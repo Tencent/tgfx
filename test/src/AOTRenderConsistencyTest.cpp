@@ -25,6 +25,7 @@
 #include <string>
 #include <vector>
 #include "base/TGFXTest.h"
+#include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
@@ -3248,6 +3249,28 @@ TGFX_TEST(AOTRenderConsistencyTest, YUVSourceReportsItsPlanesToChainPlanning) {
   ASSERT_TRUE(generatorProxy != nullptr);
   EXPECT_TRUE(generatorProxy->hasPendingUpload());
   EXPECT_FALSE(generatorProxy->mayUploadYUV());
+
+  // A missing view makes numTextureSamplers() report zero even though the upload will run before
+  // the draw. A single-plane pending dst is legal in the pointwise blend and needs no extra RGBA8
+  // materialization; a pending multi-plane YUV texture must still fail closed.
+  auto allocator = context->drawingAllocator();
+  auto pendingLeaf = TextureEffect::Make(allocator, generatorProxy);
+  auto yuvLeaf = TextureEffect::Make(allocator, yuvProxy);
+  ASSERT_NE(pendingLeaf, nullptr);
+  ASSERT_NE(yuvLeaf, nullptr);
+  auto* pendingTexture = static_cast<TextureEffect*>(pendingLeaf.get());
+  auto* yuvTexture = static_cast<TextureEffect*>(yuvLeaf.get());
+  EXPECT_EQ(pendingTexture->numTextureSamplers(), 0u);
+  EXPECT_TRUE(pendingTexture->hasPendingSinglePlaneUpload());
+  EXPECT_FALSE(yuvTexture->hasPendingSinglePlaneUpload());
+  auto pendingDecision = AOTMaterializationPolicy::Evaluate(
+      pendingLeaf.get(), MaterializationConsumer::PointwiseBlend, 1);
+  EXPECT_FALSE(pendingDecision.requiredForCorrectness);
+  EXPECT_FALSE(pendingDecision.shouldFlatten);
+  auto yuvDecision =
+      AOTMaterializationPolicy::Evaluate(yuvLeaf.get(), MaterializationConsumer::PointwiseBlend, 1);
+  EXPECT_TRUE(yuvDecision.requiredForCorrectness);
+  EXPECT_TRUE(yuvDecision.shouldFlatten);
 }
 
 // a YUV video frame drawn with a paint color filter (the video

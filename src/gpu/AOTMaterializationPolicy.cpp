@@ -51,7 +51,9 @@ static bool IsPointwiseBlendLeafMatchable(const FragmentProcessor* fp, size_t ch
   auto name = fp->name();
   if (name == "TextureEffect") {
     auto* te = static_cast<const TextureEffect*>(fp);
-    return !te->isYUV() && te->numTextureSamplers() > 0;
+    // The upload task runs before the draw: a pending single-plane view has zero samplers now,
+    // but will be a legal texture leaf when the precompiled blend is prepared.
+    return !te->isYUV() && (te->numTextureSamplers() > 0 || te->hasPendingSinglePlaneUpload());
   }
   // ConstColorProcessor is a matchable leaf only at the src position; the precompiled blend kernels
   // carry a constant-color src variant but not a constant-color dst.

@@ -45,6 +45,12 @@ class TextureEffect : public FragmentProcessor {
 
   bool isYUV() const;
 
+  // A pending single-plane upload has no TextureView yet, so numTextureSamplers() reports zero.
+  // Its view will exist before draw execution; matchers may treat it as a single texture leaf.
+  bool hasPendingSinglePlaneUpload() const {
+    return textureProxy->hasPendingUpload() && !textureProxy->mayUploadYUV();
+  }
+
   // The YUV plane layout of the texture (I420 or NV12), or YUVFormat::Unknown for non-YUV
   // textures. Used by the precompiled matcher to select the plane-sampling variant.
   YUVFormat yuvFormat() const;

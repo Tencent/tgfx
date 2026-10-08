@@ -76,7 +76,7 @@ bool TextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNode
     // cannot fire here and only the explicit subset can matter. A view-less proxy with no
     // pending upload never materializes (e.g. a generated mask whose rasterization failed); the
     // chain route must refuse it so the runtime route's zero-stub behavior stays authoritative.
-    if (!textureProxy->hasPendingUpload() || textureProxy->mayUploadYUV()) {
+    if (!hasPendingSinglePlaneUpload()) {
       return false;
     }
     parameters.isYUV = false;
