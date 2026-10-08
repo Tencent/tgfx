@@ -37,38 +37,20 @@ class TGFXBaseView {
  public:
   TGFXBaseView(const std::string& canvasID);
 
-  /**
-   * Creates a view that renders into an existing canvas object rather than a canvas looked up by id.
-   *
-   * Use this when the view is created on a thread without a DOM, such as a worker that received an
-   * OffscreenCanvas. The canvas has to stay alive for as long as the view does.
-   *
-   * @param canvas An HTMLCanvasElement or an OffscreenCanvas. Must not be null.
-   */
+  /** Creates a view for a non-null HTMLCanvasElement or OffscreenCanvas held by this thread. */
   TGFXBaseView(emscripten::val canvas);
 
   void setImagePath(const std::string& name, tgfx::NativeImageRef nativeImage);
 
   void updateSize();
 
-  /**
-   * Sets the ratio between the canvas backing store and its layout size. Needed when the view runs
-   * where that ratio cannot be read from the page, such as a worker rendering into an
-   * OffscreenCanvas. Until it is called the ratio falls back to 1 for a canvas object, and to the
-   * page for a canvas id.
-   *
-   * @param density Backing store size divided by layout size, normally window.devicePixelRatio.
-   */
+  /** Sets backing-store pixels per layout pixel, normally window.devicePixelRatio. */
   void setLayoutDensity(float density);
 
 #ifdef TGFX_USE_WEBGPU
   /**
-   * Supplies the GPUDevice the view renders with. Required when the view is created on a thread that
-   * cannot obtain the default device, such as a worker. May be called after rendering starts; the
-   * view rebuilds its window and surface on the next updateSize() or draw(). The device has to stay
-   * alive for as long as the view uses it.
-   *
-   * @param device A GPUDevice obtained from navigator.gpu, or null to use the default device.
+   * Sets or replaces the GPUDevice used by the view. Required on threads without a default device.
+   * Changes take effect on the next updateSize() or draw(); the caller must keep the device alive.
    */
   void setWebGPUDevice(emscripten::val device);
 #endif
@@ -79,20 +61,10 @@ class TGFXBaseView {
 
   void draw();
 
-  /**
-   * Starts an async readback operation. Submits the GPU copy command and returns a handle
-   * containing the buffer info needed for JS-side mapAsync. Returns an object with:
-   *   bufferHandle: int (WGPUBuffer id for JS WebGPU.mgrBuffer.get())
-   *   bufferSize: int
-   *   width: int, height: int, rowBytes: int
-   * Returns null/undefined if readback cannot be started.
-   */
+  /** Starts pixel readback; returns pixels (WebGL), buffer metadata (WebGPU), or null on failure. */
   emscripten::val startReadback(int srcX, int srcY, int width, int height);
 
-  /**
-   * Finishes a previously started readback. Assumes the buffer is already mapped (JS called
-   * mapAsync and it resolved). Returns a Uint8Array with the pixel data, or null on failure.
-   */
+  /** Returns pixels after the WebGPU buffer is mapped, or null if readback failed. */
   emscripten::val finishReadback();
 
  protected:

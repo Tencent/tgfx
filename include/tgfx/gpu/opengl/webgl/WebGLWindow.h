@@ -25,30 +25,19 @@ namespace tgfx {
 class WebGLWindow : public Window {
  public:
   /**
-   * Creates a new window from the id of a canvas element in the document.
-   * On Web, the final executable must export the GL runtime method (see the Web build section in
-   * README.md); otherwise color space configuration and image/video texture uploads will not work.
-   *
-   * Can only be created from the main thread. Use the canvas overload below to create a window on a
-   * worker thread.
+   * Creates a window for a canvas in the document. Main-thread only. Web builds require the GL
+   * runtime method for color-space configuration and image/video uploads; see README.md.
    */
   static std::shared_ptr<WebGLWindow> MakeFrom(const std::string& canvasID,
                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
-   * Creates a new window from an existing canvas, which may be an OffscreenCanvas.
+   * Creates a window for a canvas held by the calling thread. The canvas must outlive the window,
+   * which must be used on that thread. The browser presents directly from the canvas. Returns
+   * nullptr if creation fails. Web builds require the GL runtime method; see README.md.
    *
-   * Can be created from any thread that holds the canvas, including a worker thread; the window then
-   * belongs to that thread and the canvas has to stay alive for as long as it does. Nothing has to be
-   * done to present the result: if the canvas is shown on the page, the browser displays what is
-   * rendered into it.
-   *
-   * On Web, the final executable must export the GL runtime method (see the Web build section in
-   * README.md); without it the context cannot be created.
-   *
-   * @param canvas An HTMLCanvasElement or an OffscreenCanvas. Returns nullptr if it is null or the
-   *     window cannot be created.
-   * @param colorSpace An optional color space for rendering. If nullptr, the default sRGB is used.
+   * @param canvas An HTMLCanvasElement or OffscreenCanvas.
+   * @param colorSpace Optional rendering color space; defaults to sRGB.
    */
   static std::shared_ptr<WebGLWindow> MakeFrom(emscripten::val canvas,
                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);

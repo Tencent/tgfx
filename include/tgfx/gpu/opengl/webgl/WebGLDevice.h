@@ -26,28 +26,17 @@
 namespace tgfx {
 class WebGLDevice : public GLDevice {
  public:
-  /**
-   * Creates a WebGLDevice from the id of a canvas element in the document.
-   *
-   * Can only be called from the main thread. Use the canvas overload below to create a device on a
-   * worker thread.
-   */
+  /** Creates a WebGLDevice for a canvas in the document. Main-thread only. */
   static std::shared_ptr<WebGLDevice> MakeFrom(const std::string& canvasID,
                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
-   * Creates a WebGLDevice from an existing canvas, which may be an OffscreenCanvas.
+   * Creates a WebGLDevice for a canvas held by the calling thread. The canvas must outlive the
+   * device, which must be used and destroyed on that thread. Returns nullptr if context creation
+   * fails. Web builds require the GL runtime method; see README.md.
    *
-   * Can be called from any thread that holds the canvas, including a worker thread. The device
-   * belongs to the calling thread: it has to be rendered with and destroyed on that thread, and the
-   * canvas has to stay alive for as long as the device does.
-   *
-   * On Web, the final executable must export the GL runtime method (see the Web build section in
-   * README.md); without it no context can be created.
-   *
-   * @param canvas An HTMLCanvasElement or an OffscreenCanvas. Returns nullptr if it is null or no
-   *     context can be created from it.
-   * @param colorSpace An optional color space for rendering. If nullptr, the default sRGB is used.
+   * @param canvas An HTMLCanvasElement or OffscreenCanvas.
+   * @param colorSpace Optional rendering color space; defaults to sRGB.
    */
   static std::shared_ptr<WebGLDevice> MakeFrom(emscripten::val canvas,
                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);

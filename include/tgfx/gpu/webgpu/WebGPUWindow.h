@@ -27,42 +27,24 @@ namespace tgfx {
 class WebGPUWindow : public Window {
  public:
   /**
-   * Creates a new window from an HTML canvas element selector with the specified device.
-   * @param canvasSelector The CSS selector for the HTML canvas element (e.g., "#myCanvas").
-   * @param device An optional WebGPUDevice. If nullptr, a default device is created automatically.
-   * @param colorSpace An optional target color space for the drawing buffer. If nullptr, the
-   * default sRGB color space is used. When a non-null color space is provided, the canvas's WebGPU
-   * context is reconfigured with the color space so that the rendered content is displayed
-   * correctly. Both the default device and devices passed in via WebGPUDevice::MakeFrom() are
-   * supported.
-   * On Web, the final executable must export the WebGPU runtime method (see the Web build section
-   * in README.md); otherwise color space configuration and video texture uploads will not work.
-   *
-   * Note: this backend does not expose a vsync option. Browser canvas presentation only supports
-   * Fifo, so presentation is always synchronized to the display refresh rate and vsyncEnabled()
-   * always returns true.
+   * Creates a window for a canvas selected from the document.
+   * @param canvasSelector CSS selector for the canvas.
+   * @param device Device to render with; defaults to the WebGPU default device.
+   * @param colorSpace Optional drawing-buffer color space; defaults to sRGB.
+   * Web builds require the WebGPU runtime method for color-space configuration and video uploads.
+   * Presentation is synchronized to the display refresh rate.
    */
   static std::shared_ptr<WebGPUWindow> MakeFrom(const std::string& canvasSelector,
                                                 std::shared_ptr<WebGPUDevice> device = nullptr,
                                                 std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
-   * Creates a new window from an existing canvas, which may be an OffscreenCanvas.
-   *
-   * Can be created from any thread that holds the canvas, including a worker thread; the window
-   * then belongs to that thread and the canvas has to stay alive for as long as it does. Nothing
-   * has to be done to present the result: if the canvas is shown on the page, the browser displays
-   * what is rendered into it.
-   *
-   * On Web, the final executable must export the WebGPU runtime method (see the Web build section
-   * in README.md); without it the surface cannot be created.
-   *
-   * @param canvas An HTMLCanvasElement or an OffscreenCanvas. Returns nullptr if it is null or the
-   *     window cannot be created.
-   * @param device An optional WebGPUDevice. Required on a thread that cannot obtain the default
-   *     device, such as a worker thread. If nullptr, a default device is created automatically.
-   * @param colorSpace An optional target color space for the drawing buffer. If nullptr, the
-   *     default sRGB color space is used.
+   * Creates a window for a canvas held by the calling thread. The window must be used on that
+   * thread, and the canvas must outlive it. The browser presents directly from the canvas. Returns
+   * nullptr if creation fails. Web builds require the WebGPU runtime method; see README.md.
+   * @param canvas HTMLCanvasElement or OffscreenCanvas.
+   * @param device Device to render with; required on threads without a default device.
+   * @param colorSpace Optional drawing-buffer color space; defaults to sRGB.
    */
   static std::shared_ptr<WebGPUWindow> MakeFrom(emscripten::val canvas,
                                                 std::shared_ptr<WebGPUDevice> device = nullptr,

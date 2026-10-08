@@ -34,30 +34,18 @@ class WebGPUDevice : public Device {
   static std::shared_ptr<WebGPUDevice> Make();
 
   /**
-   * Creates a new WebGPUDevice from an existing WGPUDevice. The device parameter is a pointer to a
-   * WGPUDevice object. The caller retains ownership of the device and must keep it alive for the
-   * lifetime of the returned WebGPUDevice. tgfx will NOT release the device on shutdown.
-   * On Web, the handle must be a device registered in the emscripten WebGPU runtime (e.g. from
-   * emscripten_webgpu_get_device() or emscripten_webgpu_import_device()).
-   * Note: This method sets the device's uncaptured error callback for internal error reporting. The
-   * WebGPU spec provides only a single-slot callback, so any previously set callback will be
-   * overwritten. The callback is not restored on destruction.
+   * Wraps an existing WGPUDevice. The caller retains ownership and must keep it alive while the
+   * WebGPUDevice exists. On Web, the handle must be registered with Emscripten's WebGPU runtime.
+   * Replaces the device's uncaptured error callback; the previous callback is not restored.
    */
   static std::shared_ptr<WebGPUDevice> MakeFrom(void* device);
 
   /**
-   * Creates a new WebGPUDevice from an existing GPUDevice object, such as one obtained from
-   * navigator.gpu.
+   * Creates a WebGPUDevice from a GPUDevice held by the calling thread. Use and destroy the wrapper
+   * on that thread. The caller retains ownership and must keep the GPUDevice alive. Returns nullptr
+   * if import fails. Web builds require the WebGPU runtime method; see README.md.
    *
-   * Use this on a thread that cannot obtain the default device, such as a worker thread. The device
-   * belongs to the calling thread: it has to be rendered with and destroyed on that thread. The
-   * caller retains ownership and must keep it alive for as long as the returned WebGPUDevice does;
-   * tgfx does not destroy the GPUDevice.
-   *
-   * On Web, the final executable must export the WebGPU runtime method (see the Web build section
-   * in README.md); without it the device cannot be created.
-   *
-   * @param device A GPUDevice. Returns nullptr if it is null.
+   * @param device The GPUDevice to wrap.
    */
   static std::shared_ptr<WebGPUDevice> MakeFrom(emscripten::val device);
 
