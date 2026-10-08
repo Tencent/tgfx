@@ -7342,10 +7342,10 @@ TGFX_TEST(AOTRenderConsistencyTest, FiltersSceneAOTMatchesJIT) {
   const_cast<Bitmap&>(aotBitmap).unlockPixels();
   std::printf("[FiltersProbe] diffPixels=%zu/%zu maxChannelDelta=%d\n", diffCount, pixelCount,
               maxChannelDelta);
-  // The chain kernel interprets its slot program while the runtime route unrolls the same
-  // expressions, so the GPU compiler may associate the blur accumulation differently and land one
-  // ULP away on the final rounding — the same 1-LSB class the GlassUDF probes already tolerate.
-  // A structural error breaks the bound long before it.
+  // The AOT materialization retry inserts an FPFlatten RGBA8 texture and resamples it, while the
+  // runtime reference keeps the filter subtree inline. Refusing that retry removes this residual
+  // but falls back to JIT for the complex draw; it is not evidence of a chain arithmetic fix.
+  // Bound the current 1-LSB result while retaining the precompiled-route coverage checks above.
   EXPECT_LE(maxChannelDelta, 1);
 }
 
