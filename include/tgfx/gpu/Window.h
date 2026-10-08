@@ -64,7 +64,7 @@ class Window : public std::enable_shared_from_this<Window> {
    * platform frame buffer cannot act as a copy source (a CAMetalLayer with framebufferOnly set to
    * YES, a Vulkan swapchain without TRANSFER_SRC usage, or a WebGPU canvas without CopySrc usage).
    */
-  bool supportsReadback();
+  bool supportsReadback() const;
 
   /**
    * Returns the color space associated with this Window. Returns nullptr for the default sRGB.

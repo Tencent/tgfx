@@ -54,7 +54,7 @@ std::shared_ptr<Drawable> Window::nextDrawable() {
   return drawable;
 }
 
-bool Window::supportsReadback() {
+bool Window::supportsReadback() const {
   return onSupportsReadback();
 }
 
