@@ -115,6 +115,7 @@ static bool GetDrawableSize(CAMetalLayer* metalLayer, MTKView* metalView, int* w
            "is created from an MTKView, because MTKView is a UIView/NSView subclass annotated "
            "with @MainActor. Create the Surface or Drawable on the main thread, then render on "
            "any thread.");
+      return false;
     }
     metalLayer.drawableSize = metalView.drawableSize;
   }
