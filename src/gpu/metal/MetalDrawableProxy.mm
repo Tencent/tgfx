@@ -77,12 +77,6 @@ std::shared_ptr<RenderTarget> MetalDrawableProxy::getRenderTarget() const {
     }
     [_metalDrawable release];
     _metalDrawable = drawable;
-    // Schedule the drawable to be presented when the command buffer is committed, so that the
-    // GPU finishes rendering before the drawable is displayed on screen. The command buffer
-    // retains the drawable until it completes, so the proxy can drop its reference once the
-    // presentation has been scheduled (see releaseDrawable()).
-    auto metalQueue = static_cast<MetalCommandQueue*>(_context->gpu()->queue());
-    metalQueue->schedulePresent(_metalDrawable);
     MetalTextureInfo metalInfo = {};
     metalInfo.texture = (__bridge const void*)_metalDrawable.texture;
     metalInfo.format = static_cast<unsigned>(_metalDrawable.texture.pixelFormat);
@@ -90,6 +84,17 @@ std::shared_ptr<RenderTarget> MetalDrawableProxy::getRenderTarget() const {
     auto textureHeight = static_cast<int>(_metalDrawable.texture.height);
     BackendRenderTarget backendRT(metalInfo, textureWidth, textureHeight);
     _renderTarget = RenderTarget::MakeFrom(_context, backendRT, ImageOrigin::TopLeft);
+    if (_renderTarget == nullptr) {
+      // The render target creation failed; do not schedule a present for this unusable frame.
+      // A later call retries with a fresh drawable.
+      return nullptr;
+    }
+    // Schedule the drawable to be presented when the command buffer is committed, so that the
+    // GPU finishes rendering before the drawable is displayed on screen. The command buffer
+    // retains the drawable until it completes, so the proxy can drop its reference once the
+    // presentation has been scheduled (see releaseDrawable()).
+    auto metalQueue = static_cast<MetalCommandQueue*>(_context->gpu()->queue());
+    metalQueue->schedulePresent(_metalDrawable);
   }
   return _renderTarget;
 }
