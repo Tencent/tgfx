@@ -93,10 +93,6 @@ static std::string BundleTag() {
   return backend;
 }
 
-static std::string BundlePath() {
-  return "resources/shaders/shader_bundle." + BundleTag() + ".bin";
-}
-
 // The backend a standalone PrecompiledShaderCache must be constructed with so bundle loads
 // pass the profile-tag check outside of a Context.
 static Backend TestBackend() {
@@ -495,9 +491,8 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
-  ASSERT_TRUE(cache->loadBundle(bundlePath));
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   std::string expectedTag = BundleTag();
   // Entry counts follow the backend-specific exclusions in the bundle generator
   // (PermutationCompilesForBackend): the desktop GL and WebGPU bundles drop the FBF
@@ -543,8 +538,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledPerformance) {
     auto context = scope.getContext();
     ASSERT_TRUE(context != nullptr);
     auto* cache = context->precompiledShaderCache();
-    auto bundlePath = ProjectPath::Absolute(BundlePath());
-    ASSERT_TRUE(cache->loadBundle(bundlePath));
+    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
     context->globalCache()->clearPrograms();
     auto surface = Surface::Make(context, width, height);
     ASSERT_TRUE(surface != nullptr);
@@ -579,8 +573,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledRenderConsistency) {
     auto context = scope.getContext();
     ASSERT_TRUE(context != nullptr);
     auto* cache = context->precompiledShaderCache();
-    auto bundlePath = ProjectPath::Absolute(BundlePath());
-    ASSERT_TRUE(cache->loadBundle(bundlePath));
+    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
     context->globalCache()->clearPrograms();
     auto surface = Surface::Make(context, width, height);
     ASSERT_TRUE(surface != nullptr);
@@ -734,17 +727,11 @@ TGFX_TEST(ShaderPermutationTest, ProgramProvenanceSurvivesCacheHits) {
 TGFX_TEST(ShaderPermutationTest, EmbeddedBundleLoadFromMemory) {
   // Verify that PrecompiledShaderCache can load a bundle from in-memory data (the same interface
   // used by the embedded bundle mechanism in Context initialization).
-  auto bundlePath = ProjectPath::Absolute(BundlePath());
-  std::ifstream file(bundlePath, std::ios::binary | std::ios::ate);
-  if (!file.is_open()) {
-    GTEST_SKIP() << "Bundle file not found, skipping embedded load test";
+  auto data = CopyEmbeddedBundle(TestBackend());
+  if (data.empty()) {
+    GTEST_SKIP() << "This build embeds no bundle for the backend, skipping embedded load test";
     return;
   }
-  auto fileSize = static_cast<size_t>(file.tellg());
-  file.seekg(0);
-  std::vector<uint8_t> data(fileSize);
-  file.read(reinterpret_cast<char*>(data.data()), static_cast<std::streamsize>(fileSize));
-  file.close();
 
   // Load from memory (simulates embedded bundle)
   PrecompiledShaderCache cache(nullptr, TestBackend());
@@ -1311,17 +1298,11 @@ TGFX_TEST(ShaderPermutationTest, CreatorFunnelRecordsArtifactMiss) {
 
 TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
   // Load an uncompressed bundle, manually compress its data pool, then verify loading.
-  auto bundlePath = ProjectPath::Absolute(BundlePath());
-  std::ifstream file(bundlePath, std::ios::binary | std::ios::ate);
-  if (!file.is_open()) {
-    GTEST_SKIP() << "Bundle file not found";
+  auto original = CopyEmbeddedBundle(TestBackend());
+  if (original.empty()) {
+    GTEST_SKIP() << "This build embeds no bundle for the backend";
     return;
   }
-  auto fileSize = static_cast<size_t>(file.tellg());
-  file.seekg(0);
-  std::vector<uint8_t> original(fileSize);
-  file.read(reinterpret_cast<char*>(original.data()), static_cast<std::streamsize>(fileSize));
-  file.close();
 
   // Production bundles ship compressed; when the resource bundle is already compressed, the
   // load itself is the roundtrip coverage, so just verify entries and tag.
@@ -1404,12 +1385,11 @@ TGFX_TEST(ShaderPermutationTest, DrawImageHitsPrecompiledCache) {
   }
   auto surface = Surface::Make(context, 200, 200);
   ASSERT_TRUE(surface != nullptr);
-  auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
   cache->unload();
   image = MakeTexture2DImage(context, image);
   ASSERT_TRUE(image != nullptr);
-  ASSERT_TRUE(cache->loadBundle(bundlePath));
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   context->globalCache()->clearPrograms();
   context->globalCache()->resetProgramStats();
   cache->resetStats();
@@ -1450,9 +1430,8 @@ TGFX_TEST(ShaderPermutationTest, AlphaThresholdHitsPrecompiledCache) {
   if (context->backend() == Backend::OpenGL) {
     GTEST_SKIP() << "AlphaThreshold is outside the OpenGL stage 1 whitelist";
   }
-  auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
-  ASSERT_TRUE(cache->loadBundle(bundlePath));
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   cache->resetStats();
   auto surface = Surface::Make(context, 100, 100);
   ASSERT_TRUE(surface != nullptr);
@@ -1472,9 +1451,8 @@ TGFX_TEST(ShaderPermutationTest, LumaHitsPrecompiledCache) {
   if (context->backend() == Backend::OpenGL) {
     GTEST_SKIP() << "standalone Luma is outside the OpenGL stage 1 whitelist";
   }
-  auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
-  ASSERT_TRUE(cache->loadBundle(bundlePath));
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   cache->resetStats();
   auto surface = Surface::Make(context, 100, 100);
   ASSERT_TRUE(surface != nullptr);
@@ -1496,9 +1474,8 @@ TGFX_TEST(ShaderPermutationTest, GaussianBlurHitsPrecompiledCache) {
   if (context->backend() == Backend::OpenGL) {
     GTEST_SKIP() << "GaussianBlur is outside the OpenGL stage 1 whitelist";
   }
-  auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
-  ASSERT_TRUE(cache->loadBundle(bundlePath));
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   cache->resetStats();
   int width = image->width() + 50;
   int height = image->height() + 50;
@@ -1519,9 +1496,8 @@ TGFX_TEST(ShaderPermutationTest, ChainBlendClipHitsPrecompiledCache) {
   if (context->backend() == Backend::OpenGL) {
     GTEST_SKIP() << "The pointwise chain is outside the OpenGL stage 1 whitelist";
   }
-  auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
-  ASSERT_TRUE(cache->loadBundle(bundlePath));
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   cache->resetStats();
   auto surface = Surface::Make(context, 200, 200);
   ASSERT_TRUE(surface != nullptr);
@@ -1549,9 +1525,8 @@ TGFX_TEST(ShaderPermutationTest, MaskFillHitsPrecompiledCache) {
   if (context->backend() == Backend::OpenGL) {
     GTEST_SKIP() << "MaskFill is outside the OpenGL stage 1 whitelist";
   }
-  auto bundlePath = ProjectPath::Absolute(BundlePath());
   auto* cache = context->precompiledShaderCache();
-  ASSERT_TRUE(cache->loadBundle(bundlePath));
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   // hitRecords() is only populated when diagnostic recording is enabled.
   cache->setDiagnosticRecordingEnabled(true);
   cache->resetStats();
@@ -1996,8 +1971,6 @@ TGFX_TEST(ShaderPermutationTest, BlendModesMatchJIT) {
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
 
-  std::string bundlePath = ProjectPath::Absolute(BundlePath());
-
   // Clear is a degenerate mode (result always transparent, no formula branch exercised) and
   // crashes on Metal's PorterDuff pipeline; skip it.
   BlendMode modes[] = {
@@ -2030,7 +2003,7 @@ TGFX_TEST(ShaderPermutationTest, BlendModesMatchJIT) {
     }
 
     // Candidate: AOT path (bundle loaded).
-    ASSERT_TRUE(cache->loadBundle(bundlePath));
+    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
     cache->resetStats();
     context->globalCache()->resetProgramStats();
     Bitmap candidateBitmap = {};

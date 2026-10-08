@@ -26,31 +26,12 @@
 
 namespace tgfx {
 
-#ifndef TGFX_BACKEND_NAME
-#define TGFX_BACKEND_NAME "opengl"
-#endif
-
-static std::string ClosureBundlePath() {
-  std::string backend = TGFX_BACKEND_NAME;
-  auto pos = backend.find('-');
-  if (pos != std::string::npos) {
-    backend = backend.substr(0, pos);
-  }
-  // The SwiftShader build runs an ES context, which the opengles bundle serves.
-#if defined(TGFX_USE_SWIFTSHADER)
-  if (backend == "opengl") {
-    backend = "opengles";
-  }
-#endif
-  return "resources/shaders/shader_bundle." + backend + ".bin";
-}
-
 TGFX_TEST(AOTClosureTest, AllRegisteredShadersAreClosed) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
-  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ClosureBundlePath())));
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
 
   auto result = AOTClosureVerifier::Verify(cache, {});
   EXPECT_GT(result.expectedCount, 0u);

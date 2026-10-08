@@ -63,21 +63,6 @@ namespace tgfx {
 #define TGFX_BACKEND_NAME "opengl"
 #endif
 
-static std::string AuditBundlePath() {
-  std::string backend = TGFX_BACKEND_NAME;
-  auto pos = backend.find('-');
-  if (pos != std::string::npos) {
-    backend = backend.substr(0, pos);
-  }
-  // The SwiftShader build runs an ES context, which the opengles bundle serves.
-#if defined(TGFX_USE_SWIFTSHADER)
-  if (backend == "opengl") {
-    backend = "opengles";
-  }
-#endif
-  return "resources/shaders/shader_bundle." + backend + ".bin";
-}
-
 // Two-pass scenes (materialize-then-resample) cannot be byte-exact on SwiftShader: its fixed-point
 // sampler snaps ULP-level coordinate differences between the AOT and JIT code paths to adjacent
 // texels at content edges (measured 0.14% of pixels, full-swing). Metal is the byte-exact
@@ -174,7 +159,7 @@ TGFX_TEST(AOTL2AuditTest, ServedShapesMatchPlainPathWithinOneLSB) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
-  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
 
   {
     Paint paint = {};
@@ -224,7 +209,7 @@ static void RenderShaderWithColorFilterScene(Context* context, PrecompiledShader
                                              bool* pointwiseChainHit, uint32_t* outNoMatch) {
   cache->setDecompositionEnabled(decompositionEnabled);
   if (bundleLoaded) {
-    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   } else {
     cache->unload();
   }
@@ -350,7 +335,7 @@ TGFX_TEST(AOTL2AuditTest, ChainAlphaOnlyChildrenMatchPlainPath) {
   SKIP_ON_SWIFTSHADER(context);
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
-  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   auto alpha = Shader::MakeImageShader(alphaImage, TileMode::Clamp, TileMode::Clamp);
   auto color = Shader::MakeImageShader(colorImage, TileMode::Clamp, TileMode::Clamp);
   ASSERT_TRUE(alpha != nullptr && color != nullptr);
@@ -363,10 +348,10 @@ TGFX_TEST(AOTL2AuditTest, ChainAlphaOnlyChildrenMatchPlainPath) {
   ASSERT_TRUE(srcAlphaDstColor != nullptr && srcColorDstAlpha != nullptr);
   // MakeBlend collapses null operands for modes where the result is independent of the missing side;
   // use explicit two-child cases for the alpha semantic matrix below.
-  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   ExpectChainAlphaOnlyExact(srcAlphaDstColor, "two-child-src-color-dst-alpha", context, cache,
                             width, height);
-  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   ExpectChainAlphaOnlyExact(srcColorDstAlpha, "two-child-src-alpha-dst-color", context, cache,
                             width, height);
 }
@@ -380,7 +365,7 @@ TGFX_TEST(AOTL2AuditTest, CleanBlendPrefersPointwiseChain) {
   SKIP_ON_SWIFTSHADER(context);
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
-  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   auto dst = Shader::MakeImageShader(imageA, TileMode::Clamp, TileMode::Clamp);
   auto src = Shader::MakeImageShader(imageB, TileMode::Clamp, TileMode::Clamp);
   auto blend = Shader::MakeBlend(BlendMode::Multiply, dst, src);
@@ -444,7 +429,7 @@ TGFX_TEST(AOTL2AuditTest, BlendModeMatrixMatchesJIT) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
-  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
 
   int width = 128;
   int height = 128;
@@ -501,7 +486,7 @@ TGFX_TEST(AOTL2AuditTest, TiledInBlendMatchesPlainPath) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
-  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
 
   int width = image->width();
   int height = image->height();
@@ -624,7 +609,7 @@ TGFX_TEST(AOTL2AuditTest, DropShadowTiledSrcServedByteExact) {
                            &referenceFragmentArtifactMissing);
   }
 
-  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   Bitmap candidateBitmap = {};
   uint32_t candidateNoMatch = 0;
   uint32_t candidateVertexArtifactMissing = 0;
@@ -694,7 +679,7 @@ TGFX_TEST(AOTL2AuditTest, InnerShadowQuantizationAttribution) {
   Bitmap decompOff = {};
   Bitmap decompOn = {};
   {
-    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
     RenderShadowTiledScene(context, cache, image, imageFilter, width, height, false, &decompOff,
                            &scratchNoMatch, &scratchVertexMissing, &scratchFragmentMissing);
     RenderShadowTiledScene(context, cache, image, imageFilter, width, height, true, &decompOn,
@@ -776,7 +761,7 @@ TGFX_TEST(AOTL2AuditTest, InnerShadowTiledSrcServedByteExact) {
                            &referenceFragmentArtifactMissing);
   }
 
-  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   Bitmap candidateBitmap = {};
   uint32_t candidateNoMatch = 0;
   uint32_t candidateVertexArtifactMissing = 0;
@@ -864,7 +849,7 @@ TGFX_TEST(AOTL2AuditTest, ShaderMaskDecalServedByteExact) {
   SKIP_ON_SWIFTSHADER(context);
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
-  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
 
   for (bool usePicture : {false, true}) {
     for (bool inverted : {false, true}) {
@@ -883,7 +868,7 @@ TGFX_TEST(AOTL2AuditTest, ShaderMaskDecalServedByteExact) {
         RenderDecalShaderMaskScene(context, cache, color, mask, inverted, usePicture, false,
                                    &reference, &referenceNoMatch);
       }
-      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
       RenderDecalShaderMaskScene(context, cache, color, mask, inverted, usePicture, true,
                                  &candidate, &candidateNoMatch);
       Pixmap referencePixmap(reference);
@@ -957,7 +942,7 @@ TGFX_TEST(AOTL2AuditTest, CoverageTextureMaskMatchesJIT) {
   }
 
   // Candidate: cache loaded -> precompiled artifact path.
-  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   cache->resetStats();
   context->globalCache()->resetProgramStats();
   Bitmap candidateBitmap = {};
@@ -1129,7 +1114,7 @@ TGFX_TEST(AOTL2AuditTest, GradientCoverageMatchesJIT) {
     RenderGradientCoverageScene(context, width, height, &referenceBitmap);
   }
 
-  ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(AuditBundlePath())));
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   cache->resetStats();
   context->globalCache()->resetProgramStats();
   Bitmap candidateBitmap = {};

@@ -85,21 +85,6 @@ constexpr float kStarPi = 3.14159265358979323846f;
 // (e.g. the tiled-fill Dimension-normalization class of bug) shows up as a mismatch here, even for
 // scenes that no screenshot baseline happens to cover.
 
-static std::string ConsistencyBundlePath() {
-  std::string backend = TGFX_BACKEND_NAME;
-  auto pos = backend.find('-');
-  if (pos != std::string::npos) {
-    backend = backend.substr(0, pos);
-  }
-  // The SwiftShader build runs an ES context, which the opengles bundle serves.
-#if defined(TGFX_USE_SWIFTSHADER)
-  if (backend == "opengl") {
-    backend = "opengles";
-  }
-#endif
-  return "resources/shaders/shader_bundle." + backend + ".bin";
-}
-
 // Renders the given paint over a full-surface rect into outBitmap. When useBundle is true the
 // precompiled bundle is loaded so matched draws take the AOT path; otherwise the cache is unloaded
 // so every draw goes through ProgramBuilder.
@@ -110,7 +95,7 @@ static void RenderPaintOnce(const Paint& paint, int width, int height, bool useB
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
   if (useBundle) {
-    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   } else {
     cache->unload();
   }
@@ -141,7 +126,7 @@ static void RenderImageOnce(const std::shared_ptr<Image>& image,
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
   if (useBundle) {
-    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   } else {
     cache->unload();
   }
@@ -252,7 +237,7 @@ static void RenderPaintToP3Once(const Paint& paint, int width, int height, bool 
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
   if (useBundle) {
-    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   } else {
     cache->unload();
   }
@@ -347,7 +332,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AACoverageXferDstFold) {
     ASSERT_TRUE(context != nullptr);
     auto* cache = context->precompiledShaderCache();
     if (useBundle) {
-      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
     } else {
       cache->unload();
     }
@@ -427,7 +412,7 @@ TGFX_TEST(AOTRenderConsistencyTest, QuadTextureLocalMaskXferDst) {
     ASSERT_TRUE(context != nullptr);
     auto* cache = context->precompiledShaderCache();
     if (useBundle) {
-      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
     } else {
       cache->unload();
     }
@@ -495,7 +480,7 @@ TGFX_TEST(AOTRenderConsistencyTest, ChainMaskWithSolidFill) {
     auto context = scope.getContext();
     auto* cache = context->precompiledShaderCache();
     if (useBundle) {
-      cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath()));
+      LoadEmbeddedBundle(cache, context->backend());
     } else {
       cache->unload();
     }
@@ -537,7 +522,7 @@ TGFX_TEST(AOTRenderConsistencyTest, ChainMaskWithSubsetLeaf) {
     ASSERT_TRUE(context != nullptr);
     auto* cache = context->precompiledShaderCache();
     if (useBundle) {
-      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
     } else {
       cache->unload();
     }
@@ -588,7 +573,7 @@ TGFX_TEST(AOTRenderConsistencyTest, PerspectiveChainLeaf) {
     ASSERT_TRUE(context != nullptr);
     auto* cache = context->precompiledShaderCache();
     if (useBundle) {
-      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
     } else {
       cache->unload();
     }
@@ -641,7 +626,7 @@ TGFX_TEST(AOTRenderConsistencyTest, NestedTwoChildXferFold) {
     ASSERT_TRUE(context != nullptr);
     auto* cache = context->precompiledShaderCache();
     if (useBundle) {
-      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
     } else {
       cache->unload();
     }
@@ -694,7 +679,7 @@ TGFX_TEST(AOTRenderConsistencyTest, TwoChildXferBlendFold) {
     ASSERT_TRUE(context != nullptr);
     auto* cache = context->precompiledShaderCache();
     if (useBundle) {
-      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
     } else {
       cache->unload();
     }
@@ -770,7 +755,7 @@ TGFX_TEST(AOTRenderConsistencyTest, ProgramKeyColorCoverageBoundary) {
     ASSERT_TRUE(context != nullptr);
     auto* cache = context->precompiledShaderCache();
     if (useBundle) {
-      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
     } else {
       cache->unload();
     }
@@ -854,7 +839,7 @@ TGFX_TEST(AOTRenderConsistencyTest, TextureFillTriangulatedShapeAA) {
     ASSERT_TRUE(context != nullptr);
     auto* cache = context->precompiledShaderCache();
     if (useBundle) {
-      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
     } else {
       cache->unload();
     }
@@ -913,7 +898,7 @@ TGFX_TEST(AOTRenderConsistencyTest, LUTGradientMaskFold) {
     ASSERT_TRUE(context != nullptr);
     auto* cache = context->precompiledShaderCache();
     if (useBundle) {
-      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
     } else {
       cache->unload();
     }
@@ -967,7 +952,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AtlasTextConstColorFold) {
     ASSERT_TRUE(context != nullptr);
     auto* cache = context->precompiledShaderCache();
     if (useBundle) {
-      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
     } else {
       cache->unload();
     }
@@ -1011,7 +996,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AtlasTextGradientFold) {
     ASSERT_TRUE(context != nullptr);
     auto* cache = context->precompiledShaderCache();
     if (useBundle) {
-      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
     } else {
       cache->unload();
     }
@@ -1063,7 +1048,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AtlasTextNonSrcOverBlendKeepsDstOnChain) {
     ASSERT_TRUE(context != nullptr);
     auto* cache = context->precompiledShaderCache();
     if (useBundle) {
-      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
     } else {
       cache->unload();
     }
@@ -1118,7 +1103,7 @@ TGFX_TEST(AOTRenderConsistencyTest, MeshTextureAndColorsXferSrcFold) {
     ASSERT_TRUE(context != nullptr);
     auto* cache = context->precompiledShaderCache();
     if (useBundle) {
-      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
     } else {
       cache->unload();
     }
@@ -1256,7 +1241,7 @@ static void RenderClippedCircleOnce(int clipMode, int width, int height, bool us
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
   if (useBundle) {
-    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   } else {
     cache->unload();
   }
@@ -3790,7 +3775,7 @@ TGFX_TEST(AOTRenderConsistencyTest, PerlinNoiseLuminanceAlphaThreshold) {
     ASSERT_TRUE(context != nullptr);
     auto* cache = context->precompiledShaderCache();
     if (useBundle) {
-      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
     } else {
       cache->unload();
     }
@@ -3859,7 +3844,7 @@ TGFX_TEST(AOTRenderConsistencyTest, PerlinNoiseConstBlendServedWithoutRuntimePro
       ASSERT_TRUE(context != nullptr);
       auto* cache = context->precompiledShaderCache();
       if (useBundle) {
-        ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+        ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
       } else {
         cache->unload();
       }
@@ -3918,7 +3903,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AnalyticRectClipFoldsIntoChain) {
     ASSERT_TRUE(context != nullptr);
     auto* cache = context->precompiledShaderCache();
     if (useBundle) {
-      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
     } else {
       cache->unload();
     }
@@ -3955,7 +3940,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AnalyticRectClipDirectEllipseFill) {
     ASSERT_TRUE(context != nullptr);
     auto* cache = context->precompiledShaderCache();
     if (useBundle) {
-      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
     } else {
       cache->unload();
     }
@@ -4005,7 +3990,7 @@ static void RenderAnalyticClipSceneOnce(AnalyticClipScene scene, bool useBundle,
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
   if (useBundle) {
-    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   } else {
     cache->unload();
   }
@@ -4093,7 +4078,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AnalyticClipCoverageModes) {
 static void RenderFullBlendModeSceneOnce(Context* context, bool useBundle, Bitmap* outBitmap) {
   auto* cache = context->precompiledShaderCache();
   if (useBundle) {
-    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   } else {
     cache->unload();
   }
@@ -4174,7 +4159,7 @@ static void RenderFullBlendModeSceneOnce(Context* context, bool useBundle, Bitma
 static void RenderStencilPassPlusChainOnce(Context* context, bool useBundle, Bitmap* outBitmap) {
   auto* cache = context->precompiledShaderCache();
   if (useBundle) {
-    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   } else {
     cache->unload();
   }
@@ -4296,7 +4281,7 @@ static void RenderChainClipSceneOnce(ChainClipScene scene, bool useBundle, Bitma
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
   if (useBundle) {
-    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   } else {
     cache->unload();
   }
@@ -4474,7 +4459,7 @@ static void RenderBlendShaderSceneOnce(std::shared_ptr<Shader> shader, bool draw
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
   if (useBundle) {
-    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   } else {
     cache->unload();
   }
@@ -4692,7 +4677,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyMaskFoldsIntoChain) {
     ASSERT_TRUE(context != nullptr);
     auto* cache = context->precompiledShaderCache();
     if (useBundle) {
-      ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
     } else {
       cache->unload();
     }
@@ -6629,7 +6614,7 @@ static void RenderCoverageXPScene(bool useBundle, BlendMode mode, Bitmap* outBit
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
   if (useBundle) {
-    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   } else {
     cache->unload();
   }
@@ -6734,7 +6719,7 @@ static void RenderShapeInstancedLargeScene(bool useBundle, BlendMode mode, Bitma
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
   if (useBundle) {
-    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   } else {
     cache->unload();
   }
@@ -6796,7 +6781,7 @@ static void RenderDeviceSpaceClipScene(bool useBundle, BlendMode mode, Bitmap* o
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
   if (useBundle) {
-    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   } else {
     cache->unload();
   }
@@ -6868,7 +6853,7 @@ static void RenderNonAARectTiledOnce(bool useBundle, TileMode modeX, TileMode mo
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
   if (useBundle) {
-    ASSERT_TRUE(cache->loadBundle(ProjectPath::Absolute(ConsistencyBundlePath())));
+    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   } else {
     cache->unload();
   }

@@ -22,6 +22,7 @@
 #include <fstream>
 #include "ProjectPath.h"
 #include "core/utils/Log.h"
+#include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "tgfx/core/Bitmap.h"
@@ -96,6 +97,26 @@ testing::AssertionResult BitmapPremulLegal(const Bitmap& bitmap) {
   }
   mutableBitmap.unlockPixels();
   return result;
+}
+
+std::pair<const uint8_t*, size_t> GetEmbeddedBundle(Backend backend) {
+  return EmbeddedShaderBundles::GetBundle(backend);
+}
+
+bool LoadEmbeddedBundle(PrecompiledShaderCache* cache, Backend backend) {
+  auto [data, size] = EmbeddedShaderBundles::GetBundle(backend);
+  if (cache == nullptr || data == nullptr || size == 0) {
+    return false;
+  }
+  return cache->loadBundle(data, size);
+}
+
+std::vector<uint8_t> CopyEmbeddedBundle(Backend backend) {
+  auto [data, size] = EmbeddedShaderBundles::GetBundle(backend);
+  if (data == nullptr || size == 0) {
+    return {};
+  }
+  return std::vector<uint8_t>(data, data + size);
 }
 
 bool IsSwiftShaderContext(Context* context) {

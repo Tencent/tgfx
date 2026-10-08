@@ -18,6 +18,10 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <utility>
+#include <vector>
 #include "base/TGFXTest.h"
 #include "core/PixelBuffer.h"
 #include "gtest/gtest.h"
@@ -25,6 +29,7 @@
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/gpu/Backend.h"
 #include "utils/Baseline.h"
 #include "utils/ContextScope.h"
 #include "utils/DevicePool.h"
@@ -71,6 +76,32 @@ class Context;
 class GlobalCache;
 class PrecompiledShaderCache;
 class Bitmap;
+
+/**
+ * The precompiled shader bundle embedded in this build for the backend: the exact bytes Context
+ * loads when it is created and that shipping code consumes. {nullptr, 0} when the build embeds no
+ * bundle for the backend.
+ *
+ * Tests must use this instead of reading resources/shaders/shader_bundle.<backend>.bin. That
+ * directory holds published copies for web builds and offline consumers; a copy older than the
+ * sources fails every test that reads it even though the product, which runs the embedded bundle
+ * generated from the current sources, is fine. Whether the published copies are fresh is checked
+ * by shader_build_tool --verify-bundle, not by rendering tests.
+ */
+std::pair<const uint8_t*, size_t> GetEmbeddedBundle(Backend backend);
+
+/**
+ * Loads the embedded bundle of the backend into the cache. Returns false when the build embeds no
+ * bundle for the backend or the cache rejects it, so ASSERT_TRUE(LoadEmbeddedBundle(...)) fails
+ * loudly instead of letting a test run on the plain path unnoticed.
+ */
+bool LoadEmbeddedBundle(PrecompiledShaderCache* cache, Backend backend);
+
+/**
+ * A mutable copy of the embedded bundle, for tests that corrupt or recompress the bytes. Empty
+ * when the build embeds no bundle for the backend.
+ */
+std::vector<uint8_t> CopyEmbeddedBundle(Backend backend);
 
 /**
  * Premultiplied-alpha legality of a bitmap's pixels: every pixel must satisfy RGB <= A and
