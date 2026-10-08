@@ -77,6 +77,11 @@ void DrawingBuffer::presentDrawables(Context* context) {
 }
 
 bool DrawingBuffer::empty() const {
+  // Note that drawables and windowPresentations are intentionally not part of the emptiness
+  // check: drawable and window surfaces are always created with clearAll set to true, so their
+  // construction already queues a clear task, and collecting a drawable or a window presentation
+  // therefore always comes with at least one task to encode. This is an implicit contract
+  // between RenderContext, DrawingManager, and Surface.
   return resourceTasks.empty() && renderTasks.empty() && atlasTasks.empty();
 }
 
