@@ -37,6 +37,13 @@
 
 namespace tgfx {
 
+// Desired swapchain image usage, intersected with what the surface actually supports at creation
+// time. TRANSFER_DST/TRANSFER_SRC are optional (some drivers don't advertise them);
+// COLOR_ATTACHMENT is mandatory for rendering.
+static constexpr VkImageUsageFlags DesiredSwapchainUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                                                           VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                                                           VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+
 static void DestroySwapchainResources(VkDevice device, VkInstance instance, VkSurfaceKHR surface,
                                       VkSwapchainKHR swapchain) {
   if (swapchain != VK_NULL_HANDLE) {
@@ -242,12 +249,8 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(HWND hwnd,
     imageCount = capabilities.maxImageCount;
   }
 
-  // Intersect desired usage with what the surface actually supports. TRANSFER_DST is optional
-  // (some Android drivers don't advertise it), but COLOR_ATTACHMENT is mandatory for rendering.
-  VkImageUsageFlags desiredUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-                                   VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                                   VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-  VkImageUsageFlags imageUsage = desiredUsage & capabilities.supportedUsageFlags;
+  // Intersect desired usage with what the surface actually supports (see DesiredSwapchainUsage).
+  VkImageUsageFlags imageUsage = DesiredSwapchainUsage & capabilities.supportedUsageFlags;
   if (!(imageUsage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)) {
     LOGE("VulkanWindow: surface does not support COLOR_ATTACHMENT usage.");
     vkDestroySurfaceKHR(vkInstance, surface, nullptr);
@@ -423,10 +426,7 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(OHNativeWindow* nativeWindo
     imageCount = capabilities.maxImageCount;
   }
 
-  VkImageUsageFlags desiredUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-                                   VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                                   VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-  VkImageUsageFlags imageUsage = desiredUsage & capabilities.supportedUsageFlags;
+  VkImageUsageFlags imageUsage = DesiredSwapchainUsage & capabilities.supportedUsageFlags;
   if (!(imageUsage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)) {
     LOGE("VulkanWindow: surface does not support COLOR_ATTACHMENT usage.");
     vkDestroySurfaceKHR(vkInstance, surface, nullptr);
@@ -593,10 +593,7 @@ std::shared_ptr<VulkanWindow> VulkanWindow::MakeFrom(ANativeWindow* nativeWindow
     imageCount = capabilities.maxImageCount;
   }
 
-  VkImageUsageFlags desiredUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-                                   VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                                   VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-  VkImageUsageFlags imageUsage = desiredUsage & capabilities.supportedUsageFlags;
+  VkImageUsageFlags imageUsage = DesiredSwapchainUsage & capabilities.supportedUsageFlags;
   if (!(imageUsage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)) {
     LOGE("VulkanWindow: surface does not support COLOR_ATTACHMENT usage.");
     vkDestroySurfaceKHR(vkInstance, surface, nullptr);
@@ -701,10 +698,7 @@ bool VulkanWindow::PlatformState::recreateSwapchain(VkDevice device,
   if (capabilities.maxImageCount > 0 && imageCount > capabilities.maxImageCount) {
     imageCount = capabilities.maxImageCount;
   }
-  VkImageUsageFlags desiredUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-                                   VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                                   VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-  VkImageUsageFlags imageUsage = desiredUsage & capabilities.supportedUsageFlags;
+  VkImageUsageFlags imageUsage = DesiredSwapchainUsage & capabilities.supportedUsageFlags;
   if (!(imageUsage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)) {
     return false;
   }
