@@ -194,7 +194,8 @@ vec4 evalChainSlot(int slot) {
     } else if (gradT >= 1.0) {
       gradColor = GradientRightBorder;
     } else if (GradientColorizerKind == 0) {
-      gradColor = mix(GradientStart, GradientEnd, gradT);
+      // Keep the same arithmetic order as GLSLSingleIntervalGradientColorizer on the JIT path.
+      gradColor = (1.0 - gradT) * GradientStart + gradT * GradientEnd;
     } else if (GradientColorizerKind == 1) {
       vec4 gradScale = GradientScale01;
       vec4 gradBias = GradientBias01;

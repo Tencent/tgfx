@@ -104,7 +104,8 @@ void main() {
   } else if (t >= 1.0) {
     gradColor = rightBorderColor;
   } else if (ColorizerKind == 0) {
-    gradColor = mix(start, end, t);
+    // Mirror GLSLSingleIntervalGradientColorizer's arithmetic order on the runtime path.
+    gradColor = (1.0 - t) * start + t * end;
   } else if (ColorizerKind == 1) {
     vec4 scale = scale01;
     vec4 bias = bias01;

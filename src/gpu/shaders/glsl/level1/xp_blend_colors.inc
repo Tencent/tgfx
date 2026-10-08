@@ -23,7 +23,9 @@ float xpSaturation(vec3 c) {
 }
 
 vec3 xpSetLuminance(vec3 hueSat, float alpha, vec3 lumColor) {
-  float diff = xpLuminance(lumColor) - xpLuminance(hueSat);
+  // Match GLSLBlend's set_luminance: subtract the colors before computing luminance so the
+  // floating-point reduction has the same rounding path on the runtime and precompiled routes.
+  float diff = xpLuminance(lumColor - hueSat);
   vec3 outColor = hueSat + diff;
   float outLum = xpLuminance(outColor);
   float minComp = min(min(outColor.r, outColor.g), outColor.b);
