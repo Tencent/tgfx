@@ -764,8 +764,8 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::createSwapchainProxy(Context* c
 
   // Query current surface extent to detect resize.
   VkSurfaceCapabilitiesKHR capabilities = {};
-  auto result =
-      vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, _platformState->surface, &capabilities);
+  auto result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, _platformState->surface,
+                                                          &capabilities);
   if (result != VK_SUCCESS) {
     LOGE("VulkanWindow: vkGetPhysicalDeviceSurfaceCapabilitiesKHR failed: %s",
          VkResultToString(result));
