@@ -38,7 +38,14 @@ bool SurfaceReadback::isReady(Context* context) const {
   }
   auto readbackBuffer = proxy->getBuffer();
   if (readbackBuffer == nullptr) {
-    return false;
+    // Align with status()/getGPUBuffer(): submit the pending transfer task (without blocking) so
+    // the buffer can be created; otherwise polling isReady() alone would never observe the
+    // readback becoming ready.
+    context->flushAndSubmit(false);
+    readbackBuffer = proxy->getBuffer();
+    if (readbackBuffer == nullptr) {
+      return false;
+    }
   }
   return readbackBuffer->gpuBuffer()->isReady();
 }
