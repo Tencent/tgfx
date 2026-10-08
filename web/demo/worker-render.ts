@@ -109,7 +109,7 @@ async function onInit(message: any) {
     // worker has no document.
     view = module.TGFXView.MakeFromCanvas(canvas);
     if (!view) {
-        send('error', {message: 'TGFXView.MakeFrom() returned null'});
+        send('error', {message: 'TGFXView.MakeFromCanvas() returned null'});
         return;
     }
     if (message.useWebGPU) {
