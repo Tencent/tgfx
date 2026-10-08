@@ -25,6 +25,7 @@
 #include "gpu/metal/MetalGPU.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/core/SurfaceReadback.h"
 #include "tgfx/gpu/Drawable.h"
 #include "tgfx/gpu/metal/MetalWindow.h"
 #include "utils/TestUtils.h"
@@ -158,6 +159,89 @@ TGFX_TEST(MetalWindowTest, DroppedDrawableDiscardsFrame) {
   }
   auto next = window->nextDrawable();
   EXPECT_TRUE(next != nullptr);
+}
+
+/**
+ * Verifies the PresentRequested path: present() registered before the rendering is submitted
+ * rides along with the submission that carries the rendering commands, and registering the
+ * presentation ends the readback window.
+ */
+TGFX_TEST(MetalWindowTest, PresentBeforeSubmit) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  if (context == nullptr) {
+    GTEST_SKIP() << "Metal backend not available";
+  }
+  auto gpu = static_cast<MetalGPU*>(context->gpu());
+  auto layer = MakeTestLayer(gpu->device(), 16, 16);
+  auto window = MetalWindow::MakeFrom(layer, nullptr, nullptr, false);
+  ASSERT_TRUE(window != nullptr);
+
+  auto drawable = window->nextDrawable();
+  ASSERT_TRUE(drawable != nullptr);
+  auto surface = Surface::MakeFrom(context, drawable);
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->clear(Color::Blue());
+  // Register the presentation before the rendering is submitted.
+  context->present(drawable);
+  // A registered presentation ends the readback window.
+  EXPECT_TRUE(surface->asyncReadPixels(Rect::MakeWH(1, 1)) == nullptr);
+  // The submission carries both the rendering and the presentation.
+  context->flushAndSubmit(true);
+  // The frame was delivered; the window keeps providing frames.
+  EXPECT_TRUE(window->nextDrawable() != nullptr);
+}
+
+/**
+ * Verifies that present() after a scheduled-but-unsubmitted readback submits the pending
+ * readback transfer before presenting the frame, so the readback observes the frame's content.
+ */
+TGFX_TEST(MetalWindowTest, ReadbackBeforePresent) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  if (context == nullptr) {
+    GTEST_SKIP() << "Metal backend not available";
+  }
+  auto gpu = static_cast<MetalGPU*>(context->gpu());
+  auto layer = MakeTestLayer(gpu->device(), 16, 16);
+  auto window = MetalWindow::MakeFrom(layer, nullptr, nullptr, false);
+  ASSERT_TRUE(window != nullptr);
+
+  auto drawable = window->nextDrawable();
+  ASSERT_TRUE(drawable != nullptr);
+  auto surface = Surface::MakeFrom(context, drawable);
+  ASSERT_TRUE(surface != nullptr);
+  auto green = Color::Green();
+  surface->getCanvas()->clear(green);
+  context->flushAndSubmit(true);
+
+  // Schedule a readback without submitting it.
+  auto readback = surface->asyncReadPixels(Rect::MakeXYWH(8, 8, 1, 1));
+  ASSERT_TRUE(readback != nullptr);
+
+  // Present submits the pending readback first, then presents the frame.
+  context->present(drawable);
+  // The pending work was consumed by present().
+  EXPECT_FALSE(context->flushAndSubmit());
+
+  // The readback completed with the frame's content.
+  auto pixels = readback->lockPixels(context);
+  ASSERT_TRUE(pixels != nullptr);
+  auto bytes = static_cast<const uint8_t*>(pixels);
+  uint8_t rgba[4] = {};
+  if (readback->info().colorType() == ColorType::BGRA_8888) {
+    rgba[0] = bytes[2];
+    rgba[1] = bytes[1];
+    rgba[2] = bytes[0];
+    rgba[3] = bytes[3];
+  } else {
+    rgba[0] = bytes[0];
+    rgba[1] = bytes[1];
+    rgba[2] = bytes[2];
+    rgba[3] = bytes[3];
+  }
+  EXPECT_TRUE(NearlyMatches(rgba, green));
+  readback->unlockPixels(context);
 }
 
 TGFX_TEST(MetalWindowTest, SurfaceRetainsDrawable) {
