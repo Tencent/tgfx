@@ -21,6 +21,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <optional>
 #include <regex>
 #include <set>
 #include <sstream>
@@ -76,6 +77,8 @@ struct BuildOptions {
   bool audit = false;
   std::string stageReportPath;
   std::string verifyBundleDir;
+  // Set by --require-backends; stays empty (nullopt) when the flag is absent.
+  std::optional<std::vector<std::string>> requiredBackends;
   // Calibration mode for the GLES direct emission: run EmitDirectGLSLES300 on every ES
   // variant and report normalization-diff mismatches against the regenerated text, while the
   // bundle keeps storing the regenerated form. The switch to storing direct text is blocked on
@@ -184,6 +187,9 @@ static void PrintUsage() {
       << "                        exit; checks headers, identity hash, and pool completeness.\n"
       << "                        With --shader-dir it also fails any bundle whose manifest\n"
       << "                        records different sources than the ones in that directory\n"
+      << "  --require-backends <list>\n"
+      << "                        With --verify-bundle: backends whose bundle must exist; a\n"
+      << "                        missing one is a violation. Without it, missing bundles pass\n"
       << "  --compress            Compress data pool with zlib in output bundles\n";
 }
 
@@ -220,6 +226,8 @@ static bool ParseArgs(int argc, char** argv, BuildOptions* options) {
       options->stageReportPath = argv[++i];
     } else if (std::strcmp(argv[i], "--verify-bundle") == 0 && i + 1 < argc) {
       options->verifyBundleDir = argv[++i];
+    } else if (std::strcmp(argv[i], "--require-backends") == 0 && i + 1 < argc) {
+      options->requiredBackends = SplitByComma(argv[++i]);
     } else if (std::strcmp(argv[i], "--compress") == 0) {
       options->compress = true;
     } else if (std::strcmp(argv[i], "--gles-direct-check") == 0) {
@@ -1281,7 +1289,8 @@ int main(int argc, char** argv) {
   }
 
   if (!options.verifyBundleDir.empty()) {
-    return tgfx::VerifyBundles(options.verifyBundleDir, options.shaderDir);
+    return tgfx::VerifyBundles(options.verifyBundleDir, options.shaderDir,
+                               options.requiredBackends);
   }
 
   tgfx::BuildReport report;

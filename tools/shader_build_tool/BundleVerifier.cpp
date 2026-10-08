@@ -24,6 +24,7 @@
 #include <iostream>
 #include <iterator>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <utility>
@@ -441,15 +442,43 @@ BundleCheckResult VerifyOneBundle(const std::string& path, const std::string& ex
 
 }  // namespace
 
-int VerifyBundles(const std::string& bundleDir, const std::string& shaderDir) {
+int VerifyBundles(const std::string& bundleDir, const std::string& shaderDir,
+                  const std::optional<std::vector<std::string>>& requiredBackends) {
   static const char* BACKENDS[] = {"opengl", "opengles", "vulkan", "metal", "webgpu"};
+  std::set<std::string> required;
+  if (requiredBackends) {
+    // A typo must not turn into "nothing is required": reject names that are not backends, and
+    // an empty list, before any bundle is looked at.
+    if (requiredBackends->empty()) {
+      std::cerr << "[verify] --require-backends needs at least one backend\n";
+      return 1;
+    }
+    for (const auto& name : *requiredBackends) {
+      bool known = false;
+      for (const auto* backend : BACKENDS) {
+        known = known || name == backend;
+      }
+      if (!known) {
+        std::cerr << "[verify] unknown backend \"" << name << "\" in --require-backends\n";
+        return 1;
+      }
+      required.insert(name);
+    }
+  }
   int totalViolations = 0;
   size_t openedBundles = 0;
+  size_t absentNotRequired = 0;
   for (const auto* backend : BACKENDS) {
     auto path = bundleDir + "/shader_bundle." + backend + ".bin";
     auto result = VerifyOneBundle(path, backend, shaderDir);
     if (result.opened) {
       openedBundles++;
+    } else if (required.count(backend) > 0) {
+      std::cout << "[verify] " << backend << ": VIOLATION required bundle is missing: " << path
+                << "\n";
+      result.violations++;
+    } else {
+      absentNotRequired++;
     }
     totalViolations += static_cast<int>(result.violations);
   }
@@ -459,6 +488,12 @@ int VerifyBundles(const std::string& bundleDir, const std::string& shaderDir) {
   }
   std::cout << "[verify] summary: " << openedBundles << " bundle(s), " << totalViolations
             << " violation(s)\n";
+  if (!requiredBackends) {
+    // Without a required set a missing bundle is invisible to the exit code: say so, so a clean
+    // result is not read as "every backend is covered".
+    std::cout << "[verify] note: --require-backends not given; " << absentNotRequired
+              << " absent backend(s) were not treated as violations\n";
+  }
   return totalViolations == 0 ? 0 : 1;
 }
 

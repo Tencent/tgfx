@@ -1,5 +1,6 @@
 #!/bin/bash
-# Regression test for the bundle freshness contract of shader_build_tool.
+# Regression test for the bundle verification contract of shader_build_tool: freshness against the
+# sources, the manifest, and the required-backend list of --verify-bundle.
 #
 # A bundle is internally consistent even when it was built from older shaders, so the bundle's own
 # identity hash cannot tell fresh from stale. The manifest written next to every bundle records a
@@ -110,6 +111,32 @@ cp "$WORK/fresh/shader_bundle.opengl.manifest" "$WORK/swapped/"
 cp "$WORK/edited_out/shader_bundle.opengl.bin" "$WORK/swapped/"
 expect "bundle swapped under another bundle's manifest fails" fail \
   "$TOOL" --verify-bundle "$WORK/swapped" --shader-dir "$SHADER_DIR"
+
+# --require-backends: a required bundle that is absent is a violation. Only opengl was generated
+# here, so any other backend named below is genuinely missing.
+expect "required backend that is present passes" pass \
+  "$TOOL" --verify-bundle "$WORK/fresh" --shader-dir "$SHADER_DIR" --require-backends opengl
+expect "a missing required backend fails" fail \
+  "$TOOL" --verify-bundle "$WORK/fresh" --shader-dir "$SHADER_DIR" --require-backends opengl,metal
+expect_output "the missing backend is named" "metal: VIOLATION required bundle is missing"
+expect "requiring only an absent backend fails even though another bundle exists" fail \
+  "$TOOL" --verify-bundle "$WORK/fresh" --shader-dir "$SHADER_DIR" --require-backends vulkan
+expect "a misspelled backend name fails" fail \
+  "$TOOL" --verify-bundle "$WORK/fresh" --shader-dir "$SHADER_DIR" --require-backends opngl
+expect_output "the misspelled name is reported" "unknown backend"
+expect "an empty required list fails" fail \
+  "$TOOL" --verify-bundle "$WORK/fresh" --shader-dir "$SHADER_DIR" --require-backends ""
+expect "a stale required bundle still fails" fail \
+  "$TOOL" --verify-bundle "$WORK/edited_out" --shader-dir "$SHADER_DIR" --require-backends opengl
+expect "absent backends outside the required list do not fail" pass \
+  "$TOOL" --verify-bundle "$WORK/fresh" --shader-dir "$SHADER_DIR" --require-backends opengl
+expect "without --require-backends a missing bundle still passes" pass \
+  "$TOOL" --verify-bundle "$WORK/fresh" --shader-dir "$SHADER_DIR"
+expect_output "and the output says missing bundles were not treated as violations" \
+  "--require-backends not given"
+mkdir -p "$WORK/empty"
+expect "an empty directory fails even when nothing is required" fail \
+  "$TOOL" --verify-bundle "$WORK/empty" --shader-dir "$SHADER_DIR"
 
 if [ $failures -ne 0 ]; then
   echo "$failures check(s) failed"

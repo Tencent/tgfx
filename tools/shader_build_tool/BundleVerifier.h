@@ -18,7 +18,9 @@
 
 #pragma once
 
+#include <optional>
 #include <string>
+#include <vector>
 
 namespace tgfx {
 
@@ -33,6 +35,12 @@ namespace tgfx {
 /// what makes a bundle built from older shaders fail even though it is internally consistent. An
 /// empty shaderDir skips only that last comparison and says so in the output. Returns the
 /// violation count (0 = clean) so the process exit code can reject a mismatched or stale bundle.
-int VerifyBundles(const std::string& bundleDir, const std::string& shaderDir = "");
+///
+/// requiredBackends names the backends whose bundle must be present: each missing one is a
+/// violation, and a name that is not a backend (or an empty list) fails the run. Backends outside
+/// the list are still verified when their bundle exists. Without a list (std::nullopt) a missing
+/// bundle is not a violation, and the output says so.
+int VerifyBundles(const std::string& bundleDir, const std::string& shaderDir = "",
+                  const std::optional<std::vector<std::string>>& requiredBackends = std::nullopt);
 
 }  // namespace tgfx
