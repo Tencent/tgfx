@@ -175,9 +175,9 @@ void AOTPlanRenderTask::execute(CommandEncoder* encoder) {
     recordExecutionFailure();
     return;
   }
-  if (!ExecutePreparedPass(encoder, finalTarget.get(),
-                           static_cast<StandardDrawOp*>(originalDraw.get()), LoadAction::Load,
-                           PMColor::Transparent())) {
+  if (!ExecutePreparedPass(
+          encoder, finalTarget.get(), static_cast<StandardDrawOp*>(originalDraw.get()),
+          clearDestination ? LoadAction::Clear : LoadAction::Load, PMColor::Transparent())) {
     LOGE("AOTPlanRenderTask::execute() Terminal pass failed to begin");
     recordExecutionFailure();
     return;
@@ -198,7 +198,8 @@ void AOTPlanRenderTask::executeFallback(CommandEncoder* encoder,
   if (!drawOp->prepareForTask(finalTarget.get(), ProgramLookupMode::AllowRuntimeFallback)) {
     return;
   }
-  if (!ExecutePreparedPass(encoder, finalTarget.get(), drawOp, LoadAction::Load,
+  if (!ExecutePreparedPass(encoder, finalTarget.get(), drawOp,
+                           clearDestination ? LoadAction::Clear : LoadAction::Load,
                            PMColor::Transparent())) {
     return;
   }

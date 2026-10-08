@@ -310,7 +310,7 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t render
                                                const AOTEffectPlan& plan, const Rect& deviceBounds,
                                                std::shared_ptr<RenderTargetProxy> destination,
                                                PlacementPtr<DrawOp>* originalDraw,
-                                               const Point& fpCoordOffset) {
+                                               const Point& fpCoordOffset, bool clearDestination) {
   if (context == nullptr || destination == nullptr || destination->getContext() != context ||
       originalDraw == nullptr || *originalDraw == nullptr || deviceBounds.isEmpty() ||
       !CanExecute(graph, plan)) {
@@ -386,6 +386,7 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t render
     return nullptr;
   }
   task->setOriginalDraw(std::move(*originalDraw));
+  task->setClearDestination(clearDestination);
   return task;
 }
 }  // namespace tgfx

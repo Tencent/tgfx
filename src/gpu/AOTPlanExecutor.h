@@ -43,13 +43,15 @@ class AOTPlanExecutor {
    * (DrawingManager::fillRTWithFP), whose draw always lands at (0,0,w,h) while its processors see
    * coords shifted by that offset. Intermediate passes add it to their fill offset so the rebuilt
    * chain evaluates in the same space the original processors would have seen; the terminal
-   * sampling matrix is independent of it.
+   * sampling matrix is independent of it. clearDestination is true only for a new offscreen fill:
+   * its entire backing (including padding past the logical bounds) must start transparent. Draws
+   * compositing onto an existing destination leave it false.
    */
   static PlacementPtr<RenderTask> Make(Context* context, uint32_t renderFlags,
                                        const AOTEffectGraph& graph, const AOTEffectPlan& plan,
                                        const Rect& deviceBounds,
                                        std::shared_ptr<RenderTargetProxy> destination,
                                        PlacementPtr<DrawOp>* originalDraw,
-                                       const Point& fpCoordOffset);
+                                       const Point& fpCoordOffset, bool clearDestination = false);
 };
 }  // namespace tgfx

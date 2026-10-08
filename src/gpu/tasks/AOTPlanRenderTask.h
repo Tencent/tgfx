@@ -58,6 +58,10 @@ class AOTPlanRenderTask : public RenderTask {
 
   void setOriginalDraw(PlacementPtr<DrawOp> drawOp);
 
+  void setClearDestination(bool clear) {
+    clearDestination = clear;
+  }
+
   void execute(CommandEncoder* encoder) override;
 
  private:
@@ -65,6 +69,7 @@ class AOTPlanRenderTask : public RenderTask {
   DrawOp::ColorProcessorList terminalColors = {};
   std::shared_ptr<RenderTargetProxy> destination = nullptr;
   PlacementPtr<DrawOp> originalDraw = nullptr;
+  bool clearDestination = false;
 
   void executeFallback(CommandEncoder* encoder, std::shared_ptr<RenderTarget> finalTarget);
 };

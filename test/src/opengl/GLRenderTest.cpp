@@ -26,6 +26,7 @@
 #include <vector>
 #include "core/utils/BlockAllocator.h"
 #include "core/utils/PixelFormatUtil.h"
+#include "gpu/DrawingManager.h"
 #include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PermutationMatcher.h"
@@ -34,8 +35,10 @@
 #include "gpu/opengl/GLCaps.h"
 #include "gpu/opengl/GLFunctions.h"
 #include "gpu/opengl/GLGPU.h"
+#include "gpu/opengl/GLTexture.h"
 #include "gpu/opengl/GLUtil.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
+#include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
@@ -863,6 +866,45 @@ TGFX_TEST(GLRenderTest, HardwareSurfaceSamplingUsesTwoDCopy) {
   surface = nullptr;
   snapshot = nullptr;
   HardwareBufferRelease(buffer);
+}
+
+// An approximate offscreen target has a 512x512 physical texture but only a 417x417 fill.
+// Prime its padding with opaque red; fillRTWithFP must initialize the entire scratch backing,
+// not leave the previous allocation's texels available to the next linear/decal sample.
+TGFX_TEST(GLRenderTest, OffscreenFillClearsApproxBacking) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto target = RenderTargetProxy::Make(context, 417, 417, false, 1, false, ImageOrigin::TopLeft,
+                                        BackingFit::Approx);
+  ASSERT_NE(target, nullptr);
+  auto proxy = target->asTextureProxy();
+  ASSERT_NE(proxy, nullptr);
+  ASSERT_GT(proxy->backingStoreWidth(), target->width());
+  ASSERT_GT(proxy->backingStoreHeight(), target->height());
+  auto renderTarget = target->getRenderTarget();
+  ASSERT_NE(renderTarget, nullptr);
+  auto texture = static_cast<GLTexture*>(renderTarget->getRenderTexture().get());
+  auto gpu = static_cast<GLGPU*>(context->gpu());
+  auto gl = gpu->functions();
+  auto state = gpu->state();
+  state->bindFramebuffer(texture);
+  state->setEnabled(GL_SCISSOR_TEST, false);
+  state->setClearColor({1.0f, 0.0f, 0.0f, 1.0f});
+  gl->clear(GL_COLOR_BUFFER_BIT);
+
+  auto processor = ConstColorProcessor::Make(context->drawingAllocator(), PMColor::Transparent(),
+                                             InputMode::Ignore);
+  ASSERT_NE(processor, nullptr);
+  ASSERT_TRUE(context->drawingManager()->fillRTWithFP(target, std::move(processor), 0));
+  context->flushAndSubmit(true);
+  state->bindFramebuffer(texture, FrameBufferTarget::Read);
+  std::array<uint8_t, 4> padding = {};
+  gl->readPixels(480, 480, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, padding.data());
+  EXPECT_EQ(padding, (std::array<uint8_t, 4>{0, 0, 0, 0}));
+  std::array<uint8_t, 4> content = {};
+  gl->readPixels(200, 200, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, content.data());
+  EXPECT_EQ(content, (std::array<uint8_t, 4>{0, 0, 0, 0}));
 }
 
 static constexpr int GlyphSurfaceWidth = 160;

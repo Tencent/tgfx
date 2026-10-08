@@ -136,8 +136,11 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     if (kernelRoutable && taskPlan.passes.size() == 1) {
       auto deviceBounds = Rect::MakeWH(static_cast<float>(renderTarget->width()),
                                        static_cast<float>(renderTarget->height()));
+      // An offscreen fill owns a fresh target. Clear its full backing before the draw so a
+      // shader-side sample cannot observe pixels left by an earlier scratch allocation. On-screen
+      // calls leave the default false and keep the destination's existing contents.
       return AOTPlanExecutor::Make(context, renderFlags, taskGraph, taskPlan, deviceBounds,
-                                   renderTarget, originalDraw, coordOffset);
+                                   renderTarget, originalDraw, coordOffset, true);
     }
     return nullptr;
   };
@@ -214,8 +217,11 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   auto allocator = drawingAllocator();
   auto drawOps = allocator->makeArray<DrawOp>(&drawOp, 1);
   auto textureProxy = renderTarget->asTextureProxy();
+  // fillRTWithFP produces a new offscreen image, never a draw over prior target contents. Its
+  // generated rectangle only covers the logical size, while the scratch backing may be larger.
+  // Initialize the whole backing so downstream linear/decal sampling never sees stale texels.
   auto task = allocator->make<OpsRenderTask>(allocator, std::move(renderTarget), std::move(drawOps),
-                                             std::nullopt);
+                                             PMColor::Transparent());
   addRenderTask(std::move(task));
   addGenerateMipmapsTask(std::move(textureProxy));
   return true;
