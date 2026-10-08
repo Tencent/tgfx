@@ -23,6 +23,7 @@
 #include "WebGPUDrawableProxy.h"
 #include "WebGPUGPU.h"
 #include "core/utils/Log.h"
+#include "platform/web/WebJSBindings.h"
 #include "platform/web/WebNamedColorSpace.h"
 
 #ifdef __EMSCRIPTEN__
@@ -79,6 +80,10 @@ std::shared_ptr<WebGPUWindow> WebGPUWindow::MakeFrom(emscripten::val canvas,
   if (!canvas.as<bool>()) {
     return nullptr;
   }
+  if (!HasWebJSBinding("createWebGPUSurface")) {
+    LOGE("WebGPUWindow::MakeFrom The JS binding does not export createWebGPUSurface.");
+    return nullptr;
+  }
   return MakeFromCanvas(std::move(canvas), "", std::move(device), std::move(colorSpace));
 }
 
@@ -128,8 +133,11 @@ std::shared_ptr<WebGPUWindow> WebGPUWindow::MakeFromCanvas(emscripten::val canva
   int canvasHeight = 0;
 #ifdef __EMSCRIPTEN__
   if (canvas.as<bool>()) {
-    canvasWidth = canvas["width"].as<int>();
-    canvasHeight = canvas["height"].as<int>();
+    if (!ReadCanvasSize(canvas, &canvasWidth, &canvasHeight)) {
+      LOGE("WebGPUWindow::MakeFrom() Canvas size is invalid or out of range.");
+      wgpuSurfaceRelease(surface);
+      return nullptr;
+    }
   } else {
     emscripten_get_canvas_element_size(canvasSelector.c_str(), &canvasWidth, &canvasHeight);
   }
@@ -216,13 +224,13 @@ std::shared_ptr<RenderTargetProxy> WebGPUWindow::onCreateRenderTarget(Context* c
 #ifdef __EMSCRIPTEN__
   int canvasWidth = 0;
   int canvasHeight = 0;
+  bool hasValidCanvasSize = true;
   if (_canvas.as<bool>()) {
-    canvasWidth = _canvas["width"].as<int>();
-    canvasHeight = _canvas["height"].as<int>();
+    hasValidCanvasSize = ReadCanvasSize(_canvas, &canvasWidth, &canvasHeight);
   } else {
     emscripten_get_canvas_element_size(_canvasSelector.c_str(), &canvasWidth, &canvasHeight);
   }
-  if (canvasWidth > 0 && canvasHeight > 0) {
+  if (hasValidCanvasSize && canvasWidth > 0 && canvasHeight > 0) {
     _width = canvasWidth;
     _height = canvasHeight;
   }

@@ -50,9 +50,9 @@ class WebGPUDevice : public Device {
    * navigator.gpu.
    *
    * Use this on a thread that cannot obtain the default device, such as a worker thread. The device
-   * belongs to the calling thread: it has to be rendered with and destroyed on that thread, and it
-   * has to stay alive for as long as the returned WebGPUDevice does. tgfx will NOT release it on
-   * shutdown.
+   * belongs to the calling thread: it has to be rendered with and destroyed on that thread. The
+   * caller retains ownership and must keep it alive for as long as the returned WebGPUDevice does;
+   * tgfx does not destroy the GPUDevice.
    *
    * On Web, the final executable must export the WebGPU runtime method (see the Web build section
    * in README.md); without it the device cannot be created.
@@ -73,6 +73,8 @@ class WebGPUDevice : public Device {
   void onUnlockContext() override;
 
  private:
+  static std::shared_ptr<WebGPUDevice> MakeFromHandle(void* device, bool ownsRuntimeRegistration);
+
   explicit WebGPUDevice(std::unique_ptr<class WebGPUGPU> gpu);
 };
 

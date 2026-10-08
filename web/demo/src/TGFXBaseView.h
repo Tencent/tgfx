@@ -64,8 +64,9 @@ class TGFXBaseView {
 #ifdef TGFX_USE_WEBGPU
   /**
    * Supplies the GPUDevice the view renders with. Required when the view is created on a thread that
-   * cannot obtain the default device, such as a worker. Must be called before the first updateSize()
-   * or draw(); the device has to stay alive for as long as the view does.
+   * cannot obtain the default device, such as a worker. May be called after rendering starts; the
+   * view rebuilds its window and surface on the next updateSize() or draw(). The device has to stay
+   * alive for as long as the view uses it.
    *
    * @param device A GPUDevice obtained from navigator.gpu, or null to use the default device.
    */
@@ -117,13 +118,14 @@ class TGFXBaseView {
   int lastSurfaceWidth = 0;
   int lastSurfaceHeight = 0;
   bool presentImmediately = true;
+  bool forceDraw = false;
   // Zero means "not pushed in yet", in which case draw() falls back to querying the DOM.
   float layoutDensity = 0.0f;
 #ifdef TGFX_USE_WEBGPU
   // Set only when a device was pushed in, in which case it is used instead of the default device.
   emscripten::val webgpuDeviceVal;
-  // The imported form of webgpuDeviceVal. Kept so that the import, which registers the device and
-  // its queue with the runtime for good, only happens once. See createWindow().
+  // The imported form of webgpuDeviceVal. Kept so retries reuse the same runtime registration and
+  // released when the wrapper is destroyed. See createWindow().
   std::shared_ptr<tgfx::WebGPUDevice> webgpuDevice = nullptr;
 #endif
 

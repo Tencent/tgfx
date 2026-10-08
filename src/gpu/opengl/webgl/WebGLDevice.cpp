@@ -19,6 +19,7 @@
 #include <emscripten/val.h>
 #include "core/utils/Log.h"
 #include "gpu/opengl/webgl/WebGLGPU.h"
+#include "platform/web/WebJSBindings.h"
 #include "platform/web/WebNamedColorSpace.h"
 
 namespace tgfx {
@@ -91,6 +92,10 @@ std::shared_ptr<WebGLDevice> WebGLDevice::MakeFrom(emscripten::val canvas,
                                                    std::shared_ptr<ColorSpace> colorSpace) {
   if (!canvas.as<bool>()) {
     LOGE("WebGLDevice::MakeFrom The canvas is null.");
+    return nullptr;
+  }
+  if (!HasWebJSBinding("createCanvasContext")) {
+    LOGE("WebGLDevice::MakeFrom The JS binding does not export createCanvasContext.");
     return nullptr;
   }
   EmscriptenWebGLContextAttributes attrs;

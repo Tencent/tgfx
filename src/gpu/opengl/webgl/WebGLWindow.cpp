@@ -21,6 +21,7 @@
 #include "core/utils/Log.h"
 #include "gpu/opengl/GLDefines.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "platform/web/WebJSBindings.h"
 
 namespace tgfx {
 
@@ -62,8 +63,10 @@ std::shared_ptr<RenderTargetProxy> WebGLWindow::onCreateRenderTarget(Context* co
   if (canvas.as<bool>()) {
     // Canvas object path: read the drawing buffer size from the canvas itself. A worker has no DOM,
     // so the Emscripten canvas lookup used below would not find it.
-    width = canvas["width"].as<int>();
-    height = canvas["height"].as<int>();
+    if (!ReadCanvasSize(canvas, &width, &height)) {
+      LOGE("WebGLWindow::onCreateRenderTarget() Canvas size is invalid or out of range.");
+      return nullptr;
+    }
   } else {
     emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
   }

@@ -45,9 +45,8 @@ TGFXBaseView::TGFXBaseView(emscripten::val canvas) : canvasVal(std::move(canvas)
 
 std::shared_ptr<tgfx::Window> TGFXBaseView::createWindow() {
 #ifdef TGFX_USE_WEBGPU
-  // Importing a GPUDevice registers it, and its command queue, with the WebGPU runtime, and that
-  // registration is never released. draw() calls this method again on every frame while the window
-  // cannot be built, so the import is done once and then reused.
+  // Cache the imported wrapper so retries while the window cannot be built reuse the same runtime
+  // registration instead of importing the GPUDevice on every frame.
   if (webgpuDevice == nullptr && webgpuDeviceVal.as<bool>()) {
     webgpuDevice = tgfx::WebGPUDevice::MakeFrom(webgpuDeviceVal);
   }
@@ -101,9 +100,12 @@ void TGFXBaseView::setLayoutDensity(float density) {
 
 #ifdef TGFX_USE_WEBGPU
 void TGFXBaseView::setWebGPUDevice(emscripten::val device) {
-  webgpuDeviceVal = std::move(device);
-  // Drop the imported form so the new device is the one that gets imported.
+  pendingReadback = nullptr;
+  surface = nullptr;
+  window = nullptr;
   webgpuDevice = nullptr;
+  webgpuDeviceVal = std::move(device);
+  forceDraw = true;
 }
 #endif
 
@@ -154,7 +156,7 @@ void TGFXBaseView::draw() {
   bool hasContentChanged = displayList.hasContentChanged();
   bool hasLastRecording = (lastRecording != nullptr);
 
-  if (!hasContentChanged && !hasLastRecording) {
+  if (!hasContentChanged && !hasLastRecording && !forceDraw) {
     return;
   }
 
@@ -216,6 +218,7 @@ void TGFXBaseView::draw() {
 #endif
 
   device->unlock();
+  forceDraw = false;
 }
 
 emscripten::val TGFXBaseView::startReadback(int srcX, int srcY, int width, int height) {

@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <emscripten/val.h>
+#include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/webgl/WebGLDevice.h"
+#include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -50,6 +52,50 @@ TGFX_TEST(WebGLDeviceTest, MakeFromRejectsUnusableCanvas) {
   // created, and the overload has to report that rather than letting the failure escape.
   canvas.call<emscripten::val>("getContext", emscripten::val("2d"));
   EXPECT_TRUE(WebGLDevice::MakeFrom(canvas) == nullptr);
+}
+
+TGFX_TEST(WebGLDeviceTest, MakeFromRejectsMissingJSBinding) {
+  auto bindings = emscripten::val::module_property("tgfx");
+  auto createCanvasContext = bindings["createCanvasContext"];
+  ASSERT_TRUE(createCanvasContext.typeOf().strictlyEquals(emscripten::val("function")));
+
+  bindings.set("createCanvasContext", emscripten::val::undefined());
+  auto device = WebGLDevice::MakeFrom(MakeTestCanvas());
+  bindings.set("createCanvasContext", createCanvasContext);
+
+  EXPECT_TRUE(device == nullptr);
+}
+
+TGFX_TEST(WebGLDeviceTest, WindowRejectsInvalidCanvasSize) {
+  auto canvas = MakeTestCanvas();
+  auto window = WebGLWindow::MakeFrom(canvas);
+  ASSERT_TRUE(window != nullptr);
+
+  auto descriptor = emscripten::val::object();
+  descriptor.set("value", emscripten::val::undefined());
+  descriptor.set("configurable", true);
+  emscripten::val::global("Object").call<emscripten::val>("defineProperty", canvas,
+                                                          emscripten::val("width"), descriptor);
+
+  auto device = window->getDevice();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::MakeFrom(context, window);
+  device->unlock();
+  EXPECT_TRUE(surface == nullptr);
+
+  auto largeCanvas = MakeTestCanvas();
+  auto largeWindow = WebGLWindow::MakeFrom(largeCanvas);
+  ASSERT_TRUE(largeWindow != nullptr);
+  descriptor.set("value", 2147483648.0);
+  emscripten::val::global("Object").call<emscripten::val>("defineProperty", largeCanvas,
+                                                          emscripten::val("width"), descriptor);
+  auto largeDevice = largeWindow->getDevice();
+  auto largeContext = largeDevice->lockContext();
+  ASSERT_TRUE(largeContext != nullptr);
+  auto largeSurface = Surface::MakeFrom(largeContext, largeWindow);
+  largeDevice->unlock();
+  EXPECT_TRUE(largeSurface == nullptr);
 }
 
 }  // namespace tgfx
