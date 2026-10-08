@@ -4248,8 +4248,13 @@ TGFX_TEST(AOTRenderConsistencyTest, BlendParityTextureScene) {
   Bitmap candidate = {};
   RenderFullBlendModeSceneOnce(context, false, &reference);
   RenderFullBlendModeSceneOnce(context, true, &candidate);
+  // ASSERT_* inside the void render helper only leaves the helper, not this test, so a bundle that
+  // fails to load leaves its bitmap empty. Stop here instead of reading through a null pointer.
+  ASSERT_FALSE(reference.isEmpty());
+  ASSERT_FALSE(candidate.isEmpty());
   auto* refPixels = static_cast<const uint8_t*>(reference.lockPixels());
   auto* candPixels = static_cast<const uint8_t*>(candidate.lockPixels());
+  ASSERT_TRUE(refPixels != nullptr && candPixels != nullptr);
   int diffBytes = 0;
   int maxDiff = 0;
   size_t totalBytes =
