@@ -25,11 +25,21 @@ namespace tgfx {
 class WebGLWindow : public Window {
  public:
   /**
-   * Creates a new window from a canvas.
-   * On Web, the final executable must export the GL runtime method (see the Web build section in
-   * README.md); otherwise color space configuration and image/video texture uploads will not work.
+   * Creates a window for a canvas in the document. Main-thread only. Web builds require the GL
+   * runtime method for color-space configuration and image/video uploads; see README.md.
    */
   static std::shared_ptr<WebGLWindow> MakeFrom(const std::string& canvasID,
+                                               std::shared_ptr<ColorSpace> colorSpace = nullptr);
+
+  /**
+   * Creates a window for a canvas held by the calling thread. The canvas must outlive the window,
+   * which must be used on that thread. The browser presents directly from the canvas. Returns
+   * nullptr if creation fails. Web builds require the GL runtime method; see README.md.
+   *
+   * @param canvas An HTMLCanvasElement or OffscreenCanvas.
+   * @param colorSpace Optional rendering color space; defaults to sRGB.
+   */
+  static std::shared_ptr<WebGLWindow> MakeFrom(emscripten::val canvas,
                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
  protected:
@@ -37,6 +47,9 @@ class WebGLWindow : public Window {
 
  private:
   std::string canvasID;
+  // Set only by the canvas object overload, in which case the render target size comes from this
+  // canvas rather than from the page.
+  emscripten::val canvas;
 
   explicit WebGLWindow(std::shared_ptr<Device> device,
                        std::shared_ptr<ColorSpace> colorSpace = nullptr);

@@ -35,6 +35,12 @@ export const uploadToTexture = (
   if (!source) {
     return;
   }
+  // Without EXPORTED_RUNTIME_METHODS=GL the runtime object is missing entirely, and dereferencing it
+  // below would throw out of the wasm call instead of letting the caller report the failure. Same
+  // guard as the standard web implementation.
+  if (!GL) {
+    return;
+  }
   const gl = GL.currentContext?.GLctx as WebGL2RenderingContext;
   gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
