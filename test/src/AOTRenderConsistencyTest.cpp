@@ -7036,19 +7036,52 @@ static bool ReadBackUDFProxy(Context* context, std::shared_ptr<TextureProxy> pro
   return result;
 }
 
+// Enables the GlassUDF debug collection for one test and restores the process afterwards. The
+// flag is read through getenv on every draw, so leaving it set makes every later test in the
+// process print its uniform data and keep appending texture proxies to a static collection that
+// outlives the context that created them.
+class ScopedGlassUDFDebug {
+ public:
+  ScopedGlassUDFDebug() {
+    if (const char* previous = std::getenv(Name)) {
+      hadPrevious = true;
+      previousValue = previous;
+    }
+    ::setenv(Name, "1", 1);
+    TakeGlassUDFDebugTextures();
+  }
+
+  ~ScopedGlassUDFDebug() {
+    TakeGlassUDFDebugTextures();
+    if (hadPrevious) {
+      ::setenv(Name, previousValue.c_str(), 1);
+    } else {
+      ::unsetenv(Name);
+    }
+  }
+
+  ScopedGlassUDFDebug(const ScopedGlassUDFDebug&) = delete;
+  ScopedGlassUDFDebug& operator=(const ScopedGlassUDFDebug&) = delete;
+
+ private:
+  static constexpr const char* Name = "TGFX_GLASS_UDF_DEBUG";
+  bool hadPrevious = false;
+  std::string previousValue = {};
+};
+
 // Isolates the GlassUDF tent-blur pipeline from the full glass style: the same coverage source and
 // request run twice (JIT first, then AOT with the embedded bundle), and each generated UDF texture
 // is read back and compared. The coverage source is drawn once under JIT and shared by both runs
 // (the rasterized-image cache pins the input), so a mismatch localizes the divergence to the UDF
 // generation itself; a match clears the tent-blur kernels and points at the refraction consumer.
 TGFX_TEST(AOTRenderConsistencyTest, GlassUDFTentBlurPipelineAOTMatchesJIT) {
-  // The debug-texture collection inside GenerateGlassUDFTexture is gated on the same environment
-  // flag as the diagnostic prints; enable it for this probe so the pass captures work without an
-  // external env.
-  setenv("TGFX_GLASS_UDF_DEBUG", "1", 1);
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
+  // The debug-texture collection inside GenerateGlassUDFTexture is gated on the same environment
+  // flag as the diagnostic prints; enable it for this probe so the pass captures work without an
+  // external env.
+  ScopedGlassUDFDebug glassDebug;
   auto* cache = context->precompiledShaderCache();
   cache->unload();
 
@@ -7431,6 +7464,9 @@ TGFX_TEST(AOTRenderConsistencyTest, GlassCellSceneAOTMatchesJIT) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
+  // The in-scene UDF texture comparison below needs the debug collection; without this the loop
+  // silently ran zero times unless an earlier test in the process had leaked the flag.
+  ScopedGlassUDFDebug glassDebug;
   auto* cache = context->precompiledShaderCache();
   cache->unload();
 
