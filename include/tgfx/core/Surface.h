@@ -206,7 +206,9 @@ class Surface {
    * Asynchronously copies a rect of pixels from the Surface and returns a SurfaceReadback. Use the
    * returned SurfaceReadback to check when the pixel data is ready and to access it. Note that the
    * pixel data respects the Surface's origin; if the origin is bottom-left, the pixel data will be
-   * vertically flipped. Returns nullptr if the rect is empty or outside the bounds of the Surface.
+   * vertically flipped. Returns nullptr if the rect is empty or outside the bounds of the Surface,
+   * or if the Surface was created from a Drawable whose frame has already been presented or
+   * discarded, or whose window does not support readback (see Window::supportsReadback()).
    */
   std::shared_ptr<SurfaceReadback> asyncReadPixels(const Rect& rect);
 
