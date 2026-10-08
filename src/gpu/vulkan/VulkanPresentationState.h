@@ -75,10 +75,6 @@ class VulkanFrameState {
   explicit VulkanFrameState(bool manual) : manual(manual) {
   }
 
-  bool isManual() const {
-    return manual;
-  }
-
   VulkanManualPhase phase() const {
     return currentPhase;
   }
