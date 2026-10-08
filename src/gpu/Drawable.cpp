@@ -72,8 +72,20 @@ std::shared_ptr<RenderTargetProxy> Drawable::import(Context* context) {
 }
 
 bool Drawable::canReadBack() const {
-  return _delivery == Delivery::Imported || _delivery == Delivery::Submitted ||
-         _delivery == Delivery::PresentRequested;
+  // The frame must still be valid: presented or abandoned frames are terminal states, and
+  // releaseFrameHandles() has already cleared _window for them, so check the delivery state
+  // before dereferencing _window.
+  if (_delivery != Delivery::Imported && _delivery != Delivery::Submitted &&
+      _delivery != Delivery::PresentRequested) {
+    return false;
+  }
+  // The frame is readable only when its source window also supports readback: blitting from a
+  // framebufferOnly Metal layer (or a swapchain without copy-source usage) would trigger GPU
+  // validation assertions.
+  if (_window == nullptr) {
+    return false;
+  }
+  return _window->onSupportsReadback();
 }
 
 bool Drawable::requestPresent(Context* context) {

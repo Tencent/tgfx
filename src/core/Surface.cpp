@@ -237,7 +237,8 @@ std::shared_ptr<SurfaceReadback> Surface::asyncReadPixels(const Rect& rect) {
     return nullptr;
   }
   if (_drawable != nullptr && !_drawable->canReadBack()) {
-    // The frame has already been presented or discarded; its content is no longer defined.
+    // The frame has already been presented or discarded, or its window does not support
+    // readback; the content is no longer defined or not copyable.
     return nullptr;
   }
   auto surfaceRect = Rect::MakeWH(width(), height());
