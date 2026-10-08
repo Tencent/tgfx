@@ -1035,6 +1035,10 @@ void VulkanGPU::presentNow(VkSwapchainKHR swapchain, uint32_t imageIndex, VkImag
   InflightSubmission submission = {};
   submission.fence = fence;
   submission.session.commandPool = pool;
+  // Match normal submissions: frameTime is the submit time. It is later used to advance
+  // _lastFenceSignalTime when the fence is observed signaled; leaving it at epoch would
+  // regress the time and break scratch/uniform reuse.
+  submission.frameTime = std::chrono::steady_clock::now();
   inflightSubmissions.push_back(std::move(submission));
 
   VkPresentInfoKHR presentInfo = {};
