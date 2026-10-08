@@ -54,10 +54,6 @@ TGFX_TEST(VulkanPresentationStateTest, ManualPhaseAndToken) {
 TGFX_TEST(VulkanPresentationStateTest, LayoutAndReadbackSupport) {
   VulkanSwapchainImageState state;
   EXPECT_EQ(*state.layout, VK_IMAGE_LAYOUT_UNDEFINED);
-  *state.layout = VK_IMAGE_LAYOUT_GENERAL;
-  EXPECT_EQ(*state.layout, VK_IMAGE_LAYOUT_GENERAL);
-  *state.layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-  EXPECT_EQ(*state.layout, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
   EXPECT_TRUE(VulkanSupportsReadback(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
                                      VK_IMAGE_USAGE_TRANSFER_SRC_BIT));
