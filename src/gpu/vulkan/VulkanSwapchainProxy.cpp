@@ -108,9 +108,6 @@ std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
     vkDestroySemaphore(_gpu->device(), imageAvailableSemaphore, nullptr);
     return nullptr;
   }
-  // Keep the acquire semaphore for the submission-time schedulePresent(); it is handed to the
-  // command queue there and destroyed with the in-flight submission's fence.
-  _pendingImageAvailableSemaphore = imageAvailableSemaphore;
 
   auto& imageState = _imageStates[_currentImageIndex];
   auto texture = VulkanTexture::MakeFrom(_gpu, _images[_currentImageIndex], _format, _width,
@@ -132,6 +129,11 @@ std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
   }
 
   _frameState = std::make_shared<VulkanFrameState>(_manualPresent);
+  // Keep the acquire semaphore for the submission-time schedulePresent(); it is handed to the
+  // command queue there and destroyed with the in-flight submission's fence. Assign the member
+  // only after every failure path has passed, so the defensive destroys in releaseFrame()/
+  // discardFrame()/the destructor never see an already-destroyed handle.
+  _pendingImageAvailableSemaphore = imageAvailableSemaphore;
   return _renderTarget;
 }
 
