@@ -260,6 +260,28 @@ expect_output "the disabled cache is reported" "stage cache disabled"
 expect "the build without a usable cache matches the uncached one" pass \
   cmp "$WORK/no_dir/shader_bundle.opengl.bin" "$WORK/nocache/shader_bundle.opengl.bin"
 
+# Regenerating identical output must leave the files alone: the build marks generation restat, so
+# an untouched bundle is what stops embedding, compiling and linking. A changed file is replaced by
+# a rename, which gives it a new inode, so the inode tells "rewritten" from "left alone".
+inode() { ls -i "$1" | awk '{print $1}'; }
+gen "$SHADER_DIR" "$WORK/same" --cache-dir "$CACHE" >/dev/null 2>&1
+same_bin=$(inode "$WORK/same/shader_bundle.opengl.bin")
+same_manifest=$(inode "$WORK/same/shader_bundle.opengl.manifest")
+expect "regenerating identical output" pass gen "$SHADER_DIR" "$WORK/same" --cache-dir "$CACHE"
+expect "an unchanged bundle is not rewritten" pass \
+  test "$(inode "$WORK/same/shader_bundle.opengl.bin")" = "$same_bin"
+expect "an unchanged manifest is not rewritten" pass \
+  test "$(inode "$WORK/same/shader_bundle.opengl.manifest")" = "$same_manifest"
+expect "regenerating from edited sources" pass gen "$WORK/edited" "$WORK/same" --cache-dir "$CACHE"
+expect "a changed bundle is replaced" fail \
+  test "$(inode "$WORK/same/shader_bundle.opengl.bin")" = "$same_bin"
+expect "the replaced bundle equals a clean build of the edited sources" pass \
+  cmp "$WORK/same/shader_bundle.opengl.bin" "$WORK/edited_out/shader_bundle.opengl.bin"
+expect "the replaced bundle is fresh for the edited sources" pass \
+  "$TOOL" --verify-bundle "$WORK/same" --shader-dir "$WORK/edited"
+expect "no temporary files are left behind" pass \
+  test -z "$(find "$WORK/same" -maxdepth 1 -name '*.tmp*')"
+
 if [ $failures -ne 0 ]; then
   echo "$failures check(s) failed"
   exit 1

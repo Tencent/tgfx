@@ -17,6 +17,20 @@ endif()
 
 file(SIZE "${INPUT_FILE}" BYTE_COUNT)
 
+# The source is written to a temporary file and only copied over OUTPUT_FILE when it differs, so an
+# unchanged bundle leaves the generated source (and its timestamp) alone. The embedding command is
+# marked restat by the Ninja generator, so the large array is then neither recompiled nor relinked.
+set(TEMP_FILE "${OUTPUT_FILE}.tmp")
+macro(commit_output METHOD)
+    execute_process(COMMAND ${CMAKE_COMMAND} -E copy_if_different "${TEMP_FILE}" "${OUTPUT_FILE}"
+            RESULT_VARIABLE COPY_RESULT)
+    file(REMOVE "${TEMP_FILE}")
+    if(NOT COPY_RESULT EQUAL 0)
+        message(FATAL_ERROR "Cannot write ${OUTPUT_FILE}")
+    endif()
+    message(STATUS "Generated ${OUTPUT_FILE} (${BYTE_COUNT} bytes, backend=${BACKEND_ENUM}) [${METHOD}]")
+endmacro()
+
 # Try xxd first (available on macOS/Linux, much faster than CMake hex loop)
 find_program(XXD_EXECUTABLE xxd)
 if(XXD_EXECUTABLE)
@@ -30,7 +44,7 @@ if(XXD_EXECUTABLE)
         # xxd outputs: "unsigned char filename[] = { 0x.., ... }; unsigned int filename_len = N;"
         # Extract just the array content between { and };
         string(REGEX REPLACE ".*\\{([^}]*)\\}.*" "\\1" ARRAY_BODY "${XXD_OUTPUT}")
-        file(WRITE "${OUTPUT_FILE}"
+        file(WRITE "${TEMP_FILE}"
 "// Auto-generated from ${INPUT_FILE} — do not edit.
 #include <cstddef>
 #include <cstdint>
@@ -54,7 +68,7 @@ void RegisterEmbeddedBundle_${FUNC_SUFFIX}() {
 }  // namespace embedded
 }  // namespace tgfx
 ")
-        message(STATUS "Generated ${OUTPUT_FILE} (${BYTE_COUNT} bytes, backend=${BACKEND_ENUM}) [xxd]")
+        commit_output(xxd)
         return()
     endif()
 endif()
@@ -84,7 +98,7 @@ if(COL GREATER 0)
     string(APPEND ARRAY_CONTENT "\n  ${LINE}")
 endif()
 
-file(WRITE "${OUTPUT_FILE}"
+file(WRITE "${TEMP_FILE}"
 "// Auto-generated from ${INPUT_FILE} — do not edit.
 #include <cstddef>
 #include <cstdint>
@@ -110,4 +124,4 @@ void RegisterEmbeddedBundle_${FUNC_SUFFIX}() {
 }  // namespace tgfx
 ")
 
-message(STATUS "Generated ${OUTPUT_FILE} (${BYTE_COUNT} bytes, backend=${BACKEND_ENUM}) [cmake fallback]")
+commit_output("cmake fallback")

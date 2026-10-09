@@ -23,18 +23,20 @@
 #include <iostream>
 #include <map>
 #include <set>
+#include <sstream>
+#include "OutputFile.h"
 #include "gpu/PrecompiledBundleIdentity.h"
 #include "zlib.h"
 #include "zstd.h"
 
 namespace tgfx {
 
-static void WriteU16LE(std::ofstream& out, uint16_t val) {
+static void WriteU16LE(std::ostream& out, uint16_t val) {
   uint8_t buf[2] = {static_cast<uint8_t>(val & 0xFF), static_cast<uint8_t>((val >> 8) & 0xFF)};
   out.write(reinterpret_cast<char*>(buf), 2);
 }
 
-static void WriteU32LE(std::ofstream& out, uint32_t val) {
+static void WriteU32LE(std::ostream& out, uint32_t val) {
   uint8_t buf[4];
   buf[0] = static_cast<uint8_t>(val & 0xFF);
   buf[1] = static_cast<uint8_t>((val >> 8) & 0xFF);
@@ -43,7 +45,7 @@ static void WriteU32LE(std::ofstream& out, uint32_t val) {
   out.write(reinterpret_cast<char*>(buf), 4);
 }
 
-static void WriteU64LE(std::ofstream& out, uint64_t val) {
+static void WriteU64LE(std::ostream& out, uint64_t val) {
   uint8_t buf[8];
   for (int i = 0; i < 8; i++) {
     buf[i] = static_cast<uint8_t>((val >> (i * 8)) & 0xFF);
@@ -185,12 +187,8 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
   uint32_t dataOffset = fragPoolOffset + fragPoolCount * POOL_ENTRY_SIZE;
   uint32_t dataSize = static_cast<uint32_t>(dataPool.size());
 
-  // Write file
-  std::ofstream file(outPath, std::ios::binary);
-  if (!file.is_open()) {
-    std::cerr << "ERROR: Cannot open output file: " << outPath << "\n";
-    return false;
-  }
+  // Serialize in memory; the file is only replaced when its bytes change (see WriteFileIfChanged).
+  std::ostringstream file(std::ios::binary);
 
   // Optionally compress the data pool with zstd (compressionType=2; 1 is the legacy zlib path).
   std::vector<uint8_t> compressedData;
@@ -278,14 +276,13 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
                static_cast<std::streamsize>(reflPool.size()));
   }
 
-  // A failed stream (disk full, permission) must not report success: the caller would treat the
+  // A failed write (disk full, permission) must not report success: the caller would treat the
   // truncated or missing file as a valid bundle.
-  if (!file.good()) {
-    std::cerr << "BundleWriter: stream error while writing bundle (disk full or I/O failure)\n";
-    file.close();
+  std::string error;
+  if (!WriteFileIfChanged(outPath, file.str(), nullptr, &error)) {
+    std::cerr << "ERROR: cannot write bundle: " << error << "\n";
     return false;
   }
-  file.close();
   return true;
 }
 
