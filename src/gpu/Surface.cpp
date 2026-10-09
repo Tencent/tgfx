@@ -195,18 +195,10 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
     return false;
   }
   flush();
-  auto texture = renderTargetProxy->getTexture();
-  auto hardwareBuffer = texture ? texture->getHardwareBuffer() : nullptr;
-  if (hardwareBuffer != nullptr) {
-    getContext()->submit(true);
-    auto pixels = HardwareBufferLock(hardwareBuffer);
-    if (pixels != nullptr) {
-      auto info = HardwareBufferGetInfo(hardwareBuffer);
-      auto success = Pixmap(info, pixels).readPixels(dstInfo, dstPixels, srcX, srcY);
-      HardwareBufferUnlock(hardwareBuffer);
-      return success;
-    }
-  }
+  // Do not read back through the CPU mapping of the hardware buffer. The GPU writes to that buffer
+  // are not guaranteed to be visible to the CPU mapping, as no fence is attached to it, which
+  // produces corrupted pixels on some GPU drivers (such as the OpenHarmony emulator's GL).
+  // glReadPixels is fully synchronized with the rendered content.
   auto renderTarget = renderTargetProxy->getRenderTarget();
   if (renderTarget == nullptr) {
     return false;
