@@ -852,7 +852,7 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     target_compile_options(tgfx_shader_declarations PRIVATE ${TGFX_COMPILE_OPTIONS})
     target_include_directories(tgfx_shader_declarations PUBLIC src include)
 
-    file(GLOB SHADER_TOOL_FILES tools/shader_build_tool/*.cpp)
+    file(GLOB SHADER_TOOL_FILES CONFIGURE_DEPENDS tools/shader_build_tool/*.cpp)
     add_executable(shader_build_tool ${SHADER_TOOL_FILES})
     target_link_libraries(shader_build_tool PRIVATE tgfx_shader_declarations)
     target_include_directories(shader_build_tool PRIVATE tools/shader_build_tool)

@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include "ShaderSources.h"
 
 namespace tgfx {
 
@@ -45,7 +46,11 @@ struct SourceDigestResult {
 /// versions of shaderc / SPIRV-Cross / tint / Xcode: those change what the same text compiles to.
 /// They are covered by the toolchain ABI discipline and by regenerating and comparing the bundle.
 /// The digest is an accident detector, not a security measure.
-SourceDigestResult ComputeSourceDigest(const std::string& shaderDir, const std::string& backend);
+///
+/// It is computed from an already loaded source set, never by reading the files again: a build
+/// passes the set it compiled from, so the digest cannot describe text the compiler never saw.
+/// Fails when the set did not load.
+SourceDigestResult ComputeSourceDigest(const ShaderSourceSet& sources, const std::string& backend);
 
 /// The sidecar record that ties one published bundle to the sources it was built from. It lives in
 /// shader_bundle.<backend>.manifest next to the .bin, so the binary format and the runtime loader

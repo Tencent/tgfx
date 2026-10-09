@@ -244,16 +244,6 @@ static bool ParseArgs(int argc, char** argv, BuildOptions* options) {
   return true;
 }
 
-std::string ReadFileContents(const std::string& path) {
-  std::ifstream file(path);
-  if (!file.is_open()) {
-    return "";
-  }
-  std::stringstream buffer;
-  buffer << file.rdbuf();
-  return buffer.str();
-}
-
 // Removes 'set = <n>, ' from layout qualifiers. glslang's OpenGL target rejects the descriptor-set
 // qualifier, while binding is kept (the GLSL output and reflection only rely on binding).
 // The token is only a descriptor set when it appears inside a layout(...) qualifier, i.e. the
@@ -740,36 +730,6 @@ std::string EmitDirectGLSLES300(const std::string& source, ShaderStageType stage
   return EmitDirectGLSL330Impl(source, stage, "#version 300 es", true, fbfVariant);
 }
 
-std::string ResolveIncludes(const std::string& source, const std::string& baseDir) {
-  std::string result;
-  std::istringstream stream(source);
-  std::string line;
-  while (std::getline(stream, line)) {
-    auto trimmed = line;
-    auto firstNonSpace = trimmed.find_first_not_of(" \t");
-    if (firstNonSpace != std::string::npos && trimmed.substr(firstNonSpace, 9) == "#include ") {
-      auto quoteStart = trimmed.find('"', firstNonSpace + 9);
-      auto quoteEnd = trimmed.find('"', quoteStart + 1);
-      if (quoteStart != std::string::npos && quoteEnd != std::string::npos) {
-        auto includePath = trimmed.substr(quoteStart + 1, quoteEnd - quoteStart - 1);
-        auto fullPath = baseDir + "/" + includePath;
-        auto includeContent = ReadFileContents(fullPath);
-        if (includeContent.empty()) {
-          std::cerr << "  WARNING: Cannot resolve #include \"" << includePath << "\"\n";
-        }
-        // Recurse so included files may include others (e.g. xp_porter_duff.inc pulling in the
-        // shared blend math). Include guards in the sources prevent duplicate definitions;
-        // intentionally guardless files (the slot bind/unbind headers) are included repeatedly by
-        // design, so no visited-set is applied.
-        result += ResolveIncludes(includeContent, baseDir) + "\n";
-        continue;
-      }
-    }
-    result += line + "\n";
-  }
-  return result;
-}
-
 // Process-wide reuse of GLSL-to-SPIR-V compilation and reflection extraction results. The common
 // compile loop runs before the per-backend emission passes, so what the cache actually saves is
 // the repeats WITHIN that loop: multiple frag variants sharing one vert permutation, revisit
@@ -818,7 +778,10 @@ static const ReflectionResult& ExtractReflectionShared(const std::string& shader
   return it->second;
 }
 
+// source is the shader's text from the build's single read of the sources (nullptr in report-only
+// mode); the bundle's source digest is computed from the same text.
 static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const BuildOptions& options,
+                                     const ShaderSource* source,
                                      std::vector<VariantData>* outVariants,
                                      std::map<std::string, uint64_t>* profileErrorCounts) {
   ShaderReport report;
@@ -829,31 +792,10 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
   report.compiledCount = 0;
   report.errorCount = 0;
 
-  std::string vertSource;
-  std::string fragSource;
-  if (!options.reportOnly && !options.shaderDir.empty()) {
-    vertSource = ReadFileContents(options.shaderDir + "/" + info.vertexFile);
-    fragSource = ReadFileContents(options.shaderDir + "/" + info.fragmentFile);
-    if (vertSource.empty()) {
-      std::cerr << "  ERROR: Cannot read vertex file or file is empty: " << info.vertexFile << "\n";
-      report.errorCount++;
-      RecordCommonArtifactError(profileErrorCounts);
-    } else {
-      auto vertDir = options.shaderDir + "/" + info.vertexFile;
-      vertDir = vertDir.substr(0, vertDir.rfind('/'));
-      vertSource = ResolveIncludes(vertSource, vertDir);
-    }
-    if (fragSource.empty()) {
-      std::cerr << "  ERROR: Cannot read fragment file or file is empty: " << info.fragmentFile
-                << "\n";
-      report.errorCount++;
-      RecordCommonArtifactError(profileErrorCounts);
-    } else {
-      auto fragDir = options.shaderDir + "/" + info.fragmentFile;
-      fragDir = fragDir.substr(0, fragDir.rfind('/'));
-      fragSource = ResolveIncludes(fragSource, fragDir);
-    }
-  }
+  // Unreadable files and broken includes were rejected when the sources were loaded, so a
+  // present source is complete.
+  std::string vertSource = source != nullptr ? source->vertex : "";
+  std::string fragSource = source != nullptr ? source->fragment : "";
 
   // The compile list comes from the matcher rules' reachable sets (the Compose single source of
   // truth in PermutationRules.cpp), enumerated at build time. This replaces the former cartesian
@@ -1303,12 +1245,33 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  // Every shader file is read exactly once, here. The compile loop and the manifests' source
+  // digests both use this set, so a manifest always describes the text that was compiled.
+  tgfx::ShaderSourceSet sources;
+  const bool compiling = !options.reportOnly && !options.shaderDir.empty();
+  if (compiling) {
+    sources = tgfx::LoadShaderSources(options.shaderDir);
+    if (!sources.ok) {
+      for (const auto& error : sources.errors) {
+        std::cerr << "  ERROR: " << error << "\n";
+      }
+      std::cerr << "Build failed: " << sources.errors.size() << " shader source error(s) in "
+                << options.shaderDir << ".\n";
+      return 1;
+    }
+  }
+
   uint32_t totalErrors = 0;
   for (const auto& factory : factories) {
     auto shader = factory();
     auto info = shader->info();
+    const tgfx::ShaderSource* source = compiling ? sources.find(info.name) : nullptr;
+    if (compiling && source == nullptr) {
+      std::cerr << "  ERROR: no loaded source for " << info.name << "\n";
+      return 1;
+    }
     auto shaderReport =
-        tgfx::CompileOneShader(info, options, &report.variants, &report.profileErrorCounts);
+        tgfx::CompileOneShader(info, options, source, &report.variants, &report.profileErrorCounts);
     std::cout << "[" << shaderReport.name << "] raw=" << shaderReport.rawCount
               << " compiled=" << shaderReport.compiledCount;
     if (shaderReport.errorCount > 0) {
@@ -1364,7 +1327,7 @@ int main(int argc, char** argv) {
       std::cout << "Bundle written: " << filename << " (" << pair.second.size() << " entries)\n";
       // The manifest ties the bundle to the exact sources it was built from; --verify-bundle
       // recomputes the digest to tell a stale bundle from a fresh one.
-      auto digest = tgfx::ComputeSourceDigest(options.shaderDir, pair.first);
+      auto digest = tgfx::ComputeSourceDigest(sources, pair.first);
       std::string manifestError;
       if (!digest.ok || !tgfx::WriteBundleManifest(path, pair.first, digest, &manifestError)) {
         std::cerr << "Failed to write the manifest of " << filename << ": "

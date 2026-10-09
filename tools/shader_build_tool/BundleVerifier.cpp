@@ -180,7 +180,7 @@ struct BundleCheckResult {
 // the bundle's bytes: a bundle built from yesterday's shaders is perfectly self-consistent.
 size_t CheckManifest(const std::string& bundlePath, const std::string& expectedTag,
                      const std::vector<uint8_t>& fileBytes, const BundleHeader& header,
-                     const std::string& shaderDir) {
+                     const std::string& shaderDir, const ShaderSourceSet* sources) {
   size_t violations = 0;
   auto manifestPath = ManifestPathFor(bundlePath);
   BundleManifest manifest;
@@ -221,7 +221,7 @@ size_t CheckManifest(const std::string& bundlePath, const std::string& expectedT
               << ": freshness NOT checked (pass --shader-dir to compare against the sources)\n";
     return violations;
   }
-  auto current = ComputeSourceDigest(shaderDir, expectedTag);
+  auto current = ComputeSourceDigest(*sources, expectedTag);
   if (!current.ok) {
     std::cout << "[verify] " << expectedTag
               << ": VIOLATION cannot compute the current source digest: " << current.error << "\n";
@@ -239,7 +239,7 @@ size_t CheckManifest(const std::string& bundlePath, const std::string& expectedT
 }
 
 BundleCheckResult VerifyOneBundle(const std::string& path, const std::string& expectedTag,
-                                  const std::string& shaderDir) {
+                                  const std::string& shaderDir, const ShaderSourceSet* sources) {
   BundleCheckResult result;
   std::ifstream file(path, std::ios::binary);
   if (!file.is_open()) {
@@ -432,7 +432,7 @@ BundleCheckResult VerifyOneBundle(const std::string& path, const std::string& ex
     result.violations++;
   }
 
-  result.violations += CheckManifest(path, expectedTag, fileBytes, header, shaderDir);
+  result.violations += CheckManifest(path, expectedTag, fileBytes, header, shaderDir, sources);
 
   std::cout << "[verify] " << expectedTag << ": " << (result.violations == 0 ? "OK" : "FAILED")
             << " (" << header.vertPoolCount << " vert + " << header.fragPoolCount
@@ -465,12 +465,20 @@ int VerifyBundles(const std::string& bundleDir, const std::string& shaderDir,
       required.insert(name);
     }
   }
+  // The current sources are read once for every bundle checked, the same way a build reads them.
+  ShaderSourceSet sources;
+  if (!shaderDir.empty()) {
+    sources = LoadShaderSources(shaderDir);
+    for (const auto& error : sources.errors) {
+      std::cout << "[verify] source error: " << error << "\n";
+    }
+  }
   int totalViolations = 0;
   size_t openedBundles = 0;
   size_t absentNotRequired = 0;
   for (const auto* backend : BACKENDS) {
     auto path = bundleDir + "/shader_bundle." + backend + ".bin";
-    auto result = VerifyOneBundle(path, backend, shaderDir);
+    auto result = VerifyOneBundle(path, backend, shaderDir, &sources);
     if (result.opened) {
       openedBundles++;
     } else if (required.count(backend) > 0) {

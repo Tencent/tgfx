@@ -138,6 +138,64 @@ mkdir -p "$WORK/empty"
 expect "an empty directory fails even when nothing is required" fail \
   "$TOOL" --verify-bundle "$WORK/empty" --shader-dir "$SHADER_DIR"
 
+# Broken sources must stop the build instead of compiling a shader with a hole in it. Includes
+# resolve against the top-level shader's directory, so the helper files go next to SHADER_FILE.
+INCLUDE_DIR=$(dirname "$SHADER_FILE")
+
+# copy_sources <name>: a private copy of the shader sources to break.
+copy_sources() {
+  cp -R "$SHADER_DIR" "$WORK/$1"
+  mkdir -p "$WORK/$1_out"
+}
+
+# A missing file behind another include: the error names the whole include chain.
+copy_sources missing_include
+printf '#include "tgfx_test_missing.inc"\n' >"$WORK/missing_include/$INCLUDE_DIR/tgfx_test_nested.inc"
+printf '\n#include "tgfx_test_nested.inc"\n' >>"$WORK/missing_include/$SHADER_FILE"
+expect "a missing include fails the build" fail \
+  "$TOOL" --shader-dir "$WORK/missing_include" --out-dir "$WORK/missing_include_out" \
+  --backends opengl --compress
+expect_output "the missing include is named" 'cannot read #include "tgfx_test_missing.inc"'
+expect_output "the error shows the include chain" "tgfx_test_nested.inc -> "
+expect "no bundle is written when an include is missing" fail \
+  test -e "$WORK/missing_include_out/shader_bundle.opengl.bin"
+expect "a missing include also fails verification" fail \
+  "$TOOL" --verify-bundle "$WORK/fresh" --shader-dir "$WORK/missing_include"
+expect_output "verification reports the source error" "source error"
+
+# Two files including each other.
+copy_sources include_cycle
+printf '#include "tgfx_test_cycle_b.inc"\n' >"$WORK/include_cycle/$INCLUDE_DIR/tgfx_test_cycle_a.inc"
+printf '#include "tgfx_test_cycle_a.inc"\n' >"$WORK/include_cycle/$INCLUDE_DIR/tgfx_test_cycle_b.inc"
+printf '\n#include "tgfx_test_cycle_a.inc"\n' >>"$WORK/include_cycle/$SHADER_FILE"
+expect "an include cycle fails the build" fail \
+  "$TOOL" --shader-dir "$WORK/include_cycle" --out-dir "$WORK/include_cycle_out" \
+  --backends opengl --compress
+expect_output "the cycle is reported as a cycle" "include cycle"
+
+# A chain longer than the nesting limit (32) without any cycle.
+copy_sources include_depth
+for i in $(seq 0 39); do
+  printf '#include "tgfx_test_depth_%d.inc"\n' $((i + 1)) \
+    >"$WORK/include_depth/$INCLUDE_DIR/tgfx_test_depth_$i.inc"
+done
+: >"$WORK/include_depth/$INCLUDE_DIR/tgfx_test_depth_40.inc"
+printf '\n#include "tgfx_test_depth_0.inc"\n' >>"$WORK/include_depth/$SHADER_FILE"
+expect "includes nested past the limit fail the build" fail \
+  "$TOOL" --shader-dir "$WORK/include_depth" --out-dir "$WORK/include_depth_out" \
+  --backends opengl --compress
+expect_output "the depth limit is reported" "nested deeper than"
+
+# Including one file repeatedly is not a cycle: the guardless slot headers rely on it. An empty
+# include file is legal too.
+copy_sources include_repeat
+: >"$WORK/include_repeat/$INCLUDE_DIR/tgfx_test_empty.inc"
+printf '\n#include "tgfx_test_empty.inc"\n#include "tgfx_test_empty.inc"\n' \
+  >>"$WORK/include_repeat/$SHADER_FILE"
+expect "a repeated, empty include builds" pass \
+  "$TOOL" --shader-dir "$WORK/include_repeat" --out-dir "$WORK/include_repeat_out" \
+  --backends opengl --compress
+
 if [ $failures -ne 0 ]; then
   echo "$failures check(s) failed"
   exit 1

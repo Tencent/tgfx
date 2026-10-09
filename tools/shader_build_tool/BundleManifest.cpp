@@ -70,11 +70,6 @@ class DigestStream {
   uint64_t state = kDigestSeed;
 };
 
-std::string DirectoryOf(const std::string& path) {
-  auto slash = path.rfind('/');
-  return slash == std::string::npos ? std::string(".") : path.substr(0, slash);
-}
-
 std::string Hex64(uint64_t value) {
   char buffer[19];
   std::snprintf(buffer, sizeof(buffer), "0x%016llx", static_cast<unsigned long long>(value));
@@ -126,8 +121,12 @@ bool ParseDecimal(const std::string& text, uint64_t* value) {
 
 }  // namespace
 
-SourceDigestResult ComputeSourceDigest(const std::string& shaderDir, const std::string& backend) {
+SourceDigestResult ComputeSourceDigest(const ShaderSourceSet& sources, const std::string& backend) {
   SourceDigestResult result;
+  if (!sources.ok) {
+    result.error = sources.errors.empty() ? "the shader sources failed to load" : sources.errors[0];
+    return result;
+  }
   DigestStream stream;
   stream.feedString("tgfx-shader-source-digest-v1");
   stream.feedU32(kExpectedToolchainABI);
@@ -136,27 +135,10 @@ SourceDigestResult ComputeSourceDigest(const std::string& shaderDir, const std::
     stream.feedString(MetalCompilerFingerprint());
   }
 
-  // Registration order follows static initialization across translation units, which is not a
-  // stable order. Sort by name so the digest does not depend on how the tool was linked.
-  std::vector<PrecompiledShaderInfo> infos;
-  for (const auto& factory : ShaderRegistry::All()) {
-    infos.push_back(factory()->info());
-  }
-  std::sort(infos.begin(), infos.end(),
-            [](const PrecompiledShaderInfo& left, const PrecompiledShaderInfo& right) {
-              return left.name < right.name;
-            });
-
-  for (const auto& info : infos) {
-    auto vertPath = shaderDir + "/" + info.vertexFile;
-    auto fragPath = shaderDir + "/" + info.fragmentFile;
-    auto vertSource = ReadFileContents(vertPath);
-    auto fragSource = ReadFileContents(fragPath);
-    if (vertSource.empty() || fragSource.empty()) {
-      result.error = "cannot read the sources of " + info.name + " (" +
-                     (vertSource.empty() ? vertPath : fragPath) + ")";
-      return result;
-    }
+  // The set is ordered by shader name, so the digest does not depend on registration order, which
+  // follows static initialization across translation units.
+  for (const auto& shader : sources.shaders) {
+    const auto& info = shader.info;
     auto reachable = EnumerateReachablePermutations(info.name);
     if (!reachable) {
       result.error = "no rule enumerator for " + info.name;
@@ -165,8 +147,8 @@ SourceDigestResult ComputeSourceDigest(const std::string& shaderDir, const std::
     stream.feedString(info.name);
     stream.feedString(info.vertexFile);
     stream.feedString(info.fragmentFile);
-    stream.feedString(ResolveIncludes(vertSource, DirectoryOf(vertPath)));
-    stream.feedString(ResolveIncludes(fragSource, DirectoryOf(fragPath)));
+    stream.feedString(shader.vertex);
+    stream.feedString(shader.fragment);
     auto vertDomain = info.vertDomain;
     auto fragDomain = info.fragDomain;
     for (const auto& permutation : *reachable) {

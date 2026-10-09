@@ -1,4 +1,4 @@
-//////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
@@ -14,20 +14,46 @@
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
 //
-//////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
 #include <string>
+#include <vector>
+#include "gpu/shaders/PrecompiledShader.h"
 
 namespace tgfx {
 
-/// Reads a whole file as text. Returns an empty string when the file cannot be opened.
-std::string ReadFileContents(const std::string& path);
+/// One registered shader with its vertex and fragment sources read from disk and every
+/// #include expanded. The expanded text is exactly what the compiler receives before the variant
+/// #defines are prepended.
+struct ShaderSource {
+  PrecompiledShaderInfo info;
+  std::string vertex;
+  std::string fragment;
+};
 
-/// Expands #include "file" lines, resolving every path against baseDir. This is the exact text the
-/// compiler receives (before the variant #defines are prepended), so the source digest hashes the
-/// result of this function rather than the raw files.
-std::string ResolveIncludes(const std::string& source, const std::string& baseDir);
+/// The sources of every registered shader, read once. A build compiles from this set and computes
+/// the bundle's source digest from the same set, so the digest always describes the text that was
+/// actually compiled even if the files change while the build runs.
+struct ShaderSourceSet {
+  /// False when any shader or include could not be read; errors lists every failure.
+  bool ok = false;
+  std::vector<std::string> errors;
+  /// Ordered by shader name, so iteration does not depend on registration order.
+  std::vector<ShaderSource> shaders;
+
+  /// Returns the shader with the given name, or nullptr.
+  const ShaderSource* find(const std::string& name) const;
+};
+
+/// Reads the vertex and fragment file of every registered shader under shaderDir and expands their
+/// includes. A shader file that is missing or empty, an include that cannot be read, an include
+/// cycle, or nesting deeper than kMaxIncludeDepth is an error: the build must not silently compile
+/// a shader with a hole in it.
+ShaderSourceSet LoadShaderSources(const std::string& shaderDir);
+
+/// The deepest include nesting LoadShaderSources accepts.
+inline constexpr int kMaxIncludeDepth = 32;
 
 }  // namespace tgfx
