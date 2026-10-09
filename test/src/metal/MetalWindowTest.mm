@@ -291,6 +291,38 @@ TGFX_TEST(MetalWindowTest, PresentBindsToFrameRecording) {
   EXPECT_TRUE(surface->asyncReadPixels(Rect::MakeWH(1, 1)) == nullptr);
 }
 
+/**
+ * Verifies that a flushed-but-unsubmitted recording does not keep a strong window reference
+ * cycle through the Context back to the Device: while the Recording is alive the window is
+ * retained, and once it is dropped (together with the surface) the window is released.
+ */
+TGFX_TEST(MetalWindowTest, DroppedRecordingReleasesWindow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  if (context == nullptr) {
+    GTEST_SKIP() << "Metal backend not available";
+  }
+  auto gpu = static_cast<MetalGPU*>(context->gpu());
+  auto layer = MakeTestLayer(gpu->device(), 16, 16);
+  auto window = MetalWindow::MakeFrom(layer, nullptr, nullptr, false);
+  ASSERT_TRUE(window != nullptr);
+
+  auto surface = Surface::MakeFrom(context, window);
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->clear(Color::Red());
+  auto recording = context->flush();
+  ASSERT_TRUE(recording != nullptr);
+
+  std::weak_ptr<Window> weakWindow = window;
+  surface = nullptr;
+  window = nullptr;
+  EXPECT_FALSE(weakWindow.expired());  // the Recording retains the window
+  // Dropping the Recording without submitting releases the window: the buffered presentation
+  // no longer forms a Device -> Context -> buffer -> Window -> Device cycle.
+  recording = nullptr;
+  EXPECT_TRUE(weakWindow.expired());
+}
+
 TGFX_TEST(MetalWindowTest, SurfaceRetainsDrawable) {
   ContextScope scope;
   auto context = scope.getContext();

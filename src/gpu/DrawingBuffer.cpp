@@ -62,9 +62,23 @@ std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
 
 void DrawingBuffer::presentWindows(Context* context) {
   for (auto& presentation : windowPresentations) {
-    presentation.window->onPresent(context, presentation.renderTargets);
+    // A window that has been destroyed (its Recording and Surface are gone) is skipped: the
+    // presentation is dropped together with the window.
+    if (auto window = presentation.window.lock()) {
+      window->onPresent(context, presentation.renderTargets);
+    }
   }
   windowPresentations.clear();
+}
+
+std::vector<std::shared_ptr<Window>> DrawingBuffer::collectRetainedWindows() const {
+  std::vector<std::shared_ptr<Window>> windows = {};
+  for (const auto& presentation : windowPresentations) {
+    if (auto window = presentation.window.lock()) {
+      windows.push_back(std::move(window));
+    }
+  }
+  return windows;
 }
 
 void DrawingBuffer::schedulePendingPresents(Context* context) {

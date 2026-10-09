@@ -194,7 +194,7 @@ void DrawingManager::collectWindow(std::shared_ptr<Window> window,
   auto& presentations = drawingBuffer->windowPresentations;
   auto independentTargets = window->hasIndependentPresentationTargets();
   for (auto& presentation : presentations) {
-    if (presentation.window != window) {
+    if (presentation.window.lock() != window) {
       continue;
     }
     for (const auto& target : presentation.renderTargets) {

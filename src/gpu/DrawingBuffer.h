@@ -85,9 +85,19 @@ class DrawingBuffer {
    */
   void presentDrawables(Context* context);
 
+  /**
+   * Returns the windows whose presentations this buffer collected, keeping them alive for the
+   * returned Recording until the buffer is submitted.
+   */
+  std::vector<std::shared_ptr<Window>> collectRetainedWindows() const;
+
  private:
+  // The window is held weakly so a flushed buffer cannot form a strong reference cycle
+  // (Device -> Context -> pending buffers -> Window -> Device). While a Recording or a Surface
+  // for the window is alive, the weak reference resolves and the presentation is delivered;
+  // when both are gone, the presentation is silently dropped along with the window.
   struct WindowPresentation {
-    std::shared_ptr<Window> window = nullptr;
+    std::weak_ptr<Window> window = {};
     std::vector<std::shared_ptr<RenderTargetProxy>> renderTargets = {};
   };
 
