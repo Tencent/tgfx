@@ -43,6 +43,11 @@ WindowFrame::WindowFrame(std::shared_ptr<Window> window,
   renderTargets.push_back(std::move(renderTarget));
 }
 
+WindowFrame::~WindowFrame() {
+  // Discard the frame if it was never delivered (matching the Drawable subclass contract).
+  abandon();
+}
+
 void WindowFrame::addTarget(std::shared_ptr<RenderTargetProxy> renderTarget) {
   if (renderTarget != nullptr) {
     renderTargets.push_back(std::move(renderTarget));

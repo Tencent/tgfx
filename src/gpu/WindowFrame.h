@@ -45,6 +45,8 @@ class WindowFrame : public Drawable {
   static std::shared_ptr<WindowFrame> Make(std::shared_ptr<Window> window,
                                            std::shared_ptr<RenderTargetProxy> renderTarget);
 
+  ~WindowFrame() override;
+
   /**
    * Appends another render target of the same window to this frame.
    */
