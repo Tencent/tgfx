@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
 #include <fstream>
 #include <limits>
 #include <set>
@@ -779,6 +780,81 @@ static void TestWriteU32LE(uint8_t* p, uint32_t val) {
   p[1] = static_cast<uint8_t>((val >> 8) & 0xFF);
   p[2] = static_cast<uint8_t>((val >> 16) & 0xFF);
   p[3] = static_cast<uint8_t>((val >> 24) & 0xFF);
+}
+
+// Restores the cache to "unloaded" when it was unloaded on entry, so a guard that has to load the
+// bundle does not turn a TGFX_AOT_DISABLE run into an AOT run for the tests after it.
+class ScopedBundleStateRestore {
+ public:
+  explicit ScopedBundleStateRestore(PrecompiledShaderCache* cache)
+      : cache(cache), wasLoaded(cache->isLoaded()) {
+  }
+
+  ~ScopedBundleStateRestore() {
+    if (!wasLoaded && cache->isLoaded()) {
+      cache->unload();
+    }
+  }
+
+  ScopedBundleStateRestore(const ScopedBundleStateRestore&) = delete;
+  ScopedBundleStateRestore& operator=(const ScopedBundleStateRestore&) = delete;
+
+ private:
+  PrecompiledShaderCache* cache = nullptr;
+  bool wasLoaded = false;
+};
+
+static std::string HexU32(uint32_t value) {
+  char buffer[16] = {};
+  std::snprintf(buffer, sizeof(buffer), "0x%08x", value);
+  return buffer;
+}
+
+// Guards the bundle embedded in the build, the one every Context loads and every AOT test
+// consumes. When it is missing or built for another toolchain ABI, the draws and tests that
+// depend on it fail far from the cause (a null pixel read, a cache that never loads). This test
+// fails first and says which of those it is.
+TGFX_TEST(ShaderPermutationTest, EmbeddedBundleIsPresentAndCurrent) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto backend = context->backend();
+  if (backend == Backend::D3D12 || backend == Backend::Unknown) {
+    GTEST_SKIP() << "This backend has no precompiled shader bundle";
+  }
+  const std::string tag = BundleTag();
+
+  auto [data, size] = GetEmbeddedBundle(backend);
+  ASSERT_TRUE(data != nullptr && size > 0)
+      << "No \"" << tag
+      << "\" bundle is embedded in this build. Either TGFX_EMBED_SHADER_BUNDLES is OFF or the "
+         "bundle generation step did not produce one; every AOT test fails without it.";
+  ASSERT_GE(size, 80u) << "The embedded \"" << tag << "\" bundle is smaller than its header";
+
+  // The ABI is read from the raw header first so a mismatch reports both numbers, instead of the
+  // loader's log line that the test output usually buries.
+  auto embeddedABI = TestReadU32LE(data + 16);
+  ASSERT_EQ(embeddedABI, kExpectedToolchainABI)
+      << "The embedded \"" << tag << "\" bundle records toolchain ABI " << HexU32(embeddedABI)
+      << " but the runtime requires " << HexU32(kExpectedToolchainABI)
+      << ". The embedded bundle is stale: the bundle generation step did not rerun after the ABI "
+         "changed, and Context silently refuses to load it.";
+
+  // Load it through the Context's own cache, which applies the full acceptance contract (format,
+  // ABI, profile tag of this context, content identity hash).
+  auto* cache = context->precompiledShaderCache();
+  ScopedBundleStateRestore restore(cache);
+  cache->unload();
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, backend))
+      << "The cache rejected the embedded \"" << tag << "\" bundle; see the PrecompiledShaderCache "
+      << "log lines above for the reason";
+  EXPECT_TRUE(cache->isLoaded());
+  EXPECT_EQ(cache->bundleToolchainABI(), kExpectedToolchainABI);
+  EXPECT_EQ(cache->profileTag(), tag);
+  EXPECT_NE(cache->bundleIdentityHash(), 0u)
+      << "A zero identity hash marks a legacy bundle without a content check";
+  EXPECT_GT(cache->vertexEntryCount(), 0u);
+  EXPECT_GT(cache->fragmentEntryCount(), 0u);
 }
 
 static std::vector<uint8_t> MakeTestBundle(const std::string& profileTag, uint32_t vertCount,
