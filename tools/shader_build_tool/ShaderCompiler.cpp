@@ -563,10 +563,10 @@ std::string ReadTextFile(const std::string& path) {
 }
 
 // Runs args[0] (looked up on PATH) with the given arguments, without a shell, writing its stderr
-// to stderrPath. Returns the exit status, 128 + signal when it was killed, or -1 with *error set
-// when it could not be started.
-int RunProcess(const std::vector<std::string>& args, const std::string& stderrPath,
-               std::string* error) {
+// (and its stdout too when captureStdout is set) to outputPath. Returns the exit status, 128 +
+// signal when it was killed, or -1 with *error set when it could not be started.
+int RunProcess(const std::vector<std::string>& args, const std::string& outputPath,
+               std::string* error, bool captureStdout = false) {
   std::vector<char*> argv;
   for (const auto& arg : args) {
     argv.push_back(const_cast<char*>(arg.c_str()));
@@ -574,8 +574,11 @@ int RunProcess(const std::vector<std::string>& args, const std::string& stderrPa
   argv.push_back(nullptr);
   posix_spawn_file_actions_t actions;
   posix_spawn_file_actions_init(&actions);
-  posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, stderrPath.c_str(),
+  posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, outputPath.c_str(),
                                    O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  if (captureStdout) {
+    posix_spawn_file_actions_adddup2(&actions, STDERR_FILENO, STDOUT_FILENO);
+  }
   pid_t pid = 0;
   int spawnResult = posix_spawnp(&pid, argv[0], &actions, nullptr, argv.data(), environ);
   posix_spawn_file_actions_destroy(&actions);
@@ -619,6 +622,34 @@ bool RunMetalStep(const char* step, const std::vector<std::string>& args,
 
 }  // namespace
 #endif
+
+std::string MetalToolchainVersion() {
+#if defined(_WIN32)
+  return "";
+#else
+  auto& scratch = ScratchDir::Get();
+  std::string version;
+  const std::vector<std::vector<std::string> > queries = {
+      {"xcrun", "-sdk", "macosx", "metal", "--version"},
+      {"xcrun", "-sdk", "macosx", "--show-sdk-version"},
+      {"xcrun", "-sdk", "macosx", "--show-sdk-build-version"}};
+  for (const auto& query : queries) {
+    auto outputPath = scratch.newFile(".txt");
+    if (outputPath.empty()) {
+      return "";
+    }
+    std::string error;
+    int status = RunProcess(query, outputPath, &error, true);
+    auto output = ReadTextFile(outputPath);
+    std::remove(outputPath.c_str());
+    if (status != 0 || output.empty()) {
+      return "";
+    }
+    version += output;
+  }
+  return version;
+#endif
+}
 
 std::vector<uint8_t> CompileMSLToMetallib(const std::string& mslSource, ShaderStageType stage,
                                           std::string* error) {

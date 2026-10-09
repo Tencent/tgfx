@@ -196,6 +196,70 @@ expect "a repeated, empty include builds" pass \
   "$TOOL" --shader-dir "$WORK/include_repeat" --out-dir "$WORK/include_repeat_out" \
   --backends opengl --compress
 
+# The stage cache must never change what is built. Every cached run is compared byte for byte with
+# a --no-cache build of the same sources.
+CACHE="$WORK/stage_cache"
+gen() { # gen <shader-dir> <out-dir> <cache args...>
+  local dir=$1 out=$2
+  shift 2
+  mkdir -p "$out"
+  "$TOOL" --shader-dir "$dir" --out-dir "$out" --backends opengl --compress "$@"
+}
+# stat_of <field>: the field of the spirv line in the last command's stage-cache summary.
+stat_of() {
+  sed -n 's/^\[stage-cache\] spirv: .*'"$1"'=\([0-9]*\).*/\1/p' "$WORK/out.txt"
+}
+
+expect "a --no-cache build" pass gen "$SHADER_DIR" "$WORK/nocache" --no-cache
+expect "--no-cache writes no cache" fail test -e "$WORK/nocache/stage_cache"
+expect "a cold cached build" pass gen "$SHADER_DIR" "$WORK/cold" --cache-dir "$CACHE"
+cold_executed=$(stat_of executed)
+expect "the cold build matches the uncached one" pass \
+  cmp "$WORK/cold/shader_bundle.opengl.bin" "$WORK/nocache/shader_bundle.opengl.bin"
+expect "a warm cached build" pass gen "$SHADER_DIR" "$WORK/warm" --cache-dir "$CACHE"
+warm_executed=$(stat_of executed)
+expect "the warm build compiles nothing" pass test "$warm_executed" = 0
+expect "the warm build matches the uncached one" pass \
+  cmp "$WORK/warm/shader_bundle.opengl.bin" "$WORK/nocache/shader_bundle.opengl.bin"
+expect "the warm manifest matches the uncached one" pass \
+  cmp "$WORK/warm/shader_bundle.opengl.manifest" "$WORK/nocache/shader_bundle.opengl.manifest"
+
+# Editing one shader recompiles only the stages whose input changed, and the result equals a clean
+# build of the edited sources.
+expect "a cached build of the edited sources" pass \
+  gen "$WORK/edited" "$WORK/edited_cached" --cache-dir "$CACHE"
+edited_executed=$(stat_of executed)
+expect "the edit recompiles some stages" pass test "${edited_executed:-0}" -gt 0
+expect "the edit does not recompile every stage" pass \
+  test "${edited_executed:-0}" -lt "${cold_executed:-0}"
+expect "the edited cached build matches a clean build of the edited sources" pass \
+  cmp "$WORK/edited_cached/shader_bundle.opengl.bin" "$WORK/edited_out/shader_bundle.opengl.bin"
+
+# A damaged entry is detected, recompiled and rewritten; the output does not change.
+entry=$(find "$CACHE" -type f | head -1)
+printf 'x' | dd of="$entry" bs=1 seek=100 conv=notrunc 2>/dev/null
+expect "a build over a damaged entry" pass gen "$SHADER_DIR" "$WORK/repaired" --cache-dir "$CACHE"
+damaged_corrupt=$(stat_of corrupt)
+damaged_executed=$(stat_of executed)
+expect "the damaged entry is reported" pass test "$damaged_corrupt" = 1
+expect "the damaged entry is recompiled" pass test "$damaged_executed" = 1
+expect "the build over a damaged entry matches the uncached one" pass \
+  cmp "$WORK/repaired/shader_bundle.opengl.bin" "$WORK/nocache/shader_bundle.opengl.bin"
+: >"$entry"
+expect "a build over a truncated entry" pass gen "$SHADER_DIR" "$WORK/truncated" --cache-dir "$CACHE"
+truncated_corrupt=$(stat_of corrupt)
+expect "the truncated entry is reported" pass test "$truncated_corrupt" = 1
+expect "the build over a truncated entry matches the uncached one" pass \
+  cmp "$WORK/truncated/shader_bundle.opengl.bin" "$WORK/nocache/shader_bundle.opengl.bin"
+
+# An unusable cache directory degrades to compiling everything instead of failing the build.
+: >"$WORK/not_a_dir"
+expect "an unusable cache directory still builds" pass \
+  gen "$SHADER_DIR" "$WORK/no_dir" --cache-dir "$WORK/not_a_dir/cache"
+expect_output "the disabled cache is reported" "stage cache disabled"
+expect "the build without a usable cache matches the uncached one" pass \
+  cmp "$WORK/no_dir/shader_bundle.opengl.bin" "$WORK/nocache/shader_bundle.opengl.bin"
+
 if [ $failures -ne 0 ]; then
   echo "$failures check(s) failed"
   exit 1

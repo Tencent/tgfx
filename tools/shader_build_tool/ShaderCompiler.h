@@ -71,6 +71,11 @@ std::vector<uint8_t> CompileMSLToMetallib(const std::string& mslSource, ShaderSt
 /// invocation can produce different binaries from identical shader text.
 std::string MetalCompilerFingerprint();
 
+/// The output of `xcrun metal --version` and the macOS SDK version and build, or "" when they
+/// cannot be queried. Not part of the source digest; it keys the stage cache's metallib entries so
+/// a toolchain update recompiles them.
+std::string MetalToolchainVersion();
+
 /// Prepends #define directives to shader source from a list of "NAME=value" strings.
 std::string PrependDefines(const std::string& source, const std::vector<std::string>& defines);
 
