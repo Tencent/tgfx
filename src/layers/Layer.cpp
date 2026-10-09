@@ -29,6 +29,7 @@
 #include "core/images/TextureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/PictureUtils.h"
 #include "core/utils/Types.h"
 #include "layers/BackgroundHandler.h"
 #include "layers/BackgroundSnapshotMap.h"
@@ -1297,8 +1298,8 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
     }
   }
   Point maskImageOffset = {};
-  auto maskContentImage =
-      ToImageWithOffset(std::move(maskPicture), &maskImageOffset, &maskBounds, args.dstColorSpace);
+  auto maskContentImage = PictureUtils::ToImageWithOffset(std::move(maskPicture), &maskImageOffset,
+                                                          &maskBounds, args.dstColorSpace);
   if (maskContentImage == nullptr) {
     return {};
   }
@@ -1339,7 +1340,8 @@ std::shared_ptr<Image> Layer::getContentContourImage(const DrawArgs& args, float
   }
   auto picture = opaqueContext.finishRecordingAsPicture();
   auto imageOffset = Point::Zero();
-  auto image = ToImageWithOffset(std::move(picture), &imageOffset, nullptr, args.dstColorSpace);
+  auto image = PictureUtils::ToImageWithOffset(std::move(picture), &imageOffset, nullptr,
+                                               args.dstColorSpace);
   if (offset) {
     *offset = imageOffset;
   }
@@ -1447,8 +1449,8 @@ std::shared_ptr<Image> Layer::createSubtreeCacheImage(const DrawArgs& args, floa
   }
 
   Point offset = {};
-  auto image =
-      ToImageWithOffset(std::move(picture), &offset, &pictureBounds, args.dstColorSpace, false);
+  auto image = PictureUtils::ToImageWithOffset(std::move(picture), &offset, &pictureBounds,
+                                               args.dstColorSpace, false);
   if (image == nullptr) {
     return nullptr;
   }
@@ -1834,8 +1836,8 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
       contourCanvas->scale(contentScale, contentScale);
       drawContents(drawArgs, contourCanvas, 1.0f);
       auto picture = opaqueContext.finishRecordingAsPicture();
-      group->content.image = ToImageWithOffset(std::move(picture), &group->content.offset, nullptr,
-                                               args.dstColorSpace);
+      group->content.image = PictureUtils::ToImageWithOffset(
+          std::move(picture), &group->content.offset, nullptr, args.dstColorSpace);
       if (group->content.image == nullptr) {
         return nullptr;
       }
@@ -1926,7 +1928,7 @@ std::shared_ptr<Image> Layer::synthesizeBackgroundImage(const DrawArgs& args, fl
   if (picture == nullptr) {
     return nullptr;
   }
-  return ToImageWithOffset(std::move(picture), offset, &bounds, args.dstColorSpace);
+  return PictureUtils::ToImageWithOffset(std::move(picture), offset, &bounds, args.dstColorSpace);
 }
 
 void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, float alpha,

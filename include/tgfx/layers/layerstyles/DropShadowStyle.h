@@ -147,6 +147,9 @@ class DropShadowStyle : public LayerStyle {
 
   void invalidateFilter();
 
+  bool tryDrawAnalytic(Canvas* canvas, const LayerStyleInput& input, float alpha,
+                       BlendMode blendMode);
+
   std::shared_ptr<ImageFilter> getShadowFilter(float contentScale);
 
   float _offsetX = 0.0f;

@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "layers/OffscreenRenderer.h"
+#include "core/utils/PictureUtils.h"
 #include "layers/BackgroundHandler.h"
-#include "layers/LayerStyleSource.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/Layer.h"
@@ -184,8 +184,8 @@ OffscreenResult OffscreenRenderer::RenderContentOnPicture(Layer* layer, const Dr
   OffscreenResult result;
   Point offset = {};
   auto dstColorSpace = args.dstColorSpace;
-  result.image = ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr,
-                                   std::move(dstColorSpace));
+  result.image = PictureUtils::ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset,
+                                                 nullptr, std::move(dstColorSpace));
   if (result.image == nullptr) {
     return {};
   }
@@ -250,8 +250,8 @@ OffscreenResult OffscreenRenderer::RenderPassThroughOnPicture(
   OffscreenResult result;
   Point offset = {};
   auto dstColorSpace = args.dstColorSpace;
-  result.image = ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset, nullptr,
-                                   std::move(dstColorSpace));
+  result.image = PictureUtils::ToImageWithOffset(recorder.finishRecordingAsPicture(), &offset,
+                                                 nullptr, std::move(dstColorSpace));
   if (result.image == nullptr) {
     return {};
   }

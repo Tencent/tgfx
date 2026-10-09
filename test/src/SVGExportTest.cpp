@@ -38,10 +38,12 @@
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/ShapeStyle.h"
+#include "tgfx/layers/SolidLayer.h"
 #include "tgfx/layers/filters/BlurFilter.h"
 #include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
+#include "tgfx/svg/SVGDOM.h"
 #include "tgfx/svg/SVGExporter.h"
 #include "tgfx/svg/SVGPathParser.h"
 #include "utils/TestUtils.h"
@@ -49,6 +51,7 @@
 namespace tgfx {
 
 namespace {
+
 bool CompareSVG(const std::shared_ptr<MemoryWriteStream>& stream, const std::string& key) {
   auto data = stream->readData();
 #ifdef GENERATE_BASELINE_IMAGES
@@ -734,7 +737,7 @@ TGFX_TEST(SVGExportTest, LayerShadow) {
   rootLayer->setMatrix(Matrix::MakeTrans(30, 30));
 
   auto dropShadowLayer = ShapeLayer::Make();
-  auto dropShadowStyle = DropShadowStyle::Make(10, 10, 10, 10, Color::White(), false);
+  auto dropShadowStyle = DropShadowStyle::Make(10, 10, 10, 10, Color::Blue(), false);
   Path rect;
   rect.addRect(Rect::MakeWH(50, 50));
   dropShadowLayer->setPath(rect);
@@ -743,12 +746,32 @@ TGFX_TEST(SVGExportTest, LayerShadow) {
   rootLayer->addChild(dropShadowLayer);
 
   auto innerShadowLayer = ShapeLayer::Make();
-  auto innerShadowStyle = InnerShadowStyle::Make(10, 10, 10, 10, Color::White());
+  auto innerShadowStyle = InnerShadowStyle::Make(10, 10, 10, 10, Color::Blue());
   innerShadowLayer->setMatrix(Matrix::MakeTrans(200, 0));
   innerShadowLayer->setPath(rect);
   innerShadowLayer->setFillStyle(ShapeStyle::Make(Color::Red()));
   innerShadowLayer->setLayerStyles({innerShadowStyle});
   rootLayer->addChild(innerShadowLayer);
+
+  // Non-zero spread on exact rects: the analytic shadow path accepts them, and the SVG export
+  // rewrites the shader as a filter.
+  auto spreadDropShadowLayer = ShapeLayer::Make();
+  auto spreadDropShadowStyle = DropShadowStyle::Make(10, 10, 10, 10, Color::Blue(), false);
+  spreadDropShadowStyle->setSpread(5);
+  spreadDropShadowLayer->setMatrix(Matrix::MakeTrans(0, 150));
+  spreadDropShadowLayer->setPath(rect);
+  spreadDropShadowLayer->setFillStyle(ShapeStyle::Make(Color::Red()));
+  spreadDropShadowLayer->setLayerStyles({spreadDropShadowStyle});
+  rootLayer->addChild(spreadDropShadowLayer);
+
+  auto spreadInnerShadowLayer = ShapeLayer::Make();
+  auto spreadInnerShadowStyle = InnerShadowStyle::Make(10, 10, 10, 10, Color::Blue());
+  spreadInnerShadowStyle->setSpread(5);
+  spreadInnerShadowLayer->setMatrix(Matrix::MakeTrans(200, 150));
+  spreadInnerShadowLayer->setPath(rect);
+  spreadInnerShadowLayer->setFillStyle(ShapeStyle::Make(Color::Red()));
+  spreadInnerShadowLayer->setLayerStyles({spreadInnerShadowStyle});
+  rootLayer->addChild(spreadInnerShadowLayer);
 
   displayList->root()->addChild(rootLayer);
   displayList->root()->draw(canvas);

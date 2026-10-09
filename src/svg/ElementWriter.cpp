@@ -34,6 +34,7 @@
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/ShaderUtils.h"
 #include "core/utils/Types.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/GradientType.h"
@@ -1148,36 +1149,25 @@ Resources ElementWriter::addResources(const Brush& brush, Context* context,
   return resources;
 }
 
-static std::pair<const Shader*, Matrix> DecomposeShader(const std::shared_ptr<Shader>& shader) {
-  Matrix matrix = {};
-  const Shader* tempShader = shader.get();
-  while (Types::Get(tempShader) == Types::ShaderType::Matrix) {
-    auto matrixShader = static_cast<const MatrixShader*>(tempShader);
-    matrix = matrix * matrixShader->matrix;
-    tempShader = matrixShader->source.get();
-  }
-  return {tempShader, matrix};
-}
-
 void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Context* context,
                                        Resources* resources) {
-  auto [decomposedShader, matrix] = DecomposeShader(shader);
+  auto [decomposedShader, matrix] = ShaderUtils::UnwrapMatrixShader(shader);
 
-  auto type = Types::Get(decomposedShader);
+  auto type = Types::Get(decomposedShader.get());
   switch (type) {
     case Types::ShaderType::Color:
-      addColorShaderResources(static_cast<const ColorShader*>(decomposedShader), resources);
+      addColorShaderResources(static_cast<const ColorShader*>(decomposedShader.get()), resources);
       break;
     case Types::ShaderType::Gradient:
-      addGradientShaderResources(static_cast<const GradientShader*>(decomposedShader), matrix,
+      addGradientShaderResources(static_cast<const GradientShader*>(decomposedShader.get()), matrix,
                                  resources);
       break;
     case Types::ShaderType::Image:
-      addImageShaderResources(static_cast<const ImageShader*>(decomposedShader), matrix, context,
-                              resources);
+      addImageShaderResources(static_cast<const ImageShader*>(decomposedShader.get()), matrix,
+                              context, resources);
       break;
     case Types::ShaderType::ColorFilter: {
-      auto colorFilterShader = static_cast<const ColorFilterShader*>(decomposedShader);
+      auto colorFilterShader = static_cast<const ColorFilterShader*>(decomposedShader.get());
       // Process the inner shader (may set fill/gradient/pattern resources).
       addShaderResources(colorFilterShader->shader, context, resources);
       // Mark that filter primitives are needed. The actual <filter> element will be emitted
@@ -1193,6 +1183,14 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Co
       resources->filter = "pending";
       break;
     }
+    case Types::ShaderType::RRectBlur:
+    case Types::ShaderType::RRectInnerShadow:
+      // Analytic shadow shaders carry their own geometry and cannot be emitted as an SVG paint
+      // resource; they are consumed at the draw entry, before reaching paint conversion. This
+      // fallback paints with the brush color.
+      DEBUG_ASSERT(false);
+      reportUnsupportedElement("Analytic shadow shader was not consumed at draw entry");
+      break;
     default:
       reportUnsupportedElement("Unsupported shader");
   }

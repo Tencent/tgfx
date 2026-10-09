@@ -32,9 +32,13 @@
 #include "core/images/SubsetImage.h"
 #include "core/shaders/ImageShader.h"
 #include "core/shaders/MatrixShader.h"
+#include "core/shaders/RRectBlurShader.h"
+#include "core/shaders/RRectInnerShadowShader.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/PictureUtils.h"
 #include "core/utils/RectToRectMatrix.h"
+#include "core/utils/ShaderUtils.h"
 #include "core/utils/ShapeUtils.h"
 #include "core/utils/StrokeUtils.h"
 #include "core/utils/Types.h"
@@ -43,9 +47,11 @@
 #include "tgfx/core/Brush.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
+#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/RRect.h"
@@ -142,6 +148,12 @@ void SVGExportContext::drawFill(const Brush& brush) {
 
 void SVGExportContext::drawRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip,
                                 const Brush& brush, const Stroke* stroke) {
+  if (brush.shader != nullptr) {
+    if (tryDrawRectByConsumingShader(rect, brush, matrix, clip, stroke)) {
+      return;
+    }
+  }
+
   std::unique_ptr<ElementWriter> svg;
   if (RequiresViewportReset(brush)) {
     svg =
@@ -849,6 +861,142 @@ void SVGExportContext::applyClipPath(const Path& clipPath) {
   auto clipID = defineClipPath(currentClipPath);
   clipGroupElement = std::make_unique<ElementWriter>("g", xmlWriter);
   clipGroupElement->addAttribute("clip-path", "url(#" + clipID + ")");
+}
+
+static std::shared_ptr<Image> RRectToImage(const RRect& shape, const Color& color,
+                                           const Rect* imageBounds, Point* offset,
+                                           const std::shared_ptr<ImageFilter>& filter = nullptr) {
+  PictureRecorder recorder = {};
+  auto* recordingCanvas = recorder.beginRecording();
+  Paint shapePaint = {};
+  shapePaint.setColor(color);
+  shapePaint.setImageFilter(filter);
+  recordingCanvas->drawRRect(shape, shapePaint);
+  auto picture = recorder.finishRecordingAsPicture();
+  if (picture == nullptr) {
+    return nullptr;
+  }
+  return PictureUtils::ToImageWithOffset(std::move(picture), offset, imageBounds);
+}
+
+static ClipStack RestrictClipWithRect(const ClipStack& clip, const Rect& contentBounds,
+                                      const Matrix& contentMatrix, const Rect& restrictRect,
+                                      const Matrix& deviceMatrix) {
+  if (restrictRect.contains(contentMatrix.mapRect(contentBounds))) {
+    return clip;
+  }
+
+  auto result = clip;
+  result.clipRect(restrictRect, deviceMatrix, false);
+  return result;
+}
+
+bool SVGExportContext::tryDrawRectByConsumingShader(const Rect& rect, const Brush& brush,
+                                                    const Matrix& matrix, const ClipStack& clip,
+                                                    const Stroke* stroke) {
+  if (brush.shader == nullptr) {
+    return false;
+  }
+  auto [shader, shaderMatrix] = ShaderUtils::UnwrapMatrixShader(brush.shader);
+  const auto type = Types::Get(shader.get());
+  const bool consumable =
+      type == Types::ShaderType::RRectBlur || type == Types::ShaderType::RRectInnerShadow;
+  // The analytic shadow shaders only appear on plain fills, so a stroked draw never carries one.
+  DEBUG_ASSERT(!consumable || stroke == nullptr);
+  if (!consumable || stroke != nullptr) {
+    return false;
+  }
+
+  Brush drawBrush = brush;
+  drawBrush.shader = nullptr;
+  switch (Types::Get(shader.get())) {
+    case Types::ShaderType::RRectBlur: {
+      const auto* blur = static_cast<const RRectBlurShader*>(shader.get());
+      return drawDropShadow(*blur, shaderMatrix, matrix, clip, rect, drawBrush);
+    }
+    case Types::ShaderType::RRectInnerShadow: {
+      const auto* inner = static_cast<const RRectInnerShadowShader*>(shader.get());
+      return drawInnerShadow(*inner, shaderMatrix, matrix, clip, rect, drawBrush);
+    }
+    default:
+      return false;
+  }
+}
+
+bool SVGExportContext::drawDropShadow(const RRectBlurShader& shader, const Matrix& shaderMatrix,
+                                      const Matrix& deviceMatrix, const ClipStack& clip,
+                                      const Rect& restrictRect, const Brush& brush) {
+  const auto shape = RRect::MakeRectXY(shader.rect, shader.radius.x, shader.radius.y);
+  Point shapeOffset = {};
+  auto shapeImage = RRectToImage(shape, shader.color, nullptr, &shapeOffset);
+  if (shapeImage == nullptr) {
+    return false;
+  }
+  auto filter = ImageFilter::Blur(shader.sigmaX, shader.sigmaY);
+  if (filter == nullptr) {
+    return false;
+  }
+  Point filterOffset = {};
+  auto shadowImage = shapeImage->makeWithFilter(filter, &filterOffset);
+  if (shadowImage == nullptr) {
+    return false;
+  }
+
+  auto realClip = RestrictClipWithRect(clip, filter->filterBounds(shape.rect()), shaderMatrix,
+                                       restrictRect, deviceMatrix);
+  auto imageMatrix = deviceMatrix;
+  imageMatrix.preConcat(shaderMatrix);
+  imageMatrix.preTranslate(shapeOffset.x + filterOffset.x, shapeOffset.y + filterOffset.y);
+  drawImage(std::move(shadowImage), {}, imageMatrix, realClip, brush);
+  return true;
+}
+
+bool SVGExportContext::drawInnerShadow(const RRectInnerShadowShader& shader,
+                                       const Matrix& shaderMatrix, const Matrix& deviceMatrix,
+                                       const ClipStack& clip, const Rect& restrictRect,
+                                       const Brush& brush) {
+  const auto shadowShape =
+      RRect::MakeRectXY(shader.shadowRect, shader.shadowRadius.x, shader.shadowRadius.y);
+  const auto maskShape =
+      RRect::MakeRectXY(shader.maskRect, shader.maskRadius.x, shader.maskRadius.y);
+  auto blurFilter = ImageFilter::Blur(shader.sigmaX, shader.sigmaY);
+  if (blurFilter == nullptr) {
+    return false;
+  }
+  const auto imageBounds = blurFilter->filterBounds(shadowShape.rect());
+  Point shadowOffset = {};
+  auto shadowImage = RRectToImage(shadowShape, shader.color, &imageBounds, &shadowOffset);
+  if (shadowImage == nullptr) {
+    return false;
+  }
+
+  // A matrix-wrapped mask shader has no SVG mask form, so the mask cannot be repositioned after
+  // recording; it is recorded over the shadow's image bounds to align with the shadow image.
+  //
+  // The blur is baked into the recording because the mask export rasterizes a FilterImage; only a
+  // PictureImage mask keeps the vector form.
+  auto maskImage = RRectToImage(maskShape, Color::White(), &imageBounds, nullptr, blurFilter);
+  if (maskImage == nullptr) {
+    return false;
+  }
+  auto maskShader =
+      Shader::MakeImageShader(std::move(maskImage), TileMode::Decal, TileMode::Decal, {});
+  if (maskShader == nullptr) {
+    return false;
+  }
+
+  Brush shadowBrush = brush;
+  shadowBrush.maskFilter = MaskFilter::MakeShader(std::move(maskShader), true);
+  auto realClip =
+      RestrictClipWithRect(clip, shadowShape.rect(), shaderMatrix, restrictRect, deviceMatrix);
+  auto imageMatrix = deviceMatrix;
+  imageMatrix.preConcat(shaderMatrix);
+  imageMatrix.preTranslate(shadowOffset.x, shadowOffset.y);
+  // TODO: The maskFilter on the brush currently rasterizes the shape image (the Picture branch of
+  // onDrawImage requires no maskFilter to vectorize). Emit vector content with an SVG <mask>
+  // instead.
+  drawImage(std::move(shadowImage), {}, imageMatrix, realClip, shadowBrush);
+  return true;
 }
 
 Bitmap SVGExportContext::ImageExportToBitmap(Context* context,
