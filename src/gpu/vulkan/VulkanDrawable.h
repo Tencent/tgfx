@@ -40,7 +40,7 @@ class VulkanDrawable : public Drawable {
 
  protected:
   std::shared_ptr<RenderTargetProxy> onImport(Context* context) override;
-  bool onSchedulePresent(Context* context) override;
+  void onAttachSubmission(Context* context) override;
   void onPresent(Context* context) override;
   void onAbandon() override;
 

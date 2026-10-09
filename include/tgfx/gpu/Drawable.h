@@ -74,6 +74,15 @@ class Drawable {
   virtual std::shared_ptr<RenderTargetProxy> onImport(Context* context) = 0;
 
   /**
+   * Called while the DrawingBuffer that carries the frame's rendering commands is about to be
+   * submitted — for every undelivered frame, whether or not a presentation has been registered.
+   * Backends whose render submission must synchronize with the frame acquisition (Vulkan's
+   * imageAvailable semaphore wait) override this to wire that synchronization into the upcoming
+   * submission. The default implementation does nothing.
+   */
+  virtual void onAttachSubmission(Context* context);
+
+  /**
    * Called when the DrawingBuffer that carries the frame's rendering commands is about to be
    * submitted, after a presentation was requested via Context::present() while the rendering was
    * still unsubmitted. Returns true when the presentation is attached to that submission itself

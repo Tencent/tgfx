@@ -28,6 +28,9 @@ Drawable::Drawable(int width, int height, std::shared_ptr<ColorSpace> colorSpace
     : _width(width), _height(height), _colorSpace(std::move(colorSpace)) {
 }
 
+void Drawable::onAttachSubmission(Context*) {
+}
+
 bool Drawable::onSchedulePresent(Context*) {
   return false;
 }
@@ -127,13 +130,18 @@ bool Drawable::requestPresent(Context* context) {
 }
 
 void Drawable::scheduleIfRequested(Context* context) {
-  if (_delivery != Delivery::PresentRequested) {
-    return;
+  // Wire every undelivered frame into the submission of the drawing buffer that carries its
+  // rendering commands, so the wiring (and any registered presentation) is ordered with that
+  // submission and never consumed by an unrelated earlier submission.
+  if (_delivery == Delivery::PresentRequested) {
+    onAttachSubmission(context);
+    _presentationAttached = onSchedulePresent(context);
+  } else if (_delivery == Delivery::Imported) {
+    // The rendering is submitted without a registered presentation (Context::present() may
+    // still come later, on the Submitted path); backends that need submission-time
+    // synchronization with the frame acquisition still wire it here.
+    onAttachSubmission(context);
   }
-  // Attach the presentation to the submission of the drawing buffer that carries this frame's
-  // rendering commands, so it is ordered after them and never consumed by an unrelated earlier
-  // submission.
-  _presentationAttached = onSchedulePresent(context);
 }
 
 void Drawable::onSubmissionCompleted(Context* context) {
