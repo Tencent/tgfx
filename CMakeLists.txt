@@ -32,6 +32,8 @@ option(TGFX_USE_VULKAN "Use Vulkan as the GPU backend" OFF)
 option(TGFX_USE_TEXT_GAMMA_CORRECTION "Enable gamma correction when rendering text" OFF)
 option(TGFX_EMBED_SHADER_BUNDLES "Embed precompiled shader bundles into libtgfx" ON)
 option(TGFX_BUILD_WEBGPU_BUNDLE "Generate the WebGPU shader bundle in native builds" OFF)
+option(TGFX_WEB_PREBUILT_BUNDLES
+        "Web builds use the bundles published under resources/shaders instead of generating them" OFF)
 option(TGFX_ENABLE_STENCIL_COVER_PATH "Enable the stencil-and-cover GPU path renderer for non-antialiased fills" OFF)
 
 # EMSCRIPTEN_PTHREADS can be set by vendor tools for building the wasm-mt architecture.
@@ -858,16 +860,41 @@ if (TGFX_USE_D3D12)
             "support")
 endif ()
 if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
-  # The tool runs on the build host only; web builds consume prebuilt bundles and never
-  # compile the tool (a wasm tool cannot shell out to host compilers anyway). A cross build
-  # (Android, iOS, OHOS) must not compile it with the target toolchain either: the result is an
-  # Android or iOS executable that cannot run here, and the Android NDK builds without exceptions,
-  # which the tool needs. It is built for the host on demand instead (tgfx_host_shader_tool below).
+  # Where the bundles come from. They are generated during the build by shader_build_tool, which
+  # reuses everything that is still up to date and compiles what is not. The tool runs on the build
+  # host only. A cross build (Android, iOS, OHOS, Web) must not compile it with the target
+  # toolchain: the result is an Android or iOS executable that cannot run here, a wasm tool cannot
+  # shell out to host compilers, and the Android NDK builds without exceptions, which the tool
+  # needs. A cross build therefore builds it for the host on demand (tgfx_host_shader_tool below).
+  #
+  # That needs the tool's dependencies (shaderc, SPIRV-Cross) built for the host, and vendor.json
+  # declares them for mac and win but not for linux. A cross build on a Linux host cannot make the
+  # tool, so it uses the bundles published under resources/shaders/ instead. Web can be asked to
+  # do the same on any host (TGFX_WEB_PREBUILT_BUNDLES). Only the backends published there exist
+  # in that mode (opengles and webgpu); anything else stops the configure with an explanation.
+  # TGFX_HOST_CAN_BUILD_SHADER_TOOL can be set to override the detection.
+  if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+    set(TGFX_HOST_CAN_BUILD_SHADER_TOOL_DEFAULT OFF)
+  else ()
+    set(TGFX_HOST_CAN_BUILD_SHADER_TOOL_DEFAULT ON)
+  endif ()
+  set(TGFX_HOST_CAN_BUILD_SHADER_TOOL ${TGFX_HOST_CAN_BUILD_SHADER_TOOL_DEFAULT} CACHE BOOL
+      "The build host can build shader_build_tool (its dependencies are vendored for the host)")
+  set(TGFX_SHADER_BUNDLES_PREBUILT OFF)
+  set(TGFX_PREBUILT_REASON "")
+  if (WEB AND TGFX_WEB_PREBUILT_BUNDLES)
+    set(TGFX_SHADER_BUNDLES_PREBUILT ON)
+    set(TGFX_PREBUILT_REASON "TGFX_WEB_PREBUILT_BUNDLES is ON")
+  elseif (CMAKE_CROSSCOMPILING AND NOT TGFX_HOST_CAN_BUILD_SHADER_TOOL)
+    set(TGFX_SHADER_BUNDLES_PREBUILT ON)
+    set(TGFX_PREBUILT_REASON
+        "the build host (${CMAKE_HOST_SYSTEM_NAME}) cannot build shader_build_tool")
+  endif ()
   set(TGFX_SHADER_TOOL_FROM_HOST OFF)
-  if (NOT WEB AND CMAKE_CROSSCOMPILING)
+  if (CMAKE_CROSSCOMPILING AND NOT TGFX_SHADER_BUNDLES_PREBUILT)
     set(TGFX_SHADER_TOOL_FROM_HOST ON)
   endif ()
-  if (NOT WEB AND NOT TGFX_SHADER_TOOL_FROM_HOST)
+  if (NOT CMAKE_CROSSCOMPILING)
     file(GLOB_RECURSE TGFX_SHADER_DECL_FILES
             src/gpu/shaders/ShaderPermutation.*
             src/gpu/shaders/PrecompiledShader.*
@@ -930,7 +957,7 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
     # Pass all backends as the single comma-separated argument expected by shader_build_tool.
     string(JOIN "," TGFX_SHADER_BACKENDS_ARG ${TGFX_SHADER_BACKENDS})
 
-    if ("webgpu" IN_LIST TGFX_SHADER_BACKENDS AND NOT WEB AND NOT TGFX_SHADER_TOOL_FROM_HOST)
+    if ("webgpu" IN_LIST TGFX_SHADER_BACKENDS AND NOT CMAKE_CROSSCOMPILING)
         tgfx_setup_tint()
         target_include_directories(shader_build_tool SYSTEM PRIVATE
                 third_party/tint third_party/tint/include)
@@ -962,10 +989,12 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
     # shader-source change (otherwise the bundles keep the old ABI and the runtime rejects them).
     list(APPEND TGFX_SHADER_SOURCES
             "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/PrecompiledBundleIdentity.h")
-    if (WEB)
-        # The Emscripten toolchain cannot run shader_build_tool at build time (it shells out to
-        # host tools), so web builds consume prebuilt bundles from resources/shaders/. Publish
-        # them from a native build via the tgfx_publish_shader_bundles target.
+    if (TGFX_SHADER_BUNDLES_PREBUILT)
+        # This build does not generate bundles; it consumes the ones published under
+        # resources/shaders/ (see the reasons above). Publish them from a build that can generate
+        # them via the tgfx_publish_shader_bundles target.
+        message(STATUS "Shader bundles: consuming the published ones from resources/shaders "
+                "(${TGFX_PREBUILT_REASON})")
         set(TGFX_PREBUILT_BUNDLE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders")
         set(TGFX_PREBUILT_BUNDLE_FILES "")
         set(TGFX_COPY_BUNDLE_COMMANDS "")
@@ -973,10 +1002,12 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
             set(PREBUILT_BUNDLE "${TGFX_PREBUILT_BUNDLE_DIR}/shader_bundle.${B}.bin")
             if (NOT EXISTS "${PREBUILT_BUNDLE}")
                 message(FATAL_ERROR "Prebuilt shader bundle not found: ${PREBUILT_BUNDLE}\n"
-                        "Web builds consume prebuilt bundles from resources/shaders/: opengles for "
-                        "WebGL and webgpu for WebGPU, and only those two are published there. "
-                        "Generate the missing bundle with a native build "
-                        "(tgfx_publish_shader_bundles) and check it in.")
+                        "This build consumes the bundles published under resources/shaders/ "
+                        "because ${TGFX_PREBUILT_REASON}. Only opengles and webgpu are published "
+                        "there, and the \"${B}\" backend needs one of its own.\n"
+                        "Build on a host that can generate it (macOS or Windows), or publish it "
+                        "from such a build with the tgfx_publish_shader_bundles target and check "
+                        "it in.")
             endif ()
             list(APPEND TGFX_PREBUILT_BUNDLE_FILES "${PREBUILT_BUNDLE}")
             list(APPEND TGFX_COPY_BUNDLE_COMMANDS
@@ -1060,9 +1091,10 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
     endif ()
     add_custom_target(tgfx_shader_bundles DEPENDS ${TGFX_SHADER_BUNDLE_STAMP}
             ${TGFX_SHADER_BUNDLE_FILES})
-    if (NOT WEB)
-        # Publishes this build's generated bundles to resources/shaders/ so web builds can
-        # consume them; run explicitly, nothing depends on it.
+    if (NOT TGFX_SHADER_BUNDLES_PREBUILT)
+        # Publishes this build's generated bundles to resources/shaders/ for the builds that
+        # consume them (Web with TGFX_WEB_PREBUILT_BUNDLES, cross builds on a Linux host); run
+        # explicitly, nothing depends on it.
         set(TGFX_PUBLISH_BUNDLE_COMMANDS "")
         foreach (B ${TGFX_SHADER_BACKENDS})
             list(APPEND TGFX_PUBLISH_BUNDLE_COMMANDS
