@@ -1,11 +1,13 @@
 #!/bin/bash
 # Verifies the shader bundles published in resources/shaders against the current shader sources.
 #
-# resources/shaders holds prebuilt copies that web builds consume (an Emscripten build cannot run
-# shader_build_tool), so a shader change that is not followed by republishing leaves web builds on
-# stale shaders without any other check noticing. This fails when a required bundle is missing,
-# its manifest is missing or belongs to another file, or the sources it was built from differ from
-# the ones in the checkout.
+# resources/shaders holds the bundles that builds which cannot generate their own consume: a cross
+# build on a Linux host (the tool's dependencies are not vendored for Linux) and a Web build
+# configured with TGFX_WEB_PREBUILT_BUNDLES. A shader change or an ABI bump that is not followed by
+# republishing leaves those builds on stale shaders without any other check noticing. This fails
+# when a required bundle is missing, its manifest is missing or belongs to another file, its
+# toolchain ABI is not the runtime's, or the sources it was built from differ from the ones in the
+# checkout.
 #
 # Usage: verify_published_bundles.sh <path/to/shader_build_tool>
 #
@@ -19,9 +21,9 @@ if [ $# -ne 1 ]; then
 fi
 TOOL=$1
 
-# The bundles web builds read: opengles for the WebGL build, webgpu for the WebGPU build. Keep this
-# in step with the WEB branch of CMakeLists.txt (TGFX_PREBUILT_BUNDLE_DIR). Other backends are not
-# published; native builds generate their bundle at build time and embed it.
+# The bundles that are published: opengles for the GLES-family builds (Android, iOS, OHOS, WebGL)
+# and webgpu for the WebGPU build. Keep this in step with BACKENDS in publish_bundles.sh. Other
+# backends are not published; every build that can generate its bundle does so at build time.
 REQUIRED_BACKENDS=opengles,webgpu
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
@@ -35,13 +37,14 @@ if [ $status -ne 0 ]; then
   cat >&2 <<EOF
 
 The published shader bundles in resources/shaders are stale, missing or inconsistent.
-Regenerate them with a shader_build_tool that was built with WebGPU support and commit the result
-(the .bin files are stored in Git LFS):
+Republish them with a shader_build_tool that was built with WebGPU support
+(-DTGFX_BUILD_WEBGPU_BUNDLE=ON), then commit the result (the .bin files are stored in Git LFS):
 
-  shader_build_tool --shader-dir src/gpu/shaders/glsl --out-dir resources/shaders \\
-      --backends $REQUIRED_BACKENDS --compress
+  tools/shader_build_tool/publish_bundles.sh <path/to/shader_build_tool>
 
-Then run this script again.
+or, from a build directory configured that way:
+
+  ninja tgfx_publish_shader_bundles
 EOF
 fi
 exit $status

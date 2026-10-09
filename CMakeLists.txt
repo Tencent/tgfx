@@ -1092,23 +1092,34 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
     add_custom_target(tgfx_shader_bundles DEPENDS ${TGFX_SHADER_BUNDLE_STAMP}
             ${TGFX_SHADER_BUNDLE_FILES})
     if (NOT TGFX_SHADER_BUNDLES_PREBUILT)
-        # Publishes this build's generated bundles to resources/shaders/ for the builds that
-        # consume them (Web with TGFX_WEB_PREBUILT_BUNDLES, cross builds on a Linux host); run
-        # explicitly, nothing depends on it.
-        set(TGFX_PUBLISH_BUNDLE_COMMANDS "")
-        foreach (B ${TGFX_SHADER_BACKENDS})
-            list(APPEND TGFX_PUBLISH_BUNDLE_COMMANDS
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                            "${TGFX_SHADER_BUNDLE_DIR}/shader_bundle.${B}.bin"
-                            "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/shader_bundle.${B}.bin"
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                            "${TGFX_SHADER_BUNDLE_DIR}/shader_bundle.${B}.manifest"
-                            "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/shader_bundle.${B}.manifest")
-        endforeach ()
-        add_custom_target(tgfx_publish_shader_bundles
-                ${TGFX_PUBLISH_BUNDLE_COMMANDS}
-                DEPENDS tgfx_shader_bundles
-                COMMENT "Publishing shader bundles to resources/shaders")
+        # Republishes the bundles under resources/shaders/ for the builds that consume them (Web
+        # with TGFX_WEB_PREBUILT_BUNDLES, cross builds on a Linux host). It runs
+        # tools/shader_build_tool/publish_bundles.sh with this build's tool, which regenerates
+        # exactly the published set (opengles and webgpu), verifies it against the sources and
+        # replaces the files atomically. It does NOT copy whatever this build happened to generate:
+        # a Metal build would publish a metal bundle and a desktop build an opengl one, neither of
+        # which anything consumes. The tool needs WebGPU support (TGFX_BUILD_WEBGPU_BUNDLE=ON);
+        # without it the script stops and says so. Run explicitly, nothing depends on it.
+        find_program(TGFX_BASH_PROGRAM bash)
+        if (TGFX_BASH_PROGRAM)
+            if (TGFX_SHADER_TOOL_FROM_HOST)
+                set(TGFX_PUBLISH_TOOL "${TGFX_SHADER_TOOL_COMMAND}")
+                set(TGFX_PUBLISH_TOOL_TARGET tgfx_host_shader_tool)
+            else ()
+                set(TGFX_PUBLISH_TOOL "$<TARGET_FILE:shader_build_tool>")
+                set(TGFX_PUBLISH_TOOL_TARGET shader_build_tool)
+            endif ()
+            add_custom_target(tgfx_publish_shader_bundles
+                    COMMAND ${TGFX_BASH_PROGRAM}
+                            "${CMAKE_CURRENT_SOURCE_DIR}/tools/shader_build_tool/publish_bundles.sh"
+                            "${TGFX_PUBLISH_TOOL}"
+                            --cache-dir "${TGFX_SHADER_BUNDLE_DIR}/stage_cache"
+                    USES_TERMINAL
+                    COMMENT "Publishing shader bundles to resources/shaders")
+            add_dependencies(tgfx_publish_shader_bundles ${TGFX_PUBLISH_TOOL_TARGET})
+        else ()
+            message(STATUS "Shader bundles: tgfx_publish_shader_bundles is unavailable without bash")
+        endif ()
     endif ()
 
     set(TGFX_EMBEDDED_BUNDLE_DIR "${CMAKE_BINARY_DIR}/generated/embedded")

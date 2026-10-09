@@ -41,6 +41,15 @@ namespace tgfx {
  * what the bytes mean; the writer picks the new value up automatically and the loader then
  * refuses every older bundle instead of feeding mismatched layouts to the GPU.
  *
+ * Bumping this constant also makes the bundles published under resources/shaders stale: they record
+ * the old value, and builds that consume them (cross builds on a Linux host, Web with
+ * TGFX_WEB_PREBUILT_BUNDLES) would hand the runtime a bundle it refuses, which then falls back to
+ * the runtime shader path on every draw. Republish them in the SAME commit as the bump, with
+ * tools/shader_build_tool/publish_bundles.sh (or the tgfx_publish_shader_bundles target). The
+ * CI step "Verify Published Shader Bundles" fails the commit that forgets: it rejects a bundle
+ * whose recorded ABI is not this value. The same goes for any change to a shader source or to its
+ * variant rules, which changes the source digest the manifests record.
+ *
  * 0x00010005: the chain kernel's FragmentUniformBlock gained TiledLeafIndex2 (two shader-tiled
  * leaves sharing one recipe block). Bundles from before that change describe a uniform layout
  * without the second selector; a new runtime fed such a bundle would silently leave the second
