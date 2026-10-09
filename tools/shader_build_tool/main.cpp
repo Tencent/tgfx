@@ -903,11 +903,14 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
           RecordBackendArtifactError(backend, profileErrorCounts);
           continue;
         }
-        vertBlob = CompileMSLToMetallib(mslVert.msl, ShaderStageType::Vertex);
-        fragBlob = CompileMSLToMetallib(mslFrag.msl, ShaderStageType::Fragment);
+        std::string metalError;
+        vertBlob = CompileMSLToMetallib(mslVert.msl, ShaderStageType::Vertex, &metalError);
+        if (!vertBlob.empty()) {
+          fragBlob = CompileMSLToMetallib(mslFrag.msl, ShaderStageType::Fragment, &metalError);
+        }
         if (vertBlob.empty() || fragBlob.empty()) {
           std::cerr << "  metallib compilation failed for " << info.name << " [vert=" << vi
-                    << " frag=" << fi << "]\n";
+                    << " frag=" << fi << "]: " << metalError << "\n";
           report.errorCount++;
           RecordBackendArtifactError(backend, profileErrorCounts);
           continue;

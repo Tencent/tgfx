@@ -59,9 +59,12 @@ CompileResult TranslateToMSL(const std::vector<uint32_t>& spirv, ShaderStageType
 CompileResult CompileGLSLToWGSL(const std::string& source, ShaderStageType stage,
                                 const std::string& shaderName, uint32_t variantIndex);
 
-/// Compiles MSL source text to Metal library binary (.metallib) using xcrun metal/metallib.
-/// Returns empty vector on failure.
-std::vector<uint8_t> CompileMSLToMetallib(const std::string& mslSource, ShaderStageType stage);
+/// Compiles MSL source text to Metal library binary (.metallib) using xcrun metal/metallib, run
+/// without a shell on files in a scratch directory private to this process. Returns an empty
+/// vector on failure, with *error (when given) naming the failed step, its exit status and the
+/// compiler's stderr. Always fails on Windows, which has no Metal toolchain.
+std::vector<uint8_t> CompileMSLToMetallib(const std::string& mslSource, ShaderStageType stage,
+                                          std::string* error = nullptr);
 
 /// Describes how metallibs are produced (compiler invocation, link command, and the
 /// TGFX_METAL_EXTRA_FLAGS experiment hook). Part of the Metal bundle's source digest: a different

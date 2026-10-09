@@ -21,8 +21,18 @@
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
+#include <iterator>
 #include <regex>
+#if !defined(_WIN32)
+#include <fcntl.h>
+#include <spawn.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <cerrno>
+extern char** environ;
+#endif
 #include <shaderc/shaderc.hpp>
 #include <spirv_glsl.hpp>
 #include <spirv_msl.hpp>
@@ -471,66 +481,220 @@ std::string MetalCompilerFingerprint() {
          ";extra=" + (extraFlags != nullptr ? extraFlags : "");
 }
 
-std::vector<uint8_t> CompileMSLToMetallib(const std::string& mslSource, ShaderStageType stage) {
-  // Use xcrun metal to compile MSL to AIR, then xcrun metallib to produce .metallib binary.
-  // Thread-safe via unique temp file names using the address of the source string.
-  auto addr = reinterpret_cast<uintptr_t>(&mslSource);
-  char tmpMsl[256];
-  char tmpAir[256];
-  char tmpLib[256];
-  snprintf(tmpMsl, sizeof(tmpMsl), "/tmp/tgfx_shader_%lx.metal", (unsigned long)addr);
-  snprintf(tmpAir, sizeof(tmpAir), "/tmp/tgfx_shader_%lx.air", (unsigned long)addr);
-  snprintf(tmpLib, sizeof(tmpLib), "/tmp/tgfx_shader_%lx.metallib", (unsigned long)addr);
+#if !defined(_WIN32)
+namespace {
 
-  // Write MSL source to temp file.
-  {
-    std::ofstream f(tmpMsl, std::ios::binary);
-    if (!f.is_open()) {
-      return {};
+std::vector<std::string> SplitOnSpaces(const std::string& text) {
+  std::vector<std::string> words;
+  std::string word;
+  for (char c : text) {
+    if (c == ' ' || c == '\t' || c == '\n') {
+      if (!word.empty()) {
+        words.push_back(word);
+        word.clear();
+      }
+    } else {
+      word += c;
     }
-    f.write(mslSource.data(), static_cast<std::streamsize>(mslSource.size()));
+  }
+  if (!word.empty()) {
+    words.push_back(word);
+  }
+  return words;
+}
+
+// A directory private to this process, created on first use and removed at exit. Every scratch
+// file gets a name from a process-wide counter, so concurrent compiles in this process and other
+// shader_build_tool processes (two build directories generating at once) never share a path.
+class ScratchDir {
+ public:
+  static ScratchDir& Get() {
+    static ScratchDir dir;
+    return dir;
   }
 
-  // Compile MSL to AIR.
-  // TGFX_METAL_EXTRA_FLAGS (experiment hook): appended verbatim to the xcrun metal invocation.
+  ~ScratchDir() {
+    if (!root.empty()) {
+      rmdir(root.c_str());
+    }
+  }
+
+  ScratchDir(const ScratchDir&) = delete;
+  ScratchDir& operator=(const ScratchDir&) = delete;
+
+  // Returns "" when the directory could not be created.
+  std::string newFile(const std::string& extension) {
+    if (root.empty()) {
+      return "";
+    }
+    return root + "/s" + std::to_string(counter.fetch_add(1)) + extension;
+  }
+
+  const std::string& error() const {
+    return createError;
+  }
+
+ private:
+  ScratchDir() {
+    const char* base = std::getenv("TMPDIR");
+    std::string parent = base != nullptr && base[0] != '\0' ? base : "/tmp";
+    while (parent.size() > 1 && parent.back() == '/') {
+      parent.pop_back();
+    }
+    std::string pattern = parent + "/tgfx_shader_build.XXXXXX";
+    std::vector<char> buffer(pattern.begin(), pattern.end());
+    buffer.push_back('\0');
+    if (mkdtemp(buffer.data()) != nullptr) {
+      root = buffer.data();
+    } else {
+      createError = "cannot create a scratch directory under " + parent + ": " + strerror(errno);
+    }
+  }
+
+  std::string root = {};
+  std::string createError = {};
+  std::atomic<uint64_t> counter = {0};
+};
+
+std::string ReadTextFile(const std::string& path) {
+  std::ifstream file(path, std::ios::binary);
+  std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  return text;
+}
+
+// Runs args[0] (looked up on PATH) with the given arguments, without a shell, writing its stderr
+// to stderrPath. Returns the exit status, 128 + signal when it was killed, or -1 with *error set
+// when it could not be started.
+int RunProcess(const std::vector<std::string>& args, const std::string& stderrPath,
+               std::string* error) {
+  std::vector<char*> argv;
+  for (const auto& arg : args) {
+    argv.push_back(const_cast<char*>(arg.c_str()));
+  }
+  argv.push_back(nullptr);
+  posix_spawn_file_actions_t actions;
+  posix_spawn_file_actions_init(&actions);
+  posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, stderrPath.c_str(),
+                                   O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  pid_t pid = 0;
+  int spawnResult = posix_spawnp(&pid, argv[0], &actions, nullptr, argv.data(), environ);
+  posix_spawn_file_actions_destroy(&actions);
+  if (spawnResult != 0) {
+    *error = "cannot start " + args[0] + ": " + strerror(spawnResult);
+    return -1;
+  }
+  int status = 0;
+  while (waitpid(pid, &status, 0) < 0) {
+    if (errno != EINTR) {
+      *error = "cannot wait for " + args[0] + ": " + strerror(errno);
+      return -1;
+    }
+  }
+  if (WIFEXITED(status)) {
+    return WEXITSTATUS(status);
+  }
+  return WIFSIGNALED(status) ? 128 + WTERMSIG(status) : -1;
+}
+
+// Runs one step of the Metal toolchain. On failure *error names the step, the exit status and the
+// tail of what the tool printed to stderr.
+bool RunMetalStep(const char* step, const std::vector<std::string>& args,
+                  const std::string& stderrPath, std::string* error) {
+  std::string spawnError;
+  int status = RunProcess(args, stderrPath, &spawnError);
+  auto output = ReadTextFile(stderrPath);
+  std::remove(stderrPath.c_str());
+  if (status == 0) {
+    return true;
+  }
+  constexpr size_t kMaxOutput = 4000;
+  if (output.size() > kMaxOutput) {
+    output = "..." + output.substr(output.size() - kMaxOutput);
+  }
+  *error = std::string(step) + " failed" +
+           (status < 0 ? ": " + spawnError : " with exit status " + std::to_string(status)) +
+           (output.empty() ? "" : "\n" + output);
+  return false;
+}
+
+}  // namespace
+#endif
+
+std::vector<uint8_t> CompileMSLToMetallib(const std::string& mslSource, ShaderStageType stage,
+                                          std::string* error) {
+  std::string localError;
+  if (error == nullptr) {
+    error = &localError;
+  }
+  const char* stageName = stage == ShaderStageType::Vertex ? "vertex" : "fragment";
+#if defined(_WIN32)
+  *error = std::string("cannot compile the ") + stageName +
+           " stage: the Metal toolchain (xcrun) is only available on macOS";
+  return {};
+#else
+  // xcrun metal compiles MSL to AIR, then xcrun metallib links the AIR into a .metallib. Both run
+  // without a shell, on files in this process's scratch directory.
+  auto& scratch = ScratchDir::Get();
+  auto mslPath = scratch.newFile(".metal");
+  if (mslPath.empty()) {
+    *error = scratch.error();
+    return {};
+  }
+  auto airPath = scratch.newFile(".air");
+  auto libPath = scratch.newFile(".metallib");
+  auto logPath = scratch.newFile(".log");
+  {
+    std::ofstream file(mslPath, std::ios::binary);
+    file.write(mslSource.data(), static_cast<std::streamsize>(mslSource.size()));
+    if (!file.good()) {
+      *error = "cannot write " + mslPath;
+      std::remove(mslPath.c_str());
+      return {};
+    }
+  }
+
+  // TGFX_METAL_EXTRA_FLAGS (experiment hook): extra xcrun metal arguments, split on whitespace.
   // Used by the FMA-attribution experiments (fast-math/contraction/optimization-level controls)
   // to rebuild the bundle under different compilation settings without touching the default
   // pipeline. Unset in production builds.
-  const char* extraFlags = std::getenv("TGFX_METAL_EXTRA_FLAGS");
-  char cmd[768];
-  const char* stageFlag = (stage == ShaderStageType::Vertex) ? "vertex" : "fragment";
-  snprintf(cmd, sizeof(cmd), "xcrun %s %s -c %s -o %s 2>/dev/null", kMetalCompileFlags,
-           extraFlags != nullptr ? extraFlags : "", tmpMsl, tmpAir);
-  (void)stageFlag;
-  int ret = std::system(cmd);
-  std::remove(tmpMsl);
-  if (ret != 0) {
-    std::remove(tmpAir);
+  std::vector<std::string> compile = {"xcrun"};
+  for (const auto& word : SplitOnSpaces(kMetalCompileFlags)) {
+    compile.push_back(word);
+  }
+  if (const char* extraFlags = std::getenv("TGFX_METAL_EXTRA_FLAGS")) {
+    for (const auto& word : SplitOnSpaces(extraFlags)) {
+      compile.push_back(word);
+    }
+  }
+  compile.insert(compile.end(), {"-c", mslPath, "-o", airPath});
+  bool compiled = RunMetalStep("xcrun metal", compile, logPath, error);
+  std::remove(mslPath.c_str());
+  if (!compiled) {
+    std::remove(airPath.c_str());
+    *error = std::string("compiling the ") + stageName + " stage: " + *error;
     return {};
   }
 
-  // Link AIR to metallib.
-  snprintf(cmd, sizeof(cmd), "%s %s -o %s 2>/dev/null", kMetalLinkCommand, tmpAir, tmpLib);
-  ret = std::system(cmd);
-  std::remove(tmpAir);
-  if (ret != 0) {
-    std::remove(tmpLib);
+  auto link = SplitOnSpaces(kMetalLinkCommand);
+  link.insert(link.end(), {airPath, "-o", libPath});
+  bool linked = RunMetalStep("xcrun metallib", link, logPath, error);
+  std::remove(airPath.c_str());
+  if (!linked) {
+    std::remove(libPath.c_str());
+    *error = std::string("linking the ") + stageName + " stage: " + *error;
     return {};
   }
 
-  // Read metallib binary.
-  std::ifstream libFile(tmpLib, std::ios::binary | std::ios::ate);
-  if (!libFile.is_open()) {
-    std::remove(tmpLib);
-    return {};
-  }
-  auto size = libFile.tellg();
-  libFile.seekg(0);
-  std::vector<uint8_t> data(static_cast<size_t>(size));
-  libFile.read(reinterpret_cast<char*>(data.data()), size);
+  std::ifstream libFile(libPath, std::ios::binary);
+  std::vector<uint8_t> data((std::istreambuf_iterator<char>(libFile)),
+                            std::istreambuf_iterator<char>());
   libFile.close();
-  std::remove(tmpLib);
+  std::remove(libPath.c_str());
+  if (data.empty()) {
+    *error = std::string("the ") + stageName + " metallib is empty or unreadable";
+  }
   return data;
+#endif
 }
 
 }  // namespace tgfx
