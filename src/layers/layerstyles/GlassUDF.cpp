@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlassUDF.h"
-#include <cstdio>
 #include <cstdlib>
 #include "gpu/DrawingManager.h"
 #include "gpu/processors/TiledTextureEffect.h"
@@ -49,15 +48,6 @@ std::shared_ptr<TextureProxy> GenerateGlassUDFTexture(Context* context,
                                                       const GlassUDFRequest& request) {
   if (context == nullptr || !request.isValid()) {
     return nullptr;
-  }
-  // TGFX_GLASS_UDF_DEBUG prints the request parameters once per call so probe tests can replay a
-  // production scene's exact shape. Diagnostic only; read once per call.
-  if (std::getenv("TGFX_GLASS_UDF_DEBUG") != nullptr) {
-    std::printf("[GlassUDF] core=%dx%d rect=(%g,%g,%g,%g) fine=(%g,%g) coarse=(%g,%g) field=%d\n",
-                request.coreWidth, request.coreHeight, request.textureRect.left,
-                request.textureRect.top, request.textureRect.right, request.textureRect.bottom,
-                request.fineRadius.x, request.fineRadius.y, request.coarseRadius.x,
-                request.coarseRadius.y, static_cast<int>(request.field));
   }
   auto& textureRect = request.textureRect;
   auto& fineRadius = request.fineRadius;

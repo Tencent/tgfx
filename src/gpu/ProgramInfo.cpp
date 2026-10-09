@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProgramInfo.h"
-#include <cstdio>
 #include <cstdlib>
 #include <iomanip>
 #include <sstream>
@@ -395,11 +394,6 @@ bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
       }
       if (fragmentUniformData != nullptr) {
         fragmentUniformData->structuralSuffix = structural;
-      }
-      // TGFX_GLASS_UDF_DEBUG prints the traversal so an A/B run can see exactly which processors
-      // receive setData. Diagnostic only.
-      if (std::getenv("TGFX_GLASS_UDF_DEBUG") != nullptr) {
-        std::printf("[GlassUDF] setData traversal: %s\n", fp->name().c_str());
       }
       fp->setData(vertexUniformData, fragmentUniformData);
       fp = iter.next();

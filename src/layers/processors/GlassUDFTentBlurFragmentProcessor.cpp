@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "layers/processors/GlassUDFTentBlurFragmentProcessor.h"
-#include <cstdio>
-#include <cstdlib>
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -182,13 +180,6 @@ void GlassUDFTentBlurFragmentProcessor::onSetData(UniformData*,
   }
   if (fragmentUniformData->hasField("InputIsPacked")) {
     fragmentUniformData->setData("InputIsPacked", inputIsPacked ? 1 : 0);
-  }
-  // TGFX_GLASS_UDF_DEBUG prints the uploaded uniform values so an A/B run can diff the exact data
-  // each route sent. Diagnostic only.
-  if (std::getenv("TGFX_GLASS_UDF_DEBUG") != nullptr) {
-    std::printf("[GlassUDF] setData dir=%d fine=%g coarse=%g field=%d packed=%d step=(%g,%g)\n",
-                static_cast<int>(direction), fineRadius, coarseRadius, static_cast<int>(field),
-                inputIsPacked ? 1 : 0, step.x, step.y);
   }
 }
 
