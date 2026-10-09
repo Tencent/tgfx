@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <algorithm>
 #include <cstdio>
 #if defined(__APPLE__)
 #include <mach/mach.h>
@@ -181,6 +182,41 @@ TGFX_TEST(ShaderBundleBenchmark, DISABLED_ColdFrames) {
                 firstMicros / 1000.0, secondMicros / 1000.0,
                 static_cast<unsigned long long>(after.cacheMisses - before.cacheMisses));
   }
+  std::fflush(stdout);
+}
+
+// Steady state: the same scene drawn over and over with every program already cached. The frame is
+// split into the time to record and submit the commands (CPU) and the time spent afterwards waiting
+// for the GPU to finish, so a per-draw CPU cost can be told apart from slower GPU execution.
+TGFX_TEST(ShaderBundleBenchmark, DISABLED_SteadyState) {
+  auto image = Image::MakeFromFile(ProjectPath::Absolute("resources/apitest/checker_128.png"));
+  ASSERT_TRUE(image != nullptr);
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 700, 520);
+  ASSERT_TRUE(surface != nullptr);
+  std::vector<double> submitMs;
+  std::vector<double> waitMs;
+  for (int frame = 0; frame < 200; frame++) {
+    auto start = Clock::Now();
+    DrawScene(surface->getCanvas(), image, typeface);
+    context->flushAndSubmit(false);
+    auto submitted = Clock::Now();
+    context->flushAndSubmit(true);
+    auto done = Clock::Now();
+    if (frame >= 20) {
+      submitMs.push_back((submitted - start) / 1000.0);
+      waitMs.push_back((done - submitted) / 1000.0);
+    }
+  }
+  std::sort(submitMs.begin(), submitMs.end());
+  std::sort(waitMs.begin(), waitMs.end());
+  std::printf("[Bench] mode=%s steady cpuSubmitMs=%.3f gpuWaitMs=%.3f\n",
+              std::getenv("TGFX_AOT_DISABLE") != nullptr ? "JIT" : "AOT",
+              submitMs[submitMs.size() / 2], waitMs[waitMs.size() / 2]);
   std::fflush(stdout);
 }
 
