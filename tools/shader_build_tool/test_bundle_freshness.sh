@@ -282,6 +282,20 @@ expect "the replaced bundle is fresh for the edited sources" pass \
 expect "no temporary files are left behind" pass \
   test -z "$(find "$WORK/same" -maxdepth 1 -name '*.tmp*')"
 
+# The Metal platform options are validated before anything runs, and they only concern the Metal
+# bundle: a non-Metal bundle stays fresh whatever they say.
+expect "an unknown Metal SDK is rejected" fail \
+  "$TOOL" --verify-bundle "$WORK/fresh" --metal-sdk watchos
+expect_output "the unknown SDK is named" 'unknown Metal SDK "watchos"'
+expect "a malformed minimum OS is rejected" fail \
+  "$TOOL" --verify-bundle "$WORK/fresh" --metal-sdk iphoneos --metal-min-os "15.0; true"
+expect_output "the malformed version is reported" "invalid minimum OS version"
+expect "an empty-segment minimum OS is rejected" fail \
+  "$TOOL" --verify-bundle "$WORK/fresh" --metal-sdk iphoneos --metal-min-os "15..0"
+expect "Metal platform options leave an opengl bundle fresh" pass \
+  "$TOOL" --verify-bundle "$WORK/fresh" --shader-dir "$SHADER_DIR" \
+  --metal-sdk iphonesimulator --metal-min-os 15.0
+
 if [ $failures -ne 0 ]; then
   echo "$failures check(s) failed"
   exit 1

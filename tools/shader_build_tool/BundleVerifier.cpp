@@ -233,6 +233,10 @@ size_t CheckManifest(const std::string& bundlePath, const std::string& expectedT
               << "digest 0x" << std::hex << manifest.sourceDigest << ", the current sources in "
               << shaderDir << " have 0x" << current.digest << std::dec << " ("
               << manifest.stageCount << " stages recorded, " << current.stageCount << " now)\n";
+    if (expectedTag == "metal") {
+      std::cout << "[verify] metal: note: a Metal bundle's digest also covers the platform it was "
+                   "compiled for; verify it with the same --metal-sdk and --metal-min-os\n";
+    }
     violations++;
   }
   return violations;

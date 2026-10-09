@@ -469,15 +469,54 @@ CompileResult CompileGLSLToWGSL(const std::string& source, ShaderStageType stage
 #endif
 }
 
-// The fixed part of the Metal toolchain invocation. Kept as constants shared with
-// MetalCompilerFingerprint() so the bundle's source digest changes whenever the way metallibs are
-// produced changes.
-static const char* const kMetalCompileFlags = "-sdk macosx metal -std=macos-metal2.3 -O2";
-static const char* const kMetalLinkCommand = "xcrun -sdk macosx metallib";
+// The Metal toolchain invocation, built from the target SDK. Both the compile command and
+// MetalCompilerFingerprint() read the same strings, so the bundle's source digest changes whenever
+// the way metallibs are produced changes, including when the target SDK does. The defaults (the
+// macOS SDK, no minimum OS flag) are exactly what the tool always used.
+static std::string gMetalSdk = "macosx";
+static std::string gMetalMinOS = "";
+
+bool SetMetalTarget(const std::string& sdk, const std::string& minOS, std::string* error) {
+  if (sdk != "macosx" && sdk != "iphoneos" && sdk != "iphonesimulator") {
+    *error = "unknown Metal SDK \"" + sdk + "\" (expected macosx, iphoneos or iphonesimulator)";
+    return false;
+  }
+  // The version ends up on a command line, so only digits and dots are accepted.
+  bool validVersion =
+      minOS.empty() || (minOS.size() <= 16 && minOS.front() != '.' && minOS.back() != '.' &&
+                        minOS.find("..") == std::string::npos);
+  for (char c : minOS) {
+    validVersion = validVersion && ((c >= '0' && c <= '9') || c == '.');
+  }
+  if (!validVersion) {
+    *error = "invalid minimum OS version \"" + minOS + "\" (expected digits and dots, e.g. 15.0)";
+    return false;
+  }
+  gMetalSdk = sdk;
+  gMetalMinOS = minOS;
+  return true;
+}
+
+static std::string MetalCompileFlags() {
+  std::string flags = "-sdk " + gMetalSdk +
+                      " metal -std=" + (gMetalSdk == "macosx" ? "macos-metal2.3" : "ios-metal2.3") +
+                      " -O2";
+  if (!gMetalMinOS.empty()) {
+    const char* option = gMetalSdk == "macosx"     ? "-mmacosx-version-min="
+                         : gMetalSdk == "iphoneos" ? "-mios-version-min="
+                                                   : "-mios-simulator-version-min=";
+    flags += std::string(" ") + option + gMetalMinOS;
+  }
+  return flags;
+}
+
+static std::string MetalLinkCommand() {
+  return "xcrun -sdk " + gMetalSdk + " metallib";
+}
 
 std::string MetalCompilerFingerprint() {
   const char* extraFlags = std::getenv("TGFX_METAL_EXTRA_FLAGS");
-  return std::string("compile=xcrun ") + kMetalCompileFlags + ";link=" + kMetalLinkCommand +
+  return "compile=xcrun " + MetalCompileFlags() + ";link=" + MetalLinkCommand() +
          ";extra=" + (extraFlags != nullptr ? extraFlags : "");
 }
 
@@ -630,9 +669,9 @@ std::string MetalToolchainVersion() {
   auto& scratch = ScratchDir::Get();
   std::string version;
   const std::vector<std::vector<std::string> > queries = {
-      {"xcrun", "-sdk", "macosx", "metal", "--version"},
-      {"xcrun", "-sdk", "macosx", "--show-sdk-version"},
-      {"xcrun", "-sdk", "macosx", "--show-sdk-build-version"}};
+      {"xcrun", "-sdk", gMetalSdk, "metal", "--version"},
+      {"xcrun", "-sdk", gMetalSdk, "--show-sdk-version"},
+      {"xcrun", "-sdk", gMetalSdk, "--show-sdk-build-version"}};
   for (const auto& query : queries) {
     auto outputPath = scratch.newFile(".txt");
     if (outputPath.empty()) {
@@ -689,7 +728,7 @@ std::vector<uint8_t> CompileMSLToMetallib(const std::string& mslSource, ShaderSt
   // to rebuild the bundle under different compilation settings without touching the default
   // pipeline. Unset in production builds.
   std::vector<std::string> compile = {"xcrun"};
-  for (const auto& word : SplitOnSpaces(kMetalCompileFlags)) {
+  for (const auto& word : SplitOnSpaces(MetalCompileFlags())) {
     compile.push_back(word);
   }
   if (const char* extraFlags = std::getenv("TGFX_METAL_EXTRA_FLAGS")) {
@@ -706,7 +745,7 @@ std::vector<uint8_t> CompileMSLToMetallib(const std::string& mslSource, ShaderSt
     return {};
   }
 
-  auto link = SplitOnSpaces(kMetalLinkCommand);
+  auto link = SplitOnSpaces(MetalLinkCommand());
   link.insert(link.end(), {airPath, "-o", libPath});
   bool linked = RunMetalStep("xcrun metallib", link, logPath, error);
   std::remove(airPath.c_str());

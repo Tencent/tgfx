@@ -1011,6 +1011,21 @@ if (TGFX_EMBED_SHADER_BUNDLES)
             set(TGFX_SHADER_TOOL_COMMAND shader_build_tool)
             set(TGFX_SHADER_TOOL_DEPENDS shader_build_tool)
         endif ()
+        # A metallib only works on the platform it was compiled for (a macOS one fails to create a
+        # pipeline on an iOS device or in the simulator), so an iOS build compiles it for its own
+        # SDK and deployment target. macOS builds keep the tool's defaults.
+        set(TGFX_SHADER_TOOL_METAL_ARGS "")
+        if (IOS AND "metal" IN_LIST TGFX_SHADER_BACKENDS)
+            string(TOLOWER "${CMAKE_OSX_SYSROOT};${SDK_NAME}" TGFX_IOS_SDK_HINT)
+            if (TGFX_IOS_SDK_HINT MATCHES "simulator")
+                set(TGFX_METAL_SDK "iphonesimulator")
+            else ()
+                set(TGFX_METAL_SDK "iphoneos")
+            endif ()
+            list(APPEND TGFX_SHADER_TOOL_METAL_ARGS
+                    --metal-sdk ${TGFX_METAL_SDK}
+                    --metal-min-os ${CMAKE_OSX_DEPLOYMENT_TARGET})
+        endif ()
         add_custom_command(
                 OUTPUT ${TGFX_SHADER_BUNDLE_STAMP}
                 BYPRODUCTS ${TGFX_SHADER_BUNDLE_FILES} ${TGFX_SHADER_MANIFEST_FILES}
@@ -1018,6 +1033,7 @@ if (TGFX_EMBED_SHADER_BUNDLES)
                         --shader-dir ${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/shaders/glsl
                         --out-dir ${TGFX_SHADER_BUNDLE_DIR}
                         --backends ${TGFX_SHADER_BACKENDS_ARG}
+                        ${TGFX_SHADER_TOOL_METAL_ARGS}
                         --compress
                 COMMAND ${CMAKE_COMMAND} -E touch ${TGFX_SHADER_BUNDLE_STAMP}
                 DEPENDS ${TGFX_SHADER_TOOL_DEPENDS} ${TGFX_SHADER_SOURCES}

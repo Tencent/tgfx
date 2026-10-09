@@ -88,6 +88,9 @@ struct BuildOptions {
   // Persistent stage cache. Defaults to <out-dir>/stage_cache; --no-cache keeps it memory-only.
   std::string cacheDir;
   bool noCache = false;
+  // The platform the Metal bundle is compiled for (see SetMetalTarget).
+  std::string metalSdk = "macosx";
+  std::string metalMinOS;
 };
 
 struct ShaderReport {
@@ -196,7 +199,10 @@ static void PrintUsage() {
       << "                        missing one is a violation. Without it, missing bundles pass\n"
       << "  --compress            Compress data pool with zlib in output bundles\n"
       << "  --cache-dir <path>    Persistent stage cache (default: <out-dir>/stage_cache)\n"
-      << "  --no-cache            Compile every stage, reading and writing no persistent cache\n";
+      << "  --no-cache            Compile every stage, reading and writing no persistent cache\n"
+      << "  --metal-sdk <sdk>     Platform of the Metal bundle: macosx (default), iphoneos or\n"
+      << "                        iphonesimulator. A metallib only works on its own platform\n"
+      << "  --metal-min-os <ver>  Minimum OS version of the Metal bundle, e.g. 15.0\n";
 }
 
 static std::vector<std::string> SplitByComma(const std::string& input) {
@@ -242,6 +248,10 @@ static bool ParseArgs(int argc, char** argv, BuildOptions* options) {
       options->cacheDir = argv[++i];
     } else if (std::strcmp(argv[i], "--no-cache") == 0) {
       options->noCache = true;
+    } else if (std::strcmp(argv[i], "--metal-sdk") == 0 && i + 1 < argc) {
+      options->metalSdk = argv[++i];
+    } else if (std::strcmp(argv[i], "--metal-min-os") == 0 && i + 1 < argc) {
+      options->metalMinOS = argv[++i];
     } else {
       std::cerr << "Unknown option: " << argv[i] << "\n";
       PrintUsage();
@@ -1339,6 +1349,11 @@ static int RunAuditMode() {
 int main(int argc, char** argv) {
   tgfx::BuildOptions options;
   if (!tgfx::ParseArgs(argc, argv, &options)) {
+    return 1;
+  }
+  std::string targetError;
+  if (!tgfx::SetMetalTarget(options.metalSdk, options.metalMinOS, &targetError)) {
+    std::cerr << "ERROR: " << targetError << "\n";
     return 1;
   }
 

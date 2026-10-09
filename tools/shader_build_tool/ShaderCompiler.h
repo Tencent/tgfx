@@ -66,6 +66,15 @@ CompileResult CompileGLSLToWGSL(const std::string& source, ShaderStageType stage
 std::vector<uint8_t> CompileMSLToMetallib(const std::string& mslSource, ShaderStageType stage,
                                           std::string* error = nullptr);
 
+/// Selects the platform the Metal bundle is compiled for: the SDK (macosx, iphoneos or
+/// iphonesimulator) and, optionally, the minimum OS version. A metallib is tied to the platform it
+/// was compiled for: one built for macOS fails to create a pipeline on an iOS device or simulator,
+/// and an iOS one fails on macOS devices that are not in the simulator. The default is the macOS
+/// SDK with no minimum version, what the tool produced before the target was selectable. Must be
+/// called before anything is compiled or digested. Returns false with *error on an unknown SDK or a
+/// malformed version.
+bool SetMetalTarget(const std::string& sdk, const std::string& minOS, std::string* error);
+
 /// Describes how metallibs are produced (compiler invocation, link command, and the
 /// TGFX_METAL_EXTRA_FLAGS experiment hook). Part of the Metal bundle's source digest: a different
 /// invocation can produce different binaries from identical shader text.
