@@ -329,6 +329,14 @@ if (TGFX_BUILD_SVG OR TGFX_BUILD_PDF OR ANDROID)
     endif ()
 endif ()
 
+if (WEB)
+    # PrecompiledShaderCache.cpp includes zlib.h unconditionally (it inflates the legacy zlib data
+    # pools of older bundles), whether or not bundles are embedded. Android, iOS and OHOS get the
+    # header from their SDK and the desktop platforms through PNG, but a Web build that does not
+    # decode PNG has neither, and failed to compile with "'zlib.h' file not found".
+    set(TGFX_USE_ZLIB ON)
+endif ()
+
 if (TGFX_USE_ZLIB)
     list(APPEND TGFX_STATIC_VENDORS zlib)
     list(APPEND TGFX_INCLUDES third_party/out/zlib/${INCLUDE_ENTRY})
