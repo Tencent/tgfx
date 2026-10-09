@@ -63,6 +63,14 @@ class Drawable {
     return _colorSpace;
   }
 
+  /**
+   * Returns true for internal automatic-path frames (WindowFrame). Used instead of
+   * dynamic_cast, which is unavailable because the project is built without RTTI.
+   */
+  virtual bool isWindowFrame() const {
+    return false;
+  }
+
  protected:
   Drawable(int width, int height, std::shared_ptr<ColorSpace> colorSpace);
 
@@ -118,14 +126,6 @@ class Drawable {
    * Context::present().
    */
   void markPresentationRequested();
-
-  /**
-   * Returns true for internal automatic-path frames (WindowFrame). Used instead of
-   * dynamic_cast, which is unavailable because the project is built without RTTI.
-   */
-  virtual bool isWindowFrame() const {
-    return false;
-  }
 
   std::shared_ptr<Window> _window = nullptr;
   std::shared_ptr<RenderTargetProxy> _importedTarget = nullptr;
