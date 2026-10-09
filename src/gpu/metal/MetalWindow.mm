@@ -155,9 +155,13 @@ bool MetalWindow::onSchedulePresentation(
   auto metalQueue = static_cast<MetalCommandQueue*>(context->gpu()->queue());
   for (const auto& renderTarget : renderTargets) {
     auto proxy = std::static_pointer_cast<MetalDrawableProxy>(renderTarget);
-    auto drawable = proxy->getMetalDrawable();
-    if (drawable != nil) {
-      metalQueue->schedulePresent(drawable);
+    // Only schedule drawables whose render target was created successfully; scheduling a
+    // drawable from a failed getRenderTarget() would present an unrendered frame.
+    if (proxy->hasRenderTarget()) {
+      auto drawable = proxy->getMetalDrawable();
+      if (drawable != nil) {
+        metalQueue->schedulePresent(drawable);
+      }
     }
   }
   return true;
