@@ -19,6 +19,7 @@
 #include "MetalDrawableProxy.h"
 #import <Metal/Metal.h>
 #include "gpu/metal/MetalCommandQueue.h"
+#include "gpu/metal/MetalDrawable.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/GPU.h"
@@ -68,22 +69,16 @@ std::shared_ptr<TextureView> MetalDrawableProxy::getTextureView() const {
 
 std::shared_ptr<RenderTarget> MetalDrawableProxy::getRenderTarget() const {
   if (_renderTarget == nullptr) {
-    id<CAMetalDrawable> drawable = nil;
-    @autoreleasepool {
-      drawable = [[_metalLayer nextDrawable] retain];
-    }
+    // Frame acquisition and texture wrapping are shared with MetalDrawable (the explicit
+    // single-frame path) so the acquire/render/present mechanism exists exactly once.
+    auto drawable = MetalDrawable::AcquireMetalDrawable(_metalLayer);
     if (drawable == nil) {
       return nullptr;
     }
     [_metalDrawable release];
     _metalDrawable = drawable;
-    MetalTextureInfo metalInfo = {};
-    metalInfo.texture = (__bridge const void*)_metalDrawable.texture;
-    metalInfo.format = static_cast<unsigned>(_metalDrawable.texture.pixelFormat);
-    auto textureWidth = static_cast<int>(_metalDrawable.texture.width);
-    auto textureHeight = static_cast<int>(_metalDrawable.texture.height);
-    BackendRenderTarget backendRT(metalInfo, textureWidth, textureHeight);
-    _renderTarget = RenderTarget::MakeFrom(_context, backendRT, ImageOrigin::TopLeft);
+    _renderTarget = RenderTarget::MakeFrom(
+        _context, MetalDrawable::MakeBackendRenderTarget(_metalDrawable), ImageOrigin::TopLeft);
     if (_renderTarget == nullptr) {
       // The render target creation failed; do not schedule a present for this unusable frame.
       // A later call retries with a fresh drawable.

@@ -27,17 +27,30 @@
 
 namespace tgfx {
 
-std::shared_ptr<MetalDrawable> MetalDrawable::Make(CAMetalLayer* metalLayer,
-                                                   std::shared_ptr<ColorSpace> colorSpace) {
+id<CAMetalDrawable> MetalDrawable::AcquireMetalDrawable(CAMetalLayer* metalLayer) {
   if (metalLayer == nil) {
-    return nullptr;
+    return nil;
   }
   id<CAMetalDrawable> metalDrawable = nil;
   @autoreleasepool {
     // nextDrawable returns an autoreleased (+0) drawable; retain it inside the pool so the
-    // reference stays valid after the pool drains. The constructor takes over this retain.
+    // reference stays valid after the pool drains. The caller takes over this retain.
     metalDrawable = [[metalLayer nextDrawable] retain];
   }
+  return metalDrawable;
+}
+
+BackendRenderTarget MetalDrawable::MakeBackendRenderTarget(id<CAMetalDrawable> drawable) {
+  MetalTextureInfo metalInfo = {};
+  metalInfo.texture = (__bridge const void*)drawable.texture;
+  metalInfo.format = static_cast<unsigned>(drawable.texture.pixelFormat);
+  return BackendRenderTarget(metalInfo, static_cast<int>(drawable.texture.width),
+                             static_cast<int>(drawable.texture.height));
+}
+
+std::shared_ptr<MetalDrawable> MetalDrawable::Make(CAMetalLayer* metalLayer,
+                                                   std::shared_ptr<ColorSpace> colorSpace) {
+  auto metalDrawable = AcquireMetalDrawable(metalLayer);
   if (metalDrawable == nil) {
     return nullptr;
   }
@@ -60,11 +73,8 @@ MetalDrawable::~MetalDrawable() {
 }
 
 std::shared_ptr<RenderTargetProxy> MetalDrawable::onImport(Context* context) {
-  MetalTextureInfo metalInfo = {};
-  metalInfo.texture = (__bridge const void*)_metalDrawable.texture;
-  metalInfo.format = static_cast<unsigned>(_metalDrawable.texture.pixelFormat);
-  BackendRenderTarget backendRT(metalInfo, width(), height());
-  return RenderTargetProxy::MakeFrom(context, backendRT, ImageOrigin::TopLeft);
+  return RenderTargetProxy::MakeFrom(context, MakeBackendRenderTarget(_metalDrawable),
+                                     ImageOrigin::TopLeft);
 }
 
 bool MetalDrawable::onSchedulePresent(Context* context) {

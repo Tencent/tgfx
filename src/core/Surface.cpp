@@ -241,6 +241,11 @@ std::shared_ptr<SurfaceReadback> Surface::asyncReadPixels(const Rect& rect) {
     // readback; the content is no longer defined or not copyable.
     return nullptr;
   }
+  if (_window != nullptr && !_window->supportsReadback()) {
+    // The automatic window path shares the same capability gate as the drawable path, so an
+    // unsupported window fails cleanly instead of enqueueing an invalid copy.
+    return nullptr;
+  }
   auto surfaceRect = Rect::MakeWH(width(), height());
   if (!surfaceRect.contains(rect)) {
     return nullptr;

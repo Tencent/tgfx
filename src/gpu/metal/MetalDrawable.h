@@ -20,6 +20,7 @@
 
 #import <QuartzCore/QuartzCore.h>
 #include <memory>
+#include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Drawable.h"
 
 namespace tgfx {
@@ -39,6 +40,21 @@ class MetalDrawable : public Drawable {
    */
   static std::shared_ptr<MetalDrawable> Make(CAMetalLayer* metalLayer,
                                              std::shared_ptr<ColorSpace> colorSpace);
+
+  /**
+   * Acquires the next drawable from the layer, retaining it inside an autorelease pool so the
+   * reference stays valid after the pool drains. The caller takes over the returned (+1)
+   * reference. Shared by MetalDrawable::Make() and MetalDrawableProxy (the automatic path's
+   * stable proxy), so drawable acquisition exists exactly once.
+   */
+  static id<CAMetalDrawable> AcquireMetalDrawable(CAMetalLayer* metalLayer);
+
+  /**
+   * Describes the drawable's texture as a BackendRenderTarget. Shared by
+   * MetalDrawable::onImport() and MetalDrawableProxy so the texture wrapping exists exactly
+   * once.
+   */
+  static BackendRenderTarget MakeBackendRenderTarget(id<CAMetalDrawable> drawable);
 
   ~MetalDrawable() override;
 
