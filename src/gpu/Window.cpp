@@ -69,6 +69,11 @@ bool Window::onSupportsReadback() const {
 void Window::onPresent(Context*, const std::vector<std::shared_ptr<RenderTargetProxy>>&) {
 }
 
+bool Window::onSchedulePresentation(Context*,
+                                    const std::vector<std::shared_ptr<RenderTargetProxy>>&) {
+  return false;
+}
+
 bool Window::hasIndependentPresentationTargets() const {
   return false;
 }

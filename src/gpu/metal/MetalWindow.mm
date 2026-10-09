@@ -20,10 +20,12 @@
 #import <Foundation/Foundation.h>
 #import <MetalKit/MetalKit.h>
 #include "core/utils/Log.h"
+#include "gpu/metal/MetalCommandQueue.h"
 #include "gpu/metal/MetalDefines.h"
 #include "gpu/metal/MetalDrawable.h"
 #include "gpu/metal/MetalDrawableProxy.h"
 #include "platform/apple/CGColorSpaceUtil.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 
@@ -142,6 +144,23 @@ void MetalWindow::onPresent(Context*,
   }
   auto proxy = std::static_pointer_cast<MetalDrawableProxy>(renderTargets.front());
   proxy->releaseDrawable();
+}
+
+bool MetalWindow::onSchedulePresentation(
+    Context* context, const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets) {
+  // Schedule each target's drawable to be presented when the command buffer that carries the
+  // frame's rendering is committed, so that the GPU finishes rendering before the drawable is
+  // displayed on screen. This is the same scheduling the explicit path performs in
+  // MetalDrawable::onSchedulePresent(), unified at submission time.
+  auto metalQueue = static_cast<MetalCommandQueue*>(context->gpu()->queue());
+  for (const auto& renderTarget : renderTargets) {
+    auto proxy = std::static_pointer_cast<MetalDrawableProxy>(renderTarget);
+    auto drawable = proxy->getMetalDrawable();
+    if (drawable != nil) {
+      metalQueue->schedulePresent(drawable);
+    }
+  }
+  return true;
 }
 
 bool MetalWindow::hasIndependentPresentationTargets() const {

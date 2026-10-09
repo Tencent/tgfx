@@ -50,6 +50,14 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
    */
   bool hasPendingFrame() const;
 
+  /**
+   * Registers the acquired frame's presentation with the command queue, wiring the
+   * acquire/present semaphore pair into the upcoming submission. Called at submission time by
+   * the drawable pipeline (automatic and explicit paths alike). In manual present mode the
+   * actual vkQueuePresentKHR stays deferred to presentFrame().
+   */
+  void schedulePresent();
+
   void releaseFrame();
   void presentFrame();
 
@@ -78,6 +86,9 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
   mutable uint32_t _currentImageIndex = 0;
   mutable std::shared_ptr<RenderTarget> _renderTarget = nullptr;
   mutable std::shared_ptr<VulkanFrameState> _frameState = nullptr;
+  // The acquire semaphore of the pending frame, created per acquisition and handed to the
+  // command queue in schedulePresent(); destroyed with the in-flight submission's fence.
+  mutable VkSemaphore _pendingImageAvailableSemaphore = VK_NULL_HANDLE;
   bool _manualPresent = false;
   bool _presentationRequested = false;
 };

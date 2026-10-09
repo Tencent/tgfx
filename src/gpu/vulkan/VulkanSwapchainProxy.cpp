@@ -38,6 +38,11 @@ VulkanSwapchainProxy::VulkanSwapchainProxy(
 }
 
 VulkanSwapchainProxy::~VulkanSwapchainProxy() {
+  if (_pendingImageAvailableSemaphore != VK_NULL_HANDLE) {
+    // The frame was acquired but never scheduled; destroy the unused semaphore.
+    vkDestroySemaphore(_gpu->device(), _pendingImageAvailableSemaphore, nullptr);
+    _pendingImageAvailableSemaphore = VK_NULL_HANDLE;
+  }
   releaseManualToken();
 }
 
@@ -103,6 +108,9 @@ std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
     vkDestroySemaphore(_gpu->device(), imageAvailableSemaphore, nullptr);
     return nullptr;
   }
+  // Keep the acquire semaphore for the submission-time schedulePresent(); it is handed to the
+  // command queue there and destroyed with the in-flight submission's fence.
+  _pendingImageAvailableSemaphore = imageAvailableSemaphore;
 
   auto& imageState = _imageStates[_currentImageIndex];
   auto texture = VulkanTexture::MakeFrom(_gpu, _images[_currentImageIndex], _format, _width,
@@ -124,11 +132,24 @@ std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
   }
 
   _frameState = std::make_shared<VulkanFrameState>(_manualPresent);
+  return _renderTarget;
+}
+
+void VulkanSwapchainProxy::schedulePresent() {
+  // Called at submission time (VulkanWindow::onSchedulePresentation() for the automatic path,
+  // the drawable pipeline for the explicit path), so the presentation is registered with the
+  // submission that carries the frame's rendering commands. In manual present mode the
+  // registration only wires the acquire/present semaphore pair; the actual vkQueuePresentKHR is
+  // deferred to presentFrame().
+  if (_renderTarget == nullptr || _pendingImageAvailableSemaphore == VK_NULL_HANDLE) {
+    return;
+  }
+  auto& imageState = _imageStates[_currentImageIndex];
   auto queue = static_cast<VulkanCommandQueue*>(_context->gpu()->queue());
   queue->schedulePresent(_swapchain, _currentImageIndex, _images[_currentImageIndex],
-                         imageAvailableSemaphore, imageState->presentSemaphore, imageState->layout,
-                         _outOfDate, _frameState, _manualPresent);
-  return _renderTarget;
+                         _pendingImageAvailableSemaphore, imageState->presentSemaphore,
+                         imageState->layout, _outOfDate, _frameState, _manualPresent);
+  _pendingImageAvailableSemaphore = VK_NULL_HANDLE;
 }
 
 bool VulkanSwapchainProxy::hasPendingFrame() const {
@@ -136,6 +157,12 @@ bool VulkanSwapchainProxy::hasPendingFrame() const {
 }
 
 void VulkanSwapchainProxy::releaseFrame() {
+  if (_pendingImageAvailableSemaphore != VK_NULL_HANDLE) {
+    // The frame was acquired but its presentation was never scheduled; destroy the unused
+    // semaphore (it was never waited on, so this is safe).
+    vkDestroySemaphore(_gpu->device(), _pendingImageAvailableSemaphore, nullptr);
+    _pendingImageAvailableSemaphore = VK_NULL_HANDLE;
+  }
   _renderTarget = nullptr;
   // The frame state was consumed by the render submission, so a new frame can be acquired.
   _frameState = nullptr;

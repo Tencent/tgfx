@@ -832,6 +832,18 @@ void VulkanWindow::onPresent(Context*,
   proxy->releaseFrame();
 }
 
+bool VulkanWindow::onSchedulePresentation(
+    Context*, const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets) {
+  // Register each target's presentation with the command queue, wiring the acquire/present
+  // semaphore pair into the upcoming submission. This is the same registration the explicit
+  // path performs through VulkanSwapchainProxy::schedulePresent(), unified at submission time.
+  for (const auto& renderTarget : renderTargets) {
+    auto proxy = std::static_pointer_cast<VulkanSwapchainProxy>(renderTarget);
+    proxy->schedulePresent();
+  }
+  return true;
+}
+
 bool VulkanWindow::hasIndependentPresentationTargets() const {
   return true;
 }

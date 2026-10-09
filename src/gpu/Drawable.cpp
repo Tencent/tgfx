@@ -44,6 +44,12 @@ void Drawable::abandon() {
   releaseFrameHandles();
 }
 
+void Drawable::markPresentationRequested() {
+  if (_delivery == Delivery::Imported || _delivery == Delivery::Acquired) {
+    _delivery = Delivery::PresentRequested;
+  }
+}
+
 std::shared_ptr<RenderTargetProxy> Drawable::import(Context* context) {
   if (context == nullptr || _window == nullptr) {
     return nullptr;

@@ -70,7 +70,9 @@ std::shared_ptr<TextureView> MetalDrawableProxy::getTextureView() const {
 std::shared_ptr<RenderTarget> MetalDrawableProxy::getRenderTarget() const {
   if (_renderTarget == nullptr) {
     // Frame acquisition and texture wrapping are shared with MetalDrawable (the explicit
-    // single-frame path) so the acquire/render/present mechanism exists exactly once.
+    // single-frame path) so the acquire/render/present mechanism exists exactly once. The
+    // presentation is scheduled by MetalWindow::onSchedulePresentation() at submission time,
+    // together with the explicit path.
     auto drawable = MetalDrawable::AcquireMetalDrawable(_metalLayer);
     if (drawable == nil) {
       return nullptr;
@@ -84,12 +86,6 @@ std::shared_ptr<RenderTarget> MetalDrawableProxy::getRenderTarget() const {
       // A later call retries with a fresh drawable.
       return nullptr;
     }
-    // Schedule the drawable to be presented when the command buffer is committed, so that the
-    // GPU finishes rendering before the drawable is displayed on screen. The command buffer
-    // retains the drawable until it completes, so the proxy can drop its reference once the
-    // presentation has been scheduled (see releaseDrawable()).
-    auto metalQueue = static_cast<MetalCommandQueue*>(_context->gpu()->queue());
-    metalQueue->schedulePresent(_metalDrawable);
   }
   return _renderTarget;
 }

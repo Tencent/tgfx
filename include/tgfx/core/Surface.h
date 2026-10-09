@@ -234,6 +234,9 @@ class Surface {
   Canvas* canvas = nullptr;
   std::shared_ptr<Image> cachedImage = nullptr;
   std::shared_ptr<Window> _window = nullptr;
+  // The current automatic-path frame collected for this surface; keeps the frame (and its
+  // window) alive until delivery. See RenderContext and DrawingManager::collectWindow().
+  std::shared_ptr<Drawable> _autoFrame = nullptr;
   std::shared_ptr<Drawable> _drawable = nullptr;
 
   static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,

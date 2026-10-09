@@ -110,6 +110,20 @@ class Window : public std::enable_shared_from_this<Window> {
                          const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets);
 
   /**
+   * Called while the drawing buffer that carries the automatic frame's rendering commands is
+   * about to be submitted (after encoding, before the command buffer is submitted). Backends
+   * that encode the presentation into the command buffer (Metal's presentDrawable, Vulkan's
+   * PresentInfo) override this to schedule those targets' presentations onto the upcoming
+   * submission. Backends that present after submission (GL swap, QGL compositor) keep the
+   * default no-op. Returns true when the presentation has been attached; the return value is
+   * informational and does not skip onPresent().
+   * @param context The Context that is about to submit the frame's rendering commands.
+   * @param renderTargets The render targets that produced the frame being presented.
+   */
+  virtual bool onSchedulePresentation(
+      Context* context, const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets);
+
+  /**
    * Returns true if every RenderTargetProxy represents an independently presentable frame. The
    * default is false for backends where all proxies target one shared native backbuffer.
    */
@@ -136,5 +150,6 @@ class Window : public std::enable_shared_from_this<Window> {
   friend class DrawingManager;
   friend class Surface;
   friend class WindowDrawable;
+  friend class WindowFrame;
 };
 }  // namespace tgfx

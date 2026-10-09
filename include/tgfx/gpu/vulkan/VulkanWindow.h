@@ -95,6 +95,9 @@ class VulkanWindow : public Window {
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
   void onPresent(Context* context,
                  const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets) override;
+  bool onSchedulePresentation(
+      Context* context,
+      const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets) override;
   bool hasIndependentPresentationTargets() const override;
   std::shared_ptr<Drawable> onNextDrawable() override;
   bool onSupportsReadback() const override;

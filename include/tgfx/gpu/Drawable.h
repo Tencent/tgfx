@@ -103,6 +103,13 @@ class Drawable {
    */
   void abandon();
 
+  /**
+   * Marks the frame as having a registered presentation request. Used by internal automatic-path
+   * frames (WindowFrame), whose presentation is registered at construction instead of through
+   * Context::present().
+   */
+  void markPresentationRequested();
+
   std::shared_ptr<Window> _window = nullptr;
   std::shared_ptr<RenderTargetProxy> _importedTarget = nullptr;
 

@@ -19,6 +19,7 @@
 #include "DrawingManager.h"
 #include "ProxyProvider.h"
 #include "core/AtlasManager.h"
+#include "gpu/WindowFrame.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/GenerateMipmapsTask.h"
@@ -185,29 +186,37 @@ void DrawingManager::collectDrawable(std::shared_ptr<Drawable> drawable) {
   drawingBuffer->drawables.push_back(std::move(drawable));
 }
 
-void DrawingManager::collectWindow(std::shared_ptr<Window> window,
-                                   std::shared_ptr<RenderTargetProxy> renderTarget) {
+std::shared_ptr<Drawable> DrawingManager::collectWindow(
+    std::shared_ptr<Window> window, std::shared_ptr<RenderTargetProxy> renderTarget) {
   if (window == nullptr || renderTarget == nullptr) {
-    return;
+    return nullptr;
   }
   auto drawingBuffer = getDrawingBuffer();
-  auto& presentations = drawingBuffer->windowPresentations;
+  // The automatic path shares the drawable pipeline: each flush cycle collects a WindowFrame per
+  // window (per target for backends with independent presentation targets), which registers its
+  // presentation at construction and is delivered by presentDrawables() after submission.
+  auto& frames = drawingBuffer->drawables;
   auto independentTargets = window->hasIndependentPresentationTargets();
-  for (auto& presentation : presentations) {
-    if (presentation.window.lock() != window) {
+  for (auto& pendingFrame : frames) {
+    auto frame = std::dynamic_pointer_cast<WindowFrame>(pendingFrame.lock());
+    if (frame == nullptr || !frame->isForWindow(window)) {
       continue;
     }
-    for (const auto& target : presentation.renderTargets) {
-      if (target == renderTarget) {
-        return;
-      }
+    if (frame->hasTarget(renderTarget)) {
+      return frame;
     }
     if (!independentTargets) {
-      presentation.renderTargets.push_back(std::move(renderTarget));
-      return;
+      frame->addTarget(std::move(renderTarget));
+      return frame;
     }
   }
-  presentations.push_back({std::move(window), {std::move(renderTarget)}});
+  auto frame = WindowFrame::Make(std::move(window), std::move(renderTarget));
+  if (frame != nullptr) {
+    frames.push_back(frame);
+  }
+  // The frame is returned so the collecting Surface can hold a strong reference across the
+  // flush boundary; the buffer itself only keeps a weak entry to stay cycle-free.
+  return frame;
 }
 
 std::shared_ptr<DrawingBuffer> DrawingManager::flush() {

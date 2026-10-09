@@ -94,14 +94,14 @@ std::unique_ptr<Recording> Context::flush(BackendSemaphore* signalSemaphore) {
   }
   _atlasManager->postFlush();
   _proxyProvider->purgeExpiredProxies();
-  // The Recording keeps the presented windows alive so their pending presentations are still
-  // delivered if it is submitted after the surfaces and windows themselves are released. The
-  // pending queue keeps the buffer itself alive so the common flush()-discard pattern (submit
-  // later without holding the Recording) still works.
+  // The Recording keeps the collected frames (and their windows) alive so their pending
+  // presentations are still delivered if it is submitted after the surfaces and windows
+  // themselves are released. The pending queue keeps the buffer itself alive so the common
+  // flush()-discard pattern (submit later without holding the Recording) still works.
   pendingDrawingBuffers.push_back(drawingBuffer);
   return std::unique_ptr<Recording>(new Recording(uniqueID(), drawingBuffer->uniqueID(),
                                                   drawingBuffer->generation(),
-                                                  drawingBuffer->collectRetainedWindows()));
+                                                  drawingBuffer->collectRetainedDrawables()));
 }
 
 std::shared_ptr<DrawingBuffer> Context::getDrawingBuffer(const Recording* recording) const {
@@ -149,7 +149,6 @@ void Context::submit(std::unique_ptr<Recording> recording, bool syncCpu) {
       // presentation is encoded with the submission that carries its frame's rendering.
       drawingBuffer->schedulePendingPresents(this);
       queue->submit(std::move(commandBuffer));
-      drawingBuffer->presentWindows(this);
       drawingBuffer->presentDrawables(this);
       pendingDrawingBuffers.pop_front();
       if (isLast) {

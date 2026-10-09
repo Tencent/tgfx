@@ -273,7 +273,9 @@ RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t 
     opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags,
                                                      PMColor::Transparent(), _colorSpace);
     if (surface && surface->_window) {
-      drawingManager->collectWindow(surface->_window, renderTarget);
+      // The Surface keeps the automatic frame alive until it is delivered; the drawing buffer
+      // only holds a weak entry (and the Recording holds it across the flush boundary).
+      surface->_autoFrame = drawingManager->collectWindow(surface->_window, renderTarget);
     }
     if (surface && surface->_drawable) {
       drawingManager->collectDrawable(surface->_drawable);
@@ -491,7 +493,7 @@ OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
     opsCompositor =
         drawingManager->addOpsCompositor(renderTarget, renderFlags, std::nullopt, _colorSpace);
     if (surface && surface->_window) {
-      drawingManager->collectWindow(surface->_window, renderTarget);
+      surface->_autoFrame = drawingManager->collectWindow(surface->_window, renderTarget);
     }
     if (surface && surface->_drawable) {
       drawingManager->collectDrawable(surface->_drawable);

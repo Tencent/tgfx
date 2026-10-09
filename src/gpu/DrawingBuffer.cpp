@@ -60,25 +60,14 @@ std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
   return commandBuffer;
 }
 
-void DrawingBuffer::presentWindows(Context* context) {
-  for (auto& presentation : windowPresentations) {
-    // A window that has been destroyed (its Recording and Surface are gone) is skipped: the
-    // presentation is dropped together with the window.
-    if (auto window = presentation.window.lock()) {
-      window->onPresent(context, presentation.renderTargets);
+std::vector<std::shared_ptr<Drawable>> DrawingBuffer::collectRetainedDrawables() const {
+  std::vector<std::shared_ptr<Drawable>> retainedDrawables = {};
+  for (const auto& pendingDrawable : drawables) {
+    if (auto drawable = pendingDrawable.lock()) {
+      retainedDrawables.push_back(std::move(drawable));
     }
   }
-  windowPresentations.clear();
-}
-
-std::vector<std::shared_ptr<Window>> DrawingBuffer::collectRetainedWindows() const {
-  std::vector<std::shared_ptr<Window>> windows = {};
-  for (const auto& presentation : windowPresentations) {
-    if (auto window = presentation.window.lock()) {
-      windows.push_back(std::move(window));
-    }
-  }
-  return windows;
+  return retainedDrawables;
 }
 
 void DrawingBuffer::schedulePendingPresents(Context* context) {
@@ -99,11 +88,10 @@ void DrawingBuffer::presentDrawables(Context* context) {
 }
 
 bool DrawingBuffer::empty() const {
-  // Note that drawables and windowPresentations are intentionally not part of the emptiness
-  // check: drawable and window surfaces are always created with clearAll set to true, so their
-  // construction already queues a clear task, and collecting a drawable or a window presentation
-  // therefore always comes with at least one task to encode. This is an implicit contract
-  // between RenderContext, DrawingManager, and Surface.
+  // Note that drawables are intentionally not part of the emptiness check: drawable and window
+  // surfaces are always created with clearAll set to true, so their construction already queues
+  // a clear task, and collecting a frame therefore always comes with at least one task to
+  // encode. This is an implicit contract between RenderContext, DrawingManager, and Surface.
   return resourceTasks.empty() && renderTasks.empty() && atlasTasks.empty();
 }
 
@@ -111,7 +99,6 @@ void DrawingBuffer::reset() {
   renderTasks.clear();
   resourceTasks.clear();
   atlasTasks.clear();
-  windowPresentations.clear();
   drawables.clear();
   vertexAllocator.clear(vertexMaxValueTracker.getMaxValue());
   instanceAllocator.clear(instanceMaxValueTracker.getMaxValue());

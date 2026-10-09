@@ -67,11 +67,6 @@ class DrawingBuffer {
   std::shared_ptr<CommandBuffer> encode();
 
   /**
-   * Calls onPresent on all windows after command buffer submission.
-   */
-  void presentWindows(Context* context);
-
-  /**
    * Attaches the pending presentation requests of the collected drawables to the upcoming
    * submission of this buffer, so each presentation is encoded/ordered with the command buffer
    * that carries its frame's rendering commands. Called right before the command buffer is
@@ -86,20 +81,18 @@ class DrawingBuffer {
   void presentDrawables(Context* context);
 
   /**
-   * Returns the windows whose presentations this buffer collected, keeping them alive for the
-   * returned Recording until the buffer is submitted.
+   * Returns the drawables collected by this buffer (explicit frames and automatic window
+   * frames), keeping them and their windows alive for the returned Recording until the buffer
+   * is submitted.
    */
-  std::vector<std::shared_ptr<Window>> collectRetainedWindows() const;
+  std::vector<std::shared_ptr<Drawable>> collectRetainedDrawables() const;
 
  private:
-  // The window is held weakly so a flushed buffer cannot form a strong reference cycle
-  // (Device -> Context -> pending buffers -> Window -> Device). While a Recording or a Surface
-  // for the window is alive, the weak reference resolves and the presentation is delivered;
-  // when both are gone, the presentation is silently dropped along with the window.
-  struct WindowPresentation {
-    std::weak_ptr<Window> window = {};
-    std::vector<std::shared_ptr<RenderTargetProxy>> renderTargets = {};
-  };
+  // All frames — explicit drawables and automatic window frames — go through this single list.
+  // Entries are weak: while a Recording or a Surface keeps a frame alive, its presentation is
+  // delivered; when both are gone, the presentation is silently dropped along with the frame.
+  // The weak entries also prevent a strong reference cycle
+  // (Device -> Context -> pending buffers -> frame -> Window -> Device).
 
   Context* context = nullptr;
   uint32_t _uniqueID = 0;
@@ -113,7 +106,6 @@ class DrawingBuffer {
   std::vector<PlacementPtr<ResourceTask>> resourceTasks = {};
   std::vector<PlacementPtr<RenderTask>> renderTasks = {};
   std::vector<PlacementPtr<AtlasUploadTask>> atlasTasks = {};
-  std::vector<WindowPresentation> windowPresentations = {};
   std::vector<std::weak_ptr<Drawable>> drawables = {};
 
   friend class DrawingManager;
