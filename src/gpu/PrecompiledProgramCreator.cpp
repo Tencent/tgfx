@@ -210,8 +210,21 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   auto cache = context->precompiledShaderCache();
   cache->recordAOTStage(PrecompiledAOTStage::Attempt);
   if (!cache->isLoaded()) {
-    cache->recordArtifactMiss(PrecompiledFallbackReason::CacheNotLoaded,
-                              MakeFallbackRecord(cache, programInfo));
+    // Say why nothing is loaded: a backend or build with no bundle is by design, a rejected bundle
+    // is a defect that needs regenerating. Anything else (TGFX_AOT_DISABLE, a test that unloaded
+    // the cache) keeps the generic reason.
+    auto reason = PrecompiledFallbackReason::CacheNotLoaded;
+    switch (cache->embeddedBundleState()) {
+      case EmbeddedBundleState::NoBundleForBackend:
+        reason = PrecompiledFallbackReason::NoBundleForBackend;
+        break;
+      case EmbeddedBundleState::Rejected:
+        reason = PrecompiledFallbackReason::BundleRejected;
+        break;
+      default:
+        break;
+    }
+    cache->recordArtifactMiss(reason, MakeFallbackRecord(cache, programInfo));
     return nullptr;
   }
   cache->recordAOTStage(PrecompiledAOTStage::CacheAvailable);

@@ -838,7 +838,18 @@ endif ()
 # This section builds shader_build_tool, generates precompiled shader bundles, and embeds them
 # into libtgfx. It is independent of TGFX_BUILD_TESTS so that production builds also benefit
 # from precompiled shaders. Set TGFX_EMBED_SHADER_BUNDLES=OFF to disable embedding entirely.
-if (TGFX_EMBED_SHADER_BUNDLES)
+# The D3D12 backend has no precompiled shader support (ExpectedProfileTag in
+# src/gpu/PrecompiledBundleIdentity.h has no tag for it, so a bundle could never be loaded), and
+# its builds used to generate and embed an OpenGL bundle that no D3D12 context can use. Skip the
+# whole section for it: no tool build, no generation, nothing embedded. Contexts report the
+# resulting runtime fallbacks as NoBundleForBackend.
+set(TGFX_BUNDLES_SUPPORTED ON)
+if (TGFX_USE_D3D12)
+    set(TGFX_BUNDLES_SUPPORTED OFF)
+    message(STATUS "Shader bundles: not generated, the D3D12 backend has no precompiled shader "
+            "support")
+endif ()
+if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
   # The tool runs on the build host only; web builds consume prebuilt bundles and never
   # compile the tool (a wasm tool cannot shell out to host compilers anyway). A cross build
   # (Android, iOS, OHOS) must not compile it with the target toolchain either: the result is an

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Context.h"
+#include <atomic>
 #include <cstdlib>
 #include "core/AtlasManager.h"
 #include "core/AtlasStrikeCache.h"
@@ -27,6 +28,7 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
+#include "gpu/PrecompiledBundleIdentity.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ResourceCache.h"
@@ -53,9 +55,36 @@ Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {
   // TGFX_AOT_DISABLE=1 skips the embedded bundle so the runtime route can be exercised directly
   // (test-suite A/B comparisons against the precompiled path).
   if (std::getenv("TGFX_AOT_DISABLE") == nullptr) {
-    auto [bundleData, bundleSize] = EmbeddedShaderBundles::GetBundle(_gpu->info()->backend);
+    auto backend = _gpu->info()->backend;
+    auto [bundleData, bundleSize] = EmbeddedShaderBundles::GetBundle(backend);
     if (bundleData != nullptr && bundleSize > 0) {
-      _precompiledShaderCache->loadBundle(bundleData, bundleSize);
+      bool loaded = _precompiledShaderCache->loadBundle(bundleData, bundleSize);
+      _precompiledShaderCache->setEmbeddedBundleState(loaded ? EmbeddedBundleState::Loaded
+                                                             : EmbeddedBundleState::Rejected);
+      // loadBundle has logged the specific reason; this line says what it means for rendering.
+      // Once per process: tests and apps create many Contexts, and the cause is the same.
+      static std::atomic_flag rejectedReported = ATOMIC_FLAG_INIT;
+      if (!loaded && !rejectedReported.test_and_set()) {
+        LOGE(
+            "Context: the precompiled shader bundle embedded for this backend was REJECTED (reason "
+            "logged above). It is damaged or was built for another toolchain; every draw takes "
+            "the runtime shader path until the bundle is regenerated.");
+      }
+    } else {
+      _precompiledShaderCache->setEmbeddedBundleState(EmbeddedBundleState::NoBundleForBackend);
+      static std::atomic_flag absentReported = ATOMIC_FLAG_INIT;
+      if (!absentReported.test_and_set()) {
+        if (ExpectedProfileTag(backend)[0] == '\0') {
+          LOGI(
+              "Context: this backend has no precompiled shader support; draws use the runtime "
+              "shader path.");
+        } else {
+          LOGI(
+              "Context: this build embeds no precompiled shader bundle for this backend "
+              "(TGFX_EMBED_SHADER_BUNDLES is off, or the bundle was not generated); draws use "
+              "the runtime shader path.");
+        }
+      }
     }
   }
   // TGFX_AOT_DISABLE_DECOMPOSITION keeps the bundle loaded but routes every draw through the plain

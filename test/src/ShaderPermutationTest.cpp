@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <limits>
 #include <set>
@@ -855,6 +856,156 @@ TGFX_TEST(ShaderPermutationTest, EmbeddedBundleIsPresentAndCurrent) {
       << "A zero identity hash marks a legacy bundle without a content check";
   EXPECT_GT(cache->vertexEntryCount(), 0u);
   EXPECT_GT(cache->fragmentEntryCount(), 0u);
+}
+
+// The Context records what became of the embedded bundle, so a run that never loaded it can say
+// whether that was by design or a defect.
+TGFX_TEST(ShaderPermutationTest, ContextRecordsTheEmbeddedBundleState) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto backend = context->backend();
+  if (backend == Backend::D3D12 || backend == Backend::Unknown) {
+    GTEST_SKIP() << "This backend has no precompiled shader bundle";
+  }
+  auto state = context->precompiledShaderCache()->embeddedBundleState();
+  if (std::getenv("TGFX_AOT_DISABLE") != nullptr) {
+    EXPECT_EQ(state, EmbeddedBundleState::NotAttempted)
+        << "TGFX_AOT_DISABLE skips the embedded bundle, which is not a rejection or an absence";
+    return;
+  }
+  auto [data, size] = GetEmbeddedBundle(backend);
+  if (data == nullptr || size == 0) {
+    EXPECT_EQ(state, EmbeddedBundleState::NoBundleForBackend)
+        << "A build that embeds no bundle for the backend must say so, not look rejected";
+    return;
+  }
+  EXPECT_EQ(state, EmbeddedBundleState::Loaded)
+      << "A build whose embedded bundle is present and current must end in Loaded; "
+         "EmbeddedBundleIsPresentAndCurrent says which of the two it is when this fails";
+}
+
+// Puts the cache and the recorded bundle state back after a test that changes them.
+class ScopedEmbeddedStateRestore {
+ public:
+  ScopedEmbeddedStateRestore(PrecompiledShaderCache* cache, Backend backend)
+      : cache(cache), backend(backend), state(cache->embeddedBundleState()),
+        wasLoaded(cache->isLoaded()) {
+  }
+
+  ~ScopedEmbeddedStateRestore() {
+    cache->setEmbeddedBundleState(state);
+    if (wasLoaded && !cache->isLoaded()) {
+      LoadEmbeddedBundle(cache, backend);
+    } else if (!wasLoaded && cache->isLoaded()) {
+      cache->unload();
+    }
+    cache->resetStats();
+  }
+
+  ScopedEmbeddedStateRestore(const ScopedEmbeddedStateRestore&) = delete;
+  ScopedEmbeddedStateRestore& operator=(const ScopedEmbeddedStateRestore&) = delete;
+
+ private:
+  PrecompiledShaderCache* cache = nullptr;
+  Backend backend = Backend::Unknown;
+  EmbeddedBundleState state = EmbeddedBundleState::NotAttempted;
+  bool wasLoaded = false;
+};
+
+// A draw that finds no bundle loaded reports WHY, and the answer differs for a backend or build
+// without a bundle (by design) and a bundle the cache refused (a defect to fix).
+TGFX_TEST(ShaderPermutationTest, FallbackReasonSaysWhyNoBundleIsLoaded) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto backend = context->backend();
+  if (backend == Backend::D3D12 || backend == Backend::Unknown) {
+    GTEST_SKIP() << "This backend has no precompiled shader bundle";
+  }
+  auto* cache = context->precompiledShaderCache();
+  if (!cache->isLoaded()) {
+    GTEST_SKIP() << "The embedded bundle is not loaded in this run (TGFX_AOT_DISABLE)";
+  }
+  ScopedEmbeddedStateRestore restore(cache, backend);
+
+  struct Case {
+    EmbeddedBundleState state;
+    PrecompiledFallbackReason expected;
+    const char* name;
+  };
+  const Case cases[] = {
+      {EmbeddedBundleState::NoBundleForBackend, PrecompiledFallbackReason::NoBundleForBackend,
+       "NoBundleForBackend"},
+      {EmbeddedBundleState::Rejected, PrecompiledFallbackReason::BundleRejected, "Rejected"},
+      {EmbeddedBundleState::NotAttempted, PrecompiledFallbackReason::CacheNotLoaded,
+       "NotAttempted"},
+      {EmbeddedBundleState::Loaded, PrecompiledFallbackReason::CacheNotLoaded,
+       "Loaded, then unloaded"},
+  };
+  const PrecompiledFallbackReason checked[] = {PrecompiledFallbackReason::CacheNotLoaded,
+                                               PrecompiledFallbackReason::NoBundleForBackend,
+                                               PrecompiledFallbackReason::BundleRejected};
+  for (const auto& testCase : cases) {
+    SCOPED_TRACE(testCase.name);
+    // Unloading drops the cached programs, so the draw below has to create one and goes through
+    // the precompiled attempt, which finds the cache empty.
+    cache->unload();
+    cache->setEmbeddedBundleState(testCase.state);
+    cache->resetStats();
+    auto surface = Surface::Make(context, 64, 64);
+    ASSERT_TRUE(surface != nullptr);
+    Paint paint = {};
+    paint.setColor(Color::FromRGBA(255, 0, 0, 255));
+    surface->getCanvas()->drawRect(Rect::MakeXYWH(8, 8, 40, 40), paint);
+    context->flushAndSubmit(true);
+    EXPECT_GT(cache->fallbackCount(testCase.expected), 0u)
+        << "The draw did not record " << PrecompiledFallbackReasonName(testCase.expected);
+    for (auto reason : checked) {
+      if (reason != testCase.expected) {
+        EXPECT_EQ(cache->fallbackCount(reason), 0u)
+            << "The draw also recorded " << PrecompiledFallbackReasonName(reason) << " while the "
+            << "state was " << testCase.name;
+      }
+    }
+  }
+}
+
+// The same question for a real build that embeds nothing for this backend, with nothing simulated:
+// only meaningful there, so it is skipped in every build that does embed a bundle.
+TGFX_TEST(ShaderPermutationTest, DrawsInABuildWithoutABundleReportNoBundleForBackend) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  if (cache->embeddedBundleState() != EmbeddedBundleState::NoBundleForBackend) {
+    GTEST_SKIP() << "This build embeds a bundle for the backend (or AOT is disabled)";
+  }
+  ASSERT_FALSE(cache->isLoaded());
+  cache->unload();  // drops cached programs so the draw below has to create one
+  cache->resetStats();
+  auto surface = Surface::Make(context, 64, 64);
+  ASSERT_TRUE(surface != nullptr);
+  Paint paint = {};
+  paint.setColor(Color::FromRGBA(0, 128, 255, 255));
+  surface->getCanvas()->drawRect(Rect::MakeXYWH(4, 4, 32, 32), paint);
+  context->flushAndSubmit(true);
+  EXPECT_GT(cache->fallbackCount(PrecompiledFallbackReason::NoBundleForBackend), 0u);
+  EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::BundleRejected), 0u);
+  EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::CacheNotLoaded), 0u);
+}
+
+TGFX_TEST(ShaderPermutationTest, FallbackReasonNamesAreDistinct) {
+  std::set<std::string> names;
+  for (size_t i = 0; i < static_cast<size_t>(PrecompiledFallbackReason::Count); ++i) {
+    names.insert(PrecompiledFallbackReasonName(static_cast<PrecompiledFallbackReason>(i)));
+  }
+  EXPECT_EQ(names.size(), static_cast<size_t>(PrecompiledFallbackReason::Count));
+  EXPECT_EQ(names.count("Unknown"), 0u);
+  EXPECT_STREQ(PrecompiledFallbackReasonName(PrecompiledFallbackReason::NoBundleForBackend),
+               "NoBundleForBackend");
+  EXPECT_STREQ(PrecompiledFallbackReasonName(PrecompiledFallbackReason::BundleRejected),
+               "BundleRejected");
 }
 
 static std::vector<uint8_t> MakeTestBundle(const std::string& profileTag, uint32_t vertCount,

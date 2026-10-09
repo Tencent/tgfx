@@ -55,7 +55,28 @@ enum class PrecompiledFallbackReason : uint8_t {
   FragmentModuleCreationFailed,
   PipelineCreationFailed,
   Unspecified,
+  // No bundle is embedded for this backend, so there is nothing to look an artifact up in: the
+  // backend has no precompiled shader support (D3D12), or this build embeds none for it
+  // (TGFX_EMBED_SHADER_BUNDLES off, or the generation step produced nothing). A build property,
+  // not a defect of any artifact.
+  NoBundleForBackend,
+  // A bundle is embedded but the cache refused to load it (toolchain ABI, profile tag, identity
+  // hash, malformed layout). Unlike NoBundleForBackend this is a defect of the build's artifact:
+  // every draw falls back to the runtime path until the bundle is regenerated.
+  BundleRejected,
   Count,
+};
+
+/// What happened to the bundle embedded in the library when a Context was created.
+enum class EmbeddedBundleState : uint8_t {
+  /// The Context did not try to load one (TGFX_AOT_DISABLE, or a cache built standalone).
+  NotAttempted,
+  /// No bundle is embedded for the backend.
+  NoBundleForBackend,
+  /// A bundle is embedded and the cache refused it.
+  Rejected,
+  /// A bundle is embedded and was loaded.
+  Loaded,
 };
 
 enum class PrecompiledAOTStage : uint8_t {
@@ -231,6 +252,17 @@ class PrecompiledShaderCache {
 
   /// Looks up a fragment shader by its 128-bit hash. Returns nullptr if not found.
   const ShaderStageBlob* findFragment(uint64_t hashHi, uint64_t hashLo) const;
+
+  /// What became of the embedded bundle when the owning Context loaded it. Set once by the Context;
+  /// later loadBundle()/unload() calls (tests swap bundles in and out) do not change it. It only
+  /// tells a draw that finds the cache empty WHY: see PrecompiledFallbackReason.
+  EmbeddedBundleState embeddedBundleState() const {
+    return _embeddedBundleState;
+  }
+
+  void setEmbeddedBundleState(EmbeddedBundleState state) {
+    _embeddedBundleState = state;
+  }
 
   /// Returns true if at least one bundle has been loaded.
   bool isLoaded() const {
@@ -467,6 +499,7 @@ class PrecompiledShaderCache {
   std::atomic<bool> missPaused{false};
   std::atomic<bool> deliberateMarking{false};
   std::atomic<bool> _decompositionEnabled{true};
+  EmbeddedBundleState _embeddedBundleState = EmbeddedBundleState::NotAttempted;
   mutable std::mutex diagnosticsMutex = {};
   std::vector<PrecompiledHitRecord> _hitRecords = {};
   std::vector<PrecompiledFallbackRecord> _fallbackRecords = {};

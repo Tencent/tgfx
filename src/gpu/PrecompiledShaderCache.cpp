@@ -57,6 +57,10 @@ const char* PrecompiledFallbackReasonName(PrecompiledFallbackReason reason) {
       return "PipelineCreationFailed";
     case PrecompiledFallbackReason::Unspecified:
       return "Unspecified";
+    case PrecompiledFallbackReason::NoBundleForBackend:
+      return "NoBundleForBackend";
+    case PrecompiledFallbackReason::BundleRejected:
+      return "BundleRejected";
     case PrecompiledFallbackReason::Count:
       return "Count";
   }
