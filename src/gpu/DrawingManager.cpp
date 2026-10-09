@@ -198,8 +198,14 @@ std::shared_ptr<Drawable> DrawingManager::collectWindow(
   auto& frames = drawingBuffer->drawables;
   auto independentTargets = window->hasIndependentPresentationTargets();
   for (auto& pendingFrame : frames) {
-    auto frame = std::dynamic_pointer_cast<WindowFrame>(pendingFrame.lock());
-    if (frame == nullptr || !frame->isForWindow(window)) {
+    // The project is built without RTTI, so the frame type is identified via the
+    // isWindowFrame() marker instead of dynamic_pointer_cast.
+    auto pending = pendingFrame.lock();
+    if (pending == nullptr || !pending->isWindowFrame()) {
+      continue;
+    }
+    auto frame = std::static_pointer_cast<WindowFrame>(pending);
+    if (!frame->isForWindow(window)) {
       continue;
     }
     if (frame->hasTarget(renderTarget)) {
