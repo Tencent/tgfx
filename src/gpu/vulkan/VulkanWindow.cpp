@@ -670,23 +670,15 @@ VulkanWindow::VulkanWindow(std::shared_ptr<Device> device, std::unique_ptr<Platf
 }
 
 VulkanWindow::~VulkanWindow() {
-  auto context = device->lockContext();
-  if (context != nullptr) {
-    auto vulkanGPU = static_cast<VulkanGPU*>(context->gpu());
-    auto vkDevice = vulkanGPU->device();
-    // Ensure all in-flight submissions referencing swapchain images have completed before
-    // destroying the swapchain and its image views.
-    vkDeviceWaitIdle(vkDevice);
-    DestroyImageStates(vkDevice, _platformState->imageStates);
-    DestroySwapchainResources(vkDevice, vulkanGPU->instance(), _platformState->surface,
-                              _platformState->swapchain);
-    device->unlock();
-  } else {
-    vkDeviceWaitIdle(_platformState->cachedDevice);
-    DestroyImageStates(_platformState->cachedDevice, _platformState->imageStates);
-    DestroySwapchainResources(_platformState->cachedDevice, _platformState->cachedInstance,
-                              _platformState->surface, _platformState->swapchain);
-  }
+  // Intentionally do not lock the device here: this destructor may run while a Context is
+  // already locked on the current thread (for example when Drawable::requestPresent() drops the
+  // last window reference inside releaseFrameHandles()), and Device uses a non-recursive mutex.
+  // The cleanup only needs the raw Vulkan handles, and vkDeviceWaitIdle() waits for all queued
+  // work on the device, which is at least as safe as holding the device lock.
+  vkDeviceWaitIdle(_platformState->cachedDevice);
+  DestroyImageStates(_platformState->cachedDevice, _platformState->imageStates);
+  DestroySwapchainResources(_platformState->cachedDevice, _platformState->cachedInstance,
+                            _platformState->surface, _platformState->swapchain);
 }
 
 bool VulkanWindow::PlatformState::recreateSwapchain(VkDevice device,
