@@ -31,6 +31,7 @@ class FileCache {
  public:
   // Returns false when the file cannot be opened. An existing empty file reads as "".
   bool read(const std::string& path, std::string* contents) {
+    // Callers pass normalized paths for includes; the top-level files are read once each anyway.
     auto it = files.find(path);
     if (it == files.end()) {
       std::ifstream file(path);
@@ -57,15 +58,60 @@ std::string FormatChain(const std::vector<std::string>& chain) {
   return text;
 }
 
-// Expands #include "file" lines. Every path resolves against baseDir, the directory of the
-// top-level shader file, exactly as before; nested includes do not switch directories. The output
-// format is unchanged too (an expanded include is followed by an extra newline), because the
-// expanded text feeds both the compiler and the published bundles' source digests.
+std::string DirectoryOf(const std::string& path) {
+  auto slash = path.rfind('/');
+  return slash == std::string::npos ? "." : path.substr(0, slash);
+}
+
+// Resolves "." and "name/.." segments and repeated slashes without touching the file system, so
+// two spellings of one path compare equal: the cycle check and the file cache key on this form.
+// A ".." that has nothing to remove stays (a relative path can legitimately start with one) and
+// is dropped after a root. Symbolic links are not followed, which is the same text-level view a C
+// preprocessor has of an include path.
+std::string NormalizePath(const std::string& path) {
+  bool absolute = !path.empty() && path[0] == '/';
+  std::vector<std::string> parts;
+  size_t start = 0;
+  while (start <= path.size()) {
+    auto slash = path.find('/', start);
+    auto end = slash == std::string::npos ? path.size() : slash;
+    auto part = path.substr(start, end - start);
+    if (part.empty() || part == ".") {
+      // Nothing to add.
+    } else if (part == "..") {
+      if (!parts.empty() && parts.back() != "..") {
+        parts.pop_back();
+      } else if (!absolute) {
+        parts.push_back(part);
+      }
+    } else {
+      parts.push_back(part);
+    }
+    if (slash == std::string::npos) {
+      break;
+    }
+    start = slash + 1;
+  }
+  std::string text = absolute ? "/" : "";
+  for (size_t i = 0; i < parts.size(); ++i) {
+    text += (i == 0 ? "" : "/") + parts[i];
+  }
+  return text.empty() ? "." : text;
+}
+
+// Expands #include "file" lines. An include resolves against the directory of the file that
+// contains it, as a C preprocessor does: for a top-level shader that is its own directory, and for
+// an include found in a subdirectory it is that subdirectory. (Every include in the current
+// sources sits next to the shaders, where this gives the same text as resolving everything against
+// the top-level directory did.) The output format is unchanged: an expanded include is followed by
+// an extra newline, because the expanded text feeds both the compiler and the published bundles'
+// source digests.
 //
-// chain holds the files being expanded, outermost first. A file that is already on the chain is a
-// cycle. Repeating a file that is not on the chain is legal: the slot bind/unbind headers are
-// guardless and included repeatedly on purpose, so no visited set is applied.
-bool ExpandIncludes(const std::string& source, const std::string& baseDir, FileCache* files,
+// chain holds the normalized paths of the files being expanded, outermost first. A file that is
+// already on the chain is a cycle, however its path is spelled. Repeating a file that is not on
+// the chain is legal: the slot bind/unbind headers are guardless and included repeatedly on
+// purpose, so no visited set is applied.
+bool ExpandIncludes(const std::string& source, const std::string& currentDir, FileCache* files,
                     std::vector<std::string>* chain, std::string* result, std::string* error) {
   std::istringstream stream(source);
   std::string line;
@@ -77,7 +123,7 @@ bool ExpandIncludes(const std::string& source, const std::string& baseDir, FileC
           quoteStart == std::string::npos ? std::string::npos : line.find('"', quoteStart + 1);
       if (quoteStart != std::string::npos && quoteEnd != std::string::npos) {
         auto includePath = line.substr(quoteStart + 1, quoteEnd - quoteStart - 1);
-        auto fullPath = baseDir + "/" + includePath;
+        auto fullPath = NormalizePath(currentDir + "/" + includePath);
         if (std::find(chain->begin(), chain->end(), fullPath) != chain->end()) {
           chain->push_back(fullPath);
           *error = "include cycle: " + FormatChain(*chain);
@@ -96,7 +142,8 @@ bool ExpandIncludes(const std::string& source, const std::string& baseDir, FileC
         }
         chain->push_back(fullPath);
         std::string expanded;
-        if (!ExpandIncludes(includeContent, baseDir, files, chain, &expanded, error)) {
+        if (!ExpandIncludes(includeContent, DirectoryOf(fullPath), files, chain, &expanded,
+                            error)) {
           return false;
         }
         chain->pop_back();
@@ -107,11 +154,6 @@ bool ExpandIncludes(const std::string& source, const std::string& baseDir, FileC
     *result += line + "\n";
   }
   return true;
-}
-
-std::string DirectoryOf(const std::string& path) {
-  auto slash = path.rfind('/');
-  return slash == std::string::npos ? "." : path.substr(0, slash);
 }
 
 // Reads one top-level shader file and expands its includes. A missing or empty top-level file is
@@ -127,8 +169,9 @@ bool LoadStage(const std::string& path, FileCache* files, std::string* expanded,
     *error = path + " is empty";
     return false;
   }
-  std::vector<std::string> chain = {path};
-  return ExpandIncludes(source, DirectoryOf(path), files, &chain, expanded, error);
+  auto normalized = NormalizePath(path);
+  std::vector<std::string> chain = {normalized};
+  return ExpandIncludes(source, DirectoryOf(normalized), files, &chain, expanded, error);
 }
 
 }  // namespace

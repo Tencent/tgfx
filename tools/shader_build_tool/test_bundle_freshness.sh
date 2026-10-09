@@ -186,6 +186,38 @@ expect "includes nested past the limit fail the build" fail \
   --backends opengl --compress
 expect_output "the depth limit is reported" "nested deeper than"
 
+# An include resolves against the directory of the file that contains it, as a C preprocessor
+# does, not against the directory of the top-level shader. Both give the same text while every
+# include sits next to the shaders, which is why the difference only shows once a file lives in a
+# subdirectory. The decoy next to the shader would fail the build if it were picked instead of the
+# sibling of the file doing the including.
+copy_sources nested_dir
+mkdir -p "$WORK/nested_dir/$INCLUDE_DIR/sub"
+printf '#include "tgfx_test_sibling.inc"\n' >"$WORK/nested_dir/$INCLUDE_DIR/sub/tgfx_test_outer.inc"
+printf 'float tgfx_nearest_probe() { return 2.0; }\n' \
+  >"$WORK/nested_dir/$INCLUDE_DIR/sub/tgfx_test_sibling.inc"
+printf '#error resolved against the top-level directory instead of the including file\n' \
+  >"$WORK/nested_dir/$INCLUDE_DIR/tgfx_test_sibling.inc"
+printf '\n#include "sub/tgfx_test_outer.inc"\n' >>"$WORK/nested_dir/$SHADER_FILE"
+expect "an include inside a subdirectory resolves its sibling" pass \
+  "$TOOL" --shader-dir "$WORK/nested_dir" --out-dir "$WORK/nested_dir_out" --backends opengl \
+  --compress
+
+# The same file under two spellings is still one file: a file that includes itself as
+# "sub/../name" is a cycle on the first repeat, and the reported chain shows the file by its
+# resolved path rather than by the spelling that led to it.
+copy_sources alias_cycle
+mkdir -p "$WORK/alias_cycle/$INCLUDE_DIR/sub"
+printf '#include "sub/../tgfx_test_alias.inc"\n' >"$WORK/alias_cycle/$INCLUDE_DIR/tgfx_test_alias.inc"
+printf '\n#include "tgfx_test_alias.inc"\n' >>"$WORK/alias_cycle/$SHADER_FILE"
+expect "a cycle through two spellings of one path fails the build" fail \
+  "$TOOL" --shader-dir "$WORK/alias_cycle" --out-dir "$WORK/alias_cycle_out" --backends opengl \
+  --compress
+cp "$WORK/out.txt" "$WORK/alias_cycle_output.txt"
+expect_output "the aliased cycle is reported as a cycle" "include cycle"
+expect "the reported chain has no unresolved .. segment" fail \
+  grep -q 'sub/\.\.' "$WORK/alias_cycle_output.txt"
+
 # Including one file repeatedly is not a cycle: the guardless slot headers rely on it. An empty
 # include file is legal too.
 copy_sources include_repeat
