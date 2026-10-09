@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PrecompiledProgramCreator.h"
+#include <cerrno>
+#include <climits>
 #include <cstdlib>
 #include <cstring>
 #include <iomanip>
@@ -32,6 +34,21 @@
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
+
+// Parses a decimal int the way std::stoi accepts it (leading whitespace, an optional sign, digits,
+// anything after the digits ignored), but reports failure through the return value. Builds that
+// disable exceptions (Android, web) cannot use std::stoi: it signals bad input by throwing.
+static bool ParseInt(const std::string& text, int* value) {
+  const char* begin = text.c_str();
+  char* end = nullptr;
+  errno = 0;
+  long parsed = std::strtol(begin, &end, 10);
+  if (end == begin || errno == ERANGE || parsed < INT_MIN || parsed > INT_MAX) {
+    return false;
+  }
+  *value = static_cast<int>(parsed);
+  return true;
+}
 
 static ShaderCodeFormat FormatForBackend(Backend backend) {
   switch (backend) {
@@ -255,15 +272,13 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
       if (sep != std::string::npos) {
         auto sep2 = token.find(':', sep + 1);
         if (sep2 != std::string::npos) {
-          try {
-            matched = token.substr(0, sep) == name &&
-                      std::stoi(token.substr(sep + 1, sep2 - sep - 1)) ==
-                          static_cast<int>(matchResult->vertPermutationIndex) &&
-                      std::stoi(token.substr(sep2 + 1)) ==
-                          static_cast<int>(matchResult->fragPermutationIndex);
-          } catch (...) {
-            matched = false;
-          }
+          int vertIndex = 0;
+          int fragIndex = 0;
+          matched = token.substr(0, sep) == name &&
+                    ParseInt(token.substr(sep + 1, sep2 - sep - 1), &vertIndex) &&
+                    vertIndex == static_cast<int>(matchResult->vertPermutationIndex) &&
+                    ParseInt(token.substr(sep2 + 1), &fragIndex) &&
+                    fragIndex == static_cast<int>(matchResult->fragPermutationIndex);
         }
       } else {
         matched = token == name;
