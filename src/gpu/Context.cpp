@@ -140,6 +140,9 @@ void Context::submit(std::unique_ptr<Recording> recording, bool syncCpu) {
           queue->waitSemaphore(std::move(semaphore));
         }
       }
+      // Attach the pending presentation requests to this buffer's command buffer, so each
+      // presentation is encoded with the submission that carries its frame's rendering.
+      drawingBuffer->schedulePendingPresents(this);
       queue->submit(std::move(commandBuffer));
       drawingBuffer->presentWindows(this);
       drawingBuffer->presentDrawables(this);

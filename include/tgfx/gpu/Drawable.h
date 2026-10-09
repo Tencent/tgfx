@@ -74,11 +74,14 @@ class Drawable {
   virtual std::shared_ptr<RenderTargetProxy> onImport(Context* context) = 0;
 
   /**
-   * Called by Context::present() when the frame's rendering has not been submitted yet. Returns
-   * true when the presentation is attached to the upcoming submission itself, in which case the
-   * submit pipeline only marks the frame presented. The default implementation returns false,
-   * which defers to onPresent() at the end of the submission that carries the frame's rendering
-   * commands.
+   * Called when the DrawingBuffer that carries the frame's rendering commands is about to be
+   * submitted, after a presentation was requested via Context::present() while the rendering was
+   * still unsubmitted. Returns true when the presentation is attached to that submission itself
+   * (for example encoded into its command buffer), in which case the submit pipeline only marks
+   * the frame presented. The default implementation returns false, which defers to onPresent()
+   * at the end of that submission. Binding the scheduling to the frame's own drawing buffer
+   * keeps the presentation ordered after the frame's rendering even when unrelated recordings
+   * are submitted in between.
    */
   virtual bool onSchedulePresent(Context* context);
 
@@ -127,6 +130,11 @@ class Drawable {
 
   // Registers or executes a presentation request. Returns false on an invalid delivery state.
   bool requestPresent(Context* context);
+
+  // Called while the drawing buffer that collected this frame is being submitted: schedules the
+  // presentation onto that submission for frames whose presentation was requested before their
+  // rendering was submitted.
+  void scheduleIfRequested(Context* context);
 
   // Marks the frame as submitted; presents it if a presentation was requested earlier.
   void onSubmissionCompleted(Context* context);

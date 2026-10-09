@@ -72,6 +72,14 @@ class DrawingBuffer {
   void presentWindows(Context* context);
 
   /**
+   * Attaches the pending presentation requests of the collected drawables to the upcoming
+   * submission of this buffer, so each presentation is encoded/ordered with the command buffer
+   * that carries its frame's rendering commands. Called right before the command buffer is
+   * submitted.
+   */
+  void schedulePendingPresents(Context* context);
+
+  /**
    * Marks the frames of all collected drawables as submitted and presents the ones whose
    * presentation was requested before the submission, after command buffer submission.
    */

@@ -21,6 +21,7 @@
 #include <cmath>
 #include <memory>
 #include "gpu/RenderContext.h"
+#include "gpu/metal/MetalCommandQueue.h"
 #include "gpu/metal/MetalDrawableProxy.h"
 #include "gpu/metal/MetalGPU.h"
 #include "tgfx/core/Canvas.h"
@@ -242,6 +243,52 @@ TGFX_TEST(MetalWindowTest, ReadbackBeforePresent) {
   }
   EXPECT_TRUE(NearlyMatches(rgba, green));
   readback->unlockPixels(context);
+}
+
+/**
+ * Verifies that a presentation request binds to the recording that carries the frame's
+ * rendering: after present() but before that recording is submitted, the queue must not hold
+ * any pending presentation, so an earlier unrelated recording (flushed but not yet submitted)
+ * cannot consume and present the frame before its rendering commands run.
+ */
+TGFX_TEST(MetalWindowTest, PresentBindsToFrameRecording) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  if (context == nullptr) {
+    GTEST_SKIP() << "Metal backend not available";
+  }
+  auto gpu = static_cast<MetalGPU*>(context->gpu());
+  auto layer = MakeTestLayer(gpu->device(), 16, 16);
+  auto window = MetalWindow::MakeFrom(layer, nullptr, nullptr, false);
+  ASSERT_TRUE(window != nullptr);
+
+  // Flush an unrelated offscreen recording (R0) without submitting it.
+  auto offscreen = Surface::Make(context, 16, 16);
+  ASSERT_TRUE(offscreen != nullptr);
+  offscreen->getCanvas()->clear(Color::Red());
+  auto recording = context->flush();
+  ASSERT_TRUE(recording != nullptr);
+
+  // Draw a drawable frame and register its presentation before any submission.
+  auto drawable = window->nextDrawable();
+  ASSERT_TRUE(drawable != nullptr);
+  auto surface = Surface::MakeFrom(context, drawable);
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->clear(Color::Green());
+  context->present(drawable);
+
+  // The presentation request must not sit on the queue while R0 is still unsubmitted;
+  // otherwise R0's command buffer would consume and present the frame.
+  auto queue = static_cast<MetalCommandQueue*>(context->gpu()->queue());
+  EXPECT_TRUE(queue->pendingDrawables.empty());
+
+  // Submitting R0 first must not present the frame.
+  context->submit(std::move(recording));
+  EXPECT_TRUE(queue->pendingDrawables.empty());
+
+  // Submitting the frame's own recording schedules the presentation with it and delivers it.
+  context->flushAndSubmit(true);
+  EXPECT_TRUE(surface->asyncReadPixels(Rect::MakeWH(1, 1)) == nullptr);
 }
 
 TGFX_TEST(MetalWindowTest, SurfaceRetainsDrawable) {

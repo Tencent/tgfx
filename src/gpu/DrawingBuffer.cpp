@@ -67,6 +67,14 @@ void DrawingBuffer::presentWindows(Context* context) {
   windowPresentations.clear();
 }
 
+void DrawingBuffer::schedulePendingPresents(Context* context) {
+  for (auto& pendingDrawable : drawables) {
+    if (auto drawable = pendingDrawable.lock()) {
+      drawable->scheduleIfRequested(context);
+    }
+  }
+}
+
 void DrawingBuffer::presentDrawables(Context* context) {
   for (auto& pendingDrawable : drawables) {
     if (auto drawable = pendingDrawable.lock()) {

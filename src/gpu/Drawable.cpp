@@ -97,10 +97,11 @@ bool Drawable::requestPresent(Context* context) {
     return false;
   }
   if (_delivery == Delivery::Imported) {
-    // The frame's rendering has not been submitted yet: register the request and let it ride
-    // along with the submission that carries the frame's rendering commands.
+    // The frame's rendering has not been submitted yet: register the request on this frame. The
+    // request rides along with the submission of the drawing buffer that carries the frame's
+    // rendering commands (see scheduleIfRequested()), so the presentation is never consumed by
+    // an unrelated earlier submission.
     _delivery = Delivery::PresentRequested;
-    _presentationAttached = onSchedulePresent(context);
     return true;
   }
   if (_delivery == Delivery::Submitted) {
@@ -117,6 +118,16 @@ bool Drawable::requestPresent(Context* context) {
   }
   LOGE("Drawable::requestPresent() The frame is not in a presentable state!");
   return false;
+}
+
+void Drawable::scheduleIfRequested(Context* context) {
+  if (_delivery != Delivery::PresentRequested) {
+    return;
+  }
+  // Attach the presentation to the submission of the drawing buffer that carries this frame's
+  // rendering commands, so it is ordered after them and never consumed by an unrelated earlier
+  // submission.
+  _presentationAttached = onSchedulePresent(context);
 }
 
 void Drawable::onSubmissionCompleted(Context* context) {
