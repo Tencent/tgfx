@@ -840,8 +840,15 @@ endif ()
 # from precompiled shaders. Set TGFX_EMBED_SHADER_BUNDLES=OFF to disable embedding entirely.
 if (TGFX_EMBED_SHADER_BUNDLES)
   # The tool runs on the build host only; web builds consume prebuilt bundles and never
-  # compile the tool (a wasm tool cannot shell out to host compilers anyway).
-  if (NOT WEB)
+  # compile the tool (a wasm tool cannot shell out to host compilers anyway). A cross build
+  # (Android, iOS, OHOS) must not compile it with the target toolchain either: the result is an
+  # Android or iOS executable that cannot run here, and the Android NDK builds without exceptions,
+  # which the tool needs. It is built for the host on demand instead (tgfx_host_shader_tool below).
+  set(TGFX_SHADER_TOOL_FROM_HOST OFF)
+  if (NOT WEB AND CMAKE_CROSSCOMPILING)
+    set(TGFX_SHADER_TOOL_FROM_HOST ON)
+  endif ()
+  if (NOT WEB AND NOT TGFX_SHADER_TOOL_FROM_HOST)
     file(GLOB_RECURSE TGFX_SHADER_DECL_FILES
             src/gpu/shaders/ShaderPermutation.*
             src/gpu/shaders/PrecompiledShader.*
@@ -904,7 +911,7 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     # Pass all backends as the single comma-separated argument expected by shader_build_tool.
     string(JOIN "," TGFX_SHADER_BACKENDS_ARG ${TGFX_SHADER_BACKENDS})
 
-    if ("webgpu" IN_LIST TGFX_SHADER_BACKENDS AND NOT WEB)
+    if ("webgpu" IN_LIST TGFX_SHADER_BACKENDS AND NOT WEB AND NOT TGFX_SHADER_TOOL_FROM_HOST)
         tgfx_setup_tint()
         target_include_directories(shader_build_tool SYSTEM PRIVATE
                 third_party/tint third_party/tint/include)
@@ -965,16 +972,55 @@ if (TGFX_EMBED_SHADER_BUNDLES)
                 DEPENDS ${TGFX_PREBUILT_BUNDLE_FILES}
                 COMMENT "Consuming prebuilt shader bundles (${TGFX_SHADER_BACKENDS})")
     else ()
+        if (TGFX_SHADER_TOOL_FROM_HOST)
+            # Configures this same source tree for the machine running the build, with no
+            # toolchain file, and builds only shader_build_tool there. It builds the tool's
+            # dependencies (shaderc, SPIRV-Cross, zlib, tint) for the host, which replaces building
+            # them for the target as a cross build used to do. Every build runs the sub-build,
+            # which does nothing when the tool is current; a relinked tool changes the file below,
+            # and that reruns the bundle generation that depends on it.
+            include(ExternalProject)
+            set(TGFX_HOST_TOOL_DIR "${CMAKE_BINARY_DIR}/host_shader_tool")
+            set(TGFX_SHADER_TOOL_COMMAND
+                    "${TGFX_HOST_TOOL_DIR}/shader_build_tool${CMAKE_HOST_EXECUTABLE_SUFFIX}")
+            set(TGFX_HOST_GENERATOR "${CMAKE_GENERATOR}")
+            if (TGFX_HOST_GENERATOR MATCHES "Xcode")
+                # An Xcode project would build for the target SDK; the tool needs the host's.
+                set(TGFX_HOST_GENERATOR "Unix Makefiles")
+            endif ()
+            set(TGFX_HOST_TOOL_WEBGPU OFF)
+            if ("webgpu" IN_LIST TGFX_SHADER_BACKENDS)
+                set(TGFX_HOST_TOOL_WEBGPU ON)
+            endif ()
+            ExternalProject_Add(tgfx_host_shader_tool
+                    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}"
+                    BINARY_DIR "${TGFX_HOST_TOOL_DIR}"
+                    CMAKE_GENERATOR "${TGFX_HOST_GENERATOR}"
+                    CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release
+                            -DTGFX_EMBED_SHADER_BUNDLES=ON
+                            -DTGFX_BUILD_WEBGPU_BUNDLE=${TGFX_HOST_TOOL_WEBGPU}
+                    BUILD_COMMAND ${CMAKE_COMMAND} --build "${TGFX_HOST_TOOL_DIR}"
+                            --target shader_build_tool --config Release
+                    INSTALL_COMMAND ""
+                    BUILD_ALWAYS ON
+                    BUILD_BYPRODUCTS "${TGFX_SHADER_TOOL_COMMAND}"
+                    USES_TERMINAL_CONFIGURE ON
+                    USES_TERMINAL_BUILD ON)
+            set(TGFX_SHADER_TOOL_DEPENDS tgfx_host_shader_tool "${TGFX_SHADER_TOOL_COMMAND}")
+        else ()
+            set(TGFX_SHADER_TOOL_COMMAND shader_build_tool)
+            set(TGFX_SHADER_TOOL_DEPENDS shader_build_tool)
+        endif ()
         add_custom_command(
                 OUTPUT ${TGFX_SHADER_BUNDLE_STAMP}
                 BYPRODUCTS ${TGFX_SHADER_BUNDLE_FILES} ${TGFX_SHADER_MANIFEST_FILES}
-                COMMAND shader_build_tool
+                COMMAND ${TGFX_SHADER_TOOL_COMMAND}
                         --shader-dir ${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/shaders/glsl
                         --out-dir ${TGFX_SHADER_BUNDLE_DIR}
                         --backends ${TGFX_SHADER_BACKENDS_ARG}
                         --compress
                 COMMAND ${CMAKE_COMMAND} -E touch ${TGFX_SHADER_BUNDLE_STAMP}
-                DEPENDS shader_build_tool ${TGFX_SHADER_SOURCES}
+                DEPENDS ${TGFX_SHADER_TOOL_DEPENDS} ${TGFX_SHADER_SOURCES}
                 COMMENT "Compiling precompiled shader bundles (${TGFX_SHADER_BACKENDS})")
     endif ()
     add_custom_target(tgfx_shader_bundles DEPENDS ${TGFX_SHADER_BUNDLE_STAMP}
