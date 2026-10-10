@@ -379,8 +379,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
     }
   }
 
-  auto* shaderCache = context->globalCache()->shaderCache();
-  auto vertexShader = shaderCache->findOrCreateModule(vertexDesc);
+  auto vertexShader = gpu->createShaderModule(vertexDesc);
   if (vertexShader == nullptr) {
     cache->recordFailure(PrecompiledFallbackReason::VertexModuleCreationFailed,
                          MakeFallbackRecord(cache, programInfo, &*matchResult));
@@ -389,7 +388,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
     return nullptr;
   }
   cache->recordAOTStage(PrecompiledAOTStage::VertexModuleCreated);
-  auto fragmentShader = shaderCache->findOrCreateModule(fragmentDesc);
+  auto fragmentShader = gpu->createShaderModule(fragmentDesc);
   if (fragmentShader == nullptr) {
     cache->recordFailure(PrecompiledFallbackReason::FragmentModuleCreationFailed,
                          MakeFallbackRecord(cache, programInfo, &*matchResult));

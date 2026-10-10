@@ -52,7 +52,7 @@ static constexpr uint16_t HairlineQuadIndexPattern[] = {
 };
 // clang-format on
 
-GlobalCache::GlobalCache(Context* context) : context(context), _shaderCache(context) {
+GlobalCache::GlobalCache(Context* context) : context(context) {
   uniformBufferPool.resize(INITIAL_UNIFORM_PACKET_COUNT);
   activePacket = &uniformBufferPool[0];
 }

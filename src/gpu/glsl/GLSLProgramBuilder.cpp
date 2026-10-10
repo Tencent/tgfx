@@ -179,15 +179,14 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   ShaderModuleDescriptor vertexModule = {};
   vertexModule.code = vertexShaderBuilder()->shaderString();
   vertexModule.stage = ShaderStage::Vertex;
-  auto* shaderCache = context->globalCache()->shaderCache();
-  auto vertexShader = shaderCache->findOrCreateModule(vertexModule);
+  auto vertexShader = gpu->createShaderModule(vertexModule);
   if (vertexShader == nullptr) {
     return nullptr;
   }
   ShaderModuleDescriptor fragmentModule = {};
   fragmentModule.code = fragmentShaderBuilder()->shaderString();
   fragmentModule.stage = ShaderStage::Fragment;
-  auto fragmentShader = shaderCache->findOrCreateModule(fragmentModule);
+  auto fragmentShader = gpu->createShaderModule(fragmentModule);
   if (fragmentShader == nullptr) {
     return nullptr;
   }

@@ -148,20 +148,12 @@ TGFX_TEST(ShaderBundleBenchmark, DISABLED_FirstFrame) {
     auto label = "frame" + std::to_string(frame);
     PrintStats(label.c_str(), micros / 1000.0, context->globalCache()->programStats());
   }
-  auto& modules = context->globalCache()->shaderCache()->stats();
-  std::printf("[Bench] modules requests=%llu hits=%llu created=%llu createMs=%.2f\n",
-              static_cast<unsigned long long>(modules.moduleRequests),
-              static_cast<unsigned long long>(modules.moduleHits),
-              static_cast<unsigned long long>(modules.moduleCreations),
-              modules.moduleCreationMicros / 1000.0);
   std::fflush(stdout);
 }
 
-// Draws the scene repeatedly, emptying the program cache and the shader cache before every round,
-// so each round is a real cold start. A cost that is paid once per process (decompressing or
-// parsing the bundle) shows up only in the first round; a cost paid per program shows up in every
-// round. TGFX_BENCH_KEEP_SHADER_CACHE=1 keeps the shader cache, to measure how much a warm shader
-// cache saves when programs are evicted and created again.
+// Draws the scene repeatedly, emptying the program cache before every frame. A cost that is paid
+// once per process (decompressing or parsing the bundle) shows up only in the first frame; a cost
+// paid per program shows up in every frame.
 TGFX_TEST(ShaderBundleBenchmark, DISABLED_ColdFrames) {
   auto image = Image::MakeFromFile(ProjectPath::Absolute("resources/apitest/checker_128.png"));
   ASSERT_TRUE(image != nullptr);
@@ -174,13 +166,8 @@ TGFX_TEST(ShaderBundleBenchmark, DISABLED_ColdFrames) {
   ASSERT_TRUE(surface != nullptr);
   for (int round = 1; round <= 6; round++) {
     // Two frames per round: the second one creates the programs a first frame leaves for later.
-    auto* shaderCache = context->globalCache()->shaderCache();
     context->globalCache()->clearPrograms();
-    if (std::getenv("TGFX_BENCH_KEEP_SHADER_CACHE") == nullptr) {
-      shaderCache->clear();
-    }
     auto before = context->globalCache()->programStats();
-    auto modulesBefore = shaderCache->stats();
     auto start = Clock::Now();
     DrawScene(surface->getCanvas(), image, typeface);
     context->flushAndSubmit(true);
@@ -190,18 +177,10 @@ TGFX_TEST(ShaderBundleBenchmark, DISABLED_ColdFrames) {
     context->flushAndSubmit(true);
     auto secondMicros = Clock::Now() - start;
     auto after = context->globalCache()->programStats();
-    auto modulesAfter = shaderCache->stats();
-    std::printf(
-        "[Bench] mode=%s coldRound%d firstMs=%.2f secondMs=%.2f newPrograms=%llu "
-        "moduleRequests=%llu moduleHits=%llu modulesCreated=%llu moduleCreateMs=%.2f\n",
-        std::getenv("TGFX_AOT_DISABLE") != nullptr ? "JIT" : "AOT", round, firstMicros / 1000.0,
-        secondMicros / 1000.0,
-        static_cast<unsigned long long>(after.cacheMisses - before.cacheMisses),
-        static_cast<unsigned long long>(modulesAfter.moduleRequests - modulesBefore.moduleRequests),
-        static_cast<unsigned long long>(modulesAfter.moduleHits - modulesBefore.moduleHits),
-        static_cast<unsigned long long>(modulesAfter.moduleCreations -
-                                        modulesBefore.moduleCreations),
-        (modulesAfter.moduleCreationMicros - modulesBefore.moduleCreationMicros) / 1000.0);
+    std::printf("[Bench] mode=%s coldRound%d firstMs=%.2f secondMs=%.2f newPrograms=%llu\n",
+                std::getenv("TGFX_AOT_DISABLE") != nullptr ? "JIT" : "AOT", round,
+                firstMicros / 1000.0, secondMicros / 1000.0,
+                static_cast<unsigned long long>(after.cacheMisses - before.cacheMisses));
   }
   std::fflush(stdout);
 }

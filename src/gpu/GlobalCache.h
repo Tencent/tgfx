@@ -25,7 +25,6 @@
 #include "core/utils/SlidingWindowTracker.h"
 #include "gpu/AAType.h"
 #include "gpu/Program.h"
-#include "gpu/ShaderCache.h"
 #include "gpu/proxies/GPUBufferProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "tgfx/core/Color.h"
@@ -70,15 +69,6 @@ class GlobalCache {
   std::shared_ptr<Sampler> getOrCreateDummySampler();
 
   std::shared_ptr<Program> findProgram(const BytesKey& programKey);
-
-  /**
-   * Returns the cache of compiled shader modules shared by every program creator. Unlike the
-   * program cache it is not emptied by clearPrograms(): its entries are content-addressed, so they
-   * stay valid when programs are dropped or the precompiled bundle changes.
-   */
-  ShaderCache* shaderCache() {
-    return &_shaderCache;
-  }
 
   /**
    * Find or creates a uniform GPUBuffer with specified size. If a suitable buffer already exists,
@@ -207,7 +197,6 @@ class GlobalCache {
   std::shared_ptr<GPUBufferProxy> getRoundStrokeIndexBuffer(bool antialias);
 
   Context* context = nullptr;
-  ShaderCache _shaderCache;
   std::shared_ptr<Texture> dummyTexture = nullptr;
   std::shared_ptr<Sampler> dummySampler = nullptr;
   std::list<Program*> programLRU = {};

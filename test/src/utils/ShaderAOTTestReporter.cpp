@@ -763,7 +763,6 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
   }
 
   void OnTestProgramEnd(const testing::UnitTest&) override {
-    PrintShaderCacheSummary();
     WriteReport();
   }
 
@@ -772,31 +771,6 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
   bool currentBundleLoadedAtStart = false;
   std::string currentProfileTag;
   std::vector<ShaderAOTTestResult> testResults = {};
-
-  // Whole-run shader cache totals, so a full suite run shows how often the GPU was really asked to
-  // compile and how large the module cache grows.
-  static void PrintShaderCacheSummary() {
-    auto device = DevicePool::Make();
-    if (device == nullptr) {
-      return;
-    }
-    auto context = device->lockContext();
-    if (context == nullptr) {
-      return;
-    }
-    auto* shaderCache = context->globalCache()->shaderCache();
-    const auto& stats = shaderCache->stats();
-    std::printf(
-        "[Shader Cache][%s] modules: requests=%llu hits=%llu created=%llu failed=%llu "
-        "evicted=%llu cached=%zu createMs=%.1f\n",
-        TGFX_BACKEND_NAME, static_cast<unsigned long long>(stats.moduleRequests),
-        static_cast<unsigned long long>(stats.moduleHits),
-        static_cast<unsigned long long>(stats.moduleCreations),
-        static_cast<unsigned long long>(stats.moduleCreationFailures),
-        static_cast<unsigned long long>(stats.moduleEvictions), shaderCache->moduleCount(),
-        static_cast<double>(stats.moduleCreationMicros) / 1000.0);
-    device->unlock();
-  }
 
   void WriteReport() const {
     ShaderAOTSummary summary;
