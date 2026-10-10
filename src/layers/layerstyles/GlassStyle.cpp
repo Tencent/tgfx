@@ -82,13 +82,15 @@ static float GetUDFMaxDisplacement(float minHalf, float refractionFactor, float 
 // instead of rendered from unreliable gradients.
 static constexpr float EdgeLightMinContentScale = 0.5f;
 
-// Edge light falloff width in layer pixels. The shader measures the edge distance in layer pixels,
-// so the band has to grow as the layer shrinks on screen to stay at least one screen pixel wide.
+// The edge light is drawn on the glass bevel, so the band is the bevel width in layer pixels. 1.5
+// keeps the visible highlight near one pixel wide, tuned below the ~2px measured from Figma. The
+// one-screen-pixel floor keeps the falloff from collapsing into a hard threshold at reduced content
+// scales, and it also sets the lower bound where the band would start flickering on sub-pixel edges.
 static float GetEdgeBandLayerPixels(float contentScale) {
   if (contentScale <= 0.0f) {
-    return 1.0f;
+    return 1.5f;
   }
-  return std::max(1.0f, 1.0f / contentScale);
+  return std::max(1.5f, 1.0f / contentScale);
 }
 
 // SDF shapes cap the refraction displacement at refractionFactor * glassThickness in the shader
@@ -760,7 +762,6 @@ GlassRefractionParams GlassStyle::makeBaseRefractionParams(float halfW, float ha
                                                            const BackgroundMapping& mapping) const {
   GlassRefractionParams params = {};
   params.dispersion = getDispersionFactor();
-  params.lightAngle = _lightAngle;
   params.lightIntensity = getLightIntensityFactor();
   params.origWidth = halfW * 2.0f;
   params.origHeight = halfH * 2.0f;
@@ -778,7 +779,10 @@ std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getSDFRefractionFilter(
     GlassShapeType shapeType, float cornerRadius, float halfWidth, float halfHeight,
     const BackgroundMapping& mapping, float contentScale) {
   auto params = makeBaseRefractionParams(halfWidth, halfHeight, mapping);
-  if (contentScale <= EdgeLightMinContentScale) {
+  // The analytical SDF light needs no edge field, so it is not bound by the UDF field budget that
+  // EdgeLightMinContentScale protects; it stays on for any positive content scale. Only a
+  // non-positive scale would make the derived geometry degenerate, so that alone disables it.
+  if (contentScale <= 0.0f) {
     params.lightIntensity = 0.0f;
   }
   params.shapeType = shapeType;
@@ -796,6 +800,8 @@ std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getSDFRefractionFilter(
   sdfParams.refractionFactor = getRefractionFactor();
   sdfParams.splay = std::clamp(_splay / 100.0f, 0.0f, 1.0f);
   sdfParams.depthRatio = getDepthRatio();
+  sdfParams.lightAngle = _lightAngle;
+  sdfParams.enableEdgeLighting = params.lightIntensity > 0.0f;
   sdfParams.edgeBandLayerPixels = GetEdgeBandLayerPixels(contentScale);
   return std::make_shared<GlassRefractionImageFilter>(params, sdfParams, GlassUDFGeometryParams{});
 }
@@ -818,6 +824,7 @@ std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getUDFRefractionFilter(
   udfParams.refractionFactor = getRefractionFactor();
   udfParams.splay = std::clamp(_splay / 100.0f, 0.0f, 1.0f);
   udfParams.depthRatio = getDepthRatio();
+  udfParams.lightAngle = _lightAngle;
   udfParams.edgeBandLayerPixels = GetEdgeBandLayerPixels(contentScale);
   udfParams.udfPixelToLayerPixelX = udf.pixelToLayerPixel.x;
   udfParams.udfPixelToLayerPixelY = udf.pixelToLayerPixel.y;
