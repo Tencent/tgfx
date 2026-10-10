@@ -27,6 +27,14 @@ QGLDrawableProxy::QGLDrawableProxy(Context* context, int width, int height, Pixe
       _origin(origin), _window(window) {
 }
 
+void QGLDrawableProxy::onPresentFrame(Context*) {
+  // Hand the frame to the Qt scene graph through the window (which owns the pending slot and
+  // the quick item).
+  if (window != nullptr) {
+    window->presentProxy(this);
+  }
+}
+
 Context* QGLDrawableProxy::getContext() const {
   return _context;
 }

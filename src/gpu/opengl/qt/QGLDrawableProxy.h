@@ -29,6 +29,7 @@ class QGLDrawableProxy : public RenderTargetProxy {
                    ImageOrigin origin, QGLWindow* window);
 
   Context* getContext() const override;
+  void onPresentFrame(Context* context) override;
   int width() const override;
   int height() const override;
   PixelFormat format() const override;

@@ -28,6 +28,8 @@
 #include "tgfx/gpu/Window.h"
 
 namespace tgfx {
+
+class QGLDrawableProxy;
 class QGLDeviceCreator;
 class QGLDrawableProxy;
 
@@ -63,8 +65,11 @@ class QGLWindow : public Window {
   bool onSupportsReadback() const override {
     return true;
   }
-  void onPresent(Context* context,
-                 const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets) override;
+  /**
+   * Presents the given frame proxy to the Qt scene graph. Called by
+   * QGLDrawableProxy::onPresentFrame().
+   */
+  void presentProxy(QGLDrawableProxy* proxy);
   bool hasIndependentPresentationTargets() const override;
 
  private:

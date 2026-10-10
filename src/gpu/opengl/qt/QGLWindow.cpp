@@ -196,12 +196,7 @@ std::shared_ptr<RenderTargetProxy> QGLWindow::onCreateRenderTarget(Context* cont
                                             ImageOrigin::TopLeft, this);
 }
 
-void QGLWindow::onPresent(Context*,
-                          const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets) {
-  if (renderTargets.empty()) {
-    return;
-  }
-  auto proxy = std::static_pointer_cast<QGLDrawableProxy>(renderTargets.front());
+void QGLWindow::presentProxy(QGLDrawableProxy* proxy) {
   if (proxy->getTextureView() == nullptr) {
     proxy->releaseTexture();
     return;
