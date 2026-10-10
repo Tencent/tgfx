@@ -178,6 +178,9 @@ void DrawingManager::collectDrawable(std::shared_ptr<Drawable> drawable) {
     return;
   }
   auto drawingBuffer = getDrawingBuffer();
+  // Record the buffer that last collected the frame; only that buffer schedules and delivers
+  // the presentation later, keeping it ordered after all of the frame's recorded commands.
+  drawable->noteCollectedBuffer(drawingBuffer->uniqueID());
   for (auto& pendingDrawable : drawingBuffer->drawables) {
     if (pendingDrawable == drawable) {
       return;
@@ -212,6 +215,7 @@ void DrawingManager::collectWindow(std::shared_ptr<Window> window,
   auto* windowKey = window.get();
   auto frame = WindowFrame::Make(std::move(window), std::move(renderTarget));
   if (frame != nullptr) {
+    frame->noteCollectedBuffer(drawingBuffer->uniqueID());
     drawingBuffer->drawables.push_back(frame);
     pendingWindowFrames[windowKey] = std::move(frame);
   }

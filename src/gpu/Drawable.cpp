@@ -80,6 +80,10 @@ std::shared_ptr<RenderTargetProxy> Drawable::import(Context* context) {
   return target;
 }
 
+bool Drawable::isFrameOpen() const {
+  return _delivery == Delivery::Imported || _delivery == Delivery::Submitted;
+}
+
 bool Drawable::canReadBack() const {
   // The frame must still be valid: presented or abandoned frames are terminal states, a
   // presentation has already been registered for PresentRequested frames (later readbacks would
@@ -129,10 +133,15 @@ bool Drawable::requestPresent(Context* context) {
   return false;
 }
 
-void Drawable::scheduleIfRequested(Context* context) {
+void Drawable::scheduleIfRequested(Context* context, uint32_t bufferID) {
   // Wire every undelivered frame into the submission of the drawing buffer that carries its
   // rendering commands, so the wiring (and any registered presentation) is ordered with that
-  // submission and never consumed by an unrelated earlier submission.
+  // submission and never consumed by an unrelated earlier submission. Only the buffer that
+  // last collected the frame may schedule the presentation, so it is ordered after all of the
+  // frame's recorded commands (earlier buffers may also hold a copy of the frame).
+  if (bufferID != _lastCollectedBufferID) {
+    return;
+  }
   if (_delivery == Delivery::PresentRequested) {
     onAttachSubmission(context);
     _presentationAttached = onSchedulePresent(context);
@@ -144,12 +153,17 @@ void Drawable::scheduleIfRequested(Context* context) {
   }
 }
 
-void Drawable::onSubmissionCompleted(Context* context) {
+void Drawable::onSubmissionCompleted(Context* context, uint32_t bufferID) {
   if (_delivery == Delivery::Imported) {
     _delivery = Delivery::Submitted;
     return;
   }
   if (_delivery == Delivery::PresentRequested) {
+    if (bufferID != _lastCollectedBufferID) {
+      // An earlier buffer that also holds this frame has completed; the presentation stays
+      // pending for the buffer that last collected the frame.
+      return;
+    }
     if (!_presentationAttached) {
       onPresent(context);
     }

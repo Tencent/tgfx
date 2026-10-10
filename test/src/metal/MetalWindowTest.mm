@@ -333,6 +333,99 @@ TGFX_TEST(MetalWindowTest, DroppedRecordingReleasesWindow) {
   EXPECT_TRUE(weakWindow.expired());
 }
 
+/**
+ * Verifies that a window without readback support (framebufferOnly = YES, the Metal default)
+ * still renders normally through the drawable path: rendering must not be gated by the
+ * readback capability, only readback itself is.
+ */
+TGFX_TEST(MetalWindowTest, NonReadableFrameStillRenders) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  if (context == nullptr) {
+    GTEST_SKIP() << "Metal backend not available";
+  }
+  auto gpu = static_cast<MetalGPU*>(context->gpu());
+  auto layer = [CAMetalLayer layer];
+  layer.device = gpu->device();
+  layer.drawableSize = CGSizeMake(16, 16);
+  layer.framebufferOnly = YES;  // no readback support, but perfectly renderable
+  auto window = MetalWindow::MakeFrom(layer, nullptr, nullptr, false);
+  ASSERT_TRUE(window != nullptr);
+  EXPECT_FALSE(window->supportsReadback());
+
+  auto drawable = window->nextDrawable();
+  ASSERT_TRUE(drawable != nullptr);
+  auto surface = Surface::MakeFrom(context, drawable);
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->clear(Color::Red());
+  // Readback is cleanly rejected (capability), but the drawing must have been recorded.
+  EXPECT_TRUE(surface->asyncReadPixels(Rect::MakeWH(1, 1)) == nullptr);
+  auto recording = context->flush();
+  EXPECT_TRUE(recording != nullptr);
+  context->submit(std::move(recording), true);
+  context->present(drawable);
+}
+
+/**
+ * Verifies that a presentation is delivered by the drawing batch that last collected the
+ * frame, not by the earliest one: the frame's second batch (recording B, holding the last
+ * drawing and the readback transfer) must schedule the presentation, so the presentation is
+ * ordered after all of the frame's recorded commands.
+ */
+TGFX_TEST(MetalWindowTest, PresentationBindsToLastBatch) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  if (context == nullptr) {
+    GTEST_SKIP() << "Metal backend not available";
+  }
+  auto gpu = static_cast<MetalGPU*>(context->gpu());
+  auto layer = MakeTestLayer(gpu->device(), 16, 16);
+  auto window = MetalWindow::MakeFrom(layer, nullptr, nullptr, false);
+  ASSERT_TRUE(window != nullptr);
+
+  auto drawable = window->nextDrawable();
+  ASSERT_TRUE(drawable != nullptr);
+  auto surface = Surface::MakeFrom(context, drawable);
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->clear(Color::Red());
+  auto recordingA = context->flush();
+  ASSERT_TRUE(recordingA != nullptr);
+
+  // Second batch: more drawing and a readback scheduled before the presentation request.
+  auto green = Color::Green();
+  surface->getCanvas()->clear(green);
+  auto readback = surface->asyncReadPixels(Rect::MakeXYWH(8, 8, 1, 1));
+  ASSERT_TRUE(readback != nullptr);
+  context->present(drawable);
+
+  // Submitting the earlier batch must not deliver the presentation.
+  auto raw = drawable.get();
+  context->submit(std::move(recordingA), true);
+  EXPECT_TRUE(raw->_delivery == Drawable::Delivery::PresentRequested);
+
+  // The last batch delivers the presentation, after its own drawing and readback transfer.
+  context->flushAndSubmit(true);
+  EXPECT_TRUE(raw->_delivery == Drawable::Delivery::Presented);
+
+  auto pixels = readback->lockPixels(context);
+  ASSERT_TRUE(pixels != nullptr);
+  auto bytes = static_cast<const uint8_t*>(pixels);
+  uint8_t rgba[4] = {};
+  if (readback->info().colorType() == ColorType::BGRA_8888) {
+    rgba[0] = bytes[2];
+    rgba[1] = bytes[1];
+    rgba[2] = bytes[0];
+    rgba[3] = bytes[3];
+  } else {
+    rgba[0] = bytes[0];
+    rgba[1] = bytes[1];
+    rgba[2] = bytes[2];
+    rgba[3] = bytes[3];
+  }
+  EXPECT_TRUE(NearlyMatches(rgba, green));
+  readback->unlockPixels(context);
+}
+
 TGFX_TEST(MetalWindowTest, SurfaceRetainsDrawable) {
   ContextScope scope;
   auto context = scope.getContext();

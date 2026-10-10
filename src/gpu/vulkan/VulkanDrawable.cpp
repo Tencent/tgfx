@@ -46,6 +46,10 @@ VulkanDrawable::~VulkanDrawable() {
 }
 
 void VulkanDrawable::onRelease(VulkanGPU*) {
+  // Discard an undelivered frame first, inside this safe device scope: the destructor's
+  // abandon() hook can no longer run the recovery (discardFrame marks the swapchain
+  // out-of-date so the acquired image is reclaimed) once the target below is gone.
+  abandon();
   // Releasing the imported target destroys the proxy (and its unused semaphores) here, inside
   // the device's synchronized scope.
   _importedTarget = nullptr;

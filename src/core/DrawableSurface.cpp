@@ -61,8 +61,9 @@ void DrawableSurface::onCollectFrame(DrawingManager* drawingManager,
 
 bool DrawableSurface::onValidateDraw() const {
   // A presentation has been registered for (or delivered to) this frame: the frame is closed
-  // and must not be drawn into anymore.
-  return _drawable == nullptr || _drawable->canReadBack();
+  // and must not be drawn into anymore. This is a pure frame-state check; the window's
+  // readback capability (checked in onValidateReadback()) must not gate rendering.
+  return _drawable == nullptr || _drawable->isFrameOpen();
 }
 
 bool DrawableSurface::onValidateReadback() const {

@@ -62,13 +62,13 @@ std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
 
 void DrawingBuffer::schedulePendingPresents(Context* context) {
   for (auto& drawable : drawables) {
-    drawable->scheduleIfRequested(context);
+    drawable->scheduleIfRequested(context, _uniqueID);
   }
 }
 
 void DrawingBuffer::presentDrawables(Context* context) {
   for (auto& drawable : drawables) {
-    drawable->onSubmissionCompleted(context);
+    drawable->onSubmissionCompleted(context, _uniqueID);
   }
   drawables.clear();
 }

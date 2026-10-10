@@ -126,6 +126,7 @@ class Drawable {
   friend class Context;
   friend class DrawableSurface;
   friend class DrawingBuffer;
+  friend class DrawingManager;
   friend class Surface;
   friend class Window;
 
@@ -142,22 +143,43 @@ class Drawable {
   // imported or the import failed.
   std::shared_ptr<RenderTargetProxy> import(Context* context);
 
-  // Returns true when readback may still be scheduled for this frame.
+  // Returns true when readback may still be scheduled for this frame. This involves both
+  // the frame state and the window's readback capability; see isFrameOpen() for a pure
+  // frame-state check.
   bool canReadBack() const;
+
+  // Returns true while the frame accepts more drawing, that is, before a presentation has been
+  // registered for it. Unlike canReadBack(), this does not involve the window's readback
+  // capability: a frame can be perfectly renderable on a window that does not support readback.
+  bool isFrameOpen() const;
 
   // Registers or executes a presentation request. Returns false on an invalid delivery state.
   bool requestPresent(Context* context);
 
-  // Called while the drawing buffer that collected this frame is being submitted: schedules the
-  // presentation onto that submission for frames whose presentation was requested before their
-  // rendering was submitted.
-  void scheduleIfRequested(Context* context);
+  // Called while the drawing buffer that collected this frame is being submitted: schedules
+  // the presentation onto that submission for frames whose presentation was requested before
+  // their rendering was submitted. Only the buffer that last collected the frame schedules or
+  // delivers the presentation, so it is ordered after all of the frame's recorded commands
+  // (a frame may be collected into several buffers when the surface keeps drawing after a
+  // flush).
+  void scheduleIfRequested(Context* context, uint32_t bufferID);
 
-  // Marks the frame as submitted; presents it if a presentation was requested earlier.
-  void onSubmissionCompleted(Context* context);
+  // Advances the delivery state after the drawing buffer that collected this frame has been
+  // submitted. See scheduleIfRequested() for the buffer scoping.
+  void onSubmissionCompleted(Context* context, uint32_t bufferID);
 
   // Drops the strong references that are only needed while the frame is undelivered.
   void releaseFrameHandles();
+
+  // Records the drawing buffer that last collected this frame. Called by
+  // DrawingManager::collectDrawable().
+  void noteCollectedBuffer(uint32_t bufferID) {
+    _lastCollectedBufferID = bufferID;
+  }
+
+  // Records the buffer that last collected this frame; only that buffer schedules and
+  // delivers the presentation. Updated by DrawingManager::collectDrawable().
+  uint32_t _lastCollectedBufferID = 0;
 
   bool _presentationAttached = false;
   Delivery _delivery = Delivery::Acquired;
