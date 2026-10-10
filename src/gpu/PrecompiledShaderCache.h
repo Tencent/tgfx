@@ -28,6 +28,7 @@
 #include <vector>
 #include "gpu/AOTEffectDecomposer.h"
 #include "gpu/Program.h"
+#include "gpu/ShaderCache.h"
 #include "gpu/Uniform.h"
 #include "tgfx/gpu/Backend.h"
 
@@ -455,7 +456,16 @@ class PrecompiledShaderCache {
   void resetStats();
 
   /// Unloads all bundle entries without discarding diagnostic statistics from the current session.
+  /// The shader cache is kept: its entries are content-addressed, so they stay valid whatever
+  /// bundle is loaded next.
   void unload();
+
+  /// Returns the cache of compiled shader modules. It lives here because this object exists for
+  /// every Context and backend, including those with no bundle; it serves the runtime program
+  /// builder as well as the precompiled creator, so it is not specific to precompiled shaders.
+  ShaderCache* shaderCache() {
+    return &_shaderCache;
+  }
 
   struct HashKey {
     uint64_t hi;
@@ -474,6 +484,7 @@ class PrecompiledShaderCache {
  private:
   Context* _context = nullptr;
   Backend _backend = Backend::Unknown;
+  ShaderCache _shaderCache;
   std::atomic<uint64_t> _generation{0};
   std::string _profileTag;
   uint64_t _bundleIdentityHash = 0;

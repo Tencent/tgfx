@@ -22,6 +22,7 @@
 #include <fstream>
 #include <string>
 #include "gpu/GlobalCache.h"
+#include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProgramSignature.h"
 #include "gpu/UniformData.h"
 #include "tgfx/gpu/GPU.h"
@@ -179,14 +180,16 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   ShaderModuleDescriptor vertexModule = {};
   vertexModule.code = vertexShaderBuilder()->shaderString();
   vertexModule.stage = ShaderStage::Vertex;
-  auto vertexShader = gpu->createShaderModule(vertexModule);
+  auto vertexShader =
+      context->precompiledShaderCache()->shaderCache()->findOrCreateModule(vertexModule);
   if (vertexShader == nullptr) {
     return nullptr;
   }
   ShaderModuleDescriptor fragmentModule = {};
   fragmentModule.code = fragmentShaderBuilder()->shaderString();
   fragmentModule.stage = ShaderStage::Fragment;
-  auto fragmentShader = gpu->createShaderModule(fragmentModule);
+  auto fragmentShader =
+      context->precompiledShaderCache()->shaderCache()->findOrCreateModule(fragmentModule);
   if (fragmentShader == nullptr) {
     return nullptr;
   }

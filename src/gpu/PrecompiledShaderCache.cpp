@@ -32,7 +32,7 @@
 namespace tgfx {
 
 PrecompiledShaderCache::PrecompiledShaderCache(Context* context, Backend backend)
-    : _context(context), _backend(backend) {
+    : _context(context), _backend(backend), _shaderCache(context) {
 }
 
 const char* PrecompiledFallbackReasonName(PrecompiledFallbackReason reason) {
