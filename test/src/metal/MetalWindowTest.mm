@@ -20,6 +20,7 @@
 #include <QuartzCore/QuartzCore.h>
 #include <cmath>
 #include <memory>
+#include "core/DrawableSurface.h"
 #include "gpu/RenderContext.h"
 #include "gpu/metal/MetalCommandQueue.h"
 #include "gpu/metal/MetalDrawableProxy.h"
@@ -345,7 +346,8 @@ TGFX_TEST(MetalWindowTest, SurfaceRetainsDrawable) {
 
   auto surface = Surface::MakeFrom(context, window->nextDrawable());
   ASSERT_TRUE(surface != nullptr);
-  std::weak_ptr<Drawable> weakDrawable = surface->_drawable;
+  std::weak_ptr<Drawable> weakDrawable =
+      std::static_pointer_cast<DrawableSurface>(surface)->getDrawable();
   EXPECT_FALSE(weakDrawable.expired());
   surface->getCanvas()->clear(Color::Red());
   context->flushAndSubmit(true);

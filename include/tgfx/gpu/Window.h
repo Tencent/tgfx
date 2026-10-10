@@ -162,5 +162,6 @@ class Window : public std::enable_shared_from_this<Window> {
   friend class Surface;
   friend class WindowDrawable;
   friend class WindowFrame;
+  friend class WindowSurface;
 };
 }  // namespace tgfx

@@ -124,6 +124,7 @@ class Drawable {
 
  private:
   friend class Context;
+  friend class DrawableSurface;
   friend class DrawingBuffer;
   friend class Surface;
   friend class Window;

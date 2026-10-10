@@ -30,6 +30,7 @@ namespace tgfx {
 class Canvas;
 class Context;
 class Drawable;
+class DrawingManager;
 class RenderContext;
 class RenderTargetProxy;
 class Window;
@@ -228,22 +229,43 @@ class Surface {
    */
   const std::shared_ptr<ColorSpace>& colorSpace() const;
 
+ protected:
+  /**
+   * Called by RenderContext when a drawing pass opens on this surface (a new ops compositor is
+   * created for the current drawing buffer). Subclasses collect their frame into the drawing
+   * manager: WindowSurface collects the window's automatic presentation frame, DrawableSurface
+   * tracks its explicit drawable. Offscreen surfaces do nothing. The render target of the
+   * drawing pass is provided by the RenderContext.
+   */
+  virtual void onCollectFrame(DrawingManager* drawingManager,
+                              const std::shared_ptr<RenderTargetProxy>& renderTarget);
+
+  /**
+   * Returns true while the surface's frame accepts more drawing. Single-frame surfaces close
+   * once a presentation is registered for their frame.
+   */
+  virtual bool onValidateDraw() const;
+
+  /**
+   * Returns true while the surface's content may be read back. Window-backed surfaces require
+   * their window to support readback; single-frame surfaces close once a presentation is
+   * registered.
+   */
+  virtual bool onValidateReadback() const;
+
+  // Internal construction helpers for the WindowSurface/DrawableSurface subclasses.
+  static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
+                                           uint32_t renderFlags = 0, bool clearAll = false,
+                                           std::shared_ptr<ColorSpace> colorSpace = nullptr);
+
+  Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags = 0, bool clearAll = false,
+          std::shared_ptr<ColorSpace> colorSpace = nullptr);
+
  private:
   uint32_t _uniqueID = 0;
   RenderContext* renderContext = nullptr;
   Canvas* canvas = nullptr;
   std::shared_ptr<Image> cachedImage = nullptr;
-  std::shared_ptr<Window> _window = nullptr;
-  std::shared_ptr<Drawable> _drawable = nullptr;
-
-  static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
-                                           uint32_t renderFlags = 0, bool clearAll = false,
-                                           std::shared_ptr<ColorSpace> colorSpace = nullptr,
-                                           std::shared_ptr<Window> window = nullptr);
-
-  Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags = 0, bool clearAll = false,
-          std::shared_ptr<ColorSpace> colorSpace = nullptr,
-          std::shared_ptr<Window> window = nullptr);
 
   bool aboutToDraw(bool discardContent = false);
 
