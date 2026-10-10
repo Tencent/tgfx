@@ -33,6 +33,19 @@ void EmitGeometryCoordinates(FragmentShaderBuilder* fragBuilder, const std::stri
   fragBuilder->codeAppend("float py = glassPixel.y - halfH;");
 }
 
+// Emits the shared angular edge-light response used by both geometry paths: the light-facing edge
+// with coefficient 1 and the back-side rim with 0.6. Sharing one emitter means retuning those
+// coefficients changes the analytical SDF path and the mask/UDF path together.
+std::string EmitFaceLight(FragmentShaderBuilder* fragBuilder) {
+  auto name = fragBuilder->getMangledFunctionName("glassFaceLight");
+  fragBuilder->addFunction("float " + name +
+                           "(vec2 n, vec2 l) {\n"
+                           "  float d = dot(n, l);\n"
+                           "  return smoothstep(0.35, 1.0, d) + 0.6 * smoothstep(0.35, 1.0, -d);\n"
+                           "}\n");
+  return name;
+}
+
 }  // namespace
 
 PlacementPtr<GlassSDFGeometryFragmentProcessor> GlassSDFGeometryFragmentProcessor::Make(
@@ -148,27 +161,21 @@ void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
     // zero at a corner; blending the responses keeps the corner bounded between the two edges. A
     // rounded corner keeps its exact radial normal, so its dark region still grows with the radius.
     // Refraction keeps the refraction-distance-amplified radius.
-    std::string faceLight = fragBuilder->getMangledFunctionName("glassFaceLight");
-    fragBuilder->addFunction(
-        "float " + faceLight +
-        "(vec2 n, vec2 l) {\n"
-        "  float d = dot(n, l);\n"
-        "  return smoothstep(0.35, 1.0, d) + 0.6 * smoothstep(0.35, 1.0, -d);\n"
-        "}\n");
+    auto faceLight = EmitFaceLight(fragBuilder);
     if (shapeType == GlassShapeType::RoundedRect) {
       fragBuilder->codeAppend(
           "    float lightCornerRadius = min(min(halfW, halfH), cornerRadius);");
-      fragBuilder->codeAppend("    float qx = abs(px) - (halfW - lightCornerRadius);");
-      fragBuilder->codeAppend("    float qy = abs(py) - (halfH - lightCornerRadius);");
+      fragBuilder->codeAppend("    float lightQx = abs(px) - (halfW - lightCornerRadius);");
+      fragBuilder->codeAppend("    float lightQy = abs(py) - (halfH - lightCornerRadius);");
       // The corner transition spans one bevel width, i.e. a fraction of the edge band rather than a
       // fixed layer-pixel count.
       fragBuilder->codeAppend(
-          "    float faceMix = smoothstep(-0.5 * edgeBand, 0.5 * edgeBand, qx - qy);");
+          "    float faceMix = smoothstep(-0.5 * edgeBand, 0.5 * edgeBand, lightQx - lightQy);");
       fragBuilder->codeAppendf(
           "    float faceResponse = faceMix * %s(vec2(sign(px), 0.0), %s.xy)"
           " + (1.0 - faceMix) * %s(vec2(0.0, sign(py)), %s.xy);",
           faceLight.c_str(), lightDir.c_str(), faceLight.c_str(), lightDir.c_str());
-      fragBuilder->codeAppend("    vec2 arcVec = sign(vec2(px, py)) * vec2(qx, qy);");
+      fragBuilder->codeAppend("    vec2 arcVec = sign(vec2(px, py)) * vec2(lightQx, lightQy);");
       fragBuilder->codeAppend("    float arcLen = length(arcVec);");
       fragBuilder->codeAppendf(
           "    float arcResponse = arcLen > 0.000001 ? %s(arcVec / arcLen, %s.xy) : 0.0;",
@@ -178,8 +185,8 @@ void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
       // edge-face normal, so the arc and edge branches stay continuous; a hard branch would leave a
       // sub-pixel seam along those tangent lines.
       fragBuilder->codeAppend(
-          "    float arcWeight = smoothstep(0.0, 0.5 * edgeBand, qx) *"
-          " smoothstep(0.0, 0.5 * edgeBand, qy);");
+          "    float arcWeight = smoothstep(0.0, 0.5 * edgeBand, lightQx) *"
+          " smoothstep(0.0, 0.5 * edgeBand, lightQy);");
       fragBuilder->codeAppend(
           "    float faceLightValue = mix(faceResponse, arcResponse, arcWeight);");
     } else {
@@ -341,12 +348,11 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
       "  float proximity = (1.0 - height * height) * (1.0 - height * height) * 1.2;");
   fragBuilder->codeAppend("  float edgeLight = 0.0;");
   if (enableEdgeLighting) {
-    // The UDF edge terms read the post-splay, normalized refractDir rather than the tent gradient.
-    fragBuilder->codeAppendf("  float lightDot = dot(-refractDir, %s.xy);", lightDir.c_str());
-    fragBuilder->codeAppend(
-        "  float signedLight = edgeWeight * smoothstep(0.35, 1.0, abs(lightDot)) * "
-        "sign(lightDot);");
-    fragBuilder->codeAppend("  edgeLight = max(signedLight, 0.0) + max(-signedLight, 0.0) * 0.6;");
+    // Same angular response as the analytical path, evaluated on the post-splay normalized
+    // refractDir instead of an analytical face normal.
+    auto faceLight = EmitFaceLight(fragBuilder);
+    fragBuilder->codeAppendf("  edgeLight = edgeWeight * %s(-refractDir, %s.xy);",
+                             faceLight.c_str(), lightDir.c_str());
   }
   fragBuilder->codeAppendf("  %s = vec4(refractDir, distance * proximity, edgeLight);",
                            args.outputColor.c_str());
