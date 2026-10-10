@@ -795,6 +795,16 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         static_cast<unsigned long long>(stats.moduleCreationFailures),
         static_cast<unsigned long long>(stats.moduleEvictions), shaderCache->moduleCount(),
         static_cast<double>(stats.moduleCreationMicros) / 1000.0);
+    std::printf(
+        "[Shader Cache][%s] pipelines: requests=%llu hits=%llu created=%llu failed=%llu "
+        "uncacheable=%llu evicted=%llu cached=%zu createMs=%.1f\n",
+        TGFX_BACKEND_NAME, static_cast<unsigned long long>(stats.pipelineRequests),
+        static_cast<unsigned long long>(stats.pipelineHits),
+        static_cast<unsigned long long>(stats.pipelineCreations),
+        static_cast<unsigned long long>(stats.pipelineCreationFailures),
+        static_cast<unsigned long long>(stats.pipelineUncacheable),
+        static_cast<unsigned long long>(stats.pipelineEvictions), shaderCache->pipelineCount(),
+        static_cast<double>(stats.pipelineCreationMicros) / 1000.0);
     device->unlock();
   }
 

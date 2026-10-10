@@ -154,6 +154,11 @@ TGFX_TEST(ShaderBundleBenchmark, DISABLED_FirstFrame) {
               static_cast<unsigned long long>(modules.moduleHits),
               static_cast<unsigned long long>(modules.moduleCreations),
               modules.moduleCreationMicros / 1000.0);
+  std::printf("[Bench] pipelines requests=%llu hits=%llu created=%llu createMs=%.2f\n",
+              static_cast<unsigned long long>(modules.pipelineRequests),
+              static_cast<unsigned long long>(modules.pipelineHits),
+              static_cast<unsigned long long>(modules.pipelineCreations),
+              modules.pipelineCreationMicros / 1000.0);
   std::fflush(stdout);
 }
 
@@ -193,7 +198,8 @@ TGFX_TEST(ShaderBundleBenchmark, DISABLED_ColdFrames) {
     auto modulesAfter = shaderCache->stats();
     std::printf(
         "[Bench] mode=%s coldRound%d firstMs=%.2f secondMs=%.2f newPrograms=%llu "
-        "moduleRequests=%llu moduleHits=%llu modulesCreated=%llu moduleCreateMs=%.2f\n",
+        "moduleRequests=%llu moduleHits=%llu modulesCreated=%llu moduleCreateMs=%.2f "
+        "pipelineHits=%llu pipelinesCreated=%llu pipelineCreateMs=%.2f\n",
         std::getenv("TGFX_AOT_DISABLE") != nullptr ? "JIT" : "AOT", round, firstMicros / 1000.0,
         secondMicros / 1000.0,
         static_cast<unsigned long long>(after.cacheMisses - before.cacheMisses),
@@ -201,7 +207,11 @@ TGFX_TEST(ShaderBundleBenchmark, DISABLED_ColdFrames) {
         static_cast<unsigned long long>(modulesAfter.moduleHits - modulesBefore.moduleHits),
         static_cast<unsigned long long>(modulesAfter.moduleCreations -
                                         modulesBefore.moduleCreations),
-        (modulesAfter.moduleCreationMicros - modulesBefore.moduleCreationMicros) / 1000.0);
+        (modulesAfter.moduleCreationMicros - modulesBefore.moduleCreationMicros) / 1000.0,
+        static_cast<unsigned long long>(modulesAfter.pipelineHits - modulesBefore.pipelineHits),
+        static_cast<unsigned long long>(modulesAfter.pipelineCreations -
+                                        modulesBefore.pipelineCreations),
+        (modulesAfter.pipelineCreationMicros - modulesBefore.pipelineCreationMicros) / 1000.0);
   }
   std::fflush(stdout);
 }

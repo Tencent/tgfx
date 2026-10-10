@@ -331,7 +331,6 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   }
   cache->recordArtifactHit();
 
-  auto gpu = context->gpu();
   auto format = FormatForBackend(context->backend());
 
   ShaderModuleDescriptor vertexDesc = {};
@@ -440,8 +439,11 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   descriptor.multisample.count = programInfo->getSampleCount();
   descriptor.depthStencil = programInfo->getDepthStencil();
 
-  auto pipeline = gpu->createRenderPipeline(descriptor);
-  context->globalCache()->recordRuntimePipelineCreation(pipeline != nullptr);
+  bool pipelineCreated = false;
+  auto pipeline = shaderCache->findOrCreatePipeline(descriptor, &pipelineCreated);
+  if (pipelineCreated) {
+    context->globalCache()->recordRuntimePipelineCreation(pipeline != nullptr);
+  }
   if (pipeline == nullptr) {
     // The same shader variant (identical vert/frag artifact) can create successfully for some draws
     // and fail for others, so the mismatch must live in the runtime-derived pipeline state rather

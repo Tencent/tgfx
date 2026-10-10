@@ -176,7 +176,6 @@ std::string GLSLProgramBuilder::getUniformBlockDeclaration(
 std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   fragmentShaderBuilder()->declareCustomOutputColor();
   finalizeShaders();
-  auto gpu = context->gpu();
   ShaderModuleDescriptor vertexModule = {};
   vertexModule.code = vertexShaderBuilder()->shaderString();
   vertexModule.stage = ShaderStage::Vertex;
@@ -250,8 +249,12 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   // construction leaves all stencil ops at Keep so existing draw ops which never opt into
   // stencil writes keep their previous behaviour.
   descriptor.depthStencil = programInfo->getDepthStencil();
-  auto pipeline = gpu->createRenderPipeline(descriptor);
-  context->globalCache()->recordRuntimePipelineCreation(pipeline != nullptr);
+  bool pipelineCreated = false;
+  auto pipeline = context->precompiledShaderCache()->shaderCache()->findOrCreatePipeline(
+      descriptor, &pipelineCreated);
+  if (pipelineCreated) {
+    context->globalCache()->recordRuntimePipelineCreation(pipeline != nullptr);
+  }
   if (pipeline == nullptr) {
     return nullptr;
   }
