@@ -119,7 +119,12 @@ class Drawable {
    */
   void markPresentationRequested();
 
-  std::shared_ptr<Window> _window = nullptr;
+  // The window is held weakly: a frame must not keep its window (and through it the device
+  // and the context with its pending drawing buffers) alive, which would form a reference
+  // cycle (buffer -> frame -> window -> device -> context -> buffer). While the frame's
+  // surface or recording is alive the weak reference resolves; frame-level backends present
+  // through their proxies and do not need the window at delivery at all.
+  std::weak_ptr<Window> _window = {};
   std::shared_ptr<RenderTargetProxy> _importedTarget = nullptr;
 
  private:

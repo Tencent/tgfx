@@ -56,11 +56,12 @@ void VulkanDrawable::onRelease(VulkanGPU*) {
 }
 
 std::shared_ptr<RenderTargetProxy> VulkanDrawable::onImport(Context* context) {
-  if (_window == nullptr) {
+  auto window = _window.lock();
+  if (window == nullptr) {
     return nullptr;
   }
-  auto window = static_cast<VulkanWindow*>(_window.get());
-  return window->createSwapchainProxy(context, true);
+  auto vulkanWindow = static_cast<VulkanWindow*>(window.get());
+  return vulkanWindow->createSwapchainProxy(context, true);
 }
 
 void VulkanDrawable::onAttachSubmission(Context*) {

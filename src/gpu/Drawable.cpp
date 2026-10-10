@@ -54,10 +54,11 @@ void Drawable::markPresentationRequested() {
 }
 
 std::shared_ptr<RenderTargetProxy> Drawable::import(Context* context) {
-  if (context == nullptr || _window == nullptr) {
+  auto window = _window.lock();
+  if (context == nullptr || window == nullptr) {
     return nullptr;
   }
-  if (context->device() != _window->getDevice().get()) {
+  if (context->device() != window->getDevice().get()) {
     LOGE("Drawable::import() The context must belong to the frame's window device!");
     return nullptr;
   }
@@ -95,19 +96,25 @@ bool Drawable::canReadBack() const {
   // The frame is readable only when its source window also supports readback: blitting from a
   // framebufferOnly Metal layer (or a swapchain without copy-source usage) would trigger GPU
   // validation assertions.
-  if (_window == nullptr) {
+  auto window = _window.lock();
+  if (window == nullptr) {
     return false;
   }
-  return _window->onSupportsReadback();
+  return window->onSupportsReadback();
 }
 
 bool Drawable::requestPresent(Context* context) {
-  if (context == nullptr || _window == nullptr) {
+  if (context == nullptr) {
     return false;
   }
-  if (context->device() != _window->getDevice().get()) {
-    LOGE("Drawable::requestPresent() The context must belong to the frame's window device!");
-    return false;
+  // The window may already be gone: frames hold it weakly (to break the device reference
+  // cycle), and frame-level backends present through their proxies without it. The device
+  // was validated when the frame was imported; skip the re-validation once the window is gone.
+  if (auto window = _window.lock()) {
+    if (context->device() != window->getDevice().get()) {
+      LOGE("Drawable::requestPresent() The context must belong to the frame's window device!");
+      return false;
+    }
   }
   if (_delivery == Delivery::Imported) {
     // The frame's rendering has not been submitted yet: register the request on this frame. The
@@ -173,7 +180,7 @@ void Drawable::onSubmissionCompleted(Context* context, uint32_t bufferID) {
 }
 
 void Drawable::releaseFrameHandles() {
-  _window = nullptr;
+  _window = {};
   _importedTarget = nullptr;
 }
 

@@ -25,6 +25,7 @@
 
 namespace tgfx {
 class DepthStencilTextureView;
+class Window;
 
 /**
  * This class defers the acquisition of render targets until they are actually required.
@@ -116,6 +117,31 @@ class RenderTargetProxy {
   virtual std::shared_ptr<RenderTarget> getRenderTarget() const = 0;
 
   /**
+   * Schedules this target's presentation onto the upcoming submission, before the command
+   * buffer that carries the frame's rendering is submitted. The default implementation does
+   * nothing; backends that encode the presentation into the command buffer (Metal's
+   * presentDrawable, Vulkan's PresentInfo) override it.
+   */
+  virtual void onSchedulePresentation(Context* context);
+
+  /**
+   * Presents this target's frame after the command buffer submission. The default
+   * implementation forwards to the window that created this target (backends with a shared
+   * native backbuffer: GL, D3D12), which requires the window to still be alive; backends with
+   * frame-level resources (Metal, Vulkan, WebGPU, QGL) override it and release the frame
+   * without the window.
+   */
+  virtual void onPresentFrame(Context* context);
+
+  /**
+   * Associates this target with the window that created it, enabling the default
+   * onPresentFrame() forwarding. Called by the surface paths after onCreateRenderTarget().
+   */
+  void setPresentingWindow(std::weak_ptr<Window> window) {
+    _presentingWindow = std::move(window);
+  }
+
+  /**
    * Returns the depth/stencil attachment associated with this render target, lazily allocating
    * it on the first call. `sampleCount` must match the colour attachment's sample count — every
    * backend requires all attachments in a render pass to share the same sample count, so callers
@@ -165,6 +191,12 @@ class RenderTargetProxy {
   Matrix getOriginTransform() const;
 
  protected:
+  // The window that created this target (set by the automatic and explicit GL-style paths).
+  // Held weakly: presenting must not keep the window (and through it the device) alive; when
+  // the window is gone, the default onPresentFrame() drops the presentation. Frame-level
+  // backends (Metal/Vulkan) do not use it.
+  std::weak_ptr<Window> _presentingWindow = {};
+
   // Cached stencil attachment, lazily created by getStencil(). Held as a strong reference so
   // the same attachment is reused across the proxy's lifetime.
   std::shared_ptr<DepthStencilTextureView> stencilAttachment = nullptr;

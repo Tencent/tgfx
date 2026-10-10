@@ -104,10 +104,23 @@ class DrawingManager {
    */
   std::shared_ptr<DrawingBuffer> flush();
 
+  /**
+   * Takes the windows whose frames the flushed buffer collected (called right after flush()).
+   */
+  std::vector<std::shared_ptr<Window>> takePendingWindows() {
+    return std::move(pendingWindows);
+  }
+
  private:
   // The automatic frame collected for each window in the current drawing buffer, so frame
   // aggregation does not need to identify WindowFrame objects in the buffer's drawable list.
   std::unordered_map<Window*, std::weak_ptr<WindowFrame>> pendingWindowFrames = {};
+
+  // The windows whose frames the current drawing buffer collected. The frames hold them
+  // weakly, so the strong references are moved into the Recording at flush time: while the
+  // Recording is alive, shared-backbuffer backends can still present through the window when
+  // the Recording is submitted after the surfaces and windows themselves are gone.
+  std::vector<std::shared_ptr<Window>> pendingWindows = {};
   Context* context = nullptr;
   std::shared_ptr<DrawingBuffer> currentBuffer = nullptr;
   std::deque<std::shared_ptr<DrawingBuffer>> bufferPool = {};

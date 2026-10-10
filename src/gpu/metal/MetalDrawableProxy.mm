@@ -94,6 +94,28 @@ id<CAMetalDrawable> MetalDrawableProxy::getMetalDrawable() const {
   return _metalDrawable;
 }
 
+void MetalDrawableProxy::onSchedulePresentation(Context* context) {
+  // Only schedule drawables whose render target was created successfully; scheduling a
+  // drawable from a failed getRenderTarget() would present an unrendered frame.
+  if (!hasRenderTarget()) {
+    return;
+  }
+  auto drawable = getMetalDrawable();
+  if (drawable == nil) {
+    return;
+  }
+  // Attach the presentation to the upcoming command buffer, so that the presentation waits
+  // for the GPU to finish rendering before the frame is displayed. The command buffer
+  // retains the drawable until it completes, so the proxy can drop its reference once the
+  // presentation has been scheduled (see onPresentFrame()).
+  auto metalQueue = static_cast<MetalCommandQueue*>(context->gpu()->queue());
+  metalQueue->schedulePresent(drawable);
+}
+
+void MetalDrawableProxy::onPresentFrame(Context*) {
+  releaseDrawable();
+}
+
 void MetalDrawableProxy::releaseDrawable() {
   [_metalDrawable release];
   _metalDrawable = nil;

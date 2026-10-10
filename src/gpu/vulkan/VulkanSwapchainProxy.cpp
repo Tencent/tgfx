@@ -154,6 +154,14 @@ void VulkanSwapchainProxy::schedulePresent() {
   _pendingImageAvailableSemaphore = VK_NULL_HANDLE;
 }
 
+void VulkanSwapchainProxy::onSchedulePresentation(Context*) {
+  schedulePresent();
+}
+
+void VulkanSwapchainProxy::onPresentFrame(Context*) {
+  releaseFrame();
+}
+
 bool VulkanSwapchainProxy::hasPendingFrame() const {
   return _renderTarget != nullptr;
 }

@@ -41,16 +41,22 @@ class RecordingWindow final : public Window {
 
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override {
+    // The default proxy-level presentation forwards here with an empty target list (proxies
+    // cannot reference themselves), so count the created targets and report them on present.
+    createdTargets++;
     return RenderTargetProxy::Make(context, 16, 16, false);
   }
 
-  void onPresent(Context*,
-                 const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets) override {
+  void onPresent(Context*, const std::vector<std::shared_ptr<RenderTargetProxy>>&) override {
     (*presentCount)++;
-    *presentedTargetCount = renderTargets.size();
+    // The default proxy-level presentation forwards with an empty list; report the targets
+    // created since the last present instead.
+    *presentedTargetCount = createdTargets;
+    createdTargets = 0;
   }
 
  private:
+  size_t createdTargets = 0;
   bool* destroyed = nullptr;
   int* presentCount = nullptr;
   size_t* presentedTargetCount = nullptr;

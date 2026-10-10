@@ -213,11 +213,12 @@ void DrawingManager::collectWindow(std::shared_ptr<Window> window,
     }
   }
   auto* windowKey = window.get();
-  auto frame = WindowFrame::Make(std::move(window), std::move(renderTarget));
+  auto frame = WindowFrame::Make(window, std::move(renderTarget));
   if (frame != nullptr) {
     frame->noteCollectedBuffer(drawingBuffer->uniqueID());
     drawingBuffer->drawables.push_back(frame);
     pendingWindowFrames[windowKey] = std::move(frame);
+    pendingWindows.push_back(std::move(window));
   }
 }
 

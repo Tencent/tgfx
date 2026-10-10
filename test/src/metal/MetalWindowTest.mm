@@ -319,18 +319,16 @@ TGFX_TEST(MetalWindowTest, DroppedRecordingReleasesWindow) {
   std::weak_ptr<Window> weakWindow = window;
   surface = nullptr;
   window = nullptr;
-  EXPECT_FALSE(weakWindow.expired());  // the Recording retains the work
-  // Dropping the Recording does not drop the pending work: the buffered frame keeps the window
-  // alive until its rendering and presentation are submitted.
+  EXPECT_FALSE(weakWindow.expired());  // the Recording retains the window
+  // Frames hold their windows weakly (breaking the device reference cycle), so dropping the
+  // Recording releases the window; the buffered rendering commands still run, and frame-level
+  // backends like Metal still present through the frame's proxy without the window.
   recording = nullptr;
-  EXPECT_FALSE(weakWindow.expired());
-  // Any later submission drains the pending queue in FIFO order, delivering the frame and
-  // releasing the window.
+  EXPECT_TRUE(weakWindow.expired());
   auto offscreen = Surface::Make(context, 8, 8);
   ASSERT_TRUE(offscreen != nullptr);
   offscreen->getCanvas()->clear(Color::Black());
   context->flushAndSubmit(true);
-  EXPECT_TRUE(weakWindow.expired());
 }
 
 /**
@@ -426,6 +424,24 @@ TGFX_TEST(MetalWindowTest, PresentationBindsToLastBatch) {
   readback->unlockPixels(context);
 }
 
+/**
+ * Verifies that the factory-created default device stays alive: MetalWindow::MakeFrom(layer)
+ * without an explicit device creates a TGFX MetalDevice that has no other owner, and callers
+ * rely on window->getDevice() to keep it alive.
+ */
+TGFX_TEST(MetalWindowTest, FactoryDefaultDeviceStaysAlive) {
+  auto layer = [CAMetalLayer layer];
+  layer.device = MTLCreateSystemDefaultDevice();
+  layer.drawableSize = CGSizeMake(16, 16);
+  auto window = MetalWindow::MakeFrom(layer);
+  ASSERT_TRUE(window != nullptr);
+  auto device = window->getDevice();
+  EXPECT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  EXPECT_TRUE(context != nullptr);
+  device->unlock();
+}
+
 TGFX_TEST(MetalWindowTest, SurfaceRetainsDrawable) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -467,13 +483,12 @@ TGFX_TEST(MetalWindowTest, DrawableRetainsWindow) {
   surface->getCanvas()->clear(Color::Green());
   context->flushAndSubmit(true);
 
+  // Frames hold their windows weakly; without the surface and the test's reference the window
+  // is gone, but Metal presents through the frame's proxy without needing it.
   window = nullptr;
   surface = nullptr;
-  // The undelivered frame keeps its window alive.
-  EXPECT_FALSE(weakWindow.expired());
-  // Presenting the frame delivers it and releases the frame's window reference.
-  context->present(drawable);
   EXPECT_TRUE(weakWindow.expired());
+  context->present(drawable);
   drawable = nullptr;
   EXPECT_TRUE(weakWindow.expired());
 }

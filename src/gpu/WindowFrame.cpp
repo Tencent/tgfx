@@ -39,6 +39,8 @@ std::shared_ptr<WindowFrame> WindowFrame::Make(std::shared_ptr<Window> window,
 WindowFrame::WindowFrame(std::shared_ptr<Window> window,
                          std::shared_ptr<RenderTargetProxy> renderTarget)
     : Drawable(renderTarget->width(), renderTarget->height(), window->colorSpace()) {
+  // The window is held weakly for identity only (frame aggregation); the presentation is
+  // carried by the render targets' proxies.
   _window = std::move(window);
   renderTargets.push_back(std::move(renderTarget));
 }
@@ -55,7 +57,7 @@ void WindowFrame::addTarget(std::shared_ptr<RenderTargetProxy> renderTarget) {
 }
 
 bool WindowFrame::isForWindow(const std::shared_ptr<Window>& window) const {
-  return _window != nullptr && _window == window;
+  return _window.lock() == window;
 }
 
 bool WindowFrame::hasTarget(const std::shared_ptr<RenderTargetProxy>& renderTarget) const {
@@ -73,12 +75,19 @@ bool WindowFrame::onSchedulePresent(Context* context) {
   // presentDrawable/PresentInfo here). Always return false: unlike explicit drawables, an
   // automatic frame still needs its onPresent() after the submission, which performs the
   // backend's frame release (Metal's releaseDrawable) or swap (GL).
-  _window->onSchedulePresentation(context, renderTargets);
+  for (auto& renderTarget : renderTargets) {
+    renderTarget->onSchedulePresentation(context);
+  }
   return false;
 }
 
 void WindowFrame::onPresent(Context* context) {
-  _window->onPresent(context, renderTargets);
+  // Shared-backbuffer backends (GL, D3D12) swap once for the aggregated frame; frame-level
+  // backends present each target. Independent backends never aggregate targets into one frame,
+  // so front() is the single target there.
+  if (!renderTargets.empty()) {
+    renderTargets.front()->onPresentFrame(context);
+  }
 }
 
 }  // namespace tgfx

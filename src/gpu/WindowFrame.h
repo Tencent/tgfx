@@ -31,16 +31,16 @@ class RenderTargetProxy;
  * window surface collects one WindowFrame per window into the drawing buffer's drawable list, so
  * the automatic path shares the single collection/delivery pipeline with explicit drawables:
  * the frame registers its presentation at construction (instead of Context::present()), the
- * submission pipeline schedules it onto the command buffer that carries the frame's rendering
- * (Window::onSchedulePresentation()), and delivers it after submission
- * (Window::onPresent()). Dropping the buffer or its Recording discards the frame.
+ * submission pipeline schedules it through the render targets' proxies (which present without
+ * needing the window on frame-level backends), and delivers it after submission. The frame
+ * holds its window weakly: presenting must not keep the window (and through it the device)
+ * alive, so a flushed buffer never forms a device reference cycle.
  */
 class WindowFrame : public Drawable {
  public:
   /**
-   * Creates an automatic frame for the given window and render targets. The window is retained
-   * until the frame is delivered; the render targets are the stable proxies created by
-   * Window::onCreateRenderTarget().
+   * Creates an automatic frame for the given window and render targets. The render targets are
+   * the stable proxies created by Window::onCreateRenderTarget() and carry the presentation.
    */
   static std::shared_ptr<WindowFrame> Make(std::shared_ptr<Window> window,
                                            std::shared_ptr<RenderTargetProxy> renderTarget);

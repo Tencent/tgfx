@@ -139,36 +139,6 @@ std::shared_ptr<RenderTargetProxy> MetalWindow::onCreateRenderTarget(Context* co
   return std::make_shared<MetalDrawableProxy>(context, width, height, metalLayer, pixelFormat);
 }
 
-void MetalWindow::onPresent(Context*,
-                            const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets) {
-  if (renderTargets.empty()) {
-    return;
-  }
-  auto proxy = std::static_pointer_cast<MetalDrawableProxy>(renderTargets.front());
-  proxy->releaseDrawable();
-}
-
-bool MetalWindow::onSchedulePresentation(
-    Context* context, const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets) {
-  // Schedule each target's drawable to be presented when the command buffer that carries the
-  // frame's rendering is committed, so that the GPU finishes rendering before the drawable is
-  // displayed on screen. This is the same scheduling the explicit path performs in
-  // MetalDrawable::onSchedulePresent(), unified at submission time.
-  auto metalQueue = static_cast<MetalCommandQueue*>(context->gpu()->queue());
-  for (const auto& renderTarget : renderTargets) {
-    auto proxy = std::static_pointer_cast<MetalDrawableProxy>(renderTarget);
-    // Only schedule drawables whose render target was created successfully; scheduling a
-    // drawable from a failed getRenderTarget() would present an unrendered frame.
-    if (proxy->hasRenderTarget()) {
-      auto drawable = proxy->getMetalDrawable();
-      if (drawable != nil) {
-        metalQueue->schedulePresent(drawable);
-      }
-    }
-  }
-  return true;
-}
-
 bool MetalWindow::hasIndependentPresentationTargets() const {
   return true;
 }

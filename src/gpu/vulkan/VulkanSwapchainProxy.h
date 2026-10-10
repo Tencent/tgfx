@@ -62,6 +62,14 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
   void presentFrame();
 
   /**
+   * Frame-level presentation, independent of the VulkanWindow: registers the frame's
+   * semaphore pair with the upcoming submission and releases the frame after the submission.
+   */
+  void onSchedulePresentation(Context* context) override;
+
+  void onPresentFrame(Context* context) override;
+
+  /**
    * Discards an acquired frame without presenting it. No GPU calls are made; the out-of-date
    * flag is set so the next proxy creation rebuilds the swapchain and reclaims the image.
    */

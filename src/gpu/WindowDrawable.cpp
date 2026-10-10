@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/WindowDrawable.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
 
@@ -38,17 +39,23 @@ WindowDrawable::~WindowDrawable() {
 }
 
 std::shared_ptr<RenderTargetProxy> WindowDrawable::onImport(Context* context) {
-  if (_window == nullptr) {
+  auto window = _window.lock();
+  if (window == nullptr) {
     return nullptr;
   }
-  return _window->onCreateRenderTarget(context);
+  auto renderTarget = window->onCreateRenderTarget(context);
+  if (renderTarget != nullptr) {
+    // Enable the default proxy-level presentation forwarding for shared-backbuffer backends.
+    renderTarget->setPresentingWindow(_window);
+  }
+  return renderTarget;
 }
 
 void WindowDrawable::onPresent(Context* context) {
-  if (_window == nullptr || _importedTarget == nullptr) {
+  if (_importedTarget == nullptr) {
     return;
   }
-  _window->onPresent(context, {_importedTarget});
+  _importedTarget->onPresentFrame(context);
 }
 
 }  // namespace tgfx

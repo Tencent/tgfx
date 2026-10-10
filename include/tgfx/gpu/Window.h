@@ -83,19 +83,22 @@ class Window : public std::enable_shared_from_this<Window> {
 
  protected:
   std::mutex locker = {};
-  // The device is held weakly: a window must not keep its device (and through it the context
-  // and its pending drawing buffers) alive, which would form a reference cycle with the frames
-  // a buffer retains (buffer -> frame -> window -> device -> context -> buffer). Use
-  // lockDevice() to access it; it returns nullptr once the device has been released.
-  std::weak_ptr<Device> _device = {};
+  // The device is held strongly: factory entry points like MetalWindow::MakeFrom(layer) create
+  // a default device that has no other owner, and callers expect window->getDevice() to keep
+  // it alive. Reference cycles with pending drawing buffers are broken on the frame side
+  // instead: frames hold their windows weakly (see Drawable) and present through their
+  // proxies.
+  std::shared_ptr<Device> _device = nullptr;
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
   const bool _vsyncEnabled = true;
 
   /**
-   * Returns the device while it is alive, or nullptr once it has been released.
+   * Returns the device. Kept as an accessor for call sites written while the device was held
+   * weakly; it returns nullptr if the device has been released mid-window-lifetime, which can
+   * no longer happen while the window is alive.
    */
   std::shared_ptr<Device> lockDevice() const {
-    return _device.lock();
+    return _device;
   }
 
   explicit Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace = nullptr,
@@ -119,20 +122,6 @@ class Window : public std::enable_shared_from_this<Window> {
    */
   virtual void onPresent(Context* context,
                          const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets);
-
-  /**
-   * Called while the drawing buffer that carries the automatic frame's rendering commands is
-   * about to be submitted (after encoding, before the command buffer is submitted). Backends
-   * that encode the presentation into the command buffer (Metal's presentDrawable, Vulkan's
-   * PresentInfo) override this to schedule those targets' presentations onto the upcoming
-   * submission. Backends that present after submission (GL swap, QGL compositor) keep the
-   * default no-op. Returns true when the presentation has been attached; the return value is
-   * informational and does not skip onPresent().
-   * @param context The Context that is about to submit the frame's rendering commands.
-   * @param renderTargets The render targets that produced the frame being presented.
-   */
-  virtual bool onSchedulePresentation(
-      Context* context, const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets);
 
   /**
    * Returns true if every RenderTargetProxy represents an independently presentable frame. The
@@ -160,6 +149,7 @@ class Window : public std::enable_shared_from_this<Window> {
   friend class DrawingBuffer;
   friend class DrawingManager;
   friend class Surface;
+  friend class RenderTargetProxy;
   friend class WindowDrawable;
   friend class WindowFrame;
   friend class WindowSurface;

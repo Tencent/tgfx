@@ -37,7 +37,7 @@ bool Window::vsyncEnabled() const {
 
 std::shared_ptr<Device> Window::getDevice() {
   std::lock_guard<std::mutex> autoLock(locker);
-  return _device.lock();
+  return _device;
 }
 
 std::shared_ptr<Drawable> Window::nextDrawable() {
@@ -67,11 +67,6 @@ bool Window::onSupportsReadback() const {
 }
 
 void Window::onPresent(Context*, const std::vector<std::shared_ptr<RenderTargetProxy>>&) {
-}
-
-bool Window::onSchedulePresentation(Context*,
-                                    const std::vector<std::shared_ptr<RenderTargetProxy>>&) {
-  return false;
 }
 
 bool Window::hasIndependentPresentationTargets() const {

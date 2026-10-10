@@ -33,6 +33,9 @@ std::shared_ptr<Surface> WindowSurface::Make(Context* context, std::shared_ptr<W
   if (proxy == nullptr) {
     return nullptr;
   }
+  // Enable the default proxy-level presentation forwarding for shared-backbuffer backends
+  // (GL, D3D12); frame-level backends (Metal, Vulkan) override the proxy hooks instead.
+  proxy->setPresentingWindow(window);
   auto colorSpace = window->colorSpace();
   auto renderTarget = proxy;
   auto surface = std::shared_ptr<WindowSurface>(new WindowSurface(
