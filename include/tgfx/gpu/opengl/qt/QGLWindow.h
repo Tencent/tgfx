@@ -29,7 +29,6 @@
 
 namespace tgfx {
 
-class QGLDrawableProxy;
 class QGLDeviceCreator;
 class QGLDrawableProxy;
 
