@@ -20,6 +20,7 @@
 
 #import <QuartzCore/QuartzCore.h>
 #include <memory>
+#include "gpu/metal/MetalResource.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Drawable.h"
 
@@ -32,13 +33,13 @@ namespace tgfx {
  * layer's framebufferOnly property to be NO, otherwise the drawable texture cannot be used as
  * a blit source.
  */
-class MetalDrawable : public Drawable {
+class MetalDrawable : public Drawable, public MetalResource {
  public:
   /**
    * Acquires a drawable from the specified CAMetalLayer. The call blocks until the layer can
    * provide a drawable. Returns nullptr if the layer is nil or has no drawable available.
    */
-  static std::shared_ptr<MetalDrawable> Make(CAMetalLayer* metalLayer,
+  static std::shared_ptr<MetalDrawable> Make(MetalGPU* gpu, CAMetalLayer* metalLayer,
                                              std::shared_ptr<ColorSpace> colorSpace);
 
   /**
@@ -63,9 +64,14 @@ class MetalDrawable : public Drawable {
   bool onSchedulePresent(Context* context) override;
   void onPresent(Context* context) override;
 
+ protected:
+  void onRelease(MetalGPU* gpu) override;
+
  private:
   MetalDrawable(id<CAMetalDrawable> metalDrawable, int width, int height,
                 std::shared_ptr<ColorSpace> colorSpace);
+
+  friend class MetalGPU;
 
   id<CAMetalDrawable> _metalDrawable = nil;
 };

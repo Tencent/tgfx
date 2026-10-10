@@ -22,11 +22,15 @@
 
 namespace tgfx {
 
-std::shared_ptr<VulkanDrawable> VulkanDrawable::Make(std::shared_ptr<VulkanWindow> window) {
+std::shared_ptr<VulkanDrawable> VulkanDrawable::Make(VulkanGPU* gpu,
+                                                     std::shared_ptr<VulkanWindow> window) {
   if (window == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<VulkanDrawable>(new VulkanDrawable(window->colorSpace()));
+  // The drawable is registered as a Vulkan resource: when its last reference goes away it is
+  // returned to the GPU's return queue and destroyed (releasing the manual-present proxy and
+  // its semaphores) within the device's synchronized scope instead of on an arbitrary thread.
+  return gpu->makeResource<VulkanDrawable>(window->colorSpace());
 }
 
 VulkanDrawable::VulkanDrawable(std::shared_ptr<ColorSpace> colorSpace)
@@ -36,7 +40,15 @@ VulkanDrawable::VulkanDrawable(std::shared_ptr<ColorSpace> colorSpace)
 }
 
 VulkanDrawable::~VulkanDrawable() {
+  // Discard the frame if it was never delivered; the manual-present proxy is released later in
+  // onRelease(), inside the GPU's synchronized scope.
   abandon();
+}
+
+void VulkanDrawable::onRelease(VulkanGPU*) {
+  // Releasing the imported target destroys the proxy (and its unused semaphores) here, inside
+  // the device's synchronized scope.
+  _importedTarget = nullptr;
 }
 
 std::shared_ptr<RenderTargetProxy> VulkanDrawable::onImport(Context* context) {

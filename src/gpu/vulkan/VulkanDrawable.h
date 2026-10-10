@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include "gpu/vulkan/VulkanResource.h"
 #include "tgfx/gpu/Drawable.h"
 
 namespace tgfx {
@@ -32,9 +33,9 @@ class VulkanWindow;
  * Context::present(); reading after the presentation is not supported because the presentation
  * engine owns the image once it has been presented.
  */
-class VulkanDrawable : public Drawable {
+class VulkanDrawable : public Drawable, public VulkanResource {
  public:
-  static std::shared_ptr<VulkanDrawable> Make(std::shared_ptr<VulkanWindow> window);
+  static std::shared_ptr<VulkanDrawable> Make(VulkanGPU* gpu, std::shared_ptr<VulkanWindow> window);
 
   ~VulkanDrawable() override;
 
@@ -43,9 +44,12 @@ class VulkanDrawable : public Drawable {
   void onAttachSubmission(Context* context) override;
   void onPresent(Context* context) override;
   void onAbandon() override;
+  void onRelease(VulkanGPU* gpu) override;
 
  private:
   explicit VulkanDrawable(std::shared_ptr<ColorSpace> colorSpace);
+
+  friend class VulkanGPU;
 };
 
 }  // namespace tgfx

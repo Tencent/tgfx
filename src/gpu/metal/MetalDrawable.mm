@@ -19,6 +19,7 @@
 #include "MetalDrawable.h"
 #import <Metal/Metal.h>
 #include "gpu/metal/MetalCommandQueue.h"
+#include "gpu/metal/MetalGPU.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Context.h"
@@ -48,7 +49,7 @@ BackendRenderTarget MetalDrawable::MakeBackendRenderTarget(id<CAMetalDrawable> d
                              static_cast<int>(drawable.texture.height));
 }
 
-std::shared_ptr<MetalDrawable> MetalDrawable::Make(CAMetalLayer* metalLayer,
+std::shared_ptr<MetalDrawable> MetalDrawable::Make(MetalGPU* gpu, CAMetalLayer* metalLayer,
                                                    std::shared_ptr<ColorSpace> colorSpace) {
   auto metalDrawable = AcquireMetalDrawable(metalLayer);
   if (metalDrawable == nil) {
@@ -56,8 +57,10 @@ std::shared_ptr<MetalDrawable> MetalDrawable::Make(CAMetalLayer* metalLayer,
   }
   auto width = static_cast<int>(metalDrawable.texture.width);
   auto height = static_cast<int>(metalDrawable.texture.height);
-  return std::shared_ptr<MetalDrawable>(
-      new MetalDrawable(metalDrawable, width, height, std::move(colorSpace)));
+  // The drawable is registered as a Metal resource: when its last reference goes away it is
+  // returned to the GPU's return queue and destroyed (releasing the CAMetalDrawable) within the
+  // device's synchronized scope instead of on an arbitrary thread.
+  return gpu->makeResource<MetalDrawable>(metalDrawable, width, height, std::move(colorSpace));
 }
 
 MetalDrawable::MetalDrawable(id<CAMetalDrawable> metalDrawable, int width, int height,
@@ -68,8 +71,14 @@ MetalDrawable::MetalDrawable(id<CAMetalDrawable> metalDrawable, int width, int h
 }
 
 MetalDrawable::~MetalDrawable() {
+  // Discard the frame if it was never delivered; the CAMetalDrawable is released later in
+  // onRelease(), inside the GPU's synchronized scope.
   abandon();
+}
+
+void MetalDrawable::onRelease(MetalGPU*) {
   [_metalDrawable release];
+  _metalDrawable = nil;
 }
 
 std::shared_ptr<RenderTargetProxy> MetalDrawable::onImport(Context* context) {
@@ -88,7 +97,12 @@ bool MetalDrawable::onSchedulePresent(Context* context) {
 void MetalDrawable::onPresent(Context*) {
   // Presenting the drawable directly schedules the presentation after all command buffers that
   // have been enqueued so far, so the GPU finishes rendering before the frame is displayed.
+  // Release the drawable right after the presentation is scheduled so it returns to the layer's
+  // rotation pool immediately (the presentation keeps its own reference); onRelease() is a
+  // nil-safe no-op afterwards.
   [_metalDrawable present];
+  [_metalDrawable release];
+  _metalDrawable = nil;
 }
 
 }  // namespace tgfx

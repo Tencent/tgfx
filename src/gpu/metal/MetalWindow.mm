@@ -24,8 +24,10 @@
 #include "gpu/metal/MetalDefines.h"
 #include "gpu/metal/MetalDrawable.h"
 #include "gpu/metal/MetalDrawableProxy.h"
+#include "gpu/metal/MetalGPU.h"
 #include "platform/apple/CGColorSpaceUtil.h"
 #include "tgfx/gpu/GPU.h"
+#include "tgfx/gpu/metal/MetalDevice.h"
 
 namespace tgfx {
 
@@ -177,7 +179,13 @@ std::shared_ptr<Drawable> MetalWindow::onNextDrawable() {
   if (!GetDrawableSize(metalLayer, metalView, &width, &height)) {
     return nullptr;
   }
-  return MetalDrawable::Make(metalLayer, colorSpace());
+  auto device = lockDevice();
+  if (device == nullptr) {
+    return nullptr;
+  }
+  auto metalDevice = static_cast<MetalDevice*>(device.get());
+  auto metalGPU = static_cast<MetalGPU*>(metalDevice->_gpu);
+  return MetalDrawable::Make(metalGPU, metalLayer, colorSpace());
 }
 
 bool MetalWindow::onSupportsReadback() const {

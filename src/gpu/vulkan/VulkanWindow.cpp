@@ -34,6 +34,7 @@
 #include "gpu/vulkan/VulkanGPU.h"
 #include "gpu/vulkan/VulkanSwapchainProxy.h"
 #include "gpu/vulkan/VulkanUtil.h"
+#include "tgfx/gpu/vulkan/VulkanDevice.h"
 
 namespace tgfx {
 
@@ -851,7 +852,14 @@ bool VulkanWindow::hasIndependentPresentationTargets() const {
 std::shared_ptr<Drawable> VulkanWindow::onNextDrawable() {
   // The frame handle is created without a Context; its manual-present proxy is resolved when
   // the frame is imported (VulkanDrawable::onImport()).
-  return VulkanDrawable::Make(std::static_pointer_cast<VulkanWindow>(shared_from_this()));
+  auto device = lockDevice();
+  if (device == nullptr) {
+    return nullptr;
+  }
+  auto vulkanDevice = static_cast<VulkanDevice*>(device.get());
+  auto vulkanGPU = static_cast<VulkanGPU*>(vulkanDevice->_gpu);
+  return VulkanDrawable::Make(vulkanGPU,
+                              std::static_pointer_cast<VulkanWindow>(shared_from_this()));
 }
 
 bool VulkanWindow::onSupportsReadback() const {
