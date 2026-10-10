@@ -32,6 +32,7 @@
 namespace tgfx {
 
 class Context;
+class PipelineStore;
 
 /**
  * Counters of the shader cache. They only grow (until resetStats()), so clear() and eviction do
@@ -59,6 +60,8 @@ struct ShaderCacheStats {
   uint64_t pipelineEvictions = 0;
   // Wall time spent inside GPU::createRenderPipeline() for the creations and failures above.
   int64_t pipelineCreationMicros = 0;
+  // L2 misses served by the pipeline store instead of the GPU (see PipelineStore).
+  uint64_t pipelineStoreHits = 0;
 };
 
 /**
@@ -84,6 +87,13 @@ struct ShaderModuleKeyHasher {
     return static_cast<size_t>(value ^ key.encodedSize);
   }
 };
+
+/**
+ * The content key of a render pipeline: the same digest form as a module key, taken over the full
+ * pipeline descriptor encoding (see EncodeRenderPipelineDescriptor). The two encodings start with
+ * different version bytes, so a module key never equals a pipeline key.
+ */
+using PipelineKey = ShaderModuleKey;
 
 /**
  * ShaderCache reuses the GPU objects that are expensive to create, independently of the backend
@@ -114,6 +124,8 @@ struct ShaderModuleKeyHasher {
 class ShaderCache {
  public:
   explicit ShaderCache(Context* context);
+
+  ~ShaderCache();
 
   /**
    * Returns a module for the descriptor: a cached one when an identical descriptor was compiled
@@ -160,6 +172,16 @@ class ShaderCache {
 
   bool pipelineCacheActive() const {
     return pipelineCacheEnabled;
+  }
+
+  /**
+   * Sets the store consulted on pipeline cache misses (see PipelineStore), replacing any previous
+   * one; nullptr removes it. No store is set by default. clear() keeps the store.
+   */
+  void setPipelineStore(std::unique_ptr<PipelineStore> store);
+
+  PipelineStore* pipelineStore() const {
+    return _pipelineStore.get();
   }
 
   const ShaderCacheStats& stats() const {
@@ -214,7 +236,11 @@ class ShaderCache {
   // Pipeline keys are digests of the full descriptor encoding, in the same form as module keys.
   std::list<ShaderModuleKey> pipelineLRU = {};
   std::unordered_map<ShaderModuleKey, PipelineEntry, ShaderModuleKeyHasher> pipelineMap = {};
+  std::unique_ptr<PipelineStore> _pipelineStore = nullptr;
   ShaderCacheStats _stats = {};
+
+  void addPipeline(const PipelineKey& key, std::string encoded,
+                   std::shared_ptr<RenderPipeline> pipeline);
 
   std::shared_ptr<ShaderModule> createModule(const ShaderModuleDescriptor& descriptor);
   std::shared_ptr<RenderPipeline> createPipeline(const RenderPipelineDescriptor& descriptor);

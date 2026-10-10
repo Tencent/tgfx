@@ -18,7 +18,9 @@
 
 #include <functional>
 #include <set>
+#include <unordered_map>
 #include "gpu/GlobalCache.h"
+#include "gpu/PipelineStore.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ShaderCache.h"
 #include "tgfx/core/Canvas.h"
@@ -357,6 +359,123 @@ TGFX_TEST(ShaderCacheTest, DistinctProgramsShareIdenticalPipeline) {
   auto pipelineHits = after.pipelineHits - before.pipelineHits;
   EXPECT_GT(newPrograms, 1u);
   EXPECT_GT(pipelineHits, 0u) << newPrograms << " programs, no shared pipeline";
+}
+
+// Records every call ShaderCache makes into a store and, once filled, serves pipelines back by key:
+// the per-entry way a persistent store works, with memory standing in for the disk.
+class RecordingPipelineStore : public PipelineStore {
+ public:
+  std::shared_ptr<RenderPipeline> findPipeline(const PipelineKey& key,
+                                               const RenderPipelineDescriptor&) override {
+    findCalls++;
+    if (!serve) {
+      return nullptr;
+    }
+    auto found = saved.find(key);
+    if (found == saved.end()) {
+      return nullptr;
+    }
+    served++;
+    return found->second;
+  }
+
+  void didCreatePipeline(const PipelineKey& key, const RenderPipelineDescriptor&,
+                         const std::shared_ptr<RenderPipeline>& pipeline) override {
+    createdCalls++;
+    saved[key] = pipeline;
+  }
+
+  bool serve = false;
+  uint64_t findCalls = 0;
+  uint64_t createdCalls = 0;
+  uint64_t served = 0;
+  std::unordered_map<PipelineKey, std::shared_ptr<RenderPipeline>, ShaderModuleKeyHasher> saved;
+};
+
+// The store sees every pipeline the GPU really creates, exactly once and never for a cache hit,
+// and a pipeline it returns replaces the GPU creation without counting as a runtime creation.
+TGFX_TEST(ShaderCacheTest, PipelineStoreSeesCreationsAndServesMisses) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 64, 64);
+  ASSERT_TRUE(surface != nullptr);
+  auto* globalCache = context->globalCache();
+  auto* shaderCache = context->precompiledShaderCache()->shaderCache();
+  if (!shaderCache->pipelineCacheActive()) {
+    GTEST_SKIP() << "the pipeline cache is disabled (TGFX_SHADER_CACHE_DISABLE)";
+  }
+  auto ownedStore = std::make_unique<RecordingPipelineStore>();
+  auto* store = ownedStore.get();
+  shaderCache->setPipelineStore(std::move(ownedStore));
+
+  // A cold draw: every miss asks the store, which has nothing; every creation is reported.
+  globalCache->clearPrograms();
+  shaderCache->clear();
+  auto before = shaderCache->stats();
+  DrawGradientRect(context, surface.get());
+  auto cold = shaderCache->stats();
+  auto created = cold.pipelineCreations - before.pipelineCreations;
+  ASSERT_GT(created, 0u);
+  EXPECT_EQ(store->createdCalls, created);
+  EXPECT_EQ(store->findCalls, created);
+  EXPECT_EQ(store->saved.size(), created);
+
+  // An in-memory hit does not reach the store.
+  globalCache->clearPrograms();
+  DrawGradientRect(context, surface.get());
+  EXPECT_EQ(store->findCalls, created);
+  EXPECT_EQ(store->createdCalls, created);
+
+  // After the memory cache is gone, the store serves every pipeline and the GPU creates none.
+  store->serve = true;
+  globalCache->clearPrograms();
+  shaderCache->clear();
+  auto programsBefore = globalCache->programStats();
+  auto beforeServe = shaderCache->stats();
+  DrawGradientRect(context, surface.get());
+  auto served = shaderCache->stats();
+  EXPECT_EQ(served.pipelineCreations, beforeServe.pipelineCreations);
+  EXPECT_EQ(served.pipelineStoreHits - beforeServe.pipelineStoreHits, created);
+  EXPECT_EQ(store->served, created);
+  EXPECT_EQ(globalCache->programStats().runtimePipelineCreationAttempts,
+            programsBefore.runtimePipelineCreationAttempts);
+  // What the store served is cached like a created pipeline: the next miss is an in-memory hit.
+  auto findsAfterServe = store->findCalls;
+  globalCache->clearPrograms();
+  DrawGradientRect(context, surface.get());
+  EXPECT_EQ(store->findCalls, findsAfterServe);
+
+  shaderCache->setPipelineStore(nullptr);
+  EXPECT_TRUE(shaderCache->pipelineStore() == nullptr);
+}
+
+// A persistent store namespaces its entries by the driver: every GPUInfo field that identifies
+// the driver changes the fingerprint.
+TGFX_TEST(ShaderCacheTest, DriverFingerprintDistinguishesDrivers) {
+  GPUInfo base = {};
+  base.backend = Backend::OpenGL;
+  base.vendor = "Vendor";
+  base.renderer = "Renderer";
+  base.version = "1.0";
+  auto fingerprint = MakeDriverFingerprint(base);
+  EXPECT_EQ(MakeDriverFingerprint(base), fingerprint);
+  auto backend = base;
+  backend.backend = Backend::Metal;
+  auto vendor = base;
+  vendor.vendor = "Other";
+  auto renderer = base;
+  renderer.renderer = "Other";
+  auto version = base;
+  version.version = "1.1";
+  for (const auto* changed : {&backend, &vendor, &renderer, &version}) {
+    EXPECT_NE(MakeDriverFingerprint(*changed), fingerprint);
+  }
+  // Moving characters between fields must not give the same fingerprint.
+  auto shifted = base;
+  shifted.vendor = "VendorR";
+  shifted.renderer = "enderer";
+  EXPECT_NE(MakeDriverFingerprint(shifted), fingerprint);
 }
 
 }  // namespace tgfx

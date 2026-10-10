@@ -20,6 +20,7 @@
 #include <cstdlib>
 #include "core/utils/Log.h"
 #include "core/utils/MD5.h"
+#include "gpu/PipelineStore.h"
 #include "tgfx/core/Clock.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/GPU.h"
@@ -163,6 +164,16 @@ ShaderModuleKey MakeShaderModuleKey(const std::string& encoded) {
   return key;
 }
 
+std::string MakeDriverFingerprint(const GPUInfo& info) {
+  std::string out;
+  out.push_back(1);  // Fingerprint format version.
+  AppendU32(&out, static_cast<uint32_t>(info.backend));
+  AppendString(&out, info.vendor);
+  AppendString(&out, info.renderer);
+  AppendString(&out, info.version);
+  return out;
+}
+
 static bool DisabledByEnvironment(const char* layer) {
   const char* value = std::getenv("TGFX_SHADER_CACHE_DISABLE");
   if (value == nullptr) {
@@ -175,6 +186,31 @@ static bool DisabledByEnvironment(const char* layer) {
 ShaderCache::ShaderCache(Context* context)
     : context(context), moduleCacheEnabled(!DisabledByEnvironment("L1")),
       pipelineCacheEnabled(moduleCacheEnabled && !DisabledByEnvironment("L2")) {
+}
+
+ShaderCache::~ShaderCache() = default;
+
+void ShaderCache::setPipelineStore(std::unique_ptr<PipelineStore> store) {
+  _pipelineStore = std::move(store);
+}
+
+void ShaderCache::addPipeline(const PipelineKey& key, std::string encoded,
+                              std::shared_ptr<RenderPipeline> pipeline) {
+  pipelineLRU.push_front(key);
+  PipelineEntry entry;
+  entry.pipeline = std::move(pipeline);
+  entry.lruPosition = pipelineLRU.begin();
+#ifdef DEBUG
+  entry.encoded = std::move(encoded);
+#else
+  (void)encoded;
+#endif
+  pipelineMap.emplace(key, std::move(entry));
+  while (pipelineLRU.size() > MaxPipelineCount) {
+    pipelineMap.erase(pipelineLRU.back());
+    pipelineLRU.pop_back();
+    _stats.pipelineEvictions++;
+  }
 }
 
 const ShaderModuleKey* ShaderCache::findModuleKey(const ShaderModule* module) const {
@@ -223,23 +259,23 @@ std::shared_ptr<RenderPipeline> ShaderCache::findOrCreatePipeline(
     *created = false;
     return entry.pipeline;
   }
+  if (_pipelineStore != nullptr) {
+    auto stored = _pipelineStore->findPipeline(key, descriptor);
+    if (stored != nullptr) {
+      _stats.pipelineStoreHits++;
+      *created = false;
+      addPipeline(key, std::move(encoded), stored);
+      return stored;
+    }
+  }
   auto pipeline = createPipeline(descriptor);
   if (pipeline == nullptr) {
     return nullptr;
   }
-  pipelineLRU.push_front(key);
-  PipelineEntry entry;
-  entry.pipeline = pipeline;
-  entry.lruPosition = pipelineLRU.begin();
-#ifdef DEBUG
-  entry.encoded = std::move(encoded);
-#endif
-  pipelineMap.emplace(key, std::move(entry));
-  while (pipelineLRU.size() > MaxPipelineCount) {
-    pipelineMap.erase(pipelineLRU.back());
-    pipelineLRU.pop_back();
-    _stats.pipelineEvictions++;
+  if (_pipelineStore != nullptr) {
+    _pipelineStore->didCreatePipeline(key, descriptor, pipeline);
   }
+  addPipeline(key, std::move(encoded), pipeline);
   return pipeline;
 }
 
