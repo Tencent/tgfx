@@ -31,6 +31,8 @@
 
 namespace tgfx {
 struct RuntimeInputTexture;
+class Drawable;
+class WindowFrame;
 
 class DrawingManager {
  public:
@@ -81,9 +83,19 @@ class DrawingManager {
                         std::shared_ptr<ImageCodec> codec);
 
   /**
-   * Collects a Window that needs to be presented after command buffer submission.
+   * Collects a drawable-backed frame so that its delivery state is advanced when the submission
+   * carrying its rendering commands completes.
    */
-  void collectWindow(std::weak_ptr<Window> window);
+  void collectDrawable(std::shared_ptr<Drawable> drawable);
+
+  /**
+   * Collects an automatic presentation frame for the given window and render target. Each flush
+   * cycle collects a WindowFrame per window (per target for backends with independent
+   * presentation targets) into the drawing buffer's drawable list. The buffer keeps the frame
+   * alive until it is submitted.
+   */
+  void collectWindow(std::shared_ptr<Window> window,
+                     std::shared_ptr<RenderTargetProxy> renderTarget);
 
   /**
    * Flushes all pending drawing operations and returns the DrawingBuffer. Returns nullptr if there
@@ -92,7 +104,23 @@ class DrawingManager {
    */
   std::shared_ptr<DrawingBuffer> flush();
 
+  /**
+   * Takes the windows whose frames the flushed buffer collected (called right after flush()).
+   */
+  std::vector<std::shared_ptr<Window>> takePendingWindows() {
+    return std::move(pendingWindows);
+  }
+
  private:
+  // The automatic frame collected for each window in the current drawing buffer, so frame
+  // aggregation does not need to identify WindowFrame objects in the buffer's drawable list.
+  std::unordered_map<Window*, std::weak_ptr<WindowFrame>> pendingWindowFrames = {};
+
+  // The windows whose frames the current drawing buffer collected. The frames hold them
+  // weakly, so the strong references are moved into the Recording at flush time: while the
+  // Recording is alive, shared-backbuffer backends can still present through the window when
+  // the Recording is submitted after the surfaces and windows themselves are gone.
+  std::vector<std::shared_ptr<Window>> pendingWindows = {};
   Context* context = nullptr;
   std::shared_ptr<DrawingBuffer> currentBuffer = nullptr;
   std::deque<std::shared_ptr<DrawingBuffer>> bufferPool = {};

@@ -19,12 +19,15 @@
 #include "DrawingManager.h"
 #include "ProxyProvider.h"
 #include "core/AtlasManager.h"
+#include "gpu/WindowFrame.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/GenerateMipmapsTask.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
 #include "tasks/TransferPixelsTask.h"
+#include "tgfx/gpu/Drawable.h"
+#include "tgfx/gpu/Window.h"
 
 namespace tgfx {
 DrawingManager::DrawingManager(Context* context) : context(context) {
@@ -170,18 +173,53 @@ void DrawingManager::addAtlasCellTask(std::shared_ptr<TextureProxy> textureProxy
   atlasUploadTask->addCell(allocator, std::move(codec), atlasOffset);
 }
 
-void DrawingManager::collectWindow(std::weak_ptr<Window> window) {
-  if (window.expired()) {
+void DrawingManager::collectDrawable(std::shared_ptr<Drawable> drawable) {
+  if (drawable == nullptr) {
     return;
   }
   auto drawingBuffer = getDrawingBuffer();
-  auto& windows = drawingBuffer->windows;
-  for (const auto& w : windows) {
-    if (!w.owner_before(window) && !window.owner_before(w)) {
+  // Record the buffer that last collected the frame; only that buffer schedules and delivers
+  // the presentation later, keeping it ordered after all of the frame's recorded commands.
+  drawable->noteCollectedBuffer(drawingBuffer->uniqueID());
+  for (auto& pendingDrawable : drawingBuffer->drawables) {
+    if (pendingDrawable == drawable) {
       return;
     }
   }
-  windows.push_back(std::move(window));
+  drawingBuffer->drawables.push_back(std::move(drawable));
+}
+
+void DrawingManager::collectWindow(std::shared_ptr<Window> window,
+                                   std::shared_ptr<RenderTargetProxy> renderTarget) {
+  if (window == nullptr || renderTarget == nullptr) {
+    return;
+  }
+  auto drawingBuffer = getDrawingBuffer();
+  // The automatic path shares the drawable pipeline: each flush cycle collects a WindowFrame per
+  // window (per target for backends with independent presentation targets), which registers its
+  // presentation at construction and is delivered by presentDrawables() after submission. The
+  // per-window map finds the current buffer's frame without type-identifying the drawables.
+  auto independentTargets = window->hasIndependentPresentationTargets();
+  auto iter = pendingWindowFrames.find(window.get());
+  if (iter != pendingWindowFrames.end()) {
+    if (auto frame = iter->second.lock()) {
+      if (frame->hasTarget(renderTarget)) {
+        return;
+      }
+      if (!independentTargets) {
+        frame->addTarget(std::move(renderTarget));
+        return;
+      }
+    }
+  }
+  auto* windowKey = window.get();
+  auto frame = WindowFrame::Make(window, std::move(renderTarget));
+  if (frame != nullptr) {
+    frame->noteCollectedBuffer(drawingBuffer->uniqueID());
+    drawingBuffer->drawables.push_back(frame);
+    pendingWindowFrames[windowKey] = std::move(frame);
+    pendingWindows.push_back(std::move(window));
+  }
 }
 
 std::shared_ptr<DrawingBuffer> DrawingManager::flush() {
@@ -206,6 +244,7 @@ std::shared_ptr<DrawingBuffer> DrawingManager::flush() {
   auto drawingBuffer = currentBuffer;
   bufferPool.push_back(currentBuffer);
   currentBuffer = nullptr;
+  pendingWindowFrames.clear();
   return drawingBuffer;
 }
 }  // namespace tgfx

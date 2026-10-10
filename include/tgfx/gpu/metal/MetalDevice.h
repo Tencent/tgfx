@@ -61,6 +61,8 @@ class MetalDevice : public Device {
   void onUnlockContext() override;
 
  private:
+  friend class MetalWindow;
+
   explicit MetalDevice(std::unique_ptr<class MetalGPU> gpu);
 };
 

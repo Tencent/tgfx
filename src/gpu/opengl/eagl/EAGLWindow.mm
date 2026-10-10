@@ -24,6 +24,78 @@
 #include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
+namespace {
+class EAGLRenderTargetProxy final : public RenderTargetProxy {
+ public:
+  EAGLRenderTargetProxy(std::shared_ptr<RenderTargetProxy> proxy,
+                        std::shared_ptr<EAGLLayerTexture> layerTexture)
+      : proxy(std::move(proxy)), layerTexture(std::move(layerTexture)) {
+  }
+
+  void onPresentFrame(Context* context) override {
+    // Present this frame's renderbuffer without needing the window: the proxy carries the
+    // color buffer and the context provides the EAGL context.
+    auto gl = static_cast<GLGPU*>(context->gpu())->functions();
+    gl->bindRenderbuffer(GL_RENDERBUFFER, colorBufferID());
+    auto eaglContext = static_cast<EAGLDevice*>(context->device())->eaglContext();
+    [eaglContext presentRenderbuffer:GL_RENDERBUFFER];
+    gl->bindRenderbuffer(GL_RENDERBUFFER, 0);
+  }
+
+  Context* getContext() const override {
+    return proxy->getContext();
+  }
+
+  int width() const override {
+    return proxy->width();
+  }
+
+  int height() const override {
+    return proxy->height();
+  }
+
+  PixelFormat format() const override {
+    return proxy->format();
+  }
+
+  int sampleCount() const override {
+    return proxy->sampleCount();
+  }
+
+  ImageOrigin origin() const override {
+    return proxy->origin();
+  }
+
+  bool externallyOwned() const override {
+    return proxy->externallyOwned();
+  }
+
+  std::shared_ptr<TextureProxy> asTextureProxy() const override {
+    return proxy->asTextureProxy();
+  }
+
+  std::shared_ptr<TextureView> getTextureView() const override {
+    return proxy->getTextureView();
+  }
+
+  std::shared_ptr<RenderTarget> getRenderTarget() const override {
+    return proxy->getRenderTarget();
+  }
+
+  std::shared_ptr<DepthStencilTextureView> getStencil(int sampleCount) override {
+    return proxy->getStencil(sampleCount);
+  }
+
+  unsigned colorBufferID() const {
+    return layerTexture->colorBufferID();
+  }
+
+ private:
+  std::shared_ptr<RenderTargetProxy> proxy = nullptr;
+  std::shared_ptr<EAGLLayerTexture> layerTexture = nullptr;
+};
+}  // namespace
+
 std::shared_ptr<EAGLWindow> EAGLWindow::MakeFrom(CAEAGLLayer* layer,
                                                  std::shared_ptr<GLDevice> device,
                                                  std::shared_ptr<ColorSpace> colorSpace) {
@@ -55,25 +127,32 @@ std::shared_ptr<RenderTargetProxy> EAGLWindow::onCreateRenderTarget(Context* con
          "reads CAEAGLLayer geometry. Create the Surface on the main thread, then render on "
          "any thread.");
   }
+  if (!activeRenderTarget.expired()) {
+    LOGE("EAGLWindow::onCreateRenderTarget() Only one render target can be active at a time!");
+    return nullptr;
+  }
+  auto gpu = static_cast<GLGPU*>(context->gpu());
   if (layerTexture != nullptr) {
-    // Immediately release the previous layer texture to prevent new texture creation from failing
-    // due to repeated binding of the same layer.
-    layerTexture->release(static_cast<GLGPU*>(context->gpu()));
+    layerTexture->release(gpu);
     layerTexture = nullptr;
   }
-  layerTexture = EAGLLayerTexture::MakeFrom(static_cast<GLGPU*>(context->gpu()), layer);
+  layerTexture = EAGLLayerTexture::MakeFrom(gpu, layer);
   if (layerTexture == nullptr) {
     return nullptr;
   }
   BackendRenderTarget renderTarget = layerTexture->getBackendRenderTarget();
-  return RenderTargetProxy::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
+  auto proxy = RenderTargetProxy::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
+  if (proxy == nullptr) {
+    layerTexture->release(gpu);
+    layerTexture = nullptr;
+    return nullptr;
+  }
+  auto result = std::make_shared<EAGLRenderTargetProxy>(std::move(proxy), layerTexture);
+  activeRenderTarget = result;
+  return result;
 }
 
-void EAGLWindow::onPresent(Context* context) {
-  auto gl = static_cast<GLGPU*>(context->gpu())->functions();
-  gl->bindRenderbuffer(GL_RENDERBUFFER, layerTexture->colorBufferID());
-  auto eaglContext = static_cast<EAGLDevice*>(context->device())->eaglContext();
-  [eaglContext presentRenderbuffer:GL_RENDERBUFFER];
-  gl->bindRenderbuffer(GL_RENDERBUFFER, 0);
+void EAGLWindow::onPresent(Context*, const std::vector<std::shared_ptr<RenderTargetProxy>>&) {
+  // Presentation is handled by EAGLRenderTargetProxy::onPresentFrame().
 }
 }  // namespace tgfx

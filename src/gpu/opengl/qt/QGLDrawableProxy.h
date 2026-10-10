@@ -29,6 +29,7 @@ class QGLDrawableProxy : public RenderTargetProxy {
                    ImageOrigin origin, QGLWindow* window);
 
   Context* getContext() const override;
+  void onPresentFrame(Context* context) override;
   int width() const override;
   int height() const override;
   PixelFormat format() const override;
@@ -52,7 +53,6 @@ class QGLDrawableProxy : public RenderTargetProxy {
   ImageOrigin _origin = ImageOrigin::TopLeft;
   QGLWindow* _window = nullptr;
   mutable std::shared_ptr<RenderTargetProxy> textureRTProxy = nullptr;
-  std::weak_ptr<RenderTargetProxy> weakThis;
 
   void ensureTextureRTProxy() const;
 

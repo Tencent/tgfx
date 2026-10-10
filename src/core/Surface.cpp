@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Surface.h"
+#include "core/DrawableSurface.h"
+#include "core/WindowSurface.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/CopyPixels.h"
 #include "core/utils/Log.h"
@@ -25,6 +27,7 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
+#include "tgfx/gpu/Drawable.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/Window.h"
 
@@ -83,34 +86,41 @@ std::shared_ptr<Surface> Surface::MakeFrom(Context* context, HardwareBufferRef h
 
 std::shared_ptr<Surface> Surface::MakeFrom(Context* context, std::shared_ptr<Window> window,
                                            uint32_t renderFlags) {
-  if (context == nullptr || window == nullptr) {
-    return nullptr;
-  }
-  auto proxy = window->onCreateRenderTarget(context);
-  if (proxy == nullptr) {
-    return nullptr;
-  }
-  auto colorSpace = window->colorSpace();
-  return MakeFrom(std::move(proxy), renderFlags, true, std::move(colorSpace), std::move(window));
+  return WindowSurface::Make(context, std::move(window), renderFlags);
+}
+
+std::shared_ptr<Surface> Surface::MakeFrom(Context* context, std::shared_ptr<Drawable> drawable,
+                                           uint32_t renderFlags) {
+  return DrawableSurface::Make(context, std::move(drawable), renderFlags);
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
                                            uint32_t renderFlags, bool clearAll,
-                                           std::shared_ptr<ColorSpace> colorSpace,
-                                           std::shared_ptr<Window> window) {
+                                           std::shared_ptr<ColorSpace> colorSpace) {
   if (renderTargetProxy == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<Surface>(new Surface(std::move(renderTargetProxy), renderFlags, clearAll,
-                                              std::move(colorSpace), window));
+  return std::shared_ptr<Surface>(
+      new Surface(std::move(renderTargetProxy), renderFlags, clearAll, std::move(colorSpace)));
 }
 
 Surface::Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags, bool clearAll,
-                 std::shared_ptr<ColorSpace> colorSpace, std::shared_ptr<Window> window)
-    : _uniqueID(UniqueID::Next()), _window(std::move(window)) {
+                 std::shared_ptr<ColorSpace> colorSpace)
+    : _uniqueID(UniqueID::Next()) {
   DEBUG_ASSERT(proxy != nullptr);
   renderContext =
       new RenderContext(std::move(proxy), renderFlags, clearAll, this, std::move(colorSpace));
+}
+
+void Surface::onCollectFrame(DrawingManager*, const std::shared_ptr<RenderTargetProxy>&) {
+}
+
+bool Surface::onValidateDraw() const {
+  return true;
+}
+
+bool Surface::onValidateReadback() const {
+  return true;
 }
 
 Surface::~Surface() {
@@ -212,6 +222,11 @@ std::shared_ptr<SurfaceReadback> Surface::asyncReadPixels(const Rect& rect) {
   if (rect.isEmpty()) {
     return nullptr;
   }
+  if (!onValidateReadback()) {
+    // The frame has already been presented or discarded, or its window does not support
+    // readback; the content is no longer defined or not copyable.
+    return nullptr;
+  }
   auto surfaceRect = Rect::MakeWH(width(), height());
   if (!surfaceRect.contains(rect)) {
     return nullptr;
@@ -271,6 +286,11 @@ const std::shared_ptr<ColorSpace>& Surface::colorSpace() const {
 }
 
 bool Surface::aboutToDraw(bool discardContent) {
+  if (!onValidateDraw()) {
+    // A presentation has been registered for (or delivered to) this single-frame surface: the
+    // frame is closed and must not be drawn into anymore.
+    return false;
+  }
   if (cachedImage == nullptr) {
     return true;
   }

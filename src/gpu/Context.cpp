@@ -29,6 +29,7 @@
 #include "gpu/ResourceCache.h"
 #include "gpu/ShaderCaps.h"
 #include "tgfx/core/Clock.h"
+#include "tgfx/gpu/Drawable.h"
 #include "tgfx/gpu/GPU.h"
 
 #define ASSERT_OWNER_THREAD ASSERT_SINGLE_OWNER(*singleOwner)
@@ -93,9 +94,14 @@ std::unique_ptr<Recording> Context::flush(BackendSemaphore* signalSemaphore) {
   }
   _atlasManager->postFlush();
   _proxyProvider->purgeExpiredProxies();
+  // The pending queue keeps the buffer (and with it the frames) alive until it is submitted,
+  // so the common flush()-discard pattern and the drop-the-Recording contract (rendering and
+  // presentations still run) hold. The Recording keeps the collected windows alive for
+  // shared-backbuffer backends, whose proxies present through the window.
   pendingDrawingBuffers.push_back(drawingBuffer);
-  return std::unique_ptr<Recording>(
-      new Recording(uniqueID(), drawingBuffer->uniqueID(), drawingBuffer->generation()));
+  return std::unique_ptr<Recording>(new Recording(uniqueID(), drawingBuffer->uniqueID(),
+                                                  drawingBuffer->generation(),
+                                                  _drawingManager->takePendingWindows()));
 }
 
 std::shared_ptr<DrawingBuffer> Context::getDrawingBuffer(const Recording* recording) const {
@@ -139,8 +145,11 @@ void Context::submit(std::unique_ptr<Recording> recording, bool syncCpu) {
           queue->waitSemaphore(std::move(semaphore));
         }
       }
+      // Attach the pending presentation requests to this buffer's command buffer, so each
+      // presentation is encoded with the submission that carries its frame's rendering.
+      drawingBuffer->schedulePendingPresents(this);
       queue->submit(std::move(commandBuffer));
-      drawingBuffer->presentWindows(this);
+      drawingBuffer->presentDrawables(this);
       pendingDrawingBuffers.pop_front();
       if (isLast) {
         break;
@@ -160,6 +169,14 @@ bool Context::flushAndSubmit(bool syncCpu) {
     submit(std::move(recording), syncCpu);
   }
   return hasRecording;
+}
+
+void Context::present(std::shared_ptr<Drawable> drawable) {
+  ASSERT_OWNER_THREAD;
+  if (drawable == nullptr) {
+    return;
+  }
+  drawable->requestPresent(this);
 }
 
 size_t Context::memoryUsage() const {

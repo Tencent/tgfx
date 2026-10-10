@@ -28,6 +28,8 @@
 
 namespace tgfx {
 
+class Drawable;
+class RenderTargetProxy;
 class Window;
 
 class DrawingBuffer {
@@ -65,11 +67,26 @@ class DrawingBuffer {
   std::shared_ptr<CommandBuffer> encode();
 
   /**
-   * Calls onPresent on all windows after command buffer submission.
+   * Attaches the pending presentation requests of the collected drawables to the upcoming
+   * submission of this buffer, so each presentation is encoded/ordered with the command buffer
+   * that carries its frame's rendering commands. Called right before the command buffer is
+   * submitted.
    */
-  void presentWindows(Context* context);
+  void schedulePendingPresents(Context* context);
+
+  /**
+   * Marks the frames of all collected drawables as submitted and presents the ones whose
+   * presentation was requested before the submission, after command buffer submission.
+   */
+  void presentDrawables(Context* context);
 
  private:
+  // All frames — explicit drawables and automatic window frames — go through this single list.
+  // Entries are strong: a buffer keeps its frames alive until it is submitted, so dropping a
+  // Recording never discards a presentation whose rendering commands still run. The frames
+  // hold their windows strongly, which is cycle-free because Window only holds its device
+  // weakly (see Window::_device).
+
   Context* context = nullptr;
   uint32_t _uniqueID = 0;
   uint64_t _generation = 0;
@@ -82,7 +99,7 @@ class DrawingBuffer {
   std::vector<PlacementPtr<ResourceTask>> resourceTasks = {};
   std::vector<PlacementPtr<RenderTask>> renderTasks = {};
   std::vector<PlacementPtr<AtlasUploadTask>> atlasTasks = {};
-  std::vector<std::weak_ptr<Window>> windows = {};
+  std::vector<std::shared_ptr<Drawable>> drawables = {};
 
   friend class DrawingManager;
 };

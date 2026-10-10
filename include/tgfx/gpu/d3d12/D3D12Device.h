@@ -58,6 +58,8 @@ class D3D12Device : public Device {
   void onUnlockContext() override;
 
  private:
+  friend class D3D12Window;
+
   explicit D3D12Device(std::unique_ptr<class D3D12GPU> gpu);
 };
 

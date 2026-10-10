@@ -19,6 +19,7 @@
 #include "DrawingBuffer.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/GlobalCache.h"
+#include "tgfx/gpu/Drawable.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/Window.h"
 
@@ -59,15 +60,24 @@ std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
   return commandBuffer;
 }
 
-void DrawingBuffer::presentWindows(Context* context) {
-  for (auto& pendingWindow : windows) {
-    if (auto window = pendingWindow.lock()) {
-      window->onPresent(context);
-    }
+void DrawingBuffer::schedulePendingPresents(Context* context) {
+  for (auto& drawable : drawables) {
+    drawable->scheduleIfRequested(context, _uniqueID);
   }
 }
 
+void DrawingBuffer::presentDrawables(Context* context) {
+  for (auto& drawable : drawables) {
+    drawable->onSubmissionCompleted(context, _uniqueID);
+  }
+  drawables.clear();
+}
+
 bool DrawingBuffer::empty() const {
+  // Note that drawables are intentionally not part of the emptiness check: drawable and window
+  // surfaces are always created with clearAll set to true, so their construction already queues
+  // a clear task, and collecting a frame therefore always comes with at least one task to
+  // encode. This is an implicit contract between RenderContext, DrawingManager, and Surface.
   return resourceTasks.empty() && renderTasks.empty() && atlasTasks.empty();
 }
 
@@ -75,7 +85,7 @@ void DrawingBuffer::reset() {
   renderTasks.clear();
   resourceTasks.clear();
   atlasTasks.clear();
-  windows.clear();
+  drawables.clear();
   vertexAllocator.clear(vertexMaxValueTracker.getMaxValue());
   instanceAllocator.clear(instanceMaxValueTracker.getMaxValue());
   drawingAllocator.clear(drawingMaxValueTracker.getMaxValue());

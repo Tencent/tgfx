@@ -81,7 +81,7 @@ ISize GetNativeWindowSize(EGLNativeWindowType nativeWindow) {
 }
 
 std::shared_ptr<RenderTargetProxy> EGLWindow::onCreateRenderTarget(Context* context) {
-  auto eglDevice = static_cast<EGLDevice*>(device.get());
+  auto eglDevice = static_cast<EGLDevice*>(lockDevice().get());
   if (nativeWindow) {
     if (!eglDevice->recreateSurfaceIfNeeded(nativeWindow)) {
       return nullptr;
@@ -110,8 +110,8 @@ void EGLWindow::setPresentationTime(int64_t time) {
   presentationTime = time;
 }
 
-void EGLWindow::onPresent(Context*) {
-  auto device = std::static_pointer_cast<EGLDevice>(this->device);
+void EGLWindow::onPresent(Context*, const std::vector<std::shared_ptr<RenderTargetProxy>>&) {
+  auto device = std::static_pointer_cast<EGLDevice>(lockDevice());
   auto eglDisplay = device->eglDisplay;
   // eglSurface cannot be nullptr in EGLWindow.
   auto eglSurface = device->eglSurface;

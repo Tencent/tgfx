@@ -29,6 +29,8 @@
 namespace tgfx {
 class Canvas;
 class Context;
+class Drawable;
+class DrawingManager;
 class RenderContext;
 class RenderTargetProxy;
 class Window;
@@ -100,8 +102,25 @@ class Surface {
    * call MakeFrom() again to obtain a new Surface that matches the updated dimensions.
    * The color space is automatically obtained from the Window via window->colorSpace().
    * Returns nullptr if the context is nullptr or the window cannot provide a valid render target.
+   * Note that the window's frame buffer is recycled right after presentation, so readPixels() on
+   * the returned Surface has no guaranteed content once it has been submitted. Use
+   * Window::nextDrawable() and Surface::asyncReadPixels() before Context::present() instead when
+   * readback is required.
    */
   static std::shared_ptr<Surface> MakeFrom(Context* context, std::shared_ptr<Window> window,
+                                           uint32_t renderFlags = 0);
+
+  /**
+   * Creates a new Surface by importing the single frame of the specified Drawable, which was
+   * acquired from a Window via Window::nextDrawable(). The frame identity is fixed: the returned
+   * Surface renders exactly this frame and never acquires the next one. The frame is presented
+   * via Context::present(drawable); dropping the Drawable without presenting it discards the
+   * frame. Readback through asyncReadPixels() is defined until a presentation is registered or
+   * the frame is presented. The color space is obtained from the
+   * Drawable. Returns nullptr if the context is nullptr, the drawable is nullptr, the context
+   * belongs to a different device, or the drawable's frame has already been imported.
+   */
+  static std::shared_ptr<Surface> MakeFrom(Context* context, std::shared_ptr<Drawable> drawable,
                                            uint32_t renderFlags = 0);
 
   virtual ~Surface();
@@ -188,7 +207,9 @@ class Surface {
    * Asynchronously copies a rect of pixels from the Surface and returns a SurfaceReadback. Use the
    * returned SurfaceReadback to check when the pixel data is ready and to access it. Note that the
    * pixel data respects the Surface's origin; if the origin is bottom-left, the pixel data will be
-   * vertically flipped. Returns nullptr if the rect is empty or outside the bounds of the Surface.
+   * vertically flipped. Returns nullptr if the rect is empty or outside the bounds of the Surface,
+   * or if the Surface was created from a Drawable whose frame has already been presented or
+   * discarded, or whose window does not support readback (see Window::supportsReadback()).
    */
   std::shared_ptr<SurfaceReadback> asyncReadPixels(const Rect& rect);
 
@@ -197,6 +218,10 @@ class Surface {
    * does not exceed Surface (width(), height()). Pixels are always provided in top-left origin
    * format; if the Surface's origin is bottom-left, the pixels are flipped during the copy. Pixels
    * are copied only if pixel conversion is possible. Returns true if pixels are copied to dstPixels.
+   * Note that for a Surface created from a Window, the content is not defined once the Surface has
+   * been submitted, because the window's frame buffer is recycled right after presentation. Use
+   * Window::nextDrawable() and Surface::asyncReadPixels() before Context::present() instead when
+   * readback of window content is required.
    */
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0);
   /**
@@ -204,24 +229,47 @@ class Surface {
    */
   const std::shared_ptr<ColorSpace>& colorSpace() const;
 
+ protected:
+  /**
+   * Called by RenderContext when a drawing pass opens on this surface (a new ops compositor is
+   * created for the current drawing buffer). Subclasses collect their frame into the drawing
+   * manager: WindowSurface collects the window's automatic presentation frame, DrawableSurface
+   * tracks its explicit drawable. Offscreen surfaces do nothing. The render target of the
+   * drawing pass is provided by the RenderContext.
+   */
+  virtual void onCollectFrame(DrawingManager* drawingManager,
+                              const std::shared_ptr<RenderTargetProxy>& renderTarget);
+
+  /**
+   * Returns true while the surface's frame accepts more drawing. Single-frame surfaces close
+   * once a presentation is registered for their frame.
+   */
+  virtual bool onValidateDraw() const;
+
+  /**
+   * Returns true while the surface's content may be read back. Window-backed surfaces require
+   * their window to support readback; single-frame surfaces close once a presentation is
+   * registered.
+   */
+  virtual bool onValidateReadback() const;
+
+  // Internal construction helpers for the WindowSurface/DrawableSurface subclasses.
+  static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
+                                           uint32_t renderFlags = 0, bool clearAll = false,
+                                           std::shared_ptr<ColorSpace> colorSpace = nullptr);
+
+  Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags = 0, bool clearAll = false,
+          std::shared_ptr<ColorSpace> colorSpace = nullptr);
+
  private:
   uint32_t _uniqueID = 0;
   RenderContext* renderContext = nullptr;
   Canvas* canvas = nullptr;
   std::shared_ptr<Image> cachedImage = nullptr;
-  std::shared_ptr<Window> _window = nullptr;
-
-  static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
-                                           uint32_t renderFlags = 0, bool clearAll = false,
-                                           std::shared_ptr<ColorSpace> colorSpace = nullptr,
-                                           std::shared_ptr<Window> window = nullptr);
-
-  Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags = 0, bool clearAll = false,
-          std::shared_ptr<ColorSpace> colorSpace = nullptr,
-          std::shared_ptr<Window> window = nullptr);
 
   bool aboutToDraw(bool discardContent = false);
 
+  friend class Drawable;
   friend class RenderContext;
 };
 }  // namespace tgfx

@@ -60,13 +60,13 @@ CGLWindow::CGLWindow(std::shared_ptr<Device> device, NSView* view,
                      std::shared_ptr<ColorSpace> colorSpace, bool vsyncEnabled)
     : Window(std::move(device), std::move(colorSpace), vsyncEnabled), view(view) {
   // do not retain view here, otherwise it can cause circular reference.
-  auto glContext = static_cast<CGLDevice*>(this->device.get())->glContext;
+  auto glContext = static_cast<CGLDevice*>(lockDevice().get())->glContext;
   int interval = vsyncEnabled ? 1 : 0;
   [glContext setValues:&interval forParameter:NSOpenGLContextParameterSwapInterval];
 }
 
 CGLWindow::~CGLWindow() {
-  auto glContext = static_cast<CGLDevice*>(device.get())->glContext;
+  auto glContext = static_cast<CGLDevice*>(lockDevice().get())->glContext;
   [glContext setView:nil];
   view = nil;
 }
@@ -77,7 +77,7 @@ std::shared_ptr<RenderTargetProxy> CGLWindow::onCreateRenderTarget(Context* cont
          "reads NSView geometry and binds the GL context to the view. Create the Surface on "
          "the main thread, then render on any thread.");
   }
-  auto glContext = static_cast<CGLDevice*>(device.get())->glContext;
+  auto glContext = static_cast<CGLDevice*>(lockDevice().get())->glContext;
   // AppKit may silently reset view.window.colorSpace when the window moves to a display whose
   // native gamut differs from the configured one. Reassert the color space before [glContext
   // update] reallocates the back buffer, otherwise the new buffer inherits the reset (native) color
@@ -97,8 +97,8 @@ std::shared_ptr<RenderTargetProxy> CGLWindow::onCreateRenderTarget(Context* cont
   return RenderTargetProxy::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 
-void CGLWindow::onPresent(Context*) {
-  auto glContext = static_cast<CGLDevice*>(device.get())->glContext;
+void CGLWindow::onPresent(Context*, const std::vector<std::shared_ptr<RenderTargetProxy>>&) {
+  auto glContext = static_cast<CGLDevice*>(lockDevice().get())->glContext;
   [glContext flushBuffer];
 }
 }  // namespace tgfx

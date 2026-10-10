@@ -135,7 +135,6 @@ QGLWindow::QGLWindow(QQuickItem* quickItem, bool singleBufferMode,
 
 QGLWindow::~QGLWindow() {
   delete deviceCreator;
-  drawableProxy = nullptr;
   textureSlots.clear();
   delete presentedQSGTexture;
 }
@@ -143,8 +142,8 @@ QGLWindow::~QGLWindow() {
 void QGLWindow::moveToThread(QThread* thread) {
   std::lock_guard<std::mutex> autoLock(locker);
   renderThread = thread;
-  if (device != nullptr) {
-    static_cast<QGLDevice*>(device.get())->moveToThread(renderThread);
+  if (lockDevice() != nullptr) {
+    static_cast<QGLDevice*>(lockDevice().get())->moveToThread(renderThread);
   }
 }
 
@@ -193,18 +192,11 @@ std::shared_ptr<RenderTargetProxy> QGLWindow::onCreateRenderTarget(Context* cont
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  drawableProxy = std::make_shared<QGLDrawableProxy>(context, width, height, PixelFormat::RGBA_8888,
-                                                     1, ImageOrigin::TopLeft, this);
-  std::static_pointer_cast<QGLDrawableProxy>(drawableProxy)->weakThis = drawableProxy;
-  return drawableProxy;
+  return std::make_shared<QGLDrawableProxy>(context, width, height, PixelFormat::RGBA_8888, 1,
+                                            ImageOrigin::TopLeft, this);
 }
 
-void QGLWindow::onPresent(Context*) {
-  if (presentingProxy == nullptr) {
-    return;
-  }
-  auto proxy = std::static_pointer_cast<QGLDrawableProxy>(presentingProxy);
-  presentingProxy = nullptr;
+void QGLWindow::presentProxy(QGLDrawableProxy* proxy) {
   if (proxy->getTextureView() == nullptr) {
     proxy->releaseTexture();
     return;
@@ -221,6 +213,10 @@ void QGLWindow::onPresent(Context*) {
     reuseTexture(oldProxy);
   }
   QMetaObject::invokeMethod(quickItem, "update", Qt::AutoConnection);
+}
+
+bool QGLWindow::hasIndependentPresentationTargets() const {
+  return true;
 }
 
 std::shared_ptr<RenderTargetProxy> QGLWindow::acquireTexture(Context* context, int width,
@@ -282,9 +278,9 @@ void QGLWindow::createDevice(QOpenGLContext* context) {
   auto surface = new QOffscreenSurface();
   surface->setFormat(context->format());
   surface->create();
-  device = QGLDevice::MakeFrom(context, surface, true);
+  _device = QGLDevice::MakeFrom(context, surface, true);
   if (renderThread != nullptr) {
-    static_cast<QGLDevice*>(device.get())->moveToThread(renderThread);
+    static_cast<QGLDevice*>(lockDevice().get())->moveToThread(renderThread);
   }
   QMetaObject::invokeMethod(quickItem, "update", Qt::AutoConnection);
 }

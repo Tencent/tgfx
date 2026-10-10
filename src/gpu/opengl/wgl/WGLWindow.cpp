@@ -67,8 +67,8 @@ std::shared_ptr<RenderTargetProxy> WGLWindow::onCreateRenderTarget(Context* cont
   return RenderTargetProxy::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 
-void WGLWindow::onPresent(Context*) {
-  const auto wglDevice = std::static_pointer_cast<WGLDevice>(this->device);
+void WGLWindow::onPresent(Context*, const std::vector<std::shared_ptr<RenderTargetProxy>>&) {
+  const auto wglDevice = std::static_pointer_cast<WGLDevice>(lockDevice());
   // The GL context is current here (locked by DrawingBuffer before present), so wglSwapInterval
   // targets this window's context. The vsync setting is fixed at creation, so apply it once on the
   // first present.

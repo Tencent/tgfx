@@ -94,6 +94,11 @@ std::shared_ptr<RenderTarget> WebGPUDrawableProxy::getRenderTarget() const {
   return _renderTarget;
 }
 
+void WebGPUDrawableProxy::onPresentFrame(Context*) {
+  present();
+  releaseDrawable();
+}
+
 void WebGPUDrawableProxy::present() {
 #ifndef __EMSCRIPTEN__
   if (_surface != nullptr) {

@@ -17,12 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Window.h"
+#include "core/utils/Log.h"
+#include "gpu/WindowDrawable.h"
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {
 Window::Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace,
                bool vsyncEnabled)
-    : device(std::move(device)), _colorSpace(std::move(colorSpace)), _vsyncEnabled(vsyncEnabled) {
+    : _device(std::move(device)), _colorSpace(std::move(colorSpace)), _vsyncEnabled(vsyncEnabled) {
 }
 
 std::shared_ptr<ColorSpace> Window::colorSpace() const {
@@ -35,9 +37,39 @@ bool Window::vsyncEnabled() const {
 
 std::shared_ptr<Device> Window::getDevice() {
   std::lock_guard<std::mutex> autoLock(locker);
-  return device;
+  return _device;
 }
 
-void Window::onPresent(Context*) {
+std::shared_ptr<Drawable> Window::nextDrawable() {
+  if (weak_from_this().expired()) {
+    LOGE("Window::nextDrawable() The window must be owned by a shared_ptr!");
+    return nullptr;
+  }
+  auto drawable = onNextDrawable();
+  if (drawable != nullptr) {
+    // The frame handle keeps its window alive until the frame is delivered; device validation
+    // happens later, when the frame is imported into a Context.
+    drawable->_window = shared_from_this();
+  }
+  return drawable;
+}
+
+bool Window::supportsReadback() const {
+  return onSupportsReadback();
+}
+
+std::shared_ptr<Drawable> Window::onNextDrawable() {
+  return WindowDrawable::Make(shared_from_this());
+}
+
+bool Window::onSupportsReadback() const {
+  return false;
+}
+
+void Window::onPresent(Context*, const std::vector<std::shared_ptr<RenderTargetProxy>>&) {
+}
+
+bool Window::hasIndependentPresentationTargets() const {
+  return false;
 }
 }  // namespace tgfx

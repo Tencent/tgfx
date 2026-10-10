@@ -19,8 +19,13 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
+#include <vector>
 
 namespace tgfx {
+
+class Window;
+
 /**
  * Recording represents a snapshot of rendering commands that have been flushed from a Context but
  * not yet submitted to the GPU. This allows for deferred submission, giving applications control
@@ -28,16 +33,24 @@ namespace tgfx {
  * Context::submit().
  * Note: If multiple Recording objects are created, submitting a later Recording will force all
  * earlier Recordings to be submitted first, maintaining the correct rendering order.
+ * The flushed drawing buffer keeps the frames it rendered to alive until it is submitted, so
+ * their pending presentations are still delivered even after the surfaces and this Recording
+ * itself have been released. The Recording additionally keeps the rendered-to windows alive:
+ * frames hold their windows only weakly (to break the device reference cycle), and
+ * shared-backbuffer backends (GL, D3D12) present through the window.
  */
 class Recording {
  private:
-  Recording(uint32_t contextID, uint32_t drawingBufferID, uint64_t generation)
-      : contextID(contextID), drawingBufferID(drawingBufferID), generation(generation) {
+  Recording(uint32_t contextID, uint32_t drawingBufferID, uint64_t generation,
+            std::vector<std::shared_ptr<Window>> retainedWindows)
+      : contextID(contextID), drawingBufferID(drawingBufferID), generation(generation),
+        retainedWindows(std::move(retainedWindows)) {
   }
 
   uint32_t contextID = 0;
   uint32_t drawingBufferID = 0;
   uint64_t generation = 0;
+  std::vector<std::shared_ptr<Window>> retainedWindows = {};
 
   friend class Context;
 };

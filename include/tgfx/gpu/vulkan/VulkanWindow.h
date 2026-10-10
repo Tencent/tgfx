@@ -93,7 +93,9 @@ class VulkanWindow : public Window {
 
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
-  void onPresent(Context* context) override;
+  bool hasIndependentPresentationTargets() const override;
+  std::shared_ptr<Drawable> onNextDrawable() override;
+  bool onSupportsReadback() const override;
 
  private:
   // PImpl: all Vulkan handles and swapchain state live in PlatformState (defined in .cpp) to avoid
@@ -104,7 +106,11 @@ class VulkanWindow : public Window {
   explicit VulkanWindow(std::shared_ptr<Device> device, std::unique_ptr<PlatformState> state,
                         std::shared_ptr<ColorSpace> colorSpace, bool vsyncEnabled);
 
+  std::shared_ptr<RenderTargetProxy> createSwapchainProxy(Context* context, bool manualPresent);
+
   std::unique_ptr<PlatformState> _platformState;
+
+  friend class VulkanDrawable;
 };
 
 }  // namespace tgfx

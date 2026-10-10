@@ -18,22 +18,32 @@
 
 #include "VulkanSwapchainProxy.h"
 #include "VulkanCommandQueue.h"
-#include "VulkanGPU.h"
+#include "VulkanTexture.h"
 #include "VulkanUtil.h"
 #include "core/utils/Log.h"
-#include "gpu/resources/RenderTarget.h"
-#include "tgfx/gpu/Backend.h"
+#include "gpu/resources/TextureRenderTarget.h"
 
 namespace tgfx {
 
-VulkanSwapchainProxy::VulkanSwapchainProxy(Context* context, VulkanGPU* gpu,
-                                           VkSwapchainKHR swapchain, VkFormat format, int width,
-                                           int height, const std::vector<VkImageView>& imageViews,
-                                           const std::vector<VkImage>& images,
-                                           const VulkanGPU::PresentationSlot& slot)
+VulkanSwapchainProxy::VulkanSwapchainProxy(
+    Context* context, VulkanGPU* gpu, VkSwapchainKHR swapchain, VkFormat format, int width,
+    int height, const std::vector<VkImage>& images,
+    const std::vector<std::shared_ptr<VulkanSwapchainImageState>>& imageStates,
+    std::shared_ptr<bool> outOfDate, std::shared_ptr<VulkanManualToken> manualToken,
+    std::shared_ptr<uint64_t> swapchainGeneration, bool manualPresent)
     : _context(context), _gpu(gpu), _swapchain(swapchain), _format(format), _width(width),
-      _height(height), _imageViews(imageViews), _images(images),
-      _imageAvailableSemaphore(slot.imageAvailable), _renderFinishedSemaphore(slot.renderFinished) {
+      _height(height), _images(images), _imageStates(imageStates), _outOfDate(std::move(outOfDate)),
+      _manualToken(std::move(manualToken)), _swapchainGeneration(std::move(swapchainGeneration)),
+      _generationValue(*_swapchainGeneration), _manualPresent(manualPresent) {
+}
+
+VulkanSwapchainProxy::~VulkanSwapchainProxy() {
+  if (_pendingImageAvailableSemaphore != VK_NULL_HANDLE) {
+    // The frame was acquired but never scheduled; destroy the unused semaphore.
+    vkDestroySemaphore(_gpu->device(), _pendingImageAvailableSemaphore, nullptr);
+    _pendingImageAvailableSemaphore = VK_NULL_HANDLE;
+  }
+  releaseManualToken();
 }
 
 Context* VulkanSwapchainProxy::getContext() const {
@@ -69,42 +79,130 @@ std::shared_ptr<TextureView> VulkanSwapchainProxy::getTextureView() const {
 }
 
 std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
-  if (_renderTarget == nullptr) {
-    // Acquire the next swapchain image. The imageAvailable semaphore is signaled when the
-    // presentation engine releases the image; the GPU waits on it at COLOR_ATTACHMENT_OUTPUT.
-    auto result =
-        vkAcquireNextImageKHR(_gpu->device(), _swapchain, UINT64_MAX, _imageAvailableSemaphore,
-                              VK_NULL_HANDLE, &_currentImageIndex);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-      _outOfDate = true;
-      return nullptr;
-    }
-    if (result == VK_SUBOPTIMAL_KHR) {
-      _outOfDate = true;
-    } else if (result != VK_SUCCESS) {
-      LOGE("VulkanSwapchainProxy: vkAcquireNextImageKHR failed (result=%d).",
-           static_cast<int>(result));
-      return nullptr;
-    }
-
-    // Schedule the present to happen at the end of the next submit(). The submit will wait on
-    // imageAvailable and signal renderFinished; present will wait on renderFinished.
-    auto queue = static_cast<VulkanCommandQueue*>(_context->gpu()->queue());
-    queue->schedulePresent(_swapchain, _currentImageIndex, _images[_currentImageIndex],
-                           _imageAvailableSemaphore, _renderFinishedSemaphore);
-
-    VulkanImageInfo vulkanInfo = {};
-    vulkanInfo.image = reinterpret_cast<uint64_t>(_images[_currentImageIndex]);
-    vulkanInfo.format = static_cast<uint32_t>(_format);
-    vulkanInfo.layout = static_cast<uint32_t>(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    BackendRenderTarget backendRT(vulkanInfo, _width, _height);
-    _renderTarget = RenderTarget::MakeFrom(_context, backendRT, ImageOrigin::TopLeft);
+  if (_renderTarget != nullptr) {
+    return _renderTarget;
   }
+  if (*_swapchainGeneration != _generationValue) {
+    // The swapchain has been rebuilt since this proxy was created. The cached handles are stale;
+    // the caller must create a new Surface, matching the documented resize contract.
+    return nullptr;
+  }
+  if (_frameState != nullptr || _presentationRequested) {
+    return nullptr;
+  }
+
+  VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
+  VkSemaphoreCreateInfo semaphoreInfo = {};
+  semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+  if (vkCreateSemaphore(_gpu->device(), &semaphoreInfo, nullptr, &imageAvailableSemaphore) !=
+      VK_SUCCESS) {
+    *_outOfDate = true;
+    return nullptr;
+  }
+  auto result = vkAcquireNextImageKHR(_gpu->device(), _swapchain, UINT64_MAX,
+                                      imageAvailableSemaphore, VK_NULL_HANDLE, &_currentImageIndex);
+  if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+    *_outOfDate = true;
+  }
+  if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+    vkDestroySemaphore(_gpu->device(), imageAvailableSemaphore, nullptr);
+    return nullptr;
+  }
+
+  auto& imageState = _imageStates[_currentImageIndex];
+  auto texture = VulkanTexture::MakeFrom(_gpu, _images[_currentImageIndex], _format, _width,
+                                         _height, TextureUsage::RENDER_ATTACHMENT, false,
+                                         *imageState->layout, imageState->layout);
+  if (texture == nullptr) {
+    vkDeviceWaitIdle(_gpu->device());
+    vkDestroySemaphore(_gpu->device(), imageAvailableSemaphore, nullptr);
+    *_outOfDate = true;
+    return nullptr;
+  }
+  _renderTarget =
+      TextureRenderTarget::MakeFrom(_context, std::move(texture), 1, ImageOrigin::TopLeft, true);
+  if (_renderTarget == nullptr) {
+    vkDeviceWaitIdle(_gpu->device());
+    vkDestroySemaphore(_gpu->device(), imageAvailableSemaphore, nullptr);
+    *_outOfDate = true;
+    return nullptr;
+  }
+
+  _frameState = std::make_shared<VulkanFrameState>(_manualPresent);
+  // Keep the acquire semaphore for the submission-time schedulePresent(); it is handed to the
+  // command queue there and destroyed with the in-flight submission's fence. Assign the member
+  // only after every failure path has passed, so the defensive destroys in releaseFrame()/
+  // discardFrame()/the destructor never see an already-destroyed handle.
+  _pendingImageAvailableSemaphore = imageAvailableSemaphore;
   return _renderTarget;
 }
 
+void VulkanSwapchainProxy::schedulePresent() {
+  // Called at submission time (VulkanWindow::onSchedulePresentation() for the automatic path,
+  // the drawable pipeline for the explicit path), so the presentation is registered with the
+  // submission that carries the frame's rendering commands. In manual present mode the
+  // registration only wires the acquire/present semaphore pair; the actual vkQueuePresentKHR is
+  // deferred to presentFrame().
+  if (_renderTarget == nullptr || _pendingImageAvailableSemaphore == VK_NULL_HANDLE) {
+    return;
+  }
+  auto& imageState = _imageStates[_currentImageIndex];
+  auto queue = static_cast<VulkanCommandQueue*>(_context->gpu()->queue());
+  queue->schedulePresent(_swapchain, _currentImageIndex, _images[_currentImageIndex],
+                         _pendingImageAvailableSemaphore, imageState->presentSemaphore,
+                         imageState->layout, _outOfDate, _frameState, _manualPresent);
+  _pendingImageAvailableSemaphore = VK_NULL_HANDLE;
+}
+
+void VulkanSwapchainProxy::onSchedulePresentation(Context*) {
+  schedulePresent();
+}
+
+void VulkanSwapchainProxy::onPresentFrame(Context*) {
+  releaseFrame();
+}
+
+bool VulkanSwapchainProxy::hasPendingFrame() const {
+  return _renderTarget != nullptr;
+}
+
 void VulkanSwapchainProxy::releaseFrame() {
+  if (_pendingImageAvailableSemaphore != VK_NULL_HANDLE) {
+    // The frame was acquired but its presentation was never scheduled; destroy the unused
+    // semaphore (it was never waited on, so this is safe).
+    vkDestroySemaphore(_gpu->device(), _pendingImageAvailableSemaphore, nullptr);
+    _pendingImageAvailableSemaphore = VK_NULL_HANDLE;
+  }
   _renderTarget = nullptr;
+  // The frame state was consumed by the render submission, so a new frame can be acquired.
+  _frameState = nullptr;
+}
+
+void VulkanSwapchainProxy::presentFrame() {
+  _presentationRequested = true;
+  if (!_manualPresent || _frameState == nullptr || !_frameState->beginPresent()) {
+    releaseManualToken();
+    return;
+  }
+  auto& imageState = _imageStates[_currentImageIndex];
+  _gpu->presentNow(_swapchain, _currentImageIndex, _images[_currentImageIndex],
+                   imageState->presentSemaphore, imageState->layout, _outOfDate);
+  releaseFrame();
+  releaseManualToken();
+}
+
+void VulkanSwapchainProxy::discardFrame() {
+  if (_outOfDate != nullptr) {
+    *_outOfDate = true;
+  }
+  releaseFrame();
+}
+
+void VulkanSwapchainProxy::releaseManualToken() {
+  if (_manualToken != nullptr) {
+    _manualToken->release();
+    _manualToken = nullptr;
+  }
 }
 
 }  // namespace tgfx

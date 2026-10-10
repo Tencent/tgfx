@@ -20,19 +20,23 @@
 
 #include <memory>
 #include <mutex>
+#include <vector>
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {
+class Drawable;
 class RenderTargetProxy;
 
 /**
  * Window represents a native displayable resource that can be rendered to by a Device. Use
  * Surface::MakeFrom(context, window) to obtain a Surface for rendering, then call
- * context->submit() to automatically present the result.
+ * context->submit() to automatically present the result. To read back the rendered content, use
+ * nextDrawable() to acquire a Drawable instead, which keeps the frame readable until it is
+ * presented through Context::present().
  */
-class Window {
+class Window : public std::enable_shared_from_this<Window> {
  public:
   virtual ~Window() = default;
 
@@ -41,6 +45,26 @@ class Window {
    * the process of initializing.
    */
   std::shared_ptr<Device> getDevice();
+
+  /**
+   * Acquires the usage right of the next single frame of this Window. No drawing Context is
+   * involved: acquisition only talks to the platform presentation endpoint (drawable pool or
+   * swapchain). Import the frame into a Context later via Surface::MakeFrom(context, drawable),
+   * then present it via Context::present(drawable). The returned Drawable keeps this Window
+   * alive until its frame is presented or discarded. Only one drawable should be held at a
+   * time, otherwise frame acquisition may stall. Returns nullptr if the window is not owned by
+   * a shared_ptr or cannot provide a frame right now (for example, the window has a zero size
+   * or the platform frame buffer is unavailable).
+   */
+  std::shared_ptr<Drawable> nextDrawable();
+
+  /**
+   * Returns true when this window's frames can be copied before presentation, for example through
+   * Surface::asyncReadPixels() on a Surface created from a Drawable. False on windows whose
+   * platform frame buffer cannot act as a copy source (a CAMetalLayer with framebufferOnly set to
+   * YES, a Vulkan swapchain without TRANSFER_SRC usage, or a WebGPU canvas without CopySrc usage).
+   */
+  bool supportsReadback() const;
 
   /**
    * Returns the color space associated with this Window. Returns nullptr for the default sRGB.
@@ -59,9 +83,23 @@ class Window {
 
  protected:
   std::mutex locker = {};
-  std::shared_ptr<Device> device = nullptr;
+  // The device is held strongly: factory entry points like MetalWindow::MakeFrom(layer) create
+  // a default device that has no other owner, and callers expect window->getDevice() to keep
+  // it alive. Reference cycles with pending drawing buffers are broken on the frame side
+  // instead: frames hold their windows weakly (see Drawable) and present through their
+  // proxies.
+  std::shared_ptr<Device> _device = nullptr;
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
   const bool _vsyncEnabled = true;
+
+  /**
+   * Returns the device. Kept as an accessor for call sites written while the device was held
+   * weakly; it returns nullptr if the device has been released mid-window-lifetime, which can
+   * no longer happen while the window is alive.
+   */
+  std::shared_ptr<Device> lockDevice() const {
+    return _device;
+  }
 
   explicit Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace = nullptr,
                   bool vsyncEnabled = true);
@@ -75,13 +113,45 @@ class Window {
   virtual std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) = 0;
 
   /**
-   * Called after command buffer submission to present the rendered content. The default
-   * implementation does nothing.
+   * Called after command buffer submission to present a group of render targets with the same
+   * presentation identity. Backends with a shared native backbuffer receive all render targets for
+   * the Window in one call. Backends with independent frame buffers receive one render target per
+   * call. The default implementation does nothing.
+   * @param context The Context that submitted the rendering commands.
+   * @param renderTargets The render targets that produced the frame being presented.
    */
-  virtual void onPresent(Context* context);
+  virtual void onPresent(Context* context,
+                         const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets);
+
+  /**
+   * Returns true if every RenderTargetProxy represents an independently presentable frame. The
+   * default is false for backends where all proxies target one shared native backbuffer.
+   */
+  virtual bool hasIndependentPresentationTargets() const;
+
+  /**
+   * Creates a backend-specific Drawable for nextDrawable(). Backends only talk to the platform
+   * presentation endpoint here; the frame is imported into a Context later through
+   * Drawable::onImport(). The default implementation returns a WindowDrawable, which resolves its
+   * frame through onCreateRenderTarget()/onPresent() at import time. Returns nullptr if the window
+   * cannot provide a frame right now.
+   */
+  virtual std::shared_ptr<Drawable> onNextDrawable();
+
+  /**
+   * Returns true when this window's frames can act as a copy source before presentation. The
+   * default implementation returns false.
+   */
+  virtual bool onSupportsReadback() const;
 
  private:
+  friend class Drawable;
   friend class DrawingBuffer;
+  friend class DrawingManager;
   friend class Surface;
+  friend class RenderTargetProxy;
+  friend class WindowDrawable;
+  friend class WindowFrame;
+  friend class WindowSurface;
 };
 }  // namespace tgfx

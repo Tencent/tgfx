@@ -28,6 +28,7 @@
 #include "tgfx/gpu/Window.h"
 
 namespace tgfx {
+
 class QGLDeviceCreator;
 class QGLDrawableProxy;
 
@@ -60,7 +61,15 @@ class QGLWindow : public Window {
 
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
-  void onPresent(Context* context) override;
+  bool onSupportsReadback() const override {
+    return true;
+  }
+  /**
+   * Presents the given frame proxy to the Qt scene graph. Called by
+   * QGLDrawableProxy::onPresentFrame().
+   */
+  void presentProxy(QGLDrawableProxy* proxy);
+  bool hasIndependentPresentationTargets() const override;
 
  private:
   struct TextureSlot {
@@ -76,8 +85,6 @@ class QGLWindow : public Window {
   QGLDeviceCreator* deviceCreator = nullptr;
   QSGTexture* presentedQSGTexture = nullptr;
   std::shared_ptr<RenderTargetProxy> pendingProxy = nullptr;
-  std::shared_ptr<RenderTargetProxy> drawableProxy = nullptr;
-  std::shared_ptr<RenderTargetProxy> presentingProxy = nullptr;
 
   explicit QGLWindow(QQuickItem* quickItem, bool singleBufferMode = false,
                      std::shared_ptr<ColorSpace> colorSpace = nullptr);

@@ -27,6 +27,14 @@ QGLDrawableProxy::QGLDrawableProxy(Context* context, int width, int height, Pixe
       _origin(origin), _window(window) {
 }
 
+void QGLDrawableProxy::onPresentFrame(Context*) {
+  // Hand the frame to the Qt scene graph through the window (which owns the pending slot and
+  // the quick item).
+  if (_window != nullptr) {
+    _window->presentProxy(this);
+  }
+}
+
 Context* QGLDrawableProxy::getContext() const {
   return _context;
 }
@@ -58,9 +66,6 @@ bool QGLDrawableProxy::externallyOwned() const {
 void QGLDrawableProxy::ensureTextureRTProxy() const {
   if (textureRTProxy == nullptr) {
     textureRTProxy = _window->acquireTexture(_context, _width, _height);
-    if (textureRTProxy != nullptr) {
-      _window->presentingProxy = weakThis.lock();
-    }
   }
 }
 
