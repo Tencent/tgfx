@@ -194,30 +194,26 @@ void DrawingManager::collectWindow(std::shared_ptr<Window> window,
   auto drawingBuffer = getDrawingBuffer();
   // The automatic path shares the drawable pipeline: each flush cycle collects a WindowFrame per
   // window (per target for backends with independent presentation targets), which registers its
-  // presentation at construction and is delivered by presentDrawables() after submission.
-  auto& frames = drawingBuffer->drawables;
+  // presentation at construction and is delivered by presentDrawables() after submission. The
+  // per-window map finds the current buffer's frame without type-identifying the drawables.
   auto independentTargets = window->hasIndependentPresentationTargets();
-  for (auto& pendingFrame : frames) {
-    // The project is built without RTTI, so the frame type is identified via the
-    // isWindowFrame() marker instead of dynamic_pointer_cast.
-    if (!pendingFrame->isWindowFrame()) {
-      continue;
-    }
-    auto frame = std::static_pointer_cast<WindowFrame>(pendingFrame);
-    if (!frame->isForWindow(window)) {
-      continue;
-    }
-    if (frame->hasTarget(renderTarget)) {
-      return;
-    }
-    if (!independentTargets) {
-      frame->addTarget(std::move(renderTarget));
-      return;
+  auto iter = pendingWindowFrames.find(window.get());
+  if (iter != pendingWindowFrames.end()) {
+    if (auto frame = iter->second.lock()) {
+      if (frame->hasTarget(renderTarget)) {
+        return;
+      }
+      if (!independentTargets) {
+        frame->addTarget(std::move(renderTarget));
+        return;
+      }
     }
   }
+  auto* windowKey = window.get();
   auto frame = WindowFrame::Make(std::move(window), std::move(renderTarget));
   if (frame != nullptr) {
-    frames.push_back(std::move(frame));
+    drawingBuffer->drawables.push_back(frame);
+    pendingWindowFrames[windowKey] = std::move(frame);
   }
 }
 
@@ -243,6 +239,7 @@ std::shared_ptr<DrawingBuffer> DrawingManager::flush() {
   auto drawingBuffer = currentBuffer;
   bufferPool.push_back(currentBuffer);
   currentBuffer = nullptr;
+  pendingWindowFrames.clear();
   return drawingBuffer;
 }
 }  // namespace tgfx

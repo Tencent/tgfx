@@ -52,10 +52,6 @@ class WindowFrame : public Drawable {
    */
   void addTarget(std::shared_ptr<RenderTargetProxy> renderTarget);
 
-  bool isWindowFrame() const override {
-    return true;
-  }
-
   /**
    * Returns true when this frame presents the given window. Frames stop matching after delivery
    * (their window reference is released).

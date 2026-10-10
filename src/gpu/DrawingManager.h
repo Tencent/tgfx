@@ -32,6 +32,7 @@
 namespace tgfx {
 struct RuntimeInputTexture;
 class Drawable;
+class WindowFrame;
 
 class DrawingManager {
  public:
@@ -104,6 +105,9 @@ class DrawingManager {
   std::shared_ptr<DrawingBuffer> flush();
 
  private:
+  // The automatic frame collected for each window in the current drawing buffer, so frame
+  // aggregation does not need to identify WindowFrame objects in the buffer's drawable list.
+  std::unordered_map<Window*, std::weak_ptr<WindowFrame>> pendingWindowFrames = {};
   Context* context = nullptr;
   std::shared_ptr<DrawingBuffer> currentBuffer = nullptr;
   std::deque<std::shared_ptr<DrawingBuffer>> bufferPool = {};

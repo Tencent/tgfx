@@ -305,6 +305,11 @@ const std::shared_ptr<ColorSpace>& Surface::colorSpace() const {
 }
 
 bool Surface::aboutToDraw(bool discardContent) {
+  if (_drawable != nullptr && !_drawable->canReadBack()) {
+    // A presentation has been registered for (or delivered to) this single-frame surface: the
+    // frame is closed and must not be drawn into anymore.
+    return false;
+  }
   if (cachedImage == nullptr) {
     return true;
   }
