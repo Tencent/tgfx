@@ -35,11 +35,13 @@ struct GlassGeometryParams {
   float refractionFactor = 0.0f;
   float splay = 0.0f;
   float depthRatio = 0.0f;
+  // Direction of the light source in degrees, clockwise (0 = light from directly above).
+  float lightAngle = 0.0f;
   /**
-   * Width of the edge light falloff in layer pixels. The shader measures the edge distance in layer
-   * pixels, so a band of one layer pixel covers less than one screen pixel once the layer is scaled
-   * down and the falloff collapses into a hard threshold. Callers rendering at a reduced scale must
-   * widen the band accordingly. Values below one are ignored.
+   * Width of the edge-light band in layer pixels; the light is drawn on the glass bevel, so this is
+   * the bevel width. The shader measures the edge distance in layer pixels, so the band must be
+   * widened to stay at least one screen pixel wide once the layer is scaled down; without that the
+   * falloff collapses into a hard threshold. Values below one are ignored.
    */
   float edgeBandLayerPixels = 1.0f;
 };
@@ -47,6 +49,8 @@ struct GlassGeometryParams {
 struct GlassSDFGeometryParams : public GlassGeometryParams {
   float cornerRadius = 0.0f;
   float glassThickness = 0.0f;
+  // When false the SDF stage skips the light taps and packs a zero light response.
+  bool enableEdgeLighting = false;
 };
 
 struct GlassUDFGeometryParams : public GlassGeometryParams {
@@ -71,7 +75,14 @@ struct GlassUDFGeometryParams : public GlassGeometryParams {
 
 /**
  * Computes shape-dependent refraction geometry from source UV coordinates supplied in inputColor.
- * The output is vec4(refractDirection.xy, displacementDistance, edgeWeight).
+ * The output is vec4(refractDirection.xy, displacementDistance, lightResponse): the
+ * corner-amplified refraction field, its per-pixel offset and the packed light response. The
+ * analytical SDF path carries the two edge terms of the un-amplified shape normal (light-facing
+ * edge and light-away back-side rim, coefficients 1 and 0.6) plus a signed wide-band dark term
+ * (coefficient 0.05) on the light-facing side, whose ramp is clamp(1 - edgeDistance /
+ * glassThickness, 0, 1)^2 read straight from the shape depth. The mask/UDF path keeps the two edge
+ * terms only: the arbitrary-shape Figma pipeline exposes exactly those two edge terms and no
+ * wide-band dark term, so none is added here.
  */
 class GlassShapeGeometryFragmentProcessor : public FragmentProcessor {
  protected:

@@ -44,8 +44,8 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
   auto common = args.uniformHandler->addUniform("GlassOpticsP0", UniformFormat::Float4,
                                                 ShaderStage::Fragment);
-  auto lighting = args.uniformHandler->addUniform("GlassOpticsP1", UniformFormat::Float4,
-                                                  ShaderStage::Fragment);
+  auto layerToSource = args.uniformHandler->addUniform("GlassOpticsP1", UniformFormat::Float2,
+                                                       ShaderStage::Fragment);
   auto offsets = args.uniformHandler->addUniform("GlassOpticsP2", UniformFormat::Float4,
                                                  ShaderStage::Fragment);
   auto geometryMapping = args.uniformHandler->addUniform("GlassOpticsP3", UniformFormat::Float4,
@@ -58,14 +58,15 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
                            offsets.c_str(), geometryMapping.c_str());
   std::string geometryOutput = "glassGeometry";
   emitChild(geometryIndex, "vec4(glassUV, 0.0, 0.0)", &geometryOutput, args);
+  // glassGeometry is vec4(refractDir.xy, offsetDist, lightResponse); see the geometry class doc.
   fragBuilder->codeAppendf("vec2 refractDir = %s.xy;", geometryOutput.c_str());
   fragBuilder->codeAppendf("float offsetDist = %s.z;", geometryOutput.c_str());
-  fragBuilder->codeAppendf("float edgeWeight = %s.w;", geometryOutput.c_str());
+  fragBuilder->codeAppendf("float lightResponse = %s.w;", geometryOutput.c_str());
   fragBuilder->codeAppend("vec2 displacement = refractDir * offsetDist;");
   fragBuilder->codeAppendf("displacement = clamp(displacement, vec2(-%s.w), vec2(%s.w));",
                            common.c_str(), common.c_str());
   fragBuilder->codeAppendf("vec2 uvOffset = vec2(displacement.x * %s.x, -displacement.y * %s.y);",
-                           lighting.c_str(), lighting.c_str());
+                           layerToSource.c_str(), layerToSource.c_str());
 
   fragBuilder->codeAppend("vec3 finalColor;");
   fragBuilder->codeAppend("float srcAlpha;");
@@ -93,14 +94,7 @@ void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
   }
 
   if (params.lightIntensity > 0.0f) {
-    fragBuilder->codeAppend("if (edgeWeight > 0.0) {");
-    fragBuilder->codeAppendf("  float NdotL = dot(-refractDir, %s.zw);", lighting.c_str());
-    fragBuilder->codeAppendf("  float diffuse = smoothstep(0.35, 1.0, NdotL) * edgeWeight * %s.z;",
-                             offsets.c_str());
-    fragBuilder->codeAppendf(
-        "  float rim = smoothstep(0.35, 1.0, -NdotL) * edgeWeight * %s.z * 0.6;", offsets.c_str());
-    fragBuilder->codeAppend("  finalColor += vec3(diffuse + rim);");
-    fragBuilder->codeAppend("}");
+    fragBuilder->codeAppendf("finalColor += vec3(lightResponse * %s.z);", offsets.c_str());
   }
   fragBuilder->codeAppendf("%s = vec4(finalColor, srcAlpha);", args.outputColor.c_str());
 }
@@ -113,7 +107,6 @@ void GLSLGlassRefractionFragmentProcessor::onSetData(UniformData*,
                          params.maxDisplacement};
   fragmentUniformData->setData("GlassOpticsP0", commonData);
 
-  float angle = params.lightAngle * static_cast<float>(M_PI) / 180.0f;
   float layerToSourceX = params.layerPixelToSourcePixelX;
   float layerToSourceY = params.layerPixelToSourcePixelY;
   if (layerToSourceX <= 0.0f) {
@@ -122,9 +115,8 @@ void GLSLGlassRefractionFragmentProcessor::onSetData(UniformData*,
   if (layerToSourceY <= 0.0f) {
     layerToSourceY = params.origHeight > 0.0f ? sourceHeight / params.origHeight : 1.0f;
   }
-  float lightingData[4] = {layerToSourceX / sourceWidth, layerToSourceY / sourceHeight,
-                           std::sin(angle), std::cos(angle)};
-  fragmentUniformData->setData("GlassOpticsP1", lightingData);
+  float layerToSourceData[2] = {layerToSourceX / sourceWidth, layerToSourceY / sourceHeight};
+  fragmentUniformData->setData("GlassOpticsP1", layerToSourceData);
 
   float glassUVScaleX = params.glassUVScaleX > 0.0f ? params.glassUVScaleX : 1.0f / sourceWidth;
   float glassUVScaleY = params.glassUVScaleY > 0.0f ? params.glassUVScaleY : 1.0f / sourceHeight;
