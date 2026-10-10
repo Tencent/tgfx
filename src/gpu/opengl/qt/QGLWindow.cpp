@@ -143,7 +143,7 @@ void QGLWindow::moveToThread(QThread* thread) {
   std::lock_guard<std::mutex> autoLock(locker);
   renderThread = thread;
   if (device != nullptr) {
-    static_cast<QGLDevice*>(device.get())->moveToThread(renderThread);
+    static_cast<QGLDevice*>(lockDevice().get())->moveToThread(renderThread);
   }
 }
 
@@ -285,7 +285,7 @@ void QGLWindow::createDevice(QOpenGLContext* context) {
   surface->create();
   device = QGLDevice::MakeFrom(context, surface, true);
   if (renderThread != nullptr) {
-    static_cast<QGLDevice*>(device.get())->moveToThread(renderThread);
+    static_cast<QGLDevice*>(lockDevice().get())->moveToThread(renderThread);
   }
   QMetaObject::invokeMethod(quickItem, "update", Qt::AutoConnection);
 }

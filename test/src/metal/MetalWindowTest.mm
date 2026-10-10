@@ -292,9 +292,11 @@ TGFX_TEST(MetalWindowTest, PresentBindsToFrameRecording) {
 }
 
 /**
- * Verifies that a flushed-but-unsubmitted recording does not keep a strong window reference
- * cycle through the Context back to the Device: while the Recording is alive the window is
- * retained, and once it is dropped (together with the surface) the window is released.
+ * Verifies the frame-retention contract of flushed-but-unsubmitted work: the pending drawing
+ * buffer keeps the frame (and its window) alive until it is submitted, so dropping a Recording
+ * never discards a presentation whose rendering commands still run; the window is released only
+ * after the buffer is submitted. The Window holds its device weakly, so this retention never
+ * forms a Device -> Context -> buffer -> frame -> window -> Device cycle.
  */
 TGFX_TEST(MetalWindowTest, DroppedRecordingReleasesWindow) {
   ContextScope scope;
@@ -316,10 +318,17 @@ TGFX_TEST(MetalWindowTest, DroppedRecordingReleasesWindow) {
   std::weak_ptr<Window> weakWindow = window;
   surface = nullptr;
   window = nullptr;
-  EXPECT_FALSE(weakWindow.expired());  // the Recording retains the window
-  // Dropping the Recording without submitting releases the window: the buffered presentation
-  // no longer forms a Device -> Context -> buffer -> Window -> Device cycle.
+  EXPECT_FALSE(weakWindow.expired());  // the Recording retains the work
+  // Dropping the Recording does not drop the pending work: the buffered frame keeps the window
+  // alive until its rendering and presentation are submitted.
   recording = nullptr;
+  EXPECT_FALSE(weakWindow.expired());
+  // Any later submission drains the pending queue in FIFO order, delivering the frame and
+  // releasing the window.
+  auto offscreen = Surface::Make(context, 8, 8);
+  ASSERT_TRUE(offscreen != nullptr);
+  offscreen->getCanvas()->clear(Color::Black());
+  context->flushAndSubmit(true);
   EXPECT_TRUE(weakWindow.expired());
 }
 

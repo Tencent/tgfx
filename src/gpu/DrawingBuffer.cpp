@@ -60,29 +60,15 @@ std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
   return commandBuffer;
 }
 
-std::vector<std::shared_ptr<Drawable>> DrawingBuffer::collectRetainedDrawables() const {
-  std::vector<std::shared_ptr<Drawable>> retainedDrawables = {};
-  for (const auto& pendingDrawable : drawables) {
-    if (auto drawable = pendingDrawable.lock()) {
-      retainedDrawables.push_back(std::move(drawable));
-    }
-  }
-  return retainedDrawables;
-}
-
 void DrawingBuffer::schedulePendingPresents(Context* context) {
-  for (auto& pendingDrawable : drawables) {
-    if (auto drawable = pendingDrawable.lock()) {
-      drawable->scheduleIfRequested(context);
-    }
+  for (auto& drawable : drawables) {
+    drawable->scheduleIfRequested(context);
   }
 }
 
 void DrawingBuffer::presentDrawables(Context* context) {
-  for (auto& pendingDrawable : drawables) {
-    if (auto drawable = pendingDrawable.lock()) {
-      drawable->onSubmissionCompleted(context);
-    }
+  for (auto& drawable : drawables) {
+    drawable->onSubmissionCompleted(context);
   }
   drawables.clear();
 }

@@ -90,11 +90,11 @@ class DrawingManager {
   /**
    * Collects an automatic presentation frame for the given window and render target. Each flush
    * cycle collects a WindowFrame per window (per target for backends with independent
-   * presentation targets) into the drawing buffer's drawable list. Returns the collected frame
-   * so the caller can keep it alive across the flush boundary.
+   * presentation targets) into the drawing buffer's drawable list. The buffer keeps the frame
+   * alive until it is submitted.
    */
-  std::shared_ptr<Drawable> collectWindow(std::shared_ptr<Window> window,
-                                          std::shared_ptr<RenderTargetProxy> renderTarget);
+  void collectWindow(std::shared_ptr<Window> window,
+                     std::shared_ptr<RenderTargetProxy> renderTarget);
 
   /**
    * Flushes all pending drawing operations and returns the DrawingBuffer. Returns nullptr if there

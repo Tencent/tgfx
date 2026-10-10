@@ -80,19 +80,12 @@ class DrawingBuffer {
    */
   void presentDrawables(Context* context);
 
-  /**
-   * Returns the drawables collected by this buffer (explicit frames and automatic window
-   * frames), keeping them and their windows alive for the returned Recording until the buffer
-   * is submitted.
-   */
-  std::vector<std::shared_ptr<Drawable>> collectRetainedDrawables() const;
-
  private:
   // All frames — explicit drawables and automatic window frames — go through this single list.
-  // Entries are weak: while a Recording or a Surface keeps a frame alive, its presentation is
-  // delivered; when both are gone, the presentation is silently dropped along with the frame.
-  // The weak entries also prevent a strong reference cycle
-  // (Device -> Context -> pending buffers -> frame -> Window -> Device).
+  // Entries are strong: a buffer keeps its frames alive until it is submitted, so dropping a
+  // Recording never discards a presentation whose rendering commands still run. The frames
+  // hold their windows strongly, which is cycle-free because Window only holds its device
+  // weakly (see Window::_device).
 
   Context* context = nullptr;
   uint32_t _uniqueID = 0;
@@ -106,7 +99,7 @@ class DrawingBuffer {
   std::vector<PlacementPtr<ResourceTask>> resourceTasks = {};
   std::vector<PlacementPtr<RenderTask>> renderTasks = {};
   std::vector<PlacementPtr<AtlasUploadTask>> atlasTasks = {};
-  std::vector<std::weak_ptr<Drawable>> drawables = {};
+  std::vector<std::shared_ptr<Drawable>> drawables = {};
 
   friend class DrawingManager;
 };

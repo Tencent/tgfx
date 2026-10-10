@@ -179,17 +179,17 @@ void DrawingManager::collectDrawable(std::shared_ptr<Drawable> drawable) {
   }
   auto drawingBuffer = getDrawingBuffer();
   for (auto& pendingDrawable : drawingBuffer->drawables) {
-    if (pendingDrawable.lock() == drawable) {
+    if (pendingDrawable == drawable) {
       return;
     }
   }
   drawingBuffer->drawables.push_back(std::move(drawable));
 }
 
-std::shared_ptr<Drawable> DrawingManager::collectWindow(
-    std::shared_ptr<Window> window, std::shared_ptr<RenderTargetProxy> renderTarget) {
+void DrawingManager::collectWindow(std::shared_ptr<Window> window,
+                                   std::shared_ptr<RenderTargetProxy> renderTarget) {
   if (window == nullptr || renderTarget == nullptr) {
-    return nullptr;
+    return;
   }
   auto drawingBuffer = getDrawingBuffer();
   // The automatic path shares the drawable pipeline: each flush cycle collects a WindowFrame per
@@ -200,29 +200,25 @@ std::shared_ptr<Drawable> DrawingManager::collectWindow(
   for (auto& pendingFrame : frames) {
     // The project is built without RTTI, so the frame type is identified via the
     // isWindowFrame() marker instead of dynamic_pointer_cast.
-    auto pending = pendingFrame.lock();
-    if (pending == nullptr || !pending->isWindowFrame()) {
+    if (!pendingFrame->isWindowFrame()) {
       continue;
     }
-    auto frame = std::static_pointer_cast<WindowFrame>(pending);
+    auto frame = std::static_pointer_cast<WindowFrame>(pendingFrame);
     if (!frame->isForWindow(window)) {
       continue;
     }
     if (frame->hasTarget(renderTarget)) {
-      return frame;
+      return;
     }
     if (!independentTargets) {
       frame->addTarget(std::move(renderTarget));
-      return frame;
+      return;
     }
   }
   auto frame = WindowFrame::Make(std::move(window), std::move(renderTarget));
   if (frame != nullptr) {
-    frames.push_back(frame);
+    frames.push_back(std::move(frame));
   }
-  // The frame is returned so the collecting Surface can hold a strong reference across the
-  // flush boundary; the buffer itself only keeps a weak entry to stay cycle-free.
-  return frame;
 }
 
 std::shared_ptr<DrawingBuffer> DrawingManager::flush() {

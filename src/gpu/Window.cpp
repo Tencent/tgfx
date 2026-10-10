@@ -24,7 +24,7 @@
 namespace tgfx {
 Window::Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace,
                bool vsyncEnabled)
-    : device(std::move(device)), _colorSpace(std::move(colorSpace)), _vsyncEnabled(vsyncEnabled) {
+    : _device(std::move(device)), _colorSpace(std::move(colorSpace)), _vsyncEnabled(vsyncEnabled) {
 }
 
 std::shared_ptr<ColorSpace> Window::colorSpace() const {
@@ -37,7 +37,7 @@ bool Window::vsyncEnabled() const {
 
 std::shared_ptr<Device> Window::getDevice() {
   std::lock_guard<std::mutex> autoLock(locker);
-  return device;
+  return _device.lock();
 }
 
 std::shared_ptr<Drawable> Window::nextDrawable() {

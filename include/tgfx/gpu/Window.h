@@ -83,9 +83,20 @@ class Window : public std::enable_shared_from_this<Window> {
 
  protected:
   std::mutex locker = {};
-  std::shared_ptr<Device> device = nullptr;
+  // The device is held weakly: a window must not keep its device (and through it the context
+  // and its pending drawing buffers) alive, which would form a reference cycle with the frames
+  // a buffer retains (buffer -> frame -> window -> device -> context -> buffer). Use
+  // lockDevice() to access it; it returns nullptr once the device has been released.
+  std::weak_ptr<Device> _device = {};
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
   const bool _vsyncEnabled = true;
+
+  /**
+   * Returns the device while it is alive, or nullptr once it has been released.
+   */
+  std::shared_ptr<Device> lockDevice() const {
+    return _device.lock();
+  }
 
   explicit Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace = nullptr,
                   bool vsyncEnabled = true);
