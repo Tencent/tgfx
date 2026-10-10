@@ -353,10 +353,8 @@ class CSSParser {
       }
       // Parse the individual rule
       std::string ruleString = css.substr(ruleStart, ruleEnd - ruleStart + 1);
-      CSSRule rule = parseRule(ruleString);
-      if (!rule.selector.empty()) {
-        rules.push_back(rule);
-      }
+      auto parsedRules = parseRule(ruleString);
+      rules.insert(rules.end(), parsedRules.begin(), parsedRules.end());
       pos = ruleEnd + 1;
     }
   }
@@ -376,23 +374,35 @@ class CSSParser {
     return str.substr(first, (last - first + 1));
   }
 
-  CSSRule parseRule(const std::string& ruleStr) {
-    CSSRule rule;
+  std::vector<CSSRule> parseRule(const std::string& ruleStr) {
+    std::vector<CSSRule> result;
     // Find delimiter between selector and declarations
     size_t openBrace = ruleStr.find('{');
     if (openBrace == std::string::npos) {
-      return rule;
+      return result;
     }
-    // Extract selector
-    rule.selector = trim(ruleStr.substr(0, openBrace)).substr(1);
-
     // Extract declarations block
     size_t closeBrace = ruleStr.find('}', openBrace);
     if (closeBrace == std::string::npos) {
-      return rule;
+      return result;
     }
-    rule.declarations = ruleStr.substr(openBrace + 1, closeBrace - openBrace - 1);
-    return rule;
+    std::string declarations = ruleStr.substr(openBrace + 1, closeBrace - openBrace - 1);
+
+    // A comma-separated selector list shares one declarations block; emit one rule per selector
+    std::string selectors = ruleStr.substr(0, openBrace);
+    size_t pos = 0;
+    while (pos < selectors.size()) {
+      size_t comma = selectors.find(',', pos);
+      auto selector = trim(selectors.substr(pos, comma - pos));
+      if (!selector.empty() && selector.front() == '.') {
+        result.push_back({selector.substr(1), declarations});
+      }
+      if (comma == std::string::npos) {
+        break;
+      }
+      pos = comma + 1;
+    }
+    return result;
   }
 
   std::string css;
