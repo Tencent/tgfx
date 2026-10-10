@@ -142,7 +142,7 @@ QGLWindow::~QGLWindow() {
 void QGLWindow::moveToThread(QThread* thread) {
   std::lock_guard<std::mutex> autoLock(locker);
   renderThread = thread;
-  if (device != nullptr) {
+  if (lockDevice() != nullptr) {
     static_cast<QGLDevice*>(lockDevice().get())->moveToThread(renderThread);
   }
 }
@@ -283,7 +283,7 @@ void QGLWindow::createDevice(QOpenGLContext* context) {
   auto surface = new QOffscreenSurface();
   surface->setFormat(context->format());
   surface->create();
-  device = QGLDevice::MakeFrom(context, surface, true);
+  _device = QGLDevice::MakeFrom(context, surface, true);
   if (renderThread != nullptr) {
     static_cast<QGLDevice*>(lockDevice().get())->moveToThread(renderThread);
   }

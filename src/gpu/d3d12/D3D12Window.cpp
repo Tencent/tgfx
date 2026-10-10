@@ -381,7 +381,8 @@ D3D12Window::~D3D12Window() {
   // pending trips OBJECT_DELETED_WHILE_STILL_IN_USE (#921). drainQueue covers both waits;
   // drainBackBufferOwners then drops the cached ExternalRenderTarget and recycled command
   // lists that still pin each backbuffer resource.
-  auto context = device->lockContext();
+  auto device = lockDevice();
+  auto context = device != nullptr ? device->lockContext() : nullptr;
   if (context != nullptr) {
     auto* d3d12GPU = static_cast<D3D12GPU*>(context->gpu());
     _platformState->drainQueue(d3d12GPU);
