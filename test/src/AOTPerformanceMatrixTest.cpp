@@ -181,10 +181,12 @@ TimingResult MeasureRoute(Context* context, PrecompiledShaderCache* cache, bool 
     return result;
   }
   // Cold frames: every program gets looked up (and created on the runtime route). Each sample
-  // clears the program cache independently; the samples' spread (min..max) shows the stability
-  // the audit's single-cold-sample design could not.
+  // clears the program cache and the shader cache independently, so every sample compiles its
+  // shaders again; the samples' spread (min..max) shows the stability the audit's
+  // single-cold-sample design could not.
   for (int cold = 0; cold < kColdSamples; ++cold) {
     context->globalCache()->clearPrograms();
+    context->globalCache()->shaderCache()->clear();
     context->globalCache()->resetProgramStats();
     cache->resetStats();
     cache->setDiagnosticRecordingEnabled(true);
