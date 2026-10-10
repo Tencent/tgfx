@@ -963,18 +963,18 @@ bool SVGExportContext::drawInnerShadow(const RRectInnerShadowShader& shader,
   if (blurFilter == nullptr) {
     return false;
   }
-  const auto imageBounds = blurFilter->filterBounds(shadowShape.rect());
+  const auto imageBounds = shadowShape.rect();
   Point shadowOffset = {};
   auto shadowImage = RRectToImage(shadowShape, shader.color, &imageBounds, &shadowOffset);
   if (shadowImage == nullptr) {
     return false;
   }
 
-  // A matrix-wrapped mask shader has no SVG mask form, so the mask cannot be repositioned after
-  // recording; it is recorded over the shadow's image bounds to align with the shadow image.
-  //
-  // The blur is baked into the recording because the mask export rasterizes a FilterImage; only a
-  // PictureImage mask keeps the vector form.
+  // The mask image is recorded over the shadow's image bounds rather than its own tight bounds:
+  // tight bounds would require a matrix on the mask shader to reposition it, and SVG mask export
+  // does not support matrix-wrapped mask shaders.
+  // A FilterImage mask is rasterized on export; to keep the mask vector, the blur is baked into
+  // the picture recording instead of applied via makeWithFilter.
   auto maskImage = RRectToImage(maskShape, Color::White(), &imageBounds, nullptr, blurFilter);
   if (maskImage == nullptr) {
     return false;

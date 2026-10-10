@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include <vector>
 #include "ResourceStore.h"
 #include "core/filters/BlendImageFilter.h"
@@ -147,13 +148,15 @@ class ElementWriter {
   std::string addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter, const Rect& bound,
                              const std::shared_ptr<SVGCustomWriter>& exportWriter,
                              Context* context);
-  std::string emitFilterElement(const std::shared_ptr<ImageFilter>& imageFilter, const Rect& bound,
+  std::string emitFilterElement(const std::shared_ptr<ImageFilter>& imageFilter,
                                 const std::shared_ptr<SVGCustomWriter>& exportWriter,
-                                Context* context, bool preserveSoftAlpha = false);
+                                Context* context, bool preserveSoftAlpha = false,
+                                const std::optional<Rect>& bound = std::nullopt);
   bool writeFilterPrimitives(const std::shared_ptr<ImageFilter>& imageFilter,
                              ElementWriter& filterElement,
                              const std::shared_ptr<SVGCustomWriter>& exportWriter,
-                             const Rect& bound, Context* context, bool preserveSoftAlpha);
+                             const std::optional<Rect>& bound, Context* context,
+                             bool preserveSoftAlpha);
   void callbackBlurImageFilter(const GaussianBlurImageFilter* filter,
                                const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                ElementWriter& filterElement);
