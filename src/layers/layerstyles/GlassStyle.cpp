@@ -82,15 +82,15 @@ static float GetUDFMaxDisplacement(float minHalf, float refractionFactor, float 
 // instead of rendered from unreliable gradients.
 static constexpr float EdgeLightMinContentScale = 0.5f;
 
-// The edge light is drawn on the glass bevel, so the band is the bevel width in layer pixels. The
-// 2.5 value was read from Figma, whose dark band saturates across the bevel so that the flat top
-// width equals the bevel width (~2-3 layer pixels). The one-screen-pixel floor keeps the falloff
-// from collapsing into a hard threshold at reduced content scales.
+// The edge light is drawn on the glass bevel, so the band is the bevel width in layer pixels. 1.5
+// keeps the visible highlight near one pixel wide, tuned below the ~2px measured from Figma. The
+// one-screen-pixel floor keeps the falloff from collapsing into a hard threshold at reduced content
+// scales, and it also sets the lower bound where the band would start flickering on sub-pixel edges.
 static float GetEdgeBandLayerPixels(float contentScale) {
   if (contentScale <= 0.0f) {
-    return 2.5f;
+    return 1.5f;
   }
-  return std::max(2.5f, 1.0f / contentScale);
+  return std::max(1.5f, 1.0f / contentScale);
 }
 
 // SDF shapes cap the refraction displacement at refractionFactor * glassThickness in the shader
@@ -779,7 +779,10 @@ std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getSDFRefractionFilter(
     GlassShapeType shapeType, float cornerRadius, float halfWidth, float halfHeight,
     const BackgroundMapping& mapping, float contentScale) {
   auto params = makeBaseRefractionParams(halfWidth, halfHeight, mapping);
-  if (contentScale <= EdgeLightMinContentScale) {
+  // The analytical SDF light needs no edge field, so it is not bound by the UDF field budget that
+  // EdgeLightMinContentScale protects; it stays on for any positive content scale. Only a
+  // non-positive scale would make the derived geometry degenerate, so that alone disables it.
+  if (contentScale <= 0.0f) {
     params.lightIntensity = 0.0f;
   }
   params.shapeType = shapeType;

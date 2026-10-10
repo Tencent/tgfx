@@ -136,50 +136,64 @@ void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("    float refractLength = length(refractDir);");
   fragBuilder->codeAppend(
       "    refractDir = refractLength < 0.000001 ? gradientDir : refractDir / refractLength;");
-  // Without light the taps below cannot change the result; the flag is part of the processor key.
+  // Without light nothing below can change the result; the flag is part of the processor key.
   fragBuilder->codeAppend("    float lightResponse = 0.0;");
   if (params.enableEdgeLighting) {
     fragBuilder->codeAppendf("    float edgeBand = max(1.0, %s.w);", effect.c_str());
     fragBuilder->codeAppend(
         "    float edgeWeight = smoothstep(-(edgeBand + 0.001), -0.2 * edgeBand, -edgeDist);");
-    // The light terms read the shape normal at its original corner radius, while refraction keeps
-    // the refraction-distance-amplified radius, matching the captured shading.
+    // Shade the two adjacent edge faces separately and blend their responses, rather than shading a
+    // single normalized blend of the two face normals. A blended normal points between the faces, so
+    // its projection onto the light is not the mix of the two face projections and can collapse to
+    // zero at a corner; blending the responses keeps the corner bounded between the two edges. A
+    // rounded corner keeps its exact radial normal, so its dark region still grows with the radius.
+    // Refraction keeps the refraction-distance-amplified radius.
+    std::string faceLight = fragBuilder->getMangledFunctionName("glassFaceLight");
+    fragBuilder->addFunction(
+        "float " + faceLight +
+        "(vec2 n, vec2 l) {\n"
+        "  float d = dot(n, l);\n"
+        "  return smoothstep(0.35, 1.0, d) + 0.6 * smoothstep(0.35, 1.0, -d);\n"
+        "}\n");
     if (shapeType == GlassShapeType::RoundedRect) {
-      fragBuilder->codeAppend("    float lightRadius = min(cornerRadius, min(halfW, halfH));");
-      fragBuilder->codeAppendf("    float sdfLx = %s(px - 1.0, py, halfW, halfH, lightRadius);",
-                               sdfFunction.c_str());
-      fragBuilder->codeAppendf("    float sdfRx = %s(px + 1.0, py, halfW, halfH, lightRadius);",
-                               sdfFunction.c_str());
-      fragBuilder->codeAppendf("    float sdfDy = %s(px, py - 1.0, halfW, halfH, lightRadius);",
-                               sdfFunction.c_str());
-      fragBuilder->codeAppendf("    float sdfUy = %s(px, py + 1.0, halfW, halfH, lightRadius);",
-                               sdfFunction.c_str());
+      fragBuilder->codeAppend(
+          "    float lightCornerRadius = min(min(halfW, halfH), cornerRadius);");
+      fragBuilder->codeAppend("    float qx = abs(px) - (halfW - lightCornerRadius);");
+      fragBuilder->codeAppend("    float qy = abs(py) - (halfH - lightCornerRadius);");
+      // The corner transition spans one bevel width, i.e. a fraction of the edge band rather than a
+      // fixed layer-pixel count.
+      fragBuilder->codeAppend(
+          "    float faceMix = smoothstep(-0.5 * edgeBand, 0.5 * edgeBand, qx - qy);");
+      fragBuilder->codeAppendf(
+          "    float faceResponse = faceMix * %s(vec2(sign(px), 0.0), %s.xy)"
+          " + (1.0 - faceMix) * %s(vec2(0.0, sign(py)), %s.xy);",
+          faceLight.c_str(), lightDir.c_str(), faceLight.c_str(), lightDir.c_str());
+      fragBuilder->codeAppend("    vec2 arcVec = sign(vec2(px, py)) * vec2(qx, qy);");
+      fragBuilder->codeAppend("    float arcLen = length(arcVec);");
+      fragBuilder->codeAppendf(
+          "    float arcResponse = arcLen > 0.000001 ? %s(arcVec / arcLen, %s.xy) : 0.0;",
+          faceLight.c_str(), lightDir.c_str());
+      // The arc response applies only where both q are positive (the rounded corner). Its weight
+      // fades to zero as either q reaches 0, which is exactly where the arc normal meets the matching
+      // edge-face normal, so the arc and edge branches stay continuous; a hard branch would leave a
+      // sub-pixel seam along those tangent lines.
+      fragBuilder->codeAppend(
+          "    float arcWeight = smoothstep(0.0, 0.5 * edgeBand, qx) *"
+          " smoothstep(0.0, 0.5 * edgeBand, qy);");
+      fragBuilder->codeAppend(
+          "    float faceLightValue = mix(faceResponse, arcResponse, arcWeight);");
     } else {
-      fragBuilder->codeAppendf("    float sdfLx = %s(px - 1.0, py, halfW, halfH);",
-                               sdfFunction.c_str());
-      fragBuilder->codeAppendf("    float sdfRx = %s(px + 1.0, py, halfW, halfH);",
-                               sdfFunction.c_str());
-      fragBuilder->codeAppendf("    float sdfDy = %s(px, py - 1.0, halfW, halfH);",
-                               sdfFunction.c_str());
-      fragBuilder->codeAppendf("    float sdfUy = %s(px, py + 1.0, halfW, halfH);",
-                               sdfFunction.c_str());
+      fragBuilder->codeAppend(
+          "    vec2 ellipseNormal = vec2(px / (halfW * halfW), py / (halfH * halfH));");
+      fragBuilder->codeAppend("    float ellipseLen = length(ellipseNormal);");
+      fragBuilder->codeAppendf(
+          "    float faceLightValue = ellipseLen > 0.000001"
+          " ? %s(ellipseNormal / ellipseLen, %s.xy) : 0.0;",
+          faceLight.c_str(), lightDir.c_str());
     }
-    // Central differences of the SDF, whose gradient points outward (away from the shape), so this
-    // is the outward normal the light terms need.
-    fragBuilder->codeAppend("    vec2 outwardNormal = vec2(sdfRx - sdfLx, sdfUy - sdfDy) * 0.5;");
-    fragBuilder->codeAppend("    float outwardNormalLength = length(outwardNormal);");
-    fragBuilder->codeAppend(
-        "    outwardNormal = outwardNormalLength > 0.000001 ? outwardNormal / outwardNormalLength "
-        ": vec2(0.0);");
-    // lightDir is sin/cos of lightAngle expressed in the layer's local axes, so the dot below is
-    // dot(outward normal, source direction). At lightAngle 0 the top edge lights, at 90 the right
-    // edge. frameRotation compensation is deferred and intentionally not applied.
-    fragBuilder->codeAppendf("    float lightDot = dot(outwardNormal, %s.xy);", lightDir.c_str());
-    fragBuilder->codeAppend(
-        "    float signedLight = edgeWeight * smoothstep(0.35, 1.0, abs(lightDot)) * "
-        "sign(lightDot);");
-    fragBuilder->codeAppend(
-        "    float edgeLight = max(signedLight, 0.0) + max(-signedLight, 0.0) * 0.6;");
+    // At lightAngle 0 the top edge lights, at 90 the right edge. frameRotation compensation is
+    // deferred and intentionally not applied.
+    fragBuilder->codeAppend("    float edgeLight = edgeWeight * faceLightValue;");
     fragBuilder->codeAppend("    float bandRamp = heightT * heightT;");
     fragBuilder->codeAppendf("    float darkTerm = dot(refractDir, %s.xy) * bandRamp * 0.05;",
                              lightDir.c_str());
