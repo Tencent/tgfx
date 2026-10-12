@@ -11,6 +11,9 @@
         opacity: .5
       }
       .cls-3 {
+        fill: #00ff00;;
+      }
+      .cls-3 {
         fill: #ff0000
       }
     </style>
