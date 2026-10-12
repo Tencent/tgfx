@@ -28,6 +28,7 @@ GlassSDFGeometryFragmentProcessor::GlassSDFGeometryFragmentProcessor(
 
 void GlassSDFGeometryFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   bytesKey->write(static_cast<uint32_t>(shapeType));
+  bytesKey->write(static_cast<uint32_t>(params.enableEdgeLighting));
 }
 
 GlassUDFGeometryFragmentProcessor::GlassUDFGeometryFragmentProcessor(

@@ -33,6 +33,34 @@ void EmitGeometryCoordinates(FragmentShaderBuilder* fragBuilder, const std::stri
   fragBuilder->codeAppend("float py = glassPixel.y - halfH;");
 }
 
+// Emits the shared angular edge-light response used by both geometry paths: the light-facing edge
+// with coefficient 1 and the back-side rim with 0.6. Sharing one emitter means retuning those
+// coefficients changes the analytical SDF path and the mask/UDF path together.
+std::string EmitFaceLight(FragmentShaderBuilder* fragBuilder) {
+  auto name = fragBuilder->getMangledFunctionName("glassFaceLight");
+  fragBuilder->addFunction("float " + name +
+                           "(vec2 n, vec2 l) {\n"
+                           "  float d = dot(n, l);\n"
+                           "  return smoothstep(0.35, 1.0, d) + 0.6 * smoothstep(0.35, 1.0, -d);\n"
+                           "}\n");
+  return name;
+}
+
+// Emits the shared edge-light band floor and falloff; returns the falloff function's name. The
+// caller must declare `float edgeBand` in the current scope first, since the appended line assigns
+// it; this emitter only writes the band floor and the falloff function, matching EmitFaceLight's
+// style. Sharing one emitter keeps the analytical SDF path and the mask/UDF path from drifting
+// apart: the band floor and the falloff slope below are defined in exactly one place.
+std::string EmitEdgeBand(FragmentShaderBuilder* fragBuilder, const std::string& effectUniform) {
+  fragBuilder->codeAppendf("edgeBand = max(1.0, %s.w);", effectUniform.c_str());
+  auto name = fragBuilder->getMangledFunctionName("glassEdgeBandWeight");
+  fragBuilder->addFunction("float " + name +
+                           "(float edgeDistance, float band) {\n"
+                           "  return smoothstep(-(band + 0.001), -0.2 * band, -edgeDistance);\n"
+                           "}\n");
+  return name;
+}
+
 }  // namespace
 
 PlacementPtr<GlassSDFGeometryFragmentProcessor> GlassSDFGeometryFragmentProcessor::Make(
@@ -54,6 +82,8 @@ void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
       args.uniformHandler->addUniform("GlassShapeP0", UniformFormat::Float4, ShaderStage::Fragment);
   auto effect =
       args.uniformHandler->addUniform("GlassShapeP1", UniformFormat::Float4, ShaderStage::Fragment);
+  auto lightDir = args.uniformHandler->addUniform("GlassLightDir", UniformFormat::Float2,
+                                                  ShaderStage::Fragment);
 
   std::string sdfFunction = fragBuilder->getMangledFunctionName("glassShapeSDF");
   if (shapeType == GlassShapeType::RoundedRect) {
@@ -86,8 +116,6 @@ void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
   fragBuilder->codeAppend("if (outerSDF < 0.0) {");
   fragBuilder->codeAppend("  float edgeDist = -outerSDF;");
-  fragBuilder->codeAppendf("  float edgeBand = max(1.0, %s.w);", effect.c_str());
-  fragBuilder->codeAppend("  float edgeWeight = 1.0 - smoothstep(0.0, edgeBand, edgeDist);");
   // Figma profile with rd = glassThickness, bs = 0 (no bevel):
   // offset = I * rd * pow(clamp((rd - d) / rd, 0, 1), 3.5), capped at 0.999 * rd.
   fragBuilder->codeAppendf("  float rd = max(%s.w, 0.0001);", shape.c_str());
@@ -95,6 +123,9 @@ void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("  float offsetDist = min(%s.x * rd * pow(heightT, 3.5), 0.999 * rd);",
                            effect.c_str());
   fragBuilder->codeAppendf("  float effectiveSplay = %s.y;", effect.c_str());
+  // Keep a fallback direction so the analytical edge light still evaluates on degenerate gradient
+  // pixels; only the direction computation is gated below, not the light response.
+  fragBuilder->codeAppend("  vec2 refractDir = vec2(0.0);");
   if (shapeType == GlassShapeType::Ellipse) {
     fragBuilder->codeAppend(
         "  vec2 sdfGradient = vec2(px / (halfW * halfW), py / (halfH * halfH));");
@@ -132,13 +163,73 @@ void GLSLGlassSDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend(
       "    vec2 centerDir = centerDistance > 0.001 ? -vec2(px, py) / centerDistance : "
       "gradientDir;");
-  fragBuilder->codeAppend("    vec2 refractDir = mix(gradientDir, centerDir, effectiveSplay);");
+  fragBuilder->codeAppend("    refractDir = mix(gradientDir, centerDir, effectiveSplay);");
   fragBuilder->codeAppend("    float refractLength = length(refractDir);");
   fragBuilder->codeAppend(
       "    refractDir = refractLength < 0.000001 ? gradientDir : refractDir / refractLength;");
-  fragBuilder->codeAppendf("    %s = vec4(refractDir, offsetDist, edgeWeight);",
-                           args.outputColor.c_str());
   fragBuilder->codeAppend("  }");
+  // The edge light does not depend on the gradient direction, so it is evaluated outside the gate
+  // above: degenerate gradient pixels keep a zero refraction (refractDir stays (0, 0)) but still
+  // receive the analytical highlight. darkTerm reads the final refractDir assigned inside the gate.
+  // Without light nothing below can change the result; the flag is part of the processor key.
+  fragBuilder->codeAppend("  float lightResponse = 0.0;");
+  if (params.enableEdgeLighting) {
+    fragBuilder->codeAppend("  float edgeBand;");
+    auto edgeBandWeight = EmitEdgeBand(fragBuilder, effect);
+    fragBuilder->codeAppendf("  float edgeWeight = %s(edgeDist, edgeBand);",
+                             edgeBandWeight.c_str());
+    // Shade the two adjacent edge faces separately and blend their responses, rather than shading a
+    // single normalized blend of the two face normals. A blended normal points between the faces, so
+    // its projection onto the light is not the mix of the two face projections and can collapse to
+    // zero at a corner; blending the responses keeps the corner bounded between the two edges. A
+    // rounded corner keeps its exact radial normal, so its dark region still grows with the radius.
+    // Refraction keeps the refraction-distance-amplified radius.
+    auto faceLight = EmitFaceLight(fragBuilder);
+    if (shapeType == GlassShapeType::RoundedRect) {
+      fragBuilder->codeAppend("  float lightCornerRadius = min(min(halfW, halfH), cornerRadius);");
+      fragBuilder->codeAppend("  float lightQx = abs(px) - (halfW - lightCornerRadius);");
+      fragBuilder->codeAppend("  float lightQy = abs(py) - (halfH - lightCornerRadius);");
+      // The corner transition spans one bevel width, i.e. a fraction of the edge band rather than a
+      // fixed layer-pixel count.
+      fragBuilder->codeAppend(
+          "  float faceMix = smoothstep(-0.5 * edgeBand, 0.5 * edgeBand, lightQx - lightQy);");
+      fragBuilder->codeAppendf(
+          "  float faceResponse = faceMix * %s(vec2(sign(px), 0.0), %s.xy)"
+          " + (1.0 - faceMix) * %s(vec2(0.0, sign(py)), %s.xy);",
+          faceLight.c_str(), lightDir.c_str(), faceLight.c_str(), lightDir.c_str());
+      fragBuilder->codeAppend("  vec2 arcVec = sign(vec2(px, py)) * vec2(lightQx, lightQy);");
+      fragBuilder->codeAppend("  float arcLen = length(arcVec);");
+      fragBuilder->codeAppendf(
+          "  float arcResponse = arcLen > 0.000001 ? %s(arcVec / arcLen, %s.xy) : 0.0;",
+          faceLight.c_str(), lightDir.c_str());
+      // The arc response applies only where both q are positive (the rounded corner). Its weight
+      // fades to zero as either q reaches 0, which is exactly where the arc normal meets the matching
+      // edge-face normal, so the arc and edge branches stay continuous; a hard branch would leave a
+      // sub-pixel seam along those tangent lines.
+      fragBuilder->codeAppend(
+          "  float arcWeight = smoothstep(0.0, 0.5 * edgeBand, lightQx) *"
+          " smoothstep(0.0, 0.5 * edgeBand, lightQy);");
+      fragBuilder->codeAppend(
+          "  float faceLightValue = mix(faceResponse, arcResponse, arcWeight);");
+    } else {
+      fragBuilder->codeAppend(
+          "  vec2 ellipseNormal = vec2(px / (halfW * halfW), py / (halfH * halfH));");
+      fragBuilder->codeAppend("  float ellipseLen = length(ellipseNormal);");
+      fragBuilder->codeAppendf(
+          "  float faceLightValue = ellipseLen > 0.000001"
+          " ? %s(ellipseNormal / ellipseLen, %s.xy) : 0.0;",
+          faceLight.c_str(), lightDir.c_str());
+    }
+    // At lightAngle 0 the top edge lights, at 90 the right edge. frameRotation compensation is
+    // deferred and intentionally not applied.
+    fragBuilder->codeAppend("  float edgeLight = edgeWeight * faceLightValue;");
+    fragBuilder->codeAppend("  float bandRamp = heightT * heightT;");
+    fragBuilder->codeAppendf("  float darkTerm = dot(refractDir, %s.xy) * bandRamp * 0.05;",
+                             lightDir.c_str());
+    fragBuilder->codeAppend("  lightResponse = edgeLight + darkTerm;");
+  }
+  fragBuilder->codeAppendf("  %s = vec4(refractDir, offsetDist, lightResponse);",
+                           args.outputColor.c_str());
   fragBuilder->codeAppend("}");
 }
 
@@ -149,6 +240,9 @@ void GLSLGlassSDFGeometryFragmentProcessor::onSetData(UniformData*,
   float effectData[4] = {params.refractionFactor, params.splay, params.depthRatio,
                          params.edgeBandLayerPixels};
   fragmentUniformData->setData("GlassShapeP1", effectData);
+  float angle = params.lightAngle * static_cast<float>(M_PI) / 180.0f;
+  float lightDirData[2] = {std::sin(angle), std::cos(angle)};
+  fragmentUniformData->setData("GlassLightDir", lightDirData);
 }
 
 PlacementPtr<GlassUDFGeometryFragmentProcessor> GlassUDFGeometryFragmentProcessor::Make(
@@ -184,6 +278,8 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
                                                   ShaderStage::Fragment);
   auto edgeMaskUV = args.uniformHandler->addUniform("GlassEdgeMaskUV", UniformFormat::Float4,
                                                     ShaderStage::Fragment);
+  auto lightDir = args.uniformHandler->addUniform("GlassLightDir", UniformFormat::Float2,
+                                                  ShaderStage::Fragment);
   auto& maskSampler = (*args.textureSamplers)[0];
 
   EmitGeometryCoordinates(fragBuilder, args.inputColor, shape);
@@ -250,8 +346,9 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
         "float edgeDistance = max((edgeHeight - 0.5) / edgeGradientLength, 0.0);");
     // The distance is in layer pixels, so the band is widened by the caller when the layer renders
     // at a reduced scale; without that the falloff collapses into a hard threshold.
-    fragBuilder->codeAppendf("float edgeBand = max(1.0, %s.w);", effect.c_str());
-    fragBuilder->codeAppend("edgeWeight = 1.0 - smoothstep(0.0, edgeBand, edgeDistance);");
+    fragBuilder->codeAppend("float edgeBand;");
+    auto edgeBandWeight = EmitEdgeBand(fragBuilder, effect);
+    fragBuilder->codeAppendf("edgeWeight = %s(edgeDistance, edgeBand);", edgeBandWeight.c_str());
   }
   fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
   fragBuilder->codeAppend("if (gradientLength > 0.000001 && gradientWeight > 0.000001) {");
@@ -270,7 +367,15 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
       effect.c_str(), effect.c_str());
   fragBuilder->codeAppend(
       "  float proximity = (1.0 - height * height) * (1.0 - height * height) * 1.2;");
-  fragBuilder->codeAppendf("  %s = vec4(refractDir, distance * proximity, edgeWeight);",
+  fragBuilder->codeAppend("  float edgeLight = 0.0;");
+  if (enableEdgeLighting) {
+    // Same angular response as the analytical path, evaluated on the post-splay normalized
+    // refractDir instead of an analytical face normal.
+    auto faceLight = EmitFaceLight(fragBuilder);
+    fragBuilder->codeAppendf("  edgeLight = edgeWeight * %s(-refractDir, %s.xy);",
+                             faceLight.c_str(), lightDir.c_str());
+  }
+  fragBuilder->codeAppendf("  %s = vec4(refractDir, distance * proximity, edgeLight);",
                            args.outputColor.c_str());
   fragBuilder->codeAppend("}");
 }
@@ -283,6 +388,9 @@ void GLSLGlassUDFGeometryFragmentProcessor::onSetData(UniformData*,
   float effectData[4] = {params.refractionFactor, params.splay, params.depthRatio,
                          params.edgeBandLayerPixels};
   fragmentUniformData->setData("GlassShapeP1", effectData);
+  float angle = params.lightAngle * static_cast<float>(M_PI) / 180.0f;
+  float lightDirData[2] = {std::sin(angle), std::cos(angle)};
+  fragmentUniformData->setData("GlassLightDir", lightDirData);
   float edgeSpanData[2] = {params.edgeSpanX, params.edgeSpanY};
   fragmentUniformData->setData("GlassEdgeSpan", edgeSpanData);
   float textureWidth = static_cast<float>(maskProxy->width());
