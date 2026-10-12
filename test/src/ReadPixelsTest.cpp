@@ -22,6 +22,7 @@
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/gpu/Surface.h"
 #include "tgfx/opengl/GLDevice.h"
+#include "tgfx/platform/HardwareBuffer.h"
 #include "tgfx/utils/Buffer.h"
 #include "utils/TestUtils.h"
 
@@ -257,6 +258,37 @@ TGFX_TEST(ReadPixelsTest, Surface) {
   gl->deleteTextures(1, &textureInfo.id);
   device->unlock();
   bitmap.unlockPixels();
+}
+
+TGFX_TEST(ReadPixelsTest, HardwareBufferSync) {
+  auto device = DevicePool::Make();
+  ASSERT_TRUE(device != nullptr);
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto hardwareBuffer = HardwareBufferAllocate(128, 128, false);
+  ASSERT_TRUE(hardwareBuffer != nullptr);
+  auto surface = Surface::MakeFrom(context, hardwareBuffer);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clearRect(Rect::MakeWH(128, 128), Color::Red());
+  surface->flush();
+  context->submit(true);
+  Bitmap bitmap(128, 128, false, false);
+  ASSERT_FALSE(bitmap.isEmpty());
+  auto pixels = bitmap.lockPixels();
+  auto result = surface->readPixels(bitmap.info(), pixels);
+  bitmap.unlockPixels();
+  ASSERT_TRUE(result);
+  // The rendered content must be visible to Surface::readPixels() after the GPU work is
+  // submitted. Reading back through the CPU mapping of the hardware buffer is not reliable on
+  // some GPU drivers, which return unrelated memory instead of the rendered content.
+  auto color = Pixmap(bitmap.info(), pixels).getColor(64, 64);
+  EXPECT_EQ(color.red, 1.0f);
+  EXPECT_EQ(color.green, 0.0f);
+  EXPECT_EQ(color.blue, 0.0f);
+  EXPECT_EQ(color.alpha, 1.0f);
+  HardwareBufferRelease(hardwareBuffer);
+  device->unlock();
 }
 
 TGFX_TEST(ReadPixelsTest, PngCodec) {
