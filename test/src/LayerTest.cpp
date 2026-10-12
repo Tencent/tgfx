@@ -3905,12 +3905,12 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(vectorLayer);
   }
 
-  // Case 18: ShapeLayer thin strip 160x4 fill with a large blur, spread=8. The strip's short side
+  // Case 18: ShapeLayer thin strip 130x4 fill with a large blur, spread=8. The strip's short side
   // is far smaller than the blur kernel and the aspect ratio is extreme.
   for (int i = 0; i < 2; ++i) {
     auto layer = ShapeLayer::Make();
     Path path = {};
-    path.addRect(Rect::MakeXYWH(0.0f, 28.0f, 160.0f, 4.0f));
+    path.addRect(Rect::MakeXYWH(0.0f, 28.0f, 130.0f, 4.0f));
     layer->setPath(path);
     layer->setFillStyle(ShapeStyle::Make(Color::Red()));
     layer->setMatrix(
@@ -3925,13 +3925,13 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
   for (int i = 0; i < 2; ++i) {
     auto layer = SolidLayer::Make();
     layer->setColor(Color::Red());
-    layer->setWidth(80);
+    layer->setWidth(60);
     layer->setHeight(40);
     layer->setRadiusX(8);
     layer->setRadiusY(8);
     layer->setAlpha(0.5f);
     auto matrix = Matrix::MakeTrans(i == 0 ? lItemXOffset : rItemXOffset, cellH * 6 + gap);
-    matrix.postScale(2.0f, 1.5f);
+    matrix.preScale(2.0f, 1.5f);
     layer->setMatrix(matrix);
     layer->setLayerStyles({MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f)});
     displayList.root()->addChild(layer);
