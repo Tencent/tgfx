@@ -151,7 +151,7 @@ PlacementPtr<PerlinNoiseFragmentProcessor> PerlinNoiseFragmentProcessor::Make(
 
   return allocator->make<GLSLPerlinNoiseFragmentProcessor>(
       noiseType, numOctaves, stitchTiles, std::move(paintingData), std::move(permutationsView),
-      std::move(noiseView), uvMatrix, std::vector<AOTPointwiseSlot>{});
+      std::move(noiseView), uvMatrix, std::vector<AOTPointwiseSlot>{}, true);
 }
 
 PlacementPtr<PerlinNoiseFragmentProcessor> PerlinNoiseFragmentProcessor::MakeFromViews(
@@ -179,10 +179,10 @@ GLSLPerlinNoiseFragmentProcessor::GLSLPerlinNoiseFragmentProcessor(
     PerlinNoiseType noiseType, int numOctaves, bool stitchTiles,
     std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,
     std::shared_ptr<TextureView> permutationsView, std::shared_ptr<TextureView> noiseView,
-    const Matrix* uvMatrix, const std::vector<AOTPointwiseSlot>& slots)
+    const Matrix* uvMatrix, const std::vector<AOTPointwiseSlot>& slots, bool hasOriginalLookupData)
     : PerlinNoiseFragmentProcessor(noiseType, numOctaves, stitchTiles, std::move(paintingData),
                                    std::move(permutationsView), std::move(noiseView), uvMatrix,
-                                   slots) {
+                                   slots, hasOriginalLookupData) {
 }
 
 void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {

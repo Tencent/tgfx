@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <array>
+#include <limits>
+#include <set>
 #include "base/TGFXTest.h"
 #include "core/utils/BlockAllocator.h"
 #include "gpu/AOTChainBuilder.h"
@@ -38,7 +40,11 @@
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
+#include "gpu/resources/TextureView.h"
+#include "gpu/shaders/PermutationRules.h"
+#include "gpu/shaders/level1/PointwiseChainShader.h"
 #include "gtest/gtest.h"
+#include "layers/NoiseDensityUtils.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/core/ColorSpace.h"
@@ -1194,6 +1200,320 @@ TGFX_TEST(AOTEffectTest, PerlinNoiseLowersToPerlinNoiseSourceNode) {
   EXPECT_NE(parameters->permutationsView, nullptr);
   EXPECT_NE(parameters->noiseView, nullptr);
   EXPECT_EQ(parameters->numOctaves, 3);
+}
+
+TGFX_TEST(AOTEffectTest, PerlinNoiseLookupIdentityAndComputationAreSeparate) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto first = MakePerlinProcessor(context);
+  auto second = MakePerlinProcessor(context);
+  ASSERT_NE(first, nullptr);
+  ASSERT_NE(second, nullptr);
+  AOTEffectGraph firstGraph;
+  AOTEffectGraph secondGraph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({first.get()}, &firstGraph));
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({second.get()}, &secondGraph));
+  const auto* firstParameters =
+      std::get_if<AOTPerlinNoiseParameters>(&firstGraph.nodeAt(AOTNodeID(1))->parameters);
+  const auto* secondParameters =
+      std::get_if<AOTPerlinNoiseParameters>(&secondGraph.nodeAt(AOTNodeID(1))->parameters);
+  ASSERT_NE(firstParameters, nullptr);
+  ASSERT_NE(secondParameters, nullptr);
+  ASSERT_NE(firstParameters->lookupData, nullptr);
+  ASSERT_NE(secondParameters->lookupData, nullptr);
+  EXPECT_NE(firstParameters->permutationsView, secondParameters->permutationsView);
+  EXPECT_NE(firstParameters->noiseView, secondParameters->noiseView);
+  EXPECT_TRUE(AOTPerlinNoiseLookupsEquivalent(*firstParameters, *secondParameters));
+  EXPECT_TRUE(AOTPerlinNoiseComputationsEquivalent(*firstParameters, *secondParameters));
+
+  auto changed = *secondParameters;
+  changed.baseFrequencyX *= 2.0f;
+  EXPECT_TRUE(AOTPerlinNoiseLookupsEquivalent(*firstParameters, changed));
+  EXPECT_FALSE(AOTPerlinNoiseComputationsEquivalent(*firstParameters, changed));
+  changed = *secondParameters;
+  changed.uvMatrix = Matrix::MakeTrans(1.0f, 0.0f);
+  EXPECT_TRUE(AOTPerlinNoiseLookupsEquivalent(*firstParameters, changed));
+  EXPECT_FALSE(AOTPerlinNoiseComputationsEquivalent(*firstParameters, changed));
+  changed = *secondParameters;
+  changed.numOctaves++;
+  EXPECT_FALSE(AOTPerlinNoiseComputationsEquivalent(*firstParameters, changed));
+  changed = *secondParameters;
+  changed.noiseType = 1 - changed.noiseType;
+  EXPECT_FALSE(AOTPerlinNoiseComputationsEquivalent(*firstParameters, changed));
+  changed = *secondParameters;
+  changed.stitchTiles = !changed.stitchTiles;
+  EXPECT_FALSE(AOTPerlinNoiseComputationsEquivalent(*firstParameters, changed));
+  changed = *secondParameters;
+  changed.stitchWidth++;
+  EXPECT_FALSE(AOTPerlinNoiseComputationsEquivalent(*firstParameters, changed));
+  changed = *secondParameters;
+  changed.stitchHeight++;
+  EXPECT_FALSE(AOTPerlinNoiseComputationsEquivalent(*firstParameters, changed));
+  changed = *secondParameters;
+  changed.baseFrequencyY = std::numeric_limits<float>::quiet_NaN();
+  EXPECT_FALSE(AOTPerlinNoiseComputationsEquivalent(changed, changed));
+
+  changed = *secondParameters;
+  auto differentTable = std::make_shared<AOTPerlinNoiseLookupData>(*changed.lookupData);
+  differentTable->noise[0] ^= 1;
+  changed.lookupData = differentTable;
+  EXPECT_FALSE(AOTPerlinNoiseLookupsEquivalent(*firstParameters, changed));
+  differentTable = std::make_shared<AOTPerlinNoiseLookupData>(*secondParameters->lookupData);
+  differentTable->permutations[0] ^= 1;
+  changed.lookupData = differentTable;
+  EXPECT_FALSE(AOTPerlinNoiseLookupsEquivalent(*firstParameters, changed));
+  changed = *secondParameters;
+  changed.lookupData.reset();
+  EXPECT_FALSE(AOTPerlinNoiseLookupsEquivalent(*firstParameters, changed));
+  changed = *firstParameters;
+  changed.lookupData.reset();
+  EXPECT_TRUE(AOTPerlinNoiseLookupsEquivalent(*firstParameters, changed));
+
+  AOTNodeBuilder builder;
+  AOTNodeID geometry;
+  AOTNodeID firstNoise;
+  AOTNodeID secondNoise;
+  ASSERT_TRUE(builder.addGeometryColor(&geometry));
+  ASSERT_TRUE(builder.addPerlinNoiseSource(geometry, *firstParameters, &firstNoise));
+  ASSERT_TRUE(builder.addPerlinNoiseSource(geometry, *secondParameters, &secondNoise));
+  EXPECT_EQ(firstNoise, secondNoise);
+  AOTEffectGraph canonical;
+  ASSERT_TRUE(builder.finish(secondNoise, &canonical));
+  const auto& canonicalFirst =
+      std::get<AOTPerlinNoiseParameters>(canonical.nodeAt(firstNoise)->parameters);
+  const auto& canonicalSecond =
+      std::get<AOTPerlinNoiseParameters>(canonical.nodeAt(secondNoise)->parameters);
+  EXPECT_EQ(canonicalFirst.permutationsView, canonicalSecond.permutationsView);
+  EXPECT_EQ(canonicalFirst.noiseView, canonicalSecond.noiseView);
+  EXPECT_EQ(canonicalFirst.lookupData, canonicalSecond.lookupData);
+  EXPECT_EQ(first->textureAt(0), firstParameters->permutationsView->getTexture());
+  EXPECT_EQ(second->textureAt(0), secondParameters->permutationsView->getTexture());
+  EXPECT_EQ(second->textureAt(1), secondParameters->noiseView->getTexture());
+}
+
+TGFX_TEST(AOTEffectTest, PerlinNoiseReconstructionPreservesLookupEvidence) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto original = MakePerlinProcessor(context);
+  ASSERT_NE(original, nullptr);
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({original.get()}, &graph));
+  const auto* parameters =
+      std::get_if<AOTPerlinNoiseParameters>(&graph.nodeAt(AOTNodeID(1))->parameters);
+  ASSERT_NE(parameters, nullptr);
+  ASSERT_NE(parameters->lookupData, nullptr);
+  auto rebuilt = PerlinNoiseFragmentProcessor::MakeFromAOTParameters(&allocator, *parameters, {});
+  ASSERT_NE(rebuilt, nullptr);
+  AOTEffectGraph rebuiltGraph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({rebuilt.get()}, &rebuiltGraph));
+  const auto& rebuiltParameters =
+      std::get<AOTPerlinNoiseParameters>(rebuiltGraph.nodeAt(AOTNodeID(1))->parameters);
+  EXPECT_EQ(rebuiltParameters.lookupData, parameters->lookupData);
+  EXPECT_TRUE(AOTPerlinNoiseComputationsEquivalent(*parameters, rebuiltParameters));
+
+  auto paintingData = std::make_unique<PerlinNoiseShader::PaintingData>(
+      parameters->baseFrequencyX, parameters->baseFrequencyY, parameters->stitchWidth,
+      parameters->stitchHeight);
+  auto rawRebuild = PerlinNoiseFragmentProcessor::MakeFromViews(
+      &allocator, static_cast<PerlinNoiseType>(parameters->noiseType), parameters->numOctaves,
+      parameters->stitchTiles, std::move(paintingData), parameters->permutationsView,
+      parameters->noiseView, &parameters->uvMatrix, {});
+  ASSERT_NE(rawRebuild, nullptr);
+  AOTEffectGraph rawGraph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({rawRebuild.get()}, &rawGraph));
+  const auto& rawParameters =
+      std::get<AOTPerlinNoiseParameters>(rawGraph.nodeAt(AOTNodeID(1))->parameters);
+  EXPECT_EQ(rawParameters.lookupData, nullptr);
+  EXPECT_TRUE(AOTPerlinNoiseLookupsEquivalent(*parameters, rawParameters));
+}
+
+TGFX_TEST(AOTEffectTest, PerlinDensityBranchesShareLookupResources) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  constexpr std::array<float, 20> contrastMatrix = {
+      2.0f, 0.0f, 0.0f, 0.0f, -0.5f, 0.0f, 2.0f, 0.0f, 0.0f, -0.5f,
+      0.0f, 0.0f, 2.0f, 0.0f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+  };
+  for (float seed : {0.0f, 6903.0f}) {
+    for (float density : {0.25f, 1.0f}) {
+      for (float shift : {0.0f, 13.5f}) {
+        auto noise = Shader::MakeFractalNoise(0.25f, 0.25f, 3, seed);
+        ASSERT_NE(noise, nullptr);
+        auto mono = MakeDarkDensityFilter(noise, density);
+        auto bright = MakeBrightDensityFilter(noise, density);
+        ASSERT_NE(mono, nullptr);
+        ASSERT_NE(bright, nullptr);
+        auto duo = Shader::MakeBlend(
+            BlendMode::SrcOver,
+            mono->makeWithColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::SrcIn)),
+            bright->makeWithColorFilter(ColorFilter::Blend(Color::Blue(), BlendMode::SrcIn)));
+        auto multi = Shader::MakeBlend(
+            BlendMode::DstIn, noise->makeWithColorFilter(ColorFilter::Matrix(contrastMatrix)),
+            mono);
+        ASSERT_NE(duo, nullptr);
+        ASSERT_NE(multi, nullptr);
+        const std::array<std::shared_ptr<Shader>, 3> shaders = {mono, duo, multi};
+        for (size_t family = 0; family < shaders.size(); ++family) {
+          SCOPED_TRACE(::testing::Message() << "family=" << family << " density=" << density
+                                            << " seed=" << seed << " shift=" << shift);
+          auto shader = shaders[family]->makeWithMatrix(Matrix::MakeTrans(shift, -shift));
+          FPArgs args(context, 0, Rect::MakeWH(64.0f, 64.0f));
+          auto processor = FragmentProcessor::Make(shader, args);
+          ASSERT_NE(processor, nullptr);
+          AOTEffectGraph graph;
+          ASSERT_TRUE(AOTEffectDecomposer::Lower({processor.get()}, &graph));
+          const AOTPerlinNoiseParameters* firstNoise = nullptr;
+          size_t noiseNodes = 0;
+          for (size_t index = 0; index < graph.nodeCount(); ++index) {
+            const auto* node = graph.nodeAt(AOTNodeID(static_cast<uint32_t>(index)));
+            if (node->kind != AOTEffectKind::PerlinNoiseSource) {
+              continue;
+            }
+            const auto& parameters = std::get<AOTPerlinNoiseParameters>(node->parameters);
+            ASSERT_NE(parameters.lookupData, nullptr);
+            noiseNodes++;
+            if (firstNoise == nullptr) {
+              firstNoise = &parameters;
+            }
+            EXPECT_EQ(firstNoise->permutationsView, parameters.permutationsView);
+            EXPECT_EQ(firstNoise->noiseView, parameters.noiseView);
+            EXPECT_TRUE(AOTPerlinNoiseComputationsEquivalent(*firstNoise, parameters));
+          }
+          EXPECT_EQ(noiseNodes, 1u);
+          AOTEffectPlan plan;
+          ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+          ASSERT_EQ(plan.passes.size(), 1u);
+          EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
+          EXPECT_FALSE(plan.passes[0].materializesOutput);
+          ASSERT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+          auto rebuilt = AOTChainBuilder::BuildChainProcessor(context->drawingAllocator(), graph,
+                                                              plan.passes[0]);
+          ASSERT_NE(rebuilt, nullptr);
+          const auto* chain = static_cast<const AOTPointwiseChainProcessor*>(rebuilt.get());
+          EXPECT_TRUE(chain->hasNoise());
+          EXPECT_EQ(chain->leafCount(), 4u);
+        }
+      }
+    }
+  }
+}
+
+TGFX_TEST(AOTEffectTest, NoiseChainPermutationsRemainBounded) {
+  PointwiseChainInputs inputs;
+  inputs.gpKind = 1;
+  inputs.hasCoverage = true;
+  inputs.textureCount = 1;
+  inputs.hasNoise = true;
+  std::set<std::pair<uint32_t, uint32_t>> noisePairs;
+  for (int xp = 0; xp < 3; ++xp) {
+    inputs.xpType = xp;
+    auto composed = ComposePointwiseChain(inputs);
+    ASSERT_TRUE(composed.has_value());
+    EXPECT_EQ(composed->fragValues[PointwiseChainShader::FD::HAS_NOISE], 1);
+    noisePairs.insert({PointwiseChainShader::VD::domain().encode(composed->vertValues),
+                       PointwiseChainShader::FD::domain().encode(composed->fragValues)});
+    inputs.hasNoise = false;
+    auto plain = ComposePointwiseChain(inputs);
+    ASSERT_TRUE(plain.has_value());
+    EXPECT_EQ(plain->vertValues, composed->vertValues);
+    EXPECT_EQ(plain->fragValues[PointwiseChainShader::FD::HAS_NOISE], 0);
+    inputs.hasNoise = true;
+  }
+  EXPECT_EQ(noisePairs.size(), 3u);
+  const auto reachable = EnumeratePointwiseChainReachable();
+  EXPECT_EQ(reachable.size(), 57u);
+  size_t noiseCount = 0;
+  for (const auto& pair : reachable) {
+    if (PointwiseChainShader::FD::domain().valueOf(pair.second, "HAS_NOISE") == 1) {
+      ++noiseCount;
+      EXPECT_NE(noisePairs.find(pair), noisePairs.end());
+    }
+  }
+  EXPECT_EQ(noiseCount, 3u);
+  auto unsupported = inputs;
+  unsupported.gpKind = 0;
+  EXPECT_FALSE(ComposePointwiseChain(unsupported).has_value());
+  unsupported = inputs;
+  unsupported.hasUVCoord = true;
+  EXPECT_FALSE(ComposePointwiseChain(unsupported).has_value());
+  unsupported = inputs;
+  unsupported.hasColor = true;
+  EXPECT_FALSE(ComposePointwiseChain(unsupported).has_value());
+  unsupported = inputs;
+  unsupported.textureCount = 0;
+  EXPECT_FALSE(ComposePointwiseChain(unsupported).has_value());
+}
+
+TGFX_TEST(AOTEffectTest, PerlinDAGRejectsDistinctNoiseAndPrunesUnusedInputs) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto original = MakePerlinProcessor(context);
+  ASSERT_NE(original, nullptr);
+  AOTEffectGraph originalGraph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({original.get()}, &originalGraph));
+  auto noise = std::get<AOTPerlinNoiseParameters>(originalGraph.nodeAt(AOTNodeID(1))->parameters);
+  ASSERT_TRUE(AOTPerlinNoiseParametersSupported(noise));
+  for (int changedField = 0; changedField < 4; ++changedField) {
+    AOTNodeBuilder builder;
+    AOTNodeID geometry;
+    AOTNodeID first;
+    AOTNodeID second;
+    AOTNodeID root;
+    ASSERT_TRUE(builder.addGeometryColor(&geometry));
+    ASSERT_TRUE(builder.addPerlinNoiseSource(geometry, noise, &first));
+    auto changed = noise;
+    if (changedField == 0) {
+      changed.baseFrequencyX *= 2;
+    } else if (changedField == 1) {
+      changed.uvMatrix = Matrix::MakeTrans(1, 0);
+    } else if (changedField == 2) {
+      changed.numOctaves++;
+    } else {
+      changed.noiseType = 1 - changed.noiseType;
+    }
+    ASSERT_TRUE(builder.addPerlinNoiseSource(geometry, changed, &second));
+    EXPECT_NE(first, second);
+    AOTBlendParameters blend;
+    blend.blendMode = static_cast<int>(BlendMode::SrcOver);
+    blend.childType = 2;
+    ASSERT_TRUE(builder.addBlend(first, second, blend, &root));
+    AOTEffectGraph graph;
+    ASSERT_TRUE(builder.finish(root, &graph));
+    AOTEffectPlan plan;
+    EXPECT_FALSE(AOTEffectDecomposer::Decompose(graph, &plan));
+  }
+  AOTNodeBuilder builder;
+  AOTNodeID geometry;
+  AOTNodeID first;
+  ASSERT_TRUE(builder.addGeometryColor(&geometry));
+  ASSERT_TRUE(builder.addPerlinNoiseSource(geometry, noise, &first));
+  AOTNodeID current = first;
+  AOTColorMatrixParameters matrix;
+  matrix.matrix = IdentityColorMatrix;
+  for (int index = 0; index < 33; ++index) {
+    AOTNodeID next;
+    ASSERT_TRUE(builder.addColorMatrix(current, matrix, &next));
+    current = next;
+  }
+  AOTNodeID reused;
+  ASSERT_TRUE(builder.addPerlinNoiseSource(current, noise, &reused));
+  EXPECT_EQ(first, reused);
+  AOTEffectGraph graph;
+  ASSERT_TRUE(builder.finish(reused, &graph));
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+  ASSERT_EQ(plan.passes.size(), 1u);
+  EXPECT_EQ(plan.passes[0].nodes.size(), 1u);
+  EXPECT_EQ(plan.passes[0].output, first);
+  EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+  auto rebuilt =
+      AOTChainBuilder::BuildChainProcessor(context->drawingAllocator(), graph, plan.passes[0]);
+  ASSERT_NE(rebuilt, nullptr);
 }
 
 TGFX_TEST(AOTEffectTest, BarePerlinNoiseUsesPerlinNoiseFillPlanner) {

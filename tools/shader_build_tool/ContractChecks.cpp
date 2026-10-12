@@ -173,7 +173,8 @@ size_t ValidateChainOpCodes(const std::string& shaderDir) {
                             {"OP_RRECT_COVERAGE", ChainOp::RRectCoverage},
                             {"OP_TEX_MODULATE", ChainOp::TexModulate},
                             {"OP_INPUT_OPAQUE", ChainOp::InputOpaque},
-                            {"OP_MUL_ALPHA", ChainOp::MulAlpha}});
+                            {"OP_MUL_ALPHA", ChainOp::MulAlpha},
+                            {"OP_PERLIN_NOISE", ChainOp::PerlinNoise}});
 }
 
 // The plain pointwise slot selects its operator the same way, so pointwise_op.inc must agree

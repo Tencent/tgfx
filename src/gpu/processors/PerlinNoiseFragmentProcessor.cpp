@@ -18,6 +18,7 @@
 
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
 #include <algorithm>
+#include <cstring>
 #include "gpu/AOTEffect.h"
 #include "gpu/resources/TextureView.h"
 
@@ -27,11 +28,11 @@ PerlinNoiseFragmentProcessor::PerlinNoiseFragmentProcessor(
     PerlinNoiseType noiseType, int numOctaves, bool stitchTiles,
     std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,
     std::shared_ptr<TextureView> permutationsView, std::shared_ptr<TextureView> noiseView,
-    const Matrix* uvMatrix, const std::vector<AOTPointwiseSlot>& slots)
-    : FragmentProcessor(ClassID()), noiseType(noiseType), numOctaves(numOctaves),
-      stitchTiles(stitchTiles), paintingData(std::move(paintingData)),
-      permutationsView(std::move(permutationsView)), noiseView(std::move(noiseView)),
-      slotCount(std::min(slots.size(), MaxPointwiseSlots)) {
+    const Matrix* uvMatrix, const std::vector<AOTPointwiseSlot>& slots, bool hasOriginalLookupData)
+    : FragmentProcessor(ClassID()), hasOriginalLookupData(hasOriginalLookupData),
+      noiseType(noiseType), numOctaves(numOctaves), stitchTiles(stitchTiles),
+      paintingData(std::move(paintingData)), permutationsView(std::move(permutationsView)),
+      noiseView(std::move(noiseView)), slotCount(std::min(slots.size(), MaxPointwiseSlots)) {
   for (size_t index = 0; index < slotCount; ++index) {
     pointwiseSlots[index] = slots[index];
   }
@@ -76,6 +77,22 @@ SamplerState PerlinNoiseFragmentProcessor::onSamplerStateAt(size_t) const {
   return SamplerState(SamplingOptions(FilterMode::Nearest));
 }
 
+PlacementPtr<PerlinNoiseFragmentProcessor> PerlinNoiseFragmentProcessor::MakeFromAOTParameters(
+    BlockAllocator* allocator, const AOTPerlinNoiseParameters& parameters,
+    const std::vector<AOTPointwiseSlot>& slots) {
+  auto paintingData = std::make_unique<PerlinNoiseShader::PaintingData>(
+      parameters.baseFrequencyX, parameters.baseFrequencyY, parameters.stitchWidth,
+      parameters.stitchHeight);
+  auto processor =
+      MakeFromViews(allocator, static_cast<PerlinNoiseType>(parameters.noiseType),
+                    parameters.numOctaves, parameters.stitchTiles, std::move(paintingData),
+                    parameters.permutationsView, parameters.noiseView, &parameters.uvMatrix, slots);
+  if (processor != nullptr) {
+    processor->lookupData = parameters.lookupData;
+  }
+  return processor;
+}
+
 bool PerlinNoiseFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
                                               AOTNodeID* output) const {
   if (builder == nullptr || output == nullptr) {
@@ -92,6 +109,16 @@ bool PerlinNoiseFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID
   parameters.stitchWidth = paintingData->stitchWidth;
   parameters.stitchHeight = paintingData->stitchHeight;
   parameters.uvMatrix = coordTransform.matrix;
+  if (lookupData == nullptr && hasOriginalLookupData) {
+    auto data = std::make_shared<AOTPerlinNoiseLookupData>();
+    static_assert(sizeof(paintingData->latticeSelector) == sizeof(data->permutations));
+    static_assert(sizeof(paintingData->noise) == sizeof(data->noise));
+    std::memcpy(data->permutations.data(), paintingData->latticeSelector,
+                data->permutations.size());
+    std::memcpy(data->noise.data(), paintingData->noise, data->noise.size());
+    lookupData = std::move(data);
+  }
+  parameters.lookupData = lookupData;
   return builder->addPerlinNoiseSource(input, parameters, output);
 }
 }  // namespace tgfx

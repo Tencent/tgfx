@@ -45,6 +45,7 @@ enum class AOTChainOp : int {
   TexModulate = ChainOp::TexModulate,
   InputOpaque = ChainOp::InputOpaque,
   MulAlpha = ChainOp::MulAlpha,
+  PerlinNoise = ChainOp::PerlinNoise,
 };
 
 /// One node of a pointwise DAG after flattening into the fused kernel's instruction array.
@@ -111,6 +112,7 @@ struct AOTChainSlot {
   // OP_GRADIENT only: layout/colorizer parameters. The kernel reads chain-wide Gradient*
   // uniforms, so at most one slot per chain may carry this op (enforced by the builder).
   AOTGradientParameters gradient = {};
+  AOTPerlinNoiseParameters noise = {};
 };
 
 /**
@@ -196,6 +198,10 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   // the runtime application, not the binding layout.
   bool hasMask() const {
     return hasMaskChild;
+  }
+
+  bool hasNoise() const {
+    return noiseSamplerBase >= 0;
   }
 
   size_t slotCount() const {
@@ -288,6 +294,7 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   // counted by leafCount() so the matcher sizes TEXTURE_COUNT for it) but holding no chain slot;
   // lutLeafIndex is its sampler index, read by the kernel's OP_GRADIENT LUT branch.
   int lutLeafIndex = -1;
+  int noiseSamplerBase = -1;
 };
 
 }  // namespace tgfx

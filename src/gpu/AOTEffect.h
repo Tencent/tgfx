@@ -196,6 +196,12 @@ struct AOTBlendParameters {
   bool multiplyInputAlpha = false;
 };
 
+// Immutable upload bytes for graph-local lookup sharing, not a program-cache key.
+struct AOTPerlinNoiseLookupData {
+  std::array<uint8_t, 256> permutations = {};
+  std::array<uint8_t, 4096> noise = {};
+};
+
 // Procedural-noise source (PerlinNoiseFragmentProcessor). Unlike AOTTextureParameters, the two
 // texture views are internal lookup tables (a 256x1 permutation table and a 256x4 gradient table),
 // not a user-sampled image, so this carries the noise math parameters directly instead of texture
@@ -213,7 +219,17 @@ struct AOTPerlinNoiseParameters {
   int stitchWidth = 0;
   int stitchHeight = 0;
   Matrix uvMatrix = {};
+  std::shared_ptr<const AOTPerlinNoiseLookupData> lookupData = nullptr;
 };
+
+bool AOTPerlinNoiseParametersSupported(const AOTPerlinNoiseParameters& parameters);
+
+bool AOTPerlinNoiseLookupsEquivalent(const AOTPerlinNoiseParameters& first,
+                                     const AOTPerlinNoiseParameters& second);
+
+// Only compares noise sources within the same draw and coordinate-input environment.
+bool AOTPerlinNoiseComputationsEquivalent(const AOTPerlinNoiseParameters& first,
+                                          const AOTPerlinNoiseParameters& second);
 
 // Analytic gradient source (ClampedGradientEffect): color computed from the fragment's
 // transformed coordinate instead of a texture sample. The layout (linear/radial/conic/diamond)

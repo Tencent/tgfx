@@ -22,6 +22,7 @@
 #define OP_TEX_MODULATE 12
 #define OP_INPUT_OPAQUE 13
 #define OP_MUL_ALPHA 14
+#define OP_PERLIN_NOISE 15
 #define OP_AARECT_COVERAGE 8
 #define OP_GRADIENT 9
 #define OP_LOCAL_RECT_COVERAGE 10
@@ -62,6 +63,13 @@ vec4 evalChainSlot(int slot) {
   if (Packed.x == OP_NONE) {
     return vec4(0.0);
   }
+#if HAS_NOISE
+  if (Packed.x == OP_PERLIN_NOISE) {
+    highp vec2 coord = GradientCoords.xy / GradientCoords.z;
+    return aotPerlinNoise(coord, NoiseFrequencyStitch.xy, NoiseFrequencyStitch.zw,
+                          NoiseModeOctaves.x, NoiseModeOctaves.y, NoiseModeOctaves.z);
+  }
+#endif
   if (Packed.x == OP_TEXTURE) {
     vec4 texColor = chainLeafTex[slot];
     if ((Packed.w & 2) != 0) {

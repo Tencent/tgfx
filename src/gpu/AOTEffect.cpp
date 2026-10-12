@@ -17,7 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/AOTEffect.h"
+#include <cmath>
+#include <cstring>
 #include "gpu/ColorSpaceXformHelper.h"
+#include "gpu/resources/TextureView.h"
 
 namespace tgfx {
 
@@ -140,16 +143,115 @@ bool AOTNodeBuilder::addBlend(AOTNodeID src, AOTNodeID dst, const AOTBlendParame
   return addBinaryNode(AOTEffectKind::Blend, src, dst, traits, parameters, output);
 }
 
+static bool PerlinLookupViewsCompatible(const std::shared_ptr<TextureView>& first,
+                                        const std::shared_ptr<TextureView>& second) {
+  if (first == nullptr || second == nullptr || first->getContext() == nullptr ||
+      first->getContext() != second->getContext() || first->isYUV() || second->isYUV()) {
+    return false;
+  }
+  const auto firstTexture = first->getTexture();
+  const auto secondTexture = second->getTexture();
+  return firstTexture != nullptr && secondTexture != nullptr &&
+         firstTexture->type() == TextureType::TwoD && secondTexture->type() == TextureType::TwoD &&
+         firstTexture->format() == secondTexture->format() && firstTexture->sampleCount() == 1 &&
+         secondTexture->sampleCount() == 1 && first->width() == second->width() &&
+         first->height() == second->height() && first->origin() == second->origin() &&
+         !first->hasMipmaps() && !second->hasMipmaps();
+}
+
+bool AOTPerlinNoiseParametersSupported(const AOTPerlinNoiseParameters& parameters) {
+  const auto& permutation = parameters.permutationsView;
+  const auto& noise = parameters.noiseView;
+  if (!PerlinLookupViewsCompatible(permutation, permutation) ||
+      !PerlinLookupViewsCompatible(noise, noise) ||
+      permutation->getContext() != noise->getContext() || permutation->width() != 256 ||
+      permutation->height() != 1 || !permutation->isAlphaOnly() || noise->width() != 256 ||
+      noise->height() != 4 || noise->getTexture()->format() != PixelFormat::RGBA_8888 ||
+      permutation->origin() != ImageOrigin::TopLeft || noise->origin() != ImageOrigin::TopLeft ||
+      parameters.noiseType < 0 || parameters.noiseType > 1 || parameters.numOctaves < 1 ||
+      parameters.numOctaves > 255 || !std::isfinite(parameters.baseFrequencyX) ||
+      !std::isfinite(parameters.baseFrequencyY) ||
+      (parameters.stitchTiles && (parameters.stitchWidth <= 0 || parameters.stitchHeight <= 0))) {
+    return false;
+  }
+  for (int index = 0; index < 9; ++index) {
+    if (!std::isfinite(parameters.uvMatrix[index])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool AOTPerlinNoiseLookupsEquivalent(const AOTPerlinNoiseParameters& first,
+                                     const AOTPerlinNoiseParameters& second) {
+  if (!PerlinLookupViewsCompatible(first.permutationsView, second.permutationsView) ||
+      !PerlinLookupViewsCompatible(first.noiseView, second.noiseView) ||
+      first.permutationsView->getContext() != first.noiseView->getContext()) {
+    return false;
+  }
+  if (first.permutationsView == second.permutationsView && first.noiseView == second.noiseView) {
+    return true;
+  }
+  return first.lookupData != nullptr && second.lookupData != nullptr &&
+         first.permutationsView->width() == 256 && first.permutationsView->height() == 1 &&
+         first.permutationsView->isAlphaOnly() && first.noiseView->width() == 256 &&
+         first.noiseView->height() == 4 &&
+         first.noiseView->getTexture()->format() == PixelFormat::RGBA_8888 &&
+         first.lookupData->permutations == second.lookupData->permutations &&
+         first.lookupData->noise == second.lookupData->noise;
+}
+
+static bool PerlinFloatBitsEqual(float first, float second) {
+  return std::isfinite(first) && std::isfinite(second) &&
+         std::memcmp(&first, &second, sizeof(float)) == 0;
+}
+
+bool AOTPerlinNoiseComputationsEquivalent(const AOTPerlinNoiseParameters& first,
+                                          const AOTPerlinNoiseParameters& second) {
+  if (!AOTPerlinNoiseLookupsEquivalent(first, second) || first.noiseType != second.noiseType ||
+      first.numOctaves != second.numOctaves || first.stitchTiles != second.stitchTiles ||
+      first.stitchWidth != second.stitchWidth || first.stitchHeight != second.stitchHeight ||
+      !PerlinFloatBitsEqual(first.baseFrequencyX, second.baseFrequencyX) ||
+      !PerlinFloatBitsEqual(first.baseFrequencyY, second.baseFrequencyY)) {
+    return false;
+  }
+  for (int index = 0; index < 9; ++index) {
+    if (!PerlinFloatBitsEqual(first.uvMatrix[index], second.uvMatrix[index])) {
+      return false;
+    }
+  }
+  return true;
+}
+
 bool AOTNodeBuilder::addPerlinNoiseSource(AOTNodeID input,
                                           const AOTPerlinNoiseParameters& parameters,
                                           AOTNodeID* output) {
-  if (parameters.permutationsView == nullptr || parameters.noiseView == nullptr) {
+  if (output == nullptr || !contains(input) || parameters.permutationsView == nullptr ||
+      parameters.noiseView == nullptr) {
     return false;
+  }
+  auto canonical = parameters;
+  for (size_t index = 0; index < nodes.size(); ++index) {
+    const auto& node = nodes[index];
+    const auto* existing = std::get_if<AOTPerlinNoiseParameters>(&node.parameters);
+    if (node.kind != AOTEffectKind::PerlinNoiseSource || existing == nullptr) {
+      continue;
+    }
+    if (AOTPerlinNoiseComputationsEquivalent(*existing, canonical)) {
+      *output = AOTNodeID(static_cast<uint32_t>(index));
+      return true;
+    }
+    if (AOTPerlinNoiseLookupsEquivalent(*existing, canonical)) {
+      canonical.permutationsView = existing->permutationsView;
+      canonical.noiseView = existing->noiseView;
+      canonical.lookupData = existing->lookupData;
+    }
   }
   // The kernel ignores its input color entirely (perlin_noise.frag has no Color uniform), so this
   // is a self-contained source, matching ConstColor's Ignore-mode traits.
   EffectTraits traits = {EffectDomain::Pointwise, EffectInputUsage::Ignore, true, false, false};
-  return addUnaryNode(AOTEffectKind::PerlinNoiseSource, input, traits, parameters, output);
+  return addUnaryNode(AOTEffectKind::PerlinNoiseSource, input, traits, std::move(canonical),
+                      output);
 }
 
 bool AOTNodeBuilder::addRectCoverage(AOTNodeID input, const AOTRectCoverageParameters& parameters,

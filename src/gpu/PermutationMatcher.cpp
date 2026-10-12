@@ -782,6 +782,7 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
   inputs.textureCount = leafCount == 0 ? 0 : 1;
   inputs.hasMask = chain->hasMask();
   inputs.hasCoverageSubtree = chain->coverageRoot() >= 0;
+  inputs.hasNoise = chain->hasNoise();
   inputs.xpType = GetXPType(programInfo);
   if (gpKind == 1) {
     auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);

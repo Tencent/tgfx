@@ -27,7 +27,8 @@ class GLSLPerlinNoiseFragmentProcessor : public PerlinNoiseFragmentProcessor {
                                    std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,
                                    std::shared_ptr<TextureView> permutationsView,
                                    std::shared_ptr<TextureView> noiseView, const Matrix* uvMatrix,
-                                   const std::vector<AOTPointwiseSlot>& slots);
+                                   const std::vector<AOTPointwiseSlot>& slots,
+                                   bool hasOriginalLookupData = false);
 
   void emitCode(EmitArgs& args) const override;
 

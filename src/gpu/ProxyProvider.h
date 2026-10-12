@@ -150,6 +150,9 @@ class ProxyProvider {
    */
   std::shared_ptr<TextureProxy> createTextureProxy(HardwareBufferRef hardwareBuffer);
 
+  /** Wraps an existing view while retaining its resource and requiring the same context. */
+  std::shared_ptr<TextureProxy> wrapTextureView(std::shared_ptr<TextureView> textureView);
+
   /**
    * Creates a texture proxy for the provided BackendTexture. If adopted is true, the backend
    * texture will be destroyed at a later point after the texture proxy is released.

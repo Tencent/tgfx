@@ -61,6 +61,7 @@ constexpr int RRectCoverage = 11;
 constexpr int TexModulate = 12;
 constexpr int InputOpaque = 13;
 constexpr int MulAlpha = 14;
+constexpr int PerlinNoise = 15;
 
 }  // namespace ChainOp
 

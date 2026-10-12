@@ -351,7 +351,8 @@ struct PointwiseChainInputs {
   int textureCount = 0;             // domain value: 0 = leaf-free, 1 = four-leaf padded slots.
   bool hasMask = false;             // device-space mask child present.
   bool hasCoverageSubtree = false;  // chain coverage subtree present.
-  int xpType = -1;                  // -1 = no representable XferProcessor.
+  bool hasNoise = false;
+  int xpType = -1;  // -1 = no representable XferProcessor.
 };
 
 /**

@@ -48,6 +48,8 @@ namespace tgfx {
 ///   HAS_COVERAGE / HAS_COLOR / TEXTURE_COUNT: mirrored with the vertex stage.
 ///   HAS_MASK_TEXTURE (bool): a device-space alpha mask child sampled after the DAG and before the
 ///     XP stage, matching the legacy blend kernel's mask application point. DefaultGP only.
+///   HAS_NOISE (bool): one distinct Perlin source sharing the existing coordinate varying and
+///     four leaf bindings with up to two image leaves. Restricted to common-color position Quad.
 class PointwiseChainShader : public PrecompiledShader {
  public:
   struct VertDims {
@@ -74,6 +76,7 @@ class PointwiseChainShader : public PrecompiledShader {
       HAS_COLOR,
       TEXTURE_COUNT,
       HAS_MASK_TEXTURE,
+      HAS_NOISE,
       COUNT
     };
     static PermutationDomain domain() {
@@ -84,11 +87,12 @@ class PointwiseChainShader : public PrecompiledShader {
           PermutationBool("HAS_COLOR"),
           PermutationInt("TEXTURE_COUNT", 2),
           PermutationBool("HAS_MASK_TEXTURE"),
+          PermutationBool("HAS_NOISE"),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 6, "Update the Compose mapping when fragment dimensions change.");
+  static_assert(FD::COUNT == 7, "Update the Compose mapping when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"PointwiseChainShader",

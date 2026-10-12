@@ -503,10 +503,11 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   // GlassRefractionShader's DISPERSION_ON dimension doubled its fragment count from 24 to 48.
   // The FBF-keeping bundles take all 24 new variants (267 -> 291); the FBF-dropping ones take
   // only the HAS_XP != 2 two thirds, i.e. 16 (179 -> 195).
+  // Noise chains reuse a vertex stage and add three fragments (two without framebuffer fetch).
   const bool keepsFramebufferFetch =
       expectedTag == "metal" || expectedTag == "vulkan" || expectedTag == "opengles";
   EXPECT_EQ(cache->vertexEntryCount(), 95u);
-  EXPECT_EQ(cache->fragmentEntryCount(), keepsFramebufferFetch ? 291u : 195u);
+  EXPECT_EQ(cache->fragmentEntryCount(), keepsFramebufferFetch ? 294u : 197u);
   EXPECT_EQ(cache->profileTag(), expectedTag);
   cache->unload();
 }
@@ -1547,7 +1548,7 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
     // everything. See PrecompiledBundleLoad for the DISPERSION_ON arithmetic behind these totals.
     const bool keepsFramebufferFetch = tag == "metal" || tag == "vulkan" || tag == "opengles";
     EXPECT_EQ(compressedOnly.vertexEntryCount(), 95u);
-    EXPECT_EQ(compressedOnly.fragmentEntryCount(), keepsFramebufferFetch ? 291u : 195u);
+    EXPECT_EQ(compressedOnly.fragmentEntryCount(), keepsFramebufferFetch ? 294u : 197u);
     EXPECT_EQ(compressedOnly.profileTag(), tag);
     return;
   }

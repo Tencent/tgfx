@@ -1047,7 +1047,9 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateAtlasTextFillReachable() {
 }
 
 std::optional<RuleComposedValues> ComposePointwiseChain(const PointwiseChainInputs& inputs) {
-  if (inputs.xpType < 0) {
+  if (inputs.xpType < 0 || inputs.xpType > 2 ||
+      (inputs.hasNoise && (inputs.gpKind != 1 || inputs.hasUVCoord || inputs.hasColor ||
+                           inputs.textureCount != 1 || !inputs.hasCoverage))) {
     return std::nullopt;
   }
   // Each GP profile fixes the attribute slots its vertex buffers carry. Quad and Mesh buffers
@@ -1128,6 +1130,7 @@ std::optional<RuleComposedValues> ComposePointwiseChain(const PointwiseChainInpu
   values.fragValues[FD::HAS_COLOR] = hasColor;
   values.fragValues[FD::TEXTURE_COUNT] = inputs.textureCount;
   values.fragValues[FD::HAS_MASK_TEXTURE] = hasMaskTexture;
+  values.fragValues[FD::HAS_NOISE] = inputs.hasNoise ? 1 : 0;
   return values;
 }
 
@@ -1150,13 +1153,18 @@ std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseChainReachable() {
                   inputs.hasMask = hasMask != 0;
                   inputs.hasCoverageSubtree = hasCoverageSubtree != 0;
                   inputs.xpType = xpType;
-                  auto composed = ComposePointwiseChain(inputs);
-                  if (!composed) {
-                    continue;
+                  for (bool hasNoise : {false, true}) {
+                    inputs.hasNoise = hasNoise;
+                    auto composed = ComposePointwiseChain(inputs);
+                    if (!composed) {
+                      continue;
+                    }
+                    auto vertIndex =
+                        PointwiseChainShader::VD::domain().encode(composed->vertValues);
+                    auto fragIndex =
+                        PointwiseChainShader::FD::domain().encode(composed->fragValues);
+                    result.insert({vertIndex, fragIndex});
                   }
-                  auto vertIndex = PointwiseChainShader::VD::domain().encode(composed->vertValues);
-                  auto fragIndex = PointwiseChainShader::FD::domain().encode(composed->fragValues);
-                  result.insert({vertIndex, fragIndex});
                 }
               }
             }

@@ -567,8 +567,13 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(HardwareBufferRe
 
 std::shared_ptr<TextureProxy> ProxyProvider::wrapExternalTexture(
     const BackendTexture& backendTexture, ImageOrigin origin, bool adopted) {
-  auto textureView = TextureView::MakeFrom(context, backendTexture, origin, adopted);
-  if (textureView == nullptr) {
+  return wrapTextureView(TextureView::MakeFrom(context, backendTexture, origin, adopted));
+}
+
+std::shared_ptr<TextureProxy> ProxyProvider::wrapTextureView(
+    std::shared_ptr<TextureView> textureView) {
+  if (textureView == nullptr || textureView->getContext() != context ||
+      textureView->getTexture() == nullptr) {
     return nullptr;
   }
   auto format = textureView->getTexture()->format();

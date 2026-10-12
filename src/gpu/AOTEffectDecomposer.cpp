@@ -347,8 +347,35 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
   if (geometryNode == nullptr || geometryNode->kind != AOTEffectKind::GeometryColor) {
     return false;
   }
-  int textureLeaves = 0;
+  bool containsNoise = false;
   for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+    containsNoise |= graph.nodeAt(AOTNodeID(index))->kind == AOTEffectKind::PerlinNoiseSource;
+  }
+  std::vector<bool> reachable(graph.nodeCount(), !containsNoise);
+  std::vector<AOTNodeID> pending =
+      containsNoise ? std::vector<AOTNodeID>{graph.root()} : std::vector<AOTNodeID>{};
+  while (!pending.empty()) {
+    auto id = pending.back();
+    pending.pop_back();
+    const auto* node = graph.nodeAt(id);
+    if (node == nullptr) {
+      return false;
+    }
+    if (reachable[id.index()]) {
+      continue;
+    }
+    reachable[id.index()] = true;
+    if (node->kind != AOTEffectKind::PerlinNoiseSource) {
+      pending.insert(pending.end(), node->inputs.begin(), node->inputs.end());
+    }
+  }
+  int textureLeaves = 0;
+  int noiseSources = 0;
+  int gradients = 0;
+  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+    if (!reachable[index]) {
+      continue;
+    }
     auto node = graph.nodeAt(AOTNodeID(index));
     if (node == nullptr) {
       return false;
@@ -376,7 +403,15 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
       case AOTEffectKind::Blend:
       case AOTEffectKind::RectCoverage:
       case AOTEffectKind::RRectCoverage:
+        break;
       case AOTEffectKind::GradientSource:
+        ++gradients;
+        break;
+      case AOTEffectKind::PerlinNoiseSource:
+        if (++noiseSources > 1) {
+          return false;
+        }
+        textureLeaves += 2;
         break;
       case AOTEffectKind::GeometryColorOpaqueInput:
       case AOTEffectKind::GeometryWhiteInput:
@@ -394,7 +429,7 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
         return false;
     }
   }
-  if (textureLeaves > MaxFusedAOTSamplers) {
+  if (textureLeaves > MaxFusedAOTSamplers || (noiseSources > 0 && gradients > 0)) {
     return false;
   }
   AOTEffectPlan result = {};
@@ -404,7 +439,7 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
   pass.materializesOutput = false;
   for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
     auto node = graph.nodeAt(AOTNodeID(index));
-    if (node->kind == AOTEffectKind::GeometryColorOpaqueInput ||
+    if (!reachable[index] || node->kind == AOTEffectKind::GeometryColorOpaqueInput ||
         node->kind == AOTEffectKind::GeometryWhiteInput) {
       continue;
     }
@@ -420,12 +455,12 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
 }
 
 bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
-  // A graph that fits the DAG planner's contracts is served in one fused pass with no
-  // intermediate materialization, so it is preferred over the tail planner's segmented passes
-  // (the tail shader's fixed slot count splits ordinary texture + unary chains into multiple
-  // passes even when the whole chain fits the 16-slot chain kernel). Graphs the DAG planner
-  // rejects — device-space sampling, YUV/RGBAAA sources, gather or noise nodes, slot or leaf
-  // budget overruns — keep the established tail/perlin order.
+  // Keep simple noise on the existing compact kernel. Noise DAGs and ordinary pointwise DAGs
+  // use the chain when they fit its instruction and sampler budgets, without materialization.
+  // Device-space and YUV sources retain their dedicated tail/source planners.
+  if (DecomposePerlinNoiseChain(graph, plan)) {
+    return true;
+  }
   if (DecomposePointwiseDAG(graph, plan)) {
     return true;
   }
@@ -435,7 +470,7 @@ bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTEffectPlan* 
   if (DecomposeYUVChain(graph, plan)) {
     return true;
   }
-  return DecomposePerlinNoiseChain(graph, plan);
+  return false;
 }
 
 AOTAxisAnalysis AOTEffectDecomposer::AnalyzeChain(

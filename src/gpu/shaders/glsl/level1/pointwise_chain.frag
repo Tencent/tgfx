@@ -33,6 +33,9 @@
 #ifndef TEXTURE_COUNT
 #define TEXTURE_COUNT 0
 #endif
+#ifndef HAS_NOISE
+#define HAS_NOISE 0
+#endif
 #define CHAIN_LEAF_SAMPLER sampler2D
 
 #if TEXTURE_COUNT == 0
@@ -151,6 +154,10 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   // Leaf index of the LUT gradient texture (a sampler-only child with no DAG slot), read by the
   // OP_GRADIENT LUT colorizer branch. -1 when no LUT gradient is present.
   int GradientLUTLeaf;
+#if HAS_NOISE
+  vec4 NoiseFrequencyStitch;
+  ivec4 NoiseModeOctaves;
+#endif
 
   // Tiled leaf support: up to two leaves go through the shader-side tiling (wrap or border
   // emulation), each with its own recipe. TiledLeafIndex selects the leaf that reads the first
@@ -351,6 +358,29 @@ highp float ellipseGpCoverage = 1.0;
 #define TGFX_CHAIN_UNIT_COVERAGE vec4(1.0)
 #endif
 
+#if HAS_NOISE
+vec4 aotPerlinPermutation(vec2 coord) {
+  if (NoiseModeOctaves.w == 0) {
+    return texture(TextureSampler_0, coord);
+  }
+  if (NoiseModeOctaves.w == 1) {
+    return texture(TextureSampler_1, coord);
+  }
+  return texture(TextureSampler_2, coord);
+}
+
+vec4 aotPerlinGradient(vec2 coord) {
+  if (NoiseModeOctaves.w == 0) {
+    return texture(TextureSampler_1, coord);
+  }
+  if (NoiseModeOctaves.w == 1) {
+    return texture(TextureSampler_2, coord);
+  }
+  return texture(TextureSampler_3, coord);
+}
+
+#include "perlin_noise_math.inc"
+#endif
 #include "pointwise_chain_eval.inc"
 
 void main() {
@@ -362,7 +392,7 @@ void main() {
   ellipseGpCoverage = ellipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, StrokeEnabled);
 #endif
   // Active slots are contiguous from 0 by construction (texture leaves first, then the rest in
-  // topological order, root last), so a uniform guard skips the whole evaluation of unused slots —
+  // topological order), so a uniform guard skips the whole evaluation of unused slots —
   // including the Packed read — instead of relying on the OP_NONE early-out alone.
   // Texture leaves occupy slots 0..NTEX-1. Each prefetch is guarded by the slot's op marker so
   // the phantom slot of a 3-leaf chain and the sampler-only LUT child (both non-texture slots

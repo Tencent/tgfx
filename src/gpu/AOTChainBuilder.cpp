@@ -16,10 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "AOTChainBuilder.h"
+#include <algorithm>
 #include <utility>
 #include <vector>
 #include "core/shaders/PerlinNoiseShader.h"
 #include "gpu/AOTChainRegisterAllocator.h"
+#include "gpu/ProxyProvider.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AOTPointwiseTailProcessor.h"
 #include "gpu/processors/AOTYUVChainProcessor.h"
@@ -32,6 +34,7 @@
 #include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/resources/TextureView.h"
 
 namespace tgfx {
 
@@ -244,14 +247,7 @@ static PlacementPtr<FragmentProcessor> BuildPerlinNoiseFillFP(BlockAllocator* al
     }
     slots.push_back(slot);
   }
-  auto paintingData = std::make_unique<PerlinNoiseShader::PaintingData>(
-      parameters->baseFrequencyX, parameters->baseFrequencyY, parameters->stitchWidth,
-      parameters->stitchHeight);
-  auto uvMatrix = parameters->uvMatrix;
-  return PerlinNoiseFragmentProcessor::MakeFromViews(
-      allocator, static_cast<PerlinNoiseType>(parameters->noiseType), parameters->numOctaves,
-      parameters->stitchTiles, std::move(paintingData), parameters->permutationsView,
-      parameters->noiseView, &uvMatrix, slots);
+  return PerlinNoiseFragmentProcessor::MakeFromAOTParameters(allocator, *parameters, slots);
 }
 
 // Maps a DAG input edge onto a chain slot index. GeometryColor is not a slot: it maps to -1, the
@@ -464,6 +460,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   bool hasRectCoverage = false;
   bool hasLocalRectCoverage = false;
   bool hasGradient = false;
+  const AOTPerlinNoiseParameters* noiseParameters = nullptr;
   std::vector<AOTChainSlot> slots(ordered.size());
   // All-ones reproduces the legacy behavior (every target reads the uvCoord attribute when the GP
   // carries one). The atlas-text route clears it and sets only the coverage leaves' bits.
@@ -582,6 +579,16 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
           }
         }
         leaves.push_back(std::move(leaf));
+        break;
+      }
+      case AOTEffectKind::PerlinNoiseSource: {
+        auto parameters = std::get_if<AOTPerlinNoiseParameters>(&node->parameters);
+        if (parameters == nullptr || noiseParameters != nullptr || inputBase != 0) {
+          return nullptr;
+        }
+        noiseParameters = parameters;
+        slot.op = AOTChainOp::PerlinNoise;
+        slot.noise = *parameters;
         break;
       }
       case AOTEffectKind::ConstColor: {
@@ -705,7 +712,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
       default:
         return nullptr;
     }
-    if (slot.op != AOTChainOp::Texture &&
+    if (slot.op != AOTChainOp::Texture && slot.op != AOTChainOp::PerlinNoise &&
         (slot.in0 == -2 ||
          ((slot.op == AOTChainOp::Blend || slot.op == AOTChainOp::MulAlpha) && slot.in1 == -2))) {
       return nullptr;
@@ -740,9 +747,41 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   // state (not per-unit), so a default-state phantom bound after the real leaf would overwrite
   // e.g. a decal clamp-to-border with clamp-to-edge for the whole draw.
   std::vector<PlacementPtr<FragmentProcessor>> samplerPadding = {};
+  std::shared_ptr<TextureProxy> noisePaddingProxy = nullptr;
+  if (noiseParameters != nullptr) {
+    if (hasGradient || leaves.size() > 2 || coverageLeafFromUVCoord ||
+        !AOTPerlinNoiseParametersSupported(*noiseParameters)) {
+      return nullptr;
+    }
+    for (const auto& view : {noiseParameters->permutationsView, noiseParameters->noiseView}) {
+      if (view == nullptr || view->getContext() == nullptr) {
+        return nullptr;
+      }
+      auto proxy = view->getContext()->proxyProvider()->wrapTextureView(view);
+      if (proxy == nullptr) {
+        return nullptr;
+      }
+      SamplingArgs lookupArgs = {TileMode::Clamp, TileMode::Clamp,
+                                 SamplingOptions(FilterMode::Nearest), SrcRectConstraint::Fast};
+      auto matrix = Matrix::I();
+      auto child = TextureEffect::Make(allocator, proxy, lookupArgs, &matrix);
+      if (child == nullptr) {
+        return nullptr;
+      }
+      if (noisePaddingProxy == nullptr) {
+        noisePaddingProxy = proxy;
+      }
+      samplerPadding.push_back(std::move(child));
+    }
+  }
   std::shared_ptr<TextureProxy> paddingProxy = nullptr;
   SamplerState paddingState = {};
   for (size_t index = 0; index < nodes.size() && paddingProxy == nullptr; ++index) {
+    if (noiseParameters != nullptr && index < colorCount &&
+        std::find(pass.nodes.begin(), pass.nodes.end(), AOTNodeID(static_cast<uint32_t>(index))) ==
+            pass.nodes.end()) {
+      continue;
+    }
     if (nodes[index]->kind == AOTEffectKind::TextureSource) {
       auto* textureParams = std::get_if<AOTTextureParameters>(&nodes[index]->parameters);
       if (textureParams != nullptr) {
@@ -763,11 +802,15 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
       }
     }
   }
+  if (paddingProxy == nullptr && noisePaddingProxy != nullptr) {
+    paddingProxy = noisePaddingProxy;
+    paddingState = SamplerState(SamplingOptions(FilterMode::Nearest));
+  }
   SamplingOptions paddingSampling(paddingState.minFilterMode, paddingState.magFilterMode,
                                   paddingState.mipmapMode);
   SamplingArgs paddingArgs = {paddingState.tileModeX, paddingState.tileModeY, paddingSampling,
                               SrcRectConstraint::Fast};
-  size_t samplerChildren = leaves.size() + (lutChild != nullptr ? 1 : 0);
+  size_t samplerChildren = leaves.size() + (lutChild != nullptr ? 1 : 0) + samplerPadding.size();
   if (samplerChildren > 0 && samplerChildren < 4) {
     if (paddingProxy == nullptr) {
       return nullptr;

@@ -18,6 +18,7 @@
 
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/ColorSpaceXformHelper.h"
+#include "gpu/resources/TextureView.h"
 
 namespace tgfx {
 namespace {
@@ -203,8 +204,7 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
   const auto validOutput = [](int reg) {
     return reg >= -1 && reg < static_cast<int>(MaxRegisters);
   };
-  if (!validOutput(static_cast<int>(rootSlot)) ||
-      (coverageRootSlot >= 0 && !validOutput(coverageRootSlot))) {
+  if (rootSlot >= MaxRegisters || (coverageRootSlot >= 0 && !validOutput(coverageRootSlot))) {
     return nullptr;
   }
   for (const auto& slot : slots) {
@@ -229,6 +229,7 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
       case AOTChainOp::TexModulate:
       case AOTChainOp::InputOpaque:
       case AOTChainOp::MulAlpha:
+      case AOTChainOp::PerlinNoise:
         break;
       case AOTChainOp::None:
       default:
@@ -261,7 +262,7 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     // Required-input checks: the kernel resolves an unmapped input (-2) to vec4(0.0) silently, so
     // an operator that actually consumes its input must not leave it unmapped. Texture slots
     // carry flags in in0/in1 rather than register indices, and Texture is exempt.
-    if (slot.op != AOTChainOp::Texture && slot.in0 == -2) {
+    if (slot.op != AOTChainOp::Texture && slot.op != AOTChainOp::PerlinNoise && slot.in0 == -2) {
       return nullptr;
     }
     if ((slot.op == AOTChainOp::Blend || slot.op == AOTChainOp::MulAlpha) && slot.in1 == -2) {
@@ -269,6 +270,11 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     }
   }
   auto leafCount = textureLeaves.size();
+  for (const auto& child : samplerPadding) {
+    if (child == nullptr || child->name() != "TextureEffect" || child->numTextureSamplers() > 1) {
+      return nullptr;
+    }
+  }
   // Sampler-binding children include the DAG leaves plus sampler-only children (the LUT gradient
   // texture and phantom padding). TEXTURE_COUNT exists only as 0 or 4, so any chain with leaves
   // must pad exactly up to the four-sampler artifacts.
@@ -309,6 +315,7 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
   size_t deviceRectSlots = 0;
   size_t colorSpaceSlots = 0;
   size_t gradientSlots = 0;
+  size_t noiseSlots = 0;
   size_t rrectSlots = 0;
   for (const auto& slot : slots) {
     if (slot.op == AOTChainOp::None) {
@@ -318,6 +325,17 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
         (!ColorSpaceXformStepsSupported(slot.colorSpaceXform.steps.get()) ||
          ++colorSpaceSlots > MaxColorSpaceXformSlots)) {
       return nullptr;
+    }
+    if (slot.op == AOTChainOp::PerlinNoise) {
+      if (++noiseSlots > 1 || !AOTPerlinNoiseParametersSupported(slot.noise) || leafCount > 2 ||
+          samplerPadding.size() < 2 || lutChild != nullptr) {
+        return nullptr;
+      }
+      if (samplerPadding[0] == nullptr || samplerPadding[1] == nullptr ||
+          samplerPadding[0]->textureAt(0) != slot.noise.permutationsView->getTexture() ||
+          samplerPadding[1]->textureAt(0) != slot.noise.noiseView->getTexture()) {
+        return nullptr;
+      }
     }
     if (slot.op == AOTChainOp::Gradient && ++gradientSlots > MaxGradientSlots) {
       return nullptr;
@@ -337,7 +355,8 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
       return nullptr;
     }
   }
-  if (clipCoverageRegister >= static_cast<int>(MaxRegisters)) {
+  if ((noiseSlots > 0 && gradientSlots > 0) ||
+      clipCoverageRegister >= static_cast<int>(MaxRegisters)) {
     return nullptr;
   }
   return allocator->make<AOTPointwiseChainProcessor>(
@@ -371,6 +390,9 @@ AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
     slots[index] = newSlots[index];
     if (slots[index].op == AOTChainOp::Gradient) {
       gradientCoordTransform = CoordTransform(slots[index].gradient.coordMatrix);
+    } else if (slots[index].op == AOTChainOp::PerlinNoise) {
+      gradientCoordTransform = CoordTransform(slots[index].noise.uvMatrix);
+      noiseSamplerBase = static_cast<int>(textureLeaves.size());
     }
   }
   // Exposed unconditionally (a default identity transform when no gradient slot exists) so the
@@ -411,6 +433,7 @@ void AOTPointwiseChainProcessor::onComputeProcessorKey(BytesKey* bytesKey) const
   // by effect topology and defeat the variant reuse that is the point of the chain kernel.
   static constexpr uint32_t ChainProgramTag = 0xA07C41A7u;
   bytesKey->write(ChainProgramTag);
+  bytesKey->write(static_cast<uint32_t>(hasNoise()));
 }
 
 void AOTPointwiseChainProcessor::onSetData(UniformData* vertexUniformData,
@@ -465,6 +488,17 @@ void AOTPointwiseChainProcessor::onSetData(UniformData* vertexUniformData,
   for (size_t index = 0; index < _slotCount; ++index) {
     if (slots[index].op == AOTChainOp::Gradient) {
       UploadGradientParams(fragmentUniformData, slots[index].gradient);
+      break;
+    }
+    if (slots[index].op == AOTChainOp::PerlinNoise) {
+      const auto& noise = slots[index].noise;
+      float frequencyStitch[] = {noise.baseFrequencyX, noise.baseFrequencyY,
+                                 static_cast<float>(noise.stitchWidth),
+                                 static_cast<float>(noise.stitchHeight)};
+      int modeOctaves[] = {noise.noiseType, noise.numOctaves, noise.stitchTiles ? 1 : 0,
+                           noiseSamplerBase};
+      fragmentUniformData->setDataOptional("NoiseFrequencyStitch", frequencyStitch);
+      fragmentUniformData->setDataOptional("NoiseModeOctaves", modeOctaves);
       break;
     }
   }

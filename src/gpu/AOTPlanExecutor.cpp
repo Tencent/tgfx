@@ -228,6 +228,7 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
     size_t shaderTiledLeaves = 0;
     size_t colorSpaceXforms = 0;
     size_t gradients = 0;
+    size_t noiseSources = 0;
     size_t deviceRects = 0;
     size_t localRects = 0;
     size_t rrects = 0;
@@ -264,6 +265,12 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
           return false;
         }
         ++plainLeaves;
+      } else if (node->kind == AOTEffectKind::PerlinNoiseSource) {
+        auto parameters = std::get_if<AOTPerlinNoiseParameters>(&node->parameters);
+        if (parameters == nullptr || !AOTPerlinNoiseParametersSupported(*parameters) ||
+            ++noiseSources > 1) {
+          return false;
+        }
       } else if (node->kind == AOTEffectKind::ColorSpaceXform) {
         auto parameters = std::get_if<AOTColorSpaceXformParameters>(&node->parameters);
         if (parameters == nullptr || parameters->steps == nullptr ||
@@ -300,7 +307,11 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
     if (hasLUT && plainLeaves > 1) {
       return false;
     }
-    return AOTPointwiseChainProcessor::HasChainKernelVariant(plainLeaves + (hasLUT ? 1u : 0u));
+    if (noiseSources > 0 && gradients > 0) {
+      return false;
+    }
+    return AOTPointwiseChainProcessor::HasChainKernelVariant(plainLeaves + (hasLUT ? 1u : 0u) +
+                                                             noiseSources * 2);
   }
   return ValidateLinearPlan(graph, plan);
 }
@@ -315,6 +326,18 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t render
       originalDraw == nullptr || *originalDraw == nullptr || deviceBounds.isEmpty() ||
       !CanExecute(graph, plan)) {
     return nullptr;
+  }
+  for (const auto& pass : plan.passes) {
+    for (auto id : pass.nodes) {
+      const auto* node = graph.nodeAt(id);
+      const auto* noise =
+          node != nullptr ? std::get_if<AOTPerlinNoiseParameters>(&node->parameters) : nullptr;
+      if (noise != nullptr && (noise->permutationsView == nullptr || noise->noiseView == nullptr ||
+                               noise->permutationsView->getContext() != context ||
+                               noise->noiseView->getContext() != context)) {
+        return nullptr;
+      }
+    }
   }
   // One geometry for the whole plan. Every intermediate pass renders into a target of exactly this
   // size and the terminal draw samples the last one back with its top-left, so the capture area and

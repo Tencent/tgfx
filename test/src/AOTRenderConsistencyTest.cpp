@@ -37,7 +37,9 @@
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/shaders/level1/PointwiseChainShader.h"
 #include "gtest/gtest.h"
+#include "layers/NoiseDensityUtils.h"
 #include "layers/layerstyles/GlassUDF.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
@@ -3907,6 +3909,95 @@ TGFX_TEST(AOTRenderConsistencyTest, PerlinNoiseConstBlendServedWithoutRuntimePro
     EXPECT_EQ(candidateDraws.fpFlattenEdges, 0u) << scene.label;
     EXPECT_EQ(candidateDraws.materializedEdges, 0u) << scene.label;
     ExpectBitmapsIdentical(scene.label, candidate, reference, width, height);
+  }
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, PerlinDensityDAGServedByteExact) {
+  constexpr int size = 64;
+  constexpr std::array<float, 20> contrast = {
+      2, 0, 0, 0, -0.5f, 0, 2, 0, 0, -0.5f, 0, 0, 2, 0, -0.5f, 0, 0, 0, 1, 0,
+  };
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+  for (int family = 0; family < 3; ++family) {
+    for (int textures = 0; textures <= 2; ++textures) {
+      for (auto mode : {BlendMode::SrcOver, BlendMode::Src, BlendMode::Multiply}) {
+        SCOPED_TRACE(::testing::Message() << "family=" << family << " textures=" << textures
+                                          << " mode=" << static_cast<int>(mode));
+        auto noise = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903);
+        auto dark = MakeDarkDensityFilter(noise, 0.25f);
+        auto shader = dark->makeWithColorFilter(
+            ColorFilter::Blend(Color(1.0f, 0.2f, 0.1f, 0.7f), BlendMode::SrcIn));
+        if (family == 1) {
+          auto bright = MakeBrightDensityFilter(noise, 0.25f)
+                            ->makeWithColorFilter(ColorFilter::Blend(Color(0.1f, 0.3f, 1.0f, 0.6f),
+                                                                     BlendMode::SrcIn));
+          shader = Shader::MakeBlend(BlendMode::SrcOver, shader, bright);
+        } else if (family == 2) {
+          shader = Shader::MakeBlend(
+              BlendMode::DstIn, noise->makeWithColorFilter(ColorFilter::Matrix(contrast)), dark);
+        }
+        shader = shader->makeWithMatrix(Matrix::MakeTrans(13.5f, -13.5f));
+        if (textures > 0) {
+          shader = Shader::MakeBlend(BlendMode::SrcIn, shader, Shader::MakeImageShader(image));
+        }
+        if (textures > 1) {
+          shader = Shader::MakeBlend(BlendMode::SrcOver, shader, Shader::MakeImageShader(image));
+        }
+        ASSERT_NE(shader, nullptr);
+        Bitmap reference;
+        Bitmap candidate;
+        for (bool useBundle : {false, true}) {
+          ContextScope scope;
+          auto* context = scope.getContext();
+          ASSERT_NE(context, nullptr);
+          auto* cache = context->precompiledShaderCache();
+          cache->unload();
+          if (useBundle) {
+            ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+          }
+          ScopedAOTStatsPause referencePause(context, !useBundle);
+          cache->setDecompositionEnabled(useBundle);
+          cache->setDiagnosticRecordingEnabled(true);
+          cache->resetStats();
+          context->globalCache()->clearPrograms();
+          context->globalCache()->resetProgramStats();
+          auto surface = Surface::Make(context, size, size);
+          ASSERT_NE(surface, nullptr);
+          surface->getCanvas()->clear(Color::White());
+          Paint paint;
+          paint.setShader(shader);
+          paint.setAlpha(0.25f);
+          paint.setBlendMode(mode);
+          surface->getCanvas()->drawRect(Rect::MakeLTRB(2.25f, 3.5f, 61.25f, 60.5f), paint);
+          context->flushAndSubmit(true);
+          if (useBundle) {
+            EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+            EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+            EXPECT_EQ(cache->drawStats().materializedEdges, 0u);
+            EXPECT_EQ(cache->drawStats().completeAOTDraws, 1u);
+            const auto hits = cache->hitRecords();
+            bool noiseVariantHit = false;
+            for (const auto& hit : hits) {
+              noiseVariantHit |= hit.shaderName == "PointwiseChainShader" &&
+                                 PointwiseChainShader::FD::domain().valueOf(
+                                     hit.fragPermutationIndex, "HAS_NOISE") == 1;
+            }
+            EXPECT_TRUE(noiseVariantHit);
+          }
+          auto* bitmap = useBundle ? &candidate : &reference;
+          ASSERT_TRUE(bitmap->allocPixels(size, size));
+          auto* pixels = bitmap->lockPixels();
+          ASSERT_NE(pixels, nullptr);
+          ASSERT_TRUE(surface->readPixels(bitmap->info(), pixels));
+          bitmap->unlockPixels();
+          cache->setDiagnosticRecordingEnabled(false);
+          cache->unload();
+          context->globalCache()->clearPrograms();
+        }
+        ExpectBitmapsIdentical("perlin-density-dag", candidate, reference, size, size);
+      }
+    }
   }
 }
 
