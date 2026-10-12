@@ -45,6 +45,13 @@ AOTCoverageGateResult EvaluateAOTCoverageGate(uint64_t rawNoMatchingRule,
                                               uint64_t rawBuilderCreations,
                                               uint64_t excludedBuilderCreations);
 
+/**
+ * Whether a whole run meets the strict coverage targets. Zero misses alone is not enough: a run
+ * that drew nothing, or whose draws were all excluded from the metrics, also reports zero, so the
+ * run must additionally have served at least one program from a precompiled artifact.
+ */
+bool AOTCoverageGateMet(const AOTCoverageGateResult& gate, uint64_t precompiledArtifactCreations);
+
 void InstallShaderAOTTestReporter();
 
 }  // namespace tgfx

@@ -456,6 +456,11 @@ TGFX_TEST(AOTCoverageGateTest, ProductionMetricsPreserveUnmarkedFailures) {
   // than exist flips consistency instead of clamping the count to zero.
   EXPECT_FALSE(EvaluateAOTCoverageGate(2, 0, 2, 0, 1, 0).consistent);
   EXPECT_FALSE(EvaluateAOTCoverageGate(0, 0, 0, 0, 0, 1).passed());
+  // A run with no miss is only evidence of coverage when it also served a precompiled program:
+  // drawing nothing (or only excluded draws) is vacuous, not met.
+  EXPECT_FALSE(AOTCoverageGateMet(EvaluateAOTCoverageGate(0, 0, 0, 0, 0, 0), 0));
+  EXPECT_TRUE(AOTCoverageGateMet(EvaluateAOTCoverageGate(0, 0, 0, 0, 0, 0), 1));
+  EXPECT_FALSE(AOTCoverageGateMet(EvaluateAOTCoverageGate(0, 0, 0, 0, 1, 0), 5));
 
   GlobalCache programs(nullptr);
   ProgramProvenance provenance = {};

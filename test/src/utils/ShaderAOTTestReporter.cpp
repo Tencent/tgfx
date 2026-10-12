@@ -104,6 +104,10 @@ AOTCoverageGateResult EvaluateAOTCoverageGate(uint64_t rawNoMatchingRule,
   return result;
 }
 
+bool AOTCoverageGateMet(const AOTCoverageGateResult& gate, uint64_t precompiledArtifactCreations) {
+  return gate.passed() && precompiledArtifactCreations > 0;
+}
+
 #ifndef TGFX_BACKEND_NAME
 #define TGFX_BACKEND_NAME "unknown"
 #endif
@@ -1150,7 +1154,11 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
           {"excludedByDesign", coverageGate.excludedByDesign},
           {"excludedEnvironment", coverageGate.excludedEnvironment},
           {"consistent", coverageGate.consistent},
-          {"passed", coverageGate.passed()}}},
+          {"precompiledArtifactCreations", summary.programStats.precompiledArtifactCreations},
+          {"vacuous",
+           coverageGate.passed() && summary.programStats.precompiledArtifactCreations == 0},
+          {"passed",
+           AOTCoverageGateMet(coverageGate, summary.programStats.precompiledArtifactCreations)}}},
         {"metricDefinitions",
          {{"coldAOTHitRate",
            "precompiledArtifactCreations / (precompiledArtifactCreations + "
@@ -1251,12 +1259,29 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
     // selected tests and is not a certificate of full-suite coverage. Default runs monitor.
     auto strictNoMatching = coverageGate.noMatchingRule;
     auto strictRuntimeCompiles = coverageGate.runtimeCompiles;
-    if (coverageGate.passed()) {
+    const char* gateMode = std::getenv("TGFX_AOT_COVERAGE_GATE");
+    const bool blocking = gateMode != nullptr && std::strcmp(gateMode, "blocking") == 0;
+    const auto precompiledCreations = summary.programStats.precompiledArtifactCreations;
+    if (AOTCoverageGateMet(coverageGate, precompiledCreations)) {
       std::printf(
           "[Coverage Gate][%s] strict targets MET: noMatchingRule=0 runtimeCompiles=0 "
-          "(excluded byDesign=%llu environment=%llu)\n",
-          TGFX_BACKEND_NAME, static_cast<unsigned long long>(coverageGate.excludedByDesign),
+          "precompiledPrograms=%llu (excluded byDesign=%llu environment=%llu)\n",
+          TGFX_BACKEND_NAME, static_cast<unsigned long long>(precompiledCreations),
+          static_cast<unsigned long long>(coverageGate.excludedByDesign),
           static_cast<unsigned long long>(coverageGate.excludedEnvironment));
+    } else if (coverageGate.passed()) {
+      // Zero misses with zero precompiled programs proves nothing: the run drew nothing, or every
+      // draw it made was excluded from the metrics.
+      std::printf(
+          "[Coverage Gate][%s] VACUOUS: no miss recorded, but no program was served from a "
+          "precompiled artifact either, so this run is no evidence of coverage\n",
+          TGFX_BACKEND_NAME);
+      if (blocking) {
+        std::printf("[Coverage Gate][%s] BLOCKING: vacuous run; failing the test process\n",
+                    TGFX_BACKEND_NAME);
+        std::fflush(stdout);
+        std::exit(1);
+      }
     } else {
       std::printf(
           "[Coverage Gate][%s] MONITORING (targets: noMatchingRule=0 runtimeCompiles=0): "
@@ -1277,8 +1302,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
                     PrecompiledFallbackReasonName(sortedFallbacks[i].record.reason),
                     sortedFallbacks[i].record.effectSignature.c_str());
       }
-      const char* gateMode = std::getenv("TGFX_AOT_COVERAGE_GATE");
-      if (gateMode != nullptr && std::strcmp(gateMode, "blocking") == 0) {
+      if (blocking) {
         std::printf(
             "[Coverage Gate][%s] BLOCKING: strict targets not met (see the PENDING list "
             "above); failing the test process\n",
