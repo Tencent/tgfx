@@ -65,9 +65,14 @@ static bool ExecutePreparedPass(CommandEncoder* encoder, RenderTarget* renderTar
     LOGE("AOTPlanRenderTask::execute() Failed to initialize the render pass!");
     return false;
   }
-  drawOp->executePrepared(renderPass.get(), renderTarget, false);
+  // A pass whose draw submitted nothing (no uniform backing store) has not executed: report it as
+  // failed so the task records an execution failure instead of a complete AOT draw.
+  bool submitted = drawOp->executePrepared(renderPass.get(), renderTarget, false);
   renderPass->end();
-  return true;
+  if (!submitted) {
+    LOGE("AOTPlanRenderTask::execute() A prepared pass submitted no draw!");
+  }
+  return submitted;
 }
 
 AOTPlanRenderTask::AOTPlanRenderTask(BlockAllocator* allocator,

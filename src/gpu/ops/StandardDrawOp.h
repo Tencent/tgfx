@@ -54,9 +54,10 @@ class StandardDrawOp : public DrawOp {
   /**
    * Executes a successfully prepared draw and uploads its uniforms and texture samplers. Set
    * recordDrawStats to false when a caller aggregates multiple prepared passes into one logical
-   * Draw-level record.
+   * Draw-level record. Returns false when nothing was submitted (the draw is not prepared, or its
+   * uniforms have no backing store), so such callers do not count the pass as executed.
    */
-  void executePrepared(RenderPass* renderPass, RenderTarget* renderTarget,
+  bool executePrepared(RenderPass* renderPass, RenderTarget* renderTarget,
                        bool recordDrawStats = true);
 
   /**

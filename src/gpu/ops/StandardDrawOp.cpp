@@ -228,17 +228,17 @@ bool StandardDrawOp::prepareForTask(RenderTarget* renderTarget, ProgramLookupMod
   return prepare(renderTarget, mode, std::move(colorOverride));
 }
 
-void StandardDrawOp::executePrepared(RenderPass* renderPass, RenderTarget* renderTarget,
+bool StandardDrawOp::executePrepared(RenderPass* renderPass, RenderTarget* renderTarget,
                                      bool recordDrawStats) {
   if (preparedProgramInfo == nullptr || preparedProgram == nullptr ||
       preparedRenderTarget == nullptr) {
     LOGE("StandardDrawOp::executePrepared() DrawOp is not prepared!");
-    return;
+    return false;
   }
   renderPass->setPipeline(preparedProgram->getPipeline());
   if (!preparedProgramInfo->setUniformsAndSamplers(renderPass, preparedProgram.get())) {
     // No uniform backing store: submitting would draw with unwritten (or garbage) uniforms.
-    return;
+    return false;
   }
   if (offscreenFillKey != InvalidOffscreenFillKey) {
     auto cache = preparedRenderTarget->getContext()->precompiledShaderCache();
@@ -258,5 +258,6 @@ void StandardDrawOp::executePrepared(RenderPass* renderPass, RenderTarget* rende
         preparedProgram->getProvenance().program == ProgramOrigin::PrecompiledArtifact;
     cache->recordDraw(drawDelta, completeAOTDraw);
   }
+  return true;
 }
 }  // namespace tgfx
