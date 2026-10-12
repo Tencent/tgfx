@@ -388,13 +388,13 @@ class CSSParser {
     }
 
     // A comma-separated selector list shares one declarations block; emit one rule per selector
-    std::string declarations = ruleStr.substr(openBrace + 1, closeBrace - openBrace - 1);
-    std::string selectors = ruleStr.substr(0, openBrace);
+    const std::string declarations = ruleStr.substr(openBrace + 1, closeBrace - openBrace - 1);
+    const std::string selectors = ruleStr.substr(0, openBrace);
     size_t pos = 0;
     while (pos < selectors.size()) {
       size_t comma = selectors.find(',', pos);
-      auto selector = trim(selectors.substr(pos, comma - pos));
-      if (!selector.empty() && selector.front() == '.') {
+      const auto selector = trim(selectors.substr(pos, comma - pos));
+      if (selector.size() > 1 && selector.front() == '.') {
         result.push_back({selector.substr(1), declarations});
       }
       if (comma == std::string::npos) {
@@ -420,7 +420,7 @@ void SVGNodeConstructor::ParseCSSStyle(const DOMNode* xmlNode, CSSMapper* mapper
         auto [iter, inserted] = mapper->insert({rule.selector, rule.declarations});
         if (!inserted) {
           // CSS Syntax Level 3 allows the last declaration of a block to omit its trailing ';'.
-          auto last = iter->second.find_last_not_of(" \t\n\r");
+          const auto last = iter->second.find_last_not_of(" \t\n\r");
           if (last != std::string::npos && iter->second[last] != ';') {
             iter->second += ';';
           }
