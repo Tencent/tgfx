@@ -74,8 +74,16 @@ class D3D12SwapchainProxy : public RenderTargetProxy {
   bool externallyOwned() const override {
     return true;
   }
+  bool isWindowBacked() const override {
+    return true;
+  }
 
   void onPresentFrame(Context*) override {
+    if (_presentingWindow.expired()) {
+      // The window that owns the swap chain is gone; drop the presentation instead of calling
+      // Present on dangling handles.
+      return;
+    }
     if (_swapChain == nullptr) {
       return;
     }
@@ -97,6 +105,11 @@ class D3D12SwapchainProxy : public RenderTargetProxy {
   }
 
   std::shared_ptr<RenderTarget> getRenderTarget() const override {
+    if (_presentingWindow.expired()) {
+      // The window that owns the swap chain and back buffers is gone; their handles are
+      // dangling and no frame can be resolved through them.
+      return nullptr;
+    }
     if (_swapChain == nullptr || _backBuffers == nullptr || _backBuffers->empty()) {
       return nullptr;
     }

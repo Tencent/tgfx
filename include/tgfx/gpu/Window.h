@@ -20,7 +20,6 @@
 
 #include <memory>
 #include <mutex>
-#include <unordered_map>
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/Device.h"
@@ -134,16 +133,5 @@ class Window : public std::enable_shared_from_this<Window> {
   friend class RenderTargetProxy;
   friend class ProxyDrawable;
   friend class WindowSurface;
-
-  /**
-   * Returns the automatic render target this window shares with every Surface created for the
-   * given Context (Surface::MakeFrom(context, window)): one frame identity per window per
-   * recording batch, so presenting it once delivers the batch's frame no matter how many
-   * surfaces drew into it. The targets are keyed by Context and held weakly; the surfaces (and
-   * the recording batches they feed) hold the strong references.
-   */
-  std::shared_ptr<RenderTargetProxy> getAutomaticTarget(Context* context);
-
-  std::unordered_map<Context*, std::weak_ptr<RenderTargetProxy>> _automaticTargets = {};
 };
 }  // namespace tgfx

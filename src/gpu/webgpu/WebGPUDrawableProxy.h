@@ -45,6 +45,10 @@ class WebGPUDrawableProxy : public RenderTargetProxy {
 
   void onPresentFrame(Context* context) override;
 
+  bool isWindowBacked() const override {
+    return true;
+  }
+
  private:
   Context* _context = nullptr;
   int _width = 0;

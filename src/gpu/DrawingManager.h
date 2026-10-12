@@ -82,6 +82,13 @@ class DrawingManager {
                         std::shared_ptr<ImageCodec> codec);
 
   /**
+   * Records a frame usage for the given render target on the current drawing batch when the
+   * target is window-backed (see RenderTargetProxy::isWindowBacked()), so the submission wires
+   * the frame acquisition synchronization. Called by every task-collecting entry point.
+   */
+  void collectWindowUsage(const std::shared_ptr<RenderTargetProxy>& renderTarget);
+
+  /**
    * Collects a drawable-backed frame so that it is marked as submitted when the submission
    * carrying its rendering commands completes.
    */
@@ -92,6 +99,15 @@ class DrawingManager {
    * Context::present()). The request is delivered by the submission of that batch.
    */
   void registerPresentation(std::shared_ptr<Drawable> drawable);
+
+  /**
+   * Returns the automatic render target this context shares with every Surface created for the
+   * given window within the current recording batch (Surface::MakeFrom(context, window)): one
+   * frame identity per window per batch. The cache is cleared at flush time, so every new batch
+   * resolves a fresh target (re-reading the window size and rebuilding expired presentation
+   * resources); long-lived surfaces keep and reuse their own target across batches.
+   */
+  std::shared_ptr<RenderTargetProxy> getAutomaticTarget(std::shared_ptr<Window> window);
 
   /**
    * Registers the automatic presentation for the given window's shared render target on the
@@ -117,6 +133,10 @@ class DrawingManager {
   }
 
  private:
+  // The automatic render target shared per window within the current recording batch (see
+  // getAutomaticTarget()); cleared at flush time so each new batch resolves fresh targets.
+  std::unordered_map<Window*, std::shared_ptr<RenderTargetProxy>> automaticTargets = {};
+
   // The windows whose presentations the current drawing buffer registered. The presentations
   // hold them weakly (through the proxies), so the strong references are moved into the
   // Recording at flush time: while the Recording is alive, shared-backbuffer backends can still

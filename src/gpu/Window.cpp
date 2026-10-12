@@ -60,23 +60,6 @@ std::shared_ptr<Drawable> Window::onNextDrawable() {
   return ProxyDrawable::Make(shared_from_this());
 }
 
-std::shared_ptr<RenderTargetProxy> Window::getAutomaticTarget(Context* context) {
-  std::lock_guard<std::mutex> autoLock(locker);
-  auto iter = _automaticTargets.find(context);
-  if (iter != _automaticTargets.end()) {
-    if (auto target = iter->second.lock()) {
-      return target;
-    }
-    // The Context released its surfaces; create a fresh target for it below.
-    _automaticTargets.erase(iter);
-  }
-  auto target = onCreateRenderTarget(context);
-  if (target != nullptr) {
-    _automaticTargets[context] = target;
-  }
-  return target;
-}
-
 void Window::onPresent(Context*) {
 }
 }  // namespace tgfx

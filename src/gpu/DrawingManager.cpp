@@ -45,11 +45,28 @@ DrawingBuffer* DrawingManager::createDrawingBuffer() {
   return currentBuffer.get();
 }
 
+void DrawingManager::collectWindowUsage(const std::shared_ptr<RenderTargetProxy>& renderTarget) {
+  // Tasks that access a window-backed target record a frame usage on the current batch, so the
+  // submission wires the frame acquisition synchronization even for batches without a registered
+  // presentation (for example a readback-only transfer).
+  if (renderTarget == nullptr || !renderTarget->isWindowBacked()) {
+    return;
+  }
+  auto drawingBuffer = getDrawingBuffer();
+  for (auto& proxy : drawingBuffer->windowUsages) {
+    if (proxy == renderTarget) {
+      return;
+    }
+  }
+  drawingBuffer->windowUsages.push_back(renderTarget);
+}
+
 bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
                                   PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags) {
   if (renderTarget == nullptr || processor == nullptr) {
     return false;
   }
+  collectWindowUsage(renderTarget);
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto bounds = Rect::MakeWH(renderTarget->width(), renderTarget->height());
@@ -82,6 +99,7 @@ void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderT
   if (renderTarget == nullptr || (drawOps.empty() && !clearColor.has_value())) {
     return;
   }
+  collectWindowUsage(renderTarget);
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto textureProxy = renderTarget->asTextureProxy();
@@ -98,6 +116,7 @@ void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> rende
   if (renderTarget == nullptr || inputs.empty() || effect == nullptr) {
     return;
   }
+  collectWindowUsage(renderTarget);
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto textureProxy = renderTarget->asTextureProxy();
@@ -123,6 +142,7 @@ void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> 
   if (source == nullptr || dest == nullptr) {
     return;
   }
+  collectWindowUsage(source);
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto task = allocator->make<RenderTargetCopyTask>(allocator, std::move(source), std::move(dest),
@@ -136,6 +156,7 @@ void DrawingManager::addTransferPixelsTask(std::shared_ptr<RenderTargetProxy> so
   if (source == nullptr || dest == nullptr || srcRect.isEmpty()) {
     return;
   }
+  collectWindowUsage(source);
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto task =
@@ -193,6 +214,26 @@ void DrawingManager::registerPresentation(std::shared_ptr<Drawable> drawable) {
   drawingBuffer->presentables.push_back({drawable, drawable->_importedTarget});
 }
 
+std::shared_ptr<RenderTargetProxy> DrawingManager::getAutomaticTarget(
+    std::shared_ptr<Window> window) {
+  if (window == nullptr) {
+    return nullptr;
+  }
+  auto iter = automaticTargets.find(window.get());
+  if (iter != automaticTargets.end()) {
+    return iter->second;
+  }
+  auto target = window->onCreateRenderTarget(context);
+  if (target != nullptr) {
+    // Associate the target with its window: the default proxy-level presentation forwards
+    // through the window (shared-backbuffer backends), and window-backed proxies use the weak
+    // reference to fail safely once the window is gone.
+    target->setPresentingWindow(window);
+    automaticTargets[window.get()] = target;
+  }
+  return target;
+}
+
 void DrawingManager::collectWindow(std::shared_ptr<Window> window,
                                    std::shared_ptr<RenderTargetProxy> renderTarget) {
   if (window == nullptr || renderTarget == nullptr) {
@@ -234,6 +275,7 @@ std::shared_ptr<DrawingBuffer> DrawingManager::flush() {
   auto drawingBuffer = currentBuffer;
   bufferPool.push_back(currentBuffer);
   currentBuffer = nullptr;
+  automaticTargets.clear();
   return drawingBuffer;
 }
 }  // namespace tgfx

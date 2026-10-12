@@ -61,6 +61,10 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
   void releaseFrame();
   void presentFrame();
 
+  bool isWindowBacked() const override {
+    return true;
+  }
+
   /**
    * Frame-level wiring, independent of the VulkanWindow: registers the frame's semaphore pair
    * with the upcoming render submission (whether or not a presentation was registered for that

@@ -82,6 +82,11 @@ std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
   if (_renderTarget != nullptr) {
     return _renderTarget;
   }
+  if (_presentingWindow.expired()) {
+    // The window that owns the swapchain is gone; its handles are dangling and a new frame
+    // must not be acquired through them.
+    return nullptr;
+  }
   if (*_swapchainGeneration != _generationValue) {
     // The swapchain has been rebuilt since this proxy was created. The cached handles are stale;
     // the caller must create a new Surface, matching the documented resize contract.
@@ -145,6 +150,12 @@ void VulkanSwapchainProxy::schedulePresent() {
   if (_renderTarget == nullptr || _pendingImageAvailableSemaphore == VK_NULL_HANDLE) {
     return;
   }
+  if (_presentingWindow.expired()) {
+    // The window that owns the swapchain is gone; its image states and semaphores are
+    // dangling, so the pending frame is dropped instead.
+    releaseFrame();
+    return;
+  }
   auto& imageState = _imageStates[_currentImageIndex];
   auto queue = static_cast<VulkanCommandQueue*>(_context->gpu()->queue());
   queue->schedulePresent(_swapchain, _currentImageIndex, _images[_currentImageIndex],
@@ -194,6 +205,12 @@ void VulkanSwapchainProxy::releaseFrame() {
 
 void VulkanSwapchainProxy::presentFrame() {
   _presentationRequested = true;
+  if (_presentingWindow.expired()) {
+    // The window that owns the swapchain is gone; drop the pending frame instead of
+    // presenting through dangling handles.
+    releaseFrame();
+    return;
+  }
   if (!_manualPresent || _frameState == nullptr || !_frameState->beginPresent()) {
     releaseManualToken();
     return;

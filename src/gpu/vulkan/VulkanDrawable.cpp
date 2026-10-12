@@ -61,7 +61,13 @@ std::shared_ptr<RenderTargetProxy> VulkanDrawable::onImport(Context* context) {
     return nullptr;
   }
   auto vulkanWindow = static_cast<VulkanWindow*>(window.get());
-  return vulkanWindow->createSwapchainProxy(context, true);
+  auto proxy = vulkanWindow->createSwapchainProxy(context, true);
+  if (proxy != nullptr) {
+    // The proxy's swapchain handles are owned by the window; associate them so the proxy fails
+    // safely once the window is gone.
+    proxy->setPresentingWindow(_window);
+  }
+  return proxy;
 }
 
 void VulkanDrawable::onAbandon() {

@@ -117,6 +117,16 @@ class RenderTargetProxy {
   virtual std::shared_ptr<RenderTarget> getRenderTarget() const = 0;
 
   /**
+   * Returns true when this target is backed by a window's presentation endpoint (a swapchain or
+   * platform frame buffer). Tasks that access such a target record a frame usage on their
+   * drawing buffer, so the submission wires the frame acquisition synchronization even for
+   * batches without a registered presentation (for example a readback-only transfer).
+   */
+  virtual bool isWindowBacked() const {
+    return false;
+  }
+
+  /**
    * Wires this target's frame into the upcoming render submission, before the command buffer
    * that carries the frame's rendering is submitted. Called for every used frame, whether or not
    * a presentation has been registered for it. The default implementation does nothing; backends
@@ -144,7 +154,9 @@ class RenderTargetProxy {
 
   /**
    * Associates this target with the window that created it, enabling the default
-   * onPresentFrame() forwarding. Called by the surface paths after onCreateRenderTarget().
+   * onPresentFrame() forwarding and the window-lifetime gating: window-backed proxies whose
+   * backend resources (swapchains, surfaces, image states) are owned by the window fail safely
+   * once the window is gone. Called by the surface paths after onCreateRenderTarget().
    */
   void setPresentingWindow(std::weak_ptr<Window> window) {
     _presentingWindow = std::move(window);

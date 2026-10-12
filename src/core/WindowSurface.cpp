@@ -29,16 +29,14 @@ std::shared_ptr<Surface> WindowSurface::Make(Context* context, std::shared_ptr<W
   if (context == nullptr || window == nullptr) {
     return nullptr;
   }
-  // All surfaces of this window share one automatic target (unified frame acquisition): one
-  // frame identity per window per recording batch, presented once at the end of the batch.
-  auto proxy = window->getAutomaticTarget(context);
+  // All surfaces of this window share one automatic target within the current recording batch
+  // (unified frame acquisition): one frame identity per window per batch, presented once at the
+  // end of the batch. The batch cache is cleared at flush time, so a surface created for a new
+  // batch (for example after a window resize) resolves a fresh target.
+  auto proxy = context->drawingManager()->getAutomaticTarget(window);
   if (proxy == nullptr) {
     return nullptr;
   }
-  // Enable the default proxy-level presentation forwarding for shared-backbuffer backends
-  // (GL); frame-level backends (Metal, Vulkan, WebGPU, EAGL, QGL, D3D12) override the proxy
-  // hooks instead.
-  proxy->setPresentingWindow(window);
   auto colorSpace = window->colorSpace();
   auto renderTarget = proxy;
   auto surface = std::shared_ptr<WindowSurface>(new WindowSurface(

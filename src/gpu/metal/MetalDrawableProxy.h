@@ -52,6 +52,10 @@ class MetalDrawableProxy : public RenderTargetProxy {
 
   id<CAMetalDrawable> getMetalDrawable() const;
 
+  bool isWindowBacked() const override {
+    return true;
+  }
+
   /**
    * Frame-level presentation, independent of the MetalWindow: schedules the drawable onto the
    * upcoming command buffer at submission time.

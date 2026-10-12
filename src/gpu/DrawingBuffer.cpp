@@ -66,6 +66,9 @@ void DrawingBuffer::attachFrameUsages(Context* context) {
       drawable->_importedTarget->onAttachSubmission(context);
     }
   }
+  for (auto& proxy : windowUsages) {
+    proxy->onAttachSubmission(context);
+  }
 }
 
 void DrawingBuffer::schedulePresents(Context* context) {
@@ -81,6 +84,7 @@ void DrawingBuffer::deliverFrames(Context* context) {
     drawable->markSubmitted();
   }
   frameUsages.clear();
+  windowUsages.clear();
   for (auto& pending : presentables) {
     if (pending.proxy != nullptr) {
       pending.proxy->onPresentFrame(context);
@@ -106,6 +110,7 @@ void DrawingBuffer::reset() {
   resourceTasks.clear();
   atlasTasks.clear();
   frameUsages.clear();
+  windowUsages.clear();
   presentables.clear();
   vertexAllocator.clear(vertexMaxValueTracker.getMaxValue());
   instanceAllocator.clear(instanceMaxValueTracker.getMaxValue());
