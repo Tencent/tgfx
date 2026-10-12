@@ -54,10 +54,13 @@ class MetalDrawableProxy : public RenderTargetProxy {
 
   /**
    * Frame-level presentation, independent of the MetalWindow: schedules the drawable onto the
-   * upcoming command buffer at submission time and releases it after the submission.
+   * upcoming command buffer at submission time.
    */
   void onSchedulePresentation(Context* context) override;
 
+  /**
+   * Releases the drawable after the submission, so it returns to the layer's rotation pool.
+   */
   void onPresentFrame(Context* context) override;
 
   /**

@@ -62,11 +62,16 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
   void presentFrame();
 
   /**
-   * Frame-level frame wiring, independent of the VulkanWindow: registers the frame's
-   * semaphore pair with the upcoming submission and presents/releases the frame after it.
+   * Frame-level wiring, independent of the VulkanWindow: registers the frame's semaphore pair
+   * with the upcoming render submission (whether or not a presentation was registered for that
+   * batch).
    */
   void onAttachSubmission(Context* context) override;
 
+  /**
+   * Registers the frame's semaphore pair with the submission of the batch carrying the
+   * presentation request; the wiring is idempotent.
+   */
   void onSchedulePresentation(Context* context) override;
 
   void onPresentFrame(Context* context) override;
