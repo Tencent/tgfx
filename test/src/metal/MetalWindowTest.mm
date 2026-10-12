@@ -332,6 +332,40 @@ TGFX_TEST(MetalWindowTest, DroppedRecordingReleasesWindow) {
 }
 
 /**
+ * Verifies that a readback-only batch on an automatic window surface keeps the frame state in
+ * step with the submission: the batch's usage wiring may present the frame it acquired (backends
+ * like Vulkan aggregate the acquire wait and the present), and the surface must keep serving
+ * fresh frames for the following drawing instead of an already-presented one.
+ */
+TGFX_TEST(MetalWindowTest, ReadbackOnlyBatchKeepsFrameUsable) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  if (context == nullptr) {
+    GTEST_SKIP() << "Metal backend not available";
+  }
+  auto gpu = static_cast<MetalGPU*>(context->gpu());
+  auto layer = MakeTestLayer(gpu->device(), 16, 16);
+  auto window = MetalWindow::MakeFrom(layer, nullptr, nullptr, false);
+  ASSERT_TRUE(window != nullptr);
+  auto surface = Surface::MakeFrom(context, window);
+  ASSERT_TRUE(surface != nullptr);
+
+  surface->getCanvas()->clear(Color::Red());
+  context->flushAndSubmit(true);
+
+  // A batch that only carries a readback transfer: it acquires a window frame without a
+  // registered presentation request.
+  auto firstReadback = surface->asyncReadPixels(Rect::MakeXYWH(8, 8, 1, 1));
+  EXPECT_TRUE(firstReadback != nullptr);
+  context->flushAndSubmit(true);
+
+  // The surface keeps drawing on a fresh frame and the new content is readable.
+  surface->getCanvas()->clear(Color::Green());
+  EXPECT_TRUE(ReadCenterPixel(surface.get(), Color::Green()));
+  context->flushAndSubmit(true);
+}
+
+/**
  * Verifies that a window without readback support (framebufferOnly = YES, the Metal default)
  * still renders normally through the drawable path: rendering must not be gated by the
  * readback capability, only readback itself is.

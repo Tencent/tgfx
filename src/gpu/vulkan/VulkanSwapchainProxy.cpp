@@ -79,13 +79,13 @@ std::shared_ptr<TextureView> VulkanSwapchainProxy::getTextureView() const {
 }
 
 std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
+  if (_presentingWindow.expired()) {
+    // The window that owns the swapchain is gone; its handles are dangling, so neither the
+    // cached target (it wraps destroyed images) nor a new frame may be served.
+    return nullptr;
+  }
   if (_renderTarget != nullptr) {
     return _renderTarget;
-  }
-  if (_presentingWindow.expired()) {
-    // The window that owns the swapchain is gone; its handles are dangling and a new frame
-    // must not be acquired through them.
-    return nullptr;
   }
   if (*_swapchainGeneration != _generationValue) {
     // The swapchain has been rebuilt since this proxy was created. The cached handles are stale;
@@ -183,6 +183,15 @@ void VulkanSwapchainProxy::onPresentFrame(Context*) {
   if (_manualPresent) {
     presentFrame();
   } else {
+    releaseFrame();
+  }
+}
+
+void VulkanSwapchainProxy::onUsageCompleted(Context*) {
+  // The acquire semaphore was consumed by this batch's wiring and the frame is still open, so
+  // the queue presented it with the submission; end the frame in step.
+  if (!_manualPresent && _renderTarget != nullptr &&
+      _pendingImageAvailableSemaphore == VK_NULL_HANDLE) {
     releaseFrame();
   }
 }

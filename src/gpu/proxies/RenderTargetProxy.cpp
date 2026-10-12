@@ -84,6 +84,9 @@ void RenderTargetProxy::onAttachSubmission(Context*) {
 void RenderTargetProxy::onSchedulePresentation(Context*) {
 }
 
+void RenderTargetProxy::onUsageCompleted(Context*) {
+}
+
 void RenderTargetProxy::onPresentFrame(Context* context) {
   // Backends with a shared native backbuffer (GL) present through their window; when the window
   // is gone there is nothing to present into and the presentation is dropped.

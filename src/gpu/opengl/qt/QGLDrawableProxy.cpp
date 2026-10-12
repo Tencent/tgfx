@@ -68,6 +68,11 @@ bool QGLDrawableProxy::externallyOwned() const {
 
 void QGLDrawableProxy::ensureTextureRTProxy() const {
   if (textureRTProxy == nullptr) {
+    if (_presentingWindow.expired()) {
+      // The window that owns the texture slots is gone; its handles are dangling and no frame
+      // can be resolved through them.
+      return;
+    }
     textureRTProxy = _window->acquireTexture(_context, _width, _height);
   }
 }
@@ -96,7 +101,11 @@ std::shared_ptr<RenderTargetProxy> QGLDrawableProxy::getTextureTargetProxy() con
 
 void QGLDrawableProxy::releaseTexture() {
   if (textureRTProxy != nullptr) {
-    _window->reuseTexture(textureRTProxy);
+    if (!_presentingWindow.expired()) {
+      _window->reuseTexture(textureRTProxy);
+    }
+    // Once the window is gone the slot cannot be returned; drop the reference instead of
+    // touching the destroyed window.
     textureRTProxy = nullptr;
   }
 }

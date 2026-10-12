@@ -78,6 +78,15 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
    */
   void onSchedulePresentation(Context* context) override;
 
+  /**
+   * Ends automatic frames whose acquire wiring was attached to a batch's submission: the queue
+   * aggregates the acquire wait and the present, so the frame was presented with that
+   * submission even without a registered presentation request, and the proxy must not keep
+   * serving an image the presentation engine already owns. Manual (explicit-path) frames defer
+   * their presentation and stay open.
+   */
+  void onUsageCompleted(Context* context) override;
+
   void onPresentFrame(Context* context) override;
 
   /**
