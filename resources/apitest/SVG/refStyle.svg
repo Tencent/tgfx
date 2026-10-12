@@ -4,9 +4,15 @@
       .cls-1 {
         fill: #fcfae9
       }
-      .cls-2, .cls-3 { fill: #cad4dd; }
-      .cls-2 { opacity: .5; }
-      .cls-3 { fill: #ff0000; }
+      .cls-2, .cls-3 {
+        fill: #cad4dd
+      }
+      .cls-2 {
+        opacity: .5
+      }
+      .cls-3 {
+        fill: #ff0000
+      }
     </style>
   </defs>
   <g id="Layer_1">
