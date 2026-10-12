@@ -129,7 +129,8 @@ bool DropShadowStyle::tryDrawAnalytic(Canvas* canvas, const LayerStyleInput& inp
   if (FloatNearlyZero(sigmaX) || FloatNearlyZero(sigmaY)) {
     return false;
   }
-  const auto shape = AnalyticShadowUtils::MakeShadowShape(input, _spread);
+  const auto shape =
+      AnalyticShadowUtils::MakeShadowShape(input, _spread, !FloatNearlyZero(_spread));
   if (!shape.has_value()) {
     return false;
   }

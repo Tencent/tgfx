@@ -221,17 +221,16 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
     DrawSpreadRRect(recordCanvas, rRect, type, strokeAlign, strokeWidth, spread);
   } else {
     if (!path.isRect(&rect)) {
-      // Irregular paths (stars, freeform shapes) have an exact shape but no closed-form spread:
-      // their bounding rect is used as a fill approximation for the shadow source (a pre-existing
-      // behavior); the fallback above only covers layers with no exact outline at all. A
-      // collapsed stroke is already rejected by IsSpreadCollapsed above, so any stroke reaching
-      // here is non-collapsed and safe to approximate as a fill.
+      // Complex paths use their bounding rect as an approximation for the shadow source:
+      // FillStroke is treated as a fill with the stroke outset folded into the rect, while
+      // Stroke keeps its band rendering on the rect. A collapsed stroke is already rejected by
+      // IsSpreadCollapsed above, so any stroke reaching here is non-collapsed.
       rect = path.getBounds();
-      if (type == StyledShapeType::Stroke || type == StyledShapeType::FillStroke) {
+      if (type == StyledShapeType::FillStroke) {
         auto outset = SpreadUtils::StrokeOutset(strokeWidth, styledShape.strokeAlign);
         rect.outset(outset, outset);
+        type = StyledShapeType::Fill;
       }
-      type = StyledShapeType::Fill;
     }
     DrawSpreadRRect(recordCanvas, RRect::MakeRectXY(rect, 0, 0), type, strokeAlign, strokeWidth,
                     spread);

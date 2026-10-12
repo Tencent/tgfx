@@ -28,7 +28,7 @@
 namespace tgfx {
 
 // Returns the path as an RRect when the closed-form shadow supports it; nullopt otherwise.
-static inline std::optional<RRect> AsAnalyticRRect(const Path& path) {
+static inline std::optional<RRect> AsAnalyticRRect(const Path& path, bool allowFallback) {
   // Path::isRect, Path::isRRect and Path::isOval each recognize only their own shape kind, so
   // all three must be checked.
   Rect rect = {};
@@ -45,11 +45,16 @@ static inline std::optional<RRect> AsAnalyticRRect(const Path& path) {
   if (path.isOval(&rect)) {
     return RRect::MakeOval(rect);
   }
-  return std::nullopt;
+  if (!allowFallback) {
+    return std::nullopt;
+  }
+  // Complex paths use their bounding rect as an approximation for the shadow source, matching
+  // MakeSpreadShapeImage.
+  return RRect::MakeRect(path.getBounds());
 }
 
 std::optional<RRect> AnalyticShadowUtils::MakeShadowShape(const LayerStyleInput& input,
-                                                          float spread) {
+                                                          float spread, bool allowFallback) {
   auto* source = input.findExtraSource(StyleInputSource::Type::Contour);
   if (source == nullptr) {
     return std::nullopt;
@@ -82,7 +87,7 @@ std::optional<RRect> AnalyticShadowUtils::MakeShadowShape(const LayerStyleInput&
   if (path.isEmpty()) {
     return RRect::MakeRect(Rect::MakeEmpty());
   }
-  auto rRect = AsAnalyticRRect(path);
+  auto rRect = AsAnalyticRRect(path, allowFallback);
   if (!rRect.has_value()) {
     return std::nullopt;
   }
