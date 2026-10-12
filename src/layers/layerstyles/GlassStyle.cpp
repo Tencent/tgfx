@@ -592,11 +592,11 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       // density as the core. Any other factor would shift the texture origin away from the
       // coordinates the shader derives from the full-layer mapping.
 
-      // This radius controls only the smoothness and reach of the distance field. The shader
-      // divides the field height by its reconstructed gradient and then applies smoothstep(0, 1),
-      // so the visible edge-light width remains exactly one layer pixel. Keeping the field radius
-      // at four layer pixels and at least four texels prevents sparse point-like gradients without
-      // coupling the visible width to zoom or UDF density.
+      // This radius controls only the smoothness and reach of the distance field, which the shader
+      // turns into a layer-pixel distance by dividing the field height by its reconstructed
+      // gradient. Four layer pixels and at least four texels prevent sparse point-like gradients.
+      // The visible edge-light width is controlled independently by edgeBandLayerPixels (see
+      // GetEdgeBandLayerPixels) and is not coupled to this radius.
       static constexpr float EDGE_FIELD_RADIUS_LAYER_PIXELS = 4.0f;
       static constexpr float MIN_COARSE_TENT_TEXELS = 4.0f;
       Point coarseRadius = {

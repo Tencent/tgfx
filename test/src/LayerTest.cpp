@@ -3941,8 +3941,8 @@ static void AddGlassCell(Layer* root, std::shared_ptr<Image> bgImage, float x, f
                          float cellSize, float refraction, float depth, float frost,
                          float dispersion, float splay, float lightAngle, float lightIntensity,
                          float glassW = -1.0f, float glassH = -1.0f, float radiusX = -1.0f,
-                         float radiusY = -1.0f,
-                         Color rectColor = Color::FromRGBA(0, 100, 255, 255)) {
+                         float radiusY = -1.0f, Color rectColor = Color::FromRGBA(0, 100, 255, 255),
+                         float layerScale = 1.0f) {
   auto container = Layer::Make();
   container->setMatrix(Matrix::MakeTrans(x, y));
 
@@ -3988,7 +3988,11 @@ static void AddGlassCell(Layer* root, std::shared_ptr<Image> bgImage, float x, f
   glassLayer->setHeight(gh);
   glassLayer->setRadiusX(rx);
   glassLayer->setRadiusY(ry);
-  glassLayer->setMatrix(Matrix::MakeTrans((cellSize - gw) * 0.5f, (cellSize - gh) * 0.5f));
+  // Draw the panel smaller about the cell centre; contentScale then becomes layerScale, which
+  // widens the edge band to max(1.5, 1 / layerScale) layer pixels.
+  float offsetX = (cellSize - gw) * 0.5f + (1.0f - layerScale) * gw * 0.5f;
+  float offsetY = (cellSize - gh) * 0.5f + (1.0f - layerScale) * gh * 0.5f;
+  glassLayer->setMatrix(Matrix::MakeTrans(offsetX, offsetY) * Matrix::MakeScale(layerScale));
   auto style =
       GlassStyle::Make(refraction, depth, frost, dispersion, splay, lightAngle, lightIntensity);
   glassLayer->setLayerStyles({style});
@@ -4324,6 +4328,65 @@ TGFX_TEST(LayerTest, GlassStyleSplayCompare) {
                135, 50, 180.0f, 180.0f, 0.0f, 0.0f);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleSplayCompare"));
+}
+
+TGFX_TEST(LayerTest, GlassStyleShallowDepthEdgeLight) {
+  // On a sharp square (cornerRadius = 0) the analytical SDF gradient degenerates along the corner
+  // diagonal, where the highlight used to be trapped inside the gradientLength > 0.000001 gate.
+  // That only becomes visible when a degenerate sample also lands inside the edge-light band, i.e.
+  // when r_eff (= glassThickness = depth) <= edgeDist <= band, with the band floor being
+  // max(1.5, 1 / contentScale) layer pixels. The degenerate set is |px| == |py| held exactly in
+  // float and |px| <= halfW - r_eff, so a hit needs both the band window and the grid phase.
+  // Cells 2, 4 and 6 hit that window; cells 1, 3 and 5 are controls. Cell 1 has the same depth and
+  // band window as cell 2 but a 180 px panel, whose sampling phase keeps |px| == |py| from holding
+  // exactly, so it stays unchanged. Cell 3 (depth 5) sits outside the band window, and cell 5
+  // (cornerRadius 24 pushes r_eff to 24) sits far outside the band. Cells 4 and 6 draw a 100 px and
+  // a 180 px panel at 0.5 scale, so contentScale becomes 0.5 and the band widens to 2 layer pixels
+  // while the corner samples stay inside the window.
+  //
+  // Phase note: a hit needs the degenerate set to meet the band window, so it depends on both the
+  // window and the sampling grid; no configuration hits independently of the phase. Resizing a cell
+  // moves the phase without changing the mechanism, so a cell can drop out of the window. To
+  // re-verify, temporarily move the light response back inside the gradient gate and re-render
+  // this sheet: cells 2, 4 and 6 should differ again. If they do not, the phase changed, so pick
+  // another panel size whose samples land on the diagonal.
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr float cellSize = 200;
+  constexpr float gap = 10;
+  constexpr int cols = 6;
+  int surfaceW = static_cast<int>(cols * (cellSize + gap) + gap);
+  int surfaceH = static_cast<int>(cellSize + 2 * gap);
+  auto surface = Surface::Make(context, surfaceW, surfaceH);
+  auto displayList = std::make_unique<DisplayList>();
+  auto bgImage = MakeImage("resources/apitest/checker_128.png");
+  // cell 1: control, sharp 180 px panel at depth 0.5. It shares cell 2's depth and band window, but
+  // its sampling phase keeps |px| == |py| from holding exactly, so nothing changes.
+  AddGlassCell(displayList->root(), bgImage, gap, gap, cellSize, 80, 0.5f, 0, 0, 50, 0, 100, 180.0f,
+               180.0f, 0.0f, 0.0f);
+  // cell 2: positive, the same at a 100 px panel whose diagonal sample phase lands in the band -> 4
+  // corner pixels brighten.
+  AddGlassCell(displayList->root(), bgImage, gap + (cellSize + gap), gap, cellSize, 80, 0.5f, 0, 0,
+               50, 0, 100, 100.0f, 100.0f, 0.0f, 0.0f);
+  // cell 3: control, depth far outside the band window.
+  AddGlassCell(displayList->root(), bgImage, gap + 2.0f * (cellSize + gap), gap, cellSize, 80, 5.0f,
+               0, 0, 50, 0, 100, 180.0f, 180.0f, 0.0f, 0.0f);
+  // cell 4: positive, the 100 px panel drawn at 0.5 scale (reviewer case): the band widens to 2
+  // layer pixels and 2 corner pixels change.
+  AddGlassCell(displayList->root(), bgImage, gap + 3.0f * (cellSize + gap), gap, cellSize, 80, 1.0f,
+               0, 0, 50, 0, 100, 100.0f, 100.0f, 0.0f, 0.0f, Color::FromRGBA(0, 100, 255, 255),
+               0.5f);
+  // cell 5: control, rounded corner (r_eff = 24) keeps the degenerate set out of the band.
+  AddGlassCell(displayList->root(), bgImage, gap + 4.0f * (cellSize + gap), gap, cellSize, 80, 0.5f,
+               0, 0, 50, 0, 100, 180.0f, 180.0f, 24.0f, 24.0f);
+  // cell 6: positive, the 180 px panel at 0.5 scale: the band widens to 2 layer pixels and 2 corner
+  // pixels change.
+  AddGlassCell(displayList->root(), bgImage, gap + 5.0f * (cellSize + gap), gap, cellSize, 80, 0.5f,
+               0, 0, 50, 0, 100, 180.0f, 180.0f, 0.0f, 0.0f, Color::FromRGBA(0, 100, 255, 255),
+               0.5f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleShallowDepthEdgeLight"));
 }
 
 TGFX_TEST(LayerTest, GlassStyleEllipseSDF) {
