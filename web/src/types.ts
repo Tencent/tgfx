@@ -50,6 +50,8 @@ export const enum MatrixIndex {
     ty,
 }
 
+// Mirrors the WebNamedColorSpace enum defined on the C++ side (src/platform/web/WebNamedColorSpace.h),
+// which is the authoritative definition. The integer values must stay in sync with it.
 export const enum WindowColorSpace{
     None,
     SRGB,
@@ -144,7 +146,15 @@ export interface EmscriptenGLContext {
 }
 
 export type EmscriptenGLContextAttributes =
-    { majorVersion: number; minorVersion: number }
+    {
+        majorVersion: number;
+        minorVersion: number;
+        // Emscripten's own extras, which the WebGL specification does not define.
+        enableExtensionsByDefault?: boolean;
+        explicitSwapControl?: boolean;
+        proxyContextToMainThread?: number;
+        renderViaOffscreenBackBuffer?: boolean;
+    }
     & WebGLContextAttributes;
 
 export interface EmscriptenGL {
@@ -163,11 +173,28 @@ export interface EmscriptenGL {
     textures: (WebGLTexture | null)[];
 }
 
+export interface EmscriptenWebGPU {
+    mgrSurface: {create: (context: any) => number};
+    mgrDevice: {create: (device: any, wrapper?: any) => number};
+    mgrQueue: {create: (queue: any) => number};
+    [key: string]: any;
+}
+
 export interface TGFX extends EmscriptenModule {
     TGFXLineCap: TGFXLineCap;
     TGFXLineJoin: TGFXLineJoin;
     GL: EmscriptenGL;
+    WebGPU: EmscriptenWebGPU;
     TGFXPathFillType: TGFXPathFillType;
+    /**
+     * Sets the maximum number of worker threads that can be created for running tasks. Pass zero to
+     * restore the default, which is based on the number of CPU cores and capped at 32.
+     */
+    setTaskMaxThreadCounts: (maxThreadCounts: number) => void;
+    /**
+     * Returns the current maximum number of worker threads that can be created for running tasks.
+     */
+    taskMaxThreadCounts: () => number;
     _Matrix: {
         _MakeAll: (
             scaleX: number,

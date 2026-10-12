@@ -18,6 +18,7 @@
 
 #include <math.h>
 #include <vector>
+#include "core/Matrix3DUtils.h"
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/shaders/GradientShader.h"
 #include "core/utils/MathExtra.h"
@@ -27,6 +28,7 @@
 #include "layers/RootLayer.h"
 #include "layers/SubtreeCache.h"
 #include "layers/TileCache.h"
+#include "layers/compositing3d/Render3DContext.h"
 #include "layers/contents/ComposeContent.h"
 #include "layers/contents/MatrixContent.h"
 #include "layers/contents/RRectsContent.h"
@@ -3379,6 +3381,41 @@ TGFX_TEST(LayerTest, BackgroundBlurWithFilter) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurWithFilter_Partial"));
 }
 
+TGFX_TEST(LayerTest, BackgroundBlurAlignment) {
+  // A checker background gives grid lines with exact positions, so any offset or coverage loss
+  // in the background snapshot chain shows up as a discontinuity between the blurred grid
+  // inside the layer and the sharp grid outside it. The layer also carries a LayerFilter,
+  // which routes the capture pass through the offscreen content path.
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 484, 484);
+  ASSERT_TRUE(surface != nullptr);
+
+  auto background = ImageLayer::Make();
+  background->setImage(MakeImage("resources/apitest/checker_128.png"));
+  auto backgroundMatrix = Matrix::MakeScale(3, 3);
+  backgroundMatrix.postTranslate(50, 50);
+  background->setMatrix(backgroundMatrix);
+
+  auto blurLayer = SolidLayer::Make();
+  blurLayer->setColor(Color::FromRGBA(255, 255, 255, 60));
+  blurLayer->setWidth(130);
+  blurLayer->setHeight(120);
+  blurLayer->setMatrix(Matrix::MakeTrans(282, 120));
+  blurLayer->setLayerStyles({BackgroundBlurStyle::Make(13, 13)});
+  blurLayer->setFilters({BlurFilter::Make(1, 1)});
+
+  auto rootLayer = Layer::Make();
+  rootLayer->addChild(background);
+  rootLayer->addChild(blurLayer);
+  DisplayList displayList;
+  displayList.root()->addChild(rootLayer);
+  displayList.render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurAlignment"));
+}
+
 TGFX_TEST(LayerTest, BackgroundColor) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -4108,7 +4145,135 @@ static void RunGlassStyleTest(const std::string& keySuffix, float zoomScale = 1.
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyle" + keySuffix));
 }
+TGFX_TEST_PRIVATE(LayerTest, GlassStyleStrokeContentBounds) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  std::vector<int> widths = {};
+  std::vector<float> offsets = {};
 
+  for (auto strokeAlign : {StrokeAlign::Center, StrokeAlign::Inside, StrokeAlign::Outside}) {
+    auto vectorLayer = VectorLayer::Make();
+    auto rectangle = Rectangle::Make();
+    rectangle->setPosition({100, 100});
+    rectangle->setSize({100, 100});
+    rectangle->setRoundness({20, 20, 20, 20});
+    auto fill = FillStyle::Make(SolidColor::Make(Color::White()));
+    auto stroke = StrokeStyle::Make(SolidColor::Make(Color::Blue()));
+    stroke->setStrokeWidth(10);
+    stroke->setStrokeAlign(strokeAlign);
+    vectorLayer->setContents({rectangle, fill, stroke});
+    vectorLayer->setLayerStyles({GlassStyle::Make(80, 50, 0, 50, 0, 135, 50)});
+    DrawArgs drawArgs(context);
+    TGFX_PRIVATE_ACCESS(auto source = vectorLayer->getLayerStyleSource(drawArgs, Matrix::I());
+                        ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
+                        ASSERT_TRUE(source->groups[0]->content.image != nullptr);
+                        widths.push_back(source->groups[0]->content.image->width());
+                        offsets.push_back(source->groups[0]->content.offset.x);)
+  }
+  ASSERT_EQ(widths.size(), 3u);
+  EXPECT_EQ(widths[1], 100);
+  EXPECT_LT(offsets[0], offsets[1]);
+  EXPECT_GT(widths[0], widths[1]);
+  EXPECT_LT(offsets[2], offsets[0]);
+  EXPECT_GT(widths[2], widths[0]);
+}
+
+TGFX_TEST_PRIVATE(LayerTest, ShapeLayerContentShapeExactness) {
+  auto layer = ShapeLayer::Make();
+  Path path = {};
+  path.addRRect(RRect::MakeRectXY(Rect::MakeXYWH(50, 50, 100, 100), 20, 20));
+  layer->setPath(path);
+  layer->setFillStyle(ShapeStyle::Make(Color::White()));
+  layer->setStrokeStyle(ShapeStyle::Make(Color::Blue()));
+  TGFX_PRIVATE_ACCESS(auto singleStroke = layer->onGetContentShape();
+                      ASSERT_TRUE(singleStroke.has_value());
+                      EXPECT_EQ(singleStroke->type, StyledShapeType::FillStroke);
+                      EXPECT_TRUE(singleStroke->shape != nullptr);)
+
+  layer->addStrokeStyle(ShapeStyle::Make(Color::Red()));
+  TGFX_PRIVATE_ACCESS(auto multipleStrokes = layer->onGetContentShape();
+                      ASSERT_TRUE(multipleStrokes.has_value());
+                      // Stacked stroke styles share the layer's single width and alignment, so the
+                      // contour stays exact no matter how many are stacked.
+                      EXPECT_EQ(multipleStrokes->type, StyledShapeType::FillStroke);
+                      EXPECT_TRUE(multipleStrokes->shape != nullptr);)
+
+  auto multipleFills = ShapeLayer::Make();
+  multipleFills->setPath(path);
+  multipleFills->setFillStyles({ShapeStyle::Make(Color::White()), ShapeStyle::Make(Color::Blue())});
+  TGFX_PRIVATE_ACCESS(auto multipleFillShape = multipleFills->onGetContentShape();
+                      ASSERT_TRUE(multipleFillShape.has_value());
+                      EXPECT_EQ(multipleFillShape->type, StyledShapeType::Fill);
+                      EXPECT_TRUE(multipleFillShape->shape != nullptr);)
+
+  auto strokeOnly = ShapeLayer::Make();
+  strokeOnly->setPath(path);
+  strokeOnly->addStrokeStyle(ShapeStyle::Make(Color::Blue()));
+  strokeOnly->addStrokeStyle(ShapeStyle::Make(Color::Red()));
+  TGFX_PRIVATE_ACCESS(auto strokeOnlyShape = strokeOnly->onGetContentShape();
+                      ASSERT_TRUE(strokeOnlyShape.has_value());
+                      EXPECT_EQ(strokeOnlyShape->type, StyledShapeType::Stroke);
+                      EXPECT_TRUE(strokeOnlyShape->shape != nullptr);)
+}
+
+static std::optional<uint32_t> RenderSpreadShadowPixel(Context* context,
+                                                       const std::shared_ptr<Layer>& layer, int x,
+                                                       int y) {
+  auto surface = Surface::Make(context, 200, 200);
+  if (surface == nullptr) {
+    return std::nullopt;
+  }
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->root()->addChild(layer);
+  displayList->render(surface.get());
+  auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  uint32_t pixel = 0;
+  if (!surface->readPixels(info, &pixel, x, y)) {
+    return std::nullopt;
+  }
+  return pixel;
+}
+
+static std::shared_ptr<VectorLayer> MakeMultiGeometryVectorLayer() {
+  auto vectorLayer = VectorLayer::Make();
+  auto group = VectorGroup::Make();
+  auto rect = Rectangle::Make();
+  rect->setPosition({100, 100});
+  rect->setSize({100, 100});
+  auto ellipse = Ellipse::Make();
+  ellipse->setPosition({100, 100});
+  ellipse->setSize({80, 80});
+  auto fill = FillStyle::Make(SolidColor::Make(Color::FromRGBA(255, 255, 255, 255)));
+  group->setElements({rect, ellipse, fill});
+  vectorLayer->setContents({group});
+  return vectorLayer;
+}
+
+// Multiple geometries cannot produce a single exact outline: the spread falls back to the
+// content image's bounds, so it still applies — the shadow expands by the spread from the
+// bounds rect rather than hugging the content.
+TGFX_TEST(LayerTest, DropShadowSpreadWithoutExactShape) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Both geometries are centered at (100, 100); the rect spans [50, 150], so the content bounds
+  // end at 150. The shadow has no blur and a Y offset of 15, and a spread of 10 expands the
+  // bounds footprint to 160, so the shadow reaches 175.
+  auto layer = MakeMultiGeometryVectorLayer();
+  auto shadowStyle = DropShadowStyle::Make(0, 15, 0, 0, Color::Black());
+  shadowStyle->setSpread(10);
+  layer->setLayerStyles({shadowStyle});
+  // Within the spread-expanded footprint (150 + 10 + 15).
+  auto spreadPixel = RenderSpreadShadowPixel(context, layer, 100, 170);
+  ASSERT_TRUE(spreadPixel.has_value());
+  EXPECT_NE(*spreadPixel, 0u) << "spread was not applied from the content bounds";
+  // Beyond the spread-expanded footprint the shadow must be absent.
+  auto outsidePixel = RenderSpreadShadowPixel(context, layer, 100, 180);
+  ASSERT_TRUE(outsidePixel.has_value());
+  EXPECT_EQ(*outsidePixel, 0u);
+}
 TGFX_TEST_PRIVATE(LayerTest, GlassStyleUsesBackgroundAndContourSource) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -4135,7 +4300,7 @@ TGFX_TEST(LayerTest, GlassStyleBackgroundOutsets) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 600, 200);
+  auto surface = Surface::Make(context, 800, 200);
   auto displayList = std::make_unique<DisplayList>();
 
   auto sharpLayer = SolidLayer::Make();
@@ -4159,14 +4324,24 @@ TGFX_TEST(LayerTest, GlassStyleBackgroundOutsets) {
       {BackgroundBlurStyle::Make(100, 100), GlassStyle::Make(80, 50, 0, 50, 0, 0, 0)});
   displayList->root()->addChild(mixedLayer);
 
+  auto combinedLayer = SolidLayer::Make();
+  combinedLayer->setWidth(150);
+  combinedLayer->setHeight(100);
+  combinedLayer->setMatrix(Matrix::MakeTrans(600, 0));
+  combinedLayer->setLayerStyles({GlassStyle::Make(80, 50, 100, 50, 0, 0, 0)});
+  displayList->root()->addChild(combinedLayer);
+
   displayList->render(surface.get());
 
   TGFX_PRIVATE_ACCESS(EXPECT_GT(sharpLayer->maxBackgroundOutset, 0.0f);
-                      EXPECT_EQ(sharpLayer->minBackgroundOutset, 0.0f);
+                      EXPECT_GT(sharpLayer->minBackgroundOutset, 0.0f);
                       EXPECT_GT(softLayer->minBackgroundOutset, 0.0f);
                       EXPECT_EQ(softLayer->maxBackgroundOutset, softLayer->minBackgroundOutset);
                       EXPECT_GT(mixedLayer->maxBackgroundOutset, 0.0f);
-                      EXPECT_EQ(mixedLayer->minBackgroundOutset, 0.0f);)
+                      EXPECT_GT(mixedLayer->minBackgroundOutset, 0.0f); EXPECT_GT(
+                          combinedLayer->maxBackgroundOutset, sharpLayer->maxBackgroundOutset);
+                      EXPECT_GT(combinedLayer->maxBackgroundOutset, softLayer->maxBackgroundOutset);
+                      EXPECT_GT(combinedLayer->minBackgroundOutset, 0.0f);)
 }
 
 TGFX_TEST(LayerTest, GlassStyleShapeLayerContentOffset) {
@@ -4208,6 +4383,29 @@ TGFX_TEST(LayerTest, GlassStyleRoundedRect) {
   RunGlassStyleTest("RoundedRect", 1.0f, 180.0f, 120.0f, 30.0f, 30.0f);
 }
 
+TGFX_TEST(LayerTest, GlassStyleSplayCompare) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr float cellSize = 200;
+  constexpr float gap = 10;
+  constexpr int cols = 2;
+  int surfaceW = static_cast<int>(cols * (cellSize + gap) + gap);
+  int surfaceH = static_cast<int>(cellSize + 2 * gap);
+  auto surface = Surface::Make(context, surfaceW, surfaceH);
+  auto displayList = std::make_unique<DisplayList>();
+  auto bgImage = MakeImage("resources/apitest/checker_128.png");
+  // Square glass panel (180x180, sharp corners), refraction=100 and depth=50. Left cell uses
+  // splay=1, right cell uses splay=2, to compare the refraction direction blend at near-zero splay
+  // values.
+  AddGlassCell(displayList->root(), bgImage, gap, gap, cellSize, 100, 50, 0, 0, 1, 135, 50, 180.0f,
+               180.0f, 0.0f, 0.0f);
+  AddGlassCell(displayList->root(), bgImage, gap + cellSize + gap, gap, cellSize, 100, 50, 0, 0, 2,
+               135, 50, 180.0f, 180.0f, 0.0f, 0.0f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleSplayCompare"));
+}
+
 TGFX_TEST(LayerTest, GlassStyleEllipseSDF) {
   // Ellipse with unequal width/height (180x120, radius = half dimensions) exercises the SDF path.
   RunGlassStyleTest("EllipseSDF", 1.0f, 180.0f, 120.0f, 90.0f, 60.0f);
@@ -4217,6 +4415,20 @@ TGFX_TEST(LayerTest, GlassStyleEllipticalCorner) {
   // Rounded rect with elliptical corners (radius 40x20, rx != ry) falls back to the AlphaMask
   // path because the SDF shader only supports uniform circular corners (rx == ry).
   RunGlassStyleTest("EllipticalCorner", 1.0f, 180.0f, 120.0f, 40.0f, 20.0f);
+}
+
+TGFX_TEST(LayerTest, GlassStyleEllipticalCornerSingleCell) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr float cellSize = 200;
+  auto surface = Surface::Make(context, static_cast<int>(cellSize), static_cast<int>(cellSize));
+  auto displayList = std::make_unique<DisplayList>();
+  auto bgImage = MakeImage("resources/apitest/checker_128.png");
+  AddGlassCell(displayList->root(), bgImage, 0, 0, cellSize, 50, 100, 0, 0, 50, 135, 50, 180.0f,
+               120.0f, 40.0f, 20.0f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleEllipticalCornerSingleCell"));
 }
 
 TGFX_TEST(LayerTest, GlassStyleExtremeAspectRatioUDF) {
@@ -4270,6 +4482,677 @@ TGFX_TEST(LayerTest, GlassStyleExtremeAspectRatioUDF) {
 
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleExtremeAspectRatioUDF"));
+}
+
+static std::shared_ptr<SolidLayer> BuildClippedGlassEvaluationScene(DisplayList* displayList) {
+  auto background = ImageLayer::Make();
+  background->setImage(MakeImage("resources/apitest/checker_128.png"));
+  background->setMatrix(Matrix::MakeScale(5));
+  displayList->root()->addChild(background);
+
+  auto accent = SolidLayer::Make();
+  accent->setColor(Color::FromRGBA(230, 50, 40, 255));
+  accent->setWidth(60);
+  accent->setHeight(60);
+  accent->setMatrix(Matrix::MakeTrans(260, 270));
+  displayList->root()->addChild(accent);
+
+  constexpr float PanelWidth = 500;
+  constexpr float PanelHeight = 150;
+  constexpr float GlassScale = 8;
+  for (int index = 0; index < 3; ++index) {
+    auto viewport = Layer::Make();
+    viewport->setScrollRect(Rect::MakeWH(PanelWidth, PanelHeight));
+    viewport->setMatrix(Matrix::MakeTrans(50, 50 + static_cast<float>(index) * 175));
+
+    auto glass = SolidLayer::Make();
+    glass->setColor(Color::FromRGBA(255, 255, 255, 128));
+    glass->setWidth(1000);
+    glass->setHeight(300);
+    glass->setMatrix(index == 0 ? Matrix::MakeScale(GlassScale, 2.0f)
+                                : Matrix::MakeScale(GlassScale));
+    if (index == 1) {
+      glass->setRadiusX(40);
+      glass->setRadiusY(20);
+      glass->setLayerStyles({GlassStyle::Make(0, 30, 20, 0, 70, 135, 0)});
+    } else if (index == 2) {
+      glass->setRadiusX(40);
+      glass->setRadiusY(40);
+      glass->setLayerStyles({GlassStyle::Make(100, 100, 100, 100, 50, 135, 80)});
+    } else {
+      glass->setRadiusX(40);
+      glass->setRadiusY(40);
+      glass->setLayerStyles({GlassStyle::Make(60, 30, 20, 20, 30, 135, 80)});
+    }
+    viewport->addChild(glass);
+    displayList->root()->addChild(viewport);
+  }
+  return accent;
+}
+
+TGFX_TEST(LayerTest, GlassStyleClippedEvaluationDirect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 600, 600);
+  ASSERT_TRUE(surface != nullptr);
+  DisplayList displayList;
+  displayList.setRenderMode(RenderMode::Direct);
+  BuildClippedGlassEvaluationScene(&displayList);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleClippedEvaluationDirect"));
+}
+
+TGFX_TEST(LayerTest, GlassStyleClippedEvaluationTiled) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 600, 600);
+  ASSERT_TRUE(surface != nullptr);
+  DisplayList displayList;
+  displayList.setRenderMode(RenderMode::Tiled);
+  displayList.setTileSize(128);
+  auto accent = BuildClippedGlassEvaluationScene(&displayList);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleClippedEvaluationTiled"));
+
+  accent->setColor(Color::FromRGBA(40, 90, 230, 255));
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleClippedEvaluationTiledUpdate"));
+}
+
+constexpr int DensityFloorSize = 2000;
+constexpr int DensityOutputWidth = 1200;
+constexpr int DensityOutputHeight = 1000;
+constexpr int DensityFrameInset = 50;
+constexpr float DensityPerspectiveDepth = 500.0f;
+constexpr float DensityFloorScale = 0.2f;
+constexpr float DensityPartiallyClippedFloorScaleX = 0.8f;
+constexpr float DensityTopEdgeZ = 10.0f;
+constexpr float DensityBottomEdgeZ = 210.0f;
+constexpr float DensityFloorRotationDegrees = 30.0f;
+constexpr int DensityGridStep = 8;
+constexpr int DensityBackgroundValue = 24;
+constexpr int DensityFrameBackgroundValue = 8;
+
+static std::shared_ptr<Image> MakeDensityFloorImage(Context* context) {
+  auto surface = Surface::Make(context, DensityFloorSize, DensityFloorSize);
+  if (surface == nullptr) {
+    return nullptr;
+  }
+  auto* canvas = surface->getCanvas();
+  canvas->clear(Color::FromRGBA(12, 12, 12, 255));
+
+  Paint gridPaint;
+  gridPaint.setColor(Color::FromRGBA(180, 180, 180, 255));
+  gridPaint.setStrokeWidth(1.0f);
+  for (int coordinate = 0; coordinate <= DensityFloorSize; coordinate += DensityGridStep) {
+    canvas->drawLine(static_cast<float>(coordinate), 0, static_cast<float>(coordinate),
+                     DensityFloorSize, gridPaint);
+    canvas->drawLine(0, static_cast<float>(coordinate), DensityFloorSize,
+                     static_cast<float>(coordinate), gridPaint);
+  }
+
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  if (typeface == nullptr) {
+    return nullptr;
+  }
+  Font font(typeface, 40.0f);
+  auto label = TextBlob::MakeFrom("DENSITY 0123456789", font);
+  if (label == nullptr) {
+    return nullptr;
+  }
+  Paint textPaint;
+  textPaint.setColor(Color::FromRGBA(255, 224, 64, 255));
+  for (int y = 64; y < DensityFloorSize; y += 160) {
+    canvas->drawTextBlob(label, 1000, static_cast<float>(y), textPaint);
+  }
+  return surface->makeImageSnapshot();
+}
+
+static Matrix3D MakeDensityFloorMatrix(float horizontalScale) {
+  const float anchorX = static_cast<float>(DensityFloorSize) * 0.5f;
+  const auto offsetToAnchor = Matrix3D::MakeTranslate(-anchorX, 0, 0);
+  const auto scale = Matrix3D::MakeScale(horizontalScale, DensityFloorScale, 1.0f);
+  const auto rotation = Matrix3D::MakeRotate({1, 0, 0}, DensityFloorRotationDegrees);
+  const auto translateZ = Matrix3D::MakeTranslate(0, 0, DensityTopEdgeZ);
+  auto perspectiveMatrix = Matrix3D::I();
+  perspectiveMatrix.setRowColumn(3, 2, -1.0f / DensityPerspectiveDepth);
+  const auto originTranslate = Matrix3D::MakeTranslate(DensityOutputWidth * 0.5f, 200, 0);
+  return originTranslate * perspectiveMatrix * translateZ * rotation * scale * offsetToAnchor;
+}
+
+static std::shared_ptr<Surface> RenderDensityFloor(Context* context,
+                                                   const std::shared_ptr<Image>& image,
+                                                   float horizontalScale) {
+  auto surface = Surface::Make(context, DensityOutputWidth, DensityOutputHeight);
+  if (surface == nullptr) {
+    return nullptr;
+  }
+  surface->getCanvas()->clear(
+      Color::FromRGBA(DensityBackgroundValue, DensityBackgroundValue, DensityBackgroundValue, 255));
+
+  auto container = Layer::Make();
+  container->setPreserve3D(true);
+  auto floor = ImageLayer::Make();
+  floor->setImage(image);
+  floor->setMatrix3D(MakeDensityFloorMatrix(horizontalScale));
+  container->addChild(floor);
+
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->root()->addChild(container);
+  displayList->render(surface.get());
+  return surface;
+}
+
+static std::shared_ptr<Surface> RenderFramedDensityFloor(Context* context,
+                                                         const std::shared_ptr<Image>& image,
+                                                         float horizontalScale) {
+  auto floorSurface = RenderDensityFloor(context, image, horizontalScale);
+  if (floorSurface == nullptr) {
+    return nullptr;
+  }
+  auto surface = Surface::Make(context, DensityOutputWidth + DensityFrameInset * 2,
+                               DensityOutputHeight + DensityFrameInset * 2);
+  if (surface == nullptr) {
+    return nullptr;
+  }
+  auto floorImage = floorSurface->makeImageSnapshot();
+  if (floorImage == nullptr) {
+    return nullptr;
+  }
+  auto* canvas = surface->getCanvas();
+  canvas->clear(Color::FromRGBA(DensityFrameBackgroundValue, DensityFrameBackgroundValue,
+                                DensityFrameBackgroundValue, 255));
+  canvas->drawImage(floorImage, DensityFrameInset, DensityFrameInset);
+  return surface;
+}
+
+// A fully visible preserve-3D floor spanning z=10 (upper edge) to z=210 (lower edge). Its
+// complete footprint stays inside the compositor viewport, verifying the contentScale density path.
+TGFX_TEST(LayerTest, PerspectiveFloor10To210) {
+  EXPECT_FLOAT_EQ(DensityTopEdgeZ + DensityFloorSize * DensityFloorScale * 0.5f,
+                  DensityBottomEdgeZ);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeDensityFloorImage(context);
+  ASSERT_TRUE(image != nullptr);
+
+  auto surface = RenderDensityFloor(context, image, DensityFloorScale);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PerspectiveFloor10To210"));
+}
+
+// A wider floor keeps the same z range but exceeds the compositor viewport horizontally. The
+// clipped footprint exercises the projected dest/local density path, while the outer 50px frame
+// keeps the final screenshot centered.
+TGFX_TEST(LayerTest, PerspectiveFloorPartiallyClipped) {
+  EXPECT_FLOAT_EQ(DensityTopEdgeZ + DensityFloorSize * DensityFloorScale * 0.5f,
+                  DensityBottomEdgeZ);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeDensityFloorImage(context);
+  ASSERT_TRUE(image != nullptr);
+
+  auto surface = RenderFramedDensityFloor(context, image, DensityPartiallyClippedFloorScaleX);
+  ASSERT_TRUE(surface != nullptr);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PerspectiveFloorPartiallyClipped"));
+}
+
+static Matrix3D MakeLocalToCompositorMatrix(const Matrix3D& nodeTransform, float contentScale,
+                                            const Rect& renderRect) {
+  Matrix3D matrix = nodeTransform;
+  matrix.postScale(contentScale, contentScale, 1.0f);
+  matrix.postTranslate(-renderRect.left, -renderRect.top, 0);
+  return matrix;
+}
+
+static Matrix3D MakeRasterPerspectiveMatrix(float depth) {
+  Matrix3D matrix = Matrix3D::I();
+  matrix.setRowColumn(3, 2, -1.0f / depth);
+  return matrix;
+}
+
+// A fully visible leaf retains contentScale density even when its projected scale differs from
+// contentScale, exercising the coversWholeLeaf branch.
+TGFX_TEST_PRIVATE(LayerTest, FlatLeaf_PreservesContentScaleSizing) {
+  TGFX_PRIVATE_ACCESS({
+    const Rect localBounds = Rect::MakeWH(100, 100);
+    const float contentScale = 3.0f;
+    const Rect renderRect = Rect::MakeWH(600, 600);
+    const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
+    const auto localToCompositor = MakeLocalToCompositorMatrix(
+        Matrix3D::MakeScale(0.5f, 0.5f, 1.0f), contentScale, renderRect);
+    Render3DContext::RasterInfo info;
+
+    ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
+                                                   contentScale, &info));
+    EXPECT_EQ(info.visibleLocal, localBounds);
+    EXPECT_FLOAT_EQ(info.density.getScaleX(), contentScale);
+    EXPECT_FLOAT_EQ(info.density.getScaleY(), contentScale);
+    EXPECT_EQ(info.rasterWidth, 300);
+    EXPECT_EQ(info.rasterHeight, 300);
+  });
+}
+
+// An identity affine mapping rasters 1:1 and samples 1:1, so the offscreen mip chain can be
+// skipped entirely.
+TGFX_TEST_PRIVATE(LayerTest, AffineLeafWithoutMinification_SkipsMipmaps) {
+  TGFX_PRIVATE_ACCESS({
+    const Rect localBounds = Rect::MakeWH(100, 100);
+    const float contentScale = 1.0f;
+    const Rect renderRect = Rect::MakeWH(1000, 1000);
+    const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
+    const auto localToCompositor =
+        MakeLocalToCompositorMatrix(Matrix3D::I(), contentScale, renderRect);
+    Render3DContext::RasterInfo info;
+
+    ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
+                                                   contentScale, &info));
+    EXPECT_FALSE(info.mipmapped);
+  });
+}
+
+// A uniformly minified leaf samples its raster at half size, so the mip chain must be retained.
+TGFX_TEST_PRIVATE(LayerTest, MinifiedAffineLeaf_KeepsMipmaps) {
+  TGFX_PRIVATE_ACCESS({
+    const Rect localBounds = Rect::MakeWH(100, 100);
+    const float contentScale = 1.0f;
+    const Rect renderRect = Rect::MakeWH(1000, 1000);
+    const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
+    const auto localToCompositor = MakeLocalToCompositorMatrix(
+        Matrix3D::MakeScale(0.5f, 0.5f, 1.0f), contentScale, renderRect);
+    Render3DContext::RasterInfo info;
+    info.mipmapped = false;
+
+    ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
+                                                   contentScale, &info));
+    EXPECT_TRUE(info.mipmapped);
+  });
+}
+
+// A clipped leaf rasters at the projected density instead of contentScale, so even a minifying
+// transform samples its visible footprint 1:1 and the mip chain can be skipped.
+TGFX_TEST_PRIVATE(LayerTest, MinifiedClippedAffineLeaf_SkipsMipmaps) {
+  TGFX_PRIVATE_ACCESS({
+    const Rect localBounds = Rect::MakeWH(3000, 3000);
+    const float contentScale = 1.0f;
+    const Rect renderRect = Rect::MakeWH(1000, 1000);
+    const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
+    const auto localToCompositor = MakeLocalToCompositorMatrix(
+        Matrix3D::MakeScale(0.5f, 0.5f, 1.0f), contentScale, renderRect);
+    Render3DContext::RasterInfo info;
+
+    ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
+                                                   contentScale, &info));
+    EXPECT_LT(info.visibleLocal.width(), localBounds.width());
+    EXPECT_FALSE(info.mipmapped);
+  });
+}
+
+// The horizontal axis is extreme enough to overflow float-only arithmetic, but the double
+// intermediates still resolve the exact decision: the vertical axis stays 1:1, so no minification
+// occurs and the mip chain can be skipped.
+TGFX_TEST_PRIVATE(LayerTest, ExtremeAnisotropicAffineLeaf_SkipsMipmaps) {
+  TGFX_PRIVATE_ACCESS({
+    const Rect localBounds = Rect::MakeWH(100, 100);
+    const float contentScale = 1.0f;
+    const Rect renderRect = Rect::MakeWH(1000, 1000);
+    const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
+    const auto localToCompositor = MakeLocalToCompositorMatrix(
+        Matrix3D::MakeScale(1.0e35f, 1.0f, 1.0f), contentScale, renderRect);
+    Render3DContext::RasterInfo info;
+
+    ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
+                                                   contentScale, &info));
+    EXPECT_FALSE(info.mipmapped);
+  });
+}
+
+// A fully visible anisotropic mapping magnifies one axis 9x but minifies the other 0.11x, so the
+// short axis still shrinks while sampling and the mip chain must be retained.
+TGFX_TEST_PRIVATE(LayerTest, AnisotropicMinifiedAffineLeaf_KeepsMipmaps) {
+  TGFX_PRIVATE_ACCESS({
+    const Rect localBounds = Rect::MakeWH(100, 100);
+    const float contentScale = 1.0f;
+    const Rect renderRect = Rect::MakeWH(1000, 1000);
+    const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
+    const auto localToCompositor = MakeLocalToCompositorMatrix(
+        Matrix3D::MakeScale(9.0f, 0.11f, 1.0f), contentScale, renderRect);
+    Render3DContext::RasterInfo info;
+    info.mipmapped = false;
+
+    ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
+                                                   contentScale, &info));
+    EXPECT_TRUE(info.mipmapped);
+  });
+}
+
+// A large leaf under an extreme content scale is cropped to the compositor viewport before
+// rasterization, avoiding an allocation of more than one million pixels per axis.
+TGFX_TEST_PRIVATE(LayerTest, ExtremeZoom_CropsToViewportScale) {
+  TGFX_PRIVATE_ACCESS({
+    const Rect localBounds = Rect::MakeWH(1556, 1556);
+    const float contentScale = 783.0f;
+    const Rect renderRect = Rect::MakeWH(1861, 1861);
+    const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
+    const auto localToCompositor =
+        MakeLocalToCompositorMatrix(Matrix3D::I(), contentScale, renderRect);
+    Render3DContext::RasterInfo info;
+
+    ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
+                                                   contentScale, &info));
+    EXPECT_LT(info.visibleLocal.width(), localBounds.width());
+    EXPECT_LT(info.visibleLocal.height(), localBounds.height());
+    EXPECT_LE(static_cast<float>(info.rasterWidth), viewport.width() + 1.0f);
+    EXPECT_LE(static_cast<float>(info.rasterHeight), viewport.height() + 1.0f);
+  });
+}
+
+// A fully visible oversized leaf retains contentScale sizing and can still exceed the GPU texture
+// limit because no viewport clipping is needed.
+TGFX_TEST_PRIVATE(LayerTest, FullyVisibleOversizedLeaf_PreservesMainBehavior) {
+  TGFX_PRIVATE_ACCESS({
+    const Rect localBounds = Rect::MakeWH(200, 200);
+    const float contentScale = 100.0f;
+    const Rect renderRect = Rect::MakeWH(30000, 30000);
+    const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
+    const auto localToCompositor =
+        MakeLocalToCompositorMatrix(Matrix3D::I(), contentScale, renderRect);
+    Render3DContext::RasterInfo info;
+
+    ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
+                                                   contentScale, &info));
+    EXPECT_EQ(info.visibleLocal, localBounds);
+    EXPECT_FLOAT_EQ(info.density.getScaleX(), contentScale);
+    EXPECT_FLOAT_EQ(info.density.getScaleY(), contentScale);
+    EXPECT_EQ(info.rasterWidth, 20000);
+    EXPECT_EQ(info.rasterHeight, 20000);
+  });
+}
+
+// A leaf that crosses the near plane is not rasterized because ComputeRasterInfo rejects every
+// leaf with a corner behind the camera before computing visible footprints.
+TGFX_TEST_PRIVATE(LayerTest, NearPlaneStraddle_CullsLeaf) {
+  TGFX_PRIVATE_ACCESS({
+    const Rect localBounds = Rect::MakeWH(100, 300);
+    Matrix3D nodeTransform = Matrix3D::I();
+    nodeTransform.setRowColumn(3, 1, -1.0f / 200.0f);
+    const float contentScale = 1.0f;
+    const Rect renderRect = Rect::MakeWH(1000, 1000);
+    const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
+    const auto localToCompositor =
+        MakeLocalToCompositorMatrix(nodeTransform, contentScale, renderRect);
+    Render3DContext::RasterInfo info;
+
+    EXPECT_FALSE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
+                                                    contentScale, &info));
+  });
+}
+
+TGFX_TEST_PRIVATE(LayerTest, LeafOutsideViewport_CullsLeaf) {
+  TGFX_PRIVATE_ACCESS({
+    const Rect localBounds = Rect::MakeWH(200, 200);
+    const float contentScale = 1.0f;
+    const Rect renderRect = Rect::MakeWH(500, 500);
+    const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
+    const auto localToCompositor = MakeLocalToCompositorMatrix(
+        Matrix3D::MakeTranslate(10000, 10000, 0), contentScale, renderRect);
+    Render3DContext::RasterInfo info;
+
+    EXPECT_FALSE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
+                                                    contentScale, &info));
+  });
+}
+
+TGFX_TEST_PRIVATE(LayerTest, LeafBehindCamera_CullsLeaf) {
+  TGFX_PRIVATE_ACCESS({
+    const Rect localBounds = Rect::MakeWH(200, 200);
+    Matrix3D nodeTransform = Matrix3D::MakeTranslate(0, 0, 100);
+    nodeTransform = MakeRasterPerspectiveMatrix(50.0f) * nodeTransform;
+    const float contentScale = 1.0f;
+    const Rect renderRect = Rect::MakeWH(500, 500);
+    const Rect viewport = Rect::MakeWH(renderRect.width(), renderRect.height());
+    const auto localToCompositor =
+        MakeLocalToCompositorMatrix(nodeTransform, contentScale, renderRect);
+    Render3DContext::RasterInfo info;
+
+    EXPECT_FALSE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
+                                                    contentScale, &info));
+  });
+}
+
+// A leaf clipped only along the horizontal axis keeps the untouched vertical range and derives a
+// projected-footprint density distinct from the horizontal one.
+TGFX_TEST_PRIVATE(LayerTest, ClippedAnisotropicProjection_UsesProjectedDensity) {
+  TGFX_PRIVATE_ACCESS({
+    const Rect localBounds = Rect::MakeWH(200, 200);
+    Matrix3D nodeTransform = Matrix3D::MakeRotate({0, 1, 0}, 45.0f);
+    nodeTransform = MakeRasterPerspectiveMatrix(200.0f) * nodeTransform;
+    const float contentScale = 5.0f;
+    const Rect renderRect = Rect::MakeWH(2000, 2000);
+    // The leaf projects to x in [0, 414] and y in [0, 1000]. This viewport removes both
+    // horizontal edges while preserving the complete vertical range.
+    const Rect viewport = Rect::MakeLTRB(100, 0, 400, 2000);
+    const auto localToCompositor =
+        MakeLocalToCompositorMatrix(nodeTransform, contentScale, renderRect);
+    Render3DContext::RasterInfo info;
+
+    ASSERT_TRUE(Render3DContext::ComputeRasterInfo(localToCompositor, localBounds, viewport,
+                                                   contentScale, &info));
+    EXPECT_GT(info.visibleLocal.left, localBounds.left);
+    EXPECT_LT(info.visibleLocal.right, localBounds.right);
+    EXPECT_EQ(info.visibleLocal.height(), localBounds.height());
+
+    EXPECT_NE(info.density.getScaleX(), info.density.getScaleY());
+    EXPECT_LT(info.density.getTranslateX(), 0.0f);
+    EXPECT_FLOAT_EQ(info.density.getTranslateY(), 0.0f);
+    EXPECT_LE(static_cast<float>(info.rasterWidth), viewport.width() + 1.0f);
+    EXPECT_LE(static_cast<float>(info.rasterHeight), viewport.height() + 1.0f);
+  });
+}
+
+constexpr float FootprintEpsilon = 0.01f;
+
+static Matrix3D MakeFootprintPerspectiveMatrix(float depth) {
+  Matrix3D matrix = Matrix3D::I();
+  matrix.setRowColumn(3, 2, -1.0f / depth);
+  return matrix;
+}
+
+// Near-plane straddle: the bottom corners are behind the camera while the top corners are in
+// front. Homogeneous clipping keeps only the finite in-front portion, bounded by the viewport.
+TGFX_TEST(LayerTest, ComputeVisibleFootprintsStraddleNearPlane) {
+  const Rect localBounds = Rect::MakeWH(100, 300);
+  const Rect destRect = Rect::MakeWH(1000, 1000);
+  Matrix3D matrix = Matrix3D::I();
+  // W = 1 - y / 200. The top corners have W = 1; the bottom corners have W = -0.5.
+  matrix.setRowColumn(3, 1, -1.0f / 200.0f);
+
+  ASSERT_TRUE(Matrix3DUtils::IsRectBehindCamera(localBounds, matrix));
+  EXPECT_GT(matrix.mapHomogeneous(0, 0, 0, 1).w, 0.0f);
+  EXPECT_LT(matrix.mapHomogeneous(0, 300, 0, 1).w, 0.0f);
+
+  Rect localFootprint;
+  Rect destFootprint;
+  ASSERT_TRUE(Matrix3DUtils::ComputeVisibleFootprints(localBounds, destRect, matrix,
+                                                      &localFootprint, &destFootprint));
+  // y = 500 / 3 projects to the viewport bottom (y / (1 - y / 200) = 1000).
+  EXPECT_NEAR(localFootprint.left, 0, FootprintEpsilon);
+  EXPECT_NEAR(localFootprint.top, 0, FootprintEpsilon);
+  EXPECT_NEAR(localFootprint.right, 100, FootprintEpsilon);
+  EXPECT_NEAR(localFootprint.bottom, 500.0f / 3.0f, FootprintEpsilon);
+  EXPECT_NEAR(destFootprint.left, 0, FootprintEpsilon);
+  EXPECT_NEAR(destFootprint.top, 0, FootprintEpsilon);
+  EXPECT_NEAR(destFootprint.right, 600, FootprintEpsilon);
+  EXPECT_NEAR(destFootprint.bottom, 1000, FootprintEpsilon);
+}
+
+// Leaves fully behind the camera or fully outside the viewport have no surviving polygon.
+TGFX_TEST(LayerTest, ComputeVisibleFootprintsCullsInvisibleLeaves) {
+  const Rect localBounds = Rect::MakeWH(200, 200);
+  const Rect destRect = Rect::MakeWH(600, 600);
+  Rect localFootprint;
+  Rect destFootprint;
+
+  Matrix3D behindCamera = Matrix3D::MakeTranslate(0, 0, 100);
+  behindCamera = MakeFootprintPerspectiveMatrix(50.0f) * behindCamera;
+  EXPECT_FALSE(Matrix3DUtils::ComputeVisibleFootprints(localBounds, destRect, behindCamera,
+                                                       &localFootprint, &destFootprint));
+
+  const Matrix3D outsideViewport = Matrix3D::MakeTranslate(10000, 10000, 0);
+  EXPECT_FALSE(Matrix3DUtils::ComputeVisibleFootprints(localBounds, destRect, outsideViewport,
+                                                       &localFootprint, &destFootprint));
+}
+
+// Partial viewport overhang clamps the destination footprint and maps the same surviving region
+// back to the corresponding local footprint.
+TGFX_TEST(LayerTest, ComputeVisibleFootprintsClipsPartialViewportOverhang) {
+  const Rect localBounds = Rect::MakeWH(100, 100);
+  const Rect destRect = Rect::MakeWH(100, 100);
+  // Leaf spans dest x in [50, 150], y in [0, 100]: the right half exceeds the viewport.
+  const Matrix3D matrix = Matrix3D::MakeTranslate(50, 0, 0);
+
+  Rect localFootprint;
+  Rect destFootprint;
+  ASSERT_TRUE(Matrix3DUtils::ComputeVisibleFootprints(localBounds, destRect, matrix,
+                                                      &localFootprint, &destFootprint));
+  EXPECT_NEAR(destFootprint.left, 50, FootprintEpsilon);
+  EXPECT_NEAR(destFootprint.right, 100, FootprintEpsilon);
+  EXPECT_NEAR(destFootprint.top, 0, FootprintEpsilon);
+  EXPECT_NEAR(destFootprint.bottom, 100, FootprintEpsilon);
+  EXPECT_NEAR(localFootprint.left, 0, FootprintEpsilon);
+  EXPECT_NEAR(localFootprint.right, 50, FootprintEpsilon);
+  EXPECT_NEAR(localFootprint.top, 0, FootprintEpsilon);
+  EXPECT_NEAR(localFootprint.bottom, 100, FootprintEpsilon);
+}
+
+// A fully visible projective leaf validates the local/destination footprint pairing. Both outputs
+// describe the same local rect, with destination coordinates after perspective divide.
+TGFX_TEST(LayerTest, ComputeVisibleFootprintsKeepsProjectiveFootprintsPaired) {
+  const Rect localBounds = Rect::MakeWH(100, 100);
+  const Rect destRect = Rect::MakeWH(200, 200);
+  Matrix3D matrix = Matrix3D::I();
+  // W = 1 - y / 400 stays positive over localBounds; the bottom-right corner (100, 100)
+  // projects to (400/3, 400/3), setting both the destination right and bottom edges.
+  matrix.setRowColumn(3, 1, -1.0f / 400.0f);
+
+  Rect localFootprint;
+  Rect destFootprint;
+  ASSERT_TRUE(Matrix3DUtils::ComputeVisibleFootprints(localBounds, destRect, matrix,
+                                                      &localFootprint, &destFootprint));
+  EXPECT_NEAR(localFootprint.left, 0, FootprintEpsilon);
+  EXPECT_NEAR(localFootprint.top, 0, FootprintEpsilon);
+  EXPECT_NEAR(localFootprint.right, 100, FootprintEpsilon);
+  EXPECT_NEAR(localFootprint.bottom, 100, FootprintEpsilon);
+  EXPECT_NEAR(destFootprint.left, 0, FootprintEpsilon);
+  EXPECT_NEAR(destFootprint.top, 0, FootprintEpsilon);
+  EXPECT_NEAR(destFootprint.right, 400.0f / 3.0f, FootprintEpsilon);
+  EXPECT_NEAR(destFootprint.bottom, 400.0f / 3.0f, FootprintEpsilon);
+}
+
+// A singular local-to-destination homography cannot yield paired footprints.
+TGFX_TEST(LayerTest, ComputeVisibleFootprintsRejectsSingularHomography) {
+  const Rect localBounds = Rect::MakeWH(100, 100);
+  const Rect destRect = Rect::MakeWH(200, 200);
+  Matrix3D matrix = Matrix3D::I();
+  matrix.setRowColumn(0, 0, 0);
+
+  Rect localFootprint;
+  Rect destFootprint;
+  EXPECT_FALSE(Matrix3DUtils::ComputeVisibleFootprints(localBounds, destRect, matrix,
+                                                       &localFootprint, &destFootprint));
+}
+
+// Tiled mode with per-frame tile budget. Zooming in invalidates every tile; with
+// TileUpdateMode::Fast and setMaxTilesRefinedPerFrame(1), each render() call refines at most one
+// missing tile, so every tile runs its own offscreen pass followed by a Picture::asImage unwrap.
+// An anchor drift in the unwrap path then surfaces as block-aligned misalignment between tiles.
+// The text is placed off-origin so the DrawImageRect subset offset is nonzero, which makes the
+// unwrap anchor correction observable.
+static void RenderNestedOffscreenTiledZoom(DisplayList* displayList,
+                                           const std::shared_ptr<Surface>& surface, float zoomScale,
+                                           const std::string& key) {
+  displayList->setZoomScale(zoomScale);
+  for (int i = 0; i < 40; ++i) {
+    displayList->render(surface.get());
+  }
+  EXPECT_TRUE(Baseline::Compare(surface, key));
+}
+
+TGFX_TEST(LayerTest, NestedOffscreenTiledZoom) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto surface = Surface::Make(context, 1024, 1024);
+  ASSERT_NE(surface, nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setTileUpdateMode(TileUpdateMode::Fast);
+  displayList->setMaxTilesRefinedPerFrame(1);
+  auto root = Layer::Make();
+  displayList->root()->addChild(root);
+  // Three nested layers each with passThroughBackground disabled, forcing every level through
+  // its own offscreen render pass before compositing.
+  Layer* parent = root.get();
+  for (int i = 0; i < 3; ++i) {
+    auto frame = Layer::Make();
+    frame->setPassThroughBackground(false);
+    parent->addChild(frame);
+    parent = frame.get();
+  }
+  auto textLayer = TextLayer::Make();
+  textLayer->setText("06");
+  textLayer->setTextColor(Color::Black());
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  Font font(typeface, 40);
+  textLayer->setFont(font);
+  textLayer->setMatrix(Matrix::MakeTrans(30.0f, 20.0f));
+  parent->addChild(textLayer);
+  // Warm up at zoom=1.0 to build the initial tile cache and clear the startup dirty regions.
+  displayList->render(surface.get());
+  // Zoom in: the frame right after the zoom change has a zero tile budget, so every tile falls
+  // back to the zoom=1.0 cache. Each following frame refines at most one missing tile. Loop until
+  // all tiles in the viewport are rasterized at the target zoom.
+  RenderNestedOffscreenTiledZoom(displayList.get(), surface, 12.29f,
+                                 "LayerTest/NestedOffscreenTiledZoom");
+}
+
+TGFX_TEST(LayerTest, GlassStyleWithDropShadow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 250, 250);
+  DisplayList displayList;
+
+  auto background = SolidLayer::Make();
+  background->setColor(Color::White());
+  background->setWidth(150);
+  background->setHeight(150);
+  background->setMatrix(Matrix::MakeTrans(50, 50));
+  displayList.root()->addChild(background);
+
+  auto bottomRect = SolidLayer::Make();
+  bottomRect->setColor(Color::FromRGBA(143, 0, 0));
+  bottomRect->setWidth(100);
+  bottomRect->setHeight(100);
+  bottomRect->setMatrix(Matrix::MakeTrans(70, 70));
+  displayList.root()->addChild(bottomRect);
+
+  auto topRect = SolidLayer::Make();
+  topRect->setColor(Color::FromRGBA(143, 0, 0, 26));
+  topRect->setWidth(100);
+  topRect->setHeight(100);
+  topRect->setMatrix(Matrix::MakeTrans(70, 70));
+  auto dropShadow = DropShadowStyle::Make(20, 20, 0, 0, Color::FromRGBA(0, 0, 0, 255));
+  dropShadow->setShowBehindLayer(false);
+  topRect->setLayerStyles({dropShadow, GlassStyle::Make(0, 50, 100, 0, 0, 0, 0)});
+  displayList.root()->addChild(topRect);
+
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/GlassStyleWithDropShadow"));
 }
 
 }  // namespace tgfx

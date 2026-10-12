@@ -29,8 +29,16 @@
 
 namespace tgfx {
 
+static void ApplyWindowColorSpace(NSView* view, const std::shared_ptr<ColorSpace>& colorSpace) {
+  if (view.window != nil && colorSpace != nullptr &&
+      ColorSpace::Equals(colorSpace.get(), ColorSpace::DisplayP3().get())) {
+    view.window.colorSpace = [NSColorSpace displayP3ColorSpace];
+  }
+}
+
 std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj sharedContext,
-                                               std::shared_ptr<ColorSpace> colorSpace) {
+                                               std::shared_ptr<ColorSpace> colorSpace,
+                                               bool vsyncEnabled) {
   if (view == nil) {
     return nullptr;
   }
@@ -38,21 +46,23 @@ std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj share
   if (device == nullptr) {
     return nullptr;
   }
-  if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get())) {
-    if (ColorSpace::Equals(colorSpace.get(), ColorSpace::DisplayP3().get())) {
-      view.window.colorSpace = [NSColorSpace displayP3ColorSpace];
-    } else {
-      LOGE("CGLWindow::MakeFrom() The specified ColorSpace is not supported on this platform. "
-           "Rendering may have color inaccuracies.");
-    }
+  if (colorSpace != nullptr && !ColorSpace::Equals(colorSpace.get(), ColorSpace::SRGB().get()) &&
+      !ColorSpace::Equals(colorSpace.get(), ColorSpace::DisplayP3().get())) {
+    LOGE("CGLWindow::MakeFrom() The specified ColorSpace is not supported on this platform. "
+         "Rendering may have color inaccuracies.");
   }
-  return std::shared_ptr<CGLWindow>(new CGLWindow(device, view, std::move(colorSpace)));
+  ApplyWindowColorSpace(view, colorSpace);
+  return std::shared_ptr<CGLWindow>(
+      new CGLWindow(device, view, std::move(colorSpace), vsyncEnabled));
 }
 
 CGLWindow::CGLWindow(std::shared_ptr<Device> device, NSView* view,
-                     std::shared_ptr<ColorSpace> colorSpace)
-    : Window(std::move(device), std::move(colorSpace)), view(view) {
+                     std::shared_ptr<ColorSpace> colorSpace, bool vsyncEnabled)
+    : Window(std::move(device), std::move(colorSpace), vsyncEnabled), view(view) {
   // do not retain view here, otherwise it can cause circular reference.
+  auto glContext = static_cast<CGLDevice*>(this->device.get())->glContext;
+  int interval = vsyncEnabled ? 1 : 0;
+  [glContext setValues:&interval forParameter:NSOpenGLContextParameterSwapInterval];
 }
 
 CGLWindow::~CGLWindow() {
@@ -68,6 +78,11 @@ std::shared_ptr<RenderTargetProxy> CGLWindow::onCreateRenderTarget(Context* cont
          "the main thread, then render on any thread.");
   }
   auto glContext = static_cast<CGLDevice*>(device.get())->glContext;
+  // AppKit may silently reset view.window.colorSpace when the window moves to a display whose
+  // native gamut differs from the configured one. Reassert the color space before [glContext
+  // update] reallocates the back buffer, otherwise the new buffer inherits the reset (native) color
+  // space and pixels get tagged incorrectly.
+  ApplyWindowColorSpace(view, _colorSpace);
   [glContext update];
   CGSize size = [view convertSizeToBacking:view.bounds.size];
   if (size.width <= 0 || size.height <= 0) {

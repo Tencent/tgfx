@@ -272,26 +272,9 @@ void MetalRenderPass::setTexture(unsigned binding, std::shared_ptr<Texture> text
   if (!renderEncoder || !texture) {
     return;
   }
-
-  // Remap logical binding to actual Metal texture index via the pipeline's mapping table.
-  unsigned textureIndex = currentPipeline ? currentPipeline->getTextureIndex(binding) : binding;
-
-  if (textureIndex < MaxTextureBindings && lastTextures[textureIndex] == texture.get() &&
-      lastSamplers[textureIndex] == sampler.get()) {
-    return;
-  }
-  if (textureIndex < MaxTextureBindings) {
-    lastTextures[textureIndex] = texture.get();
-    lastSamplers[textureIndex] = sampler.get();
-  }
-
-  auto metalTexture = std::static_pointer_cast<MetalTexture>(texture);
-  [renderEncoder setFragmentTexture:metalTexture->metalTexture() atIndex:textureIndex];
-
-  if (sampler) {
-    auto metalSampler = std::static_pointer_cast<MetalSampler>(sampler);
-    [renderEncoder setFragmentSamplerState:metalSampler->metalSamplerState() atIndex:textureIndex];
-  }
+  // Record the binding; the logical->physical translation happens in flushBindings() at draw time,
+  // so setTexture can be called before or after setPipeline().
+  pendingTextures[binding] = {std::move(texture), std::move(sampler)};
 }
 
 void MetalRenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuffer> buffer,
@@ -299,43 +282,48 @@ void MetalRenderPass::setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuff
   if (!renderEncoder || !buffer) {
     return;
   }
-  DEBUG_ASSERT(binding < VertexBufferIndexStart);
-  (void)size;  // Metal doesn't need explicit size
+  (void)size;
+  // Record the binding; the logical->physical translation happens in flushBindings() at draw time,
+  // so setUniformBuffer can be called before or after setPipeline().
+  pendingUniforms[binding] = {std::move(buffer), offset};
+}
 
-  if (binding < MaxUniformBindings && lastUniformBuffers[binding] == buffer.get() &&
-      lastUniformOffsets[binding] == offset) {
-    return;
+bool MetalRenderPass::flushBindings() {
+  if (!currentPipeline) {
+    LOGE("MetalRenderPass::flushBindings: setPipeline must be called first.");
+    return false;
   }
-
-  uint32_t visibility = currentPipeline ? currentPipeline->getUniformBlockVisibility(binding)
-                                        : ShaderVisibility::VertexFragment;
-
-  if (binding < MaxUniformBindings && lastUniformBuffers[binding] == buffer.get()) {
-    // Same buffer, only offset changed — use lightweight offset-only update.
-    lastUniformOffsets[binding] = offset;
-    if (visibility & ShaderVisibility::Vertex) {
-      [renderEncoder setVertexBufferOffset:offset atIndex:binding];
+  for (auto& [binding, uniform] : pendingUniforms) {
+    auto slots = currentPipeline->getUniformSlots(binding);
+    if (slots == nullptr) {
+      continue;
     }
-    if (visibility & ShaderVisibility::Fragment) {
-      [renderEncoder setFragmentBufferOffset:offset atIndex:binding];
+    auto metalBuffer = std::static_pointer_cast<MetalBuffer>(uniform.buffer);
+    if (slots->vertexSlot.has_value()) {
+      [renderEncoder setVertexBuffer:metalBuffer->metalBuffer()
+                              offset:uniform.offset
+                             atIndex:*slots->vertexSlot];
     }
-    return;
+    if (slots->fragmentSlot.has_value()) {
+      [renderEncoder setFragmentBuffer:metalBuffer->metalBuffer()
+                                offset:uniform.offset
+                               atIndex:*slots->fragmentSlot];
+    }
   }
-
-  if (binding < MaxUniformBindings) {
-    lastUniformBuffers[binding] = buffer.get();
-    lastUniformOffsets[binding] = offset;
+  for (auto& [binding, tex] : pendingTextures) {
+    if (tex.texture == nullptr) {
+      continue;
+    }
+    unsigned textureIndex = currentPipeline->getTextureIndex(binding);
+    auto metalTexture = std::static_pointer_cast<MetalTexture>(tex.texture);
+    [renderEncoder setFragmentTexture:metalTexture->metalTexture() atIndex:textureIndex];
+    if (tex.sampler != nullptr) {
+      auto metalSampler = std::static_pointer_cast<MetalSampler>(tex.sampler);
+      [renderEncoder setFragmentSamplerState:metalSampler->metalSamplerState()
+                                     atIndex:textureIndex];
+    }
   }
-
-  auto metalBuffer = std::static_pointer_cast<MetalBuffer>(buffer);
-
-  // Bind the uniform buffer to the shader stages specified by the pipeline's visibility flags.
-  if (visibility & ShaderVisibility::Vertex) {
-    [renderEncoder setVertexBuffer:metalBuffer->metalBuffer() offset:offset atIndex:binding];
-  }
-  if (visibility & ShaderVisibility::Fragment) {
-    [renderEncoder setFragmentBuffer:metalBuffer->metalBuffer() offset:offset atIndex:binding];
-  }
+  return true;
 }
 
 void MetalRenderPass::setStencilReference(uint32_t reference) {
@@ -348,6 +336,9 @@ void MetalRenderPass::setStencilReference(uint32_t reference) {
 void MetalRenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
                            uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
   if (!renderEncoder) {
+    return;
+  }
+  if (!flushBindings()) {
     return;
   }
 
@@ -363,6 +354,9 @@ void MetalRenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCou
                                   uint32_t instanceCount, uint32_t firstIndex, int32_t baseVertex,
                                   uint32_t firstInstance) {
   if (!renderEncoder || !indexBuffer) {
+    return;
+  }
+  if (!flushBindings()) {
     return;
   }
 

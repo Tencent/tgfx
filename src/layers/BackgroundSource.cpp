@@ -17,15 +17,20 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BackgroundSource.h"
+#include <algorithm>
 #include <utility>
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/PictureRecorder.h"
+#include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 
 namespace {
+
+static constexpr int MaxBackgroundSurfaceSize = 2048;
 
 // Geometry shared by top-level Make.
 struct TopLevelGeometry {
@@ -50,17 +55,25 @@ static float MaxBlurOutset() {
 }
 
 static TopLevelGeometry ComputeTopLevelGeometry(const Rect& drawRect, float maxOutset,
-                                                float minOutset, const Matrix& matrix) {
+                                                float minOutset, const Matrix& matrix,
+                                                int maxTextureSize) {
   TopLevelGeometry out;
   auto rect = drawRect;
   rect.outset(maxOutset, maxOutset);
   rect.roundOut();
-  // Down-sample uniformly when blur outset would push the surface past the single-pass budget.
+  if (rect.isEmpty() || maxTextureSize <= 2) {
+    return out;
+  }
+  // Down-sample the complete capture uniformly. The two-pixel margin guarantees that roundOut()
+  // cannot push either dimension back over the hardware limit.
   out.surfaceScale = 1.0f;
   auto maxBlurOutset = MaxBlurOutset();
   if (minOutset > maxBlurOutset) {
     out.surfaceScale = maxBlurOutset / minOutset;
   }
+  auto safeTextureSize = static_cast<float>(maxTextureSize - 2);
+  out.surfaceScale =
+      std::min({out.surfaceScale, safeTextureSize / rect.width(), safeTextureSize / rect.height()});
   rect.scale(out.surfaceScale, out.surfaceScale);
   rect.roundOut();
   out.surfaceMatrix = Matrix::MakeTrans(-rect.x(), -rect.y());
@@ -172,7 +185,9 @@ std::shared_ptr<BackgroundSource> BackgroundSource::Make(Context* context, const
   if (context == nullptr) {
     return nullptr;
   }
-  auto geometry = ComputeTopLevelGeometry(drawRect, maxOutset, minOutset, matrix);
+  auto maxTextureSize = context->gpu()->limits()->maxTextureDimension2D;
+  auto surfaceSizeLimit = std::min(maxTextureSize, MaxBackgroundSurfaceSize);
+  auto geometry = ComputeTopLevelGeometry(drawRect, maxOutset, minOutset, matrix, surfaceSizeLimit);
   if (!geometry.valid) {
     return nullptr;
   }

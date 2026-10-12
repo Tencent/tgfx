@@ -19,10 +19,32 @@
 #include "YUVTextureView.h"
 #include "core/utils/HardwareBufferUtil.h"
 #include "core/utils/Log.h"
+#include "core/utils/PixelFormatUtil.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 static constexpr int YUV_SIZE_FACTORS[] = {0, 1, 1};
+
+// YUVData describes the layout of the planes but not the length of the buffers behind them, so the
+// row size is the only part that can be verified here. A row that cannot hold a full line of the
+// plane means the upload would read past what the caller described, which happens when a decoder
+// returns a frame that is smaller than the size its caller declared.
+static bool ValidateYUVData(const YUVData* yuvData, const PixelFormat* formats) {
+  auto count = yuvData->planeCount();
+  for (size_t index = 0; index < count; index++) {
+    auto width = yuvData->width() >> YUV_SIZE_FACTORS[index];
+    auto rowBytes = yuvData->getRowBytesAt(index);
+    auto minimumRowBytes = static_cast<size_t>(width) * PixelFormatBytesPerPixel(formats[index]);
+    if (yuvData->getBaseAddressAt(index) == nullptr || rowBytes < minimumRowBytes) {
+      LOGE(
+          "YUVTextureView: plane %zu has a base address of %p and %zu bytes per row, but %d pixels "
+          "need at least %zu bytes.",
+          index, yuvData->getBaseAddressAt(index), rowBytes, width, minimumRowBytes);
+      return false;
+    }
+  }
+  return true;
+}
 
 static std::vector<std::shared_ptr<Texture>> MakeTexturePlanes(GPU* gpu, const YUVData* yuvData,
                                                                const PixelFormat* formats) {
@@ -63,6 +85,9 @@ std::shared_ptr<TextureView> TextureView::MakeI420(Context* context, const YUVDa
   }
   PixelFormat yuvFormats[YUVData::I420_PLANE_COUNT] = {PixelFormat::GRAY_8, PixelFormat::GRAY_8,
                                                        PixelFormat::GRAY_8};
+  if (!ValidateYUVData(yuvData, yuvFormats)) {
+    return nullptr;
+  }
   auto texturePlanes = MakeTexturePlanes(context->gpu(), yuvData, yuvFormats);
   if (texturePlanes.empty()) {
     return nullptr;
@@ -81,6 +106,9 @@ std::shared_ptr<TextureView> TextureView::MakeNV12(Context* context, const YUVDa
     return nullptr;
   }
   PixelFormat yuvFormats[YUVData::NV12_PLANE_COUNT] = {PixelFormat::GRAY_8, PixelFormat::RG_88};
+  if (!ValidateYUVData(yuvData, yuvFormats)) {
+    return nullptr;
+  }
   auto texturePlanes = MakeTexturePlanes(context->gpu(), yuvData, yuvFormats);
   if (texturePlanes.empty()) {
     return nullptr;

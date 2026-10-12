@@ -111,6 +111,14 @@ bool TextureEffect::needSubset() const {
     // If the texture size is different from the proxy size, we need to use subset.
     return true;
   }
+  auto type = textureView->getTexture()->type();
+  if (type == TextureType::External) {
+    // The descriptor size of external (OES) textures may not match the actual size of the
+    // underlying buffer, which can hold unstable padding outside the content bounds (for example,
+    // SurfaceTexture buffers aligned by hardware decoders). Always clamp the sampling to the
+    // content bounds to prevent bilinear filtering from reaching the padding area.
+    return true;
+  }
   return false;
 }
 

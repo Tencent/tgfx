@@ -21,6 +21,7 @@
 #include "MetalShaderModule.h"
 #include "MetalUtil.h"
 #include "core/utils/Log.h"
+#include "gpu/ShaderCompiler.h"
 
 namespace tgfx {
 
@@ -28,6 +29,17 @@ std::shared_ptr<MetalRenderPipeline> MetalRenderPipeline::Make(
     MetalGPU* gpu, const RenderPipelineDescriptor& descriptor) {
   if (!gpu) {
     return nullptr;
+  }
+
+  if (descriptor.vertex.module && descriptor.fragment.module) {
+    auto vertexShader = std::static_pointer_cast<MetalShaderModule>(descriptor.vertex.module);
+    auto fragmentShader = std::static_pointer_cast<MetalShaderModule>(descriptor.fragment.module);
+    std::string mismatch;
+    if (!VaryingInterfacesMatch(vertexShader->varyingDecls(), fragmentShader->varyingDecls(),
+                                mismatch)) {
+      LOGE("MetalRenderPipeline: %s", mismatch.c_str());
+      return nullptr;
+    }
   }
 
   auto pipeline = gpu->makeResource<MetalRenderPipeline>(gpu, descriptor);
@@ -54,9 +66,18 @@ MetalRenderPipeline::MetalRenderPipeline(MetalGPU* gpu,
     textureUnits[entry.binding] = textureUnit++;
   }
 
-  // Build uniform block visibility mapping: binding -> shader stage visibility flags.
-  for (auto& entry : descriptor.layout.uniformBlocks) {
-    uniformBlockVisibility[entry.binding] = entry.visibility;
+  auto vertexShader = std::static_pointer_cast<MetalShaderModule>(descriptor.vertex.module);
+  auto fragmentShader = std::static_pointer_cast<MetalShaderModule>(descriptor.fragment.module);
+  std::string error;
+  if (!ResolveUniformSlots(vertexShader.get(), fragmentShader.get(),
+                           descriptor.layout.uniformBlocks, uniformSlots, error)) {
+    LOGE("MetalRenderPipeline: %s.", error.c_str());
+    // Reject the pipeline: a dangling logical binding must not silently produce a usable pipeline.
+    if (pipelineState != nil) {
+      [pipelineState release];
+      pipelineState = nil;
+    }
+    return;
   }
 }
 
@@ -83,12 +104,9 @@ unsigned MetalRenderPipeline::getTextureIndex(unsigned binding) const {
   return binding;
 }
 
-uint32_t MetalRenderPipeline::getUniformBlockVisibility(unsigned binding) const {
-  auto result = uniformBlockVisibility.find(binding);
-  if (result != uniformBlockVisibility.end()) {
-    return result->second;
-  }
-  return ShaderVisibility::VertexFragment;
+const UniformSlotMapping* MetalRenderPipeline::getUniformSlots(unsigned binding) const {
+  auto result = uniformSlots.find(binding);
+  return result != uniformSlots.end() ? &result->second : nullptr;
 }
 
 bool MetalRenderPipeline::createPipelineState(MetalGPU* gpu,

@@ -98,7 +98,8 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
   }
 
   // Only a single shared geometry across all painters with a uniform stroke style can be
-  // simplified to a StyledShape.
+  // simplified to a StyledShape. Anything else has no exact outline: nullopt (consumers fall
+  // back to non-vector paths — glass uses the content alpha, spread uses the content bounds).
   Geometry* sharedGeometry = nullptr;
   auto hasFill = false;
   std::optional<PainterStyle> strokeStyle = std::nullopt;
@@ -108,12 +109,12 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
       continue;
     }
     if (painter->geometries.size() != 1) {
-      return Layer::onGetContentShape();
+      return std::nullopt;
     }
     if (sharedGeometry == nullptr) {
       sharedGeometry = painter->geometries[0];
     } else if (painter->geometries[0] != sharedGeometry) {
-      return Layer::onGetContentShape();
+      return std::nullopt;
     }
 
     auto style = painter->getStyle();
@@ -122,7 +123,7 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
     } else {
       // Multiple strokes cannot be simplified to a single StyledShape.
       if (strokeStyle.has_value()) {
-        return Layer::onGetContentShape();
+        return std::nullopt;
       }
       strokeStyle = style;
     }

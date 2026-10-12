@@ -20,7 +20,9 @@
 
 #include <webgpu/webgpu.h>
 #include <string>
+#include <unordered_map>
 #include "WebGPUResource.h"
+#include "gpu/VaryingShaderModule.h"
 #include "tgfx/gpu/ShaderModule.h"
 #include "tgfx/gpu/ShaderStage.h"
 
@@ -28,7 +30,7 @@ namespace tgfx {
 
 class WebGPUGPU;
 
-class WebGPUShaderModule : public ShaderModule, public WebGPUResource {
+class WebGPUShaderModule : public VaryingShaderModule, public WebGPUResource {
  public:
   static std::shared_ptr<WebGPUShaderModule> Make(WebGPUGPU* gpu,
                                                   const ShaderModuleDescriptor& descriptor);
@@ -46,7 +48,7 @@ class WebGPUShaderModule : public ShaderModule, public WebGPUResource {
  private:
   WebGPUShaderModule(WebGPUGPU* gpu, const ShaderModuleDescriptor& descriptor);
 
-  bool compileShader(WGPUDevice device, const std::string& glslCode, ShaderStage stage);
+  bool compileShader(WGPUDevice device, const std::string& vulkanGLSL, ShaderStage stage);
 
   WGPUShaderModule shaderModule = nullptr;
   ShaderStage _stage = ShaderStage::Vertex;

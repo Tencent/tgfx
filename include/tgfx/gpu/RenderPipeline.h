@@ -202,7 +202,8 @@ class BindingEntry {
   /**
    * Creates a BindingEntry with the specified name, binding point, and shader stage visibility.
    * @param name The name of the resource in the shader program.
-   * @param binding The binding point of the resource.
+   * @param binding A pipeline-scoped logical resource identifier. Pass the same value to the
+   * corresponding RenderPass resource setter. Backends translate it to stage-local physical slots.
    * @param visibility A bitmask of ShaderVisibility flags indicating which shader stages can access
    * this resource. Defaults to ShaderVisibility::VertexFragment (both stages).
    */
@@ -217,7 +218,8 @@ class BindingEntry {
   std::string name;
 
   /**
-   * The binding point of the resource.
+   * The pipeline-scoped logical identifier used by RenderPass resource setters. It is independent
+   * of backend-specific descriptor sets, bind groups, Metal buffer indices, and HLSL registers.
    */
   unsigned binding = 0;
 
@@ -237,7 +239,7 @@ class BindingEntry {
 class BindingLayout {
  public:
   /**
-   * Specifies the binding points for uniform blocks used in the shader program.
+   * Specifies the logical bindings for uniform blocks used in the shader program.
    */
   std::vector<BindingEntry> uniformBlocks = {};
 

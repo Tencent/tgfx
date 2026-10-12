@@ -162,7 +162,7 @@ void VulkanCommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcText
     // Even if nothing is copied, ensure dst layout is valid for subsequent use.
     auto vulkanDst = std::static_pointer_cast<VulkanTexture>(dstTexture);
     if (vulkanDst->currentLayout() == VK_IMAGE_LAYOUT_UNDEFINED) {
-      retainResource(vulkanDst);
+      retainTexture(vulkanDst);
       TransitionImageLayout(session.commandBuffer, vulkanDst->vulkanImage(),
                             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
       vulkanDst->setCurrentLayout(VK_IMAGE_LAYOUT_GENERAL);
@@ -173,8 +173,8 @@ void VulkanCommandEncoder::copyTextureToTexture(std::shared_ptr<Texture> srcText
   auto commandBuffer = session.commandBuffer;
   auto vulkanSrc = std::static_pointer_cast<VulkanTexture>(srcTexture);
   auto vulkanDst = std::static_pointer_cast<VulkanTexture>(dstTexture);
-  retainResource(vulkanSrc);
-  retainResource(vulkanDst);
+  retainTexture(vulkanSrc);
+  retainTexture(vulkanDst);
 
   auto srcAspect = VkFormatToAspectFlags(vulkanSrc->vulkanFormat());
   auto dstAspect = VkFormatToAspectFlags(vulkanDst->vulkanFormat());
@@ -231,7 +231,7 @@ void VulkanCommandEncoder::copyTextureToBuffer(std::shared_ptr<Texture> srcTextu
   auto commandBuffer = session.commandBuffer;
   auto vulkanSrc = std::static_pointer_cast<VulkanTexture>(srcTexture);
   auto vulkanDst = std::static_pointer_cast<VulkanBuffer>(dstBuffer);
-  retainResource(vulkanSrc);
+  retainTexture(vulkanSrc);
   retainResource(vulkanDst);
 
   auto aspectMask = VkFormatToAspectFlags(vulkanSrc->vulkanFormat());
@@ -269,7 +269,7 @@ void VulkanCommandEncoder::generateMipmapsForTexture(std::shared_ptr<Texture> te
   if (vulkanTexture->mipLevelCount() <= 1) {
     return;
   }
-  retainResource(vulkanTexture);
+  retainTexture(vulkanTexture);
 
   auto commandBuffer = session.commandBuffer;
   auto image = vulkanTexture->vulkanImage();

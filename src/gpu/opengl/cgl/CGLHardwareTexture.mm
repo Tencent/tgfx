@@ -29,7 +29,7 @@ std::vector<std::shared_ptr<Texture>> CGLHardwareTexture::MakeFrom(
   }
   auto format = CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8
                     ? PixelFormat::ALPHA_8
-                    : PixelFormat::RGBA_8888;
+                    : PixelFormat::BGRA_8888;
   if (usage & TextureUsage::RENDER_ATTACHMENT && !gpu->isFormatRenderable(format)) {
     return {};
   }

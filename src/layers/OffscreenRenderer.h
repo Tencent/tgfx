@@ -59,7 +59,8 @@ class OffscreenRenderer {
                                                 const Rect& inputBounds,
                                                 const Matrix& contentMatrix);
   static OffscreenResult RenderContentOnPicture(Layer* layer, const DrawArgs& args,
-                                                const Matrix& density, const Rect& imageClip);
+                                                const Matrix& density, const Rect& imageClip,
+                                                const Matrix& contentMatrix);
 
   // Two backing variants for renderPassThrough. Same split rationale as renderContent; both
   // seed the parent backdrop first so the pass-through subtree composes on top.

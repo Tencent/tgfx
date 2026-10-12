@@ -29,17 +29,32 @@
 
 namespace tgfx {
 
-std::unique_ptr<WebGPUGPU> WebGPUGPU::Make(WGPUDevice device, bool externallyOwned) {
+std::unique_ptr<WebGPUGPU> WebGPUGPU::Make(WGPUDevice device, bool externallyOwned,
+                                           bool ownsRuntimeRegistration) {
   if (device == nullptr) {
     return nullptr;
   }
-  return std::unique_ptr<WebGPUGPU>(new WebGPUGPU(device, externallyOwned));
+  return std::unique_ptr<WebGPUGPU>(
+      new WebGPUGPU(device, externallyOwned, ownsRuntimeRegistration));
 }
 
-WebGPUGPU::WebGPUGPU(WGPUDevice device, bool externallyOwned)
+WebGPUGPU::WebGPUGPU(WGPUDevice device, bool externallyOwned, bool ownsRuntimeRegistration)
     : webgpuDevice(device), _externallyOwned(externallyOwned) {
   caps = std::make_unique<WebGPUCaps>(device);
   commandQueue = std::make_unique<WebGPUCommandQueue>(this);
+  if (ownsRuntimeRegistration) {
+    runtimeRegistration.device = webgpuDevice;
+    runtimeRegistration.queue = commandQueue->webgpuQueue();
+  }
+}
+
+WebGPUGPU::RuntimeRegistration::~RuntimeRegistration() {
+  if (queue != nullptr) {
+    wgpuQueueRelease(queue);
+  }
+  if (device != nullptr) {
+    wgpuDeviceRelease(device);
+  }
 }
 
 WebGPUGPU::~WebGPUGPU() {
@@ -105,7 +120,8 @@ std::shared_ptr<Texture> WebGPUGPU::importBackendTexture(const BackendTexture& b
   if (wgpuTexture == nullptr) {
     return nullptr;
   }
-  return WebGPUTexture::MakeFrom(this, wgpuTexture, usage, adopted);
+  return WebGPUTexture::MakeFrom(this, wgpuTexture, backendTexture.width(), backendTexture.height(),
+                                 usage, adopted);
 }
 
 std::shared_ptr<Texture> WebGPUGPU::importBackendRenderTarget(
@@ -119,7 +135,8 @@ std::shared_ptr<Texture> WebGPUGPU::importBackendRenderTarget(
     return nullptr;
   }
   return WebGPUTexture::MakeFrom(
-      this, wgpuTexture, TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING, false);
+      this, wgpuTexture, backendRenderTarget.width(), backendRenderTarget.height(),
+      TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING, false);
 }
 
 std::shared_ptr<Semaphore> WebGPUGPU::importBackendSemaphore(const BackendSemaphore&) {

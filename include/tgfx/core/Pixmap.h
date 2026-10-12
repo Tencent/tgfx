@@ -18,10 +18,12 @@
 
 #pragma once
 
+#include <memory>
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
+
 /**
  * Pixmap provides a utility to pair ImageInfo width pixels. Pixmap is a low-level class that
  * provides convenience functions to access raster destinations, which can convert the format of
@@ -49,15 +51,15 @@ class Pixmap {
 
   /**
    * Creates a new Pixmap from the specified read-only Bitmap. Pixmap will lock pixels from the
-   * Bitmap and take a reference on its PixelRef object. The Bitmap will remain locked until the
-   * Pixmap goes out of scope or reset.
+   * Bitmap and take a reference on its PixelRef object. The Bitmap will remain locked until this
+   * Pixmap and all its copies go out of scope or are reset.
    */
   explicit Pixmap(const Bitmap& bitmap);
 
   /**
    * Creates a new Pixmap from the specified writable Bitmap. Pixmap will lock pixels from the
-   * Bitmap and take a reference on its PixelRef object. The Bitmap will remain locked until the
-   * Pixmap goes out of scope or reset.
+   * Bitmap and take a reference on its PixelRef object. The Bitmap will remain locked until this
+   * Pixmap and all its copies go out of scope or are reset.
    */
   explicit Pixmap(Bitmap& bitmap);
 
@@ -82,15 +84,15 @@ class Pixmap {
 
   /**
    * Sets the Pixmap to the specified read-only Bitmap. Pixmap will lock pixels from the Bitmap and
-   * take a reference on its PixelRef object. The Bitmap will remain locked until the Pixmap goes
-   * out of scope or reset.
+   * take a reference on its PixelRef object. The Bitmap will remain locked until this Pixmap
+   * and all its copies go out of scope or are reset.
    */
   void reset(const Bitmap& bitmap);
 
   /**
    * Sets the Pixmap to the specified writable Bitmap. Pixmap will lock pixels from the Bitmap and
-   * take a reference on its PixelRef object. The Bitmap will remain locked until the Pixmap goes
-   * out of scope or reset.
+   * take a reference on its PixelRef object. The Bitmap will remain locked until this Pixmap
+   * and all its copies go out of scope or are reset.
    */
   void reset(Bitmap& bitmap);
 
@@ -218,9 +220,13 @@ class Pixmap {
   std::shared_ptr<ColorSpace> colorSpace() const;
 
  private:
+  class PixelRefLock;
+
   ImageInfo _info = {};
   const void* _pixels = nullptr;
   void* _writablePixels = nullptr;
-  std::shared_ptr<PixelRef> pixelRef = nullptr;
+  // Shared ownership of the PixelRef lock. Copies of a Pixmap share the same lock; unlockPixels
+  // runs only when the last owner is destroyed. Empty for Pixmaps constructed from raw pixels.
+  std::shared_ptr<PixelRefLock> lockGuard;
 };
 }  // namespace tgfx

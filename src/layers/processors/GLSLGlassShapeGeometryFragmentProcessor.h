@@ -35,8 +35,8 @@ class GLSLGlassSDFGeometryFragmentProcessor : public GlassSDFGeometryFragmentPro
 
 class GLSLGlassUDFGeometryFragmentProcessor : public GlassUDFGeometryFragmentProcessor {
  public:
-  GLSLGlassUDFGeometryFragmentProcessor(std::shared_ptr<TextureProxy> fineMask,
-                                        std::shared_ptr<TextureProxy> coarseMask,
+  GLSLGlassUDFGeometryFragmentProcessor(std::shared_ptr<TextureProxy> mask,
+                                        std::shared_ptr<TextureProxy> edgeMask,
                                         const GlassUDFGeometryParams& params,
                                         bool enableEdgeLighting);
 

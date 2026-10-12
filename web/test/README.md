@@ -65,7 +65,7 @@ Web 端 accept baseline 后，`accept_baseline.sh` 会自动同步 `version.json
 
 ### Web 端流程
 
-Web 端构建时始终开启 `GENERATE_BASELINE_IMAGES`，等效于原生的 `UpdateBaseline` 行为：
+Web 端默认开启 `GENERATE_BASELINE_IMAGES`（可通过 `--skip-images` 关闭），等效于原生的 `UpdateBaseline` 行为：
 
 1. **构建时**：CMake 将以下文件 preload 进 WASM 虚拟 FS：
    - `test/baseline/version.json`（仓库基准版本）
@@ -104,9 +104,16 @@ Web 端构建时始终开启 `GENERATE_BASELINE_IMAGES`，等效于原生的 `Up
 1. 暂存当前分支的未提交改动（如有）
 2. 切到 main 分支，以 `UPDATE_BASELINE` 模式构建并运行 web 测试
 3. 生成 baseline cache 到 `test/baseline/.cache/webgl/`（或 `webgpu/`）
-4. 切回当前分支，恢复暂存改动
+4. 同时生成 baseline 图像到 `test/baseline-out/`，便于本地视觉核对（可用 `--skip-images` 跳过）
+5. 切回当前分支，恢复暂存改动
 
 之后在当前分支运行 `npm run autotest` 即可对比 main baseline 验证。
+
+如仅需刷新 cache 而不生成图像（CI 流水线使用此模式），追加 `--skip-images` 参数：
+
+```bash
+./update_baseline.sh USE_WEBGL --skip-images
+```
 
 ## 命令一览
 

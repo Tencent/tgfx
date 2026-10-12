@@ -27,6 +27,8 @@
 #include <vector>
 #if defined(__ANDROID__)
 #include <dlfcn.h>
+#endif
+#if defined(__ANDROID__) || defined(_WIN32)
 #include "gpu/vulkan/VulkanHardwareTexture.h"
 #endif
 #include "core/utils/Log.h"
@@ -43,6 +45,12 @@
 #include "vk_mem_alloc.h"
 
 namespace tgfx {
+
+#if defined(_WIN32) && !defined(__ANDROID__)
+// Driver-side GPU-time timeout for the keyed-mutex acquire chained onto vkQueueSubmit. Unlike
+// the D3D12 backend this does NOT block the CPU; it only bounds the GPU-side wait.
+static constexpr uint32_t KEYED_MUTEX_ACQUIRE_TIMEOUT_MS = 5000;
+#endif
 
 static bool HasInstanceExtension(const std::vector<VkExtensionProperties>& available,
                                  const char* name) {
@@ -74,6 +82,10 @@ bool HardwareBufferAvailable() {
   // On Android, AHardwareBuffer is available on API 26+. Dynamically check by probing the symbol.
   static const bool available = (dlsym(RTLD_DEFAULT, "AHardwareBuffer_allocate") != nullptr);
   return available;
+}
+#elif defined(_WIN32)
+bool HardwareBufferAvailable() {
+  return true;
 }
 #else
 bool HardwareBufferAvailable() {
@@ -461,13 +473,17 @@ std::shared_ptr<CommandEncoder> VulkanGPU::createCommandEncoder() {
 
 std::vector<std::shared_ptr<Texture>> VulkanGPU::importHardwareTextures(
     HardwareBufferRef hardwareBuffer, uint32_t usage) {
+  // All eligibility gating (extension bits + HardwareBufferCheck + format/usage) lives inside
+  // VulkanHardwareTexture::MakeFrom to keep a single authoritative import-eligibility path.
 #if defined(__ANDROID__)
-  if (!HardwareBufferCheck(hardwareBuffer)) {
+  auto texture = VulkanHardwareTexture::MakeFrom(this, hardwareBuffer, usage);
+  if (texture == nullptr) {
     return {};
   }
-  if (!_extensions.androidHardwareBuffer) {
-    return {};
-  }
+  std::vector<std::shared_ptr<Texture>> textures;
+  textures.push_back(std::move(texture));
+  return textures;
+#elif defined(_WIN32)
   auto texture = VulkanHardwareTexture::MakeFrom(this, hardwareBuffer, usage);
   if (texture == nullptr) {
     return {};
@@ -560,8 +576,8 @@ void VulkanGPU::processUnreferencedResources() {
 
 // Per-pool capacity for descriptor set allocation. Pools are chained on demand when exhausted
 // (see VulkanCommandEncoder::allocateDescriptorSet), so this value controls granularity rather
-// than a hard per-frame limit. Each draw allocates 2 sets (UBO + texture), so 2048 covers
-// ~1024 draws per pool before chaining.
+// than a hard per-frame limit. Each draw allocates 3 sets (vertex UBO + fragment UBO + texture),
+// so 2048 covers ~682 draws per pool before chaining.
 static constexpr uint32_t POOL_MAX_DESCRIPTOR_SETS = 2048;
 static constexpr uint32_t POOL_MAX_UNIFORM_BUFFERS = 2048;
 static constexpr uint32_t POOL_MAX_COMBINED_SAMPLERS = 1024;
@@ -839,6 +855,31 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
     timelineInfo.pSignalSemaphoreValues = signalValues.data();
     submitInfo.pNext = &timelineInfo;
   }
+
+#if defined(_WIN32) && !defined(__ANDROID__)
+  // Step 4b (Windows only): if this session sampled any shared D3D11 textures, chain a
+  // VkWin32KeyedMutexAcquireReleaseInfoKHR into submitInfo.pNext so the driver handles the
+  // key = 0 acquire/release around the GPU submission. Timeout is enforced in GPU time and
+  // does not block the CPU; a failed acquire surfaces through the fence like any GPU error.
+  VkWin32KeyedMutexAcquireReleaseInfoKHR keyedMutexInfo = {};
+  std::vector<uint64_t> keyedMutexKeys;
+  std::vector<uint32_t> keyedMutexTimeouts;
+  if (!request.session.keyedMutexMemories.empty()) {
+    keyedMutexKeys.assign(request.session.keyedMutexMemories.size(), 0);
+    keyedMutexTimeouts.assign(request.session.keyedMutexMemories.size(),
+                              KEYED_MUTEX_ACQUIRE_TIMEOUT_MS);
+    keyedMutexInfo.sType = VK_STRUCTURE_TYPE_WIN32_KEYED_MUTEX_ACQUIRE_RELEASE_INFO_KHR;
+    keyedMutexInfo.pNext = submitInfo.pNext;
+    keyedMutexInfo.acquireCount = static_cast<uint32_t>(request.session.keyedMutexMemories.size());
+    keyedMutexInfo.pAcquireSyncs = request.session.keyedMutexMemories.data();
+    keyedMutexInfo.pAcquireKeys = keyedMutexKeys.data();
+    keyedMutexInfo.pAcquireTimeouts = keyedMutexTimeouts.data();
+    keyedMutexInfo.releaseCount = static_cast<uint32_t>(request.session.keyedMutexMemories.size());
+    keyedMutexInfo.pReleaseSyncs = request.session.keyedMutexMemories.data();
+    keyedMutexInfo.pReleaseKeys = keyedMutexKeys.data();
+    submitInfo.pNext = &keyedMutexInfo;
+  }
+#endif
 
   // Step 5: Submit to the GPU queue.
   auto submitResult = vkQueueSubmit(vulkanQueue, 1, &submitInfo, fence);

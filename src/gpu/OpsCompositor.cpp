@@ -185,7 +185,7 @@ static bool MatrixOnlyDiffersInTranslation(const Matrix& a, const Matrix& b) {
 void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix,
                               const ClipStack& clip, const Brush& brush) {
   DEBUG_ASSERT(shape != nullptr);
-  if (shouldUseStencilCover(brush)) {
+  if (shouldUseStencilCover(brush, *shape)) {
     if (!canAppend(PendingOpType::StencilCoverPath, clip, brush)) {
       flushPendingOps(PendingOpType::StencilCoverPath, clip, brush);
     }
@@ -229,7 +229,7 @@ void OpsCompositor::drawShape(std::shared_ptr<Shape> shape, const Matrix& matrix
   pendingShapeColors.emplace_back(brush.color);
 }
 
-bool OpsCompositor::shouldUseStencilCover(const Brush& brush) const {
+bool OpsCompositor::shouldUseStencilCover(const Brush& brush, const Shape& shape) const {
 #ifndef TGFX_ENABLE_STENCIL_COVER_PATH
   // Compile-time master switch: shouldUseStencilCover returns false unconditionally when
   // TGFX_ENABLE_STENCIL_COVER_PATH is off, which removes the only caller of the stencil-cover
@@ -237,6 +237,7 @@ bool OpsCompositor::shouldUseStencilCover(const Brush& brush) const {
   // support files (tessellator, draw op, GPs, upload task) are still pulled in by the CMake
   // GLOB and rely on the linker's dead-code stripping to drop them from the final binary.
   USE(brush);
+  USE(shape);
   return false;
 #else
   // Any brush requesting antialiasing keeps using the legacy triangulation path so the
@@ -247,6 +248,13 @@ bool OpsCompositor::shouldUseStencilCover(const Brush& brush) const {
   // stencil-and-cover compose naturally — MSAA handles edge coverage while stencil-and-cover
   // handles interior/exterior classification.
   if (brush.antiAlias) {
+    return false;
+  }
+  // Skip empty paths: Canvas::drawFill() under a non-WideOpen clip forwards an empty
+  // inverse-fill path here, and letting it enter stencil-cover would make a plain
+  // Canvas::clear() under a clip allocate a full-size DEPTH24_STENCIL8 attachment for
+  // nothing.
+  if (shape.isSimplePath() && shape.getPath().isEmpty()) {
     return false;
   }
   // Hardware gate: the render path requires a renderable stencil attachment. All other
@@ -883,16 +891,20 @@ AppliedClip OpsCompositor::applyClip(const ClipStack& clipStack) {
     return out;
   }
 
-  // Stage 2: Set initial scissor from clip bounds to restrict drawing area.
+  // Stage 2: Set initial scissor from clip bounds to restrict drawing area. The scissor is
+  // published to draw ops in canvas top-left device space — the same space viewMatrix,
+  // coverDeviceBounds and every other rect owned by a DrawOp live in. The Y-flip required for
+  // BottomLeft render targets is applied at the backend boundary (DrawOp::applyScissor,
+  // StencilCoverPathDrawOp::applyStencilScissor) via OriginFlip.h::FlipYIfNeeded, immediately
+  // before RenderPass::setScissorRect. Keeping the intermediate representation in one space
+  // avoids the mixed-space bug that used to affect getStencilResolveBounds's intersect.
   auto clipBounds = clipStack.bounds();
   if (!clipBounds.intersect(renderTarget->bounds())) {
     out.status = AppliedClipStatus::ClippedOut;
     return out;
   }
   clipBounds.roundOut();
-  auto scissorBounds = clipBounds;
-  FlipYIfNeeded(&scissorBounds, renderTarget.get());
-  out.scissor = scissorBounds;
+  out.scissor = clipBounds;
 
   // Stage 3: Iterate through valid elements.
   auto& elements = clipStack.elements();
@@ -907,6 +919,11 @@ AppliedClip OpsCompositor::applyClip(const ClipStack& clipStack) {
     auto& element = elements[i];
     if (!element.isValid()) {
       continue;
+    }
+    if (element.shape().isEmpty()) {
+      // An empty clip element makes the intersection empty: nothing in the clipped area is drawn.
+      out.status = AppliedClipStatus::ClippedOut;
+      return out;
     }
 
     // Inner and outer bounds coincide only for an axis-aligned rect whose device footprint is an
@@ -935,6 +952,13 @@ AppliedClip OpsCompositor::applyClip(const ClipStack& clipStack) {
   // Stage 4: Generate mask for remaining elements
   if (!elementsForMask.empty()) {
     clipFP = getClipMaskFP(elementsForMask, clipStack.uniqueID(), clipBounds, std::move(clipFP));
+    if (clipFP == nullptr) {
+      // Mask rasterization failed (e.g. an empty or degenerate clip path, or an allocation
+      // failure). The clip region cannot be covered, so nothing in it is drawn. This keeps the
+      // failure direction consistent with empty clip elements: clip regions converge to empty.
+      out.status = AppliedClipStatus::ClippedOut;
+      return out;
+    }
   }
 
   out.coverageFP = std::move(clipFP);
@@ -995,7 +1019,7 @@ PlacementPtr<FragmentProcessor> OpsCompositor::getClipMaskFP(
   clipTexture = makeClipTexture(elements, clipBound);
   if (clipTexture == nullptr) {
     DEBUG_ASSERT(false);
-    return inputFP;
+    return nullptr;
   }
   cachedClipID = uniqueID;
   return makeMaskFP(clipTexture, clipBound, std::move(inputFP));
@@ -1031,6 +1055,12 @@ std::shared_ptr<TextureProxy> OpsCompositor::makeClipTexture(
     auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
     auto uvMatrix = Matrix::MakeTrans(bounds.left, bounds.top);
     auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), {}, uvMatrix, aaType);
+    if (drawOp == nullptr) {
+      // Shape rasterization failed (e.g. an empty or degenerate clip path, possibly after the
+      // inverse-fill toggle for DstOut masking); return nullptr so the caller reports ClippedOut
+      // instead of queuing a null draw op.
+      return nullptr;
+    }
     if (i > 0) {
       drawOp->setBlendMode(BlendMode::DstOut);
     }

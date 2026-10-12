@@ -47,12 +47,24 @@ class Window {
    */
   std::shared_ptr<ColorSpace> colorSpace() const;
 
+  /**
+   * Returns whether vertical synchronization is enabled for presentation. This is fixed when the
+   * Window is created (defaults to true) and cannot be changed afterwards. When enabled,
+   * presentation is throttled to the display's refresh rate. When disabled, the presenting thread
+   * is no longer blocked by the display's vsync, which is useful when that thread must not stall
+   * (for example a UI callback thread). The exact effect depends on the backend and the underlying
+   * platform; backends that cannot control vsync ignore this setting.
+   */
+  bool vsyncEnabled() const;
+
  protected:
   std::mutex locker = {};
   std::shared_ptr<Device> device = nullptr;
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
+  const bool _vsyncEnabled = true;
 
-  explicit Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  explicit Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                  bool vsyncEnabled = true);
   Window() = default;
 
   /**

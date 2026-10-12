@@ -47,6 +47,15 @@ bool StandardDrawOp::bindStandardPipeline(RenderPass* renderPass, RenderTarget* 
   ProgramInfo programInfo(renderTarget, geometryProcessor.get(), std::move(fragmentProcessors),
                           colors.size(), xferProcessor.get(), blendMode);
   programInfo.setCullMode(cullMode);
+  auto dsFormat = renderPass->depthStencilFormat();
+  if (dsFormat != PixelFormat::Unknown) {
+    // Some backends reject a pipeline that declares no depth-stencil format while the pass has a
+    // depth-stencil attachment. Inherit the pass format; the default no-op depth/stencil state
+    // keeps the draw behaviour unchanged.
+    DepthStencilDescriptor depthStencil = {};
+    depthStencil.format = dsFormat;
+    programInfo.setDepthStencil(depthStencil);
+  }
   onConfigureProgramInfo(programInfo);
   auto program = programInfo.getProgram();
   if (program == nullptr) {

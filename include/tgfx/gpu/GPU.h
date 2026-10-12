@@ -141,8 +141,9 @@ class GPU {
   virtual std::shared_ptr<Sampler> createSampler(const SamplerDescriptor& descriptor) = 0;
 
   /**
-   * Creates a ShaderModule from the provided shader code. The shader code must be valid and
-   * compatible with the GPU backend. Returns nullptr if the shader module creation fails.
+   * Creates a ShaderModule from the provided shader code. The shader code must be written in GLSL
+   * with OpenGL ES 3.0 syntax. Use the "#version 300 es" directive, or "#version 150" on desktop
+   * OpenGL. Returns nullptr if the shader module creation fails.
    */
   virtual std::shared_ptr<ShaderModule> createShaderModule(
       const ShaderModuleDescriptor& descriptor) = 0;
@@ -150,6 +151,13 @@ class GPU {
   /**
    * Creates a RenderPipeline that manages the vertex and fragment shader stages for use in a
    * RenderPass. Returns nullptr if pipeline creation fails.
+   *
+   * The vertex and fragment shader stages must declare the same set of varyings: every vertex
+   * `out` varying must be consumed by the fragment stage and every fragment `in` varying must be
+   * produced by the vertex stage, with matching array lengths. On SPIR-V based backends (Metal,
+   * Vulkan, D3D12, WebGPU), a mismatch between the two stages makes pipeline creation fail and
+   * return nullptr, because those backends pair varyings by location and cannot silently drop an
+   * unmatched declaration.
    */
   virtual std::shared_ptr<RenderPipeline> createRenderPipeline(
       const RenderPipelineDescriptor& descriptor) = 0;

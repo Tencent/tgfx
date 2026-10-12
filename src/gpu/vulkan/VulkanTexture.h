@@ -64,6 +64,14 @@ class VulkanTexture : public Texture, public VulkanResource {
     layout = newLayout;
   }
 
+  /**
+   * Returns the VkDeviceMemory guarded by a Win32 keyed mutex, or VK_NULL_HANDLE if none. Only
+   * VulkanHardwareTexture on Windows returns a non-null handle; other textures short-circuit.
+   */
+  virtual VkDeviceMemory importedMemoryForKeyedMutex() const {
+    return VK_NULL_HANDLE;
+  }
+
   BackendTexture getBackendTexture() const override;
   BackendRenderTarget getBackendRenderTarget() const override;
 

@@ -46,7 +46,7 @@ jobs:
       - name: Run Autotest
         run: |
           chmod +x autotest.sh
-          ./autotest.sh USE_OPENGL_SWIFTSHADER
+          ./autotest.sh USE_OPENGL_SWIFTSHADER --skip-images
         env:
           TRACY_NO_INVARIANT_CHECK: 1
 
@@ -110,7 +110,7 @@ jobs:
       - name: Run Autotest
         run: |
           chmod +x autotest.sh
-          ./autotest.sh USE_METAL
+          ./autotest.sh USE_METAL --skip-images
         env:
           TRACY_NO_INVARIANT_CHECK: 1
 
@@ -163,7 +163,7 @@ jobs:
       - name: Run Autotest
         run: |
           chmod +x autotest.sh
-          ./autotest.sh USE_VULKAN_SWIFTSHADER
+          ./autotest.sh USE_VULKAN_SWIFTSHADER --skip-images
         env:
           TRACY_NO_INVARIANT_CHECK: 1
 
@@ -181,5 +181,73 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mac_vulkan_result
+          path: result
+
+  win-d3d12-warp:
+    name: win (d3d12-warp)
+    runs-on: windows-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            third_party
+            test/baseline/.cache/d3d12-warp
+          key: autotest-win-d3d12-warp-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          restore-keys: autotest-win-d3d12-warp-
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+        shell: bash
+
+      # windows-latest ships MinGW GCC on PATH, and depsync's internal vcvars32 leaves x86 cl
+      # first. Both cases make CMake pick the wrong compiler when the bat files invoke it.
+      # ilammy/msvc-dev-cmd runs vcvars64 at the workflow level so the environment survives
+      # git switch that update_baseline.bat performs internally (which would otherwise rewrite
+      # the bat file on disk and desync cmd's read offset with any environment logic embedded
+      # in the bat itself).
+      - name: Setup MSVC (x64)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Update Baseline
+        run: .\update_baseline.bat USE_D3D12_WARP --skip-images
+        shell: cmd
+        env:
+          CC: cl.exe
+          CXX: cl.exe
+
+      - name: Run Autotest
+        run: .\autotest.bat USE_D3D12_WARP
+        shell: cmd
+        env:
+          CC: cl.exe
+          CXX: cl.exe
+          TRACY_NO_INVARIANT_CHECK: 1
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            third_party
+            test/baseline/.cache/d3d12-warp
+          key: autotest-win-d3d12-warp-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+
+      - name: Upload Result
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: win_d3d12_warp_result
           path: result
 

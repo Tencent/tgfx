@@ -35,6 +35,13 @@ struct GlassGeometryParams {
   float refractionFactor = 0.0f;
   float splay = 0.0f;
   float depthRatio = 0.0f;
+  /**
+   * Width of the edge light falloff in layer pixels. The shader measures the edge distance in layer
+   * pixels, so a band of one layer pixel covers less than one screen pixel once the layer is scaled
+   * down and the falloff collapses into a hard threshold. Callers rendering at a reduced scale must
+   * widen the band accordingly. Values below one are ignored.
+   */
+  float edgeBandLayerPixels = 1.0f;
 };
 
 struct GlassSDFGeometryParams : public GlassGeometryParams {
@@ -45,6 +52,21 @@ struct GlassSDFGeometryParams : public GlassGeometryParams {
 struct GlassUDFGeometryParams : public GlassGeometryParams {
   float udfPixelToLayerPixelX = 1.0f;
   float udfPixelToLayerPixelY = 1.0f;
+  /**
+   * Layer-space distance between the two taps of the edge field's center difference. It must match
+   * the tent radius used to build that field, otherwise the reconstructed edge distance is scaled.
+   */
+  float edgeSpanX = 1.0f;
+  float edgeSpanY = 1.0f;
+  // Top-left position of the physical texture in the full UDF texel coordinate space.
+  float textureOriginX = 0.0f;
+  float textureOriginY = 0.0f;
+  // The edge-light field lives in a separate texture whose density is anchored to the on-screen
+  // size; the sampling transform differs from the refraction field's, hence the separate origin.
+  float edgeTextureOriginX = 0.0f;
+  float edgeTextureOriginY = 0.0f;
+  float edgePixelToLayerPixelX = 1.0f;
+  float edgePixelToLayerPixelY = 1.0f;
 };
 
 /**
@@ -82,9 +104,15 @@ class GlassSDFGeometryFragmentProcessor : public GlassShapeGeometryFragmentProce
 
 class GlassUDFGeometryFragmentProcessor : public GlassShapeGeometryFragmentProcessor {
  public:
+  /**
+   * @description Creates the processor.
+   * @param mask RGBA8 texture where RGB carries the 24-bit refraction height.
+   * @param edgeMask RGBA8 texture whose A carries the edge light height; only required when
+   * enableEdgeLighting is true.
+   */
   static PlacementPtr<GlassUDFGeometryFragmentProcessor> Make(
-      BlockAllocator* allocator, std::shared_ptr<TextureProxy> fineMask,
-      std::shared_ptr<TextureProxy> coarseMask, const GlassUDFGeometryParams& params,
+      BlockAllocator* allocator, std::shared_ptr<TextureProxy> mask,
+      std::shared_ptr<TextureProxy> edgeMask, const GlassUDFGeometryParams& params,
       bool enableEdgeLighting);
 
   std::string name() const override {
@@ -102,12 +130,12 @@ class GlassUDFGeometryFragmentProcessor : public GlassShapeGeometryFragmentProce
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  GlassUDFGeometryFragmentProcessor(std::shared_ptr<TextureProxy> fineMask,
-                                    std::shared_ptr<TextureProxy> coarseMask,
+  GlassUDFGeometryFragmentProcessor(std::shared_ptr<TextureProxy> mask,
+                                    std::shared_ptr<TextureProxy> edgeMask,
                                     const GlassUDFGeometryParams& params, bool enableEdgeLighting);
 
-  std::shared_ptr<TextureProxy> fineMaskProxy;
-  std::shared_ptr<TextureProxy> coarseMaskProxy;
+  std::shared_ptr<TextureProxy> maskProxy;
+  std::shared_ptr<TextureProxy> edgeMaskProxy;
   GlassUDFGeometryParams params = {};
   bool enableEdgeLighting = false;
 

@@ -31,23 +31,22 @@ void GlassSDFGeometryFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey
 }
 
 GlassUDFGeometryFragmentProcessor::GlassUDFGeometryFragmentProcessor(
-    std::shared_ptr<TextureProxy> fineMask, std::shared_ptr<TextureProxy> coarseMask,
+    std::shared_ptr<TextureProxy> mask, std::shared_ptr<TextureProxy> edgeMask,
     const GlassUDFGeometryParams& params, bool enableEdgeLighting)
-    : GlassShapeGeometryFragmentProcessor(ClassID()), fineMaskProxy(std::move(fineMask)),
-      coarseMaskProxy(std::move(coarseMask)), params(params),
-      enableEdgeLighting(enableEdgeLighting) {
+    : GlassShapeGeometryFragmentProcessor(ClassID()), maskProxy(std::move(mask)),
+      edgeMaskProxy(std::move(edgeMask)), params(params), enableEdgeLighting(enableEdgeLighting) {
 }
 
 void GlassUDFGeometryFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  bytesKey->write(static_cast<uint32_t>(coarseMaskProxy != nullptr && enableEdgeLighting));
+  bytesKey->write(static_cast<uint32_t>(enableEdgeLighting));
 }
 
 size_t GlassUDFGeometryFragmentProcessor::onCountTextureSamplers() const {
-  return coarseMaskProxy == nullptr ? 1 : 2;
+  return enableEdgeLighting ? 2 : 1;
 }
 
 std::shared_ptr<Texture> GlassUDFGeometryFragmentProcessor::onTextureAt(size_t index) const {
-  const auto& proxy = index == 0 ? fineMaskProxy : coarseMaskProxy;
+  auto proxy = index == 0 ? maskProxy : edgeMaskProxy;
   if (proxy == nullptr) {
     return nullptr;
   }

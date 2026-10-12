@@ -153,9 +153,12 @@ std::shared_ptr<MetalShaderModule> MetalShaderModule::Make(
 }
 
 MetalShaderModule::MetalShaderModule(MetalGPU* gpu, const ShaderModuleDescriptor& descriptor)
-    : _stage(descriptor.stage),
+    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage), {}),
+      _stage(descriptor.stage),
       _glslCode(descriptor.stage == ShaderStage::Fragment ? descriptor.code : std::string{}) {
-  compileShader(gpu->device(), gpu->shaderCompiler(), descriptor.code, descriptor.stage);
+  std::string vulkanGLSL = PreprocessGLSL(descriptor.code, descriptor.stage);
+  setUniformSlots(detail::CollectUniformSlots(vulkanGLSL));
+  compileShader(gpu->device(), gpu->shaderCompiler(), vulkanGLSL, descriptor.stage);
 }
 
 void MetalShaderModule::onRelease(MetalGPU*) {
@@ -166,8 +169,12 @@ void MetalShaderModule::onRelease(MetalGPU*) {
 }
 
 bool MetalShaderModule::compileShader(id<MTLDevice> device, const shaderc::Compiler* compiler,
-                                      const std::string& glslCode, ShaderStage stage) {
-  std::string mslCode = convertGLSLToMSL(compiler, glslCode, stage);
+                                      const std::string& vulkanGLSL, ShaderStage stage) {
+  auto spirvBinary = CompileGLSLToSPIRV(compiler, vulkanGLSL, stage);
+  if (spirvBinary.empty()) {
+    return false;
+  }
+  std::string mslCode = convertSPIRVToMSL(spirvBinary, stage);
   if (mslCode.empty()) {
     return false;
   }
@@ -179,23 +186,12 @@ bool MetalShaderModule::compileShader(id<MTLDevice> device, const shaderc::Compi
   if (!library) {
     if (error) {
       LOGE("Metal shader compilation error: %s", error.localizedDescription.UTF8String);
-      LOGE("Original GLSL:\n%s", glslCode.c_str());
       LOGE("MSL code:\n%s", mslCode.c_str());
     }
     return false;
   }
 
   return true;
-}
-
-std::string MetalShaderModule::convertGLSLToMSL(const shaderc::Compiler* compiler,
-                                                const std::string& glslCode, ShaderStage stage) {
-  std::string vulkanGLSL = PreprocessGLSL(glslCode);
-  auto spirvBinary = CompileGLSLToSPIRV(compiler, vulkanGLSL, stage);
-  if (spirvBinary.empty()) {
-    return "";
-  }
-  return convertSPIRVToMSL(spirvBinary, stage);
 }
 
 SampleMaskCompileResult CompileFragmentShaderWithSampleMask(MetalGPU* gpu,
@@ -207,7 +203,7 @@ SampleMaskCompileResult CompileFragmentShaderWithSampleMask(MetalGPU* gpu,
   auto device = gpu->device();
   auto* compiler = gpu->shaderCompiler();
   auto stage = ShaderStage::Fragment;
-  std::string vulkanGLSL = PreprocessGLSL(glslCode);
+  std::string vulkanGLSL = PreprocessGLSL(glslCode, stage);
 
   // First pass: compile to SPIR-V and collect used specialization constant IDs.
   auto spirvBinary = CompileGLSLToSPIRV(compiler, vulkanGLSL, stage);

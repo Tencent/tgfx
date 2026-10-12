@@ -50,20 +50,24 @@ class VulkanWindow : public Window {
    * Creates a VulkanWindow from a Win32 window handle. Returns nullptr if the Vulkan surface or
    * swapchain cannot be created. Note: only sRGB output is currently supported. The colorSpace
    * parameter is accepted for forward compatibility but non-sRGB values are ignored with a warning.
-   * HDR / Display-P3 support will be added in a follow-up.
+   * HDR / Display-P3 support will be added in a follow-up. The vsyncEnabled setting is fixed for
+   * the lifetime of the window and defaults to true.
    */
   static std::shared_ptr<VulkanWindow> MakeFrom(HWND hwnd, std::shared_ptr<VulkanDevice> device,
-                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                                std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                                bool vsyncEnabled = true);
 #endif
 
 #ifdef __OHOS__
   /**
    * Creates a VulkanWindow from an OHOS NativeWindow. Returns nullptr if the Vulkan surface or
-   * swapchain cannot be created. Note: only sRGB output is currently supported.
+   * swapchain cannot be created. Note: only sRGB output is currently supported. The vsyncEnabled
+   * setting is fixed for the lifetime of the window and defaults to true.
    */
   static std::shared_ptr<VulkanWindow> MakeFrom(OHNativeWindow* nativeWindow,
                                                 std::shared_ptr<VulkanDevice> device,
-                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                                std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                                bool vsyncEnabled = true);
 #endif
 
 #ifdef __ANDROID__
@@ -76,10 +80,13 @@ class VulkanWindow : public Window {
    * null.
    * @param colorSpace The desired color space for the swapchain images. Defaults to sRGB when
    * nullptr is passed.
+   * @param vsyncEnabled Whether presentation is synchronized to the display's refresh rate. Fixed
+   * for the lifetime of the window. Defaults to true.
    */
   static std::shared_ptr<VulkanWindow> MakeFrom(ANativeWindow* nativeWindow,
                                                 std::shared_ptr<VulkanDevice> device,
-                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                                std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                                bool vsyncEnabled = true);
 #endif
 
   ~VulkanWindow() override;
@@ -95,7 +102,7 @@ class VulkanWindow : public Window {
   struct PlatformState;
 
   explicit VulkanWindow(std::shared_ptr<Device> device, std::unique_ptr<PlatformState> state,
-                        std::shared_ptr<ColorSpace> colorSpace);
+                        std::shared_ptr<ColorSpace> colorSpace, bool vsyncEnabled);
 
   std::unique_ptr<PlatformState> _platformState;
 };

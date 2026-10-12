@@ -158,6 +158,50 @@ TGFX_TEST(ReadPixelsTest, PixelMap) {
   CHECK_PIXELS(BGRAInfo, pixelsB.data(), "PixelMap_alpha_to_BGRA");
 }
 
+TGFX_TEST(ReadPixelsTest, PixmapCopySharesLock) {
+  // Regression test for the double-unlock bug that used to abort MSVC debug builds. A Pixmap
+  // constructed from a Bitmap owns a lock on the Bitmap's PixelRef; copying the Pixmap must share
+  // that lock (via internal shared_ptr) so the mutex is unlocked exactly once when the last copy
+  // is destroyed. Under the old implementation, each copy called unlockPixels() independently and
+  // the second unlock aborted under MSVC's checked STL. On POSIX platforms the extra unlock was
+  // silent undefined behavior; this test observes the correct outcome (readable pixels through
+  // the surviving copy) rather than the abort, so it protects all platforms from regression.
+  Bitmap bitmap(4, 4);
+  ASSERT_FALSE(bitmap.isEmpty());
+  {
+    Pixmap writer(bitmap);
+    ASSERT_TRUE(writer.clear());
+  }
+
+  Pixmap original(bitmap);
+  ASSERT_NE(original.pixels(), nullptr);
+  const void* originalPixels = original.pixels();
+
+  // Copy construction: shares the same lock guard, points at the same pixel memory.
+  Pixmap copy = original;
+  ASSERT_NE(copy.pixels(), nullptr);
+  EXPECT_EQ(copy.pixels(), originalPixels);
+
+  // Reset the original. The old implementation would unlock the underlying mutex here; copy's
+  // destructor would then double-unlock. With shared ownership the mutex stays locked because
+  // copy still holds a reference.
+  original.reset();
+  EXPECT_EQ(original.pixels(), nullptr);
+  ASSERT_NE(copy.pixels(), nullptr);
+  EXPECT_EQ(copy.pixels(), originalPixels);
+
+  // The surviving copy must still be readable end-to-end.
+  Buffer readBuf(copy.info().byteSize());
+  EXPECT_TRUE(copy.readPixels(copy.info(), readBuf.data()));
+
+  // Copy assignment path: assigning another live Pixmap-from-Bitmap into an empty Pixmap must
+  // participate in the same shared lock guard, so both instances hold a reference and neither
+  // releases the mutex until both are destroyed.
+  Pixmap assigned;
+  assigned = copy;
+  EXPECT_EQ(assigned.pixels(), originalPixels);
+}
+
 TGFX_TEST(ReadPixelsTest, Surface) {
   auto codec = MakeImageCodec("resources/apitest/test_timestretch.png");
   ASSERT_TRUE(codec != nullptr);

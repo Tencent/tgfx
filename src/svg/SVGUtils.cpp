@@ -22,12 +22,14 @@
 #include <sstream>
 #include "core/codecs/jpeg/JpegCodec.h"
 #include "core/codecs/png/PngCodec.h"
+#include "core/utils/CopyPixels.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/gpu/GPUBuffer.h"
 
 namespace tgfx {
 
@@ -292,18 +294,51 @@ std::shared_ptr<Data> AsDataUri(const std::shared_ptr<Data>& encodedData) {
 
 std::shared_ptr<Image> ConvertImageColorSpace(const std::shared_ptr<Image>& image, Context* context,
                                               const std::shared_ptr<ColorSpace>& targetColorSpace,
-                                              const std::shared_ptr<ColorSpace>& assignColorSpace) {
+                                              const std::shared_ptr<ColorSpace>& assignColorSpace,
+                                              std::vector<PendingImage>* pendings) {
   auto tempColorSpace = assignColorSpace ? assignColorSpace : targetColorSpace;
   if (tempColorSpace == nullptr) {
     return image;
   }
   auto surface =
       Surface::Make(context, image->width(), image->height(), false, 1, false, 0, targetColorSpace);
+  if (surface == nullptr) {
+    return image;
+  }
   auto canvas = surface->getCanvas();
   canvas->drawImage(image);
+  auto readback = surface->asyncReadPixels(Rect::MakeWH(surface->width(), surface->height()));
+  if (readback == nullptr) {
+    return image;
+  }
+  // Starting the async mapping here lets it complete on a later turn of the event loop, and
+  // getGPUBuffer() flushes without the synchronous GPU wait lockPixels() would do.
+  if (auto gpuBuffer = readback->getGPUBuffer(context)) {
+    gpuBuffer->requestMapAsync();
+  }
+  auto flipY = surface->origin() == ImageOrigin::BottomLeft;
+  auto srcPixels = readback->lockPixels(context);
+  if (srcPixels == nullptr) {
+    readback->unlockPixels(context);
+    if (pendings != nullptr && readback->status(context) == ReadbackStatus::Pending) {
+      pendings->push_back(
+          PendingImage::Make(std::move(readback), pendings->size(), flipY, tempColorSpace));
+      return nullptr;
+    }
+    // On a terminal failure or without a pending sink, returning the source image keeps its
+    // original encoded data.
+    return image;
+  }
   Bitmap bitmap{image->width(), image->height(), false, true, tempColorSpace};
   auto pixels = bitmap.lockPixels();
-  surface->readPixels(bitmap.info().makeColorSpace(targetColorSpace), pixels);
+  if (pixels == nullptr) {
+    readback->unlockPixels(context);
+    LOGE("ConvertImageColorSpace() Failed to lock the destination bitmap!");
+    return image;
+  }
+  CopyPixels(readback->info(), srcPixels, bitmap.info().makeColorSpace(targetColorSpace), pixels,
+             flipY);
+  readback->unlockPixels(context);
   bitmap.unlockPixels();
   return Image::MakeFrom(bitmap);
 }

@@ -268,7 +268,8 @@ std::optional<StyledShape> ShapeLayer::onGetContentShape() {
   }
   // The dash pattern is intentionally ignored here: spread expands the stroke outline, and a dash
   // only changes how that outline is displayed, not its geometry, so it is treated as a solid
-  // stroke.
+  // stroke. Stacked stroke styles share the layer's single line width and alignment (they only
+  // differ in color), so the contour stays exact no matter how many are stacked.
   return StyledShape::Make(Shape::MakeFrom(_shape->getPath()), type, stroke.width,
                            static_cast<StrokeAlign>(shapeBitFields.strokeAlign));
 }

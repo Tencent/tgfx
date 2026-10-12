@@ -30,10 +30,12 @@
 namespace tgfx {
 static constexpr char VertexUniformBlockName[] = "VertexUniformBlock";
 static constexpr char FragmentUniformBlockName[] = "FragmentUniformBlock";
-// Descriptor set indices for multi-set Vulkan layout. UBOs and textures reside in separate
-// descriptor sets so their bindings both start from 0, eliminating cross-backend offset mapping.
-static constexpr int UBO_DESCRIPTOR_SET = 0;
-static constexpr int TEXTURE_DESCRIPTOR_SET = 1;
+// Descriptor set indices for SPIR-V based backends. Vertex and fragment UBOs use independent
+// sets so each stage can assign dense local bindings without colliding in Vulkan/WebGPU's
+// pipeline-wide resource namespace. Textures use a third set.
+static constexpr int VERTEX_UBO_DESCRIPTOR_SET = 0;
+static constexpr int FRAGMENT_UBO_DESCRIPTOR_SET = 1;
+static constexpr int TEXTURE_DESCRIPTOR_SET = 2;
 static constexpr int VERTEX_UBO_BINDING_POINT = 0;
 static constexpr int FRAGMENT_UBO_BINDING_POINT = 1;
 

@@ -34,6 +34,7 @@
 #include "layers/BackgroundHandler.h"
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/BackgroundSource.h"
+#include "layers/CanvasUtils.h"
 #include "layers/DrawArgs.h"
 #include "layers/LayerStyleSource.h"
 #include "layers/MaskContext.h"
@@ -92,6 +93,18 @@ static void ClipScrollRect(Canvas* canvas, const Rect* scrollRect, const Matrix3
 }
 
 struct MaskData {
+  MaskData() = default;
+
+  explicit MaskData(bool inverted) {
+    if (inverted) {
+      clipPath.toggleInverseFillType();
+    }
+  }
+
+  MaskData(Path path, std::shared_ptr<MaskFilter> filter)
+      : clipPath(std::move(path)), maskFilter(std::move(filter)) {
+  }
+
   Path clipPath = {};
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
 };
@@ -143,37 +156,6 @@ static void ComputeDirtyNodesForReordering(const std::vector<Layer*>& retainedCh
       nodesToMarkDirty->push_back(retainedChildren[i]);
     }
   }
-}
-
-static std::optional<Rect> GetClipBounds(const Canvas* canvas) {
-  if (canvas == nullptr) {
-    return std::nullopt;
-  }
-  const auto clipBound = canvas->getTotalClipBounds();
-  auto clipRect = Rect::MakeEmpty();
-  auto surface = canvas->getSurface();
-  if (!clipBound.has_value()) {
-    if (!surface) {
-      return std::nullopt;
-    }
-    clipRect = Rect::MakeWH(surface->width(), surface->height());
-  } else {
-    clipRect = *clipBound;
-    if (surface && !clipRect.intersect(Rect::MakeWH(surface->width(), surface->height()))) {
-      return Rect::MakeEmpty();
-    }
-  }
-  if (clipRect.isEmpty()) {
-    return Rect::MakeEmpty();
-  }
-  auto invert = Matrix::I();
-  auto viewMatrix = canvas->getMatrix();
-  if (!viewMatrix.invert(&invert)) {
-    return Rect::MakeEmpty();
-  }
-  clipRect = invert.mapRect(clipRect);
-  clipRect.roundOut();
-  return clipRect;
 }
 
 static int GetMipmapCacheLongEdge(int maxSize, float contentScale, const Rect& layerBounds) {
@@ -966,7 +948,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   // skip (same as contour / 3D subtrees). A null snapshot map signals the picture-canvas path,
   // which makes the consumer synthesize backdrops on the fly via PictureRecorder.
   AutoCanvasRestore autoRestore(canvas);
-  BackgroundConsumer consumer(snapshotsPtr);
+  BackgroundConsumer consumer(snapshotsPtr, false);
   BackgroundHandler* handler =
       needBackground ? static_cast<BackgroundHandler*>(&consumer) : BackgroundHandler::NoOp();
   DrawArgs drawArgs = args;
@@ -1031,17 +1013,10 @@ void Layer::detachProperty(LayerProperty* property) {
 }
 
 std::optional<StyledShape> Layer::onGetContentShape() {
-  auto* content = getContent();
-  if (content == nullptr) {
-    return std::nullopt;
-  }
-  auto bounds = content->getTightBounds(Matrix::I());
-  if (bounds.isEmpty()) {
-    return std::nullopt;
-  }
-  Path path = {};
-  path.addRect(bounds);
-  return StyledShape::Make(Shape::MakeFrom(path), StyledShapeType::Fill, 0, StrokeAlign::Center);
+  // The default implementation has no exact vector outline to offer: deriving a rect from the
+  // content bounds would be an approximation, which the exact-or-null StyledShape contract
+  // forbids. Layer types whose content is an exact vector shape override this.
+  return std::nullopt;
 }
 
 void Layer::onAttachToRoot(RootLayer* rootLayer) {
@@ -1272,16 +1247,21 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
   DEBUG_ASSERT(_mask != nullptr);
   DEBUG_ASSERT(args.render3DContext == nullptr);
   auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
-  auto isContourMode = maskType == LayerMaskType::Contour;
+  auto isContourMode =
+      maskType == LayerMaskType::Contour || maskType == LayerMaskType::ContourInverted;
+  bool needLuminance =
+      maskType == LayerMaskType::Luminance || maskType == LayerMaskType::LuminanceInverted;
+  bool inverted = maskType == LayerMaskType::AlphaInverted ||
+                  maskType == LayerMaskType::LuminanceInverted ||
+                  maskType == LayerMaskType::ContourInverted;
 
   auto relativeMatrix3D = _mask->getRelativeMatrix3D(this);
   auto maskPicture = getMaskPicture(args, isContourMode, scale, relativeMatrix3D);
   if (maskPicture == nullptr) {
-    return {};
+    return MaskData(inverted);
   }
 
-  bool needLuminance = maskType == LayerMaskType::Luminance;
-  if (!needLuminance) {
+  if (!needLuminance && !inverted) {
     Path maskPath = {};
     if (MaskContext::GetMaskPath(maskPicture, &maskPath)) {
       maskPath.transform(Matrix::MakeScale(1.0f / scale, 1.0f / scale));
@@ -1294,14 +1274,14 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
     auto scaledClipBounds = *layerClipBounds;
     scaledClipBounds.scale(scale, scale);
     if (!maskBounds.intersect(scaledClipBounds)) {
-      return {};
+      return MaskData(inverted);
     }
   }
   Point maskImageOffset = {};
   auto maskContentImage = PictureUtils::ToImageWithOffset(std::move(maskPicture), &maskImageOffset,
                                                           &maskBounds, args.dstColorSpace);
   if (maskContentImage == nullptr) {
-    return {};
+    return MaskData(inverted);
   }
   if (needLuminance) {
     maskContentImage =
@@ -1314,7 +1294,7 @@ MaskData Layer::getMaskData(const DrawArgs& args, float scale,
   if (shader) {
     shader = shader->makeWithMatrix(maskMatrix);
   }
-  return {{}, MaskFilter::MakeShader(shader)};
+  return {{}, MaskFilter::MakeShader(shader, inverted)};
 }
 
 std::shared_ptr<Image> Layer::getContentContourImage(const DrawArgs& args, float contentScale,
@@ -1888,11 +1868,11 @@ float Layer::drawBackgroundLayers(const DrawArgs& args, Canvas* canvas) {
 }
 
 std::shared_ptr<Image> Layer::synthesizeBackgroundImage(const DrawArgs& args, float contentScale,
-                                                        Point* offset) {
+                                                        const Rect& contentBounds, Point* offset) {
   if (FloatNearlyZero(contentScale)) {
     return nullptr;
   }
-  auto bounds = getBounds();
+  auto bounds = contentBounds;
   bounds.scale(contentScale, contentScale);
   bounds.roundOut();
   if (bounds.isEmpty()) {

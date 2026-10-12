@@ -18,7 +18,7 @@
 
 import * as types from '../types/types';
 import {TGFXBind} from '../lib/tgfx';
-import Hello2D from './wasm/hello2d';
+import Hello2D from './wasm-mt/hello2d';
 import {
     ShareData,
     updateSize,
@@ -48,7 +48,8 @@ if (typeof window !== 'undefined') {
             }
 
             shareData.Hello2DModule = await Hello2D({
-                locateFile: (file: string) => './wasm/' + file,
+                locateFile: (file: string) => './wasm-mt/' + file,
+                mainScriptUrlOrBlob: './wasm-mt/hello2d.js',
                 preinitializedWebGPUDevice: device,
             });
             TGFXBind(shareData.Hello2DModule);
@@ -73,6 +74,7 @@ if (typeof window !== 'undefined') {
             tgfxView.updateZoomScaleAndOffset(1.0, 0, 0);
             const canvas = document.getElementById('hello2d');
             bindCanvasZoomAndPanEvents(canvas, shareData);
+
             animationLoop(shareData);
             setupVisibilityListeners(shareData);
         } catch (error) {

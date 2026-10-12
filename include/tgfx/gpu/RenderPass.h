@@ -18,7 +18,9 @@
 
 #pragma once
 
+#include <optional>
 #include "tgfx/core/Color.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/gpu/GPUBuffer.h"
 #include "tgfx/gpu/RenderPipeline.h"
 #include "tgfx/gpu/Sampler.h"
@@ -170,6 +172,17 @@ class DepthStencilAttachment {
    * If set to true, the stencil component is read-only during the render pass.
    */
   bool stencilReadOnly = false;
+
+  /**
+   * Optional best-effort hint that confines the depth/stencil clear to the given rectangle
+   * (in backend scissor space) when loadAction is LoadAction::Clear, allowing backends to
+   * skip clearing pixels the caller will not touch. When nullopt, the entire attachment is
+   * cleared. Currently honored only by the OpenGL backend; Metal, Vulkan, and WebGPU
+   * ignore this field and clear the whole attachment, which is functionally correct but
+   * forgoes the bandwidth saving. Does not affect draw-time scissor, which is controlled
+   * by RenderPass::setScissorRect().
+   */
+  std::optional<Rect> clearScissor = std::nullopt;
 };
 
 /**
@@ -256,6 +269,15 @@ class RenderPass {
   virtual GPU* gpu() const = 0;
 
   /**
+   * Returns the pixel format of the bound depth-stencil attachment, or PixelFormat::Unknown if
+   * this render pass has no depth-stencil attachment.
+   */
+  PixelFormat depthStencilFormat() const {
+    auto& texture = descriptor.depthStencilAttachment.texture;
+    return texture != nullptr ? texture->format() : PixelFormat::Unknown;
+  }
+
+  /**
    * Sets the viewport used during the rasterization stage to linearly map from normalized device
    * coordinates to viewport coordinates.
    */
@@ -274,13 +296,19 @@ class RenderPass {
   virtual void setPipeline(std::shared_ptr<RenderPipeline> pipeline) = 0;
 
   /**
-   * Sets a GPUBuffer as a uniform buffer to a specified binding index in the shader's UBO table.
+   * Sets a GPUBuffer for the pipeline-scoped logical binding declared by
+   * BindingLayout::uniformBlocks. The active pipeline maps the logical binding to every physical
+   * shader-stage slot that uses the resource. The mapping is resolved when the next draw is
+   * encoded, so this call may be issued before or after setPipeline(); a draw with no pipeline
+   * bound is dropped.
    */
   virtual void setUniformBuffer(unsigned binding, std::shared_ptr<GPUBuffer> buffer, size_t offset,
                                 size_t size) = 0;
 
   /**
-   * Sets a texture and its sampler state to a specified binding index in the shader's texture table.
+   * Sets a texture and its sampler state to a specified binding index in the shader's texture
+   * table. The mapping is resolved when the next draw is encoded, so this call may be issued
+   * before or after setPipeline(); a draw with no pipeline bound is dropped.
    */
   virtual void setTexture(unsigned binding, std::shared_ptr<Texture> texture,
                           std::shared_ptr<Sampler> sampler) = 0;

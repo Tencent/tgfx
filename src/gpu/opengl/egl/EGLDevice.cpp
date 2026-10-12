@@ -19,6 +19,7 @@
 #include "tgfx/gpu/opengl/egl/EGLDevice.h"
 #include <cstring>
 #include "core/utils/Log.h"
+#include "gpu/DeviceRegistry.h"
 #include "gpu/opengl/GLDefines.h"
 #include "gpu/opengl/GLFunctions.h"
 #include "gpu/opengl/GLGPU.h"
@@ -236,7 +237,7 @@ std::shared_ptr<EGLDevice> EGLDevice::Wrap(EGLDisplay eglDisplay, EGLSurface egl
     device->eglSurface = eglSurface;
     device->eglContext = eglContext;
     device->shareContext = shareContext;
-    device->weakThis = device;
+    device = std::static_pointer_cast<EGLDevice>(Device::RegisterNative(device, {eglContext}));
   }
   if (oldEglContext != eglContext) {
     eglMakeCurrent(eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);

@@ -18,11 +18,13 @@
 
 #pragma once
 
+#include <algorithm>
 #include <memory>
 #include <vector>
 #include "gpu/vulkan/VulkanAPI.h"
 #include "gpu/vulkan/VulkanFrameSession.h"
 #include "gpu/vulkan/VulkanResource.h"
+#include "gpu/vulkan/VulkanTexture.h"
 #include "tgfx/gpu/CommandEncoder.h"
 
 namespace tgfx {
@@ -86,6 +88,25 @@ class VulkanCommandEncoder : public CommandEncoder, public VulkanResource {
   // the session to VulkanCommandBuffer. Prevents resource destruction while GPU is executing.
   void retainResource(std::shared_ptr<VulkanResource> resource) {
     session.retainedResources.push_back(std::move(resource));
+  }
+
+  // Like retainResource(), and additionally records the texture's Win32 keyed-mutex memory (if
+  // any) so vkQueueSubmit can acquire/release it. Callers holding a std::shared_ptr<VulkanTexture>
+  // should prefer this over retainResource().
+  void retainTexture(std::shared_ptr<VulkanTexture> texture) {
+#if defined(_WIN32) && !defined(__ANDROID__)
+    if (texture) {
+      auto mem = texture->importedMemoryForKeyedMutex();
+      if (mem != VK_NULL_HANDLE) {
+        auto& list = session.keyedMutexMemories;
+        // Dedup: the mutex must be acquired/released exactly once per submission.
+        if (std::find(list.begin(), list.end(), mem) == list.end()) {
+          list.push_back(mem);
+        }
+      }
+    }
+#endif
+    session.retainedResources.push_back(std::move(texture));
   }
 
   friend class VulkanGPU;

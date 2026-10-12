@@ -19,12 +19,15 @@
 #pragma once
 
 #include <Metal/Metal.h>
+#include <map>
+#include "MetalShaderModule.h"
 #include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
 
 class MetalCommandEncoder;
 class MetalRenderPipeline;
+class MetalBuffer;
 
 /**
  * Metal render pass implementation.
@@ -68,11 +71,33 @@ class MetalRenderPass : public RenderPass {
   void onEnd() override;
 
  private:
+  struct PendingUniform {
+    std::shared_ptr<GPUBuffer> buffer;
+    size_t offset = 0;
+  };
+
+  struct PendingTexture {
+    std::shared_ptr<Texture> texture;
+    std::shared_ptr<Sampler> sampler;
+  };
+
   MetalRenderPass(MetalCommandEncoder* encoder, const RenderPassDescriptor& descriptor);
+
+  // Translates the pending uniform/texture bindings against currentPipeline and issues the Metal
+  // binding calls. Called right before each draw so bindings can be recorded in any order relative
+  // to setPipeline(). Returns false (and logs) when no pipeline is bound.
+  bool flushBindings();
 
   MetalCommandEncoder* commandEncoder = nullptr;
   id<MTLRenderCommandEncoder> renderEncoder = nil;
   std::shared_ptr<MetalRenderPipeline> currentPipeline = nullptr;
+
+  // Uniform buffers and textures are recorded here keyed by their public logical binding, then
+  // translated to physical Metal slots at draw time via currentPipeline. Deferring the translation
+  // (rather than resolving it in the setter) lets callers bind resources before setPipeline() and
+  // keeps the buffer/texture alive through the shared_ptr until the draw is encoded.
+  std::map<unsigned, PendingUniform> pendingUniforms = {};
+  std::map<unsigned, PendingTexture> pendingTextures = {};
 
   // Cached scissor rect to avoid redundant Metal API calls.
   int lastScissorX = -1;
@@ -80,18 +105,8 @@ class MetalRenderPass : public RenderPass {
   int lastScissorWidth = -1;
   int lastScissorHeight = -1;
 
-  // Cached uniform buffer state to avoid redundant Metal API calls.
-  // Index 0 = VERTEX_UBO_BINDING_POINT, Index 1 = FRAGMENT_UBO_BINDING_POINT.
-  static constexpr int MaxUniformBindings = 2;
-  GPUBuffer* lastUniformBuffers[MaxUniformBindings] = {};
-  size_t lastUniformOffsets[MaxUniformBindings] = {};
-
-  // Cached texture/sampler state to avoid redundant Metal API calls.
-  static constexpr int MaxTextureBindings = 16;
-  Texture* lastTextures[MaxTextureBindings] = {};
-  Sampler* lastSamplers[MaxTextureBindings] = {};
-
-  // Cached vertex buffer state to avoid redundant Metal API calls.
+  // Vertex buffers bind to physical slots directly (no pipeline translation needed), so they are
+  // issued eagerly with a small cache to skip redundant Metal API calls.
   static constexpr int MaxVertexBufferSlots = 4;
   GPUBuffer* lastVertexBuffers[MaxVertexBufferSlots] = {};
   size_t lastVertexOffsets[MaxVertexBufferSlots] = {};
@@ -103,7 +118,7 @@ class MetalRenderPass : public RenderPass {
   bool cullModeInitialized = false;
 
   // Index buffer state (Metal doesn't have separate setIndexBuffer)
-  std::shared_ptr<class MetalBuffer> indexBuffer = nullptr;
+  std::shared_ptr<MetalBuffer> indexBuffer = nullptr;
   IndexFormat indexFormat = IndexFormat::UInt16;
 };
 

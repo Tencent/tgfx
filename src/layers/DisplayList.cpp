@@ -1171,7 +1171,11 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   // background-sourced styles, snapshots is null and we fall back to NoOp, which makes
   // background-sourced styles (if any show up unexpectedly) silently no-op — matching the
   // contour / 3D subtree semantics.
-  BackgroundConsumer consumer(snapshots);
+  // SrcOver compositing of the shared style output matches the style's own Src draw only over
+  // an opaque backdrop, and caching only pays off when the frame renders through multiple
+  // passes, so sharing is gated on both.
+  BackgroundConsumer consumer(snapshots, snapshots != nullptr && _backgroundColor.isOpaque() &&
+                                             snapshots->multiPass && snapshots->styleShareCompact);
   args.backgroundHandler = snapshots ? &consumer : BackgroundHandler::NoOp();
   _root->drawLayer(args, surface->getCanvas(), 1.0f, BlendMode::SrcOver);
 }
@@ -1210,6 +1214,7 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
   if (worldRects.empty()) {
     return nullptr;
   }
+  auto visibleRects = worldRects;
   // Expand by the max blur outset so layers whose bounds sit just outside the dirty rects but
   // still contribute pixels to the blur sampling region are not culled by the capture pass.
   for (auto& rect : worldRects) {
@@ -1224,6 +1229,25 @@ std::unique_ptr<BackgroundSnapshotMap> DisplayList::captureBackgrounds(
     return nullptr;
   }
   auto snapshotMap = std::make_unique<BackgroundSnapshotMap>();
+  snapshotMap->multiPass = renderRects.size() > 1;
+  snapshotMap->visibleRects = std::move(visibleRects);
+  snapshotMap->renderTargetWidth = surface->width();
+  snapshotMap->renderTargetHeight = surface->height();
+  {
+    auto unionRect = Rect::MakeEmpty();
+    for (const auto& rect : renderRects) {
+      unionRect.join(rect);
+    }
+    auto sumArea = 0.0;
+    for (const auto& rect : renderRects) {
+      sumArea += static_cast<double>(rect.width()) * static_cast<double>(rect.height());
+    }
+    constexpr double MaxUnionOverSum = 2.0;
+    snapshotMap->styleShareCompact =
+        sumArea <= 0.0 ||
+        static_cast<double>(unionRect.width()) * static_cast<double>(unionRect.height()) <=
+            MaxUnionOverSum * sumArea;
+  }
   // Draw backgroundColor before the layer tree so that the capture pass includes it as part of
   // the background for blur/backdrop effects.
   if (_backgroundColor != Color::Transparent()) {

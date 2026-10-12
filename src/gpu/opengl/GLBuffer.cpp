@@ -80,11 +80,19 @@ void* GLBuffer::map(size_t offset, size_t size) {
   auto target = GetTarget(_usage);
   DEBUG_ASSERT(target != 0);
   gl->bindBuffer(target, _bufferID);
-  return gl->mapBufferRange(target, static_cast<GLintptr>(offset), static_cast<GLsizeiptr>(size),
-                            access);
+  auto pointer = gl->mapBufferRange(target, static_cast<GLintptr>(offset),
+                                    static_cast<GLsizeiptr>(size), access);
+  mapped = pointer != nullptr;
+  return pointer;
 }
 
 void GLBuffer::unmap() {
+  // glUnmapBuffer() on an unmapped buffer raises GL_INVALID_OPERATION, and callers may invoke
+  // unmap() defensively to reset a recycled readback buffer.
+  if (!mapped) {
+    return;
+  }
+  mapped = false;
   auto gl = _interface->functions();
   if (gl->mapBufferRange != nullptr) {
     auto target = GetTarget(_usage);

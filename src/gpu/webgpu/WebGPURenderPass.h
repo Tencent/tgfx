@@ -71,7 +71,7 @@ class WebGPURenderPass : public RenderPass {
   WebGPURenderPass(WebGPUGPU* gpu, WGPURenderPassEncoder encoder,
                    const RenderPassDescriptor& descriptor);
 
-  void updateBindGroup();
+  bool updateBindGroup();
 
   WebGPUGPU* _gpu = nullptr;
   WGPURenderPassEncoder passEncoder = nullptr;

@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 #include "layers/BackgroundSnapshotMap.h"
@@ -177,6 +178,20 @@ class BackgroundCapturer : public BackgroundHandler {
     return snapshots;
   }
 
+  // Records the matrix that maps layer-local coordinates into the capture canvas space: world
+  // space on the main surface, or the downsampled background-source pixel space during capture.
+  // The offscreen content path records the layer into a canvas whose matrix starts at the
+  // layer-local origin, so drawBackgroundStyle() cannot recover the layer's world placement
+  // from canvas->getMatrix() there and uses this matrix instead. Set by the offscreen content
+  // path right before the layer subtree is recorded.
+  void setCaptureWorldMatrix(std::optional<Matrix> worldMatrix) {
+    _captureWorldMatrix = std::move(worldMatrix);
+  }
+
+  const std::optional<Matrix>& captureWorldMatrix() const {
+    return _captureWorldMatrix;
+  }
+
  private:
   bool isForcedCapture() const {
     return _forcedCaptureDepth > 0;
@@ -189,6 +204,7 @@ class BackgroundCapturer : public BackgroundHandler {
   std::shared_ptr<BackgroundSource> bgSource = nullptr;
   std::vector<Rect> _renderRects;
   int _forcedCaptureDepth = 0;
+  std::optional<Matrix> _captureWorldMatrix = std::nullopt;
 };
 
 class BackgroundConsumer : public BackgroundHandler {
@@ -198,7 +214,12 @@ class BackgroundConsumer : public BackgroundHandler {
   // Layer::synthesizeBackgroundImage. When snapshots is non-null (surface path) the map is
   // authoritative — a miss there indicates a capture-side coverage bug, so we silently skip
   // rather than masking it with synthesis.
-  explicit BackgroundConsumer(BackgroundSnapshotMap* snapshots) : snapshots(snapshots) {
+  // shareStyleOutput: the display list enables this only when the background color is fully
+  // opaque (which is what makes SrcOver compositing of the cached output match the style's own
+  // Src draw), the frame renders through multiple passes, and those passes cover compact render
+  // rects, since that is when caching pays for its rasterization.
+  BackgroundConsumer(BackgroundSnapshotMap* snapshots, bool shareStyleOutput)
+      : snapshots(snapshots), shareStyleOutput(shareStyleOutput) {
   }
 
   void drawBackgroundStyle(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
@@ -208,6 +229,7 @@ class BackgroundConsumer : public BackgroundHandler {
 
  private:
   BackgroundSnapshotMap* snapshots = nullptr;
+  bool shareStyleOutput = false;
   // Per-consumer read cursors: each (Layer, LayerStyle) entry list is consumed in dispatch order
   // through this map, so a shared snapshot map can be consumed by multiple consumers (e.g. one
   // per tile in tiled rendering) without cursors interfering.

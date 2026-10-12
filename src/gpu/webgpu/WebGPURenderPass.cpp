@@ -18,12 +18,14 @@
 
 #include "WebGPURenderPass.h"
 #include "WebGPUBuffer.h"
+#include "WebGPUDefines.h"
 #include "WebGPUGPU.h"
 #include "WebGPURenderPipeline.h"
 #include "WebGPUSampler.h"
 #include "WebGPUTexture.h"
 #include "WebGPUUtil.h"
 #include "core/utils/Log.h"
+#include "gpu/UniformData.h"
 
 namespace tgfx {
 
@@ -151,7 +153,11 @@ void WebGPURenderPass::setPipeline(std::shared_ptr<RenderPipeline> pipeline) {
   if (pipeline == nullptr) {
     return;
   }
-  currentPipeline = std::static_pointer_cast<WebGPURenderPipeline>(pipeline);
+  auto newPipeline = std::static_pointer_cast<WebGPURenderPipeline>(pipeline);
+  if (newPipeline == currentPipeline) {
+    return;
+  }
+  currentPipeline = std::move(newPipeline);
   if (currentPipeline->webgpuRenderPipeline() == nullptr) {
     LOGE(
         "[WebGPU RenderPass] setPipeline FAILED: webgpuRenderPipeline is null (shader compile "
@@ -208,25 +214,41 @@ void WebGPURenderPass::setStencilReference(uint32_t reference) {
   wgpuRenderPassEncoderSetStencilReference(passEncoder, reference);
 }
 
-void WebGPURenderPass::updateBindGroup() {
-  if (!bindGroupDirty || currentPipeline == nullptr || passEncoder == nullptr) {
-    return;
+bool WebGPURenderPass::updateBindGroup() {
+  if (!bindGroupDirty) {
+    return true;
   }
-  bindGroupDirty = false;
+  if (currentPipeline == nullptr || passEncoder == nullptr) {
+    return false;
+  }
 
-  std::vector<WGPUBindGroupEntry> entries = {};
+  std::vector<WGPUBindGroupEntry> groupEntries[3] = {};
 
   for (auto& [binding, uniform] : pendingUniforms) {
     if (uniform.buffer == nullptr) {
       continue;
     }
     auto webgpuBuffer = std::static_pointer_cast<WebGPUBuffer>(uniform.buffer);
-    WGPUBindGroupEntry entry = {};
-    entry.binding = binding;
-    entry.buffer = webgpuBuffer->webgpuBuffer();
-    entry.offset = uniform.offset;
-    entry.size = uniform.size;
-    entries.push_back(entry);
+    auto slots = currentPipeline->getUniformSlots(binding);
+    if (slots == nullptr) {
+      continue;
+    }
+    if (slots->vertexSlot.has_value()) {
+      WGPUBindGroupEntry entry = {};
+      entry.binding = *slots->vertexSlot;
+      entry.buffer = webgpuBuffer->webgpuBuffer();
+      entry.offset = uniform.offset;
+      entry.size = uniform.size;
+      groupEntries[VERTEX_UBO_DESCRIPTOR_SET].push_back(entry);
+    }
+    if (slots->fragmentSlot.has_value()) {
+      WGPUBindGroupEntry entry = {};
+      entry.binding = *slots->fragmentSlot;
+      entry.buffer = webgpuBuffer->webgpuBuffer();
+      entry.offset = uniform.offset;
+      entry.size = uniform.size;
+      groupEntries[FRAGMENT_UBO_DESCRIPTOR_SET].push_back(entry);
+    }
   }
 
   for (auto& [binding, texBinding] : pendingTextures) {
@@ -240,29 +262,34 @@ void WebGPURenderPass::updateBindGroup() {
     WGPUBindGroupEntry textureEntry = {};
     textureEntry.binding = textureIndex;
     textureEntry.textureView = webgpuTexture->webgpuTextureView();
-    entries.push_back(textureEntry);
+    groupEntries[TEXTURE_DESCRIPTOR_SET].push_back(textureEntry);
 
     WGPUBindGroupEntry samplerEntry = {};
     samplerEntry.binding = textureIndex + 1;
     samplerEntry.sampler = webgpuSampler->webgpuSampler();
-    entries.push_back(samplerEntry);
+    groupEntries[TEXTURE_DESCRIPTOR_SET].push_back(samplerEntry);
   }
 
-  WGPUBindGroupDescriptor bindGroupDesc = {};
-  bindGroupDesc.layout = currentPipeline->bindGroupLayout();
-  bindGroupDesc.entryCount = entries.size();
-  bindGroupDesc.entries = entries.data();
-  auto bindGroup = wgpuDeviceCreateBindGroup(_gpu->device(), &bindGroupDesc);
-  if (bindGroup != nullptr) {
-    wgpuRenderPassEncoderSetBindGroup(passEncoder, 0, bindGroup, 0, nullptr);
+  for (unsigned group = 0; group < 3; group++) {
+    WGPUBindGroupDescriptor bindGroupDesc = {};
+    bindGroupDesc.layout = currentPipeline->bindGroupLayout(group);
+    bindGroupDesc.entryCount = groupEntries[group].size();
+    bindGroupDesc.entries = groupEntries[group].data();
+    auto bindGroup = wgpuDeviceCreateBindGroup(_gpu->device(), &bindGroupDesc);
+    if (bindGroup == nullptr) {
+      return false;
+    }
+    wgpuRenderPassEncoderSetBindGroup(passEncoder, group, bindGroup, 0, nullptr);
     wgpuBindGroupRelease(bindGroup);
   }
+  bindGroupDirty = false;
+  return true;
 }
 
 void WebGPURenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
                             uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
   if (passEncoder == nullptr || currentPipeline == nullptr) {
-    LOGE("[WebGPU Draw] SKIPPED: encoder=%p pipeline=%p", static_cast<void*>(passEncoder),
+    LOGE("WebGPURenderPass::draw: encoder=%p pipeline=%p", static_cast<void*>(passEncoder),
          static_cast<void*>(currentPipeline.get()));
     return;
   }
@@ -273,7 +300,9 @@ void WebGPURenderPass::draw(PrimitiveType primitiveType, uint32_t vertexCount,
     wgpuRenderPassEncoderSetPipeline(passEncoder, wgpuPipeline);
     lastBoundPipeline = wgpuPipeline;
   }
-  updateBindGroup();
+  if (!updateBindGroup()) {
+    return;
+  }
   wgpuRenderPassEncoderDraw(passEncoder, vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
@@ -281,6 +310,8 @@ void WebGPURenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCo
                                    uint32_t instanceCount, uint32_t firstIndex, int32_t baseVertex,
                                    uint32_t firstInstance) {
   if (passEncoder == nullptr || currentPipeline == nullptr) {
+    LOGE("WebGPURenderPass::drawIndexed: encoder=%p pipeline=%p", static_cast<void*>(passEncoder),
+         static_cast<void*>(currentPipeline.get()));
     return;
   }
   auto topology = ToWGPUPrimitiveTopology(primitiveType);
@@ -289,7 +320,9 @@ void WebGPURenderPass::drawIndexed(PrimitiveType primitiveType, uint32_t indexCo
     wgpuRenderPassEncoderSetPipeline(passEncoder, wgpuPipeline);
     lastBoundPipeline = wgpuPipeline;
   }
-  updateBindGroup();
+  if (!updateBindGroup()) {
+    return;
+  }
   wgpuRenderPassEncoderDrawIndexed(passEncoder, indexCount, instanceCount, firstIndex, baseVertex,
                                    firstInstance);
 }

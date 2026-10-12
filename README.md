@@ -18,10 +18,10 @@ and various video-editing apps.
 
 ## Platform Support
 
-- iOS 9.0+
+- iOS 15.0+
 - Android 5.0+
 - HarmonyOS 5.0+
-- macOS 10.15+
+- macOS 12.0+
 - Windows 7.0+
 - Linux (No specific version requirement)
 - Chrome 69.0+ (Web)
@@ -40,7 +40,7 @@ and various video-editing apps.
 
 TGFX uses **C++17** features. Here are the minimum tools needed to build TGFX on different platforms:
 
-- Xcode 11.0+
+- Xcode 13.0+
 - GCC 9.0+
 - Visual Studio 2019+
 - NodeJS 14.14.0+
@@ -253,6 +253,36 @@ To build and run the **WebGPU** version:
 npm run build:webgpu
 npm run server:webgpu
 ```
+
+When integrating tgfx into your own Web build, the emscripten link options must export the runtime
+methods tgfx depends on. The library itself does not propagate these link options:
+
+- `GL`: required for the WebGL backend (making a context from a canvas object, color space
+  configuration, image/video texture uploads).
+- `HEAPU8`: required for reading wasm memory (image decode and canvas pixel readback).
+- `WebGPU`: required for the WebGPU backend (making a surface from a canvas object, color space
+  configuration, video frame uploads).
+
+Configure them on your final executable target with CMake:
+
+```cmake
+target_link_options(app PRIVATE -sEXPORTED_RUNTIME_METHODS=['GL','HEAPU8','WebGPU'])
+```
+
+or on the emcc command line:
+
+```bash
+emcc ... -sEXPORTED_RUNTIME_METHODS="['GL','HEAPU8','WebGPU']"
+```
+
+Note that `EXPORTED_RUNTIME_METHODS` is an overwrite-style list, not additive: list every runtime
+method your program needs. `-sUSE_WEBGPU=1` must also be set at link time when building the WebGPU
+backend, as the library's compile options do not propagate to the final link.
+
+The canvas object overloads of `WebGLDevice` / `WebGLWindow` and `WebGPUWindow` / `WebGPUDevice`
+additionally need the JS entry points that ship with the Web build (`createCanvasContext`,
+`createWebGPUSurface`, `importWebGPUDevice`). The WeChat mini-program binding exposes a smaller set
+and does not provide them yet, so those overloads are not available in a mini-program build.
 
 To build a single-threaded WebGL version:
 
@@ -475,7 +505,7 @@ or submit a [pull request](https://github.com/Tencent/tgfx/pulls). Before doing 
 
 If you find TGFX helpful, please give us a **Star**. We really appreciate your support :)
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Tencent/tgfx&type=Date)](https://star-history.com/#Tencent/tgfx&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=Tencent/tgfx&type=Date)](https://star-history.dera.page/#Tencent/tgfx&Date)
 
 ## License
 

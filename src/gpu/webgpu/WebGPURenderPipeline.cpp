@@ -22,6 +22,7 @@
 #include "WebGPUShaderModule.h"
 #include "WebGPUUtil.h"
 #include "core/utils/Log.h"
+#include "gpu/ShaderCompiler.h"
 #include "gpu/UniformData.h"
 #include "tgfx/gpu/ShaderVisibility.h"
 
@@ -37,6 +38,16 @@ std::shared_ptr<WebGPURenderPipeline> WebGPURenderPipeline::Make(
     WebGPUGPU* gpu, const RenderPipelineDescriptor& descriptor) {
   if (gpu == nullptr) {
     return nullptr;
+  }
+  if (descriptor.vertex.module && descriptor.fragment.module) {
+    auto vertexShader = std::static_pointer_cast<WebGPUShaderModule>(descriptor.vertex.module);
+    auto fragmentShader = std::static_pointer_cast<WebGPUShaderModule>(descriptor.fragment.module);
+    std::string mismatch;
+    if (!VaryingInterfacesMatch(vertexShader->varyingDecls(), fragmentShader->varyingDecls(),
+                                mismatch)) {
+      LOGE("WebGPURenderPipeline: %s", mismatch.c_str());
+      return nullptr;
+    }
   }
   auto renderPipeline = gpu->makeResource<WebGPURenderPipeline>(gpu, descriptor);
   if (renderPipeline->pipeline == nullptr) {
@@ -69,66 +80,65 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
   cullMode = ToWGPUCullMode(descriptor.primitive.cullMode);
   frontFace = ToWGPUFrontFace(descriptor.primitive.frontFace);
 
-  // Build binding layout entries for BindGroupLayout.
-  std::vector<WGPUBindGroupLayoutEntry> layoutEntries = {};
-
-  for (auto& entry : descriptor.layout.uniformBlocks) {
-    WGPUBindGroupLayoutEntry layoutEntry = {};
-    layoutEntry.binding = entry.binding;
-    layoutEntry.visibility = WGPUShaderStage_None;
-    if (entry.visibility & ShaderVisibility::Vertex) {
-      layoutEntry.visibility |= WGPUShaderStage_Vertex;
+  std::vector<WGPUBindGroupLayoutEntry> groupEntries[3] = {};
+  std::string error;
+  if (!ResolveUniformSlots(vertexModule.get(), fragmentModule.get(),
+                           descriptor.layout.uniformBlocks, uniformSlots, error)) {
+    LOGE("WebGPURenderPipeline: %s.", error.c_str());
+    return false;
+  }
+  for (const auto& [logicalBinding, mapping] : uniformSlots) {
+    (void)logicalBinding;
+    if (mapping.vertexSlot.has_value()) {
+      WGPUBindGroupLayoutEntry layoutEntry = {};
+      layoutEntry.binding = *mapping.vertexSlot;
+      layoutEntry.visibility = WGPUShaderStage_Vertex;
+      layoutEntry.buffer.type = WGPUBufferBindingType_Uniform;
+      groupEntries[VERTEX_UBO_DESCRIPTOR_SET].push_back(layoutEntry);
     }
-    if (entry.visibility & ShaderVisibility::Fragment) {
-      layoutEntry.visibility |= WGPUShaderStage_Fragment;
+    if (mapping.fragmentSlot.has_value()) {
+      WGPUBindGroupLayoutEntry layoutEntry = {};
+      layoutEntry.binding = *mapping.fragmentSlot;
+      layoutEntry.visibility = WGPUShaderStage_Fragment;
+      layoutEntry.buffer.type = WGPUBufferBindingType_Uniform;
+      groupEntries[FRAGMENT_UBO_DESCRIPTOR_SET].push_back(layoutEntry);
     }
-    layoutEntry.buffer.type = WGPUBufferBindingType_Uniform;
-    layoutEntry.buffer.hasDynamicOffset = false;
-    layoutEntry.buffer.minBindingSize = 0;
-    layoutEntries.push_back(layoutEntry);
-    uniformBlockVisibility[entry.binding] = entry.visibility;
   }
 
+  unsigned samplerIndex = 0;
   for (auto& entry : descriptor.layout.textureSamplers) {
-    // In the GLSL→WGSL conversion, combined samplers are split into separate texture and sampler
-    // resources. The GLSL binding numbers are reassigned starting from TEXTURE_BINDING_POINT_START
-    // (after uniform blocks). In WGSL, each combined sampler occupies two consecutive bindings:
-    //   texture = TEXTURE_BINDING_POINT_START + samplerIndex * 2
-    //   sampler = texture_binding + 1
-    auto samplerIndex = static_cast<unsigned>(entry.binding < TEXTURE_BINDING_POINT_START
-                                                  ? entry.binding
-                                                  : entry.binding - TEXTURE_BINDING_POINT_START);
     unsigned textureBinding = TEXTURE_BINDING_POINT_START + samplerIndex * 2;
     unsigned samplerBinding = textureBinding + 1;
+    samplerIndex++;
     WGPUBindGroupLayoutEntry textureEntry = {};
     textureEntry.binding = textureBinding;
     textureEntry.visibility = WGPUShaderStage_Fragment;
     textureEntry.texture.sampleType = WGPUTextureSampleType_Float;
     textureEntry.texture.viewDimension = WGPUTextureViewDimension_2D;
-    textureEntry.texture.multisampled = false;
-    layoutEntries.push_back(textureEntry);
+    groupEntries[TEXTURE_DESCRIPTOR_SET].push_back(textureEntry);
 
     WGPUBindGroupLayoutEntry samplerLayoutEntry = {};
     samplerLayoutEntry.binding = samplerBinding;
     samplerLayoutEntry.visibility = WGPUShaderStage_Fragment;
     samplerLayoutEntry.sampler.type = WGPUSamplerBindingType_Filtering;
-    layoutEntries.push_back(samplerLayoutEntry);
-
+    groupEntries[TEXTURE_DESCRIPTOR_SET].push_back(samplerLayoutEntry);
     textureUnits[entry.binding] = textureBinding;
   }
 
-  WGPUBindGroupLayoutDescriptor bindGroupLayoutDesc = {};
-  bindGroupLayoutDesc.entryCount = layoutEntries.size();
-  bindGroupLayoutDesc.entries = layoutEntries.data();
-  _bindGroupLayout = wgpuDeviceCreateBindGroupLayout(gpu->device(), &bindGroupLayoutDesc);
-  if (_bindGroupLayout == nullptr) {
-    LOGE("[WebGPU Pipeline] Failed to create bind group layout");
-    return false;
+  for (unsigned group = 0; group < 3; group++) {
+    WGPUBindGroupLayoutDescriptor bindGroupLayoutDesc = {};
+    bindGroupLayoutDesc.entryCount = groupEntries[group].size();
+    bindGroupLayoutDesc.entries = groupEntries[group].data();
+    bindGroupLayouts[group] = wgpuDeviceCreateBindGroupLayout(gpu->device(), &bindGroupLayoutDesc);
+    if (bindGroupLayouts[group] == nullptr) {
+      LOGE("[WebGPU Pipeline] Failed to create bind group layout %u", group);
+      return false;
+    }
   }
 
   WGPUPipelineLayoutDescriptor pipelineLayoutDesc = {};
-  pipelineLayoutDesc.bindGroupLayoutCount = 1;
-  pipelineLayoutDesc.bindGroupLayouts = &_bindGroupLayout;
+  pipelineLayoutDesc.bindGroupLayoutCount = 3;
+  pipelineLayoutDesc.bindGroupLayouts = bindGroupLayouts;
   pipelineLayout = wgpuDeviceCreatePipelineLayout(gpu->device(), &pipelineLayoutDesc);
   if (pipelineLayout == nullptr) {
     LOGE("[WebGPU Pipeline] Failed to create pipeline layout");
@@ -275,12 +285,9 @@ unsigned WebGPURenderPipeline::getTextureIndex(unsigned binding) const {
   return binding;
 }
 
-uint32_t WebGPURenderPipeline::getUniformBlockVisibility(unsigned binding) const {
-  auto it = uniformBlockVisibility.find(binding);
-  if (it != uniformBlockVisibility.end()) {
-    return it->second;
-  }
-  return ShaderVisibility::VertexFragment;
+const UniformSlotMapping* WebGPURenderPipeline::getUniformSlots(unsigned binding) const {
+  auto result = uniformSlots.find(binding);
+  return result != uniformSlots.end() ? &result->second : nullptr;
 }
 
 void WebGPURenderPipeline::onRelease(WebGPUGPU*) {
@@ -292,9 +299,11 @@ void WebGPURenderPipeline::onRelease(WebGPUGPU*) {
     wgpuRenderPipelineRelease(pipelineStrip);
     pipelineStrip = nullptr;
   }
-  if (_bindGroupLayout != nullptr) {
-    wgpuBindGroupLayoutRelease(_bindGroupLayout);
-    _bindGroupLayout = nullptr;
+  for (auto& bindGroupLayout : bindGroupLayouts) {
+    if (bindGroupLayout != nullptr) {
+      wgpuBindGroupLayoutRelease(bindGroupLayout);
+      bindGroupLayout = nullptr;
+    }
   }
   if (pipelineLayout != nullptr) {
     wgpuPipelineLayoutRelease(pipelineLayout);
