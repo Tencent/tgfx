@@ -23,10 +23,14 @@ namespace tgfx {
 
 TGFX_TEST(VulkanPresentationStateTest, SubmissionAggregation) {
   VulkanSubmissionPlan plan;
-  plan.add(false);
-  plan.add(false);
-  plan.add(true);
-  EXPECT_EQ(plan.acquireWaitCount, 3u);
+  // A frame first used and presented by the same submission.
+  plan.add(true, false);
+  plan.add(false, true);
+  // A frame only used by this submission (for example a readback): waits, never presents.
+  plan.add(true, false);
+  // A frame whose acquire wait was wired by an earlier submission: presents without waiting.
+  plan.add(false, true);
+  EXPECT_EQ(plan.acquireWaitCount, 2u);
   EXPECT_EQ(plan.signalCount, 2u);
 }
 

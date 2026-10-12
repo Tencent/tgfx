@@ -29,13 +29,13 @@ QGLDrawableProxy::QGLDrawableProxy(Context* context, int width, int height, Pixe
 
 void QGLDrawableProxy::onPresentFrame(Context*) {
   // Hand the frame to the Qt scene graph through the window (which owns the pending slot and
-  // the quick item); drop the presentation once the window is gone.
-  if (_presentingWindow.expired()) {
+  // the quick item), keeping the window alive for the duration of the call; drop the
+  // presentation once the window is gone.
+  auto window = _presentingWindow.lock();
+  if (window == nullptr || _window == nullptr) {
     return;
   }
-  if (_window != nullptr) {
-    _window->presentProxy(this);
-  }
+  _window->presentProxy(this);
 }
 
 Context* QGLDrawableProxy::getContext() const {
@@ -68,9 +68,10 @@ bool QGLDrawableProxy::externallyOwned() const {
 
 void QGLDrawableProxy::ensureTextureRTProxy() const {
   if (textureRTProxy == nullptr) {
-    if (_presentingWindow.expired()) {
-      // The window that owns the texture slots is gone; its handles are dangling and no frame
-      // can be resolved through them.
+    // Keep the window (which owns the texture slots) alive for the duration of the call; once
+    // it is gone its slots are dangling and no frame can be resolved through them.
+    auto window = _presentingWindow.lock();
+    if (window == nullptr || _window == nullptr) {
       return;
     }
     textureRTProxy = _window->acquireTexture(_context, _width, _height);
@@ -101,11 +102,13 @@ std::shared_ptr<RenderTargetProxy> QGLDrawableProxy::getTextureTargetProxy() con
 
 void QGLDrawableProxy::releaseTexture() {
   if (textureRTProxy != nullptr) {
-    if (!_presentingWindow.expired()) {
+    // Return the slot while keeping the window alive for the duration of the call. Once the
+    // window is gone the slot cannot be returned; drop the reference instead of touching the
+    // destroyed window.
+    auto window = _presentingWindow.lock();
+    if (window != nullptr && _window != nullptr) {
       _window->reuseTexture(textureRTProxy);
     }
-    // Once the window is gone the slot cannot be returned; drop the reference instead of
-    // touching the destroyed window.
     textureRTProxy = nullptr;
   }
 }

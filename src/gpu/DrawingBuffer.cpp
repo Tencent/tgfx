@@ -92,13 +92,6 @@ void DrawingBuffer::deliverFrames(Context* context) {
       pending.drawable->markPresented();
     }
   }
-  for (auto& proxy : windowUsages) {
-    // Let window-backed proxies sync their frame state with the submission: a usage-only batch
-    // (a readback or snapshot transfer without a registered presentation) may still have
-    // presented its frame with this submission, and the proxy must not keep serving an image
-    // the presentation engine already owns.
-    proxy->onUsageCompleted(context);
-  }
   presentables.clear();
   windowUsages.clear();
 }

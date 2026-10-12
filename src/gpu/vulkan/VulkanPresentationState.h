@@ -54,9 +54,11 @@ struct VulkanSubmissionPlan {
   size_t acquireWaitCount = 0;
   size_t signalCount = 0;
 
-  void add(bool manualPresent) {
-    acquireWaitCount++;
-    if (!manualPresent) {
+  void add(bool waitsAcquire, bool presents) {
+    if (waitsAcquire) {
+      acquireWaitCount++;
+    }
+    if (presents) {
       signalCount++;
     }
   }

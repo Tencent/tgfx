@@ -36,10 +36,14 @@ VulkanCommandQueue::~VulkanCommandQueue() {
   if (!pendingPresents.empty()) {
     vkDeviceWaitIdle(gpu->device());
     for (auto& present : pendingPresents) {
-      vkDestroySemaphore(gpu->device(), present.imageAvailableSemaphore, nullptr);
+      if (present.imageAvailableSemaphore != VK_NULL_HANDLE) {
+        vkDestroySemaphore(gpu->device(), present.imageAvailableSemaphore, nullptr);
+      }
       // Align with abandonPresents(): the acquired image can no longer be presented, so the
       // swapchain must be rebuilt before its images and semaphores are reused.
-      *present.outOfDate = true;
+      if (present.outOfDate != nullptr) {
+        *present.outOfDate = true;
+      }
     }
   }
 }
@@ -233,8 +237,12 @@ void VulkanCommandQueue::abandonPresents(std::vector<PendingPresent>& presents) 
   // their images and semaphores can be safely reused.
   vkDeviceWaitIdle(gpu->device());
   for (auto& present : presents) {
-    vkDestroySemaphore(gpu->device(), present.imageAvailableSemaphore, nullptr);
-    *present.outOfDate = true;
+    if (present.imageAvailableSemaphore != VK_NULL_HANDLE) {
+      vkDestroySemaphore(gpu->device(), present.imageAvailableSemaphore, nullptr);
+    }
+    if (present.outOfDate != nullptr) {
+      *present.outOfDate = true;
+    }
   }
   presents.clear();
 }
@@ -302,7 +310,7 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
 
   std::vector<VkImageMemoryBarrier> presentBarriers;
   for (auto& present : presents) {
-    if (present.manualPresent) {
+    if (!present.presents) {
       continue;
     }
     VkImageMemoryBarrier barrier = {};
@@ -352,7 +360,7 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
     request.presents.push_back(VulkanGPU::SubmitRequest::PresentInfo{
         present.swapchain, present.imageIndex, present.imageAvailableSemaphore,
         present.presentSemaphore, present.layout, present.outOfDate, present.frameState,
-        present.manualPresent});
+        present.presents});
   }
 
   gpu->executeSubmission(std::move(request));
@@ -374,16 +382,30 @@ void VulkanCommandQueue::waitSemaphore(std::shared_ptr<Semaphore> semaphore) {
   pendingWaitSemaphore = std::static_pointer_cast<VulkanSemaphore>(semaphore);
 }
 
+void VulkanCommandQueue::scheduleAcquireWait(VkSemaphore imageAvailableSemaphore,
+                                             std::shared_ptr<bool> outOfDate,
+                                             std::shared_ptr<VulkanFrameState> frameState) {
+  PendingPresent entry = {};
+  entry.imageAvailableSemaphore = imageAvailableSemaphore;
+  entry.outOfDate = std::move(outOfDate);
+  entry.frameState = std::move(frameState);
+  entry.presents = false;
+  pendingPresents.push_back(std::move(entry));
+}
+
 void VulkanCommandQueue::schedulePresent(VkSwapchainKHR swapchain, uint32_t imageIndex,
-                                         VkImage image, VkSemaphore imageAvailableSemaphore,
-                                         VkSemaphore presentSemaphore,
+                                         VkImage image, VkSemaphore presentSemaphore,
                                          std::shared_ptr<VkImageLayout> layout,
-                                         std::shared_ptr<bool> outOfDate,
-                                         std::shared_ptr<VulkanFrameState> frameState,
-                                         bool manualPresent) {
-  pendingPresents.push_back({swapchain, imageIndex, image, imageAvailableSemaphore,
-                             presentSemaphore, std::move(layout), std::move(outOfDate),
-                             std::move(frameState), manualPresent});
+                                         std::shared_ptr<bool> outOfDate) {
+  PendingPresent entry = {};
+  entry.swapchain = swapchain;
+  entry.imageIndex = imageIndex;
+  entry.image = image;
+  entry.presentSemaphore = presentSemaphore;
+  entry.layout = std::move(layout);
+  entry.outOfDate = std::move(outOfDate);
+  entry.presents = true;
+  pendingPresents.push_back(std::move(entry));
 }
 
 void VulkanCommandQueue::waitUntilCompleted() {

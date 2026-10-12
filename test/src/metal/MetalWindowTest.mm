@@ -332,10 +332,10 @@ TGFX_TEST(MetalWindowTest, DroppedRecordingReleasesWindow) {
 }
 
 /**
- * Verifies that a readback-only batch on an automatic window surface keeps the frame state in
- * step with the submission: the batch's usage wiring may present the frame it acquired (backends
- * like Vulkan aggregate the acquire wait and the present), and the surface must keep serving
- * fresh frames for the following drawing instead of an already-presented one.
+ * Verifies that a readback-only batch on an automatic window surface only uses the frame: the
+ * batch wires the frame acquisition but never presents it (the presentation belongs to the batch
+ * carrying the presentation request), so the surface keeps drawing and reading back normally
+ * afterwards.
  */
 TGFX_TEST(MetalWindowTest, ReadbackOnlyBatchKeepsFrameUsable) {
   ContextScope scope;

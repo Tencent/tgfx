@@ -69,9 +69,10 @@ std::shared_ptr<TextureView> WebGPUDrawableProxy::getTextureView() const {
 
 std::shared_ptr<RenderTarget> WebGPUDrawableProxy::getRenderTarget() const {
   if (_renderTarget == nullptr) {
-    if (_presentingWindow.expired()) {
-      // The window that owns the surface is gone; its handle is dangling and no frame can be
-      // resolved through it.
+    // Keep the window (which owns the surface) alive while acquiring the frame; once it is gone
+    // its handle is dangling and no frame can be resolved through it.
+    auto window = _presentingWindow.lock();
+    if (window == nullptr) {
       return nullptr;
     }
     WGPUSurfaceTexture surfaceTexture = {};
@@ -100,13 +101,13 @@ std::shared_ptr<RenderTarget> WebGPUDrawableProxy::getRenderTarget() const {
 }
 
 void WebGPUDrawableProxy::onPresentFrame(Context*) {
-  if (_presentingWindow.expired()) {
-    // The window that owns the surface is gone; drop the presentation and release the frame
-    // instead of presenting through a dangling handle.
-    releaseDrawable();
-    return;
+  // Keep the window (which owns the surface) alive for the duration of the present; once it is
+  // gone the presentation is dropped and the frame released instead of presenting through a
+  // dangling handle.
+  auto window = _presentingWindow.lock();
+  if (window != nullptr) {
+    present();
   }
-  present();
   releaseDrawable();
 }
 

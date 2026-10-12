@@ -69,15 +69,21 @@ class VulkanCommandQueue : public CommandQueue {
 
   void waitUntilCompleted() override;
 
-  /// Schedules one swapchain frame to be presented at the end of the next submit(). The image
-  /// is already acquired; imageAvailableSemaphore ownership moves to the queue and is destroyed
-  /// with the render fence. Automatic frames also get a layout transition to PRESENT_SRC_KHR and
-  /// are presented by the render submission itself. Manual frames only wait on acquisition here
-  /// and are presented later by VulkanGPU::presentNow(), so their content stays readable.
+  /// Makes the next submit() wait for the acquisition of a swapchain image, without presenting
+  /// it. Called once per acquired frame, by the first submission that uses the image;
+  /// imageAvailableSemaphore ownership moves to the queue and is destroyed with the render
+  /// fence. If the submission never happens, the swapchain is flagged out of date so the image
+  /// is reclaimed by a rebuild.
+  void scheduleAcquireWait(VkSemaphore imageAvailableSemaphore, std::shared_ptr<bool> outOfDate,
+                           std::shared_ptr<VulkanFrameState> frameState);
+
+  /// Presents an acquired swapchain image at the end of the next submit(): the image gets a
+  /// layout transition to PRESENT_SRC_KHR, the submission signals its per-image presentation
+  /// semaphore, and vkQueuePresentKHR waits on it. Never waits for the acquisition itself; that
+  /// is wired by scheduleAcquireWait() through the first submission that used the image.
   void schedulePresent(VkSwapchainKHR swapchain, uint32_t imageIndex, VkImage image,
-                       VkSemaphore imageAvailableSemaphore, VkSemaphore presentSemaphore,
-                       std::shared_ptr<VkImageLayout> layout, std::shared_ptr<bool> outOfDate,
-                       std::shared_ptr<VulkanFrameState> frameState, bool manualPresent = false);
+                       VkSemaphore presentSemaphore, std::shared_ptr<VkImageLayout> layout,
+                       std::shared_ptr<bool> outOfDate);
 
  private:
   void flushUploads(VkCommandBuffer commandBuffer, std::vector<VulkanGPU::PendingUpload>& uploads);
@@ -94,7 +100,8 @@ class VulkanCommandQueue : public CommandQueue {
   std::shared_ptr<VulkanSemaphore> pendingSignalSemaphore;
   std::shared_ptr<VulkanSemaphore> pendingWaitSemaphore;
 
-  // Produced by schedulePresent(), consumed by submit().
+  // Produced by scheduleAcquireWait() (imageAvailableSemaphore set, presents false) and
+  // schedulePresent() (presents true, no acquire wait), consumed by submit().
   struct PendingPresent {
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
     uint32_t imageIndex = 0;
@@ -104,7 +111,7 @@ class VulkanCommandQueue : public CommandQueue {
     std::shared_ptr<VkImageLayout> layout;
     std::shared_ptr<bool> outOfDate;
     std::shared_ptr<VulkanFrameState> frameState;
-    bool manualPresent = false;
+    bool presents = false;
   };
   std::vector<PendingPresent> pendingPresents;
 

@@ -79,9 +79,10 @@ class D3D12SwapchainProxy : public RenderTargetProxy {
   }
 
   void onPresentFrame(Context*) override {
-    if (_presentingWindow.expired()) {
-      // The window that owns the swap chain is gone; drop the presentation instead of calling
-      // Present on dangling handles.
+    // Keep the window (which owns the swap chain) alive for the duration of the present; once it
+    // is gone the presentation is dropped instead of calling Present on dangling handles.
+    auto window = _presentingWindow.lock();
+    if (window == nullptr) {
       return;
     }
     if (_swapChain == nullptr) {
@@ -105,9 +106,10 @@ class D3D12SwapchainProxy : public RenderTargetProxy {
   }
 
   std::shared_ptr<RenderTarget> getRenderTarget() const override {
-    if (_presentingWindow.expired()) {
-      // The window that owns the swap chain and back buffers is gone; their handles are
-      // dangling and no frame can be resolved through them.
+    // Keep the window (which owns the swap chain and back buffers) alive while resolving the
+    // frame; once it is gone their handles are dangling and no frame can be resolved.
+    auto window = _presentingWindow.lock();
+    if (window == nullptr) {
       return nullptr;
     }
     if (_swapChain == nullptr || _backBuffers == nullptr || _backBuffers->empty()) {

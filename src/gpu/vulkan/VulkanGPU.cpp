@@ -787,14 +787,15 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
   //       semaphore ensures A's submission completes before B's fragment shader reads it.
   //       Wait stage: FRAGMENT_SHADER (vertex work can proceed in parallel).
   //
-  //   (b) Per-window acquire semaphores — standard Vulkan presentation sync. Each pending
-  //       window waits on its own imageAvailable semaphore created for its latest
-  //       vkAcquireNextImageKHR call. Automatic frames additionally signal their per-image
-  //       presentation semaphore; manual frames wait only, and present from a later submit.
+  //   (b) Per-frame swapchain semaphores — standard Vulkan presentation sync. The first
+  //       submission that uses an acquired image waits on its imageAvailable semaphore; the
+  //       submission of the batch carrying the presentation request signals the image's
+  //       presentation semaphore and queues the present. The two are independent: an acquire
+  //       wait never implies a presentation.
   //
   VulkanSubmissionPlan presentationPlan;
   for (auto& present : request.presents) {
-    presentationPlan.add(present.manualPresent);
+    presentationPlan.add(present.imageAvailable != VK_NULL_HANDLE, present.presents);
   }
   std::vector<VkSemaphore> waitSemaphores;
   std::vector<VkPipelineStageFlags> waitStages;
@@ -818,13 +819,16 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
     signalValues.push_back(request.signalSemaphore->nextSignalValue());
   }
 
-  // (b) One acquire semaphore per pending window. Automatic frames signal their per-image
-  // presentation semaphore; manual frames only wait for acquisition and present in a later submit.
+  // (b) Acquire waits for the frames first used by this submission, presentation semaphore
+  // signals for the frames presented by it.
   for (auto& present : request.presents) {
-    waitSemaphores.push_back(present.imageAvailable);
-    waitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-    waitValues.push_back(0);
-    if (!present.manualPresent) {
+    if (present.imageAvailable != VK_NULL_HANDLE) {
+      // Transfers (readbacks, snapshot copies) touch the image too, so wait before any stage.
+      waitSemaphores.push_back(present.imageAvailable);
+      waitStages.push_back(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+      waitValues.push_back(0);
+    }
+    if (present.presents) {
       signalSemaphores.push_back(present.presentSemaphore);
       signalValues.push_back(0);
     }
@@ -916,10 +920,14 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
     submission.session.retainedResources.push_back(std::move(request.signalSemaphore));
   }
   for (auto& present : request.presents) {
-    submission.ownedSemaphores.push_back(present.imageAvailable);
-    present.imageAvailable = VK_NULL_HANDLE;
-    present.frameState->markRenderSubmitted();
-    if (!present.manualPresent) {
+    if (present.imageAvailable != VK_NULL_HANDLE) {
+      submission.ownedSemaphores.push_back(present.imageAvailable);
+      present.imageAvailable = VK_NULL_HANDLE;
+    }
+    if (present.frameState != nullptr) {
+      present.frameState->markRenderSubmitted();
+    }
+    if (present.presents) {
       *present.layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     }
   }
@@ -930,7 +938,7 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
   std::vector<VkSemaphore> presentSemaphores;
   std::vector<VkResult> presentResults;
   for (auto& present : request.presents) {
-    if (!present.manualPresent) {
+    if (present.presents) {
       swapchains.push_back(present.swapchain);
       imageIndices.push_back(present.imageIndex);
       presentSemaphores.push_back(present.presentSemaphore);
@@ -949,7 +957,7 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
     auto batchResult = vkQueuePresentKHR(vulkanQueue, &presentInfo);
     size_t automaticIndex = 0;
     for (auto& present : request.presents) {
-      if (present.manualPresent) {
+      if (!present.presents) {
         continue;
       }
       auto result = presentResults[automaticIndex++];

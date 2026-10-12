@@ -144,15 +144,6 @@ class RenderTargetProxy {
   virtual void onSchedulePresentation(Context* context);
 
   /**
-   * Called after the submission of a batch that used this window-backed target, whether or not
-   * a presentation was registered for it. Backends whose usage wiring also presents the frame
-   * with the submission (Vulkan aggregates the acquire wait and the present) override this to
-   * end the frame in step; everything else does nothing. The default implementation does
-   * nothing.
-   */
-  virtual void onUsageCompleted(Context* context);
-
-  /**
    * Presents this target's frame after the command buffer submission. The default
    * implementation forwards to the window that created this target (backends with a shared
    * native backbuffer: GL, D3D12), which requires the window to still be alive; backends with

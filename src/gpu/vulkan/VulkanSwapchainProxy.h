@@ -51,12 +51,11 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
   bool hasPendingFrame() const;
 
   /**
-   * Registers the acquired frame's presentation with the command queue, wiring the
-   * acquire/present semaphore pair into the upcoming submission. Called at submission time by
-   * the drawable pipeline (automatic and explicit paths alike). In manual present mode the
-   * actual vkQueuePresentKHR stays deferred to presentFrame().
+   * Hands the acquired frame's acquire semaphore to the upcoming submission, so that submission
+   * waits for the image acquisition before touching the image. Done once per frame, by the first
+   * submission that uses it; never presents the image.
    */
-  void schedulePresent();
+  void attachAcquireWait();
 
   void releaseFrame();
   void presentFrame();
@@ -66,26 +65,18 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
   }
 
   /**
-   * Frame-level wiring, independent of the VulkanWindow: registers the frame's semaphore pair
-   * with the upcoming render submission (whether or not a presentation was registered for that
-   * batch).
+   * Frame-level wiring, independent of the VulkanWindow: makes a batch that uses the frame wait
+   * for its acquisition, whether or not a presentation was registered for that batch. The frame
+   * stays open; it is only presented by the batch carrying the presentation request.
    */
   void onAttachSubmission(Context* context) override;
 
   /**
-   * Registers the frame's semaphore pair with the submission of the batch carrying the
-   * presentation request; the wiring is idempotent.
+   * Queues the frame's presentation with the submission of the batch carrying the presentation
+   * request (wiring the acquire wait too if that batch is the frame's first use). Manual
+   * (explicit-path) frames defer the present to presentFrame().
    */
   void onSchedulePresentation(Context* context) override;
-
-  /**
-   * Ends automatic frames whose acquire wiring was attached to a batch's submission: the queue
-   * aggregates the acquire wait and the present, so the frame was presented with that
-   * submission even without a registered presentation request, and the proxy must not keep
-   * serving an image the presentation engine already owns. Manual (explicit-path) frames defer
-   * their presentation and stay open.
-   */
-  void onUsageCompleted(Context* context) override;
 
   void onPresentFrame(Context* context) override;
 
@@ -115,7 +106,7 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
   mutable std::shared_ptr<RenderTarget> _renderTarget = nullptr;
   mutable std::shared_ptr<VulkanFrameState> _frameState = nullptr;
   // The acquire semaphore of the pending frame, created per acquisition and handed to the
-  // command queue in schedulePresent(); destroyed with the in-flight submission's fence.
+  // command queue in attachAcquireWait(); destroyed with the in-flight submission's fence.
   mutable VkSemaphore _pendingImageAvailableSemaphore = VK_NULL_HANDLE;
   bool _manualPresent = false;
   bool _presentationRequested = false;
