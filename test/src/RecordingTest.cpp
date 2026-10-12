@@ -283,7 +283,9 @@ TGFX_TEST(RecordingTest, RetainsWindowAndCoalescesSharedPresentation) {
 
   context->submit(std::move(recording), true);
   EXPECT_EQ(presentCount, 1);
-  EXPECT_EQ(presentedTargetCount, 2u);
+  // Both surfaces share the window's single automatic target (unified frame acquisition), so
+  // one presentation delivers the batch's frame.
+  EXPECT_EQ(presentedTargetCount, 1u);
   EXPECT_TRUE(destroyed);
 }
 

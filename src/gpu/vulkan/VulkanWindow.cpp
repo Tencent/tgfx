@@ -824,10 +824,6 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* c
   return createSwapchainProxy(context, false);
 }
 
-bool VulkanWindow::hasIndependentPresentationTargets() const {
-  return true;
-}
-
 std::shared_ptr<Drawable> VulkanWindow::onNextDrawable() {
   // The frame handle is created without a Context; its manual-present proxy is resolved when
   // the frame is imported (VulkanDrawable::onImport()).

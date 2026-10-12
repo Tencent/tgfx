@@ -69,7 +69,6 @@ class QGLWindow : public Window {
    * QGLDrawableProxy::onPresentFrame().
    */
   void presentProxy(QGLDrawableProxy* proxy);
-  bool hasIndependentPresentationTargets() const override;
 
  private:
   struct TextureSlot {

@@ -218,8 +218,4 @@ std::shared_ptr<RenderTargetProxy> WebGPUWindow::onCreateRenderTarget(Context* c
       context, _width, _height, wgpuSurface, WGPUTextureFormat_BGRA8Unorm, PixelFormat::BGRA_8888);
 }
 
-bool WebGPUWindow::hasIndependentPresentationTargets() const {
-  return true;
-}
-
 }  // namespace tgfx

@@ -139,10 +139,6 @@ std::shared_ptr<RenderTargetProxy> MetalWindow::onCreateRenderTarget(Context* co
   return std::make_shared<MetalDrawableProxy>(context, width, height, metalLayer, pixelFormat);
 }
 
-bool MetalWindow::hasIndependentPresentationTargets() const {
-  return true;
-}
-
 std::shared_ptr<Drawable> MetalWindow::onNextDrawable() {
   int width = 0;
   int height = 0;

@@ -89,13 +89,6 @@ class Drawable {
    */
   void abandon();
 
-  /**
-   * Marks the frame as having a registered presentation request. Used by internal automatic-path
-   * frames (WindowFrame), whose presentation is registered at construction instead of through
-   * Context::present().
-   */
-  void markPresentationRequested();
-
   // The window is held weakly: a frame must not keep its window (and through it the device
   // and the context with its pending drawing buffers) alive, which would form a reference
   // cycle (buffer -> frame -> window -> device -> context -> buffer). While the frame's

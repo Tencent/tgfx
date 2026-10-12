@@ -29,12 +29,15 @@ std::shared_ptr<Surface> WindowSurface::Make(Context* context, std::shared_ptr<W
   if (context == nullptr || window == nullptr) {
     return nullptr;
   }
-  auto proxy = window->onCreateRenderTarget(context);
+  // All surfaces of this window share one automatic target (unified frame acquisition): one
+  // frame identity per window per recording batch, presented once at the end of the batch.
+  auto proxy = window->getAutomaticTarget(context);
   if (proxy == nullptr) {
     return nullptr;
   }
   // Enable the default proxy-level presentation forwarding for shared-backbuffer backends
-  // (GL, D3D12); frame-level backends (Metal, Vulkan) override the proxy hooks instead.
+  // (GL); frame-level backends (Metal, Vulkan, WebGPU, EAGL, QGL, D3D12) override the proxy
+  // hooks instead.
   proxy->setPresentingWindow(window);
   auto colorSpace = window->colorSpace();
   auto renderTarget = proxy;

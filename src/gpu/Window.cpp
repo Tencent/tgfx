@@ -19,6 +19,7 @@
 #include "tgfx/gpu/Window.h"
 #include "core/utils/Log.h"
 #include "gpu/ProxyDrawable.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {
@@ -59,10 +60,23 @@ std::shared_ptr<Drawable> Window::onNextDrawable() {
   return ProxyDrawable::Make(shared_from_this());
 }
 
-void Window::onPresent(Context*) {
+std::shared_ptr<RenderTargetProxy> Window::getAutomaticTarget(Context* context) {
+  std::lock_guard<std::mutex> autoLock(locker);
+  auto iter = _automaticTargets.find(context);
+  if (iter != _automaticTargets.end()) {
+    if (auto target = iter->second.lock()) {
+      return target;
+    }
+    // The Context released its surfaces; create a fresh target for it below.
+    _automaticTargets.erase(iter);
+  }
+  auto target = onCreateRenderTarget(context);
+  if (target != nullptr) {
+    _automaticTargets[context] = target;
+  }
+  return target;
 }
 
-bool Window::hasIndependentPresentationTargets() const {
-  return false;
+void Window::onPresent(Context*) {
 }
 }  // namespace tgfx

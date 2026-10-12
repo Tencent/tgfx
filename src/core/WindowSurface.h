@@ -25,9 +25,9 @@ namespace tgfx {
 
 /**
  * The internal Surface subclass behind Surface::MakeFrom(context, window): the automatic,
- * cross-frame-reusable window entry. It holds the window and collects a WindowFrame for each
- * drawing batch (which registers its presentation at collection and is delivered after the
- * batch is submitted); the next batch starts a fresh frame. Created only through
+ * cross-frame-reusable window entry. It holds the window and registers the window's shared
+ * automatic target for presentation on each drawing batch (delivered after the batch is
+ * submitted); the next batch resolves a fresh frame on that target. Created only through
  * Surface::MakeFrom(); business code always sees a plain Surface.
  */
 class WindowSurface : public Surface {

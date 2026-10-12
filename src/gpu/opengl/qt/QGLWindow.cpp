@@ -215,10 +215,6 @@ void QGLWindow::presentProxy(QGLDrawableProxy* proxy) {
   QMetaObject::invokeMethod(quickItem, "update", Qt::AutoConnection);
 }
 
-bool QGLWindow::hasIndependentPresentationTargets() const {
-  return true;
-}
-
 std::shared_ptr<RenderTargetProxy> QGLWindow::acquireTexture(Context* context, int width,
                                                              int height) {
   std::lock_guard<std::mutex> autoLock(locker);

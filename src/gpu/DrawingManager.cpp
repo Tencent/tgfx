@@ -19,7 +19,6 @@
 #include "DrawingManager.h"
 #include "ProxyProvider.h"
 #include "core/AtlasManager.h"
-#include "gpu/WindowFrame.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/GenerateMipmapsTask.h"
@@ -200,32 +199,17 @@ void DrawingManager::collectWindow(std::shared_ptr<Window> window,
     return;
   }
   auto drawingBuffer = getDrawingBuffer();
-  // The automatic path shares the frame pipeline: each flush cycle collects a WindowFrame per
-  // window (per target for backends with independent presentation targets) into the drawing
-  // buffer's frame list, registers its presentation on the batch, and the presentation is
-  // delivered by deliverFrames() after submission. The per-window map finds the current buffer's
-  // frame without type-identifying the drawables.
-  auto independentTargets = window->hasIndependentPresentationTargets();
-  auto iter = pendingWindowFrames.find(window.get());
-  if (iter != pendingWindowFrames.end()) {
-    if (auto frame = iter->second.lock()) {
-      if (frame->hasTarget(renderTarget)) {
-        return;
-      }
-      if (!independentTargets) {
-        frame->addTarget(std::move(renderTarget));
-        return;
-      }
+  // The automatic path registers one presentation per window per batch: every surface of the
+  // window shares the window's automatic target (unified frame acquisition), so presenting it
+  // once at the end of the batch delivers the batch's frame. The proxy carries the backend
+  // presentation; the strong window reference is moved into the Recording at flush time.
+  for (auto& pending : drawingBuffer->presentables) {
+    if (pending.proxy == renderTarget) {
+      return;
     }
   }
-  auto* windowKey = window.get();
-  auto frame = WindowFrame::Make(window, std::move(renderTarget));
-  if (frame != nullptr) {
-    drawingBuffer->frameUsages.push_back(frame);
-    drawingBuffer->presentables.push_back({frame, frame->primaryTarget()});
-    pendingWindowFrames[windowKey] = std::move(frame);
-    pendingWindows.push_back(std::move(window));
-  }
+  drawingBuffer->presentables.push_back({nullptr, std::move(renderTarget)});
+  pendingWindows.push_back(std::move(window));
 }
 
 std::shared_ptr<DrawingBuffer> DrawingManager::flush() {
@@ -250,7 +234,6 @@ std::shared_ptr<DrawingBuffer> DrawingManager::flush() {
   auto drawingBuffer = currentBuffer;
   bufferPool.push_back(currentBuffer);
   currentBuffer = nullptr;
-  pendingWindowFrames.clear();
   return drawingBuffer;
 }
 }  // namespace tgfx
