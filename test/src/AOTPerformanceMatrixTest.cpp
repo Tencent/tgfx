@@ -176,6 +176,10 @@ TimingResult MeasureRoute(Context* context, PrecompiledShaderCache* cache, bool 
   } else {
     cache->unload();
   }
+  // The runtime route is the measurement's reference, not a production lookup: its compilations
+  // stay counted (runtimePrograms reads them) but are marked deliberate, so the AOT coverage
+  // metrics exclude them.
+  ScopedAOTDeliberateMiss runtimeReference(context, !useBundle);
   auto surface = Surface::Make(context, size, size);
   if (surface == nullptr) {
     return result;

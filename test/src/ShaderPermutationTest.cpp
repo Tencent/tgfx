@@ -946,6 +946,9 @@ TGFX_TEST(ShaderPermutationTest, FallbackReasonSaysWhyNoBundleIsLoaded) {
   const PrecompiledFallbackReason checked[] = {PrecompiledFallbackReason::CacheNotLoaded,
                                                PrecompiledFallbackReason::NoBundleForBackend,
                                                PrecompiledFallbackReason::BundleRejected};
+  // Every draw below runs with the bundle unloaded on purpose. The fallback counts asserted here
+  // still record; the deliberate marking only keeps them out of the AOT coverage metrics.
+  ScopedAOTDeliberateMiss deliberate(context);
   for (const auto& testCase : cases) {
     SCOPED_TRACE(testCase.name);
     // Unloading drops the cached programs, so the draw below has to create one and goes through

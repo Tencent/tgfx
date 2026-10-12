@@ -1307,7 +1307,8 @@ static void RenderImageWithColorFilterOnce(const std::shared_ptr<Image>& image,
                                            int width, int height, bool useBundle,
                                            bool decompositionEnabled, bool useAnalyticClip,
                                            bool forceTexture2D, Bitmap* outBitmap,
-                                           ColorFilterRenderStats* outStats) {
+                                           ColorFilterRenderStats* outStats,
+                                           bool deliberateFallback = false) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -1321,6 +1322,9 @@ static void RenderImageWithColorFilterOnce(const std::shared_ptr<Image>& image,
     cache->unload();
   }
   ScopedAOTStatsPause statsPause(context, !useBundle);
+  // Set by callers whose scene is refused on purpose, so its runtime fallback is the behavior
+  // under test and stays out of the AOT coverage metrics.
+  ScopedAOTDeliberateMiss deliberate(context, deliberateFallback);
   cache->setDiagnosticRecordingEnabled(false);
   context->globalCache()->clearPrograms();
   auto sourceImage = image;
@@ -1701,6 +1705,9 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailOverBudgetPlansRefused) {
       cache->unload();
     }
     ScopedAOTStatsPause pause(context, !useBundle);
+    // The bundle segment is refused on purpose (the tree exceeds the single-pass budget); its
+    // runtime fallback is the behavior under test, not a coverage gap.
+    ScopedAOTDeliberateMiss refusedPlan(context, useBundle);
     cache->setDecompositionEnabled(useBundle);
     cache->setDiagnosticRecordingEnabled(true);
     cache->resetStats();
@@ -1785,6 +1792,9 @@ static void RenderOffscreenCounterexample(
       cache->unload();
     }
     ScopedAOTStatsPause pause(context, !useBundle);
+    // The tree is over the tail budget, so the bundle segment's runtime fallback is the
+    // rejection boundary under test, not a coverage gap.
+    ScopedAOTDeliberateMiss refusedPlan(context, useBundle);
     cache->setDecompositionEnabled(useBundle);
     cache->setDiagnosticRecordingEnabled(true);
     cache->resetStats();
@@ -2041,6 +2051,9 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenThresholdAcrossBoundaryFlips) {
       cache->unload();
     }
     ScopedAOTStatsPause pause(context, !useBundle);
+    // The threshold tree is over the tail budget, so the bundle segment's runtime fallback is the
+    // rejection boundary under test, not a coverage gap.
+    ScopedAOTDeliberateMiss refusedPlan(context, useBundle);
     cache->setDecompositionEnabled(useBundle);
     cache->setDiagnosticRecordingEnabled(true);
     cache->resetStats();
@@ -2133,8 +2146,9 @@ TGFX_TEST(AOTRenderConsistencyTest, LongLinearChainExecutesMaterializedTailPasse
     ColorFilterRenderStats candidateStats;
     RenderImageWithColorFilterOnce(image, chain, width, height, false, false, false, true,
                                    &reference, &referenceStats);
+    // Only the 33-operator chain is over budget; the others must stay free of fallbacks.
     RenderImageWithColorFilterOnce(image, chain, width, height, true, true, false, true, &candidate,
-                                   &candidateStats);
+                                   &candidateStats, opCount > 31);
     const auto& draws = candidateStats.draws;
     EXPECT_EQ(draws.draws, 1u);
     if (opCount <= 31) {
@@ -2379,7 +2393,7 @@ TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsTransparentBlackColorFilter
   Bitmap reference = {};
   {
     cache->unload();
-    ScopedAOTDeliberateMiss deliberate(context);
+    ScopedAOTStatsPause referencePause(context, true);
     renderScene(&reference);
   }
   // Control: the same scene without the color filter. If the filter is applied anywhere in the
@@ -2537,7 +2551,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaBiasColorFilterOnBlendShaderMatchesRunt
   Bitmap reference = {};
   {
     cache->unload();
-    ScopedAOTDeliberateMiss deliberate(context);
+    ScopedAOTStatsPause referencePause(context, true);
     renderScene(&reference);
   }
   // Control: the same scene without the color filter. The transparent rim (source alpha 0.6 from
@@ -2666,7 +2680,7 @@ TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsMaskCoverage) {
   Bitmap reference = {};
   {
     cache->unload();
-    ScopedAOTDeliberateMiss deliberate(context);
+    ScopedAOTStatsPause referencePause(context, true);
     renderScene(&reference);
   }
   Bitmap candidate = {};
@@ -2678,7 +2692,12 @@ TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsMaskCoverage) {
     context->globalCache()->clearPrograms();
     cache->resetStats();
     cache->setDiagnosticRecordingEnabled(true);
-    renderScene(&candidate);
+    {
+      // The two-gradient blend is chosen because the chain route refuses it: that first miss is
+      // what triggers the retry under test, so it is deliberate rather than a coverage gap.
+      ScopedAOTDeliberateMiss retryTrigger(context);
+      renderScene(&candidate);
+    }
     auto stats = cache->drawStats();
     cache->setDiagnosticRecordingEnabled(false);
     printf("[RetryMaskCoverage] completeAOT=%u fpFlattenEdges=%u\n",
@@ -3307,7 +3326,7 @@ TGFX_TEST(AOTRenderConsistencyTest, YUVImageWithColorFilterMatchesRuntime) {
   Bitmap candidate = {};
   {
     cache->unload();
-    ScopedAOTDeliberateMiss deliberate(context);
+    ScopedAOTStatsPause referencePause(context, true);
     renderScene(&reference);
   }
   {
@@ -3383,7 +3402,7 @@ TGFX_TEST(AOTRenderConsistencyTest, NV12ImageWithColorFilterMatchesRuntime) {
   Bitmap candidate = {};
   {
     cache->unload();
-    ScopedAOTDeliberateMiss deliberate(context);
+    ScopedAOTStatsPause referencePause(context, true);
     renderScene(&reference);
   }
   {
@@ -3464,7 +3483,7 @@ TGFX_TEST(AOTRenderConsistencyTest, BlendRetryMaterializationFlipsThreshold) {
   Bitmap candidate = {};
   {
     cache->unload();
-    ScopedAOTDeliberateMiss deliberate(context);
+    ScopedAOTStatsPause referencePause(context, true);
     renderScene(&reference);
   }
   {
@@ -3476,7 +3495,12 @@ TGFX_TEST(AOTRenderConsistencyTest, BlendRetryMaterializationFlipsThreshold) {
     cache->setDiagnosticRecordingEnabled(true);
     cache->resetStats();
     context->globalCache()->resetProgramStats();
-    renderScene(&candidate);
+    {
+      // The refusal is the behavior under test: its fallback is deliberate, not a coverage gap.
+      // The counts asserted below still record.
+      ScopedAOTDeliberateMiss refused(context);
+      renderScene(&candidate);
+    }
     // RULING: the admission rule refused the retry (the tree carries an AlphaThreshold), so the
     // draw keeps its original processors — exactly one plain-matcher miss (the two-gradient
     // blend + threshold tree has no plain rule) and one runtime program build serve it. A zero
@@ -3557,7 +3581,7 @@ TGFX_TEST(AOTRenderConsistencyTest, TiledRepeatLinearSeamBlendOnChain) {
   Bitmap candidate = {};
   {
     cache->unload();
-    ScopedAOTDeliberateMiss deliberate(context);
+    ScopedAOTStatsPause referencePause(context, true);
     renderScene(&reference);
   }
   {
@@ -3636,7 +3660,7 @@ TGFX_TEST(AOTRenderConsistencyTest, TiledRepeatLinearSeamBlendOnChainViaBlur) {
   Bitmap candidate = {};
   {
     cache->unload();
-    ScopedAOTDeliberateMiss deliberate(context);
+    ScopedAOTStatsPause referencePause(context, true);
     renderScene(&reference);
   }
   {
@@ -4859,7 +4883,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyBlendOperandKeepsPaintTint) {
   Bitmap candidate = {};
   {
     cache->unload();
-    ScopedAOTDeliberateMiss deliberate(context);
+    ScopedAOTStatsPause referencePause(context, true);
     renderScene(&reference);
   }
   {
@@ -4935,7 +4959,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyColorRootKeepsPaintTint) {
   Bitmap candidate = {};
   {
     cache->unload();
-    ScopedAOTDeliberateMiss deliberate(context);
+    ScopedAOTStatsPause referencePause(context, true);
     renderScene(&reference);
   }
   {
@@ -5014,7 +5038,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyColorRootPaintAlphaBelowOne) {
   Bitmap candidate = {};
   {
     cache->unload();
-    ScopedAOTDeliberateMiss deliberate(context);
+    ScopedAOTStatsPause referencePause(context, true);
     renderScene(&reference);
   }
   {
@@ -5100,7 +5124,7 @@ TGFX_TEST(AOTRenderConsistencyTest, MeshColorBlendShaderWithTwoChildBlend) {
   Bitmap candidate = {};
   {
     cache->unload();
-    ScopedAOTDeliberateMiss deliberate(context);
+    ScopedAOTStatsPause referencePause(context, true);
     renderScene(&reference);
   }
   {
@@ -5174,7 +5198,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyImageWithPaintShaderMatchesRuntime)
   Bitmap candidate = {};
   {
     cache->unload();
-    ScopedAOTDeliberateMiss deliberate(context);
+    ScopedAOTStatsPause referencePause(context, true);
     renderScene(&reference);
   }
   {
@@ -5252,7 +5276,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyImageWithBlendShaderMatchesRuntime)
   Bitmap candidate = {};
   {
     cache->unload();
-    ScopedAOTDeliberateMiss deliberate(context);
+    ScopedAOTStatsPause referencePause(context, true);
     renderScene(&reference);
   }
   {
@@ -5373,7 +5397,7 @@ TGFX_TEST(AOTRenderConsistencyTest, ChainedAnalyticClipsOnAAPathRecordsFallbackB
   Bitmap candidate = {};
   {
     cache->unload();
-    ScopedAOTDeliberateMiss deliberate(context);
+    ScopedAOTStatsPause referencePause(context, true);
     renderScene(&reference);
   }
   {
@@ -5385,7 +5409,12 @@ TGFX_TEST(AOTRenderConsistencyTest, ChainedAnalyticClipsOnAAPathRecordsFallbackB
     cache->setDiagnosticRecordingEnabled(true);
     cache->resetStats();
     context->globalCache()->resetProgramStats();
-    renderScene(&candidate);
+    {
+      // The refusal is the behavior under test: its fallback is deliberate, not a coverage gap.
+      // The counts asserted below still record.
+      ScopedAOTDeliberateMiss refused(context);
+      renderScene(&candidate);
+    }
     // RULING: the coverage carries two FPs here (the clip's analytic Compose plus the AA path's
     // TextureEffect), which the chain's two-FP branch refuses, so the draw falls back to the
     // runtime route — exactly one program build, no partial-chain attempt. This records the
@@ -5639,7 +5668,7 @@ TGFX_TEST(AOTRenderConsistencyTest, MeshVertexColorsWithComposedShaderChildInput
   Bitmap candidate = {};
   {
     cache->unload();
-    ScopedAOTDeliberateMiss deliberate(context);
+    ScopedAOTStatsPause referencePause(context, true);
     renderScene(&reference);
   }
   {
@@ -5717,7 +5746,7 @@ TGFX_TEST(AOTRenderConsistencyTest, OutOfRangeGradientStopBlendClampOrder) {
   Bitmap candidate = {};
   {
     cache->unload();
-    ScopedAOTDeliberateMiss deliberate(context);
+    ScopedAOTStatsPause referencePause(context, true);
     renderScene(&reference);
   }
   {
@@ -5993,7 +6022,7 @@ TGFX_TEST(AOTRenderConsistencyTest, NarrowAAClipWithSrcBlendKeepsDstOnEdge) {
   Bitmap candidate = {};
   {
     cache->unload();
-    ScopedAOTDeliberateMiss deliberate(context);
+    ScopedAOTStatsPause referencePause(context, true);
     renderScene(&reference);
   }
   {
@@ -6458,6 +6487,9 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailThresholdQuantizationBand) {
       cache->unload();
     }
     ScopedAOTStatsPause pause(context, !useBundle);
+    // The tree is over the tail budget, so the bundle segment's runtime fallback is the
+    // rejection boundary under test, not a coverage gap.
+    ScopedAOTDeliberateMiss refusedPlan(context, useBundle);
     cache->setDecompositionEnabled(useBundle);
     cache->setDiagnosticRecordingEnabled(true);
     cache->resetStats();
@@ -6550,6 +6582,9 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailSamplingTransforms) {
         cache->unload();
       }
       ScopedAOTStatsPause pause(context, !useBundle);
+      // Every transform case is over the tail budget, so the bundle segment's runtime fallback is
+      // the rejection boundary under test, not a coverage gap.
+      ScopedAOTDeliberateMiss refusedPlan(context, useBundle);
       cache->setDecompositionEnabled(useBundle);
       cache->setDiagnosticRecordingEnabled(true);
       cache->resetStats();
@@ -6618,6 +6653,7 @@ static void RenderCoverageXPScene(bool useBundle, BlendMode mode, Bitmap* outBit
   } else {
     cache->unload();
   }
+  ScopedAOTStatsPause statsPause(context, !useBundle);
   context->globalCache()->clearPrograms();
   auto surface = Surface::Make(context, 120, 120);
   ASSERT_TRUE(surface != nullptr);
@@ -6987,8 +7023,10 @@ TGFX_TEST(AOTRenderConsistencyTest, IncompatibleBundleIsRejectedNotLoaded) {
 
 // Copies a UDF texture proxy back to the CPU through a plain identity fill. The fill itself matches
 // the (fixed) QuadTextureFillShader kernel on the AOT side, but an identity copy is lossless, so any
-// difference between the two bitmaps belongs to the UDF generation and not to the readback.
+// difference between the two bitmaps belongs to the UDF generation and not to the readback. The
+// copy is a test readback, not a production lookup, so it stays out of the AOT metrics.
 static bool ReadBackUDFProxy(Context* context, std::shared_ptr<TextureProxy> proxy, Bitmap* out) {
+  ScopedAOTStatsPause readbackPause(context, true);
   auto width = proxy->width();
   auto height = proxy->height();
   auto target = RenderTargetProxy::Make(context, width, height, false, 1, false,
@@ -7069,6 +7107,8 @@ TGFX_TEST(AOTRenderConsistencyTest, GlassUDFTentBlurPipelineAOTMatchesJIT) {
   ScopedGlassUDFDebug glassDebug;
   auto* cache = context->precompiledShaderCache();
   cache->unload();
+  // The runtime reference passes are not production lookups; keep them out of the AOT metrics.
+  auto jitReferencePause = std::make_unique<ScopedAOTStatsPause>(context, true);
 
   auto maskSurface = Surface::Make(context, 384, 256);
   ASSERT_TRUE(maskSurface != nullptr);
@@ -7127,6 +7167,7 @@ TGFX_TEST(AOTRenderConsistencyTest, GlassUDFTentBlurPipelineAOTMatchesJIT) {
   ASSERT_TRUE(sceneEdgeJitProxy != nullptr);
   ASSERT_TRUE(ReadBackUDFProxy(context, std::move(sceneEdgeJitProxy), &sceneEdgeJitBitmap));
   auto sceneEdgeJitPasses = TakeGlassUDFDebugTextures();
+  jitReferencePause.reset();
 
   auto bundle = EmbeddedShaderBundles::GetBundle(context->backend());
   ASSERT_TRUE(bundle.first != nullptr && bundle.second > 0);
@@ -7329,7 +7370,11 @@ TGFX_TEST(AOTRenderConsistencyTest, FiltersSceneAOTMatchesJIT) {
   auto* cache = context->precompiledShaderCache();
   cache->unload();
 
-  auto jitBitmap = RenderFiltersScene(context);
+  Bitmap jitBitmap = {};
+  {
+    ScopedAOTStatsPause jitReferencePause(context, true);
+    jitBitmap = RenderFiltersScene(context);
+  }
 
   auto bundle = EmbeddedShaderBundles::GetBundle(context->backend());
   ASSERT_TRUE(bundle.first != nullptr && bundle.second > 0);
@@ -7455,7 +7500,11 @@ TGFX_TEST(AOTRenderConsistencyTest, GlassCellSceneAOTMatchesJIT) {
   auto* cache = context->precompiledShaderCache();
   cache->unload();
 
-  auto jitBitmap = RenderGlassCellScene(context);
+  Bitmap jitBitmap = {};
+  {
+    ScopedAOTStatsPause jitReferencePause(context, true);
+    jitBitmap = RenderGlassCellScene(context);
+  }
   auto jitUDFTextures = TakeGlassUDFDebugTextures();
 
   auto bundle = EmbeddedShaderBundles::GetBundle(context->backend());
@@ -7549,7 +7598,11 @@ TGFX_TEST(AOTRenderConsistencyTest, GlassSharpCornerSceneAOTMatchesJIT) {
   auto* cache = context->precompiledShaderCache();
   cache->unload();
 
-  auto jitBitmap = RenderGlassCellScene(context, 0.0f, 0.0f);
+  Bitmap jitBitmap = {};
+  {
+    ScopedAOTStatsPause jitReferencePause(context, true);
+    jitBitmap = RenderGlassCellScene(context, 0.0f, 0.0f);
+  }
 
   auto bundle = EmbeddedShaderBundles::GetBundle(context->backend());
   ASSERT_TRUE(bundle.first != nullptr && bundle.second > 0);
