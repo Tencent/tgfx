@@ -56,10 +56,11 @@ class MetalWindow : public Window {
                                                std::shared_ptr<ColorSpace> colorSpace = nullptr,
                                                bool vsyncEnabled = true);
 
+  bool supportsReadback() const override;
+
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
   std::shared_ptr<Drawable> onNextDrawable() override;
-  bool supportsReadback() const override;
 
  private:
   CAMetalLayer* metalLayer = nil;

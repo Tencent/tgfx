@@ -59,11 +59,12 @@ class QGLWindow : public Window {
    */
   QSGTexture* getQSGTexture();
 
- protected:
-  std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
   bool supportsReadback() const override {
     return true;
   }
+
+ protected:
+  std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
   /**
    * Presents the given frame proxy to the Qt scene graph. Called by
    * QGLDrawableProxy::onPresentFrame().
