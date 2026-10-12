@@ -3585,7 +3585,11 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
   const auto rItemXOffset = gap + cellW / 2.0f;
   auto image = MakeImage("resources/apitest/test_timestretch.png")->makeScaled(100, 60);
 
-  // Case 1: SolidLayer with roundness 10, spread=8
+  // Each case draws a pair with and without spread. The no-spread draw always uses the
+  // image-filter path; the spread draw uses the analytic closed form when the outline allows it
+  // (marked "analytic"), and falls back to a rasterized spread image otherwise (marked "raster").
+
+  // Case 1: SolidLayer with roundness 10, spread=8 (analytic)
   for (int i = 0; i < 2; ++i) {
     auto layer = SolidLayer::Make();
     layer->setColor(Color::Red());
@@ -3598,7 +3602,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(layer);
   }
 
-  // Case 2: ImageLayer, spread=8
+  // Case 2: ImageLayer, spread=8 (analytic)
   for (int i = 0; i < 2; ++i) {
     auto layer = ImageLayer::Make();
     layer->setImage(image);
@@ -3607,7 +3611,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(layer);
   }
 
-  // Case 3: ShapeLayer Oval fill, spread=8
+  // Case 3: ShapeLayer Oval fill, spread=8 (analytic)
   for (int i = 0; i < 2; ++i) {
     auto layer = ShapeLayer::Make();
     Path path = {};
@@ -3619,7 +3623,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(layer);
   }
 
-  // Case 4: ShapeLayer Oval stroke, spread=8
+  // Case 4: ShapeLayer Oval stroke, spread=8 (raster)
   for (int i = 0; i < 2; ++i) {
     auto layer = ShapeLayer::Make();
     Path path = {};
@@ -3634,7 +3638,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(layer);
   }
 
-  // Case 5: ShapeLayer star stroke, spread=8
+  // Case 5: ShapeLayer star stroke, spread=8 (raster)
   for (int i = 0; i < 2; ++i) {
     auto layer = ShapeLayer::Make();
     layer->setPath(MakeStarPath());
@@ -3646,7 +3650,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(layer);
   }
 
-  // Case 6: ShapeLayer Rect + ImageShader fill, spread=8
+  // Case 6: ShapeLayer Rect + ImageShader fill, spread=8 (analytic)
   for (int i = 0; i < 2; ++i) {
     auto layer = ShapeLayer::Make();
     Path path = {};
@@ -3660,7 +3664,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(layer);
   }
 
-  // Case 7: ShapeLayer Rect fill + Outside dashed stroke, spread=8
+  // Case 7: ShapeLayer Rect fill + Outside dashed stroke, spread=8 (analytic)
   for (int i = 0; i < 2; ++i) {
     auto layer = ShapeLayer::Make();
     Path path = {};
@@ -3678,7 +3682,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(layer);
   }
 
-  // Case 8: ShapeLayer with an Inside dashed stroke baked into a fill path, spread=8
+  // Case 8: ShapeLayer with an Inside dashed stroke baked into a fill path, spread=8 (analytic)
   for (int i = 0; i < 2; ++i) {
     auto layer = ShapeLayer::Make();
     Path rectPath = {};
@@ -3702,7 +3706,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(layer);
   }
 
-  // Case 9: TextLayer with perspective, spread=8
+  // Case 9: TextLayer with perspective, spread=8 (raster)
   {
     auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
     for (int i = 0; i < 2; ++i) {
@@ -3721,7 +3725,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     }
   }
 
-  // Case 10: VectorLayer RoundRect + ImagePattern fill, spread=-8
+  // Case 10: VectorLayer RoundRect + ImagePattern fill, spread=-8 (analytic)
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto group = VectorGroup::Make();
@@ -3741,7 +3745,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(vectorLayer);
   }
 
-  // Case 11: VectorLayer Ellipse + Center stroke 15px, spread=-10 (stroke collapse)
+  // Case 11: VectorLayer Ellipse + Center stroke 15px, spread=-10 (stroke collapse) (raster)
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto group = VectorGroup::Make();
@@ -3759,7 +3763,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(vectorLayer);
   }
 
-  // Case 12: VectorLayer star fill, spread=8
+  // Case 12: VectorLayer star fill, spread=8 (analytic)
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto group = VectorGroup::Make();
@@ -3775,7 +3779,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(vectorLayer);
   }
 
-  // Case 13: VectorLayer Rect+Ellipse + Inside stroke 8px, spread=5
+  // Case 13: VectorLayer Rect+Ellipse + Inside stroke 8px, spread=5 (raster)
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto group = VectorGroup::Make();
@@ -3797,7 +3801,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(vectorLayer);
   }
 
-  // Case 14: VectorLayer Ellipse + Outside dashed stroke 8px + SolidLayer child, spread=8
+  // Case 14: VectorLayer Ellipse + Outside dashed stroke 8px + SolidLayer child, spread=8 (raster)
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto group = VectorGroup::Make();
@@ -3824,7 +3828,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(vectorLayer);
   }
 
-  // Case 15: VectorLayer Rect fill + Outside dashed stroke, spread=8
+  // Case 15: VectorLayer Rect fill + Outside dashed stroke, spread=8 (analytic)
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto group = VectorGroup::Make();
@@ -3847,7 +3851,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(vectorLayer);
   }
 
-  // Case 16: VectorLayer Ellipse + Inside stroke 15px with compound transform, spread=-5
+  // Case 16: VectorLayer Ellipse + Inside stroke 15px with compound transform, spread=-5 (raster)
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto innerGroup = VectorGroup::Make();
@@ -3874,7 +3878,8 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(vectorLayer);
   }
 
-  // Case 17: VectorLayer Ellipse + Outside dashed stroke 15px with transparent-fill child, spread=6
+  // Case 17: VectorLayer Ellipse + Outside dashed stroke 15px with transparent-fill child,
+  // spread=6 (raster)
   for (int i = 0; i < 2; ++i) {
     auto vectorLayer = VectorLayer::Make();
     auto group = VectorGroup::Make();
@@ -3905,8 +3910,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(vectorLayer);
   }
 
-  // Case 18: ShapeLayer thin strip 130x4 fill with a large blur, spread=8. The strip's short side
-  // is far smaller than the blur kernel and the aspect ratio is extreme.
+  // Case 18: ShapeLayer thin strip 130x4 fill with large blur, spread=8 (analytic)
   for (int i = 0; i < 2; ++i) {
     auto layer = ShapeLayer::Make();
     Path path = {};
@@ -3919,9 +3923,8 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(layer);
   }
 
-  // Case 19: SolidLayer at half alpha under a non-uniform scale matrix, spread=8. The shadow must
-  // land on the scaled shape with elliptical corners and render at half strength following the
-  // layer's alpha.
+  // Case 19: SolidLayer with half alpha and non-uniform scale, showBehindLayer = false, spread=8
+  // (analytic)
   for (int i = 0; i < 2; ++i) {
     auto layer = SolidLayer::Make();
     layer->setColor(Color::Red());
@@ -3933,14 +3936,12 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     auto matrix = Matrix::MakeTrans(i == 0 ? lItemXOffset : rItemXOffset, cellH * 6 + gap);
     matrix.preScale(2.0f, 1.5f);
     layer->setMatrix(matrix);
-    layer->setLayerStyles({MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f)});
+    layer->setLayerStyles(
+        {MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f, false)});
     displayList.root()->addChild(layer);
   }
 
-  // Case 20: SolidLayer with an offset drop shadow that stays hidden behind the layer
-  // (showBehindLayer = false), spread=8. The knockout combines with the analytic shadow path,
-  // unlike the earlier hidden-behind-layer cases whose stroked or complex shapes fall back to the
-  // filter path.
+  // Case 20: SolidLayer with spread large enough to collapse the shape, spread=35 (analytic)
   for (int i = 0; i < 2; ++i) {
     auto layer = SolidLayer::Make();
     layer->setColor(Color::Red());
@@ -3950,13 +3951,13 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     layer->setRadiusY(10);
     layer->setMatrix(
         Matrix::MakeTrans(cellW + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 6 + gap));
+    auto collapseSpread = type == ShadowType::Drop ? -35.0f : 35.0f;
     layer->setLayerStyles(
-        {MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f, false)});
+        {MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : collapseSpread)});
     displayList.root()->addChild(layer);
   }
 
-  // Case 21: SolidLayer whose spread consumes the shape entirely. The drop shadow shrinks to
-  // nothing while the inner shadow covers the whole shape.
+  // Case 21: SolidLayer with an anisotropic blur (12, 4), spread=8 (analytic)
   for (int i = 0; i < 2; ++i) {
     auto layer = SolidLayer::Make();
     layer->setColor(Color::Red());
@@ -3966,21 +3967,6 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     layer->setRadiusY(10);
     layer->setMatrix(
         Matrix::MakeTrans(cellW * 2 + (i == 0 ? lItemXOffset : rItemXOffset), cellH * 6 + gap));
-    auto collapseSpread = type == ShadowType::Drop ? -35.0f : 35.0f;
-    layer->setLayerStyles(
-        {MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : collapseSpread)});
-    displayList.root()->addChild(layer);
-  }
-
-  // Case 22: SolidLayer with an anisotropic blur (12, 4), spread=8
-  for (int i = 0; i < 2; ++i) {
-    auto layer = SolidLayer::Make();
-    layer->setColor(Color::Red());
-    layer->setWidth(100);
-    layer->setHeight(60);
-    layer->setRadiusX(10);
-    layer->setRadiusY(10);
-    layer->setMatrix(Matrix::MakeTrans(i == 0 ? lItemXOffset : rItemXOffset, cellH * 7 + gap));
     layer->setLayerStyles({MakeShadow(type, 25, 25, 12, 4, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f)});
     displayList.root()->addChild(layer);
   }
@@ -3994,7 +3980,7 @@ TGFX_TEST(LayerTest, DropShadow) {
   constexpr float cellH = 120.0f;
   constexpr float gap = 30.0f;
   auto surface =
-      Surface::Make(context, static_cast<int>(cellW * 3 + gap), static_cast<int>(cellH * 8 + gap));
+      Surface::Make(context, static_cast<int>(cellW * 3 + gap), static_cast<int>(cellH * 7 + gap));
   auto displayList = std::make_unique<DisplayList>();
   BuildShadowTestLayers(*displayList, ShadowType::Drop, cellW, cellH, gap);
   displayList->render(surface.get());
@@ -4009,7 +3995,7 @@ TGFX_TEST(LayerTest, InnerShadow) {
   constexpr float cellH = 120.0f;
   constexpr float gap = 30.0f;
   auto surface =
-      Surface::Make(context, static_cast<int>(cellW * 3 + gap), static_cast<int>(cellH * 8 + gap));
+      Surface::Make(context, static_cast<int>(cellW * 3 + gap), static_cast<int>(cellH * 7 + gap));
   auto displayList = std::make_unique<DisplayList>();
   BuildShadowTestLayers(*displayList, ShadowType::Inner, cellW, cellH, gap);
   displayList->render(surface.get());
