@@ -218,16 +218,6 @@ std::shared_ptr<RenderTargetProxy> WebGPUWindow::onCreateRenderTarget(Context* c
       context, _width, _height, wgpuSurface, WGPUTextureFormat_BGRA8Unorm, PixelFormat::BGRA_8888);
 }
 
-void WebGPUWindow::onPresent(Context*,
-                             const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets) {
-  if (renderTargets.empty()) {
-    return;
-  }
-  auto proxy = std::static_pointer_cast<WebGPUDrawableProxy>(renderTargets.front());
-  proxy->present();
-  proxy->releaseDrawable();
-}
-
 bool WebGPUWindow::hasIndependentPresentationTargets() const {
   return true;
 }

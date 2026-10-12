@@ -34,7 +34,7 @@ class WebGLWindow : public Window {
 
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
-  bool onSupportsReadback() const override {
+  bool supportsReadback() const override {
     return true;
   }
 

@@ -95,7 +95,7 @@ class VulkanWindow : public Window {
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
   bool hasIndependentPresentationTargets() const override;
   std::shared_ptr<Drawable> onNextDrawable() override;
-  bool onSupportsReadback() const override;
+  bool supportsReadback() const override;
 
  private:
   // PImpl: all Vulkan handles and swapchain state live in PlatformState (defined in .cpp) to avoid

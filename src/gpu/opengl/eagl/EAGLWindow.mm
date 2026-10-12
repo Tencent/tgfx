@@ -152,7 +152,4 @@ std::shared_ptr<RenderTargetProxy> EAGLWindow::onCreateRenderTarget(Context* con
   return result;
 }
 
-void EAGLWindow::onPresent(Context*, const std::vector<std::shared_ptr<RenderTargetProxy>>&) {
-  // Presentation is handled by EAGLRenderTargetProxy::onPresentFrame().
-}
 }  // namespace tgfx

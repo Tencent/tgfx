@@ -48,9 +48,9 @@ class D3D12SwapchainProxy : public RenderTargetProxy {
  public:
   D3D12SwapchainProxy(Context* context, IDXGISwapChain3* swapChain,
                       const std::vector<ComPtr<ID3D12Resource>>* backBuffers, unsigned format,
-                      int width, int height)
+                      int width, int height, bool vsyncEnabled)
       : _context(context), _swapChain(swapChain), _backBuffers(backBuffers), _format(format),
-        _width(width), _height(height) {
+        _width(width), _height(height), _vsyncEnabled(vsyncEnabled) {
   }
 
   Context* getContext() const override {
@@ -73,6 +73,24 @@ class D3D12SwapchainProxy : public RenderTargetProxy {
   }
   bool externallyOwned() const override {
     return true;
+  }
+
+  void onPresentFrame(Context*) override {
+    if (_swapChain == nullptr) {
+      return;
+    }
+    // With vsync on, SyncInterval=1 mirrors VK_PRESENT_MODE_FIFO_KHR (wait for vblank). With
+    // vsync off, SyncInterval=0 does NOT tear or present early here: the swap chain is created
+    // without DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING, so in windowed mode DWM still composites at
+    // vsync. It only releases the present call from blocking on vblank (intermediate frames may
+    // be dropped by DWM), which is what callers whose present thread must not stall on vsync
+    // need.
+    UINT syncInterval = _vsyncEnabled ? 1u : 0u;
+    auto hr = _swapChain->Present(syncInterval, 0);
+    if (FAILED(hr)) {
+      LOGE("D3D12SwapchainProxy: Present failed, HRESULT=0x%08X", static_cast<unsigned>(hr));
+    }
+    releaseFrame();
   }
   std::shared_ptr<TextureView> getTextureView() const override {
     return nullptr;
@@ -113,6 +131,7 @@ class D3D12SwapchainProxy : public RenderTargetProxy {
   unsigned _format = DXGI_FORMAT_R8G8B8A8_UNORM;
   int _width = 0;
   int _height = 0;
+  bool _vsyncEnabled = true;
   mutable std::shared_ptr<RenderTarget> _renderTarget = nullptr;
   mutable ID3D12Resource* _cachedBackBuffer = nullptr;
 };
@@ -433,31 +452,9 @@ std::shared_ptr<RenderTargetProxy> D3D12Window::onCreateRenderTarget(Context* co
   }
   // One proxy per Surface; it re-queries the current backbuffer on every getRenderTarget()
   // call to follow flip-model rotation. Allocating per frame would leak and skip rotation.
-  return std::make_shared<D3D12SwapchainProxy>(context, _platformState->swapChain.Get(),
-                                               &_platformState->backBuffers, _platformState->format,
-                                               _platformState->width, _platformState->height);
-}
-
-void D3D12Window::onPresent(Context*,
-                            const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets) {
-  if (_platformState->swapChain == nullptr) {
-    return;
-  }
-  bool vsync = vsyncEnabled();
-  // With vsync on, SyncInterval=1 mirrors VK_PRESENT_MODE_FIFO_KHR (wait for vblank). With vsync
-  // off, SyncInterval=0 does NOT tear or present early here: the swap chain is created without
-  // DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING, so in windowed mode DWM still composites at vsync. It only
-  // releases the present call from blocking on vblank (intermediate frames may be dropped by DWM),
-  // which is what callers whose present thread must not stall on vsync need.
-  UINT syncInterval = vsync ? 1u : 0u;
-  auto hr = _platformState->swapChain->Present(syncInterval, 0);
-  if (FAILED(hr)) {
-    LOGE("D3D12Window: Present failed, HRESULT=0x%08X", static_cast<unsigned>(hr));
-  }
-  for (const auto& renderTarget : renderTargets) {
-    auto proxy = std::static_pointer_cast<D3D12SwapchainProxy>(renderTarget);
-    proxy->releaseFrame();
-  }
+  return std::make_shared<D3D12SwapchainProxy>(
+      context, _platformState->swapChain.Get(), &_platformState->backBuffers,
+      _platformState->format, _platformState->width, _platformState->height, vsyncEnabled());
 }
 
 }  // namespace tgfx

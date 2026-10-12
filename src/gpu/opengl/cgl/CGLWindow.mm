@@ -97,7 +97,7 @@ std::shared_ptr<RenderTargetProxy> CGLWindow::onCreateRenderTarget(Context* cont
   return RenderTargetProxy::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 
-void CGLWindow::onPresent(Context*, const std::vector<std::shared_ptr<RenderTargetProxy>>&) {
+void CGLWindow::onPresent(Context*) {
   auto glContext = static_cast<CGLDevice*>(lockDevice().get())->glContext;
   [glContext flushBuffer];
 }

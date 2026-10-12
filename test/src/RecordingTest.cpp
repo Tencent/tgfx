@@ -47,9 +47,9 @@ class RecordingWindow final : public Window {
     return RenderTargetProxy::Make(context, 16, 16, false);
   }
 
-  void onPresent(Context*, const std::vector<std::shared_ptr<RenderTargetProxy>>&) override {
+  void onPresent(Context*) override {
     (*presentCount)++;
-    // The default proxy-level presentation forwards with an empty list; report the targets
+    // The proxy-level presentation forwards once per presented target; report the targets
     // created since the last present instead.
     *presentedTargetCount = createdTargets;
     createdTargets = 0;

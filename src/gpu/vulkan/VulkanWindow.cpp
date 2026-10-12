@@ -841,7 +841,7 @@ std::shared_ptr<Drawable> VulkanWindow::onNextDrawable() {
                               std::static_pointer_cast<VulkanWindow>(shared_from_this()));
 }
 
-bool VulkanWindow::onSupportsReadback() const {
+bool VulkanWindow::supportsReadback() const {
   return _platformState->supportsReadback;
 }
 

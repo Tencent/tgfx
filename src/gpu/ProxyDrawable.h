@@ -10,9 +10,9 @@
 //      https://opensource.org/licenses/BSD-3-Clause
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,23 +25,25 @@
 namespace tgfx {
 
 /**
- * The default Drawable implementation returned by Window::onNextDrawable(). The frame is resolved
- * through the window's onCreateRenderTarget() when it is imported into a Context, which keeps GL
- * and EAGL target creation on a current context, and presented through the window's
- * onPresent() with the frame's own render target.
+ * The generic Drawable implementation returned by Window::onNextDrawable(): it adapts the frame
+ * target and the presentation through a RenderTargetProxy created by the window. Backends with
+ * native frame objects (MetalDrawable, VulkanDrawable) subclass Drawable directly instead; they
+ * do not inherit from this class, which depends on the window's default target creation path.
+ * The frame is resolved through the window's onCreateRenderTarget() when it is imported into a
+ * Context, which keeps GL and EAGL target creation on a current context.
  */
-class WindowDrawable : public Drawable {
+class ProxyDrawable : public Drawable {
  public:
-  static std::shared_ptr<WindowDrawable> Make(std::shared_ptr<Window> window);
+  static std::shared_ptr<ProxyDrawable> Make(std::shared_ptr<Window> window);
 
-  ~WindowDrawable() override;
+  ~ProxyDrawable() override;
 
  protected:
   std::shared_ptr<RenderTargetProxy> onImport(Context* context) override;
   void onPresent(Context* context) override;
 
  private:
-  WindowDrawable(std::shared_ptr<ColorSpace> colorSpace);
+  ProxyDrawable(std::shared_ptr<ColorSpace> colorSpace);
 };
 
 }  // namespace tgfx

@@ -158,7 +158,7 @@ std::shared_ptr<Drawable> MetalWindow::onNextDrawable() {
   return MetalDrawable::Make(metalGPU, metalLayer, colorSpace());
 }
 
-bool MetalWindow::onSupportsReadback() const {
+bool MetalWindow::supportsReadback() const {
   // Reading back blits from the drawable texture, which requires sample/blit access.
   return metalLayer.framebufferOnly == NO;
 }

@@ -100,7 +100,7 @@ bool Drawable::canReadBack() const {
   if (window == nullptr) {
     return false;
   }
-  return window->onSupportsReadback();
+  return window->supportsReadback();
 }
 
 bool Drawable::requestPresent(Context* context) {

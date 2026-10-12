@@ -10,35 +10,35 @@
 //      https://opensource.org/licenses/BSD-3-Clause
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/WindowDrawable.h"
+#include "gpu/ProxyDrawable.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
 
-std::shared_ptr<WindowDrawable> WindowDrawable::Make(std::shared_ptr<Window> window) {
+std::shared_ptr<ProxyDrawable> ProxyDrawable::Make(std::shared_ptr<Window> window) {
   if (window == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<WindowDrawable>(new WindowDrawable(window->colorSpace()));
+  return std::shared_ptr<ProxyDrawable>(new ProxyDrawable(window->colorSpace()));
 }
 
-WindowDrawable::WindowDrawable(std::shared_ptr<ColorSpace> colorSpace)
+ProxyDrawable::ProxyDrawable(std::shared_ptr<ColorSpace> colorSpace)
     : Drawable(0, 0, std::move(colorSpace)) {
   // The frame size is not known until the frame is imported; Drawable::import() backfills it
   // from the resolved render target.
 }
 
-WindowDrawable::~WindowDrawable() {
+ProxyDrawable::~ProxyDrawable() {
   abandon();
 }
 
-std::shared_ptr<RenderTargetProxy> WindowDrawable::onImport(Context* context) {
+std::shared_ptr<RenderTargetProxy> ProxyDrawable::onImport(Context* context) {
   auto window = _window.lock();
   if (window == nullptr) {
     return nullptr;
@@ -51,7 +51,7 @@ std::shared_ptr<RenderTargetProxy> WindowDrawable::onImport(Context* context) {
   return renderTarget;
 }
 
-void WindowDrawable::onPresent(Context* context) {
+void ProxyDrawable::onPresent(Context* context) {
   if (_importedTarget == nullptr) {
     return;
   }

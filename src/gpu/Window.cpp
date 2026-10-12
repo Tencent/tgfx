@@ -10,15 +10,15 @@
 //      https://opensource.org/licenses/BSD-3-Clause
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Window.h"
 #include "core/utils/Log.h"
-#include "gpu/WindowDrawable.h"
+#include "gpu/ProxyDrawable.h"
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {
@@ -47,26 +47,19 @@ std::shared_ptr<Drawable> Window::nextDrawable() {
   }
   auto drawable = onNextDrawable();
   if (drawable != nullptr) {
-    // The frame handle keeps its window alive until the frame is delivered; device validation
-    // happens later, when the frame is imported into a Context.
+    // The frame holds its window only weakly (to break the device reference cycle); the
+    // Context's unsubmitted drawing buffers keep the window alive while the frame is
+    // undelivered. Device validation happens later, when the frame is imported into a Context.
     drawable->_window = shared_from_this();
   }
   return drawable;
 }
 
-bool Window::supportsReadback() const {
-  return onSupportsReadback();
-}
-
 std::shared_ptr<Drawable> Window::onNextDrawable() {
-  return WindowDrawable::Make(shared_from_this());
+  return ProxyDrawable::Make(shared_from_this());
 }
 
-bool Window::onSupportsReadback() const {
-  return false;
-}
-
-void Window::onPresent(Context*, const std::vector<std::shared_ptr<RenderTargetProxy>>&) {
+void Window::onPresent(Context*) {
 }
 
 bool Window::hasIndependentPresentationTargets() const {

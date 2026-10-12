@@ -20,7 +20,6 @@
 
 #include <memory>
 #include <mutex>
-#include <vector>
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/Device.h"
@@ -50,11 +49,12 @@ class Window : public std::enable_shared_from_this<Window> {
    * Acquires the usage right of the next single frame of this Window. No drawing Context is
    * involved: acquisition only talks to the platform presentation endpoint (drawable pool or
    * swapchain). Import the frame into a Context later via Surface::MakeFrom(context, drawable),
-   * then present it via Context::present(drawable). The returned Drawable keeps this Window
-   * alive until its frame is presented or discarded. Only one drawable should be held at a
-   * time, otherwise frame acquisition may stall. Returns nullptr if the window is not owned by
-   * a shared_ptr or cannot provide a frame right now (for example, the window has a zero size
-   * or the platform frame buffer is unavailable).
+   * then present it via Context::present(drawable). The returned Drawable holds its window only
+   * weakly; the Context's unsubmitted drawing buffers (and the Recordings created from them)
+   * keep the window alive while its frames are still undelivered. Only one drawable should be
+   * held at a time, otherwise frame acquisition may stall. Returns nullptr if the window is not
+   * owned by a shared_ptr or cannot provide a frame right now (for example, the window has a
+   * zero size or the platform frame buffer is unavailable).
    */
   std::shared_ptr<Drawable> nextDrawable();
 
@@ -62,9 +62,12 @@ class Window : public std::enable_shared_from_this<Window> {
    * Returns true when this window's frames can be copied before presentation, for example through
    * Surface::asyncReadPixels() on a Surface created from a Drawable. False on windows whose
    * platform frame buffer cannot act as a copy source (a CAMetalLayer with framebufferOnly set to
-   * YES, a Vulkan swapchain without TRANSFER_SRC usage, or a WebGPU canvas without CopySrc usage).
+   * YES, a Vulkan swapchain without TRANSFER_SRC usage, or a WebGPU canvas without CopySrc
+   * usage). The default implementation returns false.
    */
-  bool supportsReadback() const;
+  virtual bool supportsReadback() const {
+    return false;
+  }
 
   /**
    * Returns the color space associated with this Window. Returns nullptr for the default sRGB.
@@ -113,15 +116,14 @@ class Window : public std::enable_shared_from_this<Window> {
   virtual std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) = 0;
 
   /**
-   * Called after command buffer submission to present a group of render targets with the same
-   * presentation identity. Backends with a shared native backbuffer receive all render targets for
-   * the Window in one call. Backends with independent frame buffers receive one render target per
-   * call. The default implementation does nothing.
+   * Presents the window's shared native backbuffer after command buffer submission. Only
+   * backends where every proxy targets one shared backbuffer (GL) reach this entry point,
+   * through RenderTargetProxy's default presentation forwarding; backends with frame-level
+   * buffers (Metal, Vulkan, WebGPU, EAGL, QGL, D3D12) override the proxy hooks instead. The
+   * default implementation does nothing.
    * @param context The Context that submitted the rendering commands.
-   * @param renderTargets The render targets that produced the frame being presented.
    */
-  virtual void onPresent(Context* context,
-                         const std::vector<std::shared_ptr<RenderTargetProxy>>& renderTargets);
+  virtual void onPresent(Context* context);
 
   /**
    * Returns true if every RenderTargetProxy represents an independently presentable frame. The
@@ -132,17 +134,11 @@ class Window : public std::enable_shared_from_this<Window> {
   /**
    * Creates a backend-specific Drawable for nextDrawable(). Backends only talk to the platform
    * presentation endpoint here; the frame is imported into a Context later through
-   * Drawable::onImport(). The default implementation returns a WindowDrawable, which resolves its
+   * Drawable::onImport(). The default implementation returns a ProxyDrawable, which resolves its
    * frame through onCreateRenderTarget()/onPresent() at import time. Returns nullptr if the window
    * cannot provide a frame right now.
    */
   virtual std::shared_ptr<Drawable> onNextDrawable();
-
-  /**
-   * Returns true when this window's frames can act as a copy source before presentation. The
-   * default implementation returns false.
-   */
-  virtual bool onSupportsReadback() const;
 
  private:
   friend class Drawable;
@@ -150,7 +146,7 @@ class Window : public std::enable_shared_from_this<Window> {
   friend class DrawingManager;
   friend class Surface;
   friend class RenderTargetProxy;
-  friend class WindowDrawable;
+  friend class ProxyDrawable;
   friend class WindowFrame;
   friend class WindowSurface;
 };
