@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <meta name="viewport"
+          content="width=device-width,initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no"/>
+    <meta name="full-screen" content="true"/>
+    <title>Hello2D - async rendering (single threaded)</title>
+    <link rel="stylesheet" href="./index.css"/>
+    <style>
+        /* The canvas has no width/height attributes to lean on: the worker owns the backing store.
+           Sizing it with percentages instead of writing style.width/height on every resize keeps the
+           page from mutating the element while the worker is still catching up, which is what made
+           the canvas visibly jump for a frame. */
+        #hello2d {
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+<div id="container" class="container">
+    <canvas id="hello2d"></canvas>
+</div>
+<script type="module" src="./wasm/index-worker.js"></script>
+</body>
+</html>
