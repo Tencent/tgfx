@@ -827,7 +827,7 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* c
 std::shared_ptr<Drawable> VulkanWindow::onNextDrawable() {
   // The frame handle is created without a Context; its manual-present proxy is resolved when
   // the frame is imported (VulkanDrawable::onImport()).
-  auto device = lockDevice();
+  auto device = getDevice();
   if (device == nullptr) {
     return nullptr;
   }

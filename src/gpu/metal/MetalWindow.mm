@@ -145,7 +145,7 @@ std::shared_ptr<Drawable> MetalWindow::onNextDrawable() {
   if (!GetDrawableSize(metalLayer, metalView, &width, &height)) {
     return nullptr;
   }
-  auto device = lockDevice();
+  auto device = getDevice();
   if (device == nullptr) {
     return nullptr;
   }

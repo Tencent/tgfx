@@ -96,15 +96,6 @@ class Window : public std::enable_shared_from_this<Window> {
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
   const bool _vsyncEnabled = true;
 
-  /**
-   * Returns the device. Kept as an accessor for call sites written while the device was held
-   * weakly; it returns nullptr if the device has been released mid-window-lifetime, which can
-   * no longer happen while the window is alive.
-   */
-  std::shared_ptr<Device> lockDevice() const {
-    return _device;
-  }
-
   explicit Window(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace = nullptr,
                   bool vsyncEnabled = true);
   Window() = default;

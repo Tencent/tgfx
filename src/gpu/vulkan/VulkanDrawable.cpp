@@ -68,8 +68,9 @@ void VulkanDrawable::onAbandon() {
   if (_importedTarget == nullptr) {
     return;
   }
-  // The acquired image can no longer be presented; force a swapchain rebuild so the image and
-  // its semaphores are reclaimed without any GPU calls from here.
+  // The acquired image can no longer be presented; force a swapchain rebuild so the next proxy
+  // creation reclaims the image. The frame's semaphore is destroyed by releaseFrame() inside
+  // this device-synchronized scope (through the destructor's abandon() or onRelease()).
   auto proxy = std::static_pointer_cast<VulkanSwapchainProxy>(_importedTarget);
   proxy->discardFrame();
 }

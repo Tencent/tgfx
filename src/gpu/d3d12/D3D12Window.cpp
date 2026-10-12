@@ -414,7 +414,7 @@ D3D12Window::~D3D12Window() {
   //   keeps it alive; releasing the last reference means no submission is in flight;
   // - COM releases are thread-safe, and flip-model backbuffers stay valid even after the
   //   swap chain is gone.
-  auto device = lockDevice();
+  auto device = _device;
   auto* d3d12GPU = device != nullptr
                        ? static_cast<D3D12GPU*>(static_cast<D3D12Device*>(device.get())->_gpu)
                        : nullptr;
