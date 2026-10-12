@@ -67,7 +67,9 @@ std::optional<RRect> AnalyticShadowUtils::MakeShadowShape(const LayerStyleInput&
   // concentric RRects. The RRect draw op still approximates strokes that way when the corner
   // ellipse is not too elongated relative to the stroke width; accepting the same approximation
   // here is left as a possible future optimization.
-  if (styledShape.type != StyledShapeType::Fill) {
+  // An exact stroke outline is hard to express, so a FillStroke outline is treated as its fill
+  // outline outset by the stroke, ignoring the effect difference.
+  if (styledShape.type == StyledShapeType::Stroke) {
     return std::nullopt;
   }
 
@@ -96,10 +98,14 @@ std::optional<RRect> AnalyticShadowUtils::MakeShadowShape(const LayerStyleInput&
   // Shift the origin to the content image's top-left corner.
   result->offset(-input.contentOffset.x, -input.contentOffset.y);
 
-  if (!FloatNearlyZero(spread)) {
+  auto outset = spread;
+  if (styledShape.type == StyledShapeType::FillStroke) {
+    outset += SpreadUtils::StrokeOutset(styledShape.strokeWidth, styledShape.strokeAlign);
+  }
+  if (!FloatNearlyZero(outset)) {
     const auto scales = matrix.getAxisScales();
-    // Spread is measured in the layer's local space, so it scales with the geometry.
-    result = SpreadUtils::MakeSpreadRRect(*result, {spread * scales.x, spread * scales.y});
+    // The outset is measured in the layer's local space, so it scales with the geometry.
+    result = SpreadUtils::MakeSpreadRRect(*result, {outset * scales.x, outset * scales.y});
     DEBUG_ASSERT(!result->isComplex());
   }
   return result;
