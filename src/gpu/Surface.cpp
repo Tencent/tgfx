@@ -195,10 +195,12 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
     return false;
   }
   flush();
-  // Do not read back through the CPU mapping of the hardware buffer. The GPU writes to that buffer
-  // are not guaranteed to be visible to the CPU mapping, as no fence is attached to it, which
-  // produces corrupted pixels on some GPU drivers (such as the OpenHarmony emulator's GL).
-  // glReadPixels is fully synchronized with the rendered content.
+  // Do not read back through the CPU mapping of the hardware buffer. The old path already called
+  // submit(true) (glFinish) before HardwareBufferLock(), but on some OpenHarmony GL stacks the
+  // mapped memory still did not reflect the rendered content, so the corruption comes from the
+  // missing platform-side cache synchronization between the GL writer and the CPU mapping, not
+  // from unfinished GL commands. glReadPixels stays inside the GL domain and always reflects
+  // the rendered content.
   auto renderTarget = renderTargetProxy->getRenderTarget();
   if (renderTarget == nullptr) {
     return false;
