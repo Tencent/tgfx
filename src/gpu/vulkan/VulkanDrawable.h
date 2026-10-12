@@ -41,8 +41,6 @@ class VulkanDrawable : public Drawable, public VulkanResource {
 
  protected:
   std::shared_ptr<RenderTargetProxy> onImport(Context* context) override;
-  void onAttachSubmission(Context* context) override;
-  void onPresent(Context* context) override;
   void onAbandon() override;
   void onRelease(VulkanGPU* gpu) override;
 

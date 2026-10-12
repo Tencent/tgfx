@@ -35,6 +35,24 @@ MetalDrawableProxy::~MetalDrawableProxy() {
   [_metalDrawable release];
 }
 
+std::shared_ptr<MetalDrawableProxy> MetalDrawableProxy::WrapAcquiredDrawable(
+    Context* context, id<CAMetalDrawable> drawable, int width, int height, PixelFormat format) {
+  if (context == nullptr || drawable == nil) {
+    return nullptr;
+  }
+  auto proxy = std::shared_ptr<MetalDrawableProxy>(
+      new MetalDrawableProxy(context, width, height, nil, format));
+  // Take over the caller's (+1) reference; the destructor releases it.
+  proxy->_metalDrawable = drawable;
+  proxy->_renderTarget = RenderTarget::MakeFrom(
+      context, MetalDrawable::MakeBackendRenderTarget(drawable), ImageOrigin::TopLeft);
+  if (proxy->_renderTarget == nullptr) {
+    // The render target creation failed; do not schedule a present for this unusable frame.
+    return nullptr;
+  }
+  return proxy;
+}
+
 Context* MetalDrawableProxy::getContext() const {
   return _context;
 }
@@ -71,7 +89,7 @@ std::shared_ptr<RenderTarget> MetalDrawableProxy::getRenderTarget() const {
   if (_renderTarget == nullptr) {
     // Frame acquisition and texture wrapping are shared with MetalDrawable (the explicit
     // single-frame path) so the acquire/render/present mechanism exists exactly once. The
-    // presentation is scheduled by MetalWindow::onSchedulePresentation() at submission time,
+    // presentation is scheduled by this proxy's onSchedulePresentation() at submission time,
     // together with the explicit path.
     auto drawable = MetalDrawable::AcquireMetalDrawable(_metalLayer);
     if (drawable == nil) {

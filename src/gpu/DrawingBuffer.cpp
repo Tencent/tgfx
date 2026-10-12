@@ -10,18 +10,18 @@
 //      https://opensource.org/licenses/BSD-3-Clause
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingBuffer.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/GlobalCache.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/gpu/Drawable.h"
 #include "tgfx/gpu/GPU.h"
-#include "tgfx/gpu/Window.h"
 
 namespace tgfx {
 // We set the maxBlockSize to 2MB because allocating blocks that are too large can cause memory
@@ -60,32 +60,53 @@ std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
   return commandBuffer;
 }
 
-void DrawingBuffer::schedulePendingPresents(Context* context) {
-  for (auto& drawable : drawables) {
-    drawable->scheduleIfRequested(context, _uniqueID);
+void DrawingBuffer::attachFrameUsages(Context* context) {
+  for (auto& drawable : frameUsages) {
+    if (drawable->_importedTarget != nullptr) {
+      drawable->_importedTarget->onAttachSubmission(context);
+    }
   }
 }
 
-void DrawingBuffer::presentDrawables(Context* context) {
-  for (auto& drawable : drawables) {
-    drawable->onSubmissionCompleted(context, _uniqueID);
+void DrawingBuffer::schedulePresents(Context* context) {
+  for (auto& pending : presentables) {
+    if (pending.proxy != nullptr) {
+      pending.proxy->onSchedulePresentation(context);
+    }
   }
-  drawables.clear();
+}
+
+void DrawingBuffer::deliverFrames(Context* context) {
+  for (auto& drawable : frameUsages) {
+    drawable->markSubmitted();
+  }
+  frameUsages.clear();
+  for (auto& pending : presentables) {
+    if (pending.proxy != nullptr) {
+      pending.proxy->onPresentFrame(context);
+    }
+    if (pending.drawable != nullptr) {
+      pending.drawable->markPresented();
+    }
+  }
+  presentables.clear();
 }
 
 bool DrawingBuffer::empty() const {
-  // Note that drawables are intentionally not part of the emptiness check: drawable and window
+  // Note that frameUsages are intentionally not part of the emptiness check: drawable and window
   // surfaces are always created with clearAll set to true, so their construction already queues
   // a clear task, and collecting a frame therefore always comes with at least one task to
-  // encode. This is an implicit contract between RenderContext, DrawingManager, and Surface.
-  return resourceTasks.empty() && renderTasks.empty() && atlasTasks.empty();
+  // encode. Presentations, on the other hand, can be the only content of a batch (a
+  // Context::present() call after the frame's rendering was submitted) and must not be dropped.
+  return resourceTasks.empty() && renderTasks.empty() && atlasTasks.empty() && presentables.empty();
 }
 
 void DrawingBuffer::reset() {
   renderTasks.clear();
   resourceTasks.clear();
   atlasTasks.clear();
-  drawables.clear();
+  frameUsages.clear();
+  presentables.clear();
   vertexAllocator.clear(vertexMaxValueTracker.getMaxValue());
   instanceAllocator.clear(instanceMaxValueTracker.getMaxValue());
   drawingAllocator.clear(drawingMaxValueTracker.getMaxValue());

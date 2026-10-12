@@ -117,10 +117,19 @@ class RenderTargetProxy {
   virtual std::shared_ptr<RenderTarget> getRenderTarget() const = 0;
 
   /**
+   * Wires this target's frame into the upcoming render submission, before the command buffer
+   * that carries the frame's rendering is submitted. Called for every used frame, whether or not
+   * a presentation has been registered for it. The default implementation does nothing; backends
+   * whose render submission must synchronize with the frame acquisition (Vulkan's imageAvailable
+   * semaphore wait) override it.
+   */
+  virtual void onAttachSubmission(Context* context);
+
+  /**
    * Schedules this target's presentation onto the upcoming submission, before the command
-   * buffer that carries the frame's rendering is submitted. The default implementation does
-   * nothing; backends that encode the presentation into the command buffer (Metal's
-   * presentDrawable, Vulkan's PresentInfo) override it.
+   * buffer of the batch carrying the presentation request is submitted. The default
+   * implementation does nothing; backends that encode the presentation into the command buffer
+   * (Metal's presentDrawable, Vulkan's PresentInfo semaphore wiring) override it.
    */
   virtual void onSchedulePresentation(Context* context);
 

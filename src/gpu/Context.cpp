@@ -145,11 +145,13 @@ void Context::submit(std::unique_ptr<Recording> recording, bool syncCpu) {
           queue->waitSemaphore(std::move(semaphore));
         }
       }
-      // Attach the pending presentation requests to this buffer's command buffer, so each
-      // presentation is encoded with the submission that carries its frame's rendering.
-      drawingBuffer->schedulePendingPresents(this);
+      // Wire the frame synchronizations into the upcoming submission, then attach the batch's
+      // presentation requests, so each presentation is encoded/ordered with the command buffer
+      // of the batch it was registered on.
+      drawingBuffer->attachFrameUsages(this);
+      drawingBuffer->schedulePresents(this);
       queue->submit(std::move(commandBuffer));
-      drawingBuffer->presentDrawables(this);
+      drawingBuffer->deliverFrames(this);
       pendingDrawingBuffers.pop_front();
       if (isLast) {
         break;
@@ -176,7 +178,12 @@ void Context::present(std::shared_ptr<Drawable> drawable) {
   if (drawable == nullptr) {
     return;
   }
-  drawable->requestPresent(this);
+  // present() only registers the request on the current recording batch and closes the frame;
+  // it never flushes or submits other work. The presentation is executed when that batch is
+  // submitted, ordered after the frame's rendering and all earlier batches.
+  if (drawable->requestPresent(this)) {
+    _drawingManager->registerPresentation(std::move(drawable));
+  }
 }
 
 size_t Context::memoryUsage() const {

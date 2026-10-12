@@ -178,15 +178,20 @@ void DrawingManager::collectDrawable(std::shared_ptr<Drawable> drawable) {
     return;
   }
   auto drawingBuffer = getDrawingBuffer();
-  // Record the buffer that last collected the frame; only that buffer schedules and delivers
-  // the presentation later, keeping it ordered after all of the frame's recorded commands.
-  drawable->noteCollectedBuffer(drawingBuffer->uniqueID());
-  for (auto& pendingDrawable : drawingBuffer->drawables) {
+  for (auto& pendingDrawable : drawingBuffer->frameUsages) {
     if (pendingDrawable == drawable) {
       return;
     }
   }
-  drawingBuffer->drawables.push_back(std::move(drawable));
+  drawingBuffer->frameUsages.push_back(std::move(drawable));
+}
+
+void DrawingManager::registerPresentation(std::shared_ptr<Drawable> drawable) {
+  if (drawable == nullptr) {
+    return;
+  }
+  auto drawingBuffer = getDrawingBuffer();
+  drawingBuffer->presentables.push_back({drawable, drawable->_importedTarget});
 }
 
 void DrawingManager::collectWindow(std::shared_ptr<Window> window,
@@ -195,10 +200,11 @@ void DrawingManager::collectWindow(std::shared_ptr<Window> window,
     return;
   }
   auto drawingBuffer = getDrawingBuffer();
-  // The automatic path shares the drawable pipeline: each flush cycle collects a WindowFrame per
-  // window (per target for backends with independent presentation targets), which registers its
-  // presentation at construction and is delivered by presentDrawables() after submission. The
-  // per-window map finds the current buffer's frame without type-identifying the drawables.
+  // The automatic path shares the frame pipeline: each flush cycle collects a WindowFrame per
+  // window (per target for backends with independent presentation targets) into the drawing
+  // buffer's frame list, registers its presentation on the batch, and the presentation is
+  // delivered by deliverFrames() after submission. The per-window map finds the current buffer's
+  // frame without type-identifying the drawables.
   auto independentTargets = window->hasIndependentPresentationTargets();
   auto iter = pendingWindowFrames.find(window.get());
   if (iter != pendingWindowFrames.end()) {
@@ -215,8 +221,8 @@ void DrawingManager::collectWindow(std::shared_ptr<Window> window,
   auto* windowKey = window.get();
   auto frame = WindowFrame::Make(window, std::move(renderTarget));
   if (frame != nullptr) {
-    frame->noteCollectedBuffer(drawingBuffer->uniqueID());
-    drawingBuffer->drawables.push_back(frame);
+    drawingBuffer->frameUsages.push_back(frame);
+    drawingBuffer->presentables.push_back({frame, frame->primaryTarget()});
     pendingWindowFrames[windowKey] = std::move(frame);
     pendingWindows.push_back(std::move(window));
   }

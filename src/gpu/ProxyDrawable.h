@@ -40,7 +40,6 @@ class ProxyDrawable : public Drawable {
 
  protected:
   std::shared_ptr<RenderTargetProxy> onImport(Context* context) override;
-  void onPresent(Context* context) override;
 
  private:
   ProxyDrawable(std::shared_ptr<ColorSpace> colorSpace);

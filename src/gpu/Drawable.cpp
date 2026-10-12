@@ -10,9 +10,9 @@
 //      https://opensource.org/licenses/BSD-3-Clause
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,22 +28,14 @@ Drawable::Drawable(int width, int height, std::shared_ptr<ColorSpace> colorSpace
     : _width(width), _height(height), _colorSpace(std::move(colorSpace)) {
 }
 
-void Drawable::onAttachSubmission(Context*) {
-}
-
-bool Drawable::onSchedulePresent(Context*) {
-  return false;
-}
-
 void Drawable::onAbandon() {
 }
 
 void Drawable::abandon() {
-  if (_delivery == Delivery::Presented || _delivery == Delivery::Abandoned) {
+  if (_delivery == Delivery::Presented) {
     return;
   }
   onAbandon();
-  _delivery = Delivery::Abandoned;
   releaseFrameHandles();
 }
 
@@ -86,10 +78,10 @@ bool Drawable::isFrameOpen() const {
 }
 
 bool Drawable::canReadBack() const {
-  // The frame must still be valid: presented or abandoned frames are terminal states, a
-  // presentation has already been registered for PresentRequested frames (later readbacks would
-  // be ordered after the presentation), and releaseFrameHandles() has already cleared _window
-  // for them, so check the delivery state before dereferencing _window.
+  // The frame must still be valid: presented frames are terminal states, a presentation has
+  // already been registered for PresentRequested frames (later readbacks would be ordered after
+  // the presentation), and releaseFrameHandles() has already cleared _window for them, so check
+  // the delivery state before dereferencing _window.
   if (_delivery != Delivery::Imported && _delivery != Delivery::Submitted) {
     return false;
   }
@@ -116,64 +108,25 @@ bool Drawable::requestPresent(Context* context) {
       return false;
     }
   }
-  if (_delivery == Delivery::Imported) {
-    // The frame's rendering has not been submitted yet: register the request on this frame. The
-    // request rides along with the submission of the drawing buffer that carries the frame's
-    // rendering commands (see scheduleIfRequested()), so the presentation is never consumed by
-    // an unrelated earlier submission.
+  if (_delivery == Delivery::Imported || _delivery == Delivery::Submitted) {
+    // Close the frame for further drawing; the caller records the presentation request on the
+    // current recording batch, so it is delivered by the submission of that batch — ordered
+    // after the frame's rendering commands and any still-pending work of earlier batches.
     _delivery = Delivery::PresentRequested;
-    return true;
-  }
-  if (_delivery == Delivery::Submitted) {
-    // The rendering has been submitted (for example a readback was scheduled in between): flush
-    // and submit any pending work first — readback transfers scheduled after the frame's
-    // rendering submission are still unsubmitted at this point and must be submitted before the
-    // presentation, otherwise they would execute on an already-presented frame. This is a no-op
-    // when there is nothing pending. Then present immediately, ordered after all submitted work.
-    context->flushAndSubmit();
-    onPresent(context);
-    _delivery = Delivery::Presented;
-    releaseFrameHandles();
     return true;
   }
   LOGE("Drawable::requestPresent() The frame is not in a presentable state!");
   return false;
 }
 
-void Drawable::scheduleIfRequested(Context* context, uint32_t bufferID) {
-  // Wire every undelivered frame into the submission of the drawing buffer that carries its
-  // rendering commands, so the wiring (and any registered presentation) is ordered with that
-  // submission and never consumed by an unrelated earlier submission. Only the buffer that
-  // last collected the frame may schedule the presentation, so it is ordered after all of the
-  // frame's recorded commands (earlier buffers may also hold a copy of the frame).
-  if (bufferID != _lastCollectedBufferID) {
-    return;
-  }
-  if (_delivery == Delivery::PresentRequested) {
-    onAttachSubmission(context);
-    _presentationAttached = onSchedulePresent(context);
-  } else if (_delivery == Delivery::Imported) {
-    // The rendering is submitted without a registered presentation (Context::present() may
-    // still come later, on the Submitted path); backends that need submission-time
-    // synchronization with the frame acquisition still wire it here.
-    onAttachSubmission(context);
+void Drawable::markSubmitted() {
+  if (_delivery == Delivery::Imported) {
+    _delivery = Delivery::Submitted;
   }
 }
 
-void Drawable::onSubmissionCompleted(Context* context, uint32_t bufferID) {
-  if (_delivery == Delivery::Imported) {
-    _delivery = Delivery::Submitted;
-    return;
-  }
+void Drawable::markPresented() {
   if (_delivery == Delivery::PresentRequested) {
-    if (bufferID != _lastCollectedBufferID) {
-      // An earlier buffer that also holds this frame has completed; the presentation stays
-      // pending for the buffer that last collected the frame.
-      return;
-    }
-    if (!_presentationAttached) {
-      onPresent(context);
-    }
     _delivery = Delivery::Presented;
     releaseFrameHandles();
   }

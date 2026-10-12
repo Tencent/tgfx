@@ -64,26 +64,6 @@ std::shared_ptr<RenderTargetProxy> VulkanDrawable::onImport(Context* context) {
   return vulkanWindow->createSwapchainProxy(context, true);
 }
 
-void VulkanDrawable::onAttachSubmission(Context*) {
-  // Wire the manual frame's acquire/present semaphore pair into the upcoming render submission,
-  // regardless of whether the presentation has been registered: the render submission must wait
-  // for the acquire semaphore, and manual presentations always defer the actual vkQueuePresentKHR
-  // to onPresent() -> presentFrame().
-  if (_importedTarget == nullptr) {
-    return;
-  }
-  auto proxy = std::static_pointer_cast<VulkanSwapchainProxy>(_importedTarget);
-  proxy->schedulePresent();
-}
-
-void VulkanDrawable::onPresent(Context*) {
-  if (_importedTarget == nullptr) {
-    return;
-  }
-  auto proxy = std::static_pointer_cast<VulkanSwapchainProxy>(_importedTarget);
-  proxy->presentFrame();
-}
-
 void VulkanDrawable::onAbandon() {
   if (_importedTarget == nullptr) {
     return;

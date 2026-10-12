@@ -10,9 +10,9 @@
 //      https://opensource.org/licenses/BSD-3-Clause
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,10 +32,12 @@ class Window;
  * the frame identity and its delivery state: it holds no drawing Context and never references a
  * Surface. The frame is imported into a Context via Surface::MakeFrom(context, drawable), which
  * resolves backend targets that need a current context, and is presented via
- * Context::present(drawable). Readback goes through Surface::asyncReadPixels() until a
- * presentation is registered or the frame is presented, and only if the frame's window supports
- * readback (see Window::supportsReadback()). Dropping a Drawable without presenting it discards
- * the frame; backends release it without any GPU calls.
+ * Context::present(drawable), which registers the presentation on the current recording batch;
+ * the presentation is executed when that batch is submitted. Readback goes through
+ * Surface::asyncReadPixels() until a presentation is registered or the frame is presented, and
+ * only if the frame's window supports readback (see Window::supportsReadback()). Dropping a
+ * Drawable without presenting it discards the frame; backends release it within their
+ * device-synchronized scopes (see the backend Resource onRelease() mechanisms).
  */
 class Drawable {
  public:
@@ -74,35 +76,10 @@ class Drawable {
   virtual std::shared_ptr<RenderTargetProxy> onImport(Context* context) = 0;
 
   /**
-   * Called while the DrawingBuffer that carries the frame's rendering commands is about to be
-   * submitted — for every undelivered frame, whether or not a presentation has been registered.
-   * Backends whose render submission must synchronize with the frame acquisition (Vulkan's
-   * imageAvailable semaphore wait) override this to wire that synchronization into the upcoming
-   * submission. The default implementation does nothing.
-   */
-  virtual void onAttachSubmission(Context* context);
-
-  /**
-   * Called when the DrawingBuffer that carries the frame's rendering commands is about to be
-   * submitted, after a presentation was requested via Context::present() while the rendering was
-   * still unsubmitted. Returns true when the presentation is attached to that submission itself
-   * (for example encoded into its command buffer), in which case the submit pipeline only marks
-   * the frame presented. The default implementation returns false, which defers to onPresent()
-   * at the end of that submission. Binding the scheduling to the frame's own drawing buffer
-   * keeps the presentation ordered after the frame's rendering even when unrelated recordings
-   * are submitted in between.
-   */
-  virtual bool onSchedulePresent(Context* context);
-
-  /**
-   * Presents the frame. The frame's rendering commands have been submitted; the presentation must
-   * be ordered after them without blocking the CPU. The Context is still valid and current.
-   */
-  virtual void onPresent(Context* context) = 0;
-
-  /**
-   * Discards the frame without presenting it. No GPU calls are allowed; backends only release
-   * CPU-side references and mark state for later recovery.
+   * Discards the frame without presenting it. Implementations must not issue GPU calls from
+   * arbitrary threads; backend cleanup runs within the device's synchronized scope (for example
+   * through the Resource onRelease() mechanisms). Only backends with independent discard duties
+   * (Vulkan's swapchain out-of-date recovery) override this.
    */
   virtual void onAbandon();
 
@@ -141,7 +118,6 @@ class Drawable {
     Submitted,
     PresentRequested,
     Presented,
-    Abandoned,
   };
 
   // Imports the frame while the Context is locked. Returns nullptr if the frame was already
@@ -158,35 +134,22 @@ class Drawable {
   // capability: a frame can be perfectly renderable on a window that does not support readback.
   bool isFrameOpen() const;
 
-  // Registers or executes a presentation request. Returns false on an invalid delivery state.
+  // Registers a presentation request for the frame and closes it for further drawing. Returns
+  // false on an invalid delivery state; the caller (Context::present()) records the request on
+  // the current recording batch when this succeeds.
   bool requestPresent(Context* context);
 
-  // Called while the drawing buffer that collected this frame is being submitted: schedules
-  // the presentation onto that submission for frames whose presentation was requested before
-  // their rendering was submitted. Only the buffer that last collected the frame schedules or
-  // delivers the presentation, so it is ordered after all of the frame's recorded commands
-  // (a frame may be collected into several buffers when the surface keeps drawing after a
-  // flush).
-  void scheduleIfRequested(Context* context, uint32_t bufferID);
+  // Marks the frame as submitted after the drawing batch carrying its rendering commands has
+  // been handed to the GPU queue.
+  void markSubmitted();
 
-  // Advances the delivery state after the drawing buffer that collected this frame has been
-  // submitted. See scheduleIfRequested() for the buffer scoping.
-  void onSubmissionCompleted(Context* context, uint32_t bufferID);
+  // Marks the frame as presented after the batch carrying its presentation request has been
+  // submitted, and drops the references that are only needed while the frame is undelivered.
+  void markPresented();
 
   // Drops the strong references that are only needed while the frame is undelivered.
   void releaseFrameHandles();
 
-  // Records the drawing buffer that last collected this frame. Called by
-  // DrawingManager::collectDrawable().
-  void noteCollectedBuffer(uint32_t bufferID) {
-    _lastCollectedBufferID = bufferID;
-  }
-
-  // Records the buffer that last collected this frame; only that buffer schedules and
-  // delivers the presentation. Updated by DrawingManager::collectDrawable().
-  uint32_t _lastCollectedBufferID = 0;
-
-  bool _presentationAttached = false;
   Delivery _delivery = Delivery::Acquired;
   int _width = 0;
   int _height = 0;

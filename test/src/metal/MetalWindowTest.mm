@@ -221,10 +221,10 @@ TGFX_TEST(MetalWindowTest, ReadbackBeforePresent) {
   auto readback = surface->asyncReadPixels(Rect::MakeXYWH(8, 8, 1, 1));
   ASSERT_TRUE(readback != nullptr);
 
-  // Present submits the pending readback first, then presents the frame.
+  // Present registers the request on the current batch; submitting that batch runs the pending
+  // readback transfer first (earlier batches are always submitted first), then presents.
   context->present(drawable);
-  // The pending work was consumed by present().
-  EXPECT_FALSE(context->flushAndSubmit());
+  EXPECT_TRUE(context->flushAndSubmit(true));
 
   // The readback completed with the frame's content.
   auto pixels = readback->lockPixels(context);

@@ -10,9 +10,9 @@
 //      https://opensource.org/licenses/BSD-3-Clause
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -56,38 +56,18 @@ void WindowFrame::addTarget(std::shared_ptr<RenderTargetProxy> renderTarget) {
   }
 }
 
-bool WindowFrame::isForWindow(const std::shared_ptr<Window>& window) const {
-  return _window.lock() == window;
-}
-
 bool WindowFrame::hasTarget(const std::shared_ptr<RenderTargetProxy>& renderTarget) const {
   return std::find(renderTargets.begin(), renderTargets.end(), renderTarget) != renderTargets.end();
+}
+
+std::shared_ptr<RenderTargetProxy> WindowFrame::primaryTarget() const {
+  return renderTargets.empty() ? nullptr : renderTargets.front();
 }
 
 std::shared_ptr<RenderTargetProxy> WindowFrame::onImport(Context*) {
   // Automatic frames are never imported: the window surface's stable proxy provides the render
   // target directly. The frame only carries the presentation.
   return nullptr;
-}
-
-bool WindowFrame::onSchedulePresent(Context* context) {
-  // Scheduling the presentation onto the upcoming submission is a side effect (backends encode
-  // presentDrawable/PresentInfo here). Always return false: unlike explicit drawables, an
-  // automatic frame still needs its onPresent() after the submission, which performs the
-  // backend's frame release (Metal's releaseDrawable) or swap (GL).
-  for (auto& renderTarget : renderTargets) {
-    renderTarget->onSchedulePresentation(context);
-  }
-  return false;
-}
-
-void WindowFrame::onPresent(Context* context) {
-  // Shared-backbuffer backends (GL, D3D12) swap once for the aggregated frame; frame-level
-  // backends present each target. Independent backends never aggregate targets into one frame,
-  // so front() is the single target there.
-  if (!renderTargets.empty()) {
-    renderTargets.front()->onPresentFrame(context);
-  }
 }
 
 }  // namespace tgfx

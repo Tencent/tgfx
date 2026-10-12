@@ -29,6 +29,17 @@ class MetalDrawableProxy : public RenderTargetProxy {
                      PixelFormat format);
   ~MetalDrawableProxy() override;
 
+  /**
+   * Wraps a drawable that has already been acquired (the explicit single-frame path,
+   * MetalDrawable::onImport()) so the presentation is carried by this proxy's hooks exactly
+   * once for both the explicit and the automatic path. Takes over the caller's (+1) reference.
+   * Returns nullptr if the drawable's render target cannot be created.
+   */
+  static std::shared_ptr<MetalDrawableProxy> WrapAcquiredDrawable(Context* context,
+                                                                  id<CAMetalDrawable> drawable,
+                                                                  int width, int height,
+                                                                  PixelFormat format);
+
   Context* getContext() const override;
   int width() const override;
   int height() const override;

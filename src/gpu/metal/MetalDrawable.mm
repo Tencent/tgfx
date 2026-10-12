@@ -18,13 +18,13 @@
 
 #include "MetalDrawable.h"
 #import <Metal/Metal.h>
-#include "gpu/metal/MetalCommandQueue.h"
+#include "gpu/metal/MetalDefines.h"
+#include "gpu/metal/MetalDrawableProxy.h"
 #include "gpu/metal/MetalGPU.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/GPU.h"
-#include "tgfx/gpu/metal/MetalTypes.h"
 
 namespace tgfx {
 
@@ -82,27 +82,16 @@ void MetalDrawable::onRelease(MetalGPU*) {
 }
 
 std::shared_ptr<RenderTargetProxy> MetalDrawable::onImport(Context* context) {
-  return RenderTargetProxy::MakeFrom(context, MakeBackendRenderTarget(_metalDrawable),
-                                     ImageOrigin::TopLeft);
-}
-
-bool MetalDrawable::onSchedulePresent(Context* context) {
-  // Attach the presentation to the upcoming command buffer, so that the presentation waits for
-  // the GPU to finish rendering before the frame is displayed.
-  auto metalQueue = static_cast<MetalCommandQueue*>(context->gpu()->queue());
-  metalQueue->schedulePresent(_metalDrawable);
-  return true;
-}
-
-void MetalDrawable::onPresent(Context*) {
-  // Presenting the drawable directly schedules the presentation after all command buffers that
-  // have been enqueued so far, so the GPU finishes rendering before the frame is displayed.
-  // Release the drawable right after the presentation is scheduled so it returns to the layer's
-  // rotation pool immediately (the presentation keeps its own reference); onRelease() is a
-  // nil-safe no-op afterwards.
-  [_metalDrawable present];
-  [_metalDrawable release];
+  // Wrap the acquired drawable in the automatic path's proxy so the presentation is carried by
+  // the proxy hooks (onSchedulePresentation/onPresentFrame) exactly once for both paths. The
+  // proxy takes over the (+1) drawable reference; onRelease() is a nil-safe no-op afterwards.
+  auto texture = [_metalDrawable texture];
+  auto format = MetalPixelFormatToPixelFormat(static_cast<unsigned>(texture.pixelFormat));
+  auto proxy = MetalDrawableProxy::WrapAcquiredDrawable(context, _metalDrawable,
+                                                        static_cast<int>(texture.width),
+                                                        static_cast<int>(texture.height), format);
   _metalDrawable = nil;
+  return proxy;
 }
 
 }  // namespace tgfx

@@ -51,11 +51,4 @@ std::shared_ptr<RenderTargetProxy> ProxyDrawable::onImport(Context* context) {
   return renderTarget;
 }
 
-void ProxyDrawable::onPresent(Context* context) {
-  if (_importedTarget == nullptr) {
-    return;
-  }
-  _importedTarget->onPresentFrame(context);
-}
-
 }  // namespace tgfx

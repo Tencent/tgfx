@@ -83,10 +83,16 @@ class DrawingManager {
                         std::shared_ptr<ImageCodec> codec);
 
   /**
-   * Collects a drawable-backed frame so that its delivery state is advanced when the submission
+   * Collects a drawable-backed frame so that it is marked as submitted when the submission
    * carrying its rendering commands completes.
    */
   void collectDrawable(std::shared_ptr<Drawable> drawable);
+
+  /**
+   * Registers a presentation request on the current recording batch (called by
+   * Context::present()). The request is delivered by the submission of that batch.
+   */
+  void registerPresentation(std::shared_ptr<Drawable> drawable);
 
   /**
    * Collects an automatic presentation frame for the given window and render target. Each flush

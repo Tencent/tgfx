@@ -138,11 +138,10 @@ std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
 }
 
 void VulkanSwapchainProxy::schedulePresent() {
-  // Called at submission time (VulkanWindow::onSchedulePresentation() for the automatic path,
-  // the drawable pipeline for the explicit path), so the presentation is registered with the
-  // submission that carries the frame's rendering commands. In manual present mode the
-  // registration only wires the acquire/present semaphore pair; the actual vkQueuePresentKHR is
-  // deferred to presentFrame().
+  // Called at submission time (onAttachSubmission()/onSchedulePresentation()), so the
+  // presentation is registered with the submission that carries the frame's rendering commands.
+  // In manual present mode the registration only wires the acquire/present semaphore pair; the
+  // actual vkQueuePresentKHR is deferred to presentFrame().
   if (_renderTarget == nullptr || _pendingImageAvailableSemaphore == VK_NULL_HANDLE) {
     return;
   }
@@ -154,12 +153,27 @@ void VulkanSwapchainProxy::schedulePresent() {
   _pendingImageAvailableSemaphore = VK_NULL_HANDLE;
 }
 
+void VulkanSwapchainProxy::onAttachSubmission(Context*) {
+  // Wire the manual frame's acquire/present semaphore pair into the upcoming render submission,
+  // regardless of whether a presentation has been registered for this batch: the render
+  // submission must always wait for the acquire semaphore. The wiring is idempotent; batches
+  // that also carry the presentation request wire it through onSchedulePresentation() instead.
+  schedulePresent();
+}
+
 void VulkanSwapchainProxy::onSchedulePresentation(Context*) {
+  // Wire the frame's acquire/present semaphore pair into the submission of the batch carrying
+  // the presentation request. In manual present mode the registration only wires the semaphore
+  // pair; the actual vkQueuePresentKHR is deferred to onPresentFrame() -> presentFrame().
   schedulePresent();
 }
 
 void VulkanSwapchainProxy::onPresentFrame(Context*) {
-  releaseFrame();
+  if (_manualPresent) {
+    presentFrame();
+  } else {
+    releaseFrame();
+  }
 }
 
 bool VulkanSwapchainProxy::hasPendingFrame() const {

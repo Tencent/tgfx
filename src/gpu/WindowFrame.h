@@ -10,9 +10,9 @@
 //      https://opensource.org/licenses/BSD-3-Clause
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,13 +28,13 @@ class RenderTargetProxy;
 
 /**
  * The automatic presentation frame of Surface::MakeFrom(context, window). Each flush cycle of a
- * window surface collects one WindowFrame per window into the drawing buffer's drawable list, so
+ * window surface collects one WindowFrame per window into the drawing buffer's frame list, so
  * the automatic path shares the single collection/delivery pipeline with explicit drawables:
- * the frame registers its presentation at construction (instead of Context::present()), the
- * submission pipeline schedules it through the render targets' proxies (which present without
- * needing the window on frame-level backends), and delivers it after submission. The frame
- * holds its window weakly: presenting must not keep the window (and through it the device)
- * alive, so a flushed buffer never forms a device reference cycle.
+ * the frame registers its presentation on the batch at construction (instead of through
+ * Context::present()), and the submission pipeline schedules and delivers it through the render
+ * targets' proxies (which present without needing the window on frame-level backends). The
+ * frame holds its window weakly: presenting must not keep the window (and through it the
+ * device) alive, so a flushed buffer never forms a device reference cycle.
  */
 class WindowFrame : public Drawable {
  public:
@@ -53,22 +53,17 @@ class WindowFrame : public Drawable {
   void addTarget(std::shared_ptr<RenderTargetProxy> renderTarget);
 
   /**
-   * Returns true when this frame presents the given window. Frames stop matching after delivery
-   * (their window reference is released).
-   */
-  bool isForWindow(const std::shared_ptr<Window>& window) const;
-
-  /**
    * Returns true when the given render target is already part of this frame.
    */
   bool hasTarget(const std::shared_ptr<RenderTargetProxy>& renderTarget) const;
 
+  /**
+   * Returns the render target that carries this frame's presentation.
+   */
+  std::shared_ptr<RenderTargetProxy> primaryTarget() const;
+
  protected:
   std::shared_ptr<RenderTargetProxy> onImport(Context* context) override;
-
-  bool onSchedulePresent(Context* context) override;
-
-  void onPresent(Context* context) override;
 
  private:
   WindowFrame(std::shared_ptr<Window> window, std::shared_ptr<RenderTargetProxy> renderTarget);

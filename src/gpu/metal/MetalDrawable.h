@@ -61,8 +61,6 @@ class MetalDrawable : public Drawable, public MetalResource {
 
  protected:
   std::shared_ptr<RenderTargetProxy> onImport(Context* context) override;
-  bool onSchedulePresent(Context* context) override;
-  void onPresent(Context* context) override;
 
  protected:
   void onRelease(MetalGPU* gpu) override;

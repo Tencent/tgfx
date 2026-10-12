@@ -78,6 +78,9 @@ std::shared_ptr<DepthStencilTextureView> RenderTargetProxy::getOrAllocateStencil
   return stencilAttachment;
 }
 
+void RenderTargetProxy::onAttachSubmission(Context*) {
+}
+
 void RenderTargetProxy::onSchedulePresentation(Context*) {
 }
 
