@@ -125,7 +125,7 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
                            PlacementPtr<DrawOp>* originalDraw) -> PlacementPtr<RenderTask> {
     const auto& firstPass = taskPlan.passes.front();
     bool kernelRoutable = firstPass.kernel == AOTKernelKind::PointwiseTail ||
-                          firstPass.kernel == AOTKernelKind::PointwiseChain ||
+                          IsAOTPointwiseDAGKernel(firstPass.kernel) ||
                           firstPass.kernel == AOTKernelKind::PerlinNoiseFill;
     // Only single-pass plans may route to the precompiled kernels. A multi-pass tail plan
     // materializes RGBA8 intermediates: every boundary quantizes to the 1/255 grid, and a

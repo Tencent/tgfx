@@ -63,7 +63,7 @@ vec4 evalChainSlot(int slot) {
   if (Packed.x == OP_NONE) {
     return vec4(0.0);
   }
-#if HAS_NOISE
+#ifdef TGFX_POINTWISE_NOISE
   if (Packed.x == OP_PERLIN_NOISE) {
     highp vec2 coord = GradientCoords.xy / GradientCoords.z;
     return aotPerlinNoise(coord, NoiseFrequencyStitch.xy, NoiseFrequencyStitch.zw,

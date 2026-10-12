@@ -23,6 +23,7 @@
 #include "gpu/processors/AOTPointwiseTailProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
+#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 
 namespace tgfx {
 
@@ -372,6 +373,7 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
   int textureLeaves = 0;
   int noiseSources = 0;
   int gradients = 0;
+  size_t tiledRecipes = 0;
   for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
     if (!reachable[index]) {
       continue;
@@ -393,6 +395,11 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
           return false;
         }
         ++textureLeaves;
+        if (parameters->tiledRecipe.has_value() &&
+            (parameters->tiledRecipe->shaderModeX != TiledTextureShaderMode::None ||
+             parameters->tiledRecipe->shaderModeY != TiledTextureShaderMode::None)) {
+          ++tiledRecipes;
+        }
         break;
       }
       case AOTEffectKind::ColorMatrix:
@@ -434,7 +441,17 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
   }
   AOTEffectPlan result = {};
   AOTPassDescriptor pass = {};
-  pass.kernel = AOTKernelKind::PointwiseChain;
+  AOTResourceDemand demand = {};
+  demand.leafBindings = static_cast<size_t>(textureLeaves);
+  demand.tiledRecipes = tiledRecipes;
+  demand.noiseSources = static_cast<size_t>(noiseSources);
+  demand.gradients = static_cast<size_t>(gradients);
+  pass.resourceProfile = SelectAOTResourceProfile(demand);
+  if (pass.resourceProfile == AOTResourceProfile::Automatic) {
+    return false;
+  }
+  pass.kernel = IsAOTGraphProfile(pass.resourceProfile) ? AOTKernelKind::PointwiseGraph
+                                                        : AOTKernelKind::PointwiseChain;
   pass.output = graph.root();
   pass.materializesOutput = false;
   for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
@@ -456,7 +473,7 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
 
 bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
   // Keep simple noise on the existing compact kernel. Noise DAGs and ordinary pointwise DAGs
-  // use the chain when they fit its instruction and sampler budgets, without materialization.
+  // use their separate graph/chain families within shared budgets, without materialization.
   // Device-space and YUV sources retain their dedicated tail/source planners.
   if (DecomposePerlinNoiseChain(graph, plan)) {
     return true;
@@ -563,6 +580,15 @@ AOTFoldRouteOutcome AOTEffectDecomposer::AnalyzeFoldRoute(const ProgramInfo* pro
   if (gp == nullptr || (gp->name() != "DefaultGeometryProcessor" &&
                         gp->name() != "QuadPerEdgeAAGeometryProcessor")) {
     return AOTFoldRouteOutcome::GPIncompatible;
+  }
+  if (plan.passes.size() == 1 && plan.passes[0].kernel == AOTKernelKind::PointwiseGraph) {
+    if (gp->name() != "QuadPerEdgeAAGeometryProcessor") {
+      return AOTFoldRouteOutcome::GPIncompatible;
+    }
+    const auto* quad = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+    if (!quad->hasCommonColor() || !quad->hasUVMatrix() || quad->getHasSubset()) {
+      return AOTFoldRouteOutcome::GPIncompatible;
+    }
   }
   return AOTFoldRouteOutcome::Routable;
 }

@@ -23,6 +23,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include "gpu/AOTResourceProfile.h"
 
 namespace tgfx {
 
@@ -336,7 +337,7 @@ struct AtlasTextFillInputs {
 };
 
 /**
- * Input contract of the PointwiseChainShader matcher rule. gpKind selects the GP profile
+ * Shared input contract for the PointwiseChainShader/PointwiseGraphShader rules. gpKind selects
  * (0 = DefaultGP, 1 = QuadPerEdgeAA, 2 = Mesh, 3 = sampler-free AtlasText twin, 4 = Ellipse);
  * each profile fixes which attribute slots its vertex buffers carry, and Compose rejects
  * profile-inconsistent combinations. The chain slot topology (ops, indices) is runtime data;
@@ -352,6 +353,7 @@ struct PointwiseChainInputs {
   bool hasMask = false;             // device-space mask child present.
   bool hasCoverageSubtree = false;  // chain coverage subtree present.
   bool hasNoise = false;
+  AOTResourceProfile resourceProfile = AOTResourceProfile::Automatic;
   int xpType = -1;  // -1 = no representable XferProcessor.
 };
 
@@ -538,6 +540,7 @@ std::optional<RuleComposedValues> ComposeAtlasTextFill(const AtlasTextFillInputs
  * contract.
  */
 std::optional<RuleComposedValues> ComposePointwiseChain(const PointwiseChainInputs& inputs);
+std::optional<RuleComposedValues> ComposePointwiseGraph(const PointwiseChainInputs& inputs);
 
 /**
  * Returns every (vertIndex, fragIndex) pair the RoundStrokeRect rule can ever produce, by
@@ -684,6 +687,7 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateAtlasTextFillReachable();
  * Returns every (vertIndex, fragIndex) pair the PointwiseChain rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseChainReachable();
+std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseGraphReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the

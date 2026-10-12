@@ -67,8 +67,11 @@ namespace tgfx {
  * instead of sharing the first leaf's. A pre-change kernel would apply the first leaf's recipe to
  * the second leaf, clamping it to the wrong domain, while the runtime now admits leaves with
  * different recipes, so those bundles are refused.
+ *
+ * 0x00010008: pointwise resource profiles become explicit admission and program-key contracts;
+ * PointwiseGraphShader gains a no-noise, three-tiled-recipe uniform-array layout.
  */
-inline constexpr uint32_t kExpectedToolchainABI = 0x00010007u;
+inline constexpr uint32_t kExpectedToolchainABI = 0x00010008u;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

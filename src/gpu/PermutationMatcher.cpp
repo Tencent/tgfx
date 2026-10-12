@@ -71,6 +71,7 @@
 #include "gpu/shaders/level1/PerlinNoiseFillShader.h"
 #include "gpu/shaders/level1/PointwiseChainShader.h"
 #include "gpu/shaders/level1/PointwiseDirectShader.h"
+#include "gpu/shaders/level1/PointwiseGraphShader.h"
 #include "gpu/shaders/level1/PointwiseTailShader.h"
 #include "gpu/shaders/level1/QuadColorFillShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
@@ -719,8 +720,7 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseTail(const Program
 // Matches the fused pointwise-DAG kernel. The chain processor carries the whole DAG in uniforms,
 // so this rule only validates the parts that are baked into the program: the GP, the leaf count
 // (sampler/varying layout), and that every leaf is a plain sampled texture.
-static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
-    const ProgramInfo* programInfo) {
+static std::optional<PermutationMatchResult> TryMatchPointwiseDAG(const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
   // GP profiles: 0 covers the rect GPs (Default/Quad), 2 Mesh (whose vertex buffers follow the
   // chain's attribute order), 3 the sampler-free AtlasText twin, 4 the ellipse layout.
@@ -783,6 +783,7 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
   inputs.hasMask = chain->hasMask();
   inputs.hasCoverageSubtree = chain->coverageRoot() >= 0;
   inputs.hasNoise = chain->hasNoise();
+  inputs.resourceProfile = chain->resourceProfile();
   inputs.xpType = GetXPType(programInfo);
   if (gpKind == 1) {
     auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
@@ -819,6 +820,15 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseChain(
     inputs.hasCoverage = false;
   } else {
     inputs.hasCoverage = GetGPCoverage(gp) != 0;
+  }
+  if (IsAOTGraphProfile(inputs.resourceProfile)) {
+    auto composed = ComposePointwiseGraph(inputs);
+    if (!composed) {
+      return std::nullopt;
+    }
+    auto vertIndex = PointwiseGraphShader::VD::domain().encode(composed->vertValues);
+    auto fragIndex = PointwiseGraphShader::FD::domain().encode(composed->fragValues);
+    return PermutationMatchResult{"PointwiseGraphShader", vertIndex, fragIndex};
   }
   auto composed = ComposePointwiseChain(inputs);
   if (!composed) {
@@ -1848,7 +1858,7 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
   if (auto result = TryMatchPointwiseTail(programInfo)) {
     return result;
   }
-  if (auto result = TryMatchPointwiseChain(programInfo)) {
+  if (auto result = TryMatchPointwiseDAG(programInfo)) {
     return result;
   }
   if (auto result = TryMatchDeviceSpaceTexture(programInfo)) {

@@ -26,7 +26,7 @@ namespace tgfx {
 
 /**
  * Rebuilds concrete FragmentProcessors from a decomposed AOT plan: the fused chain kernel for
- * PointwiseChain passes, the fused perlin kernel for PerlinNoiseFill passes and the linear
+ * PointwiseChain/PointwiseGraph passes, the perlin kernel for PerlinNoiseFill and the linear
  * texture-plus-tail-op sequence for PointwiseTail passes. Used by AOTPlanExecutor's task assembly
  * and by the direct-draw decomposition route in StandardDrawOp::prepare.
  */
@@ -45,10 +45,9 @@ class AOTChainBuilder {
       PlacementPtr<FragmentProcessor> sourceOverride);
 
   /**
-   * Flattens a single-pass PointwiseChain plan into the fused chain processor, or returns nullptr
-   * if the pass shape exceeds what the chain kernel can represent. The returned processor carries
-   * the whole DAG in uniforms, so a draw whose color processors are replaced by it evaluates the
-   * same pixels through the precompiled PointwiseChainShader.
+   * Flattens a single-pass PointwiseChain/PointwiseGraph plan into the shared processor, or returns
+   * nullptr if the pass shape exceeds the selected kernel's capabilities. The processor carries
+   * the whole DAG in uniforms and resolves to the corresponding independent shader family.
    *
    * coverageFPs, when non-empty, folds the draw's coverage into the chain. A single FP uses the
    * narrow forms first (a bare device-space AA RectEffect becomes an AARectCoverage slot, an alpha-only

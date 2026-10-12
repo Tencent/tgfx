@@ -453,10 +453,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   collect(false);
   std::vector<PlacementPtr<FragmentProcessor>> leaves = {};
   leaves.reserve(leafCount);
-  int tiledLeafIndex = -1;
-  int tiledLeafIndex2 = -1;
-  AOTTiledTextureRecipe tiledRecipe = {};
-  AOTTiledTextureRecipe tiledRecipe2 = {};
+  std::vector<AOTChainTiledLeaf> tiledLeaves = {};
   bool hasRectCoverage = false;
   bool hasLocalRectCoverage = false;
   bool hasGradient = false;
@@ -564,19 +561,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
             parameters->tiledRecipe.has_value() &&
             (parameters->tiledRecipe->shaderModeX != TiledTextureShaderMode::None ||
              parameters->tiledRecipe->shaderModeY != TiledTextureShaderMode::None)) {
-          // The kernel carries two independent tiled-sampling recipes, selected by
-          // TiledLeafIndex/TiledLeafIndex2. Each shader-tiled leaf keeps its own recipe (a drop
-          // shadow's source and offset shadow resolve to different clamp rects); a third one has
-          // no selector and cannot be represented.
-          if (tiledLeafIndex < 0) {
-            tiledLeafIndex = static_cast<int>(leaves.size());
-            tiledRecipe = *parameters->tiledRecipe;
-          } else if (tiledLeafIndex2 < 0) {
-            tiledLeafIndex2 = static_cast<int>(leaves.size());
-            tiledRecipe2 = *parameters->tiledRecipe;
-          } else {
-            return nullptr;
-          }
+          tiledLeaves.push_back({static_cast<int>(leaves.size()), *parameters->tiledRecipe});
         }
         leaves.push_back(std::move(leaf));
         break;
@@ -717,6 +702,37 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
          ((slot.op == AOTChainOp::Blend || slot.op == AOTChainOp::MulAlpha) && slot.in1 == -2))) {
       return nullptr;
     }
+  }
+  size_t colorTiledRecipes = 0;
+  for (auto nodeID : pass.nodes) {
+    const auto* node = graph.nodeAt(nodeID);
+    const auto* texture =
+        node != nullptr ? std::get_if<AOTTextureParameters>(&node->parameters) : nullptr;
+    if (texture != nullptr && texture->samplingKind == AOTTextureSamplingKind::Tiled &&
+        texture->tiledRecipe.has_value() &&
+        (texture->tiledRecipe->shaderModeX != TiledTextureShaderMode::None ||
+         texture->tiledRecipe->shaderModeY != TiledTextureShaderMode::None)) {
+      ++colorTiledRecipes;
+    }
+  }
+  auto declaredProfile = pass.resourceProfile;
+  if (declaredProfile == AOTResourceProfile::Automatic) {
+    declaredProfile = pass.kernel == AOTKernelKind::PointwiseGraph ? AOTResourceProfile::NoiseGraph
+                                                                   : AOTResourceProfile::Chain;
+  }
+  const auto* declaredCapacity = GetAOTResourceCapacity(declaredProfile);
+  if (declaredCapacity == nullptr || colorTiledRecipes > declaredCapacity->tiledRecipes ||
+      IsAOTGraphProfile(declaredProfile) != (pass.kernel == AOTKernelKind::PointwiseGraph) ||
+      (declaredProfile == AOTResourceProfile::NoiseGraph) != (noiseParameters != nullptr)) {
+    return nullptr;
+  }
+  auto finalProfile = declaredProfile;
+  if (finalProfile == AOTResourceProfile::Chain &&
+      tiledLeaves.size() > ChainResourceCapacity.tiledRecipes) {
+    if (coverageGraph == nullptr) {
+      return nullptr;
+    }
+    finalProfile = AOTResourceProfile::TiledGraph;
   }
   // A LUT gradient carries its baked texture as a sampler-only child appended after the DAG
   // leaves; the OP_GRADIENT LUT branch reads it through the GradientLUTLeaf uniform.
@@ -1019,8 +1035,19 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
     }
     maskChildIsPhantom = true;
   }
-  const AOTTiledTextureRecipe* recipePtr = tiledLeafIndex >= 0 ? &tiledRecipe : nullptr;
-  const AOTTiledTextureRecipe* recipePtr2 = tiledLeafIndex2 >= 0 ? &tiledRecipe2 : nullptr;
+  const auto* capacity = GetAOTResourceCapacity(finalProfile);
+  if (capacity == nullptr || tiledLeaves.size() > capacity->tiledRecipes) {
+    return nullptr;
+  }
+  const int tiledLeafIndex = tiledLeaves.empty() ? -1 : tiledLeaves[0].leafIndex;
+  const int tiledLeafIndex2 = tiledLeaves.size() < 2 ? -1 : tiledLeaves[1].leafIndex;
+  const AOTTiledTextureRecipe* recipePtr = tiledLeaves.empty() ? nullptr : &tiledLeaves[0].recipe;
+  const AOTTiledTextureRecipe* recipePtr2 =
+      tiledLeaves.size() < 2 ? nullptr : &tiledLeaves[1].recipe;
+  std::vector<AOTChainTiledLeaf> additionalTiledLeaves = {};
+  if (tiledLeaves.size() > 2) {
+    additionalTiledLeaves.assign(tiledLeaves.begin() + 2, tiledLeaves.end());
+  }
   // Register allocation: the slot wiring built above uses instruction ordinals; this pass
   // rewrites every reference into the kernel's recycled chainResults registers, so the
   // instruction budget (MaxSlots) and the live-result budget (MaxRegisters) are independent. A
@@ -1056,7 +1083,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
       allocator, std::move(leaves), slots, rootIndex, tiledLeafIndex, recipePtr,
       std::move(maskChild), coverageRootSlot, coordSourceMask, std::move(lutChild), lutLeafIndex,
       std::move(samplerPadding), maskChildIsPhantom, clipCoverageRegister, tiledLeafIndex2,
-      recipePtr2);
+      recipePtr2, finalProfile, additionalTiledLeaves);
 }
 
 }  // namespace
@@ -1153,7 +1180,7 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildFPForPass(
     }
     return AOTPointwiseTailProcessor::Make(allocator, std::move(current), slots);
   }
-  if (pass.kernel == AOTKernelKind::PointwiseChain) {
+  if (IsAOTPointwiseDAGKernel(pass.kernel)) {
     ChainClipSlots emptyClipSlots = {};
     return BuildChainFP(allocator, graph, pass, emptyClipSlots, nullptr);
   }
@@ -1208,7 +1235,7 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildFPForPass(
 PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessor(
     BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
     const std::vector<const FragmentProcessor*>& coverageFPs, bool coverageLeafFromUVCoord) {
-  if (pass.kernel != AOTKernelKind::PointwiseChain) {
+  if (!IsAOTPointwiseDAGKernel(pass.kernel)) {
     return nullptr;
   }
   ChainClipSlots clipSlots = {};

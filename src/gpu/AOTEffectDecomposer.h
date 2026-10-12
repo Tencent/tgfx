@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 #include "gpu/AOTEffect.h"
+#include "gpu/AOTResourceProfile.h"
 
 namespace tgfx {
 class FragmentProcessor;
@@ -46,7 +47,13 @@ enum class AOTKernelKind {
   // three bounded pointwise operator slots, matching YUVTextureFillShader's color-grade tail.
   // Produced by DecomposeYUVChain; single pass, over-budget shapes are rejected.
   YUVTextureFill = 7,
+  // Extended-resource DAGs use the independent PointwiseGraphShader profiles.
+  PointwiseGraph = 8,
 };
+
+inline bool IsAOTPointwiseDAGKernel(AOTKernelKind kernel) {
+  return kernel == AOTKernelKind::PointwiseChain || kernel == AOTKernelKind::PointwiseGraph;
+}
 
 struct AOTPassDescriptor {
   AOTKernelKind kernel = AOTKernelKind::TextureFill;
@@ -54,6 +61,7 @@ struct AOTPassDescriptor {
   std::vector<uint32_t> dependencies = {};
   AOTNodeID output = AOTNodeID::Invalid();
   bool materializesOutput = false;
+  AOTResourceProfile resourceProfile = AOTResourceProfile::Automatic;
 };
 
 struct AOTEffectPlan {

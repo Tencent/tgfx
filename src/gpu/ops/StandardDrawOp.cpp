@@ -170,7 +170,7 @@ std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
   }
   auto kernel = plan.passes.empty() ? AOTKernelKind::TextureFill : plan.passes[0].kernel;
   if (!decomposed || plan.passes.size() != 1 ||
-      (kernel != AOTKernelKind::PointwiseChain && kernel != AOTKernelKind::PerlinNoiseFill) ||
+      (!IsAOTPointwiseDAGKernel(kernel) && kernel != AOTKernelKind::PerlinNoiseFill) ||
       !AOTPlanExecutor::CanExecute(graph, plan)) {
     return nullptr;
   }

@@ -21,6 +21,7 @@
 #include <array>
 #include <vector>
 #include "gpu/AOTEffect.h"
+#include "gpu/AOTResourceProfile.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/shaders/KernelContract.h"
 
@@ -126,24 +127,28 @@ struct AOTChainSlot {
  * leaves): it is not a DAG node; the kernel samples it after the DAG and multiplies the result
  * before the coverage/XP stage, matching the legacy blend kernel's mask application point.
  */
+struct AOTChainTiledLeaf {
+  int leafIndex = -1;
+  AOTTiledTextureRecipe recipe = {};
+};
+
 class AOTPointwiseChainProcessor : public FragmentProcessor {
  public:
   // The instruction capacity of the fused kernel: how many DAG nodes (texture leaves, operators,
   // coverage and clip slots) one chain program may evaluate. Independent of the result-register
   // count below because the kernel recycles registers by last use.
-  static constexpr size_t MaxSlots = 32;
+  static constexpr size_t MaxSlots = ChainResourceCapacity.instructions;
 
   // The chainResults storage the kernel evaluates into. The allocator assigns one element per
   // simultaneously-live intermediate value, so a linear chain of any supported length runs with
   // two registers while a wide DAG may need up to this many.
-  static constexpr size_t MaxRegisters = 16;
+  static constexpr size_t MaxRegisters = ChainResourceCapacity.registers;
 
   // The chain kernel carries two independent tiled-sampling recipes, selected by
   // TiledLeafIndex/TiledLeafIndex2, so at most this many leaves may use shader-side tiling; their
   // recipes need not match (a drop shadow's source and offset shadow resolve to different clamp
-  // rects). This constant is the capacity authority for CanExecute; the builder enforces the same
-  // two-slot limit through its second-index bookkeeping.
-  static constexpr size_t MaxShaderTiledChainLeaves = 2;
+  // rects). Extended profiles have their own capacities in AOTResourceProfile.h.
+  static constexpr size_t MaxShaderTiledChainLeaves = ChainResourceCapacity.tiledRecipes;
 
   // The single authority for the chain kernel's shared parameter-block budgets. The kernel has
   // exactly one chain-wide gradient block and gradient coordinate varying, one color-space
@@ -171,7 +176,9 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
       uint32_t coordSourceMask = ~0u, PlacementPtr<FragmentProcessor> lutChild = nullptr,
       int lutLeafIndex = -1, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding = {},
       bool maskChildIsPhantom = false, int clipCoverageRegister = -1, int tiledLeafIndex2 = -1,
-      const AOTTiledTextureRecipe* tiledRecipe2 = nullptr);
+      const AOTTiledTextureRecipe* tiledRecipe2 = nullptr,
+      AOTResourceProfile resourceProfile = AOTResourceProfile::Automatic,
+      const std::vector<AOTChainTiledLeaf>& additionalTiledLeaves = {});
 
   AOTPointwiseChainProcessor(std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
                              const std::vector<AOTChainSlot>& slots, size_t rootSlot,
@@ -181,7 +188,9 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
                              int lutLeafIndex,
                              std::vector<PlacementPtr<FragmentProcessor>> samplerPadding,
                              bool maskChildIsPhantom, int clipCoverageRegister, int tiledLeafIndex2,
-                             const AOTTiledTextureRecipe* tiledRecipe2);
+                             const AOTTiledTextureRecipe* tiledRecipe2,
+                             AOTResourceProfile resourceProfile,
+                             const std::vector<AOTChainTiledLeaf>& additionalTiledLeaves);
 
   std::string name() const override {
     return "AOTPointwiseChainProcessor";
@@ -229,12 +238,20 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   // Index of the leaf that reads the first shader-side tiling recipe (wrap/border emulation), or
   // -1 when every leaf is plain.
   int tiledLeaf() const {
-    return tiledLeafIndex;
+    return tiledLeaves.empty() ? -1 : tiledLeaves[0].leafIndex;
   }
 
   // Index of the leaf that reads the second tiling recipe, or -1 when at most one leaf is tiled.
   int tiledLeaf2() const {
-    return tiledLeafIndex2;
+    return tiledLeaves.size() < 2 ? -1 : tiledLeaves[1].leafIndex;
+  }
+
+  AOTResourceProfile resourceProfile() const {
+    return _resourceProfile;
+  }
+
+  const std::vector<AOTChainTiledLeaf>& tiledLeafParameters() const {
+    return tiledLeaves;
   }
 
   // Sampler index of the LUT gradient child, or -1 when the chain has none. The LUT child binds a
@@ -245,11 +262,13 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   }
 
   const AOTTiledTextureRecipe& tiledRecipe() const {
-    return _tiledRecipe;
+    static const AOTTiledTextureRecipe empty = {};
+    return tiledLeaves.empty() ? empty : tiledLeaves[0].recipe;
   }
 
   const AOTTiledTextureRecipe& tiledRecipe2() const {
-    return _tiledRecipe2;
+    static const AOTTiledTextureRecipe empty = {};
+    return tiledLeaves.size() < 2 ? empty : tiledLeaves[1].recipe;
   }
 
   const AOTChainSlot& slot(size_t index) const {
@@ -268,11 +287,8 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
 
   size_t _slotCount = 0;
   size_t rootSlot = 0;
-  int tiledLeafIndex = -1;
-  // Second shader-tiled leaf, reading its own recipe (_tiledRecipe2); -1 when absent.
-  int tiledLeafIndex2 = -1;
-  AOTTiledTextureRecipe _tiledRecipe = {};
-  AOTTiledTextureRecipe _tiledRecipe2 = {};
+  AOTResourceProfile _resourceProfile = AOTResourceProfile::Chain;
+  std::vector<AOTChainTiledLeaf> tiledLeaves = {};
   std::array<AOTChainSlot, MaxSlots> slots = {};
   // Kept only to mark the mask's presence; the mask itself is the last registered child.
   // The mask sampler slot is occupied (real mask or phantom) — four-leaf chains always occupy it.

@@ -188,7 +188,8 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     int coverageRootSlot, uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChild,
     int lutLeafIndex, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding,
     bool maskChildIsPhantom, int clipCoverageRegister, int tiledLeafIndex2,
-    const AOTTiledTextureRecipe* tiledRecipe2) {
+    const AOTTiledTextureRecipe* tiledRecipe2, AOTResourceProfile profile,
+    const std::vector<AOTChainTiledLeaf>& additionalTiledLeaves) {
   if (allocator == nullptr || slots.empty() || slots.size() > MaxSlots) {
     return nullptr;
   }
@@ -305,6 +306,25 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
        tiledRecipe2 == nullptr || tiledLeafIndex2 == tiledLeafIndex)) {
     return nullptr;
   }
+  std::vector<AOTChainTiledLeaf> tiledLeaves = {};
+  if (tiledLeafIndex >= 0) {
+    tiledLeaves.push_back({tiledLeafIndex, *tiledRecipe});
+  }
+  if (tiledLeafIndex2 >= 0) {
+    tiledLeaves.push_back({tiledLeafIndex2, *tiledRecipe2});
+  }
+  tiledLeaves.insert(tiledLeaves.end(), additionalTiledLeaves.begin(), additionalTiledLeaves.end());
+  for (size_t index = 0; index < tiledLeaves.size(); ++index) {
+    const auto& tiled = tiledLeaves[index];
+    if (tiled.leafIndex < 0 || static_cast<size_t>(tiled.leafIndex) >= leafCount) {
+      return nullptr;
+    }
+    for (size_t previous = 0; previous < index; ++previous) {
+      if (tiledLeaves[previous].leafIndex == tiled.leafIndex) {
+        return nullptr;
+      }
+    }
+  }
   // Leaves pair slot-for-slot with samplers: slot k must be the leaf that samples TextureSampler_k.
   for (size_t index = 0; index < leafCount; ++index) {
     if (textureLeaves[index] == nullptr || slots[index].op != AOTChainOp::Texture) {
@@ -359,11 +379,27 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
       clipCoverageRegister >= static_cast<int>(MaxRegisters)) {
     return nullptr;
   }
+  if (profile == AOTResourceProfile::Automatic) {
+    profile = noiseSlots > 0 ? AOTResourceProfile::NoiseGraph : AOTResourceProfile::Chain;
+  }
+  AOTResourceDemand demand = {slots.size(),
+                              0,
+                              leafCount + (lutChild != nullptr ? 1u : 0u) + noiseSlots * 2,
+                              tiledLeaves.size(),
+                              noiseSlots,
+                              gradientSlots,
+                              colorSpaceSlots,
+                              deviceRectSlots,
+                              localRectSlots,
+                              rrectSlots};
+  if (!FitsAOTResourceProfile(demand, profile)) {
+    return nullptr;
+  }
   return allocator->make<AOTPointwiseChainProcessor>(
       std::move(textureLeaves), slots, rootSlot, tiledLeafIndex, tiledRecipe, std::move(maskChild),
       coverageRootSlot, coordSourceMask, std::move(lutChild), lutLeafIndex,
       std::move(samplerPadding), maskChildIsPhantom, clipCoverageRegister, tiledLeafIndex2,
-      tiledRecipe2);
+      tiledRecipe2, profile, additionalTiledLeaves);
 }
 
 AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
@@ -373,19 +409,20 @@ AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
     int coverageRootSlot, uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChildFP,
     int lutLeafIndex, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding,
     bool maskChildIsPhantom, int clipCoverageRegister, int tiledLeafIndex2,
-    const AOTTiledTextureRecipe* tiledRecipe2)
+    const AOTTiledTextureRecipe* tiledRecipe2, AOTResourceProfile profile,
+    const std::vector<AOTChainTiledLeaf>& additionalTiledLeaves)
     : FragmentProcessor(ClassID()), _slotCount(newSlots.size()), rootSlot(rootSlot),
-      tiledLeafIndex(tiledLeafIndex), tiledLeafIndex2(tiledLeafIndex2),
-      hasMaskSlotChild(maskChildFP != nullptr),
+      _resourceProfile(profile), hasMaskSlotChild(maskChildFP != nullptr),
       hasMaskChild(maskChildFP != nullptr && !maskChildIsPhantom),
       coverageRootSlot(coverageRootSlot), clipCoverageRegister(clipCoverageRegister),
       coordSourceMask(coordSourceMask), lutLeafIndex(lutLeafIndex) {
-  if (tiledRecipe != nullptr) {
-    _tiledRecipe = *tiledRecipe;
+  if (tiledLeafIndex >= 0 && tiledRecipe != nullptr) {
+    tiledLeaves.push_back({tiledLeafIndex, *tiledRecipe});
   }
-  if (tiledRecipe2 != nullptr) {
-    _tiledRecipe2 = *tiledRecipe2;
+  if (tiledLeafIndex2 >= 0 && tiledRecipe2 != nullptr) {
+    tiledLeaves.push_back({tiledLeafIndex2, *tiledRecipe2});
   }
+  tiledLeaves.insert(tiledLeaves.end(), additionalTiledLeaves.begin(), additionalTiledLeaves.end());
   for (size_t index = 0; index < newSlots.size(); ++index) {
     slots[index] = newSlots[index];
     if (slots[index].op == AOTChainOp::Gradient) {
@@ -433,7 +470,7 @@ void AOTPointwiseChainProcessor::onComputeProcessorKey(BytesKey* bytesKey) const
   // by effect topology and defeat the variant reuse that is the point of the chain kernel.
   static constexpr uint32_t ChainProgramTag = 0xA07C41A7u;
   bytesKey->write(ChainProgramTag);
-  bytesKey->write(static_cast<uint32_t>(hasNoise()));
+  bytesKey->write(static_cast<uint32_t>(_resourceProfile));
 }
 
 void AOTPointwiseChainProcessor::onSetData(UniformData* vertexUniformData,
@@ -454,14 +491,33 @@ void AOTPointwiseChainProcessor::onSetData(UniformData* vertexUniformData,
   fragmentUniformData->setDataOptional("SlotCount", static_cast<int>(_slotCount));
   // Each selector names the leaf that reads the matching recipe set; the kernel never reads a set
   // whose selector is -1, so an absent recipe needs no upload.
-  fragmentUniformData->setDataOptional("TiledLeafIndex", tiledLeafIndex);
-  fragmentUniformData->setDataOptional("TiledLeafIndex2", tiledLeafIndex2);
   fragmentUniformData->setDataOptional("GradientLUTLeaf", lutLeafIndex);
-  if (tiledLeafIndex >= 0) {
-    UploadTiledRecipe(fragmentUniformData, _tiledRecipe, "");
-  }
-  if (tiledLeafIndex2 >= 0) {
-    UploadTiledRecipe(fragmentUniformData, _tiledRecipe2, "2");
+  if (_resourceProfile == AOTResourceProfile::TiledGraph) {
+    for (size_t index = 0; index < TiledGraphResourceCapacity.tiledRecipes; ++index) {
+      int modes[] = {-1, 0, 0, 0};
+      if (index < tiledLeaves.size()) {
+        const auto& tiled = tiledLeaves[index];
+        modes[0] = tiled.leafIndex;
+        modes[1] = static_cast<int>(tiled.recipe.shaderModeX);
+        modes[2] = static_cast<int>(tiled.recipe.shaderModeY);
+        modes[3] = tiled.recipe.strict ? 1 : 0;
+        const auto& subset = tiled.recipe.shaderSubset;
+        const auto& clamp = tiled.recipe.shaderClamp;
+        float subsetData[] = {subset.left, subset.top, subset.right, subset.bottom};
+        float clampData[] = {clamp.left, clamp.top, clamp.right, clamp.bottom};
+        fragmentUniformData->setArrayElement("TiledRecipeSubsets", index, subsetData);
+        fragmentUniformData->setArrayElement("TiledRecipeClamps", index, clampData);
+        fragmentUniformData->setArrayElement("TiledRecipeDimensions", index,
+                                             tiled.recipe.shaderDimensions);
+      }
+      fragmentUniformData->setArrayElement("TiledRecipeModes", index, modes);
+    }
+  } else {
+    fragmentUniformData->setDataOptional("TiledLeafIndex", tiledLeaf());
+    fragmentUniformData->setDataOptional("TiledLeafIndex2", tiledLeaf2());
+    for (size_t index = 0; index < tiledLeaves.size(); ++index) {
+      UploadTiledRecipe(fragmentUniformData, tiledLeaves[index].recipe, index == 0 ? "" : "2");
+    }
   }
   // RRect coverage slots consume the CoverageRRect* arrays in slot order; the upload assigns the
   // ordinals the same way, so the selector's bits 16-19 match the array element written here.

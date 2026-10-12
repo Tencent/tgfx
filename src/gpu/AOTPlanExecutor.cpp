@@ -6,6 +6,7 @@
 #include <vector>
 #include "core/shaders/PerlinNoiseShader.h"
 #include "gpu/AOTChainBuilder.h"
+#include "gpu/AOTChainRegisterAllocator.h"
 #include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/BackingFit.h"
 #include "gpu/DrawingManager.h"
@@ -73,7 +74,8 @@ static bool ValidateLinearPlan(const AOTEffectGraph& graph, const AOTEffectPlan&
   }
   for (size_t index = 0; index < plan.passes.size(); ++index) {
     const auto& pass = plan.passes[index];
-    if (!pass.output.isValid() || pass.nodes.empty() || pass.output != pass.nodes.back() ||
+    if (pass.resourceProfile != AOTResourceProfile::Automatic || !pass.output.isValid() ||
+        pass.nodes.empty() || pass.output != pass.nodes.back() ||
         pass.materializesOutput != (index + 1 < plan.passes.size())) {
       return false;
     }
@@ -185,12 +187,68 @@ static bool ValidateLinearPlan(const AOTEffectGraph& graph, const AOTEffectPlan&
   return plan.output == plan.passes.back().output;
 }
 
+static bool CheckDAGRegisterBudget(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
+                                   size_t capacity) {
+  std::vector<int> slotOf(graph.nodeCount(), -1);
+  std::vector<AOTNodeID> ordered;
+  std::vector<bool> raw;
+  auto computedTexture = [&](const AOTEffectNode* node) {
+    if (node->kind != AOTEffectKind::TextureSource || node->inputs.empty()) {
+      return false;
+    }
+    const auto* input = graph.nodeAt(node->inputs[0]);
+    return input != nullptr && input->kind != AOTEffectKind::GeometryColor &&
+           input->kind != AOTEffectKind::GeometryColorOpaqueInput &&
+           input->kind != AOTEffectKind::GeometryWhiteInput &&
+           input->kind != AOTEffectKind::GeometryCoverage;
+  };
+  for (auto id : pass.nodes) {
+    const auto* node = graph.nodeAt(id);
+    if (node == nullptr) {
+      return false;
+    }
+    if (node->kind == AOTEffectKind::TextureSource) {
+      if (!computedTexture(node)) {
+        slotOf[id.index()] = static_cast<int>(ordered.size());
+      }
+      ordered.push_back(id);
+      raw.push_back(true);
+    }
+  }
+  for (auto id : pass.nodes) {
+    const auto* node = graph.nodeAt(id);
+    if (node->kind != AOTEffectKind::TextureSource || computedTexture(node)) {
+      slotOf[id.index()] = static_cast<int>(ordered.size());
+      ordered.push_back(id);
+      raw.push_back(false);
+    }
+  }
+  std::vector<std::vector<int>> inputs(ordered.size());
+  for (size_t index = 0; index < ordered.size(); ++index) {
+    const auto* node = graph.nodeAt(ordered[index]);
+    if (raw[index] || node->kind == AOTEffectKind::PerlinNoiseSource) {
+      continue;
+    }
+    for (auto input : node->inputs) {
+      if (graph.nodeAt(input) == nullptr) {
+        return false;
+      }
+      if (slotOf[input.index()] >= 0) {
+        inputs[index].push_back(slotOf[input.index()]);
+      }
+    }
+  }
+  AOTChainRegisterAssignment assignment;
+  return pass.output.index() < slotOf.size() && slotOf[pass.output.index()] >= 0 &&
+         AllocateChainRegisters(inputs, slotOf[pass.output.index()], -1, -1, capacity, &assignment);
+}
+
 }  // namespace
 
 bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPlan& plan) {
-  // A PointwiseChain plan is a single fused pass over the whole DAG; the linear-pass invariants do
+  // PointwiseChain/PointwiseGraph plans fuse the whole DAG; the linear-pass invariants do
   // not apply to it. Its structural checks live in BuildChainFP and AOTPointwiseChainProcessor::Make.
-  if (plan.passes.size() == 1 && plan.passes[0].kernel == AOTKernelKind::PointwiseChain) {
+  if (plan.passes.size() == 1 && IsAOTPointwiseDAGKernel(plan.passes[0].kernel)) {
     const auto& pass = plan.passes[0];
     if (!plan.output.isValid() || plan.output != graph.root() || pass.output != plan.output ||
         pass.materializesOutput || pass.nodes.empty() || !pass.dependencies.empty()) {
@@ -252,13 +310,8 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
           }
           if (recipe->shaderModeX != TiledTextureShaderMode::None ||
               recipe->shaderModeY != TiledTextureShaderMode::None) {
-            // PointwiseChainShader carries MaxShaderTiledChainLeaves independent tiled-sampling
-            // recipes, one per selector; a leaf beyond that has no selector and cannot be
-            // represented — reject before planning execution rather than letting construction
-            // fail after CanExecute promised success.
-            if (shaderTiledLeaves >= AOTPointwiseChainProcessor::MaxShaderTiledChainLeaves) {
-              return false;
-            }
+            // Count shader-side recipes separately from hardware-only wrapping; the selected
+            // resource profile checks their capacity after all nodes have been examined.
             ++shaderTiledLeaves;
           }
         } else if (parameters->samplingKind != AOTTextureSamplingKind::Plain) {
@@ -307,11 +360,26 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
     if (hasLUT && plainLeaves > 1) {
       return false;
     }
-    if (noiseSources > 0 && gradients > 0) {
-      return false;
+    auto profile = pass.resourceProfile;
+    if (profile == AOTResourceProfile::Automatic) {
+      profile = pass.kernel == AOTKernelKind::PointwiseGraph ? AOTResourceProfile::NoiseGraph
+                                                             : AOTResourceProfile::Chain;
     }
-    return AOTPointwiseChainProcessor::HasChainKernelVariant(plainLeaves + (hasLUT ? 1u : 0u) +
-                                                             noiseSources * 2);
+    AOTResourceDemand demand = {encodedInstructions,
+                                0,
+                                plainLeaves + (hasLUT ? 1u : 0u) + noiseSources * 2,
+                                shaderTiledLeaves,
+                                noiseSources,
+                                gradients,
+                                colorSpaceXforms,
+                                deviceRects,
+                                localRects,
+                                rrects};
+    const auto* capacity = GetAOTResourceCapacity(profile);
+    return capacity != nullptr &&
+           IsAOTGraphProfile(profile) == (pass.kernel == AOTKernelKind::PointwiseGraph) &&
+           FitsAOTResourceProfile(demand, profile) &&
+           CheckDAGRegisterBudget(graph, pass, capacity->registers);
   }
   return ValidateLinearPlan(graph, plan);
 }

@@ -173,6 +173,7 @@ struct OffscreenFillStats {
   uint64_t decomposeSucceeded = 0;
   uint64_t canExecute = 0;
   uint64_t pointwiseChainPlans = 0;
+  uint64_t pointwiseGraphPlans = 0;
   uint64_t pointwiseTailPlans = 0;
   uint64_t multiPassPlans = 0;
   uint64_t precompiledPrograms = 0;

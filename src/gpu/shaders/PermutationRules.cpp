@@ -33,6 +33,7 @@
 #include "gpu/shaders/level1/PerlinNoiseFillShader.h"
 #include "gpu/shaders/level1/PointwiseChainShader.h"
 #include "gpu/shaders/level1/PointwiseDirectShader.h"
+#include "gpu/shaders/level1/PointwiseGraphShader.h"
 #include "gpu/shaders/level1/PointwiseTailShader.h"
 #include "gpu/shaders/level1/QuadColorFillShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
@@ -1047,9 +1048,9 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateAtlasTextFillReachable() {
 }
 
 std::optional<RuleComposedValues> ComposePointwiseChain(const PointwiseChainInputs& inputs) {
-  if (inputs.xpType < 0 || inputs.xpType > 2 ||
-      (inputs.hasNoise && (inputs.gpKind != 1 || inputs.hasUVCoord || inputs.hasColor ||
-                           inputs.textureCount != 1 || !inputs.hasCoverage))) {
+  if (inputs.xpType < 0 || inputs.xpType > 2 || inputs.hasNoise ||
+      (inputs.resourceProfile != AOTResourceProfile::Automatic &&
+       inputs.resourceProfile != AOTResourceProfile::Chain)) {
     return std::nullopt;
   }
   // Each GP profile fixes the attribute slots its vertex buffers carry. Quad and Mesh buffers
@@ -1130,7 +1131,6 @@ std::optional<RuleComposedValues> ComposePointwiseChain(const PointwiseChainInpu
   values.fragValues[FD::HAS_COLOR] = hasColor;
   values.fragValues[FD::TEXTURE_COUNT] = inputs.textureCount;
   values.fragValues[FD::HAS_MASK_TEXTURE] = hasMaskTexture;
-  values.fragValues[FD::HAS_NOISE] = inputs.hasNoise ? 1 : 0;
   return values;
 }
 
@@ -1153,23 +1153,58 @@ std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseChainReachable() {
                   inputs.hasMask = hasMask != 0;
                   inputs.hasCoverageSubtree = hasCoverageSubtree != 0;
                   inputs.xpType = xpType;
-                  for (bool hasNoise : {false, true}) {
-                    inputs.hasNoise = hasNoise;
-                    auto composed = ComposePointwiseChain(inputs);
-                    if (!composed) {
-                      continue;
-                    }
-                    auto vertIndex =
-                        PointwiseChainShader::VD::domain().encode(composed->vertValues);
-                    auto fragIndex =
-                        PointwiseChainShader::FD::domain().encode(composed->fragValues);
-                    result.insert({vertIndex, fragIndex});
+                  auto composed = ComposePointwiseChain(inputs);
+                  if (!composed) {
+                    continue;
                   }
+                  auto vertIndex = PointwiseChainShader::VD::domain().encode(composed->vertValues);
+                  auto fragIndex = PointwiseChainShader::FD::domain().encode(composed->fragValues);
+                  result.insert({vertIndex, fragIndex});
                 }
               }
             }
           }
         }
+      }
+    }
+  }
+  return result;
+}
+
+std::optional<RuleComposedValues> ComposePointwiseGraph(const PointwiseChainInputs& inputs) {
+  auto profile = inputs.resourceProfile;
+  if (profile == AOTResourceProfile::Automatic && inputs.hasNoise) {
+    profile = AOTResourceProfile::NoiseGraph;
+  }
+  if (!IsAOTGraphProfile(profile) ||
+      (profile == AOTResourceProfile::NoiseGraph) != inputs.hasNoise || inputs.gpKind != 1 ||
+      !inputs.hasCoverage || inputs.hasUVCoord || inputs.hasColor || inputs.textureCount != 1 ||
+      inputs.xpType < 0 || inputs.xpType > 2) {
+    return std::nullopt;
+  }
+  RuleComposedValues values;
+  values.fragValues.resize(PointwiseGraphShader::FD::COUNT);
+  values.fragValues[PointwiseGraphShader::FD::HAS_XP] = inputs.xpType;
+  values.fragValues[PointwiseGraphShader::FD::RESOURCE_KIND] =
+      profile == AOTResourceProfile::TiledGraph ? 1 : 0;
+  return values;
+}
+
+std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseGraphReachable() {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  PointwiseChainInputs inputs;
+  inputs.gpKind = 1;
+  inputs.hasCoverage = true;
+  inputs.textureCount = 1;
+  for (auto profile : {AOTResourceProfile::NoiseGraph, AOTResourceProfile::TiledGraph}) {
+    inputs.resourceProfile = profile;
+    inputs.hasNoise = profile == AOTResourceProfile::NoiseGraph;
+    for (int xpType = -1; xpType <= 3; ++xpType) {
+      inputs.xpType = xpType;
+      auto composed = ComposePointwiseGraph(inputs);
+      if (composed) {
+        result.insert({PointwiseGraphShader::VD::domain().encode(composed->vertValues),
+                       PointwiseGraphShader::FD::domain().encode(composed->fragValues)});
       }
     }
   }
@@ -1264,6 +1299,9 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "PointwiseChainShader") {
     return EnumeratePointwiseChainReachable();
+  }
+  if (shaderName == "PointwiseGraphShader") {
+    return EnumeratePointwiseGraphReachable();
   }
   return std::nullopt;
 }

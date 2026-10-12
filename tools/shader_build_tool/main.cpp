@@ -53,6 +53,7 @@
 #include "gpu/shaders/level1/PerlinNoiseFillShader.h"
 #include "gpu/shaders/level1/PointwiseChainShader.h"
 #include "gpu/shaders/level1/PointwiseDirectShader.h"
+#include "gpu/shaders/level1/PointwiseGraphShader.h"
 #include "gpu/shaders/level1/PointwiseTailShader.h"
 #include "gpu/shaders/level1/QuadColorFillShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
@@ -513,10 +514,11 @@ static std::string EmitDirectGLSL330Impl(const std::string& source, ShaderStageT
               // Anything else (parenthesized expressions, color-expression macros) stays
               // unrecorded exactly as before.
               auto valueEnd = body.find_first_of(" \t", valueStart);
-              auto alias = body.substr(valueStart, valueEnd == std::string::npos
-                                                        ? std::string::npos
-                                                        : valueEnd - valueStart);
-              if (!alias.empty() && (isalpha(static_cast<unsigned char>(alias[0])) || alias[0] == '_') &&
+              auto alias =
+                  body.substr(valueStart, valueEnd == std::string::npos ? std::string::npos
+                                                                        : valueEnd - valueStart);
+              if (!alias.empty() &&
+                  (isalpha(static_cast<unsigned char>(alias[0])) || alias[0] == '_') &&
                   macros.find(alias) != macros.end()) {
                 macros[name] = macros[alias];
               }

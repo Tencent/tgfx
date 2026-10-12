@@ -38,6 +38,7 @@
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/shaders/level1/PointwiseChainShader.h"
+#include "gpu/shaders/level1/PointwiseGraphShader.h"
 #include "gtest/gtest.h"
 #include "layers/NoiseDensityUtils.h"
 #include "layers/layerstyles/GlassUDF.h"
@@ -2706,9 +2707,10 @@ TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsMaskCoverage) {
            static_cast<unsigned>(stats.completeAOTDraws),
            static_cast<unsigned>(stats.fpFlattenEdges));
     fflush(stdout);
-    // Non-vacuous: the retry materialized and the draw was served.
+    // Coverage-incompatible retries must be rejected before allocating unconsumed intermediates.
     if (!legacy) {
-      EXPECT_GE(stats.fpFlattenEdges, 1u);
+      EXPECT_EQ(stats.fpFlattenEdges, 0u);
+      EXPECT_EQ(stats.planMaterializedEdges, 0u);
     }
   }
   auto* refPixels = static_cast<const uint32_t*>(const_cast<Bitmap&>(reference).lockPixels());
@@ -3976,12 +3978,11 @@ TGFX_TEST(AOTRenderConsistencyTest, PerlinDensityDAGServedByteExact) {
             EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
             EXPECT_EQ(cache->drawStats().materializedEdges, 0u);
             EXPECT_EQ(cache->drawStats().completeAOTDraws, 1u);
+            EXPECT_EQ(cache->drawStats().kernelInvocations, 1u);
             const auto hits = cache->hitRecords();
             bool noiseVariantHit = false;
             for (const auto& hit : hits) {
-              noiseVariantHit |= hit.shaderName == "PointwiseChainShader" &&
-                                 PointwiseChainShader::FD::domain().valueOf(
-                                     hit.fragPermutationIndex, "HAS_NOISE") == 1;
+              noiseVariantHit |= hit.shaderName == "PointwiseGraphShader";
             }
             EXPECT_TRUE(noiseVariantHit);
           }
@@ -3997,6 +3998,176 @@ TGFX_TEST(AOTRenderConsistencyTest, PerlinDensityDAGServedByteExact) {
         }
         ExpectBitmapsIdentical("perlin-density-dag", candidate, reference, size, size);
       }
+    }
+  }
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, ThreeIndependentTiledInputsUseGraphByteExact) {
+  constexpr int size = 96;
+  Bitmap source;
+  ASSERT_TRUE(source.allocPixels(128, 128));
+  auto* sourcePixels = static_cast<uint8_t*>(source.lockPixels());
+  ASSERT_NE(sourcePixels, nullptr);
+  for (size_t y = 0; y < 128; ++y) {
+    for (size_t x = 0; x < 128; ++x) {
+      auto* pixel = sourcePixels + y * source.rowBytes() + x * 4;
+      pixel[0] = ((x / 5 + y / 7) % 2) == 0 ? 0 : 255;
+      pixel[1] = ((x / 11 + y / 3) % 2) == 0 ? 0 : 255;
+      pixel[2] = ((x / 7 + y / 13) % 2) == 0 ? 0 : 255;
+      pixel[3] = 255;
+    }
+  }
+  source.unlockPixels();
+  auto image = Image::MakeFrom(source);
+  ASSERT_NE(image, nullptr);
+  const std::array<Rect, 3> subsets = {Rect::MakeXYWH(8, 12, 32, 24),
+                                       Rect::MakeXYWH(48, 36, 24, 28),
+                                       Rect::MakeXYWH(72, 68, 40, 36)};
+  const std::array<TileMode, 3> modes = {TileMode::Repeat, TileMode::Mirror, TileMode::Decal};
+  for (int variant = 0; variant < 3; ++variant) {
+    for (auto blend : {BlendMode::SrcOver, BlendMode::Src, BlendMode::Multiply}) {
+      SCOPED_TRACE(::testing::Message()
+                   << "variant=" << variant << " blend=" << static_cast<int>(blend));
+      std::array<std::shared_ptr<Shader>, 3> inputs;
+      for (size_t index = 0; index < inputs.size(); ++index) {
+        auto subset = image->makeSubset(subsets[index]);
+        ASSERT_NE(subset, nullptr);
+        inputs[index] =
+            Shader::MakeImageShader(subset, modes[(index + static_cast<size_t>(variant)) % 3],
+                                    modes[index], SamplingOptions(FilterMode::Nearest));
+        ASSERT_NE(inputs[index], nullptr);
+        inputs[index] = inputs[index]->makeWithMatrix(
+            Matrix::MakeTrans(7.25f * static_cast<float>(index), 5.5f * static_cast<float>(index)) *
+            Matrix::MakeScale(1.5f, 1.25f));
+      }
+      auto shader = Shader::MakeBlend(BlendMode::SrcOver,
+                                      Shader::MakeBlend(BlendMode::Multiply, inputs[0], inputs[1]),
+                                      inputs[2]);
+      ASSERT_NE(shader, nullptr);
+      Bitmap reference;
+      Bitmap candidate;
+      for (bool useBundle : {false, true}) {
+        ContextScope scope;
+        auto* context = scope.getContext();
+        ASSERT_NE(context, nullptr);
+        auto* cache = context->precompiledShaderCache();
+        cache->unload();
+        if (useBundle) {
+          ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+        }
+        ScopedAOTStatsPause pause(context, !useBundle);
+        cache->setDecompositionEnabled(useBundle);
+        cache->setDiagnosticRecordingEnabled(true);
+        cache->resetStats();
+        context->globalCache()->clearPrograms();
+        context->globalCache()->resetProgramStats();
+        auto surface = Surface::Make(context, size, size);
+        ASSERT_NE(surface, nullptr);
+        auto* canvas = surface->getCanvas();
+        canvas->clear(Color(0.2f, 0.4f, 0.6f, 1.0f));
+        canvas->clipRect(Rect::MakeLTRB(8.25f, 9.5f, 88.75f, 86.25f), true);
+        Paint paint;
+        paint.setShader(shader);
+        paint.setAlpha(0.5f);
+        paint.setBlendMode(blend);
+        canvas->drawRect(Rect::MakeLTRB(3.25f, 4.5f, 92.75f, 90.25f), paint);
+        context->flushAndSubmit(true);
+        if (useBundle) {
+          EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+          EXPECT_EQ(cache->drawStats().fpFlattenEdges, 0u);
+          EXPECT_EQ(cache->drawStats().planMaterializedEdges, 0u);
+          bool tiledHit = false;
+          for (const auto& hit : cache->hitRecords()) {
+            tiledHit |= hit.shaderName == "PointwiseGraphShader" &&
+                        PointwiseGraphShader::FD::domain().valueOf(hit.fragPermutationIndex,
+                                                                   "RESOURCE_KIND") == 1;
+          }
+          EXPECT_TRUE(tiledHit);
+        }
+        auto* bitmap = useBundle ? &candidate : &reference;
+        ASSERT_TRUE(bitmap->allocPixels(size, size));
+        auto* pixels = bitmap->lockPixels();
+        ASSERT_NE(pixels, nullptr);
+        ASSERT_TRUE(surface->readPixels(bitmap->info(), pixels));
+        bitmap->unlockPixels();
+        cache->setDiagnosticRecordingEnabled(false);
+        cache->unload();
+        context->globalCache()->clearPrograms();
+      }
+      ExpectBitmapsIdentical("three-tiled-inputs", candidate, reference, size, size);
+    }
+  }
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, PerlinGraphClipCoverageServedByteExact) {
+  constexpr int size = 64;
+  for (int clip = 0; clip < 3; ++clip) {
+    for (auto mode : {BlendMode::SrcOver, BlendMode::Src, BlendMode::Multiply}) {
+      SCOPED_TRACE(::testing::Message() << "clip=" << clip << " mode=" << static_cast<int>(mode));
+      auto noise = Shader::MakeFractalNoise(0.25f, 0.25f, 3, 6903);
+      auto shader = MakeDarkDensityFilter(noise, 0.25f)
+                        ->makeWithColorFilter(
+                            ColorFilter::Blend(Color(1.0f, 0.2f, 0.1f, 0.7f), BlendMode::SrcIn));
+      Bitmap reference;
+      Bitmap candidate;
+      for (bool useBundle : {false, true}) {
+        ContextScope scope;
+        auto* context = scope.getContext();
+        ASSERT_NE(context, nullptr);
+        auto* cache = context->precompiledShaderCache();
+        cache->unload();
+        if (useBundle) {
+          ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+        }
+        ScopedAOTStatsPause referencePause(context, !useBundle);
+        cache->setDecompositionEnabled(useBundle);
+        cache->setDiagnosticRecordingEnabled(true);
+        cache->resetStats();
+        context->globalCache()->clearPrograms();
+        context->globalCache()->resetProgramStats();
+        auto surface = Surface::Make(context, size, size);
+        ASSERT_NE(surface, nullptr);
+        auto* canvas = surface->getCanvas();
+        canvas->clear(Color(0.2f, 0.4f, 0.6f, 1.0f));
+        if (clip > 0) {
+          Path mask;
+          mask.moveTo(5.25f, 5.5f);
+          mask.lineTo(59.5f, 14.25f);
+          mask.lineTo(37.25f, 58.5f);
+          mask.lineTo(13.5f, 38.25f);
+          mask.close();
+          canvas->clipPath(mask, true);
+        }
+        if (clip != 1) {
+          canvas->clipRect(Rect::MakeLTRB(8.25f, 9.5f, 55.75f, 54.25f), true);
+        }
+        Paint paint;
+        paint.setShader(shader);
+        paint.setAlpha(0.25f);
+        paint.setBlendMode(mode);
+        canvas->drawRect(Rect::MakeLTRB(2.25f, 3.5f, 61.25f, 60.5f), paint);
+        context->flushAndSubmit(true);
+        if (useBundle) {
+          EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+          EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+          bool graphHit = false;
+          for (const auto& hit : cache->hitRecords()) {
+            graphHit |= hit.shaderName == "PointwiseGraphShader";
+          }
+          EXPECT_TRUE(graphHit);
+          EXPECT_EQ(cache->drawStats().planMaterializedEdges, 0u);
+        }
+        auto* bitmap = useBundle ? &candidate : &reference;
+        ASSERT_TRUE(bitmap->allocPixels(size, size));
+        auto* pixels = bitmap->lockPixels();
+        ASSERT_NE(pixels, nullptr);
+        ASSERT_TRUE(surface->readPixels(bitmap->info(), pixels));
+        bitmap->unlockPixels();
+        cache->setDiagnosticRecordingEnabled(false);
+        cache->unload();
+        context->globalCache()->clearPrograms();
+      }
+      ExpectBitmapsIdentical("perlin-graph-clip", candidate, reference, size, size);
     }
   }
 }
@@ -7471,7 +7642,22 @@ TGFX_TEST(AOTRenderConsistencyTest, FiltersSceneAOTMatchesJIT) {
   ASSERT_TRUE(bundle.first != nullptr && bundle.second > 0);
   ASSERT_TRUE(cache->loadBundle(bundle.first, bundle.second));
   context->globalCache()->clearPrograms();
+  context->globalCache()->resetProgramStats();
+  cache->setDiagnosticRecordingEnabled(true);
+  cache->resetStats();
   auto aotBitmap = RenderFiltersScene(context);
+  EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+  EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+  EXPECT_EQ(cache->drawStats().fpFlattenEdges, 0u);
+  EXPECT_EQ(cache->drawStats().planMaterializedEdges, 0u);
+  bool tiledGraphHit = false;
+  for (const auto& hit : cache->hitRecords()) {
+    tiledGraphHit |=
+        hit.shaderName == "PointwiseGraphShader" &&
+        PointwiseGraphShader::FD::domain().valueOf(hit.fragPermutationIndex, "RESOURCE_KIND") == 1;
+  }
+  EXPECT_TRUE(tiledGraphHit);
+  cache->setDiagnosticRecordingEnabled(false);
   cache->unload();
 
   auto* jitPixels = static_cast<const uint32_t*>(const_cast<Bitmap&>(jitBitmap).lockPixels());
@@ -7501,11 +7687,8 @@ TGFX_TEST(AOTRenderConsistencyTest, FiltersSceneAOTMatchesJIT) {
   const_cast<Bitmap&>(aotBitmap).unlockPixels();
   std::printf("[FiltersProbe] diffPixels=%zu/%zu maxChannelDelta=%d\n", diffCount, pixelCount,
               maxChannelDelta);
-  // The AOT materialization retry inserts an FPFlatten RGBA8 texture and resamples it, while the
-  // runtime reference keeps the filter subtree inline. Refusing that retry removes this residual
-  // but falls back to JIT for the complex draw; it is not evidence of a chain arithmetic fix.
-  // Bound the current 1-LSB result while retaining the precompiled-route coverage checks above.
-  EXPECT_LE(maxChannelDelta, 1);
+  EXPECT_EQ(maxChannelDelta, 0);
+  EXPECT_EQ(diffCount, 0u);
 }
 
 // Renders the GlassStyleEllipticalCornerSingleCell scene once and reads the result back: a

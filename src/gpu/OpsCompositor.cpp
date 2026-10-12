@@ -1421,7 +1421,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
           AOTEffectDecomposer::Decompose(foldedGraph, &foldedPlan) &&
           foldedPlan.passes.size() == 1 &&
           (foldedPlan.passes[0].kernel == AOTKernelKind::PointwiseTail ||
-           foldedPlan.passes[0].kernel == AOTKernelKind::PointwiseChain ||
+           IsAOTPointwiseDAGKernel(foldedPlan.passes[0].kernel) ||
            foldedPlan.passes[0].kernel == AOTKernelKind::PerlinNoiseFill ||
            foldedPlan.passes[0].kernel == AOTKernelKind::YUVTextureFill)) {
         // The mask now travels inside the color chain, so the terminal draw must not apply it
@@ -1474,7 +1474,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     // tail plans are refused here so over-budget chains keep the runtime path as their reference.
     if (mainDecompose && plan.passes.size() == 1 &&
         (plan.passes[0].kernel == AOTKernelKind::PointwiseTail ||
-         plan.passes[0].kernel == AOTKernelKind::PointwiseChain ||
+         IsAOTPointwiseDAGKernel(plan.passes[0].kernel) ||
          plan.passes[0].kernel == AOTKernelKind::PerlinNoiseFill ||
          plan.passes[0].kernel == AOTKernelKind::YUVTextureFill)) {
       auto task = AOTPlanExecutor::Make(context, renderFlags, graph, plan, *deviceBounds,
@@ -1524,7 +1524,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
       // processor straight from the image), so the rebuild can also come from a closure the
       // flush site captured. Trailing processors behind the rebuilt one (e.g. a
       // ColorSpaceXformEffect) stay on the op and ride along the retry.
-      bool canRebuild = !flipRisk && (brush.shader != nullptr || rebuildColorChain != nullptr);
+      bool canRebuild = !op->hasCoverage() && !flipRisk &&
+                        (brush.shader != nullptr || rebuildColorChain != nullptr);
       if (canRebuild && colorProcessors.size() >= 1) {
         auto* xfer = colorProcessors[0];
         bool nested = (args.renderFlags & InternalRenderFlags::NestedRasterization) != 0;
@@ -1562,7 +1563,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
                   AOTEffectDecomposer::Decompose(retryGraph, &retryPlan) &&
                   retryPlan.passes.size() == 1 &&
                   (retryPlan.passes[0].kernel == AOTKernelKind::PointwiseTail ||
-                   retryPlan.passes[0].kernel == AOTKernelKind::PointwiseChain ||
+                   IsAOTPointwiseDAGKernel(retryPlan.passes[0].kernel) ||
                    retryPlan.passes[0].kernel == AOTKernelKind::PerlinNoiseFill)) {
                 auto task = AOTPlanExecutor::Make(context, renderFlags, retryGraph, retryPlan,
                                                   *deviceBounds, renderTarget, &op, Point::Zero());

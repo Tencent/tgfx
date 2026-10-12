@@ -277,6 +277,8 @@ static const char* OffscreenKernelName(AOTKernelKind kernel) {
       return "TexturedLuma";
     case AOTKernelKind::PointwiseChain:
       return "PointwiseChain";
+    case AOTKernelKind::PointwiseGraph:
+      return "PointwiseGraph";
     case AOTKernelKind::PointwiseTail:
       return "PointwiseTail";
     case AOTKernelKind::PerlinNoiseFill:
@@ -324,6 +326,8 @@ OffscreenFillKey PrecompiledShaderCache::recordOffscreenFillAnalysis(
           stats.multiPassPlans++;
         } else if (kernels.size() == 1 && kernels[0] == AOTKernelKind::PointwiseChain) {
           stats.pointwiseChainPlans++;
+        } else if (kernels.size() == 1 && kernels[0] == AOTKernelKind::PointwiseGraph) {
+          stats.pointwiseGraphPlans++;
         } else if (kernels.size() == 1 && kernels[0] == AOTKernelKind::PointwiseTail) {
           stats.pointwiseTailPlans++;
         }
@@ -392,6 +396,7 @@ OffscreenFillStats PrecompiledShaderCache::offscreenFillStats() const {
     total.decomposeSucceeded += stats.decomposeSucceeded;
     total.canExecute += stats.canExecute;
     total.pointwiseChainPlans += stats.pointwiseChainPlans;
+    total.pointwiseGraphPlans += stats.pointwiseGraphPlans;
     total.pointwiseTailPlans += stats.pointwiseTailPlans;
     total.multiPassPlans += stats.multiPassPlans;
     total.precompiledPrograms += stats.precompiledPrograms;

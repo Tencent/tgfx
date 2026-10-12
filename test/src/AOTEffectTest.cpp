@@ -43,6 +43,7 @@
 #include "gpu/resources/TextureView.h"
 #include "gpu/shaders/PermutationRules.h"
 #include "gpu/shaders/level1/PointwiseChainShader.h"
+#include "gpu/shaders/level1/PointwiseGraphShader.h"
 #include "gtest/gtest.h"
 #include "layers/NoiseDensityUtils.h"
 #include "tgfx/core/BlendMode.h"
@@ -305,6 +306,13 @@ TGFX_TEST(AOTEffectTest, TiledHardwareSamplingSnapshotMatchesLowering) {
   // Hardware-resolved tiling (shader mode None on both axes) is chain-compatible: the kernel
   // samples through the resolved hardware sampler with a no-op subset clamp.
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+  auto wrongFamily = plan;
+  wrongFamily.passes[0].kernel = AOTKernelKind::PointwiseGraph;
+  EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, wrongFamily));
+  EXPECT_EQ(AOTChainBuilder::BuildChainProcessor(&allocator, graph, wrongFamily.passes[0]),
+            nullptr);
+  EXPECT_EQ(AOTChainBuilder::BuildFPForPass(&allocator, graph, wrongFamily.passes[0], nullptr),
+            nullptr);
 }
 
 TGFX_TEST(AOTEffectTest, TiledShaderModesAndStrictSubsetMatchLowering) {
@@ -481,16 +489,13 @@ TGFX_TEST(AOTEffectTest, ChainKeepsIndependentRecipesForTwoTiledLeaves) {
   }
 }
 
-TGFX_TEST(AOTEffectTest, ChainRejectsThirdShaderTiledLeaf) {
+TGFX_TEST(AOTEffectTest, ThreeTiledLeavesUseGraphAndFourthIsRejected) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
   BlockAllocator allocator;
   auto sampleArea = Rect::MakeXYWH(1, 1, 6, 4);
-  // Three tiled leaves (nested two-child blends): the first two ride the two recipe sets through
-  // TiledLeafIndex/TiledLeafIndex2, but the kernel has no third selector —
-  // the capacity boundary is MaxShaderTiledChainLeaves, and both the planner and CanExecute must
-  // enforce it rather than let a third leaf silently fall to the plain Subset-clamp path.
+  // Three independent tiled leaves require the extended profile, not an RGBA8 intermediate.
   auto makeLeaf = [&]() {
     return MakeTiledTextureProcessor(context, &allocator, TileMode::Decal, TileMode::Clamp,
                                      PixelFormat::RGBA_8888, SrcRectConstraint::Strict, sampleArea);
@@ -511,7 +516,169 @@ TGFX_TEST(AOTEffectTest, ChainRejectsThirdShaderTiledLeaf) {
   AOTEffectGraph graph;
   ASSERT_TRUE(AOTEffectDecomposer::Lower({outer.get()}, &graph));
   AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+  ASSERT_EQ(plan.passes.size(), 1u);
+  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseGraph);
+  EXPECT_EQ(plan.passes[0].resourceProfile, AOTResourceProfile::TiledGraph);
+  EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+  auto rebuilt = AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]);
+  ASSERT_NE(rebuilt, nullptr);
+  const auto* chain = static_cast<const AOTPointwiseChainProcessor*>(rebuilt.get());
+  EXPECT_EQ(chain->resourceProfile(), AOTResourceProfile::TiledGraph);
+  EXPECT_EQ(chain->tiledLeafParameters().size(), 3u);
+  auto wrongProfile = plan;
+  wrongProfile.passes[0].kernel = AOTKernelKind::PointwiseChain;
+  wrongProfile.passes[0].resourceProfile = AOTResourceProfile::Chain;
+  EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, wrongProfile));
+  auto rect = RectEffect::Make(&allocator, Rect::MakeLTRB(1.5f, 1.5f, 6.5f, 4.5f));
+  ASSERT_NE(rect, nullptr);
+  EXPECT_EQ(
+      AOTChainBuilder::BuildChainProcessor(&allocator, graph, wrongProfile.passes[0], {rect.get()}),
+      nullptr);
+
+  auto fourth = makeLeaf();
+  ASSERT_NE(fourth, nullptr);
+  auto tooWide = XfermodeFragmentProcessor::MakeFromTwoProcessors(
+      &allocator, std::move(outer), std::move(fourth), BlendMode::SrcOver);
+  ASSERT_NE(tooWide, nullptr);
+  AOTEffectGraph wideGraph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({tooWide.get()}, &wideGraph));
+  AOTEffectPlan widePlan;
+  EXPECT_FALSE(AOTEffectDecomposer::Decompose(wideGraph, &widePlan));
+}
+
+TGFX_TEST(AOTEffectTest, DirectProcessorRequiresExplicitThreeRecipeProfile) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto tiled = MakeTiledTextureProcessor(context, &allocator, TileMode::Decal, TileMode::Clamp,
+                                         PixelFormat::RGBA_8888, SrcRectConstraint::Strict,
+                                         Rect::MakeXYWH(1, 1, 6, 4));
+  ASSERT_NE(tiled, nullptr);
+  auto recipe = static_cast<TiledTextureEffect*>(tiled.get())->resolveSampling();
+  ASSERT_NE(recipe, nullptr);
+  auto build = [&](AOTResourceProfile profile, int additionalIndex, size_t additionalCount) {
+    std::vector<PlacementPtr<FragmentProcessor>> leaves;
+    std::vector<AOTChainSlot> slots(4);
+    for (int index = 0; index < 4; ++index) {
+      auto leaf = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
+      if (leaf == nullptr) {
+        return PlacementPtr<AOTPointwiseChainProcessor>(nullptr);
+      }
+      leaves.push_back(std::move(leaf));
+      slots[static_cast<size_t>(index)].op = AOTChainOp::Texture;
+      slots[static_cast<size_t>(index)].outRegister = index;
+    }
+    std::vector<AOTChainTiledLeaf> extra;
+    for (size_t index = 0; index < additionalCount; ++index) {
+      extra.push_back({additionalIndex + static_cast<int>(index), *recipe});
+    }
+    return AOTPointwiseChainProcessor::Make(&allocator, std::move(leaves), slots, 3, 0, recipe,
+                                            nullptr, -1, ~0u, nullptr, -1, {}, false, -1, 1, recipe,
+                                            profile, extra);
+  };
+  EXPECT_EQ(build(AOTResourceProfile::Automatic, 2, 1), nullptr);
+  EXPECT_EQ(build(AOTResourceProfile::Chain, 2, 1), nullptr);
+  EXPECT_NE(build(AOTResourceProfile::TiledGraph, 2, 1), nullptr);
+  EXPECT_EQ(build(AOTResourceProfile::TiledGraph, 1, 1), nullptr);
+  EXPECT_EQ(build(AOTResourceProfile::TiledGraph, 4, 1), nullptr);
+  EXPECT_EQ(build(AOTResourceProfile::TiledGraph, 2, 2), nullptr);
+  EXPECT_EQ(build(static_cast<AOTResourceProfile>(99), 2, 1), nullptr);
+}
+
+TGFX_TEST(AOTEffectTest, ResourceProfilesRejectInvalidAndOverBudgetDemands) {
+  AOTResourceDemand demand = {};
+  demand.leafBindings = 3;
+  demand.tiledRecipes = 2;
+  EXPECT_EQ(SelectAOTResourceProfile(demand), AOTResourceProfile::Chain);
+  demand.tiledRecipes = 3;
+  EXPECT_EQ(SelectAOTResourceProfile(demand), AOTResourceProfile::TiledGraph);
+  EXPECT_FALSE(FitsAOTResourceProfile(demand, AOTResourceProfile::Chain));
+  demand.tiledRecipes = 4;
+  EXPECT_EQ(SelectAOTResourceProfile(demand), AOTResourceProfile::Automatic);
+  demand.tiledRecipes = 0;
+  demand.noiseSources = 1;
+  EXPECT_EQ(SelectAOTResourceProfile(demand), AOTResourceProfile::NoiseGraph);
+  demand.gradients = 1;
+  EXPECT_EQ(SelectAOTResourceProfile(demand), AOTResourceProfile::Automatic);
+  demand = {};
+  demand.instructions = 33;
+  EXPECT_EQ(SelectAOTResourceProfile(demand), AOTResourceProfile::Automatic);
+  demand = {};
+  demand.registers = 17;
+  EXPECT_EQ(SelectAOTResourceProfile(demand), AOTResourceProfile::Automatic);
+  demand = {};
+  demand.leafBindings = 5;
+  EXPECT_EQ(SelectAOTResourceProfile(demand), AOTResourceProfile::Automatic);
+  EXPECT_FALSE(FitsAOTResourceProfile({}, static_cast<AOTResourceProfile>(99)));
+}
+
+TGFX_TEST(AOTEffectTest, DAGAdmissionChecksActualRegisterPressure) {
+  AOTNodeBuilder builder;
+  AOTNodeID geometry;
+  ASSERT_TRUE(builder.addGeometryColor(&geometry));
+  std::vector<AOTNodeID> constants;
+  for (int index = 0; index < 17; ++index) {
+    AOTConstColorParameters params;
+    params.color = {0.1f, 0.2f, 0.3f, 1.0f};
+    AOTNodeID node;
+    ASSERT_TRUE(builder.addConstColor(geometry, params, &node));
+    constants.push_back(node);
+  }
+  auto combine = [&](size_t first, size_t last) {
+    AOTNodeID result = constants[first];
+    for (size_t index = first + 1; index < last; ++index) {
+      AOTBlendParameters blend;
+      blend.blendMode = static_cast<int>(BlendMode::SrcOver);
+      AOTNodeID node;
+      if (!builder.addBlend(result, constants[index], blend, &node)) {
+        return AOTNodeID::Invalid();
+      }
+      result = node;
+    }
+    return result;
+  };
+  auto root = combine(0, 9);
+  ASSERT_TRUE(root.isValid());
+  ASSERT_TRUE(combine(9, 17).isValid());
+  AOTEffectGraph graph;
+  ASSERT_TRUE(builder.finish(root, &graph));
+  AOTEffectPlan plan;
   EXPECT_FALSE(AOTEffectDecomposer::Decompose(graph, &plan));
+}
+
+TGFX_TEST(AOTEffectTest, CoverageRecipeCanPromoteChainToGraph) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto sampleArea = Rect::MakeXYWH(1, 1, 6, 4);
+  auto makeLeaf = [&]() {
+    return MakeTiledTextureProcessor(context, &allocator, TileMode::Decal, TileMode::Clamp,
+                                     PixelFormat::RGBA_8888, SrcRectConstraint::Strict, sampleArea);
+  };
+  auto first = makeLeaf();
+  auto second = makeLeaf();
+  auto coverage = makeLeaf();
+  ASSERT_NE(first, nullptr);
+  ASSERT_NE(second, nullptr);
+  ASSERT_NE(coverage, nullptr);
+  auto blend = XfermodeFragmentProcessor::MakeFromTwoProcessors(
+      &allocator, std::move(first), std::move(second), BlendMode::SrcOver);
+  ASSERT_NE(blend, nullptr);
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({blend.get()}, &graph));
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+  EXPECT_EQ(plan.passes[0].resourceProfile, AOTResourceProfile::Chain);
+  auto rebuilt =
+      AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0], {coverage.get()});
+  ASSERT_NE(rebuilt, nullptr);
+  const auto* chain = static_cast<const AOTPointwiseChainProcessor*>(rebuilt.get());
+  EXPECT_EQ(chain->resourceProfile(), AOTResourceProfile::TiledGraph);
+  EXPECT_EQ(chain->tiledLeafParameters().size(), 3u);
+  EXPECT_GE(chain->coverageRoot(), 0);
 }
 
 TGFX_TEST(AOTEffectTest, TiledAlphaOnlySnapshotMatchesLowering) {
@@ -1387,9 +1554,18 @@ TGFX_TEST(AOTEffectTest, PerlinDensityBranchesShareLookupResources) {
           AOTEffectPlan plan;
           ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
           ASSERT_EQ(plan.passes.size(), 1u);
-          EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
+          EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseGraph);
           EXPECT_FALSE(plan.passes[0].materializesOutput);
           ASSERT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+          auto wrongFamily = plan;
+          wrongFamily.passes[0].kernel = AOTKernelKind::PointwiseChain;
+          EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, wrongFamily));
+          EXPECT_EQ(AOTChainBuilder::BuildChainProcessor(context->drawingAllocator(), graph,
+                                                         wrongFamily.passes[0]),
+                    nullptr);
+          EXPECT_EQ(AOTChainBuilder::BuildFPForPass(context->drawingAllocator(), graph,
+                                                    wrongFamily.passes[0], nullptr),
+                    nullptr);
           auto rebuilt = AOTChainBuilder::BuildChainProcessor(context->drawingAllocator(), graph,
                                                               plan.passes[0]);
           ASSERT_NE(rebuilt, nullptr);
@@ -1402,50 +1578,73 @@ TGFX_TEST(AOTEffectTest, PerlinDensityBranchesShareLookupResources) {
   }
 }
 
-TGFX_TEST(AOTEffectTest, NoiseChainPermutationsRemainBounded) {
+TGFX_TEST(AOTEffectTest, PointwiseGraphPermutationsAreIndependentAndBounded) {
   PointwiseChainInputs inputs;
   inputs.gpKind = 1;
   inputs.hasCoverage = true;
   inputs.textureCount = 1;
   inputs.hasNoise = true;
-  std::set<std::pair<uint32_t, uint32_t>> noisePairs;
+  std::set<std::pair<uint32_t, uint32_t>> graphPairs;
   for (int xp = 0; xp < 3; ++xp) {
     inputs.xpType = xp;
-    auto composed = ComposePointwiseChain(inputs);
+    auto composed = ComposePointwiseGraph(inputs);
     ASSERT_TRUE(composed.has_value());
-    EXPECT_EQ(composed->fragValues[PointwiseChainShader::FD::HAS_NOISE], 1);
-    noisePairs.insert({PointwiseChainShader::VD::domain().encode(composed->vertValues),
-                       PointwiseChainShader::FD::domain().encode(composed->fragValues)});
+    EXPECT_TRUE(composed->vertValues.empty());
+    EXPECT_EQ(composed->fragValues[PointwiseGraphShader::FD::HAS_XP], xp);
+    graphPairs.insert({PointwiseGraphShader::VD::domain().encode(composed->vertValues),
+                       PointwiseGraphShader::FD::domain().encode(composed->fragValues)});
+    EXPECT_FALSE(ComposePointwiseChain(inputs).has_value());
     inputs.hasNoise = false;
-    auto plain = ComposePointwiseChain(inputs);
-    ASSERT_TRUE(plain.has_value());
-    EXPECT_EQ(plain->vertValues, composed->vertValues);
-    EXPECT_EQ(plain->fragValues[PointwiseChainShader::FD::HAS_NOISE], 0);
+    EXPECT_TRUE(ComposePointwiseChain(inputs).has_value());
+    EXPECT_FALSE(ComposePointwiseGraph(inputs).has_value());
     inputs.hasNoise = true;
+    auto masked = inputs;
+    masked.hasMask = true;
+    masked.hasCoverageSubtree = true;
+    auto maskedValues = ComposePointwiseGraph(masked);
+    ASSERT_TRUE(maskedValues.has_value());
+    EXPECT_EQ(maskedValues->vertValues, composed->vertValues);
+    EXPECT_EQ(maskedValues->fragValues, composed->fragValues);
   }
-  EXPECT_EQ(noisePairs.size(), 3u);
-  const auto reachable = EnumeratePointwiseChainReachable();
-  EXPECT_EQ(reachable.size(), 57u);
-  size_t noiseCount = 0;
-  for (const auto& pair : reachable) {
-    if (PointwiseChainShader::FD::domain().valueOf(pair.second, "HAS_NOISE") == 1) {
-      ++noiseCount;
-      EXPECT_NE(noisePairs.find(pair), noisePairs.end());
-    }
+  EXPECT_EQ(graphPairs.size(), 3u);
+  for (int xp = 0; xp < 3; ++xp) {
+    auto tiled = inputs;
+    tiled.hasNoise = false;
+    tiled.resourceProfile = AOTResourceProfile::TiledGraph;
+    tiled.xpType = xp;
+    auto composed = ComposePointwiseGraph(tiled);
+    ASSERT_TRUE(composed.has_value());
+    EXPECT_EQ(composed->fragValues[PointwiseGraphShader::FD::RESOURCE_KIND], 1);
+    graphPairs.insert({PointwiseGraphShader::VD::domain().encode(composed->vertValues),
+                       PointwiseGraphShader::FD::domain().encode(composed->fragValues)});
+    EXPECT_FALSE(ComposePointwiseChain(tiled).has_value());
+    tiled.hasNoise = true;
+    EXPECT_FALSE(ComposePointwiseGraph(tiled).has_value());
   }
-  EXPECT_EQ(noiseCount, 3u);
+  EXPECT_EQ(graphPairs.size(), 6u);
+  EXPECT_EQ(EnumeratePointwiseGraphReachable(), graphPairs);
+  EXPECT_EQ(EnumeratePointwiseChainReachable().size(), 54u);
+  EXPECT_EQ(EnumerateReachablePermutations("PointwiseGraphShader"), graphPairs);
   auto unsupported = inputs;
   unsupported.gpKind = 0;
-  EXPECT_FALSE(ComposePointwiseChain(unsupported).has_value());
+  EXPECT_FALSE(ComposePointwiseGraph(unsupported).has_value());
   unsupported = inputs;
   unsupported.hasUVCoord = true;
-  EXPECT_FALSE(ComposePointwiseChain(unsupported).has_value());
+  EXPECT_FALSE(ComposePointwiseGraph(unsupported).has_value());
   unsupported = inputs;
   unsupported.hasColor = true;
-  EXPECT_FALSE(ComposePointwiseChain(unsupported).has_value());
+  EXPECT_FALSE(ComposePointwiseGraph(unsupported).has_value());
   unsupported = inputs;
   unsupported.textureCount = 0;
-  EXPECT_FALSE(ComposePointwiseChain(unsupported).has_value());
+  EXPECT_FALSE(ComposePointwiseGraph(unsupported).has_value());
+  unsupported = inputs;
+  unsupported.hasCoverage = false;
+  EXPECT_FALSE(ComposePointwiseGraph(unsupported).has_value());
+  for (int xp : {-1, 3}) {
+    unsupported = inputs;
+    unsupported.xpType = xp;
+    EXPECT_FALSE(ComposePointwiseGraph(unsupported).has_value());
+  }
 }
 
 TGFX_TEST(AOTEffectTest, PerlinDAGRejectsDistinctNoiseAndPrunesUnusedInputs) {
@@ -1895,6 +2094,9 @@ TGFX_TEST(AOTEffectTest, PerlinNoisePlusTwoOpsFusesToSinglePass) {
             std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(2), AOTNodeID(3)}));
   EXPECT_FALSE(plan.passes[0].materializesOutput);
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+  auto invalidProfile = plan;
+  invalidProfile.passes[0].resourceProfile = static_cast<AOTResourceProfile>(99);
+  EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, invalidProfile));
 }
 
 // Shader::makeWithColorFilter(ColorFilter::Blend(c, mode)) lowers to Perlin -> Xfermode-src(Const).
