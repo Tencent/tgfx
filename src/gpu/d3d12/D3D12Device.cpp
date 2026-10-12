@@ -142,7 +142,6 @@ std::shared_ptr<D3D12Device> D3D12Device::MakeFrom(void* device) {
     return nullptr;
   }
   auto result = std::shared_ptr<D3D12Device>(new D3D12Device(std::move(gpu)));
-  result->weakThis = result;
   return result;
 }
 

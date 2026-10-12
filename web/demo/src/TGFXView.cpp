@@ -24,6 +24,9 @@ namespace hello2d {
 TGFXView::TGFXView(const std::string& canvasID) : TGFXBaseView(canvasID) {
 }
 
+TGFXView::TGFXView(emscripten::val canvas) : TGFXBaseView(std::move(canvas)) {
+}
+
 void TGFXView::registerFonts() {
   auto typeface = tgfx::Typeface::MakeFromName("default", "Regular");
   if (typeface) {

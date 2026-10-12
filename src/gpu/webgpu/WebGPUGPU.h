@@ -36,7 +36,8 @@ class WebGPUResource;
  */
 class WebGPUGPU : public GPU {
  public:
-  static std::unique_ptr<WebGPUGPU> Make(WGPUDevice device, bool externallyOwned = false);
+  static std::unique_ptr<WebGPUGPU> Make(WGPUDevice device, bool externallyOwned = false,
+                                         bool ownsRuntimeRegistration = false);
 
   ~WebGPUGPU();
 
@@ -117,12 +118,22 @@ class WebGPUGPU : public GPU {
   const MipmapPipeline* getMipmapPipeline(WGPUTextureFormat format);
 
  private:
-  explicit WebGPUGPU(WGPUDevice device, bool externallyOwned);
+  // Holds the initial refs created when importing a JS GPUDevice. Declared before the GPU members so
+  // it is destroyed after the command queue and other objects using those runtime handles.
+  struct RuntimeRegistration {
+    WGPUDevice device = nullptr;
+    WGPUQueue queue = nullptr;
+
+    ~RuntimeRegistration();
+  };
+
+  explicit WebGPUGPU(WGPUDevice device, bool externallyOwned, bool ownsRuntimeRegistration);
 
   std::shared_ptr<WebGPUResource> addResource(WebGPUResource* resource);
 
   static uint32_t MakeSamplerKey(const SamplerDescriptor& descriptor);
 
+  RuntimeRegistration runtimeRegistration = {};
   WGPUDevice webgpuDevice = nullptr;
   bool _externallyOwned = false;
   std::unique_ptr<WebGPUCaps> caps = nullptr;

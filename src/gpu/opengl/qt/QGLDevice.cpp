@@ -20,6 +20,7 @@
 #include <QApplication>
 #include <QThread>
 #include "core/utils/Log.h"
+#include "gpu/DeviceRegistry.h"
 #include "gpu/opengl/qt/QGLGPU.h"
 
 namespace tgfx {
@@ -90,7 +91,7 @@ std::shared_ptr<QGLDevice> QGLDevice::Wrap(QOpenGLContext* qtContext, QSurface* 
     device->externallyOwned = externallyOwned;
     device->qtContext = qtContext;
     device->qtSurface = qtSurface;
-    device->weakThis = device;
+    device = std::static_pointer_cast<QGLDevice>(Device::RegisterNative(device, {qtContext}));
   }
   if (oldContext != qtContext) {
     qtContext->doneCurrent();
