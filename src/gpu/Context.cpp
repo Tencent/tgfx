@@ -145,7 +145,7 @@ void Context::submit(std::unique_ptr<Recording> recording, bool syncCpu) {
         }
       }
       // Wire the frame synchronizations into the upcoming submission, then attach the batch's
-      // presentation requests, so each presentation is encoded/ordered with the command buffer
+      // window presentations, so each presentation is encoded/ordered with the command buffer
       // of the batch it was registered on.
       drawingBuffer->attachFrameUsages(this);
       drawingBuffer->schedulePresents(this);

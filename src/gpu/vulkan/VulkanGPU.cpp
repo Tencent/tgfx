@@ -789,7 +789,7 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
   //
   //   (b) Per-frame swapchain semaphores — standard Vulkan presentation sync. The first
   //       submission that uses an acquired image waits on its imageAvailable semaphore; the
-  //       submission of the batch carrying the presentation request signals the image's
+  //       submission of the batch that presents the frame signals the image's
   //       presentation semaphore and queues the present. The two are independent: an acquire
   //       wait never implies a presentation.
   //

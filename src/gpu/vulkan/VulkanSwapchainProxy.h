@@ -61,7 +61,7 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
   /**
    * Frame-level wiring, independent of the VulkanWindow: makes a batch that uses the frame wait
    * for its acquisition, whether or not a presentation was registered for that batch. The frame
-   * stays open; it is only presented by the batch carrying the presentation request.
+   * stays open; it is only presented by the batch that draws into it.
    */
   void onAttachSubmission(Context* context) override;
 

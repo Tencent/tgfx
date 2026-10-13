@@ -200,7 +200,7 @@ class VulkanGPU : public GPU {
 
     // A swapchain frame wired into this submission. An entry either waits for the image
     // acquisition (imageAvailable set; the first submission that uses the frame) or presents the
-    // image (presents true; the submission of the batch carrying the presentation request), and
+    // image (presents true; the submission of the batch that presents the frame), and
     // never both: acquire waits never imply a presentation.
     struct PresentInfo {
       VkSwapchainKHR swapchain = VK_NULL_HANDLE;
