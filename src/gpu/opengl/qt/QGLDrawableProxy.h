@@ -30,9 +30,6 @@ class QGLDrawableProxy : public RenderTargetProxy {
 
   Context* getContext() const override;
   void onPresentFrame(Context* context) override;
-  bool isWindowBacked() const override {
-    return true;
-  }
   int width() const override;
   int height() const override;
   PixelFormat format() const override;

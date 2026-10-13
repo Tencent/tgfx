@@ -46,6 +46,9 @@ class DrawableSurface : public Surface {
   void onCollectFrame(DrawingManager* drawingManager,
                       const std::shared_ptr<RenderTargetProxy>& renderTarget) override;
 
+  void onCollectFrameUsage(DrawingManager* drawingManager,
+                           const std::shared_ptr<RenderTargetProxy>& renderTarget) override;
+
   bool onValidateDraw() const override;
 
   bool onValidateReadback() const override;

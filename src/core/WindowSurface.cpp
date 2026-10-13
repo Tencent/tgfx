@@ -57,7 +57,19 @@ WindowSurface::WindowSurface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t 
 void WindowSurface::onCollectFrame(DrawingManager* drawingManager,
                                    const std::shared_ptr<RenderTargetProxy>& renderTarget) {
   if (drawingManager != nullptr && _window != nullptr && renderTarget != nullptr) {
+    // Drawing into the window frame: the batch uses the frame and, on the automatic path,
+    // presents it once at the end of the batch.
+    drawingManager->collectFrameUsage(renderTarget);
     drawingManager->collectWindow(_window, renderTarget);
+  }
+}
+
+void WindowSurface::onCollectFrameUsage(DrawingManager* drawingManager,
+                                        const std::shared_ptr<RenderTargetProxy>& renderTarget) {
+  if (drawingManager != nullptr && renderTarget != nullptr) {
+    // Reading the window frame (a readback or snapshot copy) only uses it; the presentation
+    // stays with the batches that draw into it.
+    drawingManager->collectFrameUsage(renderTarget);
   }
 }
 

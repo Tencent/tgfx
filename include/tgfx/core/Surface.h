@@ -232,13 +232,23 @@ class Surface {
  protected:
   /**
    * Called by RenderContext when a drawing pass opens on this surface (a new ops compositor is
-   * created for the current drawing buffer). Subclasses collect their frame into the drawing
-   * manager: WindowSurface collects the window's automatic presentation frame, DrawableSurface
-   * tracks its explicit drawable. Offscreen surfaces do nothing. The render target of the
-   * drawing pass is provided by the RenderContext.
+   * created for the current drawing buffer). Surfaces backed by presentable frames tell the
+   * drawing manager about it: WindowSurface declares the frame usage and requests the window's
+   * automatic presentation at the end of the batch, DrawableSurface tracks its explicit
+   * drawable. Offscreen surfaces do nothing. The render target of the drawing pass is provided
+   * by the RenderContext.
    */
   virtual void onCollectFrame(DrawingManager* drawingManager,
                               const std::shared_ptr<RenderTargetProxy>& renderTarget);
+
+  /**
+   * Called when work that reads this surface's render target without drawing into it (a
+   * readback transfer or a snapshot copy) is recorded on the current drawing buffer. Surfaces
+   * backed by presentable frames declare the frame usage, so the submission wires the frame
+   * acquisition synchronization; no presentation is requested. Offscreen surfaces do nothing.
+   */
+  virtual void onCollectFrameUsage(DrawingManager* drawingManager,
+                                   const std::shared_ptr<RenderTargetProxy>& renderTarget);
 
   /**
    * Returns true while the surface's frame accepts more drawing. Single-frame surfaces close

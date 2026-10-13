@@ -45,11 +45,8 @@ DrawingBuffer* DrawingManager::createDrawingBuffer() {
   return currentBuffer.get();
 }
 
-void DrawingManager::collectWindowUsage(const std::shared_ptr<RenderTargetProxy>& renderTarget) {
-  // Tasks that access a window-backed target record a frame usage on the current batch, so the
-  // submission wires the frame acquisition synchronization even for batches without a registered
-  // presentation (for example a readback-only transfer).
-  if (renderTarget == nullptr || !renderTarget->isWindowBacked()) {
+void DrawingManager::collectFrameUsage(std::shared_ptr<RenderTargetProxy> renderTarget) {
+  if (renderTarget == nullptr) {
     return;
   }
   auto drawingBuffer = getDrawingBuffer();
@@ -58,7 +55,7 @@ void DrawingManager::collectWindowUsage(const std::shared_ptr<RenderTargetProxy>
       return;
     }
   }
-  drawingBuffer->windowUsages.push_back(renderTarget);
+  drawingBuffer->windowUsages.push_back(std::move(renderTarget));
 }
 
 bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
@@ -66,7 +63,6 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   if (renderTarget == nullptr || processor == nullptr) {
     return false;
   }
-  collectWindowUsage(renderTarget);
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto bounds = Rect::MakeWH(renderTarget->width(), renderTarget->height());
@@ -99,7 +95,6 @@ void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderT
   if (renderTarget == nullptr || (drawOps.empty() && !clearColor.has_value())) {
     return;
   }
-  collectWindowUsage(renderTarget);
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto textureProxy = renderTarget->asTextureProxy();
@@ -116,7 +111,6 @@ void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> rende
   if (renderTarget == nullptr || inputs.empty() || effect == nullptr) {
     return;
   }
-  collectWindowUsage(renderTarget);
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto textureProxy = renderTarget->asTextureProxy();
@@ -142,7 +136,6 @@ void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> 
   if (source == nullptr || dest == nullptr) {
     return;
   }
-  collectWindowUsage(source);
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto task = allocator->make<RenderTargetCopyTask>(allocator, std::move(source), std::move(dest),
@@ -156,7 +149,6 @@ void DrawingManager::addTransferPixelsTask(std::shared_ptr<RenderTargetProxy> so
   if (source == nullptr || dest == nullptr || srcRect.isEmpty()) {
     return;
   }
-  collectWindowUsage(source);
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto task =

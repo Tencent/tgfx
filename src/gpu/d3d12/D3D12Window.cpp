@@ -74,9 +74,6 @@ class D3D12SwapchainProxy : public RenderTargetProxy {
   bool externallyOwned() const override {
     return true;
   }
-  bool isWindowBacked() const override {
-    return true;
-  }
 
   void onPresentFrame(Context*) override {
     // Keep the window (which owns the swap chain) alive for the duration of the present; once it

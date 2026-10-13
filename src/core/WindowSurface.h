@@ -39,6 +39,9 @@ class WindowSurface : public Surface {
   void onCollectFrame(DrawingManager* drawingManager,
                       const std::shared_ptr<RenderTargetProxy>& renderTarget) override;
 
+  void onCollectFrameUsage(DrawingManager* drawingManager,
+                           const std::shared_ptr<RenderTargetProxy>& renderTarget) override;
+
   bool onValidateReadback() const override;
 
  private:

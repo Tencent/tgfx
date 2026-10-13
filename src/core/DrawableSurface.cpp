@@ -59,6 +59,15 @@ void DrawableSurface::onCollectFrame(DrawingManager* drawingManager,
   }
 }
 
+void DrawableSurface::onCollectFrameUsage(DrawingManager* drawingManager,
+                                          const std::shared_ptr<RenderTargetProxy>&) {
+  // Reading the frame (a readback or snapshot copy) uses it like drawing does; the presentation
+  // is only registered explicitly through Context::present().
+  if (drawingManager != nullptr && _drawable != nullptr) {
+    drawingManager->collectDrawable(_drawable);
+  }
+}
+
 bool DrawableSurface::onValidateDraw() const {
   // A presentation has been registered for (or delivered to) this frame: the frame is closed
   // and must not be drawn into anymore. This is a pure frame-state check; the window's

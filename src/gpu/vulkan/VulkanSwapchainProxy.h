@@ -60,10 +60,6 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
   void releaseFrame();
   void presentFrame();
 
-  bool isWindowBacked() const override {
-    return true;
-  }
-
   /**
    * Frame-level wiring, independent of the VulkanWindow: makes a batch that uses the frame wait
    * for its acquisition, whether or not a presentation was registered for that batch. The frame

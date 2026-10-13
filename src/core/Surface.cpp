@@ -115,6 +115,9 @@ Surface::Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
 void Surface::onCollectFrame(DrawingManager*, const std::shared_ptr<RenderTargetProxy>&) {
 }
 
+void Surface::onCollectFrameUsage(DrawingManager*, const std::shared_ptr<RenderTargetProxy>&) {
+}
+
 bool Surface::onValidateDraw() const {
   return true;
 }
@@ -201,6 +204,7 @@ std::shared_ptr<Image> Surface::makeImageSnapshot() {
   if (textureProxy == nullptr || renderTarget->externallyOwned()) {
     textureProxy = renderTarget->makeTextureProxy();
     drawingManager->addRenderTargetCopyTask(renderTarget, textureProxy);
+    onCollectFrameUsage(drawingManager, renderTarget);
   }
   cachedImage = TextureImage::Wrap(std::move(textureProxy), colorSpace());
   return cachedImage;
@@ -247,7 +251,9 @@ std::shared_ptr<SurfaceReadback> Surface::asyncReadPixels(const Rect& rect) {
     return nullptr;
   }
   renderContext->flush();
-  context->drawingManager()->addTransferPixelsTask(renderTarget, srcRect, readbackBuffer);
+  auto drawingManager = context->drawingManager();
+  drawingManager->addTransferPixelsTask(renderTarget, srcRect, readbackBuffer);
+  onCollectFrameUsage(drawingManager, renderTarget);
   return std::shared_ptr<SurfaceReadback>(new SurfaceReadback(info, std::move(readbackBuffer)));
 }
 

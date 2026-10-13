@@ -46,10 +46,6 @@ class EAGLRenderTargetProxy final : public RenderTargetProxy {
     return proxy->getContext();
   }
 
-  bool isWindowBacked() const override {
-    return true;
-  }
-
   int width() const override {
     return proxy->width();
   }

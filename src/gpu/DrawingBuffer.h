@@ -106,9 +106,9 @@ class DrawingBuffer {
   // device strongly (see Window::_device).
   std::vector<std::shared_ptr<Drawable>> frameUsages = {};
 
-  // The window-backed targets accessed by this batch's tasks (including readback/copy transfers
-  // without a registered presentation), so the submission wires the frame acquisition
-  // synchronization for every frame it uses.
+  // The automatic window frames this batch uses, as declared by their surfaces (drawing passes as
+  // well as readback/copy transfers without a registered presentation), so the submission wires
+  // the frame acquisition synchronization for every frame it uses.
   std::vector<std::shared_ptr<RenderTargetProxy>> windowUsages = {};
 
   // The presentation requests registered on this batch. Entries are strong for the same reason

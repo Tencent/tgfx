@@ -82,11 +82,13 @@ class DrawingManager {
                         std::shared_ptr<ImageCodec> codec);
 
   /**
-   * Records a frame usage for the given render target on the current drawing batch when the
-   * target is window-backed (see RenderTargetProxy::isWindowBacked()), so the submission wires
-   * the frame acquisition synchronization. Called by every task-collecting entry point.
+   * Records that the current drawing batch uses the frame behind the given render target, so the
+   * submission wires the frame acquisition synchronization. Called by the surfaces backed by
+   * presentable frames (WindowSurface) whenever they record work on their target; the drawing
+   * manager does not inspect where a render target comes from. Recording a usage never requests
+   * a presentation.
    */
-  void collectWindowUsage(const std::shared_ptr<RenderTargetProxy>& renderTarget);
+  void collectFrameUsage(std::shared_ptr<RenderTargetProxy> renderTarget);
 
   /**
    * Collects a drawable-backed frame so that it is marked as submitted when the submission
