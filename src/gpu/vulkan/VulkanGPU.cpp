@@ -924,9 +924,6 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
       submission.ownedSemaphores.push_back(present.imageAvailable);
       present.imageAvailable = VK_NULL_HANDLE;
     }
-    if (present.frameState != nullptr) {
-      present.frameState->markRenderSubmitted();
-    }
     if (present.presents) {
       *present.layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     }
@@ -966,99 +963,6 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
         *present.outOfDate = true;
       }
     }
-  }
-}
-
-void VulkanGPU::presentNow(VkSwapchainKHR swapchain, uint32_t imageIndex, VkImage image,
-                           VkSemaphore presentSemaphore, std::shared_ptr<VkImageLayout> layout,
-                           std::shared_ptr<bool> outOfDate) {
-  if (contextLost) {
-    *outOfDate = true;
-    return;
-  }
-  pollCompletedSubmissions();
-
-  VkCommandPoolCreateInfo poolInfo = {};
-  poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-  poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-  poolInfo.queueFamilyIndex = queueFamilyIndex;
-  VkCommandPool pool = VK_NULL_HANDLE;
-  if (vkCreateCommandPool(vulkanDevice, &poolInfo, nullptr, &pool) != VK_SUCCESS) {
-    *outOfDate = true;
-    return;
-  }
-  VkCommandBufferAllocateInfo allocInfo = {};
-  allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  allocInfo.commandPool = pool;
-  allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  allocInfo.commandBufferCount = 1;
-  VkCommandBuffer cmd = VK_NULL_HANDLE;
-  if (vkAllocateCommandBuffers(vulkanDevice, &allocInfo, &cmd) != VK_SUCCESS) {
-    vkDestroyCommandPool(vulkanDevice, pool, nullptr);
-    *outOfDate = true;
-    return;
-  }
-  VkCommandBufferBeginInfo beginInfo = {};
-  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-  vkBeginCommandBuffer(cmd, &beginInfo);
-  VkImageMemoryBarrier barrier = {};
-  barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-  barrier.oldLayout = *layout;
-  barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.image = image;
-  barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-  barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
-  barrier.dstAccessMask = 0;
-  vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                       VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1,
-                       &barrier);
-  vkEndCommandBuffer(cmd);
-
-  VkSubmitInfo submitInfo = {};
-  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submitInfo.commandBufferCount = 1;
-  submitInfo.pCommandBuffers = &cmd;
-  submitInfo.signalSemaphoreCount = 1;
-  submitInfo.pSignalSemaphores = &presentSemaphore;
-  VkFence fence = acquireFence();
-  if (fence == VK_NULL_HANDLE) {
-    vkDestroyCommandPool(vulkanDevice, pool, nullptr);
-    *outOfDate = true;
-    return;
-  }
-  auto result = vkQueueSubmit(vulkanQueue, 1, &submitInfo, fence);
-  if (result != VK_SUCCESS) {
-    if (result == VK_ERROR_DEVICE_LOST) {
-      contextLost = true;
-    }
-    recycleFence(fence);
-    vkDestroyCommandPool(vulkanDevice, pool, nullptr);
-    *outOfDate = true;
-    return;
-  }
-  *layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-  InflightSubmission submission = {};
-  submission.fence = fence;
-  submission.session.commandPool = pool;
-  // Match normal submissions: frameTime is the submit time. It is later used to advance
-  // _lastFenceSignalTime when the fence is observed signaled; leaving it at epoch would
-  // regress the time and break scratch/uniform reuse.
-  submission.frameTime = std::chrono::steady_clock::now();
-  inflightSubmissions.push_back(std::move(submission));
-
-  VkPresentInfoKHR presentInfo = {};
-  presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-  presentInfo.swapchainCount = 1;
-  presentInfo.pSwapchains = &swapchain;
-  presentInfo.pImageIndices = &imageIndex;
-  presentInfo.waitSemaphoreCount = 1;
-  presentInfo.pWaitSemaphores = &presentSemaphore;
-  result = vkQueuePresentKHR(vulkanQueue, &presentInfo);
-  if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-    *outOfDate = true;
   }
 }
 

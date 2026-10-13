@@ -20,7 +20,6 @@
 #include "core/utils/UniqueID.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "tgfx/gpu/Drawable.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
@@ -61,47 +60,29 @@ std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
 }
 
 void DrawingBuffer::attachFrameUsages(Context* context) {
-  for (auto& drawable : frameUsages) {
-    if (drawable->_importedTarget != nullptr) {
-      drawable->_importedTarget->onAttachSubmission(context);
-    }
-  }
   for (auto& proxy : windowUsages) {
     proxy->onAttachSubmission(context);
   }
 }
 
 void DrawingBuffer::schedulePresents(Context* context) {
-  for (auto& pending : presentables) {
-    if (pending.proxy != nullptr) {
-      pending.proxy->onSchedulePresentation(context);
-    }
+  for (auto& proxy : presentables) {
+    proxy->onSchedulePresentation(context);
   }
 }
 
 void DrawingBuffer::deliverFrames(Context* context) {
-  for (auto& drawable : frameUsages) {
-    drawable->markSubmitted();
-  }
-  frameUsages.clear();
-  for (auto& pending : presentables) {
-    if (pending.proxy != nullptr) {
-      pending.proxy->onPresentFrame(context);
-    }
-    if (pending.drawable != nullptr) {
-      pending.drawable->markPresented();
-    }
+  for (auto& proxy : presentables) {
+    proxy->onPresentFrame(context);
   }
   presentables.clear();
   windowUsages.clear();
 }
 
 bool DrawingBuffer::empty() const {
-  // Note that frameUsages are intentionally not part of the emptiness check: drawable and window
-  // surfaces are always created with clearAll set to true, so their construction already queues
-  // a clear task, and collecting a frame therefore always comes with at least one task to
-  // encode. Presentations, on the other hand, can be the only content of a batch (a
-  // Context::present() call after the frame's rendering was submitted) and must not be dropped.
+  // Window frame usages are intentionally not part of the emptiness check: they always come with
+  // the task that uses the frame. Presentations are kept so that a batch whose drawing pass was
+  // opened on a window frame still delivers that frame.
   return resourceTasks.empty() && renderTasks.empty() && atlasTasks.empty() && presentables.empty();
 }
 
@@ -109,7 +90,6 @@ void DrawingBuffer::reset() {
   renderTasks.clear();
   resourceTasks.clear();
   atlasTasks.clear();
-  frameUsages.clear();
   windowUsages.clear();
   presentables.clear();
   vertexAllocator.clear(vertexMaxValueTracker.getMaxValue());

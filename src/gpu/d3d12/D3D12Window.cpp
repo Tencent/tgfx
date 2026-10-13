@@ -417,13 +417,13 @@ D3D12Window::D3D12Window(std::shared_ptr<Device> device, std::unique_ptr<Platfor
 D3D12Window::~D3D12Window() {
   // Intentionally do not lock the device here: the device uses a non-recursive mutex, and this
   // destructor may run while a Context is already locked on the current thread (for example
-  // when Drawable::requestPresent() drops the last window reference inside
-  // releaseFrameHandles()). The cleanup below is safe without the lock:
+  // when the last window Surface or the Recording that kept the window alive is released inside
+  // the locked scope). The cleanup below is safe without the lock:
   // - drainQueue() only needs the GPU handles (double-fence wait covering the GPU-side flip
   //   work that Present enqueues, avoiding OBJECT_DELETED_WHILE_STILL_IN_USE (#921));
   // - no concurrent CPU-side submission can race the teardown, because every submission path
-  //   reaches the window through the strong buffer -> frame -> window chain and therefore
-  //   keeps it alive; releasing the last reference means no submission is in flight;
+  //   that touches the window's resources locks the window through its proxy's weak reference
+  //   first and keeps it alive for the call; releasing the last reference means none is running;
   // - COM releases are thread-safe, and flip-model backbuffers stay valid even after the
   //   swap chain is gone.
   auto device = _device;

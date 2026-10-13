@@ -25,7 +25,6 @@
 #include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
 #include "tasks/TransferPixelsTask.h"
-#include "tgfx/gpu/Drawable.h"
 #include "tgfx/gpu/Window.h"
 
 namespace tgfx {
@@ -185,27 +184,6 @@ void DrawingManager::addAtlasCellTask(std::shared_ptr<TextureProxy> textureProxy
   atlasUploadTask->addCell(allocator, std::move(codec), atlasOffset);
 }
 
-void DrawingManager::collectDrawable(std::shared_ptr<Drawable> drawable) {
-  if (drawable == nullptr) {
-    return;
-  }
-  auto drawingBuffer = getDrawingBuffer();
-  for (auto& pendingDrawable : drawingBuffer->frameUsages) {
-    if (pendingDrawable == drawable) {
-      return;
-    }
-  }
-  drawingBuffer->frameUsages.push_back(std::move(drawable));
-}
-
-void DrawingManager::registerPresentation(std::shared_ptr<Drawable> drawable) {
-  if (drawable == nullptr) {
-    return;
-  }
-  auto drawingBuffer = getDrawingBuffer();
-  drawingBuffer->presentables.push_back({drawable, drawable->_importedTarget});
-}
-
 std::shared_ptr<RenderTargetProxy> DrawingManager::getAutomaticTarget(
     std::shared_ptr<Window> window) {
   if (window == nullptr) {
@@ -232,17 +210,30 @@ void DrawingManager::collectWindow(std::shared_ptr<Window> window,
     return;
   }
   auto drawingBuffer = getDrawingBuffer();
-  // The automatic path registers one presentation per window per batch: every surface of the
-  // window shares the window's automatic target (unified frame acquisition), so presenting it
-  // once at the end of the batch delivers the batch's frame. The proxy carries the backend
-  // presentation; the strong window reference is moved into the Recording at flush time.
+  // One presentation per window target per batch: every surface of the window shares the
+  // window's target within the batch (unified frame acquisition), so presenting it once at the
+  // end of the batch delivers the batch's frame. The proxy carries the backend presentation; the
+  // strong window reference is moved into the Recording at flush time.
   for (auto& pending : drawingBuffer->presentables) {
-    if (pending.proxy == renderTarget) {
+    if (pending == renderTarget) {
       return;
     }
   }
-  drawingBuffer->presentables.push_back({nullptr, std::move(renderTarget)});
+  drawingBuffer->presentables.push_back(std::move(renderTarget));
   pendingWindows.push_back(std::move(window));
+}
+
+bool DrawingManager::hasPendingPresentation(
+    const std::shared_ptr<RenderTargetProxy>& renderTarget) const {
+  if (currentBuffer == nullptr || renderTarget == nullptr) {
+    return false;
+  }
+  for (auto& pending : currentBuffer->presentables) {
+    if (pending == renderTarget) {
+      return true;
+    }
+  }
+  return false;
 }
 
 std::shared_ptr<DrawingBuffer> DrawingManager::flush() {

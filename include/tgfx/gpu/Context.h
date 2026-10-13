@@ -26,7 +26,6 @@
 #include "tgfx/gpu/Recording.h"
 
 namespace tgfx {
-class Drawable;
 class GlobalCache;
 class ResourceCache;
 class DrawingManager;
@@ -152,23 +151,22 @@ class Context {
 
   /**
    * Flushes all pending drawing operations for this context into a Recording object and returns
-   * it. The flush fixes the batch: the recorded commands, the frames they use, and the
-   * presentation requests registered so far (see present()) can no longer be changed by later
-   * recordings. A call to Context::submit is always required to ensure work is actually sent to
-   * the GPU. If signalSemaphore is not null, a new semaphore will be created and assigned to
-   * signalSemaphore. The caller is responsible for deleting the semaphore returned in
-   * signalSemaphore. Returns nullptr if there are no pending drawing operations and no
-   * registered presentation requests. In that case, signalSemaphore will not be initialized, and
-   * the caller should not wait on it.
+   * it. The flush fixes the batch: the recorded commands, the window frames they use, and the
+   * window presentations requested by the surfaces drawn in this batch can no longer be changed
+   * by later recordings. A call to Context::submit is always required to ensure work is actually
+   * sent to the GPU. If signalSemaphore is not null, a new semaphore will be created and assigned
+   * to signalSemaphore. The caller is responsible for deleting the semaphore returned in
+   * signalSemaphore. Returns nullptr if there are no pending drawing operations. In that case,
+   * signalSemaphore will not be initialized, and the caller should not wait on it.
    */
   std::unique_ptr<Recording> flush(BackendSemaphore* signalSemaphore = nullptr);
 
   /**
    * Submit the provided recording object to the GPU for execution. The recording must have been
    * created by this context via a call to Context::flush(); submitting it also submits all
-   * earlier recordings of this context first, so each batch's frame usage and presentation
-   * requests are delivered in order. If the syncCpu flag is true, this function will return once
-   * the gpu has finished with all submitted work.
+   * earlier recordings of this context first, so each batch's window presentations are delivered
+   * in order, right after the batch's own commands. If the syncCpu flag is true, this function
+   * will return once the gpu has finished with all submitted work.
    */
   void submit(std::unique_ptr<Recording> recording, bool syncCpu = false);
 
@@ -178,19 +176,6 @@ class Context {
    * Returns false if there are no pending drawing operations and nothing was flushed to the GPU.
    */
   bool flushAndSubmit(bool syncCpu = false);
-
-  /**
-   * Registers a presentation request for the single frame of the given Drawable, which was
-   * acquired from a Window via Window::nextDrawable() and imported through
-   * Surface::MakeFrom(context, drawable). The request is recorded on the current recording batch
-   * and closes the frame for further drawing; it is executed when that batch is submitted —
-   * ordered after the frame's rendering commands and after any still-pending work of earlier
-   * batches (such as an unsubmitted readback transfer) — without flushing or submitting anything
-   * implicitly. Batches that only carry presentation requests are flushable and submittable.
-   * Dropping a Drawable without calling present() discards its frame. Must be called while the
-   * Context is valid, before Device::unlock().
-   */
-  void present(std::shared_ptr<Drawable> drawable);
 
   GlobalCache* globalCache() const {
     return _globalCache;

@@ -20,14 +20,9 @@
 #import <Foundation/Foundation.h>
 #import <MetalKit/MetalKit.h>
 #include "core/utils/Log.h"
-#include "gpu/metal/MetalCommandQueue.h"
 #include "gpu/metal/MetalDefines.h"
-#include "gpu/metal/MetalDrawable.h"
 #include "gpu/metal/MetalDrawableProxy.h"
-#include "gpu/metal/MetalGPU.h"
 #include "platform/apple/CGColorSpaceUtil.h"
-#include "tgfx/gpu/GPU.h"
-#include "tgfx/gpu/metal/MetalDevice.h"
 
 namespace tgfx {
 
@@ -112,46 +107,24 @@ MetalWindow::MetalWindow(std::shared_ptr<Device> device, MTKView* view, CAMetalL
   ApplyVSync(metalLayer, vsyncEnabled);
 }
 
-static bool GetDrawableSize(CAMetalLayer* metalLayer, MTKView* metalView, int* width, int* height) {
+std::shared_ptr<RenderTargetProxy> MetalWindow::onCreateRenderTarget(Context* context) {
   if (metalView != nil) {
     if (![NSThread isMainThread]) {
-      LOGE("MetalWindow render target creation must be called on the main thread when the window "
-           "is created from an MTKView, because MTKView is a UIView/NSView subclass annotated "
-           "with @MainActor. Create the Surface or Drawable on the main thread, then render on "
+      LOGE("MetalWindow::onCreateRenderTarget() must be called on the main thread when the "
+           "window is created from an MTKView, because MTKView is a UIView/NSView subclass "
+           "annotated with @MainActor. Create the Surface on the main thread, then render on "
            "any thread.");
-      return false;
     }
     metalLayer.drawableSize = metalView.drawableSize;
   }
   auto drawableSize = metalLayer.drawableSize;
-  *width = static_cast<int>(drawableSize.width);
-  *height = static_cast<int>(drawableSize.height);
-  return *width > 0 && *height > 0;
-}
-
-std::shared_ptr<RenderTargetProxy> MetalWindow::onCreateRenderTarget(Context* context) {
-  int width = 0;
-  int height = 0;
-  if (!GetDrawableSize(metalLayer, metalView, &width, &height)) {
+  auto width = static_cast<int>(drawableSize.width);
+  auto height = static_cast<int>(drawableSize.height);
+  if (width <= 0 || height <= 0) {
     return nullptr;
   }
   auto pixelFormat = MetalPixelFormatToPixelFormat(static_cast<unsigned>(metalLayer.pixelFormat));
   return std::make_shared<MetalDrawableProxy>(context, width, height, metalLayer, pixelFormat);
-}
-
-std::shared_ptr<Drawable> MetalWindow::onNextDrawable() {
-  int width = 0;
-  int height = 0;
-  if (!GetDrawableSize(metalLayer, metalView, &width, &height)) {
-    return nullptr;
-  }
-  auto device = getDevice();
-  if (device == nullptr) {
-    return nullptr;
-  }
-  auto metalDevice = static_cast<MetalDevice*>(device.get());
-  auto metalGPU = static_cast<MetalGPU*>(metalDevice->_gpu);
-  return MetalDrawable::Make(metalGPU, metalLayer, colorSpace());
 }
 
 bool MetalWindow::supportsReadback() const {

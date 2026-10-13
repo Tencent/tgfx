@@ -34,24 +34,6 @@ TGFX_TEST(VulkanPresentationStateTest, SubmissionAggregation) {
   EXPECT_EQ(plan.signalCount, 2u);
 }
 
-TGFX_TEST(VulkanPresentationStateTest, ManualPhaseAndToken) {
-  VulkanManualToken token;
-  EXPECT_TRUE(token.acquire());
-  EXPECT_FALSE(token.acquire());
-  EXPECT_TRUE(token.isActive());
-
-  VulkanFrameState frame(true);
-  EXPECT_FALSE(frame.beginPresent());
-  frame.markRenderSubmitted();
-  EXPECT_EQ(frame.phase(), VulkanManualPhase::RenderSubmitted);
-  EXPECT_TRUE(frame.beginPresent());
-  EXPECT_FALSE(frame.beginPresent());
-
-  token.release();
-  EXPECT_FALSE(token.isActive());
-  EXPECT_TRUE(token.acquire());
-}
-
 TGFX_TEST(VulkanPresentationStateTest, LayoutAndReadbackSupport) {
   VulkanSwapchainImageState state;
   EXPECT_EQ(*state.layout, VK_IMAGE_LAYOUT_UNDEFINED);

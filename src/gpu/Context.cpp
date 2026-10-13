@@ -29,7 +29,6 @@
 #include "gpu/ResourceCache.h"
 #include "gpu/ShaderCaps.h"
 #include "tgfx/core/Clock.h"
-#include "tgfx/gpu/Drawable.h"
 #include "tgfx/gpu/GPU.h"
 
 #define ASSERT_OWNER_THREAD ASSERT_SINGLE_OWNER(*singleOwner)
@@ -171,19 +170,6 @@ bool Context::flushAndSubmit(bool syncCpu) {
     submit(std::move(recording), syncCpu);
   }
   return hasRecording;
-}
-
-void Context::present(std::shared_ptr<Drawable> drawable) {
-  ASSERT_OWNER_THREAD;
-  if (drawable == nullptr) {
-    return;
-  }
-  // present() only registers the request on the current recording batch and closes the frame;
-  // it never flushes or submits other work. The presentation is executed when that batch is
-  // submitted, ordered after the frame's rendering and all earlier batches.
-  if (drawable->requestPresent(this)) {
-    _drawingManager->registerPresentation(std::move(drawable));
-  }
 }
 
 size_t Context::memoryUsage() const {

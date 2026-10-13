@@ -31,8 +31,7 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
                        int width, int height, const std::vector<VkImage>& images,
                        const std::vector<std::shared_ptr<VulkanSwapchainImageState>>& imageStates,
                        std::shared_ptr<bool> outOfDate,
-                       std::shared_ptr<VulkanManualToken> manualToken,
-                       std::shared_ptr<uint64_t> swapchainGeneration, bool manualPresent = false);
+                       std::shared_ptr<uint64_t> swapchainGeneration);
   ~VulkanSwapchainProxy() override;
 
   Context* getContext() const override;
@@ -58,7 +57,6 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
   void attachAcquireWait();
 
   void releaseFrame();
-  void presentFrame();
 
   /**
    * Frame-level wiring, independent of the VulkanWindow: makes a batch that uses the frame wait
@@ -68,23 +66,18 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
   void onAttachSubmission(Context* context) override;
 
   /**
-   * Queues the frame's presentation with the submission of the batch carrying the presentation
-   * request (wiring the acquire wait too if that batch is the frame's first use). Manual
-   * (explicit-path) frames defer the present to presentFrame().
+   * Queues the frame's presentation with the submission of the batch that draws it (wiring the
+   * acquire wait too if that batch is the frame's first use).
    */
   void onSchedulePresentation(Context* context) override;
 
+  /**
+   * Ends the frame after the submission that presented it, so the next use acquires a fresh
+   * image.
+   */
   void onPresentFrame(Context* context) override;
 
-  /**
-   * Discards an acquired frame without presenting it. No GPU calls are made; the out-of-date
-   * flag is set so the next proxy creation rebuilds the swapchain and reclaims the image.
-   */
-  void discardFrame();
-
  private:
-  void releaseManualToken();
-
   Context* _context = nullptr;
   VulkanGPU* _gpu = nullptr;
   VkSwapchainKHR _swapchain = VK_NULL_HANDLE;
@@ -94,18 +87,14 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
   std::vector<VkImage> _images;
   std::vector<std::shared_ptr<VulkanSwapchainImageState>> _imageStates;
   std::shared_ptr<bool> _outOfDate;
-  std::shared_ptr<VulkanManualToken> _manualToken;
   std::shared_ptr<uint64_t> _swapchainGeneration;
   uint64_t _generationValue = 0;
 
   mutable uint32_t _currentImageIndex = 0;
   mutable std::shared_ptr<RenderTarget> _renderTarget = nullptr;
-  mutable std::shared_ptr<VulkanFrameState> _frameState = nullptr;
   // The acquire semaphore of the pending frame, created per acquisition and handed to the
   // command queue in attachAcquireWait(); destroyed with the in-flight submission's fence.
   mutable VkSemaphore _pendingImageAvailableSemaphore = VK_NULL_HANDLE;
-  bool _manualPresent = false;
-  bool _presentationRequested = false;
 };
 
 }  // namespace tgfx

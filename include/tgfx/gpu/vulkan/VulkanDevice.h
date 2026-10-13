@@ -56,8 +56,6 @@ class VulkanDevice : public Device {
   ~VulkanDevice() override;
 
  private:
-  friend class VulkanWindow;
-
   explicit VulkanDevice(std::unique_ptr<class VulkanGPU> gpu);
 };
 

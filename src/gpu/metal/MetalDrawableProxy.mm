@@ -19,13 +19,35 @@
 #include "MetalDrawableProxy.h"
 #import <Metal/Metal.h>
 #include "gpu/metal/MetalCommandQueue.h"
-#include "gpu/metal/MetalDrawable.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/metal/MetalTypes.h"
 
 namespace tgfx {
+// Acquires the next drawable of the layer and returns it retained (+1); the caller takes over
+// the reference. Returns nil if the layer cannot provide a drawable right now.
+static id<CAMetalDrawable> AcquireMetalDrawable(CAMetalLayer* metalLayer) {
+  if (metalLayer == nil) {
+    return nil;
+  }
+  id<CAMetalDrawable> metalDrawable = nil;
+  @autoreleasepool {
+    // nextDrawable returns an autoreleased (+0) drawable; retain it inside the pool so the
+    // reference stays valid after the pool drains.
+    metalDrawable = [[metalLayer nextDrawable] retain];
+  }
+  return metalDrawable;
+}
+
+static BackendRenderTarget MakeBackendRenderTarget(id<CAMetalDrawable> drawable) {
+  MetalTextureInfo metalInfo = {};
+  metalInfo.texture = (__bridge const void*)drawable.texture;
+  metalInfo.format = static_cast<unsigned>(drawable.texture.pixelFormat);
+  return BackendRenderTarget(metalInfo, static_cast<int>(drawable.texture.width),
+                             static_cast<int>(drawable.texture.height));
+}
+
 MetalDrawableProxy::MetalDrawableProxy(Context* context, int width, int height,
                                        CAMetalLayer* metalLayer, PixelFormat format)
     : _context(context), _width(width), _height(height), _format(format), _metalLayer(metalLayer) {
@@ -33,24 +55,6 @@ MetalDrawableProxy::MetalDrawableProxy(Context* context, int width, int height,
 
 MetalDrawableProxy::~MetalDrawableProxy() {
   [_metalDrawable release];
-}
-
-std::shared_ptr<MetalDrawableProxy> MetalDrawableProxy::WrapAcquiredDrawable(
-    Context* context, id<CAMetalDrawable> drawable, int width, int height, PixelFormat format) {
-  if (context == nullptr || drawable == nil) {
-    return nullptr;
-  }
-  auto proxy = std::shared_ptr<MetalDrawableProxy>(
-      new MetalDrawableProxy(context, width, height, nil, format));
-  // Take over the caller's (+1) reference; the destructor releases it.
-  proxy->_metalDrawable = drawable;
-  proxy->_renderTarget = RenderTarget::MakeFrom(
-      context, MetalDrawable::MakeBackendRenderTarget(drawable), ImageOrigin::TopLeft);
-  if (proxy->_renderTarget == nullptr) {
-    // The render target creation failed; do not schedule a present for this unusable frame.
-    return nullptr;
-  }
-  return proxy;
 }
 
 Context* MetalDrawableProxy::getContext() const {
@@ -87,18 +91,16 @@ std::shared_ptr<TextureView> MetalDrawableProxy::getTextureView() const {
 
 std::shared_ptr<RenderTarget> MetalDrawableProxy::getRenderTarget() const {
   if (_renderTarget == nullptr) {
-    // Frame acquisition and texture wrapping are shared with MetalDrawable (the explicit
-    // single-frame path) so the acquire/render/present mechanism exists exactly once. The
-    // presentation is scheduled by this proxy's onSchedulePresentation() at submission time,
-    // together with the explicit path.
-    auto drawable = MetalDrawable::AcquireMetalDrawable(_metalLayer);
+    // The drawable is acquired lazily, when the batch that draws the frame is encoded. Its
+    // presentation is scheduled by onSchedulePresentation() at submission time.
+    auto drawable = AcquireMetalDrawable(_metalLayer);
     if (drawable == nil) {
       return nullptr;
     }
     [_metalDrawable release];
     _metalDrawable = drawable;
-    _renderTarget = RenderTarget::MakeFrom(
-        _context, MetalDrawable::MakeBackendRenderTarget(_metalDrawable), ImageOrigin::TopLeft);
+    _renderTarget = RenderTarget::MakeFrom(_context, MakeBackendRenderTarget(_metalDrawable),
+                                           ImageOrigin::TopLeft);
     if (_renderTarget == nullptr) {
       // The render target creation failed; do not schedule a present for this unusable frame.
       // A later call retries with a fresh drawable.

@@ -31,7 +31,6 @@
 
 namespace tgfx {
 struct RuntimeInputTexture;
-class Drawable;
 
 class DrawingManager {
  public:
@@ -82,25 +81,12 @@ class DrawingManager {
                         std::shared_ptr<ImageCodec> codec);
 
   /**
-   * Records that the current drawing batch uses the frame behind the given render target, so the
-   * submission wires the frame acquisition synchronization. Called by the surfaces backed by
-   * presentable frames (WindowSurface) whenever they record work on their target; the drawing
-   * manager does not inspect where a render target comes from. Recording a usage never requests
-   * a presentation.
+   * Records that the current drawing batch uses the window frame behind the given render target,
+   * so the submission wires the frame acquisition synchronization. Called by window surfaces
+   * whenever they record work on their target; the drawing manager does not inspect where a
+   * render target comes from. Recording a usage never requests a presentation.
    */
   void collectFrameUsage(std::shared_ptr<RenderTargetProxy> renderTarget);
-
-  /**
-   * Collects a drawable-backed frame so that it is marked as submitted when the submission
-   * carrying its rendering commands completes.
-   */
-  void collectDrawable(std::shared_ptr<Drawable> drawable);
-
-  /**
-   * Registers a presentation request on the current recording batch (called by
-   * Context::present()). The request is delivered by the submission of that batch.
-   */
-  void registerPresentation(std::shared_ptr<Drawable> drawable);
 
   /**
    * Returns the automatic render target this context shares with every Surface created for the
@@ -112,13 +98,20 @@ class DrawingManager {
   std::shared_ptr<RenderTargetProxy> getAutomaticTarget(std::shared_ptr<Window> window);
 
   /**
-   * Registers the automatic presentation for the given window's shared render target on the
-   * current recording batch. Each flush cycle registers one presentation per window: the
-   * target's proxy carries the backend presentation and is delivered after the batch is
-   * submitted.
+   * Requests the presentation of the given window's render target at the end of the current
+   * recording batch (called by window surfaces when they draw). Each batch presents a window
+   * target once: the target's proxy carries the backend presentation and is delivered after the
+   * batch is submitted.
    */
   void collectWindow(std::shared_ptr<Window> window,
                      std::shared_ptr<RenderTargetProxy> renderTarget);
+
+  /**
+   * Returns true if the current, not yet flushed drawing batch presents the given render target,
+   * that is, the target's frame has been drawn in this batch and has not been handed to the
+   * display yet.
+   */
+  bool hasPendingPresentation(const std::shared_ptr<RenderTargetProxy>& renderTarget) const;
 
   /**
    * Flushes all pending drawing operations and returns the DrawingBuffer. Returns nullptr if there

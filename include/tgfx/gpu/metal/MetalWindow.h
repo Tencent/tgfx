@@ -60,7 +60,6 @@ class MetalWindow : public Window {
 
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
-  std::shared_ptr<Drawable> onNextDrawable() override;
 
  private:
   CAMetalLayer* metalLayer = nil;

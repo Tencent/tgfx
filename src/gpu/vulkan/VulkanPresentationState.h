@@ -28,28 +28,6 @@ inline bool VulkanSupportsReadback(VkImageUsageFlags supportedUsage) {
   return (supportedUsage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) != 0;
 }
 
-class VulkanManualToken {
- public:
-  bool acquire() {
-    if (active) {
-      return false;
-    }
-    active = true;
-    return true;
-  }
-
-  void release() {
-    active = false;
-  }
-
-  bool isActive() const {
-    return active;
-  }
-
- private:
-  bool active = false;
-};
-
 struct VulkanSubmissionPlan {
   size_t acquireWaitCount = 0;
   size_t signalCount = 0;
@@ -62,36 +40,6 @@ struct VulkanSubmissionPlan {
       signalCount++;
     }
   }
-};
-
-enum class VulkanManualPhase { Acquired, RenderSubmitted, Presented };
-
-class VulkanFrameState {
- public:
-  explicit VulkanFrameState(bool manual) : manual(manual) {
-  }
-
-  VulkanManualPhase phase() const {
-    return currentPhase;
-  }
-
-  void markRenderSubmitted() {
-    if (currentPhase == VulkanManualPhase::Acquired) {
-      currentPhase = VulkanManualPhase::RenderSubmitted;
-    }
-  }
-
-  bool beginPresent() {
-    if (!manual || currentPhase != VulkanManualPhase::RenderSubmitted) {
-      return false;
-    }
-    currentPhase = VulkanManualPhase::Presented;
-    return true;
-  }
-
- private:
-  bool manual = false;
-  VulkanManualPhase currentPhase = VulkanManualPhase::Acquired;
 };
 
 struct VulkanSwapchainImageState {

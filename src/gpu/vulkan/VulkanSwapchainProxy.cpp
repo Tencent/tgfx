@@ -29,12 +29,11 @@ VulkanSwapchainProxy::VulkanSwapchainProxy(
     Context* context, VulkanGPU* gpu, VkSwapchainKHR swapchain, VkFormat format, int width,
     int height, const std::vector<VkImage>& images,
     const std::vector<std::shared_ptr<VulkanSwapchainImageState>>& imageStates,
-    std::shared_ptr<bool> outOfDate, std::shared_ptr<VulkanManualToken> manualToken,
-    std::shared_ptr<uint64_t> swapchainGeneration, bool manualPresent)
+    std::shared_ptr<bool> outOfDate, std::shared_ptr<uint64_t> swapchainGeneration)
     : _context(context), _gpu(gpu), _swapchain(swapchain), _format(format), _width(width),
       _height(height), _images(images), _imageStates(imageStates), _outOfDate(std::move(outOfDate)),
-      _manualToken(std::move(manualToken)), _swapchainGeneration(std::move(swapchainGeneration)),
-      _generationValue(*_swapchainGeneration), _manualPresent(manualPresent) {
+      _swapchainGeneration(std::move(swapchainGeneration)),
+      _generationValue(*_swapchainGeneration) {
 }
 
 VulkanSwapchainProxy::~VulkanSwapchainProxy() {
@@ -49,7 +48,6 @@ VulkanSwapchainProxy::~VulkanSwapchainProxy() {
     vkDestroySemaphore(_gpu->device(), _pendingImageAvailableSemaphore, nullptr);
     _pendingImageAvailableSemaphore = VK_NULL_HANDLE;
   }
-  releaseManualToken();
 }
 
 Context* VulkanSwapchainProxy::getContext() const {
@@ -100,10 +98,6 @@ std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
     // the caller must create a new Surface, matching the documented resize contract.
     return nullptr;
   }
-  if (_frameState != nullptr || _presentationRequested) {
-    return nullptr;
-  }
-
   VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
   VkSemaphoreCreateInfo semaphoreInfo = {};
   semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -141,11 +135,10 @@ std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
     return nullptr;
   }
 
-  _frameState = std::make_shared<VulkanFrameState>(_manualPresent);
   // Keep the acquire semaphore for the submission-time attachAcquireWait(); it is handed to the
   // command queue there and destroyed with the in-flight submission's fence. Assign the member
-  // only after every failure path has passed, so the defensive destroys in releaseFrame()/
-  // discardFrame()/the destructor never see an already-destroyed handle.
+  // only after every failure path has passed, so the defensive destroys in releaseFrame() and
+  // the destructor never see an already-destroyed handle.
   _pendingImageAvailableSemaphore = imageAvailableSemaphore;
   return _renderTarget;
 }
@@ -166,22 +159,21 @@ void VulkanSwapchainProxy::attachAcquireWait() {
     return;
   }
   auto queue = static_cast<VulkanCommandQueue*>(_context->gpu()->queue());
-  queue->scheduleAcquireWait(_pendingImageAvailableSemaphore, _outOfDate, _frameState);
+  queue->scheduleAcquireWait(_pendingImageAvailableSemaphore, _outOfDate);
   _pendingImageAvailableSemaphore = VK_NULL_HANDLE;
 }
 
 void VulkanSwapchainProxy::onAttachSubmission(Context*) {
-  // A batch that uses the frame without a registered presentation (for example a readback or a
-  // snapshot copy) only waits for the acquisition; the frame stays open for later drawing.
+  // A batch that uses the frame without presenting it (a snapshot copy) only waits for the
+  // acquisition; the frame stays open for later drawing.
   attachAcquireWait();
 }
 
 void VulkanSwapchainProxy::onSchedulePresentation(Context*) {
-  // The batch carrying the presentation request also needs the acquire wait if it is the
-  // frame's first use. Manual (explicit-path) frames defer the present to presentFrame(), so
-  // their content stays readable after this submission.
+  // The batch that presents the frame also needs the acquire wait if it is the frame's first
+  // use.
   attachAcquireWait();
-  if (_manualPresent || _renderTarget == nullptr) {
+  if (_renderTarget == nullptr) {
     return;
   }
   auto window = _presentingWindow.lock();
@@ -196,13 +188,9 @@ void VulkanSwapchainProxy::onSchedulePresentation(Context*) {
 }
 
 void VulkanSwapchainProxy::onPresentFrame(Context*) {
-  if (_manualPresent) {
-    presentFrame();
-  } else {
-    // The present was queued by this batch's submission; end the frame so the next use
-    // acquires a fresh image.
-    releaseFrame();
-  }
+  // The present was queued by this batch's submission; end the frame so the next use acquires a
+  // fresh image.
+  releaseFrame();
 }
 
 bool VulkanSwapchainProxy::hasPendingFrame() const {
@@ -217,43 +205,6 @@ void VulkanSwapchainProxy::releaseFrame() {
     _pendingImageAvailableSemaphore = VK_NULL_HANDLE;
   }
   _renderTarget = nullptr;
-  // The frame state was consumed by the render submission, so a new frame can be acquired.
-  _frameState = nullptr;
-}
-
-void VulkanSwapchainProxy::presentFrame() {
-  _presentationRequested = true;
-  auto window = _presentingWindow.lock();
-  if (window == nullptr) {
-    // The window that owns the swapchain is gone; drop the pending frame instead of
-    // presenting through dangling handles. The window is kept alive below for the duration of
-    // the present.
-    releaseFrame();
-    return;
-  }
-  if (!_manualPresent || _frameState == nullptr || !_frameState->beginPresent()) {
-    releaseManualToken();
-    return;
-  }
-  auto& imageState = _imageStates[_currentImageIndex];
-  _gpu->presentNow(_swapchain, _currentImageIndex, _images[_currentImageIndex],
-                   imageState->presentSemaphore, imageState->layout, _outOfDate);
-  releaseFrame();
-  releaseManualToken();
-}
-
-void VulkanSwapchainProxy::discardFrame() {
-  if (_outOfDate != nullptr) {
-    *_outOfDate = true;
-  }
-  releaseFrame();
-}
-
-void VulkanSwapchainProxy::releaseManualToken() {
-  if (_manualToken != nullptr) {
-    _manualToken->release();
-    _manualToken = nullptr;
-  }
 }
 
 }  // namespace tgfx

@@ -209,7 +209,6 @@ class VulkanGPU : public GPU {
       VkSemaphore presentSemaphore = VK_NULL_HANDLE;
       std::shared_ptr<VkImageLayout> layout;
       std::shared_ptr<bool> outOfDate;
-      std::shared_ptr<VulkanFrameState> frameState;
       bool presents = false;
     };
     std::vector<PresentInfo> presents;
@@ -221,14 +220,6 @@ class VulkanGPU : public GPU {
   void reclaimAbandonedSession(FrameSession session);
   VkDescriptorPool acquireDescriptorPool();
   void releaseDescriptorPool(VkDescriptorPool pool);
-
-  /**
-   * Submits the final layout transition for a manually presented image, signals its per-image
-   * semaphore, and queues presentation without waiting on the CPU.
-   */
-  void presentNow(VkSwapchainKHR swapchain, uint32_t imageIndex, VkImage image,
-                  VkSemaphore presentSemaphore, std::shared_ptr<VkImageLayout> layout,
-                  std::shared_ptr<bool> outOfDate);
 
  private:
   VulkanGPU();

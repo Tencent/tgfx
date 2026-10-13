@@ -10,16 +10,13 @@
 //      https://opensource.org/licenses/BSD-3-Clause
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
-//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the License.
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Window.h"
-#include "core/utils/Log.h"
-#include "gpu/ProxyDrawable.h"
-#include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {
@@ -39,25 +36,6 @@ bool Window::vsyncEnabled() const {
 std::shared_ptr<Device> Window::getDevice() {
   std::lock_guard<std::mutex> autoLock(locker);
   return _device;
-}
-
-std::shared_ptr<Drawable> Window::nextDrawable() {
-  if (weak_from_this().expired()) {
-    LOGE("Window::nextDrawable() The window must be owned by a shared_ptr!");
-    return nullptr;
-  }
-  auto drawable = onNextDrawable();
-  if (drawable != nullptr) {
-    // The frame holds its window only weakly (to break the device reference cycle); the
-    // Context's unsubmitted drawing buffers keep the window alive while the frame is
-    // undelivered. Device validation happens later, when the frame is imported into a Context.
-    drawable->_window = shared_from_this();
-  }
-  return drawable;
-}
-
-std::shared_ptr<Drawable> Window::onNextDrawable() {
-  return ProxyDrawable::Make(shared_from_this());
 }
 
 void Window::onPresent(Context*) {

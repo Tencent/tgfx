@@ -74,8 +74,7 @@ class VulkanCommandQueue : public CommandQueue {
   /// imageAvailableSemaphore ownership moves to the queue and is destroyed with the render
   /// fence. If the submission never happens, the swapchain is flagged out of date so the image
   /// is reclaimed by a rebuild.
-  void scheduleAcquireWait(VkSemaphore imageAvailableSemaphore, std::shared_ptr<bool> outOfDate,
-                           std::shared_ptr<VulkanFrameState> frameState);
+  void scheduleAcquireWait(VkSemaphore imageAvailableSemaphore, std::shared_ptr<bool> outOfDate);
 
   /// Presents an acquired swapchain image at the end of the next submit(): the image gets a
   /// layout transition to PRESENT_SRC_KHR, the submission signals its per-image presentation
@@ -110,7 +109,6 @@ class VulkanCommandQueue : public CommandQueue {
     VkSemaphore presentSemaphore = VK_NULL_HANDLE;
     std::shared_ptr<VkImageLayout> layout;
     std::shared_ptr<bool> outOfDate;
-    std::shared_ptr<VulkanFrameState> frameState;
     bool presents = false;
   };
   std::vector<PendingPresent> pendingPresents;

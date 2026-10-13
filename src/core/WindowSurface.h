@@ -24,11 +24,12 @@
 namespace tgfx {
 
 /**
- * The internal Surface subclass behind Surface::MakeFrom(context, window): the automatic,
- * cross-frame-reusable window entry. It holds the window and registers the window's shared
- * automatic target for presentation on each drawing batch (delivered after the batch is
- * submitted); the next batch resolves a fresh frame on that target. Created only through
- * Surface::MakeFrom(); business code always sees a plain Surface.
+ * The internal Surface subclass behind Surface::MakeFrom(context, window): the cross-frame
+ * reusable window entry. It holds the window and tells the drawing manager to present the
+ * window's frame on each batch that draws into it (delivered after the batch is submitted); the
+ * next batch resolves a fresh frame on the same target. Its content can only be read back within
+ * the batch that drew the current frame. Created only through Surface::MakeFrom(); business code
+ * always sees a plain Surface.
  */
 class WindowSurface : public Surface {
  public:
@@ -42,7 +43,7 @@ class WindowSurface : public Surface {
   void onCollectFrameUsage(DrawingManager* drawingManager,
                            const std::shared_ptr<RenderTargetProxy>& renderTarget) override;
 
-  bool onValidateReadback() const override;
+  bool onValidateReadback(const std::shared_ptr<RenderTargetProxy>& renderTarget) const override;
 
  private:
   WindowSurface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags, bool clearAll,

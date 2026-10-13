@@ -30,7 +30,6 @@
 #include <vector>
 #include "core/utils/Log.h"
 #include "gpu/vulkan/VulkanAPI.h"
-#include "gpu/vulkan/VulkanDrawable.h"
 #include "gpu/vulkan/VulkanGPU.h"
 #include "gpu/vulkan/VulkanSwapchainProxy.h"
 #include "gpu/vulkan/VulkanUtil.h"
@@ -140,7 +139,6 @@ struct VulkanWindow::PlatformState {
   int height = 0;
   bool supportsReadback = false;
   std::shared_ptr<bool> outOfDate = std::make_shared<bool>(false);
-  std::shared_ptr<VulkanManualToken> manualToken = std::make_shared<VulkanManualToken>();
   std::shared_ptr<uint64_t> generation = std::make_shared<uint64_t>(0);
   std::vector<std::weak_ptr<VulkanSwapchainProxy>> activeProxies;
 
@@ -672,8 +670,9 @@ VulkanWindow::VulkanWindow(std::shared_ptr<Device> device, std::unique_ptr<Platf
 
 VulkanWindow::~VulkanWindow() {
   // Intentionally do not lock the device here: this destructor may run while a Context is
-  // already locked on the current thread (for example when Drawable::requestPresent() drops the
-  // last window reference inside releaseFrameHandles()), and Device uses a non-recursive mutex.
+  // already locked on the current thread (for example when the last window Surface or the
+  // Recording that kept the window alive is released inside the locked scope), and Device uses a
+  // non-recursive mutex.
   // The cleanup only needs the raw Vulkan handles, and vkDeviceWaitIdle() waits for all queued
   // work on the device, which is at least as safe as holding the device lock.
   vkDeviceWaitIdle(_platformState->cachedDevice);
@@ -749,8 +748,7 @@ bool VulkanWindow::PlatformState::recreateSwapchain(VkDevice device,
   return true;
 }
 
-std::shared_ptr<RenderTargetProxy> VulkanWindow::createSwapchainProxy(Context* context,
-                                                                      bool manualPresent) {
+std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* context) {
   auto vulkanGPU = static_cast<VulkanGPU*>(context->gpu());
   auto vkDevice = vulkanGPU->device();
   auto physicalDevice = vulkanGPU->physicalDevice();
@@ -767,7 +765,7 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::createSwapchainProxy(Context* c
   auto extent = capabilities.currentExtent;
   if (extent.width == 0xFFFFFFFF) {
     // The surface does not report a fixed extent (e.g. Wayland). Skip this frame and let the
-    // next createSwapchainProxy call re-query the capabilities for an updated extent.
+    // next onCreateRenderTarget call re-query the capabilities for an updated extent.
     return nullptr;
   }
 
@@ -787,8 +785,7 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::createSwapchainProxy(Context* c
     }
     // A rebuild destroys the old swapchain, so it can only run while no proxy holds an acquired
     // image. Idle proxies are safe: they detect the generation change and stop acquiring.
-    if (extent.width == 0 || extent.height == 0 || _platformState->manualToken->isActive() ||
-        hasPendingFrame) {
+    if (extent.width == 0 || extent.height == 0 || hasPendingFrame) {
       return nullptr;
     }
     if (!_platformState->recreateSwapchain(vkDevice, capabilities, extent)) {
@@ -796,20 +793,10 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::createSwapchainProxy(Context* c
     }
   }
 
-  std::shared_ptr<VulkanManualToken> token = nullptr;
-  if (manualPresent) {
-    // Only the single-frame manual token gates manual drawables. presentNow never requires
-    // TRANSFER_SRC usage, so pure presentation must not be disabled on surfaces without
-    // readback support.
-    if (!_platformState->manualToken->acquire()) {
-      return nullptr;
-    }
-    token = _platformState->manualToken;
-  }
   auto proxy = std::make_shared<VulkanSwapchainProxy>(
       context, vulkanGPU, _platformState->swapchain, _platformState->format, _platformState->width,
       _platformState->height, _platformState->images, _platformState->imageStates,
-      _platformState->outOfDate, std::move(token), _platformState->generation, manualPresent);
+      _platformState->outOfDate, _platformState->generation);
   // Prune proxies that have gone away so the tracking list stays bounded; entries would
   // otherwise only be cleaned up on the next needsRebuild pass.
   auto& proxies = _platformState->activeProxies;
@@ -818,23 +805,6 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::createSwapchainProxy(Context* c
                 proxies.end());
   proxies.push_back(proxy);
   return proxy;
-}
-
-std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* context) {
-  return createSwapchainProxy(context, false);
-}
-
-std::shared_ptr<Drawable> VulkanWindow::onNextDrawable() {
-  // The frame handle is created without a Context; its manual-present proxy is resolved when
-  // the frame is imported (VulkanDrawable::onImport()).
-  auto device = getDevice();
-  if (device == nullptr) {
-    return nullptr;
-  }
-  auto vulkanDevice = static_cast<VulkanDevice*>(device.get());
-  auto vulkanGPU = static_cast<VulkanGPU*>(vulkanDevice->_gpu);
-  return VulkanDrawable::Make(vulkanGPU,
-                              std::static_pointer_cast<VulkanWindow>(shared_from_this()));
 }
 
 bool VulkanWindow::supportsReadback() const {

@@ -359,8 +359,7 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
   for (auto& present : presents) {
     request.presents.push_back(VulkanGPU::SubmitRequest::PresentInfo{
         present.swapchain, present.imageIndex, present.imageAvailableSemaphore,
-        present.presentSemaphore, present.layout, present.outOfDate, present.frameState,
-        present.presents});
+        present.presentSemaphore, present.layout, present.outOfDate, present.presents});
   }
 
   gpu->executeSubmission(std::move(request));
@@ -383,12 +382,10 @@ void VulkanCommandQueue::waitSemaphore(std::shared_ptr<Semaphore> semaphore) {
 }
 
 void VulkanCommandQueue::scheduleAcquireWait(VkSemaphore imageAvailableSemaphore,
-                                             std::shared_ptr<bool> outOfDate,
-                                             std::shared_ptr<VulkanFrameState> frameState) {
+                                             std::shared_ptr<bool> outOfDate) {
   PendingPresent entry = {};
   entry.imageAvailableSemaphore = imageAvailableSemaphore;
   entry.outOfDate = std::move(outOfDate);
-  entry.frameState = std::move(frameState);
   entry.presents = false;
   pendingPresents.push_back(std::move(entry));
 }
