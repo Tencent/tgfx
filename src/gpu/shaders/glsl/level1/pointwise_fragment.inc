@@ -112,7 +112,8 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 
 #include "pointwise_chain_uniforms.inc"
 
-  // Gradient source block (OP_GRADIENT): at most one gradient slot per chain. All fields are
+#ifdef TGFX_POINTWISE_GRADIENT
+  // Gradient source block (OP_GRADIENT): at most one gradient slot per extended chain. All fields are
   // runtime uniforms written only when a gradient slot is present; names mirror the dedicated
   // gradient kernels with a "Gradient" prefix.
   int GradientLayoutType;
@@ -150,6 +151,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   // Leaf index of the LUT gradient texture (a sampler-only child with no DAG slot), read by the
   // OP_GRADIENT LUT colorizer branch. -1 when no LUT gradient is present.
   int GradientLUTLeaf;
+#endif
 #ifdef TGFX_POINTWISE_NOISE
   vec4 NoiseFrequencyStitch;
   ivec4 NoiseModeOctaves;
@@ -210,10 +212,9 @@ layout(location = NTEX + 1) in vec4 vColor;
 #if NTEX >= 1
 layout(location = CHAIN_TEX_LOC_BASE + 0) in vec3 TransformedCoords_0;
 #endif
-// Gradient coordinate varying at a fixed location beyond every layout's varyings (ellipse with
-// color and 4 texture coords tops out at location 6). Always written by the vertex stage; only
-// read when a chain slot is OP_GRADIENT.
+#ifdef TGFX_POINTWISE_SOURCE_COORDS
 layout(location = 7) in vec3 GradientCoords;
+#endif
 #if NTEX >= 2
 layout(location = CHAIN_TEX_LOC_BASE + 1) in vec3 TransformedCoords_1;
 #endif

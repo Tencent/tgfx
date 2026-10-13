@@ -34,6 +34,7 @@
 #include "gpu/ops/StencilCoverPathDrawOp.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
+#include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
 #include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/ConstColorProcessor.h"
@@ -41,7 +42,9 @@
 #include "gpu/processors/LumaFragmentProcessor.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
 #include "gpu/processors/RRectEffect.h"
+#include "gpu/processors/RadialGradientLayout.h"
 #include "gpu/processors/RectEffect.h"
+#include "gpu/processors/SingleIntervalGradientColorizer.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
@@ -769,6 +772,12 @@ TGFX_TEST(AOTEffectTest, ResourceProfilesRejectInvalidAndOverBudgetDemands) {
   EXPECT_EQ(SelectAOTResourceProfile(demand), AOTResourceProfile::NoiseGraph);
   demand.gradients = 1;
   EXPECT_EQ(SelectAOTResourceProfile(demand), AOTResourceProfile::Automatic);
+  demand.noiseSources = 0;
+  EXPECT_EQ(SelectAOTResourceProfile(demand), AOTResourceProfile::TiledGraph);
+  EXPECT_FALSE(FitsAOTResourceProfile(demand, AOTResourceProfile::Chain));
+  EXPECT_TRUE(FitsAOTResourceProfile(demand, AOTResourceProfile::TiledGraph));
+  demand.gradients = 2;
+  EXPECT_EQ(SelectAOTResourceProfile(demand), AOTResourceProfile::Automatic);
   demand = {};
   demand.instructions = 33;
   EXPECT_EQ(SelectAOTResourceProfile(demand), AOTResourceProfile::Automatic);
@@ -779,6 +788,72 @@ TGFX_TEST(AOTEffectTest, ResourceProfilesRejectInvalidAndOverBudgetDemands) {
   demand.leafBindings = 5;
   EXPECT_EQ(SelectAOTResourceProfile(demand), AOTResourceProfile::Automatic);
   EXPECT_FALSE(FitsAOTResourceProfile({}, static_cast<AOTResourceProfile>(99)));
+}
+
+TGFX_TEST(AOTEffectTest, DirectGradientProcessorRejectsChainAndAutomaticallySelectsGraph) {
+  BlockAllocator allocator;
+  std::vector<AOTChainSlot> slots(1);
+  slots[0].op = AOTChainOp::Gradient;
+  slots[0].in0 = -1;
+  slots[0].outRegister = 0;
+  slots[0].gradient.coordMatrix = Matrix::MakeTrans(4, 6);
+  for (auto profile : {AOTResourceProfile::Automatic, AOTResourceProfile::Chain,
+                       AOTResourceProfile::TiledGraph, AOTResourceProfile::NoiseGraph}) {
+    auto processor =
+        AOTPointwiseChainProcessor::Make(&allocator, {}, slots, 0, -1, nullptr, nullptr, -1, ~0u,
+                                         nullptr, -1, {}, false, -1, -1, nullptr, profile);
+    if (profile == AOTResourceProfile::Chain || profile == AOTResourceProfile::NoiseGraph) {
+      EXPECT_EQ(processor, nullptr);
+      continue;
+    }
+    ASSERT_NE(processor, nullptr);
+    EXPECT_EQ(processor->resourceProfile(), AOTResourceProfile::TiledGraph);
+    ASSERT_EQ(processor->numCoordTransforms(), 1u);
+    EXPECT_EQ(processor->coordTransform(0)->matrix, slots[0].gradient.coordMatrix);
+  }
+}
+
+TGFX_TEST(AOTEffectTest, BaseChainOmitsGradientTransformAndExtendedProfilesKeepOrdinals) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  for (auto profile : {AOTResourceProfile::Chain, AOTResourceProfile::TiledGraph}) {
+    std::vector<PlacementPtr<FragmentProcessor>> leaves;
+    std::vector<AOTChainSlot> slots(4);
+    std::array<Matrix, 4> matrices;
+    for (size_t index = 0; index < slots.size(); ++index) {
+      matrices[index] = Matrix::MakeTrans(static_cast<float>(index + 1), 6);
+      auto proxy = context->proxyProvider()->createTextureProxy({}, 2, 2, PixelFormat::RGBA_8888);
+      ASSERT_NE(proxy, nullptr);
+      auto leaf = TextureEffect::Make(&allocator, std::move(proxy), {}, &matrices[index]);
+      ASSERT_NE(leaf, nullptr);
+      matrices[index] = leaf->coordTransform(0)->matrix;
+      leaves.push_back(std::move(leaf));
+      slots[index].op = AOTChainOp::Texture;
+      slots[index].outRegister = static_cast<int>(index);
+    }
+    auto processor = AOTPointwiseChainProcessor::Make(&allocator, std::move(leaves), slots, 3, -1,
+                                                      nullptr, nullptr, -1, ~0u, nullptr, -1, {},
+                                                      false, -1, -1, nullptr, profile);
+    ASSERT_NE(processor, nullptr);
+    EXPECT_EQ(processor->numCoordTransforms(), profile == AOTResourceProfile::Chain ? 0u : 1u);
+    if (profile == AOTResourceProfile::TiledGraph) {
+      EXPECT_EQ(processor->coordTransform(0)->matrix, Matrix::I());
+    }
+    ProgramInfo programInfo(nullptr, nullptr, {processor.get()}, 1, nullptr, BlendMode::SrcOver);
+    FragmentProcessor::CoordTransformIter iter(&programInfo);
+    if (profile == AOTResourceProfile::TiledGraph) {
+      EXPECT_EQ(iter.next(), processor->coordTransform(0));
+    }
+    for (size_t index = 0; index < slots.size(); ++index) {
+      auto transform = iter.next();
+      ASSERT_NE(transform, nullptr);
+      EXPECT_EQ(transform, processor->childProcessor(index)->coordTransform(0));
+      EXPECT_EQ(transform->matrix, matrices[index]);
+    }
+    EXPECT_EQ(iter.next(), nullptr);
+  }
 }
 
 TGFX_TEST(AOTEffectTest, DAGAdmissionChecksActualRegisterPressure) {
@@ -846,6 +921,47 @@ TGFX_TEST(AOTEffectTest, CoverageRecipeCanPromoteChainToGraph) {
   EXPECT_EQ(chain->resourceProfile(), AOTResourceProfile::TiledGraph);
   EXPECT_EQ(chain->tiledLeafParameters().size(), 3u);
   EXPECT_GE(chain->coverageRoot(), 0);
+}
+
+TGFX_TEST(AOTEffectTest, CoverageGradientPromotesBaseChainToTiledGraph) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto color = ConstColorProcessor::Make(&allocator, PMColor::White(), InputMode::ModulateRGBA);
+  auto colorizer = SingleIntervalGradientColorizer::Make(&allocator, Color::Red(), Color::Blue());
+  auto matrix = Matrix::MakeTrans(4, 6);
+  auto layout = RadialGradientLayout::Make(&allocator, matrix);
+  auto coverage = ClampedGradientEffect::Make(&allocator, std::move(colorizer), std::move(layout),
+                                              Color::Red(), Color::Blue());
+  ASSERT_NE(color, nullptr);
+  ASSERT_NE(coverage, nullptr);
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({color.get()}, &graph));
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+  ASSERT_EQ(plan.passes.size(), 1u);
+  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
+  EXPECT_EQ(plan.passes[0].resourceProfile, AOTResourceProfile::Chain);
+  auto original = AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]);
+  ASSERT_NE(original, nullptr);
+  EXPECT_EQ(original->numCoordTransforms(), 0u);
+  auto rebuilt =
+      AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0], {coverage.get()});
+  ASSERT_NE(rebuilt, nullptr);
+  const auto* chain = static_cast<const AOTPointwiseChainProcessor*>(rebuilt.get());
+  EXPECT_EQ(chain->resourceProfile(), AOTResourceProfile::TiledGraph);
+  EXPECT_GE(chain->coverageRoot(), 0);
+  ASSERT_EQ(chain->numCoordTransforms(), 1u);
+  EXPECT_EQ(chain->coordTransform(0)->matrix, matrix);
+  size_t gradientCount = 0;
+  for (size_t index = 0; index < chain->slotCount(); ++index) {
+    if (chain->slot(index).op == AOTChainOp::Gradient) {
+      ++gradientCount;
+      EXPECT_EQ(chain->slot(index).in0, -3);
+    }
+  }
+  EXPECT_EQ(gradientCount, 1u);
 }
 
 TGFX_TEST(AOTEffectTest, TiledAlphaOnlySnapshotMatchesLowering) {
@@ -1096,9 +1212,35 @@ TGFX_TEST(AOTEffectTest, LUTBindingBudgetIsNotOrdinaryLeafBudget) {
     ASSERT_EQ(AOTEffectDecomposer::Decompose(graph, &plan), textureCount < 2);
     if (textureCount < 2) {
       ASSERT_EQ(plan.passes.size(), 1u);
+      EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseGraph);
+      EXPECT_EQ(plan.passes[0].resourceProfile, AOTResourceProfile::TiledGraph);
       EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
       BlockAllocator allocator;
-      EXPECT_NE(AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]), nullptr);
+      auto rebuilt = AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]);
+      ASSERT_NE(rebuilt, nullptr);
+      const auto* chain = static_cast<const AOTPointwiseChainProcessor*>(rebuilt.get());
+      EXPECT_EQ(chain->resourceProfile(), AOTResourceProfile::TiledGraph);
+      EXPECT_EQ(chain->lutLeaf(), textureCount);
+      auto maskProxy = context->proxyProvider()->createTextureProxy({}, 2, 2, PixelFormat::ALPHA_8);
+      ASSERT_NE(maskProxy, nullptr);
+      auto mask = DeviceSpaceTextureEffect::Make(&allocator, std::move(maskProxy), Matrix::I());
+      ASSERT_NE(mask, nullptr);
+      auto masked =
+          AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0], {mask.get()});
+      ASSERT_NE(masked, nullptr);
+      const auto* maskedChain = static_cast<const AOTPointwiseChainProcessor*>(masked.get());
+      EXPECT_TRUE(maskedChain->hasMask());
+      EXPECT_EQ(maskedChain->resourceProfile(), AOTResourceProfile::TiledGraph);
+      EXPECT_EQ(maskedChain->lutLeaf(), textureCount);
+      EXPECT_EQ(maskedChain->leafCount(), 4u);
+      auto forcedChain = plan;
+      forcedChain.passes[0].kernel = AOTKernelKind::PointwiseChain;
+      forcedChain.passes[0].resourceProfile = AOTResourceProfile::Chain;
+      EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, forcedChain));
+      EXPECT_EQ(AOTChainBuilder::BuildChainProcessor(&allocator, graph, forcedChain.passes[0]),
+                nullptr);
+      EXPECT_EQ(AOTChainBuilder::BuildFPForPass(&allocator, graph, forcedChain.passes[0], nullptr),
+                nullptr);
     }
   }
 }
@@ -1738,7 +1880,16 @@ TGFX_TEST(AOTEffectTest, PerlinDensityBranchesShareLookupResources) {
           ASSERT_NE(rebuilt, nullptr);
           const auto* chain = static_cast<const AOTPointwiseChainProcessor*>(rebuilt.get());
           EXPECT_TRUE(chain->hasNoise());
+          EXPECT_EQ(chain->resourceProfile(), AOTResourceProfile::NoiseGraph);
           EXPECT_EQ(chain->leafCount(), 4u);
+          ASSERT_EQ(chain->numCoordTransforms(), 1u);
+          EXPECT_EQ(chain->coordTransform(0)->matrix, firstNoise->uvMatrix);
+          ProgramInfo chainInfo(nullptr, nullptr, {rebuilt.get()}, 1, nullptr, BlendMode::SrcOver);
+          FragmentProcessor::CoordTransformIter coordIter(&chainInfo);
+          EXPECT_EQ(coordIter.next(), chain->coordTransform(0));
+          for (size_t leaf = 0; leaf < chain->leafCount(); ++leaf) {
+            EXPECT_EQ(coordIter.next(), chain->childProcessor(leaf)->coordTransform(0));
+          }
         }
       }
     }
@@ -1756,8 +1907,10 @@ TGFX_TEST(AOTEffectTest, PointwiseGraphPermutationsAreIndependentAndBounded) {
     inputs.xpType = xp;
     auto composed = ComposePointwiseGraph(inputs);
     ASSERT_TRUE(composed.has_value());
-    EXPECT_TRUE(composed->vertValues.empty());
+    EXPECT_EQ(composed->vertValues.size(), PointwiseChainShader::VD::COUNT);
+    EXPECT_EQ(composed->fragValues.size(), PointwiseChainShader::FD::COUNT + 1);
     EXPECT_EQ(composed->fragValues[PointwiseGraphShader::FD::HAS_XP], xp);
+    EXPECT_EQ(composed->fragValues[PointwiseGraphShader::FD::RESOURCE_KIND], 0);
     graphPairs.insert({PointwiseGraphShader::VD::domain().encode(composed->vertValues),
                        PointwiseGraphShader::FD::domain().encode(composed->fragValues)});
     EXPECT_FALSE(ComposePointwiseChain(inputs).has_value());
@@ -1774,23 +1927,54 @@ TGFX_TEST(AOTEffectTest, PointwiseGraphPermutationsAreIndependentAndBounded) {
     EXPECT_EQ(maskedValues->fragValues, composed->fragValues);
   }
   EXPECT_EQ(graphPairs.size(), 3u);
-  for (int xp = 0; xp < 3; ++xp) {
-    auto tiled = inputs;
-    tiled.hasNoise = false;
-    tiled.resourceProfile = AOTResourceProfile::TiledGraph;
-    tiled.xpType = xp;
-    auto composed = ComposePointwiseGraph(tiled);
-    ASSERT_TRUE(composed.has_value());
-    EXPECT_EQ(composed->fragValues[PointwiseGraphShader::FD::RESOURCE_KIND], 1);
-    graphPairs.insert({PointwiseGraphShader::VD::domain().encode(composed->vertValues),
-                       PointwiseGraphShader::FD::domain().encode(composed->fragValues)});
-    EXPECT_FALSE(ComposePointwiseChain(tiled).has_value());
-    tiled.hasNoise = true;
-    EXPECT_FALSE(ComposePointwiseGraph(tiled).has_value());
+  for (int gpKind = 0; gpKind <= 4; ++gpKind) {
+    for (int flags = 0; flags < 64; ++flags) {
+      for (int xp = 0; xp < 3; ++xp) {
+        PointwiseChainInputs base;
+        base.gpKind = gpKind;
+        base.hasCoverage = (flags & 1) != 0;
+        base.hasUVCoord = (flags & 2) != 0;
+        base.hasColor = (flags & 4) != 0;
+        base.textureCount = (flags & 8) != 0 ? 1 : 0;
+        base.hasMask = (flags & 16) != 0;
+        base.hasCoverageSubtree = (flags & 32) != 0;
+        base.xpType = xp;
+        auto chainValues = ComposePointwiseChain(base);
+        auto tiled = base;
+        tiled.resourceProfile = AOTResourceProfile::TiledGraph;
+        auto composed = ComposePointwiseGraph(tiled);
+        ASSERT_EQ(composed.has_value(), chainValues.has_value());
+        EXPECT_FALSE(ComposePointwiseChain(tiled).has_value());
+        auto automatic = base;
+        automatic.hasGradient = true;
+        auto automaticValues = ComposePointwiseGraph(automatic);
+        ASSERT_EQ(automaticValues.has_value(), composed.has_value());
+        EXPECT_FALSE(ComposePointwiseChain(automatic).has_value());
+        auto explicitChain = automatic;
+        explicitChain.resourceProfile = AOTResourceProfile::Chain;
+        EXPECT_FALSE(ComposePointwiseChain(explicitChain).has_value());
+        EXPECT_FALSE(ComposePointwiseGraph(explicitChain).has_value());
+        if (!composed) {
+          continue;
+        }
+        auto expectedFragment = chainValues->fragValues;
+        expectedFragment.push_back(1);
+        EXPECT_EQ(composed->vertValues, chainValues->vertValues);
+        EXPECT_EQ(composed->fragValues, expectedFragment);
+        EXPECT_EQ(automaticValues->vertValues, composed->vertValues);
+        EXPECT_EQ(automaticValues->fragValues, composed->fragValues);
+        auto vertexIndex = PointwiseGraphShader::VD::domain().encode(composed->vertValues);
+        auto fragmentIndex = PointwiseGraphShader::FD::domain().encode(composed->fragValues);
+        EXPECT_TRUE(
+            IsBuildablePermutation(PointwiseGraphShader().info(), vertexIndex, fragmentIndex));
+        graphPairs.insert({vertexIndex, fragmentIndex});
+        tiled.hasNoise = true;
+        EXPECT_FALSE(ComposePointwiseGraph(tiled).has_value());
+      }
+    }
   }
-  EXPECT_EQ(graphPairs.size(), 6u);
+  EXPECT_EQ(graphPairs.size(), EnumeratePointwiseChainReachable().size() + 3);
   EXPECT_EQ(EnumeratePointwiseGraphReachable(), graphPairs);
-  EXPECT_EQ(EnumeratePointwiseChainReachable().size(), 54u);
   EXPECT_EQ(EnumerateReachablePermutations("PointwiseGraphShader"), graphPairs);
   auto unsupported = inputs;
   unsupported.gpKind = 0;

@@ -45,7 +45,6 @@
 #include "gpu/shaders/level1/TextureFillShader.h"
 #include "gpu/shaders/level1/TexturedEffectShader.h"
 #include "gpu/shaders/level1/TiledTextureFillShader.h"
-#include "gpu/shaders/level1/UnifiedGradientShader.h"
 #include "gpu/shaders/level1/YUVTextureFillShader.h"
 
 namespace tgfx {
@@ -965,49 +964,6 @@ std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseDirectReachable() {
   return result;
 }
 
-std::optional<RuleComposedValues> ComposeUnifiedGradient(const UnifiedGradientInputs& inputs) {
-  if (inputs.xpType < 0) {
-    return std::nullopt;
-  }
-  // LUT gradients keep the legacy TextureGradientShader behavior: coverage-carrying draws stay on
-  // the runtime path.
-  if (inputs.hasLUT && inputs.hasVCoverage) {
-    return std::nullopt;
-  }
-  using VD = UnifiedGradientShader::VD;
-  using FD = UnifiedGradientShader::FD;
-  RuleComposedValues values;
-  values.vertValues.resize(VD::COUNT);
-  values.vertValues[VD::HAS_VCOVERAGE] = inputs.hasVCoverage ? 1 : 0;
-  values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_XP] = inputs.xpType;
-  values.fragValues[FD::HAS_VCOVERAGE] = values.vertValues[VD::HAS_VCOVERAGE];
-  values.fragValues[FD::HAS_LUT] = inputs.hasLUT ? 1 : 0;
-  return values;
-}
-
-std::set<std::pair<uint32_t, uint32_t>> EnumerateUnifiedGradientReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int hasVCoverage = 0; hasVCoverage <= 1; ++hasVCoverage) {
-    for (int hasLUT = 0; hasLUT <= 1; ++hasLUT) {
-      for (int xpType = -1; xpType <= 2; ++xpType) {
-        UnifiedGradientInputs inputs;
-        inputs.hasVCoverage = hasVCoverage != 0;
-        inputs.hasLUT = hasLUT != 0;
-        inputs.xpType = xpType;
-        auto composed = ComposeUnifiedGradient(inputs);
-        if (!composed) {
-          continue;
-        }
-        auto vertIndex = UnifiedGradientShader::VD::domain().encode(composed->vertValues);
-        auto fragIndex = UnifiedGradientShader::FD::domain().encode(composed->fragValues);
-        result.insert({vertIndex, fragIndex});
-      }
-    }
-  }
-  return result;
-}
-
 std::optional<RuleComposedValues> ComposeAtlasTextFill(const AtlasTextFillInputs& inputs) {
   if (inputs.xpType < 0) {
     return std::nullopt;
@@ -1047,10 +1003,9 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateAtlasTextFillReachable() {
   return result;
 }
 
-std::optional<RuleComposedValues> ComposePointwiseChain(const PointwiseChainInputs& inputs) {
-  if (inputs.xpType < 0 || inputs.xpType > 2 || inputs.hasNoise ||
-      (inputs.resourceProfile != AOTResourceProfile::Automatic &&
-       inputs.resourceProfile != AOTResourceProfile::Chain)) {
+static std::optional<RuleComposedValues> ComposePointwiseGP(const PointwiseChainInputs& inputs) {
+  if (inputs.xpType < 0 || inputs.xpType > 2 || inputs.textureCount < 0 ||
+      inputs.textureCount > 1) {
     return std::nullopt;
   }
   // Each GP profile fixes the attribute slots its vertex buffers carry. Quad and Mesh buffers
@@ -1134,6 +1089,15 @@ std::optional<RuleComposedValues> ComposePointwiseChain(const PointwiseChainInpu
   return values;
 }
 
+std::optional<RuleComposedValues> ComposePointwiseChain(const PointwiseChainInputs& inputs) {
+  if (inputs.hasNoise || inputs.hasGradient ||
+      (inputs.resourceProfile != AOTResourceProfile::Automatic &&
+       inputs.resourceProfile != AOTResourceProfile::Chain)) {
+    return std::nullopt;
+  }
+  return ComposePointwiseGP(inputs);
+}
+
 std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseChainReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int gpKind = 0; gpKind <= 4; ++gpKind) {
@@ -1173,39 +1137,51 @@ std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseChainReachable() {
 
 std::optional<RuleComposedValues> ComposePointwiseGraph(const PointwiseChainInputs& inputs) {
   auto profile = inputs.resourceProfile;
-  if (profile == AOTResourceProfile::Automatic && inputs.hasNoise) {
-    profile = AOTResourceProfile::NoiseGraph;
+  if (profile == AOTResourceProfile::Automatic) {
+    if (inputs.hasNoise) {
+      profile = AOTResourceProfile::NoiseGraph;
+    } else if (inputs.hasGradient) {
+      profile = AOTResourceProfile::TiledGraph;
+    }
   }
   if (!IsAOTGraphProfile(profile) ||
-      (profile == AOTResourceProfile::NoiseGraph) != inputs.hasNoise || inputs.gpKind != 1 ||
-      !inputs.hasCoverage || inputs.hasUVCoord || inputs.hasColor || inputs.textureCount != 1 ||
-      inputs.xpType < 0 || inputs.xpType > 2) {
+      (profile == AOTResourceProfile::NoiseGraph) != inputs.hasNoise) {
     return std::nullopt;
   }
-  RuleComposedValues values;
-  values.fragValues.resize(PointwiseGraphShader::FD::COUNT);
-  values.fragValues[PointwiseGraphShader::FD::HAS_XP] = inputs.xpType;
-  values.fragValues[PointwiseGraphShader::FD::RESOURCE_KIND] =
+  if (profile == AOTResourceProfile::NoiseGraph &&
+      (inputs.hasGradient || inputs.gpKind != 1 || !inputs.hasCoverage || inputs.hasUVCoord ||
+       inputs.hasColor || inputs.textureCount != 1)) {
+    return std::nullopt;
+  }
+  auto values = ComposePointwiseGP(inputs);
+  if (!values) {
+    return std::nullopt;
+  }
+  values->fragValues.resize(PointwiseGraphShader::FD::COUNT);
+  values->fragValues[PointwiseGraphShader::FD::RESOURCE_KIND] =
       profile == AOTResourceProfile::TiledGraph ? 1 : 0;
   return values;
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseGraphReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
+  for (const auto& indices : EnumeratePointwiseChainReachable()) {
+    auto fragValues = PointwiseChainShader::FD::domain().decode(indices.second);
+    fragValues.push_back(1);
+    result.insert({indices.first, PointwiseGraphShader::FD::domain().encode(fragValues)});
+  }
   PointwiseChainInputs inputs;
   inputs.gpKind = 1;
   inputs.hasCoverage = true;
   inputs.textureCount = 1;
-  for (auto profile : {AOTResourceProfile::NoiseGraph, AOTResourceProfile::TiledGraph}) {
-    inputs.resourceProfile = profile;
-    inputs.hasNoise = profile == AOTResourceProfile::NoiseGraph;
-    for (int xpType = -1; xpType <= 3; ++xpType) {
-      inputs.xpType = xpType;
-      auto composed = ComposePointwiseGraph(inputs);
-      if (composed) {
-        result.insert({PointwiseGraphShader::VD::domain().encode(composed->vertValues),
-                       PointwiseGraphShader::FD::domain().encode(composed->fragValues)});
-      }
+  inputs.resourceProfile = AOTResourceProfile::NoiseGraph;
+  inputs.hasNoise = true;
+  for (int xpType = -1; xpType <= 3; ++xpType) {
+    inputs.xpType = xpType;
+    auto composed = ComposePointwiseGraph(inputs);
+    if (composed) {
+      result.insert({PointwiseGraphShader::VD::domain().encode(composed->vertValues),
+                     PointwiseGraphShader::FD::domain().encode(composed->fragValues)});
     }
   }
   return result;
@@ -1290,9 +1266,6 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "PointwiseDirectShader") {
     return EnumeratePointwiseDirectReachable();
-  }
-  if (shaderName == "UnifiedGradientShader") {
-    return EnumerateUnifiedGradientReachable();
   }
   if (shaderName == "AtlasTextFillShader") {
     return EnumerateAtlasTextFillReachable();

@@ -356,14 +356,8 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
         return false;
       }
     }
-    // The LUT branch addresses sampler 0 or 1 only, even though bindings are padded to four.
     if (hasLUT && plainLeaves > 1) {
       return false;
-    }
-    auto profile = pass.resourceProfile;
-    if (profile == AOTResourceProfile::Automatic) {
-      profile = pass.kernel == AOTKernelKind::PointwiseGraph ? AOTResourceProfile::NoiseGraph
-                                                             : AOTResourceProfile::Chain;
     }
     AOTResourceDemand demand = {encodedInstructions,
                                 0,
@@ -375,6 +369,10 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
                                 deviceRects,
                                 localRects,
                                 rrects};
+    auto profile = pass.resourceProfile;
+    if (profile == AOTResourceProfile::Automatic) {
+      profile = SelectAOTResourceProfile(demand);
+    }
     const auto* capacity = GetAOTResourceCapacity(profile);
     return capacity != nullptr &&
            IsAOTGraphProfile(profile) == (pass.kernel == AOTKernelKind::PointwiseGraph) &&

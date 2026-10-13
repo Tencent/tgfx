@@ -294,9 +294,7 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   // The mask sampler slot is occupied (real mask or phantom) — four-leaf chains always occupy it.
   bool hasMaskSlotChild = false;
   bool hasMaskChild = false;
-  // Always registered as this processor's own coord transform (index 0, ahead of the leaf
-  // transforms) so the gradient coordinate mapping shares the GP-written transform path. A chain
-  // without a gradient slot exposes a default identity transform here.
+  // Registered only by extended profiles, ahead of the leaf transforms.
   CoordTransform gradientCoordTransform = {};
   int coverageRootSlot = -1;
   // Register index of the narrow clip product / atlas coverage root; -1 when absent.

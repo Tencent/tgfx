@@ -717,32 +717,42 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
       return nullptr;
     }
   }
-  size_t colorTiledRecipes = 0;
+  AOTResourceDemand colorDemand = {};
   for (auto nodeID : pass.nodes) {
     const auto* node = graph.nodeAt(nodeID);
     const auto* texture =
         node != nullptr ? std::get_if<AOTTextureParameters>(&node->parameters) : nullptr;
-    if (texture != nullptr && texture->samplingKind == AOTTextureSamplingKind::Tiled &&
-        texture->tiledRecipe.has_value() &&
-        (texture->tiledRecipe->shaderModeX != TiledTextureShaderMode::None ||
-         texture->tiledRecipe->shaderModeY != TiledTextureShaderMode::None)) {
-      ++colorTiledRecipes;
+    if (texture != nullptr) {
+      ++colorDemand.leafBindings;
+      if (texture->samplingKind == AOTTextureSamplingKind::Tiled &&
+          texture->tiledRecipe.has_value() &&
+          (texture->tiledRecipe->shaderModeX != TiledTextureShaderMode::None ||
+           texture->tiledRecipe->shaderModeY != TiledTextureShaderMode::None)) {
+        ++colorDemand.tiledRecipes;
+      }
+    }
+    const auto* gradient =
+        node != nullptr ? std::get_if<AOTGradientParameters>(&node->parameters) : nullptr;
+    if (gradient != nullptr) {
+      ++colorDemand.gradients;
+      if (gradient->colorizerKind == 3) {
+        ++colorDemand.leafBindings;
+      }
     }
   }
+  colorDemand.noiseSources = noiseParameters != nullptr ? 1 : 0;
+  colorDemand.leafBindings += colorDemand.noiseSources * 2;
   auto declaredProfile = pass.resourceProfile;
   if (declaredProfile == AOTResourceProfile::Automatic) {
-    declaredProfile = pass.kernel == AOTKernelKind::PointwiseGraph ? AOTResourceProfile::NoiseGraph
-                                                                   : AOTResourceProfile::Chain;
+    declaredProfile = SelectAOTResourceProfile(colorDemand);
   }
-  const auto* declaredCapacity = GetAOTResourceCapacity(declaredProfile);
-  if (declaredCapacity == nullptr || colorTiledRecipes > declaredCapacity->tiledRecipes ||
-      IsAOTGraphProfile(declaredProfile) != (pass.kernel == AOTKernelKind::PointwiseGraph) ||
-      (declaredProfile == AOTResourceProfile::NoiseGraph) != (noiseParameters != nullptr)) {
+  if (!FitsAOTResourceProfile(colorDemand, declaredProfile) ||
+      IsAOTGraphProfile(declaredProfile) != (pass.kernel == AOTKernelKind::PointwiseGraph)) {
     return nullptr;
   }
   auto finalProfile = declaredProfile;
   if (finalProfile == AOTResourceProfile::Chain &&
-      tiledLeaves.size() > ChainResourceCapacity.tiledRecipes) {
+      (hasGradient || tiledLeaves.size() > ChainResourceCapacity.tiledRecipes)) {
     if (coverageGraph == nullptr) {
       return nullptr;
     }
@@ -754,8 +764,6 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   int lutLeafIndex = -1;
   for (auto& slot : slots) {
     if (slot.op == AOTChainOp::Gradient && slot.gradient.colorizerKind == 3) {
-      // The LUT counts as a leaf for sampler binding, and TEXTURE_COUNT only exists for 1 or 2
-      // leaves here, so at most one DAG leaf can coexist with it.
       if (leaves.size() >= 2) {
         return nullptr;
       }
@@ -902,10 +910,9 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   }
   int coverageRootSlot = -1;
   if (coverageGraph != nullptr) {
-    // Acceptance gate, kept tight to the byte-verified shapes. Accepted roots: a single blend
-    // consuming the unit input (the xfer-dst coverage family), a bare texture leaf consuming the
-    // unit (a local mask fill, modulated by the unit alpha through selector bit 2), or an analytic
-    // coverage node (RectCoverage / RRectCoverage) closing a chain that starts at the unit. The
+    // Accepted roots: a single blend consuming the unit input (the xfer-dst coverage family), a
+    // bare texture or gradient consuming the unit alpha, or an analytic coverage node
+    // (RectCoverage / RRectCoverage) closing a chain that starts at the unit. The
     // unit may otherwise feed only texture leaves (their input is unused — blend operands sample
     // raw), the gradient (a blend child, so it reads the opaque -4 designator), and analytic
     // coverage nodes. Analytic clip slots may multiply a blend-rooted subtree: the scalar coverage
@@ -915,9 +922,10 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
     auto* covRootNode = nodes[covRootCombined];
     const bool rootIsBlend = covRootNode->kind == AOTEffectKind::Blend;
     const bool rootIsTexture = covRootNode->kind == AOTEffectKind::TextureSource;
+    const bool rootIsGradient = covRootNode->kind == AOTEffectKind::GradientSource;
     const bool rootIsAnalytic = covRootNode->kind == AOTEffectKind::RectCoverage ||
                                 covRootNode->kind == AOTEffectKind::RRectCoverage;
-    if (!rootIsBlend && !rootIsTexture && !rootIsAnalytic) {
+    if (!rootIsBlend && !rootIsTexture && !rootIsGradient && !rootIsAnalytic) {
       return nullptr;
     }
     int coverageBlendCount = 0;
@@ -946,9 +954,8 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
       }
     }
     // An analytic root consumes the previous analytic node rather than the unit, but the chain
-    // still transmits the unit coverage transitively, so the root-consumes-unit requirement only
-    // applies to the blend and texture roots (the blend-count rule already rejects blends under
-    // an analytic root).
+    // still transmits the unit coverage transitively, so only analytic roots may omit a direct
+    // unit input (the blend-count rule already rejects blends under an analytic root).
     if (rejected || coverageBlendCount != (rootIsBlend ? 1 : 0) ||
         (!rootConsumesUnit && !rootIsAnalytic)) {
       return nullptr;
@@ -1051,7 +1058,9 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
     maskChildIsPhantom = true;
   }
   const auto* capacity = GetAOTResourceCapacity(finalProfile);
-  if (capacity == nullptr || tiledLeaves.size() > capacity->tiledRecipes) {
+  if (capacity == nullptr || samplerChildren > capacity->leafBindings ||
+      tiledLeaves.size() > capacity->tiledRecipes || (hasGradient && capacity->gradients == 0) ||
+      (noiseParameters != nullptr && capacity->noiseSources == 0)) {
     return nullptr;
   }
   const int tiledLeafIndex = tiledLeaves.empty() ? -1 : tiledLeaves[0].leafIndex;

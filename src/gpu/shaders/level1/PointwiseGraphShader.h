@@ -18,30 +18,28 @@
 
 #pragma once
 
-#include "gpu/shaders/PrecompiledShader.h"
+#include <utility>
+#include "gpu/shaders/level1/PointwiseChainShader.h"
 
 namespace tgfx {
 
-// Single-pass extended pointwise graphs. Shares the chain instruction ABI and evaluator;
-// resource kind 0 carries one Perlin computation, kind 1 carries three tiled-image recipes.
-// Both profiles use common-color, position-based AA quads with four leaf bindings.
+// Single-pass extended pointwise graphs sharing the chain instruction ABI and GP layouts.
+// Resource kind 0 retains the fixed noise-quad subset; kind 1 supports one gradient and three
+// tiled-image recipes throughout the chain's reachable layouts.
 class PointwiseGraphShader : public PrecompiledShader {
  public:
-  struct VertDims {
-    enum : uint32_t { COUNT = 0 };
-    static PermutationDomain domain() {
-      return PermutationDomain({});
-    }
-  };
-  using VD = VertDims;
+  using VD = PointwiseChainShader::VD;
 
-  struct FragDims {
-    enum : uint32_t { HAS_XP, RESOURCE_KIND, COUNT };
+  struct FragDims : PointwiseChainShader::FD {
+    enum : uint32_t { RESOURCE_KIND = PointwiseChainShader::FD::COUNT, COUNT };
     static PermutationDomain domain() {
-      return PermutationDomain({PermutationInt("HAS_XP", 3), PermutationInt("RESOURCE_KIND", 2)});
+      auto dimensions = PointwiseChainShader::FD::domain().getDimensions();
+      dimensions.emplace_back(PermutationInt("RESOURCE_KIND", 2));
+      return PermutationDomain(std::move(dimensions));
     }
   };
   using FD = FragDims;
+  static_assert(FD::COUNT == 7, "Update the Compose mapping when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"PointwiseGraphShader",

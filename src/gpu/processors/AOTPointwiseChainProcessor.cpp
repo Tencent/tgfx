@@ -148,9 +148,7 @@ static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTCha
   }
 }
 
-// Writes the chain-wide gradient parameter block (UBO fields declared unconditionally in
-// pointwise_chain.frag). Field names mirror the dedicated gradient kernels, prefixed with
-// "Gradient"; the unrolled-binary arrays use the scale0_1-style names of gradient_fill.frag.
+// Writes the extended chain's gradient parameter block.
 static void UploadGradientParams(UniformData* uniformData, const AOTGradientParameters& params) {
   uniformData->setDataOptional("GradientLayoutType", params.layoutType);
   uniformData->setDataOptional("GradientBias", params.bias);
@@ -287,12 +285,8 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
       maskChild->name() != "DeviceSpaceTextureEffect") {
     return nullptr;
   }
-  // The LUT child binds the sampler right after the DAG leaves; a real mask child's binding point
-  // relative to it is undefined, so reject that (currently unreachable) combination. A phantom
-  // mask child always binds last, after the padding.
   if (lutChild != nullptr &&
-      (lutLeafIndex < 0 || lutLeafIndex > 1 || static_cast<size_t>(lutLeafIndex) != leafCount ||
-       (maskChild != nullptr && !maskChildIsPhantom))) {
+      (lutLeafIndex < 0 || lutLeafIndex > 3 || static_cast<size_t>(lutLeafIndex) != leafCount)) {
     return nullptr;
   }
   if (tiledLeafIndex >= 0 &&
@@ -380,7 +374,9 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     return nullptr;
   }
   if (profile == AOTResourceProfile::Automatic) {
-    profile = noiseSlots > 0 ? AOTResourceProfile::NoiseGraph : AOTResourceProfile::Chain;
+    profile = noiseSlots > 0      ? AOTResourceProfile::NoiseGraph
+              : gradientSlots > 0 ? AOTResourceProfile::TiledGraph
+                                  : AOTResourceProfile::Chain;
   }
   AOTResourceDemand demand = {slots.size(),
                               0,
@@ -432,10 +428,9 @@ AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
       noiseSamplerBase = static_cast<int>(textureLeaves.size());
     }
   }
-  // Exposed unconditionally (a default identity transform when no gradient slot exists) so the
-  // leaf transforms keep stable ordinals: the gradient transform is index 0, leaf k is index
-  // k+1, and the GP-written CoordTransformMatrix_* uniforms line up the same way for every chain.
-  addCoordTransform(&gradientCoordTransform);
+  if (IsAOTGraphProfile(_resourceProfile)) {
+    addCoordTransform(&gradientCoordTransform);
+  }
   for (auto& leaf : textureLeaves) {
     registerChildProcessor(std::move(leaf));
   }

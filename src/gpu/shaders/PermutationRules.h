@@ -315,18 +315,6 @@ struct PointwiseDirectInputs {
 };
 
 /**
- * Input contract of the UnifiedGradientShader matcher rule. The colorizer kind (beyond LUT vs
- * analytic), layout type, and perspective checks are whole-draw rejections in Extract; the
- * colorizer itself is a runtime uniform. LUT gradients never carry per-vertex coverage, which
- * Compose enforces.
- */
-struct UnifiedGradientInputs {
-  bool hasVCoverage = false;
-  bool hasLUT = false;
-  int xpType = -1;  // -1 = no representable XferProcessor.
-};
-
-/**
  * Input contract of the AtlasTextFillShader matcher rule. The optional device-space mask
  * structure checks are whole-draw rejections in Extract; the mask is a runtime uniform.
  */
@@ -342,7 +330,8 @@ struct AtlasTextFillInputs {
  * each profile fixes which attribute slots its vertex buffers carry, and Compose rejects
  * profile-inconsistent combinations. The chain slot topology (ops, indices) is runtime data;
  * only the leaf-count class, the mask flag, the coverage-subtree flag, and the transfer type
- * shape dimensions.
+ * shape the shared dimensions. TiledGraph adds a resource-kind value for its single gradient and
+ * three tiled recipes; NoiseGraph retains its fixed position-based, common-color AA quad subset.
  */
 struct PointwiseChainInputs {
   int gpKind = 0;
@@ -353,6 +342,7 @@ struct PointwiseChainInputs {
   bool hasMask = false;             // device-space mask child present.
   bool hasCoverageSubtree = false;  // chain coverage subtree present.
   bool hasNoise = false;
+  bool hasGradient = false;  // one gradient belongs to the extended TiledGraph profile.
   AOTResourceProfile resourceProfile = AOTResourceProfile::Automatic;
   int xpType = -1;  // -1 = no representable XferProcessor.
 };
@@ -524,12 +514,6 @@ std::optional<RuleComposedValues> ComposePointwiseTail(const PointwiseTailInputs
 std::optional<RuleComposedValues> ComposePointwiseDirect(const PointwiseDirectInputs& inputs);
 
 /**
- * Pure mapping for the UnifiedGradientShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
- */
-std::optional<RuleComposedValues> ComposeUnifiedGradient(const UnifiedGradientInputs& inputs);
-
-/**
  * Pure mapping for the AtlasTextFillShader rule; see ComposeRoundStrokeRect for the sharing
  * contract.
  */
@@ -540,6 +524,11 @@ std::optional<RuleComposedValues> ComposeAtlasTextFill(const AtlasTextFillInputs
  * contract.
  */
 std::optional<RuleComposedValues> ComposePointwiseChain(const PointwiseChainInputs& inputs);
+
+/**
+ * Maps TiledGraph through the shared chain GP contract and NoiseGraph through its fixed quad
+ * subset, adding the fragment-stage resource-kind dimension.
+ */
 std::optional<RuleComposedValues> ComposePointwiseGraph(const PointwiseChainInputs& inputs);
 
 /**
@@ -674,11 +663,6 @@ std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseTailReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseDirectReachable();
 
 /**
- * Returns every (vertIndex, fragIndex) pair the UnifiedGradient rule can ever produce.
- */
-std::set<std::pair<uint32_t, uint32_t>> EnumerateUnifiedGradientReachable();
-
-/**
  * Returns every (vertIndex, fragIndex) pair the AtlasTextFill rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateAtlasTextFillReachable();
@@ -687,6 +671,10 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateAtlasTextFillReachable();
  * Returns every (vertIndex, fragIndex) pair the PointwiseChain rule can ever produce.
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseChainReachable();
+
+/**
+ * Returns the chain-reachable pairs mapped to TiledGraph plus the fixed NoiseGraph quad pairs.
+ */
 std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseGraphReachable();
 
 /**

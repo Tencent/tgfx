@@ -27,6 +27,22 @@
 #include "gpu/processors/ConstColorProcessor.h"
 
 namespace tgfx {
+
+static bool ContainsGradientSource(const FragmentProcessor* processor) {
+  if (processor == nullptr) {
+    return false;
+  }
+  if (processor->name() == "ClampedGradientEffect") {
+    return true;
+  }
+  for (size_t index = 0; index < processor->numChildProcessors(); ++index) {
+    if (ContainsGradientSource(processor->childProcessor(index))) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void StandardDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   if (!onPrepare()) {
     return;
@@ -99,8 +115,20 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, ProgramLookupMode mode,
 std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
     RenderTarget* renderTarget, const ColorProcessorList& activeColors) {
   auto cache = renderTarget->getContext()->precompiledShaderCache();
-  if (!cache->isLoaded() || !cache->decompositionEnabled()) {
+  if (!cache->isLoaded()) {
     return nullptr;
+  }
+  if (!cache->decompositionEnabled()) {
+    bool requiresGradientLowering = false;
+    for (size_t index = 0; index < preparedProgramInfo->numFragmentProcessors(); ++index) {
+      if (ContainsGradientSource(preparedProgramInfo->getFragmentProcessor(index))) {
+        requiresGradientLowering = true;
+        break;
+      }
+    }
+    if (!requiresGradientLowering) {
+      return nullptr;
+    }
   }
   if (MatchPermutation(preparedProgramInfo.get()).has_value()) {
     return nullptr;

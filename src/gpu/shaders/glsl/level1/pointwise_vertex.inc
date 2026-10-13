@@ -53,21 +53,23 @@ layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
 #if GP_LAYOUT == 0
   mat3 Matrix;
 #endif
-  // The chain processor always exposes one own coord transform ahead of the leaf transforms:
-  // index 0 is the gradient coordinate mapping (identity for chains without a gradient source),
-  // and texture leaf k reads CoordTransformMatrix_{k+1}.
+#ifdef TGFX_POINTWISE_SOURCE_COORDS
   mat3 CoordTransformMatrix_0;
-#if NTEX >= 1
+#if NTEX > 0
   mat3 CoordTransformMatrix_1;
-#endif
-#if NTEX >= 2
   mat3 CoordTransformMatrix_2;
-#endif
-#if NTEX >= 4
   mat3 CoordTransformMatrix_3;
   mat3 CoordTransformMatrix_4;
-  // The mask-slot phantom child contributes a transform like every child; it is never read.
   mat3 CoordTransformMatrix_5;
+#endif
+#else
+#if NTEX > 0
+  mat3 CoordTransformMatrix_0;
+  mat3 CoordTransformMatrix_1;
+  mat3 CoordTransformMatrix_2;
+  mat3 CoordTransformMatrix_3;
+  mat3 CoordTransformMatrix_4;
+#endif
 #endif
 #if GP_LAYOUT == 0 && HAS_UV_COORD
   // Per-target coordinate source: bit k set picks the uvCoord attribute for leaf k, bit 4 for the
@@ -121,10 +123,9 @@ layout(location = CHAIN_TEX_LOC_BASE + 1) out vec3 TransformedCoords_1;
 layout(location = CHAIN_TEX_LOC_BASE + 2) out vec3 TransformedCoords_2;
 layout(location = CHAIN_TEX_LOC_BASE + 3) out vec3 TransformedCoords_3;
 #endif
-// Gradient coordinate varying at a fixed location beyond every layout's varyings (ellipse with
-// color and 4 texture coords tops out at location 6). Always emitted; the fragment stage reads
-// it only when a chain slot is OP_GRADIENT.
+#ifdef TGFX_POINTWISE_SOURCE_COORDS
 layout(location = 7) out vec3 GradientCoords;
+#endif
 
 void main() {
 #if GP_LAYOUT == 0 && HAS_UV_COORD
@@ -151,17 +152,22 @@ void main() {
   vColor = inColor;
 #endif
 #endif
-#if NTEX >= 1
+#ifdef TGFX_POINTWISE_SOURCE_COORDS
+#if NTEX > 0
   TransformedCoords_0 = (CoordTransformMatrix_1 * vec3(CHAIN_LEAF_SOURCE(0), 1.0)).xyz;
-#endif
-#if NTEX >= 2
   TransformedCoords_1 = (CoordTransformMatrix_2 * vec3(CHAIN_LEAF_SOURCE(1), 1.0)).xyz;
-#endif
-#if NTEX >= 4
   TransformedCoords_2 = (CoordTransformMatrix_3 * vec3(CHAIN_LEAF_SOURCE(2), 1.0)).xyz;
   TransformedCoords_3 = (CoordTransformMatrix_4 * vec3(CHAIN_LEAF_SOURCE(3), 1.0)).xyz;
 #endif
   GradientCoords = (CoordTransformMatrix_0 * vec3(CHAIN_GRADIENT_SOURCE, 1.0)).xyz;
+#else
+#if NTEX > 0
+  TransformedCoords_0 = (CoordTransformMatrix_0 * vec3(CHAIN_LEAF_SOURCE(0), 1.0)).xyz;
+  TransformedCoords_1 = (CoordTransformMatrix_1 * vec3(CHAIN_LEAF_SOURCE(1), 1.0)).xyz;
+  TransformedCoords_2 = (CoordTransformMatrix_2 * vec3(CHAIN_LEAF_SOURCE(2), 1.0)).xyz;
+  TransformedCoords_3 = (CoordTransformMatrix_3 * vec3(CHAIN_LEAF_SOURCE(3), 1.0)).xyz;
+#endif
+#endif
 #if GP_LAYOUT == 0 && HAS_COVERAGE
   vCoverage = inCoverage;
 #endif

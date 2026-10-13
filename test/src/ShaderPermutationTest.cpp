@@ -27,12 +27,16 @@
 #include "base/TGFXTest.h"
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/utils/BlockAllocator.h"
+#include "gpu/AOTChainBuilder.h"
+#include "gpu/AOTEffectDecomposer.h"
 #include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PermutationMatcher.h"
 #include "gpu/PrecompiledBundleIdentity.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/ShaderKeyHash.h"
+#include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
@@ -52,11 +56,11 @@
 #include "gpu/shaders/PermutationRules.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"
+#include "gpu/shaders/level1/PointwiseGraphShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedTextureCoverageShader.h"
 #include "gpu/shaders/level1/TextureFillShader.h"
-#include "gpu/shaders/level1/UnifiedGradientShader.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ColorFilter.h"
@@ -321,39 +325,99 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
 }
 
 TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
-  UnifiedGradientShader shader;
+  PointwiseGraphShader shader;
   auto info = shader.info();
-  EXPECT_EQ(info.vertDomain.totalCount(), 2u);
-  EXPECT_EQ(info.fragDomain.totalCount(), 12u);
+  EXPECT_EQ(info.vertDomain.dimensionCount(), 5u);
+  EXPECT_EQ(info.fragDomain.dimensionCount(), 7u);
+  EXPECT_EQ(info.vertDomain.totalCount(), PointwiseChainShader::VD::domain().totalCount());
+  EXPECT_EQ(info.fragDomain.totalCount(), PointwiseChainShader::FD::domain().totalCount() * 2);
+  EXPECT_EQ(PointwiseGraphShader::FD::RESOURCE_KIND, PointwiseGraphShader::FD::COUNT - 1);
 
   auto reachable = EnumerateReachablePermutations(info.name);
   ASSERT_TRUE(reachable.has_value());
   std::set<uint32_t> vertexIndices;
   std::set<uint32_t> fragmentIndices;
-  for (const auto& permutation : *reachable) {
-    vertexIndices.insert(permutation.first);
-    fragmentIndices.insert(permutation.second);
+  for (int gpType = 0; gpType < 2; ++gpType) {
+    for (int hasCoverage = 0; hasCoverage < 2; ++hasCoverage) {
+      for (int xpType = 0; xpType < 3; ++xpType) {
+        PointwiseChainInputs inputs;
+        inputs.gpKind = gpType;
+        inputs.hasCoverage = gpType == 1 || hasCoverage != 0;
+        inputs.hasGradient = true;
+        inputs.resourceProfile = AOTResourceProfile::TiledGraph;
+        inputs.xpType = xpType;
+        auto composed = ComposePointwiseGraph(inputs);
+        ASSERT_TRUE(composed.has_value());
+        auto vertexIndex = info.vertDomain.encode(composed->vertValues);
+        auto fragmentIndex = info.fragDomain.encode(composed->fragValues);
+        EXPECT_TRUE(IsBuildablePermutation(info, vertexIndex, fragmentIndex));
+        EXPECT_EQ(reachable->count({vertexIndex, fragmentIndex}), 1u);
+        EXPECT_EQ(composed->fragValues[PointwiseGraphShader::FD::RESOURCE_KIND], 1);
+        vertexIndices.insert(vertexIndex);
+        fragmentIndices.insert(fragmentIndex);
+      }
+    }
   }
-  // 12 raw frag combos minus the three LUT-with-coverage combos excluded by the rule's Compose
-  // mapping; the device mask is a runtime uniform now, not a dimension.
-  EXPECT_EQ(reachable->size(), 9u);
   EXPECT_EQ(vertexIndices.size(), 2u);
-  EXPECT_EQ(fragmentIndices.size(), 9u);
+  EXPECT_EQ(fragmentIndices.size(), 6u);
+}
+
+TGFX_TEST(ShaderPermutationTest, GradientUniformsExistOnlyInExtendedChainArtifacts) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+  const auto hasUniform = [](const ShaderStageBlob* blob, const std::string& name) {
+    for (const auto& uniform : blob->uniforms) {
+      if (uniform.name() == name) {
+        return true;
+      }
+    }
+    return false;
+  };
+  const auto checkFamily = [&](const char* family, bool extended) {
+    auto info = extended ? PointwiseGraphShader().info() : PointwiseChainShader().info();
+    auto reachable = EnumerateReachablePermutations(family);
+    ASSERT_TRUE(reachable.has_value());
+    for (const auto& indices : *reachable) {
+      if (!PermutationCompilesForBackend(info, indices.first, indices.second,
+                                         cache->profileTag())) {
+        continue;
+      }
+      auto vertexKey = ComputeVertexKeyHash(family, indices.first, cache->profileTag());
+      auto fragmentKey = ComputeFragmentKeyHash(family, indices.second, cache->profileTag());
+      auto vertex = cache->findVertex(vertexKey.hi, vertexKey.lo);
+      auto fragment = cache->findFragment(fragmentKey.hi, fragmentKey.lo);
+      ASSERT_NE(vertex, nullptr);
+      ASSERT_NE(fragment, nullptr);
+      bool hasGradient = extended && info.fragDomain.valueOf(indices.second, "RESOURCE_KIND") == 1;
+      EXPECT_EQ(hasUniform(fragment, "GradientLayoutType"), hasGradient);
+      EXPECT_EQ(hasUniform(fragment, "GradientLUTLeaf"), hasGradient);
+      if (extended) {
+        EXPECT_TRUE(hasUniform(vertex, "CoordTransformMatrix_0"));
+      } else if (info.vertDomain.valueOf(indices.first, "TEXTURE_COUNT") == 0) {
+        EXPECT_FALSE(hasUniform(vertex, "CoordTransformMatrix_0"));
+      }
+    }
+  };
+  checkFamily("PointwiseChainShader", false);
+  checkFamily("PointwiseGraphShader", true);
+  cache->unload();
 }
 
 TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
-  if (context->backend() == Backend::OpenGL) {
-    GTEST_SKIP() << "SingleIntervalGradient is outside the OpenGL stage 1 whitelist";
-  }
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   auto renderTargetProxy = RenderTargetProxy::Make(context, 8, 8, false);
   ASSERT_NE(renderTargetProxy, nullptr);
   auto renderTarget = renderTargetProxy->getRenderTarget();
   ASSERT_NE(renderTarget, nullptr);
 
-  UnifiedGradientShader shader;
+  PointwiseGraphShader shader;
   auto info = shader.info();
   std::set<uint32_t> vertexIndices;
   std::set<uint32_t> fragmentIndices;
@@ -375,15 +439,25 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
           if (xpType != 0) {
             ASSERT_NE(xp, nullptr);
           }
-          std::vector<FragmentProcessor*> processors = {gradient.get()};
+          AOTEffectGraph graph;
+          ASSERT_TRUE(AOTEffectDecomposer::Lower({gradient.get()}, &graph));
+          AOTEffectPlan plan;
+          ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+          ASSERT_EQ(plan.passes.size(), 1u);
+          EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseGraph);
+          EXPECT_EQ(plan.passes[0].resourceProfile, AOTResourceProfile::TiledGraph);
+          std::vector<const FragmentProcessor*> coverageProcessors;
           if (coverage != nullptr) {
-            processors.push_back(coverage.get());
+            coverageProcessors.push_back(coverage.get());
           }
-          ProgramInfo programInfo(renderTarget.get(), gp.get(), std::move(processors), 1, xp.get(),
+          auto rebuilt = AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0],
+                                                              coverageProcessors);
+          ASSERT_NE(rebuilt, nullptr);
+          ProgramInfo programInfo(renderTarget.get(), gp.get(), {rebuilt.get()}, 1, xp.get(),
                                   BlendMode::SrcOver);
           auto match = MatchPermutation(&programInfo);
           ASSERT_TRUE(match.has_value());
-          EXPECT_EQ(match->shaderName, "UnifiedGradientShader");
+          EXPECT_EQ(match->shaderName, "PointwiseGraphShader");
           ASSERT_LT(match->vertPermutationIndex, info.vertDomain.totalCount());
           ASSERT_LT(match->fragPermutationIndex, info.fragDomain.totalCount());
           auto vertValues = info.vertDomain.decode(match->vertPermutationIndex);
@@ -398,9 +472,8 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
     }
   }
   EXPECT_EQ(vertexIndices.size(), 2u);
-  // The device mask no longer contributes a dimension, so only XP and coverage vary.
-  EXPECT_EQ(fragmentIndices.size(), 6u);
-  EXPECT_EQ(pairs.size(), 6u);
+  EXPECT_EQ(fragmentIndices.size(), 12u);
+  EXPECT_EQ(pairs.size(), 12u);
 
   for (int hasVertexCoverage = 0; hasVertexCoverage < 2; ++hasVertexCoverage) {
     BlockAllocator allocator;
@@ -424,10 +497,94 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
     auto coverage =
         FragmentProcessor::MulInputByChildAlpha(&allocator, std::move(tiledMask), false);
     ASSERT_NE(coverage, nullptr);
-    ProgramInfo programInfo(renderTarget.get(), gp.get(), {gradient.get(), coverage.get()}, 1,
-                            nullptr, BlendMode::SrcOver);
-    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+    AOTEffectGraph graph;
+    ASSERT_TRUE(AOTEffectDecomposer::Lower({gradient.get()}, &graph));
+    AOTEffectPlan plan;
+    ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+    ASSERT_EQ(plan.passes.size(), 1u);
+    auto rebuilt =
+        AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0], {coverage.get()});
+    ASSERT_NE(rebuilt, nullptr);
+    ProgramInfo programInfo(renderTarget.get(), gp.get(), {rebuilt.get()}, 1, nullptr,
+                            BlendMode::SrcOver);
+    auto match = MatchPermutation(&programInfo);
+    ASSERT_TRUE(match.has_value());
+    EXPECT_EQ(match->shaderName, "PointwiseGraphShader");
+    EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "RESOURCE_KIND"), 1);
+    EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "TEXTURE_COUNT"), 1);
   }
+  cache->unload();
+}
+
+TGFX_TEST(ShaderPermutationTest, LUTGradientWithRealMaskUsesAllLeafSelectors) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+  auto renderTargetProxy = RenderTargetProxy::Make(context, 8, 8, false);
+  ASSERT_NE(renderTargetProxy, nullptr);
+  auto renderTarget = renderTargetProxy->getRenderTarget();
+  ASSERT_NE(renderTarget, nullptr);
+  PointwiseGraphShader shader;
+  auto info = shader.info();
+  for (int lutLeaf = 0; lutLeaf < 4; ++lutLeaf) {
+    SCOPED_TRACE(lutLeaf);
+    BlockAllocator allocator;
+    std::vector<PlacementPtr<FragmentProcessor>> leaves;
+    std::vector<AOTChainSlot> slots(static_cast<size_t>(lutLeaf) + 1);
+    for (int index = 0; index < lutLeaf; ++index) {
+      auto proxy = context->proxyProvider()->createTextureProxy({}, 8, 8, PixelFormat::RGBA_8888);
+      auto leaf = TextureEffect::Make(&allocator, std::move(proxy));
+      ASSERT_NE(leaf, nullptr);
+      leaves.push_back(std::move(leaf));
+      slots[static_cast<size_t>(index)].op = AOTChainOp::Texture;
+      slots[static_cast<size_t>(index)].outRegister = index;
+    }
+    auto lutProxy = context->proxyProvider()->createTextureProxy({}, 8, 1, PixelFormat::RGBA_8888);
+    ASSERT_NE(lutProxy, nullptr);
+    auto lutChild = TextureEffect::Make(&allocator, lutProxy);
+    ASSERT_NE(lutChild, nullptr);
+    std::vector<PlacementPtr<FragmentProcessor>> padding;
+    for (int index = lutLeaf + 1; index < 4; ++index) {
+      auto child = TextureEffect::Make(&allocator, lutProxy);
+      ASSERT_NE(child, nullptr);
+      padding.push_back(std::move(child));
+    }
+    auto maskProxy = context->proxyProvider()->createTextureProxy({}, 8, 8, PixelFormat::ALPHA_8);
+    ASSERT_NE(maskProxy, nullptr);
+    auto mask = DeviceSpaceTextureEffect::Make(&allocator, std::move(maskProxy), Matrix::I());
+    ASSERT_NE(mask, nullptr);
+    auto& gradient = slots.back();
+    gradient.op = AOTChainOp::Gradient;
+    gradient.in0 = -1;
+    gradient.outRegister = lutLeaf;
+    gradient.gradient.colorizerKind = 3;
+    gradient.gradient.lutProxy = lutProxy;
+    gradient.gradient.coordMatrix = Matrix::MakeTrans(4, 6);
+    auto processor = AOTPointwiseChainProcessor::Make(
+        &allocator, std::move(leaves), slots, static_cast<size_t>(lutLeaf), -1, nullptr,
+        std::move(mask), -1, ~0u, std::move(lutChild), lutLeaf, std::move(padding));
+    ASSERT_NE(processor, nullptr);
+    EXPECT_EQ(processor->resourceProfile(), AOTResourceProfile::TiledGraph);
+    EXPECT_EQ(processor->lutLeaf(), lutLeaf);
+    EXPECT_TRUE(processor->hasMask());
+    EXPECT_EQ(processor->leafCount(), 4u);
+    ASSERT_EQ(processor->numCoordTransforms(), 1u);
+    EXPECT_EQ(processor->coordTransform(0)->matrix, gradient.gradient.coordMatrix);
+    EXPECT_EQ(processor->childProcessor(static_cast<size_t>(lutLeaf))->textureAt(0),
+              lutProxy->getTextureView()->getTexture());
+    auto gp = MakeSingleIntervalGeometry(&allocator, 1, true);
+    ASSERT_NE(gp, nullptr);
+    ProgramInfo programInfo(renderTarget.get(), gp.get(), {processor.get()}, 1, nullptr,
+                            BlendMode::SrcOver);
+    auto match = MatchPermutation(&programInfo);
+    ASSERT_TRUE(match.has_value());
+    EXPECT_EQ(match->shaderName, "PointwiseGraphShader");
+    EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "RESOURCE_KIND"), 1);
+    EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "TEXTURE_COUNT"), 1);
+  }
+  cache->unload();
 }
 
 TGFX_TEST(ShaderPermutationTest, QuadTextureLocalMaskRejectsInvertedCoverage) {
@@ -489,6 +646,31 @@ TGFX_TEST(ShaderPermutationTest, TextureFillTypedEncodingMatchesDomains) {
   }
 }
 
+static void ExpectBundleEntryCounts(const PrecompiledShaderCache& cache,
+                                    const std::string& profileTag) {
+  size_t vertexCount = 0;
+  size_t fragmentCount = 0;
+  for (const auto& factory : ShaderRegistry::All()) {
+    auto shader = factory();
+    auto info = shader->info();
+    auto reachable = EnumerateReachablePermutations(info.name);
+    ASSERT_TRUE(reachable.has_value()) << info.name;
+    std::set<uint32_t> vertexIndices;
+    std::set<uint32_t> fragmentIndices;
+    for (const auto& permutation : *reachable) {
+      if (!PermutationCompilesForBackend(info, permutation.first, permutation.second, profileTag)) {
+        continue;
+      }
+      vertexIndices.insert(permutation.first);
+      fragmentIndices.insert(permutation.second);
+    }
+    vertexCount += vertexIndices.size();
+    fragmentCount += fragmentIndices.size();
+  }
+  EXPECT_EQ(cache.vertexEntryCount(), vertexCount);
+  EXPECT_EQ(cache.fragmentEntryCount(), fragmentCount);
+}
+
 TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -496,18 +678,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   auto* cache = context->precompiledShaderCache();
   ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   std::string expectedTag = BundleTag();
-  // Entry counts follow the backend-specific exclusions in the bundle generator
-  // (PermutationCompilesForBackend): the desktop GL and WebGPU bundles drop the FBF
-  // (subpassInput) variants, while the opengles bundle keeps them in the
-  // GL_EXT_shader_framebuffer_fetch dialect; Metal and Vulkan keep everything.
-  // GlassRefractionShader's DISPERSION_ON dimension doubled its fragment count from 24 to 48.
-  // The FBF-keeping bundles take all 24 new variants (267 -> 291); the FBF-dropping ones take
-  // only the HAS_XP != 2 two thirds, i.e. 16 (179 -> 195).
-  // Two graph resource profiles share one vertex; each owns three fragments (two without FBF).
-  const bool keepsFramebufferFetch =
-      expectedTag == "metal" || expectedTag == "vulkan" || expectedTag == "opengles";
-  EXPECT_EQ(cache->vertexEntryCount(), 96u);
-  EXPECT_EQ(cache->fragmentEntryCount(), keepsFramebufferFetch ? 297u : 199u);
+  ExpectBundleEntryCounts(*cache, expectedTag);
   EXPECT_EQ(cache->profileTag(), expectedTag);
   cache->unload();
 }
@@ -1521,7 +1692,8 @@ TGFX_TEST(ShaderPermutationTest, CreatorFunnelRecordsArtifactMiss) {
   const auto& programStats = context->globalCache()->programStats();
   EXPECT_EQ(programStats.cacheMisses, 1u);
   EXPECT_EQ(programStats.precompiledArtifactCreations, 0u);
-  EXPECT_EQ(programStats.programBuilderCreations, 1u);
+  EXPECT_EQ(programStats.programBuilderCreations, 0u);
+  EXPECT_TRUE(cache->jitProgramRecords().empty());
 
   cache->setDiagnosticRecordingEnabled(false);
   cache->unload();
@@ -1542,13 +1714,7 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {
     ASSERT_TRUE(compressedOnly.loadBundle(original.data(), original.size()));
     EXPECT_TRUE(compressedOnly.isLoaded());
     std::string tag = BundleTag();
-    // Counts follow the generator's backend exclusions (PermutationCompilesForBackend): the
-    // desktop GL and WebGPU bundles drop the FBF (subpassInput) variants, the opengles bundle
-    // keeps them in the GL_EXT_shader_framebuffer_fetch dialect, and metal/vulkan keep
-    // everything. See PrecompiledBundleLoad for the DISPERSION_ON arithmetic behind these totals.
-    const bool keepsFramebufferFetch = tag == "metal" || tag == "vulkan" || tag == "opengles";
-    EXPECT_EQ(compressedOnly.vertexEntryCount(), 96u);
-    EXPECT_EQ(compressedOnly.fragmentEntryCount(), keepsFramebufferFetch ? 297u : 199u);
+    ExpectBundleEntryCounts(compressedOnly, tag);
     EXPECT_EQ(compressedOnly.profileTag(), tag);
     return;
   }

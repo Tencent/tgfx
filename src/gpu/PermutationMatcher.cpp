@@ -34,7 +34,6 @@
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
-#include "gpu/processors/DualIntervalGradientColorizer.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
 #include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/GaussianBlur1DFragmentProcessor.h"
@@ -50,9 +49,7 @@
 #include "gpu/processors/ShapeInstancedGeometryProcessor.h"
 #include "gpu/processors/SingleIntervalGradientColorizer.h"
 #include "gpu/processors/TextureEffect.h"
-#include "gpu/processors/TextureGradientColorizer.h"
 #include "gpu/processors/TiledTextureEffect.h"
-#include "gpu/processors/UnrolledBinaryGradientColorizer.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 #include "gpu/shaders/PermutationRules.h"
 #include "gpu/shaders/level1/AtlasTextFillShader.h"
@@ -83,7 +80,6 @@
 #include "gpu/shaders/level1/TextureFillShader.h"
 #include "gpu/shaders/level1/TexturedEffectShader.h"
 #include "gpu/shaders/level1/TiledTextureFillShader.h"
-#include "gpu/shaders/level1/UnifiedGradientShader.h"
 #include "gpu/shaders/level1/YUVTextureFillShader.h"
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
 #include "layers/processors/GlassShapeGeometryFragmentProcessor.h"
@@ -750,15 +746,17 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseDAG(const ProgramI
   if (leafCount != 0 && leafCount != 4) {
     return std::nullopt;
   }
-  // The kernel carries one shared chain-wide ColorSpaceXform parameter block, so a chain with two
-  // color-space ops cannot be represented and must fall back.
+  // Color-space transforms and gradients each share one chain-wide parameter block.
   int colorSpaceXformCount = 0;
+  int gradientCount = 0;
   for (size_t index = 0; index < chain->slotCount(); ++index) {
     if (chain->slot(index).op == AOTChainOp::ColorSpaceXform) {
       ++colorSpaceXformCount;
+    } else if (chain->slot(index).op == AOTChainOp::Gradient) {
+      ++gradientCount;
     }
   }
-  if (colorSpaceXformCount > 1) {
+  if (colorSpaceXformCount > 1 || gradientCount > 1) {
     return std::nullopt;
   }
   for (size_t index = 0; index < leafCount; ++index) {
@@ -783,6 +781,7 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseDAG(const ProgramI
   inputs.hasMask = chain->hasMask();
   inputs.hasCoverageSubtree = chain->coverageRoot() >= 0;
   inputs.hasNoise = chain->hasNoise();
+  inputs.hasGradient = gradientCount != 0;
   inputs.resourceProfile = chain->resourceProfile();
   inputs.xpType = GetXPType(programInfo);
   if (gpKind == 1) {
@@ -837,98 +836,6 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseDAG(const ProgramI
   auto vertIndex = PointwiseChainShader::VD::domain().encode(composed->vertValues);
   auto fragIndex = PointwiseChainShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"PointwiseChainShader", vertIndex, fragIndex};
-}
-
-static int GradientLayoutTypeIndex(const std::string& layoutName) {
-  if (layoutName == "LinearGradientLayout") {
-    return 0;
-  }
-  if (layoutName == "RadialGradientLayout") {
-    return 1;
-  }
-  if (layoutName == "ConicGradientLayout") {
-    return 2;
-  }
-  if (layoutName == "DiamondGradientLayout") {
-    return 3;
-  }
-  return -1;
-}
-
-static std::optional<PermutationMatchResult> TryMatchUnifiedGradient(
-    const ProgramInfo* programInfo) {
-  auto gp = programInfo->getGeometryProcessor();
-  int gpType = GetGPType(gp);
-  if (gpType < 0) {
-    return std::nullopt;
-  }
-  if (gpType == 1) {
-    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-    if (!quadGP->hasUVMatrix()) {
-      return std::nullopt;
-    }
-  }
-  if (programInfo->numColorFragmentProcessors() != 1) {
-    return std::nullopt;
-  }
-  auto coverageType = SharedDeviceMaskValue(programInfo);
-  if (!coverageType) {
-    return std::nullopt;
-  }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
-    return std::nullopt;
-  }
-  auto fp = programInfo->getFragmentProcessor(0);
-  if (fp->name() != "ClampedGradientEffect") {
-    return std::nullopt;
-  }
-  if (fp->numChildProcessors() != 2) {
-    return std::nullopt;
-  }
-  auto colorizer = fp->childProcessor(0);
-  auto layout = fp->childProcessor(1);
-  int colorizerKind = -1;
-  if (colorizer->name() == "SingleIntervalGradientColorizer") {
-    colorizerKind = 0;
-  } else if (colorizer->name() == "DualIntervalGradientColorizer") {
-    colorizerKind = 1;
-  } else if (colorizer->name() == "UnrolledBinaryGradientColorizer") {
-    auto* unrolled = static_cast<const UnrolledBinaryGradientColorizer*>(colorizer);
-    int intervalCount = unrolled->getIntervalCount();
-    if (intervalCount < 1 || intervalCount > 8) {
-      return std::nullopt;
-    }
-    colorizerKind = 2;
-  } else if (colorizer->name() == "TextureGradientColorizer") {
-    colorizerKind = 3;
-  } else {
-    return std::nullopt;
-  }
-  int layoutType = GradientLayoutTypeIndex(layout->name());
-  if (layoutType < 0) {
-    return std::nullopt;
-  }
-  if (layout->numCoordTransforms() > 0 && layout->coordTransform(0)->matrix.hasPerspective()) {
-    return std::nullopt;
-  }
-
-  // Per-vertex AA coverage is carried through the HAS_VCOVERAGE dimension (the shared vertex shader
-  // emits a vCoverage varying the fragment shader multiplies in), so coverage-carrying draws are
-  // served rather than rejected. LUT gradients keep the legacy TextureGradientShader behavior:
-  // coverage-carrying draws stay on the runtime path.
-  int vCoverage = GetGPCoverage(gp);
-  UnifiedGradientInputs inputs;
-  inputs.hasVCoverage = vCoverage != 0;
-  inputs.hasLUT = colorizerKind == 3;
-  inputs.xpType = xpType;
-  auto composed = ComposeUnifiedGradient(inputs);
-  if (!composed) {
-    return std::nullopt;
-  }
-  auto vertIndex = UnifiedGradientShader::VD::domain().encode(composed->vertValues);
-  auto fragIndex = UnifiedGradientShader::FD::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"UnifiedGradientShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchTextureColorMatrix(
@@ -1862,9 +1769,6 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
     return result;
   }
   if (auto result = TryMatchDeviceSpaceTexture(programInfo)) {
-    return result;
-  }
-  if (auto result = TryMatchUnifiedGradient(programInfo)) {
     return result;
   }
   if (auto result = TryMatchTextureColorMatrix(programInfo)) {

@@ -1232,6 +1232,58 @@ TGFX_TEST(AOTRenderConsistencyTest, GradientLayoutModes) {
                          height);
 }
 
+TGFX_TEST(AOTRenderConsistencyTest, StandaloneGradientUsesExtendedChain) {
+  for (bool decompositionEnabled : {false, true}) {
+    for (bool antiAlias : {false, true}) {
+      for (size_t stopCount : {2u, 3u, 6u, 17u}) {
+        SCOPED_TRACE(decompositionEnabled);
+        SCOPED_TRACE(antiAlias);
+        SCOPED_TRACE(stopCount);
+        ContextScope scope;
+        auto context = scope.getContext();
+        ASSERT_NE(context, nullptr);
+        auto* cache = context->precompiledShaderCache();
+        ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+        cache->setDecompositionEnabled(decompositionEnabled);
+        cache->setDiagnosticRecordingEnabled(true);
+        context->globalCache()->clearPrograms();
+        auto surface = Surface::Make(context, 80, 80);
+        ASSERT_NE(surface, nullptr);
+        std::vector<Color> stops;
+        for (size_t index = 0; index < stopCount; ++index) {
+          stops.push_back(index % 2 == 0 ? Color::Red() : Color::Blue());
+        }
+        Paint paint;
+        paint.setAntiAlias(antiAlias);
+        paint.setAlpha(160.0f / 255.0f);
+        paint.setShader(Shader::MakeLinearGradient(Point{8, 8}, Point{72, 72}, stops, {}));
+        ASSERT_NE(paint.getShader(), nullptr);
+        cache->resetStats();
+        surface->getCanvas()->drawRect(Rect::MakeLTRB(8.25f, 8.25f, 71.75f, 71.75f), paint);
+        context->flushAndSubmit(true);
+        const auto records = cache->hitRecords();
+        ASSERT_FALSE(records.empty());
+        for (const auto& record : records) {
+          EXPECT_EQ(record.shaderName, "PointwiseGraphShader");
+        }
+        EXPECT_TRUE(cache->fallbackRecords().empty());
+        EXPECT_TRUE(cache->jitProgramRecords().empty());
+        EXPECT_EQ(cache->drawStats().materializedEdges, 0u);
+        Bitmap bitmap;
+        ASSERT_TRUE(bitmap.allocPixels(80, 80));
+        auto* pixels = static_cast<uint8_t*>(bitmap.lockPixels());
+        ASSERT_NE(pixels, nullptr);
+        ASSERT_TRUE(surface->readPixels(bitmap.info(), pixels));
+        EXPECT_EQ(pixels[(40 * 80 + 40) * 4 + 3], 160);
+        bitmap.unlockPixels();
+        cache->setDiagnosticRecordingEnabled(false);
+        cache->setDecompositionEnabled(true);
+        cache->unload();
+      }
+    }
+  }
+}
+
 // Renders an antialiased circle (EllipseGeometryProcessor) under an optional clip into outBitmap.
 // clipMode: 0 = no clip, 1 = antialiased clipRect (a device-space RectEffect coverage), 2 = antialiased
 // non-rect clipPath (device-space mask texture coverage). This exercises the EllipseFillShader
@@ -2831,17 +2883,9 @@ TGFX_TEST(AOTRenderConsistencyTest, BlendChildMaterializationIsPlannedNotBakedIn
   }
 }
 
-// Attribution experiment for the three-way diff finding (test/diff harness). After the P4
-// migration the three configurations mean:
-//  - reference: bundle unloaded — the original tree runs the runtime route with no
-//    materialization (the F02 main-equivalence guarantee now holds by default, no env needed)
-//  - bundle + decomposition disabled: the gate never opens, so the same untouched tree runs the
-//    runtime route — identical to the reference by construction
-//  - bundle + decomposition enabled: the plain chain route refuses the original two-gradient
-//    tree, the in-plan retry materializes both operands, and the chain kernel serves the draw
-// The materialization path is expected to cost at most 1 LSB (the P1 three-way diff measured
-// exactly that across every blend mode), so the full-AOT render may differ from the original
-// tree by <=1 while the AOT execution itself must stay byte-exact against its own input.
+// Two gradients exceed the fused budget. A loaded bundle without optional decomposition must
+// reject the draw, never compile JIT; enabled decomposition materializes the operands in AOT.
+// The unloaded-bundle reference measures the existing materialization error, bounded by 1 LSB.
 TGFX_TEST(AOTRenderConsistencyTest, GradientBlendDiffAttribution) {
   if (std::getenv("TGFX_AOT_LEGACY_BLEND_MATERIALIZATION") != nullptr) {
     GTEST_SKIP() << "The legacy switch restores construction-time materialization; this test "
@@ -2907,17 +2951,25 @@ TGFX_TEST(AOTRenderConsistencyTest, GradientBlendDiffAttribution) {
     referenceStats = cache->drawStats();
     printStats("reference", referenceStats);
   }
-  AOTDrawStats materializedJITStats = {};
-  Bitmap materializedJIT;
   {
     ASSERT_TRUE(loadEmbeddedBundle());
     cache->setDecompositionEnabled(false);
     context->globalCache()->clearPrograms();
     ScopedAOTDeliberateMiss deliberate(context);
+    const bool diagnosticsEnabled = cache->diagnosticRecordingEnabled();
+    cache->setDiagnosticRecordingEnabled(true);
     cache->resetStats();
-    renderScene(&materializedJIT);
-    materializedJITStats = cache->drawStats();
-    printStats("materializedJIT", materializedJITStats);
+    Bitmap rejectedDraw;
+    renderScene(&rejectedDraw);
+    EXPECT_EQ(cache->drawStats().kernelInvocations, 0u);
+    EXPECT_TRUE(cache->jitProgramRecords().empty());
+    auto* pixels = static_cast<const uint8_t*>(rejectedDraw.lockPixels());
+    ASSERT_NE(pixels, nullptr);
+    for (size_t index = 0; index < static_cast<size_t>(size) * size * 4; ++index) {
+      EXPECT_EQ(pixels[index], 255);
+    }
+    rejectedDraw.unlockPixels();
+    cache->setDiagnosticRecordingEnabled(diagnosticsEnabled);
   }
   AOTDrawStats fullAOTStats = {};
   Bitmap fullAOT;
@@ -2963,22 +3015,7 @@ TGFX_TEST(AOTRenderConsistencyTest, GradientBlendDiffAttribution) {
     const_cast<Bitmap&>(b).unlockPixels();
     return std::make_tuple(maxDiff, diffCount, gt2Count);
   };
-  auto materializedStats = pairStats("materializedJIT_vs_reference", materializedJIT, reference);
   auto aotStats = pairStats("fullAOT_vs_reference", fullAOT, reference);
-  pairStats("fullAOT_vs_materializedJIT", fullAOT, materializedJIT);
-  bool runtimeOnly = std::getenv("TGFX_AOT_DISABLE") != nullptr;
-  if (runtimeOnly) {
-    // With the runtime route forced, no materialization happens anywhere and all three renders
-    // must be byte-identical.
-    EXPECT_EQ(std::get<0>(materializedStats), 0);
-    EXPECT_EQ(std::get<0>(aotStats), 0);
-    EXPECT_EQ(referenceStats.fpFlattenEdges, 0u);
-    EXPECT_EQ(materializedJITStats.fpFlattenEdges, 0u);
-    EXPECT_EQ(fullAOTStats.completeAOTDraws, 0u);
-    return;
-  }
-  // The untouched tree runs identically on both runtime configurations.
-  EXPECT_EQ(std::get<0>(materializedStats), 0);
   // The full-AOT render materializes both operands, which costs at most 1 LSB (the documented
   // materialization quantization); the chain kernel itself stays byte-exact against that input.
   EXPECT_LE(std::get<0>(aotStats), 1);
@@ -6921,7 +6958,7 @@ static void RenderCoverageXPScene(bool useBundle, BlendMode mode, Bitmap* outBit
   paint.setAntiAlias(true);
   paint.setBlendMode(mode);
   if (useGradient) {
-    // UnifiedGradient path: a linear gradient shader over an AA rect, with a half-transparent
+    // Extended gradient chain: an AA rect with a half-transparent
     // input color so the gradient output alpha differs from 1 and any vCoverage handling error
     // changes the result by a visible factor.
     paint.setShader(Shader::MakeLinearGradient(
@@ -6987,7 +7024,7 @@ TGFX_TEST(AOTRenderConsistencyTest, RoundStrokeRectCoverageXPContract) {
   }
 }
 
-TGFX_TEST(AOTRenderConsistencyTest, UnifiedGradientVCoverageXPContract) {
+TGFX_TEST(AOTRenderConsistencyTest, ExtendedGradientVCoverageXPContract) {
   for (auto mode : COVERAGE_XP_PROBE_MODES) {
     Bitmap aotBitmap = {};
     Bitmap runtimeBitmap = {};

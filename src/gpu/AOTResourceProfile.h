@@ -50,7 +50,7 @@ struct AOTResourceCapacity {
   size_t leafBindings = 4;
   size_t tiledRecipes = 2;
   size_t noiseSources = 0;
-  size_t gradients = 1;
+  size_t gradients = 0;
   size_t colorSpaceXforms = 1;
   size_t deviceRects = 1;
   size_t localRects = 1;

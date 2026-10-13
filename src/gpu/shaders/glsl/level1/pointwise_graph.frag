@@ -8,11 +8,8 @@
 #define TGFX_POINTWISE_NOISE 1
 #else
 #define TGFX_POINTWISE_TILED 1
+#define TGFX_POINTWISE_GRADIENT 1
 #endif
-#define GP_LAYOUT 0
-#define HAS_COVERAGE 1
-#define HAS_COLOR 0
-#define TEXTURE_COUNT 1
-#define HAS_MASK_TEXTURE 0
+#define TGFX_POINTWISE_SOURCE_COORDS 1
 
 #include "pointwise_fragment.inc"

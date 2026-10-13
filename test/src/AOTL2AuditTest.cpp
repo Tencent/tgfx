@@ -1133,9 +1133,7 @@ TGFX_TEST(AOTL2AuditTest, GradientCoverageMatchesJIT) {
   LOGI("[L2GRAD] backend=%s shape=GradientCoverage noMatch=%u hits=%u maxDelta=%d pass=%d",
        TGFX_BACKEND_NAME, noMatch, hits, result.maxChannelDiff, result.passed ? 1 : 0);
 
-  // main's analytic clip refactor turned the AA rect edge into a RectEffect coverage FP, which
-  // the UnifiedGradientShader coverage rule serves on every backend (including desktop OpenGL,
-  // which previously missed this shape), so the hit expectation is uniform now.
+  // The extended chain carries the gradient and its analytic clip on every backend.
   EXPECT_EQ(noMatch, 0u) << "anti-aliased multi-stop gradient still misses the precompiled cache";
   EXPECT_GT(hits, 0u) << "expected a precompiled artifact hit for the AA gradient draw";
   EXPECT_FALSE(result.structuralDifference);

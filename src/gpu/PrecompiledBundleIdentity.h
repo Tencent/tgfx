@@ -70,8 +70,11 @@ namespace tgfx {
  *
  * 0x00010008: pointwise resource profiles become explicit admission and program-key contracts;
  * PointwiseGraphShader gains a no-noise, three-tiled-recipe uniform-array layout.
+ *
+ * 0x00010009: gradients move to extended chains, which gain the base geometry interfaces;
+ * base chains no longer carry the source coordinate transform or gradient parameters.
  */
-inline constexpr uint32_t kExpectedToolchainABI = 0x00010008u;
+inline constexpr uint32_t kExpectedToolchainABI = 0x00010009u;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

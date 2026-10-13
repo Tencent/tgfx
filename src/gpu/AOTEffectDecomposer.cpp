@@ -411,9 +411,17 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
       case AOTEffectKind::RectCoverage:
       case AOTEffectKind::RRectCoverage:
         break;
-      case AOTEffectKind::GradientSource:
+      case AOTEffectKind::GradientSource: {
+        auto parameters = std::get_if<AOTGradientParameters>(&node->parameters);
+        if (parameters == nullptr) {
+          return false;
+        }
         ++gradients;
+        if (parameters->colorizerKind == 3) {
+          ++textureLeaves;
+        }
         break;
+      }
       case AOTEffectKind::PerlinNoiseSource:
         if (++noiseSources > 1) {
           return false;
@@ -574,19 +582,47 @@ AOTFoldRouteOutcome AOTEffectDecomposer::AnalyzeFoldRoute(const ProgramInfo* pro
   if (!AOTPlanExecutor::CanExecute(graph, plan)) {
     return AOTFoldRouteOutcome::NotExecutable;
   }
-  // The fused kernels' matchers only know the two rect-oriented GPs; anything else (shape,
-  // atlas text, mesh, ellipse) would fail the strict lookup after a successful plan.
   auto gp = programInfo->getGeometryProcessor();
-  if (gp == nullptr || (gp->name() != "DefaultGeometryProcessor" &&
-                        gp->name() != "QuadPerEdgeAAGeometryProcessor")) {
+  if (gp == nullptr) {
     return AOTFoldRouteOutcome::GPIncompatible;
   }
-  if (plan.passes.size() == 1 && plan.passes[0].kernel == AOTKernelKind::PointwiseGraph) {
-    if (gp->name() != "QuadPerEdgeAAGeometryProcessor") {
+  const bool pointwiseDAG =
+      plan.passes.size() == 1 && IsAOTPointwiseDAGKernel(plan.passes[0].kernel);
+  const auto& gpName = gp->name();
+  if (gpName != "DefaultGeometryProcessor" && gpName != "QuadPerEdgeAAGeometryProcessor" &&
+      (!pointwiseDAG ||
+       (gpName != "MeshGeometryProcessor" && gpName != "AtlasTextGeometryProcessor" &&
+        gpName != "EllipseGeometryProcessor"))) {
+    return AOTFoldRouteOutcome::GPIncompatible;
+  }
+  if (pointwiseDAG && gpName == "QuadPerEdgeAAGeometryProcessor" &&
+      static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp)->getHasSubset()) {
+    return AOTFoldRouteOutcome::GPIncompatible;
+  }
+  if (pointwiseDAG && plan.passes[0].resourceProfile == AOTResourceProfile::NoiseGraph) {
+    if (gpName != "QuadPerEdgeAAGeometryProcessor") {
       return AOTFoldRouteOutcome::GPIncompatible;
     }
     const auto* quad = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-    if (!quad->hasCommonColor() || !quad->hasUVMatrix() || quad->getHasSubset()) {
+    if (!quad->hasCommonColor() || !quad->hasUVMatrix()) {
+      return AOTFoldRouteOutcome::GPIncompatible;
+    }
+  }
+  if (pointwiseDAG && gpName == "AtlasTextGeometryProcessor") {
+    if (gp->numTextureSamplers() != 0) {
+      return AOTFoldRouteOutcome::GPIncompatible;
+    }
+    bool hasLeaf = false;
+    for (auto nodeID : plan.passes[0].nodes) {
+      const auto* node = graph.nodeAt(nodeID);
+      const auto* gradient = std::get_if<AOTGradientParameters>(&node->parameters);
+      if (node->kind == AOTEffectKind::TextureSource ||
+          (gradient != nullptr && gradient->colorizerKind == 3)) {
+        hasLeaf = true;
+        break;
+      }
+    }
+    if (!hasLeaf) {
       return AOTFoldRouteOutcome::GPIncompatible;
     }
   }

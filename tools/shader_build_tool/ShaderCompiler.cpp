@@ -342,7 +342,7 @@ static std::string expandSamplerCallArgs(const std::string& source,
 }
 
 // Runs the GLSL preprocessor before the regex passes. Template shaders wrap conditional sampler
-// declarations in #if blocks (e.g. UnifiedGradientShader's GradientTexture), so a regex pass over
+// declarations in #if blocks, so a regex pass over
 // the raw source would count declarations the preprocessor removes, leaving binding holes between
 // the reassigned binding numbers and the reflection's sampler list. Preprocessing first keeps the
 // declaration set exact.

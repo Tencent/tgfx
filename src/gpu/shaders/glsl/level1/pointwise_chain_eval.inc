@@ -37,8 +37,10 @@
 #define CS_DST_OOTF 64
 #endif
 
+#ifdef TGFX_POINTWISE_GRADIENT
 #include "gradient_layout.inc"
 #include "gradient_colorize.inc"
+#endif
 #include "pointwise_math.inc"
 
 #include "transfer_function.inc"
@@ -188,6 +190,7 @@ vec4 evalChainSlot(int slot) {
                                             CoverageRRectAntiAlias[rrectOrdinal],
                                             CoverageRRectDeviceToLocal[rrectOrdinal]));
   }
+#ifdef TGFX_POINTWISE_GRADIENT
   if (Packed.x == OP_GRADIENT) {
     // Analytic gradient source. The layout math and border clamp are verbatim from the dedicated
     // gradient kernels; the colorizer kind selects between the single-interval mix, the
@@ -228,6 +231,14 @@ vec4 evalChainSlot(int slot) {
         gradColor = texture(TextureSampler_1, lutCoord);
       }
 #endif
+#if NTEX > 2
+      if (GradientLUTLeaf == 2) {
+        gradColor = texture(TextureSampler_2, lutCoord);
+      }
+      if (GradientLUTLeaf == 3) {
+        gradColor = texture(TextureSampler_3, lutCoord);
+      }
+#endif
 #endif
     } else {
       gradColor = gradientColorizeUnrolled(
@@ -240,6 +251,7 @@ vec4 evalChainSlot(int slot) {
     gradColor.rgb *= gradColor.a;
     return gradColor * in0.a;
   }
+#endif
   // OP_COLOR_SPACE_XFORM
   if ((ChainCSFlags & CS_UNPREMUL) != 0) {
     float a = color.a;
