@@ -1360,7 +1360,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
 
   auto cache = context->precompiledShaderCache();
   if (cache != nullptr && cache->isLoaded() && cache->decompositionEnabled() &&
-      deviceBounds.has_value() && !deviceBounds->isEmpty()) {
+      op->type() != DrawOp::Type::StencilCoverPathDrawOp && deviceBounds.has_value() &&
+      !deviceBounds->isEmpty()) {
     std::vector<const FragmentProcessor*> colorProcessors;
     colorProcessors.reserve(op->colorProcessors().size());
     for (const auto& processor : op->colorProcessors()) {
@@ -1501,9 +1502,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
       // operands the materialization policy would rewrite, rebuild the chain from the original
       // source with the MaterializeBlendChildren flag set — the source shader or filter then
       // applies the same EnsureSimpleBlendChild rewrite the construction-time path used to apply.
-      // The chain route is retried first (coverage-free draws only, matching the main path's
-      // constraint); when it cannot serve the materialized tree, the original op is kept as-is
-      // and the plain route below serves it with its ORIGINAL processors — a failed retry must
+      // The retry includes coverage only when the existing fold contract permits it. Unsupported
+      // coverage keeps the original draw intact; a failed retry must
       // never leave a rewritten (materialized) tree on the draw (: the pre-fix swap
       // replaced the original with the materialized tree, so even the fallback executed a
       // quantization boundary the reference never had).
@@ -1524,7 +1524,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
       // processor straight from the image), so the rebuild can also come from a closure the
       // flush site captured. Trailing processors behind the rebuilt one (e.g. a
       // ColorSpaceXformEffect) stay on the op and ride along the retry.
-      bool canRebuild = !op->hasCoverage() && !flipRisk &&
+      bool canRebuild = (!op->hasCoverage() || foldMask) && !flipRisk &&
                         (brush.shader != nullptr || rebuildColorChain != nullptr);
       if (canRebuild && colorProcessors.size() >= 1) {
         auto* xfer = colorProcessors[0];
@@ -1556,15 +1556,24 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
               for (size_t i = 1; i < colorProcessors.size(); ++i) {
                 retryProcessors.push_back(colorProcessors[i]);
               }
+              if (foldMask) {
+                for (size_t index = colorProcessors.size(); index < foldedProcessors.size();
+                     ++index) {
+                  retryProcessors.push_back(foldedProcessors[index]);
+                }
+              }
               AOTEffectGraph retryGraph = {};
               AOTEffectPlan retryPlan = {};
-              if (!op->hasCoverage() && AOTEffectDecomposer::Lower(retryProcessors, &retryGraph) &&
+              if (AOTEffectDecomposer::Lower(retryProcessors, &retryGraph) &&
                   AOTEffectDecomposer::ValidateForFusion(retryGraph) &&
                   AOTEffectDecomposer::Decompose(retryGraph, &retryPlan) &&
                   retryPlan.passes.size() == 1 &&
                   (retryPlan.passes[0].kernel == AOTKernelKind::PointwiseTail ||
                    IsAOTPointwiseDAGKernel(retryPlan.passes[0].kernel) ||
                    retryPlan.passes[0].kernel == AOTKernelKind::PerlinNoiseFill)) {
+                if (foldMask) {
+                  op->moveCoveragesToColors();
+                }
                 auto task = AOTPlanExecutor::Make(context, renderFlags, retryGraph, retryPlan,
                                                   *deviceBounds, renderTarget, &op, Point::Zero());
                 if (task != nullptr) {
@@ -1575,15 +1584,10 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
                   return;
                 }
               }
-              // The chain route cannot serve the materialized tree (no chain variant for this
-              // geometry processor, or the draw carries GP coverage). The original op still
-              // carries its untouched processors: drop the retry result and let the plain route
-              // below serve the ORIGINAL tree — the reference semantics (: the pre-fix
-              // swap replaced the original with the materialized tree, so the fallback executed
-              // a quantization boundary the reference never had, and a JIT of the swapped tree
-              // baked that boundary into the cached program). The materialization fills the
-              // rebuild already enqueued render unconsumed (wasted work, no pixel effect); a
-              // two-phase commit that defers those enqueues is future work.
+              // The retry was not accepted. The original color tree remains intact; any coverage
+              // moved into its tail is equivalent under the fold contract. Dropping retryFP avoids
+              // inserting quantized operands into the original draw. Enqueued materialization fills
+              // remain unconsumed; deferring those enqueues requires a separate two-phase commit.
             } else {
               // The rebuild itself failed: the original op still carries its untouched
               // processors and falls through to the plain route below. Any materialization the

@@ -20,14 +20,18 @@
 #include <limits>
 #include <set>
 #include "base/TGFXTest.h"
+#include "core/ClipStack.h"
 #include "core/utils/BlockAllocator.h"
 #include "gpu/AOTChainBuilder.h"
 #include "gpu/AOTEffect.h"
 #include "gpu/AOTEffectDecomposer.h"
 #include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/AOTPlanExecutor.h"
+#include "gpu/DrawingManager.h"
+#include "gpu/OpsCompositor.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/ops/StencilCoverPathDrawOp.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
@@ -76,6 +80,28 @@ class ShapeRejectingFragmentProcessor : public FragmentProcessor {
 
   void emitCode(EmitArgs&) const override {
   }
+};
+
+class SelfManagedPipelineDrawOp : public DrawOp {
+ public:
+  SelfManagedPipelineDrawOp(BlockAllocator* allocator, bool coverage)
+      : DrawOp(allocator, AAType::None), coverage(coverage) {
+  }
+
+  bool hasCoverage() const override {
+    return coverage;
+  }
+
+  Type type() const override {
+    return Type::StencilCoverPathDrawOp;
+  }
+
+  void execute(RenderPass*, RenderTarget*) override {
+    ADD_FAILURE() << "A self-managed draw must not execute through an AOT plan task";
+  }
+
+ private:
+  bool coverage = false;
 };
 
 static AOTAxisAnalysis AnalyzeColorProcessor(FragmentProcessor* processor) {
@@ -152,6 +178,146 @@ static bool BuildTripleGraph(Context* context, BlockAllocator* allocator, AOTEff
     return false;
   }
   return AOTEffectDecomposer::Lower({texture.get(), colorMatrix.get(), luma.get()}, graph);
+}
+
+TGFX_TEST_PRIVATE(AOTEffectTest, ExecutorRejectsSelfManagedDrawWithoutSideEffects) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* manager = context->drawingManager();
+  auto* allocator = manager->drawingAllocator();
+  auto destination = RenderTargetProxy::Make(context, 64, 64, false);
+  ASSERT_NE(destination, nullptr);
+  AOTEffectGraph graph;
+  ASSERT_TRUE(BuildTripleGraph(context, allocator, &graph));
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+  ASSERT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+  for (bool coverage : {false, true}) {
+    SCOPED_TRACE(coverage);
+    PlacementPtr<DrawOp> draw = allocator->make<SelfManagedPipelineDrawOp>(allocator, coverage);
+    auto color = ConstColorProcessor::Make(allocator, PMColor::White(), InputMode::Ignore);
+    ASSERT_NE(color, nullptr);
+    auto* originalColor = color.get();
+    draw->addColorFP(std::move(color));
+    auto clip = RectEffect::Make(allocator, Rect::MakeLTRB(4, 4, 60, 60));
+    ASSERT_NE(clip, nullptr);
+    auto* originalClip = clip.get();
+    draw->addCoverageFP(std::move(clip));
+    auto* original = draw.get();
+    auto allocated = allocator->size();
+    auto* buffer = manager->getDrawingBuffer();
+    auto renderTasks = buffer->renderTasks.size();
+    auto resourceTasks = buffer->resourceTasks.size();
+    auto task = AOTPlanExecutor::Make(context, 0, graph, plan, Rect::MakeWH(64, 64), destination,
+                                      &draw, Point::Zero());
+    EXPECT_EQ(task, nullptr);
+    EXPECT_EQ(draw.get(), original);
+    ASSERT_EQ(draw->colorProcessors().size(), 1u);
+    EXPECT_EQ(draw->colorProcessors()[0].get(), originalColor);
+    ASSERT_EQ(draw->coverages.size(), 1u);
+    EXPECT_EQ(draw->coverages[0].get(), originalClip);
+    EXPECT_EQ(allocator->size(), allocated);
+    EXPECT_EQ(buffer->renderTasks.size(), renderTasks);
+    EXPECT_EQ(buffer->resourceTasks.size(), resourceTasks);
+  }
+  auto color = ConstColorProcessor::Make(allocator, PMColor::White(), InputMode::Ignore);
+  auto draw = manager->makeFillDrawOp(destination, std::move(color), 0);
+  ASSERT_NE(draw, nullptr);
+  auto task = AOTPlanExecutor::Make(context, 0, graph, plan, Rect::MakeWH(64, 64), destination,
+                                    &draw, Point::Zero());
+  EXPECT_NE(task, nullptr);
+  EXPECT_EQ(draw, nullptr);
+}
+
+TGFX_TEST_PRIVATE(AOTEffectTest, ExecutorRejectsStencilCoverDrawWithoutTakingOwnership) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* manager = context->drawingManager();
+  auto* allocator = manager->drawingAllocator();
+  auto bounds = Rect::MakeWH(64, 64);
+  auto destination = RenderTargetProxy::Make(context, 64, 64, false);
+  ASSERT_NE(destination, nullptr);
+  AOTEffectGraph graph;
+  ASSERT_TRUE(BuildTripleGraph(context, allocator, &graph));
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+  ASSERT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+  Path path;
+  path.addRect(bounds);
+  auto geometry = context->proxyProvider()->createStencilCoverPathProxy(Shape::MakeFrom(path), 0);
+  ASSERT_NE(geometry, nullptr);
+  PlacementPtr<DrawOp> draw = StencilCoverPathDrawOp::Make(geometry, PMColor::White(), Matrix::I(),
+                                                           bounds, PathFillType::Winding);
+  ASSERT_NE(draw, nullptr);
+  EXPECT_EQ(draw->type(), DrawOp::Type::StencilCoverPathDrawOp);
+  EXPECT_TRUE(draw->hasCoverage());
+  EXPECT_TRUE(draw->needsStencil());
+  auto* original = draw.get();
+  auto allocated = allocator->size();
+  auto* buffer = manager->getDrawingBuffer();
+  auto renderTasks = buffer->renderTasks.size();
+  auto resourceTasks = buffer->resourceTasks.size();
+  auto task =
+      AOTPlanExecutor::Make(context, 0, graph, plan, bounds, destination, &draw, Point::Zero());
+  EXPECT_EQ(task, nullptr);
+  EXPECT_EQ(draw.get(), original);
+  EXPECT_EQ(allocator->size(), allocated);
+  EXPECT_EQ(buffer->renderTasks.size(), renderTasks);
+  EXPECT_EQ(buffer->resourceTasks.size(), resourceTasks);
+}
+
+TGFX_TEST_PRIVATE(AOTEffectTest, CompositorKeepsSelfManagedDrawOutOfFoldAndRetry) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+  auto* manager = context->drawingManager();
+  auto* allocator = manager->drawingAllocator();
+  auto destination = RenderTargetProxy::Make(context, 96, 96, false);
+  ASSERT_NE(destination, nullptr);
+  ClipStack clip;
+  clip.clipRect(Rect::MakeLTRB(8.5f, 8.5f, 80.5f, 80.5f), Matrix::I(), true);
+  for (bool needsRetry : {false, true}) {
+    SCOPED_TRACE(needsRetry);
+    OpsCompositor compositor(destination, 0);
+    Brush brush(Color::White(), BlendMode::SrcOver, false);
+    auto first =
+        Shader::MakeLinearGradient(Point(0, 0), Point(96, 96), {Color::Red(), Color::Blue()});
+    ASSERT_NE(first, nullptr);
+    if (needsRetry) {
+      auto second =
+          Shader::MakeLinearGradient(Point(96, 0), Point(0, 96), {Color::Green(), Color::White()});
+      ASSERT_NE(second, nullptr);
+      brush.shader = Shader::MakeBlend(BlendMode::Multiply, first, second);
+    } else {
+      brush.shader = first;
+    }
+    ASSERT_NE(brush.shader, nullptr);
+    auto applied = compositor.applyClip(clip);
+    ASSERT_NE(applied.coverageFP, nullptr);
+    auto color = FragmentProcessor::Make(brush.shader, FPArgs(context, 0, Rect::MakeWH(96, 96)));
+    ASSERT_NE(color, nullptr);
+    AOTEffectGraph graph;
+    bool lowered = AOTEffectDecomposer::Lower({color.get(), applied.coverageFP.get()}, &graph);
+    AOTEffectPlan plan;
+    bool decomposed = lowered && AOTEffectDecomposer::Decompose(graph, &plan);
+    EXPECT_EQ(decomposed, !needsRetry);
+    PlacementPtr<DrawOp> draw = allocator->make<SelfManagedPipelineDrawOp>(allocator, true);
+    auto* original = draw.get();
+    auto* buffer = manager->getDrawingBuffer();
+    auto renderTasks = buffer->renderTasks.size();
+    compositor.addDrawOp(std::move(draw), clip, brush, Rect::MakeWH(96, 96), Rect::MakeWH(96, 96),
+                         1);
+    ASSERT_EQ(compositor.drawOps.size(), 1u);
+    EXPECT_EQ(compositor.drawOps[0].get(), original);
+    EXPECT_EQ(compositor.drawOps[0]->type(), DrawOp::Type::StencilCoverPathDrawOp);
+    EXPECT_EQ(compositor.drawOps[0]->colorProcessors().size(), 1u);
+    EXPECT_EQ(compositor.drawOps[0]->coverages.size(), 1u);
+    EXPECT_EQ(buffer->renderTasks.size(), renderTasks);
+  }
 }
 
 TGFX_TEST(AOTEffectTest, BuilderRejectsInvalidInput) {

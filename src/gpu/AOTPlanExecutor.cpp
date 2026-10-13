@@ -391,7 +391,8 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t render
                                                PlacementPtr<DrawOp>* originalDraw,
                                                const Point& fpCoordOffset, bool clearDestination) {
   if (context == nullptr || destination == nullptr || destination->getContext() != context ||
-      originalDraw == nullptr || *originalDraw == nullptr || deviceBounds.isEmpty() ||
+      originalDraw == nullptr || *originalDraw == nullptr ||
+      (*originalDraw)->type() == DrawOp::Type::StencilCoverPathDrawOp || deviceBounds.isEmpty() ||
       !CanExecute(graph, plan)) {
     return nullptr;
   }

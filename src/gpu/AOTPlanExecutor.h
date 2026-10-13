@@ -33,7 +33,8 @@ class AOTPlanExecutor {
   static bool CanExecute(const AOTEffectGraph& graph, const AOTEffectPlan& plan);
 
   /**
-   * Builds an atomic render task for a supported linear AOT plan without enqueueing it. On failure,
+   * Builds an atomic render task for an AOT plan executed by a StandardDrawOp without enqueueing it.
+   * Stencil-and-cover draws manage their own pipelines and cannot use this task. On failure,
    * originalDraw remains unchanged. On success, ownership of originalDraw moves into the task.
    *
    * deviceBounds is the area the original draw covers on the destination, in destination device

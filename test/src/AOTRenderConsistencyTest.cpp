@@ -2636,14 +2636,9 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaBiasColorFilterOnBlendShaderMatchesRunt
   EXPECT_LE(maxDiff, 4) << "diffBytes=" << diffCount << "/" << totalBytes;
 }
 
-// P4 retry semantics, risk two: coverage retention. A draw carrying a shader mask filter keeps
-// the mask as a coverage processor; when the chain route refuses the color tree and the in-plan
-// retry swaps the materialized tree into the op, the swap must only replace the color processors
-// — the mask coverage stays on the op and the plain route composites it. The scene pairs a
-// two-gradient blend (guaranteed chain refusal, so the retry and its swap are non-vacuous) with
-// a decal image-shader mask filter. A dropped mask would paint the full rect with the blended
-// color; a correct retry paints only where the mask has alpha, within the materialization
-// quantization budget.
+// A two-gradient blend exceeds the fused gradient budget and requires two AOT materializations.
+// Its decal shader mask must remain in the complete retry graph and be applied exactly once by
+// the terminal chain, without a runtime shader fallback or unconsumed coverage intermediates.
 TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsMaskCoverage) {
   // Under the legacy switch this test still renders the bundle segment and prints the candidate
   // fingerprint, so a planned-vs-legacy double run can verify the fallback equivalence (the
@@ -2695,21 +2690,22 @@ TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsMaskCoverage) {
     context->globalCache()->clearPrograms();
     cache->resetStats();
     cache->setDiagnosticRecordingEnabled(true);
-    {
-      // The two-gradient blend is chosen because the chain route refuses it: that first miss is
-      // what triggers the retry under test, so it is deliberate rather than a coverage gap.
-      ScopedAOTDeliberateMiss retryTrigger(context);
-      renderScene(&candidate);
-    }
+    context->globalCache()->resetProgramStats();
+    renderScene(&candidate);
+    EXPECT_GT(cache->hitCount(), 0u);
+    EXPECT_EQ(cache->missCount(), 0u);
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
     auto stats = cache->drawStats();
+    EXPECT_GT(stats.completeAOTDraws, 0u);
+    EXPECT_EQ(stats.atomicFallbacks, 0u);
     cache->setDiagnosticRecordingEnabled(false);
     printf("[RetryMaskCoverage] completeAOT=%u fpFlattenEdges=%u\n",
            static_cast<unsigned>(stats.completeAOTDraws),
            static_cast<unsigned>(stats.fpFlattenEdges));
     fflush(stdout);
-    // Coverage-incompatible retries must be rejected before allocating unconsumed intermediates.
     if (!legacy) {
-      EXPECT_EQ(stats.fpFlattenEdges, 0u);
+      EXPECT_EQ(stats.completeAOTDraws, 3u);
+      EXPECT_EQ(stats.fpFlattenEdges, 2u);
       EXPECT_EQ(stats.planMaterializedEdges, 0u);
     }
   }
@@ -2742,10 +2738,7 @@ TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsMaskCoverage) {
   }
   const_cast<Bitmap&>(reference).unlockPixels();
   candidate.unlockPixels();
-  // Fallback-equivalence fingerprint: the planned retry's swapped materialized tree is built by
-  // the same flag path the legacy construction-time rewrite used, so its output must match the
-  // legacy render byte for byte. The hash lets two process runs (planned vs legacy) be compared
-  // from the logs.
+  // The fingerprint compares planned and legacy materialization without changing pixel baselines.
   uint64_t hash = 1469598103934665603ULL;
   {
     auto* hashPixels = static_cast<const uint32_t*>(candidate.lockPixels());
@@ -2756,13 +2749,14 @@ TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsMaskCoverage) {
     candidate.unlockPixels();
   }
   printf(
-      "[RetryMaskCoverage] maxChannelDiff=%d differing=%lld/%d whiteOnlyInRef=%lld "
+      "[RetryMaskCoverage] maxChannelDiff=%d differing=%lld/%d whiteOnlyInCandidate=%lld "
       "candidateHash=%llu\n",
       maxDiff, diffCount, size * size, fullPaintCount, static_cast<unsigned long long>(hash));
   fflush(stdout);
   // A dropped mask leaves large white-vs-color regions; the quantization budget is 1 LSB per
   // materialized edge.
   if (!legacy) {
+    EXPECT_EQ(fullPaintCount, 0);
     EXPECT_LE(maxDiff, 4);
   }
 }
