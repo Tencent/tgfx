@@ -1823,6 +1823,73 @@ TGFX_TEST(AOTEffectTest, ChainedRectCoverageFeedsFromUnitCoverage) {
   EXPECT_EQ(chain->slot(2).in0, -3);
 }
 
+static void ExpectComposedClipsWithLocalMask(size_t rectCount, size_t rrectCount,
+                                             bool rectAntiAlias, bool accepted) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  SCOPED_TRACE(rectCount);
+  SCOPED_TRACE(rrectCount);
+  SCOPED_TRACE(rectAntiAlias);
+  BlockAllocator allocator;
+  auto color = ConstColorProcessor::Make(&allocator, PMColor::White(), InputMode::ModulateRGBA);
+  ASSERT_NE(color, nullptr);
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower({color.get()}, &graph));
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+  ASSERT_EQ(plan.passes.size(), 1u);
+  PlacementPtr<FragmentProcessor> clips;
+  for (size_t index = 0; index < rectCount; ++index) {
+    auto rect =
+        RectEffect::Make(&allocator, Rect::MakeLTRB(8, 8, 72, 72), Matrix::I(), rectAntiAlias);
+    ASSERT_NE(rect, nullptr);
+    clips = FragmentProcessor::Compose(&allocator, std::move(clips), std::move(rect));
+  }
+  for (size_t index = 0; index < rrectCount; ++index) {
+    auto rrect =
+        RRectEffect::Make(&allocator, RRect::MakeRectXY(Rect::MakeLTRB(16, 16, 80, 80), 12, 12));
+    ASSERT_NE(rrect, nullptr);
+    clips = FragmentProcessor::Compose(&allocator, std::move(clips), std::move(rrect));
+  }
+  ASSERT_NE(clips, nullptr);
+  auto mask = MakeTextureProcessor(context, &allocator, PixelFormat::ALPHA_8);
+  ASSERT_NE(mask, nullptr);
+  auto processor = AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0],
+                                                        {clips.get(), mask.get()});
+  if (!accepted) {
+    EXPECT_EQ(processor, nullptr);
+    return;
+  }
+  ASSERT_NE(processor, nullptr);
+  auto* chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
+  ASSERT_EQ(chain->slotCount(), 2 + rectCount + rrectCount);
+  const auto& maskSlot = chain->slot(0);
+  EXPECT_EQ(maskSlot.op, AOTChainOp::Texture);
+  EXPECT_EQ(maskSlot.textureAlphaOnly, 1);
+  EXPECT_EQ(maskSlot.textureModulateUnit, 1);
+  EXPECT_EQ(chain->coverageRoot(), maskSlot.outRegister);
+  EXPECT_EQ(chain->root(), static_cast<size_t>(chain->slot(1).outRegister));
+  int previous = -4;
+  for (size_t index = 2; index < chain->slotCount(); ++index) {
+    const auto& slot = chain->slot(index);
+    EXPECT_EQ(slot.op,
+              index < 2 + rectCount ? AOTChainOp::AARectCoverage : AOTChainOp::RRectCoverage);
+    EXPECT_EQ(slot.in0, previous);
+    EXPECT_GE(slot.outRegister, 0);
+    previous = slot.outRegister;
+  }
+  EXPECT_EQ(chain->clipCoverage(), previous);
+}
+
+TGFX_TEST(AOTEffectTest, ComposedAnalyticClipsWithLocalMaskRespectBudgets) {
+  ExpectComposedClipsWithLocalMask(1, 1, true, true);
+  ExpectComposedClipsWithLocalMask(1, 4, true, true);
+  ExpectComposedClipsWithLocalMask(2, 1, true, false);
+  ExpectComposedClipsWithLocalMask(1, 5, true, false);
+  ExpectComposedClipsWithLocalMask(1, 1, false, false);
+}
+
 static PlacementPtr<FragmentProcessor> MakeAdditionalAnalyticClip(BlockAllocator* allocator,
                                                                   AOTChainOp op) {
   auto rect = Rect::MakeLTRB(30, 20, 90, 90);

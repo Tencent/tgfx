@@ -5612,17 +5612,10 @@ TGFX_TEST(AOTRenderConsistencyTest, StackedClipsKeepGPCoverageOnAAEdge) {
   ExpectBitmapsIdentical("stacked-clips-gp-coverage", candidate, reference, size, size);
 }
 
-// the defect (a chained analytic
-// coverage whose first node reads opaque white instead of the GP coverage unit, silently
-// dropping the GP coverage) is verified constructively in AOTEffectTest
-// (ChainedRectCoverageFeedsFromUnitCoverage asserts the -3 unit designator). Reaching it end to
-// end would need a draw with fractional GP coverage under a multi-leaf analytic clip chain, but
-// every renderer that produces fractional coverage here also emits a second coverage FP (the AA
-// path adds a TextureEffect coverage alongside the clip Compose), and the two-FP branch rejects
-// that combination — so the defect is UNREACHABLE through public APIs today and this test
-// records the fallback boundary as a tripwire: if the two-FP gate ever opens without the chain
-// honoring the unit, the pixel comparison below flips.
-TGFX_TEST(AOTRenderConsistencyTest, ChainedAnalyticClipsOnAAPathRecordsFallbackBoundary) {
+// An AA path supplies a texture coverage FP after the composed analytic clips. The chain must
+// evaluate the mask from the GP coverage unit and multiply the pure analytic clip product exactly
+// once, without materialization or a runtime shader fallback.
+TGFX_TEST(AOTRenderConsistencyTest, ChainedAnalyticClipsOnAAPathServedByteExact) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
@@ -5671,24 +5664,29 @@ TGFX_TEST(AOTRenderConsistencyTest, ChainedAnalyticClipsOnAAPathRecordsFallbackB
     cache->setDiagnosticRecordingEnabled(true);
     cache->resetStats();
     context->globalCache()->resetProgramStats();
-    {
-      // The refusal is the behavior under test: its fallback is deliberate, not a coverage gap.
-      // The counts asserted below still record.
-      ScopedAOTDeliberateMiss refused(context);
-      renderScene(&candidate);
+    renderScene(&candidate);
+    EXPECT_GT(cache->hitCount(), 0u);
+    EXPECT_EQ(cache->missCount(), 0u);
+    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+    EXPECT_GT(cache->aotStageCount(PrecompiledAOTStage::PipelineCreated), 0u);
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+    auto draws = cache->drawStats();
+    EXPECT_GT(draws.completeAOTDraws, 0u);
+    EXPECT_EQ(draws.atomicFallbacks, 0u);
+    EXPECT_EQ(draws.planMaterializedEdges, 0u);
+    EXPECT_EQ(draws.fpFlattenEdges, 0u);
+    auto hits = cache->hitRecords();
+    bool chainServed = false;
+    for (const auto& hit : hits) {
+      chainServed |= hit.shaderName == "PointwiseChainShader";
     }
-    // RULING: the coverage carries two FPs here (the clip's analytic Compose plus the AA path's
-    // TextureEffect), which the chain's two-FP branch refuses, so the draw falls back to the
-    // runtime route — exactly one program build, no partial-chain attempt. This records the
-    // boundary; a zero here would mean the gate opened and the unit wiring must be re-verified.
-    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 1u);
-    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 1u);
+    EXPECT_TRUE(chainServed);
     cache->setDiagnosticRecordingEnabled(false);
     cache->unload();
     context->globalCache()->clearPrograms();
   }
-  ExpectBitmapsIdentical("chained-analytic-clips-fallback-boundary", candidate, reference, size,
-                         size);
+  EXPECT_GT(CountFractionalAlphaPixels(candidate), 0u);
+  ExpectBitmapsIdentical("chained-analytic-clips-aa-mask", candidate, reference, size, size);
 }
 
 // program identity. Three draws in one context whose color trees share

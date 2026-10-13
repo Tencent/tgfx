@@ -299,10 +299,24 @@ struct ChainClipSlots {
   std::vector<const RRectEffect*> rrects = {};
 };
 
-// Collects one bare analytic clip leaf (no Compose here — composed coverage lowers through the
-// AOT graph instead). Returns false for anything the chain cannot represent.
+// Collects analytic clip leaves, including composed clips, within the chain's parameter budgets.
+// Returns false if any leaf cannot be represented without materialization.
 static bool CollectChainClipSlot(const FragmentProcessor* fp, ChainClipSlots* slots) {
-  if (fp == nullptr || slots == nullptr || fp->numChildProcessors() != 0) {
+  if (fp == nullptr || slots == nullptr) {
+    return false;
+  }
+  if (fp->name() == "ComposeFragmentProcessor") {
+    if (fp->numChildProcessors() == 0) {
+      return false;
+    }
+    for (size_t index = 0; index < fp->numChildProcessors(); ++index) {
+      if (!CollectChainClipSlot(fp->childProcessor(index), slots)) {
+        return false;
+      }
+    }
+    return true;
+  }
+  if (fp->numChildProcessors() != 0) {
     return false;
   }
   if (fp->name() == "RectEffect") {
@@ -1314,7 +1328,8 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessor(
       }
     } else if (last->name() == "TextureEffect") {
       subtreeFP = last;
-      if (first->name() == "RectEffect" || first->name() == "RRectEffect") {
+      if (first->name() == "RectEffect" || first->name() == "RRectEffect" ||
+          first->name() == "ComposeFragmentProcessor") {
         if (!CollectChainClipSlot(first, &clipSlots)) {
           return nullptr;
         }
