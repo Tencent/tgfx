@@ -26,31 +26,12 @@
 
 namespace tgfx {
 
-// F12 fault injection (diagnostics contract): TGFX_AOT_TEST_INJECT_PASS_FAILURE selects which
-// pass of a plan task fails its render-pass setup during execution — "first" (the first
-// intermediate pass), "middle" (a later intermediate pass), or "last" (the terminal pass onto
-// the destination). The task must stop after the failure, record the execution-failure
-// diagnostic, and not crash; the destination may carry partially executed passes, which is the
-// documented non-atomic execution contract. Read once per process; test-only.
-static const char* InjectedPassFailure() {
-  return std::getenv("TGFX_AOT_TEST_INJECT_PASS_FAILURE");
-}
-
-static bool InjectFailureAt(const char* mode, bool isFirstIntermediate, bool isTerminal) {
-  if (mode == nullptr) {
-    return false;
-  }
-  std::string value = mode;
-  if (value == "first") {
-    return isFirstIntermediate;
-  }
-  if (value == "middle") {
-    return !isFirstIntermediate;
-  }
-  if (value == "last") {
-    return isTerminal;
-  }
-  return false;
+// Fault injection (diagnostics contract): TGFX_AOT_TEST_INJECT_PASS_FAILURE set to "last" fails the
+// task's render-pass setup during execution. The task must stop, record the execution-failure
+// diagnostic, and not crash. Test-only.
+static bool InjectedPassFailure() {
+  const char* mode = std::getenv("TGFX_AOT_TEST_INJECT_PASS_FAILURE");
+  return mode != nullptr && std::string(mode) == "last";
 }
 
 static bool ExecutePreparedPass(CommandEncoder* encoder, RenderTarget* renderTarget,
@@ -76,11 +57,10 @@ static bool ExecutePreparedPass(CommandEncoder* encoder, RenderTarget* renderTar
 }
 
 AOTPlanRenderTask::AOTPlanRenderTask(BlockAllocator* allocator,
-                                     std::vector<AOTIntermediatePass>&& intermediatePasses,
-                                     DrawOp::ColorProcessorList&& terminalColors,
+                                     DrawOp::ColorProcessorList&& planColors,
                                      std::shared_ptr<RenderTargetProxy> destination)
-    : RenderTask(allocator), intermediatePasses(std::move(intermediatePasses)),
-      terminalColors(std::move(terminalColors)), destination(std::move(destination)) {
+    : RenderTask(allocator), planColors(std::move(planColors)),
+      destination(std::move(destination)) {
 }
 
 void AOTPlanRenderTask::setOriginalDraw(PlacementPtr<DrawOp> drawOp) {
@@ -88,94 +68,33 @@ void AOTPlanRenderTask::setOriginalDraw(PlacementPtr<DrawOp> drawOp) {
 }
 
 void AOTPlanRenderTask::execute(CommandEncoder* encoder) {
-  std::vector<std::shared_ptr<RenderTarget>> renderTargets = {};
-  renderTargets.reserve(intermediatePasses.size());
-  bool targetsResolved = true;
-  for (const auto& pass : intermediatePasses) {
-    auto renderTarget = pass.target->getRenderTarget();
-    targetsResolved = targetsResolved && renderTarget != nullptr;
-    renderTargets.push_back(std::move(renderTarget));
-  }
   auto finalTarget = destination->getRenderTarget();
-  targetsResolved = targetsResolved && finalTarget != nullptr;
-  if (!targetsResolved) {
+  if (finalTarget == nullptr) {
     executeFallback(encoder, std::move(finalTarget));
     return;
   }
-
-  bool prepared = true;
-  // These strict prepares double as route-validation probes: a plan pass the matcher cannot
-  // serve (e.g. a perspective leaf transform) falls back to the runtime route, so its lookup
-  // failure must not record a diagnostic miss against the rewritten pipeline — the fallback
-  // path records the draw's original pipeline instead.
-  auto* statsCache = finalTarget->getContext()->precompiledShaderCache();
-  statsCache->setMissRecordingPaused(true);
-  for (size_t index = 0; index < intermediatePasses.size(); ++index) {
-    auto drawOp = static_cast<StandardDrawOp*>(intermediatePasses[index].drawOp.get());
-    if (!drawOp->prepareForTask(renderTargets[index].get(), ProgramLookupMode::PrecompiledOnly)) {
-      prepared = false;
-      break;
-    }
-  }
-  if (prepared && !static_cast<StandardDrawOp*>(originalDraw.get())
-                       ->prepareForTask(finalTarget.get(), ProgramLookupMode::PrecompiledOnly,
-                                        std::move(terminalColors))) {
-    prepared = false;
-  }
-  statsCache->setMissRecordingPaused(false);
+  // The strict prepare doubles as a route-validation probe: a plan the matcher cannot serve
+  // (e.g. a perspective leaf transform) falls back to the runtime route, so its lookup failure
+  // must not record a diagnostic miss against the rewritten pipeline — the fallback path records
+  // the draw's original pipeline instead.
+  auto* cache = finalTarget->getContext()->precompiledShaderCache();
+  cache->setMissRecordingPaused(true);
+  bool prepared = static_cast<StandardDrawOp*>(originalDraw.get())
+                      ->prepareForTask(finalTarget.get(), ProgramLookupMode::PrecompiledOnly,
+                                       std::move(planColors));
+  cache->setMissRecordingPaused(false);
   if (!prepared) {
     executeFallback(encoder, std::move(finalTarget));
     return;
   }
-
-  AOTDrawStats drawStats = {};
-  drawStats.kernelInvocations = intermediatePasses.size() + 1;
-  drawStats.offscreenTargets = intermediatePasses.size();
-  drawStats.materializedEdges = intermediatePasses.size();
-  drawStats.renderTargetSwitches = intermediatePasses.size();
-  drawStats.offscreenPlanDraws = 1;
-  drawStats.planMaterializedEdges = intermediatePasses.size();
-  size_t passBucket = intermediatePasses.size() < drawStats.planPassHistogram.size() - 1
-                          ? intermediatePasses.size()
-                          : drawStats.planPassHistogram.size() - 1;
-  drawStats.planPassHistogram[passBucket]++;
-  for (const auto& renderTarget : renderTargets) {
-    auto bytes = static_cast<uint64_t>(renderTarget->width()) *
-                 static_cast<uint64_t>(renderTarget->height()) * 4;
-    drawStats.intermediateReadBytes += bytes;
-    drawStats.intermediateWriteBytes += bytes;
-    drawStats.peakTemporaryBytes += bytes;
-    // The plan's intermediates also join the flush cycle's simultaneously-live set (the
-    // per-draw delta above is a different, draw-local view of the same bytes).
-    if (auto* statsCache = finalTarget->getContext()->precompiledShaderCache();
-        statsCache != nullptr && statsCache->diagnosticRecordingEnabled()) {
-      statsCache->recordActiveTemporaryBytes(bytes);
-    }
-  }
-
-  auto* failureCache = finalTarget->getContext()->precompiledShaderCache();
-  auto recordExecutionFailure = [failureCache]() {
-    if (failureCache != nullptr && failureCache->diagnosticRecordingEnabled()) {
+  auto recordExecutionFailure = [cache]() {
+    if (cache->diagnosticRecordingEnabled()) {
       AOTDrawStats failStats = {};
       failStats.planExecutionFailures = 1;
-      failureCache->recordDraw(failStats, false);
+      cache->recordDraw(failStats, false);
     }
   };
-  for (size_t index = 0; index < intermediatePasses.size(); ++index) {
-    if (InjectFailureAt(InjectedPassFailure(), index == 0, false)) {
-      LOGE("AOTPlanRenderTask::execute() Injected pass failure at intermediate pass %zu", index);
-      recordExecutionFailure();
-      return;
-    }
-    if (!ExecutePreparedPass(encoder, renderTargets[index].get(),
-                             static_cast<StandardDrawOp*>(intermediatePasses[index].drawOp.get()),
-                             LoadAction::Clear, PMColor::Transparent())) {
-      LOGE("AOTPlanRenderTask::execute() Intermediate pass %zu failed to begin", index);
-      recordExecutionFailure();
-      return;
-    }
-  }
-  if (InjectFailureAt(InjectedPassFailure(), intermediatePasses.empty(), true)) {
+  if (InjectedPassFailure()) {
     LOGE("AOTPlanRenderTask::execute() Injected pass failure at the terminal pass");
     recordExecutionFailure();
     return;
@@ -183,12 +102,15 @@ void AOTPlanRenderTask::execute(CommandEncoder* encoder) {
   if (!ExecutePreparedPass(
           encoder, finalTarget.get(), static_cast<StandardDrawOp*>(originalDraw.get()),
           clearDestination ? LoadAction::Clear : LoadAction::Load, PMColor::Transparent())) {
-    LOGE("AOTPlanRenderTask::execute() Terminal pass failed to begin");
+    LOGE("AOTPlanRenderTask::execute() The plan pass failed to begin");
     recordExecutionFailure();
     return;
   }
-  auto cache = finalTarget->getContext()->precompiledShaderCache();
   if (cache->diagnosticRecordingEnabled()) {
+    AOTDrawStats drawStats = {};
+    drawStats.kernelInvocations = 1;
+    drawStats.offscreenPlanDraws = 1;
+    drawStats.planPassHistogram[0]++;
     cache->recordDraw(drawStats, true);
   }
 }

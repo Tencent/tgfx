@@ -2585,8 +2585,7 @@ TGFX_TEST(AOTRenderConsistencyTest, LinearChainInstructionBudgetRejectsWithoutJI
 
 // A non-permutation matrix with fractional scales and biases: every level does real clamped
 // arithmetic, so quantization and ordering differences accumulate instead of cancelling the way
-// the channel-swap chain above does. The alpha row stays [0,0,0,1,0] so ValidateForFusion keeps
-// accepting the chain.
+// the channel-swap chain above does. The alpha row stays [0,0,0,1,0].
 static const std::array<float, 20>& NonTrivialScaleBiasMatrix() {
   static const std::array<float, 20> matrix = {0.92f, 0.01f, 0.0f,   0.0f,  0.015f, 0.0f, 0.88f,
                                                0.02f, 0.0f,  0.022f, 0.01f, 0.0f,   0.9f, 0.0f,
@@ -2768,8 +2767,7 @@ TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsTransparentBlackColorFilter
   // color), which is the exact condition addDrawOp uses to merge the filter into the shader
   // (ColorFilterShader) instead of appending it as a trailing processor. A matrix filter with
   // an alpha-row bias qualifies the same way and fuses like any other matrix — see
-  // AlphaBiasColorFilterOnBlendShaderMatchesRuntime, which locked that in after the historical
-  // ValidateForFusion rejection proved conservative.
+  // AlphaBiasColorFilterOnBlendShaderMatchesRuntime.
   const Color filterColor = Color(0.5f, 0.0f, 0.0f, 0.5f);
   constexpr int size = 96;
   auto renderScene = [&](Bitmap* outBitmap) {
@@ -5436,9 +5434,8 @@ TGFX_TEST(AOTRenderConsistencyTest, ColorFilterShaderServesFusedTreeWithoutMater
   }
 }
 
-// Encoded images use GL_TEXTURE_RECTANGLE on macOS. The pointwise chain kernel carries a
-// TEXTURE_KIND dimension, so a rectangle image with a color-filter chain is served by a single
-// fused precompiled pass and stays pixel-identical to the runtime fallback.
+// An encoded image with a color-filter chain on macOS OpenGL is served by a single fused
+// precompiled pass and stays pixel-identical to the runtime fallback.
 TGFX_TEST(AOTRenderConsistencyTest, MultiPassUnsupportedSourceFallsBackAtomically) {
   if (std::string(TGFX_BACKEND_NAME) != "opengl") {
     GTEST_SKIP() << "This case relies on macOS OpenGL encoded images using Rectangle textures";
@@ -5458,7 +5455,7 @@ TGFX_TEST(AOTRenderConsistencyTest, MultiPassUnsupportedSourceFallsBackAtomicall
                                  &reference, &referenceStats);
   RenderImageWithColorFilterOnce(image, chain, width, height, true, true, false, false, &candidate,
                                  &candidateStats);
-  // The rectangle source is served by the fused pointwise chain kernel: the matcher accepts it
+  // The source is served by the fused pointwise chain kernel: the matcher accepts it
   // (no fallback miss) and an AOT artifact is created and used. The whole draw stays a single
   // fused pass — no offscreen target, no materialized intermediate, no render-target switch — and
   // the output is pixel-identical to the runtime fallback.

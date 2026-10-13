@@ -19,17 +19,12 @@
 #include <algorithm>
 #include <utility>
 #include <vector>
-#include "core/shaders/PerlinNoiseShader.h"
 #include "gpu/AOTChainRegisterAllocator.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AOTPointwiseTailProcessor.h"
 #include "gpu/processors/AOTYUVChainProcessor.h"
-#include "gpu/processors/AlphaThresholdFragmentProcessor.h"
-#include "gpu/processors/ColorMatrixFragmentProcessor.h"
-#include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
-#include "gpu/processors/LumaFragmentProcessor.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
 #include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
@@ -52,98 +47,64 @@ bool AOTChainBuilder::IsChainCompatibleTiledMode(TiledTextureShaderMode mode) {
 
 namespace {
 
-static PlacementPtr<FragmentProcessor> BuildFPForNode(BlockAllocator* allocator,
-                                                      const AOTEffectNode* node,
-                                                      PlacementPtr<FragmentProcessor> input) {
-  switch (node->kind) {
-    case AOTEffectKind::TextureSource: {
-      auto parameters = std::get_if<AOTTextureParameters>(&node->parameters);
-      if (parameters == nullptr) {
-        return nullptr;
-      }
-      if (parameters->samplingKind == AOTTextureSamplingKind::Device) {
-        return DeviceSpaceTextureEffect::Make(allocator, parameters->textureProxy,
-                                              parameters->uvMatrix);
-      }
-      if (parameters->samplingKind == AOTTextureSamplingKind::Tiled) {
-        const auto& recipe = parameters->tiledRecipe;
-        if (!recipe.has_value() ||
-            !AOTChainBuilder::IsChainCompatibleTiledMode(recipe->shaderModeX) ||
-            !AOTChainBuilder::IsChainCompatibleTiledMode(recipe->shaderModeY)) {
-          return nullptr;
-        }
-        // The hardware sampler performs all tiling (wrap modes and clamp-to-border), so the leaf
-        // is a plain TextureEffect carrying the resolved sampler state. The huge sample area makes
-        // the chain kernel's always-on Subset clamp a no-op, which the wrap/border modes rely on.
-        SamplingOptions sampling(recipe->hardwareSampler.minFilterMode,
-                                 recipe->hardwareSampler.magFilterMode,
-                                 recipe->hardwareSampler.mipmapMode);
-        SamplingArgs args = {recipe->hardwareSampler.tileModeX, recipe->hardwareSampler.tileModeY,
-                             sampling, SrcRectConstraint::Fast};
-        args.sampleArea = Rect::MakeLTRB(-1e9f, -1e9f, 1e9f, 1e9f);
-        auto uvMatrix = parameters->uvMatrix;
-        return TextureEffect::Make(allocator, parameters->textureProxy, args, &uvMatrix);
-      }
-      if (parameters->samplingKind != AOTTextureSamplingKind::Plain) {
-        return nullptr;
-      }
-      SamplingOptions sampling(parameters->samplerState.minFilterMode,
-                               parameters->samplerState.magFilterMode,
-                               parameters->samplerState.mipmapMode);
-      SamplingArgs args = {parameters->samplerState.tileModeX, parameters->samplerState.tileModeY,
-                           sampling, parameters->constraint};
-      args.sampleArea = parameters->subset;
-      auto uvMatrix = parameters->uvMatrix;
-      if (parameters->hasRGBAAA) {
-        return TextureEffect::MakeRGBAAA(allocator, parameters->textureProxy, args,
-                                         parameters->alphaStart, &uvMatrix);
-      }
-      return TextureEffect::Make(allocator, parameters->textureProxy, args, &uvMatrix);
-    }
-    case AOTEffectKind::ColorMatrix: {
-      auto parameters = std::get_if<AOTColorMatrixParameters>(&node->parameters);
-      if (parameters == nullptr || input == nullptr) {
-        return nullptr;
-      }
-      auto matrix = ColorMatrixFragmentProcessor::Make(allocator, parameters->matrix);
-      return FragmentProcessor::Compose(allocator, std::move(input), std::move(matrix));
-    }
-    case AOTEffectKind::Luma: {
-      auto parameters = std::get_if<AOTLumaParameters>(&node->parameters);
-      if (parameters == nullptr || input == nullptr) {
-        return nullptr;
-      }
-      auto luma =
-          LumaFragmentProcessor::Make(allocator, parameters->kr, parameters->kg, parameters->kb);
-      return FragmentProcessor::Compose(allocator, std::move(input), std::move(luma));
-    }
-    case AOTEffectKind::AlphaThreshold: {
-      auto parameters = std::get_if<AOTAlphaThresholdParameters>(&node->parameters);
-      if (parameters == nullptr || input == nullptr) {
-        return nullptr;
-      }
-      auto step = AlphaThresholdFragmentProcessor::Make(allocator, parameters->threshold);
-      return FragmentProcessor::Compose(allocator, std::move(input), std::move(step));
-    }
-    case AOTEffectKind::ColorSpaceXform: {
-      auto parameters = std::get_if<AOTColorSpaceXformParameters>(&node->parameters);
-      if (parameters == nullptr || parameters->steps == nullptr || input == nullptr) {
-        return nullptr;
-      }
-      auto xform = ColorSpaceXformEffect::Make(allocator, parameters->steps);
-      return FragmentProcessor::Compose(allocator, std::move(input), std::move(xform));
-    }
-    default:
-      return nullptr;
+// Rebuilds the texture processor of one TextureSource node: a device-space source, or a plain or
+// tiled leaf sampling through its resolved sampler state. Every planner refuses RGBAAA sources.
+static PlacementPtr<FragmentProcessor> BuildTextureLeafFP(BlockAllocator* allocator,
+                                                          const AOTEffectNode* node) {
+  auto parameters = node != nullptr && node->kind == AOTEffectKind::TextureSource
+                        ? std::get_if<AOTTextureParameters>(&node->parameters)
+                        : nullptr;
+  if (parameters == nullptr || parameters->hasRGBAAA) {
+    return nullptr;
   }
+  if (parameters->samplingKind == AOTTextureSamplingKind::Device) {
+    return DeviceSpaceTextureEffect::Make(allocator, parameters->textureProxy,
+                                          parameters->uvMatrix);
+  }
+  if (parameters->samplingKind == AOTTextureSamplingKind::Tiled) {
+    const auto& recipe = parameters->tiledRecipe;
+    if (!recipe.has_value() || !AOTChainBuilder::IsChainCompatibleTiledMode(recipe->shaderModeX) ||
+        !AOTChainBuilder::IsChainCompatibleTiledMode(recipe->shaderModeY)) {
+      return nullptr;
+    }
+    // The hardware sampler performs all tiling (wrap modes and clamp-to-border), so the leaf is a
+    // plain TextureEffect carrying the resolved sampler state. The huge sample area makes the
+    // chain kernel's always-on Subset clamp a no-op, which the wrap/border modes rely on.
+    SamplingOptions sampling(recipe->hardwareSampler.minFilterMode,
+                             recipe->hardwareSampler.magFilterMode,
+                             recipe->hardwareSampler.mipmapMode);
+    SamplingArgs args = {recipe->hardwareSampler.tileModeX, recipe->hardwareSampler.tileModeY,
+                         sampling, SrcRectConstraint::Fast};
+    args.sampleArea = Rect::MakeLTRB(-1e9f, -1e9f, 1e9f, 1e9f);
+    auto uvMatrix = parameters->uvMatrix;
+    return TextureEffect::Make(allocator, parameters->textureProxy, args, &uvMatrix);
+  }
+  SamplingOptions sampling(parameters->samplerState.minFilterMode,
+                           parameters->samplerState.magFilterMode,
+                           parameters->samplerState.mipmapMode);
+  SamplingArgs args = {parameters->samplerState.tileModeX, parameters->samplerState.tileModeY,
+                       sampling, parameters->constraint};
+  args.sampleArea = parameters->subset;
+  auto uvMatrix = parameters->uvMatrix;
+  return TextureEffect::Make(allocator, parameters->textureProxy, args, &uvMatrix);
 }
 
-// Rebuilds the fused perlin-source processor of a PerlinNoiseFill pass: the noise source plus up
-// to two pointwise operators folded into the processor's own slot records, so the whole pass maps
-// onto one PerlinNoiseFillShader program with no Compose wrapper and no materialization.
-static PlacementPtr<FragmentProcessor> BuildPerlinNoiseFillFP(BlockAllocator* allocator,
-                                                              const AOTEffectGraph& graph,
-                                                              const AOTPassDescriptor& pass);
+static bool BuildPointwiseSlot(const AOTEffectGraph& graph, const AOTEffectNode* node,
+                               AOTPointwiseSlot* slot);
+
+// The operator slots of a linear pass: every node after the pass's source, in order.
+static bool BuildLinearSlots(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
+                             std::vector<AOTPointwiseSlot>* slots) {
+  slots->reserve(pass.nodes.size() - 1);
+  for (size_t index = 1; index < pass.nodes.size(); ++index) {
+    AOTPointwiseSlot slot = {};
+    if (!BuildPointwiseSlot(graph, graph.nodeAt(pass.nodes[index]), &slot)) {
+      return false;
+    }
+    slots->push_back(slot);
+  }
+  return true;
+}
 
 static bool BuildPointwiseSlot(const AOTEffectGraph& graph, const AOTEffectNode* node,
                                AOTPointwiseSlot* slot) {
@@ -222,32 +183,6 @@ static bool BuildPointwiseSlot(const AOTEffectGraph& graph, const AOTEffectNode*
     return true;
   }
   return false;
-}
-
-static PlacementPtr<FragmentProcessor> BuildPerlinNoiseFillFP(BlockAllocator* allocator,
-                                                              const AOTEffectGraph& graph,
-                                                              const AOTPassDescriptor& pass) {
-  if (pass.nodes.empty() || pass.nodes.size() > 4) {
-    return nullptr;
-  }
-  auto perlinNode = graph.nodeAt(pass.nodes[0]);
-  auto parameters = perlinNode != nullptr
-                        ? std::get_if<AOTPerlinNoiseParameters>(&perlinNode->parameters)
-                        : nullptr;
-  if (perlinNode == nullptr || perlinNode->kind != AOTEffectKind::PerlinNoiseSource ||
-      parameters == nullptr) {
-    return nullptr;
-  }
-  std::vector<AOTPointwiseSlot> slots = {};
-  slots.reserve(pass.nodes.size() - 1);
-  for (size_t index = 1; index < pass.nodes.size(); ++index) {
-    AOTPointwiseSlot slot = {};
-    if (!BuildPointwiseSlot(graph, graph.nodeAt(pass.nodes[index]), &slot)) {
-      return nullptr;
-    }
-    slots.push_back(slot);
-  }
-  return PerlinNoiseFragmentProcessor::MakeFromAOTParameters(allocator, *parameters, slots);
 }
 
 // Maps a DAG input edge onto a chain slot index. GeometryColor is not a slot: it maps to -1, the
@@ -1037,7 +972,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   std::vector<PlacementPtr<FragmentProcessor>> leaves = {};
   leaves.reserve(layout.leafNodes.size());
   for (auto* node : layout.leafNodes) {
-    auto leaf = BuildFPForNode(allocator, node, nullptr);
+    auto leaf = BuildTextureLeafFP(allocator, node);
     if (leaf == nullptr || leaf->name() != "TextureEffect") {
       return nullptr;
     }
@@ -1256,15 +1191,6 @@ bool AOTChainBuilder::ResolveChainProfile(const AOTEffectGraph& graph,
   return true;
 }
 
-PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildPerlinNoiseFP(BlockAllocator* allocator,
-                                                                    const AOTEffectGraph& graph,
-                                                                    const AOTPassDescriptor& pass) {
-  if (pass.kernel != AOTKernelKind::PerlinNoiseFill) {
-    return nullptr;
-  }
-  return BuildPerlinNoiseFillFP(allocator, graph, pass);
-}
-
 // Single-FP analytic coverage beyond the narrow forms: a bare AA RectEffect (local space), a bare
 // RRectEffect, or a flat Compose of AA rect / rrect leaves with at most one alpha-only device-space
 // mask (extracted as the mask child — the kernel cannot sample a device-space leaf inside the
@@ -1272,80 +1198,49 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildPerlinNoiseFP(BlockAllocat
 // RRectCoverage nodes rooted at the GP coverage unit, which is what makes composed multi-clip
 // coverage representable at all. Returns false when the coverage carries anything else.
 
-PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildFPForPass(
-    BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
-    PlacementPtr<FragmentProcessor> sourceOverride) {
-  PlacementPtr<FragmentProcessor> current = std::move(sourceOverride);
-  if (pass.kernel == AOTKernelKind::PointwiseTail) {
-    size_t nodeIndex = 0;
-    if (current == nullptr) {
-      auto sourceNode = graph.nodeAt(pass.nodes[nodeIndex++]);
-      current = BuildFPForNode(allocator, sourceNode, nullptr);
-    }
-    if (current == nullptr) {
-      return nullptr;
-    }
-    std::vector<AOTPointwiseSlot> slots = {};
-    slots.reserve(pass.nodes.size() - nodeIndex);
-    for (; nodeIndex < pass.nodes.size(); ++nodeIndex) {
-      AOTPointwiseSlot slot = {};
-      if (!BuildPointwiseSlot(graph, graph.nodeAt(pass.nodes[nodeIndex]), &slot)) {
-        return nullptr;
-      }
-      slots.push_back(slot);
-    }
-    return AOTPointwiseTailProcessor::Make(allocator, std::move(current), slots);
+PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildFPForPass(BlockAllocator* allocator,
+                                                                const AOTEffectGraph& graph,
+                                                                const AOTPassDescriptor& pass) {
+  if (pass.nodes.empty()) {
+    return nullptr;
   }
   if (IsAOTPointwiseDAGKernel(pass.kernel)) {
-    ChainClipSlots emptyClipSlots = {};
-    return BuildChainFP(allocator, graph, pass, emptyClipSlots, nullptr);
+    return BuildChainFP(allocator, graph, pass, {}, nullptr);
   }
-  if (pass.kernel == AOTKernelKind::PerlinNoiseFill) {
-    // A PerlinNoiseFill pass is always the plan's first pass and consumes no upstream texture: the
-    // planner only emits it for a GeometryColor-fed noise source, so an incoming override would
-    // have nowhere to attach.
-    if (current != nullptr) {
-      return nullptr;
-    }
-    return BuildPerlinNoiseFillFP(allocator, graph, pass);
+  // The linear kernels: the source node plus its operators folded into the processor's own slot
+  // records, one program per pass with no Compose wrapper.
+  std::vector<AOTPointwiseSlot> slots = {};
+  if (!BuildLinearSlots(graph, pass, &slots)) {
+    return nullptr;
   }
-  if (pass.kernel == AOTKernelKind::YUVTextureFill) {
-    if (current != nullptr || pass.nodes.empty()) {
-      return nullptr;
+  auto sourceNode = graph.nodeAt(pass.nodes[0]);
+  switch (pass.kernel) {
+    case AOTKernelKind::PointwiseTail: {
+      auto source = BuildTextureLeafFP(allocator, sourceNode);
+      return source != nullptr
+                 ? AOTPointwiseTailProcessor::Make(allocator, std::move(source), slots)
+                 : nullptr;
     }
-    // The YUV source node plus the bounded pointwise tail: rebuild the multi-plane source and
-    // fold the operators into the processor's slot records, one YUVTextureFillShader program.
-    auto sourceNode = graph.nodeAt(pass.nodes[0]);
-    auto source = sourceNode != nullptr ? BuildFPForNode(allocator, sourceNode, nullptr) : nullptr;
-    if (source == nullptr || source->name() != "TextureEffect") {
-      return nullptr;
-    }
-    std::vector<AOTPointwiseSlot> slots = {};
-    slots.reserve(pass.nodes.size() - 1);
-    for (size_t index = 1; index < pass.nodes.size(); ++index) {
-      AOTPointwiseSlot slot = {};
-      if (!BuildPointwiseSlot(graph, graph.nodeAt(pass.nodes[index]), &slot)) {
+    case AOTKernelKind::YUVTextureFill: {
+      auto source = BuildTextureLeafFP(allocator, sourceNode);
+      if (source == nullptr || source->name() != "TextureEffect") {
         return nullptr;
       }
-      slots.push_back(slot);
+      return AOTYUVChainProcessor::Make(allocator, std::move(source), slots);
     }
-    return AOTYUVChainProcessor::Make(allocator, std::move(source), slots);
-  }
-  for (size_t index = 0; index < pass.nodes.size(); ++index) {
-    auto node = graph.nodeAt(pass.nodes[index]);
-    if (node == nullptr) {
+    case AOTKernelKind::PerlinNoiseFill: {
+      auto parameters =
+          sourceNode != nullptr && sourceNode->kind == AOTEffectKind::PerlinNoiseSource
+              ? std::get_if<AOTPerlinNoiseParameters>(&sourceNode->parameters)
+              : nullptr;
+      if (parameters == nullptr || slots.size() > PerlinNoiseFragmentProcessor::MaxPointwiseSlots) {
+        return nullptr;
+      }
+      return PerlinNoiseFragmentProcessor::MakeFromAOTParameters(allocator, *parameters, slots);
+    }
+    default:
       return nullptr;
-    }
-    if (index == 0 && current == nullptr) {
-      current = BuildFPForNode(allocator, node, nullptr);
-    } else if (node->kind != AOTEffectKind::TextureSource) {
-      current = BuildFPForNode(allocator, node, std::move(current));
-    }
-    if (current == nullptr) {
-      return nullptr;
-    }
   }
-  return current;
 }
 
 PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessor(

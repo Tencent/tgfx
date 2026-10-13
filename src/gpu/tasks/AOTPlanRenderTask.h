@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <vector>
 #include "gpu/ops/DrawOp.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/tasks/RenderTask.h"
@@ -27,33 +26,17 @@ namespace tgfx {
 
 class RenderTarget;
 
-// One materialized step of a multi-pass AOT plan: the exact-fit target the step renders into and
-// the prepared draw op that renders it.
-struct AOTIntermediatePass {
-  std::shared_ptr<RenderTargetProxy> target = nullptr;
-  PlacementPtr<DrawOp> drawOp = nullptr;
-};
-
 /**
- * Render task for a supported linear AOT plan: it renders every materializing pass into its
- * intermediate target and then replays the original draw with the plan's terminal color list onto
- * the destination. The guarantee is two-phase, and only the first phase is atomic:
- *
- *  - Prepare phase (atomic fallback): every intermediate pass and the terminal pass are prepared
- *    strictly against precompiled artifacts; if any lookup or target resolution fails, the whole
- *    task falls back atomically to the original draw on the runtime route, so up to the execution
- *    boundary a plan either runs fully precompiled or not at all.
- *  - Execution phase (fail-stop, non-atomic): once passes begin, a render-pass setup failure stops
- *    the task at that pass. The destination may then carry partially executed passes; the failure
- *    is recorded as a planExecutionFailures diagnostic instead of being silently dropped. This
- *    matches the plain task family's behavior on backend errors and deliberately does not attempt
- *    a mid-flight replay.
+ * Render task for a single-pass AOT plan: it replays the original draw with the plan's rebuilt
+ * color processors onto the destination. The prepare phase is atomic: the draw is prepared strictly
+ * against the precompiled artifacts, and if the lookup or target resolution fails, the task replays
+ * the original draw unchanged instead. Once the render pass begins, a setup failure stops the task
+ * and is recorded as a planExecutionFailures diagnostic, matching the plain task family's behavior
+ * on backend errors.
  */
 class AOTPlanRenderTask : public RenderTask {
  public:
-  AOTPlanRenderTask(BlockAllocator* allocator,
-                    std::vector<AOTIntermediatePass>&& intermediatePasses,
-                    DrawOp::ColorProcessorList&& terminalColors,
+  AOTPlanRenderTask(BlockAllocator* allocator, DrawOp::ColorProcessorList&& planColors,
                     std::shared_ptr<RenderTargetProxy> destination);
 
   void setOriginalDraw(PlacementPtr<DrawOp> drawOp);
@@ -65,8 +48,7 @@ class AOTPlanRenderTask : public RenderTask {
   void execute(CommandEncoder* encoder) override;
 
  private:
-  std::vector<AOTIntermediatePass> intermediatePasses = {};
-  DrawOp::ColorProcessorList terminalColors = {};
+  DrawOp::ColorProcessorList planColors = {};
   std::shared_ptr<RenderTargetProxy> destination = nullptr;
   PlacementPtr<DrawOp> originalDraw = nullptr;
   bool clearDestination = false;

@@ -161,25 +161,20 @@ MetalShaderModule::MetalShaderModule(MetalGPU* gpu, const ShaderModuleDescriptor
     // the baked block bindings arrive via the descriptor (filled by the pipeline creator from
     // the offline templates' declared bindings).
     setUniformSlots(descriptor.uniformSlots);
-    // Precompiled metallib binary path: load directly without runtime compilation.
-    if (!descriptor.binaryData.empty()) {
-      dispatch_data_t data =
-          dispatch_data_create(descriptor.binaryData.data(), descriptor.binaryData.size(),
-                               dispatch_get_global_queue(0, 0), DISPATCH_DATA_DESTRUCTOR_DEFAULT);
-      NSError* error = nil;
-      library = [gpu->device() newLibraryWithData:data error:&error];
-      dispatch_release(data);
-      if (!library && error) {
-        LOGE("MetalShaderModule: metallib load error: %s", error.localizedDescription.UTF8String);
-      }
+    // Precompiled metallib binary: load directly without runtime compilation. The program creator
+    // always passes the bundle blob as binary data, so an empty one is a corrupt entry.
+    if (descriptor.binaryData.empty()) {
+      LOGE("MetalShaderModule: precompiled metallib is empty");
       return;
     }
-    // Fallback: MSL text path (legacy bundles without metallib).
-    NSString* mslSource = [NSString stringWithUTF8String:descriptor.code.c_str()];
+    dispatch_data_t data =
+        dispatch_data_create(descriptor.binaryData.data(), descriptor.binaryData.size(),
+                             dispatch_get_global_queue(0, 0), DISPATCH_DATA_DESTRUCTOR_DEFAULT);
     NSError* error = nil;
-    library = [gpu->device() newLibraryWithSource:mslSource options:nil error:&error];
+    library = [gpu->device() newLibraryWithData:data error:&error];
+    dispatch_release(data);
     if (!library && error) {
-      LOGE("MetalShaderModule: precompiled MSL error: %s", error.localizedDescription.UTF8String);
+      LOGE("MetalShaderModule: metallib load error: %s", error.localizedDescription.UTF8String);
     }
     return;
   }

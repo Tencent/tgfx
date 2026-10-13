@@ -101,16 +101,11 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   AOTEffectPlan plan = {};
   std::string blocker;
   bool lowerSucceeded = false;
-  bool validateSucceeded = false;
   bool decomposeSucceeded = false;
-  bool canExecute = false;
   if (analyze) {
     lowerSucceeded = AOTEffectDecomposer::Lower({processor.get()}, &graph, &blocker);
-    validateSucceeded = lowerSucceeded && AOTEffectDecomposer::ValidateForFusion(graph);
-    decomposeSucceeded = validateSucceeded && AOTEffectDecomposer::Decompose(graph, &plan);
-    // Recorded as the production verdict (CanRoute), the same rule makeChainTask applies below,
-    // so the analysis never reports a multi-pass plan as servable.
-    canExecute = decomposeSucceeded && AOTPlanExecutor::CanRoute(graph, plan);
+    // Decompose only returns plans the executor runs, so this is also the production verdict.
+    decomposeSucceeded = lowerSucceeded && AOTEffectDecomposer::Decompose(graph, &plan);
   }
   OffscreenFillKey diagnosticKey = InvalidOffscreenFillKey;
   if (cache != nullptr && cache->diagnosticRecordingEnabled() && processor != nullptr) {
@@ -119,28 +114,24 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     for (const auto& pass : plan.passes) {
       kernels.push_back(pass.kernel);
     }
-    diagnosticKey = cache->recordOffscreenFillAnalysis(
-        source, coordOffset != Point::Zero(), processor->name(), lowerSucceeded, blocker,
-        validateSucceeded, decomposeSucceeded, canExecute, kernels);
+    diagnosticKey =
+        cache->recordOffscreenFillAnalysis(source, coordOffset != Point::Zero(), processor->name(),
+                                           lowerSucceeded, blocker, decomposeSucceeded, kernels);
   }
-  auto makeChainTask = [&](const AOTEffectGraph& taskGraph, const AOTEffectPlan& taskPlan,
-                           PlacementPtr<DrawOp>* originalDraw) -> PlacementPtr<RenderTask> {
-    // Only single-pass plans may route to the precompiled kernels (AOTPlanExecutor::CanRoute). A
-    // multi-pass tail plan materializes RGBA8 intermediates: every boundary quantizes to the 1/255
-    // grid, and a discontinuous operator (AlphaThreshold) reading a materialized input can flip its
-    // step() decision outright (exact-rational counterexample) — a divergence no tolerance can
-    // bound. Over-budget chains keep the runtime reference everywhere (the on-screen route
-    // already refuses them), which evaluates the whole tree in one shader at float precision.
-    if (!AOTPlanExecutor::CanRoute(taskGraph, taskPlan)) {
-      return nullptr;
+  // Submits the plan task for the fill's draw op. The plan executor takes ownership of the op on
+  // success, so the fill must stop there: falling through to the plain branch would submit a null
+  // op. An offscreen fill owns a fresh target, so the task clears its full backing first and a
+  // shader-side sample cannot observe pixels left by an earlier scratch allocation.
+  auto submitPlanTask = [&](const AOTEffectGraph& taskGraph, const AOTEffectPlan& taskPlan,
+                            PlacementPtr<DrawOp>* originalDraw) {
+    auto task =
+        AOTPlanExecutor::Make(context, taskGraph, taskPlan, renderTarget, originalDraw, true);
+    if (task == nullptr) {
+      return false;
     }
-    auto deviceBounds = Rect::MakeWH(static_cast<float>(renderTarget->width()),
-                                     static_cast<float>(renderTarget->height()));
-    // An offscreen fill owns a fresh target. Clear its full backing before the draw so a
-    // shader-side sample cannot observe pixels left by an earlier scratch allocation. On-screen
-    // calls leave the default false and keep the destination's existing contents.
-    return AOTPlanExecutor::Make(context, renderFlags, taskGraph, taskPlan, deviceBounds,
-                                 renderTarget, originalDraw, coordOffset, true);
+    addRenderTask(std::move(task));
+    addGenerateMipmapsTask(renderTarget->asTextureProxy());
+    return true;
   };
   // P4 group three: the retry-warranted verdict must be taken before the processor is moved into
   // the plain draw op below. ADMISSION RULE (): a tree carrying a discontinuous operator
@@ -166,18 +157,7 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   if (drawOp == nullptr) {
     return false;
   }
-  bool chainServed = false;
-  if (routeCandidate && decomposeSucceeded && canExecute && !plan.passes.empty()) {
-    auto task = makeChainTask(graph, plan, &drawOp);
-    if (task != nullptr) {
-      // The plan executor took ownership of the draw op (setOriginalDraw moved it out), so this
-      // fill must stop here: falling through to the plain branch would submit a null op.
-      addRenderTask(std::move(task));
-      addGenerateMipmapsTask(renderTarget->asTextureProxy());
-      chainServed = true;
-    }
-  }
-  if (chainServed) {
+  if (routeCandidate && decomposeSucceeded && submitPlanTask(graph, plan, &drawOp)) {
     return true;
   }
   if (retryWarranted) {
@@ -191,19 +171,10 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     if (retryProcessor != nullptr) {
       AOTEffectGraph retryGraph = {};
       AOTEffectPlan retryPlan = {};
-      std::string retryBlocker = {};
-      bool retryLower =
-          AOTEffectDecomposer::Lower({retryProcessor.get()}, &retryGraph, &retryBlocker);
-      bool retryValidate = retryLower && AOTEffectDecomposer::ValidateForFusion(retryGraph);
-      bool retryDecompose = retryValidate && AOTEffectDecomposer::Decompose(retryGraph, &retryPlan);
-      bool retryCanExecute = retryDecompose && AOTPlanExecutor::CanRoute(retryGraph, retryPlan);
-      if (retryDecompose && retryCanExecute && !retryPlan.passes.empty()) {
-        auto task = makeChainTask(retryGraph, retryPlan, &drawOp);
-        if (task != nullptr) {
-          addRenderTask(std::move(task));
-          addGenerateMipmapsTask(renderTarget->asTextureProxy());
-          return true;
-        }
+      if (AOTEffectDecomposer::Lower({retryProcessor.get()}, &retryGraph) &&
+          AOTEffectDecomposer::Decompose(retryGraph, &retryPlan) &&
+          submitPlanTask(retryGraph, retryPlan, &drawOp)) {
+        return true;
       }
       // The chain route cannot serve the materialized tree either: drop the retry result. The
       // plain draw op below still carries the fill's ORIGINAL processor — the reference

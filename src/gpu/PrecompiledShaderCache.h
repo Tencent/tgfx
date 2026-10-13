@@ -173,13 +173,11 @@ struct OffscreenFillStats {
   uint64_t calls = 0;
   uint64_t coordOffsetNonZero = 0;
   uint64_t lowerSucceeded = 0;
-  uint64_t validateSucceeded = 0;
   uint64_t decomposeSucceeded = 0;
   uint64_t canExecute = 0;
   uint64_t pointwiseChainPlans = 0;
   uint64_t pointwiseGraphPlans = 0;
   uint64_t pointwiseTailPlans = 0;
-  uint64_t multiPassPlans = 0;
   uint64_t precompiledPrograms = 0;
   uint64_t programBuilderPrograms = 0;
   uint64_t precompiledCanExecute = 0;
@@ -221,7 +219,7 @@ struct AOTDrawStats {
   // recordDecomposeRejection() only when diagnostic recording is enabled, so a draw that
   // silently fell back to the plain route carries an observable "why" instead of nothing.
   // FusablePointwise never appears here: that outcome means the route was not attempted.
-  std::array<uint64_t, 6> decomposeRejections = {};
+  std::array<uint64_t, 5> decomposeRejections = {};
 };
 
 /// Runtime cache that loads precompiled shader bundles and provides O(1) lookup by ShaderKey hash.
@@ -447,8 +445,7 @@ class PrecompiledShaderCache {
   OffscreenFillKey recordOffscreenFillAnalysis(OffscreenFillSource source, bool coordOffsetNonZero,
                                                const std::string& topLevelProcessor,
                                                bool lowerSucceeded, const std::string& lowerBlocker,
-                                               bool validateSucceeded, bool decomposeSucceeded,
-                                               bool canExecute,
+                                               bool decomposeSucceeded,
                                                const std::vector<AOTKernelKind>& kernels);
   void recordOffscreenFillProgram(OffscreenFillKey key, ProgramOrigin origin);
   OffscreenFillStats offscreenFillStats() const;

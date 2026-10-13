@@ -45,11 +45,6 @@ bool IsBuildablePermutation(const PrecompiledShaderInfo& info, uint32_t vertInde
 bool PermutationCompilesForBackend(const PrecompiledShaderInfo& info, uint32_t vertIndex,
                                    uint32_t fragIndex, const std::string& profileTag) {
   USE(vertIndex);
-  // RECT variants declare sampler2DRect, whose SPIR-V (OpTypeImage Dim=Rect) is invalid under
-  // Vulkan semantics; they compile under OpenGL semantics and only enter the OpenGL bundle.
-  if (info.fragDomain.valueOf(fragIndex, "TEXTURE_KIND") == 1 && profileTag != "opengl") {
-    return false;
-  }
   // FBF variants (HAS_XP == 2) read the framebuffer through subpassInput, which WGSL cannot
   // express. The opengles bundle keeps them in the GL_EXT_shader_framebuffer_fetch dialect:
   // devices with that extension take the fetch route (see UsesRuntimeFrameBufferFetch in

@@ -134,7 +134,7 @@ std::string ProgramInfo::getMangledSuffix(const Processor* processor) const {
   return "_P" + std::to_string(processorIndex);
 }
 
-static std::string DiagnosticProgramKey(const BytesKey& key) {
+std::string ProgramInfo::FormatDiagnosticKey(const BytesKey& key) {
   std::stringstream stream;
   stream << key.size() << ":" << std::hex << std::setfill('0');
   for (size_t index = 0; index < key.size(); ++index) {
@@ -216,7 +216,7 @@ std::shared_ptr<Program> ProgramInfo::getProgram(ProgramLookupMode mode) const {
     }
     if (programCreated && shaderCache->diagnosticRecordingEnabled() &&
         program->getProvenance().program != ProgramOrigin::PrecompiledArtifact) {
-      shaderCache->recordJITProgram({DiagnosticProgramKey(programKey)});
+      shaderCache->recordJITProgram({FormatDiagnosticKey(programKey)});
     }
   }
   if (precompiledOnly && program->getProvenance().program != ProgramOrigin::PrecompiledArtifact) {

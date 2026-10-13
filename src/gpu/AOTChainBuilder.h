@@ -53,13 +53,13 @@ class AOTChainBuilder {
                                   AOTResourceProfile* profile);
 
   /**
-   * Rebuilds the color processor of one plan pass: a fused chain/perlin kernel for the matching
-   * single-pass kernels, or the pass's source node followed by its pointwise tail slots when
-   * sourceOverride is nullptr. Returns nullptr when the pass shape cannot be rebuilt.
+   * Rebuilds the color processor of a plan's single pass: the fused chain/graph processor without
+   * draw coverage, or the tail, YUV or perlin processor with the pass's operators folded into its
+   * slot records. Returns nullptr when the pass shape cannot be rebuilt.
    */
-  static PlacementPtr<FragmentProcessor> BuildFPForPass(
-      BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
-      PlacementPtr<FragmentProcessor> sourceOverride);
+  static PlacementPtr<FragmentProcessor> BuildFPForPass(BlockAllocator* allocator,
+                                                        const AOTEffectGraph& graph,
+                                                        const AOTPassDescriptor& pass);
 
   /**
    * Flattens a single-pass PointwiseChain/PointwiseGraph plan into the shared processor, or returns
@@ -78,14 +78,5 @@ class AOTChainBuilder {
       BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
       const std::vector<const FragmentProcessor*>& coverageFPs = {},
       bool coverageLeafFromUVCoord = false);
-
-  /**
-   * Rebuilds the fused perlin-source processor of a single-pass PerlinNoiseFill plan: the noise
-   * source plus up to three folded pointwise/const/blend operator slots. Returns nullptr when the
-   * pass is not a valid PerlinNoiseFill pass.
-   */
-  static PlacementPtr<FragmentProcessor> BuildPerlinNoiseFP(BlockAllocator* allocator,
-                                                            const AOTEffectGraph& graph,
-                                                            const AOTPassDescriptor& pass);
 };
 }  // namespace tgfx

@@ -269,14 +269,6 @@ AOTDrawStats PrecompiledShaderCache::drawStats() const {
 
 static const char* OffscreenKernelName(AOTKernelKind kernel) {
   switch (kernel) {
-    case AOTKernelKind::TextureFill:
-      return "TextureFill";
-    case AOTKernelKind::TextureColorMatrix:
-      return "TextureColorMatrix";
-    case AOTKernelKind::TexturedColorMatrix:
-      return "TexturedColorMatrix";
-    case AOTKernelKind::TexturedLuma:
-      return "TexturedLuma";
     case AOTKernelKind::PointwiseChain:
       return "PointwiseChain";
     case AOTKernelKind::PointwiseGraph:
@@ -293,8 +285,10 @@ static const char* OffscreenKernelName(AOTKernelKind kernel) {
 
 OffscreenFillKey PrecompiledShaderCache::recordOffscreenFillAnalysis(
     OffscreenFillSource source, bool coordOffsetNonZero, const std::string& topLevelProcessor,
-    bool lowerSucceeded, const std::string& lowerBlocker, bool validateSucceeded,
-    bool decomposeSucceeded, bool canExecute, const std::vector<AOTKernelKind>& kernels) {
+    bool lowerSucceeded, const std::string& lowerBlocker, bool decomposeSucceeded,
+    const std::vector<AOTKernelKind>& kernels) {
+  // Decompose only returns executable plans, so a decomposed fill is an executable one.
+  const bool canExecute = decomposeSucceeded;
   if (statsRecordingPaused() || !diagnosticRecordingEnabled()) {
     return InvalidOffscreenFillKey;
   }
@@ -320,22 +314,17 @@ OffscreenFillKey PrecompiledShaderCache::recordOffscreenFillAnalysis(
     stats.lowerBlockers[lowerBlocker.empty() ? "Unknown" : lowerBlocker]++;
   } else {
     stats.lowerSucceeded++;
-    if (validateSucceeded) {
-      stats.validateSucceeded++;
-      if (decomposeSucceeded) {
-        stats.decomposeSucceeded++;
-        if (kernels.size() > 1) {
-          stats.multiPassPlans++;
-        } else if (kernels.size() == 1 && kernels[0] == AOTKernelKind::PointwiseChain) {
-          stats.pointwiseChainPlans++;
-        } else if (kernels.size() == 1 && kernels[0] == AOTKernelKind::PointwiseGraph) {
-          stats.pointwiseGraphPlans++;
-        } else if (kernels.size() == 1 && kernels[0] == AOTKernelKind::PointwiseTail) {
-          stats.pointwiseTailPlans++;
-        }
-        if (canExecute) {
-          stats.canExecute++;
-        }
+    if (decomposeSucceeded) {
+      stats.decomposeSucceeded++;
+      if (kernels.size() == 1 && kernels[0] == AOTKernelKind::PointwiseChain) {
+        stats.pointwiseChainPlans++;
+      } else if (kernels.size() == 1 && kernels[0] == AOTKernelKind::PointwiseGraph) {
+        stats.pointwiseGraphPlans++;
+      } else if (kernels.size() == 1 && kernels[0] == AOTKernelKind::PointwiseTail) {
+        stats.pointwiseTailPlans++;
+      }
+      if (canExecute) {
+        stats.canExecute++;
       }
     }
   }
@@ -394,13 +383,11 @@ OffscreenFillStats PrecompiledShaderCache::offscreenFillStats() const {
     total.calls += stats.calls;
     total.coordOffsetNonZero += stats.coordOffsetNonZero;
     total.lowerSucceeded += stats.lowerSucceeded;
-    total.validateSucceeded += stats.validateSucceeded;
     total.decomposeSucceeded += stats.decomposeSucceeded;
     total.canExecute += stats.canExecute;
     total.pointwiseChainPlans += stats.pointwiseChainPlans;
     total.pointwiseGraphPlans += stats.pointwiseGraphPlans;
     total.pointwiseTailPlans += stats.pointwiseTailPlans;
-    total.multiPassPlans += stats.multiPassPlans;
     total.precompiledPrograms += stats.precompiledPrograms;
     total.programBuilderPrograms += stats.programBuilderPrograms;
     total.precompiledCanExecute += stats.precompiledCanExecute;

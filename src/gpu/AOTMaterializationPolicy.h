@@ -157,32 +157,10 @@ class AOTMaterializationPolicy {
                                           MaterializationConsumer consumer, size_t childIndex);
 
   /**
-   * Computes the pixel geometry of one materialization edge covering drawBounds grown by apronRadius
-   * on every side. A caller that renders several passes over the same area must call this once and
-   * reuse the result for every pass and for the consumer's sampling matrix, so the capture area and
-   * the coordinate mapping can never disagree.
-   *
-   * @param drawBounds   The area the materialized subtree paints, before the apron.
-   * @param apronRadius  Extra ring of pixels to capture, from MaterializationDecision.
-   * @return             The geometry; isEmpty() is true when the snapped area is degenerate.
-   */
-  static MaterializedGeometry PrepareGeometry(const Rect& drawBounds, float apronRadius);
-
-  /**
-   * Allocates one offscreen target for the given geometry. Returns a target whose renderTarget is
-   * null when the geometry is degenerate or the allocation fails.
-   *
-   * This deliberately records no draw metrics. The two materialization routes count an edge at
-   * different moments: the decomposition executor only counts one once its whole plan survives
-   * strict preparation, while an inline flatten has already queued its render task and counts on
-   * creation. Each caller reports its own edge.
-   */
-  static MaterializedTarget AllocateTarget(Context* context, const MaterializedGeometry& geometry);
-
-  /**
-   * Convenience for the single-edge case: computes the geometry and allocates its target in one
-   * step. A caller issuing several passes over one area must use PrepareGeometry plus AllocateTarget
-   * instead, so all passes share one geometry.
+   * Allocates the offscreen target of one materialization edge covering drawBounds grown by
+   * apronRadius on every side. Returns a target whose renderTarget is null when the snapped area is
+   * degenerate or the allocation fails. This records no draw metrics: the inline flatten counts its
+   * edge when it queues the render task.
    */
   static MaterializedTarget PrepareTarget(Context* context, const Rect& drawBounds,
                                           float apronRadius);

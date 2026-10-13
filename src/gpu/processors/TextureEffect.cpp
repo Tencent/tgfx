@@ -71,18 +71,13 @@ bool TextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNode
     // pending leaf is required to be single-plane: an ImageBuffer-backed YUV source reports its
     // YUV-ness at proxy creation and is refused here; a generator-backed source is trusted to
     // decode single-plane (every built-in codec does), with the chain matcher's multi-sampler
-    // rejection as the backstop. The uploaded view always matches the proxy's own size (the
-    // task builds it from the same buffer dimensions), so the size branch of needSubset()
-    // cannot fire here and only the explicit subset can matter. A view-less proxy with no
+    // rejection as the backstop. A view-less proxy with no
     // pending upload never materializes (e.g. a generated mask whose rasterization failed); the
     // chain route must refuse it so the runtime route's zero-stub behavior stays authoritative.
     if (!hasPendingSinglePlaneUpload()) {
       return false;
     }
     parameters.isYUV = false;
-    parameters.hasSubset =
-        subset.has_value() &&
-        !subset->contains(Rect::MakeWH(textureProxy->width(), textureProxy->height()));
   } else {
     // Format gate (): the runtime applies Swizzle::ForRead to every texture lookup
     // (GRAY_8 -> .rrra, RG_88 -> .rgrg), which the chain's plain leaf does not carry — a gray
@@ -96,7 +91,6 @@ bool TextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNode
       }
     }
     parameters.isYUV = textureView->isYUV();
-    parameters.hasSubset = needSubset();
   }
   return builder->addTextureSource(input, parameters, output);
 }

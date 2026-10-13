@@ -29,26 +29,25 @@ class FragmentProcessor;
 class ProgramInfo;
 
 enum class AOTKernelKind {
-  TextureFill = 0,
-  TextureColorMatrix = 1,
-  TexturedColorMatrix = 2,
-  TexturedLuma = 3,
   // A single fused pass that evaluates a pointwise DAG (texture/const-color leaves combined by
   // color-matrix, luma and blend ops) via a runtime opcode chain. Produced by the pointwise-DAG
   // planner; its kernel artifact is PointwiseChainShader.
-  PointwiseChain = 4,
-  PointwiseTail = 5,
+  PointwiseChain,
+  // A plain or device-space texture source followed by bounded pointwise operator slots, matching
+  // PointwiseTailShader. Produced by DecomposeLinearPointwiseTail for linear chains the DAG
+  // planner refuses (device-space sources, chains over the chain kernel's budgets).
+  PointwiseTail,
   // A procedural-noise source (PerlinNoiseFragmentProcessor) optionally followed by up to three
   // folded pointwise/const/blend operator slots, matching PerlinNoiseFillShader. Produced by
   // DecomposePerlinNoiseChain; the plan is always a single pass — shapes beyond the slot budget
   // are rejected rather than split.
-  PerlinNoiseFill = 6,
+  PerlinNoiseFill,
   // A YUV video source (TextureEffect over an I420/NV12 proxy) optionally followed by up to
   // three bounded pointwise operator slots, matching YUVTextureFillShader's color-grade tail.
   // Produced by DecomposeYUVChain; single pass, over-budget shapes are rejected.
-  YUVTextureFill = 7,
+  YUVTextureFill,
   // Extended-resource DAGs use the independent PointwiseGraphShader profiles.
-  PointwiseGraph = 8,
+  PointwiseGraph,
 };
 
 inline bool IsAOTPointwiseDAGKernel(AOTKernelKind kernel) {
@@ -56,11 +55,9 @@ inline bool IsAOTPointwiseDAGKernel(AOTKernelKind kernel) {
 }
 
 struct AOTPassDescriptor {
-  AOTKernelKind kernel = AOTKernelKind::TextureFill;
+  AOTKernelKind kernel = AOTKernelKind::PointwiseChain;
   std::vector<AOTNodeID> nodes = {};
-  std::vector<uint32_t> dependencies = {};
   AOTNodeID output = AOTNodeID::Invalid();
-  bool materializesOutput = false;
   AOTResourceProfile resourceProfile = AOTResourceProfile::Automatic;
 };
 
@@ -78,20 +75,17 @@ struct AOTEffectPlan {
 enum class AOTDecomposeOutcome {
   /// The axis has no fragment processors (e.g. an empty coverage chain). Nothing to decompose.
   Trivial,
-  /// Lower + ValidateForFusion + Decompose succeed and AOTPlanExecutor::CanRoute accepts the plan:
-  /// a production route submits it (matching the precompiled artifact is a separate step).
+  /// Lower + Decompose succeed (so AOTPlanExecutor::CanExecute accepts the plan): a production
+  /// route submits it (matching the precompiled artifact is a separate step).
   FusablePointwise,
   /// Some fragment processor in the tree has no AOT lowering yet. blockingProcessor names the first
   /// one reported by the actual lowering call chain — the actionable "add lowerToAOT for X" signal.
   BlockedByLowering,
-  /// The chain lowers but fusing it would change pixels (ValidateForFusion rejected it).
-  BlockedByValidation,
-  /// The chain lowers and is fusion-safe, but the current Decompose rules do not yet cover its
+  /// The chain lowers, but the current Decompose rules do not yet cover its
   /// shape — the "grow the decomposer" signal.
   UnsupportedShape,
-  /// A plan exists, but no production route submits it: AOTPlanExecutor::CanRoute refuses it
-  /// (a multi-pass plan, or a pass the executor cannot run), or the draw carries coverage the
-  /// attempted route cannot apply.
+  /// The color chain plans, but the attempted route still refused the draw: it carries coverage
+  /// that route cannot apply. Recorded by the on-screen color-only route only.
   NotRoutable,
 };
 
@@ -126,13 +120,8 @@ enum class AOTFoldRouteOutcome {
   FoldBlockedByXP,
   /// Some processor in the folded chain has no AOT lowering yet.
   BlockedByLowering,
-  /// Folding the coverage would change pixels (ValidateForFusion rejected the folded graph).
-  BlockedByValidation,
-  /// The folded chain lowers and is fusion-safe, but no planner rule covers its shape.
+  /// The folded chain lowers, but no planner rule covers its shape.
   UnsupportedShape,
-  /// A plan exists but AOTPlanExecutor::CanRoute refuses it (e.g. a multi-pass plan, or a pass over
-  /// the kernel budgets).
-  NotExecutable,
   /// The plan is executable, but the fused kernels' matchers do not support this draw's GP.
   GPIncompatible,
   /// The draw would decompose, execute, and match if the route were enabled.
@@ -154,19 +143,9 @@ class AOTEffectDecomposer {
   static bool Decompose(const AOTEffectGraph& graph, AOTEffectPlan* plan);
 
   /**
-   * Validates that the effect graph is safe to fuse into a single Pointwise chain, enforcing the
-   * semantic guards that the plain node checks do not cover (review #4). Returns false — forcing a
-   * fallback to the plain route — when fusing would change pixels, specifically a ColorMatrix whose
-   * alpha row carries a non-zero constant bias, which can affect transparent black (design §6.3):
-   * fusing it into the chain would drop the source-alpha constraint. Conservative by design: when
-   * the required semantic information is unavailable, it rejects.
-   */
-  static bool ValidateForFusion(const AOTEffectGraph& graph);
-
-  /**
    * Statically classifies whether the color and coverage effect axes of the given draw can be
-   * reduced onto the existing AOT kernel basis. Pure analysis: it runs Lower / ValidateForFusion /
-   * Decompose but never renders, allocates GPU resources, or mutates the ProgramInfo. Used by the
+   * reduced onto the existing AOT kernel basis. Pure analysis: it runs Lower / Decompose
+   * but never renders, allocates GPU resources, or mutates the ProgramInfo. Used by the
    * offline decomposition-coverage audit to quantify recovery potential per mechanism and to name
    * the specific fragment processors whose AOT lowering is still missing.
    *
@@ -186,7 +165,7 @@ class AOTEffectDecomposer {
   /**
    * Statically answers whether the given draw (assumed to have missed every matcher rule) would
    * become matchable if its coverage FPs were folded into the color chain at program-creation
-   * time. Runs Lower / ValidateForFusion / Decompose / CanRoute on the concatenated
+   * time. Runs Lower / Decompose on the concatenated
    * color+coverage processor list and checks the GP against the fused kernels' supported set.
    * Pure analysis: no rendering, no GPU allocation, no ProgramInfo mutation.
    *

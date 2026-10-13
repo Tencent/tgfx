@@ -190,20 +190,19 @@ static std::optional<CoverageKind> ClassifyCoverageFP(const ProgramInfo* program
   return std::nullopt;
 }
 
-// Direct analytic clip coverage is the sole coverage FP, not a composed child. Keeping this test
-// separate from ClassifyCoverageFP prevents Compose(DeviceSpaceTextureEffect, RectEffect) from
-// silently losing its rect component by being treated as a device mask.
+// Direct analytic clip coverage: the sole coverage FP is an AA rect or a leaf rrect.
 static bool HasDirectAnalyticClipCoverage(const ProgramInfo* programInfo) {
-  auto numColorFP = programInfo->numColorFragmentProcessors();
-  if (programInfo->numFragmentProcessors() != numColorFP + 1) {
-    return false;
-  }
-  auto coverageFP = programInfo->getFragmentProcessor(numColorFP);
-  auto coverageName = coverageFP->name();
-  if (coverageName == "RectEffect") {
-    return IsFoldableAARectEffect(coverageFP);
-  }
-  return coverageName == "RRectEffect" && coverageFP->numChildProcessors() == 0;
+  auto coverage = ClassifyCoverageFP(programInfo);
+  return coverage == CoverageKind::AARect || coverage == CoverageKind::RRect;
+}
+
+// Kernels whose color comes from the GP Color uniform: a color FP would be silently dropped, so
+// the draw may carry no FP at all or only a direct analytic clip evaluated from the runtime clip
+// contract uniforms.
+static bool HasNoProcessorsOrDirectClip(const ProgramInfo* programInfo) {
+  return programInfo->numFragmentProcessors() == 0 ||
+         (programInfo->numColorFragmentProcessors() == 0 &&
+          HasDirectAnalyticClipCoverage(programInfo));
 }
 
 // Analytic clip coverage (AA rect or rrect) changes only fragment math, whereas a device-space
@@ -217,14 +216,53 @@ static std::optional<int> SharedDeviceMaskValue(const ProgramInfo* programInfo) 
   return *coverage == CoverageKind::DeviceMask ? 1 : 0;
 }
 
-static int GetGPCoverage(const GeometryProcessor* gp);
+static int GetGPType(const GeometryProcessor* gp) {
+  auto name = gp->name();
+  if (name == "DefaultGeometryProcessor") {
+    return 0;
+  }
+  if (name == "QuadPerEdgeAAGeometryProcessor") {
+    return 1;
+  }
+  return -1;
+}
 
-// True when the TextureEffect's coordinate transform carries a projective matrix. The plain
-// precompiled texture templates transform coordinates affinely ((CoordTransformMatrix * vec3(pos,
-// 1)).xy with no w division), so a projective source must stay off them and ride the runtime
-// route, which emits a perspective-divided coordinate (emitPerspTextCoord).
-static bool TextureEffectIsProjective(const TextureEffect* te) {
-  return te->hasPerspective();
+// Returns 1 if the geometry processor supplies a per-vertex AA coverage attribute (inCoverage), 0
+// otherwise. Coverage is orthogonal to the GP type: both DefaultGP and QuadPerEdgeAAGP emit it only
+// when their AA type is Coverage.
+static int GetGPCoverage(const GeometryProcessor* gp) {
+  auto name = gp->name();
+  if (name == "DefaultGeometryProcessor") {
+    return static_cast<const DefaultGeometryProcessor*>(gp)->getAAType() == AAType::Coverage ? 1
+                                                                                             : 0;
+  }
+  if (name == "QuadPerEdgeAAGeometryProcessor") {
+    return static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp)->getAAType() == AAType::Coverage
+               ? 1
+               : 0;
+  }
+  return 0;
+}
+
+// The position-only rect GP forms the texture and noise fill kernels share: a DefaultGP, or a
+// QuadPerEdgeAA GP whose coordinate comes from aPosition (a common color, a uv matrix, no
+// per-quad subset), since those precompiled vertex stages declare aPosition plus the optional AA
+// coverage attribute only. *coverage receives that attribute's presence.
+static bool IsPositionOnlyRectGP(const GeometryProcessor* gp, int* coverage) {
+  int gpType = GetGPType(gp);
+  if (gpType < 0) {
+    return false;
+  }
+  if (gpType == 1) {
+    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+    if (!quadGP->hasCommonColor() || !quadGP->hasUVMatrix() || quadGP->getHasSubset()) {
+      return false;
+    }
+  }
+  if (coverage != nullptr) {
+    *coverage = GetGPCoverage(gp);
+  }
+  return true;
 }
 
 static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramInfo* programInfo) {
@@ -264,8 +302,8 @@ static std::optional<PermutationMatchResult> TryMatchTextureFill(const ProgramIn
     return std::nullopt;
   }
   // The precompiled vertex template transforms the coordinate affinely; a projective source must
-  // stay off this artifact (see TextureEffectIsProjective).
-  if (TextureEffectIsProjective(te)) {
+  // stay off this artifact (the plain templates transform coordinates affinely, with no w division).
+  if (te->hasPerspective()) {
     return std::nullopt;
   }
   // alphaOnly / hasRGBAAA are runtime uniforms (AlphaOnly / HasRgbaaa) written by
@@ -294,30 +332,16 @@ static bool TiledModeSupported(int mode) {
   return mode == 0 || mode == 1 || mode == 2 || mode == 3 || mode == 6 || mode == 7 || mode == 8;
 }
 
-// The tiled fill kernel additionally handles RepeatLinearNone(3) — shares mode 2's coordinate, the
-// linear vs nearest difference being the sampler filter — and the mipmap-repeat modes 4/5 via an
-// inline 4-tap seam blend. So it accepts every mode.
+// The tiled fill kernel additionally handles the mipmap-repeat modes 4/5 via an inline 4-tap seam
+// blend. So it accepts every mode.
 static bool TiledFillModeSupported(int mode) {
-  return TiledModeSupported(mode) || mode == 3 || mode == 4 || mode == 5;
+  return TiledModeSupported(mode) || mode == 4 || mode == 5;
 }
 
 static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
     const ProgramInfo* programInfo) {
-  auto gp = programInfo->getGeometryProcessor();
   int hasCoverage = 0;
-  if (gp->name() == "DefaultGeometryProcessor") {
-    hasCoverage =
-        static_cast<const DefaultGeometryProcessor*>(gp)->getAAType() == AAType::Coverage ? 1 : 0;
-  } else if (gp->name() == "QuadPerEdgeAAGeometryProcessor") {
-    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-    // The precompiled quad vert declares aPosition plus an optional AA coverage attribute; it has no
-    // uvCoord/color/subset attributes. hasUVMatrix() means the coord comes from aPosition. Per-vertex
-    // AA coverage is now supported via the HAS_COVERAGE dimension, so it is no longer rejected.
-    if (!quadGP->hasCommonColor() || !quadGP->hasUVMatrix() || quadGP->getHasSubset()) {
-      return std::nullopt;
-    }
-    hasCoverage = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
-  } else {
+  if (!IsPositionOnlyRectGP(programInfo->getGeometryProcessor(), &hasCoverage)) {
     return std::nullopt;
   }
   if (programInfo->numFragmentProcessors() != 1) {
@@ -419,9 +443,7 @@ static std::optional<PermutationMatchResult> TryMatchSolidColorFill(
   // processor would be silently dropped and must reject. The only accepted FP is one direct
   // analytic clip coverage FP (AA rect or rrect), which this shader evaluates from the runtime
   // clip contract uniforms.
-  if (programInfo->numFragmentProcessors() != 0 &&
-      (programInfo->numColorFragmentProcessors() != 0 ||
-       !HasDirectAnalyticClipCoverage(programInfo))) {
+  if (!HasNoProcessorsOrDirectClip(programInfo)) {
     return std::nullopt;
   }
   auto* dgp = static_cast<const DefaultGeometryProcessor*>(gp);
@@ -567,20 +589,11 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   // runtime route's emitTransformedPoint divides by w when the transform is projective. A
   // projective source carrying a GP subset would clamp the texture coordinate to wrong bounds
   // (one edge-line class of A/B divergence), so it must stay on the runtime route — the same
-  // conservative policy TextureEffectIsProjective applies in TryMatchTextureFill. Projective
+  // conservative policy TryMatchTextureFill applies to projective sources. Projective
   // draws without a GP subset are fine: TransformedCoords_0 is a vec3 varying that the fragment
   // shader divides.
   if (inputs.hasSubset && (quadGP->getHasUVPerspective() || te->hasPerspective())) {
     return std::nullopt;
-  }
-  // TGFX_QTF_DEBUG prints the match inputs so A/B runs can see which QuadTextureFill variants
-  // each draw actually selects. Diagnostic only.
-  if (std::getenv("TGFX_QTF_DEBUG") != nullptr) {
-    std::printf(
-        "[QTF] hasUVCoord=%d hasSubset=%d localMask=%d xp=%d uvPersp=%d tePersp=%d "
-        "teSubset=%d\n",
-        inputs.hasUVCoord, inputs.hasSubset, inputs.hasLocalMask, inputs.xpType,
-        quadGP->getHasUVPerspective(), te->hasPerspective(), te->hasSubset());
   }
   inputs.hasLocalMask = hasLocalMask;
   inputs.xpType = xpType;
@@ -592,8 +605,6 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
   auto fragIndex = QuadTextureFillShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"QuadTextureFillShader", vertIndex, fragIndex};
 }
-
-static int GetGPCoverage(const GeometryProcessor* gp);
 
 static std::optional<PermutationMatchResult> TryMatchDeviceSpaceTexture(
     const ProgramInfo* programInfo) {
@@ -628,46 +639,11 @@ static std::optional<PermutationMatchResult> TryMatchDeviceSpaceTexture(
   return PermutationMatchResult{"DeviceSpaceTextureShader", vertIndex, fragIndex};
 }
 
-static int GetGPType(const GeometryProcessor* gp) {
-  auto name = gp->name();
-  if (name == "DefaultGeometryProcessor") {
-    return 0;
-  }
-  if (name == "QuadPerEdgeAAGeometryProcessor") {
-    return 1;
-  }
-  return -1;
-}
-
-// Returns 1 if the geometry processor supplies a per-vertex AA coverage attribute (inCoverage), 0
-// otherwise. Coverage is orthogonal to the GP type: both DefaultGP and QuadPerEdgeAAGP emit it only
-// when their AA type is Coverage.
-static int GetGPCoverage(const GeometryProcessor* gp) {
-  auto name = gp->name();
-  if (name == "DefaultGeometryProcessor") {
-    return static_cast<const DefaultGeometryProcessor*>(gp)->getAAType() == AAType::Coverage ? 1
-                                                                                             : 0;
-  }
-  if (name == "QuadPerEdgeAAGeometryProcessor") {
-    return static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp)->getAAType() == AAType::Coverage
-               ? 1
-               : 0;
-  }
-  return 0;
-}
-
 static std::optional<PermutationMatchResult> TryMatchPointwiseTail(const ProgramInfo* programInfo) {
-  auto gp = programInfo->getGeometryProcessor();
-  int gpType = GetGPType(gp);
-  if (gpType < 0 || programInfo->numColorFragmentProcessors() != 1 ||
-      programInfo->numFragmentProcessors() != 1) {
+  int hasCoverage = 0;
+  if (!IsPositionOnlyRectGP(programInfo->getGeometryProcessor(), &hasCoverage) ||
+      programInfo->numColorFragmentProcessors() != 1 || programInfo->numFragmentProcessors() != 1) {
     return std::nullopt;
-  }
-  if (gpType == 1) {
-    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-    if (!quadGP->hasCommonColor() || !quadGP->hasUVMatrix() || quadGP->getHasSubset()) {
-      return std::nullopt;
-    }
   }
   int xpType = GetXPType(programInfo);
   if (xpType < 0) {
@@ -700,7 +676,6 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseTail(const Program
     }
   }
 
-  int hasCoverage = GetGPCoverage(gp);
   PointwiseTailInputs inputs;
   inputs.hasCoverage = hasCoverage != 0;
   inputs.xpType = xpType;
@@ -718,7 +693,7 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseTail(const Program
 // (sampler/varying layout), and that every leaf is a plain sampled texture.
 static std::optional<PermutationMatchResult> TryMatchPointwiseDAG(const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
-  // GP profiles: 0 covers the rect GPs (Default/Quad), 2 Mesh (whose vertex buffers follow the
+  // GP profiles: 0 Default, 1 Quad, 2 Mesh (whose vertex buffers follow the
   // chain's attribute order), 3 the sampler-free AtlasText twin, 4 the ellipse layout.
   int gpKind = -1;
   if (gp->name() == "DefaultGeometryProcessor") {
@@ -871,8 +846,8 @@ static std::optional<PermutationMatchResult> TryMatchTextureColorMatrix(
     return std::nullopt;
   }
   // The plain vertex template transforms coordinates affinely; a projective source must ride the
-  // runtime route (see TextureEffectIsProjective).
-  if (TextureEffectIsProjective(te)) {
+  // runtime route (the plain templates transform coordinates affinely, with no w division).
+  if (te->hasPerspective()) {
     return std::nullopt;
   }
   TextureColorMatrixInputs inputs;
@@ -932,71 +907,6 @@ static std::optional<PermutationMatchResult> TryMatchAtlasTextFill(const Program
 // Matches a single pointwise operator applied straight to the input color, with no texture source:
 // Luma, AlphaThreshold or ColorSpaceXform. These were three separate shaders whose skeletons were
 // identical; the operator is now the OpType runtime uniform of PointwiseDirectShader.
-static std::optional<PermutationMatchResult> TryMatchPointwiseDirect(
-    const ProgramInfo* programInfo) {
-  auto gp = programInfo->getGeometryProcessor();
-  int gpType = GetGPType(gp);
-  if (gpType < 0 || programInfo->numFragmentProcessors() != 1) {
-    return std::nullopt;
-  }
-  // The operator must be the COLOR processor: the same FP as a coverage processor is a different
-  // draw (it modulates the draw coverage instead of replacing the paint color), and the Direct
-  // template applies applyPointwiseOp to the paint color only.
-  if (programInfo->numColorFragmentProcessors() != 1) {
-    return std::nullopt;
-  }
-  if (gpType == 1) {
-    // The Direct vertex template reads only position (+ optional coverage) and the fragment reads
-    // the Color uniform: a quad without a common color carries per-vertex colors the template
-    // cannot express.
-    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-    if (!quadGP->hasCommonColor()) {
-      return std::nullopt;
-    }
-  }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
-    return std::nullopt;
-  }
-  auto fp = programInfo->getFragmentProcessor(0);
-  auto name = fp->name();
-  if (name != "LumaFragmentProcessor" && name != "AlphaStepFragmentProcessor" &&
-      name != "ColorSpaceXformEffect") {
-    return std::nullopt;
-  }
-  if (name == "ColorSpaceXformEffect") {
-    auto* effect = static_cast<const ColorSpaceXformEffect*>(fp);
-    auto* xform = effect->colorXform();
-    if (xform == nullptr) {
-      return std::nullopt;
-    }
-    // The pipeline steps are runtime uniforms (CSFlags), so any flag combination hits the same
-    // variant. Only the transfer-function types must be in the range the shared operator encodes.
-    if (xform->flags.linearize &&
-        TFTypeToIndex(gfx::skcms_TransferFunction_getType(
-            reinterpret_cast<const gfx::skcms_TransferFunction*>(&xform->srcTransferFunction))) <
-            0) {
-      return std::nullopt;
-    }
-    if (xform->flags.encode && TFTypeToIndex(gfx::skcms_TransferFunction_getType(
-                                   reinterpret_cast<const gfx::skcms_TransferFunction*>(
-                                       &xform->dstTransferFunctionInverse))) < 0) {
-      return std::nullopt;
-    }
-  }
-  int hasCoverage = GetGPCoverage(gp);
-  PointwiseDirectInputs inputs;
-  inputs.hasCoverage = hasCoverage != 0;
-  inputs.xpType = xpType;
-  auto composed = ComposePointwiseDirect(inputs);
-  if (!composed) {
-    return std::nullopt;
-  }
-  auto vertIndex = PointwiseDirectShader::VD::domain().encode(composed->vertValues);
-  auto fragIndex = PointwiseDirectShader::FD::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"PointwiseDirectShader", vertIndex, fragIndex};
-}
-
 // Returns true if fp is one of the four pointwise operators that share the runtime OpType uniform
 // (ColorMatrix / Luma / AlphaThreshold / ColorSpaceXform). For ColorSpaceXform the transfer-function
 // type must be in the supported 0-3 range; the pipeline flags themselves are runtime uniforms.
@@ -1030,24 +940,54 @@ static bool IsSupportedPointwiseOp(const FragmentProcessor* fp) {
   return true;
 }
 
-static std::optional<PermutationMatchResult> TryMatchComposedTexture(
+static std::optional<PermutationMatchResult> TryMatchPointwiseDirect(
     const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
-  int hasCoverage = 0;
-  if (gp->name() == "DefaultGeometryProcessor") {
-    hasCoverage =
-        static_cast<const DefaultGeometryProcessor*>(gp)->getAAType() == AAType::Coverage ? 1 : 0;
-  } else if (gp->name() == "QuadPerEdgeAAGeometryProcessor") {
+  int gpType = GetGPType(gp);
+  if (gpType < 0 || programInfo->numFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  // The operator must be the COLOR processor: the same FP as a coverage processor is a different
+  // draw (it modulates the draw coverage instead of replacing the paint color), and the Direct
+  // template applies applyPointwiseOp to the paint color only.
+  if (programInfo->numColorFragmentProcessors() != 1) {
+    return std::nullopt;
+  }
+  if (gpType == 1) {
+    // The Direct vertex template reads only position (+ optional coverage) and the fragment reads
+    // the Color uniform: a quad without a common color carries per-vertex colors the template
+    // cannot express.
     auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-    // The precompiled quad vert declares aPosition alone and derives the texture coordinate from it
-    // via CoordTransformMatrix_0, so reject quads carrying color/uvCoord/subset attributes. Per-
-    // vertex AA coverage is now supported via the HAS_COVERAGE dimension, so it is no longer
-    // rejected.
-    if (!quadGP->hasCommonColor() || !quadGP->hasUVMatrix() || quadGP->getHasSubset()) {
+    if (!quadGP->hasCommonColor()) {
       return std::nullopt;
     }
-    hasCoverage = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
-  } else {
+  }
+  int xpType = GetXPType(programInfo);
+  if (xpType < 0) {
+    return std::nullopt;
+  }
+  // Every shared pointwise operator except ColorMatrix, which has its own direct kernels.
+  auto fp = programInfo->getFragmentProcessor(0);
+  if (fp->name() == "ColorMatrixFragmentProcessor" || !IsSupportedPointwiseOp(fp)) {
+    return std::nullopt;
+  }
+  int hasCoverage = GetGPCoverage(gp);
+  PointwiseDirectInputs inputs;
+  inputs.hasCoverage = hasCoverage != 0;
+  inputs.xpType = xpType;
+  auto composed = ComposePointwiseDirect(inputs);
+  if (!composed) {
+    return std::nullopt;
+  }
+  auto vertIndex = PointwiseDirectShader::VD::domain().encode(composed->vertValues);
+  auto fragIndex = PointwiseDirectShader::FD::domain().encode(composed->fragValues);
+  return PermutationMatchResult{"PointwiseDirectShader", vertIndex, fragIndex};
+}
+
+static std::optional<PermutationMatchResult> TryMatchComposedTexture(
+    const ProgramInfo* programInfo) {
+  int hasCoverage = 0;
+  if (!IsPositionOnlyRectGP(programInfo->getGeometryProcessor(), &hasCoverage)) {
     return std::nullopt;
   }
   int xpType = GetXPType(programInfo);
@@ -1083,8 +1023,8 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
     return std::nullopt;
   }
   // The precompiled vertex template transforms the coordinate affinely; a projective source must
-  // stay off this artifact (see TextureEffectIsProjective).
-  if (TextureEffectIsProjective(te)) {
+  // stay off this artifact (the plain templates transform coordinates affinely, with no w division).
+  if (te->hasPerspective()) {
     return std::nullopt;
   }
 
@@ -1106,6 +1046,35 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
   auto vertIndex = TexturedEffectShader::VD::domain().encode(composed->vertValues);
   auto fragIndex = TexturedEffectShader::D::domain().encode(composed->fragValues);
   return PermutationMatchResult{"TexturedEffectShader", vertIndex, fragIndex};
+}
+
+// The child a blur kernel samples per tap: a plain TextureEffect (inlined texture() call) or a
+// TiledTextureEffect, whose shared tiled_sample.inc tiling is applied per tap. The kernels clamp
+// plain-child taps to the subset (edge stretch), which is only the Clamp tap semantics: a Decal
+// child must return transparent outside its subset — a drop shadow's blurred source is exactly
+// that — so a non-Clamp plain child falls back. Tiled children are limited to the ShaderMode values
+// tiled_sample.inc implements.
+static bool IsServableBlurChild(const FragmentProcessor* childFP) {
+  if (childFP == nullptr || childFP->numTextureSamplers() == 0) {
+    return false;
+  }
+  if (childFP->name() == "TextureEffect") {
+    TileMode modeX = TileMode::Clamp;
+    TileMode modeY = TileMode::Clamp;
+    static_cast<const TextureEffect*>(childFP)->getTileModes(&modeX, &modeY);
+    return modeX == TileMode::Clamp && modeY == TileMode::Clamp;
+  }
+  if (childFP->name() == "TiledTextureEffect") {
+    auto* childTiled = static_cast<const TiledTextureEffect*>(childFP);
+    if (childTiled->hasPerspective()) {
+      return false;
+    }
+    int modeX = 0;
+    int modeY = 0;
+    childTiled->getShaderModes(&modeX, &modeY);
+    return TiledModeSupported(modeX) && TiledModeSupported(modeY);
+  }
+  return false;
 }
 
 static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
@@ -1134,40 +1103,7 @@ static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
   if (blur->numChildProcessors() != 1) {
     return std::nullopt;
   }
-  auto childFP = blur->childProcessor(0);
-  if (childFP == nullptr) {
-    return std::nullopt;
-  }
-  // The blur child is either a plain TextureEffect (inlined texture() call) or a TiledTextureEffect,
-  // in which case the shared tiled_sample.inc tiling is applied per tap (HAS_TILED_CHILD). Tiled
-  // children are limited to the ShaderMode values tiled_sample.inc implements; others fall back.
-  if (childFP->name() == "TextureEffect") {
-    auto* childTE = static_cast<const TextureEffect*>(childFP);
-    if (childTE->numTextureSamplers() == 0) {
-      return std::nullopt;
-    }
-    // The kernel clamps plain-child taps to the subset (edge stretch), which is only the Clamp
-    // tap semantics. A Decal child must return transparent outside its subset — a drop shadow's
-    // blurred source is exactly that, and its edge taps decide the shadow's alpha — so a non-
-    // Clamp plain child falls back to the runtime route.
-    TileMode modeX = TileMode::Clamp;
-    TileMode modeY = TileMode::Clamp;
-    childTE->getTileModes(&modeX, &modeY);
-    if (modeX != TileMode::Clamp || modeY != TileMode::Clamp) {
-      return std::nullopt;
-    }
-  } else if (childFP->name() == "TiledTextureEffect") {
-    auto* childTiled = static_cast<const TiledTextureEffect*>(childFP);
-    if (childTiled->numTextureSamplers() == 0 || childTiled->hasPerspective()) {
-      return std::nullopt;
-    }
-    int modeX = 0;
-    int modeY = 0;
-    childTiled->getShaderModes(&modeX, &modeY);
-    if (!TiledModeSupported(modeX) || !TiledModeSupported(modeY)) {
-      return std::nullopt;
-    }
-  } else {
+  if (!IsServableBlurChild(blur->childProcessor(0))) {
     return std::nullopt;
   }
   // The kernel radius is a runtime uniform, not a variant dimension. The precompiled shader uses
@@ -1214,38 +1150,8 @@ static std::optional<PermutationMatchResult> TryMatchGlassUDFTentBlur(
   if (tent->numChildProcessors() != 1) {
     return std::nullopt;
   }
-  auto childFP = tent->childProcessor(0);
-  if (childFP == nullptr) {
-    return std::nullopt;
-  }
-  // The horizontal pass reads a plain TextureEffect; the vertical pass reads a TiledTextureEffect.
-  // Tiled children are limited to the ShaderMode values tiled_sample.inc implements; others fall
-  // back.
-  if (childFP->name() == "TextureEffect") {
-    auto* childTE = static_cast<const TextureEffect*>(childFP);
-    if (childTE->numTextureSamplers() == 0) {
-      return std::nullopt;
-    }
-    // Same Clamp-only rule as the Gaussian matcher: this kernel also clamps plain-child taps to
-    // the subset, so a Decal (or otherwise non-Clamp) plain child falls back to the runtime.
-    TileMode modeX = TileMode::Clamp;
-    TileMode modeY = TileMode::Clamp;
-    childTE->getTileModes(&modeX, &modeY);
-    if (modeX != TileMode::Clamp || modeY != TileMode::Clamp) {
-      return std::nullopt;
-    }
-  } else if (childFP->name() == "TiledTextureEffect") {
-    auto* childTiled = static_cast<const TiledTextureEffect*>(childFP);
-    if (childTiled->numTextureSamplers() == 0 || childTiled->hasPerspective()) {
-      return std::nullopt;
-    }
-    int modeX = 0;
-    int modeY = 0;
-    childTiled->getShaderModes(&modeX, &modeY);
-    if (!TiledModeSupported(modeX) || !TiledModeSupported(modeY)) {
-      return std::nullopt;
-    }
-  } else {
+  // The horizontal pass reads a plain TextureEffect; the vertical pass a TiledTextureEffect.
+  if (!IsServableBlurChild(tent->childProcessor(0))) {
     return std::nullopt;
   }
   // The loop upper bound is the fixed constant 64; a longer max radius exceeds it and falls back.
@@ -1309,7 +1215,7 @@ static std::optional<PermutationMatchResult> TryMatchGlassRefraction(
   // Both vertex kernels emit the affine coordinate form ((Matrix * vec3(pos, 1)).xy computed in
   // the vertex stage), matching GeometryProcessor::emitTransforms' non-perspective branch. A
   // projective transform makes the runtime emit a vec3 varying divided in the fragment stage, so
-  // it must ride the runtime route — the same policy TextureEffectIsProjective applies above.
+  // it must ride the runtime route — the same policy TryMatchTextureFill applies to projective sources.
   if (fp->numCoordTransforms() > 0 && fp->coordTransform(0)->matrix.hasPerspective()) {
     return std::nullopt;
   }
@@ -1351,12 +1257,7 @@ static std::optional<PermutationMatchResult> TryMatchHairlineLine(const ProgramI
   if (gp->name() != "HairlineLineGeometryProcessor") {
     return std::nullopt;
   }
-  // The stroke color comes from the geometry processor Color uniform, so a color fragment
-  // processor would be silently dropped and must reject; a direct analytic clip coverage FP
-  // (AA rect or rrect) is evaluated from the runtime clip contract uniforms.
-  if (programInfo->numFragmentProcessors() != 0 &&
-      (programInfo->numColorFragmentProcessors() != 0 ||
-       !HasDirectAnalyticClipCoverage(programInfo))) {
+  if (!HasNoProcessorsOrDirectClip(programInfo)) {
     return std::nullopt;
   }
   HairlineLineInputs inputs;
@@ -1374,12 +1275,7 @@ static std::optional<PermutationMatchResult> TryMatchHairlineQuad(const ProgramI
   if (gp->name() != "HairlineQuadGeometryProcessor") {
     return std::nullopt;
   }
-  // The stroke color comes from the geometry processor Color uniform, so a color fragment
-  // processor would be silently dropped and must reject; a direct analytic clip coverage FP
-  // (AA rect or rrect) is evaluated from the runtime clip contract uniforms.
-  if (programInfo->numFragmentProcessors() != 0 &&
-      (programInfo->numColorFragmentProcessors() != 0 ||
-       !HasDirectAnalyticClipCoverage(programInfo))) {
+  if (!HasNoProcessorsOrDirectClip(programInfo)) {
     return std::nullopt;
   }
   HairlineQuadInputs inputs;
@@ -1648,21 +1544,8 @@ static std::optional<PermutationMatchResult> TryMatchMeshFill(const ProgramInfo*
 }
 
 static std::optional<PermutationMatchResult> TryMatchPerlin(const ProgramInfo* programInfo) {
-  auto gp = programInfo->getGeometryProcessor();
   int hasCoverage = 0;
-  if (gp->name() == "DefaultGeometryProcessor") {
-    hasCoverage =
-        static_cast<const DefaultGeometryProcessor*>(gp)->getAAType() == AAType::Coverage ? 1 : 0;
-  } else if (gp->name() == "QuadPerEdgeAAGeometryProcessor") {
-    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-    // The precompiled vert derives the noise coordinate from aPosition via CoordTransformMatrix_0,
-    // so reject quads carrying color/uvCoord/subset attributes (same constraint as the textured
-    // matchers). Per-vertex AA coverage is supported via HAS_COVERAGE.
-    if (!quadGP->hasCommonColor() || !quadGP->hasUVMatrix() || quadGP->getHasSubset()) {
-      return std::nullopt;
-    }
-    hasCoverage = quadGP->getAAType() == AAType::Coverage ? 1 : 0;
-  } else {
+  if (!IsPositionOnlyRectGP(programInfo->getGeometryProcessor(), &hasCoverage)) {
     return std::nullopt;
   }
   // Accept a PerlinNoiseFragmentProcessor optionally followed by one pointwise operator, in the
@@ -1716,13 +1599,8 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
     return std::nullopt;
   }
 
-  // Only RGBA and alpha-only (AAAA, Swizzle::ForWrite(ALPHA_8)) render targets are supported. Any
-  // other write swizzle would need a mapping the precompiled shaders do not implement.
-  auto outputSwizzle = programInfo->getOutputSwizzle();
-  if (outputSwizzle != Swizzle::RGBA() && outputSwizzle != Swizzle::AAAA()) {
-    return std::nullopt;
-  }
-  if (outputSwizzle == Swizzle::AAAA()) {
+  // MatchPermutation already refused every write swizzle other than RGBA and alpha-only (AAAA).
+  if (programInfo->getOutputSwizzle() == Swizzle::AAAA()) {
     // Alpha-only targets: only the kernels that apply the write swizzle at output (via the
     // OutputAlphaSwizzle uniform) may serve the draw. Other kernels assume RGBA output. The
     // gaussian blur kernel applies it too (an alpha-only blur pass writes its mask accumulation
@@ -1857,6 +1735,8 @@ static uint32_t RequiredTextureReads(const ProgramInfo* programInfo) {
 
 std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo,
                                                        PermutationMatchFailure* failure) {
+  // Only RGBA and alpha-only (AAAA, Swizzle::ForWrite(ALPHA_8)) render targets are supported. Any
+  // other write swizzle would need a mapping the precompiled shaders do not implement.
   auto outputSwizzle = programInfo->getOutputSwizzle();
   if (outputSwizzle != Swizzle::RGBA() && outputSwizzle != Swizzle::AAAA()) {
     if (failure != nullptr) {

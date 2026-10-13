@@ -187,23 +187,16 @@ std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
   AOTEffectGraph graph = {};
   AOTEffectPlan plan = {};
   bool decomposed = AOTEffectDecomposer::Lower(colorProcessors, &graph) &&
-                    AOTEffectDecomposer::ValidateForFusion(graph) &&
                     AOTEffectDecomposer::Decompose(graph, &plan);
-  // A single-pass pointwise-tail plan is a linear texture-plus-ops chain, and the tail ops are a
-  // subset of the chain op set, so the chain kernel can evaluate it as-is. This route only runs
-  // after the plain matcher missed, which includes the shapes the tail rule rejects (no UV
-  // matrix, alpha-only source, per-quad subset); rewriting the kernel field lets them resolve to
-  // the chain artifact instead of falling back to runtime compilation. Device-space sources and
-  // other chain-incompatible shapes are still rejected by CanExecute/BuildChainProcessor below.
-  if (decomposed && plan.passes.size() == 1 &&
-      plan.passes[0].kernel == AOTKernelKind::PointwiseTail) {
-    plan.passes[0].kernel = AOTKernelKind::PointwiseChain;
+  // Decompose only returns executable plans. The direct rewrite only carries the processors that
+  // replace a color list in place (chain/graph and perlin). A PointwiseTail plan is never rebuilt
+  // here: the tail planner only runs after the DAG planner refused the same node set, so the chain
+  // kernel could not carry it either.
+  if (!decomposed) {
+    return nullptr;
   }
-  // The production admission rule (CanRoute) plus this route's own executor: the direct rewrite
-  // only carries the processors that replace a color list in place (chain/graph and perlin).
-  auto kernel = plan.passes.empty() ? AOTKernelKind::TextureFill : plan.passes[0].kernel;
-  if (!decomposed || !AOTPlanExecutor::CanRoute(graph, plan) ||
-      (!IsAOTPointwiseDAGKernel(kernel) && kernel != AOTKernelKind::PerlinNoiseFill)) {
+  auto kernel = plan.passes[0].kernel;
+  if (!IsAOTPointwiseDAGKernel(kernel) && kernel != AOTKernelKind::PerlinNoiseFill) {
     return nullptr;
   }
   PlacementPtr<FragmentProcessor> chainFP = nullptr;
@@ -212,7 +205,7 @@ std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
     if (!coverageFPs.empty()) {
       return nullptr;
     }
-    chainFP = AOTChainBuilder::BuildPerlinNoiseFP(allocator, graph, plan.passes[0]);
+    chainFP = AOTChainBuilder::BuildFPForPass(allocator, graph, plan.passes[0]);
   } else {
     chainFP = AOTChainBuilder::BuildChainProcessor(allocator, graph, plan.passes[0], coverageFPs,
                                                    !ownedChainCoverageFPs.empty());

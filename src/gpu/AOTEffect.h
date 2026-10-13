@@ -106,29 +106,6 @@ enum class AOTEffectKind {
   MulAlpha,
 };
 
-enum class EffectDomain {
-  Pointwise,
-  Neighborhood,
-  Composite,
-  External,
-};
-
-enum class EffectInputUsage {
-  Ignore,
-  ColorRGBA,
-  ColorAlpha,
-  SameCoordinateChild,
-  RepeatedCoordinateChild,
-};
-
-struct EffectTraits {
-  EffectDomain domain = EffectDomain::Pointwise;
-  EffectInputUsage inputUsage = EffectInputUsage::Ignore;
-  bool isSelfContained = false;
-  bool preservesAlphaRepresentation = false;
-  bool preservesColorSpace = false;
-};
-
 enum class AOTTextureSamplingKind {
   Plain,
   Tiled,
@@ -149,7 +126,6 @@ struct AOTTextureParameters {
   bool isYUV = false;
   bool isAlphaOnly = false;
   bool hasRGBAAA = false;
-  bool hasSubset = false;
   bool hasPerspective = false;
 };
 
@@ -329,7 +305,6 @@ struct AOTPointwiseSlot {
 struct AOTEffectNode {
   AOTEffectKind kind = AOTEffectKind::GeometryColor;
   std::vector<AOTNodeID> inputs = {};
-  EffectTraits traits = {};
   AOTEffectParameters parameters = {};
 };
 
@@ -437,10 +412,10 @@ class AOTNodeBuilder {
     }
   }
 
-  bool addUnaryNode(AOTEffectKind kind, AOTNodeID input, EffectTraits traits,
-                    AOTEffectParameters parameters, AOTNodeID* output);
+  bool addUnaryNode(AOTEffectKind kind, AOTNodeID input, AOTEffectParameters parameters,
+                    AOTNodeID* output);
 
-  bool addBinaryNode(AOTEffectKind kind, AOTNodeID first, AOTNodeID second, EffectTraits traits,
+  bool addBinaryNode(AOTEffectKind kind, AOTNodeID first, AOTNodeID second,
                      AOTEffectParameters parameters, AOTNodeID* output);
 
   bool contains(AOTNodeID nodeID) const;

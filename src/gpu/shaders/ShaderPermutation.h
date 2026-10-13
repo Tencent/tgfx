@@ -37,7 +37,6 @@ namespace tgfx {
  *
  *   Binding axes:
  *     TEXTURE_COUNT  (0/1/2/4)            each texture = one sampler binding + one coord varying
- *     TEXTURE_KIND   (TwoD/Rect/YUV)      sampler type; YUV binds three planes
  *     DST_KIND       (None/Texture/FBF)   dst-texture binding vs framebuffer-fetch attachment
  *     MASK_KIND      (None/DeviceTexture) a device mask is one sampler binding
  *

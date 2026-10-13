@@ -264,44 +264,6 @@ static bool ParseArgs(int argc, char** argv, BuildOptions* options) {
   return true;
 }
 
-// Removes 'set = <n>, ' from layout qualifiers. glslang's OpenGL target rejects the descriptor-set
-// qualifier, while binding is kept (the GLSL output and reflection only rely on binding).
-// The token is only a descriptor set when it appears inside a layout(...) qualifier, i.e. the
-// preceding non-space character is '(' or ','. This avoids false positives on identifiers that
-// merely contain the substring (e.g. "offset = ", "Subset = ").
-static std::string StripDescriptorSets(std::string source) {
-  std::string result;
-  size_t cursor = 0;
-  const std::string token = "set = ";
-  while (true) {
-    auto pos = source.find(token, cursor);
-    if (pos == std::string::npos) {
-      result += source.substr(cursor);
-      break;
-    }
-    // Require a layout-qualifier context: the nearest non-space character before the token must be
-    // '(' or ','. Otherwise it is an identifier fragment, not a descriptor set — skip it.
-    size_t before = pos;
-    while (before > 0 && (source[before - 1] == ' ' || source[before - 1] == '\t')) {
-      --before;
-    }
-    bool isDescriptorSet = before > 0 && (source[before - 1] == '(' || source[before - 1] == ',');
-    auto digitsStart = pos + token.size();
-    auto digitsEnd = source.find_first_not_of("0123456789", digitsStart);
-    if (!isDescriptorSet || digitsEnd == std::string::npos || source[digitsEnd] != ',') {
-      result += source.substr(cursor, digitsStart - cursor);
-      cursor = digitsStart;
-      continue;
-    }
-    result += source.substr(cursor, pos - cursor);
-    cursor = digitsEnd + 1;
-    if (cursor < source.size() && source[cursor] == ' ') {
-      cursor++;
-    }
-  }
-  return result;
-}
-
 // Rewrites a preprocessed template (GLSL 450 with Vulkan-style set/binding layout qualifiers)
 // into the desktop-GL 330 form the precompiled GL pipeline consumes: drop the `set = N` and
 // `binding = N` layout members (330 has no descriptor-set syntax; the runtime binds the UBO at a
@@ -766,8 +728,7 @@ static std::map<std::string, SpirvCacheEntry> spirvCache;
 
 static const SpirvCacheEntry& CompileGLSLShared(const std::string& source, ShaderStageType stage,
                                                 const std::string& shaderName,
-                                                uint32_t variantIndex, bool optimize,
-                                                bool openGLEnv) {
+                                                uint32_t variantIndex, bool optimize) {
   const char* kind = optimize ? "spirv-optimized" : "spirv";
   auto& cache = StageCache::Get();
   auto& stats = cache.stats(kind);
@@ -777,7 +738,6 @@ static const SpirvCacheEntry& CompileGLSLShared(const std::string& source, Shade
                  .add(shaderName + "_variant_" + std::to_string(variantIndex))
                  .add(static_cast<uint64_t>(stage))
                  .add(static_cast<uint64_t>(optimize))
-                 .add(static_cast<uint64_t>(openGLEnv))
                  .add(source)
                  .finish();
   auto it = spirvCache.find(key);
@@ -793,7 +753,7 @@ static const SpirvCacheEntry& CompileGLSLShared(const std::string& source, Shade
     std::memcpy(entry.spirv.data(), payload.data(), payload.size());
   } else {
     stats.executed++;
-    auto result = CompileGLSL(source, stage, shaderName, variantIndex, optimize, openGLEnv);
+    auto result = CompileGLSL(source, stage, shaderName, variantIndex, optimize);
     entry.success = result.success;
     entry.spirv = std::move(result.spirv);
     entry.error = std::move(result.error);
@@ -941,19 +901,13 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
       continue;
     }
 
-    // A TEXTURE_KIND=1 variant declares sampler2DRect, whose SPIR-V (OpTypeImage Dim=Rect) is
-    // invalid under Vulkan semantics. It compiles under OpenGL semantics and only enters the
-    // opengl bundle.
-    bool rectVariant = info.fragDomain.valueOf(fi, "TEXTURE_KIND") == 1;
-
     auto vertDefines = vertDomain.defineListFor(vi);
     auto fragDefines = fragDomain.defineListFor(fi);
 
     // Compile vertex shader. The shared cache also covers the multiple-frag-per-vert reuse the
     // old per-backend vertCache handled, plus the cross-backend repeats.
-    const auto& vertResult =
-        CompileGLSLShared(PrependDefines(vertSource, vertDefines), ShaderStageType::Vertex,
-                          info.name, vi, false, false);
+    const auto& vertResult = CompileGLSLShared(PrependDefines(vertSource, vertDefines),
+                                               ShaderStageType::Vertex, info.name, vi, false);
     if (!vertResult.success) {
       std::cerr << "  " << vertResult.error << "\n";
       report.errorCount++;
@@ -962,14 +916,8 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
     }
     const auto* vertSpirv = &vertResult.spirv;
 
-    auto expandedFrag = PrependDefines(fragSource, fragDefines);
-    if (rectVariant) {
-      // glslang's OpenGL target rejects 'descriptor set' layout qualifiers, so strip the
-      // 'set = N, ' fragment while keeping binding (which the reflection and GLSL output use).
-      expandedFrag = StripDescriptorSets(std::move(expandedFrag));
-    }
-    const auto& fragResult = CompileGLSLShared(expandedFrag, ShaderStageType::Fragment, info.name,
-                                               fi, false, rectVariant);
+    const auto& fragResult = CompileGLSLShared(PrependDefines(fragSource, fragDefines),
+                                               ShaderStageType::Fragment, info.name, fi, false);
     if (!fragResult.success) {
       std::cerr << "  " << fragResult.error << "\n";
       report.errorCount++;
@@ -986,7 +934,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
     report.compiledCount++;
 
     for (const auto& backend : options.backends) {
-      // Backend-specific exclusions (RECT, WebGPU FBF) share one source of truth with the
+      // Backend-specific exclusions (the FBF variants) share one source of truth with the
       // closure verifier; see PermutationCompilesForBackend.
       if (!PermutationCompilesForBackend(info, vi, fi, backend)) {
         continue;
@@ -998,10 +946,10 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
         // Re-compile with optimization for smaller SPIR-V output.
         auto expandedVertOpt = PrependDefines(vertSource, vertDefines);
         const auto& vertOpt =
-            CompileGLSLShared(expandedVertOpt, ShaderStageType::Vertex, info.name, vi, true, false);
+            CompileGLSLShared(expandedVertOpt, ShaderStageType::Vertex, info.name, vi, true);
         auto expandedFragOpt = PrependDefines(fragSource, fragDefines);
-        const auto& fragOpt = CompileGLSLShared(expandedFragOpt, ShaderStageType::Fragment,
-                                                info.name, fi, true, false);
+        const auto& fragOpt =
+            CompileGLSLShared(expandedFragOpt, ShaderStageType::Fragment, info.name, fi, true);
         if (!vertOpt.success || !fragOpt.success) {
           // Fallback to unoptimized if optimization fails.
           auto* vp = reinterpret_cast<const uint8_t*>(vertSpirv->data());
@@ -1085,7 +1033,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
           //      on the actual GL driver.
           // A word-boundary hazard: variable names like `offset = ` contain the substring
           // "set = ", so the leak check must see the layout-qualifier context (the token is
-          // preceded by '(' or ','), the same test StripDescriptorSets uses.
+          // preceded by '(' or ','), the same layout-qualifier context test.
           auto hasLayoutMember = [](const std::string& text, const std::string& member) -> int64_t {
             std::string token = member + " ";
             size_t cursor = 0;

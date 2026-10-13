@@ -55,11 +55,6 @@ class TextureFillShader : public PrecompiledShader {
   static_assert(FD::COUNT == 2,
                 "Update the encoders and the Compose mapping when dimensions change.");
 
-  struct FragmentValues {
-    uint32_t xp = 0;
-    uint32_t deviceMask = 0;
-  };
-
   /** Returns the stable template name used by both bundle generation and runtime lookup. */
   static constexpr const char* Name() {
     return "TextureFillShader";
@@ -68,11 +63,6 @@ class TextureFillShader : public PrecompiledShader {
   /** TextureFill has one vertex artifact because its vertex interface is invariant. */
   static constexpr uint32_t EncodeVertex() {
     return 0;
-  }
-
-  /** Encodes fragment values with the same mixed-radix layout as FD::domain() without allocation. */
-  static constexpr uint32_t EncodeFragment(const FragmentValues& values) {
-    return values.xp + values.deviceMask * 3u;
   }
 
   PrecompiledShaderInfo info() const override {

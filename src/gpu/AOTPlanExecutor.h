@@ -29,41 +29,29 @@ class RenderTargetProxy;
 
 class AOTPlanExecutor {
  public:
-  /** Returns whether the current production executor can preserve this plan's semantics. */
+  /**
+   * Whether the executor can run this plan with the precompiled kernels: exactly one pass, of a
+   * kernel the executor runs on a draw (PointwiseChain/Graph, PointwiseTail, PerlinNoiseFill,
+   * YUVTextureFill), within that kernel's slot and resource budgets. Decompose only returns plans
+   * that pass it, so every production entry and every diagnostic that reports a draw as routable
+   * share this one rule. Multi-pass plans are never produced: their RGBA8 intermediates would
+   * quantize (a discontinuous operator such as AlphaThreshold can flip outright) and could not
+   * inherit the paint alpha or the draw transform.
+   */
   static bool CanExecute(const AOTEffectGraph& graph, const AOTEffectPlan& plan);
 
   /**
-   * Whether a production draw may submit this plan through Make(): exactly one pass, of a kernel
-   * the executor runs on a draw (PointwiseTail, PointwiseChain/Graph, PerlinNoiseFill,
-   * YUVTextureFill), and CanExecute holds. Every production entry (the on-screen color, fold and
-   * retry routes and the offscreen fill) and every diagnostic that reports a draw as routable use
-   * this one rule. Multi-pass plans stay refused: their RGBA8 intermediates quantize (a
-   * discontinuous operator such as AlphaThreshold can flip outright) and the intermediate passes
-   * inherit neither the paint alpha nor the draw transform. Make() itself still runs them.
+   * Builds an atomic render task that replays originalDraw with the plan's rebuilt color processors,
+   * without enqueueing it. The plan must pass CanExecute. Stencil-and-cover draws manage their own
+   * pipelines and cannot use this task. On failure, originalDraw remains unchanged. On success,
+   * ownership of originalDraw moves into the task. clearDestination is true only for a new
+   * offscreen fill: its entire backing (including padding past the logical bounds) must start
+   * transparent. Draws compositing onto an existing destination leave it false.
    */
-  static bool CanRoute(const AOTEffectGraph& graph, const AOTEffectPlan& plan);
-
-  /**
-   * Builds an atomic render task for an AOT plan executed by a StandardDrawOp without enqueueing it.
-   * Stencil-and-cover draws manage their own pipelines and cannot use this task. On failure,
-   * originalDraw remains unchanged. On success, ownership of originalDraw moves into the task.
-   *
-   * deviceBounds is the area the original draw covers on the destination, in destination device
-   * coordinates. fpCoordOffset is the translation the draw's geometry applies between destination
-   * device coordinates and the coordinate space the fragment processors evaluate in: zero for an
-   * OpsCompositor draw (FP local == device), or the caller's coordOffset for an offscreen fill
-   * (DrawingManager::fillRTWithFP), whose draw always lands at (0,0,w,h) while its processors see
-   * coords shifted by that offset. Intermediate passes add it to their fill offset so the rebuilt
-   * chain evaluates in the same space the original processors would have seen; the terminal
-   * sampling matrix is independent of it. clearDestination is true only for a new offscreen fill:
-   * its entire backing (including padding past the logical bounds) must start transparent. Draws
-   * compositing onto an existing destination leave it false.
-   */
-  static PlacementPtr<RenderTask> Make(Context* context, uint32_t renderFlags,
-                                       const AOTEffectGraph& graph, const AOTEffectPlan& plan,
-                                       const Rect& deviceBounds,
+  static PlacementPtr<RenderTask> Make(Context* context, const AOTEffectGraph& graph,
+                                       const AOTEffectPlan& plan,
                                        std::shared_ptr<RenderTargetProxy> destination,
                                        PlacementPtr<DrawOp>* originalDraw,
-                                       const Point& fpCoordOffset, bool clearDestination = false);
+                                       bool clearDestination = false);
 };
 }  // namespace tgfx

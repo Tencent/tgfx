@@ -18,9 +18,6 @@
 
 #include "gpu/processors/AOTYUVChainProcessor.h"
 #include "gpu/AOTPointwiseSlotWriter.h"
-#include "gpu/ColorSpaceXformHelper.h"
-#include "gpu/glsl/GLSLBlend.h"
-#include "gpu/processors/ConstColorProcessor.h"
 
 namespace tgfx {
 
@@ -58,103 +55,7 @@ AOTYUVChainProcessor::AOTYUVChainProcessor(PlacementPtr<FragmentProcessor> sourc
 
 void AOTYUVChainProcessor::emitCode(EmitArgs& args) const {
   emitChild(0, args.inputColor, args);
-  for (size_t index = 0; index < slotCount; ++index) {
-    const auto& current = pointwiseSlots[index];
-    if (current.type == AOTPointwiseOpType::ColorMatrix) {
-      auto matrix = args.uniformHandler->addUniform("ColorMatrix", UniformFormat::Float4x4,
-                                                    ShaderStage::Fragment, MaxPointwiseSlots);
-      auto vector = args.uniformHandler->addUniform("ColorVector", UniformFormat::Float4,
-                                                    ShaderStage::Fragment, MaxPointwiseSlots);
-      args.fragBuilder->codeAppendf("%s = vec4(%s.rgb / max(%s.a, 9.9999997473787516e-05), %s.a);",
-                                    args.outputColor.c_str(), args.outputColor.c_str(),
-                                    args.outputColor.c_str(), args.outputColor.c_str());
-      args.fragBuilder->codeAppendf("%s = clamp(%s[%d] * %s + %s[%d], 0.0, 1.0);",
-                                    args.outputColor.c_str(), matrix.c_str(),
-                                    static_cast<int>(index), args.outputColor.c_str(),
-                                    vector.c_str(), static_cast<int>(index));
-      args.fragBuilder->codeAppendf("%s.rgb *= %s.a;", args.outputColor.c_str(),
-                                    args.outputColor.c_str());
-    } else if (current.type == AOTPointwiseOpType::Luma) {
-      auto kr = args.uniformHandler->addUniform("Kr", UniformFormat::Float, ShaderStage::Fragment,
-                                                MaxPointwiseSlots);
-      auto kg = args.uniformHandler->addUniform("Kg", UniformFormat::Float, ShaderStage::Fragment,
-                                                MaxPointwiseSlots);
-      auto kb = args.uniformHandler->addUniform("Kb", UniformFormat::Float, ShaderStage::Fragment,
-                                                MaxPointwiseSlots);
-      args.fragBuilder->codeAppendf("float yuvLuma%d = dot(%s.rgb, vec3(%s[%d], %s[%d], %s[%d]));",
-                                    static_cast<int>(index), args.outputColor.c_str(), kr.c_str(),
-                                    static_cast<int>(index), kg.c_str(), static_cast<int>(index),
-                                    kb.c_str(), static_cast<int>(index));
-      args.fragBuilder->codeAppendf("%s = vec4(yuvLuma%d);", args.outputColor.c_str(),
-                                    static_cast<int>(index));
-    } else if (current.type == AOTPointwiseOpType::AlphaThreshold) {
-      auto threshold = args.uniformHandler->addUniform("Threshold", UniformFormat::Float,
-                                                       ShaderStage::Fragment, MaxPointwiseSlots);
-      args.fragBuilder->codeAppendf("vec4 yuvStep%d = vec4(0.0);", static_cast<int>(index));
-      args.fragBuilder->codeAppendf("if (%s.a > 0.0) {", args.outputColor.c_str());
-      args.fragBuilder->codeAppendf("  yuvStep%d.rgb = %s.rgb / %s.a;", static_cast<int>(index),
-                                    args.outputColor.c_str(), args.outputColor.c_str());
-      args.fragBuilder->codeAppendf("  yuvStep%d.a = step(%s[%d], %s.a);", static_cast<int>(index),
-                                    threshold.c_str(), static_cast<int>(index),
-                                    args.outputColor.c_str());
-      args.fragBuilder->codeAppendf("  yuvStep%d = clamp(yuvStep%d, 0.0, 1.0);",
-                                    static_cast<int>(index), static_cast<int>(index));
-      args.fragBuilder->codeAppend("}");
-      args.fragBuilder->codeAppendf("%s = yuvStep%d;", args.outputColor.c_str(),
-                                    static_cast<int>(index));
-    } else if (current.type == AOTPointwiseOpType::ConstColor) {
-      auto value = args.uniformHandler->addUniform("ConstColorValue", UniformFormat::Float4,
-                                                   ShaderStage::Fragment, MaxPointwiseSlots);
-      // Mirrors GLSLConstColorProcessor's emission for the same input mode (the precompiled
-      // kernel folds it into the ConstInputMode runtime uniform; the JIT bakes it per slot).
-      switch (static_cast<InputMode>(current.constColor.inputMode)) {
-        case InputMode::Ignore:
-          args.fragBuilder->codeAppendf("%s = %s[%d];", args.outputColor.c_str(), value.c_str(),
-                                        static_cast<int>(index));
-          break;
-        case InputMode::ModulateRGBA:
-          args.fragBuilder->codeAppendf("%s = %s[%d] * %s;", args.outputColor.c_str(),
-                                        value.c_str(), static_cast<int>(index),
-                                        args.inputColor.c_str());
-          break;
-        case InputMode::ModulateA:
-          args.fragBuilder->codeAppendf("%s = %s[%d] * %s.a;", args.outputColor.c_str(),
-                                        value.c_str(), static_cast<int>(index),
-                                        args.inputColor.c_str());
-          break;
-      }
-    } else if (current.type == AOTPointwiseOpType::Blend) {
-      // Blend with a constant operand, matching the precompiled kernel's OP_BLEND: the operand
-      // order follows BlendConstFirst, the mode is baked per slot.
-      auto value = args.uniformHandler->addUniform("ConstColorValue", UniformFormat::Float4,
-                                                   ShaderStage::Fragment, MaxPointwiseSlots);
-      auto srcName = "yuvBlendSrc" + std::to_string(index);
-      auto dstName = "yuvBlendDst" + std::to_string(index);
-      // childType mirrors XfermodeFragmentProcessor::Child: SrcChild (1) puts the constant in the
-      // src operand, DstChild (0) in the dst operand — same mapping as the shared upload's
-      // BlendConstFirst bit.
-      if (current.blend.childType == 1) {
-        args.fragBuilder->codeAppendf("vec4 %s = %s[%d];", srcName.c_str(), value.c_str(),
-                                      static_cast<int>(index));
-        args.fragBuilder->codeAppendf("vec4 %s = %s;", dstName.c_str(), args.outputColor.c_str());
-      } else {
-        args.fragBuilder->codeAppendf("vec4 %s = %s;", srcName.c_str(), args.outputColor.c_str());
-        args.fragBuilder->codeAppendf("vec4 %s = %s[%d];", dstName.c_str(), value.c_str(),
-                                      static_cast<int>(index));
-      }
-      AppendMode(args.fragBuilder, srcName, "vec4(1.0)", dstName, args.outputColor,
-                 static_cast<BlendMode>(current.blend.blendMode), false);
-    } else {
-      // ColorSpaceXform rides the same ColorSpaceXformHelper path the tail processor uses;
-      // slots beyond the count stay OP_NONE in the precompiled kernel.
-      auto steps = current.colorSpaceXform.steps.get();
-      ColorSpaceXformHelper helper(static_cast<int>(index), MaxPointwiseSlots);
-      helper.emitCode(args.uniformHandler, steps);
-      std::string transformed;
-      args.fragBuilder->appendColorGamutXform(&transformed, args.outputColor.c_str(), &helper);
-      args.fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), transformed.c_str());
-    }
-  }
+  EmitAOTPointwiseSlots(args, pointwiseSlots.data(), slotCount, MaxPointwiseSlots, "yuv");
 }
 
 void AOTYUVChainProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {

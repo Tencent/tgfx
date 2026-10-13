@@ -92,8 +92,8 @@ MaterializationDecision AOTMaterializationPolicy::Evaluate(const FragmentProcess
   return decision;
 }
 
-MaterializedGeometry AOTMaterializationPolicy::PrepareGeometry(const Rect& drawBounds,
-                                                               float apronRadius) {
+MaterializedTarget AOTMaterializationPolicy::PrepareTarget(Context* context, const Rect& drawBounds,
+                                                           float apronRadius) {
   auto bounds = drawBounds;
   bounds.outset(apronRadius, apronRadius);
   bounds.roundOut();
@@ -102,11 +102,6 @@ MaterializedGeometry AOTMaterializationPolicy::PrepareGeometry(const Rect& drawB
   geometry.coordOffset = Point::Make(bounds.left, bounds.top);
   geometry.width = static_cast<int>(bounds.width());
   geometry.height = static_cast<int>(bounds.height());
-  return geometry;
-}
-
-MaterializedTarget AOTMaterializationPolicy::AllocateTarget(Context* context,
-                                                            const MaterializedGeometry& geometry) {
   if (context == nullptr || geometry.isEmpty()) {
     return {};
   }
@@ -123,11 +118,6 @@ MaterializedTarget AOTMaterializationPolicy::AllocateTarget(Context* context,
   target.renderTarget = std::move(renderTarget);
   target.geometry = geometry;
   return target;
-}
-
-MaterializedTarget AOTMaterializationPolicy::PrepareTarget(Context* context, const Rect& drawBounds,
-                                                           float apronRadius) {
-  return AllocateTarget(context, PrepareGeometry(drawBounds, apronRadius));
 }
 
 }  // namespace tgfx

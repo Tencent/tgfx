@@ -37,12 +37,9 @@ struct CompileResult {
 
 /// Compiles GLSL source (already with #defines prepended) to SPIR-V using shaderc.
 /// When optimize is true, applies performance-level optimization to reduce SPIR-V size.
-/// When openGLEnv is true, targets OpenGL semantics instead of Vulkan: required for
-/// sampler2DRect (OpTypeImage Dim=Rect), which is invalid under Vulkan semantics. The
-/// resulting SPIR-V must only be translated to GLSL (never Vulkan/Metal).
 CompileResult CompileGLSL(const std::string& source, ShaderStageType stage,
                           const std::string& shaderName, uint32_t variantIndex,
-                          bool optimize = false, bool openGLEnv = false);
+                          bool optimize = false);
 
 /// Translates SPIR-V binary to GLSL via spirv-cross: desktop GLSL 330, or GLSL ES 300 when
 /// gles is true (precision qualifiers are added by spirv-cross).

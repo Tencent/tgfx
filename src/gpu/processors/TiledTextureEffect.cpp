@@ -254,7 +254,6 @@ bool TiledTextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
   parameters.subset = subset;
   parameters.tiledRecipe = *resolved;
   parameters.isAlphaOnly = resolved->alphaOnly;
-  parameters.hasSubset = subset != Rect::MakeWH(textureProxy->width(), textureProxy->height());
   parameters.hasPerspective = resolved->hasPerspective;
   return builder->addTextureSource(input, parameters, output);
 }

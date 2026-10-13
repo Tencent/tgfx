@@ -1410,32 +1410,15 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     if (foldMask) {
       AOTEffectGraph foldedGraph = {};
       AOTEffectPlan foldedPlan = {};
-      // On-screen draws only accept single-pass plans: a multi-pass tail plan materializes
-      // intermediate passes that inherit neither the original draw's paint alpha (the geometry
-      // color enters only at the terminal draw, so non-linear operators see an unmodulated
-      // input) nor its transform (the first pass samples through the source's local uvMatrix
-      // while running in the offset rectangle's coordinate space). The runtime path stays the
-      // reference for over-budget chains until the executor carries both through.
       bool coverageMoved = false;
       if (AOTEffectDecomposer::Lower(foldedProcessors, &foldedGraph) &&
-          AOTEffectDecomposer::ValidateForFusion(foldedGraph) &&
-          AOTEffectDecomposer::Decompose(foldedGraph, &foldedPlan) &&
-          AOTPlanExecutor::CanRoute(foldedGraph, foldedPlan)) {
+          AOTEffectDecomposer::Decompose(foldedGraph, &foldedPlan)) {
         // The mask now travels inside the color chain, so the terminal draw must not apply it
         // again as a coverage processor. The move happens before Make so the task's own
         // fallback path (which prepares the op with its own processors) sees the folded tree.
         op->moveCoveragesToColors();
         coverageMoved = true;
-        auto task = AOTPlanExecutor::Make(context, renderFlags, foldedGraph, foldedPlan,
-                                          *deviceBounds, renderTarget, &op, Point::Zero());
-        if (task != nullptr) {
-          submitDrawOps();
-          context->drawingManager()->addRenderTask(std::move(task));
-          // The chain task writes level 0 directly, so a mipmapped target must regenerate its
-          // lower levels afterwards — every other path that renders into a mipmapped render
-          // target schedules this (see addOpsRenderTask), and skipping it leaves downscaled
-          // consumers sampling stale transparent levels.
-          context->drawingManager()->addGenerateMipmapsTask(renderTarget->asTextureProxy());
+        if (submitPlanTask(foldedGraph, foldedPlan, &op)) {
           return;
         }
       }
@@ -1460,21 +1443,11 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     // matchers are all single-FP, so a draw still carrying a coverage FP (clip coverage or an
     // unfoldable mask) can never match: attempting the route would only waste a strict prepare
     // before the atomic fallback replays the draw through the runtime path anyway.
-    std::string mainBlocker = {};
-    bool mainLower =
-        !op->hasCoverage() && AOTEffectDecomposer::Lower(colorProcessors, &graph, &mainBlocker);
-    bool mainValidate = mainLower && AOTEffectDecomposer::ValidateForFusion(graph);
-    bool mainDecompose = mainValidate && AOTEffectDecomposer::Decompose(graph, &plan);
-    // Single-pass on-screen acceptance (same rationale as the folded route above): multi-pass
-    // tail plans are refused here so over-budget chains keep the runtime path as their reference.
-    if (mainDecompose && AOTPlanExecutor::CanRoute(graph, plan)) {
-      auto task = AOTPlanExecutor::Make(context, renderFlags, graph, plan, *deviceBounds,
-                                        renderTarget, &op, Point::Zero());
-      if (task != nullptr) {
-        submitDrawOps();
-        context->drawingManager()->addRenderTask(std::move(task));
-        // Same mipmap regeneration as the folded route above.
-        context->drawingManager()->addGenerateMipmapsTask(renderTarget->asTextureProxy());
+    bool mainDecompose = !op->hasCoverage() &&
+                         AOTEffectDecomposer::Lower(colorProcessors, &graph) &&
+                         AOTEffectDecomposer::Decompose(graph, &plan);
+    if (mainDecompose) {
+      if (submitPlanTask(graph, plan, &op)) {
         return;
       }
     } else {
@@ -1560,32 +1533,20 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
               AOTEffectGraph retryGraph = {};
               AOTEffectPlan retryPlan = {};
               if (AOTEffectDecomposer::Lower(retryProcessors, &retryGraph) &&
-                  AOTEffectDecomposer::ValidateForFusion(retryGraph) &&
-                  AOTEffectDecomposer::Decompose(retryGraph, &retryPlan) &&
-                  AOTPlanExecutor::CanRoute(retryGraph, retryPlan)) {
+                  AOTEffectDecomposer::Decompose(retryGraph, &retryPlan)) {
                 if (foldMask) {
                   op->moveCoveragesToColors();
                 }
-                auto task = AOTPlanExecutor::Make(context, renderFlags, retryGraph, retryPlan,
-                                                  *deviceBounds, renderTarget, &op, Point::Zero());
-                if (task != nullptr) {
-                  submitDrawOps();
-                  context->drawingManager()->addRenderTask(std::move(task));
-                  // Same mipmap regeneration as the folded route above.
-                  context->drawingManager()->addGenerateMipmapsTask(renderTarget->asTextureProxy());
+                if (submitPlanTask(retryGraph, retryPlan, &op)) {
                   return;
                 }
               }
-              // The retry was not accepted. The original color tree remains intact; any coverage
-              // moved into its tail is equivalent under the fold contract. Dropping retryFP avoids
-              // inserting quantized operands into the original draw. Enqueued materialization fills
-              // remain unconsumed; deferring those enqueues requires a separate two-phase commit.
-            } else {
-              // The rebuild itself failed: the original op still carries its untouched
-              // processors and falls through to the plain route below. Any materialization the
-              // rebuild had already enqueued renders unconsumed (wasted work, no pixel effect);
-              // a two-phase commit that defers those enqueues is future work.
             }
+            // A refused retry or a failed rebuild leaves the original color tree intact; any
+            // coverage moved into its tail is equivalent under the fold contract. Dropping retryFP
+            // avoids inserting quantized operands into the original draw. Materialization fills the
+            // rebuild already enqueued render unconsumed (wasted work, no pixel effect); deferring
+            // them requires a separate two-phase commit.
           }
         }
       }
@@ -1609,11 +1570,23 @@ void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, co
   pendingRects.emplace_back(std::move(record));
 }
 
-void OpsCompositor::submitDrawOps() {
-  for (size_t i = 0; i < drawOps.size(); ++i) {
-    if (drawOps[i] == nullptr) {
-    }
+bool OpsCompositor::submitPlanTask(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
+                                   PlacementPtr<DrawOp>* op) {
+  auto task = AOTPlanExecutor::Make(context, graph, plan, renderTarget, op);
+  if (task == nullptr) {
+    return false;
   }
+  submitDrawOps();
+  context->drawingManager()->addRenderTask(std::move(task));
+  // The plan task writes level 0 directly, so a mipmapped target must regenerate its lower levels
+  // afterwards — every other path that renders into a mipmapped render target schedules this (see
+  // addOpsRenderTask), and skipping it leaves downscaled consumers sampling stale transparent
+  // levels.
+  context->drawingManager()->addGenerateMipmapsTask(renderTarget->asTextureProxy());
+  return true;
+}
+
+void OpsCompositor::submitDrawOps() {
   auto opArray = drawingAllocator()->makeArray(std::move(drawOps));
   context->drawingManager()->addOpsRenderTask(renderTarget, std::move(opArray), clearColor);
   clearColor.reset();

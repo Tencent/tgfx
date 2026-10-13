@@ -61,17 +61,12 @@ static AOTAxisAnalysis ClassifyAxis(const std::vector<const FragmentProcessor*>&
                                                           : AOTDecomposeOutcome::BlockedByLowering;
     return analysis;
   }
-  if (!AOTEffectDecomposer::ValidateForFusion(graph)) {
-    analysis.outcome = AOTDecomposeOutcome::BlockedByValidation;
-    return analysis;
-  }
   AOTEffectPlan plan = {};
   if (!AOTEffectDecomposer::Decompose(graph, &plan)) {
     analysis.outcome = AOTDecomposeOutcome::UnsupportedShape;
     return analysis;
   }
-  analysis.outcome = AOTPlanExecutor::CanRoute(graph, plan) ? AOTDecomposeOutcome::FusablePointwise
-                                                            : AOTDecomposeOutcome::NotRoutable;
+  analysis.outcome = AOTDecomposeOutcome::FusablePointwise;
   return analysis;
 }
 
@@ -107,22 +102,6 @@ bool AOTEffectDecomposer::Lower(const std::vector<const FragmentProcessor*>& pro
     return false;
   }
   *graph = std::move(result);
-  return true;
-}
-
-bool AOTEffectDecomposer::ValidateForFusion(const AOTEffectGraph& graph) {
-  for (uint32_t index = 0; index < graph.nodeCount(); ++index) {
-    auto node = graph.nodeAt(AOTNodeID(index));
-    if (node == nullptr) {
-      return false;
-    }
-    // Alpha-bias color matrices (matrix[19] != 0, affectsTransparentBlack) fuse like any other
-    // matrix: the bias is pure uniform data to the kernel (clamp(M * c + v) is value-agnostic),
-    // and the ColorFilterShader SrcIn wrap lowers to an exact Porter-Duff blend op, so the
-    // fused evaluation matches the runtime tree up to the materialization quantization budget.
-    // Verified by AlphaBiasColorFilterOnBlendShaderMatchesRuntime; the historical rejection
-    // predates the P4 materialization semantics and proved to be conservative.
-  }
   return true;
 }
 
@@ -163,29 +142,19 @@ static bool DecomposeLinearPointwiseTail(const AOTEffectGraph& graph, AOTEffectP
     }
   }
 
+  // A single fused pass: the source plus at most MaxSlots operators. Longer chains are refused
+  // rather than split, since no production route submits a multi-pass plan.
+  if (graph.nodeCount() - 2 > AOTPointwiseTailProcessor::MaxSlots) {
+    return false;
+  }
   AOTEffectPlan result = {};
-  uint32_t nodeIndex = 1;
-  bool firstPass = true;
-  while (nodeIndex < graph.nodeCount()) {
-    AOTPassDescriptor pass = {};
-    pass.kernel = AOTKernelKind::PointwiseTail;
-    if (firstPass) {
-      pass.nodes.push_back(AOTNodeID(nodeIndex++));
-      firstPass = false;
-    } else {
-      pass.dependencies.push_back(static_cast<uint32_t>(result.passes.size() - 1));
-    }
-    size_t slotCount = 0;
-    while (nodeIndex < graph.nodeCount() && slotCount < AOTPointwiseTailProcessor::MaxSlots) {
-      pass.nodes.push_back(AOTNodeID(nodeIndex++));
-      ++slotCount;
-    }
-    pass.output = pass.nodes.back();
-    result.passes.push_back(std::move(pass));
+  AOTPassDescriptor pass = {};
+  pass.kernel = AOTKernelKind::PointwiseTail;
+  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+    pass.nodes.push_back(AOTNodeID(index));
   }
-  for (size_t index = 0; index < result.passes.size(); ++index) {
-    result.passes[index].materializesOutput = index + 1 < result.passes.size();
-  }
+  pass.output = graph.root();
+  result.passes.push_back(std::move(pass));
   result.output = graph.root();
   *plan = std::move(result);
   return true;
@@ -283,7 +252,6 @@ static bool DecomposePerlinNoiseChain(const AOTEffectGraph& graph, AOTEffectPlan
   pass.kernel = AOTKernelKind::PerlinNoiseFill;
   pass.nodes = std::move(passNodes);
   pass.output = pass.nodes.back();
-  pass.materializesOutput = false;
   result.passes.push_back(std::move(pass));
   result.output = graph.root();
   *plan = std::move(result);
@@ -331,7 +299,6 @@ static bool DecomposeYUVChain(const AOTEffectGraph& graph, AOTEffectPlan* plan) 
     pass.nodes.push_back(AOTNodeID(index));
   }
   pass.output = graph.root();
-  pass.materializesOutput = false;
   result.passes.push_back(std::move(pass));
   result.output = graph.root();
   *plan = std::move(result);
@@ -413,7 +380,6 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
   AOTEffectPlan result = {};
   AOTPassDescriptor pass = {};
   pass.output = graph.root();
-  pass.materializesOutput = false;
   for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
     auto node = graph.nodeAt(AOTNodeID(index));
     if (!reachable[index] || node->kind == AOTEffectKind::GeometryColorOpaqueInput ||
@@ -431,9 +397,6 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
       IsAOTGraphProfile(profile) ? AOTKernelKind::PointwiseGraph : AOTKernelKind::PointwiseChain;
   result.passes.push_back(std::move(pass));
   result.output = graph.root();
-  if (!AOTPlanExecutor::CanExecute(graph, result)) {
-    return false;
-  }
   *plan = std::move(result);
   return true;
 }
@@ -442,17 +405,19 @@ bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTEffectPlan* 
   // Keep simple noise on the existing compact kernel. Noise DAGs and ordinary pointwise DAGs
   // use their separate graph/chain families within shared budgets, without materialization.
   // Device-space and YUV sources retain their dedicated tail/source planners.
-  if (DecomposePerlinNoiseChain(graph, plan)) {
-    return true;
+  // Each planner proposes the plan for its shape; the first one the executor accepts wins, so
+  // every plan Decompose returns passes AOTPlanExecutor::CanExecute.
+  if (plan == nullptr) {
+    return false;
   }
-  if (DecomposePointwiseDAG(graph, plan)) {
-    return true;
-  }
-  if (DecomposeLinearPointwiseTail(graph, plan)) {
-    return true;
-  }
-  if (DecomposeYUVChain(graph, plan)) {
-    return true;
+  using Planner = bool (*)(const AOTEffectGraph&, AOTEffectPlan*);
+  for (Planner planner : {DecomposePerlinNoiseChain, DecomposePointwiseDAG,
+                          DecomposeLinearPointwiseTail, DecomposeYUVChain}) {
+    AOTEffectPlan candidate = {};
+    if (planner(graph, &candidate) && AOTPlanExecutor::CanExecute(graph, candidate)) {
+      *plan = std::move(candidate);
+      return true;
+    }
   }
   return false;
 }
@@ -491,12 +456,8 @@ const char* AOTFoldRouteOutcomeName(AOTFoldRouteOutcome outcome) {
       return "FoldBlockedByXP";
     case AOTFoldRouteOutcome::BlockedByLowering:
       return "BlockedByLowering";
-    case AOTFoldRouteOutcome::BlockedByValidation:
-      return "BlockedByValidation";
     case AOTFoldRouteOutcome::UnsupportedShape:
       return "UnsupportedShape";
-    case AOTFoldRouteOutcome::NotExecutable:
-      return "NotExecutable";
     case AOTFoldRouteOutcome::GPIncompatible:
       return "GPIncompatible";
     case AOTFoldRouteOutcome::Routable:
@@ -531,15 +492,9 @@ AOTFoldRouteOutcome AOTEffectDecomposer::AnalyzeFoldRoute(const ProgramInfo* pro
   if (!Lower(allProcessors, &graph)) {
     return AOTFoldRouteOutcome::BlockedByLowering;
   }
-  if (!ValidateForFusion(graph)) {
-    return AOTFoldRouteOutcome::BlockedByValidation;
-  }
   AOTEffectPlan plan = {};
   if (!Decompose(graph, &plan)) {
     return AOTFoldRouteOutcome::UnsupportedShape;
-  }
-  if (!AOTPlanExecutor::CanRoute(graph, plan)) {
-    return AOTFoldRouteOutcome::NotExecutable;
   }
   auto gp = programInfo->getGeometryProcessor();
   if (gp == nullptr) {

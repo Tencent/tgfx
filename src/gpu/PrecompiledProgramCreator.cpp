@@ -146,13 +146,7 @@ static std::string BuildPipelineSignature(const ProgramInfo* programInfo) {
 }
 
 static std::string ProgramKeyForDiagnostics(const ProgramInfo* programInfo) {
-  auto key = programInfo->programKeyForDiagnostics();
-  std::stringstream stream;
-  stream << key.size() << ":" << std::hex << std::setfill('0');
-  for (size_t i = 0; i < key.size(); ++i) {
-    stream << std::setw(8) << key.data()[i];
-  }
-  return stream.str();
+  return ProgramInfo::FormatDiagnosticKey(programInfo->programKeyForDiagnostics());
 }
 
 static PrecompiledFallbackRecord MakeFallbackRecord(

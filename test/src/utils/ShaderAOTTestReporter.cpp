@@ -154,13 +154,11 @@ static void AddOffscreenFillStats(OffscreenFillStats* target, const OffscreenFil
   target->calls += source.calls;
   target->coordOffsetNonZero += source.coordOffsetNonZero;
   target->lowerSucceeded += source.lowerSucceeded;
-  target->validateSucceeded += source.validateSucceeded;
   target->decomposeSucceeded += source.decomposeSucceeded;
   target->canExecute += source.canExecute;
   target->pointwiseChainPlans += source.pointwiseChainPlans;
   target->pointwiseGraphPlans += source.pointwiseGraphPlans;
   target->pointwiseTailPlans += source.pointwiseTailPlans;
-  target->multiPassPlans += source.multiPassPlans;
   target->precompiledPrograms += source.precompiledPrograms;
   target->programBuilderPrograms += source.programBuilderPrograms;
   target->precompiledCanExecute += source.precompiledCanExecute;
@@ -217,13 +215,11 @@ static nlohmann::json OffscreenFillStatsToJSON(const OffscreenFillStats& stats) 
   return {{"calls", stats.calls},
           {"coordOffsetNonZero", stats.coordOffsetNonZero},
           {"lowerSucceeded", stats.lowerSucceeded},
-          {"validateSucceeded", stats.validateSucceeded},
           {"decomposeSucceeded", stats.decomposeSucceeded},
           {"canExecute", stats.canExecute},
           {"pointwiseChainPlans", stats.pointwiseChainPlans},
           {"pointwiseGraphPlans", stats.pointwiseGraphPlans},
           {"pointwiseTailPlans", stats.pointwiseTailPlans},
-          {"multiPassPlans", stats.multiPassPlans},
           {"precompiledPrograms", stats.precompiledPrograms},
           {"programBuilderPrograms", stats.programBuilderPrograms},
           {"precompiledCanExecute", stats.precompiledCanExecute},
@@ -240,8 +236,6 @@ static const char* AOTDecomposeOutcomeName(AOTDecomposeOutcome outcome) {
       return "FusablePointwise";
     case AOTDecomposeOutcome::BlockedByLowering:
       return "BlockedByLowering";
-    case AOTDecomposeOutcome::BlockedByValidation:
-      return "BlockedByValidation";
     case AOTDecomposeOutcome::UnsupportedShape:
       return "UnsupportedShape";
     case AOTDecomposeOutcome::NotRoutable:

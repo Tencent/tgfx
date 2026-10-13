@@ -171,6 +171,9 @@ class ProgramInfo {
   // effect/pipeline signatures (which omit processor-key details).
   BytesKey programKeyForDiagnostics() const;
 
+  /** Formats a program key as the hex string the diagnostic records carry. */
+  static std::string FormatDiagnosticKey(const BytesKey& key);
+
   /**
    * Returns the GPU backend used by this program's render target.
    */

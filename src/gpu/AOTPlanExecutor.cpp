@@ -1,32 +1,14 @@
 
 #include "AOTPlanExecutor.h"
-#include <cstdio>
-#include <cstdlib>
 #include <utility>
-#include <vector>
-#include "core/shaders/PerlinNoiseShader.h"
 #include "gpu/AOTChainBuilder.h"
-#include "gpu/AOTMaterializationPolicy.h"
-#include "gpu/BackingFit.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/PrecompiledShaderCache.h"
-#include "gpu/ops/StandardDrawOp.h"
-#include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AOTPointwiseTailProcessor.h"
-#include "gpu/processors/AlphaThresholdFragmentProcessor.h"
-#include "gpu/processors/ColorMatrixFragmentProcessor.h"
-#include "gpu/processors/ColorSpaceXFormEffect.h"
-#include "gpu/processors/DeviceSpaceTextureEffect.h"
-#include "gpu/processors/LumaFragmentProcessor.h"
+#include "gpu/processors/AOTYUVChainProcessor.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
-#include "gpu/processors/RRectEffect.h"
-#include "gpu/processors/RectEffect.h"
-#include "gpu/processors/TextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "gpu/resources/RenderTarget.h"
 #include "gpu/tasks/AOTPlanRenderTask.h"
 #include "tgfx/gpu/Context.h"
-#include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
 namespace {
@@ -67,247 +49,119 @@ static bool ValidatePerlinNoiseSource(const AOTEffectGraph& graph, AOTNodeID nod
          input->kind == AOTEffectKind::GeometryColor;
 }
 
-static bool ValidateLinearPlan(const AOTEffectGraph& graph, const AOTEffectPlan& plan) {
-  if (plan.passes.empty() || !plan.output.isValid() || plan.output != graph.root()) {
-    return false;
-  }
-  for (size_t index = 0; index < plan.passes.size(); ++index) {
-    const auto& pass = plan.passes[index];
-    if (pass.resourceProfile != AOTResourceProfile::Automatic || !pass.output.isValid() ||
-        pass.nodes.empty() || pass.output != pass.nodes.back() ||
-        pass.materializesOutput != (index + 1 < plan.passes.size())) {
+// The operator slots after a linear pass's source: unary pointwise ops chained in order. The perlin
+// kernel additionally carries a const-color op or a blend whose other operand is an input-
+// independent constant (the constant itself stays out of pass.nodes).
+static bool ValidateLinearSlots(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
+                                bool allowConstOperands) {
+  AOTNodeID expectedInput = pass.nodes[0];
+  for (size_t opIndex = 1; opIndex < pass.nodes.size(); ++opIndex) {
+    auto node = graph.nodeAt(pass.nodes[opIndex]);
+    if (node == nullptr) {
       return false;
     }
-    if (pass.kernel == AOTKernelKind::PointwiseTail) {
-      size_t opIndex = 0;
-      AOTNodeID expectedInput = AOTNodeID::Invalid();
-      if (index == 0) {
-        if (!pass.dependencies.empty() || pass.nodes.size() > 3 ||
-            !ValidatePointwiseTailSource(graph, pass.nodes[0])) {
-          return false;
-        }
-        expectedInput = pass.nodes[0];
-        opIndex = 1;
-      } else {
-        if (pass.dependencies.size() != 1 || pass.dependencies[0] != index - 1 ||
-            pass.nodes.size() > 2) {
-          return false;
-        }
-        expectedInput = plan.passes[index - 1].output;
-      }
-      for (; opIndex < pass.nodes.size(); ++opIndex) {
-        if (!ValidatePointwiseTailOp(graph, pass.nodes[opIndex], expectedInput)) {
-          return false;
-        }
-        expectedInput = pass.nodes[opIndex];
-      }
-      continue;
+    bool accepted = ValidatePointwiseTailOp(graph, pass.nodes[opIndex], expectedInput);
+    if (!accepted && allowConstOperands && node->kind == AOTEffectKind::ConstColor) {
+      accepted = node->inputs.size() == 1 && node->inputs[0] == expectedInput;
     }
-    if (index == 0) {
-      if (!pass.dependencies.empty()) {
-        return false;
-      }
-      if (pass.kernel == AOTKernelKind::YUVTextureFill) {
-        // One fused pass: a YUV source plus up to three unary pointwise-operator slots,
-        // matching the three slot records the YUVTextureFillShader kernel carries. Blends and
-        // deeper tails are rejected at planning time and never reach here.
-        if (pass.nodes.empty() || pass.nodes.size() > 4) {
-          return false;
-        }
-        auto sourceNode = graph.nodeAt(pass.nodes[0]);
-        auto parameters = sourceNode != nullptr
-                              ? std::get_if<AOTTextureParameters>(&sourceNode->parameters)
-                              : nullptr;
-        if (sourceNode == nullptr || sourceNode->kind != AOTEffectKind::TextureSource ||
-            sourceNode->inputs.size() != 1 || sourceNode->inputs[0] != AOTNodeID(0) ||
-            parameters == nullptr || !parameters->isYUV || parameters->hasRGBAAA ||
-            parameters->samplingKind != AOTTextureSamplingKind::Plain) {
-          return false;
-        }
-        AOTNodeID expectedInput = pass.nodes[0];
-        for (size_t opIndex = 1; opIndex < pass.nodes.size(); ++opIndex) {
-          if (!ValidatePointwiseTailOp(graph, pass.nodes[opIndex], expectedInput)) {
-            return false;
-          }
-          expectedInput = pass.nodes[opIndex];
-        }
-        continue;
-      }
-      if (pass.kernel == AOTKernelKind::PerlinNoiseFill) {
-        // One fused pass: a perlin source plus up to three pointwise-operator slots, matching the
-        // three slot records the PerlinNoiseFillShader kernel carries. A slot may also be a
-        // const-color op or a blend with a constant side operand.
-        if (pass.nodes.empty() || pass.nodes.size() > 4 ||
-            !ValidatePerlinNoiseSource(graph, pass.nodes[0])) {
-          return false;
-        }
-        AOTNodeID expectedInput = pass.nodes[0];
-        for (size_t opIndex = 1; opIndex < pass.nodes.size(); ++opIndex) {
-          auto node = graph.nodeAt(pass.nodes[opIndex]);
-          if (node == nullptr) {
-            return false;
-          }
-          if (ValidatePointwiseTailOp(graph, pass.nodes[opIndex], expectedInput)) {
-            expectedInput = pass.nodes[opIndex];
-            continue;
-          }
-          if (node->kind == AOTEffectKind::ConstColor && node->inputs.size() == 1 &&
-              node->inputs[0] == expectedInput) {
-            expectedInput = pass.nodes[opIndex];
-            continue;
-          }
-          if (node->kind == AOTEffectKind::Blend && node->inputs.size() == 2) {
-            auto blendParams = std::get_if<AOTBlendParameters>(&node->parameters);
-            auto* srcNode = graph.nodeAt(node->inputs[0]);
-            auto* dstNode = graph.nodeAt(node->inputs[1]);
-            bool srcIsConst = srcNode != nullptr && srcNode->kind == AOTEffectKind::ConstColor;
-            bool dstIsConst = dstNode != nullptr && dstNode->kind == AOTEffectKind::ConstColor;
-            AOTNodeID chained = srcIsConst ? node->inputs[1] : node->inputs[0];
-            if (blendParams == nullptr || blendParams->childType == 2 || srcIsConst == dstIsConst ||
-                chained != expectedInput ||
-                !AOTConstColorIsInputIndependent(graph, srcIsConst ? srcNode : dstNode)) {
-              return false;
-            }
-            expectedInput = pass.nodes[opIndex];
-            continue;
-          }
-          return false;
-        }
-      } else {
-        return false;
-      }
-      continue;
+    if (!accepted && allowConstOperands && node->kind == AOTEffectKind::Blend &&
+        node->inputs.size() == 2) {
+      auto blendParams = std::get_if<AOTBlendParameters>(&node->parameters);
+      auto* srcNode = graph.nodeAt(node->inputs[0]);
+      auto* dstNode = graph.nodeAt(node->inputs[1]);
+      bool srcIsConst = srcNode != nullptr && srcNode->kind == AOTEffectKind::ConstColor;
+      bool dstIsConst = dstNode != nullptr && dstNode->kind == AOTEffectKind::ConstColor;
+      AOTNodeID chained = srcIsConst ? node->inputs[1] : node->inputs[0];
+      accepted = blendParams != nullptr && blendParams->childType != 2 &&
+                 srcIsConst != dstIsConst && chained == expectedInput &&
+                 AOTConstColorIsInputIndependent(graph, srcIsConst ? srcNode : dstNode);
     }
-    // The legacy linear TextureFill/TextureColorMatrix/TexturedColorMatrix/TexturedLuma kernels
-    // are no longer produced by the decomposer's planners, so any non-first pass that is not a
-    // PointwiseTail segment is unreachable and rejected outright.
-    return false;
+    if (!accepted) {
+      return false;
+    }
+    expectedInput = pass.nodes[opIndex];
   }
-  return plan.output == plan.passes.back().output;
+  return true;
+}
+
+static bool ValidateYUVSource(const AOTEffectGraph& graph, AOTNodeID nodeID) {
+  auto node = graph.nodeAt(nodeID);
+  auto parameters =
+      node != nullptr ? std::get_if<AOTTextureParameters>(&node->parameters) : nullptr;
+  return parameters != nullptr && node->kind == AOTEffectKind::TextureSource &&
+         node->inputs.size() == 1 && node->inputs[0] == AOTNodeID(0) && parameters->isYUV &&
+         !parameters->hasRGBAAA && parameters->samplingKind == AOTTextureSamplingKind::Plain;
 }
 
 }  // namespace
 
 bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPlan& plan) {
-  // PointwiseChain/PointwiseGraph plans fuse the whole DAG; the linear-pass invariants do not
-  // apply to it. The chain builder's own planner decides: it runs the slot encoding (including the
-  // extra TEX_MODULATE instruction of a computed-input texture and the closure of every input
-  // edge), the per-kind parameter blocks, the resource profile and the register allocation that
-  // construction runs, without creating processors. Clip slots appended from the draw's coverage
-  // FPs are not part of the plan; the builder re-plans with them and refuses what no longer fits.
-  if (plan.passes.size() == 1 && IsAOTPointwiseDAGKernel(plan.passes[0].kernel)) {
-    const auto& pass = plan.passes[0];
-    if (!plan.output.isValid() || plan.output != graph.root() || pass.output != plan.output ||
-        pass.materializesOutput || pass.nodes.empty() || !pass.dependencies.empty()) {
-      return false;
-    }
+  if (plan.passes.size() != 1 || !plan.output.isValid() || plan.output != graph.root()) {
+    return false;
+  }
+  const auto& pass = plan.passes[0];
+  if (pass.nodes.empty() || pass.output != plan.output) {
+    return false;
+  }
+  // PointwiseChain/PointwiseGraph passes fuse the whole DAG. The chain builder's own planner
+  // decides: it runs the slot encoding (including the extra TEX_MODULATE instruction of a
+  // computed-input texture and the closure of every input edge), the per-kind parameter blocks,
+  // the resource profile and the register allocation that construction runs, without creating
+  // processors. Clip slots appended from the draw's coverage FPs are not part of the plan; the
+  // builder re-plans with them and refuses what no longer fits.
+  if (IsAOTPointwiseDAGKernel(pass.kernel)) {
     return AOTChainBuilder::PlanChainPass(graph, pass);
   }
-  return ValidateLinearPlan(graph, plan);
-}
-
-bool AOTPlanExecutor::CanRoute(const AOTEffectGraph& graph, const AOTEffectPlan& plan) {
-  if (plan.passes.size() != 1) {
+  // The linear kernels: a source node followed by a bounded run of operator slots.
+  if (pass.resourceProfile != AOTResourceProfile::Automatic || pass.output != pass.nodes.back()) {
     return false;
   }
-  auto kernel = plan.passes[0].kernel;
-  if (kernel != AOTKernelKind::PointwiseTail && !IsAOTPointwiseDAGKernel(kernel) &&
-      kernel != AOTKernelKind::PerlinNoiseFill && kernel != AOTKernelKind::YUVTextureFill) {
-    return false;
+  switch (pass.kernel) {
+    case AOTKernelKind::PointwiseTail:
+      return pass.nodes.size() <= 1 + AOTPointwiseTailProcessor::MaxSlots &&
+             ValidatePointwiseTailSource(graph, pass.nodes[0]) &&
+             ValidateLinearSlots(graph, pass, false);
+    case AOTKernelKind::YUVTextureFill:
+      return pass.nodes.size() <= 1 + AOTYUVChainProcessor::MaxPointwiseSlots &&
+             ValidateYUVSource(graph, pass.nodes[0]) && ValidateLinearSlots(graph, pass, false);
+    case AOTKernelKind::PerlinNoiseFill:
+      return pass.nodes.size() <= 1 + PerlinNoiseFragmentProcessor::MaxPointwiseSlots &&
+             ValidatePerlinNoiseSource(graph, pass.nodes[0]) &&
+             ValidateLinearSlots(graph, pass, true);
+    default:
+      return false;
   }
-  return CanExecute(graph, plan);
 }
 
-PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t renderFlags,
-                                               const AOTEffectGraph& graph,
-                                               const AOTEffectPlan& plan, const Rect& deviceBounds,
+PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, const AOTEffectGraph& graph,
+                                               const AOTEffectPlan& plan,
                                                std::shared_ptr<RenderTargetProxy> destination,
                                                PlacementPtr<DrawOp>* originalDraw,
-                                               const Point& fpCoordOffset, bool clearDestination) {
+                                               bool clearDestination) {
   if (context == nullptr || destination == nullptr || destination->getContext() != context ||
       originalDraw == nullptr || *originalDraw == nullptr ||
-      (*originalDraw)->type() == DrawOp::Type::StencilCoverPathDrawOp || deviceBounds.isEmpty() ||
-      !CanExecute(graph, plan)) {
+      (*originalDraw)->type() == DrawOp::Type::StencilCoverPathDrawOp || !CanExecute(graph, plan)) {
     return nullptr;
   }
-  for (const auto& pass : plan.passes) {
-    for (auto id : pass.nodes) {
-      const auto* node = graph.nodeAt(id);
-      const auto* noise =
-          node != nullptr ? std::get_if<AOTPerlinNoiseParameters>(&node->parameters) : nullptr;
-      if (noise != nullptr && (noise->permutationsView == nullptr || noise->noiseView == nullptr ||
-                               noise->permutationsView->getContext() != context ||
-                               noise->noiseView->getContext() != context)) {
-        return nullptr;
-      }
+  const auto& pass = plan.passes[0];
+  for (auto id : pass.nodes) {
+    const auto* node = graph.nodeAt(id);
+    const auto* noise =
+        node != nullptr ? std::get_if<AOTPerlinNoiseParameters>(&node->parameters) : nullptr;
+    if (noise != nullptr && (noise->permutationsView->getContext() != context ||
+                             noise->noiseView->getContext() != context)) {
+      return nullptr;
     }
   }
-  // One geometry for the whole plan. Every intermediate pass renders into a target of exactly this
-  // size and the terminal draw samples the last one back with its top-left, so the capture area and
-  // the sampling translation are the same value by construction. The apron is zero here: all six
-  // kernel kinds are pointwise, so a pass reads its input at the output coordinate only, and each
-  // intermediate texture is pixel-aligned with the next target (uvMatrix is identity). A non-zero
-  // apron would break that alignment instead of fixing a sampling error.
-  auto geometry = AOTMaterializationPolicy::PrepareGeometry(deviceBounds, 0.0f);
-  if (geometry.isEmpty()) {
+  auto allocator = context->drawingManager()->drawingAllocator();
+  auto processor = AOTChainBuilder::BuildFPForPass(allocator, graph, pass);
+  if (processor == nullptr) {
     return nullptr;
   }
-  // Intermediate fills must present the rebuilt chain with the same local coordinates the original
-  // processors see: the draw's own offset plus any FP-space translation the caller's geometry
-  // applies (zero for OpsCompositor draws; the coordOffset of an offscreen fill). The terminal
-  // draw samples the last intermediate back with trans(-geometry.coordOffset), which is exact for
-  // both cases: fragCoord + fpCoordOffset - (geometry.coordOffset + fpCoordOffset) maps a
-  // destination pixel to its intermediate texel with no leftover term.
-  auto intermediateOffset = geometry.coordOffset + fpCoordOffset;
-  auto drawingManager = context->drawingManager();
-  auto allocator = drawingManager->drawingAllocator();
-  std::vector<AOTIntermediatePass> intermediatePasses = {};
-  intermediatePasses.reserve(plan.passes.size() - 1);
-  std::shared_ptr<TextureProxy> previousTexture = nullptr;
-  DrawOp::ColorProcessorList terminalColors = {};
-
-  for (size_t index = 0; index < plan.passes.size(); ++index) {
-    PlacementPtr<FragmentProcessor> source = nullptr;
-    if (previousTexture != nullptr) {
-      // Intermediate consumers run in offscreen-local coordinates. Only the terminal draw samples
-      // that texture from the destination's device coordinates and needs the bounds translation.
-      auto deviceMatrix = index + 1 == plan.passes.size()
-                              ? Matrix::MakeTrans(-geometry.bounds.left, -geometry.bounds.top)
-                              : Matrix::I();
-      source = DeviceSpaceTextureEffect::Make(allocator, previousTexture, deviceMatrix);
-      if (source == nullptr) {
-        return nullptr;
-      }
-    }
-    auto processor =
-        AOTChainBuilder::BuildFPForPass(allocator, graph, plan.passes[index], std::move(source));
-    if (processor == nullptr) {
-      return nullptr;
-    }
-    if (index + 1 == plan.passes.size()) {
-      terminalColors.emplace_back(std::move(processor));
-      break;
-    }
-
-    auto materialized = AOTMaterializationPolicy::AllocateTarget(context, geometry);
-    if (materialized.renderTarget == nullptr) {
-      return nullptr;
-    }
-    auto target = std::move(materialized.renderTarget);
-    auto drawOp = drawingManager->makeFillDrawOp(target, std::move(processor), renderFlags,
-                                                 intermediateOffset);
-    if (drawOp == nullptr) {
-      return nullptr;
-    }
-    previousTexture = target->asTextureProxy();
-    if (previousTexture == nullptr) {
-      return nullptr;
-    }
-    intermediatePasses.push_back({std::move(target), std::move(drawOp)});
-  }
-
-  auto task = allocator->make<AOTPlanRenderTask>(allocator, std::move(intermediatePasses),
-                                                 std::move(terminalColors), std::move(destination));
+  DrawOp::ColorProcessorList planColors = {};
+  planColors.emplace_back(std::move(processor));
+  auto task =
+      allocator->make<AOTPlanRenderTask>(allocator, std::move(planColors), std::move(destination));
   if (task == nullptr) {
     return nullptr;
   }

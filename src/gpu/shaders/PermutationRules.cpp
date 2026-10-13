@@ -67,7 +67,7 @@ std::optional<RuleComposedValues> ComposeRoundStrokeRect(const RoundStrokeRectIn
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateRoundStrokeRectReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumerateRoundStrokeRectReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int isCoverageAA = 0; isCoverageAA <= 1; ++isCoverageAA) {
     for (int hasCommonColor = 0; hasCommonColor <= 1; ++hasCommonColor) {
@@ -103,7 +103,7 @@ std::optional<RuleComposedValues> ComposeMaskFill(const MaskFillInputs& inputs) 
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateMaskFillReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumerateMaskFillReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int xpType = -1; xpType <= 2; ++xpType) {
     MaskFillInputs inputs;
@@ -129,7 +129,7 @@ std::optional<RuleComposedValues> ComposeHairlineLine(const HairlineLineInputs& 
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineLineReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineLineReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int xpType = -1; xpType <= 2; ++xpType) {
     HairlineLineInputs inputs;
@@ -155,7 +155,7 @@ std::optional<RuleComposedValues> ComposeHairlineQuad(const HairlineQuadInputs& 
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineQuadReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineQuadReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int xpType = -1; xpType <= 2; ++xpType) {
     HairlineQuadInputs inputs;
@@ -182,7 +182,7 @@ std::optional<RuleComposedValues> ComposeQuadColorFill(const QuadColorFillInputs
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadColorFillReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadColorFillReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int xpType = -1; xpType <= 2; ++xpType) {
     for (int hasMaskTexture = 0; hasMaskTexture <= 1; ++hasMaskTexture) {
@@ -215,7 +215,7 @@ std::optional<RuleComposedValues> ComposeSolidColorFill(const SolidColorFillInpu
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateSolidColorFillReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumerateSolidColorFillReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int isCoverageAA = 0; isCoverageAA <= 1; ++isCoverageAA) {
     for (int xpType = -1; xpType <= 2; ++xpType) {
@@ -252,7 +252,7 @@ std::optional<RuleComposedValues> ComposeComplexEllipseFill(
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexEllipseFillReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexEllipseFillReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int isStroke = 0; isStroke <= 1; ++isStroke) {
     for (int hasCommonColor = 0; hasCommonColor <= 1; ++hasCommonColor) {
@@ -290,7 +290,7 @@ std::optional<RuleComposedValues> ComposeEllipseFill(const EllipseFillInputs& in
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateEllipseFillReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumerateEllipseFillReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int hasCommonColor = 0; hasCommonColor <= 1; ++hasCommonColor) {
     for (int deviceMask = 0; deviceMask <= 1; ++deviceMask) {
@@ -336,7 +336,7 @@ std::optional<RuleComposedValues> ComposeNonAARRectFill(const NonAARRectFillInpu
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateNonAARRectFillReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumerateNonAARRectFillReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int hasCommonColor = 0; hasCommonColor <= 1; ++hasCommonColor) {
     for (int isStroke = 0; isStroke <= 1; ++isStroke) {
@@ -379,7 +379,7 @@ std::optional<RuleComposedValues> ComposeComplexNonAARRectFill(
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexNonAARRectFillReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexNonAARRectFillReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int hasCommonColor = 0; hasCommonColor <= 1; ++hasCommonColor) {
     for (int isStroke = 0; isStroke <= 1; ++isStroke) {
@@ -419,7 +419,7 @@ std::optional<RuleComposedValues> ComposeMeshFill(const MeshFillInputs& inputs) 
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateMeshFillReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumerateMeshFillReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int hasTexCoords = 0; hasTexCoords <= 1; ++hasTexCoords) {
     for (int hasColors = 0; hasColors <= 1; ++hasColors) {
@@ -459,7 +459,7 @@ std::optional<RuleComposedValues> ComposePerlinNoiseFill(const PerlinNoiseFillIn
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumeratePerlinNoiseFillReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumeratePerlinNoiseFillReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
     for (int xpType = -1; xpType <= 2; ++xpType) {
@@ -491,7 +491,7 @@ std::optional<RuleComposedValues> ComposeTextureColorMatrix(
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateTextureColorMatrixReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumerateTextureColorMatrixReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int xpType = -1; xpType <= 2; ++xpType) {
     TextureColorMatrixInputs inputs;
@@ -521,7 +521,7 @@ std::optional<RuleComposedValues> ComposeYUVTextureFill(const YUVTextureFillInpu
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateYUVTextureFillReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumerateYUVTextureFillReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int hasUVMatrix = 0; hasUVMatrix <= 1; ++hasUVMatrix) {
     for (int yuvFormat = -1; yuvFormat <= 1; ++yuvFormat) {
@@ -560,7 +560,7 @@ std::optional<RuleComposedValues> ComposeDeviceSpaceTexture(
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateDeviceSpaceTextureReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumerateDeviceSpaceTextureReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
     for (int xpType = -1; xpType <= 2; ++xpType) {
@@ -598,7 +598,7 @@ std::optional<RuleComposedValues> ComposeShapeInstancedTextureCoverage(
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedTextureCoverageReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedTextureCoverageReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int gradient = 0; gradient <= 1; ++gradient) {
     for (int hasColors = 0; hasColors <= 1; ++hasColors) {
@@ -637,7 +637,7 @@ std::optional<RuleComposedValues> ComposeShapeInstancedFill(
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedFillReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedFillReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int hasColors = 0; hasColors <= 1; ++hasColors) {
     for (int isCoverageAA = 0; isCoverageAA <= 1; ++isCoverageAA) {
@@ -671,7 +671,7 @@ std::optional<RuleComposedValues> ComposeTextureFill(const TextureFillInputs& in
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateTextureFillReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumerateTextureFillReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int deviceMask = 0; deviceMask <= 1; ++deviceMask) {
     for (int xpType = -1; xpType <= 2; ++xpType) {
@@ -704,7 +704,7 @@ std::optional<RuleComposedValues> ComposeTiledTextureFill(const TiledTextureFill
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateTiledTextureFillReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumerateTiledTextureFillReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
     for (int xpType = -1; xpType <= 2; ++xpType) {
@@ -743,7 +743,7 @@ std::optional<RuleComposedValues> ComposeQuadTextureFill(const QuadTextureFillIn
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadTextureFillReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadTextureFillReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int hasUVCoord = 0; hasUVCoord <= 1; ++hasUVCoord) {
     for (int hasSubset = 0; hasSubset <= 1; ++hasSubset) {
@@ -779,7 +779,7 @@ std::optional<RuleComposedValues> ComposeGaussianBlur1D(const GaussianBlur1DInpu
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateGaussianBlur1DReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumerateGaussianBlur1DReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int xpType = -1; xpType <= 2; ++xpType) {
     GaussianBlur1DInputs inputs;
@@ -805,7 +805,7 @@ std::optional<RuleComposedValues> ComposeGlassUDFTentBlur(const GlassUDFTentBlur
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassUDFTentBlurReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassUDFTentBlurReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int xpType = -1; xpType <= 2; ++xpType) {
     GlassUDFTentBlurInputs inputs;
@@ -837,7 +837,7 @@ std::optional<RuleComposedValues> ComposeGlassRefraction(const GlassRefractionIn
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassRefractionReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassRefractionReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int gpKind = 0; gpKind < 2; ++gpKind) {
     for (int geometryKind = 0; geometryKind < 4; ++geometryKind) {
@@ -877,7 +877,7 @@ std::optional<RuleComposedValues> ComposeTexturedEffect(const TexturedEffectInpu
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateTexturedEffectReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumerateTexturedEffectReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
     for (int xpType = -1; xpType <= 2; ++xpType) {
@@ -911,7 +911,7 @@ std::optional<RuleComposedValues> ComposePointwiseTail(const PointwiseTailInputs
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseTailReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseTailReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
     for (int xpType = -1; xpType <= 2; ++xpType) {
@@ -945,7 +945,7 @@ std::optional<RuleComposedValues> ComposePointwiseDirect(const PointwiseDirectIn
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseDirectReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseDirectReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
     for (int xpType = -1; xpType <= 2; ++xpType) {
@@ -981,7 +981,7 @@ std::optional<RuleComposedValues> ComposeAtlasTextFill(const AtlasTextFillInputs
   return values;
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateAtlasTextFillReachable() {
+static std::set<std::pair<uint32_t, uint32_t>> EnumerateAtlasTextFillReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
     for (int hasCommonColor = 0; hasCommonColor <= 1; ++hasCommonColor) {
@@ -1057,13 +1057,10 @@ static std::optional<RuleComposedValues> ComposePointwiseGP(const PointwiseChain
     default:
       return std::nullopt;
   }
-  // Coverage subtrees draw their unit input from the GP coverage. The rect layouts supply it as
-  // the vCoverage varying; the ellipse layout evaluates its per-pixel edge coverage ahead of the
-  // chain in the kernel (ellipseGpCoverage), so both rect and ellipse layouts carry subtrees.
-  // The remaining non-rect layouts (mesh, atlas) supply neither and stay rejected.
-  if (inputs.hasCoverageSubtree && gpLayout > 1) {
-    return std::nullopt;
-  }
+  // Coverage subtrees draw their unit input from the GP coverage: the rect and mesh layouts supply
+  // it as the vCoverage varying, and the ellipse layout evaluates its per-pixel edge coverage ahead
+  // of the chain in the kernel (ellipseGpCoverage). The atlas route never carries a subtree: its
+  // glyph leaf rides the clip-coverage register instead (AOTChainBuilder).
   // Four-leaf variants apply the mask through a runtime uniform, so the compile-time mask
   // dimension exists only for leaf-free chains, and those stay rect-only without quad attributes.
   int hasMaskTexture = inputs.textureCount == 0 && inputs.hasMask ? 1 : 0;

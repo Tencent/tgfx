@@ -631,21 +631,6 @@ TGFX_TEST(ShaderPermutationTest, TextureFillVertexDomainIsInvariant) {
   EXPECT_EQ(TextureFillShader::EncodeVertex(), 0u);
 }
 
-TGFX_TEST(ShaderPermutationTest, TextureFillTypedEncodingMatchesDomains) {
-  auto vertexDomain = TextureFillShader::VD::domain();
-  EXPECT_EQ(vertexDomain.totalCount(), 1u);
-  EXPECT_EQ(TextureFillShader::EncodeVertex(), 0u);
-
-  auto fragmentDomain = TextureFillShader::FD::domain();
-  for (uint32_t index = 0; index < fragmentDomain.totalCount(); index++) {
-    auto values = fragmentDomain.decode(index);
-    TextureFillShader::FragmentValues typedValues = {};
-    typedValues.xp = static_cast<uint32_t>(values[TextureFillShader::FD::HAS_XP]);
-    typedValues.deviceMask = static_cast<uint32_t>(values[TextureFillShader::FD::HAS_DEVICE_MASK]);
-    EXPECT_EQ(TextureFillShader::EncodeFragment(typedValues), index);
-  }
-}
-
 static void ExpectBundleEntryCounts(const PrecompiledShaderCache& cache,
                                     const std::string& profileTag) {
   size_t vertexCount = 0;

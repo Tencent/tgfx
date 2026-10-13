@@ -28,6 +28,8 @@
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
+class AOTEffectGraph;
+struct AOTEffectPlan;
 
 /**
  * Rebuilds a draw's leading color chain (its materialization-prone source processor) with the
@@ -232,6 +234,13 @@ class OpsCompositor {
                  float drawScale, ColorChainRebuild rebuildColorChain = nullptr);
 
   void submitDrawOps();
+
+  /**
+   * Builds the AOT plan task for op and enqueues it after the pending ops. Returns false, leaving op
+   * untouched, when the executor refuses the plan.
+   */
+  bool submitPlanTask(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
+                      PlacementPtr<DrawOp>* op);
 
   friend class DrawingManager;
   friend class PendingOpsAutoReset;

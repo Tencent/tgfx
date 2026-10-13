@@ -20,6 +20,7 @@
 
 #include "gpu/AOTEffect.h"
 #include "gpu/UniformData.h"
+#include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
 
@@ -32,5 +33,14 @@ namespace tgfx {
  */
 void UploadAOTPointwiseSlot(UniformData* uniformData, size_t slotIndex, uint32_t slotCapacity,
                             const AOTPointwiseSlot& slot);
+
+/**
+ * Emits the runtime-generated (JIT) code of the first slotCount pointwise-operator slots, applied
+ * in order to args.outputColor. It declares the same per-slot std140 arrays (slotCapacity
+ * elements) the precompiled kernels read, so UploadAOTPointwiseSlot serves both program kinds.
+ * localPrefix keeps the emitted local variable names unique within the shader.
+ */
+void EmitAOTPointwiseSlots(FragmentProcessor::EmitArgs& args, const AOTPointwiseSlot* slots,
+                           size_t slotCount, uint32_t slotCapacity, const std::string& localPrefix);
 
 }  // namespace tgfx
