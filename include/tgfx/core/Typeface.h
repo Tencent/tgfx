@@ -124,6 +124,15 @@ class Typeface {
   virtual bool hasOutlines() const = 0;
 
   /**
+   * Returns true if the glyph outlines of this typeface describe their filled area with the
+   * even-odd rule instead of the winding rule. Such outlines run nested contours in the same
+   * direction, so a winding rasterizer fills their counters in. Defaults to false.
+   */
+  virtual bool usesEvenOddFill() const {
+    return false;
+  }
+
+  /**
    * Returns the glyph ID corresponds to the specified glyph name. The glyph name must be in utf-8
    * encoding. Returns 0 if the glyph name is not in this typeface.
    */

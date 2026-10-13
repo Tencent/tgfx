@@ -36,6 +36,19 @@ std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<TextBlob> textBlob) {
   return nullptr;
 }
 
+TextShape::TextShape(std::shared_ptr<TextBlob> textBlob) : textBlob(std::move(textBlob)) {
+  // onGetPath() appends the glyph outlines into one path, so a single parity typeface decides
+  // the rule for the whole blob. Mixing both kinds in one blob cannot be expressed with a single
+  // fill type; parity wins because filled-in counters are the more visible error.
+  for (auto run : *this->textBlob) {
+    auto typeface = run.font.getTypeface();
+    if (typeface != nullptr && typeface->usesEvenOddFill()) {
+      evenOddFill = true;
+      break;
+    }
+  }
+}
+
 Rect TextShape::onGetBounds() const {
   return textBlob->getBounds();
 }
@@ -72,6 +85,10 @@ Path TextShape::onGetPath(float resolutionScale) const {
   }
   auto inverseMatrix = Matrix::MakeScale(1.f / resolutionScale, 1.f / resolutionScale);
   totalPath.transform(inverseMatrix);
+  // addPath() in append mode keeps the destination fill type, which for an initially empty path
+  // means the first glyph silently decides it. State it explicitly so the path and fillType()
+  // always agree.
+  totalPath.setFillType(fillType());
   return totalPath;
 }
 }  // namespace tgfx

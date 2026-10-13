@@ -165,14 +165,13 @@ class PathUserScalerContext final : public UserScalerContext {
   float fauxBoldSize = 0.0f;
 };
 
-std::shared_ptr<UserTypeface> PathUserTypeface::Make(uint32_t builderID,
-                                                     const std::string& fontFamily,
-                                                     const std::string& fontStyle,
-                                                     const FontMetrics& fontMetrics,
-                                                     const Rect& fontBounds, int unitsPerEm,
-                                                     const GlyphRecords& glyphRecords) {
-  auto typeface = std::shared_ptr<PathUserTypeface>(new PathUserTypeface(
-      builderID, fontFamily, fontStyle, fontMetrics, fontBounds, unitsPerEm, glyphRecords));
+std::shared_ptr<UserTypeface> PathUserTypeface::Make(
+    uint32_t builderID, const std::string& fontFamily, const std::string& fontStyle,
+    const FontMetrics& fontMetrics, const Rect& fontBounds, int unitsPerEm,
+    const GlyphRecords& glyphRecords, bool evenOddFill) {
+  auto typeface = std::shared_ptr<PathUserTypeface>(
+      new PathUserTypeface(builderID, fontFamily, fontStyle, fontMetrics, fontBounds, unitsPerEm,
+                           glyphRecords, evenOddFill));
   typeface->weakThis = typeface;
   return typeface;
 }
@@ -180,9 +179,9 @@ std::shared_ptr<UserTypeface> PathUserTypeface::Make(uint32_t builderID,
 PathUserTypeface::PathUserTypeface(uint32_t builderID, const std::string& fontFamily,
                                    const std::string& fontStyle, const FontMetrics& fontMetrics,
                                    const Rect& fontBounds, int unitsPerEm,
-                                   const GlyphRecords& glyphRecords)
+                                   const GlyphRecords& glyphRecords, bool evenOddFill)
     : UserTypeface(builderID, fontFamily, fontStyle, fontMetrics, fontBounds, unitsPerEm),
-      glyphRecords(glyphRecords) {
+      glyphRecords(glyphRecords), _evenOddFill(evenOddFill) {
 }
 
 size_t PathUserTypeface::glyphsCount() const {
@@ -195,6 +194,10 @@ bool PathUserTypeface::hasColor() const {
 
 bool PathUserTypeface::hasOutlines() const {
   return true;
+}
+
+bool PathUserTypeface::usesEvenOddFill() const {
+  return _evenOddFill;
 }
 
 std::shared_ptr<ScalerContext> PathUserTypeface::onCreateScalerContext(float size) const {

@@ -50,6 +50,10 @@ GlyphID PathTypefaceBuilder::addGlyph(const Path& path, float advance) {
   auto glyphID = static_cast<GlyphID>(glyphRecords.size() + 1);
   auto bounds = path.getBounds();
   fontBounds.join(bounds);
+  auto fillType = path.getFillType();
+  if (fillType == PathFillType::EvenOdd || fillType == PathFillType::InverseEvenOdd) {
+    _evenOddFill = true;
+  }
   glyphRecords.push_back({PathProvider::Wrap(path), advance});
   return glyphID;
 }
@@ -72,7 +76,7 @@ std::shared_ptr<Typeface> PathTypefaceBuilder::detach() const {
     return nullptr;
   }
   return PathUserTypeface::Make(uniqueID, _fontFamily, _fontStyle, _fontMetrics, fontBounds,
-                                _unitsPerEm, glyphRecords);
+                                _unitsPerEm, glyphRecords, _evenOddFill);
 }
 
 ImageTypefaceBuilder::ImageTypefaceBuilder(int unitsPerEm) : CustomTypefaceBuilder(unitsPerEm) {

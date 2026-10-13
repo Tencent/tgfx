@@ -29,7 +29,10 @@ class GlyphShape : public Shape {
   explicit GlyphShape(Font font, GlyphID glyphID);
 
   PathFillType fillType() const override {
-    return PathFillType::Winding;
+    // Must agree with the fill type onGetPath() reports, otherwise the GPU stencil pass and the
+    // CPU rasterizer disagree about the same geometry. Resolved once in the constructor because
+    // this is queried on every fill.
+    return evenOddFill ? PathFillType::EvenOdd : PathFillType::Winding;
   }
 
   Rect onGetBounds() const override;
@@ -46,5 +49,8 @@ class GlyphShape : public Shape {
  private:
   Font font;
   GlyphID glyphID = 0;
+  // The typeface cannot change after construction, so the fill rule is fixed as well. getUniqueKey()
+  // already covers the typeface ID, so a cached value can never go stale behind the key.
+  bool evenOddFill = false;
 };
 }  // namespace tgfx

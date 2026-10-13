@@ -56,6 +56,10 @@ class FTTypeface : public Typeface {
     return _hasOutlines;
   }
 
+  bool usesEvenOddFill() const override {
+    return _parityOutlines;
+  }
+
   GlyphID getGlyphID(Unichar unichar) const override;
 
   std::unique_ptr<Stream> openStream() const override;
@@ -75,6 +79,7 @@ class FTTypeface : public Typeface {
   FT_Face face = nullptr;
   bool _hasColor = false;
   bool _hasOutlines = true;
+  bool _parityOutlines = false;
 
 #if defined(__ANDROID__) || defined(ANDROID)
   Global<jobject> typeface;
