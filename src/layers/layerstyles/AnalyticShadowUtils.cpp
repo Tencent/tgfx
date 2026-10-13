@@ -70,8 +70,6 @@ std::optional<RRect> AnalyticShadowUtils::MakeShadowShape(const LayerStyleInput&
   // concentric RRects. The RRect draw op still approximates strokes that way when the corner
   // ellipse is not too elongated relative to the stroke width; accepting the same approximation
   // here is left as a possible future optimization.
-  // An exact stroke outline is hard to express, so a FillStroke outline is treated as its fill
-  // outline outset by the stroke, ignoring the effect difference.
   if (styledShape.type == StyledShapeType::Stroke) {
     return std::nullopt;
   }
@@ -110,6 +108,8 @@ std::optional<RRect> AnalyticShadowUtils::MakeShadowShape(const LayerStyleInput&
   }
 
   auto outset = spread;
+  // A FillStroke outline is treated as its fill outline outset by the stroke, ignoring the
+  // effect difference.
   if (styledShape.type == StyledShapeType::FillStroke) {
     outset += SpreadUtils::StrokeOutset(styledShape.strokeWidth, styledShape.strokeAlign);
   }

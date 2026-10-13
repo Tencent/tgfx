@@ -19,7 +19,6 @@
 #pragma once
 
 #include <memory>
-#include <optional>
 #include <utility>
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"

@@ -29,7 +29,8 @@ class ShaderUtils {
  public:
   /**
    * Returns the shader behind any MatrixShader wrappers together with their accumulated
-   * transform.
+   * transform. The returned matrix maps the unwrapped shader's local space to the original
+   * shader's space.
    */
   static std::pair<std::shared_ptr<Shader>, Matrix> UnwrapMatrixShader(
       std::shared_ptr<Shader> shader);

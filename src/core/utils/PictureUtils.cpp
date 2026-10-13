@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/utils/PictureUtils.h"
+#include <utility>
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/Matrix.h"
 

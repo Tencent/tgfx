@@ -3941,7 +3941,8 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(layer);
   }
 
-  // Case 20: SolidLayer with spread large enough to collapse the shape, spread=35 (analytic)
+  // Case 20: SolidLayer with spread large enough to collapse the shape, spread=-35 for drop and
+  // 35 for inner (analytic)
   for (int i = 0; i < 2; ++i) {
     auto layer = SolidLayer::Make();
     layer->setColor(Color::Red());

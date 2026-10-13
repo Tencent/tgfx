@@ -33,7 +33,7 @@ class AnalyticShadowUtils {
    * to nothing; that case returns an empty RRect rather than nullopt. An outline without a closed
    * form is approximated by its bounding rect.
    *
-   * The returned RRect is never complex, so all four corners share one radius pair and either entry
+   * The returned RRect is never complex, so all four corners share one radius pair and any entry
    * of radii() describes the shape. It is expressed in the content image's coordinate system:
    * scaled by contentScale, with the origin at the image's top-left corner.
    */
