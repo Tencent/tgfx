@@ -56,4 +56,8 @@ void SVGShape::onRender(const SVGRenderContext& context) const {
 void SVGShape::appendChild(std::shared_ptr<SVGNode>) {
   LOGE("cannot append child nodes to an SVG shape.\n");
 }
+
+const std::vector<std::shared_ptr<SVGNode>>& SVGShape::getChildren() const {
+  return EmptyNodes();
+}
 }  // namespace tgfx

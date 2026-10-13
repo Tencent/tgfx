@@ -60,17 +60,16 @@ void SVGTextContainer::appendChild(std::shared_ptr<SVGNode> child) {
     case SVGTag::TextLiteral:
     case SVGTag::TextPath:
     case SVGTag::TSpan:
-      children.push_back(std::static_pointer_cast<SVGTextFragment>(child));
+      children.push_back(std::move(child));
       break;
     default:
       break;
   }
 }
 
-const std::vector<std::shared_ptr<SVGTextFragment>>& SVGTextContainer::getTextChildren() const {
+const std::vector<std::shared_ptr<SVGNode>>& SVGTextContainer::getChildren() const {
   return children;
 }
-
 void SVGTextFragment::renderText(const SVGRenderContext& context,
                                  const ShapedTextCallback& function) const {
   SVGRenderContext localContext(context);
@@ -94,7 +93,8 @@ void SVGTextContainer::onShapeText(const SVGRenderContext& context,
 
   // TODO (YGAurora) : Handle rotate
   for (uint32_t i = 0; i < children.size(); i++) {
-    auto child = children[i];
+    // appendChild only admits text fragments, so the downcast is safe.
+    auto child = std::static_pointer_cast<SVGTextFragment>(children[i]);
     context.canvas()->save();
     float offsetX = (i < x.size() ? x[i] : 0.0f) + (i < dx.size() ? dx[i] : 0.0f);
     float offsetY = (i < y.size() ? y[i] : 0.0f) + (i < dy.size() ? dy[i] : 0.0f);

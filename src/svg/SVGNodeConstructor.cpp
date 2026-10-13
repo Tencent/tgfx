@@ -500,11 +500,8 @@ void SVGNodeConstructor::SetClassStyleAttributes(SVGNode& root, const CSSMapper&
         SetStyleAttributes(*node, style, nullptr);
       }
     }
-    if (node->hasChildren()) {
-      auto container = static_cast<SVGContainer*>(node);
-      for (const auto& child : container->getChildren()) {
-        setter(setter, child.get());
-      }
+    for (const auto& child : node->getChildren()) {
+      setter(setter, child.get());
     }
   };
   styleSetter(styleSetter, &root);

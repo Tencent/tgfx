@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 96">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 136">
   <defs>
     <style>
       .cls-1 {
@@ -27,4 +27,6 @@
   </g>
   <circle class="cls-2" cx="144" cy="48" r="40" />
   <circle class="cls-3" cx="240" cy="48" r="40" />
+  <rect x="0" y="96" width="98" height="40" fill="#231815" />
+  <text transform="translate(19 126)" font-size="20" fill="#fff"><tspan class="cls-1" x="0" y="0">T</tspan><tspan class="cls-2" x="16" y="0">G</tspan><tspan class="cls-3" x="32" y="0">F</tspan><tspan class="cls-1" x="48" y="0">X</tspan></text>
 </svg>

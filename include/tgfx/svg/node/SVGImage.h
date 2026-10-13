@@ -44,6 +44,10 @@ class SVGImage final : public SVGTransformableNode {
   void appendChild(std::shared_ptr<SVGNode> /*node*/) override {
   }
 
+  const std::vector<std::shared_ptr<SVGNode>>& getChildren() const override {
+    return EmptyNodes();
+  }
+
   struct ImageInfo {
     std::shared_ptr<Image> image;
     Rect destinationRect;
