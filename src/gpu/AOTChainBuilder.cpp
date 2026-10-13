@@ -883,6 +883,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
             i + 1 < suffixSlots.size() ? static_cast<int>(suffixSlots[i + 1]) : -4;
       }
       clipCoverageSlot = static_cast<int>(suffixSlots.front());
+      clipChainInput = clipCoverageSlot;
     }
   }
   int coverageRootSlot = -1;

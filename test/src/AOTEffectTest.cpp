@@ -36,6 +36,7 @@
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/LumaFragmentProcessor.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
+#include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
@@ -1820,6 +1821,103 @@ TGFX_TEST(AOTEffectTest, ChainedRectCoverageFeedsFromUnitCoverage) {
   EXPECT_EQ(chain->slot(2).op, AOTChainOp::AARectCoverage);
   EXPECT_EQ(chain->slot(3).op, AOTChainOp::LocalRectCoverage);
   EXPECT_EQ(chain->slot(2).in0, -3);
+}
+
+static PlacementPtr<FragmentProcessor> MakeAdditionalAnalyticClip(BlockAllocator* allocator,
+                                                                  AOTChainOp op) {
+  auto rect = Rect::MakeLTRB(30, 20, 90, 90);
+  switch (op) {
+    case AOTChainOp::AARectCoverage:
+      return RectEffect::Make(allocator, rect);
+    case AOTChainOp::LocalRectCoverage:
+      return RectEffect::Make(allocator, rect, Matrix::MakeTrans(4, 4));
+    case AOTChainOp::RRectCoverage:
+      return RRectEffect::Make(allocator, RRect::MakeRectXY(rect, 8, 8));
+    default:
+      return nullptr;
+  }
+}
+
+static void ExpectAdditionalClipPreservesCoverageSuffix(AOTChainOp op, bool withMask) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  for (size_t suffixCount = 0; suffixCount <= 2; ++suffixCount) {
+    SCOPED_TRACE(suffixCount);
+    SCOPED_TRACE(withMask);
+    BlockAllocator allocator;
+    auto texture = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
+    ASSERT_NE(texture, nullptr);
+    std::vector<PlacementPtr<RRectEffect>> suffixes;
+    std::vector<const FragmentProcessor*> colorProcessors = {texture.get()};
+    for (size_t index = 0; index < suffixCount; ++index) {
+      auto rect = Rect::MakeLTRB(10 + static_cast<float>(index) * 4, 10, 70, 70);
+      auto suffix = RRectEffect::Make(&allocator, RRect::MakeRectXY(rect, 8, 8));
+      ASSERT_NE(suffix, nullptr);
+      colorProcessors.push_back(suffix.get());
+      suffixes.push_back(std::move(suffix));
+    }
+    AOTEffectGraph graph;
+    ASSERT_TRUE(AOTEffectDecomposer::Lower(colorProcessors, &graph));
+    AOTEffectPlan plan;
+    ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+    ASSERT_EQ(plan.passes.size(), 1u);
+    ASSERT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+    auto original = AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]);
+    ASSERT_NE(original, nullptr);
+    auto originalChain = static_cast<const AOTPointwiseChainProcessor*>(original.get());
+    ASSERT_EQ(originalChain->slotCount(), suffixCount + 1);
+    EXPECT_EQ(originalChain->root(), static_cast<size_t>(originalChain->slot(0).outRegister));
+    EXPECT_EQ(originalChain->coverageRoot(), -1);
+    EXPECT_EQ(originalChain->clipCoverage(),
+              suffixCount == 0 ? -1 : originalChain->slot(suffixCount).outRegister);
+
+    auto additionalClip = MakeAdditionalAnalyticClip(&allocator, op);
+    ASSERT_NE(additionalClip, nullptr);
+    std::vector<const FragmentProcessor*> coverageProcessors = {additionalClip.get()};
+    PlacementPtr<FragmentProcessor> mask;
+    if (withMask) {
+      auto proxy = context->proxyProvider()->createTextureProxy({}, 2, 2, PixelFormat::ALPHA_8);
+      ASSERT_NE(proxy, nullptr);
+      mask = DeviceSpaceTextureEffect::Make(&allocator, std::move(proxy), Matrix::I());
+      ASSERT_NE(mask, nullptr);
+      coverageProcessors.push_back(mask.get());
+    }
+    auto rebuilt =
+        AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0], coverageProcessors);
+    ASSERT_NE(rebuilt, nullptr);
+    auto chain = static_cast<const AOTPointwiseChainProcessor*>(rebuilt.get());
+    ASSERT_EQ(chain->slotCount(), suffixCount + 2);
+    EXPECT_EQ(chain->root(), static_cast<size_t>(chain->slot(0).outRegister));
+    EXPECT_EQ(chain->coverageRoot(), -1);
+    EXPECT_EQ(chain->hasMask(), withMask);
+    int previousCoverage = -4;
+    for (size_t index = 1; index <= suffixCount; ++index) {
+      const auto& suffix = chain->slot(index);
+      EXPECT_EQ(suffix.op, AOTChainOp::RRectCoverage);
+      EXPECT_EQ(suffix.in0, previousCoverage);
+      EXPECT_GE(suffix.outRegister, 0);
+      previousCoverage = suffix.outRegister;
+    }
+    const auto& appended = chain->slot(suffixCount + 1);
+    EXPECT_EQ(appended.op, op);
+    EXPECT_EQ(appended.in0, previousCoverage);
+    EXPECT_GE(appended.outRegister, 0);
+    EXPECT_EQ(chain->clipCoverage(), appended.outRegister);
+  }
+}
+
+TGFX_TEST(AOTEffectTest, DeviceRectPreservesCoverageSuffix) {
+  ExpectAdditionalClipPreservesCoverageSuffix(AOTChainOp::AARectCoverage, false);
+  ExpectAdditionalClipPreservesCoverageSuffix(AOTChainOp::AARectCoverage, true);
+}
+
+TGFX_TEST(AOTEffectTest, LocalRectPreservesCoverageSuffix) {
+  ExpectAdditionalClipPreservesCoverageSuffix(AOTChainOp::LocalRectCoverage, true);
+}
+
+TGFX_TEST(AOTEffectTest, RRectPreservesCoverageSuffix) {
+  ExpectAdditionalClipPreservesCoverageSuffix(AOTChainOp::RRectCoverage, true);
 }
 
 TGFX_TEST(AOTEffectTest, WhiteInputFeedsTwoChildBlendChildren) {
