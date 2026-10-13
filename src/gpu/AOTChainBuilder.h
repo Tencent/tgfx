@@ -53,13 +53,23 @@ class AOTChainBuilder {
                                   AOTResourceProfile* profile);
 
   /**
-   * Rebuilds the color processor of a plan's single pass: the fused chain/graph processor without
-   * draw coverage, or the tail, YUV or perlin processor with the pass's operators folded into its
-   * slot records. Returns nullptr when the pass shape cannot be rebuilt.
+   * Rebuilds the color processor of one plan pass: the fused chain/graph processor without draw
+   * coverage, or the tail, YUV or perlin processor with the pass's operators folded into its slot
+   * records. sourceOverride, when given, replaces the pass source: it is the predecessor's
+   * materialized output in a multi-pass tail plan, or a rebuilt first-pass source, and then every
+   * node of the pass is an operator slot. Returns nullptr when the pass shape cannot be rebuilt.
    */
-  static PlacementPtr<FragmentProcessor> BuildFPForPass(BlockAllocator* allocator,
-                                                        const AOTEffectGraph& graph,
-                                                        const AOTPassDescriptor& pass);
+  static PlacementPtr<FragmentProcessor> BuildFPForPass(
+      BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
+      PlacementPtr<FragmentProcessor> sourceOverride = nullptr);
+
+  /**
+   * Rebuilds the texture processor a TextureSource node with these parameters lowers back to: a
+   * device-space source, or a plain or tiled leaf sampling through its resolved sampler state.
+   * Returns nullptr for parameters no planner admits (RGBAAA, unsupported tiling).
+   */
+  static PlacementPtr<FragmentProcessor> BuildTextureSourceFP(
+      BlockAllocator* allocator, const AOTTextureParameters& parameters);
 
   /**
    * Flattens a single-pass PointwiseChain/PointwiseGraph plan into the shared processor, or returns

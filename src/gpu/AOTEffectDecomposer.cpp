@@ -142,19 +142,30 @@ static bool DecomposeLinearPointwiseTail(const AOTEffectGraph& graph, AOTEffectP
     }
   }
 
-  // A single fused pass: the source plus at most MaxSlots operators. Longer chains are refused
-  // rather than split, since no production route submits a multi-pass plan.
-  if (graph.nodeCount() - 2 > AOTPointwiseTailProcessor::MaxSlots) {
-    return false;
-  }
+  // The first pass carries the source plus up to MaxSlots operators. A longer chain continues in
+  // further passes of up to MaxSlots operators each, every one reading its predecessor's
+  // materialized output.
   AOTEffectPlan result = {};
-  AOTPassDescriptor pass = {};
-  pass.kernel = AOTKernelKind::PointwiseTail;
-  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
-    pass.nodes.push_back(AOTNodeID(index));
+  uint32_t nodeIndex = 1;
+  while (nodeIndex < graph.nodeCount()) {
+    AOTPassDescriptor pass = {};
+    pass.kernel = AOTKernelKind::PointwiseTail;
+    if (result.passes.empty()) {
+      pass.nodes.push_back(AOTNodeID(nodeIndex++));
+    } else {
+      pass.dependencies.push_back(static_cast<uint32_t>(result.passes.size() - 1));
+    }
+    for (size_t slotCount = 0;
+         nodeIndex < graph.nodeCount() && slotCount < AOTPointwiseTailProcessor::MaxSlots;
+         ++slotCount) {
+      pass.nodes.push_back(AOTNodeID(nodeIndex++));
+    }
+    pass.output = pass.nodes.back();
+    result.passes.push_back(std::move(pass));
   }
-  pass.output = graph.root();
-  result.passes.push_back(std::move(pass));
+  for (size_t index = 0; index + 1 < result.passes.size(); ++index) {
+    result.passes[index].materializesOutput = true;
+  }
   result.output = graph.root();
   *plan = std::move(result);
   return true;

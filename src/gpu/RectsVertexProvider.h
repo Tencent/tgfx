@@ -114,6 +114,14 @@ class RectsVertexProvider : public VertexProvider {
   }
 
   /**
+   * Returns the UV rect of the first rect, or nullptr when the provider has no explicit UV rects
+   * (its UV coordinates, if any, are then the rect's own local coordinates).
+   */
+  const Rect* firstUVRect() const {
+    return uvRects.empty() ? nullptr : uvRects.front().get();
+  }
+
+  /**
    * Returns the first color in the provider. If no color record exists, a white color is returned.
    */
   const Color& firstColor() const {

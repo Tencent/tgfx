@@ -213,7 +213,8 @@ TGFX_TEST_PRIVATE(AOTEffectTest, ExecutorRejectsSelfManagedDrawWithoutSideEffect
     auto* buffer = manager->getDrawingBuffer();
     auto renderTasks = buffer->renderTasks.size();
     auto resourceTasks = buffer->resourceTasks.size();
-    auto task = AOTPlanExecutor::Make(context, graph, plan, destination, &draw);
+    auto task =
+        AOTPlanExecutor::Make(context, 0, graph, plan, Rect::MakeWH(64, 64), destination, &draw);
     EXPECT_EQ(task, nullptr);
     EXPECT_EQ(draw.get(), original);
     ASSERT_EQ(draw->colorProcessors().size(), 1u);
@@ -227,7 +228,8 @@ TGFX_TEST_PRIVATE(AOTEffectTest, ExecutorRejectsSelfManagedDrawWithoutSideEffect
   auto color = ConstColorProcessor::Make(allocator, PMColor::White(), InputMode::Ignore);
   auto draw = manager->makeFillDrawOp(destination, std::move(color), 0);
   ASSERT_NE(draw, nullptr);
-  auto task = AOTPlanExecutor::Make(context, graph, plan, destination, &draw);
+  auto task =
+      AOTPlanExecutor::Make(context, 0, graph, plan, Rect::MakeWH(64, 64), destination, &draw);
   EXPECT_NE(task, nullptr);
   EXPECT_EQ(draw, nullptr);
 }
@@ -261,7 +263,8 @@ TGFX_TEST_PRIVATE(AOTEffectTest, ExecutorRejectsStencilCoverDrawWithoutTakingOwn
   auto* buffer = manager->getDrawingBuffer();
   auto renderTasks = buffer->renderTasks.size();
   auto resourceTasks = buffer->resourceTasks.size();
-  auto task = AOTPlanExecutor::Make(context, graph, plan, destination, &draw);
+  auto task =
+      AOTPlanExecutor::Make(context, 0, graph, plan, Rect::MakeWH(64, 64), destination, &draw);
   EXPECT_EQ(task, nullptr);
   EXPECT_EQ(draw.get(), original);
   EXPECT_EQ(allocator->size(), allocated);
@@ -1185,6 +1188,25 @@ TGFX_TEST(AOTEffectTest, TripleChainFusesToSinglePass) {
 // A device-space texture chain cannot use the fused chain kernel (it samples in device
 // coordinates), so the tail planner serves it in one pass of the source plus at most two
 // operators. A longer chain is refused rather than split into materialized passes.
+// A segmented tail plan: the source pass, then passes of operator slots each reading its
+// predecessor, every pass but the last materializing.
+static void ExpectSegmentedTailPlan(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
+                                    size_t passes) {
+  ASSERT_EQ(plan.passes.size(), passes);
+  for (size_t index = 0; index < passes; ++index) {
+    const auto& pass = plan.passes[index];
+    EXPECT_EQ(pass.kernel, AOTKernelKind::PointwiseTail);
+    EXPECT_EQ(pass.materializesOutput, index + 1 < passes);
+    if (index == 0) {
+      EXPECT_TRUE(pass.dependencies.empty());
+    } else {
+      EXPECT_EQ(pass.dependencies, std::vector<uint32_t>{static_cast<uint32_t>(index - 1)});
+    }
+  }
+  EXPECT_EQ(plan.passes.back().output, graph.root());
+  EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+}
+
 TGFX_TEST(AOTEffectTest, DeviceSpaceLinearChainUsesPointwiseTailPlanner) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -1213,11 +1235,14 @@ TGFX_TEST(AOTEffectTest, DeviceSpaceLinearChainUsesPointwiseTailPlanner) {
   AOTEffectGraph longGraph;
   ASSERT_TRUE(AOTEffectDecomposer::Lower(
       {texture.get(), colorMatrix.get(), luma.get(), colorMatrix2.get()}, &longGraph));
+  // A third operator exceeds the tail's slot budget: the chain continues in a second pass that
+  // reads the first pass's materialized output.
   AOTEffectPlan longPlan;
-  EXPECT_FALSE(AOTEffectDecomposer::Decompose(longGraph, &longPlan));
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(longGraph, &longPlan));
+  ExpectSegmentedTailPlan(longGraph, longPlan, 2);
   auto analysis = AOTEffectDecomposer::AnalyzeChain(
       {texture.get(), colorMatrix.get(), luma.get(), colorMatrix2.get()});
-  EXPECT_EQ(analysis.outcome, AOTDecomposeOutcome::UnsupportedShape);
+  EXPECT_EQ(analysis.outcome, AOTDecomposeOutcome::FusablePointwise);
 }
 
 // CanExecute and the chain builder share one planner, so a pass whose node list omits a producer
@@ -1276,15 +1301,11 @@ TGFX_TEST(AOTEffectTest, TwoColorSpaceTransformsRetainTailCandidate) {
     AOTEffectGraph graph;
     ASSERT_TRUE(AOTEffectDecomposer::Lower(processors, &graph));
     // Two transforms exceed the chain kernel's single color-space block, so the tail planner
-    // takes the two-operator chain; with a third operator it exceeds the tail's slot budget too.
+    // takes the chain: one pass for two operators, a second pass once a third one is inserted.
     AOTEffectPlan plan;
-    ASSERT_EQ(AOTEffectDecomposer::Decompose(graph, &plan), !insertLuma);
-    if (!insertLuma) {
-      ASSERT_EQ(plan.passes.size(), 1u);
-      EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseTail);
-      EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
-      EXPECT_NE(AOTChainBuilder::BuildFPForPass(&allocator, graph, plan.passes[0]), nullptr);
-    }
+    ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+    ExpectSegmentedTailPlan(graph, plan, insertLuma ? 2u : 1u);
+    EXPECT_NE(AOTChainBuilder::BuildFPForPass(&allocator, graph, plan.passes[0]), nullptr);
     AOTEffectPlan forcedChain = {};
     forcedChain.output = graph.root();
     AOTPassDescriptor pass = {};
@@ -1374,13 +1395,15 @@ TGFX_TEST(AOTEffectTest, LinearChainSlotBoundaryIsChainInstructionBudget) {
     ASSERT_TRUE(AOTEffectDecomposer::Lower(processors, &graph));
     // The chain kernel carries 32 instructions with a recycled 16-entry register file, so a
     // texture plus 31 operators fuses into one pass; the 32nd operator crosses the instruction
-    // budget and the chain is refused (the tail kernel only carries two operators).
+    // budget and the tail planner splits the chain into 16 passes of two operators each.
     AOTEffectPlan plan;
-    ASSERT_EQ(AOTEffectDecomposer::Decompose(graph, &plan), opCount == 31);
+    ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
     if (opCount == 31) {
       ASSERT_EQ(plan.passes.size(), 1u);
       EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
       EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+    } else {
+      ExpectSegmentedTailPlan(graph, plan, 16);
     }
   }
 }
@@ -2843,7 +2866,7 @@ TGFX_TEST(AOTEffectTest, PerlinNoiseBlendRefusesInputDependentConstOperand) {
 // invariants below are checked for every row, so a new effect or variant is one added row:
 //   - admission implies construction: every plan Decompose returns builds its processor;
 //   - the analysis verdict is the production verdict (FusablePointwise iff Decompose plans it);
-//   - Decompose only returns single-pass plans CanExecute accepts.
+//   - Decompose only returns plans CanExecute accepts, with the expected number of passes.
 struct AdmissionCase {
   const char* name = "";
   // Builds the color processors into owners; returns false when the fixture cannot be created.
@@ -2852,6 +2875,7 @@ struct AdmissionCase {
   bool lowers = true;
   bool planned = true;
   AOTKernelKind kernel = AOTKernelKind::PointwiseChain;
+  size_t passes = 1;
 };
 
 static PlacementPtr<FragmentProcessor> MakeRadialGradient(BlockAllocator* allocator) {
@@ -2920,7 +2944,7 @@ TGFX_TEST(AOTEffectTest, AdmissionMatrixKeepsPlanningAndConstructionAligned) {
          o->push_back(matrix(a));
          return true;
        },
-       true, false},
+       true, true, AOTKernelKind::PointwiseTail, 2},
       {"unsupported-lowering",
        [&](Context*, BlockAllocator* a, Owners* o) {
          o->push_back(a->make<ShapeRejectingFragmentProcessor>());
@@ -2953,7 +2977,7 @@ TGFX_TEST(AOTEffectTest, AdmissionMatrixKeepsPlanningAndConstructionAligned) {
     if (!planned) {
       continue;
     }
-    ASSERT_EQ(plan.passes.size(), 1u);
+    ASSERT_EQ(plan.passes.size(), row.passes);
     EXPECT_EQ(plan.passes[0].kernel, row.kernel);
     EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
     EXPECT_NE(AOTChainBuilder::BuildFPForPass(&allocator, graph, plan.passes[0]), nullptr);

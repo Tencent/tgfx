@@ -2078,12 +2078,11 @@ TGFX_TEST(AOTRenderConsistencyTest, LinearChainSinglePass) {
   ExpectBitmapsIdentical("linear-chain-matrix-luma-matrix", candidate, reference, width, height);
 }
 
-// Formerly asserted multi-pass tail execution preserved coordinate domains across
-// materialization boundaries. Since the D5 ruling (a discontinuous operator reading an RGBA8
-// materialized input can flip its step() decision — not a tolerance question), multi-pass
-// tail plans are refused on every route; this now records the rejection boundary for both the
-// device-space-source shape (formerly 2 passes) and the plain long chain (formerly 17).
-TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailOverBudgetPlansRefused) {
+// Multi-pass tail execution preserves coordinate domains across materialization boundaries, for
+// both a device-space source (2 passes) and a plain long chain (17 passes), with and without an
+// FP coordinate offset. Swapping red and blue is exact on RGBA8, so the quantizing intermediates
+// change nothing and the result is byte-identical to the runtime reference.
+TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailOverBudgetPlansRunMultiPass) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
@@ -2110,9 +2109,6 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailOverBudgetPlansRefused) {
       cache->unload();
     }
     ScopedAOTStatsPause pause(context, !useBundle);
-    // The bundle segment is refused on purpose (the tree exceeds the single-pass budget); its
-    // runtime fallback is the behavior under test, not a coverage gap.
-    ScopedAOTDeliberateMiss refusedPlan(context, useBundle);
     cache->setDecompositionEnabled(useBundle);
     cache->setDiagnosticRecordingEnabled(true);
     cache->resetStats();
@@ -2162,75 +2158,77 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailOverBudgetPlansRefused) {
       ProgramCacheStats candidatePrograms;
       render(deviceSource, false, offset, &reference, &referenceDraws, &referencePrograms);
       render(deviceSource, true, offset, &candidate, &candidateDraws, &candidatePrograms);
-      // Rejection boundary: both shapes (a 2-pass device-source chain and a 17-pass plain
-      // chain) exceed the single-pass budget, so the runtime reference serves the fill — one
-      // program build, one kernel invocation, no materialized edges, byte-identical output.
-      EXPECT_GE(candidatePrograms.programBuilderCreations, 1u);
-      EXPECT_EQ(candidateDraws.completeAOTDraws, 0u);
+      size_t passes = deviceSource ? 2u : 17u;
+      EXPECT_EQ(candidatePrograms.programBuilderCreations, 0u);
+      EXPECT_EQ(candidateDraws.completeAOTDraws, 1u);
       EXPECT_EQ(candidateDraws.atomicFallbacks, 0u);
-      EXPECT_EQ(candidateDraws.kernelInvocations, 1u);
-      EXPECT_EQ(candidateDraws.planMaterializedEdges, 0u);
+      EXPECT_EQ(candidateDraws.kernelInvocations, passes);
+      EXPECT_EQ(candidateDraws.planMaterializedEdges, passes - 1);
       EXPECT_EQ(candidateDraws.fpFlattenEdges, 0u);
       ExpectBitmapsIdentical("offscreen-tail-coordinates", candidate, reference, 64, 64);
     }
   }
 }
 
-// Offscreen fills initialize their target to transparent; rejected tails must draw no content.
-static void RenderOffscreenRejection(
+// An over-budget offscreen tail runs as a multi-pass plan on the precompiled kernels: every pass
+// is an artifact hit, no runtime program is built, and the result matches the runtime reference
+// within the RGBA8 quantization the intermediate passes introduce.
+static void ExpectOverBudgetOffscreenFillRunsMultiPass(
     Context* context, PrecompiledShaderCache* cache,
     const std::function<PlacementPtr<FragmentProcessor>(BlockAllocator*)>& buildTree,
-    const char* label, Bitmap* reference, Bitmap* candidate, AOTDrawStats* candidateDraws) {
-  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
-  cache->setDecompositionEnabled(true);
-  cache->setDiagnosticRecordingEnabled(true);
-  ScopedAOTDeliberateMiss refusedPlan(context);
-  auto surface = Surface::Make(context, 64, 64);
-  ASSERT_NE(surface, nullptr);
-  surface->getCanvas()->clear(Color::Transparent());
-  context->flushAndSubmit(true);
-  ASSERT_TRUE(reference->allocPixels(64, 64));
-  auto* beforePixels = reference->lockPixels();
-  ASSERT_NE(beforePixels, nullptr);
-  ASSERT_TRUE(surface->readPixels(reference->info(), beforePixels));
-  reference->unlockPixels();
-  auto target =
-      RenderTargetProxy::MakeFrom(context, surface->getBackendRenderTarget(), surface->origin());
-  ASSERT_NE(target, nullptr);
-  cache->resetStats();
-  context->globalCache()->clearPrograms();
-  context->globalCache()->resetProgramStats();
-  auto processor = buildTree(context->drawingAllocator());
-  ASSERT_NE(processor, nullptr);
-  ASSERT_TRUE(
-      context->drawingManager()->fillRTWithFP(target, std::move(processor), 0, Point::Zero()));
-  context->flushAndSubmit(true);
-  ASSERT_NE(candidateDraws, nullptr);
-  *candidateDraws = cache->drawStats();
-  EXPECT_EQ(candidateDraws->draws, 0u);
-  EXPECT_EQ(candidateDraws->completeAOTDraws, 0u);
-  EXPECT_EQ(candidateDraws->atomicFallbacks, 0u);
-  EXPECT_EQ(candidateDraws->kernelInvocations, 0u);
-  EXPECT_EQ(candidateDraws->materializedEdges, 0u);
-  EXPECT_EQ(candidateDraws->offscreenTargets, 0u);
-  EXPECT_GT(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
-  EXPECT_FALSE(cache->fallbackRecords().empty());
-  EXPECT_TRUE(cache->hitRecords().empty());
-  EXPECT_TRUE(cache->jitProgramRecords().empty());
-  EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
-  EXPECT_EQ(context->globalCache()->programStats().precompiledArtifactCreations, 0u);
-  ASSERT_TRUE(candidate->allocPixels(64, 64));
-  auto* afterPixels = candidate->lockPixels();
-  ASSERT_NE(afterPixels, nullptr);
-  ASSERT_TRUE(surface->readPixels(candidate->info(), afterPixels));
-  candidate->unlockPixels();
-  ExpectBitmapsIdentical(label, *candidate, *reference, 64, 64);
-  cache->setDiagnosticRecordingEnabled(false);
-  cache->setDecompositionEnabled(true);
-  cache->unload();
+    const char* label, size_t expectedPasses, int tolerance) {
+  auto render = [&](bool useBundle, Bitmap* bitmap, AOTDrawStats* draws) {
+    if (useBundle) {
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause pause(context, !useBundle);
+    cache->setDecompositionEnabled(true);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->clearPrograms();
+    context->globalCache()->resetProgramStats();
+    auto surface = Surface::Make(context, 64, 64);
+    ASSERT_NE(surface, nullptr);
+    surface->getCanvas()->clear(Color::Transparent());
+    context->flushAndSubmit(true);
+    auto target =
+        RenderTargetProxy::MakeFrom(context, surface->getBackendRenderTarget(), surface->origin());
+    ASSERT_NE(target, nullptr);
+    auto processor = buildTree(context->drawingAllocator());
+    ASSERT_NE(processor, nullptr);
+    ASSERT_TRUE(
+        context->drawingManager()->fillRTWithFP(target, std::move(processor), 0, Point::Zero()));
+    context->flushAndSubmit(true);
+    *draws = cache->drawStats();
+    if (useBundle) {
+      EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+      EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+    }
+    ASSERT_TRUE(bitmap->allocPixels(64, 64));
+    auto* pixels = bitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    ASSERT_TRUE(surface->readPixels(bitmap->info(), pixels));
+    bitmap->unlockPixels();
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->unload();
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  AOTDrawStats referenceDraws = {};
+  AOTDrawStats candidateDraws = {};
+  render(false, &reference, &referenceDraws);
+  render(true, &candidate, &candidateDraws);
+  EXPECT_EQ(candidateDraws.completeAOTDraws, 1u);
+  EXPECT_EQ(candidateDraws.atomicFallbacks, 0u);
+  EXPECT_EQ(candidateDraws.kernelInvocations, expectedPasses);
+  EXPECT_EQ(candidateDraws.materializedEdges, expectedPasses - 1);
+  EXPECT_EQ(candidateDraws.planMaterializedEdges, expectedPasses - 1);
+  ExpectBitmapsNear(label, candidate, reference, 64, 64, tolerance);
 }
 
-TGFX_TEST(AOTRenderConsistencyTest, OverBudgetOffscreenAlphaThresholdRejectsWithoutJIT) {
+TGFX_TEST(AOTRenderConsistencyTest, OverBudgetOffscreenAlphaThresholdRunsMultiPass) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
@@ -2264,14 +2262,12 @@ TGFX_TEST(AOTRenderConsistencyTest, OverBudgetOffscreenAlphaThresholdRejectsWith
     }
     return processor;
   };
-  Bitmap reference = {};
-  Bitmap candidate = {};
-  AOTDrawStats candidateDraws = {};
-  RenderOffscreenRejection(context, cache, buildTree, "over-budget-offscreen-alpha-threshold",
-                           &reference, &candidate, &candidateDraws);
+  // Source plus 33 operators: the source pass carries two, then 16 passes of two.
+  ExpectOverBudgetOffscreenFillRunsMultiPass(context, cache, buildTree,
+                                             "over-budget-offscreen-alpha-threshold", 17, 1);
 }
 
-TGFX_TEST(AOTRenderConsistencyTest, OverBudgetOffscreenRotatedUVRejectsWithoutJIT) {
+TGFX_TEST(AOTRenderConsistencyTest, OverBudgetOffscreenRotatedUVRunsMultiPass) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
@@ -2309,20 +2305,15 @@ TGFX_TEST(AOTRenderConsistencyTest, OverBudgetOffscreenRotatedUVRejectsWithoutJI
     }
     return processor;
   };
-  Bitmap reference = {};
-  Bitmap candidate = {};
-  AOTDrawStats candidateDraws = {};
-  // Source plus 32 matrices deliberately exceeds the instruction budget.
-  RenderOffscreenRejection(context, cache, buildTree, "over-budget-offscreen-rotated-uv",
-                           &reference, &candidate, &candidateDraws);
+  // Source plus 32 matrices: the source pass carries two, then 15 passes of two.
+  ExpectOverBudgetOffscreenFillRunsMultiPass(context, cache, buildTree,
+                                             "over-budget-offscreen-rotated-uv", 16, 1);
 }
 
 // F12 execution-failure contract: a plan task that passed the prepare phase must stop cleanly
-// and record a diagnostic when its render pass fails to begin during execution. Since the D5
-// ruling refuses multi-pass tail plans everywhere, the reachable injection position is the
-// terminal pass of a single-pass plan (a device-space source with two operators — the chain
-// kernel cannot take the device-space source, and two operators fit the tail's single pass).
-// The "first"/"middle" intermediate-pass positions no longer exist on any reachable route.
+// and record a diagnostic when any of its render passes fails to begin during execution — the
+// terminal pass of a single-pass plan, and the first and a later intermediate pass of a
+// three-pass plan (a device-space source with six operators).
 TGFX_TEST(AOTRenderConsistencyTest, PlanExecutionFailureIsRecordedNotFatal) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -2345,9 +2336,9 @@ TGFX_TEST(AOTRenderConsistencyTest, PlanExecutionFailureIsRecordedNotFatal) {
   }
   auto source = context->proxyProvider()->wrapExternalTexture(sourceSurface->getBackendTexture());
   ASSERT_NE(source, nullptr);
-  // Renders a single-pass tail plan (a device-space source plus two operators) and returns the
-  // draw stats of exactly that fill.
-  auto renderSinglePassPlan = [&]() -> AOTDrawStats {
+  // Renders a tail plan (a device-space source plus operatorCount operators, two per pass) and
+  // returns the draw stats of exactly that fill.
+  auto renderPlan = [&](int operatorCount) -> AOTDrawStats {
     AOTDrawStats stats = {};
     if (!cache->loadBundle(bundleData, bundleBytes)) {
       return stats;
@@ -2372,7 +2363,7 @@ TGFX_TEST(AOTRenderConsistencyTest, PlanExecutionFailureIsRecordedNotFatal) {
       cache->setDiagnosticRecordingEnabled(false);
       return stats;
     }
-    for (int index = 0; index < 2; ++index) {
+    for (int index = 0; index < operatorCount; ++index) {
       processor =
           FragmentProcessor::Compose(allocator, std::move(processor),
                                      ColorMatrixFragmentProcessor::Make(allocator, swapRedBlue));
@@ -2386,20 +2377,29 @@ TGFX_TEST(AOTRenderConsistencyTest, PlanExecutionFailureIsRecordedNotFatal) {
     cache->setDiagnosticRecordingEnabled(false);
     return stats;
   };
-  {
-    SCOPED_TRACE("last");
-    ASSERT_EQ(::setenv("TGFX_AOT_TEST_INJECT_PASS_FAILURE", "last", 1), 0);
-    auto stats = renderSinglePassPlan();
+  struct InjectionCase {
+    const char* position;
+    int operatorCount;
+  };
+  for (const auto& injection : {InjectionCase{"last", 2}, InjectionCase{"last", 6},
+                                InjectionCase{"first", 6}, InjectionCase{"middle", 6}}) {
+    SCOPED_TRACE(injection.position);
+    SCOPED_TRACE(injection.operatorCount);
+    ASSERT_EQ(::setenv("TGFX_AOT_TEST_INJECT_PASS_FAILURE", injection.position, 1), 0);
+    auto stats = renderPlan(injection.operatorCount);
     ::unsetenv("TGFX_AOT_TEST_INJECT_PASS_FAILURE");
     // The failure is observable: counted, and the draw never lands as complete.
     EXPECT_GE(stats.planExecutionFailures, 1u);
     EXPECT_EQ(stats.completeAOTDraws, 0u);
   }
-  // Un-injecting restores the normal service: the same single-pass plan completes.
-  auto healthy = renderSinglePassPlan();
-  EXPECT_EQ(healthy.planExecutionFailures, 0u);
-  EXPECT_GE(healthy.completeAOTDraws, 1u);
-  EXPECT_EQ(healthy.kernelInvocations, 1u);
+  // Un-injecting restores the normal service: the same plans complete.
+  for (int operatorCount : {2, 6}) {
+    SCOPED_TRACE(operatorCount);
+    auto healthy = renderPlan(operatorCount);
+    EXPECT_EQ(healthy.planExecutionFailures, 0u);
+    EXPECT_GE(healthy.completeAOTDraws, 1u);
+    EXPECT_EQ(healthy.kernelInvocations, static_cast<uint64_t>(operatorCount / 2));
+  }
 }
 
 // a discontinuous operator (AlphaThreshold) whose input is produced by
@@ -2407,9 +2407,10 @@ TGFX_TEST(AOTRenderConsistencyTest, PlanExecutionFailureIsRecordedNotFatal) {
 // construction: the source is black, a matrix scales alpha to 513/1024, the threshold is
 // 1027/2048. Direct evaluation keeps alpha at 513/1024 < 1027/2048, so step() yields 0; after
 // an RGBA8 materialization the stored alpha rounds up to 129/255 > 1027/2048, and step() flips
-// to 1 — a full 255-LSB divergence, not a tolerance question. The three-operator chain over a
-// device-space source cannot enter the single-pass chain kernel, so the tail planner splits it
-// into two passes with the threshold on the far side of the materialization boundary.
+// to 1 — a full 255-LSB divergence, not a tolerance question. The four-operator chain over a
+// device-space source cannot enter the chain kernel, so the tail planner splits it into two
+// passes ([source, identity, scale] and [threshold, identity]) with the threshold on the far side
+// of the materialization boundary.
 TGFX_TEST(AOTRenderConsistencyTest, OffscreenThresholdAcrossBoundaryFlips) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -2439,9 +2440,6 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenThresholdAcrossBoundaryFlips) {
       cache->unload();
     }
     ScopedAOTStatsPause pause(context, !useBundle);
-    // The threshold tree is over the tail budget, so the bundle segment's runtime fallback is the
-    // rejection boundary under test, not a coverage gap.
-    ScopedAOTDeliberateMiss refusedPlan(context, useBundle);
     cache->setDecompositionEnabled(useBundle);
     cache->setDiagnosticRecordingEnabled(true);
     cache->resetStats();
@@ -2453,6 +2451,11 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenThresholdAcrossBoundaryFlips) {
     PlacementPtr<FragmentProcessor> processor =
         DeviceSpaceTextureEffect::Make(allocator, source, Matrix::I());
     ASSERT_NE(processor, nullptr);
+    // The leading identity fills the first pass's second slot, so the scaled alpha is the first
+    // pass's output and the threshold reads it back from the RGBA8 intermediate.
+    processor =
+        FragmentProcessor::Compose(allocator, std::move(processor),
+                                   ColorMatrixFragmentProcessor::Make(allocator, identityMatrix));
     processor = FragmentProcessor::Compose(
         allocator, std::move(processor), ColorMatrixFragmentProcessor::Make(allocator, alphaScale));
     processor = FragmentProcessor::Compose(
@@ -2495,20 +2498,28 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenThresholdAcrossBoundaryFlips) {
     const_cast<Bitmap&>(reference).unlockPixels();
   }
   render(true, &candidate, &candidateDraws);
-  // RULING: a discontinuous operator must never read its input through an RGBA8 materialized
-  // intermediate — the over-budget tail plan is refused and the runtime reference serves the
-  // fill (byte-identical, one program build, no AOT draw). Serving it as multi-pass AOT is the
-  // D5 defect: the flipped threshold would diverge by a full 255 LSB.
-  EXPECT_EQ(candidateDraws.completeAOTDraws, 0u);
+  // The over-budget chain runs as a two-pass plan on the precompiled kernels, with the threshold
+  // reading the RGBA8 intermediate. This pins the known cost of a pass boundary: the stored alpha
+  // rounds to 129/255, above the threshold, so step() outputs 1 where direct evaluation gives 0.
+  EXPECT_EQ(candidateDraws.completeAOTDraws, 1u);
   EXPECT_EQ(candidateDraws.atomicFallbacks, 0u);
-  // The runtime fill executes once (a plain StandardDrawOp counts one kernel invocation); the
-  // plan route's two-pass invocation pattern is gone.
-  EXPECT_EQ(candidateDraws.kernelInvocations, 1u);
-  EXPECT_GE(context->globalCache()->programStats().programBuilderCreations, 1u);
-  ExpectBitmapsIdentical("offscreen-threshold-boundary", candidate, reference, 64, 64);
+  EXPECT_EQ(candidateDraws.kernelInvocations, 2u);
+  EXPECT_EQ(candidateDraws.planMaterializedEdges, 1u);
+  EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+  {
+    auto* pixels = static_cast<const uint8_t*>(const_cast<Bitmap&>(candidate).lockPixels());
+    ASSERT_NE(pixels, nullptr);
+    const uint8_t* center = pixels + 32 * candidate.rowBytes() + 32 * 4;
+    EXPECT_EQ(center[3], 255);
+    const_cast<Bitmap&>(candidate).unlockPixels();
+  }
 }
 
-TGFX_TEST(AOTRenderConsistencyTest, LinearChainInstructionBudgetRejectsWithoutJIT) {
+// Inside the chain kernel's instruction budget an on-screen color-filter chain runs as one fused
+// pass; one operator over it, the tail planner splits the chain into a multi-pass plan that the
+// on-screen route serves through device-aligned intermediates. A channel rotation is exact on
+// RGBA8, so both shapes must match the runtime reference byte for byte.
+TGFX_TEST(AOTRenderConsistencyTest, LinearChainInstructionBudgetRunsMultiPassOverBudget) {
   SKIP_ON_SWIFTSHADER_ENV();
   auto image = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_NE(image, nullptr);
@@ -2528,12 +2539,10 @@ TGFX_TEST(AOTRenderConsistencyTest, LinearChainInstructionBudgetRejectsWithoutJI
     Bitmap candidate;
     ColorFilterRenderStats referenceStats;
     ColorFilterRenderStats candidateStats;
-    if (opCount <= maxOperators) {
-      RenderImageWithColorFilterOnce(image, chain, width, height, false, false, false, true,
-                                     &reference, &referenceStats);
-    }
+    RenderImageWithColorFilterOnce(image, chain, width, height, false, false, false, true,
+                                   &reference, &referenceStats);
     RenderImageWithColorFilterOnce(image, chain, width, height, true, true, false, true, &candidate,
-                                   &candidateStats, opCount > maxOperators);
+                                   &candidateStats);
     const auto& draws = candidateStats.draws;
     EXPECT_EQ(candidateStats.programs.programBuilderCreations, 0u);
     EXPECT_EQ(candidateStats.jitPrograms, 0u);
@@ -2556,29 +2565,17 @@ TGFX_TEST(AOTRenderConsistencyTest, LinearChainInstructionBudgetRejectsWithoutJI
       ExpectBitmapsIdentical("linear-chain-instruction-budget", candidate, reference, width,
                              height);
     } else {
-      EXPECT_GT(candidateStats.noMatchingRule, 0u);
-      EXPECT_EQ(candidateStats.hits, 0u);
-      EXPECT_EQ(candidateStats.pipelines, 0u);
-      EXPECT_EQ(candidateStats.programs.precompiledArtifactCreations, 0u);
-      EXPECT_EQ(draws.draws, 0u);
-      EXPECT_EQ(draws.completeAOTDraws, 0u);
+      // The source pass carries two operators, every later pass two more.
+      size_t passes = 1 + (opCount - 2 + 1) / 2;
+      EXPECT_EQ(candidateStats.noMatchingRule, 0u);
+      EXPECT_EQ(draws.draws, 1u);
+      EXPECT_EQ(draws.completeAOTDraws, 1u);
       EXPECT_EQ(draws.atomicFallbacks, 0u);
-      EXPECT_EQ(draws.kernelInvocations, 0u);
-      EXPECT_EQ(draws.offscreenTargets, 0u);
-      EXPECT_EQ(draws.materializedEdges, 0u);
-      EXPECT_EQ(draws.intermediateReadBytes, 0u);
-      EXPECT_EQ(draws.intermediateWriteBytes, 0u);
-      auto* pixels = static_cast<const uint8_t*>(candidate.lockPixels());
-      ASSERT_NE(pixels, nullptr);
-      const uint8_t background[] = {64, 64, 64, 255};
-      for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x) {
-          const auto* pixel = pixels + static_cast<size_t>(y) * candidate.rowBytes() + x * 4;
-          ASSERT_EQ(std::memcmp(pixel, background, sizeof(background)), 0)
-              << "rejected draw changed pixel " << x << "," << y;
-        }
-      }
-      candidate.unlockPixels();
+      EXPECT_EQ(draws.kernelInvocations, passes);
+      EXPECT_EQ(draws.offscreenTargets, passes - 1);
+      EXPECT_EQ(draws.planMaterializedEdges, passes - 1);
+      ExpectBitmapsIdentical("linear-chain-over-budget-multipass", candidate, reference, width,
+                             height);
     }
   }
 }
@@ -3815,13 +3812,10 @@ TGFX_TEST(AOTRenderConsistencyTest, NV12ImageWithColorFilterMatchesRuntime) {
 // rebuilt it with both children flattened to RGBA8 textures; the sweep gradient's alpha
 // quantizes onto the 1/255 grid on the way through, and the threshold (1027/2048, sitting in the
 // exact-rational gap between the float values that round to byte 128 and 128/255 itself) flipped
-// a band of columns by 255 LSBs — the pre-fix red light measured maxChannelDiff=255 over 672
-// bytes. The ADMISSION RULE now refuses the retry outright when the color tree carries a
-// discontinuous operator (TreeContainsQuantizationFlipRisk; the proven class is AlphaThreshold):
-// the draw keeps its original processors and the runtime's single-shader float evaluation stays
-// authoritative. This test records that refusal boundary: exactly one plain-matcher miss and one
-// runtime program build serve the original tree, byte-identical to the reference. A zero here
-// would mean the gate opened and the quantization-flip risk must be re-verified first.
+// a band of columns by 255 LSBs. With a bundle loaded the retry is the only route that renders
+// the draw, so it runs: this test pins that it is served entirely by precompiled kernels and that
+// its divergence is exactly that flip band — every differing pixel is a threshold flip from 0 to
+// 255 inside the predicted columns, and nothing else moves.
 TGFX_TEST(AOTRenderConsistencyTest, BlendRetryMaterializationFlipsThreshold) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -3879,23 +3873,39 @@ TGFX_TEST(AOTRenderConsistencyTest, BlendRetryMaterializationFlipsThreshold) {
     cache->setDiagnosticRecordingEnabled(true);
     cache->resetStats();
     context->globalCache()->resetProgramStats();
-    {
-      // The refusal is the behavior under test: its fallback is deliberate, not a coverage gap.
-      // The counts asserted below still record.
-      ScopedAOTDeliberateMiss refused(context);
-      renderScene(&candidate);
-    }
-    // RULING: the admission rule refused the retry (the tree carries an AlphaThreshold), so the
-    // draw keeps its original processors — exactly one plain-matcher miss (the two-gradient
-    // blend + threshold tree has no plain rule) and one runtime program build serve it. A zero
-    // here would mean the retry fired despite the flip risk.
-    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 1u);
-    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 1u);
+    renderScene(&candidate);
+    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
     cache->setDiagnosticRecordingEnabled(false);
     cache->unload();
     context->globalCache()->clearPrograms();
   }
-  ExpectBitmapsIdentical("blend-retry-materialization-flip", candidate, reference, size, size);
+  auto* referencePixels = static_cast<const uint8_t*>(reference.lockPixels());
+  auto* candidatePixels = static_cast<const uint8_t*>(candidate.lockPixels());
+  ASSERT_TRUE(referencePixels != nullptr && candidatePixels != nullptr);
+  int firstFlipColumn = size;
+  int lastFlipColumn = -1;
+  for (int y = 0; y < size; ++y) {
+    for (int x = 0; x < size; ++x) {
+      auto offset = static_cast<size_t>(y) * reference.rowBytes() + static_cast<size_t>(x) * 4;
+      if (std::memcmp(referencePixels + offset, candidatePixels + offset, 4) == 0) {
+        continue;
+      }
+      // A flip: step() gave 0 at float precision and 1 on the quantized input.
+      EXPECT_EQ(referencePixels[offset + 3], 0) << "x=" << x << " y=" << y;
+      EXPECT_EQ(candidatePixels[offset + 3], 255) << "x=" << x << " y=" << y;
+      firstFlipColumn = std::min(firstFlipColumn, x);
+      lastFlipColumn = std::max(lastFlipColumn, x);
+    }
+  }
+  reference.unlockPixels();
+  candidate.unlockPixels();
+  // The predicted band is [127.5/255, 1027/2048) of the 0.49 -> 0.51 sweep: about 16 columns
+  // around the middle of the width.
+  ASSERT_GE(lastFlipColumn, firstFlipColumn);
+  EXPECT_LE(lastFlipColumn - firstFlipColumn + 1, 16);
+  EXPECT_GT(firstFlipColumn, size / 4);
+  EXPECT_LT(lastFlipColumn, size * 3 / 4);
 }
 
 // reachability ruling + regression fence: the
@@ -7058,12 +7068,9 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyImageBlurMatchesRuntime) {
 // premul invariant and the identity alpha rows never let the step() decision flip, so the old
 // maxDiff<=1 pass proved nothing.
 //
-// multi-pass tail plans are refused on every route
-// (: a discontinuous operator reading an RGBA8 materialized input can flip its step()
-// decision — a 255-LSB divergence no tolerance bounds; see
-// OffscreenThresholdAcrossBoundaryFlips for the exact-rational proof). Rebuilding the scene as
-// a "valid" quantization probe is moot: the risk class no longer executes. This test now
-// records the rejection boundary: the runtime reference serves the fill, byte-identical.
+// The tree now runs as a 17-pass plan. On this sweep the threshold's inputs stay clear of the
+// grid gap, so only the matrices' RGBA8 rounding shows: within 1 LSB of the runtime reference.
+// OffscreenThresholdAcrossBoundaryFlips pins the case where a boundary does flip the threshold.
 TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailThresholdQuantizationBand) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -7126,9 +7133,6 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailThresholdQuantizationBand) {
       cache->unload();
     }
     ScopedAOTStatsPause pause(context, !useBundle);
-    // The tree is over the tail budget, so the bundle segment's runtime fallback is the
-    // rejection boundary under test, not a coverage gap.
-    ScopedAOTDeliberateMiss refusedPlan(context, useBundle);
     cache->setDecompositionEnabled(useBundle);
     cache->setDiagnosticRecordingEnabled(true);
     cache->resetStats();
@@ -7159,15 +7163,12 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailThresholdQuantizationBand) {
   };
   render(false, &reference, nullptr);
   render(true, &candidate, &candidateDraws);
-  // Rejection boundary: the 34-instruction tree exceeds the tail budget, so the plan is refused
-  // and the runtime reference serves the fill (one program build, one kernel invocation, no
-  // materialized edges, byte-identical output — the threshold never reads a quantized input).
-  EXPECT_EQ(candidateDraws.completeAOTDraws, 0u);
+  EXPECT_EQ(candidateDraws.completeAOTDraws, 1u);
   EXPECT_EQ(candidateDraws.atomicFallbacks, 0u);
-  EXPECT_EQ(candidateDraws.kernelInvocations, 1u);
-  EXPECT_EQ(candidateDraws.planMaterializedEdges, 0u);
-  EXPECT_GE(context->globalCache()->programStats().programBuilderCreations, 1u);
-  ExpectBitmapsIdentical("offscreen-tail-threshold-refused", candidate, reference, 64, 64);
+  EXPECT_EQ(candidateDraws.kernelInvocations, 17u);
+  EXPECT_EQ(candidateDraws.planMaterializedEdges, 16u);
+  EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+  ExpectBitmapsNear("offscreen-tail-threshold-multipass", candidate, reference, 64, 64, 1);
 }
 
 // materialized multi-pass sampling under translation, magnification,
@@ -7179,11 +7180,9 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailThresholdQuantizationBand) {
 // executed mipmap sampling (no sampler override, no mip levels), so the old maxDiff<=3 pass
 // said nothing about sampling across materialization boundaries.
 //
-// multi-pass tail plans are refused on every route
-// ( ruling; see OffscreenThresholdAcrossBoundaryFlips). Sampling across materialized
-// intermediates no longer executes at all, so re-probing it with a real mipmap sampler is moot.
-// This test now records the rejection boundary under every transform: the runtime reference
-// serves the fill, byte-identical.
+// The tree runs as an 18-pass plan: the device-space source with its transform is sampled once in
+// the first pass, and later passes read the intermediates pixel-aligned. Each of the 17 boundaries
+// rounds the scale-bias matrices' output to RGBA8, which accumulates to at most 3 LSB.
 TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailSamplingTransforms) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -7221,9 +7220,6 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailSamplingTransforms) {
         cache->unload();
       }
       ScopedAOTStatsPause pause(context, !useBundle);
-      // Every transform case is over the tail budget, so the bundle segment's runtime fallback is
-      // the rejection boundary under test, not a coverage gap.
-      ScopedAOTDeliberateMiss refusedPlan(context, useBundle);
       cache->setDecompositionEnabled(useBundle);
       cache->setDiagnosticRecordingEnabled(true);
       cache->resetStats();
@@ -7264,13 +7260,12 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailSamplingTransforms) {
     AOTDrawStats candidateDraws = {};
     render(false, &reference, nullptr);
     render(true, &candidate, &candidateDraws);
-    // Rejection boundary under every transform: the runtime reference serves the fill.
-    EXPECT_EQ(candidateDraws.completeAOTDraws, 0u);
+    EXPECT_EQ(candidateDraws.completeAOTDraws, 1u);
     EXPECT_EQ(candidateDraws.atomicFallbacks, 0u);
-    EXPECT_EQ(candidateDraws.kernelInvocations, 1u);
-    EXPECT_EQ(candidateDraws.planMaterializedEdges, 0u);
-    EXPECT_GE(context->globalCache()->programStats().programBuilderCreations, 1u);
-    ExpectBitmapsIdentical("offscreen-tail-sampling-refused", candidate, reference, 64, 64);
+    EXPECT_EQ(candidateDraws.kernelInvocations, 18u);
+    EXPECT_EQ(candidateDraws.planMaterializedEdges, 17u);
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+    ExpectBitmapsNear("offscreen-tail-sampling-multipass", candidate, reference, 64, 64, 3);
   }
 }
 

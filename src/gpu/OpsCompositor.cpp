@@ -39,6 +39,7 @@
 #include "gpu/ops/MeshDrawOp.h"
 #include "gpu/ops/ShapeDrawOp.h"
 #include "gpu/ops/ShapeInstancedDrawOp.h"
+#include "gpu/ops/StandardDrawOp.h"
 #include "gpu/ops/StencilCoverPathDrawOp.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/RRectEffect.h"
@@ -1418,7 +1419,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
         // fallback path (which prepares the op with its own processors) sees the folded tree.
         op->moveCoveragesToColors();
         coverageMoved = true;
-        if (submitPlanTask(foldedGraph, foldedPlan, &op)) {
+        if (submitPlanTask(foldedGraph, foldedPlan, *deviceBounds, &op)) {
           return;
         }
       }
@@ -1447,7 +1448,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
                          AOTEffectDecomposer::Lower(colorProcessors, &graph) &&
                          AOTEffectDecomposer::Decompose(graph, &plan);
     if (mainDecompose) {
-      if (submitPlanTask(graph, plan, &op)) {
+      if (submitPlanTask(graph, plan, *deviceBounds, &op)) {
         return;
       }
     } else {
@@ -1475,24 +1476,14 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
       // never leave a rewritten (materialized) tree on the draw (: the pre-fix swap
       // replaced the original with the materialized tree, so even the fallback executed a
       // quantization boundary the reference never had).
-      // ADMISSION RULE (): the materialization boundary is an RGBA8 quantization step. A
-      // tree carrying a discontinuous operator (the proven class: AlphaThreshold — a stored byte
-      // rounding across the threshold's grid gap flips step() by 255 LSBs;
-      // BlendRetryMaterializationFlipsThreshold) must never be materialized: refuse the retry
-      // outright so the runtime's single-shader float evaluation stays authoritative. The draw
-      // then falls through to the plain route below (its program is cached after the first use).
-      bool flipRisk = false;
-      for (auto* processor : colorProcessors) {
-        if (TreeContainsQuantizationFlipRisk(processor)) {
-          flipRisk = true;
-          break;
-        }
-      }
+      // The materialization boundary is an RGBA8 quantization step: an AlphaThreshold behind it
+      // can flip where its input rounds across the threshold. With a precompiled bundle loaded the
+      // runtime route is unavailable, so the retry is still the only way to render the draw.
       // P4 group three: image-driven draws have no brush shader (drawImage builds the leading
       // processor straight from the image), so the rebuild can also come from a closure the
       // flush site captured. Trailing processors behind the rebuilt one (e.g. a
       // ColorSpaceXformEffect) stay on the op and ride along the retry.
-      bool canRebuild = (!op->hasCoverage() || foldMask) && !flipRisk &&
+      bool canRebuild = (!op->hasCoverage() || foldMask) &&
                         (brush.shader != nullptr || rebuildColorChain != nullptr);
       if (canRebuild && colorProcessors.size() >= 1) {
         auto* xfer = colorProcessors[0];
@@ -1537,7 +1528,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
                 if (foldMask) {
                   op->moveCoveragesToColors();
                 }
-                if (submitPlanTask(retryGraph, retryPlan, &op)) {
+                if (submitPlanTask(retryGraph, retryPlan, *deviceBounds, &op)) {
                   return;
                 }
               }
@@ -1571,8 +1562,28 @@ void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, co
 }
 
 bool OpsCompositor::submitPlanTask(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
-                                   PlacementPtr<DrawOp>* op) {
-  auto task = AOTPlanExecutor::Make(context, graph, plan, renderTarget, op);
+                                   const Rect& deviceBounds, PlacementPtr<DrawOp>* op) {
+  std::optional<Matrix> deviceToLocal = std::nullopt;
+  if (plan.passes.size() > 1) {
+    // The intermediate passes are device-aligned fills with an opaque white input color. They
+    // reproduce the draw's source pass exactly only when every fragment of the draw receives an
+    // opaque input color (the tail source reads only the input alpha, and the terminal draw then
+    // multiplies the final result by it once more), and when the source samples device space or
+    // the draw reports one affine device-to-local mapping for its local coordinates.
+    auto drawOp = static_cast<StandardDrawOp*>(op->get());
+    auto color = drawOp->uniformGeometryColor();
+    if (!color.has_value() || color->alpha != 1.0f) {
+      return false;
+    }
+    if (!AOTPlanExecutor::SamplesDeviceSpace(graph, plan)) {
+      deviceToLocal = drawOp->deviceToLocalMatrix();
+      if (!deviceToLocal.has_value()) {
+        return false;
+      }
+    }
+  }
+  auto task = AOTPlanExecutor::Make(context, renderFlags, graph, plan, deviceBounds, renderTarget,
+                                    op, Point::Zero(), false, deviceToLocal);
   if (task == nullptr) {
     return false;
   }

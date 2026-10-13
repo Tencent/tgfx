@@ -59,6 +59,29 @@ RectDrawOp::RectDrawOp(BlockAllocator* allocator, RectsVertexProvider* provider)
     commonColor = ToPMColor(provider->firstColor(), provider->dstColorSpace());
   }
   hasSubset = provider->hasSubset();
+  // Fill rects interpolate their local coordinates affinely over the device quad: through the
+  // shared inverse view matrix without UV coordinates, and through a single rect's rect-to-UV
+  // mapping with them. Strokes and batches of several UV-mapped rects have no single mapping, and
+  // neither has a scaled UV rect under coverage AA: its edge padding is applied to the UV rect in
+  // rect units, which bends the mapping away from rect-to-UV.
+  if (!provider->lineJoin().has_value()) {
+    if (uvMatrix.has_value()) {
+      deviceToLocal = uvMatrix;
+    } else if (provider->rectCount() == 1) {
+      Matrix inverse = {};
+      const auto& rect = provider->firstRect();
+      auto uvRect = provider->firstUVRect() != nullptr ? *provider->firstUVRect() : rect;
+      bool paddedUV = provider->aaType() == AAType::Coverage &&
+                      (uvRect.width() != rect.width() || uvRect.height() != rect.height());
+      if (!rect.isEmpty() && !paddedUV && provider->firstMatrix().invert(&inverse)) {
+        auto rectToUV = Matrix::MakeTrans(-rect.left, -rect.top);
+        rectToUV.postScale(uvRect.width() / rect.width(), uvRect.height() / rect.height());
+        rectToUV.postTranslate(uvRect.left, uvRect.top);
+        rectToUV.preConcat(inverse);
+        deviceToLocal = rectToUV;
+      }
+    }
+  }
 }
 
 PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {

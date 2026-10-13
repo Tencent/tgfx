@@ -23,27 +23,6 @@
 
 namespace tgfx {
 
-static bool FPSubtreeContainsFlipRisk(const FragmentProcessor* fp) {
-  if (fp == nullptr) {
-    return false;
-  }
-  // The threshold processor's runtime name (AlphaThresholdFragmentProcessor::name) — the
-  // discontinuous step() is the proven flip class ().
-  if (fp->name() == "AlphaStepFragmentProcessor") {
-    return true;
-  }
-  for (size_t index = 0; index < fp->numChildProcessors(); ++index) {
-    if (FPSubtreeContainsFlipRisk(fp->childProcessor(index))) {
-      return true;
-    }
-  }
-  return false;
-}
-
-bool TreeContainsQuantizationFlipRisk(const FragmentProcessor* root) {
-  return FPSubtreeContainsFlipRisk(root);
-}
-
 static bool IsPointwiseBlendLeafMatchable(const FragmentProcessor* fp, size_t childIndex) {
   if (fp == nullptr) {
     return true;
@@ -92,8 +71,8 @@ MaterializationDecision AOTMaterializationPolicy::Evaluate(const FragmentProcess
   return decision;
 }
 
-MaterializedTarget AOTMaterializationPolicy::PrepareTarget(Context* context, const Rect& drawBounds,
-                                                           float apronRadius) {
+MaterializedGeometry AOTMaterializationPolicy::PrepareGeometry(const Rect& drawBounds,
+                                                               float apronRadius) {
   auto bounds = drawBounds;
   bounds.outset(apronRadius, apronRadius);
   bounds.roundOut();
@@ -102,6 +81,16 @@ MaterializedTarget AOTMaterializationPolicy::PrepareTarget(Context* context, con
   geometry.coordOffset = Point::Make(bounds.left, bounds.top);
   geometry.width = static_cast<int>(bounds.width());
   geometry.height = static_cast<int>(bounds.height());
+  return geometry;
+}
+
+MaterializedTarget AOTMaterializationPolicy::PrepareTarget(Context* context, const Rect& drawBounds,
+                                                           float apronRadius) {
+  return AllocateTarget(context, PrepareGeometry(drawBounds, apronRadius));
+}
+
+MaterializedTarget AOTMaterializationPolicy::AllocateTarget(Context* context,
+                                                            const MaterializedGeometry& geometry) {
   if (context == nullptr || geometry.isEmpty()) {
     return {};
   }

@@ -35,6 +35,10 @@ class ShapeDrawOp : public StandardDrawOp {
 
   void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
+  std::optional<PMColor> uniformGeometryColor() const override {
+    return color;
+  }
+
   Type type() const override {
     return Type::ShapeDrawOp;
   }

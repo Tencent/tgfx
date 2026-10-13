@@ -35,7 +35,8 @@ enum class AOTKernelKind {
   PointwiseChain,
   // A plain or device-space texture source followed by bounded pointwise operator slots, matching
   // PointwiseTailShader. Produced by DecomposeLinearPointwiseTail for linear chains the DAG
-  // planner refuses (device-space sources, chains over the chain kernel's budgets).
+  // planner refuses (device-space sources, chains over the chain kernel's budgets); a chain over
+  // the tail's slot budget is split into several passes joined by materialized intermediates.
   PointwiseTail,
   // A procedural-noise source (PerlinNoiseFragmentProcessor) optionally followed by up to three
   // folded pointwise/const/blend operator slots, matching PerlinNoiseFillShader. Produced by
@@ -54,10 +55,18 @@ inline bool IsAOTPointwiseDAGKernel(AOTKernelKind kernel) {
   return kernel == AOTKernelKind::PointwiseChain || kernel == AOTKernelKind::PointwiseGraph;
 }
 
+/**
+ * One kernel invocation of a plan. A plan with several passes is a linear PointwiseTail chain
+ * split at the tail kernel's slot budget: every pass but the last renders into an intermediate
+ * texture (materializesOutput), and each later pass reads its predecessor's texture as its source
+ * (dependencies holds that predecessor's index), so its nodes are operator slots only.
+ */
 struct AOTPassDescriptor {
   AOTKernelKind kernel = AOTKernelKind::PointwiseChain;
   std::vector<AOTNodeID> nodes = {};
+  std::vector<uint32_t> dependencies = {};
   AOTNodeID output = AOTNodeID::Invalid();
+  bool materializesOutput = false;
   AOTResourceProfile resourceProfile = AOTResourceProfile::Automatic;
 };
 

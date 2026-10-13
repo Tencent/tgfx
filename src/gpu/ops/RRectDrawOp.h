@@ -64,6 +64,10 @@ class RRectDrawOp : public StandardDrawOp {
 
   void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
+  std::optional<PMColor> uniformGeometryColor() const override {
+    return commonColor;
+  }
+
   Type type() const override {
     return Type::RRectDrawOp;
   }

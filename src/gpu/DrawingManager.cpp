@@ -124,8 +124,12 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   // shader-side sample cannot observe pixels left by an earlier scratch allocation.
   auto submitPlanTask = [&](const AOTEffectGraph& taskGraph, const AOTEffectPlan& taskPlan,
                             PlacementPtr<DrawOp>* originalDraw) {
-    auto task =
-        AOTPlanExecutor::Make(context, taskGraph, taskPlan, renderTarget, originalDraw, true);
+    // The fill covers the target's logical bounds, and its processors see coordinates shifted by
+    // coordOffset; the intermediates of a multi-pass plan reproduce both.
+    auto deviceBounds = Rect::MakeWH(static_cast<float>(renderTarget->width()),
+                                     static_cast<float>(renderTarget->height()));
+    auto task = AOTPlanExecutor::Make(context, renderFlags, taskGraph, taskPlan, deviceBounds,
+                                      renderTarget, originalDraw, coordOffset, true);
     if (task == nullptr) {
       return false;
     }
@@ -134,16 +138,12 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     return true;
   };
   // P4 group three: the retry-warranted verdict must be taken before the processor is moved into
-  // the plain draw op below. ADMISSION RULE (): a tree carrying a discontinuous operator
-  // (the proven class: AlphaThreshold — a stored byte rounding across the threshold's grid gap
-  // flips step() by 255 LSBs; BlendRetryMaterializationFlipsThreshold) must never be
-  // materialized; the fill then keeps its original processor and the runtime's float evaluation
-  // stays authoritative.
+  // the plain draw op below. The materialization boundary quantizes to RGBA8 (an AlphaThreshold
+  // behind it can flip at the grid gap), but with a bundle loaded the retry is the only route.
   bool retryWarranted = false;
   if (routeCandidate && rebuildColorChain != nullptr && processor != nullptr &&
       processor->numChildProcessors() == 2 &&
-      processor->name() == "XfermodeFragmentProcessor - two" &&
-      !TreeContainsQuantizationFlipRisk(processor.get())) {
+      processor->name() == "XfermodeFragmentProcessor - two") {
     bool nested = (renderFlags & InternalRenderFlags::NestedRasterization) != 0;
     for (size_t childIndex = 0; childIndex < 2 && !retryWarranted; ++childIndex) {
       auto decision =

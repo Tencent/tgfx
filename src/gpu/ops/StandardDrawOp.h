@@ -72,6 +72,24 @@ class StandardDrawOp : public DrawOp {
   bool prepareForTask(RenderTarget* renderTarget, ProgramLookupMode mode,
                       std::optional<ColorProcessorList> colorOverride = std::nullopt);
 
+  /**
+   * The geometry color every fragment of this op receives as its input color, or nullopt when
+   * the color varies per vertex or the op does not report it. The AOT route uses it to decide
+   * whether intermediate fills, which run with an opaque white input, see the same input.
+   */
+  virtual std::optional<PMColor> uniformGeometryColor() const {
+    return std::nullopt;
+  }
+
+  /**
+   * The matrix mapping this op's top-left device positions onto the local coordinates its
+   * fragment processors evaluate at, when that mapping is one affine matrix for the whole op, or
+   * nullopt otherwise (per-vertex UV coordinates, or an op that does not report it).
+   */
+  virtual std::optional<Matrix> deviceToLocalMatrix() const {
+    return std::nullopt;
+  }
+
  protected:
   StandardDrawOp(BlockAllocator* allocator, AAType aaType) : DrawOp(allocator, aaType) {
   }

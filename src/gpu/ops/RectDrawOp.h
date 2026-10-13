@@ -83,6 +83,14 @@ class RectDrawOp : public StandardDrawOp {
 
   void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
+  std::optional<PMColor> uniformGeometryColor() const override {
+    return commonColor;
+  }
+
+  std::optional<Matrix> deviceToLocalMatrix() const override {
+    return deviceToLocal;
+  }
+
   Type type() const override {
     return Type::RectDrawOp;
   }
@@ -92,6 +100,7 @@ class RectDrawOp : public StandardDrawOp {
   std::optional<LineJoin> lineJoin = std::nullopt;
   std::optional<PMColor> commonColor = std::nullopt;
   std::optional<Matrix> uvMatrix = std::nullopt;
+  std::optional<Matrix> deviceToLocal = std::nullopt;
   bool hasSubset = false;
   std::shared_ptr<GPUBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<VertexBufferView> vertexBufferProxyView = nullptr;

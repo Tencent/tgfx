@@ -123,17 +123,6 @@ struct MaterializedTarget {
 };
 
 /**
- * True when the processor tree rooted at `root` (children included, recursively) contains an
- * operator whose output can flip discontinuously when an input value crosses an RGBA8
- * quantization boundary. Proven class: AlphaThreshold's step() — a materialized input whose
- * float value rounds across the threshold's grid gap flips the output by 255 LSBs (,
- * BlendRetryMaterializationFlipsThreshold; the same exact-rational class as the
- * multi-pass tail). Any materialization retry on such a tree must be refused so the runtime's
- * single-shader float evaluation stays authoritative.
- */
-bool TreeContainsQuantizationFlipRisk(const FragmentProcessor* root);
-
-/**
  * AOTMaterializationPolicy is the single authority that decides where to insert materialization
  * edges to convert an otherwise unmatchable FragmentProcessor chain into a sequence of
  * AOT-matchable kernels. Callers at FragmentProcessor-build sites consult it instead of hand-coding
@@ -157,11 +146,22 @@ class AOTMaterializationPolicy {
                                           MaterializationConsumer consumer, size_t childIndex);
 
   /**
-   * Allocates the offscreen target of one materialization edge covering drawBounds grown by
-   * apronRadius on every side. Returns a target whose renderTarget is null when the snapped area is
-   * degenerate or the allocation fails. This records no draw metrics: the inline flatten counts its
-   * edge when it queues the render task.
+   * Computes the pixel geometry of one materialization edge covering drawBounds grown by
+   * apronRadius on every side, snapped out to whole pixels. A caller rendering several passes over
+   * the same area computes it once and reuses it for every pass and for the consumer's sampling
+   * matrix, so the capture area and the coordinate mapping cannot disagree.
    */
+  static MaterializedGeometry PrepareGeometry(const Rect& drawBounds, float apronRadius);
+
+  /**
+   * Allocates one exact-fit offscreen target for the given geometry. Returns a target whose
+   * renderTarget is null when the geometry is degenerate or the allocation fails. This records no
+   * draw metrics: each caller reports its own edge (the plan executor once its whole plan
+   * survives strict preparation, the inline flatten when it queues its render task).
+   */
+  static MaterializedTarget AllocateTarget(Context* context, const MaterializedGeometry& geometry);
+
+  /** PrepareGeometry plus AllocateTarget for the single-edge case. */
   static MaterializedTarget PrepareTarget(Context* context, const Rect& drawBounds,
                                           float apronRadius);
 };

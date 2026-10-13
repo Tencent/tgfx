@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <vector>
 #include "gpu/ops/DrawOp.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/tasks/RenderTask.h"
@@ -26,17 +27,28 @@ namespace tgfx {
 
 class RenderTarget;
 
+// One materialized step of a multi-pass AOT plan: the exact-fit target the step renders into and
+// the draw op that renders it.
+struct AOTIntermediatePass {
+  std::shared_ptr<RenderTargetProxy> target = nullptr;
+  PlacementPtr<DrawOp> drawOp = nullptr;
+};
+
 /**
- * Render task for a single-pass AOT plan: it replays the original draw with the plan's rebuilt
- * color processors onto the destination. The prepare phase is atomic: the draw is prepared strictly
- * against the precompiled artifacts, and if the lookup or target resolution fails, the task replays
- * the original draw unchanged instead. Once the render pass begins, a setup failure stops the task
- * and is recorded as a planExecutionFailures diagnostic, matching the plain task family's behavior
- * on backend errors.
+ * Render task for an AOT plan: it renders every materializing pass into its intermediate target,
+ * then replays the original draw with the plan's terminal color processors onto the destination.
+ * The prepare phase is atomic: every intermediate pass and the terminal draw are prepared strictly
+ * against the precompiled artifacts, and if any lookup or target resolution fails, the task
+ * replays the original draw unchanged instead. Once passes begin, a render-pass setup failure stops
+ * the task at that pass (the destination is untouched unless the terminal pass started) and is
+ * recorded as a planExecutionFailures diagnostic, matching the plain task family's behavior on
+ * backend errors.
  */
 class AOTPlanRenderTask : public RenderTask {
  public:
-  AOTPlanRenderTask(BlockAllocator* allocator, DrawOp::ColorProcessorList&& planColors,
+  AOTPlanRenderTask(BlockAllocator* allocator,
+                    std::vector<AOTIntermediatePass>&& intermediatePasses,
+                    DrawOp::ColorProcessorList&& terminalColors,
                     std::shared_ptr<RenderTargetProxy> destination);
 
   void setOriginalDraw(PlacementPtr<DrawOp> drawOp);
@@ -48,7 +60,8 @@ class AOTPlanRenderTask : public RenderTask {
   void execute(CommandEncoder* encoder) override;
 
  private:
-  DrawOp::ColorProcessorList planColors = {};
+  std::vector<AOTIntermediatePass> intermediatePasses = {};
+  DrawOp::ColorProcessorList terminalColors = {};
   std::shared_ptr<RenderTargetProxy> destination = nullptr;
   PlacementPtr<DrawOp> originalDraw = nullptr;
   bool clearDestination = false;

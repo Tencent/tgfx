@@ -1198,9 +1198,35 @@ bool AOTChainBuilder::ResolveChainProfile(const AOTEffectGraph& graph,
 // RRectCoverage nodes rooted at the GP coverage unit, which is what makes composed multi-clip
 // coverage representable at all. Returns false when the coverage carries anything else.
 
-PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildFPForPass(BlockAllocator* allocator,
-                                                                const AOTEffectGraph& graph,
-                                                                const AOTPassDescriptor& pass) {
+PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildTextureSourceFP(
+    BlockAllocator* allocator, const AOTTextureParameters& parameters) {
+  AOTEffectNode node = {};
+  node.kind = AOTEffectKind::TextureSource;
+  node.parameters = parameters;
+  return BuildTextureLeafFP(allocator, &node);
+}
+
+PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildFPForPass(
+    BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
+    PlacementPtr<FragmentProcessor> sourceOverride) {
+  if (sourceOverride != nullptr) {
+    // A later pass of a multi-pass tail plan: the source is the predecessor's materialized output
+    // and every node of the pass is an operator slot.
+    if (pass.kernel != AOTKernelKind::PointwiseTail ||
+        pass.nodes.size() > AOTPointwiseTailProcessor::MaxSlots) {
+      return nullptr;
+    }
+    std::vector<AOTPointwiseSlot> slots = {};
+    slots.reserve(pass.nodes.size());
+    for (auto nodeID : pass.nodes) {
+      AOTPointwiseSlot slot = {};
+      if (!BuildPointwiseSlot(graph, graph.nodeAt(nodeID), &slot)) {
+        return nullptr;
+      }
+      slots.push_back(slot);
+    }
+    return AOTPointwiseTailProcessor::Make(allocator, std::move(sourceOverride), slots);
+  }
   if (pass.nodes.empty()) {
     return nullptr;
   }

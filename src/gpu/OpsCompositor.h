@@ -236,11 +236,12 @@ class OpsCompositor {
   void submitDrawOps();
 
   /**
-   * Builds the AOT plan task for op and enqueues it after the pending ops. Returns false, leaving op
-   * untouched, when the executor refuses the plan.
+   * Builds the AOT plan task for op over deviceBounds and enqueues it after the pending ops.
+   * Returns false, leaving op untouched, when the executor refuses the plan or a multi-pass plan
+   * cannot reproduce this draw exactly (see the gate in the implementation).
    */
   bool submitPlanTask(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
-                      PlacementPtr<DrawOp>* op);
+                      const Rect& deviceBounds, PlacementPtr<DrawOp>* op);
 
   friend class DrawingManager;
   friend class PendingOpsAutoReset;
