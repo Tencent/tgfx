@@ -222,12 +222,11 @@ bool InnerShadowStyle::tryDrawAnalytic(Canvas* canvas, const LayerStyleInput& in
     return false;
   }
   // The shadow shape is the layer's own outline and the mask is that shape inset by the spread.
-  const auto shadowShape =
-      AnalyticShadowUtils::MakeShadowShape(input, 0.0f, !FloatNearlyZero(_spread));
+  const auto shadowShape = AnalyticShadowUtils::MakeShadowShape(input, 0.0f);
   if (!shadowShape.has_value()) {
     return false;
   }
-  auto maskShape = AnalyticShadowUtils::MakeShadowShape(input, -_spread, !FloatNearlyZero(_spread));
+  auto maskShape = AnalyticShadowUtils::MakeShadowShape(input, -_spread);
   if (!maskShape.has_value()) {
     return false;
   }

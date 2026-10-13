@@ -822,7 +822,7 @@ bool PDFExportContext::tryDrawRectByConsumingShader(const Rect& rect, const Brus
 
   Brush drawBrush = brush;
   drawBrush.shader = nullptr;
-  switch (Types::Get(shader.get())) {
+  switch (type) {
     case Types::ShaderType::RRectBlur: {
       const auto* blur = static_cast<const RRectBlurShader*>(shader.get());
       return exportDropShadowImage(*blur, shaderMatrix, matrix, clip, rect, drawBrush);

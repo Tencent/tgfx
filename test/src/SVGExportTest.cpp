@@ -41,12 +41,10 @@
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/ShapeStyle.h"
-#include "tgfx/layers/SolidLayer.h"
 #include "tgfx/layers/filters/BlurFilter.h"
 #include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
-#include "tgfx/svg/SVGDOM.h"
 #include "tgfx/svg/SVGExporter.h"
 #include "tgfx/svg/SVGPathParser.h"
 #include "utils/TestUtils.h"
@@ -756,8 +754,7 @@ TGFX_TEST(SVGExportTest, LayerShadow) {
   innerShadowLayer->setLayerStyles({innerShadowStyle});
   rootLayer->addChild(innerShadowLayer);
 
-  // Non-zero spread on exact rects: the analytic shadow path accepts them, and the SVG export
-  // rewrites the shader as a filter.
+  // Non-zero spread on exact rects: covered by the analytic shadow path.
   auto spreadDropShadowLayer = ShapeLayer::Make();
   auto spreadDropShadowStyle = DropShadowStyle::Make(10, 10, 10, 10, Color::Blue(), false);
   spreadDropShadowStyle->setSpread(5);

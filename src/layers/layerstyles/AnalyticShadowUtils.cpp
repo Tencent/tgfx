@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "layers/layerstyles/AnalyticShadowUtils.h"
+#include <utility>
 #include "core/RRectUtils.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -28,7 +29,7 @@
 namespace tgfx {
 
 // Returns the path as an RRect when the closed-form shadow supports it; nullopt otherwise.
-static inline std::optional<RRect> AsAnalyticRRect(const Path& path, bool allowFallback) {
+static inline std::optional<RRect> AsAnalyticRRect(const Path& path) {
   // Path::isRect, Path::isRRect and Path::isOval each recognize only their own shape kind, so
   // all three must be checked.
   Rect rect = {};
@@ -45,16 +46,13 @@ static inline std::optional<RRect> AsAnalyticRRect(const Path& path, bool allowF
   if (path.isOval(&rect)) {
     return RRect::MakeOval(rect);
   }
-  if (!allowFallback) {
-    return std::nullopt;
-  }
   // Complex paths use their bounding rect as an approximation for the shadow source, matching
   // MakeSpreadShapeImage.
   return RRect::MakeRect(path.getBounds());
 }
 
 std::optional<RRect> AnalyticShadowUtils::MakeShadowShape(const LayerStyleInput& input,
-                                                          float spread, bool allowFallback) {
+                                                          float spread) {
   auto* source = input.findExtraSource(StyleInputSource::Type::Contour);
   if (source == nullptr) {
     return std::nullopt;
@@ -87,7 +85,7 @@ std::optional<RRect> AnalyticShadowUtils::MakeShadowShape(const LayerStyleInput&
   if (path.isEmpty()) {
     return RRect::MakeRect(Rect::MakeEmpty());
   }
-  auto rRect = AsAnalyticRRect(path, allowFallback);
+  auto rRect = AsAnalyticRRect(path);
   if (!rRect.has_value()) {
     return std::nullopt;
   }
@@ -102,14 +100,28 @@ std::optional<RRect> AnalyticShadowUtils::MakeShadowShape(const LayerStyleInput&
   }
   // Shift the origin to the content image's top-left corner.
   result->offset(-input.contentOffset.x, -input.contentOffset.y);
+  // The contour outlines the layer's content and is expected to stay within the content image; a
+  // shape exceeding it is treated as unavailable.
+  const auto contentBounds = Rect::MakeWH(static_cast<float>(input.content->width()),
+                                          static_cast<float>(input.content->height()));
+  DEBUG_ASSERT(contentBounds.contains(result->rect()));
+  if (!contentBounds.contains(result->rect())) {
+    return std::nullopt;
+  }
 
   auto outset = spread;
   if (styledShape.type == StyledShapeType::FillStroke) {
     outset += SpreadUtils::StrokeOutset(styledShape.strokeWidth, styledShape.strokeAlign);
   }
   if (!FloatNearlyZero(outset)) {
-    const auto scales = matrix.getAxisScales();
-    // The outset is measured in the layer's local space, so it scales with the geometry.
+    auto scales = matrix.getAxisScales();
+    if (!matrix.isScaleTranslate()) {
+      // getAxisScales() returns the scales of the shape's local axes. A quarter-turn rotation maps
+      // the local x axis onto the y axis of the axis-aligned result, so the per-axis scales swap.
+      std::swap(scales.x, scales.y);
+    }
+    // The outset is measured in the shape's own geometry space, so it scales per axis with the
+    // transform's scale factors.
     result = SpreadUtils::MakeSpreadRRect(*result, {outset * scales.x, outset * scales.y});
     DEBUG_ASSERT(!result->isComplex());
   }

@@ -149,10 +149,8 @@ void SVGExportContext::drawFill(const Brush& brush) {
 
 void SVGExportContext::drawRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip,
                                 const Brush& brush, const Stroke* stroke) {
-  if (brush.shader != nullptr) {
-    if (tryDrawRectByConsumingShader(rect, brush, matrix, clip, stroke)) {
-      return;
-    }
+  if (tryDrawRectByConsumingShader(rect, brush, matrix, clip, stroke)) {
+    return;
   }
 
   std::unique_ptr<ElementWriter> svg;
@@ -981,7 +979,7 @@ bool SVGExportContext::tryDrawRectByConsumingShader(const Rect& rect, const Brus
 
   Brush drawBrush = brush;
   drawBrush.shader = nullptr;
-  switch (Types::Get(shader.get())) {
+  switch (type) {
     case Types::ShaderType::RRectBlur: {
       const auto* blur = static_cast<const RRectBlurShader*>(shader.get());
       return drawDropShadow(*blur, shaderMatrix, matrix, clip, rect, drawBrush);
@@ -1065,7 +1063,7 @@ bool SVGExportContext::drawInnerShadow(const RRectInnerShadowShader& shader,
   imageMatrix.preConcat(shaderMatrix);
   imageMatrix.preTranslate(shadowOffset.x, shadowOffset.y);
   // TODO: The maskFilter on the brush currently rasterizes the shape image (the Picture branch of
-  // onDrawImage requires no maskFilter to vectorize). Emit vector content with an SVG <mask>
+  // drawImage requires no maskFilter to vectorize). Emit vector content with an SVG <mask>
   // instead.
   drawImage(std::move(shadowImage), {}, imageMatrix, realClip, shadowBrush);
   return true;

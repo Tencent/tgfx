@@ -22,9 +22,9 @@
 
 namespace tgfx {
 
-// Sample counts the rounded-rect coverage form uses along the axis it does not solve in closed
-// form. At a fixed count the quadrature error grows with the ratio between the corner's two
-// semi-axes, so the count is picked per shape rather than fixed.
+// Quadrature point counts the rounded-rect coverage form uses along the axis it does not solve
+// in closed form. At a fixed count the quadrature error grows with the ratio between the corner's
+// two semi-axes, so the count is picked per shape rather than fixed.
 static constexpr int LowQuadratureCount = 4;
 static constexpr int HighQuadratureCount = 8;
 
@@ -156,10 +156,10 @@ float shapeBlurSliceCoverage(float alongCoord, float crossCoord, float cornerAlo
   // the slice at y:
   //   C(p) = int [ int_{-w(y)}^{+w(y)} g(px - x) dx ] * g(py - y) dy
   // The inner integral is closed form (shapeBlurSliceCoverage). The outer one is a fixed
-  // midpoint sum over N samples s_i = start + (i + 0.5) * step, where slice_i (the code's span)
-  // is the inner integral on the slice offset s_i from p, and w_i = exp(-0.5 * s_i^2); the sum
-  // is rescaled by the exact window mass:
-  //   C(p) = [sum_i w_i * slice_i] * (CDF(end) - CDF(start)) / sum_i w_i
+  // midpoint sum over N quadrature points s_i = start + (i + 0.5) * step, where slice_i (the
+  // code's span) is the inner integral on the slice offset s_i from p, and
+  // weight_i = exp(-0.5 * s_i^2); the sum is rescaled by the exact window mass:
+  //   C(p) = [sum_i weight_i * slice_i] * (CDF(end) - CDF(start)) / sum_i weight_i
   //
   // The quadrature axis follows the smaller coordinate component so the outer interval is more
   // likely to span the full kernel window, which lowers the quadrature error. Swapping the axes

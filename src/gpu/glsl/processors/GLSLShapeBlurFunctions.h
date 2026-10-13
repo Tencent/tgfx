@@ -24,9 +24,10 @@
 namespace tgfx {
 
 /**
- * Each function below may be called at most once per FragmentShaderBuilder, and the rectangle and
- * rounded-rect variants of a group are mutually exclusive on one builder: AppendRectBlurFunctions
- * with AppendRRectBlurFunctions, and AppendRectMaskFunctions with AppendRRectMaskFunctions.
+ * Each emitting function below may be called at most once per FragmentShaderBuilder, and the
+ * rectangle and rounded-rect variants of a group are mutually exclusive on one builder:
+ * AppendRectBlurFunctions with AppendRRectBlurFunctions, and AppendRectMaskFunctions with
+ * AppendRRectMaskFunctions.
  */
 
 /**
@@ -36,16 +37,16 @@ namespace tgfx {
 void AppendRectBlurFunctions(FragmentShaderBuilder* fragBuilder);
 
 /**
- * Returns the number of sample points the rounded-rect coverage form should use for a corner whose
- * two semi-axes are given in sigma units.
+ * Returns the number of quadrature points the rounded-rect coverage form should use for a corner
+ * whose two semi-axes are given in sigma units.
  */
 int GetRRectBlurQuadratureCount(const Point& cornerOverSigma);
 
 /**
  * Emits:
  *   float shapeBlurRRectCoverage(vec2 coord, vec2 halfSize, vec2 corner);
- * @param quadratureCount the number of sample points the coverage form uses along the axis it does
- * not solve in closed form. GetRRectBlurQuadratureCount gives the value to pass.
+ * @param quadratureCount the number of quadrature points the coverage form uses along the axis it
+ * does not solve in closed form. GetRRectBlurQuadratureCount gives the value to pass.
  */
 void AppendRRectBlurFunctions(FragmentShaderBuilder* fragBuilder, int quadratureCount);
 
