@@ -813,6 +813,87 @@ TGFX_TEST(AOTEffectTest, DirectGradientProcessorRejectsChainAndAutomaticallySele
   }
 }
 
+static PlacementPtr<AOTPointwiseChainProcessor> MakeChainWithTextureLeaves(
+    Context* context, BlockAllocator* allocator, size_t leafCount,
+    const std::vector<AOTChainSlot>& slots, size_t root, AOTResourceProfile profile) {
+  std::vector<PlacementPtr<FragmentProcessor>> leaves;
+  std::vector<PlacementPtr<FragmentProcessor>> padding;
+  for (size_t index = 0; index < (leafCount == 0 ? 0u : 4u); ++index) {
+    auto texture = MakeTextureProcessor(context, allocator, PixelFormat::RGBA_8888);
+    if (texture == nullptr) {
+      return nullptr;
+    }
+    if (index < leafCount) {
+      leaves.push_back(std::move(texture));
+    } else {
+      padding.push_back(std::move(texture));
+    }
+  }
+  return AOTPointwiseChainProcessor::Make(allocator, std::move(leaves), slots, root, -1, nullptr,
+                                          nullptr, -1, ~0u, nullptr, -1, std::move(padding), false,
+                                          -1, -1, nullptr, profile);
+}
+
+TGFX_TEST(AOTEffectTest, TextureSlotsMustMatchRealLeaves) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  for (auto profile : {AOTResourceProfile::Chain, AOTResourceProfile::TiledGraph}) {
+    for (size_t leafCount = 0; leafCount <= 4; ++leafCount) {
+      SCOPED_TRACE(static_cast<uint32_t>(profile));
+      SCOPED_TRACE(leafCount);
+      std::vector<AOTChainSlot> slots(leafCount + 1);
+      for (size_t index = 0; index < leafCount; ++index) {
+        slots[index].op = AOTChainOp::Texture;
+      }
+      slots.back().op = AOTChainOp::ConstColor;
+      slots.back().in0 = -1;
+      slots.back().outRegister = 0;
+      ASSERT_NE(MakeChainWithTextureLeaves(context, &allocator, leafCount, slots, 0, profile),
+                nullptr);
+      slots.back().op = AOTChainOp::Texture;
+      EXPECT_EQ(MakeChainWithTextureLeaves(context, &allocator, leafCount, slots, 0, profile),
+                nullptr);
+      if (leafCount > 0) {
+        slots.back().op = AOTChainOp::ConstColor;
+        slots[0].op = AOTChainOp::ConstColor;
+        slots[0].in0 = -1;
+        EXPECT_EQ(MakeChainWithTextureLeaves(context, &allocator, leafCount, slots, 0, profile),
+                  nullptr);
+      }
+    }
+  }
+}
+
+TGFX_TEST(AOTEffectTest, TexModulateRequiresRealTextureSource) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  for (auto profile : {AOTResourceProfile::Chain, AOTResourceProfile::TiledGraph}) {
+    for (size_t leafCount = 0; leafCount <= 4; ++leafCount) {
+      SCOPED_TRACE(static_cast<uint32_t>(profile));
+      SCOPED_TRACE(leafCount);
+      std::vector<AOTChainSlot> slots(leafCount + 1);
+      for (size_t index = 0; index < leafCount; ++index) {
+        slots[index].op = AOTChainOp::Texture;
+      }
+      slots.back().op = AOTChainOp::TexModulate;
+      slots.back().in0 = -1;
+      slots.back().outRegister = 0;
+      slots.back().texModulateSourceSlot = static_cast<int>(leafCount);
+      EXPECT_EQ(MakeChainWithTextureLeaves(context, &allocator, leafCount, slots, 0, profile),
+                nullptr);
+      if (leafCount > 0) {
+        slots.back().texModulateSourceSlot = static_cast<int>(leafCount - 1);
+        ASSERT_NE(MakeChainWithTextureLeaves(context, &allocator, leafCount, slots, 0, profile),
+                  nullptr);
+      }
+    }
+  }
+}
+
 TGFX_TEST(AOTEffectTest, BaseChainOmitsGradientTransformAndExtendedProfilesKeepOrdinals) {
   ContextScope scope;
   auto context = scope.getContext();

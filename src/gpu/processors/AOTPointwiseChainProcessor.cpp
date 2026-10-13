@@ -319,9 +319,17 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
       }
     }
   }
-  // Leaves pair slot-for-slot with samplers: slot k must be the leaf that samples TextureSampler_k.
-  for (size_t index = 0; index < leafCount; ++index) {
-    if (textureLeaves[index] == nullptr || slots[index].op != AOTChainOp::Texture) {
+  // Only real DAG leaves have prefetched samples; LUT and padding children do not.
+  for (size_t index = 0; index < slots.size(); ++index) {
+    const auto& slot = slots[index];
+    if ((slot.op == AOTChainOp::Texture) != (index < leafCount)) {
+      return nullptr;
+    }
+    if (index < leafCount && textureLeaves[index] == nullptr) {
+      return nullptr;
+    }
+    if (slot.op == AOTChainOp::TexModulate &&
+        static_cast<size_t>(slot.texModulateSourceSlot) >= leafCount) {
       return nullptr;
     }
   }
