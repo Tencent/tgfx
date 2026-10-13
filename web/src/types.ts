@@ -183,8 +183,8 @@ export interface EmscriptenWebGPU {
 export interface TGFX extends EmscriptenModule {
     TGFXLineCap: TGFXLineCap;
     TGFXLineJoin: TGFXLineJoin;
-    GL: EmscriptenGL;
-    WebGPU: EmscriptenWebGPU;
+    GL?: EmscriptenGL;
+    WebGPU?: EmscriptenWebGPU;
     TGFXPathFillType: TGFXPathFillType;
     /**
      * Sets the maximum number of worker threads that can be created for running tasks. Pass zero to
