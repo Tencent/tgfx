@@ -141,23 +141,26 @@ std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
   // NarrowAAClipWithSrcBlendKeepsDstOnEdge and AtlasTextNonSrcOverBlendKeepsDstProbe).
   std::vector<const FragmentProcessor*> coverageFPs = {};
   std::vector<PlacementPtr<FragmentProcessor>> ownedChainCoverageFPs = {};
-  if (!coverages.empty()) {
-    // Up to two coverage FPs fold into the chain: a single one lowers as the narrow forms or a
-    // general subtree, and a pair folds as subtree + trailing device-mask child.
-    if (coverages.size() > 2) {
-      return nullptr;
-    }
-    coverageFPs.reserve(coverages.size());
-    for (auto& coverage : coverages) {
-      coverageFPs.push_back(coverage.get());
-    }
-  } else if (geometryProcessor->name() == "AtlasTextGeometryProcessor") {
-    // Atlas text: the GP-owned atlas becomes a synthesized coverage leaf (the glyph mask), and
-    // the rewrite needs a sampler-free twin GP. A null override means the draw is not servable
-    // this way (e.g. a color-emoji atlas), so keep the original route. The glyph mask is TRUE
-    // coverage in the runtime composite, and the builder routes the subtree's root through the
-    // chain's clip-coverage register so it composites as the XP's coverage input for every blend
-    // mode (AtlasTextNonSrcOverBlendKeepsDstProbe) — no blend-mode restriction here.
+  // Atlas text: the GP-owned atlas becomes a synthesized coverage leaf (the glyph mask), and the
+  // rewrite needs a sampler-free twin GP. A null override means the draw is not servable this way
+  // (e.g. a color-emoji atlas), so keep the original route. The glyph mask is TRUE coverage in
+  // the runtime composite, and the builder routes the subtree's root through the chain's
+  // clip-coverage register so it composites as the XP's coverage input for every blend mode
+  // (AtlasTextNonSrcOverBlendKeepsDstProbe) — no blend-mode restriction here. A draw clip rides
+  // in front of the glyph leaf as the two-FP [clip, local texture] form; the builder chains the
+  // clip slots on top of the glyph register (glyph * clip).
+  const bool atlasText = geometryProcessor->name() == "AtlasTextGeometryProcessor";
+  // Up to two coverage FPs fold into the chain: a single one lowers as the narrow forms or a
+  // general subtree, and a pair folds as subtree + clip slots or device-mask child. The atlas
+  // glyph leaf takes one of the two positions.
+  if (coverages.size() > (atlasText ? 1u : 2u)) {
+    return nullptr;
+  }
+  coverageFPs.reserve(coverages.size() + 1);
+  for (auto& coverage : coverages) {
+    coverageFPs.push_back(coverage.get());
+  }
+  if (atlasText) {
     chainGeometryProcessor = onMakeChainGeometryProcessor(&ownedChainCoverageFPs);
     if (chainGeometryProcessor == nullptr) {
       return nullptr;
@@ -196,10 +199,11 @@ std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
       plan.passes[0].kernel == AOTKernelKind::PointwiseTail) {
     plan.passes[0].kernel = AOTKernelKind::PointwiseChain;
   }
+  // The production admission rule (CanRoute) plus this route's own executor: the direct rewrite
+  // only carries the processors that replace a color list in place (chain/graph and perlin).
   auto kernel = plan.passes.empty() ? AOTKernelKind::TextureFill : plan.passes[0].kernel;
-  if (!decomposed || plan.passes.size() != 1 ||
-      (!IsAOTPointwiseDAGKernel(kernel) && kernel != AOTKernelKind::PerlinNoiseFill) ||
-      !AOTPlanExecutor::CanExecute(graph, plan)) {
+  if (!decomposed || !AOTPlanExecutor::CanRoute(graph, plan) ||
+      (!IsAOTPointwiseDAGKernel(kernel) && kernel != AOTKernelKind::PerlinNoiseFill)) {
     return nullptr;
   }
   PlacementPtr<FragmentProcessor> chainFP = nullptr;

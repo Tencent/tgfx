@@ -153,9 +153,9 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   // The single authority for the chain kernel's shared parameter-block budgets. The kernel has
   // exactly one chain-wide gradient block and gradient coordinate varying, one color-space
   // transform block, one device-space rect coverage block, one local rect coverage block, and
-  // four rrect array elements. The planner (AOTPlanExecutor::CanExecute), the chain builder, and
-  // this processor's constructor all consult these constants instead of hard-coding their own
-  // copies, so a budget change cannot leave the three check sites disagreeing.
+  // four rrect array elements. ValidateSlots is the one place that enforces them; the chain
+  // builder's planner (and so AOTPlanExecutor::CanExecute and the DAG planner) and Make() both
+  // run it on the same instruction array, so a budget change cannot leave check sites disagreeing.
   static constexpr size_t MaxGradientSlots = 1;
   static constexpr size_t MaxColorSpaceXformSlots = 1;
   static constexpr size_t MaxDeviceRectCoverageSlots = 1;
@@ -167,6 +167,21 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   static bool HasChainKernelVariant(size_t samplerChildren) {
     return samplerChildren <= static_cast<size_t>(MaxFusedAOTSamplers);
   }
+
+  /**
+   * The data-only half of Make(): validates an encoded instruction array (register domains,
+   * opcodes, selector fields, leaf layout, per-kind parameter blocks) and resolves its resource
+   * profile against the profile capacities, without looking at any child processor. The chain
+   * builder runs it while planning (AOTPlanExecutor::CanExecute) and Make() runs it again on the
+   * same data, so planning and construction cannot disagree on a slot rule or a budget.
+   * leafCount is the number of real DAG texture leaves (slots [0, leafCount) must be OP_TEXTURE),
+   * hasLUT whether a LUT gradient child follows them, and tiledLeafIndices the leaves carrying a
+   * shader-side tiling recipe. On success *profile holds the resolved (non-Automatic) profile.
+   */
+  static bool ValidateSlots(const std::vector<AOTChainSlot>& slots, size_t rootSlot,
+                            int coverageRootSlot, int clipCoverageRegister, size_t leafCount,
+                            bool hasLUT, const std::vector<int>& tiledLeafIndices,
+                            AOTResourceProfile* profile);
 
   static PlacementPtr<AOTPointwiseChainProcessor> Make(
       BlockAllocator* allocator, std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,

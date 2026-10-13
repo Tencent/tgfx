@@ -65,6 +65,10 @@ enum class PrecompiledFallbackReason : uint8_t {
   // hash, malformed layout). Unlike NoBundleForBackend this is a defect of the build's artifact:
   // every draw falls back to the runtime path until the bundle is regenerated.
   BundleRejected,
+  // A rule matched, but the draw samples a texture whose read semantics (the GRAY_8 / RG_88 read
+  // swizzle) the matched shader family does not implement (PrecompiledShaderInfo::textureReads).
+  // A capability gap of that family, refused instead of drawn with the wrong channels.
+  UnsupportedTextureRead,
   Count,
 };
 
@@ -217,7 +221,7 @@ struct AOTDrawStats {
   // recordDecomposeRejection() only when diagnostic recording is enabled, so a draw that
   // silently fell back to the plain route carries an observable "why" instead of nothing.
   // FusablePointwise never appears here: that outcome means the route was not attempted.
-  std::array<uint64_t, 5> decomposeRejections = {};
+  std::array<uint64_t, 6> decomposeRejections = {};
 };
 
 /// Runtime cache that loads precompiled shader bundles and provides O(1) lookup by ShaderKey hash.

@@ -98,7 +98,8 @@ class PointwiseChainShader : public PrecompiledShader {
             FD::domain(),
             PermutationDomain({}),
             "",
-            ""};
+            "",
+            ShaderTextureReadSwizzle};
   }
 };
 

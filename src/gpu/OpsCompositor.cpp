@@ -1420,11 +1420,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
       if (AOTEffectDecomposer::Lower(foldedProcessors, &foldedGraph) &&
           AOTEffectDecomposer::ValidateForFusion(foldedGraph) &&
           AOTEffectDecomposer::Decompose(foldedGraph, &foldedPlan) &&
-          foldedPlan.passes.size() == 1 &&
-          (foldedPlan.passes[0].kernel == AOTKernelKind::PointwiseTail ||
-           IsAOTPointwiseDAGKernel(foldedPlan.passes[0].kernel) ||
-           foldedPlan.passes[0].kernel == AOTKernelKind::PerlinNoiseFill ||
-           foldedPlan.passes[0].kernel == AOTKernelKind::YUVTextureFill)) {
+          AOTPlanExecutor::CanRoute(foldedGraph, foldedPlan)) {
         // The mask now travels inside the color chain, so the terminal draw must not apply it
         // again as a coverage processor. The move happens before Make so the task's own
         // fallback path (which prepares the op with its own processors) sees the folded tree.
@@ -1469,15 +1465,9 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
         !op->hasCoverage() && AOTEffectDecomposer::Lower(colorProcessors, &graph, &mainBlocker);
     bool mainValidate = mainLower && AOTEffectDecomposer::ValidateForFusion(graph);
     bool mainDecompose = mainValidate && AOTEffectDecomposer::Decompose(graph, &plan);
-    if (colorProcessors.size() == 1 && colorProcessors[0]->numChildProcessors() > 0) {
-    }
     // Single-pass on-screen acceptance (same rationale as the folded route above): multi-pass
     // tail plans are refused here so over-budget chains keep the runtime path as their reference.
-    if (mainDecompose && plan.passes.size() == 1 &&
-        (plan.passes[0].kernel == AOTKernelKind::PointwiseTail ||
-         IsAOTPointwiseDAGKernel(plan.passes[0].kernel) ||
-         plan.passes[0].kernel == AOTKernelKind::PerlinNoiseFill ||
-         plan.passes[0].kernel == AOTKernelKind::YUVTextureFill)) {
+    if (mainDecompose && AOTPlanExecutor::CanRoute(graph, plan)) {
       auto task = AOTPlanExecutor::Make(context, renderFlags, graph, plan, *deviceBounds,
                                         renderTarget, &op, Point::Zero());
       if (task != nullptr) {
@@ -1492,9 +1482,14 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
         // The route was attempted and refused: record the pure-analysis reason so a silently
         // falling-back draw carries an observable "why" (which processor lacks a lowering, which
         // shape no planner covers) instead of nothing. Trivial (empty chain) is not a rejection.
+        // A color chain that is routable on its own was refused here only because the draw still
+        // carries coverage the color-only route cannot apply, which is NotRoutable as well.
         auto analysis = AOTEffectDecomposer::AnalyzeChain(colorProcessors);
-        if (analysis.outcome != AOTDecomposeOutcome::Trivial) {
-          cache->recordDecomposeRejection(analysis.outcome);
+        auto outcome = analysis.outcome == AOTDecomposeOutcome::FusablePointwise
+                           ? AOTDecomposeOutcome::NotRoutable
+                           : analysis.outcome;
+        if (outcome != AOTDecomposeOutcome::Trivial) {
+          cache->recordDecomposeRejection(outcome);
         }
       }
       // P4 first migration group: in-plan materialization retry. When the plain chain route
@@ -1567,10 +1562,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
               if (AOTEffectDecomposer::Lower(retryProcessors, &retryGraph) &&
                   AOTEffectDecomposer::ValidateForFusion(retryGraph) &&
                   AOTEffectDecomposer::Decompose(retryGraph, &retryPlan) &&
-                  retryPlan.passes.size() == 1 &&
-                  (retryPlan.passes[0].kernel == AOTKernelKind::PointwiseTail ||
-                   IsAOTPointwiseDAGKernel(retryPlan.passes[0].kernel) ||
-                   retryPlan.passes[0].kernel == AOTKernelKind::PerlinNoiseFill)) {
+                  AOTPlanExecutor::CanRoute(retryGraph, retryPlan)) {
                 if (foldMask) {
                   op->moveCoveragesToColors();
                 }

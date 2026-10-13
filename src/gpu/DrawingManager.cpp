@@ -108,7 +108,9 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     lowerSucceeded = AOTEffectDecomposer::Lower({processor.get()}, &graph, &blocker);
     validateSucceeded = lowerSucceeded && AOTEffectDecomposer::ValidateForFusion(graph);
     decomposeSucceeded = validateSucceeded && AOTEffectDecomposer::Decompose(graph, &plan);
-    canExecute = decomposeSucceeded && AOTPlanExecutor::CanExecute(graph, plan);
+    // Recorded as the production verdict (CanRoute), the same rule makeChainTask applies below,
+    // so the analysis never reports a multi-pass plan as servable.
+    canExecute = decomposeSucceeded && AOTPlanExecutor::CanRoute(graph, plan);
   }
   OffscreenFillKey diagnosticKey = InvalidOffscreenFillKey;
   if (cache != nullptr && cache->diagnosticRecordingEnabled() && processor != nullptr) {
@@ -123,26 +125,22 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   }
   auto makeChainTask = [&](const AOTEffectGraph& taskGraph, const AOTEffectPlan& taskPlan,
                            PlacementPtr<DrawOp>* originalDraw) -> PlacementPtr<RenderTask> {
-    const auto& firstPass = taskPlan.passes.front();
-    bool kernelRoutable = firstPass.kernel == AOTKernelKind::PointwiseTail ||
-                          IsAOTPointwiseDAGKernel(firstPass.kernel) ||
-                          firstPass.kernel == AOTKernelKind::PerlinNoiseFill;
-    // Only single-pass plans may route to the precompiled kernels. A multi-pass tail plan
-    // materializes RGBA8 intermediates: every boundary quantizes to the 1/255 grid, and a
-    // discontinuous operator (AlphaThreshold) reading a materialized input can flip its step()
-    // decision outright (exact-rational counterexample) — a divergence no tolerance
-    // can bound. Over-budget chains keep the runtime reference everywhere (the on-screen route
+    // Only single-pass plans may route to the precompiled kernels (AOTPlanExecutor::CanRoute). A
+    // multi-pass tail plan materializes RGBA8 intermediates: every boundary quantizes to the 1/255
+    // grid, and a discontinuous operator (AlphaThreshold) reading a materialized input can flip its
+    // step() decision outright (exact-rational counterexample) — a divergence no tolerance can
+    // bound. Over-budget chains keep the runtime reference everywhere (the on-screen route
     // already refuses them), which evaluates the whole tree in one shader at float precision.
-    if (kernelRoutable && taskPlan.passes.size() == 1) {
-      auto deviceBounds = Rect::MakeWH(static_cast<float>(renderTarget->width()),
-                                       static_cast<float>(renderTarget->height()));
-      // An offscreen fill owns a fresh target. Clear its full backing before the draw so a
-      // shader-side sample cannot observe pixels left by an earlier scratch allocation. On-screen
-      // calls leave the default false and keep the destination's existing contents.
-      return AOTPlanExecutor::Make(context, renderFlags, taskGraph, taskPlan, deviceBounds,
-                                   renderTarget, originalDraw, coordOffset, true);
+    if (!AOTPlanExecutor::CanRoute(taskGraph, taskPlan)) {
+      return nullptr;
     }
-    return nullptr;
+    auto deviceBounds = Rect::MakeWH(static_cast<float>(renderTarget->width()),
+                                     static_cast<float>(renderTarget->height()));
+    // An offscreen fill owns a fresh target. Clear its full backing before the draw so a
+    // shader-side sample cannot observe pixels left by an earlier scratch allocation. On-screen
+    // calls leave the default false and keep the destination's existing contents.
+    return AOTPlanExecutor::Make(context, renderFlags, taskGraph, taskPlan, deviceBounds,
+                                 renderTarget, originalDraw, coordOffset, true);
   };
   // P4 group three: the retry-warranted verdict must be taken before the processor is moved into
   // the plain draw op below. ADMISSION RULE (): a tree carrying a discontinuous operator
@@ -198,7 +196,7 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
           AOTEffectDecomposer::Lower({retryProcessor.get()}, &retryGraph, &retryBlocker);
       bool retryValidate = retryLower && AOTEffectDecomposer::ValidateForFusion(retryGraph);
       bool retryDecompose = retryValidate && AOTEffectDecomposer::Decompose(retryGraph, &retryPlan);
-      bool retryCanExecute = retryDecompose && AOTPlanExecutor::CanExecute(retryGraph, retryPlan);
+      bool retryCanExecute = retryDecompose && AOTPlanExecutor::CanRoute(retryGraph, retryPlan);
       if (retryDecompose && retryCanExecute && !retryPlan.passes.empty()) {
         auto task = makeChainTask(retryGraph, retryPlan, &drawOp);
         if (task != nullptr) {

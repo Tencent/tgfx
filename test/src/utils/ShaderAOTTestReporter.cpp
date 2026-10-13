@@ -244,6 +244,8 @@ static const char* AOTDecomposeOutcomeName(AOTDecomposeOutcome outcome) {
       return "BlockedByValidation";
     case AOTDecomposeOutcome::UnsupportedShape:
       return "UnsupportedShape";
+    case AOTDecomposeOutcome::NotRoutable:
+      return "NotRoutable";
   }
   return "Unknown";
 }

@@ -36,6 +36,23 @@ class AOTChainBuilder {
   static bool IsChainCompatibleTiledMode(TiledTextureShaderMode mode);
 
   /**
+   * Pure admission of a PointwiseChain/PointwiseGraph pass without draw coverage. Runs the same
+   * slot encoding, closure, budget, profile and register checks BuildChainProcessor runs, but
+   * creates no processor. AOTPlanExecutor::CanExecute relies on it, so a pass admitted here can
+   * only fail at construction when a resource cannot be wrapped (or when the draw's coverage adds
+   * slots this check cannot see).
+   */
+  static bool PlanChainPass(const AOTEffectGraph& graph, const AOTPassDescriptor& pass);
+
+  /**
+   * Same planning as PlanChainPass, ignoring the pass kernel: reports the resource profile (and
+   * so the kernel family) the pass needs. Used by the DAG planner to pick the kernel; returns
+   * false when no profile can carry the pass.
+   */
+  static bool ResolveChainProfile(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
+                                  AOTResourceProfile* profile);
+
+  /**
    * Rebuilds the color processor of one plan pass: a fused chain/perlin kernel for the matching
    * single-pass kernels, or the pass's source node followed by its pointwise tail slots when
    * sourceOverride is nullptr. Returns nullptr when the pass shape cannot be rebuilt.

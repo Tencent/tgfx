@@ -78,8 +78,8 @@ struct AOTEffectPlan {
 enum class AOTDecomposeOutcome {
   /// The axis has no fragment processors (e.g. an empty coverage chain). Nothing to decompose.
   Trivial,
-  /// Lower + ValidateForFusion + Decompose all succeed: the chain reduces onto the existing basis
-  /// and would be recovered by the fused-pointwise route once its kernel artifact lands.
+  /// Lower + ValidateForFusion + Decompose succeed and AOTPlanExecutor::CanRoute accepts the plan:
+  /// a production route submits it (matching the precompiled artifact is a separate step).
   FusablePointwise,
   /// Some fragment processor in the tree has no AOT lowering yet. blockingProcessor names the first
   /// one reported by the actual lowering call chain — the actionable "add lowerToAOT for X" signal.
@@ -89,6 +89,10 @@ enum class AOTDecomposeOutcome {
   /// The chain lowers and is fusion-safe, but the current Decompose rules do not yet cover its
   /// shape — the "grow the decomposer" signal.
   UnsupportedShape,
+  /// A plan exists, but no production route submits it: AOTPlanExecutor::CanRoute refuses it
+  /// (a multi-pass plan, or a pass the executor cannot run), or the draw carries coverage the
+  /// attempted route cannot apply.
+  NotRoutable,
 };
 
 /** Per-axis feasibility analysis produced by AOTEffectDecomposer::Analyze. */
@@ -126,7 +130,8 @@ enum class AOTFoldRouteOutcome {
   BlockedByValidation,
   /// The folded chain lowers and is fusion-safe, but no planner rule covers its shape.
   UnsupportedShape,
-  /// A plan exists but the executor cannot run it (e.g. zero or three texture leaves).
+  /// A plan exists but AOTPlanExecutor::CanRoute refuses it (e.g. a multi-pass plan, or a pass over
+  /// the kernel budgets).
   NotExecutable,
   /// The plan is executable, but the fused kernels' matchers do not support this draw's GP.
   GPIncompatible,
@@ -181,7 +186,7 @@ class AOTEffectDecomposer {
   /**
    * Statically answers whether the given draw (assumed to have missed every matcher rule) would
    * become matchable if its coverage FPs were folded into the color chain at program-creation
-   * time. Runs Lower / ValidateForFusion / Decompose / CanExecute on the concatenated
+   * time. Runs Lower / ValidateForFusion / Decompose / CanRoute on the concatenated
    * color+coverage processor list and checks the GP against the fused kernels' supported set.
    * Pure analysis: no rendering, no GPU allocation, no ProgramInfo mutation.
    *

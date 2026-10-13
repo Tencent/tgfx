@@ -26,9 +26,11 @@
 //   - kMatcher: a matcher rule serves draws containing it (verified by the name() string or a
 //     qualified `ClassName::` reference appearing in PermutationMatcher.cpp);
 //   - kLowering: the class declares lowerToAOT (verified in its header);
-//   - kStructural: it is consumed inside another processor's claim — gradient layouts and
-//     colorizers, the glass geometry children — and the matcher references its name to
-//     discriminate the parent's shape;
+//   - kStructural: it is consumed inside another processor's claim — the glass geometry
+//     children — and the matcher references its name to discriminate the parent's shape;
+//   - kParentLowering: it is consumed by its parent's lowerToAOT (gradient layouts and
+//     colorizers lower inside ClampedGradientEffect), verified by the parent declaring
+//     lowerToAOT and the parent's source referencing the class;
 //   - none of the above (runtime by design), which requires a documented reason.
 // AOTClosureVerifier covers a different axis (registered shaders' reachable sets fit inside the
 // published bundles); this gate covers the processor-type axis and the two checks coexist.
@@ -59,12 +61,15 @@ namespace {
 constexpr uint32_t kMatcher = 1;
 constexpr uint32_t kLowering = 2;
 constexpr uint32_t kStructural = 4;
+constexpr uint32_t kParentLowering = 8;
 
 struct ProcessorClaim {
   const char* className = "";
   const char* nameString = "";
   uint32_t claims = 0;
   const char* note = "";
+  // kParentLowering only: the processor class whose lowerToAOT consumes this one.
+  const char* parent = "";
 };
 
 // The claim manifest. Keep in sync with the processor headers: adding a class without a claim
@@ -116,16 +121,23 @@ const ProcessorClaim ProcessorClaims[] = {
     {"TiledTextureEffect", "TiledTextureEffect", kMatcher | kLowering, ""},
     {"XfermodeFragmentProcessor", "XfermodeFragmentProcessor", kMatcher | kLowering,
      "the SrcIn local-mask coverage form is matcher-claimed; two-processor blends lower"},
-    // Structural parts consumed inside ClampedGradientEffect and GlassRefractionShader's
-    // matcher rule; the matcher references their names to discriminate the parent's shape.
-    {"ConicGradientLayout", "ConicGradientLayout", kStructural, ""},
-    {"DiamondGradientLayout", "DiamondGradientLayout", kStructural, ""},
-    {"LinearGradientLayout", "LinearGradientLayout", kStructural, ""},
-    {"RadialGradientLayout", "RadialGradientLayout", kStructural, ""},
-    {"SingleIntervalGradientColorizer", "SingleIntervalGradientColorizer", kStructural, ""},
-    {"DualIntervalGradientColorizer", "DualIntervalGradientColorizer", kStructural, ""},
-    {"TextureGradientColorizer", "TextureGradientColorizer", kStructural, ""},
-    {"UnrolledBinaryGradientColorizer", "UnrolledBinaryGradientColorizer", kStructural, ""},
+    // Gradient parts: ClampedGradientEffect::lowerToAOT reads each layout and colorizer into the
+    // gradient node's parameters, so the parent's lowering is their claim.
+    {"ConicGradientLayout", "ConicGradientLayout", kParentLowering, "", "ClampedGradientEffect"},
+    {"DiamondGradientLayout", "DiamondGradientLayout", kParentLowering, "",
+     "ClampedGradientEffect"},
+    {"LinearGradientLayout", "LinearGradientLayout", kParentLowering, "", "ClampedGradientEffect"},
+    {"RadialGradientLayout", "RadialGradientLayout", kParentLowering, "", "ClampedGradientEffect"},
+    {"SingleIntervalGradientColorizer", "SingleIntervalGradientColorizer", kParentLowering, "",
+     "ClampedGradientEffect"},
+    {"DualIntervalGradientColorizer", "DualIntervalGradientColorizer", kParentLowering, "",
+     "ClampedGradientEffect"},
+    {"TextureGradientColorizer", "TextureGradientColorizer", kParentLowering, "",
+     "ClampedGradientEffect"},
+    {"UnrolledBinaryGradientColorizer", "UnrolledBinaryGradientColorizer", kParentLowering, "",
+     "ClampedGradientEffect"},
+    // Glass geometry children consumed inside GlassRefractionShader's matcher rule; the matcher
+    // references their names to discriminate the parent's shape.
     {"GlassSDFGeometryFragmentProcessor", "GlassSDFGeometryFragmentProcessor", kStructural, ""},
     {"GlassUDFGeometryFragmentProcessor", "GlassUDFGeometryFragmentProcessor", kStructural, ""},
     // Executor-rebuilt processors matched by the fused kernel rules, and effect processors
@@ -141,6 +153,8 @@ struct ScannedProcessor {
   std::string className;
   std::string filePath;
   bool hasLowerToAOT = false;
+  // The implementation source next to the header (X.h -> X.cpp), read for parent-lowering claims.
+  std::string sourceText;
 };
 
 static std::string ReadTextFile(const std::string& path) {
@@ -208,6 +222,9 @@ static void ScanProcessorHeader(const std::filesystem::path& path,
     ScannedProcessor processor = {};
     processor.className = owner;
     processor.filePath = path.filename().string();
+    auto sourcePath = path;
+    sourcePath.replace_extension(".cpp");
+    processor.sourceText = ReadTextFile(sourcePath.string());
     for (const auto& loweringOwner : loweringOwners) {
       if (loweringOwner == owner) {
         processor.hasLowerToAOT = true;
@@ -274,6 +291,21 @@ static std::vector<std::string> EvaluateProcessorClaims(
     if ((claim->claims & kLowering) != 0 && !processor.hasLowerToAOT) {
       violations.push_back("lowerToAOT missing for: " + processor.className);
     }
+    if ((claim->claims & kParentLowering) != 0) {
+      const ScannedProcessor* parent = nullptr;
+      for (const auto& candidate : scanned) {
+        if (candidate.className == claim->parent) {
+          parent = &candidate;
+          break;
+        }
+      }
+      if (parent == nullptr || !parent->hasLowerToAOT ||
+          parent->sourceText.find(processor.className) == std::string::npos) {
+        violations.push_back("parent lowering does not consume: " + processor.className +
+                             " (expected " + claim->parent +
+                             "::lowerToAOT and a reference in its source)");
+      }
+    }
     if (claim->claims == 0 && std::string(claim->note).empty()) {
       violations.push_back("runtime-by-design entry without a reason: " + processor.className);
     }
@@ -326,16 +358,31 @@ TGFX_TEST(AOTCoverageGateTest, GateRejectsSyntheticViolations) {
   ScannedProcessor reasonless = {};
   reasonless.className = "ReasonlessRuntimeProcessor";
   scanned.push_back(reasonless);
+  ScannedProcessor parent = {};
+  parent.className = "ParentProcessor";
+  parent.hasLowerToAOT = true;
+  parent.sourceText = "// reads ConsumedPart";
+  scanned.push_back(parent);
+  ScannedProcessor consumed = {};
+  consumed.className = "ConsumedPart";
+  scanned.push_back(consumed);
+  ScannedProcessor forgotten = {};
+  forgotten.className = "ForgottenPart";
+  scanned.push_back(forgotten);
 
   const ProcessorClaim claims[] = {
       {"GoodProcessor", "GoodProcessor", kLowering, ""},
       {"GoodProcessorMissingReference", "GoodProcessorMissingReference", kMatcher, ""},
       {"RemovedProcessor", "RemovedProcessor", kMatcher, ""},
       {"ReasonlessRuntimeProcessor", "ReasonlessRuntimeProcessor", 0, ""},
+      {"ParentProcessor", "ParentProcessor", kLowering, ""},
+      {"ConsumedPart", "ConsumedPart", kParentLowering, "", "ParentProcessor"},
+      {"ForgottenPart", "ForgottenPart", kParentLowering, "", "ParentProcessor"},
   };
   // The matcher source deliberately lacks every synthetic name.
-  auto violations = EvaluateProcessorClaims(scanned, claims, 4, "// empty matcher");
-  EXPECT_EQ(violations.size(), 4u);
+  auto violations = EvaluateProcessorClaims(scanned, claims, 7, "// empty matcher");
+  EXPECT_EQ(violations.size(), 5u);
+  bool sawForgottenPart = false;
   bool sawUnclaimed = false;
   bool sawStale = false;
   bool sawMissingReference = false;
@@ -355,7 +402,11 @@ TGFX_TEST(AOTCoverageGateTest, GateRejectsSyntheticViolations) {
     if (violation.find("runtime-by-design entry without a reason") != std::string::npos) {
       sawReasonless = true;
     }
+    if (violation.find("parent lowering does not consume: ForgottenPart") != std::string::npos) {
+      sawForgottenPart = true;
+    }
   }
+  EXPECT_TRUE(sawForgottenPart);
   EXPECT_TRUE(sawUnclaimed);
   EXPECT_TRUE(sawStale);
   EXPECT_TRUE(sawMissingReference);

@@ -496,6 +496,88 @@ TGFX_TEST(AOTRenderConsistencyTest, RGBAStandaloneAndFusedTiledReadControl) {
   ExpectTiledReadFormatMatchesReference(PixelFormat::RGBA_8888, true);
 }
 
+// Default-deny shader texture reads: a plain drawImage of a GRAY_8 / RG_88 texture matches a
+// family that never learned the read swizzle (QuadTextureFill / TextureFill). The matcher must
+// refuse it with UnsupportedTextureRead instead of serving the artifact, which read (g, 0, 0, 1)
+// for gray and (r, g, 0, 1) for RG. A loaded bundle disables runtime program builds, so the
+// refused draw is a recorded miss that writes nothing — never the wrong channels.
+static void ExpectPlainReadFormatRefusedWithoutWrongPixels(PixelFormat format) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  const size_t channels = format == PixelFormat::RG_88 ? 2u : 1u;
+  std::vector<uint8_t> pixels(2 * 2 * channels);
+  const uint8_t rg[] = {64, 128};
+  for (size_t index = 0; index < 4; ++index) {
+    for (size_t channel = 0; channel < channels; ++channel) {
+      pixels[index * channels + channel] = rg[channel];
+    }
+  }
+  auto texture = context->gpu()->createTexture(
+      TextureDescriptor(2, 2, format, false, 1, TextureUsage::TEXTURE_BINDING));
+  ASSERT_NE(texture, nullptr);
+  ASSERT_EQ(texture->format(), format);
+  context->gpu()->queue()->writeTexture(texture, Rect::MakeWH(2, 2), pixels.data(), 2 * channels);
+  context->gpu()->queue()->waitUntilCompleted();
+  std::shared_ptr<Image> image;
+  if (format == PixelFormat::GRAY_8) {
+    auto view = Resource::AddToCache(context, new DefaultTextureView(texture));
+    ASSERT_NE(view, nullptr);
+    image = TextureImage::Wrap(context->proxyProvider()->wrapTextureView(view), nullptr);
+  } else {
+    image = Image::MakeFrom(context, texture->getBackendTexture());
+  }
+  ASSERT_NE(image, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  std::array<std::array<uint8_t, 8 * 8 * 4>, 2> outputs = {};
+  for (int route = 0; route < 2; ++route) {
+    const bool useBundle = route == 1;
+    if (useBundle) {
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause pause(context, !useBundle);
+    context->globalCache()->clearPrograms();
+    cache->setDiagnosticRecordingEnabled(true);
+    auto surface = Surface::Make(context, 8, 8);
+    ASSERT_NE(surface, nullptr);
+    surface->getCanvas()->clear(Color::Transparent());
+    context->flushAndSubmit(true);
+    cache->resetStats();
+    surface->getCanvas()->scale(4, 4);
+    surface->getCanvas()->drawImage(image, 0, 0);
+    context->flushAndSubmit(true);
+    if (useBundle) {
+      EXPECT_GT(cache->fallbackCount(PrecompiledFallbackReason::UnsupportedTextureRead), 0u);
+      for (const auto& hit : cache->hitRecords()) {
+        EXPECT_NE(hit.shaderName, "QuadTextureFillShader");
+        EXPECT_NE(hit.shaderName, "TextureFillShader");
+      }
+    }
+    auto info = ImageInfo::Make(8, 8, ColorType::RGBA_8888, AlphaType::Premultiplied);
+    ASSERT_TRUE(surface->readPixels(info, outputs[static_cast<size_t>(route)].data()));
+    cache->setDiagnosticRecordingEnabled(false);
+  }
+  const std::array<uint8_t, 4> expected = format == PixelFormat::GRAY_8
+                                              ? std::array<uint8_t, 4>{64, 64, 64, 255}
+                                              : std::array<uint8_t, 4>{64, 128, 64, 128};
+  std::array<uint8_t, 4> reference = {};
+  std::copy_n(outputs[0].data() + (4 * 8 + 4) * 4, 4, reference.begin());
+  EXPECT_EQ(reference, expected);
+  const std::array<uint8_t, 8 * 8 * 4> untouched = {};
+  EXPECT_EQ(outputs[1], untouched);
+  cache->unload();
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, ImportedRG8PlainReadRefusedByUndeclaredFamily) {
+  ExpectPlainReadFormatRefusedWithoutWrongPixels(PixelFormat::RG_88);
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, GrayViewPlainReadRefusedByUndeclaredFamily) {
+  ExpectPlainReadFormatRefusedWithoutWrongPixels(PixelFormat::GRAY_8);
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, ExtendedChainTiledReadSwizzle) {
   for (auto format : {PixelFormat::RG_88, PixelFormat::GRAY_8}) {
     SCOPED_TRACE(static_cast<int>(format));
@@ -1290,6 +1372,69 @@ TGFX_TEST(AOTRenderConsistencyTest, AtlasTextNonSrcOverBlendKeepsDstOnChain) {
   renderOnce(true, &aotBitmap);
   renderOnce(false, &runtimeBitmap);
   ExpectBitmapsIdentical("atlas-text-src-blend-probe", aotBitmap, runtimeBitmap, 200, 100);
+}
+
+// Atlas text under an anti-aliased clip: the draw's clip coverage and the synthesized glyph leaf
+// fold together ([clip, glyph] coverage), with the clip chained on top of the glyph register.
+// Before, a clip coverage FP disabled the glyph synthesis entirely, so the draw neither matched a
+// kernel nor kept the original route's pixels on a bundle-only build.
+TGFX_TEST(AOTRenderConsistencyTest, AtlasTextWithClipFoldsGlyphAndClip) {
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  auto textBlob = TextBlob::MakeFrom("TGFX", Font(typeface, 50));
+  ASSERT_TRUE(textBlob != nullptr);
+  for (auto clip :
+       {Rect::MakeLTRB(8.5f, 8.5f, 180.5f, 80.5f), Rect::MakeLTRB(40.5f, 20.f, 120.f, 70.5f)}) {
+    uint64_t kernels = 0;
+    auto renderOnce = [&](bool useBundle, Bitmap* outBitmap) {
+      ContextScope scope;
+      auto context = scope.getContext();
+      ASSERT_TRUE(context != nullptr);
+      auto* cache = context->precompiledShaderCache();
+      if (useBundle) {
+        ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+      } else {
+        cache->unload();
+      }
+      ScopedAOTStatsPause statsPause(context, !useBundle);
+      context->globalCache()->clearPrograms();
+      auto surface = Surface::Make(context, 200, 100);
+      ASSERT_TRUE(surface != nullptr);
+      auto* canvas = surface->getCanvas();
+      canvas->clear(Color::White());
+      context->flushAndSubmit(true);
+      if (useBundle) {
+        cache->setDiagnosticRecordingEnabled(true);
+        cache->resetStats();
+      }
+      canvas->clipRect(clip, true);
+      Paint paint;
+      paint.setColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Multiply));
+      canvas->drawTextBlob(textBlob, 25, 60, paint);
+      context->flushAndSubmit(true);
+      if (useBundle) {
+        kernels = cache->drawStats().kernelInvocations;
+        EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+        EXPECT_TRUE(cache->jitProgramRecords().empty());
+        cache->setDiagnosticRecordingEnabled(false);
+      }
+      ASSERT_TRUE(outBitmap->allocPixels(200, 100));
+      auto* pixels = outBitmap->lockPixels();
+      ASSERT_TRUE(pixels != nullptr);
+      ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+      outBitmap->unlockPixels();
+      if (useBundle) {
+        cache->unload();
+      }
+    };
+    Bitmap aotBitmap = {};
+    Bitmap runtimeBitmap = {};
+    renderOnce(true, &aotBitmap);
+    renderOnce(false, &runtimeBitmap);
+    EXPECT_GT(kernels, 0u);
+    ExpectBitmapsIdentical("atlas-text-clip-fold", aotBitmap, runtimeBitmap, 200, 100);
+  }
 }
 
 TGFX_TEST(AOTRenderConsistencyTest, MeshTextureAndColorsXferSrcFold) {

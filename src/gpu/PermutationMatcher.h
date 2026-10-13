@@ -34,6 +34,9 @@ enum class PermutationMatchFailure {
   None,
   UnsupportedOutputSwizzle,
   NoMatchingRule,
+  /// A rule matched, but the draw samples a texture whose read semantics (e.g. the GRAY_8 / RG_88
+  /// read swizzle) the matched shader family does not declare in PrecompiledShaderInfo.
+  UnsupportedTextureRead,
 };
 
 /**

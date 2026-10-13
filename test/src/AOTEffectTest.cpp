@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <array>
+#include <functional>
 #include <limits>
 #include <set>
 #include "base/TGFXTest.h"
@@ -1217,6 +1218,43 @@ TGFX_TEST(AOTEffectTest, DeviceSpaceLinearChainUsesPointwiseTailPlanner) {
   }
   EXPECT_FALSE(plan.passes.back().materializesOutput);
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+  // The executor can run the segmented plan, but no production route submits a multi-pass plan,
+  // and the analysis must report the same verdict instead of promising a fused route.
+  EXPECT_FALSE(AOTPlanExecutor::CanRoute(graph, plan));
+  auto analysis = AOTEffectDecomposer::AnalyzeChain(
+      {texture.get(), colorMatrix.get(), luma.get(), colorMatrix2.get()});
+  EXPECT_EQ(analysis.outcome, AOTDecomposeOutcome::NotRoutable);
+}
+
+// CanExecute and the chain builder share one planner, so a pass whose node list omits a producer
+// that another pass node consumes is refused at admission rather than promised and then refused
+// at construction.
+TGFX_TEST(AOTEffectTest, DAGAdmissionRejectsPassMissingProducer) {
+  BlockAllocator allocator;
+  AOTNodeBuilder builder;
+  AOTNodeID geometry, source, root;
+  ASSERT_TRUE(builder.addGeometryColor(&geometry));
+  AOTConstColorParameters color;
+  color.color = {0.2f, 0.3f, 0.4f, 1.0f};
+  ASSERT_TRUE(builder.addConstColor(geometry, color, &source));
+  ASSERT_TRUE(builder.addColorMatrix(source, {IdentityColorMatrix}, &root));
+  AOTEffectGraph graph;
+  ASSERT_TRUE(builder.finish(root, &graph));
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+  ASSERT_EQ(plan.passes.size(), 1u);
+  ASSERT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+  EXPECT_NE(AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]), nullptr);
+
+  auto missingProducer = plan;
+  missingProducer.passes[0].nodes = {root};
+  EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, missingProducer));
+  EXPECT_EQ(AOTChainBuilder::BuildChainProcessor(&allocator, graph, missingProducer.passes[0]),
+            nullptr);
+
+  auto duplicated = plan;
+  duplicated.passes[0].nodes.push_back(root);
+  EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, duplicated));
 }
 
 TGFX_TEST(AOTEffectTest, TwoColorSpaceTransformsRetainTailCandidate) {
@@ -2812,6 +2850,128 @@ TGFX_TEST(AOTEffectTest, PerlinNoiseBlendRefusesInputDependentConstOperand) {
   EXPECT_FALSE(AOTPlanExecutor::CanExecute(modulateGraph, forcedPlan));
   EXPECT_EQ(AOTChainBuilder::BuildPerlinNoiseFP(&allocator, modulateGraph, forcedPlan.passes[0]),
             nullptr);
+}
+
+// Table-driven admission matrix. Each row is one processor chain plus the route it must take; the
+// invariants below are checked for every row, so a new effect or variant is one added row:
+//   - admission implies construction: a routable DAG pass always builds its chain processor;
+//   - the analysis verdict is the production verdict (FusablePointwise iff CanRoute);
+//   - the DAG planner never emits a pass CanExecute refuses.
+struct AdmissionCase {
+  const char* name = "";
+  // Builds the color processors into owners; returns false when the fixture cannot be created.
+  std::function<bool(Context*, BlockAllocator*, std::vector<PlacementPtr<FragmentProcessor>>*)>
+      make;
+  bool lowers = true;
+  size_t passes = 1;
+  AOTKernelKind kernel = AOTKernelKind::PointwiseChain;
+  bool routable = true;
+};
+
+static PlacementPtr<FragmentProcessor> MakeRadialGradient(BlockAllocator* allocator) {
+  auto colorizer = SingleIntervalGradientColorizer::Make(allocator, Color::Red(), Color::Blue());
+  auto layout = RadialGradientLayout::Make(allocator, Matrix::MakeTrans(4, 6));
+  return ClampedGradientEffect::Make(allocator, std::move(colorizer), std::move(layout),
+                                     Color::Red(), Color::Blue());
+}
+
+TGFX_TEST(AOTEffectTest, AdmissionMatrixKeepsPlanningAndConstructionAligned) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  using Owners = std::vector<PlacementPtr<FragmentProcessor>>;
+  auto texture = [](Context* c, BlockAllocator* a) {
+    return MakeTextureProcessor(c, a, PixelFormat::RGBA_8888);
+  };
+  auto matrix = [](BlockAllocator* a) {
+    return ColorMatrixFragmentProcessor::Make(a, IdentityColorMatrix);
+  };
+  auto deviceTexture = [](Context* c, BlockAllocator* a) -> PlacementPtr<FragmentProcessor> {
+    auto proxy = c->proxyProvider()->createTextureProxy({}, 2, 2, PixelFormat::RGBA_8888);
+    return proxy != nullptr ? DeviceSpaceTextureEffect::Make(a, std::move(proxy), Matrix::I())
+                            : nullptr;
+  };
+  const AdmissionCase cases[] = {
+      {"texture+matrix",
+       [&](Context* c, BlockAllocator* a, Owners* o) {
+         o->push_back(texture(c, a));
+         o->push_back(matrix(a));
+         return true;
+       }},
+      {"tiled-repeat+luma",
+       [&](Context* c, BlockAllocator* a, Owners* o) {
+         o->push_back(MakeTiledTextureProcessor(c, a, TileMode::Repeat, TileMode::Mirror,
+                                                PixelFormat::RGBA_8888, SrcRectConstraint::Fast,
+                                                std::nullopt));
+         o->push_back(LumaFragmentProcessor::Make(a));
+         return true;
+       }},
+      {"two-texture-blend",
+       [&](Context* c, BlockAllocator* a, Owners* o) {
+         o->push_back(XfermodeFragmentProcessor::MakeFromTwoProcessors(
+             a, texture(c, a), texture(c, a), BlendMode::Multiply));
+         return true;
+       }},
+      {"radial-gradient+matrix",
+       [&](Context*, BlockAllocator* a, Owners* o) {
+         o->push_back(MakeRadialGradient(a));
+         o->push_back(matrix(a));
+         return true;
+       },
+       true, 1, AOTKernelKind::PointwiseGraph, true},
+      {"device-texture+matrix",
+       [&](Context* c, BlockAllocator* a, Owners* o) {
+         o->push_back(deviceTexture(c, a));
+         o->push_back(matrix(a));
+         return true;
+       },
+       true, 1, AOTKernelKind::PointwiseTail, true},
+      {"device-texture+three-ops",
+       [&](Context* c, BlockAllocator* a, Owners* o) {
+         o->push_back(deviceTexture(c, a));
+         o->push_back(matrix(a));
+         o->push_back(LumaFragmentProcessor::Make(a));
+         o->push_back(matrix(a));
+         return true;
+       },
+       true, 2, AOTKernelKind::PointwiseTail, false},
+      {"unsupported-lowering",
+       [&](Context*, BlockAllocator* a, Owners* o) {
+         o->push_back(a->make<ShapeRejectingFragmentProcessor>());
+         return true;
+       },
+       false, 0, AOTKernelKind::PointwiseChain, false},
+  };
+  for (const auto& row : cases) {
+    SCOPED_TRACE(row.name);
+    BlockAllocator allocator;
+    Owners owners;
+    ASSERT_TRUE(row.make(context, &allocator, &owners));
+    std::vector<const FragmentProcessor*> processors;
+    for (const auto& owner : owners) {
+      ASSERT_NE(owner, nullptr);
+      processors.push_back(owner.get());
+    }
+    AOTEffectGraph graph;
+    bool lowered = AOTEffectDecomposer::Lower(processors, &graph);
+    EXPECT_EQ(lowered, row.lowers);
+    auto analysis = AOTEffectDecomposer::AnalyzeChain(processors);
+    if (!lowered) {
+      EXPECT_NE(analysis.outcome, AOTDecomposeOutcome::FusablePointwise);
+      continue;
+    }
+    AOTEffectPlan plan;
+    ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+    ASSERT_EQ(plan.passes.size(), row.passes);
+    EXPECT_EQ(plan.passes[0].kernel, row.kernel);
+    EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+    bool routable = AOTPlanExecutor::CanRoute(graph, plan);
+    EXPECT_EQ(routable, row.routable);
+    EXPECT_EQ(analysis.outcome == AOTDecomposeOutcome::FusablePointwise, routable);
+    if (routable && IsAOTPointwiseDAGKernel(plan.passes[0].kernel)) {
+      EXPECT_NE(AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]), nullptr);
+    }
+  }
 }
 
 }  // namespace tgfx

@@ -180,17 +180,14 @@ static void UploadGradientParams(UniformData* uniformData, const AOTGradientPara
 }
 }  // namespace
 
-PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
-    BlockAllocator* allocator, std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
-    const std::vector<AOTChainSlot>& slots, size_t rootSlot, int tiledLeafIndex,
-    const AOTTiledTextureRecipe* tiledRecipe, PlacementPtr<FragmentProcessor> maskChild,
-    int coverageRootSlot, uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChild,
-    int lutLeafIndex, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding,
-    bool maskChildIsPhantom, int clipCoverageRegister, int tiledLeafIndex2,
-    const AOTTiledTextureRecipe* tiledRecipe2, AOTResourceProfile profile,
-    const std::vector<AOTChainTiledLeaf>& additionalTiledLeaves) {
-  if (allocator == nullptr || slots.empty() || slots.size() > MaxSlots) {
-    return nullptr;
+bool AOTPointwiseChainProcessor::ValidateSlots(const std::vector<AOTChainSlot>& slots,
+                                               size_t rootSlot, int coverageRootSlot,
+                                               int clipCoverageRegister, size_t leafCount,
+                                               bool hasLUT,
+                                               const std::vector<int>& tiledLeafIndices,
+                                               AOTResourceProfile* profile) {
+  if (profile == nullptr || slots.empty() || slots.size() > MaxSlots) {
+    return false;
   }
   // Validation domains are separated (fail-closed): in0/in1 are INPUT selectors and
   // may carry the kernel's special negative designators (-1 geometry color ... -5 opaque
@@ -204,12 +201,13 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
   const auto validOutput = [](int reg) {
     return reg >= -1 && reg < static_cast<int>(MaxRegisters);
   };
-  if (rootSlot >= MaxRegisters || (coverageRootSlot >= 0 && !validOutput(coverageRootSlot))) {
-    return nullptr;
+  if (rootSlot >= MaxRegisters || (coverageRootSlot >= 0 && !validOutput(coverageRootSlot)) ||
+      clipCoverageRegister >= static_cast<int>(MaxRegisters) || leafCount > slots.size()) {
+    return false;
   }
   for (const auto& slot : slots) {
     if (!validOutput(slot.outRegister) || !validInput(slot.in0) || !validInput(slot.in1)) {
-      return nullptr;
+      return false;
     }
     // Opcode whitelist: the kernel's evaluation switch has no default branch (an unknown value
     // falls through into the ColorSpaceXform evaluation), so an out-of-enum opcode must be
@@ -233,7 +231,7 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
         break;
       case AOTChainOp::None:
       default:
-        return nullptr;
+        return false;
     }
     // Selector sub-field domains: the upload packs these ints straight into the selector's bit
     // fields, so an out-of-domain value does not merely misbehave — it bleeds into neighboring
@@ -242,34 +240,151 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     // surface, so fail closed here instead of trusting the builder.
     if (slot.op == AOTChainOp::ConstColor &&
         (slot.constColor.inputMode < 0 || slot.constColor.inputMode > 2)) {
-      return nullptr;
+      return false;
     }
     if (slot.op == AOTChainOp::Blend && (slot.blend.blendMode < 0 || slot.blend.blendMode > 0xFF ||
                                          slot.blend.childType < 0 || slot.blend.childType > 2)) {
-      return nullptr;
+      return false;
     }
     if (slot.op == AOTChainOp::Texture &&
         ((slot.textureModulate | slot.textureAlphaOnly | slot.textureModulateGeometryRGB |
           slot.textureModulateFullInput | slot.textureModulateUnit) &
          ~1) != 0) {
-      return nullptr;
+      return false;
     }
     if (slot.op == AOTChainOp::TexModulate &&
         (slot.texModulateSourceSlot < 0 || slot.texModulateSourceSlot > 3 ||
          (slot.texModulateAlphaOnly & ~1) != 0)) {
-      return nullptr;
+      return false;
     }
     // Required-input checks: the kernel resolves an unmapped input (-2) to vec4(0.0) silently, so
     // an operator that actually consumes its input must not leave it unmapped. Texture slots
     // carry flags in in0/in1 rather than register indices, and Texture is exempt.
     if (slot.op != AOTChainOp::Texture && slot.op != AOTChainOp::PerlinNoise && slot.in0 == -2) {
-      return nullptr;
+      return false;
     }
     if ((slot.op == AOTChainOp::Blend || slot.op == AOTChainOp::MulAlpha) && slot.in1 == -2) {
+      return false;
+    }
+  }
+  for (size_t index = 0; index < tiledLeafIndices.size(); ++index) {
+    auto leafIndex = tiledLeafIndices[index];
+    if (leafIndex < 0 || static_cast<size_t>(leafIndex) >= leafCount) {
+      return false;
+    }
+    for (size_t previous = 0; previous < index; ++previous) {
+      if (tiledLeafIndices[previous] == leafIndex) {
+        return false;
+      }
+    }
+  }
+  // Only real DAG leaves have prefetched samples; LUT and padding children do not.
+  for (size_t index = 0; index < slots.size(); ++index) {
+    const auto& slot = slots[index];
+    if ((slot.op == AOTChainOp::Texture) != (index < leafCount)) {
+      return false;
+    }
+    if (slot.op == AOTChainOp::TexModulate &&
+        static_cast<size_t>(slot.texModulateSourceSlot) >= leafCount) {
+      return false;
+    }
+  }
+  size_t localRectSlots = 0;
+  size_t deviceRectSlots = 0;
+  size_t colorSpaceSlots = 0;
+  size_t gradientSlots = 0;
+  size_t noiseSlots = 0;
+  size_t rrectSlots = 0;
+  for (const auto& slot : slots) {
+    if (slot.op == AOTChainOp::ColorSpaceXform &&
+        (!ColorSpaceXformStepsSupported(slot.colorSpaceXform.steps.get()) ||
+         ++colorSpaceSlots > MaxColorSpaceXformSlots)) {
+      return false;
+    }
+    if (slot.op == AOTChainOp::PerlinNoise &&
+        (++noiseSlots > 1 || !AOTPerlinNoiseParametersSupported(slot.noise) ||
+         slot.noise.permutationsView == nullptr || slot.noise.noiseView == nullptr ||
+         leafCount > 2 || hasLUT)) {
+      return false;
+    }
+    if (slot.op == AOTChainOp::Gradient && ++gradientSlots > MaxGradientSlots) {
+      return false;
+    }
+    if (slot.op == AOTChainOp::AARectCoverage && ++deviceRectSlots > MaxDeviceRectCoverageSlots) {
+      return false;
+    }
+    // The kernel carries one chain-wide local-rect parameter set and four rrect array elements.
+    if (slot.op == AOTChainOp::LocalRectCoverage && ++localRectSlots > MaxLocalRectCoverageSlots) {
+      return false;
+    }
+    if (slot.op == AOTChainOp::RRectCoverage && ++rrectSlots > MaxRRectCoverageSlots) {
+      return false;
+    }
+  }
+  if (noiseSlots > 0 && gradientSlots > 0) {
+    return false;
+  }
+  auto resolved = *profile;
+  if (resolved == AOTResourceProfile::Automatic) {
+    resolved = noiseSlots > 0      ? AOTResourceProfile::NoiseGraph
+               : gradientSlots > 0 ? AOTResourceProfile::TiledGraph
+                                   : AOTResourceProfile::Chain;
+  }
+  AOTResourceDemand demand = {slots.size(),
+                              0,
+                              leafCount + (hasLUT ? 1u : 0u) + noiseSlots * 2,
+                              tiledLeafIndices.size(),
+                              noiseSlots,
+                              gradientSlots,
+                              colorSpaceSlots,
+                              deviceRectSlots,
+                              localRectSlots,
+                              rrectSlots};
+  if (!FitsAOTResourceProfile(demand, resolved)) {
+    return false;
+  }
+  *profile = resolved;
+  return true;
+}
+
+PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
+    BlockAllocator* allocator, std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
+    const std::vector<AOTChainSlot>& slots, size_t rootSlot, int tiledLeafIndex,
+    const AOTTiledTextureRecipe* tiledRecipe, PlacementPtr<FragmentProcessor> maskChild,
+    int coverageRootSlot, uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChild,
+    int lutLeafIndex, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding,
+    bool maskChildIsPhantom, int clipCoverageRegister, int tiledLeafIndex2,
+    const AOTTiledTextureRecipe* tiledRecipe2, AOTResourceProfile profile,
+    const std::vector<AOTChainTiledLeaf>& additionalTiledLeaves) {
+  if (allocator == nullptr) {
+    return nullptr;
+  }
+  auto leafCount = textureLeaves.size();
+  // The recipe pointers belong to the processor-facing signature; the leaf indices they pair
+  // with are checked by ValidateSlots together with the additional recipes.
+  if ((tiledLeafIndex >= 0 && tiledRecipe == nullptr) ||
+      (tiledLeafIndex2 >= 0 && (tiledLeafIndex < 0 || tiledRecipe2 == nullptr))) {
+    return nullptr;
+  }
+  std::vector<int> tiledLeafIndices = {};
+  if (tiledLeafIndex >= 0) {
+    tiledLeafIndices.push_back(tiledLeafIndex);
+  }
+  if (tiledLeafIndex2 >= 0) {
+    tiledLeafIndices.push_back(tiledLeafIndex2);
+  }
+  for (const auto& tiled : additionalTiledLeaves) {
+    tiledLeafIndices.push_back(tiled.leafIndex);
+  }
+  if (!ValidateSlots(slots, rootSlot, coverageRootSlot, clipCoverageRegister, leafCount,
+                     lutChild != nullptr, tiledLeafIndices, &profile)) {
+    return nullptr;
+  }
+  for (const auto& leaf : textureLeaves) {
+    if (leaf == nullptr) {
       return nullptr;
     }
   }
-  auto leafCount = textureLeaves.size();
   for (const auto& child : samplerPadding) {
     if (child == nullptr || child->name() != "TextureEffect" || child->numTextureSamplers() > 1) {
       return nullptr;
@@ -279,7 +394,7 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
   // texture and phantom padding). TEXTURE_COUNT exists only as 0 or 4, so any chain with leaves
   // must pad exactly up to the four-sampler artifacts.
   size_t samplerChildren = leafCount + (lutChild != nullptr ? 1 : 0) + samplerPadding.size();
-  if ((samplerChildren != 0 && samplerChildren != 4) || leafCount > slots.size()) {
+  if (samplerChildren != 0 && samplerChildren != 4) {
     return nullptr;
   }
   if (maskChild != nullptr && !maskChildIsPhantom &&
@@ -290,115 +405,16 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
       (lutLeafIndex < 0 || lutLeafIndex > 3 || static_cast<size_t>(lutLeafIndex) != leafCount)) {
     return nullptr;
   }
-  if (tiledLeafIndex >= 0 &&
-      (static_cast<size_t>(tiledLeafIndex) >= leafCount || tiledRecipe == nullptr)) {
-    return nullptr;
-  }
-  // The second tiled leaf reads its own recipe (the Tiled*2 uniform set), so it requires that
-  // recipe, must name a real leaf distinct from the first, and only exists alongside the first.
-  if (tiledLeafIndex2 >= 0 &&
-      (tiledLeafIndex < 0 || static_cast<size_t>(tiledLeafIndex2) >= leafCount ||
-       tiledRecipe2 == nullptr || tiledLeafIndex2 == tiledLeafIndex)) {
-    return nullptr;
-  }
-  std::vector<AOTChainTiledLeaf> tiledLeaves = {};
-  if (tiledLeafIndex >= 0) {
-    tiledLeaves.push_back({tiledLeafIndex, *tiledRecipe});
-  }
-  if (tiledLeafIndex2 >= 0) {
-    tiledLeaves.push_back({tiledLeafIndex2, *tiledRecipe2});
-  }
-  tiledLeaves.insert(tiledLeaves.end(), additionalTiledLeaves.begin(), additionalTiledLeaves.end());
-  for (size_t index = 0; index < tiledLeaves.size(); ++index) {
-    const auto& tiled = tiledLeaves[index];
-    if (tiled.leafIndex < 0 || static_cast<size_t>(tiled.leafIndex) >= leafCount) {
-      return nullptr;
-    }
-    for (size_t previous = 0; previous < index; ++previous) {
-      if (tiledLeaves[previous].leafIndex == tiled.leafIndex) {
-        return nullptr;
-      }
-    }
-  }
-  // Only real DAG leaves have prefetched samples; LUT and padding children do not.
-  for (size_t index = 0; index < slots.size(); ++index) {
-    const auto& slot = slots[index];
-    if ((slot.op == AOTChainOp::Texture) != (index < leafCount)) {
-      return nullptr;
-    }
-    if (index < leafCount && textureLeaves[index] == nullptr) {
-      return nullptr;
-    }
-    if (slot.op == AOTChainOp::TexModulate &&
-        static_cast<size_t>(slot.texModulateSourceSlot) >= leafCount) {
-      return nullptr;
-    }
-  }
-  size_t localRectSlots = 0;
-  size_t deviceRectSlots = 0;
-  size_t colorSpaceSlots = 0;
-  size_t gradientSlots = 0;
-  size_t noiseSlots = 0;
-  size_t rrectSlots = 0;
   for (const auto& slot : slots) {
-    if (slot.op == AOTChainOp::None) {
+    if (slot.op != AOTChainOp::PerlinNoise) {
+      continue;
+    }
+    // The two noise lookup tables ride the first two sampler-only children.
+    if (samplerPadding.size() < 2 || samplerPadding[0] == nullptr || samplerPadding[1] == nullptr ||
+        samplerPadding[0]->textureAt(0) != slot.noise.permutationsView->getTexture() ||
+        samplerPadding[1]->textureAt(0) != slot.noise.noiseView->getTexture()) {
       return nullptr;
     }
-    if (slot.op == AOTChainOp::ColorSpaceXform &&
-        (!ColorSpaceXformStepsSupported(slot.colorSpaceXform.steps.get()) ||
-         ++colorSpaceSlots > MaxColorSpaceXformSlots)) {
-      return nullptr;
-    }
-    if (slot.op == AOTChainOp::PerlinNoise) {
-      if (++noiseSlots > 1 || !AOTPerlinNoiseParametersSupported(slot.noise) || leafCount > 2 ||
-          samplerPadding.size() < 2 || lutChild != nullptr) {
-        return nullptr;
-      }
-      if (samplerPadding[0] == nullptr || samplerPadding[1] == nullptr ||
-          samplerPadding[0]->textureAt(0) != slot.noise.permutationsView->getTexture() ||
-          samplerPadding[1]->textureAt(0) != slot.noise.noiseView->getTexture()) {
-        return nullptr;
-      }
-    }
-    if (slot.op == AOTChainOp::Gradient && ++gradientSlots > MaxGradientSlots) {
-      return nullptr;
-    }
-    if (slot.op == AOTChainOp::AARectCoverage && ++deviceRectSlots > MaxDeviceRectCoverageSlots) {
-      return nullptr;
-    }
-    // The kernel carries one chain-wide local-rect parameter set and four rrect array elements.
-    if (slot.op == AOTChainOp::LocalRectCoverage && ++localRectSlots > MaxLocalRectCoverageSlots) {
-      return nullptr;
-    }
-    if (slot.op == AOTChainOp::RRectCoverage && ++rrectSlots > MaxRRectCoverageSlots) {
-      return nullptr;
-    }
-    // -1 (the geometry color) is a legitimate blend operand; only an unmapped edge (-2) is invalid.
-    if (slot.op == AOTChainOp::Blend && (slot.in0 == -2 || slot.in1 == -2)) {
-      return nullptr;
-    }
-  }
-  if ((noiseSlots > 0 && gradientSlots > 0) ||
-      clipCoverageRegister >= static_cast<int>(MaxRegisters)) {
-    return nullptr;
-  }
-  if (profile == AOTResourceProfile::Automatic) {
-    profile = noiseSlots > 0      ? AOTResourceProfile::NoiseGraph
-              : gradientSlots > 0 ? AOTResourceProfile::TiledGraph
-                                  : AOTResourceProfile::Chain;
-  }
-  AOTResourceDemand demand = {slots.size(),
-                              0,
-                              leafCount + (lutChild != nullptr ? 1u : 0u) + noiseSlots * 2,
-                              tiledLeaves.size(),
-                              noiseSlots,
-                              gradientSlots,
-                              colorSpaceSlots,
-                              deviceRectSlots,
-                              localRectSlots,
-                              rrectSlots};
-  if (!FitsAOTResourceProfile(demand, profile)) {
-    return nullptr;
   }
   return allocator->make<AOTPointwiseChainProcessor>(
       std::move(textureLeaves), slots, rootSlot, tiledLeafIndex, tiledRecipe, std::move(maskChild),

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/AOTEffectDecomposer.h"
+#include "gpu/AOTChainBuilder.h"
 #include "gpu/AOTPlanExecutor.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
@@ -69,7 +70,8 @@ static AOTAxisAnalysis ClassifyAxis(const std::vector<const FragmentProcessor*>&
     analysis.outcome = AOTDecomposeOutcome::UnsupportedShape;
     return analysis;
   }
-  analysis.outcome = AOTDecomposeOutcome::FusablePointwise;
+  analysis.outcome = AOTPlanExecutor::CanRoute(graph, plan) ? AOTDecomposeOutcome::FusablePointwise
+                                                            : AOTDecomposeOutcome::NotRoutable;
   return analysis;
 }
 
@@ -370,10 +372,9 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
       pending.insert(pending.end(), node->inputs.begin(), node->inputs.end());
     }
   }
-  int textureLeaves = 0;
-  int noiseSources = 0;
-  int gradients = 0;
-  size_t tiledRecipes = 0;
+  // Shape rule only: which node kinds a single fused pass may carry. Leaf parameters, budgets and
+  // the resource profile belong to the chain builder's planner, consulted below, so the planner,
+  // CanExecute and construction cannot count differently.
   for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
     if (!reachable[index]) {
       continue;
@@ -383,25 +384,7 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
       return false;
     }
     switch (node->kind) {
-      case AOTEffectKind::TextureSource: {
-        auto parameters = std::get_if<AOTTextureParameters>(&node->parameters);
-        if (parameters == nullptr || parameters->isYUV || parameters->hasRGBAAA) {
-          return false;
-        }
-        bool supportedSampling = parameters->samplingKind == AOTTextureSamplingKind::Plain ||
-                                 (parameters->samplingKind == AOTTextureSamplingKind::Tiled &&
-                                  parameters->tiledRecipe.has_value());
-        if (!supportedSampling) {
-          return false;
-        }
-        ++textureLeaves;
-        if (parameters->tiledRecipe.has_value() &&
-            (parameters->tiledRecipe->shaderModeX != TiledTextureShaderMode::None ||
-             parameters->tiledRecipe->shaderModeY != TiledTextureShaderMode::None)) {
-          ++tiledRecipes;
-        }
-        break;
-      }
+      case AOTEffectKind::TextureSource:
       case AOTEffectKind::ColorMatrix:
       case AOTEffectKind::Luma:
       case AOTEffectKind::AlphaThreshold:
@@ -410,33 +393,16 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
       case AOTEffectKind::Blend:
       case AOTEffectKind::RectCoverage:
       case AOTEffectKind::RRectCoverage:
-        break;
-      case AOTEffectKind::GradientSource: {
-        auto parameters = std::get_if<AOTGradientParameters>(&node->parameters);
-        if (parameters == nullptr) {
-          return false;
-        }
-        ++gradients;
-        if (parameters->colorizerKind == 3) {
-          ++textureLeaves;
-        }
-        break;
-      }
+      case AOTEffectKind::GradientSource:
       case AOTEffectKind::PerlinNoiseSource:
-        if (++noiseSources > 1) {
-          return false;
-        }
-        textureLeaves += 2;
-        break;
+      // A designator-only input node (two-child xfer children / single-child xfer child) is never
+      // a chain slot; it stays out of the pass node list below.
       case AOTEffectKind::GeometryColorOpaqueInput:
       case AOTEffectKind::GeometryWhiteInput:
-        // A designator-only input node (two-child xfer children / single-child xfer child): never
-        // a chain slot, so it stays out of the pass node list.
-        continue;
+      // Explicit input-environment and epilogue instructions for a two-child xfer over a
+      // computed input; real chain slots (OP_INPUT_OPAQUE / OP_MUL_ALPHA).
       case AOTEffectKind::InputOpaque:
       case AOTEffectKind::MulAlpha:
-        // Explicit input-environment and epilogue instructions for a two-child xfer over a
-        // computed input; real chain slots (OP_INPUT_OPAQUE / OP_MUL_ALPHA).
         break;
       default:
         // GeometryColor only legal at index 0; anything else (Gather/Neighborhood/External) is not
@@ -444,22 +410,8 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
         return false;
     }
   }
-  if (textureLeaves > MaxFusedAOTSamplers || (noiseSources > 0 && gradients > 0)) {
-    return false;
-  }
   AOTEffectPlan result = {};
   AOTPassDescriptor pass = {};
-  AOTResourceDemand demand = {};
-  demand.leafBindings = static_cast<size_t>(textureLeaves);
-  demand.tiledRecipes = tiledRecipes;
-  demand.noiseSources = static_cast<size_t>(noiseSources);
-  demand.gradients = static_cast<size_t>(gradients);
-  pass.resourceProfile = SelectAOTResourceProfile(demand);
-  if (pass.resourceProfile == AOTResourceProfile::Automatic) {
-    return false;
-  }
-  pass.kernel = IsAOTGraphProfile(pass.resourceProfile) ? AOTKernelKind::PointwiseGraph
-                                                        : AOTKernelKind::PointwiseChain;
   pass.output = graph.root();
   pass.materializesOutput = false;
   for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
@@ -470,6 +422,13 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
     }
     pass.nodes.push_back(AOTNodeID(index));
   }
+  AOTResourceProfile profile = AOTResourceProfile::Automatic;
+  if (!AOTChainBuilder::ResolveChainProfile(graph, pass, &profile)) {
+    return false;
+  }
+  pass.resourceProfile = profile;
+  pass.kernel =
+      IsAOTGraphProfile(profile) ? AOTKernelKind::PointwiseGraph : AOTKernelKind::PointwiseChain;
   result.passes.push_back(std::move(pass));
   result.output = graph.root();
   if (!AOTPlanExecutor::CanExecute(graph, result)) {
@@ -579,7 +538,7 @@ AOTFoldRouteOutcome AOTEffectDecomposer::AnalyzeFoldRoute(const ProgramInfo* pro
   if (!Decompose(graph, &plan)) {
     return AOTFoldRouteOutcome::UnsupportedShape;
   }
-  if (!AOTPlanExecutor::CanExecute(graph, plan)) {
+  if (!AOTPlanExecutor::CanRoute(graph, plan)) {
     return AOTFoldRouteOutcome::NotExecutable;
   }
   auto gp = programInfo->getGeometryProcessor();

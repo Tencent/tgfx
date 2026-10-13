@@ -61,6 +61,8 @@ const char* PrecompiledFallbackReasonName(PrecompiledFallbackReason reason) {
       return "NoBundleForBackend";
     case PrecompiledFallbackReason::BundleRejected:
       return "BundleRejected";
+    case PrecompiledFallbackReason::UnsupportedTextureRead:
+      return "UnsupportedTextureRead";
     case PrecompiledFallbackReason::Count:
       return "Count";
   }

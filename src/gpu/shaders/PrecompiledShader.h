@@ -26,6 +26,18 @@
 namespace tgfx {
 
 /**
+ * Texture-read semantics a precompiled shader family implements beyond plain RGBA and alpha-only
+ * samples. A family declares a capability only when its shader source applies it; MatchPermutation
+ * refuses every draw that needs a capability its matched family does not declare (default deny),
+ * so a family that never learned a semantic reports a miss instead of drawing wrong pixels.
+ */
+enum ShaderTextureRead : uint32_t {
+  /// Applies the runtime read swizzle (Swizzle::ForRead) of single-plane GRAY_8 (rrra) and RG_88
+  /// (rgrg) textures, through texture_read_swizzle.inc.
+  ShaderTextureReadSwizzle = 1u << 0,
+};
+
+/**
  * Metadata describing a precompiled shader, including its permutation domain and source file
  * paths. The compiled variant list is defined by the matcher rules (see PermutationRules.h);
  * no shader-side filter exists.
@@ -39,6 +51,8 @@ struct PrecompiledShaderInfo {
   PermutationDomain gpDomain;
   std::string gpClassName;
   std::string declarationFile;
+  /// ShaderTextureRead bits this family implements. Zero (the default) declares none.
+  uint32_t textureReads = 0;
 };
 
 /**

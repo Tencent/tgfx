@@ -83,7 +83,8 @@ class TiledTextureFillShader : public PrecompiledShader {
             FD::domain(),
             PermutationDomain({}),
             "",
-            ""};
+            "",
+            ShaderTextureReadSwizzle};
   }
 };
 

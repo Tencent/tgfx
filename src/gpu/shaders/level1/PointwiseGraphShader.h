@@ -49,7 +49,8 @@ class PointwiseGraphShader : public PrecompiledShader {
             FD::domain(),
             PermutationDomain({}),
             "",
-            ""};
+            "",
+            ShaderTextureReadSwizzle};
   }
 };
 

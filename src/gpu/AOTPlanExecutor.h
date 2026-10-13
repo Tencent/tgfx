@@ -33,6 +33,17 @@ class AOTPlanExecutor {
   static bool CanExecute(const AOTEffectGraph& graph, const AOTEffectPlan& plan);
 
   /**
+   * Whether a production draw may submit this plan through Make(): exactly one pass, of a kernel
+   * the executor runs on a draw (PointwiseTail, PointwiseChain/Graph, PerlinNoiseFill,
+   * YUVTextureFill), and CanExecute holds. Every production entry (the on-screen color, fold and
+   * retry routes and the offscreen fill) and every diagnostic that reports a draw as routable use
+   * this one rule. Multi-pass plans stay refused: their RGBA8 intermediates quantize (a
+   * discontinuous operator such as AlphaThreshold can flip outright) and the intermediate passes
+   * inherit neither the paint alpha nor the draw transform. Make() itself still runs them.
+   */
+  static bool CanRoute(const AOTEffectGraph& graph, const AOTEffectPlan& plan);
+
+  /**
    * Builds an atomic render task for an AOT plan executed by a StandardDrawOp without enqueueing it.
    * Stencil-and-cover draws manage their own pipelines and cannot use this task. On failure,
    * originalDraw remains unchanged. On success, ownership of originalDraw moves into the task.

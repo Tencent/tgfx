@@ -195,6 +195,8 @@ static PrecompiledFallbackReason ToFallbackReason(PermutationMatchFailure failur
       return PrecompiledFallbackReason::UnsupportedOutputSwizzle;
     case PermutationMatchFailure::NoMatchingRule:
       return PrecompiledFallbackReason::NoMatchingRule;
+    case PermutationMatchFailure::UnsupportedTextureRead:
+      return PrecompiledFallbackReason::UnsupportedTextureRead;
     case PermutationMatchFailure::None:
       return PrecompiledFallbackReason::Unspecified;
   }

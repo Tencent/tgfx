@@ -1830,6 +1830,31 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
   return std::nullopt;
 }
 
+// The ShaderTextureRead semantics the draw's sampled textures need. YUV planes are excluded: the
+// YUV kernels read the plane channels they need (.r / .rg), which the read swizzle preserves.
+static uint32_t RequiredTextureReads(const ProgramInfo* programInfo) {
+  uint32_t required = 0;
+  auto addTexture = [&](const std::shared_ptr<Texture>& texture) {
+    if (texture != nullptr && AOTReadSwizzleMode(texture->format()) != 0) {
+      required |= ShaderTextureReadSwizzle;
+    }
+  };
+  auto gp = programInfo->getGeometryProcessor();
+  for (size_t i = 0; gp != nullptr && i < gp->numTextureSamplers(); ++i) {
+    addTexture(gp->textureAt(i));
+  }
+  FragmentProcessor::Iter iter(programInfo);
+  for (auto fp = iter.next(); fp != nullptr; fp = iter.next()) {
+    if (fp->name() == "TextureEffect" && static_cast<const TextureEffect*>(fp)->isYUV()) {
+      continue;
+    }
+    for (size_t i = 0; i < fp->numTextureSamplers(); ++i) {
+      addTexture(fp->textureAt(i));
+    }
+  }
+  return required;
+}
+
 std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo,
                                                        PermutationMatchFailure* failure) {
   auto outputSwizzle = programInfo->getOutputSwizzle();
@@ -1839,16 +1864,22 @@ std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* progra
     }
     return std::nullopt;
   }
+  auto matchFailure = PermutationMatchFailure::NoMatchingRule;
   auto result = MatchPermutationImpl(programInfo);
   if (result) {
     auto info = ShaderRegistry::Find(result->shaderName);
     if (info == nullptr || !IsBuildablePermutation(*info, result->vertPermutationIndex,
                                                    result->fragPermutationIndex)) {
       result.reset();
+    } else if ((RequiredTextureReads(programInfo) & ~info->textureReads) != 0) {
+      // Default deny: the matched family's shader would read these textures without the
+      // semantic the runtime applies, so the draw is a reported miss rather than wrong pixels.
+      result.reset();
+      matchFailure = PermutationMatchFailure::UnsupportedTextureRead;
     }
   }
   if (failure != nullptr) {
-    *failure = result ? PermutationMatchFailure::None : PermutationMatchFailure::NoMatchingRule;
+    *failure = result ? PermutationMatchFailure::None : matchFailure;
   }
   return result;
 }

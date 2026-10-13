@@ -6,7 +6,6 @@
 #include <vector>
 #include "core/shaders/PerlinNoiseShader.h"
 #include "gpu/AOTChainBuilder.h"
-#include "gpu/AOTChainRegisterAllocator.h"
 #include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/BackingFit.h"
 #include "gpu/DrawingManager.h"
@@ -187,199 +186,36 @@ static bool ValidateLinearPlan(const AOTEffectGraph& graph, const AOTEffectPlan&
   return plan.output == plan.passes.back().output;
 }
 
-static bool CheckDAGRegisterBudget(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
-                                   size_t capacity) {
-  std::vector<int> slotOf(graph.nodeCount(), -1);
-  std::vector<AOTNodeID> ordered;
-  std::vector<bool> raw;
-  auto computedTexture = [&](const AOTEffectNode* node) {
-    if (node->kind != AOTEffectKind::TextureSource || node->inputs.empty()) {
-      return false;
-    }
-    const auto* input = graph.nodeAt(node->inputs[0]);
-    return input != nullptr && input->kind != AOTEffectKind::GeometryColor &&
-           input->kind != AOTEffectKind::GeometryColorOpaqueInput &&
-           input->kind != AOTEffectKind::GeometryWhiteInput &&
-           input->kind != AOTEffectKind::GeometryCoverage;
-  };
-  for (auto id : pass.nodes) {
-    const auto* node = graph.nodeAt(id);
-    if (node == nullptr) {
-      return false;
-    }
-    if (node->kind == AOTEffectKind::TextureSource) {
-      if (!computedTexture(node)) {
-        slotOf[id.index()] = static_cast<int>(ordered.size());
-      }
-      ordered.push_back(id);
-      raw.push_back(true);
-    }
-  }
-  for (auto id : pass.nodes) {
-    const auto* node = graph.nodeAt(id);
-    if (node->kind != AOTEffectKind::TextureSource || computedTexture(node)) {
-      slotOf[id.index()] = static_cast<int>(ordered.size());
-      ordered.push_back(id);
-      raw.push_back(false);
-    }
-  }
-  std::vector<std::vector<int>> inputs(ordered.size());
-  for (size_t index = 0; index < ordered.size(); ++index) {
-    const auto* node = graph.nodeAt(ordered[index]);
-    if (raw[index] || node->kind == AOTEffectKind::PerlinNoiseSource) {
-      continue;
-    }
-    for (auto input : node->inputs) {
-      if (graph.nodeAt(input) == nullptr) {
-        return false;
-      }
-      if (slotOf[input.index()] >= 0) {
-        inputs[index].push_back(slotOf[input.index()]);
-      }
-    }
-  }
-  AOTChainRegisterAssignment assignment;
-  return pass.output.index() < slotOf.size() && slotOf[pass.output.index()] >= 0 &&
-         AllocateChainRegisters(inputs, slotOf[pass.output.index()], -1, -1, capacity, &assignment);
-}
-
 }  // namespace
 
 bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPlan& plan) {
-  // PointwiseChain/PointwiseGraph plans fuse the whole DAG; the linear-pass invariants do
-  // not apply to it. Its structural checks live in BuildChainFP and AOTPointwiseChainProcessor::Make.
+  // PointwiseChain/PointwiseGraph plans fuse the whole DAG; the linear-pass invariants do not
+  // apply to it. The chain builder's own planner decides: it runs the slot encoding (including the
+  // extra TEX_MODULATE instruction of a computed-input texture and the closure of every input
+  // edge), the per-kind parameter blocks, the resource profile and the register allocation that
+  // construction runs, without creating processors. Clip slots appended from the draw's coverage
+  // FPs are not part of the plan; the builder re-plans with them and refuses what no longer fits.
   if (plan.passes.size() == 1 && IsAOTPointwiseDAGKernel(plan.passes[0].kernel)) {
     const auto& pass = plan.passes[0];
     if (!plan.output.isValid() || plan.output != graph.root() || pass.output != plan.output ||
         pass.materializesOutput || pass.nodes.empty() || !pass.dependencies.empty()) {
       return false;
     }
-    // Final encoded-instruction budget (): the node count underestimates what the
-    // builder emits. A computed-input texture occupies TWO slots (a raw sampling slot plus a
-    // TEX_MODULATE instruction following its producer), so the admission check must count the
-    // expansion — a graph of exactly MaxSlots nodes with one computed-input texture would pass
-    // the old check and fail inside BuildChainProcessor after CanExecute promised success.
-    // Appended clip slots (from the draw's coverage FPs, not the plan) remain invisible here;
-    // the builder's own MaxSlots check rejects those at construction and the caller falls back.
-    size_t encodedInstructions = pass.nodes.size();
-    for (auto nodeID : pass.nodes) {
-      auto node = graph.nodeAt(nodeID);
-      if (node == nullptr) {
-        return false;
-      }
-      if (node->kind == AOTEffectKind::TextureSource && !node->inputs.empty()) {
-        auto* inputNode = graph.nodeAt(node->inputs[0]);
-        if (inputNode != nullptr && inputNode->kind != AOTEffectKind::GeometryColor &&
-            inputNode->kind != AOTEffectKind::GeometryColorOpaqueInput &&
-            inputNode->kind != AOTEffectKind::GeometryWhiteInput &&
-            inputNode->kind != AOTEffectKind::GeometryCoverage) {
-          ++encodedInstructions;
-        }
-      }
-    }
-    if (encodedInstructions > AOTPointwiseChainProcessor::MaxSlots) {
-      return false;
-    }
-    // Check kernel-wide parameter budgets before accepting a DAG candidate. Logical texture
-    // leaves are padded to the existing four-sampler artifacts by the chain builder.
-    size_t plainLeaves = 0;
-    size_t shaderTiledLeaves = 0;
-    size_t colorSpaceXforms = 0;
-    size_t gradients = 0;
-    size_t noiseSources = 0;
-    size_t deviceRects = 0;
-    size_t localRects = 0;
-    size_t rrects = 0;
-    bool hasLUT = false;
-    for (auto nodeID : pass.nodes) {
-      auto node = graph.nodeAt(nodeID);
-      if (node == nullptr) {
-        return false;
-      }
-      if (node->kind == AOTEffectKind::TextureSource) {
-        auto parameters = std::get_if<AOTTextureParameters>(&node->parameters);
-        if (parameters == nullptr || parameters->isYUV || parameters->hasRGBAAA) {
-          return false;
-        }
-        if (parameters->samplingKind == AOTTextureSamplingKind::Tiled) {
-          const auto& recipe = parameters->tiledRecipe;
-          if (!recipe.has_value() ||
-              !AOTChainBuilder::IsChainCompatibleTiledMode(recipe->shaderModeX) ||
-              !AOTChainBuilder::IsChainCompatibleTiledMode(recipe->shaderModeY)) {
-            return false;
-          }
-          if (recipe->shaderModeX != TiledTextureShaderMode::None ||
-              recipe->shaderModeY != TiledTextureShaderMode::None) {
-            // Count shader-side recipes separately from hardware-only wrapping; the selected
-            // resource profile checks their capacity after all nodes have been examined.
-            ++shaderTiledLeaves;
-          }
-        } else if (parameters->samplingKind != AOTTextureSamplingKind::Plain) {
-          return false;
-        }
-        ++plainLeaves;
-      } else if (node->kind == AOTEffectKind::PerlinNoiseSource) {
-        auto parameters = std::get_if<AOTPerlinNoiseParameters>(&node->parameters);
-        if (parameters == nullptr || !AOTPerlinNoiseParametersSupported(*parameters) ||
-            ++noiseSources > 1) {
-          return false;
-        }
-      } else if (node->kind == AOTEffectKind::ColorSpaceXform) {
-        auto parameters = std::get_if<AOTColorSpaceXformParameters>(&node->parameters);
-        if (parameters == nullptr || parameters->steps == nullptr ||
-            ++colorSpaceXforms > AOTPointwiseChainProcessor::MaxColorSpaceXformSlots) {
-          return false;
-        }
-      } else if (node->kind == AOTEffectKind::GradientSource) {
-        auto parameters = std::get_if<AOTGradientParameters>(&node->parameters);
-        if (parameters == nullptr || ++gradients > AOTPointwiseChainProcessor::MaxGradientSlots) {
-          return false;
-        }
-        hasLUT = parameters->colorizerKind == 3;
-        if (hasLUT && parameters->lutProxy == nullptr) {
-          return false;
-        }
-      } else if (node->kind == AOTEffectKind::RectCoverage) {
-        auto parameters = std::get_if<AOTRectCoverageParameters>(&node->parameters);
-        if (parameters == nullptr) {
-          return false;
-        }
-        const std::array<float, 9> identity = {1, 0, 0, 0, 1, 0, 0, 0, 1};
-        auto& count = parameters->deviceToLocal == identity ? deviceRects : localRects;
-        if (++count > (parameters->deviceToLocal == identity
-                           ? AOTPointwiseChainProcessor::MaxDeviceRectCoverageSlots
-                           : AOTPointwiseChainProcessor::MaxLocalRectCoverageSlots)) {
-          return false;
-        }
-      } else if (node->kind == AOTEffectKind::RRectCoverage &&
-                 ++rrects > AOTPointwiseChainProcessor::MaxRRectCoverageSlots) {
-        return false;
-      }
-    }
-    if (hasLUT && plainLeaves > 1) {
-      return false;
-    }
-    AOTResourceDemand demand = {encodedInstructions,
-                                0,
-                                plainLeaves + (hasLUT ? 1u : 0u) + noiseSources * 2,
-                                shaderTiledLeaves,
-                                noiseSources,
-                                gradients,
-                                colorSpaceXforms,
-                                deviceRects,
-                                localRects,
-                                rrects};
-    auto profile = pass.resourceProfile;
-    if (profile == AOTResourceProfile::Automatic) {
-      profile = SelectAOTResourceProfile(demand);
-    }
-    const auto* capacity = GetAOTResourceCapacity(profile);
-    return capacity != nullptr &&
-           IsAOTGraphProfile(profile) == (pass.kernel == AOTKernelKind::PointwiseGraph) &&
-           FitsAOTResourceProfile(demand, profile) &&
-           CheckDAGRegisterBudget(graph, pass, capacity->registers);
+    return AOTChainBuilder::PlanChainPass(graph, pass);
   }
   return ValidateLinearPlan(graph, plan);
+}
+
+bool AOTPlanExecutor::CanRoute(const AOTEffectGraph& graph, const AOTEffectPlan& plan) {
+  if (plan.passes.size() != 1) {
+    return false;
+  }
+  auto kernel = plan.passes[0].kernel;
+  if (kernel != AOTKernelKind::PointwiseTail && !IsAOTPointwiseDAGKernel(kernel) &&
+      kernel != AOTKernelKind::PerlinNoiseFill && kernel != AOTKernelKind::YUVTextureFill) {
+    return false;
+  }
+  return CanExecute(graph, plan);
 }
 
 PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t renderFlags,
