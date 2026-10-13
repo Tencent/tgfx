@@ -56,10 +56,6 @@ class FTTypeface : public Typeface {
     return _hasOutlines;
   }
 
-  bool usesEvenOddFill() const override {
-    return _parityOutlines;
-  }
-
   GlyphID getGlyphID(Unichar unichar) const override;
 
   std::unique_ptr<Stream> openStream() const override;
@@ -79,6 +75,9 @@ class FTTypeface : public Typeface {
   FT_Face face = nullptr;
   bool _hasColor = false;
   bool _hasOutlines = true;
+  // True for the PAGX CFF subsets whose outlines describe their filled area with parity semantics.
+  // Kept internal: a fill rule belongs to an emitted Path, not to a typeface, so FTScalerContext
+  // applies it when it produces a glyph path or glyph pixels.
   bool _parityOutlines = false;
 
 #if defined(__ANDROID__) || defined(ANDROID)
@@ -86,6 +85,10 @@ class FTTypeface : public Typeface {
 #endif
 
   FTTypeface(FTFontData data, FT_Face face);
+
+  bool parityOutlines() const {
+    return _parityOutlines;
+  }
 
   int unitsPerEmInternal() const;
 

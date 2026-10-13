@@ -93,11 +93,6 @@ class PathTypefaceBuilder : public CustomTypefaceBuilder {
    * Adds a glyph to the typeface using a vector path. Returns the GlyphID of the new glyph, which
    * is a unique identifier within the typeface, starting from 1. Returns 0 if the glyph cannot be
    * added because the typeface builder is full.
-   *
-   * The fill type of the path is remembered: if any glyph is added with an even-odd fill type, the
-   * detached typeface reports Typeface::usesEvenOddFill() as true, so the shapes built from it
-   * agree with the outlines they return.
-   *
    * @param path The vector path that defines the glyph's outline.
    * @param advance The horizontal advance width of the glyph in design space coordinates. This
    * value determines the spacing between this glyph and the next when rendering text.
@@ -110,11 +105,6 @@ class PathTypefaceBuilder : public CustomTypefaceBuilder {
    * and immutable after creation. Returns the GlyphID of the new glyph, which is a unique
    * identifier within the typeface, starting from 1. Returns 0 if the glyph cannot be added because
    * the typeface builder is full.
-   *
-   * Unlike the Path overload, the fill type cannot be read without resolving the provider, which
-   * defeats its laziness. Glyphs added this way therefore never mark the typeface as even-odd fill;
-   * pass the resolved Path instead if the outlines rely on the even-odd rule.
-   *
    * @param provider The PathProvider that supplies the glyph's path.
    * @param advance The horizontal advance width of the glyph in design space coordinates.
    */
@@ -138,10 +128,6 @@ class PathTypefaceBuilder : public CustomTypefaceBuilder {
   };
 
   std::vector<PathGlyphRecord> glyphRecords = {};
-  // True once any glyph was added with an even-odd fill type. A typeface reports a single fill
-  // rule, so one parity glyph decides for the whole typeface; parity wins because filled-in
-  // counters are the more visible error.
-  bool _evenOddFill = false;
 };
 
 /**

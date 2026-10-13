@@ -33,8 +33,6 @@ std::shared_ptr<Shape> Shape::MakeFrom(Font font, GlyphID glyphID) {
 }
 
 GlyphShape::GlyphShape(Font font, GlyphID glyphID) : font(std::move(font)), glyphID(glyphID) {
-  auto typeface = this->font.getTypeface();
-  evenOddFill = typeface != nullptr && typeface->usesEvenOddFill();
 }
 
 UniqueKey GlyphShape::getUniqueKey() const {

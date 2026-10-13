@@ -27,12 +27,13 @@ namespace tgfx {
  */
 class TextShape : public UniqueKeyShape {
  public:
-  explicit TextShape(std::shared_ptr<TextBlob> textBlob);
+  explicit TextShape(std::shared_ptr<TextBlob> textBlob) : textBlob(std::move(textBlob)) {
+  }
 
   PathFillType fillType() const override {
-    // Must agree with the fill type onGetPath() reports. Resolved once in the constructor because
-    // this is queried on every fill and onGetPath() asks for it again.
-    return evenOddFill ? PathFillType::EvenOdd : PathFillType::Winding;
+    // Reports the rule of the merged outline, so it can never disagree with getPath(). onGetPath()
+    // must not call fillType(): getPath() is what computes it, and that would recurse.
+    return getPath().getFillType();
   }
 
   Rect onGetBounds() const override;
@@ -46,7 +47,5 @@ class TextShape : public UniqueKeyShape {
 
  private:
   std::shared_ptr<TextBlob> textBlob = nullptr;
-  // The blob cannot change after construction, so the aggregated fill rule is fixed as well.
-  bool evenOddFill = false;
 };
 }  // namespace tgfx

@@ -29,15 +29,12 @@ class PathUserTypeface final : public UserTypeface {
   static std::shared_ptr<UserTypeface> Make(uint32_t builderID, const std::string& fontFamily,
                                             const std::string& fontStyle,
                                             const FontMetrics& fontMetrics, const Rect& fontBounds,
-                                            int unitsPerEm, const GlyphRecords& glyphRecords,
-                                            bool evenOddFill);
+                                            int unitsPerEm, const GlyphRecords& glyphRecords);
   size_t glyphsCount() const override;
 
   bool hasColor() const override;
 
   bool hasOutlines() const override;
-
-  bool usesEvenOddFill() const override;
 
   std::shared_ptr<PathProvider> getPathProvider(GlyphID glyphID) const;
 
@@ -49,11 +46,8 @@ class PathUserTypeface final : public UserTypeface {
   explicit PathUserTypeface(uint32_t builderID, const std::string& fontFamily,
                             const std::string& fontStyle, const FontMetrics& fontMetrics,
                             const Rect& fontBounds, int unitsPerEm,
-                            const GlyphRecords& glyphRecords, bool evenOddFill);
+                            const GlyphRecords& glyphRecords);
 
   GlyphRecords glyphRecords = {};
-  // Aggregated from the glyph paths by PathTypefaceBuilder, so the shapes built from this typeface
-  // report the same fill rule as the outlines generatePath() returns.
-  bool _evenOddFill = false;
 };
 }  // namespace tgfx

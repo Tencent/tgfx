@@ -525,7 +525,7 @@ bool FTScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItal
     path->reset();
     return false;
   }
-  if (ftTypeface()->usesEvenOddFill()) {
+  if (ftTypeface()->parityOutlines()) {
     // These glyphs store parity contours: nested outlines all run the same way, so a winding
     // rasterizer fills the counters in. Declaring the rule the outlines were authored with
     // keeps the geometry untouched and matches what CoreText does for the same bytes.
@@ -879,7 +879,7 @@ bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
     // restored afterwards so this call adds no lasting change to the shared glyph slot.
     // RenderOutLineGlyph() still translates the outline in place, as it did before.
     auto outlineFlags = face->glyph->outline.flags;
-    if (ftTypeface()->usesEvenOddFill()) {
+    if (ftTypeface()->parityOutlines()) {
       face->glyph->outline.flags |= FT_OUTLINE_EVEN_ODD_FILL;
     }
     ClearPixels(dstInfo, dstPixels);

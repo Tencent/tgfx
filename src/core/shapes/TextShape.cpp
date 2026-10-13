@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextShape.h"
+#include <vector>
 #include "core/GlyphTransform.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -36,19 +37,6 @@ std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<TextBlob> textBlob) {
   return nullptr;
 }
 
-TextShape::TextShape(std::shared_ptr<TextBlob> textBlob) : textBlob(std::move(textBlob)) {
-  // onGetPath() appends the glyph outlines into one path, so a single parity typeface decides
-  // the rule for the whole blob. Mixing both kinds in one blob cannot be expressed with a single
-  // fill type; parity wins because filled-in counters are the more visible error.
-  for (auto run : *this->textBlob) {
-    auto typeface = run.font.getTypeface();
-    if (typeface != nullptr && typeface->usesEvenOddFill()) {
-      evenOddFill = true;
-      break;
-    }
-  }
-}
-
 Rect TextShape::onGetBounds() const {
   return textBlob->getBounds();
 }
@@ -59,7 +47,11 @@ Path TextShape::onGetPath(float resolutionScale) const {
   }
   auto hasScale = !FloatNearlyEqual(resolutionScale, 1.0f);
   auto matrix = Matrix::MakeScale(resolutionScale, resolutionScale);
-  Path totalPath = {};
+  // A single Path carries one fill rule, so the outlines cannot always be appended: outlines that
+  // disagree would lose their meaning, and overlapping even-odd outlines would cancel each other
+  // out. Collect them first to find out which case this blob is.
+  std::vector<Path> glyphPaths = {};
+  auto needsUnion = false;
   for (auto run : *textBlob) {
     if (!run.font.hasOutlines()) {
       continue;
@@ -71,24 +63,35 @@ Path TextShape::onGetPath(float resolutionScale) const {
     for (size_t index = 0; index < run.glyphCount; index++) {
       auto glyphID = run.glyphs[index];
       Path glyphPath = {};
-      if (font.getPath(glyphID, &glyphPath)) {
-        auto glyphMatrix = GetGlyphMatrix(run, index);
-        glyphMatrix.preScale(1.0f / resolutionScale, 1.0f / resolutionScale);
-        glyphMatrix.postConcat(matrix);
-        glyphPath.transform(glyphMatrix);
-        totalPath.addPath(glyphPath);
-      } else {
+      if (!font.getPath(glyphID, &glyphPath)) {
         LOGE("TextShape::getPath() Failed to get path for glyph!");
         return {};
       }
+      if (glyphPath.isEmpty()) {
+        continue;
+      }
+      auto glyphMatrix = GetGlyphMatrix(run, index);
+      glyphMatrix.preScale(1.0f / resolutionScale, 1.0f / resolutionScale);
+      glyphMatrix.postConcat(matrix);
+      glyphPath.transform(glyphMatrix);
+      if (glyphPath.getFillType() != PathFillType::Winding) {
+        needsUnion = true;
+      }
+      glyphPaths.push_back(std::move(glyphPath));
+    }
+  }
+  Path totalPath = {};
+  for (auto& glyphPath : glyphPaths) {
+    if (totalPath.isEmpty()) {
+      totalPath = glyphPath;
+    } else if (needsUnion) {
+      totalPath.addPath(glyphPath, PathOp::Union);
+    } else {
+      totalPath.addPath(glyphPath);
     }
   }
   auto inverseMatrix = Matrix::MakeScale(1.f / resolutionScale, 1.f / resolutionScale);
   totalPath.transform(inverseMatrix);
-  // addPath() in append mode keeps the destination fill type, which for an initially empty path
-  // means the first glyph silently decides it. State it explicitly so the path and fillType()
-  // always agree.
-  totalPath.setFillType(fillType());
   return totalPath;
 }
 }  // namespace tgfx
