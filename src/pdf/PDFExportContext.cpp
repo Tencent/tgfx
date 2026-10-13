@@ -687,8 +687,8 @@ void PDFExportContext::drawDropShadowBeforeLayer(const std::shared_ptr<Picture>&
   if (image) {
     image = image->makeTextureImage(document->context());
     auto imageMatrix = matrix;
-    imageMatrix.postTranslate(pictureBounds.x() - offset.x + dropShadowFilter->dx,
-                              pictureBounds.y() - offset.y + dropShadowFilter->dy);
+    imageMatrix.preTranslate(pictureBounds.x() - offset.x + dropShadowFilter->dx,
+                             pictureBounds.y() - offset.y + dropShadowFilter->dy);
     drawImage(std::move(image), SamplingOptions(), imageMatrix, clip, brush);
   }
 }

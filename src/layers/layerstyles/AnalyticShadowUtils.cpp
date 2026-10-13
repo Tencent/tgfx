@@ -108,8 +108,8 @@ std::optional<RRect> AnalyticShadowUtils::MakeShadowShape(const LayerStyleInput&
   }
 
   auto outset = spread;
-  // A FillStroke outline is treated as its fill outline outset by the stroke, ignoring the
-  // effect difference.
+  // An exact stroke outline is hard to express, so a FillStroke outline is treated as its fill
+  // outline outset by the stroke, ignoring the effect difference.
   if (styledShape.type == StyledShapeType::FillStroke) {
     outset += SpreadUtils::StrokeOutset(styledShape.strokeWidth, styledShape.strokeAlign);
   }
