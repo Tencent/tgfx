@@ -73,8 +73,10 @@ namespace tgfx {
  *
  * 0x00010009: gradients move to extended chains, which gain the base geometry interfaces;
  * base chains no longer carry the source coordinate transform or gradient parameters.
+ *
+ * 0x0001000A: chain leaf and standalone tiled sampling gain runtime read-swizzle uniforms.
  */
-inline constexpr uint32_t kExpectedToolchainABI = 0x00010009u;
+inline constexpr uint32_t kExpectedToolchainABI = 0x0001000Au;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

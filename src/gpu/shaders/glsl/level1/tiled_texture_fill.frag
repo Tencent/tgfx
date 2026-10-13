@@ -42,12 +42,18 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   // compile-time permutations; both are pure fragment math (coherent branches).
   int AlphaOnly;
   int Strict;
+  int ReadSwizzle;
 };
 
 #define XP_DST_TEX_BINDING 1
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
 #include "tiled_sample.inc"
+#include "texture_read_swizzle.inc"
+
+vec4 aotTiledRead(vec2 coord) {
+  return aotReadSwizzle(texture(TextureSampler_0, coord), ReadSwizzle);
+}
 
 // Per-axis coordinate for the mipmap-repeat modes (RepeatNearestMipmap(4), RepeatLinearMipmap(5)),
 // ported verbatim from GLSLTiledTextureEffect::subsetCoord. Produces the wrapped subset coord, the
@@ -105,17 +111,17 @@ void main() {
       s3 *= Dimension;
       s4 *= Dimension;
     }
-    vec4 c1 = texture(TextureSampler_0, s1);
-    vec4 c2 = texture(TextureSampler_0, s2);
-    vec4 c3 = texture(TextureSampler_0, s3);
-    vec4 c4 = texture(TextureSampler_0, s4);
+    vec4 c1 = aotTiledRead(s1);
+    vec4 c2 = aotTiledRead(s2);
+    vec4 c3 = aotTiledRead(s3);
+    vec4 c4 = aotTiledRead(s4);
     color = mix(mix(c1, c2, weightX), mix(c3, c4, weightX), weightY);
   } else {
     vec2 inCoord;
     vec2 subsetCoord;
     vec2 clampedCoord;
     vec2 sampleCoord = tiledMapCoord(texCoord, Strict != 0, inCoord, subsetCoord, clampedCoord);
-    color = texture(TextureSampler_0, sampleCoord);
+    color = aotTiledRead(sampleCoord);
     color = tiledApplyBorder(color, inCoord, subsetCoord, clampedCoord);
     // RepeatLinearNone seam blend: when the mod-wrapped coordinate clamps at a subset edge, blend
     // with the opposite edge so linear filtering wraps across the seam. Mirrors the runtime codegen
@@ -130,11 +136,11 @@ void main() {
       highp float repeatCoordY = errY > 0.0 ? Clamp.y : Clamp.w;
       if (repX && repY) {
         vec4 repeatReadX =
-            texture(TextureSampler_0, vec2(repeatCoordX, clampedCoord.y) * sampleScale);
+            aotTiledRead(vec2(repeatCoordX, clampedCoord.y) * sampleScale);
         vec4 repeatReadY =
-            texture(TextureSampler_0, vec2(clampedCoord.x, repeatCoordY) * sampleScale);
+            aotTiledRead(vec2(clampedCoord.x, repeatCoordY) * sampleScale);
         vec4 repeatReadXY =
-            texture(TextureSampler_0, vec2(repeatCoordX, repeatCoordY) * sampleScale);
+            aotTiledRead(vec2(repeatCoordX, repeatCoordY) * sampleScale);
         if (errX != 0.0 && errY != 0.0) {
           errX = abs(errX);
           color = mix(mix(color, repeatReadX, errX), mix(repeatReadY, repeatReadXY, errX),
@@ -147,13 +153,13 @@ void main() {
       } else if (repX) {
         if (errX != 0.0) {
           vec4 repeatReadX =
-              texture(TextureSampler_0, vec2(repeatCoordX, clampedCoord.y) * sampleScale);
+              aotTiledRead(vec2(repeatCoordX, clampedCoord.y) * sampleScale);
           color = mix(color, repeatReadX, errX);
         }
       } else {
         if (errY != 0.0) {
           vec4 repeatReadY =
-              texture(TextureSampler_0, vec2(clampedCoord.x, repeatCoordY) * sampleScale);
+              aotTiledRead(vec2(clampedCoord.x, repeatCoordY) * sampleScale);
           color = mix(color, repeatReadY, errY);
         }
       }

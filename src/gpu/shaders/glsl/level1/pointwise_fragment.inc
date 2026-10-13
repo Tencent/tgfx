@@ -56,6 +56,9 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   // folding coverage into the source was only correct for SrcOver).
   int ClipCoverageRegister;
   int SlotCount;
+#if NTEX > 0
+  ivec4 LeafReadSwizzles;
+#endif
   // Per-leaf subset rects, named for the structural ordinals the TextureEffect writers use.
   vec4 Subset;
 #if NTEX >= 2
@@ -272,8 +275,14 @@ highp vec2 chainTiledDimension;
 // exactly like tiledMapCoord's returned sample coord. Without this, every tile edge on the chain
 // route snaps to the clamped edge texel while the runtime blends (the chain-side
 // shape needs a subset-bearing tiled leaf, which the hardware wrap never produces).
+#include "texture_read_swizzle.inc"
+
+vec4 aotChainRead(CHAIN_LEAF_SAMPLER texSampler, vec2 coord, int readSwizzle) {
+  return aotReadSwizzle(texture(texSampler, coord), readSwizzle);
+}
+
 vec4 tiledSeamBlend(CHAIN_LEAF_SAMPLER texSampler, vec4 texColor, vec2 subsetCoord,
-                    vec2 clampedCoord) {
+                    vec2 clampedCoord, int readSwizzle) {
   bool repeatX = ShaderModeX == 3 && subsetCoord.x != clampedCoord.x;
   bool repeatY = ShaderModeY == 3 && subsetCoord.y != clampedCoord.y;
   if (!repeatX && !repeatY) {
@@ -284,17 +293,20 @@ vec4 tiledSeamBlend(CHAIN_LEAF_SAMPLER texSampler, vec4 texColor, vec2 subsetCoo
   float repeatCoordX = errX > 0.0 ? Clamp.x : Clamp.z;
   float repeatCoordY = errY > 0.0 ? Clamp.y : Clamp.w;
   if (repeatX && repeatY) {
-    vec4 repeatReadX = texture(texSampler, vec2(repeatCoordX, clampedCoord.y) * Dimension);
-    vec4 repeatReadY = texture(texSampler, vec2(clampedCoord.x, repeatCoordY) * Dimension);
-    vec4 repeatReadXY = texture(texSampler, vec2(repeatCoordX, repeatCoordY) * Dimension);
+    vec4 repeatReadX = aotChainRead(texSampler, vec2(repeatCoordX, clampedCoord.y) * Dimension,
+                                    readSwizzle);
+    vec4 repeatReadY = aotChainRead(texSampler, vec2(clampedCoord.x, repeatCoordY) * Dimension, readSwizzle);
+    vec4 repeatReadXY =
+        aotChainRead(texSampler, vec2(repeatCoordX, repeatCoordY) * Dimension, readSwizzle);
     return mix(mix(texColor, repeatReadX, abs(errX)), mix(repeatReadY, repeatReadXY, abs(errX)),
                abs(errY));
   }
   if (repeatX) {
-    vec4 repeatReadX = texture(texSampler, vec2(repeatCoordX, clampedCoord.y) * Dimension);
+    vec4 repeatReadX = aotChainRead(texSampler, vec2(repeatCoordX, clampedCoord.y) * Dimension,
+                                    readSwizzle);
     return mix(texColor, repeatReadX, errX);
   }
-  vec4 repeatReadY = texture(texSampler, vec2(clampedCoord.x, repeatCoordY) * Dimension);
+  vec4 repeatReadY = aotChainRead(texSampler, vec2(clampedCoord.x, repeatCoordY) * Dimension, readSwizzle);
   return mix(texColor, repeatReadY, errY);
 }
 #undef ShaderModeX
@@ -310,6 +322,10 @@ vec4 chainLeafFetch(CHAIN_LEAF_SAMPLER texSampler, vec3 coord, vec4 leafSubset, 
   // QuadTextureFillShader); the tiled/subset math below then runs on the divided coordinate,
   // matching the runtime's emitPerspTextCoord ordering.
   highp vec2 uv = coord.xy / coord.z;
+  int readSwizzle = 0;
+#if NTEX > 0
+  readSwizzle = LeafReadSwizzles[leafIndex];
+#endif
 #ifdef TGFX_POINTWISE_TILED
   int recipeIndex = -1;
   for (int index = 0; index < 3; ++index) {
@@ -339,11 +355,11 @@ vec4 chainLeafFetch(CHAIN_LEAF_SAMPLER texSampler, vec3 coord, vec4 leafSubset, 
     vec2 subsetCoord = vec2(0.0);
     vec2 clampedCoord = vec2(0.0);
     vec2 sampleCoord = tiledMapCoord(uv, strict, inCoord, subsetCoord, clampedCoord);
-    vec4 texColor = texture(texSampler, sampleCoord);
-    texColor = tiledSeamBlend(texSampler, texColor, subsetCoord, clampedCoord);
+    vec4 texColor = aotChainRead(texSampler, sampleCoord, readSwizzle);
+    texColor = tiledSeamBlend(texSampler, texColor, subsetCoord, clampedCoord, readSwizzle);
     return tiledApplyBorder(texColor, inCoord, subsetCoord, clampedCoord);
   }
-  return texture(texSampler, clamp(uv, leafSubset.xy, leafSubset.zw));
+  return aotChainRead(texSampler, clamp(uv, leafSubset.xy, leafSubset.zw), readSwizzle);
 }
 
 layout(location = 0) out vec4 fragColor;

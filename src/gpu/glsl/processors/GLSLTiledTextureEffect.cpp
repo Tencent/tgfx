@@ -19,6 +19,7 @@
 #include "GLSLTiledTextureEffect.h"
 #include "gpu/SamplerState.h"
 #include "gpu/ShaderCaps.h"
+#include "gpu/Swizzle.h"
 #include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
@@ -422,6 +423,12 @@ void GLSLTiledTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
   auto sampling = resolveSampling();
   if (sampling == nullptr) {
     return;
+  }
+  if (fragmentUniformData->hasField("ReadSwizzle")) {
+    auto view = getTextureView();
+    if (view != nullptr) {
+      fragmentUniformData->setData("ReadSwizzle", AOTReadSwizzleMode(view->getTexture()->format()));
+    }
   }
   if (sampling->usesShaderDimensions) {
     fragmentUniformData->setData("Dimension", sampling->shaderDimensions);

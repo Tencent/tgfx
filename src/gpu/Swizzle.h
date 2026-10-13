@@ -113,4 +113,15 @@ class Swizzle {
       : swiz{c[0], c[1], c[2], c[3], '\0'}, key(MakeKey(c)) {
   }
 };
+
+inline int AOTReadSwizzleMode(PixelFormat format) {
+  auto swizzle = Swizzle::ForRead(format);
+  if (swizzle == Swizzle::RRRA()) {
+    return 1;
+  }
+  if (swizzle == Swizzle::RGRG()) {
+    return 2;
+  }
+  return 0;
+}
 }  // namespace tgfx

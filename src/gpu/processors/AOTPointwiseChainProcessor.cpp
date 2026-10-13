@@ -18,6 +18,7 @@
 
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/ColorSpaceXformHelper.h"
+#include "gpu/Swizzle.h"
 #include "gpu/resources/TextureView.h"
 
 namespace tgfx {
@@ -492,6 +493,18 @@ void AOTPointwiseChainProcessor::onSetData(UniformData* vertexUniformData,
   fragmentUniformData->setDataOptional("CoverageRootIndex", coverageRootSlot);
   fragmentUniformData->setDataOptional("ClipCoverageRegister", clipCoverageRegister);
   fragmentUniformData->setDataOptional("SlotCount", static_cast<int>(_slotCount));
+  if (leafCount() > 0) {
+    std::array<int, 4> readSwizzles = {};
+    for (size_t index = 0; index < leafCount() && index < _slotCount; ++index) {
+      if (slots[index].op == AOTChainOp::Texture) {
+        auto texture = childProcessor(index)->textureAt(0);
+        if (texture != nullptr) {
+          readSwizzles[index] = AOTReadSwizzleMode(texture->format());
+        }
+      }
+    }
+    fragmentUniformData->setData("LeafReadSwizzles", readSwizzles);
+  }
   // Each selector names the leaf that reads the matching recipe set; the kernel never reads a set
   // whose selector is -1, so an absent recipe needs no upload.
   fragmentUniformData->setDataOptional("GradientLUTLeaf", lutLeafIndex);

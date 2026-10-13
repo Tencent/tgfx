@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -25,6 +27,7 @@
 #include <string>
 #include <vector>
 #include "base/TGFXTest.h"
+#include "core/images/TextureImage.h"
 #include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/EmbeddedShaderBundles.h"
@@ -37,7 +40,9 @@
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/resources/DefaultTextureView.h"
 #include "gpu/shaders/level1/PointwiseChainShader.h"
 #include "gpu/shaders/level1/PointwiseGraphShader.h"
 #include "gtest/gtest.h"
@@ -60,6 +65,7 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/YUVData.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/GPU.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/Layer.h"
@@ -318,6 +324,196 @@ TGFX_TEST(AOTRenderConsistencyTest, TiledTextureFillModes) {
   ExpectShaderConsistent("tiled-repeat-mirror",
                          Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Mirror), width,
                          height);
+}
+
+static void ExpectTiledReadFormatMatchesReference(PixelFormat format, bool fused,
+                                                  bool extended = false,
+                                                  TileMode tileMode = TileMode::Repeat,
+                                                  bool withSubset = false) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  const size_t channels = format == PixelFormat::RG_88    ? 2u
+                          : format == PixelFormat::GRAY_8 ? 1u
+                                                          : 4u;
+  std::vector<uint8_t> pixels(2 * 2 * channels);
+  const uint8_t rgba[] = {64, 128, 64, 128};
+  for (size_t index = 0; index < 4; ++index) {
+    for (size_t channel = 0; channel < channels; ++channel) {
+      pixels[index * channels + channel] = rgba[channel];
+    }
+  }
+  auto texture = context->gpu()->createTexture(
+      TextureDescriptor(2, 2, format, false, 1, TextureUsage::TEXTURE_BINDING));
+  ASSERT_NE(texture, nullptr) << "format=" << static_cast<int>(format);
+  ASSERT_EQ(texture->format(), format);
+  context->gpu()->queue()->writeTexture(texture, Rect::MakeWH(2, 2), pixels.data(), 2 * channels);
+  context->gpu()->queue()->waitUntilCompleted();
+  std::shared_ptr<Image> image;
+  if (format == PixelFormat::GRAY_8) {
+    auto view = Resource::AddToCache(context, new DefaultTextureView(texture));
+    ASSERT_NE(view, nullptr);
+    EXPECT_FALSE(view->isYUV());
+    image = TextureImage::Wrap(context->proxyProvider()->wrapTextureView(view), nullptr);
+  } else {
+    auto backendTexture = texture->getBackendTexture();
+    ASSERT_TRUE(backendTexture.isValid());
+    ASSERT_EQ(backendTexture.format(), format);
+    image = Image::MakeFrom(context, backendTexture);
+  }
+  ASSERT_NE(image, nullptr);
+  EXPECT_FALSE(image->isAlphaOnly());
+  auto shader = Shader::MakeImageShader(image, tileMode, tileMode);
+  ASSERT_NE(shader, nullptr);
+  if (extended) {
+    auto gradient =
+        Shader::MakeLinearGradient(Point{0, 0}, Point{8, 0}, {Color::White(), Color::White()}, {});
+    ASSERT_NE(gradient, nullptr);
+    shader = Shader::MakeBlend(BlendMode::DstIn, shader, gradient);
+    ASSERT_NE(shader, nullptr);
+  }
+  if (fused) {
+    const std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0,
+                                               1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+    shader = shader->makeWithColorFilter(ColorFilter::Matrix(swapRedBlue));
+    ASSERT_NE(shader, nullptr);
+  }
+  auto* cache = context->precompiledShaderCache();
+  std::array<uint8_t, 8 * 8 * 4> referencePixels = {};
+  std::array<uint8_t, 8 * 8 * 4> candidatePixels = {};
+  const auto render = [&](bool useBundle, std::array<uint8_t, 4>* sample) {
+    if (useBundle) {
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause pause(context, !useBundle);
+    context->globalCache()->clearPrograms();
+    context->globalCache()->resetProgramStats();
+    cache->setDiagnosticRecordingEnabled(true);
+    auto surface = Surface::Make(context, 8, 8);
+    ASSERT_NE(surface, nullptr);
+    surface->getCanvas()->clear(Color::Transparent());
+    context->flushAndSubmit(true);
+    cache->resetStats();
+    if (withSubset) {
+      auto target = RenderTargetProxy::MakeFrom(context, surface->getBackendRenderTarget(),
+                                                surface->origin());
+      ASSERT_NE(target, nullptr);
+      auto proxy = context->proxyProvider()->wrapExternalTexture(texture->getBackendTexture());
+      if (format == PixelFormat::GRAY_8) {
+        auto view = Resource::AddToCache(context, new DefaultTextureView(texture));
+        proxy = context->proxyProvider()->wrapTextureView(view);
+      }
+      ASSERT_NE(proxy, nullptr);
+      SamplingArgs sampling(tileMode, tileMode, SamplingOptions(), SrcRectConstraint::Fast);
+      sampling.sampleArea = Rect::MakeWH(1, 1);
+      auto matrix = Matrix::MakeTrans(0.25f, 0.25f);
+      auto processor =
+          TiledTextureEffect::Make(context->drawingAllocator(), proxy, sampling, &matrix);
+      ASSERT_NE(processor, nullptr);
+      ASSERT_EQ(processor->name(), "TiledTextureEffect");
+      int modeX = 0;
+      int modeY = 0;
+      static_cast<const TiledTextureEffect*>(processor.get())->getShaderModes(&modeX, &modeY);
+      EXPECT_NE(modeX, 0);
+      EXPECT_NE(modeY, 0);
+      if (fused) {
+        const std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0,
+                                                   1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+        processor = FragmentProcessor::Compose(
+            context->drawingAllocator(), std::move(processor),
+            ColorMatrixFragmentProcessor::Make(context->drawingAllocator(), swapRedBlue));
+      }
+      ASSERT_TRUE(context->drawingManager()->fillRTWithFP(target, std::move(processor), 0));
+    } else {
+      Paint paint;
+      paint.setShader(shader);
+      surface->getCanvas()->drawRect(Rect::MakeWH(8, 8), paint);
+    }
+    context->flushAndSubmit(true);
+    if (useBundle) {
+      const auto records = cache->hitRecords();
+      ASSERT_FALSE(records.empty());
+      for (const auto& record : records) {
+        EXPECT_EQ(record.shaderName, extended ? "PointwiseGraphShader"
+                                     : fused  ? "PointwiseChainShader"
+                                              : "TiledTextureFillShader");
+      }
+      EXPECT_TRUE(cache->jitProgramRecords().empty());
+      EXPECT_TRUE(cache->fallbackRecords().empty());
+      EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+    }
+    std::array<uint8_t, 8 * 8 * 4> output = {};
+    auto info = ImageInfo::Make(8, 8, ColorType::RGBA_8888, AlphaType::Premultiplied);
+    ASSERT_TRUE(surface->readPixels(info, output.data()));
+    (useBundle ? candidatePixels : referencePixels) = output;
+    std::copy_n(output.data() + (4 * 8 + 4) * 4, 4, sample->begin());
+    cache->setDiagnosticRecordingEnabled(false);
+  };
+  std::array<uint8_t, 4> reference = {};
+  std::array<uint8_t, 4> candidate = {};
+  render(false, &reference);
+  render(true, &candidate);
+  const std::array<uint8_t, 4> expected = format == PixelFormat::GRAY_8
+                                              ? std::array<uint8_t, 4>{64, 64, 64, 255}
+                                              : std::array<uint8_t, 4>{64, 128, 64, 128};
+  printf(
+      "[TiledReadFormat] backend=%s format=%d route=%s reference=[%u,%u,%u,%u] "
+      "aot=[%u,%u,%u,%u]\n",
+      TGFX_BACKEND_NAME, static_cast<int>(format), fused ? "chain" : "standalone", reference[0],
+      reference[1], reference[2], reference[3], candidate[0], candidate[1], candidate[2],
+      candidate[3]);
+  if (tileMode != TileMode::Decal) {
+    EXPECT_EQ(reference, expected);
+  } else {
+    EXPECT_GT(referencePixels[3], 0u);
+    EXPECT_EQ(referencePixels[(7 * 8 + 7) * 4 + 3], 0u);
+  }
+  EXPECT_EQ(candidate, reference);
+  EXPECT_EQ(candidatePixels, referencePixels);
+  cache->unload();
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, ImportedRG8StandaloneTiledReadSwizzle) {
+  ExpectTiledReadFormatMatchesReference(PixelFormat::RG_88, false);
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, ImportedRG8FusedTiledReadSwizzle) {
+  ExpectTiledReadFormatMatchesReference(PixelFormat::RG_88, true);
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, GrayViewStandaloneTiledReadSwizzle) {
+  ExpectTiledReadFormatMatchesReference(PixelFormat::GRAY_8, false);
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, GrayViewFusedTiledReadSwizzle) {
+  ExpectTiledReadFormatMatchesReference(PixelFormat::GRAY_8, true);
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, RGBAStandaloneAndFusedTiledReadControl) {
+  ExpectTiledReadFormatMatchesReference(PixelFormat::RGBA_8888, false);
+  ExpectTiledReadFormatMatchesReference(PixelFormat::RGBA_8888, true);
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, ExtendedChainTiledReadSwizzle) {
+  for (auto format : {PixelFormat::RG_88, PixelFormat::GRAY_8}) {
+    SCOPED_TRACE(static_cast<int>(format));
+    ExpectTiledReadFormatMatchesReference(format, true, true);
+  }
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, TiledReadSwizzlePreservesSeamsAndDecal) {
+  for (auto format : {PixelFormat::RG_88, PixelFormat::GRAY_8}) {
+    for (bool fused : {false, true}) {
+      for (auto tileMode : {TileMode::Repeat, TileMode::Decal}) {
+        SCOPED_TRACE(static_cast<int>(format));
+        SCOPED_TRACE(fused);
+        SCOPED_TRACE(static_cast<int>(tileMode));
+        ExpectTiledReadFormatMatchesReference(format, fused, false, tileMode, true);
+      }
+    }
+  }
 }
 
 // Gaussian blur over a tiled source: exercises GaussianBlur1DShader with a TiledTextureEffect child
