@@ -188,33 +188,38 @@ BytesKey ProgramInfo::buildProgramKey() const {
 std::shared_ptr<Program> ProgramInfo::getProgram(ProgramLookupMode mode) const {
   auto context = renderTarget->getContext();
   auto globalCache = context->globalCache();
+  auto* shaderCache = context->precompiledShaderCache();
+  bool precompiledOnly = mode == ProgramLookupMode::PrecompiledOnly || shaderCache->isLoaded();
 
   auto programKey = buildProgramKey();
   auto program = globalCache->findProgram(programKey);
   bool cacheKeyOccupied = program != nullptr;
   bool programCreated = false;
   bool deferredFallback = false;
-  if (program != nullptr && mode == ProgramLookupMode::PrecompiledOnly &&
+  if (program != nullptr && precompiledOnly &&
       program->getProvenance().program != ProgramOrigin::PrecompiledArtifact) {
     program = nullptr;
   }
   if (program == nullptr) {
     program = PrecompiledProgramCreator::CreateProgram(context, this, &deferredFallback);
-    if (program == nullptr && mode == ProgramLookupMode::AllowRuntimeFallback) {
+    if (program == nullptr && !precompiledOnly) {
       program = ProgramBuilder::CreateProgram(context, this);
     }
     programCreated = program != nullptr;
     if (program == nullptr) {
-      LOGE("ProgramInfo::getProgram() Failed to create the program!");
+      if (precompiledOnly) {
+        LOGE("ProgramInfo::getProgram() Precompiled program unavailable!");
+      } else {
+        LOGE("ProgramInfo::getProgram() Failed to create the program!");
+      }
       return nullptr;
     }
-    if (programCreated && context->precompiledShaderCache()->diagnosticRecordingEnabled() &&
+    if (programCreated && shaderCache->diagnosticRecordingEnabled() &&
         program->getProvenance().program != ProgramOrigin::PrecompiledArtifact) {
-      context->precompiledShaderCache()->recordJITProgram({DiagnosticProgramKey(programKey)});
+      shaderCache->recordJITProgram({DiagnosticProgramKey(programKey)});
     }
   }
-  if (mode == ProgramLookupMode::PrecompiledOnly &&
-      program->getProvenance().program != ProgramOrigin::PrecompiledArtifact) {
+  if (precompiledOnly && program->getProvenance().program != ProgramOrigin::PrecompiledArtifact) {
     LOGE("ProgramInfo::getProgram() Rejected a non-precompiled program!");
     return nullptr;
   }

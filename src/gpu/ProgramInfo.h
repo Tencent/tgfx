@@ -39,7 +39,7 @@ struct SamplerInfo {
  * Controls whether a program lookup may fall back to runtime shader generation.
  */
 enum class ProgramLookupMode {
-  /// Uses a precompiled artifact when available and otherwise falls back to ProgramBuilder.
+  /// Falls back to ProgramBuilder only when no precompiled bundle is loaded.
   AllowRuntimeFallback,
   /// Returns only programs whose provenance is ProgramOrigin::PrecompiledArtifact.
   PrecompiledOnly,
