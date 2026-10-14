@@ -2789,10 +2789,6 @@ TGFX_TEST(AOTRenderConsistencyTest, LowBrushAlphaLongChainMatchesRuntime) {
 // materialization budget; a correct retry differs from the untouched reference only by the
 // documented quantization.
 TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsTransparentBlackColorFilter) {
-  if (std::getenv("TGFX_AOT_LEGACY_BLEND_MATERIALIZATION") != nullptr) {
-    GTEST_SKIP() << "The legacy switch restores construction-time materialization; this test "
-                    "asserts the planned path";
-  }
   ContextScope scope;
   auto context = scope.getContext();
   SKIP_ON_SWIFTSHADER(context);
@@ -3076,11 +3072,6 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaBiasColorFilterOnBlendShaderMatchesRunt
 // Its decal shader mask must remain in the complete retry graph and be applied exactly once by
 // the terminal chain, without a runtime shader fallback or unconsumed coverage intermediates.
 TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsMaskCoverage) {
-  // Under the legacy switch this test still renders the bundle segment and prints the candidate
-  // fingerprint, so a planned-vs-legacy double run can verify the fallback equivalence (the
-  // swapped materialized tree must match the construction-time rewrite byte for byte); only the
-  // planned-path assertions are skipped.
-  bool legacy = std::getenv("TGFX_AOT_LEGACY_BLEND_MATERIALIZATION") != nullptr;
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
@@ -3139,13 +3130,11 @@ TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsMaskCoverage) {
            static_cast<unsigned>(stats.completeAOTDraws),
            static_cast<unsigned>(stats.fpFlattenEdges));
     fflush(stdout);
-    if (!legacy) {
-      // The two materialized operands run as producer passes inside the draw's own plan task, so
-      // the whole draw is one complete AOT draw carrying two materialized edges.
-      EXPECT_EQ(stats.completeAOTDraws, 1u);
-      EXPECT_EQ(stats.fpFlattenEdges, 2u);
-      EXPECT_EQ(stats.planMaterializedEdges, 0u);
-    }
+    // The two materialized operands run as producer passes inside the draw's own plan task, so
+    // the whole draw is one complete AOT draw carrying two materialized edges.
+    EXPECT_EQ(stats.completeAOTDraws, 1u);
+    EXPECT_EQ(stats.fpFlattenEdges, 2u);
+    EXPECT_EQ(stats.planMaterializedEdges, 0u);
   }
   auto* refPixels = static_cast<const uint32_t*>(const_cast<Bitmap&>(reference).lockPixels());
   auto* candPixels = static_cast<uint32_t*>(candidate.lockPixels());
@@ -3176,27 +3165,13 @@ TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsMaskCoverage) {
   }
   const_cast<Bitmap&>(reference).unlockPixels();
   candidate.unlockPixels();
-  // The fingerprint compares planned and legacy materialization without changing pixel baselines.
-  uint64_t hash = 1469598103934665603ULL;
-  {
-    auto* hashPixels = static_cast<const uint32_t*>(candidate.lockPixels());
-    for (int i = 0; i < size * size; ++i) {
-      hash ^= hashPixels[i];
-      hash *= 1099511628211ULL;
-    }
-    candidate.unlockPixels();
-  }
-  printf(
-      "[RetryMaskCoverage] maxChannelDiff=%d differing=%lld/%d whiteOnlyInCandidate=%lld "
-      "candidateHash=%llu\n",
-      maxDiff, diffCount, size * size, fullPaintCount, static_cast<unsigned long long>(hash));
+  printf("[RetryMaskCoverage] maxChannelDiff=%d differing=%lld/%d whiteOnlyInCandidate=%lld\n",
+         maxDiff, diffCount, size * size, fullPaintCount);
   fflush(stdout);
   // A dropped mask leaves large white-vs-color regions; the quantization budget is 1 LSB per
   // materialized edge.
-  if (!legacy) {
-    EXPECT_EQ(fullPaintCount, 0);
-    EXPECT_LE(maxDiff, 4);
-  }
+  EXPECT_EQ(fullPaintCount, 0);
+  EXPECT_LE(maxDiff, 4);
 }
 
 // After the P4 migration, blend-child materialization is planned, not baked in: the original
@@ -3208,10 +3183,6 @@ TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsMaskCoverage) {
 //  - default + bundle: the chain route refuses the two-gradient tree, the retry materializes
 //    both operands, and the chain kernel serves the draw (the non-vacuous positive control).
 TGFX_TEST(AOTRenderConsistencyTest, BlendChildMaterializationIsPlannedNotBakedIn) {
-  if (std::getenv("TGFX_AOT_LEGACY_BLEND_MATERIALIZATION") != nullptr) {
-    GTEST_SKIP() << "The legacy switch restores construction-time materialization; this test "
-                    "asserts the planned path";
-  }
   bool runtimeOnly = std::getenv("TGFX_AOT_DISABLE") != nullptr;
   ContextScope scope;
   auto context = scope.getContext();
@@ -3274,9 +3245,6 @@ TGFX_TEST(AOTRenderConsistencyTest, BlendChildMaterializationIsPlannedNotBakedIn
 // its previous contents. Before producers joined the consumer task, each producer was its own
 // fill task and the consumer still ran over whatever the failed producer left behind.
 TGFX_TEST(AOTRenderConsistencyTest, MaterializationRetryProducersShareConsumerTask) {
-  if (std::getenv("TGFX_AOT_LEGACY_BLEND_MATERIALIZATION") != nullptr) {
-    GTEST_SKIP() << "The legacy switch materializes at construction time, outside any retry";
-  }
   ContextScope scope;
   auto context = scope.getContext();
   SKIP_ON_SWIFTSHADER(context);
@@ -3437,10 +3405,6 @@ TGFX_TEST(AOTRenderConsistencyTest, DroppedDrawIsCounted) {
 // reject the draw, never compile JIT; enabled decomposition materializes the operands in AOT.
 // The unloaded-bundle reference measures the existing materialization error, bounded by 1 LSB.
 TGFX_TEST(AOTRenderConsistencyTest, GradientBlendDiffAttribution) {
-  if (std::getenv("TGFX_AOT_LEGACY_BLEND_MATERIALIZATION") != nullptr) {
-    GTEST_SKIP() << "The legacy switch restores construction-time materialization; this test "
-                    "asserts the planned path";
-  }
   ContextScope scope;
   auto context = scope.getContext();
   SKIP_ON_SWIFTSHADER(context);
@@ -5665,10 +5629,6 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyMaskFoldsIntoChain) {
 // rewrite. The bundle segment asserts that non-vacuously; the no-bundle segment asserts the
 // untouched-tree runtime route.
 TGFX_TEST(AOTRenderConsistencyTest, ColorFilterShaderServesFusedTreeWithoutMaterialization) {
-  if (std::getenv("TGFX_AOT_LEGACY_BLEND_MATERIALIZATION") != nullptr) {
-    GTEST_SKIP() << "The legacy switch restores construction-time materialization; this test "
-                    "asserts the planned path";
-  }
   ContextScope scope;
   auto context = scope.getContext();
   SKIP_ON_SWIFTSHADER(context);

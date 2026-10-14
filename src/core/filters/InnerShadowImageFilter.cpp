@@ -68,10 +68,9 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcess
     invertShadowMask =
         ConstColorProcessor::Make(allocator, PMColor::Transparent(), InputMode::Ignore);
   }
-  // P4 group three: no construction-time materialization by default; the in-plan retry (or the
-  // legacy switch) sets MaterializeBlendChildren when the chain route refuses the original tree.
-  if (BlendChildMaterializationIsLegacy() ||
-      (args.renderFlags & InternalRenderFlags::MaterializeBlendChildren) != 0) {
+  // No construction-time materialization: the materialization retry sets MaterializeBlendChildren
+  // only when the AOT route refuses the original tree.
+  if ((args.renderFlags & InternalRenderFlags::MaterializeBlendChildren) != 0) {
     invertShadowMask = EnsureSimpleBlendChild(args, std::move(invertShadowMask), 1);
     if (invertShadowMask == nullptr) {
       return nullptr;
@@ -107,11 +106,10 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
   auto blendMode = shadowOnly ? BlendMode::SrcIn : BlendMode::SrcATop;
 
   auto shadowFP = getShadowFragmentProcessor(source, args, sampling, constraint, uvMatrix);
-  // P4 group three: same planned-materialization gate as getShadowFragmentProcessor above. The
+  // Same materialization gate as getShadowFragmentProcessor above. The
   // shadow FP is itself a two-child blend (complex), so it is exactly the operand the retry
   // rewrites before the final SrcIn/SrcATop tree.
-  if (BlendChildMaterializationIsLegacy() ||
-      (args.renderFlags & InternalRenderFlags::MaterializeBlendChildren) != 0) {
+  if ((args.renderFlags & InternalRenderFlags::MaterializeBlendChildren) != 0) {
     shadowFP = EnsureSimpleBlendChild(args, std::move(shadowFP));
     if (shadowFP == nullptr) {
       return nullptr;

@@ -71,13 +71,11 @@ PlacementPtr<FragmentProcessor> BlendShader::asFragmentProcessor(
   if (fpB == nullptr) {
     return nullptr;
   }
-  // P4 first migration group: the construction-time materialization is gone by default. The
-  // original two-child tree survives to the draw, and OpsCompositor's in-plan retry materializes
-  // the operands only when the plain chain route refuses the original tree — so the fallback
-  // path always carries the untouched processors. The retry (or the legacy switch below) is what
-  // sets the MaterializeBlendChildren flag when it rebuilds this chain.
-  if (BlendChildMaterializationIsLegacy() ||
-      (args.renderFlags & InternalRenderFlags::MaterializeBlendChildren) != 0) {
+  // No construction-time materialization: the original two-child tree survives to the draw, and
+  // the materialization retry (AOTRouter::RouteWithMaterializedLeading) rebuilds this chain with
+  // MaterializeBlendChildren set only when the AOT route refuses the original tree. The plain
+  // route therefore always carries the untouched processors.
+  if ((args.renderFlags & InternalRenderFlags::MaterializeBlendChildren) != 0) {
     fpB = EnsureSimpleBlendChild(args, std::move(fpB));
     if (fpB == nullptr) {
       return nullptr;

@@ -59,12 +59,9 @@ PlacementPtr<FragmentProcessor> ColorFilterShader::asFragmentProcessor(
   }
   // The color filter transforms transparent pixels into non-transparent ones. Use the original
   // shader alpha as a mask to prevent coloring transparent regions.
-  // P4 migration group two: the construction-time materialization is gone by default, mirroring
-  // BlendShader. The original SrcIn tree survives to the draw, and OpsCompositor's in-plan retry
-  // materializes both operands only when the chain route refuses the original tree — so the
-  // fallback path always carries the untouched processors.
-  if (BlendChildMaterializationIsLegacy() ||
-      (args.renderFlags & InternalRenderFlags::MaterializeBlendChildren) != 0) {
+  // No construction-time materialization, as in BlendShader: the materialization retry rebuilds
+  // this tree with MaterializeBlendChildren set only when the AOT route refuses the original.
+  if ((args.renderFlags & InternalRenderFlags::MaterializeBlendChildren) != 0) {
     composed = EnsureSimpleBlendChild(args, std::move(composed));
     if (composed == nullptr) {
       return nullptr;

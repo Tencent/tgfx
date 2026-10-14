@@ -100,10 +100,9 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::getShadowFragmentProcesso
   if (shadowProcessor == nullptr) {
     return nullptr;
   }
-  // P4 group three: no construction-time materialization by default; the in-plan retry (or the
-  // legacy switch) sets MaterializeBlendChildren when the chain route refuses the original tree.
-  if (BlendChildMaterializationIsLegacy() ||
-      (args.renderFlags & InternalRenderFlags::MaterializeBlendChildren) != 0) {
+  // No construction-time materialization: the materialization retry sets MaterializeBlendChildren
+  // only when the AOT route refuses the original tree.
+  if ((args.renderFlags & InternalRenderFlags::MaterializeBlendChildren) != 0) {
     shadowProcessor = EnsureSimpleBlendChild(args, std::move(shadowProcessor), 1);
     if (shadowProcessor == nullptr) {
       return nullptr;
@@ -130,11 +129,10 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
     return getSourceFragmentProcessor(source, args, sampling, constraint, uvMatrix);
   }
   auto sourceFP = getSourceFragmentProcessor(source, args, sampling, constraint, uvMatrix);
-  // P4 group three: same planned-materialization gate as getShadowFragmentProcessor above. The
+  // Same materialization gate as getShadowFragmentProcessor above. The
   // shadow fragment was already returned unmaterialized by that helper; this branch re-applies the
   // rewrite to both operands of the final SrcOver tree when the retry asks for it.
-  if (BlendChildMaterializationIsLegacy() ||
-      (args.renderFlags & InternalRenderFlags::MaterializeBlendChildren) != 0) {
+  if ((args.renderFlags & InternalRenderFlags::MaterializeBlendChildren) != 0) {
     sourceFP = EnsureSimpleBlendChild(args, std::move(sourceFP));
     if (sourceFP == nullptr) {
       return nullptr;
