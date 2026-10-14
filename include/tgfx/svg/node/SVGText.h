@@ -67,7 +67,8 @@ class SVGTextContainer : public SVGTextFragment {
   SVG_ATTR(Rotate, std::vector<SVGNumberType>, {})
 
   void appendChild(std::shared_ptr<SVGNode> child) final;
-  const std::vector<std::shared_ptr<SVGTextFragment>>& getTextChildren() const;
+  const std::vector<std::shared_ptr<SVGNode>>& getChildren() const final;
+  bool hasChildren() const final;
 
  protected:
   explicit SVGTextContainer(SVGTag t) : INHERITED(t) {
@@ -79,7 +80,7 @@ class SVGTextContainer : public SVGTextFragment {
   bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
  private:
-  std::vector<std::shared_ptr<SVGTextFragment>> children;
+  std::vector<std::shared_ptr<SVGNode>> children;
 
   using INHERITED = SVGTextFragment;
 };
@@ -130,6 +131,10 @@ class SVGTextLiteral final : public SVGTextFragment {
                    const ShapedTextCallback& function) const override;
 
   void appendChild(std::shared_ptr<SVGNode> /*node*/) override {
+  }
+
+  const std::vector<std::shared_ptr<SVGNode>>& getChildren() const override {
+    return EmptyNodes();
   }
 
   using INHERITED = SVGTextFragment;

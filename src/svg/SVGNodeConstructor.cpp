@@ -160,21 +160,24 @@ class StyleIterator {
   }
 
   std::tuple<std::string, std::string> next() {
-    std::string name;
-    std::string value;
-
-    if (pos) {
+    // CSS Syntax Level 3 allows empty declarations between semicolons; skip any segment that
+    // is not a complete declaration instead of treating it as the end of input.
+    while (pos) {
+      std::string name;
+      std::string value;
       const char* sep = this->nextSeparator();
       const char* valueSep = strchr(pos, ':');
-      if (valueSep && valueSep < sep) {
+      if (valueSep && pos < valueSep && valueSep + 1 < sep) {
         name = TrimmedString(pos, valueSep - 1);
         value = TrimmedString(valueSep + 1, sep - 1);
       }
 
       pos = *sep ? sep + 1 : nullptr;
+      if (!name.empty() && !value.empty()) {
+        return std::make_tuple(name, value);
+      }
     }
-
-    return std::make_tuple(name, value);
+    return {};
   }
 
  private:
@@ -353,10 +356,8 @@ class CSSParser {
       }
       // Parse the individual rule
       std::string ruleString = css.substr(ruleStart, ruleEnd - ruleStart + 1);
-      CSSRule rule = parseRule(ruleString);
-      if (!rule.selector.empty()) {
-        rules.push_back(rule);
-      }
+      auto parsedRules = parseRules(ruleString);
+      rules.insert(rules.end(), parsedRules.begin(), parsedRules.end());
       pos = ruleEnd + 1;
     }
   }
@@ -376,23 +377,35 @@ class CSSParser {
     return str.substr(first, (last - first + 1));
   }
 
-  CSSRule parseRule(const std::string& ruleStr) {
-    CSSRule rule;
+  std::vector<CSSRule> parseRules(const std::string& ruleStr) {
+    std::vector<CSSRule> result;
     // Find delimiter between selector and declarations
     size_t openBrace = ruleStr.find('{');
     if (openBrace == std::string::npos) {
-      return rule;
+      return result;
     }
-    // Extract selector
-    rule.selector = trim(ruleStr.substr(0, openBrace)).substr(1);
-
     // Extract declarations block
     size_t closeBrace = ruleStr.find('}', openBrace);
     if (closeBrace == std::string::npos) {
-      return rule;
+      return result;
     }
-    rule.declarations = ruleStr.substr(openBrace + 1, closeBrace - openBrace - 1);
-    return rule;
+
+    // A comma-separated selector list shares one declarations block; emit one rule per selector
+    const std::string declarations = ruleStr.substr(openBrace + 1, closeBrace - openBrace - 1);
+    const std::string selectors = ruleStr.substr(0, openBrace);
+    size_t pos = 0;
+    while (pos < selectors.size()) {
+      size_t comma = selectors.find(',', pos);
+      const auto selector = trim(selectors.substr(pos, comma - pos));
+      if (selector.size() > 1 && selector.front() == '.') {
+        result.push_back({selector.substr(1), declarations});
+      }
+      if (comma == std::string::npos) {
+        break;
+      }
+      pos = comma + 1;
+    }
+    return result;
   }
 
   std::string css;
@@ -407,7 +420,15 @@ void SVGNodeConstructor::ParseCSSStyle(const DOMNode* xmlNode, CSSMapper* mapper
       CSSParser parser(css);
       parser.parse();
       for (const auto& rule : parser.getRules()) {
-        mapper->insert({rule.selector, rule.declarations});
+        auto [iter, inserted] = mapper->insert({rule.selector, rule.declarations});
+        if (!inserted) {
+          // CSS Syntax Level 3 allows the last declaration of a block to omit its trailing ';'.
+          const auto last = iter->second.find_last_not_of(" \t\n\r");
+          if (last != std::string::npos && iter->second[last] != ';') {
+            iter->second += ';';
+          }
+          iter->second += rule.declarations;
+        }
       }
     }
     child = child->nextSibling;
@@ -477,11 +498,8 @@ void SVGNodeConstructor::SetClassStyleAttributes(SVGNode& root, const CSSMapper&
         SetStyleAttributes(*node, style, nullptr);
       }
     }
-    if (node->hasChildren()) {
-      auto container = static_cast<SVGContainer*>(node);
-      for (const auto& child : container->getChildren()) {
-        setter(setter, child.get());
-      }
+    for (const auto& child : node->getChildren()) {
+      setter(setter, child.get());
     }
   };
   styleSetter(styleSetter, &root);
