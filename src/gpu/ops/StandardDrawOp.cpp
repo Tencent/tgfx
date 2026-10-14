@@ -98,7 +98,15 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, ProgramLookupMode mode,
     preparedProgram = preparedProgramInfo->getProgram(mode);
   }
   if (preparedProgram == nullptr) {
-    LOGE("StandardDrawOp::prepare() Failed to get the program!");
+    if (mode == ProgramLookupMode::AllowRuntimeFallback) {
+      // The final lookup for this draw (PrecompiledOnly lookups are AOT plan probes, which fall
+      // back to the original draw): nothing will be drawn, so the drop must be visible.
+      LOGE("StandardDrawOp::prepare() No program for the draw; the draw is dropped!");
+      auto cache = renderTarget->getContext()->precompiledShaderCache();
+      if (cache->diagnosticRecordingEnabled()) {
+        cache->recordDroppedDraw();
+      }
+    }
     return false;
   }
   preparedRenderTarget = renderTarget;

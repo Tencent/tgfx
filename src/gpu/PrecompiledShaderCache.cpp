@@ -228,6 +228,18 @@ void PrecompiledShaderCache::recordDecomposeRejection(AOTDecomposeOutcome outcom
   _drawStats.decomposeRejections[index]++;
 }
 
+void PrecompiledShaderCache::recordDroppedDraw() {
+  if (statsRecordingPaused()) {
+    return;
+  }
+  std::lock_guard<std::mutex> autoLock(drawStatsMutex);
+  if (deliberateMissMarking()) {
+    _drawStats.deliberateDroppedDraws++;
+  } else {
+    _drawStats.droppedDraws++;
+  }
+}
+
 void PrecompiledShaderCache::recordMaterializedEdge(uint64_t bytes) {
   if (statsRecordingPaused()) {
     return;

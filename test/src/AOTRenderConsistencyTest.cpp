@@ -502,7 +502,8 @@ TGFX_TEST(AOTRenderConsistencyTest, RGBAStandaloneAndFusedTiledReadControl) {
 // family that never learned the read swizzle (QuadTextureFill / TextureFill). The matcher must
 // refuse it with UnsupportedTextureRead instead of serving the artifact, which read (g, 0, 0, 1)
 // for gray and (r, g, 0, 1) for RG. A loaded bundle disables runtime program builds, so the
-// refused draw is a recorded miss that writes nothing — never the wrong channels.
+// refused draw is a recorded miss that writes nothing — never the wrong channels — and a counted
+// drop. The refusal is the point of the test, so the bundle route runs in a deliberate-miss scope.
 static void ExpectPlainReadFormatRefusedWithoutWrongPixels(PixelFormat format) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -540,6 +541,7 @@ static void ExpectPlainReadFormatRefusedWithoutWrongPixels(PixelFormat format) {
       cache->unload();
     }
     ScopedAOTStatsPause pause(context, !useBundle);
+    ScopedAOTDeliberateMiss deliberate(context, useBundle);
     context->globalCache()->clearPrograms();
     cache->setDiagnosticRecordingEnabled(true);
     auto surface = Surface::Make(context, 8, 8);
@@ -551,6 +553,8 @@ static void ExpectPlainReadFormatRefusedWithoutWrongPixels(PixelFormat format) {
     surface->getCanvas()->drawImage(image, 0, 0);
     context->flushAndSubmit(true);
     if (useBundle) {
+      EXPECT_EQ(cache->drawStats().deliberateDroppedDraws, 1u);
+      EXPECT_EQ(cache->drawStats().droppedDraws, 0u);
       EXPECT_GT(cache->fallbackCount(PrecompiledFallbackReason::UnsupportedTextureRead), 0u);
       for (const auto& hit : cache->hitRecords()) {
         EXPECT_NE(hit.shaderName, "QuadTextureFillShader");
@@ -3338,8 +3342,8 @@ TGFX_TEST(AOTRenderConsistencyTest, MaterializationRecorderDropsOrCommitsPending
   auto readTarget = [&](const std::shared_ptr<RenderTargetProxy>& target, Bitmap* outBitmap) {
     auto renderTarget = target->getRenderTarget();
     ASSERT_NE(renderTarget, nullptr);
-    auto surface = Surface::MakeFrom(context, renderTarget->getBackendRenderTarget(),
-                                     renderTarget->origin());
+    auto surface =
+        Surface::MakeFrom(context, renderTarget->getBackendRenderTarget(), renderTarget->origin());
     ASSERT_NE(surface, nullptr);
     ASSERT_TRUE(outBitmap->allocPixels(size, size));
     auto* pixels = outBitmap->lockPixels();
@@ -3388,6 +3392,45 @@ TGFX_TEST(AOTRenderConsistencyTest, MaterializationRecorderDropsOrCommitsPending
   cache->setDiagnosticRecordingEnabled(false);
   // The producer is sampled at its texel centers, so the round trip is exact.
   ExpectBitmapsIdentical("recorder-committed-producer", candidate, reference, size, size);
+}
+
+// A draw that no precompiled program serves, with a bundle loaded, renders nothing; the drop must
+// be counted, not silent. Two gradients exceed the fused budget and, with decomposition disabled,
+// nothing can split them, so the draw is dropped. The drop is provoked on purpose, so it runs in a
+// deliberate-miss scope and lands in deliberateDroppedDraws, outside the coverage gate.
+TGFX_TEST(AOTRenderConsistencyTest, DroppedDrawIsCounted) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+  ASSERT_NE(bundleData, nullptr);
+  ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+  context->globalCache()->clearPrograms();
+  constexpr int size = 64;
+  auto surface = Surface::Make(context, size, size);
+  ASSERT_NE(surface, nullptr);
+  auto gradientA = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(size, size),
+                                              {Color(1, 0, 0, 1), Color(0, 0, 1, 1)});
+  auto gradientB = Shader::MakeLinearGradient(Point::Make(size, 0), Point::Make(0, size),
+                                              {Color(0, 1, 0, 1), Color(1, 1, 0, 1)});
+  Paint paint = {};
+  paint.setShader(Shader::MakeBlend(BlendMode::Multiply, gradientA, gradientB));
+  cache->setDecompositionEnabled(false);
+  cache->setDiagnosticRecordingEnabled(true);
+  cache->resetStats();
+  {
+    ScopedAOTDeliberateMiss deliberate(context);
+    surface->getCanvas()->drawRect(Rect::MakeWH(size, size), paint);
+    context->flushAndSubmit(true);
+  }
+  auto stats = cache->drawStats();
+  cache->setDiagnosticRecordingEnabled(false);
+  cache->setDecompositionEnabled(true);
+  EXPECT_EQ(stats.deliberateDroppedDraws, 1u);
+  EXPECT_EQ(stats.droppedDraws, 0u);
+  EXPECT_EQ(stats.completeAOTDraws, 0u);
+  EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
 }
 
 // Two gradients exceed the fused budget. A loaded bundle without optional decomposition must

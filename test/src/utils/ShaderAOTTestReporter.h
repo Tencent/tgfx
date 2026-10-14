@@ -31,10 +31,12 @@ struct AOTCoverageGateResult {
   // fallback runtime compilation, so the runtimeCompiles total drops by the same amounts.
   uint64_t excludedByDesign = 0;
   uint64_t excludedEnvironment = 0;
+  // Draws that rendered nothing (AOTDrawStats::droppedDraws, deliberate drops excluded).
+  uint64_t droppedDraws = 0;
   bool consistent = true;
 
   bool passed() const {
-    return consistent && noMatchingRule == 0 && runtimeCompiles == 0;
+    return consistent && noMatchingRule == 0 && runtimeCompiles == 0 && droppedDraws == 0;
   }
 };
 

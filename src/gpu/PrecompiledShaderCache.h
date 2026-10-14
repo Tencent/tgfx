@@ -207,6 +207,12 @@ struct AOTDrawStats {
   // may carry partial passes — so the count is the observable "why did this draw not land"
   // signal, not a recoverable event.
   uint64_t planExecutionFailures = 0;
+  // Draws that rendered nothing because their final program lookup failed (with a bundle loaded:
+  // no precompiled program serves them and there is no runtime fallback). Every one is also logged
+  // as an error. Drops provoked on purpose inside a deliberate-miss scope (test fixtures) are
+  // counted in deliberateDroppedDraws instead.
+  uint64_t droppedDraws = 0;
+  uint64_t deliberateDroppedDraws = 0;
   // Distribution of executed plan pass counts: bucket k counts plans with k+1 passes, the last
   // bucket accumulates deeper plans.
   std::array<uint64_t, 4> planPassHistogram = {};
@@ -421,6 +427,11 @@ class PrecompiledShaderCache {
   /// leaves the Draw-level counters untouched, because an inline flatten is one edge of a Draw
   /// rather than a Draw of its own. `bytes` is the size of the offscreen target it allocated.
   void recordMaterializedEdge(uint64_t bytes);
+
+  /**
+   * Counts a draw dropped because its final program lookup failed (AOTDrawStats::droppedDraws).
+   */
+  void recordDroppedDraw();
 
   /// Settles the simultaneously-live materialized bytes accumulated by recordMaterializedEdge
   /// (and the offscreen plan targets) into peakTemporaryBytes and resets the running total.

@@ -203,6 +203,9 @@ static void AddDrawStats(AOTDrawStats* target, const AOTDrawStats& source) {
   target->offscreenPlanDraws += source.offscreenPlanDraws;
   target->fpFlattenEdges += source.fpFlattenEdges;
   target->planMaterializedEdges += source.planMaterializedEdges;
+  target->planExecutionFailures += source.planExecutionFailures;
+  target->droppedDraws += source.droppedDraws;
+  target->deliberateDroppedDraws += source.deliberateDroppedDraws;
   for (size_t index = 0; index < target->planPassHistogram.size(); ++index) {
     target->planPassHistogram[index] += source.planPassHistogram[index];
   }
@@ -257,6 +260,9 @@ static nlohmann::json DrawStatsToJSON(const AOTDrawStats& stats) {
   return {{"draws", stats.draws},
           {"completeAOTDraws", stats.completeAOTDraws},
           {"atomicFallbacks", stats.atomicFallbacks},
+          {"planExecutionFailures", stats.planExecutionFailures},
+          {"droppedDraws", stats.droppedDraws},
+          {"deliberateDroppedDraws", stats.deliberateDroppedDraws},
           {"kernelInvocations", stats.kernelInvocations},
           {"offscreenTargets", stats.offscreenTargets},
           {"materializedEdges", stats.materializedEdges},
@@ -1070,6 +1076,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       coverageGate.runtimeCompiles += testGate.runtimeCompiles;
       coverageGate.excludedByDesign += testGate.excludedByDesign;
       coverageGate.excludedEnvironment += testGate.excludedEnvironment;
+      coverageGate.droppedDraws += result.drawStats.droppedDraws;
       coverageGate.consistent = coverageGate.consistent && testGate.consistent;
     }
     const auto productionBuilderCreations = coverageGate.runtimeCompiles;
@@ -1151,6 +1158,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
           {"runtimeCompiles", coverageGate.runtimeCompiles},
           {"excludedByDesign", coverageGate.excludedByDesign},
           {"excludedEnvironment", coverageGate.excludedEnvironment},
+          {"droppedDraws", coverageGate.droppedDraws},
           {"consistent", coverageGate.consistent},
           {"precompiledArtifactCreations", summary.programStats.precompiledArtifactCreations},
           {"vacuous",
@@ -1263,7 +1271,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
     if (AOTCoverageGateMet(coverageGate, precompiledCreations)) {
       std::printf(
           "[Coverage Gate][%s] strict targets MET: noMatchingRule=0 runtimeCompiles=0 "
-          "precompiledPrograms=%llu (excluded byDesign=%llu environment=%llu)\n",
+          "droppedDraws=0 precompiledPrograms=%llu (excluded byDesign=%llu environment=%llu)\n",
           TGFX_BACKEND_NAME, static_cast<unsigned long long>(precompiledCreations),
           static_cast<unsigned long long>(coverageGate.excludedByDesign),
           static_cast<unsigned long long>(coverageGate.excludedEnvironment));
@@ -1282,10 +1290,12 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       }
     } else {
       std::printf(
-          "[Coverage Gate][%s] MONITORING (targets: noMatchingRule=0 runtimeCompiles=0): "
-          "noMatchingRule=%llu runtimeCompiles=%llu (excluded byDesign=%llu environment=%llu)\n",
+          "[Coverage Gate][%s] MONITORING (targets: noMatchingRule=0 runtimeCompiles=0 "
+          "droppedDraws=0): noMatchingRule=%llu runtimeCompiles=%llu droppedDraws=%llu (excluded "
+          "byDesign=%llu environment=%llu)\n",
           TGFX_BACKEND_NAME, static_cast<unsigned long long>(strictNoMatching),
           static_cast<unsigned long long>(strictRuntimeCompiles),
+          static_cast<unsigned long long>(coverageGate.droppedDraws),
           static_cast<unsigned long long>(coverageGate.excludedByDesign),
           static_cast<unsigned long long>(coverageGate.excludedEnvironment));
       for (size_t i = 0; i < sortedFallbacks.size(); ++i) {
@@ -1299,6 +1309,13 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
                     static_cast<unsigned long long>(sortedFallbacks[i].count),
                     PrecompiledFallbackReasonName(sortedFallbacks[i].record.reason),
                     sortedFallbacks[i].record.effectSignature.c_str());
+      }
+      for (const auto& result : testResults) {
+        if (result.drawStats.droppedDraws > 0) {
+          std::printf("  DROPPED count=%llu test=%s\n",
+                      static_cast<unsigned long long>(result.drawStats.droppedDraws),
+                      result.testName.c_str());
+        }
       }
       if (blocking) {
         std::printf(
