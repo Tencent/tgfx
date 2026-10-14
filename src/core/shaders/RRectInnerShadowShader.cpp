@@ -56,7 +56,7 @@ bool RRectInnerShadowShader::isEqual(const Shader* shader) const {
   if (type != Types::ShaderType::RRectInnerShadow) {
     return false;
   }
-  auto other = static_cast<const RRectInnerShadowShader*>(shader);
+  auto* other = static_cast<const RRectInnerShadowShader*>(shader);
   return shadowRect == other->shadowRect && shadowRadius == other->shadowRadius &&
          maskRect == other->maskRect && maskRadius == other->maskRadius &&
          sigmaX == other->sigmaX && sigmaY == other->sigmaY && color == other->color;
@@ -79,7 +79,7 @@ PlacementPtr<FragmentProcessor> RRectInnerShadowShader::asFragmentProcessor(
       Point::Make(maskRect.width() * 0.5f / sigmaX, maskRect.height() * 0.5f / sigmaY);
   const auto shadowHalfSize = Point::Make(shadowRect.width() * 0.5f, shadowRect.height() * 0.5f);
   const auto pmColor = ToPMColor(color, dstColorSpace);
-  auto allocator = args.context->drawingAllocator();
+  auto* allocator = args.context->drawingAllocator();
   // Near-zero radii degenerate to the rectangle form, which the rect processor evaluates without
   // the quadrature.
   if (FloatNearlyZero(shadowRadius.x) && FloatNearlyZero(shadowRadius.y) &&

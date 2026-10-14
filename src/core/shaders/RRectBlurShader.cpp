@@ -52,7 +52,7 @@ bool RRectBlurShader::isEqual(const Shader* shader) const {
   if (type != Types::ShaderType::RRectBlur) {
     return false;
   }
-  auto other = static_cast<const RRectBlurShader*>(shader);
+  auto* other = static_cast<const RRectBlurShader*>(shader);
   return rect == other->rect && radius == other->radius && sigmaX == other->sigmaX &&
          sigmaY == other->sigmaY && color == other->color;
 }
@@ -70,7 +70,7 @@ PlacementPtr<FragmentProcessor> RRectBlurShader::asFragmentProcessor(
   const auto halfSizeOverSigma =
       Point::Make(rect.width() * 0.5f / sigmaX, rect.height() * 0.5f / sigmaY);
   const auto pmColor = ToPMColor(color, dstColorSpace);
-  auto allocator = args.context->drawingAllocator();
+  auto* allocator = args.context->drawingAllocator();
   // A near-zero radius degenerates to the rectangle form, which the rect processor evaluates
   // without the quadrature.
   if (FloatNearlyZero(radius.x) && FloatNearlyZero(radius.y)) {

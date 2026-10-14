@@ -31,24 +31,6 @@ static constexpr int HighQuadratureCount = 8;
 // The corner semi-axis ratio above which the high count is used instead of the low one.
 static constexpr float SemiAxisRatioThreshold = 2.0f;
 
-int GetRRectBlurQuadratureCount(const Point& cornerOverSigma) {
-  // A zero corner (no arc) makes every slice identical along the summed axis, so the
-  // quadrature's sampling error is a common factor of the sum and the weight sum, which cancels
-  // in the division — any count is exact, and the low count suffices.
-  if (cornerOverSigma.x <= 0.0f || cornerOverSigma.y <= 0.0f) {
-    return LowQuadratureCount;
-  }
-  // Worst errors measured over 337 sigma-normalized shapes (corner semi-axes from 0.25 to 10,
-  // six half-size pairs), in 8-bit levels: 16.01 with the low count everywhere, 7.90 with the
-  // high count everywhere. With this dispatch, shapes below the threshold reach only 6.16 and
-  // the overall worst stays 7.90.
-  //
-  // The threshold stays at 2: at 2.5 the low-count worst would rise from 6.16 to 7.57.
-  const auto ratio =
-      std::max(cornerOverSigma.x / cornerOverSigma.y, cornerOverSigma.y / cornerOverSigma.x);
-  return ratio > SemiAxisRatioThreshold ? HighQuadratureCount : LowQuadratureCount;
-}
-
 // Emits the kernel helpers shared by the rectangle and rounded-rect forms.
 static inline void AppendKernelFunctions(FragmentShaderBuilder* fragBuilder) {
   // Approximates erf with the rational form from Hastings (1955), published as Abramowitz & Stegun
@@ -110,6 +92,24 @@ highp float shapeBlurRectCoverage(highp vec2 coord, highp vec2 halfSize) {
   return (shapeBlurCDF(lo.x) - shapeBlurCDF(hi.x)) * (shapeBlurCDF(lo.y) - shapeBlurCDF(hi.y));
 }
 )");
+}
+
+int GetRRectBlurQuadratureCount(const Point& cornerOverSigma) {
+  // A zero corner (no arc) makes every slice identical along the summed axis, so the
+  // quadrature's sampling error is a common factor of the sum and the weight sum, which cancels
+  // in the division — any count is exact, and the low count suffices.
+  if (cornerOverSigma.x <= 0.0f || cornerOverSigma.y <= 0.0f) {
+    return LowQuadratureCount;
+  }
+  // Worst errors measured over 337 sigma-normalized shapes (corner semi-axes from 0.25 to 10,
+  // six half-size pairs), in 8-bit levels: 16.01 with the low count everywhere, 7.90 with the
+  // high count everywhere. With this dispatch, shapes below the threshold reach only 6.16 and
+  // the overall worst stays 7.90.
+  //
+  // The threshold stays at 2: at 2.5 the low-count worst would rise from 6.16 to 7.57.
+  const auto ratio =
+      std::max(cornerOverSigma.x / cornerOverSigma.y, cornerOverSigma.y / cornerOverSigma.x);
+  return ratio > SemiAxisRatioThreshold ? HighQuadratureCount : LowQuadratureCount;
 }
 
 void AppendRRectBlurFunctions(FragmentShaderBuilder* fragBuilder, int quadratureCount) {

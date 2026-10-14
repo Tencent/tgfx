@@ -25,8 +25,7 @@ namespace tgfx {
 
 /**
  * Fills with a solid color modulated by the coverage of a rounded rectangle convolved with a
- * Gaussian kernel truncated at +/- 2 sigma. One axis is evaluated in closed form while the other is
- * summed over a fixed number of slices, so the cost does not depend on sigma.
+ * Gaussian kernel truncated at +/- 2 sigma. The cost does not depend on sigma.
  */
 class RRectBlurFragmentProcessor : public FragmentProcessor {
  public:

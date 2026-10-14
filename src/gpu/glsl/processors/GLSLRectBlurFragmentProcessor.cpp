@@ -46,8 +46,8 @@ void GLSLRectBlurFragmentProcessor::emitCode(EmitArgs& args) const {
       args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
 
   auto coordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
-  fragBuilder->codeAppendf("highp float coverage = shapeBlurRectCoverage(%s, %s);", coordName.c_str(),
-                           halfSizeName.c_str());
+  fragBuilder->codeAppendf("highp float coverage = shapeBlurRectCoverage(%s, %s);",
+                           coordName.c_str(), halfSizeName.c_str());
   fragBuilder->codeAppendf("%s = %s * coverage;", args.outputColor.c_str(), colorName.c_str());
   // Only the input alpha is consumed; the shadow color comes from the uniform.
   fragBuilder->codeAppendf("%s *= %s.a;", args.outputColor.c_str(), args.inputColor.c_str());

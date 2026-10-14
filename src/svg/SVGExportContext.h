@@ -166,6 +166,7 @@ class SVGExportContext : public DrawContext {
 
   void exportGlyphRunAsPath(const GlyphRun& glyphRun, const Matrix& matrix, const Brush& brush,
                             const Stroke* stroke);
+
   void exportGlyphRunAsText(const GlyphRun& glyphRun, const Matrix& matrix, const Brush& brush,
                             const Stroke* stroke);
 
