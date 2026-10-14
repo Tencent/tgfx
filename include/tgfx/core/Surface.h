@@ -101,10 +101,11 @@ class Surface {
    * call MakeFrom() again to obtain a new Surface that matches the updated dimensions.
    * The color space is automatically obtained from the Window via window->colorSpace().
    * Returns nullptr if the context is nullptr or the window cannot provide a valid render target.
-   * Every recording batch that draws into the returned Surface presents the window's frame
-   * automatically when the batch is submitted. Since the window's frame buffer is handed to the
-   * display at that point, reading the Surface back is only supported within the batch that drew
-   * the frame, before it is flushed; see asyncReadPixels().
+   * The returned Surface is a drawing entry reused across frames, not a persistent store of the
+   * last frame: every recording batch that draws into it presents the window's frame
+   * automatically when the batch is submitted, and the next batch draws into a new frame. To read
+   * the rendered pixels back, record the read in the same batch as the drawing; see readPixels()
+   * and asyncReadPixels().
    */
   static std::shared_ptr<Surface> MakeFrom(Context* context, std::shared_ptr<Window> window,
                                            uint32_t renderFlags = 0);
@@ -194,13 +195,16 @@ class Surface {
    * returned SurfaceReadback to check when the pixel data is ready and to access it. Note that the
    * pixel data respects the Surface's origin; if the origin is bottom-left, the pixel data will be
    * vertically flipped. Returns nullptr if the rect is empty or outside the bounds of the Surface.
-   * For a Surface created from a Window, the pixels are copied in the same submission that
-   * presents the frame, ordered after the frame's drawing, so the read must be issued after
-   * drawing the frame and before the batch is flushed: it then captures exactly the presented
-   * content, and the returned SurfaceReadback stays valid after the presentation. Returns nullptr
-   * if the Surface has not been drawn in the current (unflushed) batch, because its last frame
-   * has already been handed to the display, or if the window does not support readback (see
-   * Window::supportsReadback()).
+   *
+   * For a Surface created from a Window, the readback copy must be recorded in the same batch as
+   * the drawing: call this method after drawing the frame and before Context::flush(), then
+   * submit the batch and read the pixels from the returned SurfaceReadback once the copy has
+   * completed. The copy captures the drawing recorded before this call; drawing added to the
+   * batch afterwards is presented but not captured. The SurfaceReadback is independent of the
+   * window frame and stays valid after the frame is presented. Returns nullptr if the window's
+   * frame has not been drawn in the current unflushed batch: once a batch is flushed it is fixed,
+   * and no readback copy can be added to it anymore. Also returns nullptr if the window does not
+   * support readback (see Window::supportsReadback()).
    */
   std::shared_ptr<SurfaceReadback> asyncReadPixels(const Rect& rect);
 
@@ -209,58 +213,60 @@ class Surface {
    * does not exceed Surface (width(), height()). Pixels are always provided in top-left origin
    * format; if the Surface's origin is bottom-left, the pixels are flipped during the copy. Pixels
    * are copied only if pixel conversion is possible. Returns true if pixels are copied to dstPixels.
-   * This call flushes and submits all pending work of the Context and waits for it. For a Surface
-   * created from a Window, that submission also presents the frame, so call it only after
-   * drawing the whole frame; it fails under the same conditions as asyncReadPixels().
+   *
+   * This call records a readback copy, then flushes and submits all pending work of the Context
+   * and waits for it. For a Surface created from a Window, that submission also presents the
+   * frame, so call it after drawing the whole frame, before the batch is flushed. It fails under
+   * the same conditions as asyncReadPixels().
    */
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0);
+
   /**
    * Returns the colorSpace of the surface.
    */
   const std::shared_ptr<ColorSpace>& colorSpace() const;
-
- protected:
-  /**
-   * Called by RenderContext when a drawing pass opens on this surface (a new ops compositor is
-   * created for the current drawing buffer). Window surfaces tell the drawing manager that the
-   * batch uses the window's frame and requests its presentation at the end of the batch; the
-   * drawing manager never inspects where a render target comes from. Offscreen surfaces do
-   * nothing. The render target of the drawing pass is provided by the RenderContext.
-   */
-  virtual void onCollectFrame(DrawingManager* drawingManager,
-                              const std::shared_ptr<RenderTargetProxy>& renderTarget);
-
-  /**
-   * Called when work that reads this surface's render target without drawing into it (a
-   * readback transfer or a snapshot copy) is recorded on the current drawing buffer. Window
-   * surfaces declare the frame usage, so the submission wires the frame acquisition
-   * synchronization; no presentation is requested. Offscreen surfaces do nothing.
-   */
-  virtual void onCollectFrameUsage(DrawingManager* drawingManager,
-                                   const std::shared_ptr<RenderTargetProxy>& renderTarget);
-
-  /**
-   * Returns true while the content of the given render target may be read back. Window surfaces
-   * require their window to support readback and their frame to be drawn in the current
-   * unflushed batch, since a frame from an earlier batch has already been handed to the display.
-   */
-  virtual bool onValidateReadback(const std::shared_ptr<RenderTargetProxy>& renderTarget) const;
-
-  // Internal construction helper for the WindowSurface subclass.
-  static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
-                                           uint32_t renderFlags = 0, bool clearAll = false,
-                                           std::shared_ptr<ColorSpace> colorSpace = nullptr);
-
-  Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags = 0, bool clearAll = false,
-          std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
  private:
   uint32_t _uniqueID = 0;
   RenderContext* renderContext = nullptr;
   Canvas* canvas = nullptr;
   std::shared_ptr<Image> cachedImage = nullptr;
+  std::shared_ptr<Window> _window = nullptr;
+
+  static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
+                                           uint32_t renderFlags = 0, bool clearAll = false,
+                                           std::shared_ptr<ColorSpace> colorSpace = nullptr,
+                                           std::shared_ptr<Window> window = nullptr);
+
+  Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags = 0, bool clearAll = false,
+          std::shared_ptr<ColorSpace> colorSpace = nullptr,
+          std::shared_ptr<Window> window = nullptr);
 
   bool aboutToDraw(bool discardContent = false);
+
+  /**
+   * Called by RenderContext when a drawing pass opens on this surface. A window surface tells the
+   * drawing manager that the current batch uses the window's frame and presents it at the end of
+   * the batch; the drawing manager never inspects where a render target comes from. Offscreen
+   * surfaces do nothing.
+   */
+  void collectFrame(DrawingManager* drawingManager,
+                    const std::shared_ptr<RenderTargetProxy>& renderTarget);
+
+  /**
+   * Called when work that reads the render target without drawing into it (a readback or a
+   * snapshot copy) is recorded. A window surface declares the frame usage so the submission wires
+   * the frame acquisition; no presentation is requested. Offscreen surfaces do nothing.
+   */
+  void collectFrameUsage(DrawingManager* drawingManager,
+                         const std::shared_ptr<RenderTargetProxy>& renderTarget);
+
+  /**
+   * Returns true if a readback copy of the render target can be recorded now. A window surface
+   * requires the window to support readback and its frame to be drawn in the current unflushed
+   * batch, so the copy joins the batch that draws and presents the frame.
+   */
+  bool canReadBack(const std::shared_ptr<RenderTargetProxy>& renderTarget) const;
 
   friend class RenderContext;
 };

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Surface.h"
-#include "core/WindowSurface.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/CopyPixels.h"
 #include "core/utils/Log.h"
@@ -84,35 +83,73 @@ std::shared_ptr<Surface> Surface::MakeFrom(Context* context, HardwareBufferRef h
 
 std::shared_ptr<Surface> Surface::MakeFrom(Context* context, std::shared_ptr<Window> window,
                                            uint32_t renderFlags) {
-  return WindowSurface::Make(context, std::move(window), renderFlags);
+  if (context == nullptr || window == nullptr) {
+    return nullptr;
+  }
+  // All surfaces of the window share one target within the current recording batch (unified
+  // frame acquisition): one frame per window per batch, presented once at the end of the batch.
+  // The batch cache is cleared at flush time, so a surface created for a new batch (for example
+  // after a window resize) resolves a fresh target.
+  auto proxy = context->drawingManager()->getAutomaticTarget(window);
+  auto colorSpace = window->colorSpace();
+  return MakeFrom(std::move(proxy), renderFlags, true, std::move(colorSpace), std::move(window));
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
                                            uint32_t renderFlags, bool clearAll,
-                                           std::shared_ptr<ColorSpace> colorSpace) {
+                                           std::shared_ptr<ColorSpace> colorSpace,
+                                           std::shared_ptr<Window> window) {
   if (renderTargetProxy == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<Surface>(
-      new Surface(std::move(renderTargetProxy), renderFlags, clearAll, std::move(colorSpace)));
+  return std::shared_ptr<Surface>(new Surface(std::move(renderTargetProxy), renderFlags, clearAll,
+                                              std::move(colorSpace), std::move(window)));
 }
 
 Surface::Surface(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags, bool clearAll,
-                 std::shared_ptr<ColorSpace> colorSpace)
-    : _uniqueID(UniqueID::Next()) {
+                 std::shared_ptr<ColorSpace> colorSpace, std::shared_ptr<Window> window)
+    : _uniqueID(UniqueID::Next()), _window(std::move(window)) {
   DEBUG_ASSERT(proxy != nullptr);
+  // _window is set before the RenderContext is created, so the initial clear collects the
+  // window's first frame through collectFrame() during construction.
   renderContext =
       new RenderContext(std::move(proxy), renderFlags, clearAll, this, std::move(colorSpace));
 }
 
-void Surface::onCollectFrame(DrawingManager*, const std::shared_ptr<RenderTargetProxy>&) {
+void Surface::collectFrame(DrawingManager* drawingManager,
+                           const std::shared_ptr<RenderTargetProxy>& renderTarget) {
+  if (_window == nullptr || drawingManager == nullptr || renderTarget == nullptr) {
+    return;
+  }
+  // Drawing into the window frame: the batch uses the frame and presents it once at the end of
+  // the batch.
+  drawingManager->collectFrameUsage(renderTarget);
+  drawingManager->collectWindow(_window, renderTarget);
 }
 
-void Surface::onCollectFrameUsage(DrawingManager*, const std::shared_ptr<RenderTargetProxy>&) {
+void Surface::collectFrameUsage(DrawingManager* drawingManager,
+                                const std::shared_ptr<RenderTargetProxy>& renderTarget) {
+  if (_window == nullptr || drawingManager == nullptr || renderTarget == nullptr) {
+    return;
+  }
+  // Reading the window frame (a readback or snapshot copy) only uses it; the presentation stays
+  // with the batches that draw into it.
+  drawingManager->collectFrameUsage(renderTarget);
 }
 
-bool Surface::onValidateReadback(const std::shared_ptr<RenderTargetProxy>&) const {
-  return true;
+bool Surface::canReadBack(const std::shared_ptr<RenderTargetProxy>& renderTarget) const {
+  if (_window == nullptr) {
+    return true;
+  }
+  if (!_window->supportsReadback() || renderTarget == nullptr) {
+    // The window's frame buffer cannot act as a copy source.
+    return false;
+  }
+  // The readback copy must join the batch that draws the frame, so it runs in the submission
+  // that presents the frame, after the drawing recorded before it. A flushed batch is fixed and
+  // no copy can be added to it anymore.
+  auto drawingManager = renderTarget->getContext()->drawingManager();
+  return drawingManager->hasPendingPresentation(renderTarget);
 }
 
 Surface::~Surface() {
@@ -193,7 +230,7 @@ std::shared_ptr<Image> Surface::makeImageSnapshot() {
   if (textureProxy == nullptr || renderTarget->externallyOwned()) {
     textureProxy = renderTarget->makeTextureProxy();
     drawingManager->addRenderTargetCopyTask(renderTarget, textureProxy);
-    onCollectFrameUsage(drawingManager, renderTarget);
+    collectFrameUsage(drawingManager, renderTarget);
   }
   cachedImage = TextureImage::Wrap(std::move(textureProxy), colorSpace());
   return cachedImage;
@@ -220,9 +257,9 @@ std::shared_ptr<SurfaceReadback> Surface::asyncReadPixels(const Rect& rect) {
     return nullptr;
   }
   auto renderTarget = renderContext->renderTarget;
-  if (!onValidateReadback(renderTarget)) {
-    // The window frame has already been handed to the display, or the window does not support
-    // readback; the content is no longer defined or not copyable.
+  if (!canReadBack(renderTarget)) {
+    // The window does not support readback, or its frame has not been drawn in the current
+    // unflushed batch, so no readback copy can join the batch that draws the frame.
     return nullptr;
   }
   auto srcRect = renderTarget->getOriginTransform().mapRect(rect);
@@ -242,7 +279,7 @@ std::shared_ptr<SurfaceReadback> Surface::asyncReadPixels(const Rect& rect) {
   renderContext->flush();
   auto drawingManager = context->drawingManager();
   drawingManager->addTransferPixelsTask(renderTarget, srcRect, readbackBuffer);
-  onCollectFrameUsage(drawingManager, renderTarget);
+  collectFrameUsage(drawingManager, renderTarget);
   return std::shared_ptr<SurfaceReadback>(new SurfaceReadback(info, std::move(readbackBuffer)));
 }
 

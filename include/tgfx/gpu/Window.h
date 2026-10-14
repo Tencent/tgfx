@@ -107,6 +107,5 @@ class Window : public std::enable_shared_from_this<Window> {
   friend class DrawingManager;
   friend class Surface;
   friend class RenderTargetProxy;
-  friend class WindowSurface;
 };
 }  // namespace tgfx

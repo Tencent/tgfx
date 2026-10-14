@@ -108,8 +108,8 @@ class DrawingManager {
 
   /**
    * Returns true if the current, not yet flushed drawing batch presents the given render target,
-   * that is, the target's frame has been drawn in this batch and has not been handed to the
-   * display yet.
+   * that is, the target's frame has been drawn in this batch, so work recorded now (such as a
+   * readback copy) still joins the batch that draws and presents the frame.
    */
   bool hasPendingPresentation(const std::shared_ptr<RenderTargetProxy>& renderTarget) const;
 

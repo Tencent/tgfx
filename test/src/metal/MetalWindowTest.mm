@@ -80,9 +80,9 @@ static MetalDrawableProxy* SurfaceProxy(Surface* surface) {
 
 /**
  * Verifies the synchronous readback of a window surface: reading back after drawing the frame
- * and before the batch is flushed returns exactly the drawn content. readPixels() submits the
- * batch, which also presents the frame, so a second read without drawing again is rejected
- * instead of resolving another frame from the layer's pool.
+ * and before the batch is flushed returns the drawn content. readPixels() submits the batch,
+ * which also presents the frame, so a second read without drawing again is rejected: there is
+ * no unflushed batch drawing the frame that a readback copy could join.
  */
 TGFX_TEST(MetalWindowTest, ReadPixelsInDrawingBatch) {
   ContextScope scope;
@@ -107,9 +107,10 @@ TGFX_TEST(MetalWindowTest, ReadPixelsInDrawingBatch) {
 }
 
 /**
- * Verifies the asynchronous readback of a window surface: a readback issued after drawing and
- * before the batch is flushed is copied in the same submission that presents the frame, ordered
- * after the drawing, so its result stays valid after the presentation.
+ * Verifies the asynchronous readback of a window surface: a readback recorded after drawing and
+ * before the batch is flushed is copied in the same submission that presents the frame, after
+ * the drawing recorded before it, and the independent SurfaceReadback stays valid after the
+ * presentation.
  */
 TGFX_TEST(MetalWindowTest, AsyncReadbackOutlivesPresentation) {
   ContextScope scope;
@@ -134,9 +135,9 @@ TGFX_TEST(MetalWindowTest, AsyncReadbackOutlivesPresentation) {
 
 /**
  * Verifies that a window surface rejects readbacks once the batch that drew its frame has been
- * flushed, whether or not it has been submitted yet: the frame belongs to the display from that
- * point on, and reading would resolve a different frame. Drawing again opens a new frame that is
- * readable within its batch.
+ * flushed, whether or not it has been submitted yet: a flushed batch is fixed, so no readback
+ * copy can be added to it anymore, and a later batch would resolve a different frame. Drawing
+ * again opens a new frame that is readable within its batch.
  */
 TGFX_TEST(MetalWindowTest, ReadbackAfterFlushIsRejected) {
   ContextScope scope;
