@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ExternalTextureRenderTargetProxy.h"
+#include "gpu/opengl/GLDefines.h"
+#include "tgfx/gpu/opengl/GLTypes.h"
 
 namespace tgfx {
 ExternalTextureRenderTargetProxy::ExternalTextureRenderTargetProxy(
@@ -25,6 +27,12 @@ ExternalTextureRenderTargetProxy::ExternalTextureRenderTargetProxy(
     : TextureRenderTargetProxy(backendTexture.width(), backendTexture.height(), format, sampleCount,
                                false, origin, !adopted),
       backendTexture(backendTexture) {
+  // Only OpenGL can hand over a texture whose target is not 2D (GL_TEXTURE_RECTANGLE, or
+  // GL_TEXTURE_EXTERNAL_OES). Every other backend's textures are sampled as 2D.
+  GLTextureInfo glInfo = {};
+  if (backendTexture.getGLTextureInfo(&glInfo)) {
+    sampledDirectly = glInfo.target == GL_TEXTURE_2D;
+  }
 }
 
 std::shared_ptr<TextureView> ExternalTextureRenderTargetProxy::onMakeTexture(
