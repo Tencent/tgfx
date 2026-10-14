@@ -180,11 +180,9 @@ export interface EmscriptenWebGPU {
     [key: string]: any;
 }
 
-export interface TGFX extends EmscriptenModule {
+interface TGFXBase extends EmscriptenModule {
     TGFXLineCap: TGFXLineCap;
     TGFXLineJoin: TGFXLineJoin;
-    GL: EmscriptenGL;
-    WebGPU: EmscriptenWebGPU;
     TGFXPathFillType: TGFXPathFillType;
     /**
      * Sets the maximum number of worker threads that can be created for running tasks. Pass zero to
@@ -213,3 +211,11 @@ export interface TGFX extends EmscriptenModule {
 
     [key: string]: any;
 }
+
+/**
+ * A WebAssembly module exposing at least one graphics backend runtime.
+ */
+export type TGFX = TGFXBase & (
+    | { GL: EmscriptenGL; WebGPU?: EmscriptenWebGPU }
+    | { GL?: EmscriptenGL; WebGPU: EmscriptenWebGPU }
+);
