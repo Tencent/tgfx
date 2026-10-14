@@ -168,7 +168,7 @@ class StyleIterator {
     while (pos) {
       const char* sep = this->nextSeparator();
       const char* valueSep = strchr(pos, ':');
-      if (valueSep && valueSep < sep) {
+      if (valueSep && pos < valueSep && valueSep + 1 < sep) {
         name = TrimmedString(pos, valueSep - 1);
         value = TrimmedString(valueSep + 1, sep - 1);
       }

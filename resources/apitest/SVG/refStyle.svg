@@ -8,6 +8,8 @@
         fill: #cad4dd
       }
       .cls-2 {
+        :red;
+        opacity:;
         opacity: .5
       }
       .cls-3 {
