@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <cstddef>
 #include <memory>
 #include <vector>
 #include "gpu/AOTMaterializationPolicy.h"
@@ -58,21 +57,19 @@ struct AOTMaterializedEdge {
 
 /**
  * One producer pass of an AOTRenderPlan: a fill draw that renders a materialized edge into its own
- * offscreen target. The target is cleared to transparent before the draw.
+ * offscreen target. The target is cleared to transparent before the draw. A pass may sample the
+ * targets of any earlier pass in the same plan, never a later one.
  */
 struct AOTRenderPass {
   std::shared_ptr<RenderTargetProxy> target = nullptr;
   /// The fill draw (DrawingManager::makeFillDrawOp) that renders the edge into target.
   PlacementPtr<DrawOp> drawOp = nullptr;
-  /// Indices of the earlier passes in the same plan whose targets this pass samples. Every index is
-  /// smaller than the pass's own index, so running the passes in order satisfies all of them.
-  std::vector<size_t> dependencies = {};
   AOTMaterializedEdge edge = {};
 };
 
 /**
- * The executable form of an AOT route for one draw: the producer passes in dependency order, then
- * the terminal pass, which replays the original draw onto its destination with terminalColors in
+ * The executable form of an AOT route for one draw: the producer passes, ordered so that every pass
+ * comes after the passes whose targets it samples, then the terminal pass, which replays the original draw onto its destination with terminalColors in
  * place of its color processors. The terminal pass may sample any producer. AOTPlanRenderTask runs
  * the whole plan as one task, so a producer and the passes that read it can never be split across
  * tasks.
@@ -82,18 +79,13 @@ struct AOTRenderPlan {
   DrawOp::ColorProcessorList terminalColors = {};
 
   /**
-   * Whether every pass has a target and a draw and depends only on earlier passes.
+   * Whether every pass has a target and a draw, and the terminal pass has color processors. The
+   * pass order is the builder's responsibility and is not checked here.
    */
   bool isWellFormed() const {
-    for (size_t index = 0; index < passes.size(); ++index) {
-      const auto& pass = passes[index];
+    for (const auto& pass : passes) {
       if (pass.target == nullptr || pass.drawOp == nullptr) {
         return false;
-      }
-      for (auto dependency : pass.dependencies) {
-        if (dependency >= index) {
-          return false;
-        }
       }
     }
     return !terminalColors.empty();

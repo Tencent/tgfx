@@ -18,6 +18,7 @@
 
 #include "gpu/FPFlattenHelper.h"
 #include <cstdlib>
+#include "gpu/AOTMaterializationRecorder.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/processors/TextureEffect.h"
@@ -55,19 +56,26 @@ PlacementPtr<FragmentProcessor> FlattenToTexture(const FPArgs& args,
   if (target.renderTarget == nullptr) {
     return nullptr;
   }
-  auto drawingManager = context->drawingManager();
-  if (!drawingManager->fillRTWithFP(target.renderTarget, std::move(fp), args.renderFlags,
-                                    target.geometry.coordOffset, OffscreenFillSource::FPFlatten)) {
-    return nullptr;
-  }
   auto textureProxy = target.renderTarget->asTextureProxy();
-  if (textureProxy == nullptr) {
+  if (textureProxy == nullptr || fp == nullptr) {
     return nullptr;
   }
   auto uvMatrix = Matrix::MakeTrans(-target.geometry.bounds.left, -target.geometry.bounds.top);
-  auto cache = context->precompiledShaderCache();
-  if (cache != nullptr && cache->diagnosticRecordingEnabled()) {
-    cache->recordMaterializedEdge(target.geometry.byteSize());
+  auto drawingManager = context->drawingManager();
+  if (auto recorder = drawingManager->materializationRecorder()) {
+    // Inside the materialization retry: the producer is rendered only if the retry is taken, and
+    // then in the consumer's own plan task (see AOTMaterializationRecorder).
+    recorder->record({target, apronRadius, std::move(fp), args.renderFlags});
+  } else {
+    if (!drawingManager->fillRTWithFP(target.renderTarget, std::move(fp), args.renderFlags,
+                                      target.geometry.coordOffset,
+                                      OffscreenFillSource::FPFlatten)) {
+      return nullptr;
+    }
+    auto cache = context->precompiledShaderCache();
+    if (cache != nullptr && cache->diagnosticRecordingEnabled()) {
+      cache->recordMaterializedEdge(target.geometry.byteSize());
+    }
   }
   auto allocator = context->drawingAllocator();
   return TextureEffect::Make(allocator, std::move(textureProxy), {}, &uvMatrix);

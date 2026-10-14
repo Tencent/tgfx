@@ -25,7 +25,8 @@ namespace tgfx {
 
 /**
  * Renders a complex FragmentProcessor into an offscreen texture and returns a simple TextureEffect
- * that samples from it. The FP's coordTransform expects to receive coordinates in the range
+ * that samples from it. Inside an AOTMaterializationRecorder (the materialization retry) the render
+ * is recorded instead of enqueued; otherwise it is enqueued at once as an offscreen fill. The FP's coordTransform expects to receive coordinates in the range
  * [drawRect.x..right, drawRect.y..bottom], so a coordOffset is applied during offscreen rendering
  * to ensure the FP sees the correct coordinate space. apronRadius expands the captured area on every
  * side; pass the value the materialization policy produced for this consumer. Returns nullptr on

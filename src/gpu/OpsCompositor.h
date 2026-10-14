@@ -233,7 +233,8 @@ class OpsCompositor {
    * cannot reproduce this draw exactly (see the gate in the implementation).
    */
   bool submitPlanTask(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
-                      const Rect& deviceBounds, PlacementPtr<DrawOp>* op);
+                      const Rect& deviceBounds, PlacementPtr<DrawOp>* op,
+                      AOTMaterializationRecorder* producers);
 
   friend class DrawingManager;
   friend class PendingOpsAutoReset;

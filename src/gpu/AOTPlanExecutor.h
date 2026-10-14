@@ -20,13 +20,16 @@
 
 #include <memory>
 #include <optional>
+#include <vector>
 #include "gpu/AOTEffectDecomposer.h"
+#include "gpu/AOTRenderPlan.h"
 #include "gpu/ops/DrawOp.h"
 #include "gpu/tasks/RenderTask.h"
 
 namespace tgfx {
 class Context;
 class RenderTargetProxy;
+class AOTMaterializationRecorder;
 
 class AOTPlanExecutor {
  public:
@@ -67,6 +70,11 @@ class AOTPlanExecutor {
    * the affine map from the draw's top-left device positions to the local coordinates its
    * processors see (StandardDrawOp::deviceToLocalMatrix); a multi-pass plan over a local-coordinate
    * source applies it to the source pass, and nullopt means local == device + fpCoordOffset.
+   *
+   * producers, when not null, holds the blend-child materializations recorded while the plan's
+   * processors were built (the materialization retry). They are moved into the task ahead of the
+   * plan's own passes, so they run in the same task as the draw that samples them. They are
+   * consumed even when Make fails; the caller then refuses the retry, so nothing reads them.
    */
   static PlacementPtr<RenderTask> Make(Context* context, uint32_t renderFlags,
                                        const AOTEffectGraph& graph, const AOTEffectPlan& plan,
@@ -75,6 +83,20 @@ class AOTPlanExecutor {
                                        PlacementPtr<DrawOp>* originalDraw,
                                        const Point& fpCoordOffset = Point::Zero(),
                                        bool clearDestination = false,
-                                       const std::optional<Matrix>& deviceToLocal = std::nullopt);
+                                       const std::optional<Matrix>& deviceToLocal = std::nullopt,
+                                       AOTMaterializationRecorder* producers = nullptr);
+
+  /**
+   * Builds the passes of a plan that passed CanExecute without validating or enqueueing anything:
+   * appends the split-off passes of a multi-pass plan to passes and the terminal color processors
+   * to terminalColors. The parameters mean what they mean for Make; destination is only read for
+   * its origin. Returns false if a processor, target, or draw cannot be created.
+   */
+  static bool BuildPasses(Context* context, uint32_t renderFlags, const AOTEffectGraph& graph,
+                          const AOTEffectPlan& plan, const Rect& deviceBounds,
+                          const RenderTargetProxy* destination, const Point& fpCoordOffset,
+                          const std::optional<Matrix>& deviceToLocal,
+                          std::vector<AOTRenderPass>* passes,
+                          DrawOp::ColorProcessorList* terminalColors);
 };
 }  // namespace tgfx

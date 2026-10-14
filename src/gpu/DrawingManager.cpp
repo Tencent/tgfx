@@ -19,6 +19,7 @@
 #include "DrawingManager.h"
 #include "ProxyProvider.h"
 #include "core/AtlasManager.h"
+#include "gpu/AOTMaterializationRecorder.h"
 #include "gpu/AOTPlanExecutor.h"
 #include "gpu/AOTRouter.h"
 #include "gpu/PrecompiledShaderCache.h"
@@ -85,51 +86,64 @@ PlacementPtr<DrawOp> DrawingManager::makeFillDrawOp(std::shared_ptr<RenderTarget
   return drawOp;
 }
 
+bool DrawingManager::isFillRouteCandidate(const FragmentProcessor* processor) const {
+  // The decomposition route only pays off for chains the plain route cannot match directly: a
+  // composite processor tree (Compose/Xfermode children). A bare single-source fill is already
+  // served by the direct matchers, so it must skip the route and keep its single program lookup.
+  auto cache = context->precompiledShaderCache();
+  return cache != nullptr && cache->isLoaded() && cache->decompositionEnabled() &&
+         processor != nullptr && processor->numChildProcessors() > 0;
+}
+
+bool DrawingManager::planFill(const FragmentProcessor* processor, const Point& coordOffset,
+                              OffscreenFillSource source, AOTEffectGraph* graph,
+                              AOTEffectPlan* plan, OffscreenFillKey* diagnosticKey) {
+  *diagnosticKey = InvalidOffscreenFillKey;
+  auto cache = context->precompiledShaderCache();
+  bool routeCandidate = isFillRouteCandidate(processor);
+  bool recording = cache != nullptr && cache->diagnosticRecordingEnabled();
+  if (processor == nullptr || (!routeCandidate && !recording)) {
+    return false;
+  }
+  std::string blocker;
+  bool lowerSucceeded = AOTEffectDecomposer::Lower({processor}, graph, &blocker);
+  // Decompose only returns plans the executor runs, so this is also the production verdict.
+  bool decomposeSucceeded = lowerSucceeded && AOTEffectDecomposer::Decompose(*graph, plan);
+  if (recording) {
+    std::vector<AOTKernelKind> kernels = {};
+    kernels.reserve(plan->passes.size());
+    for (const auto& pass : plan->passes) {
+      kernels.push_back(pass.kernel);
+    }
+    *diagnosticKey =
+        cache->recordOffscreenFillAnalysis(source, coordOffset != Point::Zero(), processor->name(),
+                                           lowerSucceeded, blocker, decomposeSucceeded, kernels);
+  }
+  return routeCandidate && decomposeSucceeded;
+}
+
 bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
                                   PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags,
                                   const Point& coordOffset, OffscreenFillSource source,
                                   ColorChainRebuild rebuildColorChain) {
-  auto cache = context->precompiledShaderCache();
-  // The decomposition route only pays off for chains the plain route cannot match directly: a
-  // composite processor tree (Compose/Xfermode children). A bare single-source fill is already
-  // served by the direct matchers, so it must skip the route and keep its single program lookup.
-  bool routeCandidate = cache != nullptr && cache->isLoaded() && cache->decompositionEnabled() &&
-                        processor != nullptr && processor->numChildProcessors() > 0;
-  bool analyze = processor != nullptr &&
-                 (routeCandidate || (cache != nullptr && cache->diagnosticRecordingEnabled()));
   AOTEffectGraph graph = {};
   AOTEffectPlan plan = {};
-  std::string blocker;
-  bool lowerSucceeded = false;
-  bool decomposeSucceeded = false;
-  if (analyze) {
-    lowerSucceeded = AOTEffectDecomposer::Lower({processor.get()}, &graph, &blocker);
-    // Decompose only returns plans the executor runs, so this is also the production verdict.
-    decomposeSucceeded = lowerSucceeded && AOTEffectDecomposer::Decompose(graph, &plan);
-  }
   OffscreenFillKey diagnosticKey = InvalidOffscreenFillKey;
-  if (cache != nullptr && cache->diagnosticRecordingEnabled() && processor != nullptr) {
-    std::vector<AOTKernelKind> kernels = {};
-    kernels.reserve(plan.passes.size());
-    for (const auto& pass : plan.passes) {
-      kernels.push_back(pass.kernel);
-    }
-    diagnosticKey =
-        cache->recordOffscreenFillAnalysis(source, coordOffset != Point::Zero(), processor->name(),
-                                           lowerSucceeded, blocker, decomposeSucceeded, kernels);
-  }
+  bool planned = planFill(processor.get(), coordOffset, source, &graph, &plan, &diagnosticKey);
   // Submits the plan task for the fill's draw op. The plan executor takes ownership of the op on
   // success, so the fill must stop there: falling through to the plain branch would submit a null
   // op. An offscreen fill owns a fresh target, so the task clears its full backing first and a
   // shader-side sample cannot observe pixels left by an earlier scratch allocation.
   auto submitPlanTask = [&](const AOTEffectGraph& taskGraph, const AOTEffectPlan& taskPlan,
-                            PlacementPtr<DrawOp>* originalDraw) {
+                            PlacementPtr<DrawOp>* originalDraw,
+                            AOTMaterializationRecorder* producers) {
     // The fill covers the target's logical bounds, and its processors see coordinates shifted by
-    // coordOffset; the intermediates of a multi-pass plan reproduce both.
+    // coordOffset; the split-off passes of a multi-pass plan reproduce both.
     auto deviceBounds = Rect::MakeWH(static_cast<float>(renderTarget->width()),
                                      static_cast<float>(renderTarget->height()));
-    auto task = AOTPlanExecutor::Make(context, renderFlags, taskGraph, taskPlan, deviceBounds,
-                                      renderTarget, originalDraw, coordOffset, true);
+    auto task =
+        AOTPlanExecutor::Make(context, renderFlags, taskGraph, taskPlan, deviceBounds, renderTarget,
+                              originalDraw, coordOffset, true, std::nullopt, producers);
     if (task == nullptr) {
       return false;
     }
@@ -139,7 +153,7 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   };
   // The retry verdict reads the processor tree, so it must be taken before the processor moves
   // into the fill's draw op below.
-  bool retryWarranted = routeCandidate && rebuildColorChain != nullptr &&
+  bool retryWarranted = isFillRouteCandidate(processor.get()) && rebuildColorChain != nullptr &&
                         AOTRouter::RetryWarranted(processor.get(), renderFlags);
   auto drawOp =
       makeFillDrawOp(renderTarget, std::move(processor), renderFlags, coordOffset, diagnosticKey);
@@ -147,19 +161,21 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     return false;
   }
   AOTRouter::SubmitPlan submitFill = [&](const AOTEffectGraph& taskGraph,
-                                         const AOTEffectPlan& taskPlan) {
-    return submitPlanTask(taskGraph, taskPlan, &drawOp);
+                                         const AOTEffectPlan& taskPlan,
+                                         AOTMaterializationRecorder* producers) {
+    return submitPlanTask(taskGraph, taskPlan, &drawOp, producers);
   };
   // The original tree was already planned above (the diagnostics need the plan too), so its
   // route only has to submit that plan.
-  if (routeCandidate && decomposeSucceeded && submitFill(graph, plan)) {
+  if (planned && submitFill(graph, plan, nullptr)) {
     return true;
   }
   // Materialization retry, shared with on-screen draws (AOTRouter::RouteWithMaterializedLeading):
   // the caller's closure rebuilds the whole fill processor with materialized blend children. A
   // refused retry is dropped and the plain fill below keeps the ORIGINAL processor.
-  if (retryWarranted && AOTRouter::RouteWithMaterializedLeading(
-                            rebuildColorChain, {}, submitFill) == AOTRouteResult::Submitted) {
+  if (retryWarranted &&
+      AOTRouter::RouteWithMaterializedLeading(context, rebuildColorChain, {}, submitFill) ==
+          AOTRouteResult::Submitted) {
     return true;
   }
   auto allocator = drawingAllocator();
@@ -191,6 +207,7 @@ void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderT
   if (renderTarget == nullptr || (drawOps.empty() && !clearColor.has_value())) {
     return;
   }
+  commitPendingMaterializations();
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto textureProxy = renderTarget->asTextureProxy();
@@ -207,6 +224,7 @@ void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> rende
   if (renderTarget == nullptr || inputs.empty() || effect == nullptr) {
     return;
   }
+  commitPendingMaterializations();
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto textureProxy = renderTarget->asTextureProxy();
@@ -220,6 +238,7 @@ void DrawingManager::addGenerateMipmapsTask(std::shared_ptr<TextureProxy> textur
   if (textureProxy == nullptr || !textureProxy->hasMipmaps()) {
     return;
   }
+  commitPendingMaterializations();
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto task = allocator->make<GenerateMipmapsTask>(allocator, std::move(textureProxy));
@@ -232,6 +251,7 @@ void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> 
   if (source == nullptr || dest == nullptr) {
     return;
   }
+  commitPendingMaterializations();
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto task = allocator->make<RenderTargetCopyTask>(allocator, std::move(source), std::move(dest),
@@ -245,6 +265,7 @@ void DrawingManager::addTransferPixelsTask(std::shared_ptr<RenderTargetProxy> so
   if (source == nullptr || dest == nullptr || srcRect.isEmpty()) {
     return;
   }
+  commitPendingMaterializations();
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto task =
@@ -256,8 +277,23 @@ void DrawingManager::addRenderTask(PlacementPtr<RenderTask> renderTask) {
   if (renderTask == nullptr) {
     return;
   }
+  commitPendingMaterializations();
   auto drawingBuffer = getDrawingBuffer();
   drawingBuffer->renderTasks.emplace_back(std::move(renderTask));
+}
+
+void DrawingManager::commitPendingMaterializations() {
+  std::vector<AOTMaterializationRecorder*> recorders = {};
+  for (auto recorder = activeRecorder; recorder != nullptr; recorder = recorder->previous) {
+    if (!recorder->empty()) {
+      recorders.push_back(recorder);
+    }
+  }
+  // An outer recorder's producers were recorded before any inner recorder opened, so committing
+  // outermost first keeps every producer ahead of the producers that may sample it.
+  for (auto recorder = recorders.rbegin(); recorder != recorders.rend(); ++recorder) {
+    (*recorder)->commitPending();
+  }
 }
 
 void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask) {
@@ -304,6 +340,7 @@ void DrawingManager::collectWindow(std::weak_ptr<Window> window) {
 }
 
 std::shared_ptr<DrawingBuffer> DrawingManager::flush() {
+  commitPendingMaterializations();
   if (currentBuffer == nullptr && compositors.empty()) {
     return nullptr;
   }

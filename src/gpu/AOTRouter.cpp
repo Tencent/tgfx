@@ -19,18 +19,19 @@
 #include "AOTRouter.h"
 #include "gpu/AOTEffectDecomposer.h"
 #include "gpu/AOTMaterializationPolicy.h"
+#include "gpu/AOTMaterializationRecorder.h"
 
 namespace tgfx {
 
 AOTRouteResult AOTRouter::Route(const std::vector<const FragmentProcessor*>& processors,
-                                const SubmitPlan& submit) {
+                                const SubmitPlan& submit, AOTMaterializationRecorder* producers) {
   AOTEffectGraph graph = {};
   AOTEffectPlan plan = {};
   if (!AOTEffectDecomposer::Lower(processors, &graph) ||
       !AOTEffectDecomposer::Decompose(graph, &plan)) {
     return AOTRouteResult::NoPlan;
   }
-  return submit(graph, plan) ? AOTRouteResult::Submitted : AOTRouteResult::TaskRefused;
+  return submit(graph, plan, producers) ? AOTRouteResult::Submitted : AOTRouteResult::TaskRefused;
 }
 
 bool AOTRouter::RetryWarranted(const FragmentProcessor* leading, uint32_t renderFlags) {
@@ -50,11 +51,14 @@ bool AOTRouter::RetryWarranted(const FragmentProcessor* leading, uint32_t render
 }
 
 AOTRouteResult AOTRouter::RouteWithMaterializedLeading(
-    const ColorChainRebuild& rebuildLeading, const std::vector<const FragmentProcessor*>& trailing,
-    const SubmitPlan& submit) {
-  if (rebuildLeading == nullptr) {
+    Context* context, const ColorChainRebuild& rebuildLeading,
+    const std::vector<const FragmentProcessor*>& trailing, const SubmitPlan& submit) {
+  if (context == nullptr || rebuildLeading == nullptr) {
     return AOTRouteResult::NoPlan;
   }
+  // Producers recorded during the rebuild stay pending until Route hands them to the entry's plan
+  // task; whatever is still pending when the recorder goes out of scope was refused and is dropped.
+  AOTMaterializationRecorder recorder(context);
   auto leading = rebuildLeading();
   if (leading == nullptr) {
     return AOTRouteResult::NoPlan;
@@ -63,6 +67,6 @@ AOTRouteResult AOTRouter::RouteWithMaterializedLeading(
   processors.insert(processors.end(), trailing.begin(), trailing.end());
   // The plan task rebuilds its processors from the lowered graph, so the rebuilt leading
   // processor is not needed once Route returns.
-  return Route(processors, submit);
+  return Route(processors, submit, &recorder);
 }
 }  // namespace tgfx

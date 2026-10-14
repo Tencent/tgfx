@@ -26,6 +26,8 @@
 namespace tgfx {
 class AOTEffectGraph;
 struct AOTEffectPlan;
+class AOTMaterializationRecorder;
+class Context;
 
 /**
  * Rebuilds a draw's leading color processor (its materialization-prone source) with the
@@ -64,15 +66,19 @@ class AOTRouter {
  public:
   /**
    * Builds and enqueues the render task for a plan. Returns false, leaving the entry's draw
-   * untouched, when no task can be built for it.
+   * untouched, when no task can be built for it. producers is the retry's recorder (nullptr for an
+   * original route); the entry hands it to AOTPlanExecutor::Make so the recorded producers run in
+   * the same task as the draw.
    */
-  using SubmitPlan = std::function<bool(const AOTEffectGraph&, const AOTEffectPlan&)>;
+  using SubmitPlan = std::function<bool(const AOTEffectGraph&, const AOTEffectPlan&,
+                                        AOTMaterializationRecorder* producers)>;
 
   /**
    * Lowers and decomposes the processors and hands the plan to submit.
    */
   static AOTRouteResult Route(const std::vector<const FragmentProcessor*>& processors,
-                              const SubmitPlan& submit);
+                              const SubmitPlan& submit,
+                              AOTMaterializationRecorder* producers = nullptr);
 
   /**
    * Whether the materialization retry applies to a chain led by this processor: it is a two-child
@@ -84,12 +90,14 @@ class AOTRouter {
 
   /**
    * The materialization retry: rebuilds the leading processor, then routes it followed by the
-   * trailing processors. The rebuilt processor is released whether or not the route is taken, so a
-   * refused retry never puts materialized operands on the entry's original draw. A failed rebuild
-   * reports NoPlan.
+   * trailing processors. The rebuild runs inside an AOTMaterializationRecorder, so its blend-child
+   * materializations are recorded instead of rendered: a taken route runs them in the draw's own
+   * plan task, a refused one drops them unrendered. The rebuilt processor is released either way,
+   * so a refused retry never puts materialized operands on the entry's original draw. A failed
+   * rebuild reports NoPlan.
    */
   static AOTRouteResult RouteWithMaterializedLeading(
-      const ColorChainRebuild& rebuildLeading,
+      Context* context, const ColorChainRebuild& rebuildLeading,
       const std::vector<const FragmentProcessor*>& trailing, const SubmitPlan& submit);
 };
 }  // namespace tgfx

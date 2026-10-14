@@ -4,6 +4,7 @@
 #include <vector>
 #include "gpu/AOTChainBuilder.h"
 #include "gpu/AOTMaterializationPolicy.h"
+#include "gpu/AOTMaterializationRecorder.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/processors/AOTPointwiseTailProcessor.h"
 #include "gpu/processors/AOTYUVChainProcessor.h"
@@ -206,13 +207,111 @@ bool AOTPlanExecutor::SamplesDeviceSpace(const AOTEffectGraph& graph, const AOTE
   return texture != nullptr && texture->samplingKind == AOTTextureSamplingKind::Device;
 }
 
-PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t renderFlags,
-                                               const AOTEffectGraph& graph,
-                                               const AOTEffectPlan& plan, const Rect& deviceBounds,
-                                               std::shared_ptr<RenderTargetProxy> destination,
-                                               PlacementPtr<DrawOp>* originalDraw,
-                                               const Point& fpCoordOffset, bool clearDestination,
-                                               const std::optional<Matrix>& deviceToLocal) {
+bool AOTPlanExecutor::BuildPasses(Context* context, uint32_t renderFlags,
+                                  const AOTEffectGraph& graph, const AOTEffectPlan& plan,
+                                  const Rect& deviceBounds, const RenderTargetProxy* destination,
+                                  const Point& fpCoordOffset,
+                                  const std::optional<Matrix>& deviceToLocal,
+                                  std::vector<AOTRenderPass>* passes,
+                                  DrawOp::ColorProcessorList* terminalColors) {
+  auto drawingManager = context->drawingManager();
+  auto allocator = drawingManager->drawingAllocator();
+  if (plan.passes.size() == 1) {
+    auto processor = AOTChainBuilder::BuildFPForPass(allocator, graph, plan.passes[0]);
+    if (processor == nullptr) {
+      return false;
+    }
+    terminalColors->emplace_back(std::move(processor));
+    return true;
+  }
+  // One geometry for the whole plan: every split-off pass renders into a target of exactly this
+  // size over the draw's device bounds, and the terminal draw samples the last one back at the
+  // same pixel. Every pass is pointwise (an operator reads its input at the output pixel only), so
+  // no apron is needed and the targets stay pixel-aligned with each other.
+  auto geometry = AOTMaterializationPolicy::PrepareGeometry(deviceBounds, 0.0f);
+  if (geometry.isEmpty()) {
+    return false;
+  }
+  // A split-off fill evaluates its processors at local coordinates fragCoord + offset, the same
+  // values the original processors see at the matching destination pixel: the draw's own
+  // FP-space translation (fpCoordOffset, the coordOffset of an offscreen fill) plus the target's
+  // placement on the destination.
+  auto intermediateOffset = geometry.coordOffset + fpCoordOffset;
+  auto deviceToFragCoord = DeviceToFragCoord(destination);
+  std::shared_ptr<TextureProxy> previousTexture = nullptr;
+  for (size_t index = 0; index < plan.passes.size(); ++index) {
+    const auto& pass = plan.passes[index];
+    bool isTerminal = index + 1 == plan.passes.size();
+    PlacementPtr<FragmentProcessor> processor = nullptr;
+    if (index == 0) {
+      // The source pass runs as a split-off fill, so its source must sample what the original
+      // draw samples at the same destination pixel.
+      auto texture = FirstPassTexture(graph, plan);
+      if (texture == nullptr) {
+        return false;
+      }
+      auto parameters = *texture;
+      if (parameters.samplingKind == AOTTextureSamplingKind::Device) {
+        // A device-space source reads fragment coordinates. In the split-off target the fragment
+        // coordinate of a pixel is its top-left device position minus the target's placement;
+        // map it back to the destination's fragment coordinates first.
+        parameters.uvMatrix.preConcat(deviceToFragCoord);
+        parameters.uvMatrix.preTranslate(geometry.coordOffset.x, geometry.coordOffset.y);
+      } else if (deviceToLocal.has_value()) {
+        // The fill's local coordinates are top-left device positions (plus fpCoordOffset); the
+        // original draw maps those onto its own local coordinates first.
+        parameters.uvMatrix.preConcat(*deviceToLocal);
+      }
+      auto source = AOTChainBuilder::BuildTextureSourceFP(allocator, parameters);
+      auto operators = pass;
+      operators.nodes.erase(operators.nodes.begin());
+      processor = source != nullptr ? AOTChainBuilder::BuildFPForPass(allocator, graph, operators,
+                                                                      std::move(source))
+                                    : nullptr;
+    } else {
+      // Split-off passes read each other at the same target pixel. The terminal draw reads the
+      // last one from the destination's fragment coordinates: back to top-left device positions,
+      // then into the target's pixel space.
+      auto matrix = Matrix::I();
+      if (isTerminal) {
+        matrix = Matrix::MakeTrans(-geometry.coordOffset.x, -geometry.coordOffset.y);
+        matrix.preConcat(deviceToFragCoord);
+      }
+      auto source = DeviceSpaceTextureEffect::Make(allocator, previousTexture, matrix);
+      processor = source != nullptr
+                      ? AOTChainBuilder::BuildFPForPass(allocator, graph, pass, std::move(source))
+                      : nullptr;
+    }
+    if (processor == nullptr) {
+      return false;
+    }
+    if (isTerminal) {
+      terminalColors->emplace_back(std::move(processor));
+      break;
+    }
+    auto materialized = AOTMaterializationPolicy::AllocateTarget(context, geometry);
+    if (materialized.renderTarget == nullptr) {
+      return false;
+    }
+    AOTRenderPass renderPass = {};
+    renderPass.target = std::move(materialized.renderTarget);
+    renderPass.drawOp = drawingManager->makeFillDrawOp(renderPass.target, std::move(processor),
+                                                       renderFlags, intermediateOffset);
+    previousTexture = renderPass.target->asTextureProxy();
+    if (renderPass.drawOp == nullptr || previousTexture == nullptr) {
+      return false;
+    }
+    renderPass.edge = {AOTEdgeSpace::Device, geometry, 0.0f};
+    passes->push_back(std::move(renderPass));
+  }
+  return true;
+}
+
+PlacementPtr<RenderTask> AOTPlanExecutor::Make(
+    Context* context, uint32_t renderFlags, const AOTEffectGraph& graph, const AOTEffectPlan& plan,
+    const Rect& deviceBounds, std::shared_ptr<RenderTargetProxy> destination,
+    PlacementPtr<DrawOp>* originalDraw, const Point& fpCoordOffset, bool clearDestination,
+    const std::optional<Matrix>& deviceToLocal, AOTMaterializationRecorder* producers) {
   if (context == nullptr || destination == nullptr || destination->getContext() != context ||
       originalDraw == nullptr || *originalDraw == nullptr ||
       (*originalDraw)->type() == DrawOp::Type::StencilCoverPathDrawOp || !CanExecute(graph, plan) ||
@@ -230,106 +329,18 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t render
       }
     }
   }
-  auto drawingManager = context->drawingManager();
-  auto allocator = drawingManager->drawingAllocator();
   AOTRenderPlan renderPlan = {};
-  if (plan.passes.size() == 1) {
-    auto processor = AOTChainBuilder::BuildFPForPass(allocator, graph, plan.passes[0]);
-    if (processor == nullptr) {
-      return nullptr;
-    }
-    renderPlan.terminalColors.emplace_back(std::move(processor));
-  } else {
-    // One geometry for the whole plan: every intermediate pass renders into a target of exactly
-    // this size over the draw's device bounds, and the terminal draw samples the last one back at
-    // the same pixel. Every pass is pointwise (an operator reads its input at the output pixel
-    // only), so no apron is needed and the intermediates stay pixel-aligned with each other.
-    auto geometry = AOTMaterializationPolicy::PrepareGeometry(deviceBounds, 0.0f);
-    if (geometry.isEmpty()) {
-      return nullptr;
-    }
-    // An intermediate fill evaluates its processors at local coordinates fragCoord + offset, the
-    // same values the original processors see at the matching destination pixel: the draw's own
-    // FP-space translation (fpCoordOffset, the coordOffset of an offscreen fill) plus the target's
-    // placement on the destination.
-    auto intermediateOffset = geometry.coordOffset + fpCoordOffset;
-    auto deviceToFragCoord = DeviceToFragCoord(destination.get());
-    std::shared_ptr<TextureProxy> previousTexture = nullptr;
-    for (size_t index = 0; index < plan.passes.size(); ++index) {
-      const auto& pass = plan.passes[index];
-      bool isTerminal = index + 1 == plan.passes.size();
-      PlacementPtr<FragmentProcessor> processor = nullptr;
-      if (index == 0) {
-        // The source pass runs as an intermediate fill, so its source must sample what the
-        // original draw samples at the same destination pixel.
-        auto texture = FirstPassTexture(graph, plan);
-        if (texture == nullptr) {
-          return nullptr;
-        }
-        auto parameters = *texture;
-        if (parameters.samplingKind == AOTTextureSamplingKind::Device) {
-          // A device-space source reads fragment coordinates. In the intermediate target the
-          // fragment coordinate of a pixel is its top-left device position minus the target's
-          // placement; map it back to the destination's fragment coordinates first.
-          parameters.uvMatrix.preConcat(deviceToFragCoord);
-          parameters.uvMatrix.preTranslate(geometry.coordOffset.x, geometry.coordOffset.y);
-        } else if (deviceToLocal.has_value()) {
-          // The fill's local coordinates are top-left device positions (plus fpCoordOffset); the
-          // original draw maps those onto its own local coordinates first.
-          parameters.uvMatrix.preConcat(*deviceToLocal);
-        }
-        auto source = AOTChainBuilder::BuildTextureSourceFP(allocator, parameters);
-        auto operators = pass;
-        operators.nodes.erase(operators.nodes.begin());
-        processor = source != nullptr ? AOTChainBuilder::BuildFPForPass(allocator, graph, operators,
-                                                                        std::move(source))
-                                      : nullptr;
-      } else {
-        // Intermediates read each other at the same target pixel. The terminal draw reads the last
-        // one from the destination's fragment coordinates: back to top-left device positions,
-        // then into the target's pixel space.
-        auto matrix = Matrix::I();
-        if (isTerminal) {
-          matrix = Matrix::MakeTrans(-geometry.coordOffset.x, -geometry.coordOffset.y);
-          matrix.preConcat(deviceToFragCoord);
-        }
-        auto source = DeviceSpaceTextureEffect::Make(allocator, previousTexture, matrix);
-        processor = source != nullptr
-                        ? AOTChainBuilder::BuildFPForPass(allocator, graph, pass, std::move(source))
-                        : nullptr;
-      }
-      if (processor == nullptr) {
-        return nullptr;
-      }
-      if (isTerminal) {
-        renderPlan.terminalColors.emplace_back(std::move(processor));
-        break;
-      }
-      auto materialized = AOTMaterializationPolicy::AllocateTarget(context, geometry);
-      if (materialized.renderTarget == nullptr) {
-        return nullptr;
-      }
-      auto target = std::move(materialized.renderTarget);
-      auto drawOp = drawingManager->makeFillDrawOp(target, std::move(processor), renderFlags,
-                                                   intermediateOffset);
-      previousTexture = target->asTextureProxy();
-      if (drawOp == nullptr || previousTexture == nullptr) {
-        return nullptr;
-      }
-      // Each split-off segment reads only its predecessor, at the same device pixel.
-      AOTRenderPass renderPass = {};
-      renderPass.target = std::move(target);
-      renderPass.drawOp = std::move(drawOp);
-      if (index > 0) {
-        renderPass.dependencies.push_back(index - 1);
-      }
-      renderPass.edge = {AOTEdgeSpace::Device, geometry, 0.0f};
-      renderPlan.passes.push_back(std::move(renderPass));
-    }
-  }
-  if (!renderPlan.isWellFormed()) {
+  // Producers go first: the plan's own passes (and its terminal draw) may sample any of them,
+  // including a split-off source pass whose source texture is a materialized blend operand.
+  if (producers != nullptr && !producers->takeProducerPasses(&renderPlan.passes)) {
     return nullptr;
   }
+  if (!BuildPasses(context, renderFlags, graph, plan, deviceBounds, destination.get(),
+                   fpCoordOffset, deviceToLocal, &renderPlan.passes, &renderPlan.terminalColors) ||
+      !renderPlan.isWellFormed()) {
+    return nullptr;
+  }
+  auto allocator = context->drawingManager()->drawingAllocator();
   auto task =
       allocator->make<AOTPlanRenderTask>(allocator, std::move(renderPlan), std::move(destination));
   if (task == nullptr) {

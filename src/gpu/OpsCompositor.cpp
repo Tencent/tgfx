@@ -1413,10 +1413,10 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     // task's own fallback path (which prepares the op with its own processors) sees the folded
     // tree. A moved coverage stays moved when no task is built: under the fold contract a trailing
     // coverage multiply is pixel-equivalent on the plain route.
-    AOTRouter::SubmitPlan submitFolded = [&](const AOTEffectGraph& graph,
-                                             const AOTEffectPlan& plan) {
+    AOTRouter::SubmitPlan submitFolded = [&](const AOTEffectGraph& graph, const AOTEffectPlan& plan,
+                                             AOTMaterializationRecorder* producers) {
       op->moveCoveragesToColors();
-      return submitPlanTask(graph, plan, *deviceBounds, &op);
+      return submitPlanTask(graph, plan, *deviceBounds, &op, producers);
     };
     if (foldMask) {
       auto foldResult = AOTRouter::Route(foldedProcessors, submitFolded);
@@ -1436,9 +1436,9 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     // The color-only route replaces the color processors with rebuilt Tail/Chain/Perlin FPs whose
     // matchers are all single-FP, so a draw still carrying a coverage FP (clip coverage or an
     // unfoldable mask) can never match and skips it.
-    AOTRouter::SubmitPlan submitColors = [&](const AOTEffectGraph& graph,
-                                             const AOTEffectPlan& plan) {
-      return submitPlanTask(graph, plan, *deviceBounds, &op);
+    AOTRouter::SubmitPlan submitColors = [&](const AOTEffectGraph& graph, const AOTEffectPlan& plan,
+                                             AOTMaterializationRecorder* producers) {
+      return submitPlanTask(graph, plan, *deviceBounds, &op, producers);
     };
     bool coverageFree = !op->hasCoverage();
     auto colorResult =
@@ -1490,7 +1490,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
         }
       }
       auto& submitRetry = foldMask ? submitFolded : submitColors;
-      if (AOTRouter::RouteWithMaterializedLeading(rebuildLeading, trailing, submitRetry) ==
+      if (AOTRouter::RouteWithMaterializedLeading(context, rebuildLeading, trailing, submitRetry) ==
           AOTRouteResult::Submitted) {
         return;
       }
@@ -1515,7 +1515,8 @@ void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, co
 }
 
 bool OpsCompositor::submitPlanTask(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
-                                   const Rect& deviceBounds, PlacementPtr<DrawOp>* op) {
+                                   const Rect& deviceBounds, PlacementPtr<DrawOp>* op,
+                                   AOTMaterializationRecorder* producers) {
   std::optional<Matrix> deviceToLocal = std::nullopt;
   if (plan.passes.size() > 1) {
     // The intermediate passes are device-aligned fills with an opaque white input color. They
@@ -1536,7 +1537,7 @@ bool OpsCompositor::submitPlanTask(const AOTEffectGraph& graph, const AOTEffectP
     }
   }
   auto task = AOTPlanExecutor::Make(context, renderFlags, graph, plan, deviceBounds, renderTarget,
-                                    op, Point::Zero(), false, deviceToLocal);
+                                    op, Point::Zero(), false, deviceToLocal, producers);
   if (task == nullptr) {
     return false;
   }

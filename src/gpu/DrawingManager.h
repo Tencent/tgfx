@@ -31,6 +31,7 @@
 
 namespace tgfx {
 struct RuntimeInputTexture;
+class AOTMaterializationRecorder;
 
 class DrawingManager {
  public:
@@ -72,6 +73,25 @@ class DrawingManager {
                     const Point& coordOffset = Point::Zero(),
                     OffscreenFillSource source = OffscreenFillSource::Unknown,
                     ColorChainRebuild rebuildColorChain = nullptr);
+
+  /**
+   * Plans an offscreen fill's processor the way fillRTWithFP does, and records the offscreen-fill
+   * diagnostic when diagnostic recording is on (diagnosticKey receives its key, or
+   * InvalidOffscreenFillKey). Returns true when the fill should take the plan in graph/plan: the
+   * decomposition route is on, the processor is a composite tree (a bare single-source fill is
+   * already served by the direct matchers), and an executable plan exists.
+   */
+  bool planFill(const FragmentProcessor* processor, const Point& coordOffset,
+                OffscreenFillSource source, AOTEffectGraph* graph, AOTEffectPlan* plan,
+                OffscreenFillKey* diagnosticKey);
+
+  /**
+   * The innermost active AOTMaterializationRecorder, or nullptr. FlattenToTexture records its
+   * producer there instead of rendering it at once.
+   */
+  AOTMaterializationRecorder* materializationRecorder() const {
+    return activeRecorder;
+  }
 
   std::shared_ptr<OpsCompositor> addOpsCompositor(std::shared_ptr<RenderTargetProxy> renderTarget,
                                                   uint32_t renderFlags,
@@ -118,6 +138,7 @@ class DrawingManager {
   std::deque<std::shared_ptr<DrawingBuffer>> bufferPool = {};
   std::list<std::shared_ptr<OpsCompositor>> compositors = {};
   std::unordered_map<TextureProxy*, AtlasUploadTask*> atlasTaskMap = {};
+  AOTMaterializationRecorder* activeRecorder = nullptr;
 
   DrawingBuffer* getDrawingBuffer() {
     return currentBuffer ? currentBuffer.get() : createDrawingBuffer();
@@ -125,7 +146,17 @@ class DrawingManager {
 
   DrawingBuffer* createDrawingBuffer();
 
+  /**
+   * Commits the pending producers of every active recorder, outermost first, as ordinary offscreen
+   * fills. Called before any render task is enqueued, because that task may sample a pending
+   * producer's target; a producer must always be enqueued before anything that reads it.
+   */
+  void commitPendingMaterializations();
+
+  bool isFillRouteCandidate(const FragmentProcessor* processor) const;
+
   friend class OpsCompositor;
+  friend class AOTMaterializationRecorder;
   friend class RenderContext;
 };
 }  // namespace tgfx

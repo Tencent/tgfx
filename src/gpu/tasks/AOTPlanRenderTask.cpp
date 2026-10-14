@@ -147,16 +147,26 @@ void AOTPlanRenderTask::execute(CommandEncoder* encoder) {
     return;
   }
   if (cache->diagnosticRecordingEnabled()) {
+    // Every producer pass is one materialized edge. Device-space passes are the ones a multi-pass
+    // plan split off (planMaterializedEdges, and the plan-length histogram); local-space passes
+    // are materialized blend operands (fpFlattenEdges), counted here only once they have rendered.
     AOTDrawStats drawStats = {};
     auto edges = plan.passes.size();
+    size_t splitEdges = 0;
+    for (const auto& pass : plan.passes) {
+      if (pass.edge.space == AOTEdgeSpace::Device) {
+        splitEdges++;
+      }
+    }
     drawStats.kernelInvocations = edges + 1;
     drawStats.offscreenTargets = edges;
     drawStats.materializedEdges = edges;
     drawStats.renderTargetSwitches = edges;
     drawStats.offscreenPlanDraws = 1;
-    drawStats.planMaterializedEdges = edges;
+    drawStats.planMaterializedEdges = splitEdges;
+    drawStats.fpFlattenEdges = edges - splitEdges;
     auto lastBucket = drawStats.planPassHistogram.size() - 1;
-    drawStats.planPassHistogram[edges < lastBucket ? edges : lastBucket]++;
+    drawStats.planPassHistogram[splitEdges < lastBucket ? splitEdges : lastBucket]++;
     for (const auto& renderTarget : renderTargets) {
       auto bytes = static_cast<uint64_t>(renderTarget->width()) *
                    static_cast<uint64_t>(renderTarget->height()) * 4;

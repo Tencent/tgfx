@@ -29,8 +29,10 @@
 #include "base/TGFXTest.h"
 #include "core/images/TextureImage.h"
 #include "gpu/AOTMaterializationPolicy.h"
+#include "gpu/AOTMaterializationRecorder.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/EmbeddedShaderBundles.h"
+#include "gpu/FPFlattenHelper.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProxyProvider.h"
@@ -3134,7 +3136,9 @@ TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsMaskCoverage) {
            static_cast<unsigned>(stats.fpFlattenEdges));
     fflush(stdout);
     if (!legacy) {
-      EXPECT_EQ(stats.completeAOTDraws, 3u);
+      // The two materialized operands run as producer passes inside the draw's own plan task, so
+      // the whole draw is one complete AOT draw carrying two materialized edges.
+      EXPECT_EQ(stats.completeAOTDraws, 1u);
       EXPECT_EQ(stats.fpFlattenEdges, 2u);
       EXPECT_EQ(stats.planMaterializedEdges, 0u);
     }
@@ -3259,6 +3263,131 @@ TGFX_TEST(AOTRenderConsistencyTest, BlendChildMaterializationIsPlannedNotBakedIn
     EXPECT_GE(stats.fpFlattenEdges, 1u);
     EXPECT_GE(stats.completeAOTDraws, 1u);
   }
+}
+
+// The producers of a materialization retry run inside the consumer's plan task. With the first
+// producer pass forced to fail, the task stops before the consumer pass, so the destination keeps
+// its previous contents. Before producers joined the consumer task, each producer was its own
+// fill task and the consumer still ran over whatever the failed producer left behind.
+TGFX_TEST(AOTRenderConsistencyTest, MaterializationRetryProducersShareConsumerTask) {
+  if (std::getenv("TGFX_AOT_LEGACY_BLEND_MATERIALIZATION") != nullptr) {
+    GTEST_SKIP() << "The legacy switch materializes at construction time, outside any retry";
+  }
+  ContextScope scope;
+  auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+  ASSERT_NE(bundleData, nullptr);
+  ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+  context->globalCache()->clearPrograms();
+  constexpr int size = 96;
+  auto surface = Surface::Make(context, size, size);
+  ASSERT_NE(surface, nullptr);
+  surface->getCanvas()->clear(Color::White());
+  context->flushAndSubmit(true);
+  // Two gradients exceed the fused budget, so the retry materializes both blend operands.
+  auto gradientA = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(size, size),
+                                              {Color(1, 0, 0, 1), Color(0, 0, 1, 1)});
+  auto gradientB = Shader::MakeLinearGradient(Point::Make(size, 0), Point::Make(0, size),
+                                              {Color(0, 1, 0, 1), Color(1, 1, 0, 1)});
+  Paint paint = {};
+  paint.setShader(Shader::MakeBlend(BlendMode::Multiply, gradientA, gradientB));
+  cache->setDiagnosticRecordingEnabled(true);
+  cache->resetStats();
+  ASSERT_EQ(::setenv("TGFX_AOT_TEST_INJECT_PASS_FAILURE", "first", 1), 0);
+  surface->getCanvas()->drawRect(Rect::MakeWH(size, size), paint);
+  context->flushAndSubmit(true);
+  ::unsetenv("TGFX_AOT_TEST_INJECT_PASS_FAILURE");
+  auto stats = cache->drawStats();
+  cache->setDiagnosticRecordingEnabled(false);
+  EXPECT_EQ(stats.planExecutionFailures, 1u);
+  EXPECT_EQ(stats.completeAOTDraws, 0u);
+  Bitmap bitmap = {};
+  ASSERT_TRUE(bitmap.allocPixels(size, size));
+  auto* pixels = static_cast<uint8_t*>(bitmap.lockPixels());
+  ASSERT_NE(pixels, nullptr);
+  ASSERT_TRUE(surface->readPixels(bitmap.info(), pixels));
+  size_t changedPixels = 0;
+  for (size_t offset = 0; offset < static_cast<size_t>(size * size) * 4; offset += 4) {
+    if (pixels[offset] != 255 || pixels[offset + 1] != 255 || pixels[offset + 2] != 255 ||
+        pixels[offset + 3] != 255) {
+      changedPixels++;
+    }
+  }
+  bitmap.unlockPixels();
+  EXPECT_EQ(changedPixels, 0u);
+}
+
+// The two rules of AOTMaterializationRecorder outside a plan task. A recorder that goes out of
+// scope with producers still pending drops them without rendering. A render task enqueued while
+// producers are pending may sample them, so DrawingManager enqueues the pending producers first:
+// an offscreen fill that samples a recorded producer must see the producer's output.
+TGFX_TEST(AOTRenderConsistencyTest, MaterializationRecorderDropsOrCommitsPending) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto* drawingManager = context->drawingManager();
+  constexpr int size = 32;
+  FPArgs args(context, 0, Rect::MakeWH(size, size));
+  auto shader = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(size, size),
+                                           {Color(1, 0, 0, 1), Color(0, 0, 1, 1)});
+  ASSERT_NE(shader, nullptr);
+  auto readTarget = [&](const std::shared_ptr<RenderTargetProxy>& target, Bitmap* outBitmap) {
+    auto renderTarget = target->getRenderTarget();
+    ASSERT_NE(renderTarget, nullptr);
+    auto surface = Surface::MakeFrom(context, renderTarget->getBackendRenderTarget(),
+                                     renderTarget->origin());
+    ASSERT_NE(surface, nullptr);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    EXPECT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  cache->setDiagnosticRecordingEnabled(true);
+  {
+    // Dropped: nothing samples the producer, so it never renders.
+    cache->resetStats();
+    {
+      AOTMaterializationRecorder recorder(context);
+      auto flattened = FlattenToTexture(args, FragmentProcessor::Make(shader, args), 1.0f);
+      EXPECT_NE(flattened, nullptr);
+      EXPECT_FALSE(recorder.empty());
+    }
+    context->flushAndSubmit(true);
+    EXPECT_EQ(cache->drawStats().fpFlattenEdges, 0u);
+  }
+  Bitmap reference = {};
+  {
+    auto target = RenderTargetProxy::Make(context, size, size, false);
+    ASSERT_NE(target, nullptr);
+    ASSERT_TRUE(drawingManager->fillRTWithFP(target, FragmentProcessor::Make(shader, args), 0));
+    context->flushAndSubmit(true);
+    readTarget(target, &reference);
+  }
+  Bitmap candidate = {};
+  {
+    // Committed: the fill below samples the producer, so the producer is enqueued before it.
+    cache->resetStats();
+    auto target = RenderTargetProxy::Make(context, size, size, false);
+    ASSERT_NE(target, nullptr);
+    {
+      AOTMaterializationRecorder recorder(context);
+      auto flattened = FlattenToTexture(args, FragmentProcessor::Make(shader, args), 1.0f);
+      ASSERT_NE(flattened, nullptr);
+      ASSERT_TRUE(drawingManager->fillRTWithFP(target, std::move(flattened), 0));
+      EXPECT_TRUE(recorder.empty());
+    }
+    context->flushAndSubmit(true);
+    EXPECT_EQ(cache->drawStats().fpFlattenEdges, 1u);
+    readTarget(target, &candidate);
+  }
+  cache->setDiagnosticRecordingEnabled(false);
+  // The producer is sampled at its texel centers, so the round trip is exact.
+  ExpectBitmapsIdentical("recorder-committed-producer", candidate, reference, size, size);
 }
 
 // Two gradients exceed the fused budget. A loaded bundle without optional decomposition must
