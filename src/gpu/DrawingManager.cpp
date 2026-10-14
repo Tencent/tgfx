@@ -19,8 +19,8 @@
 #include "DrawingManager.h"
 #include "ProxyProvider.h"
 #include "core/AtlasManager.h"
-#include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/AOTPlanExecutor.h"
+#include "gpu/AOTRouter.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
@@ -137,51 +137,30 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     addGenerateMipmapsTask(renderTarget->asTextureProxy());
     return true;
   };
-  // P4 group three: the retry-warranted verdict must be taken before the processor is moved into
-  // the plain draw op below. The materialization boundary quantizes to RGBA8 (an AlphaThreshold
-  // behind it can flip at the grid gap), but with a bundle loaded the retry is the only route.
-  bool retryWarranted = false;
-  if (routeCandidate && rebuildColorChain != nullptr && processor != nullptr &&
-      processor->numChildProcessors() == 2 &&
-      processor->name() == "XfermodeFragmentProcessor - two") {
-    bool nested = (renderFlags & InternalRenderFlags::NestedRasterization) != 0;
-    for (size_t childIndex = 0; childIndex < 2 && !retryWarranted; ++childIndex) {
-      auto decision =
-          AOTMaterializationPolicy::Evaluate(processor->childProcessor(childIndex),
-                                             MaterializationConsumer::PointwiseBlend, childIndex);
-      retryWarranted = decision.requiredForCorrectness || (!nested && decision.shouldFlatten);
-    }
-  }
+  // The retry verdict reads the processor tree, so it must be taken before the processor moves
+  // into the fill's draw op below.
+  bool retryWarranted = routeCandidate && rebuildColorChain != nullptr &&
+                        AOTRouter::RetryWarranted(processor.get(), renderFlags);
   auto drawOp =
       makeFillDrawOp(renderTarget, std::move(processor), renderFlags, coordOffset, diagnosticKey);
   if (drawOp == nullptr) {
     return false;
   }
-  if (routeCandidate && decomposeSucceeded && submitPlanTask(graph, plan, &drawOp)) {
+  AOTRouter::SubmitPlan submitFill = [&](const AOTEffectGraph& taskGraph,
+                                         const AOTEffectPlan& taskPlan) {
+    return submitPlanTask(taskGraph, taskPlan, &drawOp);
+  };
+  // The original tree was already planned above (the diagnostics need the plan too), so its
+  // route only has to submit that plan.
+  if (routeCandidate && decomposeSucceeded && submitFill(graph, plan)) {
     return true;
   }
-  if (retryWarranted) {
-    // P4 group three: in-plan materialization retry for filter fills. The unmodified tree was
-    // refused (or its plan not routable), and the caller can rebuild the processor with the
-    // MaterializeBlendChildren flag set — the filter then applies the same
-    // EnsureSimpleBlendChild rewrite the construction-time path used to apply. Retry the chain
-    // with the materialized tree; when it is still refused, the materialized tree is dropped and
-    // the plain fill below keeps the ORIGINAL processor.
-    auto retryProcessor = rebuildColorChain();
-    if (retryProcessor != nullptr) {
-      AOTEffectGraph retryGraph = {};
-      AOTEffectPlan retryPlan = {};
-      if (AOTEffectDecomposer::Lower({retryProcessor.get()}, &retryGraph) &&
-          AOTEffectDecomposer::Decompose(retryGraph, &retryPlan) &&
-          submitPlanTask(retryGraph, retryPlan, &drawOp)) {
-        return true;
-      }
-      // The chain route cannot serve the materialized tree either: drop the retry result. The
-      // plain draw op below still carries the fill's ORIGINAL processor — the reference
-      // semantics (: the pre-fix swap replaced it with the materialized tree, baking a
-      // quantization boundary into the fill that the reference never had). The rebuild's
-      // materialization fills render unconsumed (wasted work, no pixel effect).
-    }
+  // Materialization retry, shared with on-screen draws (AOTRouter::RouteWithMaterializedLeading):
+  // the caller's closure rebuilds the whole fill processor with materialized blend children. A
+  // refused retry is dropped and the plain fill below keeps the ORIGINAL processor.
+  if (retryWarranted && AOTRouter::RouteWithMaterializedLeading(
+                            rebuildColorChain, {}, submitFill) == AOTRouteResult::Submitted) {
+    return true;
   }
   auto allocator = drawingAllocator();
   auto drawOps = allocator->makeArray<DrawOp>(&drawOp, 1);

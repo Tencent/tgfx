@@ -1408,138 +1408,91 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     // the plain route with their PorterDuff XP, where the chain's C input composites them.)
     bool foldMask = !foldBlocked && foldedProcessors.size() > colorProcessors.size() &&
                     !BlendModeNeedDstTexture(brush.blendMode, true);
+    // Folding submits the color chain with the coverage moved into it, so the terminal draw must
+    // not apply the coverage again as a coverage processor. The move happens before Make so the
+    // task's own fallback path (which prepares the op with its own processors) sees the folded
+    // tree. A moved coverage stays moved when no task is built: under the fold contract a trailing
+    // coverage multiply is pixel-equivalent on the plain route.
+    AOTRouter::SubmitPlan submitFolded = [&](const AOTEffectGraph& graph,
+                                             const AOTEffectPlan& plan) {
+      op->moveCoveragesToColors();
+      return submitPlanTask(graph, plan, *deviceBounds, &op);
+    };
     if (foldMask) {
-      AOTEffectGraph foldedGraph = {};
-      AOTEffectPlan foldedPlan = {};
-      bool coverageMoved = false;
-      if (AOTEffectDecomposer::Lower(foldedProcessors, &foldedGraph) &&
-          AOTEffectDecomposer::Decompose(foldedGraph, &foldedPlan)) {
-        // The mask now travels inside the color chain, so the terminal draw must not apply it
-        // again as a coverage processor. The move happens before Make so the task's own
-        // fallback path (which prepares the op with its own processors) sees the folded tree.
-        op->moveCoveragesToColors();
-        coverageMoved = true;
-        if (submitPlanTask(foldedGraph, foldedPlan, *deviceBounds, &op)) {
-          return;
-        }
+      auto foldResult = AOTRouter::Route(foldedProcessors, submitFolded);
+      if (foldResult == AOTRouteResult::Submitted) {
+        return;
       }
-      if (coverageMoved) {
-        // The fold's task could not be built AFTER the coverage moved into the op's color
-        // processors. That state is valid for the plain route (the fold only runs for
-        // SrcOver-class XP, where a trailing coverage multiply is pixel-equivalent) but NOT
-        // for the color-only route below: it plans from the ORIGINAL color list (without the
-        // coverage) while the op no longer carries any coverage, so a successful plan would
-        // silently drop the mask/clip (). Go straight to the plain route.
+      if (foldResult == AOTRouteResult::TaskRefused) {
+        // The coverage already moved into the op's color processors, so the color-only route and
+        // the retry below, which plan from the ORIGINAL color list without the coverage, would
+        // silently drop the mask/clip. Go straight to the plain route.
         drawOps.emplace_back(std::move(op));
         return;
       }
-      // The fold never moved anything (the folded tree failed lowering or planning): fall
-      // through to the color-only route — a draw whose leading processor the materialization
-      // policy would rewrite can still be saved by the in-plan retry below. Draws without a
-      // rebuild source fall straight through to the plain route.
+      // The folded tree had no plan and nothing moved: fall through. A draw whose leading
+      // processor the materialization policy would rewrite can still be saved by the retry.
     }
-    AOTEffectGraph graph = {};
-    AOTEffectPlan plan = {};
     // The color-only route replaces the color processors with rebuilt Tail/Chain/Perlin FPs whose
     // matchers are all single-FP, so a draw still carrying a coverage FP (clip coverage or an
-    // unfoldable mask) can never match: attempting the route would only waste a strict prepare
-    // before the atomic fallback replays the draw through the runtime path anyway.
-    bool mainDecompose = !op->hasCoverage() &&
-                         AOTEffectDecomposer::Lower(colorProcessors, &graph) &&
-                         AOTEffectDecomposer::Decompose(graph, &plan);
-    if (mainDecompose) {
-      if (submitPlanTask(graph, plan, *deviceBounds, &op)) {
+    // unfoldable mask) can never match and skips it.
+    AOTRouter::SubmitPlan submitColors = [&](const AOTEffectGraph& graph,
+                                             const AOTEffectPlan& plan) {
+      return submitPlanTask(graph, plan, *deviceBounds, &op);
+    };
+    bool coverageFree = !op->hasCoverage();
+    auto colorResult =
+        coverageFree ? AOTRouter::Route(colorProcessors, submitColors) : AOTRouteResult::NoPlan;
+    if (colorResult == AOTRouteResult::Submitted) {
+      return;
+    }
+    if (colorResult == AOTRouteResult::NoPlan && cache->diagnosticRecordingEnabled()) {
+      // The route was attempted and refused: record the pure-analysis reason so a draw left on
+      // the plain route carries an observable "why" (which processor lacks a lowering, which
+      // shape no planner covers) instead of nothing. Trivial (empty chain) is not a rejection.
+      // A color chain that is routable on its own was refused here only because the draw still
+      // carries coverage the color-only route cannot apply, which is NotRoutable as well.
+      auto analysis = AOTEffectDecomposer::AnalyzeChain(colorProcessors);
+      auto outcome = analysis.outcome == AOTDecomposeOutcome::FusablePointwise
+                         ? AOTDecomposeOutcome::NotRoutable
+                         : analysis.outcome;
+      if (outcome != AOTDecomposeOutcome::Trivial) {
+        cache->recordDecomposeRejection(outcome);
+      }
+    }
+    // Materialization retry (AOTRouter::RouteWithMaterializedLeading): the original chain was not
+    // routed, so rebuild its leading processor with materialized blend children and route again.
+    // The retry carries the folded coverage only when the fold contract admits it; other coverage
+    // keeps the original draw intact. A refused retry leaves the original color tree on the op.
+    // Image-driven draws have no brush shader (drawImage builds the leading processor straight
+    // from the image), so their rebuild comes from the closure the flush site captured. Trailing
+    // color processors behind the leading one (e.g. a ColorSpaceXformEffect) ride along.
+    bool canRebuild =
+        (coverageFree || foldMask) && (brush.shader != nullptr || rebuildColorChain != nullptr);
+    if (canRebuild && !colorProcessors.empty() &&
+        AOTRouter::RetryWarranted(colorProcessors[0], args.renderFlags)) {
+      ColorChainRebuild rebuildLeading = rebuildColorChain;
+      if (brush.shader != nullptr) {
+        // Rebuild from the merged shader when a transparent-black color filter was folded into it
+        // (see mergedShader above); otherwise the raw brush.shader is the whole color source.
+        auto shaderForRetry = mergedShader != nullptr ? mergedShader : brush.shader;
+        rebuildLeading = [&, shaderForRetry]() {
+          FPArgs retryArgs = args;
+          retryArgs.renderFlags |= InternalRenderFlags::MaterializeBlendChildren;
+          return FragmentProcessor::Make(shaderForRetry, retryArgs, nullptr, dstColorSpace);
+        };
+      }
+      std::vector<const FragmentProcessor*> trailing(colorProcessors.begin() + 1,
+                                                     colorProcessors.end());
+      if (foldMask) {
+        for (size_t index = colorProcessors.size(); index < foldedProcessors.size(); ++index) {
+          trailing.push_back(foldedProcessors[index]);
+        }
+      }
+      auto& submitRetry = foldMask ? submitFolded : submitColors;
+      if (AOTRouter::RouteWithMaterializedLeading(rebuildLeading, trailing, submitRetry) ==
+          AOTRouteResult::Submitted) {
         return;
-      }
-    } else {
-      if (cache->diagnosticRecordingEnabled()) {
-        // The route was attempted and refused: record the pure-analysis reason so a silently
-        // falling-back draw carries an observable "why" (which processor lacks a lowering, which
-        // shape no planner covers) instead of nothing. Trivial (empty chain) is not a rejection.
-        // A color chain that is routable on its own was refused here only because the draw still
-        // carries coverage the color-only route cannot apply, which is NotRoutable as well.
-        auto analysis = AOTEffectDecomposer::AnalyzeChain(colorProcessors);
-        auto outcome = analysis.outcome == AOTDecomposeOutcome::FusablePointwise
-                           ? AOTDecomposeOutcome::NotRoutable
-                           : analysis.outcome;
-        if (outcome != AOTDecomposeOutcome::Trivial) {
-          cache->recordDecomposeRejection(outcome);
-        }
-      }
-      // P4 first migration group: in-plan materialization retry. When the plain chain route
-      // refuses the unmodified tree and the color chain is a single two-child blend whose
-      // operands the materialization policy would rewrite, rebuild the chain from the original
-      // source with the MaterializeBlendChildren flag set — the source shader or filter then
-      // applies the same EnsureSimpleBlendChild rewrite the construction-time path used to apply.
-      // The retry includes coverage only when the existing fold contract permits it. Unsupported
-      // coverage keeps the original draw intact; a failed retry must
-      // never leave a rewritten (materialized) tree on the draw (: the pre-fix swap
-      // replaced the original with the materialized tree, so even the fallback executed a
-      // quantization boundary the reference never had).
-      // The materialization boundary is an RGBA8 quantization step: an AlphaThreshold behind it
-      // can flip where its input rounds across the threshold. With a precompiled bundle loaded the
-      // runtime route is unavailable, so the retry is still the only way to render the draw.
-      // P4 group three: image-driven draws have no brush shader (drawImage builds the leading
-      // processor straight from the image), so the rebuild can also come from a closure the
-      // flush site captured. Trailing processors behind the rebuilt one (e.g. a
-      // ColorSpaceXformEffect) stay on the op and ride along the retry.
-      bool canRebuild = (!op->hasCoverage() || foldMask) &&
-                        (brush.shader != nullptr || rebuildColorChain != nullptr);
-      if (canRebuild && colorProcessors.size() >= 1) {
-        auto* xfer = colorProcessors[0];
-        bool nested = (args.renderFlags & InternalRenderFlags::NestedRasterization) != 0;
-        if (xfer != nullptr && xfer->numChildProcessors() == 2 &&
-            xfer->name() == "XfermodeFragmentProcessor - two") {
-          bool retryWarranted = false;
-          for (size_t childIndex = 0; childIndex < 2 && !retryWarranted; ++childIndex) {
-            auto decision = AOTMaterializationPolicy::Evaluate(
-                xfer->childProcessor(childIndex), MaterializationConsumer::PointwiseBlend,
-                childIndex);
-            retryWarranted = decision.requiredForCorrectness || (!nested && decision.shouldFlatten);
-          }
-          if (retryWarranted) {
-            PlacementPtr<FragmentProcessor> retryFP = nullptr;
-            if (brush.shader != nullptr) {
-              FPArgs retryArgs = args;
-              retryArgs.renderFlags |= InternalRenderFlags::MaterializeBlendChildren;
-              // Rebuild from the merged shader when a transparent-black color filter was folded
-              // into it (see mergedShader above); otherwise the raw brush.shader is the whole
-              // color source and rebuilding from it is correct.
-              auto shaderForRetry = mergedShader != nullptr ? mergedShader : brush.shader;
-              retryFP = FragmentProcessor::Make(shaderForRetry, retryArgs, nullptr, dstColorSpace);
-            } else {
-              retryFP = rebuildColorChain();
-            }
-            if (retryFP != nullptr) {
-              std::vector<const FragmentProcessor*> retryProcessors = {retryFP.get()};
-              for (size_t i = 1; i < colorProcessors.size(); ++i) {
-                retryProcessors.push_back(colorProcessors[i]);
-              }
-              if (foldMask) {
-                for (size_t index = colorProcessors.size(); index < foldedProcessors.size();
-                     ++index) {
-                  retryProcessors.push_back(foldedProcessors[index]);
-                }
-              }
-              AOTEffectGraph retryGraph = {};
-              AOTEffectPlan retryPlan = {};
-              if (AOTEffectDecomposer::Lower(retryProcessors, &retryGraph) &&
-                  AOTEffectDecomposer::Decompose(retryGraph, &retryPlan)) {
-                if (foldMask) {
-                  op->moveCoveragesToColors();
-                }
-                if (submitPlanTask(retryGraph, retryPlan, *deviceBounds, &op)) {
-                  return;
-                }
-              }
-            }
-            // A refused retry or a failed rebuild leaves the original color tree intact; any
-            // coverage moved into its tail is equivalent under the fold contract. Dropping retryFP
-            // avoids inserting quantized operands into the original draw. Materialization fills the
-            // rebuild already enqueued render unconsumed (wasted work, no pixel effect); deferring
-            // them requires a separate two-phase commit.
-          }
-        }
       }
     }
   }
