@@ -165,8 +165,8 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     // refused (or its plan not routable), and the caller can rebuild the processor with the
     // MaterializeBlendChildren flag set — the filter then applies the same
     // EnsureSimpleBlendChild rewrite the construction-time path used to apply. Retry the chain
-    // with the materialized tree first; when it is still refused, swap it into the plain draw so
-    // the fill below serves it exactly the way the pre-P4 construction-time rewrite was served.
+    // with the materialized tree; when it is still refused, the materialized tree is dropped and
+    // the plain fill below keeps the ORIGINAL processor.
     auto retryProcessor = rebuildColorChain();
     if (retryProcessor != nullptr) {
       AOTEffectGraph retryGraph = {};

@@ -5302,8 +5302,8 @@ static std::vector<std::shared_ptr<Image>> MakeBlendFixtureImages() {
 }
 
 // WP4-0 fixtures: over-sampler-budget blend DAGs (5/7/9 texture leaves against the fused kernel's
-// four-sampler budget), drawn as a rect (rect GPs) and as an oval (the non-rect-GP terminal
-// materialization route). Since the P4 migration the materialization is planned: the retry
+// four-sampler budget), drawn as a rect (rect GPs) and as an oval (an AA ellipse GP, no separate
+// coverage processor). Since the P4 migration the materialization is planned: the retry
 // rebuilds the tree with materialized operands when the chain route refuses the original. The
 // no-bundle reference pass now runs the original tree with no materialization at all (the F02
 // main-equivalence guarantee), so the bundle pass's per-edge RGBA8 quantization shows up as a
@@ -5336,21 +5336,13 @@ TGFX_TEST(AOTRenderConsistencyTest, NestedBlendSamplerBudget) {
     ColorFilterRenderStats stats = {};
     RenderBlendShaderSceneOnce(shader, scene.drawOval, false, &reference, nullptr);
     RenderBlendShaderSceneOnce(shader, scene.drawOval, true, &candidate, &stats);
-    // Routing split by shape (materialization-retry ruling): the RECT scenes carry no GP
-    // coverage, so the in-plan retry's materialized 2-leaf tree rides the chain — precompiled
-    // all the way. The OVAL scene carries the ellipse's AA coverage, which the retry's chain
-    // attempt does not take; the pre-fix code swapped the materialized tree into the plain
-    // route instead (a quantization boundary the reference never had — removed by the
-    // failed-retry-preserves-original ruling), so the oval now keeps its ORIGINAL tree and
-    // falls to the runtime route: exactly one miss and one build, byte-identical output.
-    if (scene.drawOval) {
-      EXPECT_EQ(stats.programs.programBuilderCreations, 1u);
-      EXPECT_EQ(stats.noMatchingRule, 1u);
-    } else {
-      EXPECT_GE(stats.draws.completeAOTDraws, 1u);
-      EXPECT_EQ(stats.programs.programBuilderCreations, 0u);
-      EXPECT_EQ(stats.noMatchingRule, 0u);
-    }
+    // Every scene, rect or oval, must be served by precompiled programs: with a bundle loaded
+    // there is no runtime route, so a refused draw is a dropped draw. The oval's AA comes from
+    // its geometry processor, not from a separate coverage processor, so it must take the same
+    // materialization retry as the rect scenes.
+    EXPECT_GE(stats.draws.completeAOTDraws, 1u);
+    EXPECT_EQ(stats.programs.programBuilderCreations, 0u);
+    EXPECT_EQ(stats.noMatchingRule, 0u);
     auto* refPixels = static_cast<const uint8_t*>(reference.lockPixels());
     auto* candPixels = static_cast<const uint8_t*>(candidate.lockPixels());
     ASSERT_TRUE(refPixels != nullptr && candPixels != nullptr);
@@ -5557,8 +5549,9 @@ TGFX_TEST(AOTRenderConsistencyTest, ColorFilterShaderServesFusedTreeWithoutMater
 }
 
 // An encoded image with a color-filter chain on macOS OpenGL is served by a single fused
-// precompiled pass and stays pixel-identical to the runtime fallback.
-TGFX_TEST(AOTRenderConsistencyTest, MultiPassUnsupportedSourceFallsBackAtomically) {
+// precompiled pass and stays pixel-identical to the runtime route. This is a single-pass case;
+// it does not exercise multi-pass planning or the atomic fallback.
+TGFX_TEST(AOTRenderConsistencyTest, EncodedImageColorFilterChainRunsSingleFusedPass) {
   if (std::string(TGFX_BACKEND_NAME) != "opengl") {
     GTEST_SKIP() << "This case relies on macOS OpenGL encoded images using Rectangle textures";
   }
@@ -5591,7 +5584,7 @@ TGFX_TEST(AOTRenderConsistencyTest, MultiPassUnsupportedSourceFallsBackAtomicall
   EXPECT_EQ(candidateStats.draws.intermediateReadBytes, 0u);
   EXPECT_EQ(candidateStats.draws.intermediateWriteBytes, 0u);
   EXPECT_EQ(candidateStats.draws.peakTemporaryBytes, 0u);
-  ExpectBitmapsIdentical("linear-chain-unsupported-source-fallback", candidate, reference, width,
+  ExpectBitmapsIdentical("encoded-image-color-filter-single-pass", candidate, reference, width,
                          height);
 }
 
@@ -7283,14 +7276,10 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailThresholdQuantizationBand) {
   ExpectBitmapsNear("offscreen-tail-threshold-multipass", candidate, reference, 64, 64, 1);
 }
 
-// materialized multi-pass sampling under translation, magnification,
-// and minification with mipmap filtering. The offscreen fill drives a 36-instruction tree (a
-// device-space texture source with a transform-carrying uvMatrix plus 35 matrices) — formerly
-// through an 18-pass tail plan where every source sample rode a materialization chain.
-//
-// evidence insufficient — the "minify-mipmap" case never
-// executed mipmap sampling (no sampler override, no mip levels), so the old maxDiff<=3 pass
-// said nothing about sampling across materialization boundaries.
+// materialized multi-pass sampling under translation, magnification, and minification. The
+// offscreen fill drives a 36-instruction tree (a device-space texture source with a
+// transform-carrying uvMatrix plus 35 matrices). No case enables mipmap filtering, so this test
+// says nothing about mipmapped sampling across materialization boundaries.
 //
 // The tree runs as an 18-pass plan: the device-space source with its transform is sampled once in
 // the first pass, and later passes read the intermediates pixel-aligned. Each of the 17 boundaries
@@ -7318,7 +7307,7 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailSamplingTransforms) {
   const std::array<TransformCase, 3> cases = {{
       {"translate", Matrix::MakeTrans(31, 17)},
       {"magnify", Matrix::MakeScale(0.5f, 0.5f)},
-      {"minify-mipmap", Matrix::MakeScale(3.2f, 3.2f)},
+      {"minify", Matrix::MakeScale(3.2f, 3.2f)},
   }};
   for (const auto& transformCase : cases) {
     SCOPED_TRACE(transformCase.label);

@@ -68,7 +68,8 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
   // P4 group three: hand the fill an in-plan materialization retry. When the chain route refuses
   // the unmodified filter tree, the closure rebuilds it with the MaterializeBlendChildren flag
   // set (the filter then applies the EnsureSimpleBlendChild rewrite the construction-time path
-  // used to apply) so the fill can retry the chain and otherwise serve the materialized tree.
+  // used to apply) so the fill can retry the chain. A refused retry is dropped and the fill keeps
+  // the original processor.
   // The nested fill flags are captured verbatim, keeping the nested semantics (only
   // correctness-required operands materialize) intact. The source copy is taken before the
   // processor construction moves it below.
