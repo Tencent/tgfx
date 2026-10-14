@@ -160,12 +160,11 @@ class StyleIterator {
   }
 
   std::tuple<std::string, std::string> next() {
-    std::string name;
-    std::string value;
-
     // CSS Syntax Level 3 allows empty declarations between semicolons; skip any segment that
     // is not a complete declaration instead of treating it as the end of input.
     while (pos) {
+      std::string name;
+      std::string value;
       const char* sep = this->nextSeparator();
       const char* valueSep = strchr(pos, ':');
       if (valueSep && pos < valueSep && valueSep + 1 < sep) {
@@ -175,11 +174,10 @@ class StyleIterator {
 
       pos = *sep ? sep + 1 : nullptr;
       if (!name.empty() && !value.empty()) {
-        break;
+        return std::make_tuple(name, value);
       }
     }
-
-    return std::make_tuple(name, value);
+    return {};
   }
 
  private:

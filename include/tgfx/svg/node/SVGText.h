@@ -68,6 +68,7 @@ class SVGTextContainer : public SVGTextFragment {
 
   void appendChild(std::shared_ptr<SVGNode> child) final;
   const std::vector<std::shared_ptr<SVGNode>>& getChildren() const final;
+  bool hasChildren() const final;
 
  protected:
   explicit SVGTextContainer(SVGTag t) : INHERITED(t) {

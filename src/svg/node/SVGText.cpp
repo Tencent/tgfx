@@ -70,6 +70,11 @@ void SVGTextContainer::appendChild(std::shared_ptr<SVGNode> child) {
 const std::vector<std::shared_ptr<SVGNode>>& SVGTextContainer::getChildren() const {
   return children;
 }
+
+bool SVGTextContainer::hasChildren() const {
+  return !children.empty();
+}
+
 void SVGTextFragment::renderText(const SVGRenderContext& context,
                                  const ShapedTextCallback& function) const {
   SVGRenderContext localContext(context);
