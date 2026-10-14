@@ -65,6 +65,8 @@ class RectInnerShadowFragmentProcessor : public FragmentProcessor {
                                    PMColor color, const Matrix& shadowCoordMatrix,
                                    const Matrix& maskCoordMatrix);
 
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
+
   Point shadowHalfSize = {};
   Point maskHalfOverSigma = {};
   PMColor color = {};

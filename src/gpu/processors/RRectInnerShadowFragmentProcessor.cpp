@@ -34,7 +34,12 @@ RRectInnerShadowFragmentProcessor::RRectInnerShadowFragmentProcessor(
 
 void RRectInnerShadowFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   // Geometry and color are uniforms, so they do not affect the program. The quadrature count is
-  // baked into the shader source, so instances differing in it need separate programs.
+  // baked into the shader source, so instances differing in it need separate programs. Each coord
+  // transform's perspective property decides whether the shader emits the perspective division for
+  // that coordinate, so both go into the key as well.
   bytesKey->write(static_cast<uint32_t>(quadratureCount));
+  uint32_t flags = shadowCoordTransform.matrix.hasPerspective() ? 1 : 0;
+  flags |= maskCoordTransform.matrix.hasPerspective() ? 2 : 0;
+  bytesKey->write(flags);
 }
 }  // namespace tgfx

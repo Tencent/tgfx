@@ -51,6 +51,8 @@ class RectBlurFragmentProcessor : public FragmentProcessor {
   RectBlurFragmentProcessor(const Point& halfSizeOverSigma, PMColor color,
                             const Matrix& coordMatrix);
 
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
+
   Point halfSizeOverSigma = {};
   PMColor color = {};
   CoordTransform coordTransform;

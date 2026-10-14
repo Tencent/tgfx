@@ -215,10 +215,11 @@ bool InnerShadowStyle::tryDrawAnalytic(Canvas* canvas, const LayerStyleInput& in
   DEBUG_ASSERT(!FloatNearlyZero(_spread));
   const auto sigmaX = _blurrinessX * input.contentScale;
   const auto sigmaY = _blurrinessY * input.contentScale;
-  // The closed form normalizes by sigma per axis, so a zero sigma cannot be expressed. Supporting
-  // an axis with zero blur would require additional shader branches, whose benefit has not been
-  // validated.
-  if (FloatNearlyZero(sigmaX) || FloatNearlyZero(sigmaY)) {
+  // The closed form normalizes by sigma per axis, so a near-zero sigma cannot be expressed.
+  // Supporting an axis with zero blur would require additional shader branches, whose benefit has
+  // not been validated. A negative blurriness falls back to the filter path, which renders it as
+  // an unblurred offset shadow.
+  if (sigmaX <= FLOAT_NEARLY_ZERO || sigmaY <= FLOAT_NEARLY_ZERO) {
     return false;
   }
   // The shadow shape is the layer's own outline and the mask is that shape inset by the spread.

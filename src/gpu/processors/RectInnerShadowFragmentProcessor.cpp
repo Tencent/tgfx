@@ -32,4 +32,13 @@ RectInnerShadowFragmentProcessor::RectInnerShadowFragmentProcessor(const Point& 
   addCoordTransform(&maskCoordTransform);
 }
 
+void RectInnerShadowFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
+  // Geometry and color are uniforms, so they do not affect the program. Each coord transform's
+  // perspective property decides whether the shader emits the perspective division for that
+  // coordinate, so both go into the key.
+  uint32_t flags = shadowCoordTransform.matrix.hasPerspective() ? 1 : 0;
+  flags |= maskCoordTransform.matrix.hasPerspective() ? 2 : 0;
+  bytesKey->write(flags);
+}
+
 }  // namespace tgfx
