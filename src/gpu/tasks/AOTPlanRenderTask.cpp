@@ -27,21 +27,21 @@
 namespace tgfx {
 
 // Fault injection (diagnostics contract): TGFX_AOT_TEST_INJECT_PASS_FAILURE selects which pass of
-// a plan task fails its render-pass setup during execution: "first" (the first intermediate pass),
-// "middle" (a later intermediate pass) or "last" (the terminal pass onto the destination). The
+// a plan task fails its render-pass setup during execution: "first" (the first producer pass),
+// "middle" (a later producer pass) or "last" (the terminal pass onto the destination). The
 // task must stop after the failure, record the execution-failure diagnostic, and not crash.
 // Test-only.
-static bool InjectFailureAt(bool isFirstIntermediate, bool isTerminal) {
+static bool InjectFailureAt(bool isFirstProducer, bool isTerminal) {
   const char* mode = std::getenv("TGFX_AOT_TEST_INJECT_PASS_FAILURE");
   if (mode == nullptr) {
     return false;
   }
   std::string value = mode;
   if (value == "first") {
-    return isFirstIntermediate && !isTerminal;
+    return isFirstProducer && !isTerminal;
   }
   if (value == "middle") {
-    return !isFirstIntermediate && !isTerminal;
+    return !isFirstProducer && !isTerminal;
   }
   return value == "last" && isTerminal;
 }
@@ -68,12 +68,10 @@ static bool ExecutePreparedPass(CommandEncoder* encoder, RenderTarget* renderTar
   return submitted;
 }
 
-AOTPlanRenderTask::AOTPlanRenderTask(BlockAllocator* allocator,
-                                     std::vector<AOTIntermediatePass>&& intermediatePasses,
-                                     DrawOp::ColorProcessorList&& terminalColors,
+AOTPlanRenderTask::AOTPlanRenderTask(BlockAllocator* allocator, AOTRenderPlan&& plan,
                                      std::shared_ptr<RenderTargetProxy> destination)
-    : RenderTask(allocator), intermediatePasses(std::move(intermediatePasses)),
-      terminalColors(std::move(terminalColors)), destination(std::move(destination)) {
+    : RenderTask(allocator), plan(std::move(plan)), destination(std::move(destination)) {
+  DEBUG_ASSERT(this->plan.isWellFormed());
 }
 
 void AOTPlanRenderTask::setOriginalDraw(PlacementPtr<DrawOp> drawOp) {
@@ -82,9 +80,9 @@ void AOTPlanRenderTask::setOriginalDraw(PlacementPtr<DrawOp> drawOp) {
 
 void AOTPlanRenderTask::execute(CommandEncoder* encoder) {
   std::vector<std::shared_ptr<RenderTarget>> renderTargets = {};
-  renderTargets.reserve(intermediatePasses.size());
+  renderTargets.reserve(plan.passes.size());
   bool targetsResolved = true;
-  for (const auto& pass : intermediatePasses) {
+  for (const auto& pass : plan.passes) {
     auto renderTarget = pass.target->getRenderTarget();
     targetsResolved = targetsResolved && renderTarget != nullptr;
     renderTargets.push_back(std::move(renderTarget));
@@ -101,14 +99,14 @@ void AOTPlanRenderTask::execute(CommandEncoder* encoder) {
   auto* cache = finalTarget->getContext()->precompiledShaderCache();
   cache->setMissRecordingPaused(true);
   bool prepared = true;
-  for (size_t index = 0; index < intermediatePasses.size() && prepared; ++index) {
-    auto drawOp = static_cast<StandardDrawOp*>(intermediatePasses[index].drawOp.get());
+  for (size_t index = 0; index < plan.passes.size() && prepared; ++index) {
+    auto drawOp = static_cast<StandardDrawOp*>(plan.passes[index].drawOp.get());
     prepared =
         drawOp->prepareForTask(renderTargets[index].get(), ProgramLookupMode::PrecompiledOnly);
   }
   prepared = prepared && static_cast<StandardDrawOp*>(originalDraw.get())
                              ->prepareForTask(finalTarget.get(), ProgramLookupMode::PrecompiledOnly,
-                                              std::move(terminalColors));
+                                              std::move(plan.terminalColors));
   cache->setMissRecordingPaused(false);
   if (!prepared) {
     executeFallback(encoder, std::move(finalTarget));
@@ -121,21 +119,22 @@ void AOTPlanRenderTask::execute(CommandEncoder* encoder) {
       cache->recordDraw(failStats, false);
     }
   };
-  for (size_t index = 0; index < intermediatePasses.size(); ++index) {
+  // Passes run in plan order, which places every producer before the passes that sample it.
+  for (size_t index = 0; index < plan.passes.size(); ++index) {
     if (InjectFailureAt(index == 0, false)) {
-      LOGE("AOTPlanRenderTask::execute() Injected pass failure at intermediate pass %zu", index);
+      LOGE("AOTPlanRenderTask::execute() Injected pass failure at producer pass %zu", index);
       recordExecutionFailure();
       return;
     }
     if (!ExecutePreparedPass(encoder, renderTargets[index].get(),
-                             static_cast<StandardDrawOp*>(intermediatePasses[index].drawOp.get()),
+                             static_cast<StandardDrawOp*>(plan.passes[index].drawOp.get()),
                              LoadAction::Clear, PMColor::Transparent())) {
-      LOGE("AOTPlanRenderTask::execute() Intermediate pass %zu failed to begin", index);
+      LOGE("AOTPlanRenderTask::execute() Producer pass %zu failed to begin", index);
       recordExecutionFailure();
       return;
     }
   }
-  if (InjectFailureAt(intermediatePasses.empty(), true)) {
+  if (InjectFailureAt(plan.passes.empty(), true)) {
     LOGE("AOTPlanRenderTask::execute() Injected pass failure at the terminal pass");
     recordExecutionFailure();
     return;
@@ -149,7 +148,7 @@ void AOTPlanRenderTask::execute(CommandEncoder* encoder) {
   }
   if (cache->diagnosticRecordingEnabled()) {
     AOTDrawStats drawStats = {};
-    auto edges = intermediatePasses.size();
+    auto edges = plan.passes.size();
     drawStats.kernelInvocations = edges + 1;
     drawStats.offscreenTargets = edges;
     drawStats.materializedEdges = edges;

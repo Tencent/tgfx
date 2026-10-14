@@ -232,14 +232,13 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t render
   }
   auto drawingManager = context->drawingManager();
   auto allocator = drawingManager->drawingAllocator();
-  std::vector<AOTIntermediatePass> intermediatePasses = {};
-  DrawOp::ColorProcessorList terminalColors = {};
+  AOTRenderPlan renderPlan = {};
   if (plan.passes.size() == 1) {
     auto processor = AOTChainBuilder::BuildFPForPass(allocator, graph, plan.passes[0]);
     if (processor == nullptr) {
       return nullptr;
     }
-    terminalColors.emplace_back(std::move(processor));
+    renderPlan.terminalColors.emplace_back(std::move(processor));
   } else {
     // One geometry for the whole plan: every intermediate pass renders into a target of exactly
     // this size over the draw's device bounds, and the terminal draw samples the last one back at
@@ -303,7 +302,7 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t render
         return nullptr;
       }
       if (isTerminal) {
-        terminalColors.emplace_back(std::move(processor));
+        renderPlan.terminalColors.emplace_back(std::move(processor));
         break;
       }
       auto materialized = AOTMaterializationPolicy::AllocateTarget(context, geometry);
@@ -317,11 +316,22 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t render
       if (drawOp == nullptr || previousTexture == nullptr) {
         return nullptr;
       }
-      intermediatePasses.push_back({std::move(target), std::move(drawOp)});
+      // Each split-off segment reads only its predecessor, at the same device pixel.
+      AOTRenderPass renderPass = {};
+      renderPass.target = std::move(target);
+      renderPass.drawOp = std::move(drawOp);
+      if (index > 0) {
+        renderPass.dependencies.push_back(index - 1);
+      }
+      renderPass.edge = {AOTEdgeSpace::Device, geometry, 0.0f};
+      renderPlan.passes.push_back(std::move(renderPass));
     }
   }
-  auto task = allocator->make<AOTPlanRenderTask>(allocator, std::move(intermediatePasses),
-                                                 std::move(terminalColors), std::move(destination));
+  if (!renderPlan.isWellFormed()) {
+    return nullptr;
+  }
+  auto task =
+      allocator->make<AOTPlanRenderTask>(allocator, std::move(renderPlan), std::move(destination));
   if (task == nullptr) {
     return nullptr;
   }
