@@ -1,15 +1,44 @@
-// Extended pointwise graphs: resource layout and transfer mechanism are compile-time profiles.
+// PointwiseGraphShader: single-pass pointwise graphs with extended resources. RESOURCE_KIND selects
+// the resource profile (PointwiseGraphShader::FragDims, AOTResourceProfile):
+//   0 = NoiseGraph: Perlin noise source, two-recipe tiling
+//   1 = TiledGraph: gradient source, three-recipe tiling
+// Everything else is the shared pointwise core (see pointwise_fragment_config.inc).
 #version 450
 
 #ifndef RESOURCE_KIND
 #define RESOURCE_KIND 0
 #endif
-#if RESOURCE_KIND == 0
-#define TGFX_POINTWISE_NOISE 1
-#else
-#define TGFX_POINTWISE_TILED 1
-#define TGFX_POINTWISE_GRADIENT 1
-#endif
-#define TGFX_POINTWISE_SOURCE_COORDS 1
 
-#include "pointwise_fragment.inc"
+#include "pointwise_fragment_config.inc"
+
+layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
+#include "pointwise_fragment_uniforms.inc"
+#if RESOURCE_KIND == 0
+#include "pointwise_noise_uniforms.inc"
+#include "pointwise_tiled2_uniforms.inc"
+#else
+#include "pointwise_gradient_uniforms.inc"
+#include "pointwise_tiled3_uniforms.inc"
+#endif
+#include "xp_uniforms.inc"
+};
+
+#include "pointwise_fragment_interface.inc"
+
+#if RESOURCE_KIND == 0
+#include "pointwise_tiled2.inc"
+#include "pointwise_noise.inc"
+
+bool evalResourceSlot(ivec4 Packed, vec4 in0, out vec4 value) {
+  return evalNoiseSlot(Packed, value);
+}
+#else
+#include "pointwise_tiled3.inc"
+#include "pointwise_gradient.inc"
+
+bool evalResourceSlot(ivec4 Packed, vec4 in0, out vec4 value) {
+  return evalGradientSlot(Packed, in0, value);
+}
+#endif
+
+#include "pointwise_fragment_main.inc"

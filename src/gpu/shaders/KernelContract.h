@@ -45,7 +45,7 @@ constexpr const char* DeviceToLocal = "DeviceToLocal";
 namespace ChainOp {
 
 // The pointwise chain slot op codes, mirrored by the OP_* defines in
-// pointwise_chain_eval.inc and the AOTChainOp enum (which anchors to these constants).
+// pointwise_chain_ops.inc and the AOTChainOp enum (which anchors to these constants).
 constexpr int ColorMatrix = 0;
 constexpr int Luma = 1;
 constexpr int AlphaThreshold = 2;

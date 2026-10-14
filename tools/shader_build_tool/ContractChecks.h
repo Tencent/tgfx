@@ -28,7 +28,7 @@ namespace tgfx {
 /// ClipContract uniform fields. Returns the error count.
 size_t ValidateClipContractFields(const std::vector<VariantData>& variants);
 
-/// Validates the OP_* defines in pointwise_chain_eval.inc against the ChainOp constants that
+/// Validates the OP_* defines in pointwise_chain_ops.inc against the ChainOp constants that
 /// anchor the AOTChainOp enum. Returns the error count.
 size_t ValidateChainOpCodes(const std::string& shaderDir);
 

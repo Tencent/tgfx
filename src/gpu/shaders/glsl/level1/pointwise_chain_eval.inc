@@ -5,42 +5,13 @@
 // portable); the OP_TEXTURE branch of evalChainSlot only applies the leaf modulation flags to the
 // prefetched sample.
 //
-// Op values mirror AOTChainOp and are part of the precompiled kernel ABI. The ColorSpaceXform
-// parameters are shared chain-wide (ChainCSFlags & friends): the matcher guarantees at most one
-// slot per chain uses them.
+// Resource ops (gradient and noise sources) are not evaluated here: a slot that none of the core
+// ops below claim goes to the kernel entry's evalResourceSlot(), which dispatches to the resource
+// modules the entry includes, and only then falls through to OP_COLOR_SPACE_XFORM. The
+// ColorSpaceXform parameters are shared chain-wide (ChainCSFlags & friends): the matcher
+// guarantees at most one slot per chain uses them.
 
-#ifndef TGFX_CHAIN_OP_CONSTANTS
-#define TGFX_CHAIN_OP_CONSTANTS
-#define OP_COLOR_MATRIX 0
-#define OP_LUMA 1
-#define OP_ALPHA_THRESHOLD 2
-#define OP_COLOR_SPACE_XFORM 3
-#define OP_NONE 4
-#define OP_TEXTURE 5
-#define OP_CONST_COLOR 6
-#define OP_BLEND 7
-#define OP_TEX_MODULATE 12
-#define OP_INPUT_OPAQUE 13
-#define OP_MUL_ALPHA 14
-#define OP_PERLIN_NOISE 15
-#define OP_AARECT_COVERAGE 8
-#define OP_GRADIENT 9
-#define OP_LOCAL_RECT_COVERAGE 10
-#define OP_RRECT_COVERAGE 11
-
-#define CS_UNPREMUL 1
-#define CS_LINEARIZE 2
-#define CS_GAMUT 4
-#define CS_ENCODE 8
-#define CS_PREMUL 16
-#define CS_SRC_OOTF 32
-#define CS_DST_OOTF 64
-#endif
-
-#ifdef TGFX_POINTWISE_GRADIENT
-#include "gradient_layout.inc"
-#include "gradient_colorize.inc"
-#endif
+#include "pointwise_chain_ops.inc"
 #include "pointwise_math.inc"
 
 #include "transfer_function.inc"
@@ -65,13 +36,6 @@ vec4 evalChainSlot(int slot) {
   if (Packed.x == OP_NONE) {
     return vec4(0.0);
   }
-#ifdef TGFX_POINTWISE_NOISE
-  if (Packed.x == OP_PERLIN_NOISE) {
-    highp vec2 coord = GradientCoords.xy / GradientCoords.z;
-    return aotPerlinNoise(coord, NoiseFrequencyStitch.xy, NoiseFrequencyStitch.zw,
-                          NoiseModeOctaves.x, NoiseModeOctaves.y, NoiseModeOctaves.z);
-  }
-#endif
   if (Packed.x == OP_TEXTURE) {
     vec4 texColor = chainLeafTex[slot];
     if ((Packed.w & 2) != 0) {
@@ -190,68 +154,10 @@ vec4 evalChainSlot(int slot) {
                                             CoverageRRectAntiAlias[rrectOrdinal],
                                             CoverageRRectDeviceToLocal[rrectOrdinal]));
   }
-#ifdef TGFX_POINTWISE_GRADIENT
-  if (Packed.x == OP_GRADIENT) {
-    // Analytic gradient source. The layout math and border clamp are verbatim from the dedicated
-    // gradient kernels; the colorizer kind selects between the single-interval mix, the
-    // dual-interval scale/bias pair and the unrolled-binary tree, each byte-matching its
-    // dedicated kernel. The epilogue premultiplies and modulates by the input alpha, matching
-    // the runtime ClampedGradientEffect emission.
-    highp vec2 gradientCoord = GradientCoords.xy / GradientCoords.z;
-    float gradT = gradientLayoutT(GradientLayoutType, GradientBias, GradientScale, gradientCoord);
-    vec4 gradColor;
-    if (gradT <= 0.0) {
-      gradColor = GradientLeftBorder;
-    } else if (gradT >= 1.0) {
-      gradColor = GradientRightBorder;
-    } else if (GradientColorizerKind == 0) {
-      // Keep the same arithmetic order as GLSLSingleIntervalGradientColorizer on the JIT path.
-      gradColor = (1.0 - gradT) * GradientStart + gradT * GradientEnd;
-    } else if (GradientColorizerKind == 1) {
-      vec4 gradScale = GradientScale01;
-      vec4 gradBias = GradientBias01;
-      if (gradT >= GradientThreshold) {
-        gradScale = GradientScale23;
-        gradBias = GradientBias23;
-      }
-      gradColor = vec4(gradT * gradScale + gradBias);
-    } else if (GradientColorizerKind == 3) {
-      // LUT colorizer, matching the dedicated texture_gradient kernel: sample the baked gradient
-      // texture at the computed t. The LUT child occupies a leaf slot for sampler binding only;
-      // GradientLUTLeaf selects it with static indices. Unreachable when NTEX == 0 (a LUT chain
-      // always carries the child), but the branch must still compile for those variants.
-      gradColor = vec4(0.0);
-#if NTEX > 0
-      highp vec2 lutCoord = vec2(gradT, 0.5);
-      if (GradientLUTLeaf == 0) {
-        gradColor = texture(TextureSampler_0, lutCoord);
-      }
-#if NTEX > 1
-      if (GradientLUTLeaf == 1) {
-        gradColor = texture(TextureSampler_1, lutCoord);
-      }
-#endif
-#if NTEX > 2
-      if (GradientLUTLeaf == 2) {
-        gradColor = texture(TextureSampler_2, lutCoord);
-      }
-      if (GradientLUTLeaf == 3) {
-        gradColor = texture(TextureSampler_3, lutCoord);
-      }
-#endif
-#endif
-    } else {
-      gradColor = gradientColorizeUnrolled(
-          gradT, GradientThresholds1_7, GradientThresholds9_13, GradientScale0_1, GradientBias0_1,
-          GradientScale2_3, GradientBias2_3, GradientScale4_5, GradientBias4_5, GradientScale6_7,
-          GradientBias6_7, GradientScale8_9, GradientBias8_9, GradientScale10_11,
-          GradientBias10_11, GradientScale12_13, GradientBias12_13, GradientScale14_15,
-          GradientBias14_15);
-    }
-    gradColor.rgb *= gradColor.a;
-    return gradColor * in0.a;
+  vec4 resourceValue = vec4(0.0);
+  if (evalResourceSlot(Packed, in0, resourceValue)) {
+    return resourceValue;
   }
-#endif
   // OP_COLOR_SPACE_XFORM
   if ((ChainCSFlags & CS_UNPREMUL) != 0) {
     float a = color.a;
@@ -283,4 +189,3 @@ vec4 evalChainSlot(int slot) {
   }
   return color;
 }
-

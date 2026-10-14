@@ -158,7 +158,7 @@ static size_t ValidateOpDefines(const std::string& shaderDir, const char* fileNa
 // The chain slot op codes ride the Packed.x selector, so the GLSL OP_* defines and the C++
 // AOTChainOp enum (anchored to the ChainOp constants) must agree value-for-value.
 size_t ValidateChainOpCodes(const std::string& shaderDir) {
-  return ValidateOpDefines(shaderDir, "pointwise_chain_eval.inc",
+  return ValidateOpDefines(shaderDir, "pointwise_chain_ops.inc",
                            {{"OP_COLOR_MATRIX", ChainOp::ColorMatrix},
                             {"OP_LUMA", ChainOp::Luma},
                             {"OP_ALPHA_THRESHOLD", ChainOp::AlphaThreshold},
