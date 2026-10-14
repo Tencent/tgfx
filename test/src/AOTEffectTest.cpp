@@ -1245,6 +1245,65 @@ TGFX_TEST(AOTEffectTest, DeviceSpaceLinearChainUsesPointwiseTailPlanner) {
   EXPECT_EQ(analysis.outcome, AOTDecomposeOutcome::FusablePointwise);
 }
 
+// A multi-pass tail plan never starts a pass at an AlphaThreshold, because the pass boundary would
+// round the threshold's input to RGBA8. The planner ends the previous pass early so the threshold
+// joins the operator that feeds it; when no earlier boundary is left (the threshold's feeding
+// operators are thresholds too), the chain is refused. CanExecute rejects a hand-built plan that
+// breaks the rule.
+TGFX_TEST(AOTEffectTest, TailPlanNeverStartsPassAtThreshold) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto proxy = context->proxyProvider()->createTextureProxy({}, 2, 2, PixelFormat::RGBA_8888);
+  ASSERT_NE(proxy, nullptr);
+  auto texture = DeviceSpaceTextureEffect::Make(&allocator, std::move(proxy), Matrix::I());
+  auto matrixA = ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix);
+  auto matrixB = ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix);
+  auto matrixC = ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix);
+  auto thresholdA = AlphaThresholdFragmentProcessor::Make(&allocator, 0.5f);
+  auto thresholdB = AlphaThresholdFragmentProcessor::Make(&allocator, 0.5f);
+  ASSERT_TRUE(texture != nullptr && matrixA != nullptr && matrixB != nullptr &&
+              matrixC != nullptr && thresholdA != nullptr && thresholdB != nullptr);
+
+  // [matrix, matrix, threshold, matrix]: the slot budget alone would split [source, matrix,
+  // matrix] | [threshold, matrix]. The planner gives [source, matrix] | [matrix, threshold] |
+  // [matrix].
+  AOTEffectGraph graph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower(
+      {texture.get(), matrixA.get(), matrixB.get(), thresholdA.get(), matrixC.get()}, &graph));
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+  ASSERT_EQ(plan.passes.size(), 3u);
+  EXPECT_EQ(plan.passes[0].nodes.size(), 2u);
+  ASSERT_EQ(plan.passes[1].nodes.size(), 2u);
+  EXPECT_EQ(graph.nodeAt(plan.passes[1].nodes[1])->kind, AOTEffectKind::AlphaThreshold);
+  EXPECT_EQ(plan.passes[2].nodes.size(), 1u);
+  for (size_t index = 1; index < plan.passes.size(); ++index) {
+    EXPECT_NE(graph.nodeAt(plan.passes[index].nodes[0])->kind, AOTEffectKind::AlphaThreshold);
+  }
+  EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+
+  // The plain slot-budget split of the same chain starts its second pass at the threshold.
+  AOTEffectPlan budgetSplit = plan;
+  budgetSplit.passes.resize(2);
+  budgetSplit.passes[0].nodes = {AOTNodeID(1), AOTNodeID(2), AOTNodeID(3)};
+  budgetSplit.passes[0].output = AOTNodeID(3);
+  budgetSplit.passes[1].nodes = {AOTNodeID(4), AOTNodeID(5)};
+  budgetSplit.passes[1].output = AOTNodeID(5);
+  budgetSplit.passes[1].materializesOutput = false;
+  ASSERT_EQ(graph.nodeAt(AOTNodeID(4))->kind, AOTEffectKind::AlphaThreshold);
+  EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, budgetSplit));
+
+  // [matrix, threshold, threshold]: three operators need two passes, but every boundary inside the
+  // chain is in front of a threshold or would leave a pass with no operator.
+  AOTEffectGraph refusedGraph;
+  ASSERT_TRUE(AOTEffectDecomposer::Lower(
+      {texture.get(), matrixA.get(), thresholdA.get(), thresholdB.get()}, &refusedGraph));
+  AOTEffectPlan refusedPlan;
+  EXPECT_FALSE(AOTEffectDecomposer::Decompose(refusedGraph, &refusedPlan));
+}
+
 // CanExecute and the chain builder share one planner, so a pass whose node list omits a producer
 // that another pass node consumes is refused at admission rather than promised and then refused
 // at construction.

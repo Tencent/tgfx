@@ -99,7 +99,8 @@ static bool ValidateYUVSource(const AOTEffectGraph& graph, AOTNodeID nodeID) {
 
 // A linear PointwiseTail chain split at the tail kernel's slot budget: the first pass carries the
 // source plus up to MaxSlots operators, every later pass up to MaxSlots operators reading its
-// predecessor's materialized output, and all but the last pass materialize.
+// predecessor's materialized output, and all but the last pass materialize. No later pass starts
+// with an AlphaThreshold (see CanStartTailPassAt in AOTEffectDecomposer.cpp).
 static bool ValidateSegmentedTailPlan(const AOTEffectGraph& graph, const AOTEffectPlan& plan) {
   AOTNodeID expectedInput = AOTNodeID::Invalid();
   for (size_t index = 0; index < plan.passes.size(); ++index) {
@@ -119,9 +120,13 @@ static bool ValidateSegmentedTailPlan(const AOTEffectGraph& graph, const AOTEffe
       }
       expectedInput = pass.nodes[0];
       firstOp = 1;
-    } else if (pass.dependencies.size() != 1 || pass.dependencies[0] != index - 1 ||
-               pass.nodes.size() > AOTPointwiseTailProcessor::MaxSlots) {
-      return false;
+    } else {
+      auto first = graph.nodeAt(pass.nodes[0]);
+      if (pass.dependencies.size() != 1 || pass.dependencies[0] != index - 1 ||
+          pass.nodes.size() > AOTPointwiseTailProcessor::MaxSlots || first == nullptr ||
+          first->kind == AOTEffectKind::AlphaThreshold) {
+        return false;
+      }
     }
     for (size_t opIndex = firstOp; opIndex < pass.nodes.size(); ++opIndex) {
       if (!ValidatePointwiseTailOp(graph, pass.nodes[opIndex], expectedInput)) {

@@ -2440,16 +2440,16 @@ TGFX_TEST(AOTRenderConsistencyTest, PlanExecutionFailureIsRecordedNotFatal) {
   }
 }
 
-// a discontinuous operator (AlphaThreshold) whose input is produced by
-// matrices over a device-space source, through the offscreen tail route. The exact-rational
-// construction: the source is black, a matrix scales alpha to 513/1024, the threshold is
-// 1027/2048. Direct evaluation keeps alpha at 513/1024 < 1027/2048, so step() yields 0; after
-// an RGBA8 materialization the stored alpha rounds up to 129/255 > 1027/2048, and step() flips
-// to 1 — a full 255-LSB divergence, not a tolerance question. The four-operator chain over a
-// device-space source cannot enter the chain kernel, so the tail planner splits it into two
-// passes ([source, identity, scale] and [threshold, identity]) with the threshold on the far side
-// of the materialization boundary.
-TGFX_TEST(AOTRenderConsistencyTest, OffscreenThresholdAcrossBoundaryFlips) {
+// The tail planner never starts a pass at an AlphaThreshold: a pass boundary rounds the threshold's
+// input to RGBA8, and a step function can flip across that rounding. Exact-rational construction:
+// the source is black, a matrix scales alpha to 513/1024, and the threshold is 1027/2048. Direct
+// evaluation keeps alpha at 513/1024 < 1027/2048, so step() yields 0; stored in RGBA8 the scaled
+// alpha would round up to 129/255 > 1027/2048 and step() would flip to 1 (a 255-LSB error). The
+// chain [identity, scale, threshold, identity] over a device-space source cannot enter the chain
+// kernel, so it runs as a tail plan. A plain two-slot split would put the boundary right after the
+// scale; the planner shortens the first pass instead, giving [source, identity] | [scale,
+// threshold] | [identity], and the output matches direct evaluation exactly.
+TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailKeepsThresholdWithItsInput) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
@@ -2489,8 +2489,8 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenThresholdAcrossBoundaryFlips) {
     PlacementPtr<FragmentProcessor> processor =
         DeviceSpaceTextureEffect::Make(allocator, source, Matrix::I());
     ASSERT_NE(processor, nullptr);
-    // The leading identity fills the first pass's second slot, so the scaled alpha is the first
-    // pass's output and the threshold reads it back from the RGBA8 intermediate.
+    // The leading identity fills the first pass's second slot, so a plain slot-budget split would
+    // end the first pass right after the scale and leave the threshold behind the boundary.
     processor =
         FragmentProcessor::Compose(allocator, std::move(processor),
                                    ColorMatrixFragmentProcessor::Make(allocator, identityMatrix));
@@ -2536,21 +2536,15 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenThresholdAcrossBoundaryFlips) {
     const_cast<Bitmap&>(reference).unlockPixels();
   }
   render(true, &candidate, &candidateDraws);
-  // The over-budget chain runs as a two-pass plan on the precompiled kernels, with the threshold
-  // reading the RGBA8 intermediate. This pins the known cost of a pass boundary: the stored alpha
-  // rounds to 129/255, above the threshold, so step() outputs 1 where direct evaluation gives 0.
+  // Three passes on the precompiled kernels, with the scale and the threshold in the same pass:
+  // the threshold reads the exact scaled alpha, so step() outputs 0 as in direct evaluation. Every
+  // value crossing a boundary (black, then the thresholded result) is exact in RGBA8.
   EXPECT_EQ(candidateDraws.completeAOTDraws, 1u);
   EXPECT_EQ(candidateDraws.atomicFallbacks, 0u);
-  EXPECT_EQ(candidateDraws.kernelInvocations, 2u);
-  EXPECT_EQ(candidateDraws.planMaterializedEdges, 1u);
+  EXPECT_EQ(candidateDraws.kernelInvocations, 3u);
+  EXPECT_EQ(candidateDraws.planMaterializedEdges, 2u);
   EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
-  {
-    auto* pixels = static_cast<const uint8_t*>(const_cast<Bitmap&>(candidate).lockPixels());
-    ASSERT_NE(pixels, nullptr);
-    const uint8_t* center = pixels + 32 * candidate.rowBytes() + 32 * 4;
-    EXPECT_EQ(center[3], 255);
-    const_cast<Bitmap&>(candidate).unlockPixels();
-  }
+  ExpectBitmapsIdentical("offscreen-tail-threshold-with-input", candidate, reference, 64, 64);
 }
 
 // Inside the chain kernel's instruction budget an on-screen color-filter chain runs as one fused
@@ -7305,9 +7299,11 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyImageBlurMatchesRuntime) {
 // premul invariant and the identity alpha rows never let the step() decision flip, so the old
 // maxDiff<=1 pass proved nothing.
 //
-// The tree now runs as a 17-pass plan. On this sweep the threshold's inputs stay clear of the
-// grid gap, so only the matrices' RGBA8 rounding shows: within 1 LSB of the runtime reference.
-// OffscreenThresholdAcrossBoundaryFlips pins the case where a boundary does flip the threshold.
+// The tree runs as a 17-pass plan. The plain two-slot split would start a pass at the threshold;
+// instead that pass's predecessor ends one operator early, so the threshold shares a pass with the
+// matrix that feeds it (OffscreenTailKeepsThresholdWithItsInput pins why). The later passes shift
+// by one, which fills the one-operator last pass of the plain split, so the pass count is
+// unchanged. Only the matrices' RGBA8 rounding shows: within 1 LSB of the runtime reference.
 TGFX_TEST(AOTRenderConsistencyTest, OffscreenTailThresholdQuantizationBand) {
   ContextScope scope;
   auto context = scope.getContext();

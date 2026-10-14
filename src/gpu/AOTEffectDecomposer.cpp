@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/AOTEffectDecomposer.h"
+#include <algorithm>
 #include "gpu/AOTChainBuilder.h"
 #include "gpu/AOTPlanExecutor.h"
 #include "gpu/ProgramInfo.h"
@@ -126,6 +127,15 @@ static bool IsPointwiseTailOp(const AOTEffectNode* node) {
           node->kind == AOTEffectKind::ColorSpaceXform);
 }
 
+// Whether a multi-pass plan may start a new pass at this node. A pass boundary stores the previous
+// pass's output in an RGBA8 target, rounding it to the 1/255 grid. Most operators move by at most
+// that rounding, but AlphaThreshold is a step function: an input just below the threshold can round
+// to a grid point just above it and flip the output from 0 to the full color. So an AlphaThreshold
+// always shares a pass with the operator that produces its input.
+static bool CanStartTailPassAt(const AOTEffectNode* node) {
+  return node != nullptr && node->kind != AOTEffectKind::AlphaThreshold;
+}
+
 static bool DecomposeLinearPointwiseTail(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
   if (plan == nullptr || graph.nodeCount() < 2 || graph.root().index() + 1 != graph.nodeCount()) {
     return false;
@@ -144,20 +154,36 @@ static bool DecomposeLinearPointwiseTail(const AOTEffectGraph& graph, AOTEffectP
 
   // The first pass carries the source plus up to MaxSlots operators. A longer chain continues in
   // further passes of up to MaxSlots operators each, every one reading its predecessor's
-  // materialized output.
+  // materialized output. A pass ends early when the next pass would otherwise start at a node that
+  // may not start a pass (CanStartTailPassAt); the chain is refused when no boundary is left.
   AOTEffectPlan result = {};
+  const auto nodeCount = static_cast<uint32_t>(graph.nodeCount());
+  constexpr auto MaxTailSlots = static_cast<uint32_t>(AOTPointwiseTailProcessor::MaxSlots);
   uint32_t nodeIndex = 1;
-  while (nodeIndex < graph.nodeCount()) {
+  while (nodeIndex < nodeCount) {
     AOTPassDescriptor pass = {};
     pass.kernel = AOTKernelKind::PointwiseTail;
+    // The first operator of this pass; the first pass also holds the source in front of it.
+    uint32_t firstOperator = nodeIndex;
     if (result.passes.empty()) {
       pass.nodes.push_back(AOTNodeID(nodeIndex++));
+      firstOperator = nodeIndex;
     } else {
       pass.dependencies.push_back(static_cast<uint32_t>(result.passes.size() - 1));
     }
-    for (size_t slotCount = 0;
-         nodeIndex < graph.nodeCount() && slotCount < AOTPointwiseTailProcessor::MaxSlots;
-         ++slotCount) {
+    // One past the last node of this pass.
+    auto passEnd = std::min(nodeCount, firstOperator + MaxTailSlots);
+    while (passEnd < nodeCount && passEnd > firstOperator &&
+           !CanStartTailPassAt(graph.nodeAt(AOTNodeID(passEnd)))) {
+      passEnd--;
+    }
+    if (passEnd < nodeCount && !CanStartTailPassAt(graph.nodeAt(AOTNodeID(passEnd)))) {
+      return false;
+    }
+    if (passEnd == firstOperator && !result.passes.empty()) {
+      return false;
+    }
+    while (nodeIndex < passEnd) {
       pass.nodes.push_back(AOTNodeID(nodeIndex++));
     }
     pass.output = pass.nodes.back();
