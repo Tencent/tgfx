@@ -32,7 +32,7 @@ bool evalNoiseSlot(ivec4 Packed, out vec4 value) {
   if (Packed.x != OP_PERLIN_NOISE) {
     return false;
   }
-  highp vec2 coord = GradientCoords.xy / GradientCoords.z;
+  highp vec2 coord = SourceCoords.xy / SourceCoords.z;
   value = aotPerlinNoise(coord, NoiseFrequencyStitch.xy, NoiseFrequencyStitch.zw,
                          NoiseModeOctaves.x, NoiseModeOctaves.y, NoiseModeOctaves.z);
   return true;

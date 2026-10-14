@@ -73,8 +73,9 @@ layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
 #endif
 #if GP_LAYOUT == 0 && HAS_UV_COORD
   // Per-target coordinate source: bit k set picks the uvCoord attribute for leaf k, bit 4 for the
-  // gradient; a clear bit sources from aPosition. Atlas text sources the atlas leaf from
-  // maskCoord (riding the uvCoord slot) but gradients and image leaves from position; every
+  // procedural source (gradient or noise, SourceCoords); a clear bit sources from aPosition. Atlas
+  // text sources the atlas leaf from maskCoord (riding the uvCoord slot) but gradients and image
+  // leaves from position; every
   // other GP writes all-ones, which reproduces the previous shared coordSource behavior.
   int CoordSourceMask;
 #endif
@@ -124,19 +125,19 @@ layout(location = CHAIN_TEX_LOC_BASE + 2) out vec3 TransformedCoords_2;
 layout(location = CHAIN_TEX_LOC_BASE + 3) out vec3 TransformedCoords_3;
 #endif
 #ifdef TGFX_POINTWISE_SOURCE_COORDS
-layout(location = 7) out vec3 GradientCoords;
+layout(location = 7) out vec3 SourceCoords;
 #endif
 
 void main() {
 #if GP_LAYOUT == 0 && HAS_UV_COORD
 #define CHAIN_LEAF_SOURCE(k) ((((CoordSourceMask >> (k)) & 1) != 0) ? uvCoord : aPosition)
-#define CHAIN_GRADIENT_SOURCE ((((CoordSourceMask >> 4) & 1) != 0) ? uvCoord : aPosition)
+#define CHAIN_SOURCE_COORDS ((((CoordSourceMask >> 4) & 1) != 0) ? uvCoord : aPosition)
 #elif GP_LAYOUT == 0
 #define CHAIN_LEAF_SOURCE(k) aPosition
-#define CHAIN_GRADIENT_SOURCE aPosition
+#define CHAIN_SOURCE_COORDS aPosition
 #else
 #define CHAIN_LEAF_SOURCE(k) inPosition
-#define CHAIN_GRADIENT_SOURCE inPosition
+#define CHAIN_SOURCE_COORDS inPosition
 #endif
 #if GP_LAYOUT == 0
   highp vec2 position = (Matrix * vec3(aPosition, 1.0)).xy;
@@ -159,7 +160,7 @@ void main() {
   TransformedCoords_2 = (CoordTransformMatrix_3 * vec3(CHAIN_LEAF_SOURCE(2), 1.0)).xyz;
   TransformedCoords_3 = (CoordTransformMatrix_4 * vec3(CHAIN_LEAF_SOURCE(3), 1.0)).xyz;
 #endif
-  GradientCoords = (CoordTransformMatrix_0 * vec3(CHAIN_GRADIENT_SOURCE, 1.0)).xyz;
+  SourceCoords = (CoordTransformMatrix_0 * vec3(CHAIN_SOURCE_COORDS, 1.0)).xyz;
 #else
 #if NTEX > 0
   TransformedCoords_0 = (CoordTransformMatrix_0 * vec3(CHAIN_LEAF_SOURCE(0), 1.0)).xyz;

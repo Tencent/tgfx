@@ -4,5 +4,5 @@
 // so it is declared once whichever source the kernel carries.
 #ifndef TGFX_POINTWISE_SOURCE_COORDS_INC
 #define TGFX_POINTWISE_SOURCE_COORDS_INC
-layout(location = 7) in vec3 GradientCoords;
+layout(location = 7) in vec3 SourceCoords;
 #endif

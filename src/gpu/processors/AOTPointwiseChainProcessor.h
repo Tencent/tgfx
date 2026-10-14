@@ -151,7 +151,8 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   static constexpr size_t MaxShaderTiledChainLeaves = ChainResourceCapacity.tiledRecipes;
 
   // The single authority for the chain kernel's shared parameter-block budgets. The kernel has
-  // exactly one chain-wide gradient block and gradient coordinate varying, one color-space
+  // exactly one chain-wide gradient block, one procedural-source coordinate varying
+  // (SourceCoords, shared by the gradient and noise sources), one color-space
   // transform block, one device-space rect coverage block, one local rect coverage block, and
   // four rrect array elements. ValidateSlots is the one place that enforces them; the chain
   // builder's planner (and so AOTPlanExecutor::CanExecute and the DAG planner) and Make() both
@@ -315,7 +316,8 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   // Register index of the narrow clip product / atlas coverage root; -1 when absent.
   int clipCoverageRegister = -1;
   // Per-target coordinate source for the chain vertex stage: bit k set sources leaf k from the
-  // uvCoord attribute, bit 4 does the same for the gradient coordinates; clear bits source from
+  // uvCoord attribute, bit 4 does the same for the procedural-source coordinates (SourceCoords);
+  // clear bits source from
   // aPosition. All-ones reproduces the legacy shared-source behavior (quads, meshes); atlas text
   // sets only the atlas leaf's bit so gradients and image leaves come from position.
   uint32_t coordSourceMask = ~0u;

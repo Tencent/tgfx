@@ -675,7 +675,7 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
           return false;
         }
         // Single-authority budget: AOTPointwiseChainProcessor::MaxGradientSlots (the kernel
-        // carries one chain-wide gradient parameter block and one gradient coordinate varying).
+        // carries one chain-wide gradient parameter block and one SourceCoords varying).
         if (hasGradient) {
           return false;
         }

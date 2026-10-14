@@ -16,7 +16,7 @@ bool evalGradientSlot(ivec4 Packed, vec4 in0, out vec4 value) {
   // dual-interval scale/bias pair and the unrolled-binary tree, each byte-matching its
   // dedicated kernel. The epilogue premultiplies and modulates by the input alpha, matching
   // the runtime ClampedGradientEffect emission.
-  highp vec2 gradientCoord = GradientCoords.xy / GradientCoords.z;
+  highp vec2 gradientCoord = SourceCoords.xy / SourceCoords.z;
   float gradT = gradientLayoutT(GradientLayoutType, GradientBias, GradientScale, gradientCoord);
   vec4 gradColor;
   if (gradT <= 0.0) {
