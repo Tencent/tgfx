@@ -139,6 +139,9 @@ void GLSLGlassRefractionFragmentProcessor::onSetData(UniformData*,
   if (fragmentUniformData->hasField("LightingOn")) {
     fragmentUniformData->setData("LightingOn", params.lightIntensity > 0.0f ? 1 : 0);
   }
+  // The precompiled quad kernel's optional local shape mask defaults to off; the mask's coverage
+  // processor, set after the color processors, turns it on. Absent from runtime programs.
+  fragmentUniformData->setDataOptional("HasLocalMask", 0);
 }
 
 }  // namespace tgfx

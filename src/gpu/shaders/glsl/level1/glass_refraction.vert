@@ -3,6 +3,8 @@
 // (common color, uvMatrix, per-edge coverage) + GlassRefractionFragmentProcessor.
 // Permutation dimensions (vert):
 //   GP_KIND (0~1): 0=ellipse analytic attributes, 1=quad per-edge coverage + position transform
+// The quad form always emits the local-mask coordinate (TransformedCoords_1); the fragment stage
+// reads it only when the draw carries a mask (HasLocalMask).
 #version 450
 
 #ifndef GP_KIND
@@ -12,6 +14,11 @@
 layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
   vec4 tgfx_RTAdjust;
   mat3 CoordTransformMatrix_0;
+#if GP_KIND == 1
+  // The local mask's coordinate transform (the coverage processor's transform follows the color
+  // processor's, so it is index 1). Left unwritten when the draw has no mask.
+  mat3 CoordTransformMatrix_1;
+#endif
 };
 
 #if GP_KIND == 1
@@ -35,11 +42,13 @@ layout(location = 1) in float inCoverage;
 // one this kernel has to reproduce.
 layout(location = 0) out vec2 TransformedCoords_0;
 layout(location = 1) out float vCoverage;
+layout(location = 2) out vec2 TransformedCoords_1;
 
 void main() {
   vCoverage = inCoverage;
   gl_Position = vec4(aPosition.xy * tgfx_RTAdjust.xz + tgfx_RTAdjust.yw, 0.0, 1.0);
   TransformedCoords_0 = (CoordTransformMatrix_0 * vec3(aPosition, 1.0)).xy;
+  TransformedCoords_1 = (CoordTransformMatrix_1 * vec3(aPosition, 1.0)).xy;
 }
 
 #else

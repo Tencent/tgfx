@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "gpu/GlobalCache.h"
+#include "gpu/PrecompiledShaderCache.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/PathMeasure.h"
 #include "tgfx/core/RSXform.h"
@@ -207,6 +209,86 @@ TGFX_TEST(VectorLayerTest, GlassStyleMultiStrokeRoundedCorner) {
   ASSERT_TRUE(withGlass.has_value());
   EXPECT_EQ(withGlass->outsideCorner, withoutGlass->outsideCorner);
   EXPECT_NE(withGlass->center, withoutGlass->center);
+}
+
+// Stacked strokes have no exact outline, so GlassStyle draws the refraction over a rect with the
+// content as a local shape mask (a SrcIn ShaderMaskFilter). GlassRefractionShader applies that mask
+// through its HasLocalMask runtime branch, which must reproduce the runtime program byte for byte:
+// the precompiled route (bundle loaded) and the runtime route (bundle unloaded) render the same
+// scene, with and without dispersion and edge lighting.
+TGFX_TEST(VectorLayerTest, GlassStyleLocalMaskAOTMatchesJIT) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto backgroundImage = MakeImage("resources/apitest/checker_128.png");
+  ASSERT_TRUE(backgroundImage != nullptr);
+  struct GlassCase {
+    const char* label;
+    float dispersion;
+    float lightIntensity;
+  };
+  const GlassCase cases[] = {
+      {"plain", 0, 0},
+      {"dispersion", 50, 0},
+      {"edge-light", 0, 50},
+      {"dispersion-edge-light", 50, 50},
+  };
+  auto render = [&](const GlassCase& glassCase, Bitmap* bitmap) {
+    auto surface = Surface::Make(context, 200, 200);
+    ASSERT_TRUE(surface != nullptr);
+    auto displayList = std::make_unique<DisplayList>();
+    auto background = ImageLayer::Make();
+    background->setImage(backgroundImage);
+    auto scale = 200.0f / static_cast<float>(backgroundImage->width());
+    background->setMatrix(Matrix::MakeScale(scale, scale));
+    displayList->root()->addChild(background);
+    auto vectorLayer = VectorLayer::Make();
+    vectorLayer->setContents(MakeRoundedRectangleContents(true));
+    vectorLayer->setLayerStyles(
+        {GlassStyle::Make(80, 50, 0, glassCase.dispersion, 0, 135, glassCase.lightIntensity)});
+    displayList->root()->addChild(vectorLayer);
+    displayList->render(surface.get());
+    ASSERT_TRUE(bitmap->allocPixels(200, 200));
+    auto* pixels = bitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(bitmap->info(), pixels));
+    bitmap->unlockPixels();
+  };
+  for (const auto& glassCase : cases) {
+    SCOPED_TRACE(glassCase.label);
+    Bitmap reference = {};
+    {
+      cache->unload();
+      ScopedAOTStatsPause pause(context, true);
+      context->globalCache()->clearPrograms();
+      render(glassCase, &reference);
+    }
+    Bitmap candidate = {};
+    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+    context->globalCache()->clearPrograms();
+    context->globalCache()->resetProgramStats();
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    render(glassCase, &candidate);
+    auto stats = cache->drawStats();
+    cache->setDiagnosticRecordingEnabled(false);
+    EXPECT_EQ(stats.droppedDraws, 0u);
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+    auto* referencePixels = static_cast<const uint32_t*>(reference.lockPixels());
+    auto* candidatePixels = static_cast<const uint32_t*>(candidate.lockPixels());
+    ASSERT_TRUE(referencePixels != nullptr && candidatePixels != nullptr);
+    size_t diffPixels = 0;
+    for (size_t index = 0; index < 200 * 200; ++index) {
+      if (referencePixels[index] != candidatePixels[index]) {
+        diffPixels++;
+      }
+    }
+    reference.unlockPixels();
+    candidate.unlockPixels();
+    EXPECT_EQ(diffPixels, 0u);
+  }
+  cache->unload();
 }
 
 /**

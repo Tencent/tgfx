@@ -75,8 +75,13 @@ namespace tgfx {
  * base chains no longer carry the source coordinate transform or gradient parameters.
  *
  * 0x0001000A: chain leaf and standalone tiled sampling gain runtime read-swizzle uniforms.
+ *
+ * 0x0001000B: GlassRefractionShader's quad form gains an optional local shape mask (the
+ * HasLocalMask runtime branch, LocalMaskSampler, and the CoordTransformMatrix_1 transform), and the
+ * matcher now admits the masked draw. A pre-change kernel has none of them, so it would draw the
+ * glass over the whole rect with the mask silently ignored; those bundles are refused.
  */
-inline constexpr uint32_t kExpectedToolchainABI = 0x0001000Au;
+inline constexpr uint32_t kExpectedToolchainABI = 0x0001000Bu;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

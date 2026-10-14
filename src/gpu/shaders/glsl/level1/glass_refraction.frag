@@ -9,6 +9,11 @@
 //                  1=quad (per-vertex edge coverage, vec3 background coordinate)
 //   GEOMETRY_KIND (0~3): 0=SDF rounded rect, 1=SDF ellipse, 2=UDF, 3=UDF + edge light
 //   HAS_XP (0~2): 0=Empty, 1=PorterDuff DST_TEX, 2=PorterDuff FBF
+// The quad form also carries an optional local shape mask (the SrcIn ShaderMaskFilter GlassStyle
+// attaches when the content has no exact outline). It is a runtime branch, not a dimension:
+// HasLocalMask selects it, and LocalMaskSampler is always bound (the shared dummy texture when the
+// draw has no mask). The mask only scales coverage after the refraction sample, so the branch
+// cannot move a texture coordinate.
 #version 450
 
 #ifndef GP_KIND
@@ -40,6 +45,11 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   // Edge lighting stays a runtime branch: it only adds to an already-sampled colour, so it cannot
   // move a texture coordinate. Dispersion is a compile-time dimension instead (see DISPERSION_ON).
   int LightingOn;
+#if GP_KIND == 1
+  // Written as 0 by GlassRefractionFragmentProcessor and as 1 by the local-mask coverage processor
+  // (XfermodeFragmentProcessor, which runs after the color processors).
+  int HasLocalMask;
+#endif
 #include "coverage_uniforms.inc"
 #include "xp_uniforms.inc"
 };
@@ -50,6 +60,8 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 // vertex kernel), and the quad's per-vertex edge coverage replaces the analytic ellipse coverage.
 layout(location = 0) in vec2 TransformedCoords_0;
 layout(location = 1) in float vCoverage;
+// The local mask coordinate, in the same affine vec2 form as TransformedCoords_0.
+layout(location = 2) in vec2 TransformedCoords_1;
 #else
 layout(location = 0) in vec2 vEllipseOffsets;
 layout(location = 1) in vec4 vEllipseRadii;
@@ -62,11 +74,20 @@ layout(set = 1, binding = 1) uniform sampler2D MaskSampler;
 #endif
 #if GEOMETRY_KIND == 3
 layout(set = 1, binding = 2) uniform sampler2D EdgeMaskSampler;
-#define XP_DST_TEX_BINDING 3
+#define GLASS_COLOR_SAMPLER_COUNT 3
 #elif GEOMETRY_KIND == 2
-#define XP_DST_TEX_BINDING 2
+#define GLASS_COLOR_SAMPLER_COUNT 2
 #else
-#define XP_DST_TEX_BINDING 1
+#define GLASS_COLOR_SAMPLER_COUNT 1
+#endif
+// The local mask is a coverage texture, so it binds right after the color-side samplers, the slot
+// ProgramInfo pads with the dummy texture when the draw has no coverage texture; the XP dst
+// texture always binds last.
+#if GP_KIND == 1
+layout(set = 1, binding = GLASS_COLOR_SAMPLER_COUNT) uniform sampler2D LocalMaskSampler;
+#define XP_DST_TEX_BINDING (GLASS_COLOR_SAMPLER_COUNT + 1)
+#else
+#define XP_DST_TEX_BINDING GLASS_COLOR_SAMPLER_COUNT
 #endif
 #include "ellipse_coverage.inc"
 #include "xp_porter_duff.inc"
@@ -276,7 +297,12 @@ void main() {
   // the quad's per-vertex edge coverage for the quad form; coverage_output.inc multiplies the clip
   // term on top and hands xp_output.inc the uncovered color plus the total coverage.
 #if GP_KIND == 1
-#define TGFX_INITIAL_COVERAGE vec4(vCoverage)
+  // The runtime coverage processor is SrcIn(input coverage, mask): vec4(vCoverage) * mask.a.
+  vec4 initialCoverage = vec4(vCoverage);
+  if (HasLocalMask != 0) {
+    initialCoverage = initialCoverage * texture(LocalMaskSampler, TransformedCoords_1).a;
+  }
+#define TGFX_INITIAL_COVERAGE initialCoverage
 #else
   highp float edgeAlpha = ellipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, StrokeEnabled);
 #define TGFX_INITIAL_COVERAGE vec4(edgeAlpha)

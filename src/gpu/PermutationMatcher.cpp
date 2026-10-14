@@ -1197,8 +1197,22 @@ static std::optional<PermutationMatchResult> TryMatchGlassRefraction(
   } else {
     return std::nullopt;
   }
-  if (programInfo->numColorFragmentProcessors() != 1 || programInfo->numFragmentProcessors() != 1) {
+  if (programInfo->numColorFragmentProcessors() != 1) {
     return std::nullopt;
+  }
+  // The only coverage processor the kernel takes is the quad form's local shape mask (a SrcIn
+  // ShaderMaskFilter over a hardware-tiled RGBA texture), applied through the HasLocalMask runtime
+  // branch. It needs an affine mask transform, like the background coordinate below.
+  if (programInfo->numFragmentProcessors() != 1) {
+    auto coverage = ClassifyCoverageFP(programInfo);
+    if (gpKind != 1 || programInfo->numFragmentProcessors() != 2 || !coverage ||
+        *coverage != CoverageKind::LocalMask) {
+      return std::nullopt;
+    }
+    auto mask = programInfo->getFragmentProcessor(1)->childProcessor(0);
+    if (mask->numCoordTransforms() != 1 || mask->coordTransform(0)->matrix.hasPerspective()) {
+      return std::nullopt;
+    }
   }
   int xpType = GetXPType(programInfo);
   if (xpType < 0) {
