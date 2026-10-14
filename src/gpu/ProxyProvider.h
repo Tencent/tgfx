@@ -155,7 +155,9 @@ class ProxyProvider {
 
   /**
    * Creates a texture proxy for the provided BackendTexture. If adopted is true, the backend
-   * texture will be destroyed at a later point after the texture proxy is released.
+   * texture will be destroyed at a later point after the texture proxy is released. A desktop GL
+   * rectangle texture is copied into a new 2D texture (with renderable formats), and the returned
+   * proxy is that copy.
    */
   std::shared_ptr<TextureProxy> wrapExternalTexture(const BackendTexture& backendTexture,
                                                     ImageOrigin origin = ImageOrigin::TopLeft,

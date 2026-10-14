@@ -567,7 +567,29 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(HardwareBufferRe
 
 std::shared_ptr<TextureProxy> ProxyProvider::wrapExternalTexture(
     const BackendTexture& backendTexture, ImageOrigin origin, bool adopted) {
-  return wrapTextureView(TextureView::MakeFrom(context, backendTexture, origin, adopted));
+  auto proxy = wrapTextureView(TextureView::MakeFrom(context, backendTexture, origin, adopted));
+  if (proxy == nullptr) {
+    return nullptr;
+  }
+  auto texture = proxy->getTextureView()->getTexture();
+  if (texture->type() != TextureType::Rectangle) {
+    return proxy;
+  }
+  // A desktop GL rectangle texture has its own sampler type, which the precompiled kernels do not
+  // declare. Copy it once into a plain 2D texture and hand that out instead, as CGLHardwareTexture
+  // does for imported pixel buffers. One copy is enough: the caller must keep the texture
+  // unchanged for the lifetime of the image (Image::MakeFrom). The copy reads the source through a
+  // framebuffer, so a format that cannot be rendered keeps the rectangle texture.
+  if (!context->gpu()->isFormatRenderable(texture->format())) {
+    return proxy;
+  }
+  auto copy = createTextureProxy({}, proxy->width(), proxy->height(), texture->format(), false,
+                                 proxy->origin());
+  if (copy == nullptr) {
+    return proxy;
+  }
+  context->drawingManager()->addTextureCopyTask(std::move(proxy), copy);
+  return copy;
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::wrapTextureView(

@@ -110,6 +110,11 @@ class DrawingManager {
   void addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
                                std::shared_ptr<TextureProxy> dest, int srcX = 0, int srcY = 0);
 
+  /**
+   * Enqueues a copy of the whole source texture into dest (see TextureCopyTask).
+   */
+  void addTextureCopyTask(std::shared_ptr<TextureProxy> source, std::shared_ptr<TextureProxy> dest);
+
   void addTransferPixelsTask(std::shared_ptr<RenderTargetProxy> source, const Rect& srcRect,
                              std::shared_ptr<GPUBufferProxy> dest);
 

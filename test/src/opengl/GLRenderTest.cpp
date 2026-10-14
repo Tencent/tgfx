@@ -45,6 +45,7 @@
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/resources/TextureView.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/Font.h"
@@ -614,16 +615,19 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
     // matched texture kind depend on test order.
     auto glInfo = CreateRectangleTexture(context, 7, 5);
     ASSERT_NE(glInfo.id, 0u);
-    auto textureProxy = context->proxyProvider()->wrapExternalTexture(BackendTexture(glInfo, 7, 5),
-                                                                      ImageOrigin::TopLeft, true);
+    // wrapExternalTexture copies a rectangle texture into a 2D one, so wrap the view directly to
+    // reach the matcher with a rectangle sampler.
+    auto textureProxy = context->proxyProvider()->wrapTextureView(
+        TextureView::MakeFrom(context, BackendTexture(glInfo, 7, 5), ImageOrigin::TopLeft, true));
+    ASSERT_NE(textureProxy, nullptr);
     auto fp = DeviceSpaceTextureEffect::Make(&allocator, std::move(textureProxy), Matrix::I());
     ASSERT_NE(gp, nullptr);
     ASSERT_NE(fp, nullptr);
     ProgramInfo programInfo(renderTarget.get(), gp.get(), {fp.get()}, 1, nullptr,
                             BlendMode::SrcOver);
     EXPECT_FALSE(programInfo.samplersAre2D());
-    // A rectangle texture (external adopters only) has no precompiled variant and is rejected by
-    // the matcher gate (it would otherwise bind to a plain sampler2D).
+    // A rectangle sampler has no precompiled variant and is rejected by the matcher gate (it
+    // would otherwise bind to a plain sampler2D).
     EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
   }
 
@@ -696,6 +700,65 @@ TGFX_TEST(GLRenderTest, EmbeddedAOTCreatesPipeline) {
   EXPECT_GT(cache->aotStageCount(PrecompiledAOTStage::VertexModuleCreated), 0u);
   EXPECT_GT(cache->aotStageCount(PrecompiledAOTStage::FragmentModuleCreated), 0u);
   EXPECT_GT(cache->aotStageCount(PrecompiledAOTStage::PipelineCreated), 0u);
+}
+
+// An external rectangle texture is copied into a 2D texture when it is wrapped
+// (ProxyProvider::wrapExternalTexture), so the precompiled kernels can sample it. The copy must
+// keep every pixel in place for both origins, and drawing the image must need no runtime program.
+TGFX_TEST(GLRenderTest, RectangleTextureImportCopiesTo2D) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr int width = 4;
+  constexpr int height = 3;
+  std::array<uint32_t, width* height> source = {};
+  for (int y = 0; y < height; ++y) {
+    for (int x = 0; x < width; ++x) {
+      auto r = static_cast<uint32_t>(40 * x + 10);
+      auto g = static_cast<uint32_t>(70 * y + 20);
+      source[static_cast<size_t>(y * width + x)] = 0xFF000000u | (30u << 16) | (g << 8) | r;
+    }
+  }
+  auto gpu = static_cast<GLGPU*>(context->gpu());
+  auto gl = gpu->functions();
+  auto glInfo = CreateRectangleTexture(context, width, height);
+  ASSERT_NE(glInfo.id, 0u);
+  const auto& textureFormat = gpu->caps()->getTextureFormat(PixelFormat::RGBA_8888);
+  gl->texImage2D(glInfo.target, 0, static_cast<int>(textureFormat.internalFormatTexImage), width,
+                 height, 0, textureFormat.externalFormat, textureFormat.externalType,
+                 source.data());
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+  for (auto origin : {ImageOrigin::TopLeft, ImageOrigin::BottomLeft}) {
+    SCOPED_TRACE(origin == ImageOrigin::TopLeft ? "TopLeft" : "BottomLeft");
+    auto image = Image::MakeFrom(context, BackendTexture(glInfo, width, height), origin);
+    ASSERT_TRUE(image != nullptr);
+    auto surface = Surface::Make(context, width, height);
+    ASSERT_TRUE(surface != nullptr);
+    context->globalCache()->clearPrograms();
+    context->globalCache()->resetProgramStats();
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    surface->getCanvas()->drawImage(image, 0, 0);
+    context->flushAndSubmit(true);
+    EXPECT_EQ(cache->drawStats().droppedDraws, 0u);
+    cache->setDiagnosticRecordingEnabled(false);
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+    std::array<uint32_t, width* height> result = {};
+    auto info = ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Premultiplied);
+    ASSERT_TRUE(surface->readPixels(info, result.data()));
+    for (int y = 0; y < height; ++y) {
+      // A bottom-left image shows the texture's first row at the bottom.
+      int sourceRow = origin == ImageOrigin::TopLeft ? y : height - 1 - y;
+      for (int x = 0; x < width; ++x) {
+        EXPECT_EQ(result[static_cast<size_t>(y * width + x)],
+                  source[static_cast<size_t>(sourceRow * width + x)])
+            << "at (" << x << ", " << y << ")";
+      }
+    }
+  }
+  cache->unload();
+  gl->deleteTextures(1, &glInfo.id);
 }
 
 TGFX_TEST(GLRenderTest, TileModeFallback) {

@@ -28,6 +28,7 @@
 #include "gpu/tasks/GenerateMipmapsTask.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
+#include "gpu/tasks/TextureCopyTask.h"
 #include "tasks/TransferPixelsTask.h"
 
 namespace tgfx {
@@ -256,6 +257,18 @@ void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> 
   auto allocator = &drawingBuffer->drawingAllocator;
   auto task = allocator->make<RenderTargetCopyTask>(allocator, std::move(source), std::move(dest),
                                                     srcX, srcY);
+  drawingBuffer->renderTasks.emplace_back(std::move(task));
+}
+
+void DrawingManager::addTextureCopyTask(std::shared_ptr<TextureProxy> source,
+                                        std::shared_ptr<TextureProxy> dest) {
+  if (source == nullptr || dest == nullptr) {
+    return;
+  }
+  commitPendingMaterializations();
+  auto drawingBuffer = getDrawingBuffer();
+  auto allocator = &drawingBuffer->drawingAllocator;
+  auto task = allocator->make<TextureCopyTask>(allocator, std::move(source), std::move(dest));
   drawingBuffer->renderTasks.emplace_back(std::move(task));
 }
 

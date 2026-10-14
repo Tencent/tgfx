@@ -1605,9 +1605,12 @@ static std::optional<PermutationMatchResult> TryMatchPerlin(const ProgramInfo* p
 
 static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramInfo* programInfo) {
   // OpenGL is served from the bundle profile matching the context (desktop GL or the GLES
-  // family: GLES, WebGL, SwiftShader), as do External (OES) and rectangle samplers (external
-  // adopters only; every texture the context itself produces is two-dimensional) which keep the
-  // ProgramBuilder route.
+  // family: GLES, WebGL, SwiftShader). The precompiled kernels only declare 2D samplers. Desktop GL
+  // rectangle textures are copied into 2D textures where they enter (ProxyProvider::
+  // wrapExternalTexture, CGLHardwareTexture, and the dst copy of a rectangle render target), so a
+  // rectangle sampler only reaches this gate through an unconverted view. External (OES) textures
+  // (Android SurfaceTexture and YUV hardware buffers) are not converted yet: with a bundle loaded
+  // there is no runtime route, so their draws are dropped and counted as droppedDraws.
   if (programInfo->backend() == Backend::OpenGL &&
       (!programInfo->glProfileMatchesCache() || !programInfo->samplersAre2D())) {
     return std::nullopt;

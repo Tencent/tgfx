@@ -513,8 +513,8 @@ bool ProgramInfo::samplersAre2D() const {
     if (sampler.texture == nullptr) {
       return false;
     }
-    // Only TwoD is supported by the precompiled samplers. External (OES) and rectangle textures
-    // (external adopters only) keep the ProgramBuilder route.
+    // Only TwoD is supported by the precompiled samplers (see the gate in MatchPermutationImpl
+    // for where rectangle and External (OES) textures come from).
     if (sampler.texture->type() != TextureType::TwoD) {
       return false;
     }
