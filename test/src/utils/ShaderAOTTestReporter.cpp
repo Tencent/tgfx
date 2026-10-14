@@ -158,7 +158,7 @@ static void AddOffscreenFillStats(OffscreenFillStats* target, const OffscreenFil
   target->canExecute += source.canExecute;
   target->pointwiseChainPlans += source.pointwiseChainPlans;
   target->pointwiseGraphPlans += source.pointwiseGraphPlans;
-  target->pointwiseTailPlans += source.pointwiseTailPlans;
+  target->multiPassPlans += source.multiPassPlans;
   target->precompiledPrograms += source.precompiledPrograms;
   target->programBuilderPrograms += source.programBuilderPrograms;
   target->precompiledCanExecute += source.precompiledCanExecute;
@@ -222,7 +222,7 @@ static nlohmann::json OffscreenFillStatsToJSON(const OffscreenFillStats& stats) 
           {"canExecute", stats.canExecute},
           {"pointwiseChainPlans", stats.pointwiseChainPlans},
           {"pointwiseGraphPlans", stats.pointwiseGraphPlans},
-          {"pointwiseTailPlans", stats.pointwiseTailPlans},
+          {"multiPassPlans", stats.multiPassPlans},
           {"precompiledPrograms", stats.precompiledPrograms},
           {"programBuilderPrograms", stats.programBuilderPrograms},
           {"precompiledCanExecute", stats.precompiledCanExecute},

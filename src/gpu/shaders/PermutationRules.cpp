@@ -34,7 +34,6 @@
 #include "gpu/shaders/level1/PointwiseChainShader.h"
 #include "gpu/shaders/level1/PointwiseDirectShader.h"
 #include "gpu/shaders/level1/PointwiseGraphShader.h"
-#include "gpu/shaders/level1/PointwiseTailShader.h"
 #include "gpu/shaders/level1/QuadColorFillShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
@@ -896,40 +895,6 @@ static std::set<std::pair<uint32_t, uint32_t>> EnumerateTexturedEffectReachable(
   return result;
 }
 
-std::optional<RuleComposedValues> ComposePointwiseTail(const PointwiseTailInputs& inputs) {
-  if (inputs.xpType < 0) {
-    return std::nullopt;
-  }
-  using VD = PointwiseTailShader::VD;
-  using FD = PointwiseTailShader::FD;
-  RuleComposedValues values;
-  values.vertValues.resize(VD::COUNT);
-  values.vertValues[VD::HAS_COVERAGE] = inputs.hasCoverage ? 1 : 0;
-  values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_XP] = inputs.xpType;
-  values.fragValues[FD::HAS_COVERAGE] = values.vertValues[VD::HAS_COVERAGE];
-  return values;
-}
-
-static std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseTailReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
-    for (int xpType = -1; xpType <= 2; ++xpType) {
-      PointwiseTailInputs inputs;
-      inputs.hasCoverage = hasCoverage != 0;
-      inputs.xpType = xpType;
-      auto composed = ComposePointwiseTail(inputs);
-      if (!composed) {
-        continue;
-      }
-      auto vertIndex = PointwiseTailShader::VD::domain().encode(composed->vertValues);
-      auto fragIndex = PointwiseTailShader::FD::domain().encode(composed->fragValues);
-      result.insert({vertIndex, fragIndex});
-    }
-  }
-  return result;
-}
-
 std::optional<RuleComposedValues> ComposePointwiseDirect(const PointwiseDirectInputs& inputs) {
   if (inputs.xpType < 0) {
     return std::nullopt;
@@ -1257,9 +1222,6 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "TexturedEffectShader") {
     return EnumerateTexturedEffectReachable();
-  }
-  if (shaderName == "PointwiseTailShader") {
-    return EnumeratePointwiseTailReachable();
   }
   if (shaderName == "PointwiseDirectShader") {
     return EnumeratePointwiseDirectReachable();

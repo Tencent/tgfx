@@ -22,7 +22,6 @@
 #include "gpu/AOTPlanExecutor.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
-#include "gpu/processors/AOTPointwiseTailProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
@@ -106,7 +105,9 @@ bool AOTEffectDecomposer::Lower(const std::vector<const FragmentProcessor*>& pro
   return true;
 }
 
-static bool IsPointwiseTailSource(const AOTEffectNode* node) {
+// The source of a multi-pass linear plan: an affine RGBA texture fed by the geometry color, sampled
+// plainly or in device space.
+static bool IsLinearMultiPassSource(const AOTEffectNode* node) {
   if (node == nullptr || node->kind != AOTEffectKind::TextureSource || node->inputs.size() != 1 ||
       node->inputs[0] != AOTNodeID(0)) {
     return false;
@@ -120,7 +121,7 @@ static bool IsPointwiseTailSource(const AOTEffectNode* node) {
          parameters->samplingKind == AOTTextureSamplingKind::Device;
 }
 
-static bool IsPointwiseTailOp(const AOTEffectNode* node) {
+static bool IsUnaryPointwiseOp(const AOTEffectNode* node) {
   return node != nullptr && node->inputs.size() == 1 &&
          (node->kind == AOTEffectKind::ColorMatrix || node->kind == AOTEffectKind::Luma ||
           node->kind == AOTEffectKind::AlphaThreshold ||
@@ -132,62 +133,85 @@ static bool IsPointwiseTailOp(const AOTEffectNode* node) {
 // that rounding, but AlphaThreshold is a step function: an input just below the threshold can round
 // to a grid point just above it and flip the output from 0 to the full color. So an AlphaThreshold
 // always shares a pass with the operator that produces its input.
-static bool CanStartTailPassAt(const AOTEffectNode* node) {
+static bool CanStartPassAt(const AOTEffectNode* node) {
   return node != nullptr && node->kind != AOTEffectKind::AlphaThreshold;
 }
 
-static bool DecomposeLinearPointwiseTail(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
+// Planner for a linear chain one fused pass cannot carry: GeometryColor -> plain or device-space
+// TextureSource -> unary pointwise ops, with more operators than the chain kernel has instructions
+// or more color-space transforms than its parameter block holds. The chain is cut into chain-kernel
+// passes, each as long as fits (AOTChainBuilder::BuildLinearSegment is the fit check), every later
+// pass reading its predecessor's materialized output in device space. A pass ends early when the
+// next one would otherwise start at a node that may not start a pass (CanStartPassAt); the chain is
+// refused when no boundary is left.
+static bool DecomposeLinearMultiPass(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
   if (plan == nullptr || graph.nodeCount() < 2 || graph.root().index() + 1 != graph.nodeCount()) {
     return false;
   }
   auto geometryNode = graph.nodeAt(AOTNodeID(0));
   if (geometryNode == nullptr || geometryNode->kind != AOTEffectKind::GeometryColor ||
-      !IsPointwiseTailSource(graph.nodeAt(AOTNodeID(1)))) {
+      !IsLinearMultiPassSource(graph.nodeAt(AOTNodeID(1)))) {
     return false;
   }
   for (uint32_t index = 2; index < graph.nodeCount(); ++index) {
     auto node = graph.nodeAt(AOTNodeID(index));
-    if (!IsPointwiseTailOp(node) || node->inputs[0] != AOTNodeID(index - 1)) {
+    if (!IsUnaryPointwiseOp(node) || node->inputs[0] != AOTNodeID(index - 1)) {
       return false;
     }
   }
-
-  // The first pass carries the source plus up to MaxSlots operators. A longer chain continues in
-  // further passes of up to MaxSlots operators each, every one reading its predecessor's
-  // materialized output. A pass ends early when the next pass would otherwise start at a node that
-  // may not start a pass (CanStartTailPassAt); the chain is refused when no boundary is left.
+  const auto& source = std::get<AOTTextureParameters>(graph.nodeAt(AOTNodeID(1))->parameters);
+  // A later pass reads an intermediate that does not exist yet; its fit only depends on the
+  // source kind, so the plan's own texture stands in for it.
+  auto intermediate = AOTChainBuilder::IntermediateSource(source.textureProxy, Matrix::I());
+  auto fits = [&](uint32_t firstOperator, uint32_t passEnd, bool firstPass) {
+    std::vector<AOTNodeID> operators = {};
+    for (auto index = firstOperator; index < passEnd; ++index) {
+      operators.push_back(AOTNodeID(index));
+    }
+    AOTEffectGraph segment = {};
+    AOTPassDescriptor segmentPass = {};
+    return AOTChainBuilder::BuildLinearSegment(graph, operators, firstPass ? source : intermediate,
+                                               &segment, &segmentPass);
+  };
   AOTEffectPlan result = {};
   const auto nodeCount = static_cast<uint32_t>(graph.nodeCount());
-  constexpr auto MaxTailSlots = static_cast<uint32_t>(AOTPointwiseTailProcessor::MaxSlots);
-  uint32_t nodeIndex = 1;
-  while (nodeIndex < nodeCount) {
+  uint32_t firstOperator = 2;
+  while (true) {
+    bool firstPass = result.passes.empty();
+    if (firstPass && !fits(firstOperator, firstOperator, true)) {
+      return false;
+    }
+    // One past the last node of this pass.
+    auto passEnd = firstOperator;
+    while (passEnd < nodeCount && fits(firstOperator, passEnd + 1, firstPass)) {
+      ++passEnd;
+    }
+    while (passEnd < nodeCount && passEnd > firstOperator &&
+           !CanStartPassAt(graph.nodeAt(AOTNodeID(passEnd)))) {
+      --passEnd;
+    }
+    if (passEnd < nodeCount && !CanStartPassAt(graph.nodeAt(AOTNodeID(passEnd)))) {
+      return false;
+    }
+    if (passEnd == firstOperator && !firstPass) {
+      return false;
+    }
     AOTPassDescriptor pass = {};
-    pass.kernel = AOTKernelKind::PointwiseTail;
-    // The first operator of this pass; the first pass also holds the source in front of it.
-    uint32_t firstOperator = nodeIndex;
-    if (result.passes.empty()) {
-      pass.nodes.push_back(AOTNodeID(nodeIndex++));
-      firstOperator = nodeIndex;
+    pass.kernel = AOTKernelKind::PointwiseChain;
+    if (firstPass) {
+      pass.nodes.push_back(AOTNodeID(1));
     } else {
       pass.dependencies.push_back(static_cast<uint32_t>(result.passes.size() - 1));
     }
-    // One past the last node of this pass.
-    auto passEnd = std::min(nodeCount, firstOperator + MaxTailSlots);
-    while (passEnd < nodeCount && passEnd > firstOperator &&
-           !CanStartTailPassAt(graph.nodeAt(AOTNodeID(passEnd)))) {
-      passEnd--;
-    }
-    if (passEnd < nodeCount && !CanStartTailPassAt(graph.nodeAt(AOTNodeID(passEnd)))) {
-      return false;
-    }
-    if (passEnd == firstOperator && !result.passes.empty()) {
-      return false;
-    }
-    while (nodeIndex < passEnd) {
-      pass.nodes.push_back(AOTNodeID(nodeIndex++));
+    for (auto index = firstOperator; index < passEnd; ++index) {
+      pass.nodes.push_back(AOTNodeID(index));
     }
     pass.output = pass.nodes.back();
     result.passes.push_back(std::move(pass));
+    if (passEnd == nodeCount) {
+      break;
+    }
+    firstOperator = passEnd;
   }
   for (size_t index = 0; index + 1 < result.passes.size(); ++index) {
     result.passes[index].materializesOutput = true;
@@ -239,7 +263,7 @@ static bool DecomposePerlinNoiseChain(const AOTEffectGraph& graph, AOTEffectPlan
     if (slotCount >= PerlinNoiseFragmentProcessor::MaxPointwiseSlots) {
       return false;
     }
-    if (IsPointwiseTailOp(node) && node->inputs.size() == 1 && node->inputs[0] == prev) {
+    if (IsUnaryPointwiseOp(node) && node->inputs.size() == 1 && node->inputs[0] == prev) {
       passNodes.push_back(AOTNodeID(index));
       ++slotCount;
       prev = AOTNodeID(index);
@@ -321,7 +345,7 @@ static bool DecomposeYUVChain(const AOTEffectGraph& graph, AOTEffectPlan* plan) 
   AOTNodeID prev = AOTNodeID(1);
   for (uint32_t index = 2; index < graph.nodeCount(); ++index) {
     auto node = graph.nodeAt(AOTNodeID(index));
-    if (!IsPointwiseTailOp(node) || node->inputs[0] != prev) {
+    if (!IsUnaryPointwiseOp(node) || node->inputs[0] != prev) {
       return false;
     }
     prev = AOTNodeID(index);
@@ -344,8 +368,8 @@ static bool DecomposeYUVChain(const AOTEffectGraph& graph, AOTEffectPlan* plan) 
 
 // New planner: a pointwise DAG whose only leaves are texture sources / const colors and whose
 // interior nodes are pure pointwise or blend ops. Such a DAG evaluates in a single fused pass (the
-// PointwiseChain kernel) with no intermediate materialization. Resolved plain and tiled texture
-// leaves are supported; device-space and non-pointwise nodes require a different planner.
+// PointwiseChain kernel) with no intermediate materialization. Resolved plain, tiled and
+// device-space texture leaves are supported; non-pointwise nodes require a different planner.
 static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
   if (plan == nullptr || graph.nodeCount() < 2) {
     return false;
@@ -441,7 +465,8 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
 bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
   // Keep simple noise on the existing compact kernel. Noise DAGs and ordinary pointwise DAGs
   // use their separate graph/chain families within shared budgets, without materialization.
-  // Device-space and YUV sources retain their dedicated tail/source planners.
+  // A linear chain over one chain pass's budget splits into several chain passes; YUV sources
+  // keep their dedicated kernel.
   // Each planner proposes the plan for its shape; the first one the executor accepts wins, so
   // every plan Decompose returns passes AOTPlanExecutor::CanExecute.
   if (plan == nullptr) {
@@ -449,7 +474,7 @@ bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTEffectPlan* 
   }
   using Planner = bool (*)(const AOTEffectGraph&, AOTEffectPlan*);
   for (Planner planner : {DecomposePerlinNoiseChain, DecomposePointwiseDAG,
-                          DecomposeLinearPointwiseTail, DecomposeYUVChain}) {
+                          DecomposeLinearMultiPass, DecomposeYUVChain}) {
     AOTEffectPlan candidate = {};
     if (planner(graph, &candidate) && AOTPlanExecutor::CanExecute(graph, candidate)) {
       *plan = std::move(candidate);

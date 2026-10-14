@@ -35,9 +35,9 @@ class AOTPlanExecutor {
  public:
   /**
    * Whether the executor can run this plan with the precompiled kernels: either one pass of a
-   * kernel the executor runs on a draw (PointwiseChain/Graph, PointwiseTail, PerlinNoiseFill,
-   * YUVTextureFill) within that kernel's slot and resource budgets, or a linear PointwiseTail chain
-   * split into several passes at the tail slot budget. Decompose only returns plans that pass it,
+   * kernel the executor runs on a draw (PointwiseChain/Graph, PerlinNoiseFill, YUVTextureFill)
+   * within that kernel's slot and resource budgets, or a linear chain split into several chain
+   * passes, each fitting one chain pass. Decompose only returns plans that pass it,
    * so every production entry and every diagnostic that reports a draw as routable share this rule.
    * A multi-pass plan stores each intermediate result in an RGBA8 texture, so a pass boundary
    * quantizes to the 1/255 grid (an AlphaThreshold right after a boundary can flip at the grid

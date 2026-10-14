@@ -1433,7 +1433,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
       // The folded tree had no plan and nothing moved: fall through. A draw whose leading
       // processor the materialization policy would rewrite can still be saved by the retry.
     }
-    // The color-only route replaces the color processors with rebuilt Tail/Chain/Perlin FPs whose
+    // The color-only route replaces the color processors with rebuilt Chain/Perlin/YUV FPs whose
     // matchers are all single-FP, so a draw still carrying a coverage FP (clip coverage or an
     // unfoldable mask) can never match and skips it. Coverage from the geometry processor (AA
     // edges of a rect, oval, or path) is no obstacle: the terminal pass keeps the draw's own

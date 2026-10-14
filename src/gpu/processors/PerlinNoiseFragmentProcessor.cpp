@@ -55,7 +55,7 @@ void PerlinNoiseFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) con
   }
   bytesKey->write(key);
   // Slot kinds are runtime uniforms in the precompiled kernel, but a runtime-built program would
-  // bake them into code, so the key must separate them (mirroring AOTPointwiseTailProcessor).
+  // bake them into code, so the key must separate them.
   bytesKey->write(static_cast<uint32_t>(slotCount));
   for (size_t index = 0; index < slotCount; ++index) {
     bytesKey->write(static_cast<uint32_t>(pointwiseSlots[index].type));

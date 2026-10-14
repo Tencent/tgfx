@@ -26,10 +26,9 @@ namespace tgfx {
 
 /**
  * Writes one pointwise-operator slot's uniform record into the per-slot arrays of a multi-slot
- * precompiled kernel (PerlinNoiseFillShader, PointwiseTailShader). Array-element writes tolerate
+ * precompiled kernel (PerlinNoiseFillShader, YUVTextureFillShader). Array-element writes tolerate
  * targets that lack the arrays (runtime-generated programs), where the operator is baked into the
- * emitted code instead. slotCapacity is the kernel's array capacity (2 for the tail, 3 for
- * perlin).
+ * emitted code instead. slotCapacity is the kernel's array capacity (3 for both).
  */
 void UploadAOTPointwiseSlot(UniformData* uniformData, size_t slotIndex, uint32_t slotCapacity,
                             const AOTPointwiseSlot& slot);

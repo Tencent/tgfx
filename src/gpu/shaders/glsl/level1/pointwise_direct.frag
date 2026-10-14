@@ -4,9 +4,8 @@
 // skeletons were identical and differed only in the operator: the operator is now the OpType runtime
 // uniform from the shared pointwise operator table, not three separate shaders.
 //
-// This is the source-less sibling of pointwise_tail.frag. The two stay separate kernels because the
-// varying layout differs — without a texture source there is no TransformedCoords_0, so vCoverage
-// occupies location 0 — and the vertex/fragment interface is a structural axis, not a parameter.
+// Without a texture source there is no TransformedCoords_0 varying, so vCoverage occupies
+// location 0.
 #version 450
 
 #ifndef HAS_XP

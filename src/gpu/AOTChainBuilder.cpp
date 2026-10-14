@@ -22,7 +22,6 @@
 #include "gpu/AOTChainRegisterAllocator.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
-#include "gpu/processors/AOTPointwiseTailProcessor.h"
 #include "gpu/processors/AOTYUVChainProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
@@ -47,8 +46,9 @@ bool AOTChainBuilder::IsChainCompatibleTiledMode(TiledTextureShaderMode mode) {
 
 namespace {
 
-// Rebuilds the texture processor of one TextureSource node: a device-space source, or a plain or
-// tiled leaf sampling through its resolved sampler state. Every planner refuses RGBAAA sources.
+// Rebuilds the texture processor of one TextureSource node: a plain or tiled leaf sampling through
+// its resolved sampler state, or the stand-in leaf of a device-space source. Every planner refuses
+// RGBAAA sources.
 static PlacementPtr<FragmentProcessor> BuildTextureLeafFP(BlockAllocator* allocator,
                                                           const AOTEffectNode* node) {
   auto parameters = node != nullptr && node->kind == AOTEffectKind::TextureSource
@@ -58,8 +58,17 @@ static PlacementPtr<FragmentProcessor> BuildTextureLeafFP(BlockAllocator* alloca
     return nullptr;
   }
   if (parameters->samplingKind == AOTTextureSamplingKind::Device) {
-    return DeviceSpaceTextureEffect::Make(allocator, parameters->textureProxy,
-                                          parameters->uvMatrix);
+    // The chain kernel samples this leaf at DeviceLeafCoordMatrix * gl_FragCoord (see
+    // AOTChainDeviceLeaf), so the child only binds the texture with the sampler state of a
+    // DeviceSpaceTextureEffect (clamp, linear, no mipmaps). Its coordinate transform is unused,
+    // and the unbounded sample area makes the kernel's subset clamp a no-op, as the runtime effect
+    // samples unclamped.
+    SamplingArgs args = {TileMode::Clamp, TileMode::Clamp,
+                         SamplingOptions(FilterMode::Linear, MipmapMode::None),
+                         SrcRectConstraint::Fast};
+    args.sampleArea = Rect::MakeLTRB(-1e9f, -1e9f, 1e9f, 1e9f);
+    auto uvMatrix = Matrix::I();
+    return TextureEffect::Make(allocator, parameters->textureProxy, args, &uvMatrix);
   }
   if (parameters->samplingKind == AOTTextureSamplingKind::Tiled) {
     const auto& recipe = parameters->tiledRecipe;
@@ -305,19 +314,25 @@ struct ChainLayout {
   size_t rootRegister = 0;
   int coverageRootRegister = -1;
   int clipCoverageRegister = -1;
+  // Index into leafNodes of the device-space leaf, -1 when the pass has none.
+  int deviceLeafIndex = -1;
   AOTResourceProfile profile = AOTResourceProfile::Automatic;
 };
 
 // Whether a texture node's parameters describe a leaf the chain kernel samples itself: a resolved
-// plain leaf, or a tiled leaf whose shader wrap modes the kernel's single-tap path implements.
-// YUV planes and RGBAAA sources need their own kernels; device-space sources sample through
-// fragment coordinates the chain leaves do not carry.
+// plain leaf, a device-space leaf (sampled through DeviceLeafCoordMatrix), or a tiled leaf whose
+// shader wrap modes the kernel's single-tap path implements. YUV planes and RGBAAA sources need
+// their own kernels.
 static bool IsChainTextureLeaf(const AOTTextureParameters& parameters) {
   if (parameters.textureProxy == nullptr || parameters.isYUV || parameters.hasRGBAAA) {
     return false;
   }
   if (parameters.samplingKind == AOTTextureSamplingKind::Plain) {
     return true;
+  }
+  if (parameters.samplingKind == AOTTextureSamplingKind::Device) {
+    // The same source shapes the device-space linear route always served: an affine RGBA source.
+    return !parameters.isAlphaOnly && !parameters.hasPerspective;
   }
   if (parameters.samplingKind != AOTTextureSamplingKind::Tiled) {
     return false;
@@ -460,6 +475,7 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
   layout->tiledLeaves.clear();
   layout->lutGradient = nullptr;
   layout->noise = nullptr;
+  layout->deviceLeafIndex = -1;
   for (size_t index = 0; index < ordered.size(); ++index) {
     const size_t combined = ordered[index];
     auto node = nodes[combined];
@@ -552,6 +568,14 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
         if (HasShaderTiling(*parameters)) {
           layout->tiledLeaves.push_back(
               {static_cast<int>(layout->leafNodes.size()), *parameters->tiledRecipe});
+        }
+        if (parameters->samplingKind == AOTTextureSamplingKind::Device) {
+          // The kernel carries one device-space leaf coordinate matrix, and only color leaves
+          // take this form (a device-space coverage texture becomes the mask child instead).
+          if (layout->deviceLeafIndex >= 0 || inputBase != 0) {
+            return false;
+          }
+          layout->deviceLeafIndex = static_cast<int>(layout->leafNodes.size());
         }
         layout->leafNodes.push_back(node);
         break;
@@ -1112,12 +1136,23 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   if (tiledLeaves.size() > 2) {
     additionalTiledLeaves.assign(tiledLeaves.begin() + 2, tiledLeaves.end());
   }
+  AOTChainDeviceLeaf deviceLeaf = {};
+  if (layout.deviceLeafIndex >= 0) {
+    const auto* parameters = std::get_if<AOTTextureParameters>(
+        &layout.leafNodes[static_cast<size_t>(layout.deviceLeafIndex)]->parameters);
+    if (parameters == nullptr) {
+      return nullptr;
+    }
+    deviceLeaf.leafIndex = layout.deviceLeafIndex;
+    deviceLeaf.textureProxy = parameters->textureProxy;
+    deviceLeaf.uvMatrix = parameters->uvMatrix;
+  }
   return AOTPointwiseChainProcessor::Make(
       allocator, std::move(leaves), layout.slots, layout.rootRegister, tiledLeafIndex, recipePtr,
       std::move(maskChild), layout.coverageRootRegister, layout.coordSourceMask,
       std::move(lutChild), lutLeafIndex, std::move(samplerPadding), maskChildIsPhantom,
       layout.clipCoverageRegister, tiledLeafIndex2, recipePtr2, layout.profile,
-      additionalTiledLeaves);
+      additionalTiledLeaves, deviceLeaf);
 }
 
 }  // namespace
@@ -1198,35 +1233,74 @@ bool AOTChainBuilder::ResolveChainProfile(const AOTEffectGraph& graph,
 // RRectCoverage nodes rooted at the GP coverage unit, which is what makes composed multi-clip
 // coverage representable at all. Returns false when the coverage carries anything else.
 
-PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildTextureSourceFP(
-    BlockAllocator* allocator, const AOTTextureParameters& parameters) {
-  AOTEffectNode node = {};
-  node.kind = AOTEffectKind::TextureSource;
-  node.parameters = parameters;
-  return BuildTextureLeafFP(allocator, &node);
+bool AOTChainBuilder::BuildLinearSegment(const AOTEffectGraph& graph,
+                                         const std::vector<AOTNodeID>& operators,
+                                         const AOTTextureParameters& source,
+                                         AOTEffectGraph* segment, AOTPassDescriptor* pass) {
+  if (segment == nullptr || pass == nullptr) {
+    return false;
+  }
+  AOTNodeBuilder builder = {};
+  AOTNodeID current = AOTNodeID::Invalid();
+  if (!builder.addGeometryColor(&current) || !builder.addTextureSource(current, source, &current)) {
+    return false;
+  }
+  for (auto nodeID : operators) {
+    const auto* node = graph.nodeAt(nodeID);
+    if (node == nullptr || node->inputs.size() != 1) {
+      return false;
+    }
+    bool added = false;
+    if (const auto* matrix = std::get_if<AOTColorMatrixParameters>(&node->parameters)) {
+      added = node->kind == AOTEffectKind::ColorMatrix &&
+              builder.addColorMatrix(current, *matrix, &current);
+    } else if (const auto* luma = std::get_if<AOTLumaParameters>(&node->parameters)) {
+      added = node->kind == AOTEffectKind::Luma && builder.addLuma(current, *luma, &current);
+    } else if (const auto* threshold =
+                   std::get_if<AOTAlphaThresholdParameters>(&node->parameters)) {
+      added = node->kind == AOTEffectKind::AlphaThreshold &&
+              builder.addAlphaThreshold(current, *threshold, &current);
+    } else if (const auto* xform = std::get_if<AOTColorSpaceXformParameters>(&node->parameters)) {
+      added = node->kind == AOTEffectKind::ColorSpaceXform &&
+              builder.addColorSpaceXform(current, *xform, &current);
+    }
+    if (!added) {
+      return false;
+    }
+  }
+  AOTEffectGraph result = {};
+  if (!builder.finish(current, &result)) {
+    return false;
+  }
+  AOTPassDescriptor resultPass = {};
+  for (uint32_t index = 1; index < result.nodeCount(); ++index) {
+    resultPass.nodes.push_back(AOTNodeID(index));
+  }
+  resultPass.output = result.root();
+  AOTResourceProfile profile = AOTResourceProfile::Automatic;
+  if (!ResolveChainProfile(result, resultPass, &profile)) {
+    return false;
+  }
+  resultPass.resourceProfile = profile;
+  resultPass.kernel =
+      IsAOTGraphProfile(profile) ? AOTKernelKind::PointwiseGraph : AOTKernelKind::PointwiseChain;
+  *segment = std::move(result);
+  *pass = std::move(resultPass);
+  return true;
 }
 
-PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildFPForPass(
-    BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
-    PlacementPtr<FragmentProcessor> sourceOverride) {
-  if (sourceOverride != nullptr) {
-    // A later pass of a multi-pass tail plan: the source is the predecessor's materialized output
-    // and every node of the pass is an operator slot.
-    if (pass.kernel != AOTKernelKind::PointwiseTail ||
-        pass.nodes.size() > AOTPointwiseTailProcessor::MaxSlots) {
-      return nullptr;
-    }
-    std::vector<AOTPointwiseSlot> slots = {};
-    slots.reserve(pass.nodes.size());
-    for (auto nodeID : pass.nodes) {
-      AOTPointwiseSlot slot = {};
-      if (!BuildPointwiseSlot(graph, graph.nodeAt(nodeID), &slot)) {
-        return nullptr;
-      }
-      slots.push_back(slot);
-    }
-    return AOTPointwiseTailProcessor::Make(allocator, std::move(sourceOverride), slots);
-  }
+AOTTextureParameters AOTChainBuilder::IntermediateSource(std::shared_ptr<TextureProxy> textureProxy,
+                                                         const Matrix& uvMatrix) {
+  AOTTextureParameters parameters = {};
+  parameters.textureProxy = std::move(textureProxy);
+  parameters.samplingKind = AOTTextureSamplingKind::Device;
+  parameters.uvMatrix = uvMatrix;
+  return parameters;
+}
+
+PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildFPForPass(BlockAllocator* allocator,
+                                                                const AOTEffectGraph& graph,
+                                                                const AOTPassDescriptor& pass) {
   if (pass.nodes.empty()) {
     return nullptr;
   }
@@ -1241,12 +1315,6 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildFPForPass(
   }
   auto sourceNode = graph.nodeAt(pass.nodes[0]);
   switch (pass.kernel) {
-    case AOTKernelKind::PointwiseTail: {
-      auto source = BuildTextureLeafFP(allocator, sourceNode);
-      return source != nullptr
-                 ? AOTPointwiseTailProcessor::Make(allocator, std::move(source), slots)
-                 : nullptr;
-    }
     case AOTKernelKind::YUVTextureFill: {
       auto source = BuildTextureLeafFP(allocator, sourceNode);
       if (source == nullptr || source->name() != "TextureEffect") {

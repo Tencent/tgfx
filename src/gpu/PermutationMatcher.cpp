@@ -21,7 +21,6 @@
 #include "ColorSpaceXformHelper.h"
 #include "gpu/Swizzle.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
-#include "gpu/processors/AOTPointwiseTailProcessor.h"
 #include "gpu/processors/AOTYUVChainProcessor.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
@@ -69,7 +68,6 @@
 #include "gpu/shaders/level1/PointwiseChainShader.h"
 #include "gpu/shaders/level1/PointwiseDirectShader.h"
 #include "gpu/shaders/level1/PointwiseGraphShader.h"
-#include "gpu/shaders/level1/PointwiseTailShader.h"
 #include "gpu/shaders/level1/QuadColorFillShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
@@ -637,55 +635,6 @@ static std::optional<PermutationMatchResult> TryMatchDeviceSpaceTexture(
   auto vertIndex = DeviceSpaceTextureShader::VD::domain().encode(composed->vertValues);
   auto fragIndex = DeviceSpaceTextureShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"DeviceSpaceTextureShader", vertIndex, fragIndex};
-}
-
-static std::optional<PermutationMatchResult> TryMatchPointwiseTail(const ProgramInfo* programInfo) {
-  int hasCoverage = 0;
-  if (!IsPositionOnlyRectGP(programInfo->getGeometryProcessor(), &hasCoverage) ||
-      programInfo->numColorFragmentProcessors() != 1 || programInfo->numFragmentProcessors() != 1) {
-    return std::nullopt;
-  }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
-    return std::nullopt;
-  }
-  auto fp = programInfo->getFragmentProcessor(0);
-  if (fp->name() != "AOTPointwiseTailProcessor" || fp->numChildProcessors() != 1) {
-    return std::nullopt;
-  }
-  auto* tail = static_cast<const AOTPointwiseTailProcessor*>(fp);
-  auto source = tail->source();
-  // Subset clamping is a runtime uniform now: the kernel always clamps by Subset, and the source
-  // uploads the full texture bounds when there is no real subset.
-  if (tail->sourceKind() == AOTPointwiseTailProcessor::SourceKind::Plain) {
-    if (source->name() != "TextureEffect" || source->numTextureSamplers() != 1) {
-      return std::nullopt;
-    }
-    auto* texture = static_cast<const TextureEffect*>(source);
-    if (texture->isYUV() || texture->isAlphaOnly() || texture->hasRGBAAA() ||
-        source->coordTransform(0)->matrix.hasPerspective()) {
-      return std::nullopt;
-    }
-  } else {
-    if (source->name() != "DeviceSpaceTextureEffect" || source->numTextureSamplers() != 1) {
-      return std::nullopt;
-    }
-    auto* texture = static_cast<const DeviceSpaceTextureEffect*>(source);
-    if (texture->isAlphaOnly() || texture->hasPerspective()) {
-      return std::nullopt;
-    }
-  }
-
-  PointwiseTailInputs inputs;
-  inputs.hasCoverage = hasCoverage != 0;
-  inputs.xpType = xpType;
-  auto composed = ComposePointwiseTail(inputs);
-  if (!composed) {
-    return std::nullopt;
-  }
-  auto vertIndex = PointwiseTailShader::VD::domain().encode(composed->vertValues);
-  auto fragIndex = PointwiseTailShader::FD::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"PointwiseTailShader", vertIndex, fragIndex};
 }
 
 // Matches the fused pointwise-DAG kernel. The chain processor carries the whole DAG in uniforms,
@@ -1655,9 +1604,6 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
     return result;
   }
   if (auto result = TryMatchMaskFill(programInfo)) {
-    return result;
-  }
-  if (auto result = TryMatchPointwiseTail(programInfo)) {
     return result;
   }
   if (auto result = TryMatchPointwiseDAG(programInfo)) {

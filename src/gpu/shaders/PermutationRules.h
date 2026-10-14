@@ -296,15 +296,6 @@ struct TexturedEffectInputs {
 };
 
 /**
- * Input contract of the PointwiseTailShader matcher rule. The tail source structure checks
- * (plain vs device-space texture, perspective) are whole-draw rejections in Extract.
- */
-struct PointwiseTailInputs {
-  bool hasCoverage = false;
-  int xpType = -1;  // -1 = no representable XferProcessor.
-};
-
-/**
  * Input contract of the PointwiseDirectShader matcher rule. The pointwise FP identity and
  * transfer-function range checks are whole-draw rejections in Extract; the operator and pipeline
  * flags are runtime uniforms.
@@ -500,12 +491,6 @@ std::optional<RuleComposedValues> ComposeGlassRefraction(const GlassRefractionIn
  * contract.
  */
 std::optional<RuleComposedValues> ComposeTexturedEffect(const TexturedEffectInputs& inputs);
-
-/**
- * Pure mapping for the PointwiseTailShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
- */
-std::optional<RuleComposedValues> ComposePointwiseTail(const PointwiseTailInputs& inputs);
 
 /**
  * Pure mapping for the PointwiseDirectShader rule; see ComposeRoundStrokeRect for the sharing

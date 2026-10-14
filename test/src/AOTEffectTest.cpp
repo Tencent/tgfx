@@ -1185,17 +1185,14 @@ TGFX_TEST(AOTEffectTest, TripleChainFusesToSinglePass) {
             std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(2), AOTNodeID(3)}));
 }
 
-// A device-space texture chain cannot use the fused chain kernel (it samples in device
-// coordinates), so the tail planner serves it in one pass of the source plus at most two
-// operators. A longer chain is refused rather than split into materialized passes.
-// A segmented tail plan: the source pass, then passes of operator slots each reading its
-// predecessor, every pass but the last materializing.
-static void ExpectSegmentedTailPlan(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
-                                    size_t passes) {
+// A multi-pass linear plan: the source pass, then passes of operators each reading its
+// predecessor, every pass but the last materializing, all on the chain kernel.
+static void ExpectSegmentedChainPlan(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
+                                     size_t passes) {
   ASSERT_EQ(plan.passes.size(), passes);
   for (size_t index = 0; index < passes; ++index) {
     const auto& pass = plan.passes[index];
-    EXPECT_EQ(pass.kernel, AOTKernelKind::PointwiseTail);
+    EXPECT_EQ(pass.kernel, AOTKernelKind::PointwiseChain);
     EXPECT_EQ(pass.materializesOutput, index + 1 < passes);
     if (index == 0) {
       EXPECT_TRUE(pass.dependencies.empty());
@@ -1207,7 +1204,10 @@ static void ExpectSegmentedTailPlan(const AOTEffectGraph& graph, const AOTEffect
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
 }
 
-TGFX_TEST(AOTEffectTest, DeviceSpaceLinearChainUsesPointwiseTailPlanner) {
+// A device-space texture source is a chain leaf sampled at the fragment position, so a
+// device-space linear chain fuses into one chain pass like a plain one. The leaf child is a plain
+// TextureEffect, and the chain processor records which leaf samples in device space.
+TGFX_TEST(AOTEffectTest, DeviceSpaceLinearChainUsesChainKernel) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
@@ -1215,7 +1215,7 @@ TGFX_TEST(AOTEffectTest, DeviceSpaceLinearChainUsesPointwiseTailPlanner) {
   auto proxy = context->proxyProvider()->createTextureProxy({}, 2, 2, PixelFormat::RGBA_8888);
   ASSERT_NE(proxy, nullptr);
   ASSERT_NE(proxy->getTextureView(), nullptr);
-  auto texture = DeviceSpaceTextureEffect::Make(&allocator, std::move(proxy), Matrix::I());
+  auto texture = DeviceSpaceTextureEffect::Make(&allocator, proxy, Matrix::MakeTrans(3, 5));
   auto colorMatrix = ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix);
   auto luma = LumaFragmentProcessor::Make(&allocator);
   auto colorMatrix2 = ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix);
@@ -1223,34 +1223,52 @@ TGFX_TEST(AOTEffectTest, DeviceSpaceLinearChainUsesPointwiseTailPlanner) {
   ASSERT_NE(colorMatrix, nullptr);
   ASSERT_NE(luma, nullptr);
   ASSERT_NE(colorMatrix2, nullptr);
-  AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({texture.get(), colorMatrix.get(), luma.get()}, &graph));
-  AOTEffectPlan plan;
-  ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
-  ASSERT_EQ(plan.passes.size(), 1u);
-  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseTail);
-  EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
-  EXPECT_NE(AOTChainBuilder::BuildFPForPass(&allocator, graph, plan.passes[0]), nullptr);
+  for (const auto& processors : std::vector<std::vector<const FragmentProcessor*>>{
+           {texture.get(), colorMatrix.get(), luma.get()},
+           {texture.get(), colorMatrix.get(), luma.get(), colorMatrix2.get()}}) {
+    SCOPED_TRACE(processors.size());
+    AOTEffectGraph graph;
+    ASSERT_TRUE(AOTEffectDecomposer::Lower(processors, &graph));
+    AOTEffectPlan plan;
+    ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+    ASSERT_EQ(plan.passes.size(), 1u);
+    EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
+    EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+    auto processor = AOTChainBuilder::BuildFPForPass(&allocator, graph, plan.passes[0]);
+    ASSERT_NE(processor, nullptr);
+    ASSERT_EQ(processor->name(), "AOTPointwiseChainProcessor");
+    auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
+    EXPECT_EQ(chain->deviceLeafIndex(), 0);
+    EXPECT_EQ(chain->childProcessor(0)->name(), "TextureEffect");
+    EXPECT_EQ(AOTEffectDecomposer::AnalyzeChain(processors).outcome,
+              AOTDecomposeOutcome::FusablePointwise);
+  }
 
-  AOTEffectGraph longGraph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower(
-      {texture.get(), colorMatrix.get(), luma.get(), colorMatrix2.get()}, &longGraph));
-  // A third operator exceeds the tail's slot budget: the chain continues in a second pass that
-  // reads the first pass's materialized output.
-  AOTEffectPlan longPlan;
-  ASSERT_TRUE(AOTEffectDecomposer::Decompose(longGraph, &longPlan));
-  ExpectSegmentedTailPlan(longGraph, longPlan, 2);
-  auto analysis = AOTEffectDecomposer::AnalyzeChain(
-      {texture.get(), colorMatrix.get(), luma.get(), colorMatrix2.get()});
-  EXPECT_EQ(analysis.outcome, AOTDecomposeOutcome::FusablePointwise);
+  // The kernel carries one device-space leaf coordinate matrix, so a DAG blending two device-space
+  // sources does not fit one chain pass.
+  AOTNodeBuilder builder;
+  AOTNodeID geometry, first, second, blended;
+  ASSERT_TRUE(builder.addGeometryColor(&geometry));
+  AOTTextureParameters device = {};
+  device.textureProxy = proxy;
+  device.samplingKind = AOTTextureSamplingKind::Device;
+  ASSERT_TRUE(builder.addTextureSource(geometry, device, &first));
+  ASSERT_TRUE(builder.addTextureSource(geometry, device, &second));
+  AOTBlendParameters blend = {};
+  blend.blendMode = static_cast<int>(BlendMode::SrcOver);
+  ASSERT_TRUE(builder.addBlend(first, second, blend, &blended));
+  AOTEffectGraph twoDeviceLeaves;
+  ASSERT_TRUE(builder.finish(blended, &twoDeviceLeaves));
+  AOTEffectPlan refused;
+  EXPECT_FALSE(AOTEffectDecomposer::Decompose(twoDeviceLeaves, &refused));
 }
 
-// A multi-pass tail plan never starts a pass at an AlphaThreshold, because the pass boundary would
-// round the threshold's input to RGBA8. The planner ends the previous pass early so the threshold
-// joins the operator that feeds it; when no earlier boundary is left (the threshold's feeding
-// operators are thresholds too), the chain is refused. CanExecute rejects a hand-built plan that
-// breaks the rule.
-TGFX_TEST(AOTEffectTest, TailPlanNeverStartsPassAtThreshold) {
+// A multi-pass plan never starts a pass at an AlphaThreshold, because the pass boundary would
+// round the threshold's input to RGBA8. A chain pass holds the source plus 31 operators; the
+// planner ends a pass early so the threshold joins the operator that feeds it, and when no earlier
+// boundary is left (the threshold's feeding operators are thresholds too), the chain is refused.
+// CanExecute rejects a hand-built plan that breaks the rule.
+TGFX_TEST(AOTEffectTest, MultiPassPlanNeverStartsPassAtThreshold) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
@@ -1258,48 +1276,56 @@ TGFX_TEST(AOTEffectTest, TailPlanNeverStartsPassAtThreshold) {
   auto proxy = context->proxyProvider()->createTextureProxy({}, 2, 2, PixelFormat::RGBA_8888);
   ASSERT_NE(proxy, nullptr);
   auto texture = DeviceSpaceTextureEffect::Make(&allocator, std::move(proxy), Matrix::I());
-  auto matrixA = ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix);
-  auto matrixB = ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix);
-  auto matrixC = ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix);
-  auto thresholdA = AlphaThresholdFragmentProcessor::Make(&allocator, 0.5f);
-  auto thresholdB = AlphaThresholdFragmentProcessor::Make(&allocator, 0.5f);
-  ASSERT_TRUE(texture != nullptr && matrixA != nullptr && matrixB != nullptr &&
-              matrixC != nullptr && thresholdA != nullptr && thresholdB != nullptr);
+  ASSERT_NE(texture, nullptr);
+  constexpr size_t PassOperators = AOTPointwiseChainProcessor::MaxSlots - 1;
+  std::vector<PlacementPtr<FragmentProcessor>> owners = {};
+  auto matrix = [&]() {
+    owners.push_back(ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix));
+    return owners.back().get();
+  };
+  auto threshold = [&]() {
+    owners.push_back(AlphaThresholdFragmentProcessor::Make(&allocator, 0.5f));
+    return owners.back().get();
+  };
 
-  // [matrix, matrix, threshold, matrix]: the slot budget alone would split [source, matrix,
-  // matrix] | [threshold, matrix]. The planner gives [source, matrix] | [matrix, threshold] |
-  // [matrix].
+  // [matrix x31, threshold, matrix]: the instruction budget alone would split [source, matrix x31]
+  // | [threshold, matrix]. The planner gives [source, matrix x30] | [matrix, threshold, matrix].
+  std::vector<const FragmentProcessor*> processors = {texture.get()};
+  for (size_t index = 0; index < PassOperators; ++index) {
+    processors.push_back(matrix());
+  }
+  processors.push_back(threshold());
+  processors.push_back(matrix());
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower(
-      {texture.get(), matrixA.get(), matrixB.get(), thresholdA.get(), matrixC.get()}, &graph));
+  ASSERT_TRUE(AOTEffectDecomposer::Lower(processors, &graph));
   AOTEffectPlan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
-  ASSERT_EQ(plan.passes.size(), 3u);
-  EXPECT_EQ(plan.passes[0].nodes.size(), 2u);
-  ASSERT_EQ(plan.passes[1].nodes.size(), 2u);
+  ExpectSegmentedChainPlan(graph, plan, 2);
+  EXPECT_EQ(plan.passes[0].nodes.size(), PassOperators);
+  ASSERT_EQ(plan.passes[1].nodes.size(), 3u);
   EXPECT_EQ(graph.nodeAt(plan.passes[1].nodes[1])->kind, AOTEffectKind::AlphaThreshold);
-  EXPECT_EQ(plan.passes[2].nodes.size(), 1u);
-  for (size_t index = 1; index < plan.passes.size(); ++index) {
-    EXPECT_NE(graph.nodeAt(plan.passes[index].nodes[0])->kind, AOTEffectKind::AlphaThreshold);
-  }
-  EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
 
-  // The plain slot-budget split of the same chain starts its second pass at the threshold.
+  // The plain instruction-budget split of the same chain starts its second pass at the threshold.
+  const auto thresholdNode = static_cast<uint32_t>(PassOperators + 2);
+  ASSERT_EQ(graph.nodeAt(AOTNodeID(thresholdNode))->kind, AOTEffectKind::AlphaThreshold);
   AOTEffectPlan budgetSplit = plan;
-  budgetSplit.passes.resize(2);
-  budgetSplit.passes[0].nodes = {AOTNodeID(1), AOTNodeID(2), AOTNodeID(3)};
-  budgetSplit.passes[0].output = AOTNodeID(3);
-  budgetSplit.passes[1].nodes = {AOTNodeID(4), AOTNodeID(5)};
-  budgetSplit.passes[1].output = AOTNodeID(5);
-  budgetSplit.passes[1].materializesOutput = false;
-  ASSERT_EQ(graph.nodeAt(AOTNodeID(4))->kind, AOTEffectKind::AlphaThreshold);
+  budgetSplit.passes[0].nodes.clear();
+  for (uint32_t index = 1; index < thresholdNode; ++index) {
+    budgetSplit.passes[0].nodes.push_back(AOTNodeID(index));
+  }
+  budgetSplit.passes[0].output = AOTNodeID(thresholdNode - 1);
+  budgetSplit.passes[1].nodes = {AOTNodeID(thresholdNode), AOTNodeID(thresholdNode + 1)};
+  budgetSplit.passes[1].output = AOTNodeID(thresholdNode + 1);
   EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, budgetSplit));
 
-  // [matrix, threshold, threshold]: three operators need two passes, but every boundary inside the
-  // chain is in front of a threshold or would leave a pass with no operator.
+  // [matrix, threshold x31]: the operators need two passes, but every boundary inside the chain is
+  // in front of a threshold or would leave the second pass with no operator.
+  std::vector<const FragmentProcessor*> refusedProcessors = {texture.get(), matrix()};
+  for (size_t index = 0; index < PassOperators; ++index) {
+    refusedProcessors.push_back(threshold());
+  }
   AOTEffectGraph refusedGraph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower(
-      {texture.get(), matrixA.get(), thresholdA.get(), thresholdB.get()}, &refusedGraph));
+  ASSERT_TRUE(AOTEffectDecomposer::Lower(refusedProcessors, &refusedGraph));
   AOTEffectPlan refusedPlan;
   EXPECT_FALSE(AOTEffectDecomposer::Decompose(refusedGraph, &refusedPlan));
 }
@@ -1335,7 +1361,7 @@ TGFX_TEST(AOTEffectTest, DAGAdmissionRejectsPassMissingProducer) {
   EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, duplicated));
 }
 
-TGFX_TEST(AOTEffectTest, TwoColorSpaceTransformsRetainTailCandidate) {
+TGFX_TEST(AOTEffectTest, TwoColorSpaceTransformsSplitIntoChainPasses) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
@@ -1359,11 +1385,13 @@ TGFX_TEST(AOTEffectTest, TwoColorSpaceTransformsRetainTailCandidate) {
     processors.push_back(second.get());
     AOTEffectGraph graph;
     ASSERT_TRUE(AOTEffectDecomposer::Lower(processors, &graph));
-    // Two transforms exceed the chain kernel's single color-space block, so the tail planner
-    // takes the chain: one pass for two operators, a second pass once a third one is inserted.
+    // Two transforms exceed the chain kernel's single color-space block, so the multi-pass
+    // planner cuts the chain in front of the second one: [source, xform(, luma)] | [xform].
     AOTEffectPlan plan;
     ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
-    ExpectSegmentedTailPlan(graph, plan, insertLuma ? 2u : 1u);
+    ExpectSegmentedChainPlan(graph, plan, 2u);
+    EXPECT_EQ(plan.passes[0].nodes.size(), insertLuma ? 3u : 2u);
+    EXPECT_EQ(plan.passes[1].nodes, std::vector<AOTNodeID>{graph.root()});
     EXPECT_NE(AOTChainBuilder::BuildFPForPass(&allocator, graph, plan.passes[0]), nullptr);
     AOTEffectPlan forcedChain = {};
     forcedChain.output = graph.root();
@@ -1454,7 +1482,7 @@ TGFX_TEST(AOTEffectTest, LinearChainSlotBoundaryIsChainInstructionBudget) {
     ASSERT_TRUE(AOTEffectDecomposer::Lower(processors, &graph));
     // The chain kernel carries 32 instructions with a recycled 16-entry register file, so a
     // texture plus 31 operators fuses into one pass; the 32nd operator crosses the instruction
-    // budget and the tail planner splits the chain into 16 passes of two operators each.
+    // budget and the multi-pass planner moves it into a second chain pass.
     AOTEffectPlan plan;
     ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
     if (opCount == 31) {
@@ -1462,7 +1490,9 @@ TGFX_TEST(AOTEffectTest, LinearChainSlotBoundaryIsChainInstructionBudget) {
       EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
       EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
     } else {
-      ExpectSegmentedTailPlan(graph, plan, 16);
+      ExpectSegmentedChainPlan(graph, plan, 2);
+      EXPECT_EQ(plan.passes[0].nodes.size(), opCount);
+      EXPECT_EQ(plan.passes[1].nodes.size(), 1u);
     }
   }
 }
@@ -1719,8 +1749,8 @@ TGFX_TEST(AOTEffectTest, ConstColorChainDecomposesToPointwiseChain) {
 }
 
 // A plain linear texture chain fits the fused chain kernel's contracts, so the DAG planner
-// serves it in one pass (the tail planner would split it into segments bounded by its fixed
-// two-slot shader, materializing intermediates unnecessarily).
+// serves it in one pass rather than the multi-pass planner, which would materialize
+// intermediates.
 TGFX_TEST(AOTEffectTest, LinearTextureChainPrefersSinglePassChain) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -2994,7 +3024,7 @@ TGFX_TEST(AOTEffectTest, AdmissionMatrixKeepsPlanningAndConstructionAligned) {
          o->push_back(matrix(a));
          return true;
        },
-       true, true, AOTKernelKind::PointwiseTail},
+       true, true, AOTKernelKind::PointwiseChain},
       {"device-texture+three-ops",
        [&](Context* c, BlockAllocator* a, Owners* o) {
          o->push_back(deviceTexture(c, a));
@@ -3003,7 +3033,7 @@ TGFX_TEST(AOTEffectTest, AdmissionMatrixKeepsPlanningAndConstructionAligned) {
          o->push_back(matrix(a));
          return true;
        },
-       true, true, AOTKernelKind::PointwiseTail, 2},
+       true, true, AOTKernelKind::PointwiseChain},
       {"unsupported-lowering",
        [&](Context*, BlockAllocator* a, Owners* o) {
          o->push_back(a->make<ShapeRejectingFragmentProcessor>());

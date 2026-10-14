@@ -61,6 +61,11 @@
   // never read — the mask is sampled unclamped.
   vec4 DeviceMaskSubset;
   int HasMaskTexture;
+  // The leaf sampled in destination device space (a DeviceSpaceTextureEffect source), -1 when
+  // the chain has none. That leaf reads DeviceLeafCoordMatrix * gl_FragCoord instead of its
+  // TransformedCoords varying; at most one leaf per chain.
+  int DeviceLeafIndex;
+  mat3 DeviceLeafCoordMatrix;
 #elif HAS_MASK_TEXTURE
   mat3 DeviceCoordMatrix;
   // Decoy write target for the coverage mask FP (see GLSLDeviceSpaceTextureEffect::onSetData);

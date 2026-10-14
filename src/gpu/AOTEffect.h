@@ -272,8 +272,8 @@ using AOTEffectParameters =
                  AOTBlendParameters, AOTPerlinNoiseParameters, AOTRectCoverageParameters,
                  AOTGradientParameters, AOTRRectCoverageParameters>;
 
-// Runtime-selected pointwise operator applied by the fused kernels (PointwiseTail, PointwiseChain
-// and PerlinNoiseFill). The values mirror the OP_* constants in pointwise_op.inc: the kernels
+// Runtime-selected pointwise operator applied by the fused kernels (PointwiseChain,
+// PerlinNoiseFill and YUVTextureFill). The values mirror the OP_* constants in pointwise_op.inc: the kernels
 // declare every operator's parameter block unconditionally and select at draw time via a uniform,
 // so the operator kind is never a compile-time permutation axis.
 enum class AOTPointwiseOpType : int {

@@ -143,7 +143,6 @@ const ProcessorClaim ProcessorClaims[] = {
     // Executor-rebuilt processors matched by the fused kernel rules, and effect processors
     // served by dedicated matcher rules.
     {"AOTPointwiseChainProcessor", "AOTPointwiseChainProcessor", kMatcher, ""},
-    {"AOTPointwiseTailProcessor", "AOTPointwiseTailProcessor", kMatcher, ""},
     {"GaussianBlur1DFragmentProcessor", "GaussianBlur1DFragmentProcessor", kMatcher, ""},
     {"GlassRefractionFragmentProcessor", "GlassRefractionFragmentProcessor", kMatcher, ""},
     {"GlassUDFTentBlurFragmentProcessor", "GlassUDFTentBlurFragmentProcessor", kMatcher, ""},

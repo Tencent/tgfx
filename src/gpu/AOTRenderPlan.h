@@ -33,7 +33,7 @@ namespace tgfx {
 enum class AOTEdgeSpace {
   /// Captured over the destination's device bounds. The consumer reads it at its own device pixel
   /// (DeviceSpaceTextureEffect), so producer and consumer stay pixel-aligned and no apron is
-  /// needed. Used by the passes a multi-pass PointwiseTail plan splits off.
+  /// needed. Used by the passes a multi-pass linear plan splits off.
   Device,
   /// Captured in the local coordinate space of the subtree it replaces. The consumer reads it with a
   /// TextureEffect at the subtree's local coordinates, which can land just outside the captured

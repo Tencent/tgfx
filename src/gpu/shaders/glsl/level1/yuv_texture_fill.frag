@@ -5,8 +5,8 @@
 // The plane sampling and conversion mirror GLSLTextureEffect::emitYUVTextureCode; the limited
 // range offset is a runtime uniform (YUVLimitedRange) since it is pure fragment math.
 // The three pointwise-operator slots carry a bounded color-grade tail (ColorMatrix / Luma /
-// AlphaThreshold / ColorSpaceXform): per-slot uniform arrays with a runtime-bound slot loop,
-// exactly the tail kernel's mechanism — the tail rides the same pass as the plane conversion,
+// AlphaThreshold / ColorSpaceXform): per-slot uniform arrays with a runtime-bound slot loop, so
+// the tail rides the same pass as the plane conversion,
 // so a video frame with a paint color filter never takes the runtime stitching route. A draw
 // with no operators leaves every slot at OP_NONE (a passthrough), byte-identical to before.
 #version 450

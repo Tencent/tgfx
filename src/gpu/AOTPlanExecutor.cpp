@@ -6,9 +6,7 @@
 #include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/AOTMaterializationRecorder.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/processors/AOTPointwiseTailProcessor.h"
 #include "gpu/processors/AOTYUVChainProcessor.h"
-#include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/tasks/AOTPlanRenderTask.h"
@@ -17,7 +15,7 @@
 namespace tgfx {
 namespace {
 
-static bool ValidatePointwiseTailSource(const AOTEffectGraph& graph, AOTNodeID nodeID) {
+static bool ValidateLinearSource(const AOTEffectGraph& graph, AOTNodeID nodeID) {
   auto node = graph.nodeAt(nodeID);
   if (node == nullptr || node->kind != AOTEffectKind::TextureSource || node->inputs.size() != 1) {
     return false;
@@ -31,8 +29,8 @@ static bool ValidatePointwiseTailSource(const AOTEffectGraph& graph, AOTNodeID n
          !parameters->hasPerspective;
 }
 
-static bool ValidatePointwiseTailOp(const AOTEffectGraph& graph, AOTNodeID nodeID,
-                                    AOTNodeID expectedInput) {
+static bool ValidateUnaryPointwiseOp(const AOTEffectGraph& graph, AOTNodeID nodeID,
+                                     AOTNodeID expectedInput) {
   auto node = graph.nodeAt(nodeID);
   return node != nullptr && node->inputs.size() == 1 && node->inputs[0] == expectedInput &&
          (node->kind == AOTEffectKind::ColorMatrix || node->kind == AOTEffectKind::Luma ||
@@ -64,7 +62,7 @@ static bool ValidateLinearSlots(const AOTEffectGraph& graph, const AOTPassDescri
     if (node == nullptr) {
       return false;
     }
-    bool accepted = ValidatePointwiseTailOp(graph, pass.nodes[opIndex], expectedInput);
+    bool accepted = ValidateUnaryPointwiseOp(graph, pass.nodes[opIndex], expectedInput);
     if (!accepted && allowConstOperands && node->kind == AOTEffectKind::ConstColor) {
       accepted = node->inputs.size() == 1 && node->inputs[0] == expectedInput;
     }
@@ -97,42 +95,57 @@ static bool ValidateYUVSource(const AOTEffectGraph& graph, AOTNodeID nodeID) {
          !parameters->hasRGBAAA && parameters->samplingKind == AOTTextureSamplingKind::Plain;
 }
 
-// A linear PointwiseTail chain split at the tail kernel's slot budget: the first pass carries the
-// source plus up to MaxSlots operators, every later pass up to MaxSlots operators reading its
-// predecessor's materialized output, and all but the last pass materialize. No later pass starts
-// with an AlphaThreshold (see CanStartTailPassAt in AOTEffectDecomposer.cpp).
-static bool ValidateSegmentedTailPlan(const AOTEffectGraph& graph, const AOTEffectPlan& plan) {
+// The operator nodes of one pass of a multi-pass linear plan: everything after the source in the
+// first pass, the whole node list in a later one.
+static std::vector<AOTNodeID> SegmentOperators(const AOTPassDescriptor& pass, bool firstPass) {
+  return {pass.nodes.begin() + (firstPass ? 1 : 0), pass.nodes.end()};
+}
+
+// A linear chain split into chain-kernel passes: the first pass carries the source plus its
+// operators, every later pass operators reading its predecessor's materialized output in device
+// space, and all but the last pass materialize. Every pass must fit one chain pass as its own
+// segment (AOTChainBuilder::BuildLinearSegment, the same check the planner cuts by), and no later
+// pass starts with an AlphaThreshold (see CanStartPassAt in AOTEffectDecomposer.cpp).
+static bool ValidateSegmentedPlan(const AOTEffectGraph& graph, const AOTEffectPlan& plan) {
   AOTNodeID expectedInput = AOTNodeID::Invalid();
+  const AOTTextureParameters* source = nullptr;
   for (size_t index = 0; index < plan.passes.size(); ++index) {
     const auto& pass = plan.passes[index];
     bool isLast = index + 1 == plan.passes.size();
-    if (pass.kernel != AOTKernelKind::PointwiseTail ||
-        pass.resourceProfile != AOTResourceProfile::Automatic || pass.nodes.empty() ||
+    if (!IsAOTPointwiseDAGKernel(pass.kernel) || pass.nodes.empty() ||
         pass.output != pass.nodes.back() || pass.materializesOutput == isLast) {
       return false;
     }
     size_t firstOp = 0;
     if (index == 0) {
-      if (!pass.dependencies.empty() ||
-          pass.nodes.size() > 1 + AOTPointwiseTailProcessor::MaxSlots ||
-          !ValidatePointwiseTailSource(graph, pass.nodes[0])) {
+      if (!pass.dependencies.empty() || !ValidateLinearSource(graph, pass.nodes[0])) {
         return false;
       }
+      source = std::get_if<AOTTextureParameters>(&graph.nodeAt(pass.nodes[0])->parameters);
       expectedInput = pass.nodes[0];
       firstOp = 1;
     } else {
       auto first = graph.nodeAt(pass.nodes[0]);
-      if (pass.dependencies.size() != 1 || pass.dependencies[0] != index - 1 ||
-          pass.nodes.size() > AOTPointwiseTailProcessor::MaxSlots || first == nullptr ||
+      if (pass.dependencies.size() != 1 || pass.dependencies[0] != index - 1 || first == nullptr ||
           first->kind == AOTEffectKind::AlphaThreshold) {
         return false;
       }
     }
     for (size_t opIndex = firstOp; opIndex < pass.nodes.size(); ++opIndex) {
-      if (!ValidatePointwiseTailOp(graph, pass.nodes[opIndex], expectedInput)) {
+      if (!ValidateUnaryPointwiseOp(graph, pass.nodes[opIndex], expectedInput)) {
         return false;
       }
       expectedInput = pass.nodes[opIndex];
+    }
+    // A later pass's intermediate does not exist yet; its fit only depends on the source kind.
+    auto segmentSource =
+        index == 0 ? *source
+                   : AOTChainBuilder::IntermediateSource(source->textureProxy, Matrix::I());
+    AOTEffectGraph segment = {};
+    AOTPassDescriptor segmentPass = {};
+    if (!AOTChainBuilder::BuildLinearSegment(graph, SegmentOperators(pass, index == 0),
+                                             segmentSource, &segment, &segmentPass)) {
+      return false;
     }
   }
   return plan.passes.back().output == plan.output;
@@ -167,7 +180,7 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
     return false;
   }
   if (plan.passes.size() > 1) {
-    return ValidateSegmentedTailPlan(graph, plan);
+    return ValidateSegmentedPlan(graph, plan);
   }
   const auto& pass = plan.passes[0];
   if (pass.nodes.empty() || pass.output != plan.output || !pass.dependencies.empty() ||
@@ -188,10 +201,6 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
     return false;
   }
   switch (pass.kernel) {
-    case AOTKernelKind::PointwiseTail:
-      return pass.nodes.size() <= 1 + AOTPointwiseTailProcessor::MaxSlots &&
-             ValidatePointwiseTailSource(graph, pass.nodes[0]) &&
-             ValidateLinearSlots(graph, pass, false);
     case AOTKernelKind::YUVTextureFill:
       return pass.nodes.size() <= 1 + AOTYUVChainProcessor::MaxPointwiseSlots &&
              ValidateYUVSource(graph, pass.nodes[0]) && ValidateLinearSlots(graph, pass, false);
@@ -247,7 +256,7 @@ bool AOTPlanExecutor::BuildPasses(Context* context, uint32_t renderFlags,
   for (size_t index = 0; index < plan.passes.size(); ++index) {
     const auto& pass = plan.passes[index];
     bool isTerminal = index + 1 == plan.passes.size();
-    PlacementPtr<FragmentProcessor> processor = nullptr;
+    AOTTextureParameters source = {};
     if (index == 0) {
       // The source pass runs as a split-off fill, so its source must sample what the original
       // draw samples at the same destination pixel.
@@ -255,24 +264,18 @@ bool AOTPlanExecutor::BuildPasses(Context* context, uint32_t renderFlags,
       if (texture == nullptr) {
         return false;
       }
-      auto parameters = *texture;
-      if (parameters.samplingKind == AOTTextureSamplingKind::Device) {
+      source = *texture;
+      if (source.samplingKind == AOTTextureSamplingKind::Device) {
         // A device-space source reads fragment coordinates. In the split-off target the fragment
         // coordinate of a pixel is its top-left device position minus the target's placement;
         // map it back to the destination's fragment coordinates first.
-        parameters.uvMatrix.preConcat(deviceToFragCoord);
-        parameters.uvMatrix.preTranslate(geometry.coordOffset.x, geometry.coordOffset.y);
+        source.uvMatrix.preConcat(deviceToFragCoord);
+        source.uvMatrix.preTranslate(geometry.coordOffset.x, geometry.coordOffset.y);
       } else if (deviceToLocal.has_value()) {
         // The fill's local coordinates are top-left device positions (plus fpCoordOffset); the
         // original draw maps those onto its own local coordinates first.
-        parameters.uvMatrix.preConcat(*deviceToLocal);
+        source.uvMatrix.preConcat(*deviceToLocal);
       }
-      auto source = AOTChainBuilder::BuildTextureSourceFP(allocator, parameters);
-      auto operators = pass;
-      operators.nodes.erase(operators.nodes.begin());
-      processor = source != nullptr ? AOTChainBuilder::BuildFPForPass(allocator, graph, operators,
-                                                                      std::move(source))
-                                    : nullptr;
     } else {
       // Split-off passes read each other at the same target pixel. The terminal draw reads the
       // last one from the destination's fragment coordinates: back to top-left device positions,
@@ -282,10 +285,16 @@ bool AOTPlanExecutor::BuildPasses(Context* context, uint32_t renderFlags,
         matrix = Matrix::MakeTrans(-geometry.coordOffset.x, -geometry.coordOffset.y);
         matrix.preConcat(deviceToFragCoord);
       }
-      auto source = DeviceSpaceTextureEffect::Make(allocator, previousTexture, matrix);
-      processor = source != nullptr
-                      ? AOTChainBuilder::BuildFPForPass(allocator, graph, pass, std::move(source))
-                      : nullptr;
+      source = AOTChainBuilder::IntermediateSource(previousTexture, matrix);
+    }
+    // Every pass runs on the chain kernel as its own segment: the source above, then this pass's
+    // operators.
+    AOTEffectGraph segment = {};
+    AOTPassDescriptor segmentPass = {};
+    PlacementPtr<FragmentProcessor> processor = nullptr;
+    if (AOTChainBuilder::BuildLinearSegment(graph, SegmentOperators(pass, index == 0), source,
+                                            &segment, &segmentPass)) {
+      processor = AOTChainBuilder::BuildFPForPass(allocator, segment, segmentPass);
     }
     if (processor == nullptr) {
       return false;

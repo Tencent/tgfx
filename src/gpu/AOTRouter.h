@@ -91,9 +91,8 @@ class AOTRouter {
   /**
    * Plans processors for the inline rewrite: true when they lower and decompose into a single pass
    * of a kernel whose processor can replace a draw's color list in place (PointwiseChain,
-   * PointwiseGraph, or PerlinNoiseFill). A PointwiseTail plan never qualifies: the tail planner only
-   * runs after the DAG planner refused the same nodes, so the chain kernel cannot carry them, and a
-   * multi-pass plan needs a plan task.
+   * PointwiseGraph, or PerlinNoiseFill). A multi-pass plan never qualifies: its intermediate
+   * passes need a plan task.
    */
   static bool PlanInlineRewrite(const std::vector<const FragmentProcessor*>& processors,
                                 AOTEffectGraph* graph, AOTEffectPlan* plan);

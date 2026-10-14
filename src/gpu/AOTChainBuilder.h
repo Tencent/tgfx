@@ -26,8 +26,9 @@ namespace tgfx {
 
 /**
  * Rebuilds concrete FragmentProcessors from a decomposed AOT plan: the fused chain kernel for
- * PointwiseChain/PointwiseGraph passes, the perlin kernel for PerlinNoiseFill and the linear
- * texture-plus-tail-op sequence for PointwiseTail passes. Used by AOTPlanExecutor's task assembly
+ * PointwiseChain/PointwiseGraph passes (including every pass of a multi-pass linear plan, through
+ * BuildLinearSegment), the perlin kernel for PerlinNoiseFill and the YUV kernel for
+ * YUVTextureFill. Used by AOTPlanExecutor's task assembly
  * and by the direct-draw decomposition route in StandardDrawOp::prepare.
  */
 class AOTChainBuilder {
@@ -53,23 +54,36 @@ class AOTChainBuilder {
                                   AOTResourceProfile* profile);
 
   /**
-   * Rebuilds the color processor of one plan pass: the fused chain/graph processor without draw
-   * coverage, or the tail, YUV or perlin processor with the pass's operators folded into its slot
-   * records. sourceOverride, when given, replaces the pass source: it is the predecessor's
-   * materialized output in a multi-pass tail plan, or a rebuilt first-pass source, and then every
-   * node of the pass is an operator slot. Returns nullptr when the pass shape cannot be rebuilt.
+   * Rebuilds the color processor of one self-contained plan pass: the fused chain/graph processor
+   * without draw coverage, or the YUV or perlin processor with the pass's operators folded into
+   * its slot records. Returns nullptr when the pass shape cannot be rebuilt. A pass of a
+   * multi-pass plan is not self-contained (it reads its predecessor's output); build it through
+   * BuildLinearSegment first.
    */
-  static PlacementPtr<FragmentProcessor> BuildFPForPass(
-      BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
-      PlacementPtr<FragmentProcessor> sourceOverride = nullptr);
+  static PlacementPtr<FragmentProcessor> BuildFPForPass(BlockAllocator* allocator,
+                                                        const AOTEffectGraph& graph,
+                                                        const AOTPassDescriptor& pass);
 
   /**
-   * Rebuilds the texture processor a TextureSource node with these parameters lowers back to: a
-   * device-space source, or a plain or tiled leaf sampling through its resolved sampler state.
-   * Returns nullptr for parameters no planner admits (RGBAAA, unsupported tiling).
+   * Builds the self-contained graph one pass of a multi-pass linear plan executes: the geometry
+   * color, a texture source with the given parameters (the plan's own source for the first pass,
+   * the predecessor's intermediate sampled in device space for a later one), then copies of the
+   * unary pointwise operators in order. On success *pass covers the whole segment on the chain
+   * kernel family its resources need. Returns false when an operator is not a unary pointwise
+   * one or when the segment does not fit one chain pass, so planning uses it as the fit check.
    */
-  static PlacementPtr<FragmentProcessor> BuildTextureSourceFP(
-      BlockAllocator* allocator, const AOTTextureParameters& parameters);
+  static bool BuildLinearSegment(const AOTEffectGraph& graph,
+                                 const std::vector<AOTNodeID>& operators,
+                                 const AOTTextureParameters& source, AOTEffectGraph* segment,
+                                 AOTPassDescriptor* pass);
+
+  /**
+   * The source a later pass of a multi-pass linear plan reads: its predecessor's RGBA
+   * intermediate, sampled in device space through uvMatrix (destination fragment coordinates to
+   * the intermediate's pixel space).
+   */
+  static AOTTextureParameters IntermediateSource(std::shared_ptr<TextureProxy> textureProxy,
+                                                 const Matrix& uvMatrix);
 
   /**
    * Flattens a single-pass PointwiseChain/PointwiseGraph plan into the shared processor, or returns

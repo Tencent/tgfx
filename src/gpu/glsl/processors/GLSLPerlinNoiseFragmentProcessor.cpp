@@ -28,8 +28,8 @@
 namespace tgfx {
 
 namespace {
-// Emits one pointwise operator on the output color, mirroring AOTPointwiseTailProcessor's slot
-// emission. The empty prefix addresses the kernel's shared OpType record (slot 0); slot 1 uses the
+// Emits one pointwise operator on the output color, mirroring the precompiled kernel's slot
+// evaluation (pointwise_op.inc). The empty prefix addresses the kernel's shared OpType record (slot 0); slot 1 uses the
 // "Slot1" prefix declared by perlin_noise.frag.
 void EmitPointwiseSlot(FragmentProcessor::EmitArgs& args,
                        std::unordered_map<std::string, std::string>& declaredArrays, size_t index,

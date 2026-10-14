@@ -1,6 +1,6 @@
 // Shared pointwise-operator uniform declarations. Included inside a FragmentUniformBlock by any
 // kernel that applies a runtime-selected pointwise operator (TexturedEffectShader,
-// PerlinNoiseFillShader, PointwiseTailShader). OpType selects the operator; the remaining fields are
+// PerlinNoiseFillShader, YUVTextureFillShader, PointwiseDirectShader). OpType selects the operator; the remaining fields are
 // the per-operator parameters. See pointwise_op.inc for the matching logic and OpType encoding.
 //
 // Single-slot kernels include this with TGFX_SLOT_ARRAY_SUFFIX undefined (scalar fields).
@@ -9,7 +9,7 @@
 // applyPointwiseOp. The reflection extractor reads flat top-level block members
 // (ReflectionExtractor.cpp), so slots must be flat fields or arrays rather than a nested struct.
 //
-// Field order must stay in sync with AOTPointwiseTailProcessor's uniform writes: the std140 block
+// Field order must stay in sync with AOTPointwiseSlotWriter's uniform writes: the std140 block
 // layout is derived from this order, so reordering changes the binary layout of every including
 // kernel.
 #ifndef TGFX_SLOT_ARRAY_SUFFIX

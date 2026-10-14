@@ -177,7 +177,8 @@ struct OffscreenFillStats {
   uint64_t canExecute = 0;
   uint64_t pointwiseChainPlans = 0;
   uint64_t pointwiseGraphPlans = 0;
-  uint64_t pointwiseTailPlans = 0;
+  // Plans that split a linear chain into several chain passes.
+  uint64_t multiPassPlans = 0;
   uint64_t precompiledPrograms = 0;
   uint64_t programBuilderPrograms = 0;
   uint64_t precompiledCanExecute = 0;

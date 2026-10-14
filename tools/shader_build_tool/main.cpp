@@ -54,7 +54,6 @@
 #include "gpu/shaders/level1/PointwiseChainShader.h"
 #include "gpu/shaders/level1/PointwiseDirectShader.h"
 #include "gpu/shaders/level1/PointwiseGraphShader.h"
-#include "gpu/shaders/level1/PointwiseTailShader.h"
 #include "gpu/shaders/level1/QuadColorFillShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"

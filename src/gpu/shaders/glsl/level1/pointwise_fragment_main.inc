@@ -12,6 +12,12 @@ vec4 chainLeafFetch(CHAIN_LEAF_SAMPLER texSampler, vec3 coord, vec4 leafSubset, 
   int readSwizzle = 0;
 #if NTEX > 0
   readSwizzle = LeafReadSwizzles[leafIndex];
+  // A device-space leaf samples at the fragment's destination position, like the runtime
+  // DeviceSpaceTextureEffect. Its Subset is unbounded, so the clamp below is a no-op for it.
+  if (leafIndex == DeviceLeafIndex) {
+    highp vec3 deviceCoord = DeviceLeafCoordMatrix * vec3(gl_FragCoord.xy, 1.0);
+    uv = deviceCoord.xy;
+  }
 #endif
   bool strict = false;
   if (chainLoadTiledRecipe(leafIndex, strict)) {

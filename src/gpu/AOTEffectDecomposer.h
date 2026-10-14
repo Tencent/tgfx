@@ -31,13 +31,9 @@ class ProgramInfo;
 enum class AOTKernelKind {
   // A single fused pass that evaluates a pointwise DAG (texture/const-color leaves combined by
   // color-matrix, luma and blend ops) via a runtime opcode chain. Produced by the pointwise-DAG
-  // planner; its kernel artifact is PointwiseChainShader.
+  // planner, and for every pass of a linear chain the multi-pass planner splits; its kernel
+  // artifact is PointwiseChainShader.
   PointwiseChain,
-  // A plain or device-space texture source followed by bounded pointwise operator slots, matching
-  // PointwiseTailShader. Produced by DecomposeLinearPointwiseTail for linear chains the DAG
-  // planner refuses (device-space sources, chains over the chain kernel's budgets); a chain over
-  // the tail's slot budget is split into several passes joined by materialized intermediates.
-  PointwiseTail,
   // A procedural-noise source (PerlinNoiseFragmentProcessor) optionally followed by up to three
   // folded pointwise/const/blend operator slots, matching PerlinNoiseFillShader. Produced by
   // DecomposePerlinNoiseChain; the plan is always a single pass — shapes beyond the slot budget
@@ -56,10 +52,10 @@ inline bool IsAOTPointwiseDAGKernel(AOTKernelKind kernel) {
 }
 
 /**
- * One kernel invocation of a plan. A plan with several passes is a linear PointwiseTail chain
- * split at the tail kernel's slot budget: every pass but the last renders into an intermediate
- * texture (materializesOutput), and each later pass reads its predecessor's texture as its source
- * (dependencies holds that predecessor's index), so its nodes are operator slots only.
+ * One kernel invocation of a plan. A plan with several passes is a linear chain split into chain
+ * passes, each fitting one chain pass: every pass but the last renders into an intermediate RGBA8
+ * texture (materializesOutput), and each later pass reads its predecessor's texture in device space
+ * as its source (dependencies holds that predecessor's index), so its nodes are operators only.
  */
 struct AOTPassDescriptor {
   AOTKernelKind kernel = AOTKernelKind::PointwiseChain;
