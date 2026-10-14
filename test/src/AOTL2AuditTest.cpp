@@ -457,8 +457,15 @@ TGFX_TEST(AOTL2AuditTest, BlendModeMatrixMatchesJIT) {
       uint32_t aotHits = 0;
       uint32_t jitNoMatch = 0;
       uint32_t aotNoMatch = 0;
-      RenderShaderScene(context, cache, blend, width, height, false, &jitBitmap, &jitHits,
-                        &jitNoMatch);
+      // The reference is the runtime route: with a bundle loaded there is no runtime fallback, so
+      // a decomposition-off render would drop every draw the plain matchers miss.
+      cache->unload();
+      {
+        ScopedAOTStatsPause referencePause(context, true);
+        RenderShaderScene(context, cache, blend, width, height, false, &jitBitmap, &jitHits,
+                          &jitNoMatch);
+      }
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
       RenderShaderScene(context, cache, blend, width, height, true, &aotBitmap, &aotHits,
                         &aotNoMatch);
       ASSERT_TRUE(aotHits > 0) << "AOT path did not hit for mode=" << static_cast<int>(mode)
@@ -496,8 +503,9 @@ TGFX_TEST(AOTL2AuditTest, TiledInBlendMatchesPlainPath) {
   // chain kernel's Multiply math matches the runtime/JIT path.
   // Clean L2 test: tiled (repeat, full-size) is the SRC/index-0 child so only the decomposition gate
   // flattens it; the DST child is a same-size plain image so there is no child-size/coord mismatch.
-  // Gate OFF: inline two(Tiled,Texture) -> the chain rejects tiled -> JIT (correct reference).
-  // Gate ON: tiled materialized full-size -> two(Texture,Texture) -> chain. Must be bit-exact.
+  // Reference: no bundle, so the runtime route serves the inline two(Tiled,Texture) tree. (With a
+  // bundle loaded there is no runtime fallback: a decomposition-off render would drop the draw.)
+  // Candidate: bundle + decomposition, served by the precompiled kernels. Must be bit-exact.
   auto image2 = MakeImage("resources/apitest/test_timestretch.png");
   ASSERT_TRUE(image2 != nullptr);
   auto tiled = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat);
@@ -506,19 +514,17 @@ TGFX_TEST(AOTL2AuditTest, TiledInBlendMatchesPlainPath) {
   auto blend = Shader::MakeBlend(BlendMode::Multiply, plain, tiled);
   ASSERT_TRUE(blend != nullptr);
 
-  Bitmap warmupBitmap = {};
-  uint32_t warmupHits = 0;
-  uint32_t warmupNoMatch = 0;
-  RenderShaderScene(context, cache, blend, width, height, false, &warmupBitmap, &warmupHits,
-                    &warmupNoMatch);
-
-  // Reference = decomposition OFF (tiled inline -> JIT).
   Bitmap referenceBitmap = {};
   uint32_t referenceHits = 0;
   uint32_t referenceNoMatch = 0;
-  RenderShaderScene(context, cache, blend, width, height, false, &referenceBitmap, &referenceHits,
-                    &referenceNoMatch);
-  // Candidate = decomposition ON (tiled materialized -> BlendMerge).
+  cache->unload();
+  {
+    ScopedAOTStatsPause referencePause(context, true);
+    RenderShaderScene(context, cache, blend, width, height, false, &referenceBitmap, &referenceHits,
+                      &referenceNoMatch);
+  }
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+  // Candidate = bundle + decomposition.
   Bitmap candidateBitmap = {};
   uint32_t candidateHits = 0;
   uint32_t candidateNoMatch = 0;
@@ -644,13 +650,9 @@ TGFX_TEST(AOTL2AuditTest, DropShadowTiledSrcServedByteExact) {
   EXPECT_TRUE(result.passed) << "DropShadow AOT render diverges from the no-bundle reference";
 }
 
-// InnerShadow three-way attribution. Three renders of the same scene isolate the factors behind
-// any delta between the AOT render and the no-bundle reference:
+// InnerShadow attribution between the AOT render and the no-bundle reference:
 //  1. reference: no bundle — the original tree runs the runtime route;
-//  2. bundle + decomposition disabled: the gate never opens, the same untouched tree runs the
-//     runtime route — must be identical to the reference by construction (any difference would
-//     indicate bundle loading alone perturbs rendering);
-//  3. bundle + decomposition enabled: the chain kernel serves the tree. Its two decal leaves now
+//  2. bundle + decomposition enabled: the chain kernel serves the tree. Its two decal leaves now
 //     fuse in one pass with independent tiled recipes (earlier the differing recipes forced a
 //     shadow-subtree materialization whose RGBA8 round trip showed up as a 616-pixel delta); the
 //     reported delta against (1) is InnerShadowTiledSrcServedByteExact's byte-exact contract.
@@ -676,12 +678,9 @@ TGFX_TEST(AOTL2AuditTest, InnerShadowQuantizationAttribution) {
     RenderShadowTiledScene(context, cache, image, imageFilter, width, height, false, &reference,
                            &scratchNoMatch, &scratchVertexMissing, &scratchFragmentMissing);
   }
-  Bitmap decompOff = {};
   Bitmap decompOn = {};
   {
     ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
-    RenderShadowTiledScene(context, cache, image, imageFilter, width, height, false, &decompOff,
-                           &scratchNoMatch, &scratchVertexMissing, &scratchFragmentMissing);
     RenderShadowTiledScene(context, cache, image, imageFilter, width, height, true, &decompOn,
                            &scratchNoMatch, &scratchVertexMissing, &scratchFragmentMissing);
   }
@@ -716,11 +715,7 @@ TGFX_TEST(AOTL2AuditTest, InnerShadowQuantizationAttribution) {
     fflush(stdout);
     return std::make_pair(maxDiff, diffCount);
   };
-  auto offStats = compareBitmaps("decompOff_vs_reference", decompOff, reference);
   auto onStats = compareBitmaps("decompOn_vs_reference", decompOn, reference);
-  // Factor isolation: the runtime route with the bundle loaded must be byte-identical.
-  EXPECT_EQ(offStats.first, 0);
-  EXPECT_EQ(offStats.second, 0u);
   // The decomposition delta is the materialization quantization alone (see the test comment).
   printf("[InnerShadowAttribution] quantization-only delta: max=%d pixels=%llu\n", onStats.first,
          static_cast<unsigned long long>(onStats.second));

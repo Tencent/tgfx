@@ -40,6 +40,18 @@ class TiledTextureEffect : public FragmentProcessor {
   using ShaderMode = TiledTextureShaderMode;
   using ResolvedSampling = TiledTextureSampling;
 
+  // The texture facts the sampling resolution depends on. They come from the texture view once
+  // it exists, or from the proxy of a pending single-plane upload, whose view is created from
+  // exactly these facts before any draw of the same flush executes.
+  struct SamplingSource {
+    int width = 0;
+    int height = 0;
+    TextureType type = TextureType::TwoD;
+    bool hasMipmaps = false;
+    ImageOrigin origin = ImageOrigin::TopLeft;
+    const GPUFeatures* features = nullptr;
+  };
+
   /// Returns the immutable sampling snapshot shared by runtime shader setup and AOT lowering.
   const ResolvedSampling* resolveSampling() const;
 
@@ -62,7 +74,7 @@ class TiledTextureEffect : public FragmentProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   struct Sampling {
-    Sampling(const TextureView* textureView, SamplerState sampler, const Rect& subset);
+    Sampling(const SamplingSource& source, SamplerState sampler, const Rect& subset);
 
     SamplerState hardwareSampler;
     ShaderMode shaderModeX = ShaderMode::None;
@@ -84,6 +96,12 @@ class TiledTextureEffect : public FragmentProcessor {
   SamplerState onSamplerStateAt(size_t) const override;
 
   const TextureView* getTextureView() const;
+
+  // The sampling source for the texture view, or for a pending single-plane upload when the view
+  // does not exist yet. Returns false when neither is available.
+  bool getSamplingSource(SamplingSource* source, bool* fromPendingUpload) const;
+
+  ResolvedSampling makeResolvedSampling(const SamplingSource& source) const;
 
   static ShaderMode GetShaderMode(TileMode tileMode, FilterMode filter, MipmapMode mipmapMode);
 

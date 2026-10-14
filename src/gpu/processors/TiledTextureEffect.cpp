@@ -79,7 +79,7 @@ bool TiledTextureEffect::ShaderModeRequiresUnormCoord(ShaderMode mode) {
   return false;
 }
 
-TiledTextureEffect::Sampling::Sampling(const TextureView* textureView, SamplerState sampler,
+TiledTextureEffect::Sampling::Sampling(const SamplingSource& source, SamplerState sampler,
                                        const Rect& subset) {
   struct Span {
     float a = 0.f;
@@ -99,12 +99,11 @@ TiledTextureEffect::Sampling::Sampling(const TextureView* textureView, SamplerSt
     Span shaderClamp;
     TileMode hwMode = TileMode::Clamp;
   };
-  auto features = textureView->getContext()->gpu()->features();
   auto canDoWrapInHW = [&](TileMode tileMode) {
-    if (tileMode == TileMode::Decal && !features->clampToBorder) {
+    if (tileMode == TileMode::Decal && !source.features->clampToBorder) {
       return false;
     }
-    if (textureView->getTexture()->type() != TextureType::TwoD &&
+    if (source.type != TextureType::TwoD &&
         !(tileMode == TileMode::Clamp || tileMode == TileMode::Decal)) {
       return false;
     }
@@ -132,7 +131,7 @@ TiledTextureEffect::Sampling::Sampling(const TextureView* textureView, SamplerSt
     } else {
       r.shaderClamp = subsetSpan.makeInset(linearFilterInset);
     }
-    auto mipmapMode = textureView->hasMipmaps() ? sampler.mipmapMode : MipmapMode::None;
+    auto mipmapMode = source.hasMipmaps ? sampler.mipmapMode : MipmapMode::None;
     auto filterMode =
         sampler.minFilterMode == FilterMode::Nearest || sampler.magFilterMode == FilterMode::Nearest
             ? FilterMode::Nearest
@@ -143,9 +142,9 @@ TiledTextureEffect::Sampling::Sampling(const TextureView* textureView, SamplerSt
   };
 
   Span subsetX{subset.left, subset.right};
-  auto x = resolve(textureView->width(), sampler.tileModeX, subsetX, 0.5f);
+  auto x = resolve(source.width, sampler.tileModeX, subsetX, 0.5f);
   Span subsetY{subset.top, subset.bottom};
-  auto y = resolve(textureView->height(), sampler.tileModeY, subsetY, 0.5f);
+  auto y = resolve(source.height, sampler.tileModeY, subsetY, 0.5f);
   hardwareSampler = SamplerState(x.hwMode, y.hwMode, sampler.minFilterMode, sampler.magFilterMode,
                                  sampler.mipmapMode);
   shaderModeX = x.shaderMode;
@@ -165,51 +164,100 @@ TiledTextureEffect::TiledTextureEffect(std::shared_ptr<TextureProxy> proxy,
   addCoordTransform(&coordTransform);
 }
 
-static Rect ResolveShaderRect(const TextureView* textureView, Rect rect,
+// TextureView::getTextureCoord for a single-plane view: normalized for 2D textures, unnormalized
+// for rectangle textures.
+static Point SourceTextureCoord(const TiledTextureEffect::SamplingSource& source, float x,
+                                float y) {
+  if (source.type == TextureType::Rectangle) {
+    return {x, y};
+  }
+  return {x / static_cast<float>(source.width), y / static_cast<float>(source.height)};
+}
+
+static Rect ResolveShaderRect(const TiledTextureEffect::SamplingSource& source, Rect rect,
                               bool usesShaderDimensions) {
-  if (textureView->origin() == ImageOrigin::BottomLeft) {
-    auto height = static_cast<float>(textureView->height());
+  if (source.origin == ImageOrigin::BottomLeft) {
+    auto height = static_cast<float>(source.height);
     rect.top = height - rect.top;
     rect.bottom = height - rect.bottom;
     std::swap(rect.top, rect.bottom);
   }
-  if (!usesShaderDimensions && textureView->getTexture()->type() != TextureType::Rectangle) {
-    auto leftTop = textureView->getTextureCoord(rect.left, rect.top);
-    auto rightBottom = textureView->getTextureCoord(rect.right, rect.bottom);
+  if (!usesShaderDimensions && source.type != TextureType::Rectangle) {
+    auto leftTop = SourceTextureCoord(source, rect.left, rect.top);
+    auto rightBottom = SourceTextureCoord(source, rect.right, rect.bottom);
     rect = {leftTop.x, leftTop.y, rightBottom.x, rightBottom.y};
   }
   return rect;
 }
 
-const TiledTextureEffect::ResolvedSampling* TiledTextureEffect::resolveSampling() const {
-  if (resolvedSampling.has_value()) {
-    return &*resolvedSampling;
+bool TiledTextureEffect::getSamplingSource(SamplingSource* source, bool* fromPendingUpload) const {
+  *fromPendingUpload = false;
+  if (auto textureView = getTextureView()) {
+    source->width = textureView->width();
+    source->height = textureView->height();
+    source->type = textureView->getTexture()->type();
+    source->hasMipmaps = textureView->hasMipmaps();
+    source->origin = textureView->origin();
+    source->features = textureView->getContext()->gpu()->features();
+    return true;
   }
-  auto textureView = getTextureView();
-  if (textureView == nullptr) {
-    return nullptr;
+  // A pending single-plane upload: TextureUploadTask creates the view from the decoded buffer as a
+  // top-left 2D texture of the proxy's size, with a full mip chain when mipmaps were requested.
+  if (textureProxy->getTextureView() != nullptr || !textureProxy->hasPendingUpload() ||
+      textureProxy->mayUploadYUV()) {
+    return false;
   }
-  Sampling sampling(textureView, samplerState, subset);
+  auto context = textureProxy->getContext();
+  if (context == nullptr) {
+    return false;
+  }
+  source->width = textureProxy->width();
+  source->height = textureProxy->height();
+  source->type = TextureType::TwoD;
+  source->hasMipmaps = textureProxy->hasMipmaps() && std::max(source->width, source->height) > 1;
+  source->origin = textureProxy->origin();
+  source->features = context->gpu()->features();
+  *fromPendingUpload = true;
+  return true;
+}
+
+TiledTextureEffect::ResolvedSampling TiledTextureEffect::makeResolvedSampling(
+    const SamplingSource& source) const {
+  Sampling sampling(source, samplerState, subset);
   ResolvedSampling resolved = {};
   resolved.hardwareSampler = sampling.hardwareSampler;
   resolved.shaderModeX = sampling.shaderModeX;
   resolved.shaderModeY = sampling.shaderModeY;
   resolved.usesShaderDimensions = (ShaderModeRequiresUnormCoord(resolved.shaderModeX) ||
                                    ShaderModeRequiresUnormCoord(resolved.shaderModeY)) &&
-                                  textureView->getTexture()->type() != TextureType::Rectangle;
+                                  source.type != TextureType::Rectangle;
   if (resolved.usesShaderDimensions) {
-    resolved.shaderDimensions = textureView->getTextureCoord(1.f, 1.f);
+    resolved.shaderDimensions = SourceTextureCoord(source, 1.f, 1.f);
   }
   resolved.shaderSubset =
-      ResolveShaderRect(textureView, sampling.shaderSubset, resolved.usesShaderDimensions);
+      ResolveShaderRect(source, sampling.shaderSubset, resolved.usesShaderDimensions);
   resolved.shaderClamp =
-      ResolveShaderRect(textureView, sampling.shaderClamp, resolved.usesShaderDimensions);
+      ResolveShaderRect(source, sampling.shaderClamp, resolved.usesShaderDimensions);
   resolved.strict = constraint == SrcRectConstraint::Strict;
   resolved.coordMatrix = coordTransform.matrix;
   resolved.hasPerspective = coordTransform.matrix.hasPerspective();
   resolved.alphaOnly = textureProxy->isAlphaOnly();
-  resolved.textureOrigin = textureView->origin();
-  resolvedSampling = resolved;
+  resolved.textureOrigin = source.origin;
+  return resolved;
+}
+
+const TiledTextureEffect::ResolvedSampling* TiledTextureEffect::resolveSampling() const {
+  if (resolvedSampling.has_value()) {
+    return &*resolvedSampling;
+  }
+  // Only a view-derived snapshot is cached: the runtime shader setup reads it once the view
+  // exists, and lowering a pending upload computes its own snapshot (see lowerToAOT).
+  SamplingSource source = {};
+  bool fromPendingUpload = false;
+  if (!getSamplingSource(&source, &fromPendingUpload) || fromPendingUpload) {
+    return nullptr;
+  }
+  resolvedSampling = makeResolvedSampling(source);
   return &*resolvedSampling;
 }
 
@@ -230,31 +278,36 @@ bool TiledTextureEffect::isAlphaOnly() const {
 
 bool TiledTextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
                                     AOTNodeID* output) const {
-  auto textureView = getTextureView();
-  if (builder == nullptr || output == nullptr || textureView == nullptr) {
+  if (builder == nullptr || output == nullptr) {
+    return false;
+  }
+  // A pending single-plane upload resolves its sampling from the proxy: the upload task creates
+  // the view before this draw executes, from the same size, origin and mip request, so the
+  // snapshot equals the one the view yields. Refusing it instead would send every tiled draw of a
+  // freshly decoded image through a materialization retry (an RGBA8 round trip) on its first
+  // frame.
+  SamplingSource source = {};
+  bool fromPendingUpload = false;
+  if (!getSamplingSource(&source, &fromPendingUpload)) {
     return false;
   }
   // Rectangle textures cannot be served: the context no longer produces them (the CGL pixel
   // buffer import copies into a plain 2D texture), and rectangle samplers adopted from external
   // adopters have no precompiled variant.
-  auto textureType = textureView->getTexture()->type();
-  if (textureType != TextureType::TwoD) {
+  if (source.type != TextureType::TwoD) {
     return false;
   }
-  auto resolved = resolveSampling();
-  if (resolved == nullptr) {
-    return false;
-  }
+  auto resolved = fromPendingUpload ? makeResolvedSampling(source) : *resolveSampling();
   AOTTextureParameters parameters = {};
   parameters.textureProxy = textureProxy;
   parameters.samplingKind = AOTTextureSamplingKind::Tiled;
-  parameters.samplerState = resolved->hardwareSampler;
+  parameters.samplerState = resolved.hardwareSampler;
   parameters.constraint = constraint;
-  parameters.uvMatrix = resolved->coordMatrix;
+  parameters.uvMatrix = resolved.coordMatrix;
   parameters.subset = subset;
-  parameters.tiledRecipe = *resolved;
-  parameters.isAlphaOnly = resolved->alphaOnly;
-  parameters.hasPerspective = resolved->hasPerspective;
+  parameters.tiledRecipe = resolved;
+  parameters.isAlphaOnly = resolved.alphaOnly;
+  parameters.hasPerspective = resolved.hasPerspective;
   return builder->addTextureSource(input, parameters, output);
 }
 

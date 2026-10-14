@@ -1862,8 +1862,9 @@ TGFX_TEST(AOTRenderConsistencyTest, TexturedEffect2D) {
 // The decomposition switch must gate every entry point, including the direct-draw rewrite in
 // StandardDrawOp::prepareDecomposedProgram, which previously only checked bundle loading. The
 // trigger scene is the triangulated AA polygon (its GP coverage makes the plain matcher pass,
-// so the chain rewrite serves it): with the switch on the draw records a direct chain rewrite;
-// with the switch off the rewrite must not run and the draw falls back to the runtime builder.
+// so the chain rewrite serves it): with the switch on the draw records a direct chain rewrite
+// and matches the no-bundle runtime reference; with the switch off the rewrite must not run,
+// and since a loaded bundle has no runtime fallback, the draw is refused without a program.
 // Note a separate boundary this test documents: the switch does not gate the matcher's own
 // chain rule — a draw the plain matcher serves directly (e.g. a simple filter chain) still uses
 // the chain kernel with the switch off. That rule-level gating is a semantic decision recorded
@@ -1930,11 +1931,42 @@ TGFX_TEST(AOTRenderConsistencyTest, DecompositionSwitchControlsDirectDrawEntry) 
   EXPECT_GE(onDraws.directChainDraws, 1u);
   EXPECT_EQ(onPrograms.programBuilderCreations, 0u);
   EXPECT_EQ(onPrograms.excludedProgramBuilderCreations, 0u);
+  // directChainDraws accumulates across the two renders: the switch-off render adds none.
   EXPECT_EQ(offDraws.directChainDraws, onDraws.directChainDraws);
-  EXPECT_GE(offPrograms.programBuilderCreations, 1u);
-  EXPECT_EQ(offPrograms.excludedProgramBuilderCreations, offPrograms.programBuilderCreations);
+  EXPECT_EQ(offPrograms.programBuilderCreations, 0u);
   EXPECT_FALSE(cache->deliberateMissMarking());
-  ExpectBitmapsIdentical("decomposition-switch-direct-entry", onBitmap, offBitmap, 240, 240);
+  Bitmap referenceBitmap = {};
+  {
+    cache->unload();
+    ScopedAOTStatsPause referencePause(context, true);
+    context->globalCache()->clearPrograms();
+    auto surface = Surface::Make(context, 240, 240);
+    ASSERT_TRUE(surface != nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    Path path = {};
+    for (int i = 0; i < 5; ++i) {
+      float angle = static_cast<float>(i) * 72.0f - 90.0f;
+      float x = 120.0f + 95.0f * cosf(angle * kStarPi / 180.0f);
+      float y = 120.0f + 95.0f * sinf(angle * kStarPi / 180.0f);
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    path.close();
+    Paint paint = {};
+    paint.setShader(Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp));
+    canvas->drawShape(Shape::MakeFrom(std::move(path)), paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(referenceBitmap.allocPixels(240, 240));
+    auto* pixels = referenceBitmap.lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(referenceBitmap.info(), pixels));
+    referenceBitmap.unlockPixels();
+  }
+  ExpectBitmapsIdentical("decomposition-switch-direct-entry", onBitmap, referenceBitmap, 240, 240);
 }
 
 // Bundle identity and program-cache generations (4/F06). Sequence A: draw without a
@@ -3656,6 +3688,86 @@ TGFX_TEST(AOTRenderConsistencyTest, YUVSourceReportsItsPlanesToChainPlanning) {
       AOTMaterializationPolicy::Evaluate(yuvLeaf.get(), MaterializationConsumer::PointwiseBlend, 1);
   EXPECT_TRUE(yuvDecision.requiredForCorrectness);
   EXPECT_TRUE(yuvDecision.shouldFlatten);
+}
+
+// A tiled leaf over a pending single-plane upload lowers before its view exists: the sampling
+// snapshot is derived from the proxy (size, origin, mip request), and must equal the snapshot the
+// view yields once the upload ran. Refusing it instead sent every tiled draw of a freshly decoded
+// image (decal masks, inner-shadow sources) through a materialization retry, an RGBA8 round trip
+// that drifted 1 LSB from the runtime reference.
+TGFX_TEST(AOTRenderConsistencyTest, PendingUploadTiledLeafLowersWithViewSampling) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  struct Case {
+    TileMode tileX;
+    TileMode tileY;
+    FilterMode filter;
+    MipmapMode mipmap;
+    bool mipmapped;
+    std::optional<Rect> subset;
+  };
+  const Case cases[] = {
+      {TileMode::Decal, TileMode::Decal, FilterMode::Linear, MipmapMode::None, false, std::nullopt},
+      {TileMode::Repeat, TileMode::Mirror, FilterMode::Linear, MipmapMode::Linear, true,
+       std::nullopt},
+      {TileMode::Clamp, TileMode::Repeat, FilterMode::Nearest, MipmapMode::None, false,
+       Rect::MakeLTRB(2, 3, 13, 11)},
+  };
+  for (const auto& entry : cases) {
+    SCOPED_TRACE(static_cast<int>(entry.tileX));
+    Bitmap bitmap(16, 16, false, false);
+    ASSERT_FALSE(bitmap.isEmpty());
+    bitmap.clear();
+    auto buffer = bitmap.makeBuffer();
+    ASSERT_NE(buffer, nullptr);
+    auto proxy = context->proxyProvider()->createTextureProxy(buffer, entry.mipmapped);
+    ASSERT_NE(proxy, nullptr);
+    ASSERT_TRUE(proxy->hasPendingUpload());
+    ASSERT_FALSE(proxy->mayUploadYUV());
+    SamplingArgs args = {entry.tileX, entry.tileY, SamplingOptions(entry.filter, entry.mipmap),
+                         SrcRectConstraint::Fast};
+    if (entry.subset.has_value()) {
+      args.sampleArea = *entry.subset;
+    }
+    auto allocator = context->drawingAllocator();
+    auto leaf = TiledTextureEffect::Make(allocator, proxy, args);
+    ASSERT_NE(leaf, nullptr);
+    ASSERT_EQ(leaf->name(), "TiledTextureEffect");
+    auto* tiled = static_cast<TiledTextureEffect*>(leaf.get());
+    EXPECT_EQ(tiled->resolveSampling(), nullptr);
+    AOTEffectGraph pendingGraph = {};
+    ASSERT_TRUE(AOTEffectDecomposer::Lower({leaf.get()}, &pendingGraph));
+    auto pendingNode = pendingGraph.nodeAt(pendingGraph.root());
+    ASSERT_NE(pendingNode, nullptr);
+    auto pending = std::get_if<AOTTextureParameters>(&pendingNode->parameters);
+    ASSERT_TRUE(pending != nullptr && pending->tiledRecipe.has_value());
+    // A pending snapshot is not cached: the view-derived one is still resolved later.
+    EXPECT_EQ(tiled->resolveSampling(), nullptr);
+
+    // Run the upload, then compare against the view-derived snapshot.
+    context->flushAndSubmit(true);
+    ASSERT_NE(proxy->getTextureView(), nullptr);
+    auto viewSampling = tiled->resolveSampling();
+    ASSERT_NE(viewSampling, nullptr);
+    const auto& a = *pending->tiledRecipe;
+    const auto& b = *viewSampling;
+    EXPECT_EQ(a.hardwareSampler.tileModeX, b.hardwareSampler.tileModeX);
+    EXPECT_EQ(a.hardwareSampler.tileModeY, b.hardwareSampler.tileModeY);
+    EXPECT_EQ(a.hardwareSampler.minFilterMode, b.hardwareSampler.minFilterMode);
+    EXPECT_EQ(a.hardwareSampler.magFilterMode, b.hardwareSampler.magFilterMode);
+    EXPECT_EQ(a.hardwareSampler.mipmapMode, b.hardwareSampler.mipmapMode);
+    EXPECT_EQ(a.shaderModeX, b.shaderModeX);
+    EXPECT_EQ(a.shaderModeY, b.shaderModeY);
+    EXPECT_EQ(a.shaderSubset, b.shaderSubset);
+    EXPECT_EQ(a.shaderClamp, b.shaderClamp);
+    EXPECT_EQ(a.shaderDimensions, b.shaderDimensions);
+    EXPECT_EQ(a.usesShaderDimensions, b.usesShaderDimensions);
+    EXPECT_EQ(a.strict, b.strict);
+    EXPECT_EQ(a.coordMatrix, b.coordMatrix);
+    EXPECT_EQ(a.alphaOnly, b.alphaOnly);
+    EXPECT_EQ(a.textureOrigin, b.textureOrigin);
+  }
 }
 
 // a YUV video frame drawn with a paint color filter (the video
