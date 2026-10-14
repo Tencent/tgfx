@@ -524,18 +524,24 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
 
   if (needLocalBounds || needDeviceBounds) {
     if (pendingType == PendingOpType::RRect) {
-      deviceBounds = Rect::MakeEmpty();
+      // RRect records carry their own view matrices, so both bounds are the clipped device
+      // bounds. deviceBounds is only set when needComputeBounds asked for it: its presence is what
+      // admits the draw to the AOT route, which bare single-source shaders must keep skipping.
+      auto bounds = Rect::MakeEmpty();
       for (auto& record : pendingRRects) {
-        auto rect = record->viewMatrix.mapRect(record->rRect.rect());
-        deviceBounds->join(rect);
-        drawScale = std::max(*drawScale, record->viewMatrix.getMaxScale());
+        bounds.join(record->viewMatrix.mapRect(record->rRect.rect()));
+        if (needLocalBounds) {
+          drawScale = std::max(*drawScale, record->viewMatrix.getMaxScale());
+        }
       }
-      if (!deviceBounds->intersect(clipBounds)) {
-        deviceBounds->setEmpty();
+      if (!bounds.intersect(clipBounds)) {
+        bounds.setEmpty();
       }
-      localBounds = deviceBounds;
-      if (!localBounds->intersect(clipBounds)) {
-        localBounds->setEmpty();
+      if (needLocalBounds) {
+        localBounds = bounds;
+      }
+      if (needDeviceBounds) {
+        deviceBounds = bounds;
       }
     } else {
       if (needLocalBounds) {
@@ -966,12 +972,6 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Brush& brush, bool 
          !renderTarget->canBeSampledDirectly() || renderTarget->sampleCount() > 1)) {
       needDeviceBounds = true;
     }
-  }
-  if (pendingType == PendingOpType::RRect && (needDeviceBounds || needLocalBounds)) {
-    // When either localBounds or deviceBounds needs to be computed for RRect, both should be set to
-    // true, since localBounds and deviceBounds are computed together in that case.
-    needLocalBounds = true;
-    needDeviceBounds = true;
   }
   return {needLocalBounds, needDeviceBounds};
 }
@@ -1435,12 +1435,14 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     }
     // The color-only route replaces the color processors with rebuilt Tail/Chain/Perlin FPs whose
     // matchers are all single-FP, so a draw still carrying a coverage FP (clip coverage or an
-    // unfoldable mask) can never match and skips it.
+    // unfoldable mask) can never match and skips it. Coverage from the geometry processor (AA
+    // edges of a rect, oval, or path) is no obstacle: the terminal pass keeps the draw's own
+    // geometry processor.
     AOTRouter::SubmitPlan submitColors = [&](const AOTEffectGraph& graph, const AOTEffectPlan& plan,
                                              AOTMaterializationRecorder* producers) {
       return submitPlanTask(graph, plan, *deviceBounds, &op, producers);
     };
-    bool coverageFree = !op->hasCoverage();
+    bool coverageFree = !op->hasCoverageProcessors();
     auto colorResult =
         coverageFree ? AOTRouter::Route(colorProcessors, submitColors) : AOTRouteResult::NoPlan;
     if (colorResult == AOTRouteResult::Submitted) {

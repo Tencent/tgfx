@@ -99,7 +99,21 @@ class DrawOp {
     return colors;
   }
 
+  /**
+   * Whether the draw produces fractional coverage from any source: its coverage processors, or its
+   * geometry processor (analytic AA edges, glyph masks, per-vertex coverage). Decides whether the
+   * blend needs a dst texture.
+   */
   virtual bool hasCoverage() const {
+    return !coverages.empty();
+  }
+
+  /**
+   * Whether the draw carries coverage processors (clip or mask coverage FPs). Coverage produced by
+   * the geometry processor does not count: it stays inside the geometry processor whatever color
+   * processors the AOT route puts on the draw.
+   */
+  bool hasCoverageProcessors() const {
     return !coverages.empty();
   }
 
