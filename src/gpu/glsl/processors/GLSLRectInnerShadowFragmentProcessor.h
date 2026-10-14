@@ -23,7 +23,7 @@
 namespace tgfx {
 class GLSLRectInnerShadowFragmentProcessor : public RectInnerShadowFragmentProcessor {
  public:
-  GLSLRectInnerShadowFragmentProcessor(const Point& maskHalfOverSigma, const Point& shadowHalfSize,
+  GLSLRectInnerShadowFragmentProcessor(const Point& shadowHalfSize, const Point& maskHalfOverSigma,
                                        PMColor color, const Matrix& shadowCoordMatrix,
                                        const Matrix& maskCoordMatrix);
 

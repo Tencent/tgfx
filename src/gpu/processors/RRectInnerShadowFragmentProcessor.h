@@ -38,15 +38,15 @@ class RRectInnerShadowFragmentProcessor : public FragmentProcessor {
   /**
    * Creates a processor that draws the inner shadow left inside the shadow rounded rectangle by the
    * inset mask rounded rectangle's blurred coverage, in the given color.
-   * @param maskHalfOverSigma half the mask bounds size, each axis divided by its own sigma. Both
-   * components must be positive.
-   * @param maskCornerOverSigma the mask corner radius, each axis divided by its own sigma. Each
-   * component must not exceed the matching maskHalfOverSigma component.
    * @param shadowHalfSize half the shadow bounds size, in content pixels. Both components must be
    * positive.
    * @param shadowCornerRadius the shadow corner radius per axis, in content pixels. The two
    * components may differ, describing an elliptical corner. Each component must not exceed the
    * matching shadowHalfSize component.
+   * @param maskHalfOverSigma half the mask bounds size, each axis divided by its own sigma. Both
+   * components must be positive.
+   * @param maskCornerOverSigma the mask corner radius, each axis divided by its own sigma. Each
+   * component must not exceed the matching maskHalfOverSigma component.
    * @param color the fill color, premultiplied.
    * @param shadowCoordMatrix maps the drawn coordinates into content pixels centered on the shadow
    * shape.
@@ -54,8 +54,8 @@ class RRectInnerShadowFragmentProcessor : public FragmentProcessor {
    * centered on the origin and both axes are divided by sigma.
    */
   static PlacementPtr<FragmentProcessor> Make(
-      BlockAllocator* allocator, const Point& maskHalfOverSigma, const Point& maskCornerOverSigma,
-      const Point& shadowHalfSize, const Point& shadowCornerRadius, PMColor color,
+      BlockAllocator* allocator, const Point& shadowHalfSize, const Point& shadowCornerRadius,
+      const Point& maskHalfOverSigma, const Point& maskCornerOverSigma, PMColor color,
       const Matrix& shadowCoordMatrix, const Matrix& maskCoordMatrix);
 
   std::string name() const override {
@@ -65,18 +65,18 @@ class RRectInnerShadowFragmentProcessor : public FragmentProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  RRectInnerShadowFragmentProcessor(const Point& maskHalfOverSigma,
-                                    const Point& maskCornerOverSigma, const Point& shadowHalfSize,
-                                    const Point& shadowCornerRadius, PMColor color,
+  RRectInnerShadowFragmentProcessor(const Point& shadowHalfSize, const Point& shadowCornerRadius,
+                                    const Point& maskHalfOverSigma,
+                                    const Point& maskCornerOverSigma, PMColor color,
                                     const Matrix& shadowCoordMatrix, const Matrix& maskCoordMatrix,
                                     int quadratureCount);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
-  Point maskHalfOverSigma = {};
-  Point maskCornerOverSigma = {};
   Point shadowHalfSize = {};
   Point shadowCornerRadius = {};
+  Point maskHalfOverSigma = {};
+  Point maskCornerOverSigma = {};
   PMColor color = {};
   int quadratureCount = 0;
   CoordTransform shadowCoordTransform;

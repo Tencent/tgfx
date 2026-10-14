@@ -21,12 +21,12 @@
 namespace tgfx {
 
 RRectInnerShadowFragmentProcessor::RRectInnerShadowFragmentProcessor(
-    const Point& maskHalfOverSigma, const Point& maskCornerOverSigma, const Point& shadowHalfSize,
-    const Point& shadowCornerRadius, PMColor color, const Matrix& shadowCoordMatrix,
+    const Point& shadowHalfSize, const Point& shadowCornerRadius, const Point& maskHalfOverSigma,
+    const Point& maskCornerOverSigma, PMColor color, const Matrix& shadowCoordMatrix,
     const Matrix& maskCoordMatrix, int quadratureCount)
-    : FragmentProcessor(ClassID()), maskHalfOverSigma(maskHalfOverSigma),
-      maskCornerOverSigma(maskCornerOverSigma), shadowHalfSize(shadowHalfSize),
-      shadowCornerRadius(shadowCornerRadius), color(color), quadratureCount(quadratureCount),
+    : FragmentProcessor(ClassID()), shadowHalfSize(shadowHalfSize),
+      shadowCornerRadius(shadowCornerRadius), maskHalfOverSigma(maskHalfOverSigma),
+      maskCornerOverSigma(maskCornerOverSigma), color(color), quadratureCount(quadratureCount),
       shadowCoordTransform(shadowCoordMatrix), maskCoordTransform(maskCoordMatrix) {
   addCoordTransform(&shadowCoordTransform);
   addCoordTransform(&maskCoordTransform);

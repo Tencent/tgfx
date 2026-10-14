@@ -38,10 +38,10 @@ class RectInnerShadowFragmentProcessor : public FragmentProcessor {
   /**
    * Creates a processor that draws the inner shadow left inside the shadow rectangle by the inset
    * mask rectangle's blurred coverage, in the given color.
-   * @param maskHalfOverSigma half the mask rectangle size, each axis divided by its own sigma. Both
-   * components must be positive.
    * @param shadowHalfSize half the shadow rectangle size, in content pixels. Both components must
    * be positive.
+   * @param maskHalfOverSigma half the mask rectangle size, each axis divided by its own sigma. Both
+   * components must be positive.
    * @param color the fill color, premultiplied.
    * @param shadowCoordMatrix maps the drawn coordinates into content pixels centered on the shadow
    * rectangle.
@@ -49,8 +49,8 @@ class RectInnerShadowFragmentProcessor : public FragmentProcessor {
    * centered on the origin and both axes are divided by sigma.
    */
   static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator,
-                                              const Point& maskHalfOverSigma,
-                                              const Point& shadowHalfSize, PMColor color,
+                                              const Point& shadowHalfSize,
+                                              const Point& maskHalfOverSigma, PMColor color,
                                               const Matrix& shadowCoordMatrix,
                                               const Matrix& maskCoordMatrix);
 
@@ -61,12 +61,12 @@ class RectInnerShadowFragmentProcessor : public FragmentProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  RectInnerShadowFragmentProcessor(const Point& maskHalfOverSigma, const Point& shadowHalfSize,
+  RectInnerShadowFragmentProcessor(const Point& shadowHalfSize, const Point& maskHalfOverSigma,
                                    PMColor color, const Matrix& shadowCoordMatrix,
                                    const Matrix& maskCoordMatrix);
 
-  Point maskHalfOverSigma = {};
   Point shadowHalfSize = {};
+  Point maskHalfOverSigma = {};
   PMColor color = {};
   CoordTransform shadowCoordTransform;
   CoordTransform maskCoordTransform;

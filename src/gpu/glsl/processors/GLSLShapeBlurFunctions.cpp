@@ -59,11 +59,11 @@ static inline void AppendKernelFunctions(FragmentShaderBuilder* fragBuilder) {
   // Valid for 0 <= x < inf with a stated error bound of 5e-4. The sign is applied afterwards since
   // erf is odd.
   fragBuilder->addFunction(R"(
-float shapeBlurErf(float x) {
-  float ax = abs(x);
-  float d = 1.0 + ax * (0.278393 + ax * (0.230389 + ax * (0.000972 + ax * 0.078108)));
-  float d2 = d * d;
-  float positiveBranch = 1.0 - 1.0 / (d2 * d2);
+highp float shapeBlurErf(highp float x) {
+  highp float ax = abs(x);
+  highp float d = 1.0 + ax * (0.278393 + ax * (0.230389 + ax * (0.000972 + ax * 0.078108)));
+  highp float d2 = d * d;
+  highp float positiveBranch = 1.0 - 1.0 / (d2 * d2);
   return x >= 0.0 ? positiveBranch : -positiveBranch;
 }
 )");
@@ -78,7 +78,7 @@ float shapeBlurErf(float x) {
   // the left end, and 0.95449974 is Phi(2) - Phi(-2), the mass kept inside the window;
   // 0.70710678 is 1 / sqrt(2).
   fragBuilder->addFunction(R"(
-float shapeBlurCDF(highp float u) {
+highp float shapeBlurCDF(highp float u) {
   if (u <= -2.0) {
     return 0.0;
   }
@@ -104,7 +104,7 @@ void AppendRectBlurFunctions(FragmentShaderBuilder* fragBuilder) {
   // The rectangle is centered at the origin, so x0 = -halfSize.x, x1 = +halfSize.x: the arguments
   // below are px - x0 = lo.x and px - x1 = hi.x, and likewise for y.
   fragBuilder->addFunction(R"(
-float shapeBlurRectCoverage(highp vec2 coord, highp vec2 halfSize) {
+highp float shapeBlurRectCoverage(highp vec2 coord, highp vec2 halfSize) {
   highp vec2 lo = coord + halfSize;
   highp vec2 hi = coord - halfSize;
   return (shapeBlurCDF(lo.x) - shapeBlurCDF(hi.x)) * (shapeBlurCDF(lo.y) - shapeBlurCDF(hi.y));
@@ -136,7 +136,7 @@ void AppendRRectBlurFunctions(FragmentShaderBuilder* fragBuilder, int quadrature
   //
   // Callers guarantee cornerAlong <= halfAlong and cornerCross <= halfCross.
   fragBuilder->addFunction(R"(
-float shapeBlurSliceCoverage(highp float alongCoord, highp float crossCoord,
+highp float shapeBlurSliceCoverage(highp float alongCoord, highp float crossCoord,
                              highp float cornerAlong, highp float cornerCross,
                              highp float halfAlong, highp float halfCross) {
   highp float delta = min(halfCross - cornerCross - abs(crossCoord), 0.0);
@@ -170,7 +170,7 @@ float shapeBlurSliceCoverage(highp float alongCoord, highp float crossCoord,
   // Coverage is always 1 inside the shape inset by the kernel support of 2, so the quadrature can
   // be skipped there. Subtracting the corner keeps this box test inside that inset shape.
   auto quadrature = std::string(R"(
-float shapeBlurRRectCoverage(highp vec2 coord, highp vec2 halfSize, highp vec2 corner) {
+highp float shapeBlurRRectCoverage(highp vec2 coord, highp vec2 halfSize, highp vec2 corner) {
   if (all(lessThan(abs(coord), halfSize - (corner + vec2(2.0))))) {
     return 1.0;
   }
@@ -194,13 +194,13 @@ float shapeBlurRRectCoverage(highp vec2 coord, highp vec2 halfSize, highp vec2 c
   if (start == end) {
     return 0.0;
   }
-  float step = (end - start) / float(N);
-  float s = start + step * 0.5;
-  float accum = 0.0;
-  float weightSum = 0.0;
+  highp float step = (end - start) / float(N);
+  highp float s = start + step * 0.5;
+  highp float accum = 0.0;
+  highp float weightSum = 0.0;
   for (int i = 0; i < N; i++) {
-    float weight = exp(-0.5 * s * s);
-    float span;
+    highp float weight = exp(-0.5 * s * s);
+    highp float span;
     if (swapAxes) {
       span = shapeBlurSliceCoverage(coord.y, coord.x - s, corner.y, corner.x, halfSize.y,
                                     halfSize.x);
@@ -237,7 +237,7 @@ highp float shapeMaskRectSDF(highp vec2 p, highp vec2 halfSize) {
   //   sdf     the signed distance in content pixels, positive outside the shape
   //   return  the coverage at that distance, in [0, 1]
   fragBuilder->addFunction(R"(
-float shapeMaskCoverage(highp float sdf) {
+highp float shapeMaskCoverage(highp float sdf) {
   return clamp(0.5 - sdf, 0.0, 1.0);
 }
 )");

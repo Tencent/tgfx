@@ -23,10 +23,10 @@
 namespace tgfx {
 class GLSLRRectInnerShadowFragmentProcessor : public RRectInnerShadowFragmentProcessor {
  public:
-  GLSLRRectInnerShadowFragmentProcessor(const Point& maskHalfOverSigma,
-                                        const Point& maskCornerOverSigma,
-                                        const Point& shadowHalfSize,
-                                        const Point& shadowCornerRadius, PMColor color,
+  GLSLRRectInnerShadowFragmentProcessor(const Point& shadowHalfSize,
+                                        const Point& shadowCornerRadius,
+                                        const Point& maskHalfOverSigma,
+                                        const Point& maskCornerOverSigma, PMColor color,
                                         const Matrix& shadowCoordMatrix,
                                         const Matrix& maskCoordMatrix, int quadratureCount);
 

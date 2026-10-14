@@ -23,8 +23,8 @@
 namespace tgfx {
 
 PlacementPtr<FragmentProcessor> RRectInnerShadowFragmentProcessor::Make(
-    BlockAllocator* allocator, const Point& maskHalfOverSigma, const Point& maskCornerOverSigma,
-    const Point& shadowHalfSize, const Point& shadowCornerRadius, PMColor color,
+    BlockAllocator* allocator, const Point& shadowHalfSize, const Point& shadowCornerRadius,
+    const Point& maskHalfOverSigma, const Point& maskCornerOverSigma, PMColor color,
     const Matrix& shadowCoordMatrix, const Matrix& maskCoordMatrix) {
   DEBUG_ASSERT(shadowHalfSize.x > 0.0f && shadowHalfSize.y > 0.0f && maskHalfOverSigma.x > 0.0f &&
                maskHalfOverSigma.y > 0.0f && shadowCornerRadius.x <= shadowHalfSize.x &&
@@ -32,16 +32,16 @@ PlacementPtr<FragmentProcessor> RRectInnerShadowFragmentProcessor::Make(
                maskCornerOverSigma.x <= maskHalfOverSigma.x &&
                maskCornerOverSigma.y <= maskHalfOverSigma.y);
   return allocator->make<GLSLRRectInnerShadowFragmentProcessor>(
-      maskHalfOverSigma, maskCornerOverSigma, shadowHalfSize, shadowCornerRadius, color,
+      shadowHalfSize, shadowCornerRadius, maskHalfOverSigma, maskCornerOverSigma, color,
       shadowCoordMatrix, maskCoordMatrix, GetRRectBlurQuadratureCount(maskCornerOverSigma));
 }
 
 GLSLRRectInnerShadowFragmentProcessor::GLSLRRectInnerShadowFragmentProcessor(
-    const Point& maskHalfOverSigma, const Point& maskCornerOverSigma, const Point& shadowHalfSize,
-    const Point& shadowCornerRadius, PMColor color, const Matrix& shadowCoordMatrix,
+    const Point& shadowHalfSize, const Point& shadowCornerRadius, const Point& maskHalfOverSigma,
+    const Point& maskCornerOverSigma, PMColor color, const Matrix& shadowCoordMatrix,
     const Matrix& maskCoordMatrix, int quadratureCount)
-    : RRectInnerShadowFragmentProcessor(maskHalfOverSigma, maskCornerOverSigma, shadowHalfSize,
-                                        shadowCornerRadius, color, shadowCoordMatrix,
+    : RRectInnerShadowFragmentProcessor(shadowHalfSize, shadowCornerRadius, maskHalfOverSigma,
+                                        maskCornerOverSigma, color, shadowCoordMatrix,
                                         maskCoordMatrix, quadratureCount) {
 }
 
@@ -63,7 +63,7 @@ void GLSLRRectInnerShadowFragmentProcessor::emitCode(EmitArgs& args) const {
 
   auto shadowCoordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
   auto maskCoordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[1]);
-  fragBuilder->codeAppendf("float coverage = 1.0 - shapeBlurRRectCoverage(%s, %s, %s);",
+  fragBuilder->codeAppendf("highp float coverage = 1.0 - shapeBlurRRectCoverage(%s, %s, %s);",
                            maskCoordName.c_str(), maskHalfName.c_str(), maskCornerName.c_str());
   fragBuilder->codeAppendf("coverage *= shapeMaskCoverage(shapeMaskRRectSDF(%s, %s, %s));",
                            shadowCoordName.c_str(), shadowHalfName.c_str(),

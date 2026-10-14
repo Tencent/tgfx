@@ -21,7 +21,6 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/Types.h"
-#include "gpu/processors/RRectBlurFragmentProcessor.h"
 #include "gpu/processors/RRectInnerShadowFragmentProcessor.h"
 #include "gpu/processors/RectInnerShadowFragmentProcessor.h"
 
@@ -85,12 +84,12 @@ PlacementPtr<FragmentProcessor> RRectInnerShadowShader::asFragmentProcessor(
   // the quadrature.
   if (FloatNearlyZero(shadowRadius.x) && FloatNearlyZero(shadowRadius.y) &&
       FloatNearlyZero(maskRadius.x) && FloatNearlyZero(maskRadius.y)) {
-    return RectInnerShadowFragmentProcessor::Make(allocator, maskHalfOverSigma, shadowHalfSize,
+    return RectInnerShadowFragmentProcessor::Make(allocator, shadowHalfSize, maskHalfOverSigma,
                                                   pmColor, shadowCoordMatrix, maskCoordMatrix);
   }
   const auto maskCornerOverSigma = Point::Make(maskRadius.x / sigmaX, maskRadius.y / sigmaY);
-  return RRectInnerShadowFragmentProcessor::Make(allocator, maskHalfOverSigma, maskCornerOverSigma,
-                                                 shadowHalfSize, shadowRadius, pmColor,
+  return RRectInnerShadowFragmentProcessor::Make(allocator, shadowHalfSize, shadowRadius,
+                                                 maskHalfOverSigma, maskCornerOverSigma, pmColor,
                                                  shadowCoordMatrix, maskCoordMatrix);
 }
 }  // namespace tgfx

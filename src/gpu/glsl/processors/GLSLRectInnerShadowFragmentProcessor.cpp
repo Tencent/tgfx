@@ -23,18 +23,18 @@
 namespace tgfx {
 
 PlacementPtr<FragmentProcessor> RectInnerShadowFragmentProcessor::Make(
-    BlockAllocator* allocator, const Point& maskHalfOverSigma, const Point& shadowHalfSize,
+    BlockAllocator* allocator, const Point& shadowHalfSize, const Point& maskHalfOverSigma,
     PMColor color, const Matrix& shadowCoordMatrix, const Matrix& maskCoordMatrix) {
   DEBUG_ASSERT(shadowHalfSize.x > 0.0f && shadowHalfSize.y > 0.0f && maskHalfOverSigma.x > 0.0f &&
                maskHalfOverSigma.y > 0.0f);
   return allocator->make<GLSLRectInnerShadowFragmentProcessor>(
-      maskHalfOverSigma, shadowHalfSize, color, shadowCoordMatrix, maskCoordMatrix);
+      shadowHalfSize, maskHalfOverSigma, color, shadowCoordMatrix, maskCoordMatrix);
 }
 
 GLSLRectInnerShadowFragmentProcessor::GLSLRectInnerShadowFragmentProcessor(
-    const Point& maskHalfOverSigma, const Point& shadowHalfSize, PMColor color,
+    const Point& shadowHalfSize, const Point& maskHalfOverSigma, PMColor color,
     const Matrix& shadowCoordMatrix, const Matrix& maskCoordMatrix)
-    : RectInnerShadowFragmentProcessor(maskHalfOverSigma, shadowHalfSize, color, shadowCoordMatrix,
+    : RectInnerShadowFragmentProcessor(shadowHalfSize, maskHalfOverSigma, color, shadowCoordMatrix,
                                        maskCoordMatrix) {
 }
 
@@ -52,7 +52,7 @@ void GLSLRectInnerShadowFragmentProcessor::emitCode(EmitArgs& args) const {
 
   auto shadowCoordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
   auto maskCoordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[1]);
-  fragBuilder->codeAppendf("float coverage = 1.0 - shapeBlurRectCoverage(%s, %s);",
+  fragBuilder->codeAppendf("highp float coverage = 1.0 - shapeBlurRectCoverage(%s, %s);",
                            maskCoordName.c_str(), maskHalfName.c_str());
   fragBuilder->codeAppendf("coverage *= shapeMaskCoverage(shapeMaskRectSDF(%s, %s));",
                            shadowCoordName.c_str(), shadowHalfName.c_str());

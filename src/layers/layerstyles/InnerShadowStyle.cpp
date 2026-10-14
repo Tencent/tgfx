@@ -264,7 +264,11 @@ bool InnerShadowStyle::tryDrawAnalytic(Canvas* canvas, const LayerStyleInput& in
   paint.setShader(std::move(shader));
   paint.setBlendMode(blendMode);
   paint.setAlpha(alpha);
-  canvas->drawRect(shadowShape->rect(), paint);
+  // The shader's edge ramp extends 0.5px past the shape, so outset the draw rect by 1px to
+  // keep it out of the geometry AA band.
+  auto drawRect = shadowShape->rect();
+  drawRect.outset(1.0f, 1.0f);
+  canvas->drawRect(drawRect, paint);
   return true;
 }
 
