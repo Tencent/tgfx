@@ -34,6 +34,16 @@ AOTRouteResult AOTRouter::Route(const std::vector<const FragmentProcessor*>& pro
   return submit(graph, plan, producers) ? AOTRouteResult::Submitted : AOTRouteResult::TaskRefused;
 }
 
+bool AOTRouter::PlanInlineRewrite(const std::vector<const FragmentProcessor*>& processors,
+                                  AOTEffectGraph* graph, AOTEffectPlan* plan) {
+  if (!AOTEffectDecomposer::Lower(processors, graph) ||
+      !AOTEffectDecomposer::Decompose(*graph, plan) || plan->passes.size() != 1) {
+    return false;
+  }
+  auto kernel = plan->passes[0].kernel;
+  return IsAOTPointwiseDAGKernel(kernel) || kernel == AOTKernelKind::PerlinNoiseFill;
+}
+
 bool AOTRouter::RetryWarranted(const FragmentProcessor* leading, uint32_t renderFlags) {
   if (leading == nullptr || leading->numChildProcessors() != 2 ||
       leading->name() != "XfermodeFragmentProcessor - two") {

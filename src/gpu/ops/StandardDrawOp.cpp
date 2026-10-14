@@ -21,6 +21,7 @@
 #include "gpu/AOTChainBuilder.h"
 #include "gpu/AOTEffectDecomposer.h"
 #include "gpu/AOTPlanExecutor.h"
+#include "gpu/AOTRouter.h"
 #include "gpu/PermutationMatcher.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/Program.h"
@@ -194,19 +195,10 @@ std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
   }
   AOTEffectGraph graph = {};
   AOTEffectPlan plan = {};
-  bool decomposed = AOTEffectDecomposer::Lower(colorProcessors, &graph) &&
-                    AOTEffectDecomposer::Decompose(graph, &plan);
-  // Decompose only returns executable plans. The direct rewrite only carries the processors that
-  // replace a color list in place (chain/graph and perlin). A PointwiseTail plan is never rebuilt
-  // here: the tail planner only runs after the DAG planner refused the same node set, so the chain
-  // kernel could not carry it either.
-  if (!decomposed) {
+  if (!AOTRouter::PlanInlineRewrite(colorProcessors, &graph, &plan)) {
     return nullptr;
   }
   auto kernel = plan.passes[0].kernel;
-  if (!IsAOTPointwiseDAGKernel(kernel) && kernel != AOTKernelKind::PerlinNoiseFill) {
-    return nullptr;
-  }
   PlacementPtr<FragmentProcessor> chainFP = nullptr;
   if (kernel == AOTKernelKind::PerlinNoiseFill) {
     // The perlin kernel carries its own coordinate transform and has no coverage-fold path.

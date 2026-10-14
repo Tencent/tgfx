@@ -50,11 +50,19 @@ enum class AOTRouteResult {
 };
 
 /**
- * The routing steps shared by the two AOT entries: OpsCompositor::addDrawOp (on-screen draws) and
- * DrawingManager::fillRTWithFP (offscreen fills). Each entry collects the processors it wants
- * planned and supplies a SubmitPlan callback that turns a plan into a render task for its own
- * destination. The router owns planning and the materialization retry, so both entries apply the
- * same rules:
+ * The AOT routing rules, in one place. A draw reaches the precompiled kernels in one of two ways:
+ *
+ *   - As a plan task (AOTPlanRenderTask), built at record time by the two entries,
+ *     OpsCompositor::addDrawOp (on-screen draws) and DrawingManager::fillRTWithFP (offscreen
+ *     fills), through Route / RouteWithMaterializedLeading below. A plan task can run several
+ *     passes: materialized blend operands and the split-off passes of a long linear chain.
+ *   - As an inline rewrite at prepare time (StandardDrawOp::prepareDecomposedProgram), for a draw
+ *     that is still on the plain route: its color processors are replaced in place by one fused
+ *     kernel processor (PlanInlineRewrite). Single pass only; it also folds coverage processors.
+ *
+ * Each plan-task entry collects the processors it wants planned and supplies a SubmitPlan callback
+ * that turns a plan into a render task for its own destination. The router owns planning and the
+ * materialization retry, so both entries apply the same rules:
  *
  *   1. Route the original processors.
  *   2. If that route was not taken (no plan, or the entry could not build a task for it) and
@@ -79,6 +87,16 @@ class AOTRouter {
   static AOTRouteResult Route(const std::vector<const FragmentProcessor*>& processors,
                               const SubmitPlan& submit,
                               AOTMaterializationRecorder* producers = nullptr);
+
+  /**
+   * Plans processors for the inline rewrite: true when they lower and decompose into a single pass
+   * of a kernel whose processor can replace a draw's color list in place (PointwiseChain,
+   * PointwiseGraph, or PerlinNoiseFill). A PointwiseTail plan never qualifies: the tail planner only
+   * runs after the DAG planner refused the same nodes, so the chain kernel cannot carry them, and a
+   * multi-pass plan needs a plan task.
+   */
+  static bool PlanInlineRewrite(const std::vector<const FragmentProcessor*>& processors,
+                                AOTEffectGraph* graph, AOTEffectPlan* plan);
 
   /**
    * Whether the materialization retry applies to a chain led by this processor: it is a two-child
