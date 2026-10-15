@@ -268,6 +268,62 @@ TGFX_TEST(TypefaceTest, PathProviderKeepsWrappedFillRule) {
   EXPECT_EQ(glyphShape->getPath().getFillType(), PathFillType::EvenOdd);
 }
 
+// An empty path is empty only while it uses a normal fill type. With an inverse fill type it has
+// no contour segments yet fills the entire plane, so skipping it would turn the whole plane into
+// nothing.
+TGFX_TEST(TypefaceTest, EmptyInverseGlyphKeepsWholePlaneFill) {
+  Path inversePath = {};
+  inversePath.setFillType(PathFillType::InverseEvenOdd);
+  PathTypefaceBuilder builder(1000);
+  ASSERT_NE(builder.addGlyph(inversePath, 1000.0f), 0);
+  auto typeface = builder.detach();
+  ASSERT_TRUE(typeface != nullptr);
+  Font font(typeface, 1000.0f);
+
+  GlyphID glyphs[] = {1};
+  Point positions[] = {Point::Make(0.0f, 0.0f)};
+  auto blob = TextBlob::MakeFrom(glyphs, positions, 1, font);
+  ASSERT_TRUE(blob != nullptr);
+  auto shape = Shape::MakeFrom(blob);
+  ASSERT_TRUE(shape != nullptr);
+
+  auto path = shape->getPath();
+  EXPECT_TRUE(path.isInverseFillType());
+  EXPECT_TRUE(path.contains(2000.0f, 2000.0f)) << "whole-plane fill lost";
+  EXPECT_EQ(shape->fillType(), path.getFillType());
+}
+
+// An inverse outline unioned with the rectangle it excludes covers the whole plane. That result
+// has no contour segments either, so merging a third glyph must not mistake it for "not
+// initialized" and overwrite the plane.
+TGFX_TEST(TypefaceTest, InverseGlyphUnionKeepsWholePlaneResult) {
+  auto makeRect = [](PathFillType fillType) {
+    Path path = {};
+    path.addRect(Rect::MakeLTRB(0.0f, 0.0f, 1000.0f, 1000.0f));
+    path.setFillType(fillType);
+    return path;
+  };
+  PathTypefaceBuilder builder(1000);
+  ASSERT_NE(builder.addGlyph(makeRect(PathFillType::InverseEvenOdd), 1000.0f), 0);
+  ASSERT_NE(builder.addGlyph(makeRect(PathFillType::EvenOdd), 1000.0f), 0);
+  ASSERT_NE(builder.addGlyph(makeRect(PathFillType::EvenOdd), 1000.0f), 0);
+  auto typeface = builder.detach();
+  ASSERT_TRUE(typeface != nullptr);
+  Font font(typeface, 1000.0f);
+
+  GlyphID glyphs[] = {1, 2, 3};
+  Point positions[] = {Point::Make(0.0f, 0.0f), Point::Make(0.0f, 0.0f), Point::Make(0.0f, 0.0f)};
+  auto blob = TextBlob::MakeFrom(glyphs, positions, 3, font);
+  ASSERT_TRUE(blob != nullptr);
+  auto shape = Shape::MakeFrom(blob);
+  ASSERT_TRUE(shape != nullptr);
+
+  auto path = shape->getPath();
+  // The first two glyphs already cover everything, so a point far outside the rectangle is filled.
+  EXPECT_TRUE(path.contains(2000.0f, 2000.0f)) << "whole-plane result overwritten";
+  EXPECT_EQ(shape->fillType(), path.getFillType());
+}
+
 // Two overlapping even-odd outlines share one rule, but appending them and filling with that rule
 // would cancel the overlap out. The merged shape has to keep it filled.
 TGFX_TEST(TypefaceTest, OverlappingGlyphsDoNotCancelOut) {

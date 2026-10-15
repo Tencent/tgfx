@@ -29,9 +29,7 @@
 #include FT_TRUETYPE_TABLES_H
 #include FT_FONT_FORMATS_H
 #include FT_TYPE1_TABLES_H
-#include FT_SFNT_NAMES_H
 #include <array>
-#include <cstring>
 #include "FTScalerContext.h"
 #include "SystemFont.h"
 #include "core/utils/UniqueID.h"
@@ -107,50 +105,10 @@ std::shared_ptr<FTTypeface> FTTypeface::Make(FTFontData data) {
   return typeface;
 }
 
-// Detects the CFF subsets produced by the PAGX HTML exporter. Their charstrings describe the
-// filled area with parity semantics, a rule CFF cannot record, so the outlines have to be
-// recognised by the naming fingerprint the exporter writes. This only covers files that already
-// exist; new producers should state the fill rule explicitly rather than extend this check.
-static bool HasParityOutlines(FT_Face face) {
-  static constexpr char FamilyPrefix[] = "pagx-font-";
-  const auto format = FT_Get_Font_Format(face);
-  const auto postScriptName = FT_Get_Postscript_Name(face);
-  if (!format || strcmp(format, "CFF") != 0 || !face->family_name || !postScriptName ||
-      strncmp(face->family_name, FamilyPrefix, sizeof(FamilyPrefix) - 1) != 0 ||
-      strcmp(face->family_name, postScriptName) != 0 || FT_HAS_COLOR(face)) {
-    return false;
-  }
-  // The PAGX exporter writes the same UTF-16BE string into these four SFNT name records.
-  // A family prefix alone must not change an arbitrary font's fill semantics.
-  unsigned int matched = 0;
-  const auto length = strlen(face->family_name);
-  for (FT_UInt i = 0; i < FT_Get_Sfnt_Name_Count(face); ++i) {
-    FT_SfntName name = {};
-    if (FT_Get_Sfnt_Name(face, i, &name) != 0 || name.platform_id != 3 || name.encoding_id != 1 ||
-        name.language_id != 0x0409 || name.string_len != length * 2) {
-      continue;
-    }
-    bool equal = true;
-    for (size_t j = 0; j < length; ++j) {
-      if (name.string[j * 2] != 0 ||
-          name.string[j * 2 + 1] != static_cast<unsigned char>(face->family_name[j])) {
-        equal = false;
-        break;
-      }
-    }
-    if (equal &&
-        (name.name_id == 1 || name.name_id == 2 || name.name_id == 4 || name.name_id == 6)) {
-      matched |= 1u << name.name_id;
-    }
-  }
-  return matched == ((1u << 1) | (1u << 2) | (1u << 4) | (1u << 6));
-}
-
 FTTypeface::FTTypeface(FTFontData data, FT_Face face)
     : _uniqueID(UniqueID::Next()), data(std::move(data)), face(std::move(face)) {
   _hasColor = FT_HAS_COLOR(this->face);
   _hasOutlines = FT_IS_SCALABLE(this->face);
-  _parityOutlines = _hasOutlines && HasParityOutlines(this->face);
 #if defined(__ANDROID__) || defined(ANDROID)
   if (hasColor() && hasOutlines() && GlyphRenderer::IsAvailable()) {
     JNIEnvironment environment;

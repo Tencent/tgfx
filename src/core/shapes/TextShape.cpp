@@ -41,6 +41,12 @@ Rect TextShape::onGetBounds() const {
   return textBlob->getBounds();
 }
 
+// A path with no contour segments fills nothing, unless it carries an inverse fill type: that one
+// fills the entire plane. Shape::MakeFrom(Path) and ShapeRasterizer already draw this distinction.
+static bool FillsWholePlane(const Path& path) {
+  return path.isEmpty() && path.isInverseFillType();
+}
+
 Path TextShape::onGetPath(float resolutionScale) const {
   if (FloatNearlyZero(resolutionScale)) {
     return {};
@@ -67,7 +73,11 @@ Path TextShape::onGetPath(float resolutionScale) const {
         LOGE("TextShape::getPath() Failed to get path for glyph!");
         return {};
       }
-      if (glyphPath.isEmpty()) {
+      // A path without contour segments is empty, except when it carries an inverse fill type:
+      // that one fills the whole plane. Only the genuinely empty outlines are dropped here.
+      // A path without contour segments is empty, except when it carries an inverse fill type:
+      // that one fills the whole plane. Only the genuinely empty outlines are dropped here.
+      if (glyphPath.isEmpty() && !glyphPath.isInverseFillType()) {
         continue;
       }
       auto glyphMatrix = GetGlyphMatrix(run, index);
@@ -81,10 +91,18 @@ Path TextShape::onGetPath(float resolutionScale) const {
     }
   }
   Path totalPath = {};
+  auto havePath = false;
   for (auto& glyphPath : glyphPaths) {
-    if (totalPath.isEmpty()) {
+    if (!havePath || FillsWholePlane(glyphPath)) {
+      // A whole-plane outline absorbs every other one, so it also replaces what was collected.
       totalPath = glyphPath;
+      havePath = true;
+    } else if (FillsWholePlane(totalPath)) {
+      continue;
     } else if (needsUnion) {
+      // isEmpty() cannot stand in for "not initialized" here: an intermediate result may fill the
+      // whole plane, and pathops treats an empty operand as absent, dropping the inverse fill
+      // type and with it the whole plane.
       totalPath.addPath(glyphPath, PathOp::Union);
     } else {
       totalPath.addPath(glyphPath);
