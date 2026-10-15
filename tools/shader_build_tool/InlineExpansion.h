@@ -60,11 +60,11 @@ struct InlineExpansionRecord {
 
 /// Validates the expansion policy over the fragment stages: the instructions a function adds by
 /// being inlined more than once (its own instructions times its copies beyond the first) must
-/// stay below the limit in InlineExpansion.cpp, unless the allowlist there names the function with
-/// a reason and a copy budget. A function with several call sites is the pattern that multiplied
-/// the pointwise kernels' compile time (per-leaf tiled fetches, per-mode HSL blend helpers);
-/// funnelling the call sites into one is what removes the copies. Returns the violation count and
-/// prints each violation.
+/// stay below the limit in InlineExpansion.cpp, with no exceptions. A function with several call
+/// sites is the pattern that multiplied the pointwise kernels' compile time (per-leaf tiled
+/// fetches, per-mode HSL blend helpers, per-channel transfer functions, the XferProcessor blend
+/// next to the loop's blend); funnelling the call sites into one is what removes the copies.
+/// Returns the violation count and prints each violation.
 size_t ValidateInlineExpansion(const std::vector<InlineExpansionRecord>& records);
 
 /// Writes the per-variant expansion and every duplicated function to a JSON file. Returns false

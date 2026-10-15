@@ -40,33 +40,11 @@ constexpr uint32_t OpFunctionCall = 57;
 // first. The limit is on that product, not on the body size: a 135-instruction helper called from
 // eight sites (the former per-mode HSL blend helpers, 945 duplicated instructions) costs the
 // driver as much as a large body called twice. Small pickers duplicated a few times stay below.
+// There are no exceptions: every heavy function the kernels share has a single call site.
 constexpr size_t MaxDuplicatedInstructions = 400;
 
 size_t DuplicatedInstructions(const InlinedFunction& function) {
   return function.copies > 1 ? function.instructions * (function.copies - 1) : 0;
-}
-
-// Functions whose duplication is known and accepted, each with its copy budget and the reason.
-// Keep every entry justified: the allowlist is the inventory of known duplication.
-struct AllowedExpansion {
-  const char* function;
-  size_t maxCopies;
-  const char* reason;
-};
-constexpr AllowedExpansion ExpansionAllowlist[] = {
-    {"xpBlendColors", 2,
-     "a dst-reading XP variant blends twice: the chain's OP_BLEND instruction and the final XP "
-     "composite (xpBlendWithCoverage's advanced-mode fallback). Folding the final composite into "
-     "the instruction loop changes the kernel interface; tracked separately."},
-};
-
-const AllowedExpansion* FindAllowed(const std::string& function) {
-  for (const auto& entry : ExpansionAllowlist) {
-    if (function == entry.function) {
-      return &entry;
-    }
-  }
-  return nullptr;
 }
 
 std::string DecodeLiteralString(const std::vector<uint32_t>& spirv, size_t firstWord,
@@ -218,10 +196,6 @@ size_t ValidateInlineExpansion(const std::vector<InlineExpansionRecord>& records
       if (duplicated < MaxDuplicatedInstructions) {
         continue;
       }
-      auto* allowed = FindAllowed(function.name);
-      if (allowed != nullptr && function.copies <= allowed->maxCopies) {
-        continue;
-      }
       auto& violation = violations[{record.shaderName, function.name}];
       ++violation.variants;
       if (duplicated > violation.duplicated) {
@@ -234,18 +208,13 @@ size_t ValidateInlineExpansion(const std::vector<InlineExpansionRecord>& records
   }
   for (const auto& entry : violations) {
     const auto& violation = entry.second;
-    auto* allowed = FindAllowed(entry.first.second);
     std::cerr << "[InlineCheck] " << entry.first.first << ": '" << entry.first.second << "' ("
               << violation.instructions << " instructions) reaches the driver "
               << violation.copies << " times in frag " << violation.worstVariant << " ("
               << violation.variants << " variant(s)), " << violation.duplicated
-              << " duplicated instructions; "
-              << (allowed != nullptr
-                      ? "the allowlist budget is " + std::to_string(allowed->maxCopies) + " copies"
-                      : "the limit is " + std::to_string(MaxDuplicatedInstructions) +
-                            " duplicated instructions")
-              << ". Funnel the call sites into one (select the operands, then call once), or "
-                 "allowlist the function in InlineExpansion.cpp with the reason.\n";
+              << " duplicated instructions; the limit is " << MaxDuplicatedInstructions
+              << ". Funnel the call sites into one: select the operands, then call once (or run "
+                 "the call in a loop whose pass count is uniform data).\n";
   }
   return invalid + violations.size();
 }
