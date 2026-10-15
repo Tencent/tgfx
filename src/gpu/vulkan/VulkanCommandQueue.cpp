@@ -39,8 +39,7 @@ VulkanCommandQueue::~VulkanCommandQueue() {
       if (present.imageAvailableSemaphore != VK_NULL_HANDLE) {
         vkDestroySemaphore(gpu->device(), present.imageAvailableSemaphore, nullptr);
       }
-      // Align with abandonPresents(): the acquired image can no longer be presented, so the
-      // swapchain must be rebuilt before its images and semaphores are reused.
+      // The image can no longer be presented; rebuild the swapchain as abandonPresents() does.
       if (present.outOfDate != nullptr) {
         *present.outOfDate = true;
       }
@@ -233,8 +232,7 @@ void VulkanCommandQueue::abandonPresents(std::vector<PendingPresent>& presents) 
   if (presents.empty()) {
     return;
   }
-  // The acquired images can no longer be presented, so the swapchains must be rebuilt before
-  // their images and semaphores can be safely reused.
+  // The acquired images can no longer be presented; rebuild the swapchains.
   vkDeviceWaitIdle(gpu->device());
   for (auto& present : presents) {
     if (present.imageAvailableSemaphore != VK_NULL_HANDLE) {
@@ -270,9 +268,7 @@ void VulkanCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
   pendingPresents.clear();
 
   if (cmd == VK_NULL_HANDLE) {
-    // Encoding failed after images were acquired. The frames can never be presented, so destroy
-    // their acquire semaphores and force the swapchains to rebuild instead of leaking the pending
-    // state into an unrelated later submission.
+    // Encoding failed: drop the acquired frames and rebuild their swapchains.
     abandonSubmit(std::move(session), std::move(uploads));
     abandonPresents(presents);
     return;
@@ -409,8 +405,7 @@ void VulkanCommandQueue::waitUntilCompleted() {
   if (gpu == nullptr) {
     return;
   }
-  // Frames that were acquired but never submitted can never be presented; release them instead of
-  // leaking the pending state into a later submission.
+  // Release acquired frames that were never submitted.
   abandonPresents(pendingPresents);
   if (!pendingUploads.empty()) {
     VkCommandPool pool = VK_NULL_HANDLE;

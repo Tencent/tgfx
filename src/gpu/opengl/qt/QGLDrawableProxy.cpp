@@ -28,9 +28,7 @@ QGLDrawableProxy::QGLDrawableProxy(Context* context, int width, int height, Pixe
 }
 
 void QGLDrawableProxy::onPresentFrame(Context*) {
-  // Hand the frame to the Qt scene graph through the window (which owns the pending slot and
-  // the quick item), keeping the window alive for the duration of the call; drop the
-  // presentation once the window is gone.
+  // Keep the window alive while presenting; drop the presentation once it is gone.
   auto window = _presentingWindow.lock();
   if (window == nullptr || _window == nullptr) {
     return;
@@ -68,8 +66,7 @@ bool QGLDrawableProxy::externallyOwned() const {
 
 void QGLDrawableProxy::ensureTextureRTProxy() const {
   if (textureRTProxy == nullptr) {
-    // Keep the window (which owns the texture slots) alive for the duration of the call; once
-    // it is gone its slots are dangling and no frame can be resolved through them.
+    // Keep the window alive while resolving; its texture slots dangle once it is gone.
     auto window = _presentingWindow.lock();
     if (window == nullptr || _window == nullptr) {
       return;
@@ -102,9 +99,7 @@ std::shared_ptr<RenderTargetProxy> QGLDrawableProxy::getTextureTargetProxy() con
 
 void QGLDrawableProxy::releaseTexture() {
   if (textureRTProxy != nullptr) {
-    // Return the slot while keeping the window alive for the duration of the call. Once the
-    // window is gone the slot cannot be returned; drop the reference instead of touching the
-    // destroyed window.
+    // Return the slot only while the window is alive.
     auto window = _presentingWindow.lock();
     if (window != nullptr && _window != nullptr) {
       _window->reuseTexture(textureRTProxy);

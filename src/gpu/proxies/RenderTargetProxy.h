@@ -117,35 +117,25 @@ class RenderTargetProxy {
   virtual std::shared_ptr<RenderTarget> getRenderTarget() const = 0;
 
   /**
-   * Wires this target's frame into the upcoming render submission, before the command buffer
-   * that carries the frame's rendering is submitted. Called for every used frame, whether or not
-   * the batch presents it. The default implementation does nothing; backends
-   * whose render submission must synchronize with the frame acquisition (Vulkan's imageAvailable
-   * semaphore wait) override it.
+   * Called before submitting a batch that uses this frame, presented or not, to attach its
+   * acquisition wait. The default implementation does nothing.
    */
   virtual void onAttachSubmission(Context* context);
 
   /**
-   * Schedules this target's presentation onto the upcoming submission, before the command
-   * buffer of the batch that presents the frame is submitted. The default
-   * implementation does nothing; backends that encode the presentation into the command buffer
-   * (Metal's presentDrawable, Vulkan's PresentInfo semaphore wiring) override it.
+   * Called before submitting the batch that presents this frame. The default implementation does
+   * nothing.
    */
   virtual void onSchedulePresentation(Context* context);
 
   /**
-   * Presents this target's frame after the command buffer submission. The default
-   * implementation forwards to the window that created this target (backends with a shared
-   * native backbuffer: GL), which requires the window to still be alive; backends with
-   * frame-level resources (Metal, Vulkan, WebGPU, EAGL, QGL, D3D12) override it.
+   * Presents this frame after the command buffer submission. The default implementation forwards
+   * to the window if it is still alive.
    */
   virtual void onPresentFrame(Context* context);
 
   /**
-   * Associates this target with the window that created it, enabling the default
-   * onPresentFrame() forwarding and the window-lifetime gating: window-backed proxies whose
-   * backend resources (swapchains, surfaces, image states) are owned by the window fail safely
-   * once the window is gone. Called by the window surface path after onCreateRenderTarget().
+   * Associates this target with the window that created it.
    */
   void setPresentingWindow(std::weak_ptr<Window> window) {
     _presentingWindow = std::move(window);
@@ -201,10 +191,7 @@ class RenderTargetProxy {
   Matrix getOriginTransform() const;
 
  protected:
-  // The window that created this target (set when a window surface resolves its target). Held
-  // weakly: presenting must not keep the window (and through it the device) alive. When the
-  // window is gone, the default onPresentFrame() drops the presentation, and window-backed
-  // proxies whose resources are owned by the window stop touching them.
+  // Held weakly so the frame does not keep the window and its device alive.
   std::weak_ptr<Window> _presentingWindow = {};
 
   // Cached stencil attachment, lazily created by getStencil(). Held as a strong reference so

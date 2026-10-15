@@ -85,8 +85,6 @@ void RenderTargetProxy::onSchedulePresentation(Context*) {
 }
 
 void RenderTargetProxy::onPresentFrame(Context* context) {
-  // Backends with a shared native backbuffer (GL) present through their window; when the window
-  // is gone there is nothing to present into and the presentation is dropped.
   if (auto window = _presentingWindow.lock()) {
     window->onPresent(context);
   }

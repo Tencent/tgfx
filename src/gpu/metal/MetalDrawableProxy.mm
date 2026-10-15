@@ -25,16 +25,14 @@
 #include "tgfx/gpu/metal/MetalTypes.h"
 
 namespace tgfx {
-// Acquires the next drawable of the layer and returns it retained (+1); the caller takes over
-// the reference. Returns nil if the layer cannot provide a drawable right now.
+// Returns the layer's next drawable retained (+1), or nil if none is available.
 static id<CAMetalDrawable> AcquireMetalDrawable(CAMetalLayer* metalLayer) {
   if (metalLayer == nil) {
     return nil;
   }
   id<CAMetalDrawable> metalDrawable = nil;
   @autoreleasepool {
-    // nextDrawable returns an autoreleased (+0) drawable; retain it inside the pool so the
-    // reference stays valid after the pool drains.
+    // Retain inside the pool so the drawable outlives it.
     metalDrawable = [[metalLayer nextDrawable] retain];
   }
   return metalDrawable;
@@ -91,8 +89,7 @@ std::shared_ptr<TextureView> MetalDrawableProxy::getTextureView() const {
 
 std::shared_ptr<RenderTarget> MetalDrawableProxy::getRenderTarget() const {
   if (_renderTarget == nullptr) {
-    // The drawable is acquired lazily, when the batch that draws the frame is encoded. Its
-    // presentation is scheduled by onSchedulePresentation() at submission time.
+    // The drawable is acquired lazily when the batch is encoded.
     auto drawable = AcquireMetalDrawable(_metalLayer);
     if (drawable == nil) {
       return nullptr;
@@ -102,8 +99,7 @@ std::shared_ptr<RenderTarget> MetalDrawableProxy::getRenderTarget() const {
     _renderTarget = RenderTarget::MakeFrom(_context, MakeBackendRenderTarget(_metalDrawable),
                                            ImageOrigin::TopLeft);
     if (_renderTarget == nullptr) {
-      // The render target creation failed; do not schedule a present for this unusable frame.
-      // A later call retries with a fresh drawable.
+      // Do not present a frame without a render target; a later call retries.
       return nullptr;
     }
   }
@@ -115,8 +111,6 @@ id<CAMetalDrawable> MetalDrawableProxy::getMetalDrawable() const {
 }
 
 void MetalDrawableProxy::onSchedulePresentation(Context* context) {
-  // Only schedule drawables whose render target was created successfully; scheduling a
-  // drawable from a failed getRenderTarget() would present an unrendered frame.
   if (!hasRenderTarget()) {
     return;
   }
@@ -124,10 +118,7 @@ void MetalDrawableProxy::onSchedulePresentation(Context* context) {
   if (drawable == nil) {
     return;
   }
-  // Attach the presentation to the upcoming command buffer, so that the presentation waits
-  // for the GPU to finish rendering before the frame is displayed. The command buffer
-  // retains the drawable until it completes, so the proxy can drop its reference once the
-  // presentation has been scheduled (see onPresentFrame()).
+  // Present after the command buffer completes; the command buffer retains the drawable.
   auto metalQueue = static_cast<MetalCommandQueue*>(context->gpu()->queue());
   metalQueue->schedulePresent(drawable);
 }

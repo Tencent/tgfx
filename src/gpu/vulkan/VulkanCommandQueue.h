@@ -69,17 +69,11 @@ class VulkanCommandQueue : public CommandQueue {
 
   void waitUntilCompleted() override;
 
-  /// Makes the next submit() wait for the acquisition of a swapchain image, without presenting
-  /// it. Called once per acquired frame, by the first submission that uses the image;
-  /// imageAvailableSemaphore ownership moves to the queue and is destroyed with the render
-  /// fence. If the submission never happens, the swapchain is flagged out of date so the image
-  /// is reclaimed by a rebuild.
+  /// Makes the next submit() wait for a swapchain image acquisition, taking ownership of the
+  /// semaphore. Called once per acquired frame.
   void scheduleAcquireWait(VkSemaphore imageAvailableSemaphore, std::shared_ptr<bool> outOfDate);
 
-  /// Presents an acquired swapchain image at the end of the next submit(): the image gets a
-  /// layout transition to PRESENT_SRC_KHR, the submission signals its per-image presentation
-  /// semaphore, and vkQueuePresentKHR waits on it. Never waits for the acquisition itself; that
-  /// is wired by scheduleAcquireWait() through the first submission that used the image.
+  /// Presents an acquired swapchain image at the end of the next submit().
   void schedulePresent(VkSwapchainKHR swapchain, uint32_t imageIndex, VkImage image,
                        VkSemaphore presentSemaphore, std::shared_ptr<VkImageLayout> layout,
                        std::shared_ptr<bool> outOfDate);
@@ -99,8 +93,7 @@ class VulkanCommandQueue : public CommandQueue {
   std::shared_ptr<VulkanSemaphore> pendingSignalSemaphore;
   std::shared_ptr<VulkanSemaphore> pendingWaitSemaphore;
 
-  // Produced by scheduleAcquireWait() (imageAvailableSemaphore set, presents false) and
-  // schedulePresent() (presents true, no acquire wait), consumed by submit().
+  // Produced by scheduleAcquireWait() and schedulePresent(), consumed by submit().
   struct PendingPresent {
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
     uint32_t imageIndex = 0;

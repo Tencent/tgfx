@@ -787,11 +787,8 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
   //       semaphore ensures A's submission completes before B's fragment shader reads it.
   //       Wait stage: FRAGMENT_SHADER (vertex work can proceed in parallel).
   //
-  //   (b) Per-frame swapchain semaphores — standard Vulkan presentation sync. The first
-  //       submission that uses an acquired image waits on its imageAvailable semaphore; the
-  //       submission of the batch that presents the frame signals the image's
-  //       presentation semaphore and queues the present. The two are independent: an acquire
-  //       wait never implies a presentation.
+  //   (b) Per-frame swapchain semaphores. The first submission using an image waits on its
+  //       imageAvailable semaphore; the presenting submission signals its present semaphore.
   //
   VulkanSubmissionPlan presentationPlan;
   for (auto& present : request.presents) {
@@ -819,8 +816,7 @@ void VulkanGPU::executeSubmission(SubmitRequest request) {
     signalValues.push_back(request.signalSemaphore->nextSignalValue());
   }
 
-  // (b) Acquire waits for the frames first used by this submission, presentation semaphore
-  // signals for the frames presented by it.
+  // (b) Acquire waits and present semaphore signals.
   for (auto& present : request.presents) {
     if (present.imageAvailable != VK_NULL_HANDLE) {
       // Transfers (readbacks, snapshot copies) touch the image too, so wait before any stage.

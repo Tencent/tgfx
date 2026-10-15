@@ -66,17 +66,14 @@ class DrawingBuffer {
   std::shared_ptr<CommandBuffer> encode();
 
   /**
-   * Wires the window frames this batch uses into the upcoming submission: backends whose render
-   * submission must synchronize with the frame acquisition (Vulkan's imageAvailable semaphore
-   * wait) attach that synchronization here, whether or not the batch presents the frame. Called
-   * right before the command buffer is submitted.
+   * Attaches the frame acquisition waits of the window frames this batch uses. Called right
+   * before the command buffer is submitted.
    */
   void attachFrameUsages(Context* context);
 
   /**
-   * Schedules the window presentations requested by this batch onto the upcoming submission, so
-   * each presentation is encoded/ordered with the command buffer of the batch that drew the
-   * frame. Called right before the command buffer is submitted.
+   * Schedules this batch's window presentations. Called right before the command buffer is
+   * submitted.
    */
   void schedulePresents(Context* context);
 
@@ -86,16 +83,10 @@ class DrawingBuffer {
   void deliverFrames(Context* context);
 
  private:
-  // The window frames this batch uses, as declared by their surfaces (drawing passes as well as
-  // snapshot copies without a presentation), so the submission wires the frame acquisition
-  // synchronization for every frame it uses.
+  // Window frames this batch draws into or copies from.
   std::vector<std::shared_ptr<RenderTargetProxy>> windowUsages = {};
 
-  // The window targets this batch presents, requested by the surfaces drawn in the batch.
-  // Entries are strong: the buffer keeps them alive until it is submitted, so dropping a
-  // Recording never discards a presentation whose rendering still runs. The proxies hold their
-  // windows weakly and carry the presentation, so no device reference cycle is formed even
-  // though the Window holds its device strongly (see Window::_device).
+  // Window targets this batch presents, kept alive until the buffer is submitted.
   std::vector<std::shared_ptr<RenderTargetProxy>> presentables = {};
 
   Context* context = nullptr;

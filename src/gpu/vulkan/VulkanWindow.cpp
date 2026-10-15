@@ -37,9 +37,7 @@
 
 namespace tgfx {
 
-// Desired swapchain image usage, intersected with what the surface actually supports at creation
-// time. TRANSFER_DST/TRANSFER_SRC are optional (some drivers don't advertise them);
-// COLOR_ATTACHMENT is mandatory for rendering.
+// Desired swapchain image usage; the TRANSFER bits are optional and dropped when unsupported.
 static constexpr VkImageUsageFlags DesiredSwapchainUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
                                                            VK_IMAGE_USAGE_TRANSFER_DST_BIT |
                                                            VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -669,12 +667,8 @@ VulkanWindow::VulkanWindow(std::shared_ptr<Device> device, std::unique_ptr<Platf
 }
 
 VulkanWindow::~VulkanWindow() {
-  // Intentionally do not lock the device here: this destructor may run while a Context is
-  // already locked on the current thread (for example when the last window Surface or the
-  // Recording that kept the window alive is released inside the locked scope), and Device uses a
-  // non-recursive mutex.
-  // The cleanup only needs the raw Vulkan handles, and vkDeviceWaitIdle() waits for all queued
-  // work on the device, which is at least as safe as holding the device lock.
+  // Do not lock the device: this destructor may run inside a locked scope and the device mutex is
+  // not recursive. vkDeviceWaitIdle() is enough for the cleanup.
   vkDeviceWaitIdle(_platformState->cachedDevice);
   DestroyImageStates(_platformState->cachedDevice, _platformState->imageStates);
   DestroySwapchainResources(_platformState->cachedDevice, _platformState->cachedInstance,
@@ -742,8 +736,7 @@ bool VulkanWindow::PlatformState::recreateSwapchain(VkDevice device,
   height = static_cast<int>(extent.height);
   supportsReadback = VulkanSupportsReadback(imageUsage);
   outOfDate = std::make_shared<bool>(false);
-  // Invalidate all proxies created against the previous swapchain so they never touch the
-  // destroyed handles; callers must create a new Surface after a rebuild.
+  // Invalidate proxies of the old swapchain; callers must create a new Surface.
   (*generation)++;
   return true;
 }
@@ -783,8 +776,7 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* c
         iterator = proxies.erase(iterator);
       }
     }
-    // A rebuild destroys the old swapchain, so it can only run while no proxy holds an acquired
-    // image. Idle proxies are safe: they detect the generation change and stop acquiring.
+    // Rebuild only when no proxy holds an acquired image.
     if (extent.width == 0 || extent.height == 0 || hasPendingFrame) {
       return nullptr;
     }
@@ -797,8 +789,7 @@ std::shared_ptr<RenderTargetProxy> VulkanWindow::onCreateRenderTarget(Context* c
       context, vulkanGPU, _platformState->swapchain, _platformState->format, _platformState->width,
       _platformState->height, _platformState->images, _platformState->imageStates,
       _platformState->outOfDate, _platformState->generation);
-  // Prune proxies that have gone away so the tracking list stays bounded; entries would
-  // otherwise only be cleaned up on the next needsRebuild pass.
+  // Prune expired proxies.
   auto& proxies = _platformState->activeProxies;
   proxies.erase(std::remove_if(proxies.begin(), proxies.end(),
                                [](const auto& weakProxy) { return weakProxy.expired(); }),

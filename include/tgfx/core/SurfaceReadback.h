@@ -64,10 +64,8 @@ class SurfaceReadback {
   /**
    * Returns true if the pixel data is ready to access, false otherwise. The pixel data may not be
    * immediately available after starting the readback operation, as it can involve asynchronous
-   * GPU processing. This method does not block the calling thread and never submits pending work:
-   * a readback whose transfer task has not been submitted yet (for example, scheduled after the
-   * last flushAndSubmit() call) reports false until the task is submitted. Poll status() or call
-   * flushAndSubmit() to advance such a readback.
+   * GPU processing. This method does not block the calling thread and never submits pending
+   * work, so it reports false until the readback has been submitted.
    */
   bool isReady(Context* context) const;
 

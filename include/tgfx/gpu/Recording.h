@@ -33,11 +33,7 @@ class Window;
  * Context::submit().
  * Note: If multiple Recording objects are created, submitting a later Recording will force all
  * earlier Recordings to be submitted first, maintaining the correct rendering order.
- * The flushed drawing buffer keeps the frames it rendered to alive until it is submitted, so
- * their pending presentations are still delivered even after the surfaces and this Recording
- * itself have been released. The Recording additionally keeps the rendered-to windows alive:
- * frames hold their windows only weakly (to break the device reference cycle), and
- * shared-backbuffer backends (GL, D3D12) present through the window.
+ * A Recording keeps the windows it rendered to alive until it is submitted or released.
  */
 class Recording {
  private:

@@ -35,8 +35,7 @@ MetalCommandQueue::~MetalCommandQueue() {
   // async completion handlers (which capture `this`) have fired before the object is destroyed.
   [lastSubmittedCommandBuffer waitUntilCompleted];
   [lastSubmittedCommandBuffer release];
-  // Release any drawables still pending presentation. They were retained in schedulePresent()
-  // and may remain here if the queue is destroyed before a command buffer consumed them.
+  // Release drawables that were never submitted.
   for (auto& drawable : pendingDrawables) {
     [drawable release];
   }
@@ -60,10 +59,7 @@ void MetalCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
         pendingSignalSemaphore = nullptr;
       }
 
-      // Present all pending drawables after the command buffer's GPU work completes. Each
-      // drawable was retained by schedulePresent(). The presentDrawable: encoding keeps the
-      // drawable alive until the command buffer completes, so the queue's reference can be
-      // released right after encoding.
+      // Present pending drawables after the GPU work; the command buffer keeps them alive.
       for (auto& drawable : pendingDrawables) {
         [metalCommandBuffer->metalCommandBuffer() presentDrawable:drawable];
         [drawable release];
@@ -207,9 +203,7 @@ void MetalCommandQueue::schedulePresent(id<CAMetalDrawable> drawable) {
   if (drawable == nil) {
     return;
   }
-  // The C++ vector does not retain Objective-C objects under MRC, so retain the drawable here.
-  // It is released in submit() once encoded via presentDrawable: (the command buffer then
-  // holds its own reference), or in the destructor if it is never submitted.
+  // Retained manually under MRC; released in submit() or the destructor.
   pendingDrawables.push_back([drawable retain]);
 }
 

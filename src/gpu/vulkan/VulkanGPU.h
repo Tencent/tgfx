@@ -198,10 +198,7 @@ class VulkanGPU : public GPU {
     std::shared_ptr<VulkanSemaphore> waitSemaphore;
     std::chrono::steady_clock::time_point frameTime = {};
 
-    // A swapchain frame wired into this submission. An entry either waits for the image
-    // acquisition (imageAvailable set; the first submission that uses the frame) or presents the
-    // image (presents true; the submission of the batch that presents the frame), and
-    // never both: acquire waits never imply a presentation.
+    // A swapchain frame of this submission: either an acquire wait or a presentation, never both.
     struct PresentInfo {
       VkSwapchainKHR swapchain = VK_NULL_HANDLE;
       uint32_t imageIndex = 0;

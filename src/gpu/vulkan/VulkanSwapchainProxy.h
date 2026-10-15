@@ -50,30 +50,24 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
   bool hasPendingFrame() const;
 
   /**
-   * Hands the acquired frame's acquire semaphore to the upcoming submission, so that submission
-   * waits for the image acquisition before touching the image. Done once per frame, by the first
-   * submission that uses it; never presents the image.
+   * Makes the next submission wait for the frame acquisition. Done once per frame.
    */
   void attachAcquireWait();
 
   void releaseFrame();
 
   /**
-   * Frame-level wiring, independent of the VulkanWindow: makes a batch that uses the frame wait
-   * for its acquisition, whether or not a presentation was registered for that batch. The frame
-   * stays open; it is only presented by the batch that draws into it.
+   * Waits for the frame acquisition without presenting the frame.
    */
   void onAttachSubmission(Context* context) override;
 
   /**
-   * Queues the frame's presentation with the submission of the batch that draws it (wiring the
-   * acquire wait too if that batch is the frame's first use).
+   * Queues the frame's presentation with the current batch.
    */
   void onSchedulePresentation(Context* context) override;
 
   /**
-   * Ends the frame after the submission that presented it, so the next use acquires a fresh
-   * image.
+   * Ends the frame after it is presented.
    */
   void onPresentFrame(Context* context) override;
 
@@ -92,8 +86,7 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
 
   mutable uint32_t _currentImageIndex = 0;
   mutable std::shared_ptr<RenderTarget> _renderTarget = nullptr;
-  // The acquire semaphore of the pending frame, created per acquisition and handed to the
-  // command queue in attachAcquireWait(); destroyed with the in-flight submission's fence.
+  // The acquire semaphore of the pending frame, released with the submission's fence.
   mutable VkSemaphore _pendingImageAvailableSemaphore = VK_NULL_HANDLE;
 };
 

@@ -486,8 +486,6 @@ OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
   }
   if (opsCompositor == nullptr || opsCompositor->isClosed()) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
-    // The surface decides which target the drawing pass uses (a window surface may switch to the
-    // window's current frame) or rejects the pass.
     auto target = surface ? surface->collectFrame(drawingManager, renderTarget) : renderTarget;
     if (target == nullptr) {
       return nullptr;

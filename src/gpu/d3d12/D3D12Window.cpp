@@ -76,8 +76,7 @@ class D3D12SwapchainProxy : public RenderTargetProxy {
   }
 
   void onPresentFrame(Context*) override {
-    // Keep the window (which owns the swap chain) alive for the duration of the present; once it
-    // is gone the presentation is dropped instead of calling Present on dangling handles.
+    // Keep the window alive while presenting; drop the presentation once it is gone.
     auto window = _presentingWindow.lock();
     if (window == nullptr) {
       return;
@@ -103,8 +102,7 @@ class D3D12SwapchainProxy : public RenderTargetProxy {
   }
 
   std::shared_ptr<RenderTarget> getRenderTarget() const override {
-    // Keep the window (which owns the swap chain and back buffers) alive while resolving the
-    // frame; once it is gone their handles are dangling and no frame can be resolved.
+    // Keep the window alive while resolving the frame; its handles dangle once it is gone.
     auto window = _presentingWindow.lock();
     if (window == nullptr) {
       return nullptr;
@@ -173,10 +171,7 @@ struct D3D12Window::PlatformState {
   // Runs the DirectComposition tear-down protocol (SetContent(nullptr) → SetRoot(nullptr) →
   // Commit) and drops the DComp COM refs. All three steps are required — skipping Commit
   // leaves DWM holding a stale reference and reproduces OBJECT_DELETED_WHILE_STILL_IN_USE.
-  // Caller must have drained the GPU queue. Holding the device lock is not required when the
-  // window's last reference is being released: no concurrent submission can be in flight (it
-  // would keep the window alive through the buffer -> frame -> window chain). No-op for
-  // opaque swap chains.
+  // Caller must have drained the GPU queue. No-op for opaque swap chains.
   void detachCompositionTree();
   bool rebuild(Context* context, int newWidth, int newHeight);
 };
@@ -218,9 +213,7 @@ bool D3D12Window::PlatformState::rebuild(Context* context, int newWidth, int new
 void D3D12Window::PlatformState::drainBackBufferOwners(Context* context, D3D12GPU* gpu) {
   backBuffers.clear();
   if (context != nullptr) {
-    // Best-effort cache purge: releases cached ExternalRenderTargets promptly. Flip-model
-    // backbuffers stay valid after the swap chain is gone, so resources that linger in the
-    // cache without a context are still released safely by later eviction.
+    // Best-effort purge; lingering entries are released safely by later eviction.
     context->purgeResourcesNotUsedSince(std::chrono::steady_clock::now());
   }
   gpu->processUnreferencedResources();
@@ -415,17 +408,9 @@ D3D12Window::D3D12Window(std::shared_ptr<Device> device, std::unique_ptr<Platfor
 }
 
 D3D12Window::~D3D12Window() {
-  // Intentionally do not lock the device here: the device uses a non-recursive mutex, and this
-  // destructor may run while a Context is already locked on the current thread (for example
-  // when the last window Surface or the Recording that kept the window alive is released inside
-  // the locked scope). The cleanup below is safe without the lock:
-  // - drainQueue() only needs the GPU handles (double-fence wait covering the GPU-side flip
-  //   work that Present enqueues, avoiding OBJECT_DELETED_WHILE_STILL_IN_USE (#921));
-  // - no concurrent CPU-side submission can race the teardown, because every submission path
-  //   that touches the window's resources locks the window through its proxy's weak reference
-  //   first and keeps it alive for the call; releasing the last reference means none is running;
-  // - COM releases are thread-safe, and flip-model backbuffers stay valid even after the
-  //   swap chain is gone.
+  // Do not lock the device: this destructor may run inside a locked scope and the device mutex
+  // is not recursive. No submission can touch the window's resources once its last reference is
+  // released, and drainQueue() only needs the GPU handles (#921).
   auto device = _device;
   auto* d3d12GPU = device != nullptr
                        ? static_cast<D3D12GPU*>(static_cast<D3D12Device*>(device.get())->_gpu)

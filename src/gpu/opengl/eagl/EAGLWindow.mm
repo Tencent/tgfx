@@ -33,8 +33,7 @@ class EAGLRenderTargetProxy final : public RenderTargetProxy {
   }
 
   void onPresentFrame(Context* context) override {
-    // Present this frame's renderbuffer without needing the window: the proxy carries the
-    // color buffer and the context provides the EAGL context.
+    // Presents the renderbuffer without the window.
     auto gl = static_cast<GLGPU*>(context->gpu())->functions();
     gl->bindRenderbuffer(GL_RENDERBUFFER, colorBufferID());
     auto eaglContext = static_cast<EAGLDevice*>(context->device())->eaglContext();

@@ -38,13 +38,10 @@ VulkanSwapchainProxy::VulkanSwapchainProxy(
 
 VulkanSwapchainProxy::~VulkanSwapchainProxy() {
   if (_renderTarget != nullptr && _outOfDate != nullptr) {
-    // The frame was acquired but never presented (for example its surface was dropped after a
-    // readback-only batch). An acquired image is only returned to the swapchain by presenting
-    // it, so flag the swapchain for a rebuild that reclaims the image.
+    // An acquired image can only be reclaimed by presenting it, so rebuild the swapchain.
     *_outOfDate = true;
   }
   if (_pendingImageAvailableSemaphore != VK_NULL_HANDLE) {
-    // The frame was acquired but never scheduled; destroy the unused semaphore.
     vkDestroySemaphore(_gpu->device(), _pendingImageAvailableSemaphore, nullptr);
     _pendingImageAvailableSemaphore = VK_NULL_HANDLE;
   }
@@ -85,17 +82,14 @@ std::shared_ptr<TextureView> VulkanSwapchainProxy::getTextureView() const {
 std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
   auto window = _presentingWindow.lock();
   if (window == nullptr) {
-    // The window that owns the swapchain is gone; its handles are dangling, so neither the
-    // cached target (it wraps destroyed images) nor a new frame may be served. The window is
-    // kept alive below for the duration of the acquisition.
+    // The window is gone and its swapchain handles are dangling.
     return nullptr;
   }
   if (_renderTarget != nullptr) {
     return _renderTarget;
   }
   if (*_swapchainGeneration != _generationValue) {
-    // The swapchain has been rebuilt since this proxy was created. The cached handles are stale;
-    // the caller must create a new Surface, matching the documented resize contract.
+    // The swapchain was rebuilt; a new Surface is required.
     return nullptr;
   }
   VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
@@ -135,26 +129,19 @@ std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
     return nullptr;
   }
 
-  // Keep the acquire semaphore for the submission-time attachAcquireWait(); it is handed to the
-  // command queue there and destroyed with the in-flight submission's fence. Assign the member
-  // only after every failure path has passed, so the defensive destroys in releaseFrame() and
-  // the destructor never see an already-destroyed handle.
+  // Assign only after all failure paths so releaseFrame() never destroys it twice.
   _pendingImageAvailableSemaphore = imageAvailableSemaphore;
   return _renderTarget;
 }
 
 void VulkanSwapchainProxy::attachAcquireWait() {
-  // Hand the acquire semaphore to the first submission that uses the frame, so every command
-  // touching the image (rendering, readback transfers, snapshot copies) waits for the
-  // acquisition. The semaphore is handed over once; later submissions of the same frame are
-  // ordered after this one by the queue. This never presents the image.
+  // The first submission using the frame waits for its acquisition.
   if (_renderTarget == nullptr || _pendingImageAvailableSemaphore == VK_NULL_HANDLE) {
     return;
   }
   auto window = _presentingWindow.lock();
   if (window == nullptr) {
-    // The window that owns the swapchain is gone; drop the frame instead of wiring dangling
-    // handles. The window is kept alive below for the duration of the wiring.
+    // The window is gone; drop the frame.
     releaseFrame();
     return;
   }
@@ -164,14 +151,11 @@ void VulkanSwapchainProxy::attachAcquireWait() {
 }
 
 void VulkanSwapchainProxy::onAttachSubmission(Context*) {
-  // A batch that uses the frame without presenting it (a snapshot copy) only waits for the
-  // acquisition; the frame stays open for later drawing.
+  // Using the frame without presenting it only waits for the acquisition.
   attachAcquireWait();
 }
 
 void VulkanSwapchainProxy::onSchedulePresentation(Context*) {
-  // The batch that presents the frame also needs the acquire wait if it is the frame's first
-  // use.
   attachAcquireWait();
   if (_renderTarget == nullptr) {
     return;
@@ -188,8 +172,7 @@ void VulkanSwapchainProxy::onSchedulePresentation(Context*) {
 }
 
 void VulkanSwapchainProxy::onPresentFrame(Context*) {
-  // The present was queued by this batch's submission; end the frame so the next use acquires a
-  // fresh image.
+  // End the presented frame so the next use acquires a new image.
   releaseFrame();
 }
 
@@ -199,8 +182,6 @@ bool VulkanSwapchainProxy::hasPendingFrame() const {
 
 void VulkanSwapchainProxy::releaseFrame() {
   if (_pendingImageAvailableSemaphore != VK_NULL_HANDLE) {
-    // The frame was acquired but its presentation was never scheduled; destroy the unused
-    // semaphore (it was never waited on, so this is safe).
     vkDestroySemaphore(_gpu->device(), _pendingImageAvailableSemaphore, nullptr);
     _pendingImageAvailableSemaphore = VK_NULL_HANDLE;
   }

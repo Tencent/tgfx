@@ -150,23 +150,21 @@ class Context {
   bool wait(const BackendSemaphore& waitSemaphore);
 
   /**
-   * Flushes all pending drawing operations for this context into a Recording object and returns
-   * it. The flush fixes the batch: the recorded commands, the window frames they use, and the
-   * window presentations requested by the surfaces drawn in this batch can no longer be changed
-   * by later recordings. A call to Context::submit is always required to ensure work is actually
-   * sent to the GPU. If signalSemaphore is not null, a new semaphore will be created and assigned
-   * to signalSemaphore. The caller is responsible for deleting the semaphore returned in
-   * signalSemaphore. Returns nullptr if there are no pending drawing operations. In that case,
-   * signalSemaphore will not be initialized, and the caller should not wait on it.
+   * Flushes all pending drawing operations for this context into a Recording object and returns it.
+   * The flush fixes the batch, including its window presentations. A call to Context::submit is
+   * always required to ensure work is actually sent to the GPU. If signalSemaphore is not null, a
+   * new semaphore will be created and assigned to signalSemaphore. The caller is responsible for
+   * deleting the semaphore returned in signalSemaphore. Returns nullptr if there are no pending
+   * drawing operations. In that case, signalSemaphore will not be initialized, and the caller
+   * should not wait on it.
    */
   std::unique_ptr<Recording> flush(BackendSemaphore* signalSemaphore = nullptr);
 
   /**
    * Submit the provided recording object to the GPU for execution. The recording must have been
-   * created by this context via a call to Context::flush(); submitting it also submits all
-   * earlier recordings of this context first, so each batch's window presentations are delivered
-   * in order, right after the batch's own commands. If the syncCpu flag is true, this function
-   * will return once the gpu has finished with all submitted work.
+   * created by this context via a call to Context::flush(). Window frames of each batch are
+   * presented after its commands. If the syncCpu flag is true, this function will return once the
+   * gpu has finished with all submitted work.
    */
   void submit(std::unique_ptr<Recording> recording, bool syncCpu = false);
 

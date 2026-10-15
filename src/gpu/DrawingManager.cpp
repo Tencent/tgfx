@@ -209,9 +209,7 @@ std::shared_ptr<RenderTargetProxy> DrawingManager::createWindowTarget(
   if (target == nullptr) {
     return nullptr;
   }
-  // Associate the target with its window: the default proxy-level presentation forwards
-  // through the window (shared-backbuffer backends), and window-backed proxies use the weak
-  // reference to fail safely once the window is gone.
+  // Lets the proxy present through the window and detect when the window is gone.
   target->setPresentingWindow(window);
   entry.target = target;
   return target;
@@ -266,10 +264,7 @@ void DrawingManager::collectWindow(std::shared_ptr<Window> window,
     return;
   }
   auto drawingBuffer = getDrawingBuffer();
-  // One presentation per window target per batch: every surface of the window shares the
-  // window's target within the batch (unified frame acquisition), so presenting it once at the
-  // end of the batch delivers the batch's frame. The proxy carries the backend presentation; the
-  // strong window reference is moved into the Recording at flush time.
+  // Present each window target once per batch.
   for (auto& pending : drawingBuffer->presentables) {
     if (pending == renderTarget) {
       return;

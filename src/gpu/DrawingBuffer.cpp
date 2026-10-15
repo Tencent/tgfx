@@ -80,9 +80,7 @@ void DrawingBuffer::deliverFrames(Context* context) {
 }
 
 bool DrawingBuffer::empty() const {
-  // Window frame usages are intentionally not part of the emptiness check: they always come with
-  // the task that uses the frame. Presentations are kept so that a batch whose drawing pass was
-  // opened on a window frame still delivers that frame.
+  // Frame usages always come with a task; a pending presentation alone keeps the batch.
   return resourceTasks.empty() && renderTasks.empty() && atlasTasks.empty() && presentables.empty();
 }
 

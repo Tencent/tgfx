@@ -42,8 +42,7 @@ class MetalDrawableProxy : public RenderTargetProxy {
   id<CAMetalDrawable> getMetalDrawable() const;
 
   /**
-   * Frame-level presentation, independent of the MetalWindow: schedules the drawable onto the
-   * upcoming command buffer at submission time.
+   * Schedules the drawable onto the upcoming command buffer.
    */
   void onSchedulePresentation(Context* context) override;
 
@@ -53,17 +52,14 @@ class MetalDrawableProxy : public RenderTargetProxy {
   void onPresentFrame(Context* context) override;
 
   /**
-   * Returns true when the current drawable has a successfully created render target; drawables
-   * without one must not be scheduled for presentation.
+   * Returns true if the current drawable has a valid render target.
    */
   bool hasRenderTarget() const {
     return _renderTarget != nullptr;
   }
 
   /**
-   * Releases the drawable and the cached render target right after the drawable has been
-   * scheduled for presentation, so the drawable is returned to the layer's rotation pool without
-   * being held across frames.
+   * Releases the drawable after it is scheduled, returning it to the layer's pool.
    */
   void releaseDrawable();
 
