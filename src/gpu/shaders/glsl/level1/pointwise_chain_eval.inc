@@ -27,12 +27,32 @@ vec3 chainDstTF(vec3 x) {
   return transferTF(x, ChainDstTF0, ChainDstTF1, ChainDstTFType);
 }
 
+#if HAS_XP >= 1
+// The operands of the XferProcessor's advanced blend pass (xp_blend_pass.inc), set by main()
+// before it evaluates slot SlotCount.
+vec4 chainXPSrc = vec4(0.0);
+vec4 chainXPDst = vec4(0.0);
+#endif
+
 // Evaluates slot `slot`, reading its fields from the uniform arrays. OP_TEXTURE slots read the
 // prefetched sample from chainLeafTex (fetched in main with statically bound samplers) and apply
 // the leaf modulation flags; every other op shares this single implementation so the op library
 // exists exactly once in the binary.
+//
+// With a dst-reading XferProcessor, slot SlotCount is the XferProcessor's advanced blend pass: an
+// OP_BLEND of chainXPSrc and chainXPDst in XPBlendMode that writes no register, so the final
+// composite shares the instruction loop's blend site instead of inlining xpBlendColors again.
 vec4 evalChainSlot(int slot) {
-  ivec4 Packed = SlotPacked[slot];
+  ivec4 Packed;
+#if HAS_XP >= 1
+  if (slot == SlotCount) {
+    Packed = ivec4(OP_BLEND, -4, -4, XPBlendMode);
+  } else {
+    Packed = SlotPacked[slot];
+  }
+#else
+  Packed = SlotPacked[slot];
+#endif
   if (Packed.x == OP_NONE) {
     return vec4(0.0);
   }
@@ -112,7 +132,15 @@ vec4 evalChainSlot(int slot) {
     return pmApplyConstColor(SlotConstColor[slot], in0, constMode);
   }
   if (Packed.x == OP_BLEND) {
-    vec4 blendResult = xpBlendColors(in0, in1, Packed.w & 0xFF);
+    vec4 blendSrc = in0;
+    vec4 blendDst = in1;
+#if HAS_XP >= 1
+    if (slot == SlotCount) {
+      blendSrc = chainXPSrc;
+      blendDst = chainXPDst;
+    }
+#endif
+    vec4 blendResult = xpBlendColors(blendSrc, blendDst, Packed.w & 0xFF);
     // Bit 8 of the selector: the two-child xfer epilogue re-multiplies by the input color's
     // alpha, which at the color root is the geometry color's alpha.
     if ((Packed.w & 0x100) != 0) {

@@ -7,6 +7,9 @@
 // blend modes composite coverage correctly as coverage*blend + (1-coverage)*dst, instead of
 // blending a coverage-premultiplied source (which is only equivalent for SrcOver-style modes).
 // Defaults to TGFX_XP_SRC_COLOR so shaders that do not set it keep their previous behavior exactly.
+// A kernel that runs the XferProcessor's advanced blend as a pass of its evaluation loop
+// (xp_blend_pass.inc) also defines TGFX_XP_DST_COLOR (the dst read ahead of the loop) and
+// TGFX_XP_BLENDED (the pass result).
 #ifndef TGFX_XP_COVERAGE
 #define TGFX_XP_COVERAGE vec4(1.0)
 #endif
@@ -14,7 +17,10 @@
 #define TGFX_XP_SRC_UNPREMUL TGFX_XP_SRC_COLOR
 #endif
 
-#if HAS_XP
+#if HAS_XP && defined(TGFX_XP_BLENDED)
+  fragColor = xpCompositeBlendPass(TGFX_XP_SRC_UNPREMUL, TGFX_XP_DST_COLOR, TGFX_XP_COVERAGE,
+                                   TGFX_XP_BLENDED);
+#elif HAS_XP
   fragColor = applyPorterDuffXP(TGFX_XP_SRC_UNPREMUL, TGFX_XP_COVERAGE);
 #else
   fragColor = TGFX_XP_SRC_COLOR;
@@ -23,3 +29,5 @@
 #undef TGFX_XP_SRC_COLOR
 #undef TGFX_XP_COVERAGE
 #undef TGFX_XP_SRC_UNPREMUL
+#undef TGFX_XP_DST_COLOR
+#undef TGFX_XP_BLENDED

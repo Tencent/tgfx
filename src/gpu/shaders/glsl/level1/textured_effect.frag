@@ -35,6 +35,7 @@ layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
 #define XP_DST_TEX_BINDING 1
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
+#include "xp_blend_pass.inc"
 
 layout(location = 0) out vec4 fragColor;
 
@@ -49,7 +50,28 @@ void main() {
   // TextureEffect post-processing: intermediate is never alpha-only or RGBAAA.
   color = color * outputColor.a;
 
+#if HAS_XP
+  // The operator and the XferProcessor's advanced blend share applyPointwiseOp's blend site: the
+  // second pass of this loop is the advanced blend (xp_blend_pass.inc). The pass count is uniform
+  // data, so the loop stays a loop instead of two inlined copies.
+  vec4 xpDst = xpReadDstColor();
+  vec4 xpBlended = vec4(0.0);
+  vec4 result = color;
+  int passCount = xpNeedsBlendPass() ? 2 : 1;
+  for (int pass = 0; pass < passCount; ++pass) {
+    bool xpPass = pass == 1;
+    vec4 value = applyPointwiseOp(0, result, xpPass, xpDst);
+    if (xpPass) {
+      xpBlended = value;
+    } else {
+      result = value;
+    }
+  }
+#define TGFX_XP_DST_COLOR xpDst
+#define TGFX_XP_BLENDED xpBlended
+#else
   vec4 result = applyPointwiseOp(0, color);
+#endif
 
 #if HAS_COVERAGE
 // Per-vertex AA coverage: keep the un-premultiplied result for the XferProcessor lerp and multiply

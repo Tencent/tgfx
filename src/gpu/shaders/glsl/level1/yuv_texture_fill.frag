@@ -63,6 +63,7 @@ layout(set = 1, binding = 2) uniform sampler2D TextureSampler_2;
 // are written against; compiling op before bind yields array/scalar type mismatches.
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
+#include "xp_blend_pass.inc"
 // The clip helper follows the XP includes.
 #include "clip_coverage.inc"
 
@@ -72,6 +73,7 @@ layout(location = 0) out vec4 fragColor;
 // The op functions are written against the array bindings above.
 #include "pointwise_op.inc"
 #include "pointwise_slot_array_unbind.inc"
+#include "pointwise_slot_loop.inc"
 
 void main() {
   vec4 outputColor = vColor;
@@ -113,15 +115,19 @@ void main() {
 
   // The bounded pointwise tail, mirroring the runtime Compose order (operators apply after the
   // texture readback, including the paint-alpha multiply above).
-  vec4 result = color;
-  for (int i = 0; i < PointwiseSlotCount; ++i) {
-    result = applyPointwiseOp(i, result);
-  }
+#if HAS_XP
+  // The XferProcessor's advanced blend runs as the tail's last pass (xp_blend_pass.inc).
+  vec4 xpDst = xpReadDstColor();
+  vec4 xpBlended;
+  vec4 result = applyPointwiseSlots(color, xpDst, xpBlended);
+#else
+  vec4 result = applyPointwiseSlots(color);
+#endif
 
   float totalCoverage = vCoverage * clipCoverage();
 
 #if HAS_XP
-  fragColor = applyPorterDuffXP(result, vec4(totalCoverage));
+  fragColor = xpCompositeBlendPass(result, xpDst, vec4(totalCoverage), xpBlended);
 #else
   fragColor = result * totalCoverage;
 #endif

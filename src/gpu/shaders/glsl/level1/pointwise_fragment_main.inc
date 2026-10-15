@@ -177,23 +177,52 @@ void main() {
   vec4 result = vec4(0.0);
   vec4 clipRegister = vec4(0.0);
   vec4 coverageRootRegister = vec4(0.0);
-  for (int i = 0; i < SlotCount; ++i) {
+  // The XferProcessor source without coverage: the root, times the coverage subtree root in the
+  // layouts without a coverage varying (see the epilogue below).
+#if GP_LAYOUT == 1 || HAS_COVERAGE
+#define CHAIN_XP_SRC_UNPREMUL result
+#else
+#define CHAIN_XP_SRC_UNPREMUL (CoverageRootIndex >= 0 ? result * coverageRootRegister : result)
+#endif
+#if HAS_XP >= 1
+  // With an advanced XferProcessor mode the loop runs one pass past the instructions: slot
+  // SlotCount blends the XferProcessor source with the dst at evalChainSlot's OP_BLEND site
+  // (xp_blend_pass.inc). The pass count stays uniform data, so the loop is not unrolled.
+  chainXPDst = xpReadDstColor();
+  vec4 xpBlended = vec4(0.0);
+  int passCount = SlotCount + (xpNeedsBlendPass() ? 1 : 0);
+#else
+  int passCount = SlotCount;
+#endif
+  for (int i = 0; i < passCount; ++i) {
+#if HAS_XP >= 1
+    if (i == SlotCount) {
+      chainXPSrc = CHAIN_XP_SRC_UNPREMUL;
+    }
+#endif
     // Bits 20-24 of the selector carry the result register + 1 (0 = dead instruction, skip the
     // write). The value is evaluated before the write, so a consumer may share a register with
     // its just-released producer.
     vec4 value = evalChainSlot(i);
-    int outRegister = (SlotPacked[i].w >> 20) & 0x1F;
-    if (outRegister != 0) {
-      int written = outRegister - 1;
-      chainResults[written] = value;
-      if (written == RootIndex) {
-        result = value;
-      }
-      if (written == ClipCoverageRegister) {
-        clipRegister = value;
-      }
-      if (written == CoverageRootIndex) {
-        coverageRootRegister = value;
+#if HAS_XP >= 1
+    if (i == SlotCount) {
+      xpBlended = value;
+    } else
+#endif
+    {
+      int outRegister = (SlotPacked[i].w >> 20) & 0x1F;
+      if (outRegister != 0) {
+        int written = outRegister - 1;
+        chainResults[written] = value;
+        if (written == RootIndex) {
+          result = value;
+        }
+        if (written == ClipCoverageRegister) {
+          clipRegister = value;
+        }
+        if (written == CoverageRootIndex) {
+          coverageRootRegister = value;
+        }
       }
     }
   }
@@ -232,7 +261,7 @@ void main() {
   }
   ellipseFinalCoverage *= clipCoverage;
 #define TGFX_XP_SRC_COLOR (result * ellipseFinalCoverage)
-#define TGFX_XP_SRC_UNPREMUL result
+#define TGFX_XP_SRC_UNPREMUL CHAIN_XP_SRC_UNPREMUL
 #define TGFX_XP_COVERAGE ellipseFinalCoverage
 #elif HAS_COVERAGE
   // A coverage subtree's root already carries the GP coverage (fed in through the -3 unit
@@ -241,7 +270,7 @@ void main() {
   finalCoverage *= deviceMask;
   finalCoverage *= clipCoverage;
 #define TGFX_XP_SRC_COLOR (result * finalCoverage)
-#define TGFX_XP_SRC_UNPREMUL result
+#define TGFX_XP_SRC_UNPREMUL CHAIN_XP_SRC_UNPREMUL
 #define TGFX_XP_COVERAGE finalCoverage
 #else
   // The no-coverage-varying layouts previously left TGFX_XP_COVERAGE at its vec4(1.0) default
@@ -255,8 +284,13 @@ void main() {
 #define TGFX_XP_SRC_COLOR                                                       \
   (CoverageRootIndex >= 0 ? result * coverageRootRegister * noCovCoverage \
                           : result * noCovCoverage)
-#define TGFX_XP_SRC_UNPREMUL (CoverageRootIndex >= 0 ? result * coverageRootRegister : result)
+#define TGFX_XP_SRC_UNPREMUL CHAIN_XP_SRC_UNPREMUL
 #define TGFX_XP_COVERAGE noCovCoverage
 #endif
+#if HAS_XP >= 1
+#define TGFX_XP_DST_COLOR chainXPDst
+#define TGFX_XP_BLENDED xpBlended
+#endif
 #include "xp_output.inc"
+#undef CHAIN_XP_SRC_UNPREMUL
 }

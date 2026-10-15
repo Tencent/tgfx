@@ -198,70 +198,83 @@ vec4 xpBlendColors(vec4 S, vec4 D, int mode) {
 // C*blend(S,D) + (1-C)*D whenever the coverage alpha does not equal its rgb or S.a < 1. These
 // branches mirror that table exactly (primary/secondary outputs and src/dst factors, final
 // clamp included); advanced modes keep the generic form, matching the runtime's
-// HandleBlendModes + coverage wrapper.
-vec4 xpBlendWithCoverage(vec4 S, vec4 D, vec4 C, int mode) {
-  if (mode == 0) {
-    // clear: D*One - C*D
-    return clamp(D - C * D, 0.0, 1.0);
-  }
-  if (mode == 1) {
-    // src: primary=S*C; dst factor OneMinusSrc1Alpha on secondary=C
-    return clamp(S * C + D * (1.0 - C.a), 0.0, 1.0);
-  }
-  if (mode == 2) {
-    // dst
-    return clamp(D, 0.0, 1.0);
-  }
-  if (mode == 3) {
-    // src-over: primary=S*C; dst factor OneMinusSrcAlpha on primary
-    return clamp(S * C + D * (1.0 - (S * C).a), 0.0, 1.0);
-  }
-  if (mode == 4) {
-    // dst-over: src factor OneMinusDstAlpha on primary
-    return clamp(S * C * (1.0 - D.a) + D, 0.0, 1.0);
-  }
-  if (mode == 5) {
-    // src-in: src factor DstAlpha on primary; dst factor OneMinusSrc1Alpha on secondary=C
-    return clamp(S * C * D.a + D * (1.0 - C.a), 0.0, 1.0);
-  }
-  if (mode == 6) {
-    // dst-in: D*One - (1-S.a)*C*D
-    return clamp(D - (1.0 - S.a) * C * D, 0.0, 1.0);
-  }
-  if (mode == 7) {
-    // src-out: src factor OneMinusDstAlpha on primary; dst factor OneMinusSrc1Alpha on secondary
-    return clamp(S * C * (1.0 - D.a) + D * (1.0 - C.a), 0.0, 1.0);
-  }
-  if (mode == 8) {
-    // dst-out: dst factor OneMinusSrcAlpha on primary
-    return clamp(D * (1.0 - (S * C).a), 0.0, 1.0);
-  }
-  if (mode == 9) {
-    // src-atop
-    return clamp(S * C * D.a + D * (1.0 - (S * C).a), 0.0, 1.0);
-  }
-  if (mode == 10) {
-    // dst-atop: secondary=(1-S.a)*C; dst factor OneMinusSrc1 (vec4)
-    return clamp(S * C * (1.0 - D.a) + D * (vec4(1.0) - (1.0 - S.a) * C), 0.0, 1.0);
-  }
-  if (mode == 11) {
-    // xor
-    return clamp(S * C * (1.0 - D.a) + D * (1.0 - (S * C).a), 0.0, 1.0);
-  }
-  if (mode == 12) {
-    // plus
-    return clamp(S * C + D, 0.0, 1.0);
-  }
-  if (mode == 13) {
-    // modulate: D*One - (vec4(1.0)-S)*C*D
-    return clamp(D - (vec4(1.0) - S) * C * D, 0.0, 1.0);
-  }
-  if (mode == 14) {
-    // screen: dst factor OneMinusSrcColor (vec4) on primary
-    return clamp(S * C + D * (vec4(1.0) - S * C), 0.0, 1.0);
-  }
-  vec4 blended = xpBlendColors(S, D, mode);
+// HandleBlendModes + coverage wrapper. Per mode:
+//    0 clear:     D*One - C*D
+//    1 src:       primary=S*C; dst factor OneMinusSrc1Alpha on secondary=C
+//    2 dst
+//    3 src-over:  primary=S*C; dst factor OneMinusSrcAlpha on primary
+//    4 dst-over:  src factor OneMinusDstAlpha on primary
+//    5 src-in:    src factor DstAlpha on primary; dst factor OneMinusSrc1Alpha on secondary=C
+//    6 dst-in:    D*One - (1-S.a)*C*D
+//    7 src-out:   src factor OneMinusDstAlpha on primary; dst factor OneMinusSrc1Alpha on
+//                 secondary
+//    8 dst-out:   dst factor OneMinusSrcAlpha on primary
+//    9 src-atop
+//   10 dst-atop:  secondary=(1-S.a)*C; dst factor OneMinusSrc1 (vec4)
+//   11 xor
+//   12 plus
+//   13 modulate:  D*One - (vec4(1.0)-S)*C*D
+//   14 screen:    dst factor OneMinusSrcColor (vec4) on primary
+//
+// The body is a macro over S, D, C and mode in scope; ADVANCED_BLEND is the advanced modes' blend
+// expression, reached only after every coefficient mode has returned. It has two expansions:
+// xpBlendWithCoverage below blends there with xpBlendColors, while xpCompositeBlendPass
+// (xp_blend_pass.inc) takes the blend its kernel's evaluation loop already computed, so that
+// kernel inlines xpBlendColors once. A kernel without the blend pass compiles the same function
+// as before; splitting it into separate coefficient and advanced functions instead measured 4%
+// slower desktop GL cold compiles for every dst-reading kernel.
+#define XP_FIRST_ADVANCED_MODE 15
+#define XP_COMPOSITE_WITH_COVERAGE(ADVANCED_BLEND) \
+  if (mode == 0) { \
+    return clamp(D - C * D, 0.0, 1.0); \
+  } \
+  if (mode == 1) { \
+    return clamp(S * C + D * (1.0 - C.a), 0.0, 1.0); \
+  } \
+  if (mode == 2) { \
+    return clamp(D, 0.0, 1.0); \
+  } \
+  if (mode == 3) { \
+    return clamp(S * C + D * (1.0 - (S * C).a), 0.0, 1.0); \
+  } \
+  if (mode == 4) { \
+    return clamp(S * C * (1.0 - D.a) + D, 0.0, 1.0); \
+  } \
+  if (mode == 5) { \
+    return clamp(S * C * D.a + D * (1.0 - C.a), 0.0, 1.0); \
+  } \
+  if (mode == 6) { \
+    return clamp(D - (1.0 - S.a) * C * D, 0.0, 1.0); \
+  } \
+  if (mode == 7) { \
+    return clamp(S * C * (1.0 - D.a) + D * (1.0 - C.a), 0.0, 1.0); \
+  } \
+  if (mode == 8) { \
+    return clamp(D * (1.0 - (S * C).a), 0.0, 1.0); \
+  } \
+  if (mode == 9) { \
+    return clamp(S * C * D.a + D * (1.0 - (S * C).a), 0.0, 1.0); \
+  } \
+  if (mode == 10) { \
+    return clamp(S * C * (1.0 - D.a) + D * (vec4(1.0) - (1.0 - S.a) * C), 0.0, 1.0); \
+  } \
+  if (mode == 11) { \
+    return clamp(S * C * (1.0 - D.a) + D * (1.0 - (S * C).a), 0.0, 1.0); \
+  } \
+  if (mode == 12) { \
+    return clamp(S * C + D, 0.0, 1.0); \
+  } \
+  if (mode == 13) { \
+    return clamp(D - (vec4(1.0) - S) * C * D, 0.0, 1.0); \
+  } \
+  if (mode == 14) { \
+    return clamp(S * C + D * (vec4(1.0) - S * C), 0.0, 1.0); \
+  } \
+  vec4 blended = ADVANCED_BLEND; \
   return C * blended + (vec4(1.0) - C) * D;
+
+vec4 xpBlendWithCoverage(vec4 S, vec4 D, vec4 C, int mode) {
+  XP_COMPOSITE_WITH_COVERAGE(xpBlendColors(S, D, mode))
 }
 
 #endif  // TGFX_XP_BLEND_COLORS_INC

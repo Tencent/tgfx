@@ -59,5 +59,6 @@ layout(set = 1, binding = NTEX) uniform sampler2D MaskTextureSampler;
 #include "xp_blend_colors.inc"
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
+#include "xp_blend_pass.inc"
 
 #include "pointwise_tiled_sampling.inc"

@@ -48,12 +48,14 @@ layout(set = 1, binding = 1) uniform sampler2D TextureSampler_1;  // noise (RGBA
 #define XP_DST_TEX_BINDING 2
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
+#include "xp_blend_pass.inc"
 
 layout(location = 0) out vec4 fragColor;
 
 #include "pointwise_slot_array_bind.inc"
 #include "pointwise_op.inc"
 #include "pointwise_slot_array_unbind.inc"
+#include "pointwise_slot_loop.inc"
 
 vec4 aotPerlinPermutation(vec2 coord) {
   return texture(TextureSampler_0, coord);
@@ -68,9 +70,16 @@ vec4 aotPerlinGradient(vec2 coord) {
 void main() {
   vec4 result = aotPerlinNoise(TransformedCoords_0, baseFrequency, stitchData,
                                NoiseType, NumOctaves, StitchTiles);
-  for (int i = 0; i < PointwiseSlotCount; ++i) {
-    result = applyPointwiseOp(i, result);
-  }
+#if HAS_XP
+  // The XferProcessor's advanced blend runs as the tail's last pass (xp_blend_pass.inc).
+  vec4 xpDst = xpReadDstColor();
+  vec4 xpBlended;
+  result = applyPointwiseSlots(result, xpDst, xpBlended);
+#define TGFX_XP_DST_COLOR xpDst
+#define TGFX_XP_BLENDED xpBlended
+#else
+  result = applyPointwiseSlots(result);
+#endif
 
 #if HAS_COVERAGE
 #define TGFX_XP_SRC_COLOR (result * vCoverage)

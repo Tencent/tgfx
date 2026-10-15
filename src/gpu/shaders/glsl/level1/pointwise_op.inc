@@ -45,28 +45,45 @@ vec3 dst_tf(int slot, vec3 x) {
 }
 
 // Applies the selected pointwise operator to a premultiplied color and returns a premultiplied color.
+#if HAS_XP >= 1
+// With xpPass set, this is instead the XferProcessor's advanced blend pass (xp_blend_pass.inc):
+// it blends `color`, the XferProcessor source, with xpDst in XPBlendMode at the OP_BLEND site, so
+// the kernel inlines xpBlendColors once. The caller keeps `slot` in range on that pass.
+vec4 applyPointwiseOp(int slot, vec4 color, bool xpPass, vec4 xpDst) {
+  int opType = xpPass ? OP_BLEND : OpType;
+#else
 vec4 applyPointwiseOp(int slot, vec4 color) {
-  if (OpType == OP_NONE) {
+  int opType = OpType;
+#endif
+  if (opType == OP_NONE) {
     return color;
   }
   vec4 result;
-  if (OpType == OP_COLOR_MATRIX) {
+  if (opType == OP_COLOR_MATRIX) {
     result = pmApplyColorMatrix(color, ColorMatrix, ColorVector);
-  } else if (OpType == OP_LUMA) {
+  } else if (opType == OP_LUMA) {
     result = pmApplyLuma(color, vec3(Kr, Kg, Kb));
-  } else if (OpType == OP_ALPHA_THRESHOLD) {
+  } else if (opType == OP_ALPHA_THRESHOLD) {
     result = pmApplyAlphaThreshold(color, Threshold);
-  } else if (OpType == OP_CONST_COLOR) {
+  } else if (opType == OP_CONST_COLOR) {
     // Matches the chain kernel's const-color op and the runtime ConstColorProcessor emission.
     result = pmApplyConstColor(ConstColorValue, color, ConstInputMode);
-  } else if (OpType == OP_BLEND) {
+  } else if (opType == OP_BLEND) {
     // Blend with a constant operand; the operand order follows the source fragment processor's
     // child position (BlendConstFirst mirrors XfermodeFragmentProcessor::Child). Select the
     // arguments before the call so the compiler inlines xpBlendColors once instead of twice
     // (one per ternary branch).
     vec4 blendSrc = BlendConstFirst != 0 ? ConstColorValue : color;
     vec4 blendDst = BlendConstFirst != 0 ? color : ConstColorValue;
-    result = xpBlendColors(blendSrc, blendDst, BlendModeValue);
+    int blendMode = BlendModeValue;
+#if HAS_XP >= 1
+    if (xpPass) {
+      blendSrc = color;
+      blendDst = xpDst;
+      blendMode = XPBlendMode;
+    }
+#endif
+    result = xpBlendColors(blendSrc, blendDst, blendMode);
   } else {  // OP_COLOR_SPACE_XFORM
     if ((CSFlags & CS_UNPREMUL) != 0) {
       float a = color.a;
