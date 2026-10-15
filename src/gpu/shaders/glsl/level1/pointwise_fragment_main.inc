@@ -4,7 +4,10 @@
 
 // Leaf fetch: plain leaves clamp to their Subset rect (full bounds = no-op). The tiled leaf, if
 // any, goes through the shared tiling math so wrap and clamp-to-border modes match the runtime.
-vec4 chainLeafFetch(CHAIN_LEAF_SAMPLER texSampler, vec3 coord, vec4 leafSubset, int leafIndex) {
+// An RGBAAA leaf (always a plain one) reads its alpha from the second area at leafAlphaStart past
+// the clamped coordinate, as GLSLTextureEffect::emitDefaultTextureCode does.
+vec4 chainLeafFetch(CHAIN_LEAF_SAMPLER texSampler, vec3 coord, vec4 leafSubset,
+                    vec2 leafAlphaStart, int leafHasRgbaaa, int leafIndex) {
   // Perspective divide: affine transforms produce z=1.0, making this a no-op (same contract as
   // QuadTextureFillShader); the tiled/subset math below then runs on the divided coordinate,
   // matching the runtime's emitPerspTextCoord ordering.
@@ -29,7 +32,15 @@ vec4 chainLeafFetch(CHAIN_LEAF_SAMPLER texSampler, vec3 coord, vec4 leafSubset, 
     texColor = tiledSeamBlend(texSampler, texColor, subsetCoord, clampedCoord, readSwizzle);
     return tiledApplyBorder(texColor, inCoord, subsetCoord, clampedCoord);
   }
-  return aotChainRead(texSampler, clamp(uv, leafSubset.xy, leafSubset.zw), readSwizzle);
+  highp vec2 finalCoord = clamp(uv, leafSubset.xy, leafSubset.zw);
+  vec4 color = aotChainRead(texSampler, finalCoord, readSwizzle);
+  if (leafHasRgbaaa != 0) {
+    vec4 alpha = aotChainRead(texSampler, finalCoord + leafAlphaStart, readSwizzle);
+    color = clamp(color, 0.0, 1.0);
+    alpha = clamp(alpha, 0.0, 1.0);
+    color = vec4(color.rgb * alpha.r, alpha.r);
+  }
+  return color;
 }
 
 layout(location = 0) out vec4 fragColor;
@@ -83,22 +94,26 @@ void main() {
   // other slot.
 #if NTEX > 0
   if (SlotPacked[0].x == OP_TEXTURE) {
-    chainLeafTex[0] = chainLeafFetch(TextureSampler_0, TransformedCoords_0, Subset, 0);
+    chainLeafTex[0] =
+        chainLeafFetch(TextureSampler_0, TransformedCoords_0, Subset, AlphaStart, HasRgbaaa, 0);
   }
 #endif
 #if NTEX > 1
   if (SlotPacked[1].x == OP_TEXTURE) {
-    chainLeafTex[1] = chainLeafFetch(TextureSampler_1, TransformedCoords_1, Subset_1, 1);
+    chainLeafTex[1] = chainLeafFetch(TextureSampler_1, TransformedCoords_1, Subset_1,
+                                     AlphaStart_1, HasRgbaaa_1, 1);
   }
 #endif
 #if NTEX > 2
   if (SlotPacked[2].x == OP_TEXTURE) {
-    chainLeafTex[2] = chainLeafFetch(TextureSampler_2, TransformedCoords_2, Subset_2, 2);
+    chainLeafTex[2] = chainLeafFetch(TextureSampler_2, TransformedCoords_2, Subset_2,
+                                     AlphaStart_2, HasRgbaaa_2, 2);
   }
 #endif
 #if NTEX > 3
   if (SlotPacked[3].x == OP_TEXTURE) {
-    chainLeafTex[3] = chainLeafFetch(TextureSampler_3, TransformedCoords_3, Subset_3, 3);
+    chainLeafTex[3] = chainLeafFetch(TextureSampler_3, TransformedCoords_3, Subset_3,
+                                     AlphaStart_3, HasRgbaaa_3, 3);
   }
 #endif
   // The three registers the epilogue consumes (root, clip coverage, coverage subtree root) are

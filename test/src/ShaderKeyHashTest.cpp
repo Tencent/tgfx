@@ -52,9 +52,9 @@ TGFX_TEST(ShaderKeyHashTest, FixedBlobVector) {
 }
 
 TGFX_TEST(ShaderKeyHashTest, StageSuffixDistinct) {
-  const auto plain = ComputeShaderKeyHash("TextureFillShader", 3, "metal");
-  const auto vert = ComputeVertexKeyHash("TextureFillShader", 3, "metal");
-  const auto frag = ComputeFragmentKeyHash("TextureFillShader", 3, "metal");
+  const auto plain = ComputeShaderKeyHash("MaskFillShader", 3, "metal");
+  const auto vert = ComputeVertexKeyHash("MaskFillShader", 3, "metal");
+  const auto frag = ComputeFragmentKeyHash("MaskFillShader", 3, "metal");
   EXPECT_FALSE(HashEquals(plain, vert.hi, vert.lo));
   EXPECT_FALSE(HashEquals(plain, frag.hi, frag.lo));
   EXPECT_FALSE(HashEquals(vert, frag.hi, frag.lo));

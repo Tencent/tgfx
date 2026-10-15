@@ -1,7 +1,6 @@
 // Shared plain-texture vertex template: position transform plus one affine texture
-// coordinate (CoordTransformMatrix_0). Used by the families whose vertex stage is exactly
-// this shape: TextureFillShader, TextureColorMatrixShader, and MaskFillShader (whose
-// coverage mask rides the same coord-transform mechanism).
+// coordinate (CoordTransformMatrix_0). Used by MaskFillShader, whose coverage mask rides the
+// coord-transform mechanism.
 #version 450
 layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
   vec4 tgfx_RTAdjust;

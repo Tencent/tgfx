@@ -173,15 +173,6 @@ struct PerlinNoiseFillInputs {
 };
 
 /**
- * Input contract of the TextureColorMatrixShader matcher rule. alphaOnly / hasRGBAAA / subset are
- * runtime uniforms, so only the transfer type shapes dimensions; the TextureEffect + ColorMatrix
- * structure checks are whole-draw rejections in Extract.
- */
-struct TextureColorMatrixInputs {
-  int xpType = -1;  // -1 = no representable XferProcessor.
-};
-
-/**
  * Input contract of the YUVTextureFillShader matcher rule. yuvFormat is the plane layout index
  * (0 = I420, 1 = NV12); unsupported formats map to -1 and are rejected in Compose so the
  * enumeration sees the same rejection as the runtime.
@@ -190,15 +181,6 @@ struct YUVTextureFillInputs {
   bool hasUVMatrix = false;
   int yuvFormat = -1;  // -1 = unsupported plane layout.
   int xpType = -1;     // -1 = no representable XferProcessor.
-};
-
-/**
- * Input contract of the DeviceSpaceTextureShader matcher rule. ALPHA_ONLY is a runtime uniform,
- * so only coverage and the transfer type shape dimensions.
- */
-struct DeviceSpaceTextureInputs {
-  bool hasCoverage = false;
-  int xpType = -1;  // -1 = no representable XferProcessor.
 };
 
 /**
@@ -218,15 +200,6 @@ struct ShapeInstancedFillInputs {
   bool hasColors = false;
   bool isCoverageAA = false;
   int xpType = -1;  // -1 = no representable XferProcessor.
-};
-
-/**
- * Input contract of the TextureFillShader matcher rule. The TextureEffect shape checks (no YUV)
- * are whole-draw rejections in Extract; alphaOnly / RGBAAA / subset are runtime uniforms.
- */
-struct TextureFillInputs {
-  int deviceMask = 0;  // 0 = no mask coverage FP, 1 = device-space mask.
-  int xpType = -1;     // -1 = no representable XferProcessor.
 };
 
 /**
@@ -291,16 +264,6 @@ struct GlassRefractionInputs {
  * rides the OpType runtime uniform, so only coverage and the transfer type shape dimensions.
  */
 struct TexturedEffectInputs {
-  bool hasCoverage = false;
-  int xpType = -1;  // -1 = no representable XferProcessor.
-};
-
-/**
- * Input contract of the PointwiseDirectShader matcher rule. The pointwise FP identity and
- * transfer-function range checks are whole-draw rejections in Extract; the operator and pipeline
- * flags are runtime uniforms.
- */
-struct PointwiseDirectInputs {
   bool hasCoverage = false;
   int xpType = -1;  // -1 = no representable XferProcessor.
 };
@@ -420,22 +383,10 @@ std::optional<RuleComposedValues> ComposeMeshFill(const MeshFillInputs& inputs);
 std::optional<RuleComposedValues> ComposePerlinNoiseFill(const PerlinNoiseFillInputs& inputs);
 
 /**
- * Pure mapping for the TextureColorMatrixShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
- */
-std::optional<RuleComposedValues> ComposeTextureColorMatrix(const TextureColorMatrixInputs& inputs);
-
-/**
  * Pure mapping for the YUVTextureFillShader rule; see ComposeRoundStrokeRect for the sharing
  * contract.
  */
 std::optional<RuleComposedValues> ComposeYUVTextureFill(const YUVTextureFillInputs& inputs);
-
-/**
- * Pure mapping for the DeviceSpaceTextureShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
- */
-std::optional<RuleComposedValues> ComposeDeviceSpaceTexture(const DeviceSpaceTextureInputs& inputs);
 
 /**
  * Pure mapping for the ShapeInstancedTextureCoverageShader rule; see ComposeRoundStrokeRect for
@@ -449,12 +400,6 @@ std::optional<RuleComposedValues> ComposeShapeInstancedTextureCoverage(
  * contract.
  */
 std::optional<RuleComposedValues> ComposeShapeInstancedFill(const ShapeInstancedFillInputs& inputs);
-
-/**
- * Pure mapping for the TextureFillShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
- */
-std::optional<RuleComposedValues> ComposeTextureFill(const TextureFillInputs& inputs);
 
 /**
  * Pure mapping for the TiledTextureFillShader rule; see ComposeRoundStrokeRect for the sharing
@@ -491,12 +436,6 @@ std::optional<RuleComposedValues> ComposeGlassRefraction(const GlassRefractionIn
  * contract.
  */
 std::optional<RuleComposedValues> ComposeTexturedEffect(const TexturedEffectInputs& inputs);
-
-/**
- * Pure mapping for the PointwiseDirectShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
- */
-std::optional<RuleComposedValues> ComposePointwiseDirect(const PointwiseDirectInputs& inputs);
 
 /**
  * Pure mapping for the AtlasTextFillShader rule; see ComposeRoundStrokeRect for the sharing

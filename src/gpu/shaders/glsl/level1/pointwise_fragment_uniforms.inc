@@ -27,6 +27,19 @@
   vec4 Subset_2;
   vec4 Subset_3;
 #endif
+#if NTEX > 0
+  // Per-leaf RGBAAA layout (Image::makeRGBAAA), named for the same structural ordinals: the
+  // TextureEffect writer sets HasRgbaaa for every leaf and AlphaStart (the alpha area's offset in
+  // texture coordinates) for an RGBAAA one. Sampler-only children write HasRgbaaa = 0 too.
+  vec2 AlphaStart;
+  int HasRgbaaa;
+  vec2 AlphaStart_1;
+  int HasRgbaaa_1;
+  vec2 AlphaStart_2;
+  int HasRgbaaa_2;
+  vec2 AlphaStart_3;
+  int HasRgbaaa_3;
+#endif
   // Shared ColorSpaceXform parameters; at most one slot per chain may be OP_COLOR_SPACE_XFORM.
   int ChainCSFlags;
   vec4 ChainSrcTF0;

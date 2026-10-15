@@ -571,7 +571,7 @@ TGFX_TEST(AOTPerformanceMatrixTest, PerFamilyMatrix) {
 //   (a) bundle + decomposition ON  — the tree is rewritten into the chain kernel (offscreen plan
 //       route, interpreter execution);
 //   (b) bundle + decomposition OFF — the original tree reaches the matcher, so the dedicated
-//       families (TextureColorMatrix / TexturedEffect shapes) serve it;
+//       families (QuadTextureFill / TexturedEffect shapes) serve it;
 //   (c) runtime (no bundle)        — JIT reference.
 // (b) vs (c) validates the dedicated route; (a) vs (b) is the chain route's total premium
 // (plan-task overhead + interpreter execution). Route evidence prints with each row so the

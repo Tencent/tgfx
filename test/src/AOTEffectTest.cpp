@@ -1263,6 +1263,51 @@ TGFX_TEST(AOTEffectTest, DeviceSpaceLinearChainUsesChainKernel) {
   EXPECT_FALSE(AOTEffectDecomposer::Decompose(twoDeviceLeaves, &refused));
 }
 
+// The chain takes an alpha-only device-space source and an RGBAAA plain source as leaves. The
+// rebuilt leaf children keep the properties the kernel reads per leaf: the alpha-only proxy (its
+// slot selector splat) and the RGBAAA alpha-area offset (AlphaStart / HasRgbaaa).
+TGFX_TEST(AOTEffectTest, ChainLeavesTakeAlphaOnlyDeviceAndRgbaaaSources) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  BlockAllocator allocator;
+  auto alphaProxy = context->proxyProvider()->createTextureProxy({}, 4, 4, PixelFormat::ALPHA_8);
+  ASSERT_NE(alphaProxy, nullptr);
+  ASSERT_TRUE(alphaProxy->isAlphaOnly());
+  auto rgbaProxy = context->proxyProvider()->createTextureProxy({}, 8, 4, PixelFormat::RGBA_8888);
+  ASSERT_NE(rgbaProxy, nullptr);
+  auto device = DeviceSpaceTextureEffect::Make(&allocator, alphaProxy, Matrix::I());
+  auto rgbaaa = TextureEffect::MakeRGBAAA(&allocator, rgbaProxy, {}, Point::Make(4, 0));
+  auto colorMatrix = ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix);
+  ASSERT_NE(device, nullptr);
+  ASSERT_NE(rgbaaa, nullptr);
+  ASSERT_NE(colorMatrix, nullptr);
+  struct Case {
+    const FragmentProcessor* source;
+    bool device;
+  };
+  for (const auto& testCase : {Case{device.get(), true}, Case{rgbaaa.get(), false}}) {
+    SCOPED_TRACE(testCase.device ? "device-alpha-only" : "rgbaaa");
+    std::vector<const FragmentProcessor*> processors = {testCase.source, colorMatrix.get()};
+    AOTEffectGraph graph;
+    ASSERT_TRUE(AOTEffectDecomposer::Lower(processors, &graph));
+    AOTEffectPlan plan;
+    ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+    ASSERT_EQ(plan.passes.size(), 1u);
+    EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
+    EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
+    auto processor = AOTChainBuilder::BuildFPForPass(&allocator, graph, plan.passes[0]);
+    ASSERT_NE(processor, nullptr);
+    ASSERT_EQ(processor->name(), "AOTPointwiseChainProcessor");
+    auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
+    EXPECT_EQ(chain->deviceLeafIndex(), testCase.device ? 0 : -1);
+    ASSERT_EQ(chain->childProcessor(0)->name(), "TextureEffect");
+    auto leaf = static_cast<const TextureEffect*>(chain->childProcessor(0));
+    EXPECT_EQ(leaf->isAlphaOnly(), testCase.device);
+    EXPECT_EQ(leaf->hasRGBAAA(), !testCase.device);
+  }
+}
+
 // A multi-pass plan never starts a pass at an AlphaThreshold, because the pass boundary would
 // round the threshold's input to RGBA8. A chain pass holds the source plus 31 operators; the
 // planner ends a pass early so the threshold joins the operator that feeds it, and when no earlier

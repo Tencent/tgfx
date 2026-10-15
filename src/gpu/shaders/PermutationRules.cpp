@@ -20,7 +20,6 @@
 #include "gpu/shaders/level1/AtlasTextFillShader.h"
 #include "gpu/shaders/level1/ComplexEllipseFillShader.h"
 #include "gpu/shaders/level1/ComplexNonAARRectFillShader.h"
-#include "gpu/shaders/level1/DeviceSpaceTextureShader.h"
 #include "gpu/shaders/level1/EllipseFillShader.h"
 #include "gpu/shaders/level1/GaussianBlur1DShader.h"
 #include "gpu/shaders/level1/GlassRefractionShader.h"
@@ -32,7 +31,6 @@
 #include "gpu/shaders/level1/NonAARRectFillShader.h"
 #include "gpu/shaders/level1/PerlinNoiseFillShader.h"
 #include "gpu/shaders/level1/PointwiseChainShader.h"
-#include "gpu/shaders/level1/PointwiseDirectShader.h"
 #include "gpu/shaders/level1/PointwiseGraphShader.h"
 #include "gpu/shaders/level1/QuadColorFillShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
@@ -40,8 +38,6 @@
 #include "gpu/shaders/level1/ShapeInstancedFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedTextureCoverageShader.h"
 #include "gpu/shaders/level1/SolidColorFillShader.h"
-#include "gpu/shaders/level1/TextureColorMatrixShader.h"
-#include "gpu/shaders/level1/TextureFillShader.h"
 #include "gpu/shaders/level1/TexturedEffectShader.h"
 #include "gpu/shaders/level1/TiledTextureFillShader.h"
 #include "gpu/shaders/level1/YUVTextureFillShader.h"
@@ -477,34 +473,6 @@ static std::set<std::pair<uint32_t, uint32_t>> EnumeratePerlinNoiseFillReachable
   return result;
 }
 
-std::optional<RuleComposedValues> ComposeTextureColorMatrix(
-    const TextureColorMatrixInputs& inputs) {
-  if (inputs.xpType < 0) {
-    return std::nullopt;
-  }
-  using D = TextureColorMatrixShader::D;
-  RuleComposedValues values;
-  values.fragValues.resize(D::COUNT);
-  // alphaOnly / hasRGBAAA / subset are runtime uniforms, not permutation dimensions.
-  values.fragValues[D::HAS_XP] = inputs.xpType;
-  return values;
-}
-
-static std::set<std::pair<uint32_t, uint32_t>> EnumerateTextureColorMatrixReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int xpType = -1; xpType <= 2; ++xpType) {
-    TextureColorMatrixInputs inputs;
-    inputs.xpType = xpType;
-    auto composed = ComposeTextureColorMatrix(inputs);
-    if (!composed) {
-      continue;
-    }
-    auto fragIndex = TextureColorMatrixShader::D::domain().encode(composed->fragValues);
-    result.insert({0, fragIndex});
-  }
-  return result;
-}
-
 std::optional<RuleComposedValues> ComposeYUVTextureFill(const YUVTextureFillInputs& inputs) {
   if (inputs.xpType < 0 || inputs.yuvFormat < 0) {
     return std::nullopt;
@@ -537,42 +505,6 @@ static std::set<std::pair<uint32_t, uint32_t>> EnumerateYUVTextureFillReachable(
         auto fragIndex = YUVTextureFillShader::FD::domain().encode(composed->fragValues);
         result.insert({vertIndex, fragIndex});
       }
-    }
-  }
-  return result;
-}
-
-std::optional<RuleComposedValues> ComposeDeviceSpaceTexture(
-    const DeviceSpaceTextureInputs& inputs) {
-  if (inputs.xpType < 0) {
-    return std::nullopt;
-  }
-  using VD = DeviceSpaceTextureShader::VD;
-  using FD = DeviceSpaceTextureShader::FD;
-  RuleComposedValues values;
-  values.vertValues.resize(VD::COUNT);
-  values.vertValues[VD::HAS_COVERAGE] = inputs.hasCoverage ? 1 : 0;
-  values.fragValues.resize(FD::COUNT);
-  // ALPHA_ONLY is a runtime uniform (AlphaOnly), not a permutation dimension.
-  values.fragValues[FD::HAS_COVERAGE] = values.vertValues[VD::HAS_COVERAGE];
-  values.fragValues[FD::HAS_XP] = inputs.xpType;
-  return values;
-}
-
-static std::set<std::pair<uint32_t, uint32_t>> EnumerateDeviceSpaceTextureReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
-    for (int xpType = -1; xpType <= 2; ++xpType) {
-      DeviceSpaceTextureInputs inputs;
-      inputs.hasCoverage = hasCoverage != 0;
-      inputs.xpType = xpType;
-      auto composed = ComposeDeviceSpaceTexture(inputs);
-      if (!composed) {
-        continue;
-      }
-      auto vertIndex = DeviceSpaceTextureShader::VD::domain().encode(composed->vertValues);
-      auto fragIndex = DeviceSpaceTextureShader::FD::domain().encode(composed->fragValues);
-      result.insert({vertIndex, fragIndex});
     }
   }
   return result;
@@ -653,36 +585,6 @@ static std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedFillReacha
         auto fragIndex = ShapeInstancedFillShader::FD::domain().encode(composed->fragValues);
         result.insert({vertIndex, fragIndex});
       }
-    }
-  }
-  return result;
-}
-
-std::optional<RuleComposedValues> ComposeTextureFill(const TextureFillInputs& inputs) {
-  if (inputs.xpType < 0) {
-    return std::nullopt;
-  }
-  using FD = TextureFillShader::FD;
-  RuleComposedValues values;
-  values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_XP] = inputs.xpType;
-  values.fragValues[FD::HAS_DEVICE_MASK] = inputs.deviceMask;
-  return values;
-}
-
-static std::set<std::pair<uint32_t, uint32_t>> EnumerateTextureFillReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int deviceMask = 0; deviceMask <= 1; ++deviceMask) {
-    for (int xpType = -1; xpType <= 2; ++xpType) {
-      TextureFillInputs inputs;
-      inputs.deviceMask = deviceMask;
-      inputs.xpType = xpType;
-      auto composed = ComposeTextureFill(inputs);
-      if (!composed) {
-        continue;
-      }
-      auto fragIndex = TextureFillShader::FD::domain().encode(composed->fragValues);
-      result.insert({0, fragIndex});
     }
   }
   return result;
@@ -889,40 +791,6 @@ static std::set<std::pair<uint32_t, uint32_t>> EnumerateTexturedEffectReachable(
       }
       auto vertIndex = TexturedEffectShader::VD::domain().encode(composed->vertValues);
       auto fragIndex = TexturedEffectShader::D::domain().encode(composed->fragValues);
-      result.insert({vertIndex, fragIndex});
-    }
-  }
-  return result;
-}
-
-std::optional<RuleComposedValues> ComposePointwiseDirect(const PointwiseDirectInputs& inputs) {
-  if (inputs.xpType < 0) {
-    return std::nullopt;
-  }
-  using VD = PointwiseDirectShader::VD;
-  using FD = PointwiseDirectShader::FD;
-  RuleComposedValues values;
-  values.vertValues.resize(VD::COUNT);
-  values.vertValues[VD::HAS_COVERAGE] = inputs.hasCoverage ? 1 : 0;
-  values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_XP] = inputs.xpType;
-  values.fragValues[FD::HAS_COVERAGE] = values.vertValues[VD::HAS_COVERAGE];
-  return values;
-}
-
-static std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseDirectReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
-    for (int xpType = -1; xpType <= 2; ++xpType) {
-      PointwiseDirectInputs inputs;
-      inputs.hasCoverage = hasCoverage != 0;
-      inputs.xpType = xpType;
-      auto composed = ComposePointwiseDirect(inputs);
-      if (!composed) {
-        continue;
-      }
-      auto vertIndex = PointwiseDirectShader::VD::domain().encode(composed->vertValues);
-      auto fragIndex = PointwiseDirectShader::FD::domain().encode(composed->fragValues);
       result.insert({vertIndex, fragIndex});
     }
   }
@@ -1187,23 +1055,14 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   if (shaderName == "PerlinNoiseFillShader") {
     return EnumeratePerlinNoiseFillReachable();
   }
-  if (shaderName == "TextureColorMatrixShader") {
-    return EnumerateTextureColorMatrixReachable();
-  }
   if (shaderName == "YUVTextureFillShader") {
     return EnumerateYUVTextureFillReachable();
-  }
-  if (shaderName == "DeviceSpaceTextureShader") {
-    return EnumerateDeviceSpaceTextureReachable();
   }
   if (shaderName == "ShapeInstancedTextureCoverageShader") {
     return EnumerateShapeInstancedTextureCoverageReachable();
   }
   if (shaderName == "ShapeInstancedFillShader") {
     return EnumerateShapeInstancedFillReachable();
-  }
-  if (shaderName == "TextureFillShader") {
-    return EnumerateTextureFillReachable();
   }
   if (shaderName == "TiledTextureFillShader") {
     return EnumerateTiledTextureFillReachable();
@@ -1222,9 +1081,6 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
   }
   if (shaderName == "TexturedEffectShader") {
     return EnumerateTexturedEffectReachable();
-  }
-  if (shaderName == "PointwiseDirectShader") {
-    return EnumeratePointwiseDirectReachable();
   }
   if (shaderName == "AtlasTextFillShader") {
     return EnumerateAtlasTextFillReachable();

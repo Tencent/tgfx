@@ -47,14 +47,16 @@ bool AOTChainBuilder::IsChainCompatibleTiledMode(TiledTextureShaderMode mode) {
 namespace {
 
 // Rebuilds the texture processor of one TextureSource node: a plain or tiled leaf sampling through
-// its resolved sampler state, or the stand-in leaf of a device-space source. Every planner refuses
-// RGBAAA sources.
+// its resolved sampler state, or the stand-in leaf of a device-space source. Only a plain leaf may
+// carry the RGBAAA layout: its rebuilt TextureEffect keeps the alpha-area offset and writes it to
+// the kernel's per-leaf AlphaStart / HasRgbaaa fields.
 static PlacementPtr<FragmentProcessor> BuildTextureLeafFP(BlockAllocator* allocator,
                                                           const AOTEffectNode* node) {
   auto parameters = node != nullptr && node->kind == AOTEffectKind::TextureSource
                         ? std::get_if<AOTTextureParameters>(&node->parameters)
                         : nullptr;
-  if (parameters == nullptr || parameters->hasRGBAAA) {
+  if (parameters == nullptr ||
+      (parameters->hasRGBAAA && parameters->samplingKind != AOTTextureSamplingKind::Plain)) {
     return nullptr;
   }
   if (parameters->samplingKind == AOTTextureSamplingKind::Device) {
@@ -95,7 +97,8 @@ static PlacementPtr<FragmentProcessor> BuildTextureLeafFP(BlockAllocator* alloca
                        sampling, parameters->constraint};
   args.sampleArea = parameters->subset;
   auto uvMatrix = parameters->uvMatrix;
-  return TextureEffect::Make(allocator, parameters->textureProxy, args, &uvMatrix);
+  return TextureEffect::MakeRGBAAA(allocator, parameters->textureProxy, args,
+                                   parameters->alphaStart, &uvMatrix);
 }
 
 static bool BuildPointwiseSlot(const AOTEffectGraph& graph, const AOTEffectNode* node,
@@ -320,19 +323,27 @@ struct ChainLayout {
 };
 
 // Whether a texture node's parameters describe a leaf the chain kernel samples itself: a resolved
-// plain leaf, a device-space leaf (sampled through DeviceLeafCoordMatrix), or a tiled leaf whose
-// shader wrap modes the kernel's single-tap path implements. YUV planes and RGBAAA sources need
-// their own kernels.
+// plain leaf (RGBAAA included), a device-space leaf (sampled through DeviceLeafCoordMatrix), or a
+// tiled leaf whose shader wrap modes the kernel's single-tap path implements. YUV planes need their
+// own kernel.
 static bool IsChainTextureLeaf(const AOTTextureParameters& parameters) {
-  if (parameters.textureProxy == nullptr || parameters.isYUV || parameters.hasRGBAAA) {
+  if (parameters.textureProxy == nullptr || parameters.isYUV) {
     return false;
   }
   if (parameters.samplingKind == AOTTextureSamplingKind::Plain) {
-    return true;
+    // The kernel splats an alpha-only leaf's .r after the RGBAAA merge, while the runtime reads
+    // the merged .a; an RGBAAA image is never alpha-only (RGBAAAImage::MakeFrom), so the
+    // combination is refused instead of implemented.
+    return !(parameters.hasRGBAAA && parameters.isAlphaOnly);
+  }
+  if (parameters.hasRGBAAA) {
+    return false;
   }
   if (parameters.samplingKind == AOTTextureSamplingKind::Device) {
-    // The same source shapes the device-space linear route always served: an affine RGBA source.
-    return !parameters.isAlphaOnly && !parameters.hasPerspective;
+    // An alpha-only source takes the same slot selector bits as a plain alpha-only leaf. The
+    // kernel, like the runtime effect, uses the mapped coordinate without a perspective divide,
+    // and the leaf keeps refusing projective matrices.
+    return !parameters.hasPerspective;
   }
   if (parameters.samplingKind != AOTTextureSamplingKind::Tiled) {
     return false;

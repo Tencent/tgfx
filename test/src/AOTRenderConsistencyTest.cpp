@@ -558,7 +558,6 @@ static void ExpectPlainReadFormatRefusedWithoutWrongPixels(PixelFormat format) {
       EXPECT_GT(cache->fallbackCount(PrecompiledFallbackReason::UnsupportedTextureRead), 0u);
       for (const auto& hit : cache->hitRecords()) {
         EXPECT_NE(hit.shaderName, "QuadTextureFillShader");
-        EXPECT_NE(hit.shaderName, "TextureFillShader");
       }
     }
     auto info = ImageInfo::Make(8, 8, ColorType::RGBA_8888, AlphaType::Premultiplied);
@@ -1507,8 +1506,8 @@ TGFX_TEST(AOTRenderConsistencyTest, GaussianBlurTileModes) {
                               height);
 }
 
-// Color-space conversions into a Display-P3 surface: exercises the color-space operator of
-// PointwiseDirectShader and TexturedEffectShader, whose seven pipeline steps are selected by the
+// Color-space conversions into a Display-P3 surface: exercises the color-space operator of the
+// pointwise chain kernel and TexturedEffectShader, whose seven pipeline steps are selected by the
 // CSFlags runtime uniform. A precompiled variant that reads a flag differently from the runtime
 // codegen would show up as a byte mismatch here.
 TGFX_TEST(AOTRenderConsistencyTest, ColorSpaceXformModes) {
@@ -1863,6 +1862,143 @@ TGFX_TEST(AOTRenderConsistencyTest, TexturedEffect2D) {
   EXPECT_EQ(candidateStats.draws.offscreenTargets, 0u);
   EXPECT_EQ(candidateStats.draws.materializedEdges, 0u);
   ExpectBitmapsIdentical("textured-effect-2d", candidate, reference, width, height);
+}
+
+struct ChainServedRenderStats {
+  uint32_t noMatchingRule = 0;
+  AOTDrawStats draws = {};
+  ProgramCacheStats programs = {};
+  std::vector<std::string> shaders = {};
+};
+
+// Draws paint over a non-AA triangle. DefaultGeometryProcessor carries no coverage attribute for
+// it: the image-fill shape the removed TextureFillShader / TextureColorMatrixShader families
+// served, which the pointwise chain kernel serves now. The surface must exceed the 162-pixel
+// rasterization threshold (PathTriangulator::ShouldTriangulatePath), or the path becomes a
+// coverage mask texture instead of triangles.
+static void RenderNonAAPathOnce(const Paint& paint, int width, int height, bool useBundle,
+                                Bitmap* outBitmap, ChainServedRenderStats* outStats) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  if (useBundle) {
+    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+  } else {
+    cache->unload();
+  }
+  ScopedAOTStatsPause statsPause(context, !useBundle);
+  cache->setDiagnosticRecordingEnabled(true);
+  cache->resetStats();
+  context->globalCache()->clearPrograms();
+  context->globalCache()->resetProgramStats();
+  auto surface = Surface::Make(context, width, height);
+  ASSERT_TRUE(surface != nullptr);
+  auto w = static_cast<float>(width);
+  auto h = static_cast<float>(height);
+  Path path = {};
+  path.moveTo(4, 4);
+  path.lineTo(w - 4, 12);
+  path.lineTo(20, h - 4);
+  path.close();
+  Paint nonAAPaint = paint;
+  nonAAPaint.setAntiAlias(false);
+  surface->getCanvas()->drawPath(path, nonAAPaint);
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(outBitmap->allocPixels(width, height));
+  auto* pixels = outBitmap->lockPixels();
+  ASSERT_TRUE(pixels != nullptr);
+  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+  outBitmap->unlockPixels();
+  outStats->noMatchingRule = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
+  outStats->draws = cache->drawStats();
+  outStats->programs = context->globalCache()->programStats();
+  for (const auto& hit : cache->hitRecords()) {
+    outStats->shaders.push_back(hit.shaderName);
+  }
+  cache->setDiagnosticRecordingEnabled(false);
+  if (useBundle) {
+    cache->unload();
+  }
+  context->globalCache()->clearPrograms();
+}
+
+static void ExpectServedByChain(const char* label, const ChainServedRenderStats& stats) {
+  EXPECT_EQ(stats.noMatchingRule, 0u) << label;
+  EXPECT_EQ(stats.programs.programBuilderCreations, 0u) << label;
+  EXPECT_EQ(stats.draws.droppedDraws, 0u) << label;
+  EXPECT_GE(stats.draws.completeAOTDraws, 1u) << label;
+  EXPECT_EQ(stats.draws.atomicFallbacks, 0u) << label;
+  EXPECT_NE(std::find(stats.shaders.begin(), stats.shaders.end(), "PointwiseChainShader"),
+            stats.shaders.end())
+      << label;
+}
+
+// Image fills on the coverage-free DefaultGP form: plain, with a color matrix (the two shapes the
+// removed TextureFill / TextureColorMatrix kernels served), and from an RGBAAA image, whose alpha
+// area the chain leaf now reads through its AlphaStart / HasRgbaaa uniforms.
+TGFX_TEST(AOTRenderConsistencyTest, NonAAImageFillsUseChainKernel) {
+  SKIP_ON_SWIFTSHADER_ENV();
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_TRUE(image != nullptr);
+  auto rgbaaaSource = MakeImage("resources/apitest/rgbaaa.png");
+  ASSERT_TRUE(rgbaaaSource != nullptr);
+  auto rgbaaa = rgbaaaSource->makeRGBAAA(512, 512, 512, 0);
+  ASSERT_TRUE(rgbaaa != nullptr);
+  std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+  struct Case {
+    const char* label;
+    std::shared_ptr<Image> image;
+    std::shared_ptr<ColorFilter> colorFilter;
+    Matrix shaderMatrix;
+  };
+  std::vector<Case> cases = {
+      {"nonaa-image", image, nullptr, Matrix::I()},
+      {"nonaa-image-matrix", image, ColorFilter::Matrix(swapRedBlue), Matrix::I()},
+      {"nonaa-rgbaaa", rgbaaa, nullptr, Matrix::MakeScale(0.25f)},
+      {"nonaa-rgbaaa-matrix", rgbaaa, ColorFilter::Matrix(swapRedBlue), Matrix::MakeScale(0.25f)},
+  };
+  for (const auto& testCase : cases) {
+    Paint paint = {};
+    paint.setShader(Shader::MakeImageShader(testCase.image)->makeWithMatrix(testCase.shaderMatrix));
+    paint.setColorFilter(testCase.colorFilter);
+    Bitmap reference = {};
+    Bitmap candidate = {};
+    ChainServedRenderStats referenceStats = {};
+    ChainServedRenderStats candidateStats = {};
+    RenderNonAAPathOnce(paint, 256, 256, false, &reference, &referenceStats);
+    RenderNonAAPathOnce(paint, 256, 256, true, &candidate, &candidateStats);
+    ExpectServedByChain(testCase.label, candidateStats);
+    ExpectBitmapsNear(testCase.label, candidate, reference, 256, 256, ExperimentTolerance(1));
+  }
+}
+
+// drawImage of an RGBAAA image with a color filter: the TexturedEffect fast path refuses RGBAAA
+// sources, so the draw reaches the chain kernel, which reads the alpha area per leaf.
+TGFX_TEST(AOTRenderConsistencyTest, RgbaaaImageWithColorFilterUsesChainKernel) {
+  SKIP_ON_SWIFTSHADER_ENV();
+  auto source = MakeImage("resources/apitest/rgbaaa.png");
+  ASSERT_TRUE(source != nullptr);
+  auto image = source->makeRGBAAA(512, 512, 512, 0);
+  ASSERT_TRUE(image != nullptr);
+  std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+  auto colorFilter = ColorFilter::Matrix(swapRedBlue);
+  int width = image->width();
+  int height = image->height();
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  ColorFilterRenderStats referenceStats = {};
+  ColorFilterRenderStats candidateStats = {};
+  RenderImageWithColorFilterOnce(image, colorFilter, width, height, false, true, false, false,
+                                 &reference, &referenceStats);
+  RenderImageWithColorFilterOnce(image, colorFilter, width, height, true, true, false, false,
+                                 &candidate, &candidateStats);
+  EXPECT_EQ(candidateStats.noMatchingRule, 0u);
+  EXPECT_EQ(candidateStats.programs.programBuilderCreations, 0u);
+  EXPECT_EQ(candidateStats.draws.droppedDraws, 0u);
+  EXPECT_EQ(candidateStats.draws.completeAOTDraws, 1u);
+  ExpectBitmapsNear("rgbaaa-image-color-filter", candidate, reference, width, height,
+                    ExperimentTolerance(1));
 }
 
 // The decomposition switch must gate every entry point, including the direct-draw rewrite in
@@ -2352,6 +2488,38 @@ TGFX_TEST(AOTRenderConsistencyTest, OverBudgetOffscreenRotatedUVRunsMultiPass) {
   // Source plus 32 matrices: the first chain pass carries 31, the second the last one.
   ExpectOverBudgetOffscreenFillRunsMultiPass(context, cache, buildTree,
                                              "over-budget-offscreen-rotated-uv", 2, 1);
+}
+
+// A device-space alpha-only source is a chain leaf like an RGBA one: its slot selector splats the
+// sample's .r and multiplies by the full input color, the runtime alpha-only readback
+// (sample.a * inputColor), so the fill runs as one chain pass that matches the runtime.
+TGFX_TEST(AOTRenderConsistencyTest, DeviceSpaceAlphaOnlyLeafMatchesRuntime) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto maskSurface = Surface::Make(context, 64, 64, true);
+  ASSERT_NE(maskSurface, nullptr);
+  {
+    ScopedAOTStatsPause pause(context, true);
+    Paint paint = {};
+    paint.setShader(Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(64, 64),
+                                               {Color::Transparent(), Color::Black()}));
+    maskSurface->getCanvas()->drawRect(Rect::MakeWH(64, 64), paint);
+    context->flushAndSubmit(true);
+  }
+  auto source = context->proxyProvider()->wrapExternalTexture(maskSurface->getBackendTexture());
+  ASSERT_NE(source, nullptr);
+  ASSERT_TRUE(source->isAlphaOnly());
+  const std::array<float, 20> tint = {0.2f, 0, 0, 0, 0.6f, 0, 0.5f, 0, 0,    0.1f,
+                                      0,    0, 1, 0, 0,    0, 0,    0, 0.8f, 0};
+  auto buildTree = [&](BlockAllocator* allocator) -> PlacementPtr<FragmentProcessor> {
+    auto processor = DeviceSpaceTextureEffect::Make(allocator, source, Matrix::I());
+    return FragmentProcessor::Compose(allocator, std::move(processor),
+                                      ColorMatrixFragmentProcessor::Make(allocator, tint));
+  };
+  ExpectOverBudgetOffscreenFillRunsMultiPass(context, cache, buildTree,
+                                             "device-space-alpha-only-leaf", 1, 1);
 }
 
 // F12 execution-failure contract: a plan task that passed the prepare phase must stop cleanly

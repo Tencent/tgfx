@@ -60,7 +60,6 @@
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedTextureCoverageShader.h"
-#include "gpu/shaders/level1/TextureFillShader.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ColorFilter.h"
@@ -305,23 +304,27 @@ TGFX_TEST(ShaderPermutationTest, DefineDimsMacro) {
 
 TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
   auto& factories = ShaderRegistry::All();
-  bool foundTextureFill = false;
+  bool foundMaskFill = false;
   for (auto& factory : factories) {
     auto shader = factory();
     auto shaderInfo = shader->info();
-    if (shaderInfo.name == TextureFillShader::Name()) {
-      foundTextureFill = true;
+    // The chain kernel serves the families removed from the registry.
+    EXPECT_NE(shaderInfo.name, "TextureFillShader");
+    EXPECT_NE(shaderInfo.name, "TextureColorMatrixShader");
+    EXPECT_NE(shaderInfo.name, "DeviceSpaceTextureShader");
+    EXPECT_NE(shaderInfo.name, "PointwiseDirectShader");
+    if (shaderInfo.name == "MaskFillShader") {
+      foundMaskFill = true;
       EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 1u);
       EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 0u);
-      // FragDims: HAS_XP(int3) + HAS_DEVICE_MASK(bool) = 6 permutations. AARect clipping is a
-      // runtime uniform (Rect / HasClip), not a compile-time dimension.
-      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 6u);
-      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 2u);
+      // FragDims: HAS_XP(int3) = 3 permutations.
+      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 3u);
+      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 1u);
       EXPECT_EQ(shaderInfo.vertexFile, "level1/plain_texture.vert");
-      EXPECT_EQ(shaderInfo.fragmentFile, "level1/texture_fill.frag");
+      EXPECT_EQ(shaderInfo.fragmentFile, "level1/mask_fill.frag");
     }
   }
-  EXPECT_TRUE(foundTextureFill);
+  EXPECT_TRUE(foundMaskFill);
 }
 
 TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
@@ -622,13 +625,6 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureLocalMaskRejectsInvertedCoverage) {
       EXPECT_EQ(match->shaderName, "QuadTextureFillShader");
     }
   }
-}
-
-TGFX_TEST(ShaderPermutationTest, TextureFillVertexDomainIsInvariant) {
-  auto domain = TextureFillShader::VD::domain();
-  EXPECT_EQ(domain.dimensionCount(), 0u);
-  EXPECT_EQ(domain.totalCount(), 1u);
-  EXPECT_EQ(TextureFillShader::EncodeVertex(), 0u);
 }
 
 static void ExpectBundleEntryCounts(const PrecompiledShaderCache& cache,
