@@ -19,11 +19,11 @@
 #include "analytic_clip_math.inc"
 
 // ColorSpaceXform transfer functions bound to the shared chain-wide parameter block.
-float chainSrcTF(float x) {
+vec3 chainSrcTF(vec3 x) {
   return transferTF(x, ChainSrcTF0, ChainSrcTF1, ChainSrcTFType);
 }
 
-float chainDstTF(float x) {
+vec3 chainDstTF(vec3 x) {
   return transferTF(x, ChainDstTF0, ChainDstTF1, ChainDstTFType);
 }
 
@@ -164,9 +164,7 @@ vec4 evalChainSlot(int slot) {
     color = (a > 0.0) ? vec4(color.rgb / a, a) : vec4(0.0);
   }
   if ((ChainCSFlags & CS_LINEARIZE) != 0) {
-    color.r = chainSrcTF(color.r);
-    color.g = chainSrcTF(color.g);
-    color.b = chainSrcTF(color.b);
+    color.rgb = chainSrcTF(color.rgb);
   }
   if ((ChainCSFlags & CS_SRC_OOTF) != 0) {
     float srcY = dot(color.rgb, ChainSrcOOTF.rgb);
@@ -180,9 +178,7 @@ vec4 evalChainSlot(int slot) {
     color.rgb *= sign(dstY) * pow(abs(dstY), ChainDstOOTF.a);
   }
   if ((ChainCSFlags & CS_ENCODE) != 0) {
-    color.r = chainDstTF(color.r);
-    color.g = chainDstTF(color.g);
-    color.b = chainDstTF(color.b);
+    color.rgb = chainDstTF(color.rgb);
   }
   if ((ChainCSFlags & CS_PREMUL) != 0) {
     color.rgb *= color.a;

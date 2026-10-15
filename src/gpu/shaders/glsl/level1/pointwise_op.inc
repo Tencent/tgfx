@@ -36,11 +36,11 @@
 #include "pointwise_math.inc"
 
 // ColorSpaceXform transfer functions bound to this slot's uniform names.
-float src_tf(int slot, float x) {
+vec3 src_tf(int slot, vec3 x) {
   return transferTF(x, SrcTF0, SrcTF1, SrcTFType);
 }
 
-float dst_tf(int slot, float x) {
+vec3 dst_tf(int slot, vec3 x) {
   return transferTF(x, DstTF0, DstTF1, DstTFType);
 }
 
@@ -73,9 +73,7 @@ vec4 applyPointwiseOp(int slot, vec4 color) {
       color = (a > 0.0) ? vec4(color.rgb / a, a) : vec4(0.0);
     }
     if ((CSFlags & CS_LINEARIZE) != 0) {
-      color.r = src_tf(slot, color.r);
-      color.g = src_tf(slot, color.g);
-      color.b = src_tf(slot, color.b);
+      color.rgb = src_tf(slot, color.rgb);
     }
     if ((CSFlags & CS_SRC_OOTF) != 0) {
       float srcY = dot(color.rgb, SrcOOTF.rgb);
@@ -89,9 +87,7 @@ vec4 applyPointwiseOp(int slot, vec4 color) {
       color.rgb *= sign(dstY) * pow(abs(dstY), DstOOTF.a);
     }
     if ((CSFlags & CS_ENCODE) != 0) {
-      color.r = dst_tf(slot, color.r);
-      color.g = dst_tf(slot, color.g);
-      color.b = dst_tf(slot, color.b);
+      color.rgb = dst_tf(slot, color.rgb);
     }
     if ((CSFlags & CS_PREMUL) != 0) {
       color.rgb *= color.a;

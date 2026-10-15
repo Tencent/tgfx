@@ -58,10 +58,6 @@ constexpr AllowedExpansion ExpansionAllowlist[] = {
      "a dst-reading XP variant blends twice: the chain's OP_BLEND instruction and the final XP "
      "composite (xpBlendWithCoverage's advanced-mode fallback). Folding the final composite into "
      "the instruction loop changes the kernel interface; tracked separately."},
-    {"transferTF", 6,
-     "the color space transform linearizes and encodes r, g and b separately. Funnelling the six "
-     "calls through a three-iteration loop measured no GL cold-compile change (within 1%), so the "
-     "per-channel form stays."},
 };
 
 const AllowedExpansion* FindAllowed(const std::string& function) {
