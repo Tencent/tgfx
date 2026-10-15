@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include <vector>
 #include "PendingImage.h"
 #include "ResourceStore.h"
@@ -155,15 +156,16 @@ class ElementWriter {
   std::string addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter, const Rect& bound,
                              const std::shared_ptr<SVGCustomWriter>& exportWriter, Context* context,
                              std::vector<PendingImage>* pendings = nullptr);
-  std::string emitFilterElement(const std::shared_ptr<ImageFilter>& imageFilter, const Rect& bound,
+  std::string emitFilterElement(const std::shared_ptr<ImageFilter>& imageFilter,
                                 const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                 Context* context, bool preserveSoftAlpha = false,
+                                const std::optional<Rect>& bound = std::nullopt,
                                 std::vector<PendingImage>* pendings = nullptr);
   bool writeFilterPrimitives(const std::shared_ptr<ImageFilter>& imageFilter,
                              ElementWriter& filterElement,
                              const std::shared_ptr<SVGCustomWriter>& exportWriter,
-                             const Rect& bound, Context* context, bool preserveSoftAlpha,
-                             std::vector<PendingImage>* pendings = nullptr);
+                             const std::optional<Rect>& bound, Context* context,
+                             bool preserveSoftAlpha, std::vector<PendingImage>* pendings = nullptr);
   void callbackBlurImageFilter(const GaussianBlurImageFilter* filter,
                                const std::shared_ptr<SVGCustomWriter>& exportWriter,
                                ElementWriter& filterElement);

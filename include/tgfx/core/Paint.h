@@ -95,8 +95,8 @@ class Paint {
 
   /**
    * Sets optional shader used to generate colors, such as gradients or image patterns. If nullptr,
-   * the solid color is used instead. The shader exists in the coordinate space of the associated
-   * surface and is unaffected by the canvas matrix.
+   * the solid color is used instead. The shader exists in the local coordinate space of the draw
+   * call, into which the sampling coordinates are mapped by the inverse of the canvas matrix.
    */
   void setShader(std::shared_ptr<Shader> newShader);
 

@@ -38,6 +38,9 @@
 
 namespace tgfx {
 
+class RRectBlurShader;
+class RRectInnerShadowShader;
+
 class PDFExportContext : public DrawContext {
  public:
   explicit PDFExportContext(ISize pageSize, PDFDocumentImpl* document,
@@ -163,6 +166,17 @@ class PDFExportContext : public DrawContext {
   void drawBlurLayer(const std::shared_ptr<Picture>& picture,
                      const std::shared_ptr<ImageFilter>& imageFilter, const Matrix& matrix,
                      const ClipStack& clip, const Brush& brush);
+
+  bool tryDrawRectByConsumingShader(const Rect& rect, const Brush& brush, const Matrix& matrix,
+                                    const ClipStack& clip, const Stroke* stroke);
+
+  bool exportDropShadowImage(const RRectBlurShader& shader, const Matrix& shaderMatrix,
+                             const Matrix& deviceMatrix, const ClipStack& clip,
+                             const Rect& restrictRect, const Brush& brush);
+
+  bool exportInnerShadowImage(const RRectInnerShadowShader& shader, const Matrix& shaderMatrix,
+                              const Matrix& deviceMatrix, const ClipStack& clip,
+                              const Rect& restrictRect, const Brush& brush);
 
   void drawPathWithFilter(const Matrix& matrix, const ClipStack& clip, const Path& originPath,
                           const Matrix& pathExtraMatrix, const Brush& originPaint);
