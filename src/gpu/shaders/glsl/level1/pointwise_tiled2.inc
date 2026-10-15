@@ -2,6 +2,13 @@
 // PointwiseChainShader and the NoiseGraph profile of PointwiseGraphShader. Pairs with
 // pointwise_tiled2_uniforms.inc.
 
+// The number of recipe sets, and the leaf that reads recipe set `recipe` (-1 = unused). Pure
+// selector reads: main() uses them to find the tiled leaves without touching the chainTiled* state.
+#define CHAIN_TILED_RECIPES 2
+int chainTiledRecipeLeaf(int recipe) {
+  return recipe == 0 ? TiledLeafIndex : TiledLeafIndex2;
+}
+
 // Loads the recipe of leafIndex into the chainTiled* state (pointwise_tiled_sampling.inc) and
 // returns true when the leaf is tiled.
 bool chainLoadTiledRecipe(int leafIndex, out bool strict) {

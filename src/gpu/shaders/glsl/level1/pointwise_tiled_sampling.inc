@@ -28,12 +28,34 @@ highp vec2 chainTiledDimension;
 // shape needs a subset-bearing tiled leaf, which the hardware wrap never produces).
 #include "texture_read_swizzle.inc"
 
-vec4 aotChainRead(CHAIN_LEAF_SAMPLER texSampler, vec2 coord, int readSwizzle) {
+#if NTEX > 0
+// Reads a plain leaf through its statically bound sampler.
+vec4 aotChainSample(CHAIN_LEAF_SAMPLER texSampler, vec2 coord, int readSwizzle) {
   return aotReadSwizzle(texture(texSampler, coord), readSwizzle);
 }
 
-vec4 tiledSeamBlend(CHAIN_LEAF_SAMPLER texSampler, vec4 texColor, vec2 subsetCoord,
-                    vec2 clampedCoord, int readSwizzle) {
+// Reads tiled leaf leafIndex's texture. Sampler arrays cannot be indexed dynamically on every
+// target, so the sampler is picked by compile-time branches on the leaf index, which is uniform
+// across the draw (main() fetches the tiled leaves in a loop over a uniform bound). The tiling
+// code around the reads (coordinate mapping, seam blend, border) then exists once for all leaves
+// instead of once per leaf: a GPU compiler inlines every call site, so per-leaf call sites used to
+// carry one copy of that code per leaf.
+vec4 aotChainRead(int leafIndex, vec2 coord, int readSwizzle) {
+  vec4 color;
+  if (leafIndex == 0) {
+    color = texture(TextureSampler_0, coord);
+  } else if (leafIndex == 1) {
+    color = texture(TextureSampler_1, coord);
+  } else if (leafIndex == 2) {
+    color = texture(TextureSampler_2, coord);
+  } else {
+    color = texture(TextureSampler_3, coord);
+  }
+  return aotReadSwizzle(color, readSwizzle);
+}
+
+vec4 tiledSeamBlend(int leafIndex, vec4 texColor, vec2 subsetCoord, vec2 clampedCoord,
+                    int readSwizzle) {
   bool repeatX = ShaderModeX == 3 && subsetCoord.x != clampedCoord.x;
   bool repeatY = ShaderModeY == 3 && subsetCoord.y != clampedCoord.y;
   if (!repeatX && !repeatY) {
@@ -44,22 +66,25 @@ vec4 tiledSeamBlend(CHAIN_LEAF_SAMPLER texSampler, vec4 texColor, vec2 subsetCoo
   float repeatCoordX = errX > 0.0 ? Clamp.x : Clamp.z;
   float repeatCoordY = errY > 0.0 ? Clamp.y : Clamp.w;
   if (repeatX && repeatY) {
-    vec4 repeatReadX = aotChainRead(texSampler, vec2(repeatCoordX, clampedCoord.y) * Dimension,
+    vec4 repeatReadX = aotChainRead(leafIndex, vec2(repeatCoordX, clampedCoord.y) * Dimension,
                                     readSwizzle);
-    vec4 repeatReadY = aotChainRead(texSampler, vec2(clampedCoord.x, repeatCoordY) * Dimension, readSwizzle);
+    vec4 repeatReadY = aotChainRead(leafIndex, vec2(clampedCoord.x, repeatCoordY) * Dimension,
+                                    readSwizzle);
     vec4 repeatReadXY =
-        aotChainRead(texSampler, vec2(repeatCoordX, repeatCoordY) * Dimension, readSwizzle);
+        aotChainRead(leafIndex, vec2(repeatCoordX, repeatCoordY) * Dimension, readSwizzle);
     return mix(mix(texColor, repeatReadX, abs(errX)), mix(repeatReadY, repeatReadXY, abs(errX)),
                abs(errY));
   }
   if (repeatX) {
-    vec4 repeatReadX = aotChainRead(texSampler, vec2(repeatCoordX, clampedCoord.y) * Dimension,
+    vec4 repeatReadX = aotChainRead(leafIndex, vec2(repeatCoordX, clampedCoord.y) * Dimension,
                                     readSwizzle);
     return mix(texColor, repeatReadX, errX);
   }
-  vec4 repeatReadY = aotChainRead(texSampler, vec2(clampedCoord.x, repeatCoordY) * Dimension, readSwizzle);
+  vec4 repeatReadY = aotChainRead(leafIndex, vec2(clampedCoord.x, repeatCoordY) * Dimension,
+                                  readSwizzle);
   return mix(texColor, repeatReadY, errY);
 }
+#endif
 #undef ShaderModeX
 #undef ShaderModeY
 #undef Subset

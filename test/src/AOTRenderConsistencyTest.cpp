@@ -28,6 +28,8 @@
 #include <vector>
 #include "base/TGFXTest.h"
 #include "core/images/TextureImage.h"
+#include "gpu/AOTChainBuilder.h"
+#include "gpu/AOTEffectDecomposer.h"
 #include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/AOTMaterializationRecorder.h"
 #include "gpu/DrawingManager.h"
@@ -56,6 +58,7 @@
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/ImageBuffer.h"
+#include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/ImageGenerator.h"
 #include "tgfx/core/MaskFilter.h"
@@ -2808,6 +2811,138 @@ TGFX_TEST(AOTRenderConsistencyTest, ChainPassSamplesSeveralDeviceSpaceLeaves) {
   EXPECT_EQ(candidateDraws.materializedEdges, 0u);
   EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
   ExpectBitmapsIdentical("chain-pass-several-device-leaves", candidate, reference, size, size);
+}
+
+// Builds the four-leaf tree screen(multiply(A, B), srcOver(C, T)) over one source texture: A, B
+// and C are plain leaves under different translations, T is a tiled leaf repeating a sub-rect of
+// the source with linear filtering, so its tile edges go through the seam blend. T is the last
+// leaf in topological order, so it lands on leaf slot 3 of the chain kernel, which fetches every
+// leaf through the same code path.
+static PlacementPtr<FragmentProcessor> MakeFourLeafTreeWithTrailingTiledLeaf(
+    BlockAllocator* allocator, const std::shared_ptr<TextureProxy>& source) {
+  auto plainMatrixA = Matrix::MakeTrans(3, 5);
+  auto plainMatrixB = Matrix::MakeTrans(17, 9);
+  auto plainMatrixC = Matrix::MakeTrans(31, 2);
+  auto plainA = TextureEffect::Make(allocator, source, {}, &plainMatrixA);
+  auto plainB = TextureEffect::Make(allocator, source, {}, &plainMatrixB);
+  auto plainC = TextureEffect::Make(allocator, source, {}, &plainMatrixC);
+  SamplingArgs tiledArgs(TileMode::Repeat, TileMode::Repeat,
+                         SamplingOptions(FilterMode::Linear, MipmapMode::None),
+                         SrcRectConstraint::Fast);
+  tiledArgs.sampleArea = Rect::MakeXYWH(20, 24, 37, 29);
+  auto tiledMatrix = Matrix::MakeTrans(-6.5f, -3.25f);
+  auto tiled = TiledTextureEffect::Make(allocator, source, tiledArgs, &tiledMatrix);
+  if (plainA == nullptr || plainB == nullptr || plainC == nullptr || tiled == nullptr ||
+      tiled->name() != "TiledTextureEffect") {
+    return nullptr;
+  }
+  auto left = XfermodeFragmentProcessor::MakeFromTwoProcessors(allocator, std::move(plainA),
+                                                               std::move(plainB),
+                                                               BlendMode::Multiply);
+  auto right = XfermodeFragmentProcessor::MakeFromTwoProcessors(allocator, std::move(plainC),
+                                                                std::move(tiled),
+                                                                BlendMode::SrcOver);
+  return XfermodeFragmentProcessor::MakeFromTwoProcessors(allocator, std::move(left),
+                                                          std::move(right), BlendMode::Screen);
+}
+
+// A tiled leaf on a trailing leaf slot. The chain kernel fetches every leaf through one code path,
+// so the shader-side tiling must work for any leaf slot, not only the first two. Before rendering,
+// the tree is planned and built directly to pin the shape under test: one chain pass whose tiled
+// leaf sits on a leaf slot >= 2 in the seam-blending linear repeat mode. Then the tree is rendered
+// with and without the bundle; the 64x64 target spans several tiles of the 37x29 sub-rect, and
+// the two renders must match byte for byte.
+TGFX_TEST(AOTRenderConsistencyTest, TrailingTiledLeafMatchesRuntime) {
+  const std::string label = "trailing-tiled-leaf";
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto codec = ImageCodec::MakeFrom(ProjectPath::Absolute("resources/apitest/mandrill_128.png"));
+  ASSERT_NE(codec, nullptr);
+  auto source = context->proxyProvider()->createTextureProxy(codec);
+  ASSERT_NE(source, nullptr);
+  {
+    ScopedAOTStatsPause pause(context, true);
+    context->flushAndSubmit(true);
+  }
+  {
+    BlockAllocator allocator;
+    auto tree = MakeFourLeafTreeWithTrailingTiledLeaf(&allocator, source);
+    ASSERT_NE(tree, nullptr);
+    AOTEffectGraph graph;
+    ASSERT_TRUE(AOTEffectDecomposer::Lower({tree.get()}, &graph));
+    AOTEffectPlan plan;
+    ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+    ASSERT_EQ(plan.passes.size(), 1u);
+    ASSERT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
+    auto built = AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]);
+    ASSERT_NE(built, nullptr);
+    auto chain = static_cast<const AOTPointwiseChainProcessor*>(built.get());
+    EXPECT_EQ(chain->leafCount(), 4u);
+    EXPECT_GE(chain->tiledLeaf(), 2) << label;
+    EXPECT_EQ(chain->tiledLeaf2(), -1) << label;
+    // The recipe must take the seam-blending shader mode, not a hardware wrap that would bypass
+    // the leaf's tiling code.
+    EXPECT_EQ(chain->tiledRecipe().shaderModeX, TiledTextureShaderMode::RepeatLinearNone) << label;
+    EXPECT_EQ(chain->tiledRecipe().shaderModeY, TiledTextureShaderMode::RepeatLinearNone) << label;
+  }
+  constexpr int size = 64;
+  auto render = [&](bool useBundle, Bitmap* outBitmap, AOTDrawStats* outDraws) {
+    if (useBundle) {
+      auto bundle = EmbeddedShaderBundles::GetBundle(context->backend());
+      ASSERT_NE(bundle.first, nullptr);
+      ASSERT_TRUE(cache->loadBundle(bundle.first, bundle.second));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause pause(context, !useBundle);
+    cache->setDecompositionEnabled(useBundle);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->clearPrograms();
+    context->globalCache()->resetProgramStats();
+    auto target = RenderTargetProxy::Make(context, size, size, false);
+    ASSERT_NE(target, nullptr);
+    auto processor = MakeFourLeafTreeWithTrailingTiledLeaf(context->drawingAllocator(), source);
+    ASSERT_NE(processor, nullptr);
+    ASSERT_TRUE(
+        context->drawingManager()->fillRTWithFP(target, std::move(processor), 0, Point::Zero()));
+    context->flushAndSubmit(true);
+    if (useBundle) {
+      const auto records = cache->hitRecords();
+      ASSERT_FALSE(records.empty());
+      for (const auto& record : records) {
+        EXPECT_EQ(record.shaderName, "PointwiseChainShader") << label;
+      }
+    }
+    auto rt = target->getRenderTarget();
+    ASSERT_NE(rt, nullptr);
+    auto surface = Surface::MakeFrom(context, rt->getBackendRenderTarget(), rt->origin());
+    ASSERT_NE(surface, nullptr);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    EXPECT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+    if (outDraws != nullptr) {
+      *outDraws = cache->drawStats();
+    }
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->setDecompositionEnabled(true);
+    cache->unload();
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  AOTDrawStats candidateDraws = {};
+  render(false, &reference, nullptr);
+  render(true, &candidate, &candidateDraws);
+  EXPECT_EQ(candidateDraws.completeAOTDraws, 1u) << label;
+  EXPECT_EQ(candidateDraws.atomicFallbacks, 0u) << label;
+  EXPECT_EQ(candidateDraws.kernelInvocations, 1u) << label;
+  EXPECT_EQ(candidateDraws.materializedEdges, 0u) << label;
+  EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u) << label;
+  ExpectBitmapsIdentical(label.c_str(), candidate, reference, size, size);
 }
 
 // Inside the chain kernel's instruction budget an on-screen color-filter chain runs as one fused

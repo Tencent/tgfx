@@ -2,40 +2,37 @@
 // and main(). The entry defines chainLoadTiledRecipe() (through its tiling module) and
 // evalResourceSlot() before including this file.
 
-// Leaf fetch: plain leaves clamp to their Subset rect (full bounds = no-op). The tiled leaf, if
-// any, goes through the shared tiling math so wrap and clamp-to-border modes match the runtime.
-// An RGBAAA leaf (always a plain one) reads its alpha from the second area at leafAlphaStart past
-// the clamped coordinate, as GLSLTextureEffect::emitDefaultTextureCode does.
-vec4 chainLeafFetch(CHAIN_LEAF_SAMPLER texSampler, vec3 coord, vec4 leafSubset,
-                    vec2 leafAlphaStart, int leafHasRgbaaa, int leafIndex) {
-  // Perspective divide: affine transforms produce z=1.0, making this a no-op (same contract as
-  // QuadTextureFillShader); the tiled/subset math below then runs on the divided coordinate,
-  // matching the runtime's emitPerspTextCoord ordering.
-  highp vec2 uv = coord.xy / coord.z;
-  int readSwizzle = 0;
 #if NTEX > 0
-  readSwizzle = LeafReadSwizzles[leafIndex];
-  // A device-space leaf samples at the fragment's destination position, like the runtime
-  // DeviceSpaceTextureEffect. Its Subset is unbounded, so the clamp below is a no-op for it.
-  if (((DeviceLeafMask >> leafIndex) & 1) != 0) {
+// The leaf's sample position before any subset or tiling math. Perspective divide: affine
+// transforms produce z=1.0, making this a no-op (same contract as QuadTextureFillShader); the
+// tiled/subset math then runs on the divided coordinate, matching the runtime's
+// emitPerspTextCoord ordering. A device-space leaf samples at the fragment's destination position,
+// like the runtime DeviceSpaceTextureEffect; its Subset is unbounded, so the plain clamp is a no-op
+// for it.
+highp vec2 chainLeafCoord(vec3 coord, int leafIndex) {
+  highp vec2 uv = coord.xy / coord.z;
+  // The shift amount is unsigned: in the tiled-leaf loop leafIndex is not a constant, and WGSL
+  // (through tint) only accepts a u32 shift amount.
+  if (((DeviceLeafMask >> uint(leafIndex)) & 1) != 0) {
     highp vec3 deviceCoord = DeviceLeafCoordMatrix[leafIndex] * vec3(gl_FragCoord.xy, 1.0);
     uv = deviceCoord.xy;
   }
-#endif
-  bool strict = false;
-  if (chainLoadTiledRecipe(leafIndex, strict)) {
-    vec2 inCoord = vec2(0.0);
-    vec2 subsetCoord = vec2(0.0);
-    vec2 clampedCoord = vec2(0.0);
-    vec2 sampleCoord = tiledMapCoord(uv, strict, inCoord, subsetCoord, clampedCoord);
-    vec4 texColor = aotChainRead(texSampler, sampleCoord, readSwizzle);
-    texColor = tiledSeamBlend(texSampler, texColor, subsetCoord, clampedCoord, readSwizzle);
-    return tiledApplyBorder(texColor, inCoord, subsetCoord, clampedCoord);
-  }
+  return uv;
+}
+
+// Plain leaf fetch: clamps to the leaf's Subset rect (full bounds = no-op). An RGBAAA leaf (always
+// a plain one) reads its alpha from the second area at leafAlphaStart past the clamped
+// coordinate, as GLSLTextureEffect::emitDefaultTextureCode does. main() calls this once per leaf
+// with the leaf's own sampler: the body is short, and statically bound per-leaf reads keep the
+// common draw's sampling as direct as it can be.
+vec4 chainPlainLeafFetch(CHAIN_LEAF_SAMPLER texSampler, vec3 coord, vec4 leafSubset,
+                         vec2 leafAlphaStart, int leafHasRgbaaa, int leafIndex) {
+  highp vec2 uv = chainLeafCoord(coord, leafIndex);
+  int readSwizzle = LeafReadSwizzles[leafIndex];
   highp vec2 finalCoord = clamp(uv, leafSubset.xy, leafSubset.zw);
-  vec4 color = aotChainRead(texSampler, finalCoord, readSwizzle);
+  vec4 color = aotChainSample(texSampler, finalCoord, readSwizzle);
   if (leafHasRgbaaa != 0) {
-    vec4 alpha = aotChainRead(texSampler, finalCoord + leafAlphaStart, readSwizzle);
+    vec4 alpha = aotChainSample(texSampler, finalCoord + leafAlphaStart, readSwizzle);
     color = clamp(color, 0.0, 1.0);
     alpha = clamp(alpha, 0.0, 1.0);
     color = vec4(color.rgb * alpha.r, alpha.r);
@@ -43,12 +40,59 @@ vec4 chainLeafFetch(CHAIN_LEAF_SAMPLER texSampler, vec3 coord, vec4 leafSubset,
   return color;
 }
 
+// The coordinate varying of leaf leafIndex, picked with compile-time branches so the varyings stay
+// exactly what the vertex stage and the reflection expect.
+vec3 chainLeafCoordVarying(int leafIndex) {
+  if (leafIndex == 0) {
+    return TransformedCoords_0;
+  }
+  if (leafIndex == 1) {
+    return TransformedCoords_1;
+  }
+  if (leafIndex == 2) {
+    return TransformedCoords_2;
+  }
+  return TransformedCoords_3;
+}
+
+// Tiled leaf fetch: the shared tiling math, so wrap and clamp-to-border modes match the runtime.
+// This is the heavy part of a leaf fetch (coordinate mapping, a seam blend with up to three extra
+// reads, the border post-pass). main() calls it from a single site inside a loop over the leaves,
+// reading the leaf's texture through aotChainRead's per-index sampler pick, so the tiling code
+// exists once in the binary instead of once per leaf (a GPU compiler inlines every call site).
+vec4 chainTiledLeafFetch(int leafIndex) {
+  highp vec2 uv = chainLeafCoord(chainLeafCoordVarying(leafIndex), leafIndex);
+  int readSwizzle = LeafReadSwizzles[leafIndex];
+  bool strict = false;
+  chainLoadTiledRecipe(leafIndex, strict);
+  vec2 inCoord = vec2(0.0);
+  vec2 subsetCoord = vec2(0.0);
+  vec2 clampedCoord = vec2(0.0);
+  vec2 sampleCoord = tiledMapCoord(uv, strict, inCoord, subsetCoord, clampedCoord);
+  vec4 texColor = aotChainRead(leafIndex, sampleCoord, readSwizzle);
+  texColor = tiledSeamBlend(leafIndex, texColor, subsetCoord, clampedCoord, readSwizzle);
+  return tiledApplyBorder(texColor, inCoord, subsetCoord, clampedCoord);
+}
+
+// Whether leaf leafIndex goes through the shader-side tiling: some recipe set names it. Reads the
+// recipe selectors only (the constant-bound loop unrolls into two or three compares), so the plain
+// fetches in main() do not load any tiling state.
+bool chainLeafIsTiled(int leafIndex) {
+  for (int recipe = 0; recipe < CHAIN_TILED_RECIPES; ++recipe) {
+    if (chainTiledRecipeLeaf(recipe) == leafIndex) {
+      return true;
+    }
+  }
+  return false;
+}
+#endif
+
 layout(location = 0) out vec4 fragColor;
 
 vec4 chainResults[16];
 
-// Prefetched leaf samples. Fetched with statically bound samplers in main; the OP_TEXTURE branch
-// of evalChainSlot reads them back by instruction index.
+// Prefetched leaf samples. Fetched in main (the samplers stay statically bound, see aotChainRead);
+// the OP_TEXTURE branch of evalChainSlot reads them back by instruction index.
 vec4 chainLeafTex[4];
 
 // The ellipse layout's per-pixel edge coverage (GP_LAYOUT=1). Computed ahead of the chain
@@ -91,29 +135,36 @@ void main() {
   // Texture leaves occupy slots 0..NTEX-1. Each prefetch is guarded by the slot's op marker so
   // the phantom slot of a 3-leaf chain and the sampler-only LUT child (both non-texture slots
   // occupying leaf positions) are never sampled; the loop below still evaluates them like any
-  // other slot.
+  // other slot. Plain leaves are fetched one by one with their own samplers; tiled leaves (one per
+  // recipe set, two or three per chain, see the tiling module) are fetched by one loop over the
+  // recipe sets with a single call site, so the tiling code is not repeated per leaf. The loop
+  // bound involves SlotCount so the compiler keeps it a loop (a constant bound would unroll it
+  // back into one copy per recipe); every tiled leaf has its own slot, so SlotCount never cuts a
+  // used recipe set off. The leaf index, the loop bound and the tiled test are uniform across the
+  // draw, so every texture read stays in uniform control flow.
 #if NTEX > 0
-  if (SlotPacked[0].x == OP_TEXTURE) {
-    chainLeafTex[0] =
-        chainLeafFetch(TextureSampler_0, TransformedCoords_0, Subset, AlphaStart, HasRgbaaa, 0);
+  if (SlotPacked[0].x == OP_TEXTURE && !chainLeafIsTiled(0)) {
+    chainLeafTex[0] = chainPlainLeafFetch(TextureSampler_0, TransformedCoords_0, Subset,
+                                          AlphaStart, HasRgbaaa, 0);
   }
-#endif
-#if NTEX > 1
-  if (SlotPacked[1].x == OP_TEXTURE) {
-    chainLeafTex[1] = chainLeafFetch(TextureSampler_1, TransformedCoords_1, Subset_1,
-                                     AlphaStart_1, HasRgbaaa_1, 1);
+  if (SlotPacked[1].x == OP_TEXTURE && !chainLeafIsTiled(1)) {
+    chainLeafTex[1] = chainPlainLeafFetch(TextureSampler_1, TransformedCoords_1, Subset_1,
+                                          AlphaStart_1, HasRgbaaa_1, 1);
   }
-#endif
-#if NTEX > 2
-  if (SlotPacked[2].x == OP_TEXTURE) {
-    chainLeafTex[2] = chainLeafFetch(TextureSampler_2, TransformedCoords_2, Subset_2,
-                                     AlphaStart_2, HasRgbaaa_2, 2);
+  if (SlotPacked[2].x == OP_TEXTURE && !chainLeafIsTiled(2)) {
+    chainLeafTex[2] = chainPlainLeafFetch(TextureSampler_2, TransformedCoords_2, Subset_2,
+                                          AlphaStart_2, HasRgbaaa_2, 2);
   }
-#endif
-#if NTEX > 3
-  if (SlotPacked[3].x == OP_TEXTURE) {
-    chainLeafTex[3] = chainLeafFetch(TextureSampler_3, TransformedCoords_3, Subset_3,
-                                     AlphaStart_3, HasRgbaaa_3, 3);
+  if (SlotPacked[3].x == OP_TEXTURE && !chainLeafIsTiled(3)) {
+    chainLeafTex[3] = chainPlainLeafFetch(TextureSampler_3, TransformedCoords_3, Subset_3,
+                                          AlphaStart_3, HasRgbaaa_3, 3);
+  }
+  int recipeCount = min(SlotCount, CHAIN_TILED_RECIPES);
+  for (int recipe = 0; recipe < recipeCount; ++recipe) {
+    int leaf = chainTiledRecipeLeaf(recipe);
+    if (leaf >= 0 && leaf < NTEX && SlotPacked[leaf].x == OP_TEXTURE) {
+      chainLeafTex[leaf] = chainTiledLeafFetch(leaf);
+    }
   }
 #endif
   // The three registers the epilogue consumes (root, clip coverage, coverage subtree root) are
