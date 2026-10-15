@@ -22,10 +22,12 @@
 #include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
+
 class MetalDrawableProxy : public RenderTargetProxy {
  public:
   MetalDrawableProxy(Context* context, int width, int height, CAMetalLayer* metalLayer,
                      PixelFormat format);
+  ~MetalDrawableProxy() override;
 
   Context* getContext() const override;
   int width() const override;
@@ -38,6 +40,27 @@ class MetalDrawableProxy : public RenderTargetProxy {
   std::shared_ptr<RenderTarget> getRenderTarget() const override;
 
   id<CAMetalDrawable> getMetalDrawable() const;
+
+  /**
+   * Schedules the drawable onto the upcoming command buffer.
+   */
+  void onSchedulePresentation(Context* context) override;
+
+  /**
+   * Releases the drawable after the submission, so it returns to the layer's rotation pool.
+   */
+  void onPresentFrame(Context* context) override;
+
+  /**
+   * Returns true if the current drawable has a valid render target.
+   */
+  bool hasRenderTarget() const {
+    return _renderTarget != nullptr;
+  }
+
+  /**
+   * Releases the drawable after it is scheduled, returning it to the layer's pool.
+   */
   void releaseDrawable();
 
  private:
