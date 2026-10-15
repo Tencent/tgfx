@@ -1521,14 +1521,11 @@ bool OpsCompositor::submitPlanTask(const AOTEffectGraph& graph, const AOTEffectP
                                    AOTMaterializationRecorder* producers) {
   std::optional<Matrix> deviceToLocal = std::nullopt;
   if (plan.passes.size() > 1) {
-    // The intermediate passes are device-aligned fills with an opaque white input color. They
-    // reproduce the draw's source pass exactly only when every fragment of the draw receives an
-    // opaque input color (the tail source reads only the input alpha, and the terminal draw then
-    // multiplies the final result by it once more), and when the source samples device space or
-    // the draw reports one affine device-to-local mapping for its local coordinates.
+    // The first split-off fill receives the draw's uniform input alpha, and later passes sample
+    // their intermediate without applying it again. Per-vertex colors cannot be reconstructed by
+    // the device-aligned fill. A local-space source also needs one affine device-to-local map.
     auto drawOp = static_cast<StandardDrawOp*>(op->get());
-    auto color = drawOp->uniformGeometryColor();
-    if (!color.has_value() || color->alpha != 1.0f) {
+    if (!drawOp->uniformGeometryColor().has_value()) {
       return false;
     }
     if (!AOTPlanExecutor::SamplesDeviceSpace(graph, plan)) {

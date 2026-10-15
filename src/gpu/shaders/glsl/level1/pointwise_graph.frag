@@ -4,6 +4,7 @@
 //   1 = TiledGraph: gradient source, three-recipe tiling
 // Everything else is the shared pointwise core (see pointwise_fragment_config.inc).
 #version 450
+#define CHAIN_SLOT_CAPACITY 32
 
 #ifndef RESOURCE_KIND
 #define RESOURCE_KIND 0

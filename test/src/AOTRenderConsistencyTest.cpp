@@ -2254,7 +2254,7 @@ TGFX_TEST(AOTRenderConsistencyTest, LinearChainSinglePass) {
 // Linear plans preserve coordinate domains in one chain pass and across materialization
 // boundaries, for both a device-space and a plain source, with and without an FP coordinate
 // offset. Three operators fit one chain pass (a device-space source is a chain leaf sampled at the
-// fragment position); 33 exceed it (the source plus 31 operators), so they run as two chain
+// fragment position); 17 exceed it (the source plus 15 operators), so they run as two chain
 // passes. Swapping red and blue is exact on RGBA8, so the quantizing intermediate changes nothing
 // and the result is byte-identical to the runtime reference.
 TGFX_TEST(AOTRenderConsistencyTest, OffscreenLinearPlansPreserveCoordinates) {
@@ -2321,7 +2321,7 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenLinearPlansPreserveCoordinates) {
     cache->unload();
   };
   for (bool deviceSource : {false, true}) {
-    for (int opCount : {3, 33}) {
+    for (int opCount : {3, 17}) {
       for (Point offset : {Point::Zero(), Point::Make(11, 7)}) {
         SCOPED_TRACE(deviceSource);
         SCOPED_TRACE(opCount);
@@ -2423,7 +2423,7 @@ TGFX_TEST(AOTRenderConsistencyTest, OverBudgetOffscreenAlphaThresholdRunsMultiPa
   }
   auto source = context->proxyProvider()->wrapExternalTexture(sourceSurface->getBackendTexture());
   ASSERT_NE(source, nullptr);
-  // Source, alpha scaling, threshold and 31 matrices deliberately exceed the 32-slot budget.
+  // Source, alpha scaling, threshold and 31 matrices exceed the 16-slot budget.
   const std::array<float, 20> halfAlpha = {1, 0, 0, 0, 0, 0, 1, 0, 0,    0,
                                            0, 0, 1, 0, 0, 0, 0, 0, 0.4f, 0};
   const std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0,
@@ -2441,10 +2441,9 @@ TGFX_TEST(AOTRenderConsistencyTest, OverBudgetOffscreenAlphaThresholdRunsMultiPa
     }
     return processor;
   };
-  // Source plus 33 operators: the first chain pass carries 31 of them (the scale, the threshold and
-  // 29 matrices), the second the last two matrices.
+  // Source plus 33 operators: each pass carries at most 15, so the plan needs three passes.
   ExpectOverBudgetOffscreenFillRunsMultiPass(context, cache, buildTree,
-                                             "over-budget-offscreen-alpha-threshold", 2, 1);
+                                             "over-budget-offscreen-alpha-threshold", 3, 1);
 }
 
 TGFX_TEST(AOTRenderConsistencyTest, OverBudgetOffscreenRotatedUVRunsMultiPass) {
@@ -2485,9 +2484,9 @@ TGFX_TEST(AOTRenderConsistencyTest, OverBudgetOffscreenRotatedUVRunsMultiPass) {
     }
     return processor;
   };
-  // Source plus 32 matrices: the first chain pass carries 31, the second the last one.
+  // Source plus 32 matrices: with 15 operators per pass this takes three passes.
   ExpectOverBudgetOffscreenFillRunsMultiPass(context, cache, buildTree,
-                                             "over-budget-offscreen-rotated-uv", 2, 1);
+                                             "over-budget-offscreen-rotated-uv", 3, 1);
 }
 
 // A device-space alpha-only source is a chain leaf like an RGBA one: its slot selector splats the
@@ -2525,7 +2524,7 @@ TGFX_TEST(AOTRenderConsistencyTest, DeviceSpaceAlphaOnlyLeafMatchesRuntime) {
 // F12 execution-failure contract: a plan task that passed the prepare phase must stop cleanly
 // and record a diagnostic when any of its render passes fails to begin during execution — the
 // terminal pass of a single-pass plan, and the first and a later intermediate pass of a
-// three-pass plan (a device-space source with 63 operators: 31, 31 and 1 per chain pass).
+// five-pass plan (a device-space source with 63 operators: 15, 15, 15, 15 and 3).
 TGFX_TEST(AOTRenderConsistencyTest, PlanExecutionFailureIsRecordedNotFatal) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -2548,7 +2547,7 @@ TGFX_TEST(AOTRenderConsistencyTest, PlanExecutionFailureIsRecordedNotFatal) {
   }
   auto source = context->proxyProvider()->wrapExternalTexture(sourceSurface->getBackendTexture());
   ASSERT_NE(source, nullptr);
-  // Renders a linear plan (a device-space source plus operatorCount operators, up to 31 per chain
+  // Renders a linear plan (a device-space source plus operatorCount operators, up to 15 per chain
   // pass) and returns the draw stats of exactly that fill.
   auto renderPlan = [&](int operatorCount) -> AOTDrawStats {
     AOTDrawStats stats = {};
@@ -2610,7 +2609,7 @@ TGFX_TEST(AOTRenderConsistencyTest, PlanExecutionFailureIsRecordedNotFatal) {
     auto healthy = renderPlan(operatorCount);
     EXPECT_EQ(healthy.planExecutionFailures, 0u);
     EXPECT_GE(healthy.completeAOTDraws, 1u);
-    EXPECT_EQ(healthy.kernelInvocations, operatorCount == 2 ? 1u : 3u);
+    EXPECT_EQ(healthy.kernelInvocations, operatorCount == 2 ? 1u : 5u);
   }
 }
 
@@ -2619,10 +2618,10 @@ TGFX_TEST(AOTRenderConsistencyTest, PlanExecutionFailureIsRecordedNotFatal) {
 // construction: the source is black, a matrix scales alpha to 513/1024, and the threshold is
 // 1027/2048. Direct evaluation keeps alpha at 513/1024 < 1027/2048, so step() yields 0; stored in
 // RGBA8 the scaled alpha would round up to 129/255 > 1027/2048 and step() would flip to 1 (a
-// 255-LSB error). The chain [identity x30, scale, threshold, identity] over a device-space source
-// exceeds one chain pass (the source plus 31 operators). The plain instruction-budget split would
+// 255-LSB error). The chain [identity x14, scale, threshold, identity] over a device-space source
+// exceeds one chain pass (the source plus 15 operators). The plain instruction-budget split would
 // put the boundary right after the scale; the planner shortens the first pass instead, giving
-// [source, identity x30] | [scale, threshold, identity], and the output matches direct evaluation
+// [source, identity x14] | [scale, threshold, identity], and the output matches direct evaluation
 // exactly.
 TGFX_TEST(AOTRenderConsistencyTest, MultiPassKeepsThresholdWithItsInput) {
   ContextScope scope;
@@ -2667,7 +2666,7 @@ TGFX_TEST(AOTRenderConsistencyTest, MultiPassKeepsThresholdWithItsInput) {
     // The leading identities fill the first pass up to the scale, so a plain instruction-budget
     // split would end the first pass right after the scale and leave the threshold behind the
     // boundary.
-    for (int index = 0; index < 30; ++index) {
+    for (int index = 0; index < 14; ++index) {
       processor =
           FragmentProcessor::Compose(allocator, std::move(processor),
                                      ColorMatrixFragmentProcessor::Make(allocator, identityMatrix));
@@ -2738,8 +2737,8 @@ TGFX_TEST(AOTRenderConsistencyTest, LinearChainInstructionBudgetRunsMultiPassOve
   const std::array<float, 20> rotateRGB = {0, 1, 0, 0, 0, 0, 0, 1, 0, 0,
                                            1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
   // One instruction is reserved for the source; probe ordinary chains and the exact capacity edge.
-  const size_t maxOperators = AOTPointwiseChainProcessor::MaxSlots - 1;
-  for (size_t opCount : {size_t{15}, size_t{16}, size_t{17}, maxOperators, maxOperators + 1}) {
+  const size_t maxOperators = ChainResourceCapacity.instructions - 1;
+  for (size_t opCount : {size_t{14}, maxOperators, maxOperators + 1, maxOperators + 2}) {
     SCOPED_TRACE(opCount);
     std::shared_ptr<ColorFilter> chain = nullptr;
     for (size_t index = 0; index < opCount; ++index) {
@@ -2826,24 +2825,17 @@ TGFX_TEST(AOTRenderConsistencyTest, NonTrivialLinearChainLengthMatrixMatchesRunt
     EXPECT_EQ(candidateStats.draws.draws, 1u);
     EXPECT_EQ(candidateStats.draws.completeAOTDraws, 1u);
     EXPECT_EQ(candidateStats.draws.atomicFallbacks, 0u);
-    // The chain kernel carries 32 instructions with a recycled 16-entry register file, so a
-    // texture plus up to 31 operators stays in one fused pass; only longer chains split, 31
-    // operators per chain pass.
-    uint64_t passCount = (opCount + 30) / 31;
+    // The base chain carries 16 instructions; each segment uses one for the texture source,
+    // leaving at most 15 operators (the recycled register file still holds 16 results).
+    constexpr uint64_t operatorsPerPass = ChainResourceCapacity.instructions - 1;
+    uint64_t passCount = (opCount + operatorsPerPass - 1) / operatorsPerPass;
     EXPECT_EQ(candidateStats.draws.kernelInvocations, passCount);
     EXPECT_EQ(candidateStats.draws.planMaterializedEdges, passCount - 1);
-    // Metal: the MSL compiler optimizes the kernel's interpreted arithmetic differently from
-    // the runtime's unrolled expressions, so a single pixel may round 1 LSB apart; OpenGL
-    // byte-matches both structures.
-    // Attribution (compiler-optimization artifact, PROVEN by controls): the raw divergence is
-    // maxChannelDiff=1, diffBytes=1/65536 (TGFX_STRICT_ZERO=1). Rebuilding the metal bundle
-    // with the build tool's TGFX_METAL_EXTRA_FLAGS experiment hook: -O0 eliminates the
-    // divergence entirely (zero failing op counts), and -fno-fast-math shifts the pattern
-    // (67/1/1/2 bytes across op counts) — the difference is optimization-dependent rounding,
-    // not a semantic error; a structural error would break the bound long before.
-    // The tolerance stays 1 on Metal only, zero elsewhere.
+    // A split pass quantizes its intermediate to RGBA8, allowing a 1-LSB difference on both
+    // backends. Single-pass OpenGL remains byte-exact; Metal's compiler may round by 1 LSB.
+    int tolerance = passCount > 1 || std::string(TGFX_BACKEND_NAME) == "metal" ? 1 : 0;
     ExpectBitmapsNear("nontrivial-linear-chain-matrix", candidate, reference, width, height,
-                      ExperimentTolerance(std::string(TGFX_BACKEND_NAME) == "metal" ? 1 : 0));
+                      ExperimentTolerance(tolerance));
   }
 }
 
@@ -2854,8 +2846,8 @@ TGFX_TEST(AOTRenderConsistencyTest, BrushAlphaEntersChainBeforeThreshold) {
   int width = image->width();
   int height = image->height();
   // The threshold sits at the head of the chain (closest to the texture) with 15 trailing
-  // matrices: the whole graph rides the single-pass chain kernel, which folds the brush alpha
-  // into the texture read (selector bit 0) exactly like the runtime's SrcIn wrap. The brush
+  // matrices: 17 instructions now need two chain passes. The first pass folds the brush alpha
+  // into the source texture read (selector bit 0), exactly like the runtime. The brush
   // alpha is 0.5 and the opaque source has alpha 1: with the input-alpha-inside semantics,
   // threshold(0.5*1) is transparent everywhere; an alpha applied after the chain would keep the
   // image visible at half opacity (0.5*threshold(1)). The two outcomes differ massively, so the
@@ -2876,10 +2868,10 @@ TGFX_TEST(AOTRenderConsistencyTest, BrushAlphaEntersChainBeforeThreshold) {
   EXPECT_EQ(candidateStats.noMatchingRule, 0u);
   EXPECT_EQ(candidateStats.draws.completeAOTDraws, 1u);
   EXPECT_EQ(candidateStats.draws.atomicFallbacks, 0u);
-  // One texture + threshold + 15 matrices = 17 instructions, inside the chain kernel's
-  // 32-instruction budget: a single fused pass with no materialization.
-  EXPECT_EQ(candidateStats.draws.kernelInvocations, 1u);
-  EXPECT_EQ(candidateStats.draws.planMaterializedEdges, 0u);
+  // Texture + threshold + 15 matrices = 17 instructions: alpha enters the first segment, not
+  // the last. A reversed ordering would make the threshold's output visibly wrong.
+  EXPECT_EQ(candidateStats.draws.kernelInvocations, 2u);
+  EXPECT_EQ(candidateStats.draws.planMaterializedEdges, 1u);
   ExpectBitmapsIdentical("brush-alpha-before-threshold", candidate, reference, width, height);
 }
 
@@ -2889,11 +2881,9 @@ TGFX_TEST(AOTRenderConsistencyTest, RotatedDrawWithLongChainMatchesRuntime) {
   ASSERT_NE(image, nullptr);
   int width = image->width();
   int height = image->height();
-  // A 30-degree rotation about the image center plus a 17-operator chain. The graph fits the
-  // chain kernel's instruction budget, so the plan keeps the original draw (its GP and matrix
-  // intact) and swaps only the color processors: the texture sampling runs in the original
-  // local coordinate space by construction, and a coordinate mismatch would show up as
-  // rotated-content ghosts in the byte comparison.
+  // A 30-degree rotation about the image center plus a 17-operator chain. The source pass maps
+  // device coordinates back into the original draw's local coordinates; the terminal pass keeps
+  // the original GP and final blend. A coordinate mismatch would create visible ghost content.
   auto drawMatrix =
       Matrix::MakeRotate(30.0f, static_cast<float>(width) / 2, static_cast<float>(height) / 2);
   std::shared_ptr<ColorFilter> chain = nullptr;
@@ -2912,9 +2902,10 @@ TGFX_TEST(AOTRenderConsistencyTest, RotatedDrawWithLongChainMatchesRuntime) {
   EXPECT_EQ(candidateStats.noMatchingRule, 0u);
   EXPECT_EQ(candidateStats.draws.completeAOTDraws, 1u);
   EXPECT_EQ(candidateStats.draws.atomicFallbacks, 0u);
-  EXPECT_EQ(candidateStats.draws.kernelInvocations, 1u);
-  EXPECT_EQ(candidateStats.draws.planMaterializedEdges, 0u);
-  ExpectBitmapsIdentical("rotated-long-chain", candidate, reference, width, height);
+  EXPECT_EQ(candidateStats.draws.kernelInvocations, 2u);
+  EXPECT_EQ(candidateStats.draws.planMaterializedEdges, 1u);
+  ExpectBitmapsNear("rotated-long-chain", candidate, reference, width, height,
+                    ExperimentTolerance(1));
 }
 
 TGFX_TEST(AOTRenderConsistencyTest, LowBrushAlphaLongChainMatchesRuntime) {
@@ -2923,11 +2914,9 @@ TGFX_TEST(AOTRenderConsistencyTest, LowBrushAlphaLongChainMatchesRuntime) {
   ASSERT_NE(image, nullptr);
   int width = image->width();
   int height = image->height();
-  // A 0.05 brush alpha with a 17-operator chain riding the single-pass kernel: no RGBA8
-  // materialization exists on this route, so even the low-alpha amplification regime stays
-  // byte-identical. (When the chain exceeds the instruction budget and splits into chain passes,
-  // each materialized edge quantizes the premultiplied color; that boundary is covered by the
-  // length-matrix test with quantization-exact matrices.)
+  // A 0.05 brush alpha with a 17-operator chain now materializes once. The first pass must
+  // multiply by the paint alpha before the matrices; the final one must not multiply it again.
+  // RGBA8 quantization at the boundary may change one color level.
   std::shared_ptr<ColorFilter> chain = nullptr;
   for (size_t index = 0; index < 17; ++index) {
     chain = ColorFilter::Compose(chain, ColorFilter::Matrix(NonTrivialScaleBiasMatrix()));
@@ -2944,9 +2933,10 @@ TGFX_TEST(AOTRenderConsistencyTest, LowBrushAlphaLongChainMatchesRuntime) {
   EXPECT_EQ(candidateStats.noMatchingRule, 0u);
   EXPECT_EQ(candidateStats.draws.completeAOTDraws, 1u);
   EXPECT_EQ(candidateStats.draws.atomicFallbacks, 0u);
-  EXPECT_EQ(candidateStats.draws.kernelInvocations, 1u);
-  EXPECT_EQ(candidateStats.draws.planMaterializedEdges, 0u);
-  ExpectBitmapsIdentical("low-alpha-long-chain", candidate, reference, width, height);
+  EXPECT_EQ(candidateStats.draws.kernelInvocations, 2u);
+  EXPECT_EQ(candidateStats.draws.planMaterializedEdges, 1u);
+  ExpectBitmapsNear("low-alpha-long-chain", candidate, reference, width, height,
+                    ExperimentTolerance(1));
 }
 
 // P4 retry semantics, risk one: color-filter retention. addDrawOp merges an
@@ -7472,9 +7462,9 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyImageBlurMatchesRuntime) {
 // offscreen fill drives a 34-instruction tree (texture, 16 matrices, threshold, 16 matrices) over
 // an alpha-sweep source, so the step() decision varies across the rows.
 //
-// The tree runs as two chain passes: the first carries the texture and 31 operators (the
-// threshold among them, reading its exact input), the second the last two matrices. Only the
-// matrices' RGBA8 rounding at the one boundary shows: within 1 LSB of the runtime reference.
+// The tree runs as three chain passes with at most 15 operators each. The threshold shares its
+// pass with the operator supplying its input; the two RGBA8 boundaries stay within 1 LSB of the
+// runtime reference.
 TGFX_TEST(AOTRenderConsistencyTest, OffscreenMultiPassThresholdQuantizationBand) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -7569,8 +7559,8 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenMultiPassThresholdQuantizationBand)
   render(true, &candidate, &candidateDraws);
   EXPECT_EQ(candidateDraws.completeAOTDraws, 1u);
   EXPECT_EQ(candidateDraws.atomicFallbacks, 0u);
-  EXPECT_EQ(candidateDraws.kernelInvocations, 2u);
-  EXPECT_EQ(candidateDraws.planMaterializedEdges, 1u);
+  EXPECT_EQ(candidateDraws.kernelInvocations, 3u);
+  EXPECT_EQ(candidateDraws.planMaterializedEdges, 2u);
   EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
   ExpectBitmapsNear("offscreen-multipass-threshold", candidate, reference, 64, 64, 1);
 }
@@ -7580,9 +7570,9 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenMultiPassThresholdQuantizationBand)
 // transform-carrying uvMatrix plus 35 matrices). No case enables mipmap filtering, so this test
 // says nothing about mipmapped sampling across materialization boundaries.
 //
-// The tree runs as two chain passes: the device-space source with its transform is sampled once
-// in the first pass (with 31 matrices), and the second reads the intermediate pixel-aligned. The
-// one boundary rounds the scale-bias matrices' output to RGBA8: within 1 LSB.
+// The tree runs as three chain passes: the device-space source with its transform is sampled
+// once in the first pass, and later passes read intermediate pixels at aligned coordinates.
+// The two boundaries round the scale-bias output to RGBA8: within 1 LSB here.
 TGFX_TEST(AOTRenderConsistencyTest, OffscreenMultiPassSamplingTransforms) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -7662,8 +7652,8 @@ TGFX_TEST(AOTRenderConsistencyTest, OffscreenMultiPassSamplingTransforms) {
     render(true, &candidate, &candidateDraws);
     EXPECT_EQ(candidateDraws.completeAOTDraws, 1u);
     EXPECT_EQ(candidateDraws.atomicFallbacks, 0u);
-    EXPECT_EQ(candidateDraws.kernelInvocations, 2u);
-    EXPECT_EQ(candidateDraws.planMaterializedEdges, 1u);
+    EXPECT_EQ(candidateDraws.kernelInvocations, 3u);
+    EXPECT_EQ(candidateDraws.planMaterializedEdges, 2u);
     EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
     ExpectBitmapsNear("offscreen-multipass-sampling", candidate, reference, 64, 64, 1);
   }

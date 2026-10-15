@@ -1,6 +1,7 @@
 // PointwiseChainShader: ordinary pointwise chains. The fragment stage is the shared pointwise core
 // with the two-recipe tiling module and no resource ops (see pointwise_fragment_config.inc).
 #version 450
+#define CHAIN_SLOT_CAPACITY 16
 
 #include "pointwise_fragment_config.inc"
 

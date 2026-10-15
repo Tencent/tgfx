@@ -6,6 +6,7 @@
 #include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/AOTMaterializationRecorder.h"
 #include "gpu/DrawingManager.h"
+#include "gpu/ops/StandardDrawOp.h"
 #include "gpu/processors/AOTYUVChainProcessor.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -144,7 +145,7 @@ static bool ValidateSegmentedPlan(const AOTEffectGraph& graph, const AOTEffectPl
     AOTEffectGraph segment = {};
     AOTPassDescriptor segmentPass = {};
     if (!AOTChainBuilder::BuildLinearSegment(graph, SegmentOperators(pass, index == 0),
-                                             segmentSource, &segment, &segmentPass)) {
+                                             segmentSource, &segment, &segmentPass, index == 0)) {
       return false;
     }
   }
@@ -227,7 +228,7 @@ bool AOTPlanExecutor::BuildPasses(Context* context, uint32_t renderFlags,
                                   const Point& fpCoordOffset,
                                   const std::optional<Matrix>& deviceToLocal,
                                   std::vector<AOTRenderPass>* passes,
-                                  DrawOp::ColorProcessorList* terminalColors) {
+                                  DrawOp::ColorProcessorList* terminalColors, float sourceAlpha) {
   auto drawingManager = context->drawingManager();
   auto allocator = drawingManager->drawingAllocator();
   if (plan.passes.size() == 1) {
@@ -293,7 +294,7 @@ bool AOTPlanExecutor::BuildPasses(Context* context, uint32_t renderFlags,
     AOTPassDescriptor segmentPass = {};
     PlacementPtr<FragmentProcessor> processor = nullptr;
     if (AOTChainBuilder::BuildLinearSegment(graph, SegmentOperators(pass, index == 0), source,
-                                            &segment, &segmentPass)) {
+                                            &segment, &segmentPass, index == 0)) {
       processor = AOTChainBuilder::BuildFPForPass(allocator, segment, segmentPass);
     }
     if (processor == nullptr) {
@@ -309,8 +310,9 @@ bool AOTPlanExecutor::BuildPasses(Context* context, uint32_t renderFlags,
     }
     AOTRenderPass renderPass = {};
     renderPass.target = std::move(materialized.renderTarget);
-    renderPass.drawOp = drawingManager->makeFillDrawOp(renderPass.target, std::move(processor),
-                                                       renderFlags, intermediateOffset);
+    renderPass.drawOp = drawingManager->makeFillDrawOp(
+        renderPass.target, std::move(processor), renderFlags, intermediateOffset,
+        InvalidOffscreenFillKey, index == 0 ? sourceAlpha : 1.0f);
     previousTexture = renderPass.target->asTextureProxy();
     if (renderPass.drawOp == nullptr || previousTexture == nullptr) {
       return false;
@@ -349,8 +351,19 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(
   if (producers != nullptr && !producers->takeProducerPasses(&renderPlan.passes)) {
     return nullptr;
   }
+  float sourceAlpha = 1.0f;
+  if (plan.passes.size() > 1) {
+    // Only a uniform geometry alpha can be moved into the split-off source pass. A per-vertex
+    // alpha cannot be reconstructed by a device-aligned full-rect fill.
+    auto color = static_cast<StandardDrawOp*>(originalDraw->get())->uniformGeometryColor();
+    if (!color.has_value()) {
+      return nullptr;
+    }
+    sourceAlpha = color->alpha;
+  }
   if (!BuildPasses(context, renderFlags, graph, plan, deviceBounds, destination.get(),
-                   fpCoordOffset, deviceToLocal, &renderPlan.passes, &renderPlan.terminalColors) ||
+                   fpCoordOffset, deviceToLocal, &renderPlan.passes, &renderPlan.terminalColors,
+                   sourceAlpha) ||
       !renderPlan.isWellFormed()) {
     return nullptr;
   }

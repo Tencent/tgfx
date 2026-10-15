@@ -171,7 +171,7 @@ static bool DecomposeLinearMultiPass(const AOTEffectGraph& graph, AOTEffectPlan*
     AOTEffectGraph segment = {};
     AOTPassDescriptor segmentPass = {};
     return AOTChainBuilder::BuildLinearSegment(graph, operators, firstPass ? source : intermediate,
-                                               &segment, &segmentPass);
+                                               &segment, &segmentPass, firstPass);
   };
   AOTEffectPlan result = {};
   const auto nodeCount = static_cast<uint32_t>(graph.nodeCount());

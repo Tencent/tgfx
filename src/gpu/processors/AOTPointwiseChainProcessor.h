@@ -146,10 +146,10 @@ struct AOTChainDeviceLeaf {
 
 class AOTPointwiseChainProcessor : public FragmentProcessor {
  public:
-  // The instruction capacity of the fused kernel: how many DAG nodes (texture leaves, operators,
-  // coverage and clip slots) one chain program may evaluate. Independent of the result-register
-  // count below because the kernel recycles registers by last use.
-  static constexpr size_t MaxSlots = ChainResourceCapacity.instructions;
+  // The maximum physical instruction storage across both kernels (extended Graph: 32). The
+  // basic Chain shader declares only ChainResourceCapacity.instructions (16) slots; ValidateSlots
+  // enforces each profile's budget. Registers are recycled independently of instruction count.
+  static constexpr size_t MaxSlots = TiledGraphResourceCapacity.instructions;
 
   // The chainResults storage the kernel evaluates into. The allocator assigns one element per
   // simultaneously-live intermediate value, so a linear chain of any supported length runs with

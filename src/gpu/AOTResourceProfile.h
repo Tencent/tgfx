@@ -45,7 +45,7 @@ struct AOTResourceDemand {
 };
 
 struct AOTResourceCapacity {
-  size_t instructions = 32;
+  size_t instructions = 16;
   size_t registers = 16;
   size_t leafBindings = 4;
   size_t tiledRecipes = 2;

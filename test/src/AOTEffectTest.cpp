@@ -1309,7 +1309,7 @@ TGFX_TEST(AOTEffectTest, ChainLeavesTakeAlphaOnlyDeviceAndRgbaaaSources) {
 }
 
 // A multi-pass plan never starts a pass at an AlphaThreshold, because the pass boundary would
-// round the threshold's input to RGBA8. A chain pass holds the source plus 31 operators; the
+// round the threshold's input to RGBA8. A chain pass holds the source plus 15 operators; the
 // planner ends a pass early so the threshold joins the operator that feeds it, and when no earlier
 // boundary is left (the threshold's feeding operators are thresholds too), the chain is refused.
 // CanExecute rejects a hand-built plan that breaks the rule.
@@ -1322,7 +1322,7 @@ TGFX_TEST(AOTEffectTest, MultiPassPlanNeverStartsPassAtThreshold) {
   ASSERT_NE(proxy, nullptr);
   auto texture = DeviceSpaceTextureEffect::Make(&allocator, std::move(proxy), Matrix::I());
   ASSERT_NE(texture, nullptr);
-  constexpr size_t PassOperators = AOTPointwiseChainProcessor::MaxSlots - 1;
+  constexpr size_t PassOperators = ChainResourceCapacity.instructions - 1;
   std::vector<PlacementPtr<FragmentProcessor>> owners = {};
   auto matrix = [&]() {
     owners.push_back(ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix));
@@ -1333,8 +1333,8 @@ TGFX_TEST(AOTEffectTest, MultiPassPlanNeverStartsPassAtThreshold) {
     return owners.back().get();
   };
 
-  // [matrix x31, threshold, matrix]: the instruction budget alone would split [source, matrix x31]
-  // | [threshold, matrix]. The planner gives [source, matrix x30] | [matrix, threshold, matrix].
+  // [matrix x15, threshold, matrix]: the budget alone would split [source, matrix x15]
+  // | [threshold, matrix]. The planner gives [source, matrix x14] | [matrix, threshold, matrix].
   std::vector<const FragmentProcessor*> processors = {texture.get()};
   for (size_t index = 0; index < PassOperators; ++index) {
     processors.push_back(matrix());
@@ -1515,7 +1515,8 @@ TGFX_TEST(AOTEffectTest, LinearChainSlotBoundaryIsChainInstructionBudget) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
-  for (size_t opCount : {size_t{31}, size_t{32}}) {
+  constexpr size_t MaxOperators = ChainResourceCapacity.instructions - 1;
+  for (size_t opCount : {MaxOperators, MaxOperators + 1}) {
     BlockAllocator allocator;
     auto texture = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
     auto matrix = ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix);
@@ -1525,12 +1526,11 @@ TGFX_TEST(AOTEffectTest, LinearChainSlotBoundaryIsChainInstructionBudget) {
     processors.insert(processors.end(), opCount, matrix.get());
     AOTEffectGraph graph;
     ASSERT_TRUE(AOTEffectDecomposer::Lower(processors, &graph));
-    // The chain kernel carries 32 instructions with a recycled 16-entry register file, so a
-    // texture plus 31 operators fuses into one pass; the 32nd operator crosses the instruction
-    // budget and the multi-pass planner moves it into a second chain pass.
+    // The chain kernel carries 16 instructions with a recycled 16-entry register file, so a
+    // texture plus 15 operators fuses into one pass; the 16th operator moves to a second pass.
     AOTEffectPlan plan;
     ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
-    if (opCount == 31) {
+    if (opCount == MaxOperators) {
       ASSERT_EQ(plan.passes.size(), 1u);
       EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
       EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
@@ -2815,10 +2815,10 @@ TGFX_TEST(AOTEffectTest, ChainRejectsNonRGBAColorFormats) {
 
 // Audit A6: the admission budget must count FINAL ENCODED instructions,
 // not graph nodes. A computed-input texture occupies two slots (a raw sampling slot plus a
-// TEX_MODULATE instruction after its producer), so a 32-node graph carrying one is 33 encoded
+// TEX_MODULATE instruction after its producer), so a 16-node graph carrying one is 17 encoded
 // instructions and must be refused by CanExecute (and by the DAG planner that consults it) —
-// the pre-fix check compared the node count to MaxSlots directly, let 33-instruction graphs
-// through the promise, and failed inside BuildChainProcessor instead.
+// the pre-fix check compared the node count directly to the budget, then admitted an oversized
+// instruction stream that BuildChainProcessor refused.
 TGFX_TEST(AOTEffectTest, ComputedInputExpansionCountsTowardSlotBudget) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -2845,10 +2845,10 @@ TGFX_TEST(AOTEffectTest, ComputedInputExpansionCountsTowardSlotBudget) {
     // The DAG planner consults CanExecute: a budget overrun must surface as a planning refusal.
     return AOTEffectDecomposer::Lower(raw, &graph) && AOTEffectDecomposer::Decompose(graph, &plan);
   };
-  // mask(1) + computed-input image(1) + 29 matrices = 31 nodes, 32 encoded: accepted.
-  EXPECT_TRUE(build(29));
-  // ... + 1 more matrix = 32 nodes, 33 encoded: refused by the admission budget.
-  EXPECT_FALSE(build(30));
+  // mask(1) + computed-input image(1) + 13 matrices = 15 nodes, 16 encoded: accepted.
+  EXPECT_TRUE(build(ChainResourceCapacity.instructions - 3));
+  // One more matrix = 16 nodes, 17 encoded: refused by the admission budget.
+  EXPECT_FALSE(build(ChainResourceCapacity.instructions - 2));
 }
 
 TGFX_TEST(AOTEffectTest, PerlinNoisePlusTwoOpsFusesToSinglePass) {

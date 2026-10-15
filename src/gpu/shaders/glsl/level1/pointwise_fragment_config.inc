@@ -21,12 +21,11 @@
 // The core never tests which modules are present: a tiled module provides
 // chainLoadTiledRecipe(), and the entry's evalResourceSlot() names the source ops it supports.
 //
-// Evaluates an arbitrary pointwise DAG in one pass. The DAG shape is runtime uniform data: 32
-// instruction slots each carry a Packed ivec4 (op, two input-register indices, blend/const
-// selector with the result register in bits 20-24), so any topology with the same texture-leaf
-// count shares one program variant. Intermediate results live in the 16-element chainResults
-// register file, recycled by last use on the CPU side (AOTChainRegisterAllocator), so the
-// instruction count and the live-result count are independent budgets. Texture leaves occupy
+// Evaluates an arbitrary pointwise DAG in one pass. The DAG shape is runtime uniform data:
+// CHAIN_SLOT_CAPACITY instruction slots (16 for Chain, 32 for Graph) each carry a Packed ivec4
+// (op, two input registers, selector with the result register in bits 20-24), so topologies with
+// the same texture-leaf count share a variant. Intermediate results live in 16 recycled registers
+// (AOTChainRegisterAllocator), independent of the instruction count. Texture leaves occupy
 // instructions 0..NTEX-1 and each samples its own sampler, keeping sampler indexing static.
 // TEXTURE_COUNT encodes 0/1/2/4 leaves; a zero-leaf chain evaluates const-color and blend ops
 // against the geometry color alone. With HAS_MASK_TEXTURE a device-space alpha mask child is

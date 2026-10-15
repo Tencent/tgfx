@@ -51,7 +51,8 @@ DrawingBuffer* DrawingManager::createDrawingBuffer() {
 PlacementPtr<DrawOp> DrawingManager::makeFillDrawOp(std::shared_ptr<RenderTargetProxy> renderTarget,
                                                     PlacementPtr<FragmentProcessor> processor,
                                                     uint32_t renderFlags, const Point& coordOffset,
-                                                    OffscreenFillKey diagnosticKey) {
+                                                    OffscreenFillKey diagnosticKey,
+                                                    float inputAlpha) {
   if (renderTarget == nullptr || processor == nullptr) {
     return nullptr;
   }
@@ -59,13 +60,15 @@ PlacementPtr<DrawOp> DrawingManager::makeFillDrawOp(std::shared_ptr<RenderTarget
   auto width = static_cast<float>(renderTarget->width());
   auto height = static_cast<float>(renderTarget->height());
   PlacementPtr<RectsVertexProvider> provider = nullptr;
-  if (coordOffset.x == 0.0f && coordOffset.y == 0.0f) {
+  if (coordOffset.x == 0.0f && coordOffset.y == 0.0f && inputAlpha == 1.0f) {
     auto bounds = Rect::MakeWH(width, height);
     provider = RectsVertexProvider::MakeFrom(allocator, bounds, AAType::None, true);
   } else {
     auto rect = Rect::MakeXYWH(coordOffset.x, coordOffset.y, width, height);
     auto viewMatrix = Matrix::MakeTrans(-coordOffset.x, -coordOffset.y);
-    auto record = allocator->make<RectRecord>(rect, viewMatrix);
+    // The first split-off pass must see the original draw's input alpha before its pointwise
+    // operators run. For later passes this remains 1: their texture leaf is unmodulated.
+    auto record = allocator->make<RectRecord>(rect, viewMatrix, Color(1, 1, 1, inputAlpha));
     auto rects = std::vector<PlacementPtr<RectRecord>>();
     rects.push_back(std::move(record));
     provider = RectsVertexProvider::MakeFrom(allocator, std::move(rects), {}, {}, AAType::None,

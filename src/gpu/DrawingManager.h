@@ -53,13 +53,15 @@ class DrawingManager {
    * Creates a full-rect draw operation using the provided fragment processor without enqueueing it.
    * The optional coordOffset shifts the coordinates fed to the fragment processor so that it
    * receives positions in [offset.x .. offset.x+w, offset.y .. offset.y+h] instead of [0..w,
-   * 0..h]. Returns nullptr if the render target or fragment processor is nullptr.
+   * 0..h]. inputAlpha applies the original uniform geometry alpha to a split-off source fill;
+   * the default opaque input is unchanged. Returns nullptr for a null target or processor.
    */
   PlacementPtr<DrawOp> makeFillDrawOp(std::shared_ptr<RenderTargetProxy> renderTarget,
                                       PlacementPtr<FragmentProcessor> processor,
                                       uint32_t renderFlags,
                                       const Point& coordOffset = Point::Zero(),
-                                      OffscreenFillKey diagnosticKey = InvalidOffscreenFillKey);
+                                      OffscreenFillKey diagnosticKey = InvalidOffscreenFillKey,
+                                      float inputAlpha = 1.0f);
 
   /**
    * Fills the render target using the provided fragment processor, and automatically resolves the

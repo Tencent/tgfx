@@ -65,17 +65,16 @@ class AOTChainBuilder {
                                                         const AOTPassDescriptor& pass);
 
   /**
-   * Builds the self-contained graph one pass of a multi-pass linear plan executes: the geometry
-   * color, a texture source with the given parameters (the plan's own source for the first pass,
-   * the predecessor's intermediate sampled in device space for a later one), then copies of the
-   * unary pointwise operators in order. On success *pass covers the whole segment on the chain
-   * kernel family its resources need. Returns false when an operator is not a unary pointwise
-   * one or when the segment does not fit one chain pass, so planning uses it as the fit check.
+   * Builds the self-contained graph one pass of a multi-pass linear plan executes: a texture
+   * source with the given parameters (the plan's source for the first pass, the predecessor's
+   * intermediate thereafter), then copies of the unary operators. The first source consumes the
+   * geometry color; later sources consume the white designator so the original geometry alpha is
+   * not applied again at the terminal draw. On success *pass fits its selected kernel family.
    */
   static bool BuildLinearSegment(const AOTEffectGraph& graph,
                                  const std::vector<AOTNodeID>& operators,
                                  const AOTTextureParameters& source, AOTEffectGraph* segment,
-                                 AOTPassDescriptor* pass);
+                                 AOTPassDescriptor* pass, bool firstPass = true);
 
   /**
    * The source a later pass of a multi-pass linear plan reads: its predecessor's RGBA

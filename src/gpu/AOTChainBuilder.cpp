@@ -944,8 +944,8 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
   }
   // Register allocation: the slot wiring built above uses instruction ordinals; this pass
   // rewrites every reference into the kernel's recycled chainResults registers, so the
-  // instruction budget (MaxSlots) and the live-result budget (MaxRegisters) are independent. A
-  // DAG whose simultaneous intermediates exceed the register budget is refused here.
+  // per-profile instruction budget (16 for Chain, 32 for Graph) and the live-result budget
+  // (MaxRegisters) are independent. A DAG exceeding the register budget is refused here.
   std::vector<std::vector<int>> instructionInputs(slots.size());
   for (size_t index = 0; index < slots.size(); ++index) {
     for (int input : {slots[index].in0, slots[index].in1}) {
@@ -1247,13 +1247,22 @@ bool AOTChainBuilder::ResolveChainProfile(const AOTEffectGraph& graph,
 bool AOTChainBuilder::BuildLinearSegment(const AOTEffectGraph& graph,
                                          const std::vector<AOTNodeID>& operators,
                                          const AOTTextureParameters& source,
-                                         AOTEffectGraph* segment, AOTPassDescriptor* pass) {
+                                         AOTEffectGraph* segment, AOTPassDescriptor* pass,
+                                         bool firstPass) {
   if (segment == nullptr || pass == nullptr) {
     return false;
   }
   AOTNodeBuilder builder = {};
+  AOTNodeID geometry = AOTNodeID::Invalid();
   AOTNodeID current = AOTNodeID::Invalid();
-  if (!builder.addGeometryColor(&current) || !builder.addTextureSource(current, source, &current)) {
+  if (!builder.addGeometryColor(&geometry) ||
+      (!firstPass && !builder.addGeometryWhiteInput(&current))) {
+    return false;
+  }
+  if (firstPass) {
+    current = geometry;
+  }
+  if (!builder.addTextureSource(current, source, &current)) {
     return false;
   }
   for (auto nodeID : operators) {
@@ -1284,7 +1293,8 @@ bool AOTChainBuilder::BuildLinearSegment(const AOTEffectGraph& graph,
     return false;
   }
   AOTPassDescriptor resultPass = {};
-  for (uint32_t index = 1; index < result.nodeCount(); ++index) {
+  for (uint32_t index = firstPass ? 1 : 2; index < result.nodeCount(); ++index) {
+    // GeometryWhiteInput is a designator, not an instruction slot.
     resultPass.nodes.push_back(AOTNodeID(index));
   }
   resultPass.output = result.root();

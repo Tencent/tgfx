@@ -575,8 +575,11 @@ void AOTPointwiseChainProcessor::onSetData(UniformData* vertexUniformData,
   }
   // RRect coverage slots consume the CoverageRRect* arrays in slot order; the upload assigns the
   // ordinals the same way, so the selector's bits 16-19 match the array element written here.
+  // Fill all declared slots (including inactive ones, whose OP_NONE marker protects the static
+  // texture prefetch), but never probe the 16 absent indices of a base-chain shader.
   int rrectOrdinal = 0;
-  for (size_t index = 0; index < MaxSlots; ++index) {
+  const auto* capacity = GetAOTResourceCapacity(_resourceProfile);
+  for (size_t index = 0; index < capacity->instructions; ++index) {
     UploadChainSlot(fragmentUniformData, index, slots[index], rrectOrdinal);
     if (slots[index].op == AOTChainOp::RRectCoverage) {
       ++rrectOrdinal;

@@ -70,6 +70,9 @@ class AOTPlanExecutor {
    * the affine map from the draw's top-left device positions to the local coordinates its
    * processors see (StandardDrawOp::deviceToLocalMatrix); a multi-pass plan over a local-coordinate
    * source applies it to the source pass, and nullopt means local == device + fpCoordOffset.
+   * For a multi-pass draw, originalDraw must report one uniform geometry color: its alpha is
+   * applied in the source pass, while later segments read the intermediate without applying it
+   * again. Geometry coverage and blending still execute only in the terminal pass.
    *
    * producers, when not null, holds the blend-child materializations recorded while the plan's
    * processors were built (the materialization retry). They are moved into the task ahead of the
@@ -97,6 +100,6 @@ class AOTPlanExecutor {
                           const RenderTargetProxy* destination, const Point& fpCoordOffset,
                           const std::optional<Matrix>& deviceToLocal,
                           std::vector<AOTRenderPass>* passes,
-                          DrawOp::ColorProcessorList* terminalColors);
+                          DrawOp::ColorProcessorList* terminalColors, float sourceAlpha = 1.0f);
 };
 }  // namespace tgfx

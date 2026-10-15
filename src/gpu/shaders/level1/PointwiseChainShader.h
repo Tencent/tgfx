@@ -24,7 +24,7 @@ namespace tgfx {
 
 /// Precompiled shader that evaluates an arbitrary pointwise DAG (texture and const-color leaves
 /// combined by color-matrix, luma, alpha-threshold, color-space-xform and blend ops) in a single
-/// fused pass. The DAG shape is runtime data: every node occupies one of 32 instruction slots
+/// fused pass. The DAG shape is runtime data: every node occupies one of 16 instruction slots
 /// whose OpType and two input-register indices are uniforms, and the intermediates live in a
 /// 16-entry register file recycled by last use, so any topology hits the same variant. Only the
 /// texture-leaf count is a compile-time dimension, because each leaf adds a sampler binding and a
