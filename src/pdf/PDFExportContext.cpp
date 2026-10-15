@@ -674,6 +674,9 @@ void PDFExportContext::drawDropShadowBeforeLayer(const std::shared_ptr<Picture>&
                                static_cast<int>(blurBounds.height()), false, 1, false, 0,
                                document->dstColorSpace());
   DEBUG_ASSERT(surface);
+  if (surface == nullptr) {
+    return;
+  }
   auto canvas = surface->getCanvas();
 
   Paint picturePaint = {};
@@ -686,10 +689,23 @@ void PDFExportContext::drawDropShadowBeforeLayer(const std::shared_ptr<Picture>&
   auto image = surface->makeImageSnapshot();
   if (image) {
     image = image->makeTextureImage(document->context());
+    const auto snapshotOffset = Point::Make(pictureBounds.x() - offset.x + dropShadowFilter->dx,
+                                            pictureBounds.y() - offset.y + dropShadowFilter->dy);
     auto imageMatrix = matrix;
-    imageMatrix.preTranslate(pictureBounds.x() - offset.x + dropShadowFilter->dx,
-                             pictureBounds.y() - offset.y + dropShadowFilter->dy);
-    drawImage(std::move(image), SamplingOptions(), imageMatrix, clip, brush);
+    imageMatrix.preTranslate(snapshotOffset.x, snapshotOffset.y);
+    // The snapshotOffset translation propagates to the brush's space, so apply the inverse to
+    // the mask shader to keep it anchored in the original space.
+    Brush imageBrush = brush;
+    if (imageBrush.maskFilter != nullptr &&
+        Types::Get(imageBrush.maskFilter.get()) == Types::MaskFilterType::Shader) {
+      const auto* shaderMaskFilter =
+          static_cast<const ShaderMaskFilter*>(imageBrush.maskFilter.get());
+      auto maskShader = shaderMaskFilter->getShader()->makeWithMatrix(
+          Matrix::MakeTrans(-snapshotOffset.x, -snapshotOffset.y));
+      imageBrush.maskFilter =
+          MaskFilter::MakeShader(std::move(maskShader), shaderMaskFilter->isInverted());
+    }
+    drawImage(std::move(image), SamplingOptions(), imageMatrix, clip, imageBrush);
   }
 }
 

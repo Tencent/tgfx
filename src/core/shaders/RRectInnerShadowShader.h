@@ -32,7 +32,8 @@ class RRectInnerShadowShader : public Shader {
  public:
   /**
    * Creates a shader for the given rounded rectangles. Returns nullptr when the inputs cannot
-   * produce a closed-form result. Zero radii produce the plain rectangle form.
+   * produce a closed-form result. Zero radii on both the shadow and the mask shape produce the
+   * plain rectangle form.
    * @param shadowRRect the shadow shape. Its four corners must share one radius, whose two
    * components may differ to describe an elliptical corner. Must not be empty.
    * @param maskRRect the shape whose blurred coverage is subtracted from the shadow. Same

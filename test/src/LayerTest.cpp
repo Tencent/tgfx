@@ -3602,7 +3602,7 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(layer);
   }
 
-  // Case 2: ImageLayer, spread=8 (analytic)
+  // Case 2: ImageLayer, spread=8 (raster)
   for (int i = 0; i < 2; ++i) {
     auto layer = ImageLayer::Make();
     layer->setImage(image);
@@ -3923,8 +3923,8 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     displayList.root()->addChild(layer);
   }
 
-  // Case 19: SolidLayer with half alpha and non-uniform scale, showBehindLayer = false, spread=8
-  // (analytic)
+  // Case 19: SolidLayer with half alpha and non-uniform scale, showBehindLayer = false (drop
+  // shadow only), spread=8 (analytic)
   for (int i = 0; i < 2; ++i) {
     auto layer = SolidLayer::Make();
     layer->setColor(Color::Red());
