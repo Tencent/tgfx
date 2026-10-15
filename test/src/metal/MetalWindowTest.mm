@@ -222,8 +222,10 @@ TGFX_TEST(MetalWindowTest, NonReadableWindowStillRenders) {
 }
 
 /**
- * Verifies that all surfaces of a window share one frame within a batch and that the frame is
- * presented once at the end of the batch, returning the drawable to the pool.
+ * Verifies that all surfaces of a window share one frame within a batch, that the frame is
+ * presented once at the end of the batch, and that the surfaces' drawing applies to the frame in
+ * the order it was recorded (A draws, B draws, A draws again), not in the order the surfaces'
+ * drawing passes happen to be closed.
  */
 TGFX_TEST(MetalWindowTest, SurfacesShareFrameWithinBatch) {
   ContextScope scope;
@@ -244,8 +246,140 @@ TGFX_TEST(MetalWindowTest, SurfacesShareFrameWithinBatch) {
   firstSurface->getCanvas()->clear(Color::Red());
   secondSurface->getCanvas()->clear(Color::Blue());
   EXPECT_EQ(context->drawingManager()->currentBuffer->presentables.size(), 1u);
-  context->flushAndSubmit(true);
+  // The later clear of the second surface wins.
+  EXPECT_TRUE(ReadCenterPixel(firstSurface.get(), Color::Blue()));
   EXPECT_TRUE(SurfaceProxy(firstSurface.get())->getMetalDrawable() == nil);
+
+  // A draws, B draws over part of it, A draws again over a smaller part.
+  auto surfaceA = Surface::MakeFrom(context, window);
+  auto surfaceB = Surface::MakeFrom(context, window);
+  ASSERT_TRUE(surfaceA != nullptr);
+  ASSERT_TRUE(surfaceB != nullptr);
+  surfaceA->getCanvas()->clear(Color::Red());
+  Paint paint = {};
+  paint.setColor(Color::Blue());
+  surfaceB->getCanvas()->drawRect(Rect::MakeWH(8, 16), paint);
+  paint.setColor(Color::Green());
+  surfaceA->getCanvas()->drawRect(Rect::MakeWH(4, 16), paint);
+  EXPECT_EQ(context->drawingManager()->currentBuffer->presentables.size(), 1u);
+  uint8_t row[16 * 4] = {};
+  auto info = ImageInfo::Make(16, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  ASSERT_TRUE(surfaceB->readPixels(info, row, 0, 8));
+  EXPECT_TRUE(NearlyMatches(row + 2 * 4, Color::Green()));
+  EXPECT_TRUE(NearlyMatches(row + 6 * 4, Color::Blue()));
+  EXPECT_TRUE(NearlyMatches(row + 12 * 4, Color::Red()));
+}
+
+/**
+ * Verifies that a readback through one surface of a window captures the drawing every surface of
+ * the window recorded on the shared frame before it, and nothing recorded after it.
+ */
+TGFX_TEST(MetalWindowTest, ReadbackCapturesSharedFrameInOrder) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  if (context == nullptr) {
+    GTEST_SKIP() << "Metal backend not available";
+  }
+  auto gpu = static_cast<MetalGPU*>(context->gpu());
+  auto window =
+      MetalWindow::MakeFrom(MakeTestLayer(gpu->device(), 16, 16), nullptr, nullptr, false);
+  ASSERT_TRUE(window != nullptr);
+  auto surfaceA = Surface::MakeFrom(context, window);
+  auto surfaceB = Surface::MakeFrom(context, window);
+  ASSERT_TRUE(surfaceA != nullptr);
+  ASSERT_TRUE(surfaceB != nullptr);
+
+  auto rect = Rect::MakeXYWH(8, 8, 1, 1);
+  surfaceA->getCanvas()->clear(Color::Red());
+  surfaceB->getCanvas()->clear(Color::Blue());
+  auto first = surfaceA->asyncReadPixels(rect);
+  ASSERT_TRUE(first != nullptr);
+  surfaceA->getCanvas()->clear(Color::Green());
+  auto second = surfaceB->asyncReadPixels(rect);
+  ASSERT_TRUE(second != nullptr);
+  surfaceB->getCanvas()->clear(Color::White());
+  context->flushAndSubmit(true);
+  EXPECT_TRUE(ReadbackMatches(context, first.get(), Color::Blue()));
+  EXPECT_TRUE(ReadbackMatches(context, second.get(), Color::Green()));
+}
+
+/**
+ * Verifies that a surface kept across batches and a surface created in the current batch use
+ * one frame of the window, in either creation order: the batch resolves and presents a single
+ * target, and a surface created while the batch already uses the frame keeps its content.
+ */
+TGFX_TEST(MetalWindowTest, LongLivedAndNewSurfacesShareFrame) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  if (context == nullptr) {
+    GTEST_SKIP() << "Metal backend not available";
+  }
+  auto gpu = static_cast<MetalGPU*>(context->gpu());
+  auto window =
+      MetalWindow::MakeFrom(MakeTestLayer(gpu->device(), 16, 16), nullptr, nullptr, false);
+  ASSERT_TRUE(window != nullptr);
+  auto drawingManager = context->drawingManager();
+  auto longLived = Surface::MakeFrom(context, window);
+  ASSERT_TRUE(longLived != nullptr);
+  longLived->getCanvas()->clear(Color::Red());
+  context->flushAndSubmit(true);
+
+  // The long-lived surface draws first, then a new surface joins its frame.
+  longLived->getCanvas()->clear(Color::Green());
+  auto joined = Surface::MakeFrom(context, window);
+  ASSERT_TRUE(joined != nullptr);
+  EXPECT_EQ(SurfaceProxy(joined.get()), SurfaceProxy(longLived.get()));
+  EXPECT_TRUE(ReadCenterPixel(joined.get(), Color::Green()));
+  EXPECT_TRUE(SurfaceProxy(longLived.get())->getMetalDrawable() == nil);
+
+  // A new surface is created first, then the long-lived surface switches to its target.
+  auto created = Surface::MakeFrom(context, window);
+  ASSERT_TRUE(created != nullptr);
+  created->getCanvas()->clear(Color::Blue());
+  Paint paint = {};
+  paint.setColor(Color::Green());
+  longLived->getCanvas()->drawRect(Rect::MakeWH(4, 16), paint);
+  EXPECT_EQ(SurfaceProxy(longLived.get()), SurfaceProxy(created.get()));
+  EXPECT_EQ(drawingManager->currentBuffer->presentables.size(), 1u);
+  uint8_t row[16 * 4] = {};
+  auto info = ImageInfo::Make(16, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  ASSERT_TRUE(longLived->readPixels(info, row, 0, 8));
+  EXPECT_TRUE(NearlyMatches(row + 2 * 4, Color::Green()));
+  EXPECT_TRUE(NearlyMatches(row + 12 * 4, Color::Blue()));
+  EXPECT_TRUE(SurfaceProxy(created.get())->getMetalDrawable() == nil);
+}
+
+/**
+ * Verifies that once a surface of a different size is created for a resized window, the surfaces
+ * created before it stop drawing into the window, so a batch never resolves two frames.
+ */
+TGFX_TEST(MetalWindowTest, StaleSurfaceIgnoredAfterResize) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  if (context == nullptr) {
+    GTEST_SKIP() << "Metal backend not available";
+  }
+  auto gpu = static_cast<MetalGPU*>(context->gpu());
+  auto layer = MakeTestLayer(gpu->device(), 16, 16);
+  auto window = MetalWindow::MakeFrom(layer, nullptr, nullptr, false);
+  ASSERT_TRUE(window != nullptr);
+  auto staleSurface = Surface::MakeFrom(context, window);
+  ASSERT_TRUE(staleSurface != nullptr);
+  staleSurface->getCanvas()->clear(Color::Red());
+  context->flushAndSubmit(true);
+
+  layer.drawableSize = CGSizeMake(32, 24);
+  auto resized = Surface::MakeFrom(context, window);
+  ASSERT_TRUE(resized != nullptr);
+  EXPECT_EQ(resized->width(), 32);
+  EXPECT_EQ(resized->height(), 24);
+  resized->getCanvas()->clear(Color::Blue());
+  auto staleProxy = SurfaceProxy(staleSurface.get());
+  staleSurface->getCanvas()->clear(Color::Red());
+  EXPECT_EQ(SurfaceProxy(staleSurface.get()), staleProxy);
+  EXPECT_TRUE(staleSurface->asyncReadPixels(Rect::MakeWH(1, 1)) == nullptr);
+  EXPECT_EQ(context->drawingManager()->currentBuffer->presentables.size(), 1u);
+  EXPECT_TRUE(ReadCenterPixel(resized.get(), Color::Blue()));
 }
 
 /**

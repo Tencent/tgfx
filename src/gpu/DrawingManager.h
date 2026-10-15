@@ -89,13 +89,38 @@ class DrawingManager {
   void collectFrameUsage(std::shared_ptr<RenderTargetProxy> renderTarget);
 
   /**
-   * Returns the automatic render target this context shares with every Surface created for the
-   * given window within the current recording batch (Surface::MakeFrom(context, window)): one
-   * frame identity per window per batch. The cache is cleared at flush time, so every new batch
-   * resolves a fresh target (re-reading the window size and rebuilding expired presentation
-   * resources); long-lived surfaces keep and reuse their own target across batches.
+   * Returns the render target for a new Surface of the given window
+   * (Surface::MakeFrom(context, window)). If the current batch already uses the window's frame,
+   * returns the window's current target so the new surface joins that frame. Otherwise creates a
+   * fresh target (re-reading the window size and rebuilding expired presentation resources) and
+   * makes it the window's current target; surfaces holding an older target switch to it the next
+   * time they use the window (see resolveWindowTarget()).
    */
-  std::shared_ptr<RenderTargetProxy> getAutomaticTarget(std::shared_ptr<Window> window);
+  std::shared_ptr<RenderTargetProxy> createWindowTarget(std::shared_ptr<Window> window);
+
+  /**
+   * Returns the window's current target that a window surface holding renderTarget must use for
+   * the current batch, so all surfaces of a window use one frame per batch whether they were
+   * created in this batch or earlier. If no live surface holds a current target for the window,
+   * renderTarget becomes the current target and is returned. Called by window surfaces before
+   * they record work on their frame; the caller decides whether it can switch to the result.
+   */
+  std::shared_ptr<RenderTargetProxy> resolveWindowTarget(
+      const std::shared_ptr<Window>& window, std::shared_ptr<RenderTargetProxy> renderTarget);
+
+  /**
+   * Returns true if the current, not yet flushed drawing batch uses the frame behind the given
+   * render target (see collectFrameUsage()).
+   */
+  bool isFrameUsed(const std::shared_ptr<RenderTargetProxy>& renderTarget) const;
+
+  /**
+   * Closes every open ops compositor that draws into the given render target, appending their
+   * pending drawing to the current batch. Called by window surfaces, whose surfaces share one
+   * target per batch, before they record new work on it, so the batch's tasks keep the order
+   * in which the surfaces' drawing and copies were recorded.
+   */
+  void closeCompositors(const std::shared_ptr<RenderTargetProxy>& renderTarget);
 
   /**
    * Requests the presentation of the given window's render target at the end of the current
@@ -128,9 +153,15 @@ class DrawingManager {
   }
 
  private:
-  // The automatic render target shared per window within the current recording batch (see
-  // getAutomaticTarget()); cleared at flush time so each new batch resolves fresh targets.
-  std::unordered_map<Window*, std::shared_ptr<RenderTargetProxy>> automaticTargets = {};
+  struct WindowTarget {
+    std::weak_ptr<Window> window;
+    std::weak_ptr<RenderTargetProxy> target;
+  };
+
+  // The current render target of each window (see createWindowTarget() and
+  // resolveWindowTarget()). Held weakly: the surfaces own their targets, and an entry whose
+  // target is no longer held by any surface is dropped at flush time.
+  std::unordered_map<Window*, WindowTarget> windowTargets = {};
 
   // The windows whose presentations the current drawing buffer registered. The presentations
   // hold them weakly (through the proxies), so the strong references are moved into the
@@ -149,6 +180,8 @@ class DrawingManager {
   }
 
   DrawingBuffer* createDrawingBuffer();
+
+  WindowTarget& windowTargetEntry(const std::shared_ptr<Window>& window);
 
   friend class OpsCompositor;
   friend class RenderContext;

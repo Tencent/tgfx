@@ -106,6 +106,12 @@ class Surface {
    * automatically when the batch is submitted, and the next batch draws into a new frame. To read
    * the rendered pixels back, record the read in the same batch as the drawing; see readPixels()
    * and asyncReadPixels().
+   * All Surfaces of a window draw into one window frame per batch, whether they were created in
+   * the current batch or earlier, and their drawing and readbacks apply to that frame in the
+   * order they are recorded. A Surface created while the current batch already uses the window's
+   * frame joins that frame, keeping its content and size. Once a Surface of a different size is
+   * created for the window (for example after a resize), the Surfaces created before it ignore
+   * further drawing, and their readbacks and snapshots return nullptr.
    */
   static std::shared_ptr<Surface> MakeFrom(Context* context, std::shared_ptr<Window> window,
                                            uint32_t renderFlags = 0);
@@ -245,13 +251,34 @@ class Surface {
   bool aboutToDraw(bool discardContent = false);
 
   /**
-   * Called by RenderContext when a drawing pass opens on this surface. A window surface tells the
-   * drawing manager that the current batch uses the window's frame and presents it at the end of
-   * the batch; the drawing manager never inspects where a render target comes from. Offscreen
-   * surfaces do nothing.
+   * Called by RenderContext before a drawing pass opens on this surface; returns the render
+   * target the pass draws into, or nullptr to reject the pass. Offscreen surfaces return
+   * renderTarget unchanged. A window surface switches to the window's current frame target (see
+   * resolveFrameTarget()), closes the drawing other surfaces left open on that frame so the
+   * batch keeps the recording order, and tells the drawing manager that the batch uses the frame
+   * and presents it at the end of the batch; the drawing manager never inspects where a render
+   * target comes from.
    */
-  void collectFrame(DrawingManager* drawingManager,
-                    const std::shared_ptr<RenderTargetProxy>& renderTarget);
+  std::shared_ptr<RenderTargetProxy> collectFrame(
+      DrawingManager* drawingManager, const std::shared_ptr<RenderTargetProxy>& renderTarget);
+
+  /**
+   * Prepares recording a copy (a readback or a snapshot) of the surface content and returns the
+   * render target to copy from, or nullptr if the surface can no longer use it. Closes the open
+   * drawing on the target first, so the copy captures everything recorded before it. For a window
+   * surface, that includes the drawing other surfaces of the window recorded on the shared frame,
+   * and the surface switches to the window's current frame target first.
+   */
+  std::shared_ptr<RenderTargetProxy> prepareCopy(DrawingManager* drawingManager);
+
+  /**
+   * Returns the target a window surface currently holding renderTarget must use: the window's
+   * current frame target, which all surfaces of the window share, or nullptr if the surface is
+   * stale because a surface of a different size was created for the window after it. Offscreen
+   * surfaces return renderTarget.
+   */
+  std::shared_ptr<RenderTargetProxy> resolveFrameTarget(
+      DrawingManager* drawingManager, const std::shared_ptr<RenderTargetProxy>& renderTarget) const;
 
   /**
    * Called when work that reads the render target without drawing into it (a readback or a
