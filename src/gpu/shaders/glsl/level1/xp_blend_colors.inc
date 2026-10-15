@@ -156,27 +156,31 @@ vec4 xpBlendColors(vec4 S, vec4 D, int mode) {
   } else if (mode == 24) {
     result.a = S.a + (1.0 - S.a) * D.a;
     result.rgb = (1.0 - S.a) * D.rgb + (1.0 - D.a) * S.rgb + S.rgb * D.rgb;
-  } else if (mode == 25) {
+  } else if (mode >= 25 && mode <= 28) {
+    // Hue (25), Saturation (26), Color (27), Luminosity (28). The four modes differ only in the
+    // operands they feed set_saturation / set_luminance (GLSLBlend.cpp), so the operands are
+    // selected first and each helper has a single call site. A GPU compiler inlines every call
+    // site; one call per helper instead of one per mode keeps a single copy of the HSL math in
+    // every kernel that includes this file. The selected operands are the very expressions the
+    // per-mode branches passed, so each mode computes the same values as before.
     result.a = S.a + (1.0 - S.a) * D.a;
     vec4 dstSrcAlpha = D * S.a;
-    result.rgb = xpSetLuminance(xpSetSaturation(S.rgb * D.a, dstSrcAlpha.rgb), dstSrcAlpha.a,
-                                dstSrcAlpha.rgb);
-    result.rgb += (1.0 - S.a) * D.rgb + (1.0 - D.a) * S.rgb;
-  } else if (mode == 26) {
-    result.a = S.a + (1.0 - S.a) * D.a;
-    vec4 dstSrcAlpha = D * S.a;
-    result.rgb = xpSetLuminance(xpSetSaturation(dstSrcAlpha.rgb, S.rgb * D.a), dstSrcAlpha.a,
-                                dstSrcAlpha.rgb);
-    result.rgb += (1.0 - S.a) * D.rgb + (1.0 - D.a) * S.rgb;
-  } else if (mode == 27) {
-    result.a = S.a + (1.0 - S.a) * D.a;
     vec4 srcDstAlpha = S * D.a;
-    result.rgb = xpSetLuminance(srcDstAlpha.rgb, srcDstAlpha.a, D.rgb * S.a);
-    result.rgb += (1.0 - S.a) * D.rgb + (1.0 - D.a) * S.rgb;
-  } else if (mode == 28) {
-    result.a = S.a + (1.0 - S.a) * D.a;
-    vec4 srcDstAlpha = S * D.a;
-    result.rgb = xpSetLuminance(D.rgb * S.a, srcDstAlpha.a, srcDstAlpha.rgb);
+    vec3 hueSat = vec3(0.0);
+    float lumAlpha = 0.0;
+    vec3 lumColor = vec3(0.0);
+    if (mode <= 26) {
+      vec3 hueColor = mode == 25 ? S.rgb * D.a : dstSrcAlpha.rgb;
+      vec3 satColor = mode == 25 ? dstSrcAlpha.rgb : S.rgb * D.a;
+      hueSat = xpSetSaturation(hueColor, satColor);
+      lumAlpha = dstSrcAlpha.a;
+      lumColor = dstSrcAlpha.rgb;
+    } else {
+      hueSat = mode == 27 ? srcDstAlpha.rgb : D.rgb * S.a;
+      lumAlpha = srcDstAlpha.a;
+      lumColor = mode == 27 ? D.rgb * S.a : srcDstAlpha.rgb;
+    }
+    result.rgb = xpSetLuminance(hueSat, lumAlpha, lumColor);
     result.rgb += (1.0 - S.a) * D.rgb + (1.0 - D.a) * S.rgb;
   } else if (mode == 29) {
     result.a = S.a + (1.0 - S.a) * D.a;
