@@ -133,10 +133,11 @@ struct AOTChainTiledLeaf {
 };
 
 /**
- * The chain leaf that samples in destination device space, as a DeviceSpaceTextureEffect does:
- * its coordinate is uvMatrix applied to the fragment position, not its TransformedCoords varying.
- * The leaf child itself is a plain TextureEffect over textureProxy with an unbounded subset, so
- * the kernel's subset clamp is a no-op for it. At most one per chain; leafIndex -1 means none.
+ * A chain leaf that samples in destination device space, as a DeviceSpaceTextureEffect does: its
+ * coordinate is uvMatrix applied to the fragment position, not its TransformedCoords varying. The
+ * leaf child itself is a plain TextureEffect over textureProxy with an unbounded subset, so the
+ * kernel's subset clamp is a no-op for it. Every leaf of a chain may be one, each with its own
+ * matrix.
  */
 struct AOTChainDeviceLeaf {
   int leafIndex = -1;
@@ -207,7 +208,7 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
       const AOTTiledTextureRecipe* tiledRecipe2 = nullptr,
       AOTResourceProfile resourceProfile = AOTResourceProfile::Automatic,
       const std::vector<AOTChainTiledLeaf>& additionalTiledLeaves = {},
-      const AOTChainDeviceLeaf& deviceLeaf = {});
+      const std::vector<AOTChainDeviceLeaf>& deviceLeaves = {});
 
   AOTPointwiseChainProcessor(std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
                              const std::vector<AOTChainSlot>& slots, size_t rootSlot,
@@ -220,7 +221,7 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
                              const AOTTiledTextureRecipe* tiledRecipe2,
                              AOTResourceProfile resourceProfile,
                              const std::vector<AOTChainTiledLeaf>& additionalTiledLeaves,
-                             const AOTChainDeviceLeaf& deviceLeaf);
+                             const std::vector<AOTChainDeviceLeaf>& deviceLeaves);
 
   std::string name() const override {
     return "AOTPointwiseChainProcessor";
@@ -291,11 +292,9 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
     return lutLeafIndex;
   }
 
-  // Index of the leaf sampled in destination device space, or -1 when every leaf samples through
-  // its coordinate transform.
-  int deviceLeafIndex() const {
-    return deviceLeaf.leafIndex;
-  }
+  // Bit k is set when leaf k samples in destination device space; zero when every leaf samples
+  // through its coordinate transform.
+  uint32_t deviceLeafMask() const;
 
   const AOTTiledTextureRecipe& tiledRecipe() const {
     static const AOTTiledTextureRecipe empty = {};
@@ -346,7 +345,7 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   // lutLeafIndex is its sampler index, read by the kernel's OP_GRADIENT LUT branch.
   int lutLeafIndex = -1;
   int noiseSamplerBase = -1;
-  AOTChainDeviceLeaf deviceLeaf = {};
+  std::vector<AOTChainDeviceLeaf> deviceLeaves = {};
 };
 
 }  // namespace tgfx

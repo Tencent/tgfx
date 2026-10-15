@@ -60,7 +60,7 @@ static PlacementPtr<FragmentProcessor> BuildTextureLeafFP(BlockAllocator* alloca
     return nullptr;
   }
   if (parameters->samplingKind == AOTTextureSamplingKind::Device) {
-    // The chain kernel samples this leaf at DeviceLeafCoordMatrix * gl_FragCoord (see
+    // The chain kernel samples this leaf at its DeviceLeafCoordMatrix * gl_FragCoord (see
     // AOTChainDeviceLeaf), so the child only binds the texture with the sampler state of a
     // DeviceSpaceTextureEffect (clamp, linear, no mipmaps). Its coordinate transform is unused,
     // and the unbounded sample area makes the kernel's subset clamp a no-op, as the runtime effect
@@ -317,8 +317,8 @@ struct ChainLayout {
   size_t rootRegister = 0;
   int coverageRootRegister = -1;
   int clipCoverageRegister = -1;
-  // Index into leafNodes of the device-space leaf, -1 when the pass has none.
-  int deviceLeafIndex = -1;
+  // Indices into leafNodes of the device-space leaves, in leaf order.
+  std::vector<int> deviceLeafIndices = {};
   AOTResourceProfile profile = AOTResourceProfile::Automatic;
 };
 
@@ -486,7 +486,7 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
   layout->tiledLeaves.clear();
   layout->lutGradient = nullptr;
   layout->noise = nullptr;
-  layout->deviceLeafIndex = -1;
+  layout->deviceLeafIndices.clear();
   for (size_t index = 0; index < ordered.size(); ++index) {
     const size_t combined = ordered[index];
     auto node = nodes[combined];
@@ -581,12 +581,12 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
               {static_cast<int>(layout->leafNodes.size()), *parameters->tiledRecipe});
         }
         if (parameters->samplingKind == AOTTextureSamplingKind::Device) {
-          // The kernel carries one device-space leaf coordinate matrix, and only color leaves
-          // take this form (a device-space coverage texture becomes the mask child instead).
-          if (layout->deviceLeafIndex >= 0 || inputBase != 0) {
+          // Every color leaf may sample in device space through its own coordinate matrix; a
+          // device-space coverage texture becomes the mask child instead.
+          if (inputBase != 0) {
             return false;
           }
-          layout->deviceLeafIndex = static_cast<int>(layout->leafNodes.size());
+          layout->deviceLeafIndices.push_back(static_cast<int>(layout->leafNodes.size()));
         }
         layout->leafNodes.push_back(node);
         break;
@@ -1147,23 +1147,22 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   if (tiledLeaves.size() > 2) {
     additionalTiledLeaves.assign(tiledLeaves.begin() + 2, tiledLeaves.end());
   }
-  AOTChainDeviceLeaf deviceLeaf = {};
-  if (layout.deviceLeafIndex >= 0) {
+  std::vector<AOTChainDeviceLeaf> deviceLeaves = {};
+  deviceLeaves.reserve(layout.deviceLeafIndices.size());
+  for (auto leafIndex : layout.deviceLeafIndices) {
     const auto* parameters = std::get_if<AOTTextureParameters>(
-        &layout.leafNodes[static_cast<size_t>(layout.deviceLeafIndex)]->parameters);
+        &layout.leafNodes[static_cast<size_t>(leafIndex)]->parameters);
     if (parameters == nullptr) {
       return nullptr;
     }
-    deviceLeaf.leafIndex = layout.deviceLeafIndex;
-    deviceLeaf.textureProxy = parameters->textureProxy;
-    deviceLeaf.uvMatrix = parameters->uvMatrix;
+    deviceLeaves.push_back({leafIndex, parameters->textureProxy, parameters->uvMatrix});
   }
   return AOTPointwiseChainProcessor::Make(
       allocator, std::move(leaves), layout.slots, layout.rootRegister, tiledLeafIndex, recipePtr,
       std::move(maskChild), layout.coverageRootRegister, layout.coordSourceMask,
       std::move(lutChild), lutLeafIndex, std::move(samplerPadding), maskChildIsPhantom,
       layout.clipCoverageRegister, tiledLeafIndex2, recipePtr2, layout.profile,
-      additionalTiledLeaves, deviceLeaf);
+      additionalTiledLeaves, deviceLeaves);
 }
 
 }  // namespace

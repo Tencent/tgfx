@@ -356,7 +356,7 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     bool maskChildIsPhantom, int clipCoverageRegister, int tiledLeafIndex2,
     const AOTTiledTextureRecipe* tiledRecipe2, AOTResourceProfile profile,
     const std::vector<AOTChainTiledLeaf>& additionalTiledLeaves,
-    const AOTChainDeviceLeaf& deviceLeaf) {
+    const std::vector<AOTChainDeviceLeaf>& deviceLeaves) {
   if (allocator == nullptr) {
     return nullptr;
   }
@@ -417,17 +417,25 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
       return nullptr;
     }
   }
-  // The device-space leaf is one of the DAG leaves (a texture slot), never a sampler-only child.
-  if (deviceLeaf.leafIndex >= 0 &&
-      (static_cast<size_t>(deviceLeaf.leafIndex) >= leafCount ||
-       deviceLeaf.textureProxy == nullptr || deviceLeaf.uvMatrix.hasPerspective())) {
-    return nullptr;
+  // A device-space leaf is one of the DAG leaves (a texture slot), never a sampler-only child, and
+  // each leaf takes at most one device-space matrix.
+  uint32_t seenDeviceLeaves = 0;
+  for (const auto& deviceLeaf : deviceLeaves) {
+    if (deviceLeaf.leafIndex < 0 || static_cast<size_t>(deviceLeaf.leafIndex) >= leafCount ||
+        deviceLeaf.textureProxy == nullptr || deviceLeaf.uvMatrix.hasPerspective()) {
+      return nullptr;
+    }
+    auto bit = 1u << static_cast<uint32_t>(deviceLeaf.leafIndex);
+    if ((seenDeviceLeaves & bit) != 0) {
+      return nullptr;
+    }
+    seenDeviceLeaves |= bit;
   }
   return allocator->make<AOTPointwiseChainProcessor>(
       std::move(textureLeaves), slots, rootSlot, tiledLeafIndex, tiledRecipe, std::move(maskChild),
       coverageRootSlot, coordSourceMask, std::move(lutChild), lutLeafIndex,
       std::move(samplerPadding), maskChildIsPhantom, clipCoverageRegister, tiledLeafIndex2,
-      tiledRecipe2, profile, additionalTiledLeaves, deviceLeaf);
+      tiledRecipe2, profile, additionalTiledLeaves, deviceLeaves);
 }
 
 AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
@@ -439,12 +447,12 @@ AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
     bool maskChildIsPhantom, int clipCoverageRegister, int tiledLeafIndex2,
     const AOTTiledTextureRecipe* tiledRecipe2, AOTResourceProfile profile,
     const std::vector<AOTChainTiledLeaf>& additionalTiledLeaves,
-    const AOTChainDeviceLeaf& deviceLeaf)
+    const std::vector<AOTChainDeviceLeaf>& deviceLeaves)
     : FragmentProcessor(ClassID()), _slotCount(newSlots.size()), rootSlot(rootSlot),
       _resourceProfile(profile), hasMaskSlotChild(maskChildFP != nullptr),
       hasMaskChild(maskChildFP != nullptr && !maskChildIsPhantom),
       coverageRootSlot(coverageRootSlot), clipCoverageRegister(clipCoverageRegister),
-      coordSourceMask(coordSourceMask), lutLeafIndex(lutLeafIndex), deviceLeaf(deviceLeaf) {
+      coordSourceMask(coordSourceMask), lutLeafIndex(lutLeafIndex), deviceLeaves(deviceLeaves) {
   if (tiledLeafIndex >= 0 && tiledRecipe != nullptr) {
     tiledLeaves.push_back({tiledLeafIndex, *tiledRecipe});
   }
@@ -476,6 +484,14 @@ AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
   if (maskChildFP != nullptr) {
     registerChildProcessor(std::move(maskChildFP));
   }
+}
+
+uint32_t AOTPointwiseChainProcessor::deviceLeafMask() const {
+  uint32_t mask = 0;
+  for (const auto& deviceLeaf : deviceLeaves) {
+    mask |= 1u << static_cast<uint32_t>(deviceLeaf.leafIndex);
+  }
+  return mask;
 }
 
 void AOTPointwiseChainProcessor::emitCode(EmitArgs& args) const {
@@ -517,19 +533,26 @@ void AOTPointwiseChainProcessor::onSetData(UniformData* vertexUniformData,
   fragmentUniformData->setDataOptional("CoverageRootIndex", coverageRootSlot);
   fragmentUniformData->setDataOptional("ClipCoverageRegister", clipCoverageRegister);
   fragmentUniformData->setDataOptional("SlotCount", static_cast<int>(_slotCount));
-  // Written for every draw (absent in leaf-free variants): a stale index from an earlier draw
+  // Written for every draw (absent in leaf-free variants): a stale mask from an earlier draw
   // would make an ordinary leaf sample in device space.
-  fragmentUniformData->setDataOptional("DeviceLeafIndex", deviceLeaf.leafIndex);
-  if (deviceLeaf.leafIndex >= 0 && fragmentUniformData->hasField("DeviceLeafCoordMatrix")) {
+  fragmentUniformData->setDataOptional("DeviceLeafMask", static_cast<int>(deviceLeafMask()));
+  for (const auto& deviceLeaf : deviceLeaves) {
     // Same mapping as GLSLDeviceSpaceTextureEffect::onSetData: destination fragment coordinates
     // to the texture's sampling space.
     auto textureView = deviceLeaf.textureProxy->getTextureView();
-    if (textureView != nullptr) {
-      auto deviceCoordMatrix = deviceLeaf.uvMatrix;
-      auto scale = textureView->getTextureCoord(1, 1);
-      deviceCoordMatrix.postScale(scale.x, scale.y);
-      fragmentUniformData->setData("DeviceLeafCoordMatrix", deviceCoordMatrix);
+    if (textureView == nullptr) {
+      continue;
     }
+    auto deviceCoordMatrix = deviceLeaf.uvMatrix;
+    auto scale = textureView->getTextureCoord(1, 1);
+    deviceCoordMatrix.postScale(scale.x, scale.y);
+    std::array<float, 9> values = {
+        deviceCoordMatrix[0], deviceCoordMatrix[1], deviceCoordMatrix[2],
+        deviceCoordMatrix[3], deviceCoordMatrix[4], deviceCoordMatrix[5],
+        deviceCoordMatrix[6], deviceCoordMatrix[7], deviceCoordMatrix[8]};
+    fragmentUniformData->setArrayElementOptional("DeviceLeafCoordMatrix",
+                                                 static_cast<size_t>(deviceLeaf.leafIndex),
+                                                 MatrixColumnMajor(values));
   }
   if (leafCount() > 0) {
     std::array<int, 4> readSwizzles = {};

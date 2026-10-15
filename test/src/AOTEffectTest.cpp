@@ -1238,14 +1238,14 @@ TGFX_TEST(AOTEffectTest, DeviceSpaceLinearChainUsesChainKernel) {
     ASSERT_NE(processor, nullptr);
     ASSERT_EQ(processor->name(), "AOTPointwiseChainProcessor");
     auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
-    EXPECT_EQ(chain->deviceLeafIndex(), 0);
+    EXPECT_EQ(chain->deviceLeafMask(), 1u);
     EXPECT_EQ(chain->childProcessor(0)->name(), "TextureEffect");
     EXPECT_EQ(AOTEffectDecomposer::AnalyzeChain(processors).outcome,
               AOTDecomposeOutcome::FusablePointwise);
   }
 
-  // The kernel carries one device-space leaf coordinate matrix, so a DAG blending two device-space
-  // sources does not fit one chain pass.
+  // Every leaf carries its own device-space coordinate matrix, so a DAG blending two device-space
+  // sources with different mappings fuses into one chain pass with both leaves in device space.
   AOTNodeBuilder builder;
   AOTNodeID geometry, first, second, blended;
   ASSERT_TRUE(builder.addGeometryColor(&geometry));
@@ -1253,14 +1253,22 @@ TGFX_TEST(AOTEffectTest, DeviceSpaceLinearChainUsesChainKernel) {
   device.textureProxy = proxy;
   device.samplingKind = AOTTextureSamplingKind::Device;
   ASSERT_TRUE(builder.addTextureSource(geometry, device, &first));
+  device.uvMatrix = Matrix::MakeTrans(7, 11);
   ASSERT_TRUE(builder.addTextureSource(geometry, device, &second));
   AOTBlendParameters blend = {};
   blend.blendMode = static_cast<int>(BlendMode::SrcOver);
   ASSERT_TRUE(builder.addBlend(first, second, blend, &blended));
   AOTEffectGraph twoDeviceLeaves;
   ASSERT_TRUE(builder.finish(blended, &twoDeviceLeaves));
-  AOTEffectPlan refused;
-  EXPECT_FALSE(AOTEffectDecomposer::Decompose(twoDeviceLeaves, &refused));
+  AOTEffectPlan plan;
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(twoDeviceLeaves, &plan));
+  ASSERT_EQ(plan.passes.size(), 1u);
+  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
+  auto processor = AOTChainBuilder::BuildFPForPass(&allocator, twoDeviceLeaves, plan.passes[0]);
+  ASSERT_NE(processor, nullptr);
+  ASSERT_EQ(processor->name(), "AOTPointwiseChainProcessor");
+  auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
+  EXPECT_EQ(chain->deviceLeafMask(), 3u);
 }
 
 // The chain takes an alpha-only device-space source and an RGBAAA plain source as leaves. The
@@ -1300,7 +1308,7 @@ TGFX_TEST(AOTEffectTest, ChainLeavesTakeAlphaOnlyDeviceAndRgbaaaSources) {
     ASSERT_NE(processor, nullptr);
     ASSERT_EQ(processor->name(), "AOTPointwiseChainProcessor");
     auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
-    EXPECT_EQ(chain->deviceLeafIndex(), testCase.device ? 0 : -1);
+    EXPECT_EQ(chain->deviceLeafMask(), testCase.device ? 1u : 0u);
     ASSERT_EQ(chain->childProcessor(0)->name(), "TextureEffect");
     auto leaf = static_cast<const TextureEffect*>(chain->childProcessor(0));
     EXPECT_EQ(leaf->isAlphaOnly(), testCase.device);

@@ -2,11 +2,11 @@
 manifestVersion=1
 backend=opengles
 file=shader_bundle.opengles.bin
-fileSize=187774
-fileHash=0xada31f69bf38ee16
-identityHash=0x72b96832cb1adba3
+fileSize=187848
+fileHash=0x9a8c49b74dad3684
+identityHash=0x7482288f19187d4f
 toolchainABI=0x000000000001000b
 formatVersion=4
-sourceDigest=0xc0aa7685ee61014a
+sourceDigest=0xd06ef831fa48fbce
 shaderCount=24
 stageCount=369

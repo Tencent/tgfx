@@ -43,6 +43,7 @@
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
+#include "gpu/processors/XfermodeFragmentProcessor.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/resources/DefaultTextureView.h"
 #include "gpu/shaders/level1/PointwiseChainShader.h"
@@ -2722,6 +2723,91 @@ TGFX_TEST(AOTRenderConsistencyTest, MultiPassKeepsThresholdWithItsInput) {
   EXPECT_EQ(candidateDraws.planMaterializedEdges, 1u);
   EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
   ExpectBitmapsIdentical("offscreen-multipass-threshold-with-input", candidate, reference, 64, 64);
+}
+
+// A chain pass samples several leaves in destination device space, each through its own matrix.
+// Two device-space sources over the same image, offset by different integer translations, are
+// blended in one offscreen fill. Both leaves ride a single chain pass with no intermediate
+// texture, and every leaf reads its own mapping: a shared or swapped matrix would sample both
+// leaves at the same offset and show up in the byte comparison.
+TGFX_TEST(AOTRenderConsistencyTest, ChainPassSamplesSeveralDeviceSpaceLeaves) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+  auto sourceSurface = Surface::Make(context, image->width(), image->height(), false, 1, true);
+  ASSERT_NE(sourceSurface, nullptr);
+  {
+    ScopedAOTStatsPause pause(context, true);
+    sourceSurface->getCanvas()->drawImage(image, 0, 0);
+    context->flushAndSubmit(true);
+  }
+  auto source = context->proxyProvider()->wrapExternalTexture(sourceSurface->getBackendTexture());
+  ASSERT_NE(source, nullptr);
+  constexpr int size = 64;
+  auto render = [&](bool useBundle, Bitmap* outBitmap, AOTDrawStats* outDraws) {
+    if (useBundle) {
+      auto bundle = EmbeddedShaderBundles::GetBundle(context->backend());
+      ASSERT_NE(bundle.first, nullptr);
+      ASSERT_TRUE(cache->loadBundle(bundle.first, bundle.second));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause pause(context, !useBundle);
+    cache->setDecompositionEnabled(useBundle);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->clearPrograms();
+    context->globalCache()->resetProgramStats();
+    auto target = RenderTargetProxy::Make(context, size, size, false);
+    ASSERT_NE(target, nullptr);
+    auto allocator = context->drawingAllocator();
+    auto first = DeviceSpaceTextureEffect::Make(allocator, source, Matrix::MakeTrans(8, 16));
+    auto second = DeviceSpaceTextureEffect::Make(allocator, source, Matrix::MakeTrans(40, 24));
+    ASSERT_NE(first, nullptr);
+    ASSERT_NE(second, nullptr);
+    auto processor = XfermodeFragmentProcessor::MakeFromTwoProcessors(
+        allocator, std::move(first), std::move(second), BlendMode::Screen);
+    ASSERT_NE(processor, nullptr);
+    ASSERT_TRUE(
+        context->drawingManager()->fillRTWithFP(target, std::move(processor), 0, Point::Zero()));
+    context->flushAndSubmit(true);
+    if (useBundle) {
+      const auto records = cache->hitRecords();
+      ASSERT_FALSE(records.empty());
+      for (const auto& record : records) {
+        EXPECT_EQ(record.shaderName, "PointwiseChainShader");
+      }
+    }
+    auto rt = target->getRenderTarget();
+    ASSERT_NE(rt, nullptr);
+    auto surface = Surface::MakeFrom(context, rt->getBackendRenderTarget(), rt->origin());
+    ASSERT_NE(surface, nullptr);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    EXPECT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+    if (outDraws != nullptr) {
+      *outDraws = cache->drawStats();
+    }
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->setDecompositionEnabled(true);
+    cache->unload();
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  AOTDrawStats candidateDraws = {};
+  render(false, &reference, nullptr);
+  render(true, &candidate, &candidateDraws);
+  EXPECT_EQ(candidateDraws.completeAOTDraws, 1u);
+  EXPECT_EQ(candidateDraws.atomicFallbacks, 0u);
+  EXPECT_EQ(candidateDraws.kernelInvocations, 1u);
+  EXPECT_EQ(candidateDraws.materializedEdges, 0u);
+  EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+  ExpectBitmapsIdentical("chain-pass-several-device-leaves", candidate, reference, size, size);
 }
 
 // Inside the chain kernel's instruction budget an on-screen color-filter chain runs as one fused
