@@ -263,13 +263,20 @@ class Surface {
       DrawingManager* drawingManager, const std::shared_ptr<RenderTargetProxy>& renderTarget);
 
   /**
-   * Prepares recording a copy (a readback or a snapshot) of the surface content and returns the
-   * render target to copy from, or nullptr if the surface can no longer use it. Closes the open
-   * drawing on the target first, so the copy captures everything recorded before it. For a window
-   * surface, that includes the drawing other surfaces of the window recorded on the shared frame,
-   * and the surface switches to the window's current frame target first.
+   * Returns the render target a copy (a readback or a snapshot) of the surface content reads
+   * from, or nullptr if the surface can no longer use it. Records nothing for offscreen surfaces;
+   * a window surface switches to the window's current frame target first. Call
+   * closeDrawingForCopy() right before recording the copy itself.
    */
-  std::shared_ptr<RenderTargetProxy> prepareCopy(DrawingManager* drawingManager);
+  std::shared_ptr<RenderTargetProxy> resolveCopySource(DrawingManager* drawingManager);
+
+  /**
+   * Closes the open drawing on the copy source, so the copy recorded next captures everything
+   * recorded before it. For a window surface, that includes the drawing other surfaces of the
+   * window recorded on the shared frame.
+   */
+  void closeDrawingForCopy(DrawingManager* drawingManager,
+                           const std::shared_ptr<RenderTargetProxy>& renderTarget);
 
   /**
    * Returns the target a window surface currently holding renderTarget must use: the window's
