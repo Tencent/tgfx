@@ -32,6 +32,7 @@
 #include "BundleVerifier.h"
 #include "BundleWriter.h"
 #include "ContractChecks.h"
+#include "InlineExpansion.h"
 #include "ReflectionExtractor.h"
 #include "ShaderCompiler.h"
 #include "ShaderSources.h"
@@ -72,6 +73,7 @@ struct BuildOptions {
   bool compress = false;
   bool audit = false;
   std::string stageReportPath;
+  std::string inlineReportPath;
   std::string verifyBundleDir;
   // Set by --require-backends; stays empty (nullopt) when the flag is absent.
   std::optional<std::vector<std::string>> requiredBackends;
@@ -98,6 +100,8 @@ struct ShaderReport {
 struct BuildReport {
   std::vector<ShaderReport> shaders;
   std::vector<VariantData> variants;
+  // One per compiled fragment permutation, from its unoptimized SPIR-V.
+  std::vector<InlineExpansionRecord> inlineExpansions;
   std::map<std::string, uint64_t> profileErrorCounts;
   bool hasErrors = false;
   std::string errorMessage;
@@ -185,6 +189,9 @@ static void PrintUsage() {
       << "  --report-only         Only enumerate and report, do not compile\n"
       << "  --audit               Cross-check legacy compile lists against rule-reachable sets\n"
       << "  --stage-report <path> Write the per-stage audit report (requires a full compile)\n"
+      << "  --inline-report <path>\n"
+      << "                        Write each fragment variant's inline expansion (functions the\n"
+      << "                        driver compiles more than once) as JSON\n"
       << "  --verify-bundle <dir> Verify existing bundles in <dir> against the reachable set and\n"
       << "                        exit; checks headers, identity hash, and pool completeness.\n"
       << "                        With --shader-dir it also fails any bundle whose manifest\n"
@@ -231,6 +238,8 @@ static bool ParseArgs(int argc, char** argv, BuildOptions* options) {
       options->audit = true;
     } else if (std::strcmp(argv[i], "--stage-report") == 0 && i + 1 < argc) {
       options->stageReportPath = argv[++i];
+    } else if (std::strcmp(argv[i], "--inline-report") == 0 && i + 1 < argc) {
+      options->inlineReportPath = argv[++i];
     } else if (std::strcmp(argv[i], "--verify-bundle") == 0 && i + 1 < argc) {
       options->verifyBundleDir = argv[++i];
     } else if (std::strcmp(argv[i], "--require-backends") == 0 && i + 1 < argc) {
@@ -862,8 +871,10 @@ static const ReflectionResult& ExtractReflectionShared(const std::string& shader
 static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const BuildOptions& options,
                                      const ShaderSource* source,
                                      std::vector<VariantData>* outVariants,
+                                     std::vector<InlineExpansionRecord>* outInlineExpansions,
                                      std::map<std::string, uint64_t>* profileErrorCounts) {
   ShaderReport report;
+  std::set<uint32_t> analyzedFrags;
   report.name = info.name;
   auto vertDomain = info.vertDomain;
   auto fragDomain = info.fragDomain;
@@ -918,6 +929,12 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
       report.errorCount++;
       RecordCommonArtifactError(profileErrorCounts);
       continue;
+    }
+
+    // The unoptimized SPIR-V still has one function per GLSL function and one OpFunctionCall per
+    // call site, so it shows what every backend's driver ends up inlining.
+    if (analyzedFrags.insert(fi).second) {
+      outInlineExpansions->push_back({info.name, fi, AnalyzeInlineExpansion(fragResult.spirv)});
     }
 
     // Extract reflection from SPIR-V (shared across backend passes, like the compiles above).
@@ -1354,7 +1371,8 @@ int main(int argc, char** argv) {
       return 1;
     }
     auto shaderReport =
-        tgfx::CompileOneShader(info, options, source, &report.variants, &report.profileErrorCounts);
+        tgfx::CompileOneShader(info, options, source, &report.variants, &report.inlineExpansions,
+                               &report.profileErrorCounts);
     std::cout << "[" << shaderReport.name << "] raw=" << shaderReport.rawCount
               << " compiled=" << shaderReport.compiledCount;
     if (shaderReport.errorCount > 0) {
@@ -1380,6 +1398,13 @@ int main(int argc, char** argv) {
   // the C++ constants, otherwise the runtime uploads would silently miss their targets.
   size_t contractErrors = tgfx::ValidateClipContractFields(report.variants);
   contractErrors += tgfx::ValidateReflectionContracts(report.variants);
+  // A heavy function inlined at several call sites multiplies the driver's compile work on every
+  // backend that compiles at runtime (GL source, Metal AIR, SPIR-V).
+  if (!options.inlineReportPath.empty() &&
+      !tgfx::WriteInlineExpansionReport(options.inlineReportPath, report.inlineExpansions)) {
+    return 1;
+  }
+  contractErrors += tgfx::ValidateInlineExpansion(report.inlineExpansions);
   if (!options.reportOnly && !options.shaderDir.empty()) {
     contractErrors += tgfx::ValidateChainOpCodes(options.shaderDir);
     contractErrors += tgfx::ValidatePointwiseOpCodes(options.shaderDir);
