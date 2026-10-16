@@ -50,6 +50,10 @@ OpaqueContext::OpaqueContext() {
 
 OpaqueContext::~OpaqueContext() = default;
 
+void OpaqueContext::setUnionCoverage(bool unionCoverage) {
+  this->unionCoverage = unionCoverage;
+}
+
 Canvas* OpaqueContext::beginRecording() {
   if (canvas == nullptr) {
     canvas = std::unique_ptr<Canvas>(new Canvas(this));
@@ -326,15 +330,19 @@ void OpaqueContext::flushPendingContour(const Contour& contour, const Matrix& ma
  * Converts a brush to "opaque mode" by applying AlphaThreshold filter.
  * Semi-transparent pixels become fully opaque, while fully transparent pixels remain transparent.
  */
-Brush GetOpaqueBrush(const Brush& brush) {
+Brush GetOpaqueBrush(const Brush& brush, bool unionCoverage) {
   Color color;
   if (brush.shader && !brush.shader->asColor(&color)) {
     auto opaqueBrush = brush;
     opaqueBrush.colorFilter = ColorFilter::AlphaThreshold(OPAQUE_THRESHOLD);
     return opaqueBrush;
   }
-  // Src + coverage AA may cause edge artifacts, use SrcOver instead.
-  auto opaqueBrush = Brush(Color::White(), BlendMode::SrcOver, false);
+  // Src + coverage AA may cause edge artifacts, use SrcOver instead. That holds for a composite of
+  // independent painters, but an own-silhouette recording needs their union: SrcOver leaves the
+  // shared anti-aliased boundary of two adjacent painters at 1 - f + f * f (0.75 at f = 0.5), so
+  // the union must be additive to keep the covered area at full opacity.
+  auto blendMode = unionCoverage ? BlendMode::PlusLighter : BlendMode::SrcOver;
+  auto opaqueBrush = Brush(Color::White(), blendMode, false);
   opaqueBrush.maskFilter = brush.maskFilter;
   return opaqueBrush;
 }
@@ -344,7 +352,7 @@ void OpaqueContext::appendFill(const Brush& brush) {
   if (pendingShader == nullptr) {
     return;
   }
-  pendingBrushes.emplace_back(GetOpaqueBrush(brush));
+  pendingBrushes.emplace_back(GetOpaqueBrush(brush, unionCoverage));
 }
 
 void OpaqueContext::resetPendingContour(const Contour& contour, const Matrix& matrix,
@@ -352,7 +360,7 @@ void OpaqueContext::resetPendingContour(const Contour& contour, const Matrix& ma
   pendingContour = contour;
   pendingMatrix = matrix;
   pendingClip = clip;
-  pendingBrushes = {GetOpaqueBrush(brush)};
+  pendingBrushes = {GetOpaqueBrush(brush, unionCoverage)};
 }
 
 bool OpaqueContext::Contour::isInverseFillType() const {

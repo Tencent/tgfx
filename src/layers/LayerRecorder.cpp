@@ -273,7 +273,8 @@ bool LayerRecorder::canAppend(PendingType type, const LayerPaint& paint,
     return false;
   }
   if (pendingPaint.placement != paint.placement || pendingPaint.style != paint.style ||
-      pendingPaint.blendMode != paint.blendMode) {
+      pendingPaint.blendMode != paint.blendMode ||
+      pendingPaint.silhouetteOnly != paint.silhouetteOnly) {
     return false;
   }
   if (pendingPaint.color != paint.color) {

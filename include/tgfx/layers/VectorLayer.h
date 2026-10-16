@@ -65,7 +65,13 @@ class VectorLayer : public Layer {
 
   std::optional<StyledShape> onGetContentShape() override;
 
+  std::optional<StyledShape> onGetOwnContourShape() override;
+
  private:
+  // Derives the layer outline from the painters. includeSilhouetteOnly decides whether painters
+  // marked silhouetteOnly, which draw nothing but still describe the layer's own shape, take part.
+  std::optional<StyledShape> computeContentShape(bool includeSilhouetteOnly);
+
   std::vector<std::shared_ptr<VectorElement>> _contents = {};
 };
 
