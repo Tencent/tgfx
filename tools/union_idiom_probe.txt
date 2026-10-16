@@ -1,0 +1,15 @@
+=== off 42958415 len 6850 tags ['refraction', 'smoothstep'] ===
+(no uniform block)
+vec2 a(float b){float c=floor(b*255.0)*(1.0/255.0);float d=(b-c)*255.0;return vec2(c,d);}vec4 e(float b){vec2 f=a(b);float g=f.x+f.y*(1.0/255.0);float h=(b-g)*65025.0;vec2 i=a(h);return vec4(f,i);}const vec4 j=vec4(1.0,1.0/255.0,1.0/65025.0,1.0/16581375.0);float k(vec4 l){return dot(l,j);}vec2 m(vec
+
+=== off 42972549 len 6830 tags ['refraction', 'smoothstep'] ===
+uniform UniformBlock{mat3 nodeToTileSpace;mat3 tileToNodeSpace;vec4 quad;vec2 nodeSpaceCenterPoint;float tileExpansionScale;float heightExpansionScale;float bevelExpansionScale;float heightMapTexelSize;float frameRotation;float refractionIntensity;fl
+layout(std140)uniform UniformBlock{mat3 nodeToTileSpace;mat3 tileToNodeSpace;vec4 quad;vec2 nodeSpaceCenterPoint;float tileExpansionScale;float heightExpansionScale;float bevelExpansionScale;float heightMapTexelSize;float frameRotation;float refractionIntensity;float refractionDistance;float lightIn
+
+=== off 43001139 len 6840 tags ['refraction', 'cornerSmoothings', 'cornerRadii', 'smoothstep'] ===
+(no uniform block)
+vec2 a(vec2 b){float c=dot(b,b);return c>1.0e-10?b/sqrt(c):vec2(0.0,0.0);}float d(vec2 e,vec2 f){vec2 g=abs(e)-f;return length(max(g,vec2(0.0)))+min(max(g.x,g.y),0.0);}float h(vec2 e,vec2 f,float i){float j=min(i,min(f.x,f.y));return d(e,f-j)-j;}float k(vec2 e,vec2 f,vec4 l){float g=-9999999.0;vec2 
+
+=== off 43015215 len 6776 tags ['refraction', 'cornerSmoothings', 'cornerRadii', 'smoothstep'] ===
+uniform UniformBlock{mat3 nodeToTileSpace;mat3 tileToNodeSpace;vec4 quad;vec4 cornerRadii;vec4 cornerSmoothings;vec4 tintColor;vec2 nodeSpaceCenterPoint;int hasUniformCorners;float tileExpansionScale;float splay;float frameRotation;float refractionIn
+layout(std140)uniform UniformBlock{mat3 nodeToTileSpace;mat3 tileToNodeSpace;vec4 quad;vec4 cornerRadii;vec4 cornerSmoothings;vec4 tintColor;vec2 nodeSpaceCenterPoint;int hasUniformCorners;float tileExpansionScale;float splay;float frameRotation;float refractionIntensity;float refractionDistance;flo

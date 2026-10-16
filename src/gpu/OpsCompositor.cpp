@@ -132,6 +132,17 @@ static bool ComplexMismatch(const RRect& newRRect,
   return newRRect.isComplex() != pending.front()->rRect.isComplex();
 }
 
+// Returns true when the new RRect's corner smoothness disagrees with the RRects already queued.
+// Smooth RRects use a dedicated GP whose smoothness coefficients are uniforms shared by the whole
+// batch, so one op can only hold a single smoothness value.
+static bool SmoothnessMismatch(const RRect& newRRect,
+                               const std::vector<PlacementPtr<RRectRecord>>& pending) {
+  if (pending.empty()) {
+    return false;
+  }
+  return newRRect.smoothness() != pending.front()->rRect.smoothness();
+}
+
 void OpsCompositor::fillRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip,
                              const Brush& brush, const Stroke* stroke) {
   DEBUG_ASSERT(!rect.isEmpty());
@@ -154,7 +165,8 @@ void OpsCompositor::drawRRect(const RRect& rRect, const Matrix& matrix, const Cl
   // Complex and non-Complex RRects use different GPs and vertex layouts, so they cannot be
   // batched into the same op; flush if the incoming RRect's complexity disagrees with pending.
   if (!canAppend(PendingOpType::RRect, clip, rectBrush) ||
-      ShouldFlushRectOps(pendingStrokes, stroke) || ComplexMismatch(rRect, pendingRRects)) {
+      ShouldFlushRectOps(pendingStrokes, stroke) || ComplexMismatch(rRect, pendingRRects) ||
+      SmoothnessMismatch(rRect, pendingRRects)) {
     flushPendingOps(PendingOpType::RRect, clip, rectBrush);
   }
   auto record = drawingAllocator()->make<RRectRecord>(rRect, matrix, rectBrush.color);

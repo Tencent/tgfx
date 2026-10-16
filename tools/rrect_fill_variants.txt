@@ -1,0 +1,85 @@
+=== 43063510 len 542 tags ['discard', 'uShapeType'] ===
+uniform float alpha;uniform vec4 color;varying vec2 _coord2;bool a(vec2 b,vec2 c,float d){vec2 e=abs(b*c-c/2.0)-(c/2.0)+d;return min(max(e.x,e.y),0.0)+length(max(e,0.0))<=d;}uniform int uShapeType;uniform float cornerRadius;uniform vec2 rectSize;varying vec2 _vertexCoord2;const int f=1;const int g=2;void h(){if(uShapeType==f){if(!a(_vertexCoord2,rectSize,cornerRadius)){discard;}}else if(uShapeType==g){vec2 i=vec2(0.5,0.5)-_vertexCoord2;if((i.x*i.x)/(0.5*0.5)+(i.y*i.y)/(0.5*0.5)>1.0){discard;}}}v
+
+=== 43064575 len 654 tags ['discard', 'uShapeType'] ===
+layout(std140)uniform UniformBlock{mat3 paintTransform;mat3 vertexTransform;vec4 color;vec2 rectSize;float alpha;int uShapeType;float cornerRadius;float dummyPadding0;float dummyPadding1;float dummyPadding2;};in vec2 _coord2;bool a(vec2 b,vec2 c,float d){vec2 e=abs(b*c-c/2.0)-(c/2.0)+d;return min(max(e.x,e.y),0.0)+length(max(e,0.0))<=d;}in vec2 _vertexCoord2;const int f=1;const int g=2;void h(){if(uShapeType==f){if(!a(_vertexCoord2,rectSize,cornerRadius)){discard;}}else if(uShapeType==g){vec2 i=
+
+=== 43065198 len 623 tags ['discard', 'uShapeType'] ===
+layout(std140)uniform UniformBlock{vec4 quad;vec4 color;vec2 rectSize;float alpha;int uShapeType;float cornerRadius;float dummyPadding0;float dummyPadding1;float dummyPadding2;};in vec2 _coord2;bool a(vec2 b,vec2 c,float d){vec2 e=abs(b*c-c/2.0)-(c/2.0)+d;return min(max(e.x,e.y),0.0)+length(max(e,0.0))<=d;}in vec2 _vertexCoord2;const int f=1;const int g=2;void h(){if(uShapeType==f){if(!a(_vertexCoord2,rectSize,cornerRadius)){discard;}}else if(uShapeType==g){vec2 i=vec2(0.5,0.5)-_vertexCoord2;if(
+
+=== 43065682 len 556 tags ['discard', 'uShapeType'] ===
+uniform float alpha;uniform vec4 color;in vec2 _coord2;bool a(vec2 b,vec2 c,float d){vec2 e=abs(b*c-c/2.0)-(c/2.0)+d;return min(max(e.x,e.y),0.0)+length(max(e,0.0))<=d;}uniform int uShapeType;uniform float cornerRadius;uniform vec2 rectSize;in vec2 _vertexCoord2;const int f=1;const int g=2;void h(){if(uShapeType==f){if(!a(_vertexCoord2,rectSize,cornerRadius)){discard;}}else if(uShapeType==g){vec2 i=vec2(0.5,0.5)-_vertexCoord2;if((i.x*i.x)/(0.5*0.5)+(i.y*i.y)/(0.5*0.5)>1.0){discard;}}}out vec4 fi
+
+=== 43070067 len 4410 tags ['discard', 'uShapeType', 'clamp('] ===
+uniform int colorConversionType;vec3 a(vec3 b){vec3 c;for(int d=0;d<3;d++){float e=b[d];float sign=e<0.0?-1.0:1.0;float f=abs(e);if(f<0.04045){c[d]=e/12.92;}else{c[d]=sign*pow((f+0.055)/1.055,2.4);}}return c;}vec3 g(vec3 b){vec3 c;for(int d=0;d<3;d++){float e=b[d];float sign=e<0.0?-1.0:1.0;float f=abs(e);if(f>0.0031308){c[d]=sign*(1.055*pow(f,1.0/2.4)-0.055);}else{c[d]=12.92*e;}}return c;}vec3 h(vec3 b){const float i=0.17883277;const float j=0.28466892;const float k=0.55991073;vec3 c;for(int d=0
+
+=== 43074467 len 4400 tags ['discard', 'uShapeType', 'clamp('] ===
+uniform int colorConversionType;vec3 a(vec3 b){vec3 c;for(int d=0;d<3;d++){float e=b[d];float sign=e<0.0?-1.0:1.0;float f=abs(e);if(f<0.04045){c[d]=e/12.92;}else{c[d]=sign*pow((f+0.055)/1.055,2.4);}}return c;}vec3 g(vec3 b){vec3 c;for(int d=0;d<3;d++){float e=b[d];float sign=e<0.0?-1.0:1.0;float f=abs(e);if(f>0.0031308){c[d]=sign*(1.055*pow(f,1.0/2.4)-0.055);}else{c[d]=12.92*e;}}return c;}vec3 h(vec3 b){const float i=0.17883277;const float j=0.28466892;const float k=0.55991073;vec3 c;for(int d=0
+
+=== 43080987 len 6524 tags ['discard', 'uShapeType', 'clamp('] ===
+uniform int colorConversionType;vec3 a(vec3 b){vec3 c;for(int d=0;d<3;d++){float e=b[d];float sign=e<0.0?-1.0:1.0;float f=abs(e);if(f<0.04045){c[d]=e/12.92;}else{c[d]=sign*pow((f+0.055)/1.055,2.4);}}return c;}vec3 g(vec3 b){vec3 c;for(int d=0;d<3;d++){float e=b[d];float sign=e<0.0?-1.0:1.0;float f=abs(e);if(f>0.0031308){c[d]=sign*(1.055*pow(f,1.0/2.4)-0.055);}else{c[d]=12.92*e;}}return c;}vec3 h(vec3 b){const float i=0.17883277;const float j=0.28466892;const float k=0.55991073;vec3 c;for(int d=0
+
+=== 43087501 len 6514 tags ['discard', 'uShapeType', 'clamp('] ===
+uniform int colorConversionType;vec3 a(vec3 b){vec3 c;for(int d=0;d<3;d++){float e=b[d];float sign=e<0.0?-1.0:1.0;float f=abs(e);if(f<0.04045){c[d]=e/12.92;}else{c[d]=sign*pow((f+0.055)/1.055,2.4);}}return c;}vec3 g(vec3 b){vec3 c;for(int d=0;d<3;d++){float e=b[d];float sign=e<0.0?-1.0:1.0;float f=abs(e);if(f>0.0031308){c[d]=sign*(1.055*pow(f,1.0/2.4)-0.055);}else{c[d]=12.92*e;}}return c;}vec3 h(vec3 b){const float i=0.17883277;const float j=0.28466892;const float k=0.55991073;vec3 c;for(int d=0
+
+=== 43092028 len 4470 tags ['discard', 'uShapeType', 'clamp('] ===
+layout(std140)uniform UniformBlock{mat3 paintTransform;mat3 vertexTransform;vec2 rectSize;int colorConversionType;int emulateWrapAddress;float alpha;int uShapeType;float cornerRadius;float dummyPadding0;};vec3 a(vec3 b){vec3 c;for(int d=0;d<3;d++){float e=b[d];float sign=e<0.0?-1.0:1.0;float f=abs(e);if(f<0.04045){c[d]=e/12.92;}else{c[d]=sign*pow((f+0.055)/1.055,2.4);}}return c;}vec3 g(vec3 b){vec3 c;for(int d=0;d<3;d++){float e=b[d];float sign=e<0.0?-1.0:1.0;float f=abs(e);if(f>0.0031308){c[d]=
+
+=== 43096488 len 4460 tags ['discard', 'uShapeType', 'clamp('] ===
+layout(std140)uniform UniformBlock{mat3 paintTransform;mat3 vertexTransform;vec2 rectSize;int colorConversionType;int emulateWrapAddress;float alpha;int uShapeType;float cornerRadius;float dummyPadding0;};vec3 a(vec3 b){vec3 c;for(int d=0;d<3;d++){float e=b[d];float sign=e<0.0?-1.0:1.0;float f=abs(e);if(f<0.04045){c[d]=e/12.92;}else{c[d]=sign*pow((f+0.055)/1.055,2.4);}}return c;}vec3 g(vec3 b){vec3 c;for(int d=0;d<3;d++){float e=b[d];float sign=e<0.0?-1.0:1.0;float f=abs(e);if(f>0.0031308){c[d]=
+
+=== 43100836 len 4420 tags ['discard', 'uShapeType', 'clamp('] ===
+uniform int colorConversionType;vec3 a(vec3 b){vec3 c;for(int d=0;d<3;d++){float e=b[d];float sign=e<0.0?-1.0:1.0;float f=abs(e);if(f<0.04045){c[d]=e/12.92;}else{c[d]=sign*pow((f+0.055)/1.055,2.4);}}return c;}vec3 g(vec3 b){vec3 c;for(int d=0;d<3;d++){float e=b[d];float sign=e<0.0?-1.0:1.0;float f=abs(e);if(f>0.0031308){c[d]=sign*(1.055*pow(f,1.0/2.4)-0.055);}else{c[d]=12.92*e;}}return c;}vec3 h(vec3 b){const float i=0.17883277;const float j=0.28466892;const float k=0.55991073;vec3 c;for(int d=0
+
+=== 43105246 len 4410 tags ['discard', 'uShapeType', 'clamp('] ===
+uniform int colorConversionType;vec3 a(vec3 b){vec3 c;for(int d=0;d<3;d++){float e=b[d];float sign=e<0.0?-1.0:1.0;float f=abs(e);if(f<0.04045){c[d]=e/12.92;}else{c[d]=sign*pow((f+0.055)/1.055,2.4);}}return c;}vec3 g(vec3 b){vec3 c;for(int d=0;d<3;d++){float e=b[d];float sign=e<0.0?-1.0:1.0;float f=abs(e);if(f>0.0031308){c[d]=sign*(1.055*pow(f,1.0/2.4)-0.055);}else{c[d]=12.92*e;}}return c;}vec3 h(vec3 b){const float i=0.17883277;const float j=0.28466892;const float k=0.55991073;vec3 c;for(int d=0
+
+=== 43111834 len 6520 tags ['discard', 'uShapeType', 'clamp('] ===
+layout(std140)uniform UniformBlock{mat3 paintTransform;mat3 vertexTransform;vec2 rectSize;int colorConversionType;float globalTint;float globalColor;float globalShadows;float globalHighlights;float globalExposure;float globalTemperature;float globalContrast;float highlightShadowThreshold;int emulateWrapAddress;float alpha;int uShapeType;float cornerRadius;float dummyPadding0;};vec3 a(vec3 b){vec3 c;for(int d=0;d<3;d++){float e=b[d];float sign=e<0.0?-1.0:1.0;float f=abs(e);if(f<0.04045){c[d]=e/12
+
+=== 43118344 len 6510 tags ['discard', 'uShapeType', 'clamp('] ===
+layout(std140)uniform UniformBlock{mat3 paintTransform;mat3 vertexTransform;vec2 rectSize;int colorConversionType;float globalTint;float globalColor;float globalShadows;float globalHighlights;float globalExposure;float globalTemperature;float globalContrast;float highlightShadowThreshold;int emulateWrapAddress;float alpha;int uShapeType;float cornerRadius;float dummyPadding0;};vec3 a(vec3 b){vec3 c;for(int d=0;d<3;d++){float e=b[d];float sign=e<0.0?-1.0:1.0;float f=abs(e);if(f<0.04045){c[d]=e/12
+
+=== 43124806 len 6534 tags ['discard', 'uShapeType', 'clamp('] ===
+uniform int colorConversionType;vec3 a(vec3 b){vec3 c;for(int d=0;d<3;d++){float e=b[d];float sign=e<0.0?-1.0:1.0;float f=abs(e);if(f<0.04045){c[d]=e/12.92;}else{c[d]=sign*pow((f+0.055)/1.055,2.4);}}return c;}vec3 g(vec3 b){vec3 c;for(int d=0;d<3;d++){float e=b[d];float sign=e<0.0?-1.0:1.0;float f=abs(e);if(f>0.0031308){c[d]=sign*(1.055*pow(f,1.0/2.4)-0.055);}else{c[d]=12.92*e;}}return c;}vec3 h(vec3 b){const float i=0.17883277;const float j=0.28466892;const float k=0.55991073;vec3 c;for(int d=0
+
+=== 43131330 len 6524 tags ['discard', 'uShapeType', 'clamp('] ===
+uniform int colorConversionType;vec3 a(vec3 b){vec3 c;for(int d=0;d<3;d++){float e=b[d];float sign=e<0.0?-1.0:1.0;float f=abs(e);if(f<0.04045){c[d]=e/12.92;}else{c[d]=sign*pow((f+0.055)/1.055,2.4);}}return c;}vec3 g(vec3 b){vec3 c;for(int d=0;d<3;d++){float e=b[d];float sign=e<0.0?-1.0:1.0;float f=abs(e);if(f>0.0031308){c[d]=sign*(1.055*pow(f,1.0/2.4)-0.055);}else{c[d]=12.92*e;}}return c;}vec3 h(vec3 b){const float i=0.17883277;const float j=0.28466892;const float k=0.55991073;vec3 c;for(int d=0
+
+=== 43216553 len 2773 tags ['smoothstep', 'fwidth', 'clamp('] ===
+#extension GL_OES_standard_derivatives:enable
+const float a=0.007843;float b(){vec2 c=gl_FragCoord.xy;return fract(sin(dot(vec2(12.9898,78.233),c))*43758.5453);}vec4 d(vec4 color){float e=(b()-0.5)*a;return color.a>0.0?min(abs(color+e),1.0):color;}float f(float g){if(g<-1.0){return 0.0;}else if(g<0.0){return 0.5*(g+1.0)*(g+1.0);}else if(g<1.0){return 0.5-0.5*g*(g-2.0);}else{return 1.0;}}float h(float g){return max(0.0,(1.0-abs(g)));}float i(vec4 j){return(f(j.x)-f(j.z))*(f(j.y)-f(j.w));}float k(
+
+=== 43219455 len 2850 tags ['smoothstep', 'fwidth', 'clamp('] ===
+layout(std140)uniform UniformBlock{mat3 vertexTransform;vec4 shadowBounds;vec4 maskBounds;vec4 color;float blurRadius;int useAAAMask;float dummyPadding0;float dummyPadding1;};const float a=0.007843;float b(){vec2 c=gl_FragCoord.xy;return fract(sin(dot(vec2(12.9898,78.233),c))*43758.5453);}vec4 d(vec4 color){float e=(b()-0.5)*a;return color.a>0.0?min(abs(color+e),1.0):color;}float f(float g){if(g<-1.0){return 0.0;}else if(g<0.0){return 0.5*(g+1.0)*(g+1.0);}else if(g<1.0){return 0.5-0.5*g*(g-2.0);
+
+=== 43222130 len 2741 tags ['smoothstep', 'fwidth', 'clamp('] ===
+const float a=0.007843;float b(){vec2 c=gl_FragCoord.xy;return fract(sin(dot(vec2(12.9898,78.233),c))*43758.5453);}vec4 d(vec4 color){float e=(b()-0.5)*a;return color.a>0.0?min(abs(color+e),1.0):color;}float f(float g){if(g<-1.0){return 0.0;}else if(g<0.0){return 0.5*(g+1.0)*(g+1.0);}else if(g<1.0){return 0.5-0.5*g*(g-2.0);}else{return 1.0;}}float h(float g){return max(0.0,(1.0-abs(g)));}float i(vec4 j){return(f(j.x)-f(j.z))*(f(j.y)-f(j.w));}float k(float l,float m,float n,float o,float p){float
+
+=== 43416473 len 1182 tags ['discard', 'uShapeType'] ===
+layout(std140)uniform UniformBlock{mat3 paintTransform;mat3 vertexTransform;vec2 rectSize;int type;float alpha;int uShapeType;float cornerRadius;float dummyPadding0;float dummyPadding1;};const float a=3.141592;vec2 b(in vec2 c){const int d=1;const int e=2;const int f=3;const int g=4;vec2 h=c-0.5;float i=type==d?h.x+0.5:type==e?2.0*length(h):type==f?fract(atan(h.y,h.x)/(2.0*a)):type==g?2.0*max(abs(h.x+h.y),abs(h.y-h.x)):0.0;return vec2(i,0.25+(0.75-0.25)/256.0);}const float j=0.007843;float k(){v
+
+=== 43417505 len 1104 tags ['discard', 'uShapeType'] ===
+uniform int type;const float a=3.141592;vec2 b(in vec2 c){const int d=1;const int e=2;const int f=3;const int g=4;vec2 h=c-0.5;float i=type==d?h.x+0.5:type==e?2.0*length(h):type==f?fract(atan(h.y,h.x)/(2.0*a)):type==g?2.0*max(abs(h.x+h.y),abs(h.y-h.x)):0.0;return vec2(i,0.25+(0.75-0.25)/256.0);}const float j=0.007843;float k(){vec2 l=gl_FragCoord.xy;return fract(sin(dot(vec2(12.9898,78.233),l))*43758.5453);}vec4 m(vec4 n){float o=(k()-0.5)*j;return n.a>0.0?min(abs(n+o),1.0):n;}uniform float alph
+
+=== 43418614 len 1092 tags ['discard', 'uShapeType'] ===
+uniform int type;const float a=3.141592;vec2 b(in vec2 c){const int d=1;const int e=2;const int f=3;const int g=4;vec2 h=c-0.5;float i=type==d?h.x+0.5:type==e?2.0*length(h):type==f?fract(atan(h.y,h.x)/(2.0*a)):type==g?2.0*max(abs(h.x+h.y),abs(h.y-h.x)):0.0;return vec2(i,0.25+(0.75-0.25)/256.0);}const float j=0.007843;float k(){vec2 l=gl_FragCoord.xy;return fract(sin(dot(vec2(12.9898,78.233),l))*43758.5453);}vec4 m(vec4 n){float o=(k()-0.5)*j;return n.a>0.0?min(abs(n+o),1.0):n;}uniform float alph
+
+=== 43421383 len 3198 tags ['smoothstep', 'fwidth', 'clamp('] ===
+#extension GL_OES_standard_derivatives:enable
+const float a=0.007843;float b(){vec2 c=gl_FragCoord.xy;return fract(sin(dot(vec2(12.9898,78.233),c))*43758.5453);}vec4 d(vec4 color){float e=(b()-0.5)*a;return color.a>0.0?min(abs(color+e),1.0):color;}float f(float g){if(g<-1.0){return 0.0;}else if(g<0.0){return 0.5*(g+1.0)*(g+1.0);}else if(g<1.0){return 0.5-0.5*g*(g-2.0);}else{return 1.0;}}float h(float g){return max(0.0,(1.0-abs(g)));}float i(vec4 j){return(f(j.x)-f(j.z))*(f(j.y)-f(j.w));}float k(
+
+=== 43424836 len 3279 tags ['smoothstep', 'fwidth', 'clamp('] ===
+layout(std140)uniform UniformBlock{mat3 vertexTransform;vec4 shadowBounds;vec4 maskBounds;vec4 color;vec2 maskHalfSize;vec2 shadowHalfSize;float blurRadius;float maskCornerRadius;float shadowCornerRadius;float invBlurRadius;int useAAAMask;float dummyPadding0;float dummyPadding1;float dummyPadding2;};const float a=0.007843;float b(){vec2 c=gl_FragCoord.xy;return fract(sin(dot(vec2(12.9898,78.233),c))*43758.5453);}vec4 d(vec4 color){float e=(b()-0.5)*a;return color.a>0.0?min(abs(color+e),1.0):colo
+
+=== 43427814 len 3166 tags ['smoothstep', 'fwidth', 'clamp('] ===
+const float a=0.007843;float b(){vec2 c=gl_FragCoord.xy;return fract(sin(dot(vec2(12.9898,78.233),c))*43758.5453);}vec4 d(vec4 color){float e=(b()-0.5)*a;return color.a>0.0?min(abs(color+e),1.0):color;}float f(float g){if(g<-1.0){return 0.0;}else if(g<0.0){return 0.5*(g+1.0)*(g+1.0);}else if(g<1.0){return 0.5-0.5*g*(g-2.0);}else{return 1.0;}}float h(float g){return max(0.0,(1.0-abs(g)));}float i(vec4 j){return(f(j.x)-f(j.z))*(f(j.y)-f(j.w));}float k(float l,float m,float n,float o,float p){float
+
+=== 43447116 len 403 tags ['discard'] ===
+bool a(vec2 b,vec2 c,float d){vec2 e=abs(b*c-c/2.0)-(c/2.0)+d;return min(max(e.x,e.y),0.0)+length(max(e,0.0))<=d;}uniform sampler2D texture0;uniform mat3 tileUVToNodeSpace;uniform vec2 rectSize;uniform float cornerRadius;in vec2 _coord2;out vec4 fig_FragColor;void main(){vec2 b=(tileUVToNodeSpace*vec3(_coord2,1.0)).xy;if(!a(b,rectSize,cornerRadius)){discard;}fig_FragColor=texture(texture0,_coord2);}
+
+=== 43447642 len 446 tags ['discard'] ===
+layout(std140)uniform UniformBlock{mat3 tileUVToNodeSpace;vec4 quad;vec2 rectSize;float cornerRadius;float dummyPadding0;};bool a(vec2 b,vec2 c,float d){vec2 e=abs(b*c-c/2.0)-(c/2.0)+d;return min(max(e.x,e.y),0.0)+length(max(e,0.0))<=d;}uniform sampler2D texture0;in vec2 _coord2;out vec4 fig_FragColor;void main(){vec2 b=(tileUVToNodeSpace*vec3(_coord2,1.0)).xy;if(!a(b,rectSize,cornerRadius)){discard;}fig_FragColor=texture(texture0,_coord2);}
+
+=== 43449067 len 386 tags ['discard'] ===
+bool a(vec2 b,vec2 c,float d){vec2 e=abs(b*c-c/2.0)-(c/2.0)+d;return min(max(e.x,e.y),0.0)+length(max(e,0.0))<=d;}uniform sampler2D texture0;uniform mat3 tileUVToNodeSpace;uniform vec2 rectSize;uniform float cornerRadius;varying vec2 _coord2;void main(){vec2 b=(tileUVToNodeSpace*vec3(_coord2,1.0)).xy;if(!a(b,rectSize,cornerRadius)){discard;}gl_FragColor=texture2D(texture0,_coord2);}

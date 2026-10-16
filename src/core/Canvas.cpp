@@ -309,15 +309,19 @@ static bool HasSharpCorner(const RRect& rRect, const Matrix& viewMatrix) {
 }
 
 // Returns true when either diagonal corner pair has overlapping arc-center boxes on at least
-// one axis, i.e. its x-radii or y-radii sum exceeds the corresponding side length.
+// one axis, i.e. its x-radii or y-radii sum exceeds the corresponding side length. Smoothed
+// corners occupy (1 + smoothness) * radius along each edge, so the footprint is what must not
+// overlap.
 static bool HasDiagonalCornerAxisOverlap(const RRect& rRect) {
   if (!rRect.isComplex()) {
     return false;
   }
+  const auto footprintScale = 1.0f + rRect.smoothness();
   const auto& r = rRect.radii();
   const auto w = rRect.rect().width();
   const auto h = rRect.rect().height();
-  return r[0].x + r[2].x > w || r[0].y + r[2].y > h || r[1].x + r[3].x > w || r[1].y + r[3].y > h;
+  return (r[0].x + r[2].x) * footprintScale > w || (r[0].y + r[2].y) * footprintScale > h ||
+         (r[1].x + r[3].x) * footprintScale > w || (r[1].y + r[3].y) * footprintScale > h;
 }
 
 /**
@@ -343,6 +347,22 @@ static bool UseDrawPath(const Stroke* stroke, const RRect& rRect, bool hasSharpC
   // stricter AA rule and fall back to drawPath whenever any axis is crossed.
   if (HasDiagonalCornerAxisOverlap(rRect)) {
     return true;
+  }
+  if (rRect.smoothness() > 0.0f) {
+    // The analytic smooth-corner shader only evaluates filled circular corners: strokes,
+    // elliptical corners, and non-uniform axis scales fall back to drawPath.
+    if (stroke) {
+      return true;
+    }
+    for (const auto& r : rRect.radii()) {
+      if (r.x > 0.0f && r.x != r.y) {
+        return true;
+      }
+    }
+    const auto scales = viewMatrix.getAxisScales();
+    if (scales.x != scales.y) {
+      return true;
+    }
   }
   if (!stroke) {
     return false;

@@ -667,6 +667,98 @@ class NonAAComplexRRectsVertexProvider final : public RRectsVertexProvider {
   }
 };
 
+class SmoothRRectsVertexProvider final : public RRectsVertexProvider {
+ public:
+  SmoothRRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool hasColor,
+                             std::shared_ptr<BlockAllocator> reference,
+                             std::shared_ptr<ColorSpace> colorSpace = nullptr)
+      : RRectsVertexProvider(std::move(rects), aaType, hasColor, {}, std::move(reference),
+                             std::move(colorSpace)) {
+    _smoothness = this->rects.front()->rRect.smoothness();
+  }
+
+  // The smooth layout (single quad with per-corner scalar radii) is uniform for Simple and
+  // Complex rrects; the flag is only read by the non-smooth GP selection.
+  bool isComplex() const override {
+    return false;
+  }
+
+  size_t vertexCount() const override {
+    // Smooth: 4 vertices per RRect.
+    //   position(2) + localCoord(2) + radii(4) + rectBounds(4) = 12
+    //   Optional: color(1).
+    size_t floatsPerVertex = 12;
+    if (bitFields.hasColor) {
+      floatsPerVertex += 1;
+    }
+    return rects.size() * 4 * floatsPerVertex;
+  }
+
+  void getVertices(float* vertices) const override {
+    size_t index = 0;
+    auto steps = MakeColorSpaceXformStepsIfNeeded(bitFields.hasColor, _dstColorSpace);
+
+    for (auto& record : rects) {
+      auto viewMatrix = record->viewMatrix;
+      auto rRect = record->rRect;
+      auto scales = viewMatrix.getAxisScales();
+      // Upstream guarantees uniform axis scales for smooth corners, so baking keeps circular
+      // corners circular.
+      DEBUG_ASSERT(scales.x == scales.y);
+      for (const auto& corner : rRect.radii()) {
+        DEBUG_ASSERT(corner.x == 0.0f || corner.x == corner.y);
+      }
+      rRect.scale(scales.x, scales.y);
+      viewMatrix.preScale(1 / scales.x, 1 / scales.y);
+      uint32_t uintColor = 0;
+      if (bitFields.hasColor) {
+        uintColor = ToUintPMColor(record->color, steps.get());
+      }
+
+      const auto& rect = rRect.rect();
+      const auto& radii = rRect.radii();
+      const auto currentAAType = aaType();
+      // Extend the quad so the AA coverage ramp is fully covered. On MSAA, bloat enough to
+      // guarantee any pixel that might be touched by the rRect has full sample coverage.
+      const auto aaBloat = currentAAType == AAType::None
+                               ? 0.0f
+                               : (currentAAType == AAType::MSAA ? FLOAT_SQRT2 : 0.5f);
+      const auto quad = rect.makeOutset(aaBloat, aaBloat);
+      // Corner positions for a quad: TL, TR, BR, BL
+      const Point corners[] = {
+          {quad.left, quad.top},
+          {quad.right, quad.top},
+          {quad.right, quad.bottom},
+          {quad.left, quad.bottom},
+      };
+      for (int v = 0; v < 4; ++v) {
+        auto point = corners[v];
+        viewMatrix.mapPoints(&point, 1);
+        // position (2 floats)
+        vertices[index++] = point.x;
+        vertices[index++] = point.y;
+        // localCoord (2 floats) - coordinates within the rect for shape evaluation
+        vertices[index++] = corners[v].x;
+        vertices[index++] = corners[v].y;
+        // radii (4 floats) - per-corner circular radii [TL, TR, BR, BL]
+        vertices[index++] = radii[0].x;
+        vertices[index++] = radii[1].x;
+        vertices[index++] = radii[2].x;
+        vertices[index++] = radii[3].x;
+        // rectBounds (4 floats)
+        vertices[index++] = rect.left;
+        vertices[index++] = rect.top;
+        vertices[index++] = rect.right;
+        vertices[index++] = rect.bottom;
+        // Optional color
+        if (bitFields.hasColor) {
+          std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
+        }
+      }
+    }
+  }
+};
+
 PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
     BlockAllocator* allocator, std::vector<PlacementPtr<RRectRecord>>&& rects, AAType aaType,
     std::vector<PlacementPtr<Stroke>>&& strokes, std::shared_ptr<ColorSpace> colorSpace) {
@@ -676,7 +768,9 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
   auto hasColor = false;
   auto hasComplex = false;
   auto& firstColor = rects.front()->color;
+  const auto smoothness = rects.front()->rRect.smoothness();
   for (auto& record : rects) {
+    DEBUG_ASSERT(record->rRect.smoothness() == smoothness);
     if (record->color != firstColor) {
       hasColor = true;
     }
@@ -689,6 +783,10 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
   }
   auto array = allocator->makeArray(std::move(rects));
   auto strokeArray = allocator->makeArray(std::move(strokes));
+  if (smoothness > 0.0f) {
+    return allocator->make<SmoothRRectsVertexProvider>(
+        std::move(array), aaType, hasColor, allocator->addReference(), std::move(colorSpace));
+  }
   if (aaType == AAType::None) {
     if (hasComplex) {
       return allocator->make<NonAAComplexRRectsVertexProvider>(

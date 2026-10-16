@@ -81,6 +81,21 @@ class RRectsVertexProvider : public VertexProvider {
   virtual bool isComplex() const = 0;
 
   /**
+   * Returns the corner smoothness shared by all records, in [0, 1]. The compositor keeps a single
+   * smoothness per batch.
+   */
+  float smoothness() const {
+    return _smoothness;
+  }
+
+  /**
+   * Returns true if the records carry corner smoothness.
+   */
+  bool hasSmoothness() const {
+    return _smoothness > 0.0f;
+  }
+
+  /**
    * Returns the first color in the provider. If no color record exists, a white color is returned.
    */
   const Color& firstColor() const {
@@ -95,6 +110,7 @@ class RRectsVertexProvider : public VertexProvider {
   PlacementArray<RRectRecord> rects = {};
   PlacementArray<Stroke> strokes = {};
   std::shared_ptr<ColorSpace> _dstColorSpace = nullptr;
+  float _smoothness = 0.0f;
   struct {
     uint8_t aaType : 2;
     bool hasColor : 1;

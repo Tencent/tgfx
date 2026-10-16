@@ -26,6 +26,7 @@
 #include <include/core/SkPathTypes.h>
 #include <include/core/SkRect.h>
 #include "core/PathRef.h"
+#include "core/SmoothCornerCoeffs.h"
 #include "core/utils/AtomicCache.h"
 #include "core/utils/MathExtra.h"
 
@@ -34,6 +35,10 @@ using namespace pk;
 
 static SkPathDirection ToSkDirection(bool reversed) {
   return reversed ? SkPathDirection::kCCW : SkPathDirection::kCW;
+}
+
+static SkPoint ToSkPoint(const Point& point) {
+  return {point.x, point.y};
 }
 
 #define DistanceToControlPoint(radStep) (4 * tanf((radStep)*0.25f) / 3)
@@ -517,7 +522,163 @@ void Path::addRoundRect(const Rect& rect, const std::array<Point, 4>& radii, boo
   writableRef()->path.addRRect(skRRect, ToSkDirection(reversed), startIndex);
 }
 
+// Points of one smoothed corner in absolute coordinates. The contour runs from entry (the tangent
+// point on the incoming edge) to exit (the tangent point on the outgoing edge) through two
+// transition cubics and, when the smoothness is below 1, a circular arc in between.
+struct SmoothCornerPoints {
+  Point entry = {};
+  Point ctrl1 = {};
+  Point ctrl2 = {};
+  Point arcStart = {};
+  Point arcCtrl1 = {};
+  Point arcCtrl2 = {};
+  Point arcEnd = {};
+  Point exitCtrl1 = {};
+  Point exitCtrl2 = {};
+  Point exit = {};
+};
+
+// Builds the points of one smoothed circular corner. uIn points along the incoming edge toward
+// the vertex, nIn points from the incoming edge into the shape, and uOut/nOut are the same for
+// the outgoing edge.
+static SmoothCornerPoints BuildSmoothCorner(const Point& vertex, const Point& uIn, const Point& nIn,
+                                            const Point& uOut, const Point& nOut, float radius,
+                                            const SmoothCornerCoeffs& coeffs) {
+  const auto footprint = coeffs.tangentRatio * radius;
+  const auto step = coeffs.controlStep * radius;
+  const auto endX = coeffs.endOffsetX * radius;
+  const auto endY = coeffs.endOffsetY * radius;
+  SmoothCornerPoints corner = {};
+  corner.entry = vertex - uIn * footprint;
+  corner.ctrl1 = corner.entry + uIn * (2.0f * step);
+  corner.ctrl2 = corner.entry + uIn * (3.0f * step);
+  corner.arcStart = corner.ctrl2 + uIn * endX + nIn * endY;
+  corner.exit = vertex + uOut * footprint;
+  corner.exitCtrl2 = corner.exit - uOut * (2.0f * step);
+  corner.exitCtrl1 = corner.exit - uOut * (3.0f * step);
+  corner.arcEnd = corner.exitCtrl1 - uOut * endX + nOut * endY;
+  const auto center = vertex + (nIn + nOut) * radius;
+  // Middle point of the retained arc, on the bisector between the two inward normals.
+  const auto mid = center - (nIn + nOut) * (radius / FLOAT_SQRT2);
+  // The tangent vectors below keep the length of the radius so that multiplying by arcHandle (a
+  // ratio of the radius) yields the actual handle length.
+  auto tangentStart = Point{center.y - corner.arcStart.y, corner.arcStart.x - center.x};
+  if (tangentStart.x * (mid.x - corner.arcStart.x) + tangentStart.y * (mid.y - corner.arcStart.y) <
+      0.0f) {
+    tangentStart = {-tangentStart.x, -tangentStart.y};
+  }
+  corner.arcCtrl1 = corner.arcStart + tangentStart * coeffs.arcHandle;
+  auto tangentEnd = Point{center.y - corner.arcEnd.y, corner.arcEnd.x - center.x};
+  if (tangentEnd.x * (corner.arcEnd.x - mid.x) + tangentEnd.y * (corner.arcEnd.y - mid.y) < 0.0f) {
+    tangentEnd = {-tangentEnd.x, -tangentEnd.y};
+  }
+  corner.arcCtrl2 = corner.arcEnd - tangentEnd * coeffs.arcHandle;
+  return corner;
+}
+
+static void ScalePointYAbout(Point& point, float originY, float scaleY) {
+  point.y = originY + (point.y - originY) * scaleY;
+}
+
+// Scales a circular smoothed corner vertically about its vertex to produce an elliptical corner.
+// Cubic beziers are preserved exactly under affine transforms.
+static void ScaleSmoothCornerY(SmoothCornerPoints& corner, float originY, float scaleY) {
+  ScalePointYAbout(corner.entry, originY, scaleY);
+  ScalePointYAbout(corner.ctrl1, originY, scaleY);
+  ScalePointYAbout(corner.ctrl2, originY, scaleY);
+  ScalePointYAbout(corner.arcStart, originY, scaleY);
+  ScalePointYAbout(corner.arcCtrl1, originY, scaleY);
+  ScalePointYAbout(corner.arcCtrl2, originY, scaleY);
+  ScalePointYAbout(corner.arcEnd, originY, scaleY);
+  ScalePointYAbout(corner.exitCtrl1, originY, scaleY);
+  ScalePointYAbout(corner.exitCtrl2, originY, scaleY);
+  ScalePointYAbout(corner.exit, originY, scaleY);
+}
+
+static void AppendSmoothCorner(SkPath* path, const SmoothCornerPoints& corner, bool hasArc) {
+  path->cubicTo(ToSkPoint(corner.ctrl1), ToSkPoint(corner.ctrl2), ToSkPoint(corner.arcStart));
+  if (hasArc) {
+    path->cubicTo(ToSkPoint(corner.arcCtrl1), ToSkPoint(corner.arcCtrl2), ToSkPoint(corner.arcEnd));
+  }
+  path->cubicTo(ToSkPoint(corner.exitCtrl1), ToSkPoint(corner.exitCtrl2), ToSkPoint(corner.exit));
+}
+
+static void AppendSmoothCornerReversed(SkPath* path, const SmoothCornerPoints& corner,
+                                       bool hasArc) {
+  path->cubicTo(ToSkPoint(corner.exitCtrl2), ToSkPoint(corner.exitCtrl1), ToSkPoint(corner.arcEnd));
+  if (hasArc) {
+    path->cubicTo(ToSkPoint(corner.arcCtrl2), ToSkPoint(corner.arcCtrl1),
+                  ToSkPoint(corner.arcStart));
+  }
+  path->cubicTo(ToSkPoint(corner.ctrl2), ToSkPoint(corner.ctrl1), ToSkPoint(corner.entry));
+}
+
+// Emits a smoothed rounded rectangle as explicit cubic segments. Each corner still has two
+// boundary points where the corner curve joins the straight edges, in the same order as a
+// general rounded rectangle, so startIndex selects the same contour positions. The only
+// difference is that these points sit at a distance of (1 + smoothness) * radius from the
+// corner vertex instead of radius.
+static void AddSmoothRRect(SkPath* path, const RRect& rRect, bool reversed, unsigned startIndex) {
+  const auto& rect = rRect.rect();
+  const auto& radii = rRect.radii();
+  const auto smoothness = rRect.smoothness();
+  const auto coeffs = ComputeSmoothCornerCoeffs(smoothness);
+  // Per-corner edge directions in clockwise order (top-left, top-right, bottom-right,
+  // bottom-left): uIn, nIn, uOut, nOut.
+  static constexpr Point CornerDirs[4][4] = {
+      {{0, -1}, {1, 0}, {1, 0}, {0, 1}},
+      {{1, 0}, {0, 1}, {0, 1}, {-1, 0}},
+      {{0, 1}, {-1, 0}, {-1, 0}, {0, -1}},
+      {{-1, 0}, {0, -1}, {0, -1}, {1, 0}},
+  };
+  const Point vertices[4] = {{rect.left, rect.top},
+                             {rect.right, rect.top},
+                             {rect.right, rect.bottom},
+                             {rect.left, rect.bottom}};
+  SmoothCornerPoints corners[4] = {};
+  for (size_t i = 0; i < 4; ++i) {
+    corners[i] = BuildSmoothCorner(vertices[i], CornerDirs[i][0], CornerDirs[i][1],
+                                   CornerDirs[i][2], CornerDirs[i][3], radii[i].x, coeffs);
+    if (radii[i].x > 0.0f && radii[i].y != radii[i].x) {
+      ScaleSmoothCornerY(corners[i], vertices[i].y, radii[i].y / radii[i].x);
+    }
+  }
+  // Boundary points between corners, in the same order as a circular rrect: even indices end a
+  // corner, odd indices start one.
+  const Point boundary[8] = {
+      corners[0].exit, corners[1].entry, corners[1].exit, corners[2].entry,
+      corners[2].exit, corners[3].entry, corners[3].exit, corners[0].entry,
+  };
+  const auto hasArc = smoothness < 1.0f;
+  auto index = startIndex % 8;
+  path->moveTo(ToSkPoint(boundary[index]));
+  for (unsigned i = 0; i < 8; ++i) {
+    if (reversed) {
+      const auto next = (index + 7) % 8;
+      if (index % 2 == 0) {
+        AppendSmoothCornerReversed(path, corners[index / 2], hasArc);
+      } else {
+        path->lineTo(ToSkPoint(boundary[next]));
+      }
+      index = next;
+    } else {
+      const auto next = (index + 1) % 8;
+      if (index % 2 == 1) {
+        AppendSmoothCorner(path, corners[(index + 1) / 2 % 4], hasArc);
+      } else {
+        path->lineTo(ToSkPoint(boundary[next]));
+      }
+      index = next;
+    }
+  }
+  path->close();
+}
+
 void Path::addRRect(const RRect& rRect, bool reversed, unsigned int startIndex) {
+  if (rRect.smoothness() > 0.0f) {
+    AddSmoothRRect(&writableRef()->path, rRect, reversed, startIndex);
+    return;
+  }
   SkRRect skRRect;
   skRRect.setRectRadii(ToSkRect(rRect.rect()),
                        reinterpret_cast<const SkPoint*>(rRect.radii().data()));
