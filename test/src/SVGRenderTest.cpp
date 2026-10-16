@@ -16,12 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "core/filters/ComposeImageFilter.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/utils/Types.h"
 #include "gtest/gtest.h"
+#include "svg/SVGAttributeParser.h"
 #include "svg/SVGRenderContext.h"
+#include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Paint.h"
@@ -36,6 +39,7 @@
 #include "tgfx/svg/SVGExporter.h"
 #include "tgfx/svg/SVGLengthContext.h"
 #include "tgfx/svg/TextShaper.h"
+#include "tgfx/svg/node/SVGFilter.h"
 #include "tgfx/svg/node/SVGNode.h"
 #include "tgfx/svg/xml/XMLDOM.h"
 #include "utils/TestUtils.h"
@@ -183,9 +187,8 @@ TGFX_TEST(SVGRenderTest, MaskSVG) {
   EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/mask"));
 }
 
-TGFX_TEST(SVGRenderTest, GradientSVG) {
-  auto stream =
-      Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/radialGradient.svg"));
+TGFX_TEST(SVGRenderTest, Gradient) {
+  auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/gradient.svg"));
   ASSERT_TRUE(stream != nullptr);
   auto SVGDom = SVGDOM::Make(*stream);
   auto rootNode = SVGDom->getRoot();
@@ -200,11 +203,11 @@ TGFX_TEST(SVGRenderTest, GradientSVG) {
   auto canvas = surface->getCanvas();
 
   SVGDom->render(canvas);
-  EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/radialGradient"));
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/gradient"));
 }
 
-TGFX_TEST(SVGRenderTest, BlurSVG) {
-  auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/blur.svg"));
+TGFX_TEST(SVGRenderTest, Filter) {
+  auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/filter.svg"));
   ASSERT_TRUE(stream != nullptr);
   auto SVGDom = SVGDOM::Make(*stream);
   auto rootNode = SVGDom->getRoot();
@@ -219,7 +222,7 @@ TGFX_TEST(SVGRenderTest, BlurSVG) {
   auto canvas = surface->getCanvas();
 
   SVGDom->render(canvas);
-  EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/blur"));
+  EXPECT_TRUE(Baseline::Compare(surface, "SVGTest/filter"));
 }
 
 TGFX_TEST(SVGRenderTest, TextSVG) {
@@ -883,6 +886,187 @@ TGFX_TEST_PRIVATE(SVGRenderTest, RenderContextCopyPreservesOpacityAndClip) {
         ASSERT_TRUE(copy._clipPath.has_value());
         EXPECT_EQ(*copy._clipPath, expectedClip);
       })
+}
+
+// Finds the first filter node in the document and builds its image filter chain.
+static std::shared_ptr<ImageFilter> BuildImageFilterFromSVG(const std::string& svgString) {
+  auto data = Data::MakeWithCopy(svgString.c_str(), svgString.size());
+  auto stream = Stream::MakeFromData(data);
+  auto dom = SVGDOM::Make(*stream);
+  if (dom == nullptr) {
+    return nullptr;
+  }
+  for (const auto& [id, node] : dom->nodeIDMapper()) {
+    if (node->tag() == SVGTag::Filter) {
+      PictureRecorder recorder;
+      auto* canvas = recorder.beginRecording();
+      SVGIDMapper mapper;
+      SVGLengthContext lengthContext(Size::Make(100.f, 100.f));
+      SVGPresentationContext presentationContext;
+      SVGRenderContext::OBBScope obbScope{nullptr, nullptr};
+      SVGRenderContext context(canvas, TextShaper::Make({}), mapper, lengthContext,
+                               presentationContext, obbScope, Matrix::I());
+      return static_cast<SVGFilter*>(node.get())->buildFilterDAG(context);
+    }
+  }
+  return nullptr;
+}
+
+// The Pixso-style filter chain encoding a drop shadow followed by an inner shadow, in the
+// pretty-printed form produced by design tool exports.
+static const char* ShadowChainFormatted = R"SVG(
+<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
+	<defs>
+		<filter id="filter_56" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+			<feFlood flood-opacity="0" result="BackgroundImageFix" />
+			<feColorMatrix result="hardAlpha" in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2.36111 0 " />
+			<feOffset dx="1.000000" dy="2.000000" in="hardAlpha" />
+			<feGaussianBlur stdDeviation="0.666666687" />
+			<feComposite k2="-1" k3="1" in2="hardAlpha" operator="out" />
+			<feColorMatrix type="matrix" values="0 0 0 0 0.447059 0 0 0 0 0.266667 0 0 0 0 0.00392157 0 0 0 0.501961 0 " />
+			<feBlend result="effect_dropShadow_1" in2="BackgroundImageFix" mode="normal" />
+			<feBlend result="shape" in="SourceGraphic" in2="effect_dropShadow_1" mode="normal" />
+			<feColorMatrix result="hardAlpha" in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2.36111 0 " />
+			<feOffset dx="0.000000" dy="0.000000" in="hardAlpha" />
+			<feGaussianBlur stdDeviation="0.333333343" />
+			<feComposite k2="-1" k3="1" in2="hardAlpha" operator="arithmetic" />
+			<feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0 " />
+			<feBlend result="effect_innerShadow_2" in2="shape" mode="normal" />
+		</filter>
+	</defs>
+	<rect width="10" height="10" filter="url(#filter_56)" />
+</svg>
+)SVG";
+
+static const char* ShadowChainCompact = R"SVG(
+<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><defs><filter id="filter_56" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feFlood flood-opacity="0" result="BackgroundImageFix" /><feColorMatrix result="hardAlpha" in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2.36111 0 " /><feOffset dx="1.000000" dy="2.000000" in="hardAlpha" /><feGaussianBlur stdDeviation="0.666666687" /><feComposite k2="-1" k3="1" in2="hardAlpha" operator="out" /><feColorMatrix type="matrix" values="0 0 0 0 0.447059 0 0 0 0 0.266667 0 0 0 0 0.00392157 0 0 0 0.501961 0 " /><feBlend result="effect_dropShadow_1" in2="BackgroundImageFix" mode="normal" /><feBlend result="shape" in="SourceGraphic" in2="effect_dropShadow_1" mode="normal" /><feColorMatrix result="hardAlpha" in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2.36111 0 " /><feOffset dx="0.000000" dy="0.000000" in="hardAlpha" /><feGaussianBlur stdDeviation="0.333333343" /><feComposite k2="-1" k3="1" in2="hardAlpha" operator="arithmetic" /><feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0 " /><feBlend result="effect_innerShadow_2" in2="shape" mode="normal" /></filter></defs><rect width="10" height="10" filter="url(#filter_56)" /></svg>
+)SVG";
+
+static void ExpectDropShadowAndInnerShadow(const std::shared_ptr<ImageFilter>& filter) {
+  ASSERT_TRUE(filter != nullptr);
+  ASSERT_EQ(Types::Get(filter.get()), Types::ImageFilterType::Compose);
+  TGFX_PRIVATE_ACCESS(
+      auto compose = std::static_pointer_cast<ComposeImageFilter>(filter);
+      ASSERT_TRUE(compose->filters.size() == 2);
+      ASSERT_EQ(Types::Get(compose->filters[0].get()), Types::ImageFilterType::DropShadow);
+      ASSERT_EQ(Types::Get(compose->filters[1].get()), Types::ImageFilterType::InnerShadow);
+      auto dropShadow = std::static_pointer_cast<DropShadowImageFilter>(compose->filters[0]);
+      auto dropBlur = std::static_pointer_cast<GaussianBlurImageFilter>(dropShadow->blurFilter);
+      EXPECT_FLOAT_EQ(dropShadow->dx, 1.f); EXPECT_FLOAT_EQ(dropShadow->dy, 2.f);
+      EXPECT_FLOAT_EQ(dropBlur->blurrinessX, 0.666666687f);
+      EXPECT_FLOAT_EQ(dropShadow->color.red, 0.447059f);
+      EXPECT_FLOAT_EQ(dropShadow->color.green, 0.266667f);
+      EXPECT_FLOAT_EQ(dropShadow->color.blue, 0.00392157f);
+      EXPECT_FLOAT_EQ(dropShadow->color.alpha, 0.501961f); EXPECT_FALSE(dropShadow->shadowOnly);
+      auto innerShadow = std::static_pointer_cast<InnerShadowImageFilter>(compose->filters[1]);
+      auto innerBlur = std::static_pointer_cast<GaussianBlurImageFilter>(innerShadow->blurFilter);
+      EXPECT_FLOAT_EQ(innerShadow->dx, 0.f); EXPECT_FLOAT_EQ(innerShadow->dy, 0.f);
+      EXPECT_FLOAT_EQ(innerBlur->blurrinessX, 0.333333343f);
+      EXPECT_FLOAT_EQ(innerShadow->color.alpha, 1.f); EXPECT_FALSE(innerShadow->shadowOnly);)
+}
+
+// A chain carrying both a drop shadow and an inner shadow must be recognized as a Compose of
+// the two, even when whitespace text nodes sit between the primitives.
+TGFX_TEST(SVGRenderTest, ShadowFilterChainRecognition) {
+  ExpectDropShadowAndInnerShadow(BuildImageFilterFromSVG(ShadowChainFormatted));
+}
+
+// Whitespace between primitives must not change the recognition result.
+TGFX_TEST(SVGRenderTest, FilterChainFormattedVsCompact) {
+  ExpectDropShadowAndInnerShadow(BuildImageFilterFromSVG(ShadowChainCompact));
+}
+
+// Reference ids that merely start with a reserved keyword must parse as named references
+// instead of being dropped.
+TGFX_TEST(SVGRenderTest, FeInputTypeReservedPrefix) {
+  auto customId = SVGAttributeParser::parse<SVGFeInputType>("BackgroundImageFix");
+  ASSERT_TRUE(customId.has_value());
+  EXPECT_EQ(customId->type(), SVGFeInputType::Type::FilterPrimitiveReference);
+  EXPECT_EQ(customId->id(), "BackgroundImageFix");
+
+  auto keyword = SVGAttributeParser::parse<SVGFeInputType>("BackgroundImage");
+  ASSERT_TRUE(keyword.has_value());
+  EXPECT_EQ(keyword->type(), SVGFeInputType::Type::BackgroundImage);
+
+  auto reference = SVGAttributeParser::parse<SVGFeInputType>("effect_dropShadow_1");
+  ASSERT_TRUE(reference.has_value());
+  EXPECT_EQ(reference->type(), SVGFeInputType::Type::FilterPrimitiveReference);
+  EXPECT_EQ(reference->id(), "effect_dropShadow_1");
+}
+
+// A chain containing feFlood must build successfully instead of being discarded.
+TGFX_TEST(SVGRenderTest, FeFloodChainBuildsFilter) {
+  std::string svgString = R"SVG(
+<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="f" filterUnits="userSpaceOnUse">
+      <feFlood flood-opacity="0" result="b"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="b" result="shape"/>
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+  </defs>
+  <rect width="10" height="10" filter="url(#f)"/>
+</svg>
+)SVG";
+  auto filter = BuildImageFilterFromSVG(svgString);
+  EXPECT_TRUE(filter != nullptr);
+}
+
+// Renders a 10x10 svg and samples the column center at two rows.
+static void RenderGradientAndSample(Context* context, const std::string& svgString,
+                                    uint8_t* topPixel, uint8_t* bottomPixel) {
+  auto data = Data::MakeWithCopy(svgString.c_str(), svgString.size());
+  auto stream = Stream::MakeFromData(data);
+  auto dom = SVGDOM::Make(*stream);
+  auto surface = Surface::Make(context, 10, 10);
+  auto canvas = surface->getCanvas();
+  dom->render(canvas);
+  auto bitmap = Bitmap(10, 10, false);
+  auto* pixels = static_cast<uint8_t*>(bitmap.lockPixels());
+  if (pixels != nullptr && surface->readPixels(bitmap.info(), pixels)) {
+    memcpy(topPixel, pixels + bitmap.info().rowBytes() + 5 * 4, 4);
+    memcpy(bottomPixel, pixels + 8 * bitmap.info().rowBytes() + 5 * 4, 4);
+  }
+  bitmap.unlockPixels();
+}
+
+// A rect filled with a vertical white-to-black linear gradient must show the first stop near
+// the top and the last stop near the bottom, for both gradientUnits flavors.
+TGFX_TEST(SVGRenderTest, LinearGradientUnits) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  std::string userSpaceSvg = R"SVG(
+<svg width="10" height="10" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g" x1="5" y1="0" x2="5" y2="10" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#000000"/>
+    </linearGradient>
+  </defs>
+  <rect width="10" height="10" fill="url(#g)"/>
+</svg>
+)SVG";
+  std::string boundingBoxSvg = R"SVG(
+<svg width="10" height="10" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#000000"/>
+    </linearGradient>
+  </defs>
+  <rect width="10" height="10" fill="url(#g)"/>
+</svg>
+)SVG";
+
+  for (const auto& svgString : {userSpaceSvg, boundingBoxSvg}) {
+    uint8_t top[4] = {};
+    uint8_t bottom[4] = {};
+    RenderGradientAndSample(context, svgString, top, bottom);
+    EXPECT_GT(top[0], 200);
+    EXPECT_LT(bottom[0], 60);
+  }
 }
 
 }  // namespace tgfx

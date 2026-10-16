@@ -23,6 +23,7 @@
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Shader.h"
+#include "tgfx/core/Size.h"
 #include "tgfx/core/TileMode.h"
 
 namespace tgfx {
@@ -44,6 +45,10 @@ std::shared_ptr<Shader> SVGRadialGradient::onMakeShader(const SVGRenderContext& 
                                                         const std::vector<float>& position,
                                                         TileMode, const Matrix& matrix) const {
   SVGLengthContext lengthContext = context.lengthContext();
+  if (getGradientUnits().type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
+    // Resolve bounding box coordinates in the unit square; matrix maps them to user space.
+    lengthContext = SVGLengthContext(Size::Make(1, 1));
+  }
   lengthContext.setBoundingBoxUnits(getGradientUnits());
 
   auto radius = lengthContext.resolve(R, SVGLengthContext::LengthType::Other);

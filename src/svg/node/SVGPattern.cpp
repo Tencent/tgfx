@@ -25,6 +25,7 @@
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
+#include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/TileMode.h"
 #include "tgfx/svg/SVGTypes.h"
@@ -131,12 +132,20 @@ const SVGPattern* SVGPattern::resolveHref(const SVGRenderContext& context,
 bool SVGPattern::onAsPaint(const SVGRenderContext& context, Paint* paint) const {
   PatternAttributes attrs;
   const auto contentNode = this->resolveHref(context, &attrs);
-  auto lengthContext = context.lengthContext();
-  lengthContext.setBoundingBoxUnits(PatternUnits);
-  Rect tile = lengthContext.resolveRect(attrs.x.has_value() ? *attrs.x : SVGLength(0),
-                                        attrs.y.has_value() ? *attrs.y : SVGLength(0),
-                                        attrs.width.has_value() ? *attrs.width : SVGLength(0),
-                                        attrs.height.has_value() ? *attrs.height : SVGLength(0));
+  SVGLengthContext tileContext = context.lengthContext();
+  if (PatternUnits.type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
+    // Resolve bounding box coordinates in the unit square, then map them to user space.
+    tileContext = SVGLengthContext(Size::Make(1, 1));
+  }
+  tileContext.setBoundingBoxUnits(PatternUnits);
+  Rect tile = tileContext.resolveRect(attrs.x.has_value() ? *attrs.x : SVGLength(0),
+                                      attrs.y.has_value() ? *attrs.y : SVGLength(0),
+                                      attrs.width.has_value() ? *attrs.width : SVGLength(0),
+                                      attrs.height.has_value() ? *attrs.height : SVGLength(0));
+  const auto transform = context.transformForCurrentBoundBox(PatternUnits);
+  tile = Rect::MakeXYWH(transform.scale.x * tile.x() + transform.offset.x,
+                        transform.scale.y * tile.y() + transform.offset.y,
+                        transform.scale.x * tile.width(), transform.scale.y * tile.height());
 
   if (tile.isEmpty()) {
     return false;
@@ -147,13 +156,22 @@ bool SVGPattern::onAsPaint(const SVGRenderContext& context, Paint* paint) const 
   auto patternMatrix = attrs.patternTransform.value_or(Matrix::I());
   canvas->concat(patternMatrix);
   {
-    SVGRenderContext recordingContext(context, canvas, lengthContext);
+    // Pattern content lengths are resolved in the same units as the tile itself; for
+    // objectBoundingBox that means the referencing element's bounding box size.
+    SVGLengthContext contentContext = context.lengthContext();
+    if (PatternUnits.type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
+      contentContext = SVGLengthContext(Size::Make(transform.scale.x, transform.scale.y));
+    }
+    contentContext.setBoundingBoxUnits(PatternUnits);
+    SVGRenderContext recordingContext(context, canvas, contentContext);
     contentNode->SVGContainer::onRender(recordingContext);
   }
   auto picture = patternRecorder.finishRecordingAsPicture();
   auto shaderImage =
       Image::MakeFrom(picture, static_cast<int>(tile.width()), static_cast<int>(tile.height()));
-  auto shader = Shader::MakeImageShader(shaderImage, TileMode::Repeat, TileMode::Repeat);
+  // Anchor the first tile at the tile origin instead of the global origin.
+  auto shader = Shader::MakeImageShader(shaderImage, TileMode::Repeat, TileMode::Repeat)
+                    ->makeWithMatrix(Matrix::MakeTrans(tile.x(), tile.y()));
   paint->setShader(shader);
   return true;
 }

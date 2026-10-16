@@ -129,17 +129,20 @@ bool SVGAttributeParser::parse(SVGFeInputType* type) {
       {"StrokePaint", SVGFeInputType::Type::StrokePaint},
   };
 
-  SVGStringType resultId;
-  SVGFeInputType::Type tempType;
-  bool parsedValue = false;
-  if (this->parseEnumMap(typeMap, &tempType)) {
-    *type = SVGFeInputType(tempType);
-    parsedValue = true;
-  } else if (parse(&resultId)) {
-    *type = SVGFeInputType(resultId);
-    parsedValue = true;
+  // Read the whole token before comparing: the value may be a custom result id that merely
+  // starts with a reserved keyword (e.g. "BackgroundImageFix"), and prefix matching would
+  // otherwise consume the keyword part and fail the trailing check, dropping the attribute.
+  SVGStringType token;
+  if (!parse(&token)) {
+    return false;
   }
-
-  return parsedValue && this->parseEOSToken();
+  for (const auto& [name, keywordType] : typeMap) {
+    if (token == name) {
+      *type = SVGFeInputType(keywordType);
+      return true;
+    }
+  }
+  *type = SVGFeInputType(token);
+  return true;
 }
 }  // namespace tgfx

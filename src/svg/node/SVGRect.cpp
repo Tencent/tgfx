@@ -61,12 +61,7 @@ RRect SVGRect::resolve(const SVGLengthContext& lengthContext) const {
 void SVGRect::onDrawFill(Canvas* canvas, const SVGLengthContext& lengthContext, const Paint& paint,
                          PathFillType) const {
   auto rrect = this->resolve(lengthContext);
-  auto offset = Point::Make(rrect.rect().left, rrect.rect().top);
-  rrect.offset(-offset.x, -offset.y);
-  canvas->save();
-  canvas->translate(offset.x, offset.y);
   canvas->drawRRect(rrect, paint);
-  canvas->restore();
 }
 
 void SVGRect::onDrawStroke(Canvas* canvas, const SVGLengthContext& lengthContext,
@@ -77,15 +72,10 @@ void SVGRect::onDrawStroke(Canvas* canvas, const SVGLengthContext& lengthContext
   }
 
   auto rrect = this->resolve(lengthContext);
-  auto offset = Point::Make(rrect.rect().left, rrect.rect().top);
-  rrect.offset(-offset.x, -offset.y);
   Path path;
   path.addRRect(rrect);
   if (pathEffect->filterPath(&path)) {
-    canvas->save();
-    canvas->translate(offset.x, offset.y);
     canvas->drawPath(path, paint);
-    canvas->restore();
   }
 };
 
