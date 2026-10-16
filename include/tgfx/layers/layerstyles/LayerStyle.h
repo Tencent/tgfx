@@ -76,7 +76,9 @@ enum class LayerStyleType {
  *    semi-transparent pixels to fully opaque (fully transparent pixels are preserved).
  *
  * 2. **Contour** (layer contour): Similar to Content, but with two differences:
- *    - Includes geometries from painters with alpha=0
+ *    - Includes geometries from painters with alpha=0. Painters flagged silhouetteOnly are the
+ *      exception: they are left out even at alpha=0, and only take part in the layer's own outline,
+ *      which is what usesOwnOutlineAsContent() asks for.
  *    - Replaces gradient fills with solid color fills (ignoring local transparency in gradients)
  *
  * 3. **Background** (layer background): The normally rendered content below the current layer.
@@ -144,6 +146,18 @@ class LayerStyle : public LayerProperty {
    */
   virtual uint32_t extraSourceType() const {
     return static_cast<uint32_t>(LayerStyleExtraSourceType::None);
+  }
+
+  /**
+   * Returns whether this layer style draws from the layer's own outline instead of the shared
+   * content image. The own outline is the layer's own content without its descendants, and it
+   * includes the painters flagged silhouetteOnly that the shared source images leave out. A layer
+   * records it only while it carries a style that declares this, so a style that needs the layer's
+   * own geometry declares it here instead of being recognized by a style type elsewhere. The
+   * default value is false.
+   */
+  virtual bool usesOwnOutlineAsContent() const {
+    return false;
   }
 
   /**

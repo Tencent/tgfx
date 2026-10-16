@@ -267,10 +267,10 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (group == nullptr) {
     return;
   }
-  // The entry the consumer samples: Glass takes the layer's own outline, every other style the
-  // shared content image. A style that resolves to nothing to draw is skipped by BOTH sides, so
-  // capture and consume keep the same push/pop count.
-  auto* contentEntry = ResolveContentEntry(*group, style->Type());
+  // The entry the consumer samples: a style that declares the own outline takes the layer's own
+  // outline, every other style the shared content image. A style that resolves to nothing to draw is
+  // skipped by BOTH sides, so capture and consume keep the same push/pop count.
+  auto* contentEntry = ResolveContentEntry(*group, style);
   if (contentEntry == nullptr || contentEntry->image == nullptr) {
     return;
   }
@@ -441,9 +441,10 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (group == nullptr) {
     return;
   }
-  // Glass consumes the layer's own outline, every other style the shared content image; a group
-  // that recorded nothing usable for this style resolves to nullptr so the style is skipped.
-  auto* contentEntry = ResolveContentEntry(*group, style->Type());
+  // A style that declares the own outline consumes the layer's own outline, every other style the
+  // shared content image; a group that recorded nothing usable for this style resolves to nullptr so
+  // the style is skipped.
+  auto* contentEntry = ResolveContentEntry(*group, style);
   if (contentEntry == nullptr || contentEntry->image == nullptr) {
     return;
   }
@@ -493,9 +494,11 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   styleInput.extraSources.push_back(
       std::make_shared<StyleInputSource>(std::move(bgImage), backgroundOffset));
   if ((sourceFlags & static_cast<uint32_t>(LayerStyleExtraSourceType::Contour)) != 0) {
-    // The Contour extra source pairs the shared contour raster with the shape resolved below. Glass
-    // reads only that shape (DetectGlassShape), so the raster it carries stays the shared contour
-    // even though the shape then describes the own outline; the mismatch is inert for every style.
+    // The Contour extra source carries the shared contour raster, paired with the shape resolved
+    // below. Only a content-based style reads that raster, and it is handed the shared shape that
+    // matches it; a style that draws from the own outline reads the shape alone (DetectGlassShape)
+    // and samples the raster of the entry ResolveContentEntry returned instead, so the shape and
+    // this raster are never read as a pair.
     std::shared_ptr<Image> contourImage = nullptr;
     Point contourOffset = {};
     if (group->contour.has_value()) {
@@ -504,7 +507,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     }
     styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
         std::move(contourImage), contourOffset,
-        ResolveContourShape(*group, style->Type(), source->contentShape)));
+        ResolveContourShape(*group, style, source->contentShape)));
   }
 
   // On the first pass that needs it, rasterize the style's output once and cache it; every

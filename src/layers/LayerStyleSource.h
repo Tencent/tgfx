@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <optional>
+#include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Image.h"
@@ -44,9 +45,9 @@ struct LayerStyleSourceEntry {
 
 /**
  * Pairs the content image with the optional contour image for a specific excludeChildEffects
- * bucket. content.image is usually populated, but a Glass bucket whose content render failed is
- * kept alive by its own outline and then leaves content.image null; contour is only present when at
- * least one Contour-sourced LayerStyle in this bucket requires a distinct contour image.
+ * bucket. content.image is usually populated, but a bucket kept alive by an own-outline style whose
+ * content render failed leaves it null; contour is only present when at least one Contour-sourced
+ * LayerStyle in this bucket requires a distinct contour image.
  */
 struct LayerStyleSourceGroup {
   LayerStyleSourceEntry content = {};
@@ -62,39 +63,40 @@ struct LayerStyleSourceGroup {
 };
 
 /**
- * Resolves the entry a consumer must use as LayerStyleInput.content for the given style. Glass wants
- * the layer's own outline, which is the only image that includes the silhouette-only markers, and
- * falls back to the shared subtree recordings when no own outline exists (see the fallback block
- * below); every other style keeps the shared content image.
+ * Resolves the entry a consumer must use as LayerStyleInput.content for the given style. A style that
+ * declares usesOwnOutlineAsContent() wants the layer's own outline, which is the only image that
+ * includes the silhouette-only markers, and falls back to the shared subtree recordings when no own
+ * outline exists (see the fallback block below); every other style keeps the shared content image.
  *
  * Returns nullptr when the resolved entry carries no image: the group then has nothing to offer
- * this style, and consumers must skip it rather than draw from a missing image. Only Glass may be
- * driven by the own outline; handing it to a content-based style would make that style draw an
- * outline instead of the layer content.
+ * this style, and consumers must skip it rather than draw from a missing image. style must not be
+ * null. Only a style that declares the own outline may be driven by it; handing it to a content-based
+ * style would make that style draw an outline instead of the layer content.
  */
 inline const LayerStyleSourceEntry* ResolveContentEntry(const LayerStyleSourceGroup& group,
-                                                        LayerStyleType styleType) {
-  if (styleType == LayerStyleType::Glass) {
+                                                        const LayerStyle* style) {
+  DEBUG_ASSERT(style != nullptr);
+  if (style->usesOwnOutlineAsContent()) {
     if (group.ownContour.has_value() && group.ownContour->image != nullptr) {
       return &*group.ownContour;
     }
-    // Glass that records no own outline resolves to the shared subtree contour when present (and
-    // falls back to `content` otherwise).
-    // A Glass whose geometry lives in child layers records no own outline, and its two subtree
+    // A style that declares the own outline but records none resolves to the shared subtree contour
+    // when present (and falls back to `content` otherwise).
+    // A style whose geometry lives in child layers records no own outline, and its two subtree
     // recordings then disagree on two axes. `content` (drawDefault, DrawContent.cpp) drops every
     // painter whose effective color alpha is <= 0; `contour` (drawContourInternal) has no alpha gate
     // and keeps it. In the opposite direction `contour` drops every painter flagged silhouetteOnly
-    // (LayerContent.h); `content` keeps it. A retained 0%-opacity user fill therefore survives only
+    // (LayerContent.h); `content` keeps it. A retained 0%-opacity fill therefore survives only
     // in `contour`, and falling back to `content` silently removed the glass coverage over that fill
     // -- the bug this fallback fixes. The two axes have opposite signs, so the change is not
     // scope-neutral: both recordings span the same subtree (self + descendants), so preferring
     // `contour` can never draw outside that subtree, but it CAN drop coverage over a descendant's
-    // silhouette-only painter that `content` still holds. That case is bounded in the editor flow,
-    // where the coverage marker is injected into the glass node's own content, so the node always
-    // records an own outline and never reaches this branch. No new draw site is introduced either:
-    // the branch is only reached with `ownContour` absent and `contour.image != nullptr`, and a null
-    // `content` image has already marked the bucket unusable and skipped it (Layer.cpp), so the old
-    // code had already drawn -- a null-content bucket cannot become a drawing one.
+    // silhouette-only painter that `content` still holds. That case is bounded where the style and
+    // its coverage geometry live in the same layer: such a layer records an own outline and never
+    // reaches this branch. No new draw site is introduced either: the branch is only reached with
+    // `ownContour` absent and `contour.image != nullptr`, and a null `content` image has already
+    // marked the bucket unusable and skipped it (Layer.cpp), so the old code had already drawn -- a
+    // null-content bucket cannot become a drawing one.
     if (group.contour.has_value() && group.contour->image != nullptr) {
       return &*group.contour;
     }
@@ -103,26 +105,28 @@ inline const LayerStyleSourceEntry* ResolveContentEntry(const LayerStyleSourceGr
 }
 
 /**
- * Resolves the shape that describes the contour image handed to the style: Glass matches its own
- * outline, every other style keeps the shared content shape. Once a group carries an own outline the
- * shape must come from that outline too — even when it is absent — so the shape and the own outline
- * stay paired; only a group without an own outline falls back to the shared shape.
+ * Resolves the shape that describes the image ResolveContentEntry hands to the style. The shape
+ * always comes from the same recording as that image: a style that declares the own outline and
+ * finds one gets the shape recorded with it, which may itself be absent -- an absent own shape stays
+ * absent rather than being replaced by the shared shape, because the shared shape describes a
+ * different recording. Every other case, including the fallback where such a style is handed the
+ * shared contour raster, gets the shared content shape.
  *
- * The shape must stay paired with the content image ResolveContentEntry returns, because Glass turns
- * it into the SDF path in DetectGlassShape and a shape that disagreed with the raster would refract
- * a different region than the one that is covered. The fallback above resolves Glass to the
- * shared contour raster whenever no own outline exists, and this function deliberately keeps
- * returning the shared content shape for that same case. The shared shape and the contour raster are
- * not guaranteed pixel-exact -- they are two separate recordings that differ on the alpha <= 0 and
- * silhouetteOnly axes (see ResolveContentEntry above) -- but the mismatch cannot manifest in the flow
- * this fallback serves: a group that records no own outline has no own content shape either, so it
- * hands no shape here, exactly as it did before this fallback, and the image and shape stay paired by
- * both being absent.
+ * The pairing matters because the style turns this shape into a path (DetectGlassShape) while it
+ * samples the image as coverage, so a shape that disagreed with the raster would treat a different
+ * region as the covered one. In the fallback, the shape and the raster are two separate recordings
+ * that differ on the alpha <= 0 and silhouetteOnly axes (see ResolveContentEntry above), so the
+ * pairing holds only under an invariant the code relies on rather than enforces: a group that
+ * records no own outline has no shape of its own either, so the shared shape handed out here is
+ * absent as well. That holds today for the container-like layer this fallback serves, whose geometry
+ * lives in child layers and whose own content therefore contributes no shape; a group that recorded
+ * no own outline while still owning a shape would hand a shape that need not match the raster.
  */
 inline const std::optional<StyledShape>& ResolveContourShape(
-    const LayerStyleSourceGroup& group, LayerStyleType styleType,
+    const LayerStyleSourceGroup& group, const LayerStyle* style,
     const std::optional<StyledShape>& sharedShape) {
-  if (styleType == LayerStyleType::Glass && group.ownContour.has_value() &&
+  DEBUG_ASSERT(style != nullptr);
+  if (style->usesOwnOutlineAsContent() && group.ownContour.has_value() &&
       group.ownContour->image != nullptr) {
     return group.ownContourShape;
   }
@@ -140,6 +144,8 @@ struct LayerStyleSource {
 
   // groups[0]: excludeChildEffects = false
   // groups[1]: excludeChildEffects = true
+  // A bucket that recorded nothing usable is left null while the source itself stays non-null and
+  // the other bucket may still be populated, so every reader must test its group before using it.
   std::unique_ptr<LayerStyleSourceGroup> groups[2] = {};
 
   // Simplified content shape of the layer for LayerStyles that need vector access (e.g. shadow

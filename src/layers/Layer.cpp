@@ -1801,16 +1801,17 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     return nullptr;
   }
 
-  // Collect which excludeChildEffects values need content and/or a rasterized contour.
+  // Collect which excludeChildEffects values need content, a rasterized contour and the layer's own
+  // outline, and whether any style needs a content shape.
   bool needContent[2] = {false, false};
   bool needContour[2] = {false, false};
-  bool hasGlass[2] = {false, false};
+  bool needOwnOutline[2] = {false, false};
   bool needsContentShape = false;
   for (const auto& layerStyle : _layerStyles) {
     auto index = static_cast<int>(layerStyle->excludeChildEffects());
     needContent[index] = true;
-    if (layerStyle->Type() == LayerStyleType::Glass) {
-      hasGlass[index] = true;
+    if (layerStyle->usesOwnOutlineAsContent()) {
+      needOwnOutline[index] = true;
     }
     auto sourceFlags = layerStyle->extraSourceType();
     if (NeedsContourSource(sourceFlags)) {
@@ -1822,12 +1823,13 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   auto source = std::make_unique<LayerStyleSource>();
   source->contentScale = contentScale;
 
-  // Only a Glass layer may drop a single unusable bucket. A Glass bucket can still be driven by the
-  // own outline even when the shared content is empty, so losing one bucket must not cancel the
-  // other. Every other layer keeps the original fail-closed contract: one unusable bucket makes the
-  // whole source unusable, so a bucket that records nothing never revives a style that the previous
-  // code left undrawn.
-  const bool layerHasGlass = hasGlass[0] || hasGlass[1];
+  // A layer that carries a style declaring the own outline may drop a single unusable bucket: such a
+  // bucket can still be driven by the own outline even when the shared content is empty, so losing
+  // one bucket must not cancel the other. The relaxation is per layer rather than per bucket, so a
+  // failed bucket no longer suppresses the styles of the other bucket either -- they draw where the
+  // previous fail-closed contract left them undrawn. Every other layer keeps that contract: one
+  // unusable bucket makes the whole source unusable.
+  const bool layerUsesOwnOutline = needOwnOutline[0] || needOwnOutline[1];
 
   DrawArgs drawArgs = args;
   drawArgs.render3DContext = nullptr;
@@ -1871,11 +1873,11 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
       }
     }
 
-    if (hasGlass[i]) {
-      // Glass always consumes the layer's own outline rather than the shared content: the shared
-      // images exclude the painters marked silhouetteOnly, so a layer whose only painter is such a
-      // marker records an empty content image while its outline is still fully available. Recording
-      // it unconditionally also keeps the coverage independent of any visible descendant.
+    if (needOwnOutline[i]) {
+      // A style that draws from the own outline always consumes it rather than the shared content:
+      // the shared images exclude the painters marked silhouetteOnly, so a layer whose only painter
+      // is such a marker records an empty content image while its outline is still fully available.
+      // Recording it unconditionally also keeps the coverage independent of any visible descendant.
       LayerStyleSourceEntry ownEntry = {};
       ownEntry.image = getOwnContourImage(drawArgs, contentScale, &ownEntry.offset);
       if (ownEntry.image != nullptr) {
@@ -1886,7 +1888,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     }
 
     if (!bucketUsable) {
-      if (layerHasGlass) {
+      if (layerUsesOwnOutline) {
         continue;
       }
       return nullptr;
@@ -1995,7 +1997,7 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
     return;
   }
 
-  auto* contentEntry = ResolveContentEntry(*group, layerStyle->Type());
+  auto* contentEntry = ResolveContentEntry(*group, layerStyle);
   if (contentEntry == nullptr) {
     return;
   }
@@ -2011,15 +2013,17 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   styleInput.contentScale = source->contentScale;
   auto sourceFlags = layerStyle->extraSourceType();
   if (HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour)) {
-    // The Contour extra source pairs the shared contour raster with the shape resolved below. Glass
-    // reads only that shape (DetectGlassShape), so the raster it carries stays the shared contour
-    // even though the shape then describes the own outline; the mismatch is inert for every style.
+    // The Contour extra source carries the shared contour raster, paired with the shape resolved
+    // below. Only a content-based style reads that raster, and it is handed the shared shape that
+    // matches it; a style that draws from the own outline reads the shape alone (DetectGlassShape)
+    // and samples the raster of the entry ResolveContentEntry returned instead, so the shape and
+    // this raster are never read as a pair.
     auto contourImage = group->contour.has_value() ? group->contour->image : nullptr;
     auto contourOffset =
         contourImage ? group->contour->offset - contentEntry->offset : Point::Zero();
     styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
         std::move(contourImage), contourOffset,
-        ResolveContourShape(*group, layerStyle->Type(), source->contentShape)));
+        ResolveContourShape(*group, layerStyle, source->contentShape)));
   }
   layerStyle->draw(canvas, styleInput, alpha);
 }
