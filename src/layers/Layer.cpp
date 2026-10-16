@@ -2013,14 +2013,13 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   styleInput.contentScale = source->contentScale;
   auto sourceFlags = layerStyle->extraSourceType();
   if (HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour)) {
-    // The Contour extra source carries the shared contour raster, paired with the shape resolved
-    // below. Only a content-based style reads that raster, and it is handed the shared shape that
-    // matches it; a style that draws from the own outline reads the shape alone (DetectGlassShape)
-    // and samples the raster of the entry ResolveContentEntry returned instead, so the shape and
-    // this raster are never read as a pair.
-    auto contourImage = group->contour.has_value() ? group->contour->image : nullptr;
+    // The Contour extra source carries one recording's raster together with the shape that describes
+    // it: ResolveContourEntry picks the raster (own-outline or shared contour) that matches the
+    // shape ResolveContourShape returns.
+    auto* contourEntry = ResolveContourEntry(*group, layerStyle);
+    auto contourImage = contourEntry ? contourEntry->image : nullptr;
     auto contourOffset =
-        contourImage ? group->contour->offset - contentEntry->offset : Point::Zero();
+        contourImage ? contourEntry->offset - contentEntry->offset : Point::Zero();
     styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
         std::move(contourImage), contourOffset,
         ResolveContourShape(*group, layerStyle, source->contentShape)));
