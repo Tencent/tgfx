@@ -4562,9 +4562,10 @@ enum class OwnContourFillKind { None, Marker, Transparent };
 // fillKind selects the painter recorded next to the stroke. styles are attached to the layer: with a
 // Glass style the layer records an own outline, without one it renders as the glass-off reference.
 static std::shared_ptr<Layer> MakeOwnContourStrokePanel(
-    const Rect& rect, float radius, float strokeWidth, StrokeAlign align, OwnContourFillKind fillKind,
-    const std::vector<std::shared_ptr<LayerStyle>>& styles = {GlassStyle::Make(0, 50, 100, 0, 0, 0,
-                                                                             0)}) {
+    const Rect& rect, float radius, float strokeWidth, StrokeAlign align,
+    OwnContourFillKind fillKind,
+    const std::vector<std::shared_ptr<LayerStyle>>& styles = {
+        GlassStyle::Make(0, 50, 100, 0, 0, 0, 0)}) {
   auto layer = VectorLayer::Make();
   auto shape = Rectangle::Make();
   shape->setPosition({rect.centerX(), rect.centerY()});
@@ -4717,16 +4718,16 @@ TGFX_TEST_PRIVATE(LayerTest, GlassMarkerGivesCoverageWithoutAnyFill) {
       << "marker-only interior ROI: the silhouette-only marker must not paint anything";
   // With the Glass style the marker's geometry drives real frost over the whole panel.
   const auto frosted = CountDifferingPixels(plain.get(), glassPanel.get(), interior, 16);
-  EXPECT_GT(frosted, interiorArea / 5)
-      << "marker-only interior ROI: the marker-driven Glass must frost a sizable part of the panel, "
-         "frosted "
-      << frosted << " of " << interiorArea;
+  EXPECT_GT(frosted, interiorArea / 5) << "marker-only interior ROI: the marker-driven Glass must "
+                                          "frost a sizable part of the panel, "
+                                          "frosted "
+                                       << frosted << " of " << interiorArea;
   // The coverage ends at the marker outline.
-  EXPECT_EQ(CountDifferingPixels(plain.get(), glassPanel.get(),
-                                 Rect::MakeXYWH(0.0f, 0.0f, GlassMarkerPanelLeft - 1.0f,
-                                                GlassMarkerSurfaceExtent),
-                                 2),
-            0)
+  EXPECT_EQ(
+      CountDifferingPixels(
+          plain.get(), glassPanel.get(),
+          Rect::MakeXYWH(0.0f, 0.0f, GlassMarkerPanelLeft - 1.0f, GlassMarkerSurfaceExtent), 2),
+      0)
       << "left-of-panel ROI: the marker-driven Glass must not reach outside its outline";
   // A silhouette-only paint is still PAINTED according to its own alpha: the flag only routes the
   // geometry (which contour and which shape consume it), it does not make the paint invisible. A
@@ -4784,8 +4785,7 @@ TGFX_TEST_PRIVATE(LayerTest, GlassMarkerGivesCoverageWithoutAnyFill) {
                                    GlassMarkerPanelLeft + holeBounds.left - 2.0f,
                                    GlassMarkerPanelTop + regionBBounds.bottom - 5.0f);
   const auto areaBandB = static_cast<int>(worldBandB.width() * worldBandB.height());
-  EXPECT_GT(CountDifferingPixels(donutPlain.get(), donutGlass.get(), worldBandB, 16),
-            areaBandB / 5)
+  EXPECT_GT(CountDifferingPixels(donutPlain.get(), donutGlass.get(), worldBandB, 16), areaBandB / 5)
       << "donut second-region band ROI: every region of the own outline must be covered";
   auto worldHole = holeBounds;
   worldHole.offset(GlassMarkerPanelLeft, GlassMarkerPanelTop);
@@ -4841,9 +4841,8 @@ TGFX_TEST_PRIVATE(LayerTest, GlassMarkerDoesNotLeakIntoSharedRecordings) {
   const auto shadowRoi =
       Rect::MakeLTRB(0.0f, 0.0f, GlassMarkerSurfaceExtent, GlassMarkerSurfaceExtent);
   for (auto markerFirst : {false, true}) {
-    auto markedShadowPixel =
-        RenderSpreadShadowPixel(context, makeShadowPanel(true, markerFirst), cornerProbeX,
-                                cornerProbeY);
+    auto markedShadowPixel = RenderSpreadShadowPixel(context, makeShadowPanel(true, markerFirst),
+                                                     cornerProbeX, cornerProbeY);
     ASSERT_TRUE(markedShadowPixel.has_value());
     EXPECT_EQ(*markedShadowPixel, *plainShadowPixel)
         << "rounded-corner probe (markerFirst=" << markerFirst
@@ -4886,8 +4885,8 @@ TGFX_TEST_PRIVATE(LayerTest, GlassMarkerDoesNotLeakIntoSharedRecordings) {
   auto disjointUserFillShadow =
       RenderPanelOverChecker(context, makeDisjointShadow(disjointUserFill, true));
   ASSERT_TRUE(disjointUserFillShadow != nullptr);
-  EXPECT_GT(
-      CountDifferingPixels(fillOnlyShadow.get(), disjointUserFillShadow.get(), shadowRoi, 2), 0)
+  EXPECT_GT(CountDifferingPixels(fillOnlyShadow.get(), disjointUserFillShadow.get(), shadowRoi, 2),
+            0)
       << "disjoint-marker shadow ROI (unmarked control): a second region that DOES join the "
          "content shape must change the shadow footprint, otherwise the equality above is vacuous";
 
@@ -4905,8 +4904,8 @@ TGFX_TEST_PRIVATE(LayerTest, GlassMarkerDoesNotLeakIntoSharedRecordings) {
   auto bandShadowLayer = MakeMarkerPanel({bandPanel}, {bandShadow});
   auto bandPixel = RenderSpreadShadowPixel(context, bandShadowLayer, 100, 45);
   ASSERT_TRUE(bandPixel.has_value());
-  EXPECT_NE(*bandPixel, 0u)
-      << "stroke-band probe: the spread shadow must render over the band the shared recording holds";
+  EXPECT_NE(*bandPixel, 0u) << "stroke-band probe: the spread shadow must render over the band the "
+                               "shared recording holds";
   auto bandInteriorPixel = RenderSpreadShadowPixel(context, bandShadowLayer, 100, 90);
   ASSERT_TRUE(bandInteriorPixel.has_value());
   EXPECT_EQ(*bandInteriorPixel, 0u)
@@ -4976,9 +4975,8 @@ TGFX_TEST_PRIVATE(LayerTest, GlassMarkerKeepsInteriorCoverageWithAStroke) {
   deepInterior.inset(strokeWidth * 2.0f, strokeWidth * 2.0f);
   const auto deepArea =
       static_cast<int>(deepInterior.width()) * static_cast<int>(deepInterior.height());
-  const auto bandRoi =
-      Rect::MakeXYWH(GlassMarkerPanelLeft, GlassMarkerPanelTop - strokeWidth, GlassMarkerPanelWidth,
-                     strokeWidth);
+  const auto bandRoi = Rect::MakeXYWH(GlassMarkerPanelLeft, GlassMarkerPanelTop - strokeWidth,
+                                      GlassMarkerPanelWidth, strokeWidth);
 
   auto control = RenderPanelOverChecker(context, MakeMarkerPanel({withStroke}));
   auto glassPanel = RenderPanelOverChecker(context, MakeMarkerPanel({withStroke}, {glass}));
@@ -4992,19 +4990,20 @@ TGFX_TEST_PRIVATE(LayerTest, GlassMarkerKeepsInteriorCoverageWithAStroke) {
       << frostedDeep << " of " << deepArea;
   // The coverage ends at the own outline: a ring-only coverage would spill the effect outside the
   // stroke, where the filled shape has nothing.
-  EXPECT_EQ(CountDifferingPixels(
-                control.get(), glassPanel.get(),
-                Rect::MakeXYWH(GlassMarkerPanelLeft - 19.0f, GlassMarkerPanelTop - 19.0f, 10.0f,
-                               GlassMarkerPanelHeight + 38.0f),
-                2),
-            0)
+  EXPECT_EQ(
+      CountDifferingPixels(control.get(), glassPanel.get(),
+                           Rect::MakeXYWH(GlassMarkerPanelLeft - 19.0f, GlassMarkerPanelTop - 19.0f,
+                                          10.0f, GlassMarkerPanelHeight + 38.0f),
+                           2),
+      0)
       << "left-of-panel ROI: the Glass must not cover anything outside the shape and its stroke";
   // The own outline is the geometric union of the marker geometry and the outside stroke, so the
   // shape is a fill-plus-stroke. A wrong classification as a plain fill would make Glass take the
   // analytic SDF of the base path alone, leaving the band outside that path uncovered: bandRoi sits
   // entirely inside the band, whose outer edge is strokeWidth above the panel top.
   EXPECT_GT(CountDifferingPixels(control.get(), glassPanel.get(), bandRoi, 2), 0)
-      << "stroke-band ROI (marker + outside stroke): a wrong own-outline shape classification would "
+      << "stroke-band ROI (marker + outside stroke): a wrong own-outline shape classification "
+         "would "
          "leave the band outside the base path uncovered";
 
   // Control: with the marker removed the outline is the stroke band alone, so the interior has to
@@ -5056,8 +5055,7 @@ TGFX_TEST_PRIVATE(LayerTest, OwnOutlineUnionReachesFullCoverage) {
       auto outsideRoi =
           Rect::MakeLTRB(0.0f, 0.0f, rect.left - outward - 2.0f, MaskProbeSurfaceSize);
       auto interiorRoi = rect;
-      interiorRoi.inset(probe.radius * 0.5f + outward + 2.0f,
-                        probe.radius * 0.5f + outward + 2.0f);
+      interiorRoi.inset(probe.radius * 0.5f + outward + 2.0f, probe.radius * 0.5f + outward + 2.0f);
       ASSERT_FALSE(interiorRoi.isEmpty());
       const auto interiorArea =
           static_cast<int>(interiorRoi.width()) * static_cast<int>(interiorRoi.height());
@@ -5116,18 +5114,19 @@ TGFX_TEST_PRIVATE(LayerTest, OwnOutlineUnionReachesFullCoverage) {
   auto emptyPanel = RenderPanelOverChecker(context, MakeMarkerPanel({}));
   ASSERT_TRUE(twoPainters != nullptr && onePainter != nullptr && emptyPanel != nullptr);
   const auto sharedBoundaryRoi = Rect::MakeLTRB(
-      GlassMarkerPanelLeft + 4.0f, GlassMarkerPanelTop + 4.0f, GlassMarkerPanelLeft + panelSize - 4.0f,
-      GlassMarkerPanelTop + panelSize - 4.0f);
+      GlassMarkerPanelLeft + 4.0f, GlassMarkerPanelTop + 4.0f,
+      GlassMarkerPanelLeft + panelSize - 4.0f, GlassMarkerPanelTop + panelSize - 4.0f);
   EXPECT_EQ(CountDifferingPixels(twoPainters.get(), onePainter.get(), sharedBoundaryRoi, 4), 0)
       << "shared-AA-boundary ROI: the union of the two painters must render like the single square";
   const auto sharedBoundaryArea =
       static_cast<int>(sharedBoundaryRoi.width()) * static_cast<int>(sharedBoundaryRoi.height());
-  const auto unionQuadrantRoi =
-      Rect::MakeLTRB(GlassMarkerPanelLeft + 8.0f, GlassMarkerPanelTop + 8.0f,
-                     GlassMarkerPanelLeft + panelSize * 0.5f, GlassMarkerPanelTop + panelSize * 0.5f);
+  const auto unionQuadrantRoi = Rect::MakeLTRB(
+      GlassMarkerPanelLeft + 8.0f, GlassMarkerPanelTop + 8.0f,
+      GlassMarkerPanelLeft + panelSize * 0.5f, GlassMarkerPanelTop + panelSize * 0.5f);
   EXPECT_GT(CountDifferingPixels(emptyPanel.get(), twoPainters.get(), unionQuadrantRoi, 16),
             sharedBoundaryArea / 20)
-      << "union-quadrant ROI: the two-painter union must cover its interior, otherwise the equality "
+      << "union-quadrant ROI: the two-painter union must cover its interior, otherwise the "
+         "equality "
          "above is vacuous";
 }
 
@@ -5171,7 +5170,8 @@ TGFX_TEST_PRIVATE(LayerTest, TwoGroupAssemblyKeepsInteriorCoverage) {
   };
 
   for (const auto& arm : arms) {
-    auto glass = MakeOwnOutlineGlass(arm.refraction, arm.depth, arm.frost, arm.dispersion, arm.splay);
+    auto glass =
+        MakeOwnOutlineGlass(arm.refraction, arm.depth, arm.frost, arm.dispersion, arm.splay);
     auto makePanel = [&](bool withFillGroup, const std::shared_ptr<GlassStyle>& style) {
       if (arm.ellipse) {
         auto makeEllipse = [&]() {
@@ -5187,10 +5187,9 @@ TGFX_TEST_PRIVATE(LayerTest, TwoGroupAssemblyKeepsInteriorCoverage) {
                                          MakeRectShapePath(rect, radius), strokeWidth, style,
                                          withFillGroup);
     };
-    auto armInterior = arm.ellipse
-                           ? Rect::MakeXYWH(rect.centerX() - 20.0f, rect.centerY() - 20.0f, 40.0f,
-                                            40.0f)
-                           : deepInterior;
+    auto armInterior =
+        arm.ellipse ? Rect::MakeXYWH(rect.centerX() - 20.0f, rect.centerY() - 20.0f, 40.0f, 40.0f)
+                    : deepInterior;
     const auto armArea =
         static_cast<int>(armInterior.width()) * static_cast<int>(armInterior.height());
 
@@ -5265,7 +5264,8 @@ TGFX_TEST_PRIVATE(LayerTest, TwoGroupAssemblyKeepsInteriorCoverage) {
          "stroke band: "
       << regionDiff << " of " << deepArea << " interior pixels changed";
   EXPECT_GT(CountDifferingPixels(regionPlain.get(), regionStyled.get(), bandRoi, 2), 0)
-      << "band ROI (multi-region): the control Glass must still frost the stroke band it does cover";
+      << "band ROI (multi-region): the control Glass must still frost the stroke band it does "
+         "cover";
   EXPECT_GT(CountDifferingPixels(secondPlain.get(), secondStyled.get(), bandRoi, 2), 0)
       << "band ROI (multi-region, 0% group dropped): the second region must keep the outline alive";
   EXPECT_EQ(CountDifferingPixels(secondPlain.get(), secondStyled.get(), deepInterior, 16), 0)
@@ -5329,13 +5329,15 @@ TGFX_TEST_PRIVATE(LayerTest, UnusableBucketOnlyDropsItself) {
   auto silhouettePristine = RenderPanelOverChecker(context, makeTree(true, false));
   ASSERT_TRUE(silhouetteStyled != nullptr && silhouettePristine != nullptr);
   EXPECT_EQ(CountDifferingPixels(silhouetteStyled.get(), silhouettePristine.get(), full, 2), 0)
-      << "silhouette-child frame ROI: one unusable bucket must fail the whole source closed, so the "
+      << "silhouette-child frame ROI: one unusable bucket must fail the whole source closed, so "
+         "the "
          "styled tree renders like the pristine one";
   auto normalStyled = RenderPanelOverChecker(context, makeTree(false, true));
   auto normalPristine = RenderPanelOverChecker(context, makeTree(false, false));
   ASSERT_TRUE(normalStyled != nullptr && normalPristine != nullptr);
   EXPECT_GT(CountDifferingPixels(normalStyled.get(), normalPristine.get(), full, 16), 0)
-      << "normal-child frame ROI: with a recorded child both buckets are usable, so the styled tree "
+      << "normal-child frame ROI: with a recorded child both buckets are usable, so the styled "
+         "tree "
          "must differ from the pristine one";
 }
 
@@ -5395,9 +5397,9 @@ TGFX_TEST_PRIVATE(LayerTest, GlassWithoutOwnOutlineResolvesToSharedContour) {
   const auto holeWithFill = renderDiff(GlassChildFillKind::Donut, holeRoi, 16);
   ASSERT_GE(annulusWithFill, 0);
   ASSERT_GE(holeWithFill, 0);
-  EXPECT_GT(annulusWithFill, 0)
-      << "annulus band ROI (0% donut fill): the band must be covered, otherwise the hole reading is "
-         "vacuous";
+  EXPECT_GT(annulusWithFill, 0) << "annulus band ROI (0% donut fill): the band must be covered, "
+                                   "otherwise the hole reading is "
+                                   "vacuous";
   EXPECT_EQ(holeWithFill, 0)
       << "annulus hole ROI (0% donut fill): the hole must stay uncovered, so the coverage follows "
          "the fill geometry and not its bounding box";
@@ -5538,9 +5540,9 @@ TGFX_TEST_PRIVATE(LayerTest, MaskFillAndStrokeUnionKeepsFullCoverageOnRoundedCor
         << " align=" << static_cast<int>(probe.align)
         << ": the shadow must follow the merged rounded rectangle to its corner";
     auto farOffset = (outerRadius + spread + 4.0f) * diagonal;
-    auto beyondSpread = RenderSpreadShadowPixel(
-        context, shadowLayer, static_cast<int>(cornerCenterX - farOffset + 0.5f),
-        static_cast<int>(cornerCenterY - farOffset + 0.5f));
+    auto beyondSpread = RenderSpreadShadowPixel(context, shadowLayer,
+                                                static_cast<int>(cornerCenterX - farOffset + 0.5f),
+                                                static_cast<int>(cornerCenterY - farOffset + 0.5f));
     ASSERT_TRUE(beyondSpread.has_value()) << "merged-fill shadow probe, r=" << probe.radius;
     EXPECT_EQ(*beyondSpread, 0u)
         << "merged-fill beyond-spread ROI, r=" << probe.radius << " w=" << probe.strokeWidth
@@ -5585,7 +5587,8 @@ static float MeasureLeftBandReach(Context* context, float zoom) {
     // sampled color proportionally, so the difference profile is the displacement profile.
     auto ramp = ShapeLayer::Make();
     Path rampPath = {};
-    rampPath.addRect(Rect::MakeWH(static_cast<float>(surfaceSize), static_cast<float>(surfaceSize)));
+    rampPath.addRect(
+        Rect::MakeWH(static_cast<float>(surfaceSize), static_cast<float>(surfaceSize)));
     ramp->setPath(rampPath);
     auto rampShader = Shader::MakeLinearGradient({0.0f, 0.0f}, {rampSpan, 0.0f},
                                                  {Color::Black(), Color::White()});
@@ -5593,9 +5596,10 @@ static float MeasureLeftBandReach(Context* context, float zoom) {
     displayList->root()->addChild(ramp);
     displayList->root()->addChild(makePanel(withGlass));
     displayList->render(surface.get());
-    auto info = ImageInfo::Make(surfaceSize, surfaceSize, ColorType::RGBA_8888,
-                                AlphaType::Premultiplied);
-    std::vector<uint32_t> pixels(static_cast<size_t>(surfaceSize) * static_cast<size_t>(surfaceSize));
+    auto info =
+        ImageInfo::Make(surfaceSize, surfaceSize, ColorType::RGBA_8888, AlphaType::Premultiplied);
+    std::vector<uint32_t> pixels(static_cast<size_t>(surfaceSize) *
+                                 static_cast<size_t>(surfaceSize));
     if (!surface->readPixels(info, pixels.data())) {
       return std::vector<uint32_t>{};
     }
@@ -5656,7 +5660,8 @@ TGFX_TEST(LayerTest, GlassCoverageKeepsTransparentColorRegion) {
   transparent.bounds = regionBBounds;
   transparent.fill = MarkerFillKind::TransparentColor;
   auto plain = RenderPanelOverChecker(context, MakeMarkerPanel({marker, transparent}));
-  auto glassPanel = RenderPanelOverChecker(context, MakeMarkerPanel({marker, transparent}, {glass}));
+  auto glassPanel =
+      RenderPanelOverChecker(context, MakeMarkerPanel({marker, transparent}, {glass}));
   ASSERT_TRUE(plain != nullptr && glassPanel != nullptr);
   // The own-outline shape must keep the same painter set as the own-outline raster, so a transparent
   // solid color sitting next to the marker still gets its region covered.
@@ -6707,11 +6712,9 @@ TGFX_TEST_PRIVATE(LayerTest, GlassParentChildRenderedCoverage) {
     // Control 3 (non-glass regression): a DropShadow consumes the shared content image, so a shadow
     // driven by the ring alone must leave the deep interior untouched.
     auto shadow = DropShadowStyle::Make(0, 0, 0, 0, Color::Black());
-    auto shadowRing =
-        renderDiff(shadow, GlassChildFillKind::Full,
-                   Rect::MakeLTRB(baseRect.left, baseRect.top - ringWidth, baseRect.right,
-                                  baseRect.top),
-                   2);
+    auto shadowRing = renderDiff(
+        shadow, GlassChildFillKind::Full,
+        Rect::MakeLTRB(baseRect.left, baseRect.top - ringWidth, baseRect.right, baseRect.top), 2);
     const auto shadowInterior = renderDiff(shadow, GlassChildFillKind::Full, deepInterior, 16);
     ASSERT_GE(shadowRing, 0) << "drop-shadow ring render failed, " << arm.label;
     ASSERT_GE(shadowInterior, 0) << "drop-shadow interior render failed, " << arm.label;
@@ -6843,18 +6846,17 @@ TGFX_TEST_PRIVATE(LayerTest, CollapsedFillGeometryLeavesBandOnly) {
 // Reads the own-outline coverage of `panel` onto a fixed probe surface, in layer-local coordinates,
 // and returns its alpha raster. Returns an empty raster when the layer records no own outline.
 static std::vector<int> RasterizeOwnOutlineAlpha(Context* context,
-                                                const std::shared_ptr<Layer>& panel) {
+                                                 const std::shared_ptr<Layer>& panel) {
   static constexpr int ProbeSize = 200;
   std::vector<int> raster = {};
   DrawArgs drawArgs(context);
   std::shared_ptr<Image> image = nullptr;
   Point offset = Point::Zero();
-  TGFX_PRIVATE_ACCESS(
-      auto source = panel->getLayerStyleSource(drawArgs, Matrix::I());
-      if (source == nullptr || source->groups[0] == nullptr ||
-          !source->groups[0]->ownContour.has_value()) { return raster; }
-      image = source->groups[0]->ownContour->image;
-      offset = source->groups[0]->ownContour->offset;)
+  TGFX_PRIVATE_ACCESS(auto source = panel->getLayerStyleSource(drawArgs, Matrix::I());
+                      if (source == nullptr || source->groups[0] == nullptr ||
+                          !source->groups[0]->ownContour.has_value()) { return raster; } image =
+                          source->groups[0]->ownContour->image;
+                      offset = source->groups[0]->ownContour->offset;)
   if (image == nullptr) {
     return raster;
   }
@@ -6989,9 +6991,8 @@ TGFX_TEST_PRIVATE(LayerTest, OwnOutlineCoincidentPaintersDoNotGrowTheCoveredArea
   ASSERT_TRUE(renderedMarkerOnly != nullptr && renderedCoincident != nullptr &&
               renderedDisjoint != nullptr);
   const auto wholeSurface = Rect::MakeLTRB(0.0f, 0.0f, 200.0f, 200.0f);
-  EXPECT_EQ(CountDifferingPixels(renderedMarkerOnly.get(), renderedCoincident.get(), wholeSurface,
-                                 2),
-            0)
+  EXPECT_EQ(
+      CountDifferingPixels(renderedMarkerOnly.get(), renderedCoincident.get(), wholeSurface, 2), 0)
       << "rendered checker ROI: the coincident 0%-alpha fill must leave the Glass render untouched";
   EXPECT_GT(CountDifferingPixels(renderedMarkerOnly.get(), renderedDisjoint.get(), wholeSurface, 2),
             0)

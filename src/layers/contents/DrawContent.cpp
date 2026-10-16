@@ -60,7 +60,8 @@ Rect DrawContent::getBounds() const {
   return bounds;
 }
 
-void DrawContent::drawContourInternal(Canvas* canvas, bool antiAlias, bool includeSilhouette) const {
+void DrawContent::drawContourInternal(Canvas* canvas, bool antiAlias,
+                                      bool includeSilhouette) const {
   if (silhouetteOnly && !includeSilhouette) {
     // The shared contour is the contour of the visible content; a silhouette-only painter belongs
     // to the layer's own outline alone, so styles such as shadows must not see it.
