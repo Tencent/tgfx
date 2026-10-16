@@ -4229,10 +4229,10 @@ TGFX_TEST_PRIVATE(LayerTest, GlassStyleUsesBackgroundAndContourSource) {
 // bump. Internal recordings are asserted only where a rendered difference cannot attribute a
 // failure, and every such assertion says why it is there.
 
-// Mirrors the marker an editor injects on a layer that owns a Glass style but no visible fill: a
-// white color source (color alpha 1, so the geometry still counts as a visible color source for the
-// shape classifiers) with style alpha 0 and the silhouette-only flag. The fill paints nothing, but
-// its geometry still defines the layer's own outline.
+// The painter of a shape that carries a Glass style but no visible fill: a white color source (color
+// alpha 1, so the geometry still counts as a visible color source for the shape classifiers) with
+// style alpha 0 and the silhouette-only flag. The fill paints nothing, but its geometry still
+// defines the layer's own outline.
 static std::shared_ptr<FillStyle> MakeSilhouetteOnlyFill() {
   auto fill = FillStyle::Make(SolidColor::Make(Color::White()));
   fill->setAlpha(0.0f);
@@ -4329,9 +4329,9 @@ static Rect GlassMarkerPanelLocalBounds() {
 
 // Which painter a marker region carries over its geometry.
 //   None        - no painter: the region adds no geometry to the outline.
-//   Marker      - the editor's silhouette-only marker: geometry only, dropped from the shared
-//                 contour and the visible content, kept in the layer's own outline.
-//   Transparent - a real 0% user fill: geometry only, but it stays in the shared contour.
+//   Marker      - a silhouette-only painter: geometry only, dropped from the shared contour and the
+//                 visible content, kept in the layer's own outline.
+//   Transparent - a retained 0%-alpha fill: geometry only, but it stays in the shared contour.
 //   Opaque      - a visible fill.
 enum class MarkerFillKind { None, Marker, Transparent, Opaque };
 
@@ -4444,10 +4444,10 @@ static float RoundedRectSignedDistance(const Rect& rect, float radius, float px,
          radius;
 }
 
-// Renders the exported mask for one parameter combination: a single opaque, additively blended
+// Renders the merged mask for one parameter combination: a single opaque, additively blended
 // rounded-rectangle fill grown by `outward` on every side (size += 2 * outward, radius += outward),
-// which is the geometry image_exporter's fuse_outside_stroke_into_fill() prepares. Returns an empty
-// vector on failure.
+// i.e. the geometry that merges a fill with its outside stroke band. Returns an empty vector on
+// failure.
 static std::vector<uint32_t> RenderMergedFillMask(Context* context, float radius, float outward) {
   std::vector<uint32_t> pixels = {};
   auto surface = Surface::Make(context, MaskProbeSurfaceSize, MaskProbeSurfaceSize);
@@ -4538,9 +4538,9 @@ static InteriorCoverage ScanInteriorCoverage(const std::vector<uint32_t>& pixels
   return result;
 }
 
-// A rectangle geometry for one group. The fill and the stroke need two separate instances: the
-// editor flattens them into one element list only when they share the same VectorElement, and that
-// shared instance is the single-group structure the stroke probe covers.
+// A rectangle geometry for one group. The fill and the stroke need two separate instances: sharing
+// one geometry element puts them in the same element list, and that shared-instance, single-group
+// structure is what the stroke probe covers.
 static std::shared_ptr<ShapePath> MakeRectShapePath(const Rect& rect, float radius) {
   auto shape = ShapePath::Make();
   Path path = {};
@@ -4549,8 +4549,8 @@ static std::shared_ptr<ShapePath> MakeRectShapePath(const Rect& rect, float radi
   return shape;
 }
 
-// Which fill painter a panel carries next to its stroke: none, the silhouette-only marker an editor
-// injects for a Glass layer without a visible fill, or a real fully transparent user fill.
+// Which fill painter a panel carries next to its stroke: none, the silhouette-only painter of a
+// shape carrying a Glass style with no visible fill, or a retained fully transparent fill.
 enum class OwnContourFillKind { None, Marker, Transparent };
 
 // One rounded rectangle with an optional fill painter and one stroke painter of the given alignment.
@@ -4587,11 +4587,9 @@ static std::shared_ptr<Layer> MakeOwnContourStrokePanel(
   return layer;
 }
 
-// Mirrors the real editor assembly (rebuildContents in
-// packages/common/editor/ui/src/builders/fill_and_stroke.cc): a fill painter and a differently typed
-// stroke painter live in two sibling VectorGroups instead of one element list. withFillGroup=false
-// drops the fill group and is the control that shows what a shape with no coverage inside its stroke
-// band reads back as.
+// A fill painter and a differently typed stroke painter live in two sibling VectorGroups instead of
+// one element list. withFillGroup=false drops the fill group and is the control that shows what a
+// shape with no coverage inside its stroke band reads back as.
 static std::shared_ptr<Layer> MakeTwoGroupFillStrokePanel(
     const std::shared_ptr<VectorElement>& fillGeometry, float fillAlpha,
     const std::shared_ptr<VectorElement>& strokeGeometry, float strokeWidth,
@@ -4621,7 +4619,7 @@ static std::shared_ptr<Layer> MakeTwoGroupFillStrokePanel(
   return layer;
 }
 
-// The editor always marks Glass with excludeChildEffects, so its own outline lands in the
+// Glass is built here with excludeChildEffects set, so its own outline lands in the
 // excludeChildEffects bucket groups[1] and not in groups[0], the bucket a plain style reads.
 static std::shared_ptr<GlassStyle> MakeOwnOutlineGlass(float refraction, float depth, float frost,
                                                        float dispersion, float splay) {
@@ -4633,7 +4631,7 @@ static std::shared_ptr<GlassStyle> MakeOwnOutlineGlass(float refraction, float d
 // Which painter the child-A layer of a parent/child panel carries.
 enum class GlassChildFillKind { None, Full, Donut };
 
-// Parent + children tree shared by the parent/child cases: an optional child-A retained 0% user fill
+// Parent + children tree shared by the parent/child cases: an optional child-A retained 0%-alpha fill
 // (whole base rectangle or an annulus) plus the ring band on a second child, so the parent keeps no
 // painter of its own. `style` may be null, which is the glass-off reference the rendered comparison
 // subtracts.
@@ -4658,8 +4656,8 @@ static std::shared_ptr<Layer> MakeGlassChildPanel(GlassChildFillKind fillKind, c
       geometry = shape;
     }
     auto fillLayer = VectorLayer::Make();
-    // The editor's retained 0% user fill: style alpha 0 over a color alpha of 1, so drawDefault
-    // drops it from `content` while drawContourInternal keeps it in `contour`.
+    // A retained 0%-alpha fill: style alpha 0 over a color alpha of 1, so drawDefault drops it from
+    // `content` while drawContourInternal keeps it in `contour`.
     auto fill = FillStyle::Make(SolidColor::Make(Color::White()));
     fill->setAlpha(0.0f);
     fillLayer->setContents({MakeFilledRegion(geometry, fill)});
@@ -4726,9 +4724,9 @@ TGFX_TEST_PRIVATE(LayerTest, GlassMarkerGivesCoverageWithoutAnyFill) {
             0)
       << "left-of-panel ROI: the marker-driven Glass must not reach outside its outline";
   // A silhouette-only paint is still PAINTED according to its own alpha: the flag only routes the
-  // geometry (which contour and which shape consume it), it does not make the paint invisible. The
-  // editor's marker is alpha 0, but the mask export path normalises a marker to alpha 1, so that
-  // configuration has to keep painting.
+  // geometry (which contour and which shape consume it), it does not make the paint invisible. A
+  // silhouette-only painter with alpha 0 stays invisible, so the alpha 1 configuration below is the
+  // one that has to keep painting.
   MarkerRegionSpec alphaOneMarker = marker;
   alphaOneMarker.markerAlpha = 1.0f;
   auto withoutMarker = RenderPanelOverChecker(context, MakeMarkerPanel({}, {glass}));
@@ -5128,11 +5126,11 @@ TGFX_TEST_PRIVATE(LayerTest, OwnOutlineUnionReachesFullCoverage) {
          "above is vacuous";
 }
 
-// A style only covers what its own outline holds, so the editor's two-group fill/stroke assembly has
-// to keep the fill geometry in the own outline. The arms are the failing rectangles of the roundtrip
-// document (refractive 100/100/14/100), the frost-only path at both parameter sets, and an ellipse,
-// plus a two-region panel whose second region carries a 0% fill. Every arm pairs its assertion with a
-// band-only control, so a covered shape cannot pass on a missing fill geometry.
+// A style only covers what its own outline holds, so the two-group fill/stroke assembly has to keep
+// the fill geometry in the own outline. The arms are the refractive parameter set (100/100/14/100) on
+// a rounded rectangle, the frost-only path at both frost values, and an ellipse, plus a two-region
+// panel whose second region carries a 0%-alpha fill. Every arm pairs its assertion with a band-only
+// control, so a covered shape cannot pass on a missing fill geometry.
 TGFX_TEST_PRIVATE(LayerTest, TwoGroupAssemblyKeepsInteriorCoverage) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -5337,10 +5335,10 @@ TGFX_TEST_PRIVATE(LayerTest, UnusableBucketOnlyDropsItself) {
 }
 
 // A parent whose geometry lives in child layers records no own outline, so Glass falls back to the
-// shared subtree recordings. That fallback keeps a child's retained 0% fill, which survives only in
-// the shared contour. The last arm pins the boundary the fallback trades away: a descendant's
-// silhouette-only painter is kept by the content image but dropped by the contour, so the coverage
-// misses that region -- the accepted, editor-bounded limitation.
+// shared subtree recordings. That fallback keeps a child's retained 0%-alpha fill, which survives
+// only in the shared contour. The last arm pins the boundary the fallback trades away: a
+// descendant's silhouette-only painter is kept by the content image but dropped by the contour, so
+// the coverage misses that region -- a limitation the fallback accepts.
 TGFX_TEST_PRIVATE(LayerTest, GlassWithoutOwnOutlineResolvesToSharedContour) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -5401,7 +5399,7 @@ TGFX_TEST_PRIVATE(LayerTest, GlassWithoutOwnOutlineResolvesToSharedContour) {
 
   // Divergence arm: a DESCENDANT carries a silhouette-only painter with a positive alpha, so the
   // content image holds its region while the shared contour the fallback resolves to drops it. This
-  // pins the accepted, editor-bounded boundary of the fallback.
+  // pins the boundary the fallback accepts.
   const Rect regionA = Rect::MakeLTRB(50.0f, 80.0f, 90.0f, 120.0f);
   const Rect regionB = Rect::MakeLTRB(110.0f, 80.0f, 150.0f, 120.0f);
   auto makeDivergencePanel = [&](bool withGlass) {
@@ -5415,8 +5413,8 @@ TGFX_TEST_PRIVATE(LayerTest, GlassWithoutOwnOutlineResolvesToSharedContour) {
     auto rectB = Rectangle::Make();
     rectB->setPosition({regionB.centerX(), regionB.centerY()});
     rectB->setSize({regionB.width(), regionB.height()});
-    // A silhouette-only painter with a POSITIVE alpha: content draws it, contour excludes it. The
-    // editor's usual marker has alpha 0, which both recordings drop, so it cannot exhibit this axis.
+    // A silhouette-only painter with a POSITIVE alpha: content draws it, contour excludes it. An
+    // alpha-0 silhouette-only painter is dropped by both recordings, so it cannot exhibit this axis.
     auto fillB = FillStyle::Make(SolidColor::Make(Color::White()));
     fillB->setSilhouetteOnly(true);
     child->setContents({MakeFilledRegion(rectA, fillA), MakeFilledRegion(rectB, fillB)});
@@ -5451,16 +5449,16 @@ TGFX_TEST_PRIVATE(LayerTest, GlassWithoutOwnOutlineResolvesToSharedContour) {
       << "a group with only children must not record an own outline";
       ASSERT_TRUE(group.contour.has_value()); ASSERT_TRUE(group.contour->image != nullptr);
       ASSERT_TRUE(group.content.image != nullptr);
-      EXPECT_EQ(ResolveContentEntry(group, LayerStyleType::Glass), &*group.contour)
+      EXPECT_EQ(ResolveContentEntry(group, glass.get()), &*group.contour)
       << "Glass must resolve to the shared contour when no own outline exists";)
 }
 
-// The export mask contract: image_exporter's fuse_outside_stroke_into_fill() merges a fill area and
-// its outside stroke band into a single shape grown by the stroke width (size += 2w, roundness +=
-// w). Two adjacent opaque regions anti-alias on their own curves and their coverages add up to less
-// than one on the corner arcs, so the single merged region has to reach full coverage everywhere
-// inside its outer boundary. The merged region is rendered and its coverage is read back, and a
-// spread shadow probes that its outline really is the grown rounded rectangle.
+// The merged-mask contract: a fill area and its outside stroke band are merged into a single shape
+// grown by the stroke width (size += 2w, roundness += w). Two adjacent opaque regions anti-alias on
+// their own curves and their coverages add up to less than one on the corner arcs, so the single
+// merged region has to reach full coverage everywhere inside its outer boundary. The merged region is
+// rendered and its coverage is read back, and a spread shadow probes that its outline really is the
+// grown rounded rectangle.
 TGFX_TEST_PRIVATE(LayerTest, MaskFillAndStrokeUnionKeepsFullCoverageOnRoundedCorners) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -6466,15 +6464,14 @@ TGFX_TEST(LayerTest, GlassStyleWithDropShadow) {
 
 // ===== A Glass on a parent whose geometry lives in child layers =====
 //
-// After a PAGX round trip the failing document puts the author's retained 0% fill on a CHILD layer
-// and the Glass style on its PARENT, which owns no painter at all. The parent then records no own
-// outline, so Glass falls back to the shared subtree contour, which is the recording that keeps a
-// 0%-alpha fill (see ResolveContentEntry in LayerStyleSource.h). These cases pin the final RENDERED
-// pixels over a checker backdrop under the frost-only and the refractive parameter sets of the real
-// document.
+// A parent layer carrying the Glass style whose geometry lives in child layers owns no painter at
+// all, so it records no own outline and Glass falls back to the shared subtree contour, which is the
+// recording that keeps a 0%-alpha fill (see ResolveContentEntry in LayerStyleSource.h). These cases
+// pin the final RENDERED pixels over a checker backdrop under the frost-only and the refractive
+// parameter sets.
 
-// Full-parameter counterpart of MakeOwnOutlineGlass for the frame arm: the pagx light defaults
-// (angle 45, intensity 80) survive, where MakeOwnOutlineGlass drops them to 0.
+// Full-parameter counterpart of MakeOwnOutlineGlass for the light-carrying arms: the light angle and
+// intensity survive, where MakeOwnOutlineGlass drops them to 0.
 static std::shared_ptr<GlassStyle> MakeOwnOutlineGlassWithLight(float refraction, float depth,
                                                                 float frost, float dispersion,
                                                                 float splay, float lightAngle,
@@ -6485,13 +6482,13 @@ static std::shared_ptr<GlassStyle> MakeOwnOutlineGlassWithLight(float refraction
   return glass;
 }
 
-// One table over the parameter sets the roundtrip document uses: the frost-only path (refraction 0,
-// so an interior difference is pure coverage), the vector rectangle node the exporter emitted
-// (refraction 100 / depth 100 / frost 14 / dispersion 100) and the frame node (pagx defaults with
-// frost overridden to 4). With refraction > 0 the glass DISPLACES the backdrop, so an interior region
-// can differ for reasons other than coverage; every arm therefore pairs the interior reading with a
-// no-fill control rendered under the SAME refractive glass, and with a donut base whose hole has to
-// stay uncovered, plus a non-glass drop-shadow control.
+// One table over the parameter sets the parent/child cases are checked with: the frost-only path
+// (refraction 0, so an interior difference is pure coverage), the refractive set (refraction 100 /
+// depth 100 / frost 14 / dispersion 100) and a light-carrying set (refraction 80 / depth 20 / frost
+// 4 / dispersion 50, light 45 at intensity 80). With refraction > 0 the glass DISPLACES the backdrop,
+// so an interior region can differ for reasons other than coverage; every arm therefore pairs the
+// interior reading with a no-fill control rendered under the SAME refractive glass, and with a donut
+// base whose hole has to stay uncovered, plus a non-glass drop-shadow control.
 TGFX_TEST_PRIVATE(LayerTest, GlassParentChildRenderedCoverage) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -6539,8 +6536,8 @@ TGFX_TEST_PRIVATE(LayerTest, GlassParentChildRenderedCoverage) {
   };
   const Arm arms[] = {
       {"frost-only 0/50/100/0/0 light 0@0", 0, 50, 100, 0, 0, 0, 0},
-      {"vector rect 100/100/14/100 light 0@0", 100, 100, 14, 100, 0, 0, 0},
-      {"frame 80/20/4/50 light 45@80", 80, 20, 4, 50, 0, 45, 80},
+      {"refractive 100/100/14/100 light 0@0", 100, 100, 14, 100, 0, 0, 0},
+      {"light 80/20/4/50 light 45@80", 80, 20, 4, 50, 0, 45, 80},
   };
 
   for (const auto& arm : arms) {
@@ -6599,16 +6596,15 @@ TGFX_TEST_PRIVATE(LayerTest, GlassParentChildRenderedCoverage) {
   }
 }
 
-// ===== Imported Frame size: a collapsed fill geometry must not still cover the interior =====
+// ===== A collapsed fill geometry: the stroke band alone must not cover the interior =====
 
-// The PAGX round trip produced one Frame whose own <Rectangle/> carries the extent while the Layer
-// itself declares no width/height, so the Frame size is resolved from that Rectangle. If it had
-// collapsed, the editor would build its rectangle-like fill geometry at 0x0, the sub-pixel fill would
-// be dropped and the Glass would be left with the stroke band only. A real Frame drives its fill and
-// its stroke from one Rectangle element built from its size(), so shareElement mirrors the real
-// assembly. The split arms keep the stroke geometry at the frame extent while the fill collapses --
-// the most generous case for a stroke-only outline, which is exactly the "can the stroke alone cover
-// the interior?" question (an outside stroke band is a ring).
+// The shape's extent comes from its own Rectangle element, not from a size declared on the layer: when
+// that extent collapses, the rectangle-like fill geometry is built at 0x0, the sub-pixel fill is
+// dropped and the Glass is left with the stroke band only. shareElement selects whether the fill and
+// the stroke share one Rectangle element built from a single extent or use one each. The split arms
+// keep the stroke geometry at the full extent while the fill collapses -- the most generous case for
+// a stroke-only outline, which is exactly the "can the stroke alone cover the interior?" question (an
+// outside stroke band is a ring).
 static std::shared_ptr<Layer> MakeFrameSizeGlassPanel(float fillExtent, float strokeExtent,
                                                       bool shareElement, const Rect& rect,
                                                       float strokeWidth,
@@ -6619,7 +6615,7 @@ static std::shared_ptr<Layer> MakeFrameSizeGlassPanel(float fillExtent, float st
     shape->setSize({extent, extent});
     return shape;
   };
-  // A genuine 0% user fill: style alpha 0 (paints nothing), color alpha 1 (still a visible color
+  // A retained 0%-alpha fill: style alpha 0 (paints nothing), color alpha 1 (still a visible color
   // source, so the geometry keeps feeding the shape classifiers).
   auto fill = FillStyle::Make(SolidColor::Make(Color::White()));
   fill->setAlpha(0.0f);
@@ -6674,8 +6670,8 @@ TGFX_TEST_PRIVATE(LayerTest, CollapsedFillGeometryLeavesBandOnly) {
     bool shareElement;
     bool collapsed;
   };
-  // proper = the frame size() as imported (positive); zero-fill / subpixel-fill = the frame size()
-  // collapsed while the stroke geometry still holds the frame extent.
+  // proper = the extent the shape carries (positive); zero-fill / subpixel-fill = that extent
+  // collapsed while the stroke geometry still holds the full extent.
   const SizeProbe probes[] = {
       {"proper", MaskProbeRectSize, MaskProbeRectSize, true, false},
       {"zero-fill", 0.0f, MaskProbeRectSize, false, true},
@@ -6710,6 +6706,167 @@ TGFX_TEST_PRIVATE(LayerTest, CollapsedFillGeometryLeavesBandOnly) {
           << "): with the fill geometry collapsed the Glass must not reach into the shape interior";
     }
   }
+}
+
+// ===== The own outline: a coincident second painter =====
+
+// Reads the own-outline coverage of `panel` onto a fixed probe surface, in layer-local coordinates,
+// and returns its alpha raster. Returns an empty raster when the layer records no own outline.
+static std::vector<int> RasterizeOwnOutlineAlpha(Context* context,
+                                                const std::shared_ptr<Layer>& panel) {
+  static constexpr int ProbeSize = 200;
+  std::vector<int> raster = {};
+  DrawArgs drawArgs(context);
+  std::shared_ptr<Image> image = nullptr;
+  Point offset = Point::Zero();
+  TGFX_PRIVATE_ACCESS(
+      auto source = panel->getLayerStyleSource(drawArgs, Matrix::I());
+      if (source == nullptr || source->groups[0] == nullptr ||
+          !source->groups[0]->ownContour.has_value()) { return raster; }
+      image = source->groups[0]->ownContour->image;
+      offset = source->groups[0]->ownContour->offset;)
+  if (image == nullptr) {
+    return raster;
+  }
+  auto surface = Surface::Make(context, ProbeSize, ProbeSize);
+  if (surface == nullptr) {
+    return raster;
+  }
+  // The image is cropped to the outline's rounded-out bounds, so its recorded offset puts the
+  // raster back into layer-local coordinates.
+  surface->getCanvas()->drawImage(image, offset.x, offset.y);
+  auto info = ImageInfo::Make(ProbeSize, ProbeSize, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  std::vector<uint32_t> pixels(static_cast<size_t>(ProbeSize) * ProbeSize);
+  if (!surface->readPixels(info, pixels.data())) {
+    return raster;
+  }
+  raster.reserve(pixels.size());
+  for (auto pixel : pixels) {
+    raster.push_back(static_cast<int>((pixel >> 24) & 0xFF));
+  }
+  return raster;
+}
+
+// A layer whose own outline holds a silhouette-only painter AND a fill of the same geometry has one
+// shape described by two painters. The own outline is recorded as an additive union, which is exact
+// for painters whose coverages ABUT (0.5 + 0.5 -> 1.0) but would over-cover a SHARED anti-aliased
+// edge: both painters would contribute the shape's own boundary coverage, so the outermost
+// half-covered pixel could read 1.0 and the glass shape could grow by a pixel. This pins the actual
+// contract on that shape -- the coincident pair covers exactly what the single silhouette-only
+// painter covers, boundary included, and renders identically over the checker -- with a DISJOINT
+// second painter as the non-vacuity control, so the equality cannot pass on the second painter simply
+// being dropped. The outline recording rasterizes an opaque, hard edged coverage today, which is why
+// a single painter's boundary pixel is already full; were that to gain a partial-coverage edge, the
+// coincident arm is what would catch the over-cover.
+TGFX_TEST_PRIVATE(LayerTest, OwnOutlineCoincidentPaintersDoNotGrowTheCoveredArea) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // A half-pixel offset, so a boundary pixel sits exactly on the shape edge: it is the pixel a
+  // shared-coverage over-cover would flip to full.
+  const Rect markerRect = Rect::MakeXYWH(60.5f, 60.5f, 80.0f, 80.0f);
+  const Rect disjointRect = Rect::MakeXYWH(150.5f, 150.5f, 30.0f, 30.0f);
+  const auto disjointArea =
+      static_cast<int>(disjointRect.width()) * static_cast<int>(disjointRect.height());
+
+  auto makePanel = [&](bool withUserFill, bool coincidentFill) {
+    auto layer = VectorLayer::Make();
+    auto markerShape = Rectangle::Make();
+    markerShape->setPosition({markerRect.centerX(), markerRect.centerY()});
+    markerShape->setSize({markerRect.width(), markerRect.height()});
+    // The silhouette-only painter: the geometry plus a painter that paints nothing yet still defines
+    // the layer's own outline.
+    std::vector<std::shared_ptr<VectorElement>> elements = {markerShape, MakeSilhouetteOnlyFill()};
+    if (withUserFill && coincidentFill) {
+      // A retained 0%-alpha fill on the SAME geometry element: style alpha 0 over a color alpha of
+      // 1, so it paints nothing while its geometry still feeds the own outline. It joins the
+      // silhouette-only painter's element list, so the only difference from the unpainted panel is
+      // one more painter of the same geometry -- the exact pair under test, with the geometry count
+      // and the panel structure unchanged.
+      auto fill = FillStyle::Make(SolidColor::Make(Color::White()));
+      fill->setAlpha(0.0f);
+      elements.push_back(fill);
+    }
+    auto group = VectorGroup::Make();
+    group->setElements(std::move(elements));
+    std::vector<std::shared_ptr<VectorElement>> contents = {group};
+    if (withUserFill && !coincidentFill) {
+      // Non-vacuity control: the same 0%-alpha fill, but on its own DISJOINT geometry, so its
+      // painter has to add its own area to the own outline.
+      auto fillShape = Rectangle::Make();
+      fillShape->setPosition({disjointRect.centerX(), disjointRect.centerY()});
+      fillShape->setSize({disjointRect.width(), disjointRect.height()});
+      auto fill = FillStyle::Make(SolidColor::Make(Color::White()));
+      fill->setAlpha(0.0f);
+      auto fillGroup = VectorGroup::Make();
+      fillGroup->setElements({fillShape, fill});
+      contents.push_back(fillGroup);
+    }
+    layer->setContents(std::move(contents));
+    layer->setLayerStyles({GlassStyle::Make(0, 50, 100, 0, 0, 0, 0)});
+    return layer;
+  };
+
+  auto countFull = [](const std::vector<int>& raster) {
+    int count = 0;
+    for (auto value : raster) {
+      if (value == 255) {
+        count++;
+      }
+    }
+    return count;
+  };
+
+  auto markerOnly = RasterizeOwnOutlineAlpha(context, makePanel(false, false));
+  auto coincident = RasterizeOwnOutlineAlpha(context, makePanel(true, true));
+  auto disjoint = RasterizeOwnOutlineAlpha(context, makePanel(true, false));
+  ASSERT_FALSE(markerOnly.empty());
+  ASSERT_EQ(markerOnly.size(), coincident.size());
+  ASSERT_EQ(markerOnly.size(), disjoint.size());
+
+  const auto markerFull = countFull(markerOnly);
+  const auto coincidentFull = countFull(coincident);
+  const auto disjointFull = countFull(disjoint);
+  EXPECT_GT(markerFull, 0) << "the marker-only outline must cover something, otherwise the "
+                              "comparisons below are vacuous";
+  EXPECT_EQ(coincidentFull, markerFull)
+      << "coincident-fill outline: a second painter describing the SAME geometry must not add any "
+         "fully covered pixel -- additive union coverage over the shared boundary would grow the "
+         "glass shape by a pixel";
+  int differing = 0;
+  for (size_t i = 0; i < markerOnly.size(); i++) {
+    if (markerOnly[i] != coincident[i]) {
+      differing++;
+    }
+  }
+  EXPECT_EQ(differing, 0)
+      << "coincident-fill outline: the whole raster must match the marker-only outline pixel for "
+         "pixel, boundary included; "
+      << differing << " pixels differ";
+  // Non-vacuity: the same fixture with the second painter DISJOINT does add its own area, so the
+  // equality above cannot pass on the fill being dropped from the own outline.
+  EXPECT_EQ(disjointFull - markerFull, disjointArea)
+      << "disjoint-fill outline: the second painter must be recorded, so it has to add exactly its "
+         "own "
+      << disjointArea << "-pixel area";
+
+  // The same boundary on rendered pixels: both configurations must frost the checker backdrop
+  // identically, or the extra painter would be visible as a fringe.
+  auto renderedMarkerOnly = RenderPanelOverChecker(context, makePanel(false, false));
+  auto renderedCoincident = RenderPanelOverChecker(context, makePanel(true, true));
+  auto renderedDisjoint = RenderPanelOverChecker(context, makePanel(true, false));
+  ASSERT_TRUE(renderedMarkerOnly != nullptr && renderedCoincident != nullptr &&
+              renderedDisjoint != nullptr);
+  const auto wholeSurface = Rect::MakeLTRB(0.0f, 0.0f, 200.0f, 200.0f);
+  EXPECT_EQ(CountDifferingPixels(renderedMarkerOnly.get(), renderedCoincident.get(), wholeSurface,
+                                 2),
+            0)
+      << "rendered checker ROI: the coincident 0%-alpha fill must leave the Glass render untouched";
+  EXPECT_GT(CountDifferingPixels(renderedMarkerOnly.get(), renderedDisjoint.get(), wholeSurface, 2),
+            0)
+      << "rendered checker ROI (disjoint control): the render comparison must be able to see an "
+         "extra fill at all, or the equality above is vacuous";
 }
 
 }  // namespace tgfx
