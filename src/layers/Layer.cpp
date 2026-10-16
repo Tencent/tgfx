@@ -2018,8 +2018,7 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
     // shape ResolveContourShape returns.
     auto* contourEntry = ResolveContourEntry(*group, layerStyle);
     auto contourImage = contourEntry ? contourEntry->image : nullptr;
-    auto contourOffset =
-        contourImage ? contourEntry->offset - contentEntry->offset : Point::Zero();
+    auto contourOffset = contourImage ? contourEntry->offset - contentEntry->offset : Point::Zero();
     styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
         std::move(contourImage), contourOffset,
         ResolveContourShape(*group, layerStyle, source->contentShape)));

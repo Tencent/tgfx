@@ -543,10 +543,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       float minBlurRadius = MIN_FINE_TENT_TEXELS / (udfScale * layerToSourceX);
       blurRadius = std::max(blurRadius, minBlurRadius);
       float effectiveBlurRadius = std::min(blurRadius, minHalf);
-      Point fineRadius = {std::min(effectiveBlurRadius * rhoX,
-                                   static_cast<float>(GlassUDFMaxTentRadius)),
-                          std::min(effectiveBlurRadius * rhoY,
-                                   static_cast<float>(GlassUDFMaxTentRadius))};
+      Point fineRadius = {
+          std::min(effectiveBlurRadius * rhoX, static_cast<float>(GlassUDFMaxTentRadius)),
+          std::min(effectiveBlurRadius * rhoY, static_cast<float>(GlassUDFMaxTentRadius))};
       float gradientSampleRadius = getDepthRatio() * 3.0f + 1.0f;
       float fineHaloX = std::ceil(gradientSampleRadius) + 1.0f;
       float fineHaloY = std::ceil(gradientSampleRadius) + 1.0f;

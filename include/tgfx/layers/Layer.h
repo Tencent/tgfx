@@ -706,7 +706,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   // Records the layer's own outline (own content only, silhouette-only painters included). Used as
   // the content of styles that must cover the layer's own shape rather than its rendered content.
-  std::shared_ptr<Image> getOwnContourImage(const DrawArgs& args, float contentScale, Point* offset);
+  std::shared_ptr<Image> getOwnContourImage(const DrawArgs& args, float contentScale,
+                                            Point* offset);
 
   bool hasValidMask() const;
 
