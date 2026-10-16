@@ -537,10 +537,12 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       float rhoY = static_cast<float>(udfHeight) / origBounds.height();
       // Low depth on a large layer leaves the refraction kernel below one UDF texel, which turns
       // the coverage ramp into per-texel steps. The internal floor lifts the layer-space radius so
-      // the kernel always spans at least MIN_FINE_TENT_TEXELS texels. The density cap above runs
-      // first, so this floor only widens the physical radius; it never shrinks it.
+      // the kernel spans at least MIN_FINE_TENT_TEXELS texels on both axes: it divides by the
+      // rounded per-axis density min(rhoX, rhoY), so an axis that rounds down still stays covered.
+      // The density cap above runs first, so this floor only widens the physical radius; it never
+      // shrinks it.
       static constexpr float MIN_FINE_TENT_TEXELS = 2.0f;
-      float minBlurRadius = MIN_FINE_TENT_TEXELS / (udfScale * layerToSourceX);
+      float minBlurRadius = MIN_FINE_TENT_TEXELS / std::min(rhoX, rhoY);
       blurRadius = std::max(blurRadius, minBlurRadius);
       float effectiveBlurRadius = std::min(blurRadius, minHalf);
       Point fineRadius = {
