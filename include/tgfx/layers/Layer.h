@@ -597,6 +597,13 @@ class Layer : public std::enable_shared_from_this<Layer> {
    */
   virtual std::optional<StyledShape> onGetContentShape();
 
+  /**
+   * Returns the shape of this layer's own outline, i.e. the outline its content records without
+   * its descendants and including the painters marked silhouetteOnly. The base class returns the
+   * content shape; layer types whose own content is exactly a vector shape override this.
+   */
+  virtual std::optional<StyledShape> onGetOwnContourShape();
+
  private:
   /**
    * Marks the layer as needing to be redrawn. Unlike invalidateContent(), this method only marks
@@ -697,6 +704,11 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<Image> getContentContourImage(const DrawArgs& args, float contentScale,
                                                 Point* offset, bool* contourMatchesContent);
 
+  // Records the layer's own outline (own content only, silhouette-only painters included). Used as
+  // the content of styles that must cover the layer's own shape rather than its rendered content.
+  std::shared_ptr<Image> getOwnContourImage(const DrawArgs& args, float contentScale,
+                                            Point* offset);
+
   bool hasValidMask() const;
 
   void updateRenderBounds(std::shared_ptr<RegionTransformer> transformer = nullptr,
@@ -738,6 +750,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void updateStaticSubtreeFlags();
 
   std::optional<StyledShape> getContentShape();
+
+  std::optional<StyledShape> getOwnContourShape();
 
   struct {
     bool dirtyContent : 1;        // layer's content needs updating

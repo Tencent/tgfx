@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -1329,6 +1330,42 @@ std::shared_ptr<Image> Layer::getContentContourImage(const DrawArgs& args, float
   return image;
 }
 
+std::shared_ptr<Image> Layer::getOwnContourImage(const DrawArgs& args, float contentScale,
+                                                 Point* offset) {
+  if (FloatNearlyZero(contentScale)) {
+    return nullptr;
+  }
+  auto content = getContent();
+  if (content == nullptr) {
+    return nullptr;
+  }
+  OpaqueContext opaqueContext;
+  // This raster is a geometric union of several painters, so their shared anti-aliased boundaries
+  // must add up instead of compositing with SrcOver, which would leave them at 0.75 coverage and
+  // let the backdrop show through the style. Only this own-outline recording needs it: the shared
+  // content and contour rasters keep SrcOver, and a user blend mode must never survive into them.
+  opaqueContext.setUnionCoverage(true);
+  auto* contourCanvas = opaqueContext.beginRecording();
+  contourCanvas->scale(contentScale, contentScale);
+  // This is the layer's own outline, not the contour shared with layer styles: recounting it
+  // directly keeps descendants out and includeSilhouette keeps the silhouette-only painters that
+  // the shared contour drops, which is exactly the coverage a style like Glass needs.
+  content->drawContour(contourCanvas, bitFields.allowsEdgeAntialiasing, true);
+  auto picture = opaqueContext.finishRecordingAsPicture();
+  auto imageOffset = Point::Zero();
+  auto image = ToImageWithOffset(std::move(picture), &imageOffset, nullptr, args.dstColorSpace);
+  if (offset) {
+    *offset = imageOffset;
+  }
+  return image;
+}
+
+std::optional<StyledShape> Layer::onGetOwnContourShape() {
+  // The base class has no outline of its own, so the own outline is the content shape; only layer
+  // types with an exact vector shape have anything to override here.
+  return onGetContentShape();
+}
+
 bool Layer::shouldPassThroughBackground(BlendMode blendMode) const {
   // Pass-through background is only possible when:
   // 1. The feature is enabled
@@ -1764,13 +1801,18 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     return nullptr;
   }
 
-  // Collect which excludeChildEffects values need content and/or a rasterized contour.
+  // Collect which excludeChildEffects values need content, a rasterized contour and the layer's own
+  // outline, and whether any style needs a content shape.
   bool needContent[2] = {false, false};
   bool needContour[2] = {false, false};
+  bool needOwnOutline[2] = {false, false};
   bool needsContentShape = false;
   for (const auto& layerStyle : _layerStyles) {
     auto index = static_cast<int>(layerStyle->excludeChildEffects());
     needContent[index] = true;
+    if (layerStyle->usesOwnOutlineAsContent()) {
+      needOwnOutline[index] = true;
+    }
     auto sourceFlags = layerStyle->extraSourceType();
     if (NeedsContourSource(sourceFlags)) {
       needContour[index] = true;
@@ -1780,6 +1822,14 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
 
   auto source = std::make_unique<LayerStyleSource>();
   source->contentScale = contentScale;
+
+  // A layer that carries a style declaring the own outline may drop a single unusable bucket: such a
+  // bucket can still be driven by the own outline even when the shared content is empty, so losing
+  // one bucket must not cancel the other. The relaxation is per layer rather than per bucket, so a
+  // failed bucket no longer suppresses the styles of the other bucket either -- they draw where the
+  // previous fail-closed contract left them undrawn. Every other layer keeps that contract: one
+  // unusable bucket makes the whole source unusable.
+  const bool layerUsesOwnOutline = needOwnOutline[0] || needOwnOutline[1];
 
   DrawArgs drawArgs = args;
   drawArgs.render3DContext = nullptr;
@@ -1792,6 +1842,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     }
     drawArgs.excludeEffects = static_cast<bool>(i);
     auto group = std::make_unique<LayerStyleSourceGroup>();
+    bool bucketUsable = true;
 
     bool allContourMatch = false;
     if (needContour[i]) {
@@ -1799,16 +1850,17 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
       contourEntry.image =
           getContentContourImage(drawArgs, contentScale, &contourEntry.offset, &allContourMatch);
       if (contourEntry.image == nullptr) {
-        return nullptr;
+        bucketUsable = false;
+      } else {
+        if (allContourMatch) {
+          group->content = contourEntry;
+          needContent[i] = false;
+        }
+        group->contour = std::move(contourEntry);
       }
-      if (allContourMatch) {
-        group->content = contourEntry;
-        needContent[i] = false;
-      }
-      group->contour = std::move(contourEntry);
     }
 
-    if (needContent[i]) {
+    if (needContent[i] && bucketUsable) {
       OpaqueContext opaqueContext;
       auto* contourCanvas = opaqueContext.beginRecording();
       contourCanvas->scale(contentScale, contentScale);
@@ -1817,11 +1869,37 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
       group->content.image = ToImageWithOffset(std::move(picture), &group->content.offset, nullptr,
                                                args.dstColorSpace);
       if (group->content.image == nullptr) {
-        return nullptr;
+        bucketUsable = false;
       }
     }
 
+    if (needOwnOutline[i]) {
+      // A style that draws from the own outline always consumes it rather than the shared content:
+      // the shared images exclude the painters marked silhouetteOnly, so a layer whose only painter
+      // is such a marker records an empty content image while its outline is still fully available.
+      // Recording it unconditionally also keeps the coverage independent of any visible descendant.
+      LayerStyleSourceEntry ownEntry = {};
+      ownEntry.image = getOwnContourImage(drawArgs, contentScale, &ownEntry.offset);
+      if (ownEntry.image != nullptr) {
+        group->ownContour = std::move(ownEntry);
+        group->ownContourShape = getOwnContourShape();
+        bucketUsable = true;
+      }
+    }
+
+    if (!bucketUsable) {
+      if (layerUsesOwnOutline) {
+        continue;
+      }
+      return nullptr;
+    }
     source->groups[i] = std::move(group);
+  }
+
+  if (source->groups[0] == nullptr && source->groups[1] == nullptr) {
+    // Nothing usable was recorded in any bucket: keep the previous fail-closed result so a style
+    // whose input is entirely absent draws nothing.
+    return nullptr;
   }
 
   if (needsContentShape) {
@@ -1919,24 +1997,31 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
     return;
   }
 
-  auto& contentEntry = group->content;
+  auto* contentEntry = ResolveContentEntry(*group, layerStyle);
+  if (contentEntry == nullptr) {
+    return;
+  }
   // Apply the content transform matrix to canvas so that rendering happens at the final scale,
   // avoiding blurry results that would come from baking contentScale into a picture recording.
   AutoCanvasRestore restoreCanvas(canvas);
   auto matrix = Matrix::MakeScale(1.f / source->contentScale, 1.f / source->contentScale);
-  matrix.preTranslate(contentEntry.offset.x, contentEntry.offset.y);
+  matrix.preTranslate(contentEntry->offset.x, contentEntry->offset.y);
   canvas->concat(matrix);
   LayerStyleInput styleInput = {};
-  styleInput.content = contentEntry.image;
-  styleInput.contentOffset = contentEntry.offset;
+  styleInput.content = contentEntry->image;
+  styleInput.contentOffset = contentEntry->offset;
   styleInput.contentScale = source->contentScale;
   auto sourceFlags = layerStyle->extraSourceType();
   if (HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour)) {
-    auto contourImage = group->contour.has_value() ? group->contour->image : nullptr;
-    auto contourOffset =
-        contourImage ? group->contour->offset - contentEntry.offset : Point::Zero();
+    // The Contour extra source carries one recording's raster together with the shape that describes
+    // it: ResolveContourEntry picks the raster (own-outline or shared contour) that matches the
+    // shape ResolveContourShape returns.
+    auto* contourEntry = ResolveContourEntry(*group, layerStyle);
+    auto contourImage = contourEntry ? contourEntry->image : nullptr;
+    auto contourOffset = contourImage ? contourEntry->offset - contentEntry->offset : Point::Zero();
     styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
-        std::move(contourImage), contourOffset, source->contentShape));
+        std::move(contourImage), contourOffset,
+        ResolveContourShape(*group, layerStyle, source->contentShape)));
   }
   layerStyle->draw(canvas, styleInput, alpha);
 }
@@ -2255,6 +2340,10 @@ void Layer::updateStaticSubtreeFlags() {
 
 std::optional<StyledShape> Layer::getContentShape() {
   return onGetContentShape();
+}
+
+std::optional<StyledShape> Layer::getOwnContourShape() {
+  return onGetOwnContourShape();
 }
 
 }  // namespace tgfx

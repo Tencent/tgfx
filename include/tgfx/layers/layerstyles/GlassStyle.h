@@ -134,6 +134,15 @@ class GlassStyle : public LayerStyle {
            static_cast<uint32_t>(LayerStyleExtraSourceType::Contour);
   }
 
+  /**
+   * Glass covers the layer's own outline rather than its rendered content: the shared content and
+   * contour images leave out the painters flagged silhouetteOnly, so a layer whose only painter is
+   * such a marker would have no coverage at all.
+   */
+  bool usesOwnOutlineAsContent() const override {
+    return true;
+  }
+
  protected:
   Rect filterBackgroundSoft(const Rect& srcRect, float contentScale) override;
 

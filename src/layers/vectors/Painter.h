@@ -95,6 +95,7 @@ class Painter {
   BlendMode blendMode = BlendMode::SrcOver;
   float alpha = 1.0f;
   LayerPlacement placement = LayerPlacement::Background;
+  bool silhouetteOnly = false;
   std::vector<Geometry*> geometries = {};
   std::vector<Matrix> innerMatrices = {};
 

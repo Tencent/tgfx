@@ -32,7 +32,8 @@ static bool StrokeEquals(const Stroke* a, const Stroke* b) {
   return *a == *b;
 }
 
-DrawContent::DrawContent(const LayerPaint& paint) : blendMode(paint.blendMode) {
+DrawContent::DrawContent(const LayerPaint& paint)
+    : blendMode(paint.blendMode), silhouetteOnly(paint.silhouetteOnly) {
   auto paintShader = paint.shader;
   if (paintShader) {
     Color shaderColor = {};
@@ -59,7 +60,13 @@ Rect DrawContent::getBounds() const {
   return bounds;
 }
 
-void DrawContent::drawContour(Canvas* canvas, bool antiAlias) const {
+void DrawContent::drawContourInternal(Canvas* canvas, bool antiAlias,
+                                      bool includeSilhouette) const {
+  if (silhouetteOnly && !includeSilhouette) {
+    // The shared contour is the contour of the visible content; a silhouette-only painter belongs
+    // to the layer's own outline alone, so styles such as shadows must not see it.
+    return;
+  }
   Paint paint = {};
   paint.setAntiAlias(antiAlias);
   if (stroke) {
@@ -73,6 +80,11 @@ void DrawContent::drawContour(Canvas* canvas, bool antiAlias) const {
 }
 
 bool DrawContent::contourEqualsOpaqueContent() const {
+  if (silhouetteOnly) {
+    // The shared contour drops this painter, so the contour render never carries its geometry and
+    // cannot be reused as the content render, regardless of whether the content paints it.
+    return false;
+  }
   if (color.alpha <= 0) {
     return false;
   }
@@ -114,6 +126,12 @@ bool DrawContent::hasSameGeometry(const GeometryContent* other) const {
     return false;
   }
   auto otherContent = static_cast<const DrawContent*>(other);
+  if (silhouetteOnly != otherContent->silhouetteOnly) {
+    // The shared contour drops silhouette-only painters, so contents that agree on geometry but not
+    // on this flag must stay in separate groups: merging them lets either flag decide the contour
+    // of the other's geometry, and a marker recorded first then hides the geometry of the fill.
+    return false;
+  }
   if (!StrokeEquals(stroke.get(), otherContent->stroke.get())) {
     return false;
   }

@@ -473,6 +473,9 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       float blurRadius =
           std::max(std::min((_depth / 100.0f) * MAX_BLUR_RADIUS, MAX_BLUR_RADIUS), MIN_BLUR_RADIUS);
       float minHalf = std::min(origBounds.width(), origBounds.height()) * 0.5f;
+      // Nominal layer-space tent reach, before the texel-count floors below are applied. The
+      // density budget uses this value so the cap tracks the physical radius, not the floors.
+      float nominalTentRadius = std::min(blurRadius, minHalf);
       auto visibleContentRect = Rect::MakeWH(contentWidth, contentHeight);
       if (clipBounds.has_value() && !visibleContentRect.intersect(*clipBounds)) {
         return;
@@ -502,6 +505,22 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       if (fullMinDim * udfScale < MIN_SHORT_SIDE_TEXELS) {
         udfScale = MIN_SHORT_SIDE_TEXELS / fullMinDim;
       }
+      // Layer-pixel-to-source-pixel ratio per axis (= contentScale on both axes). Used to convert
+      // the layer-space radius into the UDF texel density.
+      float layerToSourceX = contentWidth / origBounds.width();
+      float layerToSourceY = contentHeight / origBounds.height();
+      // The UDF has a hard box-limited tent radius (GlassUDFMaxTentRadius). Clamping the radius
+      // would shrink the layer-space transition band as the density grows with zoom * DPR, so the
+      // density is lowered instead: the physical radius has priority, and the density is capped so
+      // that radius * density never exceeds the tent box. This can leave the short axis of a narrow
+      // shape below MIN_SHORT_SIDE_TEXELS, which is the intended trade-off for a stable radius.
+      float layerToSourceMax = std::max(layerToSourceX, layerToSourceY);
+      float densityCap =
+          static_cast<float>(GlassUDFMaxTentRadius) / std::max(nominalTentRadius, 1e-4f);
+      udfScale = std::min(udfScale, densityCap / layerToSourceMax);
+      if (!(udfScale > 0.0f) || !std::isfinite(udfScale)) {
+        return;
+      }
       int udfWidth = std::max(1, static_cast<int>(std::round(contentWidth * udfScale)));
       int udfHeight = std::max(1, static_cast<int>(std::round(contentHeight * udfScale)));
       // The UDF dimensions are rounded independently, so each axis needs its own layer-pixel
@@ -511,19 +530,24 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       // Blur radius in UDF pixel space. The horizontal pass samples input.content directly into
       // the target UDF core, so resizing does not require an intermediate texture.
       // The radius scales with udfScale, keeping the layer-space radius constant.
-      float layerToSourceX = contentWidth / origBounds.width();
-      float layerToSourceY = contentHeight / origBounds.height();
+      //
+      // The radius is converted back to layer pixels through the *rounded* per-axis texel density
+      // (rhoX/rhoY), not the ideal udfScale, so independent rounding cannot shift the tent reach.
+      float rhoX = static_cast<float>(udfWidth) / origBounds.width();
+      float rhoY = static_cast<float>(udfHeight) / origBounds.height();
       // Low depth on a large layer leaves the refraction kernel below one UDF texel, which turns
       // the coverage ramp into per-texel steps. The internal floor lifts the layer-space radius so
-      // the kernel always spans at least MIN_FINE_TENT_TEXELS texels.
+      // the kernel spans at least MIN_FINE_TENT_TEXELS texels on both axes: it divides by the
+      // rounded per-axis density min(rhoX, rhoY), so an axis that rounds down still stays covered.
+      // The density cap above runs first, so this floor only widens the physical radius; it never
+      // shrinks it.
       static constexpr float MIN_FINE_TENT_TEXELS = 2.0f;
-      float minBlurRadius = MIN_FINE_TENT_TEXELS / (udfScale * layerToSourceX);
+      float minBlurRadius = MIN_FINE_TENT_TEXELS / std::min(rhoX, rhoY);
       blurRadius = std::max(blurRadius, minBlurRadius);
       float effectiveBlurRadius = std::min(blurRadius, minHalf);
-      Point fineRadius = {std::min(effectiveBlurRadius * udfScale * layerToSourceX,
-                                   static_cast<float>(GlassUDFMaxTentRadius)),
-                          std::min(effectiveBlurRadius * udfScale * layerToSourceY,
-                                   static_cast<float>(GlassUDFMaxTentRadius))};
+      Point fineRadius = {
+          std::min(effectiveBlurRadius * rhoX, static_cast<float>(GlassUDFMaxTentRadius)),
+          std::min(effectiveBlurRadius * rhoY, static_cast<float>(GlassUDFMaxTentRadius))};
       float gradientSampleRadius = getDepthRatio() * 3.0f + 1.0f;
       float fineHaloX = std::ceil(gradientSampleRadius) + 1.0f;
       float fineHaloY = std::ceil(gradientSampleRadius) + 1.0f;

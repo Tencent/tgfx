@@ -91,6 +91,7 @@ LayerPaint Painter::makeBasePaint() const {
   LayerPaint paint = {};
   paint.blendMode = blendMode;
   paint.placement = placement;
+  paint.silhouetteOnly = silhouetteOnly;
   paint.color.alpha = alpha;
   return paint;
 }
