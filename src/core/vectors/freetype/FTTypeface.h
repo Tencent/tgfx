@@ -75,12 +75,20 @@ class FTTypeface : public Typeface {
   FT_Face face = nullptr;
   bool _hasColor = false;
   bool _hasOutlines = true;
+  // True for the PAGX CFF subsets whose outlines describe their filled area with parity semantics.
+  // Kept internal: a fill rule belongs to an emitted Path, not to a typeface, so FTScalerContext
+  // applies it when it produces a glyph path or glyph pixels.
+  bool _parityOutlines = false;
 
 #if defined(__ANDROID__) || defined(ANDROID)
   Global<jobject> typeface;
 #endif
 
   FTTypeface(FTFontData data, FT_Face face);
+
+  bool parityOutlines() const {
+    return _parityOutlines;
+  }
 
   int unitsPerEmInternal() const;
 
