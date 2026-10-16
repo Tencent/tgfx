@@ -115,12 +115,12 @@ std::optional<StyledShape> VectorLayer::computeContentShape(bool includeSilhouet
   std::optional<PainterStyle> strokeStyle = std::nullopt;
   for (const auto& painter : context.painters) {
     DEBUG_ASSERT(painter != nullptr);
-    if (HasTransparentSolidColor(painter.get())) {
-      continue;
-    }
-    if (!includeSilhouetteOnly && painter->silhouetteOnly) {
-      // A silhouette-only painter is invisible in the rendered content, so it does not take part
-      // in the content shape even though its geometry is a perfectly valid outline.
+    // The content shape describes what the layer renders, so it drops painters that contribute no
+    // visible content. The own outline is a geometry recording that keeps both the 0-alpha and the
+    // silhouette-only painters, so its shape must keep that same painter set or it would describe
+    // fewer painters than the raster it is paired with.
+    if (!includeSilhouetteOnly &&
+        (HasTransparentSolidColor(painter.get()) || painter->silhouetteOnly)) {
       continue;
     }
     if (painter->geometries.size() != 1) {
@@ -144,8 +144,8 @@ std::optional<StyledShape> VectorLayer::computeContentShape(bool includeSilhouet
     }
   }
 
-  // sharedGeometry stays null when every painter was skipped as invisible, meaning the layer has
-  // no visible content.
+  // For the content shape, sharedGeometry stays null when every painter was skipped as invisible,
+  // meaning the layer has no visible content; the own-outline shape never skips a painter.
   if (sharedGeometry == nullptr) {
     return std::nullopt;
   }

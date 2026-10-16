@@ -63,6 +63,21 @@ struct LayerStyleSourceGroup {
 };
 
 /**
+ * Returns the layer's own outline entry when the given style draws from it, or nullptr otherwise.
+ * The single source of the own-outline predicate shared by the resolvers below, so they can never
+ * disagree on when a style is driven by the own outline.
+ */
+inline const LayerStyleSourceEntry* OwnContourEntry(const LayerStyleSourceGroup& group,
+                                                    const LayerStyle* style) {
+  DEBUG_ASSERT(style != nullptr);
+  if (style->usesOwnOutlineAsContent() && group.ownContour.has_value() &&
+      group.ownContour->image != nullptr) {
+    return &*group.ownContour;
+  }
+  return nullptr;
+}
+
+/**
  * Resolves the entry a consumer must use as LayerStyleInput.content for the given style. A style that
  * declares usesOwnOutlineAsContent() wants the layer's own outline, which is the only image that
  * includes the silhouette-only markers, and falls back to the shared subtree recordings when no own
@@ -77,8 +92,8 @@ inline const LayerStyleSourceEntry* ResolveContentEntry(const LayerStyleSourceGr
                                                         const LayerStyle* style) {
   DEBUG_ASSERT(style != nullptr);
   if (style->usesOwnOutlineAsContent()) {
-    if (group.ownContour.has_value() && group.ownContour->image != nullptr) {
-      return &*group.ownContour;
+    if (auto* ownEntry = OwnContourEntry(group, style)) {
+      return ownEntry;
     }
     // A style that declares the own outline but records none resolves to the shared subtree contour
     // when present (and falls back to `content` otherwise).
@@ -126,11 +141,28 @@ inline const std::optional<StyledShape>& ResolveContourShape(
     const LayerStyleSourceGroup& group, const LayerStyle* style,
     const std::optional<StyledShape>& sharedShape) {
   DEBUG_ASSERT(style != nullptr);
-  if (style->usesOwnOutlineAsContent() && group.ownContour.has_value() &&
-      group.ownContour->image != nullptr) {
+  if (OwnContourEntry(group, style) != nullptr) {
     return group.ownContourShape;
   }
   return sharedShape;
+}
+
+/**
+ * Resolves the entry whose raster pairs with the shape ResolveContourShape returns: the own-outline
+ * entry when the style draws from it, otherwise the shared contour entry when it carries an image,
+ * otherwise nullptr. Image, offset and shape must all come from one recording, so a style handed the
+ * own-outline shape must also be handed the own-outline raster.
+ */
+inline const LayerStyleSourceEntry* ResolveContourEntry(const LayerStyleSourceGroup& group,
+                                                        const LayerStyle* style) {
+  DEBUG_ASSERT(style != nullptr);
+  if (auto* ownEntry = OwnContourEntry(group, style)) {
+    return ownEntry;
+  }
+  if (group.contour.has_value() && group.contour->image != nullptr) {
+    return &*group.contour;
+  }
+  return nullptr;
 }
 
 /**

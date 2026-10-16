@@ -494,17 +494,13 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   styleInput.extraSources.push_back(
       std::make_shared<StyleInputSource>(std::move(bgImage), backgroundOffset));
   if ((sourceFlags & static_cast<uint32_t>(LayerStyleExtraSourceType::Contour)) != 0) {
-    // The Contour extra source carries the shared contour raster, paired with the shape resolved
-    // below. Only a content-based style reads that raster, and it is handed the shared shape that
-    // matches it; a style that draws from the own outline reads the shape alone (DetectGlassShape)
-    // and samples the raster of the entry ResolveContentEntry returned instead, so the shape and
-    // this raster are never read as a pair.
-    std::shared_ptr<Image> contourImage = nullptr;
-    Point contourOffset = {};
-    if (group->contour.has_value()) {
-      contourImage = group->contour->image;
-      contourOffset = group->contour->offset - contentEntry->offset;
-    }
+    // The Contour extra source carries one recording's raster together with the shape that describes
+    // it: ResolveContourEntry picks the raster (own-outline or shared contour) that matches the
+    // shape ResolveContourShape returns.
+    auto* contourEntry = ResolveContourEntry(*group, style);
+    std::shared_ptr<Image> contourImage = contourEntry ? contourEntry->image : nullptr;
+    Point contourOffset =
+        contourImage ? contourEntry->offset - contentEntry->offset : Point::Zero();
     styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
         std::move(contourImage), contourOffset,
         ResolveContourShape(*group, style, source->contentShape)));
