@@ -35,7 +35,6 @@ class MatrixContent : public GeometryContent {
   bool hitTestPoint(float localX, float localY) const override;
   bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
   void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
-  void drawContour(Canvas* canvas, bool antiAlias) const override;
   bool contourEqualsOpaqueContent() const override;
   bool hasBlendMode() const override;
   bool hasSameGeometry(const GeometryContent* other) const override;
@@ -45,6 +44,8 @@ class MatrixContent : public GeometryContent {
   Matrix matrix = Matrix::I();
 
  protected:
+  void drawContourInternal(Canvas* canvas, bool antiAlias, bool includeSilhouette) const override;
+
   Type type() const override {
     return Type::Matrix;
   }

@@ -83,6 +83,16 @@ void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
 }
 
 std::optional<StyledShape> VectorLayer::onGetContentShape() {
+  return computeContentShape(false);
+}
+
+std::optional<StyledShape> VectorLayer::onGetOwnContourShape() {
+  // The own outline keeps the silhouette-only painters, which the content shape skips: they are
+  // invisible but they are part of the layer's own shape.
+  return computeContentShape(true);
+}
+
+std::optional<StyledShape> VectorLayer::computeContentShape(bool includeSilhouetteOnly) {
   if (_contents.empty()) {
     return std::nullopt;
   }
@@ -106,6 +116,11 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
   for (const auto& painter : context.painters) {
     DEBUG_ASSERT(painter != nullptr);
     if (HasTransparentSolidColor(painter.get())) {
+      continue;
+    }
+    if (!includeSilhouetteOnly && painter->silhouetteOnly) {
+      // A silhouette-only painter is invisible in the rendered content, so it does not take part
+      // in the content shape even though its geometry is a perfectly valid outline.
       continue;
     }
     if (painter->geometries.size() != 1) {

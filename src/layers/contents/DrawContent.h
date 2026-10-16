@@ -36,7 +36,6 @@ class DrawContent : public GeometryContent {
   Rect getBounds() const override;
   Rect getTightBounds(const Matrix& matrix) const override = 0;
   bool hitTestPoint(float localX, float localY) const override = 0;
-  void drawContour(Canvas* canvas, bool antiAlias) const override;
   bool contourEqualsOpaqueContent() const override;
   bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
   void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
@@ -57,6 +56,8 @@ class DrawContent : public GeometryContent {
   }
 
  protected:
+  void drawContourInternal(Canvas* canvas, bool antiAlias, bool includeSilhouette) const override;
+
   virtual Rect onGetBounds() const = 0;
   virtual void onDraw(Canvas* canvas, const Paint& paint) const = 0;
   virtual bool onHasSameGeometry(const GeometryContent* other) const = 0;
@@ -65,6 +66,7 @@ class DrawContent : public GeometryContent {
   std::shared_ptr<Shader> shader = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
   std::unique_ptr<Stroke> stroke = nullptr;
+  bool silhouetteOnly = false;
 };
 
 }  // namespace tgfx
