@@ -4332,8 +4332,10 @@ static Rect GlassMarkerPanelLocalBounds() {
 //   Marker      - a silhouette-only painter: geometry only, dropped from the shared contour and the
 //                 visible content, kept in the layer's own outline.
 //   Transparent - a retained 0%-alpha fill: geometry only, but it stays in the shared contour.
+//   TransparentColor - a fully transparent solid color (alpha 0 in the color source), which the
+//                      content-shape derivation skips.
 //   Opaque      - a visible fill.
-enum class MarkerFillKind { None, Marker, Transparent, Opaque };
+enum class MarkerFillKind { None, Marker, Transparent, TransparentColor, Opaque };
 
 // One rectangle region of a marker panel plus the overrides the special cases need.
 struct MarkerRegionSpec {
@@ -4375,6 +4377,9 @@ static std::shared_ptr<VectorGroup> MakeMarkerRegion(const MarkerRegionSpec& spe
       elements.push_back(fill);
       break;
     }
+    case MarkerFillKind::TransparentColor:
+      elements.push_back(FillStyle::Make(SolidColor::Make(Color::Transparent())));
+      break;
     case MarkerFillKind::Opaque:
       elements.push_back(FillStyle::Make(SolidColor::Make(Color::White())));
       break;
@@ -5542,6 +5547,131 @@ TGFX_TEST_PRIVATE(LayerTest, MaskFillAndStrokeUnionKeepsFullCoverageOnRoundedCor
         << " align=" << static_cast<int>(probe.align)
         << ": the shadow must stop beyond the spread of the merged outline";
   }
+}
+
+// Renders one UDF-path glass panel over a horizontal ramp and returns the layer-space width of the
+// refraction band on its left edge, measured as the inward reach of the differing samples at the
+// vertical centre. The ramp turns a backdrop displacement of d layer pixels into a difference of d
+// samples, so the reach is read straight from the difference profile.
+static float MeasureLeftBandReach(Context* context, float zoom) {
+  constexpr float shapeW = 200.0f;
+  constexpr float shapeH = 120.0f;
+  constexpr float offset = 30.0f;
+  constexpr float rampSpan = 256.0f;
+  const auto surfaceSize = static_cast<int>(std::ceil((offset * 2.0f + shapeW) * zoom)) + 4;
+  auto makePanel = [&](bool withGlass) {
+    auto layer = VectorLayer::Make();
+    Path path = {};
+    // Non-uniform corners keep the shape off the analytical SDF path, so this exercises the UDF band.
+    path.addRRect(RRect::MakeRectXY(Rect::MakeWH(shapeW, shapeH), 40.0f, 20.0f));
+    auto shape = ShapePath::Make();
+    shape->setPath(std::move(path));
+    auto group = VectorGroup::Make();
+    group->setElements({shape, MakeSilhouetteOnlyFill()});
+    layer->setContents({group});
+    layer->setMatrix(Matrix::MakeTrans(offset, offset));
+    if (withGlass) {
+      layer->setLayerStyles({GlassStyle::Make(80, 100, 0, 0, 0, 0, 0)});
+    }
+    return layer;
+  };
+  auto render = [&](bool withGlass) {
+    auto surface = Surface::Make(context, surfaceSize, surfaceSize);
+    auto displayList = std::make_unique<DisplayList>();
+    if (zoom != 1.0f) {
+      displayList->setZoomScale(zoom);
+    }
+    // A smooth horizontal ramp instead of the checker: a displacement of d layer pixels shifts the
+    // sampled color proportionally, so the difference profile is the displacement profile.
+    auto ramp = ShapeLayer::Make();
+    Path rampPath = {};
+    rampPath.addRect(Rect::MakeWH(static_cast<float>(surfaceSize), static_cast<float>(surfaceSize)));
+    ramp->setPath(rampPath);
+    auto rampShader = Shader::MakeLinearGradient({0.0f, 0.0f}, {rampSpan, 0.0f},
+                                                 {Color::Black(), Color::White()});
+    ramp->setFillStyle(ShapeStyle::Make(rampShader));
+    displayList->root()->addChild(ramp);
+    displayList->root()->addChild(makePanel(withGlass));
+    displayList->render(surface.get());
+    auto info = ImageInfo::Make(surfaceSize, surfaceSize, ColorType::RGBA_8888,
+                                AlphaType::Premultiplied);
+    std::vector<uint32_t> pixels(static_cast<size_t>(surfaceSize) * static_cast<size_t>(surfaceSize));
+    if (!surface->readPixels(info, pixels.data())) {
+      return std::vector<uint32_t>{};
+    }
+    return pixels;
+  };
+  auto styled = render(true);
+  auto plain = render(false);
+  if (styled.empty() || plain.empty()) {
+    return -1.0f;
+  }
+  auto differs = [&](int x, int y) {
+    auto i = static_cast<size_t>(y) * static_cast<size_t>(surfaceSize) + static_cast<size_t>(x);
+    int maxDiff = 0;
+    for (int shift = 0; shift < 32; shift += 8) {
+      maxDiff = std::max(maxDiff, std::abs(static_cast<int>((styled[i] >> shift) & 0xFF) -
+                                           static_cast<int>((plain[i] >> shift) & 0xFF)));
+    }
+    return maxDiff;
+  };
+  const auto scanY = static_cast<int>((offset + shapeH * 0.5f) * zoom);
+  const auto left = static_cast<int>(offset * zoom);
+  const auto right = static_cast<int>((offset + shapeW) * zoom);
+  const auto mid = (left + right) / 2;
+  int leftBand = left;
+  for (int x = left; x < mid; x++) {
+    if (differs(x, scanY) > 2) {
+      leftBand = x;
+    }
+  }
+  return static_cast<float>(leftBand - left) / zoom;
+}
+
+TGFX_TEST(LayerTest, GlassUDFBandReachIsZoomInvariant) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  const float reachAtOne = MeasureLeftBandReach(context, 1.0f);
+  const float reachAtFive = MeasureLeftBandReach(context, 5.0f);
+  ASSERT_GT(reachAtOne, 0.0f);
+  ASSERT_GT(reachAtFive, 0.0f);
+  // The density cap keeps radius * density inside the tent box, so the layer-space band must not
+  // shrink as the canvas zooms; without the cap the reach collapses at high zoom.
+  EXPECT_NEAR(reachAtFive, reachAtOne, 3.0f)
+      << "UDF band reach changed with zoom: " << reachAtOne << " -> " << reachAtFive;
+}
+
+TGFX_TEST(LayerTest, GlassCoverageKeepsTransparentColorRegion) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  const auto glass = GlassStyle::Make(0, 50, 100, 0, 0, 0, 0);
+  const auto regionABounds = Rect::MakeLTRB(0.0f, 0.0f, 60.0f, 80.0f);
+  const auto regionBBounds = Rect::MakeLTRB(80.0f, 0.0f, 140.0f, 80.0f);
+  MarkerRegionSpec marker = {};
+  marker.bounds = regionABounds;
+  marker.fill = MarkerFillKind::Marker;
+  MarkerRegionSpec transparent = {};
+  transparent.bounds = regionBBounds;
+  transparent.fill = MarkerFillKind::TransparentColor;
+  auto plain = RenderPanelOverChecker(context, MakeMarkerPanel({marker, transparent}));
+  auto glassPanel = RenderPanelOverChecker(context, MakeMarkerPanel({marker, transparent}, {glass}));
+  ASSERT_TRUE(plain != nullptr && glassPanel != nullptr);
+  // The own-outline shape must keep the same painter set as the own-outline raster, so a transparent
+  // solid color sitting next to the marker still gets its region covered.
+  auto roiA = regionABounds;
+  roiA.offset(GlassMarkerPanelLeft, GlassMarkerPanelTop);
+  roiA.inset(5.0f, 5.0f);
+  EXPECT_GT(CountDifferingPixels(plain.get(), glassPanel.get(), roiA, 16),
+            static_cast<int>(roiA.width() * roiA.height()) / 5)
+      << "marker region must stay covered";
+  auto roiB = regionBBounds;
+  roiB.offset(GlassMarkerPanelLeft, GlassMarkerPanelTop);
+  roiB.inset(5.0f, 5.0f);
+  EXPECT_GT(CountDifferingPixels(plain.get(), glassPanel.get(), roiB, 16),
+            static_cast<int>(roiB.width() * roiB.height()) / 5)
+      << "transparent-color region must be covered too";
 }
 
 TGFX_TEST(LayerTest, GlassStyleBackgroundOutsets) {
