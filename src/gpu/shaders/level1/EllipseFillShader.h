@@ -50,4 +50,4 @@ class EllipseFillShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::EllipseFillShader)
+TGFX_REGISTER_SHADER(tgfx::EllipseFillShader, tgfx::EnumerateEllipseFillReachable)

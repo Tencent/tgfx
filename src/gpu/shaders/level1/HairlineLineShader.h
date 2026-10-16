@@ -49,4 +49,4 @@ class HairlineLineShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::HairlineLineShader)
+TGFX_REGISTER_SHADER(tgfx::HairlineLineShader, tgfx::EnumerateHairlineLineReachable)

@@ -86,4 +86,4 @@ class GlassRefractionShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::GlassRefractionShader)
+TGFX_REGISTER_SHADER(tgfx::GlassRefractionShader, tgfx::EnumerateGlassRefractionReachable)

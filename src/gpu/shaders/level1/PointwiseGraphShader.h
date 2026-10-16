@@ -56,4 +56,4 @@ class PointwiseGraphShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::PointwiseGraphShader)
+TGFX_REGISTER_SHADER(tgfx::PointwiseGraphShader, tgfx::EnumeratePointwiseGraphReachable)

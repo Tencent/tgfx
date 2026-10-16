@@ -49,4 +49,4 @@ class HairlineQuadShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::HairlineQuadShader)
+TGFX_REGISTER_SHADER(tgfx::HairlineQuadShader, tgfx::EnumerateHairlineQuadReachable)

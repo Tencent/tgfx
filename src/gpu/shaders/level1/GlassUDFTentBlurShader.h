@@ -78,4 +78,4 @@ class GlassUDFTentBlurShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::GlassUDFTentBlurShader)
+TGFX_REGISTER_SHADER(tgfx::GlassUDFTentBlurShader, tgfx::EnumerateGlassUDFTentBlurReachable)

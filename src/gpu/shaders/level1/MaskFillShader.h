@@ -56,4 +56,4 @@ class MaskFillShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::MaskFillShader)
+TGFX_REGISTER_SHADER(tgfx::MaskFillShader, tgfx::EnumerateMaskFillReachable)

@@ -327,6 +327,177 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
   EXPECT_TRUE(foundMaskFill);
 }
 
+TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
+  const auto& factories = ShaderRegistry::All();
+  ASSERT_EQ(factories.size(), 24u);
+  std::set<std::string> names;
+  size_t pairCount = 0;
+  for (auto factory : factories) {
+    auto shader = factory();
+    ASSERT_NE(shader, nullptr);
+    auto info = shader->info();
+    SCOPED_TRACE(info.name);
+    EXPECT_TRUE(names.insert(info.name).second);
+    const auto* registered = ShaderRegistry::Find(info.name);
+    ASSERT_NE(registered, nullptr);
+    EXPECT_EQ(registered->vertexFile, info.vertexFile);
+    EXPECT_EQ(registered->fragmentFile, info.fragmentFile);
+    EXPECT_EQ(registered->textureReads, info.textureReads);
+    auto reachable = EnumerateReachablePermutations(info.name);
+    ASSERT_TRUE(reachable.has_value());
+    ASSERT_FALSE(reachable->empty());
+    pairCount += reachable->size();
+    for (const auto& indices : *reachable) {
+      EXPECT_TRUE(IsBuildablePermutation(info, indices.first, indices.second));
+    }
+    shader.reset();
+    EXPECT_EQ(ShaderRegistry::Find(info.name), registered);
+  }
+  EXPECT_EQ(pairCount, 369u);
+  EXPECT_EQ(*EnumerateReachablePermutations("PointwiseChainShader"),
+            EnumeratePointwiseChainReachable());
+  EXPECT_EQ(*EnumerateReachablePermutations("PointwiseGraphShader"),
+            EnumeratePointwiseGraphReachable());
+  const std::set<std::pair<uint32_t, uint32_t>> maskPairs = {{0, 0}, {0, 1}, {0, 2}};
+  EXPECT_EQ(*EnumerateReachablePermutations("MaskFillShader"), maskPairs);
+  EXPECT_EQ(ShaderRegistry::Find("UnknownShader"), nullptr);
+  EXPECT_FALSE(ShaderRegistry::Enumerate("UnknownShader").has_value());
+  EXPECT_FALSE(EnumerateReachablePermutations("UnknownShader").has_value());
+}
+
+TGFX_TEST(ShaderPermutationTest, ShaderRegistryAllowsIdenticalRegistrations) {
+  auto factories = ShaderRegistry::All();
+  const auto* info = ShaderRegistry::Find("PointwiseGraphShader");
+  ASSERT_NE(info, nullptr);
+  ShaderRegistry::Register(
+      []() -> std::unique_ptr<PrecompiledShader> {
+        return std::make_unique<PointwiseGraphShader>();
+      },
+      EnumeratePointwiseGraphReachable);
+  ShaderRegistry::Register(
+      []() -> std::unique_ptr<PrecompiledShader> {
+        return std::make_unique<PointwiseGraphShader>();
+      },
+      EnumeratePointwiseGraphReachable);
+  EXPECT_EQ(ShaderRegistry::All(), factories);
+  EXPECT_EQ(ShaderRegistry::Find("PointwiseGraphShader"), info);
+  EXPECT_EQ(*ShaderRegistry::Enumerate("PointwiseGraphShader"), EnumeratePointwiseGraphReachable());
+}
+
+#if GTEST_HAS_DEATH_TEST
+namespace {
+PrecompiledShaderInfo& RegistryConflictInfo() {
+  static auto info = PointwiseGraphShader().info();
+  return info;
+}
+
+class RegistryConflictShader : public PrecompiledShader {
+ public:
+  PrecompiledShaderInfo info() const override {
+    return RegistryConflictInfo();
+  }
+};
+
+std::unique_ptr<PrecompiledShader> MakeRegistryConflictShader() {
+  return std::make_unique<RegistryConflictShader>();
+}
+}  // namespace
+
+TGFX_TEST(ShaderPermutationTest, ShaderRegistryRejectsConflictingDeclarations) {
+  ::testing::FLAGS_gtest_death_test_style = "threadsafe";
+  for (int change = 0; change < 9; ++change) {
+    SCOPED_TRACE(change);
+    auto& info = RegistryConflictInfo();
+    info = PointwiseGraphShader().info();
+    switch (change) {
+      case 0:
+        info.vertexFile += ".changed";
+        break;
+      case 1:
+        info.fragmentFile += ".changed";
+        break;
+      case 2:
+        info.gpClassName += "changed";
+        break;
+      case 3:
+        info.declarationFile += "changed";
+        break;
+      case 4:
+        info.textureReads ^= ShaderTextureReadSwizzle;
+        break;
+      case 5: {
+        auto dimensions = info.vertDomain.getDimensions();
+        std::swap(dimensions[0], dimensions[1]);
+        info.vertDomain = PermutationDomain(std::move(dimensions));
+        break;
+      }
+      case 6: {
+        auto dimensions = info.fragDomain.getDimensions();
+        std::get<PermutationInt>(dimensions[PointwiseGraphShader::FD::HAS_XP]).count = 4;
+        info.fragDomain = PermutationDomain(std::move(dimensions));
+        break;
+      }
+      case 7:
+        info.gpDomain = PermutationDomain({PermutationBool("EXTRA_GP_FIELD")});
+        break;
+      case 8: {
+        auto dimensions = info.fragDomain.getDimensions();
+        dimensions[PointwiseGraphShader::FD::GP_LAYOUT] = PermutationBool("GP_LAYOUT");
+        info.fragDomain = PermutationDomain(std::move(dimensions));
+        break;
+      }
+    }
+    EXPECT_DEATH(
+        ShaderRegistry::Register(MakeRegistryConflictShader, EnumeratePointwiseGraphReachable),
+        "conflicting declaration or enumerator for 'PointwiseGraphShader'");
+  }
+}
+
+TGFX_TEST(ShaderPermutationTest, ShaderRegistryRejectsConflictingEnumerators) {
+  ::testing::FLAGS_gtest_death_test_style = "threadsafe";
+  EXPECT_DEATH(ShaderRegistry::Register(
+                   []() -> std::unique_ptr<PrecompiledShader> {
+                     return std::make_unique<PointwiseGraphShader>();
+                   },
+                   EnumeratePointwiseChainReachable),
+               "conflicting declaration or enumerator for 'PointwiseGraphShader'");
+}
+
+TGFX_TEST(ShaderPermutationTest, ShaderRegistryRejectsChangedEnumLabels) {
+  ::testing::FLAGS_gtest_death_test_style = "threadsafe";
+  EXPECT_DEATH(
+      {
+        auto& info = RegistryConflictInfo();
+        info = PointwiseGraphShader().info();
+        info.name = "RegistryEnumConflict";
+        info.fragDomain = PermutationDomain({PermutationEnum("MODE", {"A", "B"})});
+        ShaderRegistry::Register(MakeRegistryConflictShader, EnumeratePointwiseGraphReachable);
+        ShaderRegistry::Register(MakeRegistryConflictShader, EnumeratePointwiseGraphReachable);
+        info.fragDomain = PermutationDomain({PermutationEnum("MODE", {"B", "A"})});
+        ShaderRegistry::Register(MakeRegistryConflictShader, EnumeratePointwiseGraphReachable);
+      },
+      "conflicting declaration or enumerator for 'RegistryEnumConflict'");
+}
+
+TGFX_TEST(ShaderPermutationTest, ShaderRegistryRejectsMissingEntries) {
+  ::testing::FLAGS_gtest_death_test_style = "threadsafe";
+  EXPECT_DEATH(ShaderRegistry::Register(nullptr, EnumeratePointwiseGraphReachable),
+               "missing factory or enumerator");
+  EXPECT_DEATH(ShaderRegistry::Register(MakeRegistryConflictShader, nullptr),
+               "missing factory or enumerator");
+  EXPECT_DEATH(
+      ShaderRegistry::Register([]() -> std::unique_ptr<PrecompiledShader> { return nullptr; },
+                               EnumeratePointwiseGraphReachable),
+      "factory returned no shader");
+  EXPECT_DEATH(
+      {
+        RegistryConflictInfo().name.clear();
+        ShaderRegistry::Register(MakeRegistryConflictShader, EnumeratePointwiseGraphReachable);
+      },
+      "empty family name");
+}
+#endif
+
 TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
   PointwiseGraphShader shader;
   auto info = shader.info();

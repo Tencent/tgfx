@@ -76,4 +76,4 @@ class GaussianBlur1DShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::GaussianBlur1DShader)
+TGFX_REGISTER_SHADER(tgfx::GaussianBlur1DShader, tgfx::EnumerateGaussianBlur1DReachable)

@@ -55,4 +55,4 @@ class ShapeInstancedFillShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::ShapeInstancedFillShader)
+TGFX_REGISTER_SHADER(tgfx::ShapeInstancedFillShader, tgfx::EnumerateShapeInstancedFillReachable)

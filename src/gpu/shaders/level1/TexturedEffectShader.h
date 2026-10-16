@@ -73,4 +73,4 @@ class TexturedEffectShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::TexturedEffectShader)
+TGFX_REGISTER_SHADER(tgfx::TexturedEffectShader, tgfx::EnumerateTexturedEffectReachable)

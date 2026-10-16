@@ -90,4 +90,4 @@ class TiledTextureFillShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::TiledTextureFillShader)
+TGFX_REGISTER_SHADER(tgfx::TiledTextureFillShader, tgfx::EnumerateTiledTextureFillReachable)

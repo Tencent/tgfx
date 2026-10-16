@@ -17,7 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/shaders/PrecompiledShader.h"
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <map>
+#include <type_traits>
+#include <utility>
 #include "core/utils/USE.h"
 
 namespace tgfx {
@@ -27,9 +32,57 @@ static std::vector<ShaderRegistry::Factory>& GetFactories() {
   return factories;
 }
 
-static std::map<std::string, PrecompiledShaderInfo>& GetShaderInfos() {
-  static std::map<std::string, PrecompiledShaderInfo> shaderInfos;
+struct RegisteredShader {
+  PrecompiledShaderInfo info;
+  ShaderRegistry::Enumerator enumerator;
+};
+
+static std::map<std::string, RegisteredShader>& GetShaderInfos() {
+  static std::map<std::string, RegisteredShader> shaderInfos;
   return shaderInfos;
+}
+
+static bool SameDomain(const PermutationDomain& left, const PermutationDomain& right) {
+  const auto& leftDims = left.getDimensions();
+  const auto& rightDims = right.getDimensions();
+  if (leftDims.size() != rightDims.size()) {
+    return false;
+  }
+  for (size_t index = 0; index < leftDims.size(); ++index) {
+    if (leftDims[index].index() != rightDims[index].index()) {
+      return false;
+    }
+    bool same = std::visit(
+        [&](const auto& dimension) {
+          using Dimension = std::decay_t<decltype(dimension)>;
+          const auto& other = std::get<Dimension>(rightDims[index]);
+          if (std::strcmp(dimension.defineName, other.defineName) != 0 ||
+              dimension.valueCount() != other.valueCount()) {
+            return false;
+          }
+          if constexpr (std::is_same_v<Dimension, PermutationEnum>) {
+            for (size_t value = 0; value < dimension.valueNames.size(); ++value) {
+              if (std::strcmp(dimension.valueNames[value], other.valueNames[value]) != 0) {
+                return false;
+              }
+            }
+          }
+          return true;
+        },
+        leftDims[index]);
+    if (!same) {
+      return false;
+    }
+  }
+  return true;
+}
+
+static bool SameShaderInfo(const PrecompiledShaderInfo& left, const PrecompiledShaderInfo& right) {
+  return left.name == right.name && left.vertexFile == right.vertexFile &&
+         left.fragmentFile == right.fragmentFile && left.gpClassName == right.gpClassName &&
+         left.declarationFile == right.declarationFile && left.textureReads == right.textureReads &&
+         SameDomain(left.vertDomain, right.vertDomain) &&
+         SameDomain(left.fragDomain, right.fragDomain) && SameDomain(left.gpDomain, right.gpDomain);
 }
 
 bool IsBuildablePermutation(const PrecompiledShaderInfo& info, uint32_t vertIndex,
@@ -57,17 +110,36 @@ bool PermutationCompilesForBackend(const PrecompiledShaderInfo& info, uint32_t v
   return true;
 }
 
-void ShaderRegistry::Register(Factory factory) {
+void ShaderRegistry::Register(Factory factory, Enumerator enumerator) {
+  if (factory == nullptr || enumerator == nullptr) {
+    std::fprintf(stderr, "ShaderRegistry: missing factory or enumerator\n");
+    std::abort();
+  }
   auto shader = factory();
   if (shader == nullptr) {
-    return;
+    std::fprintf(stderr, "ShaderRegistry: factory returned no shader\n");
+    std::abort();
   }
   auto info = shader->info();
-  auto name = info.name;
-  auto result = GetShaderInfos().emplace(std::move(name), std::move(info));
-  if (result.second) {
-    GetFactories().push_back(factory);
+  if (info.name.empty()) {
+    std::fprintf(stderr, "ShaderRegistry: empty family name\n");
+    std::abort();
   }
+  auto& shaderInfos = GetShaderInfos();
+  auto existing = shaderInfos.find(info.name);
+  if (existing != shaderInfos.end()) {
+    // Headers register once per translation unit. Their factory lambdas have different addresses,
+    // so compare the declaration and the shared enumerator, not the factory pointer.
+    if (existing->second.enumerator != enumerator || !SameShaderInfo(existing->second.info, info)) {
+      std::fprintf(stderr, "ShaderRegistry: conflicting declaration or enumerator for '%s'\n",
+                   info.name.c_str());
+      std::abort();
+    }
+    return;
+  }
+  auto name = info.name;
+  shaderInfos.emplace(std::move(name), RegisteredShader{std::move(info), enumerator});
+  GetFactories().push_back(factory);
 }
 
 const std::vector<ShaderRegistry::Factory>& ShaderRegistry::All() {
@@ -77,7 +149,17 @@ const std::vector<ShaderRegistry::Factory>& ShaderRegistry::All() {
 const PrecompiledShaderInfo* ShaderRegistry::Find(const std::string& name) {
   auto& shaderInfos = GetShaderInfos();
   auto result = shaderInfos.find(name);
-  return result == shaderInfos.end() ? nullptr : &result->second;
+  return result == shaderInfos.end() ? nullptr : &result->second.info;
+}
+
+std::optional<std::set<std::pair<uint32_t, uint32_t>>> ShaderRegistry::Enumerate(
+    const std::string& name) {
+  const auto& shaderInfos = GetShaderInfos();
+  auto result = shaderInfos.find(name);
+  if (result == shaderInfos.end()) {
+    return std::nullopt;
+  }
+  return result->second.enumerator();
 }
 
 }  // namespace tgfx

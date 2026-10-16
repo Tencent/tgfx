@@ -57,4 +57,5 @@ class ShapeInstancedTextureCoverageShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::ShapeInstancedTextureCoverageShader)
+TGFX_REGISTER_SHADER(tgfx::ShapeInstancedTextureCoverageShader,
+                     tgfx::EnumerateShapeInstancedTextureCoverageReachable)

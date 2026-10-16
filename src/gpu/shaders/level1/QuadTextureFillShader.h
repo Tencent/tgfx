@@ -86,4 +86,4 @@ class QuadTextureFillShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::QuadTextureFillShader)
+TGFX_REGISTER_SHADER(tgfx::QuadTextureFillShader, tgfx::EnumerateQuadTextureFillReachable)

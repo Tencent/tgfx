@@ -455,6 +455,30 @@ std::optional<RuleComposedValues> ComposePointwiseChain(const PointwiseChainInpu
  */
 std::optional<RuleComposedValues> ComposePointwiseGraph(const PointwiseChainInputs& inputs);
 
+/** Family enumerators bound alongside their factories by TGFX_REGISTER_SHADER. */
+std::set<std::pair<uint32_t, uint32_t>> EnumerateRoundStrokeRectReachable();
+std::set<std::pair<uint32_t, uint32_t>> EnumerateMaskFillReachable();
+std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineLineReachable();
+std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineQuadReachable();
+std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadColorFillReachable();
+std::set<std::pair<uint32_t, uint32_t>> EnumerateSolidColorFillReachable();
+std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexEllipseFillReachable();
+std::set<std::pair<uint32_t, uint32_t>> EnumerateEllipseFillReachable();
+std::set<std::pair<uint32_t, uint32_t>> EnumerateNonAARRectFillReachable();
+std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexNonAARRectFillReachable();
+std::set<std::pair<uint32_t, uint32_t>> EnumerateMeshFillReachable();
+std::set<std::pair<uint32_t, uint32_t>> EnumeratePerlinNoiseFillReachable();
+std::set<std::pair<uint32_t, uint32_t>> EnumerateYUVTextureFillReachable();
+std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedTextureCoverageReachable();
+std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedFillReachable();
+std::set<std::pair<uint32_t, uint32_t>> EnumerateTiledTextureFillReachable();
+std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadTextureFillReachable();
+std::set<std::pair<uint32_t, uint32_t>> EnumerateGaussianBlur1DReachable();
+std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassUDFTentBlurReachable();
+std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassRefractionReachable();
+std::set<std::pair<uint32_t, uint32_t>> EnumerateTexturedEffectReachable();
+std::set<std::pair<uint32_t, uint32_t>> EnumerateAtlasTextFillReachable();
+
 /**
  * Returns every (vertIndex, fragIndex) pair the PointwiseChain rule can ever produce.
  */

@@ -51,4 +51,4 @@ class MeshFillShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::MeshFillShader)
+TGFX_REGISTER_SHADER(tgfx::MeshFillShader, tgfx::EnumerateMeshFillReachable)

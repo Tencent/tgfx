@@ -59,4 +59,4 @@ class AtlasTextFillShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::AtlasTextFillShader)
+TGFX_REGISTER_SHADER(tgfx::AtlasTextFillShader, tgfx::EnumerateAtlasTextFillReachable)

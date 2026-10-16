@@ -105,4 +105,4 @@ class PointwiseChainShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::PointwiseChainShader)
+TGFX_REGISTER_SHADER(tgfx::PointwiseChainShader, tgfx::EnumeratePointwiseChainReachable)

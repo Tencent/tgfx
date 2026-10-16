@@ -69,4 +69,4 @@ class YUVTextureFillShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::YUVTextureFillShader)
+TGFX_REGISTER_SHADER(tgfx::YUVTextureFillShader, tgfx::EnumerateYUVTextureFillReachable)

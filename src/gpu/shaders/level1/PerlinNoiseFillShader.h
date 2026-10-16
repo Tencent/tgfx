@@ -71,4 +71,4 @@ class PerlinNoiseFillShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::PerlinNoiseFillShader)
+TGFX_REGISTER_SHADER(tgfx::PerlinNoiseFillShader, tgfx::EnumeratePerlinNoiseFillReachable)

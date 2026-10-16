@@ -58,4 +58,4 @@ class RoundStrokeRectFillShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::RoundStrokeRectFillShader)
+TGFX_REGISTER_SHADER(tgfx::RoundStrokeRectFillShader, tgfx::EnumerateRoundStrokeRectReachable)

@@ -56,4 +56,4 @@ class NonAARRectFillShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::NonAARRectFillShader)
+TGFX_REGISTER_SHADER(tgfx::NonAARRectFillShader, tgfx::EnumerateNonAARRectFillReachable)

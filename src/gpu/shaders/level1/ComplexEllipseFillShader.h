@@ -55,4 +55,4 @@ class ComplexEllipseFillShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::ComplexEllipseFillShader)
+TGFX_REGISTER_SHADER(tgfx::ComplexEllipseFillShader, tgfx::EnumerateComplexEllipseFillReachable)

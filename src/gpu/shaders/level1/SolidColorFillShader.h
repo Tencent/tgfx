@@ -71,4 +71,4 @@ class SolidColorFillShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::SolidColorFillShader)
+TGFX_REGISTER_SHADER(tgfx::SolidColorFillShader, tgfx::EnumerateSolidColorFillReachable)

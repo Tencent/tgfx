@@ -65,4 +65,4 @@ class QuadColorFillShader : public PrecompiledShader {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::QuadColorFillShader)
+TGFX_REGISTER_SHADER(tgfx::QuadColorFillShader, tgfx::EnumerateQuadColorFillReachable)
