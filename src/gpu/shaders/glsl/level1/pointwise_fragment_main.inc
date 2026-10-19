@@ -95,10 +95,10 @@ vec4 chainResults[16];
 // the OP_TEXTURE branch of evalChainSlot reads them back by instruction index.
 vec4 chainLeafTex[4];
 
-// The per-pixel GP edge coverage of the ellipse (GP_LAYOUT=1) and hairline-line (GP_LAYOUT=2)
-// layouts. Computed ahead of the chain evaluation in main so the coverage subtree's unit input can
-// consume it like the rect layouts' vCoverage varying; 1.0 keeps the define valid for every other
-// variant.
+// The per-pixel GP edge coverage of the ellipse (GP_LAYOUT=1), hairline-line (GP_LAYOUT=2) and
+// complex rounded-rect (GP_LAYOUT=3/4) layouts. Computed ahead of the chain evaluation in main so
+// the coverage subtree's unit input can consume it like the rect layouts' vCoverage varying; 1.0
+// keeps the define valid for every other variant.
 highp float gpPixelCoverage = 1.0;
 
 // Geometry color source: the unconditional inColor attribute on QuadGP (broadcast for
@@ -133,6 +133,14 @@ void main() {
 #elif GP_LAYOUT == 2
   // The hairline edge coverage (Coverage * edge alpha), with the same contract as the ellipse.
   gpPixelCoverage = hairlineLineEdgeCoverage(vEdgeDistance, Coverage, AAEnabled);
+#elif GP_LAYOUT == 3
+  // The complex rounded-rect fill coverage (per-corner radii), same contract as the ellipse.
+  gpPixelCoverage =
+      complexEllipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, vEdgeDist, vec2(0.0), false);
+#elif GP_LAYOUT == 4
+  // The complex rounded-rect stroke coverage: the outer curve times the inner one.
+  gpPixelCoverage =
+      complexEllipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, vEdgeDist, vStrokeWidth, true);
 #endif
   // Active slots are contiguous from 0 by construction (texture leaves first, then the rest in
   // topological order), so a uniform guard skips the whole evaluation of unused slots —

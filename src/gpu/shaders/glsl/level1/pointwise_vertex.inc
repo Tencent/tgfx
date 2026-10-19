@@ -8,7 +8,10 @@
 // identity, bit-exact), 1 = EllipseGeometryProcessor (device-space vertices, carries the ellipse
 // edge varyings whose per-pixel coverage is evaluated in the fragment stage), 2 =
 // HairlineLineGeometryProcessor (position through the Matrix uniform, carries the edge-distance
-// varying; leaf coordinates come from the transformed position, as the runtime GP emits them).
+// varying; leaf coordinates come from the transformed position, as the runtime GP emits them),
+// 3 / 4 = ComplexEllipseGeometryProcessor fill / stroke (device-space vertices like the ellipse,
+// plus the per-corner edge distances; the stroke form adds the half stroke width attribute, which
+// is why fill and stroke are two layouts rather than a runtime flag).
 
 #ifndef GP_LAYOUT
 #define GP_LAYOUT 0
@@ -50,8 +53,26 @@ layout(location = 2) in vec4 inEllipseRadii;
 // HairlineLineGP attribute order: position, edgeDistance. The edge-distance varying occupies
 // location 0, so the leaf coordinates start at 1.
 #define CHAIN_TEX_LOC_BASE 1
+#elif GP_LAYOUT >= 3
+// ComplexEllipseGP attribute order: position, [color], ellipseOffset, ellipseRadii, edgeDist,
+// [strokeWidth]. Varyings: offsets 0, radii 1, edge distances 2, then the stroke width and the
+// color when present (pointwise_complex_ellipse_layout.inc).
+#include "pointwise_complex_ellipse_layout.inc"
+#if HAS_COLOR
+layout(location = 1) in vec4 inColor;
+#endif
+layout(location = 1 + HAS_COLOR) in vec2 inEllipseOffset;
+layout(location = 2 + HAS_COLOR) in vec4 inEllipseRadii;
+layout(location = 3 + HAS_COLOR) in vec2 inEdgeDist;
+#if GP_LAYOUT == 4
+layout(location = 4 + HAS_COLOR) in vec2 inStrokeWidth;
+#endif
 #else
 #define CHAIN_TEX_LOC_BASE 0
+#endif
+// The procedural-source varying; must agree with pointwise_source_coords.inc.
+#ifndef CHAIN_SOURCE_COORDS_LOC
+#define CHAIN_SOURCE_COORDS_LOC 7
 #endif
 
 layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
@@ -115,6 +136,16 @@ layout(location = 2) out vec4 vColor;
 #endif
 #elif GP_LAYOUT == 2
 layout(location = 0) out float vEdgeDistance;
+#elif GP_LAYOUT >= 3
+layout(location = 0) out vec2 vEllipseOffsets;
+layout(location = 1) out vec4 vEllipseRadii;
+layout(location = 2) out vec2 vEdgeDist;
+#if GP_LAYOUT == 4
+layout(location = CHAIN_COMPLEX_STROKE_LOC) out vec2 vStrokeWidth;
+#endif
+#if HAS_COLOR
+layout(location = CHAIN_COMPLEX_COLOR_LOC) out vec4 vColor;
+#endif
 #else
 #if HAS_COVERAGE
 layout(location = NTEX) out float vCoverage;
@@ -136,7 +167,7 @@ layout(location = CHAIN_TEX_LOC_BASE + 2) out vec3 TransformedCoords_2;
 layout(location = CHAIN_TEX_LOC_BASE + 3) out vec3 TransformedCoords_3;
 #endif
 #ifdef TGFX_POINTWISE_SOURCE_COORDS
-layout(location = 7) out vec3 SourceCoords;
+layout(location = CHAIN_SOURCE_COORDS_LOC) out vec3 SourceCoords;
 #endif
 
 void main() {
@@ -163,11 +194,23 @@ void main() {
 #elif GP_LAYOUT == 2
   highp vec2 position = (Matrix * vec3(aPosition, 1.0)).xy;
   vEdgeDistance = aEdgeDistance;
-#else
+#elif GP_LAYOUT == 1
   // EllipseGeometryProcessor vertices are pre-transformed to device space.
   highp vec2 position = inPosition;
   vEllipseOffsets = inEllipseOffset;
   vEllipseRadii = inEllipseRadii;
+#if HAS_COLOR
+  vColor = inColor;
+#endif
+#else
+  // ComplexEllipseGeometryProcessor vertices are pre-transformed to device space too.
+  highp vec2 position = inPosition;
+  vEllipseOffsets = inEllipseOffset;
+  vEllipseRadii = inEllipseRadii;
+  vEdgeDist = inEdgeDist;
+#if GP_LAYOUT == 4
+  vStrokeWidth = inStrokeWidth;
+#endif
 #if HAS_COLOR
   vColor = inColor;
 #endif

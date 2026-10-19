@@ -111,8 +111,15 @@ namespace tgfx {
  * and the matcher now routes HairlineLineGeometryProcessor draws carrying color or coverage FPs
  * onto them. Widening GP_LAYOUT from two to three values re-encodes every pointwise permutation
  * index, so a pre-change bundle would bind a different variant; those bundles are refused.
+ *
+ * 0x00010012: the pointwise kernels gained the complex rounded-rect GP layouts (GP_LAYOUT=3 fill,
+ * 4 stroke: ComplexEllipseGeometryProcessor's offset/radii/edge-distance varyings, plus the stroke
+ * width for 4), and the matcher now routes ComplexEllipseGeometryProcessor draws carrying color or
+ * composed coverage FPs onto them. GP_LAYOUT widens from three to five values (re-encoding every
+ * pointwise permutation index), and those layouts move the graph kernel's SourceCoords varying
+ * from location 7 to 9; pre-change bundles are refused.
  */
-inline constexpr uint32_t kExpectedToolchainABI = 0x00010011u;
+inline constexpr uint32_t kExpectedToolchainABI = 0x00010012u;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

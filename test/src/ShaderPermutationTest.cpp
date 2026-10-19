@@ -357,8 +357,11 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
   // ComplexEllipseFillShader keeps 12 variants: its device mask is a runtime uniform, not a
   // dimension (a dimension would have made it 24 for two observed draws). The hairline-line
   // pointwise layout (GP_LAYOUT=2) adds 9 chain variants (leaf-free, leaf-free with the device
-  // mask, four-leaf; each for the three XP kinds) and their 9 TiledGraph twins.
-  EXPECT_EQ(pairCount, 387u);
+  // mask, four-leaf; each for the three XP kinds) and their 9 TiledGraph twins. The complex
+  // rounded-rect layouts (GP_LAYOUT=3 fill, 4 stroke) add 15 chain variants each (uniform color:
+  // leaf-free, leaf-free with the device mask, four-leaf; per-vertex color: leaf-free, four-leaf;
+  // each for the three XP kinds) and their 30 TiledGraph twins.
+  EXPECT_EQ(pairCount, 447u);
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseChainShader"),
             EnumeratePointwiseChainReachable());
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseGraphShader"),

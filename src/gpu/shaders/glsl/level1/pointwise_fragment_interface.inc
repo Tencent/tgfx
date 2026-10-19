@@ -14,6 +14,18 @@ layout(location = 2) in vec4 vColor;
 #elif GP_LAYOUT == 2
 layout(location = 0) in float vEdgeDistance;
 #define CHAIN_TEX_LOC_BASE 1
+#elif GP_LAYOUT >= 3
+// ComplexEllipse fill (3) / stroke (4); the locations live in pointwise_complex_ellipse_layout.inc.
+#include "pointwise_complex_ellipse_layout.inc"
+layout(location = 0) in vec2 vEllipseOffsets;
+layout(location = 1) in vec4 vEllipseRadii;
+layout(location = 2) in vec2 vEdgeDist;
+#if GP_LAYOUT == 4
+layout(location = CHAIN_COMPLEX_STROKE_LOC) in vec2 vStrokeWidth;
+#endif
+#if HAS_COLOR
+layout(location = CHAIN_COMPLEX_COLOR_LOC) in vec4 vColor;
+#endif
 #else
 #define CHAIN_TEX_LOC_BASE 0
 #endif
@@ -60,6 +72,7 @@ layout(set = 1, binding = NTEX) uniform sampler2D MaskTextureSampler;
 // xp_porter_duff.inc re-includes it under HAS_XP >= 1, guarded against double definition.
 #include "ellipse_coverage.inc"
 #include "hairline_line_coverage.inc"
+#include "complex_ellipse_coverage.inc"
 #include "xp_blend_colors.inc"
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"

@@ -280,7 +280,8 @@ struct AtlasTextFillInputs {
 
 /**
  * Shared input contract for the PointwiseChainShader/PointwiseGraphShader rules. gpKind selects
- * (0 = DefaultGP, 1 = QuadPerEdgeAA, 2 = Mesh, 3 = sampler-free AtlasText twin, 4 = Ellipse);
+ * (0 = DefaultGP, 1 = QuadPerEdgeAA, 2 = Mesh, 3 = sampler-free AtlasText twin, 4 = Ellipse,
+ * 5 = HairlineLine, 6 = ComplexEllipse fill, 7 = ComplexEllipse stroke);
  * each profile fixes which attribute slots its vertex buffers carry, and Compose rejects
  * profile-inconsistent combinations. The chain slot topology (ops, indices) is runtime data;
  * only the leaf-count class, the mask flag, the coverage-subtree flag, and the transfer type

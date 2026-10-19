@@ -568,7 +568,8 @@ AOTFoldRouteOutcome AOTEffectDecomposer::AnalyzeFoldRoute(const ProgramInfo* pro
   if (gpName != "DefaultGeometryProcessor" && gpName != "QuadPerEdgeAAGeometryProcessor" &&
       (!pointwiseDAG ||
        (gpName != "MeshGeometryProcessor" && gpName != "AtlasTextGeometryProcessor" &&
-        gpName != "EllipseGeometryProcessor" && gpName != "HairlineLineGeometryProcessor"))) {
+        gpName != "EllipseGeometryProcessor" && gpName != "HairlineLineGeometryProcessor" &&
+        gpName != "ComplexEllipseGeometryProcessor"))) {
     return AOTFoldRouteOutcome::GPIncompatible;
   }
   if (pointwiseDAG && gpName == "QuadPerEdgeAAGeometryProcessor" &&

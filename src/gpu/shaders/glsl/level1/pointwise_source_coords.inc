@@ -4,5 +4,10 @@
 // so it is declared once whichever source the kernel carries.
 #ifndef TGFX_POINTWISE_SOURCE_COORDS_INC
 #define TGFX_POINTWISE_SOURCE_COORDS_INC
-layout(location = 7) in vec3 SourceCoords;
+// Location 7 sits past every layout's leaf coordinates except the ComplexEllipse ones, which
+// define their own (pointwise_complex_ellipse_layout.inc).
+#ifndef CHAIN_SOURCE_COORDS_LOC
+#define CHAIN_SOURCE_COORDS_LOC 7
+#endif
+layout(location = CHAIN_SOURCE_COORDS_LOC) in vec3 SourceCoords;
 #endif
