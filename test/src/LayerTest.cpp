@@ -6878,6 +6878,58 @@ static std::vector<int> RasterizeOwnOutlineAlpha(Context* context,
   return raster;
 }
 
+// Two painters that together describe one square must record the same own-geometry coverage as the
+// single painter, shared boundary included. The recording is a geometric union: without it the
+// boundary pixel carries 0.75 (each painter covers half of it), which lets the backdrop show through
+// the style. This is a recording assertion on purpose -- comparing rendered output against a single
+// painter also moves that reference onto the SDF path, which would confound the coverage.
+TGFX_TEST_PRIVATE(LayerTest, OwnGeometryUnionsAbuttingPainters) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  constexpr float panelSize = 64.0f;
+  auto makeShapeRegion = [&](const Path& path) {
+    auto shapePath = ShapePath::Make();
+    shapePath->setPath(path);
+    MarkerRegionSpec spec = {};
+    spec.shape = shapePath;
+    return spec;
+  };
+  Path upperRight = {};
+  upperRight.moveTo(0.0f, 0.0f);
+  upperRight.lineTo(panelSize, 0.0f);
+  upperRight.lineTo(panelSize, panelSize);
+  upperRight.close();
+  Path lowerLeft = {};
+  lowerLeft.moveTo(0.0f, 0.0f);
+  lowerLeft.lineTo(0.0f, panelSize);
+  lowerLeft.lineTo(panelSize, panelSize);
+  lowerLeft.close();
+  Path square = {};
+  square.addRect(Rect::MakeWH(panelSize, panelSize));
+  const auto glass = GlassStyle::Make(0, 50, 100, 0, 0, 0, 0);
+  auto two = RasterizeOwnOutlineAlpha(
+      context, MakeMarkerPanel({makeShapeRegion(upperRight), makeShapeRegion(lowerLeft)}, {glass}));
+  auto one = RasterizeOwnOutlineAlpha(context, MakeMarkerPanel({makeShapeRegion(square)}, {glass}));
+  ASSERT_FALSE(two.empty());
+  ASSERT_EQ(two.size(), one.size());
+  int differing = 0;
+  int full = 0;
+  for (size_t i = 0; i < two.size(); i++) {
+    if (two[i] != one[i]) {
+      differing++;
+    }
+    if (two[i] == 255) {
+      full++;
+    }
+  }
+  EXPECT_GT(full, 0) << "the two-painter outline must cover something, otherwise the equality below "
+                        "is vacuous";
+  EXPECT_EQ(differing, 0)
+      << "two painters describing one square must record the same coverage as the single painter; "
+      << differing << " pixels differ";
+}
+
 // A layer whose own geometry holds a silhouette-only painter AND a fill of the same geometry has one
 // shape described by two painters. The own geometry is recorded as an opaque, hard-edged coverage,
 // so a coincident second painter covers the same pixels and the result must equal the single-painter
