@@ -2,11 +2,11 @@
 manifestVersion=1
 backend=webgpu
 file=shader_bundle.webgpu.bin
-fileSize=643258
-fileHash=0x788d838211a0f5ff
-identityHash=0xed270a9d1b718331
-toolchainABI=0x000000000001000b
+fileSize=652690
+fileHash=0x1efc07d2a364eb35
+identityHash=0x0a5eb5013d0af2db
+toolchainABI=0x000000000001000d
 formatVersion=4
-sourceDigest=0x32ca4cf27de50c38
+sourceDigest=0x902d06315eb1abaa
 shaderCount=24
-stageCount=247
+stageCount=255
