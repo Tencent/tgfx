@@ -341,7 +341,8 @@ Brush GetOpaqueBrush(const Brush& brush, bool unionCoverage) {
   // independent painters, but an own-geometry recording needs their union: on a shared boundary
   // pixel the two adjacent painters cover f and 1 - f, and SrcOver composites them to
   // (1 - f) + f * (1 - (1 - f)) = 1 - f + f * f, i.e. 0.75 at f = 0.5, so the union must be additive
-  // to keep the covered area at full opacity.
+  // to keep the covered area at full opacity. The boundary coverage stays fractional even with this
+  // brush's antiAlias disabled, so the union cannot be replaced by a hard-edged recording.
   auto blendMode = unionCoverage ? BlendMode::PlusLighter : BlendMode::SrcOver;
   auto opaqueBrush = Brush(Color::White(), blendMode, false);
   opaqueBrush.maskFilter = brush.maskFilter;
