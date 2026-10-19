@@ -88,6 +88,11 @@
 #if GP_LAYOUT == 1
   // EllipseGeometryProcessor writes this for every ellipse draw (stroke vs fill coverage).
   int StrokeEnabled;
+#elif GP_LAYOUT == 2
+  // HairlineLineGeometryProcessor writes both for every hairline draw: the coverage scale and
+  // whether the edge ramp is antialiased (otherwise stepped at 0.5).
+  float Coverage;
+  int AAEnabled;
 #endif
 
 #include "pointwise_chain_uniforms.inc"

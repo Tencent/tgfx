@@ -11,6 +11,9 @@ layout(location = 2) in vec4 vColor;
 #else
 #define CHAIN_TEX_LOC_BASE 2
 #endif
+#elif GP_LAYOUT == 2
+layout(location = 0) in float vEdgeDistance;
+#define CHAIN_TEX_LOC_BASE 1
 #else
 #define CHAIN_TEX_LOC_BASE 0
 #endif
@@ -56,6 +59,7 @@ layout(set = 1, binding = NTEX) uniform sampler2D MaskTextureSampler;
 // The chain kernel blends regardless of XP state, so include the shared blend math directly;
 // xp_porter_duff.inc re-includes it under HAS_XP >= 1, guarded against double definition.
 #include "ellipse_coverage.inc"
+#include "hairline_line_coverage.inc"
 #include "xp_blend_colors.inc"
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"

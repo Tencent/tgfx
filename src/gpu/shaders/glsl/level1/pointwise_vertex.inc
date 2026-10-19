@@ -6,7 +6,9 @@
 // GP_LAYOUT: 0 = rect family (DefaultGP and QuadPerEdgeAAGP share it — the position always goes
 // through the Matrix uniform, which DefaultGP fills with the view matrix and QuadPerEdgeAAGP with
 // identity, bit-exact), 1 = EllipseGeometryProcessor (device-space vertices, carries the ellipse
-// edge varyings whose per-pixel coverage is evaluated in the fragment stage).
+// edge varyings whose per-pixel coverage is evaluated in the fragment stage), 2 =
+// HairlineLineGeometryProcessor (position through the Matrix uniform, carries the edge-distance
+// varying; leaf coordinates come from the transformed position, as the runtime GP emits them).
 
 #ifndef GP_LAYOUT
 #define GP_LAYOUT 0
@@ -44,13 +46,17 @@ layout(location = 1) in vec2 inEllipseOffset;
 layout(location = 2) in vec4 inEllipseRadii;
 #define CHAIN_TEX_LOC_BASE 2
 #endif
+#elif GP_LAYOUT == 2
+// HairlineLineGP attribute order: position, edgeDistance. The edge-distance varying occupies
+// location 0, so the leaf coordinates start at 1.
+#define CHAIN_TEX_LOC_BASE 1
 #else
 #define CHAIN_TEX_LOC_BASE 0
 #endif
 
 layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
   vec4 tgfx_RTAdjust;
-#if GP_LAYOUT == 0
+#if GP_LAYOUT == 0 || GP_LAYOUT == 2
   mat3 Matrix;
 #endif
 #ifdef TGFX_POINTWISE_SOURCE_COORDS
@@ -94,6 +100,9 @@ layout(location = 1 + HAS_COVERAGE) in vec2 uvCoord;
 #if HAS_COLOR
 layout(location = 1 + HAS_COVERAGE + HAS_UV_COORD) in vec4 inColor;
 #endif
+#elif GP_LAYOUT == 2
+layout(location = 0) in vec2 aPosition;
+layout(location = 1) in float aEdgeDistance;
 #else
 layout(location = 0) in vec2 inPosition;
 #endif
@@ -104,6 +113,8 @@ layout(location = 1) out vec4 vEllipseRadii;
 #if HAS_COLOR
 layout(location = 2) out vec4 vColor;
 #endif
+#elif GP_LAYOUT == 2
+layout(location = 0) out float vEdgeDistance;
 #else
 #if HAS_COVERAGE
 layout(location = NTEX) out float vCoverage;
@@ -135,6 +146,11 @@ void main() {
 #elif GP_LAYOUT == 0
 #define CHAIN_LEAF_SOURCE(k) aPosition
 #define CHAIN_SOURCE_COORDS aPosition
+#elif GP_LAYOUT == 2
+// GLSLHairlineLineGeometryProcessor feeds emitTransforms the transformed position; the uvMatrix
+// it folds into every coord transform maps that back to local space.
+#define CHAIN_LEAF_SOURCE(k) position
+#define CHAIN_SOURCE_COORDS position
 #else
 #define CHAIN_LEAF_SOURCE(k) inPosition
 #define CHAIN_SOURCE_COORDS inPosition
@@ -144,6 +160,9 @@ void main() {
 #if HAS_COLOR
   vColor = inColor;
 #endif
+#elif GP_LAYOUT == 2
+  highp vec2 position = (Matrix * vec3(aPosition, 1.0)).xy;
+  vEdgeDistance = aEdgeDistance;
 #else
   // EllipseGeometryProcessor vertices are pre-transformed to device space.
   highp vec2 position = inPosition;

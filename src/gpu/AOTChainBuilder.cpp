@@ -785,7 +785,7 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
   }
   // The clip-coverage channel (kernel: ClipCoverageRegister). The narrow clip slots chain from
   // the scalar unit one (-4) through clipChainInput — NOT from the coverage unit (-3): the tail
-  // multiplies the clip product in on top of the GP coverage (vCoverage / ellipseGpCoverage /
+  // multiplies the clip product in on top of the GP coverage (vCoverage / gpPixelCoverage /
   // the coverage root), so a clip chain that already starts from the GP coverage would square it
   // (q * (q * clip)). The clip slots' product is therefore a pure clip value. Early-fold clips
   // arrive differently — the fold routes the clip coverage into the color graph as a

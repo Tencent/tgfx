@@ -31,6 +31,8 @@ namespace tgfx {
 /// TransformedCoords varying.
 ///
 /// Vertex dimensions:
+///   GP_LAYOUT (int, 3 values): 0 = rect family (Default/Quad/Mesh/AtlasText), 1 = ellipse,
+///     2 = hairline line (per-pixel edge coverage from the edge-distance varying).
 ///   HAS_COVERAGE (bool): per-vertex AA coverage varying present.
 ///   HAS_UV_COORD (bool): quad only; leaf coords come from the uvCoord attribute instead of
 ///     aPosition.
@@ -47,14 +49,15 @@ namespace tgfx {
 ///   HAS_XP (int, 3 values): 0=Empty, 1=PorterDuff DST_TEX, 2=PorterDuff FBF
 ///   HAS_COVERAGE / HAS_COLOR / TEXTURE_COUNT: mirrored with the vertex stage.
 ///   HAS_MASK_TEXTURE (bool): a device-space alpha mask child sampled after the DAG and before the
-///     XP stage, matching the legacy blend kernel's mask application point. DefaultGP only.
+///     XP stage, matching the legacy blend kernel's mask application point. Leaf-free DefaultGP and
+///     hairline-line chains only.
 class PointwiseChainShader : public PrecompiledShader {
  public:
   struct VertDims {
     enum : uint32_t { GP_LAYOUT, HAS_COVERAGE, HAS_UV_COORD, HAS_COLOR, TEXTURE_COUNT, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationInt("GP_LAYOUT", 2),
+          PermutationInt("GP_LAYOUT", 3),
           PermutationBool("HAS_COVERAGE"),
           PermutationBool("HAS_UV_COORD"),
           PermutationBool("HAS_COLOR"),
@@ -78,7 +81,7 @@ class PointwiseChainShader : public PrecompiledShader {
     };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationInt("GP_LAYOUT", 2),
+          PermutationInt("GP_LAYOUT", 3),
           PermutationInt("HAS_XP", 3),
           PermutationBool("HAS_COVERAGE"),
           PermutationBool("HAS_COLOR"),

@@ -355,8 +355,10 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
     EXPECT_EQ(ShaderRegistry::Find(info.name), registered);
   }
   // ComplexEllipseFillShader keeps 12 variants: its device mask is a runtime uniform, not a
-  // dimension (a dimension would have made it 24 for two observed draws).
-  EXPECT_EQ(pairCount, 369u);
+  // dimension (a dimension would have made it 24 for two observed draws). The hairline-line
+  // pointwise layout (GP_LAYOUT=2) adds 9 chain variants (leaf-free, leaf-free with the device
+  // mask, four-leaf; each for the three XP kinds) and their 9 TiledGraph twins.
+  EXPECT_EQ(pairCount, 387u);
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseChainShader"),
             EnumeratePointwiseChainReachable());
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseGraphShader"),

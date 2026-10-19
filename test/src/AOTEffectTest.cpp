@@ -2202,7 +2202,7 @@ TGFX_TEST(AOTEffectTest, PointwiseGraphPermutationsAreIndependentAndBounded) {
     EXPECT_EQ(maskedValues->fragValues, composed->fragValues);
   }
   EXPECT_EQ(graphPairs.size(), 3u);
-  for (int gpKind = 0; gpKind <= 4; ++gpKind) {
+  for (int gpKind = 0; gpKind <= 5; ++gpKind) {
     for (int flags = 0; flags < 64; ++flags) {
       for (int xp = 0; xp < 3; ++xp) {
         PointwiseChainInputs base;

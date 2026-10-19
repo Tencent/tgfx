@@ -887,17 +887,27 @@ static std::optional<RuleComposedValues> ComposePointwiseGP(const PointwiseChain
       gpLayout = 1;
       hasColor = inputs.hasColor ? 1 : 0;
       break;
+    case 5:
+      // HairlineLineGP buffers are (position, edgeDistance): the color is the Color uniform and the
+      // edge AA is evaluated per pixel from the edge-distance varying, so no coverage, uvCoord or
+      // color attribute exists.
+      if (inputs.hasCoverage || inputs.hasUVCoord || inputs.hasColor) {
+        return std::nullopt;
+      }
+      gpLayout = 2;
+      break;
     default:
       return std::nullopt;
   }
   // Coverage subtrees draw their unit input from the GP coverage: the rect and mesh layouts supply
-  // it as the vCoverage varying, and the ellipse layout evaluates its per-pixel edge coverage ahead
-  // of the chain in the kernel (ellipseGpCoverage). The atlas route never carries a subtree: its
-  // glyph leaf rides the clip-coverage register instead (AOTChainBuilder).
+  // it as the vCoverage varying, and the ellipse and hairline layouts evaluate their per-pixel edge
+  // coverage ahead of the chain in the kernel (gpPixelCoverage). The atlas route never carries a
+  // subtree: its glyph leaf rides the clip-coverage register instead (AOTChainBuilder).
   // Four-leaf variants apply the mask through a runtime uniform, so the compile-time mask
-  // dimension exists only for leaf-free chains, and those stay rect-only without quad attributes.
+  // dimension exists only for leaf-free chains, and those stay on the rect layout without quad
+  // attributes or on the hairline layout (a path clip over a solid or gradient hairline).
   int hasMaskTexture = inputs.textureCount == 0 && inputs.hasMask ? 1 : 0;
-  if (hasMaskTexture != 0 && (gpLayout != 0 || hasUVCoord != 0 || hasColor != 0)) {
+  if (hasMaskTexture != 0 && (gpLayout == 1 || hasUVCoord != 0 || hasColor != 0)) {
     return std::nullopt;
   }
   using VD = PointwiseChainShader::VD;
@@ -930,7 +940,7 @@ std::optional<RuleComposedValues> ComposePointwiseChain(const PointwiseChainInpu
 
 std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseChainReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int gpKind = 0; gpKind <= 4; ++gpKind) {
+  for (int gpKind = 0; gpKind <= 5; ++gpKind) {
     for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
       for (int hasUVCoord = 0; hasUVCoord <= 1; ++hasUVCoord) {
         for (int hasColor = 0; hasColor <= 1; ++hasColor) {

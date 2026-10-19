@@ -105,8 +105,14 @@ namespace tgfx {
  * 0x00010010: the pointwise kernels gained the OutputAlphaSwizzle uniform (alpha-only render
  * targets), and the AAAA matcher branch now admits the pointwise DAG kernels. A pre-change kernel
  * lacks the field, so an alpha-only target would read it uninitialized and write RGBA.
+ *
+ * 0x00010011: the pointwise kernels gained the hairline-line GP layout (GP_LAYOUT=2: the
+ * edge-distance varying, the Coverage/AAEnabled uniforms and the leaf-free device-mask variant),
+ * and the matcher now routes HairlineLineGeometryProcessor draws carrying color or coverage FPs
+ * onto them. Widening GP_LAYOUT from two to three values re-encodes every pointwise permutation
+ * index, so a pre-change bundle would bind a different variant; those bundles are refused.
  */
-inline constexpr uint32_t kExpectedToolchainABI = 0x00010010u;
+inline constexpr uint32_t kExpectedToolchainABI = 0x00010011u;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

@@ -24,17 +24,13 @@ layout(location = 0) in float vEdgeDistance;
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
 #include "clip_coverage.inc"
+#include "hairline_line_coverage.inc"
 
 layout(location = 0) out vec4 fragColor;
 
 void main() {
-  highp float edgeAlpha = abs(vEdgeDistance);
-  edgeAlpha = clamp(edgeAlpha, 0.0, 1.0);
-  if (AAEnabled == 0) {
-    edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0;
-  }
-
-  vec4 outputCoverage = vec4(Coverage * edgeAlpha * clipCoverage());
+  vec4 outputCoverage =
+      vec4(hairlineLineEdgeCoverage(vEdgeDistance, Coverage, AAEnabled) * clipCoverage());
 
 #define TGFX_XP_SRC_COLOR (Color * outputCoverage)
 #define TGFX_XP_SRC_UNPREMUL Color

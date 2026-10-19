@@ -568,7 +568,8 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
 static std::optional<PermutationMatchResult> TryMatchPointwiseDAG(const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
   // GP profiles: 0 Default, 1 Quad, 2 Mesh (whose vertex buffers follow the
-  // chain's attribute order), 3 the sampler-free AtlasText twin, 4 the ellipse layout.
+  // chain's attribute order), 3 the sampler-free AtlasText twin, 4 the ellipse layout, 5 the
+  // hairline-line layout.
   int gpKind = -1;
   if (gp->name() == "DefaultGeometryProcessor") {
     gpKind = 0;
@@ -580,6 +581,8 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseDAG(const ProgramI
     gpKind = 3;
   } else if (gp->name() == "EllipseGeometryProcessor") {
     gpKind = 4;
+  } else if (gp->name() == "HairlineLineGeometryProcessor") {
+    gpKind = 5;
   }
   if (gpKind < 0 || programInfo->numColorFragmentProcessors() != 1 ||
       programInfo->numFragmentProcessors() != 1) {
@@ -666,6 +669,9 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseDAG(const ProgramI
   } else if (gpKind == 4) {
     auto* ellipseGP = static_cast<const EllipseGeometryProcessor*>(gp);
     inputs.hasColor = !ellipseGP->hasCommonColor();
+    inputs.hasCoverage = false;
+  } else if (gpKind == 5) {
+    // The hairline edge AA is per-pixel (edge-distance varying); the color is a uniform.
     inputs.hasCoverage = false;
   } else {
     inputs.hasCoverage = GetGPCoverage(gp) != 0;
