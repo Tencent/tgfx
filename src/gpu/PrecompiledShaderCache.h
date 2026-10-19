@@ -116,6 +116,10 @@ struct PrecompiledFallbackRecord {
   std::string shaderName;
   uint32_t vertPermutationIndex = std::numeric_limits<uint32_t>::max();
   uint32_t fragPermutationIndex = std::numeric_limits<uint32_t>::max();
+  // Sub-reason of the miss as a PermutationMatchFailure value (0 = None). NoMatchingRule alone
+  // cannot say whether the GL gate, a subset attribute, the gradient budget or the enumerated
+  // variant set rejected the draw.
+  uint8_t matchFailure = 0;
   // Set when the miss was provoked on purpose (a test fixture verifying miss accounting); such
   // records are listed but excluded from the production coverage metrics.
   bool deliberate = false;
@@ -240,6 +244,12 @@ class PrecompiledShaderCache {
   /// during the Context constructor (embedded-bundle auto load), before the owner-thread
   /// contract is in effect and Context::backend() may be called.
   explicit PrecompiledShaderCache(Context* context, Backend backend);
+
+  /// Writes one diagnostics JSON: draw metrics, misses grouped by coarse reason plus the
+  /// sub-reason that rejected them, every miss shape with its full pipeline signature, and hits by
+  /// shader. The caller decides when to write (a test reporter or an app at exit); the cache keeps
+  /// no process-wide state.
+  bool writeDiagnosticsDump(const std::string& path) const;
 
   /// Returns the number of bundle generation changes (loads and unloads) since construction.
   /// Diagnostic counter for lifecycle verification; program invalidation itself happens

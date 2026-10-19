@@ -37,7 +37,27 @@ enum class PermutationMatchFailure {
   /// A rule matched, but the draw samples a texture whose read semantics (e.g. the GRAY_8 / RG_88
   /// read swizzle) the matched shader family does not declare in PrecompiledShaderInfo.
   UnsupportedTextureRead,
+  // Sub-reasons below all report as NoMatchingRule to the coarse fallback category; they exist so a
+  // miss says where it was rejected instead of only "no rule matched". Append only.
+  /// The OpenGL entry gate refused the pipeline (bundle profile mismatch or a non-2D sampler).
+  GlGateRejected,
+  /// The chain path refuses quads that carry a vertex subset attribute.
+  QuadSubset,
+  /// More than one gradient (or gradient + noise) in a single chain pass.
+  GradientOrNoiseBudget,
+  /// The draw carries a coverage FP shape the candidate kernel cannot evaluate.
+  CoverageShape,
+  /// No family matched the geometry processor at all.
+  NoMatchingFamily,
+  /// The pipeline composed, but that combination is not in the enumerated variant set.
+  PermutationNotEnumerated,
+  /// Building the AOT graph failed because a processor has no lowering (the default
+  /// FragmentProcessor::lowerToAOT).
+  MissingLowering,
 };
+
+/// Stable name of a failure value for diagnostics dumps. Never null.
+const char* PermutationMatchFailureName(PermutationMatchFailure failure);
 
 /**
  * Attempts to match a ProgramInfo's processor combination against known precompiled shader

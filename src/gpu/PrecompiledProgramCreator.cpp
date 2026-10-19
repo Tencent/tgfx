@@ -191,6 +191,14 @@ static PrecompiledFallbackReason ToFallbackReason(PermutationMatchFailure failur
       return PrecompiledFallbackReason::NoMatchingRule;
     case PermutationMatchFailure::UnsupportedTextureRead:
       return PrecompiledFallbackReason::UnsupportedTextureRead;
+    case PermutationMatchFailure::GlGateRejected:
+    case PermutationMatchFailure::QuadSubset:
+    case PermutationMatchFailure::GradientOrNoiseBudget:
+    case PermutationMatchFailure::CoverageShape:
+    case PermutationMatchFailure::NoMatchingFamily:
+    case PermutationMatchFailure::PermutationNotEnumerated:
+    case PermutationMatchFailure::MissingLowering:
+      return PrecompiledFallbackReason::NoMatchingRule;
     case PermutationMatchFailure::None:
       return PrecompiledFallbackReason::Unspecified;
   }
@@ -247,6 +255,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
       }
     }
     auto record = MakeFallbackRecord(cache, programInfo);
+    record.matchFailure = static_cast<uint8_t>(matchFailure);
     // Offline decomposition-coverage audit: for structural misses, classify (during diagnostic
     // runs only) whether each effect axis could be reduced onto the existing AOT kernel basis. This
     // is pure static analysis — no rendering, no state change — gated so the production hot path

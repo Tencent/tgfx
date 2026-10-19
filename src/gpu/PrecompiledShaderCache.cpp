@@ -18,12 +18,16 @@
 
 #include "PrecompiledShaderCache.h"
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <limits>
+#include <map>
+#include <tuple>
 #include "PrecompiledBundleIdentity.h"
 #include "core/utils/Log.h"
 #include "gpu/GlobalCache.h"
+#include "gpu/PermutationMatcher.h"
 #include "gpu/ShaderCaps.h"
 #include "tgfx/gpu/Context.h"
 #include "zlib.h"
@@ -946,6 +950,143 @@ const ShaderStageBlob* PrecompiledShaderCache::findFragment(uint64_t hashHi,
     return nullptr;
   }
   return &it->second;
+}
+
+}  // namespace tgfx
+
+namespace tgfx {
+
+namespace {
+
+void AppendEscaped(std::string* out, const std::string& value) {
+  out->push_back('"');
+  for (char ch : value) {
+    switch (ch) {
+      case '"':
+        out->append("\\\"");
+        break;
+      case '\\':
+        out->append("\\\\");
+        break;
+      case '\n':
+        out->append("\\n");
+        break;
+      default:
+        out->push_back(ch);
+        break;
+    }
+  }
+  out->push_back('"');
+}
+
+}  // namespace
+
+bool PrecompiledShaderCache::writeDiagnosticsDump(const std::string& path) const {
+  auto stats = drawStats();
+  auto misses = fallbackRecords();
+  auto hits = hitRecords();
+  std::string out;
+  out.reserve(4096 + misses.size() * 512);
+  out.append("{\n\"schemaVersion\": 2,\n\"identity\": {");
+  out.append("\"backend\": " + std::to_string(static_cast<int>(_backend)));
+  out.append(", \"profileTag\": ");
+  AppendEscaped(&out, _profileTag);
+  out.append(", \"bundleLoaded\": ");
+  out.append(isLoaded() ? "true" : "false");
+  out.append("},\n\"drawMetrics\": {");
+  out.append("\"draws\": " + std::to_string(stats.draws));
+  out.append(", \"completeAOTDraws\": " + std::to_string(stats.completeAOTDraws));
+  out.append(", \"directChainDraws\": " + std::to_string(stats.directChainDraws));
+  out.append(", \"offscreenPlanDraws\": " + std::to_string(stats.offscreenPlanDraws));
+  out.append(", \"droppedDraws\": " + std::to_string(stats.droppedDraws));
+  out.append(", \"materializedEdges\": " + std::to_string(stats.materializedEdges));
+  out.append(", \"renderTargetSwitches\": " + std::to_string(stats.renderTargetSwitches));
+  out.append(", \"planPassHistogram\": [");
+  for (size_t index = 0; index < stats.planPassHistogram.size(); ++index) {
+    if (index != 0) {
+      out.append(", ");
+    }
+    out.append(std::to_string(stats.planPassHistogram[index]));
+  }
+  out.append("]},\n");
+  // Misses grouped by coarse reason plus the sub-reason that actually rejected the draw. That is
+  // the whole point: NoMatchingRule alone cannot say whether the GL gate, a subset attribute, the
+  // gradient budget or the enumerated set refused it.
+  struct MissKey {
+    int reason = 0;
+    int failure = 0;
+    bool operator<(const MissKey& other) const {
+      return std::tie(reason, failure) < std::tie(other.reason, other.failure);
+    }
+  };
+  std::map<MissKey, uint64_t> summary;
+  for (const auto& record : misses) {
+    if (record.deliberate) {
+      continue;
+    }
+    MissKey key;
+    key.reason = static_cast<int>(record.reason);
+    key.failure = record.matchFailure;
+    summary[key] += 1;
+  }
+  out.append("\"missSummary\": [");
+  bool first = true;
+  for (const auto& entry : summary) {
+    if (!first) {
+      out.append(",");
+    }
+    first = false;
+    out.append("\n  {\"reason\": ");
+    AppendEscaped(&out, PrecompiledFallbackReasonName(
+                            static_cast<PrecompiledFallbackReason>(entry.first.reason)));
+    out.append(", \"matchFailure\": ");
+    AppendEscaped(&out, PermutationMatchFailureName(
+                            static_cast<PermutationMatchFailure>(entry.first.failure)));
+    out.append(", \"count\": " + std::to_string(entry.second) + "}");
+  }
+  out.append("\n],\n\"missRecords\": [");
+  first = true;
+  for (const auto& record : misses) {
+    if (record.deliberate) {
+      continue;
+    }
+    if (!first) {
+      out.append(",");
+    }
+    first = false;
+    out.append("\n  {\"effect\": ");
+    AppendEscaped(&out, record.effectSignature);
+    out.append(", \"pipeline\": ");
+    AppendEscaped(&out, record.pipelineSignature);
+    out.append(", \"reason\": ");
+    AppendEscaped(&out, PrecompiledFallbackReasonName(record.reason));
+    out.append(", \"matchFailure\": ");
+    AppendEscaped(
+        &out, PermutationMatchFailureName(static_cast<PermutationMatchFailure>(record.matchFailure)));
+    out.append("}");
+  }
+  out.append("\n],\n\"hitSummary\": [");
+  std::map<std::string, uint64_t> hitSummary;
+  for (const auto& hit : hits) {
+    hitSummary[hit.shaderName] += 1;
+  }
+  first = true;
+  for (const auto& entry : hitSummary) {
+    if (!first) {
+      out.append(",");
+    }
+    first = false;
+    out.append("\n  {\"shader\": ");
+    AppendEscaped(&out, entry.first);
+    out.append(", \"count\": " + std::to_string(entry.second) + "}");
+  }
+  out.append("\n]\n}\n");
+  std::ofstream file(path, std::ios::binary | std::ios::trunc);
+  if (!file.is_open()) {
+    return false;
+  }
+  file << out;
+  return file.good();
 }
 
 }  // namespace tgfx

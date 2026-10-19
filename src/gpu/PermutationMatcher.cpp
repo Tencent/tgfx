@@ -81,6 +81,18 @@
 
 namespace tgfx {
 
+// Sub-reason of the most recent rejection on this thread. The TryMatch* helpers only ever return
+// nullopt, so the first rejecting site records why here; MatchPermutation copies it into the
+// caller's out-parameter and clears it. Diagnostic only: no control flow depends on it.
+static thread_local PermutationMatchFailure gPendingMatchFailure = PermutationMatchFailure::None;
+
+static std::optional<PermutationMatchResult> Fail(PermutationMatchFailure reason) {
+  if (gPendingMatchFailure == PermutationMatchFailure::None) {
+    gPendingMatchFailure = reason;
+  }
+  return std::nullopt;
+}
+
 // Returns 0 for EmptyXferProcessor, 1 for PorterDuffXferProcessor with dst texture (DST_TEX mode),
 // 2 for PorterDuffXferProcessor with framebuffer fetch, or -1 for unsupported XP types.
 static int GetXPType(const ProgramInfo* programInfo) {
@@ -571,7 +583,7 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseDAG(const ProgramI
   }
   if (gpKind < 0 || programInfo->numColorFragmentProcessors() != 1 ||
       programInfo->numFragmentProcessors() != 1) {
-    return std::nullopt;
+    return Fail(PermutationMatchFailure::NoMatchingFamily);
   }
   auto fp = programInfo->getFragmentProcessor(0);
   if (fp->name() != "AOTPointwiseChainProcessor") {
@@ -594,7 +606,7 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseDAG(const ProgramI
     }
   }
   if (colorSpaceXformCount > 1 || gradientCount > 1) {
-    return std::nullopt;
+    return Fail(PermutationMatchFailure::GradientOrNoiseBudget);
   }
   for (size_t index = 0; index < leafCount; ++index) {
     auto leaf = chain->childProcessor(index);
@@ -626,7 +638,7 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseDAG(const ProgramI
     auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
     // The precompiled vert has no texSubset attribute, so subset-carrying quads fall back.
     if (quadGP->getHasSubset()) {
-      return std::nullopt;
+      return Fail(PermutationMatchFailure::QuadSubset);
     }
     inputs.hasUVCoord = !quadGP->hasUVMatrix();
     inputs.hasColor = !quadGP->hasCommonColor();
@@ -661,7 +673,7 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseDAG(const ProgramI
   if (IsAOTGraphProfile(inputs.resourceProfile)) {
     auto composed = ComposePointwiseGraph(inputs);
     if (!composed) {
-      return std::nullopt;
+      return Fail(PermutationMatchFailure::PermutationNotEnumerated);
     }
     auto vertIndex = PointwiseGraphShader::VD::domain().encode(composed->vertValues);
     auto fragIndex = PointwiseGraphShader::FD::domain().encode(composed->fragValues);
@@ -1120,7 +1132,7 @@ static std::optional<PermutationMatchResult> TryMatchComplexEllipseFill(
   // always-declared MaskTextureSampler (padded with the dummy texture when absent). LocalMask needs
   // a per-vertex UV this geometry does not provide and stays rejected.
   if (!SharedDeviceMaskValue(programInfo)) {
-    return std::nullopt;
+    return Fail(PermutationMatchFailure::CoverageShape);
   }
   auto* cegp = static_cast<const ComplexEllipseGeometryProcessor*>(gp);
   ComplexEllipseFillInputs inputs;
@@ -1284,7 +1296,7 @@ static std::optional<PermutationMatchResult> TryMatchShapeInstancedTextureCovera
       fp = first;
     } else {
       // Two masks, or two clips, are not a shape this kernel evaluates.
-      return std::nullopt;
+      return Fail(PermutationMatchFailure::CoverageShape);
     }
   } else {
     return std::nullopt;
@@ -1416,7 +1428,7 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
   // there is no runtime route, so their draws are dropped and counted as droppedDraws.
   if (programInfo->backend() == Backend::OpenGL &&
       (!programInfo->glProfileMatchesCache() || !programInfo->samplersAre2D())) {
-    return std::nullopt;
+    return Fail(PermutationMatchFailure::GlGateRejected);
   }
 
   // MatchPermutation already refused every write swizzle other than RGBA and alpha-only (AAAA).
@@ -1540,6 +1552,10 @@ static uint32_t RequiredTextureReads(const ProgramInfo* programInfo) {
 
 std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo,
                                                        PermutationMatchFailure* failure) {
+  // Sub-reason carried out of the (deeply nested) TryMatch* helpers: they only return nullopt, so
+  // the first rejecting site records why on this thread and the public entry point copies it into
+  // the caller's out-parameter.
+  gPendingMatchFailure = PermutationMatchFailure::None;
   // Only RGBA and alpha-only (AAAA, Swizzle::ForWrite(ALPHA_8)) render targets are supported. Any
   // other write swizzle would need a mapping the precompiled shaders do not implement.
   auto outputSwizzle = programInfo->getOutputSwizzle();
@@ -1556,6 +1572,7 @@ std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* progra
     if (info == nullptr || !IsBuildablePermutation(*info, result->vertPermutationIndex,
                                                    result->fragPermutationIndex)) {
       result.reset();
+      matchFailure = PermutationMatchFailure::PermutationNotEnumerated;
     } else if ((RequiredTextureReads(programInfo) & ~info->textureReads) != 0) {
       // Default deny: the matched family's shader would read these textures without the
       // semantic the runtime applies, so the draw is a reported miss rather than wrong pixels.
@@ -1563,10 +1580,43 @@ std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* progra
       matchFailure = PermutationMatchFailure::UnsupportedTextureRead;
     }
   }
+  if (!result && matchFailure == PermutationMatchFailure::NoMatchingRule &&
+      gPendingMatchFailure != PermutationMatchFailure::None) {
+    matchFailure = gPendingMatchFailure;
+  }
+  gPendingMatchFailure = PermutationMatchFailure::None;
   if (failure != nullptr) {
     *failure = result ? PermutationMatchFailure::None : matchFailure;
   }
   return result;
+}
+
+const char* PermutationMatchFailureName(PermutationMatchFailure failure) {
+  switch (failure) {
+    case PermutationMatchFailure::None:
+      return "None";
+    case PermutationMatchFailure::UnsupportedOutputSwizzle:
+      return "UnsupportedOutputSwizzle";
+    case PermutationMatchFailure::NoMatchingRule:
+      return "NoMatchingRule";
+    case PermutationMatchFailure::UnsupportedTextureRead:
+      return "UnsupportedTextureRead";
+    case PermutationMatchFailure::GlGateRejected:
+      return "GlGateRejected";
+    case PermutationMatchFailure::QuadSubset:
+      return "QuadSubset";
+    case PermutationMatchFailure::GradientOrNoiseBudget:
+      return "GradientOrNoiseBudget";
+    case PermutationMatchFailure::CoverageShape:
+      return "CoverageShape";
+    case PermutationMatchFailure::NoMatchingFamily:
+      return "NoMatchingFamily";
+    case PermutationMatchFailure::PermutationNotEnumerated:
+      return "PermutationNotEnumerated";
+    case PermutationMatchFailure::MissingLowering:
+      return "MissingLowering";
+  }
+  return "Unknown";
 }
 
 }  // namespace tgfx
