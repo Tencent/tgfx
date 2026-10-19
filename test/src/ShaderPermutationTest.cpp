@@ -353,8 +353,9 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
     shader.reset();
     EXPECT_EQ(ShaderRegistry::Find(info.name), registered);
   }
-  // 381 after ComplexEllipseFillShader gained the HAS_DEVICE_MASK dimension (12 -> 24 variants).
-  EXPECT_EQ(pairCount, 381u);
+  // ComplexEllipseFillShader keeps 12 variants: its device mask is a runtime uniform, not a
+  // dimension (a dimension would have made it 24 for two observed draws).
+  EXPECT_EQ(pairCount, 369u);
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseChainShader"),
             EnumeratePointwiseChainReachable());
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseGraphShader"),

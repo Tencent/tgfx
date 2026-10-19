@@ -17,9 +17,10 @@
 #define HAS_XP 0
 #endif
 #define HAS_RUNTIME_CLIP 1
-#ifndef HAS_DEVICE_MASK
-#define HAS_DEVICE_MASK 0
-#endif
+// The device-space mask is a runtime uniform (HasDeviceMask) with a padded dummy sampler, not a
+// permutation dimension: ComplexEllipse draws are rare and every extra dimension doubles the whole
+// family (stroke x common-color x XP).
+#define HAS_RUNTIME_DEVICE_MASK 1
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #if HAS_COMMON_COLOR
@@ -43,14 +44,10 @@ layout(location = 3) in vec2 vStrokeWidth;
 #endif
 #endif
 
-// A device-space mask coverage FP binds its sampler first, so the terminal XP dst texture shifts
-// one binding up (same layout EllipseFillShader uses).
-#if HAS_DEVICE_MASK
+// The mask sampler is always declared so the runtime branch needs no second variant; when the draw
+// carries no mask FP the binding is padded with the shared dummy texture (ProgramInfo).
 layout(set = 1, binding = 0) uniform sampler2D MaskTextureSampler;
 #define XP_DST_TEX_BINDING 1
-#else
-#define XP_DST_TEX_BINDING 0
-#endif
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
 #include "clip_coverage.inc"

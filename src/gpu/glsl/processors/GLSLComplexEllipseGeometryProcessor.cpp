@@ -159,5 +159,9 @@ void GLSLComplexEllipseGeometryProcessor::setData(UniformData* vertexUniformData
   if (commonColor.has_value()) {
     fragmentUniformData->setData("Color", *commonColor);
   }
+  if (fragmentUniformData != nullptr) {
+    // Default for the runtime device mask; a present mask FP overwrites it with 1 later.
+    fragmentUniformData->setDataOptional("HasDeviceMask", 0);
+  }
 }
 }  // namespace tgfx

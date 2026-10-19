@@ -117,8 +117,6 @@ struct ComplexEllipseFillInputs {
   bool isStroke = false;
   bool hasCommonColor = false;
   int xpType = -1;  // -1 = no representable XferProcessor.
-  /// 0 = no coverage FP, 1 = device-space mask sampler (the shared coverage classification result).
-  int deviceMask = 0;
 };
 
 /**

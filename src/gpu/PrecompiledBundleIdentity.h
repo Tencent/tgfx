@@ -90,8 +90,14 @@ namespace tgfx {
  * (shifting the terminal XP dst texture one binding up), and the matcher now admits a device-space
  * mask coverage FP. Inserting a fragment dimension shifts every fragment permutation index, so a
  * pre-change bundle would bind a different variant and ignore the mask; those bundles are refused.
+ *
+ * 0x0001000E: the device mask became a runtime uniform (HasDeviceMask) over an always-declared
+ * MaskTextureSampler instead of the HAS_DEVICE_MASK dimension: the family is rare, and the
+ * dimension doubled every stroke/common-color/XP variant for it. The uniform block gains
+ * DeviceCoordMatrix/HasDeviceMask and the terminal XP dst texture permanently moves to binding 1,
+ * which a 0x0001000D kernel does not describe.
  */
-inline constexpr uint32_t kExpectedToolchainABI = 0x0001000Du;
+inline constexpr uint32_t kExpectedToolchainABI = 0x0001000Eu;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

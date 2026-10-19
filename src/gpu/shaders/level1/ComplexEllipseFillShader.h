@@ -28,18 +28,20 @@ class ComplexEllipseFillShader : public PrecompiledShader {
   using D = Dims;
 
   struct FragDims {
-    enum : uint32_t { STROKE, HAS_COMMON_COLOR, HAS_XP, HAS_DEVICE_MASK, COUNT };
+    // The device-space mask is a runtime uniform (HasDeviceMask) with a padded dummy sampler: this
+    // family is rare, and a HAS_DEVICE_MASK dimension would double all stroke/common-color/XP
+    // variants for it.
+    enum : uint32_t { STROKE, HAS_COMMON_COLOR, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("STROKE"),
           PermutationBool("HAS_COMMON_COLOR"),
           PermutationInt("HAS_XP", 3),
-          PermutationBool("HAS_DEVICE_MASK"),
       });
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 2 && FD::COUNT == 4,
+  static_assert(D::COUNT == 2 && FD::COUNT == 3,
                 "Update the Compose mapping when dimensions change.");
 
   PrecompiledShaderInfo info() const override {

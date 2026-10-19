@@ -1107,19 +1107,18 @@ static std::optional<PermutationMatchResult> TryMatchComplexEllipseFill(
   if (programInfo->numColorFragmentProcessors() != 0) {
     return std::nullopt;
   }
-  // A sole coverage FP is served through the shared coverage contract: an AA rect/rrect clip rides
-  // the runtime clip uniforms (coverage_uniforms.inc / clip_coverage.inc, no dimension), and a
-  // device-space mask adds the HAS_DEVICE_MASK sampler — the same split EllipseFillShader uses.
-  // LocalMask needs a per-vertex UV this geometry does not provide and stays rejected.
-  auto deviceMask = SharedDeviceMaskValue(programInfo);
-  if (!deviceMask) {
+  // A sole coverage FP is served through the shared coverage contract, with no dimension either
+  // way: an AA rect/rrect clip rides the runtime clip uniforms (coverage_uniforms.inc /
+  // clip_coverage.inc) and a device-space mask is the runtime HasDeviceMask uniform over the
+  // always-declared MaskTextureSampler (padded with the dummy texture when absent). LocalMask needs
+  // a per-vertex UV this geometry does not provide and stays rejected.
+  if (!SharedDeviceMaskValue(programInfo)) {
     return std::nullopt;
   }
   auto* cegp = static_cast<const ComplexEllipseGeometryProcessor*>(gp);
   ComplexEllipseFillInputs inputs;
   inputs.isStroke = cegp->isStroke();
   inputs.hasCommonColor = cegp->hasCommonColor();
-  inputs.deviceMask = *deviceMask;
   inputs.xpType = GetXPType(programInfo);
   auto composed = ComposeComplexEllipseFill(inputs);
   if (!composed) {
