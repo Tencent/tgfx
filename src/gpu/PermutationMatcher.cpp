@@ -144,16 +144,10 @@ enum class CoverageKind {
 // Classifies coverage semantics independently of any shader's permutation layout. LocalMask is a
 // distinct capability: it needs a local-space varying and sampler and therefore cannot be encoded
 // in the shared three-value HAS_COVERAGE dimension.
-static std::optional<CoverageKind> ClassifyCoverageFP(const ProgramInfo* programInfo) {
-  auto numFP = programInfo->numFragmentProcessors();
-  auto numColorFP = programInfo->numColorFragmentProcessors();
-  if (numFP == numColorFP) {
-    return CoverageKind::None;
-  }
-  if (numFP != numColorFP + 1) {
+static std::optional<CoverageKind> ClassifyCoverage(const FragmentProcessor* coverageFP) {
+  if (coverageFP == nullptr) {
     return std::nullopt;
   }
-  auto coverageFP = programInfo->getFragmentProcessor(numColorFP);
   auto coverageName = coverageFP->name();
   if (coverageName == "RectEffect" && IsFoldableAARectEffect(coverageFP)) {
     return CoverageKind::AARect;
@@ -182,6 +176,19 @@ static std::optional<CoverageKind> ClassifyCoverageFP(const ProgramInfo* program
     return CoverageKind::DeviceMask;
   }
   return std::nullopt;
+}
+
+// Classifies the coverage stage of a ProgramInfo carrying at most one coverage FP.
+static std::optional<CoverageKind> ClassifyCoverageFP(const ProgramInfo* programInfo) {
+  auto numFP = programInfo->numFragmentProcessors();
+  auto numColorFP = programInfo->numColorFragmentProcessors();
+  if (numFP == numColorFP) {
+    return CoverageKind::None;
+  }
+  if (numFP != numColorFP + 1) {
+    return std::nullopt;
+  }
+  return ClassifyCoverage(programInfo->getFragmentProcessor(numColorFP));
 }
 
 // Direct analytic clip coverage: the sole coverage FP is an AA rect or a leaf rrect.
@@ -1257,10 +1264,31 @@ static std::optional<PermutationMatchResult> TryMatchShapeInstancedTextureCovera
   } else if (colorCount != 0) {
     return std::nullopt;
   }
-  if (programInfo->numFragmentProcessors() != colorCount + 1) {
+  // One coverage texture, optionally preceded/followed by an analytic clip. The clip rides the
+  // runtime clip contract uniforms (no permutation change), so both forms select the same variant.
+  auto fpCount = programInfo->numFragmentProcessors();
+  const FragmentProcessor* fp = nullptr;
+  if (fpCount == colorCount + 1) {
+    fp = programInfo->getFragmentProcessor(colorCount);
+  } else if (fpCount == colorCount + 2) {
+    auto first = programInfo->getFragmentProcessor(colorCount);
+    auto second = programInfo->getFragmentProcessor(colorCount + 1);
+    auto firstKind = ClassifyCoverage(first);
+    auto secondKind = ClassifyCoverage(second);
+    auto isClip = [](const std::optional<CoverageKind>& kind) {
+      return kind && (*kind == CoverageKind::AARect || *kind == CoverageKind::RRect);
+    };
+    if (isClip(firstKind) && !isClip(secondKind)) {
+      fp = second;
+    } else if (isClip(secondKind) && !isClip(firstKind)) {
+      fp = first;
+    } else {
+      // Two masks, or two clips, are not a shape this kernel evaluates.
+      return std::nullopt;
+    }
+  } else {
     return std::nullopt;
   }
-  auto fp = programInfo->getFragmentProcessor(colorCount);
   if (fp->name() != "TextureEffect") {
     return std::nullopt;
   }

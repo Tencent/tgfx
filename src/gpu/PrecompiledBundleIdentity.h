@@ -96,8 +96,13 @@ namespace tgfx {
  * dimension doubled every stroke/common-color/XP variant for it. The uniform block gains
  * DeviceCoordMatrix/HasDeviceMask and the terminal XP dst texture permanently moves to binding 1,
  * which a 0x0001000D kernel does not describe.
+ *
+ * 0x0001000F: ShapeInstancedTextureCoverageShader gained the runtime clip contract (the
+ * coverage_uniforms.inc fields) and the matcher now admits an analytic clip coverage FP beside the
+ * coverage texture. A pre-change kernel has no clip fields, so HasClip would read uninitialized and
+ * the clip would be silently ignored.
  */
-inline constexpr uint32_t kExpectedToolchainABI = 0x0001000Eu;
+inline constexpr uint32_t kExpectedToolchainABI = 0x0001000Fu;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

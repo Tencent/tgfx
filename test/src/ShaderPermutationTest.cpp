@@ -47,6 +47,7 @@
 #include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/RadialGradientLayout.h"
+#include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
 #include "gpu/processors/ShapeInstancedGeometryProcessor.h"
 #include "gpu/processors/SingleIntervalGradientColorizer.h"
@@ -2145,9 +2146,8 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
-  if (context->backend() == Backend::OpenGL) {
-    GTEST_SKIP() << "ShapeInstancedTextureCoverage is outside the OpenGL stage 1 whitelist";
-  }
+  // This is a matcher-only test: the family is compiled for the OpenGL profile too (the full-suite
+  // AOT report serves it), so the former "stage 1 whitelist" skip no longer applies.
   auto renderTargetProxy = RenderTargetProxy::Make(context, 8, 8, false);
   ASSERT_NE(renderTargetProxy, nullptr);
   auto textureProxy = context->proxyProvider()->createTextureProxy({}, 8, 8, PixelFormat::ALPHA_8);
@@ -2233,6 +2233,49 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     ASSERT_NE(xp, nullptr);
     ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {coverage.get()},
                             0, xp.get(), BlendMode::SrcOver);
+    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+  }
+
+  // A rounded clip next to the coverage texture: the clip rides the runtime clip contract uniforms,
+  // so the draw selects the same variant as the bare-coverage form (the libpag corpus carries this
+  // shape; before the contract it had no precompiled route at all).
+  const auto expectedIndex = ShapeInstancedTextureCoverageShader::D::domain().encode({0, 1});
+  for (int clipFirst = 0; clipFirst <= 1; ++clipFirst) {
+    BlockAllocator allocator;
+    auto gp = ShapeInstancedGeometryProcessor::Make(&allocator, 8, 8, AAType::None, true,
+                                                    Matrix::I(), Matrix::I());
+    auto coverage = TextureEffect::Make(&allocator, textureProxy);
+    RRect rRect = {};
+    rRect.setRectXY(Rect::MakeXYWH(0, 0, 8, 8), 3, 3);
+    auto clip = RRectEffect::Make(&allocator, rRect, Matrix::I(), true);
+    ASSERT_NE(gp, nullptr);
+    ASSERT_NE(coverage, nullptr);
+    ASSERT_NE(clip, nullptr);
+    std::vector<FragmentProcessor*> processors =
+        clipFirst != 0 ? std::vector<FragmentProcessor*>{clip.get(), coverage.get()}
+                       : std::vector<FragmentProcessor*>{coverage.get(), clip.get()};
+    ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), processors, 0,
+                            nullptr, BlendMode::SrcOver);
+    auto match = MatchPermutation(&programInfo);
+    ASSERT_TRUE(match.has_value()) << "clipFirst=" << clipFirst;
+    EXPECT_EQ(match->shaderName, "ShapeInstancedTextureCoverageShader");
+    EXPECT_EQ(match->vertPermutationIndex, expectedIndex);
+    EXPECT_EQ(match->fragPermutationIndex, expectedIndex);
+  }
+
+  // Two masks (no clip) are still not a shape this kernel evaluates.
+  {
+    BlockAllocator allocator;
+    auto gp = ShapeInstancedGeometryProcessor::Make(&allocator, 8, 8, AAType::None, true,
+                                                    Matrix::I(), Matrix::I());
+    auto coverage = TextureEffect::Make(&allocator, textureProxy);
+    auto secondCoverage = TextureEffect::Make(&allocator, textureProxy);
+    ASSERT_NE(gp, nullptr);
+    ASSERT_NE(coverage, nullptr);
+    ASSERT_NE(secondCoverage, nullptr);
+    ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(),
+                            {coverage.get(), secondCoverage.get()}, 0, nullptr,
+                            BlendMode::SrcOver);
     EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
   }
 }

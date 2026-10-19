@@ -6,10 +6,14 @@
 #ifndef HAS_COLORS
 #define HAS_COLORS 0
 #endif
+// An analytic clip (AA rect / rrect) rides the runtime clip contract uniforms, so a draw carrying
+// a clip coverage FP next to its coverage texture selects the same variant.
+#define HAS_RUNTIME_CLIP 1
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   vec4 Subset;
   int AlphaOnly;
+#include "coverage_uniforms.inc"
 #if GRADIENT
   // Single-interval gradient parameters, written by the gradient FP's onSetData (same names as
   // SingleIntervalGradientShader).
@@ -38,12 +42,18 @@ layout(location = 0) out vec4 fragColor;
 #if GRADIENT
 #include "gradient_layout.inc"
 #endif
+#include "clip_coverage.inc"
 
 void main() {
   highp vec2 finalCoord = clamp(TransformedCoords_0, Subset.xy, Subset.zw);
   vec4 coverage = texture(TextureSampler_0, finalCoord);
   if (AlphaOnly != 0) {
     coverage = vec4(coverage.r);
+  }
+  // The runtime multiplies the clip coverage into the total coverage before the color is
+  // modulated by it, so the clip lands here rather than on fragColor.
+  if (HasClip != 0) {
+    coverage *= clipCoverage();
   }
 #if GRADIENT
   // The runtime gradient emission: border clamp, premultiply, then modulate by the input
