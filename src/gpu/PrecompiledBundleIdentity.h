@@ -85,8 +85,13 @@ namespace tgfx {
  * fields in an always-present FragmentUniformBlock), and the matcher now admits a sole AA-rect or
  * rrect coverage FP. A pre-change kernel has no clip fields, so feeding it such a draw would leave
  * HasClip uninitialized and the clip silently ignored; those bundles are refused.
+ *
+ * 0x0001000D: ComplexEllipseFillShader gained the HAS_DEVICE_MASK dimension and its sampler binding
+ * (shifting the terminal XP dst texture one binding up), and the matcher now admits a device-space
+ * mask coverage FP. Inserting a fragment dimension shifts every fragment permutation index, so a
+ * pre-change bundle would bind a different variant and ignore the mask; those bundles are refused.
  */
-inline constexpr uint32_t kExpectedToolchainABI = 0x0001000Cu;
+inline constexpr uint32_t kExpectedToolchainABI = 0x0001000Du;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

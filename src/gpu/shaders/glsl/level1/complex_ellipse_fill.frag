@@ -17,6 +17,9 @@
 #define HAS_XP 0
 #endif
 #define HAS_RUNTIME_CLIP 1
+#ifndef HAS_DEVICE_MASK
+#define HAS_DEVICE_MASK 0
+#endif
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #if HAS_COMMON_COLOR
@@ -40,7 +43,14 @@ layout(location = 3) in vec2 vStrokeWidth;
 #endif
 #endif
 
+// A device-space mask coverage FP binds its sampler first, so the terminal XP dst texture shifts
+// one binding up (same layout EllipseFillShader uses).
+#if HAS_DEVICE_MASK
+layout(set = 1, binding = 0) uniform sampler2D MaskTextureSampler;
+#define XP_DST_TEX_BINDING 1
+#else
 #define XP_DST_TEX_BINDING 0
+#endif
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
 #include "clip_coverage.inc"

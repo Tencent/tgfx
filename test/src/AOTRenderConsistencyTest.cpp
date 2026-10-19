@@ -8997,4 +8997,79 @@ TGFX_TEST(AOTRenderConsistencyTest, ComplexEllipseRRectClipMatchesRuntime) {
   ExpectBitmapsIdentical("complex-ellipse-rrect-clip", candidate, reference, size, size);
 }
 
+// The second complex-ellipse coverage shape from the libpag corpus (2 occurrences): a device-space
+// mask filter binds DeviceSpaceTextureEffect as the sole coverage FP. The kernel now carries the
+// HAS_DEVICE_MASK sampler (binding 0, shifting the terminal XP dst texture up) and multiplies the
+// mask into the coverage through coverage_output.inc.
+TGFX_TEST(AOTRenderConsistencyTest, ComplexEllipseDeviceMaskMatchesRuntime) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 160;
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::Transparent());
+    // Per-corner radii mark the rrect complex, which routes the draw onto the
+    // ComplexEllipseGeometryProcessor.
+    std::array<Point, 4> radii = {Point::Make(28, 14), Point::Make(10, 24), Point::Make(20, 8),
+                                  Point::Make(6, 12)};
+    RRect shape = {};
+    shape.setRectRadii(Rect::MakeXYWH(18, 18, 120, 120), radii);
+    Paint paint = {};
+    paint.setColor(Color::FromRGBA(200, 90, 60, 255));
+    // A path clip has no analytic form, so it is rasterized into a device-space mask texture and
+    // reaches the draw as DeviceSpaceTextureEffect coverage — the shape the libpag corpus carries.
+    Path clipPath = {};
+    clipPath.moveTo(12, 20);
+    clipPath.lineTo(148, 34);
+    clipPath.lineTo(96, 152);
+    clipPath.close();
+    canvas->clipPath(clipPath);
+    canvas->drawRRect(shape, paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  {
+    cache->unload();
+    ScopedAOTStatsPause referencePause(context, true);
+    renderScene(&reference);
+  }
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    cache->setDecompositionEnabled(true);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->resetProgramStats();
+    renderScene(&candidate);
+    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+    bool servedComplexEllipseWithMask = false;
+    for (const auto& record : cache->hitRecords()) {
+      if (record.shaderName == "ComplexEllipseFillShader" &&
+          record.effectSignature.find("CoverageFP=[DeviceSpaceTextureEffect]") !=
+              std::string::npos) {
+        servedComplexEllipseWithMask = true;
+      }
+    }
+    EXPECT_TRUE(servedComplexEllipseWithMask);
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->unload();
+    context->globalCache()->clearPrograms();
+  }
+  ExpectBitmapsIdentical("complex-ellipse-device-mask", candidate, reference, size, size);
+}
+
 }  // namespace tgfx

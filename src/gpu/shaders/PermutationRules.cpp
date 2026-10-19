@@ -244,6 +244,7 @@ std::optional<RuleComposedValues> ComposeComplexEllipseFill(
   values.fragValues[FD::STROKE] = values.vertValues[D::STROKE];
   values.fragValues[FD::HAS_COMMON_COLOR] = values.vertValues[D::HAS_COMMON_COLOR];
   values.fragValues[FD::HAS_XP] = inputs.xpType;
+  values.fragValues[FD::HAS_DEVICE_MASK] = inputs.deviceMask != 0 ? 1 : 0;
   return values;
 }
 
@@ -251,18 +252,21 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexEllipseFillReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int isStroke = 0; isStroke <= 1; ++isStroke) {
     for (int hasCommonColor = 0; hasCommonColor <= 1; ++hasCommonColor) {
-      for (int xpType = -1; xpType <= 2; ++xpType) {
-        ComplexEllipseFillInputs inputs;
-        inputs.isStroke = isStroke != 0;
-        inputs.hasCommonColor = hasCommonColor != 0;
-        inputs.xpType = xpType;
-        auto composed = ComposeComplexEllipseFill(inputs);
-        if (!composed) {
-          continue;
+      for (int deviceMask = 0; deviceMask <= 1; ++deviceMask) {
+        for (int xpType = -1; xpType <= 2; ++xpType) {
+          ComplexEllipseFillInputs inputs;
+          inputs.isStroke = isStroke != 0;
+          inputs.hasCommonColor = hasCommonColor != 0;
+          inputs.xpType = xpType;
+          inputs.deviceMask = deviceMask;
+          auto composed = ComposeComplexEllipseFill(inputs);
+          if (!composed) {
+            continue;
+          }
+          auto vertIndex = ComplexEllipseFillShader::Dims::domain().encode(composed->vertValues);
+          auto fragIndex = ComplexEllipseFillShader::FD::domain().encode(composed->fragValues);
+          result.insert({vertIndex, fragIndex});
         }
-        auto vertIndex = ComplexEllipseFillShader::Dims::domain().encode(composed->vertValues);
-        auto fragIndex = ComplexEllipseFillShader::FD::domain().encode(composed->fragValues);
-        result.insert({vertIndex, fragIndex});
       }
     }
   }
