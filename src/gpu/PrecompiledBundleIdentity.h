@@ -118,8 +118,20 @@ namespace tgfx {
  * composed coverage FPs onto them. GP_LAYOUT widens from three to five values (re-encoding every
  * pointwise permutation index), and those layouts move the graph kernel's SourceCoords varying
  * from location 7 to 9; pre-change bundles are refused.
+ *
+ * 0x00010013: NonAARRectFill and RoundStrokeRectFill gained the runtime clip contract fields
+ * (Rect/HasClip/LocalRect/RadiiX/RadiiY/AntiAlias/DeviceToLocal) and multiply clipCoverage() into
+ * their output coverage, so a draw carrying a sole analytic clip is served by the dedicated kernel
+ * instead of falling back. The fragment uniform blocks of both kernels now always exist and carry
+ * those fields, so a pre-change bundle would bind the previous layout and is refused.
+ *
+ * 0x00010014: the pointwise kernels' CoverageRect / CoverageLocalRect /
+ * CoverageLocalDeviceToLocal uniforms became two-element arrays indexed by the slot's ordinal, so a
+ * draw whose clip stack holds two rects in one space (two analytic clips, or a clip over a shape
+ * mask) is served by one chain pass instead of falling back. Every pointwise variant's uniform
+ * block layout changed, so pre-change bundles are refused.
  */
-inline constexpr uint32_t kExpectedToolchainABI = 0x00010012u;
+inline constexpr uint32_t kExpectedToolchainABI = 0x00010014u;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

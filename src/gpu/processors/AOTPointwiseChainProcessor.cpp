@@ -49,7 +49,7 @@ static void UploadTiledRecipe(UniformData* uniformData, const AOTTiledTextureRec
 }
 
 static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTChainSlot& slot,
-                            int rrectOrdinal) {
+                            int rectOrdinal, int localRectOrdinal, int rrectOrdinal) {
   int selector = slot.op == AOTChainOp::Blend
                      ? slot.blend.blendMode | (slot.blend.multiplyInputAlpha ? 0x100 : 0)
                      : 0;
@@ -70,6 +70,14 @@ static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTCha
     // Bit 0: the source leaf is alpha-only. Bits 16-19: the leading raw-sampling slot's index
     // into chainLeafTex (not Packed.z, which the register allocator rewrites).
     selector = slot.texModulateAlphaOnly | (slot.texModulateSourceSlot << 16);
+  }
+  if (slot.op == AOTChainOp::AARectCoverage) {
+    // Bits 16-19: the slot's ordinal into the CoverageRect array.
+    selector = rectOrdinal << 16;
+  }
+  if (slot.op == AOTChainOp::LocalRectCoverage) {
+    // Bits 16-19: the slot's ordinal into the CoverageLocalRect arrays.
+    selector = localRectOrdinal << 16;
   }
   if (slot.op == AOTChainOp::RRectCoverage) {
     // Bits 16-19: the slot's ordinal into the CoverageRRect* parameter arrays.
@@ -114,7 +122,8 @@ static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTCha
       // at a half-pixel inset to 1 at a half-pixel outset (same as GLSLRectEffect::onSetData).
       const auto& rect = slot.rectCoverage.rect;
       float rectData[] = {rect[0] - 0.5f, rect[1] - 0.5f, rect[2] + 0.5f, rect[3] + 0.5f};
-      uniformData->setDataOptional("CoverageRect", rectData);
+      uniformData->setArrayElementOptional("CoverageRect", static_cast<size_t>(rectOrdinal),
+                                           rectData);
       break;
     }
     case AOTChainOp::LocalRectCoverage: {
@@ -122,9 +131,11 @@ static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTCha
       // to half a pixel after mapping through the device-to-local matrix.
       const auto& params = slot.localRectCoverage;
       float rectData[] = {params.rect[0], params.rect[1], params.rect[2], params.rect[3]};
-      uniformData->setDataOptional("CoverageLocalRect", rectData);
-      uniformData->setDataOptional("CoverageLocalDeviceToLocal",
-                                   MatrixColumnMajor(params.deviceToLocal));
+      uniformData->setArrayElementOptional("CoverageLocalRect",
+                                           static_cast<size_t>(localRectOrdinal), rectData);
+      uniformData->setArrayElementOptional("CoverageLocalDeviceToLocal",
+                                           static_cast<size_t>(localRectOrdinal),
+                                           MatrixColumnMajor(params.deviceToLocal));
       break;
     }
     case AOTChainOp::RRectCoverage: {
@@ -313,7 +324,7 @@ bool AOTPointwiseChainProcessor::ValidateSlots(const std::vector<AOTChainSlot>& 
     if (slot.op == AOTChainOp::AARectCoverage && ++deviceRectSlots > MaxDeviceRectCoverageSlots) {
       return false;
     }
-    // The kernel carries one chain-wide local-rect parameter set and four rrect array elements.
+    // The kernel carries two local-rect parameter sets and four rrect array elements.
     if (slot.op == AOTChainOp::LocalRectCoverage && ++localRectSlots > MaxLocalRectCoverageSlots) {
       return false;
     }
@@ -596,15 +607,23 @@ void AOTPointwiseChainProcessor::onSetData(UniformData* vertexUniformData,
       UploadTiledRecipe(fragmentUniformData, tiledLeaves[index].recipe, index == 0 ? "" : "2");
     }
   }
-  // RRect coverage slots consume the CoverageRRect* arrays in slot order; the upload assigns the
-  // ordinals the same way, so the selector's bits 16-19 match the array element written here.
-  // Fill all declared slots (including inactive ones, whose OP_NONE marker protects the static
-  // texture prefetch), but never probe the 16 absent indices of a base-chain shader.
+  // Coverage slots consume the CoverageRect / CoverageLocalRect arrays and the CoverageRRect*
+  // arrays in slot order; the upload assigns the ordinals the same way, so the selector's bits
+  // 16-19 match the array element written here. Fill all declared slots (including inactive ones,
+  // whose OP_NONE marker protects the static texture prefetch), but never probe the 16 absent
+  // indices of a base-chain shader.
+  int rectOrdinal = 0;
+  int localRectOrdinal = 0;
   int rrectOrdinal = 0;
   const auto* capacity = GetAOTResourceCapacity(_resourceProfile);
   for (size_t index = 0; index < capacity->instructions; ++index) {
-    UploadChainSlot(fragmentUniformData, index, slots[index], rrectOrdinal);
-    if (slots[index].op == AOTChainOp::RRectCoverage) {
+    UploadChainSlot(fragmentUniformData, index, slots[index], rectOrdinal, localRectOrdinal,
+                    rrectOrdinal);
+    if (slots[index].op == AOTChainOp::AARectCoverage) {
+      ++rectOrdinal;
+    } else if (slots[index].op == AOTChainOp::LocalRectCoverage) {
+      ++localRectOrdinal;
+    } else if (slots[index].op == AOTChainOp::RRectCoverage) {
       ++rrectOrdinal;
     }
   }

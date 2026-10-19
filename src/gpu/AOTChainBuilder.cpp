@@ -236,14 +236,18 @@ static bool IsChainFoldableRectEffect(const FragmentProcessor* fp) {
 }
 
 // Analytic clip FPs folded onto the chain as color-root coverage slots (the two-FP coverage
-// forms). The device-space AA rect keeps the existing chain-wide CoverageRect uniform
-// (AARectCoverage); the local-space AA rect and the rrects use the dedicated LocalRectCoverage /
-// RRectCoverage slot ops. The chain kernel carries one chain-wide rect parameter set per space and
-// four rrect array elements, so a coverage exceeding those caps keeps the runtime route.
+// forms). The device-space AA rects use the AARectCoverage slot op, the local-space AA rects the
+// LocalRectCoverage op, and the rrects RRectCoverage. The chain kernel carries two rect parameter
+// sets per space (arrays indexed by the slot's ordinal) and four rrect elements, so a coverage
+// exceeding those caps keeps the runtime route.
 struct ChainClipSlots {
-  const RectEffect* deviceRect = nullptr;
-  const RectEffect* localRect = nullptr;
+  std::vector<const RectEffect*> deviceRects = {};
+  std::vector<const RectEffect*> localRects = {};
   std::vector<const RRectEffect*> rrects = {};
+
+  bool empty() const {
+    return deviceRects.empty() && localRects.empty() && rrects.empty();
+  }
 };
 
 // Collects analytic clip leaves, including composed clips, within the chain's parameter budgets.
@@ -272,15 +276,15 @@ static bool CollectChainClipSlot(const FragmentProcessor* fp, ChainClipSlots* sl
       return false;
     }
     if (rectEffect->isDeviceSpaceRect()) {
-      if (slots->deviceRect != nullptr) {
+      if (slots->deviceRects.size() >= 2) {
         return false;
       }
-      slots->deviceRect = rectEffect;
+      slots->deviceRects.push_back(rectEffect);
     } else {
-      if (slots->localRect != nullptr) {
+      if (slots->localRects.size() >= 2) {
         return false;
       }
-      slots->localRect = rectEffect;
+      slots->localRects.push_back(rectEffect);
     }
     return true;
   }
@@ -476,8 +480,8 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
   collect(true);
   collect(false);
   std::vector<AOTChainSlot> slots(ordered.size());
-  bool hasRectCoverage = false;
-  bool hasLocalRectCoverage = false;
+  size_t rectCoverageCount = 0;
+  size_t localRectCoverageCount = 0;
   bool hasGradient = false;
   // All-ones reproduces the legacy behavior (every target reads the uvCoord attribute when the GP
   // carries one). The atlas-text route clears it and sets only the coverage leaves' bits.
@@ -672,20 +676,20 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
           return false;
         }
         if (IsIdentityMatrix(parameters->deviceToLocal)) {
-          // The kernel carries one chain-wide CoverageRect uniform, so a second device-space
-          // rect-coverage node cannot be represented.
-          if (hasRectCoverage) {
+          // The kernel carries two CoverageRect array elements per space (the largest clip stack
+          // either space produces in practice); a third one keeps the runtime route.
+          if (rectCoverageCount >= 2) {
             return false;
           }
-          hasRectCoverage = true;
+          ++rectCoverageCount;
           slot.op = AOTChainOp::AARectCoverage;
           slot.rectCoverage = *parameters;
         } else {
-          // Same for the local-space form through the CoverageLocalRect uniform set.
-          if (hasLocalRectCoverage) {
+          // Same for the local-space form through the CoverageLocalRect array.
+          if (localRectCoverageCount >= 2) {
             return false;
           }
-          hasLocalRectCoverage = true;
+          ++localRectCoverageCount;
           slot.op = AOTChainOp::LocalRectCoverage;
           slot.localRectCoverage = *parameters;
         }
@@ -905,19 +909,19 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
     clipCoverageSlot = clipChainInput;
     slots.push_back(clipSlot);
   };
-  if (clipSlots.deviceRect != nullptr) {
+  for (auto* deviceRect : clipSlots.deviceRects) {
     AOTChainSlot rectSlot = {};
     rectSlot.op = AOTChainOp::AARectCoverage;
-    const auto& rect = clipSlots.deviceRect->getRect();
+    const auto& rect = deviceRect->getRect();
     rectSlot.rectCoverage.rect = {rect.left, rect.top, rect.right, rect.bottom};
     appendClipSlot(rectSlot);
   }
-  if (clipSlots.localRect != nullptr) {
+  for (auto* localRect : clipSlots.localRects) {
     AOTChainSlot localRectSlot = {};
     localRectSlot.op = AOTChainOp::LocalRectCoverage;
-    const auto& rect = clipSlots.localRect->getRect();
+    const auto& rect = localRect->getRect();
     localRectSlot.localRectCoverage.rect = {rect.left, rect.top, rect.right, rect.bottom};
-    const auto& matrix = clipSlots.localRect->getDeviceToLocal();
+    const auto& matrix = localRect->getDeviceToLocal();
     localRectSlot.localRectCoverage.deviceToLocal = {matrix[0], matrix[1], matrix[2],
                                                      matrix[3], matrix[4], matrix[5],
                                                      matrix[6], matrix[7], matrix[8]};
@@ -1384,7 +1388,7 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessor(
     auto* coverage = coverageFPs.front();
     auto coverageName = coverage->name();
     if (coverageName == "RectEffect" && IsChainFoldableRectEffect(coverage)) {
-      clipSlots.deviceRect = static_cast<const RectEffect*>(coverage);
+      clipSlots.deviceRects.push_back(static_cast<const RectEffect*>(coverage));
       return BuildChainFP(allocator, graph, pass, clipSlots, nullptr);
     }
     if (coverageName == "DeviceSpaceTextureEffect") {
@@ -1398,7 +1402,7 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessor(
         coverage->childProcessor(0)->name() == "DeviceSpaceTextureEffect" &&
         IsChainFoldableRectEffect(coverage->childProcessor(1))) {
       maskEffect = static_cast<const DeviceSpaceTextureEffect*>(coverage->childProcessor(0));
-      clipSlots.deviceRect = static_cast<const RectEffect*>(coverage->childProcessor(1));
+      clipSlots.deviceRects.push_back(static_cast<const RectEffect*>(coverage->childProcessor(1)));
       if (!maskEffect->isAlphaOnly() || maskEffect->hasPerspective()) {
         return nullptr;
       }
@@ -1451,7 +1455,10 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessor(
       } else {
         return nullptr;
       }
-    } else if (last->name() == "RectEffect" || last->name() == "RRectEffect") {
+    } else if (last->name() == "RectEffect" || last->name() == "RRectEffect" ||
+               last->name() == "ComposeFragmentProcessor") {
+      // A composed analytic clip in the trailing position: the mask filter (or another subtree)
+      // comes first and the clip stack folds into the clip slots after it.
       if (!CollectChainClipSlot(last, &clipSlots)) {
         return nullptr;
       }
@@ -1463,8 +1470,7 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessor(
   if (subtreeFP == nullptr) {
     // A two-FP [analytic slots, device mask] coverage carries no texture subtree; the slots and
     // the mask child are the whole coverage.
-    if (clipSlots.deviceRect == nullptr && clipSlots.localRect == nullptr &&
-        clipSlots.rrects.empty()) {
+    if (clipSlots.empty()) {
       return nullptr;
     }
     return BuildChainFP(allocator, graph, pass, clipSlots, maskEffect);

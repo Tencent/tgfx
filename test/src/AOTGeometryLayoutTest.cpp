@@ -26,11 +26,13 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 #include "base/TGFXTest.h"
 #include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
+#include "gpu/PermutationMatcher.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ShaderCaps.h"
 #include "gpu/shaders/level1/PointwiseChainShader.h"
@@ -601,6 +603,88 @@ void ExpectReportedShapeServed(const ReportedShape& shape) {
   ExpectRendersNear(shape.label, candidate, reference, 1);
 }
 
+// A draw scene under test: paints its geometry on an already-cleared canvas.
+using ReportedScene = std::function<void(Canvas*)>;
+
+// Renders one scene twice: first on the runtime route with diagnostics on, which must produce an
+// effect signature exactly equal to `signature` for `gpName` (proving the scene reproduces the
+// reported draw), then with the embedded bundle, which must serve it without a dropped draw, a
+// NoMatchingRule fallback or a runtime program. The two renders must match within 1/255.
+void ExpectSceneServed(const char* label, const char* gpName, const char* signature,
+                       const ReportedScene& scene) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  SKIP_ON_SWIFTSHADER(context);
+  auto* cache = context->precompiledShaderCache();
+  auto render = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, SceneSize, SceneSize);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::FromRGBA(40, 90, 160, 255));
+    canvas->save();
+    scene(canvas);
+    canvas->restore();
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(SceneSize, SceneSize));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  {
+    cache->unload();
+    context->globalCache()->clearPrograms();
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    render(&reference);
+    bool reproduced = false;
+    std::string seen = {};
+    std::string allSeen = {};
+    for (const auto& record : cache->fallbackRecords()) {
+      allSeen += "  " + record.effectSignature + "\n";
+      if (record.effectSignature.find(gpName) == std::string::npos) {
+        continue;
+      }
+      seen += record.effectSignature + "\n";
+      reproduced = reproduced || record.effectSignature == signature;
+    }
+    EXPECT_TRUE(reproduced) << label << ": the scene did not produce\n  " << signature << "\n"
+                            << gpName << " signatures seen:\n"
+                            << (seen.empty() ? allSeen : seen);
+    cache->setDiagnosticRecordingEnabled(false);
+  }
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    context->globalCache()->clearPrograms();
+    cache->setDecompositionEnabled(true);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->resetProgramStats();
+    render(&candidate);
+    EXPECT_EQ(cache->drawStats().droppedDraws, 0u) << label;
+    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u) << label;
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u) << label;
+    std::string misses = {};
+    for (const auto& record : cache->fallbackRecords()) {
+      misses += record.effectSignature + " [" +
+                PermutationMatchFailureName(
+                    static_cast<PermutationMatchFailure>(record.matchFailure)) +
+                "]\n";
+    }
+    EXPECT_TRUE(misses.empty()) << label << " misses:\n" << misses;
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->unload();
+    context->globalCache()->clearPrograms();
+  }
+  ExpectRendersNear(label, candidate, reference, 1);
+}
+
 }  // namespace
 
 // Rows 12-22 of the integration miss report: HairlineLineGeometryProcessor with a color FP or a
@@ -906,6 +990,140 @@ TGFX_TEST(AOTGeometryLayoutTest, ComplexRRectChainVertexColor) {
   texture.clip = LayoutClip::PathMask;
   texture.dstRead = true;
   ExpectComplexRRectBothLayouts("chain-vertex-color-texture-dst", texture);
+}
+
+// Row 23: a non-AA rounded rect under an analytic rounded clip. The dedicated NonAARRectFillShader
+// reads the clip from the runtime clip contract uniforms.
+TGFX_TEST(AOTGeometryLayoutTest, ReportedNonAARRectClip) {
+  ExpectSceneServed(
+      "row23", "NonAARRectGeometryProcessor",
+      "GP=NonAARRectGeometryProcessor;ColorFP=[];CoverageFP=[RRectEffect];XP=EmptyXferProcessor",
+      [](Canvas* canvas) {
+        // A large radius keeps the clip on the coverage-FP route: it cuts into the shape, so it
+        // cannot be reduced to a device-space rect test.
+        RRect clip = {};
+        clip.setRectXY(Rect::MakeXYWH(10, 12, 122, 112), 46, 46);
+        canvas->clipRRect(clip);
+        // Uniform radii keep the draw on the non-complex NonAARRect path.
+        RRect shape = {};
+        shape.setRectXY(Rect::MakeXYWH(20, 20, 120, 120), 18, 22);
+        Paint paint = {};
+        paint.setColor(Color::FromRGBA(70, 130, 180, 255));
+        paint.setAntiAlias(false);
+        canvas->drawRRect(shape, paint);
+      });
+}
+
+// Row 37: a round-capped stroke segment (RoundStrokeRectGeometryProcessor) under an analytic rect
+// clip. The dedicated RoundStrokeRectFillShader reads the clip from the same uniforms.
+TGFX_TEST(AOTGeometryLayoutTest, ReportedRoundStrokeRectClip) {
+  ExpectSceneServed(
+      "row37", "RoundStrokeRectGeometryProcessor",
+      "GP=RoundStrokeRectGeometryProcessor;ColorFP=[];CoverageFP=[RectEffect];XP=EmptyXferProcessor",
+      [](Canvas* canvas) {
+        // Rotated and fractional, so the clip stays an analytic AA rect in local space.
+        canvas->rotate(4, 80, 80);
+        canvas->clipRect(Rect::MakeLTRB(30.5f, 9.25f, 150.75f, 120.5f));
+        canvas->resetMatrix();
+        Paint paint = {};
+        paint.setColor(Color::FromRGBA(250, 245, 235, 255));
+        paint.setAntiAlias(true);
+        paint.setStyle(PaintStyle::Stroke);
+        paint.setStroke(Stroke(9.0f, LineCap::Round, LineJoin::Round));
+        canvas->drawRect(Rect::MakeXYWH(24, 28, 96, 64), paint);
+      });
+}
+
+// Row 24: two analytic rect clips in the same space (Compose(RectEffect, RectEffect)) on a quad.
+// The chain kernel now carries two rect parameter sets per space.
+TGFX_TEST(AOTGeometryLayoutTest, ReportedTwoRectClips) {
+  ExpectSceneServed(
+      "row24", "QuadPerEdgeAAGeometryProcessor",
+      "GP=QuadPerEdgeAAGeometryProcessor;ColorFP=[];CoverageFP=[ComposeFragmentProcessor(RectEffect,"
+      "RectEffect)];XP=EmptyXferProcessor",
+      [](Canvas* canvas) {
+        // Two overlapping fractional clips under different transforms: neither contains the other
+        // and neither is a device-space rect.
+        canvas->rotate(5, 80, 80);
+        canvas->clipRect(Rect::MakeLTRB(12.25f, 8.5f, 132.75f, 118.25f));
+        canvas->resetMatrix();
+        canvas->rotate(-3, 80, 80);
+        canvas->clipRect(Rect::MakeLTRB(28.5f, 22.75f, 150.25f, 140.5f));
+        canvas->resetMatrix();
+        Paint paint = {};
+        paint.setColor(Color::FromRGBA(250, 245, 235, 255));
+        canvas->drawRect(Rect::MakeXYWH(6, 6, 148, 148), paint);
+      });
+}
+
+// Row 26: the same two rect clips with an image shader (a four-leaf chain).
+TGFX_TEST(AOTGeometryLayoutTest, ReportedTwoRectClipsTexture) {
+  auto image = MakePatternImage();
+  ExpectSceneServed(
+      "row26", "QuadPerEdgeAAGeometryProcessor",
+      "GP=QuadPerEdgeAAGeometryProcessor;ColorFP=[TextureEffect];CoverageFP=["
+      "ComposeFragmentProcessor(RectEffect,RectEffect)];XP=EmptyXferProcessor",
+      [image](Canvas* canvas) {
+        canvas->rotate(5, 80, 80);
+        canvas->clipRect(Rect::MakeLTRB(12.25f, 8.5f, 132.75f, 118.25f));
+        canvas->resetMatrix();
+        canvas->rotate(-3, 80, 80);
+        canvas->clipRect(Rect::MakeLTRB(28.5f, 22.75f, 150.25f, 140.5f));
+        canvas->resetMatrix();
+        Paint paint = {};
+        paint.setShader(Shader::MakeImageShader(image));
+        canvas->drawRect(Rect::MakeXYWH(6, 6, 148, 148), paint);
+      });
+}
+
+// Row 1: atlas text under two analytic rect clips. The atlas chain route folds the glyph leaf and
+// the composed clip stack into one pass.
+TGFX_TEST(AOTGeometryLayoutTest, ReportedAtlasTextTwoRectClips) {
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  auto textBlob = TextBlob::MakeFrom("TGFX", Font(typeface, 46));
+  ASSERT_TRUE(textBlob != nullptr);
+  ExpectSceneServed(
+      "row1", "AtlasTextGeometryProcessor",
+      "GP=AtlasTextGeometryProcessor;ColorFP=[];CoverageFP=[ComposeFragmentProcessor(RectEffect,"
+      "RectEffect)];XP=EmptyXferProcessor",
+      [textBlob](Canvas* canvas) {
+        canvas->rotate(5, 80, 80);
+        canvas->clipRect(Rect::MakeLTRB(10.5f, 26.25f, 150.75f, 118.5f));
+        canvas->resetMatrix();
+        canvas->rotate(-3, 80, 80);
+        canvas->clipRect(Rect::MakeLTRB(6.25f, 18.5f, 128.5f, 140.75f));
+        canvas->resetMatrix();
+        Paint paint = {};
+        paint.setColor(Color::FromRGBA(250, 245, 235, 255));
+        canvas->drawTextBlob(textBlob, 16, 96, paint);
+      });
+}
+
+// The rows 25/27/29/31/32/35/36 class: a shader mask filter (SrcIn against a sampled texture,
+// i.e. Xfermode-dst) composed with two analytic rect clips. The chain folds the mask as the
+// coverage subtree and the clip stack into the two rect slots.
+TGFX_TEST(AOTGeometryLayoutTest, ReportedShaderMaskTwoRectClips) {
+  auto image = MakePatternImage();
+  ExpectSceneServed(
+      "coverage-mask-two-rect-clips", "QuadPerEdgeAAGeometryProcessor",
+      "GP=QuadPerEdgeAAGeometryProcessor;ColorFP=[];CoverageFP=[XfermodeFragmentProcessor - "
+      "dst(TextureEffect),ComposeFragmentProcessor(RectEffect,RectEffect)];XP=EmptyXferProcessor",
+      [image](Canvas* canvas) {
+        canvas->rotate(5, 80, 80);
+        canvas->clipRect(Rect::MakeLTRB(10.5f, 26.25f, 150.75f, 118.5f));
+        canvas->resetMatrix();
+        canvas->rotate(-3, 80, 80);
+        canvas->clipRect(Rect::MakeLTRB(6.25f, 18.5f, 128.5f, 140.75f));
+        canvas->resetMatrix();
+        Paint paint = {};
+        paint.setColor(Color::FromRGBA(250, 245, 235, 255));
+        // A Clamp image-shader mask filter resolves to a hardware-sampled TextureEffect, i.e. the
+        // local-space shape mask class.
+        paint.setMaskFilter(MaskFilter::MakeShader(Shader::MakeImageShader(image)));
+        canvas->drawRect(Rect::MakeXYWH(8, 8, 146, 146), paint);
+      });
 }
 
 TGFX_TEST(AOTGeometryLayoutTest, ComplexRRectGradient) {

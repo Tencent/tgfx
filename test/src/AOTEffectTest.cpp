@@ -2508,7 +2508,9 @@ static void ExpectComposedClipsWithLocalMask(size_t rectCount, size_t rrectCount
 TGFX_TEST(AOTEffectTest, ComposedAnalyticClipsWithLocalMaskRespectBudgets) {
   ExpectComposedClipsWithLocalMask(1, 1, true, true);
   ExpectComposedClipsWithLocalMask(1, 4, true, true);
-  ExpectComposedClipsWithLocalMask(2, 1, true, false);
+  // Two rects per space fit the CoverageRect arrays; a third one stays on the runtime route.
+  ExpectComposedClipsWithLocalMask(2, 1, true, true);
+  ExpectComposedClipsWithLocalMask(3, 0, true, false);
   ExpectComposedClipsWithLocalMask(1, 5, true, false);
   ExpectComposedClipsWithLocalMask(1, 1, false, false);
 }

@@ -18,8 +18,11 @@
 #ifndef TEXTURED
 #define TEXTURED 0
 #endif
+// The analytic draw clip (AA rect or rounded rect) rides the shared runtime clip contract uniforms,
+// so it costs no variant: the draw carries the clip FP only for its uniforms. The block is
+// unconditional because the contract fields must always be declared.
+#define HAS_RUNTIME_CLIP 1
 
-#if HAS_COMMON_COLOR || HAS_XP || TEXTURED
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #if HAS_COMMON_COLOR
   vec4 Color;
@@ -35,9 +38,9 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   int AlphaOnly;
   int Strict;
 #endif
+#include "coverage_uniforms.inc"
 #include "xp_uniforms.inc"
 };
-#endif
 
 #if TEXTURED
 layout(location = 5) in vec2 TransformedCoords_0;
@@ -65,6 +68,7 @@ layout(location = 3) in vec2 vStrokeWidth;
 #endif
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
+#include "clip_coverage.inc"
 #if TEXTURED
 #include "tiled_sample.inc"
 #endif
@@ -122,10 +126,11 @@ void main() {
   highp float coverage = outerCoverage;
 #endif
 
-// The XP path needs the uncovered color plus the total coverage separately; defining only the
-// covered SRC_COLOR double-applies the coverage inside the XferProcessor blend.
-#define TGFX_XP_SRC_COLOR (outputColor * coverage)
-#define TGFX_XP_SRC_UNPREMUL outputColor
-#define TGFX_XP_COVERAGE vec4(coverage)
+// The analytic clip enters as coverage on top of the shape's step coverage; coverage_output.inc
+// hands xp_output.inc the uncovered color plus the total coverage, so the XferProcessor path does
+// not double-apply it.
+#define TGFX_COVERAGE_SRC_COLOR outputColor
+#define TGFX_INITIAL_COVERAGE vec4(coverage)
+#include "coverage_output.inc"
 #include "xp_output.inc"
 }

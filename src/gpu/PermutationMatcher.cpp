@@ -1175,23 +1175,29 @@ static std::optional<PermutationMatchResult> TryMatchNonAARRectFill(
   inputs.hasCommonColor = ngp->hasCommonColor();
   inputs.isStroke = ngp->isStroke();
   if (programInfo->numFragmentProcessors() == 1) {
-    auto fp = programInfo->getFragmentProcessor(0);
-    // The textured variant carries the single-tap tiled modes only: the mipmap-repeat 4-tap path
-    // and perspective coordinates stay on the runtime route.
-    if (fp->name() != "TiledTextureEffect" || ngp->isStroke()) {
-      return std::nullopt;
+    // A sole analytic clip (AA rect or rounded rect) rides the runtime clip contract uniforms, so
+    // it needs no dimension: the FP is there only to write them.
+    const bool clipOnly = programInfo->numColorFragmentProcessors() == 0 &&
+                          HasDirectAnalyticClipCoverage(programInfo);
+    if (!clipOnly) {
+      auto fp = programInfo->getFragmentProcessor(0);
+      // The textured variant carries the single-tap tiled modes only: the mipmap-repeat 4-tap path
+      // and perspective coordinates stay on the runtime route.
+      if (fp->name() != "TiledTextureEffect" || ngp->isStroke()) {
+        return std::nullopt;
+      }
+      auto* tte = static_cast<const TiledTextureEffect*>(fp);
+      if (tte->hasPerspective()) {
+        return std::nullopt;
+      }
+      int modeX = 0;
+      int modeY = 0;
+      tte->getShaderModes(&modeX, &modeY);
+      if (!TiledModeSupported(modeX) || !TiledModeSupported(modeY)) {
+        return std::nullopt;
+      }
+      inputs.textured = true;
     }
-    auto* tte = static_cast<const TiledTextureEffect*>(fp);
-    if (tte->hasPerspective()) {
-      return std::nullopt;
-    }
-    int modeX = 0;
-    int modeY = 0;
-    tte->getShaderModes(&modeX, &modeY);
-    if (!TiledModeSupported(modeX) || !TiledModeSupported(modeY)) {
-      return std::nullopt;
-    }
-    inputs.textured = true;
   }
   inputs.xpType = GetXPType(programInfo);
   auto composed = ComposeNonAARRectFill(inputs);
@@ -1235,7 +1241,9 @@ static std::optional<RoundStrokeRectInputs> ExtractRoundStrokeRect(const Program
   if (gp->name() != "RoundStrokeRectGeometryProcessor") {
     return std::nullopt;
   }
-  if (programInfo->numFragmentProcessors() != 0) {
+  // The kernel reads the clip from the runtime clip contract uniforms, so a sole analytic clip is
+  // admitted alongside the FP-free form.
+  if (!HasNoProcessorsOrDirectClip(programInfo)) {
     return std::nullopt;
   }
   auto* rsgp = static_cast<const RoundStrokeRectGeometryProcessor*>(gp);

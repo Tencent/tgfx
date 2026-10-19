@@ -51,14 +51,13 @@
   vec4 ChainDstTF0;
   vec4 ChainDstTF1;
   int ChainDstTFType;
-  // Chain-wide AA-rect clip for OP_AARECT_COVERAGE (at most one such slot per chain). The rect is
-  // in destination device coordinates and already carries the 0.5 outset for the AA falloff.
-  vec4 CoverageRect;
-  // Chain-wide local-space rect clip for OP_LOCAL_RECT_COVERAGE (at most one such slot per
-  // chain). CoverageLocalRect keeps exact coordinates; the kernel maps gl_FragCoord through
-  // CoverageLocalDeviceToLocal before the half-pixel AA ramp.
-  vec4 CoverageLocalRect;
-  mat3 CoverageLocalDeviceToLocal;
+  // AA-rect clip parameters, two slots per space (selector bits 16-19 carry the slot's ordinal
+  // into these arrays). CoverageRect is in destination device coordinates and already carries the
+  // 0.5 outset for the AA falloff. CoverageLocalRect keeps exact coordinates; the kernel maps
+  // gl_FragCoord through CoverageLocalDeviceToLocal before the half-pixel AA ramp.
+  vec4 CoverageRect[2];
+  vec4 CoverageLocalRect[2];
+  mat3 CoverageLocalDeviceToLocal[2];
   // RRect clip parameter arrays for OP_RRECT_COVERAGE, indexed by the slot's rrect ordinal
   // (selector bits 16-19); at most four such slots per chain.
   vec4 CoverageRRectRect[4];

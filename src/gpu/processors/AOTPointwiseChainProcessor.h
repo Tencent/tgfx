@@ -172,8 +172,8 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   // run it on the same instruction array, so a budget change cannot leave check sites disagreeing.
   static constexpr size_t MaxGradientSlots = 1;
   static constexpr size_t MaxColorSpaceXformSlots = 1;
-  static constexpr size_t MaxDeviceRectCoverageSlots = 1;
-  static constexpr size_t MaxLocalRectCoverageSlots = 1;
+  static constexpr size_t MaxDeviceRectCoverageSlots = 2;
+  static constexpr size_t MaxLocalRectCoverageSlots = 2;
   static constexpr size_t MaxRRectCoverageSlots = 4;
 
   // Logical sampler children before padding. The artifacts bind 0 or 4 samplers; the builder

@@ -16,15 +16,18 @@
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
+// The analytic draw clip (AA rect or rounded rect) rides the shared runtime clip contract uniforms,
+// so it costs no variant: the draw carries the clip FP only for its uniforms. The block is
+// unconditional because the contract fields must always be declared.
+#define HAS_RUNTIME_CLIP 1
 
-#if HAS_COMMON_COLOR || HAS_XP
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #if HAS_COMMON_COLOR
   vec4 Color;
 #endif
+#include "coverage_uniforms.inc"
 #include "xp_uniforms.inc"
 };
-#endif
 
 layout(location = 0) in vec2 vEllipseOffsets;
 #if HAS_AA
@@ -42,6 +45,7 @@ layout(location = 1) in vec4 vColor;
 #define XP_DST_TEX_BINDING 0
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
+#include "clip_coverage.inc"
 
 layout(location = 0) out vec4 fragColor;
 
@@ -71,8 +75,11 @@ void main() {
   vec4 outputCoverage = vec4(edgeAlpha);
 #endif
 
-#define TGFX_XP_SRC_COLOR (outputColor * outputCoverage)
-#define TGFX_XP_SRC_UNPREMUL outputColor
-#define TGFX_XP_COVERAGE outputCoverage
+// The analytic clip enters as coverage on top of the cap/edge coverage; coverage_output.inc hands
+// xp_output.inc the uncovered color plus the total coverage, so the XferProcessor path does not
+// double-apply it.
+#define TGFX_COVERAGE_SRC_COLOR outputColor
+#define TGFX_INITIAL_COVERAGE outputCoverage
+#include "coverage_output.inc"
 #include "xp_output.inc"
 }

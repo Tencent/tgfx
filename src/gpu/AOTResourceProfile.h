@@ -52,14 +52,14 @@ struct AOTResourceCapacity {
   size_t noiseSources = 0;
   size_t gradients = 0;
   size_t colorSpaceXforms = 1;
-  size_t deviceRects = 1;
-  size_t localRects = 1;
+  size_t deviceRects = 2;
+  size_t localRects = 2;
   size_t rrects = 4;
 };
 
 inline constexpr AOTResourceCapacity ChainResourceCapacity = {};
-inline constexpr AOTResourceCapacity NoiseGraphResourceCapacity = {32, 16, 4, 2, 1, 0, 1, 1, 1, 4};
-inline constexpr AOTResourceCapacity TiledGraphResourceCapacity = {32, 16, 4, 3, 0, 1, 1, 1, 1, 4};
+inline constexpr AOTResourceCapacity NoiseGraphResourceCapacity = {32, 16, 4, 2, 1, 0, 1, 2, 2, 4};
+inline constexpr AOTResourceCapacity TiledGraphResourceCapacity = {32, 16, 4, 3, 0, 1, 1, 2, 2, 4};
 
 inline const AOTResourceCapacity* GetAOTResourceCapacity(AOTResourceProfile profile) {
   switch (profile) {
