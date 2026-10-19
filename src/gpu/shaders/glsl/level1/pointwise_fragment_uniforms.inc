@@ -91,3 +91,8 @@
 #endif
 
 #include "pointwise_chain_uniforms.inc"
+
+  // Alpha-only render target (Swizzle::ForWrite(ALPHA_8) == AAAA): 1 makes main() write
+  // fragColor.aaaa through output_swizzle.inc, so one variant serves both formats — the same
+  // runtime uniform SolidColorFill/MaskFill/GaussianBlur1D already use.
+  int OutputAlphaSwizzle;

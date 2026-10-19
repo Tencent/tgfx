@@ -293,4 +293,5 @@ void main() {
 #endif
 #include "xp_output.inc"
 #undef CHAIN_XP_SRC_UNPREMUL
+#include "output_swizzle.inc"
 }

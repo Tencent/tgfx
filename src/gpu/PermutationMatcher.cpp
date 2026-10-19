@@ -1449,7 +1449,13 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
     if (auto result = TryMatchGaussianBlur1D(programInfo)) {
       return result;
     }
-    return std::nullopt;
+    // The pointwise kernels now carry the OutputAlphaSwizzle uniform (output_swizzle.inc), so a
+    // chain-serving draw onto an alpha-only target — a const-color or gradient mask pass, the
+    // largest remaining libpag gap — is served by the same variants as the RGBA case.
+    if (auto result = TryMatchPointwiseDAG(programInfo)) {
+      return result;
+    }
+    return Fail(PermutationMatchFailure::NoMatchingFamily);
   }
   if (auto result = TryMatchQuadColorFill(programInfo)) {
     return result;

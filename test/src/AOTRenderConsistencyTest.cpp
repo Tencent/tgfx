@@ -9072,4 +9072,91 @@ TGFX_TEST(AOTRenderConsistencyTest, ComplexEllipseDeviceMaskMatchesRuntime) {
   ExpectBitmapsIdentical("complex-ellipse-device-mask", candidate, reference, size, size);
 }
 
+// The two shapes of the remaining libpag gap: const-color and gradient fills rendered onto an
+// alpha-only (ALPHA_8) target — the classic mask/coverage intermediate pass. The AAAA matcher
+// branch used to admit only four kernels and the pointwise kernels lacked the write swizzle, so
+// both shapes were dropped draws (3 + 3 occurrences, Swizzle=aaaa/Format=1 in the miss pipeline
+// signature).
+TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyFillMatchesRuntime) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 128;
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size, true);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::Transparent());
+    // Empty-FP form: a plain paint leaves the color in the GP, no color FP at all.
+    Paint solidPaint = {};
+    solidPaint.setColor(Color::FromRGBA(90, 160, 70, 255));
+    canvas->drawRect(Rect::MakeXYWH(8, 8, 60, 60), solidPaint);
+    // Gradient form: a single-interval linear gradient rides the chain's gradient slot.
+    Paint gradientPaint = {};
+    auto gradient = Shader::MakeLinearGradient(Point{0, 0}, Point(64.0f, 112.0f),
+                                               {Color::White(), Color::Transparent()}, {});
+    ASSERT_NE(gradient, nullptr);
+    gradientPaint.setShader(gradient);
+    canvas->drawRect(Rect::MakeXYWH(64, 16, 56, 96), gradientPaint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size, true));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  {
+    cache->unload();
+    ScopedAOTStatsPause referencePause(context, true);
+    renderScene(&reference);
+  }
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    cache->setDecompositionEnabled(true);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->resetProgramStats();
+    renderScene(&candidate);
+    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+    // The alpha-only draws must ride the pointwise chain, not fall back to the runtime route.
+    bool servedByPointwiseKernel = false;
+    for (const auto& record : cache->hitRecords()) {
+      if (record.shaderName == "PointwiseChainShader" ||
+          record.shaderName == "PointwiseGraphShader") {
+        servedByPointwiseKernel = true;
+      }
+    }
+    EXPECT_TRUE(servedByPointwiseKernel);
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->unload();
+    context->globalCache()->clearPrograms();
+  }
+  // Alpha-only bitmaps are one byte per pixel; compare directly instead of the RGBA helper.
+  auto* referencePixels = static_cast<const uint8_t*>(reference.lockPixels());
+  auto* candidatePixels = static_cast<const uint8_t*>(candidate.lockPixels());
+  ASSERT_TRUE(referencePixels != nullptr && candidatePixels != nullptr);
+  size_t totalBytes = static_cast<size_t>(size) * static_cast<size_t>(size);
+  int maxDiff = 0;
+  size_t diffCount = 0;
+  for (size_t i = 0; i < totalBytes; ++i) {
+    int diff = std::abs(static_cast<int>(referencePixels[i]) - static_cast<int>(candidatePixels[i]));
+    if (diff > 0) {
+      ++diffCount;
+    }
+    maxDiff = std::max(maxDiff, diff);
+  }
+  reference.unlockPixels();
+  candidate.unlockPixels();
+  EXPECT_EQ(maxDiff, 0) << "alpha-only fill diverged (diffBytes=" << diffCount << "/" << totalBytes
+                        << ")";
+}
+
 }  // namespace tgfx

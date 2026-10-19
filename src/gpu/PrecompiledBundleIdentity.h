@@ -101,8 +101,12 @@ namespace tgfx {
  * coverage_uniforms.inc fields) and the matcher now admits an analytic clip coverage FP beside the
  * coverage texture. A pre-change kernel has no clip fields, so HasClip would read uninitialized and
  * the clip would be silently ignored.
+ *
+ * 0x00010010: the pointwise kernels gained the OutputAlphaSwizzle uniform (alpha-only render
+ * targets), and the AAAA matcher branch now admits the pointwise DAG kernels. A pre-change kernel
+ * lacks the field, so an alpha-only target would read it uninitialized and write RGBA.
  */
-inline constexpr uint32_t kExpectedToolchainABI = 0x0001000Fu;
+inline constexpr uint32_t kExpectedToolchainABI = 0x00010010u;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"
