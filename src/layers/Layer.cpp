@@ -1340,10 +1340,10 @@ std::shared_ptr<Image> Layer::getOwnContourImage(const DrawArgs& args, float con
     return nullptr;
   }
   OpaqueContext opaqueContext;
-  // This raster is a geometric union of several painters, so their shared anti-aliased boundaries
-  // must add up instead of compositing with SrcOver, which would leave them at 0.75 coverage and
-  // let the backdrop show through the style. Only this own-outline recording needs it: the shared
-  // content and contour rasters keep SrcOver, and a user blend mode must never survive into them.
+  // This raster is a geometric union of several painters, so their shared boundaries must add up
+  // instead of compositing with SrcOver, which would leave them at 0.75 coverage and let the
+  // backdrop show through the style. Only this own-geometry recording needs it: the shared content
+  // and contour rasters keep SrcOver, and a user blend mode must never survive into them.
   opaqueContext.setUnionCoverage(true);
   auto* contourCanvas = opaqueContext.beginRecording();
   contourCanvas->scale(contentScale, contentScale);
@@ -1810,10 +1810,10 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   for (const auto& layerStyle : _layerStyles) {
     auto index = static_cast<int>(layerStyle->excludeChildEffects());
     needContent[index] = true;
-    if (layerStyle->usesOwnOutlineAsContent()) {
+    auto sourceFlags = layerStyle->extraSourceType();
+    if ((sourceFlags & static_cast<uint32_t>(LayerStyleExtraSourceType::OwnShape)) != 0) {
       needOwnOutline[index] = true;
     }
-    auto sourceFlags = layerStyle->extraSourceType();
     if (NeedsContourSource(sourceFlags)) {
       needContour[index] = true;
       needsContentShape = true;
@@ -1823,11 +1823,11 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   auto source = std::make_unique<LayerStyleSource>();
   source->contentScale = contentScale;
 
-  // A layer that carries a style declaring the own outline may drop a single unusable bucket: such a
-  // bucket can still be driven by the own outline even when the shared content is empty, so losing
-  // one bucket must not cancel the other. The relaxation is per layer rather than per bucket, so a
-  // failed bucket no longer suppresses the styles of the other bucket either -- they draw where the
-  // previous fail-closed contract left them undrawn. Every other layer keeps that contract: one
+  // A layer that carries a style declaring the own geometry may drop a single unusable bucket: such
+  // a bucket can still be driven by the own geometry even when the shared content is empty, so
+  // losing one bucket must not cancel the other. The relaxation is per layer rather than per bucket,
+  // so a failed bucket no longer suppresses the styles of the other bucket either -- they draw where
+  // the previous fail-closed contract left them undrawn. Every other layer keeps that contract: one
   // unusable bucket makes the whole source unusable.
   const bool layerUsesOwnOutline = needOwnOutline[0] || needOwnOutline[1];
 
@@ -2013,15 +2013,19 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   styleInput.contentScale = source->contentScale;
   auto sourceFlags = layerStyle->extraSourceType();
   if (HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour)) {
-    // The Contour extra source carries one recording's raster together with the shape that describes
-    // it: ResolveContourEntry picks the raster (own-outline or shared contour) that matches the
-    // shape ResolveContourShape returns.
-    auto* contourEntry = ResolveContourEntry(*group, layerStyle);
-    auto contourImage = contourEntry ? contourEntry->image : nullptr;
-    auto contourOffset = contourImage ? contourEntry->offset - contentEntry->offset : Point::Zero();
+    // The Contour source is the shared contour: its raster and the shared content shape describe
+    // the same recording.
+    auto contourImage = group->contour.has_value() ? group->contour->image : nullptr;
+    auto contourOffset =
+        contourImage ? group->contour->offset - contentEntry->offset : Point::Zero();
     styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
-        std::move(contourImage), contourOffset,
-        ResolveContourShape(*group, layerStyle, source->contentShape)));
+        std::move(contourImage), contourOffset, source->contentShape));
+  }
+  if (HasExtraSource(sourceFlags, LayerStyleExtraSourceType::OwnShape)) {
+    // The own geometry is not a contour: it is the layer's own painters without its descendants, and
+    // it carries only the shape; its raster is the content entry resolved above.
+    styleInput.extraSources.push_back(
+        std::make_shared<OwnShapeInputSource>(ResolveOwnShape(*group, layerStyle)));
   }
   layerStyle->draw(canvas, styleInput, alpha);
 }

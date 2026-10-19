@@ -129,18 +129,14 @@ class GlassStyle : public LayerStyle {
     return srcRect;
   }
 
+  /**
+   * Glass samples the background, the shared contour raster (the fallback when the layer has no own
+   * geometry) and the layer's own geometry (the SDF shape and the coverage raster it derives from).
+   */
   uint32_t extraSourceType() const override {
     return static_cast<uint32_t>(LayerStyleExtraSourceType::Background) |
-           static_cast<uint32_t>(LayerStyleExtraSourceType::Contour);
-  }
-
-  /**
-   * Glass covers the layer's own outline rather than its rendered content: the shared content and
-   * contour images leave out the painters flagged silhouetteOnly, so a layer whose only painter is
-   * such a marker would have no coverage at all.
-   */
-  bool usesOwnOutlineAsContent() const override {
-    return true;
+           static_cast<uint32_t>(LayerStyleExtraSourceType::Contour) |
+           static_cast<uint32_t>(LayerStyleExtraSourceType::OwnShape);
   }
 
  protected:

@@ -338,7 +338,7 @@ Brush GetOpaqueBrush(const Brush& brush, bool unionCoverage) {
     return opaqueBrush;
   }
   // Src + coverage AA may cause edge artifacts, use SrcOver instead. That holds for a composite of
-  // independent painters, but an own-silhouette recording needs their union: on a shared boundary
+  // independent painters, but an own-geometry recording needs their union: on a shared boundary
   // pixel the two adjacent painters cover f and 1 - f, and SrcOver composites them to
   // (1 - f) + f * (1 - (1 - f)) = 1 - f + f * f, i.e. 0.75 at f = 0.5, so the union must be additive
   // to keep the covered area at full opacity.

@@ -38,8 +38,11 @@ class StyleInputSource {
   enum class Type {
     /** A plain image source, such as the background content below the layer. */
     Base,
-    /** A contour source that additionally carries the layer's vector shape. */
-    Contour
+    /** A contour source that additionally carries the shared contour's vector shape. */
+    Contour,
+    /** The layer's own geometry, without its descendants. Carries the vector shape only; the
+     * matching raster is the content entry. */
+    OwnShape
   };
 
   /**
@@ -103,6 +106,31 @@ class ContourInputSource : public StyleInputSource {
 };
 
 /**
+ * The layer's own geometry. It is not a contour: it holds the layer's own painters without its
+ * descendants, including painters with alpha=0 and the painters flagged silhouetteOnly. Only the
+ * shape is carried here; the matching raster is the content entry that the style also receives.
+ */
+class OwnShapeInputSource : public StyleInputSource {
+ public:
+  /**
+   * Creates an own-geometry source.
+   * @param shape The optional vector shape of the layer's own geometry. It is absent when the
+   * geometry cannot be expressed as a single StyledShape.
+   */
+  explicit OwnShapeInputSource(std::optional<StyledShape> shape)
+      : StyleInputSource(Type::OwnShape, nullptr, Point::Zero()), _shape(std::move(shape)) {
+  }
+
+  /** Returns the optional vector shape of the layer's own geometry. */
+  const std::optional<StyledShape>& shape() const {
+    return _shape;
+  }
+
+ private:
+  std::optional<StyledShape> _shape = std::nullopt;
+};
+
+/**
  * Contains the source data that a LayerStyle needs to perform its drawing.
  */
 struct LayerStyleInput {
@@ -126,8 +154,8 @@ struct LayerStyleInput {
 
   /**
    * Extra sources requested by LayerStyle::extraSourceType() flags. Each source is an independent
-   * StyleInputSource (or ContourInputSource for contour sources). Use findExtraSource() to
-   * retrieve a source by type.
+   * StyleInputSource, a ContourInputSource for contour sources, or an OwnShapeInputSource for the
+   * layer's own geometry. Use findExtraSource() to retrieve a source by type.
    */
   std::vector<std::shared_ptr<StyleInputSource>> extraSources = {};
 

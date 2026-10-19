@@ -44,13 +44,32 @@ enum class LayerStyleExtraSourceType : uint32_t {
    */
   None = 0,
   /**
-   * The layerStyle requires the layer contour to be drawn.
+   * The layerStyle requires the layer contour to be drawn: the shared subtree recording, which
+   * includes geometries from painters with alpha=0 and leaves out the painters flagged
+   * silhouetteOnly because those do not take part in drawing.
    */
   Contour = 1 << 0,
   /**
    * The layerStyle requires the background content.
    */
-  Background = 1 << 1
+  Background = 1 << 1,
+  /**
+   * The layerStyle draws from the layer's own geometry. The source carries the geometry of the
+   * layer's own painters without its descendants, and it includes painters with alpha=0 and the
+   * painters flagged silhouetteOnly, since both describe the layer's own shape even though neither
+   * paints. A style that declares it samples the own recording's raster and receives the matching
+   * vector shape through StyleInputSource::Type::OwnShape.
+   *
+   * The shape is absent when the own geometry cannot be expressed as a single StyledShape -- more
+   * than one geometry, more than one stroke style, or geometry that does not convert to a Shape --
+   * and the style must then fall back to its alpha-mask path. When the layer has no own geometry,
+   * the source stays absent and the content entry falls back to the shared subtree recordings. The
+   * own geometry never unions with a descendant's geometry, which is the intended behaviour and
+   * not a missing coverage. silhouetteOnly decides which recording the geometry enters and which
+   * shape pairs with it; whether it paints is still decided by its alpha, so a caller that needs
+   * geometry without visible color must set the alpha to 0.
+   */
+  OwnShape = 1 << 2
 };
 
 enum class LayerStyleType {
@@ -76,12 +95,15 @@ enum class LayerStyleType {
  *    semi-transparent pixels to fully opaque (fully transparent pixels are preserved).
  *
  * 2. **Contour** (layer contour): Similar to Content, but with two differences:
- *    - Includes geometries from painters with alpha=0. Painters flagged silhouetteOnly are the
- *      exception: they are left out even at alpha=0, and only take part in the layer's own outline,
- *      which is what usesOwnOutlineAsContent() asks for.
+ *    - Includes geometries from painters with alpha=0. Painters flagged silhouetteOnly do not take
+ *      part in this recording because they do not take part in drawing.
  *    - Replaces gradient fills with solid color fills (ignoring local transparency in gradients)
  *
  * 3. **Background** (layer background): The normally rendered content below the current layer.
+ *
+ * 4. **OwnShape** (layer's own geometry): The geometry of the layer's own painters without its
+ *    descendants, including painters with alpha=0 and the painters flagged silhouetteOnly. See
+ *    LayerStyleExtraSourceType::OwnShape for the exact contract.
  */
 class LayerStyle : public LayerProperty {
  public:
@@ -146,18 +168,6 @@ class LayerStyle : public LayerProperty {
    */
   virtual uint32_t extraSourceType() const {
     return static_cast<uint32_t>(LayerStyleExtraSourceType::None);
-  }
-
-  /**
-   * Returns whether this layer style draws from the layer's own outline instead of the shared
-   * content image. The own outline is the layer's own content without its descendants, and it
-   * includes the painters flagged silhouetteOnly that the shared source images leave out. A layer
-   * records it only while it carries a style that declares this, so a style that needs the layer's
-   * own geometry declares it here instead of being recognized by a style type elsewhere. The
-   * default value is false.
-   */
-  virtual bool usesOwnOutlineAsContent() const {
-    return false;
   }
 
   /**
