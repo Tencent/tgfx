@@ -4211,7 +4211,8 @@ TGFX_TEST_PRIVATE(LayerTest, GlassStyleUsesBackgroundAndContourSource) {
 
   EXPECT_EQ(glassStyle->extraSourceType(),
             static_cast<uint32_t>(LayerStyleExtraSourceType::Background) |
-                static_cast<uint32_t>(LayerStyleExtraSourceType::Contour));
+                static_cast<uint32_t>(LayerStyleExtraSourceType::Contour) |
+                static_cast<uint32_t>(LayerStyleExtraSourceType::OwnShape));
 
   DrawArgs drawArgs(context);
   TGFX_PRIVATE_ACCESS(auto source = layer->getLayerStyleSource(drawArgs, Matrix::I());
@@ -5019,13 +5020,12 @@ TGFX_TEST_PRIVATE(LayerTest, GlassMarkerKeepsInteriorCoverageWithAStroke) {
          "reading is vacuous";
 }
 
-// The own outline is the geometric union of the layer's painters, and a rendered comparison can only
-// see its REACH: a partially covered pixel still differs from the backdrop, so a diff cannot tell
-// whether the union's coverages add up to one. The fill/stroke arms below therefore assert the reach
-// on rendered pixels -- every interior pixel has to change and nothing outside the outline may --
-// while the shared-boundary arm pins the coverage sum through a reference that carries a single
-// boundary.
-TGFX_TEST_PRIVATE(LayerTest, OwnOutlineUnionReachesFullCoverage) {
+// The own geometry rasterizes an opaque, hard-edged coverage: the opaque brush disables
+// anti-aliasing, so a painter's boundary pixel is fully covered or not covered at all, and
+// abutting painters tile the plane exactly. A rendered comparison can therefore see the coverage's
+// REACH -- every interior pixel has to change and nothing outside the outline may -- and the
+// shared-boundary arm pins that two painters describing one square render like the single square.
+TGFX_TEST_PRIVATE(LayerTest, OwnOutlineCoversItsPainters) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -5071,7 +5071,7 @@ TGFX_TEST_PRIVATE(LayerTest, OwnOutlineUnionReachesFullCoverage) {
       EXPECT_EQ(interiorDiff, interiorArea)
           << "interior ROI, r=" << probe.radius << " w=" << probe.strokeWidth
           << " align=" << static_cast<int>(probe.align) << " fill=" << static_cast<int>(fillKind)
-          << ": every interior pixel must change, so the union covers the whole interior: "
+          << ": every interior pixel must change, so the own geometry covers the whole interior: "
           << interiorDiff << " of " << interiorArea << " pixels changed";
       EXPECT_EQ(CountDifferingPixels(plain.get(), styled.get(), outsideRoi, 2), 0)
           << "outside ROI, r=" << probe.radius << " w=" << probe.strokeWidth
@@ -5080,11 +5080,10 @@ TGFX_TEST_PRIVATE(LayerTest, OwnOutlineUnionReachesFullCoverage) {
     }
   }
 
-  // Two painters that share an anti-aliased boundary. Two triangles meet on the diagonal
-  // y = x, which runs through the center of every pixel on that diagonal, so each covers exactly
-  // half of each of those pixels. Their union is the same square a single painter describes, so a
-  // Glass over the two must render like a Glass over the one; compositing the two halves with
-  // SrcOver instead leaves a 0.75 seam along the diagonal and the two renders differ there.
+  // Two painters that share a boundary. Two triangles meet on the diagonal y = x, so together they
+  // describe the same square as the single painter below. Because the own geometry recording is
+  // hard-edged, each boundary pixel belongs to one triangle, and the two-painter outline must render
+  // like the single square.
   constexpr float panelSize = 64.0f;
   auto makeShapeRegion = [&](const Path& path) {
     auto shapePath = ShapePath::Make();
@@ -5117,17 +5116,17 @@ TGFX_TEST_PRIVATE(LayerTest, OwnOutlineUnionReachesFullCoverage) {
       GlassMarkerPanelLeft + 4.0f, GlassMarkerPanelTop + 4.0f,
       GlassMarkerPanelLeft + panelSize - 4.0f, GlassMarkerPanelTop + panelSize - 4.0f);
   EXPECT_EQ(CountDifferingPixels(twoPainters.get(), onePainter.get(), sharedBoundaryRoi, 4), 0)
-      << "shared-AA-boundary ROI: the union of the two painters must render like the single square";
+      << "shared-boundary ROI: two painters describing the same square must render like the single "
+         "square";
   const auto sharedBoundaryArea =
       static_cast<int>(sharedBoundaryRoi.width()) * static_cast<int>(sharedBoundaryRoi.height());
-  const auto unionQuadrantRoi = Rect::MakeLTRB(
+  const auto twoPainterQuadrantRoi = Rect::MakeLTRB(
       GlassMarkerPanelLeft + 8.0f, GlassMarkerPanelTop + 8.0f,
       GlassMarkerPanelLeft + panelSize * 0.5f, GlassMarkerPanelTop + panelSize * 0.5f);
-  EXPECT_GT(CountDifferingPixels(emptyPanel.get(), twoPainters.get(), unionQuadrantRoi, 16),
+  EXPECT_GT(CountDifferingPixels(emptyPanel.get(), twoPainters.get(), twoPainterQuadrantRoi, 16),
             sharedBoundaryArea / 20)
-      << "union-quadrant ROI: the two-painter union must cover its interior, otherwise the "
-         "equality "
-         "above is vacuous";
+      << "two-painter quadrant ROI: the two-painter outline must cover its interior, otherwise the "
+         "equality above is vacuous";
 }
 
 // A style only covers what its own outline holds, so the two-group fill/stroke assembly has to keep
@@ -6879,17 +6878,11 @@ static std::vector<int> RasterizeOwnOutlineAlpha(Context* context,
   return raster;
 }
 
-// A layer whose own outline holds a silhouette-only painter AND a fill of the same geometry has one
-// shape described by two painters. The own outline is recorded as an additive union, which is exact
-// for painters whose coverages ABUT (0.5 + 0.5 -> 1.0) but would over-cover a SHARED anti-aliased
-// edge: both painters would contribute the shape's own boundary coverage, so the outermost
-// half-covered pixel could read 1.0 and the glass shape could grow by a pixel. This pins the actual
-// contract on that shape -- the coincident pair covers exactly what the single silhouette-only
-// painter covers, boundary included, and renders identically over the checker -- with a DISJOINT
-// second painter as the non-vacuity control, so the equality cannot pass on the second painter simply
-// being dropped. The outline recording rasterizes an opaque, hard edged coverage today, which is why
-// a single painter's boundary pixel is already full; were that to gain a partial-coverage edge, the
-// coincident arm is what would catch the over-cover.
+// A layer whose own geometry holds a silhouette-only painter AND a fill of the same geometry has one
+// shape described by two painters. The own geometry is recorded as an opaque, hard-edged coverage,
+// so a coincident second painter covers the same pixels and the result must equal the single-painter
+// outline exactly, boundary included, on the raster and on rendered pixels. A DISJOINT second painter
+// is the non-vacuity control, so the equality cannot pass on the second painter simply being dropped.
 TGFX_TEST_PRIVATE(LayerTest, OwnOutlineCoincidentPaintersDoNotGrowTheCoveredArea) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -6964,8 +6957,7 @@ TGFX_TEST_PRIVATE(LayerTest, OwnOutlineCoincidentPaintersDoNotGrowTheCoveredArea
                               "comparisons below are vacuous";
   EXPECT_EQ(coincidentFull, markerFull)
       << "coincident-fill outline: a second painter describing the SAME geometry must not add any "
-         "fully covered pixel -- additive union coverage over the shared boundary would grow the "
-         "glass shape by a pixel";
+         "fully covered pixel";
   int differing = 0;
   for (size_t i = 0; i < markerOnly.size(); i++) {
     if (markerOnly[i] != coincident[i]) {

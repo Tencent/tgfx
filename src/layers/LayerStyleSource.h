@@ -63,14 +63,22 @@ struct LayerStyleSourceGroup {
 };
 
 /**
- * Returns the layer's own outline entry when the given style draws from it, or nullptr otherwise.
- * The single source of the own-outline predicate shared by the resolvers below, so they can never
- * disagree on when a style is driven by the own outline.
+ * Returns whether the style declares the layer's own geometry as an input.
  */
-inline const LayerStyleSourceEntry* OwnContourEntry(const LayerStyleSourceGroup& group,
-                                                    const LayerStyle* style) {
+inline bool NeedsOwnShape(const LayerStyle* style) {
   DEBUG_ASSERT(style != nullptr);
-  if (style->usesOwnOutlineAsContent() && group.ownContour.has_value() &&
+  return (style->extraSourceType() &
+          static_cast<uint32_t>(LayerStyleExtraSourceType::OwnShape)) != 0;
+}
+
+/**
+ * Returns the layer's own geometry entry when the given style declares it, or nullptr otherwise.
+ * The single source of the own-geometry predicate shared by the resolvers below, so they can never
+ * disagree on when a style is driven by the own geometry.
+ */
+inline const LayerStyleSourceEntry* OwnShapeEntry(const LayerStyleSourceGroup& group,
+                                                  const LayerStyle* style) {
+  if (NeedsOwnShape(style) && group.ownContour.has_value() &&
       group.ownContour->image != nullptr) {
     return &*group.ownContour;
   }
@@ -78,26 +86,27 @@ inline const LayerStyleSourceEntry* OwnContourEntry(const LayerStyleSourceGroup&
 }
 
 /**
- * Resolves the entry a consumer must use as LayerStyleInput.content for the given style. A style that
- * declares usesOwnOutlineAsContent() wants the layer's own outline, which is the only image that
- * includes the silhouette-only markers, and falls back to the shared subtree recordings when no own
- * outline exists (see the fallback block below); every other style keeps the shared content image.
+ * Resolves the entry a consumer must use as LayerStyleInput.content for the given style. A style
+ * that declares LayerStyleExtraSourceType::OwnShape samples the layer's own geometry, which is the
+ * only image that includes the silhouette-only markers, and falls back to the shared subtree
+ * recordings when no own geometry exists (see the fallback block below); every other style keeps
+ * the shared content image.
  *
  * Returns nullptr when the resolved entry carries no image: the group then has nothing to offer
  * this style, and consumers must skip it rather than draw from a missing image. style must not be
- * null. Only a style that declares the own outline may be driven by it; handing it to a content-based
- * style would make that style draw an outline instead of the layer content.
+ * null. Only a style that declares the own geometry may be driven by it; handing it to a
+ * content-based style would make that style draw an outline instead of the layer content.
  */
 inline const LayerStyleSourceEntry* ResolveContentEntry(const LayerStyleSourceGroup& group,
                                                         const LayerStyle* style) {
   DEBUG_ASSERT(style != nullptr);
-  if (style->usesOwnOutlineAsContent()) {
-    if (auto* ownEntry = OwnContourEntry(group, style)) {
+  if (NeedsOwnShape(style)) {
+    if (auto* ownEntry = OwnShapeEntry(group, style)) {
       return ownEntry;
     }
-    // A style that declares the own outline but records none resolves to the shared subtree contour
+    // A style that declares the own geometry but records none resolves to the shared subtree contour
     // when present (and falls back to `content` otherwise).
-    // A style whose geometry lives in child layers records no own outline, and its two subtree
+    // A style whose geometry lives in child layers records no own geometry, and its two subtree
     // recordings then disagree on two axes. `content` (drawDefault, DrawContent.cpp) drops every
     // painter whose effective color alpha is <= 0; `contour` (drawContourInternal) has no alpha gate
     // and keeps it. In the opposite direction `contour` drops every painter flagged silhouetteOnly
@@ -107,7 +116,7 @@ inline const LayerStyleSourceEntry* ResolveContentEntry(const LayerStyleSourceGr
     // scope-neutral: both recordings span the same subtree (self + descendants), so preferring
     // `contour` can never draw outside that subtree, but it CAN drop coverage over a descendant's
     // silhouette-only painter that `content` still holds. That case is bounded where the style and
-    // its coverage geometry live in the same layer: such a layer records an own outline and never
+    // its coverage geometry live in the same layer: such a layer records an own geometry and never
     // reaches this branch. No new draw site is introduced either: the branch is only reached with
     // `ownContour` absent and `contour.image != nullptr`, and a null `content` image has already
     // marked the bucket unusable and skipped it (Layer.cpp), so the old code had already drawn -- a
@@ -120,49 +129,17 @@ inline const LayerStyleSourceEntry* ResolveContentEntry(const LayerStyleSourceGr
 }
 
 /**
- * Resolves the shape that describes the image ResolveContentEntry hands to the style. The shape
- * always comes from the same recording as that image: a style that declares the own outline and
- * finds one gets the shape recorded with it, which may itself be absent -- an absent own shape stays
- * absent rather than being replaced by the shared shape, because the shared shape describes a
- * different recording. Every other case, including the fallback where such a style is handed the
- * shared contour raster, gets the shared content shape.
- *
- * The pairing matters because the style turns this shape into a path (DetectGlassShape) while it
- * samples the image as coverage, so a shape that disagreed with the raster would treat a different
- * region as the covered one. In the fallback, the shape and the raster are two separate recordings
- * that differ on the alpha <= 0 and silhouetteOnly axes (see ResolveContentEntry above), so the
- * pairing holds only under an invariant the code relies on rather than enforces: a group that
- * records no own outline has no shape of its own either, so the shared shape handed out here is
- * absent as well. That holds today for the container-like layer this fallback serves, whose geometry
- * lives in child layers and whose own content therefore contributes no shape; a group that recorded
- * no own outline while still owning a shape would hand a shape that need not match the raster.
+ * Resolves the vector shape of the layer's own geometry for a style that declares it. The shape
+ * describes the same recording as the raster ResolveContentEntry returns: when the own entry
+ * exists, both come from the own geometry; when it does not, the shape stays absent and the style
+ * falls back to its alpha-mask path over the shared raster.
  */
-inline const std::optional<StyledShape>& ResolveContourShape(
-    const LayerStyleSourceGroup& group, const LayerStyle* style,
-    const std::optional<StyledShape>& sharedShape) {
-  DEBUG_ASSERT(style != nullptr);
-  if (OwnContourEntry(group, style) != nullptr) {
-    return group.ownContourShape;
+inline std::optional<StyledShape> ResolveOwnShape(const LayerStyleSourceGroup& group,
+                                                  const LayerStyle* style) {
+  if (OwnShapeEntry(group, style) == nullptr) {
+    return std::nullopt;
   }
-  return sharedShape;
-}
-
-/**
- * Resolves the entry whose raster pairs with the shape ResolveContourShape returns: the own-outline
- * entry when the style draws from it, otherwise the shared contour entry when it carries an image,
- * otherwise nullptr. Image, offset and shape must all come from one recording, so a style handed the
- * own-outline shape must also be handed the own-outline raster.
- */
-inline const LayerStyleSourceEntry* ResolveContourEntry(const LayerStyleSourceGroup& group,
-                                                        const LayerStyle* style) {
-  DEBUG_ASSERT(style != nullptr);
-  if (auto* ownEntry = OwnContourEntry(group, style)) {
-    return ownEntry;
-  }
-  if (group.contour.has_value() && group.contour->image != nullptr) {
-    return &*group.contour;
-  }
-  return nullptr;
+  return group.ownContourShape;
 }
 
 /**

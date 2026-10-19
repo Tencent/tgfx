@@ -42,13 +42,12 @@ class OpaqueContext : public DrawContext {
 
   /**
    * Records the painters' coverage as their geometric union, adding up their coverages instead of
-   * compositing them with SrcOver. The union holds on the solid/colour path of GetOpaqueBrush only:
-   * a painter whose shader is an image keeps its own shader and blend mode there (the early return)
-   * and is therefore not part of the union. A layer's own outline is recorded from several painters
-   * at once, and SrcOver collapses the shared anti-aliased boundary of two adjacent painters -- which
-   * cover f and 1 - f on that boundary pixel -- to (1 - f) + f * (1 - (1 - f)) = 1 - f + f * f (0.75
-   * at f = 0.5), which lets the backdrop show through every style that derives its coverage from this
-   * raster, such as Glass. Must be set before the first drawing call.
+   * compositing them with SrcOver. A layer's own geometry is recorded from several painters at once,
+   * and SrcOver collapses the shared boundary of two adjacent painters -- which cover f and 1 - f
+   * there -- to (1 - f) + f * (1 - (1 - f)) = 1 - f + f * f (0.75 at f = 0.5), which lets the
+   * backdrop show through every style that derives its coverage from this raster, such as Glass.
+   * The union applies to the solid/colour path of GetOpaqueBrush; a painter carrying an image shader
+   * keeps its own brush and blend mode there. Must be set before the first drawing call.
    */
   void setUnionCoverage(bool unionCoverage);
 

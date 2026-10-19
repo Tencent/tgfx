@@ -132,15 +132,17 @@ struct GlassShapeInfo {
 // alpha — the actually rendered shape, strokes included.
 static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   GlassShapeInfo info;
-  auto* contourSource = input.findExtraSource(StyleInputSource::Type::Contour);
-  if (contourSource == nullptr) {
+  // The SDF shape comes from the layer's own geometry, not from the shared contour: it is the only
+  // recording that includes the silhouette-only markers and the painters with alpha=0.
+  auto* ownShapeSource = input.findExtraSource(StyleInputSource::Type::OwnShape);
+  if (ownShapeSource == nullptr) {
     return info;
   }
-  auto contour = static_cast<const ContourInputSource*>(contourSource);
-  if (!contour->shape().has_value()) {
+  auto ownShape = static_cast<const OwnShapeInputSource*>(ownShapeSource);
+  if (!ownShape->shape().has_value()) {
     return info;
   }
-  const auto& optShape = contour->shape();
+  const auto& optShape = ownShape->shape();
   if (optShape->type != StyledShapeType::Fill) {
     return info;
   }
