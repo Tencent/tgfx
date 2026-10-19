@@ -41,6 +41,13 @@ struct AOTToleranceSpec {
   /// always fails, regardless of the ratios above. Guards against a few catastrophically wrong
   /// pixels hiding under a low overall ratio.
   int structuralChannelDiff = 64;
+  /// Maximum allowed drift of the mean alpha, in 8-bit units [0,255]. A distributed alpha shift
+  /// (for example a mask collapsing over the whole image) can stay under maxChannelDiff and under
+  /// structuralChannelDiff while still changing what the image shows. Negative disables the check.
+  double maxAlphaMeanDrift = -1.0;
+  /// Maximum allowed change in the fraction of non-transparent pixels. Catches content appearing or
+  /// disappearing when the per-channel deltas stay small. Negative disables the check.
+  double maxNonEmptyRatioDelta = -1.0;
 };
 
 /**
@@ -56,6 +63,10 @@ struct AOTToleranceResult {
   int maxChannelDiff = 0;
   uint64_t diffPixelCount = 0;
   uint64_t totalPixelCount = 0;
+  /// Absolute difference of the mean alpha of both renders, in 8-bit units.
+  double alphaMeanDrift = 0.0;
+  double referenceNonEmptyRatio = 0.0;
+  double candidateNonEmptyRatio = 0.0;
 
   double diffPixelRatio() const {
     return totalPixelCount == 0

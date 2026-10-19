@@ -16,15 +16,15 @@
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
+#define HAS_RUNTIME_CLIP 1
 
-#if HAS_COMMON_COLOR || HAS_XP
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #if HAS_COMMON_COLOR
   vec4 Color;
 #endif
+#include "coverage_uniforms.inc"
 #include "xp_uniforms.inc"
 };
-#endif
 
 layout(location = 0) in vec2 vEllipseOffsets;
 layout(location = 1) in vec4 vEllipseRadii;
@@ -43,6 +43,7 @@ layout(location = 3) in vec2 vStrokeWidth;
 #define XP_DST_TEX_BINDING 0
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
+#include "clip_coverage.inc"
 
 layout(location = 0) out vec4 fragColor;
 
@@ -100,10 +101,13 @@ void main() {
   outerAlpha *= innerAlpha;
 #endif
 
-// The XP path needs the uncovered color plus the total coverage separately; defining only the
-// covered SRC_COLOR double-applies the coverage inside the XferProcessor blend.
-#define TGFX_XP_SRC_COLOR (outputColor * outerAlpha)
-#define TGFX_XP_SRC_UNPREMUL outputColor
-#define TGFX_XP_COVERAGE vec4(outerAlpha)
+// The uncovered color rides TGFX_COVERAGE_SRC_COLOR and the analytic edge coverage enters as the
+// initial coverage; coverage_output.inc multiplies the runtime clip coverage (rrect/AA-rect, the
+// shared clip contract uniforms) on top and hands xp_output.inc the uncovered color plus the
+// TOTAL coverage. With HasClip == 0 the result is identical to the previous direct
+// outputColor * outerAlpha composition.
+#define TGFX_COVERAGE_SRC_COLOR outputColor
+#define TGFX_INITIAL_COVERAGE vec4(outerAlpha)
+#include "coverage_output.inc"
 #include "xp_output.inc"
 }

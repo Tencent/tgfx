@@ -210,6 +210,10 @@ static void ExpectBitmapsNear(const char* label, const Bitmap& aotBitmap,
   // alpha-only expression difference from an RGB one.
   const bool dumpDiffs = std::getenv("TGFX_DUMP_DIFFS") != nullptr;
   size_t dumped = 0;
+  double aotAlphaSum = 0.0;
+  double runtimeAlphaSum = 0.0;
+  size_t aotNonEmpty = 0;
+  size_t runtimeNonEmpty = 0;
   for (size_t i = 0; i < totalBytes; i++) {
     int d = std::abs(static_cast<int>(a[i]) - static_cast<int>(r[i]));
     if (d > 0) {
@@ -224,12 +228,33 @@ static void ExpectBitmapsNear(const char* label, const Bitmap& aotBitmap,
     if (d > maxDiff) {
       maxDiff = d;
     }
+    if (i % 4 == 3) {
+      aotAlphaSum += static_cast<double>(a[i]);
+      runtimeAlphaSum += static_cast<double>(r[i]);
+      aotNonEmpty += a[i] != 0 ? 1 : 0;
+      runtimeNonEmpty += r[i] != 0 ? 1 : 0;
+    }
   }
   const_cast<Bitmap&>(aotBitmap).unlockPixels();
   const_cast<Bitmap&>(runtimeBitmap).unlockPixels();
+  auto pixelCount = static_cast<double>(static_cast<size_t>(width) * static_cast<size_t>(height));
+  double aotMeanAlpha = pixelCount > 0 ? aotAlphaSum / pixelCount : 0.0;
+  double runtimeMeanAlpha = pixelCount > 0 ? runtimeAlphaSum / pixelCount : 0.0;
+  double aotNonEmptyRatio = pixelCount > 0 ? static_cast<double>(aotNonEmpty) / pixelCount : 0.0;
+  double runtimeNonEmptyRatio =
+      pixelCount > 0 ? static_cast<double>(runtimeNonEmpty) / pixelCount : 0.0;
   EXPECT_LE(maxDiff, tolerance) << "AOT vs runtime render diverged for scene: " << label
                                 << " (maxChannelDiff=" << maxDiff << ", diffBytes=" << diffCount
                                 << "/" << totalBytes << ", tolerance=" << tolerance << ")";
+  // Per-channel tolerance alone cannot catch a distributed alpha shift (for example a mask
+  // collapsing over the whole image), so the scene also has to keep its alpha mass and its
+  // non-transparent area.
+  EXPECT_NEAR(aotMeanAlpha, runtimeMeanAlpha, 0.5)
+      << "AOT vs runtime alpha mass diverged for scene: " << label
+      << " (meanAlpha aot=" << aotMeanAlpha << " runtime=" << runtimeMeanAlpha << ")";
+  EXPECT_NEAR(aotNonEmptyRatio, runtimeNonEmptyRatio, 0.001)
+      << "AOT vs runtime non-empty area diverged for scene: " << label
+      << " (nonEmpty aot=" << aotNonEmptyRatio << " runtime=" << runtimeNonEmptyRatio << ")";
 }
 
 static void ExpectShaderConsistent(const char* label, const std::shared_ptr<Shader>& shader,
@@ -8896,6 +8921,80 @@ TGFX_TEST(AOTRenderConsistencyTest, GlassSharpCornerSceneAOTMatchesJIT) {
   // tolerated here is the same 1-LSB rounding the other AOT/JIT probes accept.
   EXPECT_LE(sharpMaxChannelDelta, 1);
   EXPECT_LE(sharpDiffCount, sharpPixelCount / 100);
+}
+
+// Regression for the largest NoMatchingRule bucket in the libpag corpus (56 occurrences): a complex
+// rounded rect (the ComplexEllipse geometry) drawn under a rounded clip attaches a leaf RRectEffect
+// coverage FP. The kernel now evaluates that clip from the shared runtime clip contract uniforms
+// (coverage_uniforms.inc / clip_coverage.inc) instead of refusing every draw that carries a
+// coverage FP, and the result must stay byte-identical to the runtime render.
+TGFX_TEST(AOTRenderConsistencyTest, ComplexEllipseRRectClipMatchesRuntime) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 160;
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_NE(surface, nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::Transparent());
+    // A large corner radius keeps the clip on the coverage-FP route: it cuts into the shape, so it
+    // cannot be reduced to a device-space rect test.
+    RRect clip = {};
+    clip.setRectXY(Rect::MakeXYWH(10, 10, 120, 110), 45, 45);
+    canvas->clipRRect(clip);
+    // Per-corner radii mark the rrect complex, which routes the draw onto the
+    // ComplexEllipseGeometryProcessor.
+    std::array<Point, 4> radii = {Point::Make(30, 16), Point::Make(12, 26), Point::Make(22, 8),
+                                  Point::Make(6, 14)};
+    RRect shape = {};
+    shape.setRectRadii(Rect::MakeXYWH(20, 20, 120, 120), radii);
+    Paint paint = {};
+    paint.setColor(Color::FromRGBA(70, 130, 180, 255));
+    canvas->drawRRect(shape, paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_NE(pixels, nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  {
+    cache->unload();
+    ScopedAOTStatsPause referencePause(context, true);
+    renderScene(&reference);
+  }
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    cache->setDecompositionEnabled(true);
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->resetProgramStats();
+    renderScene(&candidate);
+    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+    // Pin the served shape, not just "some AOT program ran": the draw has to carry the rrect
+    // coverage FP and be served by the complex ellipse kernel.
+    bool servedComplexEllipseWithClip = false;
+    for (const auto& record : cache->hitRecords()) {
+      if (record.shaderName == "ComplexEllipseFillShader" &&
+          record.effectSignature.find("CoverageFP=[RRectEffect]") != std::string::npos) {
+        servedComplexEllipseWithClip = true;
+      }
+    }
+    EXPECT_TRUE(servedComplexEllipseWithClip);
+    cache->setDiagnosticRecordingEnabled(false);
+    cache->unload();
+    context->globalCache()->clearPrograms();
+  }
+  ExpectBitmapsIdentical("complex-ellipse-rrect-clip", candidate, reference, size, size);
 }
 
 }  // namespace tgfx

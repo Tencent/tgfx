@@ -1104,8 +1104,19 @@ static std::optional<PermutationMatchResult> TryMatchComplexEllipseFill(
   if (gp->name() != "ComplexEllipseGeometryProcessor") {
     return std::nullopt;
   }
-  if (programInfo->numFragmentProcessors() != 0) {
+  if (programInfo->numColorFragmentProcessors() != 0) {
     return std::nullopt;
+  }
+  // The kernel evaluates the runtime clip contract (coverage_uniforms.inc / clip_coverage.inc),
+  // so a sole AA-rect or rrect coverage FP is served through uniforms without a permutation
+  // change — the same route EllipseFillShader takes. Device-space and local mask coverage need a
+  // sampler this kernel does not declare, so they stay on other routes.
+  if (programInfo->numFragmentProcessors() != 0) {
+    auto coverage = ClassifyCoverageFP(programInfo);
+    if (!coverage ||
+        (*coverage != CoverageKind::AARect && *coverage != CoverageKind::RRect)) {
+      return std::nullopt;
+    }
   }
   auto* cegp = static_cast<const ComplexEllipseGeometryProcessor*>(gp);
   ComplexEllipseFillInputs inputs;
