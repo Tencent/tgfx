@@ -1997,8 +1997,8 @@ static void ExpectDedicatedAndChainAgree(const char* label,
   BrushRenderStats dedicatedStats = {};
   BrushRenderStats chainStats = {};
   RenderSceneThroughRoute(scene, width, height, KernelRoute::Runtime, &jit, &jitStats);
-  RenderSceneThroughRoute(scene, width, height, KernelRoute::Dedicated, &dedicated,
-                          &dedicatedStats, plainMatcher);
+  RenderSceneThroughRoute(scene, width, height, KernelRoute::Dedicated, &dedicated, &dedicatedStats,
+                          plainMatcher);
   RenderSceneThroughRoute(scene, width, height, KernelRoute::Chain, &chain, &chainStats);
   auto served = [](const BrushRenderStats& stats, const char* shader) {
     return std::find(stats.shaders.begin(), stats.shaders.end(), shader) != stats.shaders.end();
@@ -2115,7 +2115,8 @@ TGFX_TEST(AOTRenderConsistencyTest, DedicatedAndChainAgreeOnTexturedEffectDraws)
   ASSERT_NE(pixels, nullptr);
   for (int y = 0; y < imageSize; ++y) {
     for (int x = 0; x < imageSize; ++x) {
-      auto* pixel = pixels + static_cast<size_t>(y) * bitmap.rowBytes() + static_cast<size_t>(x) * 4;
+      auto* pixel =
+          pixels + static_cast<size_t>(y) * bitmap.rowBytes() + static_cast<size_t>(x) * 4;
       const int alpha = 3 + x * 4;
       pixel[0] = static_cast<uint8_t>(200 * alpha / 255);
       pixel[1] = static_cast<uint8_t>((60 + y * 2) * alpha / 255);
@@ -2126,8 +2127,8 @@ TGFX_TEST(AOTRenderConsistencyTest, DedicatedAndChainAgreeOnTexturedEffectDraws)
   bitmap.unlockPixels();
   auto image = Image::MakeFrom(bitmap);
   ASSERT_NE(image, nullptr);
-  const std::array<float, 20> warm = {1.1f, 0.05f, 0, 0, 0.02f, 0, 0.95f, 0, 0, 0,
-                                      0,    0,     0.8f, 0, 0,   0, 0,     0, 1, 0};
+  const std::array<float, 20> warm = {1.1f, 0.05f, 0,    0, 0.02f, 0, 0.95f, 0, 0, 0,
+                                      0,    0,     0.8f, 0, 0,     0, 0,     0, 1, 0};
   struct FilterCase {
     const char* name;
     std::shared_ptr<ColorFilter> filter;

@@ -674,16 +674,16 @@ TGFX_TEST(AOTPerformanceMatrixTest, DedicatedVsChainHotFamilies) {
                         canvas->restore();
                       },
                       true});
-    scenes.push_back({"rect",
-                      [&](Canvas* canvas) {
-                        Paint paint = {};
-                        paint.setColor(Color::FromRGBA(220, 60, 40, 255));
-                        paint.setAntiAlias(true);
-                        canvas->drawRect(
-                            Rect::MakeXYWH(8.3f * scale, 12.6f * scale, 110.2f * scale, 100.4f * scale),
-                            paint);
-                      },
-                      false});
+    scenes.push_back(
+        {"rect",
+         [&](Canvas* canvas) {
+           Paint paint = {};
+           paint.setColor(Color::FromRGBA(220, 60, 40, 255));
+           paint.setAntiAlias(true);
+           canvas->drawRect(
+               Rect::MakeXYWH(8.3f * scale, 12.6f * scale, 110.2f * scale, 100.4f * scale), paint);
+         },
+         false});
     scenes.push_back({"ellipse",
                       [&](Canvas* canvas) {
                         Paint paint = {};
