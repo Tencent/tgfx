@@ -6932,6 +6932,62 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryUnionsAbuttingPainters) {
       << differing << " pixels differ";
 }
 
+// Four painters that meet at one corner pixel: each quadrant covers a quarter of it, so a
+// per-painter binary decision would drop all four and punch a one-pixel hole in the coverage. This
+// pins what the recording actually produces at such a junction.
+TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoversPaintersSharingACorner) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  constexpr float quadrant = 32.0f;
+  auto makeQuadrant = [](float x, float y) {
+    Path path = {};
+    path.addRect(Rect::MakeXYWH(x, y, quadrant, quadrant));
+    auto shape = ShapePath::Make();
+    shape->setPath(path);
+    MarkerRegionSpec spec = {};
+    spec.shape = shape;
+    return spec;
+  };
+  auto panel = MakeMarkerPanel(
+      {makeQuadrant(0.5f, 0.5f), makeQuadrant(0.5f + quadrant, 0.5f),
+       makeQuadrant(0.5f, 0.5f + quadrant), makeQuadrant(0.5f + quadrant, 0.5f + quadrant)},
+      {MakeOwnOutlineGlass(0, 50, 100, 0, 0)});
+
+  DrawArgs drawArgs(context);
+  std::shared_ptr<Image> mask = nullptr;
+  Point offset = {};
+  TGFX_PRIVATE_ACCESS(auto source = panel->getLayerStyleSource(drawArgs, Matrix::I());
+                      ASSERT_TRUE(source != nullptr); for (auto& group
+                                                           : source->groups) {
+                        if (group != nullptr && group->ownContour.has_value() &&
+                            group->ownContour->image != nullptr) {
+                          mask = group->ownContour->image;
+                          offset = group->ownContour->offset;
+                        }
+                      })
+  ASSERT_TRUE(mask != nullptr);
+  auto surface = Surface::Make(context, mask->width(), mask->height());
+  ASSERT_TRUE(surface != nullptr);
+  surface->getCanvas()->drawImage(mask, 0, 0);
+  auto info = ImageInfo::Make(mask->width(), mask->height(), ColorType::RGBA_8888,
+                              AlphaType::Premultiplied);
+  std::vector<uint32_t> pixels(static_cast<size_t>(mask->width()) *
+                               static_cast<size_t>(mask->height()));
+  ASSERT_TRUE(surface->readPixels(info, pixels.data()));
+  auto alphaAt = [&](int x, int y) {
+    return static_cast<int>(pixels[static_cast<size_t>(y) * static_cast<size_t>(mask->width()) +
+                                   static_cast<size_t>(x)] >>
+                            24);
+  };
+  auto cornerX = static_cast<int>(quadrant - offset.x);
+  auto cornerY = static_cast<int>(quadrant - offset.y);
+  EXPECT_EQ(alphaAt(cornerX, cornerY), 255)
+      << "the pixel shared by four quadrants must stay covered";
+  EXPECT_EQ(alphaAt(cornerX - 8, cornerY - 8), 255) << "the quadrant interiors stay covered";
+}
+
 // A layer whose own geometry holds a silhouette-only painter AND a fill of the same geometry has one
 // shape described by two painters. The own geometry is recorded as an opaque, hard-edged coverage,
 // so a coincident second painter covers the same pixels and the result must equal the single-painter
