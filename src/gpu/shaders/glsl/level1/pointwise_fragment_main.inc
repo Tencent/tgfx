@@ -29,6 +29,13 @@ vec4 chainPlainLeafFetch(CHAIN_LEAF_SAMPLER texSampler, vec3 coord, vec4 leafSub
                          vec2 leafAlphaStart, int leafHasRgbaaa, int leafIndex) {
   highp vec2 uv = chainLeafCoord(coord, leafIndex);
   int readSwizzle = LeafReadSwizzles[leafIndex];
+#if HAS_SUBSET
+  // A strict draw's per-quad subset clamps leaf 0 ahead of its Subset uniform, the order of the
+  // runtime TextureEffect's extra subset (leafIndex is a constant at each call site).
+  if (leafIndex == 0) {
+    uv = aotTextureClamp(uv, vTexSubset, true);
+  }
+#endif
   highp vec2 finalCoord = aotTextureClamp(uv, leafSubset, true);
   vec4 color = aotTextureRead(texSampler, finalCoord, readSwizzle);
   if (leafHasRgbaaa != 0) {

@@ -46,6 +46,9 @@ namespace tgfx {
 ///   TEXTURE_COUNT (int, 2 values): 0 -> no texture leaves, 1 -> the four-leaf slots (chains
 ///     with 1-3 sampler children bind phantom padding and run them). A zero-leaf chain
 ///     evaluates const-color/blend ops against the geometry color alone.
+///   HAS_SUBSET (bool): quad four-leaf chains only; the per-quad texSubset attribute of a
+///     SrcRectConstraint::Strict draw, transformed into leaf 0's texture space and passed on as
+///     the vTexSubset varying (the runtime QuadPerEdgeAAGeometryProcessor's subset varying).
 ///
 /// Fragment dimensions:
 ///   HAS_XP (int, 3 values): 0=Empty, 1=PorterDuff DST_TEX, 2=PorterDuff FBF
@@ -53,10 +56,20 @@ namespace tgfx {
 ///   HAS_MASK_TEXTURE (bool): a device-space alpha mask child sampled after the DAG and before the
 ///     XP stage, matching the legacy blend kernel's mask application point. Leaf-free uniform-color
 ///     chains on the DefaultGP, hairline-line and complex rounded-rect layouts only.
+///   HAS_SUBSET: mirrored with the vertex stage; leaf 0 clamps to vTexSubset ahead of its Subset
+///     uniform, as the runtime TextureEffect applies the GP subset of a strict draw.
 class PointwiseChainShader : public PrecompiledShader {
  public:
   struct VertDims {
-    enum : uint32_t { GP_LAYOUT, HAS_COVERAGE, HAS_UV_COORD, HAS_COLOR, TEXTURE_COUNT, COUNT };
+    enum : uint32_t {
+      GP_LAYOUT,
+      HAS_COVERAGE,
+      HAS_UV_COORD,
+      HAS_COLOR,
+      TEXTURE_COUNT,
+      HAS_SUBSET,
+      COUNT
+    };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("GP_LAYOUT", 5),
@@ -66,6 +79,8 @@ class PointwiseChainShader : public PrecompiledShader {
           // 0 = no texture leaves, 1 = the four-leaf artifacts (chains with 1-3 sampler
           // children bind phantom padding and run them).
           PermutationInt("TEXTURE_COUNT", 2),
+          // Appended last so every subset-free index keeps its value.
+          PermutationBool("HAS_SUBSET"),
       });
     }
   };
@@ -79,6 +94,7 @@ class PointwiseChainShader : public PrecompiledShader {
       HAS_COLOR,
       TEXTURE_COUNT,
       HAS_MASK_TEXTURE,
+      HAS_SUBSET,
       COUNT
     };
     static PermutationDomain domain() {
@@ -89,11 +105,12 @@ class PointwiseChainShader : public PrecompiledShader {
           PermutationBool("HAS_COLOR"),
           PermutationInt("TEXTURE_COUNT", 2),
           PermutationBool("HAS_MASK_TEXTURE"),
+          PermutationBool("HAS_SUBSET"),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 6, "Update the Compose mapping when fragment dimensions change.");
+  static_assert(FD::COUNT == 7, "Update the Compose mapping when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"PointwiseChainShader",

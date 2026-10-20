@@ -296,6 +296,7 @@ struct PointwiseChainInputs {
   int textureCount = 0;             // domain value: 0 = leaf-free, 1 = four-leaf padded slots.
   bool hasMask = false;             // device-space mask child present.
   bool hasCoverageSubtree = false;  // chain coverage subtree present.
+  bool hasSubset = false;           // quad four-leaf chain: per-quad subset of a strict draw.
   bool hasNoise = false;
   bool hasGradient = false;  // one gradient belongs to the extended TiledGraph profile.
   AOTResourceProfile resourceProfile = AOTResourceProfile::Automatic;

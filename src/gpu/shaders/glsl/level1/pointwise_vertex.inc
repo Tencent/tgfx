@@ -2,7 +2,8 @@
 // Feeds one TransformedCoords varying per texture leaf of the pointwise DAG. The leaf count is the
 // TEXTURE_COUNT permutation (0 -> 0 leaves, 1 -> 1, 2 -> 2, 3 -> 4) because the varying layout is
 // part of the vertex/fragment interface.
-// Permutation dimensions (vert): GP_LAYOUT, HAS_COVERAGE, HAS_UV_COORD, HAS_COLOR, TEXTURE_COUNT.
+// Permutation dimensions (vert): GP_LAYOUT, HAS_COVERAGE, HAS_UV_COORD, HAS_COLOR, TEXTURE_COUNT,
+// HAS_SUBSET.
 // GP_LAYOUT: 0 = rect family (DefaultGP and QuadPerEdgeAAGP share it — the position always goes
 // through the Matrix uniform, which DefaultGP fills with the view matrix and QuadPerEdgeAAGP with
 // identity, bit-exact), 1 = EllipseGeometryProcessor (device-space vertices, carries the ellipse
@@ -27,6 +28,9 @@
 #endif
 #ifndef TEXTURE_COUNT
 #define TEXTURE_COUNT 0
+#endif
+#ifndef HAS_SUBSET
+#define HAS_SUBSET 0
 #endif
 
 #if TEXTURE_COUNT == 0
@@ -74,6 +78,9 @@ layout(location = 4 + HAS_COLOR) in vec2 inStrokeWidth;
 #ifndef CHAIN_SOURCE_COORDS_LOC
 #define CHAIN_SOURCE_COORDS_LOC 7
 #endif
+// The per-quad subset varying (rect layout only: leaves 0-3, coverage 4, color 5); must agree with
+// pointwise_fragment_interface.inc.
+#define CHAIN_SUBSET_LOC 6
 
 layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
   vec4 tgfx_RTAdjust;
@@ -106,6 +113,11 @@ layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
   // other GP writes all-ones, which reproduces the previous shared coordSource behavior.
   int CoordSourceMask;
 #endif
+#if HAS_SUBSET && !HAS_UV_COORD
+  // Leaf 0's coordinate transform, written by the quad GP for the subset corners; with uvCoord the
+  // corners go through CoordTransformMatrix_0 itself, as in the runtime GP.
+  mat3 texSubsetMatrix;
+#endif
 };
 
 #if GP_LAYOUT == 0
@@ -120,6 +132,10 @@ layout(location = 1 + HAS_COVERAGE) in vec2 uvCoord;
 #endif
 #if HAS_COLOR
 layout(location = 1 + HAS_COVERAGE + HAS_UV_COORD) in vec4 inColor;
+#endif
+#if HAS_SUBSET
+// QuadPerEdgeAAGP only: its color slot is unconditional, so the subset follows it.
+layout(location = 2 + HAS_COVERAGE + HAS_UV_COORD) in vec4 texSubset;
 #endif
 #elif GP_LAYOUT == 2
 layout(location = 0) in vec2 aPosition;
@@ -168,6 +184,9 @@ layout(location = CHAIN_TEX_LOC_BASE + 3) out vec3 TransformedCoords_3;
 #endif
 #ifdef TGFX_POINTWISE_SOURCE_COORDS
 layout(location = CHAIN_SOURCE_COORDS_LOC) out vec3 SourceCoords;
+#endif
+#if HAS_SUBSET
+layout(location = CHAIN_SUBSET_LOC) out vec4 vTexSubset;
 #endif
 
 void main() {
@@ -233,6 +252,18 @@ void main() {
 #endif
 #if GP_LAYOUT == 0 && HAS_COVERAGE
   vCoverage = inCoverage;
+#endif
+#if HAS_SUBSET
+  // The subset corners in leaf 0's texture space (GLSLQuadPerEdgeAAGeometryProcessor's
+  // onEmitTransform; projective draws stay on the runtime route).
+#if HAS_UV_COORD
+  highp vec2 subsetLT = (CoordTransformMatrix_0 * vec3(texSubset.xy, 1.0)).xy;
+  highp vec2 subsetRB = (CoordTransformMatrix_0 * vec3(texSubset.zw, 1.0)).xy;
+#else
+  highp vec2 subsetLT = (texSubsetMatrix * vec3(texSubset.xy, 1.0)).xy;
+  highp vec2 subsetRB = (texSubsetMatrix * vec3(texSubset.zw, 1.0)).xy;
+#endif
+  vTexSubset = vec4(min(subsetLT, subsetRB), max(subsetLT, subsetRB));
 #endif
   gl_Position = vec4(position.xy * tgfx_RTAdjust.xz + tgfx_RTAdjust.yw, 0.0, 1.0);
 }

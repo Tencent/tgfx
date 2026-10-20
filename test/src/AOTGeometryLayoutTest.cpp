@@ -1284,4 +1284,90 @@ TGFX_TEST(AOTGeometryLayoutTest, ConstantMaskCoverageBlendModes) {
 
 #undef TGFX_CONST_MASK_COLOR
 
+// SrcRectConstraint::Strict image draws whose coverage the dedicated QuadTextureFillShader cannot
+// carry (a shader mask filter, or two analytic clips). The quad carries a per-quad subset, so the
+// chain serves them through its HAS_SUBSET variants: leaf 0 clamps to the subset varying ahead of
+// its Subset uniform. The image is magnified and the source rect sits inside it, so a missing or
+// misplaced clamp bleeds the neighboring texels into the edges.
+namespace {
+
+enum class StrictCoverage { MaskRect, MaskTwoRects, TwoRects, MaskRRect };
+
+void DrawStrictImage(Canvas* canvas, const std::shared_ptr<Image>& image, StrictCoverage coverage,
+                     BlendMode blend) {
+  if (coverage != StrictCoverage::MaskRRect) {
+    canvas->rotate(5, 80, 80);
+    canvas->clipRect(Rect::MakeLTRB(12.25f, 8.5f, 132.75f, 118.25f));
+    canvas->resetMatrix();
+  } else {
+    RRect rrect = {};
+    rrect.setRectXY(Rect::MakeXYWH(6, 6, 140, 118), 40, 40);
+    canvas->clipRRect(rrect);
+  }
+  if (coverage == StrictCoverage::MaskTwoRects || coverage == StrictCoverage::TwoRects) {
+    canvas->rotate(-3, 80, 80);
+    canvas->clipRect(Rect::MakeLTRB(28.5f, 22.75f, 150.25f, 140.5f));
+    canvas->resetMatrix();
+  }
+  Paint paint = {};
+  paint.setAntiAlias(true);
+  paint.setBlendMode(blend);
+  if (coverage != StrictCoverage::TwoRects) {
+    paint.setMaskFilter(
+        MaskFilter::MakeShader(Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat)));
+  }
+  canvas->drawImageRect(image, Rect::MakeLTRB(5.5f, 4.25f, 27.75f, 26.5f),
+                        Rect::MakeLTRB(6.5f, 9.25f, 151.75f, 148.5f), SamplingOptions(), &paint,
+                        SrcRectConstraint::Strict);
+}
+
+#define TGFX_STRICT_QUAD "GP=QuadPerEdgeAAGeometryProcessor;ColorFP=[TextureEffect];"
+#define TGFX_STRICT_MASK "CoverageFP=[XfermodeFragmentProcessor - dst(TiledTextureEffect),"
+
+}  // namespace
+
+TGFX_TEST(AOTGeometryLayoutTest, StrictImageMaskRectClip) {
+  auto image = MakePatternImage();
+  ExpectSceneServed("strict-mask-rect", "QuadPerEdgeAAGeometryProcessor",
+                    TGFX_STRICT_QUAD TGFX_STRICT_MASK "RectEffect];XP=EmptyXferProcessor",
+                    [image](Canvas* canvas) {
+                      DrawStrictImage(canvas, image, StrictCoverage::MaskRect, BlendMode::SrcOver);
+                    });
+}
+
+TGFX_TEST(AOTGeometryLayoutTest, StrictImageMaskTwoRectClips) {
+  auto image = MakePatternImage();
+  ExpectSceneServed("strict-mask-two-rects", "QuadPerEdgeAAGeometryProcessor",
+                    TGFX_STRICT_QUAD TGFX_STRICT_MASK
+                    "ComposeFragmentProcessor(RectEffect,RectEffect)];XP=EmptyXferProcessor",
+                    [image](Canvas* canvas) {
+                      DrawStrictImage(canvas, image, StrictCoverage::MaskTwoRects,
+                                      BlendMode::SrcOver);
+                    });
+}
+
+TGFX_TEST(AOTGeometryLayoutTest, StrictImageMaskRRectClipDstRead) {
+  auto image = MakePatternImage();
+  ExpectSceneServed("strict-mask-rrect-multiply", "QuadPerEdgeAAGeometryProcessor",
+                    TGFX_STRICT_QUAD TGFX_STRICT_MASK "RRectEffect];XP=PorterDuffXferProcessor",
+                    [image](Canvas* canvas) {
+                      DrawStrictImage(canvas, image, StrictCoverage::MaskRRect,
+                                      BlendMode::Multiply);
+                    });
+}
+
+TGFX_TEST(AOTGeometryLayoutTest, StrictImageTwoRectClips) {
+  auto image = MakePatternImage();
+  ExpectSceneServed(
+      "strict-two-rects", "QuadPerEdgeAAGeometryProcessor",
+      TGFX_STRICT_QUAD
+      "CoverageFP=[ComposeFragmentProcessor(RectEffect,RectEffect)];XP=EmptyXferProcessor",
+      [image](Canvas* canvas) {
+        DrawStrictImage(canvas, image, StrictCoverage::TwoRects, BlendMode::SrcOver);
+      });
+}
+
+#undef TGFX_STRICT_QUAD
+#undef TGFX_STRICT_MASK
+
 }  // namespace tgfx

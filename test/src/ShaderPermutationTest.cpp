@@ -361,8 +361,10 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
   // mask, four-leaf; each for the three XP kinds) and their 9 TiledGraph twins. The complex
   // rounded-rect layouts (GP_LAYOUT=3 fill, 4 stroke) add 15 chain variants each (uniform color:
   // leaf-free, leaf-free with the device mask, four-leaf; per-vertex color: leaf-free, four-leaf;
-  // each for the three XP kinds) and their 30 TiledGraph twins.
-  EXPECT_EQ(pairCount, 447u);
+  // each for the three XP kinds) and their 30 TiledGraph twins. The per-quad subset of strict
+  // image draws adds 12 chain variants (the four quad four-leaf vertex forms, uvCoord and per-vertex
+  // color on or off, each for the three XP kinds) with no TiledGraph twin.
+  EXPECT_EQ(pairCount, 459u);
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseChainShader"),
             EnumeratePointwiseChainReachable());
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseGraphShader"),
@@ -510,8 +512,8 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryRejectsMissingEntries) {
 TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
   PointwiseGraphShader shader;
   auto info = shader.info();
-  EXPECT_EQ(info.vertDomain.dimensionCount(), 5u);
-  EXPECT_EQ(info.fragDomain.dimensionCount(), 7u);
+  EXPECT_EQ(info.vertDomain.dimensionCount(), 6u);
+  EXPECT_EQ(info.fragDomain.dimensionCount(), 8u);
   EXPECT_EQ(info.vertDomain.totalCount(), PointwiseChainShader::VD::domain().totalCount());
   EXPECT_EQ(info.fragDomain.totalCount(), PointwiseChainShader::FD::domain().totalCount() * 2);
   EXPECT_EQ(PointwiseGraphShader::FD::RESOURCE_KIND, PointwiseGraphShader::FD::COUNT - 1);

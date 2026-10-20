@@ -38,6 +38,11 @@ layout(location = NTEX) in float vCoverage;
 layout(location = NTEX + 1) in vec4 vColor;
 #endif
 
+#if HAS_SUBSET
+// The per-quad subset of a strict draw, in leaf 0's texture space (pointwise_vertex.inc).
+layout(location = 6) in vec4 vTexSubset;
+#endif
+
 #if NTEX >= 1
 layout(location = CHAIN_TEX_LOC_BASE + 0) in vec3 TransformedCoords_0;
 #endif

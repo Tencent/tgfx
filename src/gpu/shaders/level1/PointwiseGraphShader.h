@@ -39,7 +39,7 @@ class PointwiseGraphShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 7, "Update the Compose mapping when fragment dimensions change.");
+  static_assert(FD::COUNT == 8, "Update the Compose mapping when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"PointwiseGraphShader",

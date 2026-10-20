@@ -65,6 +65,11 @@ class TextureEffect : public FragmentProcessor {
     return needSubset();
   }
 
+  // Strict draws also clamp to the geometry processor's per-quad subset varying.
+  SrcRectConstraint getConstraint() const {
+    return constraint;
+  }
+
   // The child's tile modes. The precompiled blur kernel clamps plain-child taps to the subset
   // (edge stretch), which is only the correct tap semantics for Clamp — a Decal child must stay
   // transparent outside its subset, so matchers use this to keep it off that kernel.

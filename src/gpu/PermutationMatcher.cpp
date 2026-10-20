@@ -565,6 +565,38 @@ static std::optional<PermutationMatchResult> TryMatchQuadTextureFill(
 // Matches the fused pointwise-DAG kernel. The chain processor carries the whole DAG in uniforms,
 // so this rule only validates the parts that are baked into the program: the GP, the leaf count
 // (sampler/varying layout), and that every leaf is a plain sampled texture.
+// A quad's per-quad subset (SrcRectConstraint::Strict) reaches every strict texture of the
+// runtime program as the GP's vTexSubset varying, which the GP transforms with the program's
+// first coordinate transform. The HAS_SUBSET chain variant computes it with leaf 0's transform and
+// clamps leaf 0 alone, so it serves the draw only when leaf 0 is the one strict texture: a plain
+// sampled leaf (the tiled and device-space leaf forms clamp differently) with every other leaf and
+// tiling recipe non-strict. A projective subset stays on the runtime route, as for
+// QuadTextureFillShader: the precompiled vertex stage transforms the subset corners affinely.
+static bool IsChainQuadSubsetServable(const QuadPerEdgeAAGeometryProcessor* quadGP,
+                                      const AOTPointwiseChainProcessor* chain) {
+  if (chain->leafCount() == 0 || chain->tiledLeaf() == 0 || chain->tiledLeaf2() == 0 ||
+      (chain->deviceLeafMask() & 1u) != 0 || quadGP->getHasUVPerspective()) {
+    return false;
+  }
+  for (const auto& tiled : chain->tiledLeafParameters()) {
+    if (tiled.recipe.strict) {
+      return false;
+    }
+  }
+  for (size_t index = 0; index < chain->leafCount(); ++index) {
+    auto leaf = chain->childProcessor(index);
+    if (leaf->name() != "TextureEffect") {
+      return false;
+    }
+    auto* texture = static_cast<const TextureEffect*>(leaf);
+    bool strict = texture->getConstraint() == SrcRectConstraint::Strict;
+    if (strict != (index == 0) || (index == 0 && texture->hasPerspective())) {
+      return false;
+    }
+  }
+  return true;
+}
+
 static std::optional<PermutationMatchResult> TryMatchPointwiseDAG(const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
   // GP profiles: 0 Default, 1 Quad, 2 Mesh (whose vertex buffers follow the
@@ -641,9 +673,11 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseDAG(const ProgramI
   inputs.xpType = GetXPType(programInfo);
   if (gpKind == 1) {
     auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-    // The precompiled vert has no texSubset attribute, so subset-carrying quads fall back.
     if (quadGP->getHasSubset()) {
-      return Fail(PermutationMatchFailure::QuadSubset);
+      if (!IsChainQuadSubsetServable(quadGP, chain)) {
+        return Fail(PermutationMatchFailure::QuadSubset);
+      }
+      inputs.hasSubset = true;
     }
     inputs.hasUVCoord = !quadGP->hasUVMatrix();
     inputs.hasColor = !quadGP->hasCommonColor();

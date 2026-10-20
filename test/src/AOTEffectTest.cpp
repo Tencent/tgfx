@@ -2248,7 +2248,15 @@ TGFX_TEST(AOTEffectTest, PointwiseGraphPermutationsAreIndependentAndBounded) {
       }
     }
   }
-  EXPECT_EQ(graphPairs.size(), EnumeratePointwiseChainReachable().size() + 3);
+  // Every chain pair has a TiledGraph twin except the per-quad subset ones (a Chain-only
+  // capability), plus the three NoiseGraph pairs.
+  size_t chainSubsetPairs = 0;
+  for (const auto& indices : EnumeratePointwiseChainReachable()) {
+    auto fragValues = PointwiseChainShader::FD::domain().decode(indices.second);
+    chainSubsetPairs += fragValues[PointwiseChainShader::FD::HAS_SUBSET] != 0 ? 1 : 0;
+  }
+  EXPECT_EQ(chainSubsetPairs, 12u);
+  EXPECT_EQ(graphPairs.size(), EnumeratePointwiseChainReachable().size() - chainSubsetPairs + 3);
   EXPECT_EQ(EnumeratePointwiseGraphReachable(), graphPairs);
   EXPECT_EQ(EnumerateReachablePermutations("PointwiseGraphShader"), graphPairs);
   auto unsupported = inputs;

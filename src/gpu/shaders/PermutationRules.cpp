@@ -924,6 +924,12 @@ static std::optional<RuleComposedValues> ComposePointwiseGP(const PointwiseChain
   if (hasMaskTexture != 0 && (gpLayout == 1 || hasUVCoord != 0 || hasColor != 0)) {
     return std::nullopt;
   }
+  // The per-quad subset is a QuadPerEdgeAAGP attribute that clamps a texture leaf, so it exists
+  // only on the quad profile with the four-leaf slots.
+  if (inputs.hasSubset && (inputs.gpKind != 1 || inputs.textureCount != 1)) {
+    return std::nullopt;
+  }
+  int hasSubset = inputs.hasSubset ? 1 : 0;
   using VD = PointwiseChainShader::VD;
   using FD = PointwiseChainShader::FD;
   RuleComposedValues values;
@@ -933,6 +939,7 @@ static std::optional<RuleComposedValues> ComposePointwiseGP(const PointwiseChain
   values.vertValues[VD::HAS_UV_COORD] = hasUVCoord;
   values.vertValues[VD::HAS_COLOR] = hasColor;
   values.vertValues[VD::TEXTURE_COUNT] = inputs.textureCount;
+  values.vertValues[VD::HAS_SUBSET] = hasSubset;
   values.fragValues.resize(FD::COUNT);
   values.fragValues[FD::GP_LAYOUT] = gpLayout;
   values.fragValues[FD::HAS_XP] = inputs.xpType;
@@ -940,6 +947,7 @@ static std::optional<RuleComposedValues> ComposePointwiseGP(const PointwiseChain
   values.fragValues[FD::HAS_COLOR] = hasColor;
   values.fragValues[FD::TEXTURE_COUNT] = inputs.textureCount;
   values.fragValues[FD::HAS_MASK_TEXTURE] = hasMaskTexture;
+  values.fragValues[FD::HAS_SUBSET] = hasSubset;
   return values;
 }
 
@@ -962,22 +970,27 @@ std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseChainReachable() {
             for (int hasMask = 0; hasMask <= 1; ++hasMask) {
               for (int hasCoverageSubtree = 0; hasCoverageSubtree <= 1; ++hasCoverageSubtree) {
                 for (int xpType = -1; xpType <= 2; ++xpType) {
-                  PointwiseChainInputs inputs;
-                  inputs.gpKind = gpKind;
-                  inputs.hasCoverage = hasCoverage != 0;
-                  inputs.hasUVCoord = hasUVCoord != 0;
-                  inputs.hasColor = hasColor != 0;
-                  inputs.textureCount = textureCount;
-                  inputs.hasMask = hasMask != 0;
-                  inputs.hasCoverageSubtree = hasCoverageSubtree != 0;
-                  inputs.xpType = xpType;
-                  auto composed = ComposePointwiseChain(inputs);
-                  if (!composed) {
-                    continue;
+                  for (int hasSubset = 0; hasSubset <= 1; ++hasSubset) {
+                    PointwiseChainInputs inputs;
+                    inputs.gpKind = gpKind;
+                    inputs.hasCoverage = hasCoverage != 0;
+                    inputs.hasUVCoord = hasUVCoord != 0;
+                    inputs.hasColor = hasColor != 0;
+                    inputs.textureCount = textureCount;
+                    inputs.hasMask = hasMask != 0;
+                    inputs.hasCoverageSubtree = hasCoverageSubtree != 0;
+                    inputs.xpType = xpType;
+                    inputs.hasSubset = hasSubset != 0;
+                    auto composed = ComposePointwiseChain(inputs);
+                    if (!composed) {
+                      continue;
+                    }
+                    auto vertIndex =
+                        PointwiseChainShader::VD::domain().encode(composed->vertValues);
+                    auto fragIndex =
+                        PointwiseChainShader::FD::domain().encode(composed->fragValues);
+                    result.insert({vertIndex, fragIndex});
                   }
-                  auto vertIndex = PointwiseChainShader::VD::domain().encode(composed->vertValues);
-                  auto fragIndex = PointwiseChainShader::FD::domain().encode(composed->fragValues);
-                  result.insert({vertIndex, fragIndex});
                 }
               }
             }
@@ -998,8 +1011,9 @@ std::optional<RuleComposedValues> ComposePointwiseGraph(const PointwiseChainInpu
       profile = AOTResourceProfile::TiledGraph;
     }
   }
+  // The per-quad subset of a strict draw is a Chain-only capability.
   if (!IsAOTGraphProfile(profile) ||
-      (profile == AOTResourceProfile::NoiseGraph) != inputs.hasNoise) {
+      (profile == AOTResourceProfile::NoiseGraph) != inputs.hasNoise || inputs.hasSubset) {
     return std::nullopt;
   }
   if (profile == AOTResourceProfile::NoiseGraph &&
@@ -1021,6 +1035,9 @@ std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseGraphReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (const auto& indices : EnumeratePointwiseChainReachable()) {
     auto fragValues = PointwiseChainShader::FD::domain().decode(indices.second);
+    if (fragValues[PointwiseChainShader::FD::HAS_SUBSET] != 0) {
+      continue;
+    }
     fragValues.push_back(1);
     result.insert({indices.first, PointwiseGraphShader::FD::domain().encode(fragValues)});
   }

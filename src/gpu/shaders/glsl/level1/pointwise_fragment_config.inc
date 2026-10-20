@@ -53,6 +53,9 @@
 #ifndef TEXTURE_COUNT
 #define TEXTURE_COUNT 0
 #endif
+#ifndef HAS_SUBSET
+#define HAS_SUBSET 0
+#endif
 #define CHAIN_LEAF_SAMPLER sampler2D
 
 #if TEXTURE_COUNT == 0
