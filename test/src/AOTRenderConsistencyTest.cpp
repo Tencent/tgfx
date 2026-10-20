@@ -2303,6 +2303,58 @@ TGFX_TEST(AOTRenderConsistencyTest, QuadTextureMaskFactorsMatchRuntime) {
   }
 }
 
+// EllipseFillShader's device-mask and per-vertex-color variants: a path clip rasterized into a
+// coverage texture (HAS_DEVICE_MASK) and a batch of differently colored ovals, which carries each
+// oval's color as a vertex attribute instead of the Color uniform (HAS_COMMON_COLOR = 0). The
+// edge coverage, the mask and the clip all reach the XferProcessor's coverage, so a wrong product
+// or order shows under the dst-reading Multiply as well as under SrcOver.
+TGFX_TEST(AOTRenderConsistencyTest, EllipseMaskAndVertexColorMatchRuntime) {
+  SKIP_ON_SWIFTSHADER_ENV();
+  constexpr int size = 96;
+  const Path star = MakeStarPath(1.0f);
+  const Color colors[] = {Color::FromRGBA(220, 60, 40, 255), Color::FromRGBA(40, 160, 220, 200),
+                          Color::FromRGBA(90, 200, 70, 150)};
+  for (int clipMode : {0, 1}) {
+    for (int colorMode : {0, 1}) {
+      for (BlendMode blend : {BlendMode::SrcOver, BlendMode::Multiply}) {
+        auto scene = [=](Canvas* canvas) {
+          canvas->clear(Color::FromRGBA(240, 200, 120, 255));
+          if (clipMode == 1) {
+            canvas->clipPath(star);
+          }
+          Paint paint = {};
+          paint.setAntiAlias(true);
+          paint.setBlendMode(blend);
+          for (int i = 0; i < 3; ++i) {
+            paint.setColor(colors[colorMode == 0 ? 0 : i]);
+            paint.setAlpha(colorMode == 0 ? 0.37f : paint.getAlpha());
+            auto offset = static_cast<float>(i) * 9.5f;
+            canvas->drawOval(Rect::MakeXYWH(6.3f + offset, 8.6f + offset, 61.2f, 47.9f), paint);
+          }
+        };
+        std::string label = std::string(clipMode == 0 ? "no-clip" : "path-clip") +
+                            (colorMode == 0 ? " one-color" : " three-colors") +
+                            (blend == BlendMode::SrcOver ? " srcover" : " multiply");
+        SCOPED_TRACE(label);
+        Bitmap jit = {};
+        Bitmap dedicated = {};
+        BrushRenderStats jitStats = {};
+        BrushRenderStats dedicatedStats = {};
+        RenderSceneThroughRoute(scene, size, size, KernelRoute::Runtime, &jit, &jitStats);
+        RenderSceneThroughRoute(scene, size, size, KernelRoute::Dedicated, &dedicated,
+                                &dedicatedStats);
+        EXPECT_NE(std::find(dedicatedStats.shaders.begin(), dedicatedStats.shaders.end(),
+                            "EllipseFillShader"),
+                  dedicatedStats.shaders.end());
+        EXPECT_EQ(dedicatedStats.noMatchingRule, 0u);
+        EXPECT_EQ(dedicatedStats.programs.programBuilderCreations, 0u);
+        EXPECT_EQ(dedicatedStats.draws.droppedDraws, 0u);
+        ExpectBitmapsNear(label.c_str(), dedicated, jit, size, size, ExperimentTolerance(1));
+      }
+    }
+  }
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, DedicatedAndChainAgreeOnTextureDraws) {
   SKIP_ON_SWIFTSHADER_ENV();
   constexpr int size = 48;
