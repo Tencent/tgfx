@@ -85,4 +85,10 @@ std::string MetalToolchainVersion();
 /// Prepends #define directives to shader source from a list of "NAME=value" strings.
 std::string PrependDefines(const std::string& source, const std::vector<std::string>& defines);
 
+/// Runs the standard GLSL preprocessor (shaderc) over the source: macros are expanded, every
+/// conditional block is resolved, comments are dropped, and the #line directives it emits are
+/// removed. #version, #extension and #pragma lines are kept. Returns an empty string and sets
+/// error on failure.
+std::string PreprocessGLSL(const std::string& source, ShaderStageType stage, std::string* error);
+
 }  // namespace tgfx

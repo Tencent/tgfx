@@ -19,6 +19,7 @@
 #include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <map>
 #include <optional>
@@ -297,8 +298,121 @@ static std::string EmitDirectGLSL330Impl(const std::string& source, ShaderStageT
                                          const std::string& versionLine, bool esDialect,
                                          bool fbfVariant);
 
+// Desktop GL stores the text after the standard GLSL preprocessor (the same one the SPIR-V
+// backends compile through): every #if block is resolved for this variant, so the stored blob
+// carries only the live code, and the driver neither re-parses dead branches nor depends on the
+// emitter's own reading of the conditionals. Returns an empty string on failure.
 static std::string EmitDirectGLSL330(const std::string& source, ShaderStageType stage) {
-  return EmitDirectGLSL330Impl(source, stage, "#version 330", false, false);
+  std::string error;
+  auto preprocessed = PreprocessGLSL(source, stage, &error);
+  if (preprocessed.empty()) {
+    std::cerr << "  direct-GL 330 preprocessing failed: " << error << "\n";
+    return {};
+  }
+  return EmitDirectGLSL330Impl(preprocessed, stage, "#version 330", false, false);
+}
+
+// Evaluates an integer constant expression of a layout id: decimal literals, identifiers
+// (resolved through lookup), unary +/-, binary + - *, and parentheses. Returns false on any other
+// form, so the caller keeps the original text instead of storing a wrong literal.
+template <typename Lookup>
+static bool FoldIntegerExpression(const std::string& expr, const Lookup& lookup, int64_t* value) {
+  size_t pos = 0;
+  auto skip = [&]() {
+    while (pos < expr.size() && isspace(static_cast<unsigned char>(expr[pos]))) {
+      ++pos;
+    }
+  };
+  std::function<bool(int64_t*)> parseSum;
+  std::function<bool(int64_t*)> parseUnary = [&](int64_t* out) -> bool {
+    skip();
+    if (pos >= expr.size()) {
+      return false;
+    }
+    auto c = expr[pos];
+    if (c == '+' || c == '-') {
+      ++pos;
+      int64_t inner = 0;
+      if (!parseUnary(&inner)) {
+        return false;
+      }
+      *out = c == '-' ? -inner : inner;
+      return true;
+    }
+    if (c == '(') {
+      ++pos;
+      if (!parseSum(out)) {
+        return false;
+      }
+      skip();
+      if (pos >= expr.size() || expr[pos] != ')') {
+        return false;
+      }
+      ++pos;
+      return true;
+    }
+    auto start = pos;
+    if (isdigit(static_cast<unsigned char>(c))) {
+      while (pos < expr.size() && isdigit(static_cast<unsigned char>(expr[pos]))) {
+        ++pos;
+      }
+      *out = std::stoll(expr.substr(start, pos - start));
+      return true;
+    }
+    if (isalpha(static_cast<unsigned char>(c)) || c == '_') {
+      while (pos < expr.size() &&
+             (isalnum(static_cast<unsigned char>(expr[pos])) || expr[pos] == '_')) {
+        ++pos;
+      }
+      *out = lookup(expr.substr(start, pos - start));
+      return true;
+    }
+    return false;
+  };
+  auto parseProduct = [&](int64_t* out) -> bool {
+    if (!parseUnary(out)) {
+      return false;
+    }
+    while (true) {
+      skip();
+      if (pos >= expr.size() || expr[pos] != '*') {
+        return true;
+      }
+      ++pos;
+      int64_t rhs = 0;
+      if (!parseUnary(&rhs)) {
+        return false;
+      }
+      *out *= rhs;
+    }
+  };
+  parseSum = [&](int64_t* out) -> bool {
+    if (!parseProduct(out)) {
+      return false;
+    }
+    while (true) {
+      skip();
+      if (pos >= expr.size() || (expr[pos] != '+' && expr[pos] != '-')) {
+        return true;
+      }
+      auto op = expr[pos++];
+      int64_t rhs = 0;
+      if (!parseProduct(&rhs)) {
+        return false;
+      }
+      *out = op == '+' ? *out + rhs : *out - rhs;
+    }
+  };
+  int64_t result = 0;
+  if (!parseSum(&result)) {
+    return false;
+  }
+  skip();
+  if (pos != expr.size()) {
+    return false;
+  }
+  *value = result;
+  return true;
 }
 
 // ES-300 direct emission (the GLES sibling of EmitDirectGLSL330): the same strip/fold/comment
@@ -523,7 +637,17 @@ static std::string EmitDirectGLSL330Impl(const std::string& source, ShaderStageT
     {
       auto open = code.find("layout(");
       while (open != std::string::npos) {
-        auto close = code.find(')', open);
+        // The matching parenthesis: a layout id may be a parenthesized expression.
+        auto close = std::string::npos;
+        int depth = 0;
+        for (auto i = open + 6; i < code.size(); ++i) {
+          if (code[i] == '(') {
+            ++depth;
+          } else if (code[i] == ')' && --depth == 0) {
+            close = i;
+            break;
+          }
+        }
         if (close == std::string::npos) {
           break;
         }
@@ -559,37 +683,7 @@ static std::string EmitDirectGLSL330Impl(const std::string& source, ShaderStageT
                 // Fold `location = <expr>` to a literal using the current macro state.
                 auto expr = member.substr(eq + 2);
                 int64_t folded = 0;
-                bool ok = true;
-                // Sum/difference of macros and integers — the only forms the sources use.
-                size_t partCursor = 0;
-                bool negate = false;
-                while (partCursor < expr.size()) {
-                  auto op = expr.find_first_of("+-", partCursor == 0 ? 0 : partCursor);
-                  auto part = expr.substr(
-                      partCursor, op == std::string::npos ? std::string::npos : op - partCursor);
-                  auto partWs = part.find_first_not_of(" \t\r");
-                  if (partWs != std::string::npos) {
-                    auto partEnd = part.find_last_not_of(" \t\r");
-                    part = part.substr(partWs, partEnd - partWs + 1);
-                    int64_t v = 0;
-                    if (isdigit(part[0])) {
-                      try {
-                        v = std::stoll(part);
-                      } catch (...) {
-                        ok = false;
-                      }
-                    } else if (isalpha(part[0]) || part[0] == '_') {
-                      v = macroValue(part);
-                    } else {
-                      ok = false;
-                    }
-                    folded += negate ? -v : v;
-                  }
-                  if (op == std::string::npos) break;
-                  negate = expr[op] == '-';
-                  partCursor = op + 1;
-                }
-                if (ok) {
+                if (FoldIntegerExpression(expr, macroValue, &folded)) {
                   member = "location = " + std::to_string(folded);
                 }
               }
@@ -1028,8 +1122,8 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
           auto directFrag =
               EmitDirectGLSL330(PrependDefines(fragSource, fragDefines), ShaderStageType::Fragment);
           if (directVert.empty() || directFrag.empty()) {
-            std::cerr << "  direct-GL 330 emission failed (missing #version 450 header) for "
-                      << info.name << " [vert=" << vi << " frag=" << fi << "]\n";
+            std::cerr << "  direct-GL 330 emission failed (preprocessing or missing #version 450) "
+                      << "for " << info.name << " [vert=" << vi << " frag=" << fi << "]\n";
             report.errorCount++;
             RecordBackendArtifactError(backend, profileErrorCounts);
             continue;
@@ -1062,14 +1156,19 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
             return -1;
           };
           auto assertDirectForm = [&](const std::string& text, const char* stage) {
-            // Runs on the un-preprocessed text, so only transform-level leaks are checkable
-            // here: a surviving set/binding qualifier (the strip missed a form) or a missing
-            // version rewrite. Vulkan-only syntax inside a `#if HAS_XP == 2` block is NOT a
-            // leak — the block is dead for every desktop variant, and the live-block routing
-            // (PermutationCompilesForBackend excludes XP=2 from opengl) is audited elsewhere.
+            // Runs on the preprocessed text, so everything left is live for this variant: a
+            // surviving set/binding qualifier (the strip missed a form), a missing version
+            // rewrite, a surviving conditional directive, or Vulkan-only subpass syntax reaching
+            // a desktop variant all fail the variant.
+            static const std::regex conditional(
+                R"((^|\n)[ \t]*#[ \t]*(if|ifdef|ifndef|elif|else|endif|define)\b)");
             auto setPos = hasLayoutMember(text, "set =");
             auto bindingPos = hasLayoutMember(text, "binding =");
-            if (setPos >= 0 || bindingPos >= 0 || text.find("#version 330") == std::string::npos) {
+            bool leak = text.find("#version 330") == std::string::npos ||
+                        text.find("subpassInput") != std::string::npos ||
+                        text.find("subpassLoad") != std::string::npos ||
+                        std::regex_search(text, conditional);
+            if (setPos >= 0 || bindingPos >= 0 || leak) {
               std::cerr << "  direct-GL 330 form assertion failed (" << stage << ") for "
                         << info.name << " [vert=" << vi << " frag=" << fi << "]";
               for (auto [pos, label] :

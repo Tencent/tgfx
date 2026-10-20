@@ -71,6 +71,24 @@ std::string PrependDefines(const std::string& source, const std::vector<std::str
   return prefix + source;
 }
 
+std::string PreprocessGLSL(const std::string& source, ShaderStageType stage, std::string* error) {
+  shaderc::Compiler compiler;
+  shaderc::CompileOptions options;
+  auto shaderKind =
+      (stage == ShaderStageType::Vertex) ? shaderc_vertex_shader : shaderc_fragment_shader;
+  auto preprocessed = compiler.PreprocessGlsl(source, shaderKind, "shader", options);
+  if (preprocessed.GetCompilationStatus() != shaderc_compilation_status_success) {
+    *error = preprocessed.GetErrorMessage();
+    return {};
+  }
+  std::string result{preprocessed.cbegin(), preprocessed.cend()};
+  // The #line directives can sit between a layout qualifier and its declaration, which breaks
+  // the line-oriented rewrites that consume this text.
+  static std::regex lineRegex(R"((^|\n)[ \t]*#[ \t]*line[^\n]*)");
+  result = std::regex_replace(result, lineRegex, "$1");
+  return result;
+}
+
 CompileResult CompileGLSL(const std::string& source, ShaderStageType stage,
                           const std::string& shaderName, uint32_t variantIndex, bool optimize) {
   CompileResult result;
@@ -336,30 +354,6 @@ static std::string expandSamplerCallArgs(const std::string& source,
   return result;
 }
 
-// Runs the GLSL preprocessor before the regex passes. Template shaders wrap conditional sampler
-// declarations in #if blocks, so a regex pass over
-// the raw source would count declarations the preprocessor removes, leaving binding holes between
-// the reassigned binding numbers and the reflection's sampler list. Preprocessing first keeps the
-// declaration set exact.
-static std::string preprocessGLSLMacros(const std::string& source, ShaderStageType stage,
-                                        std::string* error) {
-  shaderc::Compiler compiler;
-  shaderc::CompileOptions options;
-  auto shaderKind =
-      (stage == ShaderStageType::Vertex) ? shaderc_vertex_shader : shaderc_fragment_shader;
-  auto preprocessed = compiler.PreprocessGlsl(source, shaderKind, "shader", options);
-  if (preprocessed.GetCompilationStatus() != shaderc_compilation_status_success) {
-    *error = preprocessed.GetErrorMessage();
-    return {};
-  }
-  std::string result{preprocessed.cbegin(), preprocessed.cend()};
-  // Strip the #line directives the preprocessor emits: they can appear between a layout
-  // qualifier and the uniform declaration, breaking the regex passes below.
-  static std::regex lineRegex(R"((^|\n)[ \t]*#[ \t]*line[^\n]*)");
-  result = std::regex_replace(result, lineRegex, "$1");
-  return result;
-}
-
 static std::string preprocessWebGPU(const std::string& source) {
   auto samplerNames = collectSamplerNames(source);
   auto samplerParamFunctions = collectSamplerParamFunctions(source);
@@ -400,7 +394,10 @@ CompileResult CompileGLSLToWGSL(const std::string& source, ShaderStageType stage
   std::string errorPrefix = "[" + shaderName + " variant " + std::to_string(variantIndex) + "] ";
 #ifdef TGFX_SHADER_TOOL_HAS_TINT
   std::string compileError;
-  auto expandedSource = preprocessGLSLMacros(source, stage, &compileError);
+  // Template shaders wrap conditional sampler declarations in #if blocks; the regex passes of
+  // preprocessWebGPU must see only the live declarations, or the reassigned binding numbers
+  // would leave holes against the reflection's sampler list.
+  auto expandedSource = PreprocessGLSL(source, stage, &compileError);
   if (expandedSource.empty()) {
     result.error = errorPrefix + "GLSL preprocess: " + compileError;
     return result;
