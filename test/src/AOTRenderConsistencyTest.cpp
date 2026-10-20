@@ -2234,6 +2234,75 @@ TGFX_TEST(AOTRenderConsistencyTest, DedicatedAndChainAgreeOnMaskedPathFills) {
   ExpectPathFillsAgree("MaskFillShader", 1.0f, 96, {0});
 }
 
+// QuadTextureFillShader's two mask factors: a device-space mask (a path clip rasterized into a
+// coverage texture, a runtime HasDeviceMask branch) and a local-space mask (a shader mask filter,
+// the HAS_LOCAL_MASK variants). The chain rewrite takes mask-filter draws before the matcher sees
+// them, so the local-mask scenes run the dedicated route with the rewrite off. Both images carry
+// alpha ramps, so a mis-wired mask factor or a wrong coverage product shows.
+TGFX_TEST(AOTRenderConsistencyTest, QuadTextureMaskFactorsMatchRuntime) {
+  SKIP_ON_SWIFTSHADER_ENV();
+  constexpr int size = 96;
+  auto makeRamp = [](int width, int height, bool horizontal, uint32_t rgb) {
+    Bitmap bitmap = {};
+    bitmap.allocPixels(width, height);
+    auto* pixels = static_cast<uint32_t*>(bitmap.lockPixels());
+    for (int y = 0; y < height; ++y) {
+      for (int x = 0; x < width; ++x) {
+        auto t = horizontal ? x * 255 / (width - 1) : y * 255 / (height - 1);
+        auto alpha = static_cast<uint32_t>(20 + t * 220 / 255);
+        auto scale = [&](uint32_t channel) { return channel * alpha / 255; };
+        pixels[static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)] =
+            (alpha << 24) | (scale((rgb >> 16) & 0xFF) << 16) | (scale((rgb >> 8) & 0xFF) << 8) |
+            scale(rgb & 0xFF);
+      }
+    }
+    bitmap.unlockPixels();
+    return Image::MakeFrom(bitmap);
+  };
+  auto colorImage = makeRamp(64, 64, true, 0x2266DD);
+  auto maskImage = makeRamp(64, 64, false, 0xFFFFFF);
+  ASSERT_NE(colorImage, nullptr);
+  ASSERT_NE(maskImage, nullptr);
+  const Path star = MakeStarPath(1.0f);
+  for (int maskMode : {0, 1}) {
+    for (float alpha : {1.0f, 0.37f}) {
+      for (BlendMode blend : {BlendMode::SrcOver, BlendMode::Multiply}) {
+        auto scene = [=](Canvas* canvas) {
+          canvas->clear(Color::FromRGBA(240, 200, 120, 255));
+          Paint paint = {};
+          paint.setAlpha(alpha);
+          paint.setBlendMode(blend);
+          if (maskMode == 0) {
+            canvas->clipPath(star);
+          } else {
+            paint.setMaskFilter(MaskFilter::MakeShader(Shader::MakeImageShader(maskImage)));
+          }
+          canvas->concat(Matrix::MakeScale(1.5f, 1.5f));
+          canvas->drawImage(colorImage, 0, 0, &paint);
+        };
+        std::string label = std::string(maskMode == 0 ? "device-mask" : "local-mask") +
+                            " alpha=" + std::to_string(alpha) +
+                            (blend == BlendMode::SrcOver ? " srcover" : " multiply");
+        SCOPED_TRACE(label);
+        Bitmap jit = {};
+        Bitmap dedicated = {};
+        BrushRenderStats jitStats = {};
+        BrushRenderStats dedicatedStats = {};
+        RenderSceneThroughRoute(scene, size, size, KernelRoute::Runtime, &jit, &jitStats);
+        RenderSceneThroughRoute(scene, size, size, KernelRoute::Dedicated, &dedicated,
+                                &dedicatedStats, maskMode == 1);
+        EXPECT_NE(std::find(dedicatedStats.shaders.begin(), dedicatedStats.shaders.end(),
+                            "QuadTextureFillShader"),
+                  dedicatedStats.shaders.end());
+        EXPECT_EQ(dedicatedStats.noMatchingRule, 0u);
+        EXPECT_EQ(dedicatedStats.programs.programBuilderCreations, 0u);
+        EXPECT_EQ(dedicatedStats.draws.droppedDraws, 0u);
+        ExpectBitmapsNear(label.c_str(), dedicated, jit, size, size, ExperimentTolerance(1));
+      }
+    }
+  }
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, DedicatedAndChainAgreeOnTextureDraws) {
   SKIP_ON_SWIFTSHADER_ENV();
   constexpr int size = 48;
