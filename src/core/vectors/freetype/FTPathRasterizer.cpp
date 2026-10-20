@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <cstring>
+
 #include "FTPathRasterizer.h"
 #include "FTLibrary.h"
 #include "FTPath.h"
@@ -93,6 +95,33 @@ bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   ftPath.setEvenOdd(fillType == PathFillType::EvenOdd || fillType == PathFillType::InverseEvenOdd);
   auto outlines = ftPath.getOutlines();
   auto ftLibrary = FTLibrary::Get();
+  if (!antiAlias) {
+    // Only the smooth rasterizer honors FT_OUTLINE_EVEN_ODD_FILL, so a monochrome bitmap would drop
+    // even-odd holes. Render with the smooth rasterizer and binarize instead: the fill rule stays
+    // correct and the coverage is still hard 0/255.
+    FT_Bitmap bitmap;
+    bitmap.width = static_cast<unsigned>(targetInfo.width());
+    bitmap.rows = static_cast<unsigned>(targetInfo.height());
+    bitmap.pitch = static_cast<int>(targetInfo.rowBytes());
+    bitmap.buffer = static_cast<unsigned char*>(dstPixels);
+    bitmap.pixel_mode = FT_PIXEL_MODE_GRAY;
+    bitmap.num_grays = 256;
+    for (auto& outline : outlines) {
+      FT_Outline_Get_Bitmap(ftLibrary, &(outline->outline), &bitmap);
+    }
+    auto* pixels = static_cast<unsigned char*>(dstPixels);
+    for (int y = 0; y < targetInfo.height(); y++) {
+      auto* row = pixels + static_cast<size_t>(y) * targetInfo.rowBytes();
+      for (int x = 0; x < targetInfo.width(); x++) {
+        row[x] = row[x] >= 128 ? 0xFF : 0x00;
+      }
+    }
+    if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
+      ConvertColorSpaceInPlace(width(), height(), colorType, alphaType, dstRowBytes, colorSpace(),
+                               dstColorSpace, dstPixels);
+    }
+    return true;
+  }
   if (!needsGammaCorrection) {
     FT_Bitmap bitmap;
     bitmap.width = static_cast<unsigned>(targetInfo.width());
