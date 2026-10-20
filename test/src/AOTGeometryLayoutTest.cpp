@@ -1235,19 +1235,19 @@ void DrawConstantMaskImage(Canvas* canvas, const std::shared_ptr<Image>& image, 
                     &paint);
 }
 
-#define TGFX_CONST_MASK_COLOR                                                                     \
-  "GP=QuadPerEdgeAAGeometryProcessor;ColorFP=[XfermodeFragmentProcessor - two(ConstColorProcessor," \
+#define TGFX_CONST_MASK_COLOR                                               \
+  "GP=QuadPerEdgeAAGeometryProcessor;ColorFP=[XfermodeFragmentProcessor - " \
+  "two(ConstColorProcessor,"                                                \
   "TiledTextureEffect)];"
 
 }  // namespace
 
 TGFX_TEST(AOTGeometryLayoutTest, ReportedConstantMaskCoverage) {
   auto image = MakePatternImage();
-  ExpectSceneServed("row28", "QuadPerEdgeAAGeometryProcessor",
-                    TGFX_CONST_MASK_COLOR "CoverageFP=[ConstColorProcessor];XP=EmptyXferProcessor",
-                    [image](Canvas* canvas) {
-                      DrawConstantMaskImage(canvas, image, 0, BlendMode::SrcOver);
-                    });
+  ExpectSceneServed(
+      "row28", "QuadPerEdgeAAGeometryProcessor",
+      TGFX_CONST_MASK_COLOR "CoverageFP=[ConstColorProcessor];XP=EmptyXferProcessor",
+      [image](Canvas* canvas) { DrawConstantMaskImage(canvas, image, 0, BlendMode::SrcOver); });
 }
 
 TGFX_TEST(AOTGeometryLayoutTest, ReportedConstantMaskCoverageRect) {
@@ -1272,11 +1272,13 @@ TGFX_TEST(AOTGeometryLayoutTest, ConstantMaskCoverageBlendModes) {
   auto image = MakePatternImage();
   ExpectSceneServed(
       "constant-mask-multiply", "QuadPerEdgeAAGeometryProcessor",
-      TGFX_CONST_MASK_COLOR "CoverageFP=[ConstColorProcessor,RectEffect];XP=PorterDuffXferProcessor",
+      TGFX_CONST_MASK_COLOR
+      "CoverageFP=[ConstColorProcessor,RectEffect];XP=PorterDuffXferProcessor",
       [image](Canvas* canvas) { DrawConstantMaskImage(canvas, image, 1, BlendMode::Multiply); });
   ExpectSceneServed(
       "constant-mask-src", "QuadPerEdgeAAGeometryProcessor",
-      TGFX_CONST_MASK_COLOR "CoverageFP=[ConstColorProcessor,RectEffect];XP=PorterDuffXferProcessor",
+      TGFX_CONST_MASK_COLOR
+      "CoverageFP=[ConstColorProcessor,RectEffect];XP=PorterDuffXferProcessor",
       [image](Canvas* canvas) { DrawConstantMaskImage(canvas, image, 1, BlendMode::Src); });
 }
 
