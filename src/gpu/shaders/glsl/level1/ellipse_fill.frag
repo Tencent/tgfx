@@ -1,8 +1,11 @@
-// EllipseFillShader fragment shader
-// Processor layout: EllipseGeometryProcessor() + EmptyXferProcessor/PorterDuffXP
-// Permutation dimensions (injected as #define 0/1):
-//   HAS_COMMON_COLOR: whether a common color uniform is used
-//   HAS_XP: 0=passthrough, 1=PorterDuff XP (dst texture blend)
+// EllipseFillShader fragment entry: EllipseGeometryProcessor + EmptyXferProcessor/PorterDuffXP.
+// The pipeline is the shared dedicated one (fill_fragment_main.inc); this file declares the
+// family's interface and selects the steps. The ellipse edge coverage (ellipse_coverage.inc, shared
+// with the pointwise chain's GP_LAYOUT 1) is the true coverage: it reaches the XferProcessor's
+// coverage input together with the device mask and the clip, never baked into the source color.
+// Fragment dimensions:
+//   HAS_COMMON_COLOR: the Color uniform instead of the vColor varying
+//   HAS_XP: 0=passthrough, 1=PorterDuff dst texture, 2=PorterDuff framebuffer fetch
 //   HAS_DEVICE_MASK: device-space mask texture binding is present
 #version 450
 
@@ -12,6 +15,7 @@
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
+// coverage_uniforms.inc declares the runtime clip contract fields (Rect, HasClip, rrect).
 #define HAS_RUNTIME_CLIP 1
 #ifndef HAS_DEVICE_MASK
 #define HAS_DEVICE_MASK 0
@@ -38,29 +42,13 @@ layout(set = 1, binding = 0) uniform sampler2D MaskTextureSampler;
 #else
 #define XP_DST_TEX_BINDING 0
 #endif
-#include "ellipse_coverage.inc"
-#include "xp_porter_duff.inc"
-#include "xp_porter_duff_fbf.inc"
-#include "clip_coverage.inc"
 
-layout(location = 0) out vec4 fragColor;
-
-void main() {
-#if HAS_COMMON_COLOR
-  vec4 outputColor = Color;
-#else
-  vec4 outputColor = vColor;
+#if !HAS_COMMON_COLOR
+#define FILL_COLOR FILL_COLOR_VARYING
 #endif
-
-  // Outer curve coverage using ellipse distance approximation
-  highp float edgeAlpha = ellipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, StrokeEnabled);
-
-  // The uncovered color rides TGFX_COVERAGE_SRC_COLOR and the edge antialiasing enters as the
-  // initial coverage; coverage_output.inc multiplies clip and device-mask coverage on top and
-  // hands xp_output.inc the uncovered color (TGFX_XP_SRC_UNPREMUL) plus the TOTAL coverage.
-  // Baking edgeAlpha into the source color instead double-applies it on the XferProcessor path.
-#define TGFX_COVERAGE_SRC_COLOR outputColor
-#define TGFX_INITIAL_COVERAGE vec4(edgeAlpha)
-#include "coverage_output.inc"
-#include "xp_output.inc"
-}
+#define FILL_COVERAGE FILL_COVERAGE_ELLIPSE
+#if HAS_DEVICE_MASK
+#define FILL_DEVICE_MASK FILL_DEVICE_MASK_ALWAYS
+#endif
+#define FILL_CLIP 1
+#include "fill_fragment_main.inc"
