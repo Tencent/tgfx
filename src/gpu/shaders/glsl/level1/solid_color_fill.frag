@@ -1,7 +1,8 @@
-// SolidColorFillShader fragment shader
-// Processor layout: DefaultGeometryProcessor + EmptyXferProcessor/PorterDuffXP (no fragment
-// processors). The fill color is the DefaultGP Color uniform.
-// Permutation dimensions (frag): HAS_COVERAGE, HAS_XP
+// SolidColorFillShader fragment entry: DefaultGeometryProcessor + EmptyXferProcessor/PorterDuffXP,
+// no fragment processor. The fill color is the DefaultGP Color uniform. The pipeline is the shared
+// dedicated one (fill_fragment_main.inc); this file declares the family's interface and selects the
+// steps.
+// Fragment dimensions: HAS_COVERAGE, HAS_XP.
 #version 450
 
 #ifndef HAS_COVERAGE
@@ -29,22 +30,10 @@ layout(location = 0) in float vCoverage;
 #endif
 
 #define XP_DST_TEX_BINDING 0
-#include "xp_porter_duff.inc"
-#include "xp_porter_duff_fbf.inc"
-#include "clip_coverage.inc"
 
-layout(location = 0) out vec4 fragColor;
-
-void main() {
-  float totalCoverage = clipCoverage();
 #if HAS_COVERAGE
-  totalCoverage *= vCoverage;
+#define FILL_COVERAGE FILL_COVERAGE_VERTEX
 #endif
-
-#if HAS_XP
-  fragColor = applyPorterDuffXP(Color, vec4(totalCoverage));
-#else
-  fragColor = Color * totalCoverage;
-#endif
-#include "output_swizzle.inc"
-}
+#define FILL_CLIP 1
+#define FILL_OUTPUT_SWIZZLE 1
+#include "fill_fragment_main.inc"
