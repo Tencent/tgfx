@@ -42,6 +42,7 @@
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/RRect.h"
@@ -1133,6 +1134,74 @@ TGFX_TEST(AOTGeometryLayoutTest, ComplexRRectGradient) {
                                                          LayoutClip::PathMask, false, "", 0, 0, 0});
   ExpectComplexRRectBothLayouts("gradient-texture-dst", {"", LayoutPaint::GradientTimesImage,
                                                          LayoutClip::TwoRRects, true, "", 0, 0, 0});
+}
+
+// Row 11: a small filled path (rasterized into a coverage texture) under a path clip and a rect
+// clip. The clip stack composes the path clip's device mask with the analytic rect, so the
+// coverage is [Compose(DeviceSpaceTextureEffect, RectEffect), TextureEffect]; the chain carries the
+// device mask as its mask child and the rect as a clip slot.
+TGFX_TEST(AOTGeometryLayoutTest, ReportedPathMaskRectClipShapeMask) {
+  ExpectSceneServed(
+      "row11", "DefaultGeometryProcessor",
+      "GP=DefaultGeometryProcessor;ColorFP=[];CoverageFP=[ComposeFragmentProcessor("
+      "DeviceSpaceTextureEffect,RectEffect),TextureEffect];XP=EmptyXferProcessor",
+      [](Canvas* canvas) {
+        Path clipPath = {};
+        clipPath.moveTo(4, 12);
+        clipPath.lineTo(156, 30);
+        clipPath.lineTo(110, 156);
+        clipPath.lineTo(14, 140);
+        clipPath.close();
+        canvas->clipPath(clipPath);
+        canvas->rotate(5, 80, 80);
+        canvas->clipRect(Rect::MakeLTRB(12.25f, 8.5f, 132.75f, 118.25f));
+        canvas->resetMatrix();
+        Path star = {};
+        for (int i = 0; i < 10; ++i) {
+          auto angle = static_cast<float>(i) * 3.14159265f / 5 - 3.14159265f / 2;
+          auto radius = i % 2 == 0 ? 70.0f : 31.5f;
+          auto x = 80 + radius * std::cos(angle);
+          auto y = 80 + radius * std::sin(angle);
+          if (i == 0) {
+            star.moveTo(x, y);
+          } else {
+            star.lineTo(x, y);
+          }
+        }
+        star.close();
+        Paint paint = {};
+        paint.setAntiAlias(true);
+        paint.setColor(Color::FromRGBA(250, 245, 235, 255));
+        canvas->drawPath(star, paint);
+      });
+}
+
+// The same composed clip after a shader mask filter: [mask filter, Compose(DeviceSpaceTextureEffect,
+// RectEffect)]. The mask filter lowers as the coverage subtree, the device mask as the mask child
+// and the rect as a clip slot.
+TGFX_TEST(AOTGeometryLayoutTest, ShaderMaskPathMaskRectClip) {
+  auto image = MakePatternImage();
+  ExpectSceneServed(
+      "shader-mask-path-mask-rect", "QuadPerEdgeAAGeometryProcessor",
+      "GP=QuadPerEdgeAAGeometryProcessor;ColorFP=[];CoverageFP=[XfermodeFragmentProcessor - "
+      "dst(TextureEffect),ComposeFragmentProcessor(DeviceSpaceTextureEffect,RectEffect)];"
+      "XP=EmptyXferProcessor",
+      [image](Canvas* canvas) {
+        Path clipPath = {};
+        clipPath.moveTo(4, 12);
+        clipPath.lineTo(156, 30);
+        clipPath.lineTo(110, 156);
+        clipPath.lineTo(14, 140);
+        clipPath.close();
+        canvas->clipPath(clipPath);
+        canvas->rotate(5, 80, 80);
+        canvas->clipRect(Rect::MakeLTRB(12.25f, 8.5f, 132.75f, 118.25f));
+        canvas->resetMatrix();
+        Paint paint = {};
+        paint.setColor(Color::FromRGBA(250, 245, 235, 255));
+        paint.setMaskFilter(MaskFilter::MakeShader(Shader::MakeImageShader(image)));
+        canvas->drawRect(Rect::MakeXYWH(8, 8, 146, 146), paint);
+      });
 }
 
 }  // namespace tgfx

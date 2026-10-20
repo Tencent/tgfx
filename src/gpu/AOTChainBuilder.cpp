@@ -251,8 +251,12 @@ struct ChainClipSlots {
 };
 
 // Collects analytic clip leaves, including composed clips, within the chain's parameter budgets.
-// Returns false if any leaf cannot be represented without materialization.
-static bool CollectChainClipSlot(const FragmentProcessor* fp, ChainClipSlots* slots) {
+// When maskEffect is given, one alpha-only, non-perspective DeviceSpaceTextureEffect inside the
+// clip (a path clip's rasterized mask composed with analytic clips) is taken as the chain's mask
+// child; maskEffect must be null on entry for that, so a second mask fails. Returns false if any
+// leaf cannot be represented without materialization.
+static bool CollectChainClipSlot(const FragmentProcessor* fp, ChainClipSlots* slots,
+                                 const DeviceSpaceTextureEffect** maskEffect = nullptr) {
   if (fp == nullptr || slots == nullptr) {
     return false;
   }
@@ -261,7 +265,7 @@ static bool CollectChainClipSlot(const FragmentProcessor* fp, ChainClipSlots* sl
       return false;
     }
     for (size_t index = 0; index < fp->numChildProcessors(); ++index) {
-      if (!CollectChainClipSlot(fp->childProcessor(index), slots)) {
+      if (!CollectChainClipSlot(fp->childProcessor(index), slots, maskEffect)) {
         return false;
       }
     }
@@ -269,6 +273,15 @@ static bool CollectChainClipSlot(const FragmentProcessor* fp, ChainClipSlots* sl
   }
   if (fp->numChildProcessors() != 0) {
     return false;
+  }
+  if (fp->name() == "DeviceSpaceTextureEffect") {
+    auto* dste = static_cast<const DeviceSpaceTextureEffect*>(fp);
+    if (maskEffect == nullptr || *maskEffect != nullptr || !dste->isAlphaOnly() ||
+        dste->hasPerspective()) {
+      return false;
+    }
+    *maskEffect = dste;
+    return true;
   }
   if (fp->name() == "RectEffect") {
     auto* rectEffect = static_cast<const RectEffect*>(fp);
@@ -1444,7 +1457,7 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessor(
       subtreeFP = last;
       if (first->name() == "RectEffect" || first->name() == "RRectEffect" ||
           first->name() == "ComposeFragmentProcessor") {
-        if (!CollectChainClipSlot(first, &clipSlots)) {
+        if (!CollectChainClipSlot(first, &clipSlots, &maskEffect)) {
           return nullptr;
         }
       } else if (first->name() == "DeviceSpaceTextureEffect") {
@@ -1458,8 +1471,9 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessor(
     } else if (last->name() == "RectEffect" || last->name() == "RRectEffect" ||
                last->name() == "ComposeFragmentProcessor") {
       // A composed analytic clip in the trailing position: the mask filter (or another subtree)
-      // comes first and the clip stack folds into the clip slots after it.
-      if (!CollectChainClipSlot(last, &clipSlots)) {
+      // comes first and the clip stack folds into the clip slots after it. A path clip's device
+      // mask inside the composed clip becomes the mask child.
+      if (!CollectChainClipSlot(last, &clipSlots, &maskEffect)) {
         return nullptr;
       }
       subtreeFP = first;
