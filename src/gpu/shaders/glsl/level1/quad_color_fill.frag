@@ -1,6 +1,7 @@
-// QuadColorFillShader fragment shader
-// Processor layout: QuadPerEdgeAAGeometryProcessor + EmptyXferProcessor/PorterDuffXP (no FP)
-// Permutation dimensions: HAS_XP, HAS_MASK_TEXTURE
+// QuadColorFillShader fragment entry: QuadPerEdgeAAGeometryProcessor + EmptyXferProcessor/
+// PorterDuffXP, no fragment processor. The pipeline is the shared dedicated one
+// (fill_fragment_main.inc); this file declares the family's interface and selects the steps.
+// Fragment dimensions: HAS_XP, HAS_MASK_TEXTURE.
 //
 // Color comes only from the vColor varying and coverage only from vCoverage: providers broadcast
 // the paint color for uniform-color batches and emit coverage=1.0 for non-AA draws, so neither
@@ -44,30 +45,11 @@ layout(set = 1, binding = 0) uniform sampler2D MaskTextureSampler;
 #else
   #define XP_DST_TEX_BINDING 0
 #endif
-#include "xp_porter_duff.inc"
-#include "xp_porter_duff_fbf.inc"
-#include "clip_coverage.inc"
 
-layout(location = 0) out vec4 fragColor;
-
-void main() {
-  float maskAlpha = 1.0;
+#define FILL_COLOR FILL_COLOR_VARYING_OR_COMMON
+#define FILL_COVERAGE FILL_COVERAGE_VERTEX
 #if HAS_MASK_TEXTURE
-  highp vec3 maskCoord = DeviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0);
-  maskAlpha = texture(MaskTextureSampler, maskCoord.xy).r;
+#define FILL_DEVICE_MASK FILL_DEVICE_MASK_ALWAYS
 #endif
-  float totalCoverage = vCoverage * maskAlpha * clipCoverage();
-
-  // Prefer the exact common-color uniform when the draw has one (uniform-color batch); the vColor
-  // attribute is quantized to 8 bits per channel and cannot represent fractional colors exactly.
-  vec4 baseColor = vColor;
-  if (HasCommonColor != 0) {
-    baseColor = Color;
-  }
-
-#if HAS_XP
-  fragColor = applyPorterDuffXP(baseColor, vec4(totalCoverage));
-#else
-  fragColor = baseColor * totalCoverage;
-#endif
-}
+#define FILL_CLIP 1
+#include "fill_fragment_main.inc"
