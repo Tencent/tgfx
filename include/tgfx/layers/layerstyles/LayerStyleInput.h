@@ -135,8 +135,10 @@ class OwnShapeInputSource : public StyleInputSource {
  */
 struct LayerStyleInput {
   /**
-   * The opaque layer content image. Rendered with normal fills, then all semi-transparent pixels
-   * are converted to fully opaque (fully transparent pixels are preserved).
+   * The main raster this style resolves. A style that declares LayerStyleExtraSourceType::OwnShape
+   * gets the layer's own geometry; when the layer records none, or the style does not declare it,
+   * the shared subtree content is used. Opaque as described by OpaqueContext: sampled color alpha
+   * becomes fully opaque while fully transparent pixels stay transparent.
    */
   std::shared_ptr<Image> content = nullptr;
 
