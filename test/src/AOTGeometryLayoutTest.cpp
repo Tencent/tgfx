@@ -1141,39 +1141,38 @@ TGFX_TEST(AOTGeometryLayoutTest, ComplexRRectGradient) {
 // coverage is [Compose(DeviceSpaceTextureEffect, RectEffect), TextureEffect]; the chain carries the
 // device mask as its mask child and the rect as a clip slot.
 TGFX_TEST(AOTGeometryLayoutTest, ReportedPathMaskRectClipShapeMask) {
-  ExpectSceneServed(
-      "row11", "DefaultGeometryProcessor",
-      "GP=DefaultGeometryProcessor;ColorFP=[];CoverageFP=[ComposeFragmentProcessor("
-      "DeviceSpaceTextureEffect,RectEffect),TextureEffect];XP=EmptyXferProcessor",
-      [](Canvas* canvas) {
-        Path clipPath = {};
-        clipPath.moveTo(4, 12);
-        clipPath.lineTo(156, 30);
-        clipPath.lineTo(110, 156);
-        clipPath.lineTo(14, 140);
-        clipPath.close();
-        canvas->clipPath(clipPath);
-        canvas->rotate(5, 80, 80);
-        canvas->clipRect(Rect::MakeLTRB(12.25f, 8.5f, 132.75f, 118.25f));
-        canvas->resetMatrix();
-        Path star = {};
-        for (int i = 0; i < 10; ++i) {
-          auto angle = static_cast<float>(i) * 3.14159265f / 5 - 3.14159265f / 2;
-          auto radius = i % 2 == 0 ? 70.0f : 31.5f;
-          auto x = 80 + radius * std::cos(angle);
-          auto y = 80 + radius * std::sin(angle);
-          if (i == 0) {
-            star.moveTo(x, y);
-          } else {
-            star.lineTo(x, y);
-          }
-        }
-        star.close();
-        Paint paint = {};
-        paint.setAntiAlias(true);
-        paint.setColor(Color::FromRGBA(250, 245, 235, 255));
-        canvas->drawPath(star, paint);
-      });
+  ExpectSceneServed("row11", "DefaultGeometryProcessor",
+                    "GP=DefaultGeometryProcessor;ColorFP=[];CoverageFP=[ComposeFragmentProcessor("
+                    "DeviceSpaceTextureEffect,RectEffect),TextureEffect];XP=EmptyXferProcessor",
+                    [](Canvas* canvas) {
+                      Path clipPath = {};
+                      clipPath.moveTo(4, 12);
+                      clipPath.lineTo(156, 30);
+                      clipPath.lineTo(110, 156);
+                      clipPath.lineTo(14, 140);
+                      clipPath.close();
+                      canvas->clipPath(clipPath);
+                      canvas->rotate(5, 80, 80);
+                      canvas->clipRect(Rect::MakeLTRB(12.25f, 8.5f, 132.75f, 118.25f));
+                      canvas->resetMatrix();
+                      Path star = {};
+                      for (int i = 0; i < 10; ++i) {
+                        auto angle = static_cast<float>(i) * 3.14159265f / 5 - 3.14159265f / 2;
+                        auto radius = i % 2 == 0 ? 70.0f : 31.5f;
+                        auto x = 80 + radius * std::cos(angle);
+                        auto y = 80 + radius * std::sin(angle);
+                        if (i == 0) {
+                          star.moveTo(x, y);
+                        } else {
+                          star.lineTo(x, y);
+                        }
+                      }
+                      star.close();
+                      Paint paint = {};
+                      paint.setAntiAlias(true);
+                      paint.setColor(Color::FromRGBA(250, 245, 235, 255));
+                      canvas->drawPath(star, paint);
+                    });
 }
 
 // The same composed clip after a shader mask filter: [mask filter, Compose(DeviceSpaceTextureEffect,
