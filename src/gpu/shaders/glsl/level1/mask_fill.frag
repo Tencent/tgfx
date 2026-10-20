@@ -1,11 +1,9 @@
-// MaskFillShader fragment shader
-// Processor layout: DefaultGeometryProcessor + one alpha-only TextureEffect coverage FP + XP.
-// The fill color is the DefaultGP Color uniform; the coverage is the alpha-only mask sampled at the
-// per-vertex transformed coordinate.
-//
-// Permutation dimensions (frag): HAS_XP (int, 3) — 0=none(plain multiply), 1=PorterDuff DST_TEX,
-// 2=PorterDuff framebuffer-fetch. The mask coverage feeds the blend's coverage lerp, so advanced /
-// coefficient blends composite correctly instead of pre-multiplying coverage into the source.
+// MaskFillShader fragment entry: DefaultGeometryProcessor + one alpha-only TextureEffect coverage
+// FP + XP. The fill color is the DefaultGP Color uniform; the coverage is the alpha-only mask
+// sampled at the per-vertex transformed coordinate, and it feeds the XferProcessor's coverage, so
+// every blend mode composites correctly. The pipeline is the shared dedicated one
+// (fill_fragment_main.inc); this file declares the family's interface and selects the steps.
+// Fragment dimensions: HAS_XP (int, 3).
 //
 // The coverage sampler MUST be named TextureSampler_0: the precompiled path binds a fragment
 // processor's texture by its (suffix-stripped) runtime name, which for the first TextureEffect is
@@ -27,18 +25,7 @@ layout(location = 0) in vec2 TransformedCoords_0;
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
 
 #define XP_DST_TEX_BINDING 1
-#include "xp_porter_duff.inc"
-#include "xp_porter_duff_fbf.inc"
 
-layout(location = 0) out vec4 fragColor;
-
-void main() {
-  float maskCoverage = texture(TextureSampler_0, TransformedCoords_0).r;
-// Coverage comes entirely from the mask. Keep the un-premultiplied color for the XferProcessor lerp
-// and fold coverage into the non-XP output (matches the coverage contract in xp_output.inc).
-#define TGFX_XP_SRC_COLOR (Color * maskCoverage)
-#define TGFX_XP_SRC_UNPREMUL Color
-#define TGFX_XP_COVERAGE vec4(maskCoverage)
-#include "xp_output.inc"
-#include "output_swizzle.inc"
-}
+#define FILL_COVERAGE FILL_COVERAGE_MASK
+#define FILL_OUTPUT_SWIZZLE 1
+#include "fill_fragment_main.inc"
