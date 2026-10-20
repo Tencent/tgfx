@@ -246,6 +246,10 @@ expect "a --no-cache build" pass gen "$SHADER_DIR" "$WORK/nocache" --no-cache
 expect "--no-cache writes no cache" fail test -e "$WORK/nocache/stage_cache"
 expect "a cold cached build" pass gen "$SHADER_DIR" "$WORK/cold" --cache-dir "$CACHE"
 cold_executed=$(stat_of executed)
+# The entries this build produced, before any edited-source build adds more. The corruption checks
+# below must damage one of these: an entry that only the edited sources produced is never read by
+# a build of "$SHADER_DIR", so corrupting it would prove nothing and the summary would report 0.
+find "$CACHE" -type f | sort >"$WORK/cold_entries.txt"
 expect "the cold build matches the uncached one" pass \
   cmp "$WORK/cold/shader_bundle.opengl.bin" "$WORK/nocache/shader_bundle.opengl.bin"
 expect "a warm cached build" pass gen "$SHADER_DIR" "$WORK/warm" --cache-dir "$CACHE"
@@ -268,7 +272,8 @@ expect "the edited cached build matches a clean build of the edited sources" pas
   cmp "$WORK/edited_cached/shader_bundle.opengl.bin" "$WORK/edited_out/shader_bundle.opengl.bin"
 
 # A damaged entry is detected, recompiled and rewritten; the output does not change.
-entry=$(find "$CACHE" -type f | head -1)
+entry=$(head -1 "$WORK/cold_entries.txt")
+expect "the cold build produced cache entries" pass test -s "$WORK/cold_entries.txt"
 printf 'x' | dd of="$entry" bs=1 seek=100 conv=notrunc 2>/dev/null
 expect "a build over a damaged entry" pass gen "$SHADER_DIR" "$WORK/repaired" --cache-dir "$CACHE"
 damaged_corrupt=$(stat_of corrupt)
