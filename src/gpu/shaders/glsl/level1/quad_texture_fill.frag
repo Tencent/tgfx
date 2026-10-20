@@ -1,34 +1,20 @@
-// QuadTextureFillShader fragment shader
-// Processor layout: QuadPerEdgeAAGeometryProcessor + TextureEffect + EmptyXferProcessor/PorterDuffXP
-// Permutation dimensions (frag): HAS_SUBSET, HAS_XP, HAS_MASK_TEXTURE, HAS_LOCAL_MASK (coverage is unconditional).
-//                                HAS_XP
-// Note: HAS_YUV is always 0 at runtime — YUV textures fall back to ProgramBuilder.
-// Vertex-driven varyings are controlled by vert permutation dimensions (
-// HAS_SUBSET) which are communicated via matching varying declarations.
+// QuadTextureFillShader fragment entry: QuadPerEdgeAAGeometryProcessor + TextureEffect +
+// EmptyXferProcessor/PorterDuffXP. The pipeline is the shared fixed one (fill_fragment_main.inc);
+// this file declares the family's interface and selects the steps.
+// Fragment dimensions: HAS_SUBSET, HAS_XP, HAS_LOCAL_MASK.
 //
-// Subset clamping modes:
-//   HAS_SUBSET=1: Full subset — vertex attribute provides per-quad vTexSubset varying, and Subset
-//                 uniform provides the half-pixel-inset safe range. Both are used for clamping.
-//   HAS_SUBSET=0: Uniform-only clamp — no per-vertex subset attribute. The Subset uniform is always
-//                 present and clamps the coordinate; when the source has no real subset it holds the
-//                 full texture bounds, so the clamp is a no-op. This subsumes the former
-//                 HAS_CLAMP_SUBSET dimension.
+// Subset clamping:
+//   HAS_SUBSET=1: the per-quad vTexSubset varying clamps first, then the Subset uniform (the
+//                 half-pixel-inset safe range).
+//   HAS_SUBSET=0: the Subset uniform alone; it holds the full texture bounds when the source has no
+//                 real subset, so the clamp is a no-op.
 #version 450
 
-#ifndef HAS_YUV
-#define HAS_YUV 0
-#endif
 #ifndef HAS_SUBSET
 #define HAS_SUBSET 0
 #endif
-
-// These are driven by vertex shader permutation but the fragment shader must declare matching
-// varyings. The build tool defines them for each (vert, frag) pair.
 #ifndef HAS_XP
 #define HAS_XP 0
-#endif
-#ifndef HAS_MASK_TEXTURE
-#define HAS_MASK_TEXTURE 0
 #endif
 #ifndef HAS_LOCAL_MASK
 #define HAS_LOCAL_MASK 0
@@ -100,54 +86,12 @@ layout(set = 1, binding = 2) uniform sampler2D LocalMaskSampler;
 #else
   #define XP_DST_TEX_BINDING 2
 #endif
-#include "xp_porter_duff.inc"
-#include "xp_porter_duff_fbf.inc"
-#include "clip_coverage.inc"
-#include "texture_sampling.inc"
 
-layout(location = 0) out vec4 fragColor;
-
-void main() {
-  // The per-vertex varying broadcasts the record's paint color for uniform-color batches; the
-  // exact Color uniform is preferred when HasCommonColor is set (8-bit varying quantization would
-  // otherwise shift fractional-alpha fills by one LSB).
-  vec4 outputColor = vColor;
-  if (HasCommonColor != 0) {
-    outputColor = Color;
-  }
-
-  // Perspective divide. For affine transforms z is 1.0 (no-op); for perspective it applies the
-  // correct division.
-  highp vec2 finalCoord = TransformedCoords_0.xy / TransformedCoords_0.z;
-
-#if HAS_SUBSET
-  // Full subset: clamp first by the per-quad varying bounds; the uniform safe range follows inside
-  // aotTextureSource.
-  finalCoord = aotTextureClamp(finalCoord, vTexSubset, true);
-#endif
-  // The uniform clamp mirrors the runtime TextureEffect's needSubset() gate (SubsetClampOn): without
-  // the gate it fires on out-of-range coordinates (perspective extrapolation, edge quads), zeroing
-  // the mip derivatives and diverging from the runtime codegen.
-  vec4 color = aotTextureSource(TextureSampler_0, finalCoord, outputColor, Subset, SubsetClampOn,
-                                AlphaStart, AlphaOnly, HasRgbaaa, 0);
-
-  float maskAlpha = 1.0;
-  if (HasDeviceMask != 0) {
-    highp vec3 maskCoord = DeviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0);
-    maskAlpha = texture(MaskTextureSampler, maskCoord.xy).r;
-  }
-
-  float localMaskAlpha = 1.0;
-#if HAS_LOCAL_MASK
-  highp vec2 localMaskCoord = TransformedCoords_1.xy / TransformedCoords_1.z;
-  localMaskAlpha = texture(LocalMaskSampler, localMaskCoord).a;
-#endif
-  float totalCoverage = vCoverage * maskAlpha * localMaskAlpha * clipCoverage();
-
-#if HAS_XP
-  fragColor = applyPorterDuffXP(color, vec4(totalCoverage));
-#else
-  fragColor = color * totalCoverage;
-#endif
-#include "output_swizzle.inc"
-}
+#define FILL_COLOR FILL_COLOR_VARYING_OR_COMMON
+#define FILL_SOURCE FILL_SOURCE_TEXTURE
+#define FILL_COVERAGE FILL_COVERAGE_VERTEX
+#define FILL_DEVICE_MASK FILL_DEVICE_MASK_RUNTIME
+#define FILL_LOCAL_MASK HAS_LOCAL_MASK
+#define FILL_CLIP 1
+#define FILL_OUTPUT_SWIZZLE 1
+#include "fill_fragment_main.inc"
