@@ -42,6 +42,7 @@
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
@@ -1202,5 +1203,83 @@ TGFX_TEST(AOTGeometryLayoutTest, ShaderMaskPathMaskRectClip) {
         canvas->drawRect(Rect::MakeXYWH(8, 8, 146, 146), paint);
       });
 }
+
+// Rows 28/33/34 of the integration miss report: an inverted shader mask filter whose shader yields
+// no processor (here an image shader under a non-invertible matrix) becomes a constant coverage FP
+// (ConstColorProcessor, transparent, ignoring its input), alone or followed by an analytic clip.
+// The image is a drop-shadow-filtered subset, the reported color form. The chain carries the
+// constant as its coverage root, so the draw composites exactly as the runtime's: through the
+// constant coverage, under every blend mode.
+namespace {
+
+void DrawConstantMaskImage(Canvas* canvas, const std::shared_ptr<Image>& image, int clip,
+                           BlendMode blend) {
+  if (clip == 1) {
+    canvas->rotate(5, 80, 80);
+    canvas->clipRect(Rect::MakeLTRB(12.25f, 8.5f, 132.75f, 118.25f));
+    canvas->resetMatrix();
+  } else if (clip == 2) {
+    RRect rrect = {};
+    rrect.setRectXY(Rect::MakeXYWH(6, 6, 140, 118), 40, 40);
+    canvas->clipRRect(rrect);
+  }
+  Paint paint = {};
+  paint.setAntiAlias(true);
+  paint.setBlendMode(blend);
+  paint.setMaskFilter(MaskFilter::MakeShader(
+      Shader::MakeImageShader(image)->makeWithMatrix(Matrix::MakeScale(0, 1)), true));
+  auto shadow = ImageFilter::DropShadowOnly(3, 3, 0, 0, Color::FromRGBA(20, 30, 40, 200));
+  canvas->translate(6, 6);
+  canvas->scale(4.4f, 4.4f);
+  canvas->drawImage(image->makeSubset(Rect::MakeLTRB(3, 3, 29, 29))->makeWithFilter(shadow),
+                    &paint);
+}
+
+#define TGFX_CONST_MASK_COLOR                                                                     \
+  "GP=QuadPerEdgeAAGeometryProcessor;ColorFP=[XfermodeFragmentProcessor - two(ConstColorProcessor," \
+  "TiledTextureEffect)];"
+
+}  // namespace
+
+TGFX_TEST(AOTGeometryLayoutTest, ReportedConstantMaskCoverage) {
+  auto image = MakePatternImage();
+  ExpectSceneServed("row28", "QuadPerEdgeAAGeometryProcessor",
+                    TGFX_CONST_MASK_COLOR "CoverageFP=[ConstColorProcessor];XP=EmptyXferProcessor",
+                    [image](Canvas* canvas) {
+                      DrawConstantMaskImage(canvas, image, 0, BlendMode::SrcOver);
+                    });
+}
+
+TGFX_TEST(AOTGeometryLayoutTest, ReportedConstantMaskCoverageRect) {
+  auto image = MakePatternImage();
+  ExpectSceneServed(
+      "row33", "QuadPerEdgeAAGeometryProcessor",
+      TGFX_CONST_MASK_COLOR "CoverageFP=[ConstColorProcessor,RectEffect];XP=EmptyXferProcessor",
+      [image](Canvas* canvas) { DrawConstantMaskImage(canvas, image, 1, BlendMode::SrcOver); });
+}
+
+TGFX_TEST(AOTGeometryLayoutTest, ReportedConstantMaskCoverageRRect) {
+  auto image = MakePatternImage();
+  ExpectSceneServed(
+      "row34", "QuadPerEdgeAAGeometryProcessor",
+      TGFX_CONST_MASK_COLOR "CoverageFP=[ConstColorProcessor,RRectEffect];XP=EmptyXferProcessor",
+      [image](Canvas* canvas) { DrawConstantMaskImage(canvas, image, 2, BlendMode::SrcOver); });
+}
+
+// The same constant coverage under a dst-reading blend, and under Src, which overwrites the
+// destination wherever the coverage is nonzero: both must keep the destination untouched.
+TGFX_TEST(AOTGeometryLayoutTest, ConstantMaskCoverageBlendModes) {
+  auto image = MakePatternImage();
+  ExpectSceneServed(
+      "constant-mask-multiply", "QuadPerEdgeAAGeometryProcessor",
+      TGFX_CONST_MASK_COLOR "CoverageFP=[ConstColorProcessor,RectEffect];XP=PorterDuffXferProcessor",
+      [image](Canvas* canvas) { DrawConstantMaskImage(canvas, image, 1, BlendMode::Multiply); });
+  ExpectSceneServed(
+      "constant-mask-src", "QuadPerEdgeAAGeometryProcessor",
+      TGFX_CONST_MASK_COLOR "CoverageFP=[ConstColorProcessor,RectEffect];XP=PorterDuffXferProcessor",
+      [image](Canvas* canvas) { DrawConstantMaskImage(canvas, image, 1, BlendMode::Src); });
+}
+
+#undef TGFX_CONST_MASK_COLOR
 
 }  // namespace tgfx

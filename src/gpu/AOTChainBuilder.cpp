@@ -841,7 +841,9 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
   int coverageRootSlot = -1;
   if (coverageGraph != nullptr) {
     // Accepted roots: a single blend consuming the unit input (the xfer-dst coverage family), a
-    // bare texture or gradient consuming the unit alpha, or an analytic coverage node
+    // bare texture or gradient consuming the unit alpha, a constant (the inverted shader mask
+    // filter whose shader yields no processor: ConstColor in any input mode, the same
+    // pmApplyConstColor math as the runtime emission), or an analytic coverage node
     // (RectCoverage / RRectCoverage) closing a chain that starts at the unit. The
     // unit may otherwise feed only texture leaves (their input is unused — blend operands sample
     // raw), the gradient (a blend child, so it reads the opaque -4 designator), and analytic
@@ -854,9 +856,10 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
     const bool rootIsBlend = covRootNode->kind == AOTEffectKind::Blend;
     const bool rootIsTexture = covRootNode->kind == AOTEffectKind::TextureSource;
     const bool rootIsGradient = covRootNode->kind == AOTEffectKind::GradientSource;
+    const bool rootIsConstant = covRootNode->kind == AOTEffectKind::ConstColor;
     const bool rootIsAnalytic = covRootNode->kind == AOTEffectKind::RectCoverage ||
                                 covRootNode->kind == AOTEffectKind::RRectCoverage;
-    if (!rootIsBlend && !rootIsTexture && !rootIsGradient && !rootIsAnalytic) {
+    if (!rootIsBlend && !rootIsTexture && !rootIsGradient && !rootIsConstant && !rootIsAnalytic) {
       return false;
     }
     int coverageBlendCount = 0;
