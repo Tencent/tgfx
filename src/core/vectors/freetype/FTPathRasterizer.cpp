@@ -16,8 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <cstring>
-
 #include "FTPathRasterizer.h"
 #include "FTLibrary.h"
 #include "FTPath.h"
@@ -27,7 +25,6 @@
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/GammaCorrection.h"
 #include "core/utils/ShapeUtils.h"
-#include "tgfx/core/Buffer.h"
 #include "tgfx/core/Path.h"
 
 namespace tgfx {
@@ -141,8 +138,8 @@ bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   }
   auto buffer = static_cast<unsigned char*>(dstPixels);
   auto rows = targetInfo.height();
-  // Antialiasing is always enabled because FreeType generates only 1-bit masks when it's off,
-  // and we haven't implemented conversion from 1-bit to 8-bit masks yet.
+  // Only anti-aliased draws reach this branch; the non-anti-aliased path above binarizes instead.
+  // Gamma correction needs per-pixel coverage, so ask FT for the AA direct raster.
   auto pitch = static_cast<int>(targetInfo.rowBytes());
   FTRasterTarget target = {buffer + (rows - 1) * pitch, pitch,
                            GammaCorrection::GammaTable().data()};

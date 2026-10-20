@@ -6924,8 +6924,9 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryUnionsAbuttingPainters) {
       full++;
     }
   }
-  EXPECT_GT(full, 0) << "the two-painter outline must cover something, otherwise the equality below "
-                        "is vacuous";
+  EXPECT_GT(full, 0)
+      << "the two-painter outline must cover something, otherwise the equality below "
+         "is vacuous";
   EXPECT_EQ(differing, 0)
       << "two painters describing one square must record the same coverage as the single painter; "
       << differing << " pixels differ";
