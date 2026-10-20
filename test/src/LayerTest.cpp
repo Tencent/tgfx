@@ -6879,10 +6879,11 @@ static std::vector<int> RasterizeOwnOutlineAlpha(Context* context,
 }
 
 // Two painters that together describe one square must record the same own-geometry coverage as the
-// single painter, shared boundary included. The recording is a geometric union: without it the
-// boundary pixel carries 0.75 (each painter covers half of it), which lets the backdrop show through
-// the style. This is a recording assertion on purpose -- comparing rendered output against a single
-// painter also moves that reference onto the SDF path, which would confound the coverage.
+// single painter, shared boundary included. The recording is hard-edged: a boundary pixel that two
+// abutting painters cover half each has to end up fully covered, or the backdrop shows through the
+// style along that boundary. This is a recording assertion on purpose -- comparing rendered output
+// against a single painter also moves that reference onto the SDF path, which would confound the
+// coverage.
 TGFX_TEST_PRIVATE(LayerTest, OwnGeometryUnionsAbuttingPainters) {
   ContextScope scope;
   auto context = scope.getContext();
