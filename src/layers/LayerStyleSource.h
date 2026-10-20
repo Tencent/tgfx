@@ -85,16 +85,11 @@ inline const LayerStyleSourceEntry* OwnShapeEntry(const LayerStyleSourceGroup& g
 }
 
 /**
- * Resolves the entry a consumer must use as LayerStyleInput.content for the given style. A style
- * that declares LayerStyleExtraSourceType::OwnShape samples the layer's own geometry, which is the
- * only image that includes the silhouette-only markers, and falls back to the shared subtree
- * recordings when no own geometry exists (see the fallback block below); every other style keeps
- * the shared content image.
+ * Resolves the entry a consumer must use as LayerStyleInput.content. A style that declares
+ * LayerStyleExtraSourceType::OwnShape gets the layer's own geometry, falling back to the shared
+ * subtree recording when the layer records none; every other style keeps the shared content.
  *
- * Returns nullptr when the resolved entry carries no image: the group then has nothing to offer
- * this style, and consumers must skip it rather than draw from a missing image. style must not be
- * null. Only a style that declares the own geometry may be driven by it; handing it to a
- * content-based style would make that style draw an outline instead of the layer content.
+ * Returns nullptr when the entry carries no image, and the caller must then skip the style.
  */
 inline const LayerStyleSourceEntry* ResolveContentEntry(const LayerStyleSourceGroup& group,
                                                         const LayerStyle* style) {
@@ -103,23 +98,10 @@ inline const LayerStyleSourceEntry* ResolveContentEntry(const LayerStyleSourceGr
     if (auto* ownEntry = OwnShapeEntry(group, style)) {
       return ownEntry;
     }
-    // A style that declares the own geometry but records none resolves to the shared subtree contour
-    // when present (and falls back to `content` otherwise).
-    // A style whose geometry lives in child layers records no own geometry, and its two subtree
-    // recordings then disagree on two axes. `content` (drawDefault, DrawContent.cpp) drops every
-    // painter whose effective color alpha is <= 0; `contour` (drawContourInternal) has no alpha gate
-    // and keeps it. In the opposite direction `contour` drops every painter flagged silhouetteOnly
-    // (LayerContent.h); `content` keeps it. A retained 0%-opacity fill therefore survives only
-    // in `contour`, and falling back to `content` silently removed the glass coverage over that fill
-    // -- the bug this fallback fixes. The two axes have opposite signs, so the change is not
-    // scope-neutral: both recordings span the same subtree (self + descendants), so preferring
-    // `contour` can never draw outside that subtree, but it CAN drop coverage over a descendant's
-    // silhouette-only painter that `content` still holds. That case is bounded where the style and
-    // its coverage geometry live in the same layer: such a layer records an own geometry and never
-    // reaches this branch. No new draw site is introduced either: the branch is only reached with
-    // `ownContour` absent and `contour.image != nullptr`, and a null `content` image has already
-    // marked the bucket unusable and skipped it (Layer.cpp), so the old code had already drawn -- a
-    // null-content bucket cannot become a drawing one.
+    // Falls back to the shared contour because a retained 0%-alpha fill survives only there:
+    // `content` drops painters with alpha <= 0, `contour` keeps them. The trade-off is the opposite
+    // axis -- `contour` drops a descendant's silhouette-only painter -- which cannot happen here,
+    // since such a layer records an own geometry and never reaches this branch.
     if (group.contour.has_value() && group.contour->image != nullptr) {
       return &*group.contour;
     }

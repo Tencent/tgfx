@@ -25,16 +25,11 @@
 
 namespace tgfx {
 /**
- * OpaqueContext is a specialized DrawContext that records drawing operations in "opaque mode".
- * In opaque mode a painter contributes either full or no coverage, decided in two separate steps:
+ * Records drawing operations in "opaque mode" for layer styles (DropShadow, InnerShadow, ...):
  * sampled color alpha is pushed through AlphaThreshold, and geometric coverage is recorded without
- * antialiasing and kept per pixel only where the painter covers at least half of it.
+ * antialiasing, keeping a pixel only where the painter covers at least half of it.
  *
- * This context is used to collect layer content for layer styles (DropShadow, InnerShadow, etc.)
- * where the style effects are calculated based on the opaque representation of the content.
- *
- * Note: When recording layer contour (as opposed to content), the contour additionally includes
- * shapes from alpha=0 painters, but the opaque conversion logic remains the same.
+ * A contour additionally includes painters with alpha=0; the opaque conversion is unchanged.
  */
 class OpaqueContext : public DrawContext {
  public:
