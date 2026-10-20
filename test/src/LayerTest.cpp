@@ -6851,11 +6851,16 @@ static std::vector<int> RasterizeOwnOutlineAlpha(Context* context,
   DrawArgs drawArgs(context);
   std::shared_ptr<Image> image = nullptr;
   Point offset = Point::Zero();
-  TGFX_PRIVATE_ACCESS(auto source = panel->getLayerStyleSource(drawArgs, Matrix::I());
-                      if (source == nullptr || source->groups[0] == nullptr ||
-                          !source->groups[0]->ownContour.has_value()) { return raster; } image =
-                          source->groups[0]->ownContour->image;
-                      offset = source->groups[0]->ownContour->offset;)
+  TGFX_PRIVATE_ACCESS(
+      auto source = panel->getLayerStyleSource(drawArgs, Matrix::I());
+      if (source == nullptr) { return raster; } for (auto& group
+                                                     : source->groups) {
+        if (group != nullptr && group->ownContour.has_value() &&
+            group->ownContour->image != nullptr) {
+          image = group->ownContour->image;
+          offset = group->ownContour->offset;
+        }
+      })
   if (image == nullptr) {
     return raster;
   }
@@ -6878,24 +6883,23 @@ static std::vector<int> RasterizeOwnOutlineAlpha(Context* context,
   return raster;
 }
 
-// Two painters that together describe one square must record the same own-geometry coverage as the
-// single painter, shared boundary included. The recording is hard-edged: a boundary pixel that two
-// abutting painters cover half each has to end up fully covered, or the backdrop shows through the
-// style along that boundary. This is a recording assertion on purpose -- comparing rendered output
-// against a single painter also moves that reference onto the SDF path, which would confound the
-// coverage.
-TGFX_TEST_PRIVATE(LayerTest, OwnGeometryUnionsAbuttingPainters) {
+// The own geometry records hard coverage in the cases a per-painter rule could get wrong: two
+// painters describing one square, an image-shaded painter, and four painters meeting at one corner.
+TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoverageContract) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  constexpr float panelSize = 64.0f;
-  auto makeShapeRegion = [&](const Path& path) {
+  auto glass = MakeOwnOutlineGlass(0, 50, 100, 0, 0);
+  auto shapeRegion = [](const Path& path) {
     auto shapePath = ShapePath::Make();
     shapePath->setPath(path);
     MarkerRegionSpec spec = {};
     spec.shape = shapePath;
     return spec;
   };
+
+  // Two triangles describing one square must record what the single square records.
+  constexpr float panelSize = 64.0f;
   Path upperRight = {};
   upperRight.moveTo(0.0f, 0.0f);
   upperRight.lineTo(panelSize, 0.0f);
@@ -6908,84 +6912,61 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryUnionsAbuttingPainters) {
   lowerLeft.close();
   Path square = {};
   square.addRect(Rect::MakeWH(panelSize, panelSize));
-  const auto glass = GlassStyle::Make(0, 50, 100, 0, 0, 0, 0);
-  auto two = RasterizeOwnOutlineAlpha(
-      context, MakeMarkerPanel({makeShapeRegion(upperRight), makeShapeRegion(lowerLeft)}, {glass}));
-  auto one = RasterizeOwnOutlineAlpha(context, MakeMarkerPanel({makeShapeRegion(square)}, {glass}));
-  ASSERT_FALSE(two.empty());
-  ASSERT_EQ(two.size(), one.size());
+  auto twoPainters = RasterizeOwnOutlineAlpha(
+      context, MakeMarkerPanel({shapeRegion(upperRight), shapeRegion(lowerLeft)}, {glass}));
+  auto onePainter =
+      RasterizeOwnOutlineAlpha(context, MakeMarkerPanel({shapeRegion(square)}, {glass}));
+  ASSERT_FALSE(twoPainters.empty());
+  ASSERT_EQ(twoPainters.size(), onePainter.size());
+  int covered = 0;
   int differing = 0;
-  int full = 0;
-  for (size_t i = 0; i < two.size(); i++) {
-    if (two[i] != one[i]) {
-      differing++;
-    }
-    if (two[i] == 255) {
-      full++;
-    }
+  for (size_t i = 0; i < twoPainters.size(); i++) {
+    covered += twoPainters[i] == 255 ? 1 : 0;
+    differing += twoPainters[i] != onePainter[i] ? 1 : 0;
   }
-  EXPECT_GT(full, 0)
-      << "the two-painter outline must cover something, otherwise the equality below "
-         "is vacuous";
-  EXPECT_EQ(differing, 0)
-      << "two painters describing one square must record the same coverage as the single painter; "
-      << differing << " pixels differ";
-}
+  EXPECT_GT(covered, 0) << "the outline must cover something, otherwise the equality is vacuous";
+  EXPECT_EQ(differing, 0) << "two painters describing one square must match the single painter";
+  EXPECT_EQ(twoPainters[32 * 200 + 32], 255) << "the shared diagonal stays fully covered";
 
-// Four painters that meet at one corner pixel: each quadrant covers a quarter of it, so a
-// per-painter binary decision would drop all four and punch a one-pixel hole in the coverage. This
-// pins what the recording actually produces at such a junction.
-TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoversPaintersSharingACorner) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
+  // An image-shaded painter: the sampled color alpha must not soften the geometric edge.
+  auto image = MakeImage("resources/apitest/checker_128.png");
+  ASSERT_TRUE(image != nullptr);
+  Path rect = {};
+  rect.addRect(Rect::MakeXYWH(0.5f, 0.5f, 63.0f, 63.0f));
+  auto imageShape = ShapePath::Make();
+  imageShape->setPath(rect);
+  auto imageGroup = VectorGroup::Make();
+  imageGroup->setElements({imageShape, FillStyle::Make(ImagePattern::Make(image))});
+  auto imageLayer = VectorLayer::Make();
+  imageLayer->setContents({imageGroup});
+  imageLayer->setLayerStyles({glass});
+  auto imageAlpha = RasterizeOwnOutlineAlpha(context, imageLayer);
+  ASSERT_FALSE(imageAlpha.empty());
+  for (auto value : imageAlpha) {
+    ASSERT_TRUE(value == 0 || value == 255) << "an image painter must record hard coverage";
+  }
+  EXPECT_EQ(imageAlpha[32 * 200 + 32], 255) << "the interior is covered";
+  EXPECT_EQ(imageAlpha[70 * 200 + 70], 0) << "outside stays uncovered";
 
+  // Four painters meeting at one corner: each covers a quarter of that pixel.
   constexpr float quadrant = 32.0f;
   auto makeQuadrant = [](float x, float y) {
     Path path = {};
     path.addRect(Rect::MakeXYWH(x, y, quadrant, quadrant));
-    auto shape = ShapePath::Make();
-    shape->setPath(path);
+    auto quadrantShape = ShapePath::Make();
+    quadrantShape->setPath(path);
     MarkerRegionSpec spec = {};
-    spec.shape = shape;
+    spec.shape = quadrantShape;
     return spec;
   };
-  auto panel = MakeMarkerPanel(
+  auto cornerPanel = MakeMarkerPanel(
       {makeQuadrant(0.5f, 0.5f), makeQuadrant(0.5f + quadrant, 0.5f),
        makeQuadrant(0.5f, 0.5f + quadrant), makeQuadrant(0.5f + quadrant, 0.5f + quadrant)},
-      {MakeOwnOutlineGlass(0, 50, 100, 0, 0)});
-
-  DrawArgs drawArgs(context);
-  std::shared_ptr<Image> mask = nullptr;
-  Point offset = {};
-  TGFX_PRIVATE_ACCESS(auto source = panel->getLayerStyleSource(drawArgs, Matrix::I());
-                      ASSERT_TRUE(source != nullptr); for (auto& group
-                                                           : source->groups) {
-                        if (group != nullptr && group->ownContour.has_value() &&
-                            group->ownContour->image != nullptr) {
-                          mask = group->ownContour->image;
-                          offset = group->ownContour->offset;
-                        }
-                      })
-  ASSERT_TRUE(mask != nullptr);
-  auto surface = Surface::Make(context, mask->width(), mask->height());
-  ASSERT_TRUE(surface != nullptr);
-  surface->getCanvas()->drawImage(mask, 0, 0);
-  auto info = ImageInfo::Make(mask->width(), mask->height(), ColorType::RGBA_8888,
-                              AlphaType::Premultiplied);
-  std::vector<uint32_t> pixels(static_cast<size_t>(mask->width()) *
-                               static_cast<size_t>(mask->height()));
-  ASSERT_TRUE(surface->readPixels(info, pixels.data()));
-  auto alphaAt = [&](int x, int y) {
-    return static_cast<int>(pixels[static_cast<size_t>(y) * static_cast<size_t>(mask->width()) +
-                                   static_cast<size_t>(x)] >>
-                            24);
-  };
-  auto cornerX = static_cast<int>(quadrant - offset.x);
-  auto cornerY = static_cast<int>(quadrant - offset.y);
-  EXPECT_EQ(alphaAt(cornerX, cornerY), 255)
-      << "the pixel shared by four quadrants must stay covered";
-  EXPECT_EQ(alphaAt(cornerX - 8, cornerY - 8), 255) << "the quadrant interiors stay covered";
+      {glass});
+  auto cornerAlpha = RasterizeOwnOutlineAlpha(context, cornerPanel);
+  ASSERT_FALSE(cornerAlpha.empty());
+  EXPECT_EQ(cornerAlpha[32 * 200 + 32], 255) << "the pixel shared by four quadrants stays covered";
+  EXPECT_EQ(cornerAlpha[24 * 200 + 24], 255) << "the quadrant interiors stay covered";
 }
 
 // A layer whose own geometry holds a silhouette-only painter AND a fill of the same geometry has one
