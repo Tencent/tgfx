@@ -6848,6 +6848,9 @@ static std::vector<int> RasterizeOwnOutlineAlpha(Context* context,
                                                  const std::shared_ptr<Layer>& panel) {
   static constexpr int ProbeSize = 200;
   std::vector<int> raster = {};
+  if (panel == nullptr) {
+    return raster;
+  }
   DrawArgs drawArgs(context);
   std::shared_ptr<Image> image = nullptr;
   Point offset = Point::Zero();
@@ -6882,6 +6885,9 @@ static std::vector<int> RasterizeOwnOutlineAlpha(Context* context,
   }
   return raster;
 }
+
+// Size of each quadrant in the shared-corner case below.
+static constexpr float CornerQuadrantSize = 32.0f;
 
 // The own geometry records hard coverage in the cases a per-painter rule could get wrong: two
 // painters describing one square, an image-shaded painter, and four painters meeting at one corner.
@@ -6949,20 +6955,20 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoverageContract) {
   EXPECT_EQ(imageAlpha[70 * 200 + 70], 0) << "outside stays uncovered";
 
   // Four painters meeting at one corner: each covers a quarter of that pixel.
-  constexpr float quadrant = 32.0f;
   auto makeQuadrant = [](float x, float y) {
     Path path = {};
-    path.addRect(Rect::MakeXYWH(x, y, quadrant, quadrant));
+    path.addRect(Rect::MakeXYWH(x, y, CornerQuadrantSize, CornerQuadrantSize));
     auto quadrantShape = ShapePath::Make();
     quadrantShape->setPath(path);
     MarkerRegionSpec spec = {};
     spec.shape = quadrantShape;
     return spec;
   };
-  auto cornerPanel = MakeMarkerPanel(
-      {makeQuadrant(0.5f, 0.5f), makeQuadrant(0.5f + quadrant, 0.5f),
-       makeQuadrant(0.5f, 0.5f + quadrant), makeQuadrant(0.5f + quadrant, 0.5f + quadrant)},
-      {glass});
+  auto cornerPanel =
+      MakeMarkerPanel({makeQuadrant(0.5f, 0.5f), makeQuadrant(0.5f + CornerQuadrantSize, 0.5f),
+                       makeQuadrant(0.5f, 0.5f + CornerQuadrantSize),
+                       makeQuadrant(0.5f + CornerQuadrantSize, 0.5f + CornerQuadrantSize)},
+                      {glass});
   auto cornerAlpha = RasterizeOwnOutlineAlpha(context, cornerPanel);
   ASSERT_FALSE(cornerAlpha.empty());
   EXPECT_EQ(cornerAlpha[32 * 200 + 32], 255) << "the pixel shared by four quadrants stays covered";
