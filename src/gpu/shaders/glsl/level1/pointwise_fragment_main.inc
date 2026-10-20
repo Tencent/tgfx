@@ -29,13 +29,11 @@ vec4 chainPlainLeafFetch(CHAIN_LEAF_SAMPLER texSampler, vec3 coord, vec4 leafSub
                          vec2 leafAlphaStart, int leafHasRgbaaa, int leafIndex) {
   highp vec2 uv = chainLeafCoord(coord, leafIndex);
   int readSwizzle = LeafReadSwizzles[leafIndex];
-  highp vec2 finalCoord = clamp(uv, leafSubset.xy, leafSubset.zw);
-  vec4 color = aotChainSample(texSampler, finalCoord, readSwizzle);
+  highp vec2 finalCoord = aotTextureClamp(uv, leafSubset, true);
+  vec4 color = aotTextureRead(texSampler, finalCoord, readSwizzle);
   if (leafHasRgbaaa != 0) {
-    vec4 alpha = aotChainSample(texSampler, finalCoord + leafAlphaStart, readSwizzle);
-    color = clamp(color, 0.0, 1.0);
-    alpha = clamp(alpha, 0.0, 1.0);
-    color = vec4(color.rgb * alpha.r, alpha.r);
+    vec4 alpha = aotTextureRead(texSampler, finalCoord + leafAlphaStart, readSwizzle);
+    color = aotTextureDecodeRGBAAA(color, alpha);
   }
   return color;
 }

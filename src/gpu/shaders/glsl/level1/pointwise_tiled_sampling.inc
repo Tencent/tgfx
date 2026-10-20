@@ -26,14 +26,9 @@ highp vec2 chainTiledDimension;
 // exactly like tiledMapCoord's returned sample coord. Without this, every tile edge on the chain
 // route snaps to the clamped edge texel while the runtime blends (the chain-side
 // shape needs a subset-bearing tiled leaf, which the hardware wrap never produces).
-#include "texture_read_swizzle.inc"
+#include "texture_sampling.inc"
 
 #if NTEX > 0
-// Reads a plain leaf through its statically bound sampler.
-vec4 aotChainSample(CHAIN_LEAF_SAMPLER texSampler, vec2 coord, int readSwizzle) {
-  return aotReadSwizzle(texture(texSampler, coord), readSwizzle);
-}
-
 // Reads tiled leaf leafIndex's texture. Sampler arrays cannot be indexed dynamically on every
 // target, so the sampler is picked by compile-time branches on the leaf index, which is uniform
 // across the draw (main() fetches the tiled leaves in a loop over a uniform bound). The tiling

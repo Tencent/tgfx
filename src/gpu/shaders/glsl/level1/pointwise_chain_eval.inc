@@ -61,28 +61,28 @@ vec4 evalChainSlot(int slot) {
     if ((Packed.w & 2) != 0) {
       // Alpha-only leaf (R8 on Metal returns (r,0,0,1)): splat .r into all channels so the alpha
       // channel carries the mask value, matching the runtime TextureEffect alpha-only readback.
-      texColor = vec4(texColor.r);
+      texColor = aotTextureAlphaOnly(texColor);
       if ((Packed.w & 8) != 0) {
         // A two-child blend operand: the xfer emission feeds each child vec4(inputColor.rgb,
         // 1.0), so the mask modulates by the geometry RGB with opaque alpha.
-        texColor *= vec4(TGFX_CHAIN_GEOM_COLOR.rgb, 1.0);
+        texColor = aotTextureModulate(texColor, vec4(TGFX_CHAIN_GEOM_COLOR.rgb, 1.0), true);
       }
       if ((Packed.w & 16) != 0) {
         // The color root: the runtime readback multiplies the mask by its FULL input color
         // (sample.a * inputColor), one multiply over the premul geometry color — RGB and alpha
         // in a single step (the former bit0|bit3 pair applied the paint alpha to the RGB twice).
-        texColor *= TGFX_CHAIN_GEOM_COLOR;
+        texColor = aotTextureModulate(texColor, TGFX_CHAIN_GEOM_COLOR, true);
       }
     }
     if ((Packed.w & 4) != 0) {
       // Coverage-root leaf: modulated by the coverage unit's alpha, matching the runtime
       // coverage-FP readback (tex * coverageIn.a).
-      texColor *= TGFX_CHAIN_UNIT_COVERAGE.a;
+      texColor = aotTextureModulate(texColor, TGFX_CHAIN_UNIT_COVERAGE, false);
     }
     if ((Packed.w & 1) != 0) {
       // Color-source leaves are modulated by the geometry color's alpha, matching the runtime
       // paint-alpha wrap. Mask and blend-operand leaves sample raw, as the runtime emits them.
-      texColor *= TGFX_CHAIN_GEOM_COLOR.a;
+      texColor = aotTextureModulate(texColor, TGFX_CHAIN_GEOM_COLOR, false);
     }
     return texColor;
   }
@@ -110,9 +110,9 @@ vec4 evalChainSlot(int slot) {
     int srcSlot = (Packed.w >> 16) & 0xF;
     vec4 tex = chainLeafTex[srcSlot];
     if ((Packed.w & 1) != 0) {
-      return vec4(tex.r) * in0;
+      tex = aotTextureAlphaOnly(tex);
     }
-    return tex * in0.a;
+    return aotTextureModulate(tex, in0, (Packed.w & 1) != 0);
   }
   if (Packed.x == OP_INPUT_OPAQUE) {
     // A two-child xfer whose input is a computed node C feeds its children

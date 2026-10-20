@@ -1811,6 +1811,7 @@ struct BrushRenderStats {
   uint32_t noMatchingRule = 0;
   AOTDrawStats draws = {};
   ProgramCacheStats programs = {};
+  std::vector<std::string> shaders = {};
 };
 
 // Renders the given image with a color filter, brush alpha, and canvas transform, with or without
@@ -1857,10 +1858,71 @@ static void RenderImageWithBrushOnce(const std::shared_ptr<Image>& image,
   outStats->noMatchingRule = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
   outStats->draws = cache->drawStats();
   outStats->programs = context->globalCache()->programStats();
+  outStats->shaders.clear();
+  for (const auto& record : cache->hitRecords()) {
+    outStats->shaders.push_back(record.shaderName);
+  }
   cache->setDiagnosticRecordingEnabled(false);
   cache->setDecompositionEnabled(true);
   cache->unload();
   context->globalCache()->clearPrograms();
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, SharedTextureSamplingPreservesFractionalBrushAlpha) {
+  constexpr int size = 48;
+  Bitmap maskBitmap = {};
+  ASSERT_TRUE(maskBitmap.allocPixels(size, size, true));
+  auto* maskPixels = static_cast<uint8_t*>(maskBitmap.lockPixels());
+  ASSERT_NE(maskPixels, nullptr);
+  for (int y = 0; y < size; ++y) {
+    memset(maskPixels + static_cast<size_t>(y) * maskBitmap.rowBytes(), 0x80, size);
+  }
+  maskBitmap.unlockPixels();
+  auto mask = Image::MakeFrom(maskBitmap);
+  auto rgba = MakeImage("resources/apitest/mandrill_128.png");
+  auto source = MakeImage("resources/apitest/rgbaaa.png");
+  ASSERT_NE(mask, nullptr);
+  ASSERT_NE(rgba, nullptr);
+  ASSERT_NE(source, nullptr);
+  auto rgbaaa = source->makeRGBAAA(512, 512, 512, 0);
+  ASSERT_NE(rgbaaa, nullptr);
+  const std::array<float, 20> halfRGB = {0.5f, 0, 0, 0, 0, 0, 0.5f, 0, 0, 0,
+                                        0, 0, 0.5f, 0, 0, 0, 0, 0, 1, 0};
+  auto filter = ColorFilter::Compose(ColorFilter::Matrix(halfRGB), ColorFilter::Luma());
+  ASSERT_NE(filter, nullptr);
+  for (const auto& image : {rgba, mask, rgbaaa}) {
+    for (bool withFilter : {false, true}) {
+      SCOPED_TRACE(image->isAlphaOnly());
+      SCOPED_TRACE(image == rgbaaa);
+      SCOPED_TRACE(withFilter);
+      auto matrix = Matrix::MakeScale(static_cast<float>(size) / image->width(),
+                                      static_cast<float>(size) / image->height());
+      Bitmap reference = {};
+      Bitmap candidate = {};
+      BrushRenderStats referenceStats = {};
+      BrushRenderStats candidateStats = {};
+      RenderImageWithBrushOnce(image, withFilter ? filter : nullptr, 0.37f, matrix, size, size,
+                               false, &reference, &referenceStats);
+      RenderImageWithBrushOnce(image, withFilter ? filter : nullptr, 0.37f, matrix, size, size,
+                               true, &candidate, &candidateStats);
+      const auto* expected = withFilter ? "PointwiseChainShader" : "QuadTextureFillShader";
+      EXPECT_NE(std::find(candidateStats.shaders.begin(), candidateStats.shaders.end(), expected),
+                candidateStats.shaders.end());
+      EXPECT_EQ(candidateStats.noMatchingRule, 0u);
+      EXPECT_EQ(candidateStats.programs.programBuilderCreations, 0u);
+      EXPECT_EQ(candidateStats.draws.droppedDraws, 0u);
+      EXPECT_EQ(candidateStats.draws.completeAOTDraws, 1u);
+      EXPECT_EQ(candidateStats.draws.materializedEdges, 0u);
+      ExpectBitmapsNear("shared-texture-fractional-alpha", candidate, reference, size, size,
+                        ExperimentTolerance(1));
+      if (image == mask && !withFilter) {
+        auto* pixels = static_cast<const uint8_t*>(candidate.lockPixels());
+        ASSERT_NE(pixels, nullptr);
+        EXPECT_EQ(pixels[(size / 2) * candidate.rowBytes() + (size / 2) * 4 + 3], 47);
+        candidate.unlockPixels();
+      }
+    }
+  }
 }
 
 TGFX_TEST(AOTRenderConsistencyTest, TexturedEffect2D) {

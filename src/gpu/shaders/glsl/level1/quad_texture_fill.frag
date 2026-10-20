@@ -103,6 +103,7 @@ layout(set = 1, binding = 2) uniform sampler2D LocalMaskSampler;
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
 #include "clip_coverage.inc"
+#include "texture_sampling.inc"
 
 layout(location = 0) out vec4 fragColor;
 
@@ -122,42 +123,28 @@ void main() {
 
 #if HAS_SUBSET
   // Full subset: clamp first by per-quad varying bounds, then by uniform safe range.
-  finalCoord = clamp(finalCoord, vTexSubset.xy, vTexSubset.zw);
-  if (SubsetClampOn != 0) {
-    finalCoord = clamp(finalCoord, Subset.xy, Subset.zw);
-  }
+  finalCoord = aotTextureClamp(finalCoord, vTexSubset, true);
+  finalCoord = aotTextureClamp(finalCoord, Subset, SubsetClampOn != 0);
 #else
   // Uniform-only clamp, mirroring the runtime TextureEffect's needSubset() gate: without the
   // gate the clamp fires on out-of-range coordinates (perspective extrapolation, edge quads),
   // zeroing the mip derivatives and diverging from the runtime codegen.
-  if (SubsetClampOn != 0) {
-    finalCoord = clamp(finalCoord, Subset.xy, Subset.zw);
-  }
+  finalCoord = aotTextureClamp(finalCoord, Subset, SubsetClampOn != 0);
 #endif
 
-  vec4 color = texture(TextureSampler_0, finalCoord);
+  vec4 color = aotTextureRead(TextureSampler_0, finalCoord, 0);
 
   if (AlphaOnly != 0) {
-    // Alpha-only textures use R8 format in Metal. The sampler returns (r, 0, 0, 1).
-    // Replicate .r to all channels to get the actual alpha value.
-    color = vec4(color.r);
+    color = aotTextureAlphaOnly(color);
   }
 
   if (HasRgbaaa != 0) {
-    // RGBAAA dual-plane: the alpha lives in a separate region reached by AlphaStart. This second
-    // sample is behind a uniform (coherent) branch, so non-RGBAAA draws skip it at no cost.
-    color = clamp(color, 0.0, 1.0);
     highp vec2 alphaCoord = finalCoord + AlphaStart;
-    vec4 alpha = texture(TextureSampler_0, alphaCoord);
-    alpha = clamp(alpha, 0.0, 1.0);
-    color = vec4(color.rgb * alpha.r, alpha.r);
+    vec4 alpha = aotTextureRead(TextureSampler_0, alphaCoord, 0);
+    color = aotTextureDecodeRGBAAA(color, alpha);
   }
 
-  if (AlphaOnly != 0) {
-    color = color.a * outputColor;
-  } else {
-    color = color * outputColor.a;
-  }
+  color = aotTextureModulate(color, outputColor, AlphaOnly != 0);
 
   float maskAlpha = 1.0;
   if (HasDeviceMask != 0) {
