@@ -331,6 +331,9 @@ Brush GetOpaqueBrush(const Brush& brush) {
   if (brush.shader && !brush.shader->asColor(&color)) {
     auto opaqueBrush = brush;
     opaqueBrush.colorFilter = ColorFilter::AlphaThreshold(OPAQUE_THRESHOLD);
+    // Sample alpha and geometric coverage are two different gates: the filter makes sampled alpha
+    // opaque, and this flag makes the coverage hard-edged like the solid path below.
+    opaqueBrush.antiAlias = false;
     return opaqueBrush;
   }
   // SrcOver is the compositing rule for independent painters; their boundary coverage is binary
