@@ -19,5 +19,10 @@
 #pragma once
 
 namespace tgfx {
+/**
+ * Threshold applied to a painter's sampled color alpha so that it contributes opaque colors: any
+ * non-zero sampled alpha becomes fully opaque. This is a color-domain rule and says nothing about
+ * geometric coverage.
+ */
 static constexpr float OPAQUE_THRESHOLD = 1.0f / 256.0f;
 }  // namespace tgfx

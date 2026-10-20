@@ -107,10 +107,13 @@ bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
       FT_Outline_Get_Bitmap(ftLibrary, &(outline->outline), &bitmap);
     }
     auto* pixels = static_cast<unsigned char*>(dstPixels);
+    // Coverage is a pixel-center decision, which is the rule the other rasterizers implement when
+    // antialiasing is off; the color-alpha threshold used by OpaqueContext is a separate gate.
+    constexpr unsigned char COVERAGE_THRESHOLD = 128;
     for (int y = 0; y < targetInfo.height(); y++) {
       auto* row = pixels + static_cast<size_t>(y) * targetInfo.rowBytes();
       for (int x = 0; x < targetInfo.width(); x++) {
-        row[x] = row[x] >= 128 ? 0xFF : 0x00;
+        row[x] = row[x] >= COVERAGE_THRESHOLD ? 0xFF : 0x00;
       }
     }
     if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
