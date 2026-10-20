@@ -62,7 +62,9 @@ const char* PermutationMatchFailureName(PermutationMatchFailure failure);
 /**
  * Attempts to match a ProgramInfo's processor combination against known precompiled shader
  * patterns. Returns the shader name and permutation index if matched, or nullopt if no precompiled
- * variant covers this combination. When failure is not null, it receives the failure category.
+ * variant covers this combination. When failure is not null, it receives None on success, an
+ * applicable candidate's rejection reason on failure, or NoMatchingRule when no candidate records
+ * a reason. Probes that do not apply to the pipeline must not record a rejection reason.
  */
 std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo,
                                                        PermutationMatchFailure* failure = nullptr);

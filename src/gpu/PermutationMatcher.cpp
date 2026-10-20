@@ -588,7 +588,7 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseDAG(const ProgramI
   }
   if (gpKind < 0 || programInfo->numColorFragmentProcessors() != 1 ||
       programInfo->numFragmentProcessors() != 1) {
-    return Fail(PermutationMatchFailure::NoMatchingFamily);
+    return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
   if (fp->name() != "AOTPointwiseChainProcessor") {

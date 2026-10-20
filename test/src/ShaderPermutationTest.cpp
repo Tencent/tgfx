@@ -38,6 +38,7 @@
 #include "gpu/ShaderKeyHash.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/ClampedGradientEffect.h"
+#include "gpu/processors/ComplexEllipseGeometryProcessor.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
@@ -2261,8 +2262,10 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
                        : std::vector<FragmentProcessor*>{coverage.get(), clip.get()};
     ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), processors, 0,
                             nullptr, BlendMode::SrcOver);
-    auto match = MatchPermutation(&programInfo);
+    auto failure = PermutationMatchFailure::CoverageShape;
+    auto match = MatchPermutation(&programInfo, &failure);
     ASSERT_TRUE(match.has_value()) << "clipFirst=" << clipFirst;
+    EXPECT_EQ(failure, PermutationMatchFailure::None);
     EXPECT_EQ(match->shaderName, "ShapeInstancedTextureCoverageShader");
     EXPECT_EQ(match->vertPermutationIndex, expectedIndex);
     EXPECT_EQ(match->fragPermutationIndex, expectedIndex);
@@ -2281,8 +2284,41 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(),
                             {coverage.get(), secondCoverage.get()}, 0, nullptr,
                             BlendMode::SrcOver);
-    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+    auto failure = PermutationMatchFailure::None;
+    EXPECT_FALSE(MatchPermutation(&programInfo, &failure).has_value());
+    EXPECT_EQ(failure, PermutationMatchFailure::CoverageShape);
   }
+}
+
+TGFX_TEST(ShaderPermutationTest, ComplexEllipseCoverageFailureIsNotHiddenByChainProbe) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto renderTargetProxy = RenderTargetProxy::Make(context, 8, 8, false);
+  ASSERT_NE(renderTargetProxy, nullptr);
+  auto renderTarget = renderTargetProxy->getRenderTarget();
+  ASSERT_NE(renderTarget, nullptr);
+  auto textureProxy = context->proxyProvider()->createTextureProxy({}, 8, 8, PixelFormat::ALPHA_8);
+  ASSERT_NE(textureProxy, nullptr);
+  ASSERT_NE(textureProxy->getTextureView(), nullptr);
+  BlockAllocator allocator;
+  auto gp = ComplexEllipseGeometryProcessor::Make(&allocator, 8, 8, false, PMColor::White());
+  auto coverage = TextureEffect::Make(&allocator, textureProxy);
+  ASSERT_NE(gp, nullptr);
+  ASSERT_NE(coverage, nullptr);
+  ProgramInfo rejected(renderTarget.get(), gp.get(), {coverage.get()}, 0, nullptr,
+                       BlendMode::SrcOver);
+  auto failure = PermutationMatchFailure::None;
+  EXPECT_FALSE(MatchPermutation(&rejected, &failure).has_value());
+  EXPECT_EQ(failure, PermutationMatchFailure::CoverageShape);
+
+  ProgramInfo accepted(renderTarget.get(), gp.get(), {}, 0, nullptr, BlendMode::SrcOver);
+  auto match = MatchPermutation(&accepted, &failure);
+  ASSERT_TRUE(match.has_value());
+  EXPECT_EQ(match->shaderName, "ComplexEllipseFillShader");
+  EXPECT_EQ(failure, PermutationMatchFailure::None);
+  EXPECT_FALSE(MatchPermutation(&rejected, &failure).has_value());
+  EXPECT_EQ(failure, PermutationMatchFailure::CoverageShape);
 }
 
 TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageShaderRegistry) {
@@ -2477,7 +2513,9 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectRejectsComposedCoverage) {
   ASSERT_NE(composed, nullptr);
   ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {composed.get()}, 0,
                           nullptr, BlendMode::SrcOver);
-  EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+  auto failure = PermutationMatchFailure::None;
+  EXPECT_FALSE(MatchPermutation(&programInfo, &failure).has_value());
+  EXPECT_EQ(failure, PermutationMatchFailure::NoMatchingRule);
 }
 
 // --- MirroredDim: permanent desync guard --------------------------------------------------------
