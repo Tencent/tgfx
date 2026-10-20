@@ -40,17 +40,6 @@ class OpaqueContext : public DrawContext {
   OpaqueContext();
   ~OpaqueContext() override;
 
-  /**
-   * Records the painters' coverage as their geometric union, adding up their coverages instead of
-   * compositing them with SrcOver. A layer's own geometry is recorded from several painters at once,
-   * and SrcOver collapses the shared boundary of two adjacent painters -- which cover f and 1 - f
-   * there -- to (1 - f) + f * (1 - (1 - f)) = 1 - f + f * f (0.75 at f = 0.5), which lets the
-   * backdrop show through every style that derives its coverage from this raster, such as Glass.
-   * The union applies to the solid/colour path of GetOpaqueBrush; a painter carrying an image shader
-   * keeps its own brush and blend mode there. Must be set before the first drawing call.
-   */
-  void setUnionCoverage(bool unionCoverage);
-
   Canvas* beginRecording();
 
   void drawFill(const Brush& brush) override;
@@ -181,8 +170,6 @@ class OpaqueContext : public DrawContext {
   std::vector<Rect> contourBounds = {};
   PictureContext pictureContext = {};
   std::unique_ptr<Canvas> canvas = nullptr;
-
-  bool unionCoverage = false;
 
   friend class PendingOpaqueAutoReset;
 };

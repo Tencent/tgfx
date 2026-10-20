@@ -1340,11 +1340,6 @@ std::shared_ptr<Image> Layer::getOwnContourImage(const DrawArgs& args, float con
     return nullptr;
   }
   OpaqueContext opaqueContext;
-  // This raster is a geometric union of several painters, so their shared boundaries must add up
-  // instead of compositing with SrcOver, which would leave them at 0.75 coverage and let the
-  // backdrop show through the style. Only this own-geometry recording needs it: the shared content
-  // and contour rasters keep SrcOver, and a user blend mode must never survive into them.
-  opaqueContext.setUnionCoverage(true);
   auto* contourCanvas = opaqueContext.beginRecording();
   contourCanvas->scale(contentScale, contentScale);
   // This is the layer's own outline, not the contour shared with layer styles: recounting it
