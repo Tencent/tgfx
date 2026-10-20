@@ -31,6 +31,7 @@
 #include "core/PathTriangulator.h"
 #include "core/ShapeRasterizer.h"
 #include "gtest/gtest.h"
+#include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
@@ -420,6 +421,121 @@ TGFX_TEST(PathTest, IteratorPerformance) {
            skPathUs, nsPerVerbIterator, nsPerVerbSkPath, ratio);
   }
   printf("\n");
+}
+
+// ===== PathRasterizer antialiasing contract =====
+
+// Rasterizes `path` into a coverage mask. PathRasterizer is where the antiAlias flag is honored, so
+// these cases pin that contract directly instead of observing it through a layer style.
+static std::vector<uint8_t> RasterizeCoverage(const Path& path, int width, int height,
+                                              bool antiAlias) {
+  auto rasterizer = PathRasterizer::MakeFrom(width, height, path, antiAlias);
+  if (rasterizer == nullptr) {
+    return {};
+  }
+  auto info = ImageInfo::Make(width, height, ColorType::ALPHA_8, AlphaType::Premultiplied);
+  std::vector<uint8_t> pixels(static_cast<size_t>(width) * static_cast<size_t>(height));
+  if (!rasterizer->readPixels(info, pixels.data())) {
+    return {};
+  }
+  return pixels;
+}
+
+// A donut offset by half a pixel, so its edges cross pixel centers and carry fractional coverage
+// while antialiasing is on.
+static Path MakeHalfPixelDonut(bool evenOdd) {
+  Path donut = {};
+  donut.setFillType(evenOdd ? PathFillType::EvenOdd : PathFillType::Winding);
+  donut.addRect(Rect::MakeXYWH(0.5f, 0.5f, 63.0f, 63.0f));
+  donut.addRect(Rect::MakeXYWH(20.5f, 20.5f, 23.0f, 23.0f), !evenOdd);
+  return donut;
+}
+
+static bool IsBinaryCoverage(const std::vector<uint8_t>& pixels) {
+  for (auto value : pixels) {
+    if (value != 0 && value != 255) {
+      return false;
+    }
+  }
+  return true;
+}
+
+static size_t FractionalCoverageCount(const std::vector<uint8_t>& pixels) {
+  size_t count = 0;
+  for (auto value : pixels) {
+    if (value != 0 && value != 255) {
+      count++;
+    }
+  }
+  return count;
+}
+
+// antiAlias == false has to produce a fully binary mask. The FreeType rasterizer used to ignore the
+// flag and keep the antialiased mask, which is why every coverage consumer saw fractional edges.
+TGFX_TEST(PathTest, NonAntiAliasCoverageIsBinary) {
+  constexpr int size = 64;
+  Path circle = {};
+  circle.addOval(Rect::MakeXYWH(0.5f, 0.5f, 63.0f, 63.0f));
+
+  auto antialiased = RasterizeCoverage(circle, size, size, true);
+  auto hard = RasterizeCoverage(circle, size, size, false);
+  ASSERT_EQ(antialiased.size(), static_cast<size_t>(size) * static_cast<size_t>(size));
+  ASSERT_EQ(hard.size(), antialiased.size());
+  EXPECT_GT(FractionalCoverageCount(antialiased), 0U)
+      << "the antialiased mask must keep fractional coverage, otherwise this case proves nothing";
+  EXPECT_TRUE(IsBinaryCoverage(hard)) << "antiAlias == false must binarize the coverage";
+  EXPECT_EQ(hard[32 * size + 32], 255) << "the interior stays covered";
+  EXPECT_EQ(hard[1 * size + 1], 0) << "the exterior stays uncovered";
+}
+
+// Even-odd holes survive without antialiasing: the mono rasterizer of FreeType drops the fill rule,
+// so the smooth rasterizer has to remain the one that produces the mask.
+TGFX_TEST(PathTest, NonAntiAliasEvenOddKeepsHole) {
+  constexpr int size = 64;
+  auto donut = MakeHalfPixelDonut(true);
+  auto antialiased = RasterizeCoverage(donut, size, size, true);
+  auto hard = RasterizeCoverage(donut, size, size, false);
+  ASSERT_EQ(hard.size(), static_cast<size_t>(size) * static_cast<size_t>(size));
+  EXPECT_EQ(antialiased[32 * size + 32], 0) << "even-odd keeps the hole while antialiasing";
+  EXPECT_EQ(hard[32 * size + 32], 0) << "even-odd must keep the hole without antialiasing";
+  EXPECT_EQ(hard[8 * size + 32], 255) << "the ring stays covered";
+  EXPECT_TRUE(IsBinaryCoverage(hard)) << "antiAlias == false must binarize the coverage";
+}
+
+// The same donut expressed with winding order instead of even-odd: the hole comes from the reversed
+// inner contour, so it has to survive on both paths as well.
+TGFX_TEST(PathTest, NonAntiAliasWindingKeepsHole) {
+  constexpr int size = 64;
+  auto donut = MakeHalfPixelDonut(false);
+  auto hard = RasterizeCoverage(donut, size, size, false);
+  ASSERT_EQ(hard.size(), static_cast<size_t>(size) * static_cast<size_t>(size));
+  EXPECT_EQ(hard[32 * size + 32], 0) << "the reversed inner contour must keep the hole";
+  EXPECT_EQ(hard[8 * size + 32], 255) << "the ring stays covered";
+  EXPECT_TRUE(IsBinaryCoverage(hard)) << "antiAlias == false must binarize the coverage";
+}
+
+// Inverse fill types are downgraded to an even-odd intersection with the raster bounds, and separate
+// contours of one path are rasterized together; both keep their meaning without antialiasing.
+TGFX_TEST(PathTest, NonAntiAliasInverseFillAndMultipleContours) {
+  constexpr int size = 64;
+  Path inverse = {};
+  inverse.addRect(Rect::MakeXYWH(16.5f, 16.5f, 31.0f, 31.0f));
+  inverse.setFillType(PathFillType::InverseEvenOdd);
+  auto inverted = RasterizeCoverage(inverse, size, size, false);
+  ASSERT_EQ(inverted.size(), static_cast<size_t>(size) * static_cast<size_t>(size));
+  EXPECT_EQ(inverted[2 * size + 2], 255) << "the inverse fill covers everything outside the rect";
+  EXPECT_EQ(inverted[32 * size + 32], 0) << "the rect itself stays excluded";
+  EXPECT_TRUE(IsBinaryCoverage(inverted)) << "antiAlias == false must binarize the coverage";
+
+  Path pair = {};
+  pair.addRect(Rect::MakeXYWH(0.5f, 0.5f, 20.0f, 20.0f));
+  pair.addRect(Rect::MakeXYWH(40.5f, 40.5f, 20.0f, 20.0f));
+  auto separate = RasterizeCoverage(pair, size, size, false);
+  ASSERT_EQ(separate.size(), static_cast<size_t>(size) * static_cast<size_t>(size));
+  EXPECT_EQ(separate[8 * size + 8], 255) << "the first contour stays covered";
+  EXPECT_EQ(separate[48 * size + 48], 255) << "the second contour stays covered";
+  EXPECT_EQ(separate[32 * size + 32], 0) << "the gap between the contours stays uncovered";
+  EXPECT_TRUE(IsBinaryCoverage(separate)) << "antiAlias == false must binarize the coverage";
 }
 
 }  // namespace tgfx
