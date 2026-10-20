@@ -165,7 +165,8 @@ void AssertPerformanceGates(Context* context, const std::string& label, const Ti
 
 template <typename Scene>
 TimingResult MeasureRoute(Context* context, PrecompiledShaderCache* cache, bool useBundle,
-                          const Scene& scene, int size = kSize, bool decompositionEnabled = true) {
+                          const Scene& scene, int size = kSize, bool decompositionEnabled = true,
+                          bool dedicatedKernels = true) {
   TimingResult result = {};
   if (useBundle) {
     auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
@@ -173,6 +174,7 @@ TimingResult MeasureRoute(Context* context, PrecompiledShaderCache* cache, bool 
       return result;
     }
     cache->setDecompositionEnabled(decompositionEnabled);
+    cache->setDedicatedKernelsEnabled(dedicatedKernels);
   } else {
     cache->unload();
   }
@@ -620,6 +622,56 @@ TGFX_TEST(AOTPerformanceMatrixTest, ChainVsDedicatedDecomposition) {
   // the thread-local cached Context across tests — restore the production default so later
   // tests (e.g. the atlas chain-route assertions) are not served with it disabled.
   cache->setDecompositionEnabled(true);
+}
+
+// The same three routes for the two hottest dedicated families, a plain texture fill and a solid
+// ellipse, with the dedicated family forced off for the chain row. Route evidence prints with each
+// row so a row that silently landed on another family is visible.
+TGFX_TEST(AOTPerformanceMatrixTest, DedicatedVsChainHotFamilies) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+  for (int size : {128, 512}) {
+    const float scale = static_cast<float>(size) / 128.0f;
+    std::vector<std::pair<std::string, std::function<void(Canvas*)>>> scenes = {};
+    scenes.emplace_back("texture", [&](Canvas* canvas) {
+      canvas->save();
+      canvas->scale(scale, scale);
+      Paint paint = {};
+      paint.setAlpha(0.8f);
+      canvas->drawImage(image, 0, 0, &paint);
+      canvas->restore();
+    });
+    scenes.emplace_back("ellipse", [&](Canvas* canvas) {
+      Paint paint = {};
+      paint.setColor(Color::FromRGBA(220, 60, 40, 255));
+      paint.setAntiAlias(true);
+      canvas->drawOval(Rect::MakeXYWH(8 * scale, 12 * scale, 110 * scale, 100 * scale), paint);
+    });
+    for (const auto& entry : scenes) {
+      MeasureRoute(context, cache, false, entry.second, size);
+      auto dedicated = MeasureRoute(context, cache, true, entry.second, size, true, true);
+      auto chain = MeasureRoute(context, cache, true, entry.second, size, true, false);
+      auto runtime = MeasureRoute(context, cache, false, entry.second, size);
+      EXPECT_EQ(dedicated.runtimePrograms, 0u);
+      EXPECT_EQ(chain.runtimePrograms, 0u);
+      PrintResult((entry.first + "-dedicated").c_str(), "aot", dedicated, size);
+      PrintResult((entry.first + "-chain").c_str(), "aot", chain, size);
+      PrintResult((entry.first + "-runtime").c_str(), "runtime", runtime, size);
+      printf(
+          "[HotFamilyGap] %s size=%d dedicatedHot=%.3fms chainHot=%.3fms runtimeHot=%.3fms "
+          "chain/dedicated=%.2fx dedicated/runtime=%.2fx\n",
+          entry.first.c_str(), size, dedicated.hotMedianMs, chain.hotMedianMs, runtime.hotMedianMs,
+          dedicated.hotMedianMs > 0 ? chain.hotMedianMs / dedicated.hotMedianMs : 0.0,
+          runtime.hotMedianMs > 0 ? dedicated.hotMedianMs / runtime.hotMedianMs : 0.0);
+    }
+  }
+  cache->setDecompositionEnabled(true);
+  cache->setDedicatedKernelsEnabled(true);
 }
 
 }  // namespace tgfx

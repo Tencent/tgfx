@@ -1931,6 +1931,125 @@ TGFX_TEST(AOTRenderConsistencyTest, SharedTextureSamplingPreservesFractionalBrus
 // the pointwise chain kernel — must agree. The dedicated kernel and the chain share the texture
 // sampling and modulation functions (texture_sampling.inc), so this guards the wiring around them:
 // the order of clamp, alpha-only, RGBAAA decode and modulation, and where the paint alpha enters.
+enum class KernelRoute { Runtime, Dedicated, Chain };
+
+// Renders a scene through one route. Runtime is the JIT reference; Dedicated lets the matcher pick
+// the dedicated family; Chain sends the same draw through the pointwise chain kernel.
+static void RenderSceneThroughRoute(const std::function<void(Canvas*)>& scene, int width,
+                                    int height, KernelRoute route, Bitmap* outBitmap,
+                                    BrushRenderStats* outStats) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  const bool useBundle = route != KernelRoute::Runtime;
+  if (useBundle) {
+    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+  } else {
+    cache->unload();
+  }
+  ScopedAOTStatsPause statsPause(context, !useBundle);
+  cache->setDecompositionEnabled(useBundle);
+  cache->setDedicatedKernelsEnabled(route != KernelRoute::Chain);
+  cache->setDiagnosticRecordingEnabled(true);
+  cache->resetStats();
+  context->globalCache()->clearPrograms();
+  context->globalCache()->resetProgramStats();
+  auto surface = Surface::Make(context, width, height);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+  canvas->clear(Color::FromRGBA(40, 90, 160, 255));
+  scene(canvas);
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(outBitmap->allocPixels(width, height));
+  auto* pixels = outBitmap->lockPixels();
+  ASSERT_TRUE(pixels != nullptr);
+  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+  outBitmap->unlockPixels();
+  outStats->noMatchingRule = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
+  outStats->draws = cache->drawStats();
+  outStats->programs = context->globalCache()->programStats();
+  outStats->shaders.clear();
+  for (const auto& record : cache->hitRecords()) {
+    outStats->shaders.push_back(record.shaderName);
+  }
+  cache->setDiagnosticRecordingEnabled(false);
+  cache->setDecompositionEnabled(true);
+  cache->setDedicatedKernelsEnabled(true);
+  cache->unload();
+  context->globalCache()->clearPrograms();
+}
+
+// Runs a scene through JIT, the dedicated family and the chain, and requires the dedicated family
+// to be the one that served the second route and the chain the one that served the third.
+static void ExpectDedicatedAndChainAgree(const char* label,
+                                         const std::function<void(Canvas*)>& scene, int width,
+                                         int height, const char* dedicatedShader,
+                                         const char* chainShader) {
+  SCOPED_TRACE(label);
+  Bitmap jit = {};
+  Bitmap dedicated = {};
+  Bitmap chain = {};
+  BrushRenderStats jitStats = {};
+  BrushRenderStats dedicatedStats = {};
+  BrushRenderStats chainStats = {};
+  RenderSceneThroughRoute(scene, width, height, KernelRoute::Runtime, &jit, &jitStats);
+  RenderSceneThroughRoute(scene, width, height, KernelRoute::Dedicated, &dedicated,
+                          &dedicatedStats);
+  RenderSceneThroughRoute(scene, width, height, KernelRoute::Chain, &chain, &chainStats);
+  auto served = [](const BrushRenderStats& stats, const char* shader) {
+    return std::find(stats.shaders.begin(), stats.shaders.end(), shader) != stats.shaders.end();
+  };
+  EXPECT_TRUE(served(dedicatedStats, dedicatedShader));
+  EXPECT_FALSE(served(chainStats, dedicatedShader));
+  EXPECT_TRUE(served(chainStats, chainShader));
+  for (const auto* stats : {&dedicatedStats, &chainStats}) {
+    EXPECT_EQ(stats->noMatchingRule, 0u);
+    EXPECT_EQ(stats->programs.programBuilderCreations, 0u);
+    EXPECT_EQ(stats->draws.droppedDraws, 0u);
+  }
+  ExpectBitmapsNear("dedicated-vs-jit", dedicated, jit, width, height, ExperimentTolerance(1));
+  ExpectBitmapsNear("chain-vs-jit", chain, jit, width, height, ExperimentTolerance(1));
+  ExpectBitmapsNear("chain-vs-dedicated", chain, dedicated, width, height, ExperimentTolerance(1));
+}
+
+// A solid-color ellipse is the other hot dedicated family. EllipseFillShader and the chain's
+// GP_LAYOUT 1 path both evaluate ellipse_coverage.inc; this guards the wiring around it: where the
+// edge coverage enters, how it composes with a clip and a dst-reading blend, and fill versus
+// stroke.
+TGFX_TEST(AOTRenderConsistencyTest, DedicatedAndChainAgreeOnEllipseDraws) {
+  SKIP_ON_SWIFTSHADER_ENV();
+  constexpr int size = 96;
+  for (bool stroke : {false, true}) {
+    for (float alpha : {1.0f, 0.37f}) {
+      for (int clipMode : {0, 1}) {
+        for (BlendMode blend : {BlendMode::SrcOver, BlendMode::Multiply}) {
+          auto scene = [=](Canvas* canvas) {
+            if (clipMode == 1) {
+              canvas->clipRect(Rect::MakeLTRB(14.25f, 10.5f, 85.75f, 89.5f), true);
+            }
+            Paint paint = {};
+            paint.setColor(Color::FromRGBA(220, 60, 40, 255));
+            paint.setAlpha(alpha);
+            paint.setBlendMode(blend);
+            paint.setAntiAlias(true);
+            if (stroke) {
+              paint.setStyle(PaintStyle::Stroke);
+              paint.setStrokeWidth(9.0f);
+            }
+            canvas->drawOval(Rect::MakeXYWH(6, 10, 84, 76), paint);
+          };
+          std::string label = std::string(stroke ? "stroke" : "fill") + " alpha=" +
+                              std::to_string(alpha) + " clip=" + std::to_string(clipMode) +
+                              (blend == BlendMode::SrcOver ? " srcover" : " multiply");
+          ExpectDedicatedAndChainAgree(label.c_str(), scene, size, size, "EllipseFillShader",
+                                       "PointwiseChainShader");
+        }
+      }
+    }
+  }
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, DedicatedAndChainAgreeOnTextureDraws) {
   SKIP_ON_SWIFTSHADER_ENV();
   constexpr int size = 48;
