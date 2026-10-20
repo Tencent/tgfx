@@ -67,8 +67,8 @@ struct LayerStyleSourceGroup {
  */
 inline bool NeedsOwnShape(const LayerStyle* style) {
   DEBUG_ASSERT(style != nullptr);
-  return (style->extraSourceType() &
-          static_cast<uint32_t>(LayerStyleExtraSourceType::OwnShape)) != 0;
+  return (style->extraSourceType() & static_cast<uint32_t>(LayerStyleExtraSourceType::OwnShape)) !=
+         0;
 }
 
 /**
@@ -78,8 +78,7 @@ inline bool NeedsOwnShape(const LayerStyle* style) {
  */
 inline const LayerStyleSourceEntry* OwnShapeEntry(const LayerStyleSourceGroup& group,
                                                   const LayerStyle* style) {
-  if (NeedsOwnShape(style) && group.ownContour.has_value() &&
-      group.ownContour->image != nullptr) {
+  if (NeedsOwnShape(style) && group.ownContour.has_value() && group.ownContour->image != nullptr) {
     return &*group.ownContour;
   }
   return nullptr;
