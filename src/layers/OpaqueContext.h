@@ -26,8 +26,9 @@
 namespace tgfx {
 /**
  * Records drawing operations in "opaque mode" for layer styles (DropShadow, InnerShadow, ...):
- * sampled color alpha is pushed through AlphaThreshold, and geometric coverage is recorded without
- * antialiasing, keeping a pixel only where the painter covers at least half of it.
+ * sampled color alpha is pushed through AlphaThreshold, and geometric coverage is recorded as hard
+ * 0/255. The software path fallback keeps a pixel covered at least half way; platform rasterizers
+ * apply their own hard-edge rules and may differ by a pixel.
  *
  * A contour additionally includes painters with alpha=0; the opaque conversion is unchanged.
  */

@@ -135,9 +135,9 @@ class OwnShapeInputSource : public StyleInputSource {
  */
 struct LayerStyleInput {
   /**
-   * The main raster this style resolves: the layer's own geometry for a style that declares
-   * LayerStyleExtraSourceType::OwnShape, otherwise the shared subtree content. Opaque, as described
-   * by OpaqueContext.
+   * The main raster this style resolves: the own recording when the style declares
+   * LayerStyleExtraSourceType::OwnShape and the layer records one, otherwise the shared contour, then
+   * the shared content. Opaque, as described by OpaqueContext.
    */
   std::shared_ptr<Image> content = nullptr;
 
