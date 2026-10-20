@@ -181,11 +181,11 @@ vec4 evalChainSlot(int slot) {
     // Analytic rrect coverage; bits 16-19 of the selector carry this slot's ordinal into the
     // CoverageRRect* parameter arrays.
     int rrectOrdinal = (Packed.w >> 16) & 0xF;
-    return in0 * vec4(analyticRRectCoverage(CoverageRRectRect[rrectOrdinal],
-                                            CoverageRRectRadiiX[rrectOrdinal],
-                                            CoverageRRectRadiiY[rrectOrdinal],
-                                            CoverageRRectAntiAlias[rrectOrdinal],
-                                            CoverageRRectDeviceToLocal[rrectOrdinal]));
+    return aotApplyRRectCoverage(in0, CoverageRRectRect[rrectOrdinal],
+                                 CoverageRRectRadiiX[rrectOrdinal],
+                                 CoverageRRectRadiiY[rrectOrdinal],
+                                 CoverageRRectAntiAlias[rrectOrdinal],
+                                 CoverageRRectDeviceToLocal[rrectOrdinal]);
   }
   vec4 resourceValue = vec4(0.0);
   if (evalResourceSlot(Packed, in0, resourceValue)) {

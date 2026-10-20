@@ -47,3 +47,8 @@ float analyticRRectCoverage(vec4 rect, vec4 radiiX, vec4 radiiY, float antiAlias
   highp float nonAACov = step(dist, 0.0);
   return mix(nonAACov, aaCov, antiAlias);
 }
+
+vec4 aotApplyRRectCoverage(vec4 inputCoverage, vec4 rect, vec4 radiiX, vec4 radiiY,
+                           float antiAlias, mat3 deviceToLocal) {
+  return inputCoverage * vec4(analyticRRectCoverage(rect, radiiX, radiiY, antiAlias, deviceToLocal));
+}

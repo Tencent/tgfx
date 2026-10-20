@@ -1822,7 +1822,7 @@ static void RenderImageWithBrushOnce(const std::shared_ptr<Image>& image,
                                      const std::shared_ptr<ColorFilter>& colorFilter,
                                      float brushAlpha, const Matrix& drawMatrix, int width,
                                      int height, bool useBundle, Bitmap* outBitmap,
-                                     BrushRenderStats* outStats) {
+                                     BrushRenderStats* outStats, bool forceChain = false) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -1837,6 +1837,7 @@ static void RenderImageWithBrushOnce(const std::shared_ptr<Image>& image,
   }
   ScopedAOTStatsPause statsPause(context, !useBundle);
   cache->setDecompositionEnabled(useBundle);
+  cache->setDedicatedKernelsEnabled(!forceChain);
   cache->setDiagnosticRecordingEnabled(true);
   cache->resetStats();
   context->globalCache()->clearPrograms();
@@ -1864,6 +1865,7 @@ static void RenderImageWithBrushOnce(const std::shared_ptr<Image>& image,
   }
   cache->setDiagnosticRecordingEnabled(false);
   cache->setDecompositionEnabled(true);
+  cache->setDedicatedKernelsEnabled(true);
   cache->unload();
   context->globalCache()->clearPrograms();
 }
@@ -1920,6 +1922,74 @@ TGFX_TEST(AOTRenderConsistencyTest, SharedTextureSamplingPreservesFractionalBrus
         ASSERT_NE(pixels, nullptr);
         EXPECT_EQ(pixels[(size / 2) * candidate.rowBytes() + (size / 2) * 4 + 3], 47);
         candidate.unlockPixels();
+      }
+    }
+  }
+}
+
+// One texture draw through the three routes — runtime JIT, the dedicated QuadTextureFill kernel and
+// the pointwise chain kernel — must agree. The dedicated kernel and the chain share the texture
+// sampling and modulation functions (texture_sampling.inc), so this guards the wiring around them:
+// the order of clamp, alpha-only, RGBAAA decode and modulation, and where the paint alpha enters.
+TGFX_TEST(AOTRenderConsistencyTest, DedicatedAndChainAgreeOnTextureDraws) {
+  SKIP_ON_SWIFTSHADER_ENV();
+  constexpr int size = 48;
+  Bitmap maskBitmap = {};
+  ASSERT_TRUE(maskBitmap.allocPixels(size, size, true));
+  auto* maskPixels = static_cast<uint8_t*>(maskBitmap.lockPixels());
+  ASSERT_NE(maskPixels, nullptr);
+  for (int y = 0; y < size; ++y) {
+    memset(maskPixels + static_cast<size_t>(y) * maskBitmap.rowBytes(), 0x80, size);
+  }
+  maskBitmap.unlockPixels();
+  auto mask = Image::MakeFrom(maskBitmap);
+  auto rgba = MakeImage("resources/apitest/mandrill_128.png");
+  auto source = MakeImage("resources/apitest/rgbaaa.png");
+  ASSERT_NE(mask, nullptr);
+  ASSERT_NE(rgba, nullptr);
+  ASSERT_NE(source, nullptr);
+  auto rgbaaa = source->makeRGBAAA(512, 512, 512, 0);
+  ASSERT_NE(rgbaaa, nullptr);
+  for (const auto& image : {rgba, mask, rgbaaa}) {
+    for (float alpha : {1.0f, 0.37f}) {
+      for (bool shifted : {false, true}) {
+        SCOPED_TRACE(image->isAlphaOnly());
+        SCOPED_TRACE(image == rgbaaa);
+        SCOPED_TRACE(alpha);
+        SCOPED_TRACE(shifted);
+        // The shifted draw leaves part of the target uncovered and samples at the image edge.
+        auto matrix = Matrix::MakeScale(static_cast<float>(size) / image->width(),
+                                        static_cast<float>(size) / image->height());
+        if (shifted) {
+          matrix.postTranslate(size * 0.3f, size * 0.2f);
+        }
+        Bitmap jit = {};
+        Bitmap dedicated = {};
+        Bitmap chain = {};
+        BrushRenderStats jitStats = {};
+        BrushRenderStats dedicatedStats = {};
+        BrushRenderStats chainStats = {};
+        RenderImageWithBrushOnce(image, nullptr, alpha, matrix, size, size, false, &jit, &jitStats);
+        RenderImageWithBrushOnce(image, nullptr, alpha, matrix, size, size, true, &dedicated,
+                                 &dedicatedStats);
+        RenderImageWithBrushOnce(image, nullptr, alpha, matrix, size, size, true, &chain,
+                                 &chainStats, true);
+        auto served = [](const BrushRenderStats& stats, const char* shader) {
+          return std::find(stats.shaders.begin(), stats.shaders.end(), shader) !=
+                 stats.shaders.end();
+        };
+        EXPECT_TRUE(served(dedicatedStats, "QuadTextureFillShader"));
+        EXPECT_FALSE(served(chainStats, "QuadTextureFillShader"));
+        EXPECT_TRUE(served(chainStats, "PointwiseChainShader"));
+        for (const auto* stats : {&dedicatedStats, &chainStats}) {
+          EXPECT_EQ(stats->noMatchingRule, 0u);
+          EXPECT_EQ(stats->programs.programBuilderCreations, 0u);
+          EXPECT_EQ(stats->draws.droppedDraws, 0u);
+        }
+        ExpectBitmapsNear("dedicated-vs-jit", dedicated, jit, size, size, ExperimentTolerance(1));
+        ExpectBitmapsNear("chain-vs-jit", chain, jit, size, size, ExperimentTolerance(1));
+        ExpectBitmapsNear("chain-vs-dedicated", chain, dedicated, size, size,
+                          ExperimentTolerance(1));
       }
     }
   }

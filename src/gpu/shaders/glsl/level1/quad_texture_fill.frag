@@ -118,33 +118,18 @@ void main() {
 
   // Perspective divide. For affine transforms z is 1.0 (no-op); for perspective it applies the
   // correct division.
-  highp vec2 texCoord = TransformedCoords_0.xy / TransformedCoords_0.z;
-  highp vec2 finalCoord = texCoord;
+  highp vec2 finalCoord = TransformedCoords_0.xy / TransformedCoords_0.z;
 
 #if HAS_SUBSET
-  // Full subset: clamp first by per-quad varying bounds, then by uniform safe range.
+  // Full subset: clamp first by the per-quad varying bounds; the uniform safe range follows inside
+  // aotTextureSource.
   finalCoord = aotTextureClamp(finalCoord, vTexSubset, true);
-  finalCoord = aotTextureClamp(finalCoord, Subset, SubsetClampOn != 0);
-#else
-  // Uniform-only clamp, mirroring the runtime TextureEffect's needSubset() gate: without the
-  // gate the clamp fires on out-of-range coordinates (perspective extrapolation, edge quads),
-  // zeroing the mip derivatives and diverging from the runtime codegen.
-  finalCoord = aotTextureClamp(finalCoord, Subset, SubsetClampOn != 0);
 #endif
-
-  vec4 color = aotTextureRead(TextureSampler_0, finalCoord, 0);
-
-  if (AlphaOnly != 0) {
-    color = aotTextureAlphaOnly(color);
-  }
-
-  if (HasRgbaaa != 0) {
-    highp vec2 alphaCoord = finalCoord + AlphaStart;
-    vec4 alpha = aotTextureRead(TextureSampler_0, alphaCoord, 0);
-    color = aotTextureDecodeRGBAAA(color, alpha);
-  }
-
-  color = aotTextureModulate(color, outputColor, AlphaOnly != 0);
+  // The uniform clamp mirrors the runtime TextureEffect's needSubset() gate (SubsetClampOn): without
+  // the gate it fires on out-of-range coordinates (perspective extrapolation, edge quads), zeroing
+  // the mip derivatives and diverging from the runtime codegen.
+  vec4 color = aotTextureSource(TextureSampler_0, finalCoord, outputColor, Subset, SubsetClampOn,
+                                AlphaStart, AlphaOnly, HasRgbaaa, 0);
 
   float maskAlpha = 1.0;
   if (HasDeviceMask != 0) {

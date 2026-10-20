@@ -421,6 +421,17 @@ class PrecompiledShaderCache {
     return _decompositionEnabled.load(std::memory_order_relaxed);
   }
 
+  /// Diagnostic switch. On by default: a draw that a dedicated kernel family serves keeps that
+  /// family. Turning it off lets such a draw be rewritten onto the pointwise chain kernel, so a
+  /// test can run the same draw through both routes and compare them.
+  void setDedicatedKernelsEnabled(bool enabled) {
+    _dedicatedKernelsEnabled.store(enabled, std::memory_order_relaxed);
+  }
+
+  bool dedicatedKernelsEnabled() const {
+    return _dedicatedKernelsEnabled.load(std::memory_order_relaxed);
+  }
+
   /// Returns a snapshot of successful AOT pipeline records collected since the last reset.
   std::vector<PrecompiledHitRecord> hitRecords() const;
 
@@ -534,6 +545,7 @@ class PrecompiledShaderCache {
   std::atomic<bool> missPaused{false};
   std::atomic<bool> deliberateMarking{false};
   std::atomic<bool> _decompositionEnabled{true};
+  std::atomic<bool> _dedicatedKernelsEnabled{true};
   EmbeddedBundleState _embeddedBundleState = EmbeddedBundleState::NotAttempted;
   mutable std::mutex diagnosticsMutex = {};
   std::vector<PrecompiledHitRecord> _hitRecords = {};

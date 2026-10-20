@@ -31,4 +31,28 @@ vec4 aotTextureModulate(vec4 color, vec4 inputColor, bool modulateRGBA) {
   return color * inputColor.a;
 }
 
+// Coordinates are already perspective-divided by the caller. Subset gating and channel decode
+// order are explicit; alpha-only is applied before RGBAAA, matching TextureEffect.
+vec4 aotTextureSample(sampler2D texSampler, highp vec2 coord, vec4 subset, int subsetClampOn,
+                      vec2 alphaStart, int alphaOnly, int hasRgbaaa, int readSwizzle) {
+  highp vec2 finalCoord = aotTextureClamp(coord, subset, subsetClampOn != 0);
+  vec4 color = aotTextureRead(texSampler, finalCoord, readSwizzle);
+  if (alphaOnly != 0) {
+    color = aotTextureAlphaOnly(color);
+  }
+  if (hasRgbaaa != 0) {
+    vec4 alpha = aotTextureRead(texSampler, finalCoord + alphaStart, readSwizzle);
+    color = aotTextureDecodeRGBAAA(color, alpha);
+  }
+  return color;
+}
+
+vec4 aotTextureSource(sampler2D texSampler, highp vec2 coord, vec4 inputColor, vec4 subset,
+                      int subsetClampOn, vec2 alphaStart, int alphaOnly, int hasRgbaaa,
+                      int readSwizzle) {
+  vec4 color = aotTextureSample(texSampler, coord, subset, subsetClampOn, alphaStart, alphaOnly,
+                               hasRgbaaa, readSwizzle);
+  return aotTextureModulate(color, inputColor, alphaOnly != 0);
+}
+
 #endif
