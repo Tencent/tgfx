@@ -323,8 +323,10 @@ void OpaqueContext::flushPendingContour(const Contour& contour, const Matrix& ma
 }
 
 /**
- * Converts a brush to "opaque mode" by applying AlphaThreshold filter.
- * Semi-transparent pixels become fully opaque, while fully transparent pixels remain transparent.
+ * Converts a brush to "opaque mode": sampled color alpha is pushed through AlphaThreshold, and the
+ * geometric coverage is recorded without antialiasing. Those are two separate gates: a painter with
+ * a partially transparent image still paints opaque colors, while a pixel it covers partially is
+ * still decided one way or the other.
  */
 Brush GetOpaqueBrush(const Brush& brush) {
   Color color;
