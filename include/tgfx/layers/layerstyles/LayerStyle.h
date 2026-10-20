@@ -46,7 +46,7 @@ enum class LayerStyleExtraSourceType : uint32_t {
   /**
    * The layerStyle requires the layer contour to be drawn: the shared subtree recording, which
    * includes geometries from painters with alpha=0 and leaves out the painters flagged
-   * silhouetteOnly because those do not take part in drawing.
+   * silhouetteOnly, since those belong to the layer's own outline instead.
    */
   Contour = 1 << 0,
   /**
@@ -95,8 +95,8 @@ enum class LayerStyleType {
  *    semi-transparent pixels to fully opaque (fully transparent pixels are preserved).
  *
  * 2. **Contour** (layer contour): Similar to Content, but with two differences:
- *    - Includes geometries from painters with alpha=0. Painters flagged silhouetteOnly do not take
- *      part in this recording because they do not take part in drawing.
+ *    - Includes geometries from painters with alpha=0. Painters flagged silhouetteOnly belong to the
+ *      layer's own outline instead and are therefore left out here.
  *    - Replaces gradient fills with solid color fills (ignoring local transparency in gradients)
  *
  * 3. **Background** (layer background): The normally rendered content below the current layer.

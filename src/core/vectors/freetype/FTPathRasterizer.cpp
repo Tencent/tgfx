@@ -107,8 +107,9 @@ bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
       FT_Outline_Get_Bitmap(ftLibrary, &(outline->outline), &bitmap);
     }
     auto* pixels = static_cast<unsigned char*>(dstPixels);
-    // Coverage is a pixel-center decision, which is the rule the other rasterizers implement when
-    // antialiasing is off; the color-alpha threshold used by OpaqueContext is a separate gate.
+    // Decided by area: a pixel covered at least half way stays, the rest is dropped. The platform
+    // rasterizers apply their own no-anti-aliasing rules, so curved and rotated edges may differ by
+    // a pixel; the area threshold is the shared approximation, not an exact pixel-center rule.
     constexpr unsigned char COVERAGE_THRESHOLD = 128;
     for (int y = 0; y < targetInfo.height(); y++) {
       auto* row = pixels + static_cast<size_t>(y) * targetInfo.rowBytes();
