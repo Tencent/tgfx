@@ -130,8 +130,7 @@ class GlassStyle : public LayerStyle {
   }
 
   /**
-   * Glass samples the background, the shared contour raster (the fallback when the layer has no own
-   * geometry) and the layer's own geometry (the SDF shape and the coverage raster it derives from).
+   * Glass needs the background, the shared contour (its fallback) and the layer's own geometry.
    */
   uint32_t extraSourceType() const override {
     return static_cast<uint32_t>(LayerStyleExtraSourceType::Background) |

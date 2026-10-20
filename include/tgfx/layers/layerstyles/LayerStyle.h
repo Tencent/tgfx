@@ -54,20 +54,13 @@ enum class LayerStyleExtraSourceType : uint32_t {
    */
   Background = 1 << 1,
   /**
-   * The layerStyle draws from the layer's own geometry. The source carries the geometry of the
-   * layer's own painters without its descendants, and it includes painters with alpha=0 and the
-   * painters flagged silhouetteOnly, since both describe the layer's own shape even though neither
-   * paints. A style that declares it samples the own recording's raster and receives the matching
-   * vector shape through StyleInputSource::Type::OwnShape.
-   *
-   * The shape is absent when the own geometry cannot be expressed as a single StyledShape -- more
-   * than one geometry, more than one stroke style, or geometry that does not convert to a Shape --
-   * and the style must then fall back to its alpha-mask path. When the layer has no own geometry,
-   * the source stays absent and the content entry falls back to the shared subtree recordings. The
-   * own geometry never unions with a descendant's geometry, which is the intended behaviour and
-   * not a missing coverage. silhouetteOnly decides which recording the geometry enters and which
-   * shape pairs with it; whether it paints is still decided by its alpha, so a caller that needs
-   * geometry without visible color must set the alpha to 0.
+   * The layerStyle draws from the layer's own geometry: its own painters without descendants,
+   * including painters with alpha=0 and those flagged silhouetteOnly. The paired StyledShape is
+   * absent when the geometry cannot be expressed as one shape -- several geometries, several stroke
+   * styles, or no Shape conversion -- and the style then uses its alpha-mask path. Without own
+   * geometry the source is absent and content falls back to the shared subtree recording. Own
+   * geometry never unions with a descendant's; silhouetteOnly picks the recording, while alpha still
+   * decides whether the painter is drawn.
    */
   OwnShape = 1 << 2
 };

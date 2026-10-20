@@ -93,9 +93,8 @@ bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   auto outlines = ftPath.getOutlines();
   auto ftLibrary = FTLibrary::Get();
   if (!antiAlias) {
-    // Only the smooth rasterizer honors FT_OUTLINE_EVEN_ODD_FILL, so a monochrome bitmap would drop
-    // even-odd holes. Render with the smooth rasterizer and binarize instead: the fill rule stays
-    // correct and the coverage is still hard 0/255.
+    // A monochrome bitmap drops even-odd holes, because only the smooth rasterizer honors the fill
+    // rule. Render smooth, then binarize.
     FT_Bitmap bitmap;
     bitmap.width = static_cast<unsigned>(targetInfo.width());
     bitmap.rows = static_cast<unsigned>(targetInfo.height());
@@ -107,9 +106,8 @@ bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
       FT_Outline_Get_Bitmap(ftLibrary, &(outline->outline), &bitmap);
     }
     auto* pixels = static_cast<unsigned char*>(dstPixels);
-    // Decided by area: a pixel covered at least half way stays, the rest is dropped. The platform
-    // rasterizers apply their own no-anti-aliasing rules, so curved and rotated edges may differ by
-    // a pixel; the area threshold is the shared approximation, not an exact pixel-center rule.
+    // Area at least half stays. The platform rasterizers use their own hard-edge rules, so curved
+    // edges may differ by a pixel.
     constexpr unsigned char COVERAGE_THRESHOLD = 128;
     for (int y = 0; y < targetInfo.height(); y++) {
       auto* row = pixels + static_cast<size_t>(y) * targetInfo.rowBytes();

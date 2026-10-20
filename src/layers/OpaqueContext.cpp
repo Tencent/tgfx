@@ -323,23 +323,18 @@ void OpaqueContext::flushPendingContour(const Contour& contour, const Matrix& ma
 }
 
 /**
- * Converts a brush to "opaque mode": sampled color alpha is pushed through AlphaThreshold, and the
- * geometric coverage is recorded without antialiasing. Those are two separate gates: a painter with
- * a partially transparent image still paints opaque colors, while a pixel it covers partially is
- * still decided one way or the other.
+ * Switches a brush to "opaque mode": opaque sampled colors, hard-edged geometric coverage.
  */
 Brush GetOpaqueBrush(const Brush& brush) {
   Color color;
   if (brush.shader && !brush.shader->asColor(&color)) {
     auto opaqueBrush = brush;
     opaqueBrush.colorFilter = ColorFilter::AlphaThreshold(OPAQUE_THRESHOLD);
-    // Sample alpha and geometric coverage are two different gates: the filter makes sampled alpha
-    // opaque, and this flag makes the coverage hard-edged like the solid path below.
+    // The filter makes sampled alpha opaque; this flag makes the coverage hard-edged.
     opaqueBrush.antiAlias = false;
     return opaqueBrush;
   }
-  // SrcOver is the compositing rule for independent painters; their boundary coverage is binary
-  // because this brush requests no antialiasing.
+  // SrcOver for independent painters; coverage is binary because antialiasing is off.
   auto opaqueBrush = Brush(Color::White(), BlendMode::SrcOver, false);
   opaqueBrush.maskFilter = brush.maskFilter;
   return opaqueBrush;
