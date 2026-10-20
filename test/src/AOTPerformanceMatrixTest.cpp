@@ -624,9 +624,11 @@ TGFX_TEST(AOTPerformanceMatrixTest, ChainVsDedicatedDecomposition) {
   cache->setDecompositionEnabled(true);
 }
 
-// The same three routes for the two hottest dedicated families, a plain texture fill and a solid
-// ellipse, with the dedicated family forced off for the chain row. Route evidence prints with each
-// row so a row that silently landed on another family is visible.
+// The same three routes for the hot dedicated families, with the dedicated family forced off for
+// the chain row. Route evidence prints with each row so a row that silently landed on another
+// family is visible. A path draws as an alpha mask below 162 pixels and as triangles above, so the
+// "path" scene changes family between the two sizes. The "filter" scene is only reachable by the
+// dedicated family with the chain rewrite off, which its dedicated row turns off.
 TGFX_TEST(AOTPerformanceMatrixTest, DedicatedVsChainHotFamilies) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -635,37 +637,85 @@ TGFX_TEST(AOTPerformanceMatrixTest, DedicatedVsChainHotFamilies) {
   auto* cache = context->precompiledShaderCache();
   auto image = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_NE(image, nullptr);
+  struct SceneCase {
+    std::string name;
+    std::function<void(Canvas*)> draw;
+    bool plainMatcherForDedicated;
+  };
   for (int size : {128, 512}) {
     const float scale = static_cast<float>(size) / 128.0f;
-    std::vector<std::pair<std::string, std::function<void(Canvas*)>>> scenes = {};
-    scenes.emplace_back("texture", [&](Canvas* canvas) {
-      canvas->save();
-      canvas->scale(scale, scale);
-      Paint paint = {};
-      paint.setAlpha(0.8f);
-      canvas->drawImage(image, 0, 0, &paint);
-      canvas->restore();
-    });
-    scenes.emplace_back("ellipse", [&](Canvas* canvas) {
-      Paint paint = {};
-      paint.setColor(Color::FromRGBA(220, 60, 40, 255));
-      paint.setAntiAlias(true);
-      canvas->drawOval(Rect::MakeXYWH(8 * scale, 12 * scale, 110 * scale, 100 * scale), paint);
-    });
+    Path star = {};
+    for (int i = 0; i < 10; ++i) {
+      const float angle = static_cast<float>(i) * 3.14159265f / 5 - 3.14159265f / 2;
+      const float radius = (i % 2 == 0 ? 56.0f : 25.0f) * scale;
+      const float x = 64.0f * scale + radius * std::cos(angle);
+      const float y = 64.0f * scale + radius * std::sin(angle);
+      i == 0 ? star.moveTo(x, y) : star.lineTo(x, y);
+    }
+    star.close();
+    std::vector<SceneCase> scenes = {};
+    scenes.push_back({"texture",
+                      [&](Canvas* canvas) {
+                        canvas->save();
+                        canvas->scale(scale, scale);
+                        Paint paint = {};
+                        paint.setAlpha(0.8f);
+                        canvas->drawImage(image, 0, 0, &paint);
+                        canvas->restore();
+                      },
+                      false});
+    scenes.push_back({"filter",
+                      [&](Canvas* canvas) {
+                        canvas->save();
+                        canvas->scale(scale, scale);
+                        Paint paint = {};
+                        paint.setColorFilter(ColorFilter::Matrix(WarmMatrix()));
+                        canvas->drawImage(image, 0, 0, &paint);
+                        canvas->restore();
+                      },
+                      true});
+    scenes.push_back({"rect",
+                      [&](Canvas* canvas) {
+                        Paint paint = {};
+                        paint.setColor(Color::FromRGBA(220, 60, 40, 255));
+                        paint.setAntiAlias(true);
+                        canvas->drawRect(
+                            Rect::MakeXYWH(8.3f * scale, 12.6f * scale, 110.2f * scale, 100.4f * scale),
+                            paint);
+                      },
+                      false});
+    scenes.push_back({"ellipse",
+                      [&](Canvas* canvas) {
+                        Paint paint = {};
+                        paint.setColor(Color::FromRGBA(220, 60, 40, 255));
+                        paint.setAntiAlias(true);
+                        canvas->drawOval(
+                            Rect::MakeXYWH(8 * scale, 12 * scale, 110 * scale, 100 * scale), paint);
+                      },
+                      false});
+    scenes.push_back({"path",
+                      [&](Canvas* canvas) {
+                        Paint paint = {};
+                        paint.setColor(Color::FromRGBA(220, 60, 40, 255));
+                        paint.setAntiAlias(true);
+                        canvas->drawPath(star, paint);
+                      },
+                      false});
     for (const auto& entry : scenes) {
-      MeasureRoute(context, cache, false, entry.second, size);
-      auto dedicated = MeasureRoute(context, cache, true, entry.second, size, true, true);
-      auto chain = MeasureRoute(context, cache, true, entry.second, size, true, false);
-      auto runtime = MeasureRoute(context, cache, false, entry.second, size);
+      MeasureRoute(context, cache, false, entry.draw, size);
+      auto dedicated = MeasureRoute(context, cache, true, entry.draw, size,
+                                    !entry.plainMatcherForDedicated, true);
+      auto chain = MeasureRoute(context, cache, true, entry.draw, size, true, false);
+      auto runtime = MeasureRoute(context, cache, false, entry.draw, size);
       EXPECT_EQ(dedicated.runtimePrograms, 0u);
       EXPECT_EQ(chain.runtimePrograms, 0u);
-      PrintResult((entry.first + "-dedicated").c_str(), "aot", dedicated, size);
-      PrintResult((entry.first + "-chain").c_str(), "aot", chain, size);
-      PrintResult((entry.first + "-runtime").c_str(), "runtime", runtime, size);
+      PrintResult((entry.name + "-dedicated").c_str(), "aot", dedicated, size);
+      PrintResult((entry.name + "-chain").c_str(), "aot", chain, size);
+      PrintResult((entry.name + "-runtime").c_str(), "runtime", runtime, size);
       printf(
           "[HotFamilyGap] %s size=%d dedicatedHot=%.3fms chainHot=%.3fms runtimeHot=%.3fms "
           "chain/dedicated=%.2fx dedicated/runtime=%.2fx\n",
-          entry.first.c_str(), size, dedicated.hotMedianMs, chain.hotMedianMs, runtime.hotMedianMs,
+          entry.name.c_str(), size, dedicated.hotMedianMs, chain.hotMedianMs, runtime.hotMedianMs,
           dedicated.hotMedianMs > 0 ? chain.hotMedianMs / dedicated.hotMedianMs : 0.0,
           runtime.hotMedianMs > 0 ? dedicated.hotMedianMs / runtime.hotMedianMs : 0.0);
     }

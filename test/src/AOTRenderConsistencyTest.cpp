@@ -1935,9 +1935,12 @@ enum class KernelRoute { Runtime, Dedicated, Chain };
 
 // Renders a scene through one route. Runtime is the JIT reference; Dedicated lets the matcher pick
 // the dedicated family; Chain sends the same draw through the pointwise chain kernel.
+//
+// plainMatcher turns the chain rewrite off for the Dedicated route. Some families are only reachable
+// that way: the rewrite takes the draw before the matcher sees it.
 static void RenderSceneThroughRoute(const std::function<void(Canvas*)>& scene, int width,
                                     int height, KernelRoute route, Bitmap* outBitmap,
-                                    BrushRenderStats* outStats) {
+                                    BrushRenderStats* outStats, bool plainMatcher = false) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -1949,7 +1952,7 @@ static void RenderSceneThroughRoute(const std::function<void(Canvas*)>& scene, i
     cache->unload();
   }
   ScopedAOTStatsPause statsPause(context, !useBundle);
-  cache->setDecompositionEnabled(useBundle);
+  cache->setDecompositionEnabled(useBundle && !(plainMatcher && route == KernelRoute::Dedicated));
   cache->setDedicatedKernelsEnabled(route != KernelRoute::Chain);
   cache->setDiagnosticRecordingEnabled(true);
   cache->resetStats();
@@ -1985,7 +1988,7 @@ static void RenderSceneThroughRoute(const std::function<void(Canvas*)>& scene, i
 static void ExpectDedicatedAndChainAgree(const char* label,
                                          const std::function<void(Canvas*)>& scene, int width,
                                          int height, const char* dedicatedShader,
-                                         const char* chainShader) {
+                                         const char* chainShader, bool plainMatcher = false) {
   SCOPED_TRACE(label);
   Bitmap jit = {};
   Bitmap dedicated = {};
@@ -1995,14 +1998,23 @@ static void ExpectDedicatedAndChainAgree(const char* label,
   BrushRenderStats chainStats = {};
   RenderSceneThroughRoute(scene, width, height, KernelRoute::Runtime, &jit, &jitStats);
   RenderSceneThroughRoute(scene, width, height, KernelRoute::Dedicated, &dedicated,
-                          &dedicatedStats);
+                          &dedicatedStats, plainMatcher);
   RenderSceneThroughRoute(scene, width, height, KernelRoute::Chain, &chain, &chainStats);
   auto served = [](const BrushRenderStats& stats, const char* shader) {
     return std::find(stats.shaders.begin(), stats.shaders.end(), shader) != stats.shaders.end();
   };
-  EXPECT_TRUE(served(dedicatedStats, dedicatedShader));
-  EXPECT_FALSE(served(chainStats, dedicatedShader));
-  EXPECT_TRUE(served(chainStats, chainShader));
+  auto describe = [](const BrushRenderStats& stats) {
+    std::string text = {};
+    for (const auto& shader : stats.shaders) {
+      text += shader + " ";
+    }
+    return text;
+  };
+  EXPECT_TRUE(served(dedicatedStats, dedicatedShader))
+      << "dedicated route served: " << describe(dedicatedStats);
+  EXPECT_FALSE(served(chainStats, dedicatedShader))
+      << "chain route served: " << describe(chainStats);
+  EXPECT_TRUE(served(chainStats, chainShader)) << "chain route served: " << describe(chainStats);
   for (const auto* stats : {&dedicatedStats, &chainStats}) {
     EXPECT_EQ(stats->noMatchingRule, 0u);
     EXPECT_EQ(stats->programs.programBuilderCreations, 0u);
@@ -2048,6 +2060,177 @@ TGFX_TEST(AOTRenderConsistencyTest, DedicatedAndChainAgreeOnEllipseDraws) {
       }
     }
   }
+}
+
+// A solid-color rectangle is the most common draw. QuadColorFillShader and the chain's ConstColor
+// program share the clip, device-mask and XP modules; this guards the wiring around them: the
+// per-vertex AA coverage, the exact Color uniform versus the quantized color varying, and how the
+// coverage reaches a dst-reading blend.
+TGFX_TEST(AOTRenderConsistencyTest, DedicatedAndChainAgreeOnRectFills) {
+  SKIP_ON_SWIFTSHADER_ENV();
+  constexpr int size = 96;
+  for (float alpha : {1.0f, 0.37f}) {
+    for (int clipMode : {0, 1, 2}) {
+      for (BlendMode blend : {BlendMode::SrcOver, BlendMode::Multiply}) {
+        auto scene = [=](Canvas* canvas) {
+          if (clipMode == 1) {
+            canvas->clipRect(Rect::MakeLTRB(14.25f, 10.5f, 85.75f, 89.5f), true);
+          } else if (clipMode == 2) {
+            Path clip = {};
+            clip.addRoundRect(Rect::MakeLTRB(12.5f, 12.5f, 83.5f, 83.5f), 14.0f, 9.0f);
+            canvas->clipPath(clip);
+          }
+          Paint paint = {};
+          paint.setColor(Color::FromRGBA(220, 60, 40, 255));
+          paint.setAlpha(alpha);
+          paint.setBlendMode(blend);
+          paint.setAntiAlias(true);
+          canvas->drawRect(Rect::MakeLTRB(5.3f, 8.6f, 90.4f, 87.7f), paint);
+        };
+        std::string label = std::string("alpha=") + std::to_string(alpha) +
+                            " clip=" + std::to_string(clipMode) +
+                            (blend == BlendMode::SrcOver ? " srcover" : " multiply");
+        ExpectDedicatedAndChainAgree(label.c_str(), scene, size, size, "QuadColorFillShader",
+                                     "PointwiseChainShader");
+      }
+    }
+  }
+}
+
+// An image followed by one pointwise operator is served by TexturedEffectShader, which selects the
+// operator at draw time through the OpType uniform, while the chain runs it as a slot. With the
+// chain rewrite on (the default) the chain takes these draws before the matcher sees them, so the
+// dedicated route here runs with the rewrite off; only a color-space transform reaches the family
+// by default. Both call
+// the pmApply* functions of pointwise_math.inc; this guards the wiring around them: the operand
+// premultiplication, the paint alpha entering before the operator, and the dst-reading blend. The
+// image carries a horizontal alpha ramp so the unpremultiply and the threshold have work to do.
+TGFX_TEST(AOTRenderConsistencyTest, DedicatedAndChainAgreeOnTexturedEffectDraws) {
+  SKIP_ON_SWIFTSHADER_ENV();
+  constexpr int size = 96;
+  constexpr int imageSize = 64;
+  Bitmap bitmap = {};
+  ASSERT_TRUE(bitmap.allocPixels(imageSize, imageSize));
+  auto* pixels = static_cast<uint8_t*>(bitmap.lockPixels());
+  ASSERT_NE(pixels, nullptr);
+  for (int y = 0; y < imageSize; ++y) {
+    for (int x = 0; x < imageSize; ++x) {
+      auto* pixel = pixels + static_cast<size_t>(y) * bitmap.rowBytes() + static_cast<size_t>(x) * 4;
+      const int alpha = 3 + x * 4;
+      pixel[0] = static_cast<uint8_t>(200 * alpha / 255);
+      pixel[1] = static_cast<uint8_t>((60 + y * 2) * alpha / 255);
+      pixel[2] = static_cast<uint8_t>(40 * alpha / 255);
+      pixel[3] = static_cast<uint8_t>(alpha);
+    }
+  }
+  bitmap.unlockPixels();
+  auto image = Image::MakeFrom(bitmap);
+  ASSERT_NE(image, nullptr);
+  const std::array<float, 20> warm = {1.1f, 0.05f, 0, 0, 0.02f, 0, 0.95f, 0, 0, 0,
+                                      0,    0,     0.8f, 0, 0,   0, 0,     0, 1, 0};
+  struct FilterCase {
+    const char* name;
+    std::shared_ptr<ColorFilter> filter;
+  };
+  const std::vector<FilterCase> filters = {{"matrix", ColorFilter::Matrix(warm)},
+                                           {"luma", ColorFilter::Luma()},
+                                           {"threshold", ColorFilter::AlphaThreshold(0.5f)}};
+  for (const auto& entry : filters) {
+    ASSERT_NE(entry.filter, nullptr);
+    for (float alpha : {1.0f, 0.37f}) {
+      for (BlendMode blend : {BlendMode::SrcOver, BlendMode::Multiply}) {
+        auto scene = [=](Canvas* canvas) {
+          Paint paint = {};
+          paint.setAlpha(alpha);
+          paint.setBlendMode(blend);
+          paint.setColorFilter(entry.filter);
+          // Pixel aligned: an edge that needs antialiasing selects QuadPerEdgeAA geometry, which
+          // TexturedEffectShader does not serve. 64 * 1.5 fills the target exactly.
+          canvas->concat(Matrix::MakeScale(1.5f, 1.5f));
+          canvas->drawImage(image, 0, 0, &paint);
+        };
+        std::string label = std::string(entry.name) + " alpha=" + std::to_string(alpha) +
+                            (blend == BlendMode::SrcOver ? " srcover" : " multiply");
+        ExpectDedicatedAndChainAgree(label.c_str(), scene, size, size, "TexturedEffectShader",
+                                     "PointwiseChainShader", true);
+      }
+    }
+  }
+}
+
+// A filled path reaches DefaultGeometryProcessor in one of two forms, chosen by
+// PathTriangulator::ShouldTriangulatePath: a path whose longer side is at most 162 pixels is
+// rasterized into an alpha mask (MaskFillShader), a larger one is tessellated into triangles whose
+// antialiasing is per-vertex coverage (SolidColorFillShader). Both share the clip and XP modules
+// with the chain; this guards the wiring around them: the coverage varying or mask sample, the clip
+// product, and how both reach a dst-reading blend.
+static Path MakeStarPath(float scale) {
+  Path path = {};
+  constexpr int points = 5;
+  for (int i = 0; i < points * 2; ++i) {
+    const float angle = static_cast<float>(i) * 3.14159265f / points - 3.14159265f / 2;
+    const float radius = (i % 2 == 0 ? 44.3f : 19.7f) * scale;
+    const float x = (48.4f + 0.0f) * scale + radius * std::cos(angle);
+    const float y = (49.1f + 0.0f) * scale + radius * std::sin(angle);
+    if (i == 0) {
+      path.moveTo(x, y);
+    } else {
+      path.lineTo(x, y);
+    }
+  }
+  path.close();
+  return path;
+}
+
+static void ExpectPathFillsAgree(const char* family, float scale, int size,
+                                 const std::vector<int>& clipModes) {
+  const Path star = MakeStarPath(scale);
+  for (bool antiAlias : {true, false}) {
+    for (float alpha : {1.0f, 0.37f}) {
+      for (int clipMode : clipModes) {
+        for (BlendMode blend : {BlendMode::SrcOver, BlendMode::Multiply}) {
+          auto scene = [=](Canvas* canvas) {
+            if (clipMode == 1) {
+              canvas->clipRect(
+                  Rect::MakeLTRB(14.25f * scale, 10.5f * scale, 85.75f * scale, 89.5f * scale),
+                  true);
+            } else if (clipMode == 2) {
+              Path clip = {};
+              clip.addRoundRect(
+                  Rect::MakeLTRB(12.5f * scale, 12.5f * scale, 83.5f * scale, 83.5f * scale),
+                  14.0f * scale, 9.0f * scale);
+              canvas->clipPath(clip);
+            }
+            Paint paint = {};
+            paint.setColor(Color::FromRGBA(220, 60, 40, 255));
+            paint.setAlpha(alpha);
+            paint.setBlendMode(blend);
+            paint.setAntiAlias(antiAlias);
+            canvas->drawPath(star, paint);
+          };
+          std::string label = std::string(family) + (antiAlias ? " aa" : " nonaa") +
+                              " alpha=" + std::to_string(alpha) +
+                              " clip=" + std::to_string(clipMode) +
+                              (blend == BlendMode::SrcOver ? " srcover" : " multiply");
+          ExpectDedicatedAndChainAgree(label.c_str(), scene, size, size, family,
+                                       "PointwiseChainShader");
+        }
+      }
+    }
+  }
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, DedicatedAndChainAgreeOnTriangulatedPathFills) {
+  SKIP_ON_SWIFTSHADER_ENV();
+  // 2.3 times the base star is about 204 pixels wide: past the 162 pixel rasterization limit.
+  ExpectPathFillsAgree("SolidColorFillShader", 2.3f, 220, {0, 1, 2});
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, DedicatedAndChainAgreeOnMaskedPathFills) {
+  SKIP_ON_SWIFTSHADER_ENV();
+  // A clip adds a coverage processor that MaskFillShader does not serve, so the draw would take
+  // the chain route on both sides and prove nothing; only the unclipped form is compared.
+  ExpectPathFillsAgree("MaskFillShader", 1.0f, 96, {0});
 }
 
 TGFX_TEST(AOTRenderConsistencyTest, DedicatedAndChainAgreeOnTextureDraws) {
