@@ -1,14 +1,12 @@
-// TexturedEffectShader fragment shader
-// 冷结构类 uber for the (S1, none, {noXP,XP}, RGBA) class: samples one intermediate texture then
-// applies exactly one pointwise operator, selected at runtime by the OpType uniform. Merges the
-// former TexturedColorMatrix / TexturedLuma / TexturedAlphaThreshold / TexturedColorSpaceXform
-// shaders (identical skeleton, only the operator differed) into a single precompiled shader.
+// TexturedEffectShader fragment entry: one texture followed by exactly one pointwise operator,
+// selected at runtime by the OpType uniform (0 = ColorMatrix, 1 = Luma, 2 = AlphaThreshold,
+// 3 = ColorSpaceXform, set by the pointwise FP's onSetData).
 // Processor layout: ComposeFragmentProcessor(TextureEffect, <pointwise op>) OR the sibling form
 //                   [TextureEffect, <pointwise op>].
-// Permutation dimensions (frag): HAS_XP (int, 3), HAS_COVERAGE (bool)
-// Runtime uniform OpType selects the operator (set by the pointwise FP's onSetData):
-//   0 = ColorMatrix, 1 = Luma, 2 = AlphaThreshold, 3 = ColorSpaceXform
-// Subset is always declared and clamped; a draw without one uploads the full texture bounds.
+// The pipeline is the shared dedicated one (fill_fragment_main.inc); this file declares the
+// family's interface and selects the steps. Subset is always declared and clamped; a draw without
+// one uploads the full texture bounds.
+// Fragment dimensions: HAS_XP (int, 3), HAS_COVERAGE (bool).
 #version 450
 
 #ifndef HAS_XP
@@ -33,54 +31,9 @@ layout(location = 1) in float vCoverage;
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
 
 #define XP_DST_TEX_BINDING 1
-#include "xp_porter_duff.inc"
-#include "xp_porter_duff_fbf.inc"
-#include "xp_blend_pass.inc"
-
-layout(location = 0) out vec4 fragColor;
-
-#include "pointwise_op.inc"
-
-void main() {
-  vec4 outputColor = Color;
-  highp vec2 finalCoord = TransformedCoords_0;
-  finalCoord = clamp(finalCoord, Subset.xy, Subset.zw);
-
-  vec4 color = texture(TextureSampler_0, finalCoord);
-  // TextureEffect post-processing: intermediate is never alpha-only or RGBAAA.
-  color = color * outputColor.a;
-
-#if HAS_XP
-  // The operator and the XferProcessor's advanced blend share applyPointwiseOp's blend site: the
-  // second pass of this loop is the advanced blend (xp_blend_pass.inc). The pass count is uniform
-  // data, so the loop stays a loop instead of two inlined copies.
-  vec4 xpDst = xpReadDstColor();
-  vec4 xpBlended = vec4(0.0);
-  vec4 result = color;
-  int passCount = xpNeedsBlendPass() ? 2 : 1;
-  for (int pass = 0; pass < passCount; ++pass) {
-    bool xpPass = pass == 1;
-    vec4 value = applyPointwiseOp(0, result, xpPass, xpDst);
-    if (xpPass) {
-      xpBlended = value;
-    } else {
-      result = value;
-    }
-  }
-#define TGFX_XP_DST_COLOR xpDst
-#define TGFX_XP_BLENDED xpBlended
-#else
-  vec4 result = applyPointwiseOp(0, color);
-#endif
-
+#define FILL_SOURCE FILL_SOURCE_CLAMPED_TEXTURE
+#define FILL_OPERATOR 1
 #if HAS_COVERAGE
-// Per-vertex AA coverage: keep the un-premultiplied result for the XferProcessor lerp and multiply
-// coverage into the non-XP output (matches the coverage contract in xp_output.inc).
-#define TGFX_XP_SRC_COLOR (result * vCoverage)
-#define TGFX_XP_SRC_UNPREMUL result
-#define TGFX_XP_COVERAGE vec4(vCoverage)
-#else
-#define TGFX_XP_SRC_COLOR result
+#define FILL_COVERAGE FILL_COVERAGE_VERTEX
 #endif
-#include "xp_output.inc"
-}
+#include "fill_fragment_main.inc"
