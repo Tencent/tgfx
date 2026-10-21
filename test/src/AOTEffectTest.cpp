@@ -2504,8 +2504,15 @@ static void ExpectComposedClipsWithLocalMask(size_t rectCount, size_t rrectCount
   int previous = -4;
   for (size_t index = 2; index < chain->slotCount(); ++index) {
     const auto& slot = chain->slot(index);
-    EXPECT_EQ(slot.op,
-              index < 2 + rectCount ? AOTChainOp::AARectCoverage : AOTChainOp::RRectCoverage);
+    auto expectedRectOp = rectAntiAlias ? AOTChainOp::AARectCoverage : AOTChainOp::RRectCoverage;
+    EXPECT_EQ(slot.op, index < 2 + rectCount ? expectedRectOp : AOTChainOp::RRectCoverage);
+    if (!rectAntiAlias && index < 2 + rectCount) {
+      EXPECT_FLOAT_EQ(slot.rrectCoverage.antiAlias, 0.0f);
+      for (size_t corner = 0; corner < 4; ++corner) {
+        EXPECT_FLOAT_EQ(slot.rrectCoverage.radiiX[corner], 0.0f);
+        EXPECT_FLOAT_EQ(slot.rrectCoverage.radiiY[corner], 0.0f);
+      }
+    }
     EXPECT_EQ(slot.in0, previous);
     EXPECT_GE(slot.outRegister, 0);
     previous = slot.outRegister;
@@ -2520,7 +2527,10 @@ TGFX_TEST(AOTEffectTest, ComposedAnalyticClipsWithLocalMaskRespectBudgets) {
   ExpectComposedClipsWithLocalMask(2, 1, true, true);
   ExpectComposedClipsWithLocalMask(3, 0, true, false);
   ExpectComposedClipsWithLocalMask(1, 5, true, false);
-  ExpectComposedClipsWithLocalMask(1, 1, false, false);
+  // Non-AA rects share the four RRectCoverage slots with rounded rects.
+  ExpectComposedClipsWithLocalMask(1, 1, false, true);
+  ExpectComposedClipsWithLocalMask(4, 0, false, true);
+  ExpectComposedClipsWithLocalMask(5, 0, false, false);
 }
 
 static PlacementPtr<FragmentProcessor> MakeAdditionalAnalyticClip(BlockAllocator* allocator,

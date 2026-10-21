@@ -6478,6 +6478,8 @@ enum class ChainClipScene {
   ShapeMaskUnderRRect,
   ShapeMaskUnderLocalRect,
   ShaderMaskUnderLocalRect,
+  ShaderMaskUnderNonAALocalRect,
+  ShaderMaskUnderNonAADeviceRect,
 };
 
 static void RenderChainClipSceneOnce(ChainClipScene scene, bool useBundle, Bitmap* outBitmap,
@@ -6568,18 +6570,43 @@ static void RenderChainClipSceneOnce(ChainClipScene scene, bool useBundle, Bitma
       canvas->drawShape(Shape::MakeFrom(std::move(star)), shapePaint);
       break;
     }
-    case ChainClipScene::ShaderMaskUnderLocalRect: {
-      // The shader mask filter contributes an xfermode coverage (a blend-rooted subtree) and the
-      // rotated rect clip folds as a local-rect slot on top of it.
+    case ChainClipScene::ShaderMaskUnderLocalRect:
+    case ChainClipScene::ShaderMaskUnderNonAALocalRect:
+    case ChainClipScene::ShaderMaskUnderNonAADeviceRect: {
+      // The shader mask filter contributes an xfermode coverage (a blend-rooted subtree). AA rects
+      // use the dedicated rect slot, while non-AA rects reuse zero-radius RRectCoverage slots with
+      // antiAlias=0. The local variants rotate the clip so its device-to-local matrix is non-trivial.
+      const bool antiAlias = scene == ChainClipScene::ShaderMaskUnderLocalRect;
+      const bool localSpace = scene != ChainClipScene::ShaderMaskUnderNonAADeviceRect;
       auto maskShader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp);
       ASSERT_TRUE(maskShader != nullptr);
       Paint maskPaint = {};
       maskPaint.setMaskFilter(MaskFilter::MakeShader(maskShader));
-      canvas->concat(Matrix::MakeTrans(90, 90) * Matrix::MakeRotate(18) *
-                     Matrix::MakeTrans(-90, -90));
-      canvas->clipRect(Rect::MakeLTRB(20, 24, 160, 156), true);
-      canvas->concat(Matrix::MakeTrans(90, 90) * Matrix::MakeRotate(-18) *
-                     Matrix::MakeTrans(-90, -90));
+      const bool cornerProbe = scene == ChainClipScene::ShaderMaskUnderNonAALocalRect;
+      Matrix clipMatrix = {};
+      Matrix inverseClipMatrix = {};
+      if (localSpace) {
+        if (cornerProbe) {
+          // Land the top-left local corner near the center of pixel (90, 90). The fractional rect
+          // edges exercise the hard-edge corner path with a non-trivial device-to-local matrix.
+          clipMatrix = Matrix::MakeTrans(90.5f, 90.5f) * Matrix::MakeRotate(18) *
+                       Matrix::MakeTrans(-20.5f, -24.5f);
+          inverseClipMatrix = Matrix::MakeTrans(20.5f, 24.5f) * Matrix::MakeRotate(-18) *
+                              Matrix::MakeTrans(-90.5f, -90.5f);
+        } else {
+          clipMatrix = Matrix::MakeTrans(90, 90) * Matrix::MakeRotate(18) *
+                       Matrix::MakeTrans(-90, -90);
+          inverseClipMatrix = Matrix::MakeTrans(90, 90) * Matrix::MakeRotate(-18) *
+                              Matrix::MakeTrans(-90, -90);
+        }
+        canvas->concat(clipMatrix);
+      }
+      auto clipRect = antiAlias ? Rect::MakeLTRB(20, 24, 160, 156)
+                                : Rect::MakeLTRB(20.6f, 24.6f, 160.4f, 156.4f);
+      canvas->clipRect(clipRect, antiAlias);
+      if (localSpace) {
+        canvas->concat(inverseClipMatrix);
+      }
       canvas->drawImage(image, 26, 26, &maskPaint);
       break;
     }
@@ -6624,6 +6651,10 @@ TGFX_TEST(AOTRenderConsistencyTest, ChainClipCoverageModes) {
                                  ChainClipScene::ShapeMaskUnderLocalRect);
   ExpectChainClipSceneConsistent("chain-shadermask-localrect",
                                  ChainClipScene::ShaderMaskUnderLocalRect);
+  ExpectChainClipSceneConsistent("chain-shadermask-non-aa-localrect",
+                                 ChainClipScene::ShaderMaskUnderNonAALocalRect);
+  ExpectChainClipSceneConsistent("chain-shadermask-non-aa-devicerect",
+                                 ChainClipScene::ShaderMaskUnderNonAADeviceRect);
 }
 
 // Builds a balanced binary blend tree over the given number of image leaves (cycling through the

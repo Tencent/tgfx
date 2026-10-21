@@ -224,9 +224,9 @@ static int MapChainInput(const std::vector<const AOTEffectNode*>& nodes,
   return slot == SIZE_MAX ? -2 : static_cast<int>(slot);
 }
 
-// A RectEffect folds into the chain's AARectCoverage slot only in its device-space AA form:
-// a transformed rect cannot be expressed by the device-space rect parameters, and the NonAA
-// hard edge is not implemented by the analytic coverage kernel.
+// A device-space AA RectEffect folds into the chain's dedicated AARectCoverage slot. Other AA
+// rects lower through RectCoverage, while non-AA rects use the existing zero-radius RRectCoverage
+// op with antiAlias=0, so no new shader variant is required.
 static bool IsChainFoldableRectEffect(const FragmentProcessor* fp) {
   if (fp == nullptr || fp->name() != "RectEffect" || fp->numChildProcessors() != 0) {
     return false;
@@ -236,17 +236,22 @@ static bool IsChainFoldableRectEffect(const FragmentProcessor* fp) {
 }
 
 // Analytic clip FPs folded onto the chain as color-root coverage slots (the two-FP coverage
-// forms). The device-space AA rects use the AARectCoverage slot op, the local-space AA rects the
-// LocalRectCoverage op, and the rrects RRectCoverage. The chain kernel carries two rect parameter
-// sets per space (arrays indexed by the slot's ordinal) and four rrect elements, so a coverage
-// exceeding those caps keeps the runtime route.
+// forms). Device-space AA rects use AARectCoverage, local-space AA rects use LocalRectCoverage,
+// and rrects plus non-AA rects use RRectCoverage. The kernel carries two rect parameter sets per
+// space and four rrect elements, so coverage exceeding those caps keeps the runtime route.
+struct ChainNonAARect {
+  Rect rect = {};
+  Matrix deviceToLocal = Matrix::I();
+};
+
 struct ChainClipSlots {
   std::vector<const RectEffect*> deviceRects = {};
   std::vector<const RectEffect*> localRects = {};
   std::vector<const RRectEffect*> rrects = {};
+  std::vector<ChainNonAARect> nonAARects = {};
 
   bool empty() const {
-    return deviceRects.empty() && localRects.empty() && rrects.empty();
+    return deviceRects.empty() && localRects.empty() && rrects.empty() && nonAARects.empty();
   }
 };
 
@@ -286,7 +291,11 @@ static bool CollectChainClipSlot(const FragmentProcessor* fp, ChainClipSlots* sl
   if (fp->name() == "RectEffect") {
     auto* rectEffect = static_cast<const RectEffect*>(fp);
     if (!rectEffect->isAntiAlias()) {
-      return false;
+      if (slots->nonAARects.size() + slots->rrects.size() >= 4) {
+        return false;
+      }
+      slots->nonAARects.push_back({rectEffect->getRect(), rectEffect->getDeviceToLocal()});
+      return true;
     }
     if (rectEffect->isDeviceSpaceRect()) {
       if (slots->deviceRects.size() >= 2) {
@@ -302,7 +311,7 @@ static bool CollectChainClipSlot(const FragmentProcessor* fp, ChainClipSlots* sl
     return true;
   }
   if (fp->name() == "RRectEffect") {
-    if (slots->rrects.size() >= 4) {
+    if (slots->rrects.size() + slots->nonAARects.size() >= 4) {
       return false;
     }
     slots->rrects.push_back(static_cast<const RRectEffect*>(fp));
@@ -942,6 +951,17 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
                                                      matrix[3], matrix[4], matrix[5],
                                                      matrix[6], matrix[7], matrix[8]};
     appendClipSlot(localRectSlot);
+  }
+  for (const auto& nonAARect : clipSlots.nonAARects) {
+    AOTChainSlot rectSlot = {};
+    rectSlot.op = AOTChainOp::RRectCoverage;
+    const auto& rect = nonAARect.rect;
+    rectSlot.rrectCoverage.rect = {rect.left, rect.top, rect.right, rect.bottom};
+    const auto& matrix = nonAARect.deviceToLocal;
+    rectSlot.rrectCoverage.deviceToLocal = {matrix[0], matrix[1], matrix[2], matrix[3], matrix[4],
+                                            matrix[5], matrix[6], matrix[7], matrix[8]};
+    rectSlot.rrectCoverage.antiAlias = 0.0f;
+    appendClipSlot(rectSlot);
   }
   for (auto* rrectEffect : clipSlots.rrects) {
     AOTChainSlot rrectSlot = {};
