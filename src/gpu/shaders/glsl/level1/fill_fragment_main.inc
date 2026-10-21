@@ -27,6 +27,10 @@
 #define FILL_SOURCE_TEXTURE 1
 // TextureSampler_0 at TransformedCoords_0 (vec2) clamped to Subset, times the color's alpha.
 #define FILL_SOURCE_CLAMPED_TEXTURE 2
+// Tiled-sampling recipe (tiled_sample.inc): the sample is modulated by the input color's alpha, or
+// by the alpha-only red channel. The recipe uniforms (ShaderModeX/Y, Subset, Clamp, Dimension,
+// AlphaOnly, Strict) are the family's interface.
+#define FILL_SOURCE_TILED 3
 
 #define FILL_COVERAGE_NONE 0
 #define FILL_COVERAGE_VERTEX 1   // vCoverage varying
@@ -34,6 +38,10 @@
 #define FILL_COVERAGE_MASK 3     // red channel of TextureSampler_0 at TransformedCoords_0
 #define FILL_COVERAGE_HAIRLINE_LINE 4  // hairline_line_coverage.inc on vEdgeDistance
 #define FILL_COVERAGE_HAIRLINE_QUAD 5  // hairline_quad_coverage.inc (Loop-Blinn) on vHairQuadEdge
+#define FILL_COVERAGE_RRECT 6           // rrect_coverage.inc (hard step) on vLocalCoord
+#define FILL_COVERAGE_COMPLEX_RRECT 7   // complex_rrect_coverage.inc (per-corner radii)
+#define FILL_COVERAGE_COMPLEX_ELLIPSE 8  // complex_ellipse_coverage.inc (region dispatch)
+#define FILL_COVERAGE_ROUND_STROKE 9    // round_stroke_rect_coverage.inc (cap/edge SDF)
 
 #define FILL_DEVICE_MASK_NONE 0
 #define FILL_DEVICE_MASK_ALWAYS 1   // MaskTextureSampler through DeviceCoordMatrix
@@ -69,8 +77,11 @@
 #if FILL_OPERATOR
 #include "xp_blend_pass.inc"
 #endif
-#if FILL_SOURCE != FILL_SOURCE_COLOR
+#if FILL_SOURCE == FILL_SOURCE_TEXTURE || FILL_SOURCE == FILL_SOURCE_CLAMPED_TEXTURE
 #include "texture_sampling.inc"
+#endif
+#if FILL_SOURCE == FILL_SOURCE_TILED
+#include "tiled_sample.inc"
 #endif
 #if FILL_COVERAGE == FILL_COVERAGE_ELLIPSE
 #include "ellipse_coverage.inc"
@@ -80,6 +91,18 @@
 #endif
 #if FILL_COVERAGE == FILL_COVERAGE_HAIRLINE_QUAD
 #include "hairline_quad_coverage.inc"
+#endif
+#if FILL_COVERAGE == FILL_COVERAGE_RRECT
+#include "rrect_coverage.inc"
+#endif
+#if FILL_COVERAGE == FILL_COVERAGE_COMPLEX_RRECT
+#include "complex_rrect_coverage.inc"
+#endif
+#if FILL_COVERAGE == FILL_COVERAGE_COMPLEX_ELLIPSE
+#include "complex_ellipse_coverage.inc"
+#endif
+#if FILL_COVERAGE == FILL_COVERAGE_ROUND_STROKE
+#include "round_stroke_rect_coverage.inc"
 #endif
 #if FILL_CLIP
 #include "clip_coverage.inc"
@@ -123,6 +146,24 @@ void main() {
 #elif FILL_SOURCE == FILL_SOURCE_CLAMPED_TEXTURE
   vec4 color = aotTextureSource(TextureSampler_0, TransformedCoords_0, outputColor, Subset, 1,
                                 vec2(0.0), 0, 0, 0);
+#elif FILL_SOURCE == FILL_SOURCE_TILED
+  // Tiled texture as the color source, single-tap modes only (the matcher rejects the
+  // mipmap-repeat modes for this kernel). Mirrors GLSLTiledTextureEffect's emission: the sample
+  // is modulated by the input color's alpha.
+  vec2 texCoord = TransformedCoords_0;
+  vec2 inCoord;
+  vec2 subsetCoord;
+  vec2 clampedCoord;
+  vec2 sampleCoord = tiledMapCoord(texCoord, Strict != 0, inCoord, subsetCoord, clampedCoord);
+  vec4 texColor = texture(TextureSampler_0, sampleCoord);
+  texColor = tiledApplyBorder(texColor, inCoord, subsetCoord, clampedCoord);
+  if (AlphaOnly != 0) {
+    texColor = vec4(texColor.r);
+    outputColor = texColor.a * outputColor;
+  } else {
+    outputColor = texColor * outputColor.a;
+  }
+  vec4 color = outputColor;
 #else
   vec4 color = outputColor;
 #endif
@@ -161,6 +202,34 @@ void main() {
   float totalCoverage = hairlineLineEdgeCoverage(vEdgeDistance, Coverage, AAEnabled);
 #elif FILL_COVERAGE == FILL_COVERAGE_HAIRLINE_QUAD
   float totalCoverage = hairlineQuadEdgeCoverage(vHairQuadEdge, Coverage, AAEnabled);
+#elif FILL_COVERAGE == FILL_COVERAGE_RRECT
+#if STROKE
+  float totalCoverage = nonAARRectCoverage(vLocalCoord, vRectBounds, vRadii, vStrokeWidth, true);
+#else
+  float totalCoverage = nonAARRectCoverage(vLocalCoord, vRectBounds, vRadii, vec2(0.0), false);
+#endif
+#elif FILL_COVERAGE == FILL_COVERAGE_COMPLEX_RRECT
+#if STROKE
+  float totalCoverage =
+      complexRRectCoverage(vLocalCoord, vRectBounds, vXRadii, vYRadii, vStrokeWidth, true);
+#else
+  float totalCoverage =
+      complexRRectCoverage(vLocalCoord, vRectBounds, vXRadii, vYRadii, vec2(0.0), false);
+#endif
+#elif FILL_COVERAGE == FILL_COVERAGE_COMPLEX_ELLIPSE
+#if STROKE
+  float totalCoverage =
+      complexEllipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, vEdgeDist, vStrokeWidth, true);
+#else
+  float totalCoverage =
+      complexEllipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, vEdgeDist, vec2(0.0), false);
+#endif
+#elif FILL_COVERAGE == FILL_COVERAGE_ROUND_STROKE
+#if HAS_AA
+  float totalCoverage = roundStrokeRectCoverage(vEllipseOffsets, vEllipseRadii, vCoverage, true);
+#else
+  float totalCoverage = roundStrokeRectCoverage(vEllipseOffsets, vec2(0.0), 0.0, false);
+#endif
 #else
   float totalCoverage = 1.0;
 #endif

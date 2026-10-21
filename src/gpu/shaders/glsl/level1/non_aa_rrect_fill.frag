@@ -1,9 +1,10 @@
-// NonAARRectFillShader fragment shader
-// Processor layout: NonAARRectGeometryProcessor() + EmptyXferProcessor/PorterDuffXP
-// Permutation dimensions (injected as #define 0/1):
-//   HAS_COMMON_COLOR: whether a common color uniform is used
-//   STROKE: whether stroke mode is enabled
-//   HAS_XP: 0=passthrough, 1=PorterDuff XP (dst texture blend)
+// NonAARRectFillShader fragment entry: NonAARRectGeometryProcessor + EmptyXferProcessor/PorterDuffXP.
+// The pipeline is the shared dedicated one (fill_fragment_main.inc); this file declares the family's
+// interface and selects the steps. The shape's hard rounded-rect step coverage (the stroke's inner
+// SDF included) is rrect_coverage.inc; the analytic draw clip (AA rect or rounded rect) rides the
+// shared runtime clip contract uniforms, so it costs no variant: the draw carries the clip FP only
+// for its uniforms. The block is unconditional because the contract fields must always be declared.
+// Fragment dimensions: HAS_COMMON_COLOR, STROKE, TEXTURED, HAS_XP (int, 3).
 #version 450
 
 #ifndef HAS_COMMON_COLOR
@@ -12,15 +13,12 @@
 #ifndef STROKE
 #define STROKE 0
 #endif
-#ifndef HAS_XP
-#define HAS_XP 0
-#endif
 #ifndef TEXTURED
 #define TEXTURED 0
 #endif
-// The analytic draw clip (AA rect or rounded rect) rides the shared runtime clip contract uniforms,
-// so it costs no variant: the draw carries the clip FP only for its uniforms. The block is
-// unconditional because the contract fields must always be declared.
+#ifndef HAS_XP
+#define HAS_XP 0
+#endif
 #define HAS_RUNTIME_CLIP 1
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
@@ -62,75 +60,17 @@ layout(location = 3) in vec2 vStrokeWidth;
 #endif
 
 #if TEXTURED
-  #define XP_DST_TEX_BINDING 1
+#define XP_DST_TEX_BINDING 1
 #else
-  #define XP_DST_TEX_BINDING 0
+#define XP_DST_TEX_BINDING 0
 #endif
-#include "xp_porter_duff.inc"
-#include "xp_porter_duff_fbf.inc"
-#include "clip_coverage.inc"
+
+#if !HAS_COMMON_COLOR
+#define FILL_COLOR FILL_COLOR_VARYING
+#endif
 #if TEXTURED
-#include "tiled_sample.inc"
+#define FILL_SOURCE FILL_SOURCE_TILED
 #endif
-
-layout(location = 0) out vec4 fragColor;
-
-void main() {
-#if HAS_COMMON_COLOR
-  vec4 outputColor = Color;
-#else
-  vec4 outputColor = vColor;
-#endif
-
-#if TEXTURED
-  // Tiled texture as the color source, single-tap modes only (the matcher rejects the
-  // mipmap-repeat modes for this kernel). Mirrors GLSLTiledTextureEffect's emission: the sample
-  // is modulated by the input color's alpha.
-  vec2 texCoord = TransformedCoords_0;
-  vec2 inCoord;
-  vec2 subsetCoord;
-  vec2 clampedCoord;
-  vec2 sampleCoord = tiledMapCoord(texCoord, Strict != 0, inCoord, subsetCoord, clampedCoord);
-  vec4 texColor = texture(TextureSampler_0, sampleCoord);
-  texColor = tiledApplyBorder(texColor, inCoord, subsetCoord, clampedCoord);
-  if (AlphaOnly != 0) {
-    texColor = vec4(texColor.r);
-    outputColor = texColor.a * outputColor;
-  } else {
-    outputColor = texColor * outputColor.a;
-  }
-#endif
-
-  // Outer round rect SDF
-  highp vec2 center = (vRectBounds.xy + vRectBounds.zw) * 0.5;
-  highp vec2 halfSize = (vRectBounds.zw - vRectBounds.xy) * 0.5;
-  highp vec2 q = abs(vLocalCoord - center) - halfSize + vRadii;
-  highp float d = min(max(q.x / vRadii.x, q.y / vRadii.y), 0.0) +
-                  length(max(q / vRadii, vec2(0.0))) - 1.0;
-  highp float outerCoverage = step(d, 0.0);
-
-#if STROKE
-  // Inner round rect SDF for stroke
-  highp vec2 innerHalfSize = halfSize - 2.0 * vStrokeWidth;
-  highp vec2 innerRadii = max(vRadii - 2.0 * vStrokeWidth, vec2(0.0));
-  highp float innerCoverage = 0.0;
-  if (innerHalfSize.x > 0.0 && innerHalfSize.y > 0.0) {
-    highp vec2 qi = abs(vLocalCoord - center) - innerHalfSize + innerRadii;
-    highp vec2 safeInnerRadii = max(innerRadii, vec2(0.001));
-    highp float di = min(max(qi.x / safeInnerRadii.x, qi.y / safeInnerRadii.y), 0.0) +
-                     length(max(qi / safeInnerRadii, vec2(0.0))) - 1.0;
-    innerCoverage = step(di, 0.0);
-  }
-  highp float coverage = outerCoverage * (1.0 - innerCoverage);
-#else
-  highp float coverage = outerCoverage;
-#endif
-
-// The analytic clip enters as coverage on top of the shape's step coverage; coverage_output.inc
-// hands xp_output.inc the uncovered color plus the total coverage, so the XferProcessor path does
-// not double-apply it.
-#define TGFX_COVERAGE_SRC_COLOR outputColor
-#define TGFX_INITIAL_COVERAGE vec4(coverage)
-#include "coverage_output.inc"
-#include "xp_output.inc"
-}
+#define FILL_COVERAGE FILL_COVERAGE_RRECT
+#define FILL_CLIP 1
+#include "fill_fragment_main.inc"

@@ -2239,6 +2239,159 @@ TGFX_TEST(AOTRenderConsistencyTest, DedicatedAndChainAgreeOnMaskedPathFills) {
 // the HAS_LOCAL_MASK variants). The chain rewrite takes mask-filter draws before the matcher sees
 // them, so the local-mask scenes run the dedicated route with the rewrite off. Both images carry
 // alpha ramps, so a mis-wired mask factor or a wrong coverage product shows.
+// The four remaining color-source shape families. The non-AA rounded rect is a hard SDF step
+// (rrect_coverage.inc, fill and stroke; a direct analytic clip is allowed and the per-vertex-color
+// variant covers HAS_COMMON_COLOR=0). The complex non-AA rounded rect carries per-corner radii
+// (complex_rrect_coverage.inc) and matches with no fragment processor at all, so its scenes draw
+// unclipped. The complex ellipse is the same per-corner shape with analytic AA
+// (complex_ellipse_coverage.inc), and the round stroke rect scales its vertex coverage with the
+// cap/edge ellipse SDF (round_stroke_rect_coverage.inc). Every dedicated route must serve exactly
+// the expected family with no ProgramBuilder fallback or dropped draw, and match JIT within the
+// experiment tolerance; the tiled scene runs with the chain rewrite off because the rewrite takes
+// shader-bearing draws before the matcher sees them.
+TGFX_TEST(AOTRenderConsistencyTest, ShapeStepFamiliesMatchRuntime) {
+  SKIP_ON_SWIFTSHADER_ENV();
+  constexpr int size = 96;
+  Bitmap bitmap = {};
+  ASSERT_TRUE(bitmap.allocPixels(24, 24));
+  auto* pixels = static_cast<uint32_t*>(bitmap.lockPixels());
+  for (int y = 0; y < 24; ++y) {
+    for (int x = 0; x < 24; ++x) {
+      const uint32_t alpha = static_cast<uint32_t>(40 + (x * 9 + y * 3) % 200);
+      const auto scale = [&](uint32_t channel) { return channel * alpha / 255; };
+      pixels[static_cast<size_t>(y) * 24 + static_cast<size_t>(x)] =
+          (alpha << 24) | (scale(190) << 16) | (scale(120) << 8) | scale(40);
+    }
+  }
+  bitmap.unlockPixels();
+  auto tileImage = Image::MakeFrom(bitmap);
+  ASSERT_NE(tileImage, nullptr);
+  auto uniformRRect = [] {
+    RRect rrect = {};
+    rrect.setRectXY(Rect::MakeXYWH(12, 14, 70, 66), 16.0f, 16.0f);
+    return rrect;
+  };
+  // Per-corner radii route the shape onto the complex geometry processors. Every corner keeps its
+  // axis ratio under 2 and its radii above the half stroke width, so the stroked form stays on the
+  // rrect op instead of falling back to the path stroker.
+  auto complexRRect = [] {
+    RRect rrect = {};
+    std::array<Point, 4> radii = {Point::Make(28, 20), Point::Make(16, 24), Point::Make(22, 12),
+                                  Point::Make(14, 18)};
+    rrect.setRectRadii(Rect::MakeXYWH(10, 12, 74, 70), radii);
+    return rrect;
+  };
+  struct ShapeCase {
+    const char* name;
+    const char* family;
+    bool plainMatcher;
+    std::function<void(Canvas*, Paint&, float)> draw;
+  };
+  const std::vector<ShapeCase> cases = {
+      {"rrect-fill", "NonAARRectFillShader", false,
+       [&](Canvas* canvas, Paint& paint, float) {
+         paint.setAntiAlias(false);
+         canvas->drawRRect(uniformRRect(), paint);
+       }},
+      {"rrect-stroke-clip", "NonAARRectFillShader", false,
+       [&](Canvas* canvas, Paint& paint, float) {
+         paint.setAntiAlias(false);
+         paint.setStyle(PaintStyle::Stroke);
+         paint.setStrokeWidth(6.0f);
+         canvas->clipRect(Rect::MakeLTRB(14.25f, 10.5f, 85.75f, 89.5f), true);
+         canvas->drawRRect(uniformRRect(), paint);
+       }},
+      {"rrect-fill-multicolor", "NonAARRectFillShader", false,
+       [&](Canvas* canvas, Paint& paint, float alpha) {
+         paint.setAntiAlias(false);
+         canvas->save();
+         canvas->drawRRect(uniformRRect(), paint);
+         paint.setColor(Color::FromRGBA(60, 200, 90, 255));
+         paint.setAlpha(alpha);
+         canvas->translate(0, 22);
+         canvas->drawRRect(uniformRRect(), paint);
+         canvas->restore();
+       }},
+      {"rrect-fill-tiled", "NonAARRectFillShader", true,
+       [&](Canvas* canvas, Paint& paint, float) {
+         paint.setAntiAlias(false);
+         paint.setShader(Shader::MakeImageShader(tileImage, TileMode::Repeat, TileMode::Repeat));
+         canvas->drawRRect(uniformRRect(), paint);
+       }},
+      {"complex-rrect-fill", "ComplexNonAARRectFillShader", false,
+       [&](Canvas* canvas, Paint& paint, float) {
+         paint.setAntiAlias(false);
+         canvas->drawRRect(complexRRect(), paint);
+       }},
+      {"complex-rrect-stroke", "ComplexNonAARRectFillShader", false,
+       [&](Canvas* canvas, Paint& paint, float) {
+         paint.setAntiAlias(false);
+         paint.setStyle(PaintStyle::Stroke);
+         paint.setStrokeWidth(6.0f);
+         canvas->drawRRect(complexRRect(), paint);
+       }},
+      {"complex-ellipse-fill", "ComplexEllipseFillShader", false,
+       [&](Canvas* canvas, Paint& paint, float) {
+         paint.setAntiAlias(true);
+         canvas->drawRRect(complexRRect(), paint);
+       }},
+      {"complex-ellipse-stroke", "ComplexEllipseFillShader", false,
+       [&](Canvas* canvas, Paint& paint, float) {
+         paint.setAntiAlias(true);
+         paint.setStyle(PaintStyle::Stroke);
+         paint.setStrokeWidth(6.0f);
+         canvas->drawRRect(complexRRect(), paint);
+       }},
+      {"round-stroke-aa", "RoundStrokeRectFillShader", false,
+       [&](Canvas* canvas, Paint& paint, float) {
+         // A round-capped stroke segment: the stroke geometry becomes a rect grown by the cap
+         // radius, its rounded ends evaluated by the offset-space SDF.
+         paint.setAntiAlias(true);
+         paint.setStyle(PaintStyle::Stroke);
+         paint.setStroke(Stroke(9.0f, LineCap::Round, LineJoin::Round));
+         canvas->drawRect(Rect::MakeXYWH(24, 28, 48, 40), paint);
+       }},
+      {"round-stroke-nonaa", "RoundStrokeRectFillShader", false,
+       [&](Canvas* canvas, Paint& paint, float) {
+         paint.setAntiAlias(false);
+         paint.setStyle(PaintStyle::Stroke);
+         paint.setStroke(Stroke(9.0f, LineCap::Round, LineJoin::Round));
+         canvas->drawRect(Rect::MakeXYWH(24, 28, 48, 40), paint);
+       }},
+  };
+  for (const auto& entry : cases) {
+    for (float alpha : {1.0f, 0.37f}) {
+      for (BlendMode blend : {BlendMode::SrcOver, BlendMode::Multiply}) {
+        auto scene = [&](Canvas* canvas) {
+          canvas->clear(Color::FromRGBA(240, 200, 120, 255));
+          Paint paint = {};
+          paint.setColor(Color::FromRGBA(220, 60, 40, 255));
+          paint.setAlpha(alpha);
+          paint.setBlendMode(blend);
+          entry.draw(canvas, paint, alpha);
+        };
+        std::string label = std::string(entry.name) + " alpha=" + std::to_string(alpha) +
+                            (blend == BlendMode::SrcOver ? " srcover" : " multiply");
+        SCOPED_TRACE(label);
+        Bitmap jit = {};
+        Bitmap dedicated = {};
+        BrushRenderStats jitStats = {};
+        BrushRenderStats dedicatedStats = {};
+        RenderSceneThroughRoute(scene, size, size, KernelRoute::Runtime, &jit, &jitStats);
+        RenderSceneThroughRoute(scene, size, size, KernelRoute::Dedicated, &dedicated,
+                                &dedicatedStats, entry.plainMatcher);
+        EXPECT_NE(std::find(dedicatedStats.shaders.begin(), dedicatedStats.shaders.end(),
+                            entry.family),
+                  dedicatedStats.shaders.end());
+        EXPECT_EQ(dedicatedStats.noMatchingRule, 0u);
+        EXPECT_EQ(dedicatedStats.programs.programBuilderCreations, 0u);
+        EXPECT_EQ(dedicatedStats.draws.droppedDraws, 0u);
+        ExpectBitmapsNear(label.c_str(), dedicated, jit, size, size, ExperimentTolerance(1));
+      }
+    }
+  }
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, QuadTextureMaskFactorsMatchRuntime) {
   SKIP_ON_SWIFTSHADER_ENV();
   constexpr int size = 96;
