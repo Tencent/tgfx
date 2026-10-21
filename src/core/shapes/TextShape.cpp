@@ -47,6 +47,25 @@ static bool FillsWholePlane(const Path& path) {
   return path.isEmpty() && path.isInverseFillType();
 }
 
+// Whether two outlines can be appended instead of merged. Three things have to hold, and disjoint
+// bounds only buys the last one:
+//  * the rules must match, because the merged path carries a single rule - appending a parity
+//    outline onto a winding one would fill the former's counters;
+//  * neither may be inverse, since an inverse outline covers the whole plane and swallows the rest;
+//  * the bounds must not meet, because once they do, two contours running opposite ways cancel
+//    where they cross and the union of the glyphs is lost.
+static bool CanAppendWithoutInteraction(const Path& total, const Path& glyph) {
+  if (total.getFillType() != glyph.getFillType()) {
+    return false;
+  }
+  if (total.isInverseFillType() || glyph.isInverseFillType()) {
+    return false;
+  }
+  auto a = total.getBounds();
+  auto b = glyph.getBounds();
+  return a.isEmpty() || b.isEmpty() || !a.intersect(b);
+}
+
 Path TextShape::onGetPath(float resolutionScale) const {
   if (FloatNearlyZero(resolutionScale)) {
     return {};
@@ -57,7 +76,6 @@ Path TextShape::onGetPath(float resolutionScale) const {
   // disagree would lose their meaning, and overlapping even-odd outlines would cancel each other
   // out. Collect them first to find out which case this blob is.
   std::vector<Path> glyphPaths = {};
-  auto needsUnion = false;
   for (auto run : *textBlob) {
     if (!run.font.hasOutlines()) {
       continue;
@@ -75,8 +93,6 @@ Path TextShape::onGetPath(float resolutionScale) const {
       }
       // A path without contour segments is empty, except when it carries an inverse fill type:
       // that one fills the whole plane. Only the genuinely empty outlines are dropped here.
-      // A path without contour segments is empty, except when it carries an inverse fill type:
-      // that one fills the whole plane. Only the genuinely empty outlines are dropped here.
       if (glyphPath.isEmpty() && !glyphPath.isInverseFillType()) {
         continue;
       }
@@ -84,9 +100,6 @@ Path TextShape::onGetPath(float resolutionScale) const {
       glyphMatrix.preScale(1.0f / resolutionScale, 1.0f / resolutionScale);
       glyphMatrix.postConcat(matrix);
       glyphPath.transform(glyphMatrix);
-      if (glyphPath.getFillType() != PathFillType::Winding) {
-        needsUnion = true;
-      }
       glyphPaths.push_back(std::move(glyphPath));
     }
   }
@@ -99,13 +112,24 @@ Path TextShape::onGetPath(float resolutionScale) const {
       havePath = true;
     } else if (FillsWholePlane(totalPath)) {
       continue;
-    } else if (needsUnion) {
+    } else if (CanAppendWithoutInteraction(totalPath, glyphPath)) {
+      // Appending keeps each outline's own area only when the two cannot touch: disjoint bounds
+      // mean no overlap to resolve. Two winding outlines that do overlap must still be unioned,
+      // because opposite directions cancel each other out where they meet - which is what a
+      // mirrored or reflected glyph produces.
+      totalPath.addPath(glyphPath);
+    } else {
       // isEmpty() cannot stand in for "not initialized" here: an intermediate result may fill the
       // whole plane, and pathops treats an empty operand as absent, dropping the inverse fill
       // type and with it the whole plane.
-      totalPath.addPath(glyphPath, PathOp::Union);
-    } else {
-      totalPath.addPath(glyphPath);
+      auto merged = false;
+      totalPath.addPath(glyphPath, PathOp::Union, &merged);
+      if (!merged) {
+        // Falling back to an append would hand back a shape whose filled area is not the union of
+        // the glyphs, which is the one thing this merge has to guarantee.
+        LOGE("TextShape::getPath() Failed to merge a glyph outline!");
+        return {};
+      }
     }
   }
   auto inverseMatrix = Matrix::MakeScale(1.f / resolutionScale, 1.f / resolutionScale);

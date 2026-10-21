@@ -321,6 +321,9 @@ TGFX_TEST(TypefaceTest, InverseGlyphUnionKeepsWholePlaneResult) {
   auto path = shape->getPath();
   // The first two glyphs already cover everything, so a point far outside the rectangle is filled.
   EXPECT_TRUE(path.contains(2000.0f, 2000.0f)) << "whole-plane result overwritten";
+  EXPECT_TRUE(path.contains(500, 500));
+  EXPECT_TRUE(path.isEmpty());
+  EXPECT_TRUE(path.isInverseFillType());
   EXPECT_EQ(shape->fillType(), path.getFillType());
 }
 
@@ -342,5 +345,46 @@ TGFX_TEST(TypefaceTest, OverlappingGlyphsDoNotCancelOut) {
   EXPECT_TRUE(path.contains(150.0f, 150.0f));
   // The counter of the first frame stays open.
   EXPECT_FALSE(path.contains(500.0f, 500.0f));
+}
+
+TGFX_TEST(TypefaceTest, OppositeWindingGlyphsDoNotCancelOut) {
+  Path first = {};
+  first.moveTo(0, 0);
+  first.lineTo(1000, 0);
+  first.lineTo(1000, 1000);
+  first.lineTo(0, 1000);
+  first.close();
+  first.setFillType(PathFillType::Winding);
+  Path second = {};
+  second.moveTo(0, 0);
+  second.lineTo(0, 1000);
+  second.lineTo(1000, 1000);
+  second.lineTo(1000, 0);
+  second.close();
+  second.setFillType(PathFillType::Winding);
+  ASSERT_TRUE(first.contains(500, 500));
+  ASSERT_TRUE(second.contains(500, 500));
+  auto appended = first;
+  appended.addPath(second);
+  ASSERT_FALSE(appended.contains(500, 500));
+
+  PathTypefaceBuilder builder(1000);
+  ASSERT_NE(builder.addGlyph(first, 1000), 0);
+  ASSERT_NE(builder.addGlyph(second, 1000), 0);
+  auto typeface = builder.detach();
+  ASSERT_TRUE(typeface != nullptr);
+  Font font(typeface, 1000);
+  GlyphID glyphs[] = {1, 2};
+  Point positions[] = {Point::Make(0, 0), Point::Make(100, 100)};
+  auto blob = TextBlob::MakeFrom(glyphs, positions, 2, font);
+  ASSERT_TRUE(blob != nullptr);
+  auto shape = Shape::MakeFrom(blob);
+  ASSERT_TRUE(shape != nullptr);
+  auto path = shape->getPath();
+  EXPECT_EQ(shape->fillType(), path.getFillType());
+  EXPECT_TRUE(path.contains(500, 500));
+  EXPECT_TRUE(path.contains(50, 50));
+  EXPECT_TRUE(path.contains(1050, 1050));
+  EXPECT_FALSE(path.contains(1200, 1200));
 }
 }  // namespace tgfx
