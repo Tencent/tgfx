@@ -26,6 +26,14 @@ namespace tgfx {
 // Single-pass extended pointwise graphs sharing the chain instruction ABI and GP layouts.
 // Resource kind 0 retains the fixed noise-quad subset; kind 1 supports one gradient and three
 // tiled-image recipes throughout the chain's reachable layouts.
+//
+// Graph is the Chain kernel with one extra module compiled in, not an independent shader: its
+// vertex domain is Chain's, its fragment domain is Chain's plus RESOURCE_KIND, and its reachable
+// set is derived from Chain's (EnumeratePointwiseGraphReachable). Changing a Chain dimension
+// therefore changes Graph too. It stays a separate family because its vertex stage also declares
+// CoordTransformMatrix_0 and the SourceCoords varying (TGFX_POINTWISE_SOURCE_COORDS).
+// At match time one probe (TryMatchPointwiseDAG) serves both: the pass's resource profile picks
+// the family, and a Graph draw that Compose cannot place is reported as PermutationNotEnumerated.
 class PointwiseGraphShader : public PrecompiledShader {
  public:
   using VD = PointwiseChainShader::VD;

@@ -32,13 +32,15 @@ namespace tgfx {
 ///   (per-vertex color is unconditional: providers always write a color slot, broadcasting the
 ///    record's paint color for uniform-color batches)
 ///   HAS_SUBSET         (bool): texture subset attribute present
+///   HAS_LOCAL_MASK     (bool): local-space mask attribute present
 ///   (Perspective is handled uniformly: the coord is always emitted as vec3 and divided in the
 ///    fragment shader; affine transforms yield z=1 so the divide is a no-op.)
 ///
-/// Fragment dimensions (same semantics as TextureFillShader):
-///   ALPHA_ONLY (bool): texture is alpha-only format
-///   HAS_RGBAAA (bool): RGBAAA dual-plane alpha encoding
-///   HAS_SUBSET (bool): subset clamping active
+/// Fragment dimensions:
+///   HAS_SUBSET     (bool): subset clamping active
+///   HAS_XP         (int, 3): the XferProcessor form
+///   HAS_LOCAL_MASK (bool): local-space mask applied
+///   (ALPHA_ONLY and HAS_RGBAAA are runtime uniforms, see below.)
 class QuadTextureFillShader : public PrecompiledShader {
  public:
   // Vertex dimensions

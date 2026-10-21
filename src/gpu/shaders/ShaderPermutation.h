@@ -28,10 +28,13 @@ namespace tgfx {
 /**
  * Binding-signature vocabulary for precompiled shader variants.
  *
- * A degree of freedom becomes a compile-time permutation dimension if and only if it changes GPU
+ * A degree of freedom may become a compile-time permutation dimension only if it changes GPU
  * resource binding: the number or type of sampler bindings, the attachment configuration, or the
  * varying/attribute layout. Everything else must be a runtime uniform. "The generated code would
- * contain an if" is not a justification — branches over uniform data are coherent and free.
+ * contain an if" is not a justification — a branch over uniform data is coherent and usually
+ * cheaper than another variant, though not free (dispatch, parameter reads, code size). Even a
+ * binding difference can sometimes be absorbed by a placeholder binding plus a uniform, as
+ * ComplexEllipseFillShader does for its mask sampler.
  *
  * Canonical axes (new kernels may only use these):
  *

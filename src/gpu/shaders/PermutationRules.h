@@ -50,6 +50,35 @@ namespace tgfx {
 //     a pass-through (geometry normalization, resource caps, format folding).
 //
 // ---------------------------------------------------------------------------------------
+// Three kinds of precompiled shader, and what each is for
+// ---------------------------------------------------------------------------------------
+//   1. Dedicated shaders (the level1/*Shader.h families other than Pointwise*): a fixed pattern
+//      with its own fast kernel; neighborhood work (blur, glass) lives here too. Add one when
+//      hit data or a measurement shows the pattern is worth a kernel of its own. Remove one only
+//      after every case it served is served another way — "zero hits in a sample" is not proof.
+//   2. Pointwise Chain/Graph: one per-pixel DAG interpreter. Graph is the same kernel with the
+//      noise or gradient module compiled in (PointwiseGraphShader derives from the Chain domains
+//      and enumeration; it stays a separate family because its vertex stage also carries the
+//      source-coordinate varying). New ops belong here only if they are cheap, per-pixel and
+//      general: every op is compiled into every variant. Do not grow the 16/32 slot capacities
+//      to fit longer compositions.
+//   3. Everything else: split into several passes where the planner supports it (only a linear
+//      run of single-input ops over one plain texture today), otherwise it is refused. With a
+//      loaded bundle there is no JIT fallback — a refused draw with no precompiled program is
+//      dropped, so check coverage after adding or changing anything.
+//
+// Adding a family:  family header (dims, info(), TGFX_REGISTER_SHADER) + GLSL + Inputs, Compose,
+//   Enumerate in this file/.cpp + Extract/TryMatch in PermutationMatcher.cpp (and the AAAA branch
+//   if it applies) + the family-count/pair-total assertions in ShaderPermutationTest.cpp. A new
+//   uniform field also needs a writer in the shared onSetData of the processor that owns it.
+// Removing a family: delete the same places in one change, keep the "removed family stays
+//   unregistered" assertion, and update the totals.
+// Changing dimensions: apply the admission test in ShaderPermutation.h, keep vertex/fragment
+//   mirrored dimensions in step, diff the reachable set before and after, update the totals. A
+//   change to a Chain dimension also reshapes Graph and re-encodes both bundles (bump the
+//   toolchain ABI in PrecompiledBundleIdentity.h).
+//
+// ---------------------------------------------------------------------------------------
 // Contract: adding a rule input field
 // ---------------------------------------------------------------------------------------
 // Adding a field to any *Inputs struct below must be synced in two places:
@@ -59,9 +88,10 @@ namespace tgfx {
 // If the field makes Compose REJECT a combination, the rejection must live in one shared
 // validity function that both Compose and the family's Enumerate* call (see the *ValuesAllowed
 // functions in PermutationRules.cpp) — never as two independently restated expressions. A
-// diverging copy silently OVER-compiles variants the runtime never requests: no test fails,
-// because the bundle counters read the same enumeration. When adding such a predicate, diff the
-// new reachable set against the previous one. Chain/Graph/YUV instead keep the input-lattice
+// diverging copy silently OVER-compiles variants the runtime never requests; the pair-total
+// assertion in ShaderPermutationTest.cpp catches the count change but not which family drifted.
+// When adding such a predicate, diff the new reachable set against the previous one.
+// Chain/Graph/YUV instead keep the input-lattice
 // contract: add a loop layer covering every value the new field can take, or their bundles miss
 // variants and the draws silently lose precompiled coverage (with a loaded bundle the draw is
 // dropped, not recompiled).

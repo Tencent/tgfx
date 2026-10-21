@@ -928,7 +928,7 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedComplexRRectTiledImageRRectRect) {
 
 // ---- ComplexEllipse on the pointwise kernels (GP_LAYOUT=3 fill, GP_LAYOUT=4 stroke) ----
 // Each test runs both layouts. The chain variants are pinned (GP_LAYOUT, TEXTURE_COUNT,
-// HAS_MASK_TEXTURE, HAS_COLOR, HAS_XP); the gradient cases only require a precompiled, undropped,
+// HAS_MASK_TEXTURE, HAS_XP); the gradient cases only require a precompiled, undropped,
 // runtime-identical draw, since which kernel carries a gradient is a routing decision.
 
 namespace {
@@ -974,8 +974,8 @@ TGFX_TEST(AOTGeometryLayoutTest, ComplexRRectChainTexture) {
                                                       true, "PointwiseChainShader", 0, 1, 0});
 }
 
-// Per-vertex colors (two batched rrects of different colors): the HAS_COLOR forms, leaf-free and
-// four-leaf.
+// Per-vertex colors (two batched rrects of different colors): the color attribute is always
+// present, so these reuse the same leaf-free and four-leaf variants as a uniform-color draw.
 TGFX_TEST(AOTGeometryLayoutTest, ComplexRRectChainVertexColor) {
   LayoutVariant leafFree = {
       "", LayoutPaint::Solid, LayoutClip::TwoRRects, false, "PointwiseChainShader", 0, 0, 0};
