@@ -34,9 +34,11 @@ MeshGeometryProcessor::MeshGeometryProcessor(bool hasTexCoords, bool hasColors, 
   if (hasTexCoords) {
     texCoord = {"aTexCoord", VertexFormat::Float2};
   }
-  if (hasColors) {
-    this->color = {"aColor", VertexFormat::UByte4Normalized};
-  }
+  // The color attribute is unconditional: the vertex buffer always carries the slot (white for
+  // meshes without per-vertex colors, since the buffer is a per-mesh resource shared across draws
+  // and cannot hold the per-draw paint color), so the fill kernels bind it in every variant. The
+  // colorless draws pick the exact Color uniform through the HasCommonColor runtime uniform.
+  this->color = {"aColor", VertexFormat::UByte4Normalized};
   setVertexAttributes(&position, 4);
 }
 

@@ -2,15 +2,14 @@
 // Processor layout: MeshGeometryProcessor() + EmptyXferProcessor()
 // Permutation dimensions (injected as #define 0/1):
 //   HAS_TEX_COORDS: whether user-provided texture coordinates are present
-//   HAS_COLOR: whether per-vertex colors are present
 //   HAS_COVERAGE: whether per-vertex coverage is present
+// The color attribute is unconditional: the vertex buffer always carries the slot (white for
+// meshes without per-vertex colors), and the fragment stage picks the exact Color uniform for
+// colorless draws through the HasCommonColor runtime uniform.
 #version 450
 
 #ifndef HAS_TEX_COORDS
 #define HAS_TEX_COORDS 0
-#endif
-#ifndef HAS_COLOR
-#define HAS_COLOR 0
 #endif
 #ifndef HAS_COVERAGE
 #define HAS_COVERAGE 0
@@ -27,20 +26,12 @@ layout(location = 0) in vec2 aPosition;
 layout(location = 1) in float aCoverage;
 #endif
 #if HAS_TEX_COORDS
-layout(location = 2) in vec2 aTexCoord;
-#if HAS_COLOR
-layout(location = 3) in vec4 aColor;
+layout(location = 1 + HAS_COVERAGE) in vec2 aTexCoord;
 #endif
-#else
-#if HAS_COLOR
-layout(location = 2) in vec4 aColor;
-#endif
-#endif
+layout(location = 1 + HAS_COVERAGE + HAS_TEX_COORDS) in vec4 aColor;
 
 layout(location = 0) out vec2 TransformedCoords_0;
-#if HAS_COLOR
 layout(location = 1) out vec4 vColor;
-#endif
 #if HAS_COVERAGE
 layout(location = 2) out float vCoverage;
 #endif
@@ -51,9 +42,7 @@ void main() {
 #else
   TransformedCoords_0 = (CoordTransformMatrix_0 * vec3(aPosition, 1.0)).xy;
 #endif
-#if HAS_COLOR
   vColor = aColor;
-#endif
 #if HAS_COVERAGE
   vCoverage = aCoverage;
 #endif

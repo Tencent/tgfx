@@ -284,16 +284,15 @@ TGFX_TEST(ShaderPermutationTest, DefineListForZeroValue) {
 
 TGFX_TEST(ShaderPermutationTest, DefineDimsMacro) {
   using D = ShapeInstancedFillShader::Dims;
-  EXPECT_EQ(D::COUNT, 2u);
-  EXPECT_EQ(D::HAS_COLOR, 0u);
-  EXPECT_EQ(D::HAS_AA, 1u);
+  EXPECT_EQ(D::COUNT, 1u);
+  EXPECT_EQ(D::HAS_AA, 0u);
 
   auto domain = D::domain();
   EXPECT_EQ(domain.dimensionCount(), static_cast<size_t>(D::COUNT));
-  EXPECT_EQ(domain.totalCount(), 4u);
+  EXPECT_EQ(domain.totalCount(), 2u);
 
   // Verify domain dimensions match.
-  auto handDomain = PermutationDomain::FromBoolNames("HAS_COLOR, HAS_AA");
+  auto handDomain = PermutationDomain::FromBoolNames("HAS_AA");
   EXPECT_EQ(handDomain.totalCount(), domain.totalCount());
   EXPECT_EQ(handDomain.dimensionCount(), domain.dimensionCount());
 
@@ -364,14 +363,17 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
   // each for the three XP kinds) and their 30 TiledGraph twins. The per-quad subset of strict
   // image draws adds 12 chain variants (the four quad four-leaf vertex forms, uvCoord and per-vertex
   // color on or off, each for the three XP kinds) with no TiledGraph twin.
-  EXPECT_EQ(pairCount, 459u);
+  // The mesh and shape-instanced families dropped their per-vertex-color axes (the color attribute
+  // is unconditional, with a runtime-uniform source pick for mesh), removing 19 pairs from the
+  // former 459.
+  EXPECT_EQ(pairCount, 440u);
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseChainShader"),
             EnumeratePointwiseChainReachable());
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseGraphShader"),
             EnumeratePointwiseGraphReachable());
   const std::set<std::pair<uint32_t, uint32_t>> maskPairs = {{0, 0}, {0, 1}, {0, 2}};
   EXPECT_EQ(*EnumerateReachablePermutations("MaskFillShader"), maskPairs);
-  const std::set<std::pair<uint32_t, uint32_t>> shapeCoveragePairs = {{1, 1}, {2, 2}, {3, 3}};
+  const std::set<std::pair<uint32_t, uint32_t>> shapeCoveragePairs = {{0, 0}, {1, 1}};
   EXPECT_EQ(*EnumerateReachablePermutations("ShapeInstancedTextureCoverageShader"),
             shapeCoveragePairs);
   // NonAARRectFill keeps 18 pairs: the 24 mirrored forms minus the six TEXTURED && STROKE
@@ -2189,13 +2191,16 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     auto match = MatchPermutation(&programInfo);
     ASSERT_TRUE(match.has_value());
     EXPECT_EQ(match->shaderName, "ShapeInstancedTextureCoverageShader");
-    // The bare coverage form is GRADIENT=0, HAS_COLORS=1 in the two-bool domain.
-    auto expected = ShapeInstancedTextureCoverageShader::D::domain().encode({0, 1});
+    // The bare coverage form is GRADIENT=0 in the single-bool domain.
+    auto expected = ShapeInstancedTextureCoverageShader::D::domain().encode({0});
     EXPECT_EQ(match->vertPermutationIndex, expected);
     EXPECT_EQ(match->fragPermutationIndex, expected);
   }
 
   {
+    // The colorless bare form matches too: the instance color attribute is unconditional and
+    // colorless batches broadcast white, which is exactly the runtime codegen's implicit color,
+    // so the former rejection is gone and the draw picks the GRADIENT=0 variant.
     BlockAllocator allocator;
     auto gp = ShapeInstancedGeometryProcessor::Make(&allocator, 8, 8, AAType::None, false,
                                                     Matrix::I(), Matrix::I());
@@ -2204,7 +2209,11 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     ASSERT_NE(coverage, nullptr);
     ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {coverage.get()},
                             0, nullptr, BlendMode::SrcOver);
-    EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
+    auto match = MatchPermutation(&programInfo);
+    ASSERT_TRUE(match.has_value());
+    EXPECT_EQ(match->shaderName, "ShapeInstancedTextureCoverageShader");
+    EXPECT_EQ(match->vertPermutationIndex, 0u);
+    EXPECT_EQ(match->fragPermutationIndex, 0u);
   }
 
   {
@@ -2262,7 +2271,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
   // A rounded clip next to the coverage texture: the clip rides the runtime clip contract uniforms,
   // so the draw selects the same variant as the bare-coverage form (the libpag corpus carries this
   // shape; before the contract it had no precompiled route at all).
-  const auto expectedIndex = ShapeInstancedTextureCoverageShader::D::domain().encode({0, 1});
+  const auto expectedIndex = ShapeInstancedTextureCoverageShader::D::domain().encode({0});
   for (int clipFirst = 0; clipFirst <= 1; ++clipFirst) {
     BlockAllocator allocator;
     auto gp = ShapeInstancedGeometryProcessor::Make(&allocator, 8, 8, AAType::None, true,
@@ -2346,8 +2355,8 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageShaderRegistry) {
       continue;
     }
     found = true;
-    EXPECT_EQ(info.vertDomain.totalCount(), 4u);
-    EXPECT_EQ(info.fragDomain.totalCount(), 4u);
+    EXPECT_EQ(info.vertDomain.totalCount(), 2u);
+    EXPECT_EQ(info.fragDomain.totalCount(), 2u);
   }
   EXPECT_TRUE(found);
 }

@@ -24,21 +24,22 @@ namespace tgfx {
 
 class ShapeInstancedFillShader : public PrecompiledShader {
  public:
-  TGFX_DEFINE_DIMS(HAS_COLOR, HAS_AA);
+  // HAS_COLOR is not a dimension: the instance color attribute is unconditional (colorless
+  // batches broadcast white, matching the runtime codegen's implicit color).
+  TGFX_DEFINE_DIMS(HAS_AA);
   using D = Dims;
 
   struct FragDims {
-    enum : uint32_t { HAS_COLOR, HAS_AA, HAS_XP, COUNT };
+    enum : uint32_t { HAS_AA, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationBool("HAS_COLOR"),
           PermutationBool("HAS_AA"),
           PermutationInt("HAS_XP", 3),
       });
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 2 && FD::COUNT == 3,
+  static_assert(D::COUNT == 1 && FD::COUNT == 2,
                 "Update the Compose mapping when dimensions change.");
 
   PrecompiledShaderInfo info() const override {

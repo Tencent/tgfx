@@ -3,9 +3,6 @@
 #ifndef GRADIENT
 #define GRADIENT 0
 #endif
-#ifndef HAS_COLORS
-#define HAS_COLORS 0
-#endif
 // An analytic clip (AA rect / rrect) rides the runtime clip contract uniforms, so a draw carrying
 // a clip coverage FP next to its coverage texture selects the same variant.
 #define HAS_RUNTIME_CLIP 1
@@ -28,9 +25,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 };
 
 layout(location = 0) in vec2 TransformedCoords_0;
-#if HAS_COLORS
 layout(location = 1) in vec4 vColor;
-#endif
 #if GRADIENT
 layout(location = 2) in vec2 GradientCoords;
 #endif
@@ -57,7 +52,7 @@ void main() {
   }
 #if GRADIENT
   // The runtime gradient emission: border clamp, premultiply, then modulate by the input
-  // color's alpha (here the per-instance vertex color).
+  // color's alpha (the per-instance vertex color; white for colorless batches).
   highp float t = gradientLayoutT(LayoutType, Bias, Scale, GradientCoords);
   vec4 gradColor;
   if (t <= 0.0) {
@@ -68,9 +63,7 @@ void main() {
     gradColor = mix(start, end, t);
   }
   gradColor.rgb *= gradColor.a;
-#if HAS_COLORS
   gradColor *= vColor.a;
-#endif
   fragColor = gradColor * coverage;
 #else
   fragColor = vColor * coverage;

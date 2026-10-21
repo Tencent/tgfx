@@ -1,13 +1,11 @@
 // ShapeInstancedFillShader vertex shader
 // Processor layout: ShapeInstancedGeometryProcessor() + EmptyXferProcessor()
 // Permutation dimensions (injected as #define 0/1):
-//   HAS_COLOR: whether per-instance colors are used
 //   HAS_AA: whether coverage-based AA is enabled
+// The instance color attribute is unconditional: colorless batches broadcast white, so every
+// variant binds the color in a single form.
 #version 450
 
-#ifndef HAS_COLOR
-#define HAS_COLOR 0
-#endif
 #ifndef HAS_AA
 #define HAS_AA 0
 #endif
@@ -27,17 +25,13 @@ layout(location = 1) in float inCoverage;
 
 // Instance attributes
 layout(location = 2) in vec2 aOffset;
-#if HAS_COLOR
 layout(location = 3) in vec4 aColor;
-#endif
 
 layout(location = 0) out vec2 TransformedCoords_0;
 #if HAS_AA
 layout(location = 1) out float vCoverage;
 #endif
-#if HAS_COLOR
 layout(location = 2) out vec4 vColor;
-#endif
 
 void main() {
   // Recover local coords via UV matrix
@@ -49,8 +43,6 @@ void main() {
 #if HAS_AA
   vCoverage = inCoverage;
 #endif
-#if HAS_COLOR
   vColor = aColor;
-#endif
   gl_Position = vec4(position.xy * tgfx_RTAdjust.xz + tgfx_RTAdjust.yw, 0.0, 1.0);
 }

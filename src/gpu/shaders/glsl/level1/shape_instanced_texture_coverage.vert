@@ -3,9 +3,8 @@
 #ifndef GRADIENT
 #define GRADIENT 0
 #endif
-#ifndef HAS_COLORS
-#define HAS_COLORS 0
-#endif
+// The instance color attribute is unconditional: colorless batches broadcast white, so every
+// variant binds the color in a single form.
 
 layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
   vec4 tgfx_RTAdjust;
@@ -21,14 +20,10 @@ layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
 
 layout(location = 0) in vec2 aPosition;
 layout(location = 1) in vec2 aOffset;
-#if HAS_COLORS
 layout(location = 2) in vec4 aColor;
-#endif
 
 layout(location = 0) out vec2 TransformedCoords_0;
-#if HAS_COLORS
 layout(location = 1) out vec4 vColor;
-#endif
 #if GRADIENT
 layout(location = 2) out vec2 GradientCoords;
 #endif
@@ -42,8 +37,6 @@ void main() {
 #else
   TransformedCoords_0 = (CoordTransformMatrix_0 * vec3(local, 1.0)).xy;
 #endif
-#if HAS_COLORS
   vColor = aColor;
-#endif
   gl_Position = vec4(position.xy * tgfx_RTAdjust.xz + tgfx_RTAdjust.yw, 0.0, 1.0);
 }

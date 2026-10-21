@@ -24,23 +24,25 @@ namespace tgfx {
 
 class MeshFillShader : public PrecompiledShader {
  public:
-  TGFX_DEFINE_DIMS(HAS_TEX_COORDS, HAS_COLOR, HAS_COVERAGE);
+  // HAS_COLOR is not a dimension: the color attribute is unconditional (white baked for meshes
+  // without per-vertex colors), and colorless draws pick the exact Color uniform through the
+  // HasCommonColor runtime uniform.
+  TGFX_DEFINE_DIMS(HAS_TEX_COORDS, HAS_COVERAGE);
   using D = Dims;
 
   struct FragDims {
     // HAS_TEX_COORDS stays vertex-only: the fragment stage never branches on it (mesh_fill.frag
     // does not reference the define), so it is not part of the fragment domain.
-    enum : uint32_t { HAS_COLOR, HAS_COVERAGE, HAS_XP, COUNT };
+    enum : uint32_t { HAS_COVERAGE, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationBool("HAS_COLOR"),
           PermutationBool("HAS_COVERAGE"),
           PermutationInt("HAS_XP", 3),
       });
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 3 && FD::COUNT == 3,
+  static_assert(D::COUNT == 2 && FD::COUNT == 2,
                 "Update the Compose mapping when dimensions change.");
 
   PrecompiledShaderInfo info() const override {

@@ -92,13 +92,6 @@ bool NonAARRectFillValuesAllowed(const std::vector<int>& fragValues) {
            fragValues[NonAARRectFillShader::FD::STROKE] != 0);
 }
 
-// ShapeInstancedTextureCoverageShader: the bare coverage form reads the per-instance color; only
-// the gradient form serves colorless batches with an opaque-white input.
-bool ShapeInstancedCoverageValuesAllowed(const std::vector<int>& fragValues) {
-  return fragValues[ShapeInstancedTextureCoverageShader::FD::GRADIENT] != 0 ||
-         fragValues[ShapeInstancedTextureCoverageShader::FD::HAS_COLORS] != 0;
-}
-
 // PointwiseGraphShader: the per-quad subset of a strict image draw is a Chain-only capability;
 // the Graph kernel has no subset branch. Takes the Chain frag values both sides share.
 bool PointwiseGraphChainValuesAllowed(const std::vector<int>& chainFragValues) {
@@ -312,10 +305,8 @@ std::optional<RuleComposedValues> ComposeMeshFill(const MeshFillInputs& inputs) 
   RuleComposedValues values;
   values.vertValues.resize(D::COUNT);
   values.vertValues[D::HAS_TEX_COORDS] = inputs.hasTexCoords ? 1 : 0;
-  values.vertValues[D::HAS_COLOR] = inputs.hasColors ? 1 : 0;
   values.vertValues[D::HAS_COVERAGE] = inputs.hasCoverage ? 1 : 0;
   values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_COLOR] = values.vertValues[D::HAS_COLOR];
   values.fragValues[FD::HAS_COVERAGE] = values.vertValues[D::HAS_COVERAGE];
   values.fragValues[FD::HAS_XP] = inputs.xpType;
   return values;
@@ -389,20 +380,14 @@ std::optional<RuleComposedValues> ComposeShapeInstancedTextureCoverage(
   RuleComposedValues values;
   values.vertValues.resize(D::COUNT);
   values.vertValues[D::GRADIENT] = inputs.gradient ? 1 : 0;
-  values.vertValues[D::HAS_COLORS] = inputs.hasColors ? 1 : 0;
   values.fragValues.resize(FD::COUNT);
   values.fragValues[FD::GRADIENT] = values.vertValues[D::GRADIENT];
-  values.fragValues[FD::HAS_COLORS] = values.vertValues[D::HAS_COLORS];
-  if (!ShapeInstancedCoverageValuesAllowed(values.fragValues)) {
-    return std::nullopt;
-  }
   return values;
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedTextureCoverageReachable() {
   return EnumerateMirroredReachable<ShapeInstancedTextureCoverageShader::Dims,
-                                    ShapeInstancedTextureCoverageShader::FD>(
-      &ShapeInstancedCoverageValuesAllowed);
+                                    ShapeInstancedTextureCoverageShader::FD>(nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeShapeInstancedFill(
@@ -414,10 +399,8 @@ std::optional<RuleComposedValues> ComposeShapeInstancedFill(
   using FD = ShapeInstancedFillShader::FD;
   RuleComposedValues values;
   values.vertValues.resize(D::COUNT);
-  values.vertValues[D::HAS_COLOR] = inputs.hasColors ? 1 : 0;
   values.vertValues[D::HAS_AA] = inputs.isCoverageAA ? 1 : 0;
   values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_COLOR] = values.vertValues[D::HAS_COLOR];
   values.fragValues[FD::HAS_AA] = values.vertValues[D::HAS_AA];
   values.fragValues[FD::HAS_XP] = inputs.xpType;
   return values;

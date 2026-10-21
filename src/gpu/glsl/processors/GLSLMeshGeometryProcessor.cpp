@@ -97,8 +97,14 @@ void GLSLMeshGeometryProcessor::setData(UniformData* vertexUniformData,
   // additional transformation - they're already suitable for shader sampling.
   setTransformDataHelper(Matrix::I(), vertexUniformData, transformIter);
 
-  if (!hasColors) {
-    fragmentUniformData->setData("Color", commonColor);
+  // The Color uniform is the exact paint color for meshes without per-vertex colors (the baked
+  // white attribute slot cannot hold the per-draw color); meshes with per-vertex colors read the
+  // vColor varying instead. The precompiled MeshFillShader declares both plus the HasCommonColor
+  // runtime uniform that selects the source. The JIT program with per-vertex colors declares no
+  // fragment uniform at all, hence the null guard and the optional writes.
+  if (fragmentUniformData != nullptr) {
+    fragmentUniformData->setDataOptional("Color", commonColor);
+    fragmentUniformData->setDataOptional("HasCommonColor", hasColors ? 0 : 1);
   }
 }
 

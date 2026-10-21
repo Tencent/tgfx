@@ -22,10 +22,6 @@
 
 namespace tgfx {
 
-struct InstanceRecord {
-  float offset[2];  // [dx, dy]
-};
-
 struct InstanceRecordWithColor {
   float offset[2];  // [dx, dy]
   uint32_t color;   // UByte4Normalized premultiplied RGBA
@@ -38,7 +34,9 @@ PlacementPtr<InstanceProvider> InstanceProvider::MakeFrom(
     return nullptr;
   }
   bool hasColors = colors != nullptr;
-  size_t instanceStride = hasColors ? sizeof(InstanceRecordWithColor) : sizeof(InstanceRecord);
+  // The record always carries the color slot: colorless batches broadcast white, matching the
+  // runtime codegen's implicit color for instanced shapes without per-instance colors.
+  size_t instanceStride = sizeof(InstanceRecordWithColor);
   size_t dataSize = instanceStride * count;
   std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
   if (hasColors && NeedConvertColorSpace(ColorSpace::SRGB(), colorSpace)) {
@@ -58,16 +56,14 @@ InstanceProvider::InstanceProvider(std::shared_ptr<BlockAllocator> reference, co
 }
 
 void InstanceProvider::getData(void* buffer) const {
-  size_t instanceStride = _hasColors ? sizeof(InstanceRecordWithColor) : sizeof(InstanceRecord);
+  size_t instanceStride = sizeof(InstanceRecordWithColor);
   auto steps = xformSteps.get();
   for (size_t i = 0; i < count; i++) {
-    auto record = static_cast<InstanceRecord*>(buffer);
-    record->offset[0] = offsets[i].x;
-    record->offset[1] = offsets[i].y;
-    if (_hasColors) {
-      auto colorRecord = static_cast<InstanceRecordWithColor*>(buffer);
-      colorRecord->color = ToUintPMColor(colors[i], steps);
-    }
+    auto colorRecord = static_cast<InstanceRecordWithColor*>(buffer);
+    colorRecord->offset[0] = offsets[i].x;
+    colorRecord->offset[1] = offsets[i].y;
+    // White is color-space invariant, so the broadcast skips the conversion steps.
+    colorRecord->color = _hasColors ? ToUintPMColor(colors[i], steps) : 0xFFFFFFFFu;
     buffer = static_cast<uint8_t*>(buffer) + instanceStride;
   }
 }

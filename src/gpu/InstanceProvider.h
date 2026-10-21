@@ -33,9 +33,10 @@ class InstanceProvider {
  public:
   /**
    * Creates an InstanceProvider that generates instance records from the given offsets and optional
-   * colors. Each offset represents the translation difference relative to the first instance. If
-   * colors is not nullptr, each instance record will include a color field. The colorSpace is used
-   * to convert colors from sRGB to the destination color space.
+   * colors. Each offset represents the translation difference relative to the first instance. The
+   * record always carries a color field: when colors is not nullptr it holds the per-instance
+   * color, otherwise white (the runtime codegen's implicit color). The colorSpace is used to
+   * convert colors from sRGB to the destination color space.
    */
   static PlacementPtr<InstanceProvider> MakeFrom(BlockAllocator* allocator, const Point* offsets,
                                                  const Color* colors, size_t count,

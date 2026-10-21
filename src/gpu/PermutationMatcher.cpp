@@ -1365,14 +1365,13 @@ static std::optional<PermutationMatchResult> TryMatchShapeInstancedTextureCovera
     return std::nullopt;
   }
   auto* shape = static_cast<const ShapeInstancedGeometryProcessor*>(gp);
-  // The bare coverage form reads the per-instance color; the gradient form also serves
-  // colorless batches (opaque-white input). This kernel carries no AA coverage attribute.
+  // The color attribute is unconditional (white broadcast for colorless batches), so both forms
+  // read the same vColor varying. This kernel carries no AA coverage attribute.
   if (shape->getAAType() != AAType::None) {
     return std::nullopt;
   }
   ShapeInstancedTextureCoverageInputs inputs;
   inputs.gradient = gradient != 0;
-  inputs.hasColors = shape->getHasColors();
   auto composed = ComposeShapeInstancedTextureCoverage(inputs);
   if (!composed) {
     return std::nullopt;
@@ -1393,7 +1392,6 @@ static std::optional<PermutationMatchResult> TryMatchShapeInstancedFill(
   }
   auto* sigp = static_cast<const ShapeInstancedGeometryProcessor*>(gp);
   ShapeInstancedFillInputs inputs;
-  inputs.hasColors = sigp->getHasColors();
   inputs.isCoverageAA = sigp->getAAType() == AAType::Coverage;
   inputs.xpType = GetXPType(programInfo);
   auto composed = ComposeShapeInstancedFill(inputs);
@@ -1416,7 +1414,6 @@ static std::optional<PermutationMatchResult> TryMatchMeshFill(const ProgramInfo*
   auto* mgp = static_cast<const MeshGeometryProcessor*>(gp);
   MeshFillInputs inputs;
   inputs.hasTexCoords = mgp->getHasTexCoords();
-  inputs.hasColors = mgp->getHasColors();
   inputs.hasCoverage = mgp->getHasCoverage();
   inputs.xpType = GetXPType(programInfo);
   auto composed = ComposeMeshFill(inputs);

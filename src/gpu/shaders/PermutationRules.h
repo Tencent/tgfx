@@ -163,11 +163,12 @@ struct ComplexNonAARRectFillInputs {
 };
 
 /**
- * Input contract of the MeshFillShader matcher rule.
+ * Input contract of the MeshFillShader matcher rule. The color attribute is unconditional (white
+ * baked for meshes without per-vertex colors), so the color source is a runtime uniform and no
+ * input field exists for it.
  */
 struct MeshFillInputs {
   bool hasTexCoords = false;
-  bool hasColors = false;
   bool hasCoverage = false;
   int xpType = -1;  // -1 = no representable XferProcessor.
 };
@@ -196,19 +197,19 @@ struct YUVTextureFillInputs {
 
 /**
  * Input contract of the ShapeInstancedTextureCoverageShader matcher rule. The kernel is
- * EmptyXP-only and the gradient/texture structure checks are whole-draw rejections in Extract;
- * the bare coverage form requires per-instance colors, which Compose enforces.
+ * EmptyXP-only and the gradient/texture structure checks are whole-draw rejections in Extract.
+ * The instance color attribute is unconditional (colorless batches broadcast white), so both
+ * forms read the same vColor varying and no color input field exists.
  */
 struct ShapeInstancedTextureCoverageInputs {
   bool gradient = false;
-  bool hasColors = false;
 };
 
 /**
- * Input contract of the ShapeInstancedFillShader matcher rule.
+ * Input contract of the ShapeInstancedFillShader matcher rule. The instance color attribute is
+ * unconditional (colorless batches broadcast white), so no color input field exists.
  */
 struct ShapeInstancedFillInputs {
-  bool hasColors = false;
   bool isCoverageAA = false;
   int xpType = -1;  // -1 = no representable XferProcessor.
 };

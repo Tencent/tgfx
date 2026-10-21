@@ -53,9 +53,10 @@ std::shared_ptr<Resource> VertexMeshBufferUploadTask::onMakeResource(Context* co
   if (vertexMesh->hasTexCoords()) {
     stride += sizeof(float) * 2;
   }
-  if (vertexMesh->hasColors()) {
-    stride += sizeof(uint8_t) * 4;
-  }
+  // The color slot is unconditional: meshes without per-vertex colors bake white, because the
+  // buffer is a per-mesh resource shared across draws and the per-draw paint color rides the
+  // Color uniform instead (the kernels select it through the HasCommonColor runtime uniform).
+  stride += sizeof(uint8_t) * 4;
   size_t vertexDataSize = stride * static_cast<size_t>(vertexMesh->vertexCount());
 
   // Create color space transform steps if needed
@@ -86,11 +87,13 @@ std::shared_ptr<Resource> VertexMeshBufferUploadTask::onMakeResource(Context* co
       ptr += sizeof(Point);
     }
 
-    // Color (UByte4Normalized, optional)
+    // Color (UByte4Normalized, unconditional): per-vertex colors when present, otherwise white.
     if (vertexMesh->hasColors()) {
       *reinterpret_cast<uint32_t*>(ptr) = ToUintPMColor(vertexMesh->colors()[i], steps.get());
-      ptr += sizeof(uint32_t);
+    } else {
+      *reinterpret_cast<uint32_t*>(ptr) = 0xFFFFFFFFu;
     }
+    ptr += sizeof(uint32_t);
   }
 
   auto bufferResource =

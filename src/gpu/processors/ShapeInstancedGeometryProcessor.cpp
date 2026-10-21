@@ -32,9 +32,10 @@ ShapeInstancedGeometryProcessor::ShapeInstancedGeometryProcessor(int width, int 
   setVertexAttributes(&position, 2);
 
   offset = {"aOffset", VertexFormat::Float2};
-  if (hasColors) {
-    instanceColor = {"aColor", VertexFormat::UByte4Normalized};
-  }
+  // The instance color attribute is unconditional: instance data is generated per draw batch, so
+  // colorless batches broadcast white (the runtime codegen's implicit color) instead of dropping
+  // the slot, letting every fill kernel bind the attribute in a single variant.
+  instanceColor = {"aColor", VertexFormat::UByte4Normalized};
   setInstanceAttributes(&offset, 2);
 }
 
