@@ -337,16 +337,12 @@ bool AOTPointwiseChainProcessor::ValidateSlots(const std::vector<AOTChainSlot>& 
                : gradientSlots > 0 ? AOTResourceProfile::TiledGraph
                                    : AOTResourceProfile::Chain;
   }
-  AOTResourceDemand demand = {slots.size(),
-                              0,
-                              leafCount + (hasLUT ? 1u : 0u) + noiseSlots * 2,
-                              tiledLeafIndices.size(),
-                              noiseSlots,
-                              gradientSlots,
-                              colorSpaceSlots,
-                              deviceRectSlots,
-                              localRectSlots,
-                              rrectSlots};
+  AOTResourceDemand demand = {};
+  demand.instructions = slots.size();
+  demand.leafBindings = leafCount + (hasLUT ? 1u : 0u) + noiseSlots * 2;
+  demand.tiledRecipes = tiledLeafIndices.size();
+  demand.noiseSources = noiseSlots;
+  demand.gradients = gradientSlots;
   if (!FitsAOTResourceProfile(demand, resolved)) {
     return false;
   }

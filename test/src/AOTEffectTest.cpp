@@ -787,9 +787,6 @@ TGFX_TEST(AOTEffectTest, ResourceProfilesRejectInvalidAndOverBudgetDemands) {
   demand.instructions = 33;
   EXPECT_EQ(SelectAOTResourceProfile(demand), AOTResourceProfile::Automatic);
   demand = {};
-  demand.registers = 17;
-  EXPECT_EQ(SelectAOTResourceProfile(demand), AOTResourceProfile::Automatic);
-  demand = {};
   demand.leafBindings = 5;
   EXPECT_EQ(SelectAOTResourceProfile(demand), AOTResourceProfile::Automatic);
   EXPECT_FALSE(FitsAOTResourceProfile({}, static_cast<AOTResourceProfile>(99)));

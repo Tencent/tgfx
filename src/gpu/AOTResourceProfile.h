@@ -20,10 +20,14 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <initializer_list>
 
 namespace tgfx {
 
+// The pointwise kernel comes in three resource shapes, one per shader variant family:
+//   Chain      -> PointwiseChainShader
+//   NoiseGraph -> PointwiseGraphShader, RESOURCE_KIND 0 (one noise source)
+//   TiledGraph -> PointwiseGraphShader, RESOURCE_KIND 1 (one gradient, three tiled recipes)
+// Automatic means "not decided yet": the planner picks the smallest shape that fits.
 enum class AOTResourceProfile : uint32_t {
   Automatic,
   Chain,
@@ -31,35 +35,31 @@ enum class AOTResourceProfile : uint32_t {
   TiledGraph,
 };
 
+// What a chain pass asks for. Only the fields below differ between the shapes; the limits every
+// shape shares (color-space transform, clip rect and rrect blocks, result registers) are enforced
+// by AOTPointwiseChainProcessor::ValidateSlots.
 struct AOTResourceDemand {
   size_t instructions = 0;
-  size_t registers = 0;
-  size_t leafBindings = 0;
+  size_t leafBindings = 0;  // texture leaves + the LUT gradient + two noise tables.
   size_t tiledRecipes = 0;
   size_t noiseSources = 0;
   size_t gradients = 0;
-  size_t colorSpaceXforms = 0;
-  size_t deviceRects = 0;
-  size_t localRects = 0;
-  size_t rrects = 0;
 };
 
+// What a shape offers; each number is the declared length of the matching GLSL array or module.
 struct AOTResourceCapacity {
-  size_t instructions = 16;
-  size_t registers = 16;
-  size_t leafBindings = 4;
-  size_t tiledRecipes = 2;
-  size_t noiseSources = 0;
-  size_t gradients = 0;
-  size_t colorSpaceXforms = 1;
-  size_t deviceRects = 2;
-  size_t localRects = 2;
-  size_t rrects = 4;
+  size_t instructions;  // CHAIN_SLOT_CAPACITY in the shader.
+  size_t tiledRecipes;
+  size_t noiseSources;
+  size_t gradients;
 };
 
-inline constexpr AOTResourceCapacity ChainResourceCapacity = {};
-inline constexpr AOTResourceCapacity NoiseGraphResourceCapacity = {32, 16, 4, 2, 1, 0, 1, 2, 2, 4};
-inline constexpr AOTResourceCapacity TiledGraphResourceCapacity = {32, 16, 4, 3, 0, 1, 1, 2, 2, 4};
+// The sampler bindings a kernel artifact carries before padding.
+inline constexpr size_t MaxChainLeafBindings = 4;
+
+inline constexpr AOTResourceCapacity ChainResourceCapacity = {16, 2, 0, 0};
+inline constexpr AOTResourceCapacity NoiseGraphResourceCapacity = {32, 2, 1, 0};
+inline constexpr AOTResourceCapacity TiledGraphResourceCapacity = {32, 3, 0, 1};
 
 inline const AOTResourceCapacity* GetAOTResourceCapacity(AOTResourceProfile profile) {
   switch (profile) {
@@ -80,17 +80,15 @@ inline bool IsAOTGraphProfile(AOTResourceProfile profile) {
 
 inline bool FitsAOTResourceProfile(const AOTResourceDemand& demand, AOTResourceProfile profile) {
   const auto* capacity = GetAOTResourceCapacity(profile);
+  // NoiseGraph is the only shape that carries the noise module, and it must be used for it.
   if (capacity == nullptr ||
       (profile == AOTResourceProfile::NoiseGraph) != (demand.noiseSources > 0)) {
     return false;
   }
-  return demand.instructions <= capacity->instructions && demand.registers <= capacity->registers &&
-         demand.leafBindings <= capacity->leafBindings &&
+  return demand.instructions <= capacity->instructions &&
+         demand.leafBindings <= MaxChainLeafBindings &&
          demand.tiledRecipes <= capacity->tiledRecipes &&
-         demand.noiseSources <= capacity->noiseSources && demand.gradients <= capacity->gradients &&
-         demand.colorSpaceXforms <= capacity->colorSpaceXforms &&
-         demand.deviceRects <= capacity->deviceRects && demand.localRects <= capacity->localRects &&
-         demand.rrects <= capacity->rrects;
+         demand.noiseSources <= capacity->noiseSources && demand.gradients <= capacity->gradients;
 }
 
 inline AOTResourceProfile SelectAOTResourceProfile(const AOTResourceDemand& demand) {

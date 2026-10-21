@@ -147,30 +147,29 @@ struct AOTChainDeviceLeaf {
 
 class AOTPointwiseChainProcessor : public FragmentProcessor {
  public:
-  // The maximum physical instruction storage across both kernels (extended Graph: 32). The
-  // basic Chain shader declares only ChainResourceCapacity.instructions (16) slots; ValidateSlots
-  // enforces each profile's budget. Registers are recycled independently of instruction count.
+  // The maximum instruction storage across the shapes (the graph shapes: 32). The basic Chain
+  // shader declares only ChainResourceCapacity.instructions (16) slots; ValidateSlots checks the
+  // resolved shape's own capacity.
   static constexpr size_t MaxSlots = TiledGraphResourceCapacity.instructions;
 
-  // The chainResults storage the kernel evaluates into. The allocator assigns one element per
-  // simultaneously-live intermediate value, so a linear chain of any supported length runs with
-  // two registers while a wide DAG may need up to this many.
-  static constexpr size_t MaxRegisters = ChainResourceCapacity.registers;
+  // The length of the kernel's chainResults array (pointwise_fragment_main.inc). The allocator
+  // reuses a register after its last read, so this bounds the simultaneously-live values of a
+  // DAG, not its length. These are interpreter slots, not GPU hardware registers.
+  static constexpr size_t MaxRegisters = 16;
 
   // The chain kernel carries two independent tiled-sampling recipes, selected by
   // TiledLeafIndex/TiledLeafIndex2, so at most this many leaves may use shader-side tiling; their
   // recipes need not match (a drop shadow's source and offset shadow resolve to different clamp
-  // rects). Extended profiles have their own capacities in AOTResourceProfile.h.
+  // rects). The graph shapes carry more (see AOTResourceProfile.h).
   static constexpr size_t MaxShaderTiledChainLeaves = ChainResourceCapacity.tiledRecipes;
 
-  // The single authority for the chain kernel's shared parameter-block budgets. The kernel has
-  // exactly one chain-wide gradient block, one procedural-source coordinate varying
-  // (SourceCoords, shared by the gradient and noise sources), one color-space
-  // transform block, one device-space rect coverage block, one local rect coverage block, and
-  // four rrect array elements. ValidateSlots is the one place that enforces them; the chain
-  // builder's planner (and so AOTPlanExecutor::CanExecute and the DAG planner) and Make() both
-  // run it on the same instruction array, so a budget change cannot leave check sites disagreeing.
-  static constexpr size_t MaxGradientSlots = 1;
+  // The parameter blocks every shape shares: one chain-wide gradient block (and its SourceCoords
+  // varying, shared with the noise source), one color-space transform block, two device-space and
+  // two local rect coverage blocks, and four rrect array elements. They are the declared lengths of
+  // the matching arrays in pointwise_fragment_uniforms.inc. ValidateSlots is the only place that
+  // enforces them; the chain builder's planner and Make() both run it on the same instruction
+  // array, so planning and construction cannot disagree.
+  static constexpr size_t MaxGradientSlots = TiledGraphResourceCapacity.gradients;
   static constexpr size_t MaxColorSpaceXformSlots = 1;
   static constexpr size_t MaxDeviceRectCoverageSlots = 2;
   static constexpr size_t MaxLocalRectCoverageSlots = 2;
