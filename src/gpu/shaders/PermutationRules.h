@@ -35,25 +35,36 @@ namespace tgfx {
 // runtime uniform. When reviewing a new dimension, ask what ABI difference it gates; if the
 // answer is "none", make it a uniform instead.
 //
-// The Compose functions below are the single source of truth for the compiled variant list:
-// the runtime matcher feeds them real inputs (via Extract in PermutationMatcher.cpp), while the
-// build tool feeds them the full input lattice (via the Enumerate functions) and compiles
+// The Compose functions below are the single source of truth for the variant semantics: the
+// runtime matcher feeds them real inputs (via Extract in PermutationMatcher.cpp) and compiles
 // exactly what survives. Rejections that depend on dimension values must therefore live inside
 // Compose — the enumeration must see the same rejection the runtime applies — while whole-draw
 // rejections (wrong processor kind, unsupported shapes) stay in Extract where they never shape
 // the reachable set.
 //
+// The compiled variant list is enumerated two ways:
+//   - Pass-through families (Compose maps every input-axis value onto the vert/frag domains
+//     one-to-one) enumerate the mirrored domain product directly via EnumerateMirroredReachable
+//     in PermutationRules.cpp; there is no per-family input loop to keep in sync.
+//   - Chain/Graph and YUV keep dedicated input-lattice enumerators, because their Compose is not
+//     a pass-through (geometry normalization, resource caps, format folding).
+//
 // ---------------------------------------------------------------------------------------
 // Contract: adding a rule input field
 // ---------------------------------------------------------------------------------------
-// Adding a field to any *Inputs struct below must be synced in three places:
+// Adding a field to any *Inputs struct below must be synced in two places:
 //   1. Extract (PermutationMatcher.cpp) — assign the field from the ProgramInfo.
 //   2. Compose (this file) — read the field where it shapes dimensions or rejects.
-//   3. Enumerate (this file) — add a loop layer covering every value the field can take.
-// Forgetting step 3 leaves the field at its default in the enumeration, so the bundle misses
-// those variants and the affected draws fall back to runtime compilation silently. The
-// shader_build_tool --audit mode validates structural validity of the reachable set only, NOT
-// lattice completeness — the Enumerate loops are the sole declaration of the input space.
+// For a pass-through family that is the whole job when the field only shapes dimension values.
+// If the field makes Compose REJECT a combination, the rejection must additionally be restated
+// as a frag-domain filter in the family's Enumerate* call (see EnumerateNonAARRectFillReachable
+// and EnumerateShapeInstancedTextureCoverageReachable). This restatement is load-bearing in the
+// opposite direction from the old handwritten loops: a missing filter silently OVER-compiles
+// variants the runtime never requests (no test fails — the bundle counters read the same
+// enumeration), while the old loops failed loudly by under-compiling. When adding such a filter,
+// diff the new reachable set against the previous one. Chain/Graph/YUV instead keep the old
+// contract: add a loop layer covering every value the new field can take, or their bundles miss
+// variants and draws fall back to runtime compilation silently.
 // ---------------------------------------------------------------------------------------
 
 /**
@@ -497,5 +508,6 @@ std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseGraphReachable();
  */
 std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
     const std::string& shaderName);
+
 
 }  // namespace tgfx

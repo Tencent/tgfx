@@ -44,6 +44,43 @@
 
 namespace tgfx {
 
+namespace {
+
+// Enumerates every (vert, frag) variant pair of a family whose mirrored dimensions agree, then
+// applies the family's frag-side restriction (an empty fragAccept accepts everything). For the
+// pass-through families Compose maps every input-axis value onto the domains one-to-one, so the
+// reachable set is exactly the mirrored domain product minus the restriction. Chain/Graph and YUV
+// keep their dedicated enumerators.
+// Vertex-stage placeholder for families with no vertex dimensions: a single trivial variant.
+struct EmptyVertDims {
+  static PermutationDomain domain() { return PermutationDomain({}); }
+};
+
+template <typename D, typename FD>
+std::set<std::pair<uint32_t, uint32_t>> EnumerateMirroredReachable(
+    const std::function<bool(const std::vector<int>&)>& fragAccept) {
+  std::set<std::pair<uint32_t, uint32_t>> result;
+  const auto vertDomain = D::domain();
+  const auto fragDomain = FD::domain();
+  for (uint32_t vertIndex = 0; vertIndex < vertDomain.totalCount(); ++vertIndex) {
+    const auto vertValues = vertDomain.decode(vertIndex);
+    for (uint32_t fragIndex = 0; fragIndex < fragDomain.totalCount(); ++fragIndex) {
+      const auto fragValues = fragDomain.decode(fragIndex);
+      if (!MirroredDimsAgree(vertDomain, fragDomain, vertValues, fragValues)) {
+        continue;
+      }
+      if (fragAccept && !fragAccept(fragValues)) {
+        continue;
+      }
+      result.insert({vertIndex, fragIndex});
+    }
+  }
+  return result;
+}
+
+}  // namespace
+
+
 std::optional<RuleComposedValues> ComposeRoundStrokeRect(const RoundStrokeRectInputs& inputs) {
   if (inputs.xpType < 0) {
     return std::nullopt;
@@ -63,28 +100,7 @@ std::optional<RuleComposedValues> ComposeRoundStrokeRect(const RoundStrokeRectIn
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateRoundStrokeRectReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int isCoverageAA = 0; isCoverageAA <= 1; ++isCoverageAA) {
-    for (int hasCommonColor = 0; hasCommonColor <= 1; ++hasCommonColor) {
-      for (int hasUVMatrix = 0; hasUVMatrix <= 1; ++hasUVMatrix) {
-        for (int xpType = -1; xpType <= 2; ++xpType) {
-          RoundStrokeRectInputs inputs;
-          inputs.isCoverageAA = isCoverageAA != 0;
-          inputs.hasCommonColor = hasCommonColor != 0;
-          inputs.hasUVMatrix = hasUVMatrix != 0;
-          inputs.xpType = xpType;
-          auto composed = ComposeRoundStrokeRect(inputs);
-          if (!composed) {
-            continue;
-          }
-          auto vertIndex = RoundStrokeRectFillShader::Dims::domain().encode(composed->vertValues);
-          auto fragIndex = RoundStrokeRectFillShader::FD::domain().encode(composed->fragValues);
-          result.insert({vertIndex, fragIndex});
-        }
-      }
-    }
-  }
-  return result;
+  return EnumerateMirroredReachable<RoundStrokeRectFillShader::Dims, RoundStrokeRectFillShader::FD>(nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeMaskFill(const MaskFillInputs& inputs) {
@@ -99,18 +115,7 @@ std::optional<RuleComposedValues> ComposeMaskFill(const MaskFillInputs& inputs) 
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateMaskFillReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int xpType = -1; xpType <= 2; ++xpType) {
-    MaskFillInputs inputs;
-    inputs.xpType = xpType;
-    auto composed = ComposeMaskFill(inputs);
-    if (!composed) {
-      continue;
-    }
-    auto fragIndex = MaskFillShader::D::domain().encode(composed->fragValues);
-    result.insert({0, fragIndex});
-  }
-  return result;
+  return EnumerateMirroredReachable<EmptyVertDims, MaskFillShader::FragDims>(nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeHairlineLine(const HairlineLineInputs& inputs) {
@@ -125,18 +130,7 @@ std::optional<RuleComposedValues> ComposeHairlineLine(const HairlineLineInputs& 
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineLineReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int xpType = -1; xpType <= 2; ++xpType) {
-    HairlineLineInputs inputs;
-    inputs.xpType = xpType;
-    auto composed = ComposeHairlineLine(inputs);
-    if (!composed) {
-      continue;
-    }
-    auto fragIndex = HairlineLineShader::FD::domain().encode(composed->fragValues);
-    result.insert({0, fragIndex});
-  }
-  return result;
+  return EnumerateMirroredReachable<EmptyVertDims, HairlineLineShader::FD>(nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeHairlineQuad(const HairlineQuadInputs& inputs) {
@@ -151,18 +145,7 @@ std::optional<RuleComposedValues> ComposeHairlineQuad(const HairlineQuadInputs& 
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineQuadReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int xpType = -1; xpType <= 2; ++xpType) {
-    HairlineQuadInputs inputs;
-    inputs.xpType = xpType;
-    auto composed = ComposeHairlineQuad(inputs);
-    if (!composed) {
-      continue;
-    }
-    auto fragIndex = HairlineQuadShader::FD::domain().encode(composed->fragValues);
-    result.insert({0, fragIndex});
-  }
-  return result;
+  return EnumerateMirroredReachable<EmptyVertDims, HairlineQuadShader::FD>(nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeQuadColorFill(const QuadColorFillInputs& inputs) {
@@ -178,21 +161,7 @@ std::optional<RuleComposedValues> ComposeQuadColorFill(const QuadColorFillInputs
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadColorFillReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int xpType = -1; xpType <= 2; ++xpType) {
-    for (int hasMaskTexture = 0; hasMaskTexture <= 1; ++hasMaskTexture) {
-      QuadColorFillInputs inputs;
-      inputs.xpType = xpType;
-      inputs.hasMaskTexture = hasMaskTexture != 0;
-      auto composed = ComposeQuadColorFill(inputs);
-      if (!composed) {
-        continue;
-      }
-      auto fragIndex = QuadColorFillShader::FD::domain().encode(composed->fragValues);
-      result.insert({0, fragIndex});
-    }
-  }
-  return result;
+  return EnumerateMirroredReachable<EmptyVertDims, QuadColorFillShader::FD>(nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeSolidColorFill(const SolidColorFillInputs& inputs) {
@@ -211,22 +180,7 @@ std::optional<RuleComposedValues> ComposeSolidColorFill(const SolidColorFillInpu
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateSolidColorFillReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int isCoverageAA = 0; isCoverageAA <= 1; ++isCoverageAA) {
-    for (int xpType = -1; xpType <= 2; ++xpType) {
-      SolidColorFillInputs inputs;
-      inputs.isCoverageAA = isCoverageAA != 0;
-      inputs.xpType = xpType;
-      auto composed = ComposeSolidColorFill(inputs);
-      if (!composed) {
-        continue;
-      }
-      auto vertIndex = SolidColorFillShader::VD::domain().encode(composed->vertValues);
-      auto fragIndex = SolidColorFillShader::FD::domain().encode(composed->fragValues);
-      result.insert({vertIndex, fragIndex});
-    }
-  }
-  return result;
+  return EnumerateMirroredReachable<SolidColorFillShader::VD, SolidColorFillShader::FD>(nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeComplexEllipseFill(
@@ -248,25 +202,7 @@ std::optional<RuleComposedValues> ComposeComplexEllipseFill(
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexEllipseFillReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int isStroke = 0; isStroke <= 1; ++isStroke) {
-    for (int hasCommonColor = 0; hasCommonColor <= 1; ++hasCommonColor) {
-      for (int xpType = -1; xpType <= 2; ++xpType) {
-        ComplexEllipseFillInputs inputs;
-        inputs.isStroke = isStroke != 0;
-        inputs.hasCommonColor = hasCommonColor != 0;
-        inputs.xpType = xpType;
-        auto composed = ComposeComplexEllipseFill(inputs);
-        if (!composed) {
-          continue;
-        }
-        auto vertIndex = ComplexEllipseFillShader::Dims::domain().encode(composed->vertValues);
-        auto fragIndex = ComplexEllipseFillShader::FD::domain().encode(composed->fragValues);
-        result.insert({vertIndex, fragIndex});
-      }
-    }
-  }
-  return result;
+  return EnumerateMirroredReachable<ComplexEllipseFillShader::Dims, ComplexEllipseFillShader::FD>(nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeEllipseFill(const EllipseFillInputs& inputs) {
@@ -286,25 +222,7 @@ std::optional<RuleComposedValues> ComposeEllipseFill(const EllipseFillInputs& in
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateEllipseFillReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int hasCommonColor = 0; hasCommonColor <= 1; ++hasCommonColor) {
-    for (int deviceMask = 0; deviceMask <= 1; ++deviceMask) {
-      for (int xpType = -1; xpType <= 2; ++xpType) {
-        EllipseFillInputs inputs;
-        inputs.hasCommonColor = hasCommonColor != 0;
-        inputs.deviceMask = deviceMask;
-        inputs.xpType = xpType;
-        auto composed = ComposeEllipseFill(inputs);
-        if (!composed) {
-          continue;
-        }
-        auto vertIndex = EllipseFillShader::Dims::domain().encode(composed->vertValues);
-        auto fragIndex = EllipseFillShader::FD::domain().encode(composed->fragValues);
-        result.insert({vertIndex, fragIndex});
-      }
-    }
-  }
-  return result;
+  return EnumerateMirroredReachable<EllipseFillShader::Dims, EllipseFillShader::FD>(nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeNonAARRectFill(const NonAARRectFillInputs& inputs) {
@@ -332,28 +250,13 @@ std::optional<RuleComposedValues> ComposeNonAARRectFill(const NonAARRectFillInpu
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateNonAARRectFillReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int hasCommonColor = 0; hasCommonColor <= 1; ++hasCommonColor) {
-    for (int isStroke = 0; isStroke <= 1; ++isStroke) {
-      for (int textured = 0; textured <= 1; ++textured) {
-        for (int xpType = -1; xpType <= 2; ++xpType) {
-          NonAARRectFillInputs inputs;
-          inputs.hasCommonColor = hasCommonColor != 0;
-          inputs.isStroke = isStroke != 0;
-          inputs.textured = textured != 0;
-          inputs.xpType = xpType;
-          auto composed = ComposeNonAARRectFill(inputs);
-          if (!composed) {
-            continue;
-          }
-          auto vertIndex = NonAARRectFillShader::Dims::domain().encode(composed->vertValues);
-          auto fragIndex = NonAARRectFillShader::FD::domain().encode(composed->fragValues);
-          result.insert({vertIndex, fragIndex});
-        }
-      }
-    }
-  }
-  return result;
+  // ComposeNonAARRectFill's rejection, restated on the frag domain values: the textured variant
+  // (a TiledTextureEffect fill) is fill-only.
+  return EnumerateMirroredReachable<NonAARRectFillShader::Dims, NonAARRectFillShader::FD>(
+      [](const std::vector<int>& fragValues) {
+        return !(fragValues[NonAARRectFillShader::FD::TEXTURED] &&
+                 fragValues[NonAARRectFillShader::FD::STROKE]);
+      });
 }
 
 std::optional<RuleComposedValues> ComposeComplexNonAARRectFill(
@@ -375,25 +278,7 @@ std::optional<RuleComposedValues> ComposeComplexNonAARRectFill(
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexNonAARRectFillReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int hasCommonColor = 0; hasCommonColor <= 1; ++hasCommonColor) {
-    for (int isStroke = 0; isStroke <= 1; ++isStroke) {
-      for (int xpType = -1; xpType <= 2; ++xpType) {
-        ComplexNonAARRectFillInputs inputs;
-        inputs.hasCommonColor = hasCommonColor != 0;
-        inputs.isStroke = isStroke != 0;
-        inputs.xpType = xpType;
-        auto composed = ComposeComplexNonAARRectFill(inputs);
-        if (!composed) {
-          continue;
-        }
-        auto vertIndex = ComplexNonAARRectFillShader::Dims::domain().encode(composed->vertValues);
-        auto fragIndex = ComplexNonAARRectFillShader::FD::domain().encode(composed->fragValues);
-        result.insert({vertIndex, fragIndex});
-      }
-    }
-  }
-  return result;
+  return EnumerateMirroredReachable<ComplexNonAARRectFillShader::Dims, ComplexNonAARRectFillShader::FD>(nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeMeshFill(const MeshFillInputs& inputs) {
@@ -415,28 +300,7 @@ std::optional<RuleComposedValues> ComposeMeshFill(const MeshFillInputs& inputs) 
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateMeshFillReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int hasTexCoords = 0; hasTexCoords <= 1; ++hasTexCoords) {
-    for (int hasColors = 0; hasColors <= 1; ++hasColors) {
-      for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
-        for (int xpType = -1; xpType <= 2; ++xpType) {
-          MeshFillInputs inputs;
-          inputs.hasTexCoords = hasTexCoords != 0;
-          inputs.hasColors = hasColors != 0;
-          inputs.hasCoverage = hasCoverage != 0;
-          inputs.xpType = xpType;
-          auto composed = ComposeMeshFill(inputs);
-          if (!composed) {
-            continue;
-          }
-          auto vertIndex = MeshFillShader::Dims::domain().encode(composed->vertValues);
-          auto fragIndex = MeshFillShader::FD::domain().encode(composed->fragValues);
-          result.insert({vertIndex, fragIndex});
-        }
-      }
-    }
-  }
-  return result;
+  return EnumerateMirroredReachable<MeshFillShader::Dims, MeshFillShader::FD>(nullptr);
 }
 
 std::optional<RuleComposedValues> ComposePerlinNoiseFill(const PerlinNoiseFillInputs& inputs) {
@@ -455,22 +319,7 @@ std::optional<RuleComposedValues> ComposePerlinNoiseFill(const PerlinNoiseFillIn
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumeratePerlinNoiseFillReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
-    for (int xpType = -1; xpType <= 2; ++xpType) {
-      PerlinNoiseFillInputs inputs;
-      inputs.hasCoverage = hasCoverage != 0;
-      inputs.xpType = xpType;
-      auto composed = ComposePerlinNoiseFill(inputs);
-      if (!composed) {
-        continue;
-      }
-      auto vertIndex = PerlinNoiseFillShader::VD::domain().encode(composed->vertValues);
-      auto fragIndex = PerlinNoiseFillShader::D::domain().encode(composed->fragValues);
-      result.insert({vertIndex, fragIndex});
-    }
-  }
-  return result;
+  return EnumerateMirroredReachable<PerlinNoiseFillShader::VD, PerlinNoiseFillShader::FragDims>(nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeYUVTextureFill(const YUVTextureFillInputs& inputs) {
@@ -530,24 +379,15 @@ std::optional<RuleComposedValues> ComposeShapeInstancedTextureCoverage(
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedTextureCoverageReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int gradient = 0; gradient <= 1; ++gradient) {
-    for (int hasColors = 0; hasColors <= 1; ++hasColors) {
-      ShapeInstancedTextureCoverageInputs inputs;
-      inputs.gradient = gradient != 0;
-      inputs.hasColors = hasColors != 0;
-      auto composed = ComposeShapeInstancedTextureCoverage(inputs);
-      if (!composed) {
-        continue;
-      }
-      auto vertIndex =
-          ShapeInstancedTextureCoverageShader::D::domain().encode(composed->vertValues);
-      auto fragIndex =
-          ShapeInstancedTextureCoverageShader::FD::domain().encode(composed->fragValues);
-      result.insert({vertIndex, fragIndex});
-    }
-  }
-  return result;
+  // ComposeShapeInstancedTextureCoverage's rejection, restated on the frag domain values: the
+  // bare coverage form reads the per-instance color; only the gradient form serves colorless
+  // batches.
+  return EnumerateMirroredReachable<ShapeInstancedTextureCoverageShader::Dims,
+                                    ShapeInstancedTextureCoverageShader::FD>(
+      [](const std::vector<int>& fragValues) {
+        return fragValues[ShapeInstancedTextureCoverageShader::FD::GRADIENT] ||
+               fragValues[ShapeInstancedTextureCoverageShader::FD::HAS_COLORS];
+      });
 }
 
 std::optional<RuleComposedValues> ComposeShapeInstancedFill(
@@ -569,25 +409,7 @@ std::optional<RuleComposedValues> ComposeShapeInstancedFill(
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedFillReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int hasColors = 0; hasColors <= 1; ++hasColors) {
-    for (int isCoverageAA = 0; isCoverageAA <= 1; ++isCoverageAA) {
-      for (int xpType = -1; xpType <= 2; ++xpType) {
-        ShapeInstancedFillInputs inputs;
-        inputs.hasColors = hasColors != 0;
-        inputs.isCoverageAA = isCoverageAA != 0;
-        inputs.xpType = xpType;
-        auto composed = ComposeShapeInstancedFill(inputs);
-        if (!composed) {
-          continue;
-        }
-        auto vertIndex = ShapeInstancedFillShader::Dims::domain().encode(composed->vertValues);
-        auto fragIndex = ShapeInstancedFillShader::FD::domain().encode(composed->fragValues);
-        result.insert({vertIndex, fragIndex});
-      }
-    }
-  }
-  return result;
+  return EnumerateMirroredReachable<ShapeInstancedFillShader::Dims, ShapeInstancedFillShader::FD>(nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeTiledTextureFill(const TiledTextureFillInputs& inputs) {
@@ -606,22 +428,7 @@ std::optional<RuleComposedValues> ComposeTiledTextureFill(const TiledTextureFill
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateTiledTextureFillReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
-    for (int xpType = -1; xpType <= 2; ++xpType) {
-      TiledTextureFillInputs inputs;
-      inputs.hasCoverage = hasCoverage != 0;
-      inputs.xpType = xpType;
-      auto composed = ComposeTiledTextureFill(inputs);
-      if (!composed) {
-        continue;
-      }
-      auto vertIndex = TiledTextureFillShader::VD::domain().encode(composed->vertValues);
-      auto fragIndex = TiledTextureFillShader::FragDims::domain().encode(composed->fragValues);
-      result.insert({vertIndex, fragIndex});
-    }
-  }
-  return result;
+  return EnumerateMirroredReachable<TiledTextureFillShader::VD, TiledTextureFillShader::FD>(nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeQuadTextureFill(const QuadTextureFillInputs& inputs) {
@@ -645,28 +452,7 @@ std::optional<RuleComposedValues> ComposeQuadTextureFill(const QuadTextureFillIn
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadTextureFillReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int hasUVCoord = 0; hasUVCoord <= 1; ++hasUVCoord) {
-    for (int hasSubset = 0; hasSubset <= 1; ++hasSubset) {
-      for (int hasLocalMask = 0; hasLocalMask <= 1; ++hasLocalMask) {
-        for (int xpType = -1; xpType <= 2; ++xpType) {
-          QuadTextureFillInputs inputs;
-          inputs.hasUVCoord = hasUVCoord != 0;
-          inputs.hasSubset = hasSubset != 0;
-          inputs.hasLocalMask = hasLocalMask != 0;
-          inputs.xpType = xpType;
-          auto composed = ComposeQuadTextureFill(inputs);
-          if (!composed) {
-            continue;
-          }
-          auto vertIndex = QuadTextureFillShader::VD::domain().encode(composed->vertValues);
-          auto fragIndex = QuadTextureFillShader::FD::domain().encode(composed->fragValues);
-          result.insert({vertIndex, fragIndex});
-        }
-      }
-    }
-  }
-  return result;
+  return EnumerateMirroredReachable<QuadTextureFillShader::VD, QuadTextureFillShader::FD>(nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeGaussianBlur1D(const GaussianBlur1DInputs& inputs) {
@@ -681,18 +467,7 @@ std::optional<RuleComposedValues> ComposeGaussianBlur1D(const GaussianBlur1DInpu
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateGaussianBlur1DReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int xpType = -1; xpType <= 2; ++xpType) {
-    GaussianBlur1DInputs inputs;
-    inputs.xpType = xpType;
-    auto composed = ComposeGaussianBlur1D(inputs);
-    if (!composed) {
-      continue;
-    }
-    auto fragIndex = GaussianBlur1DShader::FD::domain().encode(composed->fragValues);
-    result.insert({0, fragIndex});
-  }
-  return result;
+  return EnumerateMirroredReachable<EmptyVertDims, GaussianBlur1DShader::FD>(nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeGlassUDFTentBlur(const GlassUDFTentBlurInputs& inputs) {
@@ -707,18 +482,7 @@ std::optional<RuleComposedValues> ComposeGlassUDFTentBlur(const GlassUDFTentBlur
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassUDFTentBlurReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int xpType = -1; xpType <= 2; ++xpType) {
-    GlassUDFTentBlurInputs inputs;
-    inputs.xpType = xpType;
-    auto composed = ComposeGlassUDFTentBlur(inputs);
-    if (!composed) {
-      continue;
-    }
-    auto fragIndex = GlassUDFTentBlurShader::FD::domain().encode(composed->fragValues);
-    result.insert({0, fragIndex});
-  }
-  return result;
+  return EnumerateMirroredReachable<EmptyVertDims, GlassUDFTentBlurShader::FD>(nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeGlassRefraction(const GlassRefractionInputs& inputs) {
@@ -739,28 +503,7 @@ std::optional<RuleComposedValues> ComposeGlassRefraction(const GlassRefractionIn
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassRefractionReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int gpKind = 0; gpKind < 2; ++gpKind) {
-    for (int geometryKind = 0; geometryKind < 4; ++geometryKind) {
-      for (int dispersionOn = 0; dispersionOn <= 1; ++dispersionOn) {
-        for (int xpType = 0; xpType <= 2; ++xpType) {
-          GlassRefractionInputs inputs;
-          inputs.gpKind = gpKind;
-          inputs.geometryKind = geometryKind;
-          inputs.dispersionOn = dispersionOn != 0;
-          inputs.xpType = xpType;
-          auto composed = ComposeGlassRefraction(inputs);
-          if (!composed) {
-            continue;
-          }
-          auto vertIndex = GlassRefractionShader::VD::domain().encode(composed->vertValues);
-          auto fragIndex = GlassRefractionShader::FD::domain().encode(composed->fragValues);
-          result.insert({vertIndex, fragIndex});
-        }
-      }
-    }
-  }
-  return result;
+  return EnumerateMirroredReachable<GlassRefractionShader::VD, GlassRefractionShader::FD>(nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeTexturedEffect(const TexturedEffectInputs& inputs) {
@@ -779,22 +522,7 @@ std::optional<RuleComposedValues> ComposeTexturedEffect(const TexturedEffectInpu
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateTexturedEffectReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
-    for (int xpType = -1; xpType <= 2; ++xpType) {
-      TexturedEffectInputs inputs;
-      inputs.hasCoverage = hasCoverage != 0;
-      inputs.xpType = xpType;
-      auto composed = ComposeTexturedEffect(inputs);
-      if (!composed) {
-        continue;
-      }
-      auto vertIndex = TexturedEffectShader::VD::domain().encode(composed->vertValues);
-      auto fragIndex = TexturedEffectShader::D::domain().encode(composed->fragValues);
-      result.insert({vertIndex, fragIndex});
-    }
-  }
-  return result;
+  return EnumerateMirroredReachable<TexturedEffectShader::VD, TexturedEffectShader::FragDims>(nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeAtlasTextFill(const AtlasTextFillInputs& inputs) {
@@ -815,25 +543,7 @@ std::optional<RuleComposedValues> ComposeAtlasTextFill(const AtlasTextFillInputs
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateAtlasTextFillReachable() {
-  std::set<std::pair<uint32_t, uint32_t>> result;
-  for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
-    for (int hasCommonColor = 0; hasCommonColor <= 1; ++hasCommonColor) {
-      for (int xpType = -1; xpType <= 2; ++xpType) {
-        AtlasTextFillInputs inputs;
-        inputs.hasCoverage = hasCoverage != 0;
-        inputs.hasCommonColor = hasCommonColor != 0;
-        inputs.xpType = xpType;
-        auto composed = ComposeAtlasTextFill(inputs);
-        if (!composed) {
-          continue;
-        }
-        auto vertIndex = AtlasTextFillShader::D::domain().encode(composed->vertValues);
-        auto fragIndex = AtlasTextFillShader::FD::domain().encode(composed->fragValues);
-        result.insert({vertIndex, fragIndex});
-      }
-    }
-  }
-  return result;
+  return EnumerateMirroredReachable<AtlasTextFillShader::Dims, AtlasTextFillShader::FD>(nullptr);
 }
 
 static std::optional<RuleComposedValues> ComposePointwiseGP(const PointwiseChainInputs& inputs) {
@@ -1062,5 +772,6 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
     const std::string& shaderName) {
   return ShaderRegistry::Enumerate(shaderName);
 }
+
 
 }  // namespace tgfx
