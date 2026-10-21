@@ -81,9 +81,44 @@ class DrawingManager {
                         std::shared_ptr<ImageCodec> codec);
 
   /**
-   * Collects a Window that needs to be presented after command buffer submission.
+   * Records that the current batch uses the window frame behind the render target, without
+   * requesting its presentation.
    */
-  void collectWindow(std::weak_ptr<Window> window);
+  void collectFrameUsage(std::shared_ptr<RenderTargetProxy> renderTarget);
+
+  /**
+   * Returns the target for a new Surface of the window: the current target if this batch already
+   * uses it, otherwise a newly created one that becomes current.
+   */
+  std::shared_ptr<RenderTargetProxy> createWindowTarget(std::shared_ptr<Window> window);
+
+  /**
+   * Returns the window's current target, or makes renderTarget current if there is none.
+   */
+  std::shared_ptr<RenderTargetProxy> resolveWindowTarget(
+      const std::shared_ptr<Window>& window, std::shared_ptr<RenderTargetProxy> renderTarget);
+
+  /**
+   * Returns true if the current batch uses the frame behind the render target.
+   */
+  bool isFrameUsed(const std::shared_ptr<RenderTargetProxy>& renderTarget) const;
+
+  /**
+   * Closes all open compositors drawing into the render target, keeping the recording order of
+   * surfaces that share it.
+   */
+  void closeCompositors(const std::shared_ptr<RenderTargetProxy>& renderTarget);
+
+  /**
+   * Requests presenting the window's render target once at the end of the current batch.
+   */
+  void collectWindow(std::shared_ptr<Window> window,
+                     std::shared_ptr<RenderTargetProxy> renderTarget);
+
+  /**
+   * Returns true if the current batch presents the render target.
+   */
+  bool hasPendingPresentation(const std::shared_ptr<RenderTargetProxy>& renderTarget) const;
 
   /**
    * Flushes all pending drawing operations and returns the DrawingBuffer. Returns nullptr if there
@@ -92,7 +127,25 @@ class DrawingManager {
    */
   std::shared_ptr<DrawingBuffer> flush();
 
+  /**
+   * Takes the windows collected by the last flush().
+   */
+  std::vector<std::shared_ptr<Window>> takePendingWindows() {
+    return std::move(pendingWindows);
+  }
+
  private:
+  struct WindowTarget {
+    std::weak_ptr<Window> window;
+    std::weak_ptr<RenderTargetProxy> target;
+  };
+
+  // The current target of each window, held weakly; expired entries are dropped at flush time.
+  std::unordered_map<Window*, WindowTarget> windowTargets = {};
+
+  // Windows presented by the current batch, moved into the Recording at flush time to keep them
+  // alive until submission.
+  std::vector<std::shared_ptr<Window>> pendingWindows = {};
   Context* context = nullptr;
   std::shared_ptr<DrawingBuffer> currentBuffer = nullptr;
   std::deque<std::shared_ptr<DrawingBuffer>> bufferPool = {};
@@ -104,6 +157,8 @@ class DrawingManager {
   }
 
   DrawingBuffer* createDrawingBuffer();
+
+  WindowTarget& windowTargetEntry(const std::shared_ptr<Window>& window);
 
   friend class OpsCompositor;
   friend class RenderContext;

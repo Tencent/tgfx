@@ -41,6 +41,10 @@ class SVGUse final : public SVGTransformableNode {
 
   void appendChild(std::shared_ptr<SVGNode>) override{};
 
+  const std::vector<std::shared_ptr<SVGNode>>& getChildren() const override {
+    return EmptyNodes();
+  }
+
   SVG_ATTR(X, SVGLength, SVGLength(0))
   SVG_ATTR(Y, SVGLength, SVGLength(0))
   SVG_ATTR(Href, SVGIRI, SVGIRI())

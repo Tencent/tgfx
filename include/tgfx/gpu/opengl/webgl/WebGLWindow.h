@@ -42,6 +42,10 @@ class WebGLWindow : public Window {
   static std::shared_ptr<WebGLWindow> MakeFrom(emscripten::val canvas,
                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
+  bool supportsReadback() const override {
+    return true;
+  }
+
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
 

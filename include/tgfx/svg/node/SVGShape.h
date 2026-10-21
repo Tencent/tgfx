@@ -34,6 +34,7 @@ enum class SVGTag;
 class SVGShape : public SVGTransformableNode {
  public:
   void appendChild(std::shared_ptr<SVGNode> node) override;
+  const std::vector<std::shared_ptr<SVGNode>>& getChildren() const override;
 
  protected:
   explicit SVGShape(SVGTag tag);

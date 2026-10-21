@@ -19,8 +19,8 @@
 #pragma once
 
 #include <memory>
-#include <optional>
 #include <vector>
+#include "VulkanPresentationState.h"
 #include "gpu/vulkan/VulkanGPU.h"
 #include "tgfx/gpu/CommandQueue.h"
 
@@ -35,7 +35,8 @@ class VulkanTexture;
  *
  * Holds only the data accumulated between two consecutive submit() calls:
  *   - pendingUploads: staging buffers from writeTexture(), consumed by submit().
- *   - pendingPresent: swapchain info from schedulePresent(), consumed by submit().
+ *   - pendingPresents: one swapchain frame per window from schedulePresent(), consumed by
+ *     submit() and aggregated into a single vkQueueSubmit + vkQueuePresentKHR batch.
  *   - pendingSignal/WaitSemaphore: from insertSemaphore()/waitSemaphore(), consumed by submit().
  *
  * On submit(), this class assembles the upload/render/present command buffers and the SubmitRequest
@@ -68,10 +69,14 @@ class VulkanCommandQueue : public CommandQueue {
 
   void waitUntilCompleted() override;
 
-  /// Schedules a swapchain image to be presented at the end of the next submit(). The layout
-  /// transition (GENERAL -> PRESENT_SRC_KHR) is automatically appended to the render command batch.
+  /// Makes the next submit() wait for a swapchain image acquisition, taking ownership of the
+  /// semaphore. Called once per acquired frame.
+  void scheduleAcquireWait(VkSemaphore imageAvailableSemaphore, std::shared_ptr<bool> outOfDate);
+
+  /// Presents an acquired swapchain image at the end of the next submit().
   void schedulePresent(VkSwapchainKHR swapchain, uint32_t imageIndex, VkImage image,
-                       VkSemaphore imageAvailableSemaphore, VkSemaphore renderFinishedSemaphore);
+                       VkSemaphore presentSemaphore, std::shared_ptr<VkImageLayout> layout,
+                       std::shared_ptr<bool> outOfDate);
 
  private:
   void flushUploads(VkCommandBuffer commandBuffer, std::vector<VulkanGPU::PendingUpload>& uploads);
@@ -88,15 +93,20 @@ class VulkanCommandQueue : public CommandQueue {
   std::shared_ptr<VulkanSemaphore> pendingSignalSemaphore;
   std::shared_ptr<VulkanSemaphore> pendingWaitSemaphore;
 
-  // Produced by schedulePresent(), consumed by submit().
+  // Produced by scheduleAcquireWait() and schedulePresent(), consumed by submit().
   struct PendingPresent {
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
     uint32_t imageIndex = 0;
     VkImage image = VK_NULL_HANDLE;
     VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
-    VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
+    VkSemaphore presentSemaphore = VK_NULL_HANDLE;
+    std::shared_ptr<VkImageLayout> layout;
+    std::shared_ptr<bool> outOfDate;
+    bool presents = false;
   };
-  std::optional<PendingPresent> pendingPresent;
+  std::vector<PendingPresent> pendingPresents;
+
+  void abandonPresents(std::vector<PendingPresent>& presents);
 };
 
 }  // namespace tgfx

@@ -19,30 +19,20 @@
 #pragma once
 
 #include <vector>
+#include "VulkanPresentationState.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/vulkan/VulkanGPU.h"
 
 namespace tgfx {
 
-/**
- * Manages swapchain image acquisition and per-frame presentation for window rendering.
- *
- * Synchronization model:
- *   - backpressure: VulkanGPU::acquirePresentationSlot() blocks if MAX_FRAMES_IN_FLIGHT
- *     submissions are in flight, ensuring the returned semaphore pair is safe to reuse.
- *   - acquire: vkAcquireNextImageKHR signals imageAvailable semaphore. CPU returns immediately
- *     without blocking; the GPU waits on it at COLOR_ATTACHMENT_OUTPUT before rendering.
- *   - submit: waits on imageAvailable, signals renderFinished after rendering completes.
- *   - present: scheduled via VulkanCommandQueue::schedulePresent() during acquire. The queue
- *     appends a GENERAL to PRESENT_SRC layout transition to the render batch and calls
- *     vkQueuePresentKHR after submit, waiting on renderFinished.
- */
 class VulkanSwapchainProxy : public RenderTargetProxy {
  public:
   VulkanSwapchainProxy(Context* context, VulkanGPU* gpu, VkSwapchainKHR swapchain, VkFormat format,
-                       int width, int height, const std::vector<VkImageView>& imageViews,
-                       const std::vector<VkImage>& images, const VulkanGPU::PresentationSlot& slot);
-  ~VulkanSwapchainProxy() override = default;
+                       int width, int height, const std::vector<VkImage>& images,
+                       const std::vector<std::shared_ptr<VulkanSwapchainImageState>>& imageStates,
+                       std::shared_ptr<bool> outOfDate,
+                       std::shared_ptr<uint64_t> swapchainGeneration);
+  ~VulkanSwapchainProxy() override;
 
   Context* getContext() const override;
   int width() const override;
@@ -54,15 +44,32 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
   std::shared_ptr<TextureView> getTextureView() const override;
   std::shared_ptr<RenderTarget> getRenderTarget() const override;
 
-  uint32_t currentImageIndex() const {
-    return _currentImageIndex;
-  }
+  /**
+   * Returns true if this proxy has acquired a swapchain image that has not been presented yet.
+   */
+  bool hasPendingFrame() const;
 
-  bool isOutOfDate() const {
-    return _outOfDate;
-  }
+  /**
+   * Makes the next submission wait for the frame acquisition. Done once per frame.
+   */
+  void attachAcquireWait();
 
   void releaseFrame();
+
+  /**
+   * Waits for the frame acquisition without presenting the frame.
+   */
+  void onAttachSubmission(Context* context) override;
+
+  /**
+   * Queues the frame's presentation with the current batch.
+   */
+  void onSchedulePresentation(Context* context) override;
+
+  /**
+   * Ends the frame after it is presented.
+   */
+  void onPresentFrame(Context* context) override;
 
  private:
   Context* _context = nullptr;
@@ -71,14 +78,16 @@ class VulkanSwapchainProxy : public RenderTargetProxy {
   VkFormat _format = VK_FORMAT_UNDEFINED;
   int _width = 0;
   int _height = 0;
-  std::vector<VkImageView> _imageViews;
   std::vector<VkImage> _images;
+  std::vector<std::shared_ptr<VulkanSwapchainImageState>> _imageStates;
+  std::shared_ptr<bool> _outOfDate;
+  std::shared_ptr<uint64_t> _swapchainGeneration;
+  uint64_t _generationValue = 0;
 
-  VkSemaphore _imageAvailableSemaphore = VK_NULL_HANDLE;
-  VkSemaphore _renderFinishedSemaphore = VK_NULL_HANDLE;
   mutable uint32_t _currentImageIndex = 0;
-  mutable bool _outOfDate = false;
   mutable std::shared_ptr<RenderTarget> _renderTarget = nullptr;
+  // The acquire semaphore of the pending frame, released with the submission's fence.
+  mutable VkSemaphore _pendingImageAvailableSemaphore = VK_NULL_HANDLE;
 };
 
 }  // namespace tgfx

@@ -54,7 +54,6 @@ class WebGPUWindow : public Window {
 
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
-  void onPresent(Context* context) override;
 
  private:
   WebGPUWindow(std::shared_ptr<Device> device, void* surface, int width, int height,
@@ -82,7 +81,6 @@ class WebGPUWindow : public Window {
   int _height = 0;
   int _configuredWidth = 0;
   int _configuredHeight = 0;
-  std::shared_ptr<RenderTargetProxy> drawableProxy = nullptr;
 };
 
 }  // namespace tgfx

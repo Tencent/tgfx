@@ -328,8 +328,10 @@ TGFX_TEST(ResourceTest, MultiThreadRecycling) {
       context->resourceCache()->purgeUntilMemoryTo(0);
       device->unlock();
       tgfx::Task::Run([resource, device] {
-        resource.get();
-        device.get();
+        // Keep the resource and its device alive until this task runs; the casts silence the
+        // nodiscard warnings of newer libc++ versions.
+        (void)resource.get();
+        (void)device.get();
       });
     }
   });

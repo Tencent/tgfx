@@ -35,6 +35,11 @@
 
 namespace tgfx {
 
+const std::vector<std::shared_ptr<SVGNode>>& SVGNode::EmptyNodes() {
+  static const std::vector<std::shared_ptr<SVGNode>> empty = {};
+  return empty;
+}
+
 SVGNode::SVGNode(SVGTag t) : _tag(t) {
   // Uninherited presentation attributes need a non-null default value.
   presentationAttributes.StopColor.set(SVGColor(Color::Black()));
