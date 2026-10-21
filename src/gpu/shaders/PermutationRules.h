@@ -56,15 +56,15 @@ namespace tgfx {
 //   1. Extract (PermutationMatcher.cpp) — assign the field from the ProgramInfo.
 //   2. Compose (this file) — read the field where it shapes dimensions or rejects.
 // For a pass-through family that is the whole job when the field only shapes dimension values.
-// If the field makes Compose REJECT a combination, the rejection must additionally be restated
-// as a frag-domain filter in the family's Enumerate* call (see EnumerateNonAARRectFillReachable
-// and EnumerateShapeInstancedTextureCoverageReachable). This restatement is load-bearing in the
-// opposite direction from the old handwritten loops: a missing filter silently OVER-compiles
-// variants the runtime never requests (no test fails — the bundle counters read the same
-// enumeration), while the old loops failed loudly by under-compiling. When adding such a filter,
-// diff the new reachable set against the previous one. Chain/Graph/YUV instead keep the old
+// If the field makes Compose REJECT a combination, the rejection must live in one shared
+// validity function that both Compose and the family's Enumerate* call (see the *ValuesAllowed
+// functions in PermutationRules.cpp) — never as two independently restated expressions. A
+// diverging copy silently OVER-compiles variants the runtime never requests: no test fails,
+// because the bundle counters read the same enumeration. When adding such a predicate, diff the
+// new reachable set against the previous one. Chain/Graph/YUV instead keep the input-lattice
 // contract: add a loop layer covering every value the new field can take, or their bundles miss
-// variants and draws fall back to runtime compilation silently.
+// variants and the draws silently lose precompiled coverage (with a loaded bundle the draw is
+// dropped, not recompiled).
 // ---------------------------------------------------------------------------------------
 
 /**
@@ -508,6 +508,5 @@ std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseGraphReachable();
  */
 std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
     const std::string& shaderName);
-
 
 }  // namespace tgfx

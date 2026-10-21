@@ -1216,8 +1216,9 @@ static std::optional<PermutationMatchResult> TryMatchNonAARRectFill(
     if (!clipOnly) {
       auto fp = programInfo->getFragmentProcessor(0);
       // The textured variant carries the single-tap tiled modes only: the mipmap-repeat 4-tap path
-      // and perspective coordinates stay on the runtime route.
-      if (fp->name() != "TiledTextureEffect" || ngp->isStroke()) {
+      // and perspective coordinates stay on the runtime route. The textured form never combines
+      // with stroke; ComposeNonAARRectFill applies that rejection through the shared predicate.
+      if (fp->name() != "TiledTextureEffect") {
         return std::nullopt;
       }
       auto* tte = static_cast<const TiledTextureEffect*>(fp);

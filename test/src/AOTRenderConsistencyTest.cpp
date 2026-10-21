@@ -1888,8 +1888,8 @@ TGFX_TEST(AOTRenderConsistencyTest, SharedTextureSamplingPreservesFractionalBrus
   ASSERT_NE(source, nullptr);
   auto rgbaaa = source->makeRGBAAA(512, 512, 512, 0);
   ASSERT_NE(rgbaaa, nullptr);
-  const std::array<float, 20> halfRGB = {0.5f, 0, 0, 0, 0, 0, 0.5f, 0, 0, 0,
-                                        0, 0, 0.5f, 0, 0, 0, 0, 0, 1, 0};
+  const std::array<float, 20> halfRGB = {0.5f, 0, 0,    0, 0, 0, 0.5f, 0, 0, 0,
+                                         0,    0, 0.5f, 0, 0, 0, 0,    0, 1, 0};
   auto filter = ColorFilter::Compose(ColorFilter::Matrix(halfRGB), ColorFilter::Luma());
   ASSERT_NE(filter, nullptr);
   for (const auto& image : {rgba, mask, rgbaaa}) {
@@ -2051,8 +2051,9 @@ TGFX_TEST(AOTRenderConsistencyTest, DedicatedAndChainAgreeOnEllipseDraws) {
             }
             canvas->drawOval(Rect::MakeXYWH(6, 10, 84, 76), paint);
           };
-          std::string label = std::string(stroke ? "stroke" : "fill") + " alpha=" +
-                              std::to_string(alpha) + " clip=" + std::to_string(clipMode) +
+          std::string label = std::string(stroke ? "stroke" : "fill") +
+                              " alpha=" + std::to_string(alpha) +
+                              " clip=" + std::to_string(clipMode) +
                               (blend == BlendMode::SrcOver ? " srcover" : " multiply");
           ExpectDedicatedAndChainAgree(label.c_str(), scene, size, size, "EllipseFillShader",
                                        "PointwiseChainShader");
@@ -2380,9 +2381,9 @@ TGFX_TEST(AOTRenderConsistencyTest, ShapeStepFamiliesMatchRuntime) {
         RenderSceneThroughRoute(scene, size, size, KernelRoute::Runtime, &jit, &jitStats);
         RenderSceneThroughRoute(scene, size, size, KernelRoute::Dedicated, &dedicated,
                                 &dedicatedStats, entry.plainMatcher);
-        EXPECT_NE(std::find(dedicatedStats.shaders.begin(), dedicatedStats.shaders.end(),
-                            entry.family),
-                  dedicatedStats.shaders.end());
+        EXPECT_NE(
+            std::find(dedicatedStats.shaders.begin(), dedicatedStats.shaders.end(), entry.family),
+            dedicatedStats.shaders.end());
         EXPECT_EQ(dedicatedStats.noMatchingRule, 0u);
         EXPECT_EQ(dedicatedStats.programs.programBuilderCreations, 0u);
         EXPECT_EQ(dedicatedStats.draws.droppedDraws, 0u);
@@ -2427,9 +2428,10 @@ TGFX_TEST(AOTRenderConsistencyTest, MeshAtlasTiledMatchRuntime) {
   ASSERT_NE(tileImage, nullptr);
   const Point meshPositions[] = {{16, 14}, {46, 10}, {76, 22}, {36, 74}};
   const Color meshColors[] = {Color::FromRGBA(220, 60, 40, 255), Color::FromRGBA(60, 200, 90, 255),
-                              Color::FromRGBA(60, 90, 220, 255), Color::FromRGBA(220, 160, 40, 255)};
-  auto colorMesh = Mesh::MakeCopy(MeshTopology::TriangleStrip, 4, meshPositions, nullptr,
-                                  meshColors);
+                              Color::FromRGBA(60, 90, 220, 255),
+                              Color::FromRGBA(220, 160, 40, 255)};
+  auto colorMesh =
+      Mesh::MakeCopy(MeshTopology::TriangleStrip, 4, meshPositions, nullptr, meshColors);
   ASSERT_NE(colorMesh, nullptr);
   auto solidMesh = Mesh::MakeCopy(MeshTopology::TriangleStrip, 4, meshPositions);
   ASSERT_NE(solidMesh, nullptr);
@@ -2478,9 +2480,9 @@ TGFX_TEST(AOTRenderConsistencyTest, MeshAtlasTiledMatchRuntime) {
         RenderSceneThroughRoute(scene, size, size, KernelRoute::Runtime, &jit, &jitStats);
         RenderSceneThroughRoute(scene, size, size, KernelRoute::Dedicated, &dedicated,
                                 &dedicatedStats, entry.plainMatcher);
-        EXPECT_NE(std::find(dedicatedStats.shaders.begin(), dedicatedStats.shaders.end(),
-                            entry.family),
-                  dedicatedStats.shaders.end());
+        EXPECT_NE(
+            std::find(dedicatedStats.shaders.begin(), dedicatedStats.shaders.end(), entry.family),
+            dedicatedStats.shaders.end());
         EXPECT_EQ(dedicatedStats.noMatchingRule, 0u);
         EXPECT_EQ(dedicatedStats.programs.programBuilderCreations, 0u);
         EXPECT_EQ(dedicatedStats.draws.droppedDraws, 0u);
@@ -2585,7 +2587,8 @@ TGFX_TEST(AOTRenderConsistencyTest, HairlineFillsMatchRuntime) {
     const char* family;
     Path path;
   };
-  const std::vector<ShapeCase> shapes = {{"HairlineLineShader", zigzag}, {"HairlineQuadShader", wave}};
+  const std::vector<ShapeCase> shapes = {{"HairlineLineShader", zigzag},
+                                         {"HairlineQuadShader", wave}};
   for (const auto& shape : shapes) {
     for (bool antiAlias : {true, false}) {
       for (float alpha : {1.0f, 0.37f}) {
@@ -2612,9 +2615,9 @@ TGFX_TEST(AOTRenderConsistencyTest, HairlineFillsMatchRuntime) {
           RenderSceneThroughRoute(scene, size, size, KernelRoute::Runtime, &jit, &jitStats);
           RenderSceneThroughRoute(scene, size, size, KernelRoute::Dedicated, &dedicated,
                                   &dedicatedStats, true);
-          EXPECT_NE(std::find(dedicatedStats.shaders.begin(), dedicatedStats.shaders.end(),
-                              shape.family),
-                    dedicatedStats.shaders.end());
+          EXPECT_NE(
+              std::find(dedicatedStats.shaders.begin(), dedicatedStats.shaders.end(), shape.family),
+              dedicatedStats.shaders.end());
           EXPECT_EQ(dedicatedStats.noMatchingRule, 0u);
           EXPECT_EQ(dedicatedStats.programs.programBuilderCreations, 0u);
           EXPECT_EQ(dedicatedStats.draws.droppedDraws, 0u);
@@ -3734,12 +3737,10 @@ static PlacementPtr<FragmentProcessor> MakeFourLeafTreeWithTrailingTiledLeaf(
       tiled->name() != "TiledTextureEffect") {
     return nullptr;
   }
-  auto left = XfermodeFragmentProcessor::MakeFromTwoProcessors(allocator, std::move(plainA),
-                                                               std::move(plainB),
-                                                               BlendMode::Multiply);
-  auto right = XfermodeFragmentProcessor::MakeFromTwoProcessors(allocator, std::move(plainC),
-                                                                std::move(tiled),
-                                                                BlendMode::SrcOver);
+  auto left = XfermodeFragmentProcessor::MakeFromTwoProcessors(
+      allocator, std::move(plainA), std::move(plainB), BlendMode::Multiply);
+  auto right = XfermodeFragmentProcessor::MakeFromTwoProcessors(
+      allocator, std::move(plainC), std::move(tiled), BlendMode::SrcOver);
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(allocator, std::move(left),
                                                           std::move(right), BlendMode::Screen);
 }
@@ -10020,7 +10021,8 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyFillMatchesRuntime) {
   int maxDiff = 0;
   size_t diffCount = 0;
   for (size_t i = 0; i < totalBytes; ++i) {
-    int diff = std::abs(static_cast<int>(referencePixels[i]) - static_cast<int>(candidatePixels[i]));
+    int diff =
+        std::abs(static_cast<int>(referencePixels[i]) - static_cast<int>(candidatePixels[i]));
     if (diff > 0) {
       ++diffCount;
     }

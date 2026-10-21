@@ -53,7 +53,9 @@ namespace {
 // keep their dedicated enumerators.
 // Vertex-stage placeholder for families with no vertex dimensions: a single trivial variant.
 struct EmptyVertDims {
-  static PermutationDomain domain() { return PermutationDomain({}); }
+  static PermutationDomain domain() {
+    return PermutationDomain({});
+  }
 };
 
 template <typename D, typename FD>
@@ -78,8 +80,32 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateMirroredReachable(
   return result;
 }
 
-}  // namespace
+// Shared rejection predicates: Compose and the family's enumerator call the same function, so the
+// runtime rule and the compiled variant set cannot drift apart. Each predicate takes the family's
+// frag domain values; Compose validates its composed values, the enumerator validates each
+// mirrored pair it is about to keep.
 
+// NonAARRectFillShader: the textured variant (a TiledTextureEffect fill) is fill-only; a stroked
+// rect never carries the tiled texture child.
+bool NonAARRectFillValuesAllowed(const std::vector<int>& fragValues) {
+  return !(fragValues[NonAARRectFillShader::FD::TEXTURED] != 0 &&
+           fragValues[NonAARRectFillShader::FD::STROKE] != 0);
+}
+
+// ShapeInstancedTextureCoverageShader: the bare coverage form reads the per-instance color; only
+// the gradient form serves colorless batches with an opaque-white input.
+bool ShapeInstancedCoverageValuesAllowed(const std::vector<int>& fragValues) {
+  return fragValues[ShapeInstancedTextureCoverageShader::FD::GRADIENT] != 0 ||
+         fragValues[ShapeInstancedTextureCoverageShader::FD::HAS_COLORS] != 0;
+}
+
+// PointwiseGraphShader: the per-quad subset of a strict image draw is a Chain-only capability;
+// the Graph kernel has no subset branch. Takes the Chain frag values both sides share.
+bool PointwiseGraphChainValuesAllowed(const std::vector<int>& chainFragValues) {
+  return chainFragValues[PointwiseChainShader::FD::HAS_SUBSET] == 0;
+}
+
+}  // namespace
 
 std::optional<RuleComposedValues> ComposeRoundStrokeRect(const RoundStrokeRectInputs& inputs) {
   if (inputs.xpType < 0) {
@@ -100,7 +126,8 @@ std::optional<RuleComposedValues> ComposeRoundStrokeRect(const RoundStrokeRectIn
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateRoundStrokeRectReachable() {
-  return EnumerateMirroredReachable<RoundStrokeRectFillShader::Dims, RoundStrokeRectFillShader::FD>(nullptr);
+  return EnumerateMirroredReachable<RoundStrokeRectFillShader::Dims, RoundStrokeRectFillShader::FD>(
+      nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeMaskFill(const MaskFillInputs& inputs) {
@@ -202,7 +229,8 @@ std::optional<RuleComposedValues> ComposeComplexEllipseFill(
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexEllipseFillReachable() {
-  return EnumerateMirroredReachable<ComplexEllipseFillShader::Dims, ComplexEllipseFillShader::FD>(nullptr);
+  return EnumerateMirroredReachable<ComplexEllipseFillShader::Dims, ComplexEllipseFillShader::FD>(
+      nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeEllipseFill(const EllipseFillInputs& inputs) {
@@ -229,11 +257,6 @@ std::optional<RuleComposedValues> ComposeNonAARRectFill(const NonAARRectFillInpu
   if (inputs.xpType < 0) {
     return std::nullopt;
   }
-  // The textured variant (a TiledTextureEffect fill) is fill-only: a stroked rect never carries
-  // the tiled texture child.
-  if (inputs.textured && inputs.isStroke) {
-    return std::nullopt;
-  }
   using D = NonAARRectFillShader::Dims;
   using FD = NonAARRectFillShader::FD;
   RuleComposedValues values;
@@ -246,17 +269,15 @@ std::optional<RuleComposedValues> ComposeNonAARRectFill(const NonAARRectFillInpu
   values.fragValues[FD::STROKE] = values.vertValues[D::STROKE];
   values.fragValues[FD::TEXTURED] = values.vertValues[D::TEXTURED];
   values.fragValues[FD::HAS_XP] = inputs.xpType;
+  if (!NonAARRectFillValuesAllowed(values.fragValues)) {
+    return std::nullopt;
+  }
   return values;
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateNonAARRectFillReachable() {
-  // ComposeNonAARRectFill's rejection, restated on the frag domain values: the textured variant
-  // (a TiledTextureEffect fill) is fill-only.
   return EnumerateMirroredReachable<NonAARRectFillShader::Dims, NonAARRectFillShader::FD>(
-      [](const std::vector<int>& fragValues) {
-        return !(fragValues[NonAARRectFillShader::FD::TEXTURED] &&
-                 fragValues[NonAARRectFillShader::FD::STROKE]);
-      });
+      &NonAARRectFillValuesAllowed);
 }
 
 std::optional<RuleComposedValues> ComposeComplexNonAARRectFill(
@@ -278,7 +299,8 @@ std::optional<RuleComposedValues> ComposeComplexNonAARRectFill(
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexNonAARRectFillReachable() {
-  return EnumerateMirroredReachable<ComplexNonAARRectFillShader::Dims, ComplexNonAARRectFillShader::FD>(nullptr);
+  return EnumerateMirroredReachable<ComplexNonAARRectFillShader::Dims,
+                                    ComplexNonAARRectFillShader::FD>(nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeMeshFill(const MeshFillInputs& inputs) {
@@ -319,7 +341,8 @@ std::optional<RuleComposedValues> ComposePerlinNoiseFill(const PerlinNoiseFillIn
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumeratePerlinNoiseFillReachable() {
-  return EnumerateMirroredReachable<PerlinNoiseFillShader::VD, PerlinNoiseFillShader::FragDims>(nullptr);
+  return EnumerateMirroredReachable<PerlinNoiseFillShader::VD, PerlinNoiseFillShader::FragDims>(
+      nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeYUVTextureFill(const YUVTextureFillInputs& inputs) {
@@ -361,11 +384,6 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateYUVTextureFillReachable() {
 
 std::optional<RuleComposedValues> ComposeShapeInstancedTextureCoverage(
     const ShapeInstancedTextureCoverageInputs& inputs) {
-  // The bare coverage form reads the per-instance color; only the gradient form serves colorless
-  // batches with an opaque-white input.
-  if (!inputs.gradient && !inputs.hasColors) {
-    return std::nullopt;
-  }
   using D = ShapeInstancedTextureCoverageShader::D;
   using FD = ShapeInstancedTextureCoverageShader::FD;
   RuleComposedValues values;
@@ -375,19 +393,16 @@ std::optional<RuleComposedValues> ComposeShapeInstancedTextureCoverage(
   values.fragValues.resize(FD::COUNT);
   values.fragValues[FD::GRADIENT] = values.vertValues[D::GRADIENT];
   values.fragValues[FD::HAS_COLORS] = values.vertValues[D::HAS_COLORS];
+  if (!ShapeInstancedCoverageValuesAllowed(values.fragValues)) {
+    return std::nullopt;
+  }
   return values;
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedTextureCoverageReachable() {
-  // ComposeShapeInstancedTextureCoverage's rejection, restated on the frag domain values: the
-  // bare coverage form reads the per-instance color; only the gradient form serves colorless
-  // batches.
   return EnumerateMirroredReachable<ShapeInstancedTextureCoverageShader::Dims,
                                     ShapeInstancedTextureCoverageShader::FD>(
-      [](const std::vector<int>& fragValues) {
-        return fragValues[ShapeInstancedTextureCoverageShader::FD::GRADIENT] ||
-               fragValues[ShapeInstancedTextureCoverageShader::FD::HAS_COLORS];
-      });
+      &ShapeInstancedCoverageValuesAllowed);
 }
 
 std::optional<RuleComposedValues> ComposeShapeInstancedFill(
@@ -409,7 +424,8 @@ std::optional<RuleComposedValues> ComposeShapeInstancedFill(
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedFillReachable() {
-  return EnumerateMirroredReachable<ShapeInstancedFillShader::Dims, ShapeInstancedFillShader::FD>(nullptr);
+  return EnumerateMirroredReachable<ShapeInstancedFillShader::Dims, ShapeInstancedFillShader::FD>(
+      nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeTiledTextureFill(const TiledTextureFillInputs& inputs) {
@@ -428,7 +444,8 @@ std::optional<RuleComposedValues> ComposeTiledTextureFill(const TiledTextureFill
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateTiledTextureFillReachable() {
-  return EnumerateMirroredReachable<TiledTextureFillShader::VD, TiledTextureFillShader::FD>(nullptr);
+  return EnumerateMirroredReachable<TiledTextureFillShader::VD, TiledTextureFillShader::FD>(
+      nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeQuadTextureFill(const QuadTextureFillInputs& inputs) {
@@ -522,7 +539,8 @@ std::optional<RuleComposedValues> ComposeTexturedEffect(const TexturedEffectInpu
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateTexturedEffectReachable() {
-  return EnumerateMirroredReachable<TexturedEffectShader::VD, TexturedEffectShader::FragDims>(nullptr);
+  return EnumerateMirroredReachable<TexturedEffectShader::VD, TexturedEffectShader::FragDims>(
+      nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeAtlasTextFill(const AtlasTextFillInputs& inputs) {
@@ -723,7 +741,7 @@ std::optional<RuleComposedValues> ComposePointwiseGraph(const PointwiseChainInpu
   }
   // The per-quad subset of a strict draw is a Chain-only capability.
   if (!IsAOTGraphProfile(profile) ||
-      (profile == AOTResourceProfile::NoiseGraph) != inputs.hasNoise || inputs.hasSubset) {
+      (profile == AOTResourceProfile::NoiseGraph) != inputs.hasNoise) {
     return std::nullopt;
   }
   if (profile == AOTResourceProfile::NoiseGraph &&
@@ -733,6 +751,9 @@ std::optional<RuleComposedValues> ComposePointwiseGraph(const PointwiseChainInpu
   }
   auto values = ComposePointwiseGP(inputs);
   if (!values) {
+    return std::nullopt;
+  }
+  if (!PointwiseGraphChainValuesAllowed(values->fragValues)) {
     return std::nullopt;
   }
   values->fragValues.resize(PointwiseGraphShader::FD::COUNT);
@@ -745,7 +766,7 @@ std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseGraphReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (const auto& indices : EnumeratePointwiseChainReachable()) {
     auto fragValues = PointwiseChainShader::FD::domain().decode(indices.second);
-    if (fragValues[PointwiseChainShader::FD::HAS_SUBSET] != 0) {
+    if (!PointwiseGraphChainValuesAllowed(fragValues)) {
       continue;
     }
     fragValues.push_back(1);
@@ -772,6 +793,5 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
     const std::string& shaderName) {
   return ShaderRegistry::Enumerate(shaderName);
 }
-
 
 }  // namespace tgfx

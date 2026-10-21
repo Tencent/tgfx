@@ -1061,8 +1061,8 @@ bool PrecompiledShaderCache::writeDiagnosticsDump(const std::string& path) const
     out.append(", \"reason\": ");
     AppendEscaped(&out, PrecompiledFallbackReasonName(record.reason));
     out.append(", \"matchFailure\": ");
-    AppendEscaped(
-        &out, PermutationMatchFailureName(static_cast<PermutationMatchFailure>(record.matchFailure)));
+    AppendEscaped(&out, PermutationMatchFailureName(
+                            static_cast<PermutationMatchFailure>(record.matchFailure)));
     out.append("}");
   }
   out.append("\n],\n\"hitSummary\": [");

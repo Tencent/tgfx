@@ -428,9 +428,9 @@ void ExpectComplexRRectVariant(LayoutVariant variant, bool stroke) {
 
 enum ReportedClip : int {
   ClipNone = 0,
-  ClipPath = 1,       // no analytic form: a device-space mask (DeviceSpaceTextureEffect)
-  ClipRect = 2,       // AA, fractional, under a rotation: an analytic RectEffect
-  ClipRRect = 4,      // AA rounded rect: an analytic RRectEffect
+  ClipPath = 1,   // no analytic form: a device-space mask (DeviceSpaceTextureEffect)
+  ClipRect = 2,   // AA, fractional, under a rotation: an analytic RectEffect
+  ClipRRect = 4,  // AA rounded rect: an analytic RRectEffect
   ClipSecondRRect = 8,
 };
 
@@ -576,7 +576,9 @@ void ExpectReportedShapeServed(const ReportedShape& shape) {
       reproduced = reproduced || record.effectSignature == shape.signature;
     }
     EXPECT_TRUE(reproduced) << shape.label << ": the scene did not produce\n  " << shape.signature
-                            << "\n" << gpName << " signatures seen:\n" << seen;
+                            << "\n"
+                            << gpName << " signatures seen:\n"
+                            << seen;
     cache->setDiagnosticRecordingEnabled(false);
   }
   {
@@ -674,10 +676,10 @@ void ExpectSceneServed(const char* label, const char* gpName, const char* signat
     EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u) << label;
     std::string misses = {};
     for (const auto& record : cache->fallbackRecords()) {
-      misses += record.effectSignature + " [" +
-                PermutationMatchFailureName(
-                    static_cast<PermutationMatchFailure>(record.matchFailure)) +
-                "]\n";
+      misses +=
+          record.effectSignature + " [" +
+          PermutationMatchFailureName(static_cast<PermutationMatchFailure>(record.matchFailure)) +
+          "]\n";
     }
     EXPECT_TRUE(misses.empty()) << label << " misses:\n" << misses;
     cache->setDiagnosticRecordingEnabled(false);
@@ -694,8 +696,9 @@ void ExpectSceneServed(const char* label, const char* gpName, const char* signat
 
 TGFX_TEST(AOTGeometryLayoutTest, ReportedHairlineDeviceMask) {
   ExpectReportedShapeServed(
-      {"row12", "GP=HairlineLineGeometryProcessor;ColorFP=[];CoverageFP=[DeviceSpaceTextureEffect];"
-                "XP=EmptyXferProcessor",
+      {"row12",
+       "GP=HairlineLineGeometryProcessor;ColorFP=[];CoverageFP=[DeviceSpaceTextureEffect];"
+       "XP=EmptyXferProcessor",
        false, false, ClipPath});
 }
 
@@ -708,21 +711,20 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedHairlineDeviceMaskRect) {
 }
 
 TGFX_TEST(AOTGeometryLayoutTest, ReportedHairlineGradientDeviceMaskRRect) {
-  ExpectReportedShapeServed(
-      {"row14",
-       "GP=HairlineLineGeometryProcessor;ColorFP=[ClampedGradientEffect("
-       "SingleIntervalGradientColorizer,LinearGradientLayout)];CoverageFP=[ComposeFragmentProcessor("
-       "DeviceSpaceTextureEffect,RRectEffect)];XP=EmptyXferProcessor",
-       true, false, ClipPath | ClipRRect});
+  ExpectReportedShapeServed({"row14",
+                             "GP=HairlineLineGeometryProcessor;ColorFP=[ClampedGradientEffect("
+                             "SingleIntervalGradientColorizer,LinearGradientLayout)];CoverageFP=["
+                             "ComposeFragmentProcessor("
+                             "DeviceSpaceTextureEffect,RRectEffect)];XP=EmptyXferProcessor",
+                             true, false, ClipPath | ClipRRect});
 }
 
 TGFX_TEST(AOTGeometryLayoutTest, ReportedHairlineGradientDeviceMask) {
-  ExpectReportedShapeServed(
-      {"row15",
-       "GP=HairlineLineGeometryProcessor;ColorFP=[ClampedGradientEffect("
-       "SingleIntervalGradientColorizer,LinearGradientLayout)];CoverageFP=["
-       "DeviceSpaceTextureEffect];XP=EmptyXferProcessor",
-       true, false, ClipPath});
+  ExpectReportedShapeServed({"row15",
+                             "GP=HairlineLineGeometryProcessor;ColorFP=[ClampedGradientEffect("
+                             "SingleIntervalGradientColorizer,LinearGradientLayout)];CoverageFP=["
+                             "DeviceSpaceTextureEffect];XP=EmptyXferProcessor",
+                             true, false, ClipPath});
 }
 
 TGFX_TEST(AOTGeometryLayoutTest, ReportedHairlineTwoRRects) {
@@ -768,26 +770,25 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedHairlineGradientThresholdRRect) {
 }
 
 TGFX_TEST(AOTGeometryLayoutTest, ReportedHairlineGradientDeviceMaskRect) {
-  ExpectReportedShapeServed(
-      {"row21",
-       "GP=HairlineLineGeometryProcessor;ColorFP=[ClampedGradientEffect("
-       "SingleIntervalGradientColorizer,LinearGradientLayout)];CoverageFP=[ComposeFragmentProcessor("
-       "DeviceSpaceTextureEffect,RectEffect)];XP=EmptyXferProcessor",
-       true, false, ClipPath | ClipRect});
+  ExpectReportedShapeServed({"row21",
+                             "GP=HairlineLineGeometryProcessor;ColorFP=[ClampedGradientEffect("
+                             "SingleIntervalGradientColorizer,LinearGradientLayout)];CoverageFP=["
+                             "ComposeFragmentProcessor("
+                             "DeviceSpaceTextureEffect,RectEffect)];XP=EmptyXferProcessor",
+                             true, false, ClipPath | ClipRect});
 }
 
 TGFX_TEST(AOTGeometryLayoutTest, ReportedHairlineGradientDeviceMaskRectRRect) {
   ExpectReportedShapeServed(
       {"row22",
        "GP=HairlineLineGeometryProcessor;ColorFP=[ClampedGradientEffect("
-       "SingleIntervalGradientColorizer,LinearGradientLayout)];CoverageFP=[ComposeFragmentProcessor("
+       "SingleIntervalGradientColorizer,LinearGradientLayout)];CoverageFP=["
+       "ComposeFragmentProcessor("
        "DeviceSpaceTextureEffect,RectEffect,RRectEffect)];XP=EmptyXferProcessor",
        true, false, ClipPath | ClipRect | ClipRRect});
 }
 
-namespace {
-
-}  // namespace
+namespace {}  // namespace
 
 // ---- HairlineLine on PointwiseChainShader (GP_LAYOUT=2) ----
 // Leaf-free, no mask: a solid hairline under two rounded clips (Compose(RRect, RRect)), which the
@@ -824,8 +825,8 @@ TGFX_TEST(AOTGeometryLayoutTest, HairlineChainTexture) {
 }
 
 TGFX_TEST(AOTGeometryLayoutTest, HairlineChainTextureDstRead) {
-  ExpectHairlineLineVariant({"hairline-chain-texture-dst", LayoutPaint::Image,
-                             LayoutClip::PathMask, true, "PointwiseChainShader", 0, 1, 0});
+  ExpectHairlineLineVariant({"hairline-chain-texture-dst", LayoutPaint::Image, LayoutClip::PathMask,
+                             true, "PointwiseChainShader", 0, 1, 0});
 }
 
 // ---- HairlineLine on PointwiseGraphShader (GP_LAYOUT=2, RESOURCE_KIND=1: the gradient) ----
@@ -856,9 +857,8 @@ TGFX_TEST(AOTGeometryLayoutTest, HairlineGraphGradientTexture) {
 }
 
 TGFX_TEST(AOTGeometryLayoutTest, HairlineGraphGradientTextureDstRead) {
-  ExpectHairlineLineVariant({"hairline-graph-gradient-texture-dst",
-                             LayoutPaint::GradientTimesImage, LayoutClip::TwoRRects, true,
-                             "PointwiseGraphShader", 0, 1, 0});
+  ExpectHairlineLineVariant({"hairline-graph-gradient-texture-dst", LayoutPaint::GradientTimesImage,
+                             LayoutClip::TwoRRects, true, "PointwiseGraphShader", 0, 1, 0});
 }
 
 // Rows 4-9 of the integration miss report: ComplexEllipseGeometryProcessor (rounded rects with
@@ -948,23 +948,23 @@ void ExpectComplexRRectBothLayouts(const std::string& name, LayoutVariant varian
 // Leaf-free, no mask: a solid rrect under two rounded clips (Compose(RRect, RRect)), beyond the
 // dedicated kernel's single-coverage contract.
 TGFX_TEST(AOTGeometryLayoutTest, ComplexRRectChainComposedClip) {
-  ExpectComplexRRectBothLayouts("chain-composed-clip", {"", LayoutPaint::Solid,
-                                                        LayoutClip::TwoRRects, false,
-                                                        "PointwiseChainShader", 0, 0, 0});
-  ExpectComplexRRectBothLayouts("chain-composed-clip-dst", {"", LayoutPaint::Solid,
-                                                            LayoutClip::TwoRRects, true,
-                                                            "PointwiseChainShader", 0, 0, 0});
+  ExpectComplexRRectBothLayouts(
+      "chain-composed-clip",
+      {"", LayoutPaint::Solid, LayoutClip::TwoRRects, false, "PointwiseChainShader", 0, 0, 0});
+  ExpectComplexRRectBothLayouts(
+      "chain-composed-clip-dst",
+      {"", LayoutPaint::Solid, LayoutClip::TwoRRects, true, "PointwiseChainShader", 0, 0, 0});
 }
 
 // Leaf-free with the compile-time mask: a solid rrect under a path clip plus a rounded clip
 // (Compose(mask, RRect)).
 TGFX_TEST(AOTGeometryLayoutTest, ComplexRRectChainDeviceMask) {
-  ExpectComplexRRectBothLayouts("chain-device-mask", {"", LayoutPaint::Solid,
-                                                      LayoutClip::PathMaskRRect, false,
-                                                      "PointwiseChainShader", 0, 0, 1});
-  ExpectComplexRRectBothLayouts("chain-device-mask-dst", {"", LayoutPaint::Solid,
-                                                          LayoutClip::PathMaskRRect, true,
-                                                          "PointwiseChainShader", 0, 0, 1});
+  ExpectComplexRRectBothLayouts(
+      "chain-device-mask",
+      {"", LayoutPaint::Solid, LayoutClip::PathMaskRRect, false, "PointwiseChainShader", 0, 0, 1});
+  ExpectComplexRRectBothLayouts(
+      "chain-device-mask-dst",
+      {"", LayoutPaint::Solid, LayoutClip::PathMaskRRect, true, "PointwiseChainShader", 0, 0, 1});
 }
 
 // Four-leaf: an image-shaded rrect (the dst-read case also carries a path clip, which the
@@ -979,14 +979,14 @@ TGFX_TEST(AOTGeometryLayoutTest, ComplexRRectChainTexture) {
 // Per-vertex colors (two batched rrects of different colors): the HAS_COLOR forms, leaf-free and
 // four-leaf.
 TGFX_TEST(AOTGeometryLayoutTest, ComplexRRectChainVertexColor) {
-  LayoutVariant leafFree = {"", LayoutPaint::Solid, LayoutClip::TwoRRects, false,
-                            "PointwiseChainShader", 0, 0, 0};
+  LayoutVariant leafFree = {
+      "", LayoutPaint::Solid, LayoutClip::TwoRRects, false, "PointwiseChainShader", 0, 0, 0};
   leafFree.multiColor = true;
   ExpectComplexRRectBothLayouts("chain-vertex-color", leafFree);
   leafFree.dstRead = true;
   ExpectComplexRRectBothLayouts("chain-vertex-color-dst", leafFree);
-  LayoutVariant texture = {"", LayoutPaint::Image, LayoutClip::None, false,
-                           "PointwiseChainShader", 0, 1, 0};
+  LayoutVariant texture = {
+      "", LayoutPaint::Image, LayoutClip::None, false, "PointwiseChainShader", 0, 1, 0};
   texture.multiColor = true;
   ExpectComplexRRectBothLayouts("chain-vertex-color-texture", texture);
   texture.clip = LayoutClip::PathMask;
@@ -1019,63 +1019,62 @@ TGFX_TEST(AOTGeometryLayoutTest, ReportedNonAARRectClip) {
 // Row 37: a round-capped stroke segment (RoundStrokeRectGeometryProcessor) under an analytic rect
 // clip. The dedicated RoundStrokeRectFillShader reads the clip from the same uniforms.
 TGFX_TEST(AOTGeometryLayoutTest, ReportedRoundStrokeRectClip) {
-  ExpectSceneServed(
-      "row37", "RoundStrokeRectGeometryProcessor",
-      "GP=RoundStrokeRectGeometryProcessor;ColorFP=[];CoverageFP=[RectEffect];XP=EmptyXferProcessor",
-      [](Canvas* canvas) {
-        // Rotated and fractional, so the clip stays an analytic AA rect in local space.
-        canvas->rotate(4, 80, 80);
-        canvas->clipRect(Rect::MakeLTRB(30.5f, 9.25f, 150.75f, 120.5f));
-        canvas->resetMatrix();
-        Paint paint = {};
-        paint.setColor(Color::FromRGBA(250, 245, 235, 255));
-        paint.setAntiAlias(true);
-        paint.setStyle(PaintStyle::Stroke);
-        paint.setStroke(Stroke(9.0f, LineCap::Round, LineJoin::Round));
-        canvas->drawRect(Rect::MakeXYWH(24, 28, 96, 64), paint);
-      });
+  ExpectSceneServed("row37", "RoundStrokeRectGeometryProcessor",
+                    "GP=RoundStrokeRectGeometryProcessor;ColorFP=[];CoverageFP=[RectEffect];XP="
+                    "EmptyXferProcessor",
+                    [](Canvas* canvas) {
+                      // Rotated and fractional, so the clip stays an analytic AA rect in local space.
+                      canvas->rotate(4, 80, 80);
+                      canvas->clipRect(Rect::MakeLTRB(30.5f, 9.25f, 150.75f, 120.5f));
+                      canvas->resetMatrix();
+                      Paint paint = {};
+                      paint.setColor(Color::FromRGBA(250, 245, 235, 255));
+                      paint.setAntiAlias(true);
+                      paint.setStyle(PaintStyle::Stroke);
+                      paint.setStroke(Stroke(9.0f, LineCap::Round, LineJoin::Round));
+                      canvas->drawRect(Rect::MakeXYWH(24, 28, 96, 64), paint);
+                    });
 }
 
 // Row 24: two analytic rect clips in the same space (Compose(RectEffect, RectEffect)) on a quad.
 // The chain kernel now carries two rect parameter sets per space.
 TGFX_TEST(AOTGeometryLayoutTest, ReportedTwoRectClips) {
-  ExpectSceneServed(
-      "row24", "QuadPerEdgeAAGeometryProcessor",
-      "GP=QuadPerEdgeAAGeometryProcessor;ColorFP=[];CoverageFP=[ComposeFragmentProcessor(RectEffect,"
-      "RectEffect)];XP=EmptyXferProcessor",
-      [](Canvas* canvas) {
-        // Two overlapping fractional clips under different transforms: neither contains the other
-        // and neither is a device-space rect.
-        canvas->rotate(5, 80, 80);
-        canvas->clipRect(Rect::MakeLTRB(12.25f, 8.5f, 132.75f, 118.25f));
-        canvas->resetMatrix();
-        canvas->rotate(-3, 80, 80);
-        canvas->clipRect(Rect::MakeLTRB(28.5f, 22.75f, 150.25f, 140.5f));
-        canvas->resetMatrix();
-        Paint paint = {};
-        paint.setColor(Color::FromRGBA(250, 245, 235, 255));
-        canvas->drawRect(Rect::MakeXYWH(6, 6, 148, 148), paint);
-      });
+  ExpectSceneServed("row24", "QuadPerEdgeAAGeometryProcessor",
+                    "GP=QuadPerEdgeAAGeometryProcessor;ColorFP=[];CoverageFP=["
+                    "ComposeFragmentProcessor(RectEffect,"
+                    "RectEffect)];XP=EmptyXferProcessor",
+                    [](Canvas* canvas) {
+                      // Two overlapping fractional clips under different transforms: neither contains the other
+                      // and neither is a device-space rect.
+                      canvas->rotate(5, 80, 80);
+                      canvas->clipRect(Rect::MakeLTRB(12.25f, 8.5f, 132.75f, 118.25f));
+                      canvas->resetMatrix();
+                      canvas->rotate(-3, 80, 80);
+                      canvas->clipRect(Rect::MakeLTRB(28.5f, 22.75f, 150.25f, 140.5f));
+                      canvas->resetMatrix();
+                      Paint paint = {};
+                      paint.setColor(Color::FromRGBA(250, 245, 235, 255));
+                      canvas->drawRect(Rect::MakeXYWH(6, 6, 148, 148), paint);
+                    });
 }
 
 // Row 26: the same two rect clips with an image shader (a four-leaf chain).
 TGFX_TEST(AOTGeometryLayoutTest, ReportedTwoRectClipsTexture) {
   auto image = MakePatternImage();
-  ExpectSceneServed(
-      "row26", "QuadPerEdgeAAGeometryProcessor",
-      "GP=QuadPerEdgeAAGeometryProcessor;ColorFP=[TextureEffect];CoverageFP=["
-      "ComposeFragmentProcessor(RectEffect,RectEffect)];XP=EmptyXferProcessor",
-      [image](Canvas* canvas) {
-        canvas->rotate(5, 80, 80);
-        canvas->clipRect(Rect::MakeLTRB(12.25f, 8.5f, 132.75f, 118.25f));
-        canvas->resetMatrix();
-        canvas->rotate(-3, 80, 80);
-        canvas->clipRect(Rect::MakeLTRB(28.5f, 22.75f, 150.25f, 140.5f));
-        canvas->resetMatrix();
-        Paint paint = {};
-        paint.setShader(Shader::MakeImageShader(image));
-        canvas->drawRect(Rect::MakeXYWH(6, 6, 148, 148), paint);
-      });
+  ExpectSceneServed("row26", "QuadPerEdgeAAGeometryProcessor",
+                    "GP=QuadPerEdgeAAGeometryProcessor;ColorFP=[TextureEffect];CoverageFP=["
+                    "ComposeFragmentProcessor(RectEffect,RectEffect)];XP=EmptyXferProcessor",
+                    [image](Canvas* canvas) {
+                      canvas->rotate(5, 80, 80);
+                      canvas->clipRect(Rect::MakeLTRB(12.25f, 8.5f, 132.75f, 118.25f));
+                      canvas->resetMatrix();
+                      canvas->rotate(-3, 80, 80);
+                      canvas->clipRect(Rect::MakeLTRB(28.5f, 22.75f, 150.25f, 140.5f));
+                      canvas->resetMatrix();
+                      Paint paint = {};
+                      paint.setShader(Shader::MakeImageShader(image));
+                      canvas->drawRect(Rect::MakeXYWH(6, 6, 148, 148), paint);
+                    });
 }
 
 // Row 1: atlas text under two analytic rect clips. The atlas chain route folds the glyph leaf and

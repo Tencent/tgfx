@@ -47,8 +47,8 @@
 #include "gpu/processors/MeshGeometryProcessor.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
-#include "gpu/processors/RadialGradientLayout.h"
 #include "gpu/processors/RRectEffect.h"
+#include "gpu/processors/RadialGradientLayout.h"
 #include "gpu/processors/RectEffect.h"
 #include "gpu/processors/ShapeInstancedGeometryProcessor.h"
 #include "gpu/processors/SingleIntervalGradientColorizer.h"
@@ -371,6 +371,21 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
             EnumeratePointwiseGraphReachable());
   const std::set<std::pair<uint32_t, uint32_t>> maskPairs = {{0, 0}, {0, 1}, {0, 2}};
   EXPECT_EQ(*EnumerateReachablePermutations("MaskFillShader"), maskPairs);
+  const std::set<std::pair<uint32_t, uint32_t>> shapeCoveragePairs = {{1, 1}, {2, 2}, {3, 3}};
+  EXPECT_EQ(*EnumerateReachablePermutations("ShapeInstancedTextureCoverageShader"),
+            shapeCoveragePairs);
+  // NonAARRectFill keeps 18 pairs: the 24 mirrored forms minus the six TEXTURED && STROKE
+  // combinations the family never serves (two common-color forms times three XP kinds). The
+  // property check restates the policy independently of the shared Compose predicate.
+  const auto* nonAARRectInfo = ShaderRegistry::Find("NonAARRectFillShader");
+  ASSERT_NE(nonAARRectInfo, nullptr);
+  const auto nonAARRectPairs = EnumerateReachablePermutations("NonAARRectFillShader");
+  ASSERT_TRUE(nonAARRectPairs.has_value());
+  EXPECT_EQ(nonAARRectPairs->size(), 18u);
+  for (const auto& indices : *nonAARRectPairs) {
+    EXPECT_FALSE(nonAARRectInfo->fragDomain.valueOf(indices.second, "TEXTURED") != 0 &&
+                 nonAARRectInfo->fragDomain.valueOf(indices.second, "STROKE") != 0);
+  }
   EXPECT_EQ(ShaderRegistry::Find("UnknownShader"), nullptr);
   EXPECT_FALSE(ShaderRegistry::Enumerate("UnknownShader").has_value());
   EXPECT_FALSE(EnumerateReachablePermutations("UnknownShader").has_value());
@@ -2284,8 +2299,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     ASSERT_NE(coverage, nullptr);
     ASSERT_NE(secondCoverage, nullptr);
     ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(),
-                            {coverage.get(), secondCoverage.get()}, 0, nullptr,
-                            BlendMode::SrcOver);
+                            {coverage.get(), secondCoverage.get()}, 0, nullptr, BlendMode::SrcOver);
     auto failure = PermutationMatchFailure::None;
     EXPECT_FALSE(MatchPermutation(&programInfo, &failure).has_value());
     EXPECT_EQ(failure, PermutationMatchFailure::CoverageShape);

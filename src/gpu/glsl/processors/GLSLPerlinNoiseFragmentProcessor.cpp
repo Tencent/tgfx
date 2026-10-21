@@ -23,7 +23,6 @@
 
 namespace tgfx {
 
-
 PlacementPtr<PerlinNoiseFragmentProcessor> PerlinNoiseFragmentProcessor::Make(
     BlockAllocator* allocator, Context* context, PerlinNoiseType noiseType, int numOctaves,
     bool stitchTiles, std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,

@@ -72,8 +72,7 @@ AOTToleranceResult AOTToleranceCompare::Compare(const Pixmap& reference, const P
   }
   if (result.totalPixelCount != 0) {
     auto total = static_cast<double>(result.totalPixelCount);
-    result.alphaMeanDrift =
-        std::abs(referenceAlphaSum / total - candidateAlphaSum / total);
+    result.alphaMeanDrift = std::abs(referenceAlphaSum / total - candidateAlphaSum / total);
     result.referenceNonEmptyRatio = static_cast<double>(referenceNonEmptyCount) / total;
     result.candidateNonEmptyRatio = static_cast<double>(candidateNonEmptyCount) / total;
   }
