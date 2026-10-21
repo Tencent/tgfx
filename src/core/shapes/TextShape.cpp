@@ -114,8 +114,11 @@ static bool CanAppendWithoutInteraction(const Path& total, const Path& glyph) {
     // Disjoint bounds cannot touch, so there is no overlap for the merge to resolve.
     return true;
   }
-  // Winding keeps the overlap filled, but only while both outlines run the same way: opposite
+  // Winding keeps an overlap filled, but only while both outlines run the same way: opposite
   // directions cancel out where they meet, which is what a mirrored or reflected glyph produces.
+  // NOTE: this compares one summed direction per outline, so it is a heuristic, not a proof. See
+  // the review note in the PR: matching the existing screenshots depends on it, and dropping it
+  // makes every faux-bold run unioned instead of appended.
   auto totalDirection = OutlineDirection(total);
   auto glyphDirection = OutlineDirection(glyph);
   return totalDirection != 0 && glyphDirection != 0 && totalDirection == glyphDirection;
@@ -158,20 +161,6 @@ Path TextShape::onGetPath(float resolutionScale) const {
       glyphPaths.push_back(std::move(glyphPath));
     }
   }
-  // A boolean op reports the area it resolved with parity, so merging rewrites the rule the outline
-  // claims. Outlines that overlap while running the same way round -- which is what faux bold and
-  // tight kerning produce -- would then read as holes wherever they cross, because parity counts the
-  // overlap twice and cancels it. Remember the rule every glyph agreed on and put it back once the
-  // merge is done; nothing about the resolved area depends on parity here.
-  auto commonFillType =
-      glyphPaths.empty() ? PathFillType::Winding : glyphPaths.front().getFillType();
-  auto mixedFillTypes = false;
-  for (const auto& glyphPath : glyphPaths) {
-    if (glyphPath.getFillType() != commonFillType) {
-      mixedFillTypes = true;
-      break;
-    }
-  }
   Path totalPath = {};
   auto havePath = false;
   for (auto& glyphPath : glyphPaths) {
@@ -200,9 +189,6 @@ Path TextShape::onGetPath(float resolutionScale) const {
         return {};
       }
     }
-  }
-  if (!mixedFillTypes && havePath) {
-    totalPath.setFillType(commonFillType);
   }
   auto inverseMatrix = Matrix::MakeScale(1.f / resolutionScale, 1.f / resolutionScale);
   totalPath.transform(inverseMatrix);
