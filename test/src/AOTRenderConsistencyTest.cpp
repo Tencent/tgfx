@@ -2308,6 +2308,72 @@ TGFX_TEST(AOTRenderConsistencyTest, QuadTextureMaskFactorsMatchRuntime) {
 // oval's color as a vertex attribute instead of the Color uniform (HAS_COMMON_COLOR = 0). The
 // edge coverage, the mask and the clip all reach the XferProcessor's coverage, so a wrong product
 // or order shows under the dst-reading Multiply as well as under SrcOver.
+// The two hairline dedicated families render zero-width strokes: straight segments
+// (HairlineLineShader, edge-distance coverage) and quadratic curves (HairlineQuadShader, the
+// Loop-Blinn u^2 - v edge). Both take the shared fill pipeline with one coverage factor and a clip;
+// the chain rewrite takes hairline draws before the matcher sees them, so the dedicated route runs
+// with the rewrite off. AA on and off exercise the AAEnabled branch of each edge formula, and the
+// Multiply blend makes the XferProcessor read the destination.
+TGFX_TEST(AOTRenderConsistencyTest, HairlineFillsMatchRuntime) {
+  SKIP_ON_SWIFTSHADER_ENV();
+  constexpr int size = 96;
+  Path zigzag = {};
+  zigzag.moveTo(8, 12);
+  for (int i = 1; i <= 8; ++i) {
+    const auto x = 8.0f + static_cast<float>(i) * 10.0f;
+    const auto y = (i % 2 == 0) ? 12.0f : 84.0f;
+    zigzag.lineTo(x, y);
+  }
+  Path wave = {};
+  wave.moveTo(8, 48);
+  for (int i = 0; i < 4; ++i) {
+    wave.quadTo(18.0f + i * 20.0f, 12.0f, 28.0f + i * 20.0f, 48.0f);
+    wave.quadTo(38.0f + i * 20.0f, 84.0f, 48.0f + i * 20.0f, 48.0f);
+  }
+  struct ShapeCase {
+    const char* family;
+    Path path;
+  };
+  const std::vector<ShapeCase> shapes = {{"HairlineLineShader", zigzag}, {"HairlineQuadShader", wave}};
+  for (const auto& shape : shapes) {
+    for (bool antiAlias : {true, false}) {
+      for (float alpha : {1.0f, 0.37f}) {
+        for (BlendMode blend : {BlendMode::SrcOver, BlendMode::Multiply}) {
+          auto scene = [=](Canvas* canvas) {
+            canvas->clear(Color::FromRGBA(240, 200, 120, 255));
+            Paint paint = {};
+            paint.setStyle(PaintStyle::Stroke);
+            paint.setStrokeWidth(0.0f);
+            paint.setColor(Color::FromRGBA(220, 60, 40, 255));
+            paint.setAlpha(alpha);
+            paint.setBlendMode(blend);
+            paint.setAntiAlias(antiAlias);
+            canvas->drawPath(shape.path, paint);
+          };
+          std::string label = std::string(shape.family) + (antiAlias ? " aa" : " nonaa") +
+                              " alpha=" + std::to_string(alpha) +
+                              (blend == BlendMode::SrcOver ? " srcover" : " multiply");
+          SCOPED_TRACE(label);
+          Bitmap jit = {};
+          Bitmap dedicated = {};
+          BrushRenderStats jitStats = {};
+          BrushRenderStats dedicatedStats = {};
+          RenderSceneThroughRoute(scene, size, size, KernelRoute::Runtime, &jit, &jitStats);
+          RenderSceneThroughRoute(scene, size, size, KernelRoute::Dedicated, &dedicated,
+                                  &dedicatedStats, true);
+          EXPECT_NE(std::find(dedicatedStats.shaders.begin(), dedicatedStats.shaders.end(),
+                              shape.family),
+                    dedicatedStats.shaders.end());
+          EXPECT_EQ(dedicatedStats.noMatchingRule, 0u);
+          EXPECT_EQ(dedicatedStats.programs.programBuilderCreations, 0u);
+          EXPECT_EQ(dedicatedStats.draws.droppedDraws, 0u);
+          ExpectBitmapsNear(label.c_str(), dedicated, jit, size, size, ExperimentTolerance(1));
+        }
+      }
+    }
+  }
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, EllipseMaskAndVertexColorMatchRuntime) {
   SKIP_ON_SWIFTSHADER_ENV();
   constexpr int size = 96;

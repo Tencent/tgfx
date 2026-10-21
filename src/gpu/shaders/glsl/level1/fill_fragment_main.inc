@@ -32,6 +32,8 @@
 #define FILL_COVERAGE_VERTEX 1   // vCoverage varying
 #define FILL_COVERAGE_ELLIPSE 2  // ellipse_coverage.inc on vEllipseOffsets / vEllipseRadii
 #define FILL_COVERAGE_MASK 3     // red channel of TextureSampler_0 at TransformedCoords_0
+#define FILL_COVERAGE_HAIRLINE_LINE 4  // hairline_line_coverage.inc on vEdgeDistance
+#define FILL_COVERAGE_HAIRLINE_QUAD 5  // hairline_quad_coverage.inc (Loop-Blinn) on vHairQuadEdge
 
 #define FILL_DEVICE_MASK_NONE 0
 #define FILL_DEVICE_MASK_ALWAYS 1   // MaskTextureSampler through DeviceCoordMatrix
@@ -72,6 +74,12 @@
 #endif
 #if FILL_COVERAGE == FILL_COVERAGE_ELLIPSE
 #include "ellipse_coverage.inc"
+#endif
+#if FILL_COVERAGE == FILL_COVERAGE_HAIRLINE_LINE
+#include "hairline_line_coverage.inc"
+#endif
+#if FILL_COVERAGE == FILL_COVERAGE_HAIRLINE_QUAD
+#include "hairline_quad_coverage.inc"
 #endif
 #if FILL_CLIP
 #include "clip_coverage.inc"
@@ -149,6 +157,10 @@ void main() {
   float totalCoverage = ellipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, StrokeEnabled);
 #elif FILL_COVERAGE == FILL_COVERAGE_MASK
   float totalCoverage = texture(TextureSampler_0, TransformedCoords_0).r;
+#elif FILL_COVERAGE == FILL_COVERAGE_HAIRLINE_LINE
+  float totalCoverage = hairlineLineEdgeCoverage(vEdgeDistance, Coverage, AAEnabled);
+#elif FILL_COVERAGE == FILL_COVERAGE_HAIRLINE_QUAD
+  float totalCoverage = hairlineQuadEdgeCoverage(vHairQuadEdge, Coverage, AAEnabled);
 #else
   float totalCoverage = 1.0;
 #endif

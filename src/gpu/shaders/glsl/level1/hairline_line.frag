@@ -1,7 +1,7 @@
-// HairlineLineShader fragment shader
-// Processor layout: HairlineLineGeometryProcessor() + EmptyXferProcessor/PorterDuffXP
-// Permutation dimensions (injected as #define 0/1):
-//   HAS_XP: 0=passthrough, 1=PorterDuff XP (dst texture blend)
+// HairlineLineShader fragment entry: HairlineLineGeometryProcessor + EmptyXferProcessor/PorterDuffXP.
+// The pipeline is the shared dedicated one (fill_fragment_main.inc); this file declares the family's
+// interface and selects the steps.
+// Fragment dimensions: HAS_XP.
 #version 450
 
 #ifndef HAS_XP
@@ -21,19 +21,6 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 layout(location = 0) in float vEdgeDistance;
 
 #define XP_DST_TEX_BINDING 0
-#include "xp_porter_duff.inc"
-#include "xp_porter_duff_fbf.inc"
-#include "clip_coverage.inc"
-#include "hairline_line_coverage.inc"
-
-layout(location = 0) out vec4 fragColor;
-
-void main() {
-  vec4 outputCoverage =
-      vec4(hairlineLineEdgeCoverage(vEdgeDistance, Coverage, AAEnabled) * clipCoverage());
-
-#define TGFX_XP_SRC_COLOR (Color * outputCoverage)
-#define TGFX_XP_SRC_UNPREMUL Color
-#define TGFX_XP_COVERAGE outputCoverage
-#include "xp_output.inc"
-}
+#define FILL_COVERAGE FILL_COVERAGE_HAIRLINE_LINE
+#define FILL_CLIP 1
+#include "fill_fragment_main.inc"
