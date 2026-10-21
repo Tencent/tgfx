@@ -1,9 +1,9 @@
-// ShapeInstancedFillShader fragment shader
-// Processor layout: ShapeInstancedGeometryProcessor() + EmptyXferProcessor/PorterDuffXP
-// Permutation dimensions (injected as #define 0/1):
-//   HAS_COLOR: whether per-instance colors are used
-//   HAS_AA: whether coverage-based AA is enabled
-//   HAS_XP: 0=passthrough, 1=PorterDuff XP (dst texture blend)
+// ShapeInstancedFillShader fragment entry: ShapeInstancedGeometryProcessor +
+// EmptyXferProcessor/PorterDuffXP. Instanced shape fills: the shape's own coverage is per-vertex
+// (HAS_AA), the color is per-instance (vColor) or the implicit white (no color at all — neither a
+// color uniform nor a color varying exists in that variant). The pipeline is the shared dedicated
+// one (fill_fragment_main.inc).
+// Fragment dimensions: HAS_COLOR, HAS_AA, HAS_XP (int, 3).
 #version 450
 
 #ifndef HAS_COLOR
@@ -31,26 +31,13 @@ layout(location = 2) in vec4 vColor;
 #endif
 
 #define XP_DST_TEX_BINDING 0
-#include "xp_porter_duff.inc"
-#include "xp_porter_duff_fbf.inc"
 
-layout(location = 0) out vec4 fragColor;
-
-void main() {
 #if HAS_COLOR
-  vec4 outputColor = vColor;
+#define FILL_COLOR FILL_COLOR_VARYING
 #else
-  vec4 outputColor = vec4(1.0);
+#define FILL_COLOR FILL_COLOR_WHITE
 #endif
-
 #if HAS_AA
-  vec4 outputCoverage = vec4(vCoverage);
-#else
-  vec4 outputCoverage = vec4(1.0);
+#define FILL_COVERAGE FILL_COVERAGE_VERTEX
 #endif
-
-#define TGFX_XP_SRC_COLOR (outputColor * outputCoverage)
-#define TGFX_XP_SRC_UNPREMUL outputColor
-#define TGFX_XP_COVERAGE outputCoverage
-#include "xp_output.inc"
-}
+#include "fill_fragment_main.inc"

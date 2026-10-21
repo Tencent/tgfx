@@ -1,10 +1,11 @@
-// AtlasTextFillShader fragment shader
-// Processor layout: AtlasTextGeometryProcessor() + EmptyXferProcessor/PorterDuffXP
-// Permutation dimensions (injected as #define 0/1):
-//   HAS_COVERAGE, HAS_COMMON_COLOR, HAS_XP
-// ALPHA_ONLY is a runtime uniform (AlphaOnly), written by GLSLAtlasTextGeometryProcessor::setData,
+// AtlasTextFillShader fragment entry: AtlasTextGeometryProcessor + EmptyXferProcessor/
+// PorterDuffXP. The atlas texture carries the coverage (the glyph mask) and, for a color atlas
+// (color emoji), the color itself — the shared pipeline's FILL_COVERAGE_ATLAS_TEXT step.
+// ALPHA_ONLY is a runtime uniform (AlphaOnly) written by GLSLAtlasTextGeometryProcessor::setData,
 // not a compile-time permutation: it is pure fragment math (the vertex stage never uses it), so
-// folding it into a uniform branch shrinks the variant count.
+// folding it into a uniform branch shrinks the variant count. The analytic draw clip and the
+// device-space mask ride the shared runtime clip contract uniforms.
+// Fragment dimensions: HAS_COVERAGE, HAS_COMMON_COLOR, HAS_XP (int, 3).
 #version 450
 
 #ifndef HAS_COVERAGE
@@ -45,42 +46,11 @@ layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
 // is 0.
 layout(set = 1, binding = 1) uniform sampler2D MaskTextureSampler;
 #define XP_DST_TEX_BINDING 2
-#include "xp_porter_duff.inc"
-#include "xp_porter_duff_fbf.inc"
-#include "clip_coverage.inc"
 
-layout(location = 0) out vec4 fragColor;
-
-void main() {
-  // Determine output color from GP
-#if HAS_COMMON_COLOR
-  vec4 outputColor = Color;
-#else
-  vec4 outputColor = vColor;
+#if !HAS_COMMON_COLOR
+#define FILL_COLOR FILL_COLOR_VARYING
 #endif
-
-  // Determine output coverage from GP
-#if HAS_COVERAGE
-  vec4 outputCoverage = vec4(vCoverage);
-#else
-  vec4 outputCoverage = vec4(1.0);
-#endif
-
-  // Sample atlas texture
-  vec4 texColor = texture(TextureSampler_0, vTextureCoords);
-
-  if (AlphaOnly != 0) {
-    // Alpha-only textures use R8 format in Metal. The sampler returns (r, 0, 0, 1).
-    // Use .r to get the actual alpha value.
-    outputCoverage = vec4(texColor.r);
-  } else {
-    // Color texture (e.g. color emoji): extract color and coverage
-    outputColor = clamp(vec4(texColor.rgb / texColor.a, 1.0), 0.0, 1.0);
-    outputCoverage = vec4(texColor.a);
-  }
-
-#define TGFX_INITIAL_COVERAGE outputCoverage
-#define TGFX_COVERAGE_SRC_COLOR outputColor
-#include "coverage_output.inc"
-#include "xp_output.inc"
-}
+#define FILL_COVERAGE FILL_COVERAGE_ATLAS_TEXT
+#define FILL_DEVICE_MASK FILL_DEVICE_MASK_RUNTIME
+#define FILL_CLIP 1
+#include "fill_fragment_main.inc"

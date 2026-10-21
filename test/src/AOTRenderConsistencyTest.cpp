@@ -2392,6 +2392,104 @@ TGFX_TEST(AOTRenderConsistencyTest, ShapeStepFamiliesMatchRuntime) {
   }
 }
 
+// The mesh, atlas-text and tiled families on the dedicated route. None of the suite's tests had
+// ever rendered MeshFillShader or AtlasTextFillShader: the mesh tests draw through the chain (a
+// texture plus colors folds there) and the atlas tests carry a color filter (the chain rewrite
+// takes them), so both families' fragments were compile-only. The mesh scenes cover the
+// per-vertex-color and the uniform-color variants; the atlas scene draws a plain text blob whose
+// glyph atlas is the coverage; the tiled scenes draw an image shader in repeat and mirror wrap
+// modes (the single-tap path and the RepeatLinearNone seam blend of tiled_full_sample.inc), with
+// the chain rewrite off because the rewrite takes shader-bearing draws first. Every dedicated
+// route must serve exactly the expected family with no ProgramBuilder fallback or dropped draw,
+// and match JIT within the experiment tolerance.
+TGFX_TEST(AOTRenderConsistencyTest, MeshAtlasTiledMatchRuntime) {
+  SKIP_ON_SWIFTSHADER_ENV();
+  constexpr int size = 96;
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  auto font = Font(typeface, 44);
+  auto textBlob = TextBlob::MakeFrom("TGFX", font);
+  ASSERT_TRUE(textBlob != nullptr);
+  Bitmap bitmap = {};
+  ASSERT_TRUE(bitmap.allocPixels(24, 24));
+  auto* pixels = static_cast<uint32_t*>(bitmap.lockPixels());
+  for (int y = 0; y < 24; ++y) {
+    for (int x = 0; x < 24; ++x) {
+      const auto alpha = static_cast<uint32_t>(40 + (x * 9 + y * 3) % 200);
+      const auto scale = [&](uint32_t channel) { return channel * alpha / 255; };
+      pixels[static_cast<size_t>(y) * 24 + static_cast<size_t>(x)] =
+          (alpha << 24) | (scale(190) << 16) | (scale(120) << 8) | scale(40);
+    }
+  }
+  bitmap.unlockPixels();
+  auto tileImage = Image::MakeFrom(bitmap);
+  ASSERT_NE(tileImage, nullptr);
+  const Point meshPositions[] = {{16, 14}, {46, 10}, {76, 22}, {36, 74}};
+  const Color meshColors[] = {Color::FromRGBA(220, 60, 40, 255), Color::FromRGBA(60, 200, 90, 255),
+                              Color::FromRGBA(60, 90, 220, 255), Color::FromRGBA(220, 160, 40, 255)};
+  auto colorMesh = Mesh::MakeCopy(MeshTopology::TriangleStrip, 4, meshPositions, nullptr,
+                                  meshColors);
+  ASSERT_NE(colorMesh, nullptr);
+  auto solidMesh = Mesh::MakeCopy(MeshTopology::TriangleStrip, 4, meshPositions);
+  ASSERT_NE(solidMesh, nullptr);
+  struct DrawCase {
+    const char* name;
+    const char* family;
+    bool plainMatcher;
+    std::function<void(Canvas*, Paint&)> draw;
+  };
+  const std::vector<DrawCase> cases = {
+      {"mesh-colors", "MeshFillShader", false,
+       [&](Canvas* canvas, Paint& paint) { canvas->drawMesh(colorMesh, paint); }},
+      {"mesh-solid", "MeshFillShader", false,
+       [&](Canvas* canvas, Paint& paint) { canvas->drawMesh(solidMesh, paint); }},
+      {"atlas-text", "AtlasTextFillShader", false,
+       [&](Canvas* canvas, Paint& paint) { canvas->drawTextBlob(textBlob, 10, 62, paint); }},
+      {"tiled-repeat", "TiledTextureFillShader", true,
+       [&](Canvas* canvas, Paint& paint) {
+         paint.setShader(Shader::MakeImageShader(tileImage, TileMode::Repeat, TileMode::Repeat));
+         canvas->drawRect(Rect::MakeXYWH(8, 8, 80, 80), paint);
+       }},
+      {"tiled-mirror", "TiledTextureFillShader", true,
+       [&](Canvas* canvas, Paint& paint) {
+         paint.setShader(Shader::MakeImageShader(tileImage, TileMode::Mirror, TileMode::Mirror));
+         canvas->drawRect(Rect::MakeXYWH(8, 8, 80, 80), paint);
+       }},
+  };
+  for (const auto& entry : cases) {
+    for (float alpha : {1.0f, 0.37f}) {
+      for (BlendMode blend : {BlendMode::SrcOver, BlendMode::Multiply}) {
+        auto scene = [&](Canvas* canvas) {
+          canvas->clear(Color::FromRGBA(240, 200, 120, 255));
+          Paint paint = {};
+          paint.setColor(Color::FromRGBA(220, 60, 40, 255));
+          paint.setAlpha(alpha);
+          paint.setBlendMode(blend);
+          entry.draw(canvas, paint);
+        };
+        std::string label = std::string(entry.name) + " alpha=" + std::to_string(alpha) +
+                            (blend == BlendMode::SrcOver ? " srcover" : " multiply");
+        SCOPED_TRACE(label);
+        Bitmap jit = {};
+        Bitmap dedicated = {};
+        BrushRenderStats jitStats = {};
+        BrushRenderStats dedicatedStats = {};
+        RenderSceneThroughRoute(scene, size, size, KernelRoute::Runtime, &jit, &jitStats);
+        RenderSceneThroughRoute(scene, size, size, KernelRoute::Dedicated, &dedicated,
+                                &dedicatedStats, entry.plainMatcher);
+        EXPECT_NE(std::find(dedicatedStats.shaders.begin(), dedicatedStats.shaders.end(),
+                            entry.family),
+                  dedicatedStats.shaders.end());
+        EXPECT_EQ(dedicatedStats.noMatchingRule, 0u);
+        EXPECT_EQ(dedicatedStats.programs.programBuilderCreations, 0u);
+        EXPECT_EQ(dedicatedStats.draws.droppedDraws, 0u);
+        ExpectBitmapsNear(label.c_str(), dedicated, jit, size, size, ExperimentTolerance(1));
+      }
+    }
+  }
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, QuadTextureMaskFactorsMatchRuntime) {
   SKIP_ON_SWIFTSHADER_ENV();
   constexpr int size = 96;

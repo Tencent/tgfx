@@ -19,6 +19,7 @@
 #define FILL_COLOR_VARYING 1            // vColor varying
 #define FILL_COLOR_VARYING_OR_COMMON 2  // vColor, or the exact Color uniform when HasCommonColor != 0
                                         // (the varying is 8-bit quantized)
+#define FILL_COLOR_WHITE 3              // constant vec4(1.0): no color uniform and no color varying
 
 #define FILL_SOURCE_COLOR 0  // the input color
 // TextureEffect contract: TextureSampler_0 at TransformedCoords_0 (vec3, perspective divided),
@@ -31,6 +32,10 @@
 // by the alpha-only red channel. The recipe uniforms (ShaderModeX/Y, Subset, Clamp, Dimension,
 // AlphaOnly, Strict) are the family's interface.
 #define FILL_SOURCE_TILED 3
+// The full nine-mode tiled-sampling recipe (tiled_full_sample.inc): the single-tap modes share
+// tiled_sample.inc, the mipmap-repeat modes (4/5) take a 4-tap seam blend, and RepeatLinearNone
+// blends across the seam. ReadSwizzle is the runtime texture read swizzle (texture_read_swizzle.inc).
+#define FILL_SOURCE_TILED_FULL 4
 
 #define FILL_COVERAGE_NONE 0
 #define FILL_COVERAGE_VERTEX 1   // vCoverage varying
@@ -42,6 +47,8 @@
 #define FILL_COVERAGE_COMPLEX_RRECT 7   // complex_rrect_coverage.inc (per-corner radii)
 #define FILL_COVERAGE_COMPLEX_ELLIPSE 8  // complex_ellipse_coverage.inc (region dispatch)
 #define FILL_COVERAGE_ROUND_STROKE 9    // round_stroke_rect_coverage.inc (cap/edge SDF)
+#define FILL_COVERAGE_ATLAS_TEXT 10     // the atlas texture of vTextureCoords is the coverage and,
+                                        // for a color atlas (AlphaOnly == 0), also the color
 
 #define FILL_DEVICE_MASK_NONE 0
 #define FILL_DEVICE_MASK_ALWAYS 1   // MaskTextureSampler through DeviceCoordMatrix
@@ -82,6 +89,11 @@
 #endif
 #if FILL_SOURCE == FILL_SOURCE_TILED
 #include "tiled_sample.inc"
+#endif
+#if FILL_SOURCE == FILL_SOURCE_TILED_FULL
+#include "tiled_sample.inc"
+#include "texture_read_swizzle.inc"
+#include "tiled_full_sample.inc"
 #endif
 #if FILL_COVERAGE == FILL_COVERAGE_ELLIPSE
 #include "ellipse_coverage.inc"
@@ -124,6 +136,8 @@ float fillDeviceMaskCoverage() {
 void main() {
 #if FILL_COLOR == FILL_COLOR_UNIFORM
   vec4 outputColor = Color;
+#elif FILL_COLOR == FILL_COLOR_WHITE
+  vec4 outputColor = vec4(1.0);
 #else
   vec4 outputColor = vColor;
 #if FILL_COLOR == FILL_COLOR_VARYING_OR_COMMON
@@ -164,6 +178,8 @@ void main() {
     outputColor = texColor * outputColor.a;
   }
   vec4 color = outputColor;
+#elif FILL_SOURCE == FILL_SOURCE_TILED_FULL
+  vec4 color = aotTiledFullSample(TransformedCoords_0, outputColor);
 #else
   vec4 color = outputColor;
 #endif
@@ -230,6 +246,24 @@ void main() {
 #else
   float totalCoverage = roundStrokeRectCoverage(vEllipseOffsets, vec2(0.0), 0.0, false);
 #endif
+#elif FILL_COVERAGE == FILL_COVERAGE_ATLAS_TEXT
+  // The atlas texture carries both: an alpha-only atlas (R8, the glyph mask) contributes its red
+  // channel as the coverage and leaves the GP color; a color atlas (color emoji) replaces the
+  // color with its unpremultiplied rgb and contributes its alpha. The vertex coverage is read and
+  // then replaced, mirroring the runtime emission. Only valid without a pointwise operator: the
+  // color replace writes `result` after the operator stage.
+  vec4 atlasTexColor = texture(TextureSampler_0, vTextureCoords);
+#if HAS_COVERAGE
+  float totalCoverage = vCoverage;
+#else
+  float totalCoverage = 1.0;
+#endif
+  if (AlphaOnly != 0) {
+    totalCoverage = atlasTexColor.r;
+  } else {
+    result = clamp(vec4(atlasTexColor.rgb / atlasTexColor.a, 1.0), 0.0, 1.0);
+    totalCoverage = atlasTexColor.a;
+  }
 #else
   float totalCoverage = 1.0;
 #endif
