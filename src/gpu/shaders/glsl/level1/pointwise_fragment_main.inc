@@ -106,13 +106,10 @@ vec4 chainLeafTex[4];
 // keeps the define valid for every other variant.
 highp float gpPixelCoverage = 1.0;
 
-// Geometry color source: the unconditional inColor attribute on QuadGP (broadcast for
-// common-color draws), the Color uniform otherwise.
-#if HAS_COLOR
-#define TGFX_CHAIN_GEOM_COLOR vColor
-#else
-#define TGFX_CHAIN_GEOM_COLOR Color
-#endif
+// Geometry color source: the per-vertex color attribute, or the exact Color uniform for
+// common-color draws (the broadcast into the unconditional attribute is 8-bit quantized). The
+// selection is a runtime uniform, so a single variant serves both sources.
+#define TGFX_CHAIN_GEOM_COLOR ((HasCommonColor != 0) ? Color : vColor)
 
 // The coverage subtree's unit input (slot designator -3): the GP's output coverage, which is
 // what the runtime coverage chain starts from. The rect layouts carry it as the vCoverage

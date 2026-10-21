@@ -5,14 +5,11 @@
 #if GP_LAYOUT == 1
 layout(location = 0) in vec2 vEllipseOffsets;
 layout(location = 1) in vec4 vEllipseRadii;
-#if HAS_COLOR
 layout(location = 2) in vec4 vColor;
 #define CHAIN_TEX_LOC_BASE 3
-#else
-#define CHAIN_TEX_LOC_BASE 2
-#endif
 #elif GP_LAYOUT == 2
 layout(location = 0) in float vEdgeDistance;
+layout(location = NTEX + 1) in vec4 vColor;
 #define CHAIN_TEX_LOC_BASE 1
 #elif GP_LAYOUT >= 3
 // ComplexEllipse fill (3) / stroke (4); the locations live in pointwise_complex_ellipse_layout.inc.
@@ -23,9 +20,7 @@ layout(location = 2) in vec2 vEdgeDist;
 #if GP_LAYOUT == 4
 layout(location = CHAIN_COMPLEX_STROKE_LOC) in vec2 vStrokeWidth;
 #endif
-#if HAS_COLOR
 layout(location = CHAIN_COMPLEX_COLOR_LOC) in vec4 vColor;
-#endif
 #else
 #define CHAIN_TEX_LOC_BASE 0
 #endif
@@ -33,8 +28,9 @@ layout(location = CHAIN_COMPLEX_COLOR_LOC) in vec4 vColor;
 #if GP_LAYOUT == 0 && HAS_COVERAGE
 layout(location = NTEX) in float vCoverage;
 #endif
-#if GP_LAYOUT == 0 && HAS_COLOR
-// QuadGP only: per-vertex color (broadcast for common-color draws) is the geometry color source.
+#if GP_LAYOUT == 0
+// Per-vertex color (a white filler where the buffer is shared across draws): the geometry color
+// source when HasCommonColor == 0, the exact Color uniform otherwise.
 layout(location = NTEX + 1) in vec4 vColor;
 #endif
 

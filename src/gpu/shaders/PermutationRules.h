@@ -126,7 +126,6 @@ struct SolidColorFillInputs {
  */
 struct ComplexEllipseFillInputs {
   bool isStroke = false;
-  bool hasCommonColor = false;
   int xpType = -1;  // -1 = no representable XferProcessor.
 };
 
@@ -136,7 +135,6 @@ struct ComplexEllipseFillInputs {
  * whole-draw rejections and stay in Extract.
  */
 struct EllipseFillInputs {
-  bool hasCommonColor = false;
   int deviceMask = 0;  // 0 = no mask coverage FP, 1 = device-space mask.
   int xpType = -1;     // -1 = no representable XferProcessor.
 };
@@ -163,13 +161,12 @@ struct ComplexNonAARRectFillInputs {
 };
 
 /**
- * Input contract of the MeshFillShader matcher rule. The color attribute is unconditional (white
- * baked for meshes without per-vertex colors), so the color source is a runtime uniform and no
- * input field exists for it.
+ * Input contract of the MeshFillShader matcher rule. The color and coverage attributes are
+ * unconditional (white baked for meshes without per-vertex colors, a constant 1.0f coverage), so
+ * no input fields exist for them.
  */
 struct MeshFillInputs {
   bool hasTexCoords = false;
-  bool hasCoverage = false;
   int xpType = -1;  // -1 = no representable XferProcessor.
 };
 
@@ -286,7 +283,6 @@ struct TexturedEffectInputs {
  */
 struct AtlasTextFillInputs {
   bool hasCoverage = false;
-  bool hasCommonColor = false;
   int xpType = -1;  // -1 = no representable XferProcessor.
 };
 
@@ -304,7 +300,6 @@ struct PointwiseChainInputs {
   int gpKind = 0;
   bool hasCoverage = false;         // DefaultGP: AA coverage; quad/mesh: always true.
   bool hasUVCoord = false;          // quad/mesh: texCoord slot; atlas: always true.
-  bool hasColor = false;            // per-vertex color slot (not DefaultGP).
   int textureCount = 0;             // domain value: 0 = leaf-free, 1 = four-leaf padded slots.
   bool hasMask = false;             // device-space mask child present.
   bool hasCoverageSubtree = false;  // chain coverage subtree present.

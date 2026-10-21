@@ -24,21 +24,28 @@ namespace tgfx {
 
 class EllipseFillShader : public PrecompiledShader {
  public:
-  TGFX_DEFINE_DIMS(HAS_COMMON_COLOR);
-  using D = Dims;
+  // HAS_COMMON_COLOR is not a dimension: the color attribute is unconditional (common-color
+  // batches broadcast the paint color), and the color source is the HasCommonColor runtime
+  // uniform.
+  struct VertDims {
+    enum : uint32_t { COUNT };
+    static PermutationDomain domain() {
+      return PermutationDomain({});
+    }
+  };
+  using D = VertDims;
 
   struct FragDims {
-    enum : uint32_t { HAS_COMMON_COLOR, HAS_XP, HAS_DEVICE_MASK, COUNT };
+    enum : uint32_t { HAS_XP, HAS_DEVICE_MASK, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationBool("HAS_COMMON_COLOR"),
           PermutationInt("HAS_XP", 3),
           PermutationBool("HAS_DEVICE_MASK"),
       });
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 1 && FD::COUNT == 3,
+  static_assert(D::COUNT == 0 && FD::COUNT == 2,
                 "Update the matcher below when dimensions change.");
 
   PrecompiledShaderInfo info() const override {

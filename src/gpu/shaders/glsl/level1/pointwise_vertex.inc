@@ -2,8 +2,11 @@
 // Feeds one TransformedCoords varying per texture leaf of the pointwise DAG. The leaf count is the
 // TEXTURE_COUNT permutation (0 -> 0 leaves, 1 -> 1, 2 -> 2, 3 -> 4) because the varying layout is
 // part of the vertex/fragment interface.
-// Permutation dimensions (vert): GP_LAYOUT, HAS_COVERAGE, HAS_UV_COORD, HAS_COLOR, TEXTURE_COUNT,
+// Permutation dimensions (vert): GP_LAYOUT, HAS_COVERAGE, HAS_UV_COORD, TEXTURE_COUNT,
 // HAS_SUBSET.
+// The color attribute is unconditional on every layout (a white filler where the buffer is shared
+// across draws); the exact common color rides the Color uniform through the HasCommonColor
+// runtime uniform, so HAS_COLOR is not a dimension.
 // GP_LAYOUT: 0 = rect family (DefaultGP and QuadPerEdgeAAGP share it — the position always goes
 // through the Matrix uniform, which DefaultGP fills with the view matrix and QuadPerEdgeAAGP with
 // identity, bit-exact), 1 = EllipseGeometryProcessor (device-space vertices, carries the ellipse
@@ -23,9 +26,6 @@
 #ifndef HAS_UV_COORD
 #define HAS_UV_COORD 0
 #endif
-#ifndef HAS_COLOR
-#define HAS_COLOR 0
-#endif
 #ifndef TEXTURE_COUNT
 #define TEXTURE_COUNT 0
 #endif
@@ -40,36 +40,28 @@
 #endif
 
 #if GP_LAYOUT == 1
-// EllipseGP attribute order: position, [color], ellipseOffset, ellipseRadii. The color varying
-// occupies location 2 when present.
-#if HAS_COLOR
-#define CHAIN_ELLIPSE_COLOR 1
+// EllipseGP attribute order: position, color, ellipseOffset, ellipseRadii. The color varying
+// occupies location 2.
 layout(location = 1) in vec4 inColor;
 layout(location = 2) in vec2 inEllipseOffset;
 layout(location = 3) in vec4 inEllipseRadii;
 #define CHAIN_TEX_LOC_BASE 3
-#else
-layout(location = 1) in vec2 inEllipseOffset;
-layout(location = 2) in vec4 inEllipseRadii;
-#define CHAIN_TEX_LOC_BASE 2
-#endif
 #elif GP_LAYOUT == 2
-// HairlineLineGP attribute order: position, edgeDistance. The edge-distance varying occupies
-// location 0, so the leaf coordinates start at 1.
+// HairlineLineGP attribute order: position, edgeDistance, color. The edge-distance varying
+// occupies location 0, so the leaf coordinates start at 1.
+layout(location = 2) in vec4 inColor;
 #define CHAIN_TEX_LOC_BASE 1
 #elif GP_LAYOUT >= 3
-// ComplexEllipseGP attribute order: position, [color], ellipseOffset, ellipseRadii, edgeDist,
+// ComplexEllipseGP attribute order: position, color, ellipseOffset, ellipseRadii, edgeDist,
 // [strokeWidth]. Varyings: offsets 0, radii 1, edge distances 2, then the stroke width and the
-// color when present (pointwise_complex_ellipse_layout.inc).
+// color (pointwise_complex_ellipse_layout.inc).
 #include "pointwise_complex_ellipse_layout.inc"
-#if HAS_COLOR
 layout(location = 1) in vec4 inColor;
-#endif
-layout(location = 1 + HAS_COLOR) in vec2 inEllipseOffset;
-layout(location = 2 + HAS_COLOR) in vec4 inEllipseRadii;
-layout(location = 3 + HAS_COLOR) in vec2 inEdgeDist;
+layout(location = 2) in vec2 inEllipseOffset;
+layout(location = 3) in vec4 inEllipseRadii;
+layout(location = 4) in vec2 inEdgeDist;
 #if GP_LAYOUT == 4
-layout(location = 4 + HAS_COLOR) in vec2 inStrokeWidth;
+layout(location = 5) in vec2 inStrokeWidth;
 #endif
 #else
 #define CHAIN_TEX_LOC_BASE 0
@@ -130,11 +122,9 @@ layout(location = 1) in float inCoverage;
 // coverage, so maskCoord lands directly after the position.
 layout(location = 1 + HAS_COVERAGE) in vec2 uvCoord;
 #endif
-#if HAS_COLOR
 layout(location = 1 + HAS_COVERAGE + HAS_UV_COORD) in vec4 inColor;
-#endif
 #if HAS_SUBSET
-// QuadPerEdgeAAGP only: its color slot is unconditional, so the subset follows it.
+// QuadPerEdgeAAGP only: the color slot is unconditional, so the subset follows it.
 layout(location = 2 + HAS_COVERAGE + HAS_UV_COORD) in vec4 texSubset;
 #endif
 #elif GP_LAYOUT == 2
@@ -147,11 +137,10 @@ layout(location = 0) in vec2 inPosition;
 #if GP_LAYOUT == 1
 layout(location = 0) out vec2 vEllipseOffsets;
 layout(location = 1) out vec4 vEllipseRadii;
-#if HAS_COLOR
 layout(location = 2) out vec4 vColor;
-#endif
 #elif GP_LAYOUT == 2
 layout(location = 0) out float vEdgeDistance;
+layout(location = NTEX + 1) out vec4 vColor;
 #elif GP_LAYOUT >= 3
 layout(location = 0) out vec2 vEllipseOffsets;
 layout(location = 1) out vec4 vEllipseRadii;
@@ -159,17 +148,12 @@ layout(location = 2) out vec2 vEdgeDist;
 #if GP_LAYOUT == 4
 layout(location = CHAIN_COMPLEX_STROKE_LOC) out vec2 vStrokeWidth;
 #endif
-#if HAS_COLOR
 layout(location = CHAIN_COMPLEX_COLOR_LOC) out vec4 vColor;
-#endif
 #else
 #if HAS_COVERAGE
 layout(location = NTEX) out float vCoverage;
 #endif
-#if HAS_COLOR
-// HAS_COLOR implies HAS_COVERAGE (ShouldCompile), so the color varying always follows it.
 layout(location = NTEX + 1) out vec4 vColor;
-#endif
 #endif
 
 #if NTEX >= 1
@@ -207,20 +191,17 @@ void main() {
 #endif
 #if GP_LAYOUT == 0
   highp vec2 position = (Matrix * vec3(aPosition, 1.0)).xy;
-#if HAS_COLOR
   vColor = inColor;
-#endif
 #elif GP_LAYOUT == 2
   highp vec2 position = (Matrix * vec3(aPosition, 1.0)).xy;
   vEdgeDistance = aEdgeDistance;
+  vColor = inColor;
 #elif GP_LAYOUT == 1
   // EllipseGeometryProcessor vertices are pre-transformed to device space.
   highp vec2 position = inPosition;
   vEllipseOffsets = inEllipseOffset;
   vEllipseRadii = inEllipseRadii;
-#if HAS_COLOR
   vColor = inColor;
-#endif
 #else
   // ComplexEllipseGeometryProcessor vertices are pre-transformed to device space too.
   highp vec2 position = inPosition;
@@ -230,9 +211,7 @@ void main() {
 #if GP_LAYOUT == 4
   vStrokeWidth = inStrokeWidth;
 #endif
-#if HAS_COLOR
   vColor = inColor;
-#endif
 #endif
 #ifdef TGFX_POINTWISE_SOURCE_COORDS
 #if NTEX > 0

@@ -845,7 +845,8 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
 
 PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(BlockAllocator* allocator,
                                                                 const Rect& rect, AAType aaType,
-                                                                bool forceColor) {
+                                                                bool forceColor,
+                                                                bool skipCoverage) {
   if (rect.isEmpty()) {
     return nullptr;
   }
@@ -865,9 +866,11 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(BlockAllocator* 
   }
   if (provider != nullptr) {
     provider->bitFields.writeColor = forceColor;
-    // Coverage follows the same contract: the slot exists iff the consumer is a QuadPerEdgeAA
-    // fill kernel (forceColor callers) or the draw itself is AA.
-    provider->bitFields.writeCoverage = forceColor || aaType == AAType::Coverage;
+    // Coverage follows the same contract as before: the slot exists iff the consumer is a
+    // QuadPerEdgeAA fill kernel (forceColor callers) or the draw itself is AA. skipCoverage
+    // opts a forceColor caller out of the coverage slot (the DefaultGP mask quads, whose GP
+    // declares no non-AA coverage attribute).
+    provider->bitFields.writeCoverage = (forceColor || aaType == AAType::Coverage) && !skipCoverage;
   }
   return provider;
 }
@@ -877,7 +880,7 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
     std::vector<PlacementPtr<Rect>>&& uvRects, std::vector<PlacementPtr<Rect>>&& subsetRects,
     AAType aaType, bool needUVCoord, UVSubsetMode subsetMode,
     std::vector<PlacementPtr<Stroke>>&& strokes, std::shared_ptr<ColorSpace> colorSpace,
-    bool forceColor) {
+    bool forceColor, bool skipCoverage) {
   if (rects.empty()) {
     return nullptr;
   }
@@ -907,7 +910,8 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
     }
     if (provider != nullptr) {
       provider->bitFields.writeColor = forceColor || hasColor;
-      provider->bitFields.writeCoverage = forceColor || aaType == AAType::Coverage;
+      provider->bitFields.writeCoverage =
+          (forceColor || aaType == AAType::Coverage) && !skipCoverage;
     }
     return provider;
   }

@@ -43,13 +43,10 @@ std::shared_ptr<Resource> VertexMeshBufferUploadTask::onMakeResource(Context* co
   DEBUG_ASSERT(vertexMesh->positions() != nullptr);
 
   // The buffer follows the chain's rect-layout attribute order: position, coverage, texCoord,
-  // color. Vertex meshes carry no real coverage data, so a constant 1.0f slot is written whenever
-  // texCoords or colors are present (matching MeshGeometryProcessor's attribute registration).
-  bool withCoverage = vertexMesh->hasTexCoords() || vertexMesh->hasColors();
+  // color. Vertex meshes carry no real coverage data, so a constant 1.0f slot is written for
+  // every mesh (matching MeshGeometryProcessor's unconditional coverage attribute).
   size_t stride = sizeof(float) * 2;  // position.xy
-  if (withCoverage) {
-    stride += sizeof(float);
-  }
+  stride += sizeof(float);            // coverage (constant 1.0f)
   if (vertexMesh->hasTexCoords()) {
     stride += sizeof(float) * 2;
   }
@@ -75,11 +72,9 @@ std::shared_ptr<Resource> VertexMeshBufferUploadTask::onMakeResource(Context* co
     *reinterpret_cast<Point*>(ptr) = vertexMesh->positions()[i];
     ptr += sizeof(Point);
 
-    // Coverage (float, constant 1.0 when present)
-    if (withCoverage) {
-      *reinterpret_cast<float*>(ptr) = 1.0f;
-      ptr += sizeof(float);
-    }
+    // Coverage (float, constant 1.0)
+    *reinterpret_cast<float*>(ptr) = 1.0f;
+    ptr += sizeof(float);
 
     // TexCoord (float2, optional)
     if (vertexMesh->hasTexCoords()) {

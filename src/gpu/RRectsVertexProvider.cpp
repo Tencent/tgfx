@@ -211,12 +211,10 @@ class AARRectsVertexProvider final : public RRectsVertexProvider {
 
   size_t vertexCount() const override {
     // AA simple: 16 vertices per RRect.
-    //   position(2) + ellipseOffset(2) + ellipseRadii(4) = 8
-    //   Optional: color(1).
-    size_t floatsPerVertex = 8;
-    if (bitFields.hasColor) {
-      floatsPerVertex += 1;
-    }
+    //   position(2) + color(1) + ellipseOffset(2) + ellipseRadii(4) = 9
+    // The color slot is unconditional: the consuming geometry processors (EllipseGP and the
+    // chain's L1 layout) declare the color attribute in every variant.
+    size_t floatsPerVertex = 9;
     return rects.size() * 16 * floatsPerVertex;
   }
 
@@ -224,17 +222,16 @@ class AARRectsVertexProvider final : public RRectsVertexProvider {
     size_t index = 0;
     auto currentAAType = aaType();
     size_t currentIndex = 0;
-    auto steps = MakeColorSpaceXformStepsIfNeeded(bitFields.hasColor, _dstColorSpace);
+    // The color slot is unconditional, so the conversion steps are needed whenever the
+    // destination color space differs.
+    auto steps = MakeColorSpaceXformStepsIfNeeded(true, _dstColorSpace);
 
     for (auto& record : rects) {
       DEBUG_ASSERT(!record->rRect.isComplex());
       auto viewMatrix = record->viewMatrix;
       auto rRect = record->rRect;
       auto scales = viewMatrix.getAxisScales();
-      uint32_t uintColor = 0;
-      if (bitFields.hasColor) {
-        uintColor = ToUintPMColor(record->color, steps.get());
-      }
+      uint32_t uintColor = ToUintPMColor(record->color, steps.get());
 
       auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
       auto strokeParams = ApplyScales(&rRect, &viewMatrix, scales, stroke);
@@ -287,9 +284,10 @@ class AARRectsVertexProvider final : public RRectsVertexProvider {
         viewMatrix.mapPoints(&point, 1);
         vertices[index++] = point.x;
         vertices[index++] = point.y;
-        if (bitFields.hasColor) {
-          std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
-        }
+        // The color slot is unconditional: the AA providers feed EllipseGeometryProcessor and
+        // ComplexEllipseGeometryProcessor, whose color attribute always exists (common-color
+        // batches broadcast the paint color).
+        std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
         vertices[index++] = xMaxOffset;
         vertices[index++] = yOuterOffsets[i];
         vertices[index++] = reciprocalRadii[0];
@@ -301,9 +299,7 @@ class AARRectsVertexProvider final : public RRectsVertexProvider {
         viewMatrix.mapPoints(&point, 1);
         vertices[index++] = point.x;
         vertices[index++] = point.y;
-        if (bitFields.hasColor) {
-          std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
-        }
+        std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
         vertices[index++] = FLOAT_NEARLY_ZERO;
         vertices[index++] = yOuterOffsets[i];
         vertices[index++] = reciprocalRadii[0];
@@ -315,9 +311,7 @@ class AARRectsVertexProvider final : public RRectsVertexProvider {
         viewMatrix.mapPoints(&point, 1);
         vertices[index++] = point.x;
         vertices[index++] = point.y;
-        if (bitFields.hasColor) {
-          std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
-        }
+        std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
         vertices[index++] = FLOAT_NEARLY_ZERO;
         vertices[index++] = yOuterOffsets[i];
         vertices[index++] = reciprocalRadii[0];
@@ -329,9 +323,7 @@ class AARRectsVertexProvider final : public RRectsVertexProvider {
         viewMatrix.mapPoints(&point, 1);
         vertices[index++] = point.x;
         vertices[index++] = point.y;
-        if (bitFields.hasColor) {
-          std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
-        }
+        std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
         vertices[index++] = xMaxOffset;
         vertices[index++] = yOuterOffsets[i];
         vertices[index++] = reciprocalRadii[0];
@@ -459,14 +451,13 @@ class AAComplexRRectsVertexProvider final : public RRectsVertexProvider {
 
   size_t vertexCount() const override {
     // AA complex: 16 vertices per RRect.
-    //   position(2) + ellipseOffset(2) + ellipseRadii(4) + edgeDist(2) = 10
-    //   Optional: color(1), halfStrokeWidth(2).
-    size_t floatsPerVertex = 10;
+    //   position(2) + color(1) + ellipseOffset(2) + ellipseRadii(4) + edgeDist(2) = 11
+    //   Optional: halfStrokeWidth(2).
+    // The color slot is unconditional: the consuming geometry processors (ComplexEllipseGP and
+    // the chain's L3/L4 layouts) declare the color attribute in every variant.
+    size_t floatsPerVertex = 11;
     if (bitFields.hasStroke) {
       floatsPerVertex += 2;
-    }
-    if (bitFields.hasColor) {
-      floatsPerVertex += 1;
     }
     return rects.size() * 16 * floatsPerVertex;
   }
@@ -475,17 +466,16 @@ class AAComplexRRectsVertexProvider final : public RRectsVertexProvider {
     size_t index = 0;
     auto currentAAType = aaType();
     size_t currentIndex = 0;
-    auto steps = MakeColorSpaceXformStepsIfNeeded(bitFields.hasColor, _dstColorSpace);
+    // The color slot is unconditional, so the conversion steps are needed whenever the
+    // destination color space differs.
+    auto steps = MakeColorSpaceXformStepsIfNeeded(true, _dstColorSpace);
 
     for (auto& record : rects) {
       DEBUG_ASSERT(record->rRect.isComplex());
       auto viewMatrix = record->viewMatrix;
       auto rRect = record->rRect;
       auto scales = viewMatrix.getAxisScales();
-      uint32_t uintColor = 0;
-      if (bitFields.hasColor) {
-        uintColor = ToUintPMColor(record->color, steps.get());
-      }
+      uint32_t uintColor = ToUintPMColor(record->color, steps.get());
 
       auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
       auto strokeParams = ApplyScales(&rRect, &viewMatrix, scales, stroke);
@@ -540,9 +530,10 @@ class AAComplexRRectsVertexProvider final : public RRectsVertexProvider {
           viewMatrix.mapPoints(&point, 1);
           vertices[index++] = point.x;
           vertices[index++] = point.y;
-          if (bitFields.hasColor) {
-            std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
-          }
+          // The color slot is unconditional: the AA providers feed EllipseGeometryProcessor and
+          // ComplexEllipseGeometryProcessor, whose color attribute always exists (common-color
+          // batches broadcast the paint color).
+          std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
           vertices[index++] = xOffset;
           vertices[index++] = yOffset;
           vertices[index++] = recipRadii[corner][0];

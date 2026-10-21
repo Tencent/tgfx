@@ -1,6 +1,10 @@
 // Core fields of the pointwise kernels' FragmentUniformBlock, included inside the block by the
 // kernel entry ahead of the resource modules' fields (see pointwise_fragment_config.inc).
   vec4 Color;
+  // Selects the geometry color source: the exact Color uniform when set, the per-vertex vColor
+  // varying otherwise (the broadcast into the unconditional attribute is 8-bit quantized, so the
+  // common color prefers the uniform; written by each GP's onSetData).
+  int HasCommonColor;
   int RootIndex;
   // Slot index of the coverage subtree's root, -1 when the chain has none. When present, the
   // subtree's value replaces the plain coverage modulation (it already carries the GP coverage

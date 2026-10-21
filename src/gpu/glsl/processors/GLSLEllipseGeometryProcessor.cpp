@@ -103,8 +103,17 @@ void GLSLEllipseGeometryProcessor::setData(UniformData* vertexUniformData,
                                            UniformData* fragmentUniformData,
                                            FPCoordTransformIter* transformIter) const {
   setTransformDataHelper(Matrix::I(), vertexUniformData, transformIter);
-  if (commonColor.has_value()) {
-    fragmentUniformData->setData("Color", *commonColor);
+  // The precompiled kernels always bind the color attribute; common-color draws read the exact
+  // Color uniform instead of the 8-bit quantized broadcast, selected by HasCommonColor. Only
+  // precompiled kernels declare the field, so the JIT path (uniform when common, varying
+  // otherwise) is unaffected.
+  if (fragmentUniformData != nullptr) {
+    if (commonColor.has_value()) {
+      fragmentUniformData->setDataOptional("Color", *commonColor);
+    }
+    if (fragmentUniformData->hasField("HasCommonColor")) {
+      fragmentUniformData->setData("HasCommonColor", commonColor.has_value() ? 1 : 0);
+    }
   }
   int strokeEnabled = stroke ? 1 : 0;
   fragmentUniformData->setData("StrokeEnabled", strokeEnabled);

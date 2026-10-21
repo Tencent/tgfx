@@ -21,13 +21,18 @@
 namespace tgfx {
 DefaultGeometryProcessor::DefaultGeometryProcessor(PMColor color, int width, int height, AAType aa,
                                                    const Matrix& viewMatrix, const Matrix& uvMatrix)
-    : GeometryProcessor(ClassID()), color(color), width(width), height(height), aa(aa),
+    : GeometryProcessor(ClassID()), commonColor(color), width(width), height(height), aa(aa),
       viewMatrix(viewMatrix), uvMatrix(uvMatrix) {
   position = {"aPosition", VertexFormat::Float2};
   if (aa == AAType::Coverage) {
     coverage = {"inCoverage", VertexFormat::Float};
   }
-  setVertexAttributes(&position, 2);
+  // The color attribute is unconditional: the vertex buffer always carries the slot (white for the
+  // cached path triangles and the mask quads, whose buffers are shared across draws and cannot
+  // hold the per-draw paint color), so the fill kernels bind it in every variant. The exact paint
+  // color rides the Color uniform, selected through the HasCommonColor runtime uniform.
+  this->color = {"inColor", VertexFormat::UByte4Normalized};
+  setVertexAttributes(&position, 3);
 }
 
 void DefaultGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {

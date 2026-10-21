@@ -2203,16 +2203,15 @@ TGFX_TEST(AOTEffectTest, PointwiseGraphPermutationsAreIndependentAndBounded) {
   }
   EXPECT_EQ(graphPairs.size(), 3u);
   for (int gpKind = 0; gpKind <= 7; ++gpKind) {
-    for (int flags = 0; flags < 64; ++flags) {
+    for (int flags = 0; flags < 32; ++flags) {
       for (int xp = 0; xp < 3; ++xp) {
         PointwiseChainInputs base;
         base.gpKind = gpKind;
         base.hasCoverage = (flags & 1) != 0;
         base.hasUVCoord = (flags & 2) != 0;
-        base.hasColor = (flags & 4) != 0;
-        base.textureCount = (flags & 8) != 0 ? 1 : 0;
-        base.hasMask = (flags & 16) != 0;
-        base.hasCoverageSubtree = (flags & 32) != 0;
+        base.textureCount = (flags & 4) != 0 ? 1 : 0;
+        base.hasMask = (flags & 8) != 0;
+        base.hasCoverageSubtree = (flags & 16) != 0;
         base.xpType = xp;
         auto chainValues = ComposePointwiseChain(base);
         auto tiled = base;
@@ -2255,7 +2254,7 @@ TGFX_TEST(AOTEffectTest, PointwiseGraphPermutationsAreIndependentAndBounded) {
     auto fragValues = PointwiseChainShader::FD::domain().decode(indices.second);
     chainSubsetPairs += fragValues[PointwiseChainShader::FD::HAS_SUBSET] != 0 ? 1 : 0;
   }
-  EXPECT_EQ(chainSubsetPairs, 12u);
+  EXPECT_EQ(chainSubsetPairs, 6u);
   EXPECT_EQ(graphPairs.size(), EnumeratePointwiseChainReachable().size() - chainSubsetPairs + 3);
   EXPECT_EQ(EnumeratePointwiseGraphReachable(), graphPairs);
   EXPECT_EQ(EnumerateReachablePermutations("PointwiseGraphShader"), graphPairs);
@@ -2264,9 +2263,6 @@ TGFX_TEST(AOTEffectTest, PointwiseGraphPermutationsAreIndependentAndBounded) {
   EXPECT_FALSE(ComposePointwiseGraph(unsupported).has_value());
   unsupported = inputs;
   unsupported.hasUVCoord = true;
-  EXPECT_FALSE(ComposePointwiseGraph(unsupported).has_value());
-  unsupported = inputs;
-  unsupported.hasColor = true;
   EXPECT_FALSE(ComposePointwiseGraph(unsupported).has_value());
   unsupported = inputs;
   unsupported.textureCount = 0;

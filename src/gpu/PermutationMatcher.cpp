@@ -680,15 +680,13 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseDAG(const ProgramI
       inputs.hasSubset = true;
     }
     inputs.hasUVCoord = !quadGP->hasUVMatrix();
-    inputs.hasColor = !quadGP->hasCommonColor();
     inputs.hasCoverage = true;
   } else if (gpKind == 2) {
     auto* meshGP = static_cast<const MeshGeometryProcessor*>(gp);
     // Mesh vertex buffers follow the chain's attribute order (position, coverage, texCoord,
-    // color): texCoords ride the uvCoord slot and per-vertex colors the color slot. Mesh buffers
-    // always carry the coverage slot (1.0 for vertex meshes).
+    // color): texCoords ride the uvCoord slot and the color slot is unconditional (white for
+    // colorless meshes). Mesh buffers always carry the coverage slot (1.0 for vertex meshes).
     inputs.hasUVCoord = meshGP->getHasTexCoords();
-    inputs.hasColor = meshGP->getHasColors();
     inputs.hasCoverage = true;
   } else if (gpKind == 3) {
     // Only the sampler-free chain-route twin is servable: a sampler-owning atlas GP would bind
@@ -696,23 +694,17 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseDAG(const ProgramI
     if (gp->numTextureSamplers() != 0) {
       return std::nullopt;
     }
-    auto* atlasGP = static_cast<const AtlasTextGeometryProcessor*>(gp);
-    // Atlas text buffers are (position, maskCoord, color?) with no coverage slot; maskCoord
-    // rides the uvCoord slot.
+    // Atlas text buffers are (position, maskCoord, color) with no coverage slot; maskCoord
+    // rides the uvCoord slot and the color slot is unconditional.
     inputs.hasUVCoord = true;
-    inputs.hasColor = !atlasGP->hasCommonColor();
     inputs.hasCoverage = false;
   } else if (gpKind == 4) {
-    auto* ellipseGP = static_cast<const EllipseGeometryProcessor*>(gp);
-    inputs.hasColor = !ellipseGP->hasCommonColor();
     inputs.hasCoverage = false;
   } else if (gpKind == 5) {
     // The hairline edge AA is per-pixel (edge-distance varying); the color is a uniform.
     inputs.hasCoverage = false;
   } else if (gpKind == 6 || gpKind == 7) {
-    // Per-pixel edge AA like the ellipse; per-vertex colors ride the color attribute.
-    auto* complexGP = static_cast<const ComplexEllipseGeometryProcessor*>(gp);
-    inputs.hasColor = !complexGP->hasCommonColor();
+    // Per-pixel edge AA like the ellipse; the color attribute is unconditional.
     inputs.hasCoverage = false;
   } else {
     inputs.hasCoverage = GetGPCoverage(gp) != 0;
@@ -764,7 +756,6 @@ static std::optional<PermutationMatchResult> TryMatchAtlasTextFill(const Program
   auto* atgp = static_cast<const AtlasTextGeometryProcessor*>(gp);
   AtlasTextFillInputs inputs;
   inputs.hasCoverage = atgp->getAAType() == AAType::Coverage;
-  inputs.hasCommonColor = atgp->hasCommonColor();
   inputs.xpType = xpType;
   auto composed = ComposeAtlasTextFill(inputs);
   if (!composed) {
@@ -1150,16 +1141,14 @@ static std::optional<PermutationMatchResult> TryMatchEllipseFill(const ProgramIn
   if (!coverageType) {
     return std::nullopt;
   }
-  auto* egp = static_cast<const EllipseGeometryProcessor*>(gp);
   EllipseFillInputs inputs;
-  inputs.hasCommonColor = egp->hasCommonColor();
   inputs.deviceMask = *coverageType;
   inputs.xpType = GetXPType(programInfo);
   auto composed = ComposeEllipseFill(inputs);
   if (!composed) {
     return std::nullopt;
   }
-  auto vertIndex = EllipseFillShader::Dims::domain().encode(composed->vertValues);
+  auto vertIndex = EllipseFillShader::D::domain().encode(composed->vertValues);
   auto fragIndex = EllipseFillShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"EllipseFillShader", vertIndex, fragIndex};
 }
@@ -1184,7 +1173,6 @@ static std::optional<PermutationMatchResult> TryMatchComplexEllipseFill(
   auto* cegp = static_cast<const ComplexEllipseGeometryProcessor*>(gp);
   ComplexEllipseFillInputs inputs;
   inputs.isStroke = cegp->isStroke();
-  inputs.hasCommonColor = cegp->hasCommonColor();
   inputs.xpType = GetXPType(programInfo);
   auto composed = ComposeComplexEllipseFill(inputs);
   if (!composed) {
@@ -1414,7 +1402,6 @@ static std::optional<PermutationMatchResult> TryMatchMeshFill(const ProgramInfo*
   auto* mgp = static_cast<const MeshGeometryProcessor*>(gp);
   MeshFillInputs inputs;
   inputs.hasTexCoords = mgp->getHasTexCoords();
-  inputs.hasCoverage = mgp->getHasCoverage();
   inputs.xpType = GetXPType(programInfo);
   auto composed = ComposeMeshFill(inputs);
   if (!composed) {

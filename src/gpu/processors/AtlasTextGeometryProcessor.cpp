@@ -31,9 +31,11 @@ AtlasTextGeometryProcessor::AtlasTextGeometryProcessor(std::shared_ptr<TexturePr
     coverage = {"inCoverage", VertexFormat::Float};
   }
   maskCoord = {"maskCoord", VertexFormat::Float2};
-  if (!commonColor.has_value()) {
-    color = {"inColor", VertexFormat::UByte4Normalized};
-  }
+  // The color attribute is unconditional: common-color batches broadcast the paint color into the
+  // slot, so every fill kernel binds it in a single variant; the exact common color still rides
+  // the Color uniform through the HasCommonColor runtime uniform (the broadcast is 8-bit
+  // quantized).
+  color = {"inColor", VertexFormat::UByte4Normalized};
   setVertexAttributes(&position, 4);
   if (bindAtlasSampler) {
     textures.emplace_back(this->textureProxy->getTextureView()->getTexture());

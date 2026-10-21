@@ -24,24 +24,25 @@ namespace tgfx {
 
 class ComplexEllipseFillShader : public PrecompiledShader {
  public:
-  TGFX_DEFINE_DIMS(STROKE, HAS_COMMON_COLOR);
+  // HAS_COMMON_COLOR is not a dimension: the color attribute is unconditional (common-color
+  // batches broadcast the paint color), and the color source is the HasCommonColor runtime
+  // uniform.
+  TGFX_DEFINE_DIMS(STROKE);
   using D = Dims;
 
   struct FragDims {
     // The device-space mask is a runtime uniform (HasDeviceMask) with a padded dummy sampler: this
-    // family is rare, and a HAS_DEVICE_MASK dimension would double all stroke/common-color/XP
-    // variants for it.
-    enum : uint32_t { STROKE, HAS_COMMON_COLOR, HAS_XP, COUNT };
+    // family is rare, and a HAS_DEVICE_MASK dimension would double all stroke/XP variants for it.
+    enum : uint32_t { STROKE, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("STROKE"),
-          PermutationBool("HAS_COMMON_COLOR"),
           PermutationInt("HAS_XP", 3),
       });
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 2 && FD::COUNT == 3,
+  static_assert(D::COUNT == 1 && FD::COUNT == 2,
                 "Update the Compose mapping when dimensions change.");
 
   PrecompiledShaderInfo info() const override {

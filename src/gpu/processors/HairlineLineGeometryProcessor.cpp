@@ -25,11 +25,15 @@ HairlineLineGeometryProcessor::HairlineLineGeometryProcessor(const PMColor& colo
                                                              const Matrix& viewMatrix,
                                                              std::optional<Matrix> uvMatrix,
                                                              float coverage, AAType aaType)
-    : GeometryProcessor(ClassID()), color(color), viewMatrix(viewMatrix), uvMatrix(uvMatrix),
+    : GeometryProcessor(ClassID()), commonColor(color), viewMatrix(viewMatrix), uvMatrix(uvMatrix),
       coverage(coverage), aaType(aaType) {
   position = {"aPosition", VertexFormat::Float2};
   edgeDistance = {"aEdgeDistance", VertexFormat::Float};
-  setVertexAttributes(&position, 2);
+  // The color attribute is unconditional: the hairline buffers are shared across draws, so the
+  // slot carries a white filler and the exact paint color rides the Color uniform, selected
+  // through the HasCommonColor runtime uniform.
+  this->color = {"inColor", VertexFormat::UByte4Normalized};
+  setVertexAttributes(&position, 3);
 }
 
 void HairlineLineGeometryProcessor::onComputeProcessorKey(BytesKey* /*bytesKey*/) const {

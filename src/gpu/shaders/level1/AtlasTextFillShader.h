@@ -26,22 +26,24 @@ class AtlasTextFillShader : public PrecompiledShader {
  public:
   // ALPHA_ONLY is a runtime uniform (AlphaOnly), written by GLSLAtlasTextGeometryProcessor::setData,
   // not a permutation dimension — the vertex stage never uses it.
-  TGFX_DEFINE_DIMS(HAS_COVERAGE, HAS_COMMON_COLOR);
+  // HAS_COMMON_COLOR is not a dimension either: the color attribute is unconditional (common-color
+  // glyph batches broadcast the paint color), and the color source is the HasCommonColor runtime
+  // uniform.
+  TGFX_DEFINE_DIMS(HAS_COVERAGE);
   using D = Dims;
 
   struct FragDims {
     // A device-space mask is a runtime uniform (HasDeviceMask), not a permutation dimension.
-    enum : uint32_t { HAS_COVERAGE, HAS_COMMON_COLOR, HAS_XP, COUNT };
+    enum : uint32_t { HAS_COVERAGE, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("HAS_COVERAGE"),
-          PermutationBool("HAS_COMMON_COLOR"),
           PermutationInt("HAS_XP", 3),
       });
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 2 && FD::COUNT == 3,
+  static_assert(D::COUNT == 1 && FD::COUNT == 2,
                 "Update the Compose mapping when dimensions change.");
 
  public:

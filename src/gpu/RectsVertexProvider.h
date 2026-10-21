@@ -50,18 +50,23 @@ class RectsVertexProvider : public VertexProvider {
   /**
    * Creates a new RectsVertexProvider from a single rect.
    */
+  // skipCoverage: keep the coverage slot out of a forceColor buffer whose consumer does not
+  // declare a coverage attribute (the DefaultGP mask quads).
   static PlacementPtr<RectsVertexProvider> MakeFrom(BlockAllocator* allocator, const Rect& rect,
-                                                    AAType aaType, bool forceColor = false);
+                                                    AAType aaType, bool forceColor = false,
+                                                    bool skipCoverage = false);
 
   /**
    * Creates a new RectsVertexProvider from a list of rect records.
    */
+  // skipCoverage: same contract as the single-rect overload (the atlas glyph quads: their GP
+  // declares no non-AA coverage attribute).
   static PlacementPtr<RectsVertexProvider> MakeFrom(
       BlockAllocator* allocator, std::vector<PlacementPtr<RectRecord>>&& rects,
       std::vector<PlacementPtr<Rect>>&& uvRects, std::vector<PlacementPtr<Rect>>&& subsetRects,
       AAType aaType, bool needUVCoord, UVSubsetMode subsetMode,
       std::vector<PlacementPtr<Stroke>>&& strokes, std::shared_ptr<ColorSpace> colorSpace = nullptr,
-      bool forceColor = false);
+      bool forceColor = false, bool skipCoverage = false);
 
   /**
    * Returns the number of rects in the provider.

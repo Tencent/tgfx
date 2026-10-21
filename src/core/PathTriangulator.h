@@ -33,7 +33,8 @@ class PathTriangulator {
   static bool ShouldTriangulatePath(const Path& path);
 
   /**
-   * Returns the number of vertices based on the buffer size. Each vertex has 2 floats (x, y).
+   * Returns the number of vertices based on the buffer size. Each vertex has 3 float slots (x, y
+   * and a white color filler).
    */
   static size_t GetNonAAVertexCount(size_t bufferSize);
 
@@ -46,7 +47,7 @@ class PathTriangulator {
 
   /**
    * Returns the number of vertices for antialiasing triangles based on the buffer size. Each vertex
-   * has 3 floats (x, y, coverage).
+   * has 4 float slots (x, y, coverage and a white color filler).
    */
   static size_t GetAAVertexCount(size_t bufferSize);
 

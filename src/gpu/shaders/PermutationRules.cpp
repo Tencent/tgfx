@@ -213,10 +213,8 @@ std::optional<RuleComposedValues> ComposeComplexEllipseFill(
   RuleComposedValues values;
   values.vertValues.resize(D::COUNT);
   values.vertValues[D::STROKE] = inputs.isStroke ? 1 : 0;
-  values.vertValues[D::HAS_COMMON_COLOR] = inputs.hasCommonColor ? 1 : 0;
   values.fragValues.resize(FD::COUNT);
   values.fragValues[FD::STROKE] = values.vertValues[D::STROKE];
-  values.fragValues[FD::HAS_COMMON_COLOR] = values.vertValues[D::HAS_COMMON_COLOR];
   values.fragValues[FD::HAS_XP] = inputs.xpType;
   return values;
 }
@@ -230,20 +228,17 @@ std::optional<RuleComposedValues> ComposeEllipseFill(const EllipseFillInputs& in
   if (inputs.xpType < 0) {
     return std::nullopt;
   }
-  using D = EllipseFillShader::Dims;
   using FD = EllipseFillShader::FD;
   RuleComposedValues values;
-  values.vertValues.resize(D::COUNT);
-  values.vertValues[D::HAS_COMMON_COLOR] = inputs.hasCommonColor ? 1 : 0;
+  values.vertValues.resize(EllipseFillShader::D::COUNT);
   values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_COMMON_COLOR] = values.vertValues[D::HAS_COMMON_COLOR];
   values.fragValues[FD::HAS_XP] = inputs.xpType;
   values.fragValues[FD::HAS_DEVICE_MASK] = inputs.deviceMask;
   return values;
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateEllipseFillReachable() {
-  return EnumerateMirroredReachable<EllipseFillShader::Dims, EllipseFillShader::FD>(nullptr);
+  return EnumerateMirroredReachable<EllipseFillShader::D, EllipseFillShader::FD>(nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeNonAARRectFill(const NonAARRectFillInputs& inputs) {
@@ -305,9 +300,7 @@ std::optional<RuleComposedValues> ComposeMeshFill(const MeshFillInputs& inputs) 
   RuleComposedValues values;
   values.vertValues.resize(D::COUNT);
   values.vertValues[D::HAS_TEX_COORDS] = inputs.hasTexCoords ? 1 : 0;
-  values.vertValues[D::HAS_COVERAGE] = inputs.hasCoverage ? 1 : 0;
   values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_COVERAGE] = values.vertValues[D::HAS_COVERAGE];
   values.fragValues[FD::HAS_XP] = inputs.xpType;
   return values;
 }
@@ -535,10 +528,8 @@ std::optional<RuleComposedValues> ComposeAtlasTextFill(const AtlasTextFillInputs
   RuleComposedValues values;
   values.vertValues.resize(D::COUNT);
   values.vertValues[D::HAS_COVERAGE] = inputs.hasCoverage ? 1 : 0;
-  values.vertValues[D::HAS_COMMON_COLOR] = inputs.hasCommonColor ? 1 : 0;
   values.fragValues.resize(FD::COUNT);
   values.fragValues[FD::HAS_COVERAGE] = values.vertValues[D::HAS_COVERAGE];
-  values.fragValues[FD::HAS_COMMON_COLOR] = values.vertValues[D::HAS_COMMON_COLOR];
   values.fragValues[FD::HAS_XP] = inputs.xpType;
   return values;
 }
@@ -552,18 +543,19 @@ static std::optional<RuleComposedValues> ComposePointwiseGP(const PointwiseChain
       inputs.textureCount > 1) {
     return std::nullopt;
   }
-  // Each GP profile fixes the attribute slots its vertex buffers carry. Quad and Mesh buffers
-  // always carry the coverage slot (providers emit 1.0 for non-AA draws); atlas text buffers ride
-  // maskCoord on the uvCoord slot with no coverage slot; the ellipse layout evaluates coverage
-  // per pixel and carries no coverage or uvCoord attributes; DefaultGP carries none of the quad
-  // attributes and takes coverage from its AA type.
+  // Each GP profile fixes the attribute slots its vertex buffers carry. The color attribute is
+  // unconditional on every layout (a white filler where the buffer is shared across draws), so
+  // only the other slots shape dimensions. Quad and Mesh buffers always carry the coverage slot
+  // (providers emit 1.0 for non-AA draws); atlas text buffers ride maskCoord on the uvCoord slot
+  // with no coverage slot; the ellipse layout evaluates coverage per pixel and carries no
+  // coverage or uvCoord attributes; DefaultGP carries none of the quad attributes and takes
+  // coverage from its AA type.
   int gpLayout = 0;
   int hasCoverage = 0;
   int hasUVCoord = 0;
-  int hasColor = 0;
   switch (inputs.gpKind) {
     case 0:
-      if (inputs.hasUVCoord || inputs.hasColor) {
+      if (inputs.hasUVCoord) {
         return std::nullopt;
       }
       hasCoverage = inputs.hasCoverage ? 1 : 0;
@@ -575,7 +567,6 @@ static std::optional<RuleComposedValues> ComposePointwiseGP(const PointwiseChain
       }
       hasCoverage = 1;
       hasUVCoord = inputs.hasUVCoord ? 1 : 0;
-      hasColor = inputs.hasColor ? 1 : 0;
       break;
     case 3:
       if (inputs.hasCoverage || !inputs.hasUVCoord) {
@@ -589,35 +580,32 @@ static std::optional<RuleComposedValues> ComposePointwiseGP(const PointwiseChain
         return std::nullopt;
       }
       hasUVCoord = 1;
-      hasColor = inputs.hasColor ? 1 : 0;
       break;
     case 4:
       if (inputs.hasCoverage || inputs.hasUVCoord) {
         return std::nullopt;
       }
       gpLayout = 1;
-      hasColor = inputs.hasColor ? 1 : 0;
       break;
     case 5:
-      // HairlineLineGP buffers are (position, edgeDistance): the color is the Color uniform and the
-      // edge AA is evaluated per pixel from the edge-distance varying, so no coverage, uvCoord or
-      // color attribute exists.
-      if (inputs.hasCoverage || inputs.hasUVCoord || inputs.hasColor) {
+      // HairlineLineGP buffers are (position, edgeDistance, color): the color slot is a white
+      // filler (the exact color rides the Color uniform) and the edge AA is evaluated per pixel
+      // from the edge-distance varying, so no coverage or uvCoord attribute exists.
+      if (inputs.hasCoverage || inputs.hasUVCoord) {
         return std::nullopt;
       }
       gpLayout = 2;
       break;
     case 6:
     case 7:
-      // ComplexEllipseGP buffers are (position, color?, ellipseOffset, ellipseRadii, edgeDist,
-      // strokeWidth?): device-space like the ellipse, with per-pixel coverage and no coverage or
+      // ComplexEllipseGP buffers are (position, color, ellipseOffset, ellipseRadii, edgeDist,
+      // [strokeWidth]): device-space like the ellipse, with per-pixel coverage and no coverage or
       // uvCoord attribute. The stroke form (7) adds the strokeWidth attribute, hence its own
       // layout.
       if (inputs.hasCoverage || inputs.hasUVCoord) {
         return std::nullopt;
       }
       gpLayout = inputs.gpKind == 6 ? 3 : 4;
-      hasColor = inputs.hasColor ? 1 : 0;
       break;
     default:
       return std::nullopt;
@@ -630,9 +618,9 @@ static std::optional<RuleComposedValues> ComposePointwiseGP(const PointwiseChain
   // Four-leaf variants apply the mask through a runtime uniform, so the compile-time mask
   // dimension exists only for leaf-free chains, and those stay on the rect layout without quad
   // attributes, the hairline layout (a path clip over a solid or gradient hairline) or the
-  // uniform-color complex rounded-rect layouts.
+  // complex rounded-rect layouts.
   int hasMaskTexture = inputs.textureCount == 0 && inputs.hasMask ? 1 : 0;
-  if (hasMaskTexture != 0 && (gpLayout == 1 || hasUVCoord != 0 || hasColor != 0)) {
+  if (hasMaskTexture != 0 && (gpLayout == 1 || hasUVCoord != 0)) {
     return std::nullopt;
   }
   // The per-quad subset is a QuadPerEdgeAAGP attribute that clamps a texture leaf, so it exists
@@ -648,14 +636,12 @@ static std::optional<RuleComposedValues> ComposePointwiseGP(const PointwiseChain
   values.vertValues[VD::GP_LAYOUT] = gpLayout;
   values.vertValues[VD::HAS_COVERAGE] = hasCoverage;
   values.vertValues[VD::HAS_UV_COORD] = hasUVCoord;
-  values.vertValues[VD::HAS_COLOR] = hasColor;
   values.vertValues[VD::TEXTURE_COUNT] = inputs.textureCount;
   values.vertValues[VD::HAS_SUBSET] = hasSubset;
   values.fragValues.resize(FD::COUNT);
   values.fragValues[FD::GP_LAYOUT] = gpLayout;
   values.fragValues[FD::HAS_XP] = inputs.xpType;
   values.fragValues[FD::HAS_COVERAGE] = hasCoverage;
-  values.fragValues[FD::HAS_COLOR] = hasColor;
   values.fragValues[FD::TEXTURE_COUNT] = inputs.textureCount;
   values.fragValues[FD::HAS_MASK_TEXTURE] = hasMaskTexture;
   values.fragValues[FD::HAS_SUBSET] = hasSubset;
@@ -676,32 +662,27 @@ std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseChainReachable() {
   for (int gpKind = 0; gpKind <= 7; ++gpKind) {
     for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
       for (int hasUVCoord = 0; hasUVCoord <= 1; ++hasUVCoord) {
-        for (int hasColor = 0; hasColor <= 1; ++hasColor) {
-          for (int textureCount = 0; textureCount <= 1; ++textureCount) {
-            for (int hasMask = 0; hasMask <= 1; ++hasMask) {
-              for (int hasCoverageSubtree = 0; hasCoverageSubtree <= 1; ++hasCoverageSubtree) {
-                for (int xpType = -1; xpType <= 2; ++xpType) {
-                  for (int hasSubset = 0; hasSubset <= 1; ++hasSubset) {
-                    PointwiseChainInputs inputs;
-                    inputs.gpKind = gpKind;
-                    inputs.hasCoverage = hasCoverage != 0;
-                    inputs.hasUVCoord = hasUVCoord != 0;
-                    inputs.hasColor = hasColor != 0;
-                    inputs.textureCount = textureCount;
-                    inputs.hasMask = hasMask != 0;
-                    inputs.hasCoverageSubtree = hasCoverageSubtree != 0;
-                    inputs.xpType = xpType;
-                    inputs.hasSubset = hasSubset != 0;
-                    auto composed = ComposePointwiseChain(inputs);
-                    if (!composed) {
-                      continue;
-                    }
-                    auto vertIndex =
-                        PointwiseChainShader::VD::domain().encode(composed->vertValues);
-                    auto fragIndex =
-                        PointwiseChainShader::FD::domain().encode(composed->fragValues);
-                    result.insert({vertIndex, fragIndex});
+        for (int textureCount = 0; textureCount <= 1; ++textureCount) {
+          for (int hasMask = 0; hasMask <= 1; ++hasMask) {
+            for (int hasCoverageSubtree = 0; hasCoverageSubtree <= 1; ++hasCoverageSubtree) {
+              for (int xpType = -1; xpType <= 2; ++xpType) {
+                for (int hasSubset = 0; hasSubset <= 1; ++hasSubset) {
+                  PointwiseChainInputs inputs;
+                  inputs.gpKind = gpKind;
+                  inputs.hasCoverage = hasCoverage != 0;
+                  inputs.hasUVCoord = hasUVCoord != 0;
+                  inputs.textureCount = textureCount;
+                  inputs.hasMask = hasMask != 0;
+                  inputs.hasCoverageSubtree = hasCoverageSubtree != 0;
+                  inputs.xpType = xpType;
+                  inputs.hasSubset = hasSubset != 0;
+                  auto composed = ComposePointwiseChain(inputs);
+                  if (!composed) {
+                    continue;
                   }
+                  auto vertIndex = PointwiseChainShader::VD::domain().encode(composed->vertValues);
+                  auto fragIndex = PointwiseChainShader::FD::domain().encode(composed->fragValues);
+                  result.insert({vertIndex, fragIndex});
                 }
               }
             }
@@ -729,7 +710,7 @@ std::optional<RuleComposedValues> ComposePointwiseGraph(const PointwiseChainInpu
   }
   if (profile == AOTResourceProfile::NoiseGraph &&
       (inputs.hasGradient || inputs.gpKind != 1 || !inputs.hasCoverage || inputs.hasUVCoord ||
-       inputs.hasColor || inputs.textureCount != 1)) {
+       inputs.textureCount != 1)) {
     return std::nullopt;
   }
   auto values = ComposePointwiseGP(inputs);

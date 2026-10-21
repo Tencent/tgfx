@@ -78,7 +78,8 @@ struct LayoutVariant {
   int textureCount = 0;
   int maskTexture = 0;
   LayoutGeometry geometry = LayoutGeometry::Hairline;
-  // Two batched rrects of different colors: the op carries per-vertex colors (HAS_COLOR=1).
+  // Two batched rrects of different colors: the op carries per-vertex colors (read through the
+  // unconditional color attribute; the color axis is no longer a permutation dimension).
   bool multiColor = false;
 };
 
@@ -371,7 +372,6 @@ void ExpectLayoutVariant(const LayoutVariant& variant, const char* gpName) {
     EXPECT_EQ(cache->drawStats().droppedDraws, 0u) << variant.label;
     EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u) << variant.label;
     const int expectedXP = ExpectedXPType(context, variant.dstRead);
-    const int expectedColor = variant.multiColor ? 1 : 0;
     const bool graph = std::string(variant.shaderName) == "PointwiseGraphShader";
     // An empty shader name leaves the serving kernel unpinned: the draw must still be served by a
     // precompiled program (no drop, no runtime program) and render like the runtime.
@@ -395,8 +395,7 @@ void ExpectLayoutVariant(const LayoutVariant& variant, const char* gpName) {
       bool resourceMatches = !graph || frag[PointwiseGraphShader::FD::RESOURCE_KIND] == 1;
       if (frag[FD::GP_LAYOUT] == variant.gpLayout && frag[FD::HAS_XP] == expectedXP &&
           frag[FD::TEXTURE_COUNT] == variant.textureCount &&
-          frag[FD::HAS_MASK_TEXTURE] == variant.maskTexture &&
-          frag[FD::HAS_COLOR] == expectedColor && resourceMatches) {
+          frag[FD::HAS_MASK_TEXTURE] == variant.maskTexture && resourceMatches) {
         served = true;
       }
     }
@@ -404,8 +403,7 @@ void ExpectLayoutVariant(const LayoutVariant& variant, const char* gpName) {
     EXPECT_TRUE(served) << variant.label << ": expected " << variant.shaderName
                         << " GP_LAYOUT=" << variant.gpLayout << " HAS_XP=" << expectedXP
                         << " TEXTURE_COUNT=" << variant.textureCount
-                        << " HAS_MASK_TEXTURE=" << variant.maskTexture
-                        << " HAS_COLOR=" << expectedColor << ", served: " << seen;
+                        << " HAS_MASK_TEXTURE=" << variant.maskTexture << ", served: " << seen;
     cache->setDiagnosticRecordingEnabled(false);
     cache->unload();
     context->globalCache()->clearPrograms();

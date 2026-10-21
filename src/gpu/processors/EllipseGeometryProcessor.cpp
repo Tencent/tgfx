@@ -24,9 +24,11 @@ EllipseGeometryProcessor::EllipseGeometryProcessor(int width, int height, bool s
     : GeometryProcessor(ClassID()), width(width), height(height), stroke(stroke),
       commonColor(commonColor) {
   inPosition = {"inPosition", VertexFormat::Float2};
-  if (!commonColor.has_value()) {
-    inColor = {"inColor", VertexFormat::UByte4Normalized};
-  }
+  // The color attribute is unconditional: common-color batches broadcast the paint color into the
+  // slot, so every fill kernel binds it in a single variant; the exact common color still rides
+  // the Color uniform through the HasCommonColor runtime uniform (the broadcast is 8-bit
+  // quantized).
+  inColor = {"inColor", VertexFormat::UByte4Normalized};
   inEllipseOffset = {"inEllipseOffset", VertexFormat::Float2};
   inEllipseRadii = {"inEllipseRadii", VertexFormat::Float4};
   this->setVertexAttributes(&inPosition, 4);

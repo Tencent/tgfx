@@ -364,9 +364,11 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
   // image draws adds 12 chain variants (the four quad four-leaf vertex forms, uvCoord and per-vertex
   // color on or off, each for the three XP kinds) with no TiledGraph twin.
   // The mesh and shape-instanced families dropped their per-vertex-color axes (the color attribute
-  // is unconditional, with a runtime-uniform source pick for mesh), removing 19 pairs from the
-  // former 459.
-  EXPECT_EQ(pairCount, 440u);
+  // is unconditional, with a runtime-uniform source pick for mesh), the chain/graph dropped
+  // HAS_COLOR (unconditional color attribute with the HasCommonColor runtime-uniform pick), the
+  // ellipse/complex-ellipse/atlas families dropped HAS_COMMON_COLOR the same way, and mesh also
+  // dropped HAS_COVERAGE (a constant 1.0f slot), removing 96 pairs from the former 440.
+  EXPECT_EQ(pairCount, 344u);
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseChainShader"),
             EnumeratePointwiseChainReachable());
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseGraphShader"),
@@ -529,8 +531,8 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryRejectsMissingEntries) {
 TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
   PointwiseGraphShader shader;
   auto info = shader.info();
-  EXPECT_EQ(info.vertDomain.dimensionCount(), 6u);
-  EXPECT_EQ(info.fragDomain.dimensionCount(), 8u);
+  EXPECT_EQ(info.vertDomain.dimensionCount(), 5u);
+  EXPECT_EQ(info.fragDomain.dimensionCount(), 7u);
   EXPECT_EQ(info.vertDomain.totalCount(), PointwiseChainShader::VD::domain().totalCount());
   EXPECT_EQ(info.fragDomain.totalCount(), PointwiseChainShader::FD::domain().totalCount() * 2);
   EXPECT_EQ(PointwiseGraphShader::FD::RESOURCE_KIND, PointwiseGraphShader::FD::COUNT - 1);

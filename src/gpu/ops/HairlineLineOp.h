@@ -28,8 +28,8 @@ namespace tgfx {
 
 class HairlineLineOp final : public StandardDrawOp {
  public:
-  // LineVertex = Point(2 floats) + coverage(1 float) = 12 bytes
-  static constexpr size_t BytesPerLineVertex = 12;
+  // LineVertex = Point(2 floats) + coverage(1 float) + white color filler(1 float) = 16 bytes
+  static constexpr size_t BytesPerLineVertex = 16;
   static constexpr size_t VerticesPerLine = 6;
   static constexpr size_t IndicesPerLine = 18;
   static constexpr size_t MaxNumLines = 256;

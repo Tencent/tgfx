@@ -52,8 +52,9 @@ class DefaultGeometryProcessor : public GeometryProcessor {
 
   Attribute position;
   Attribute coverage;
+  Attribute color;
 
-  PMColor color;
+  PMColor commonColor;
   int width = 1;
   int height = 1;
   AAType aa = AAType::None;

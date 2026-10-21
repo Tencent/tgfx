@@ -53,9 +53,13 @@ void main() {
 
 #else
 
+// The ellipse layout is (position, color, ellipseOffset, ellipseRadii): the color attribute is
+// unconditional, so the offset and radii follow it at locations 2 and 3. The color itself stays
+// undeclared — the matcher only accepts the common-color form, so the fragment reads the Color
+// uniform instead.
 layout(location = 0) in vec2 inPosition;
-layout(location = 1) in vec2 inEllipseOffset;
-layout(location = 2) in vec4 inEllipseRadii;
+layout(location = 2) in vec2 inEllipseOffset;
+layout(location = 3) in vec4 inEllipseRadii;
 
 layout(location = 0) out vec2 vEllipseOffsets;
 layout(location = 1) out vec4 vEllipseRadii;

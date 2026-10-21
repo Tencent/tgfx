@@ -38,9 +38,9 @@ namespace tgfx {
 ///   HAS_COVERAGE (bool): per-vertex AA coverage varying present.
 ///   HAS_UV_COORD (bool): quad only; leaf coords come from the uvCoord attribute instead of
 ///     aPosition.
-///   HAS_COLOR (bool): quad only; the per-vertex color slot exists only when the provider
-///     carries per-vertex colors (mirrored with the fragment stage, which reads vColor instead
-///     of the Color uniform when set).
+///   The color attribute is unconditional on every layout (a white filler where the buffer is
+///     shared across draws): the exact common color rides the Color uniform through the
+///     HasCommonColor runtime uniform, so there is no HAS_COLOR dimension.
 ///   There is no GP_TYPE: the position always goes through the Matrix uniform, which DefaultGP
 ///   fills with the view matrix and QuadPerEdgeAAGP fills with identity (bit-exact).
 ///   TEXTURE_COUNT (int, 2 values): 0 -> no texture leaves, 1 -> the four-leaf slots (chains
@@ -52,7 +52,7 @@ namespace tgfx {
 ///
 /// Fragment dimensions:
 ///   HAS_XP (int, 3 values): 0=Empty, 1=PorterDuff DST_TEX, 2=PorterDuff FBF
-///   HAS_COVERAGE / HAS_COLOR / TEXTURE_COUNT: mirrored with the vertex stage.
+///   HAS_COVERAGE / TEXTURE_COUNT: mirrored with the vertex stage.
 ///   HAS_MASK_TEXTURE (bool): a device-space alpha mask child sampled after the DAG and before the
 ///     XP stage, matching the legacy blend kernel's mask application point. Leaf-free uniform-color
 ///     chains on the DefaultGP, hairline-line and complex rounded-rect layouts only.
@@ -61,21 +61,12 @@ namespace tgfx {
 class PointwiseChainShader : public PrecompiledShader {
  public:
   struct VertDims {
-    enum : uint32_t {
-      GP_LAYOUT,
-      HAS_COVERAGE,
-      HAS_UV_COORD,
-      HAS_COLOR,
-      TEXTURE_COUNT,
-      HAS_SUBSET,
-      COUNT
-    };
+    enum : uint32_t { GP_LAYOUT, HAS_COVERAGE, HAS_UV_COORD, TEXTURE_COUNT, HAS_SUBSET, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("GP_LAYOUT", 5),
           PermutationBool("HAS_COVERAGE"),
           PermutationBool("HAS_UV_COORD"),
-          PermutationBool("HAS_COLOR"),
           // 0 = no texture leaves, 1 = the four-leaf artifacts (chains with 1-3 sampler
           // children bind phantom padding and run them).
           PermutationInt("TEXTURE_COUNT", 2),
@@ -91,7 +82,6 @@ class PointwiseChainShader : public PrecompiledShader {
       GP_LAYOUT,
       HAS_XP,
       HAS_COVERAGE,
-      HAS_COLOR,
       TEXTURE_COUNT,
       HAS_MASK_TEXTURE,
       HAS_SUBSET,
@@ -102,7 +92,6 @@ class PointwiseChainShader : public PrecompiledShader {
           PermutationInt("GP_LAYOUT", 5),
           PermutationInt("HAS_XP", 3),
           PermutationBool("HAS_COVERAGE"),
-          PermutationBool("HAS_COLOR"),
           PermutationInt("TEXTURE_COUNT", 2),
           PermutationBool("HAS_MASK_TEXTURE"),
           PermutationBool("HAS_SUBSET"),
@@ -110,7 +99,7 @@ class PointwiseChainShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 7, "Update the Compose mapping when fragment dimensions change.");
+  static_assert(FD::COUNT == 6, "Update the Compose mapping when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"PointwiseChainShader",

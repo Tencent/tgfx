@@ -105,8 +105,16 @@ void GLSLAtlasTextGeometryProcessor::setData(UniformData* vertexUniformData,
     vertexUniformData->setData("Matrix", Matrix::I());
   }
   setTransformDataHelper(Matrix::I(), vertexUniformData, transformIter);
-  if (commonColor.has_value()) {
-    fragmentUniformData->setData("Color", *commonColor);
+  // The precompiled kernels always bind the color attribute; common-color draws read the exact
+  // Color uniform instead of the 8-bit quantized broadcast, selected by HasCommonColor. Only
+  // precompiled kernels declare the field.
+  if (fragmentUniformData != nullptr) {
+    if (commonColor.has_value()) {
+      fragmentUniformData->setDataOptional("Color", *commonColor);
+    }
+    if (fragmentUniformData->hasField("HasCommonColor")) {
+      fragmentUniformData->setData("HasCommonColor", commonColor.has_value() ? 1 : 0);
+    }
   }
   if (fragmentUniformData != nullptr && fragmentUniformData->hasField("AlphaOnly")) {
     // Precompiled variants fold ALPHA_ONLY into a runtime uniform; the JIT program bakes it into

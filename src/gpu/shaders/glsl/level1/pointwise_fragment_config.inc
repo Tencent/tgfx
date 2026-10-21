@@ -41,9 +41,6 @@
 #ifndef HAS_COVERAGE
 #define HAS_COVERAGE 0
 #endif
-#ifndef HAS_COLOR
-#define HAS_COLOR 0
-#endif
 #ifndef GP_LAYOUT
 #define GP_LAYOUT 0
 #endif

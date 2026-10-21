@@ -84,7 +84,13 @@ void GLSLHairlineLineGeometryProcessor::setData(UniformData* vertexUniformData,
   if (uvMatrix.has_value()) {
     setTransformDataHelper(*uvMatrix, vertexUniformData, transformIter);
   }
-  fragmentUniformData->setData("Color", color);
+  // The hairline color is always the common paint color: the precompiled kernels read the exact
+  // Color uniform through the HasCommonColor runtime uniform instead of the white filler in the
+  // shared vertex buffers. Only precompiled kernels declare the field.
+  if (fragmentUniformData != nullptr && fragmentUniformData->hasField("HasCommonColor")) {
+    fragmentUniformData->setData("HasCommonColor", 1);
+  }
+  fragmentUniformData->setData("Color", commonColor);
   vertexUniformData->setData("Matrix", viewMatrix);
   fragmentUniformData->setData("Coverage", coverage);
   int aaEnabled = aaType == AAType::Coverage ? 1 : 0;

@@ -43,7 +43,10 @@ ShapeDrawOp::ShapeDrawOp(BlockAllocator* allocator, std::shared_ptr<GPUShapeProx
   auto context = shapeProxy->getContext();
   if (auto textureProxy = shapeProxy->getTextureProxy()) {
     auto maskRect = Rect::MakeWH(textureProxy->width(), textureProxy->height());
-    auto maskVertexProvider = RectsVertexProvider::MakeFrom(allocator, maskRect, AAType::None);
+    // The DefaultGP binds the color attribute unconditionally; the mask quad broadcasts the
+    // record's white filler (the paint color rides the Color uniform) and skips the coverage slot.
+    auto maskVertexProvider =
+        RectsVertexProvider::MakeFrom(allocator, maskRect, AAType::None, true, true);
     maskBufferProxy = context->proxyProvider()->createVertexBufferProxy(
         std::move(maskVertexProvider), RenderFlags::DisableAsyncTask);
   }

@@ -156,10 +156,16 @@ void GLSLComplexEllipseGeometryProcessor::setData(UniformData* vertexUniformData
                                                   UniformData* fragmentUniformData,
                                                   FPCoordTransformIter* transformIter) const {
   setTransformDataHelper(Matrix::I(), vertexUniformData, transformIter);
-  if (commonColor.has_value()) {
-    fragmentUniformData->setData("Color", *commonColor);
-  }
   if (fragmentUniformData != nullptr) {
+    // The precompiled kernels always bind the color attribute; common-color draws read the exact
+    // Color uniform instead of the 8-bit quantized broadcast, selected by HasCommonColor. Only
+    // precompiled kernels declare the field.
+    if (commonColor.has_value()) {
+      fragmentUniformData->setDataOptional("Color", *commonColor);
+    }
+    if (fragmentUniformData->hasField("HasCommonColor")) {
+      fragmentUniformData->setData("HasCommonColor", commonColor.has_value() ? 1 : 0);
+    }
     // Default for the runtime device mask; a present mask FP overwrites it with 1 later.
     fragmentUniformData->setDataOptional("HasDeviceMask", 0);
   }

@@ -4,15 +4,14 @@
 // ALPHA_ONLY is a runtime uniform (AlphaOnly) written by GLSLAtlasTextGeometryProcessor::setData,
 // not a compile-time permutation: it is pure fragment math (the vertex stage never uses it), so
 // folding it into a uniform branch shrinks the variant count. The analytic draw clip and the
-// device-space mask ride the shared runtime clip contract uniforms.
-// Fragment dimensions: HAS_COVERAGE, HAS_COMMON_COLOR, HAS_XP (int, 3).
+// device-space mask ride the shared runtime clip contract uniforms. The color attribute is
+// unconditional: the exact Color uniform serves common-color draws through the HasCommonColor
+// runtime uniform, the vColor varying per-vertex-colored ones.
+// Fragment dimensions: HAS_COVERAGE, HAS_XP (int, 3).
 #version 450
 
 #ifndef HAS_COVERAGE
 #define HAS_COVERAGE 0
-#endif
-#ifndef HAS_COMMON_COLOR
-#define HAS_COMMON_COLOR 0
 #endif
 #ifndef HAS_XP
 #define HAS_XP 0
@@ -21,9 +20,10 @@
 #define HAS_RUNTIME_CLIP 1
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
-#if HAS_COMMON_COLOR
+  // Exact paint color for common-color draws; the broadcast into the per-vertex attribute is
+  // 8-bit quantized, so HasCommonColor selects this uniform when set.
   vec4 Color;
-#endif
+  int HasCommonColor;
 #include "coverage_uniforms.inc"
 #include "xp_uniforms.inc"
   int AlphaOnly;
@@ -32,13 +32,9 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 layout(location = 0) in vec2 vTextureCoords;
 #if HAS_COVERAGE
 layout(location = 1) in float vCoverage;
-#if !HAS_COMMON_COLOR
 layout(location = 2) in vec4 vColor;
-#endif
 #else
-#if !HAS_COMMON_COLOR
 layout(location = 1) in vec4 vColor;
-#endif
 #endif
 
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
@@ -47,9 +43,7 @@ layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
 layout(set = 1, binding = 1) uniform sampler2D MaskTextureSampler;
 #define XP_DST_TEX_BINDING 2
 
-#if !HAS_COMMON_COLOR
-#define FILL_COLOR FILL_COLOR_VARYING
-#endif
+#define FILL_COLOR FILL_COLOR_VARYING_OR_COMMON
 #define FILL_COVERAGE FILL_COVERAGE_ATLAS_TEXT
 #define FILL_DEVICE_MASK FILL_DEVICE_MASK_RUNTIME
 #define FILL_CLIP 1

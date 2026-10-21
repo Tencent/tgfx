@@ -27,10 +27,11 @@ MeshGeometryProcessor::MeshGeometryProcessor(bool hasTexCoords, bool hasColors, 
       viewMatrix(viewMatrix) {
   position = {"aPosition", VertexFormat::Float2};
   // Chain-order attributes: coverage sits right after position (vertex meshes write a constant
-  // 1.0f), texCoords and colors follow. This matches the pointwise chain's rect layout.
-  if (this->hasCoverage) {
-    coverage = {"aCoverage", VertexFormat::Float};
-  }
+  // 1.0f), texCoords and colors follow. This matches the pointwise chain's rect layout. The
+  // coverage slot is unconditional too: the buffer always writes the 1.0f constant, so the
+  // chain's mesh forms can rely on it (the hasCoverage flag stays for the runtime codegen, which
+  // skips the varying when the mesh requested no coverage).
+  coverage = {"aCoverage", VertexFormat::Float};
   if (hasTexCoords) {
     texCoord = {"aTexCoord", VertexFormat::Float2};
   }

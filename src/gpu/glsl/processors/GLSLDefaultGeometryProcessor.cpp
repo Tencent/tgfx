@@ -71,7 +71,16 @@ void GLSLDefaultGeometryProcessor::setData(UniformData* vertexUniformData,
                                            UniformData* fragmentUniformData,
                                            FPCoordTransformIter* transformIter) const {
   setTransformDataHelper(uvMatrix, vertexUniformData, transformIter);
-  fragmentUniformData->setData("Color", color);
+  // The DefaultGP color is always the common paint color: the precompiled kernels read the exact
+  // Color uniform through the HasCommonColor runtime uniform instead of the broadcast (white)
+  // per-vertex slot, whose buffers are shared across draws. Only precompiled kernels declare the
+  // field, so the JIT path is unaffected.
+  if (fragmentUniformData != nullptr) {
+    fragmentUniformData->setDataOptional("Color", commonColor);
+    if (fragmentUniformData->hasField("HasCommonColor")) {
+      fragmentUniformData->setData("HasCommonColor", 1);
+    }
+  }
   vertexUniformData->setData("Matrix", viewMatrix);
 }
 }  // namespace tgfx

@@ -39,6 +39,9 @@ constexpr float HALF_PIXEL_LENGTH = PIXEL_LENGTH * 0.5f;
 struct LineVertex {
   Point pos;
   float coverage;
+  // A white filler slot for the unconditional color attribute: the hairline buffers are shared
+  // across draws, so the per-draw paint color rides the Color uniform instead.
+  uint32_t color;
 };
 
 struct ConicData {
@@ -338,6 +341,9 @@ class PathDecomposer {
 void AddLine(const Point p[2], LineVertex** vert) {
   const auto a = p[0];
   const auto b = p[1];
+  for (int i = 0; i < LINE_NUM_VERTICES; ++i) {
+    (*vert)[i].color = 0xFFFFFFFFu;
+  }
 
   auto ortho = Point::Zero();
   auto vec = b - a;

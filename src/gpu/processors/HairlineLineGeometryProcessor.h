@@ -56,7 +56,7 @@ class HairlineLineGeometryProcessor : public GeometryProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
-  PMColor color = {};
+  PMColor commonColor = {};
   Matrix viewMatrix = {};
   std::optional<Matrix> uvMatrix = std::nullopt;
   float coverage = 1.0f;
@@ -64,6 +64,7 @@ class HairlineLineGeometryProcessor : public GeometryProcessor {
 
   Attribute position = {};
   Attribute edgeDistance = {};
+  Attribute color = {};
 };
 
 }  // namespace tgfx
