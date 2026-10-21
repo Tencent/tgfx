@@ -17,109 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLPerlinNoiseFragmentProcessor.h"
-#include <unordered_map>
 #include "core/shaders/PerlinNoiseShader.h"
 #include "gpu/AOTPointwiseSlotWriter.h"
-#include "gpu/ColorSpaceXformHelper.h"
-#include "gpu/glsl/GLSLBlend.h"
-#include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/resources/TextureView.h"
 
 namespace tgfx {
 
-namespace {
-// Emits one pointwise operator on the output color, mirroring the precompiled kernel's slot
-// evaluation (pointwise_op.inc). The empty prefix addresses the kernel's shared OpType record (slot 0); slot 1 uses the
-// "Slot1" prefix declared by perlin_noise.frag.
-void EmitPointwiseSlot(FragmentProcessor::EmitArgs& args,
-                       std::unordered_map<std::string, std::string>& declaredArrays, size_t index,
-                       const AOTPointwiseSlot& slot) {
-  // Per-slot uniform fields are std140 arrays shared with the precompiled kernel; declare each
-  // array once and reference its elements by slot index.
-  auto declareSlotField = [&](const char* field, UniformFormat format) {
-    auto [it, _] = declaredArrays.try_emplace(
-        field,
-        args.uniformHandler->addUniform(field, format, ShaderStage::Fragment,
-                                        GLSLPerlinNoiseFragmentProcessor::MaxPointwiseSlots));
-    return it->second + "[" + std::to_string(index) + "]";
-  };
-  if (slot.type == AOTPointwiseOpType::ColorMatrix) {
-    auto matrix = declareSlotField("ColorMatrix", UniformFormat::Float4x4);
-    auto vector = declareSlotField("ColorVector", UniformFormat::Float4);
-    args.fragBuilder->codeAppendf("%s = vec4(%s.rgb / max(%s.a, 9.9999997473787516e-05), %s.a);",
-                                  args.outputColor.c_str(), args.outputColor.c_str(),
-                                  args.outputColor.c_str(), args.outputColor.c_str());
-    args.fragBuilder->codeAppendf("%s = clamp(%s * %s + %s, 0.0, 1.0);", args.outputColor.c_str(),
-                                  matrix.c_str(), args.outputColor.c_str(), vector.c_str());
-    args.fragBuilder->codeAppendf("%s.rgb *= %s.a;", args.outputColor.c_str(),
-                                  args.outputColor.c_str());
-  } else if (slot.type == AOTPointwiseOpType::Luma) {
-    auto kr = declareSlotField("Kr", UniformFormat::Float);
-    auto kg = declareSlotField("Kg", UniformFormat::Float);
-    auto kb = declareSlotField("Kb", UniformFormat::Float);
-    auto luma = "perlinSlotLuma" + std::to_string(index);
-    args.fragBuilder->codeAppendf("float %s = dot(%s.rgb, vec3(%s, %s, %s));", luma.c_str(),
-                                  args.outputColor.c_str(), kr.c_str(), kg.c_str(), kb.c_str());
-    args.fragBuilder->codeAppendf("%s = vec4(%s);", args.outputColor.c_str(), luma.c_str());
-  } else if (slot.type == AOTPointwiseOpType::AlphaThreshold) {
-    auto threshold = declareSlotField("Threshold", UniformFormat::Float);
-    auto stepped = "perlinSlotStep" + std::to_string(index);
-    args.fragBuilder->codeAppendf("vec4 %s = vec4(0.0);", stepped.c_str());
-    args.fragBuilder->codeAppendf("if (%s.a > 0.0) {", args.outputColor.c_str());
-    args.fragBuilder->codeAppendf("  %s.rgb = %s.rgb / %s.a;", stepped.c_str(),
-                                  args.outputColor.c_str(), args.outputColor.c_str());
-    args.fragBuilder->codeAppendf("  %s.a = step(%s, %s.a);", stepped.c_str(), threshold.c_str(),
-                                  args.outputColor.c_str());
-    args.fragBuilder->codeAppendf("  %s = clamp(%s, 0.0, 1.0);", stepped.c_str(), stepped.c_str());
-    args.fragBuilder->codeAppend("}");
-    args.fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), stepped.c_str());
-  } else if (slot.type == AOTPointwiseOpType::ConstColor) {
-    auto value = declareSlotField("ConstColorValue", UniformFormat::Float4);
-    // Mirrors GLSLConstColorProcessor's emission for the same input mode (the precompiled kernel
-    // folds it into the ConstInputMode runtime uniform; the JIT bakes it per slot).
-    switch (static_cast<InputMode>(slot.constColor.inputMode)) {
-      case InputMode::Ignore:
-        args.fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), value.c_str());
-        break;
-      case InputMode::ModulateRGBA:
-        args.fragBuilder->codeAppendf("%s = %s * %s;", args.outputColor.c_str(), value.c_str(),
-                                      args.inputColor.c_str());
-        break;
-      case InputMode::ModulateA:
-        args.fragBuilder->codeAppendf("%s = %s * %s.a;", args.outputColor.c_str(), value.c_str(),
-                                      args.inputColor.c_str());
-        break;
-    }
-  } else if (slot.type == AOTPointwiseOpType::Blend) {
-    // Blend with a constant operand, matching the precompiled kernel's OP_BLEND: the operand
-    // order follows BlendConstFirst, the mode is baked per slot.
-    auto value = declareSlotField("ConstColorValue", UniformFormat::Float4);
-    auto srcName = "perlinBlendSrc" + std::to_string(index);
-    auto dstName = "perlinBlendDst" + std::to_string(index);
-    // childType mirrors XfermodeFragmentProcessor::Child: SrcChild (1) puts the constant in the
-    // src operand, DstChild (0) in the dst operand — same mapping as the shared upload's
-    // BlendConstFirst bit.
-    if (slot.blend.childType == 1) {
-      args.fragBuilder->codeAppendf("vec4 %s = %s;", srcName.c_str(), value.c_str());
-      args.fragBuilder->codeAppendf("vec4 %s = %s;", dstName.c_str(), args.outputColor.c_str());
-    } else {
-      args.fragBuilder->codeAppendf("vec4 %s = %s;", srcName.c_str(), args.outputColor.c_str());
-      args.fragBuilder->codeAppendf("vec4 %s = %s;", dstName.c_str(), value.c_str());
-    }
-    AppendMode(args.fragBuilder, srcName, "vec4(1.0)", dstName, args.outputColor,
-               static_cast<BlendMode>(slot.blend.blendMode), false);
-  } else if (slot.type == AOTPointwiseOpType::ColorSpaceXform) {
-    ColorSpaceXformHelper helper(static_cast<int>(index),
-                                 GLSLPerlinNoiseFragmentProcessor::MaxPointwiseSlots);
-    auto steps = slot.colorSpaceXform.steps.get();
-    helper.emitCode(args.uniformHandler, steps);
-    std::string transformed;
-    args.fragBuilder->appendColorGamutXform(&transformed, args.outputColor.c_str(), &helper);
-    args.fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), transformed.c_str());
-  }
-}
-
-}  // namespace
 
 PlacementPtr<PerlinNoiseFragmentProcessor> PerlinNoiseFragmentProcessor::Make(
     BlockAllocator* allocator, Context* context, PerlinNoiseType noiseType, int numOctaves,
@@ -350,10 +253,7 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
   // kernel's applyPointwiseSlot1(applyPointwiseOp(...)) order. Only reachable when this processor
   // carries slot records (AOT route fallback safety); a pipeline-built perlin has none and relies
   // on composed operator FPs instead.
-  std::unordered_map<std::string, std::string> declaredArrays = {};
-  for (size_t index = 0; index < slotCount; ++index) {
-    EmitPointwiseSlot(args, declaredArrays, index, pointwiseSlots[index]);
-  }
+  EmitAOTPointwiseSlots(args, pointwiseSlots.data(), slotCount, MaxPointwiseSlots, "perlinSlot");
 }
 
 void GLSLPerlinNoiseFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,

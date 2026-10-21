@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <limits>
@@ -287,6 +288,22 @@ enum class AOTPointwiseOpType : int {
   ConstColor = PointwiseOp::ConstColor,
   Blend = PointwiseOp::Blend,
 };
+
+/**
+ * Splits a 20-element color matrix into the two uniform records every pointwise-slot layout uses:
+ * the 4x4 linear part (elements 0-3, 5-8, 10-13, 15-18) and the 4-element translate vector
+ * (elements 4, 9, 14, 19). Shared by the plain-slot and chain-slot uploaders so the packing order
+ * is defined once.
+ */
+inline void PackAOTColorMatrix(const std::array<float, 20>& matrix, float* matrixData,
+                               float* vectorData) {
+  const float packed[] = {matrix[0],  matrix[5],  matrix[10], matrix[15], matrix[1],  matrix[6],
+                          matrix[11], matrix[16], matrix[2],  matrix[7],  matrix[12], matrix[17],
+                          matrix[3],  matrix[8],  matrix[13], matrix[18]};
+  const float vector[] = {matrix[4], matrix[9], matrix[14], matrix[19]};
+  std::copy(packed, packed + 16, matrixData);
+  std::copy(vector, vector + 4, vectorData);
+}
 
 // One pointwise-operator slot of a fused kernel, carrying the full parameter set of whichever
 // operator it holds. Only the member matching type is read.

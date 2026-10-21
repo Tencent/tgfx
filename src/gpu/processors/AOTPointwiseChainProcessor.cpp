@@ -90,13 +90,9 @@ static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTCha
   uniformData->setArrayElementOptional("SlotPacked", index, packed);
   switch (slot.op) {
     case AOTChainOp::ColorMatrix: {
-      const auto& matrix = slot.colorMatrix.matrix;
-      float matrixData[] = {
-          matrix[0],  matrix[5],  matrix[10], matrix[15], matrix[1],  matrix[6],
-          matrix[11], matrix[16], matrix[2],  matrix[7],  matrix[12], matrix[17],
-          matrix[3],  matrix[8],  matrix[13], matrix[18],
-      };
-      float vectorData[] = {matrix[4], matrix[9], matrix[14], matrix[19]};
+      float matrixData[16];
+      float vectorData[4];
+      PackAOTColorMatrix(slot.colorMatrix.matrix, matrixData, vectorData);
       uniformData->setArrayElementOptional("SlotColorMatrix", index, matrixData);
       uniformData->setArrayElementOptional("SlotColorVector", index, vectorData);
       break;
