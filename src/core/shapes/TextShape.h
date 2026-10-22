@@ -31,7 +31,9 @@ class TextShape : public UniqueKeyShape {
   }
 
   PathFillType fillType() const override {
-    return PathFillType::Winding;
+    // Reports the rule of the merged outline, so it can never disagree with getPath(). onGetPath()
+    // must not call fillType(): getPath() is what computes it, and that would recurse.
+    return getPath().getFillType();
   }
 
   Rect onGetBounds() const override;

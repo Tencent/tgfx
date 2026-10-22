@@ -29,7 +29,11 @@ class GlyphShape : public Shape {
   explicit GlyphShape(Font font, GlyphID glyphID);
 
   PathFillType fillType() const override {
-    return PathFillType::Winding;
+    // Reports the rule the glyph outline itself carries. A typeface cannot state one rule for all
+    // of its glyphs: the path operations behind faux bold can change it. Reading it from the
+    // outline keeps the GPU stencil pass and the CPU rasterizer in agreement. getPath() caches its
+    // result and the draw path needs it anyway, so this costs nothing extra.
+    return getPath().getFillType();
   }
 
   Rect onGetBounds() const override;

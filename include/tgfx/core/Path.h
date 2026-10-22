@@ -80,6 +80,24 @@ class Path {
   void toggleInverseFillType();
 
   /**
+   * Converts this path to an equivalent path that uses the winding fill rule, reorienting its
+   * contours by nesting depth so that the filled area is unchanged. This is what lets an outline
+   * travel through a format that cannot record a fill rule: both winding and even-odd rasterizers
+   * then agree on the result.
+   *
+   * Paths that already use the winding rule are left as is. InverseEvenOdd is converted to
+   * InverseWinding.
+   *
+   * The contours must not cross themselves or each other. This holds for any result of addPath()
+   * with PathOp::Union, Intersect, Difference or XOR, since those operations resolve all
+   * intersections before emitting their contours.
+   *
+   * Returns false if the conversion fails, in which case the path is left unchanged. Callers must
+   * check the result: a silent failure leaves an outline that still depends on the even-odd rule.
+   */
+  bool toWinding();
+
+  /**
    * Returns true if Path contains only one line;
    */
   bool isLine(Point line[2] = nullptr) const;
@@ -366,6 +384,15 @@ class Path {
    * Adds a src to this Path.
    */
   void addPath(const Path& src, PathOp op = PathOp::Append);
+
+  /**
+   * Adds a src to this Path, reporting whether the operation ran. Only the boolean operations can
+   * fail: they resolve every intersection first and give up instead of emitting a partial result.
+   * Append and Extend always succeed. On failure this Path is left holding whatever the operation
+   * managed to produce, so callers must treat the reported failure as "the result is unusable"
+   * rather than reading it anyway. success may be nullptr when the caller does not care.
+   */
+  void addPath(const Path& src, PathOp op, bool* success);
 
   /**
    * Sets Path to its initial state. Internal storage associated with Path is released.
