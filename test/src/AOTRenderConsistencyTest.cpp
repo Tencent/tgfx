@@ -6903,6 +6903,106 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyMaskFoldsIntoChain) {
   ExpectBitmapsIdentical("alpha-only-mask-fold-chain", candidate, reference, width, height);
 }
 
+// Reproductions of the two alpha-target coverage gaps in the libpag sample (docs/data
+// libpag-aot-hits-20261019 droppedDrawRecords: a solid quad and a linear gradient onto an
+// alpha-only render target, six dropped draws). With a loaded bundle a miss is a dropped draw, not
+// a JIT fallback, so both scenes must be served by a precompiled program and stay byte-identical
+// to the runtime route. Alpha-only targets read back one byte per pixel, so the comparison is
+// local (ExpectBitmapsIdentical assumes RGBA).
+static void RenderAlphaOnlyTargetScene(Context* context, bool gradient, Bitmap* out, int width,
+                                       int height) {
+  auto surface = Surface::Make(context, width, height, true);
+  ASSERT_TRUE(surface != nullptr);
+  Paint paint = {};
+  if (gradient) {
+    paint.setShader(Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(width, 0),
+                                               {Color::Green(), Color::Red()}, {}));
+  } else {
+    paint.setColor(Color::FromRGBA(80, 160, 240, 220));
+  }
+  surface->getCanvas()->drawRect(Rect::MakeWH(width, height), paint);
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(out->allocPixels(width, height, true));
+  auto* pixels = out->lockPixels();
+  ASSERT_TRUE(pixels != nullptr);
+  ASSERT_TRUE(surface->readPixels(out->info(), pixels));
+  out->unlockPixels();
+}
+
+static void ExpectAlphaOnlyBitmapsIdentical(const char* label, Bitmap& candidate, Bitmap& reference,
+                                            int width, int height) {
+  auto* a = static_cast<const uint8_t*>(candidate.lockPixels());
+  auto* r = static_cast<const uint8_t*>(reference.lockPixels());
+  ASSERT_TRUE(a != nullptr && r != nullptr);
+  size_t totalBytes = static_cast<size_t>(width) * static_cast<size_t>(height);
+  int maxDiff = 0;
+  size_t diffCount = 0;
+  for (size_t i = 0; i < totalBytes; i++) {
+    int d = std::abs(static_cast<int>(a[i]) - static_cast<int>(r[i]));
+    if (d > 0) {
+      diffCount++;
+    }
+    if (d > maxDiff) {
+      maxDiff = d;
+    }
+  }
+  candidate.unlockPixels();
+  reference.unlockPixels();
+  EXPECT_EQ(maxDiff, 0) << "AOT vs runtime alpha-only render diverged for scene: " << label
+                        << " (maxDiff=" << maxDiff << ", diffBytes=" << diffCount << "/"
+                        << totalBytes << ")";
+}
+
+static void RunAlphaOnlyTargetRepro(const char* label, bool gradient) {
+  constexpr int width = 96;
+  constexpr int height = 96;
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  {
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
+    cache->unload();
+    ScopedAOTStatsPause statsPause(context, true);
+    RenderAlphaOnlyTargetScene(context, gradient, &reference, width, height);
+  }
+  {
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleBytes, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    context->globalCache()->clearPrograms();
+    cache->setDiagnosticRecordingEnabled(true);
+    cache->resetStats();
+    context->globalCache()->resetProgramStats();
+    RenderAlphaOnlyTargetScene(context, gradient, &candidate, width, height);
+    EXPECT_EQ(cache->drawStats().droppedDraws, 0u) << label;
+    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u) << label;
+    EXPECT_FALSE(cache->hitRecords().empty()) << label;
+    for (const auto& record : cache->hitRecords()) {
+      printf("[AlphaTargetRepro] %s served by %s(v%u,f%u)\n", label, record.shaderName.c_str(),
+             static_cast<unsigned>(record.vertPermutationIndex),
+             static_cast<unsigned>(record.fragPermutationIndex));
+    }
+    fflush(stdout);
+    cache->setDiagnosticRecordingEnabled(false);
+  }
+  ExpectAlphaOnlyBitmapsIdentical(label, candidate, reference, width, height);
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, SolidQuadToAlphaOnlyTargetServedByPrecompiled) {
+  RunAlphaOnlyTargetRepro("solid-quad-alpha-target", false);
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, LinearGradientToAlphaOnlyTargetServedByPrecompiled) {
+  RunAlphaOnlyTargetRepro("linear-gradient-alpha-target", true);
+}
+
 // P4 migration group two: a shader paired with an affectsTransparentBlack color filter takes the
 // ColorFilterShader path, whose SrcIn tree (composed chain masked by the original shader alpha)
 // used to be materialized at construction time. The planned path keeps the original tree; when
