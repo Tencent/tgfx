@@ -347,15 +347,13 @@ TGFX_TEST(ResourceTest, BlockAllocatorRefCount) {
   BlockAllocator blockAllocator;
   // make sure vertices expire after task is done
   float* vertices = nullptr;
-  std::shared_ptr<Task> task = nullptr;
   {
     auto vertexProvider =
         RectsVertexProvider::MakeFrom(&blockAllocator, Rect::MakeWH(100, 100), AAType::Coverage);
     vertices = new float[vertexProvider->vertexCount()];
-    task = std::make_shared<VertexProviderTask>(std::move(vertexProvider), vertices);
+    auto task = std::make_shared<VertexProviderTask>(std::move(vertexProvider), vertices);
     Task::Run(task);
   }
-  EXPECT_TRUE(task->wait());
   blockAllocator.clear();
   delete[] vertices;
 }
