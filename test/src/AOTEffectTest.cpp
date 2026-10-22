@@ -52,7 +52,6 @@
 #include "gpu/resources/TextureView.h"
 #include "gpu/shaders/PermutationRules.h"
 #include "gpu/shaders/level1/PointwiseChainShader.h"
-#include "gpu/shaders/level1/PointwiseGraphShader.h"
 #include "gtest/gtest.h"
 #include "layers/NoiseDensityUtils.h"
 #include "tgfx/core/BlendMode.h"
@@ -2168,40 +2167,52 @@ TGFX_TEST(AOTEffectTest, PerlinDensityBranchesShareLookupResources) {
   }
 }
 
-TGFX_TEST(AOTEffectTest, PointwiseGraphPermutationsAreIndependentAndBounded) {
+TGFX_TEST(AOTEffectTest, PointwiseResourceKindsAreIndependentAndBounded) {
+  using VD = PointwiseChainShader::VD;
+  using FD = PointwiseChainShader::FD;
   PointwiseChainInputs inputs;
   inputs.gpKind = 1;
   inputs.hasCoverage = true;
   inputs.textureCount = 1;
   inputs.hasNoise = true;
-  std::set<std::pair<uint32_t, uint32_t>> graphPairs;
+  inputs.resourceProfile = AOTResourceProfile::NoiseGraph;
+  std::set<std::pair<uint32_t, uint32_t>> noisePairs;
   for (int xp = 0; xp < 3; ++xp) {
     inputs.xpType = xp;
-    auto composed = ComposePointwiseGraph(inputs);
+    auto composed = ComposePointwiseChain(inputs);
     ASSERT_TRUE(composed.has_value());
-    EXPECT_EQ(composed->vertValues.size(), PointwiseChainShader::VD::COUNT);
-    EXPECT_EQ(composed->fragValues.size(), PointwiseChainShader::FD::COUNT + 1);
-    EXPECT_EQ(composed->fragValues[PointwiseGraphShader::FD::HAS_XP], xp);
-    EXPECT_EQ(composed->fragValues[PointwiseGraphShader::FD::RESOURCE_KIND], 0);
-    graphPairs.insert({PointwiseGraphShader::VD::domain().encode(composed->vertValues),
-                       PointwiseGraphShader::FD::domain().encode(composed->fragValues)});
+    EXPECT_EQ(composed->vertValues.size(), VD::COUNT);
+    EXPECT_EQ(composed->fragValues.size(), FD::COUNT);
+    EXPECT_EQ(composed->fragValues[FD::HAS_XP], xp);
+    EXPECT_EQ(composed->fragValues[FD::RESOURCE_KIND], 2);
+    EXPECT_EQ(composed->vertValues[VD::HAS_SOURCE_COORDS], 1);
+    noisePairs.insert(
+        {VD::domain().encode(composed->vertValues), FD::domain().encode(composed->fragValues)});
+    // A plain-chain profile never takes the noise module, and an Automatic profile never
+    // promotes (the plan layer resolves the profile before matching).
+    inputs.resourceProfile = AOTResourceProfile::Automatic;
     EXPECT_FALSE(ComposePointwiseChain(inputs).has_value());
-    inputs.hasNoise = false;
-    EXPECT_TRUE(ComposePointwiseChain(inputs).has_value());
-    EXPECT_FALSE(ComposePointwiseGraph(inputs).has_value());
-    inputs.hasNoise = true;
+    inputs.resourceProfile = AOTResourceProfile::Chain;
+    EXPECT_FALSE(ComposePointwiseChain(inputs).has_value());
+    inputs.resourceProfile = AOTResourceProfile::NoiseGraph;
+    // The mask and coverage-subtree flags are runtime data: they never change the permutation.
     auto masked = inputs;
     masked.hasMask = true;
     masked.hasCoverageSubtree = true;
-    auto maskedValues = ComposePointwiseGraph(masked);
+    auto maskedValues = ComposePointwiseChain(masked);
     ASSERT_TRUE(maskedValues.has_value());
     EXPECT_EQ(maskedValues->vertValues, composed->vertValues);
     EXPECT_EQ(maskedValues->fragValues, composed->fragValues);
   }
-  EXPECT_EQ(graphPairs.size(), 3u);
+  EXPECT_EQ(noisePairs.size(), 3u);
+  // The gradient kind mirrors every plain-chain shape its rule admits (no per-quad subset): the
+  // TiledGraph profile composes exactly where the plain chain does, with RESOURCE_KIND 1 and
+  // HAS_SOURCE_COORDS 1 on top of the plain values.
+  std::set<std::pair<uint32_t, uint32_t>> gradientPairs;
   for (int gpKind = 0; gpKind <= 7; ++gpKind) {
     for (int flags = 0; flags < 32; ++flags) {
       for (int xp = 0; xp < 3; ++xp) {
+        SCOPED_TRACE(gpKind * 1000 + flags * 10 + xp);
         PointwiseChainInputs base;
         base.gpKind = gpKind;
         base.hasCoverage = (flags & 1) != 0;
@@ -2213,64 +2224,78 @@ TGFX_TEST(AOTEffectTest, PointwiseGraphPermutationsAreIndependentAndBounded) {
         auto chainValues = ComposePointwiseChain(base);
         auto tiled = base;
         tiled.resourceProfile = AOTResourceProfile::TiledGraph;
-        auto composed = ComposePointwiseGraph(tiled);
+        auto composed = ComposePointwiseChain(tiled);
         ASSERT_EQ(composed.has_value(), chainValues.has_value());
-        EXPECT_FALSE(ComposePointwiseChain(tiled).has_value());
+        // Automatic and plain-chain profiles never take the gradient module.
         auto automatic = base;
         automatic.hasGradient = true;
-        auto automaticValues = ComposePointwiseGraph(automatic);
-        ASSERT_EQ(automaticValues.has_value(), composed.has_value());
         EXPECT_FALSE(ComposePointwiseChain(automatic).has_value());
         auto explicitChain = automatic;
         explicitChain.resourceProfile = AOTResourceProfile::Chain;
         EXPECT_FALSE(ComposePointwiseChain(explicitChain).has_value());
-        EXPECT_FALSE(ComposePointwiseGraph(explicitChain).has_value());
         if (!composed) {
           continue;
         }
         auto expectedFragment = chainValues->fragValues;
-        expectedFragment.push_back(1);
-        EXPECT_EQ(composed->vertValues, chainValues->vertValues);
+        expectedFragment[FD::RESOURCE_KIND] = 1;
+        auto expectedVert = chainValues->vertValues;
+        expectedVert[VD::HAS_SOURCE_COORDS] = 1;
+        EXPECT_EQ(composed->vertValues, expectedVert);
         EXPECT_EQ(composed->fragValues, expectedFragment);
-        EXPECT_EQ(automaticValues->vertValues, composed->vertValues);
-        EXPECT_EQ(automaticValues->fragValues, composed->fragValues);
-        auto vertexIndex = PointwiseGraphShader::VD::domain().encode(composed->vertValues);
-        auto fragmentIndex = PointwiseGraphShader::FD::domain().encode(composed->fragValues);
+        auto vertexIndex = VD::domain().encode(composed->vertValues);
+        auto fragmentIndex = FD::domain().encode(composed->fragValues);
         EXPECT_TRUE(
-            IsBuildablePermutation(PointwiseGraphShader().info(), vertexIndex, fragmentIndex));
-        graphPairs.insert({vertexIndex, fragmentIndex});
-        tiled.hasNoise = true;
-        EXPECT_FALSE(ComposePointwiseGraph(tiled).has_value());
+            IsBuildablePermutation(PointwiseChainShader().info(), vertexIndex, fragmentIndex));
+        gradientPairs.insert({vertexIndex, fragmentIndex});
+        // The gradient kind never takes the noise module.
+        auto withNoise = tiled;
+        withNoise.hasNoise = true;
+        EXPECT_FALSE(ComposePointwiseChain(withNoise).has_value());
       }
     }
   }
-  // Every chain pair has a TiledGraph twin except the per-quad subset ones (a Chain-only
-  // capability), plus the three NoiseGraph pairs.
+  // The merged family's reachable set: every plain-chain pair (RESOURCE_KIND 0) plus its gradient
+  // twin minus the per-quad subset pairs (a plain-chain capability), plus the three noise pairs.
+  const auto reachable = EnumeratePointwiseChainReachable();
+  std::set<std::pair<uint32_t, uint32_t>> plainPairs;
   size_t chainSubsetPairs = 0;
-  for (const auto& indices : EnumeratePointwiseChainReachable()) {
-    auto fragValues = PointwiseChainShader::FD::domain().decode(indices.second);
-    chainSubsetPairs += fragValues[PointwiseChainShader::FD::HAS_SUBSET] != 0 ? 1 : 0;
+  for (const auto& indices : reachable) {
+    auto fragValues = FD::domain().decode(indices.second);
+    if (fragValues[FD::RESOURCE_KIND] == 0) {
+      plainPairs.insert(indices);
+      chainSubsetPairs += fragValues[FD::HAS_SUBSET] != 0 ? 1 : 0;
+    }
   }
+  EXPECT_EQ(plainPairs.size(), 57u);
   EXPECT_EQ(chainSubsetPairs, 6u);
-  EXPECT_EQ(graphPairs.size(), EnumeratePointwiseChainReachable().size() - chainSubsetPairs + 3);
-  EXPECT_EQ(EnumeratePointwiseGraphReachable(), graphPairs);
-  EXPECT_EQ(EnumerateReachablePermutations("PointwiseGraphShader"), graphPairs);
+  EXPECT_EQ(gradientPairs.size(), plainPairs.size() - chainSubsetPairs);
+  EXPECT_EQ(reachable.size(), plainPairs.size() + gradientPairs.size() + noisePairs.size());
+  for (const auto& pair : gradientPairs) {
+    EXPECT_EQ(reachable.count(pair), 1u);
+  }
+  for (const auto& pair : noisePairs) {
+    EXPECT_EQ(reachable.count(pair), 1u);
+  }
+  // The noise kind's fixed quad subset: anything else is rejected.
   auto unsupported = inputs;
   unsupported.gpKind = 0;
-  EXPECT_FALSE(ComposePointwiseGraph(unsupported).has_value());
+  EXPECT_FALSE(ComposePointwiseChain(unsupported).has_value());
   unsupported = inputs;
   unsupported.hasUVCoord = true;
-  EXPECT_FALSE(ComposePointwiseGraph(unsupported).has_value());
+  EXPECT_FALSE(ComposePointwiseChain(unsupported).has_value());
   unsupported = inputs;
   unsupported.textureCount = 0;
-  EXPECT_FALSE(ComposePointwiseGraph(unsupported).has_value());
+  EXPECT_FALSE(ComposePointwiseChain(unsupported).has_value());
   unsupported = inputs;
   unsupported.hasCoverage = false;
-  EXPECT_FALSE(ComposePointwiseGraph(unsupported).has_value());
+  EXPECT_FALSE(ComposePointwiseChain(unsupported).has_value());
+  unsupported = inputs;
+  unsupported.hasGradient = true;
+  EXPECT_FALSE(ComposePointwiseChain(unsupported).has_value());
   for (int xp : {-1, 3}) {
     unsupported = inputs;
     unsupported.xpType = xp;
-    EXPECT_FALSE(ComposePointwiseGraph(unsupported).has_value());
+    EXPECT_FALSE(ComposePointwiseChain(unsupported).has_value());
   }
 }
 

@@ -49,7 +49,6 @@
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/resources/DefaultTextureView.h"
 #include "gpu/shaders/level1/PointwiseChainShader.h"
-#include "gpu/shaders/level1/PointwiseGraphShader.h"
 #include "gtest/gtest.h"
 #include "layers/NoiseDensityUtils.h"
 #include "layers/layerstyles/GlassUDF.h"
@@ -467,9 +466,16 @@ static void ExpectTiledReadFormatMatchesReference(PixelFormat format, bool fused
       const auto records = cache->hitRecords();
       ASSERT_FALSE(records.empty());
       for (const auto& record : records) {
-        EXPECT_EQ(record.shaderName, extended ? "PointwiseGraphShader"
-                                     : fused  ? "PointwiseChainShader"
-                                              : "TiledTextureFillShader");
+        if (extended || fused) {
+          EXPECT_EQ(record.shaderName, "PointwiseChainShader");
+          if (extended) {
+            EXPECT_EQ(PointwiseChainShader::FD::domain().valueOf(record.fragPermutationIndex,
+                                                                 "RESOURCE_KIND"),
+                      1);
+          }
+        } else {
+          EXPECT_EQ(record.shaderName, "TiledTextureFillShader");
+        }
       }
       EXPECT_TRUE(cache->jitProgramRecords().empty());
       EXPECT_TRUE(cache->fallbackRecords().empty());
@@ -1640,7 +1646,10 @@ TGFX_TEST(AOTRenderConsistencyTest, StandaloneGradientUsesExtendedChain) {
         const auto records = cache->hitRecords();
         ASSERT_FALSE(records.empty());
         for (const auto& record : records) {
-          EXPECT_EQ(record.shaderName, "PointwiseGraphShader");
+          EXPECT_EQ(record.shaderName, "PointwiseChainShader");
+          EXPECT_EQ(PointwiseChainShader::FD::domain().valueOf(record.fragPermutationIndex,
+                                                               "RESOURCE_KIND"),
+                    1);
         }
         EXPECT_TRUE(cache->fallbackRecords().empty());
         EXPECT_TRUE(cache->jitProgramRecords().empty());
@@ -5902,7 +5911,9 @@ TGFX_TEST(AOTRenderConsistencyTest, PerlinDensityDAGServedByteExact) {
             const auto hits = cache->hitRecords();
             bool noiseVariantHit = false;
             for (const auto& hit : hits) {
-              noiseVariantHit |= hit.shaderName == "PointwiseGraphShader";
+              noiseVariantHit |= hit.shaderName == "PointwiseChainShader" &&
+                                 PointwiseChainShader::FD::domain().valueOf(
+                                     hit.fragPermutationIndex, "RESOURCE_KIND") == 2;
             }
             EXPECT_TRUE(noiseVariantHit);
           }
@@ -5998,8 +6009,8 @@ TGFX_TEST(AOTRenderConsistencyTest, ThreeIndependentTiledInputsUseGraphByteExact
           EXPECT_EQ(cache->drawStats().planMaterializedEdges, 0u);
           bool tiledHit = false;
           for (const auto& hit : cache->hitRecords()) {
-            tiledHit |= hit.shaderName == "PointwiseGraphShader" &&
-                        PointwiseGraphShader::FD::domain().valueOf(hit.fragPermutationIndex,
+            tiledHit |= hit.shaderName == "PointwiseChainShader" &&
+                        PointwiseChainShader::FD::domain().valueOf(hit.fragPermutationIndex,
                                                                    "RESOURCE_KIND") == 1;
           }
           EXPECT_TRUE(tiledHit);
@@ -6072,7 +6083,9 @@ TGFX_TEST(AOTRenderConsistencyTest, PerlinGraphClipCoverageServedByteExact) {
           EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
           bool graphHit = false;
           for (const auto& hit : cache->hitRecords()) {
-            graphHit |= hit.shaderName == "PointwiseGraphShader";
+            graphHit |= hit.shaderName == "PointwiseChainShader" &&
+                        PointwiseChainShader::FD::domain().valueOf(hit.fragPermutationIndex,
+                                                                   "RESOURCE_KIND") != 0;
           }
           EXPECT_TRUE(graphHit);
           EXPECT_EQ(cache->drawStats().planMaterializedEdges, 0u);
@@ -9667,8 +9680,8 @@ TGFX_TEST(AOTRenderConsistencyTest, FiltersSceneAOTMatchesJIT) {
   bool tiledGraphHit = false;
   for (const auto& hit : cache->hitRecords()) {
     tiledGraphHit |=
-        hit.shaderName == "PointwiseGraphShader" &&
-        PointwiseGraphShader::FD::domain().valueOf(hit.fragPermutationIndex, "RESOURCE_KIND") == 1;
+        hit.shaderName == "PointwiseChainShader" &&
+        PointwiseChainShader::FD::domain().valueOf(hit.fragPermutationIndex, "RESOURCE_KIND") == 1;
   }
   EXPECT_TRUE(tiledGraphHit);
   cache->setDiagnosticRecordingEnabled(false);
@@ -10135,8 +10148,7 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyFillMatchesRuntime) {
     // The alpha-only draws must ride the pointwise chain, not fall back to the runtime route.
     bool servedByPointwiseKernel = false;
     for (const auto& record : cache->hitRecords()) {
-      if (record.shaderName == "PointwiseChainShader" ||
-          record.shaderName == "PointwiseGraphShader") {
+      if (record.shaderName == "PointwiseChainShader") {
         servedByPointwiseKernel = true;
       }
     }

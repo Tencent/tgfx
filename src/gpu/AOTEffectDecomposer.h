@@ -43,7 +43,7 @@ enum class AOTKernelKind {
   // three bounded pointwise operator slots, matching YUVTextureFillShader's color-grade tail.
   // Produced by DecomposeYUVChain; single pass, over-budget shapes are rejected.
   YUVTextureFill,
-  // Extended-resource DAGs use the independent PointwiseGraphShader profiles.
+  // Extended-resource DAGs use the merged PointwiseChainShader resource kinds.
   PointwiseGraph,
 };
 

@@ -30,6 +30,14 @@ namespace tgfx {
 /// texture-leaf count is a compile-time dimension, because each leaf adds a sampler binding and a
 /// TransformedCoords varying.
 ///
+/// The merged single pointwise family: RESOURCE_KIND != 0 selects the extended resource profiles
+/// that were the pre-merge PointwiseGraphShader — kind 1 the gradient source with three tiled
+/// recipes (AOTResourceProfile::TiledGraph), kind 2 the Perlin noise source (NoiseGraph). Their
+/// reachable sets derive from the plain chain's (no per-quad subset; the noise kind keeps its
+/// fixed common-color AA quad subset), the extended vertex form carries SourceCoords, and a match
+/// the extended-kinds rule cannot place is reported as PermutationNotEnumerated, as it was on the
+/// Graph family. Changing a plain-chain dimension therefore changes the extended kinds too.
+///
 /// Vertex dimensions:
 ///   GP_LAYOUT (int, 5 values): 0 = rect family (Default/Quad/Mesh/AtlasText), 1 = ellipse,
 ///     2 = hairline line (per-pixel edge coverage from the edge-distance varying),
@@ -61,7 +69,15 @@ namespace tgfx {
 class PointwiseChainShader : public PrecompiledShader {
  public:
   struct VertDims {
-    enum : uint32_t { GP_LAYOUT, HAS_COVERAGE, HAS_UV_COORD, TEXTURE_COUNT, HAS_SUBSET, COUNT };
+    enum : uint32_t {
+      GP_LAYOUT,
+      HAS_COVERAGE,
+      HAS_UV_COORD,
+      TEXTURE_COUNT,
+      HAS_SUBSET,
+      HAS_SOURCE_COORDS,
+      COUNT
+    };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("GP_LAYOUT", 5),
@@ -70,8 +86,12 @@ class PointwiseChainShader : public PrecompiledShader {
           // 0 = no texture leaves, 1 = the four-leaf artifacts (chains with 1-3 sampler
           // children bind phantom padding and run them).
           PermutationInt("TEXTURE_COUNT", 2),
-          // Appended last so every subset-free index keeps its value.
+          // Appended so every subset-free index keeps its value.
           PermutationBool("HAS_SUBSET"),
+          // The resource kinds (RESOURCE_KIND != 0) carry the SourceCoords varying and reserve
+          // CoordTransformMatrix_0 for the source module. Mirrored from the fragment tail; plain
+          // chains keep their pre-merge indices.
+          PermutationBool("HAS_SOURCE_COORDS"),
       });
     }
   };
@@ -85,6 +105,7 @@ class PointwiseChainShader : public PrecompiledShader {
       TEXTURE_COUNT,
       HAS_MASK_TEXTURE,
       HAS_SUBSET,
+      RESOURCE_KIND,
       COUNT
     };
     static PermutationDomain domain() {
@@ -95,11 +116,15 @@ class PointwiseChainShader : public PrecompiledShader {
           PermutationInt("TEXTURE_COUNT", 2),
           PermutationBool("HAS_MASK_TEXTURE"),
           PermutationBool("HAS_SUBSET"),
+          // 0 = plain chain (16 slots), 1 = gradient source (32 slots), 2 = noise source
+          // (32 slots). Appended last so plain chains keep their pre-merge indices; the noise
+          // kind holds the largest value so a future removal re-encodes nothing below it.
+          PermutationInt("RESOURCE_KIND", 3),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 6, "Update the Compose mapping when fragment dimensions change.");
+  static_assert(FD::COUNT == 7, "Update the Compose mapping when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"PointwiseChainShader",

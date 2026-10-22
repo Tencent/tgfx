@@ -58,7 +58,7 @@
 #include "gpu/shaders/PermutationRules.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"
-#include "gpu/shaders/level1/PointwiseGraphShader.h"
+#include "gpu/shaders/level1/PointwiseChainShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedFillShader.h"
@@ -331,7 +331,7 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
 
 TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
   const auto& factories = ShaderRegistry::All();
-  ASSERT_EQ(factories.size(), 24u);
+  ASSERT_EQ(factories.size(), 23u);
   std::set<std::string> names;
   size_t pairCount = 0;
   for (auto factory : factories) {
@@ -357,8 +357,8 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
   }
   // ComplexEllipseFillShader keeps 12 variants: its device mask is a runtime uniform, not a
   // dimension (a dimension would have made it 24 for two observed draws). The hairline-line
-  // pointwise layout (GP_LAYOUT=2) adds 9 chain variants (leaf-free, leaf-free with the device
-  // mask, four-leaf; each for the three XP kinds) and their 9 TiledGraph twins. The complex
+  // pointwise layout (GP_LAYOUT=2) adds 9 plain chain variants (leaf-free, leaf-free with the
+  // device mask, four-leaf; each for the three XP kinds) and their 9 gradient twins. The complex
   // rounded-rect layouts (GP_LAYOUT=3 fill, 4 stroke) add 15 chain variants each (uniform color:
   // leaf-free, leaf-free with the device mask, four-leaf; per-vertex color: leaf-free, four-leaf;
   // each for the three XP kinds) and their 30 TiledGraph twins. The per-quad subset of strict
@@ -374,11 +374,12 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
   // coverage and radii attributes unconditional, the ramp picked by the AAEnabled runtime uniform),
   // removing 6 more. GlassRefraction then merged its edge-lit UDF form (the edge-light mask
   // sampler declared unconditionally, gated by the EdgeMaskOn runtime uniform), removing 12 more.
+  // The Graph family then merged into the chain (RESOURCE_KIND/HAS_SOURCE_COORDS tail axes), so
+  // the merged family enumerates the 57 plain pairs plus the 51 gradient and 3 noise pairs; the
+  // family count drops but the total stays.
   EXPECT_EQ(pairCount, 266u);
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseChainShader"),
             EnumeratePointwiseChainReachable());
-  EXPECT_EQ(*EnumerateReachablePermutations("PointwiseGraphShader"),
-            EnumeratePointwiseGraphReachable());
   const std::set<std::pair<uint32_t, uint32_t>> maskPairs = {{0, 0}, {0, 1}, {0, 2}};
   EXPECT_EQ(*EnumerateReachablePermutations("MaskFillShader"), maskPairs);
   const std::set<std::pair<uint32_t, uint32_t>> shapeCoveragePairs = {{0, 0}, {1, 1}};
@@ -404,27 +405,27 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
 
 TGFX_TEST(ShaderPermutationTest, ShaderRegistryAllowsIdenticalRegistrations) {
   auto factories = ShaderRegistry::All();
-  const auto* info = ShaderRegistry::Find("PointwiseGraphShader");
+  const auto* info = ShaderRegistry::Find("PointwiseChainShader");
   ASSERT_NE(info, nullptr);
   ShaderRegistry::Register(
       []() -> std::unique_ptr<PrecompiledShader> {
-        return std::make_unique<PointwiseGraphShader>();
+        return std::make_unique<PointwiseChainShader>();
       },
-      EnumeratePointwiseGraphReachable);
+      EnumeratePointwiseChainReachable);
   ShaderRegistry::Register(
       []() -> std::unique_ptr<PrecompiledShader> {
-        return std::make_unique<PointwiseGraphShader>();
+        return std::make_unique<PointwiseChainShader>();
       },
-      EnumeratePointwiseGraphReachable);
+      EnumeratePointwiseChainReachable);
   EXPECT_EQ(ShaderRegistry::All(), factories);
-  EXPECT_EQ(ShaderRegistry::Find("PointwiseGraphShader"), info);
-  EXPECT_EQ(*ShaderRegistry::Enumerate("PointwiseGraphShader"), EnumeratePointwiseGraphReachable());
+  EXPECT_EQ(ShaderRegistry::Find("PointwiseChainShader"), info);
+  EXPECT_EQ(*ShaderRegistry::Enumerate("PointwiseChainShader"), EnumeratePointwiseChainReachable());
 }
 
 #if GTEST_HAS_DEATH_TEST
 namespace {
 PrecompiledShaderInfo& RegistryConflictInfo() {
-  static auto info = PointwiseGraphShader().info();
+  static auto info = PointwiseChainShader().info();
   return info;
 }
 
@@ -445,7 +446,7 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryRejectsConflictingDeclarations) {
   for (int change = 0; change < 9; ++change) {
     SCOPED_TRACE(change);
     auto& info = RegistryConflictInfo();
-    info = PointwiseGraphShader().info();
+    info = PointwiseChainShader().info();
     switch (change) {
       case 0:
         info.vertexFile += ".changed";
@@ -470,7 +471,7 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryRejectsConflictingDeclarations) {
       }
       case 6: {
         auto dimensions = info.fragDomain.getDimensions();
-        std::get<PermutationInt>(dimensions[PointwiseGraphShader::FD::HAS_XP]).count = 4;
+        std::get<PermutationInt>(dimensions[PointwiseChainShader::FD::HAS_XP]).count = 4;
         info.fragDomain = PermutationDomain(std::move(dimensions));
         break;
       }
@@ -479,14 +480,14 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryRejectsConflictingDeclarations) {
         break;
       case 8: {
         auto dimensions = info.fragDomain.getDimensions();
-        dimensions[PointwiseGraphShader::FD::GP_LAYOUT] = PermutationBool("GP_LAYOUT");
+        dimensions[PointwiseChainShader::FD::GP_LAYOUT] = PermutationBool("GP_LAYOUT");
         info.fragDomain = PermutationDomain(std::move(dimensions));
         break;
       }
     }
     EXPECT_DEATH(
-        ShaderRegistry::Register(MakeRegistryConflictShader, EnumeratePointwiseGraphReachable),
-        "conflicting declaration or enumerator for 'PointwiseGraphShader'");
+        ShaderRegistry::Register(MakeRegistryConflictShader, EnumeratePointwiseChainReachable),
+        "conflicting declaration or enumerator for 'PointwiseChainShader'");
   }
 }
 
@@ -494,10 +495,10 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryRejectsConflictingEnumerators) {
   ::testing::FLAGS_gtest_death_test_style = "threadsafe";
   EXPECT_DEATH(ShaderRegistry::Register(
                    []() -> std::unique_ptr<PrecompiledShader> {
-                     return std::make_unique<PointwiseGraphShader>();
+                     return std::make_unique<PointwiseChainShader>();
                    },
-                   EnumeratePointwiseChainReachable),
-               "conflicting declaration or enumerator for 'PointwiseGraphShader'");
+                   EnumerateMaskFillReachable),
+               "conflicting declaration or enumerator for 'PointwiseChainShader'");
 }
 
 TGFX_TEST(ShaderPermutationTest, ShaderRegistryRejectsChangedEnumLabels) {
@@ -505,44 +506,43 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryRejectsChangedEnumLabels) {
   EXPECT_DEATH(
       {
         auto& info = RegistryConflictInfo();
-        info = PointwiseGraphShader().info();
+        info = PointwiseChainShader().info();
         info.name = "RegistryEnumConflict";
         info.fragDomain = PermutationDomain({PermutationEnum("MODE", {"A", "B"})});
-        ShaderRegistry::Register(MakeRegistryConflictShader, EnumeratePointwiseGraphReachable);
-        ShaderRegistry::Register(MakeRegistryConflictShader, EnumeratePointwiseGraphReachable);
+        ShaderRegistry::Register(MakeRegistryConflictShader, EnumeratePointwiseChainReachable);
+        ShaderRegistry::Register(MakeRegistryConflictShader, EnumeratePointwiseChainReachable);
         info.fragDomain = PermutationDomain({PermutationEnum("MODE", {"B", "A"})});
-        ShaderRegistry::Register(MakeRegistryConflictShader, EnumeratePointwiseGraphReachable);
+        ShaderRegistry::Register(MakeRegistryConflictShader, EnumeratePointwiseChainReachable);
       },
       "conflicting declaration or enumerator for 'RegistryEnumConflict'");
 }
 
 TGFX_TEST(ShaderPermutationTest, ShaderRegistryRejectsMissingEntries) {
   ::testing::FLAGS_gtest_death_test_style = "threadsafe";
-  EXPECT_DEATH(ShaderRegistry::Register(nullptr, EnumeratePointwiseGraphReachable),
+  EXPECT_DEATH(ShaderRegistry::Register(nullptr, EnumeratePointwiseChainReachable),
                "missing factory or enumerator");
   EXPECT_DEATH(ShaderRegistry::Register(MakeRegistryConflictShader, nullptr),
                "missing factory or enumerator");
   EXPECT_DEATH(
       ShaderRegistry::Register([]() -> std::unique_ptr<PrecompiledShader> { return nullptr; },
-                               EnumeratePointwiseGraphReachable),
+                               EnumeratePointwiseChainReachable),
       "factory returned no shader");
   EXPECT_DEATH(
       {
         RegistryConflictInfo().name.clear();
-        ShaderRegistry::Register(MakeRegistryConflictShader, EnumeratePointwiseGraphReachable);
+        ShaderRegistry::Register(MakeRegistryConflictShader, EnumeratePointwiseChainReachable);
       },
       "empty family name");
 }
 #endif
 
 TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
-  PointwiseGraphShader shader;
+  PointwiseChainShader shader;
   auto info = shader.info();
-  EXPECT_EQ(info.vertDomain.dimensionCount(), 5u);
+  EXPECT_EQ(info.vertDomain.dimensionCount(), 6u);
   EXPECT_EQ(info.fragDomain.dimensionCount(), 7u);
-  EXPECT_EQ(info.vertDomain.totalCount(), PointwiseChainShader::VD::domain().totalCount());
-  EXPECT_EQ(info.fragDomain.totalCount(), PointwiseChainShader::FD::domain().totalCount() * 2);
-  EXPECT_EQ(PointwiseGraphShader::FD::RESOURCE_KIND, PointwiseGraphShader::FD::COUNT - 1);
+  EXPECT_EQ(PointwiseChainShader::FD::RESOURCE_KIND, PointwiseChainShader::FD::COUNT - 1);
+  EXPECT_EQ(PointwiseChainShader::VD::HAS_SOURCE_COORDS, PointwiseChainShader::VD::COUNT - 1);
 
   auto reachable = EnumerateReachablePermutations(info.name);
   ASSERT_TRUE(reachable.has_value());
@@ -559,13 +559,13 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
         inputs.hasGradient = true;
         inputs.resourceProfile = AOTResourceProfile::TiledGraph;
         inputs.xpType = xpType;
-        auto composed = ComposePointwiseGraph(inputs);
+        auto composed = ComposePointwiseChain(inputs);
         ASSERT_TRUE(composed.has_value());
         auto vertexIndex = info.vertDomain.encode(composed->vertValues);
         auto fragmentIndex = info.fragDomain.encode(composed->fragValues);
         EXPECT_TRUE(IsBuildablePermutation(info, vertexIndex, fragmentIndex));
         EXPECT_EQ(reachable->count({vertexIndex, fragmentIndex}), 1u);
-        EXPECT_EQ(composed->fragValues[PointwiseGraphShader::FD::RESOURCE_KIND], 1);
+        EXPECT_EQ(composed->fragValues[PointwiseChainShader::FD::RESOURCE_KIND], 1);
         vertexIndices.insert(vertexIndex);
         fragmentIndices.insert(fragmentIndex);
       }
@@ -589,8 +589,8 @@ TGFX_TEST(ShaderPermutationTest, GradientUniformsExistOnlyInExtendedChainArtifac
     }
     return false;
   };
-  const auto checkFamily = [&](const char* family, bool extended) {
-    auto info = extended ? PointwiseGraphShader().info() : PointwiseChainShader().info();
+  const auto checkFamily = [&](const char* family) {
+    auto info = PointwiseChainShader().info();
     auto reachable = EnumerateReachablePermutations(family);
     ASSERT_TRUE(reachable.has_value());
     for (const auto& indices : *reachable) {
@@ -604,18 +604,21 @@ TGFX_TEST(ShaderPermutationTest, GradientUniformsExistOnlyInExtendedChainArtifac
       auto fragment = cache->findFragment(fragmentKey.hi, fragmentKey.lo);
       ASSERT_NE(vertex, nullptr);
       ASSERT_NE(fragment, nullptr);
-      bool hasGradient = extended && info.fragDomain.valueOf(indices.second, "RESOURCE_KIND") == 1;
+      // Only the gradient resource kind carries the gradient uniforms; the noise kind and the
+      // plain chains do not. Every extended kind reserves CoordTransformMatrix_0 for its source,
+      // while a leaf-free plain chain declares no leaf matrix at all.
+      int resourceKind = info.fragDomain.valueOf(indices.second, "RESOURCE_KIND");
+      bool hasGradient = resourceKind == 1;
       EXPECT_EQ(hasUniform(fragment, "GradientLayoutType"), hasGradient);
       EXPECT_EQ(hasUniform(fragment, "GradientLUTLeaf"), hasGradient);
-      if (extended) {
+      if (resourceKind != 0) {
         EXPECT_TRUE(hasUniform(vertex, "CoordTransformMatrix_0"));
       } else if (info.vertDomain.valueOf(indices.first, "TEXTURE_COUNT") == 0) {
         EXPECT_FALSE(hasUniform(vertex, "CoordTransformMatrix_0"));
       }
     }
   };
-  checkFamily("PointwiseChainShader", false);
-  checkFamily("PointwiseGraphShader", true);
+  checkFamily("PointwiseChainShader");
   cache->unload();
 }
 
@@ -630,7 +633,7 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
   auto renderTarget = renderTargetProxy->getRenderTarget();
   ASSERT_NE(renderTarget, nullptr);
 
-  PointwiseGraphShader shader;
+  PointwiseChainShader shader;
   auto info = shader.info();
   std::set<uint32_t> vertexIndices;
   std::set<uint32_t> fragmentIndices;
@@ -670,7 +673,7 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
                                   BlendMode::SrcOver);
           auto match = MatchPermutation(&programInfo);
           ASSERT_TRUE(match.has_value());
-          EXPECT_EQ(match->shaderName, "PointwiseGraphShader");
+          EXPECT_EQ(match->shaderName, "PointwiseChainShader");
           ASSERT_LT(match->vertPermutationIndex, info.vertDomain.totalCount());
           ASSERT_LT(match->fragPermutationIndex, info.fragDomain.totalCount());
           auto vertValues = info.vertDomain.decode(match->vertPermutationIndex);
@@ -722,7 +725,7 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
                             BlendMode::SrcOver);
     auto match = MatchPermutation(&programInfo);
     ASSERT_TRUE(match.has_value());
-    EXPECT_EQ(match->shaderName, "PointwiseGraphShader");
+    EXPECT_EQ(match->shaderName, "PointwiseChainShader");
     EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "RESOURCE_KIND"), 1);
     EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "TEXTURE_COUNT"), 1);
   }
@@ -739,7 +742,7 @@ TGFX_TEST(ShaderPermutationTest, LUTGradientWithRealMaskUsesAllLeafSelectors) {
   ASSERT_NE(renderTargetProxy, nullptr);
   auto renderTarget = renderTargetProxy->getRenderTarget();
   ASSERT_NE(renderTarget, nullptr);
-  PointwiseGraphShader shader;
+  PointwiseChainShader shader;
   auto info = shader.info();
   for (int lutLeaf = 0; lutLeaf < 4; ++lutLeaf) {
     SCOPED_TRACE(lutLeaf);
@@ -793,7 +796,7 @@ TGFX_TEST(ShaderPermutationTest, LUTGradientWithRealMaskUsesAllLeafSelectors) {
                             BlendMode::SrcOver);
     auto match = MatchPermutation(&programInfo);
     ASSERT_TRUE(match.has_value());
-    EXPECT_EQ(match->shaderName, "PointwiseGraphShader");
+    EXPECT_EQ(match->shaderName, "PointwiseChainShader");
     EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "RESOURCE_KIND"), 1);
     EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "TEXTURE_COUNT"), 1);
   }

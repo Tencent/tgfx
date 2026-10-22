@@ -65,7 +65,6 @@
 #include "gpu/shaders/level1/NonAARRectFillShader.h"
 #include "gpu/shaders/level1/PerlinNoiseFillShader.h"
 #include "gpu/shaders/level1/PointwiseChainShader.h"
-#include "gpu/shaders/level1/PointwiseGraphShader.h"
 #include "gpu/shaders/level1/QuadColorFillShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
 #include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
@@ -687,17 +686,13 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseDAG(const ProgramI
     // constant 1.0 slot), so the DefaultGP always reports coverage.
     inputs.hasCoverage = true;
   }
-  if (IsAOTGraphProfile(inputs.resourceProfile)) {
-    auto composed = ComposePointwiseGraph(inputs);
-    if (!composed) {
-      return Fail(PermutationMatchFailure::PermutationNotEnumerated);
-    }
-    auto vertIndex = PointwiseGraphShader::VD::domain().encode(composed->vertValues);
-    auto fragIndex = PointwiseGraphShader::FD::domain().encode(composed->fragValues);
-    return PermutationMatchResult{"PointwiseGraphShader", vertIndex, fragIndex};
-  }
   auto composed = ComposePointwiseChain(inputs);
   if (!composed) {
+    if (IsAOTGraphProfile(inputs.resourceProfile)) {
+      // A draw the extended resource kinds cannot place is a coverage gap of the merged family,
+      // reported as it was on the pre-merge Graph family.
+      return Fail(PermutationMatchFailure::PermutationNotEnumerated);
+    }
     return std::nullopt;
   }
   auto vertIndex = PointwiseChainShader::VD::domain().encode(composed->vertValues);

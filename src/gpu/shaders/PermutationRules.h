@@ -57,7 +57,7 @@ namespace tgfx {
 //      hit data or a measurement shows the pattern is worth a kernel of its own. Remove one only
 //      after every case it served is served another way — "zero hits in a sample" is not proof.
 //   2. Pointwise Chain/Graph: one per-pixel DAG interpreter. Graph is the same kernel with the
-//      noise or gradient module compiled in (PointwiseGraphShader derives from the Chain domains
+//      noise or gradient module compiled in (the extended resource kinds derive from the Chain domains
 //      and enumeration; it stays a separate family because its vertex stage also carries the
 //      source-coordinate varying). New ops belong here only if they are cheap, per-pixel and
 //      general: every op is compiled into every variant. Do not grow the 16/32 slot capacities
@@ -308,7 +308,8 @@ struct AtlasTextFillInputs {
 };
 
 /**
- * Shared input contract for the PointwiseChainShader/PointwiseGraphShader rules. gpKind selects
+ * Shared input contract for the PointwiseChainShader rule (plain chains and the extended
+ * resource kinds). gpKind selects
  * (0 = DefaultGP, 1 = QuadPerEdgeAA, 2 = Mesh, 3 = sampler-free AtlasText twin, 4 = Ellipse,
  * 5 = HairlineLine, 6 = ComplexEllipse fill, 7 = ComplexEllipse stroke);
  * each profile fixes which attribute slots its vertex buffers carry, and Compose rejects
@@ -479,12 +480,6 @@ std::optional<RuleComposedValues> ComposeAtlasTextFill(const AtlasTextFillInputs
  */
 std::optional<RuleComposedValues> ComposePointwiseChain(const PointwiseChainInputs& inputs);
 
-/**
- * Maps TiledGraph through the shared chain GP contract and NoiseGraph through its fixed quad
- * subset, adding the fragment-stage resource-kind dimension.
- */
-std::optional<RuleComposedValues> ComposePointwiseGraph(const PointwiseChainInputs& inputs);
-
 /** Family enumerators bound alongside their factories by TGFX_REGISTER_SHADER. */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateRoundStrokeRectReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateMaskFillReachable();
@@ -510,14 +505,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateTexturedEffectReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateAtlasTextFillReachable();
 
 /**
- * Returns every (vertIndex, fragIndex) pair the PointwiseChain rule can ever produce.
+ * Returns every (vertIndex, fragIndex) pair the PointwiseChain rule can ever produce: the plain
+ * chains plus the extended resource kinds (the pre-merge Graph family's gradient mirror and noise
+ * subset, folded in).
  */
 std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseChainReachable();
-
-/**
- * Returns the chain-reachable pairs mapped to TiledGraph plus the fixed NoiseGraph quad pairs.
- */
-std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseGraphReachable();
 
 /**
  * Returns the reachable permutation set for a shader whose matcher rule has been migrated to the

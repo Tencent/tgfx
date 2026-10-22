@@ -157,8 +157,13 @@ namespace tgfx {
  * and clears the new EdgeMaskOn runtime uniform), the fragment uniform block gained the
  * EdgeMaskOn field, and the removed GEOMETRY_KIND value re-encodes the family's permutation
  * indices; pre-change bundles are refused.
+ *
+ * 0x00010019: the PointwiseGraphShader family merged into PointwiseChainShader — the merged
+ * family's fragment domain gained the RESOURCE_KIND tail (0 = plain chain, 1 = gradient, 2 =
+ * noise) and its vertex domain gained the HAS_SOURCE_COORDS tail, so the Graph family's name and
+ * index space disappear and every extended pair re-encodes; pre-change bundles are refused.
  */
-inline constexpr uint32_t kExpectedToolchainABI = 0x00010018u;
+inline constexpr uint32_t kExpectedToolchainABI = 0x00010019u;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

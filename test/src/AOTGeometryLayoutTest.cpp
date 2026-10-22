@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Per-variant tests for the geometry layouts of the pointwise kernels (PointwiseChainShader and
-// PointwiseGraphShader GP_LAYOUT values). Each test drives one draw shape that the dedicated
+// the merged chain family GP_LAYOUT values). Each test drives one draw shape that the dedicated
 // geometry kernel cannot serve (a color FP or a composed coverage), pins the exact variant that
 // serves it (shader, GP_LAYOUT, TEXTURE_COUNT, HAS_MASK_TEXTURE, HAS_XP, RESOURCE_KIND), and
 // compares the precompiled render against the runtime render.
@@ -36,7 +36,6 @@
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ShaderCaps.h"
 #include "gpu/shaders/level1/PointwiseChainShader.h"
-#include "gpu/shaders/level1/PointwiseGraphShader.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
@@ -372,7 +371,9 @@ void ExpectLayoutVariant(const LayoutVariant& variant, const char* gpName) {
     EXPECT_EQ(cache->drawStats().droppedDraws, 0u) << variant.label;
     EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u) << variant.label;
     const int expectedXP = ExpectedXPType(context, variant.dstRead);
-    const bool graph = std::string(variant.shaderName) == "PointwiseGraphShader";
+    // A gradient paint rides the merged family's extended resource kind (RESOURCE_KIND 1).
+    const bool gradientKind =
+        variant.paint == LayoutPaint::Gradient || variant.paint == LayoutPaint::GradientTimesImage;
     // An empty shader name leaves the serving kernel unpinned: the draw must still be served by a
     // precompiled program (no drop, no runtime program) and render like the runtime.
     const bool pinned = variant.shaderName[0] != '\0';
@@ -387,12 +388,11 @@ void ExpectLayoutVariant(const LayoutVariant& variant, const char* gpName) {
       if (record.shaderName != variant.shaderName) {
         continue;
       }
-      auto frag = graph ? PointwiseGraphShader::FD::domain().decode(record.fragPermutationIndex)
-                        : PointwiseChainShader::FD::domain().decode(record.fragPermutationIndex);
+      auto frag = PointwiseChainShader::FD::domain().decode(record.fragPermutationIndex);
       if (frag.size() < FD::COUNT) {
         continue;
       }
-      bool resourceMatches = !graph || frag[PointwiseGraphShader::FD::RESOURCE_KIND] == 1;
+      bool resourceMatches = !gradientKind || frag[FD::RESOURCE_KIND] == 1;
       if (frag[FD::GP_LAYOUT] == variant.gpLayout && frag[FD::HAS_XP] == expectedXP &&
           frag[FD::TEXTURE_COUNT] == variant.textureCount &&
           frag[FD::HAS_MASK_TEXTURE] == variant.maskTexture && resourceMatches) {
@@ -831,32 +831,32 @@ TGFX_TEST(AOTGeometryLayoutTest, HairlineChainTextureDstRead) {
 
 TGFX_TEST(AOTGeometryLayoutTest, HairlineGraphGradient) {
   ExpectHairlineLineVariant({"hairline-graph-gradient", LayoutPaint::Gradient, LayoutClip::None,
-                             false, "PointwiseGraphShader", 0, 0, 0});
+                             false, "PointwiseChainShader", 0, 0, 0});
 }
 
 TGFX_TEST(AOTGeometryLayoutTest, HairlineGraphGradientDstRead) {
   ExpectHairlineLineVariant({"hairline-graph-gradient-dst", LayoutPaint::Gradient,
-                             LayoutClip::TwoRRects, true, "PointwiseGraphShader", 0, 0, 0});
+                             LayoutClip::TwoRRects, true, "PointwiseChainShader", 0, 0, 0});
 }
 
 TGFX_TEST(AOTGeometryLayoutTest, HairlineGraphGradientDeviceMask) {
   ExpectHairlineLineVariant({"hairline-graph-gradient-device-mask", LayoutPaint::Gradient,
-                             LayoutClip::PathMask, false, "PointwiseGraphShader", 0, 0, 1});
+                             LayoutClip::PathMask, false, "PointwiseChainShader", 0, 0, 1});
 }
 
 TGFX_TEST(AOTGeometryLayoutTest, HairlineGraphGradientDeviceMaskDstRead) {
   ExpectHairlineLineVariant({"hairline-graph-gradient-device-mask-dst", LayoutPaint::Gradient,
-                             LayoutClip::PathMask, true, "PointwiseGraphShader", 0, 0, 1});
+                             LayoutClip::PathMask, true, "PointwiseChainShader", 0, 0, 1});
 }
 
 TGFX_TEST(AOTGeometryLayoutTest, HairlineGraphGradientTexture) {
   ExpectHairlineLineVariant({"hairline-graph-gradient-texture", LayoutPaint::GradientTimesImage,
-                             LayoutClip::None, false, "PointwiseGraphShader", 0, 1, 0});
+                             LayoutClip::None, false, "PointwiseChainShader", 0, 1, 0});
 }
 
 TGFX_TEST(AOTGeometryLayoutTest, HairlineGraphGradientTextureDstRead) {
   ExpectHairlineLineVariant({"hairline-graph-gradient-texture-dst", LayoutPaint::GradientTimesImage,
-                             LayoutClip::TwoRRects, true, "PointwiseGraphShader", 0, 1, 0});
+                             LayoutClip::TwoRRects, true, "PointwiseChainShader", 0, 1, 0});
 }
 
 // Rows 4-9 of the integration miss report: ComplexEllipseGeometryProcessor (rounded rects with
