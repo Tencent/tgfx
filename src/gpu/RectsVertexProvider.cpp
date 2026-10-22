@@ -727,9 +727,11 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
 
   size_t vertexCount() const override {
     size_t perVertexCount = 20;
-    // x, y, EllipseOffsets(2), color(1). The color slot is unconditional: the consuming geometry
-    // processor (RoundStrokeRectGP) declares the color attribute in every variant.
-    size_t perVertexDataSize = 5;
+    // x, y, coverage(1), EllipseOffsets(2), EllipseRadii(2), color(1): the same layout as the AA
+    // provider, with a 1.0 coverage and zero radii filler. The coverage and color slots are
+    // unconditional: the consuming geometry processor (RoundStrokeRectGP) declares both attributes
+    // in every variant and selects the AA ramp through the AAEnabled runtime uniform.
+    size_t perVertexDataSize = 8;
     if (bitFields.hasUVCoord) {
       perVertexDataSize += 2;
     }
@@ -786,8 +788,11 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
         for (size_t k = 0; k < 4; ++k) {
           vertices[index++] = points[k].x;
           vertices[index++] = points[k].y;
+          vertices[index++] = 1.0f;
           vertices[index++] = radii[j];
           vertices[index++] = radii[k];
+          vertices[index++] = 0.0f;
+          vertices[index++] = 0.0f;
           if (hasUVCoord) {
             vertices[index++] = uCoords[k];
             vertices[index++] = vCoords[k];
@@ -817,6 +822,9 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
       for (size_t k = 0; k < 4; ++k) {
         vertices[index++] = inQuad.point(k).x;
         vertices[index++] = inQuad.point(k).y;
+        vertices[index++] = 1.0f;
+        vertices[index++] = 0.0f;
+        vertices[index++] = 0.0f;
         vertices[index++] = 0.0f;
         vertices[index++] = 0.0f;
         if (hasUVCoord) {

@@ -1273,7 +1273,6 @@ static std::optional<RoundStrokeRectInputs> ExtractRoundStrokeRect(const Program
     return std::nullopt;
   }
   RoundStrokeRectInputs inputs;
-  inputs.isCoverageAA = rsgp->getAAType() == AAType::Coverage;
   inputs.hasUVMatrix = rsgp->hasUVMatrixTransform();
   inputs.xpType = GetXPType(programInfo);
   return inputs;

@@ -369,8 +369,10 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
   // ellipse/complex-ellipse/atlas families dropped HAS_COMMON_COLOR the same way, and mesh also
   // dropped HAS_COVERAGE (a constant 1.0f slot), removing 96 pairs from the former 440. The
   // NonAARRect, ComplexNonAARRect and RoundStrokeRect families then dropped HAS_COMMON_COLOR the
-  // same way too (54 -> 27 pairs), removing 27 more.
-  EXPECT_EQ(pairCount, 317u);
+  // same way too (54 -> 27 pairs), removing 27 more, and RoundStrokeRect then dropped HAS_AA (the
+  // coverage and radii attributes unconditional, the ramp picked by the AAEnabled runtime uniform),
+  // removing 6 more.
+  EXPECT_EQ(pairCount, 311u);
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseChainShader"),
             EnumeratePointwiseChainReachable());
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseGraphShader"),

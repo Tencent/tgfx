@@ -103,7 +103,6 @@ namespace tgfx {
  * perspective UV) stay in the runtime Extract step and never affect the reachable set.
  */
 struct RoundStrokeRectInputs {
-  bool isCoverageAA = false;
   bool hasUVMatrix = false;
   int xpType = -1;  // -1 = no representable XferProcessor.
 };

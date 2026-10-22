@@ -137,8 +137,14 @@ namespace tgfx {
  * HAS_COMMON_COLOR dimension. Every variant of the three families changes its vertex layout and
  * fragment uniform block, and the removed axis re-encodes their permutation indices; pre-change
  * bundles are refused.
+ *
+ * 0x00010016: the RoundStrokeRect kernel made the coverage and ellipse-radii attributes
+ * unconditional (non-AA draws write a 1.0 coverage and zero radii, with the AA ramp selected by
+ * the AAEnabled runtime uniform), dropping the HAS_AA dimension. Every variant changes its vertex
+ * layout and fragment uniform block, and the removed axis re-encodes the family's permutation
+ * indices; pre-change bundles are refused.
  */
-inline constexpr uint32_t kExpectedToolchainABI = 0x00010015u;
+inline constexpr uint32_t kExpectedToolchainABI = 0x00010016u;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

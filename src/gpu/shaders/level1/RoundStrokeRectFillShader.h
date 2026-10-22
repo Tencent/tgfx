@@ -26,24 +26,25 @@ class RoundStrokeRectFillShader : public PrecompiledShader {
  public:
   // The color attribute is unconditional (common-color batches broadcast the paint color; the
   // exact color rides the Color uniform through the HasCommonColor runtime uniform), so there is
-  // no HAS_COMMON_COLOR dimension.
-  TGFX_DEFINE_DIMS(HAS_AA, HAS_UV_MATRIX);
+  // no HAS_COMMON_COLOR dimension. The coverage and ellipse-radii attributes are unconditional
+  // too (non-AA draws write a 1.0 coverage and zero radii), with the AA ramp selected by the
+  // AAEnabled runtime uniform, so there is no HAS_AA dimension either.
+  TGFX_DEFINE_DIMS(HAS_UV_MATRIX);
   using D = Dims;
 
   struct FragDims {
     // HAS_UV_MATRIX stays vertex-only: the fragment stage never branches on it
     // (round_stroke_rect_fill.frag does not reference the define), so it is not part of the
     // fragment domain.
-    enum : uint32_t { HAS_AA, HAS_XP, COUNT };
+    enum : uint32_t { HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationBool("HAS_AA"),
           PermutationInt("HAS_XP", 3),
       });
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 2 && FD::COUNT == 2,
+  static_assert(D::COUNT == 1 && FD::COUNT == 1,
                 "Update the Compose mapping when dimensions change.");
 
   PrecompiledShaderInfo info() const override {

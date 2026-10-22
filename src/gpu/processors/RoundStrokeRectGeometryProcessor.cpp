@@ -23,13 +23,12 @@ RoundStrokeRectGeometryProcessor::RoundStrokeRectGeometryProcessor(
     AAType aaType, std::optional<PMColor> commonColor, std::optional<Matrix> uvMatrix)
     : GeometryProcessor(ClassID()), aaType(aaType), commonColor(commonColor), uvMatrix(uvMatrix) {
   inPosition = {"inPosition", VertexFormat::Float2};
-  if (aaType == AAType::Coverage) {
-    inCoverage = {"inCoverage", VertexFormat::Float};
-  }
+  // The coverage and ellipse-radii attributes are unconditional: non-AA draws write a 1.0
+  // coverage and zero radii, and the precompiled kernel selects the AA ramp through the AAEnabled
+  // runtime uniform, so there is no HAS_AA dimension.
+  inCoverage = {"inCoverage", VertexFormat::Float};
   inEllipseOffset = {"inEllipseOffset", VertexFormat::Float2};
-  if (aaType == AAType::Coverage) {
-    inEllipseRadii = {"inEllipseRadii", VertexFormat::Float2};
-  }
+  inEllipseRadii = {"inEllipseRadii", VertexFormat::Float2};
   if (!uvMatrix.has_value()) {
     inUVCoord = {"inUVCoord", VertexFormat::Float2};
   }

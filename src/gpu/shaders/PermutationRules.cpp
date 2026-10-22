@@ -108,10 +108,8 @@ std::optional<RuleComposedValues> ComposeRoundStrokeRect(const RoundStrokeRectIn
   using FD = RoundStrokeRectFillShader::FD;
   RuleComposedValues values;
   values.vertValues.resize(D::COUNT);
-  values.vertValues[D::HAS_AA] = inputs.isCoverageAA ? 1 : 0;
   values.vertValues[D::HAS_UV_MATRIX] = inputs.hasUVMatrix ? 1 : 0;
   values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_AA] = values.vertValues[D::HAS_AA];
   values.fragValues[FD::HAS_XP] = inputs.xpType;
   return values;
 }

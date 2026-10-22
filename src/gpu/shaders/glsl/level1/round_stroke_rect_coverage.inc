@@ -1,9 +1,9 @@
-// Round-stroke-rect edge coverage, shared by RoundStrokeRectFillShader's AA and non-AA variants.
-// The math is verbatim from the family's geometry emission
+// Round-stroke-rect edge coverage, shared by RoundStrokeRectFillShader's AA and non-AA forms (a
+// runtime uniform selects between them). The math is verbatim from the family's geometry emission
 // (GLSLRoundStrokeRectGeometryProcessor::emitCode): the normalized offset-space ellipse SDF scales
-// the per-vertex coverage inside the ramp band when AA is on, a hard inside step otherwise. Every
-// caller passes a compile-time constant for aa, so the unused branch folds away; ellipseRadii and
-// vertexCoverage are only read when aa is set.
+// the per-vertex coverage inside the ramp band when AA is on, a hard inside step otherwise. A
+// caller may pass a runtime value for aa; ellipseRadii and vertexCoverage are only read when it is
+// set, so a non-AA draw's filler values are inert.
 float roundStrokeRectCoverage(vec2 offsets, vec2 ellipseRadii, float vertexCoverage, bool aa) {
   highp vec2 offset = offsets;
   if (!aa) {

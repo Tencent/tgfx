@@ -241,11 +241,10 @@ void main() {
       complexEllipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, vEdgeDist, vec2(0.0), false);
 #endif
 #elif FILL_COVERAGE == FILL_COVERAGE_ROUND_STROKE
-#if HAS_AA
-  float totalCoverage = roundStrokeRectCoverage(vEllipseOffsets, vEllipseRadii, vCoverage, true);
-#else
-  float totalCoverage = roundStrokeRectCoverage(vEllipseOffsets, vec2(0.0), 0.0, false);
-#endif
+  // AA is a runtime select (AAEnabled): the non-AA branch reads only the offsets, so the coverage
+  // and radii varyings are inert when it is off.
+  float totalCoverage = roundStrokeRectCoverage(vEllipseOffsets, vEllipseRadii, vCoverage,
+                                                AAEnabled != 0);
 #elif FILL_COVERAGE == FILL_COVERAGE_ATLAS_TEXT
   // The atlas texture carries both: an alpha-only atlas (R8, the glyph mask) contributes its red
   // channel as the coverage and leaves the GP color; a color atlas (color emoji) replaces the

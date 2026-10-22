@@ -103,6 +103,11 @@ void GLSLRoundStrokeRectGeometryProcessor::setData(UniformData* vertexUniformDat
     if (fragmentUniformData->hasField("HasCommonColor")) {
       fragmentUniformData->setData("HasCommonColor", commonColor.has_value() ? 1 : 0);
     }
+    // The precompiled kernel selects the AA ramp through the AAEnabled runtime uniform; only
+    // precompiled kernels declare the field.
+    if (fragmentUniformData->hasField("AAEnabled")) {
+      fragmentUniformData->setData("AAEnabled", aaType == AAType::Coverage ? 1 : 0);
+    }
   }
 }
 
