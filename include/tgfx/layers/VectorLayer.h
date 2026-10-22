@@ -84,11 +84,11 @@ class VectorLayer : public Layer {
   // content and the geometries no painter captured.
   std::optional<StyledShape> computeContentShape();
 
-  // Derives the layer's own geometry from the painters plus the geometries no painter captured.
-  std::optional<StyledShape> computeOwnGeometryShape();
-
   std::vector<std::shared_ptr<VectorElement>> _contents = {};
   std::vector<OwnGeometry> ownGeometries = {};
+  // Derived in the same pass that records the own geometries above, so it never has to re-expand the
+  // elements to describe them.
+  std::optional<StyledShape> ownShape = std::nullopt;
 };
 
 }  // namespace tgfx

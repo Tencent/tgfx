@@ -45,10 +45,11 @@ struct LayerStyleSourceEntry {
 
 /**
  * Pairs the content image with the optional contour image for a specific excludeChildEffects
- * bucket. content.image is normally populated; it stays null only for a bucket kept alive by an
- * own-geometry style whose layer paints nothing. contour is only present when at least one
- * Contour-sourced LayerStyle in this bucket requires a distinct contour image, or when it holds the
- * lazy fallback recording of a bucket whose own geometry is empty.
+ * bucket. content.image is populated only when some style in the bucket draws from the shared
+ * content; a bucket whose styles all declare LayerStyleContentSource::Geometry leaves it null, as
+ * does a bucket kept alive by such a style whose layer paints nothing. contour is only present when
+ * at least one Contour-sourced LayerStyle in this bucket requires a distinct contour image, or when
+ * it holds the lazy fallback recording of a bucket whose own geometry is empty.
  */
 struct LayerStyleSourceGroup {
   LayerStyleSourceEntry content = {};

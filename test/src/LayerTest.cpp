@@ -4092,11 +4092,13 @@ TGFX_TEST_PRIVATE(LayerTest, GlassStyleStrokeContentBounds) {
     vectorLayer->setContents({rectangle, fill, stroke});
     vectorLayer->setLayerStyles({GlassStyle::Make(80, 50, 0, 50, 0, 135, 50)});
     DrawArgs drawArgs(context);
+    // The entry Glass samples is the layer's own geometry: its bucket records no shared content.
     TGFX_PRIVATE_ACCESS(auto source = vectorLayer->getLayerStyleSource(drawArgs, Matrix::I());
                         ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
-                        ASSERT_TRUE(source->groups[0]->content.image != nullptr);
-                        widths.push_back(source->groups[0]->content.image->width());
-                        offsets.push_back(source->groups[0]->content.offset.x);)
+                        ASSERT_TRUE(source->groups[0]->ownGeometry.has_value());
+                        ASSERT_TRUE(source->groups[0]->ownGeometry->image != nullptr);
+                        widths.push_back(source->groups[0]->ownGeometry->image->width());
+                        offsets.push_back(source->groups[0]->ownGeometry->offset.x);)
   }
   ASSERT_EQ(widths.size(), 3u);
   EXPECT_EQ(widths[1], 100);
@@ -4226,7 +4228,26 @@ TGFX_TEST_PRIVATE(LayerTest, GlassStyleDeclaresOwnGeometryContentSource) {
                       EXPECT_TRUE(source->groups[0]->ownShape.has_value())
                       << "a layered rect has an exact own-geometry shape, so Glass takes the SDF "
                          "path";
-                      EXPECT_FALSE(source->groups[0]->contour.has_value());)
+                      EXPECT_FALSE(source->groups[0]->contour.has_value());
+                      // Nothing in a Geometry-only bucket reads the shared content, so recording it
+                      // would rasterize the whole subtree for nobody.
+                      EXPECT_TRUE(source->groups[0]->content.image == nullptr)
+                      << "a Geometry-only bucket must not record the shared content";)
+
+  // The contrast that keeps the assertion above honest: a bucket holding a style that draws from the
+  // shared content still records it, so the skip above is a real classification and not a blanket
+  // skip.
+  auto mixedLayer = SolidLayer::Make();
+  mixedLayer->setWidth(100);
+  mixedLayer->setHeight(80);
+  mixedLayer->setLayerStyles({GlassStyle::Make(80, 50, 0, 50, 0, 0, 0),
+                              DropShadowStyle::Make(0, 15, 0, 0, Color::Black())});
+  TGFX_PRIVATE_ACCESS(auto mixedSource = mixedLayer->getLayerStyleSource(drawArgs, Matrix::I());
+                      ASSERT_TRUE(mixedSource != nullptr);
+                      ASSERT_TRUE(mixedSource->groups[0] != nullptr);
+                      EXPECT_TRUE(mixedSource->groups[0]->ownGeometry.has_value());
+                      EXPECT_TRUE(mixedSource->groups[0]->content.image != nullptr)
+                      << "a non-Geometry style in the same bucket still needs the shared content";)
 }
 
 // ===== The layer's own geometry: coverage asserted on rendered pixels =====
@@ -5403,12 +5424,17 @@ TGFX_TEST_PRIVATE(LayerTest, GlassWithoutOwnGeometryResolvesToSharedContour) {
   // Failure attribution: the fallback picked the lazily recorded shared contour rather than the
   // shared content. This is a recording assertion on purpose -- for a plainly visible child both
   // recordings carry the same geometry, so the rendered result cannot tell which one Glass was
-  // handed.
+  // handed. A non-Geometry style shares the bucket so that the shared content is recorded too, which
+  // is what makes the choice below observable.
   DrawArgs drawArgs(context);
+  auto panel = MakeGlassChildPanel(GlassChildFillKind::Full, baseRect, holeRect, ringWidth, glass);
+  // A non-Geometry style sharing the bucket keeps the shared content recorded, so the resolution
+  // below really has two recordings to choose from.
+  auto shadow = DropShadowStyle::Make(0, 0, 0, 0, Color::Black());
+  shadow->setExcludeChildEffects(true);
+  panel->setLayerStyles({glass, shadow});
   TGFX_PRIVATE_ACCESS(
-      auto source =
-          MakeGlassChildPanel(GlassChildFillKind::Full, baseRect, holeRect, ringWidth, glass)
-              ->getLayerStyleSource(drawArgs, Matrix::I());
+      auto source = panel->getLayerStyleSource(drawArgs, Matrix::I());
       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[1] != nullptr);
       const auto& group = *source->groups[1];
       // A group with only children must not record own geometry: that is what triggers the lazy
@@ -5416,7 +5442,8 @@ TGFX_TEST_PRIVATE(LayerTest, GlassWithoutOwnGeometryResolvesToSharedContour) {
       EXPECT_FALSE(group.ownGeometry.has_value())
       << "a group with only children must not record own geometry";
       ASSERT_TRUE(group.contour.has_value()); ASSERT_TRUE(group.contour->image != nullptr);
-      ASSERT_TRUE(group.content.image != nullptr);
+      ASSERT_TRUE(group.content.image != nullptr)
+      << "control: the non-Geometry style in this bucket records the shared content";
       EXPECT_EQ(ResolveContentEntry(group, glass.get()), &*group.contour)
       << "Glass must resolve to the shared contour when no own geometry exists";)
 }
