@@ -147,10 +147,9 @@ struct AOTChainDeviceLeaf {
 
 class AOTPointwiseChainProcessor : public FragmentProcessor {
  public:
-  // The maximum instruction storage across the shapes (the graph shapes: 32). The basic Chain
-  // shader declares only ChainResourceCapacity.instructions (16) slots; ValidateSlots checks the
-  // resolved shape's own capacity.
-  static constexpr size_t MaxSlots = TiledGraphResourceCapacity.instructions;
+  // The maximum instruction storage across the shapes (the noise shape: 32; the gradient shape
+  // shares the plain chain's 16). ValidateSlots checks the resolved shape's own capacity.
+  static constexpr size_t MaxSlots = NoiseGraphResourceCapacity.instructions;
 
   // The length of the kernel's chainResults array (pointwise_fragment_main.inc). The allocator
   // reuses a register after its last read, so this bounds the simultaneously-live values of a

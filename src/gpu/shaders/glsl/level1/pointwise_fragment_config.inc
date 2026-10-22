@@ -22,8 +22,9 @@
 // chainLoadTiledRecipe(), and the entry's evalResourceSlot() names the source ops it supports.
 //
 // Evaluates an arbitrary pointwise DAG in one pass. The DAG shape is runtime uniform data:
-// CHAIN_SLOT_CAPACITY instruction slots (16 for Chain, 32 for Graph) each carry a Packed ivec4
-// (op, two input registers, selector with the result register in bits 20-24), so topologies with
+// CHAIN_SLOT_CAPACITY instruction slots (16 for Chain and gradient, 32 for noise) each carry a
+// Packed ivec4 (op, two input registers, selector with the result register in bits 20-24), so
+// topologies with
 // the same texture-leaf count share a variant. Intermediate results live in 16 recycled registers
 // (AOTChainRegisterAllocator), independent of the instruction count. Texture leaves occupy
 // instructions 0..NTEX-1 and each samples its own sampler, keeping sampler indexing static.

@@ -986,8 +986,9 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
   }
   // Register allocation: the slot wiring built above uses instruction ordinals; this pass
   // rewrites every reference into the kernel's recycled chainResults registers, so the
-  // per-profile instruction budget (16 for Chain, 32 for Graph) and the live-result budget
-  // (MaxRegisters) are independent. A DAG exceeding the register budget is refused here.
+  // per-profile instruction budget (16 for Chain and gradient, 32 for noise) and the
+  // live-result budget (MaxRegisters) are independent. A DAG exceeding the register budget is
+  // refused here.
   std::vector<std::vector<int>> instructionInputs(slots.size());
   for (size_t index = 0; index < slots.size(); ++index) {
     for (int input : {slots[index].in0, slots[index].in1}) {

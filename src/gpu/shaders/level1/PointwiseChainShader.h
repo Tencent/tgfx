@@ -116,7 +116,7 @@ class PointwiseChainShader : public PrecompiledShader {
           PermutationInt("TEXTURE_COUNT", 2),
           PermutationBool("HAS_MASK_TEXTURE"),
           PermutationBool("HAS_SUBSET"),
-          // 0 = plain chain (16 slots), 1 = gradient source (32 slots), 2 = noise source
+          // 0 = plain chain (16 slots), 1 = gradient source (16 slots), 2 = noise source
           // (32 slots). Appended last so plain chains keep their pre-merge indices; the noise
           // kind holds the largest value so a future removal re-encodes nothing below it.
           PermutationInt("RESOURCE_KIND", 3),

@@ -162,8 +162,12 @@ namespace tgfx {
  * family's fragment domain gained the RESOURCE_KIND tail (0 = plain chain, 1 = gradient, 2 =
  * noise) and its vertex domain gained the HAS_SOURCE_COORDS tail, so the Graph family's name and
  * index space disappear and every extended pair re-encodes; pre-change bundles are refused.
+ *
+ * 0x0001001a: the gradient resource kind shares the plain chain's 16-slot storage — the kind-1
+ * variants' slot-parameter uniform arrays halve, so every gradient-chain uniform layout
+ * re-encodes; pre-change bundles are refused.
  */
-inline constexpr uint32_t kExpectedToolchainABI = 0x00010019u;
+inline constexpr uint32_t kExpectedToolchainABI = 0x0001001au;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

@@ -59,7 +59,9 @@ inline constexpr size_t MaxChainLeafBindings = 4;
 
 inline constexpr AOTResourceCapacity ChainResourceCapacity = {16, 2, 0, 0};
 inline constexpr AOTResourceCapacity NoiseGraphResourceCapacity = {32, 2, 1, 0};
-inline constexpr AOTResourceCapacity TiledGraphResourceCapacity = {32, 3, 0, 1};
+// The gradient shape shares the plain chain's 16-slot storage: the libpag corpus's heaviest
+// gradient chain needs 7 slots (p100 over 2,468 constructed chains), so 16 keeps ample headroom.
+inline constexpr AOTResourceCapacity TiledGraphResourceCapacity = {16, 3, 0, 1};
 
 inline const AOTResourceCapacity* GetAOTResourceCapacity(AOTResourceProfile profile) {
   switch (profile) {

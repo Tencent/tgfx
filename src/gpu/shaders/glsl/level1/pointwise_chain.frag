@@ -1,7 +1,7 @@
 // PointwiseChainShader: single-pass pointwise chains and graphs. RESOURCE_KIND selects the
 // resource profile (PointwiseChainShader::FragDims, AOTResourceProfile):
 //   0 = plain chain: no resource module, two-recipe tiling (16 slots)
-//   1 = TiledGraph: gradient source, three-recipe tiling (32 slots)
+//   1 = TiledGraph: gradient source, three-recipe tiling (16 slots)
 //   2 = NoiseGraph: Perlin noise source, two-recipe tiling (32 slots)
 // Everything else is the shared pointwise core (see pointwise_fragment_config.inc).
 #version 450
@@ -9,10 +9,10 @@
 #ifndef RESOURCE_KIND
 #define RESOURCE_KIND 0
 #endif
-#if RESOURCE_KIND == 0
-#define CHAIN_SLOT_CAPACITY 16
-#else
+#if RESOURCE_KIND == 2
 #define CHAIN_SLOT_CAPACITY 32
+#else
+#define CHAIN_SLOT_CAPACITY 16
 #endif
 
 #include "pointwise_fragment_config.inc"
