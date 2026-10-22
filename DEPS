@@ -81,6 +81,41 @@
         "dir": "third_party/shaderc"
       },
       {
+        "url": "https://github.com/abseil/abseil-cpp.git",
+        "commit": "1315c900e1ddbb08a23e06eeb9a06450052ccb5e",
+        "dir": "third_party/shaderc/third_party/abseil_cpp"
+      },
+      {
+        "url": "https://github.com/google/effcee.git",
+        "commit": "08da24ec245a274fea3a128ba50068f163390565",
+        "dir": "third_party/shaderc/third_party/effcee"
+      },
+      {
+        "url": "https://github.com/google/googletest.git",
+        "commit": "1d17ea141d2c11b8917d2c7d029f1c4e2b9769b2",
+        "dir": "third_party/shaderc/third_party/googletest"
+      },
+      {
+        "url": "https://github.com/KhronosGroup/glslang.git",
+        "commit": "697683e6b8871420d7d942b1a2fe233242ab5608",
+        "dir": "third_party/shaderc/third_party/glslang"
+      },
+      {
+        "url": "https://github.com/google/re2.git",
+        "commit": "4a8cee3dd3c3d81b6fe8b867811e193d5819df07",
+        "dir": "third_party/shaderc/third_party/re2"
+      },
+      {
+        "url": "https://github.com/KhronosGroup/SPIRV-Headers.git",
+        "commit": "aa6cef192b8e693916eb713e7a9ccadf06062ceb",
+        "dir": "third_party/shaderc/third_party/spirv-headers"
+      },
+      {
+        "url": "https://github.com/KhronosGroup/SPIRV-Tools.git",
+        "commit": "a62abcb402009b9ca5975e6167c09f237f630e0e",
+        "dir": "third_party/shaderc/third_party/spirv-tools"
+      },
+      {
         "url": "https://github.com/KhronosGroup/SPIRV-Cross.git",
         "commit": "ebe2aa0cd80f5eb5cd8a605da604cacf72205f3b",
         "dir": "third_party/SPIRV-Cross"
