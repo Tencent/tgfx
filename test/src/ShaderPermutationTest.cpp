@@ -60,6 +60,7 @@
 #include "gpu/shaders/ShaderPermutation.h"
 #include "gpu/shaders/level1/PointwiseGraphShader.h"
 #include "gpu/shaders/level1/QuadTextureFillShader.h"
+#include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedFillShader.h"
 #include "gpu/shaders/level1/ShapeInstancedTextureCoverageShader.h"
 #include "gtest/gtest.h"
@@ -283,16 +284,16 @@ TGFX_TEST(ShaderPermutationTest, DefineListForZeroValue) {
 }
 
 TGFX_TEST(ShaderPermutationTest, DefineDimsMacro) {
-  using D = ShapeInstancedFillShader::Dims;
+  using D = RoundStrokeRectFillShader::Dims;
   EXPECT_EQ(D::COUNT, 1u);
-  EXPECT_EQ(D::HAS_AA, 0u);
+  EXPECT_EQ(D::HAS_UV_MATRIX, 0u);
 
   auto domain = D::domain();
   EXPECT_EQ(domain.dimensionCount(), static_cast<size_t>(D::COUNT));
   EXPECT_EQ(domain.totalCount(), 2u);
 
   // Verify domain dimensions match.
-  auto handDomain = PermutationDomain::FromBoolNames("HAS_AA");
+  auto handDomain = PermutationDomain::FromBoolNames("HAS_UV_MATRIX");
   EXPECT_EQ(handDomain.totalCount(), domain.totalCount());
   EXPECT_EQ(handDomain.dimensionCount(), domain.dimensionCount());
 
@@ -372,7 +373,7 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
   // same way too (54 -> 27 pairs), removing 27 more, and RoundStrokeRect then dropped HAS_AA (the
   // coverage and radii attributes unconditional, the ramp picked by the AAEnabled runtime uniform),
   // removing 6 more.
-  EXPECT_EQ(pairCount, 311u);
+  EXPECT_EQ(pairCount, 278u);
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseChainShader"),
             EnumeratePointwiseChainReachable());
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseGraphShader"),
@@ -551,7 +552,9 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
       for (int xpType = 0; xpType < 3; ++xpType) {
         PointwiseChainInputs inputs;
         inputs.gpKind = gpType;
-        inputs.hasCoverage = gpType == 1 || hasCoverage != 0;
+        // The DefaultGP's coverage attribute is unconditional (the non-AA path triangles carry
+        // a constant 1.0 slot), so coverage is always present for every GP kind.
+        inputs.hasCoverage = true;
         inputs.hasGradient = true;
         inputs.resourceProfile = AOTResourceProfile::TiledGraph;
         inputs.xpType = xpType;
@@ -567,8 +570,8 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
       }
     }
   }
-  EXPECT_EQ(vertexIndices.size(), 2u);
-  EXPECT_EQ(fragmentIndices.size(), 6u);
+  EXPECT_EQ(vertexIndices.size(), 1u);
+  EXPECT_EQ(fragmentIndices.size(), 3u);
 }
 
 TGFX_TEST(ShaderPermutationTest, GradientUniformsExistOnlyInExtendedChainArtifacts) {
@@ -680,9 +683,9 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
       }
     }
   }
-  EXPECT_EQ(vertexIndices.size(), 2u);
-  EXPECT_EQ(fragmentIndices.size(), 12u);
-  EXPECT_EQ(pairs.size(), 12u);
+  EXPECT_EQ(vertexIndices.size(), 1u);
+  EXPECT_EQ(fragmentIndices.size(), 6u);
+  EXPECT_EQ(pairs.size(), 6u);
 
   for (int hasVertexCoverage = 0; hasVertexCoverage < 2; ++hasVertexCoverage) {
     BlockAllocator allocator;
@@ -2508,7 +2511,7 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectPreservesPermutationDomains) {
   };
   const ExpectedDomain expected[] = {
       {"QuadColorFillShader", 1, 6},  {"QuadTextureFillShader", 8, 12},
-      {"SolidColorFillShader", 2, 6}, {"HairlineLineShader", 1, 3},
+      {"SolidColorFillShader", 1, 3}, {"HairlineLineShader", 1, 3},
       {"HairlineQuadShader", 1, 3},
   };
   for (const auto& expectedDomain : expected) {

@@ -184,13 +184,9 @@ std::optional<RuleComposedValues> ComposeSolidColorFill(const SolidColorFillInpu
   if (inputs.xpType < 0) {
     return std::nullopt;
   }
-  using VD = SolidColorFillShader::VD;
   using FD = SolidColorFillShader::FD;
   RuleComposedValues values;
-  values.vertValues.resize(VD::COUNT);
-  values.vertValues[VD::HAS_COVERAGE] = inputs.isCoverageAA ? 1 : 0;
   values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_COVERAGE] = values.vertValues[VD::HAS_COVERAGE];
   values.fragValues[FD::HAS_XP] = inputs.xpType;
   return values;
 }
@@ -305,14 +301,10 @@ std::optional<RuleComposedValues> ComposePerlinNoiseFill(const PerlinNoiseFillIn
   if (inputs.xpType < 0) {
     return std::nullopt;
   }
-  using VD = PerlinNoiseFillShader::VD;
   using D = PerlinNoiseFillShader::D;
   RuleComposedValues values;
-  values.vertValues.resize(VD::COUNT);
-  values.vertValues[VD::HAS_COVERAGE] = inputs.hasCoverage ? 1 : 0;
   values.fragValues.resize(D::COUNT);
   values.fragValues[D::HAS_XP] = inputs.xpType;
-  values.fragValues[D::HAS_COVERAGE] = values.vertValues[VD::HAS_COVERAGE];
   return values;
 }
 
@@ -380,13 +372,9 @@ std::optional<RuleComposedValues> ComposeShapeInstancedFill(
   if (inputs.xpType < 0) {
     return std::nullopt;
   }
-  using D = ShapeInstancedFillShader::Dims;
   using FD = ShapeInstancedFillShader::FD;
   RuleComposedValues values;
-  values.vertValues.resize(D::COUNT);
-  values.vertValues[D::HAS_AA] = inputs.isCoverageAA ? 1 : 0;
   values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_AA] = values.vertValues[D::HAS_AA];
   values.fragValues[FD::HAS_XP] = inputs.xpType;
   return values;
 }
@@ -400,14 +388,10 @@ std::optional<RuleComposedValues> ComposeTiledTextureFill(const TiledTextureFill
   if (inputs.xpType < 0) {
     return std::nullopt;
   }
-  using VD = TiledTextureFillShader::VD;
   using FD = TiledTextureFillShader::FragDims;
   RuleComposedValues values;
-  values.vertValues.resize(VD::COUNT);
-  values.vertValues[VD::HAS_COVERAGE] = inputs.hasCoverage ? 1 : 0;
   values.fragValues.resize(FD::COUNT);
   values.fragValues[FD::HAS_XP] = inputs.xpType;
-  values.fragValues[FD::HAS_COVERAGE] = values.vertValues[VD::HAS_COVERAGE];
   return values;
 }
 
@@ -495,14 +479,10 @@ std::optional<RuleComposedValues> ComposeTexturedEffect(const TexturedEffectInpu
   if (inputs.xpType < 0) {
     return std::nullopt;
   }
-  using VD = TexturedEffectShader::VD;
   using D = TexturedEffectShader::D;
   RuleComposedValues values;
-  values.vertValues.resize(VD::COUNT);
-  values.vertValues[VD::HAS_COVERAGE] = inputs.hasCoverage ? 1 : 0;
   values.fragValues.resize(D::COUNT);
   values.fragValues[D::HAS_XP] = inputs.xpType;
-  values.fragValues[D::HAS_COVERAGE] = values.vertValues[VD::HAS_COVERAGE];
   return values;
 }
 
@@ -550,7 +530,13 @@ static std::optional<RuleComposedValues> ComposePointwiseGP(const PointwiseChain
       if (inputs.hasUVCoord) {
         return std::nullopt;
       }
-      hasCoverage = inputs.hasCoverage ? 1 : 0;
+      // The DefaultGP's coverage attribute is unconditional (the non-AA path triangles carry a
+      // constant 1.0 slot), so the matcher always reports coverage: reject the vacuous lattice
+      // cell so the enumeration equals the producible set.
+      if (!inputs.hasCoverage) {
+        return std::nullopt;
+      }
+      hasCoverage = 1;
       break;
     case 1:
     case 2:

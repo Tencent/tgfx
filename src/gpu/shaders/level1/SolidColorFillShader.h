@@ -24,38 +24,32 @@ namespace tgfx {
 
 /// Precompiled shader for a solid-color fill through DefaultGeometryProcessor with no fragment
 /// processors. The fill color comes from the geometry processor's Color uniform. Covers the common
-/// plain drawRect/drawPath path (no shader, no color/coverage FP).
-///
-/// Vertex dimensions:
-///   HAS_COVERAGE (bool): DefaultGP has per-vertex AA coverage (AAType::Coverage), adding the
-///                        inCoverage attribute and vCoverage varying.
+/// plain drawRect/drawPath path (no shader, no color/coverage FP). The coverage attribute is
+/// unconditional (the non-AA path triangles carry a constant 1.0 slot), so there is no
+/// HAS_COVERAGE dimension.
 ///
 /// Fragment dimensions:
-///   HAS_COVERAGE (bool): mirrors the vertex dimension (varying declarations must agree).
 ///   HAS_XP (int, 3 values): 0=Empty, 1=PorterDuff DST_TEX, 2=PorterDuff FBF.
 class SolidColorFillShader : public PrecompiledShader {
  public:
   struct VertDims {
-    enum : uint32_t { HAS_COVERAGE, COUNT };
+    enum : uint32_t { COUNT };
     static PermutationDomain domain() {
-      return PermutationDomain({
-          PermutationBool("HAS_COVERAGE"),
-      });
+      return PermutationDomain({});
     }
   };
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { HAS_COVERAGE, HAS_XP, COUNT };
+    enum : uint32_t { HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationBool("HAS_COVERAGE"),
           PermutationInt("HAS_XP", 3),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 2, "Update the Compose mapping when fragment dimensions change.");
+  static_assert(FD::COUNT == 1, "Update the Compose mapping when fragment dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"SolidColorFillShader",

@@ -26,10 +26,15 @@ ShapeInstancedGeometryProcessor::ShapeInstancedGeometryProcessor(int width, int 
     : GeometryProcessor(ClassID()), width(width), height(height), aa(aa), hasColors(hasColors),
       uvMatrix(uvMatrix), viewMatrix(viewMatrix) {
   position = {"aPosition", VertexFormat::Float2};
-  if (aa == AAType::Coverage) {
-    coverage = {"inCoverage", VertexFormat::Float};
-  }
-  setVertexAttributes(&position, 2);
+  // The coverage attribute is unconditional: the non-AA path triangles carry a constant 1.0 slot
+  // (they share the AA vertex layout), so the fill kernels bind it in a single variant and the
+  // non-AA modulation by one is the identity.
+  coverage = {"inCoverage", VertexFormat::Float};
+  // The color attribute is a stride filler matching the shared 16-byte path-triangle layout
+  // (x, y, coverage, white): the instance color comes from the instance buffer, so the vertex
+  // color slot is never read. The rasterized-mask quad writes the same layout.
+  color = {"inColor", VertexFormat::UByte4Normalized};
+  setVertexAttributes(&position, 3);
 
   offset = {"aOffset", VertexFormat::Float2};
   // The instance color attribute is unconditional: instance data is generated per draw batch, so

@@ -143,8 +143,16 @@ namespace tgfx {
  * the AAEnabled runtime uniform), dropping the HAS_AA dimension. Every variant changes its vertex
  * layout and fragment uniform block, and the removed axis re-encodes the family's permutation
  * indices; pre-change bundles are refused.
+ *
+ * 0x00010017: the non-AA path triangles gained a constant 1.0 coverage slot (they share the AA
+ * vertex layout), and the DefaultGP and ShapeInstancedGP coverage attributes became
+ * unconditional, so the SolidColor, TexturedEffect, TiledTexture, PerlinNoise and
+ * ShapeInstancedFill kernels dropped their HAS_COVERAGE / HAS_AA dimensions and the pointwise
+ * chain's DefaultGP forms dropped their coverage-free variants. Every affected family changes its
+ * vertex layout, and the removed axes re-encode their permutation indices; pre-change bundles are
+ * refused.
  */
-inline constexpr uint32_t kExpectedToolchainABI = 0x00010016u;
+inline constexpr uint32_t kExpectedToolchainABI = 0x00010017u;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

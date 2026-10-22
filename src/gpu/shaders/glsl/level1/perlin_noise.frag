@@ -7,15 +7,14 @@
 // Two per-draw lookup textures are bound as samplers: TextureSampler_0 = permutations (256x1 A8,
 // ForRead swizzle RRRR so the single stored channel reads through .r) and TextureSampler_1 = noise
 // (256x4 RGBA8888, identity swizzle). Output is premultiplied RGBA.
-// Up to three runtime-selected pointwise operators follow the noise in the same pass.
-// Permutation dimensions (frag): HAS_XP (int, 3), HAS_COVERAGE (bool).
+// Up to three runtime-selected pointwise operators follow the noise in the same pass. The coverage
+// source is the vCoverage varying (a constant 1.0 for non-AA path triangles and non-AA quads, so
+// the modulation is the identity there).
+// Permutation dimensions (frag): HAS_XP (int, 3).
 #version 450
 
 #ifndef HAS_XP
 #define HAS_XP 0
-#endif
-#ifndef HAS_COVERAGE
-#define HAS_COVERAGE 0
 #endif
 
 #define NOISE_FRACTAL 0
@@ -36,9 +35,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 };
 
 layout(location = 0) in vec2 TransformedCoords_0;
-#if HAS_COVERAGE
 layout(location = 1) in float vCoverage;
-#endif
 
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;  // permutations (A8)
 layout(set = 1, binding = 1) uniform sampler2D TextureSampler_1;  // noise (RGBA)
@@ -81,12 +78,8 @@ void main() {
   result = applyPointwiseSlots(result);
 #endif
 
-#if HAS_COVERAGE
 #define TGFX_XP_SRC_COLOR (result * vCoverage)
 #define TGFX_XP_SRC_UNPREMUL result
 #define TGFX_XP_COVERAGE vec4(vCoverage)
-#else
-#define TGFX_XP_SRC_COLOR result
-#endif
 #include "xp_output.inc"
 }

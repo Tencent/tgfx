@@ -2,21 +2,18 @@
 // EmptyXferProcessor/PorterDuffXP. The tiling math lives in tiled_full_sample.inc (shared with the
 // blur kernel through tiled_sample.inc) and mirrors the runtime GLSLTiledTextureEffect codegen;
 // the pipeline is the shared dedicated one (fill_fragment_main.inc). ShaderModeX/ShaderModeY are
-// runtime uniforms: all nine modes are supported here.
-// Fragment dimensions: HAS_COVERAGE, HAS_XP (int, 3).
+// runtime uniforms: all nine modes are supported here. The coverage source is the vCoverage
+// varying (a constant 1.0 for non-AA path triangles and non-AA quads, so the modulation is the
+// identity there).
+// Fragment dimensions: HAS_XP (int, 3).
 #version 450
 
 #ifndef HAS_XP
 #define HAS_XP 0
 #endif
-#ifndef HAS_COVERAGE
-#define HAS_COVERAGE 0
-#endif
 
 layout(location = 0) in vec2 TransformedCoords_0;
-#if HAS_COVERAGE
 layout(location = 1) in float vCoverage;
-#endif
 
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
 
@@ -38,7 +35,5 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #define XP_DST_TEX_BINDING 1
 
 #define FILL_SOURCE FILL_SOURCE_TILED_FULL
-#if HAS_COVERAGE
 #define FILL_COVERAGE FILL_COVERAGE_VERTEX
-#endif
 #include "fill_fragment_main.inc"

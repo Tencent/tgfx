@@ -34,25 +34,24 @@ namespace tgfx {
 /// equivalent sibling form) and, once wired, by the EffectDecomposer 2-pass pipeline.
 class TexturedEffectShader : public PrecompiledShader {
  public:
+  // The coverage attribute is unconditional (the non-AA path triangles carry a constant 1.0 slot
+  // and the quad providers emit 1.0 for non-AA draws), so there is no HAS_COVERAGE dimension.
   struct FragDims {
     // Subset clamping is runtime: the shader always declares Subset and clamps, and the writer
     // uploads the full texture bounds when there is no real subset, so the clamp is a no-op.
-    enum : uint32_t { HAS_XP, HAS_COVERAGE, COUNT };
+    enum : uint32_t { HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("HAS_XP", 3),
-          PermutationBool("HAS_COVERAGE"),
       });
     }
   };
   using D = FragDims;
 
   struct VertDims {
-    enum : uint32_t { HAS_COVERAGE, COUNT };
+    enum : uint32_t { COUNT };
     static PermutationDomain domain() {
-      return PermutationDomain({
-          PermutationBool("HAS_COVERAGE"),
-      });
+      return PermutationDomain({});
     }
   };
   using VD = VertDims;

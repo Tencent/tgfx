@@ -145,7 +145,6 @@ struct QuadColorFillInputs {
  * is a whole-draw rejection and stays in Extract.
  */
 struct SolidColorFillInputs {
-  bool isCoverageAA = false;
   int xpType = -1;  // -1 = no representable XferProcessor.
 };
 
@@ -203,7 +202,6 @@ struct MeshFillInputs {
  * shapes no dimension, so only coverage and the transfer type remain.
  */
 struct PerlinNoiseFillInputs {
-  bool hasCoverage = false;
   int xpType = -1;  // -1 = no representable XferProcessor.
 };
 
@@ -233,7 +231,6 @@ struct ShapeInstancedTextureCoverageInputs {
  * unconditional (colorless batches broadcast white), so no color input field exists.
  */
 struct ShapeInstancedFillInputs {
-  bool isCoverageAA = false;
   int xpType = -1;  // -1 = no representable XferProcessor.
 };
 
@@ -242,7 +239,6 @@ struct ShapeInstancedFillInputs {
  * are whole-draw rejections in Extract; ALPHA_ONLY / strict are runtime uniforms.
  */
 struct TiledTextureFillInputs {
-  bool hasCoverage = false;
   int xpType = -1;  // -1 = no representable XferProcessor.
 };
 
@@ -299,7 +295,6 @@ struct GlassRefractionInputs {
  * rides the OpType runtime uniform, so only coverage and the transfer type shape dimensions.
  */
 struct TexturedEffectInputs {
-  bool hasCoverage = false;
   int xpType = -1;  // -1 = no representable XferProcessor.
 };
 

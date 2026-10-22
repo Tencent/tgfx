@@ -65,7 +65,10 @@ ShapeInstancedDrawOp::ShapeInstancedDrawOp(BlockAllocator* allocator,
   auto context = shapeProxy->getContext();
   if (auto textureProxy = shapeProxy->getTextureProxy()) {
     auto maskRect = Rect::MakeWH(textureProxy->width(), textureProxy->height());
-    auto maskVertexProvider = RectsVertexProvider::MakeFrom(allocator, maskRect, AAType::None);
+    // The mask quad follows the shared 16-byte path-triangle layout (x, y, coverage, white): the
+    // GP declares all three slots, with the 1.0 coverage and the white filler never read.
+    auto maskVertexProvider =
+        RectsVertexProvider::MakeFrom(allocator, maskRect, AAType::None, true);
     maskBufferProxy = context->proxyProvider()->createVertexBufferProxy(
         std::move(maskVertexProvider), RenderFlags::DisableAsyncTask);
   }

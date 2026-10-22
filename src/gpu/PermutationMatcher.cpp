@@ -240,28 +240,11 @@ static int GetGPType(const GeometryProcessor* gp) {
   return -1;
 }
 
-// Returns 1 if the geometry processor supplies a per-vertex AA coverage attribute (inCoverage), 0
-// otherwise. Coverage is orthogonal to the GP type: both DefaultGP and QuadPerEdgeAAGP emit it only
-// when their AA type is Coverage.
-static int GetGPCoverage(const GeometryProcessor* gp) {
-  auto name = gp->name();
-  if (name == "DefaultGeometryProcessor") {
-    return static_cast<const DefaultGeometryProcessor*>(gp)->getAAType() == AAType::Coverage ? 1
-                                                                                             : 0;
-  }
-  if (name == "QuadPerEdgeAAGeometryProcessor") {
-    return static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp)->getAAType() == AAType::Coverage
-               ? 1
-               : 0;
-  }
-  return 0;
-}
-
 // The position-only rect GP forms the texture and noise fill kernels share: a DefaultGP, or a
 // QuadPerEdgeAA GP whose coordinate comes from aPosition (a common color, a uv matrix, no
 // per-quad subset), since those precompiled vertex stages declare aPosition plus the optional AA
-// coverage attribute only. *coverage receives that attribute's presence.
-static bool IsPositionOnlyRectGP(const GeometryProcessor* gp, int* coverage) {
+// coverage attribute only.
+static bool IsPositionOnlyRectGP(const GeometryProcessor* gp) {
   int gpType = GetGPType(gp);
   if (gpType < 0) {
     return false;
@@ -271,9 +254,6 @@ static bool IsPositionOnlyRectGP(const GeometryProcessor* gp, int* coverage) {
     if (!quadGP->hasCommonColor() || !quadGP->hasUVMatrix() || quadGP->getHasSubset()) {
       return false;
     }
-  }
-  if (coverage != nullptr) {
-    *coverage = GetGPCoverage(gp);
   }
   return true;
 }
@@ -297,8 +277,7 @@ static bool TiledFillModeSupported(int mode) {
 
 static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
     const ProgramInfo* programInfo) {
-  int hasCoverage = 0;
-  if (!IsPositionOnlyRectGP(programInfo->getGeometryProcessor(), &hasCoverage)) {
+  if (!IsPositionOnlyRectGP(programInfo->getGeometryProcessor())) {
     return std::nullopt;
   }
   if (programInfo->numFragmentProcessors() != 1) {
@@ -327,7 +306,6 @@ static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
   // ALPHA_ONLY and HAS_STRICT are folded into runtime uniforms (AlphaOnly / Strict), set by
   // GLSLTiledTextureEffect::onSetData; they are no longer compile-time dimensions.
   TiledTextureFillInputs inputs;
-  inputs.hasCoverage = hasCoverage != 0;
   inputs.xpType = xpType;
   auto composed = ComposeTiledTextureFill(inputs);
   if (!composed) {
@@ -402,9 +380,7 @@ static std::optional<PermutationMatchResult> TryMatchSolidColorFill(
   if (!HasNoProcessorsOrDirectClip(programInfo)) {
     return std::nullopt;
   }
-  auto* dgp = static_cast<const DefaultGeometryProcessor*>(gp);
   SolidColorFillInputs inputs;
-  inputs.isCoverageAA = dgp->getAAType() == AAType::Coverage;
   inputs.xpType = GetXPType(programInfo);
   auto composed = ComposeSolidColorFill(inputs);
   if (!composed) {
@@ -707,7 +683,9 @@ static std::optional<PermutationMatchResult> TryMatchPointwiseDAG(const ProgramI
     // Per-pixel edge AA like the ellipse; the color attribute is unconditional.
     inputs.hasCoverage = false;
   } else {
-    inputs.hasCoverage = GetGPCoverage(gp) != 0;
+    // The DefaultGP's coverage attribute is unconditional (the non-AA path triangles carry a
+    // constant 1.0 slot), so the DefaultGP always reports coverage.
+    inputs.hasCoverage = true;
   }
   if (IsAOTGraphProfile(inputs.resourceProfile)) {
     auto composed = ComposePointwiseGraph(inputs);
@@ -810,8 +788,7 @@ static bool IsSupportedPointwiseOp(const FragmentProcessor* fp) {
 // code where the chain uploads its instruction arrays (about 5 KB) and runs the interpreter loop.
 static std::optional<PermutationMatchResult> TryMatchComposedTexture(
     const ProgramInfo* programInfo) {
-  int hasCoverage = 0;
-  if (!IsPositionOnlyRectGP(programInfo->getGeometryProcessor(), &hasCoverage)) {
+  if (!IsPositionOnlyRectGP(programInfo->getGeometryProcessor())) {
     return std::nullopt;
   }
   int xpType = GetXPType(programInfo);
@@ -861,7 +838,6 @@ static std::optional<PermutationMatchResult> TryMatchComposedTexture(
     return std::nullopt;
   }
   TexturedEffectInputs inputs;
-  inputs.hasCoverage = hasCoverage != 0;
   inputs.xpType = xpType;
   auto composed = ComposeTexturedEffect(inputs);
   if (!composed) {
@@ -1374,9 +1350,7 @@ static std::optional<PermutationMatchResult> TryMatchShapeInstancedFill(
   if (programInfo->numFragmentProcessors() != 0) {
     return std::nullopt;
   }
-  auto* sigp = static_cast<const ShapeInstancedGeometryProcessor*>(gp);
   ShapeInstancedFillInputs inputs;
-  inputs.isCoverageAA = sigp->getAAType() == AAType::Coverage;
   inputs.xpType = GetXPType(programInfo);
   auto composed = ComposeShapeInstancedFill(inputs);
   if (!composed) {
@@ -1409,8 +1383,7 @@ static std::optional<PermutationMatchResult> TryMatchMeshFill(const ProgramInfo*
 }
 
 static std::optional<PermutationMatchResult> TryMatchPerlin(const ProgramInfo* programInfo) {
-  int hasCoverage = 0;
-  if (!IsPositionOnlyRectGP(programInfo->getGeometryProcessor(), &hasCoverage)) {
+  if (!IsPositionOnlyRectGP(programInfo->getGeometryProcessor())) {
     return std::nullopt;
   }
   // Accept a PerlinNoiseFragmentProcessor optionally followed by one pointwise operator, in the
@@ -1443,7 +1416,6 @@ static std::optional<PermutationMatchResult> TryMatchPerlin(const ProgramInfo* p
     return std::nullopt;
   }
   PerlinNoiseFillInputs inputs;
-  inputs.hasCoverage = hasCoverage != 0;
   inputs.xpType = xpType;
   auto composed = ComposePerlinNoiseFill(inputs);
   if (!composed) {

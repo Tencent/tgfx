@@ -30,27 +30,24 @@ namespace tgfx {
 /// permutation is needed: the octave loop runs a uniform number of iterations and the two variant
 /// branches are uniform conditionals. This keeps the noise leaf to a handful of structural variants.
 ///
-/// HAS_COVERAGE is a mirrored vertex/fragment dimension driven by the geometry processor's AAType,
-/// matching the other color-fill kernels.
+/// The coverage attribute is unconditional (the non-AA path triangles carry a constant 1.0 slot
+/// and the quad providers emit 1.0 for non-AA draws), so there is no HAS_COVERAGE dimension.
 class PerlinNoiseFillShader : public PrecompiledShader {
  public:
   struct FragDims {
-    enum : uint32_t { HAS_XP, HAS_COVERAGE, COUNT };
+    enum : uint32_t { HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("HAS_XP", 3),
-          PermutationBool("HAS_COVERAGE"),
       });
     }
   };
   using D = FragDims;
 
   struct VertDims {
-    enum : uint32_t { HAS_COVERAGE, COUNT };
+    enum : uint32_t { COUNT };
     static PermutationDomain domain() {
-      return PermutationDomain({
-          PermutationBool("HAS_COVERAGE"),
-      });
+      return PermutationDomain({});
     }
   };
   using VD = VertDims;

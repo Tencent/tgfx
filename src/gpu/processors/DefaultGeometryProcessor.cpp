@@ -24,9 +24,10 @@ DefaultGeometryProcessor::DefaultGeometryProcessor(PMColor color, int width, int
     : GeometryProcessor(ClassID()), commonColor(color), width(width), height(height), aa(aa),
       viewMatrix(viewMatrix), uvMatrix(uvMatrix) {
   position = {"aPosition", VertexFormat::Float2};
-  if (aa == AAType::Coverage) {
-    coverage = {"inCoverage", VertexFormat::Float};
-  }
+  // The coverage attribute is unconditional: the non-AA path triangles carry a constant 1.0 slot
+  // (they share the AA vertex layout), so the fill kernels bind it in a single variant and the
+  // non-AA modulation by one is the identity.
+  coverage = {"inCoverage", VertexFormat::Float};
   // The color attribute is unconditional: the vertex buffer always carries the slot (white for the
   // cached path triangles and the mask quads, whose buffers are shared across draws and cannot
   // hold the per-draw paint color), so the fill kernels bind it in every variant. The exact paint

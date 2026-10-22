@@ -67,10 +67,11 @@ RuntimeDrawTask::RuntimeDrawTask(BlockAllocator* allocator,
     auto textureProxy = input.textureProxy;
     if (textureProxy != nullptr) {
       auto maskRect = Rect::MakeWH(textureProxy->width(), textureProxy->height());
-      // The DefaultGP binds the color attribute unconditionally; the mask quad broadcasts the
-      // record's white filler (this draw's Color uniform is white too) and skips the coverage slot.
+      // The DefaultGP binds the color and coverage attributes unconditionally; the mask quad
+      // broadcasts the record's white filler (this draw's Color uniform is white too) and a 1.0
+      // coverage.
       auto maskVertexProvider =
-          RectsVertexProvider::MakeFrom(allocator, maskRect, AAType::None, true, true);
+          RectsVertexProvider::MakeFrom(allocator, maskRect, AAType::None, true);
       auto maskBuffer = context->proxyProvider()->createVertexBufferProxy(
           std::move(maskVertexProvider), RenderFlags::DisableAsyncTask);
       inputVertexBuffers.push_back(std::move(maskBuffer));

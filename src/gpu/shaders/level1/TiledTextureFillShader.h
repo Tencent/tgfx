@@ -33,9 +33,8 @@ namespace tgfx {
 /// (the matcher rejects TiledTextureEffect::hasPerspective), so no perspective vertex dimension
 /// exists: the coordinate is always affine (vec2).
 ///
-/// HAS_COVERAGE is an independent structural dimension (mirrored vertex/fragment) driven by the
-/// geometry processor's AAType, exactly like QuadTextureFillShader: when the GP carries a per-vertex
-/// AA coverage attribute it is passed through as a varying and modulated into the output.
+/// The coverage attribute is unconditional (the non-AA path triangles carry a constant 1.0 slot
+/// and the quad providers emit 1.0 for non-AA draws), so there is no HAS_COVERAGE dimension.
 ///
 /// There is no GP_TYPE dimension: the vertex stage always multiplies by the Matrix uniform, which
 /// DefaultGP fills with the view matrix and QuadPerEdgeAAGP fills with identity (bit-exact), so one
@@ -43,37 +42,30 @@ namespace tgfx {
 ///
 /// Fragment dimensions:
 ///   HAS_XP (int, 3 values): XferProcessor type
-///   HAS_COVERAGE (bool): per-vertex AA coverage varying present
-///
-/// Vertex dimensions:
-///   HAS_COVERAGE (bool): per-vertex AA coverage attribute present
 class TiledTextureFillShader : public PrecompiledShader {
  public:
   // Fragment dimensions
   //
   struct FragDims {
-    enum : uint32_t { HAS_XP, HAS_COVERAGE, COUNT };
+    enum : uint32_t { HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("HAS_XP", 3),
-          PermutationBool("HAS_COVERAGE"),
       });
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 2, "Update info() when fragment dimensions change.");
+  static_assert(FD::COUNT == 1, "Update info() when fragment dimensions change.");
 
   // Vertex dimensions
   struct VertDims {
-    enum : uint32_t { HAS_COVERAGE, COUNT };
+    enum : uint32_t { COUNT };
     static PermutationDomain domain() {
-      return PermutationDomain({
-          PermutationBool("HAS_COVERAGE"),
-      });
+      return PermutationDomain({});
     }
   };
   using VD = VertDims;
-  static_assert(VD::COUNT == 1, "Update info() when vertex dimensions change.");
+  static_assert(VD::COUNT == 0, "Update info() when vertex dimensions change.");
 
   PrecompiledShaderInfo info() const override {
     return {"TiledTextureFillShader",

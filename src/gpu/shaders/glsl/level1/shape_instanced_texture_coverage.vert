@@ -19,8 +19,11 @@ layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
 };
 
 layout(location = 0) in vec2 aPosition;
-layout(location = 1) in vec2 aOffset;
-layout(location = 2) in vec4 aColor;
+// Location 1 is the coverage stride filler of the shared 16-byte path-triangle layout (a
+// constant 1.0); the coverage texture is this kernel's coverage source, so the slot is never
+// read. Location 2 is the color stride filler (the instance color is the color source).
+layout(location = 3) in vec2 aOffset;
+layout(location = 4) in vec4 aColor;
 
 layout(location = 0) out vec2 TransformedCoords_0;
 layout(location = 1) out vec4 vColor;
