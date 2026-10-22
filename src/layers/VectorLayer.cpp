@@ -38,6 +38,21 @@ static inline bool HasTransparentSolidColor(const Painter* painter) {
   return FloatNearlyZero(static_cast<const SolidColor*>(colorSource)->color().alpha);
 }
 
+// Returns true when one of the painters records the geometry. A captured geometry is drawn through
+// its painter, so it is not part of the bare geometry the layer records on its own.
+static bool IsCapturedByAnyPainter(const Geometry* geometry,
+                                   const std::vector<std::unique_ptr<Painter>>& painters) {
+  for (const auto& painter : painters) {
+    DEBUG_ASSERT(painter != nullptr);
+    for (const auto* captured : painter->geometries) {
+      if (captured == geometry) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 std::shared_ptr<VectorLayer> VectorLayer::Make() {
   return std::shared_ptr<VectorLayer>(new VectorLayer());
 }
@@ -66,6 +81,7 @@ void VectorLayer::setContents(std::vector<std::shared_ptr<VectorElement>> value)
 }
 
 void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
+  ownGeometries = {};
   if (_contents.empty()) {
     return;
   }
@@ -76,53 +92,65 @@ void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
       element->apply(&context);
     }
   }
+  // Cache the geometries no painter captured so the own geometry shape can still include them. The
+  // set is taken after every element applied, since MergePath clears geometries and painters while
+  // Repeater clones and reorders them.
+  for (const auto& geometry : context.geometries) {
+    DEBUG_ASSERT(geometry != nullptr);
+    if (IsCapturedByAnyPainter(geometry.get(), context.painters)) {
+      continue;
+    }
+    auto shape = geometry->getShape();
+    if (shape == nullptr) {
+      continue;
+    }
+    ownGeometries.push_back({std::move(shape), geometry->matrix});
+  }
   // Render all painters
   for (const auto& painter : context.painters) {
     painter->draw(recorder);
   }
 }
 
+Rect VectorLayer::onGetOwnGeometryBounds() {
+  Rect bounds = Rect::MakeEmpty();
+  for (const auto& geometry : ownGeometries) {
+    auto shapeBounds = geometry.shape->getBounds();
+    shapeBounds = geometry.matrix.mapRect(shapeBounds);
+    bounds.join(shapeBounds);
+  }
+  return bounds;
+}
+
+void VectorLayer::onDrawOwnGeometry(Canvas* canvas) {
+  if (ownGeometries.empty()) {
+    return;
+  }
+  Paint paint = {};
+  paint.setColor(Color::White());
+  for (const auto& geometry : ownGeometries) {
+    AutoCanvasRestore autoRestore(canvas);
+    canvas->concat(geometry.matrix);
+    canvas->drawShape(geometry.shape, paint);
+  }
+}
+
 std::optional<StyledShape> VectorLayer::onGetContentShape() {
-  return computeContentShape(false);
+  return computeContentShape();
 }
 
-std::optional<StyledShape> VectorLayer::onGetOwnContourShape() {
-  // The own outline keeps the silhouette-only painters, which the content shape skips: they are
-  // invisible but they are part of the layer's own shape.
-  return computeContentShape(true);
+std::optional<StyledShape> VectorLayer::onGetOwnGeometryShape() {
+  return computeOwnGeometryShape();
 }
 
-std::optional<StyledShape> VectorLayer::computeContentShape(bool includeSilhouetteOnly) {
-  if (_contents.empty()) {
-    return std::nullopt;
-  }
-  VectorContext context = {};
-  for (const auto& element : _contents) {
-    DEBUG_ASSERT(element != nullptr);
-    if (element->enabled()) {
-      element->apply(&context);
-    }
-  }
-  if (context.painters.empty()) {
-    return std::nullopt;
-  }
-
-  // Only a single shared geometry across all painters with a uniform stroke style can be
-  // simplified to a StyledShape. Anything else has no exact outline: nullopt (consumers fall
-  // back to non-vector paths — glass uses the content alpha, spread uses the content bounds).
+// Simplifies a painter set that describes a single geometry with a uniform style into one exact
+// outline. Anything else has no exact outline: nullopt (consumers fall back to non-vector paths --
+// glass uses the content alpha, spread uses the content bounds).
+static std::optional<StyledShape> MakeStyledShape(const std::vector<const Painter*>& painters) {
   Geometry* sharedGeometry = nullptr;
   auto hasFill = false;
   std::optional<PainterStyle> strokeStyle = std::nullopt;
-  for (const auto& painter : context.painters) {
-    DEBUG_ASSERT(painter != nullptr);
-    // The content shape describes what the layer renders, so it drops painters that contribute no
-    // visible content. The own outline is a geometry recording that keeps both the 0-alpha and the
-    // silhouette-only painters, so its shape must keep that same painter set or it would describe
-    // fewer painters than the raster it is paired with.
-    if (!includeSilhouetteOnly &&
-        (HasTransparentSolidColor(painter.get()) || painter->silhouetteOnly)) {
-      continue;
-    }
+  for (const auto* painter : painters) {
     if (painter->geometries.size() != 1) {
       return std::nullopt;
     }
@@ -143,9 +171,6 @@ std::optional<StyledShape> VectorLayer::computeContentShape(bool includeSilhouet
       strokeStyle = style;
     }
   }
-
-  // For the content shape, sharedGeometry stays null when every painter was skipped as invisible,
-  // meaning the layer has no visible content; the own-outline shape never skips a painter.
   if (sharedGeometry == nullptr) {
     return std::nullopt;
   }
@@ -170,6 +195,64 @@ std::optional<StyledShape> VectorLayer::computeContentShape(bool includeSilhouet
     type = StyledShapeType::Stroke;
   }
   return StyledShape::Make(shape, type, strokeWidth, strokeAlign);
+}
+
+std::optional<StyledShape> VectorLayer::computeContentShape() {
+  if (_contents.empty()) {
+    return std::nullopt;
+  }
+  VectorContext context = {};
+  for (const auto& element : _contents) {
+    DEBUG_ASSERT(element != nullptr);
+    if (element->enabled()) {
+      element->apply(&context);
+    }
+  }
+  // The content shape describes what the layer renders, so it drops the painters that contribute no
+  // visible content.
+  std::vector<const Painter*> painters = {};
+  for (const auto& painter : context.painters) {
+    DEBUG_ASSERT(painter != nullptr);
+    if (!HasTransparentSolidColor(painter.get())) {
+      painters.push_back(painter.get());
+    }
+  }
+  return MakeStyledShape(painters);
+}
+
+std::optional<StyledShape> VectorLayer::computeOwnGeometryShape() {
+  if (_contents.empty()) {
+    return std::nullopt;
+  }
+  VectorContext context = {};
+  for (const auto& element : _contents) {
+    DEBUG_ASSERT(element != nullptr);
+    if (element->enabled()) {
+      element->apply(&context);
+    }
+  }
+  if (!ownGeometries.empty()) {
+    // Geometry no painter captured has an exact outline only when it is the layer's whole own
+    // geometry: a SDF built from it would otherwise disagree with the recorded raster, which also
+    // holds the painters, so those cases let the style take its alpha-mask path instead.
+    if (!context.painters.empty() || ownGeometries.size() != 1) {
+      return std::nullopt;
+    }
+    const auto& entry = ownGeometries.front();
+    auto shape = Shape::ApplyMatrix(entry.shape, entry.matrix);
+    if (shape == nullptr) {
+      return std::nullopt;
+    }
+    return StyledShape::Make(shape, StyledShapeType::Fill, 0.0f, StrokeAlign::Center);
+  }
+  // The own geometry keeps every painter, including the 0-alpha ones, so its shape must keep that
+  // same painter set or it would describe fewer painters than the raster it is paired with.
+  std::vector<const Painter*> painters = {};
+  for (const auto& painter : context.painters) {
+    DEBUG_ASSERT(painter != nullptr);
+    painters.push_back(painter.get());
+  }
+  return MakeStyledShape(painters);
 }
 
 }  // namespace tgfx

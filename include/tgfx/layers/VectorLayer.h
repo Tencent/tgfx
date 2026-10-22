@@ -19,6 +19,8 @@
 #pragma once
 
 #include <vector>
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Shape.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/vectors/VectorElement.h"
 
@@ -63,17 +65,30 @@ class VectorLayer : public Layer {
 
   void onUpdateContent(LayerRecorder* recorder) override;
 
+  Rect onGetOwnGeometryBounds() override;
+
+  void onDrawOwnGeometry(Canvas* canvas) override;
+
   std::optional<StyledShape> onGetContentShape() override;
 
-  std::optional<StyledShape> onGetOwnContourShape() override;
+  std::optional<StyledShape> onGetOwnGeometryShape() override;
 
  private:
-  // Derives the layer outline from the painters. includeSilhouetteOnly selects the own-outline
-  // mode, which also keeps the silhouette-only painters and the painters whose solid color is fully
-  // transparent, so its shape covers the same painters as the own-outline raster.
-  std::optional<StyledShape> computeContentShape(bool includeSilhouetteOnly);
+  /** A geometry no painter captured: it paints nothing but is still own geometry. */
+  struct OwnGeometry {
+    std::shared_ptr<Shape> shape = nullptr;
+    Matrix matrix = Matrix::I();
+  };
+
+  // Derives the content outline from the painters, skipping the painters that contribute no visible
+  // content and the geometries no painter captured.
+  std::optional<StyledShape> computeContentShape();
+
+  // Derives the layer's own geometry from the painters plus the geometries no painter captured.
+  std::optional<StyledShape> computeOwnGeometryShape();
 
   std::vector<std::shared_ptr<VectorElement>> _contents = {};
+  std::vector<OwnGeometry> ownGeometries = {};
 };
 
 }  // namespace tgfx

@@ -43,7 +43,7 @@ class ComposeContent : public LayerContent {
   void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
 
  protected:
-  void drawContourInternal(Canvas* canvas, bool antiAlias, bool includeSilhouette) const override;
+  void drawContourInternal(Canvas* canvas, bool antiAlias) const override;
 
   Type type() const override {
     return Type::Compose;

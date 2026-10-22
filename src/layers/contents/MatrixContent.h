@@ -44,7 +44,7 @@ class MatrixContent : public GeometryContent {
   Matrix matrix = Matrix::I();
 
  protected:
-  void drawContourInternal(Canvas* canvas, bool antiAlias, bool includeSilhouette) const override;
+  void drawContourInternal(Canvas* canvas, bool antiAlias) const override;
 
   Type type() const override {
     return Type::Matrix;

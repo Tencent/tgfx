@@ -108,23 +108,6 @@ class FillStyle : public VectorElement {
    */
   void setPlacement(LayerPlacement value);
 
-  /**
-   * Returns whether this fill only takes part in the layer's own silhouette, instead of the contour
-   * shared with layer styles and the shape ordinary styles see. The default value is false.
-   */
-  bool silhouetteOnly() const {
-    return _silhouetteOnly;
-  }
-
-  /**
-   * Sets whether this fill only takes part in the layer's own silhouette. It exists because alpha
-   * cannot express the difference: a fill with a fully transparent color is indistinguishable from
-   * a user's transparent fill. The flag only selects which contour and which shape the fill feeds;
-   * whether the fill paints is still decided by its own alpha, so a caller that needs geometry
-   * without visible color must also call setAlpha(0).
-   */
-  void setSilhouetteOnly(bool value);
-
  protected:
   Type type() const override {
     return Type::FillStyle;
@@ -147,7 +130,6 @@ class FillStyle : public VectorElement {
   BlendMode _blendMode = BlendMode::SrcOver;
   FillRule _fillRule = FillRule::Winding;
   LayerPlacement _placement = LayerPlacement::Background;
-  bool _silhouetteOnly = false;
 };
 
 }  // namespace tgfx

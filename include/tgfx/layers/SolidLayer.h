@@ -103,6 +103,8 @@ class SolidLayer : public Layer {
 
   std::optional<StyledShape> onGetContentShape() override;
 
+  std::optional<StyledShape> onGetOwnGeometryShape() override;
+
  private:
   Color _color = {};
   float _width = 0;

@@ -250,6 +250,12 @@ void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
   }
 }
 
+std::optional<StyledShape> ShapeLayer::onGetOwnGeometryShape() {
+  // A ShapeLayer holds no geometry that a painter leaves uncaptured, so its own geometry is its
+  // content shape. That shape still skips invisible styles (onGetContentShape), hence the nullopt.
+  return onGetContentShape();
+}
+
 std::optional<StyledShape> ShapeLayer::onGetContentShape() {
   if (_shape == nullptr) {
     return std::nullopt;

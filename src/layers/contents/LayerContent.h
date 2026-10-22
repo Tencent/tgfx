@@ -50,12 +50,11 @@ class LayerContent {
   virtual bool hitTestPoint(float localX, float localY) const = 0;
 
   /**
-   * Draws the contour of the content to the specified canvas. The contour excludes painters marked
-   * silhouetteOnly, which belong to the layer's own silhouette only; set includeSilhouette to
-   * record the layer's own outline instead, which keeps them.
+   * Draws the contour of the content to the specified canvas. Unlike the rendered content, the
+   * contour keeps the painters whose alpha is 0.
    */
-  void drawContour(Canvas* canvas, bool antiAlias, bool includeSilhouette = false) const {
-    drawContourInternal(canvas, antiAlias, includeSilhouette);
+  void drawContour(Canvas* canvas, bool antiAlias) const {
+    drawContourInternal(canvas, antiAlias);
   }
 
   /**
@@ -88,12 +87,9 @@ class LayerContent {
 
  protected:
   /**
-   * Draws the contour. A content that holds several painters forwards to them through this channel,
-   * passing includeSilhouette on so a caller that records the layer's own outline keeps the
-   * silhouette-only painters the shared contour drops.
+   * Draws the contour. A content that holds several painters forwards to them through this channel.
    */
-  virtual void drawContourInternal(Canvas* canvas, bool antiAlias,
-                                   bool includeSilhouette) const = 0;
+  virtual void drawContourInternal(Canvas* canvas, bool antiAlias) const = 0;
 
   enum class Type {
     Rect,

@@ -267,9 +267,9 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (group == nullptr) {
     return;
   }
-  // The entry the consumer samples: a style that declares the own outline takes the layer's own
-  // outline, every other style the shared content image. A style that resolves to nothing to draw is
-  // skipped by BOTH sides, so capture and consume keep the same push/pop count.
+  // The entry the consumer samples: a style that draws from the layer's own geometry takes that
+  // recording, every other style the shared content image. A style that resolves to nothing to draw
+  // is skipped by BOTH sides, so capture and consume keep the same push/pop count.
   auto* contentEntry = ResolveContentEntry(*group, style);
   if (contentEntry == nullptr || contentEntry->image == nullptr) {
     return;
@@ -410,8 +410,8 @@ const LayerStyleSource* BackgroundCapturer::cacheLayerStyleSource(
     if (group->contour.has_value() && group->contour->image != nullptr) {
       group->contour->image = group->contour->image->makeRasterized();
     }
-    if (group->ownContour.has_value() && group->ownContour->image != nullptr) {
-      group->ownContour->image = group->ownContour->image->makeRasterized();
+    if (group->ownGeometry.has_value() && group->ownGeometry->image != nullptr) {
+      group->ownGeometry->image = group->ownGeometry->image->makeRasterized();
     }
   }
   auto* raw = source.get();
@@ -441,7 +441,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (group == nullptr) {
     return;
   }
-  // A style that declares the own outline consumes the layer's own outline, every other style the
+  // A style that draws from the layer's own geometry consumes that recording, every other style the
   // shared content image; a group that recorded nothing usable for this style resolves to nullptr so
   // the style is skipped.
   auto* contentEntry = ResolveContentEntry(*group, style);
@@ -494,8 +494,6 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   styleInput.extraSources.push_back(
       std::make_shared<StyleInputSource>(std::move(bgImage), backgroundOffset));
   if ((sourceFlags & static_cast<uint32_t>(LayerStyleExtraSourceType::Contour)) != 0) {
-    // The Contour source is the shared contour: its raster and the shared content shape describe
-    // the same recording.
     std::shared_ptr<Image> contourImage = nullptr;
     Point contourOffset = {};
     if (group->contour.has_value()) {
@@ -505,12 +503,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
         std::move(contourImage), contourOffset, source->contentShape));
   }
-  if ((sourceFlags & static_cast<uint32_t>(LayerStyleExtraSourceType::OwnShape)) != 0) {
-    // The own geometry is not a contour: it carries only the shape; its raster is the content
-    // entry resolved above.
-    styleInput.extraSources.push_back(
-        std::make_shared<OwnShapeInputSource>(ResolveOwnShape(*group, style)));
-  }
+  styleInput.ownShape = ResolveOwnShape(*group, style);
 
   // On the first pass that needs it, rasterize the style's output once and cache it; every
   // pass — this one included — composites the same texture back with SrcOver. The image carries

@@ -130,12 +130,18 @@ class GlassStyle : public LayerStyle {
   }
 
   /**
-   * Glass needs the background, the shared contour (its fallback) and the layer's own geometry.
+   * Glass needs the background content below the layer.
    */
   uint32_t extraSourceType() const override {
-    return static_cast<uint32_t>(LayerStyleExtraSourceType::Background) |
-           static_cast<uint32_t>(LayerStyleExtraSourceType::Contour) |
-           static_cast<uint32_t>(LayerStyleExtraSourceType::OwnShape);
+    return static_cast<uint32_t>(LayerStyleExtraSourceType::Background);
+  }
+
+  /**
+   * Glass covers the layer's own geometry rather than its rendered content, so a layer whose
+   * painting is invisible still refracts over its own geometry.
+   */
+  LayerStyleContentSource contentSource() const override {
+    return LayerStyleContentSource::Geometry;
   }
 
  protected:

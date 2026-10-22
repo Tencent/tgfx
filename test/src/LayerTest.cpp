@@ -58,10 +58,13 @@
 #include "tgfx/layers/vectors/Ellipse.h"
 #include "tgfx/layers/vectors/FillStyle.h"
 #include "tgfx/layers/vectors/ImagePattern.h"
+#include "tgfx/layers/vectors/MergePath.h"
 #include "tgfx/layers/vectors/Rectangle.h"
+#include "tgfx/layers/vectors/Repeater.h"
 #include "tgfx/layers/vectors/ShapePath.h"
 #include "tgfx/layers/vectors/SolidColor.h"
 #include "tgfx/layers/vectors/StrokeStyle.h"
+#include "tgfx/layers/vectors/Text.h"
 #include "tgfx/layers/vectors/VectorGroup.h"
 #include "utils/TestUtils.h"
 
@@ -4198,7 +4201,7 @@ TGFX_TEST(LayerTest, DropShadowSpreadWithoutExactShape) {
   ASSERT_TRUE(outsidePixel.has_value());
   EXPECT_EQ(*outsidePixel, 0u);
 }
-TGFX_TEST_PRIVATE(LayerTest, GlassStyleUsesBackgroundAndContourSource) {
+TGFX_TEST_PRIVATE(LayerTest, GlassStyleDeclaresOwnGeometryContentSource) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -4209,35 +4212,37 @@ TGFX_TEST_PRIVATE(LayerTest, GlassStyleUsesBackgroundAndContourSource) {
   auto glassStyle = GlassStyle::Make(80, 50, 0, 50, 0, 0, 0);
   layer->setLayerStyles({glassStyle});
 
+  // Glass declares where its content comes from instead of flagging a source: it draws from the
+  // layer's own geometry and only needs the background on top of that.
+  EXPECT_EQ(glassStyle->contentSource(), LayerStyleContentSource::Geometry);
   EXPECT_EQ(glassStyle->extraSourceType(),
-            static_cast<uint32_t>(LayerStyleExtraSourceType::Background) |
-                static_cast<uint32_t>(LayerStyleExtraSourceType::Contour) |
-                static_cast<uint32_t>(LayerStyleExtraSourceType::OwnShape));
+            static_cast<uint32_t>(LayerStyleExtraSourceType::Background));
 
   DrawArgs drawArgs(context);
   TGFX_PRIVATE_ACCESS(auto source = layer->getLayerStyleSource(drawArgs, Matrix::I());
                       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
-                      EXPECT_TRUE(source->groups[0]->contour.has_value());
-                      EXPECT_TRUE(source->contentShape.has_value());)
+                      ASSERT_TRUE(source->groups[0]->ownGeometry.has_value());
+                      EXPECT_TRUE(source->groups[0]->ownGeometry->image != nullptr);
+                      EXPECT_TRUE(source->groups[0]->ownShape.has_value())
+                      << "a layered rect has an exact own-geometry shape, so Glass takes the SDF "
+                         "path";
+                      EXPECT_FALSE(source->groups[0]->contour.has_value());)
 }
 
-// ===== The layer's own outline: coverage asserted on rendered pixels =====
+// ===== The layer's own geometry: coverage asserted on rendered pixels =====
 //
-// A Glass style takes its coverage shape from the layer's own outline, so the cases below are
+// A Glass style takes its coverage shape from the layer's own geometry, so the cases below are
 // written the way the rest of this file is: set an input, render the layer tree over a checker
 // backdrop and assert on the rendered pixels. Baseline::Compare is deliberately not used, because no
 // stored reference images exist for these cases and adding one would require a baseline version
 // bump. Internal recordings are asserted only where a rendered difference cannot attribute a
 // failure, and every such assertion says why it is there.
 
-// The painter of a shape that carries a Glass style but no visible fill: a white color source (color
-// alpha 1, so the geometry still counts as a visible color source for the shape classifiers) with
-// style alpha 0 and the silhouette-only flag. The fill paints nothing, but its geometry still
-// defines the layer's own outline.
-static std::shared_ptr<FillStyle> MakeSilhouetteOnlyFill() {
+// A fill painter that paints nothing while still capturing its geometry: style alpha 0 over a color
+// alpha of 1. The contour keeps it, so the geometry still belongs to the layer's own geometry.
+static std::shared_ptr<FillStyle> MakeZeroAlphaFill() {
   auto fill = FillStyle::Make(SolidColor::Make(Color::White()));
   fill->setAlpha(0.0f);
-  fill->setSilhouetteOnly(true);
   return fill;
 }
 
@@ -4307,53 +4312,50 @@ static int CountDifferingPixels(Surface* first, Surface* second, const Rect& reg
   return count;
 }
 
-constexpr float GlassMarkerPanelLeft = 50.0f;
-constexpr float GlassMarkerPanelTop = 50.0f;
-constexpr float GlassMarkerPanelWidth = 100.0f;
-constexpr float GlassMarkerPanelHeight = 80.0f;
-constexpr float GlassMarkerSurfaceExtent = 200.0f;
-constexpr int GlassMarkerInteriorPixels = static_cast<int>(GlassMarkerPanelWidth - 2.0f) *
-                                          static_cast<int>(GlassMarkerPanelHeight - 2.0f);
+constexpr float GlassPanelLeft = 50.0f;
+constexpr float GlassPanelTop = 50.0f;
+constexpr float GlassPanelWidth = 100.0f;
+constexpr float GlassPanelHeight = 80.0f;
+constexpr float GlassPanelSurfaceExtent = 200.0f;
+constexpr int GlassPanelInteriorPixels =
+    static_cast<int>(GlassPanelWidth - 2.0f) * static_cast<int>(GlassPanelHeight - 2.0f);
 
-static Rect GlassMarkerPanelBounds() {
-  return Rect::MakeXYWH(GlassMarkerPanelLeft, GlassMarkerPanelTop, GlassMarkerPanelWidth,
-                        GlassMarkerPanelHeight);
+static Rect GlassPanelBounds() {
+  return Rect::MakeXYWH(GlassPanelLeft, GlassPanelTop, GlassPanelWidth, GlassPanelHeight);
 }
 
-// The same panel in the marker layer's own local space: MakeMarkerPanel places the layer at the
+// The same panel in the layer's own local space: MakePanel places the layer at the
 // standard offset, so a region spec carries local bounds while every ROI is in surface coordinates.
-static Rect GlassMarkerPanelLocalBounds() {
-  return Rect::MakeWH(GlassMarkerPanelWidth, GlassMarkerPanelHeight);
+static Rect GlassPanelLocalBounds() {
+  return Rect::MakeWH(GlassPanelWidth, GlassPanelHeight);
 }
 
-// ===== Shared marker fixtures =====
+// ===== Shared region fixtures =====
 
-// Which painter a marker region carries over its geometry.
-//   None        - no painter: the region adds no geometry to the outline.
-//   Marker      - a silhouette-only painter: geometry only, dropped from the shared contour and the
-//                 visible content, kept in the layer's own outline.
+// Which painter a region carries over its geometry.
+//   None        - no painter at all: the geometry joins the layer's own geometry as bare geometry
+//                 and contributes nothing to the shared content or contour.
 //   Transparent - a retained 0%-alpha fill: geometry only, but it stays in the shared contour.
 //   TransparentColor - a fully transparent solid color (alpha 0 in the color source), which the
 //                      content-shape derivation skips.
 //   Opaque      - a visible fill.
-enum class MarkerFillKind { None, Marker, Transparent, TransparentColor, Opaque };
+enum class RegionFillKind { None, Transparent, TransparentColor, Opaque };
 
-// One rectangle region of a marker panel plus the overrides the special cases need.
-struct MarkerRegionSpec {
+// One rectangle region of a panel plus the overrides the special cases need.
+struct RegionSpec {
   Rect bounds = {};
-  MarkerFillKind fill = MarkerFillKind::Marker;
-  float markerAlpha = 0.0f;                        // only meaningful for MarkerFillKind::Marker
+  RegionFillKind fill = RegionFillKind::None;
   float roundness = 0.0f;                          // 0 = sharp rectangle
   std::shared_ptr<VectorElement> shape = nullptr;  // overrides bounds/roundness when set
   float strokeWidth = 0.0f;                        // 0 = no stroke
   StrokeAlign strokeAlign = StrokeAlign::Outside;
 };
 
-// One marker region: the geometry plus its painter. This and MakeMarkerPanel are the two shared
-// builders every marker case routes through -- the same marker rectangle used to be rebuilt inline
+// One region: the geometry plus its painter. This and MakePanel are the two shared
+// builders every region case routes through -- the same region rectangle used to be rebuilt inline
 // in a dozen places, which made it hard to tell whether two cases differed in the fixture or in the
 // behaviour.
-static std::shared_ptr<VectorGroup> MakeMarkerRegion(const MarkerRegionSpec& spec) {
+static std::shared_ptr<VectorGroup> MakeRegion(const RegionSpec& spec) {
   std::shared_ptr<VectorElement> geometry = spec.shape;
   if (geometry == nullptr) {
     auto rect = Rectangle::Make();
@@ -4364,24 +4366,15 @@ static std::shared_ptr<VectorGroup> MakeMarkerRegion(const MarkerRegionSpec& spe
   }
   std::vector<std::shared_ptr<VectorElement>> elements = {geometry};
   switch (spec.fill) {
-    case MarkerFillKind::None:
+    case RegionFillKind::None:
       break;
-    case MarkerFillKind::Marker: {
-      auto fill = MakeSilhouetteOnlyFill();
-      fill->setAlpha(spec.markerAlpha);
-      elements.push_back(fill);
+    case RegionFillKind::Transparent:
+      elements.push_back(MakeZeroAlphaFill());
       break;
-    }
-    case MarkerFillKind::Transparent: {
-      auto fill = FillStyle::Make(SolidColor::Make(Color::White()));
-      fill->setAlpha(0.0f);
-      elements.push_back(fill);
-      break;
-    }
-    case MarkerFillKind::TransparentColor:
+    case RegionFillKind::TransparentColor:
       elements.push_back(FillStyle::Make(SolidColor::Make(Color::Transparent())));
       break;
-    case MarkerFillKind::Opaque:
+    case RegionFillKind::Opaque:
       elements.push_back(FillStyle::Make(SolidColor::Make(Color::White())));
       break;
   }
@@ -4398,18 +4391,18 @@ static std::shared_ptr<VectorGroup> MakeMarkerRegion(const MarkerRegionSpec& spe
   return group;
 }
 
-// The standard marker panel: the given regions laid out in marker-local space at the standard
+// The standard panel: the given regions laid out in panel-local space at the standard
 // offset, with the given styles attached.
-static std::shared_ptr<Layer> MakeMarkerPanel(
-    const std::vector<MarkerRegionSpec>& regions,
+static std::shared_ptr<Layer> MakePanel(
+    const std::vector<RegionSpec>& regions,
     const std::vector<std::shared_ptr<LayerStyle>>& styles = {}) {
   std::vector<std::shared_ptr<VectorElement>> contents = {};
   for (const auto& region : regions) {
-    contents.push_back(MakeMarkerRegion(region));
+    contents.push_back(MakeRegion(region));
   }
   auto layer = VectorLayer::Make();
   layer->setContents(std::move(contents));
-  layer->setMatrix(Matrix::MakeTrans(GlassMarkerPanelLeft, GlassMarkerPanelTop));
+  layer->setMatrix(Matrix::MakeTrans(GlassPanelLeft, GlassPanelTop));
   if (!styles.empty()) {
     layer->setLayerStyles(styles);
   }
@@ -4555,16 +4548,15 @@ static std::shared_ptr<ShapePath> MakeRectShapePath(const Rect& rect, float radi
   return shape;
 }
 
-// Which fill painter a panel carries next to its stroke: none, the silhouette-only painter of a
-// shape carrying a Glass style with no visible fill, or a retained fully transparent fill.
-enum class OwnContourFillKind { None, Marker, Transparent };
+// Which fill painter a panel carries next to its stroke: none, or a retained fully transparent fill.
+enum class OwnGeometryFillKind { None, Transparent };
 
 // One rounded rectangle with an optional fill painter and one stroke painter of the given alignment.
 // fillKind selects the painter recorded next to the stroke. styles are attached to the layer: with a
-// Glass style the layer records an own outline, without one it renders as the glass-off reference.
-static std::shared_ptr<Layer> MakeOwnContourStrokePanel(
+// Glass style the layer records its own geometry, without one it renders as the glass-off reference.
+static std::shared_ptr<Layer> MakeOwnGeometryStrokePanel(
     const Rect& rect, float radius, float strokeWidth, StrokeAlign align,
-    OwnContourFillKind fillKind,
+    OwnGeometryFillKind fillKind,
     const std::vector<std::shared_ptr<LayerStyle>>& styles = {
         GlassStyle::Make(0, 50, 100, 0, 0, 0, 0)}) {
   auto layer = VectorLayer::Make();
@@ -4577,12 +4569,8 @@ static std::shared_ptr<Layer> MakeOwnContourStrokePanel(
   stroke->setStrokeWidth(strokeWidth);
   stroke->setStrokeAlign(align);
   std::vector<std::shared_ptr<VectorElement>> elements = {shape};
-  if (fillKind == OwnContourFillKind::Marker) {
-    elements.push_back(MakeSilhouetteOnlyFill());
-  } else if (fillKind == OwnContourFillKind::Transparent) {
-    auto fill = FillStyle::Make(SolidColor::Make(Color::White()));
-    fill->setAlpha(0.0f);
-    elements.push_back(fill);
+  if (fillKind == OwnGeometryFillKind::Transparent) {
+    elements.push_back(MakeZeroAlphaFill());
   }
   elements.push_back(stroke);
   auto group = VectorGroup::Make();
@@ -4626,10 +4614,10 @@ static std::shared_ptr<Layer> MakeTwoGroupFillStrokePanel(
   return layer;
 }
 
-// Glass is built here with excludeChildEffects set, so its own outline lands in the
+// Glass is built here with excludeChildEffects set, so its own geometry lands in the
 // excludeChildEffects bucket groups[1] and not in groups[0], the bucket a plain style reads.
-static std::shared_ptr<GlassStyle> MakeOwnOutlineGlass(float refraction, float depth, float frost,
-                                                       float dispersion, float splay) {
+static std::shared_ptr<GlassStyle> MakeOwnGeometryGlass(float refraction, float depth, float frost,
+                                                        float dispersion, float splay) {
   auto glass = GlassStyle::Make(refraction, depth, frost, dispersion, splay, 0, 0);
   glass->setExcludeChildEffects(true);
   return glass;
@@ -4690,79 +4678,67 @@ static std::shared_ptr<Layer> MakeGlassChildPanel(GlassChildFillKind fillKind, c
   return parent;
 }
 
-// A layer whose only painter is a silhouette-only marker records no visible content, yet its own
-// outline drives Glass: the coverage follows the marker geometry and the marker itself paints
-// nothing. This absorbs the marker-only case, the visibility the marker's own alpha still has, and a
-// two-region outline with a hole.
-TGFX_TEST_PRIVATE(LayerTest, GlassMarkerGivesCoverageWithoutAnyFill) {
+// A layer whose only content is a geometry no painter captures records no visible content, yet its
+// own geometry drives Glass: the coverage follows the geometry and nothing paints. This absorbs the
+// geometry-only case and a two-region own geometry with a hole.
+TGFX_TEST_PRIVATE(LayerTest, GlassGeometryGivesCoverageWithoutAnyFill) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  const auto panelBounds = GlassMarkerPanelBounds();
+  const auto panelBounds = GlassPanelBounds();
   const auto glass = GlassStyle::Make(0, 50, 100, 0, 0, 0, 0);
   auto interior = panelBounds;
   interior.inset(1.0f, 1.0f);
   const auto interiorArea =
       static_cast<int>(interior.width()) * static_cast<int>(interior.height());
 
-  MarkerRegionSpec marker = {};
-  marker.bounds = GlassMarkerPanelLocalBounds();
-  marker.fill = MarkerFillKind::Marker;
+  RegionSpec bareGeometry = {};
+  bareGeometry.bounds = GlassPanelLocalBounds();
 
-  auto plain = RenderPanelOverChecker(context, MakeMarkerPanel({}));
-  auto markedPlain = RenderPanelOverChecker(context, MakeMarkerPanel({marker}));
-  auto glassPanel = RenderPanelOverChecker(context, MakeMarkerPanel({marker}, {glass}));
-  ASSERT_TRUE(plain != nullptr && markedPlain != nullptr && glassPanel != nullptr);
-  // The marker alone paints nothing: adding it to a layer without a style changes no pixel.
-  EXPECT_EQ(CountDifferingPixels(plain.get(), markedPlain.get(), interior, 2), 0)
-      << "marker-only interior ROI: the silhouette-only marker must not paint anything";
-  // With the Glass style the marker's geometry drives real frost over the whole panel.
+  auto plain = RenderPanelOverChecker(context, MakePanel({}));
+  auto geometryOnly = RenderPanelOverChecker(context, MakePanel({bareGeometry}));
+  auto glassPanel = RenderPanelOverChecker(context, MakePanel({bareGeometry}, {glass}));
+  ASSERT_TRUE(plain != nullptr && geometryOnly != nullptr && glassPanel != nullptr);
+  // The bare geometry paints nothing: adding it to a layer without a style changes no pixel.
+  EXPECT_EQ(CountDifferingPixels(plain.get(), geometryOnly.get(), interior, 2), 0)
+      << "geometry-only interior ROI: bare geometry must not paint anything";
+  // With the Glass style the bare geometry drives real frost over the whole panel.
   const auto frosted = CountDifferingPixels(plain.get(), glassPanel.get(), interior, 16);
-  EXPECT_GT(frosted, interiorArea / 5) << "marker-only interior ROI: the marker-driven Glass must "
-                                          "frost a sizable part of the panel, "
-                                          "frosted "
+  EXPECT_GT(frosted, interiorArea / 5) << "geometry-only interior ROI: the geometry-driven Glass "
+                                          "must frost a sizable part of the panel, frosted "
                                        << frosted << " of " << interiorArea;
-  // The coverage ends at the marker outline.
-  EXPECT_EQ(
-      CountDifferingPixels(
-          plain.get(), glassPanel.get(),
-          Rect::MakeXYWH(0.0f, 0.0f, GlassMarkerPanelLeft - 1.0f, GlassMarkerSurfaceExtent), 2),
-      0)
-      << "left-of-panel ROI: the marker-driven Glass must not reach outside its outline";
-  // A silhouette-only paint is still PAINTED according to its own alpha: the flag only routes the
-  // geometry (which contour and which shape consume it), it does not make the paint invisible. A
-  // silhouette-only painter with alpha 0 stays invisible, so the alpha 1 configuration below is the
-  // one that has to keep painting.
-  MarkerRegionSpec alphaOneMarker = marker;
-  alphaOneMarker.markerAlpha = 1.0f;
-  auto withoutMarker = RenderPanelOverChecker(context, MakeMarkerPanel({}, {glass}));
-  auto markerAlphaOne = RenderPanelOverChecker(context, MakeMarkerPanel({alphaOneMarker}, {glass}));
-  ASSERT_TRUE(withoutMarker != nullptr && markerAlphaOne != nullptr);
-  EXPECT_GT(CountDifferingPixels(withoutMarker.get(), markerAlphaOne.get(), interior, 0), 0)
-      << "marker ROI (silhouette-only, alpha 1): a silhouette-only paint with alpha 1 must still "
-         "paint, so the panel must differ from the same panel without the marker";
+  // The coverage ends at the geometry outline.
+  EXPECT_EQ(CountDifferingPixels(
+                plain.get(), glassPanel.get(),
+                Rect::MakeXYWH(0.0f, 0.0f, GlassPanelLeft - 1.0f, GlassPanelSurfaceExtent), 2),
+            0)
+      << "left-of-panel ROI: the geometry-driven Glass must not reach outside its outline";
 
   DrawArgs drawArgs(context);
   TGFX_PRIVATE_ACCESS(
-      // Failure attribution: the marker must not leak into the visible content, otherwise every
+      // Failure attribution: bare geometry must not leak into the visible content, otherwise every
       // content-based style would see geometry the author never drew. This is a recording assertion
       // on purpose -- a leak would change rendered pixels only through some other style, which would
       // make the failure impossible to attribute.
       auto markedSource =
-          MakeMarkerPanel({marker}, {glass})->getLayerStyleSource(drawArgs, Matrix::I());
+          MakePanel({bareGeometry}, {glass})->getLayerStyleSource(drawArgs, Matrix::I());
       ASSERT_TRUE(markedSource != nullptr); ASSERT_TRUE(markedSource->groups[0] != nullptr);
       EXPECT_TRUE(markedSource->groups[0]->content.image == nullptr)
-      << "the marker must not be recorded in the shared content image";)
+      << "bare geometry must not be recorded in the shared content image";
+      ASSERT_TRUE(markedSource->groups[0]->ownGeometry.has_value());
+      EXPECT_TRUE(markedSource->groups[0]->ownGeometry->image != nullptr);
+      EXPECT_TRUE(markedSource->groups[0]->ownShape.has_value())
+      << "a single bare geometry is the whole own geometry, so Glass gets an exact shape";)
 
-  // Donut arm: a second region with a hole. The coverage follows the union of the two markers, so it
+  // Donut arm: a second region with a hole. The coverage follows the union of the two regions, so it
   // frosts both regions and leaves the hole untouched.
   const auto regionABounds = Rect::MakeLTRB(0.0f, 0.0f, 60.0f, 80.0f);
   const auto regionBBounds = Rect::MakeLTRB(80.0f, 0.0f, 140.0f, 80.0f);
   const auto holeBounds = Rect::MakeLTRB(100.0f, 25.0f, 120.0f, 55.0f);
-  MarkerRegionSpec regionA = {};
+  RegionSpec regionA = {};
   regionA.bounds = regionABounds;
-  MarkerRegionSpec regionB = {};
+  RegionSpec regionB = {};
   {
     Path donut = {};
     donut.setFillType(PathFillType::EvenOdd);
@@ -4772,61 +4748,60 @@ TGFX_TEST_PRIVATE(LayerTest, GlassMarkerGivesCoverageWithoutAnyFill) {
     shape->setPath(std::move(donut));
     regionB.shape = shape;
   }
-  auto donutPlain = RenderPanelOverChecker(context, MakeMarkerPanel({regionA, regionB}));
-  auto donutGlass = RenderPanelOverChecker(context, MakeMarkerPanel({regionA, regionB}, {glass}));
+  auto donutPlain = RenderPanelOverChecker(context, MakePanel({regionA, regionB}));
+  auto donutGlass = RenderPanelOverChecker(context, MakePanel({regionA, regionB}, {glass}));
   ASSERT_TRUE(donutPlain != nullptr && donutGlass != nullptr);
   auto worldA = regionABounds;
-  worldA.offset(GlassMarkerPanelLeft, GlassMarkerPanelTop);
+  worldA.offset(GlassPanelLeft, GlassPanelTop);
   worldA.inset(5.0f, 5.0f);
   const auto areaA = static_cast<int>(worldA.width() * worldA.height());
   EXPECT_GT(CountDifferingPixels(donutPlain.get(), donutGlass.get(), worldA, 16), areaA / 5)
-      << "donut first-region ROI: the multi-region own outline must cover the first region";
-  auto worldBandB = Rect::MakeLTRB(GlassMarkerPanelLeft + regionBBounds.left + 2.0f,
-                                   GlassMarkerPanelTop + regionBBounds.top + 5.0f,
-                                   GlassMarkerPanelLeft + holeBounds.left - 2.0f,
-                                   GlassMarkerPanelTop + regionBBounds.bottom - 5.0f);
+      << "donut first-region ROI: the multi-region own geometry must cover the first region";
+  auto worldBandB = Rect::MakeLTRB(
+      GlassPanelLeft + regionBBounds.left + 2.0f, GlassPanelTop + regionBBounds.top + 5.0f,
+      GlassPanelLeft + holeBounds.left - 2.0f, GlassPanelTop + regionBBounds.bottom - 5.0f);
   const auto areaBandB = static_cast<int>(worldBandB.width() * worldBandB.height());
   EXPECT_GT(CountDifferingPixels(donutPlain.get(), donutGlass.get(), worldBandB, 16), areaBandB / 5)
-      << "donut second-region band ROI: every region of the own outline must be covered";
+      << "donut second-region band ROI: every region of the own geometry must be covered";
   auto worldHole = holeBounds;
-  worldHole.offset(GlassMarkerPanelLeft, GlassMarkerPanelTop);
+  worldHole.offset(GlassPanelLeft, GlassPanelTop);
   worldHole.inset(3.0f, 3.0f);
   EXPECT_EQ(CountDifferingPixels(donutPlain.get(), donutGlass.get(), worldHole, 2), 0)
-      << "donut hole ROI: the hole in the own outline must stay untouched";
+      << "donut hole ROI: the hole in the own geometry must stay untouched";
 }
 
-// The marker belongs to the layer's own outline alone. Four rendered observables pin that on the
-// recordings a content-based style consumes: a sibling spread shadow renders identically with and
-// without the marker (in either recording order, and for a marker disjoint from the visible fill),
-// the shadow follows the outside stroke band rather than the shape interior, and a
-// real 0%-opacity fill does reach the shared contour the marker does not.
-TGFX_TEST_PRIVATE(LayerTest, GlassMarkerDoesNotLeakIntoSharedRecordings) {
+// The bare geometry belongs to the layer's own geometry alone. Four rendered observables pin that on
+// the recordings a content-based style consumes: a sibling spread shadow renders identically with and
+// without the bare geometry (in either recording order, and for a region disjoint from the visible
+// fill), the shadow follows the outside stroke band rather than the shape interior, and a real
+// 0%-opacity fill does reach the shared contour the bare geometry does not.
+TGFX_TEST_PRIVATE(LayerTest, GlassGeometryDoesNotLeakIntoSharedRecordings) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   auto shadow = DropShadowStyle::Make(0, 0, 0, 0, Color::Black());
   shadow->setSpread(10);
-  MarkerRegionSpec panel = {};
-  panel.bounds = GlassMarkerPanelLocalBounds();
+  RegionSpec panel = {};
+  panel.bounds = GlassPanelLocalBounds();
   panel.roundness = 20.0f;
-  panel.fill = MarkerFillKind::Opaque;
-  MarkerRegionSpec overlayMarker = panel;
-  overlayMarker.fill = MarkerFillKind::Marker;
+  panel.fill = RegionFillKind::Opaque;
+  RegionSpec overlayGeometry = panel;
+  overlayGeometry.fill = RegionFillKind::None;
 
-  // The marker overlays the panel's own geometry, so the shadow's source shape and bounds are the
-  // panel's whether or not the marker is recorded; a leak would still move the shadow through the
-  // grouping of the shared contour.
-  auto makeShadowPanel = [&](bool withMarker, bool markerFirst) {
-    std::vector<MarkerRegionSpec> regions = {};
-    if (withMarker && markerFirst) {
-      regions.push_back(overlayMarker);
+  // The bare geometry overlays the panel's own geometry, so the shadow's source shape and bounds are
+  // the panel's whether or not the geometry is recorded; a leak would still move the shadow through
+  // the grouping of the shared contour.
+  auto makeShadowPanel = [&](bool withGeometry, bool geometryFirst) {
+    std::vector<RegionSpec> regions = {};
+    if (withGeometry && geometryFirst) {
+      regions.push_back(overlayGeometry);
     }
     regions.push_back(panel);
-    if (withMarker && !markerFirst) {
-      regions.push_back(overlayMarker);
+    if (withGeometry && !geometryFirst) {
+      regions.push_back(overlayGeometry);
     }
-    return MakeMarkerPanel(regions, {shadow});
+    return MakePanel(regions, {shadow});
   };
   // A probe just outside the rounded top-left corner: the spread reaches there, so the reading is
   // not vacuous.
@@ -4840,69 +4815,70 @@ TGFX_TEST_PRIVATE(LayerTest, GlassMarkerDoesNotLeakIntoSharedRecordings) {
   auto plainShadow = RenderPanelOverChecker(context, makeShadowPanel(false, false));
   ASSERT_TRUE(plainShadow != nullptr);
   const auto shadowRoi =
-      Rect::MakeLTRB(0.0f, 0.0f, GlassMarkerSurfaceExtent, GlassMarkerSurfaceExtent);
-  for (auto markerFirst : {false, true}) {
-    auto markedShadowPixel = RenderSpreadShadowPixel(context, makeShadowPanel(true, markerFirst),
-                                                     cornerProbeX, cornerProbeY);
-    ASSERT_TRUE(markedShadowPixel.has_value());
-    EXPECT_EQ(*markedShadowPixel, *plainShadowPixel)
-        << "rounded-corner probe (markerFirst=" << markerFirst
-        << "): the marker must not move the shadow";
-    auto markedShadow = RenderPanelOverChecker(context, makeShadowPanel(true, markerFirst));
-    ASSERT_TRUE(markedShadow != nullptr);
-    EXPECT_EQ(CountDifferingPixels(plainShadow.get(), markedShadow.get(), shadowRoi, 2), 0)
-        << "shadow ROI (markerFirst=" << markerFirst
-        << "): the marker must not change the shadow, in either recording order";
+      Rect::MakeLTRB(0.0f, 0.0f, GlassPanelSurfaceExtent, GlassPanelSurfaceExtent);
+  for (auto geometryFirst : {false, true}) {
+    auto bareShadowPixel = RenderSpreadShadowPixel(context, makeShadowPanel(true, geometryFirst),
+                                                   cornerProbeX, cornerProbeY);
+    ASSERT_TRUE(bareShadowPixel.has_value());
+    EXPECT_EQ(*bareShadowPixel, *plainShadowPixel)
+        << "rounded-corner probe (geometryFirst=" << geometryFirst
+        << "): the bare geometry must not move the shadow";
+    auto bareShadow = RenderPanelOverChecker(context, makeShadowPanel(true, geometryFirst));
+    ASSERT_TRUE(bareShadow != nullptr);
+    EXPECT_EQ(CountDifferingPixels(plainShadow.get(), bareShadow.get(), shadowRoi, 2), 0)
+        << "shadow ROI (geometryFirst=" << geometryFirst
+        << "): the bare geometry must not change the shadow, in either recording order";
   }
 
-  // Disjoint arm: the marker sits on a region the visible fill does not cover, so a leak into the
-  // content shape would take the exact outline away from the shadow. The shadow follows the content
-  // shape: with the marker left out it hugs the rounded fill, while a marker that leaked in would
-  // make the shape unavailable and let the shadow fall back to the content image's bounding rect.
-  MarkerRegionSpec disjointMarker = {};
-  disjointMarker.bounds = Rect::MakeXYWH(130.0f, 10.0f, 40.0f, 40.0f);
-  disjointMarker.fill = MarkerFillKind::Marker;
-  MarkerRegionSpec disjointUserFill = disjointMarker;
-  disjointUserFill.fill = MarkerFillKind::Transparent;
-  auto makeDisjointShadow = [&](const MarkerRegionSpec& second, bool withMarker) {
+  // Disjoint arm: the bare geometry sits on a region the visible fill does not cover, so a leak into
+  // the content shape would take the exact outline away from the shadow. The shadow follows the
+  // content shape: with the bare geometry left out it hugs the rounded fill, while a geometry that
+  // leaked in would make the shape unavailable and let the shadow fall back to the content image's
+  // bounding rect.
+  RegionSpec disjointGeometry = {};
+  disjointGeometry.bounds = Rect::MakeXYWH(130.0f, 10.0f, 40.0f, 40.0f);
+  RegionSpec disjointUserFill = disjointGeometry;
+  disjointUserFill.fill = RegionFillKind::Transparent;
+  auto makeDisjointShadow = [&](const RegionSpec& second, bool withGeometry) {
     auto disjointShadow = DropShadowStyle::Make(0, 0, 0, 0, Color::Black());
     disjointShadow->setSpread(10);
-    std::vector<MarkerRegionSpec> regions = {panel};
-    if (withMarker) {
+    std::vector<RegionSpec> regions = {panel};
+    if (withGeometry) {
       regions.push_back(second);
     }
-    return MakeMarkerPanel(regions, {disjointShadow});
+    return MakePanel(regions, {disjointShadow});
   };
-  auto fillOnlyShadow = RenderPanelOverChecker(context, makeDisjointShadow(disjointMarker, false));
-  auto disjointMarkerShadow =
-      RenderPanelOverChecker(context, makeDisjointShadow(disjointMarker, true));
-  ASSERT_TRUE(fillOnlyShadow != nullptr && disjointMarkerShadow != nullptr);
-  EXPECT_EQ(CountDifferingPixels(fillOnlyShadow.get(), disjointMarkerShadow.get(), shadowRoi, 2), 0)
-      << "disjoint-marker shadow ROI: the silhouette-only marker must not enlarge the content "
-         "shape, so the shadow footprint must stay the visible fill's";
-  // Non-vacuity: a real 0%-opacity fill on the same disjoint region is not silhouette-only, so it
+  auto fillOnlyShadow =
+      RenderPanelOverChecker(context, makeDisjointShadow(disjointGeometry, false));
+  auto disjointGeometryShadow =
+      RenderPanelOverChecker(context, makeDisjointShadow(disjointGeometry, true));
+  ASSERT_TRUE(fillOnlyShadow != nullptr && disjointGeometryShadow != nullptr);
+  EXPECT_EQ(CountDifferingPixels(fillOnlyShadow.get(), disjointGeometryShadow.get(), shadowRoi, 2),
+            0)
+      << "disjoint-geometry shadow ROI: bare geometry must not enlarge the content shape, so the "
+         "shadow footprint must stay the visible fill's";
+  // Non-vacuity: a real 0%-opacity fill on the same disjoint region is captured by a painter, so it
   // does join the content shape and takes the exact outline away. That pixel change is exactly what
-  // a leaked marker would produce, so the equality above is a real skip.
+  // a leaked geometry would produce, so the equality above is a real skip.
   auto disjointUserFillShadow =
       RenderPanelOverChecker(context, makeDisjointShadow(disjointUserFill, true));
   ASSERT_TRUE(disjointUserFillShadow != nullptr);
   EXPECT_GT(CountDifferingPixels(fillOnlyShadow.get(), disjointUserFillShadow.get(), shadowRoi, 2),
             0)
-      << "disjoint-marker shadow ROI (unmarked control): a second region that DOES join the "
-         "content shape must change the shadow footprint, otherwise the equality above is vacuous";
+      << "disjoint-geometry shadow ROI (fill control): a second region captured by a painter must "
+         "change the shadow footprint, otherwise the equality above is vacuous";
 
   // A content-based style consumes the shared contour, whose outside stroke band keeps the requested
   // width: the band is a ring and not the shape's envelope, so a spread shadow must stay out of the
   // shape interior.
   constexpr float bandStrokeWidth = 8.0f;
-  MarkerRegionSpec bandPanel = {};
-  bandPanel.bounds = GlassMarkerPanelLocalBounds();
-  bandPanel.fill = MarkerFillKind::Marker;
+  RegionSpec bandPanel = {};
+  bandPanel.bounds = GlassPanelLocalBounds();
   bandPanel.strokeWidth = bandStrokeWidth;
   bandPanel.strokeAlign = StrokeAlign::Outside;
   auto bandShadow = DropShadowStyle::Make(0, 0, 0, 0, Color::Black());
   bandShadow->setSpread(10);
-  auto bandShadowLayer = MakeMarkerPanel({bandPanel}, {bandShadow});
+  auto bandShadowLayer = MakePanel({bandPanel}, {bandShadow});
   auto bandPixel = RenderSpreadShadowPixel(context, bandShadowLayer, 100, 45);
   ASSERT_TRUE(bandPixel.has_value());
   EXPECT_NE(*bandPixel, 0u) << "stroke-band probe: the spread shadow must render over the band the "
@@ -4913,119 +4889,153 @@ TGFX_TEST_PRIVATE(LayerTest, GlassMarkerDoesNotLeakIntoSharedRecordings) {
       << "deep-interior probe: the shadow must follow the band and not the shape interior";
 
   const auto secondBounds = Rect::MakeXYWH(105.0f, 10.0f, 40.0f, 40.0f);
-  auto makeMaskedPanel = [&](MarkerFillKind secondKind) {
-    MarkerRegionSpec second = {};
+  auto makeMaskedPanel = [&](RegionFillKind secondKind) {
+    RegionSpec second = {};
     second.bounds = secondBounds;
     second.fill = secondKind;
     auto maskedShadow = DropShadowStyle::Make(0, 0, 0, 0, Color::Black());
     maskedShadow->setSpread(10);
     maskedShadow->setShowBehindLayer(false);
-    return MakeMarkerPanel({panel, second}, {maskedShadow});
+    return MakePanel({panel, second}, {maskedShadow});
   };
   // A shadow drawn behind the layer is masked by the shared contour, so it shows exactly where that
   // contour is ABSENT. Extending the contour with the second region therefore removes the shadow over
-  // the region: the unmarked 0%-opacity fill must stay in the contour and remove it, while the marker
-  // must leave the shadow alone. The sliver is the part of the second region the spread shape of the
-  // panel also covers.
-  const auto sliverRoi = Rect::MakeLTRB(secondBounds.left + GlassMarkerPanelLeft + 1.0f,
-                                        secondBounds.top + GlassMarkerPanelTop + 5.0f,
-                                        secondBounds.left + GlassMarkerPanelLeft + 6.0f,
-                                        secondBounds.top + GlassMarkerPanelTop + 35.0f);
+  // the region: the painter-captured 0%-opacity fill must stay in the contour and remove it, while
+  // the bare geometry must leave the shadow alone. The sliver is the part of the second region the
+  // spread shape of the panel also covers.
+  const auto sliverRoi = Rect::MakeLTRB(
+      secondBounds.left + GlassPanelLeft + 1.0f, secondBounds.top + GlassPanelTop + 5.0f,
+      secondBounds.left + GlassPanelLeft + 6.0f, secondBounds.top + GlassPanelTop + 35.0f);
   constexpr int sliverProbeX = 157;
   constexpr int sliverProbeY = 80;
-  auto markerSliver = RenderSpreadShadowPixel(context, makeMaskedPanel(MarkerFillKind::Marker),
-                                              sliverProbeX, sliverProbeY);
-  ASSERT_TRUE(markerSliver.has_value());
-  EXPECT_NE(*markerSliver, 0u)
-      << "contour-sliver probe (marker): the marker must not extend the shared contour, so the "
-         "shadow behind the layer still renders there";
+  auto bareSliver = RenderSpreadShadowPixel(context, makeMaskedPanel(RegionFillKind::None),
+                                            sliverProbeX, sliverProbeY);
+  ASSERT_TRUE(bareSliver.has_value());
+  EXPECT_NE(*bareSliver, 0u)
+      << "contour-sliver probe (bare geometry): bare geometry must not extend the shared contour, "
+         "so the shadow behind the layer still renders there";
   auto transparentSliver = RenderSpreadShadowPixel(
-      context, makeMaskedPanel(MarkerFillKind::Transparent), sliverProbeX, sliverProbeY);
+      context, makeMaskedPanel(RegionFillKind::Transparent), sliverProbeX, sliverProbeY);
   ASSERT_TRUE(transparentSliver.has_value());
   EXPECT_EQ(*transparentSliver, 0u)
-      << "contour-sliver probe (unmarked 0% fill): an unmarked transparent fill must stay in the "
-         "shared contour and mask the shadow over its region away";
-  auto markerMasked = RenderPanelOverChecker(context, makeMaskedPanel(MarkerFillKind::Marker));
+      << "contour-sliver probe (0% fill): a 0%-alpha fill must stay in the shared contour and mask "
+         "the shadow over its region away";
+  auto bareMasked = RenderPanelOverChecker(context, makeMaskedPanel(RegionFillKind::None));
   auto transparentMasked =
-      RenderPanelOverChecker(context, makeMaskedPanel(MarkerFillKind::Transparent));
-  ASSERT_TRUE(markerMasked != nullptr && transparentMasked != nullptr);
-  EXPECT_GT(CountDifferingPixels(markerMasked.get(), transparentMasked.get(), sliverRoi, 2), 0)
-      << "contour-sliver ROI: the unmarked 0%-opacity fill must extend the shared contour while "
-         "the marker does not";
+      RenderPanelOverChecker(context, makeMaskedPanel(RegionFillKind::Transparent));
+  ASSERT_TRUE(bareMasked != nullptr && transparentMasked != nullptr);
+  EXPECT_GT(CountDifferingPixels(bareMasked.get(), transparentMasked.get(), sliverRoi, 2), 0)
+      << "contour-sliver ROI: the 0%-opacity fill must extend the shared contour while the bare "
+         "geometry does not";
 }
 
 // A visible outside stroke is the shape the shared content and contour contain, so a Glass driven by
-// them would cover the stroke ring alone. The own outline is the union of the marker geometry and
-// the stroke, which is what makes the Glass cover the whole shape.
-TGFX_TEST_PRIVATE(LayerTest, GlassMarkerKeepsInteriorCoverageWithAStroke) {
+// them would cover the stroke ring alone. The own geometry is the union of the 0%-alpha fill's
+// geometry and the stroke, which is what makes the Glass cover the whole shape.
+TGFX_TEST_PRIVATE(LayerTest, GlassGeometryKeepsInteriorCoverageWithAStroke) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   constexpr float strokeWidth = 8.0f;
   const auto glass = GlassStyle::Make(0, 50, 100, 0, 0, 0, 0);
-  MarkerRegionSpec withStroke = {};
-  withStroke.bounds = GlassMarkerPanelLocalBounds();
-  withStroke.fill = MarkerFillKind::Marker;
+  RegionSpec withStroke = {};
+  withStroke.bounds = GlassPanelLocalBounds();
+  // A retained 0%-alpha fill: the stroke painter captures the geometry, so only a painter keeps the
+  // interior in the own geometry.
+  withStroke.fill = RegionFillKind::Transparent;
   withStroke.strokeWidth = strokeWidth;
   withStroke.strokeAlign = StrokeAlign::Outside;
-  MarkerRegionSpec strokeOnly = withStroke;
-  strokeOnly.fill = MarkerFillKind::None;
+  RegionSpec strokeOnly = withStroke;
+  strokeOnly.fill = RegionFillKind::None;
 
-  auto deepInterior = GlassMarkerPanelBounds();
+  auto deepInterior = GlassPanelBounds();
   deepInterior.inset(strokeWidth * 2.0f, strokeWidth * 2.0f);
   const auto deepArea =
       static_cast<int>(deepInterior.width()) * static_cast<int>(deepInterior.height());
-  const auto bandRoi = Rect::MakeXYWH(GlassMarkerPanelLeft, GlassMarkerPanelTop - strokeWidth,
-                                      GlassMarkerPanelWidth, strokeWidth);
+  const auto bandRoi =
+      Rect::MakeXYWH(GlassPanelLeft, GlassPanelTop - strokeWidth, GlassPanelWidth, strokeWidth);
 
-  auto control = RenderPanelOverChecker(context, MakeMarkerPanel({withStroke}));
-  auto glassPanel = RenderPanelOverChecker(context, MakeMarkerPanel({withStroke}, {glass}));
+  auto control = RenderPanelOverChecker(context, MakePanel({withStroke}));
+  auto glassPanel = RenderPanelOverChecker(context, MakePanel({withStroke}, {glass}));
   ASSERT_TRUE(control != nullptr && glassPanel != nullptr);
-  // The interior is inset well past the stroke, so it is covered by the marker geometry alone: a
+  // The interior is inset well past the stroke, so it is covered by the 0%-alpha fill alone: a
   // Glass limited to the stroke ring would leave it untouched.
   const auto frostedDeep = CountDifferingPixels(control.get(), glassPanel.get(), deepInterior, 16);
   EXPECT_GT(frostedDeep, deepArea / 5)
-      << "deep-interior ROI (marker + outside stroke): the Glass must cover the shape inside the "
+      << "deep-interior ROI (0% fill + outside stroke): the Glass must cover the shape inside the "
          "stroke, not only the stroke ring, frosted "
       << frostedDeep << " of " << deepArea;
-  // The coverage ends at the own outline: a ring-only coverage would spill the effect outside the
+  // The coverage ends at the own geometry: a ring-only coverage would spill the effect outside the
   // stroke, where the filled shape has nothing.
-  EXPECT_EQ(
-      CountDifferingPixels(control.get(), glassPanel.get(),
-                           Rect::MakeXYWH(GlassMarkerPanelLeft - 19.0f, GlassMarkerPanelTop - 19.0f,
-                                          10.0f, GlassMarkerPanelHeight + 38.0f),
-                           2),
-      0)
+  EXPECT_EQ(CountDifferingPixels(control.get(), glassPanel.get(),
+                                 Rect::MakeXYWH(GlassPanelLeft - 19.0f, GlassPanelTop - 19.0f,
+                                                10.0f, GlassPanelHeight + 38.0f),
+                                 2),
+            0)
       << "left-of-panel ROI: the Glass must not cover anything outside the shape and its stroke";
-  // The own outline is the geometric union of the marker geometry and the outside stroke, so the
+  // The own geometry is the geometric union of the fill geometry and the outside stroke, so the
   // shape is a fill-plus-stroke. A wrong classification as a plain fill would make Glass take the
   // analytic SDF of the base path alone, leaving the band outside that path uncovered: bandRoi sits
   // entirely inside the band, whose outer edge is strokeWidth above the panel top.
   EXPECT_GT(CountDifferingPixels(control.get(), glassPanel.get(), bandRoi, 2), 0)
-      << "stroke-band ROI (marker + outside stroke): a wrong own-outline shape classification "
+      << "stroke-band ROI (0% fill + outside stroke): a wrong own-geometry shape classification "
          "would "
          "leave the band outside the base path uncovered";
 
-  // Control: with the marker removed the outline is the stroke band alone, so the interior has to
+  // Control: with the fill removed the geometry is the stroke band alone, so the interior has to
   // stay untouched while the band still lights up.
-  auto bandControl = RenderPanelOverChecker(context, MakeMarkerPanel({strokeOnly}));
-  auto bandGlass = RenderPanelOverChecker(context, MakeMarkerPanel({strokeOnly}, {glass}));
+  auto bandControl = RenderPanelOverChecker(context, MakePanel({strokeOnly}));
+  auto bandGlass = RenderPanelOverChecker(context, MakePanel({strokeOnly}, {glass}));
   ASSERT_TRUE(bandControl != nullptr && bandGlass != nullptr);
   EXPECT_EQ(CountDifferingPixels(bandControl.get(), bandGlass.get(), deepInterior, 16), 0)
-      << "deep-interior ROI (marker removed): the own outline is the band alone and must not reach "
+      << "deep-interior ROI (fill removed): the own geometry is the band alone and must not reach "
          "into the shape";
   EXPECT_GT(CountDifferingPixels(bandControl.get(), bandGlass.get(), bandRoi, 16), 0)
-      << "stroke-band ROI (marker removed): the band must still be covered, otherwise the interior "
+      << "stroke-band ROI (fill removed): the band must still be covered, otherwise the interior "
          "reading is vacuous";
+}
+
+// One region whose geometry is `path` and which carries `fill`, so path-shaped cases still route
+// through MakeRegion instead of assembling their own VectorGroup.
+static RegionSpec MakePathRegion(const Path& path, RegionFillKind fill = RegionFillKind::None) {
+  auto shapePath = ShapePath::Make();
+  shapePath->setPath(path);
+  RegionSpec spec = {};
+  spec.shape = shapePath;
+  spec.fill = fill;
+  return spec;
+}
+
+// Two triangles that meet on the diagonal y = x, plus that same square as a single path. Shared by
+// the arms that compare "two geometries describing one square" against "one square".
+struct SplitSquarePaths {
+  Path upperRight = {};
+  Path lowerLeft = {};
+  Path square = {};
+};
+
+static SplitSquarePaths MakeSplitSquarePaths(float size) {
+  SplitSquarePaths paths = {};
+  paths.upperRight.moveTo(0.0f, 0.0f);
+  paths.upperRight.lineTo(size, 0.0f);
+  paths.upperRight.lineTo(size, size);
+  paths.upperRight.close();
+  paths.lowerLeft.moveTo(0.0f, 0.0f);
+  paths.lowerLeft.lineTo(0.0f, size);
+  paths.lowerLeft.lineTo(size, size);
+  paths.lowerLeft.close();
+  paths.square.addRect(Rect::MakeWH(size, size));
+  return paths;
 }
 
 // The own geometry rasterizes an opaque, hard-edged coverage: the opaque brush disables
 // anti-aliasing, so a painter's boundary pixel is fully covered or not covered at all, and
 // abutting painters tile the plane exactly. A rendered comparison can therefore see the coverage's
 // REACH -- every interior pixel has to change and nothing outside the outline may -- and the
-// shared-boundary arm pins that two painters describing one square render like the single square.
-TGFX_TEST_PRIVATE(LayerTest, OwnOutlineCoversItsPainters) {
+// shared-boundary arm pins that two geometries describing one square render like the single square,
+// through both recording channels (see the shared-boundary case below for why each one is run).
+TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoversItsPainters) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -5046,91 +5056,79 @@ TGFX_TEST_PRIVATE(LayerTest, OwnOutlineCoversItsPainters) {
       {2.0f, 8.0f, StrokeAlign::Outside},  {24.0f, 8.0f, StrokeAlign::Center},
       {24.0f, 8.0f, StrokeAlign::Inside},  {6.0f, 1.0f, StrokeAlign::Center},
   };
-  const OwnContourFillKind fills[] = {OwnContourFillKind::Marker, OwnContourFillKind::Transparent};
+  // A retained 0%-alpha fill keeps the geometry of the shape inside the stroke band in the own
+  // geometry; without one the stroke painter is the only outline and the interior is uncovered.
+  const auto fillKind = OwnGeometryFillKind::Transparent;
 
   // The rendered coverage reaches the whole interior and stops at the outer boundary.
-  for (const auto fillKind : fills) {
-    for (const auto& probe : probes) {
-      auto outward = MaskStrokeOutwardExtent(probe.strokeWidth, probe.align);
-      auto outsideRoi =
-          Rect::MakeLTRB(0.0f, 0.0f, rect.left - outward - 2.0f, MaskProbeSurfaceSize);
-      auto interiorRoi = rect;
-      interiorRoi.inset(probe.radius * 0.5f + outward + 2.0f, probe.radius * 0.5f + outward + 2.0f);
-      ASSERT_FALSE(interiorRoi.isEmpty());
-      const auto interiorArea =
-          static_cast<int>(interiorRoi.width()) * static_cast<int>(interiorRoi.height());
-      const auto glass = GlassStyle::Make(0, 50, 100, 0, 0, 0, 0);
-      auto plain = RenderPanelOverChecker(
-          context, MakeOwnContourStrokePanel(rect, probe.radius, probe.strokeWidth, probe.align,
-                                             fillKind, {}));
-      auto styled = RenderPanelOverChecker(
-          context, MakeOwnContourStrokePanel(rect, probe.radius, probe.strokeWidth, probe.align,
-                                             fillKind, {glass}));
-      ASSERT_TRUE(plain != nullptr && styled != nullptr);
-      const auto interiorDiff = CountDifferingPixels(plain.get(), styled.get(), interiorRoi, 16);
-      EXPECT_EQ(interiorDiff, interiorArea)
-          << "interior ROI, r=" << probe.radius << " w=" << probe.strokeWidth
-          << " align=" << static_cast<int>(probe.align) << " fill=" << static_cast<int>(fillKind)
-          << ": every interior pixel must change, so the own geometry covers the whole interior: "
-          << interiorDiff << " of " << interiorArea << " pixels changed";
-      EXPECT_EQ(CountDifferingPixels(plain.get(), styled.get(), outsideRoi, 2), 0)
-          << "outside ROI, r=" << probe.radius << " w=" << probe.strokeWidth
-          << " align=" << static_cast<int>(probe.align) << " fill=" << static_cast<int>(fillKind)
-          << ": the coverage must stop at the outer boundary";
-    }
+  for (const auto& probe : probes) {
+    auto outward = MaskStrokeOutwardExtent(probe.strokeWidth, probe.align);
+    auto outsideRoi = Rect::MakeLTRB(0.0f, 0.0f, rect.left - outward - 2.0f, MaskProbeSurfaceSize);
+    auto interiorRoi = rect;
+    interiorRoi.inset(probe.radius * 0.5f + outward + 2.0f, probe.radius * 0.5f + outward + 2.0f);
+    ASSERT_FALSE(interiorRoi.isEmpty());
+    const auto interiorArea =
+        static_cast<int>(interiorRoi.width()) * static_cast<int>(interiorRoi.height());
+    const auto glass = GlassStyle::Make(0, 50, 100, 0, 0, 0, 0);
+    auto plain = RenderPanelOverChecker(
+        context, MakeOwnGeometryStrokePanel(rect, probe.radius, probe.strokeWidth, probe.align,
+                                            fillKind, {}));
+    auto styled = RenderPanelOverChecker(
+        context, MakeOwnGeometryStrokePanel(rect, probe.radius, probe.strokeWidth, probe.align,
+                                            fillKind, {glass}));
+    ASSERT_TRUE(plain != nullptr && styled != nullptr);
+    const auto interiorDiff = CountDifferingPixels(plain.get(), styled.get(), interiorRoi, 16);
+    EXPECT_EQ(interiorDiff, interiorArea)
+        << "interior ROI, r=" << probe.radius << " w=" << probe.strokeWidth
+        << " align=" << static_cast<int>(probe.align)
+        << ": every interior pixel must change, so the own geometry covers the whole interior: "
+        << interiorDiff << " of " << interiorArea << " pixels changed";
+    EXPECT_EQ(CountDifferingPixels(plain.get(), styled.get(), outsideRoi, 2), 0)
+        << "outside ROI, r=" << probe.radius << " w=" << probe.strokeWidth
+        << " align=" << static_cast<int>(probe.align)
+        << ": the coverage must stop at the outer boundary";
   }
 
-  // Two painters that share a boundary. Two triangles meet on the diagonal y = x, so together they
-  // describe the same square as the single painter below. Because the own geometry recording is
-  // hard-edged, each boundary pixel belongs to one triangle, and the two-painter outline must render
-  // like the single square.
+  // Two geometries that share a boundary. Two triangles meet on the diagonal y = x, so together they
+  // describe the same square as the single geometry below. Because the own geometry recording is
+  // hard-edged, each boundary pixel belongs to one triangle, and the two-geometry outline must
+  // render like the single square. Both recording channels run the same comparison: bare geometry,
+  // and a retained 0%-alpha painter that captures the geometry -- the channel whose two abutting
+  // painters would leave a 0.75 seam on the diagonal if the outline were per-painter.
   constexpr float panelSize = 64.0f;
-  auto makeShapeRegion = [&](const Path& path) {
-    auto shapePath = ShapePath::Make();
-    shapePath->setPath(path);
-    MarkerRegionSpec spec = {};
-    spec.shape = shapePath;
-    return spec;
-  };
-  Path upperRight = {};
-  upperRight.moveTo(0.0f, 0.0f);
-  upperRight.lineTo(panelSize, 0.0f);
-  upperRight.lineTo(panelSize, panelSize);
-  upperRight.close();
-  Path lowerLeft = {};
-  lowerLeft.moveTo(0.0f, 0.0f);
-  lowerLeft.lineTo(0.0f, panelSize);
-  lowerLeft.lineTo(panelSize, panelSize);
-  lowerLeft.close();
-  Path square = {};
-  square.addRect(Rect::MakeWH(panelSize, panelSize));
+  const auto paths = MakeSplitSquarePaths(panelSize);
   const auto sharedBoundaryGlass = GlassStyle::Make(0, 50, 100, 0, 0, 0, 0);
-  auto twoPainters = RenderPanelOverChecker(
-      context, MakeMarkerPanel({makeShapeRegion(upperRight), makeShapeRegion(lowerLeft)},
-                               {sharedBoundaryGlass}));
-  auto onePainter = RenderPanelOverChecker(
-      context, MakeMarkerPanel({makeShapeRegion(square)}, {sharedBoundaryGlass}));
-  auto emptyPanel = RenderPanelOverChecker(context, MakeMarkerPanel({}));
-  ASSERT_TRUE(twoPainters != nullptr && onePainter != nullptr && emptyPanel != nullptr);
-  const auto sharedBoundaryRoi = Rect::MakeLTRB(
-      GlassMarkerPanelLeft + 4.0f, GlassMarkerPanelTop + 4.0f,
-      GlassMarkerPanelLeft + panelSize - 4.0f, GlassMarkerPanelTop + panelSize - 4.0f);
-  EXPECT_EQ(CountDifferingPixels(twoPainters.get(), onePainter.get(), sharedBoundaryRoi, 4), 0)
-      << "shared-boundary ROI: two painters describing the same square must render like the single "
-         "square";
+  const auto sharedBoundaryRoi =
+      Rect::MakeLTRB(GlassPanelLeft + 4.0f, GlassPanelTop + 4.0f, GlassPanelLeft + panelSize - 4.0f,
+                     GlassPanelTop + panelSize - 4.0f);
   const auto sharedBoundaryArea =
       static_cast<int>(sharedBoundaryRoi.width()) * static_cast<int>(sharedBoundaryRoi.height());
-  const auto twoPainterQuadrantRoi = Rect::MakeLTRB(
-      GlassMarkerPanelLeft + 8.0f, GlassMarkerPanelTop + 8.0f,
-      GlassMarkerPanelLeft + panelSize * 0.5f, GlassMarkerPanelTop + panelSize * 0.5f);
-  EXPECT_GT(CountDifferingPixels(emptyPanel.get(), twoPainters.get(), twoPainterQuadrantRoi, 16),
-            sharedBoundaryArea / 20)
-      << "two-painter quadrant ROI: the two-painter outline must cover its interior, otherwise the "
-         "equality above is vacuous";
+  const auto twoPartQuadrantRoi =
+      Rect::MakeLTRB(GlassPanelLeft + 8.0f, GlassPanelTop + 8.0f, GlassPanelLeft + panelSize * 0.5f,
+                     GlassPanelTop + panelSize * 0.5f);
+  auto emptyPanel = RenderPanelOverChecker(context, MakePanel({}));
+  ASSERT_TRUE(emptyPanel != nullptr);
+  for (auto fillKind : {RegionFillKind::None, RegionFillKind::Transparent}) {
+    auto twoGeometries =
+        RenderPanelOverChecker(context, MakePanel({MakePathRegion(paths.upperRight, fillKind),
+                                                   MakePathRegion(paths.lowerLeft, fillKind)},
+                                                  {sharedBoundaryGlass}));
+    auto oneGeometry = RenderPanelOverChecker(
+        context, MakePanel({MakePathRegion(paths.square, fillKind)}, {sharedBoundaryGlass}));
+    ASSERT_TRUE(twoGeometries != nullptr && oneGeometry != nullptr);
+    EXPECT_EQ(CountDifferingPixels(twoGeometries.get(), oneGeometry.get(), sharedBoundaryRoi, 4), 0)
+        << "shared-boundary ROI, fill=" << static_cast<int>(fillKind)
+        << ": two geometries describing the same square must render like the single square";
+    EXPECT_GT(CountDifferingPixels(emptyPanel.get(), twoGeometries.get(), twoPartQuadrantRoi, 16),
+              sharedBoundaryArea / 20)
+        << "two-part quadrant ROI, fill=" << static_cast<int>(fillKind)
+        << ": the two-part outline must cover its interior, otherwise the equality above is "
+           "vacuous";
+  }
 }
 
-// A style only covers what its own outline holds, so the two-group fill/stroke assembly has to keep
-// the fill geometry in the own outline. The arms are the refractive parameter set (100/100/14/100) on
+// A style only covers what its own geometry holds, so the two-group fill/stroke assembly has to
+// keep the fill geometry. The arms are the refractive parameter set (100/100/14/100) on
 // a rounded rectangle, the frost-only path at both frost values, and an ellipse, plus a two-region
 // panel whose second region carries a 0%-alpha fill. Every arm pairs its assertion with a band-only
 // control, so a covered shape cannot pass on a missing fill geometry.
@@ -5170,7 +5168,7 @@ TGFX_TEST_PRIVATE(LayerTest, TwoGroupAssemblyKeepsInteriorCoverage) {
 
   for (const auto& arm : arms) {
     auto glass =
-        MakeOwnOutlineGlass(arm.refraction, arm.depth, arm.frost, arm.dispersion, arm.splay);
+        MakeOwnGeometryGlass(arm.refraction, arm.depth, arm.frost, arm.dispersion, arm.splay);
     auto makePanel = [&](bool withFillGroup, const std::shared_ptr<GlassStyle>& style) {
       if (arm.ellipse) {
         auto makeEllipse = [&]() {
@@ -5217,9 +5215,9 @@ TGFX_TEST_PRIVATE(LayerTest, TwoGroupAssemblyKeepsInteriorCoverage) {
   }
 
   // Two-region panel: the 0% region has to keep its interior coverage when a second, filled region is
-  // recorded in the same own outline, and dropping the 0% group has to leave the region uncovered.
+  // recorded in the same own geometry, and dropping the 0% group has to leave the region uncovered.
   const auto secondRect = Rect::MakeXYWH(10.0f, 10.0f, 40.0f, 40.0f);
-  auto multiRegionGlass = MakeOwnOutlineGlass(100, 100, 14, 100, 0);
+  auto multiRegionGlass = MakeOwnGeometryGlass(100, 100, 14, 100, 0);
   auto makeMultiRegion = [&](bool withZeroAlphaFill, bool withGlass) {
     std::vector<std::shared_ptr<VectorElement>> contents = {};
     if (withZeroAlphaFill) {
@@ -5280,41 +5278,44 @@ TGFX_TEST_PRIVATE(LayerTest, UnusableBucketOnlyDropsItself) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  // --- With Glass: the marker-only bucket records nothing, the Glass bucket still drives coverage.
-  MarkerRegionSpec marker = {};
-  marker.bounds = GlassMarkerPanelLocalBounds();
+  // --- With Glass: the bucket whose content records nothing still has own geometry, so the Glass
+  // bucket drives coverage.
+  RegionSpec bareGeometry = {};
+  bareGeometry.bounds = GlassPanelLocalBounds();
   auto shadow = DropShadowStyle::Make(0, 8, 0, 8, Color::Black());
   shadow->setSpread(10);
   shadow->setExcludeChildEffects(true);
   auto glass = GlassStyle::Make(0, 50, 100, 0, 0, 0, 0);
-  auto shadowOnly = RenderPanelOverChecker(context, MakeMarkerPanel({marker}, {shadow}));
-  auto withGlass = RenderPanelOverChecker(context, MakeMarkerPanel({marker}, {shadow, glass}));
+  auto shadowOnly = RenderPanelOverChecker(context, MakePanel({bareGeometry}, {shadow}));
+  auto withGlass = RenderPanelOverChecker(context, MakePanel({bareGeometry}, {shadow, glass}));
   ASSERT_TRUE(shadowOnly != nullptr && withGlass != nullptr);
-  auto panelInterior = GlassMarkerPanelBounds();
+  auto panelInterior = GlassPanelBounds();
   panelInterior.inset(1.0f, 1.0f);
   const auto frosted = CountDifferingPixels(shadowOnly.get(), withGlass.get(), panelInterior, 16);
-  EXPECT_GT(frosted, GlassMarkerInteriorPixels / 20)
+  EXPECT_GT(frosted, GlassPanelInteriorPixels / 20)
       << "panel interior ROI: the Glass in the other bucket must still paint even though its "
          "sibling bucket recorded nothing, frosted "
-      << frosted << " of " << GlassMarkerInteriorPixels;
+      << frosted << " of " << GlassPanelInteriorPixels;
 
-  // --- Without Glass: a silhouette-only child leaves the contour bucket empty, so the whole source
-  // must stay unusable and the frame has to render like a pristine tree.
-  auto makeTree = [&](bool silhouetteChild, bool withStyles) {
+  // --- Without Glass: a child that only holds bare geometry leaves both recordings of the parent
+  // empty, so the whole source must stay unusable and the frame has to render like a pristine tree.
+  auto makeTree = [&](bool emptyChild, bool withStyles) {
     auto layer = VectorLayer::Make();
-    layer->setMatrix(Matrix::MakeTrans(GlassMarkerPanelLeft, GlassMarkerPanelTop));
+    layer->setMatrix(Matrix::MakeTrans(GlassPanelLeft, GlassPanelTop));
     auto child = VectorLayer::Make();
     auto rect = Rectangle::Make();
-    rect->setPosition({GlassMarkerPanelWidth * 0.5f, GlassMarkerPanelHeight * 0.5f});
-    rect->setSize({GlassMarkerPanelWidth, GlassMarkerPanelHeight});
-    auto childFill = FillStyle::Make(SolidColor::Make(Color::White()));
-    childFill->setSilhouetteOnly(silhouetteChild);
-    child->setContents({MakeFilledRegion(rect, childFill)});
+    rect->setPosition({GlassPanelWidth * 0.5f, GlassPanelHeight * 0.5f});
+    rect->setSize({GlassPanelWidth, GlassPanelHeight});
+    std::vector<std::shared_ptr<VectorElement>> childContents = {rect};
+    if (!emptyChild) {
+      childContents.push_back(FillStyle::Make(SolidColor::Make(Color::White())));
+    }
+    child->setContents(std::move(childContents));
     layer->addChild(child);
     if (withStyles) {
       // One style per excludeChildEffects bucket. The bucket-1 style needs the contour (spread makes
-      // it Contour-sourced), which the silhouette-only child does not provide, so that bucket records
-      // nothing; the bucket-0 style only needs the content image.
+      // it Contour-sourced), which a child holding bare geometry does not provide, so that bucket
+      // records nothing; the bucket-0 style only needs the content image.
       auto contentStyle = DropShadowStyle::Make(0, 0, 0, 0, Color::Black());
       auto contourStyle = DropShadowStyle::Make(0, 0, 0, 0, Color::Black());
       contourStyle->setSpread(10);
@@ -5323,29 +5324,25 @@ TGFX_TEST_PRIVATE(LayerTest, UnusableBucketOnlyDropsItself) {
     }
     return layer;
   };
-  const auto full = Rect::MakeLTRB(0.0f, 0.0f, GlassMarkerSurfaceExtent, GlassMarkerSurfaceExtent);
-  auto silhouetteStyled = RenderPanelOverChecker(context, makeTree(true, true));
-  auto silhouettePristine = RenderPanelOverChecker(context, makeTree(true, false));
-  ASSERT_TRUE(silhouetteStyled != nullptr && silhouettePristine != nullptr);
-  EXPECT_EQ(CountDifferingPixels(silhouetteStyled.get(), silhouettePristine.get(), full, 2), 0)
-      << "silhouette-child frame ROI: one unusable bucket must fail the whole source closed, so "
-         "the "
+  const auto full = Rect::MakeLTRB(0.0f, 0.0f, GlassPanelSurfaceExtent, GlassPanelSurfaceExtent);
+  auto emptyChildStyled = RenderPanelOverChecker(context, makeTree(true, true));
+  auto emptyChildPristine = RenderPanelOverChecker(context, makeTree(true, false));
+  ASSERT_TRUE(emptyChildStyled != nullptr && emptyChildPristine != nullptr);
+  EXPECT_EQ(CountDifferingPixels(emptyChildStyled.get(), emptyChildPristine.get(), full, 2), 0)
+      << "empty-child frame ROI: one unusable bucket must fail the whole source closed, so the "
          "styled tree renders like the pristine one";
   auto normalStyled = RenderPanelOverChecker(context, makeTree(false, true));
   auto normalPristine = RenderPanelOverChecker(context, makeTree(false, false));
   ASSERT_TRUE(normalStyled != nullptr && normalPristine != nullptr);
   EXPECT_GT(CountDifferingPixels(normalStyled.get(), normalPristine.get(), full, 16), 0)
       << "normal-child frame ROI: with a recorded child both buckets are usable, so the styled "
-         "tree "
-         "must differ from the pristine one";
+         "tree must differ from the pristine one";
 }
 
-// A parent whose geometry lives in child layers records no own outline, so Glass falls back to the
-// shared subtree recordings. That fallback keeps a child's retained 0%-alpha fill, which survives
-// only in the shared contour. The last arm pins the boundary the fallback trades away: a
-// descendant's silhouette-only painter is kept by the content image but dropped by the contour, so
-// the coverage misses that region -- a limitation the fallback accepts.
-TGFX_TEST_PRIVATE(LayerTest, GlassWithoutOwnOutlineResolvesToSharedContour) {
+// A parent whose geometry lives in child layers records no own geometry, so Glass falls back to the
+// lazily recorded shared subtree contour. That fallback keeps a child's retained 0%-alpha fill, which
+// survives only in the contour.
+TGFX_TEST_PRIVATE(LayerTest, GlassWithoutOwnGeometryResolvesToSharedContour) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -5363,7 +5360,7 @@ TGFX_TEST_PRIVATE(LayerTest, GlassWithoutOwnOutlineResolvesToSharedContour) {
                                       holeRect.right - 2.0f, holeRect.bottom - 2.0f);
   const auto annulusTopRoi = Rect::MakeLTRB(baseRect.left + 2.0f, baseRect.top + 2.0f,
                                             baseRect.right - 2.0f, holeRect.top - 2.0f);
-  const auto glass = MakeOwnOutlineGlass(0, 50, 100, 0, 0);
+  const auto glass = MakeOwnGeometryGlass(0, 50, 100, 0, 0);
 
   auto renderDiff = [&](GlassChildFillKind fillKind, const Rect& roi, int tolerance) {
     auto styled = RenderPanelOverChecker(
@@ -5403,45 +5400,10 @@ TGFX_TEST_PRIVATE(LayerTest, GlassWithoutOwnOutlineResolvesToSharedContour) {
       << "annulus hole ROI (0% donut fill): the hole must stay uncovered, so the coverage follows "
          "the fill geometry and not its bounding box";
 
-  // Divergence arm: a DESCENDANT carries a silhouette-only painter with a positive alpha, so the
-  // content image holds its region while the shared contour the fallback resolves to drops it. This
-  // pins the boundary the fallback accepts.
-  const Rect regionA = Rect::MakeLTRB(50.0f, 80.0f, 90.0f, 120.0f);
-  const Rect regionB = Rect::MakeLTRB(110.0f, 80.0f, 150.0f, 120.0f);
-  auto makeDivergencePanel = [&](bool withGlass) {
-    auto parent = Layer::Make();
-    auto child = VectorLayer::Make();
-    auto rectA = Rectangle::Make();
-    rectA->setPosition({regionA.centerX(), regionA.centerY()});
-    rectA->setSize({regionA.width(), regionA.height()});
-    auto fillA = FillStyle::Make(SolidColor::Make(Color::White()));
-    fillA->setAlpha(0.0f);
-    auto rectB = Rectangle::Make();
-    rectB->setPosition({regionB.centerX(), regionB.centerY()});
-    rectB->setSize({regionB.width(), regionB.height()});
-    // A silhouette-only painter with a POSITIVE alpha: content draws it, contour excludes it. An
-    // alpha-0 silhouette-only painter is dropped by both recordings, so it cannot exhibit this axis.
-    auto fillB = FillStyle::Make(SolidColor::Make(Color::White()));
-    fillB->setSilhouetteOnly(true);
-    child->setContents({MakeFilledRegion(rectA, fillA), MakeFilledRegion(rectB, fillB)});
-    parent->addChild(child);
-    if (withGlass) {
-      parent->setLayerStyles({glass});
-    }
-    return parent;
-  };
-  auto divergenceStyled = RenderPanelOverChecker(context, makeDivergencePanel(true));
-  auto divergencePlain = RenderPanelOverChecker(context, makeDivergencePanel(false));
-  ASSERT_TRUE(divergenceStyled != nullptr && divergencePlain != nullptr);
-  EXPECT_GT(CountDifferingPixels(divergencePlain.get(), divergenceStyled.get(), regionA, 16), 0)
-      << "descendant plain-region ROI: the coverage must still hold the visible descendant region";
-  EXPECT_EQ(CountDifferingPixels(divergencePlain.get(), divergenceStyled.get(), regionB, 16), 0)
-      << "descendant silhouette-only ROI: the fallback resolves to the shared contour, which drops "
-         "the descendant's silhouette-only painter, so that region stays uncovered";
-
-  // Failure attribution: the fallback picked the shared contour rather than the shared content. This
-  // is a recording assertion on purpose -- for a plainly visible child both recordings carry the
-  // same geometry, so the rendered result cannot tell which one Glass was handed.
+  // Failure attribution: the fallback picked the lazily recorded shared contour rather than the
+  // shared content. This is a recording assertion on purpose -- for a plainly visible child both
+  // recordings carry the same geometry, so the rendered result cannot tell which one Glass was
+  // handed.
   DrawArgs drawArgs(context);
   TGFX_PRIVATE_ACCESS(
       auto source =
@@ -5449,14 +5411,14 @@ TGFX_TEST_PRIVATE(LayerTest, GlassWithoutOwnOutlineResolvesToSharedContour) {
               ->getLayerStyleSource(drawArgs, Matrix::I());
       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[1] != nullptr);
       const auto& group = *source->groups[1];
-      // A group with only children must not record an own outline: that is what triggers the
+      // A group with only children must not record own geometry: that is what triggers the lazy
       // fallback.
-      EXPECT_FALSE(group.ownContour.has_value())
-      << "a group with only children must not record an own outline";
+      EXPECT_FALSE(group.ownGeometry.has_value())
+      << "a group with only children must not record own geometry";
       ASSERT_TRUE(group.contour.has_value()); ASSERT_TRUE(group.contour->image != nullptr);
       ASSERT_TRUE(group.content.image != nullptr);
       EXPECT_EQ(ResolveContentEntry(group, glass.get()), &*group.contour)
-      << "Glass must resolve to the shared contour when no own outline exists";)
+      << "Glass must resolve to the shared contour when no own geometry exists";)
 }
 
 // The merged-mask contract: a fill area and its outside stroke band are merged into a single shape
@@ -5568,7 +5530,7 @@ static float MeasureLeftBandReach(Context* context, float zoom) {
     auto shape = ShapePath::Make();
     shape->setPath(std::move(path));
     auto group = VectorGroup::Make();
-    group->setElements({shape, MakeSilhouetteOnlyFill()});
+    group->setElements({shape, MakeZeroAlphaFill()});
     layer->setContents({group});
     layer->setMatrix(Matrix::MakeTrans(offset, offset));
     if (withGlass) {
@@ -5652,26 +5614,25 @@ TGFX_TEST(LayerTest, GlassCoverageKeepsTransparentColorRegion) {
   const auto glass = GlassStyle::Make(0, 50, 100, 0, 0, 0, 0);
   const auto regionABounds = Rect::MakeLTRB(0.0f, 0.0f, 60.0f, 80.0f);
   const auto regionBBounds = Rect::MakeLTRB(80.0f, 0.0f, 140.0f, 80.0f);
-  MarkerRegionSpec marker = {};
-  marker.bounds = regionABounds;
-  marker.fill = MarkerFillKind::Marker;
-  MarkerRegionSpec transparent = {};
+  RegionSpec bareGeometry = {};
+  bareGeometry.bounds = regionABounds;
+  RegionSpec transparent = {};
   transparent.bounds = regionBBounds;
-  transparent.fill = MarkerFillKind::TransparentColor;
-  auto plain = RenderPanelOverChecker(context, MakeMarkerPanel({marker, transparent}));
+  transparent.fill = RegionFillKind::TransparentColor;
+  auto plain = RenderPanelOverChecker(context, MakePanel({bareGeometry, transparent}));
   auto glassPanel =
-      RenderPanelOverChecker(context, MakeMarkerPanel({marker, transparent}, {glass}));
+      RenderPanelOverChecker(context, MakePanel({bareGeometry, transparent}, {glass}));
   ASSERT_TRUE(plain != nullptr && glassPanel != nullptr);
-  // The own-outline shape must keep the same painter set as the own-outline raster, so a transparent
-  // solid color sitting next to the marker still gets its region covered.
+  // The own geometry keeps every painter of the layer, so a transparent solid color sitting next to
+  // bare geometry still gets its region covered.
   auto roiA = regionABounds;
-  roiA.offset(GlassMarkerPanelLeft, GlassMarkerPanelTop);
+  roiA.offset(GlassPanelLeft, GlassPanelTop);
   roiA.inset(5.0f, 5.0f);
   EXPECT_GT(CountDifferingPixels(plain.get(), glassPanel.get(), roiA, 16),
             static_cast<int>(roiA.width() * roiA.height()) / 5)
-      << "marker region must stay covered";
+      << "bare-geometry region must stay covered";
   auto roiB = regionBBounds;
-  roiB.offset(GlassMarkerPanelLeft, GlassMarkerPanelTop);
+  roiB.offset(GlassPanelLeft, GlassPanelTop);
   roiB.inset(5.0f, 5.0f);
   EXPECT_GT(CountDifferingPixels(plain.get(), glassPanel.get(), roiB, 16),
             static_cast<int>(roiB.width() * roiB.height()) / 5)
@@ -6599,17 +6560,17 @@ TGFX_TEST(LayerTest, GlassStyleWithDropShadow) {
 // ===== A Glass on a parent whose geometry lives in child layers =====
 //
 // A parent layer carrying the Glass style whose geometry lives in child layers owns no painter at
-// all, so it records no own outline and Glass falls back to the shared subtree contour, which is the
+// all, so it records no own geometry and Glass falls back to the shared subtree contour, which is
 // recording that keeps a 0%-alpha fill (see ResolveContentEntry in LayerStyleSource.h). These cases
 // pin the final RENDERED pixels over a checker backdrop under the frost-only and the refractive
 // parameter sets.
 
-// Full-parameter counterpart of MakeOwnOutlineGlass for the light-carrying arms: the light angle and
-// intensity survive, where MakeOwnOutlineGlass drops them to 0.
-static std::shared_ptr<GlassStyle> MakeOwnOutlineGlassWithLight(float refraction, float depth,
-                                                                float frost, float dispersion,
-                                                                float splay, float lightAngle,
-                                                                float lightIntensity) {
+// Full-parameter counterpart of MakeOwnGeometryGlass for the light-carrying arms: the light angle and
+// intensity survive, where MakeOwnGeometryGlass drops them to 0.
+static std::shared_ptr<GlassStyle> MakeOwnGeometryGlassWithLight(float refraction, float depth,
+                                                                 float frost, float dispersion,
+                                                                 float splay, float lightAngle,
+                                                                 float lightIntensity) {
   auto glass =
       GlassStyle::Make(refraction, depth, frost, dispersion, splay, lightAngle, lightIntensity);
   glass->setExcludeChildEffects(true);
@@ -6675,8 +6636,8 @@ TGFX_TEST_PRIVATE(LayerTest, GlassParentChildRenderedCoverage) {
   };
 
   for (const auto& arm : arms) {
-    auto glass = MakeOwnOutlineGlassWithLight(arm.refraction, arm.depth, arm.frost, arm.dispersion,
-                                              arm.splay, arm.lightAngle, arm.lightIntensity);
+    auto glass = MakeOwnGeometryGlassWithLight(arm.refraction, arm.depth, arm.frost, arm.dispersion,
+                                               arm.splay, arm.lightAngle, arm.lightIntensity);
     // Core end-to-end proof: with the retained 0% fill the base interior has to light up.
     const auto interiorWithFill = renderDiff(glass, GlassChildFillKind::Full, baseInteriorRoi, 16);
     ASSERT_GE(interiorWithFill, 0) << "interior ROI render failed, " << arm.label;
@@ -6811,7 +6772,7 @@ TGFX_TEST_PRIVATE(LayerTest, CollapsedFillGeometryLeavesBandOnly) {
   };
 
   for (const auto& probe : probes) {
-    const auto glass = MakeOwnOutlineGlass(100, 100, 14, 100, 0);
+    const auto glass = MakeOwnGeometryGlass(100, 100, 14, 100, 0);
     auto styled = RenderPanelOverChecker(
         context, MakeFrameSizeGlassPanel(probe.fillExtent, probe.strokeExtent, probe.shareElement,
                                          rect, strokeWidth, glass));
@@ -6840,13 +6801,15 @@ TGFX_TEST_PRIVATE(LayerTest, CollapsedFillGeometryLeavesBandOnly) {
   }
 }
 
-// ===== The own outline: a coincident second painter =====
+// ===== The own geometry: bare geometry versus a capturing painter =====
 
-// Reads the own-outline coverage of `panel` onto a fixed probe surface, in layer-local coordinates,
-// and returns its alpha raster. Returns an empty raster when the layer records no own outline.
-static std::vector<int> RasterizeOwnOutlineAlpha(Context* context,
-                                                 const std::shared_ptr<Layer>& panel) {
-  static constexpr int ProbeSize = 200;
+// Size of the probe surface RasterizeOwnGeometryAlpha reads the own geometry onto.
+static constexpr int OwnGeometryProbeSize = 200;
+
+// Reads the own-geometry coverage of `panel` onto a fixed probe surface, in layer-local coordinates,
+// and returns its alpha raster. Returns an empty raster when the layer records no own geometry.
+static std::vector<int> RasterizeOwnGeometryAlpha(Context* context,
+                                                  const std::shared_ptr<Layer>& panel) {
   std::vector<int> raster = {};
   if (panel == nullptr) {
     return raster;
@@ -6858,24 +6821,25 @@ static std::vector<int> RasterizeOwnOutlineAlpha(Context* context,
       auto source = panel->getLayerStyleSource(drawArgs, Matrix::I());
       if (source == nullptr) { return raster; } for (auto& group
                                                      : source->groups) {
-        if (group != nullptr && group->ownContour.has_value() &&
-            group->ownContour->image != nullptr) {
-          image = group->ownContour->image;
-          offset = group->ownContour->offset;
+        if (group != nullptr && group->ownGeometry.has_value() &&
+            group->ownGeometry->image != nullptr) {
+          image = group->ownGeometry->image;
+          offset = group->ownGeometry->offset;
         }
       })
   if (image == nullptr) {
     return raster;
   }
-  auto surface = Surface::Make(context, ProbeSize, ProbeSize);
+  auto surface = Surface::Make(context, OwnGeometryProbeSize, OwnGeometryProbeSize);
   if (surface == nullptr) {
     return raster;
   }
   // The image is cropped to the outline's rounded-out bounds, so its recorded offset puts the
   // raster back into layer-local coordinates.
   surface->getCanvas()->drawImage(image, offset.x, offset.y);
-  auto info = ImageInfo::Make(ProbeSize, ProbeSize, ColorType::RGBA_8888, AlphaType::Premultiplied);
-  std::vector<uint32_t> pixels(static_cast<size_t>(ProbeSize) * ProbeSize);
+  auto info = ImageInfo::Make(OwnGeometryProbeSize, OwnGeometryProbeSize, ColorType::RGBA_8888,
+                              AlphaType::Premultiplied);
+  std::vector<uint32_t> pixels(static_cast<size_t>(OwnGeometryProbeSize) * OwnGeometryProbeSize);
   if (!surface->readPixels(info, pixels.data())) {
     return raster;
   }
@@ -6890,49 +6854,40 @@ static std::vector<int> RasterizeOwnOutlineAlpha(Context* context,
 static constexpr float CornerQuadrantSize = 32.0f;
 
 // The own geometry records hard coverage in the cases a per-painter rule could get wrong: two
-// painters describing one square, an image-shaded painter, and four painters meeting at one corner.
+// geometries describing one square (bare geometry or a 0%-alpha painter), an image-shaded painter,
+// and four geometries meeting at one corner.
 TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoverageContract) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto glass = MakeOwnOutlineGlass(0, 50, 100, 0, 0);
-  auto shapeRegion = [](const Path& path) {
-    auto shapePath = ShapePath::Make();
-    shapePath->setPath(path);
-    MarkerRegionSpec spec = {};
-    spec.shape = shapePath;
-    return spec;
-  };
+  auto glass = MakeOwnGeometryGlass(0, 50, 100, 0, 0);
 
-  // Two triangles describing one square must record what the single square records.
+  // Two triangles describing one square must record what the single square records, in both
+  // recording channels (see OwnGeometryCoversItsPainters for the 0.75 seam they guard against).
   constexpr float panelSize = 64.0f;
-  Path upperRight = {};
-  upperRight.moveTo(0.0f, 0.0f);
-  upperRight.lineTo(panelSize, 0.0f);
-  upperRight.lineTo(panelSize, panelSize);
-  upperRight.close();
-  Path lowerLeft = {};
-  lowerLeft.moveTo(0.0f, 0.0f);
-  lowerLeft.lineTo(0.0f, panelSize);
-  lowerLeft.lineTo(panelSize, panelSize);
-  lowerLeft.close();
-  Path square = {};
-  square.addRect(Rect::MakeWH(panelSize, panelSize));
-  auto twoPainters = RasterizeOwnOutlineAlpha(
-      context, MakeMarkerPanel({shapeRegion(upperRight), shapeRegion(lowerLeft)}, {glass}));
-  auto onePainter =
-      RasterizeOwnOutlineAlpha(context, MakeMarkerPanel({shapeRegion(square)}, {glass}));
-  ASSERT_FALSE(twoPainters.empty());
-  ASSERT_EQ(twoPainters.size(), onePainter.size());
-  int covered = 0;
-  int differing = 0;
-  for (size_t i = 0; i < twoPainters.size(); i++) {
-    covered += twoPainters[i] == 255 ? 1 : 0;
-    differing += twoPainters[i] != onePainter[i] ? 1 : 0;
+  const auto paths = MakeSplitSquarePaths(panelSize);
+  for (auto fillKind : {RegionFillKind::None, RegionFillKind::Transparent}) {
+    auto twoGeometries =
+        RasterizeOwnGeometryAlpha(context, MakePanel({MakePathRegion(paths.upperRight, fillKind),
+                                                      MakePathRegion(paths.lowerLeft, fillKind)},
+                                                     {glass}));
+    auto oneGeometry = RasterizeOwnGeometryAlpha(
+        context, MakePanel({MakePathRegion(paths.square, fillKind)}, {glass}));
+    ASSERT_FALSE(twoGeometries.empty());
+    ASSERT_EQ(twoGeometries.size(), oneGeometry.size());
+    int covered = 0;
+    int differing = 0;
+    for (size_t i = 0; i < twoGeometries.size(); i++) {
+      covered += twoGeometries[i] == 255 ? 1 : 0;
+      differing += twoGeometries[i] != oneGeometry[i] ? 1 : 0;
+    }
+    EXPECT_GT(covered, 0) << "fill=" << static_cast<int>(fillKind)
+                          << ": the outline must cover something, otherwise this arm is vacuous";
+    EXPECT_EQ(differing, 0) << "fill=" << static_cast<int>(fillKind)
+                            << ": two geometries describing one square must match the single one";
+    EXPECT_EQ(twoGeometries[32 * 200 + 32], 255)
+        << "fill=" << static_cast<int>(fillKind) << ": the shared diagonal stays fully covered";
   }
-  EXPECT_GT(covered, 0) << "the outline must cover something, otherwise the equality is vacuous";
-  EXPECT_EQ(differing, 0) << "two painters describing one square must match the single painter";
-  EXPECT_EQ(twoPainters[32 * 200 + 32], 255) << "the shared diagonal stays fully covered";
 
   // An image-shaded painter: the sampled color alpha must not soften the geometric edge.
   auto image = MakeImage("resources/apitest/checker_128.png");
@@ -6946,7 +6901,7 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoverageContract) {
   auto imageLayer = VectorLayer::Make();
   imageLayer->setContents({imageGroup});
   imageLayer->setLayerStyles({glass});
-  auto imageAlpha = RasterizeOwnOutlineAlpha(context, imageLayer);
+  auto imageAlpha = RasterizeOwnGeometryAlpha(context, imageLayer);
   ASSERT_FALSE(imageAlpha.empty());
   for (auto value : imageAlpha) {
     ASSERT_TRUE(value == 0 || value == 255) << "an image painter must record hard coverage";
@@ -6954,68 +6909,65 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoverageContract) {
   EXPECT_EQ(imageAlpha[32 * 200 + 32], 255) << "the interior is covered";
   EXPECT_EQ(imageAlpha[70 * 200 + 70], 0) << "outside stays uncovered";
 
-  // Four painters meeting at one corner: each covers a quarter of that pixel.
-  auto makeQuadrant = [](float x, float y) {
-    Path path = {};
-    path.addRect(Rect::MakeXYWH(x, y, CornerQuadrantSize, CornerQuadrantSize));
-    auto quadrantShape = ShapePath::Make();
-    quadrantShape->setPath(path);
-    MarkerRegionSpec spec = {};
-    spec.shape = quadrantShape;
-    return spec;
-  };
-  auto cornerPanel =
-      MakeMarkerPanel({makeQuadrant(0.5f, 0.5f), makeQuadrant(0.5f + CornerQuadrantSize, 0.5f),
-                       makeQuadrant(0.5f, 0.5f + CornerQuadrantSize),
-                       makeQuadrant(0.5f + CornerQuadrantSize, 0.5f + CornerQuadrantSize)},
-                      {glass});
-  auto cornerAlpha = RasterizeOwnOutlineAlpha(context, cornerPanel);
-  ASSERT_FALSE(cornerAlpha.empty());
-  EXPECT_EQ(cornerAlpha[32 * 200 + 32], 255) << "the pixel shared by four quadrants stays covered";
-  EXPECT_EQ(cornerAlpha[24 * 200 + 24], 255) << "the quadrant interiors stay covered";
+  // Four geometries meeting at one corner: each covers a quarter of that pixel.
+  for (auto fillKind : {RegionFillKind::None, RegionFillKind::Transparent}) {
+    auto makeQuadrant = [fillKind](float x, float y) {
+      Path path = {};
+      path.addRect(Rect::MakeXYWH(x, y, CornerQuadrantSize, CornerQuadrantSize));
+      return MakePathRegion(path, fillKind);
+    };
+    auto cornerPanel =
+        MakePanel({makeQuadrant(0.5f, 0.5f), makeQuadrant(0.5f + CornerQuadrantSize, 0.5f),
+                   makeQuadrant(0.5f, 0.5f + CornerQuadrantSize),
+                   makeQuadrant(0.5f + CornerQuadrantSize, 0.5f + CornerQuadrantSize)},
+                  {glass});
+    auto cornerAlpha = RasterizeOwnGeometryAlpha(context, cornerPanel);
+    ASSERT_FALSE(cornerAlpha.empty());
+    EXPECT_EQ(cornerAlpha[32 * 200 + 32], 255)
+        << "fill=" << static_cast<int>(fillKind)
+        << ": the pixel shared by four quadrants stays covered";
+    EXPECT_EQ(cornerAlpha[24 * 200 + 24], 255)
+        << "fill=" << static_cast<int>(fillKind) << ": the quadrant interiors stay covered";
+  }
 }
 
-// A layer whose own geometry holds a silhouette-only painter AND a fill of the same geometry has one
-// shape described by two painters. The own geometry is recorded as an opaque, hard-edged coverage,
-// so a coincident second painter covers the same pixels and the result must equal the single-painter
-// outline exactly, boundary included, on the raster and on rendered pixels. A DISJOINT second painter
-// is the non-vacuity control, so the equality cannot pass on the second painter simply being dropped.
-TGFX_TEST_PRIVATE(LayerTest, OwnOutlineCoincidentPaintersDoNotGrowTheCoveredArea) {
+// A layer whose own geometry holds a bare geometry records it through the own-geometry channel, while
+// the same geometry captured by a 0%-alpha painter is recorded through the painter contour. The own
+// geometry is an opaque, hard-edged coverage either way, so both must cover exactly the same pixels,
+// boundary included, on the raster and on rendered pixels. A DISJOINT second painter is the
+// non-vacuity control, so the equality cannot pass on the painter simply being dropped.
+TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoincidentPaintersDoNotGrowTheCoveredArea) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
   // A half-pixel offset, so a boundary pixel sits exactly on the shape edge: it is the pixel a
   // shared-coverage over-cover would flip to full.
-  const Rect markerRect = Rect::MakeXYWH(60.5f, 60.5f, 80.0f, 80.0f);
+  const Rect bareRect = Rect::MakeXYWH(60.5f, 60.5f, 80.0f, 80.0f);
   const Rect disjointRect = Rect::MakeXYWH(150.5f, 150.5f, 30.0f, 30.0f);
   const auto disjointArea =
       static_cast<int>(disjointRect.width()) * static_cast<int>(disjointRect.height());
 
   auto makePanel = [&](bool withUserFill, bool coincidentFill) {
     auto layer = VectorLayer::Make();
-    auto markerShape = Rectangle::Make();
-    markerShape->setPosition({markerRect.centerX(), markerRect.centerY()});
-    markerShape->setSize({markerRect.width(), markerRect.height()});
-    // The silhouette-only painter: the geometry plus a painter that paints nothing yet still defines
-    // the layer's own outline.
-    std::vector<std::shared_ptr<VectorElement>> elements = {markerShape, MakeSilhouetteOnlyFill()};
+    auto bareShape = Rectangle::Make();
+    bareShape->setPosition({bareRect.centerX(), bareRect.centerY()});
+    bareShape->setSize({bareRect.width(), bareRect.height()});
+    // Bare geometry: no painter captures it, so only the own-geometry channel records it.
+    std::vector<std::shared_ptr<VectorElement>> elements = {bareShape};
     if (withUserFill && coincidentFill) {
       // A retained 0%-alpha fill on the SAME geometry element: style alpha 0 over a color alpha of
-      // 1, so it paints nothing while its geometry still feeds the own outline. It joins the
-      // silhouette-only painter's element list, so the only difference from the unpainted panel is
-      // one more painter of the same geometry -- the exact pair under test, with the geometry count
-      // and the panel structure unchanged.
-      auto fill = FillStyle::Make(SolidColor::Make(Color::White()));
-      fill->setAlpha(0.0f);
-      elements.push_back(fill);
+      // 1, so it paints nothing while its painter captures the geometry. The only difference from
+      // the bare panel is which channel records the same geometry -- the exact pair under test, with
+      // the geometry count and the panel structure unchanged.
+      elements.push_back(MakeZeroAlphaFill());
     }
     auto group = VectorGroup::Make();
     group->setElements(std::move(elements));
     std::vector<std::shared_ptr<VectorElement>> contents = {group};
     if (withUserFill && !coincidentFill) {
       // Non-vacuity control: the same 0%-alpha fill, but on its own DISJOINT geometry, so its
-      // painter has to add its own area to the own outline.
+      // painter has to add its own area to the own geometry.
       auto fillShape = Rectangle::Make();
       fillShape->setPosition({disjointRect.centerX(), disjointRect.centerY()});
       fillShape->setSize({disjointRect.width(), disjointRect.height()});
@@ -7040,53 +6992,614 @@ TGFX_TEST_PRIVATE(LayerTest, OwnOutlineCoincidentPaintersDoNotGrowTheCoveredArea
     return count;
   };
 
-  auto markerOnly = RasterizeOwnOutlineAlpha(context, makePanel(false, false));
-  auto coincident = RasterizeOwnOutlineAlpha(context, makePanel(true, true));
-  auto disjoint = RasterizeOwnOutlineAlpha(context, makePanel(true, false));
-  ASSERT_FALSE(markerOnly.empty());
-  ASSERT_EQ(markerOnly.size(), coincident.size());
-  ASSERT_EQ(markerOnly.size(), disjoint.size());
+  auto bareOnly = RasterizeOwnGeometryAlpha(context, makePanel(false, false));
+  auto coincident = RasterizeOwnGeometryAlpha(context, makePanel(true, true));
+  auto disjoint = RasterizeOwnGeometryAlpha(context, makePanel(true, false));
+  ASSERT_FALSE(bareOnly.empty());
+  ASSERT_EQ(bareOnly.size(), coincident.size());
+  ASSERT_EQ(bareOnly.size(), disjoint.size());
 
-  const auto markerFull = countFull(markerOnly);
+  const auto bareFull = countFull(bareOnly);
   const auto coincidentFull = countFull(coincident);
   const auto disjointFull = countFull(disjoint);
-  EXPECT_GT(markerFull, 0) << "the marker-only outline must cover something, otherwise the "
-                              "comparisons below are vacuous";
-  EXPECT_EQ(coincidentFull, markerFull)
+  EXPECT_GT(bareFull, 0) << "the bare-geometry outline must cover something, otherwise the "
+                            "comparisons below are vacuous";
+  EXPECT_EQ(coincidentFull, bareFull)
       << "coincident-fill outline: a second painter describing the SAME geometry must not add any "
          "fully covered pixel";
   int differing = 0;
-  for (size_t i = 0; i < markerOnly.size(); i++) {
-    if (markerOnly[i] != coincident[i]) {
+  for (size_t i = 0; i < bareOnly.size(); i++) {
+    if (bareOnly[i] != coincident[i]) {
       differing++;
     }
   }
   EXPECT_EQ(differing, 0)
-      << "coincident-fill outline: the whole raster must match the marker-only outline pixel for "
+      << "coincident-fill outline: the whole raster must match the bare-geometry outline pixel for "
          "pixel, boundary included; "
       << differing << " pixels differ";
   // Non-vacuity: the same fixture with the second painter DISJOINT does add its own area, so the
-  // equality above cannot pass on the fill being dropped from the own outline.
-  EXPECT_EQ(disjointFull - markerFull, disjointArea)
+  // equality above cannot pass on the fill being dropped from the own geometry.
+  EXPECT_EQ(disjointFull - bareFull, disjointArea)
       << "disjoint-fill outline: the second painter must be recorded, so it has to add exactly its "
          "own "
       << disjointArea << "-pixel area";
 
   // The same boundary on rendered pixels: both configurations must frost the checker backdrop
   // identically, or the extra painter would be visible as a fringe.
-  auto renderedMarkerOnly = RenderPanelOverChecker(context, makePanel(false, false));
+  auto renderedBareOnly = RenderPanelOverChecker(context, makePanel(false, false));
   auto renderedCoincident = RenderPanelOverChecker(context, makePanel(true, true));
   auto renderedDisjoint = RenderPanelOverChecker(context, makePanel(true, false));
-  ASSERT_TRUE(renderedMarkerOnly != nullptr && renderedCoincident != nullptr &&
+  ASSERT_TRUE(renderedBareOnly != nullptr && renderedCoincident != nullptr &&
               renderedDisjoint != nullptr);
   const auto wholeSurface = Rect::MakeLTRB(0.0f, 0.0f, 200.0f, 200.0f);
-  EXPECT_EQ(
-      CountDifferingPixels(renderedMarkerOnly.get(), renderedCoincident.get(), wholeSurface, 2), 0)
+  EXPECT_EQ(CountDifferingPixels(renderedBareOnly.get(), renderedCoincident.get(), wholeSurface, 2),
+            0)
       << "rendered checker ROI: the coincident 0%-alpha fill must leave the Glass render untouched";
-  EXPECT_GT(CountDifferingPixels(renderedMarkerOnly.get(), renderedDisjoint.get(), wholeSurface, 2),
+  EXPECT_GT(CountDifferingPixels(renderedBareOnly.get(), renderedDisjoint.get(), wholeSurface, 2),
             0)
       << "rendered checker ROI (disjoint control): the render comparison must be able to see an "
          "extra fill at all, or the equality above is vacuous";
+}
+
+// A bare geometry only reaches the layer bounds while some style declares the own geometry as its
+// content. Without such a style the layer paints nothing and must stay invisible, so its bounds
+// (and with them the offscreen capture and the dirty region of everything that uses them) stay
+// empty. The gate has to re-arm on both edges, which means removing the style has to drop the
+// cached content bounds as well - hence the same layer is measured with and without the style.
+TGFX_TEST(LayerTest, OwnGeometryBoundsFollowStyleContentSource) {
+  const Rect bareRect = Rect::MakeXYWH(20.0f, 30.0f, 40.0f, 25.0f);
+  auto makeGeometry = [&bareRect]() {
+    auto rect = Rectangle::Make();
+    rect->setPosition({bareRect.centerX(), bareRect.centerY()});
+    rect->setSize({bareRect.width(), bareRect.height()});
+    return rect;
+  };
+  auto makeLayer = [&](bool withOpaqueFill) {
+    std::vector<std::shared_ptr<VectorElement>> elements = {makeGeometry()};
+    if (withOpaqueFill) {
+      elements.push_back(FillStyle::Make(SolidColor::Make(Color::White())));
+    }
+    auto group = VectorGroup::Make();
+    group->setElements(std::move(elements));
+    auto layer = VectorLayer::Make();
+    layer->setContents({group});
+    return layer;
+  };
+
+  // Control: a visible fill gives the same geometry a non-empty content bounds, so an empty bounds
+  // below cannot be the fixture having no geometry at all.
+  auto filledLayer = makeLayer(true);
+  EXPECT_FALSE(filledLayer->getBounds().isEmpty())
+      << "control fixture: an opaque fill must produce content bounds";
+  EXPECT_FALSE(filledLayer->getBounds(nullptr, true).isEmpty()) << "control fixture: tight bounds";
+
+  auto layer = makeLayer(false);
+  EXPECT_TRUE(layer->getBounds().isEmpty())
+      << "a bare geometry without a Geometry-sourced style must not give the layer any bounds";
+  EXPECT_TRUE(layer->getBounds(nullptr, true).isEmpty()) << "tight bounds, no style";
+
+  layer->setLayerStyles({MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+  EXPECT_EQ(layer->getBounds(), bareRect)
+      << "the Glass style consumes the own geometry, so the bounds must cover exactly it";
+  EXPECT_EQ(layer->getBounds(nullptr, true), bareRect)
+      << "tight bounds must cover the bare geometry as well";
+
+  layer->setLayerStyles({});
+  EXPECT_TRUE(layer->getBounds().isEmpty())
+      << "removing the style must drop the own geometry from the bounds again";
+  EXPECT_TRUE(layer->getBounds(nullptr, true).isEmpty()) << "tight bounds must be dropped again";
+}
+
+// ===== The own geometry: which styles see it, and how it is composited =====
+
+// A rectangle element covering `bounds`, for the cases below that need geometry and painter in one
+// flat element list (a Repeater or a MergePath only applies to the elements of its own group).
+static std::shared_ptr<Rectangle> MakeRectElement(const Rect& bounds) {
+  auto rect = Rectangle::Make();
+  rect->setPosition({bounds.centerX(), bounds.centerY()});
+  rect->setSize({bounds.width(), bounds.height()});
+  return rect;
+}
+
+// Alpha of an own-geometry raster at (x, y), in layer-local coordinates.
+static int OwnGeometryAlphaAt(const std::vector<int>& raster, int x, int y) {
+  if (x < 0 || y < 0 || x >= OwnGeometryProbeSize || y >= OwnGeometryProbeSize ||
+      raster.size() != static_cast<size_t>(OwnGeometryProbeSize) * OwnGeometryProbeSize) {
+    return -1;
+  }
+  return raster[static_cast<size_t>(y) * OwnGeometryProbeSize + static_cast<size_t>(x)];
+}
+
+// Records the LayerStyleInput a layer hands to one style, so the per-style gating of
+// LayerStyleInput::ownShape can be asserted without a style that consumes the shape.
+class OwnShapeProbeStyle : public LayerStyle {
+ public:
+  explicit OwnShapeProbeStyle(LayerStyleContentSource source) : _contentSource(source) {
+  }
+
+  LayerStylePosition position() const override {
+    return LayerStylePosition::Above;
+  }
+
+  Rect filterBounds(const Rect& srcRect, float /*contentScale*/) override {
+    return srcRect;
+  }
+
+  LayerStyleContentSource contentSource() const override {
+    return _contentSource;
+  }
+
+  // Filled in by onDraw, so a passing assertion also proves the style was drawn at all.
+  bool drawn = false;
+  bool sawOwnShape = false;
+
+ protected:
+  void onDraw(Canvas* /*canvas*/, const LayerStyleInput& input, float /*alpha*/,
+              BlendMode /*blendMode*/) override {
+    drawn = true;
+    sawOwnShape = input.ownShape.has_value();
+  }
+
+ private:
+  LayerStyleContentSource _contentSource = LayerStyleContentSource::All;
+};
+
+// ownShape describes the layer's own geometry, so only a style that declares that content source may
+// receive it. A sibling in the same excludeChildEffects bucket shares the recorded group, and its
+// content is the shared recording, which that shape does not describe: pairing the two would make
+// the sibling read a footprint it never drew.
+TGFX_TEST_PRIVATE(LayerTest, OwnShapeIsOnlyGivenToGeometrySourceStyles) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto otherStyle = std::make_shared<OwnShapeProbeStyle>(LayerStyleContentSource::All);
+  auto geometryStyle = std::make_shared<OwnShapeProbeStyle>(LayerStyleContentSource::Geometry);
+  // The parent holds one bare geometry and paints nothing itself, so it records exactly one own
+  // geometry outline. The painted child keeps the shared content non-empty, so a style drawing from
+  // the content is drawn instead of skipped -- otherwise the assertion below would be vacuous.
+  auto parent = VectorLayer::Make();
+  RegionSpec bareGeometry = {};
+  bareGeometry.bounds = GlassPanelLocalBounds();
+  parent->setContents({MakeRegion(bareGeometry)});
+  auto child = VectorLayer::Make();
+  RegionSpec paintedRegion = {};
+  paintedRegion.bounds = GlassPanelLocalBounds();
+  paintedRegion.fill = RegionFillKind::Opaque;
+  child->setContents({MakeRegion(paintedRegion)});
+  parent->addChild(child);
+  parent->setLayerStyles({otherStyle, geometryStyle});
+
+  auto surface = RenderPanelOverChecker(context, parent);
+  ASSERT_TRUE(surface != nullptr);
+
+  TGFX_PRIVATE_ACCESS(
+      DrawArgs drawArgs(context); auto source = parent->getLayerStyleSource(drawArgs, Matrix::I());
+      ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
+      ASSERT_TRUE(source->groups[0]->ownShape.has_value())
+      << "control: the group has to carry the own shape, or the gating below proves nothing";)
+
+  EXPECT_TRUE(geometryStyle->drawn);
+  EXPECT_TRUE(otherStyle->drawn) << "control: the shared content must be drawable";
+  EXPECT_TRUE(geometryStyle->sawOwnShape)
+      << "a style declaring LayerStyleContentSource::Geometry must receive the own shape";
+  EXPECT_FALSE(otherStyle->sawOwnShape)
+      << "a style drawing from the shared content must not receive an own shape that does not "
+         "describe that content";
+}
+
+// A bare geometry next to a painter has no single exact outline, so the style is handed no own shape
+// and falls back to the alpha-mask path. The raster keeps covering both regions either way.
+TGFX_TEST_PRIVATE(LayerTest, OwnShapeIsDroppedWhenPaintersCoexist) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto glass = MakeOwnGeometryGlass(0, 50, 100, 0, 0);
+  RegionSpec painted = {};
+  painted.bounds = Rect::MakeXYWH(20.0f, 20.0f, 40.0f, 30.0f);
+  painted.fill = RegionFillKind::Opaque;
+  RegionSpec bareGeometry = {};
+  bareGeometry.bounds = Rect::MakeXYWH(100.0f, 100.0f, 40.0f, 30.0f);
+
+  auto both = MakePanel({painted, bareGeometry}, {glass});
+  TGFX_PRIVATE_ACCESS(
+      DrawArgs drawArgs(context); auto source = both->getLayerStyleSource(drawArgs, Matrix::I());
+      ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[1] != nullptr);
+      ASSERT_TRUE(source->groups[1]->ownGeometry.has_value());
+      EXPECT_FALSE(source->groups[1]->ownShape.has_value())
+      << "a painter and a bare geometry together have no single exact outline, so the style must "
+         "take the alpha-mask path instead of an SDF that would cover less than the raster";)
+
+  // Dropping the shape drops no coverage: the painter contour and the bare geometry are both in the
+  // raster the alpha mask reads.
+  auto alpha = RasterizeOwnGeometryAlpha(context, both);
+  ASSERT_FALSE(alpha.empty());
+  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 40, 35), 255) << "the painted region is covered";
+  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 120, 115), 255) << "the bare region is covered";
+  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 80, 80), 0) << "the gap between them is not";
+
+  // Control: the same bare geometry alone does have an exact outline, so the nullopt above is the
+  // painter being present rather than the fixture having no shape at all.
+  auto bareOnly = MakePanel({bareGeometry}, {glass});
+  TGFX_PRIVATE_ACCESS(DrawArgs bareArgs(context);
+                      auto bareSource = bareOnly->getLayerStyleSource(bareArgs, Matrix::I());
+                      ASSERT_TRUE(bareSource != nullptr && bareSource->groups[1] != nullptr);
+                      EXPECT_TRUE(bareSource->groups[1]->ownShape.has_value());)
+}
+
+// The own geometry is not content: nothing draws it, so asking for content bounds -- which is what
+// mapContentBoundsToImage() hands to filters and style sources -- must not include it.
+TGFX_TEST_PRIVATE(LayerTest, OwnGeometryStaysOutOfContentBounds) {
+  const Rect bareBounds = Rect::MakeXYWH(20.0f, 30.0f, 40.0f, 25.0f);
+  RegionSpec bareGeometry = {};
+  bareGeometry.bounds = bareBounds;
+  auto layer = MakePanel({bareGeometry}, {MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+
+  TGFX_PRIVATE_ACCESS(
+      EXPECT_TRUE(layer->computeBounds(Matrix3D::I(), false, true).isEmpty())
+          << "content bounds must not include geometry that nothing draws, or the filter mapping "
+             "would be computed against pixels that are never rendered";
+      EXPECT_EQ(layer->computeBounds(Matrix3D::I(), false, false), bareBounds)
+      << "the bounds the style has to cover still include the own geometry";)
+}
+
+// A Repeater clones the accumulated geometries and remaps each painter onto its own clones, so the
+// bare-geometry difference has to be taken over the clones: a painter matched by pointer identity
+// would otherwise leave every clone counted as bare.
+TGFX_TEST_PRIVATE(LayerTest, RepeaterKeepsTheBareGeometryDifference) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  const Rect paintedBounds = Rect::MakeLTRB(20.0f, 20.0f, 50.0f, 50.0f);
+  const Rect bareBounds = Rect::MakeLTRB(20.0f, 70.0f, 50.0f, 100.0f);
+  constexpr float RepeatOffset = 80.0f;
+
+  auto repeater = Repeater::Make();
+  repeater->setCopies(2.0f);
+  repeater->setOffset(0.0f);
+  repeater->setAnchor({0.0f, 0.0f});
+  repeater->setPosition({RepeatOffset, 0.0f});
+  repeater->setOrder(RepeaterOrder::AboveOriginal);
+
+  auto group = VectorGroup::Make();
+  // The fill captures one geometry, then the bare rectangle joins it, and the Repeater clones both
+  // while remapping the painter onto the clones it captured.
+  group->setElements({MakeRectElement(paintedBounds),
+                      FillStyle::Make(SolidColor::Make(Color::White())),
+                      MakeRectElement(bareBounds), repeater});
+  auto layer = VectorLayer::Make();
+  layer->setContents({group});
+  layer->setLayerStyles({MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+
+  auto alpha = RasterizeOwnGeometryAlpha(context, layer);
+  ASSERT_FALSE(alpha.empty());
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(layer->ownGeometries.size(), 2u)
+                          << "only the two replicated bare rectangles differ; four would mean the "
+                             "painters no longer "
+                             "match their clones";)
+  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 35, 85), 255) << "the first bare clone is covered";
+  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 115, 85), 255) << "the replicated bare clone is covered";
+  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 35, 35), 255) << "the painted clone stays in the contour";
+  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 165, 165), 0) << "outside every clone stays uncovered";
+}
+
+// MergePath drops the accumulated painters and adds the merged shape as a new geometry. A painter
+// after it captures that shape, so the merged result is content and must not also be recorded as
+// bare geometry; a painter before it is dropped, so then nothing paints the merged shape and the
+// bare channel is the only one that can describe it.
+TGFX_TEST_PRIVATE(LayerTest, MergePathResultStaysWithItsPainter) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  const Rect firstRect = Rect::MakeLTRB(10.0f, 10.0f, 70.0f, 70.0f);
+  const Rect secondRect = Rect::MakeLTRB(50.0f, 50.0f, 110.0f, 110.0f);
+  auto makePanel = [&](bool mergeBeforeFill) {
+    auto mergePath = MergePath::Make();
+    mergePath->setMode(MergePathOp::Union);
+    std::vector<std::shared_ptr<VectorElement>> elements = {MakeRectElement(firstRect),
+                                                            MakeRectElement(secondRect)};
+    auto fill = FillStyle::Make(SolidColor::Make(Color::White()));
+    if (mergeBeforeFill) {
+      elements.push_back(mergePath);
+      elements.push_back(fill);
+    } else {
+      elements.push_back(fill);
+      elements.push_back(mergePath);
+    }
+    auto group = VectorGroup::Make();
+    group->setElements(std::move(elements));
+    auto layer = VectorLayer::Make();
+    layer->setContents({group});
+    layer->setLayerStyles({MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+    return layer;
+  };
+
+  auto merged = makePanel(true);
+  auto alpha = RasterizeOwnGeometryAlpha(context, merged);
+  ASSERT_FALSE(alpha.empty());
+  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(merged->ownGeometries.empty())
+                          << "the fill after the merge captures the merged shape, so it is content "
+                             "and must not also "
+                             "be recorded as bare geometry";)
+  // Asserted on the raster as well: the merged outline covers the union and keeps out of the corner
+  // that neither square covers.
+  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 30, 30), 255) << "inside the first rectangle only";
+  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 90, 90), 255) << "inside the second rectangle only";
+  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 60, 60), 255) << "inside the overlap";
+  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 90, 30), 0) << "outside the union";
+
+  auto mergeAfterFill = makePanel(false);
+  auto mergeAfterFillAlpha = RasterizeOwnGeometryAlpha(context, mergeAfterFill);
+  ASSERT_EQ(mergeAfterFillAlpha.size(), alpha.size());
+  TGFX_PRIVATE_ACCESS(
+      EXPECT_EQ(mergeAfterFill->ownGeometries.size(), 1u)
+          << "MergePath clears the painters, so nothing paints the merged shape there";)
+  int differingPixels = 0;
+  for (size_t i = 0; i < alpha.size(); i++) {
+    if (alpha[i] != mergeAfterFillAlpha[i]) {
+      differingPixels++;
+    }
+  }
+  EXPECT_EQ(differingPixels, 0)
+      << "both orders must describe the same union, so the difference above is only about which "
+         "channel carries it";
+}
+
+// ===== Text without a painter is own geometry =====
+//
+// A Vector layer holding only text has no painter at all, so Geometry::getShape() turns the text
+// blob into glyph outlines and those outlines are bare geometry: the layer's own geometry, and with
+// it the coverage a Geometry-source style such as Glass draws from.
+TGFX_TEST_PRIVATE(LayerTest, OwnGeometryIncludesTextGeometry) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto typeface = MakeTypeface("resources/font/NotoSansSC-Regular.otf");
+  ASSERT_TRUE(typeface != nullptr) << "the glyph outlines come from the font, so this is required";
+  auto blob = TextBlob::MakeFrom("TGFX", Font(typeface, 36.0f));
+  ASSERT_TRUE(blob != nullptr);
+  auto text = Text::Make(blob);
+  ASSERT_TRUE(text != nullptr);
+  // Placed well inside the probe surface: a glyph above y=0 would be cropped by the probe read.
+  text->setPosition({20.0f, 100.0f});
+
+  auto makePanel = [&](bool withGlass) {
+    auto layer = VectorLayer::Make();
+    // Text only, no FillStyle: nothing captures the blob, so no painter owns the glyph outlines.
+    layer->setContents({text});
+    if (withGlass) {
+      layer->setLayerStyles({MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+    }
+    return layer;
+  };
+
+  auto panel = makePanel(true);
+  TGFX_PRIVATE_ACCESS(
+      DrawArgs drawArgs(context); auto source = panel->getLayerStyleSource(drawArgs, Matrix::I());
+      ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[1] != nullptr);
+      ASSERT_TRUE(source->groups[1]->ownGeometry.has_value())
+      << "text without a painter is still the layer's own geometry";
+      EXPECT_TRUE(source->groups[1]->ownGeometry->image != nullptr);
+      EXPECT_TRUE(source->groups[1]->ownShape.has_value())
+      << "the glyph outlines fit a single StyledShape, so Glass takes the SDF path";)
+
+  // The coverage is the glyph shapes: something is covered, and it is not the whole probe surface.
+  auto alpha = RasterizeOwnGeometryAlpha(context, panel);
+  ASSERT_FALSE(alpha.empty());
+  int covered = 0;
+  for (auto value : alpha) {
+    covered += value == 255 ? 1 : 0;
+  }
+  EXPECT_GT(covered, 0) << "the glyph outline must cover something";
+  EXPECT_LT(covered * 2, static_cast<int>(alpha.size()))
+      << "a text outline covers its glyphs, not the whole surface; covered=" << covered;
+
+  // Recorded only for a style that consumes the own geometry: the same layer without Glass hands
+  // nothing over, so the geometry above is not produced unconditionally.
+  auto plain = makePanel(false);
+  TGFX_PRIVATE_ACCESS(DrawArgs plainArgs(context);
+                      EXPECT_TRUE(plain->getLayerStyleSource(plainArgs, Matrix::I()) == nullptr)
+                      << "without a Geometry-source style the own geometry is not recorded";)
+}
+
+// ===== Own geometry under a transform-only change =====
+//
+// A layer whose style consumes bare geometry paints nothing as content, so getContent() returns null
+// and only the own-geometry gate in Layer::updateRenderBounds() can give it bounds. Moving the layer
+// only marks the transform dirty, so without that gate the bounds stay where they were: the old
+// region is never invalidated and Layer::draw culls the layer against its stale renderBounds.
+
+constexpr int OwnGeometryMoveSurfaceWidth = 300;
+constexpr int OwnGeometryMoveSurfaceHeight = 200;
+constexpr float OwnGeometryMoveDistance = 100.0f;
+// Wide enough for the glass to cover the sampled pixel with room to spare, narrow enough that the
+// start and the moved position both stay inside the surface without overlapping.
+constexpr float OwnGeometryPanelSize = 40.0f;
+
+static Rect OwnGeometryPanelRect(float left, float top) {
+  return Rect::MakeXYWH(left, top, OwnGeometryPanelSize, OwnGeometryPanelSize);
+}
+
+// The backdrop the glass frosts: an opaque red field crossed by dark red stripes. A uniform field
+// would make the frost invisible -- blurring a constant color changes nothing -- so the stripes are
+// what lets a pixel read tell a frosted region from the plain backdrop.
+static std::shared_ptr<Layer> MakeStripedRedBackdrop() {
+  const Rect fullRect = Rect::MakeWH(OwnGeometryMoveSurfaceWidth, OwnGeometryMoveSurfaceHeight);
+  auto base = VectorGroup::Make();
+  base->setElements(
+      {MakeRectElement(fullRect), FillStyle::Make(SolidColor::Make(Color::FromRGBA(255, 0, 0)))});
+  std::vector<std::shared_ptr<VectorElement>> stripes = {};
+  for (float left = 0.0f; left + 12.0f <= OwnGeometryMoveSurfaceWidth; left += 24.0f) {
+    stripes.push_back(MakeRectElement(
+        Rect::MakeXYWH(left, 0.0f, 12.0f, static_cast<float>(OwnGeometryMoveSurfaceHeight))));
+  }
+  stripes.push_back(FillStyle::Make(SolidColor::Make(Color::FromRGBA(48, 0, 0))));
+  auto stripeGroup = VectorGroup::Make();
+  stripeGroup->setElements(std::move(stripes));
+  auto backdrop = VectorLayer::Make();
+  backdrop->setContents({base, stripeGroup});
+  return backdrop;
+}
+
+// The layer under test: one rectangle and no painter at all, so its content is empty and the
+// GlassStyle is the only thing that makes it paint anything.
+static std::shared_ptr<VectorLayer> MakeBareGeometryGlassLayer(const Rect& bounds) {
+  auto group = VectorGroup::Make();
+  group->setElements({MakeRectElement(bounds)});
+  auto layer = VectorLayer::Make();
+  layer->setContents({group});
+  layer->setLayerStyles({MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+  return layer;
+}
+
+static std::optional<uint32_t> ReadPixelValue(Surface* surface, int x, int y) {
+  auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  uint32_t pixel = 0;
+  if (!surface->readPixels(info, &pixel, x, y)) {
+    return std::nullopt;
+  }
+  return pixel;
+}
+
+static int MaxChannelDifference(uint32_t first, uint32_t second) {
+  int maxDiff = 0;
+  for (int shift = 0; shift < 32; shift += 8) {
+    auto firstChannel = static_cast<int>((first >> shift) & 0xFF);
+    auto secondChannel = static_cast<int>((second >> shift) & 0xFF);
+    auto diff =
+        firstChannel > secondChannel ? firstChannel - secondChannel : secondChannel - firstChannel;
+    maxDiff = std::max(maxDiff, diff);
+  }
+  return maxDiff;
+}
+
+TGFX_TEST_PRIVATE(LayerTest, OwnGeometryLayerMovesItsRenderBounds) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, OwnGeometryMoveSurfaceWidth, OwnGeometryMoveSurfaceHeight);
+  ASSERT_TRUE(surface != nullptr);
+  const auto panelRect = OwnGeometryPanelRect(20.0f, 20.0f);
+
+  DisplayList displayList;
+  displayList.root()->addChild(MakeStripedRedBackdrop());
+  auto layer = MakeBareGeometryGlassLayer(panelRect);
+  displayList.root()->addChild(layer);
+  displayList.render(surface.get());
+
+  Rect before = {};
+  TGFX_PRIVATE_ACCESS(before = layer->renderBounds;)
+  ASSERT_FALSE(before.isEmpty()) << "the own-geometry gate must give the layer bounds, otherwise "
+                                    "the move below proves nothing";
+
+  layer->setPosition({OwnGeometryMoveDistance, 0.0f});
+  displayList.render(surface.get(), false);
+
+  Rect after = {};
+  TGFX_PRIVATE_ACCESS(after = layer->renderBounds;)
+  EXPECT_NEAR(after.left, before.left + OwnGeometryMoveDistance, 0.5f)
+      << "moving a bare-geometry layer must move its render bounds; a stale rect leaves the old "
+         "region dirty and makes Layer::draw cull the layer at its new place. before="
+      << before.left << " after=" << after.left;
+  EXPECT_NEAR(after.top, before.top, 0.5f)
+      << "a horizontal move must not shift the bounds vertically";
+  EXPECT_NEAR(after.width(), before.width(), 0.5f) << "the move must not resize the bounds";
+  EXPECT_NEAR(after.height(), before.height(), 0.5f) << "the move must not resize the bounds";
+}
+
+TGFX_TEST_PRIVATE(LayerTest, OwnGeometryLayerFollowsParentTransform) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, OwnGeometryMoveSurfaceWidth, OwnGeometryMoveSurfaceHeight);
+  ASSERT_TRUE(surface != nullptr);
+  const auto panelRect = OwnGeometryPanelRect(20.0f, 20.0f);
+
+  DisplayList displayList;
+  displayList.root()->addChild(MakeStripedRedBackdrop());
+  auto parent = Layer::Make();
+  auto layer = MakeBareGeometryGlassLayer(panelRect);
+  parent->addChild(layer);
+  displayList.root()->addChild(parent);
+  displayList.render(surface.get());
+
+  Rect before = {};
+  TGFX_PRIVATE_ACCESS(before = layer->renderBounds;)
+  ASSERT_FALSE(before.isEmpty()) << "the own-geometry gate must give the child bounds";
+
+  // The child's own transform is untouched, so its bounds have to follow through childForceDirty.
+  parent->setMatrix(Matrix::MakeTrans(OwnGeometryMoveDistance, 0.0f));
+  displayList.render(surface.get(), false);
+
+  Rect after = {};
+  TGFX_PRIVATE_ACCESS(after = layer->renderBounds;)
+  EXPECT_NEAR(after.left, before.left + OwnGeometryMoveDistance, 0.5f)
+      << "a parent transform must reach the bare-geometry child's render bounds. before="
+      << before.left << " after=" << after.left;
+  EXPECT_NEAR(after.top, before.top, 0.5f) << "a horizontal parent move must not shift the bounds";
+  EXPECT_NEAR(after.width(), before.width(), 0.5f) << "the parent move must not resize the bounds";
+  EXPECT_NEAR(after.height(), before.height(), 0.5f)
+      << "the parent move must not resize the bounds";
+}
+
+TGFX_TEST_PRIVATE(LayerTest, OwnGeometryLayerRedrawsAfterMove) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  const auto panelRect = OwnGeometryPanelRect(20.0f, 20.0f);
+  // Big enough that a frosted stripe pattern cannot be mistaken for the plain backdrop.
+  constexpr int threshold = 8;
+
+  // Reference: the same backdrop with no glass at all, so "the glass was drawn" is measured against
+  // the backdrop rather than against a second glass configuration.
+  auto referenceSurface =
+      Surface::Make(context, OwnGeometryMoveSurfaceWidth, OwnGeometryMoveSurfaceHeight);
+  ASSERT_TRUE(referenceSurface != nullptr);
+  {
+    DisplayList referenceList;
+    referenceList.root()->addChild(MakeStripedRedBackdrop());
+    referenceList.render(referenceSurface.get());
+  }
+
+  auto surface = Surface::Make(context, OwnGeometryMoveSurfaceWidth, OwnGeometryMoveSurfaceHeight);
+  ASSERT_TRUE(surface != nullptr);
+  DisplayList displayList;
+  displayList.root()->addChild(MakeStripedRedBackdrop());
+  auto layer = MakeBareGeometryGlassLayer(panelRect);
+  displayList.root()->addChild(layer);
+  displayList.render(surface.get());
+
+  const int startX = static_cast<int>(panelRect.centerX());
+  const int centerY = static_cast<int>(panelRect.centerY());
+  const int movedX = startX + static_cast<int>(OwnGeometryMoveDistance);
+  auto referenceStart = ReadPixelValue(referenceSurface.get(), startX, centerY);
+  auto referenceMoved = ReadPixelValue(referenceSurface.get(), movedX, centerY);
+  auto startBefore = ReadPixelValue(surface.get(), startX, centerY);
+  auto movedBefore = ReadPixelValue(surface.get(), movedX, centerY);
+  ASSERT_TRUE(referenceStart.has_value() && referenceMoved.has_value() && startBefore.has_value() &&
+              movedBefore.has_value());
+  EXPECT_GT(MaxChannelDifference(*startBefore, *referenceStart), threshold)
+      << "fixture control: the glass must be visible at the start position in the first frame";
+  EXPECT_LE(MaxChannelDifference(*movedBefore, *referenceMoved), threshold)
+      << "fixture control: the moved position must start out as plain backdrop";
+
+  // Incremental frame: only the dirty regions are replayed, so the layer has to be drawn at its new
+  // place AND the backdrop has to be restored where it used to be.
+  layer->setPosition({OwnGeometryMoveDistance, 0.0f});
+  displayList.render(surface.get(), false);
+
+  auto startAfter = ReadPixelValue(surface.get(), startX, centerY);
+  auto movedAfter = ReadPixelValue(surface.get(), movedX, centerY);
+  ASSERT_TRUE(startAfter.has_value() && movedAfter.has_value());
+  EXPECT_GT(MaxChannelDifference(*movedAfter, *referenceMoved), threshold)
+      << "the moved layer must be drawn at its new position; an equal backdrop read means the new "
+         "region was never redrawn";
+  EXPECT_LE(MaxChannelDifference(*startAfter, *referenceStart), threshold)
+      << "the region the layer left must be repainted as plain backdrop, so a stale render bounds "
+         "left the old glass behind";
 }
 
 }  // namespace tgfx
