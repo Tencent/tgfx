@@ -319,7 +319,8 @@ class TestResource : public Resource {
 TGFX_TEST(ResourceTest, MultiThreadRecycling) {
   auto device = DevicePool::Make();
   ASSERT_TRUE(device != nullptr);
-  tgfx::Task::Run([device] {
+  auto subTasks = std::make_shared<std::vector<std::shared_ptr<Task>>>();
+  auto task = tgfx::Task::Run([device, subTasks] {
     for (uint32_t i = 0; i < 100; ++i) {
       auto context = device->lockContext();
       ASSERT_TRUE(context != nullptr);
@@ -327,14 +328,18 @@ TGFX_TEST(ResourceTest, MultiThreadRecycling) {
       context->flushAndSubmit();
       context->resourceCache()->purgeUntilMemoryTo(0);
       device->unlock();
-      tgfx::Task::Run([resource, device] {
+      subTasks->push_back(tgfx::Task::Run([resource, device] {
         // Keep the resource and its device alive until this task runs; the casts silence the
         // nodiscard warnings of newer libc++ versions.
         (void)resource.get();
         (void)device.get();
-      });
+      }));
     }
   });
+  EXPECT_TRUE(task->wait());
+  for (const auto& subTask : *subTasks) {
+    EXPECT_TRUE(subTask->wait());
+  }
 };
 
 #ifdef TGFX_USE_THREADS
@@ -342,13 +347,15 @@ TGFX_TEST(ResourceTest, BlockAllocatorRefCount) {
   BlockAllocator blockAllocator;
   // make sure vertices expire after task is done
   float* vertices = nullptr;
+  std::shared_ptr<Task> task = nullptr;
   {
     auto vertexProvider =
         RectsVertexProvider::MakeFrom(&blockAllocator, Rect::MakeWH(100, 100), AAType::Coverage);
     vertices = new float[vertexProvider->vertexCount()];
-    auto task = std::make_shared<VertexProviderTask>(std::move(vertexProvider), vertices);
+    task = std::make_shared<VertexProviderTask>(std::move(vertexProvider), vertices);
     Task::Run(task);
   }
+  EXPECT_TRUE(task->wait());
   blockAllocator.clear();
   delete[] vertices;
 }
