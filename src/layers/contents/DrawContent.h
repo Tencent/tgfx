@@ -56,7 +56,7 @@ class DrawContent : public GeometryContent {
   }
 
  protected:
-  void drawContourInternal(Canvas* canvas, bool antiAlias, bool includeSilhouette) const override;
+  void drawContourInternal(Canvas* canvas, bool antiAlias) const override;
 
   virtual Rect onGetBounds() const = 0;
   virtual void onDraw(Canvas* canvas, const Paint& paint) const = 0;
@@ -66,7 +66,6 @@ class DrawContent : public GeometryContent {
   std::shared_ptr<Shader> shader = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
   std::unique_ptr<Stroke> stroke = nullptr;
-  bool silhouetteOnly = false;
 };
 
 }  // namespace tgfx

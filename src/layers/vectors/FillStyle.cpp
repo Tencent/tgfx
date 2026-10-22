@@ -135,14 +135,6 @@ void FillStyle::setPlacement(LayerPlacement value) {
   invalidateContent();
 }
 
-void FillStyle::setSilhouetteOnly(bool value) {
-  if (_silhouetteOnly == value) {
-    return;
-  }
-  _silhouetteOnly = value;
-  invalidateContent();
-}
-
 void FillStyle::attachToLayer(Layer* layer) {
   VectorElement::attachToLayer(layer);
   if (_colorSource) {
@@ -173,7 +165,6 @@ void FillStyle::apply(VectorContext* context) {
   painter->blendMode = _blendMode;
   painter->alpha = _alpha;
   painter->placement = _placement;
-  painter->silhouetteOnly = _silhouetteOnly;
   painter->fillRule = ToPathFillType(_fillRule);
   painter->captureGeometries(context);
   context->painters.push_back(std::move(painter));

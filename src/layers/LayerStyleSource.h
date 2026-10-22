@@ -45,82 +45,71 @@ struct LayerStyleSourceEntry {
 
 /**
  * Pairs the content image with the optional contour image for a specific excludeChildEffects
- * bucket. content.image is usually populated, but a bucket kept alive by an own-outline style whose
- * content render failed leaves it null; contour is only present when at least one Contour-sourced
- * LayerStyle in this bucket requires a distinct contour image.
+ * bucket. content.image is normally populated; it stays null only for a bucket kept alive by an
+ * own-geometry style whose layer paints nothing. contour is only present when at least one
+ * Contour-sourced LayerStyle in this bucket requires a distinct contour image, or when it holds the
+ * lazy fallback recording of a bucket whose own geometry is empty.
  */
 struct LayerStyleSourceGroup {
   LayerStyleSourceEntry content = {};
   std::optional<LayerStyleSourceEntry> contour = std::nullopt;
 
-  // The layer's own outline: its content without descendants, but including the painters marked
-  // silhouetteOnly that the shared contour deliberately drops. Recorded when the bucket carries a
-  // style that consumes it, so a layer whose only painter is such a marker still has coverage.
-  std::optional<LayerStyleSourceEntry> ownContour = std::nullopt;
+  // The layer's own geometry: its content recorded without descendants, keeping the painters with
+  // alpha=0, plus the geometries no painter captured. Recorded when the bucket carries a style whose
+  // contentSource() is Geometry, so a layer that paints nothing still has coverage.
+  std::optional<LayerStyleSourceEntry> ownGeometry = std::nullopt;
 
-  // Shape of the same own outline, matching ownContour the way contentShape matches content.
-  std::optional<StyledShape> ownContourShape = std::nullopt;
+  // Shape of the same own geometry, matching ownGeometry the way contentShape matches content.
+  std::optional<StyledShape> ownShape = std::nullopt;
 };
 
 /**
- * Returns whether the style declares the layer's own geometry as an input.
+ * Returns whether the style declares the layer's own geometry as its content.
  */
-inline bool NeedsOwnShape(const LayerStyle* style) {
+inline bool NeedsOwnGeometry(const LayerStyle* style) {
   DEBUG_ASSERT(style != nullptr);
-  return (style->extraSourceType() & static_cast<uint32_t>(LayerStyleExtraSourceType::OwnShape)) !=
-         0;
+  return style->contentSource() == LayerStyleContentSource::Geometry;
 }
 
 /**
- * Returns the layer's own geometry entry when the given style declares it, or nullptr otherwise.
- * The single source of the own-geometry predicate shared by the resolvers below, so they can never
- * disagree on when a style is driven by the own geometry.
- */
-inline const LayerStyleSourceEntry* OwnShapeEntry(const LayerStyleSourceGroup& group,
-                                                  const LayerStyle* style) {
-  if (NeedsOwnShape(style) && group.ownContour.has_value() && group.ownContour->image != nullptr) {
-    return &*group.ownContour;
-  }
-  return nullptr;
-}
-
-/**
- * Resolves the entry a consumer must use as LayerStyleInput.content. A style that declares
- * LayerStyleExtraSourceType::OwnShape gets the layer's own geometry, falling back to the shared
- * subtree recording when the layer records none; every other style keeps the shared content.
+ * Resolves the entry a consumer must use as LayerStyleInput.content: a style declaring
+ * LayerStyleContentSource::Geometry gets the layer's own geometry (with the fallbacks described
+ * there), every other style keeps the shared content.
  *
  * Returns nullptr when the entry carries no image, and the caller must then skip the style.
  */
 inline const LayerStyleSourceEntry* ResolveContentEntry(const LayerStyleSourceGroup& group,
                                                         const LayerStyle* style) {
   DEBUG_ASSERT(style != nullptr);
-  if (NeedsOwnShape(style)) {
-    if (auto* ownEntry = OwnShapeEntry(group, style)) {
-      return ownEntry;
+  if (NeedsOwnGeometry(style)) {
+    if (group.ownGeometry.has_value() && group.ownGeometry->image != nullptr) {
+      return &*group.ownGeometry;
     }
-    // Falls back to the shared contour because a retained 0%-alpha fill survives only there:
-    // `content` drops painters with alpha <= 0, `contour` keeps them. The trade-off is the opposite
-    // axis -- `contour` drops a descendant's silhouette-only painter -- which cannot happen here,
-    // since such a layer records an own geometry and never reaches this branch.
+    // Only reached when the own recording is empty, e.g. the geometry all lives in child layers.
+    // The shared contour answers for it because a retained 0%-alpha fill survives only there:
+    // `content` drops painters with alpha <= 0, `contour` keeps them.
     if (group.contour.has_value() && group.contour->image != nullptr) {
       return &*group.contour;
     }
+    return nullptr;
   }
   return group.content.image != nullptr ? &group.content : nullptr;
 }
 
 /**
- * Resolves the vector shape of the layer's own geometry for a style that declares it. The shape
- * describes the same recording as the raster ResolveContentEntry returns: when the own entry
- * exists, both come from the own geometry; when it does not, the shape stays absent and the style
- * falls back to its alpha-mask path over the shared raster.
+ * Resolves the own-geometry shape handed to a style. Only a style that declares
+ * LayerStyleContentSource::Geometry consumes the layer's own geometry, and a group may carry the
+ * shape for a sibling in the same excludeChildEffects bucket, so every other style must receive an
+ * empty shape: its content is the shared recording, and pairing it with an own shape that does not
+ * describe that content would make it read bounds it never drew.
  */
 inline std::optional<StyledShape> ResolveOwnShape(const LayerStyleSourceGroup& group,
                                                   const LayerStyle* style) {
-  if (OwnShapeEntry(group, style) == nullptr) {
+  DEBUG_ASSERT(style != nullptr);
+  if (!NeedsOwnGeometry(style)) {
     return std::nullopt;
   }
-  return group.ownContourShape;
+  return group.ownShape;
 }
 
 /**

@@ -63,17 +63,16 @@ bool ComposeContent::hitTestPoint(float localX, float localY) const {
   return false;
 }
 
-void ComposeContent::drawContourInternal(Canvas* canvas, bool antiAlias,
-                                         bool includeSilhouette) const {
+void ComposeContent::drawContourInternal(Canvas* canvas, bool antiAlias) const {
   // This container is the only entry that sees the whole outline table, so it forwards the recording
-  // to every painter it holds and passes includeSilhouette on unchanged.
+  // to every painter it holds.
   if (!contours.empty()) {
     for (const auto geometry : contours) {
-      geometry->drawContour(canvas, antiAlias, includeSilhouette);
+      geometry->drawContour(canvas, antiAlias);
     }
   } else {
     for (const auto& content : contents) {
-      content->drawContour(canvas, antiAlias, includeSilhouette);
+      content->drawContour(canvas, antiAlias);
     }
   }
 }

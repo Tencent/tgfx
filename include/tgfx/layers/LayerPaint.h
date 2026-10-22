@@ -114,21 +114,6 @@ class LayerPaint {
    * LayerPlacement::Background.
    */
   LayerPlacement placement = LayerPlacement::Background;
-
-  /**
-   * When true, this paint only takes part in the layer's own silhouette: it is left out of the
-   * contour shared with layer styles (shadows, background blur) and out of the shape ordinary
-   * styles see, and only the layer's own contour recording includes it as a contour. Normal drawing
-   * is untouched, so a paint that also carries a visible alpha is still drawn. Default is false.
-   *
-   * It exists because alpha cannot express the difference: a paint with a fully transparent color
-   * is indistinguishable from a fully transparent user fill, while a caller may need geometry that
-   * still defines the layer's outline. The flag only selects which contour and which shape consume
-   * the paint; whether it is drawn is still decided by the paint's own alpha, so a caller that
-   * needs no visible color must also set the alpha to 0. Skipping the draw here would instead break
-   * a caller that later makes the paint opaque.
-   */
-  bool silhouetteOnly = false;
 };
 
 }  // namespace tgfx
