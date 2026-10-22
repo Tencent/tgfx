@@ -1823,17 +1823,21 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     return nullptr;
   }
 
-  // Collect which excludeChildEffects values need content, a rasterized contour and the layer's own
-  // geometry, and whether any style needs a content shape.
+  // Collect which excludeChildEffects values need the shared content, a rasterized contour and the
+  // layer's own geometry, and whether any style needs a content shape.
   bool needContent[2] = {false, false};
   bool needContour[2] = {false, false};
   bool needOwnGeometry[2] = {false, false};
   bool needsContentShape = false;
   for (const auto& layerStyle : _layerStyles) {
     auto index = static_cast<int>(layerStyle->excludeChildEffects());
-    needContent[index] = true;
     if (NeedsOwnGeometry(layerStyle.get())) {
       needOwnGeometry[index] = true;
+    } else {
+      // Only a style drawing from the shared content needs it recorded: a Geometry-sourced style
+      // reads the own geometry instead, so recording content for it would rasterize the subtree for
+      // nothing.
+      needContent[index] = true;
     }
     auto sourceFlags = layerStyle->extraSourceType();
     if (NeedsContourSource(sourceFlags)) {
@@ -1859,7 +1863,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   drawArgs.backgroundHandler = BackgroundHandler::NoOp();
 
   for (int i = 0; i < 2; i++) {
-    if (!needContent[i] && !needContour[i]) {
+    if (!needContent[i] && !needContour[i] && !needOwnGeometry[i]) {
       continue;
     }
     drawArgs.excludeEffects = static_cast<bool>(i);

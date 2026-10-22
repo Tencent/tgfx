@@ -53,6 +53,8 @@ static bool IsCapturedByAnyPainter(const Geometry* geometry,
   return false;
 }
 
+static std::optional<StyledShape> MakeStyledShape(const std::vector<const Painter*>& painters);
+
 std::shared_ptr<VectorLayer> VectorLayer::Make() {
   return std::shared_ptr<VectorLayer>(new VectorLayer());
 }
@@ -82,6 +84,7 @@ void VectorLayer::setContents(std::vector<std::shared_ptr<VectorElement>> value)
 
 void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
   ownGeometries = {};
+  ownShape = std::nullopt;
   if (_contents.empty()) {
     return;
   }
@@ -105,6 +108,29 @@ void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
       continue;
     }
     ownGeometries.push_back({std::move(shape), geometry->matrix});
+  }
+  // Describe the own geometry while the context is alive: the shape needs the same painters and
+  // geometries it was taken from, so re-applying every element per query would be pure waste.
+  if (!ownGeometries.empty()) {
+    // Geometry no painter captured has an exact outline only when it is the layer's whole own
+    // geometry: a SDF built from it would otherwise disagree with the recorded raster, which also
+    // holds the painters, so those cases let the style take its alpha-mask path instead.
+    if (context.painters.empty() && ownGeometries.size() == 1) {
+      const auto& entry = ownGeometries.front();
+      auto shape = Shape::ApplyMatrix(entry.shape, entry.matrix);
+      if (shape != nullptr) {
+        ownShape = StyledShape::Make(shape, StyledShapeType::Fill, 0.0f, StrokeAlign::Center);
+      }
+    }
+  } else {
+    // The own geometry keeps every painter, including the 0-alpha ones, so its shape must keep that
+    // same painter set or it would describe fewer painters than the raster it is paired with.
+    std::vector<const Painter*> painters = {};
+    for (const auto& painter : context.painters) {
+      DEBUG_ASSERT(painter != nullptr);
+      painters.push_back(painter.get());
+    }
+    ownShape = MakeStyledShape(painters);
   }
   // Render all painters
   for (const auto& painter : context.painters) {
@@ -140,7 +166,7 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
 }
 
 std::optional<StyledShape> VectorLayer::onGetOwnGeometryShape() {
-  return computeOwnGeometryShape();
+  return ownShape;
 }
 
 // Simplifies a painter set that describes a single geometry with a uniform style into one exact
@@ -216,41 +242,6 @@ std::optional<StyledShape> VectorLayer::computeContentShape() {
     if (!HasTransparentSolidColor(painter.get())) {
       painters.push_back(painter.get());
     }
-  }
-  return MakeStyledShape(painters);
-}
-
-std::optional<StyledShape> VectorLayer::computeOwnGeometryShape() {
-  if (_contents.empty()) {
-    return std::nullopt;
-  }
-  VectorContext context = {};
-  for (const auto& element : _contents) {
-    DEBUG_ASSERT(element != nullptr);
-    if (element->enabled()) {
-      element->apply(&context);
-    }
-  }
-  if (!ownGeometries.empty()) {
-    // Geometry no painter captured has an exact outline only when it is the layer's whole own
-    // geometry: a SDF built from it would otherwise disagree with the recorded raster, which also
-    // holds the painters, so those cases let the style take its alpha-mask path instead.
-    if (!context.painters.empty() || ownGeometries.size() != 1) {
-      return std::nullopt;
-    }
-    const auto& entry = ownGeometries.front();
-    auto shape = Shape::ApplyMatrix(entry.shape, entry.matrix);
-    if (shape == nullptr) {
-      return std::nullopt;
-    }
-    return StyledShape::Make(shape, StyledShapeType::Fill, 0.0f, StrokeAlign::Center);
-  }
-  // The own geometry keeps every painter, including the 0-alpha ones, so its shape must keep that
-  // same painter set or it would describe fewer painters than the raster it is paired with.
-  std::vector<const Painter*> painters = {};
-  for (const auto& painter : context.painters) {
-    DEBUG_ASSERT(painter != nullptr);
-    painters.push_back(painter.get());
   }
   return MakeStyledShape(painters);
 }
