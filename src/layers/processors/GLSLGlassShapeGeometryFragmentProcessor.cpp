@@ -310,6 +310,13 @@ void GLSLGlassUDFGeometryFragmentProcessor::onSetData(UniformData*,
   }
   float edgeMaskUVData[4] = {edgeScaleX, edgeScaleY, edgeOriginX, edgeOriginY};
   fragmentUniformData->setData("GlassEdgeMaskUV", edgeMaskUVData);
+  // Precompiled-only field: the merged UDF variant gates its edge-mask taps on this uniform (an
+  // edge-lit-off draw binds the dummy texture on the edge slot and never samples it). Absent from
+  // runtime programs, which emit the edge path or not at compile time.
+  if (fragmentUniformData->hasField("EdgeMaskOn")) {
+    fragmentUniformData->setData("EdgeMaskOn",
+                                 enableEdgeLighting && edgeMaskProxy != nullptr ? 1 : 0);
+  }
 }
 
 }  // namespace tgfx

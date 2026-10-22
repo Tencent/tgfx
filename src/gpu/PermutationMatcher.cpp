@@ -1044,8 +1044,9 @@ static std::optional<PermutationMatchResult> TryMatchGlassRefraction(
     auto* sdf = static_cast<const GlassSDFGeometryFragmentProcessor*>(child);
     geometryKind = sdf->getShapeType() == GlassShapeType::RoundedRect ? 0 : 1;
   } else if (child->name() == "GlassUDFGeometryFragmentProcessor") {
-    auto* udf = static_cast<const GlassUDFGeometryFragmentProcessor*>(child);
-    geometryKind = udf->isEdgeLightingEnabled() ? 3 : 2;
+    // The UDF kind always declares the edge-light mask sampler; an edge-lit-off draw binds the
+    // shared dummy texture there and clears the EdgeMaskOn runtime uniform.
+    geometryKind = 2;
   }
   if (geometryKind < 0) {
     return std::nullopt;

@@ -151,8 +151,14 @@ namespace tgfx {
  * chain's DefaultGP forms dropped their coverage-free variants. Every affected family changes its
  * vertex layout, and the removed axes re-encode their permutation indices; pre-change bundles are
  * refused.
+ *
+ * 0x00010018: the GlassRefraction UDF kind merged the edge-lit form into it — the edge-light mask
+ * sampler is declared unconditionally (an edge-lit-off draw binds the shared dummy texture there
+ * and clears the new EdgeMaskOn runtime uniform), the fragment uniform block gained the
+ * EdgeMaskOn field, and the removed GEOMETRY_KIND value re-encodes the family's permutation
+ * indices; pre-change bundles are refused.
  */
-inline constexpr uint32_t kExpectedToolchainABI = 0x00010017u;
+inline constexpr uint32_t kExpectedToolchainABI = 0x00010018u;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

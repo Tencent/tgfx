@@ -372,8 +372,9 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
   // NonAARRect, ComplexNonAARRect and RoundStrokeRect families then dropped HAS_COMMON_COLOR the
   // same way too (54 -> 27 pairs), removing 27 more, and RoundStrokeRect then dropped HAS_AA (the
   // coverage and radii attributes unconditional, the ramp picked by the AAEnabled runtime uniform),
-  // removing 6 more.
-  EXPECT_EQ(pairCount, 278u);
+  // removing 6 more. GlassRefraction then merged its edge-lit UDF form (the edge-light mask
+  // sampler declared unconditionally, gated by the EdgeMaskOn runtime uniform), removing 12 more.
+  EXPECT_EQ(pairCount, 266u);
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseChainShader"),
             EnumeratePointwiseChainReachable());
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseGraphShader"),

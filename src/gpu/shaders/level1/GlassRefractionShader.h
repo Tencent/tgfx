@@ -43,7 +43,8 @@ namespace tgfx {
 ///
 /// Fragment dimensions:
 ///   GP_KIND (int, 2 values): selects the initial-coverage source and the coordinate varying form
-///   GEOMETRY_KIND (int, 4 values): 0=SDF rounded rect, 1=SDF ellipse, 2=UDF, 3=UDF + edge light
+///   GEOMETRY_KIND (int, 3 values): 0=SDF rounded rect, 1=SDF ellipse, 2=UDF (the edge-light mask
+///   is always declared; the EdgeMaskOn runtime uniform gates its taps)
 ///   DISPERSION_ON (int, 2 values): 0=single tap, 1=three chromatic taps
 ///   HAS_XP (int, 3 values): XferProcessor type
 class GlassRefractionShader : public PrecompiledShader {
@@ -63,7 +64,7 @@ class GlassRefractionShader : public PrecompiledShader {
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("GP_KIND", 2),
-          PermutationInt("GEOMETRY_KIND", 4),
+          PermutationInt("GEOMETRY_KIND", 3),
           PermutationInt("DISPERSION_ON", 2),
           PermutationInt("HAS_XP", 3),
       });

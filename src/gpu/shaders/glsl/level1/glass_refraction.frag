@@ -7,7 +7,8 @@
 // Permutation dimensions (frag):
 //   GP_KIND (0~1): 0=ellipse (analytic edge coverage, vec2 background coordinate),
 //                  1=quad (per-vertex edge coverage, vec3 background coordinate)
-//   GEOMETRY_KIND (0~3): 0=SDF rounded rect, 1=SDF ellipse, 2=UDF, 3=UDF + edge light
+//   GEOMETRY_KIND (0~2): 0=SDF rounded rect, 1=SDF ellipse, 2=UDF (the edge-light mask is always
+//   declared; the EdgeMaskOn runtime uniform gates its taps)
 //   HAS_XP (0~2): 0=Empty, 1=PorterDuff DST_TEX, 2=PorterDuff FBF
 // The quad form also carries an optional local shape mask (the SrcIn ShaderMaskFilter GlassStyle
 // attaches when the content has no exact outline). It is a runtime branch, not a dimension:
@@ -45,6 +46,9 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   // Edge lighting stays a runtime branch: it only adds to an already-sampled colour, so it cannot
   // move a texture coordinate. Dispersion is a compile-time dimension instead (see DISPERSION_ON).
   int LightingOn;
+  // Selects the edge-light mask branch in the UDF kinds. Same runtime-branch safety class as
+  // LightingOn: the edge samples only feed the additive lighting term, never a texture coordinate.
+  int EdgeMaskOn;
 #if GP_KIND == 1
   // Written as 0 by GlassRefractionFragmentProcessor and as 1 by the local-mask coverage processor
   // (XfermodeFragmentProcessor, which runs after the color processors).
@@ -71,12 +75,10 @@ layout(location = 2) in vec2 TransformedCoords_0;
 layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
 #if GEOMETRY_KIND >= 2
 layout(set = 1, binding = 1) uniform sampler2D MaskSampler;
-#endif
-#if GEOMETRY_KIND == 3
+// The edge-light mask is declared unconditionally in the UDF kinds: an edge-lit-off draw binds the
+// shared dummy texture here and EdgeMaskOn stays 0, so the guarded branch below never samples it.
 layout(set = 1, binding = 2) uniform sampler2D EdgeMaskSampler;
 #define GLASS_COLOR_SAMPLER_COUNT 3
-#elif GEOMETRY_KIND == 2
-#define GLASS_COLOR_SAMPLER_COUNT 2
 #else
 #define GLASS_COLOR_SAMPLER_COUNT 1
 #endif
@@ -206,24 +208,27 @@ vec4 glassGeometry(vec2 glassUV) {
   float gradientSignal = max(abs(deltaRight), abs(deltaUp));
   float gradientWeight = smoothstep(0.001, 0.005, gradientSignal);
   float edgeWeight = 0.0;
-#if GEOMETRY_KIND == 3
-  vec2 edgeUV = maskUV * GlassEdgeMaskUV.xy + GlassEdgeMaskUV.zw;
-  float edgeHeight = texture(EdgeMaskSampler, edgeUV).a;
-  vec2 edgeUVStep = GlassEdgeSpan *
-                    vec2(0.25 / max(halfW, 0.0001), 0.25 / max(halfH, 0.0001)) *
-                    GlassEdgeMaskUV.xy;
-  vec4 packedEdgeRight = texture(EdgeMaskSampler, edgeUV + vec2(edgeUVStep.x, 0.0));
-  vec4 packedEdgeLeft = texture(EdgeMaskSampler, edgeUV - vec2(edgeUVStep.x, 0.0));
-  vec4 packedEdgeUp = texture(EdgeMaskSampler, edgeUV - vec2(0.0, edgeUVStep.y));
-  vec4 packedEdgeDown = texture(EdgeMaskSampler, edgeUV + vec2(0.0, edgeUVStep.y));
-  vec2 edgeGradient =
-      vec2((packedEdgeRight.a - packedEdgeLeft.a) / max(GlassEdgeSpan.x, 0.0001),
-           (packedEdgeUp.a - packedEdgeDown.a) / max(GlassEdgeSpan.y, 0.0001));
-  float edgeGradientLength = max(length(edgeGradient), 0.0001);
-  float edgeDistance = max((edgeHeight - 0.5) / edgeGradientLength, 0.0);
-  float edgeBand = max(1.0, GlassShapeP1.w);
-  edgeWeight = 1.0 - smoothstep(0.0, edgeBand, edgeDistance);
-#endif
+  // Runtime branch (see EdgeMaskOn in the uniform block): an edge-lit-off UDF draw never executes
+  // the mask taps, so the dummy-bound EdgeMaskSampler content stays unsampled and the result is
+  // bit-identical to the previous separate no-edge variant.
+  if (EdgeMaskOn != 0) {
+    vec2 edgeUV = maskUV * GlassEdgeMaskUV.xy + GlassEdgeMaskUV.zw;
+    float edgeHeight = texture(EdgeMaskSampler, edgeUV).a;
+    vec2 edgeUVStep = GlassEdgeSpan *
+                      vec2(0.25 / max(halfW, 0.0001), 0.25 / max(halfH, 0.0001)) *
+                      GlassEdgeMaskUV.xy;
+    vec4 packedEdgeRight = texture(EdgeMaskSampler, edgeUV + vec2(edgeUVStep.x, 0.0));
+    vec4 packedEdgeLeft = texture(EdgeMaskSampler, edgeUV - vec2(edgeUVStep.x, 0.0));
+    vec4 packedEdgeUp = texture(EdgeMaskSampler, edgeUV - vec2(0.0, edgeUVStep.y));
+    vec4 packedEdgeDown = texture(EdgeMaskSampler, edgeUV + vec2(0.0, edgeUVStep.y));
+    vec2 edgeGradient =
+        vec2((packedEdgeRight.a - packedEdgeLeft.a) / max(GlassEdgeSpan.x, 0.0001),
+             (packedEdgeUp.a - packedEdgeDown.a) / max(GlassEdgeSpan.y, 0.0001));
+    float edgeGradientLength = max(length(edgeGradient), 0.0001);
+    float edgeDistance = max((edgeHeight - 0.5) / edgeGradientLength, 0.0);
+    float edgeBand = max(1.0, GlassShapeP1.w);
+    edgeWeight = 1.0 - smoothstep(0.0, edgeBand, edgeDistance);
+  }
   vec4 result = vec4(0.0);
   if (gradientLength > 0.000001 && gradientWeight > 0.000001) {
     vec2 gradientDir = gradient / gradientLength;

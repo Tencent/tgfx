@@ -459,8 +459,9 @@ bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
   unsigned textureBinding = 0;
   auto gpu = renderTarget->getContext()->gpu();
   auto* cache = renderTarget->getContext()->globalCache();
-  // The device-mask slot is the only hole a draw can leave in a precompiled kernel's sampler
-  // list, so an expected/supplied gap means the dummy must be inserted there.
+  // A precompiled kernel can leave a hole right after the supplied color samplers — an absent
+  // device mask, or the edge-lit-off UDF's always-declared edge-mask slot in GlassRefractionShader
+  // — so an expected/supplied gap means the dummy must be inserted there.
   bool padHole = expected > samplers.size();
   for (size_t i = 0; i < sequentialCount; ++i) {
     if (padHole && textureBinding == colorSamplerCount) {
