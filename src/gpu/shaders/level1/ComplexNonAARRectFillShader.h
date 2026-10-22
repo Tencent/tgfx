@@ -24,21 +24,23 @@ namespace tgfx {
 
 class ComplexNonAARRectFillShader : public PrecompiledShader {
  public:
-  TGFX_DEFINE_DIMS(HAS_COMMON_COLOR, STROKE);
+  // The color attribute is unconditional (common-color batches broadcast the paint color; the
+  // exact color rides the Color uniform through the HasCommonColor runtime uniform), so there is
+  // no HAS_COMMON_COLOR dimension.
+  TGFX_DEFINE_DIMS(STROKE);
   using D = Dims;
 
   struct FragDims {
-    enum : uint32_t { HAS_COMMON_COLOR, STROKE, HAS_XP, COUNT };
+    enum : uint32_t { STROKE, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationBool("HAS_COMMON_COLOR"),
           PermutationBool("STROKE"),
           PermutationInt("HAS_XP", 3),
       });
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 2 && FD::COUNT == 3,
+  static_assert(D::COUNT == 1 && FD::COUNT == 2,
                 "Update the Compose mapping when dimensions change.");
 
   PrecompiledShaderInfo info() const override {

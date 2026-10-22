@@ -24,14 +24,16 @@ namespace tgfx {
 
 class NonAARRectFillShader : public PrecompiledShader {
  public:
-  TGFX_DEFINE_DIMS(HAS_COMMON_COLOR, STROKE, TEXTURED);
+  // The color attribute is unconditional (common-color batches broadcast the paint color; the
+  // exact color rides the Color uniform through the HasCommonColor runtime uniform), so there is
+  // no HAS_COMMON_COLOR dimension.
+  TGFX_DEFINE_DIMS(STROKE, TEXTURED);
   using D = Dims;
 
   struct FragDims {
-    enum : uint32_t { HAS_COMMON_COLOR, STROKE, TEXTURED, HAS_XP, COUNT };
+    enum : uint32_t { STROKE, TEXTURED, HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationBool("HAS_COMMON_COLOR"),
           PermutationBool("STROKE"),
           PermutationBool("TEXTURED"),
           PermutationInt("HAS_XP", 3),
@@ -39,7 +41,7 @@ class NonAARRectFillShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 3 && FD::COUNT == 4,
+  static_assert(D::COUNT == 2 && FD::COUNT == 3,
                 "Update the Compose mapping when dimensions change.");
 
   PrecompiledShaderInfo info() const override {

@@ -104,7 +104,6 @@ namespace tgfx {
  */
 struct RoundStrokeRectInputs {
   bool isCoverageAA = false;
-  bool hasCommonColor = false;
   bool hasUVMatrix = false;
   int xpType = -1;  // -1 = no representable XferProcessor.
 };
@@ -175,7 +174,6 @@ struct EllipseFillInputs {
  * combines with stroke, which Compose enforces.
  */
 struct NonAARRectFillInputs {
-  bool hasCommonColor = false;
   bool isStroke = false;
   bool textured = false;
   int xpType = -1;  // -1 = no representable XferProcessor.
@@ -185,7 +183,6 @@ struct NonAARRectFillInputs {
  * Input contract of the ComplexNonAARRectFillShader matcher rule.
  */
 struct ComplexNonAARRectFillInputs {
-  bool hasCommonColor = false;
   bool isStroke = false;
   int xpType = -1;  // -1 = no representable XferProcessor.
 };

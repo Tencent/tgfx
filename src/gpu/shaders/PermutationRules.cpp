@@ -109,11 +109,9 @@ std::optional<RuleComposedValues> ComposeRoundStrokeRect(const RoundStrokeRectIn
   RuleComposedValues values;
   values.vertValues.resize(D::COUNT);
   values.vertValues[D::HAS_AA] = inputs.isCoverageAA ? 1 : 0;
-  values.vertValues[D::HAS_COMMON_COLOR] = inputs.hasCommonColor ? 1 : 0;
   values.vertValues[D::HAS_UV_MATRIX] = inputs.hasUVMatrix ? 1 : 0;
   values.fragValues.resize(FD::COUNT);
   values.fragValues[FD::HAS_AA] = values.vertValues[D::HAS_AA];
-  values.fragValues[FD::HAS_COMMON_COLOR] = values.vertValues[D::HAS_COMMON_COLOR];
   values.fragValues[FD::HAS_XP] = inputs.xpType;
   return values;
 }
@@ -249,11 +247,9 @@ std::optional<RuleComposedValues> ComposeNonAARRectFill(const NonAARRectFillInpu
   using FD = NonAARRectFillShader::FD;
   RuleComposedValues values;
   values.vertValues.resize(D::COUNT);
-  values.vertValues[D::HAS_COMMON_COLOR] = inputs.hasCommonColor ? 1 : 0;
   values.vertValues[D::STROKE] = inputs.isStroke ? 1 : 0;
   values.vertValues[D::TEXTURED] = inputs.textured ? 1 : 0;
   values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_COMMON_COLOR] = values.vertValues[D::HAS_COMMON_COLOR];
   values.fragValues[FD::STROKE] = values.vertValues[D::STROKE];
   values.fragValues[FD::TEXTURED] = values.vertValues[D::TEXTURED];
   values.fragValues[FD::HAS_XP] = inputs.xpType;
@@ -277,10 +273,8 @@ std::optional<RuleComposedValues> ComposeComplexNonAARRectFill(
   using FD = ComplexNonAARRectFillShader::FD;
   RuleComposedValues values;
   values.vertValues.resize(D::COUNT);
-  values.vertValues[D::HAS_COMMON_COLOR] = inputs.hasCommonColor ? 1 : 0;
   values.vertValues[D::STROKE] = inputs.isStroke ? 1 : 0;
   values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_COMMON_COLOR] = values.vertValues[D::HAS_COMMON_COLOR];
   values.fragValues[FD::STROKE] = values.vertValues[D::STROKE];
   values.fragValues[FD::HAS_XP] = inputs.xpType;
   return values;

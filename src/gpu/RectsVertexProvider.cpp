@@ -577,12 +577,12 @@ class AARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
 
   size_t vertexCount() const override {
     size_t perVertexCount = 24;
-    size_t perVertexDataSize = 7;  // x, y, coverage, EllipseOffsets(2), EllipseRadii(2)
+    // x, y, coverage, EllipseOffsets(2), EllipseRadii(2), color(1). The color slot is
+    // unconditional: the consuming geometry processor (RoundStrokeRectGP) declares the color
+    // attribute in every variant.
+    size_t perVertexDataSize = 8;
     if (bitFields.hasUVCoord) {
       perVertexDataSize += 2;
-    }
-    if (bitFields.hasColor) {
-      perVertexDataSize += 1;
     }
     return rects.size() * perVertexCount * perVertexDataSize;
   }
@@ -591,9 +591,8 @@ class AARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
     size_t index = 0;
     const auto aaType = static_cast<AAType>(bitFields.aaType);
     const auto hasUVCoord = bitFields.hasUVCoord;
-    const auto hasColor = bitFields.hasColor;
     std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
-    if (hasColor && NeedConvertColorSpace(ColorSpace::SRGB(), _dstColorSpace)) {
+    if (NeedConvertColorSpace(ColorSpace::SRGB(), _dstColorSpace)) {
       steps =
           std::make_unique<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
                                                  _dstColorSpace.get(), AlphaType::Premultiplied);
@@ -604,10 +603,7 @@ class AARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
       auto viewMatrix = record->viewMatrix;
       auto scales = viewMatrix.getAxisScales();
       auto rect = record->rect;
-      uint32_t uintColor = 0;
-      if (bitFields.hasColor) {
-        uintColor = ToUintPMColor(record->color, steps.get());
-      }
+      uint32_t uintColor = ToUintPMColor(record->color, steps.get());
       rect.scale(scales.x, scales.y);
       viewMatrix.preScale(1.0f / scales.x, 1.0f / scales.y);
       Point strokeSize = {stroke->width, stroke->width};
@@ -659,9 +655,8 @@ class AARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
             vertices[index++] = uCoords[j];
             vertices[index++] = vCoords[k];
           }
-          if (hasColor) {
-            std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
-          }
+          // The color slot is unconditional: common-color batches broadcast the paint color.
+          std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
         }
       }
 
@@ -706,9 +701,8 @@ class AARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
             vertices[index++] = uvQuad.point(k).x;
             vertices[index++] = uvQuad.point(k).y;
           }
-          if (hasColor) {
-            std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
-          }
+          // The color slot is unconditional: common-color batches broadcast the paint color.
+          std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
         }
       }
     }
@@ -733,12 +727,11 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
 
   size_t vertexCount() const override {
     size_t perVertexCount = 20;
-    size_t perVertexDataSize = 4;  // x, y, EllipseOffsets(2)
+    // x, y, EllipseOffsets(2), color(1). The color slot is unconditional: the consuming geometry
+    // processor (RoundStrokeRectGP) declares the color attribute in every variant.
+    size_t perVertexDataSize = 5;
     if (bitFields.hasUVCoord) {
       perVertexDataSize += 2;
-    }
-    if (bitFields.hasColor) {
-      perVertexDataSize += 1;
     }
     return rects.size() * perVertexCount * perVertexDataSize;
   }
@@ -746,9 +739,8 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
   void getVertices(float* vertices) const override {
     size_t index = 0;
     const auto hasUVCoord = bitFields.hasUVCoord;
-    const auto hasColor = bitFields.hasColor;
     std::unique_ptr<ColorSpaceXformSteps> steps = nullptr;
-    if (hasColor && NeedConvertColorSpace(ColorSpace::SRGB(), _dstColorSpace)) {
+    if (NeedConvertColorSpace(ColorSpace::SRGB(), _dstColorSpace)) {
       steps =
           std::make_unique<ColorSpaceXformSteps>(ColorSpace::SRGB().get(), AlphaType::Premultiplied,
                                                  _dstColorSpace.get(), AlphaType::Premultiplied);
@@ -759,10 +751,7 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
       auto viewMatrix = record->viewMatrix;
       auto scales = viewMatrix.getAxisScales();
       auto rect = record->rect;
-      uint32_t uintColor = 0;
-      if (bitFields.hasColor) {
-        uintColor = ToUintPMColor(record->color, steps.get());
-      }
+      uint32_t uintColor = ToUintPMColor(record->color, steps.get());
       rect.scale(scales.x, scales.y);
       viewMatrix.preScale(1.0f / scales.x, 1.0f / scales.y);
       Point strokeSize = {stroke->width, stroke->width};
@@ -803,9 +792,8 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
             vertices[index++] = uCoords[k];
             vertices[index++] = vCoords[k];
           }
-          if (hasColor) {
-            std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
-          }
+          // The color slot is unconditional: common-color batches broadcast the paint color.
+          std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
         }
       }
 
@@ -835,9 +823,8 @@ class NonAARoundStrokeRectsVertexProvider final : public RectsVertexProvider {
           vertices[index++] = inUVQuad.point(k).x;
           vertices[index++] = inUVQuad.point(k).y;
         }
-        if (hasColor) {
-          std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
-        }
+        // The color slot is unconditional: common-color batches broadcast the paint color.
+        std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
       }
     }
   }

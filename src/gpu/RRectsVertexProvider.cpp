@@ -352,31 +352,28 @@ class NonAARRectsVertexProvider final : public RRectsVertexProvider {
 
   size_t vertexCount() const override {
     // Non-AA simple: 4 vertices per RRect.
-    //   position(2) + localCoord(2) + radii(2) + rectBounds(4) = 10
-    //   Optional: color(1), halfStrokeWidth(2)
-    size_t floatsPerVertex = 10;
+    //   position(2) + localCoord(2) + radii(2) + rectBounds(4) + color(1) = 11
+    //   Optional: halfStrokeWidth(2). The color slot is unconditional: the consuming geometry
+    //   processor (NonAARRectGP) declares the color attribute in every variant.
+    size_t floatsPerVertex = 11;
     if (bitFields.hasStroke) {
       floatsPerVertex += 2;
-    }
-    if (bitFields.hasColor) {
-      floatsPerVertex += 1;
     }
     return rects.size() * 4 * floatsPerVertex;
   }
 
   void getVertices(float* vertices) const override {
     size_t index = 0;
-    auto steps = MakeColorSpaceXformStepsIfNeeded(bitFields.hasColor, _dstColorSpace);
+    // The color slot is unconditional, so the conversion steps are needed whenever the
+    // destination color space differs.
+    auto steps = MakeColorSpaceXformStepsIfNeeded(true, _dstColorSpace);
 
     size_t currentIndex = 0;
     for (auto& record : rects) {
       DEBUG_ASSERT(!record->rRect.isComplex());
       auto viewMatrix = record->viewMatrix;
       auto rRect = record->rRect;
-      uint32_t uintColor = 0;
-      if (bitFields.hasColor) {
-        uintColor = ToUintPMColor(record->color, steps.get());
-      }
+      uint32_t uintColor = ToUintPMColor(record->color, steps.get());
 
       auto scales = viewMatrix.getAxisScales();
       auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
@@ -420,10 +417,8 @@ class NonAARRectsVertexProvider final : public RRectsVertexProvider {
         vertices[index++] = rect.top;
         vertices[index++] = rect.right;
         vertices[index++] = rect.bottom;
-        // Optional color
-        if (bitFields.hasColor) {
-          std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
-        }
+        // The color slot is unconditional: common-color batches broadcast the paint color.
+        std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
         // strokeWidth (2 floats) - only for stroke mode
         if (bitFields.hasStroke) {
           vertices[index++] = strokeParams.halfStrokeX;
@@ -569,30 +564,27 @@ class NonAAComplexRRectsVertexProvider final : public RRectsVertexProvider {
 
   size_t vertexCount() const override {
     // Non-AA complex: 4 vertices per RRect.
-    //   position(2) + localCoord(2) + xRadii(4) + yRadii(4) + rectBounds(4) = 16
-    //   Optional: color(1), halfStrokeWidth(2)
-    size_t floatsPerVertex = 16;
+    //   position(2) + localCoord(2) + xRadii(4) + yRadii(4) + rectBounds(4) + color(1) = 17
+    //   Optional: halfStrokeWidth(2). The color slot is unconditional: the consuming geometry
+    //   processor (ComplexNonAARRectGP) declares the color attribute in every variant.
+    size_t floatsPerVertex = 17;
     if (bitFields.hasStroke) {
       floatsPerVertex += 2;
-    }
-    if (bitFields.hasColor) {
-      floatsPerVertex += 1;
     }
     return rects.size() * 4 * floatsPerVertex;
   }
 
   void getVertices(float* vertices) const override {
     size_t index = 0;
-    auto steps = MakeColorSpaceXformStepsIfNeeded(bitFields.hasColor, _dstColorSpace);
+    // The color slot is unconditional, so the conversion steps are needed whenever the
+    // destination color space differs.
+    auto steps = MakeColorSpaceXformStepsIfNeeded(true, _dstColorSpace);
 
     size_t currentIndex = 0;
     for (auto& record : rects) {
       auto viewMatrix = record->viewMatrix;
       auto rRect = record->rRect;
-      uint32_t uintColor = 0;
-      if (bitFields.hasColor) {
-        uintColor = ToUintPMColor(record->color, steps.get());
-      }
+      uint32_t uintColor = ToUintPMColor(record->color, steps.get());
 
       auto scales = viewMatrix.getAxisScales();
       auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
@@ -643,10 +635,8 @@ class NonAAComplexRRectsVertexProvider final : public RRectsVertexProvider {
         vertices[index++] = rect.top;
         vertices[index++] = rect.right;
         vertices[index++] = rect.bottom;
-        // Optional color
-        if (bitFields.hasColor) {
-          std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
-        }
+        // The color slot is unconditional: common-color batches broadcast the paint color.
+        std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
         // strokeWidth (2 floats) - only for stroke mode
         if (bitFields.hasStroke) {
           vertices[index++] = strokeParams.halfStrokeX;

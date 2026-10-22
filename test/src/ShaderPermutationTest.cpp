@@ -367,8 +367,10 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
   // is unconditional, with a runtime-uniform source pick for mesh), the chain/graph dropped
   // HAS_COLOR (unconditional color attribute with the HasCommonColor runtime-uniform pick), the
   // ellipse/complex-ellipse/atlas families dropped HAS_COMMON_COLOR the same way, and mesh also
-  // dropped HAS_COVERAGE (a constant 1.0f slot), removing 96 pairs from the former 440.
-  EXPECT_EQ(pairCount, 344u);
+  // dropped HAS_COVERAGE (a constant 1.0f slot), removing 96 pairs from the former 440. The
+  // NonAARRect, ComplexNonAARRect and RoundStrokeRect families then dropped HAS_COMMON_COLOR the
+  // same way too (54 -> 27 pairs), removing 27 more.
+  EXPECT_EQ(pairCount, 317u);
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseChainShader"),
             EnumeratePointwiseChainReachable());
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseGraphShader"),
@@ -378,14 +380,15 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
   const std::set<std::pair<uint32_t, uint32_t>> shapeCoveragePairs = {{0, 0}, {1, 1}};
   EXPECT_EQ(*EnumerateReachablePermutations("ShapeInstancedTextureCoverageShader"),
             shapeCoveragePairs);
-  // NonAARRectFill keeps 18 pairs: the 24 mirrored forms minus the six TEXTURED && STROKE
-  // combinations the family never serves (two common-color forms times three XP kinds). The
+  // NonAARRectFill keeps 9 pairs: the 12 mirrored forms (HAS_COMMON_COLOR is gone — the color
+  // attribute is unconditional with the HasCommonColor runtime-uniform pick) minus the three
+  // TEXTURED && STROKE combinations the family never serves (one form times three XP kinds). The
   // property check restates the policy independently of the shared Compose predicate.
   const auto* nonAARRectInfo = ShaderRegistry::Find("NonAARRectFillShader");
   ASSERT_NE(nonAARRectInfo, nullptr);
   const auto nonAARRectPairs = EnumerateReachablePermutations("NonAARRectFillShader");
   ASSERT_TRUE(nonAARRectPairs.has_value());
-  EXPECT_EQ(nonAARRectPairs->size(), 18u);
+  EXPECT_EQ(nonAARRectPairs->size(), 9u);
   for (const auto& indices : *nonAARRectPairs) {
     EXPECT_FALSE(nonAARRectInfo->fragDomain.valueOf(indices.second, "TEXTURED") != 0 &&
                  nonAARRectInfo->fragDomain.valueOf(indices.second, "STROKE") != 0);

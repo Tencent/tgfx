@@ -1194,7 +1194,6 @@ static std::optional<PermutationMatchResult> TryMatchNonAARRectFill(
   }
   auto* ngp = static_cast<const NonAARRectGeometryProcessor*>(gp);
   NonAARRectFillInputs inputs;
-  inputs.hasCommonColor = ngp->hasCommonColor();
   inputs.isStroke = ngp->isStroke();
   if (programInfo->numFragmentProcessors() == 1) {
     // A sole analytic clip (AA rect or rounded rect) rides the runtime clip contract uniforms, so
@@ -1243,7 +1242,6 @@ static std::optional<PermutationMatchResult> TryMatchComplexNonAARRectFill(
   }
   auto* cngp = static_cast<const ComplexNonAARRectGeometryProcessor*>(gp);
   ComplexNonAARRectFillInputs inputs;
-  inputs.hasCommonColor = cngp->hasCommonColor();
   inputs.isStroke = cngp->isStroke();
   inputs.xpType = GetXPType(programInfo);
   auto composed = ComposeComplexNonAARRectFill(inputs);
@@ -1276,7 +1274,6 @@ static std::optional<RoundStrokeRectInputs> ExtractRoundStrokeRect(const Program
   }
   RoundStrokeRectInputs inputs;
   inputs.isCoverageAA = rsgp->getAAType() == AAType::Coverage;
-  inputs.hasCommonColor = rsgp->hasCommonColor();
   inputs.hasUVMatrix = rsgp->hasUVMatrixTransform();
   inputs.xpType = GetXPType(programInfo);
   return inputs;

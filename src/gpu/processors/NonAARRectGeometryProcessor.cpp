@@ -27,9 +27,10 @@ NonAARRectGeometryProcessor::NonAARRectGeometryProcessor(int width, int height, 
   inLocalCoord = {"inLocalCoord", VertexFormat::Float2};
   inRadii = {"inRadii", VertexFormat::Float2};
   inRectBounds = {"inRectBounds", VertexFormat::Float4};
-  if (!commonColor.has_value()) {
-    inColor = {"inColor", VertexFormat::UByte4Normalized};
-  }
+  // The color attribute is unconditional: common-color batches broadcast the paint color into the
+  // slot, so the fill kernels bind it in a single variant; the exact common color still rides the
+  // Color uniform through the HasCommonColor runtime uniform (the broadcast is 8-bit quantized).
+  inColor = {"inColor", VertexFormat::UByte4Normalized};
   if (stroke) {
     inStrokeWidth = {"inStrokeWidth", VertexFormat::Float2};
   }

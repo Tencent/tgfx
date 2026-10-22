@@ -93,8 +93,16 @@ void GLSLRoundStrokeRectGeometryProcessor::setData(UniformData* vertexUniformDat
                                                    UniformData* fragmentUniformData,
                                                    FPCoordTransformIter* transformIter) const {
   setTransformDataHelper(uvMatrix.value_or(Matrix::I()), vertexUniformData, transformIter);
-  if (commonColor.has_value()) {
-    fragmentUniformData->setData("Color", *commonColor);
+  if (fragmentUniformData != nullptr) {
+    // The precompiled kernels always bind the color attribute; common-color draws read the exact
+    // Color uniform instead of the 8-bit quantized broadcast, selected by HasCommonColor. Only
+    // precompiled kernels declare the field.
+    if (commonColor.has_value()) {
+      fragmentUniformData->setDataOptional("Color", *commonColor);
+    }
+    if (fragmentUniformData->hasField("HasCommonColor")) {
+      fragmentUniformData->setData("HasCommonColor", commonColor.has_value() ? 1 : 0);
+    }
   }
 }
 

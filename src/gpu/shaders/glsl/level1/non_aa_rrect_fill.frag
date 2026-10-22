@@ -4,12 +4,10 @@
 // SDF included) is rrect_coverage.inc; the analytic draw clip (AA rect or rounded rect) rides the
 // shared runtime clip contract uniforms, so it costs no variant: the draw carries the clip FP only
 // for its uniforms. The block is unconditional because the contract fields must always be declared.
-// Fragment dimensions: HAS_COMMON_COLOR, STROKE, TEXTURED, HAS_XP (int, 3).
+// Fragment dimensions: STROKE, TEXTURED, HAS_XP (int, 3). The color source is a runtime select: the
+// exact Color uniform when HasCommonColor != 0, the (8-bit quantized) vColor varying otherwise.
 #version 450
 
-#ifndef HAS_COMMON_COLOR
-#define HAS_COMMON_COLOR 0
-#endif
 #ifndef STROKE
 #define STROKE 0
 #endif
@@ -22,9 +20,8 @@
 #define HAS_RUNTIME_CLIP 1
 
 layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
-#if HAS_COMMON_COLOR
   vec4 Color;
-#endif
+  int HasCommonColor;
 #if TEXTURED
   // Tiled-sampling recipe, written by GLSLTiledTextureEffect::onSetData (runtime uniforms, same
   // names as TiledTextureFillShader).
@@ -48,15 +45,9 @@ layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
 layout(location = 0) in vec2 vLocalCoord;
 layout(location = 1) in vec2 vRadii;
 layout(location = 2) in vec4 vRectBounds;
-#if !HAS_COMMON_COLOR
 layout(location = 3) in vec4 vColor;
 #if STROKE
 layout(location = 4) in vec2 vStrokeWidth;
-#endif
-#else
-#if STROKE
-layout(location = 3) in vec2 vStrokeWidth;
-#endif
 #endif
 
 #if TEXTURED
@@ -65,9 +56,7 @@ layout(location = 3) in vec2 vStrokeWidth;
 #define XP_DST_TEX_BINDING 0
 #endif
 
-#if !HAS_COMMON_COLOR
-#define FILL_COLOR FILL_COLOR_VARYING
-#endif
+#define FILL_COLOR FILL_COLOR_VARYING_OR_COMMON
 #if TEXTURED
 #define FILL_SOURCE FILL_SOURCE_TILED
 #endif

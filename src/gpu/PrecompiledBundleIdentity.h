@@ -130,8 +130,15 @@ namespace tgfx {
  * draw whose clip stack holds two rects in one space (two analytic clips, or a clip over a shape
  * mask) is served by one chain pass instead of falling back. Every pointwise variant's uniform
  * block layout changed, so pre-change bundles are refused.
+ *
+ * 0x00010015: the NonAARRect, ComplexNonAARRect and RoundStrokeRect kernels made the color
+ * attribute unconditional (common-color batches broadcast the paint color into the slot; the exact
+ * color rides the Color uniform through the HasCommonColor runtime uniform), dropping the
+ * HAS_COMMON_COLOR dimension. Every variant of the three families changes its vertex layout and
+ * fragment uniform block, and the removed axis re-encodes their permutation indices; pre-change
+ * bundles are refused.
  */
-inline constexpr uint32_t kExpectedToolchainABI = 0x00010014u;
+inline constexpr uint32_t kExpectedToolchainABI = 0x00010015u;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"
