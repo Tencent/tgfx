@@ -24,7 +24,10 @@ float analyticRRectCoverage(vec4 rect, vec4 radiiX, vec4 radiiY, float antiAlias
   vec4 signsY = vec4(1.0, 1.0, -1.0, -1.0);
   highp vec4 dx = (vec4(local.x) - cornersX) * signsX;
   highp vec4 dy = (vec4(local.y) - cornersY) * signsY;
-  vec4 inBox = step(dx, radiiX) * step(dy, radiiY);
+  // A corner with no radius must use the rect edge distance. Letting a zero-radius corner enter
+  // the SDF branch would evaluate a 0.5px guarded circle instead of the exact hard corner.
+  vec4 hasRadius = step(vec4(1e-6), radiiX + radiiY);
+  vec4 inBox = step(dx, radiiX) * step(dy, radiiY) * hasRadius;
   vec4 prefixSum = vec4(0.0, inBox.x, inBox.x + inBox.y, inBox.x + inBox.y + inBox.z);
   inBox *= step(prefixSum, vec4(0.5));
   float inAnyCorner = dot(inBox, vec4(1.0));
