@@ -6671,6 +6671,84 @@ TGFX_TEST(AOTRenderConsistencyTest, ChainClipCoverageModes) {
                                  ChainClipScene::ShaderMaskUnderNonAADeviceRect);
 }
 
+// A bare texture fill under a device-space AA rect clip is a fixed pattern QuadTextureFill serves
+// through the runtime clip contract. The clip fold must leave it to that kernel instead of lifting
+// it onto the pointwise chain interpreter, while the same clip over a non-bare color chain (here a
+// color filter) still folds into the chain. Both must match the runtime route byte for byte.
+TGFX_TEST(AOTRenderConsistencyTest, BareTextureUnderRectClipKeepsDedicatedKernel) {
+  SKIP_ON_SWIFTSHADER_ENV();
+  struct Case {
+    const char* label;
+    bool colorFilter;
+    const char* expectedShader;
+  };
+  const Case cases[] = {
+      {"bare-texture-rect-clip", false, "QuadTextureFillShader"},
+      {"filtered-texture-rect-clip", true, "PointwiseChainShader"},
+  };
+  constexpr int size = 160;
+  for (const auto& testCase : cases) {
+    Bitmap reference = {};
+    Bitmap candidate = {};
+    std::vector<std::string> shaders = {};
+    for (bool useBundle : {false, true}) {
+      ContextScope scope;
+      auto context = scope.getContext();
+      ASSERT_TRUE(context != nullptr);
+      auto* cache = context->precompiledShaderCache();
+      if (useBundle) {
+        ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+      } else {
+        cache->unload();
+      }
+      ScopedAOTStatsPause statsPause(context, !useBundle);
+      cache->setDiagnosticRecordingEnabled(true);
+      cache->resetStats();
+      context->globalCache()->clearPrograms();
+      context->globalCache()->resetProgramStats();
+      auto surface = Surface::Make(context, size, size);
+      ASSERT_TRUE(surface != nullptr);
+      auto* canvas = surface->getCanvas();
+      canvas->clear(Color::White());
+      const auto image = MakeImage("resources/apitest/mandrill_128.png");
+      ASSERT_TRUE(image != nullptr);
+      // Fractional edges make the AA ramp visible on every side of the clip.
+      canvas->clipRect(Rect::MakeLTRB(10.4f, 12.6f, 140.3f, 141.7f), true);
+      Paint paint = {};
+      if (testCase.colorFilter) {
+        paint.setColorFilter(
+            ColorFilter::Blend(Color(0.9f, 0.4f, 0.2f, 1.0f), BlendMode::Modulate));
+      }
+      canvas->drawImage(image, 14.25f, 9.5f, &paint);
+      context->flushAndSubmit(true);
+      ASSERT_TRUE((useBundle ? candidate : reference).allocPixels(size, size));
+      auto& bitmap = useBundle ? candidate : reference;
+      auto* pixels = bitmap.lockPixels();
+      ASSERT_TRUE(pixels != nullptr);
+      ASSERT_TRUE(surface->readPixels(bitmap.info(), pixels));
+      bitmap.unlockPixels();
+      if (useBundle) {
+        EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u)
+            << testCase.label;
+        EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u)
+            << testCase.label;
+        EXPECT_EQ(cache->drawStats().droppedDraws, 0u) << testCase.label;
+        for (const auto& hit : cache->hitRecords()) {
+          shaders.push_back(hit.shaderName);
+        }
+      }
+      cache->setDiagnosticRecordingEnabled(false);
+      cache->unload();
+      context->globalCache()->clearPrograms();
+    }
+    ASSERT_FALSE(shaders.empty()) << testCase.label;
+    for (const auto& shader : shaders) {
+      EXPECT_EQ(shader, testCase.expectedShader) << testCase.label;
+    }
+    ExpectBitmapsIdentical(testCase.label, candidate, reference, size, size);
+  }
+}
+
 // Builds a balanced binary blend tree over the given number of image leaves (cycling through the
 // image list), e.g. five leaves reduce to Blend(Blend(A,B), Blend(Blend(C,D),E)). The balanced
 // shape spreads the texture leaves across the DAG, so a split planner must find a cut whose both

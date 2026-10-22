@@ -1203,6 +1203,21 @@ PlacementPtr<FragmentProcessor> OpsCompositor::makeMaskFP(
   return FragmentProcessor::Compose(allocator, std::move(maskFP), std::move(inputFP));
 }
 
+// Returns true if a rect draw is a bare texture fill under an analytic clip: exactly one plain
+// TextureEffect color and nothing else beside the clip. QuadTextureFill serves that shape through
+// the runtime clip contract, so folding the clip into the pointwise chain would only move a fixed
+// pattern onto the interpreter (and its kilobyte-sized uniform block). The plain route tries the
+// dedicated kernel first and still falls back to the chain rewrite when the matcher refuses.
+static bool IsDedicatedTextureFillCandidate(const DrawOp* op,
+                                            const std::vector<const FragmentProcessor*>& colors,
+                                            const FragmentProcessor* maskCoverage) {
+  if (op->type() != DrawOp::Type::RectDrawOp || maskCoverage != nullptr || colors.size() != 1 ||
+      colors[0]->name() != "TextureEffect") {
+    return false;
+  }
+  return !static_cast<const TextureEffect*>(colors[0])->isYUV();
+}
+
 // Returns true if the coverage FP is a local texture mask whose texture can be fused into a
 // pointwise chain as an extra texture leaf (see the SrcIn/SrcOut check inside).
 static bool IsFoldableLocalMask(const FragmentProcessor* coverageFP) {
@@ -1393,10 +1408,12 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     if (clipCoverage != nullptr) {
       // Only the analytic device-space AA-rect clip coverage lowers into the chain today; a
       // clip-mask texture (DeviceSpaceTextureEffect) is device-space sampled and stays a coverage
-      // FP, which blocks the fold entirely so the draw keeps the plain route.
+      // FP, which blocks the fold entirely so the draw keeps the plain route. A bare texture fill
+      // under that clip also keeps the plain route, where QuadTextureFill takes it directly.
       if (clipCoverage->name() == "RectEffect") {
         auto rectEffect = static_cast<const RectEffect*>(clipCoverage);
-        if (rectEffect->isDeviceSpaceRect() && rectEffect->isAntiAlias()) {
+        if (rectEffect->isDeviceSpaceRect() && rectEffect->isAntiAlias() &&
+            !IsDedicatedTextureFillCandidate(op.get(), colorProcessors, maskCoverage)) {
           foldedProcessors.push_back(clipCoverage);
         } else {
           foldBlocked = true;
