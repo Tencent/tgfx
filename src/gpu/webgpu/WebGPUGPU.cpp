@@ -29,6 +29,10 @@
 
 namespace tgfx {
 
+bool HardwareBufferAvailable() {
+  return false;
+}
+
 std::unique_ptr<WebGPUGPU> WebGPUGPU::Make(WGPUDevice device, bool externallyOwned,
                                            bool ownsRuntimeRegistration) {
   if (device == nullptr) {
