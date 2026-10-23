@@ -330,6 +330,20 @@ TGFX_TEST(AOTCoverageGateTest, AllProcessorsAreClaimed) {
   ASSERT_FALSE(scanned.empty());
   auto matcherSource = ReadTextFile(ProjectPath::Absolute("src/gpu/PermutationMatcher.cpp"));
   ASSERT_FALSE(matcherSource.empty());
+  // The per-family match units (src/gpu/shaders/level1/*Shader.cpp) are matching code too: a
+  // processor referenced only there (e.g. the Perlin family's PerlinNoiseFragmentProcessor) is
+  // claimed, so their sources join the scan.
+  {
+    auto dirPath = std::filesystem::path(ProjectPath::Absolute("src/gpu/shaders/level1"));
+    std::error_code error = {};
+    for (auto it = std::filesystem::directory_iterator(dirPath, error);
+         it != std::filesystem::directory_iterator(); it.increment(error)) {
+      if (error || !it->is_regular_file() || it->path().extension() != ".cpp") {
+        continue;
+      }
+      matcherSource += "\n" + ReadTextFile(it->path().string());
+    }
+  }
   auto violations =
       EvaluateProcessorClaims(scanned, ProcessorClaims,
                               sizeof(ProcessorClaims) / sizeof(ProcessorClaims[0]), matcherSource);

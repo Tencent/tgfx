@@ -18,12 +18,16 @@
 
 #pragma once
 
+#include <optional>
+
 // Shared predicates of the per-family Match functions. Declared here and defined once in
 // PermutationMatcher.cpp (their private helper chains stay internal to that translation unit);
 // each family's .cpp includes this header, so family matching code never duplicates them.
 namespace tgfx {
 
 class ProgramInfo;
+class GeometryProcessor;
+class FragmentProcessor;
 
 /// 0 = Empty XferProcessor, 1 = PorterDuff DST_TEX, 2 = PorterDuff FBF, -1 = none representable.
 int GetXPType(const ProgramInfo* programInfo);
@@ -31,5 +35,27 @@ int GetXPType(const ProgramInfo* programInfo);
 /// True when the draw carries no fragment processors at all, or exactly one direct analytic clip
 /// coverage FP (AA rect or rrect) that the runtime clip contract uniforms can evaluate.
 bool HasNoProcessorsOrDirectClip(const ProgramInfo* programInfo);
+
+/// 0 = DefaultGeometryProcessor, 1 = QuadPerEdgeAAGeometryProcessor, -1 = anything else.
+int GetGPType(const GeometryProcessor* gp);
+
+/// True when the GP is a position-only rect form (Default, or a Quad with common color, a UV
+/// matrix and no subset): the plain fill kernels' vertex contract.
+bool IsPositionOnlyRectGP(const GeometryProcessor* gp);
+
+/// 1 when the sole coverage FP is a device-space mask, 0 when there is no coverage FP at all,
+/// nullopt for anything the shared runtime-clip contract cannot evaluate.
+std::optional<int> SharedDeviceMaskValue(const ProgramInfo* programInfo);
+
+/// Whether a ShaderMode value is one the tiled fill kernel implements.
+bool TiledFillModeSupported(int mode);
+
+/// The child a blur kernel samples per tap: a plain Clamp TextureEffect or a supported
+/// TiledTextureEffect (see the definition for the exact restrictions).
+bool IsServableBlurChild(const FragmentProcessor* childFP);
+
+/// Whether the FP is one of the four pointwise operators (ColorMatrix / Luma / AlphaThreshold /
+/// ColorSpaceXform) that share the TexturedEffect structural class.
+bool IsSupportedPointwiseOp(const FragmentProcessor* fp);
 
 }  // namespace tgfx

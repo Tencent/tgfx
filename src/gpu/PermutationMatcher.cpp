@@ -221,7 +221,7 @@ bool HasNoProcessorsOrDirectClip(const ProgramInfo* programInfo) {
 // Analytic clip coverage (AA rect or rrect) changes only fragment math, whereas a device-space
 // mask adds a sampler and shifts the terminal XP binding. Kernels using the runtime clip contract
 // therefore compile only this ABI distinction and carry the clip state through uniforms.
-static std::optional<int> SharedDeviceMaskValue(const ProgramInfo* programInfo) {
+std::optional<int> SharedDeviceMaskValue(const ProgramInfo* programInfo) {
   auto coverage = ClassifyCoverageFP(programInfo);
   if (!coverage || *coverage == CoverageKind::LocalMask) {
     return std::nullopt;
@@ -229,7 +229,7 @@ static std::optional<int> SharedDeviceMaskValue(const ProgramInfo* programInfo) 
   return *coverage == CoverageKind::DeviceMask ? 1 : 0;
 }
 
-static int GetGPType(const GeometryProcessor* gp) {
+int GetGPType(const GeometryProcessor* gp) {
   auto name = gp->name();
   if (name == "DefaultGeometryProcessor") {
     return 0;
@@ -244,7 +244,7 @@ static int GetGPType(const GeometryProcessor* gp) {
 // QuadPerEdgeAA GP whose coordinate comes from aPosition (a common color, a uv matrix, no
 // per-quad subset), since those precompiled vertex stages declare aPosition plus the optional AA
 // coverage attribute only.
-static bool IsPositionOnlyRectGP(const GeometryProcessor* gp) {
+bool IsPositionOnlyRectGP(const GeometryProcessor* gp) {
   int gpType = GetGPType(gp);
   if (gpType < 0) {
     return false;
@@ -271,49 +271,8 @@ static bool TiledModeSupported(int mode) {
 
 // The tiled fill kernel additionally handles the mipmap-repeat modes 4/5 via an inline 4-tap seam
 // blend. So it accepts every mode.
-static bool TiledFillModeSupported(int mode) {
+bool TiledFillModeSupported(int mode) {
   return TiledModeSupported(mode) || mode == 4 || mode == 5;
-}
-
-static std::optional<PermutationMatchResult> TryMatchTiledTextureFill(
-    const ProgramInfo* programInfo) {
-  if (!IsPositionOnlyRectGP(programInfo->getGeometryProcessor())) {
-    return std::nullopt;
-  }
-  if (programInfo->numFragmentProcessors() != 1) {
-    return std::nullopt;
-  }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
-    return std::nullopt;
-  }
-  auto fp = programInfo->getFragmentProcessor(0);
-  if (fp->name() != "TiledTextureEffect") {
-    return std::nullopt;
-  }
-  auto* tte = static_cast<const TiledTextureEffect*>(fp);
-  if (tte->hasPerspective()) {
-    return std::nullopt;
-  }
-  int modeX = 0;
-  int modeY = 0;
-  tte->getShaderModes(&modeX, &modeY);
-  if (!TiledFillModeSupported(modeX) || !TiledFillModeSupported(modeY)) {
-    return std::nullopt;
-  }
-  // A both-None (0/0) mode means the hardware sampler already resolves the tiling (e.g. Repeat
-  // with a full-boundary subset), so this kernel serves it like any other mode.
-  // ALPHA_ONLY and HAS_STRICT are folded into runtime uniforms (AlphaOnly / Strict), set by
-  // GLSLTiledTextureEffect::onSetData; they are no longer compile-time dimensions.
-  TiledTextureFillInputs inputs;
-  inputs.xpType = xpType;
-  auto composed = ComposeTiledTextureFill(inputs);
-  if (!composed) {
-    return std::nullopt;
-  }
-  auto vertIndex = TiledTextureFillShader::VD::domain().encode(composed->vertValues);
-  auto fragIndex = TiledTextureFillShader::FragDims::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"TiledTextureFillShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchYUVTextureFill(
@@ -365,43 +324,6 @@ static std::optional<PermutationMatchResult> TryMatchYUVTextureFill(
   auto vertIndex = YUVTextureFillShader::VD::domain().encode(composed->vertValues);
   auto fragIndex = YUVTextureFillShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"YUVTextureFillShader", vertIndex, fragIndex};
-}
-
-static std::optional<PermutationMatchResult> TryMatchMaskFill(const ProgramInfo* programInfo) {
-  auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "DefaultGeometryProcessor") {
-    return std::nullopt;
-  }
-  // Solid color (from the DefaultGP Color uniform) masked by a single alpha-only coverage
-  // TextureEffect (a rasterized shape mask from ShapeDrawOp). No color fragment processors.
-  if (programInfo->numColorFragmentProcessors() != 0) {
-    return std::nullopt;
-  }
-  if (programInfo->numFragmentProcessors() != 1) {
-    return std::nullopt;
-  }
-  auto fp = programInfo->getFragmentProcessor(0);
-  if (fp->name() != "TextureEffect") {
-    return std::nullopt;
-  }
-  auto* te = static_cast<const TextureEffect*>(fp);
-  // Only the simple mask form is supported: a plain alpha-only texture with no subset, no packed
-  // alpha, no YUV. Anything else falls back to ProgramBuilder.
-  if (te->numTextureSamplers() == 0 || te->isYUV() || !te->isAlphaOnly() || te->hasRGBAAA() ||
-      te->hasSubset()) {
-    return std::nullopt;
-  }
-  // The mask coverage feeds the XferProcessor's coverage lerp, so Porter-Duff blends (DST_TEX and
-  // framebuffer-fetch) are supported via the HAS_XP fragment dimension. Only a genuinely
-  // unsupported transfer processor (xpType < 0) falls back to ProgramBuilder.
-  MaskFillInputs inputs;
-  inputs.xpType = GetXPType(programInfo);
-  auto composed = ComposeMaskFill(inputs);
-  if (!composed) {
-    return std::nullopt;
-  }
-  auto fragIndex = MaskFillShader::D::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"MaskFillShader", 0, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchQuadColorFill(const ProgramInfo* programInfo) {
@@ -723,7 +645,7 @@ static std::optional<PermutationMatchResult> TryMatchAtlasTextFill(const Program
 // Returns true if fp is one of the four pointwise operators that share the runtime OpType uniform
 // (ColorMatrix / Luma / AlphaThreshold / ColorSpaceXform). For ColorSpaceXform the transfer-function
 // type must be in the supported 0-3 range; the pipeline flags themselves are runtime uniforms.
-static bool IsSupportedPointwiseOp(const FragmentProcessor* fp) {
+bool IsSupportedPointwiseOp(const FragmentProcessor* fp) {
   if (fp->name() == "ColorMatrixFragmentProcessor" || fp->name() == "LumaFragmentProcessor" ||
       fp->name() == "AlphaStepFragmentProcessor") {
     return true;
@@ -758,75 +680,13 @@ static bool IsSupportedPointwiseOp(const FragmentProcessor* fp) {
 // from the target takes (the color-space transform is appended automatically, e.g. a Display P3
 // photo on an sRGB surface), and it uploads a few hundred bytes of uniforms with straight-line
 // code where the chain uploads its instruction arrays (about 5 KB) and runs the interpreter loop.
-static std::optional<PermutationMatchResult> TryMatchComposedTexture(
-    const ProgramInfo* programInfo) {
-  if (!IsPositionOnlyRectGP(programInfo->getGeometryProcessor())) {
-    return std::nullopt;
-  }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
-    return std::nullopt;
-  }
-  // Accept two structurally-equivalent forms of "texture followed by one pointwise transform":
-  //   (a) a single ComposeFragmentProcessor(TextureEffect, X), or
-  //   (b) two sequential top-level color processors [TextureEffect, X].
-  // Sequential color processors are chained (each consumes the previous output), so [A, B] produces
-  // the identical result to Compose(A, B) and maps to the same precompiled variant.
-  const FragmentProcessor* child0 = nullptr;
-  const FragmentProcessor* child1 = nullptr;
-  if (programInfo->numFragmentProcessors() == 1 && programInfo->numColorFragmentProcessors() == 1) {
-    auto fp = programInfo->getFragmentProcessor(0);
-    if (fp->name() != "ComposeFragmentProcessor" || fp->numChildProcessors() != 2) {
-      return std::nullopt;
-    }
-    child0 = fp->childProcessor(0);
-    child1 = fp->childProcessor(1);
-  } else if (programInfo->numFragmentProcessors() == 2 &&
-             programInfo->numColorFragmentProcessors() == 2) {
-    child0 = programInfo->getFragmentProcessor(0);
-    child1 = programInfo->getFragmentProcessor(1);
-  } else {
-    return std::nullopt;
-  }
-  if (child0->name() != "TextureEffect") {
-    return std::nullopt;
-  }
-  auto* te = static_cast<const TextureEffect*>(child0);
-  if (te->isYUV() || te->isAlphaOnly() || te->hasRGBAAA()) {
-    return std::nullopt;
-  }
-  // The precompiled vertex template transforms the coordinate affinely; a projective source must
-  // stay off this artifact (the plain templates transform coordinates affinely, with no w division).
-  if (te->hasPerspective()) {
-    return std::nullopt;
-  }
-
-  // All four pointwise operators (ColorMatrix / Luma / AlphaThreshold / ColorSpaceXform) share the
-  // same structural class (1 sampler, no CoverageFP, RGBA) and thus the same precompiled shader:
-  // TexturedEffectShader. The operator is selected at draw time by the OpType runtime uniform (set
-  // by the pointwise FP's onSetData), so it is not a compile-time dimension. The frag index only
-  // encodes the structural axes HAS_XP and HAS_COVERAGE; subset clamping is a runtime uniform.
-  if (!IsSupportedPointwiseOp(child1)) {
-    return std::nullopt;
-  }
-  TexturedEffectInputs inputs;
-  inputs.xpType = xpType;
-  auto composed = ComposeTexturedEffect(inputs);
-  if (!composed) {
-    return std::nullopt;
-  }
-  auto vertIndex = TexturedEffectShader::VD::domain().encode(composed->vertValues);
-  auto fragIndex = TexturedEffectShader::D::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"TexturedEffectShader", vertIndex, fragIndex};
-}
-
 // The child a blur kernel samples per tap: a plain TextureEffect (inlined texture() call) or a
 // TiledTextureEffect, whose shared tiled_sample.inc tiling is applied per tap. The kernels clamp
 // plain-child taps to the subset (edge stretch), which is only the Clamp tap semantics: a Decal
 // child must return transparent outside its subset — a drop shadow's blurred source is exactly
 // that — so a non-Clamp plain child falls back. Tiled children are limited to the ShaderMode values
 // tiled_sample.inc implements.
-static bool IsServableBlurChild(const FragmentProcessor* childFP) {
+bool IsServableBlurChild(const FragmentProcessor* childFP) {
   if (childFP == nullptr || childFP->numTextureSamplers() == 0) {
     return false;
   }
@@ -847,97 +707,6 @@ static bool IsServableBlurChild(const FragmentProcessor* childFP) {
     return TiledModeSupported(modeX) && TiledModeSupported(modeY);
   }
   return false;
-}
-
-static std::optional<PermutationMatchResult> TryMatchGaussianBlur1D(
-    const ProgramInfo* programInfo) {
-  auto gp = programInfo->getGeometryProcessor();
-  int gpType = GetGPType(gp);
-  if (gpType < 0) {
-    return std::nullopt;
-  }
-  if (programInfo->numColorFragmentProcessors() != 1) {
-    return std::nullopt;
-  }
-  auto coverageType = SharedDeviceMaskValue(programInfo);
-  if (!coverageType) {
-    return std::nullopt;
-  }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
-    return std::nullopt;
-  }
-  auto fp = programInfo->getFragmentProcessor(0);
-  if (fp->name() != "GaussianBlur1DFragmentProcessor") {
-    return std::nullopt;
-  }
-  auto* blur = static_cast<const GaussianBlur1DFragmentProcessor*>(fp);
-  if (blur->numChildProcessors() != 1) {
-    return std::nullopt;
-  }
-  if (!IsServableBlurChild(blur->childProcessor(0))) {
-    return std::nullopt;
-  }
-  // The kernel radius is a runtime uniform, not a variant dimension. The precompiled shader uses
-  // a fixed maximum kernel (MAX_SIGMA=9 → radius up to 10) and breaks early at the runtime
-  // radius, so any sigma in [1,10] maps to the same variant. Sigma > 10 exceeds the fixed kernel
-  // and falls back.
-  int sigma = blur->getMaxSigma();
-  if (sigma < 1 || sigma > 10) {
-    return std::nullopt;
-  }
-  GaussianBlur1DInputs inputs;
-  inputs.xpType = xpType;
-  auto composed = ComposeGaussianBlur1D(inputs);
-  if (!composed) {
-    return std::nullopt;
-  }
-  auto fragIndex = GaussianBlur1DShader::FD::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"GaussianBlur1DShader", 0, fragIndex};
-}
-
-static std::optional<PermutationMatchResult> TryMatchGlassUDFTentBlur(
-    const ProgramInfo* programInfo) {
-  auto gp = programInfo->getGeometryProcessor();
-  int gpType = GetGPType(gp);
-  if (gpType < 0) {
-    return std::nullopt;
-  }
-  if (programInfo->numColorFragmentProcessors() != 1) {
-    return std::nullopt;
-  }
-  auto coverageType = SharedDeviceMaskValue(programInfo);
-  if (!coverageType) {
-    return std::nullopt;
-  }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
-    return std::nullopt;
-  }
-  auto fp = programInfo->getFragmentProcessor(0);
-  if (fp->name() != "GlassUDFTentBlurFragmentProcessor") {
-    return std::nullopt;
-  }
-  auto* tent = static_cast<const GlassUDFTentBlurFragmentProcessor*>(fp);
-  if (tent->numChildProcessors() != 1) {
-    return std::nullopt;
-  }
-  // The horizontal pass reads a plain TextureEffect; the vertical pass a TiledTextureEffect.
-  if (!IsServableBlurChild(tent->childProcessor(0))) {
-    return std::nullopt;
-  }
-  // The loop upper bound is the fixed constant 64; a longer max radius exceeds it and falls back.
-  if (tent->getMaxRadius() > 64) {
-    return std::nullopt;
-  }
-  GlassUDFTentBlurInputs inputs;
-  inputs.xpType = xpType;
-  auto composed = ComposeGlassUDFTentBlur(inputs);
-  if (!composed) {
-    return std::nullopt;
-  }
-  auto fragIndex = GlassUDFTentBlurShader::FD::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"GlassUDFTentBlurShader", 0, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchGlassRefraction(
@@ -1037,69 +806,6 @@ static std::optional<PermutationMatchResult> TryMatchGlassRefraction(
   auto vertIndex = GlassRefractionShader::VD::domain().encode(composed->vertValues);
   auto fragIndex = GlassRefractionShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"GlassRefractionShader", vertIndex, fragIndex};
-}
-
-static std::optional<PermutationMatchResult> TryMatchHairlineLine(const ProgramInfo* programInfo) {
-  auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "HairlineLineGeometryProcessor") {
-    return std::nullopt;
-  }
-  if (!HasNoProcessorsOrDirectClip(programInfo)) {
-    return std::nullopt;
-  }
-  HairlineLineInputs inputs;
-  inputs.xpType = GetXPType(programInfo);
-  auto composed = ComposeHairlineLine(inputs);
-  if (!composed) {
-    return std::nullopt;
-  }
-  auto fragIndex = HairlineLineShader::FD::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"HairlineLineShader", 0, fragIndex};
-}
-
-static std::optional<PermutationMatchResult> TryMatchHairlineQuad(const ProgramInfo* programInfo) {
-  auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "HairlineQuadGeometryProcessor") {
-    return std::nullopt;
-  }
-  if (!HasNoProcessorsOrDirectClip(programInfo)) {
-    return std::nullopt;
-  }
-  HairlineQuadInputs inputs;
-  inputs.xpType = GetXPType(programInfo);
-  auto composed = ComposeHairlineQuad(inputs);
-  if (!composed) {
-    return std::nullopt;
-  }
-  auto fragIndex = HairlineQuadShader::FD::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"HairlineQuadShader", 0, fragIndex};
-}
-
-static std::optional<PermutationMatchResult> TryMatchEllipseFill(const ProgramInfo* programInfo) {
-  auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "EllipseGeometryProcessor") {
-    return std::nullopt;
-  }
-  if (programInfo->numColorFragmentProcessors() != 0) {
-    return std::nullopt;
-  }
-  // A clip/mask coverage FP is served through the shared HAS_COVERAGE dimension (device-space
-  // sampling in coverage_output.inc). LocalMask needs per-vertex UV the ellipse vertex shader does
-  // not provide, so SharedCoverageValue rejects it.
-  auto coverageType = SharedDeviceMaskValue(programInfo);
-  if (!coverageType) {
-    return std::nullopt;
-  }
-  EllipseFillInputs inputs;
-  inputs.deviceMask = *coverageType;
-  inputs.xpType = GetXPType(programInfo);
-  auto composed = ComposeEllipseFill(inputs);
-  if (!composed) {
-    return std::nullopt;
-  }
-  auto vertIndex = EllipseFillShader::D::domain().encode(composed->vertValues);
-  auto fragIndex = EllipseFillShader::FD::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"EllipseFillShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchComplexEllipseFill(
@@ -1355,50 +1061,6 @@ static std::optional<PermutationMatchResult> TryMatchMeshFill(const ProgramInfo*
   return PermutationMatchResult{"MeshFillShader", vertIndex, fragIndex};
 }
 
-static std::optional<PermutationMatchResult> TryMatchPerlin(const ProgramInfo* programInfo) {
-  if (!IsPositionOnlyRectGP(programInfo->getGeometryProcessor())) {
-    return std::nullopt;
-  }
-  // Accept a PerlinNoiseFragmentProcessor optionally followed by one pointwise operator, in the
-  // same two structurally-equivalent forms as TryMatchComposedTexture:
-  //   (a) a bare PerlinNoiseFragmentProcessor (OpType == OP_NONE, set by the Perlin FP), or
-  //   (b) Compose(Perlin, op) / sequential [Perlin, op] where op is a supported pointwise operator.
-  // The operator is folded into the shared OpType runtime uniform, so the composed case hits the
-  // same PerlinNoiseFillShader variant losslessly (no materialization, no extra compile-time axis).
-  const FragmentProcessor* perlin = nullptr;
-  if (programInfo->numFragmentProcessors() == 1 && programInfo->numColorFragmentProcessors() == 1) {
-    auto fp = programInfo->getFragmentProcessor(0);
-    if (fp->name() == "PerlinNoiseFragmentProcessor") {
-      perlin = fp;
-    } else if (fp->name() == "ComposeFragmentProcessor" && fp->numChildProcessors() == 2 &&
-               fp->childProcessor(0)->name() == "PerlinNoiseFragmentProcessor" &&
-               IsSupportedPointwiseOp(fp->childProcessor(1))) {
-      perlin = fp->childProcessor(0);
-    }
-  } else if (programInfo->numFragmentProcessors() == 2 &&
-             programInfo->numColorFragmentProcessors() == 2 &&
-             programInfo->getFragmentProcessor(0)->name() == "PerlinNoiseFragmentProcessor" &&
-             IsSupportedPointwiseOp(programInfo->getFragmentProcessor(1))) {
-    perlin = programInfo->getFragmentProcessor(0);
-  }
-  if (perlin == nullptr) {
-    return std::nullopt;
-  }
-  int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
-    return std::nullopt;
-  }
-  PerlinNoiseFillInputs inputs;
-  inputs.xpType = xpType;
-  auto composed = ComposePerlinNoiseFill(inputs);
-  if (!composed) {
-    return std::nullopt;
-  }
-  auto vertIndex = PerlinNoiseFillShader::VD::domain().encode(composed->vertValues);
-  auto fragIndex = PerlinNoiseFillShader::D::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"PerlinNoiseFillShader", vertIndex, fragIndex};
-}
-
 static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramInfo* programInfo) {
   // OpenGL is served from the bundle profile matching the context (desktop GL or the GLES
   // family: GLES, WebGL, SwiftShader). The precompiled kernels only declare 2D samplers. Desktop GL
@@ -1421,13 +1083,13 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
     if (auto result = SolidColorFillShader::Match(programInfo)) {
       return result;
     }
-    if (auto result = TryMatchMaskFill(programInfo)) {
+    if (auto result = MaskFillShader::Match(programInfo)) {
       return result;
     }
     if (auto result = TryMatchQuadTextureFill(programInfo)) {
       return result;
     }
-    if (auto result = TryMatchGaussianBlur1D(programInfo)) {
+    if (auto result = GaussianBlur1DShader::Match(programInfo)) {
       return result;
     }
     // The pointwise kernels now carry the OutputAlphaSwizzle uniform (output_swizzle.inc), so a
@@ -1447,45 +1109,45 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
   if (auto result = TryMatchYUVTextureFill(programInfo)) {
     return result;
   }
-  if (auto result = TryMatchTiledTextureFill(programInfo)) {
+  if (auto result = TiledTextureFillShader::Match(programInfo)) {
     return result;
   }
   if (auto result = SolidColorFillShader::Match(programInfo)) {
     return result;
   }
-  if (auto result = TryMatchMaskFill(programInfo)) {
+  if (auto result = MaskFillShader::Match(programInfo)) {
     return result;
   }
   if (auto result = TryMatchPointwiseDAG(programInfo)) {
     return result;
   }
-  if (auto result = TryMatchComposedTexture(programInfo)) {
+  if (auto result = TexturedEffectShader::Match(programInfo)) {
     return result;
   }
 
-  if (auto result = TryMatchPerlin(programInfo)) {
+  if (auto result = PerlinNoiseFillShader::Match(programInfo)) {
     return result;
   }
 
   if (auto result = TryMatchAtlasTextFill(programInfo)) {
     return result;
   }
-  if (auto result = TryMatchGaussianBlur1D(programInfo)) {
+  if (auto result = GaussianBlur1DShader::Match(programInfo)) {
     return result;
   }
-  if (auto result = TryMatchGlassUDFTentBlur(programInfo)) {
+  if (auto result = GlassUDFTentBlurShader::Match(programInfo)) {
     return result;
   }
   if (auto result = TryMatchGlassRefraction(programInfo)) {
     return result;
   }
-  if (auto result = TryMatchHairlineLine(programInfo)) {
+  if (auto result = HairlineLineShader::Match(programInfo)) {
     return result;
   }
-  if (auto result = TryMatchHairlineQuad(programInfo)) {
+  if (auto result = HairlineQuadShader::Match(programInfo)) {
     return result;
   }
-  if (auto result = TryMatchEllipseFill(programInfo)) {
+  if (auto result = EllipseFillShader::Match(programInfo)) {
     return result;
   }
   if (auto result = TryMatchComplexEllipseFill(programInfo)) {

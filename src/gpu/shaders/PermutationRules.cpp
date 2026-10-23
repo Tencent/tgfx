@@ -119,45 +119,12 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateRoundStrokeRectReachable() {
       nullptr);
 }
 
-std::optional<RuleComposedValues> ComposeMaskFill(const MaskFillInputs& inputs) {
-  if (inputs.xpType < 0) {
-    return std::nullopt;
-  }
-  using D = MaskFillShader::D;
-  RuleComposedValues values;
-  values.fragValues.resize(D::COUNT);
-  values.fragValues[D::HAS_XP] = inputs.xpType;
-  return values;
-}
-
 std::set<std::pair<uint32_t, uint32_t>> EnumerateMaskFillReachable() {
   return EnumerateMirroredReachable<EmptyVertDims, MaskFillShader::FragDims>(nullptr);
 }
 
-std::optional<RuleComposedValues> ComposeHairlineLine(const HairlineLineInputs& inputs) {
-  if (inputs.xpType < 0) {
-    return std::nullopt;
-  }
-  using FD = HairlineLineShader::FD;
-  RuleComposedValues values;
-  values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_XP] = inputs.xpType;
-  return values;
-}
-
 std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineLineReachable() {
   return EnumerateMirroredReachable<EmptyVertDims, HairlineLineShader::FD>(nullptr);
-}
-
-std::optional<RuleComposedValues> ComposeHairlineQuad(const HairlineQuadInputs& inputs) {
-  if (inputs.xpType < 0) {
-    return std::nullopt;
-  }
-  using FD = HairlineQuadShader::FD;
-  RuleComposedValues values;
-  values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_XP] = inputs.xpType;
-  return values;
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineQuadReachable() {
@@ -203,19 +170,6 @@ std::optional<RuleComposedValues> ComposeComplexEllipseFill(
 std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexEllipseFillReachable() {
   return EnumerateMirroredReachable<ComplexEllipseFillShader::Dims, ComplexEllipseFillShader::FD>(
       nullptr);
-}
-
-std::optional<RuleComposedValues> ComposeEllipseFill(const EllipseFillInputs& inputs) {
-  if (inputs.xpType < 0) {
-    return std::nullopt;
-  }
-  using FD = EllipseFillShader::FD;
-  RuleComposedValues values;
-  values.vertValues.resize(EllipseFillShader::D::COUNT);
-  values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_XP] = inputs.xpType;
-  values.fragValues[FD::HAS_DEVICE_MASK] = inputs.deviceMask;
-  return values;
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateEllipseFillReachable() {
@@ -284,17 +238,6 @@ std::optional<RuleComposedValues> ComposeMeshFill(const MeshFillInputs& inputs) 
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateMeshFillReachable() {
   return EnumerateMirroredReachable<MeshFillShader::Dims, MeshFillShader::FD>(nullptr);
-}
-
-std::optional<RuleComposedValues> ComposePerlinNoiseFill(const PerlinNoiseFillInputs& inputs) {
-  if (inputs.xpType < 0) {
-    return std::nullopt;
-  }
-  using D = PerlinNoiseFillShader::D;
-  RuleComposedValues values;
-  values.fragValues.resize(D::COUNT);
-  values.fragValues[D::HAS_XP] = inputs.xpType;
-  return values;
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumeratePerlinNoiseFillReachable() {
@@ -373,17 +316,6 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedFillReachable() {
       nullptr);
 }
 
-std::optional<RuleComposedValues> ComposeTiledTextureFill(const TiledTextureFillInputs& inputs) {
-  if (inputs.xpType < 0) {
-    return std::nullopt;
-  }
-  using FD = TiledTextureFillShader::FragDims;
-  RuleComposedValues values;
-  values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_XP] = inputs.xpType;
-  return values;
-}
-
 std::set<std::pair<uint32_t, uint32_t>> EnumerateTiledTextureFillReachable() {
   return EnumerateMirroredReachable<TiledTextureFillShader::VD, TiledTextureFillShader::FD>(
       nullptr);
@@ -413,30 +345,8 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadTextureFillReachable() {
   return EnumerateMirroredReachable<QuadTextureFillShader::VD, QuadTextureFillShader::FD>(nullptr);
 }
 
-std::optional<RuleComposedValues> ComposeGaussianBlur1D(const GaussianBlur1DInputs& inputs) {
-  if (inputs.xpType < 0) {
-    return std::nullopt;
-  }
-  using FD = GaussianBlur1DShader::FD;
-  RuleComposedValues values;
-  values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_XP] = inputs.xpType;
-  return values;
-}
-
 std::set<std::pair<uint32_t, uint32_t>> EnumerateGaussianBlur1DReachable() {
   return EnumerateMirroredReachable<EmptyVertDims, GaussianBlur1DShader::FD>(nullptr);
-}
-
-std::optional<RuleComposedValues> ComposeGlassUDFTentBlur(const GlassUDFTentBlurInputs& inputs) {
-  if (inputs.xpType < 0) {
-    return std::nullopt;
-  }
-  using FD = GlassUDFTentBlurShader::FD;
-  RuleComposedValues values;
-  values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_XP] = inputs.xpType;
-  return values;
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassUDFTentBlurReachable() {
@@ -462,17 +372,6 @@ std::optional<RuleComposedValues> ComposeGlassRefraction(const GlassRefractionIn
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassRefractionReachable() {
   return EnumerateMirroredReachable<GlassRefractionShader::VD, GlassRefractionShader::FD>(nullptr);
-}
-
-std::optional<RuleComposedValues> ComposeTexturedEffect(const TexturedEffectInputs& inputs) {
-  if (inputs.xpType < 0) {
-    return std::nullopt;
-  }
-  using D = TexturedEffectShader::D;
-  RuleComposedValues values;
-  values.fragValues.resize(D::COUNT);
-  values.fragValues[D::HAS_XP] = inputs.xpType;
-  return values;
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateTexturedEffectReachable() {

@@ -18,9 +18,13 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/shaders/PrecompiledShader.h"
 
 namespace tgfx {
+
+class ProgramInfo;
+struct PermutationMatchResult;
 
 /// Precompiled shader for PerlinNoiseFragmentProcessor (SVG feTurbulence). Samples two per-draw
 /// lookup textures (a 256x1 alpha-only permutations table and a 256x4 RGBA gradient table) and
@@ -54,6 +58,13 @@ class PerlinNoiseFillShader : public PrecompiledShader {
 
   // HAS_COVERAGE is mirrored: the vertex stage emits the coverage varying only when the fragment
   // stage consumes it, so vert and frag must agree. Enforced automatically by MirroredDimsAgree.
+  /// Whether alpha-only (AAAA) render targets may be served by this kernel.
+  static constexpr bool ServesAlphaOnly = false;
+
+  /// Runtime matching: does this draw belong to this family? Declared here, defined in
+  /// the family's own .cpp, next to the GLSL it owns.
+  static std::optional<PermutationMatchResult> Match(const ProgramInfo* programInfo);
+
   PrecompiledShaderInfo info() const override {
     return {"PerlinNoiseFillShader",
             "level1/perlin_noise.vert",

@@ -18,9 +18,13 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/shaders/PrecompiledShader.h"
 
 namespace tgfx {
+
+class ProgramInfo;
+struct PermutationMatchResult;
 
 /// Precompiled shader declaration for TiledTextureEffect. Handles texture sampling with various
 /// tiling modes (repeat, mirror, clamp-to-border, etc.) applied per-axis via runtime uniform
@@ -66,6 +70,13 @@ class TiledTextureFillShader : public PrecompiledShader {
   };
   using VD = VertDims;
   static_assert(VD::COUNT == 0, "Update info() when vertex dimensions change.");
+
+  /// Whether alpha-only (AAAA) render targets may be served by this kernel.
+  static constexpr bool ServesAlphaOnly = false;
+
+  /// Runtime matching: does this draw belong to this family? Declared here, defined in
+  /// the family's own .cpp, next to the GLSL it owns.
+  static std::optional<PermutationMatchResult> Match(const ProgramInfo* programInfo);
 
   PrecompiledShaderInfo info() const override {
     return {"TiledTextureFillShader",

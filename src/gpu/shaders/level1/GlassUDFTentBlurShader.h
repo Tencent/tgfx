@@ -18,9 +18,13 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/shaders/PrecompiledShader.h"
 
 namespace tgfx {
+
+class ProgramInfo;
+struct PermutationMatchResult;
 
 /// Precompiled shader declaration for GlassUDFTentBlurFragmentProcessor. Blurs alpha coverage with
 /// a tent kernel in one direction and writes one field into an RGBA8 target. The tent weights are
@@ -63,6 +67,13 @@ class GlassUDFTentBlurShader : public PrecompiledShader {
   };
   using FD = FragDims;
   static_assert(FD::COUNT == 1, "Update info() when fragment dimensions change.");
+
+  /// Whether alpha-only (AAAA) render targets may be served by this kernel.
+  static constexpr bool ServesAlphaOnly = false;
+
+  /// Runtime matching: does this draw belong to this family? Declared here, defined in
+  /// the family's own .cpp, next to the GLSL it owns.
+  static std::optional<PermutationMatchResult> Match(const ProgramInfo* programInfo);
 
   PrecompiledShaderInfo info() const override {
     return {"GlassUDFTentBlurShader",

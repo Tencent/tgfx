@@ -108,29 +108,6 @@ struct RoundStrokeRectInputs {
 };
 
 /**
- * Input contract of the MaskFillShader matcher rule. The mask TextureEffect shape checks
- * (alpha-only, no subset, no RGBAAA, no YUV) are whole-draw rejections and stay in Extract.
- */
-struct MaskFillInputs {
-  int xpType = -1;  // -1 = no representable XferProcessor.
-};
-
-/**
- * Input contract of the HairlineLineShader matcher rule. The direct AARect clip coverage check
- * is a whole-draw rejection and stays in Extract.
- */
-struct HairlineLineInputs {
-  int xpType = -1;  // -1 = no representable XferProcessor.
-};
-
-/**
- * Input contract of the HairlineQuadShader matcher rule; same shape as HairlineLineShader.
- */
-struct HairlineQuadInputs {
-  int xpType = -1;  // -1 = no representable XferProcessor.
-};
-
-/**
  * Input contract of the QuadColorFillShader matcher rule. The coverage FP classification
  * (none, direct AARect, or device mask) happens in Extract: only the resulting mask flag and the
  * transfer type shape dimensions.
@@ -146,16 +123,6 @@ struct QuadColorFillInputs {
 struct ComplexEllipseFillInputs {
   bool isStroke = false;
   int xpType = -1;  // -1 = no representable XferProcessor.
-};
-
-/**
- * Input contract of the EllipseFillShader matcher rule. deviceMask is the shared coverage
- * classification result (0 = none, 1 = device-space mask); the LocalMask/unclassifiable cases are
- * whole-draw rejections and stay in Extract.
- */
-struct EllipseFillInputs {
-  int deviceMask = 0;  // 0 = no mask coverage FP, 1 = device-space mask.
-  int xpType = -1;     // -1 = no representable XferProcessor.
 };
 
 /**
@@ -184,16 +151,6 @@ struct ComplexNonAARRectFillInputs {
  */
 struct MeshFillInputs {
   bool hasTexCoords = false;
-  int xpType = -1;  // -1 = no representable XferProcessor.
-};
-
-/**
- * Input contract of the PerlinNoiseFillShader matcher rule. The GP kind (Default or QuadAA),
- * the quad attribute constraints, and the Perlin + optional pointwise FP structure checks are
- * whole-draw rejections in Extract: the folded pointwise operator rides a runtime uniform and
- * shapes no dimension, so only coverage and the transfer type remain.
- */
-struct PerlinNoiseFillInputs {
   int xpType = -1;  // -1 = no representable XferProcessor.
 };
 
@@ -227,14 +184,6 @@ struct ShapeInstancedFillInputs {
 };
 
 /**
- * Input contract of the TiledTextureFillShader matcher rule. The tiled mode / perspective checks
- * are whole-draw rejections in Extract; ALPHA_ONLY / strict are runtime uniforms.
- */
-struct TiledTextureFillInputs {
-  int xpType = -1;  // -1 = no representable XferProcessor.
-};
-
-/**
  * Input contract of the QuadTextureFillShader matcher rule. The coverage FP classification
  * (device mask = runtime uniform, local mask = dimension, else reject) and the TextureEffect
  * shape checks happen in Extract; alphaOnly / RGBAAA are runtime uniforms.
@@ -243,25 +192,6 @@ struct QuadTextureFillInputs {
   bool hasUVCoord = false;
   bool hasSubset = false;
   bool hasLocalMask = false;
-  int xpType = -1;  // -1 = no representable XferProcessor.
-};
-
-/**
- * Input contract of the GaussianBlur1DShader matcher rule. The blur child structure checks,
- * tiled-mode limits, and sigma range are whole-draw rejections in Extract; sigma and the tiled
- * child are runtime uniforms, so only the transfer type shapes dimensions.
- */
-struct GaussianBlur1DInputs {
-  int xpType = -1;  // -1 = no representable XferProcessor.
-};
-
-/**
- * Input contract of the GlassUDFTentBlurShader matcher rule. The child structure checks, tiled-mode
- * limits, and the max-radius bound are whole-draw rejections in Extract; the radius pair, field
- * selection, packed-input decode, and the tiled child are runtime uniforms, so only the transfer
- * type shapes dimensions.
- */
-struct GlassUDFTentBlurInputs {
   int xpType = -1;  // -1 = no representable XferProcessor.
 };
 
@@ -279,15 +209,6 @@ struct GlassRefractionInputs {
   int geometryKind = -1;      // -1 = unrepresentable geometry child.
   bool dispersionOn = false;  // Mirrors GlassRefractionFragmentProcessor::hasDispersion().
   int xpType = -1;            // -1 = no representable XferProcessor.
-};
-
-/**
- * Input contract of the TexturedEffectShader matcher rule (the composed texture transform). The
- * Compose(Texture, pointwise) structure checks are whole-draw rejections in Extract: the operator
- * rides the OpType runtime uniform, so only coverage and the transfer type shape dimensions.
- */
-struct TexturedEffectInputs {
-  int xpType = -1;  // -1 = no representable XferProcessor.
 };
 
 /**
@@ -341,23 +262,6 @@ struct RuleComposedValues {
 std::optional<RuleComposedValues> ComposeRoundStrokeRect(const RoundStrokeRectInputs& inputs);
 
 /**
- * Pure mapping for the MaskFillShader rule; see ComposeRoundStrokeRect for the sharing contract.
- */
-std::optional<RuleComposedValues> ComposeMaskFill(const MaskFillInputs& inputs);
-
-/**
- * Pure mapping for the HairlineLineShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
- */
-std::optional<RuleComposedValues> ComposeHairlineLine(const HairlineLineInputs& inputs);
-
-/**
- * Pure mapping for the HairlineQuadShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
- */
-std::optional<RuleComposedValues> ComposeHairlineQuad(const HairlineQuadInputs& inputs);
-
-/**
  * Pure mapping for the QuadColorFillShader rule; see ComposeRoundStrokeRect for the sharing
  * contract.
  */
@@ -368,12 +272,6 @@ std::optional<RuleComposedValues> ComposeQuadColorFill(const QuadColorFillInputs
  * contract.
  */
 std::optional<RuleComposedValues> ComposeComplexEllipseFill(const ComplexEllipseFillInputs& inputs);
-
-/**
- * Pure mapping for the EllipseFillShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
- */
-std::optional<RuleComposedValues> ComposeEllipseFill(const EllipseFillInputs& inputs);
 
 /**
  * Pure mapping for the NonAARRectFillShader rule; see ComposeRoundStrokeRect for the sharing
@@ -392,12 +290,6 @@ std::optional<RuleComposedValues> ComposeComplexNonAARRectFill(
  * Pure mapping for the MeshFillShader rule; see ComposeRoundStrokeRect for the sharing contract.
  */
 std::optional<RuleComposedValues> ComposeMeshFill(const MeshFillInputs& inputs);
-
-/**
- * Pure mapping for the PerlinNoiseFillShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
- */
-std::optional<RuleComposedValues> ComposePerlinNoiseFill(const PerlinNoiseFillInputs& inputs);
 
 /**
  * Pure mapping for the YUVTextureFillShader rule; see ComposeRoundStrokeRect for the sharing
@@ -419,40 +311,16 @@ std::optional<RuleComposedValues> ComposeShapeInstancedTextureCoverage(
 std::optional<RuleComposedValues> ComposeShapeInstancedFill(const ShapeInstancedFillInputs& inputs);
 
 /**
- * Pure mapping for the TiledTextureFillShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
- */
-std::optional<RuleComposedValues> ComposeTiledTextureFill(const TiledTextureFillInputs& inputs);
-
-/**
  * Pure mapping for the QuadTextureFillShader rule; see ComposeRoundStrokeRect for the sharing
  * contract.
  */
 std::optional<RuleComposedValues> ComposeQuadTextureFill(const QuadTextureFillInputs& inputs);
 
 /**
- * Pure mapping for the GaussianBlur1DShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
- */
-std::optional<RuleComposedValues> ComposeGaussianBlur1D(const GaussianBlur1DInputs& inputs);
-
-/**
- * Pure mapping for the GlassUDFTentBlurShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
- */
-std::optional<RuleComposedValues> ComposeGlassUDFTentBlur(const GlassUDFTentBlurInputs& inputs);
-
-/**
  * Pure mapping for the GlassRefractionShader rule; see ComposeRoundStrokeRect for the sharing
  * contract.
  */
 std::optional<RuleComposedValues> ComposeGlassRefraction(const GlassRefractionInputs& inputs);
-
-/**
- * Pure mapping for the TexturedEffectShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
- */
-std::optional<RuleComposedValues> ComposeTexturedEffect(const TexturedEffectInputs& inputs);
 
 /**
  * Pure mapping for the AtlasTextFillShader rule; see ComposeRoundStrokeRect for the sharing

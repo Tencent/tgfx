@@ -18,9 +18,13 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/shaders/PrecompiledShader.h"
 
 namespace tgfx {
+
+class ProgramInfo;
+struct PermutationMatchResult;
 
 /// Cold "uber" shader for the (1 sampler, no CoverageFP, RGBA) structural class: samples one
 /// intermediate texture then applies exactly one pointwise operator selected at runtime by the
@@ -58,6 +62,13 @@ class TexturedEffectShader : public PrecompiledShader {
 
   // HAS_COVERAGE is mirrored: the vertex stage emits the coverage varying only when the fragment
   // stage consumes it, so vert and frag must agree. Enforced automatically by MirroredDimsAgree.
+  /// Whether alpha-only (AAAA) render targets may be served by this kernel.
+  static constexpr bool ServesAlphaOnly = false;
+
+  /// Runtime matching: does this draw belong to this family? Declared here, defined in
+  /// the family's own .cpp, next to the GLSL it owns.
+  static std::optional<PermutationMatchResult> Match(const ProgramInfo* programInfo);
+
   PrecompiledShaderInfo info() const override {
     return {"TexturedEffectShader",
             "level1/textured_effect.vert",

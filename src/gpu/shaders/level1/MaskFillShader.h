@@ -18,9 +18,13 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/shaders/PrecompiledShader.h"
 
 namespace tgfx {
+
+class ProgramInfo;
+struct PermutationMatchResult;
 
 /// Precompiled shader for a solid-color fill masked by an alpha-only coverage texture, drawn through
 /// DefaultGeometryProcessor with a single TextureEffect coverage fragment processor. Covers the
@@ -41,6 +45,13 @@ class MaskFillShader : public PrecompiledShader {
     }
   };
   using D = FragDims;
+
+  /// Whether alpha-only (AAAA) render targets may be served by this kernel.
+  static constexpr bool ServesAlphaOnly = true;
+
+  /// Runtime matching: does this draw belong to this family? Declared here, defined in
+  /// the family's own .cpp, next to the GLSL it owns.
+  static std::optional<PermutationMatchResult> Match(const ProgramInfo* programInfo);
 
   PrecompiledShaderInfo info() const override {
     return {"MaskFillShader",
