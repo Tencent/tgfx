@@ -1,4 +1,4 @@
-// Shared ColorSpaceXform transfer function (mirrors textured_color_space_xform.frag). Single
+// Shared ColorSpaceXform transfer function. Single
 // source for the pointwise operator kernels (per-slot src_tf/dst_tf wrappers) and the chain
 // kernel's OP_COLOR_SPACE_XFORM slot. Parameters are passed explicitly so each caller can feed
 // its own uniform names: tf0 packs (G, A, B, C), tf1 packs (D, E, F), tfType selects the curve

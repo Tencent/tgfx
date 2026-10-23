@@ -1,6 +1,6 @@
 // Shared gradient colorizer: maps t in [0,1] to a color using piecewise linear segments.
-// All interval counts share this path at runtime. Single source for gradient_fill.frag and the
-// chain kernel's OP_GRADIENT slot. All interval uniforms are passed explicitly so each caller
+// All interval counts share this path at runtime. Single source for the chain kernel's
+// OP_GRADIENT slot. All interval uniforms are passed explicitly so each caller
 // can feed its own uniform names.
 //
 // Packing (see UnrolledBinaryGradientColorizer::Make): thresholds1_7 holds the interval end
