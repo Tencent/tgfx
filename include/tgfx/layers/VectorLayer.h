@@ -19,6 +19,8 @@
 #pragma once
 
 #include <vector>
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Shape.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/vectors/VectorElement.h"
 
@@ -63,10 +65,30 @@ class VectorLayer : public Layer {
 
   void onUpdateContent(LayerRecorder* recorder) override;
 
+  Rect onGetOwnGeometryBounds() override;
+
+  void onDrawOwnGeometry(Canvas* canvas) override;
+
   std::optional<StyledShape> onGetContentShape() override;
 
+  std::optional<StyledShape> onGetOwnGeometryShape() override;
+
  private:
+  /** A geometry no painter captured: it paints nothing but is still own geometry. */
+  struct OwnGeometry {
+    std::shared_ptr<Shape> shape = nullptr;
+    Matrix matrix = Matrix::I();
+  };
+
+  // Derives the content outline from the painters, skipping the painters that contribute no visible
+  // content and the geometries no painter captured.
+  std::optional<StyledShape> computeContentShape();
+
   std::vector<std::shared_ptr<VectorElement>> _contents = {};
+  std::vector<OwnGeometry> ownGeometries = {};
+  // Derived in the same pass that records the own geometries above, so it never has to re-expand the
+  // elements to describe them.
+  std::optional<StyledShape> ownShape = std::nullopt;
 };
 
 }  // namespace tgfx

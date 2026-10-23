@@ -50,9 +50,12 @@ class LayerContent {
   virtual bool hitTestPoint(float localX, float localY) const = 0;
 
   /**
-   * Draws the contour of the content to the specified canvas.
+   * Draws the contour of the content to the specified canvas. Unlike the rendered content, the
+   * contour keeps the painters whose alpha is 0.
    */
-  virtual void drawContour(Canvas* canvas, bool antiAlias) const = 0;
+  void drawContour(Canvas* canvas, bool antiAlias) const {
+    drawContourInternal(canvas, antiAlias);
+  }
 
   /**
    * Returns true if the contour drawing result equals the opaque content drawing result.
@@ -83,6 +86,11 @@ class LayerContent {
   virtual void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const = 0;
 
  protected:
+  /**
+   * Draws the contour. A content that holds several painters forwards to them through this channel.
+   */
+  virtual void drawContourInternal(Canvas* canvas, bool antiAlias) const = 0;
+
   enum class Type {
     Rect,
     RRect,

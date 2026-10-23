@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -447,6 +448,7 @@ void Layer::setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value
       std::equal(_layerStyles.begin(), _layerStyles.end(), value.begin())) {
     return;
   }
+  auto hadOwnGeometryContent = hasOwnGeometryContentStyle();
   for (const auto& layerStyle : _layerStyles) {
     DEBUG_ASSERT(layerStyle != nullptr);
     layerStyle->detachFromLayer(this);
@@ -458,6 +460,11 @@ void Layer::setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value
     }
     layerStyle->attachToLayer(this);
     _layerStyles.push_back(layerStyle);
+  }
+  if (hadOwnGeometryContent != hasOwnGeometryContentStyle()) {
+    // The own geometry joins the layer bounds only while a style declares it, and neither
+    // invalidateSubtree() nor invalidateTransform() drops contentBounds, so rebuild it here.
+    invalidateContent();
   }
   invalidateSubtree();
   invalidateTransform();
@@ -732,6 +739,17 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
       bounds.join(computedBounds);
     }
   }
+  // A geometry no painter captured has no content bounds, so join its bounds here or a style
+  // drawing from the own geometry would cover nothing. Gated on such a style existing and on
+  // !excludeEffects, which maps filters and style sources against content bounds only.
+  if (!excludeEffects && hasOwnGeometryContentStyle()) {
+    auto ownGeometryBounds = onGetOwnGeometryBounds();
+    if (!ownGeometryBounds.isEmpty() &&
+        (isAffine || !Matrix3DUtils::IsRectBehindCamera(ownGeometryBounds, coordinateMatrix))) {
+      auto ownGeometryMatrix = applyMatrixAtEnd ? Matrix3D::I() : coordinateMatrix;
+      bounds.join(ownGeometryMatrix.mapRect(ownGeometryBounds));
+    }
+  }
 
   for (const auto& child : _children) {
     // Alpha does not need to be checked; alpha == 0 is still valid.
@@ -822,6 +840,8 @@ Matrix3D Layer::getRelativeMatrix3D(const Layer* target) const {
 }
 
 bool Layer::hitTestPoint(float x, float y, bool shapeHitTest) {
+  // Hit testing deliberately ignores the own geometry: a geometry no painter captured is not
+  // painted, so it must not become clickable just because a style covers it.
   if (auto content = getContent()) {
     Point localPoint = globalToLocal(Point::Make(x, y));
     if (shapeHitTest) {
@@ -1329,6 +1349,43 @@ std::shared_ptr<Image> Layer::getContentContourImage(const DrawArgs& args, float
   return image;
 }
 
+std::shared_ptr<Image> Layer::getOwnGeometryImage(const DrawArgs& args, float contentScale,
+                                                  Point* offset) {
+  if (FloatNearlyZero(contentScale)) {
+    return nullptr;
+  }
+  OpaqueContext opaqueContext;
+  auto* contourCanvas = opaqueContext.beginRecording();
+  contourCanvas->scale(contentScale, contentScale);
+  // This is the layer's own geometry, not the contour shared with layer styles or masks: recording
+  // it directly only leaves the descendants out (the painters with alpha=0 stay in both).
+  auto content = getContent();
+  if (content != nullptr) {
+    content->drawContour(contourCanvas, bitFields.allowsEdgeAntialiasing);
+  }
+  // Geometries no painter captured paint nothing as content, so only the layer itself can add them.
+  onDrawOwnGeometry(contourCanvas);
+  auto picture = opaqueContext.finishRecordingAsPicture();
+  auto imageOffset = Point::Zero();
+  auto image = ToImageWithOffset(std::move(picture), &imageOffset, nullptr, args.dstColorSpace);
+  if (offset) {
+    *offset = imageOffset;
+  }
+  return image;
+}
+
+std::optional<StyledShape> Layer::onGetOwnGeometryShape() {
+  // The base class holds no geometry of its own, so it has no own geometry to describe.
+  return std::nullopt;
+}
+
+Rect Layer::onGetOwnGeometryBounds() {
+  return Rect::MakeEmpty();
+}
+
+void Layer::onDrawOwnGeometry(Canvas*) {
+}
+
 bool Layer::shouldPassThroughBackground(BlendMode blendMode) const {
   // Pass-through background is only possible when:
   // 1. The feature is enabled
@@ -1764,13 +1821,22 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     return nullptr;
   }
 
-  // Collect which excludeChildEffects values need content and/or a rasterized contour.
+  // Collect which excludeChildEffects values need the shared content, a rasterized contour and the
+  // layer's own geometry, and whether any style needs a content shape.
   bool needContent[2] = {false, false};
   bool needContour[2] = {false, false};
+  bool needOwnGeometry[2] = {false, false};
   bool needsContentShape = false;
   for (const auto& layerStyle : _layerStyles) {
     auto index = static_cast<int>(layerStyle->excludeChildEffects());
-    needContent[index] = true;
+    if (NeedsOwnGeometry(layerStyle.get())) {
+      needOwnGeometry[index] = true;
+    } else {
+      // Only a style drawing from the shared content needs it recorded: a Geometry-sourced style
+      // reads the own geometry instead, so recording content for it would rasterize the subtree for
+      // nothing.
+      needContent[index] = true;
+    }
     auto sourceFlags = layerStyle->extraSourceType();
     if (NeedsContourSource(sourceFlags)) {
       needContour[index] = true;
@@ -1781,17 +1847,40 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   auto source = std::make_unique<LayerStyleSource>();
   source->contentScale = contentScale;
 
+  // A layer that carries a style drawing from its own geometry may drop a single unusable bucket:
+  // such a bucket can still be driven by the own geometry even when the shared content is empty, so
+  // losing one bucket must not cancel the other. The relaxation is per layer rather than per bucket,
+  // so a failed bucket no longer suppresses the styles of the other bucket either -- they draw where
+  // the previous fail-closed contract left them undrawn. Every other layer keeps that contract: one
+  // unusable bucket makes the whole source unusable.
+  const bool layerUsesOwnGeometry = needOwnGeometry[0] || needOwnGeometry[1];
+
   DrawArgs drawArgs = args;
   drawArgs.render3DContext = nullptr;
   // Layer style source content is an intermediate artifact — skip background capture / consume.
   drawArgs.backgroundHandler = BackgroundHandler::NoOp();
 
+  // Record the own geometry once for both buckets. getOwnGeometryImage() and getOwnGeometryShape()
+  // read only the layer's own content, its own paint, the edge-antialiasing flag and the destination
+  // color space -- never drawArgs.excludeEffects -- so both buckets used to record the very same
+  // raster. Keep it that way: making getOwnGeometryImage() depend on the bucket would silently
+  // change what both buckets get, not just the one that changed.
+  LayerStyleSourceEntry ownGeometryEntry = {};
+  std::optional<StyledShape> ownShape = std::nullopt;
+  if (layerUsesOwnGeometry) {
+    ownGeometryEntry.image = getOwnGeometryImage(drawArgs, contentScale, &ownGeometryEntry.offset);
+    if (ownGeometryEntry.image != nullptr) {
+      ownShape = getOwnGeometryShape();
+    }
+  }
+
   for (int i = 0; i < 2; i++) {
-    if (!needContent[i] && !needContour[i]) {
+    if (!needContent[i] && !needContour[i] && !needOwnGeometry[i]) {
       continue;
     }
     drawArgs.excludeEffects = static_cast<bool>(i);
     auto group = std::make_unique<LayerStyleSourceGroup>();
+    bool bucketUsable = true;
 
     bool allContourMatch = false;
     if (needContour[i]) {
@@ -1799,16 +1888,17 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
       contourEntry.image =
           getContentContourImage(drawArgs, contentScale, &contourEntry.offset, &allContourMatch);
       if (contourEntry.image == nullptr) {
-        return nullptr;
+        bucketUsable = false;
+      } else {
+        if (allContourMatch) {
+          group->content = contourEntry;
+          needContent[i] = false;
+        }
+        group->contour = std::move(contourEntry);
       }
-      if (allContourMatch) {
-        group->content = contourEntry;
-        needContent[i] = false;
-      }
-      group->contour = std::move(contourEntry);
     }
 
-    if (needContent[i]) {
+    if (needContent[i] && bucketUsable) {
       OpaqueContext opaqueContext;
       auto* contourCanvas = opaqueContext.beginRecording();
       contourCanvas->scale(contentScale, contentScale);
@@ -1817,11 +1907,51 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
       group->content.image = ToImageWithOffset(std::move(picture), &group->content.offset, nullptr,
                                                args.dstColorSpace);
       if (group->content.image == nullptr) {
-        return nullptr;
+        bucketUsable = false;
       }
     }
 
+    if (needOwnGeometry[i]) {
+      // A style that draws from the own geometry always consumes it rather than the shared content:
+      // the shared content drops painters with alpha=0 and knows nothing about geometry no painter
+      // captured, so a layer painting nothing still has own geometry to cover. Recording it
+      // unconditionally also keeps the coverage independent of any visible descendant.
+      if (ownGeometryEntry.image != nullptr) {
+        // Consume the recording hoisted above: copying the entry shares the image by reference
+        // count, so the pixels are neither re-recorded nor duplicated.
+        group->ownGeometry = ownGeometryEntry;
+        group->ownShape = ownShape;
+        bucketUsable = true;
+      } else if (!group->contour.has_value()) {
+        // Lazy fallback: a layer whose geometry lives in its children records no own geometry, so
+        // the style falls back to the shared subtree contour. That contour keeps a descendant's
+        // painters with alpha=0, which the shared content drops. A failed recording only skips this
+        // style: ResolveContentEntry then finds neither entry and drops it, while the other styles
+        // of the bucket keep drawing from the shared content. This recording does read
+        // drawArgs.excludeEffects, so it must stay inside the loop.
+        LayerStyleSourceEntry contourEntry = {};
+        contourEntry.image =
+            getContentContourImage(drawArgs, contentScale, &contourEntry.offset, nullptr);
+        if (contourEntry.image != nullptr) {
+          group->contour = std::move(contourEntry);
+          bucketUsable = true;
+        }
+      }
+    }
+
+    if (!bucketUsable) {
+      if (layerUsesOwnGeometry) {
+        continue;
+      }
+      return nullptr;
+    }
     source->groups[i] = std::move(group);
+  }
+
+  if (source->groups[0] == nullptr && source->groups[1] == nullptr) {
+    // Nothing usable was recorded in any bucket: keep the previous fail-closed result so a style
+    // whose input is entirely absent draws nothing.
+    return nullptr;
   }
 
   if (needsContentShape) {
@@ -1919,25 +2049,31 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
     return;
   }
 
-  auto& contentEntry = group->content;
+  auto* contentEntry = ResolveContentEntry(*group, layerStyle);
+  if (contentEntry == nullptr) {
+    return;
+  }
   // Apply the content transform matrix to canvas so that rendering happens at the final scale,
   // avoiding blurry results that would come from baking contentScale into a picture recording.
   AutoCanvasRestore restoreCanvas(canvas);
   auto matrix = Matrix::MakeScale(1.f / source->contentScale, 1.f / source->contentScale);
-  matrix.preTranslate(contentEntry.offset.x, contentEntry.offset.y);
+  matrix.preTranslate(contentEntry->offset.x, contentEntry->offset.y);
   canvas->concat(matrix);
   LayerStyleInput styleInput = {};
-  styleInput.content = contentEntry.image;
-  styleInput.contentOffset = contentEntry.offset;
+  styleInput.content = contentEntry->image;
+  styleInput.contentOffset = contentEntry->offset;
   styleInput.contentScale = source->contentScale;
   auto sourceFlags = layerStyle->extraSourceType();
   if (HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour)) {
+    // The Contour source is the shared contour: its raster and the shared content shape describe
+    // the same recording.
     auto contourImage = group->contour.has_value() ? group->contour->image : nullptr;
     auto contourOffset =
-        contourImage ? group->contour->offset - contentEntry.offset : Point::Zero();
+        contourImage ? group->contour->offset - contentEntry->offset : Point::Zero();
     styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
         std::move(contourImage), contourOffset, source->contentShape));
   }
+  styleInput.ownShape = ResolveOwnShape(*group, layerStyle);
   layerStyle->draw(canvas, styleInput, alpha);
 }
 
@@ -2025,7 +2161,10 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     }
   }
   auto content = getContent();
-  if (bitFields.dirtyContentBounds || (forceDirty && content)) {
+  // A transform-only change never sets dirtyContentBounds, so a layer whose bounds come from its own
+  // geometry rather than from its content has to enter the recompute through this gate as well.
+  const bool hasOwnGeometry = hasOwnGeometryContentStyle();
+  if (bitFields.dirtyContentBounds || (forceDirty && (content != nullptr || hasOwnGeometry))) {
     if (contentBounds) {
       _root->invalidateRect(*contentBounds);
     } else {
@@ -2033,13 +2172,21 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     }
     if (content) {
       *contentBounds = content->getBounds();
-      if (transformer) {
-        transformer->transform(contentBounds);
-      }
-      _root->invalidateRect(*contentBounds);
     } else {
       contentBounds->setEmpty();
     }
+    // Same reason and gate as in computeBounds(): geometry no painter captured has no content
+    // bounds, yet a style drawing from it still needs bounds to capture the background over.
+    if (hasOwnGeometry) {
+      contentBounds->join(onGetOwnGeometryBounds());
+    }
+    // An empty content bounds has nothing to cover, but a style or filter transformer outsets
+    // whatever it is given, so running it on the empty rect would invent bounds and dirty regions
+    // for a layer that paints nothing.
+    if (transformer && !contentBounds->isEmpty()) {
+      transformer->transform(contentBounds);
+    }
+    _root->invalidateRect(*contentBounds);
     bitFields.dirtyContentBounds = false;
   }
   if (contentBounds) {
@@ -2255,6 +2402,20 @@ void Layer::updateStaticSubtreeFlags() {
 
 std::optional<StyledShape> Layer::getContentShape() {
   return onGetContentShape();
+}
+
+std::optional<StyledShape> Layer::getOwnGeometryShape() {
+  return onGetOwnGeometryShape();
+}
+
+bool Layer::hasOwnGeometryContentStyle() const {
+  for (const auto& style : _layerStyles) {
+    DEBUG_ASSERT(style != nullptr);
+    if (NeedsOwnGeometry(style.get())) {
+      return true;
+    }
+  }
+  return false;
 }
 
 }  // namespace tgfx

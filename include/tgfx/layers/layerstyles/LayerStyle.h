@@ -44,13 +44,33 @@ enum class LayerStyleExtraSourceType : uint32_t {
    */
   None = 0,
   /**
-   * The layerStyle requires the layer contour to be drawn.
+   * The layerStyle requires the layer contour to be drawn: the shared subtree recording, which
+   * includes geometries from painters with alpha=0.
    */
   Contour = 1 << 0,
   /**
    * The layerStyle requires the background content.
    */
   Background = 1 << 1
+};
+
+/**
+ * Declares which recording a layerStyle consumes as its content: whichever one contentSource()
+ * names, so the style reads that recording instead of a separate per-style raster.
+ */
+enum class LayerStyleContentSource {
+  /**
+   * The content the layer renders: its own content plus its descendants (the default).
+   */
+  All,
+  /**
+   * The layer's own geometry: the outlines of all of its own painters, including painters with
+   * alpha=0, plus the bare geometries no painter captures. Descendants never contribute, so a style
+   * keeps covering a layer whose painting is invisible. When the layer has no own geometry the style
+   * falls back to the shared subtree recording, so a layer whose geometry lives in child layers still
+   * has coverage.
+   */
+  Geometry
 };
 
 enum class LayerStyleType {
@@ -75,11 +95,14 @@ enum class LayerStyleType {
  * 1. **Content** (opaque layer content): Renders geometries with normal fills, then converts all
  *    semi-transparent pixels to fully opaque (fully transparent pixels are preserved).
  *
- * 2. **Contour** (layer contour): Similar to Content, but with two differences:
- *    - Includes geometries from painters with alpha=0
- *    - Replaces gradient fills with solid color fills (ignoring local transparency in gradients)
+ * 2. **Contour** (layer contour): Similar to Content, but it also includes geometries from painters
+ *    with alpha=0, and it replaces gradient fills with solid color fills (ignoring local
+ *    transparency in gradients).
  *
  * 3. **Background** (layer background): The normally rendered content below the current layer.
+ *
+ * A layerStyle may declare LayerStyleContentSource::Geometry instead: it then consumes the layer's
+ * own geometry in place of the content above, as described by LayerStyleContentSource::Geometry.
  */
 class LayerStyle : public LayerProperty {
  public:
@@ -144,6 +167,14 @@ class LayerStyle : public LayerProperty {
    */
   virtual uint32_t extraSourceType() const {
     return static_cast<uint32_t>(LayerStyleExtraSourceType::None);
+  }
+
+  /**
+   * Returns where this layer style takes its content image from.
+   * Default is LayerStyleContentSource::All.
+   */
+  virtual LayerStyleContentSource contentSource() const {
+    return LayerStyleContentSource::All;
   }
 
   /**

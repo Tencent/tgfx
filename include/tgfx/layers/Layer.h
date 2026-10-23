@@ -597,6 +597,32 @@ class Layer : public std::enable_shared_from_this<Layer> {
    */
   virtual std::optional<StyledShape> onGetContentShape();
 
+  /**
+   * Returns the shape of this layer's own geometry, i.e. the outline of its content without its
+   * descendants and, for layer types that hold geometries no painter captures, of those geometries
+   * as well. The base class returns nullopt; layer types whose own geometry is exactly a vector
+   * shape override this. An override may still return nullopt when the geometry cannot be expressed
+   * as a single StyledShape, as with onGetContentShape().
+   */
+  virtual std::optional<StyledShape> onGetOwnGeometryShape();
+
+  /**
+   * Returns the local bounds of the geometries this layer holds although no painter captured them.
+   * They are not part of the content, so the layer bounds have to join them explicitly; without that
+   * a style drawing from the own geometry would have no bounds to cover. The base class returns an
+   * empty rect; layer types that can hold such geometries override this.
+   */
+  virtual Rect onGetOwnGeometryBounds();
+
+  /**
+   * Draws the geometries of this layer that no painter captured. They paint nothing as content, but
+   * they still belong to the layer's own geometry, so a style drawing from the own geometry covers
+   * them. No anti-alias flag is taken: opaque recording forces hard edges on every brush, so the
+   * edge policy is fixed and asking the layer for one would have no effect. The base class draws
+   * nothing; layer types that can hold such geometries override this.
+   */
+  virtual void onDrawOwnGeometry(Canvas* canvas);
+
  private:
   /**
    * Marks the layer as needing to be redrawn. Unlike invalidateContent(), this method only marks
@@ -697,6 +723,12 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<Image> getContentContourImage(const DrawArgs& args, float contentScale,
                                                 Point* offset, bool* contourMatchesContent);
 
+  // Records the layer's own geometry: the contour of its own content (0-alpha painters included)
+  // plus the geometries no painter captured. Used as the content of styles that must cover the
+  // layer's own geometry rather than its rendered content.
+  std::shared_ptr<Image> getOwnGeometryImage(const DrawArgs& args, float contentScale,
+                                             Point* offset);
+
   bool hasValidMask() const;
 
   void updateRenderBounds(std::shared_ptr<RegionTransformer> transformer = nullptr,
@@ -738,6 +770,11 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void updateStaticSubtreeFlags();
 
   std::optional<StyledShape> getContentShape();
+
+  std::optional<StyledShape> getOwnGeometryShape();
+
+  // Whether one of the layer styles declares the layer's own geometry as its content.
+  bool hasOwnGeometryContentStyle() const;
 
   struct {
     bool dirtyContent : 1;        // layer's content needs updating

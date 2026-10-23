@@ -59,7 +59,7 @@ Rect DrawContent::getBounds() const {
   return bounds;
 }
 
-void DrawContent::drawContour(Canvas* canvas, bool antiAlias) const {
+void DrawContent::drawContourInternal(Canvas* canvas, bool antiAlias) const {
   Paint paint = {};
   paint.setAntiAlias(antiAlias);
   if (stroke) {

@@ -57,7 +57,7 @@ void MatrixContent::drawForeground(Canvas* canvas, float alpha, bool antiAlias) 
   content->drawForeground(canvas, alpha, antiAlias);
 }
 
-void MatrixContent::drawContour(Canvas* canvas, bool antiAlias) const {
+void MatrixContent::drawContourInternal(Canvas* canvas, bool antiAlias) const {
   AutoCanvasRestore autoRestore(canvas);
   canvas->concat(matrix);
   content->drawContour(canvas, antiAlias);

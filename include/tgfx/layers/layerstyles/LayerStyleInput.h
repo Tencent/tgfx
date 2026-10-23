@@ -38,7 +38,7 @@ class StyleInputSource {
   enum class Type {
     /** A plain image source, such as the background content below the layer. */
     Base,
-    /** A contour source that additionally carries the layer's vector shape. */
+    /** A contour source that additionally carries the shared contour's vector shape. */
     Contour
   };
 
@@ -107,8 +107,9 @@ class ContourInputSource : public StyleInputSource {
  */
 struct LayerStyleInput {
   /**
-   * The opaque layer content image. Rendered with normal fills, then all semi-transparent pixels
-   * are converted to fully opaque (fully transparent pixels are preserved).
+   * The main raster this style resolves: the layer's own geometry when the style declares
+   * LayerStyleContentSource::Geometry and the layer records one, the shared contour when it records
+   * none, and the shared content for every other style. Opaque, as described by OpaqueContext.
    */
   std::shared_ptr<Image> content = nullptr;
 
@@ -126,10 +127,17 @@ struct LayerStyleInput {
 
   /**
    * Extra sources requested by LayerStyle::extraSourceType() flags. Each source is an independent
-   * StyleInputSource (or ContourInputSource for contour sources). Use findExtraSource() to
+   * StyleInputSource, or a ContourInputSource for the shared contour. Use findExtraSource() to
    * retrieve a source by type.
    */
   std::vector<std::shared_ptr<StyleInputSource>> extraSources = {};
+
+  /**
+   * The vector shape of the layer's own geometry, matching `content` when it is the own-geometry
+   * recording. Absent when the style does not declare LayerStyleContentSource::Geometry, when the
+   * layer records no own geometry, or when the geometry cannot be expressed as a single StyledShape.
+   */
+  std::optional<StyledShape> ownShape = std::nullopt;
 
   /**
    * Returns the extra source with the specified type, or nullptr when it was not requested or

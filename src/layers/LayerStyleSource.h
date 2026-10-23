@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <optional>
+#include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Image.h"
@@ -27,6 +28,7 @@
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/layers/layerstyles/LayerStyle.h"
 #include "tgfx/layers/layerstyles/StyledShape.h"
 
 namespace tgfx {
@@ -43,13 +45,73 @@ struct LayerStyleSourceEntry {
 
 /**
  * Pairs the content image with the optional contour image for a specific excludeChildEffects
- * bucket. content is always populated; contour is only present when at least one Contour-sourced
- * LayerStyle in this bucket requires a distinct contour image.
+ * bucket. content.image is populated only when some style in the bucket draws from the shared
+ * content; a bucket whose styles all declare LayerStyleContentSource::Geometry leaves it null, as
+ * does a bucket kept alive by such a style whose layer paints nothing. contour is only present when
+ * at least one Contour-sourced LayerStyle in this bucket requires a distinct contour image, or when
+ * it holds the lazy fallback recording of a bucket whose own geometry is empty.
  */
 struct LayerStyleSourceGroup {
   LayerStyleSourceEntry content = {};
   std::optional<LayerStyleSourceEntry> contour = std::nullopt;
+
+  // The layer's own geometry: its content recorded without descendants, keeping the painters with
+  // alpha=0, plus the geometries no painter captured. Recorded when the bucket carries a style whose
+  // contentSource() is Geometry, so a layer that paints nothing still has coverage.
+  std::optional<LayerStyleSourceEntry> ownGeometry = std::nullopt;
+
+  // Shape of the same own geometry, matching ownGeometry the way contentShape matches content.
+  std::optional<StyledShape> ownShape = std::nullopt;
 };
+
+/**
+ * Returns whether the style declares the layer's own geometry as its content.
+ */
+inline bool NeedsOwnGeometry(const LayerStyle* style) {
+  DEBUG_ASSERT(style != nullptr);
+  return style->contentSource() == LayerStyleContentSource::Geometry;
+}
+
+/**
+ * Resolves the entry a consumer must use as LayerStyleInput.content: a style declaring
+ * LayerStyleContentSource::Geometry gets the layer's own geometry (with the fallbacks described
+ * there), every other style keeps the shared content.
+ *
+ * Returns nullptr when the entry carries no image, and the caller must then skip the style.
+ */
+inline const LayerStyleSourceEntry* ResolveContentEntry(const LayerStyleSourceGroup& group,
+                                                        const LayerStyle* style) {
+  DEBUG_ASSERT(style != nullptr);
+  if (NeedsOwnGeometry(style)) {
+    if (group.ownGeometry.has_value() && group.ownGeometry->image != nullptr) {
+      return &*group.ownGeometry;
+    }
+    // Only reached when the own recording is empty, e.g. the geometry all lives in child layers.
+    // The shared contour answers for it because a retained 0%-alpha fill survives only there:
+    // `content` drops painters with alpha <= 0, `contour` keeps them.
+    if (group.contour.has_value() && group.contour->image != nullptr) {
+      return &*group.contour;
+    }
+    return nullptr;
+  }
+  return group.content.image != nullptr ? &group.content : nullptr;
+}
+
+/**
+ * Resolves the own-geometry shape handed to a style. Only a style that declares
+ * LayerStyleContentSource::Geometry consumes the layer's own geometry, and a group may carry the
+ * shape for a sibling in the same excludeChildEffects bucket, so every other style must receive an
+ * empty shape: its content is the shared recording, and pairing it with an own shape that does not
+ * describe that content would make it read bounds it never drew.
+ */
+inline std::optional<StyledShape> ResolveOwnShape(const LayerStyleSourceGroup& group,
+                                                  const LayerStyle* style) {
+  DEBUG_ASSERT(style != nullptr);
+  if (!NeedsOwnGeometry(style)) {
+    return std::nullopt;
+  }
+  return group.ownShape;
+}
 
 /**
  * Shared drawing inputs for all LayerStyles attached to a Layer. groups[0] covers styles whose
@@ -62,6 +124,8 @@ struct LayerStyleSource {
 
   // groups[0]: excludeChildEffects = false
   // groups[1]: excludeChildEffects = true
+  // A bucket that recorded nothing usable is left null while the source itself stays non-null and
+  // the other bucket may still be populated, so every reader must test its group before using it.
   std::unique_ptr<LayerStyleSourceGroup> groups[2] = {};
 
   // Simplified content shape of the layer for LayerStyles that need vector access (e.g. shadow
