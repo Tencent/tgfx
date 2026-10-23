@@ -4250,6 +4250,90 @@ TGFX_TEST_PRIVATE(LayerTest, GlassStyleDeclaresOwnGeometryContentSource) {
                       << "a non-Geometry style in the same bucket still needs the shared content";)
 }
 
+// The own-geometry raster and shape of a layer never depend on the excludeChildEffects bucket: the
+// recording reads the layer's own content, its own paint, the edge-antialiasing flag and the
+// destination color space only. One recording therefore serves both buckets, and the shared image
+// pointer is the observable proof -- recording per bucket again would hand each group its own image.
+TGFX_TEST_PRIVATE(LayerTest, LayerStyleOwnGeometryRecordedOnceForBothBuckets) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto layer = VectorLayer::Make();
+  auto shape = Rectangle::Make();
+  shape->setPosition({50.0f, 40.0f});
+  shape->setSize({100.0f, 80.0f});
+  shape->setRoundness(12.0f);
+  auto group = VectorGroup::Make();
+  group->setElements({shape, FillStyle::Make(SolidColor::Make(Color::White()))});
+  layer->setContents({group});
+  // Two Geometry-sourced styles landing in the two different buckets, so both buckets need the own
+  // geometry and the recording above must serve both.
+  auto seesChildren = GlassStyle::Make(0, 50, 100, 0, 0, 0, 0);
+  seesChildren->setExcludeChildEffects(false);
+  auto seesOwnOnly = GlassStyle::Make(0, 50, 100, 0, 0, 0, 0);
+  seesOwnOnly->setExcludeChildEffects(true);
+  layer->setLayerStyles({seesChildren, seesOwnOnly});
+
+  DrawArgs drawArgs(context);
+  TGFX_PRIVATE_ACCESS(
+      auto source = layer->getLayerStyleSource(drawArgs, Matrix::I());
+      ASSERT_TRUE(source != nullptr);
+      ASSERT_TRUE(source->groups[0] != nullptr) << "the excludeChildEffects=false bucket";
+      ASSERT_TRUE(source->groups[1] != nullptr) << "the excludeChildEffects=true bucket";
+      ASSERT_TRUE(source->groups[0]->ownGeometry.has_value());
+      ASSERT_TRUE(source->groups[1]->ownGeometry.has_value());
+      EXPECT_EQ(source->groups[0]->ownGeometry->image, source->groups[1]->ownGeometry->image)
+      << "both buckets must share one own-geometry recording";
+      EXPECT_EQ(source->groups[0]->ownGeometry->offset, source->groups[1]->ownGeometry->offset);
+      EXPECT_TRUE(source->groups[0]->ownShape.has_value());
+      EXPECT_TRUE(source->groups[1]->ownShape.has_value());)
+}
+
+// The contrast that keeps the hoisting honest: a layer whose geometry lives in its children records
+// no own geometry, and the lazy contour fallback that answers for it does read
+// drawArgs.excludeEffects. That fallback must therefore stay per bucket, so the two groups hold two
+// distinct images and hoisting it too would silently collapse them into one.
+TGFX_TEST_PRIVATE(LayerTest, LayerStyleOwnGeometryFallbackStaysPerBucket) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // The parent paints nothing itself: every painter lives in a child layer.
+  auto parent = Layer::Make();
+  auto child = VectorLayer::Make();
+  auto shape = Rectangle::Make();
+  shape->setPosition({50.0f, 40.0f});
+  shape->setSize({100.0f, 80.0f});
+  shape->setRoundness(12.0f);
+  auto group = VectorGroup::Make();
+  group->setElements({shape, FillStyle::Make(SolidColor::Make(Color::White()))});
+  child->setContents({group});
+  parent->addChild(child);
+  auto seesChildren = GlassStyle::Make(0, 50, 100, 0, 0, 0, 0);
+  seesChildren->setExcludeChildEffects(false);
+  auto seesOwnOnly = GlassStyle::Make(0, 50, 100, 0, 0, 0, 0);
+  seesOwnOnly->setExcludeChildEffects(true);
+  parent->setLayerStyles({seesChildren, seesOwnOnly});
+
+  DrawArgs drawArgs(context);
+  TGFX_PRIVATE_ACCESS(
+      auto source = parent->getLayerStyleSource(drawArgs, Matrix::I());
+      ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
+      ASSERT_TRUE(source->groups[1] != nullptr);
+      EXPECT_FALSE(source->groups[0]->ownGeometry.has_value())
+      << "a layer painting nothing must not record own geometry, otherwise the fallback below is "
+         "never reached";
+      EXPECT_FALSE(source->groups[1]->ownGeometry.has_value());
+      ASSERT_TRUE(source->groups[0]->contour.has_value());
+      ASSERT_TRUE(source->groups[1]->contour.has_value());
+      ASSERT_TRUE(source->groups[0]->contour->image != nullptr);
+      ASSERT_TRUE(source->groups[1]->contour->image != nullptr);
+      EXPECT_NE(source->groups[0]->contour->image.get(), source->groups[1]->contour->image.get())
+      << "the lazy fallback reads excludeChildEffects, so it must stay recorded per bucket; one "
+         "shared image here means the fallback was hoisted along with the own geometry";)
+}
+
 // ===== The layer's own geometry: coverage asserted on rendered pixels =====
 //
 // A Glass style takes its coverage shape from the layer's own geometry, so the cases below are
