@@ -16,9 +16,6 @@
 #ifndef HAS_RUNTIME_CLIP
 #define HAS_RUNTIME_CLIP 0
 #endif
-#ifndef HAS_DEVICE_MASK
-#define HAS_DEVICE_MASK 0
-#endif
 #ifndef HAS_RUNTIME_DEVICE_MASK
 #define HAS_RUNTIME_DEVICE_MASK 0
 #endif
@@ -32,10 +29,6 @@
     float _maskAlpha = texture(MaskTextureSampler, _maskCoord.xy).r;
     _coverageResult *= _maskAlpha;
   }
-  #elif HAS_DEVICE_MASK
-    highp vec3 _maskCoord = DeviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0);
-    float _maskAlpha = texture(MaskTextureSampler, _maskCoord.xy).r;
-    _coverageResult *= _maskAlpha;
   #endif
 
   if (HasClip != 0) {
