@@ -55,7 +55,8 @@ enum class LayerStyleExtraSourceType : uint32_t {
 };
 
 /**
- * Declares where a layerStyle takes its content image from.
+ * Declares which recording a layerStyle consumes as its content: whichever one contentSource()
+ * names, so the style reads that recording instead of a separate per-style raster.
  */
 enum class LayerStyleContentSource {
   /**
