@@ -97,4 +97,10 @@ bool IsChainQuadSubsetServable(const QuadPerEdgeAAGeometryProcessor* quadGP,
 /// Extracts the RoundStrokeRect rule inputs from the draw's geometry processor.
 std::optional<RoundStrokeRectInputs> ExtractRoundStrokeRect(const ProgramInfo* programInfo);
 
+/// Each family's Match opens with this guard: a kernel that does not apply the write swizzle at
+/// output (ServesAlphaOnly == false) refuses draws onto alpha-only (ALPHA_8) targets, so the
+/// predicate and the family's declared capability cannot drift apart. The dispatch's alpha-only
+/// gate and the debug audit both rely on this agreement.
+bool RejectsAlphaOnlyTarget(bool servesAlphaOnly, const ProgramInfo* programInfo);
+
 }  // namespace tgfx

@@ -29,6 +29,9 @@ namespace tgfx {
 // draw's shape maps onto the permutation indices. The pass-through shape (one HAS_XP axis fed by
 // the XferProcessor type) needs no Inputs struct and no Compose function.
 std::optional<PermutationMatchResult> SolidColorFillShader::Match(const ProgramInfo* programInfo) {
+  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    return std::nullopt;
+  }
   auto gp = programInfo->getGeometryProcessor();
   if (gp->name() != "DefaultGeometryProcessor") {
     return std::nullopt;

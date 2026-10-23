@@ -26,6 +26,9 @@
 namespace tgfx {
 
 std::optional<PermutationMatchResult> EllipseFillShader::Match(const ProgramInfo* programInfo) {
+  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    return std::nullopt;
+  }
   auto gp = programInfo->getGeometryProcessor();
   if (gp->name() != "EllipseGeometryProcessor") {
     return std::nullopt;

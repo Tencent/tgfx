@@ -27,6 +27,9 @@
 namespace tgfx {
 
 std::optional<PermutationMatchResult> GaussianBlur1DShader::Match(const ProgramInfo* programInfo) {
+  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    return std::nullopt;
+  }
   auto gp = programInfo->getGeometryProcessor();
   int gpType = GetGPType(gp);
   if (gpType < 0) {

@@ -28,6 +28,9 @@ namespace tgfx {
 
 std::optional<PermutationMatchResult> RoundStrokeRectFillShader::Match(
     const ProgramInfo* programInfo) {
+  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    return std::nullopt;
+  }
   auto inputs = ExtractRoundStrokeRect(programInfo);
   if (!inputs) {
     return std::nullopt;

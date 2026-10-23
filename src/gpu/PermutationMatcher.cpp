@@ -71,6 +71,10 @@ std::optional<PermutationMatchResult> Fail(PermutationMatchFailure reason) {
   return std::nullopt;
 }
 
+bool RejectsAlphaOnlyTarget(bool servesAlphaOnly, const ProgramInfo* programInfo) {
+  return !servesAlphaOnly && programInfo->getOutputSwizzle() == Swizzle::AAAA();
+}
+
 // Returns 0 for EmptyXferProcessor, 1 for PorterDuffXferProcessor with dst texture (DST_TEX mode),
 // 2 for PorterDuffXferProcessor with framebuffer fetch, or -1 for unsupported XP types.
 int GetXPType(const ProgramInfo* programInfo) {
@@ -389,104 +393,56 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
     return Fail(PermutationMatchFailure::GlGateRejected);
   }
 
-  // MatchPermutation already refused every write swizzle other than RGBA and alpha-only (AAAA).
-  if (programInfo->getOutputSwizzle() == Swizzle::AAAA()) {
-    // Alpha-only targets: only the kernels that apply the write swizzle at output (via the
-    // OutputAlphaSwizzle uniform) may serve the draw. Other kernels assume RGBA output. The
-    // gaussian blur kernel applies it too (an alpha-only blur pass writes its mask accumulation
-    // through the AAAA swizzle), with the AlphaChild flag carrying the .rrrr readback.
-    if (auto result = SolidColorFillShader::Match(programInfo)) {
-      return result;
-    }
-    if (auto result = MaskFillShader::Match(programInfo)) {
-      return result;
-    }
-    if (auto result = QuadTextureFillShader::Match(programInfo)) {
-      return result;
-    }
-    if (auto result = GaussianBlur1DShader::Match(programInfo)) {
-      return result;
-    }
-    // The pointwise kernels now carry the OutputAlphaSwizzle uniform (output_swizzle.inc), so a
-    // chain-serving draw onto an alpha-only target — a const-color or gradient mask pass, the
-    // largest remaining libpag gap — is served by the same variants as the RGBA case.
-    if (auto result = PointwiseChainShader::Match(programInfo)) {
-      return result;
-    }
-    return Fail(PermutationMatchFailure::NoMatchingFamily);
-  }
-  if (auto result = QuadColorFillShader::Match(programInfo)) {
-    return result;
-  }
-  if (auto result = QuadTextureFillShader::Match(programInfo)) {
-    return result;
-  }
-  if (auto result = YUVTextureFillShader::Match(programInfo)) {
-    return result;
-  }
-  if (auto result = TiledTextureFillShader::Match(programInfo)) {
-    return result;
-  }
-  if (auto result = SolidColorFillShader::Match(programInfo)) {
-    return result;
-  }
-  if (auto result = MaskFillShader::Match(programInfo)) {
-    return result;
-  }
-  if (auto result = PointwiseChainShader::Match(programInfo)) {
-    return result;
-  }
-  if (auto result = TexturedEffectShader::Match(programInfo)) {
-    return result;
-  }
+  // Alpha-only (AAAA, Swizzle::ForWrite(ALPHA_8)) targets: only the kernels that apply the write
+  // swizzle at output (via the OutputAlphaSwizzle uniform) may serve the draw; the others assume
+  // RGBA output. Which kernels those are is each family's own ServesAlphaOnly declaration. The
+  // pointwise kernels carry the swizzle (output_swizzle.inc), so a chain-serving draw onto an
+  // alpha-only target — a const-color or gradient mask pass, the largest remaining libpag gap —
+  // is served by the same variants as the RGBA case. The gaussian blur kernel applies it too (an
+  // alpha-only blur pass writes its mask accumulation through the AAAA swizzle, with the
+  // AlphaChild flag carrying the .rrrr readback).
+  const bool alphaOnly = programInfo->getOutputSwizzle() == Swizzle::AAAA();
 
-  if (auto result = PerlinNoiseFillShader::Match(programInfo)) {
-    return result;
+#ifndef NDEBUG
+  // Audit pass (debug builds only): ask every family — including the ones the alpha-only gate
+  // below skips — and do not stop at the first acceptor. Two invariants, each a silent bug when
+  // violated (the dispatch order would decide the winner):
+  //   1. at most one family accepts a given draw;
+  //   2. a family that does not declare ServesAlphaOnly never accepts an alpha-only draw, which
+  //      catches a kernel gaining alpha support without flipping its flag.
+  // The extra Match calls are pure shape checks; the thread-local failure reason they may record
+  // is saved and restored so the rejection accounting is unaffected.
+  {
+    const auto savedFailure = gPendingMatchFailure;
+    int acceptors = 0;
+#define TGFX_AUDIT_FAMILY(Family)                                                       \
+  if (Family::Match(programInfo).has_value()) {                                         \
+    if (alphaOnly && !Family::ServesAlphaOnly) {                                        \
+      assert(false && #Family " accepts an alpha-only draw; flip its ServesAlphaOnly"); \
+    }                                                                                   \
+    if (++acceptors > 1) {                                                              \
+      assert(false && "multiple shader families accept the same draw");                 \
+    }                                                                                   \
   }
+    TGFX_FOR_EACH_SHADER_FAMILY(TGFX_AUDIT_FAMILY)
+#undef TGFX_AUDIT_FAMILY
+    gPendingMatchFailure = savedFailure;
+  }
+#endif
 
-  if (auto result = AtlasTextFillShader::Match(programInfo)) {
-    return result;
+  std::optional<PermutationMatchResult> accepted;
+#define TGFX_TRY_FAMILY(Family)                               \
+  if (!accepted && (!alphaOnly || Family::ServesAlphaOnly)) { \
+    if (auto result = Family::Match(programInfo)) {           \
+      accepted = result;                                      \
+    }                                                         \
   }
-  if (auto result = GaussianBlur1DShader::Match(programInfo)) {
-    return result;
+  TGFX_FOR_EACH_SHADER_FAMILY(TGFX_TRY_FAMILY)
+#undef TGFX_TRY_FAMILY
+  if (accepted) {
+    return accepted;
   }
-  if (auto result = GlassUDFTentBlurShader::Match(programInfo)) {
-    return result;
-  }
-  if (auto result = GlassRefractionShader::Match(programInfo)) {
-    return result;
-  }
-  if (auto result = HairlineLineShader::Match(programInfo)) {
-    return result;
-  }
-  if (auto result = HairlineQuadShader::Match(programInfo)) {
-    return result;
-  }
-  if (auto result = EllipseFillShader::Match(programInfo)) {
-    return result;
-  }
-  if (auto result = ComplexEllipseFillShader::Match(programInfo)) {
-    return result;
-  }
-  if (auto result = NonAARRectFillShader::Match(programInfo)) {
-    return result;
-  }
-  if (auto result = ComplexNonAARRectFillShader::Match(programInfo)) {
-    return result;
-  }
-  if (auto result = RoundStrokeRectFillShader::Match(programInfo)) {
-    return result;
-  }
-  if (auto result = ShapeInstancedTextureCoverageShader::Match(programInfo)) {
-    return result;
-  }
-  if (auto result = ShapeInstancedFillShader::Match(programInfo)) {
-    return result;
-  }
-  if (auto result = MeshFillShader::Match(programInfo)) {
-    return result;
-  }
-  return std::nullopt;
+  return alphaOnly ? Fail(PermutationMatchFailure::NoMatchingFamily) : std::nullopt;
 }
 
 // The ShaderTextureRead semantics the draw's sampled textures need. YUV planes are excluded: the

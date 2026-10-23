@@ -28,6 +28,9 @@
 namespace tgfx {
 
 std::optional<PermutationMatchResult> QuadColorFillShader::Match(const ProgramInfo* programInfo) {
+  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    return std::nullopt;
+  }
   auto gp = programInfo->getGeometryProcessor();
   if (gp->name() != "QuadPerEdgeAAGeometryProcessor") {
     return std::nullopt;

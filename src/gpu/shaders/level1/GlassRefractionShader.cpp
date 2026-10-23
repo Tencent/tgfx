@@ -32,6 +32,9 @@
 namespace tgfx {
 
 std::optional<PermutationMatchResult> GlassRefractionShader::Match(const ProgramInfo* programInfo) {
+  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    return std::nullopt;
+  }
   auto gp = programInfo->getGeometryProcessor();
   if (gp == nullptr) {
     return std::nullopt;

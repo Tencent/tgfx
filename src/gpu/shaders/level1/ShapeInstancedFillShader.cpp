@@ -29,6 +29,9 @@ namespace tgfx {
 
 std::optional<PermutationMatchResult> ShapeInstancedFillShader::Match(
     const ProgramInfo* programInfo) {
+  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    return std::nullopt;
+  }
   auto gp = programInfo->getGeometryProcessor();
   if (gp->name() != "ShapeInstancedGeometryProcessor") {
     return std::nullopt;

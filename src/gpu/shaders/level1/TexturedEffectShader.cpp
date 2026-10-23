@@ -28,6 +28,9 @@
 namespace tgfx {
 
 std::optional<PermutationMatchResult> TexturedEffectShader::Match(const ProgramInfo* programInfo) {
+  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    return std::nullopt;
+  }
   if (!IsPositionOnlyRectGP(programInfo->getGeometryProcessor())) {
     return std::nullopt;
   }

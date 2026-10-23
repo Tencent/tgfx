@@ -36,6 +36,9 @@
 namespace tgfx {
 
 std::optional<PermutationMatchResult> PointwiseChainShader::Match(const ProgramInfo* programInfo) {
+  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    return std::nullopt;
+  }
   auto gp = programInfo->getGeometryProcessor();
   // GP profiles: 0 Default, 1 Quad, 2 Mesh (whose vertex buffers follow the
   // chain's attribute order), 3 the sampler-free AtlasText twin, 4 the ellipse layout, 5 the

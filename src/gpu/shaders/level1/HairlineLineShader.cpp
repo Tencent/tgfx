@@ -26,6 +26,9 @@
 namespace tgfx {
 
 std::optional<PermutationMatchResult> HairlineLineShader::Match(const ProgramInfo* programInfo) {
+  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    return std::nullopt;
+  }
   auto gp = programInfo->getGeometryProcessor();
   if (gp->name() != "HairlineLineGeometryProcessor") {
     return std::nullopt;

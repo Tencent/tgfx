@@ -32,6 +32,9 @@ namespace tgfx {
 
 std::optional<PermutationMatchResult> ShapeInstancedTextureCoverageShader::Match(
     const ProgramInfo* programInfo) {
+  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    return std::nullopt;
+  }
   auto gp = programInfo->getGeometryProcessor();
   if (gp->name() != "ShapeInstancedGeometryProcessor" || GetXPType(programInfo) != 0) {
     return std::nullopt;

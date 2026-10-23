@@ -27,6 +27,9 @@
 namespace tgfx {
 
 std::optional<PermutationMatchResult> MaskFillShader::Match(const ProgramInfo* programInfo) {
+  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    return std::nullopt;
+  }
   auto gp = programInfo->getGeometryProcessor();
   if (gp->name() != "DefaultGeometryProcessor") {
     return std::nullopt;
