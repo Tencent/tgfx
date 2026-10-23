@@ -33,7 +33,7 @@ std::optional<PermutationMatchResult> AtlasTextFillShader::Match(const ProgramIn
     return std::nullopt;
   }
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "AtlasTextGeometryProcessor") {
+  if (gp->name() != GpClassName) {
     return std::nullopt;
   }
   if (programInfo->numColorFragmentProcessors() != 0 || programInfo->numFragmentProcessors() > 1) {

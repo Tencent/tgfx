@@ -33,7 +33,7 @@ std::optional<PermutationMatchResult> QuadTextureFillShader::Match(const Program
     return std::nullopt;
   }
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "QuadPerEdgeAAGeometryProcessor") {
+  if (gp->name() != GpClassName) {
     return std::nullopt;
   }
   // Color must be exactly one TextureEffect. Coverage is optional: a device-space mask maps to

@@ -33,7 +33,7 @@ std::optional<PermutationMatchResult> ComplexNonAARRectFillShader::Match(
     return std::nullopt;
   }
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "ComplexNonAARRectGeometryProcessor") {
+  if (gp->name() != GpClassName) {
     return std::nullopt;
   }
   if (programInfo->numFragmentProcessors() != 0) {

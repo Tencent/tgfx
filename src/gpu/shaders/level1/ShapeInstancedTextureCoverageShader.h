@@ -53,6 +53,8 @@ class ShapeInstancedTextureCoverageShader : public PrecompiledShader {
   /// the family's own .cpp, next to the GLSL it owns.
   static std::optional<PermutationMatchResult> Match(const ProgramInfo* programInfo);
 
+  // The one geometry processor this family accepts: info() reports it, Match compares against it.
+  static constexpr const char* GpClassName = "ShapeInstancedGeometryProcessor";
   PrecompiledShaderInfo info() const override {
     return {"ShapeInstancedTextureCoverageShader",
             "level1/shape_instanced_texture_coverage.vert",
@@ -60,7 +62,7 @@ class ShapeInstancedTextureCoverageShader : public PrecompiledShader {
             D::domain(),
             FD::domain(),
             PermutationDomain({}),
-            "ShapeInstancedGeometryProcessor",
+            GpClassName,
             ""};
   }
 };

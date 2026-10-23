@@ -36,7 +36,7 @@ std::optional<PermutationMatchResult> ShapeInstancedTextureCoverageShader::Match
     return std::nullopt;
   }
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "ShapeInstancedGeometryProcessor" || GetXPType(programInfo) != 0) {
+  if (gp->name() != GpClassName || GetXPType(programInfo) != 0) {
     return std::nullopt;
   }
   // Two forms: a bare coverage texture, or a single-interval gradient color FP ahead of it.

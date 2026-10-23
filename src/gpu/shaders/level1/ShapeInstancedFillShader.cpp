@@ -33,7 +33,7 @@ std::optional<PermutationMatchResult> ShapeInstancedFillShader::Match(
     return std::nullopt;
   }
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "ShapeInstancedGeometryProcessor") {
+  if (gp->name() != GpClassName) {
     return std::nullopt;
   }
   if (programInfo->numFragmentProcessors() != 0) {

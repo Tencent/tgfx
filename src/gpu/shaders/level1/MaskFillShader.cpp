@@ -31,7 +31,7 @@ std::optional<PermutationMatchResult> MaskFillShader::Match(const ProgramInfo* p
     return std::nullopt;
   }
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "DefaultGeometryProcessor") {
+  if (gp->name() != GpClassName) {
     return std::nullopt;
   }
   // Solid color (from the DefaultGP Color uniform) masked by a single alpha-only coverage

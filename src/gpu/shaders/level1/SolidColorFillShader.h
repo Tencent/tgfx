@@ -62,6 +62,8 @@ class SolidColorFillShader : public PrecompiledShader {
   /// family's own .cpp (SolidColorFillShader.cpp) next to the GLSL it owns.
   static std::optional<PermutationMatchResult> Match(const ProgramInfo* programInfo);
 
+  // The one geometry processor this family accepts: info() reports it, Match compares against it.
+  static constexpr const char* GpClassName = "DefaultGeometryProcessor";
   PrecompiledShaderInfo info() const override {
     return {"SolidColorFillShader",
             "level1/solid_color_fill.vert",
@@ -69,7 +71,7 @@ class SolidColorFillShader : public PrecompiledShader {
             VD::domain(),
             FD::domain(),
             PermutationDomain({}),
-            "",
+            GpClassName,
             ""};
   }
 };

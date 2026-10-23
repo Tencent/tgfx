@@ -33,7 +33,7 @@ std::optional<PermutationMatchResult> ComplexEllipseFillShader::Match(
     return std::nullopt;
   }
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "ComplexEllipseGeometryProcessor") {
+  if (gp->name() != GpClassName) {
     return std::nullopt;
   }
   if (programInfo->numColorFragmentProcessors() != 0) {

@@ -33,7 +33,7 @@ std::optional<PermutationMatchResult> SolidColorFillShader::Match(const ProgramI
     return std::nullopt;
   }
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "DefaultGeometryProcessor") {
+  if (gp->name() != GpClassName) {
     return std::nullopt;
   }
   // The fill color comes from the DefaultGeometryProcessor Color uniform, so a color fragment

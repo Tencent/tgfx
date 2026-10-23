@@ -30,7 +30,7 @@ std::optional<PermutationMatchResult> EllipseFillShader::Match(const ProgramInfo
     return std::nullopt;
   }
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "EllipseGeometryProcessor") {
+  if (gp->name() != GpClassName) {
     return std::nullopt;
   }
   if (programInfo->numColorFragmentProcessors() != 0) {

@@ -58,6 +58,8 @@ class AtlasTextFillShader : public PrecompiledShader {
   /// the family's own .cpp, next to the GLSL it owns.
   static std::optional<PermutationMatchResult> Match(const ProgramInfo* programInfo);
 
+  // The one geometry processor this family accepts: info() reports it, Match compares against it.
+  static constexpr const char* GpClassName = "AtlasTextGeometryProcessor";
   PrecompiledShaderInfo info() const override {
     return {"AtlasTextFillShader",
             "level1/atlas_text_fill.vert",
@@ -65,7 +67,7 @@ class AtlasTextFillShader : public PrecompiledShader {
             D::domain(),
             FD::domain(),
             PermutationDomain({}),
-            "",
+            GpClassName,
             ""};
   }
 };

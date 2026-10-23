@@ -30,7 +30,7 @@ std::optional<PermutationMatchResult> HairlineQuadShader::Match(const ProgramInf
     return std::nullopt;
   }
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "HairlineQuadGeometryProcessor") {
+  if (gp->name() != GpClassName) {
     return std::nullopt;
   }
   if (!HasNoProcessorsOrDirectClip(programInfo)) {

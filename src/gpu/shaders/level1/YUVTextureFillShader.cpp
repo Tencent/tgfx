@@ -34,7 +34,7 @@ std::optional<PermutationMatchResult> YUVTextureFillShader::Match(const ProgramI
     return std::nullopt;
   }
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "QuadPerEdgeAAGeometryProcessor") {
+  if (gp->name() != GpClassName) {
     return std::nullopt;
   }
   auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);

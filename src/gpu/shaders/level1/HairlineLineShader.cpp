@@ -30,7 +30,7 @@ std::optional<PermutationMatchResult> HairlineLineShader::Match(const ProgramInf
     return std::nullopt;
   }
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "HairlineLineGeometryProcessor") {
+  if (gp->name() != GpClassName) {
     return std::nullopt;
   }
   if (!HasNoProcessorsOrDirectClip(programInfo)) {

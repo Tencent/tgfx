@@ -55,6 +55,8 @@ class NonAARRectFillShader : public PrecompiledShader {
   /// the family's own .cpp, next to the GLSL it owns.
   static std::optional<PermutationMatchResult> Match(const ProgramInfo* programInfo);
 
+  // The one geometry processor this family accepts: info() reports it, Match compares against it.
+  static constexpr const char* GpClassName = "NonAARRectGeometryProcessor";
   PrecompiledShaderInfo info() const override {
     return {"NonAARRectFillShader",
             "level1/non_aa_rrect_fill.vert",
@@ -62,7 +64,7 @@ class NonAARRectFillShader : public PrecompiledShader {
             D::domain(),
             FD::domain(),
             PermutationDomain({}),
-            "NonAARRectGeometryProcessor",
+            GpClassName,
             ""};
   }
 };

@@ -56,6 +56,8 @@ class ComplexEllipseFillShader : public PrecompiledShader {
   /// the family's own .cpp, next to the GLSL it owns.
   static std::optional<PermutationMatchResult> Match(const ProgramInfo* programInfo);
 
+  // The one geometry processor this family accepts: info() reports it, Match compares against it.
+  static constexpr const char* GpClassName = "ComplexEllipseGeometryProcessor";
   PrecompiledShaderInfo info() const override {
     return {"ComplexEllipseFillShader",
             "level1/complex_ellipse_fill.vert",
@@ -63,7 +65,7 @@ class ComplexEllipseFillShader : public PrecompiledShader {
             D::domain(),
             FD::domain(),
             PermutationDomain({}),
-            "ComplexEllipseGeometryProcessor",
+            GpClassName,
             ""};
   }
 };

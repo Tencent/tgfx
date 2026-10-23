@@ -32,7 +32,7 @@ std::optional<PermutationMatchResult> QuadColorFillShader::Match(const ProgramIn
     return std::nullopt;
   }
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "QuadPerEdgeAAGeometryProcessor") {
+  if (gp->name() != GpClassName) {
     return std::nullopt;
   }
   // Accept either zero fragment processors, a device-space mask, or one direct analytic clip

@@ -32,7 +32,7 @@ std::optional<PermutationMatchResult> MeshFillShader::Match(const ProgramInfo* p
     return std::nullopt;
   }
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "MeshGeometryProcessor") {
+  if (gp->name() != GpClassName) {
     return std::nullopt;
   }
   if (programInfo->numFragmentProcessors() != 0) {
