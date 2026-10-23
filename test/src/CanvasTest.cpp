@@ -1718,7 +1718,15 @@ TGFX_TEST(CanvasTest, NonAARRectOp) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 500, 500);
+  constexpr int margin = 40;
+  constexpr int gap = 20;
+  constexpr int cellWidth = 160;
+  constexpr int cellHeight = 110;
+  constexpr int columns = 4;
+  constexpr int rows = 3;
+  constexpr int surfaceWidth = margin * 2 + cellWidth * columns + gap * (columns - 1);
+  constexpr int surfaceHeight = margin * 2 + cellHeight * rows + gap * (rows - 1);
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
@@ -1726,34 +1734,47 @@ TGFX_TEST(CanvasTest, NonAARRectOp) {
   // NonAARRectOp is used when antiAlias is false and no stroke.
   Paint paint;
   paint.setAntiAlias(false);
+  // Smoothness cases draw a plain (smoothness 0) underlay in this high-contrast color beneath
+  // the smoothed shape, so the inward pull of the smoothed contour shows as magenta crescents.
+  const auto underlayColor = Color{1.f, 0.f, 0.6f, 1.f};
 
-  // Single filled RRect with uniform radii.
+  // Case 1: Single filled RRect with uniform radii.
   paint.setColor(Color::Red());
-  canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(50, 50, 120, 80), 15, 15), paint);
+  canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(margin + 20, margin + 15, 120, 80), 15, 15),
+                    paint);
 
-  // Different colors and radii.
+  // Case 2: Different colors and radii.
   paint.setColor(Color::Green());
-  canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(200, 50, 150, 100), 30, 20), paint);
+  canvas->drawRRect(
+      RRect::MakeRectXY(Rect::MakeXYWH(margin + cellWidth + gap + 5, margin + 5, 150, 100), 30, 20),
+      paint);
 
-  // Ellipse-like (large corner radii).
+  // Case 3: Ellipse-like (large corner radii).
   paint.setColor(Color::Blue());
-  canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(50, 160, 100, 80), 50, 40), paint);
+  canvas->drawRRect(
+      RRect::MakeRectXY(Rect::MakeXYWH(margin + 2 * (cellWidth + gap) + 30, margin + 15, 100, 80),
+                        50, 40),
+      paint);
 
-  // Small corner radii.
+  // Case 4: Small corner radii.
   paint.setColor(Color::FromRGBA(255, 165, 0, 255));
-  canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(200, 160, 150, 100), 5, 5), paint);
+  canvas->drawRRect(
+      RRect::MakeRectXY(Rect::MakeXYWH(margin + 3 * (cellWidth + gap) + 5, margin + 5, 150, 100), 5,
+                        5),
+      paint);
 
-  // With transformation - rotation.
+  // Case 5: With transformation - rotation.
   canvas->save();
-  canvas->translate(100, 350);
+  canvas->translate(margin + cellWidth / 2, margin + cellHeight + gap + cellHeight / 2);
   canvas->rotate(15);
   paint.setColor(Color::FromRGBA(128, 0, 128, 255));
   canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(-50, -30, 100, 60), 10, 10), paint);
   canvas->restore();
 
-  // With transformation - scale.
+  // Case 6: With transformation - scale.
   canvas->save();
-  canvas->translate(280, 350);
+  canvas->translate(margin + 2 * (cellWidth + gap) + cellWidth / 2,
+                    margin + cellHeight + gap + cellHeight / 2);
   canvas->scale(1.5f, 0.8f);
   paint.setColor(Color::FromRGBA(0, 128, 128, 255));
   canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(-40, -25, 80, 50), 12, 12), paint);
@@ -1772,18 +1793,61 @@ TGFX_TEST(CanvasTest, NonAARRectOp) {
         EXPECT_EQ(rrectOp->type(), DrawOp::Type::RRectDrawOp); EXPECT_EQ(rrectOp->rectCount, 6u));
   }
 
-  // Complex RRect fill: per-corner independent radii.
+  // Case 7: Non-AA filled RRect with smoothness through the analytic smooth op.
+  const auto rect7 =
+      Rect::MakeXYWH(margin + 2 * (cellWidth + gap) + 30, margin + cellHeight + gap + 15, 100, 80);
+  paint.setColor(underlayColor);
+  canvas->drawRRect(RRect::MakeRectXY(rect7, 15, 15), paint);
+  paint.setColor(Color::FromRGBA(51, 102, 204, 255));
+  canvas->drawRRect(RRect::MakeRectXY(rect7, 15, 15, 0.6f), paint);
+  {
+    TGFX_PRIVATE_ACCESS({
+      surface->renderContext->flush();
+      auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+      auto* task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+      auto* op = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+      EXPECT_EQ(op->type(), DrawOp::Type::RRectDrawOp);
+      EXPECT_TRUE(op->hasSmoothness);
+      EXPECT_EQ(op->rectCount, 1u);
+    });
+  }
+
+  // Case 8: Non-AA Complex RRect with per-corner circular radii through the analytic smooth op.
+  const auto rect8 =
+      Rect::MakeXYWH(margin + 3 * (cellWidth + gap) + 30, margin + cellHeight + gap + 15, 100, 80);
+  const auto radii8 = std::array<Point, 4>{{{20, 20}, {8, 8}, {24, 24}, {12, 12}}};
+  paint.setColor(underlayColor);
+  canvas->drawRRect(RRect::MakeRectRadii(rect8, radii8), paint);
+  paint.setColor(Color::FromRGBA(204, 77, 51, 255));
+  auto smoothComplex = RRect::MakeRectRadii(rect8, radii8, 0.5f);
+  EXPECT_EQ(smoothComplex.type(), RRect::Type::Complex);
+  canvas->drawRRect(smoothComplex, paint);
+  {
+    TGFX_PRIVATE_ACCESS({
+      surface->renderContext->flush();
+      auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+      auto* task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+      auto* op = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+      EXPECT_EQ(op->type(), DrawOp::Type::RRectDrawOp);
+      EXPECT_TRUE(op->hasSmoothness);
+      EXPECT_EQ(op->rectCount, 1u);
+    });
+  }
+
+  // Case 9: Complex RRect fill with per-corner independent radii.
   // Simple and Complex cannot batch together (different GP and vertex layout).
   paint.setColor(Color::FromRGBA(200, 50, 50, 255));
-  auto complexFill = RRect::MakeRectRadii(Rect::MakeXYWH(50, 420, 120, 70),
-                                          {{{30, 30}, {10, 10}, {5, 5}, {20, 20}}});
+  auto complexFill = RRect::MakeRectRadii(
+      Rect::MakeXYWH(margin + 20, margin + 2 * (cellHeight + gap) + 20, 120, 70),
+      {{{30, 30}, {10, 10}, {5, 5}, {20, 20}}});
   EXPECT_EQ(complexFill.type(), RRect::Type::Complex);
   canvas->drawRRect(complexFill, paint);
 
-  // Complex RRect with a corner x-radius greater than halfWidth.
+  // Case 10: Complex RRect with a corner x-radius greater than halfWidth.
   paint.setColor(Color::FromRGBA(50, 50, 200, 255));
-  auto oversizedRRect = RRect::MakeRectRadii(Rect::MakeXYWH(220, 380, 100, 100),
-                                             {{{80, 30}, {20, 30}, {20, 30}, {80, 30}}});
+  auto oversizedRRect = RRect::MakeRectRadii(
+      Rect::MakeXYWH(margin + cellWidth + gap + 30, margin + 2 * (cellHeight + gap) + 5, 100, 100),
+      {{{80, 30}, {20, 30}, {20, 30}, {80, 30}}});
   EXPECT_EQ(oversizedRRect.type(), RRect::Type::Complex);
   canvas->drawRRect(oversizedRRect, paint);
   TGFX_PRIVATE_ACCESS({
@@ -1796,19 +1860,37 @@ TGFX_TEST(CanvasTest, NonAARRectOp) {
     EXPECT_EQ(complexOp->rectCount, 2u);
   });
 
-  // Complex RRect with diagonally overlapping corner boxes.
+  // Case 11: Complex RRect with diagonally overlapping corner boxes falls back to drawPath.
   paint.setColor(Color::FromRGBA(100, 150, 50, 255));
-  auto diagonalOverlapRRect = RRect::MakeRectRadii(Rect::MakeXYWH(370, 50, 100, 80),
-                                                   {{{60, 50}, {40, 10}, {55, 45}, {20, 20}}});
+  auto diagonalOverlapRRect =
+      RRect::MakeRectRadii(Rect::MakeXYWH(margin + 2 * (cellWidth + gap) + 30,
+                                          margin + 2 * (cellHeight + gap) + 15, 100, 80),
+                           {{{60, 50}, {40, 10}, {55, 45}, {20, 20}}});
   EXPECT_EQ(diagonalOverlapRRect.type(), RRect::Type::Complex);
   canvas->drawRRect(diagonalOverlapRRect, paint);
+  TGFX_PRIVATE_ACCESS({
+    surface->renderContext->flush();
+    auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+    auto* task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+    EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp);
+  });
 
-  // Complex RRect whose TL arc center is pushed close to the rect's BR corner.
+  // Case 12: Complex RRect whose TL arc center is pushed close to the rect's BR corner.
   paint.setColor(Color::FromRGBA(0, 120, 180, 255));
-  auto tlHeavyRRect = RRect::MakeRectRadii(Rect::MakeXYWH(370, 160, 100, 80),
-                                           {{{90, 70}, {10, 10}, {10, 10}, {10, 10}}});
+  auto tlHeavyRRect =
+      RRect::MakeRectRadii(Rect::MakeXYWH(margin + 3 * (cellWidth + gap) + 30,
+                                          margin + 2 * (cellHeight + gap) + 15, 100, 80),
+                           {{{90, 70}, {10, 10}, {10, 10}, {10, 10}}});
   EXPECT_EQ(tlHeavyRRect.type(), RRect::Type::Complex);
   canvas->drawRRect(tlHeavyRRect, paint);
+  TGFX_PRIVATE_ACCESS({
+    surface->renderContext->flush();
+    auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+    auto* task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+    auto* op = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+    EXPECT_EQ(op->type(), DrawOp::Type::RRectDrawOp);
+    EXPECT_TRUE(op->isComplex);
+  });
 
   context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/NonAARRectOp"));
@@ -1848,7 +1930,15 @@ TGFX_TEST(CanvasTest, NonAARRectOpStroke) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 500, 520);
+  constexpr int margin = 40;
+  constexpr int gap = 20;
+  constexpr int cellWidth = 160;
+  constexpr int cellHeight = 100;
+  constexpr int columns = 4;
+  constexpr int rows = 3;
+  constexpr int surfaceWidth = margin * 2 + cellWidth * columns + gap * (columns - 1);
+  constexpr int surfaceHeight = margin * 2 + cellHeight * rows + gap * (rows - 1);
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
@@ -1856,56 +1946,121 @@ TGFX_TEST(CanvasTest, NonAARRectOpStroke) {
   Paint paint;
   paint.setAntiAlias(false);
   paint.setStyle(PaintStyle::Stroke);
+  // Smoothness cases draw a plain (smoothness 0) underlay in this high-contrast color beneath
+  // the smoothed shape, so the inward pull of the smoothed contour shows as magenta crescents.
+  const auto underlayColor = Color{1.f, 0.f, 0.6f, 1.f};
 
-  // Draw stroked RRects with various stroke widths and corner radii.
-  // Top row: different stroke widths with same corner radius.
+  // Case 1-3: Different stroke widths with the same corner radius.
   paint.setColor(Color::Red());
   paint.setStroke(Stroke(4));
-  canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(50, 50, 100, 80), 20, 20), paint);
+  canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(margin + 30, margin + 10, 100, 80), 20, 20),
+                    paint);
 
   paint.setColor(Color::Green());
   paint.setStroke(Stroke(8));
-  canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(180, 50, 100, 80), 20, 20), paint);
+  canvas->drawRRect(
+      RRect::MakeRectXY(Rect::MakeXYWH(margin + cellWidth + gap + 30, margin + 10, 100, 80), 20,
+                        20),
+      paint);
 
   paint.setColor(Color::Blue());
   paint.setStroke(Stroke(16));
-  canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(310, 50, 100, 80), 20, 20), paint);
+  canvas->drawRRect(
+      RRect::MakeRectXY(Rect::MakeXYWH(margin + 2 * (cellWidth + gap) + 30, margin + 10, 100, 80),
+                        20, 20),
+      paint);
 
-  // Middle row: different corner radii with same stroke width.
+  // Case 4: Stroke with smoothness stays on the analytic smooth op when the stroke width does
+  // not exceed the corner radius; the ring is evaluated from the same signed distance field.
+  const auto rect4 = Rect::MakeXYWH(margin + 3 * (cellWidth + gap) + 30, margin + 10, 100, 80);
+  paint.setStroke(Stroke(4));
+  paint.setColor(underlayColor);
+  canvas->drawRRect(RRect::MakeRectXY(rect4, 15, 15), paint);
+  paint.setColor(Color::FromRGBA(51, 102, 204, 255));
+  canvas->drawRRect(RRect::MakeRectXY(rect4, 15, 15, 0.6f), paint);
+  TGFX_PRIVATE_ACCESS({
+    surface->renderContext->flush();
+    auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+    auto* task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+    auto* op = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+    EXPECT_EQ(op->type(), DrawOp::Type::RRectDrawOp);
+    EXPECT_TRUE(op->hasSmoothness);
+    EXPECT_TRUE(op->hasStroke);
+  });
+
+  // Case 5-7: Different corner radii with the same stroke width.
   paint.setColor(Color::FromRGBA(255, 128, 0));
   paint.setStroke(Stroke(8));
-  canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(50, 180, 100, 80), 10, 10), paint);
+  canvas->drawRRect(
+      RRect::MakeRectXY(Rect::MakeXYWH(margin + 30, margin + cellHeight + gap + 10, 100, 80), 10,
+                        10),
+      paint);
 
   paint.setColor(Color::FromRGBA(128, 0, 255));
-  canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(180, 180, 100, 80), 30, 30), paint);
+  canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(margin + cellWidth + gap + 30,
+                                                     margin + cellHeight + gap + 10, 100, 80),
+                                      30, 30),
+                    paint);
 
   paint.setColor(Color::FromRGBA(0, 128, 128));
-  canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(310, 180, 100, 80), 50, 40), paint);
+  canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(margin + 2 * (cellWidth + gap) + 30,
+                                                     margin + cellHeight + gap + 10, 100, 80),
+                                      50, 40),
+                    paint);
 
-  // Third row left: stroke that covers entire corner (thick stroke with small radius).
+  // Case 8: Complex RRect stroke whose width exceeds the smallest corner radius (24 > 10)
+  // falls back to drawPath; the Newton distance solver is only convergent within the width
+  // threshold.
+  const auto rect8 =
+      Rect::MakeXYWH(margin + 3 * (cellWidth + gap) + 30, margin + cellHeight + gap + 10, 100, 80);
+  const auto radii8 = std::array<Point, 4>{{{15, 15}, {10, 10}, {20, 20}, {12, 12}}};
+  paint.setStroke(Stroke(24));
+  paint.setColor(underlayColor);
+  canvas->drawRRect(RRect::MakeRectRadii(rect8, radii8), paint);
+  paint.setColor(Color::FromRGBA(204, 77, 51, 255));
+  auto smoothComplexStroke = RRect::MakeRectRadii(rect8, radii8, 0.5f);
+  EXPECT_EQ(smoothComplexStroke.type(), RRect::Type::Complex);
+  canvas->drawRRect(smoothComplexStroke, paint);
+  TGFX_PRIVATE_ACCESS({
+    surface->renderContext->flush();
+    auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+    auto* task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+    EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp);
+  });
+
+  // Case 9: Stroke that covers the entire corner (thick stroke with small radius).
   paint.setColor(Color::FromRGBA(128, 128, 0));
   paint.setStroke(Stroke(20));
-  canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(100, 300, 150, 60), 10, 10), paint);
+  canvas->drawRRect(
+      RRect::MakeRectXY(Rect::MakeXYWH(margin + 5, margin + 2 * (cellHeight + gap) + 20, 150, 60),
+                        10, 10),
+      paint);
 
-  // Third row right: stroke on a plain rect (no corner radius).
+  // Case 10: Stroke on a plain rect (no corner radius).
   // Note: radii < 0.5 causes Canvas::drawRRect to redirect to drawRect (RectDrawOp path).
   paint.setColor(Color::FromRGBA(0, 64, 128));
   paint.setStroke(Stroke(6));
-  canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(300, 300, 120, 60), 0, 0), paint);
+  canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(margin + cellWidth + gap + 20,
+                                                     margin + 2 * (cellHeight + gap) + 20, 120, 60),
+                                      0, 0),
+                    paint);
 
-  // Fourth row: Complex RRect stroke with per-corner independent radii.
+  // Case 11: Complex RRect stroke with per-corner independent radii.
   paint.setColor(Color::FromRGBA(0, 160, 0, 255));
   paint.setStroke(Stroke(6));
-  auto complexStroke = RRect::MakeRectRadii(Rect::MakeXYWH(50, 400, 100, 60),
-                                            {{{15, 11}, {20, 13}, {18, 16}, {12, 9}}});
+  auto complexStroke =
+      RRect::MakeRectRadii(Rect::MakeXYWH(margin + 2 * (cellWidth + gap) + 30,
+                                          margin + 2 * (cellHeight + gap) + 20, 100, 60),
+                           {{{15, 11}, {20, 13}, {18, 16}, {12, 9}}});
   EXPECT_EQ(complexStroke.type(), RRect::Type::Complex);
   canvas->drawRRect(complexStroke, paint);
 
-  // Fourth row, column 2: Complex stroke with a corner radius greater than halfWidth
-  // and halfHeight.
+  // Case 12: Complex stroke with a corner radius greater than halfWidth and halfHeight.
   paint.setColor(Color::FromRGBA(0, 80, 200, 255));
-  auto oversizedRRect = RRect::MakeRectRadii(Rect::MakeXYWH(180, 400, 100, 60),
-                                             {{{70, 35}, {20, 15}, {20, 15}, {30, 25}}});
+  auto oversizedRRect =
+      RRect::MakeRectRadii(Rect::MakeXYWH(margin + 3 * (cellWidth + gap) + 30,
+                                          margin + 2 * (cellHeight + gap) + 20, 100, 60),
+                           {{{70, 35}, {20, 15}, {20, 15}, {30, 25}}});
   EXPECT_EQ(oversizedRRect.type(), RRect::Type::Complex);
   canvas->drawRRect(oversizedRRect, paint);
   TGFX_PRIVATE_ACCESS({
@@ -2141,19 +2296,21 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   constexpr int gap = 30;
   constexpr int cellWidth = 100;
   constexpr int cellHeight = 80;
-  constexpr int columns = 3;
-  constexpr int rows = 4;
+  constexpr int columns = 4;
+  constexpr int rows = 6;
   constexpr int surfaceWidth = margin * 2 + cellWidth * columns + gap * (columns - 1);
   constexpr int surfaceHeight = margin * 2 + cellHeight * rows + gap * (rows - 1);
   auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
-  canvas->clear(Color::White());
 
   Paint fillPaint;
   Paint strokePaint;
   strokePaint.setStyle(PaintStyle::Stroke);
   const auto rect = Rect::MakeXYWH(0, 0, cellWidth, cellHeight);
+  // Smoothness cases draw a plain (smoothness 0) underlay in this high-contrast color beneath
+  // the smoothed shape, so the inward pull of the smoothed contour shows as red crescents.
+  const auto underlayColor = Color{1.f, 0.f, 0.f, 1.f};
 
   // Case 1: Complex filled RRect drawing and RRect batching strategy.
   canvas->save();
@@ -2216,7 +2373,7 @@ TGFX_TEST(CanvasTest, AARRectOp) {
 
   // Case 4: Stroked RRect fallback from the anisotropic stroke curvature check.
   canvas->save();
-  canvas->translate(margin, margin + cellHeight + gap);
+  canvas->translate(margin + 3 * (cellWidth + gap), margin);
   strokePaint.setStroke(Stroke(12));
   strokePaint.setColor(Color::FromRGBA(255, 128, 0));
   auto rRect4 = RRect::MakeRectRadii(rect, {{{22, 11}, {17, 13}, {19, 15}, {14, 9}}});
@@ -2234,7 +2391,7 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   // Case 5: Complex stroked RRect that passes all fallback checks.
   const auto rRect5Radii = std::array<Point, 4>{{{10, 10}, {25, 15}, {15, 20}, {20, 25}}};
   canvas->save();
-  canvas->translate(margin + cellWidth + gap, margin + cellHeight + gap);
+  canvas->translate(margin, margin + cellHeight + gap);
   strokePaint.setStroke(Stroke(4));
   strokePaint.setColor(Color::FromRGBA(128, 0, 255));
   auto rRect5 = RRect::MakeRectRadii(rect, rRect5Radii);
@@ -2253,7 +2410,7 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   // Case 6: Case 5 under non-uniform scale and rotation, verifying the RRect draw path still
   // works correctly.
   canvas->save();
-  canvas->translate(margin + 2 * (cellWidth + gap) + cellWidth / 2,
+  canvas->translate(margin + cellWidth + gap + cellWidth / 2,
                     margin + cellHeight + gap + cellHeight / 2);
   canvas->scale(0.9f, 0.8f);
   canvas->rotate(15);
@@ -2274,7 +2431,8 @@ TGFX_TEST(CanvasTest, AARRectOp) {
   // Case 7: Case 5 rotated by the special 90-degree angle, verifying the RRect draw path still
   // works correctly.
   canvas->save();
-  canvas->translate(margin + cellWidth / 2, margin + 2 * (cellHeight + gap) + cellHeight / 2);
+  canvas->translate(margin + 2 * (cellWidth + gap) + cellWidth / 2,
+                    margin + cellHeight + gap + cellHeight / 2);
   canvas->rotate(90);
   canvas->translate(-cellWidth / 2, -cellHeight / 2);
   auto rRect7 = RRect::MakeRectRadii(rect, rRect5Radii);
@@ -2292,7 +2450,7 @@ TGFX_TEST(CanvasTest, AARRectOp) {
 
   // Case 8: Filled RRect fallback triggered by a sharp (zero-radius) corner.
   canvas->save();
-  canvas->translate(margin + cellWidth + gap, margin + 2 * (cellHeight + gap));
+  canvas->translate(margin + 3 * (cellWidth + gap), margin + cellHeight + gap);
   fillPaint.setColor(Color::FromRGBA(0, 160, 160));
   auto rRect8 = RRect::MakeRectRadii(rect, {{{0, 0}, {20, 13}, {18, 16}, {12, 9}}});
   EXPECT_EQ(rRect8.type(), RRect::Type::Complex);
@@ -2308,7 +2466,7 @@ TGFX_TEST(CanvasTest, AARRectOp) {
 
   // Case 9: Stroked RRect fallback triggered by a sharp (zero-radius) corner.
   canvas->save();
-  canvas->translate(margin + 2 * (cellWidth + gap), margin + 2 * (cellHeight + gap));
+  canvas->translate(margin, margin + 2 * (cellHeight + gap));
   strokePaint.setStroke(Stroke(4));
   strokePaint.setColor(Color::FromRGBA(160, 80, 0));
   auto rRect9 = RRect::MakeRectRadii(rect, {{{20, 13}, {18, 16}, {0, 0}, {12, 9}}});
@@ -2325,7 +2483,7 @@ TGFX_TEST(CanvasTest, AARRectOp) {
 
   // Case 10: Filled Complex RRect fallback triggered by diagonal corner-box overlap.
   canvas->save();
-  canvas->translate(margin, margin + 3 * (cellHeight + gap));
+  canvas->translate(margin + cellWidth + gap, margin + 2 * (cellHeight + gap));
   fillPaint.setColor(Color::FromRGBA(100, 150, 50));
   auto rRect10 = RRect::MakeRectRadii(rect, {{{80, 65}, {20, 15}, {80, 65}, {15, 10}}});
   EXPECT_EQ(rRect10.type(), RRect::Type::Complex);
@@ -2342,7 +2500,7 @@ TGFX_TEST(CanvasTest, AARRectOp) {
 
   // Case 11: Filled Complex RRect whose TL arc center is pushed close to the rect's BR corner.
   canvas->save();
-  canvas->translate(margin + cellWidth + gap, margin + 3 * (cellHeight + gap));
+  canvas->translate(margin + 2 * (cellWidth + gap), margin + 2 * (cellHeight + gap));
   fillPaint.setColor(Color::FromRGBA(0, 120, 180));
   auto rRect11 = RRect::MakeRectRadii(rect, {{{90, 70}, {10, 10}, {10, 10}, {10, 10}}});
   EXPECT_EQ(rRect11.type(), RRect::Type::Complex);
@@ -2359,7 +2517,241 @@ TGFX_TEST(CanvasTest, AARRectOp) {
     });
   }
 
+  // Case 12: Simple RRect at full smoothness through the analytic smooth op. The plain
+  // underlay shows the inward pull of the smoothed corners as red crescents.
+  canvas->save();
+  canvas->translate(margin + 3 * (cellWidth + gap), margin + 2 * (cellHeight + gap));
+  fillPaint.setColor(underlayColor);
+  canvas->drawRRect(RRect::MakeRectXY(rect, 20, 20), fillPaint);
+  fillPaint.setColor(Color::White());
+  canvas->drawRRect(RRect::MakeRectXY(rect, 20, 20, 1.0f), fillPaint);
+  canvas->restore();
+  {
+    TGFX_PRIVATE_ACCESS({
+      surface->renderContext->flush();
+      auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+      auto* task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+      auto* op = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+      EXPECT_EQ(op->type(), DrawOp::Type::RRectDrawOp);
+      EXPECT_TRUE(op->hasSmoothness);
+    });
+  }
+
+  // Case 13: Stroked RRect at full smoothness with no fill. The stroke width (10) does not
+  // exceed the corner radius (20), so it stays on the analytic smooth op; the plain underlay
+  // shows the inward pull of the smoothed ring as red crescents.
+  canvas->save();
+  canvas->translate(margin + 5, margin + 3 * (cellHeight + gap) + 5);
+  strokePaint.setStroke(Stroke(10));
+  strokePaint.setColor(underlayColor);
+  canvas->drawRRect(RRect::MakeRectXY(rect, 20, 20), strokePaint);
+  strokePaint.setColor(Color::White());
+  canvas->drawRRect(RRect::MakeRectXY(rect, 20, 20, 1.0f), strokePaint);
+  canvas->restore();
+  {
+    TGFX_PRIVATE_ACCESS(surface->renderContext->flush();
+                        auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+                        auto* task =
+                            static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+                        auto* op = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+                        EXPECT_EQ(op->type(), DrawOp::Type::RRectDrawOp);
+                        EXPECT_TRUE(op->hasSmoothness); EXPECT_TRUE(op->hasStroke));
+  }
+
+  // Case 14: Diagonal overlap fallback triggered only by smoothness. The TL/BR y-radius sum of
+  // 60 fits the 80-tall rect on its own, but the smoothed footprint scale of 1.6 pushes it past
+  // the edge.
+  canvas->save();
+  canvas->translate(margin + cellWidth + gap, margin + 3 * (cellHeight + gap));
+  const auto radii14 = std::array<Point, 4>{{{30, 30}, {10, 10}, {30, 30}, {10, 10}}};
+  fillPaint.setColor(underlayColor);
+  canvas->drawRRect(RRect::MakeRectRadii(rect, radii14), fillPaint);
+  fillPaint.setColor(Color::White());
+  auto rRect14 = RRect::MakeRectRadii(rect, radii14, 0.6f);
+  EXPECT_EQ(rRect14.type(), RRect::Type::Complex);
+  canvas->drawRRect(rRect14, fillPaint);
+  canvas->restore();
+  {
+    TGFX_PRIVATE_ACCESS(surface->renderContext->flush();
+                        auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+                        auto* task =
+                            static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+                        EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp));
+  }
+
+  // Case 15: Complex RRect with per-corner circular radii through the analytic smooth op.
+  canvas->save();
+  canvas->translate(margin + 2 * (cellWidth + gap), margin + 3 * (cellHeight + gap));
+  const auto radii15 = std::array<Point, 4>{{{20, 20}, {8, 8}, {24, 24}, {12, 12}}};
+  fillPaint.setColor(underlayColor);
+  canvas->drawRRect(RRect::MakeRectRadii(rect, radii15), fillPaint);
+  fillPaint.setColor(Color::White());
+  auto rRect15 = RRect::MakeRectRadii(rect, radii15, 0.6f);
+  EXPECT_EQ(rRect15.type(), RRect::Type::Complex);
+  canvas->drawRRect(rRect15, fillPaint);
+  canvas->restore();
+  {
+    TGFX_PRIVATE_ACCESS({
+      surface->renderContext->flush();
+      auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+      auto* task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+      auto* op = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+      EXPECT_EQ(op->type(), DrawOp::Type::RRectDrawOp);
+      EXPECT_TRUE(op->hasSmoothness);
+    });
+  }
+
+  // Case 16-17: Edge competition. Smoothness reduced by edge competition with the radius
+  // intact (radius 30, smoothness 1.0), and radii scaled down after the smoothness hit zero
+  // (radius 50, smoothness 0.8). The last cell degrades to a plain rounded rect, so its
+  // contour fully covers the underlay.
+  const float edgeRadii[2] = {30.f, 50.f};
+  const float edgeSmoothness[2] = {1.0f, 0.8f};
+  const bool edgeExpectSmooth[2] = {true, false};
+  const int edgeCol[2] = {3, 0};
+  for (int i = 0; i < 2; ++i) {
+    canvas->save();
+    canvas->translate(static_cast<float>(margin + edgeCol[i] * (cellWidth + gap)),
+                      static_cast<float>(margin + (3 + i) * (cellHeight + gap)));
+    fillPaint.setColor(underlayColor);
+    canvas->drawRRect(RRect::MakeRectXY(rect, edgeRadii[i], edgeRadii[i]), fillPaint);
+    fillPaint.setColor(Color::White());
+    canvas->drawRRect(RRect::MakeRectXY(rect, edgeRadii[i], edgeRadii[i], edgeSmoothness[i]),
+                      fillPaint);
+    canvas->restore();
+    TGFX_PRIVATE_ACCESS({
+      surface->renderContext->flush();
+      auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+      auto* task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+      auto* op = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+      EXPECT_EQ(op->type(), DrawOp::Type::RRectDrawOp);
+      EXPECT_EQ(op->hasSmoothness, edgeExpectSmooth[i]);
+    });
+  }
+
+  // Case 18: The same smoothed rrect drawn through the analytic op (left) and through the CPU
+  // path fallback (right) must produce matching contours.
+  const auto contourRRect = RRect::MakeRectXY(rect, 15, 15, 0.6f);
+  canvas->save();
+  canvas->translate(margin + cellWidth + gap, margin + 4 * (cellHeight + gap));
+  fillPaint.setColor(Color::White());
+  canvas->drawRRect(contourRRect, fillPaint);
+  canvas->restore();
+  {
+    TGFX_PRIVATE_ACCESS({
+      surface->renderContext->flush();
+      auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+      auto* task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+      auto* op = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+      EXPECT_EQ(op->type(), DrawOp::Type::RRectDrawOp);
+      EXPECT_TRUE(op->hasSmoothness);
+    });
+  }
+  canvas->save();
+  canvas->translate(margin + 2 * (cellWidth + gap), margin + 4 * (cellHeight + gap));
+  Path contourPath = {};
+  contourPath.addRRect(contourRRect);
+  canvas->drawPath(contourPath, fillPaint);
+  canvas->restore();
+  {
+    TGFX_PRIVATE_ACCESS(surface->renderContext->flush();
+                        auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+                        auto* task =
+                            static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+                        EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp));
+  }
+
+  // Case 19: A non-uniform canvas scale turns circular smoothed corners into elliptical ones,
+  // which the analytic shader cannot evaluate; the result is a stretched smoothed corner via
+  // the CPU path.
+  canvas->save();
+  canvas->translate(margin + 3 * (cellWidth + gap) + cellWidth / 2,
+                    margin + 4 * (cellHeight + gap) + cellHeight / 2);
+  canvas->scale(1.25f, 0.9f);
+  canvas->translate(-cellWidth / 2, -cellHeight / 2);
+  fillPaint.setColor(underlayColor);
+  canvas->drawRRect(RRect::MakeRectXY(rect, 15, 15), fillPaint);
+  fillPaint.setColor(Color::White());
+  canvas->drawRRect(RRect::MakeRectXY(rect, 15, 15, 0.6f), fillPaint);
+  canvas->restore();
+  {
+    TGFX_PRIVATE_ACCESS(surface->renderContext->flush();
+                        auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+                        auto* task =
+                            static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+                        EXPECT_EQ(task->drawOps.back()->type(), DrawOp::Type::ShapeDrawOp));
+  }
+
+  // Case 20: Elliptical corners with smoothness go through the analytic smooth op via the
+  // scaled construction; the axis ratio of 2 is within the solver's calibrated cap.
+  canvas->save();
+  canvas->translate(margin, margin + 5 * (cellHeight + gap));
+  fillPaint.setColor(underlayColor);
+  canvas->drawRRect(RRect::MakeRectXY(rect, 20, 10), fillPaint);
+  fillPaint.setColor(Color::White());
+  canvas->drawRRect(RRect::MakeRectXY(rect, 20, 10, 0.5f), fillPaint);
+  canvas->restore();
+  {
+    TGFX_PRIVATE_ACCESS({
+      surface->renderContext->flush();
+      auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+      auto* task = static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.back().get());
+      auto* op = static_cast<RRectDrawOp*>(task->drawOps.back().get());
+      EXPECT_EQ(op->type(), DrawOp::Type::RRectDrawOp);
+      EXPECT_TRUE(op->hasSmoothness);
+      EXPECT_TRUE(op->elliptical);
+    });
+  }
+
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/AARRectOp"));
+}
+
+TGFX_TEST(CanvasTest, RRectOpBatchSmooth) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  // A grid of same-smoothness rrects with varying radii collapses into one draw op, while an
+  // interleaved plain rrect breaks the batch. The radii stay small enough that edge competition
+  // leaves the smoothness at 0.6 for every record.
+  auto surface = Surface::Make(context, 284, 284);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  Paint paint;
+  paint.setColor(Color{0.7f, 0.4f, 0.1f, 1.f});
+  constexpr int tileSize = 32;
+  size_t smoothCount = 0;
+  for (int row = 0; row < 6; ++row) {
+    for (int column = 0; column < 6; ++column) {
+      const auto x = 50.0f + static_cast<float>(column) * tileSize;
+      const auto y = 50.0f + static_cast<float>(row) * tileSize;
+      const auto size = static_cast<float>(tileSize - 8);
+      const auto radius = 4.0f + static_cast<float>((row * 6 + column) % 2) * 2.0f;
+      if (row == 2 && column == 2) {
+        canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(x, y, size, size), radius, radius),
+                          paint);
+        continue;
+      }
+      canvas->drawRRect(RRect::MakeRectXY(Rect::MakeXYWH(x, y, size, size), radius, radius, 0.6f),
+                        paint);
+      smoothCount++;
+    }
+  }
+  TGFX_PRIVATE_ACCESS(surface->renderContext->flush();
+                      auto drawingBuffer = context->drawingManager()->getDrawingBuffer();
+                      ASSERT_TRUE(drawingBuffer->renderTasks.size() == 1);
+                      auto task =
+                          static_cast<OpsRenderTask*>(drawingBuffer->renderTasks.front().get());
+                      // The plain rrect drawn in the middle splits the smooth rrects into two ops.
+                      ASSERT_TRUE(task->drawOps.size() == 3);
+                      auto firstOp = static_cast<RRectDrawOp*>(task->drawOps[0].get());
+                      auto secondOp = static_cast<RRectDrawOp*>(task->drawOps[1].get());
+                      auto thirdOp = static_cast<RRectDrawOp*>(task->drawOps[2].get());
+                      EXPECT_TRUE(firstOp->hasSmoothness); EXPECT_FALSE(secondOp->hasSmoothness);
+                      EXPECT_TRUE(thirdOp->hasSmoothness);
+                      EXPECT_EQ(firstOp->rectCount + thirdOp->rectCount, smoothCount);
+                      EXPECT_EQ(secondOp->rectCount, 1u));
+  context->flushAndSubmit();
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RRectOpBatchSmooth"));
 }
 
 TGFX_TEST(CanvasTest, DrawMesh_ColorsOnly) {

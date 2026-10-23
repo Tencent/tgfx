@@ -30,6 +30,7 @@
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
 #include "core/ShapeRasterizer.h"
+#include "core/SmoothCornerCoeffs.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
@@ -420,6 +421,195 @@ TGFX_TEST(PathTest, IteratorPerformance) {
            skPathUs, nsPerVerbIterator, nsPerVerbSkPath, ratio);
   }
   printf("\n");
+}
+
+TGFX_TEST(PathTest, SmoothRRectContour) {
+  const auto rect = Rect::MakeWH(200, 100);
+  const auto rRect = RRect::MakeRectXY(rect, 20, 20, 0.5f);
+
+  // A smoothed corner expands to three cubics, so the path is no longer detected as an rrect or
+  // an oval.
+  Path path = {};
+  path.addRRect(rRect);
+  EXPECT_FALSE(path.isRRect(nullptr));
+  EXPECT_FALSE(path.isOval());
+
+  // moveTo + 4 lines + 12 cubics + close.
+  EXPECT_EQ(path.countVerbs(), 18);
+  // At full smoothness the arcs degenerate to points and are skipped, leaving 8 cubics.
+  Path fullPath = {};
+  fullPath.addRRect(RRect::MakeRectXY(rect, 20, 20, 1.0f));
+  EXPECT_EQ(fullPath.countVerbs(), 14);
+
+  // Corners always bulge inward from the boundary points, so the bounds equal the rect at any
+  // smoothness, circular or elliptical.
+  Path plainPath = {};
+  plainPath.addRRect(RRect::MakeRectXY(rect, 20, 20));
+  EXPECT_EQ(path.getBounds(), plainPath.getBounds());
+  EXPECT_EQ(fullPath.getBounds(), plainPath.getBounds());
+  Path ellipsePath = {};
+  ellipsePath.addRRect(RRect::MakeRectXY(rect, 20, 40, 0.5f));
+  EXPECT_EQ(ellipsePath.getBounds(), plainPath.getBounds());
+}
+
+TGFX_TEST(PathTest, SmoothRRectStartIndex) {
+  const auto rRect = RRect::MakeRectXY(Rect::MakeWH(200, 100), 20, 20, 0.5f);
+  // The corner footprint is (1 + 0.5) * 20 = 30 along each edge.
+  const Point expected[8] = {{30, 0},    {170, 0},  {200, 30}, {200, 70},
+                             {170, 100}, {30, 100}, {0, 70},   {0, 30}};
+  for (unsigned startIndex = 0; startIndex < 8; ++startIndex) {
+    Path path = {};
+    path.addRRect(rRect, false, startIndex);
+    auto iter = path.begin();
+    ASSERT_NE(iter, path.end());
+    ASSERT_EQ((*iter).verb, PathVerb::Move);
+    EXPECT_EQ((*iter).points[0], expected[startIndex]);
+
+    // The reversed contour starts at the same boundary point but heads into the corner (a cubic)
+    // where the forward contour runs along an edge (a line), and vice versa.
+    Path reversedPath = {};
+    reversedPath.addRRect(rRect, true, startIndex);
+    auto reversedIter = reversedPath.begin();
+    ASSERT_NE(reversedIter, reversedPath.end());
+    EXPECT_EQ((*reversedIter).points[0], expected[startIndex]);
+    ++iter;
+    ++reversedIter;
+    if (startIndex % 2 == 0) {
+      EXPECT_EQ((*iter).verb, PathVerb::Line);
+      EXPECT_EQ((*reversedIter).verb, PathVerb::Cubic);
+    } else {
+      EXPECT_EQ((*iter).verb, PathVerb::Cubic);
+      EXPECT_EQ((*reversedIter).verb, PathVerb::Line);
+    }
+  }
+}
+
+// Reference implementation of the smooth-corner SDF emitted by GLSLSmoothCorner, mirrored line
+// by line so the CPU-generated contour can be validated against the same math the shader runs.
+static float SmoothBezierNewtonStep(float t, const Point& d0, const Point& d1, const Point& d2,
+                                    const Point& d3) {
+  const auto a2 = d2 + d3 * t;
+  const auto a1 = d1 + a2 * t;
+  const auto b2 = a2 + d3 * t;
+  const auto value = d0 + a1 * t;
+  const auto deriv = a1 + b2 * t;
+  const auto derivDot = std::max(deriv.x * deriv.x + deriv.y * deriv.y, 1.1755e-38f);
+  return t - (deriv.x * value.x + deriv.y * value.y) / derivDot;
+}
+
+static float SmoothBezierDist(const Point& p, const Point& b0, const Point& b1, const Point& b2,
+                              const Point& b3) {
+  const auto d3v = (b0 * -1.0f) + b1 * 3.0f - b2 * 3.0f + b3;
+  const auto d2v = b0 * 3.0f - b1 * 6.0f + b2 * 3.0f;
+  const auto d1v = (b1 - b0) * 3.0f;
+  const auto d0v = b0 - p;
+  auto best = 1.0e38f;
+  auto bestT = 0.0f;
+  auto seed = 0.0f;
+  for (int i = 0; i < 3; ++i) {
+    auto t = seed;
+    for (int j = 0; j < 2; ++j) {
+      t = SmoothBezierNewtonStep(t, d0v, d1v, d2v, d3v);
+    }
+    t = std::clamp(t, 0.0f, 1.0f);
+    const auto diff = ((d3v * t + d2v) * t + d1v) * t + d0v;
+    const auto distSq = diff.x * diff.x + diff.y * diff.y;
+    if (distSq < best) {
+      best = distSq;
+      bestT = t;
+    }
+    seed += 0.5f;
+  }
+  const auto bestDiff = ((d3v * bestT + d2v) * bestT + d1v) * bestT + d0v;
+  const auto bestDeriv = (d3v * (3.0f * bestT) + d2v * 2.0f) * bestT + d1v;
+  const auto side = bestDeriv.y * bestDiff.x - bestDeriv.x * bestDiff.y;
+  return std::sqrt(best) * (side > 0.0f ? 1.0f : -1.0f);
+}
+
+static float SmoothCornerDistRef(const Point& q, float radius, const SmoothCornerCoeffs& coeffs) {
+  const auto footprint = coeffs.tangentRatio * radius;
+  const auto step = coeffs.controlStep * radius;
+  const auto dx = q.x - radius;
+  const auto dy = q.y - radius;
+  const auto bisectorDot = (dx + dy) * (-0.70710678f);
+  if (bisectorDot > 0.0f &&
+      bisectorDot * bisectorDot > coeffs.arcCosSquared * (dx * dx + dy * dy)) {
+    return std::sqrt(dx * dx + dy * dy) - radius;
+  }
+  const auto ctrl2 = footprint - 3.0f * step;
+  const Point arcStart = {ctrl2 - coeffs.endOffsetX * radius, coeffs.endOffsetY * radius};
+  if (q.x >= q.y) {
+    return SmoothBezierDist(q, {footprint, 0.0f}, {footprint - 2.0f * step, 0.0f}, {ctrl2, 0.0f},
+                            arcStart);
+  }
+  const Point arcEnd = {arcStart.y, arcStart.x};
+  return SmoothBezierDist(q, arcEnd, {0.0f, ctrl2}, {0.0f, footprint - 2.0f * step},
+                          {0.0f, footprint});
+}
+
+static Point CubicPointAt(const Point pts[4], float t) {
+  const auto u = 1.0f - t;
+  return pts[0] * (u * u * u) + pts[1] * (3.0f * u * u * t) + pts[2] * (3.0f * u * t * t) +
+         pts[3] * (t * t * t);
+}
+
+TGFX_TEST(PathTest, SmoothRRectMatchesSDF) {
+  const auto rect = Rect::MakeWH(200, 100);
+  // Signs mapping device coordinates into each corner frame, in [TL, TR, BR, BL] order.
+  const Point signs[4] = {{1, 1}, {-1, 1}, {-1, -1}, {1, -1}};
+  const Point vertices[4] = {{0, 0}, {200, 0}, {200, 100}, {0, 100}};
+  // Forward from startIndex 0 the corners appear in the order TR, BR, BL, TL.
+  const size_t cornerOrder[4] = {1, 2, 3, 0};
+  for (float smoothness : {0.2f, 0.5f, 0.8f, 1.0f}) {
+    const auto rRect = RRect::MakeRectXY(rect, 20, 20, smoothness);
+    Path path = {};
+    path.addRRect(rRect);
+    const auto coeffs = ComputeSmoothCornerCoeffs(rRect.smoothness());
+    // At full smoothness the arc segment is skipped, leaving 2 cubics per corner instead of 3.
+    const size_t cubicsPerCorner = rRect.smoothness() < 1.0f ? 3 : 2;
+    size_t cubicIndex = 0;
+    for (auto segment : path) {
+      if (segment.verb != PathVerb::Cubic) {
+        continue;
+      }
+      const auto corner = cornerOrder[cubicIndex / cubicsPerCorner];
+      ++cubicIndex;
+      for (float t : {0.0f, 0.25f, 0.5f, 0.75f, 1.0f}) {
+        const auto p = CubicPointAt(segment.points, t);
+        const Point q = {(p.x - vertices[corner].x) * signs[corner].x,
+                         (p.y - vertices[corner].y) * signs[corner].y};
+        EXPECT_NEAR(SmoothCornerDistRef(q, 20, coeffs), 0.0f, 0.02f);
+      }
+    }
+  }
+}
+
+TGFX_TEST(PathTest, SmoothCornerSDFSigns) {
+  const auto coeffs = ComputeSmoothCornerCoeffs(0.5f);
+  constexpr float radius = 20.0f;
+  const auto footprint = coeffs.tangentRatio * radius;
+  const auto step = coeffs.controlStep * radius;
+  const Point arcStart = {footprint - 3.0f * step - coeffs.endOffsetX * radius,
+                          coeffs.endOffsetY * radius};
+  const Point center = {radius, radius};
+
+  // Arc-cubic seam: offsetting along the radial direction must flip the sign.
+  auto inward = center - arcStart;
+  const auto length = std::sqrt(inward.x * inward.x + inward.y * inward.y);
+  inward = inward * (0.5f / length);
+  EXPECT_LT(SmoothCornerDistRef(arcStart + inward, radius, coeffs), 0.0f);
+  EXPECT_GT(SmoothCornerDistRef(arcStart - inward, radius, coeffs), 0.0f);
+
+  // Edge-cubic seam at the tangent point: the Newton search clamps to the endpoint here, and the
+  // derivative-aligned edge must still give the right sign on both sides.
+  const Point tangent = {footprint, 0.0f};
+  EXPECT_LT(SmoothCornerDistRef(tangent + Point{0.0f, 0.5f}, radius, coeffs), 0.0f);
+  EXPECT_GT(SmoothCornerDistRef(tangent - Point{0.0f, 0.5f}, radius, coeffs), 0.0f);
+
+  // Arc sector middle: inside stays negative, outside positive.
+  const Point bisector = {-0.70710678f, -0.70710678f};
+  EXPECT_LT(SmoothCornerDistRef(center + bisector * (radius - 0.5f), radius, coeffs), 0.0f);
+  EXPECT_GT(SmoothCornerDistRef(center + bisector * (radius + 0.5f), radius, coeffs), 0.0f);
 }
 
 }  // namespace tgfx

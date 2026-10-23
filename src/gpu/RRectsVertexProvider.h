@@ -81,6 +81,29 @@ class RRectsVertexProvider : public VertexProvider {
   virtual bool isComplex() const = 0;
 
   /**
+   * Returns true if any record has an elliptical corner (radiusX != radiusY). Only smooth
+   * records can be elliptical; they use a dedicated shader variant with per-axis radii.
+   */
+  bool isElliptical() const {
+    return bitFields.elliptical;
+  }
+
+  /**
+   * Returns the corner smoothness shared by all records, in [0, 1]. The compositor keeps a single
+   * smoothness per batch.
+   */
+  float smoothness() const {
+    return _smoothness;
+  }
+
+  /**
+   * Returns true if the records carry corner smoothness.
+   */
+  bool hasSmoothness() const {
+    return _smoothness > 0.0f;
+  }
+
+  /**
    * Returns the first color in the provider. If no color record exists, a white color is returned.
    */
   const Color& firstColor() const {
@@ -95,14 +118,16 @@ class RRectsVertexProvider : public VertexProvider {
   PlacementArray<RRectRecord> rects = {};
   PlacementArray<Stroke> strokes = {};
   std::shared_ptr<ColorSpace> _dstColorSpace = nullptr;
+  float _smoothness = 0.0f;
   struct {
     uint8_t aaType : 2;
     bool hasColor : 1;
     bool hasStroke : 1;
+    bool elliptical : 1;
   } bitFields = {};
 
   RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool hasColor,
                        PlacementArray<Stroke>&& strokes, std::shared_ptr<BlockAllocator> reference,
-                       std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                       std::shared_ptr<ColorSpace> colorSpace = nullptr, bool elliptical = false);
 };
 }  // namespace tgfx

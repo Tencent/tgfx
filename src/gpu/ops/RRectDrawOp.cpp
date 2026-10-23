@@ -25,6 +25,7 @@
 #include "gpu/processors/ComplexNonAARRectGeometryProcessor.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
 #include "gpu/processors/NonAARRectGeometryProcessor.h"
+#include "gpu/processors/SmoothRRectGeometryProcessor.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -36,8 +37,11 @@ PlacementPtr<RRectDrawOp> RRectDrawOp::Make(Context* context,
   }
   auto allocator = context->drawingAllocator();
   auto drawOp = allocator->make<RRectDrawOp>(allocator, provider.get());
-  drawOp->indexBufferProxy =
-      context->globalCache()->getRRectIndexBuffer(provider->hasStroke(), provider->aaType());
+  // Smooth rrects use the single-quad layout in both AA and NonAA modes, which shares the
+  // NonAA quad index buffer.
+  const auto indexStroke = provider->hasSmoothness() ? false : provider->hasStroke();
+  const auto indexAAType = provider->hasSmoothness() ? AAType::None : provider->aaType();
+  drawOp->indexBufferProxy = context->globalCache()->getRRectIndexBuffer(indexStroke, indexAAType);
   if (provider->rectCount() <= 1) {
     // If we only have one rect, it is not worth the async task overhead.
     renderFlags |= RenderFlags::DisableAsyncTask;
@@ -54,10 +58,13 @@ RRectDrawOp::RRectDrawOp(BlockAllocator* allocator, RRectsVertexProvider* provid
   }
   hasStroke = provider->hasStroke();
   isComplex = provider->isComplex();
+  hasSmoothness = provider->hasSmoothness();
+  smoothness = provider->smoothness();
+  elliptical = provider->isElliptical();
   // MSAA shares the AA-coverage vertex layout: the quad covers more than the rounded shape,
   // so the arc boundary is evaluated inside the shader and hardware MSAA cannot provide
   // edge coverage on its own.
-  if (aaType == AAType::None) {
+  if (hasSmoothness || aaType == AAType::None) {
     indicesPerRRect = IndicesPerNonAARRect;
   } else {
     indicesPerRRect = hasStroke ? IndicesPerAAStrokeRRect : IndicesPerAAFillRRect;
@@ -65,6 +72,11 @@ RRectDrawOp::RRectDrawOp(BlockAllocator* allocator, RRectsVertexProvider* provid
 }
 
 PlacementPtr<GeometryProcessor> RRectDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
+  if (hasSmoothness) {
+    return SmoothRRectGeometryProcessor::Make(
+        allocator, renderTarget->width(), renderTarget->height(), smoothness,
+        aaType != AAType::None, commonColor, elliptical, hasStroke);
+  }
   if (aaType == AAType::None) {
     if (isComplex) {
       return ComplexNonAARRectGeometryProcessor::Make(

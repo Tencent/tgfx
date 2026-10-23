@@ -1175,6 +1175,30 @@ TGFX_TEST(SVGExportTest, ComplexRRect) {
 }
 
 /**
+ * Corner smoothness cannot be represented by SVG <rect>, so the exporter falls back to <path>.
+ */
+TGFX_TEST(SVGExportTest, SmoothRRect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  tgfx::Paint paint;
+  paint.setColor(Color::Blue());
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
+                                    SVGExportFlags::DisablePrettyXML);
+  auto canvas = exporter->getCanvas();
+
+  const auto rRect = RRect::MakeRectXY(Rect::MakeXYWH(20, 20, 160, 160), 30, 30, 0.6f);
+  ASSERT_GT(rRect.smoothness(), 0.0f);
+  canvas->drawRRect(rRect, paint);
+
+  exporter->close();
+  auto SVGString = SVGStream->readString();
+  ASSERT_NE(SVGString.find("<path"), std::string::npos);
+  ASSERT_EQ(SVGString.find("<rect"), std::string::npos);
+}
+
+/**
  * Reproduces a bug where a draw whose bounds lie fully inside an outer clip
  * gets short-circuited (no clip emitted), but is then incorrectly written into
  * a stale <g clip-path> wrapper opened by a previous draw with a different,

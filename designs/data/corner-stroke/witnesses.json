@@ -1,0 +1,98 @@
+[
+  {
+    "kind": "exact_cpu_arc_point",
+    "s": 0.0001,
+    "rx": 1024.0,
+    "ry": 1024.0,
+    "width": 1.0,
+    "arc_t": 0.21132486540518713,
+    "point": [
+      683.0825761223692,
+      58.12082475973938
+    ],
+    "exact_cpu_distance": 0.0,
+    "relative_band": 0.0009765625,
+    "approximations": {
+      "current_2": {
+        "distance": 0.27890296840837436,
+        "part": 1
+      },
+      "current_3": {
+        "distance": 0.27890296840837436,
+        "part": 1
+      },
+      "normals_2": {
+        "distance": 0.27890296840837436,
+        "part": 1
+      },
+      "normals_3": {
+        "distance": 0.27890296840837436,
+        "part": 1
+      }
+    },
+    "reference_intervals": [
+      {
+        "tolerance": 1e-05,
+        "interval": [
+          0.0,
+          9.003013351288982e-06
+        ]
+      },
+      {
+        "tolerance": 5e-06,
+        "interval": [
+          0.0,
+          2.643688221019272e-06
+        ]
+      }
+    ]
+  },
+  {
+    "kind": "exact_cpu_arc_point",
+    "s": 0.0001,
+    "rx": 4096.0,
+    "ry": 4096.0,
+    "width": 1.0,
+    "arc_t": 0.21132486540518713,
+    "point": [
+      2732.330304489477,
+      232.4832990389575
+    ],
+    "exact_cpu_distance": 0.0,
+    "relative_band": 0.000244140625,
+    "approximations": {
+      "current_2": {
+        "distance": 1.1156118736334975,
+        "part": 1
+      },
+      "current_3": {
+        "distance": 1.1156118736334975,
+        "part": 1
+      },
+      "normals_2": {
+        "distance": 1.1156118736334975,
+        "part": 1
+      },
+      "normals_3": {
+        "distance": 1.1156118736334975,
+        "part": 1
+      }
+    },
+    "reference_intervals": [
+      {
+        "tolerance": 1e-05,
+        "interval": [
+          0.0,
+          2.5785757012449044e-06
+        ]
+      },
+      {
+        "tolerance": 5e-06,
+        "interval": [
+          0.0,
+          2.5785757012449044e-06
+        ]
+      }
+    ]
+  }
+]

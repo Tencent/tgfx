@@ -314,10 +314,13 @@ static bool HasDiagonalCornerAxisOverlap(const RRect& rRect) {
   if (!rRect.isComplex()) {
     return false;
   }
+  // Smoothed corners occupy (1 + smoothness) * radius along each edge.
+  const auto rScale = 1.0f + rRect.smoothness();
   const auto& r = rRect.radii();
   const auto w = rRect.rect().width();
   const auto h = rRect.rect().height();
-  return r[0].x + r[2].x > w || r[0].y + r[2].y > h || r[1].x + r[3].x > w || r[1].y + r[3].y > h;
+  return (r[0].x + r[2].x) * rScale > w || (r[0].y + r[2].y) * rScale > h ||
+         (r[1].x + r[3].x) * rScale > w || (r[1].y + r[3].y) * rScale > h;
 }
 
 /**
@@ -343,6 +346,49 @@ static bool UseDrawPath(const Stroke* stroke, const RRect& rRect, bool hasSharpC
   // stricter AA rule and fall back to drawPath whenever any axis is crossed.
   if (HasDiagonalCornerAxisOverlap(rRect)) {
     return true;
+  }
+  if (rRect.smoothness() > 0.0f) {
+    if (stroke) {
+      // Elliptical corners fall back for strokes even within the ratio cap: the territory
+      // dispatch happens in the circular frame, which misassigns fragments in device space on
+      // the wide band a stroke requires (measured at tens of px; not a convergence issue).
+      for (const auto& r : rRect.radii()) {
+        if (r.x > 0.0f && r.x != r.y) {
+          return true;
+        }
+      }
+      // The analytic stroke reuses the fill's signed distance field as a ring of half the stroke
+      // width. The Newton distance solver stays convergent only within the transition curve's
+      // minimum radius of curvature (~0.67r at the arc joint); measured distance errors stay
+      // under a quarter pixel when the stroke width does not exceed the corner radius
+      // (tools/sweep_newton_stroke_width.py). Wider strokes fall back to drawPath.
+      auto minRadius = std::numeric_limits<float>::max();
+      for (const auto& r : rRect.radii()) {
+        if (r.x > 0.0f) {
+          minRadius = std::min(minRadius, r.x);
+        }
+      }
+      if (stroke->width > minRadius) {
+        return true;
+      }
+    }
+    // Elliptical corners go through the analytic op via the scaled construction, but the
+    // Newton solver's error near the contour grows with the axis ratio: measured at ~4e-4 of
+    // the radius for ratio 4 (invisible) and ~7e-3 for ratio 8 (visible at large radii). Fall
+    // back beyond the cap. (tools/verify_smooth_corner_math.py calibration)
+    for (const auto& r : rRect.radii()) {
+      if (r.x > 0.0f && r.y > 0.0f) {
+        const auto ratio = r.x > r.y ? r.x / r.y : r.y / r.x;
+        if (ratio > 4.0f) {
+          return true;
+        }
+      }
+    }
+    // Non-uniform axis scales still fall back: the vertex provider bakes only uniform scales.
+    const auto scales = viewMatrix.getAxisScales();
+    if (scales.x != scales.y) {
+      return true;
+    }
   }
   if (!stroke) {
     return false;
