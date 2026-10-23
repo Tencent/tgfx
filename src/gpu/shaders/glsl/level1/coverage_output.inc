@@ -42,27 +42,6 @@
 #ifndef TGFX_XP_COVERAGE
 #define TGFX_XP_COVERAGE _coverageResult
 #endif
-#elif HAS_COVERAGE
-  vec4 _coverageResult = TGFX_INITIAL_COVERAGE;
-
-  #if HAS_COVERAGE == 2
-    highp vec3 _maskCoord = DeviceCoordMatrix * vec3(gl_FragCoord.xy, 1.0);
-    float _maskAlpha = texture(MaskTextureSampler, _maskCoord.xy).r;
-    _coverageResult *= _maskAlpha;
-  #endif
-
-  highp vec4 _dists4 =
-      clamp(vec4(1.0, 1.0, -1.0, -1.0) * vec4(gl_FragCoord.xyxy - Rect), 0.0, 1.0);
-  highp vec2 _dists2 = _dists4.xy + _dists4.zw - 1.0;
-  _coverageResult *= _dists2.x * _dists2.y;
-
-  vec4 _uncoveredColor = TGFX_COVERAGE_SRC_COLOR;
-  vec4 _coveredColor = _uncoveredColor * _coverageResult;
-#define TGFX_XP_SRC_COLOR _coveredColor
-#define TGFX_XP_SRC_UNPREMUL _uncoveredColor
-#ifndef TGFX_XP_COVERAGE
-#define TGFX_XP_COVERAGE _coverageResult
-#endif
 #else
 #define TGFX_XP_SRC_COLOR TGFX_COVERAGE_SRC_COLOR
 #endif

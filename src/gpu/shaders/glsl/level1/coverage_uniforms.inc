@@ -1,6 +1,6 @@
 // Coverage uniform declarations — include inside FragmentUniformBlock.
-// HAS_RUNTIME_CLIP keeps AARect coverage in a runtime branch; older shader families continue using
-// HAS_COVERAGE until they are migrated to the same resource-interface contract.
+// HAS_RUNTIME_CLIP selects the runtime clip contract (Rect, HasClip and the rrect fields); every
+// includer enables it, and HAS_RUNTIME_DEVICE_MASK / HAS_DEVICE_MASK add the device mask fields.
 #ifndef HAS_RUNTIME_CLIP
 #define HAS_RUNTIME_CLIP 0
 #endif
@@ -16,8 +16,6 @@
   vec4 Rect;
   int HasClip;
 #include "rrect_clip_uniforms.inc"
-#elif HAS_COVERAGE
-  vec4 Rect;
 #endif
 
 #if HAS_RUNTIME_CLIP
@@ -27,6 +25,4 @@
   #elif HAS_DEVICE_MASK
     mat3 DeviceCoordMatrix;
   #endif
-#elif HAS_COVERAGE == 2
-  mat3 DeviceCoordMatrix;
 #endif
