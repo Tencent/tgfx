@@ -18,9 +18,13 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/shaders/PrecompiledShader.h"
 
 namespace tgfx {
+
+class ProgramInfo;
+struct PermutationMatchResult;
 
 /// Precompiled shader declaration for GlassRefractionFragmentProcessor, bound to either
 /// EllipseGeometryProcessor in its common-color form (the oval glass terminal draw) or
@@ -72,6 +76,13 @@ class GlassRefractionShader : public PrecompiledShader {
   };
   using FD = FragDims;
   static_assert(FD::COUNT == 4, "Update info() when fragment dimensions change.");
+
+  /// Whether alpha-only (AAAA) render targets may be served by this kernel.
+  static constexpr bool ServesAlphaOnly = false;
+
+  /// Runtime matching: does this draw belong to this family? Declared here, defined in
+  /// the family's own .cpp, next to the GLSL it owns.
+  static std::optional<PermutationMatchResult> Match(const ProgramInfo* programInfo);
 
   PrecompiledShaderInfo info() const override {
     return {"GlassRefractionShader",

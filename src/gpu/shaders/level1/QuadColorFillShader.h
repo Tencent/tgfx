@@ -18,10 +18,14 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"
 
 namespace tgfx {
+
+class ProgramInfo;
+struct PermutationMatchResult;
 
 /// Precompiled shader for QuadPerEdgeAAGeometryProcessor with zero fragment processors.
 /// Covers solid-color AA quad rendering with optional per-vertex coverage and per-vertex color.
@@ -50,6 +54,13 @@ class QuadColorFillShader : public PrecompiledShader {
   };
   using FD = FragDims;
   static_assert(FD::COUNT == 2, "Update the Compose mapping when dimensions change.");
+
+  /// Whether alpha-only (AAAA) render targets may be served by this kernel.
+  static constexpr bool ServesAlphaOnly = false;
+
+  /// Runtime matching: does this draw belong to this family? Declared here, defined in
+  /// the family's own .cpp, next to the GLSL it owns.
+  static std::optional<PermutationMatchResult> Match(const ProgramInfo* programInfo);
 
   PrecompiledShaderInfo info() const override {
     return {"QuadColorFillShader",

@@ -18,9 +18,13 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/shaders/PrecompiledShader.h"
 
 namespace tgfx {
+
+class ProgramInfo;
+struct PermutationMatchResult;
 
 /// Precompiled shader that evaluates an arbitrary pointwise DAG (texture and const-color leaves
 /// combined by color-matrix, luma, alpha-threshold, color-space-xform and blend ops) in a single
@@ -125,6 +129,13 @@ class PointwiseChainShader : public PrecompiledShader {
   };
   using FD = FragDims;
   static_assert(FD::COUNT == 7, "Update the Compose mapping when fragment dimensions change.");
+
+  /// Whether alpha-only (AAAA) render targets may be served by this kernel.
+  static constexpr bool ServesAlphaOnly = true;
+
+  /// Runtime matching: does this draw belong to this family? Declared here, defined in
+  /// the family's own .cpp, next to the GLSL it owns.
+  static std::optional<PermutationMatchResult> Match(const ProgramInfo* programInfo);
 
   PrecompiledShaderInfo info() const override {
     return {"PointwiseChainShader",

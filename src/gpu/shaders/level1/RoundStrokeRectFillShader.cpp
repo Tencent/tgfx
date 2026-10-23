@@ -1,0 +1,44 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
+//  compliance with the License. You may obtain a copy of the License at
+//
+//       https://opensource.org/licenses/BSD-3-Clause
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions and
+//  limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
+#include <optional>
+#include <vector>
+#include "gpu/PermutationMatcher.h"
+#include "gpu/ProgramInfo.h"
+#include "gpu/ShaderMatchHelpers.h"
+#include "gpu/shaders/PermutationRules.h"
+
+namespace tgfx {
+
+std::optional<PermutationMatchResult> RoundStrokeRectFillShader::Match(
+    const ProgramInfo* programInfo) {
+  auto inputs = ExtractRoundStrokeRect(programInfo);
+  if (!inputs) {
+    return std::nullopt;
+  }
+  auto composed = ComposeRoundStrokeRect(*inputs);
+  if (!composed) {
+    return std::nullopt;
+  }
+  auto vertIndex = RoundStrokeRectFillShader::Dims::domain().encode(composed->vertValues);
+  auto fragIndex = RoundStrokeRectFillShader::FD::domain().encode(composed->fragValues);
+  return PermutationMatchResult{"RoundStrokeRectFillShader", vertIndex, fragIndex};
+}
+
+}  // namespace tgfx

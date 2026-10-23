@@ -18,9 +18,13 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/shaders/PrecompiledShader.h"
 
 namespace tgfx {
+
+class ProgramInfo;
+struct PermutationMatchResult;
 
 /// Precompiled shader for QuadPerEdgeAAGeometryProcessor + TextureEffect pipeline.
 /// Covers the common drawImage path where vertices are pre-transformed to device space.
@@ -73,6 +77,13 @@ class QuadTextureFillShader : public PrecompiledShader {
   };
   using FD = FragDims;
   static_assert(FD::COUNT == 3, "Update the Compose mapping when fragment dimensions change.");
+
+  /// Whether alpha-only (AAAA) render targets may be served by this kernel.
+  static constexpr bool ServesAlphaOnly = true;
+
+  /// Runtime matching: does this draw belong to this family? Declared here, defined in
+  /// the family's own .cpp, next to the GLSL it owns.
+  static std::optional<PermutationMatchResult> Match(const ProgramInfo* programInfo);
 
   PrecompiledShaderInfo info() const override {
     return {"QuadTextureFillShader",

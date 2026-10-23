@@ -28,6 +28,22 @@ namespace tgfx {
 class ProgramInfo;
 class GeometryProcessor;
 class FragmentProcessor;
+class QuadPerEdgeAAGeometryProcessor;
+class AOTPointwiseChainProcessor;
+struct PermutationMatchResult;
+struct RoundStrokeRectInputs;
+enum class PermutationMatchFailure;
+
+/// How the draw's sole coverage FP is served. LocalMask is a distinct capability: it needs a
+/// local-space varying and sampler and therefore cannot be encoded in the shared runtime clip
+/// contract.
+enum class CoverageKind {
+  None,
+  AARect,
+  RRect,
+  DeviceMask,
+  LocalMask,
+};
 
 /// 0 = Empty XferProcessor, 1 = PorterDuff DST_TEX, 2 = PorterDuff FBF, -1 = none representable.
 int GetXPType(const ProgramInfo* programInfo);
@@ -57,5 +73,28 @@ bool IsServableBlurChild(const FragmentProcessor* childFP);
 /// Whether the FP is one of the four pointwise operators (ColorMatrix / Luma / AlphaThreshold /
 /// ColorSpaceXform) that share the TexturedEffect structural class.
 bool IsSupportedPointwiseOp(const FragmentProcessor* fp);
+
+/// Records why a candidate rejected the draw (a thread-local reason consumed by MatchPermutation)
+/// and returns nullopt.
+std::optional<PermutationMatchResult> Fail(PermutationMatchFailure reason);
+
+/// Classifies the coverage FP itself (see CoverageKind); nullopt when it cannot be classified.
+std::optional<CoverageKind> ClassifyCoverage(const FragmentProcessor* coverageFP);
+
+/// Classifies the coverage stage of a ProgramInfo carrying at most one coverage FP.
+std::optional<CoverageKind> ClassifyCoverageFP(const ProgramInfo* programInfo);
+
+/// Direct analytic clip coverage: the sole coverage FP is an AA rect or a leaf rrect.
+bool HasDirectAnalyticClipCoverage(const ProgramInfo* programInfo);
+
+/// Whether a ShaderMode value is one the blur kernels' shared tiled sampling implements.
+bool TiledModeSupported(int mode);
+
+/// Whether a subset-carrying quad's subset is servable by the chain kernel's runtime uniforms.
+bool IsChainQuadSubsetServable(const QuadPerEdgeAAGeometryProcessor* quadGP,
+                               const AOTPointwiseChainProcessor* chain);
+
+/// Extracts the RoundStrokeRect rule inputs from the draw's geometry processor.
+std::optional<RoundStrokeRectInputs> ExtractRoundStrokeRect(const ProgramInfo* programInfo);
 
 }  // namespace tgfx

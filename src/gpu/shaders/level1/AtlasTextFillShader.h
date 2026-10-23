@@ -18,9 +18,13 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/shaders/PrecompiledShader.h"
 
 namespace tgfx {
+
+class ProgramInfo;
+struct PermutationMatchResult;
 
 class AtlasTextFillShader : public PrecompiledShader {
  public:
@@ -47,6 +51,13 @@ class AtlasTextFillShader : public PrecompiledShader {
                 "Update the Compose mapping when dimensions change.");
 
  public:
+  /// Whether alpha-only (AAAA) render targets may be served by this kernel.
+  static constexpr bool ServesAlphaOnly = false;
+
+  /// Runtime matching: does this draw belong to this family? Declared here, defined in
+  /// the family's own .cpp, next to the GLSL it owns.
+  static std::optional<PermutationMatchResult> Match(const ProgramInfo* programInfo);
+
   PrecompiledShaderInfo info() const override {
     return {"AtlasTextFillShader",
             "level1/atlas_text_fill.vert",
