@@ -5990,6 +5990,105 @@ TGFX_TEST(AOTRenderConsistencyTest, PerlinDensityDAGServedByteExact) {
   }
 }
 
+// A draw that combines a gradient source with Perlin noise cannot ride one chain pass: the noise
+// source is RESOURCE_KIND 2 and the gradient is RESOURCE_KIND 1, and a kernel carries exactly one
+// of them. The planner therefore splits such a draw into per-source passes and materializes the
+// intermediate between them. This pins that route down: the noise module serves the noise operand,
+// the chain's gradient kind serves the gradient operand, nothing falls back to the runtime JIT, and
+// no draw is dropped. Without it, a regression that folded both sources into one pass (or refused
+// the combination outright) would only surface in real content.
+TGFX_TEST(AOTRenderConsistencyTest, MixedGradientAndNoiseSourcesMaterializePerSource) {
+  constexpr int size = 96;
+  struct Case {
+    const char* label;
+    int expectedMaterialized;
+  };
+  // The three shapes the layered scenes produce: the two sources blended directly, a two-operand
+  // tree over an image, and a noise subtree with a color matrix blended over a gradient.
+  const Case cases[] = {{"gradient*noise", 2},
+                        {"image*gradient*noise", 3},
+                        {"density-noise over gradient", 2}};
+  for (int scene = 0; scene < 3; ++scene) {
+    SCOPED_TRACE(cases[scene].label);
+    auto gradient = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(size, size),
+                                               {Color(1, 0, 0, 1), Color(0, 0, 1, 1)});
+    auto noise = Shader::MakeFractalNoise(0.08f, 0.08f, 3, 6903);
+    ASSERT_NE(gradient, nullptr);
+    ASSERT_NE(noise, nullptr);
+    std::shared_ptr<Shader> shader;
+    if (scene == 0) {
+      shader = Shader::MakeBlend(BlendMode::Multiply, gradient, noise);
+    } else if (scene == 1) {
+      auto image = MakeImage("resources/apitest/imageReplacement.png");
+      ASSERT_NE(image, nullptr);
+      auto imageShader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp);
+      shader = Shader::MakeBlend(
+          BlendMode::Screen, Shader::MakeBlend(BlendMode::Multiply, imageShader, gradient), noise);
+    } else {
+      const std::array<float, 20> matrix = {0, 0, 0, 0, 0, 0,    0,    0,    0, 0,
+                                            0, 0, 0, 0, 0, 0.3f, 0.6f, 0.1f, 0, 0};
+      shader = Shader::MakeBlend(BlendMode::SrcOver, gradient,
+                                 noise->makeWithColorFilter(ColorFilter::Matrix(matrix)));
+    }
+    ASSERT_NE(shader, nullptr);
+    Bitmap reference;
+    Bitmap candidate;
+    for (bool useBundle : {false, true}) {
+      ContextScope scope;
+      auto context = scope.getContext();
+      ASSERT_NE(context, nullptr);
+      auto* cache = context->precompiledShaderCache();
+      cache->unload();
+      if (useBundle) {
+        ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+      }
+      ScopedAOTStatsPause referencePause(context, !useBundle);
+      cache->setDiagnosticRecordingEnabled(true);
+      cache->resetStats();
+      context->globalCache()->clearPrograms();
+      context->globalCache()->resetProgramStats();
+      auto surface = Surface::Make(context, size, size);
+      ASSERT_NE(surface, nullptr);
+      Paint paint;
+      paint.setShader(shader);
+      surface->getCanvas()->clear(Color::White());
+      surface->getCanvas()->drawRect(Rect::MakeWH(size, size), paint);
+      context->flushAndSubmit(true);
+      if (useBundle) {
+        const auto stats = cache->drawStats();
+        EXPECT_EQ(stats.droppedDraws, 0u);
+        EXPECT_EQ(stats.atomicFallbacks, 0u);
+        EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+        EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+        EXPECT_EQ(stats.materializedEdges, static_cast<size_t>(cases[scene].expectedMaterialized));
+        ASSERT_GT(stats.kernelInvocations, 1u) << "the two sources must not share one pass";
+        bool noiseServed = false;
+        bool gradientServed = false;
+        for (const auto& hit : cache->hitRecords()) {
+          noiseServed |= hit.shaderName == "PerlinNoiseFillShader";
+          gradientServed |= hit.shaderName == "PointwiseChainShader" &&
+                            PointwiseChainShader::FD::domain().valueOf(hit.fragPermutationIndex,
+                                                                       "RESOURCE_KIND") == 1;
+        }
+        EXPECT_TRUE(noiseServed) << "the noise operand must ride the dedicated noise kernel";
+        EXPECT_TRUE(gradientServed) << "the gradient operand must ride the chain's gradient kind";
+      }
+      auto* bitmap = useBundle ? &candidate : &reference;
+      ASSERT_TRUE(bitmap->allocPixels(size, size));
+      auto* pixels = bitmap->lockPixels();
+      ASSERT_NE(pixels, nullptr);
+      ASSERT_TRUE(surface->readPixels(bitmap->info(), pixels));
+      bitmap->unlockPixels();
+      cache->setDiagnosticRecordingEnabled(false);
+      cache->unload();
+      context->globalCache()->clearPrograms();
+    }
+    // Two routes split the same tree at different points, so the materialized intermediates round
+    // through 8-bit targets at different steps; the observed spread is one or two levels.
+    ExpectBitmapsNear("mixed-gradient-noise", candidate, reference, size, size, 2);
+  }
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, ThreeIndependentTiledInputsUseGraphByteExact) {
   constexpr int size = 96;
   Bitmap source;
