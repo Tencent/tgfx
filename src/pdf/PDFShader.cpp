@@ -109,7 +109,8 @@ PDFIndirectReference PDFShader::Make(PDFDocumentImpl* doc, const std::shared_ptr
     combinedTransform.preConcat(matrixShader->matrix);
     unwrappedShader = matrixShader->source;
   }
-  if (Types::Get(unwrappedShader.get()) == Types::ShaderType::Gradient) {
+  auto shaderType = Types::Get(unwrappedShader.get());
+  if (shaderType == Types::ShaderType::Gradient) {
     const auto gradientShader = static_cast<const GradientShader*>(unwrappedShader.get());
     DEBUG_ASSERT(gradientShader->asGradient(nullptr) == GradientType::Linear ||
                  gradientShader->asGradient(nullptr) == GradientType::Radial ||
@@ -123,7 +124,7 @@ PDFIndirectReference PDFShader::Make(PDFDocumentImpl* doc, const std::shared_ptr
 
   paintColor = AdjustColor(unwrappedShader.get(), paintColor);
 
-  if (Types::Get(unwrappedShader.get()) == Types::ShaderType::Image) {
+  if (shaderType == Types::ShaderType::Image) {
     const auto imageShader = static_cast<const ImageShader*>(unwrappedShader.get());
     auto shaderImage = imageShader->image;
     // TODO (YGaurora): Cache image shaders and remove duplicates

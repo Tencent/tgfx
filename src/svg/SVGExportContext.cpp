@@ -35,7 +35,9 @@
 #include "core/utils/CopyPixels.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/PictureUtils.h"
 #include "core/utils/RectToRectMatrix.h"
+#include "core/utils/ShaderUtils.h"
 #include "core/utils/ShapeUtils.h"
 #include "core/utils/StrokeUtils.h"
 #include "core/utils/Types.h"
@@ -44,9 +46,11 @@
 #include "tgfx/core/Brush.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
+#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/RRect.h"
@@ -143,6 +147,14 @@ void SVGExportContext::drawFill(const Brush& brush) {
 
 void SVGExportContext::drawRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip,
                                 const Brush& brush, const Stroke* stroke) {
+  if (brush.shader != nullptr && stroke == nullptr) {
+    Path path;
+    path.addRect(rect);
+    if (tryDrawPathWithRuntimeShader(matrix, clip, path, brush)) {
+      return;
+    }
+  }
+
   std::unique_ptr<ElementWriter> svg;
   if (RequiresViewportReset(brush)) {
     svg = std::make_unique<ElementWriter>("svg", context, this, _pendingImages, xmlWriter.get(),
@@ -921,6 +933,50 @@ void SVGExportContext::applyClipPath(const Path& clipPath) {
   auto clipID = defineClipPath(currentClipPath);
   clipGroupElement = std::make_unique<ElementWriter>("g", xmlWriter);
   clipGroupElement->addAttribute("clip-path", "url(#" + clipID + ")");
+}
+
+bool SVGExportContext::tryDrawPathWithRuntimeShader(const Matrix& matrix, const ClipStack& clip,
+                                                    const Path& path, const Brush& brush) {
+  if (brush.shader == nullptr) {
+    return false;
+  }
+  auto [shader, shaderMatrix] = ShaderUtils::UnwrapMatrixShader(brush.shader);
+  // Runtime shaders cannot be mapped to SVG elements, so their fill is rasterized into an
+  // image covering the drawn path.
+  if (Types::Get(shader.get()) != Types::ShaderType::Runtime) {
+    return false;
+  }
+
+  Brush drawBrush = brush;
+  drawBrush.shader = nullptr;
+  return drawRuntimeShaderImage(brush.shader, matrix, clip, path, drawBrush);
+}
+
+bool SVGExportContext::drawRuntimeShaderImage(const std::shared_ptr<Shader>& shader,
+                                              const Matrix& deviceMatrix, const ClipStack& clip,
+                                              const Path& path, const Brush& brush) {
+  auto imageBounds = path.getBounds();
+  imageBounds.roundOut();
+  auto surface = Surface::Make(context, static_cast<int>(imageBounds.width()),
+                               static_cast<int>(imageBounds.height()));
+  if (surface == nullptr) {
+    return false;
+  }
+  auto* canvas = surface->getCanvas();
+  canvas->clear(Color::Transparent());
+  canvas->translate(-imageBounds.x(), -imageBounds.y());
+  Paint paint = {};
+  paint.setShader(shader);
+  paint.setAntiAlias(true);
+  canvas->drawPath(path, paint);
+  auto image = surface->makeImageSnapshot();
+  if (image == nullptr) {
+    return false;
+  }
+  auto imageMatrix = deviceMatrix;
+  imageMatrix.preTranslate(imageBounds.x(), imageBounds.y());
+  drawImage(std::move(image), {}, imageMatrix, clip, brush);
+  return true;
 }
 
 Bitmap SVGExportContext::ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image,

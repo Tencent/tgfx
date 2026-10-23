@@ -35,11 +35,15 @@
 #include "core/shaders/ColorShader.h"
 #include "core/shaders/ImageShader.h"
 #include "core/shaders/MatrixShader.h"
+#include "core/shaders/RuntimeShader.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/Log.h"
 #include "core/utils/PlacementPtr.h"
+#include "core/utils/ShaderUtils.h"
 #include "core/utils/ShapeUtils.h"
 #include "core/utils/Types.h"
+#include "layers/shaders/RRectBlurShader.h"
+#include "layers/shaders/RRectInnerShadowShader.h"
 #include "pdf/PDFBitmap.h"
 #include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFFont.h"
@@ -65,6 +69,7 @@
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/Picture.h"
+#include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/SamplingOptions.h"
@@ -667,6 +672,9 @@ void PDFExportContext::drawDropShadowBeforeLayer(const std::shared_ptr<Picture>&
                                static_cast<int>(blurBounds.height()), false, 1, false, 0,
                                document->dstColorSpace());
   DEBUG_ASSERT(surface);
+  if (surface == nullptr) {
+    return;
+  }
   auto canvas = surface->getCanvas();
 
   Paint picturePaint = {};
@@ -679,10 +687,23 @@ void PDFExportContext::drawDropShadowBeforeLayer(const std::shared_ptr<Picture>&
   auto image = surface->makeImageSnapshot();
   if (image) {
     image = image->makeTextureImage(document->context());
+    const auto snapshotOffset = Point::Make(pictureBounds.x() - offset.x + dropShadowFilter->dx,
+                                            pictureBounds.y() - offset.y + dropShadowFilter->dy);
     auto imageMatrix = matrix;
-    imageMatrix.postTranslate(pictureBounds.x() - offset.x + dropShadowFilter->dx,
-                              pictureBounds.y() - offset.y + dropShadowFilter->dy);
-    drawImage(std::move(image), SamplingOptions(), imageMatrix, clip, brush);
+    imageMatrix.preTranslate(snapshotOffset.x, snapshotOffset.y);
+    // The snapshotOffset translation propagates to the brush's space, so apply the inverse to
+    // the mask shader to keep it anchored in the original space.
+    Brush imageBrush = brush;
+    if (imageBrush.maskFilter != nullptr &&
+        Types::Get(imageBrush.maskFilter.get()) == Types::MaskFilterType::Shader) {
+      const auto* shaderMaskFilter =
+          static_cast<const ShaderMaskFilter*>(imageBrush.maskFilter.get());
+      auto maskShader = shaderMaskFilter->getShader()->makeWithMatrix(
+          Matrix::MakeTrans(-snapshotOffset.x, -snapshotOffset.y));
+      imageBrush.maskFilter =
+          MaskFilter::MakeShader(std::move(maskShader), shaderMaskFilter->isInverted());
+    }
+    drawImage(std::move(image), SamplingOptions(), imageMatrix, clip, imageBrush);
   }
 }
 
@@ -785,6 +806,131 @@ void PDFExportContext::drawBlurLayer(const std::shared_ptr<Picture>& picture,
   }
 }
 
+static ClipStack RestrictClipWithPath(const ClipStack& clip, const Rect& contentBounds,
+                                      const Matrix& contentMatrix, const Path& restrictPath,
+                                      const Matrix& deviceMatrix) {
+  Rect restrictRect = {};
+  if (restrictPath.isRect(&restrictRect) &&
+      restrictRect.contains(contentMatrix.mapRect(contentBounds))) {
+    return clip;
+  }
+
+  auto result = clip;
+  result.clipPath(restrictPath, deviceMatrix, false);
+  return result;
+}
+
+bool PDFExportContext::tryDrawPathWithRuntimeShader(const Matrix& matrix, const ClipStack& clip,
+                                                    const Path& path, const Brush& brush) {
+  if (brush.shader == nullptr) {
+    return false;
+  }
+  auto [shader, shaderMatrix] = ShaderUtils::UnwrapMatrixShader(brush.shader);
+  if (Types::Get(shader.get()) != Types::ShaderType::Runtime) {
+    return false;
+  }
+  const auto* runtimeShader = static_cast<const RuntimeShader*>(shader.get());
+
+  Brush drawBrush = brush;
+  drawBrush.shader = nullptr;
+  if (runtimeShader->classID() == RRectBlurShader::ClassID()) {
+    return exportDropShadowImage(*static_cast<const RRectBlurShader*>(runtimeShader), shaderMatrix,
+                                 matrix, clip, path, drawBrush);
+  }
+  if (runtimeShader->classID() == RRectInnerShadowShader::ClassID()) {
+    return exportInnerShadowImage(*static_cast<const RRectInnerShadowShader*>(runtimeShader),
+                                  shaderMatrix, matrix, clip, path, drawBrush);
+  }
+  return false;
+}
+
+bool PDFExportContext::exportDropShadowImage(const RRectBlurShader& shader,
+                                             const Matrix& shaderMatrix, const Matrix& deviceMatrix,
+                                             const ClipStack& clip, const Path& restrictPath,
+                                             const Brush& brush) {
+  const auto shape = RRect::MakeRectXY(shader.rect, shader.radius.x, shader.radius.y);
+  PictureRecorder recorder = {};
+  auto* recordingCanvas = recorder.beginRecording();
+  Paint shapePaint = {};
+  // The filter consumes only the source's alpha, so any opaque color works here.
+  shapePaint.setColor(Color::White());
+  recordingCanvas->drawRRect(shape, shapePaint);
+  auto picture = recorder.finishRecordingAsPicture();
+  if (picture == nullptr) {
+    return false;
+  }
+  auto filter = ImageFilter::DropShadowOnly(0.0f, 0.0f, shader.sigmaX, shader.sigmaY, shader.color);
+  if (filter == nullptr) {
+    return false;
+  }
+
+  auto realClip = RestrictClipWithPath(clip, filter->filterBounds(shape.rect()), shaderMatrix,
+                                       restrictPath, deviceMatrix);
+  auto imageMatrix = deviceMatrix;
+  imageMatrix.preConcat(shaderMatrix);
+  drawDropShadowBeforeLayer(picture, static_cast<const DropShadowImageFilter*>(filter.get()),
+                            imageMatrix, realClip, brush);
+  return true;
+}
+
+bool PDFExportContext::exportInnerShadowImage(const RRectInnerShadowShader& shader,
+                                              const Matrix& shaderMatrix,
+                                              const Matrix& deviceMatrix, const ClipStack& clip,
+                                              const Path& restrictPath, const Brush& brush) {
+  const auto shadowShape =
+      RRect::MakeRectXY(shader.shadowRect, shader.shadowRadius.x, shader.shadowRadius.y);
+  const auto maskShape =
+      RRect::MakeRectXY(shader.maskRect, shader.maskRadius.x, shader.maskRadius.y);
+  auto blurFilter = ImageFilter::Blur(shader.sigmaX, shader.sigmaY);
+  if (blurFilter == nullptr) {
+    return false;
+  }
+  // PDF has neither a blur primitive nor an inverted mask form; both force rasterization, so
+  // the mask is rasterized here.
+  auto bounds = blurFilter->filterBounds(maskShape.rect());
+  auto surface = Surface::Make(document->context(), static_cast<int>(bounds.width()),
+                               static_cast<int>(bounds.height()), false, 1, false, 0,
+                               document->dstColorSpace());
+  if (surface == nullptr) {
+    return false;
+  }
+  auto* canvas = surface->getCanvas();
+  canvas->clear(Color::Transparent());
+  canvas->translate(-bounds.x(), -bounds.y());
+  Paint maskPaint = {};
+  maskPaint.setColor(Color::White());
+  maskPaint.setAntiAlias(true);
+  maskPaint.setImageFilter(blurFilter);
+  canvas->drawRRect(maskShape, maskPaint);
+  auto maskImage = surface->makeImageSnapshot();
+  if (maskImage != nullptr) {
+    maskImage = maskImage->makeTextureImage(document->context());
+  }
+  if (maskImage == nullptr) {
+    return false;
+  }
+  auto maskShader =
+      Shader::MakeImageShader(std::move(maskImage), TileMode::Decal, TileMode::Decal, {});
+  if (maskShader == nullptr) {
+    return false;
+  }
+  maskShader = maskShader->makeWithMatrix(Matrix::MakeTrans(bounds.x(), bounds.y()));
+
+  auto realClip =
+      RestrictClipWithPath(clip, shadowShape.rect(), shaderMatrix, restrictPath, deviceMatrix);
+  Brush shadowBrush = brush;
+  shadowBrush.color = shader.color;
+  shadowBrush.color.alpha *= brush.color.alpha;
+  shadowBrush.maskFilter = MaskFilter::MakeShader(std::move(maskShader), true);
+  auto imageMatrix = deviceMatrix;
+  imageMatrix.preConcat(shaderMatrix);
+
+  Path path = {};
+  path.addRRect(shadowShape);
+  onDrawPath(imageMatrix, realClip, path, shadowBrush);
+  return true;
+}
+
 void PDFExportContext::drawLayer(std::shared_ptr<Picture> picture,
                                  std::shared_ptr<ImageFilter> imageFilter, const Matrix& matrix,
                                  const ClipStack& clip, const Brush& brush) {
@@ -849,6 +995,9 @@ std::shared_ptr<Data> PDFExportContext::getContent() {
 
 void PDFExportContext::onDrawPath(const Matrix& matrix, const ClipStack& clip, const Path& path,
                                   const Brush& brush) {
+  if (tryDrawPathWithRuntimeShader(matrix, clip, path, brush)) {
+    return;
+  }
   if (brush.maskFilter) {
     this->drawPathWithFilter(matrix, clip, path, Matrix::I(), brush);
     return;
@@ -858,14 +1007,8 @@ void PDFExportContext::onDrawPath(const Matrix& matrix, const ClipStack& clip, c
   // Keep strict constraints to avoid changing non-rectangular/path-based shader behavior.
   Rect pathRect;
   if (!path.isInverseFillType() && path.isRect(&pathRect) && brush.shader) {
-    auto shader = brush.shader;
-    Matrix shaderMatrix = Matrix::I();
+    auto [shader, shaderMatrix] = ShaderUtils::UnwrapMatrixShader(brush.shader);
     bool isSimpleImageShader = true;
-    while (Types::Get(shader.get()) == Types::ShaderType::Matrix) {
-      const auto matrixShader = static_cast<const MatrixShader*>(shader.get());
-      shaderMatrix.preConcat(matrixShader->matrix);
-      shader = matrixShader->source;
-    }
     if (Types::Get(shader.get()) != Types::ShaderType::Image) {
       isSimpleImageShader = false;
     }

@@ -183,6 +183,12 @@ class SVGExportContext : public DrawContext {
 
   static SVGPathParser::PathEncoding PathEncodingType();
 
+  bool tryDrawPathWithRuntimeShader(const Matrix& matrix, const ClipStack& clip, const Path& path,
+                                    const Brush& brush);
+
+  bool drawRuntimeShaderImage(const std::shared_ptr<Shader>& shader, const Matrix& deviceMatrix,
+                              const ClipStack& clip, const Path& path, const Brush& brush);
+
   uint32_t exportFlags = {};
   Context* context = nullptr;
   Rect viewBox = {};

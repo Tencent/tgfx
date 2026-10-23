@@ -20,8 +20,9 @@
 #include <algorithm>
 #include "core/shapes/MatrixShape.h"
 #include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
+#include "core/utils/PictureUtils.h"
 #include "core/utils/ShapeUtils.h"
-#include "layers/LayerStyleSource.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/PictureRecorder.h"
 #include "tgfx/core/RRect.h"
@@ -31,25 +32,7 @@
 namespace tgfx {
 
 static inline RRect MakeSpreadRRect(const RRect& rRect, float distance) {
-  auto bounds = rRect.rect();
-  bounds.outset(distance, distance);
-  if (bounds.width() <= 0.0f || bounds.height() <= 0.0f) {
-    return {};
-  }
-  // Adjust radii by the same amount so the expanded/contracted corners stay concentric with the
-  // original. Corners that are already sharp (zero radius) stay sharp.
-  auto radii = rRect.radii();
-  for (auto& corner : radii) {
-    if (corner.x > 0.0f) {
-      corner.x = std::max(0.0f, corner.x + distance);
-    }
-    if (corner.y > 0.0f) {
-      corner.y = std::max(0.0f, corner.y + distance);
-    }
-  }
-  RRect result = {};
-  result.setRectRadii(bounds, radii);
-  return result;
+  return SpreadUtils::MakeSpreadRRect(rRect, {distance, distance});
 }
 
 float SpreadUtils::StrokeOutset(float width, StrokeAlign align) {
@@ -72,6 +55,28 @@ std::pair<std::shared_ptr<Shape>, Matrix> SpreadUtils::UnwrapMatrixShape(
     shape = ms->shape;
   }
   return {std::move(shape), matrix};
+}
+
+RRect SpreadUtils::MakeSpreadRRect(const RRect& rRect, Point distance) {
+  auto bounds = rRect.rect();
+  bounds.outset(distance.x, distance.y);
+  if (bounds.width() <= 0.0f || bounds.height() <= 0.0f) {
+    return {};
+  }
+  // Adjust radii by the same amount so the expanded/contracted corners stay concentric with the
+  // original. Corners that are already sharp (zero radius) stay sharp.
+  auto radii = rRect.radii();
+  for (auto& corner : radii) {
+    if (corner.x > 0.0f) {
+      corner.x = std::max(0.0f, corner.x + distance.x);
+    }
+    if (corner.y > 0.0f) {
+      corner.y = std::max(0.0f, corner.y + distance.y);
+    }
+  }
+  RRect result = {};
+  result.setRectRadii(bounds, radii);
+  return result;
 }
 
 static inline void DrawSpreadRRect(Canvas* canvas, const RRect& rRect, StyledShapeType type,
@@ -132,25 +137,6 @@ static inline void DrawSpreadRRect(Canvas* canvas, const RRect& rRect, StyledSha
   }
 }
 
-bool SpreadUtils::IsSpreadCollapsed(const Shape& shape, StyledShapeType type, float strokeWidth,
-                                    StrokeAlign strokeAlign, float spread) {
-  switch (type) {
-    case StyledShapeType::Fill: {
-      auto bounds = shape.getPath().getBounds();
-      return bounds.width() + 2.0f * spread <= 0.0f || bounds.height() + 2.0f * spread <= 0.0f;
-    }
-    case StyledShapeType::Stroke: {
-      return strokeWidth + 2.0f * spread <= 0.0f;
-    }
-    case StyledShapeType::FillStroke: {
-      auto bounds = shape.getPath().getBounds();
-      auto outset = spread + StrokeOutset(strokeWidth, strokeAlign);
-      return bounds.width() + 2.0f * outset <= 0.0f || bounds.height() + 2.0f * outset <= 0.0f;
-    }
-  }
-  return false;
-}
-
 SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInput& input,
                                                             float spread) {
   auto* source = input.findExtraSource(StyleInputSource::Type::Contour);
@@ -183,7 +169,8 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
                     StrokeAlign::Center, 0, spread);
     auto fallbackPicture = fallbackRecorder.finishRecordingAsPicture();
     Point fallbackOffset = {};
-    auto fallbackImage = ToImageWithOffset(std::move(fallbackPicture), &fallbackOffset);
+    auto fallbackImage =
+        PictureUtils::ToImageWithOffset(std::move(fallbackPicture), &fallbackOffset);
     if (fallbackImage == nullptr) {
       return {nullptr, {}, false};
     }
@@ -234,17 +221,16 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
     DrawSpreadRRect(recordCanvas, rRect, type, strokeAlign, strokeWidth, spread);
   } else {
     if (!path.isRect(&rect)) {
-      // Irregular paths (stars, freeform shapes) have an exact shape but no closed-form spread:
-      // their bounding rect is used as a fill approximation for the shadow source (a pre-existing
-      // behavior); the fallback above only covers layers with no exact outline at all. A
-      // collapsed stroke is already rejected by IsSpreadCollapsed above, so any stroke reaching
-      // here is non-collapsed and safe to approximate as a fill.
+      // Complex paths use their bounding rect as an approximation for the shadow source:
+      // FillStroke is treated as a fill with the stroke outset folded into the rect, while
+      // Stroke keeps its band rendering on the rect. A collapsed stroke is already rejected by
+      // IsSpreadCollapsed above, so any stroke reaching here is non-collapsed.
       rect = path.getBounds();
-      if (type == StyledShapeType::Stroke || type == StyledShapeType::FillStroke) {
+      if (type == StyledShapeType::FillStroke) {
         auto outset = SpreadUtils::StrokeOutset(strokeWidth, styledShape.strokeAlign);
         rect.outset(outset, outset);
+        type = StyledShapeType::Fill;
       }
-      type = StyledShapeType::Fill;
     }
     DrawSpreadRRect(recordCanvas, RRect::MakeRectXY(rect, 0, 0), type, strokeAlign, strokeWidth,
                     spread);
@@ -252,7 +238,7 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
 
   auto picture = recorder.finishRecordingAsPicture();
   Point offset = {};
-  auto image = ToImageWithOffset(std::move(picture), &offset);
+  auto image = PictureUtils::ToImageWithOffset(std::move(picture), &offset);
   DEBUG_ASSERT(image != nullptr);
   if (image == nullptr) {
     return {nullptr, {}, false};
@@ -260,6 +246,25 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
   return {std::move(image),
           {offset.x - input.contentOffset.x, offset.y - input.contentOffset.y},
           false};
+}
+
+bool SpreadUtils::IsSpreadCollapsed(const Shape& shape, StyledShapeType type, float strokeWidth,
+                                    StrokeAlign strokeAlign, float spread) {
+  switch (type) {
+    case StyledShapeType::Fill: {
+      auto bounds = shape.getPath().getBounds();
+      return bounds.width() + 2.0f * spread <= 0.0f || bounds.height() + 2.0f * spread <= 0.0f;
+    }
+    case StyledShapeType::Stroke: {
+      return strokeWidth + 2.0f * spread <= 0.0f;
+    }
+    case StyledShapeType::FillStroke: {
+      auto bounds = shape.getPath().getBounds();
+      auto outset = spread + StrokeOutset(strokeWidth, strokeAlign);
+      return bounds.width() + 2.0f * outset <= 0.0f || bounds.height() + 2.0f * outset <= 0.0f;
+    }
+  }
+  return false;
 }
 
 }  // namespace tgfx

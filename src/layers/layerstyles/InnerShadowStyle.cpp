@@ -20,6 +20,8 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "layers/SpreadUtils.h"
+#include "layers/layerstyles/AnalyticShadowUtils.h"
+#include "layers/shaders/RRectInnerShadowShader.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/ImageFilter.h"
@@ -143,6 +145,13 @@ void InnerShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, floa
 
 void InnerShadowStyle::drawWithSpread(Canvas* canvas, const LayerStyleInput& input, float alpha,
                                       BlendMode blendMode) {
+  // contentShape covers only the layer's own content, not its children: a shadow derived from it
+  // follows the layer itself, while the no-spread shadow follows the whole subtree. Only the
+  // spread case can therefore be evaluated in closed form.
+  // TODO: let contentShape describe the whole subtree, then lift this restriction.
+  if (tryDrawAnalytic(canvas, input, alpha, blendMode)) {
+    return;
+  }
   auto shapeResult = SpreadUtils::MakeSpreadShapeImage(input, 0);
   auto spreadShapeResult = SpreadUtils::MakeSpreadShapeImage(input, -_spread);
 
@@ -199,6 +208,69 @@ void InnerShadowStyle::drawWithSpread(Canvas* canvas, const LayerStyleInput& inp
   paint.setMaskFilter(MaskFilter::MakeShader(offsetMaskShader, true));
   canvas->drawImage(shapeResult.image, shapeResult.offset.x, shapeResult.offset.y, sampling,
                     &paint);
+}
+
+bool InnerShadowStyle::tryDrawAnalytic(Canvas* canvas, const LayerStyleInput& input, float alpha,
+                                       BlendMode blendMode) {
+  DEBUG_ASSERT(!FloatNearlyZero(_spread));
+  const auto sigmaX = _blurrinessX * input.contentScale;
+  const auto sigmaY = _blurrinessY * input.contentScale;
+  // The closed form normalizes by sigma per axis, so a near-zero sigma cannot be expressed.
+  // Supporting an axis with zero blur would require additional shader branches, whose benefit has
+  // not been validated. A negative blurriness falls back to the filter path, which renders it as
+  // an unblurred offset shadow.
+  if (sigmaX <= FLOAT_NEARLY_ZERO || sigmaY <= FLOAT_NEARLY_ZERO) {
+    return false;
+  }
+  // The shadow shape is the layer's own outline and the mask is that shape inset by the spread.
+  const auto shadowShape = AnalyticShadowUtils::MakeShadowShape(input, 0.0f);
+  if (!shadowShape.has_value()) {
+    return false;
+  }
+  auto maskShape = AnalyticShadowUtils::MakeShadowShape(input, -_spread);
+  if (!maskShape.has_value()) {
+    return false;
+  }
+  // A collapsed mask means the inner shadow covers the entire shadow area.
+  if (maskShape->rect().isEmpty()) {
+    Paint paint = {};
+    paint.setColor(_color);
+    paint.setBlendMode(blendMode);
+    paint.setAlpha(alpha);
+    paint.setAntiAlias(true);
+    canvas->drawRRect(*shadowShape, paint);
+    return true;
+  }
+
+  // AnalyticShadowUtils::MakeShadowShape never returns a complex RRect.
+  DEBUG_ASSERT(!shadowShape->isComplex() && !maskShape->isComplex());
+  // The spread insets the shape symmetrically, so both shapes are concentric.
+  DEBUG_ASSERT(
+      FloatNearlyEqual(maskShape->rect().centerX(), shadowShape->rect().centerX(), 0.01f) &&
+      FloatNearlyEqual(maskShape->rect().centerY(), shadowShape->rect().centerY(), 0.01f));
+  // The offset moves the shadow only, so it is applied to the mask shape rather than to the
+  // canvas.
+  maskShape->offset(_offsetX * input.contentScale, _offsetY * input.contentScale);
+
+  auto shader = RRectInnerShadowShader::Make(*shadowShape, *maskShape, sigmaX, sigmaY, _color);
+  DEBUG_ASSERT(shader != nullptr);
+  if (shader == nullptr) {
+    return false;
+  }
+
+  // The closed form needs the rect axis-aligned, and the shader gets that by mapping the
+  // coordinates it is given back into the shape's own space, so a rotated or skewed canvas matrix
+  // needs no handling here.
+  Paint paint = {};
+  paint.setShader(std::move(shader));
+  paint.setBlendMode(blendMode);
+  paint.setAlpha(alpha);
+  // The shader's edge ramp extends 0.5px past the shape, so outset the draw rect by 1px to
+  // keep it out of the geometry AA band.
+  auto drawRect = shadowShape->rect();
+  drawRect.outset(1.0f, 1.0f);
+  canvas->drawRect(drawRect, paint);
+  return true;
 }
 
 std::shared_ptr<ImageFilter> InnerShadowStyle::getShadowFilter(float scale) {
