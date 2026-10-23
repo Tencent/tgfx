@@ -1,5 +1,5 @@
-// Shader-side leaf tiling with two scalar recipes (Tiled* and Tiled*2), used by
-// PointwiseChainShader and the NoiseGraph profile of PointwiseGraphShader. Pairs with
+// Shader-side leaf tiling with two scalar recipes (Tiled* and Tiled*2), used by the plain-chain
+// and noise resource kinds of PointwiseChainShader. Pairs with
 // pointwise_tiled2_uniforms.inc.
 
 // The number of recipe sets, and the leaf that reads recipe set `recipe` (-1 = unused). Pure

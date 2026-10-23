@@ -1,6 +1,6 @@
-// Shared vertex implementation for PointwiseChainShader and PointwiseGraphShader.
+// Shared vertex implementation of PointwiseChainShader.
 // Feeds one TransformedCoords varying per texture leaf of the pointwise DAG. The leaf count is the
-// TEXTURE_COUNT permutation (0 -> 0 leaves, 1 -> 1, 2 -> 2, 3 -> 4) because the varying layout is
+// TEXTURE_COUNT permutation (0 -> 0 leaves, 1 -> the four-leaf slots) because the varying layout is
 // part of the vertex/fragment interface.
 // Permutation dimensions (vert): GP_LAYOUT, HAS_COVERAGE, HAS_UV_COORD, TEXTURE_COUNT,
 // HAS_SUBSET.

@@ -1,5 +1,5 @@
-// Shader-side leaf tiling with three array recipes, used by the TiledGraph profile of
-// PointwiseGraphShader. Pairs with pointwise_tiled3_uniforms.inc.
+// Shader-side leaf tiling with three array recipes, used by the gradient resource kind
+// (RESOURCE_KIND 1) of PointwiseChainShader. Pairs with pointwise_tiled3_uniforms.inc.
 
 // The number of recipe sets, and the leaf that reads recipe set `recipe` (-1 = unused). Pure
 // selector reads: main() uses them to find the tiled leaves without touching the chainTiled* state.

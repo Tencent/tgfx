@@ -1,6 +1,6 @@
-// Perlin noise source module (OP_PERLIN_NOISE), used by the NoiseGraph profile of
-// PointwiseGraphShader. Pairs with pointwise_noise_uniforms.inc. NoiseModeOctaves.w selects which
-// leaf samplers hold the permutation and gradient lookup textures.
+// Perlin noise source module (OP_PERLIN_NOISE), used by the noise resource kind (RESOURCE_KIND 2)
+// of PointwiseChainShader. Pairs with pointwise_noise_uniforms.inc. NoiseModeOctaves.w selects
+// which leaf samplers hold the permutation and gradient lookup textures.
 #include "pointwise_chain_ops.inc"
 #include "pointwise_source_coords.inc"
 

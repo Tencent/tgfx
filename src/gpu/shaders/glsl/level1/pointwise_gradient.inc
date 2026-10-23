@@ -1,5 +1,5 @@
-// Gradient source module (OP_GRADIENT), used by the TiledGraph profile of PointwiseGraphShader.
-// Pairs with pointwise_gradient_uniforms.inc.
+// Gradient source module (OP_GRADIENT), used by the gradient resource kind (RESOURCE_KIND 1) of
+// PointwiseChainShader. Pairs with pointwise_gradient_uniforms.inc.
 #include "pointwise_chain_ops.inc"
 #include "pointwise_source_coords.inc"
 #include "gradient_layout.inc"

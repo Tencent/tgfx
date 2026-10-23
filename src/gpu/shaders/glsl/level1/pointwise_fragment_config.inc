@@ -1,4 +1,4 @@
-// Fragment stage of the pointwise kernels (PointwiseChainShader, PointwiseGraphShader): shared
+// Fragment stage of the pointwise kernels (PointwiseChainShader): shared
 // core, part 1 of 3, permutation defaults and the texture-leaf count.
 //
 // A kernel entry composes its fragment stage from the shared core and the resource modules it
