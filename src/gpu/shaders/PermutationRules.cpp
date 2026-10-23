@@ -180,17 +180,6 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadColorFillReachable() {
   return EnumerateMirroredReachable<EmptyVertDims, QuadColorFillShader::FD>(nullptr);
 }
 
-std::optional<RuleComposedValues> ComposeSolidColorFill(const SolidColorFillInputs& inputs) {
-  if (inputs.xpType < 0) {
-    return std::nullopt;
-  }
-  using FD = SolidColorFillShader::FD;
-  RuleComposedValues values;
-  values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_XP] = inputs.xpType;
-  return values;
-}
-
 std::set<std::pair<uint32_t, uint32_t>> EnumerateSolidColorFillReachable() {
   return EnumerateMirroredReachable<SolidColorFillShader::VD, SolidColorFillShader::FD>(nullptr);
 }

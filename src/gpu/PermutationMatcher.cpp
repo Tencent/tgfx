@@ -19,6 +19,7 @@
 #include "PermutationMatcher.h"
 #include <skcms.h>
 #include "ColorSpaceXformHelper.h"
+#include "ShaderMatchHelpers.h"
 #include "gpu/Swizzle.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AOTYUVChainProcessor.h"
@@ -94,7 +95,7 @@ static std::optional<PermutationMatchResult> Fail(PermutationMatchFailure reason
 
 // Returns 0 for EmptyXferProcessor, 1 for PorterDuffXferProcessor with dst texture (DST_TEX mode),
 // 2 for PorterDuffXferProcessor with framebuffer fetch, or -1 for unsupported XP types.
-static int GetXPType(const ProgramInfo* programInfo) {
+int GetXPType(const ProgramInfo* programInfo) {
   auto xp = programInfo->getXferProcessor();
   if (xp == EmptyXferProcessor::GetInstance()) {
     return 0;
@@ -211,7 +212,7 @@ static bool HasDirectAnalyticClipCoverage(const ProgramInfo* programInfo) {
 // Kernels whose color comes from the GP Color uniform: a color FP would be silently dropped, so
 // the draw may carry no FP at all or only a direct analytic clip evaluated from the runtime clip
 // contract uniforms.
-static bool HasNoProcessorsOrDirectClip(const ProgramInfo* programInfo) {
+bool HasNoProcessorsOrDirectClip(const ProgramInfo* programInfo) {
   return programInfo->numFragmentProcessors() == 0 ||
          (programInfo->numColorFragmentProcessors() == 0 &&
           HasDirectAnalyticClipCoverage(programInfo));
@@ -364,30 +365,6 @@ static std::optional<PermutationMatchResult> TryMatchYUVTextureFill(
   auto vertIndex = YUVTextureFillShader::VD::domain().encode(composed->vertValues);
   auto fragIndex = YUVTextureFillShader::FD::domain().encode(composed->fragValues);
   return PermutationMatchResult{"YUVTextureFillShader", vertIndex, fragIndex};
-}
-
-static std::optional<PermutationMatchResult> TryMatchSolidColorFill(
-    const ProgramInfo* programInfo) {
-  auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "DefaultGeometryProcessor") {
-    return std::nullopt;
-  }
-  // The fill color comes from the DefaultGeometryProcessor Color uniform, so a color fragment
-  // processor would be silently dropped and must reject. The only accepted FP is one direct
-  // analytic clip coverage FP (AA rect or rrect), which this shader evaluates from the runtime
-  // clip contract uniforms.
-  if (!HasNoProcessorsOrDirectClip(programInfo)) {
-    return std::nullopt;
-  }
-  SolidColorFillInputs inputs;
-  inputs.xpType = GetXPType(programInfo);
-  auto composed = ComposeSolidColorFill(inputs);
-  if (!composed) {
-    return std::nullopt;
-  }
-  auto vertIndex = SolidColorFillShader::VD::domain().encode(composed->vertValues);
-  auto fragIndex = SolidColorFillShader::FD::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"SolidColorFillShader", vertIndex, fragIndex};
 }
 
 static std::optional<PermutationMatchResult> TryMatchMaskFill(const ProgramInfo* programInfo) {
@@ -1441,7 +1418,7 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
     // OutputAlphaSwizzle uniform) may serve the draw. Other kernels assume RGBA output. The
     // gaussian blur kernel applies it too (an alpha-only blur pass writes its mask accumulation
     // through the AAAA swizzle), with the AlphaChild flag carrying the .rrrr readback.
-    if (auto result = TryMatchSolidColorFill(programInfo)) {
+    if (auto result = SolidColorFillShader::Match(programInfo)) {
       return result;
     }
     if (auto result = TryMatchMaskFill(programInfo)) {
@@ -1473,7 +1450,7 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
   if (auto result = TryMatchTiledTextureFill(programInfo)) {
     return result;
   }
-  if (auto result = TryMatchSolidColorFill(programInfo)) {
+  if (auto result = SolidColorFillShader::Match(programInfo)) {
     return result;
   }
   if (auto result = TryMatchMaskFill(programInfo)) {

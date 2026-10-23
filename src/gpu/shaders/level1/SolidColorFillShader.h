@@ -18,9 +18,13 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/shaders/PrecompiledShader.h"
 
 namespace tgfx {
+
+class ProgramInfo;
+struct PermutationMatchResult;
 
 /// Precompiled shader for a solid-color fill through DefaultGeometryProcessor with no fragment
 /// processors. The fill color comes from the geometry processor's Color uniform. Covers the common
@@ -49,7 +53,14 @@ class SolidColorFillShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 1, "Update the Compose mapping when fragment dimensions change.");
+  static_assert(FD::COUNT == 1, "Update Match in SolidColorFillShader.cpp when dimensions change.");
+
+  /// Whether alpha-only (AAAA) render targets may be served by this kernel.
+  static constexpr bool ServesAlphaOnly = true;
+
+  /// Runtime matching: does this draw belong to this family? Declared here, defined in the
+  /// family's own .cpp (SolidColorFillShader.cpp) next to the GLSL it owns.
+  static std::optional<PermutationMatchResult> Match(const ProgramInfo* programInfo);
 
   PrecompiledShaderInfo info() const override {
     return {"SolidColorFillShader",

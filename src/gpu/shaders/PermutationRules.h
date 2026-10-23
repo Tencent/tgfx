@@ -141,14 +141,6 @@ struct QuadColorFillInputs {
 };
 
 /**
- * Input contract of the SolidColorFillShader matcher rule. The direct AARect clip coverage check
- * is a whole-draw rejection and stays in Extract.
- */
-struct SolidColorFillInputs {
-  int xpType = -1;  // -1 = no representable XferProcessor.
-};
-
-/**
  * Input contract of the ComplexEllipseFillShader matcher rule.
  */
 struct ComplexEllipseFillInputs {
@@ -370,12 +362,6 @@ std::optional<RuleComposedValues> ComposeHairlineQuad(const HairlineQuadInputs& 
  * contract.
  */
 std::optional<RuleComposedValues> ComposeQuadColorFill(const QuadColorFillInputs& inputs);
-
-/**
- * Pure mapping for the SolidColorFillShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
- */
-std::optional<RuleComposedValues> ComposeSolidColorFill(const SolidColorFillInputs& inputs);
 
 /**
  * Pure mapping for the ComplexEllipseFillShader rule; see ComposeRoundStrokeRect for the sharing
