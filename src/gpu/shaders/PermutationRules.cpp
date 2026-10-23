@@ -17,29 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/shaders/PermutationRules.h"
-#include "gpu/shaders/level1/AtlasTextFillShader.h"
-#include "gpu/shaders/level1/ComplexEllipseFillShader.h"
-#include "gpu/shaders/level1/ComplexNonAARRectFillShader.h"
-#include "gpu/shaders/level1/EllipseFillShader.h"
-#include "gpu/shaders/level1/GaussianBlur1DShader.h"
-#include "gpu/shaders/level1/GlassRefractionShader.h"
-#include "gpu/shaders/level1/GlassUDFTentBlurShader.h"
-#include "gpu/shaders/level1/HairlineLineShader.h"
-#include "gpu/shaders/level1/HairlineQuadShader.h"
-#include "gpu/shaders/level1/MaskFillShader.h"
-#include "gpu/shaders/level1/MeshFillShader.h"
-#include "gpu/shaders/level1/NonAARRectFillShader.h"
-#include "gpu/shaders/level1/PerlinNoiseFillShader.h"
-#include "gpu/shaders/level1/PointwiseChainShader.h"
-#include "gpu/shaders/level1/QuadColorFillShader.h"
-#include "gpu/shaders/level1/QuadTextureFillShader.h"
-#include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
-#include "gpu/shaders/level1/ShapeInstancedFillShader.h"
-#include "gpu/shaders/level1/ShapeInstancedTextureCoverageShader.h"
-#include "gpu/shaders/level1/SolidColorFillShader.h"
-#include "gpu/shaders/level1/TexturedEffectShader.h"
-#include "gpu/shaders/level1/TiledTextureFillShader.h"
-#include "gpu/shaders/level1/YUVTextureFillShader.h"
+#include "gpu/shaders/AllShaderFamilies.h"
 
 namespace tgfx {
 

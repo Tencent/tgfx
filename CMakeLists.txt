@@ -806,6 +806,40 @@ if (TGFX_EXCLUDE_FILES)
     list(REMOVE_ITEM TGFX_FILES ${TGFX_EXCLUDE_FILES})
 endif ()
 
+# The one list of shader families: every src/gpu/shaders/level1/<Name>.h that registers <Name> with
+# TGFX_REGISTER_SHADER. Adding a family means adding its header; nothing else lists it. The list is
+# generated into gpu/shaders/AllShaderFamilies.h (the includes plus a TGFX_FOR_EACH_SHADER_FAMILY
+# X-macro) so the registry, the matcher, the build tool and the tests all derive from it.
+file(GLOB TGFX_SHADER_FAMILY_HEADERS CONFIGURE_DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/shaders/level1/*.h)
+set(TGFX_SHADER_FAMILY_INCLUDES "")
+set(TGFX_SHADER_FAMILY_ENTRIES "")
+foreach (FAMILY_HEADER ${TGFX_SHADER_FAMILY_HEADERS})
+    get_filename_component(FAMILY_NAME "${FAMILY_HEADER}" NAME_WE)
+    file(READ "${FAMILY_HEADER}" FAMILY_HEADER_TEXT)
+    if (NOT FAMILY_HEADER_TEXT MATCHES "TGFX_REGISTER_SHADER\\(tgfx::([A-Za-z0-9_]+)[,)]")
+        message(FATAL_ERROR "${FAMILY_HEADER} does not register a shader family with "
+                "TGFX_REGISTER_SHADER; every header under src/gpu/shaders/level1 is a family.")
+    endif ()
+    if (NOT "${CMAKE_MATCH_1}" STREQUAL "${FAMILY_NAME}")
+        message(FATAL_ERROR "${FAMILY_HEADER} registers ${CMAKE_MATCH_1}; a family header must be "
+                "named after the class it registers.")
+    endif ()
+    string(APPEND TGFX_SHADER_FAMILY_INCLUDES "#include \"gpu/shaders/level1/${FAMILY_NAME}.h\"\n")
+    string(APPEND TGFX_SHADER_FAMILY_ENTRIES " \\\n  X(${FAMILY_NAME})")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${FAMILY_HEADER}")
+endforeach ()
+set(TGFX_GENERATED_INCLUDE_DIR "${CMAKE_BINARY_DIR}/generated/include")
+file(CONFIGURE OUTPUT "${TGFX_GENERATED_INCLUDE_DIR}/gpu/shaders/AllShaderFamilies.h" CONTENT
+"// Auto-generated from src/gpu/shaders/level1/*.h by CMakeLists.txt. Do not edit.
+#pragma once
+
+${TGFX_SHADER_FAMILY_INCLUDES}
+// Calls X(FamilyName) once per registered shader family, in file-name order.
+#define TGFX_FOR_EACH_SHADER_FAMILY(X)${TGFX_SHADER_FAMILY_ENTRIES}
+" @ONLY NEWLINE_STYLE UNIX)
+list(APPEND TGFX_INCLUDES ${TGFX_GENERATED_INCLUDE_DIR})
+
 add_library(tgfx STATIC ${TGFX_FILES})
 add_dependencies(tgfx tgfx-vendor tgfx_zstd)
 target_compile_definitions(tgfx PRIVATE ${TGFX_DEFINES})
@@ -903,7 +937,8 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
     add_library(tgfx_shader_declarations STATIC ${TGFX_SHADER_DECL_FILES})
     set_target_properties(tgfx_shader_declarations PROPERTIES PREFIX "")
     target_compile_options(tgfx_shader_declarations PRIVATE ${TGFX_COMPILE_OPTIONS})
-    target_include_directories(tgfx_shader_declarations PUBLIC src include)
+    target_include_directories(tgfx_shader_declarations PUBLIC src include
+            ${TGFX_GENERATED_INCLUDE_DIR})
 
     file(GLOB SHADER_TOOL_FILES CONFIGURE_DEPENDS tools/shader_build_tool/*.cpp)
     add_executable(shader_build_tool ${SHADER_TOOL_FILES})

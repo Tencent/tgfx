@@ -55,6 +55,7 @@
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/shaders/AllShaderFamilies.h"
 #include "gpu/shaders/PermutationRules.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"
@@ -331,7 +332,11 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
 
 TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
   const auto& factories = ShaderRegistry::All();
-  ASSERT_EQ(factories.size(), 23u);
+  size_t familyCount = 0;
+#define TGFX_COUNT_FAMILY(Family) ++familyCount;
+  TGFX_FOR_EACH_SHADER_FAMILY(TGFX_COUNT_FAMILY)
+#undef TGFX_COUNT_FAMILY
+  ASSERT_EQ(factories.size(), familyCount);
   std::set<std::string> names;
   size_t pairCount = 0;
   for (auto factory : factories) {
