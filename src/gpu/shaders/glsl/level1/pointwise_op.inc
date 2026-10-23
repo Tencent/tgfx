@@ -19,30 +19,12 @@
 // Values 6/7 mirror the chain kernel's slot ABI (5 is OP_TEXTURE there, never a pointwise op).
 #define OP_CONST_COLOR 6
 #define OP_BLEND 7
-
-#define CS_UNPREMUL 1
-#define CS_LINEARIZE 2
-#define CS_GAMUT 4
-#define CS_ENCODE 8
-#define CS_PREMUL 16
-#define CS_SRC_OOTF 32
-#define CS_DST_OOTF 64
 #endif
 
 // OP_BLEND needs the shared PorterDuff blend math regardless of the kernel's XP state; the
 // include is guarded, so the per-slot re-inclusions of this file stay harmless.
-#include "transfer_function.inc"
 #include "xp_blend_colors.inc"
 #include "pointwise_math.inc"
-
-// ColorSpaceXform transfer functions bound to this slot's uniform names.
-vec3 src_tf(int slot, vec3 x) {
-  return transferTF(x, SrcTF0, SrcTF1, SrcTFType);
-}
-
-vec3 dst_tf(int slot, vec3 x) {
-  return transferTF(x, DstTF0, DstTF1, DstTFType);
-}
 
 // Applies the selected pointwise operator to a premultiplied color and returns a premultiplied color.
 #if HAS_XP >= 1
@@ -85,30 +67,8 @@ vec4 applyPointwiseOp(int slot, vec4 color) {
 #endif
     result = xpBlendColors(blendSrc, blendDst, blendMode);
   } else {  // OP_COLOR_SPACE_XFORM
-    if ((CSFlags & CS_UNPREMUL) != 0) {
-      float a = color.a;
-      color = (a > 0.0) ? vec4(color.rgb / a, a) : vec4(0.0);
-    }
-    if ((CSFlags & CS_LINEARIZE) != 0) {
-      color.rgb = src_tf(slot, color.rgb);
-    }
-    if ((CSFlags & CS_SRC_OOTF) != 0) {
-      float srcY = dot(color.rgb, SrcOOTF.rgb);
-      color.rgb *= sign(srcY) * pow(abs(srcY), SrcOOTF.a);
-    }
-    if ((CSFlags & CS_GAMUT) != 0) {
-      color.rgb = ColorXform * color.rgb;
-    }
-    if ((CSFlags & CS_DST_OOTF) != 0) {
-      float dstY = dot(color.rgb, DstOOTF.rgb);
-      color.rgb *= sign(dstY) * pow(abs(dstY), DstOOTF.a);
-    }
-    if ((CSFlags & CS_ENCODE) != 0) {
-      color.rgb = dst_tf(slot, color.rgb);
-    }
-    if ((CSFlags & CS_PREMUL) != 0) {
-      color.rgb *= color.a;
-    }
+    PM_APPLY_COLOR_SPACE_XFORM(color, CSFlags, SrcTF0, SrcTF1, SrcTFType, SrcOOTF, ColorXform,
+                               DstOOTF, DstTF0, DstTF1, DstTFType)
     result = color;
   }
   return result;

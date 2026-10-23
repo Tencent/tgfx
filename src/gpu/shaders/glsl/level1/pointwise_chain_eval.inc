@@ -14,18 +14,7 @@
 #include "pointwise_chain_ops.inc"
 #include "pointwise_math.inc"
 
-#include "transfer_function.inc"
-
 #include "analytic_clip_math.inc"
-
-// ColorSpaceXform transfer functions bound to the shared chain-wide parameter block.
-vec3 chainSrcTF(vec3 x) {
-  return transferTF(x, ChainSrcTF0, ChainSrcTF1, ChainSrcTFType);
-}
-
-vec3 chainDstTF(vec3 x) {
-  return transferTF(x, ChainDstTF0, ChainDstTF1, ChainDstTFType);
-}
 
 #if HAS_XP >= 1
 // The operands of the XferProcessor's advanced blend pass (xp_blend_pass.inc), set by main()
@@ -192,29 +181,8 @@ vec4 evalChainSlot(int slot) {
     return resourceValue;
   }
   // OP_COLOR_SPACE_XFORM
-  if ((ChainCSFlags & CS_UNPREMUL) != 0) {
-    float a = color.a;
-    color = (a > 0.0) ? vec4(color.rgb / a, a) : vec4(0.0);
-  }
-  if ((ChainCSFlags & CS_LINEARIZE) != 0) {
-    color.rgb = chainSrcTF(color.rgb);
-  }
-  if ((ChainCSFlags & CS_SRC_OOTF) != 0) {
-    float srcY = dot(color.rgb, ChainSrcOOTF.rgb);
-    color.rgb *= sign(srcY) * pow(abs(srcY), ChainSrcOOTF.a);
-  }
-  if ((ChainCSFlags & CS_GAMUT) != 0) {
-    color.rgb = ChainColorXform * color.rgb;
-  }
-  if ((ChainCSFlags & CS_DST_OOTF) != 0) {
-    float dstY = dot(color.rgb, ChainDstOOTF.rgb);
-    color.rgb *= sign(dstY) * pow(abs(dstY), ChainDstOOTF.a);
-  }
-  if ((ChainCSFlags & CS_ENCODE) != 0) {
-    color.rgb = chainDstTF(color.rgb);
-  }
-  if ((ChainCSFlags & CS_PREMUL) != 0) {
-    color.rgb *= color.a;
-  }
+  PM_APPLY_COLOR_SPACE_XFORM(color, ChainCSFlags, ChainSrcTF0, ChainSrcTF1, ChainSrcTFType,
+                             ChainSrcOOTF, ChainColorXform, ChainDstOOTF, ChainDstTF0,
+                             ChainDstTF1, ChainDstTFType)
   return color;
 }

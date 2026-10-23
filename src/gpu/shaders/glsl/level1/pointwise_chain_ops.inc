@@ -20,12 +20,4 @@
 #define OP_GRADIENT 9
 #define OP_LOCAL_RECT_COVERAGE 10
 #define OP_RRECT_COVERAGE 11
-
-#define CS_UNPREMUL 1
-#define CS_LINEARIZE 2
-#define CS_GAMUT 4
-#define CS_ENCODE 8
-#define CS_PREMUL 16
-#define CS_SRC_OOTF 32
-#define CS_DST_OOTF 64
 #endif
