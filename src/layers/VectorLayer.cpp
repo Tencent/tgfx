@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/VectorLayer.h"
+#include <unordered_set>
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/Types.h"
@@ -36,21 +37,6 @@ static inline bool HasTransparentSolidColor(const Painter* painter) {
     return false;
   }
   return FloatNearlyZero(static_cast<const SolidColor*>(colorSource)->color().alpha);
-}
-
-// Returns true when one of the painters records the geometry. A captured geometry is drawn through
-// its painter, so it is not part of the bare geometry the layer records on its own.
-static bool IsCapturedByAnyPainter(const Geometry* geometry,
-                                   const std::vector<std::unique_ptr<Painter>>& painters) {
-  for (const auto& painter : painters) {
-    DEBUG_ASSERT(painter != nullptr);
-    for (const auto* captured : painter->geometries) {
-      if (captured == geometry) {
-        return true;
-      }
-    }
-  }
-  return false;
 }
 
 static std::optional<StyledShape> MakeStyledShape(const std::vector<const Painter*>& painters);
@@ -97,10 +83,18 @@ void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
   }
   // Cache the geometries no painter captured so the own geometry shape can still include them. The
   // set is taken after every element applied, since MergePath clears geometries and painters while
-  // Repeater clones and reorders them.
+  // Repeater clones and reorders them. A captured geometry is drawn through its painter, so it is
+  // not part of the bare geometry; collecting the captures once keeps the comparison from being
+  // quadratic in the geometry count.
+  std::unordered_set<const Geometry*> capturedGeometries = {};
+  capturedGeometries.reserve(context.geometries.size());
+  for (const auto& painter : context.painters) {
+    DEBUG_ASSERT(painter != nullptr);
+    capturedGeometries.insert(painter->geometries.begin(), painter->geometries.end());
+  }
   for (const auto& geometry : context.geometries) {
     DEBUG_ASSERT(geometry != nullptr);
-    if (IsCapturedByAnyPainter(geometry.get(), context.painters)) {
+    if (capturedGeometries.count(geometry.get()) != 0) {
       continue;
     }
     auto shape = geometry->getShape();
