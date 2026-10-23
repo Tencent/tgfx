@@ -463,9 +463,7 @@ void Layer::setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value
   }
   if (hadOwnGeometryContent != hasOwnGeometryContentStyle()) {
     // The own geometry joins the layer bounds only while a style declares it, and neither
-    // invalidateSubtree() nor invalidateTransform() drops contentBounds, so it must be rebuilt.
-    // The flag is set first because invalidateContent() returns early on already-dirty content.
-    bitFields.dirtyContentBounds = true;
+    // invalidateSubtree() nor invalidateTransform() drops contentBounds, so rebuild it here.
     invalidateContent();
   }
   invalidateSubtree();
@@ -1927,9 +1925,10 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
       } else if (!group->contour.has_value()) {
         // Lazy fallback: a layer whose geometry lives in its children records no own geometry, so
         // the style falls back to the shared subtree contour. That contour keeps a descendant's
-        // painters with alpha=0, which the shared content drops. A failed recording leaves the
-        // bucket unusable, as it was before. This recording does read drawArgs.excludeEffects, so it
-        // must stay inside the loop.
+        // painters with alpha=0, which the shared content drops. A failed recording only skips this
+        // style: ResolveContentEntry then finds neither entry and drops it, while the other styles
+        // of the bucket keep drawing from the shared content. This recording does read
+        // drawArgs.excludeEffects, so it must stay inside the loop.
         LayerStyleSourceEntry contourEntry = {};
         contourEntry.image =
             getContentContourImage(drawArgs, contentScale, &contourEntry.offset, nullptr);
@@ -2181,7 +2180,10 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     if (hasOwnGeometry) {
       contentBounds->join(onGetOwnGeometryBounds());
     }
-    if (transformer) {
+    // An empty content bounds has nothing to cover, but a style or filter transformer outsets
+    // whatever it is given, so running it on the empty rect would invent bounds and dirty regions
+    // for a layer that paints nothing.
+    if (transformer && !contentBounds->isEmpty()) {
       transformer->transform(contentBounds);
     }
     _root->invalidateRect(*contentBounds);

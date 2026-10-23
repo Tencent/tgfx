@@ -7713,4 +7713,62 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryLayerRedrawsAfterMove) {
          "left the old glass behind";
 }
 
+// ===== An emptied layer must not get bounds back from its style outset =====
+//
+// updateRenderBounds() maps the content bounds through the layer's filters and styles, and a style
+// outsets whatever it is handed. Mapping the empty rect of a layer that paints nothing turns empty
+// into non-empty, so the layer would keep a render bounds and dirty a region although it has
+// nothing to draw.
+
+TGFX_TEST_PRIVATE(LayerTest, EmptyContentDoesNotGetStyleOutsetBounds) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+
+  DisplayList displayList;
+  auto group = VectorGroup::Make();
+  group->setElements({MakeRectElement(Rect::MakeXYWH(20.0f, 20.0f, 40.0f, 40.0f)),
+                      FillStyle::Make(SolidColor::Make(Color::White()))});
+  auto layer = VectorLayer::Make();
+  layer->setContents({group});
+  // DropShadow outsets its bounds by its blur radius, so an empty content bounds reaches the
+  // transformer and comes back non-empty. Glass cannot show this: its filterBounds is the identity.
+  layer->setLayerStyles({DropShadowStyle::Make(0.0f, 0.0f, 8.0f, 8.0f, Color::Black())});
+  displayList.root()->addChild(layer);
+  displayList.render(surface.get());
+
+  Rect before = {};
+  TGFX_PRIVATE_ACCESS(before = layer->renderBounds;)
+  ASSERT_FALSE(before.isEmpty()) << "fixture control: the painted layer must have render bounds";
+
+  layer->setContents({});
+  // updateRenderBounds() is the step of RootLayer::updateDirtyRegions() that recomputes bounds, and
+  // the dirty list is only drained by updateDirtyRegions(), so calling it directly tells what the
+  // emptied layer invalidated without consuming the list first.
+  std::vector<Rect> dirty = {};
+  Rect after = {};
+  TGFX_PRIVATE_ACCESS(displayList._root->updateRenderBounds();
+                      dirty = displayList._root->currentDirtyRects(); after = layer->renderBounds;)
+  EXPECT_TRUE(after.isEmpty())
+      << "a layer with no content must not keep the bounds the style outset gave it, otherwise it "
+         "is drawn and culled against a footprint it does not have. after="
+      << after.left << "," << after.top << " " << after.width() << "x" << after.height();
+  ASSERT_FALSE(dirty.empty()) << "the region the panel used to cover must still be invalidated";
+  for (const auto& rect : dirty) {
+    EXPECT_TRUE(before.contains(rect))
+        << "an emptied layer may only invalidate the region it used to cover. A rect outside that "
+           "region dirties pixels the layer never drew. dirty="
+        << rect.left << "," << rect.top << " " << rect.width() << "x" << rect.height()
+        << " before=" << before.left << "," << before.top << " " << before.width() << "x"
+        << before.height();
+  }
+
+  // The same must hold for a real incremental frame: nothing may bring the bounds back.
+  displayList.render(surface.get(), false);
+  TGFX_PRIVATE_ACCESS(after = layer->renderBounds;)
+  EXPECT_TRUE(after.isEmpty()) << "an incremental frame must not resurrect the dropped bounds";
+}
+
 }  // namespace tgfx
