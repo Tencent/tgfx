@@ -167,16 +167,16 @@ class PDFExportContext : public DrawContext {
                      const std::shared_ptr<ImageFilter>& imageFilter, const Matrix& matrix,
                      const ClipStack& clip, const Brush& brush);
 
-  bool tryDrawRectByConsumingShader(const Rect& rect, const Brush& brush, const Matrix& matrix,
-                                    const ClipStack& clip, const Stroke* stroke);
+  bool tryDrawPathWithRuntimeShader(const Matrix& matrix, const ClipStack& clip, const Path& path,
+                                    const Brush& brush);
 
   bool exportDropShadowImage(const RRectBlurShader& shader, const Matrix& shaderMatrix,
                              const Matrix& deviceMatrix, const ClipStack& clip,
-                             const Rect& restrictRect, const Brush& brush);
+                             const Path& restrictPath, const Brush& brush);
 
   bool exportInnerShadowImage(const RRectInnerShadowShader& shader, const Matrix& shaderMatrix,
                               const Matrix& deviceMatrix, const ClipStack& clip,
-                              const Rect& restrictRect, const Brush& brush);
+                              const Path& restrictPath, const Brush& brush);
 
   void drawPathWithFilter(const Matrix& matrix, const ClipStack& clip, const Path& originPath,
                           const Matrix& pathExtraMatrix, const Brush& originPaint);

@@ -18,9 +18,9 @@
 
 #pragma once
 
+#include "core/shaders/RuntimeShader.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/RRect.h"
-#include "tgfx/core/Shader.h"
 
 namespace tgfx {
 
@@ -28,8 +28,10 @@ namespace tgfx {
  * Fills with a solid color modulated by the coverage of a rounded rectangle convolved with a
  * Gaussian kernel truncated at +/- 2 sigma, at a cost independent of sigma.
  */
-class RRectBlurShader : public Shader {
+class RRectBlurShader : public RuntimeShader {
  public:
+  DEFINE_RUNTIME_SHADER_CLASS_ID
+
   /**
    * Creates a shader for the given rounded rectangle. Returns nullptr when the inputs cannot
    * produce a closed-form result.
@@ -53,10 +55,6 @@ class RRectBlurShader : public Shader {
   Color color = Color::Transparent();
 
  protected:
-  Type type() const override {
-    return Type::RRectBlur;
-  }
-
   bool isEqual(const Shader* shader) const override;
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(

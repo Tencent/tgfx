@@ -133,15 +133,6 @@ PDFIndirectReference PDFShader::Make(PDFDocumentImpl* doc, const std::shared_ptr
                         surfaceBBox, shaderImage, paintColor);
     return pdfShader;
   }
-  // Analytic shadow shaders carry their own geometry and are consumed at the draw entry, before
-  // reaching shader conversion. Reaching the fallback would rasterize them into a page-sized
-  // bitmap shader.
-  const bool isAnalyticShadow = shaderType == Types::ShaderType::RRectBlur ||
-                                shaderType == Types::ShaderType::RRectInnerShadow;
-  DEBUG_ASSERT(!isAnalyticShadow);
-  if (isAnalyticShadow) {
-    LOGE("Analytic shadow shader was not consumed at draw entry");
-  }
   // Don't bother to de-dup fallback shader.
   return MakeFallbackShader(doc, unwrappedShader, combinedTransform, surfaceBBox, paintColor);
 }

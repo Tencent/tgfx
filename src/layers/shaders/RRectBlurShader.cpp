@@ -16,13 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/shaders/RRectBlurShader.h"
+#include "layers/shaders/RRectBlurShader.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/Types.h"
-#include "gpu/processors/RRectBlurFragmentProcessor.h"
-#include "gpu/processors/RectBlurFragmentProcessor.h"
+#include "layers/processors/RRectBlurFragmentProcessor.h"
+#include "layers/processors/RectBlurFragmentProcessor.h"
 
 namespace tgfx {
 
@@ -44,15 +44,19 @@ std::shared_ptr<Shader> RRectBlurShader::Make(const RRect& rRect, float sigmaX, 
 
 RRectBlurShader::RRectBlurShader(const Rect& rect, const Point& radius, float sigmaX, float sigmaY,
                                  const Color& color)
-    : rect(rect), radius(radius), sigmaX(sigmaX), sigmaY(sigmaY), color(color) {
+    : RuntimeShader(ClassID()), rect(rect), radius(radius), sigmaX(sigmaX), sigmaY(sigmaY),
+      color(color) {
 }
 
 bool RRectBlurShader::isEqual(const Shader* shader) const {
-  auto type = Types::Get(shader);
-  if (type != Types::ShaderType::RRectBlur) {
+  if (Types::Get(shader) != Type::Runtime) {
     return false;
   }
-  auto* other = static_cast<const RRectBlurShader*>(shader);
+  const auto* runtimeShader = static_cast<const RuntimeShader*>(shader);
+  if (runtimeShader->classID() != ClassID()) {
+    return false;
+  }
+  const auto* other = static_cast<const RRectBlurShader*>(runtimeShader);
   return rect == other->rect && radius == other->radius && sigmaX == other->sigmaX &&
          sigmaY == other->sigmaY && color == other->color;
 }

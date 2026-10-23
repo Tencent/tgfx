@@ -35,14 +35,15 @@
 #include "core/shaders/ColorShader.h"
 #include "core/shaders/ImageShader.h"
 #include "core/shaders/MatrixShader.h"
-#include "core/shaders/RRectBlurShader.h"
-#include "core/shaders/RRectInnerShadowShader.h"
+#include "core/shaders/RuntimeShader.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/Log.h"
 #include "core/utils/PlacementPtr.h"
 #include "core/utils/ShaderUtils.h"
 #include "core/utils/ShapeUtils.h"
 #include "core/utils/Types.h"
+#include "layers/shaders/RRectBlurShader.h"
+#include "layers/shaders/RRectInnerShadowShader.h"
 #include "pdf/PDFBitmap.h"
 #include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFFont.h"
@@ -183,9 +184,6 @@ void PDFExportContext::drawFill(const Brush& brush) {
 
 void PDFExportContext::drawRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip,
                                 const Brush& brush, const Stroke* stroke) {
-  if (tryDrawRectByConsumingShader(rect, brush, matrix, clip, stroke)) {
-    return;
-  }
   Path path;
   path.addRect(rect);
   if (stroke) {
@@ -808,53 +806,47 @@ void PDFExportContext::drawBlurLayer(const std::shared_ptr<Picture>& picture,
   }
 }
 
-static ClipStack RestrictClipWithRect(const ClipStack& clip, const Rect& contentBounds,
-                                      const Matrix& contentMatrix, const Rect& restrictRect,
+static ClipStack RestrictClipWithPath(const ClipStack& clip, const Rect& contentBounds,
+                                      const Matrix& contentMatrix, const Path& restrictPath,
                                       const Matrix& deviceMatrix) {
-  if (restrictRect.contains(contentMatrix.mapRect(contentBounds))) {
+  Rect restrictRect = {};
+  if (restrictPath.isRect(&restrictRect) &&
+      restrictRect.contains(contentMatrix.mapRect(contentBounds))) {
     return clip;
   }
 
   auto result = clip;
-  result.clipRect(restrictRect, deviceMatrix, false);
+  result.clipPath(restrictPath, deviceMatrix, false);
   return result;
 }
 
-bool PDFExportContext::tryDrawRectByConsumingShader(const Rect& rect, const Brush& brush,
-                                                    const Matrix& matrix, const ClipStack& clip,
-                                                    const Stroke* stroke) {
+bool PDFExportContext::tryDrawPathWithRuntimeShader(const Matrix& matrix, const ClipStack& clip,
+                                                    const Path& path, const Brush& brush) {
   if (brush.shader == nullptr) {
     return false;
   }
   auto [shader, shaderMatrix] = ShaderUtils::UnwrapMatrixShader(brush.shader);
-  const auto type = Types::Get(shader.get());
-  const bool consumable =
-      type == Types::ShaderType::RRectBlur || type == Types::ShaderType::RRectInnerShadow;
-  // The analytic shadow shaders only appear on plain fills, so a stroked draw never carries one.
-  DEBUG_ASSERT(!consumable || stroke == nullptr);
-  if (!consumable || stroke != nullptr) {
+  if (Types::Get(shader.get()) != Types::ShaderType::Runtime) {
     return false;
   }
+  const auto* runtimeShader = static_cast<const RuntimeShader*>(shader.get());
 
   Brush drawBrush = brush;
   drawBrush.shader = nullptr;
-  switch (type) {
-    case Types::ShaderType::RRectBlur: {
-      const auto* blur = static_cast<const RRectBlurShader*>(shader.get());
-      return exportDropShadowImage(*blur, shaderMatrix, matrix, clip, rect, drawBrush);
-    }
-    case Types::ShaderType::RRectInnerShadow: {
-      const auto* inner = static_cast<const RRectInnerShadowShader*>(shader.get());
-      return exportInnerShadowImage(*inner, shaderMatrix, matrix, clip, rect, drawBrush);
-    }
-    default:
-      return false;
+  if (runtimeShader->classID() == RRectBlurShader::ClassID()) {
+    return exportDropShadowImage(*static_cast<const RRectBlurShader*>(runtimeShader), shaderMatrix,
+                                 matrix, clip, path, drawBrush);
   }
+  if (runtimeShader->classID() == RRectInnerShadowShader::ClassID()) {
+    return exportInnerShadowImage(*static_cast<const RRectInnerShadowShader*>(runtimeShader),
+                                  shaderMatrix, matrix, clip, path, drawBrush);
+  }
+  return false;
 }
 
 bool PDFExportContext::exportDropShadowImage(const RRectBlurShader& shader,
                                              const Matrix& shaderMatrix, const Matrix& deviceMatrix,
-                                             const ClipStack& clip, const Rect& restrictRect,
+                                             const ClipStack& clip, const Path& restrictPath,
                                              const Brush& brush) {
   const auto shape = RRect::MakeRectXY(shader.rect, shader.radius.x, shader.radius.y);
   PictureRecorder recorder = {};
@@ -872,8 +864,8 @@ bool PDFExportContext::exportDropShadowImage(const RRectBlurShader& shader,
     return false;
   }
 
-  auto realClip = RestrictClipWithRect(clip, filter->filterBounds(shape.rect()), shaderMatrix,
-                                       restrictRect, deviceMatrix);
+  auto realClip = RestrictClipWithPath(clip, filter->filterBounds(shape.rect()), shaderMatrix,
+                                       restrictPath, deviceMatrix);
   auto imageMatrix = deviceMatrix;
   imageMatrix.preConcat(shaderMatrix);
   drawDropShadowBeforeLayer(picture, static_cast<const DropShadowImageFilter*>(filter.get()),
@@ -884,7 +876,7 @@ bool PDFExportContext::exportDropShadowImage(const RRectBlurShader& shader,
 bool PDFExportContext::exportInnerShadowImage(const RRectInnerShadowShader& shader,
                                               const Matrix& shaderMatrix,
                                               const Matrix& deviceMatrix, const ClipStack& clip,
-                                              const Rect& restrictRect, const Brush& brush) {
+                                              const Path& restrictPath, const Brush& brush) {
   const auto shadowShape =
       RRect::MakeRectXY(shader.shadowRect, shader.shadowRadius.x, shader.shadowRadius.y);
   const auto maskShape =
@@ -925,7 +917,7 @@ bool PDFExportContext::exportInnerShadowImage(const RRectInnerShadowShader& shad
   maskShader = maskShader->makeWithMatrix(Matrix::MakeTrans(bounds.x(), bounds.y()));
 
   auto realClip =
-      RestrictClipWithRect(clip, shadowShape.rect(), shaderMatrix, restrictRect, deviceMatrix);
+      RestrictClipWithPath(clip, shadowShape.rect(), shaderMatrix, restrictPath, deviceMatrix);
   Brush shadowBrush = brush;
   shadowBrush.color = shader.color;
   shadowBrush.color.alpha *= brush.color.alpha;
@@ -1003,6 +995,9 @@ std::shared_ptr<Data> PDFExportContext::getContent() {
 
 void PDFExportContext::onDrawPath(const Matrix& matrix, const ClipStack& clip, const Path& path,
                                   const Brush& brush) {
+  if (tryDrawPathWithRuntimeShader(matrix, clip, path, brush)) {
+    return;
+  }
   if (brush.maskFilter) {
     this->drawPathWithFilter(matrix, clip, path, Matrix::I(), brush);
     return;

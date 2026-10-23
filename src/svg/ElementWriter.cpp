@@ -1195,13 +1195,11 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Co
       resources->filter = "pending";
       break;
     }
-    case Types::ShaderType::RRectBlur:
-    case Types::ShaderType::RRectInnerShadow:
-      // Analytic shadow shaders carry their own geometry and cannot be emitted as an SVG paint
-      // resource; they are consumed at the draw entry, before reaching paint conversion. This
-      // fallback paints with the brush color.
+    case Types::ShaderType::Runtime:
+      // Runtime shaders cannot be emitted as an SVG paint resource; they are consumed at the
+      // draw entry, before reaching paint conversion. This fallback paints with the brush color.
       DEBUG_ASSERT(false);
-      reportUnsupportedElement("Analytic shadow shader was not consumed at draw entry");
+      reportUnsupportedElement("Runtime shader was not consumed at draw entry");
       break;
     default:
       reportUnsupportedElement("Unsupported shader");

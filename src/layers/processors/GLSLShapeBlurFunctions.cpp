@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLSLShapeBlurFunctions.h"
+#include "layers/processors/GLSLShapeBlurFunctions.h"
 #include <algorithm>
 #include <string>
 
