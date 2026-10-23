@@ -1862,6 +1862,20 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   // Layer style source content is an intermediate artifact — skip background capture / consume.
   drawArgs.backgroundHandler = BackgroundHandler::NoOp();
 
+  // Record the own geometry once for both buckets. getOwnGeometryImage() and getOwnGeometryShape()
+  // read only the layer's own content, its own paint, the edge-antialiasing flag and the destination
+  // color space -- never drawArgs.excludeEffects -- so both buckets used to record the very same
+  // raster. Keep it that way: making getOwnGeometryImage() depend on the bucket would silently
+  // change what both buckets get, not just the one that changed.
+  LayerStyleSourceEntry ownGeometryEntry = {};
+  std::optional<StyledShape> ownShape = std::nullopt;
+  if (layerUsesOwnGeometry) {
+    ownGeometryEntry.image = getOwnGeometryImage(drawArgs, contentScale, &ownGeometryEntry.offset);
+    if (ownGeometryEntry.image != nullptr) {
+      ownShape = getOwnGeometryShape();
+    }
+  }
+
   for (int i = 0; i < 2; i++) {
     if (!needContent[i] && !needContour[i] && !needOwnGeometry[i]) {
       continue;
@@ -1904,17 +1918,18 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
       // the shared content drops painters with alpha=0 and knows nothing about geometry no painter
       // captured, so a layer painting nothing still has own geometry to cover. Recording it
       // unconditionally also keeps the coverage independent of any visible descendant.
-      LayerStyleSourceEntry ownEntry = {};
-      ownEntry.image = getOwnGeometryImage(drawArgs, contentScale, &ownEntry.offset);
-      if (ownEntry.image != nullptr) {
-        group->ownGeometry = std::move(ownEntry);
-        group->ownShape = getOwnGeometryShape();
+      if (ownGeometryEntry.image != nullptr) {
+        // Consume the recording hoisted above: copying the entry shares the image by reference
+        // count, so the pixels are neither re-recorded nor duplicated.
+        group->ownGeometry = ownGeometryEntry;
+        group->ownShape = ownShape;
         bucketUsable = true;
       } else if (!group->contour.has_value()) {
         // Lazy fallback: a layer whose geometry lives in its children records no own geometry, so
         // the style falls back to the shared subtree contour. That contour keeps a descendant's
         // painters with alpha=0, which the shared content drops. A failed recording leaves the
-        // bucket unusable, as it was before.
+        // bucket unusable, as it was before. This recording does read drawArgs.excludeEffects, so it
+        // must stay inside the loop.
         LayerStyleSourceEntry contourEntry = {};
         contourEntry.image =
             getContentContourImage(drawArgs, contentScale, &contourEntry.offset, nullptr);
