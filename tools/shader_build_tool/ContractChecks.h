@@ -36,6 +36,15 @@ size_t ValidateChainOpCodes(const std::string& shaderDir);
 /// the AOTPointwiseOpType enum. Returns the error count.
 size_t ValidatePointwiseOpCodes(const std::string& shaderDir);
 
+/// Validates that the shader sources do not refer to things that no longer exist: every
+/// "name.inc/.frag/.vert" token must name a file under shaderDir, and every "XxxShader" token must
+/// name a registered shader family (registeredShaders). A reference to a removed file or merged-away
+/// family means the surrounding comment or contract describes code that is gone. Placeholders
+/// ("<module>_uniforms.inc", "pointwise_*.inc") and external names (SwiftShader) are exempt.
+/// Returns the error count.
+size_t ValidateShaderSourceReferences(const std::string& shaderDir,
+                                      const std::vector<std::string>& registeredShaders);
+
 /// Validates reflection-level invariants across every compiled variant: texture samplers must be
 /// named TextureSampler_<N> with N dense from zero, array sizes must be at least one (and exactly
 /// one for samplers), and uniform/sampler names must be unique and NUL-free — everything the

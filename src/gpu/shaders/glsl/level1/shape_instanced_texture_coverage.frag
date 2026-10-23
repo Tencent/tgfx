@@ -12,8 +12,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
   int AlphaOnly;
 #include "coverage_uniforms.inc"
 #if GRADIENT
-  // Single-interval gradient parameters, written by the gradient FP's onSetData (same names as
-  // SingleIntervalGradientShader).
+  // Single-interval gradient parameters, written by the gradient FP's onSetData.
   vec4 leftBorderColor;
   vec4 rightBorderColor;
   int LayoutType;
