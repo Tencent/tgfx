@@ -85,10 +85,11 @@ vec4 aotTiledFullSample(vec2 texCoord, vec4 inputColor) {
     vec2 clampedCoord;
     vec2 sampleCoord = tiledMapCoord(texCoord, Strict != 0, inCoord, subsetCoord, clampedCoord);
     color = aotTiledRead(sampleCoord);
-    color = tiledApplyBorder(color, inCoord, subsetCoord, clampedCoord);
     // RepeatLinearNone seam blend: when the mod-wrapped coordinate clamps at a subset edge, blend
     // with the opposite edge so linear filtering wraps across the seam. Mirrors the runtime codegen
-    // (GLSLTiledTextureEffect repeat path). Nearest repeat needs no blend.
+    // (GLSLTiledTextureEffect repeat path). Nearest repeat needs no blend. The border fade below
+    // must follow the seam blend, as in the runtime codegen: a repeat axis next to a decal axis
+    // blends both in the same pixels, and the two do not commute.
     bool repX = ShaderModeX == 3;
     bool repY = ShaderModeY == 3;
     if (repX || repY) {
@@ -127,6 +128,7 @@ vec4 aotTiledFullSample(vec2 texCoord, vec4 inputColor) {
         }
       }
     }
+    color = tiledApplyBorder(color, inCoord, subsetCoord, clampedCoord);
   }
 
   if (AlphaOnly != 0) {

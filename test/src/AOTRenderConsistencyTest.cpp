@@ -356,6 +356,63 @@ TGFX_TEST(AOTRenderConsistencyTest, TiledTextureFillModes) {
                          height);
 }
 
+// A subset image repeated linearly on one axis and decal-bordered on the other crosses the repeat
+// seam and the border ramp in the same pixels. The runtime codegen blends the seam first and then
+// fades toward the border, so the precompiled tiled fill must apply the two in that order too; the
+// opposite order only differs where both are active, which whole-image tiling never reaches.
+TGFX_TEST(AOTRenderConsistencyTest, TiledTextureFillSubsetRepeatDecalSeam) {
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_TRUE(image != nullptr);
+  auto subset = image->makeSubset(Rect::MakeXYWH(11, 7, 71, 53));
+  ASSERT_TRUE(subset != nullptr);
+  constexpr int size = 220;
+  const std::pair<TileMode, TileMode> combos[] = {{TileMode::Repeat, TileMode::Decal},
+                                                  {TileMode::Decal, TileMode::Repeat}};
+  for (const auto& [modeX, modeY] : combos) {
+    SCOPED_TRACE(::testing::Message() << static_cast<int>(modeX) << "x" << static_cast<int>(modeY));
+    auto shader =
+        Shader::MakeImageShader(subset, modeX, modeY, SamplingOptions(FilterMode::Linear));
+    ASSERT_TRUE(shader != nullptr);
+    Paint paint = {};
+    // Fractional placement keeps the seam samples off texel centers.
+    paint.setShader(shader->makeWithMatrix(Matrix::MakeTrans(37.3f, 29.6f)));
+    Bitmap runtimeBitmap = {};
+    Bitmap aotBitmap = {};
+    RenderPaintOnce(paint, size, size, false, &runtimeBitmap);
+    {
+      ContextScope scope;
+      auto context = scope.getContext();
+      ASSERT_TRUE(context != nullptr);
+      auto* cache = context->precompiledShaderCache();
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+      ScopedAOTStatsPause statsPause(context, false);
+      cache->setDiagnosticRecordingEnabled(true);
+      cache->resetStats();
+      context->globalCache()->clearPrograms();
+      context->globalCache()->resetProgramStats();
+      auto surface = Surface::Make(context, size, size);
+      ASSERT_TRUE(surface != nullptr);
+      surface->getCanvas()->drawRect(Rect::MakeWH(size, size), paint);
+      context->flushAndSubmit(true);
+      ASSERT_TRUE(aotBitmap.allocPixels(size, size));
+      auto* pixels = aotBitmap.lockPixels();
+      ASSERT_TRUE(pixels != nullptr);
+      ASSERT_TRUE(surface->readPixels(aotBitmap.info(), pixels));
+      aotBitmap.unlockPixels();
+      EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+      EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
+      bool tiledFillHit = false;
+      for (const auto& hit : cache->hitRecords()) {
+        tiledFillHit = tiledFillHit || hit.shaderName == "TiledTextureFillShader";
+      }
+      EXPECT_TRUE(tiledFillHit);
+      cache->setDiagnosticRecordingEnabled(false);
+      cache->unload();
+    }
+    ExpectBitmapsIdentical("tiled-subset-repeat-decal", aotBitmap, runtimeBitmap, size, size);
+  }
+}
+
 static void ExpectTiledReadFormatMatchesReference(PixelFormat format, bool fused,
                                                   bool extended = false,
                                                   TileMode tileMode = TileMode::Repeat,
