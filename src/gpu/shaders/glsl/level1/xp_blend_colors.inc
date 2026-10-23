@@ -273,8 +273,12 @@ vec4 xpBlendColors(vec4 S, vec4 D, int mode) {
   vec4 blended = ADVANCED_BLEND; \
   return C * blended + (vec4(1.0) - C) * D;
 
+// Only the dst-reading XferProcessor routes (applyPorterDuffXP, both modes) call this, so it is
+// absent from the HAS_XP == 0 variants.
+#if HAS_XP >= 1
 vec4 xpBlendWithCoverage(vec4 S, vec4 D, vec4 C, int mode) {
   XP_COMPOSITE_WITH_COVERAGE(xpBlendColors(S, D, mode))
 }
+#endif
 
 #endif  // TGFX_XP_BLEND_COLORS_INC

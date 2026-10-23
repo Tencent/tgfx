@@ -34,21 +34,27 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 #include "pointwise_fragment_interface.inc"
 
 #if RESOURCE_KIND == 1
+#if NTEX > 0
 #include "pointwise_tiled3.inc"
+#endif
 #include "pointwise_gradient.inc"
 
 bool evalResourceSlot(ivec4 Packed, vec4 in0, out vec4 value) {
   return evalGradientSlot(Packed, in0, value);
 }
 #elif RESOURCE_KIND == 2
+#if NTEX > 0
 #include "pointwise_tiled2.inc"
+#endif
 #include "pointwise_noise.inc"
 
 bool evalResourceSlot(ivec4 Packed, vec4 in0, out vec4 value) {
   return evalNoiseSlot(Packed, value);
 }
 #else
+#if NTEX > 0
 #include "pointwise_tiled2.inc"
+#endif
 
 bool evalResourceSlot(ivec4 Packed, vec4 in0, out vec4 value) {
   value = vec4(0.0);

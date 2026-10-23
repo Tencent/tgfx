@@ -71,12 +71,22 @@ layout(set = 1, binding = NTEX) uniform sampler2D MaskTextureSampler;
 
 // The chain kernel blends regardless of XP state, so include the shared blend math directly;
 // xp_porter_duff.inc re-includes it under HAS_XP >= 1, guarded against double definition.
+#if GP_LAYOUT == 1
 #include "ellipse_coverage.inc"
+#elif GP_LAYOUT == 2
 #include "hairline_line_coverage.inc"
+#elif GP_LAYOUT >= 3
 #include "complex_ellipse_coverage.inc"
+#endif
 #include "xp_blend_colors.inc"
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
 #include "xp_blend_pass.inc"
 
+// The OP_TEXTURE branch of the evaluation loop references the shared sampling helpers in every
+// variant (the dispatch is runtime-uniform), so texture_sampling.inc stays unconditional; only
+// the tiled state and the tiled-only helpers need leaves.
+#include "texture_sampling.inc"
+#if NTEX > 0
 #include "pointwise_tiled_sampling.inc"
+#endif
