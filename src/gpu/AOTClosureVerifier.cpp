@@ -42,6 +42,9 @@ AOTClosureResult AOTClosureVerifier::Verify(const PrecompiledShaderCache* cache,
     return result;
   }
   const auto& profileTag = cache->profileTag();
+  // A bundle can carry a tag no profile has when it was parsed without a backend to check it
+  // against. Such a bundle has no profile exclusion rules, so every reachable variant is expected.
+  const auto profile = ParseProfileTag(profileTag);
   for (const auto& factory : ShaderRegistry::All()) {
     auto shader = factory();
     if (shader == nullptr) {
@@ -61,9 +64,10 @@ AOTClosureResult AOTClosureVerifier::Verify(const PrecompiledShaderCache* cache,
     std::set<uint32_t> vertIndices;
     std::set<uint32_t> fragIndices;
     for (const auto& permutation : *reachable) {
-      // Apply the same backend-specific exclusions as the bundle generator (RECT for non-GL,
-      // FBF for WebGPU); without this the verifier reports holes the runtime can never request.
-      if (!PermutationCompilesForBackend(info, permutation.first, permutation.second, profileTag)) {
+      // Apply the same profile-specific exclusions as the bundle generator (the framebuffer fetch
+      // variants); without this the verifier reports holes the runtime can never request.
+      if (profile &&
+          !PermutationCompilesForBackend(info, permutation.first, permutation.second, *profile)) {
         continue;
       }
       vertIndices.insert(permutation.first);

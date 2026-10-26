@@ -26,6 +26,7 @@
 #include <tuple>
 #include "BundleFormat.h"
 #include "PrecompiledBundleIdentity.h"
+#include "ShaderProfileResolver.h"
 #include "core/utils/Log.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PermutationMatcher.h"
@@ -843,22 +844,24 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   // same-name cross-backend bundle would otherwise feed mismatched code to the GPU. A cache
   // constructed without a backend (standalone parsing in tests) skips this check, mirroring the
   // legacy-hash skip below: an unspecified identity cannot be verified.
-  const char* expectedTag = ExpectedProfileTag(_backend);
+  const auto expectedProfile = ExpectedShaderProfile(_backend);
   // An OpenGL context running the ES standard (GLES devices, SwiftShader, WebGL) must be served
   // from the opengles bundle: the desktop tag only covers desktop GLSL profiles. The GL profile
   // is a property of the context rather than the backend enum, so a cache without a context
   // (standalone parsing) leaves the expected profile unspecified and accepts either GL tag,
   // mirroring the unspecified-identity skip below.
   bool esProfileContext = _backend == Backend::OpenGL && _context != nullptr &&
-                          _context->shaderCaps()->usesPrecisionModifiers;
+                          ResolveGLShaderProfile(_context->shaderCaps()->usesPrecisionModifiers) ==
+                              ShaderProfile::OpenGLES;
   bool profileUnspecified = _backend == Backend::OpenGL && _context == nullptr;
-  bool tagAccepted = profileUnspecified || profileTag == expectedTag ||
-                     (esProfileContext && profileTag == "opengles");
-  if (expectedTag[0] != '\0' && !tagAccepted) {
+  bool tagAccepted = profileUnspecified ||
+                     (expectedProfile && profileTag == ProfileTag(*expectedProfile)) ||
+                     (esProfileContext && profileTag == ProfileTag(ShaderProfile::OpenGLES));
+  if (expectedProfile && !tagAccepted) {
     LOGE(
         "PrecompiledShaderCache: Bundle profile tag '%s' does not match the running backend "
         "(expected '%s')",
-        profileTag.c_str(), expectedTag);
+        profileTag.c_str(), ProfileTag(*expectedProfile));
     return false;
   }
 

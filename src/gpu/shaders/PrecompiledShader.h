@@ -24,6 +24,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include "gpu/ShaderProfile.h"
 #include "gpu/shaders/ShaderPermutation.h"
 
 namespace tgfx {
@@ -66,13 +67,14 @@ bool IsBuildablePermutation(const PrecompiledShaderInfo& info, uint32_t vertInde
                             uint32_t fragIndex);
 
 /**
- * Returns true when the permutation is compiled into the bundle of the backend identified by
- * profileTag. This is the single source of truth for backend-specific variant exclusion; both
- * the bundle generator (shader_build_tool) and the closure verifier (AOTClosureVerifier) must
- * apply it, or the verifier reports holes the runtime can never request.
+ * Returns true when the permutation is compiled into the bundle of the given profile. This is the
+ * single source of truth for profile-specific variant exclusion (see
+ * ProfileSupportsFramebufferFetch); both the bundle generator (shader_build_tool) and the closure
+ * verifier (AOTClosureVerifier) must apply it, or the verifier reports holes the runtime can never
+ * request.
  */
 bool PermutationCompilesForBackend(const PrecompiledShaderInfo& info, uint32_t vertIndex,
-                                   uint32_t fragIndex, const std::string& profileTag);
+                                   uint32_t fragIndex, ShaderProfile profile);
 
 /**
  * Returns the reachable variant set of the shader registered under the given name, or nullopt

@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 #include "ShaderSources.h"
+#include "gpu/ShaderProfile.h"
 
 namespace tgfx {
 
@@ -50,7 +51,7 @@ struct SourceDigestResult {
 /// It is computed from an already loaded source set, never by reading the files again: a build
 /// passes the set it compiled from, so the digest cannot describe text the compiler never saw.
 /// Fails when the set did not load.
-SourceDigestResult ComputeSourceDigest(const ShaderSourceSet& sources, const std::string& backend);
+SourceDigestResult ComputeSourceDigest(const ShaderSourceSet& sources, ShaderProfile profile);
 
 /// The sidecar record that ties one published bundle to the sources it was built from. It lives in
 /// shader_bundle.<backend>.manifest next to the .bin, so the binary format and the runtime loader
@@ -79,7 +80,7 @@ std::string ManifestPathFor(const std::string& bundlePath);
 
 /// Reads the bundle at bundlePath back, computes the file hash and takes the identity hash, ABI
 /// and format version from its header, then writes the manifest next to it.
-bool WriteBundleManifest(const std::string& bundlePath, const std::string& backend,
+bool WriteBundleManifest(const std::string& bundlePath, ShaderProfile profile,
                          const SourceDigestResult& digest, std::string* error);
 
 /// Parses a manifest. Returns false with a reason when the file is missing or a required key is

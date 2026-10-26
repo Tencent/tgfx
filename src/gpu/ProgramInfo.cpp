@@ -26,6 +26,7 @@
 #include "gpu/PrecompiledProgramCreator.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProgramBuilder.h"
+#include "gpu/ShaderProfileResolver.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/GPU.h"
 
@@ -498,10 +499,7 @@ Backend ProgramInfo::backend() const {
 
 std::string ProgramInfo::glProfileTag() const {
   auto shaderCaps = renderTarget->getContext()->shaderCaps();
-  // ShaderCaps assigns precision modifiers to every GLES-family context (GLES, WebGL,
-  // SwiftShader); desktop GL is the remaining case. The tags mirror the shader_build_tool
-  // backends that produce the matching bundles.
-  return shaderCaps->usesPrecisionModifiers ? "opengles" : "opengl";
+  return ProfileTag(ResolveGLShaderProfile(shaderCaps->usesPrecisionModifiers));
 }
 
 bool ProgramInfo::glProfileMatchesCache() const {

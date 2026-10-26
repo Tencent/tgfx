@@ -36,6 +36,8 @@
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ShaderKeyHash.h"
+#include "gpu/ShaderProfile.h"
+#include "gpu/ShaderProfileResolver.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ComplexEllipseGeometryProcessor.h"
@@ -663,11 +665,12 @@ TGFX_TEST(ShaderPermutationTest, GradientUniformsExistOnlyInExtendedChainArtifac
   };
   const auto checkFamily = [&](const char* family) {
     auto info = PointwiseChainShader().info();
+    auto profile = ParseProfileTag(cache->profileTag());
+    ASSERT_TRUE(profile.has_value());
     auto reachable = EnumerateReachablePermutations(family);
     ASSERT_TRUE(reachable.has_value());
     for (const auto& indices : *reachable) {
-      if (!PermutationCompilesForBackend(info, indices.first, indices.second,
-                                         cache->profileTag())) {
+      if (!PermutationCompilesForBackend(info, indices.first, indices.second, *profile)) {
         continue;
       }
       auto vertexKey = ComputeVertexKeyHash(family, indices.first, cache->profileTag());
@@ -914,6 +917,8 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureLocalMaskRejectsInvertedCoverage) {
 
 static void ExpectBundleEntryCounts(const PrecompiledShaderCache& cache,
                                     const std::string& profileTag) {
+  auto profile = ParseProfileTag(profileTag);
+  ASSERT_TRUE(profile.has_value()) << profileTag;
   size_t vertexCount = 0;
   size_t fragmentCount = 0;
   for (const auto& factory : ShaderRegistry::All()) {
@@ -924,7 +929,7 @@ static void ExpectBundleEntryCounts(const PrecompiledShaderCache& cache,
     std::set<uint32_t> vertexIndices;
     std::set<uint32_t> fragmentIndices;
     for (const auto& permutation : *reachable) {
-      if (!PermutationCompilesForBackend(info, permutation.first, permutation.second, profileTag)) {
+      if (!PermutationCompilesForBackend(info, permutation.first, permutation.second, *profile)) {
         continue;
       }
       vertexIndices.insert(permutation.first);
@@ -1956,9 +1961,12 @@ TGFX_TEST(ShaderPermutationTest, CreatorFunnelRecordsArtifactMiss) {
   cache->unload();
   image = MakeTexture2DImage(context, image);
   ASSERT_TRUE(image != nullptr);
-  auto unrelatedBundle = MakeTestBundle(ExpectedProfileTag(context->backend()), 1, 1, 10);
+  auto expectedProfile = ExpectedShaderProfile(context->backend());
+  ASSERT_TRUE(expectedProfile.has_value());
+  const std::string expectedTag = ProfileTag(*expectedProfile);
+  auto unrelatedBundle = MakeTestBundle(expectedTag, 1, 1, 10);
   ASSERT_TRUE(cache->loadBundle(unrelatedBundle.data(), unrelatedBundle.size()));
-  EXPECT_EQ(cache->profileTag(), ExpectedProfileTag(context->backend()));
+  EXPECT_EQ(cache->profileTag(), expectedTag);
   context->globalCache()->clearPrograms();
   context->globalCache()->resetProgramStats();
   cache->resetStats();

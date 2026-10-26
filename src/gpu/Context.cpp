@@ -28,11 +28,11 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/PrecompiledBundleIdentity.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ResourceCache.h"
 #include "gpu/ShaderCaps.h"
+#include "gpu/ShaderProfileResolver.h"
 #include "tgfx/core/Clock.h"
 #include "tgfx/gpu/GPU.h"
 
@@ -74,7 +74,7 @@ Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {
       _precompiledShaderCache->setEmbeddedBundleState(EmbeddedBundleState::NoBundleForBackend);
       static std::atomic_flag absentReported = ATOMIC_FLAG_INIT;
       if (!absentReported.test_and_set()) {
-        if (ExpectedProfileTag(backend)[0] == '\0') {
+        if (!ExpectedShaderProfile(backend)) {
           LOGI(
               "Context: this backend has no precompiled shader support; draws use the runtime "
               "shader path.");

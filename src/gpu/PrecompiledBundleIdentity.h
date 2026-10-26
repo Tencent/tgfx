@@ -20,12 +20,15 @@
 
 #include <cstddef>
 #include <cstdint>
-#include "tgfx/gpu/Backend.h"
 
 namespace tgfx {
 
 // Shared identity contract between the offline bundle writer (tools/shader_build_tool) and the
-// runtime loader (PrecompiledShaderCache). A bundle's identity hash is a 64-bit FNV-1a over
+// runtime loader (PrecompiledShaderCache). This is a contract header: it includes nothing but the
+// standard library. The mapping from a runtime Backend to a shader profile needs runtime types and
+// lives in ShaderProfileResolver.h.
+//
+// A bundle's identity hash is a 64-bit FNV-1a over
 // the serialized pool entries, the uncompressed data pool, the reflection pool, the profile
 // tag, and the counts. Any shader-content or reflection-layout change produces a different
 // hash even when shader names and permutation indices stay the same, which is exactly the
@@ -228,25 +231,6 @@ inline uint64_t BundleIdentityHashEntry(uint64_t state, uint64_t hashHi, uint64_
   feedU32(dataSize);
   feedU32(reflOffset);
   return state;
-}
-
-// Maps a runtime Backend to the profile tag the bundle writer embeds (the --backends CLI
-// value). Bundles whose tag does not match the running backend must be rejected: their code
-// blobs are compiled for a different shader dialect or binary format, and the format version
-// says nothing about that mismatch.
-inline const char* ExpectedProfileTag(Backend backend) {
-  switch (backend) {
-    case Backend::OpenGL:
-      return "opengl";
-    case Backend::Metal:
-      return "metal";
-    case Backend::Vulkan:
-      return "vulkan";
-    case Backend::WebGPU:
-      return "webgpu";
-    default:
-      return "";
-  }
 }
 
 }  // namespace tgfx

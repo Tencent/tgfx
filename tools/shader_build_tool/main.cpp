@@ -39,6 +39,7 @@
 #include "ShaderSources.h"
 #include "StageCache.h"
 #include "StageReport.h"
+#include "gpu/ShaderProfile.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/AllShaderFamilies.h"
 
@@ -47,7 +48,7 @@ namespace tgfx {
 struct BuildOptions {
   std::string shaderDir;
   std::string outDir;
-  std::vector<std::string> backends;
+  std::vector<ShaderProfile> backends;
   bool reportOnly = false;
   bool compress = false;
   bool audit = false;
@@ -198,6 +199,18 @@ static std::vector<std::string> SplitByComma(const std::string& input) {
   return result;
 }
 
+static bool ParseProfileList(const std::string& input, std::vector<ShaderProfile>* profiles) {
+  for (const auto& tag : SplitByComma(input)) {
+    auto profile = ParseProfileTag(tag);
+    if (!profile) {
+      std::cerr << "Unknown backend: " << tag << "\n";
+      return false;
+    }
+    profiles->push_back(*profile);
+  }
+  return true;
+}
+
 static bool ParseArgs(int argc, char** argv, BuildOptions* options) {
   for (int i = 1; i < argc; i++) {
     if (std::strcmp(argv[i], "--shader-dir") == 0 && i + 1 < argc) {
@@ -205,7 +218,10 @@ static bool ParseArgs(int argc, char** argv, BuildOptions* options) {
     } else if (std::strcmp(argv[i], "--out-dir") == 0 && i + 1 < argc) {
       options->outDir = argv[++i];
     } else if (std::strcmp(argv[i], "--backends") == 0 && i + 1 < argc) {
-      options->backends = SplitByComma(argv[++i]);
+      if (!ParseProfileList(argv[++i], &options->backends)) {
+        PrintUsage();
+        return false;
+      }
     } else if (std::strcmp(argv[i], "--report-only") == 0) {
       options->reportOnly = true;
     } else if (std::strcmp(argv[i], "--audit") == 0) {
@@ -847,16 +863,17 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
     // independent of backend-level exclusions counted below.
     report.compiledCount++;
 
-    for (const auto& backend : options.backends) {
-      // Backend-specific exclusions (the FBF variants) share one source of truth with the
-      // closure verifier; see PermutationCompilesForBackend.
-      if (!PermutationCompilesForBackend(info, vi, fi, backend)) {
+    for (auto profile : options.backends) {
+      const std::string backend = ProfileTag(profile);
+      // Profile-specific exclusions (the framebuffer fetch variants) share one source of truth
+      // with the closure verifier; see PermutationCompilesForBackend.
+      if (!PermutationCompilesForBackend(info, vi, fi, profile)) {
         continue;
       }
       std::vector<uint8_t> vertBlob;
       std::vector<uint8_t> fragBlob;
 
-      if (backend == "vulkan") {
+      if (profile == ShaderProfile::Vulkan) {
         // Re-compile with optimization for smaller SPIR-V output.
         auto expandedVertOpt = PrependDefines(vertSource, vertDefines);
         const auto& vertOpt =
@@ -876,7 +893,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
           auto* fp = reinterpret_cast<const uint8_t*>(fragOpt.spirv.data());
           fragBlob.assign(fp, fp + fragOpt.spirv.size() * 4);
         }
-      } else if (backend == "metal") {
+      } else if (profile == ShaderProfile::Metal) {
         // The unoptimized SPIR-V is intentional here: xcrun produces byte-identical metallibs
         // whether fed the optimized or unoptimized translation (verified 2026-08-19), so the
         // extra optimized compile would only slow the build down.
@@ -901,7 +918,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
           RecordBackendArtifactError(backend, profileErrorCounts);
           continue;
         }
-      } else if (backend == "webgpu") {
+      } else if (profile == ShaderProfile::WebGPU) {
         // WebGPU needs its own GLSL form (separated texture/sampler bindings), so re-expand and
         // recompile like the vulkan branch instead of reusing the combined-sampler SPIR-V.
         auto expandedVertWgsl = PrependDefines(vertSource, vertDefines);
@@ -918,8 +935,8 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
         }
         vertBlob.assign(wgslVert.wgsl.begin(), wgslVert.wgsl.end());
         fragBlob.assign(wgslFrag.wgsl.begin(), wgslFrag.wgsl.end());
-      } else if (backend == "opengl" || backend == "opengles") {
-        if (backend == "opengl") {
+      } else if (profile == ShaderProfile::OpenGL || profile == ShaderProfile::OpenGLES) {
+        if (profile == ShaderProfile::OpenGL) {
           // Desktop GL direct emission (see EmitDirectGLSL330): store the preprocessed template
           // in its own 330 spelling. The mandatory compile check below runs the exact stored
           // text through glslang's OpenGL target, so a template using syntax beyond GL 330 (or
@@ -1210,8 +1227,8 @@ int main(int argc, char** argv) {
   }
 
   tgfx::BuildReport report;
-  for (const auto& backend : options.backends) {
-    report.profileErrorCounts.emplace(backend, 0);
+  for (auto profile : options.backends) {
+    report.profileErrorCounts.emplace(ProfileTag(profile), 0);
   }
   const auto& factories = tgfx::ShaderRegistry::All();
   if (factories.empty()) {
@@ -1323,9 +1340,15 @@ int main(int argc, char** argv) {
       std::cout << "Bundle written: " << filename << " (" << pair.second.size() << " entries)\n";
       // The manifest ties the bundle to the exact sources it was built from; --verify-bundle
       // recomputes the digest to tell a stale bundle from a fresh one.
-      auto digest = tgfx::ComputeSourceDigest(sources, pair.first);
+      auto profile = tgfx::ParseProfileTag(pair.first);
+      if (!profile) {
+        std::cerr << "Cannot write the manifest of " << filename << ": unknown profile "
+                  << pair.first << "\n";
+        return 1;
+      }
+      auto digest = tgfx::ComputeSourceDigest(sources, *profile);
       std::string manifestError;
-      if (!digest.ok || !tgfx::WriteBundleManifest(path, pair.first, digest, &manifestError)) {
+      if (!digest.ok || !tgfx::WriteBundleManifest(path, *profile, digest, &manifestError)) {
         std::cerr << "Failed to write the manifest of " << filename << ": "
                   << (digest.ok ? manifestError : digest.error) << "\n";
         return 1;

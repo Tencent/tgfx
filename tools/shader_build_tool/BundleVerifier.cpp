@@ -33,6 +33,7 @@
 #include "BundleWriter.h"
 #include "gpu/BundleFormat.h"
 #include "gpu/PrecompiledBundleIdentity.h"
+#include "gpu/ShaderProfile.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "zlib.h"
 #include "zstd.h"
@@ -140,7 +141,8 @@ bool DecompressDataPool(const std::vector<uint8_t>& fileBytes, const BundleHeade
 // single entry in the normal case; more than one distinct label means two candidates collided
 // on the same key, which must fail the verification instead of picking one silently.
 std::map<std::pair<uint64_t, uint64_t>, std::set<std::string>, KeyPairLess> BuildExpectedKeys(
-    const std::string& profileTag) {
+    ShaderProfile profile) {
+  const std::string profileTag = ProfileTag(profile);
   std::map<std::pair<uint64_t, uint64_t>, std::set<std::string>, KeyPairLess> expected;
   for (const auto& factory : ShaderRegistry::All()) {
     auto shader = factory();
@@ -150,7 +152,7 @@ std::map<std::pair<uint64_t, uint64_t>, std::set<std::string>, KeyPairLess> Buil
       continue;
     }
     for (const auto& pair : *reachable) {
-      if (!PermutationCompilesForBackend(info, pair.first, pair.second, profileTag)) {
+      if (!PermutationCompilesForBackend(info, pair.first, pair.second, profile)) {
         continue;
       }
       auto vertHash = ComputeVertexKeyHash(info.name, pair.first, profileTag);
@@ -173,9 +175,10 @@ struct BundleCheckResult {
 // (when a shader directory is given) that the sources it was built from are the current ones.
 // Everything the bundle's own identity hash cannot say lives here, because that hash only covers
 // the bundle's bytes: a bundle built from yesterday's shaders is perfectly self-consistent.
-size_t CheckManifest(const std::string& bundlePath, const std::string& expectedTag,
+size_t CheckManifest(const std::string& bundlePath, ShaderProfile profile,
                      const std::vector<uint8_t>& fileBytes, const BundleHeader& header,
                      const std::string& shaderDir, const ShaderSourceSet* sources) {
+  const std::string expectedTag = ProfileTag(profile);
   size_t violations = 0;
   auto manifestPath = ManifestPathFor(bundlePath);
   BundleManifest manifest;
@@ -216,7 +219,7 @@ size_t CheckManifest(const std::string& bundlePath, const std::string& expectedT
               << ": freshness NOT checked (pass --shader-dir to compare against the sources)\n";
     return violations;
   }
-  auto current = ComputeSourceDigest(*sources, expectedTag);
+  auto current = ComputeSourceDigest(*sources, profile);
   if (!current.ok) {
     std::cout << "[verify] " << expectedTag
               << ": VIOLATION cannot compute the current source digest: " << current.error << "\n";
@@ -228,7 +231,7 @@ size_t CheckManifest(const std::string& bundlePath, const std::string& expectedT
               << "digest 0x" << std::hex << manifest.sourceDigest << ", the current sources in "
               << shaderDir << " have 0x" << current.digest << std::dec << " ("
               << manifest.stageCount << " stages recorded, " << current.stageCount << " now)\n";
-    if (expectedTag == "metal") {
+    if (profile == ShaderProfile::Metal) {
       std::cout << "[verify] metal: note: a Metal bundle's digest also covers the platform it was "
                    "compiled for; verify it with the same --metal-sdk and --metal-min-os\n";
     }
@@ -237,8 +240,9 @@ size_t CheckManifest(const std::string& bundlePath, const std::string& expectedT
   return violations;
 }
 
-BundleCheckResult VerifyOneBundle(const std::string& path, const std::string& expectedTag,
+BundleCheckResult VerifyOneBundle(const std::string& path, ShaderProfile profile,
                                   const std::string& shaderDir, const ShaderSourceSet* sources) {
+  const std::string expectedTag = ProfileTag(profile);
   BundleCheckResult result;
   std::ifstream file(path, std::ios::binary);
   if (!file.is_open()) {
@@ -323,7 +327,7 @@ BundleCheckResult VerifyOneBundle(const std::string& path, const std::string& ex
     return result;
   }
 
-  auto expected = BuildExpectedKeys(expectedTag);
+  auto expected = BuildExpectedKeys(profile);
   auto reflPoolSize = fileBytes.size() - header.reflectionOffset;
   std::set<std::pair<uint64_t, uint64_t>, KeyPairLess> storedKeys;
   size_t poolViolations = 0;
@@ -436,7 +440,7 @@ BundleCheckResult VerifyOneBundle(const std::string& path, const std::string& ex
     result.violations++;
   }
 
-  result.violations += CheckManifest(path, expectedTag, fileBytes, header, shaderDir, sources);
+  result.violations += CheckManifest(path, profile, fileBytes, header, shaderDir, sources);
 
   std::cout << "[verify] " << expectedTag << ": " << (result.violations == 0 ? "OK" : "FAILED")
             << " (" << header.vertPoolCount << " vert + " << header.fragPoolCount
@@ -448,25 +452,21 @@ BundleCheckResult VerifyOneBundle(const std::string& path, const std::string& ex
 
 int VerifyBundles(const std::string& bundleDir, const std::string& shaderDir,
                   const std::optional<std::vector<std::string>>& requiredBackends) {
-  static const char* BACKENDS[] = {"opengl", "opengles", "vulkan", "metal", "webgpu"};
-  std::set<std::string> required;
+  std::set<ShaderProfile> required;
   if (requiredBackends) {
-    // A typo must not turn into "nothing is required": reject names that are not backends, and
+    // A typo must not turn into "nothing is required": reject names that are not profiles, and
     // an empty list, before any bundle is looked at.
     if (requiredBackends->empty()) {
       std::cerr << "[verify] --require-backends needs at least one backend\n";
       return 1;
     }
     for (const auto& name : *requiredBackends) {
-      bool known = false;
-      for (const auto* backend : BACKENDS) {
-        known = known || name == backend;
-      }
-      if (!known) {
+      auto profile = ParseProfileTag(name);
+      if (!profile) {
         std::cerr << "[verify] unknown backend \"" << name << "\" in --require-backends\n";
         return 1;
       }
-      required.insert(name);
+      required.insert(*profile);
     }
   }
   // The current sources are read once for every bundle checked, the same way a build reads them.
@@ -480,14 +480,14 @@ int VerifyBundles(const std::string& bundleDir, const std::string& shaderDir,
   int totalViolations = 0;
   size_t openedBundles = 0;
   size_t absentNotRequired = 0;
-  for (const auto* backend : BACKENDS) {
-    auto path = bundleDir + "/shader_bundle." + backend + ".bin";
-    auto result = VerifyOneBundle(path, backend, shaderDir, &sources);
+  for (auto profile : AllShaderProfiles) {
+    const std::string tag = ProfileTag(profile);
+    auto path = bundleDir + "/shader_bundle." + tag + ".bin";
+    auto result = VerifyOneBundle(path, profile, shaderDir, &sources);
     if (result.opened) {
       openedBundles++;
-    } else if (required.count(backend) > 0) {
-      std::cout << "[verify] " << backend << ": VIOLATION required bundle is missing: " << path
-                << "\n";
+    } else if (required.count(profile) > 0) {
+      std::cout << "[verify] " << tag << ": VIOLATION required bundle is missing: " << path << "\n";
       result.violations++;
     } else {
       absentNotRequired++;

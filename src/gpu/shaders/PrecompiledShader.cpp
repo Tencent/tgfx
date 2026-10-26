@@ -96,26 +96,10 @@ bool IsBuildablePermutation(const PrecompiledShaderInfo& info, uint32_t vertInde
 }
 
 bool PermutationCompilesForBackend(const PrecompiledShaderInfo& info, uint32_t vertIndex,
-                                   uint32_t fragIndex, const std::string& profileTag) {
+                                   uint32_t fragIndex, ShaderProfile profile) {
   USE(vertIndex);
-  // FBF variants (HAS_XP == 2) read the framebuffer instead of sampling a dst texture: Metal
-  // through the subpassInput-to-[[color(0)]] translation, GLES through the
-  // GL_EXT_shader_framebuffer_fetch dialect (WGSL cannot express the fetch at all, so webgpu is
-  // excluded). Every backend that can actually reach an FBF variant has
-  // frameBufferFetchSupport set in ShaderCaps (Metal: natively; GLES: through one of the fetch
-  // extensions), which is what makes UsesRuntimeFrameBufferFetch in OpsCompositor return true
-  // and PorterDuffXferProcessor compile without a dstTextureView, producing HAS_XP == 2.
-  //
-  // The Vulkan backend never wires that chain: ShaderCaps assigns frameBufferFetchSupport only
-  // in the Metal / WebGPU / GL-extension branches (Vulkan falls through, staying false), the
-  // render-pass code has no input-attachment binding for the subpassInput descriptor set, and
-  // BlendModeNeedDstTexture therefore always resolves a dst texture on Vulkan. The vulkan bundle
-  // carried the FBF variants as dead weight — loaded into the cache, unreachable at runtime.
-  // They are excluded here, not deleted: the GLSL sources and the Compose* rules keep
-  // enumerating them, so a future Vulkan input-attachment fetch only needs the caps flag, the
-  // render-pass wiring and this exclusion removed.
   if (info.fragDomain.valueOf(fragIndex, XP_DEFINE_NAME) == XP_FRAMEBUFFER_FETCH &&
-      (profileTag == "webgpu" || profileTag == "opengl" || profileTag == "vulkan")) {
+      !ProfileSupportsFramebufferFetch(profile)) {
     return false;
   }
   return true;
