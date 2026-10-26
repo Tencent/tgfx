@@ -24,23 +24,37 @@
 namespace tgfx {
 /**
  * Uniform variable formats.
+ *
+ * The numeric values are part of the precompiled bundle format: shader_build_tool stores a
+ * UniformFormat as one byte in every reflection entry and the runtime loader reads it back. The
+ * values are therefore written out and pinned below. Never reorder or renumber an entry, and
+ * append new formats at the end; any change to an existing value or to the meaning of a stored
+ * format must bump ExpectedToolchainABI in PrecompiledBundleIdentity.h.
  */
 enum class UniformFormat {
-  Float,                   // 32-bit floating point scalar.
-  Float2,                  // 2-component vector of 32-bit floating point values.
-  Float3,                  // 3-component vector of 32-bit floating point values.
-  Float4,                  // 4-component vector of 32-bit floating point values.
-  Float2x2,                // 2x2 matrix of 32-bit floating point values.
-  Float3x3,                // 3x3 matrix of 32-bit floating point values.
-  Float4x4,                // 4x4 matrix of 32-bit floating point values.
-  Int,                     // 32-bit signed integer scalar.
-  Int2,                    // 2-component vector of 32-bit signed integer values.
-  Int3,                    // 3-component vector of 32-bit signed integer values.
-  Int4,                    // 4-component vector of 32-bit signed integer values.
-  Texture2DSampler,        // 2D texture sampler.
-  TextureExternalSampler,  // External texture sampler (e.g. for camera input).
-  Texture2DRectSampler,    // Rectangle texture sampler.
+  Float = 0,                    // 32-bit floating point scalar.
+  Float2 = 1,                   // 2-component vector of 32-bit floating point values.
+  Float3 = 2,                   // 3-component vector of 32-bit floating point values.
+  Float4 = 3,                   // 4-component vector of 32-bit floating point values.
+  Float2x2 = 4,                 // 2x2 matrix of 32-bit floating point values.
+  Float3x3 = 5,                 // 3x3 matrix of 32-bit floating point values.
+  Float4x4 = 6,                 // 4x4 matrix of 32-bit floating point values.
+  Int = 7,                      // 32-bit signed integer scalar.
+  Int2 = 8,                     // 2-component vector of 32-bit signed integer values.
+  Int3 = 9,                     // 3-component vector of 32-bit signed integer values.
+  Int4 = 10,                    // 4-component vector of 32-bit signed integer values.
+  Texture2DSampler = 11,        // 2D texture sampler.
+  TextureExternalSampler = 12,  // External texture sampler (e.g. for camera input).
+  Texture2DRectSampler = 13,    // Rectangle texture sampler.
 };
+
+static_assert(static_cast<int>(UniformFormat::Float) == 0 &&
+                  static_cast<int>(UniformFormat::Float4x4) == 6 &&
+                  static_cast<int>(UniformFormat::Int) == 7 &&
+                  static_cast<int>(UniformFormat::Int4) == 10 &&
+                  static_cast<int>(UniformFormat::Texture2DSampler) == 11 &&
+                  static_cast<int>(UniformFormat::Texture2DRectSampler) == 13,
+              "UniformFormat values are stored in the bundle format; see the comment above.");
 
 /**
  * Represents a uniform variable in a GPU program.
