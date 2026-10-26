@@ -133,7 +133,9 @@ struct GlassShapeInfo {
 static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   GlassShapeInfo info;
   // The SDF shape comes from the layer's own geometry: unlike the shared contour it leaves
-  // descendants out, and it also holds the geometries no painter captured.
+  // descendants out, and it also holds the geometries no painter captured -- the latter only when
+  // the layer has no painter at all and exactly one such geometry, which is when the own shape is
+  // exact.
   if (!input.ownShape.has_value()) {
     return info;
   }

@@ -81,11 +81,12 @@ void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
       element->apply(&context);
     }
   }
-  // Cache the geometries no painter captured so the own geometry shape can still include them. The
-  // set is taken after every element applied, since MergePath clears geometries and painters while
-  // Repeater clones and reorders them. A captured geometry is drawn through its painter, so it is
-  // not part of the bare geometry; collecting the captures once keeps the comparison from being
-  // quadratic in the geometry count.
+  // Cache the geometries no painter captured. Three consumers read this list: the own geometry
+  // raster (onDrawOwnGeometry), the own geometry bounds, and the own geometry shape, which can
+  // still include them. The set is taken after every element applied, since MergePath clears
+  // geometries and painters while Repeater clones and reorders them. A captured geometry is drawn
+  // through its painter, so it is not part of the bare geometry; collecting the captures once
+  // keeps the comparison from being quadratic in the geometry count.
   std::unordered_set<const Geometry*> capturedGeometries = {};
   capturedGeometries.reserve(context.geometries.size());
   for (const auto& painter : context.painters) {
@@ -228,8 +229,9 @@ std::optional<StyledShape> VectorLayer::computeContentShape() {
       element->apply(&context);
     }
   }
-  // The content shape describes what the layer renders, so it drops the painters that contribute no
-  // visible content.
+  // The content shape describes what the layer renders, so it drops the painters whose color source
+  // is a fully transparent solid color; any other effectively invisible source, a transparent
+  // gradient for one, stays in.
   std::vector<const Painter*> painters = {};
   for (const auto& painter : context.painters) {
     DEBUG_ASSERT(painter != nullptr);

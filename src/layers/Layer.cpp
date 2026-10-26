@@ -840,8 +840,9 @@ Matrix3D Layer::getRelativeMatrix3D(const Layer* target) const {
 }
 
 bool Layer::hitTestPoint(float x, float y, bool shapeHitTest) {
-  // Hit testing deliberately ignores the own geometry: a geometry no painter captured is not
-  // painted, so it must not become clickable just because a style covers it.
+  // Hit testing deliberately ignores the own geometry: the layer content never paints a geometry no
+  // painter captured (only a Geometry style may draw it), so it must not become clickable just
+  // because a style covers it.
   if (auto content = getContent()) {
     Point localPoint = globalToLocal(Point::Make(x, y));
     if (shapeHitTest) {
@@ -1607,7 +1608,8 @@ std::optional<Rect> Layer::computeContentBounds(const std::optional<Rect>& clipB
 
 void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
   // Capture and consume passes share the same per-layer LayerStyleSource via the active handler,
-  // so the content/contour intermediate renders happen once per frame instead of twice.
+  // so the content, contour and own-geometry intermediate renders happen once per snapshot map
+  // instead of once per pass.
   const LayerStyleSource* sourcePtr = nullptr;
   if (args.backgroundHandler != nullptr) {
     sourcePtr = args.backgroundHandler->getCachedLayerStyleSource(this);
@@ -1851,8 +1853,10 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   // such a bucket can still be driven by the own geometry even when the shared content is empty, so
   // losing one bucket must not cancel the other. The relaxation is per layer rather than per bucket,
   // so a failed bucket no longer suppresses the styles of the other bucket either -- they draw where
-  // the previous fail-closed contract left them undrawn. Every other layer keeps that contract: one
-  // unusable bucket makes the whole source unusable.
+  // the previous fail-closed contract left them undrawn. bucketUsable is not a monotone failure
+  // flag, but the only step that revives it sits in the own-geometry branch below, so a layer
+  // without such a style keeps the fail-closed contract: one unusable bucket makes the whole source
+  // unusable.
   const bool layerUsesOwnGeometry = needOwnGeometry[0] || needOwnGeometry[1];
 
   DrawArgs drawArgs = args;
@@ -1861,9 +1865,10 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   drawArgs.backgroundHandler = BackgroundHandler::NoOp();
 
   // Record the own geometry once for both buckets. getOwnGeometryImage() and getOwnGeometryShape()
-  // read only the layer's own content, its own paint, the edge-antialiasing flag and the destination
-  // color space -- never drawArgs.excludeEffects -- so both buckets used to record the very same
-  // raster. Keep it that way: making getOwnGeometryImage() depend on the bucket would silently
+  // read only the layer's own content, its own paint and the destination color space -- never
+  // drawArgs.excludeEffects -- so both buckets would otherwise record the very same raster. The
+  // allowsEdgeAntialiasing flag it forwards is dropped by OpaqueContext, so it is not an input
+  // either. Keep it that way: making getOwnGeometryImage() depend on the bucket would silently
   // change what both buckets get, not just the one that changed.
   LayerStyleSourceEntry ownGeometryEntry = {};
   std::optional<StyledShape> ownShape = std::nullopt;
@@ -1914,8 +1919,9 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     if (needOwnGeometry[i]) {
       // A style that draws from the own geometry always consumes it rather than the shared content:
       // the shared content drops painters with alpha=0 and knows nothing about geometry no painter
-      // captured, so a layer painting nothing still has own geometry to cover. Recording it
-      // unconditionally also keeps the coverage independent of any visible descendant.
+      // captured, so a layer whose painters are all alpha=0, or whose geometries no painter
+      // captured, still has own geometry to cover. Recording it unconditionally also keeps the
+      // coverage independent of any visible descendant.
       if (ownGeometryEntry.image != nullptr) {
         // Consume the recording hoisted above: copying the entry shares the image by reference
         // count, so the pixels are neither re-recorded nor duplicated.
@@ -1927,8 +1933,9 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
         // the style falls back to the shared subtree contour. That contour keeps a descendant's
         // painters with alpha=0, which the shared content drops. A failed recording only skips this
         // style: ResolveContentEntry then finds neither entry and drops it, while the other styles
-        // of the bucket keep drawing from the shared content. This recording does read
-        // drawArgs.excludeEffects, so it must stay inside the loop.
+        // of the bucket keep drawing from the shared content -- provided that recording succeeded,
+        // since a failed one leaves group->content empty and drops its siblings as well. This
+        // recording does read drawArgs.excludeEffects, so it must stay inside the loop.
         LayerStyleSourceEntry contourEntry = {};
         contourEntry.image =
             getContentContourImage(drawArgs, contentScale, &contourEntry.offset, nullptr);
@@ -2066,7 +2073,8 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   auto sourceFlags = layerStyle->extraSourceType();
   if (HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour)) {
     // The Contour source is the shared contour: its raster and the shared content shape describe
-    // the same recording.
+    // the same recording, except that the shape drops the fully transparent solid-color painters
+    // the raster keeps.
     auto contourImage = group->contour.has_value() ? group->contour->image : nullptr;
     auto contourOffset =
         contourImage ? group->contour->offset - contentEntry->offset : Point::Zero();
@@ -2175,8 +2183,9 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     } else {
       contentBounds->setEmpty();
     }
-    // Same reason and gate as in computeBounds(): geometry no painter captured has no content
-    // bounds, yet a style drawing from it still needs bounds to capture the background over.
+    // Same reason as in computeBounds(): geometry no painter captured has no content bounds, yet a
+    // style drawing from it still needs bounds to capture the background over. Only the reason
+    // matches, not the gate: this path has no excludeEffects variant to guard against.
     if (hasOwnGeometry) {
       contentBounds->join(onGetOwnGeometryBounds());
     }

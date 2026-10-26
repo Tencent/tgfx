@@ -65,7 +65,8 @@ bool ComposeContent::hitTestPoint(float localX, float localY) const {
 
 void ComposeContent::drawContourInternal(Canvas* canvas, bool antiAlias) const {
   // This container is the only entry that sees the whole outline table, so it forwards the recording
-  // to every painter it holds.
+  // to the selected contour entries when a subset was chosen, and otherwise to every content it
+  // holds.
   if (!contours.empty()) {
     for (const auto geometry : contours) {
       geometry->drawContour(canvas, antiAlias);

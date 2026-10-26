@@ -399,7 +399,8 @@ const LayerStyleSource* BackgroundCapturer::cacheLayerStyleSource(
   }
   // Wrap each picture-backed image as Rasterized so the first draw uploads a GPU texture and the
   // second pass reuses it instead of replaying the picture. makeRasterized() on an already-
-  // rasterized image is a no-op, so wrapping content/contour independently still hits one cache.
+  // rasterized image is a no-op, so wrapping content, contour and own geometry independently still
+  // hits one cache.
   for (auto& group : source->groups) {
     if (group == nullptr) {
       continue;

@@ -55,8 +55,9 @@ enum class LayerStyleExtraSourceType : uint32_t {
 };
 
 /**
- * Declares which recording a layerStyle consumes as its content: whichever one contentSource()
- * names, so the style reads that recording instead of a separate per-style raster.
+ * Declares which recording a layerStyle prefers as its content. The style is not guaranteed to
+ * receive it: a Geometry style whose layer records no own geometry is handed the shared subtree
+ * recording instead (see Geometry). LayerStyleInput::content describes what it actually receives.
  */
 enum class LayerStyleContentSource {
   /**

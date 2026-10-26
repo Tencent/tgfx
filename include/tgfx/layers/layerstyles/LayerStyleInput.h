@@ -133,9 +133,8 @@ struct LayerStyleInput {
   std::vector<std::shared_ptr<StyleInputSource>> extraSources = {};
 
   /**
-   * The vector shape of the layer's own geometry, matching `content` when it is the own-geometry
-   * recording. Absent when the style does not declare LayerStyleContentSource::Geometry, when the
-   * layer records no own geometry, or when the geometry cannot be expressed as a single StyledShape.
+   * The vector shape of the own geometry defined by LayerStyleContentSource::Geometry, matching
+   * `content` when that is the own-geometry recording; absent otherwise.
    */
   std::optional<StyledShape> ownShape = std::nullopt;
 

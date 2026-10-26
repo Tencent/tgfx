@@ -265,8 +265,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * Returns the list of layer styles applied to the layer. Unlike layer filters, layer styles do
    * not create a new offscreen image to replace the original layer content. Instead, they add
    * visual elements either below or above the layer content, blending directly with the existing
-   * content on the canvas. Each layer style uses the same layer content as input and draws on the
-   * canvas. Layer styles are applied before filters. The default value is an empty list.
+   * content on the canvas. Each layer style draws from the shared layer content, except one that
+   * declares LayerStyleContentSource::Geometry, which reads the layer's own geometry instead. Layer
+   * styles are applied before filters. The default value is an empty list.
    */
   const std::vector<std::shared_ptr<LayerStyle>>& layerStyles() const {
     return _layerStyles;
@@ -598,11 +599,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
   virtual std::optional<StyledShape> onGetContentShape();
 
   /**
-   * Returns the shape of this layer's own geometry, i.e. the outline of its content without its
-   * descendants and, for layer types that hold geometries no painter captures, of those geometries
-   * as well. The base class returns nullopt; layer types whose own geometry is exactly a vector
-   * shape override this. An override may still return nullopt when the geometry cannot be expressed
-   * as a single StyledShape, as with onGetContentShape().
+   * Returns the shape of this layer's own geometry, as defined by
+   * LayerStyleContentSource::Geometry. The base class returns nullopt; an override returns nullopt
+   * when the geometry cannot be expressed as a single StyledShape, as with onGetContentShape().
    */
   virtual std::optional<StyledShape> onGetOwnGeometryShape();
 
@@ -617,9 +616,10 @@ class Layer : public std::enable_shared_from_this<Layer> {
   /**
    * Draws the geometries of this layer that no painter captured. They paint nothing as content, but
    * they still belong to the layer's own geometry, so a style drawing from the own geometry covers
-   * them. No anti-alias flag is taken: opaque recording forces hard edges on every brush, so the
-   * edge policy is fixed and asking the layer for one would have no effect. The base class draws
-   * nothing; layer types that can hold such geometries override this.
+   * them. No anti-alias flag is taken: the content path still passes allowsEdgeAntialiasing, but
+   * OpaqueContext forces antiAlias=false on every brush it records, so that argument has no effect
+   * and asking the layer for one would not either. The base class draws nothing; layer types that
+   * can hold such geometries override this.
    */
   virtual void onDrawOwnGeometry(Canvas* canvas);
 

@@ -34,7 +34,8 @@
 namespace tgfx {
 
 /**
- * Cached per-source image plus its offset relative to the layer's local coordinate system.
+ * Cached per-source image plus that image's top-left corner in scaled image pixels, i.e.
+ * layer-local coordinates already multiplied by contentScale, so consumers divide it back.
  * Produced once per LayerStyleSource group and consumed by every LayerStyle that matches the
  * group's excludeChildEffects bucket.
  */
@@ -55,9 +56,8 @@ struct LayerStyleSourceGroup {
   LayerStyleSourceEntry content = {};
   std::optional<LayerStyleSourceEntry> contour = std::nullopt;
 
-  // The layer's own geometry: its content recorded without descendants, keeping the painters with
-  // alpha=0, plus the geometries no painter captured. Recorded when the bucket carries a style whose
-  // contentSource() is Geometry, so a layer that paints nothing still has coverage.
+  // The layer's own geometry, as defined by LayerStyleContentSource::Geometry. Recorded once per
+  // layer and shared by both buckets, because the recording never reads excludeEffects.
   std::optional<LayerStyleSourceEntry> ownGeometry = std::nullopt;
 
   // Shape of the same own geometry, matching ownGeometry the way contentShape matches content.
@@ -116,8 +116,9 @@ inline std::optional<StyledShape> ResolveOwnShape(const LayerStyleSourceGroup& g
 /**
  * Shared drawing inputs for all LayerStyles attached to a Layer. groups[0] covers styles whose
  * excludeChildEffects is false (they see children, filters, etc.); groups[1] covers styles whose
- * excludeChildEffects is true (they see only the layer's own content). contentScale is the scale
- * factor mapping layer-local bounds to the captured images.
+ * excludeChildEffects is true: it drops the child layers' styles and filters, while their plain
+ * content is still drawn. contentScale is the scale factor mapping layer-local bounds to the
+ * captured images.
  */
 struct LayerStyleSource {
   float contentScale = 1.0f;
