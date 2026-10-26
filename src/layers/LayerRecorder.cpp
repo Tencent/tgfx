@@ -49,19 +49,26 @@ LayerRecorder::LayerRecorder() = default;
 LayerRecorder::~LayerRecorder() = default;
 
 void LayerRecorder::addRect(const Rect& rect, const LayerPaint& paint) {
-  addRect(rect, paint, _matrix);
+  addRect(rect, paint, _matrix, true);
 }
 
 void LayerRecorder::addRRect(const RRect& rRect, const LayerPaint& paint) {
-  addRRect(rRect, paint, _matrix);
+  addRRect(rRect, paint, _matrix, true);
 }
 
 void LayerRecorder::addPath(const Path& path, const LayerPaint& paint) {
-  addPath(path, paint, _matrix);
+  addPath(path, paint, _matrix, true);
 }
 
 void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint) {
-  addShape(std::move(shape), paint, _matrix);
+  addShape(std::move(shape), paint, _matrix, true);
+}
+
+void LayerRecorder::addShape(std::shared_ptr<Shape> shape) {
+  // A geometry no paint captured: it is recorded as an opaque fill so the contour and the geometry
+  // queries see its outline, while the paint flag keeps it out of the normal draw and the shared
+  // contour. An empty LayerPaint models that fill, and it is copied, never referenced.
+  addShape(std::move(shape), LayerPaint{}, _matrix, false);
 }
 
 void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint,
@@ -79,7 +86,7 @@ void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerP
   // the text position and the paint (shader/maskFilter coordinates).
   auto offset = Point::Make(x, y);
   std::unique_ptr<GeometryContent> content =
-      std::make_unique<TextContent>(std::move(textBlob), offset, paint);
+      std::make_unique<TextContent>(std::move(textBlob), offset, paint, true);
   if (!_matrix.isIdentity()) {
     content = std::make_unique<MatrixContent>(std::move(content), _matrix);
   }
@@ -95,7 +102,8 @@ void LayerRecorder::addMesh(std::shared_ptr<Mesh> mesh, const LayerPaint& paint)
   DEBUG_ASSERT(!ComplexStrokeStyle(paint));
   flushPending();
   auto& list = paint.placement == LayerPlacement::Foreground ? foregrounds : contents;
-  std::unique_ptr<GeometryContent> content = std::make_unique<MeshContent>(std::move(mesh), paint);
+  std::unique_ptr<GeometryContent> content =
+      std::make_unique<MeshContent>(std::move(mesh), paint, true);
   if (!_matrix.isIdentity()) {
     content = std::make_unique<MatrixContent>(std::move(content), _matrix);
   }
@@ -114,78 +122,82 @@ void LayerRecorder::resetMatrix() {
   _matrix = Matrix::I();
 }
 
-void LayerRecorder::addRect(const Rect& rect, const LayerPaint& paint, const Matrix& matrix) {
+void LayerRecorder::addRect(const Rect& rect, const LayerPaint& paint, const Matrix& matrix,
+                            bool hasPaint) {
   if (rect.isEmpty()) {
     return;
   }
   if (ComplexStrokeStyle(paint)) {
     Path path = {};
     path.addRect(rect);
-    flushPending(PendingType::Shape, paint, matrix);
+    flushPending(PendingType::Shape, paint, matrix, hasPaint);
     pendingShape = Shape::MakeFrom(std::move(path));
     return;
   }
-  if (!canAppend(PendingType::Rect, paint, matrix)) {
-    flushPending(PendingType::Rect, paint, matrix);
+  if (!canAppend(PendingType::Rect, paint, matrix, hasPaint)) {
+    flushPending(PendingType::Rect, paint, matrix, hasPaint);
   }
   pendingRects.push_back(rect);
 }
 
-void LayerRecorder::addRRect(const RRect& rRect, const LayerPaint& paint, const Matrix& matrix) {
+void LayerRecorder::addRRect(const RRect& rRect, const LayerPaint& paint, const Matrix& matrix,
+                             bool hasPaint) {
   if (rRect.rect().isEmpty()) {
     return;
   }
   if (rRect.isRect()) {
-    addRect(rRect.rect(), paint, matrix);
+    addRect(rRect.rect(), paint, matrix, hasPaint);
     return;
   }
   if (ComplexStrokeStyle(paint)) {
     Path path = {};
     path.addRRect(rRect);
-    flushPending(PendingType::Shape, paint, matrix);
+    flushPending(PendingType::Shape, paint, matrix, hasPaint);
     pendingShape = Shape::MakeFrom(std::move(path));
     return;
   }
-  if (!canAppend(PendingType::RRect, paint, matrix)) {
-    flushPending(PendingType::RRect, paint, matrix);
+  if (!canAppend(PendingType::RRect, paint, matrix, hasPaint)) {
+    flushPending(PendingType::RRect, paint, matrix, hasPaint);
   }
   pendingRRects.push_back(rRect);
 }
 
-void LayerRecorder::addPath(const Path& path, const LayerPaint& paint, const Matrix& matrix) {
+void LayerRecorder::addPath(const Path& path, const LayerPaint& paint, const Matrix& matrix,
+                            bool hasPaint) {
   if (path.isEmpty()) {
     return;
   }
-  if (!ComplexStrokeStyle(paint) && tryAddSimplifiedPath(path, paint, matrix)) {
+  if (!ComplexStrokeStyle(paint) && tryAddSimplifiedPath(path, paint, matrix, hasPaint)) {
     return;
   }
-  flushPending(PendingType::Shape, paint, matrix);
+  flushPending(PendingType::Shape, paint, matrix, hasPaint);
   pendingShape = Shape::MakeFrom(path);
 }
 
 void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint,
-                             const Matrix& matrix) {
+                             const Matrix& matrix, bool hasPaint) {
   if (shape == nullptr) {
     return;
   }
   if (ComplexStrokeStyle(paint)) {
-    flushPending(PendingType::Shape, paint, matrix);
+    flushPending(PendingType::Shape, paint, matrix, hasPaint);
     pendingShape = std::move(shape);
     return;
   }
   if (shape->isSimplePath()) {
-    addPath(shape->getPath(), paint, matrix);
+    addPath(shape->getPath(), paint, matrix, hasPaint);
     return;
   }
-  if (tryAddSimplifiedMatrixShape(shape, paint, matrix)) {
+  if (tryAddSimplifiedMatrixShape(shape, paint, matrix, hasPaint)) {
     return;
   }
-  flushPending(PendingType::Shape, paint, matrix);
+  flushPending(PendingType::Shape, paint, matrix, hasPaint);
   pendingShape = std::move(shape);
 }
 
 bool LayerRecorder::tryAddSimplifiedMatrixShape(const std::shared_ptr<Shape>& shape,
-                                                const LayerPaint& paint, const Matrix& matrix) {
+                                                const LayerPaint& paint, const Matrix& matrix,
+                                                bool hasPaint) {
   auto matrixShape = ShapeUtils::AsMatrixShape(shape.get());
   if (matrixShape == nullptr || !matrixShape->shape->isSimplePath()) {
     return false;
@@ -215,11 +227,12 @@ bool LayerRecorder::tryAddSimplifiedMatrixShape(const std::shared_ptr<Shape>& sh
   }
   auto combinedMatrix = matrixShape->matrix;
   combinedMatrix.postConcat(matrix);
-  return tryAddSimplifiedPath(matrixShape->shape->getPath(), adjustedPaint, combinedMatrix);
+  return tryAddSimplifiedPath(matrixShape->shape->getPath(), adjustedPaint, combinedMatrix,
+                              hasPaint);
 }
 
 bool LayerRecorder::tryAddSimplifiedPath(const Path& path, const LayerPaint& paint,
-                                         const Matrix& matrix) {
+                                         const Matrix& matrix, bool hasPaint) {
   Point line[2] = {};
   if (path.isLine(line)) {
     if (paint.style != PaintStyle::Stroke) {
@@ -229,14 +242,14 @@ bool LayerRecorder::tryAddSimplifiedPath(const Path& path, const LayerPaint& pai
     if (StrokeLineToRect(paint.stroke, line, &rect)) {
       LayerPaint fillPaint = paint;
       fillPaint.style = PaintStyle::Fill;
-      addRect(rect, fillPaint, matrix);
+      addRect(rect, fillPaint, matrix, hasPaint);
       return true;
     }
     RRect rRect = {};
     if (StrokeLineToRRect(paint.stroke, line, &rRect)) {
       LayerPaint fillPaint = paint;
       fillPaint.style = PaintStyle::Fill;
-      addRRect(rRect, fillPaint, matrix);
+      addRRect(rRect, fillPaint, matrix, hasPaint);
       return true;
     }
     return false;
@@ -247,26 +260,31 @@ bool LayerRecorder::tryAddSimplifiedPath(const Path& path, const LayerPaint& pai
   // from a closed rectangle stroke, so only forward when the path is closed or there is no
   // stroke (closedness does not affect fill).
   if (path.isRect(&rect, &closed) && (paint.style != PaintStyle::Stroke || closed)) {
-    addRect(rect, paint, matrix);
+    addRect(rect, paint, matrix, hasPaint);
     return true;
   }
   RRect rRect = {};
   // isRRect returns false for oval/circle paths, so check isOval explicitly.
   if (path.isOval(&rect)) {
     rRect.setOval(rect);
-    addRRect(rRect, paint, matrix);
+    addRRect(rRect, paint, matrix, hasPaint);
     return true;
   }
   if (path.isRRect(&rRect)) {
-    addRRect(rRect, paint, matrix);
+    addRRect(rRect, paint, matrix, hasPaint);
     return true;
   }
   return false;
 }
 
-bool LayerRecorder::canAppend(PendingType type, const LayerPaint& paint,
-                              const Matrix& matrix) const {
+bool LayerRecorder::canAppend(PendingType type, const LayerPaint& paint, const Matrix& matrix,
+                              bool hasPaint) const {
   if (pendingType != type) {
+    return false;
+  }
+  // A batch shares one paint, so one no paint captured can never join a painted batch: the batch
+  // would have to hold a paint that was never given.
+  if (pendingHasPaint != hasPaint) {
     return false;
   }
   if (pendingMatrix != matrix) {
@@ -294,24 +312,26 @@ bool LayerRecorder::canAppend(PendingType type, const LayerPaint& paint,
 }
 
 void LayerRecorder::flushPending(PendingType newType, const LayerPaint& newPaint,
-                                 const Matrix& newMatrix) {
+                                 const Matrix& newMatrix, bool newHasPaint) {
   if (pendingType != PendingType::None) {
     std::unique_ptr<GeometryContent> content = nullptr;
     auto& list = pendingPaint.placement == LayerPlacement::Foreground ? foregrounds : contents;
     switch (pendingType) {
       case PendingType::Rect:
         if (pendingRects.size() == 1) {
-          content = std::make_unique<RectContent>(pendingRects[0], pendingPaint);
+          content = std::make_unique<RectContent>(pendingRects[0], pendingPaint, pendingHasPaint);
         } else {
-          content = std::make_unique<RectsContent>(std::move(pendingRects), pendingPaint);
+          content = std::make_unique<RectsContent>(std::move(pendingRects), pendingPaint,
+                                                   pendingHasPaint);
         }
         pendingRects = {};
         break;
       case PendingType::RRect:
         if (pendingRRects.size() == 1) {
-          content = std::make_unique<RRectContent>(pendingRRects[0], pendingPaint);
+          content = std::make_unique<RRectContent>(pendingRRects[0], pendingPaint, pendingHasPaint);
         } else {
-          content = std::make_unique<RRectsContent>(std::move(pendingRRects), pendingPaint);
+          content = std::make_unique<RRectsContent>(std::move(pendingRRects), pendingPaint,
+                                                    pendingHasPaint);
         }
         pendingRRects = {};
         break;
@@ -319,9 +339,11 @@ void LayerRecorder::flushPending(PendingType newType, const LayerPaint& newPaint
         // Route to ShapeContent whenever the paint carries a complex stroke style, even if the
         // shape is a simple path. PathContent otherwise ignores strokeAlign and pathEffect.
         if (pendingShape->isSimplePath() && !ComplexStrokeStyle(pendingPaint)) {
-          content = std::make_unique<PathContent>(pendingShape->getPath(), pendingPaint);
+          content =
+              std::make_unique<PathContent>(pendingShape->getPath(), pendingPaint, pendingHasPaint);
         } else {
-          content = std::make_unique<ShapeContent>(std::move(pendingShape), pendingPaint);
+          content = std::make_unique<ShapeContent>(std::move(pendingShape), pendingPaint,
+                                                   pendingHasPaint);
         }
         pendingShape = nullptr;
         break;
@@ -341,6 +363,29 @@ void LayerRecorder::flushPending(PendingType newType, const LayerPaint& newPaint
   pendingType = newType;
   pendingPaint = newPaint;
   pendingMatrix = newMatrix;
+  pendingHasPaint = newHasPaint;
+}
+
+// The contour of one group of entries sharing a geometry needs one representative draw: they all
+// cover the same outline. Image shaders are the exception -- each of them covers a different part of
+// the geometry, so all of them are kept. Entries no paint captured stand for the geometry only when
+// the query includes them, which is what keeps them out of the shared contour.
+static std::vector<GeometryContent*> SelectContourRepresentatives(
+    const std::vector<GeometryContent*>& group, bool includeUnpaintedGeometry) {
+  std::vector<GeometryContent*> candidates = {};
+  candidates.reserve(group.size());
+  for (const auto content : group) {
+    if (content->hasPaint() || includeUnpaintedGeometry) {
+      candidates.push_back(content);
+    }
+  }
+  auto nonImageContent = std::find_if(candidates.begin(), candidates.end(), [](const auto content) {
+    return content->getShader() == nullptr || !content->getShader()->isAImage();
+  });
+  if (nonImageContent == candidates.end()) {
+    return candidates;
+  }
+  return {*nonImageContent};
 }
 
 std::unique_ptr<LayerContent> LayerRecorder::finishRecording() {
@@ -375,31 +420,36 @@ std::unique_ptr<LayerContent> LayerRecorder::finishRecording() {
     }
   }
 
-  // Phase 2: Collect contours from groups.
-  std::vector<GeometryContent*> contours = {};
-  bool needContours = false;
+  // Phase 2: Collect contours from groups, one selection per caliber. A group never mixes the two
+  // kinds of entry -- hasSameGeometry() keeps a painted entry away from a bare one -- so a group is
+  // painted or bare as a whole. The painted caliber therefore selects the representative of every
+  // painted group and nothing at all for a bare one. A table that selects nothing must stay
+  // distinguishable from no table: hasContourTable is what tells them apart.
+  bool hasContourTable = false;
+  std::vector<std::vector<GeometryContent*>> selections = {};
+  std::vector<std::vector<GeometryContent*>> paintedSelections = {};
+  selections.reserve(groups.size());
+  paintedSelections.reserve(groups.size());
   for (const auto& group : groups) {
-    auto nonImageContent = std::find_if(group.begin(), group.end(), [](auto content) {
-      return content->getShader() == nullptr || !content->getShader()->isAImage();
-    });
-    if (nonImageContent == group.end()) {
-      // All image shaders, collect all.
-      for (auto content : group) {
-        contours.push_back(content);
-      }
-    } else {
-      contours.push_back(*nonImageContent);
-      if (group.size() > 1) {
-        needContours = true;
-      }
+    selections.push_back(SelectContourRepresentatives(group, true));
+    paintedSelections.push_back(SelectContourRepresentatives(group, false));
+    if (group.size() > 1 && selections.back().size() == 1) {
+      hasContourTable = true;
     }
   }
-  if (!needContours) {
-    contours.clear();
+  std::vector<GeometryContent*> contours = {};
+  std::vector<GeometryContent*> paintedContours = {};
+  if (hasContourTable) {
+    for (size_t i = 0; i < groups.size(); i++) {
+      contours.insert(contours.end(), selections[i].begin(), selections[i].end());
+      paintedContours.insert(paintedContours.end(), paintedSelections[i].begin(),
+                             paintedSelections[i].end());
+    }
   }
 
   return std::make_unique<ComposeContent>(std::move(allContents), foregroundStartIndex,
-                                          std::move(contours));
+                                          hasContourTable, std::move(contours),
+                                          std::move(paintedContours));
 }
 
 }  // namespace tgfx

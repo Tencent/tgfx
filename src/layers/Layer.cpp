@@ -707,16 +707,17 @@ Rect Layer::getBoundsInternal(const Matrix3D& coordinateMatrix, bool computeTigh
 
 static Rect ComputeContentBounds(const LayerContent& content, const Rect& contentBounds,
                                  const Matrix3D& coordinateMatrix, bool applyMatrixAtEnd,
-                                 bool computeTightBounds) {
+                                 bool computeTightBounds, bool includeUnpaintedGeometry) {
   auto contentMatrix = applyMatrixAtEnd ? Matrix3D::I() : coordinateMatrix;
   if (!computeTightBounds) {
     return contentMatrix.mapRect(contentBounds);
   }
 
   if (Matrix3DUtils::IsMatrix3DAffine(contentMatrix)) {
-    return content.getTightBounds(Matrix3DUtils::GetMayLossyAffineMatrix(contentMatrix));
+    return content.getTightBounds(Matrix3DUtils::GetMayLossyAffineMatrix(contentMatrix),
+                                  includeUnpaintedGeometry);
   }
-  auto bounds = content.getTightBounds(Matrix::I());
+  auto bounds = content.getTightBounds(Matrix::I(), includeUnpaintedGeometry);
   return contentMatrix.mapRect(bounds);
 }
 
@@ -731,24 +732,18 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
 
   Rect bounds = {};
   if (auto content = getContent()) {
-    auto contentBounds = content->getBounds();
+    // A geometry no paint captured paints nothing, so it belongs to the layer's own geometry rather
+    // than to its content. Only a style drawing from that geometry needs it in the bounds, and only
+    // when the filters and style sources are not mapped against content bounds (excludeEffects).
+    const bool includeUnpaintedGeometry = !excludeEffects && hasOwnGeometryContentStyle();
+    auto contentBounds = content->getBounds(includeUnpaintedGeometry);
     bool behindCamera =
         !isAffine && Matrix3DUtils::IsRectBehindCamera(contentBounds, coordinateMatrix);
     if (!behindCamera) {
-      auto computedBounds = ComputeContentBounds(*content, contentBounds, coordinateMatrix,
-                                                 applyMatrixAtEnd, computeTightBounds);
+      auto computedBounds =
+          ComputeContentBounds(*content, contentBounds, coordinateMatrix, applyMatrixAtEnd,
+                               computeTightBounds, includeUnpaintedGeometry);
       bounds.join(computedBounds);
-    }
-  }
-  // A geometry no painter captured has no content bounds, so join its bounds here or a style
-  // drawing from the own geometry would cover nothing. Gated on such a style existing and on
-  // !excludeEffects, which maps filters and style sources against content bounds only.
-  if (!excludeEffects && hasOwnGeometryContentStyle()) {
-    auto ownGeometryBounds = onGetOwnGeometryBounds();
-    if (!ownGeometryBounds.isEmpty() &&
-        (isAffine || !Matrix3DUtils::IsRectBehindCamera(ownGeometryBounds, coordinateMatrix))) {
-      auto ownGeometryMatrix = applyMatrixAtEnd ? Matrix3D::I() : coordinateMatrix;
-      bounds.join(ownGeometryMatrix.mapRect(ownGeometryBounds));
     }
   }
 
@@ -841,17 +836,16 @@ Matrix3D Layer::getRelativeMatrix3D(const Layer* target) const {
 }
 
 bool Layer::hitTestPoint(float x, float y, bool shapeHitTest) {
-  // Hit testing deliberately ignores the own geometry: the layer content never paints a geometry no
-  // painter captured (only a Geometry style may draw it), so it must not become clickable just
-  // because a style covers it.
+  // Hit testing matches the painted content: a geometry no paint captured paints nothing, and only
+  // a Geometry style may draw it, so it must not become clickable just because a style covers it.
   if (auto content = getContent()) {
     Point localPoint = globalToLocal(Point::Make(x, y));
     if (shapeHitTest) {
-      if (content->hitTestPoint(localPoint.x, localPoint.y)) {
+      if (content->hitTestPoint(localPoint.x, localPoint.y, false)) {
         return true;
       }
     } else {
-      if (content->getBounds().contains(localPoint.x, localPoint.y)) {
+      if (content->getBounds(false).contains(localPoint.x, localPoint.y)) {
         return true;
       }
     }
@@ -1361,13 +1355,12 @@ std::shared_ptr<Image> Layer::getOwnGeometryImage(const DrawArgs& args, float co
   auto* contourCanvas = opaqueContext.beginRecording();
   contourCanvas->scale(contentScale, contentScale);
   // This is the layer's own geometry, not the contour shared with layer styles or masks: recording
-  // it directly only leaves the descendants out (the painters with alpha=0 stay in both).
+  // it directly only leaves the descendants out, and asking for the geometries no paint captured
+  // adds the coverage a Geometry style has to fill (the painters with alpha=0 stay in both).
   auto content = getContent();
   if (content != nullptr) {
-    content->drawContour(contourCanvas, bitFields.allowsEdgeAntialiasing);
+    content->drawContour(contourCanvas, bitFields.allowsEdgeAntialiasing, true);
   }
-  // Geometries no painter captured paint nothing as content, so only the layer itself can add them.
-  onDrawOwnGeometry(contourCanvas);
   auto picture = opaqueContext.finishRecordingAsPicture();
   // Read the shape back from the picture before it is consumed by the conversion below, so the
   // shape and the raster describe the very same recording.
@@ -1384,13 +1377,6 @@ std::shared_ptr<Image> Layer::getOwnGeometryImage(const DrawArgs& args, float co
     *shape = std::nullopt;
   }
   return image;
-}
-
-Rect Layer::onGetOwnGeometryBounds() {
-  return Rect::MakeEmpty();
-}
-
-void Layer::onDrawOwnGeometry(Canvas*) {
 }
 
 bool Layer::shouldPassThroughBackground(BlendMode blendMode) const {
@@ -1447,7 +1433,9 @@ bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode) {
   // styles, as they can be efficiently merged during rendering.
   if (_children.empty() && _layerStyles.empty() && _filters.empty()) {
     auto content = getContent();
-    if (content == nullptr) {
+    // Content only carries bare geometry when every entry came without a paint, and such content
+    // paints nothing: it is not the drawable content this optimization is about.
+    if (content == nullptr || !content->hasPaintedContent()) {
       return false;
     }
     auto contentType = Types::Get(content);
@@ -1726,7 +1714,7 @@ bool Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, bool conte
     if (!content->contourEqualsOpaqueContent()) {
       allMatch = false;
     }
-    content->drawContour(canvas, bitFields.allowsEdgeAntialiasing);
+    content->drawContour(canvas, bitFields.allowsEdgeAntialiasing, false);
   }
 
   // 3D middle node: descendants are independently registered with the active Layer3DContext, so
@@ -2122,7 +2110,8 @@ bool Layer::getLayersUnderPointInternal(float x, float y,
   } else {
     auto content = getContent();
     if (nullptr != content) {
-      auto layerBoundsRect = content->getBounds();
+      // Same caliber as hitTestPoint(): a geometry no paint captured is not hit-testable.
+      auto layerBoundsRect = content->getBounds(false);
       auto localPoint = globalToLocal(Point::Make(x, y));
       if (layerBoundsRect.contains(localPoint.x, localPoint.y)) {
         results->push_back(shared_from_this());
@@ -2184,15 +2173,13 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
       contentBounds = new Rect();
     }
     if (content) {
-      *contentBounds = content->getBounds();
+      // Geometry no paint captured is part of the bounds while a style draws from it, which is the
+      // same question computeBounds() asks: only such a style has anything to cover there. The one
+      // exception is computeBounds()'s excludeEffects, where the bounds are mapped against the
+      // content bounds and the bare geometry stays out; this path always keeps it.
+      *contentBounds = content->getBounds(hasOwnGeometry);
     } else {
       contentBounds->setEmpty();
-    }
-    // Same reason as in computeBounds(): geometry no painter captured has no content bounds, yet a
-    // style drawing from it still needs bounds to capture the background over. Only the reason
-    // matches, not the gate: this path has no excludeEffects variant to guard against.
-    if (hasOwnGeometry) {
-      contentBounds->join(onGetOwnGeometryBounds());
     }
     // An empty content bounds has nothing to cover, but a style or filter transformer outsets
     // whatever it is given, so running it on the empty rect would invent bounds and dirty regions

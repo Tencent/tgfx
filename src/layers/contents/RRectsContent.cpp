@@ -21,11 +21,14 @@
 
 namespace tgfx {
 
-RRectsContent::RRectsContent(std::vector<RRect> rRects, const LayerPaint& paint)
-    : DrawContent(paint), rRects(std::move(rRects)) {
+RRectsContent::RRectsContent(std::vector<RRect> rRects, const LayerPaint& paint, bool hasPaint)
+    : DrawContent(paint, hasPaint), rRects(std::move(rRects)) {
 }
 
-Rect RRectsContent::getTightBounds(const Matrix& matrix) const {
+Rect RRectsContent::getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const {
+  if (isExcluded(includeUnpaintedGeometry)) {
+    return Rect::MakeEmpty();
+  }
   if (stroke) {
     auto strokedPath = getFilledPath();
     strokedPath.transform(matrix);
@@ -38,7 +41,10 @@ Rect RRectsContent::getTightBounds(const Matrix& matrix) const {
   return bounds;
 }
 
-bool RRectsContent::hitTestPoint(float localX, float localY) const {
+bool RRectsContent::hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const {
+  if (isExcluded(includeUnpaintedGeometry)) {
+    return false;
+  }
   if (color.alpha <= 0) {
     return false;
   }

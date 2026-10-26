@@ -32,7 +32,14 @@ static bool StrokeEquals(const Stroke* a, const Stroke* b) {
   return *a == *b;
 }
 
-DrawContent::DrawContent(const LayerPaint& paint) : blendMode(paint.blendMode) {
+DrawContent::DrawContent(const LayerPaint& paint, bool hasPaint) : painted(hasPaint) {
+  // An entry no paint captured holds no paint state at all: reading color, shader, stroke or blend
+  // mode from the (empty) paint would invent a style the layer never asked for. The defaults it
+  // keeps are exactly what its contour needs: an opaque white fill.
+  if (!painted) {
+    return;
+  }
+  blendMode = paint.blendMode;
   auto paintShader = paint.shader;
   if (paintShader) {
     Color shaderColor = {};
@@ -51,7 +58,10 @@ DrawContent::DrawContent(const LayerPaint& paint) : blendMode(paint.blendMode) {
   }
 }
 
-Rect DrawContent::getBounds() const {
+Rect DrawContent::getBounds(bool includeUnpaintedGeometry) const {
+  if (isExcluded(includeUnpaintedGeometry)) {
+    return Rect::MakeEmpty();
+  }
   auto bounds = onGetBounds();
   if (stroke) {
     ApplyStrokeToBounds(*stroke, &bounds);
@@ -59,20 +69,36 @@ Rect DrawContent::getBounds() const {
   return bounds;
 }
 
-void DrawContent::drawContourInternal(Canvas* canvas, bool antiAlias) const {
+void DrawContent::drawContourInternal(Canvas* canvas, bool antiAlias,
+                                      bool includeUnpaintedGeometry) const {
+  if (isExcluded(includeUnpaintedGeometry)) {
+    return;
+  }
   Paint paint = {};
   paint.setAntiAlias(antiAlias);
-  if (stroke) {
-    paint.setStyle(PaintStyle::Stroke);
-    paint.setStroke(*stroke);
-  }
-  if (shader && shader->isAImage()) {
-    paint.setShader(shader);
+  if (painted) {
+    if (stroke) {
+      paint.setStyle(PaintStyle::Stroke);
+      paint.setStroke(*stroke);
+    }
+    if (shader && shader->isAImage()) {
+      paint.setShader(shader);
+    }
+  } else {
+    // A bare geometry has no paint to draw with, so its contour is the opaque white fill the
+    // own-geometry recording has always covered it with.
+    paint.setColor(Color::White());
   }
   onDraw(canvas, paint);
 }
 
 bool DrawContent::contourEqualsOpaqueContent() const {
+  // A geometry no paint captured is drawn by neither the contour nor the content query, so the two
+  // agree on it. Saying otherwise would tell the caller that a bare geometry makes the shared
+  // contour differ from the rendered content, which is exactly the difference it does not have.
+  if (!painted) {
+    return true;
+  }
   if (color.alpha <= 0) {
     return false;
   }
@@ -83,7 +109,7 @@ bool DrawContent::contourEqualsOpaqueContent() const {
 }
 
 bool DrawContent::drawDefault(Canvas* canvas, float alpha, bool antiAlias) const {
-  if (color.alpha <= 0) {
+  if (!painted || color.alpha <= 0) {
     return false;
   }
   Paint paint = {};
@@ -114,6 +140,11 @@ bool DrawContent::hasSameGeometry(const GeometryContent* other) const {
     return false;
   }
   auto otherContent = static_cast<const DrawContent*>(other);
+  // A bare geometry and a painted one describe the same outline but not the same entry: they must
+  // not end up in one group, whose contour representative would then stand for both.
+  if (painted != otherContent->painted) {
+    return false;
+  }
   if (!StrokeEquals(stroke.get(), otherContent->stroke.get())) {
     return false;
   }
@@ -122,6 +153,14 @@ bool DrawContent::hasSameGeometry(const GeometryContent* other) const {
 
 bool DrawContent::hasBlendMode() const {
   return blendMode != BlendMode::SrcOver;
+}
+
+bool DrawContent::hasPaint() const {
+  return painted;
+}
+
+bool DrawContent::hasPaintedContent() const {
+  return painted;
 }
 
 }  // namespace tgfx

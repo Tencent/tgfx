@@ -33,28 +33,32 @@ class LayerContent {
   virtual ~LayerContent() = default;
 
   /**
-   * Returns the bounds of the content.
+   * Returns the bounds of the content. A geometry no paint captured belongs to the layer's own
+   * geometry rather than to its painted content, so each query states whether it takes part.
    */
-  virtual Rect getBounds() const = 0;
+  virtual Rect getBounds(bool includeUnpaintedGeometry) const = 0;
 
   /**
-   * Returns the tight bounds of the content mapped by Matrix.
+   * Returns the tight bounds of the content mapped by Matrix. As with getBounds(), the geometries
+   * no paint captured take part only when the query asks for them.
    */
-  virtual Rect getTightBounds(const Matrix& matrix) const = 0;
+  virtual Rect getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const = 0;
 
   /**
    * Checks if the layer content overlaps or intersects with the specified point (localX, localY).
    * The localX and localY coordinates are in the layer's local coordinate space. This method
-   * performs precise hit testing on the actual shape of the layer content.
+   * performs precise hit testing on the actual shape of the layer content. Hit testing follows the
+   * painted content, so the geometries no paint captured never hit: callers query the painters.
    */
-  virtual bool hitTestPoint(float localX, float localY) const = 0;
+  virtual bool hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const = 0;
 
   /**
    * Draws the contour of the content to the specified canvas. Unlike the rendered content, the
-   * contour keeps the painters whose alpha is 0.
+   * contour keeps the painters whose alpha is 0. The geometries no paint captured are drawn only
+   * when the query includes them, since a query that excludes them describes what content paints.
    */
-  void drawContour(Canvas* canvas, bool antiAlias) const {
-    drawContourInternal(canvas, antiAlias);
+  void drawContour(Canvas* canvas, bool antiAlias, bool includeUnpaintedGeometry) const {
+    drawContourInternal(canvas, antiAlias, includeUnpaintedGeometry);
   }
 
   /**
@@ -73,6 +77,13 @@ class LayerContent {
   }
 
   /**
+   * Returns true if at least one entry of the content carries a paint. A content that holds only
+   * geometries no paint captured paints nothing, so it is not "drawable content" even though it
+   * exists.
+   */
+  virtual bool hasPaintedContent() const = 0;
+
+  /**
    * Draws the default content of the layer (content below children) to the specified canvas.
    * Returns true if the content has foreground graphics that should be drawn above children
    * by calling drawForeground().
@@ -89,7 +100,8 @@ class LayerContent {
   /**
    * Draws the contour. A content that holds several painters forwards to them through this channel.
    */
-  virtual void drawContourInternal(Canvas* canvas, bool antiAlias) const = 0;
+  virtual void drawContourInternal(Canvas* canvas, bool antiAlias,
+                                   bool includeUnpaintedGeometry) const = 0;
 
   enum class Type {
     Rect,

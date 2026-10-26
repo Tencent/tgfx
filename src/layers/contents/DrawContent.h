@@ -31,17 +31,24 @@ namespace tgfx {
  */
 class DrawContent : public GeometryContent {
  public:
-  explicit DrawContent(const LayerPaint& paint);
+  /**
+   * @param paint The paint that captured this geometry. Ignored when hasPaint is false: an entry no
+   * paint captured holds no paint state, so any read of it would be a read of nothing.
+   * @param hasPaint Whether a paint captured this geometry.
+   */
+  explicit DrawContent(const LayerPaint& paint, bool hasPaint);
 
-  Rect getBounds() const override;
-  Rect getTightBounds(const Matrix& matrix) const override = 0;
-  bool hitTestPoint(float localX, float localY) const override = 0;
+  Rect getBounds(bool includeUnpaintedGeometry) const override;
+  Rect getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const override = 0;
+  bool hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const override = 0;
   bool contourEqualsOpaqueContent() const override;
   bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
   void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
   const std::shared_ptr<Shader>& getShader() const override;
   bool hasSameGeometry(const GeometryContent* other) const override;
   bool hasBlendMode() const override;
+  bool hasPaint() const override;
+  bool hasPaintedContent() const override;
 
   const Color& getColor() const {
     return color;
@@ -56,16 +63,27 @@ class DrawContent : public GeometryContent {
   }
 
  protected:
-  void drawContourInternal(Canvas* canvas, bool antiAlias) const override;
+  void drawContourInternal(Canvas* canvas, bool antiAlias,
+                           bool includeUnpaintedGeometry) const override;
 
   virtual Rect onGetBounds() const = 0;
   virtual void onDraw(Canvas* canvas, const Paint& paint) const = 0;
   virtual bool onHasSameGeometry(const GeometryContent* other) const = 0;
 
+  /**
+   * Returns true when this entry must stay out of a query. An entry no paint captured paints
+   * nothing, so it only takes part in a query that asks for it; a painter with alpha 0 keeps its
+   * contour but paints nothing either, which the alpha test of the query itself covers.
+   */
+  bool isExcluded(bool includeUnpaintedGeometry) const {
+    return !painted && !includeUnpaintedGeometry;
+  }
+
   Color color = Color::White();
   std::shared_ptr<Shader> shader = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
   std::unique_ptr<Stroke> stroke = nullptr;
+  bool painted = true;
 };
 
 }  // namespace tgfx

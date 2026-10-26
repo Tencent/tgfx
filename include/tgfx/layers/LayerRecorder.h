@@ -33,7 +33,9 @@ class GeometryContent;
 
 /**
  * LayerRecorder records geometries and their paints as layer content. Geometries with invisible
- * paints are still included as part of the layer's contour, but they will not be rendered.
+ * paints are still included as part of the layer's contour, but they will not be rendered. A
+ * geometry may also be recorded without any paint: it paints nothing and stays out of the shared
+ * contour, and only the queries that ask for the layer's own geometry see it.
  */
 class LayerRecorder {
  public:
@@ -67,6 +69,14 @@ class LayerRecorder {
    * @param paint The paint style for the shape.
    */
   void addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint);
+
+  /**
+   * Adds a shape no paint captured. Such a geometry paints nothing and contributes no shared
+   * contour, but it is still part of the layer's own geometry. It is never batched with a painted
+   * geometry, since the batch would then have to share one paint.
+   * @param shape The shape object.
+   */
+  void addShape(std::shared_ptr<Shape> shape);
 
   /**
    * Adds a text blob with the specified paint.
@@ -118,23 +128,28 @@ class LayerRecorder {
 
   PendingType pendingType = PendingType::None;
   LayerPaint pendingPaint = {};
+  // Whether a paint captured the pending geometries. A batch only ever holds entries of one kind.
+  bool pendingHasPaint = true;
   // Transformation matrix for the pending geometries.
   Matrix pendingMatrix = Matrix::I();
   std::vector<Rect> pendingRects = {};
   std::vector<RRect> pendingRRects = {};
   std::shared_ptr<Shape> pendingShape = nullptr;
 
-  void addRect(const Rect& rect, const LayerPaint& paint, const Matrix& matrix);
-  void addRRect(const RRect& rRect, const LayerPaint& paint, const Matrix& matrix);
-  void addPath(const Path& path, const LayerPaint& paint, const Matrix& matrix);
-  void addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint, const Matrix& matrix);
+  void addRect(const Rect& rect, const LayerPaint& paint, const Matrix& matrix, bool hasPaint);
+  void addRRect(const RRect& rRect, const LayerPaint& paint, const Matrix& matrix, bool hasPaint);
+  void addPath(const Path& path, const LayerPaint& paint, const Matrix& matrix, bool hasPaint);
+  void addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint, const Matrix& matrix,
+                bool hasPaint);
 
-  bool tryAddSimplifiedPath(const Path& path, const LayerPaint& paint, const Matrix& matrix);
+  bool tryAddSimplifiedPath(const Path& path, const LayerPaint& paint, const Matrix& matrix,
+                            bool hasPaint);
   bool tryAddSimplifiedMatrixShape(const std::shared_ptr<Shape>& shape, const LayerPaint& paint,
-                                   const Matrix& matrix);
-  bool canAppend(PendingType type, const LayerPaint& paint, const Matrix& matrix) const;
+                                   const Matrix& matrix, bool hasPaint);
+  bool canAppend(PendingType type, const LayerPaint& paint, const Matrix& matrix,
+                 bool hasPaint) const;
   void flushPending(PendingType newType = PendingType::None, const LayerPaint& newPaint = {},
-                    const Matrix& newMatrix = Matrix::I());
+                    const Matrix& newMatrix = Matrix::I(), bool newHasPaint = true);
 
   std::unique_ptr<LayerContent> finishRecording();
 

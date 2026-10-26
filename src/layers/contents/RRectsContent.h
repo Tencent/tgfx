@@ -26,10 +26,10 @@ namespace tgfx {
 
 class RRectsContent : public DrawContent {
  public:
-  RRectsContent(std::vector<RRect> rRects, const LayerPaint& paint);
+  RRectsContent(std::vector<RRect> rRects, const LayerPaint& paint, bool hasPaint);
 
-  Rect getTightBounds(const Matrix& matrix) const override;
-  bool hitTestPoint(float localX, float localY) const override;
+  Rect getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const override;
+  bool hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const override;
 
   std::vector<RRect> rRects = {};
 

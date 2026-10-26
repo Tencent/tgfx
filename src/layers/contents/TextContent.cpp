@@ -22,21 +22,27 @@
 namespace tgfx {
 
 TextContent::TextContent(std::shared_ptr<TextBlob> textBlob, const Point& offset,
-                         const LayerPaint& paint)
-    : DrawContent(paint), textBlob(std::move(textBlob)), offset(offset) {
+                         const LayerPaint& paint, bool hasPaint)
+    : DrawContent(paint, hasPaint), textBlob(std::move(textBlob)), offset(offset) {
 }
 
 Rect TextContent::onGetBounds() const {
   return textBlob->getBounds().makeOffset(offset.x, offset.y);
 }
 
-Rect TextContent::getTightBounds(const Matrix& matrix) const {
+Rect TextContent::getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const {
+  if (isExcluded(includeUnpaintedGeometry)) {
+    return Rect::MakeEmpty();
+  }
   auto combinedMatrix = Matrix::MakeTrans(offset.x, offset.y);
   combinedMatrix.postConcat(matrix);
   return textBlob->getTightBounds(&combinedMatrix);
 }
 
-bool TextContent::hitTestPoint(float localX, float localY) const {
+bool TextContent::hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const {
+  if (isExcluded(includeUnpaintedGeometry)) {
+    return false;
+  }
   if (color.alpha <= 0) {
     return false;
   }

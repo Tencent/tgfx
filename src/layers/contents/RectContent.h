@@ -25,10 +25,10 @@ namespace tgfx {
 
 class RectContent : public DrawContent {
  public:
-  RectContent(const Rect& rect, const LayerPaint& paint);
+  RectContent(const Rect& rect, const LayerPaint& paint, bool hasPaint);
 
-  Rect getTightBounds(const Matrix& matrix) const override;
-  bool hitTestPoint(float localX, float localY) const override;
+  Rect getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const override;
+  bool hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const override;
 
   Rect rect = {};
 

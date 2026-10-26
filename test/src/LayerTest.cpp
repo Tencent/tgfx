@@ -2719,7 +2719,7 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorderMatrix) {
                       EXPECT_EQ(content4->type(), LayerContent::Type::Rect));
 
   // Test 5: getTightBounds with transformed content
-  auto bounds = content1->getTightBounds(Matrix::I());
+  auto bounds = content1->getTightBounds(Matrix::I(), false);
   bounds.roundOut();
   EXPECT_EQ(bounds, Rect::MakeLTRB(23, -5, 198, 116));
 
@@ -2729,9 +2729,9 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorderMatrix) {
   recorder5.addRect(Rect::MakeXYWH(0, 0, 100, 100), greenFill);
   std::unique_ptr<LayerContent> content5;
   TGFX_PRIVATE_ACCESS(content5 = recorder5.finishRecording());
-  EXPECT_TRUE(content5->hitTestPoint(50, 50));
-  EXPECT_FALSE(content5->hitTestPoint(0, 0));
-  EXPECT_TRUE(content5->hitTestPoint(50, -15));
+  EXPECT_TRUE(content5->hitTestPoint(50, 50, false));
+  EXPECT_FALSE(content5->hitTestPoint(0, 0, false));
+  EXPECT_TRUE(content5->hitTestPoint(50, -15, false));
 
   // Test 7: Render all contents
   auto surface = Surface::Make(context, 600, 200);
@@ -6964,9 +6964,38 @@ static std::vector<int> RasterizeOwnGeometryAlpha(Context* context,
   return raster;
 }
 
+// Counts the entries of `content` that carry no paint. Such an entry is a geometry no painter
+// captured: it used to live in a parallel list on VectorLayer, and now it is an ordinary content
+// entry that only the own-geometry queries see. The unit is the entry, not the geometry: two bare
+// rectangles recorded under one matrix batch into a single RectsContent and count as one, so a test
+// that needs two entries has to give them different matrices, as the Repeater case below does.
+static int CountUnpaintedEntries(const LayerContent* content) {
+  if (content == nullptr) {
+    return 0;
+  }
+  auto type = content->type();
+  if (type == LayerContent::Type::Compose) {
+    int count = 0;
+    for (const auto& child : static_cast<const ComposeContent*>(content)->contents) {
+      count += CountUnpaintedEntries(child.get());
+    }
+    return count;
+  }
+  if (type == LayerContent::Type::Matrix) {
+    return CountUnpaintedEntries(static_cast<const MatrixContent*>(content)->content.get());
+  }
+  return static_cast<const GeometryContent*>(content)->hasPaint() ? 0 : 1;
+}
+
+static int CountUnpaintedEntries(const std::shared_ptr<Layer>& layer) {
+  if (layer == nullptr) {
+    return 0;
+  }
+  TGFX_PRIVATE_ACCESS(return CountUnpaintedEntries(layer->getContent());)
+}
+
 // Size of each quadrant in the shared-corner case below.
 static constexpr float CornerQuadrantSize = 32.0f;
-
 // The own geometry records hard coverage in the cases a per-painter rule could get wrong: two
 // geometries describing one square (bare geometry or a 0%-alpha painter), an image-shaded painter,
 // and four geometries meeting at one corner.
@@ -7952,10 +7981,9 @@ TGFX_TEST_PRIVATE(LayerTest, RepeaterKeepsTheBareGeometryDifference) {
 
   auto alpha = RasterizeOwnGeometryAlpha(context, layer);
   ASSERT_FALSE(alpha.empty());
-  TGFX_PRIVATE_ACCESS(EXPECT_EQ(layer->ownGeometries.size(), 2u)
-                          << "only the two replicated bare rectangles differ; four would mean the "
-                             "painters no longer "
-                             "match their clones";)
+  EXPECT_EQ(CountUnpaintedEntries(layer), 2)
+      << "only the two replicated bare rectangles differ; four would mean the painters no longer "
+         "match their clones";
   EXPECT_EQ(OwnGeometryAlphaAt(alpha, 35, 85), 255) << "the first bare clone is covered";
   EXPECT_EQ(OwnGeometryAlphaAt(alpha, 115, 85), 255) << "the replicated bare clone is covered";
   EXPECT_EQ(OwnGeometryAlphaAt(alpha, 35, 35), 255) << "the painted clone stays in the contour";
@@ -7997,10 +8025,9 @@ TGFX_TEST_PRIVATE(LayerTest, MergePathResultStaysWithItsPainter) {
   auto merged = makePanel(true);
   auto alpha = RasterizeOwnGeometryAlpha(context, merged);
   ASSERT_FALSE(alpha.empty());
-  TGFX_PRIVATE_ACCESS(EXPECT_TRUE(merged->ownGeometries.empty())
-                          << "the fill after the merge captures the merged shape, so it is content "
-                             "and must not also "
-                             "be recorded as bare geometry";)
+  EXPECT_EQ(CountUnpaintedEntries(merged), 0)
+      << "the fill after the merge captures the merged shape, so it is content and must not also "
+         "be recorded as bare geometry";
   // Asserted on the raster as well: the merged outline covers the union and keeps out of the corner
   // that neither square covers.
   EXPECT_EQ(OwnGeometryAlphaAt(alpha, 30, 30), 255) << "inside the first rectangle only";
@@ -8011,9 +8038,8 @@ TGFX_TEST_PRIVATE(LayerTest, MergePathResultStaysWithItsPainter) {
   auto mergeAfterFill = makePanel(false);
   auto mergeAfterFillAlpha = RasterizeOwnGeometryAlpha(context, mergeAfterFill);
   ASSERT_EQ(mergeAfterFillAlpha.size(), alpha.size());
-  TGFX_PRIVATE_ACCESS(
-      EXPECT_EQ(mergeAfterFill->ownGeometries.size(), 1u)
-          << "MergePath clears the painters, so nothing paints the merged shape there";)
+  EXPECT_EQ(CountUnpaintedEntries(mergeAfterFill), 1)
+      << "MergePath clears the painters, so nothing paints the merged shape there";
   int differingPixels = 0;
   for (size_t i = 0; i < alpha.size(); i++) {
     if (alpha[i] != mergeAfterFillAlpha[i]) {
@@ -8335,6 +8361,263 @@ TGFX_TEST_PRIVATE(LayerTest, EmptyContentDoesNotGetStyleOutsetBounds) {
   displayList.render(surface.get(), false);
   TGFX_PRIVATE_ACCESS(after = layer->renderBounds;)
   EXPECT_TRUE(after.isEmpty()) << "an incremental frame must not resurrect the dropped bounds";
+}
+
+// ===== A geometry no paint captured is an ordinary content entry =====
+//
+// Such a geometry is recorded as content without a paint instead of living in a parallel list on the
+// layer. It paints nothing and contributes no shared contour, so these cases assert both sides: the
+// migration must not start drawing it, and the queries that do ask for it must still find it.
+
+// Reads the alpha channel of a square surface.
+static std::vector<int> ReadAlphaRaster(const std::shared_ptr<Surface>& surface) {
+  std::vector<int> raster = {};
+  if (surface == nullptr) {
+    return raster;
+  }
+  auto size = surface->width();
+  if (surface->height() != size) {
+    return raster;
+  }
+  auto info = ImageInfo::Make(size, size, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  std::vector<uint32_t> pixels(static_cast<size_t>(size) * static_cast<size_t>(size));
+  if (!surface->readPixels(info, pixels.data())) {
+    return raster;
+  }
+  raster.reserve(pixels.size());
+  for (auto pixel : pixels) {
+    raster.push_back(static_cast<int>((pixel >> 24) & 0xFF));
+  }
+  return raster;
+}
+
+// Alpha of a square raster at (x, y), in layer-local coordinates. Returns -1 when the raster does not
+// describe a square of that size.
+static int RasterAlphaAt(const std::vector<int>& raster, int size, int x, int y) {
+  if (x < 0 || y < 0 || x >= size || y >= size ||
+      raster.size() != static_cast<size_t>(size) * static_cast<size_t>(size)) {
+    return -1;
+  }
+  return raster[static_cast<size_t>(y) * static_cast<size_t>(size) + static_cast<size_t>(x)];
+}
+
+// Records the contour shared with layer styles and masks of `layer` onto a probe surface, in
+// layer-local coordinates, and returns its alpha raster. A contour that records nothing leaves no
+// image behind, which is the same coverage as an image of zeros.
+static std::vector<int> RasterizeSharedContourAlpha(Context* context,
+                                                    const std::shared_ptr<Layer>& layer) {
+  auto surface = Surface::Make(context, OwnGeometryProbeSize, OwnGeometryProbeSize);
+  if (surface == nullptr) {
+    return {};
+  }
+  std::shared_ptr<Image> image = nullptr;
+  Point offset = Point::Zero();
+  TGFX_PRIVATE_ACCESS(DrawArgs drawArgs(context);
+                      image = layer->getContentContourImage(drawArgs, 1.0f, &offset, nullptr);)
+  if (image == nullptr) {
+    return std::vector<int>(static_cast<size_t>(OwnGeometryProbeSize) * OwnGeometryProbeSize, 0);
+  }
+  // The image is cropped to the outline's rounded-out bounds, so its recorded offset puts the raster
+  // back into layer-local coordinates.
+  surface->getCanvas()->drawImage(image, offset.x, offset.y);
+  return ReadAlphaRaster(surface);
+}
+
+// Draws the own content of `layer` as a contour with the requested caliber onto a probe surface, in
+// layer-local coordinates, and returns its alpha raster.
+static std::vector<int> RasterizeContentContourAlpha(Context* context,
+                                                     const std::shared_ptr<Layer>& layer,
+                                                     bool includeUnpaintedGeometry) {
+  std::vector<int> raster = {};
+  auto surface = Surface::Make(context, OwnGeometryProbeSize, OwnGeometryProbeSize);
+  if (surface == nullptr) {
+    return raster;
+  }
+  LayerContent* content = nullptr;
+  TGFX_PRIVATE_ACCESS(content = layer->getContent());
+  if (content == nullptr) {
+    return raster;
+  }
+  content->drawContour(surface->getCanvas(), false, includeUnpaintedGeometry);
+  return ReadAlphaRaster(surface);
+}
+
+TGFX_TEST_PRIVATE(LayerTest, PaintlessEntryNeverDraws) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  const Rect paintedBounds = Rect::MakeXYWH(20.0f, 20.0f, 60.0f, 40.0f);
+  const Rect bareBounds = Rect::MakeXYWH(110.0f, 20.0f, 60.0f, 40.0f);
+  auto buildLayer = [&](bool withBareGeometry) {
+    std::vector<std::shared_ptr<VectorElement>> elements = {
+        MakeRectElement(paintedBounds), FillStyle::Make(SolidColor::Make(Color::White()))};
+    if (withBareGeometry) {
+      elements.push_back(MakeRectElement(bareBounds));
+    }
+    auto group = VectorGroup::Make();
+    group->setElements(std::move(elements));
+    auto layer = VectorLayer::Make();
+    layer->setContents({group});
+    return layer;
+  };
+  auto render = [context](const std::shared_ptr<Layer>& layer) {
+    auto surface = Surface::Make(context, OwnGeometryProbeSize, OwnGeometryProbeSize);
+    if (surface == nullptr) {
+      return surface;
+    }
+    DisplayList displayList;
+    displayList.root()->addChild(layer);
+    displayList.render(surface.get());
+    return surface;
+  };
+
+  auto paintedLayer = buildLayer(false);
+  auto bareLayer = buildLayer(true);
+  // Fixture control: the second rectangle really is recorded, and as an entry without a paint.
+  EXPECT_EQ(CountUnpaintedEntries(paintedLayer), 0);
+  EXPECT_EQ(CountUnpaintedEntries(bareLayer), 1);
+
+  auto painted = render(paintedLayer);
+  auto withBare = render(bareLayer);
+  ASSERT_TRUE(painted != nullptr && withBare != nullptr);
+  EXPECT_EQ(CountDifferingPixels(painted.get(), withBare.get(),
+                                 Rect::MakeWH(OwnGeometryProbeSize, OwnGeometryProbeSize), 0),
+            0)
+      << "a geometry no paint captured must not add a single pixel to the normal draw";
+  auto paintedPixel = ReadPixelValue(painted.get(), static_cast<int>(paintedBounds.centerX()),
+                                     static_cast<int>(paintedBounds.centerY()));
+  ASSERT_TRUE(paintedPixel.has_value());
+  EXPECT_GT(static_cast<int>((*paintedPixel >> 24) & 0xFF), 0)
+      << "fixture control: the painted rectangle must be visible, otherwise two empty renders "
+         "would "
+         "compare equal";
+}
+
+TGFX_TEST_PRIVATE(LayerTest, SharedContourExcludesPaintless) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  const Rect rect = Rect::MakeXYWH(60.0f, 60.0f, 80.0f, 80.0f);
+  // The geometry lives in the child; the parent only records the contour its styles share.
+  auto makeParent = [&rect](bool withAlphaZeroPainter) {
+    std::vector<std::shared_ptr<VectorElement>> elements = {MakeRectElement(rect)};
+    if (withAlphaZeroPainter) {
+      elements.push_back(MakeZeroAlphaFill());
+    }
+    auto group = VectorGroup::Make();
+    group->setElements(std::move(elements));
+    auto child = VectorLayer::Make();
+    child->setContents({group});
+    auto parent = Layer::Make();
+    parent->addChild(child);
+    return parent;
+  };
+
+  auto alphaZero = RasterizeSharedContourAlpha(context, makeParent(true));
+  auto paintless = RasterizeSharedContourAlpha(context, makeParent(false));
+  ASSERT_FALSE(alphaZero.empty());
+  ASSERT_EQ(alphaZero.size(), paintless.size());
+  EXPECT_EQ(RasterAlphaAt(alphaZero, OwnGeometryProbeSize, 100, 100), 255)
+      << "control: a painter with alpha 0 stays in the contour shared with styles and masks";
+  EXPECT_EQ(RasterAlphaAt(paintless, OwnGeometryProbeSize, 100, 100), 0)
+      << "a geometry no paint captured must stay out of that contour, otherwise a bare descendant "
+         "starts covering the parent's style output";
+  EXPECT_EQ(RasterAlphaAt(paintless, OwnGeometryProbeSize, 20, 20), 0)
+      << "the whole contour must stay empty when only bare geometry is present";
+}
+
+TGFX_TEST_PRIVATE(LayerTest, ContourRepresentativeFollowsCaliber) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  const Rect rect = Rect::MakeXYWH(60.0f, 60.0f, 80.0f, 80.0f);
+  // The same outline recorded as a bare entry and as a painter whose alpha is 0. Grouping keeps the
+  // two apart, so this fixture cannot produce one group holding both kinds of entry: it pins the
+  // invariant the caliber filter relies on instead. Two groups of one entry build no representative
+  // table at all, and the painted caliber draws the outline through the alpha-0 painter alone.
+  {
+    auto group = VectorGroup::Make();
+    group->setElements({MakeRectElement(rect), MakeZeroAlphaFill(), MakeRectElement(rect)});
+    auto layer = VectorLayer::Make();
+    layer->setContents({group});
+    EXPECT_EQ(CountUnpaintedEntries(layer), 1);
+    TGFX_PRIVATE_ACCESS(
+        auto compose = static_cast<const ComposeContent*>(layer->getContent());
+        ASSERT_NE(compose, nullptr);
+        EXPECT_FALSE(compose->hasContourTable)
+        << "a bare entry must not share a group with a painted one, so the two entries above stay "
+           "apart and no representative table is built; a table here would mean a bare duplicate "
+           "could take the representative slot away from the painted entry";)
+    auto paintedCaliber = RasterizeContentContourAlpha(context, layer, false);
+    auto allCaliber = RasterizeContentContourAlpha(context, layer, true);
+    EXPECT_EQ(RasterAlphaAt(paintedCaliber, OwnGeometryProbeSize, 100, 100), 255)
+        << "the painter whose alpha is 0 still draws the contour of the painted caliber";
+    EXPECT_EQ(RasterAlphaAt(allCaliber, OwnGeometryProbeSize, 100, 100), 255);
+  }
+  // Only bare geometry, two entries sharing one outline. A representative table exists here, and a
+  // selection that comes out empty has to mean "draw nothing" rather than "read every entry": the
+  // latter would leak the bare geometry into the queries that exclude it.
+  {
+    Path triangle = {};
+    triangle.moveTo(60.0f, 60.0f);
+    triangle.lineTo(140.0f, 60.0f);
+    triangle.lineTo(100.0f, 140.0f);
+    triangle.close();
+    auto makeTriangle = [&triangle]() {
+      auto shape = ShapePath::Make();
+      shape->setPath(triangle);
+      return shape;
+    };
+    auto group = VectorGroup::Make();
+    group->setElements({makeTriangle(), makeTriangle()});
+    auto layer = VectorLayer::Make();
+    layer->setContents({group});
+    EXPECT_EQ(CountUnpaintedEntries(layer), 2)
+        << "the fixture needs two entries sharing one outline, or no representative table exists";
+    // Asserted on the table itself: every query already excludes a bare entry on its own, so a
+    // wrong representative is invisible in pixels here and only shows up as the painted caliber
+    // borrowing a representative that paints nothing.
+    TGFX_PRIVATE_ACCESS(
+        auto compose = static_cast<const ComposeContent*>(layer->getContent());
+        ASSERT_NE(compose, nullptr);
+        ASSERT_TRUE(compose->hasContourTable)
+        << "two entries sharing one outline must build a representative table";
+        EXPECT_EQ(compose->contours.size(), 1u)
+        << "the caliber that includes bare geometry keeps one representative for the outline";
+        EXPECT_TRUE(compose->paintedContours.empty())
+        << "the caliber that excludes it selects nothing, and an empty selection must stay "
+           "distinguishable from having no table at all";)
+    auto paintedCaliber = RasterizeContentContourAlpha(context, layer, false);
+    auto allCaliber = RasterizeContentContourAlpha(context, layer, true);
+    EXPECT_EQ(RasterAlphaAt(allCaliber, OwnGeometryProbeSize, 100, 100), 255)
+        << "the caliber that includes bare geometry must draw it";
+    EXPECT_EQ(RasterAlphaAt(paintedCaliber, OwnGeometryProbeSize, 100, 100), 0)
+        << "an empty selection means nothing is drawn, not that every entry is read";
+  }
+}
+
+TGFX_TEST_PRIVATE(LayerTest, PaintlessEntryNotHitTestable) {
+  const Rect paintedBounds = Rect::MakeXYWH(20.0f, 20.0f, 60.0f, 40.0f);
+  const Rect bareBounds = Rect::MakeXYWH(110.0f, 110.0f, 60.0f, 40.0f);
+  auto group = VectorGroup::Make();
+  group->setElements({MakeRectElement(paintedBounds),
+                      FillStyle::Make(SolidColor::Make(Color::White())),
+                      MakeRectElement(bareBounds)});
+  auto layer = VectorLayer::Make();
+  layer->setContents({group});
+  EXPECT_EQ(CountUnpaintedEntries(layer), 1);
+
+  // Control: the painted rectangle is hit-testable in both modes, so the misses below are about the
+  // entries that carry no paint and not about a mis-built fixture.
+  EXPECT_TRUE(layer->hitTestPoint(paintedBounds.centerX(), paintedBounds.centerY()));
+  EXPECT_TRUE(layer->hitTestPoint(paintedBounds.centerX(), paintedBounds.centerY(), true));
+  EXPECT_FALSE(layer->hitTestPoint(bareBounds.centerX(), bareBounds.centerY()))
+      << "a geometry no paint captured must not become clickable through the bounds it lives in";
+  EXPECT_FALSE(layer->hitTestPoint(bareBounds.centerX(), bareBounds.centerY(), true))
+      << "neither must it be clickable through its shape";
 }
 
 }  // namespace tgfx

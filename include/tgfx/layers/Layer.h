@@ -598,24 +598,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
    */
   virtual std::optional<StyledShape> onGetContentShape();
 
-  /**
-   * Returns the local bounds of the geometries this layer holds although no painter captured them.
-   * They are not part of the content, so the layer bounds have to join them explicitly; without that
-   * a style drawing from the own geometry would have no bounds to cover. The base class returns an
-   * empty rect; layer types that can hold such geometries override this.
-   */
-  virtual Rect onGetOwnGeometryBounds();
-
-  /**
-   * Draws the geometries of this layer that no painter captured. They paint nothing as content, but
-   * they still belong to the layer's own geometry, so a style drawing from the own geometry covers
-   * them. No anti-alias flag is taken: the content path still passes allowsEdgeAntialiasing, but
-   * OpaqueContext forces antiAlias=false on every brush it records, so that argument has no effect
-   * and asking the layer for one would not either. The base class draws nothing; layer types that
-   * can hold such geometries override this.
-   */
-  virtual void onDrawOwnGeometry(Canvas* canvas);
-
  private:
   /**
    * Marks the layer as needing to be redrawn. Unlike invalidateContent(), this method only marks
@@ -716,10 +698,10 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<Image> getContentContourImage(const DrawArgs& args, float contentScale,
                                                 Point* offset, bool* contourMatchesContent);
 
-  // Records the layer's own geometry: the contour of its own content (0-alpha painters included)
-  // plus the geometries no painter captured. Used as the content of styles that must cover the
-  // layer's own geometry rather than its rendered content. When shape is not null, it receives the
-  // outline of that same recording, read back from it so both describe one recording.
+  // Records the layer's own geometry: the contour of its own content, which keeps both the
+  // geometries no paint captured and the painters with alpha=0. Used as the content of styles that
+  // must cover the layer's own geometry rather than its rendered content. When shape is not null, it
+  // receives the outline of that same recording, read back from it so both describe one recording.
   std::shared_ptr<Image> getOwnGeometryImage(const DrawArgs& args, float contentScale,
                                              Point* offset,
                                              std::optional<StyledShape>* shape = nullptr);

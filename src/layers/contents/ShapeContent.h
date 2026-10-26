@@ -26,11 +26,11 @@ namespace tgfx {
 
 class ShapeContent : public DrawContent {
  public:
-  ShapeContent(std::shared_ptr<Shape> shape, const LayerPaint& paint);
+  ShapeContent(std::shared_ptr<Shape> shape, const LayerPaint& paint, bool hasPaint);
 
-  Rect getBounds() const override;
-  Rect getTightBounds(const Matrix& matrix) const override;
-  bool hitTestPoint(float localX, float localY) const override;
+  Rect getBounds(bool includeUnpaintedGeometry) const override;
+  Rect getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const override;
+  bool hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const override;
 
   // Always the original user geometry, without any path effect or stroke expansion applied. The
   // path effect (e.g. dash) and stroke alignment are stored separately and applied at draw time.

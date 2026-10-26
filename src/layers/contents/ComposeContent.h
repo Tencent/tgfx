@@ -31,28 +31,56 @@ namespace tgfx {
  */
 class ComposeContent : public LayerContent {
  public:
+  /**
+   * @param contents Every recorded entry, in draw order.
+   * @param foregroundStartIndex Index of the first entry drawn above the children.
+   * @param hasContourTable Whether contours and paintedContours hold a representative per group of
+   * entries sharing one geometry. When false, the queries read every entry instead, so an empty
+   * table must not be confused with a table that selects nothing.
+   * @param contours The representative of every group for a query that includes the geometries no
+   * paint captured.
+   * @param paintedContours The representative of every group for a query that excludes them.
+   * Grouping never mixes the two kinds of entry, so a group is painted or bare as a whole: this
+   * table holds the representative of every painted group and is empty where every group is bare,
+   * which is why the selection filter can test the entries one by one.
+   */
   ComposeContent(std::vector<std::unique_ptr<GeometryContent>> contents,
-                 size_t foregroundStartIndex, std::vector<GeometryContent*> contours);
+                 size_t foregroundStartIndex, bool hasContourTable,
+                 std::vector<GeometryContent*> contours,
+                 std::vector<GeometryContent*> paintedContours);
 
-  Rect getBounds() const override;
-  Rect getTightBounds(const Matrix& matrix) const override;
-  bool hitTestPoint(float localX, float localY) const override;
+  Rect getBounds(bool includeUnpaintedGeometry) const override;
+  Rect getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const override;
+  bool hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const override;
   bool contourEqualsOpaqueContent() const override;
   bool hasBlendMode() const override;
+  bool hasPaintedContent() const override;
   bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
   void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
 
  protected:
-  void drawContourInternal(Canvas* canvas, bool antiAlias) const override;
+  void drawContourInternal(Canvas* canvas, bool antiAlias,
+                           bool includeUnpaintedGeometry) const override;
 
   Type type() const override {
     return Type::Compose;
   }
 
  private:
+  // Returns the representative table of the requested caliber, or null when no table was built and
+  // the caller has to read every entry.
+  const std::vector<GeometryContent*>* selectedContours(bool includeUnpaintedGeometry) const {
+    if (!hasContourTable) {
+      return nullptr;
+    }
+    return includeUnpaintedGeometry ? &contours : &paintedContours;
+  }
+
   std::vector<std::unique_ptr<GeometryContent>> contents = {};
   size_t foregroundStartIndex = 0;
+  bool hasContourTable = false;
   std::vector<GeometryContent*> contours = {};
+  std::vector<GeometryContent*> paintedContours = {};
 };
 
 }  // namespace tgfx

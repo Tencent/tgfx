@@ -69,7 +69,6 @@ void VectorLayer::setContents(std::vector<std::shared_ptr<VectorElement>> value)
 }
 
 void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
-  ownGeometries = {};
   if (_contents.empty()) {
     return;
   }
@@ -80,11 +79,16 @@ void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
       element->apply(&context);
     }
   }
-  // Cache the geometries no painter captured. Two consumers read this list: the own geometry raster
-  // (onDrawOwnGeometry) and the own geometry bounds. The set is taken after every element applied,
-  // since MergePath clears geometries and painters while Repeater clones and reorders them. A
-  // captured geometry is drawn through its painter, so it is not part of the bare geometry;
-  // collecting the captures once keeps the comparison from being quadratic in the geometry count.
+  // Render all painters
+  for (const auto& painter : context.painters) {
+    painter->draw(recorder);
+  }
+  // Geometries no painter captured are recorded without a paint: they paint nothing and stay out of
+  // the shared contour, but they are still this layer's own geometry. The set is taken after every
+  // element applied, since MergePath clears geometries and painters while Repeater clones and
+  // reorders them. A captured geometry is drawn through its painter, so it is not part of the bare
+  // geometry; collecting the captures once keeps the comparison from being quadratic in the
+  // geometry count.
   std::unordered_set<const Geometry*> capturedGeometries = {};
   capturedGeometries.reserve(context.geometries.size());
   for (const auto& painter : context.painters) {
@@ -100,34 +104,11 @@ void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
     if (shape == nullptr) {
       continue;
     }
-    ownGeometries.push_back({std::move(shape), geometry->matrix});
-  }
-  // Render all painters
-  for (const auto& painter : context.painters) {
-    painter->draw(recorder);
-  }
-}
-
-Rect VectorLayer::onGetOwnGeometryBounds() {
-  Rect bounds = Rect::MakeEmpty();
-  for (const auto& geometry : ownGeometries) {
-    auto shapeBounds = geometry.shape->getBounds();
-    shapeBounds = geometry.matrix.mapRect(shapeBounds);
-    bounds.join(shapeBounds);
-  }
-  return bounds;
-}
-
-void VectorLayer::onDrawOwnGeometry(Canvas* canvas) {
-  if (ownGeometries.empty()) {
-    return;
-  }
-  Paint paint = {};
-  paint.setColor(Color::White());
-  for (const auto& geometry : ownGeometries) {
-    AutoCanvasRestore autoRestore(canvas);
-    canvas->concat(geometry.matrix);
-    canvas->drawShape(geometry.shape, paint);
+    // The recorder applies its CTM to the geometry, so the matrix stays a transform instead of
+    // being baked into the shape.
+    recorder->setMatrix(geometry->matrix);
+    recorder->addShape(std::move(shape));
+    recorder->resetMatrix();
   }
 }
 
