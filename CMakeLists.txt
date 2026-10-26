@@ -1415,6 +1415,20 @@ if (TGFX_BUILD_TESTS)
     target_link_options(TGFXFullTest_${TEST_TARGET_SUFFIX} PRIVATE ${TGFX_TEST_LINK_OPTIONS})
     target_link_libraries(TGFXFullTest_${TEST_TARGET_SUFFIX} ${TGFX_TEST_LIBS})
 
+    # Unit tests of shader_build_tool. They need no GPU and no baseline environment, so they have
+    # their own main and live outside test/src, which TGFXFullTest globs.
+    if (TARGET shader_build_tool_core)
+        file(GLOB_RECURSE SHADER_TOOL_TEST_FILES CONFIGURE_DEPENDS test/shader_tool/*.cpp)
+        add_executable(ShaderBuildToolTest ${SHADER_TOOL_TEST_FILES})
+        add_dependencies(ShaderBuildToolTest test-vendor)
+        target_compile_definitions(ShaderBuildToolTest PRIVATE
+                TGFX_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+        target_compile_options(ShaderBuildToolTest PRIVATE ${TGFX_TEST_COMPILE_OPTIONS})
+        target_include_directories(ShaderBuildToolTest PRIVATE ${TGFX_TEST_INCLUDES}
+                ${TGFX_INCLUDES} test/shader_tool)
+        target_link_options(ShaderBuildToolTest PRIVATE ${TGFX_TEST_LINK_OPTIONS})
+        target_link_libraries(ShaderBuildToolTest shader_build_tool_core ${TGFX_TEST_LIBS})
+    endif ()
     # Minimal embedding consumer (audit F07): links tgfx and nothing else — no forced loading
     # and no whole archive. Its link and startup assertions prove the embedded bundle travels
     # with the library through ordinary symbol resolution.
