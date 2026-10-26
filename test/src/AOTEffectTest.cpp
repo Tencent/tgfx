@@ -50,7 +50,6 @@
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 #include "gpu/resources/TextureView.h"
-#include "gpu/shaders/PermutationRules.h"
 #include "gpu/shaders/level1/PointwiseChainShader.h"
 #include "gtest/gtest.h"
 #include "layers/NoiseDensityUtils.h"

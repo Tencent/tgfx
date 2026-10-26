@@ -39,7 +39,6 @@
 #include "ShaderSources.h"
 #include "StageCache.h"
 #include "StageReport.h"
-#include "gpu/shaders/PermutationRules.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/AllShaderFamilies.h"
 
@@ -791,7 +790,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
   std::string fragSource = source != nullptr ? source->fragment : "";
 
   // The compile list comes from the matcher rules' reachable sets (the Compose single source of
-  // truth in PermutationRules.cpp), enumerated at build time. This replaces the former cartesian
+  // truth in the family headers), enumerated at build time. This replaces the former cartesian
   // domain walk filtered by ShouldCompile; the --audit mode verified both sides agree for every
   // shader before the switch, so the bundle content is unchanged.
   auto reachable = EnumerateReachablePermutations(info.name);

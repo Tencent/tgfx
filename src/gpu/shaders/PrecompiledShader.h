@@ -19,9 +19,11 @@
 #pragma once
 
 #include <memory>
+#include <optional>
+#include <set>
 #include <string>
+#include <utility>
 #include <vector>
-#include "gpu/shaders/PermutationRules.h"
 #include "gpu/shaders/ShaderPermutation.h"
 
 namespace tgfx {
@@ -40,7 +42,7 @@ enum ShaderTextureRead : uint32_t {
 
 /**
  * Metadata describing a precompiled shader, including its permutation domain and source file
- * paths. The compiled variant list is defined by the matcher rules (see PermutationRules.h);
+ * paths. The compiled variant list is defined by the matcher rules (see the family rules in ShaderFamily.h);
  * no shader-side filter exists.
  */
 struct PrecompiledShaderInfo {
@@ -71,6 +73,15 @@ bool IsBuildablePermutation(const PrecompiledShaderInfo& info, uint32_t vertInde
  */
 bool PermutationCompilesForBackend(const PrecompiledShaderInfo& info, uint32_t vertIndex,
                                    uint32_t fragIndex, const std::string& profileTag);
+
+/**
+ * Returns the reachable variant set of the shader registered under the given name, or nullopt
+ * when no such shader is registered. The family-level rules (Inputs, Compose, Extract, the
+ * Reachable enumeration and the shared rejection predicates) live in each family's own header
+ * through the ShaderFamily base; see ShaderFamily.h for the contract.
+ */
+std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
+    const std::string& shaderName);
 
 /**
  * Base class for all precompiled shader declarations. Each concrete shader must override info()

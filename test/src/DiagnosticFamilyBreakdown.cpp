@@ -4,7 +4,6 @@
 //   TGFXFullTest_OpenGL --gtest_filter='DiagnosticFamilyBreakdown.*'
 #include <cstdio>
 #include "base/TGFXTest.h"
-#include "gpu/shaders/PermutationRules.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"
 

@@ -31,7 +31,6 @@
 #include "ShaderCompiler.h"
 #include "ShaderSources.h"
 #include "gpu/PrecompiledBundleIdentity.h"
-#include "gpu/shaders/PermutationRules.h"
 #include "gpu/shaders/PrecompiledShader.h"
 
 namespace tgfx {

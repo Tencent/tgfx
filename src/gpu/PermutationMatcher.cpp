@@ -52,7 +52,6 @@
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 #include "gpu/shaders/AllShaderFamilies.h"
-#include "gpu/shaders/PermutationRules.h"
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
 #include "layers/processors/GlassShapeGeometryFragmentProcessor.h"
 #include "layers/processors/GlassUDFTentBlurFragmentProcessor.h"

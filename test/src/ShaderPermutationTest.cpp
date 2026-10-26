@@ -56,7 +56,6 @@
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/shaders/AllShaderFamilies.h"
-#include "gpu/shaders/PermutationRules.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"
 #include "gpu/shaders/level1/PointwiseChainShader.h"

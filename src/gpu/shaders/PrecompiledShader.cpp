@@ -173,4 +173,9 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> ShaderRegistry::Enumerate
   return result->second.enumerator();
 }
 
+std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermutations(
+    const std::string& shaderName) {
+  return ShaderRegistry::Enumerate(shaderName);
+}
+
 }  // namespace tgfx

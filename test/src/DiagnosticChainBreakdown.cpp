@@ -6,7 +6,6 @@
 #include <map>
 #include <string>
 #include "base/TGFXTest.h"
-#include "gpu/shaders/PermutationRules.h"
 #include "gpu/shaders/level1/PointwiseChainShader.h"
 
 namespace tgfx {

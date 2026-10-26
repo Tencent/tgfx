@@ -32,7 +32,6 @@
 #include "BundleManifest.h"
 #include "BundleWriter.h"
 #include "gpu/PrecompiledBundleIdentity.h"
-#include "gpu/shaders/PermutationRules.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "zlib.h"
 #include "zstd.h"
