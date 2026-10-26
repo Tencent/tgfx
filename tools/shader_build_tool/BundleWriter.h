@@ -31,9 +31,19 @@ struct UniformEntry {
   uint16_t arraySize = 1;  // std140 array element count; 1 when not an array
 };
 
+// One vertex-stage input of a kernel: the attribute slot the runtime vertex binding must match.
+// The location is the single source of truth for how the GL/GLES backends bind attribute slots,
+// so recording it in the bundle lets the loader verify the .vert's declared layout.
+struct VertexInputEntry {
+  std::string name;
+  uint8_t format = 0;   // UniformFormat enum value
+  uint8_t location = 0;
+};
+
 struct StageReflectionData {
   std::vector<UniformEntry> uniforms;
   std::vector<UniformEntry> samplers;
+  std::vector<VertexInputEntry> vertexInputs;
 };
 
 struct VariantData {
@@ -48,9 +58,12 @@ struct VariantData {
 };
 
 /// Serializes stage reflection into the bundle's on-disk reflection format:
-/// [uniformCount:u8][samplerCount:u8][reserved:u8][reserved:u8] followed by the uniform entries
-/// then the sampler entries, each [nameLen:u8][name:bytes][format:u8][arraySize:u16]. Exposed so
-/// audit reporting can reproduce the exact byte-level reflection identity the bundle stores.
+/// [uniformCount:u8][samplerCount:u8][vertexInputCount:u8][reserved:u8] followed by the uniform
+/// entries, then the sampler entries, each [nameLen:u8][name:bytes][format:u8][arraySize:u16],
+/// then (format v5) the vertex input entries, each [nameLen:u8][name:bytes][format:u8]
+/// [location:u8]. The count byte keeps v4 byte-prefix compatibility: a v4 reader sees 0 vertex
+/// inputs. Exposed so audit reporting can reproduce the exact byte-level reflection identity the
+/// bundle stores.
 std::vector<uint8_t> SerializeStageReflection(const StageReflectionData& reflection);
 
 /// Writes a v3 shader bundle file with separate vertex and fragment pools.

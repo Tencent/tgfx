@@ -166,8 +166,12 @@ namespace tgfx {
  * 0x0001001a: the gradient resource kind shares the plain chain's 16-slot storage — the kind-1
  * variants' slot-parameter uniform arrays halve, so every gradient-chain uniform layout
  * re-encodes; pre-change bundles are refused.
+ *
+ * 0x0001001b: the bundle format moved to v5 — the stage reflection records the vertex stage's
+ * input attributes (name, format, location) so the loader can verify the .vert's declared
+ * layout, and the reflection blobs and identity hash re-encode; pre-change bundles are refused.
  */
-inline constexpr uint32_t ExpectedToolchainABI = 0x0001001au;
+inline constexpr uint32_t ExpectedToolchainABI = 0x0001001bu;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

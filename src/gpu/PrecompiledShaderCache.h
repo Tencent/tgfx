@@ -37,10 +37,20 @@ namespace tgfx {
 class Context;
 enum class AOTDecomposeOutcome;
 
+// One vertex-stage input recorded in the bundle (format v5): the attribute slot layout the .vert
+// declares. The runtime binds attributes by location, so a mismatch with what the geometry
+// processor emits is a layout contract violation the loader can now detect.
+struct VertexInput {
+  std::string name;
+  UniformFormat format = UniformFormat::Float;
+  uint32_t location = 0;
+};
+
 struct ShaderStageBlob {
   std::vector<uint8_t> data;
   std::vector<Uniform> uniforms;
   std::vector<Uniform> samplers;
+  std::vector<VertexInput> vertexInputs;
 };
 
 enum class PrecompiledFallbackReason : uint8_t {

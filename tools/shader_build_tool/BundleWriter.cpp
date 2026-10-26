@@ -70,11 +70,19 @@ std::vector<uint8_t> SerializeStageReflection(const StageReflectionData& reflect
   std::vector<uint8_t> blob;
   blob.push_back(static_cast<uint8_t>(reflection.uniforms.size()));
   blob.push_back(static_cast<uint8_t>(reflection.samplers.size()));
-  blob.push_back(0);  // reserved
+  // v5: the vertex input count occupies the first reserved byte, so a v4 reader still sees a
+  // byte-identical prefix with zero vertex inputs.
+  blob.push_back(static_cast<uint8_t>(reflection.vertexInputs.size()));
   blob.push_back(0);  // reserved
 
   WriteUniformEntries(blob, reflection.uniforms);
   WriteUniformEntries(blob, reflection.samplers);
+  for (const auto& entry : reflection.vertexInputs) {
+    blob.push_back(static_cast<uint8_t>(entry.name.size()));
+    blob.insert(blob.end(), entry.name.begin(), entry.name.end());
+    blob.push_back(entry.format);
+    blob.push_back(entry.location);
+  }
   return blob;
 }
 
@@ -220,7 +228,7 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
   char tagBuf[32] = {};
   std::strncpy(tagBuf, profileTag.c_str(), sizeof(tagBuf) - 1);
   uint64_t identityHash = BundleIdentityHashInit();
-  identityHash = BundleIdentityHashHeader(identityHash, 4, vertPoolCount, fragPoolCount,
+  identityHash = BundleIdentityHashHeader(identityHash, 5, vertPoolCount, fragPoolCount,
                                           reinterpret_cast<const uint8_t*>(tagBuf));
   for (const auto& entry : vertPool) {
     identityHash = BundleIdentityHashEntry(identityHash, entry.hash.hi, entry.hash.lo,
@@ -235,7 +243,7 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
 
   // Header
   WriteU32LE(file, 0x54475346);              // magic "TGSF"
-  WriteU16LE(file, 4);                       // formatVersion
+  WriteU16LE(file, 5);                       // formatVersion (v5 adds vertex input reflection)
   WriteU16LE(file, compressionFlag);         // compressionType
   WriteU64LE(file, identityHash);            // sourceHash (bundle identity, see above)
   WriteU32LE(file, ExpectedToolchainABI);   // toolchain ABI (see PrecompiledBundleIdentity.h)

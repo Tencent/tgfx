@@ -65,6 +65,31 @@ static uint8_t MapSPIRVTypeToFormat(const spirv_cross::SPIRType& type) {
   return static_cast<uint8_t>(UniformFormat::Float);
 }
 
+static std::vector<VertexInputEntry> ExtractVertexInputs(spirv_cross::Compiler& compiler) {
+  // The runtime vertex binding walks attribute slots by location, so the entries are recorded in
+  // location order; the loader separately requires the locations to be contiguous from zero.
+  std::vector<std::pair<uint32_t, VertexInputEntry>> byLocation;
+  auto resources = compiler.get_shader_resources();
+  for (auto& input : resources.stage_inputs) {
+    std::string name = compiler.get_name(input.id);
+    auto& type = compiler.get_type(input.type_id);
+    auto location = compiler.get_decoration(input.id, spv::DecorationLocation);
+    VertexInputEntry entry;
+    entry.name = name;
+    entry.format = MapSPIRVTypeToFormat(type);
+    entry.location = static_cast<uint8_t>(location);
+    byLocation.emplace_back(location, std::move(entry));
+  }
+  std::sort(byLocation.begin(), byLocation.end(),
+            [](const auto& a, const auto& b) { return a.first < b.first; });
+  std::vector<VertexInputEntry> result;
+  result.reserve(byLocation.size());
+  for (auto& [location, entry] : byLocation) {
+    result.push_back(std::move(entry));
+  }
+  return result;
+}
+
 static std::vector<UniformEntry> ExtractUBOMembers(spirv_cross::Compiler& compiler,
                                                    const std::string& blockName) {
   std::vector<UniformEntry> result;
@@ -129,6 +154,7 @@ ReflectionResult ExtractReflection(const std::vector<uint32_t>& vertexSPIRV,
   if (!vertexSPIRV.empty()) {
     spirv_cross::Compiler vertCompiler(vertexSPIRV);
     result.vertexReflection.uniforms = ExtractUBOMembers(vertCompiler, "VertexUniformBlock");
+    result.vertexReflection.vertexInputs = ExtractVertexInputs(vertCompiler);
   }
 
   if (!fragmentSPIRV.empty()) {

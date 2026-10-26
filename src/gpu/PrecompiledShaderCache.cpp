@@ -577,20 +577,80 @@ static bool ReadUniformEntries(const uint8_t* data, size_t maxLen, size_t* offse
   return true;
 }
 
-// Reflection format: [uniformCount:u8][samplerCount:u8][reserved:u8][reserved:u8]
+// Reflection format: [uniformCount:u8][samplerCount:u8][vertexInputCount:u8][reserved:u8]
 //                    For each uniform: [nameLen:u8][name:bytes][format:u8]
 //                                      (+[arraySize:u16] since bundle v4)
 //                    For each sampler: [nameLen:u8][name:bytes][format:u8]
 //                                      (+[arraySize:u16] since bundle v4)
+//                    For each vertex input (since bundle v5): [nameLen:u8][name:bytes][format:u8]
+//                                                            [location:u8]
+static bool ReadVertexInputEntries(const uint8_t* data, size_t maxLen, size_t* offset,
+                                   uint8_t count, std::vector<VertexInput>& out,
+                                   size_t* remainingBytes) {
+  if (!ConsumePayloadBudget(static_cast<size_t>(count) * sizeof(VertexInput), remainingBytes)) {
+    return false;
+  }
+  out.reserve(count);
+  bool hasPreviousLocation = false;
+  uint32_t previousLocation = 0;
+  for (uint8_t i = 0; i < count; i++) {
+    if (*offset >= maxLen) {
+      return false;
+    }
+    uint8_t nameLen = data[(*offset)++];
+    // One more byte for the location after the format.
+    if (nameLen == 0 || static_cast<size_t>(nameLen) + 2 > maxLen - *offset ||
+        !ConsumePayloadBudget(static_cast<size_t>(nameLen) + 2, remainingBytes)) {
+      return false;
+    }
+    std::string name(reinterpret_cast<const char*>(data + *offset), nameLen);
+    if (name.find('\0') != std::string::npos ||
+        std::any_of(out.begin(), out.end(),
+                    [&](const VertexInput& input) { return input.name == name; })) {
+      return false;
+    }
+    *offset += nameLen;
+    auto format = static_cast<UniformFormat>(data[(*offset)++]);
+    if (!IsValidReflectionFormat(format, false)) {
+      LOGE("PrecompiledShaderCache: vertex input '%s' has invalid format %u", name.c_str(),
+           static_cast<uint32_t>(format));
+      return false;
+    }
+    auto location = static_cast<uint32_t>(data[(*offset)++]);
+    // The entries are stored in location order, so a decreasing or duplicated location means the
+    // .vert's own layout declarations (or the serialized order) are inconsistent — the backends
+    // bind attribute slots by location, and a duplicate would silently leave one slot unbound.
+    // A gap between locations is legal: the GP's optional slots leave holes on purpose
+    // (shape-instanced kernels skip location 1), so contiguity is not required.
+    if (hasPreviousLocation && location <= previousLocation) {
+      LOGE(
+          "PrecompiledShaderCache: vertex input '%s' location %u does not increase (previous "
+          "%u)",
+          name.c_str(), location, previousLocation);
+      return false;
+    }
+    previousLocation = location;
+    hasPreviousLocation = true;
+    out.push_back(VertexInput{std::move(name), format, location});
+  }
+  return true;
+}
+
 static bool ParseStageReflection(const uint8_t* data, size_t maxLen, ShaderStageBlob* blob,
-                                 bool hasArraySize, size_t* remainingBytes) {
+                                 bool hasArraySize, bool hasVertexInputs, size_t* remainingBytes) {
   if (maxLen < 4) {
     return false;
   }
   size_t offset = 0;
   uint8_t uniformCount = data[offset++];
   uint8_t samplerCount = data[offset++];
-  offset += 2;  // reserved
+  uint8_t vertexInputCount = 0;
+  if (hasVertexInputs) {
+    vertexInputCount = data[offset++];
+  } else {
+    offset += 1;  // reserved
+  }
+  offset += 1;  // reserved
 
   if (!ReadUniformEntries(data, maxLen, &offset, uniformCount, blob->uniforms, hasArraySize, false,
                           remainingBytes)) {
@@ -599,6 +659,12 @@ static bool ParseStageReflection(const uint8_t* data, size_t maxLen, ShaderStage
   if (!ReadUniformEntries(data, maxLen, &offset, samplerCount, blob->samplers, hasArraySize, true,
                           remainingBytes)) {
     return false;
+  }
+  if (vertexInputCount > 0) {
+    if (!ReadVertexInputEntries(data, maxLen, &offset, vertexInputCount, blob->vertexInputs,
+                                remainingBytes)) {
+      return false;
+    }
   }
   return true;
 }
@@ -626,7 +692,7 @@ static bool LoadPool(const uint8_t* fileData, size_t fileSize, size_t poolOffset
                      size_t reflectionPoolStart,
                      std::unordered_map<PrecompiledShaderCache::HashKey, ShaderStageBlob,
                                         PrecompiledShaderCache::HashKeyHasher>& entries,
-                     bool hasArraySize, size_t* remainingBytes) {
+                     bool hasArraySize, bool hasVertexInputs, size_t* remainingBytes) {
   for (uint32_t i = 0; i < poolCount; i++) {
     size_t entryOff = poolOffset + static_cast<size_t>(i) * POOL_ENTRY_SIZE;
     if (entryOff > fileSize || POOL_ENTRY_SIZE > fileSize - entryOff) {
@@ -657,7 +723,7 @@ static bool LoadPool(const uint8_t* fileData, size_t fileSize, size_t poolOffset
       }
       size_t absReflOff = reflectionPoolStart + reflOff;
       if (!ParseStageReflection(fileData + absReflOff, fileSize - absReflOff, &blob, hasArraySize,
-                                remainingBytes)) {
+                                hasVertexInputs, remainingBytes)) {
         LOGE("PrecompiledShaderCache: Failed to parse reflection for entry %u", i);
         return false;
       }
@@ -681,9 +747,23 @@ static bool LoadPool(const uint8_t* fileData, size_t fileSize, size_t poolOffset
         }
         return true;
       };
+      auto vertexInputsEqual = [](const std::vector<VertexInput>& a,
+                                  const std::vector<VertexInput>& b) {
+        if (a.size() != b.size()) {
+          return false;
+        }
+        for (size_t u = 0; u < a.size(); ++u) {
+          if (a[u].name != b[u].name || a[u].format != b[u].format ||
+              a[u].location != b[u].location) {
+            return false;
+          }
+        }
+        return true;
+      };
       if (existing->second.data != blob.data ||
           !uniformListsEqual(existing->second.uniforms, blob.uniforms) ||
-          !uniformListsEqual(existing->second.samplers, blob.samplers)) {
+          !uniformListsEqual(existing->second.samplers, blob.samplers) ||
+          !vertexInputsEqual(existing->second.vertexInputs, blob.vertexInputs)) {
         LOGE(
             "PrecompiledShaderCache: Conflicting content for duplicate pool entry (key "
             "%016llx%016llx)",
@@ -711,11 +791,14 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   }
   uint16_t formatVersion = ReadU16LE(ptr + 4);
   // v4 adds an arraySize field to every reflection entry; v3 entries parse as scalars.
-  if (formatVersion != 3 && formatVersion != 4) {
-    LOGE("PrecompiledShaderCache: Unsupported format version %u (expected 3 or 4)", formatVersion);
+  // v5 appends the vertex input entries after the samplers (byte-prefix compatible with v4).
+  if (formatVersion != 3 && formatVersion != 4 && formatVersion != 5) {
+    LOGE("PrecompiledShaderCache: Unsupported format version %u (expected 3, 4 or 5)",
+         formatVersion);
     return false;
   }
   const bool hasArraySize = formatVersion >= 4;
+  const bool hasVertexInputs = formatVersion >= 5;
   uint16_t compressionType = ReadU16LE(ptr + 6);
   if (compressionType > 2) {
     LOGE("PrecompiledShaderCache: Unsupported compression type %u", compressionType);
@@ -888,11 +971,13 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> newVertEntries;
   std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> newFragEntries;
   if (!LoadPool(loadPtr, loadSize, vertPoolOffset, vertPoolCount, dataPoolStart, dataPoolEnd,
-                reflectionPoolStart, newVertEntries, hasArraySize, &remainingPayloadBytes)) {
+                reflectionPoolStart, newVertEntries, hasArraySize, hasVertexInputs,
+                &remainingPayloadBytes)) {
     return false;
   }
   if (!LoadPool(loadPtr, loadSize, fragPoolOffset, fragPoolCount, dataPoolStart, dataPoolEnd,
-                reflectionPoolStart, newFragEntries, hasArraySize, &remainingPayloadBytes)) {
+                reflectionPoolStart, newFragEntries, hasArraySize, hasVertexInputs,
+                &remainingPayloadBytes)) {
     return false;
   }
 

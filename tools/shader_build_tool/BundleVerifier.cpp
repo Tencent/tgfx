@@ -43,6 +43,7 @@ constexpr uint32_t BUNDLE_MAGIC = 0x54475346u;  // "TGSF"
 constexpr uint32_t HEADER_SIZE = 80;
 constexpr uint32_t POOL_ENTRY_SIZE = 28;
 constexpr uint16_t FORMAT_VERSION_V4 = 4;
+constexpr uint16_t FORMAT_VERSION_V5 = 5;  // v5 appends vertex input reflection entries
 
 struct PoolEntryOnDisk {
   ShaderKeyHash hash;
@@ -281,9 +282,9 @@ BundleCheckResult VerifyOneBundle(const std::string& path, const std::string& ex
               << std::dec << "\n";
     result.violations++;
   }
-  if (header.formatVersion != FORMAT_VERSION_V4) {
+  if (header.formatVersion != FORMAT_VERSION_V4 && header.formatVersion != FORMAT_VERSION_V5) {
     std::cout << "[verify] " << expectedTag << ": VIOLATION format version " << header.formatVersion
-              << " (expected " << FORMAT_VERSION_V4 << ")\n";
+              << " (expected " << FORMAT_VERSION_V4 << " or " << FORMAT_VERSION_V5 << ")\n";
     result.violations++;
   }
   if (header.toolchainABI != ExpectedToolchainABI) {

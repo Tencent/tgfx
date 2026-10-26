@@ -1403,9 +1403,16 @@ static std::vector<uint8_t> MakeReflectedTestBundle(uint16_t version) {
   TestWriteU32LE(bundle.data() + 44, static_cast<uint32_t>(bundle.size()));
   std::vector<uint8_t> reflection = {
       1, 0, 0, 0, 1, 'u', static_cast<uint8_t>(UniformFormat::Float4)};
-  if (version == 4) {
+  if (version >= 4) {
     reflection.push_back(2);
     reflection.push_back(0);
+  }
+  if (version >= 5) {
+    reflection[2] = 2;  // vertex input count
+    // Two inputs in location order with a legal gap at 1, mirroring the shape-instanced kernels
+    // that skip the optional slot.
+    reflection.insert(reflection.end(), {1, 'a', static_cast<uint8_t>(UniformFormat::Float4), 0});
+    reflection.insert(reflection.end(), {1, 'b', static_cast<uint8_t>(UniformFormat::Float2), 3});
   }
   bundle.insert(bundle.end(), reflection.begin(), reflection.end());
   return bundle;
@@ -1491,8 +1498,25 @@ static void ExpectBundleRejectedPreservingCache(const std::vector<uint8_t>& inva
   EXPECT_EQ(cache.findFragment(50 + 0x100, 0), nullptr);
 }
 
+TGFX_TEST(ShaderPermutationTest, BundleRejectsDisorderedVertexInputLocations) {
+  // The vertex input entries must appear in strictly increasing location order: the backends bind
+  // attribute slots by location, so a duplicated location leaves one slot unbound and a decreasing
+  // one means the serialized order contradicts the declared layout.
+  auto duplicate = MakeReflectedTestBundle(5);
+  // 'b' location 3 -> 0, duplicating 'a'.
+  duplicate.back() = 0;
+  ExpectBundleRejectedPreservingCache(duplicate);
+
+  auto decreasing = MakeReflectedTestBundle(5);
+  // 'a' location 0 -> 5, so the recorded sequence runs 5, 3.
+  auto reflectionOffset = TestReadU32LE(decreasing.data() + 44);
+  // Header (4) + 'u' entry (3 + 2 array size) + the 'a' entry's name/format (3).
+  decreasing[reflectionOffset + 12] = 5;
+  ExpectBundleRejectedPreservingCache(decreasing);
+}
+
 TGFX_TEST(ShaderPermutationTest, BundleCompressionAndReflectionRoundTrip) {
-  for (uint16_t version = 3; version <= 4; ++version) {
+  for (uint16_t version = 3; version <= 5; ++version) {
     for (uint16_t compression = 0; compression <= 2; ++compression) {
       for (bool withReflection : {false, true}) {
         SCOPED_TRACE(version);
@@ -1519,7 +1543,18 @@ TGFX_TEST(ShaderPermutationTest, BundleCompressionAndReflectionRoundTrip) {
             ASSERT_EQ(blob->uniforms.size(), 1u);
             EXPECT_EQ(blob->uniforms[0].name(), "u");
             EXPECT_EQ(blob->uniforms[0].format(), UniformFormat::Float4);
-            EXPECT_EQ(blob->uniforms[0].arraySize(), version == 4 ? 2u : 1u);
+            EXPECT_EQ(blob->uniforms[0].arraySize(), version >= 4 ? 2u : 1u);
+            if (version >= 5) {
+              ASSERT_EQ(blob->vertexInputs.size(), 2u);
+              EXPECT_EQ(blob->vertexInputs[0].name, "a");
+              EXPECT_EQ(blob->vertexInputs[0].format, UniformFormat::Float4);
+              EXPECT_EQ(blob->vertexInputs[0].location, 0u);
+              EXPECT_EQ(blob->vertexInputs[1].name, "b");
+              EXPECT_EQ(blob->vertexInputs[1].format, UniformFormat::Float2);
+              EXPECT_EQ(blob->vertexInputs[1].location, 3u);
+            } else {
+              EXPECT_TRUE(blob->vertexInputs.empty());
+            }
           } else {
             EXPECT_TRUE(blob->uniforms.empty());
           }
