@@ -64,7 +64,7 @@ namespace tgfx {
 // caller's out-parameter and clears it. Diagnostic only: no control flow depends on it.
 static thread_local PermutationMatchFailure gPendingMatchFailure = PermutationMatchFailure::None;
 
-std::optional<PermutationMatchResult> Fail(PermutationMatchFailure reason) {
+std::nullopt_t Fail(PermutationMatchFailure reason) {
   if (gPendingMatchFailure == PermutationMatchFailure::None) {
     gPendingMatchFailure = reason;
   }
@@ -431,11 +431,12 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
 #endif
 
   std::optional<PermutationMatchResult> accepted;
-#define TGFX_TRY_FAMILY(Family)                               \
-  if (!accepted && (!alphaOnly || Family::ServesAlphaOnly)) { \
-    if (auto result = Family::Match(programInfo)) {           \
-      accepted = result;                                      \
-    }                                                         \
+#define TGFX_TRY_FAMILY(Family)                                                \
+  if (!accepted && (!alphaOnly || Family::ServesAlphaOnly)) {                  \
+    if (auto result = Family::Match(programInfo)) {                            \
+      accepted = PermutationMatchResult{#Family, result->vertPermutationIndex, \
+                                        result->fragPermutationIndex};         \
+    }                                                                          \
   }
   TGFX_FOR_EACH_SHADER_FAMILY(TGFX_TRY_FAMILY)
 #undef TGFX_TRY_FAMILY

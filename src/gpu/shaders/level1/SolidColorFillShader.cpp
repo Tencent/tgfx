@@ -28,7 +28,7 @@ namespace tgfx {
 // The whole runtime-side knowledge of this family in one place: which draws it serves and how the
 // draw's shape maps onto the permutation indices. The pass-through shape (one HAS_XP axis fed by
 // the XferProcessor type) needs no Inputs struct and no Compose function.
-std::optional<PermutationMatchResult> SolidColorFillShader::Match(const ProgramInfo* programInfo) {
+std::optional<PermutationVariant> SolidColorFillShader::Match(const ProgramInfo* programInfo) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
@@ -48,7 +48,7 @@ std::optional<PermutationMatchResult> SolidColorFillShader::Match(const ProgramI
     return std::nullopt;
   }
   auto fragIndex = FD::domain().encode(std::vector<int>{xpType});
-  return PermutationMatchResult{"SolidColorFillShader", 0, fragIndex};
+  return PermutationVariant{0, fragIndex};
 }
 
 }  // namespace tgfx

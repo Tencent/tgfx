@@ -31,7 +31,7 @@
 
 namespace tgfx {
 
-std::optional<PermutationMatchResult> ShapeInstancedTextureCoverageShader::Match(
+std::optional<PermutationVariant> ShapeInstancedTextureCoverageShader::Match(
     const ProgramInfo* programInfo) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
@@ -103,7 +103,7 @@ std::optional<PermutationMatchResult> ShapeInstancedTextureCoverageShader::Match
   }
   auto vertIndex = ShapeInstancedTextureCoverageShader::D::domain().encode(composed->vertValues);
   auto fragIndex = ShapeInstancedTextureCoverageShader::FD::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"ShapeInstancedTextureCoverageShader", vertIndex, fragIndex};
+  return PermutationVariant{vertIndex, fragIndex};
 }
 
 }  // namespace tgfx

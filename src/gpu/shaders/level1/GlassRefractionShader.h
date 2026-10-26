@@ -24,7 +24,7 @@
 namespace tgfx {
 
 class ProgramInfo;
-struct PermutationMatchResult;
+struct PermutationVariant;
 
 /// Precompiled shader declaration for GlassRefractionFragmentProcessor, bound to either
 /// EllipseGeometryProcessor in its common-color form (the oval glass terminal draw) or
@@ -82,7 +82,7 @@ class GlassRefractionShader : public PrecompiledShader {
 
   /// Runtime matching: does this draw belong to this family? Declared here, defined in
   /// the family's own .cpp, next to the GLSL it owns.
-  static std::optional<PermutationMatchResult> Match(const ProgramInfo* programInfo);
+  static std::optional<PermutationVariant> Match(const ProgramInfo* programInfo);
 
   PrecompiledShaderInfo info() const override {
     return {"GlassRefractionShader",

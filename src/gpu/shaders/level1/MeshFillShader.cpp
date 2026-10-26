@@ -27,7 +27,7 @@
 
 namespace tgfx {
 
-std::optional<PermutationMatchResult> MeshFillShader::Match(const ProgramInfo* programInfo) {
+std::optional<PermutationVariant> MeshFillShader::Match(const ProgramInfo* programInfo) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
@@ -48,7 +48,7 @@ std::optional<PermutationMatchResult> MeshFillShader::Match(const ProgramInfo* p
   }
   auto vertIndex = MeshFillShader::Dims::domain().encode(composed->vertValues);
   auto fragIndex = MeshFillShader::FD::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"MeshFillShader", vertIndex, fragIndex};
+  return PermutationVariant{vertIndex, fragIndex};
 }
 
 }  // namespace tgfx

@@ -28,7 +28,7 @@
 
 namespace tgfx {
 
-std::optional<PermutationMatchResult> TexturedEffectShader::Match(const ProgramInfo* programInfo) {
+std::optional<PermutationVariant> TexturedEffectShader::Match(const ProgramInfo* programInfo) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
@@ -81,7 +81,7 @@ std::optional<PermutationMatchResult> TexturedEffectShader::Match(const ProgramI
     return std::nullopt;
   }
   auto fragIndex = D::domain().encode(std::vector<int>{xpType});
-  return PermutationMatchResult{"TexturedEffectShader", 0, fragIndex};
+  return PermutationVariant{0, fragIndex};
 }
 
 }  // namespace tgfx

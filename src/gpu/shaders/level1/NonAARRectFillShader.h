@@ -24,7 +24,7 @@
 namespace tgfx {
 
 class ProgramInfo;
-struct PermutationMatchResult;
+struct PermutationVariant;
 
 class NonAARRectFillShader : public PrecompiledShader {
  public:
@@ -53,7 +53,7 @@ class NonAARRectFillShader : public PrecompiledShader {
 
   /// Runtime matching: does this draw belong to this family? Declared here, defined in
   /// the family's own .cpp, next to the GLSL it owns.
-  static std::optional<PermutationMatchResult> Match(const ProgramInfo* programInfo);
+  static std::optional<PermutationVariant> Match(const ProgramInfo* programInfo);
 
   // The one geometry processor this family accepts: info() reports it, Match compares against it.
   static constexpr const char* GpClassName = "NonAARRectGeometryProcessor";

@@ -31,6 +31,7 @@ class FragmentProcessor;
 class QuadPerEdgeAAGeometryProcessor;
 class AOTPointwiseChainProcessor;
 struct PermutationMatchResult;
+struct PermutationVariant;
 struct RoundStrokeRectInputs;
 enum class PermutationMatchFailure;
 
@@ -76,7 +77,7 @@ bool IsSupportedPointwiseOp(const FragmentProcessor* fp);
 
 /// Records why a candidate rejected the draw (a thread-local reason consumed by MatchPermutation)
 /// and returns nullopt.
-std::optional<PermutationMatchResult> Fail(PermutationMatchFailure reason);
+std::nullopt_t Fail(PermutationMatchFailure reason);
 
 /// Classifies the coverage FP itself (see CoverageKind); nullopt when it cannot be classified.
 std::optional<CoverageKind> ClassifyCoverage(const FragmentProcessor* coverageFP);

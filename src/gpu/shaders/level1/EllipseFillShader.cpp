@@ -25,7 +25,7 @@
 
 namespace tgfx {
 
-std::optional<PermutationMatchResult> EllipseFillShader::Match(const ProgramInfo* programInfo) {
+std::optional<PermutationVariant> EllipseFillShader::Match(const ProgramInfo* programInfo) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
@@ -48,7 +48,7 @@ std::optional<PermutationMatchResult> EllipseFillShader::Match(const ProgramInfo
     return std::nullopt;
   }
   auto fragIndex = FD::domain().encode(std::vector<int>{xpType, *coverageType});
-  return PermutationMatchResult{"EllipseFillShader", 0, fragIndex};
+  return PermutationVariant{0, fragIndex};
 }
 
 }  // namespace tgfx

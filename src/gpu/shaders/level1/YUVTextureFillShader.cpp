@@ -29,7 +29,7 @@
 
 namespace tgfx {
 
-std::optional<PermutationMatchResult> YUVTextureFillShader::Match(const ProgramInfo* programInfo) {
+std::optional<PermutationVariant> YUVTextureFillShader::Match(const ProgramInfo* programInfo) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
@@ -79,7 +79,7 @@ std::optional<PermutationMatchResult> YUVTextureFillShader::Match(const ProgramI
   }
   auto vertIndex = YUVTextureFillShader::VD::domain().encode(composed->vertValues);
   auto fragIndex = YUVTextureFillShader::FD::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"YUVTextureFillShader", vertIndex, fragIndex};
+  return PermutationVariant{vertIndex, fragIndex};
 }
 
 }  // namespace tgfx

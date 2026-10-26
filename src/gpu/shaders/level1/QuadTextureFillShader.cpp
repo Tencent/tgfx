@@ -28,7 +28,7 @@
 
 namespace tgfx {
 
-std::optional<PermutationMatchResult> QuadTextureFillShader::Match(const ProgramInfo* programInfo) {
+std::optional<PermutationVariant> QuadTextureFillShader::Match(const ProgramInfo* programInfo) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
@@ -106,7 +106,7 @@ std::optional<PermutationMatchResult> QuadTextureFillShader::Match(const Program
   }
   auto vertIndex = QuadTextureFillShader::VD::domain().encode(composed->vertValues);
   auto fragIndex = QuadTextureFillShader::FD::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"QuadTextureFillShader", vertIndex, fragIndex};
+  return PermutationVariant{vertIndex, fragIndex};
 }
 
 }  // namespace tgfx

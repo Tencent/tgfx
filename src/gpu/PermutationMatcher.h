@@ -24,6 +24,15 @@
 
 namespace tgfx {
 
+/// The vertex/fragment variant a family's Match resolved a draw to, within the family's declared
+/// permutation domains. The family name is filled by the dispatch loop, so a Match implementation
+/// cannot misspell it.
+struct PermutationVariant {
+  uint32_t vertPermutationIndex;
+  uint32_t fragPermutationIndex;
+};
+
+/// The dispatch loop's output: the matched family plus its resolved variant indices.
 struct PermutationMatchResult {
   std::string shaderName;
   uint32_t vertPermutationIndex;

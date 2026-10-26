@@ -31,7 +31,7 @@
 
 namespace tgfx {
 
-std::optional<PermutationMatchResult> GlassRefractionShader::Match(const ProgramInfo* programInfo) {
+std::optional<PermutationVariant> GlassRefractionShader::Match(const ProgramInfo* programInfo) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
@@ -129,7 +129,7 @@ std::optional<PermutationMatchResult> GlassRefractionShader::Match(const Program
   }
   auto vertIndex = GlassRefractionShader::VD::domain().encode(composed->vertValues);
   auto fragIndex = GlassRefractionShader::FD::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"GlassRefractionShader", vertIndex, fragIndex};
+  return PermutationVariant{vertIndex, fragIndex};
 }
 
 }  // namespace tgfx

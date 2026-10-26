@@ -24,7 +24,7 @@
 namespace tgfx {
 
 class ProgramInfo;
-struct PermutationMatchResult;
+struct PermutationVariant;
 
 /// Precompiled shader declaration for GlassUDFTentBlurFragmentProcessor. Blurs alpha coverage with
 /// a tent kernel in one direction and writes one field into an RGBA8 target. The tent weights are
@@ -73,7 +73,7 @@ class GlassUDFTentBlurShader : public PrecompiledShader {
 
   /// Runtime matching: does this draw belong to this family? Declared here, defined in
   /// the family's own .cpp, next to the GLSL it owns.
-  static std::optional<PermutationMatchResult> Match(const ProgramInfo* programInfo);
+  static std::optional<PermutationVariant> Match(const ProgramInfo* programInfo);
 
   PrecompiledShaderInfo info() const override {
     return {"GlassUDFTentBlurShader",

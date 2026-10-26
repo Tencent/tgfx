@@ -26,7 +26,7 @@
 
 namespace tgfx {
 
-std::optional<PermutationMatchResult> MaskFillShader::Match(const ProgramInfo* programInfo) {
+std::optional<PermutationVariant> MaskFillShader::Match(const ProgramInfo* programInfo) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
@@ -61,7 +61,7 @@ std::optional<PermutationMatchResult> MaskFillShader::Match(const ProgramInfo* p
     return std::nullopt;
   }
   auto fragIndex = D::domain().encode(std::vector<int>{xpType});
-  return PermutationMatchResult{"MaskFillShader", 0, fragIndex};
+  return PermutationVariant{0, fragIndex};
 }
 
 }  // namespace tgfx

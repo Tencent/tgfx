@@ -24,7 +24,7 @@
 namespace tgfx {
 
 class ProgramInfo;
-struct PermutationMatchResult;
+struct PermutationVariant;
 
 /// Precompiled shader for a solid-color fill through DefaultGeometryProcessor with no fragment
 /// processors. The fill color comes from the geometry processor's Color uniform. Covers the common
@@ -60,7 +60,7 @@ class SolidColorFillShader : public PrecompiledShader {
 
   /// Runtime matching: does this draw belong to this family? Declared here, defined in the
   /// family's own .cpp (SolidColorFillShader.cpp) next to the GLSL it owns.
-  static std::optional<PermutationMatchResult> Match(const ProgramInfo* programInfo);
+  static std::optional<PermutationVariant> Match(const ProgramInfo* programInfo);
 
   // The one geometry processor this family accepts: info() reports it, Match compares against it.
   static constexpr const char* GpClassName = "DefaultGeometryProcessor";

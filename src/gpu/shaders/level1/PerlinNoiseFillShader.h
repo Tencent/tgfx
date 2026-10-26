@@ -24,7 +24,7 @@
 namespace tgfx {
 
 class ProgramInfo;
-struct PermutationMatchResult;
+struct PermutationVariant;
 
 /// Precompiled shader for PerlinNoiseFragmentProcessor (SVG feTurbulence). Samples two per-draw
 /// lookup textures (a 256x1 alpha-only permutations table and a 256x4 RGBA gradient table) and
@@ -63,7 +63,7 @@ class PerlinNoiseFillShader : public PrecompiledShader {
 
   /// Runtime matching: does this draw belong to this family? Declared here, defined in
   /// the family's own .cpp, next to the GLSL it owns.
-  static std::optional<PermutationMatchResult> Match(const ProgramInfo* programInfo);
+  static std::optional<PermutationVariant> Match(const ProgramInfo* programInfo);
 
   PrecompiledShaderInfo info() const override {
     return {"PerlinNoiseFillShader",

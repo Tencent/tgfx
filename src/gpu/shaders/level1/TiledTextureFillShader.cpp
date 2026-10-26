@@ -26,8 +26,7 @@
 
 namespace tgfx {
 
-std::optional<PermutationMatchResult> TiledTextureFillShader::Match(
-    const ProgramInfo* programInfo) {
+std::optional<PermutationVariant> TiledTextureFillShader::Match(const ProgramInfo* programInfo) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
@@ -60,7 +59,7 @@ std::optional<PermutationMatchResult> TiledTextureFillShader::Match(
   // ALPHA_ONLY and HAS_STRICT are folded into runtime uniforms (AlphaOnly / Strict), set by
   // GLSLTiledTextureEffect::onSetData; they are no longer compile-time dimensions.
   auto fragIndex = FragDims::domain().encode(std::vector<int>{xpType});
-  return PermutationMatchResult{"TiledTextureFillShader", 0, fragIndex};
+  return PermutationVariant{0, fragIndex};
 }
 
 }  // namespace tgfx

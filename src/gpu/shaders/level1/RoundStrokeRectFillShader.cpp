@@ -26,8 +26,7 @@
 
 namespace tgfx {
 
-std::optional<PermutationMatchResult> RoundStrokeRectFillShader::Match(
-    const ProgramInfo* programInfo) {
+std::optional<PermutationVariant> RoundStrokeRectFillShader::Match(const ProgramInfo* programInfo) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
@@ -41,7 +40,7 @@ std::optional<PermutationMatchResult> RoundStrokeRectFillShader::Match(
   }
   auto vertIndex = RoundStrokeRectFillShader::Dims::domain().encode(composed->vertValues);
   auto fragIndex = RoundStrokeRectFillShader::FD::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"RoundStrokeRectFillShader", vertIndex, fragIndex};
+  return PermutationVariant{vertIndex, fragIndex};
 }
 
 }  // namespace tgfx

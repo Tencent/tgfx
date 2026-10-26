@@ -26,8 +26,7 @@
 
 namespace tgfx {
 
-std::optional<PermutationMatchResult> GlassUDFTentBlurShader::Match(
-    const ProgramInfo* programInfo) {
+std::optional<PermutationVariant> GlassUDFTentBlurShader::Match(const ProgramInfo* programInfo) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
@@ -64,7 +63,7 @@ std::optional<PermutationMatchResult> GlassUDFTentBlurShader::Match(
     return std::nullopt;
   }
   auto fragIndex = FD::domain().encode(std::vector<int>{xpType});
-  return PermutationMatchResult{"GlassUDFTentBlurShader", 0, fragIndex};
+  return PermutationVariant{0, fragIndex};
 }
 
 }  // namespace tgfx

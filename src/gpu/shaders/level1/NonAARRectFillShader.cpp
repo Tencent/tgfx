@@ -28,7 +28,7 @@
 
 namespace tgfx {
 
-std::optional<PermutationMatchResult> NonAARRectFillShader::Match(const ProgramInfo* programInfo) {
+std::optional<PermutationVariant> NonAARRectFillShader::Match(const ProgramInfo* programInfo) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
@@ -75,7 +75,7 @@ std::optional<PermutationMatchResult> NonAARRectFillShader::Match(const ProgramI
   }
   auto vertIndex = NonAARRectFillShader::Dims::domain().encode(composed->vertValues);
   auto fragIndex = NonAARRectFillShader::FD::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"NonAARRectFillShader", vertIndex, fragIndex};
+  return PermutationVariant{vertIndex, fragIndex};
 }
 
 }  // namespace tgfx

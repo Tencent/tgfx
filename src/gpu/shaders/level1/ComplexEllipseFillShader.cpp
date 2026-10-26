@@ -27,8 +27,7 @@
 
 namespace tgfx {
 
-std::optional<PermutationMatchResult> ComplexEllipseFillShader::Match(
-    const ProgramInfo* programInfo) {
+std::optional<PermutationVariant> ComplexEllipseFillShader::Match(const ProgramInfo* programInfo) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
@@ -57,7 +56,7 @@ std::optional<PermutationMatchResult> ComplexEllipseFillShader::Match(
   }
   auto vertIndex = ComplexEllipseFillShader::Dims::domain().encode(composed->vertValues);
   auto fragIndex = ComplexEllipseFillShader::FD::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"ComplexEllipseFillShader", vertIndex, fragIndex};
+  return PermutationVariant{vertIndex, fragIndex};
 }
 
 }  // namespace tgfx

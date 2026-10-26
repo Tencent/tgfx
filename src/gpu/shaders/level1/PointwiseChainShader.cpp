@@ -36,7 +36,7 @@
 
 namespace tgfx {
 
-std::optional<PermutationMatchResult> PointwiseChainShader::Match(const ProgramInfo* programInfo) {
+std::optional<PermutationVariant> PointwiseChainShader::Match(const ProgramInfo* programInfo) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
@@ -164,7 +164,7 @@ std::optional<PermutationMatchResult> PointwiseChainShader::Match(const ProgramI
   }
   auto vertIndex = PointwiseChainShader::VD::domain().encode(composed->vertValues);
   auto fragIndex = PointwiseChainShader::FD::domain().encode(composed->fragValues);
-  return PermutationMatchResult{"PointwiseChainShader", vertIndex, fragIndex};
+  return PermutationVariant{vertIndex, fragIndex};
 }
 
 }  // namespace tgfx
