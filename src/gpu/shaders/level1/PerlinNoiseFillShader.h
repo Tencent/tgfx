@@ -4,27 +4,27 @@
 //
 //  Copyright (C) 2026 Tencent. All rights reserved.
 //
-//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
-//  in compliance with the License. You may obtain a copy of the License at
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
+//  compliance with the License. You may obtain a copy of the License at
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. see the license for the specific language governing permissions and
+//  limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
 #include <optional>
-#include "gpu/shaders/PrecompiledShader.h"
+#include <vector>
+#include "gpu/shaders/ShaderFamily.h"
 
 namespace tgfx {
 
 class ProgramInfo;
-struct PermutationVariant;
 
 /// Precompiled shader for PerlinNoiseFragmentProcessor (SVG feTurbulence). Samples two per-draw
 /// lookup textures (a 256x1 alpha-only permutations table and a 256x4 RGBA gradient table) and
@@ -36,8 +36,12 @@ struct PermutationVariant;
 ///
 /// The coverage attribute is unconditional (the non-AA path triangles carry a constant 1.0 slot
 /// and the quad providers emit 1.0 for non-AA draws), so there is no HAS_COVERAGE dimension.
-class PerlinNoiseFillShader : public PrecompiledShader {
+class PerlinNoiseFillShader : public ShaderFamily<PerlinNoiseFillShader> {
  public:
+  static constexpr const char* Name = "PerlinNoiseFillShader";
+  static constexpr const char* VertFile = "level1/perlin_noise.vert";
+  static constexpr const char* FragFile = "level1/perlin_noise.frag";
+
   struct FragDims {
     enum : uint32_t { HAS_XP, COUNT };
     static PermutationDomain domain() {
@@ -46,6 +50,7 @@ class PerlinNoiseFillShader : public PrecompiledShader {
       });
     }
   };
+  using FD = FragDims;
 
   struct VertDims {
     enum : uint32_t { COUNT };
@@ -53,28 +58,35 @@ class PerlinNoiseFillShader : public PrecompiledShader {
       return PermutationDomain({});
     }
   };
-  using FD = FragDims;
   using VD = VertDims;
+  static_assert(VD::COUNT == 0 && FD::COUNT == 1,
+                "Update the Compose mapping when dimensions change.");
 
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
 
-  /// Runtime matching: does this draw belong to this family? Declared here, defined in
-  /// the family's own .cpp, next to the GLSL it owns.
-  static std::optional<PermutationVariant> Match(const ProgramInfo* programInfo);
+  /// Matcher inputs: only the XferProcessor kind shapes the variant.
+  struct Inputs {
+    int xpType = XP_UNSUPPORTED;
+  };
 
-  PrecompiledShaderInfo info() const override {
-    return {"PerlinNoiseFillShader",
-            "level1/perlin_noise.vert",
-            "level1/perlin_noise.frag",
-            VD::domain(),
-            FD::domain(),
-            PermutationDomain({}),
-            "",
-            ""};
+  /// Pure mapping from inputs to dimension values. Pass-through: every input value lands on the
+  /// domain one-to-one, so the mirrored Reachable default enumerates exactly what Compose emits.
+  static std::optional<RuleComposedValues> Compose(const Inputs& inputs) {
+    if (inputs.xpType < XP_NONE) {
+      return std::nullopt;
+    }
+    RuleComposedValues values;
+    values.fragValues.resize(FD::COUNT);
+    values.fragValues[FD::HAS_XP] = inputs.xpType;
+    return values;
   }
+
+  /// Whole-draw guards (alpha-only target, position-only rect GP, the bare or composed pointwise
+  /// operator shape), defined in the family's own .cpp, next to the GLSL it owns.
+  static std::optional<Inputs> Extract(const ProgramInfo* programInfo);
 };
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::PerlinNoiseFillShader, tgfx::EnumeratePerlinNoiseFillReachable)
+TGFX_REGISTER_SHADER_FAMILY(tgfx::PerlinNoiseFillShader)

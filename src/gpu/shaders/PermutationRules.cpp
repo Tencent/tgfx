@@ -198,11 +198,6 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateMeshFillReachable() {
   return EnumerateMirroredReachable<MeshFillShader::Dims, MeshFillShader::FD>(nullptr);
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumeratePerlinNoiseFillReachable() {
-  return EnumerateMirroredReachable<PerlinNoiseFillShader::VD, PerlinNoiseFillShader::FragDims>(
-      nullptr);
-}
-
 std::optional<RuleComposedValues> ComposeYUVTextureFill(const YUVTextureFillInputs& inputs) {
   if (inputs.xpType < XP_NONE || inputs.yuvFormat < 0) {
     return std::nullopt;
@@ -274,11 +269,6 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedFillReachable() {
       nullptr);
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateTiledTextureFillReachable() {
-  return EnumerateMirroredReachable<TiledTextureFillShader::VD, TiledTextureFillShader::FD>(
-      nullptr);
-}
-
 std::optional<RuleComposedValues> ComposeQuadTextureFill(const QuadTextureFillInputs& inputs) {
   if (inputs.xpType < XP_NONE) {
     return std::nullopt;
@@ -322,11 +312,6 @@ std::optional<RuleComposedValues> ComposeGlassRefraction(const GlassRefractionIn
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassRefractionReachable() {
   return EnumerateMirroredReachable<GlassRefractionShader::VD, GlassRefractionShader::FD>(nullptr);
-}
-
-std::set<std::pair<uint32_t, uint32_t>> EnumerateTexturedEffectReachable() {
-  return EnumerateMirroredReachable<TexturedEffectShader::VD, TexturedEffectShader::FragDims>(
-      nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeAtlasTextFill(const AtlasTextFillInputs& inputs) {

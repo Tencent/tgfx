@@ -336,14 +336,11 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexEllipseFillReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateNonAARRectFillReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexNonAARRectFillReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateMeshFillReachable();
-std::set<std::pair<uint32_t, uint32_t>> EnumeratePerlinNoiseFillReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateYUVTextureFillReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedTextureCoverageReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedFillReachable();
-std::set<std::pair<uint32_t, uint32_t>> EnumerateTiledTextureFillReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadTextureFillReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassRefractionReachable();
-std::set<std::pair<uint32_t, uint32_t>> EnumerateTexturedEffectReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateAtlasTextFillReachable();
 
 /**
