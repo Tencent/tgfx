@@ -69,7 +69,7 @@ struct BundleManifest {
   uint64_t stageCount = 0;
 };
 
-inline constexpr uint32_t kBundleManifestVersion = 1;
+inline constexpr uint32_t BundleManifestVersion = 1;
 
 /// FNV-1a over a byte range, the hash recorded as BundleManifest::fileHash.
 uint64_t HashBundleBytes(const uint8_t* data, size_t size);

@@ -167,7 +167,7 @@ namespace tgfx {
  * variants' slot-parameter uniform arrays halve, so every gradient-chain uniform layout
  * re-encodes; pre-change bundles are refused.
  */
-inline constexpr uint32_t kExpectedToolchainABI = 0x0001001au;
+inline constexpr uint32_t ExpectedToolchainABI = 0x0001001au;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

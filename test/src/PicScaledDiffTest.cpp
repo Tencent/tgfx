@@ -83,7 +83,7 @@ static void RenderScaledPicture(Context* context, Bitmap* outBitmap, bool withFi
   }
 }
 
-TGFX_TEST(AOTRenderConsistencyTest, ScaledPictureImageAotJitDiff) {
+TGFX_TEST(PicScaledDiffTest, ScaledPictureImageAotJitDiff) {
   ContextScope scope;
   auto context = scope.getContext();
   SKIP_ON_SWIFTSHADER(context);
@@ -160,7 +160,7 @@ TGFX_TEST(AOTRenderConsistencyTest, ScaledPictureImageAotJitDiff) {
   EXPECT_EQ(diffCount, 0u);
 }
 
-TGFX_TEST(AOTRenderConsistencyTest, SinglePassBlurAotJitDiff) {
+TGFX_TEST(PicScaledDiffTest, SinglePassBlurAotJitDiff) {
   // Minimal single-pass bisect for the residual alpha divergence: a 32x32 gradient image drawn
   // through a horizontal-only blur (blurrinessY == 0, so exactly one GaussianBlur pass) with a
   // Decal tile mode — the same child shape as the drop-shadow chain, minus the two-pass
@@ -171,19 +171,19 @@ TGFX_TEST(AOTRenderConsistencyTest, SinglePassBlurAotJitDiff) {
   ASSERT_TRUE(context != nullptr);
   auto* cache = context->precompiledShaderCache();
 
-  constexpr int kSize = 32;
+  constexpr int Size = 32;
   Bitmap source = {};
-  ASSERT_TRUE(source.allocPixels(kSize, kSize));
+  ASSERT_TRUE(source.allocPixels(Size, Size));
   {
     auto* pixels = static_cast<uint32_t*>(source.lockPixels());
     ASSERT_TRUE(pixels != nullptr);
-    for (int y = 0; y < kSize; ++y) {
-      for (int x = 0; x < kSize; ++x) {
+    for (int y = 0; y < Size; ++y) {
+      for (int x = 0; x < Size; ++x) {
         // A horizontal alpha ramp with vertical color variation: nontrivial content for every
         // tap, alpha changing along the blur axis so edge taps matter.
-        auto a = static_cast<uint32_t>(255 * x / (kSize - 1));
-        auto r = static_cast<uint32_t>(255 * y / (kSize - 1));
-        pixels[y * kSize + x] = (a << 24) | (r << 16) | (0x40u << 8) | 0x80u;
+        auto a = static_cast<uint32_t>(255 * x / (Size - 1));
+        auto r = static_cast<uint32_t>(255 * y / (Size - 1));
+        pixels[y * Size + x] = (a << 24) | (r << 16) | (0x40u << 8) | 0x80u;
       }
     }
     source.unlockPixels();
@@ -218,13 +218,13 @@ TGFX_TEST(AOTRenderConsistencyTest, SinglePassBlurAotJitDiff) {
     if (scaledImage == nullptr) {
       return;
     }
-    auto surface = Surface::Make(context, kSize, kSize);
+    auto surface = Surface::Make(context, Size, Size);
     if (surface == nullptr) {
       return;
     }
     surface->getCanvas()->drawImage(scaledImage);
     context->flushAndSubmit(true);
-    outBitmap->allocPixels(kSize, kSize);
+    outBitmap->allocPixels(Size, Size);
     auto* pixels = outBitmap->lockPixels();
     if (pixels != nullptr) {
       surface->readPixels(outBitmap->info(), pixels);
@@ -251,10 +251,10 @@ TGFX_TEST(AOTRenderConsistencyTest, SinglePassBlurAotJitDiff) {
   size_t diffCount = 0;
   size_t maxDelta = 0;
   size_t channelHits[4] = {0, 0, 0, 0};
-  for (int y = 0; y < kSize; ++y) {
-    for (int x = 0; x < kSize; ++x) {
-      auto a = aotPixels[y * kSize + x];
-      auto b = jitPixels[y * kSize + x];
+  for (int y = 0; y < Size; ++y) {
+    for (int x = 0; x < Size; ++x) {
+      auto a = aotPixels[y * Size + x];
+      auto b = jitPixels[y * Size + x];
       if (a == b) {
         continue;
       }
@@ -280,7 +280,7 @@ TGFX_TEST(AOTRenderConsistencyTest, SinglePassBlurAotJitDiff) {
   aotBitmap.unlockPixels();
   jitBitmap.unlockPixels();
   printf("[SingleBlurDiff] diffPixels=%zu/%d maxDelta=%zu channels(r,g,b,a)=(%zu,%zu,%zu,%zu)\n",
-         diffCount, kSize * kSize, maxDelta, channelHits[0], channelHits[1], channelHits[2],
+         diffCount, Size * Size, maxDelta, channelHits[0], channelHits[1], channelHits[2],
          channelHits[3]);
   // Gate, not just a diagnostic: after the shared-recipe tiled-block fix, this scene must be
   // AOT/JIT identical. If it regresses (a second tiled leaf routed back to the plain path, a new

@@ -1134,7 +1134,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
                                {"buildType", "debug"},
 #endif
                                {"gitHead", GitHeadAtRun()},
-                               {"runtimeToolchainABI", kExpectedToolchainABI}};
+                               {"runtimeToolchainABI", ExpectedToolchainABI}};
     {
       auto device = DevicePool::Make();
       if (device != nullptr) {

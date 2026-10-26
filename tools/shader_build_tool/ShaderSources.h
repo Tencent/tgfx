@@ -49,11 +49,11 @@ struct ShaderSourceSet {
 
 /// Reads the vertex and fragment file of every registered shader under shaderDir and expands their
 /// includes. A shader file that is missing or empty, an include that cannot be read, an include
-/// cycle, or nesting deeper than kMaxIncludeDepth is an error: the build must not silently compile
+/// cycle, or nesting deeper than MaxIncludeDepth is an error: the build must not silently compile
 /// a shader with a hole in it.
 ShaderSourceSet LoadShaderSources(const std::string& shaderDir);
 
 /// The deepest include nesting LoadShaderSources accepts.
-inline constexpr int kMaxIncludeDepth = 32;
+inline constexpr int MaxIncludeDepth = 32;
 
 }  // namespace tgfx

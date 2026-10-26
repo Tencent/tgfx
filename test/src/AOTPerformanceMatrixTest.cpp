@@ -61,14 +61,14 @@ namespace tgfx {
 
 namespace {
 
-constexpr int kSize = 128;
-constexpr int kWarmUpFrames = 20;
-constexpr int kRounds = 30;
+constexpr int Size = 128;
+constexpr int WarmUpFrames = 20;
+constexpr int Rounds = 30;
 // Cold samples per route (program-cold: the program cache is cleared and the bundle reloaded
 // before each sample; process-cold is a property of how the test binary is launched, not
 // repeatable in-process, and is documented as such). 3 samples give a min/median spread for
 // the single-sample cold numbers the audit flagged.
-constexpr int kColdSamples = 3;
+constexpr int ColdSamples = 3;
 
 // A stable, non-trivial color matrix for chain construction.
 const std::array<float, 20>& WarmMatrix() {
@@ -119,10 +119,10 @@ double Percentile(std::vector<double> values, double percentile) {
   return values[index];
 }
 
-// Measures one route (useBundle selects AOT vs runtime) over one scene. Cold = kColdSamples
+// Measures one route (useBundle selects AOT vs runtime) over one scene. Cold = ColdSamples
 // first frames after clearing the program cache and (for AOT) reloading the bundle — the
 // in-process, program-level cold (process cold is a launch property, not measurable here).
-// Hot = median/p95 over kRounds batches of kBatchFrames frames each (a batch shares one
+// Hot = median/p95 over Rounds batches of BatchFrames frames each (a batch shares one
 // surface so per-frame surface setup stays out of the measurement). `size` parameterizes the
 // surface so the fill-rate axis (128 vs 512) is covered by the representative chain scenario.
 // P9 ratio gates. Calibrated 2026-09-22, Apple M4 Pro, Debug build, 10 full-matrix runs per
@@ -165,7 +165,7 @@ void AssertPerformanceGates(Context* context, const std::string& label, const Ti
 
 template <typename Scene>
 TimingResult MeasureRoute(Context* context, PrecompiledShaderCache* cache, bool useBundle,
-                          const Scene& scene, int size = kSize, bool decompositionEnabled = true,
+                          const Scene& scene, int size = Size, bool decompositionEnabled = true,
                           bool dedicatedKernels = true) {
   TimingResult result = {};
   if (useBundle) {
@@ -190,7 +190,7 @@ TimingResult MeasureRoute(Context* context, PrecompiledShaderCache* cache, bool 
   // clears the program cache and the shader cache independently, so every sample compiles its
   // shaders again; the samples' spread (min..max) shows the stability the audit's
   // single-cold-sample design could not.
-  for (int cold = 0; cold < kColdSamples; ++cold) {
+  for (int cold = 0; cold < ColdSamples; ++cold) {
     context->globalCache()->clearPrograms();
     context->precompiledShaderCache()->shaderCache()->clear();
     context->globalCache()->resetProgramStats();
@@ -231,25 +231,25 @@ TimingResult MeasureRoute(Context* context, PrecompiledShaderCache* cache, bool 
   cache->setDiagnosticRecordingEnabled(false);
   // Hot frames: steady state, programs cached on both routes (the runtime route's program cache
   // serves its stitched programs). Each sample times
-  // kBatchFrames frames (the per-frame cost is the sample divided by the batch size).
-  constexpr int kBatchFrames = 20;
+  // BatchFrames frames (the per-frame cost is the sample divided by the batch size).
+  constexpr int BatchFrames = 20;
   scene(surface->getCanvas());
   context->flushAndSubmit(true);
-  for (int warmUp = 0; warmUp < kWarmUpFrames; ++warmUp) {
+  for (int warmUp = 0; warmUp < WarmUpFrames; ++warmUp) {
     scene(surface->getCanvas());
     context->flushAndSubmit(true);
   }
   std::vector<double> samples = {};
-  samples.reserve(kRounds);
-  for (int round = 0; round < kRounds; ++round) {
+  samples.reserve(Rounds);
+  for (int round = 0; round < Rounds; ++round) {
     auto batchStart = std::chrono::steady_clock::now();
-    for (int frame = 0; frame < kBatchFrames; ++frame) {
+    for (int frame = 0; frame < BatchFrames; ++frame) {
       scene(surface->getCanvas());
       context->flushAndSubmit(true);
     }
     auto batchEnd = std::chrono::steady_clock::now();
     samples.push_back(std::chrono::duration<double, std::milli>(batchEnd - batchStart).count() /
-                      kBatchFrames);
+                      BatchFrames);
   }
   result.hotMedianMs = Median(samples);
   result.hotMinMs = samples.front();
@@ -263,16 +263,16 @@ TimingResult MeasureRoute(Context* context, PrecompiledShaderCache* cache, bool 
 }
 
 void PrintResult(const char* scenario, const char* route, const TimingResult& result,
-                 int size = kSize) {
+                 int size = Size) {
 #ifdef NDEBUG
-  constexpr const char* kBuildType = "release";
+  constexpr const char* BuildType = "release";
 #else
-  constexpr const char* kBuildType = "debug";
+  constexpr const char* BuildType = "debug";
 #endif
   printf(
       "[P7Perf] %-28s %-8s %7s %4d coldMed=%8.3fms hotMed=%8.3fms hotMin=%8.3fms "
       "hotP95=%8.3fms aotDraws=%u runtimePrograms=%u\n",
-      scenario, route, kBuildType, size, result.coldMedianMs, result.hotMedianMs, result.hotMinMs,
+      scenario, route, BuildType, size, result.coldMedianMs, result.hotMedianMs, result.hotMinMs,
       result.hotP95Ms, result.aotDraws, result.runtimePrograms);
   // Routing evidence for the same window: which variants were actually created (scene label is
   // NOT a family name), and the pass structure this scene really executed.

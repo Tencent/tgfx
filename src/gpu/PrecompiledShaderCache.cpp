@@ -729,11 +729,11 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   // bundle's reflection grammar or uniform contracts predate (or postdate) what this runtime
   // knows how to consume — reject instead of guessing.
   uint32_t toolchainVersion = ReadU32LE(ptr + 16);
-  if (toolchainVersion != kExpectedToolchainABI) {
+  if (toolchainVersion != ExpectedToolchainABI) {
     LOGE(
         "PrecompiledShaderCache: Bundle toolchain ABI 0x%08x does not match the runtime's "
         "0x%08x; the reflection/uniform contracts are incompatible",
-        toolchainVersion, kExpectedToolchainABI);
+        toolchainVersion, ExpectedToolchainABI);
     return false;
   }
   uint32_t vertPoolCount = ReadU32LE(ptr + 20);

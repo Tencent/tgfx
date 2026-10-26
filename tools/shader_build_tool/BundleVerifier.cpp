@@ -190,9 +190,9 @@ size_t CheckManifest(const std::string& bundlePath, const std::string& expectedT
               << "; the bundle cannot be proven to match any sources\n";
     return 1;
   }
-  if (manifest.manifestVersion != kBundleManifestVersion) {
+  if (manifest.manifestVersion != BundleManifestVersion) {
     std::cout << "[verify] " << expectedTag << ": VIOLATION manifest version "
-              << manifest.manifestVersion << " (expected " << kBundleManifestVersion << ")\n";
+              << manifest.manifestVersion << " (expected " << BundleManifestVersion << ")\n";
     violations++;
   }
   auto slash = bundlePath.rfind('/');
@@ -287,9 +287,9 @@ BundleCheckResult VerifyOneBundle(const std::string& path, const std::string& ex
               << " (expected " << FORMAT_VERSION_V4 << ")\n";
     result.violations++;
   }
-  if (header.toolchainABI != kExpectedToolchainABI) {
+  if (header.toolchainABI != ExpectedToolchainABI) {
     std::cout << "[verify] " << expectedTag << ": VIOLATION toolchain ABI 0x" << std::hex
-              << header.toolchainABI << " (expected 0x" << kExpectedToolchainABI << std::dec
+              << header.toolchainABI << " (expected 0x" << ExpectedToolchainABI << std::dec
               << ") — bundle predates the current contract\n";
     result.violations++;
   }

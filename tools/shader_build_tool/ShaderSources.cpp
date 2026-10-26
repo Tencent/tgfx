@@ -129,8 +129,8 @@ bool ExpandIncludes(const std::string& source, const std::string& currentDir, Fi
           *error = "include cycle: " + FormatChain(*chain);
           return false;
         }
-        if (static_cast<int>(chain->size()) > kMaxIncludeDepth) {
-          *error = "includes nested deeper than " + std::to_string(kMaxIncludeDepth) + ": " +
+        if (static_cast<int>(chain->size()) > MaxIncludeDepth) {
+          *error = "includes nested deeper than " + std::to_string(MaxIncludeDepth) + ": " +
                    FormatChain(*chain) + " -> " + fullPath;
           return false;
         }

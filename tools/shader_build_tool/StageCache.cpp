@@ -38,7 +38,7 @@ namespace tgfx {
 
 namespace {
 
-constexpr std::array<uint32_t, 64> kRoundConstants = {
+constexpr std::array<uint32_t, 64> RoundConstants = {
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
     0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
     0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
@@ -53,9 +53,9 @@ uint32_t RotateRight(uint32_t value, int bits) {
 }
 
 // Bumped whenever the entry layout or the meaning of a key changes.
-constexpr uint32_t kSchemaVersion = 1;
-constexpr char kEntryMagic[4] = {'T', 'G', 'S', 'C'};
-constexpr size_t kEntryHeaderSize = 4 + 4 + 8 + 32;
+constexpr uint32_t SchemaVersion = 1;
+constexpr char EntryMagic[4] = {'T', 'G', 'S', 'C'};
+constexpr size_t EntryHeaderSize = 4 + 4 + 8 + 32;
 
 void PutLE32(std::vector<uint8_t>* out, uint32_t value) {
   for (int i = 0; i < 4; ++i) {
@@ -141,7 +141,7 @@ void Sha256::transform(const uint8_t* block) {
   for (size_t i = 0; i < 64; ++i) {
     uint32_t s1 = RotateRight(e, 6) ^ RotateRight(e, 11) ^ RotateRight(e, 25);
     uint32_t choose = (e & f) ^ (~e & g);
-    uint32_t t1 = h + s1 + choose + kRoundConstants[i] + w[i];
+    uint32_t t1 = h + s1 + choose + RoundConstants[i] + w[i];
     uint32_t s0 = RotateRight(a, 2) ^ RotateRight(a, 13) ^ RotateRight(a, 22);
     uint32_t majority = (a & b) ^ (a & c) ^ (b & c);
     uint32_t t2 = s0 + majority;
@@ -233,7 +233,7 @@ bool Sha256SelfTest() {
 }
 
 StageCacheKey::StageCacheKey(const std::string& kind) {
-  add(static_cast<uint64_t>(kSchemaVersion));
+  add(static_cast<uint64_t>(SchemaVersion));
   add(StageCache::Get().toolIdentity());
   add(kind);
 }
@@ -321,19 +321,19 @@ bool StageCache::load(const std::string& key, std::vector<uint8_t>* payload,
   }
   std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(file)),
                              std::istreambuf_iterator<char>());
-  bool valid = bytes.size() >= kEntryHeaderSize &&
-               std::memcmp(bytes.data(), kEntryMagic, 4) == 0 &&
-               GetLE(bytes, 4, 4) == kSchemaVersion &&
-               GetLE(bytes, 8, 8) == bytes.size() - kEntryHeaderSize;
+  bool valid = bytes.size() >= EntryHeaderSize &&
+               std::memcmp(bytes.data(), EntryMagic, 4) == 0 &&
+               GetLE(bytes, 4, 4) == SchemaVersion &&
+               GetLE(bytes, 8, 8) == bytes.size() - EntryHeaderSize;
   if (valid) {
-    auto digest = Sha256Of(bytes.data() + kEntryHeaderSize, bytes.size() - kEntryHeaderSize);
+    auto digest = Sha256Of(bytes.data() + EntryHeaderSize, bytes.size() - EntryHeaderSize);
     valid = std::memcmp(digest.data(), bytes.data() + 16, 32) == 0;
   }
   if (!valid) {
     stats->corrupt++;
     return false;
   }
-  payload->assign(bytes.begin() + static_cast<std::ptrdiff_t>(kEntryHeaderSize), bytes.end());
+  payload->assign(bytes.begin() + static_cast<std::ptrdiff_t>(EntryHeaderSize), bytes.end());
   stats->diskHits++;
   return true;
 }
@@ -349,8 +349,8 @@ void StageCache::store(const std::string& key, const std::vector<uint8_t>& paylo
   if (code) {
     return;
   }
-  std::vector<uint8_t> bytes(kEntryMagic, kEntryMagic + 4);
-  PutLE32(&bytes, kSchemaVersion);
+  std::vector<uint8_t> bytes(EntryMagic, EntryMagic + 4);
+  PutLE32(&bytes, SchemaVersion);
   PutLE64(&bytes, payload.size());
   auto digest = Sha256Of(payload.data(), payload.size());
   bytes.insert(bytes.end(), digest.begin(), digest.end());

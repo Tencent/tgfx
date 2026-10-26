@@ -1184,9 +1184,9 @@ TGFX_TEST(ShaderPermutationTest, EmbeddedBundleIsPresentAndCurrent) {
   // The ABI is read from the raw header first so a mismatch reports both numbers, instead of the
   // loader's log line that the test output usually buries.
   auto embeddedABI = TestReadU32LE(data + 16);
-  ASSERT_EQ(embeddedABI, kExpectedToolchainABI)
+  ASSERT_EQ(embeddedABI, ExpectedToolchainABI)
       << "The embedded \"" << tag << "\" bundle records toolchain ABI " << HexU32(embeddedABI)
-      << " but the runtime requires " << HexU32(kExpectedToolchainABI)
+      << " but the runtime requires " << HexU32(ExpectedToolchainABI)
       << ". The embedded bundle is stale: the bundle generation step did not rerun after the ABI "
          "changed, and Context silently refuses to load it.";
 
@@ -1199,7 +1199,7 @@ TGFX_TEST(ShaderPermutationTest, EmbeddedBundleIsPresentAndCurrent) {
       << "The cache rejected the embedded \"" << tag << "\" bundle; see the PrecompiledShaderCache "
       << "log lines above for the reason";
   EXPECT_TRUE(cache->isLoaded());
-  EXPECT_EQ(cache->bundleToolchainABI(), kExpectedToolchainABI);
+  EXPECT_EQ(cache->bundleToolchainABI(), ExpectedToolchainABI);
   EXPECT_EQ(cache->profileTag(), tag);
   EXPECT_NE(cache->bundleIdentityHash(), 0u)
       << "A zero identity hash marks a legacy bundle without a content check";
@@ -1370,7 +1370,7 @@ static std::vector<uint8_t> MakeTestBundle(const std::string& profileTag, uint32
   std::vector<uint8_t> bundle(dataOffset + dataSize, 0);
   TestWriteU32LE(bundle.data(), 0x54475346);
   TestWriteU16LE(bundle.data() + 4, 3);
-  TestWriteU32LE(bundle.data() + 16, kExpectedToolchainABI);
+  TestWriteU32LE(bundle.data() + 16, ExpectedToolchainABI);
   TestWriteU32LE(bundle.data() + 20, vertCount);
   TestWriteU32LE(bundle.data() + 24, fragCount);
   TestWriteU32LE(bundle.data() + 28, HeaderSize);
@@ -1400,7 +1400,7 @@ static std::vector<uint8_t> MakeTestBundle(const std::string& profileTag, uint32
 static std::vector<uint8_t> MakeReflectedTestBundle(uint16_t version) {
   auto bundle = MakeTestBundle("bounds", 1, 1, 50);
   TestWriteU16LE(bundle.data() + 4, version);
-  TestWriteU32LE(bundle.data() + 16, kExpectedToolchainABI);
+  TestWriteU32LE(bundle.data() + 16, ExpectedToolchainABI);
   TestWriteU32LE(bundle.data() + 44, static_cast<uint32_t>(bundle.size()));
   std::vector<uint8_t> reflection = {
       1, 0, 0, 0, 1, 'u', static_cast<uint8_t>(UniformFormat::Float4)};
@@ -1684,7 +1684,7 @@ TGFX_TEST(ShaderPermutationTest, BundleRejectsIncompatibleToolchainABI) {
   // Derived from the expected ABI so a bump never collides with a hard-coded "mismatch" value
   // (the historical 0x00010001 stamp became the expected ABI itself after the P2 bump).
   for (uint32_t stamped :
-       {0x00000000u, kExpectedToolchainABI - 1u, kExpectedToolchainABI + 1u, 0xFFFFFFFFu}) {
+       {0x00000000u, ExpectedToolchainABI - 1u, ExpectedToolchainABI + 1u, 0xFFFFFFFFu}) {
     SCOPED_TRACE(stamped);
     auto bundle = MakeTestBundle("toolchain", 1, 0, 50);
     TestWriteU32LE(bundle.data() + 16, stamped);
@@ -1692,7 +1692,7 @@ TGFX_TEST(ShaderPermutationTest, BundleRejectsIncompatibleToolchainABI) {
   }
   // The matching ABI still loads and serves entries.
   auto valid = MakeTestBundle("toolchain", 1, 0, 50);
-  TestWriteU32LE(valid.data() + 16, kExpectedToolchainABI);
+  TestWriteU32LE(valid.data() + 16, ExpectedToolchainABI);
   PrecompiledShaderCache cache(nullptr, Backend::Unknown);
   EXPECT_TRUE(cache.loadBundle(valid.data(), valid.size()));
   EXPECT_NE(cache.findVertex(50, 0), nullptr);

@@ -50,8 +50,8 @@ class RectsVertexProvider : public VertexProvider {
   /**
    * Creates a new RectsVertexProvider from a single rect.
    */
-  // skipCoverage: keep the coverage slot out of a forceColor buffer whose consumer does not
-  // declare a coverage attribute (the DefaultGP mask quads).
+  // skipCoverage: keep the coverage slot out of a forceColor buffer whose consumer declares no
+  // coverage attribute (the non-AA atlas glyph quads).
   static PlacementPtr<RectsVertexProvider> MakeFrom(BlockAllocator* allocator, const Rect& rect,
                                                     AAType aaType, bool forceColor = false,
                                                     bool skipCoverage = false);

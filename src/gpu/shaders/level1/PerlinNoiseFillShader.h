@@ -56,8 +56,6 @@ class PerlinNoiseFillShader : public PrecompiledShader {
   using FD = FragDims;
   using VD = VertDims;
 
-  // HAS_COVERAGE is mirrored: the vertex stage emits the coverage varying only when the fragment
-  // stage consumes it, so vert and frag must agree. Enforced automatically by MirroredDimsAgree.
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
 

@@ -102,7 +102,7 @@ void ColorSpaceXformHelper::setData(UniformData* uniformData,
   // declares every color-space uniform. The runtime-generated shader declares neither CSFlags nor
   // the uniforms of disabled steps, so setDataOptional tolerates their absence there. Disabled
   // steps get identity placeholders: their CSFlags bit is 0, so the shader never reads them.
-  static const float kZero4[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+  static const float Zero4[4] = {0.0f, 0.0f, 0.0f, 0.0f};
   writeOptional(uniformData, "CSFlags", static_cast<int>(flags.mask()));
   // Select the ColorSpaceXform operator in the shared pointwise operator table (absent elsewhere).
   writeOptional(uniformData, "OpType", 3);
@@ -129,15 +129,15 @@ void ColorSpaceXformHelper::setData(UniformData* uniformData,
     }
     writeOptional(uniformData, "SrcTFType", srcType < 0 ? 0 : srcType);
   } else {
-    writeOptional(uniformData, "SrcTF0", kZero4);
-    writeOptional(uniformData, "SrcTF1", kZero4);
+    writeOptional(uniformData, "SrcTF0", Zero4);
+    writeOptional(uniformData, "SrcTF1", Zero4);
     writeOptional(uniformData, "SrcTFType", 0);
   }
 
   if (this->applySrcOOTF()) {
     writeRequired(uniformData, "SrcOOTF", colorSpaceXform->srcOOTF);
   } else {
-    writeOptional(uniformData, "SrcOOTF", kZero4);
+    writeOptional(uniformData, "SrcOOTF", Zero4);
   }
 
   if (slot >= 0) {
@@ -160,7 +160,7 @@ void ColorSpaceXformHelper::setData(UniformData* uniformData,
   if (this->applyDstOOTF()) {
     writeRequired(uniformData, "DstOOTF", colorSpaceXform->dstOOTF);
   } else {
-    writeOptional(uniformData, "DstOOTF", kZero4);
+    writeOptional(uniformData, "DstOOTF", Zero4);
   }
 
   if (this->applyDstTF()) {
@@ -183,8 +183,8 @@ void ColorSpaceXformHelper::setData(UniformData* uniformData,
     }
     writeOptional(uniformData, "DstTFType", dstType < 0 ? 0 : dstType);
   } else {
-    writeOptional(uniformData, "DstTF0", kZero4);
-    writeOptional(uniformData, "DstTF1", kZero4);
+    writeOptional(uniformData, "DstTF0", Zero4);
+    writeOptional(uniformData, "DstTF1", Zero4);
     writeOptional(uniformData, "DstTFType", 0);
   }
 }

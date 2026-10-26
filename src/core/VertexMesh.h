@@ -84,7 +84,8 @@ class VertexMesh : public MeshBase {
 
   /**
    * Returns the stride of interleaved vertex data in bytes.
-   * Layout: [position.x, position.y][texCoord.x, texCoord.y (opt)][color.rgba (opt)]
+   * Layout: [position.x, position.y][coverage (constant 1.0 when not requested)]
+   * [texCoord.x, texCoord.y (opt)][color.rgba (opt)]
    */
   size_t getVertexStride() const;
 

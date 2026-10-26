@@ -47,7 +47,7 @@ namespace tgfx {
 #ifdef TGFX_SHADER_TOOL_HAS_TINT
 // First binding slot for separated texture/sampler pairs; must match TEXTURE_BINDING_POINT_START
 // in src/gpu/webgpu/WebGPUDefines.h and the bind-group expansion in WebGPURenderPipeline.
-static constexpr int kWebGPUTextureBindingStart = 2;
+static constexpr int WebGPUTextureBindingStart = 2;
 #endif
 
 std::string PrependDefines(const std::string& source, const std::vector<std::string>& defines) {
@@ -250,11 +250,11 @@ static std::string replaceAllMatches(const std::string& source, const std::regex
 // tolerate one level of nested parentheses. The original numbers are ignored: bindings are
 // reassigned in declaration order, mirroring the runtime JIT path
 // (WebGPUShaderModule::preprocessGLSL) and the WebGPURenderPipeline bind-group expansion.
-static const char* kWebGPUSamplerDeclRegex =
+static const char* WebGPUSamplerDeclRegex =
     R"(layout\s*\(\s*set\s*=\s*1\s*,\s*binding\s*=\s*(?:[^()]|\([^)]*\))*\s*\)\s*uniform\s+(?:sampler2D|CHAIN_LEAF_SAMPLER)\s+(\w+)\s*;)";
 
 static std::vector<std::string> collectSamplerNames(const std::string& source) {
-  static std::regex samplerRegex(kWebGPUSamplerDeclRegex);
+  static std::regex samplerRegex(WebGPUSamplerDeclRegex);
   std::vector<std::string> names = {};
   std::smatch match;
   std::string::const_iterator searchStart(source.cbegin());
@@ -364,8 +364,8 @@ static std::string preprocessWebGPU(const std::string& source) {
   for (const auto& function : samplerParamFunctions) {
     lookupNames.push_back(function.paramName);
   }
-  static std::regex samplerDeclRegex(kWebGPUSamplerDeclRegex);
-  int binding = kWebGPUTextureBindingStart;
+  static std::regex samplerDeclRegex(WebGPUSamplerDeclRegex);
+  int binding = WebGPUTextureBindingStart;
   result = replaceAllMatches(result, samplerDeclRegex, replaceSeparatedSampler, binding);
   result = rewriteTextureLookups(result, lookupNames);
   return expandSamplerCallArgs(result, samplerParamFunctions, lookupNames);
@@ -641,9 +641,9 @@ bool RunMetalStep(const char* step, const std::vector<std::string>& args,
   if (status == 0) {
     return true;
   }
-  constexpr size_t kMaxOutput = 4000;
-  if (output.size() > kMaxOutput) {
-    output = "..." + output.substr(output.size() - kMaxOutput);
+  constexpr size_t MaxOutput = 4000;
+  if (output.size() > MaxOutput) {
+    output = "..." + output.substr(output.size() - MaxOutput);
   }
   *error = std::string(step) + " failed" +
            (status < 0 ? ": " + spawnError : " with exit status " + std::to_string(status)) +

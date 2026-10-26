@@ -467,8 +467,8 @@ void RunFillTypeDispatch(PathFillType fillType, uint8_t expectedInsideRed,
 
   ScopedStencilCoverCaps capsGuard(context, true);
 
-  constexpr int kSize = 64;
-  auto surface = Surface::Make(context, kSize, kSize);
+  constexpr int Size = 64;
+  auto surface = Surface::Make(context, Size, Size);
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
 
@@ -485,7 +485,7 @@ void RunFillTypeDispatch(PathFillType fillType, uint8_t expectedInsideRed,
   canvas->drawPath(path, paint);
   context->flushAndSubmit();
 
-  EXPECT_EQ(ReadRedChannel(surface.get(), kSize / 2, kSize / 2), expectedInsideRed)
+  EXPECT_EQ(ReadRedChannel(surface.get(), Size / 2, Size / 2), expectedInsideRed)
       << "fill type " << static_cast<int>(fillType) << ": inside-shape pixel mismatch";
   EXPECT_EQ(ReadRedChannel(surface.get(), 4, 4), expectedOutsideRed)
       << "fill type " << static_cast<int>(fillType) << ": outside-shape pixel mismatch";
@@ -506,8 +506,8 @@ struct DispatchSnapshot {
 DispatchSnapshot RunPentagonUnderCaps(Context* context, bool capsValue) {
   ScopedStencilCoverCaps capsGuard(context, capsValue);
 
-  constexpr int kSize = 64;
-  auto surface = Surface::Make(context, kSize, kSize);
+  constexpr int Size = 64;
+  auto surface = Surface::Make(context, Size, Size);
   if (surface == nullptr) {
     return {0, 0};
   }
@@ -523,7 +523,7 @@ DispatchSnapshot RunPentagonUnderCaps(Context* context, bool capsValue) {
   canvas->drawPath(path, paint);
   context->flushAndSubmit();
 
-  return {ReadRedChannel(surface.get(), kSize / 2, kSize / 2), ReadRedChannel(surface.get(), 4, 4)};
+  return {ReadRedChannel(surface.get(), Size / 2, Size / 2), ReadRedChannel(surface.get(), 4, 4)};
 }
 }  // namespace
 
@@ -625,8 +625,8 @@ TGFX_TEST(StencilCoverPathTest, Dispatch_StencilWritesAreScissoredToOpClip) {
 
   ScopedStencilCoverCaps capsGuard(context, true);
 
-  constexpr int kSize = 64;
-  auto surface = Surface::Make(context, kSize, kSize);
+  constexpr int Size = 64;
+  auto surface = Surface::Make(context, Size, Size);
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   canvas->clear(Color{0.f, 0.f, 0.f, 1.f});
@@ -647,7 +647,7 @@ TGFX_TEST(StencilCoverPathTest, Dispatch_StencilWritesAreScissoredToOpClip) {
   pathA.close();
   pathA.setFillType(PathFillType::Winding);
   canvas->save();
-  canvas->clipRect(Rect::MakeXYWH(0, 0, 32, kSize));
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 32, Size));
   canvas->drawPath(pathA, paint);
   canvas->restore();
 
@@ -663,7 +663,7 @@ TGFX_TEST(StencilCoverPathTest, Dispatch_StencilWritesAreScissoredToOpClip) {
   pathB.close();
   pathB.setFillType(PathFillType::InverseWinding);
   canvas->save();
-  canvas->clipRect(Rect::MakeXYWH(32, 0, 32, kSize));
+  canvas->clipRect(Rect::MakeXYWH(32, 0, 32, Size));
   canvas->drawPath(pathB, paint);
   canvas->restore();
 

@@ -23,12 +23,12 @@
 // uncovered effect that silently falls back to runtime compilation.
 //
 // A class is claimed when at least one of the following holds:
-//   - kMatcher: a matcher rule serves draws containing it (verified by the name() string or a
+//   - Matcher: a matcher rule serves draws containing it (verified by the name() string or a
 //     qualified `ClassName::` reference appearing in PermutationMatcher.cpp);
-//   - kLowering: the class declares lowerToAOT (verified in its header);
-//   - kStructural: it is consumed inside another processor's claim — the glass geometry
+//   - Lowering: the class declares lowerToAOT (verified in its header);
+//   - Structural: it is consumed inside another processor's claim — the glass geometry
 //     children — and the matcher references its name to discriminate the parent's shape;
-//   - kParentLowering: it is consumed by its parent's lowerToAOT (gradient layouts and
+//   - ParentLowering: it is consumed by its parent's lowerToAOT (gradient layouts and
 //     colorizers lower inside ClampedGradientEffect), verified by the parent declaring
 //     lowerToAOT and the parent's source referencing the class;
 //   - none of the above (runtime by design), which requires a documented reason.
@@ -58,17 +58,17 @@
 namespace tgfx {
 namespace {
 
-constexpr uint32_t kMatcher = 1;
-constexpr uint32_t kLowering = 2;
-constexpr uint32_t kStructural = 4;
-constexpr uint32_t kParentLowering = 8;
+constexpr uint32_t Matcher = 1;
+constexpr uint32_t Lowering = 2;
+constexpr uint32_t Structural = 4;
+constexpr uint32_t ParentLowering = 8;
 
 struct ProcessorClaim {
   const char* className = "";
   const char* nameString = "";
   uint32_t claims = 0;
   const char* note = "";
-  // kParentLowering only: the processor class whose lowerToAOT consumes this one.
+  // ParentLowering only: the processor class whose lowerToAOT consumes this one.
   const char* parent = "";
 };
 
@@ -76,18 +76,18 @@ struct ProcessorClaim {
 // entry (or a reason) fails the gate, and removing a class leaves a stale entry that also fails.
 const ProcessorClaim ProcessorClaims[] = {
     // Geometry processors, each served by matcher rules for its draw shapes.
-    {"AtlasTextGeometryProcessor", "AtlasTextGeometryProcessor", kMatcher, ""},
-    {"ComplexEllipseGeometryProcessor", "ComplexEllipseGeometryProcessor", kMatcher, ""},
-    {"ComplexNonAARRectGeometryProcessor", "ComplexNonAARRectGeometryProcessor", kMatcher, ""},
-    {"DefaultGeometryProcessor", "DefaultGeometryProcessor", kMatcher, ""},
-    {"EllipseGeometryProcessor", "EllipseGeometryProcessor", kMatcher, ""},
-    {"HairlineLineGeometryProcessor", "HairlineLineGeometryProcessor", kMatcher, ""},
-    {"HairlineQuadGeometryProcessor", "HairlineQuadGeometryProcessor", kMatcher, ""},
-    {"MeshGeometryProcessor", "MeshGeometryProcessor", kMatcher, ""},
-    {"NonAARRectGeometryProcessor", "NonAARRectGeometryProcessor", kMatcher, ""},
-    {"QuadPerEdgeAAGeometryProcessor", "QuadPerEdgeAAGeometryProcessor", kMatcher, ""},
-    {"RoundStrokeRectGeometryProcessor", "RoundStrokeRectGeometryProcessor", kMatcher, ""},
-    {"ShapeInstancedGeometryProcessor", "ShapeInstancedGeometryProcessor", kMatcher, ""},
+    {"AtlasTextGeometryProcessor", "AtlasTextGeometryProcessor", Matcher, ""},
+    {"ComplexEllipseGeometryProcessor", "ComplexEllipseGeometryProcessor", Matcher, ""},
+    {"ComplexNonAARRectGeometryProcessor", "ComplexNonAARRectGeometryProcessor", Matcher, ""},
+    {"DefaultGeometryProcessor", "DefaultGeometryProcessor", Matcher, ""},
+    {"EllipseGeometryProcessor", "EllipseGeometryProcessor", Matcher, ""},
+    {"HairlineLineGeometryProcessor", "HairlineLineGeometryProcessor", Matcher, ""},
+    {"HairlineQuadGeometryProcessor", "HairlineQuadGeometryProcessor", Matcher, ""},
+    {"MeshGeometryProcessor", "MeshGeometryProcessor", Matcher, ""},
+    {"NonAARRectGeometryProcessor", "NonAARRectGeometryProcessor", Matcher, ""},
+    {"QuadPerEdgeAAGeometryProcessor", "QuadPerEdgeAAGeometryProcessor", Matcher, ""},
+    {"RoundStrokeRectGeometryProcessor", "RoundStrokeRectGeometryProcessor", Matcher, ""},
+    {"ShapeInstancedGeometryProcessor", "ShapeInstancedGeometryProcessor", Matcher, ""},
     {"StencilCoverCoverPassGeometryProcessor", "StencilCoverCoverPassGeometryProcessor", 0,
      "the stencil cover path sits behind TGFX_ENABLE_STENCIL_COVER_PATH (off by default) and is "
      "not an AOT route"},
@@ -96,56 +96,55 @@ const ProcessorClaim ProcessorClaims[] = {
      "not an AOT route"},
     // Xfer processors: EmptyXferProcessor is claimed through its singleton identity
     // (EmptyXferProcessor::GetInstance in GetXPType) rather than a name() string.
-    {"EmptyXferProcessor", "EmptyXferProcessor", kMatcher, ""},
-    {"PorterDuffXferProcessor", "PorterDuffXferProcessor", kMatcher, ""},
+    {"EmptyXferProcessor", "EmptyXferProcessor", Matcher, ""},
+    {"PorterDuffXferProcessor", "PorterDuffXferProcessor", Matcher, ""},
     // Fragment processors carrying an AOT lowering; most are also matcher-served at the top
     // level. AlphaThresholdFragmentProcessor's name() is "AlphaStepFragmentProcessor" (the name
     // predates the class rename), and XfermodeFragmentProcessor's name() carries a
     // " - dst"/" - src" suffix.
-    {"AlphaThresholdFragmentProcessor", "AlphaStepFragmentProcessor", kMatcher | kLowering, ""},
-    {"ClampedGradientEffect", "ClampedGradientEffect", kMatcher | kLowering, ""},
-    {"ColorMatrixFragmentProcessor", "ColorMatrixFragmentProcessor", kMatcher | kLowering, ""},
-    {"ColorSpaceXformEffect", "ColorSpaceXformEffect", kMatcher | kLowering, ""},
-    {"ComposeFragmentProcessor", "ComposeFragmentProcessor", kLowering,
+    {"AlphaThresholdFragmentProcessor", "AlphaStepFragmentProcessor", Matcher | Lowering, ""},
+    {"ClampedGradientEffect", "ClampedGradientEffect", Matcher | Lowering, ""},
+    {"ColorMatrixFragmentProcessor", "ColorMatrixFragmentProcessor", Matcher | Lowering, ""},
+    {"ColorSpaceXformEffect", "ColorSpaceXformEffect", Matcher | Lowering, ""},
+    {"ComposeFragmentProcessor", "ComposeFragmentProcessor", Lowering,
      "structural container: lowers by chaining its children"},
-    {"ConstColorProcessor", "ConstColorProcessor", kLowering,
+    {"ConstColorProcessor", "ConstColorProcessor", Lowering,
      "served as a chain slot through the lowering"},
-    {"DeviceSpaceTextureEffect", "DeviceSpaceTextureEffect", kMatcher | kLowering, ""},
-    {"AOTYUVChainProcessor", "AOTYUVChainProcessor", kMatcher,
-     "the YUV color-grade route: matcher-claimed through TryMatchYUVTextureFill"},
-    {"LumaFragmentProcessor", "LumaFragmentProcessor", kMatcher | kLowering, ""},
-    {"PerlinNoiseFragmentProcessor", "PerlinNoiseFragmentProcessor", kMatcher | kLowering, ""},
-    {"RectEffect", "RectEffect", kMatcher | kLowering, ""},
-    {"RRectEffect", "RRectEffect", kMatcher | kLowering, ""},
-    {"TextureEffect", "TextureEffect", kMatcher | kLowering, ""},
-    {"TiledTextureEffect", "TiledTextureEffect", kMatcher | kLowering, ""},
-    {"XfermodeFragmentProcessor", "XfermodeFragmentProcessor", kMatcher | kLowering,
+    {"DeviceSpaceTextureEffect", "DeviceSpaceTextureEffect", Matcher | Lowering, ""},
+    {"AOTYUVChainProcessor", "AOTYUVChainProcessor", Matcher,
+     "the YUV color-grade route: matcher-claimed through YUVTextureFillShader::Match"},
+    {"LumaFragmentProcessor", "LumaFragmentProcessor", Matcher | Lowering, ""},
+    {"PerlinNoiseFragmentProcessor", "PerlinNoiseFragmentProcessor", Matcher | Lowering, ""},
+    {"RectEffect", "RectEffect", Matcher | Lowering, ""},
+    {"RRectEffect", "RRectEffect", Matcher | Lowering, ""},
+    {"TextureEffect", "TextureEffect", Matcher | Lowering, ""},
+    {"TiledTextureEffect", "TiledTextureEffect", Matcher | Lowering, ""},
+    {"XfermodeFragmentProcessor", "XfermodeFragmentProcessor", Matcher | Lowering,
      "the SrcIn local-mask coverage form is matcher-claimed; two-processor blends lower"},
     // Gradient parts: ClampedGradientEffect::lowerToAOT reads each layout and colorizer into the
     // gradient node's parameters, so the parent's lowering is their claim.
-    {"ConicGradientLayout", "ConicGradientLayout", kParentLowering, "", "ClampedGradientEffect"},
-    {"DiamondGradientLayout", "DiamondGradientLayout", kParentLowering, "",
+    {"ConicGradientLayout", "ConicGradientLayout", ParentLowering, "", "ClampedGradientEffect"},
+    {"DiamondGradientLayout", "DiamondGradientLayout", ParentLowering, "", "ClampedGradientEffect"},
+    {"LinearGradientLayout", "LinearGradientLayout", ParentLowering, "", "ClampedGradientEffect"},
+    {"RadialGradientLayout", "RadialGradientLayout", ParentLowering, "", "ClampedGradientEffect"},
+    {"SingleIntervalGradientColorizer", "SingleIntervalGradientColorizer", ParentLowering, "",
      "ClampedGradientEffect"},
-    {"LinearGradientLayout", "LinearGradientLayout", kParentLowering, "", "ClampedGradientEffect"},
-    {"RadialGradientLayout", "RadialGradientLayout", kParentLowering, "", "ClampedGradientEffect"},
-    {"SingleIntervalGradientColorizer", "SingleIntervalGradientColorizer", kParentLowering, "",
+    {"DualIntervalGradientColorizer", "DualIntervalGradientColorizer", ParentLowering, "",
      "ClampedGradientEffect"},
-    {"DualIntervalGradientColorizer", "DualIntervalGradientColorizer", kParentLowering, "",
+    {"TextureGradientColorizer", "TextureGradientColorizer", ParentLowering, "",
      "ClampedGradientEffect"},
-    {"TextureGradientColorizer", "TextureGradientColorizer", kParentLowering, "",
-     "ClampedGradientEffect"},
-    {"UnrolledBinaryGradientColorizer", "UnrolledBinaryGradientColorizer", kParentLowering, "",
+    {"UnrolledBinaryGradientColorizer", "UnrolledBinaryGradientColorizer", ParentLowering, "",
      "ClampedGradientEffect"},
     // Glass geometry children consumed inside GlassRefractionShader's matcher rule; the matcher
     // references their names to discriminate the parent's shape.
-    {"GlassSDFGeometryFragmentProcessor", "GlassSDFGeometryFragmentProcessor", kStructural, ""},
-    {"GlassUDFGeometryFragmentProcessor", "GlassUDFGeometryFragmentProcessor", kStructural, ""},
+    {"GlassSDFGeometryFragmentProcessor", "GlassSDFGeometryFragmentProcessor", Structural, ""},
+    {"GlassUDFGeometryFragmentProcessor", "GlassUDFGeometryFragmentProcessor", Structural, ""},
     // Executor-rebuilt processors matched by the fused kernel rules, and effect processors
     // served by dedicated matcher rules.
-    {"AOTPointwiseChainProcessor", "AOTPointwiseChainProcessor", kMatcher, ""},
-    {"GaussianBlur1DFragmentProcessor", "GaussianBlur1DFragmentProcessor", kMatcher, ""},
-    {"GlassRefractionFragmentProcessor", "GlassRefractionFragmentProcessor", kMatcher, ""},
-    {"GlassUDFTentBlurFragmentProcessor", "GlassUDFTentBlurFragmentProcessor", kMatcher, ""},
+    {"AOTPointwiseChainProcessor", "AOTPointwiseChainProcessor", Matcher, ""},
+    {"GaussianBlur1DFragmentProcessor", "GaussianBlur1DFragmentProcessor", Matcher, ""},
+    {"GlassRefractionFragmentProcessor", "GlassRefractionFragmentProcessor", Matcher, ""},
+    {"GlassUDFTentBlurFragmentProcessor", "GlassUDFTentBlurFragmentProcessor", Matcher, ""},
 };
 
 struct ScannedProcessor {
@@ -278,7 +277,7 @@ static std::vector<std::string> EvaluateProcessorClaims(
                            "documented runtime-by-design entry");
       continue;
     }
-    if ((claim->claims & (kMatcher | kStructural)) != 0) {
+    if ((claim->claims & (Matcher | Structural)) != 0) {
       bool referenced =
           matcherSource.find(claim->nameString) != std::string::npos ||
           matcherSource.find(std::string(claim->className) + "::") != std::string::npos ||
@@ -291,10 +290,10 @@ static std::vector<std::string> EvaluateProcessorClaims(
                              "PermutationMatcher.cpp)");
       }
     }
-    if ((claim->claims & kLowering) != 0 && !processor.hasLowerToAOT) {
+    if ((claim->claims & Lowering) != 0 && !processor.hasLowerToAOT) {
       violations.push_back("lowerToAOT missing for: " + processor.className);
     }
-    if ((claim->claims & kParentLowering) != 0) {
+    if ((claim->claims & ParentLowering) != 0) {
       const ScannedProcessor* parent = nullptr;
       for (const auto& candidate : scanned) {
         if (candidate.className == claim->parent) {
@@ -388,13 +387,13 @@ TGFX_TEST(AOTCoverageGateTest, GateRejectsSyntheticViolations) {
   scanned.push_back(forgotten);
 
   const ProcessorClaim claims[] = {
-      {"GoodProcessor", "GoodProcessor", kLowering, ""},
-      {"GoodProcessorMissingReference", "GoodProcessorMissingReference", kMatcher, ""},
-      {"RemovedProcessor", "RemovedProcessor", kMatcher, ""},
+      {"GoodProcessor", "GoodProcessor", Lowering, ""},
+      {"GoodProcessorMissingReference", "GoodProcessorMissingReference", Matcher, ""},
+      {"RemovedProcessor", "RemovedProcessor", Matcher, ""},
       {"ReasonlessRuntimeProcessor", "ReasonlessRuntimeProcessor", 0, ""},
-      {"ParentProcessor", "ParentProcessor", kLowering, ""},
-      {"ConsumedPart", "ConsumedPart", kParentLowering, "", "ParentProcessor"},
-      {"ForgottenPart", "ForgottenPart", kParentLowering, "", "ParentProcessor"},
+      {"ParentProcessor", "ParentProcessor", Lowering, ""},
+      {"ConsumedPart", "ConsumedPart", ParentLowering, "", "ParentProcessor"},
+      {"ForgottenPart", "ForgottenPart", ParentLowering, "", "ParentProcessor"},
   };
   // The matcher source deliberately lacks every synthetic name.
   auto violations = EvaluateProcessorClaims(scanned, claims, 7, "// empty matcher");
