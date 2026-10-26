@@ -817,12 +817,13 @@ set(TGFX_SHADER_FAMILY_ENTRIES "")
 foreach (FAMILY_HEADER ${TGFX_SHADER_FAMILY_HEADERS})
     get_filename_component(FAMILY_NAME "${FAMILY_HEADER}" NAME_WE)
     file(READ "${FAMILY_HEADER}" FAMILY_HEADER_TEXT)
-    if (NOT FAMILY_HEADER_TEXT MATCHES "TGFX_REGISTER_SHADER\\(tgfx::([A-Za-z0-9_]+)[,)]")
+    if (NOT FAMILY_HEADER_TEXT MATCHES "TGFX_REGISTER_SHADER(_FAMILY)?\\(tgfx::([A-Za-z0-9_]+)[,)]")
         message(FATAL_ERROR "${FAMILY_HEADER} does not register a shader family with "
-                "TGFX_REGISTER_SHADER; every header under src/gpu/shaders/level1 is a family.")
+                "TGFX_REGISTER_SHADER or TGFX_REGISTER_SHADER_FAMILY; every header under "
+                "src/gpu/shaders/level1 is a family.")
     endif ()
-    if (NOT "${CMAKE_MATCH_1}" STREQUAL "${FAMILY_NAME}")
-        message(FATAL_ERROR "${FAMILY_HEADER} registers ${CMAKE_MATCH_1}; a family header must be "
+    if (NOT "${CMAKE_MATCH_2}" STREQUAL "${FAMILY_NAME}")
+        message(FATAL_ERROR "${FAMILY_HEADER} registers ${CMAKE_MATCH_2}; a family header must be "
                 "named after the class it registers.")
     endif ()
     string(APPEND TGFX_SHADER_FAMILY_INCLUDES "#include \"gpu/shaders/level1/${FAMILY_NAME}.h\"\n")

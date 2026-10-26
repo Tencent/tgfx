@@ -248,15 +248,8 @@ struct PointwiseChainInputs {
 };
 
 /**
- * Dimension values a matcher rule produces for both stages, before domain encoding.
- */
-struct RuleComposedValues {
-  std::vector<int> vertValues;
-  std::vector<int> fragValues;
-};
-
-/**
- * Pure mapping from rule inputs to dimension values; unsupported combinations return nullopt.
+ * Pure mapping from rule inputs to dimension values (RuleComposedValues lives in
+ * ShaderPermutation.h); unsupported combinations return nullopt.
  * This is the single source of truth for what the rule can produce: the runtime matcher feeds it
  * real inputs, while the build tool feeds it every input combination, so the compiled variant
  * list and the matcher's reachable set can never drift apart.
@@ -339,7 +332,6 @@ std::optional<RuleComposedValues> ComposePointwiseChain(const PointwiseChainInpu
 /** Family enumerators bound alongside their factories by TGFX_REGISTER_SHADER. */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateRoundStrokeRectReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateMaskFillReachable();
-std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineLineReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineQuadReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadColorFillReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateSolidColorFillReachable();

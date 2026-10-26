@@ -101,10 +101,6 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateMaskFillReachable() {
   return EnumerateMirroredReachable<EmptyVertDims, MaskFillShader::FragDims>(nullptr);
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineLineReachable() {
-  return EnumerateMirroredReachable<EmptyVertDims, HairlineLineShader::FD>(nullptr);
-}
-
 std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineQuadReachable() {
   return EnumerateMirroredReachable<EmptyVertDims, HairlineQuadShader::FD>(nullptr);
 }

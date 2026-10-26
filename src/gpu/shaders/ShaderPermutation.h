@@ -125,6 +125,24 @@ class PermutationInt {
 using PermutationDimension = std::variant<PermutationBool, PermutationEnum, PermutationInt>;
 
 /**
+ * The vertex/fragment variant a family's Match resolved a draw to, within the family's declared
+ * permutation domains. The family name is filled by the matcher dispatch loop, so a Match
+ * implementation cannot misspell it.
+ */
+struct PermutationVariant {
+  uint32_t vertPermutationIndex;
+  uint32_t fragPermutationIndex;
+};
+
+/**
+ * Dimension values a matcher rule produces for both stages, before domain encoding.
+ */
+struct RuleComposedValues {
+  std::vector<int> vertValues;
+  std::vector<int> fragValues;
+};
+
+/**
  * Represents the full permutation space formed by a list of dimensions. Provides encoding and
  * decoding between a flat variant index and per-dimension value arrays using mixed-radix
  * LSB-first layout.
