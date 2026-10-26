@@ -114,7 +114,7 @@ bool PermutationCompilesForBackend(const PrecompiledShaderInfo& info, uint32_t v
   // They are excluded here, not deleted: the GLSL sources and the Compose* rules keep
   // enumerating them, so a future Vulkan input-attachment fetch only needs the caps flag, the
   // render-pass wiring and this exclusion removed.
-  if (info.fragDomain.valueOf(fragIndex, "HAS_XP") == 2 &&
+  if (info.fragDomain.valueOf(fragIndex, XP_DEFINE_NAME) == XP_FRAMEBUFFER_FETCH &&
       (profileTag == "webgpu" || profileTag == "opengl" || profileTag == "vulkan")) {
     return false;
   }

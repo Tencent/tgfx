@@ -53,7 +53,7 @@ class YUVTextureFillShader : public PrecompiledShader {
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("YUV_FORMAT", 2),
-          PermutationInt("HAS_XP", 3),
+          PermutationInt(XP_DEFINE_NAME, XP_VALUE_COUNT),
       });
     }
   };

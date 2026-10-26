@@ -70,7 +70,7 @@ class QuadTextureFillShader : public PrecompiledShader {
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("HAS_SUBSET"),
-          PermutationInt("HAS_XP", 3),
+          PermutationInt(XP_DEFINE_NAME, XP_VALUE_COUNT),
           PermutationBool("HAS_LOCAL_MASK"),
       });
     }

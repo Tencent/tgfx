@@ -182,6 +182,18 @@ class PermutationDomain {
 };
 
 /**
+ * The legacy dst-read dimension every level1 family shares: how the destination color reaches
+ * the fragment shader. New kernels should follow the DST_KIND vocabulary above instead of adding
+ * another HAS_XP domain.
+ */
+inline constexpr const char* XP_DEFINE_NAME = "HAS_XP";
+inline constexpr int XP_UNSUPPORTED = -1;
+inline constexpr int XP_NONE = 0;
+inline constexpr int XP_DST_TEXTURE = 1;
+inline constexpr int XP_FRAMEBUFFER_FETCH = 2;
+inline constexpr int XP_VALUE_COUNT = 3;
+
+/**
  * Declares a nested Dims struct containing an enum of dimension indices and a static domain()
  * method. Usage:
  *   TGFX_DEFINE_DIMS(HAS_YUV, ALPHA_ONLY, HAS_RGBAAA)

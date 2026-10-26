@@ -75,20 +75,20 @@ bool RejectsAlphaOnlyTarget(bool servesAlphaOnly, const ProgramInfo* programInfo
   return !servesAlphaOnly && programInfo->getOutputSwizzle() == Swizzle::AAAA();
 }
 
-// Returns 0 for EmptyXferProcessor, 1 for PorterDuffXferProcessor with dst texture (DST_TEX mode),
-// 2 for PorterDuffXferProcessor with framebuffer fetch, or -1 for unsupported XP types.
+// Returns XP_NONE for EmptyXferProcessor, XP_DST_TEXTURE / XP_FRAMEBUFFER_FETCH for the
+// PorterDuff modes, or XP_UNSUPPORTED for XP types no kernel can serve.
 int GetXPType(const ProgramInfo* programInfo) {
   auto xp = programInfo->getXferProcessor();
   if (xp == EmptyXferProcessor::GetInstance()) {
-    return 0;
+    return XP_NONE;
   }
   if (IsProcessor<PorterDuffXferProcessor>(xp)) {
     if (xp->dstTextureView() != nullptr) {
-      return 1;  // DST_TEX mode
+      return XP_DST_TEXTURE;
     }
-    return 2;  // Framebuffer Fetch mode
+    return XP_FRAMEBUFFER_FETCH;
   }
-  return -1;
+  return XP_UNSUPPORTED;
 }
 
 // Determines whether a texture-based coverage child can be served by the local-space mask path

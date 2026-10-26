@@ -70,7 +70,7 @@ class GlassRefractionShader : public PrecompiledShader {
           PermutationInt("GP_KIND", 2),
           PermutationInt("GEOMETRY_KIND", 3),
           PermutationInt("DISPERSION_ON", 2),
-          PermutationInt("HAS_XP", 3),
+          PermutationInt(XP_DEFINE_NAME, XP_VALUE_COUNT),
       });
     }
   };

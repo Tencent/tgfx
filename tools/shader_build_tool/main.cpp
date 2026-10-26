@@ -1005,7 +1005,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
           // check below sees only live code: the ES header, no surviving set/binding member
           // (preceded by '(' or ',', as `offset = ` contains "set = "), no conditional
           // directive, and no Vulkan subpass syntax left after the framebuffer-fetch rewrite.
-          bool fbfVariant = info.fragDomain.valueOf(fi, "HAS_XP") == 2;
+          bool fbfVariant = info.fragDomain.valueOf(fi, XP_DEFINE_NAME) == XP_FRAMEBUFFER_FETCH;
           auto dv = EmitDirectGLSLES300(PrependDefines(vertSource, vertDefines),
                                         ShaderStageType::Vertex, false);
           auto df = EmitDirectGLSLES300(PrependDefines(fragSource, fragDefines),

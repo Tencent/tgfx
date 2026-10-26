@@ -41,7 +41,7 @@ class ComplexEllipseFillShader : public PrecompiledShader {
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationBool("STROKE"),
-          PermutationInt("HAS_XP", 3),
+          PermutationInt(XP_DEFINE_NAME, XP_VALUE_COUNT),
       });
     }
   };

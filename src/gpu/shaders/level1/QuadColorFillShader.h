@@ -47,7 +47,7 @@ class QuadColorFillShader : public PrecompiledShader {
     enum : uint32_t { HAS_XP, HAS_MASK_TEXTURE, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationInt("HAS_XP", 3),
+          PermutationInt(XP_DEFINE_NAME, XP_VALUE_COUNT),
           PermutationBool("HAS_MASK_TEXTURE"),
       });
     }

@@ -24,6 +24,7 @@
 #include <utility>
 #include <vector>
 #include "gpu/AOTResourceProfile.h"
+#include "gpu/shaders/ShaderPermutation.h"
 
 namespace tgfx {
 
@@ -104,7 +105,7 @@ namespace tgfx {
  */
 struct RoundStrokeRectInputs {
   bool hasUVMatrix = false;
-  int xpType = -1;  // -1 = no representable XferProcessor.
+  int xpType = XP_UNSUPPORTED;  // no representable XferProcessor
 };
 
 /**
@@ -113,7 +114,7 @@ struct RoundStrokeRectInputs {
  * transfer type shape dimensions.
  */
 struct QuadColorFillInputs {
-  int xpType = -1;              // -1 = no representable XferProcessor.
+  int xpType = XP_UNSUPPORTED;  // -1 = no representable XferProcessor.
   bool hasMaskTexture = false;  // device-space mask coverage FP present.
 };
 
@@ -122,7 +123,7 @@ struct QuadColorFillInputs {
  */
 struct ComplexEllipseFillInputs {
   bool isStroke = false;
-  int xpType = -1;  // -1 = no representable XferProcessor.
+  int xpType = XP_UNSUPPORTED;  // no representable XferProcessor
 };
 
 /**
@@ -133,7 +134,7 @@ struct ComplexEllipseFillInputs {
 struct NonAARRectFillInputs {
   bool isStroke = false;
   bool textured = false;
-  int xpType = -1;  // -1 = no representable XferProcessor.
+  int xpType = XP_UNSUPPORTED;  // no representable XferProcessor
 };
 
 /**
@@ -141,7 +142,7 @@ struct NonAARRectFillInputs {
  */
 struct ComplexNonAARRectFillInputs {
   bool isStroke = false;
-  int xpType = -1;  // -1 = no representable XferProcessor.
+  int xpType = XP_UNSUPPORTED;  // no representable XferProcessor
 };
 
 /**
@@ -151,7 +152,7 @@ struct ComplexNonAARRectFillInputs {
  */
 struct MeshFillInputs {
   bool hasTexCoords = false;
-  int xpType = -1;  // -1 = no representable XferProcessor.
+  int xpType = XP_UNSUPPORTED;  // no representable XferProcessor
 };
 
 /**
@@ -161,8 +162,8 @@ struct MeshFillInputs {
  */
 struct YUVTextureFillInputs {
   bool hasUVMatrix = false;
-  int yuvFormat = -1;  // -1 = unsupported plane layout.
-  int xpType = -1;     // -1 = no representable XferProcessor.
+  int yuvFormat = -1;           // -1 = unsupported plane layout.
+  int xpType = XP_UNSUPPORTED;  // -1 = no representable XferProcessor.
 };
 
 /**
@@ -180,7 +181,7 @@ struct ShapeInstancedTextureCoverageInputs {
  * unconditional (colorless batches broadcast white), so no color input field exists.
  */
 struct ShapeInstancedFillInputs {
-  int xpType = -1;  // -1 = no representable XferProcessor.
+  int xpType = XP_UNSUPPORTED;  // no representable XferProcessor
 };
 
 /**
@@ -192,7 +193,7 @@ struct QuadTextureFillInputs {
   bool hasUVCoord = false;
   bool hasSubset = false;
   bool hasLocalMask = false;
-  int xpType = -1;  // -1 = no representable XferProcessor.
+  int xpType = XP_UNSUPPORTED;  // no representable XferProcessor
 };
 
 /**
@@ -205,10 +206,10 @@ struct QuadTextureFillInputs {
  * branch rides a runtime uniform since it cannot move a texture coordinate.
  */
 struct GlassRefractionInputs {
-  int gpKind = -1;            // -1 = unrepresentable geometry processor form.
-  int geometryKind = -1;      // -1 = unrepresentable geometry child.
-  bool dispersionOn = false;  // Mirrors GlassRefractionFragmentProcessor::hasDispersion().
-  int xpType = -1;            // -1 = no representable XferProcessor.
+  int gpKind = -1;              // -1 = unrepresentable geometry processor form.
+  int geometryKind = -1;        // -1 = unrepresentable geometry child.
+  bool dispersionOn = false;    // Mirrors GlassRefractionFragmentProcessor::hasDispersion().
+  int xpType = XP_UNSUPPORTED;  // -1 = no representable XferProcessor.
 };
 
 /**
@@ -217,7 +218,7 @@ struct GlassRefractionInputs {
  */
 struct AtlasTextFillInputs {
   bool hasCoverage = false;
-  int xpType = -1;  // -1 = no representable XferProcessor.
+  int xpType = XP_UNSUPPORTED;  // no representable XferProcessor
 };
 
 /**
@@ -242,7 +243,7 @@ struct PointwiseChainInputs {
   bool hasNoise = false;
   bool hasGradient = false;  // one gradient belongs to the extended TiledGraph profile.
   AOTResourceProfile resourceProfile = AOTResourceProfile::Automatic;
-  int xpType = -1;  // -1 = no representable XferProcessor.
+  int xpType = XP_UNSUPPORTED;  // no representable XferProcessor
 };
 
 /**

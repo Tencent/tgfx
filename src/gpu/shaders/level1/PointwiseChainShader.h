@@ -115,7 +115,7 @@ class PointwiseChainShader : public PrecompiledShader {
     static PermutationDomain domain() {
       return PermutationDomain({
           PermutationInt("GP_LAYOUT", 5),
-          PermutationInt("HAS_XP", 3),
+          PermutationInt(XP_DEFINE_NAME, XP_VALUE_COUNT),
           PermutationBool("HAS_COVERAGE"),
           PermutationInt("TEXTURE_COUNT", 2),
           PermutationBool("HAS_MASK_TEXTURE"),

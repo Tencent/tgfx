@@ -79,7 +79,7 @@ bool PointwiseExtendedChainValuesAllowed(const std::vector<int>& chainFragValues
 }  // namespace
 
 std::optional<RuleComposedValues> ComposeRoundStrokeRect(const RoundStrokeRectInputs& inputs) {
-  if (inputs.xpType < 0) {
+  if (inputs.xpType < XP_NONE) {
     return std::nullopt;
   }
   using VD = RoundStrokeRectFillShader::Dims;
@@ -110,7 +110,7 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineQuadReachable() {
 }
 
 std::optional<RuleComposedValues> ComposeQuadColorFill(const QuadColorFillInputs& inputs) {
-  if (inputs.xpType < 0) {
+  if (inputs.xpType < XP_NONE) {
     return std::nullopt;
   }
   using FD = QuadColorFillShader::FD;
@@ -131,7 +131,7 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateSolidColorFillReachable() {
 
 std::optional<RuleComposedValues> ComposeComplexEllipseFill(
     const ComplexEllipseFillInputs& inputs) {
-  if (inputs.xpType < 0) {
+  if (inputs.xpType < XP_NONE) {
     return std::nullopt;
   }
   using VD = ComplexEllipseFillShader::Dims;
@@ -155,7 +155,7 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateEllipseFillReachable() {
 }
 
 std::optional<RuleComposedValues> ComposeNonAARRectFill(const NonAARRectFillInputs& inputs) {
-  if (inputs.xpType < 0) {
+  if (inputs.xpType < XP_NONE) {
     return std::nullopt;
   }
   using VD = NonAARRectFillShader::Dims;
@@ -181,7 +181,7 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateNonAARRectFillReachable() {
 
 std::optional<RuleComposedValues> ComposeComplexNonAARRectFill(
     const ComplexNonAARRectFillInputs& inputs) {
-  if (inputs.xpType < 0) {
+  if (inputs.xpType < XP_NONE) {
     return std::nullopt;
   }
   using VD = ComplexNonAARRectFillShader::Dims;
@@ -201,7 +201,7 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexNonAARRectFillReachable(
 }
 
 std::optional<RuleComposedValues> ComposeMeshFill(const MeshFillInputs& inputs) {
-  if (inputs.xpType < 0) {
+  if (inputs.xpType < XP_NONE) {
     return std::nullopt;
   }
   using VD = MeshFillShader::Dims;
@@ -224,7 +224,7 @@ std::set<std::pair<uint32_t, uint32_t>> EnumeratePerlinNoiseFillReachable() {
 }
 
 std::optional<RuleComposedValues> ComposeYUVTextureFill(const YUVTextureFillInputs& inputs) {
-  if (inputs.xpType < 0 || inputs.yuvFormat < 0) {
+  if (inputs.xpType < XP_NONE || inputs.yuvFormat < 0) {
     return std::nullopt;
   }
   using VD = YUVTextureFillShader::VD;
@@ -242,7 +242,7 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateYUVTextureFillReachable() {
   std::set<std::pair<uint32_t, uint32_t>> result;
   for (int hasUVMatrix = 0; hasUVMatrix <= 1; ++hasUVMatrix) {
     for (int yuvFormat = -1; yuvFormat <= 1; ++yuvFormat) {
-      for (int xpType = -1; xpType <= 2; ++xpType) {
+      for (int xpType = XP_UNSUPPORTED; xpType <= XP_FRAMEBUFFER_FETCH; ++xpType) {
         YUVTextureFillInputs inputs;
         inputs.hasUVMatrix = hasUVMatrix != 0;
         inputs.yuvFormat = yuvFormat;
@@ -279,7 +279,7 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedTextureCoverageRe
 
 std::optional<RuleComposedValues> ComposeShapeInstancedFill(
     const ShapeInstancedFillInputs& inputs) {
-  if (inputs.xpType < 0) {
+  if (inputs.xpType < XP_NONE) {
     return std::nullopt;
   }
   using FD = ShapeInstancedFillShader::FD;
@@ -300,7 +300,7 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateTiledTextureFillReachable() {
 }
 
 std::optional<RuleComposedValues> ComposeQuadTextureFill(const QuadTextureFillInputs& inputs) {
-  if (inputs.xpType < 0) {
+  if (inputs.xpType < XP_NONE) {
     return std::nullopt;
   }
   using VD = QuadTextureFillShader::VD;
@@ -332,7 +332,7 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassUDFTentBlurReachable() {
 }
 
 std::optional<RuleComposedValues> ComposeGlassRefraction(const GlassRefractionInputs& inputs) {
-  if (inputs.gpKind < 0 || inputs.geometryKind < 0 || inputs.xpType < 0) {
+  if (inputs.gpKind < 0 || inputs.geometryKind < 0 || inputs.xpType < XP_NONE) {
     return std::nullopt;
   }
   using FD = GlassRefractionShader::FD;
@@ -358,7 +358,7 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateTexturedEffectReachable() {
 }
 
 std::optional<RuleComposedValues> ComposeAtlasTextFill(const AtlasTextFillInputs& inputs) {
-  if (inputs.xpType < 0) {
+  if (inputs.xpType < XP_NONE) {
     return std::nullopt;
   }
   using VD = AtlasTextFillShader::VD;
@@ -377,7 +377,7 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateAtlasTextFillReachable() {
 }
 
 static std::optional<RuleComposedValues> ComposePointwiseGP(const PointwiseChainInputs& inputs) {
-  if (inputs.xpType < 0 || inputs.xpType > 2 || inputs.textureCount < 0 ||
+  if (inputs.xpType < XP_NONE || inputs.xpType > XP_FRAMEBUFFER_FETCH || inputs.textureCount < 0 ||
       inputs.textureCount > 1) {
     return std::nullopt;
   }
@@ -537,7 +537,7 @@ std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseChainReachable() {
         for (int textureCount = 0; textureCount <= 1; ++textureCount) {
           for (int hasMask = 0; hasMask <= 1; ++hasMask) {
             for (int hasCoverageSubtree = 0; hasCoverageSubtree <= 1; ++hasCoverageSubtree) {
-              for (int xpType = -1; xpType <= 2; ++xpType) {
+              for (int xpType = XP_UNSUPPORTED; xpType <= XP_FRAMEBUFFER_FETCH; ++xpType) {
                 for (int hasSubset = 0; hasSubset <= 1; ++hasSubset) {
                   PointwiseChainInputs inputs;
                   inputs.gpKind = gpKind;
@@ -587,7 +587,7 @@ std::set<std::pair<uint32_t, uint32_t>> EnumeratePointwiseChainReachable() {
   inputs.textureCount = 1;
   inputs.resourceProfile = AOTResourceProfile::NoiseGraph;
   inputs.hasNoise = true;
-  for (int xpType = -1; xpType <= 3; ++xpType) {
+  for (int xpType = XP_UNSUPPORTED; xpType <= XP_FRAMEBUFFER_FETCH; ++xpType) {
     inputs.xpType = xpType;
     auto composed = ComposePointwiseChain(inputs);
     if (composed) {

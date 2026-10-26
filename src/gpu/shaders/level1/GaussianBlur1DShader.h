@@ -59,7 +59,7 @@ class GaussianBlur1DShader : public PrecompiledShader {
     enum : uint32_t { HAS_XP, COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({
-          PermutationInt("HAS_XP", 3),
+          PermutationInt(XP_DEFINE_NAME, XP_VALUE_COUNT),
       });
     }
   };
