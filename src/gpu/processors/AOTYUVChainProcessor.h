@@ -22,6 +22,7 @@
 #include <vector>
 #include "gpu/AOTEffect.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/shaders/KernelContract.h"
 
 namespace tgfx {
 
@@ -37,8 +38,8 @@ class AOTYUVChainProcessor : public FragmentProcessor {
   DEFINE_PROCESSOR_CLASS_ID
   // The precompiled YUVTextureFillShader carries three pointwise-operator slots (the same
   // capacity PerlinNoiseFillShader uses), covering the real color-grade shapes (composed color
-  // matrices collapse into one). Longer tails are rejected at planning time.
-  static constexpr size_t MaxPointwiseSlots = 3;
+  // matrices collapse into one). Longer tails are rejected at planning time. The capacity value
+  // itself is MaxPointwiseSlots in KernelContract.h.
 
   static PlacementPtr<AOTYUVChainProcessor> Make(BlockAllocator* allocator,
                                                  PlacementPtr<FragmentProcessor> source,

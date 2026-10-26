@@ -260,7 +260,7 @@ static bool DecomposePerlinNoiseChain(const AOTEffectGraph& graph, AOTEffectPlan
       ++index;
       continue;
     }
-    if (slotCount >= PerlinNoiseFragmentProcessor::MaxPointwiseSlots) {
+    if (slotCount >= MaxPointwiseSlots) {
       return false;
     }
     if (IsUnaryPointwiseOp(node) && node->inputs.size() == 1 && node->inputs[0] == prev) {
@@ -304,7 +304,7 @@ static bool DecomposePerlinNoiseChain(const AOTEffectGraph& graph, AOTEffectPlan
     }
     return false;
   }
-  if (slotCount > PerlinNoiseFragmentProcessor::MaxPointwiseSlots || prev != graph.root()) {
+  if (slotCount > MaxPointwiseSlots || prev != graph.root()) {
     return false;
   }
 

@@ -23,6 +23,7 @@
 #include "core/shaders/PerlinNoiseShader.h"
 #include "gpu/AOTEffect.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/shaders/KernelContract.h"
 
 namespace tgfx {
 class Context;
@@ -32,9 +33,10 @@ class TextureView;
 class PerlinNoiseFragmentProcessor : public FragmentProcessor {
  public:
   DEFINE_PROCESSOR_CLASS_ID
-  // The precompiled PerlinNoiseFillShader carries three pointwise-operator slots: the first is shared with an operator FP composed on top of this
-  // processor, the rest are reserved for slot records uploaded by the processor itself.
-  static constexpr size_t MaxPointwiseSlots = 3;
+  // The precompiled PerlinNoiseFillShader carries three pointwise-operator slots: the first is
+  // shared with an operator FP composed on top of this processor, the rest are reserved for slot
+  // records uploaded by the processor itself. The capacity value itself is MaxPointwiseSlots in
+  // KernelContract.h.
 
   static PlacementPtr<PerlinNoiseFragmentProcessor> Make(
       BlockAllocator* allocator, Context* context, PerlinNoiseType noiseType, int numOctaves,

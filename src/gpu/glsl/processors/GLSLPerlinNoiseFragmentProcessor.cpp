@@ -279,10 +279,10 @@ void GLSLPerlinNoiseFragmentProcessor::onSetData(UniformData* /*vertexUniformDat
   // Default the shared pointwise operator to NONE (passthrough). When a pointwise operator FP is
   // composed on top of this shader it is visited after this child in FragmentProcessor::Iter and
   // overwrites OpType with its own value, so this only takes effect for the pure-noise case.
-  fragmentUniformData->setArrayElementOptional("OpType", 0, static_cast<int>(4));
+  fragmentUniformData->setArrayElementOptional("OpType", 0, PointwiseOp::None);
   // Slots 1/2 are owned by this processor and always written here (no other FP knows the layout).
-  fragmentUniformData->setArrayElementOptional("OpType", 1, static_cast<int>(4));
-  fragmentUniformData->setArrayElementOptional("OpType", 2, static_cast<int>(4));
+  fragmentUniformData->setArrayElementOptional("OpType", 1, PointwiseOp::None);
+  fragmentUniformData->setArrayElementOptional("OpType", 2, PointwiseOp::None);
   // Runtime loop bound of the precompiled kernel; a uniform so the slot loop stays rolled and the
   // operator library exists once in the binary.
   fragmentUniformData->setDataOptional("PointwiseSlotCount", static_cast<int>(MaxPointwiseSlots));

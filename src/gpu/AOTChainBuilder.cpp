@@ -1392,7 +1392,7 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildFPForPass(BlockAllocator* 
           sourceNode != nullptr && sourceNode->kind == AOTEffectKind::PerlinNoiseSource
               ? std::get_if<AOTPerlinNoiseParameters>(&sourceNode->parameters)
               : nullptr;
-      if (parameters == nullptr || slots.size() > PerlinNoiseFragmentProcessor::MaxPointwiseSlots) {
+      if (parameters == nullptr || slots.size() > MaxPointwiseSlots) {
         return nullptr;
       }
       return PerlinNoiseFragmentProcessor::MakeFromAOTParameters(allocator, *parameters, slots);

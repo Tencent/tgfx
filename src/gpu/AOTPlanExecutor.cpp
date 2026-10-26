@@ -203,10 +203,10 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
   }
   switch (pass.kernel) {
     case AOTKernelKind::YUVTextureFill:
-      return pass.nodes.size() <= 1 + AOTYUVChainProcessor::MaxPointwiseSlots &&
+      return pass.nodes.size() <= 1 + MaxPointwiseSlots &&
              ValidateYUVSource(graph, pass.nodes[0]) && ValidateLinearSlots(graph, pass, false);
     case AOTKernelKind::PerlinNoiseFill:
-      return pass.nodes.size() <= 1 + PerlinNoiseFragmentProcessor::MaxPointwiseSlots &&
+      return pass.nodes.size() <= 1 + MaxPointwiseSlots &&
              ValidatePerlinNoiseSource(graph, pass.nodes[0]) &&
              ValidateLinearSlots(graph, pass, true);
     default:

@@ -22,8 +22,10 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <regex>
 #include <set>
 #include <sstream>
+#include "gpu/AOTResourceProfile.h"
 #include "gpu/shaders/KernelContract.h"
 
 namespace tgfx {
@@ -191,6 +193,73 @@ size_t ValidatePointwiseOpCodes(const std::string& shaderDir) {
                             {"OP_NONE", PointwiseOp::None},
                             {"OP_CONST_COLOR", PointwiseOp::ConstColor},
                             {"OP_BLEND", PointwiseOp::Blend}});
+}
+
+// The GLSL kernels carry their slot capacities as literals behind #ifndef / #if guards while the
+// runtime uploads uniform arrays sized by C++ constants, so a drifted literal reads past (or
+// wastes) what the runtime wrote. Parsing the literal at build time and comparing it to the
+// constant keeps the two in lockstep without injecting extra defines into every variant.
+size_t ValidateSlotCapacities(const std::string& shaderDir) {
+  size_t errors = 0;
+  const std::regex slotSuffixPattern("#define\\s+TGFX_SLOT_ARRAY_SUFFIX\\s*\\[\\s*(\\d+)\\s*\\]");
+  const char* slotKernels[] = {"perlin_noise.frag", "yuv_texture_fill.frag"};
+  for (const char* fileName : slotKernels) {
+    std::ifstream file(shaderDir + "/level1/" + fileName);
+    if (!file.is_open()) {
+      std::cerr << "[ContractCheck] cannot open " << fileName << " under " << shaderDir << "\n";
+      ++errors;
+      continue;
+    }
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    const std::string text = buffer.str();
+    std::smatch match;
+    if (!std::regex_search(text, match, slotSuffixPattern)) {
+      std::cerr << "[ContractCheck] " << fileName << " declares no TGFX_SLOT_ARRAY_SUFFIX\n";
+      ++errors;
+    } else if (std::stoul(match[1].str()) != MaxPointwiseSlots) {
+      std::cerr << "[ContractCheck] " << fileName << " slot capacity " << match[1].str()
+                << " does not match MaxPointwiseSlots (" << MaxPointwiseSlots << ")\n";
+      ++errors;
+    }
+  }
+  std::ifstream chainFile(shaderDir + "/level1/pointwise_chain.frag");
+  if (!chainFile.is_open()) {
+    std::cerr << "[ContractCheck] cannot open pointwise_chain.frag under " << shaderDir << "\n";
+    return errors + 1;
+  }
+  std::stringstream chainBuffer;
+  chainBuffer << chainFile.rdbuf();
+  const std::string chainText = chainBuffer.str();
+  const std::regex capacityPattern("#define\\s+CHAIN_SLOT_CAPACITY\\s+(\\d+)");
+  std::set<size_t> values;
+  for (std::sregex_iterator it(chainText.begin(), chainText.end(), capacityPattern);
+       it != std::sregex_iterator(); ++it) {
+    values.insert(std::stoul((*it)[1].str()));
+  }
+  if (values.empty()) {
+    std::cerr << "[ContractCheck] pointwise_chain.frag declares no CHAIN_SLOT_CAPACITY\n";
+    ++errors;
+  }
+  const size_t plainCapacity = ChainResourceCapacity.instructions;
+  const size_t tiledCapacity = TiledGraphResourceCapacity.instructions;
+  const size_t noiseCapacity = NoiseGraphResourceCapacity.instructions;
+  // The chain shader selects the capacity with a two-branch #if on RESOURCE_KIND, so the plain
+  // and tiled-graph capacities must share one value; a third distinct capacity needs a new branch
+  // and would fail here on purpose.
+  if (tiledCapacity != plainCapacity) {
+    std::cerr << "[ContractCheck] TiledGraph capacity " << tiledCapacity
+              << " differs from the plain chain capacity " << plainCapacity
+              << ", which the shader's two-branch capacity #if cannot express\n";
+    ++errors;
+  }
+  if (values.count(plainCapacity) == 0 || values.count(noiseCapacity) == 0 ||
+      values.size() != (plainCapacity == noiseCapacity ? 1 : 2)) {
+    std::cerr << "[ContractCheck] pointwise_chain.frag capacities do not match the C++ resource"
+              << " capacities (expected " << plainCapacity << " and " << noiseCapacity << ")\n";
+    ++errors;
+  }
+  return errors;
 }
 
 static bool IsIdentifierChar(char ch) {

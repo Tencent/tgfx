@@ -27,6 +27,12 @@ namespace tgfx {
 // against these constants at bundle build time). Renaming a field or an op code anywhere fails
 // the bundle build instead of silently leaving contract fields unwritten or misinterpreting a
 // chain slot.
+// The plain pointwise slot capacity shared by the Perlin noise and YUV kernels: the size of the
+// OpType/parameter arrays in their op tails. The GLSL side instantiates the same capacity via
+// TGFX_SLOT_ARRAY_SUFFIX in perlin_noise.frag / yuv_texture_fill.frag, and shader_build_tool
+// parses that suffix and fails the bundle build on drift, so this constant is the single source.
+inline constexpr size_t MaxPointwiseSlots = 3;
+
 namespace ClipContract {
 
 // The runtime clip contract fields (rrect_clip_uniforms.inc / clip_coverage.inc on the GLSL

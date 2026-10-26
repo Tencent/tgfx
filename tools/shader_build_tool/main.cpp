@@ -1291,6 +1291,7 @@ int main(int argc, char** argv) {
   if (!options.reportOnly && !options.shaderDir.empty()) {
     contractErrors += tgfx::ValidateChainOpCodes(options.shaderDir);
     contractErrors += tgfx::ValidatePointwiseOpCodes(options.shaderDir);
+    contractErrors += tgfx::ValidateSlotCapacities(options.shaderDir);
     std::vector<std::string> registeredShaders;
     for (auto factory : tgfx::ShaderRegistry::All()) {
       registeredShaders.push_back(factory()->info().name);
