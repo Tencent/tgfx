@@ -25,6 +25,7 @@
 #include <set>
 #include <sstream>
 #include "OutputFile.h"
+#include "gpu/BundleFormat.h"
 #include "gpu/PrecompiledBundleIdentity.h"
 #include "zlib.h"
 #include "zstd.h"
@@ -93,13 +94,9 @@ struct PoolEntry {
   uint32_t reflOffset = 0;
 };
 
-// v3 Header layout (80 bytes):
-//   magic(4) + formatVersion(2) + compressionType(2) + sourceHash(8) + toolchainVersion(4) +
-//   vertPoolCount(4) + fragPoolCount(4) + vertPoolOffset(4) + fragPoolOffset(4) +
-//   dataOffset(4) + dataSize(4) + reflectionOffset(4) + profileTag(32) = 80
-static constexpr uint32_t HEADER_SIZE_V3 = 80;
-// PoolEntry on disk: hashHi(8) + hashLo(8) + dataOff(4) + dataSize(4) + reflOff(4) = 28
-static constexpr uint32_t POOL_ENTRY_SIZE = 28;
+// The header and pool entry layout is defined in gpu/BundleFormat.h, shared with the verifier and
+// the runtime loader. The header is written field by field in that order, and WriteBundle checks
+// the written size against BundleFormat::HeaderSize.
 
 bool WriteBundle(const std::string& outPath, const std::string& profileTag,
                  const std::vector<VariantData>& variants, bool compress) {
@@ -190,17 +187,17 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
   // Compute layout offsets
   auto vertPoolCount = static_cast<uint32_t>(vertPool.size());
   auto fragPoolCount = static_cast<uint32_t>(fragPool.size());
-  uint32_t vertPoolOffset = HEADER_SIZE_V3;
-  uint32_t fragPoolOffset = vertPoolOffset + vertPoolCount * POOL_ENTRY_SIZE;
-  uint32_t dataOffset = fragPoolOffset + fragPoolCount * POOL_ENTRY_SIZE;
+  uint32_t vertPoolOffset = BundleFormat::HeaderSize;
+  uint32_t fragPoolOffset = vertPoolOffset + vertPoolCount * BundleFormat::PoolEntrySize;
+  uint32_t dataOffset = fragPoolOffset + fragPoolCount * BundleFormat::PoolEntrySize;
   uint32_t dataSize = static_cast<uint32_t>(dataPool.size());
 
   // Serialize in memory; the file is only replaced when its bytes change (see WriteFileIfChanged).
   std::ostringstream file(std::ios::binary);
 
-  // Optionally compress the data pool with zstd (compressionType=2; 1 is the legacy zlib path).
+  // Optionally compress the data pool with zstd (the legacy zlib path is still readable).
   std::vector<uint8_t> compressedData;
-  uint16_t compressionFlag = 0;
+  uint16_t compressionFlag = BundleFormat::Compression::None;
   const uint8_t* dataToWrite = dataPool.data();
   size_t dataToWriteSize = dataPool.size();
   if (compress && !dataPool.empty()) {
@@ -212,7 +209,7 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
       compressedData.resize(compSize);
       dataToWrite = compressedData.data();
       dataToWriteSize = compSize;
-      compressionFlag = 2;
+      compressionFlag = BundleFormat::Compression::Zstd;
     }
     // If compression didn't reduce size, fall back to uncompressed.
   }
@@ -228,8 +225,8 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
   char tagBuf[32] = {};
   std::strncpy(tagBuf, profileTag.c_str(), sizeof(tagBuf) - 1);
   uint64_t identityHash = BundleIdentityHashInit();
-  identityHash = BundleIdentityHashHeader(identityHash, 5, vertPoolCount, fragPoolCount,
-                                          reinterpret_cast<const uint8_t*>(tagBuf));
+  identityHash = BundleIdentityHashHeader(identityHash, BundleFormat::CurrentVersion, vertPoolCount,
+                                          fragPoolCount, reinterpret_cast<const uint8_t*>(tagBuf));
   for (const auto& entry : vertPool) {
     identityHash = BundleIdentityHashEntry(identityHash, entry.hash.hi, entry.hash.lo,
                                            entry.dataOffset, entry.dataSize, entry.reflOffset);
@@ -241,20 +238,26 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
   identityHash = BundleIdentityHashBytes(identityHash, dataPool.data(), dataPool.size());
   identityHash = BundleIdentityHashBytes(identityHash, reflPool.data(), reflPool.size());
 
-  // Header
-  WriteU32LE(file, 0x54475346);              // magic "TGSF"
-  WriteU16LE(file, 5);                       // formatVersion (v5 adds vertex input reflection)
-  WriteU16LE(file, compressionFlag);         // compressionType
-  WriteU64LE(file, identityHash);            // sourceHash (bundle identity, see above)
-  WriteU32LE(file, ExpectedToolchainABI);   // toolchain ABI (see PrecompiledBundleIdentity.h)
-  WriteU32LE(file, vertPoolCount);           // vertPoolCount
-  WriteU32LE(file, fragPoolCount);           // fragPoolCount
-  WriteU32LE(file, vertPoolOffset);          // vertPoolOffset
-  WriteU32LE(file, fragPoolOffset);          // fragPoolOffset
-  WriteU32LE(file, dataOffset);              // dataOffset
-  WriteU32LE(file, dataSize);                // dataSize (uncompressed)
-  WriteU32LE(file, actualReflectionOffset);  // reflectionOffset
+  // Header, in the order of BundleFormat::Offset.
+  WriteU32LE(file, BundleFormat::Magic);
+  WriteU16LE(file, BundleFormat::CurrentVersion);
+  WriteU16LE(file, compressionFlag);
+  WriteU64LE(file, identityHash);  // bundle identity, see above
+  WriteU32LE(file, ExpectedToolchainABI);
+  WriteU32LE(file, vertPoolCount);
+  WriteU32LE(file, fragPoolCount);
+  WriteU32LE(file, vertPoolOffset);
+  WriteU32LE(file, fragPoolOffset);
+  WriteU32LE(file, dataOffset);
+  WriteU32LE(file, dataSize);  // uncompressed
+  WriteU32LE(file, actualReflectionOffset);
+  static_assert(sizeof(tagBuf) == BundleFormat::ProfileTagSize, "the tag buffer is the tag field");
   file.write(tagBuf, sizeof(tagBuf));
+  if (static_cast<std::streamoff>(file.tellp()) !=
+      static_cast<std::streamoff>(BundleFormat::HeaderSize)) {
+    std::cerr << "BundleWriter: the written header does not match BundleFormat::HeaderSize\n";
+    return false;
+  }
 
   // Vert pool entries
   for (const auto& entry : vertPool) {

@@ -31,6 +31,7 @@
 #include <vector>
 #include "BundleManifest.h"
 #include "BundleWriter.h"
+#include "gpu/BundleFormat.h"
 #include "gpu/PrecompiledBundleIdentity.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "zlib.h"
@@ -38,12 +39,6 @@
 
 namespace tgfx {
 namespace {
-
-constexpr uint32_t BUNDLE_MAGIC = 0x54475346u;  // "TGSF"
-constexpr uint32_t HEADER_SIZE = 80;
-constexpr uint32_t POOL_ENTRY_SIZE = 28;
-constexpr uint16_t FORMAT_VERSION_V4 = 4;
-constexpr uint16_t FORMAT_VERSION_V5 = 5;  // v5 appends vertex input reflection entries
 
 struct PoolEntryOnDisk {
   ShaderKeyHash hash;
@@ -111,14 +106,14 @@ bool DecompressDataPool(const std::vector<uint8_t>& fileBytes, const BundleHeade
                         std::vector<uint8_t>* uncompressed) {
   auto storedBytes = header.reflectionOffset - header.dataOffset;
   const uint8_t* storedData = fileBytes.data() + header.dataOffset;
-  if (header.compressionType == 0) {
+  if (header.compressionType == BundleFormat::Compression::None) {
     if (storedBytes != header.dataSize) {
       return false;
     }
     uncompressed->assign(storedData, storedData + header.dataSize);
     return true;
   }
-  if (header.compressionType == 1) {
+  if (header.compressionType == BundleFormat::Compression::Zlib) {
     uncompressed->resize(header.dataSize);
     auto destLen = static_cast<uLongf>(header.dataSize);
     auto status =
@@ -129,7 +124,7 @@ bool DecompressDataPool(const std::vector<uint8_t>& fileBytes, const BundleHeade
     }
     return true;
   }
-  if (header.compressionType == 2) {
+  if (header.compressionType == BundleFormat::Compression::Zstd) {
     uncompressed->resize(header.dataSize);
     auto decoded = ZSTD_decompress(uncompressed->data(), header.dataSize, storedData, storedBytes);
     if (ZSTD_isError(decoded) || decoded != header.dataSize) {
@@ -253,7 +248,7 @@ BundleCheckResult VerifyOneBundle(const std::string& path, const std::string& ex
   result.opened = true;
   std::vector<uint8_t> fileBytes((std::istreambuf_iterator<char>(file)),
                                  std::istreambuf_iterator<char>());
-  if (fileBytes.size() < HEADER_SIZE) {
+  if (fileBytes.size() < BundleFormat::HeaderSize) {
     std::cout << "[verify] " << expectedTag << ": VIOLATION file smaller than header ("
               << fileBytes.size() << " bytes)\n";
     result.violations++;
@@ -261,30 +256,32 @@ BundleCheckResult VerifyOneBundle(const std::string& path, const std::string& ex
   }
 
   BundleHeader header;
-  auto magic = ReadU32(fileBytes, 0);
-  header.formatVersion = ReadU16(fileBytes, 4);
-  header.compressionType = ReadU16(fileBytes, 6);
-  header.identityHash = ReadU64(fileBytes, 8);
-  header.toolchainABI = ReadU32(fileBytes, 16);
-  header.vertPoolCount = ReadU32(fileBytes, 20);
-  header.fragPoolCount = ReadU32(fileBytes, 24);
-  header.vertPoolOffset = ReadU32(fileBytes, 28);
-  header.fragPoolOffset = ReadU32(fileBytes, 32);
-  header.dataOffset = ReadU32(fileBytes, 36);
-  header.dataSize = ReadU32(fileBytes, 40);
-  header.reflectionOffset = ReadU32(fileBytes, 44);
-  header.profileTag =
-      std::string(reinterpret_cast<const char*>(fileBytes.data()) + 48,
-                  strnlen(reinterpret_cast<const char*>(fileBytes.data()) + 48, 32));
+  auto magic = ReadU32(fileBytes, BundleFormat::Offset::Magic);
+  header.formatVersion = ReadU16(fileBytes, BundleFormat::Offset::FormatVersion);
+  header.compressionType = ReadU16(fileBytes, BundleFormat::Offset::CompressionType);
+  header.identityHash = ReadU64(fileBytes, BundleFormat::Offset::IdentityHash);
+  header.toolchainABI = ReadU32(fileBytes, BundleFormat::Offset::ToolchainABI);
+  header.vertPoolCount = ReadU32(fileBytes, BundleFormat::Offset::VertPoolCount);
+  header.fragPoolCount = ReadU32(fileBytes, BundleFormat::Offset::FragPoolCount);
+  header.vertPoolOffset = ReadU32(fileBytes, BundleFormat::Offset::VertPoolOffset);
+  header.fragPoolOffset = ReadU32(fileBytes, BundleFormat::Offset::FragPoolOffset);
+  header.dataOffset = ReadU32(fileBytes, BundleFormat::Offset::DataOffset);
+  header.dataSize = ReadU32(fileBytes, BundleFormat::Offset::DataSize);
+  header.reflectionOffset = ReadU32(fileBytes, BundleFormat::Offset::ReflectionOffset);
+  auto* tagBytes =
+      reinterpret_cast<const char*>(fileBytes.data()) + BundleFormat::Offset::ProfileTag;
+  header.profileTag = std::string(tagBytes, strnlen(tagBytes, BundleFormat::ProfileTagSize));
 
-  if (magic != BUNDLE_MAGIC) {
+  if (magic != BundleFormat::Magic) {
     std::cout << "[verify] " << expectedTag << ": VIOLATION bad magic 0x" << std::hex << magic
               << std::dec << "\n";
     result.violations++;
   }
-  if (header.formatVersion != FORMAT_VERSION_V4 && header.formatVersion != FORMAT_VERSION_V5) {
+  if (header.formatVersion < BundleFormat::MinVerifiableVersion ||
+      header.formatVersion > BundleFormat::CurrentVersion) {
     std::cout << "[verify] " << expectedTag << ": VIOLATION format version " << header.formatVersion
-              << " (expected " << FORMAT_VERSION_V4 << " or " << FORMAT_VERSION_V5 << ")\n";
+              << " (expected " << BundleFormat::MinVerifiableVersion << " to "
+              << BundleFormat::CurrentVersion << ")\n";
     result.violations++;
   }
   if (header.toolchainABI != ExpectedToolchainABI) {
@@ -301,10 +298,10 @@ BundleCheckResult VerifyOneBundle(const std::string& path, const std::string& ex
   // All layout arithmetic runs in size_t: the u32 fields can carry counts whose 28-byte strides
   // overflow 32 bits (0x40000000 entries wrap to zero), which would otherwise slip past these
   // checks and read past the end of the file below.
-  auto vertPoolEnd = HEADER_SIZE + static_cast<size_t>(header.vertPoolCount) * POOL_ENTRY_SIZE;
+  auto vertPoolEnd = BundleFormat::HeaderSize + static_cast<size_t>(header.vertPoolCount) * BundleFormat::PoolEntrySize;
   auto fragPoolEnd = static_cast<size_t>(header.fragPoolOffset) +
-                     static_cast<size_t>(header.fragPoolCount) * POOL_ENTRY_SIZE;
-  if (header.vertPoolOffset != HEADER_SIZE || header.fragPoolOffset != vertPoolEnd ||
+                     static_cast<size_t>(header.fragPoolCount) * BundleFormat::PoolEntrySize;
+  if (header.vertPoolOffset != BundleFormat::HeaderSize || header.fragPoolOffset != vertPoolEnd ||
       header.dataOffset != fragPoolEnd || header.reflectionOffset < header.dataOffset ||
       header.reflectionOffset > fileBytes.size()) {
     // Bail out before any pool arithmetic below: a bad layout would underflow the stored-bytes
@@ -335,8 +332,8 @@ BundleCheckResult VerifyOneBundle(const std::string& path, const std::string& ex
     auto count = isVertexPool ? header.vertPoolCount : header.fragPoolCount;
     auto poolOffset = isVertexPool ? header.vertPoolOffset : header.fragPoolOffset;
     for (uint32_t i = 0; i < count; i++) {
-      auto entryOffset = poolOffset + static_cast<size_t>(i) * POOL_ENTRY_SIZE;
-      if (entryOffset + POOL_ENTRY_SIZE > fileBytes.size()) {
+      auto entryOffset = poolOffset + static_cast<size_t>(i) * BundleFormat::PoolEntrySize;
+      if (entryOffset + BundleFormat::PoolEntrySize > fileBytes.size()) {
         std::cout << "[verify] " << expectedTag << ": VIOLATION "
                   << (isVertexPool ? "vert" : "frag") << " pool entry " << i
                   << " lies outside the file (offset " << entryOffset << ", file "
@@ -345,11 +342,12 @@ BundleCheckResult VerifyOneBundle(const std::string& path, const std::string& ex
         continue;
       }
       PoolEntryOnDisk entry;
-      entry.hash.hi = ReadU64(fileBytes, entryOffset);
-      entry.hash.lo = ReadU64(fileBytes, entryOffset + 8);
-      entry.dataOffset = ReadU32(fileBytes, entryOffset + 16);
-      entry.dataSize = ReadU32(fileBytes, entryOffset + 20);
-      entry.reflOffset = ReadU32(fileBytes, entryOffset + 24);
+      entry.hash.hi = ReadU64(fileBytes, entryOffset + BundleFormat::EntryOffset::HashHi);
+      entry.hash.lo = ReadU64(fileBytes, entryOffset + BundleFormat::EntryOffset::HashLo);
+      entry.dataOffset = ReadU32(fileBytes, entryOffset + BundleFormat::EntryOffset::DataOffset);
+      entry.dataSize = ReadU32(fileBytes, entryOffset + BundleFormat::EntryOffset::DataSize);
+      entry.reflOffset =
+          ReadU32(fileBytes, entryOffset + BundleFormat::EntryOffset::ReflectionOffset);
       auto key = std::make_pair(entry.hash.hi, entry.hash.lo);
       if (!storedKeys.insert(key).second) {
         std::cout << "[verify] " << expectedTag << ": VIOLATION "
@@ -408,7 +406,7 @@ BundleCheckResult VerifyOneBundle(const std::string& path, const std::string& ex
   // Identity hash recomputation over the same field sequence the writer fed: header fields,
   // pool entries, the uncompressed data pool, and the reflection pool. A mismatch means the
   // file was modified or truncated after it was written.
-  char tagBuf[32] = {};
+  char tagBuf[BundleFormat::ProfileTagSize] = {};
   std::strncpy(tagBuf, header.profileTag.c_str(), sizeof(tagBuf) - 1);
   uint64_t identity = BundleIdentityHashInit();
   identity =
@@ -419,11 +417,13 @@ BundleCheckResult VerifyOneBundle(const std::string& path, const std::string& ex
     auto count = isVertexPool ? header.vertPoolCount : header.fragPoolCount;
     auto poolOffset = isVertexPool ? header.vertPoolOffset : header.fragPoolOffset;
     for (uint32_t i = 0; i < count; i++) {
-      auto entryOffset = poolOffset + static_cast<size_t>(i) * POOL_ENTRY_SIZE;
+      auto entryOffset = poolOffset + static_cast<size_t>(i) * BundleFormat::PoolEntrySize;
       identity = BundleIdentityHashEntry(
-          identity, ReadU64(fileBytes, entryOffset), ReadU64(fileBytes, entryOffset + 8),
-          ReadU32(fileBytes, entryOffset + 16), ReadU32(fileBytes, entryOffset + 20),
-          ReadU32(fileBytes, entryOffset + 24));
+          identity, ReadU64(fileBytes, entryOffset + BundleFormat::EntryOffset::HashHi),
+          ReadU64(fileBytes, entryOffset + BundleFormat::EntryOffset::HashLo),
+          ReadU32(fileBytes, entryOffset + BundleFormat::EntryOffset::DataOffset),
+          ReadU32(fileBytes, entryOffset + BundleFormat::EntryOffset::DataSize),
+          ReadU32(fileBytes, entryOffset + BundleFormat::EntryOffset::ReflectionOffset));
     }
   }
   identity = BundleIdentityHashBytes(identity, dataPool.data(), dataPool.size());

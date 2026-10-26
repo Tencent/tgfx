@@ -30,6 +30,7 @@
 #include "OutputFile.h"
 #include "ShaderCompiler.h"
 #include "ShaderSources.h"
+#include "gpu/BundleFormat.h"
 #include "gpu/PrecompiledBundleIdentity.h"
 #include "gpu/shaders/PrecompiledShader.h"
 
@@ -185,7 +186,7 @@ std::string ManifestPathFor(const std::string& bundlePath) {
 bool WriteBundleManifest(const std::string& bundlePath, const std::string& backend,
                          const SourceDigestResult& digest, std::string* error) {
   std::vector<uint8_t> bytes;
-  if (!ReadBinaryFile(bundlePath, &bytes) || bytes.size() < 80) {
+  if (!ReadBinaryFile(bundlePath, &bytes) || bytes.size() < BundleFormat::HeaderSize) {
     *error = "cannot read back the bundle " + bundlePath;
     return false;
   }
@@ -199,9 +200,12 @@ bool WriteBundleManifest(const std::string& bundlePath, const std::string& backe
   out << "file=" << fileName << "\n";
   out << "fileSize=" << bytes.size() << "\n";
   out << "fileHash=" << Hex64(HashBundleBytes(bytes.data(), bytes.size())) << "\n";
-  out << "identityHash=" << Hex64(ReadLE64(bytes, 8)) << "\n";
-  out << "toolchainABI=" << Hex64(ReadLE32(bytes, 16)) << "\n";
-  out << "formatVersion=" << (bytes[4] | (bytes[5] << 8)) << "\n";
+  out << "identityHash=" << Hex64(ReadLE64(bytes, BundleFormat::Offset::IdentityHash)) << "\n";
+  out << "toolchainABI=" << Hex64(ReadLE32(bytes, BundleFormat::Offset::ToolchainABI)) << "\n";
+  out << "formatVersion="
+      << (bytes[BundleFormat::Offset::FormatVersion] |
+          (bytes[BundleFormat::Offset::FormatVersion + 1] << 8))
+      << "\n";
   out << "sourceDigest=" << Hex64(digest.digest) << "\n";
   out << "shaderCount=" << digest.shaderCount << "\n";
   out << "stageCount=" << digest.stageCount << "\n";
