@@ -38,7 +38,7 @@ class ShapeInstancedFillShader : public PrecompiledShader {
       return PermutationDomain({});
     }
   };
-  using D = Dims;
+  using VD = Dims;
 
   struct FragDims {
     enum : uint32_t { HAS_XP, COUNT };
@@ -49,7 +49,7 @@ class ShapeInstancedFillShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 0 && FD::COUNT == 1,
+  static_assert(VD::COUNT == 0 && FD::COUNT == 1,
                 "Update the Compose mapping when dimensions change.");
 
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
@@ -65,7 +65,7 @@ class ShapeInstancedFillShader : public PrecompiledShader {
     return {"ShapeInstancedFillShader",
             "level1/shape_instanced_fill.vert",
             "level1/shape_instanced_fill.frag",
-            D::domain(),
+            VD::domain(),
             FD::domain(),
             PermutationDomain({}),
             GpClassName,

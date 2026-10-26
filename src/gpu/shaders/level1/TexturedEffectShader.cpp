@@ -80,7 +80,7 @@ std::optional<PermutationVariant> TexturedEffectShader::Match(const ProgramInfo*
   if (!IsSupportedPointwiseOp(child1)) {
     return std::nullopt;
   }
-  auto fragIndex = D::domain().encode(std::vector<int>{xpType});
+  auto fragIndex = FD::domain().encode(std::vector<int>{xpType});
   return PermutationVariant{0, fragIndex};
 }
 

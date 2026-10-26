@@ -34,7 +34,7 @@ class AtlasTextFillShader : public PrecompiledShader {
   // glyph batches broadcast the paint color), and the color source is the HasCommonColor runtime
   // uniform.
   TGFX_DEFINE_DIMS(HAS_COVERAGE);
-  using D = Dims;
+  using VD = Dims;
 
   struct FragDims {
     // A device-space mask is a runtime uniform (HasDeviceMask), not a permutation dimension.
@@ -47,7 +47,7 @@ class AtlasTextFillShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 1 && FD::COUNT == 2,
+  static_assert(VD::COUNT == 1 && FD::COUNT == 2,
                 "Update the Compose mapping when dimensions change.");
 
  public:
@@ -64,7 +64,7 @@ class AtlasTextFillShader : public PrecompiledShader {
     return {"AtlasTextFillShader",
             "level1/atlas_text_fill.vert",
             "level1/atlas_text_fill.frag",
-            D::domain(),
+            VD::domain(),
             FD::domain(),
             PermutationDomain({}),
             GpClassName,

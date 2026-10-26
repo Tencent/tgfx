@@ -46,7 +46,6 @@ class PerlinNoiseFillShader : public PrecompiledShader {
       });
     }
   };
-  using D = FragDims;
 
   struct VertDims {
     enum : uint32_t { COUNT };
@@ -54,6 +53,7 @@ class PerlinNoiseFillShader : public PrecompiledShader {
       return PermutationDomain({});
     }
   };
+  using FD = FragDims;
   using VD = VertDims;
 
   // HAS_COVERAGE is mirrored: the vertex stage emits the coverage varying only when the fragment
@@ -70,7 +70,7 @@ class PerlinNoiseFillShader : public PrecompiledShader {
             "level1/perlin_noise.vert",
             "level1/perlin_noise.frag",
             VD::domain(),
-            D::domain(),
+            FD::domain(),
             PermutationDomain({}),
             "",
             ""};

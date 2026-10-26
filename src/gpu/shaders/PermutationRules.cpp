@@ -82,11 +82,11 @@ std::optional<RuleComposedValues> ComposeRoundStrokeRect(const RoundStrokeRectIn
   if (inputs.xpType < 0) {
     return std::nullopt;
   }
-  using D = RoundStrokeRectFillShader::Dims;
+  using VD = RoundStrokeRectFillShader::Dims;
   using FD = RoundStrokeRectFillShader::FD;
   RuleComposedValues values;
-  values.vertValues.resize(D::COUNT);
-  values.vertValues[D::HAS_UV_MATRIX] = inputs.hasUVMatrix ? 1 : 0;
+  values.vertValues.resize(VD::COUNT);
+  values.vertValues[VD::HAS_UV_MATRIX] = inputs.hasUVMatrix ? 1 : 0;
   values.fragValues.resize(FD::COUNT);
   values.fragValues[FD::HAS_XP] = inputs.xpType;
   return values;
@@ -134,13 +134,13 @@ std::optional<RuleComposedValues> ComposeComplexEllipseFill(
   if (inputs.xpType < 0) {
     return std::nullopt;
   }
-  using D = ComplexEllipseFillShader::Dims;
+  using VD = ComplexEllipseFillShader::Dims;
   using FD = ComplexEllipseFillShader::FD;
   RuleComposedValues values;
-  values.vertValues.resize(D::COUNT);
-  values.vertValues[D::STROKE] = inputs.isStroke ? 1 : 0;
+  values.vertValues.resize(VD::COUNT);
+  values.vertValues[VD::STROKE] = inputs.isStroke ? 1 : 0;
   values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::STROKE] = values.vertValues[D::STROKE];
+  values.fragValues[FD::STROKE] = values.vertValues[VD::STROKE];
   values.fragValues[FD::HAS_XP] = inputs.xpType;
   return values;
 }
@@ -151,22 +151,22 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexEllipseFillReachable() {
 }
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateEllipseFillReachable() {
-  return EnumerateMirroredReachable<EllipseFillShader::D, EllipseFillShader::FD>(nullptr);
+  return EnumerateMirroredReachable<EllipseFillShader::VD, EllipseFillShader::FD>(nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeNonAARRectFill(const NonAARRectFillInputs& inputs) {
   if (inputs.xpType < 0) {
     return std::nullopt;
   }
-  using D = NonAARRectFillShader::Dims;
+  using VD = NonAARRectFillShader::Dims;
   using FD = NonAARRectFillShader::FD;
   RuleComposedValues values;
-  values.vertValues.resize(D::COUNT);
-  values.vertValues[D::STROKE] = inputs.isStroke ? 1 : 0;
-  values.vertValues[D::TEXTURED] = inputs.textured ? 1 : 0;
+  values.vertValues.resize(VD::COUNT);
+  values.vertValues[VD::STROKE] = inputs.isStroke ? 1 : 0;
+  values.vertValues[VD::TEXTURED] = inputs.textured ? 1 : 0;
   values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::STROKE] = values.vertValues[D::STROKE];
-  values.fragValues[FD::TEXTURED] = values.vertValues[D::TEXTURED];
+  values.fragValues[FD::STROKE] = values.vertValues[VD::STROKE];
+  values.fragValues[FD::TEXTURED] = values.vertValues[VD::TEXTURED];
   values.fragValues[FD::HAS_XP] = inputs.xpType;
   if (!NonAARRectFillValuesAllowed(values.fragValues)) {
     return std::nullopt;
@@ -184,13 +184,13 @@ std::optional<RuleComposedValues> ComposeComplexNonAARRectFill(
   if (inputs.xpType < 0) {
     return std::nullopt;
   }
-  using D = ComplexNonAARRectFillShader::Dims;
+  using VD = ComplexNonAARRectFillShader::Dims;
   using FD = ComplexNonAARRectFillShader::FD;
   RuleComposedValues values;
-  values.vertValues.resize(D::COUNT);
-  values.vertValues[D::STROKE] = inputs.isStroke ? 1 : 0;
+  values.vertValues.resize(VD::COUNT);
+  values.vertValues[VD::STROKE] = inputs.isStroke ? 1 : 0;
   values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::STROKE] = values.vertValues[D::STROKE];
+  values.fragValues[FD::STROKE] = values.vertValues[VD::STROKE];
   values.fragValues[FD::HAS_XP] = inputs.xpType;
   return values;
 }
@@ -204,11 +204,11 @@ std::optional<RuleComposedValues> ComposeMeshFill(const MeshFillInputs& inputs) 
   if (inputs.xpType < 0) {
     return std::nullopt;
   }
-  using D = MeshFillShader::Dims;
+  using VD = MeshFillShader::Dims;
   using FD = MeshFillShader::FD;
   RuleComposedValues values;
-  values.vertValues.resize(D::COUNT);
-  values.vertValues[D::HAS_TEX_COORDS] = inputs.hasTexCoords ? 1 : 0;
+  values.vertValues.resize(VD::COUNT);
+  values.vertValues[VD::HAS_TEX_COORDS] = inputs.hasTexCoords ? 1 : 0;
   values.fragValues.resize(FD::COUNT);
   values.fragValues[FD::HAS_XP] = inputs.xpType;
   return values;
@@ -262,13 +262,13 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateYUVTextureFillReachable() {
 
 std::optional<RuleComposedValues> ComposeShapeInstancedTextureCoverage(
     const ShapeInstancedTextureCoverageInputs& inputs) {
-  using D = ShapeInstancedTextureCoverageShader::D;
+  using VD = ShapeInstancedTextureCoverageShader::VD;
   using FD = ShapeInstancedTextureCoverageShader::FD;
   RuleComposedValues values;
-  values.vertValues.resize(D::COUNT);
-  values.vertValues[D::GRADIENT] = inputs.gradient ? 1 : 0;
+  values.vertValues.resize(VD::COUNT);
+  values.vertValues[VD::GRADIENT] = inputs.gradient ? 1 : 0;
   values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::GRADIENT] = values.vertValues[D::GRADIENT];
+  values.fragValues[FD::GRADIENT] = values.vertValues[VD::GRADIENT];
   return values;
 }
 
@@ -361,13 +361,13 @@ std::optional<RuleComposedValues> ComposeAtlasTextFill(const AtlasTextFillInputs
   if (inputs.xpType < 0) {
     return std::nullopt;
   }
-  using D = AtlasTextFillShader::D;
+  using VD = AtlasTextFillShader::VD;
   using FD = AtlasTextFillShader::FD;
   RuleComposedValues values;
-  values.vertValues.resize(D::COUNT);
-  values.vertValues[D::HAS_COVERAGE] = inputs.hasCoverage ? 1 : 0;
+  values.vertValues.resize(VD::COUNT);
+  values.vertValues[VD::HAS_COVERAGE] = inputs.hasCoverage ? 1 : 0;
   values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_COVERAGE] = values.vertValues[D::HAS_COVERAGE];
+  values.fragValues[FD::HAS_COVERAGE] = values.vertValues[VD::HAS_COVERAGE];
   values.fragValues[FD::HAS_XP] = inputs.xpType;
   return values;
 }

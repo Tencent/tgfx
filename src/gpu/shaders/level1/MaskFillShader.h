@@ -44,9 +44,10 @@ class MaskFillShader : public PrecompiledShader {
       });
     }
   };
-  using D = FragDims;
 
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
+  using FD = FragDims;
+
   static constexpr bool ServesAlphaOnly = true;
 
   /// Runtime matching: does this draw belong to this family? Declared here, defined in
@@ -60,7 +61,7 @@ class MaskFillShader : public PrecompiledShader {
             "level1/plain_texture.vert",
             "level1/mask_fill.frag",
             PermutationDomain({}),
-            D::domain(),
+            FD::domain(),
             PermutationDomain({}),
             GpClassName,
             ""};

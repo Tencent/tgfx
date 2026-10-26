@@ -65,7 +65,7 @@ std::optional<PermutationVariant> AtlasTextFillShader::Match(const ProgramInfo* 
   if (!composed) {
     return std::nullopt;
   }
-  auto vertIndex = AtlasTextFillShader::D::domain().encode(composed->vertValues);
+  auto vertIndex = AtlasTextFillShader::VD::domain().encode(composed->vertValues);
   auto fragIndex = AtlasTextFillShader::FD::domain().encode(composed->fragValues);
   return PermutationVariant{vertIndex, fragIndex};
 }

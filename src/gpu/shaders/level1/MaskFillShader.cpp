@@ -60,7 +60,7 @@ std::optional<PermutationVariant> MaskFillShader::Match(const ProgramInfo* progr
   if (xpType < 0) {
     return std::nullopt;
   }
-  auto fragIndex = D::domain().encode(std::vector<int>{xpType});
+  auto fragIndex = FD::domain().encode(std::vector<int>{xpType});
   return PermutationVariant{0, fragIndex};
 }
 

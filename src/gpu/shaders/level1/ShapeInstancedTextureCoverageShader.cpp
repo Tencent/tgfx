@@ -101,7 +101,7 @@ std::optional<PermutationVariant> ShapeInstancedTextureCoverageShader::Match(
   if (!composed) {
     return std::nullopt;
   }
-  auto vertIndex = ShapeInstancedTextureCoverageShader::D::domain().encode(composed->vertValues);
+  auto vertIndex = ShapeInstancedTextureCoverageShader::VD::domain().encode(composed->vertValues);
   auto fragIndex = ShapeInstancedTextureCoverageShader::FD::domain().encode(composed->fragValues);
   return PermutationVariant{vertIndex, fragIndex};
 }

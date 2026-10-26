@@ -34,7 +34,7 @@ class ShapeInstancedTextureCoverageShader : public PrecompiledShader {
   // batches broadcast white, matching the runtime codegen's implicit color), so both the bare
   // coverage form and the gradient form read the same vColor varying.
   TGFX_DEFINE_DIMS(GRADIENT);
-  using D = Dims;
+  using VD = Dims;
 
   struct FragDims {
     enum : uint32_t { GRADIENT, COUNT };
@@ -59,7 +59,7 @@ class ShapeInstancedTextureCoverageShader : public PrecompiledShader {
     return {"ShapeInstancedTextureCoverageShader",
             "level1/shape_instanced_texture_coverage.vert",
             "level1/shape_instanced_texture_coverage.frag",
-            D::domain(),
+            VD::domain(),
             FD::domain(),
             PermutationDomain({}),
             GpClassName,

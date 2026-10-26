@@ -50,7 +50,6 @@ class TexturedEffectShader : public PrecompiledShader {
       });
     }
   };
-  using D = FragDims;
 
   struct VertDims {
     enum : uint32_t { COUNT };
@@ -58,6 +57,7 @@ class TexturedEffectShader : public PrecompiledShader {
       return PermutationDomain({});
     }
   };
+  using FD = FragDims;
   using VD = VertDims;
 
   // HAS_COVERAGE is mirrored: the vertex stage emits the coverage varying only when the fragment
@@ -74,7 +74,7 @@ class TexturedEffectShader : public PrecompiledShader {
             "level1/textured_effect.vert",
             "level1/textured_effect.frag",
             VD::domain(),
-            D::domain(),
+            FD::domain(),
             PermutationDomain({}),
             "",
             ""};

@@ -37,7 +37,7 @@ class EllipseFillShader : public PrecompiledShader {
       return PermutationDomain({});
     }
   };
-  using D = VertDims;
+  using VD = VertDims;
 
   struct FragDims {
     enum : uint32_t { HAS_XP, HAS_DEVICE_MASK, COUNT };
@@ -49,7 +49,7 @@ class EllipseFillShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 0 && FD::COUNT == 2,
+  static_assert(VD::COUNT == 0 && FD::COUNT == 2,
                 "Update the matcher below when dimensions change.");
 
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
@@ -65,7 +65,7 @@ class EllipseFillShader : public PrecompiledShader {
     return {"EllipseFillShader",
             "level1/ellipse_fill.vert",
             "level1/ellipse_fill.frag",
-            D::domain(),
+            VD::domain(),
             FD::domain(),
             PermutationDomain({}),
             GpClassName,

@@ -32,7 +32,7 @@ class ComplexEllipseFillShader : public PrecompiledShader {
   // batches broadcast the paint color), and the color source is the HasCommonColor runtime
   // uniform.
   TGFX_DEFINE_DIMS(STROKE);
-  using D = Dims;
+  using VD = Dims;
 
   struct FragDims {
     // The device-space mask is a runtime uniform (HasDeviceMask) with a padded dummy sampler: this
@@ -46,7 +46,7 @@ class ComplexEllipseFillShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 1 && FD::COUNT == 2,
+  static_assert(VD::COUNT == 1 && FD::COUNT == 2,
                 "Update the Compose mapping when dimensions change.");
 
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
@@ -62,7 +62,7 @@ class ComplexEllipseFillShader : public PrecompiledShader {
     return {"ComplexEllipseFillShader",
             "level1/complex_ellipse_fill.vert",
             "level1/complex_ellipse_fill.frag",
-            D::domain(),
+            VD::domain(),
             FD::domain(),
             PermutationDomain({}),
             GpClassName,

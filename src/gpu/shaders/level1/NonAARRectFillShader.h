@@ -32,7 +32,7 @@ class NonAARRectFillShader : public PrecompiledShader {
   // exact color rides the Color uniform through the HasCommonColor runtime uniform), so there is
   // no HAS_COMMON_COLOR dimension.
   TGFX_DEFINE_DIMS(STROKE, TEXTURED);
-  using D = Dims;
+  using VD = Dims;
 
   struct FragDims {
     enum : uint32_t { STROKE, TEXTURED, HAS_XP, COUNT };
@@ -45,7 +45,7 @@ class NonAARRectFillShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 2 && FD::COUNT == 3,
+  static_assert(VD::COUNT == 2 && FD::COUNT == 3,
                 "Update the Compose mapping when dimensions change.");
 
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
@@ -61,7 +61,7 @@ class NonAARRectFillShader : public PrecompiledShader {
     return {"NonAARRectFillShader",
             "level1/non_aa_rrect_fill.vert",
             "level1/non_aa_rrect_fill.frag",
-            D::domain(),
+            VD::domain(),
             FD::domain(),
             PermutationDomain({}),
             GpClassName,

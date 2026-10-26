@@ -34,7 +34,7 @@ class RoundStrokeRectFillShader : public PrecompiledShader {
   // too (non-AA draws write a 1.0 coverage and zero radii), with the AA ramp selected by the
   // AAEnabled runtime uniform, so there is no HAS_AA dimension either.
   TGFX_DEFINE_DIMS(HAS_UV_MATRIX);
-  using D = Dims;
+  using VD = Dims;
 
   struct FragDims {
     // HAS_UV_MATRIX stays vertex-only: the fragment stage never branches on it
@@ -48,7 +48,7 @@ class RoundStrokeRectFillShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 1 && FD::COUNT == 1,
+  static_assert(VD::COUNT == 1 && FD::COUNT == 1,
                 "Update the Compose mapping when dimensions change.");
 
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
@@ -62,7 +62,7 @@ class RoundStrokeRectFillShader : public PrecompiledShader {
     return {"RoundStrokeRectFillShader",
             "level1/round_stroke_rect_fill.vert",
             "level1/round_stroke_rect_fill.frag",
-            D::domain(),
+            VD::domain(),
             FD::domain(),
             PermutationDomain({}),
             "RoundStrokeRectGeometryProcessor",

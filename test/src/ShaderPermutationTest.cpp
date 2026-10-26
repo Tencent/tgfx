@@ -2211,7 +2211,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     ASSERT_TRUE(match.has_value());
     EXPECT_EQ(match->shaderName, "ShapeInstancedTextureCoverageShader");
     // The bare coverage form is GRADIENT=0 in the single-bool domain.
-    auto expected = ShapeInstancedTextureCoverageShader::D::domain().encode({0});
+    auto expected = ShapeInstancedTextureCoverageShader::VD::domain().encode({0});
     EXPECT_EQ(match->vertPermutationIndex, expected);
     EXPECT_EQ(match->fragPermutationIndex, expected);
   }
@@ -2290,7 +2290,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
   // A rounded clip next to the coverage texture: the clip rides the runtime clip contract uniforms,
   // so the draw selects the same variant as the bare-coverage form (the libpag corpus carries this
   // shape; before the contract it had no precompiled route at all).
-  const auto expectedIndex = ShapeInstancedTextureCoverageShader::D::domain().encode({0});
+  const auto expectedIndex = ShapeInstancedTextureCoverageShader::VD::domain().encode({0});
   for (int clipFirst = 0; clipFirst <= 1; ++clipFirst) {
     BlockAllocator allocator;
     auto gp = ShapeInstancedGeometryProcessor::Make(&allocator, 8, 8, AAType::None, true,

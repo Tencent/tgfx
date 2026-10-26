@@ -32,7 +32,7 @@ class MeshFillShader : public PrecompiledShader {
   // unconditional (white baked for meshes without per-vertex colors, a constant 1.0f coverage),
   // and colorless draws pick the exact Color uniform through the HasCommonColor runtime uniform.
   TGFX_DEFINE_DIMS(HAS_TEX_COORDS);
-  using D = Dims;
+  using VD = Dims;
 
   struct FragDims {
     // HAS_TEX_COORDS stays vertex-only: the fragment stage never branches on it (mesh_fill.frag
@@ -45,7 +45,7 @@ class MeshFillShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(D::COUNT == 1 && FD::COUNT == 1,
+  static_assert(VD::COUNT == 1 && FD::COUNT == 1,
                 "Update the Compose mapping when dimensions change.");
 
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
@@ -61,7 +61,7 @@ class MeshFillShader : public PrecompiledShader {
     return {"MeshFillShader",
             "level1/mesh_fill.vert",
             "level1/mesh_fill.frag",
-            D::domain(),
+            VD::domain(),
             FD::domain(),
             PermutationDomain({}),
             GpClassName,

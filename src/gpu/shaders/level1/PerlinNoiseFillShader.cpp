@@ -64,7 +64,7 @@ std::optional<PermutationVariant> PerlinNoiseFillShader::Match(const ProgramInfo
   if (xpType < 0) {
     return std::nullopt;
   }
-  auto fragIndex = D::domain().encode(std::vector<int>{xpType});
+  auto fragIndex = FD::domain().encode(std::vector<int>{xpType});
   return PermutationVariant{0, fragIndex};
 }
 
