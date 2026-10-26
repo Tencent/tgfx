@@ -135,14 +135,14 @@ void GLSLGaussianBlur1DFragmentProcessor::onSetData(UniformData* /*vertexUniform
   // later in traversal.
   fragmentUniformData->setDataOptional("HasDeviceMask", 0);
   fragmentUniformData->setDataOptional("TiledChild",
-                                       processor->name() == "TiledTextureEffect" ? 1 : 0);
+                                       IsProcessor<TiledTextureEffect>(processor) ? 1 : 0);
   // Alpha-only child flag: the kernel splats each tap's sample .rrrr, mirroring the runtime's
   // Swizzle::ForRead(ALPHA_8) readback. ProgramBuilder layouts do not declare this field, hence
   // the optional write; the precompiled layout receives the actual value on every draw.
   bool alphaChild = false;
-  if (processor->name() == "TextureEffect") {
+  if (IsProcessor<TextureEffect>(processor)) {
     alphaChild = static_cast<const TextureEffect*>(processor)->isAlphaOnly();
-  } else if (processor->name() == "TiledTextureEffect") {
+  } else if (IsProcessor<TiledTextureEffect>(processor)) {
     alphaChild = static_cast<const TiledTextureEffect*>(processor)->isAlphaOnly();
   }
   fragmentUniformData->setDataOptional("AlphaChild", alphaChild ? 1 : 0);

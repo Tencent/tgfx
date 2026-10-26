@@ -43,13 +43,13 @@ std::optional<PermutationMatchResult> GlassRefractionShader::Match(const Program
   // common-color attribute layout: the kernels read the Color uniform, and a per-vertex color
   // draw would quantize fractional paint colors through the UByte4 attribute.
   int gpKind = -1;
-  if (gp->name() == "EllipseGeometryProcessor") {
+  if (IsProcessor<EllipseGeometryProcessor>(gp)) {
     auto* egp = static_cast<const EllipseGeometryProcessor*>(gp);
     if (!egp->hasCommonColor()) {
       return std::nullopt;
     }
     gpKind = 0;
-  } else if (gp->name() == "QuadPerEdgeAAGeometryProcessor") {
+  } else if (IsProcessor<QuadPerEdgeAAGeometryProcessor>(gp)) {
     auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
     // The uvMatrix form is required: it declares no uvCoord attribute, so the GP transforms the
     // position for the background coordinate, which is what the quad vertex kernel reads. A
@@ -84,7 +84,7 @@ std::optional<PermutationMatchResult> GlassRefractionShader::Match(const Program
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
-  if (fp->name() != "GlassRefractionFragmentProcessor") {
+  if (!IsProcessor<GlassRefractionFragmentProcessor>(fp)) {
     return std::nullopt;
   }
   auto* refraction = static_cast<const GlassRefractionFragmentProcessor*>(fp);
@@ -105,10 +105,10 @@ std::optional<PermutationMatchResult> GlassRefractionShader::Match(const Program
   // The geometry child selects the compile-time dimension because it changes the sampler layout;
   // the dispersion and lighting branches are runtime uniforms and need no dimension.
   int geometryKind = -1;
-  if (child->name() == "GlassSDFGeometryFragmentProcessor") {
+  if (IsProcessor<GlassSDFGeometryFragmentProcessor>(child)) {
     auto* sdf = static_cast<const GlassSDFGeometryFragmentProcessor*>(child);
     geometryKind = sdf->getShapeType() == GlassShapeType::RoundedRect ? 0 : 1;
-  } else if (child->name() == "GlassUDFGeometryFragmentProcessor") {
+  } else if (IsProcessor<GlassUDFGeometryFragmentProcessor>(child)) {
     // The UDF kind always declares the edge-light mask sampler; an edge-lit-off draw binds the
     // shared dummy texture there and clears the EdgeMaskOn runtime uniform.
     geometryKind = 2;

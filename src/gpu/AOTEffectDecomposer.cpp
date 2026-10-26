@@ -542,7 +542,7 @@ AOTFoldRouteOutcome AOTEffectDecomposer::AnalyzeFoldRoute(const ProgramInfo* pro
   // what that alpha is. EmptyXferProcessor (fixed-function pipeline blend) applies coverage as a
   // plain multiply, which is exactly what the folded chain reproduces.
   auto xferProcessor = programInfo->getXferProcessor();
-  if (xferProcessor == nullptr || xferProcessor->name() != "EmptyXferProcessor") {
+  if (xferProcessor == nullptr || !IsProcessor<EmptyXferProcessor>(xferProcessor)) {
     return AOTFoldRouteOutcome::FoldBlockedByXP;
   }
   std::vector<const FragmentProcessor*> allProcessors;

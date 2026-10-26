@@ -32,6 +32,7 @@ namespace tgfx {
  */
 class EllipseGeometryProcessor : public GeometryProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<EllipseGeometryProcessor> Make(BlockAllocator* allocator, int width,
                                                      int height, bool stroke,
                                                      std::optional<PMColor> commonColor);
@@ -49,8 +50,6 @@ class EllipseGeometryProcessor : public GeometryProcessor {
   }
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   EllipseGeometryProcessor(int width, int height, bool stroke, std::optional<PMColor> commonColor);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;

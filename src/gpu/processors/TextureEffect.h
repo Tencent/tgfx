@@ -27,6 +27,7 @@
 namespace tgfx {
 class TextureEffect : public FragmentProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator,
                                               std::shared_ptr<TextureProxy> proxy,
                                               const SamplingArgs& args = {},
@@ -98,8 +99,6 @@ class TextureEffect : public FragmentProcessor {
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplerState& samplerState,
                 SrcRectConstraint constraint, const Point& alphaStart, const Matrix& uvMatrix,
                 const std::optional<Rect>& subset);

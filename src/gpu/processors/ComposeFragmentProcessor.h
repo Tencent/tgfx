@@ -23,6 +23,7 @@
 namespace tgfx {
 class ComposeFragmentProcessor : public FragmentProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator,
                                               PlacementPtr<FragmentProcessor> first,
                                               PlacementPtr<FragmentProcessor> second);
@@ -45,8 +46,6 @@ class ComposeFragmentProcessor : public FragmentProcessor {
   }
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   explicit ComposeFragmentProcessor(std::vector<PlacementPtr<FragmentProcessor>> processors);
 };
 }  // namespace tgfx

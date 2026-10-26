@@ -25,6 +25,8 @@
 #include "gpu/PermutationMatcher.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/Program.h"
+#include "gpu/processors/AtlasTextGeometryProcessor.h"
+#include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ConstColorProcessor.h"
 
 namespace tgfx {
@@ -33,7 +35,7 @@ static bool ContainsGradientSource(const FragmentProcessor* processor) {
   if (processor == nullptr) {
     return false;
   }
-  if (processor->name() == "ClampedGradientEffect") {
+  if (IsProcessor<ClampedGradientEffect>(processor)) {
     return true;
   }
   for (size_t index = 0; index < processor->numChildProcessors(); ++index) {
@@ -158,7 +160,7 @@ std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
   // (AtlasTextNonSrcOverBlendKeepsDstProbe) — no blend-mode restriction here. A draw clip rides
   // in front of the glyph leaf as the two-FP [clip, local texture] form; the builder chains the
   // clip slots on top of the glyph register (glyph * clip).
-  const bool atlasText = geometryProcessor->name() == "AtlasTextGeometryProcessor";
+  const bool atlasText = IsProcessor<AtlasTextGeometryProcessor>(geometryProcessor.get());
   // Up to two coverage FPs fold into the chain: a single one lowers as the narrow forms or a
   // general subtree, and a pair folds as subtree + clip slots or device-mask child. The atlas
   // glyph leaf takes one of the two positions.

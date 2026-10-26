@@ -81,6 +81,7 @@ class GlassShapeGeometryFragmentProcessor : public FragmentProcessor {
 
 class GlassSDFGeometryFragmentProcessor : public GlassShapeGeometryFragmentProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<GlassSDFGeometryFragmentProcessor> Make(BlockAllocator* allocator,
                                                               GlassShapeType shapeType,
                                                               const GlassSDFGeometryParams& params);
@@ -96,8 +97,6 @@ class GlassSDFGeometryFragmentProcessor : public GlassShapeGeometryFragmentProce
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   GlassSDFGeometryFragmentProcessor(GlassShapeType shapeType, const GlassSDFGeometryParams& params);
 
   GlassShapeType shapeType = GlassShapeType::RoundedRect;
@@ -108,6 +107,7 @@ class GlassSDFGeometryFragmentProcessor : public GlassShapeGeometryFragmentProce
 
 class GlassUDFGeometryFragmentProcessor : public GlassShapeGeometryFragmentProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   /**
    * @description Creates the processor.
    * @param mask RGBA8 texture where RGB carries the 24-bit refraction height.
@@ -136,8 +136,6 @@ class GlassUDFGeometryFragmentProcessor : public GlassShapeGeometryFragmentProce
   SamplerState onSamplerStateAt(size_t index) const override;
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   GlassUDFGeometryFragmentProcessor(std::shared_ptr<TextureProxy> mask,
                                     std::shared_ptr<TextureProxy> edgeMask,
                                     const GlassUDFGeometryParams& params, bool enableEdgeLighting);

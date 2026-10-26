@@ -42,7 +42,7 @@ std::optional<PermutationMatchResult> TiledTextureFillShader::Match(
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
-  if (fp->name() != "TiledTextureEffect") {
+  if (!IsProcessor<TiledTextureEffect>(fp)) {
     return std::nullopt;
   }
   auto* tte = static_cast<const TiledTextureEffect*>(fp);

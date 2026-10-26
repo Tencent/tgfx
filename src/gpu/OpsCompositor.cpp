@@ -1212,7 +1212,7 @@ static bool IsDedicatedTextureFillCandidate(const DrawOp* op,
                                             const std::vector<const FragmentProcessor*>& colors,
                                             const FragmentProcessor* maskCoverage) {
   if (op->type() != DrawOp::Type::RectDrawOp || maskCoverage != nullptr || colors.size() != 1 ||
-      colors[0]->name() != "TextureEffect") {
+      !IsProcessor<TextureEffect>(colors[0])) {
     return false;
   }
   return !static_cast<const TextureEffect*>(colors[0])->isYUV();
@@ -1410,7 +1410,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
       // clip-mask texture (DeviceSpaceTextureEffect) is device-space sampled and stays a coverage
       // FP, which blocks the fold entirely so the draw keeps the plain route. A bare texture fill
       // under that clip also keeps the plain route, where QuadTextureFill takes it directly.
-      if (clipCoverage->name() == "RectEffect") {
+      if (IsProcessor<RectEffect>(clipCoverage)) {
         auto rectEffect = static_cast<const RectEffect*>(clipCoverage);
         if (rectEffect->isDeviceSpaceRect() && rectEffect->isAntiAlias() &&
             !IsDedicatedTextureFillCandidate(op.get(), colorProcessors, maskCoverage)) {

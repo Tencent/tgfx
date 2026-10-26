@@ -28,6 +28,7 @@ namespace tgfx {
  */
 class MeshGeometryProcessor : public GeometryProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<MeshGeometryProcessor> Make(BlockAllocator* allocator, bool hasTexCoords,
                                                   bool hasColors, bool hasCoverage, PMColor color,
                                                   const Matrix& viewMatrix);
@@ -49,8 +50,6 @@ class MeshGeometryProcessor : public GeometryProcessor {
   }
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   MeshGeometryProcessor(bool hasTexCoords, bool hasColors, bool hasCoverage, PMColor color,
                         const Matrix& viewMatrix);
 

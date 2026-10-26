@@ -25,6 +25,7 @@
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/ShapeInstancedGeometryProcessor.h"
+#include "gpu/processors/SingleIntervalGradientColorizer.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/shaders/PermutationRules.h"
 
@@ -44,8 +45,8 @@ std::optional<PermutationMatchResult> ShapeInstancedTextureCoverageShader::Match
   size_t colorCount = programInfo->numColorFragmentProcessors();
   if (colorCount == 1) {
     auto colorFP = programInfo->getFragmentProcessor(0);
-    if (colorFP->name() != "ClampedGradientEffect" || colorFP->numChildProcessors() != 2 ||
-        colorFP->childProcessor(0)->name() != "SingleIntervalGradientColorizer") {
+    if (!IsProcessor<ClampedGradientEffect>(colorFP) || colorFP->numChildProcessors() != 2 ||
+        !IsProcessor<SingleIntervalGradientColorizer>(colorFP->childProcessor(0))) {
       return std::nullopt;
     }
     auto layout = colorFP->childProcessor(1);
@@ -81,7 +82,7 @@ std::optional<PermutationMatchResult> ShapeInstancedTextureCoverageShader::Match
   } else {
     return std::nullopt;
   }
-  if (fp->name() != "TextureEffect") {
+  if (!IsProcessor<TextureEffect>(fp)) {
     return std::nullopt;
   }
   auto* texture = static_cast<const TextureEffect*>(fp);

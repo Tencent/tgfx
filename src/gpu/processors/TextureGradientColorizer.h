@@ -24,6 +24,7 @@
 namespace tgfx {
 class TextureGradientColorizer : public FragmentProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<TextureGradientColorizer> Make(BlockAllocator* allocator,
                                                      std::shared_ptr<TextureProxy> gradient);
 
@@ -36,8 +37,6 @@ class TextureGradientColorizer : public FragmentProcessor {
   }
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   explicit TextureGradientColorizer(std::shared_ptr<TextureProxy> gradient)
       : FragmentProcessor(ClassID()), gradient(std::move(gradient)) {
   }

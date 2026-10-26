@@ -24,7 +24,7 @@ namespace tgfx {
 PlacementPtr<AOTYUVChainProcessor> AOTYUVChainProcessor::Make(
     BlockAllocator* allocator, PlacementPtr<FragmentProcessor> source,
     const std::vector<AOTPointwiseSlot>& slots) {
-  if (allocator == nullptr || source == nullptr || source->name() != "TextureEffect" ||
+  if (allocator == nullptr || source == nullptr || !IsProcessor<TextureEffect>(source.get()) ||
       slots.size() > MaxPointwiseSlots) {
     return nullptr;
   }

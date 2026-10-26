@@ -34,6 +34,7 @@ namespace tgfx {
  */
 class AOTYUVChainProcessor : public FragmentProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   // The precompiled YUVTextureFillShader carries three pointwise-operator slots (the same
   // capacity PerlinNoiseFillShader uses), covering the real color-grade shapes (composed color
   // matrices collapse into one). Longer tails are rejected at planning time.
@@ -65,8 +66,6 @@ class AOTYUVChainProcessor : public FragmentProcessor {
   void emitCode(EmitArgs& args) const override;
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
  private:
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 

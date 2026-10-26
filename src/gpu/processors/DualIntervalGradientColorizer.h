@@ -24,6 +24,7 @@
 namespace tgfx {
 class DualIntervalGradientColorizer : public FragmentProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<DualIntervalGradientColorizer> Make(BlockAllocator* allocator, Color c0,
                                                           Color c1, Color c2, Color c3,
                                                           float threshold);
@@ -53,8 +54,6 @@ class DualIntervalGradientColorizer : public FragmentProcessor {
   }
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   DualIntervalGradientColorizer(Color scale01, Color bias01, Color scale23, Color bias23,
                                 float threshold)
       : FragmentProcessor(ClassID()), scale01(scale01), bias01(bias01), scale23(scale23),

@@ -24,6 +24,7 @@
 namespace tgfx {
 class UnrolledBinaryGradientColorizer : public FragmentProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   static constexpr int MaxColorCount = 16;
 
   static PlacementPtr<UnrolledBinaryGradientColorizer> Make(BlockAllocator* allocator,
@@ -64,8 +65,6 @@ class UnrolledBinaryGradientColorizer : public FragmentProcessor {
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   UnrolledBinaryGradientColorizer(int intervalCount, Color* scales, Color* biases,
                                   Rect thresholds1_7, Rect thresholds9_13)
       : FragmentProcessor(ClassID()), intervalCount(intervalCount), scale0_1(scales[0]),

@@ -29,6 +29,7 @@ namespace tgfx {
  */
 class RectEffect : public FragmentProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   /**
    * @param localRect    The rectangle in local space.
    * @param matrix       Maps localRect to device space. Defaults to identity.
@@ -65,8 +66,6 @@ class RectEffect : public FragmentProcessor {
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   RectEffect(const Rect& localRect, const Matrix& deviceToLocal, bool antiAlias)
       : FragmentProcessor(ClassID()), localRect(localRect), antiAlias(antiAlias),
         _deviceToLocal(deviceToLocal), _needTransform(!deviceToLocal.isIdentity()) {

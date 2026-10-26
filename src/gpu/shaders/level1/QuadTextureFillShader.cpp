@@ -62,7 +62,7 @@ std::optional<PermutationMatchResult> QuadTextureFillShader::Match(const Program
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
-  if (fp->name() != "TextureEffect") {
+  if (!IsProcessor<TextureEffect>(fp)) {
     return std::nullopt;
   }
   auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);

@@ -47,7 +47,7 @@ std::optional<PermutationMatchResult> GaussianBlur1DShader::Match(const ProgramI
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
-  if (fp->name() != "GaussianBlur1DFragmentProcessor") {
+  if (!IsProcessor<GaussianBlur1DFragmentProcessor>(fp)) {
     return std::nullopt;
   }
   auto* blur = static_cast<const GaussianBlur1DFragmentProcessor*>(fp);

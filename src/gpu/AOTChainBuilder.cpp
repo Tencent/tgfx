@@ -23,11 +23,13 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AOTYUVChainProcessor.h"
+#include "gpu/processors/ComposeFragmentProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
 #include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/resources/TextureView.h"
 
 namespace tgfx {
@@ -228,7 +230,7 @@ static int MapChainInput(const std::vector<const AOTEffectNode*>& nodes,
 // rects lower through RectCoverage, while non-AA rects use the existing zero-radius RRectCoverage
 // op with antiAlias=0, so no new shader variant is required.
 static bool IsChainFoldableRectEffect(const FragmentProcessor* fp) {
-  if (fp == nullptr || fp->name() != "RectEffect" || fp->numChildProcessors() != 0) {
+  if (fp == nullptr || !IsProcessor<RectEffect>(fp) || fp->numChildProcessors() != 0) {
     return false;
   }
   auto rectEffect = static_cast<const RectEffect*>(fp);
@@ -265,7 +267,7 @@ static bool CollectChainClipSlot(const FragmentProcessor* fp, ChainClipSlots* sl
   if (fp == nullptr || slots == nullptr) {
     return false;
   }
-  if (fp->name() == "ComposeFragmentProcessor") {
+  if (IsProcessor<ComposeFragmentProcessor>(fp)) {
     if (fp->numChildProcessors() == 0) {
       return false;
     }
@@ -279,7 +281,7 @@ static bool CollectChainClipSlot(const FragmentProcessor* fp, ChainClipSlots* sl
   if (fp->numChildProcessors() != 0) {
     return false;
   }
-  if (fp->name() == "DeviceSpaceTextureEffect") {
+  if (IsProcessor<DeviceSpaceTextureEffect>(fp)) {
     auto* dste = static_cast<const DeviceSpaceTextureEffect*>(fp);
     if (maskEffect == nullptr || *maskEffect != nullptr || !dste->isAlphaOnly() ||
         dste->hasPerspective()) {
@@ -288,7 +290,7 @@ static bool CollectChainClipSlot(const FragmentProcessor* fp, ChainClipSlots* sl
     *maskEffect = dste;
     return true;
   }
-  if (fp->name() == "RectEffect") {
+  if (IsProcessor<RectEffect>(fp)) {
     auto* rectEffect = static_cast<const RectEffect*>(fp);
     if (!rectEffect->isAntiAlias()) {
       // A non-AA rect reuses the rrect op with zero radii and antiAlias disabled, so it shares the
@@ -312,7 +314,7 @@ static bool CollectChainClipSlot(const FragmentProcessor* fp, ChainClipSlots* sl
     }
     return true;
   }
-  if (fp->name() == "RRectEffect") {
+  if (IsProcessor<RRectEffect>(fp)) {
     if (slots->rrects.size() + slots->nonAARects.size() >= 4) {
       return false;
     }
@@ -1051,7 +1053,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   leaves.reserve(layout.leafNodes.size());
   for (auto* node : layout.leafNodes) {
     auto leaf = BuildTextureLeafFP(allocator, node);
-    if (leaf == nullptr || leaf->name() != "TextureEffect") {
+    if (leaf == nullptr || !IsProcessor<TextureEffect>(leaf.get())) {
       return nullptr;
     }
     leaves.push_back(std::move(leaf));
@@ -1217,7 +1219,7 @@ static bool LowerAnalyticCoverageFP(const FragmentProcessor* fp,
     return false;
   }
   std::vector<const FragmentProcessor*> leaves = {};
-  if (fp->name() == "ComposeFragmentProcessor") {
+  if (IsProcessor<ComposeFragmentProcessor>(fp)) {
     for (size_t i = 0; i < fp->numChildProcessors(); ++i) {
       leaves.push_back(fp->childProcessor(i));
     }
@@ -1226,7 +1228,7 @@ static bool LowerAnalyticCoverageFP(const FragmentProcessor* fp,
   }
   std::vector<const FragmentProcessor*> analytic = {};
   for (auto* leaf : leaves) {
-    if (leaf->name() == "DeviceSpaceTextureEffect") {
+    if (IsProcessor<DeviceSpaceTextureEffect>(leaf)) {
       auto* dste = static_cast<const DeviceSpaceTextureEffect*>(leaf);
       if (*maskEffect != nullptr || !dste->isAlphaOnly() || dste->hasPerspective()) {
         return false;
@@ -1245,7 +1247,7 @@ static bool LowerAnalyticCoverageFP(const FragmentProcessor* fp,
   }
   AOTNodeID current = unit;
   for (auto* leaf : analytic) {
-    if ((leaf->name() != "RectEffect" && leaf->name() != "RRectEffect") ||
+    if ((!IsProcessor<RectEffect>(leaf) && !IsProcessor<RRectEffect>(leaf)) ||
         leaf->numChildProcessors() != 0) {
       return false;
     }
@@ -1380,7 +1382,7 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildFPForPass(BlockAllocator* 
   switch (pass.kernel) {
     case AOTKernelKind::YUVTextureFill: {
       auto source = BuildTextureLeafFP(allocator, sourceNode);
-      if (source == nullptr || source->name() != "TextureEffect") {
+      if (source == nullptr || !IsProcessor<TextureEffect>(source.get())) {
         return nullptr;
       }
       return AOTYUVChainProcessor::Make(allocator, std::move(source), slots);
@@ -1438,7 +1440,7 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessor(
       return BuildChainFP(allocator, graph, pass, clipSlots, maskEffect);
     }
     if (coverageName == "ComposeFragmentProcessor" && coverage->numChildProcessors() == 2 &&
-        coverage->childProcessor(0)->name() == "DeviceSpaceTextureEffect" &&
+        IsProcessor<DeviceSpaceTextureEffect>(coverage->childProcessor(0)) &&
         IsChainFoldableRectEffect(coverage->childProcessor(1))) {
       maskEffect = static_cast<const DeviceSpaceTextureEffect*>(coverage->childProcessor(0));
       clipSlots.deviceRects.push_back(static_cast<const RectEffect*>(coverage->childProcessor(1)));
@@ -1467,26 +1469,26 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessor(
     // lowering as the subtree.
     auto* last = coverageFPs.back();
     auto* first = coverageFPs.front();
-    if (last->name() == "DeviceSpaceTextureEffect") {
+    if (IsProcessor<DeviceSpaceTextureEffect>(last)) {
       maskEffect = static_cast<const DeviceSpaceTextureEffect*>(last);
       if (!maskEffect->isAlphaOnly() || maskEffect->hasPerspective()) {
         return nullptr;
       }
-      if (first->name() == "RectEffect" || first->name() == "RRectEffect") {
+      if (IsProcessor<RectEffect>(first) || IsProcessor<RRectEffect>(first)) {
         if (!CollectChainClipSlot(first, &clipSlots)) {
           return nullptr;
         }
       } else {
         subtreeFP = first;
       }
-    } else if (last->name() == "TextureEffect") {
+    } else if (IsProcessor<TextureEffect>(last)) {
       subtreeFP = last;
-      if (first->name() == "RectEffect" || first->name() == "RRectEffect" ||
-          first->name() == "ComposeFragmentProcessor") {
+      if (IsProcessor<RectEffect>(first) || IsProcessor<RRectEffect>(first) ||
+          IsProcessor<ComposeFragmentProcessor>(first)) {
         if (!CollectChainClipSlot(first, &clipSlots, &maskEffect)) {
           return nullptr;
         }
-      } else if (first->name() == "DeviceSpaceTextureEffect") {
+      } else if (IsProcessor<DeviceSpaceTextureEffect>(first)) {
         maskEffect = static_cast<const DeviceSpaceTextureEffect*>(first);
         if (!maskEffect->isAlphaOnly() || maskEffect->hasPerspective()) {
           return nullptr;
@@ -1494,8 +1496,8 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessor(
       } else {
         return nullptr;
       }
-    } else if (last->name() == "RectEffect" || last->name() == "RRectEffect" ||
-               last->name() == "ComposeFragmentProcessor") {
+    } else if (IsProcessor<RectEffect>(last) || IsProcessor<RRectEffect>(last) ||
+               IsProcessor<ComposeFragmentProcessor>(last)) {
       // A composed analytic clip in the trailing position: the mask filter (or another subtree)
       // comes first and the clip stack folds into the clip slots after it. A path clip's device
       // mask inside the composed clip becomes the mask child.

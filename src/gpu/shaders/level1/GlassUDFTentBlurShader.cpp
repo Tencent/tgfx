@@ -48,7 +48,7 @@ std::optional<PermutationMatchResult> GlassUDFTentBlurShader::Match(
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
-  if (fp->name() != "GlassUDFTentBlurFragmentProcessor") {
+  if (!IsProcessor<GlassUDFTentBlurFragmentProcessor>(fp)) {
     return std::nullopt;
   }
   auto* tent = static_cast<const GlassUDFTentBlurFragmentProcessor*>(fp);

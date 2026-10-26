@@ -31,6 +31,9 @@
 #include "gpu/ProgramSignature.h"
 #include "gpu/ShaderKeyHash.h"
 #include "gpu/UniformData.h"
+#include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "gpu/processors/TextureEffect.h"
+#include "gpu/processors/TiledTextureEffect.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
@@ -243,8 +246,8 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
       // coverage gaps so the production metrics stay honest.
       for (size_t i = 0; i < programInfo->numFragmentProcessors(); ++i) {
         auto fp = programInfo->getFragmentProcessor(i);
-        bool textureFP = fp->name() == "TextureEffect" || fp->name() == "TiledTextureEffect" ||
-                         fp->name() == "DeviceSpaceTextureEffect";
+        bool textureFP = IsProcessor<TextureEffect>(fp) || IsProcessor<TiledTextureEffect>(fp) ||
+                         IsProcessor<DeviceSpaceTextureEffect>(fp);
         if (textureFP && fp->numTextureSamplers() == 0) {
           reason = PrecompiledFallbackReason::DeferredTexture;
           if (deferredFallback != nullptr) {

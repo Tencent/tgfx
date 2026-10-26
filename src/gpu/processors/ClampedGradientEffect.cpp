@@ -67,14 +67,14 @@ bool ClampedGradientEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
                            leftBorderColor.alpha};
   parameters.rightBorder = {rightBorderColor.red, rightBorderColor.green, rightBorderColor.blue,
                             rightBorderColor.alpha};
-  if (colorizerFP->name() == "SingleIntervalGradientColorizer") {
+  if (IsProcessor<SingleIntervalGradientColorizer>(colorizerFP)) {
     auto* single = static_cast<const SingleIntervalGradientColorizer*>(colorizerFP);
     parameters.colorizerKind = 0;
     const auto& startColor = single->startColor();
     const auto& endColor = single->endColor();
     parameters.start = {startColor.red, startColor.green, startColor.blue, startColor.alpha};
     parameters.end = {endColor.red, endColor.green, endColor.blue, endColor.alpha};
-  } else if (colorizerFP->name() == "DualIntervalGradientColorizer") {
+  } else if (IsProcessor<DualIntervalGradientColorizer>(colorizerFP)) {
     auto* dual = static_cast<const DualIntervalGradientColorizer*>(colorizerFP);
     parameters.colorizerKind = 1;
     const auto& scale01 = dual->getScale01();
@@ -86,7 +86,7 @@ bool ClampedGradientEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
     parameters.scale23 = {scale23.red, scale23.green, scale23.blue, scale23.alpha};
     parameters.bias23 = {bias23.red, bias23.green, bias23.blue, bias23.alpha};
     parameters.threshold = dual->getThreshold();
-  } else if (colorizerFP->name() == "UnrolledBinaryGradientColorizer") {
+  } else if (IsProcessor<UnrolledBinaryGradientColorizer>(colorizerFP)) {
     auto* unrolled = static_cast<const UnrolledBinaryGradientColorizer*>(colorizerFP);
     parameters.colorizerKind = 2;
     parameters.intervalCount = unrolled->getIntervalCount();
@@ -105,7 +105,7 @@ bool ClampedGradientEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
                                 thresholds1_7.bottom};
     parameters.thresholds9_13 = {thresholds9_13.left, thresholds9_13.top, thresholds9_13.right,
                                  thresholds9_13.bottom};
-  } else if (colorizerFP->name() == "TextureGradientColorizer") {
+  } else if (IsProcessor<TextureGradientColorizer>(colorizerFP)) {
     // LUT colorizer: the baked gradient texture joins the chain as a sampler-only child; the
     // kernel's OP_GRADIENT LUT branch samples it at the computed t.
     auto* lut = static_cast<const TextureGradientColorizer*>(colorizerFP);

@@ -39,6 +39,7 @@ enum class GlassUDFField { Refraction, EdgeLight };
  */
 class GlassUDFTentBlurFragmentProcessor : public FragmentProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   /**
    * @description Creates the processor. Both radii are expressed in destination texel units, and
    * only the one belonging to the requested field is read.
@@ -63,8 +64,6 @@ class GlassUDFTentBlurFragmentProcessor : public FragmentProcessor {
   void emitCode(EmitArgs& args) const override;
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   GlassUDFTentBlurFragmentProcessor(PlacementPtr<FragmentProcessor> fineSource,
                                     PlacementPtr<FragmentProcessor> coarseSource, float fineRadius,
                                     float coarseRadius, GlassUDFBlurDirection direction,

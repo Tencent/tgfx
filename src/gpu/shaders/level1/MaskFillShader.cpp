@@ -43,7 +43,7 @@ std::optional<PermutationMatchResult> MaskFillShader::Match(const ProgramInfo* p
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
-  if (fp->name() != "TextureEffect") {
+  if (!IsProcessor<TextureEffect>(fp)) {
     return std::nullopt;
   }
   auto* te = static_cast<const TextureEffect*>(fp);

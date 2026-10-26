@@ -33,6 +33,7 @@ namespace tgfx {
  */
 class RRectEffect : public FragmentProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   /**
    * @param rRect       Rounded rectangle in local space. For Rect type, prefer RectEffect for
    *                    better performance.
@@ -71,8 +72,6 @@ class RRectEffect : public FragmentProcessor {
   }
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   RRectEffect(const Rect& localRect, const std::array<Point, 4>& radii, const Matrix& deviceToLocal,
               bool antiAlias)
       : FragmentProcessor(ClassID()), localRect(localRect), radii(radii), antiAlias(antiAlias),

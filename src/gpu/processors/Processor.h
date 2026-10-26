@@ -51,4 +51,16 @@ class Processor {
  private:
   uint32_t _classID = 0;
 };
+
+/**
+ * Returns whether the given processor is an instance of the concrete processor class T, which
+ * must declare a processor class ID macro (public when the check is used outside T's own member
+ * functions). This replaces name() string comparisons for type dispatch: a name() literal has no
+ * compile-time link to the class it names, so a rename breaks the check silently, while a
+ * ClassID mismatch fails to compile.
+ */
+template <typename T>
+bool IsProcessor(const Processor* processor) {
+  return processor != nullptr && processor->classID() == T::ClassID();
+}
 }  // namespace tgfx

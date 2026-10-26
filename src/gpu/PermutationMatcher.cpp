@@ -82,7 +82,7 @@ int GetXPType(const ProgramInfo* programInfo) {
   if (xp == EmptyXferProcessor::GetInstance()) {
     return 0;
   }
-  if (xp->name() == "PorterDuffXferProcessor") {
+  if (IsProcessor<PorterDuffXferProcessor>(xp)) {
     if (xp->dstTextureView() != nullptr) {
       return 1;  // DST_TEX mode
     }
@@ -120,7 +120,7 @@ static bool IsLocalMaskChild(const FragmentProcessor* child) {
 // the runtime clip contract carries a DeviceToLocal matrix (identity for the device-space form).
 // NonAA rects keep the hard-edge step math out of the contract and stay on the fallback route.
 static bool IsFoldableAARectEffect(const FragmentProcessor* fp) {
-  if (fp == nullptr || fp->name() != "RectEffect" || fp->numChildProcessors() != 0) {
+  if (fp == nullptr || !IsProcessor<RectEffect>(fp) || fp->numChildProcessors() != 0) {
     return false;
   }
   auto rectEffect = static_cast<const RectEffect*>(fp);
@@ -272,7 +272,7 @@ bool IsChainQuadSubsetServable(const QuadPerEdgeAAGeometryProcessor* quadGP,
   }
   for (size_t index = 0; index < chain->leafCount(); ++index) {
     auto leaf = chain->childProcessor(index);
-    if (leaf->name() != "TextureEffect") {
+    if (!IsProcessor<TextureEffect>(leaf)) {
       return false;
     }
     auto* texture = static_cast<const TextureEffect*>(leaf);
@@ -292,11 +292,11 @@ bool IsChainQuadSubsetServable(const QuadPerEdgeAAGeometryProcessor* quadGP,
 // (ColorMatrix / Luma / AlphaThreshold / ColorSpaceXform). For ColorSpaceXform the transfer-function
 // type must be in the supported 0-3 range; the pipeline flags themselves are runtime uniforms.
 bool IsSupportedPointwiseOp(const FragmentProcessor* fp) {
-  if (fp->name() == "ColorMatrixFragmentProcessor" || fp->name() == "LumaFragmentProcessor" ||
-      fp->name() == "AlphaStepFragmentProcessor") {
+  if (IsProcessor<ColorMatrixFragmentProcessor>(fp) || IsProcessor<LumaFragmentProcessor>(fp) ||
+      IsProcessor<AlphaThresholdFragmentProcessor>(fp)) {
     return true;
   }
-  if (fp->name() != "ColorSpaceXformEffect") {
+  if (!IsProcessor<ColorSpaceXformEffect>(fp)) {
     return false;
   }
   auto* cse = static_cast<const ColorSpaceXformEffect*>(fp);
@@ -336,13 +336,13 @@ bool IsServableBlurChild(const FragmentProcessor* childFP) {
   if (childFP == nullptr || childFP->numTextureSamplers() == 0) {
     return false;
   }
-  if (childFP->name() == "TextureEffect") {
+  if (IsProcessor<TextureEffect>(childFP)) {
     TileMode modeX = TileMode::Clamp;
     TileMode modeY = TileMode::Clamp;
     static_cast<const TextureEffect*>(childFP)->getTileModes(&modeX, &modeY);
     return modeX == TileMode::Clamp && modeY == TileMode::Clamp;
   }
-  if (childFP->name() == "TiledTextureEffect") {
+  if (IsProcessor<TiledTextureEffect>(childFP)) {
     auto* childTiled = static_cast<const TiledTextureEffect*>(childFP);
     if (childTiled->hasPerspective()) {
       return false;
@@ -361,7 +361,7 @@ bool IsServableBlurChild(const FragmentProcessor* childFP) {
 // by ComposeRoundStrokeRect in PermutationRules.cpp and shared with the build tool.
 std::optional<RoundStrokeRectInputs> ExtractRoundStrokeRect(const ProgramInfo* programInfo) {
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != "RoundStrokeRectGeometryProcessor") {
+  if (!IsProcessor<RoundStrokeRectGeometryProcessor>(gp)) {
     return std::nullopt;
   }
   // The kernel reads the clip from the runtime clip contract uniforms, so a sole analytic clip is
@@ -460,7 +460,7 @@ static uint32_t RequiredTextureReads(const ProgramInfo* programInfo) {
   }
   FragmentProcessor::Iter iter(programInfo);
   for (auto fp = iter.next(); fp != nullptr; fp = iter.next()) {
-    if (fp->name() == "TextureEffect" && static_cast<const TextureEffect*>(fp)->isYUV()) {
+    if (IsProcessor<TextureEffect>(fp) && static_cast<const TextureEffect*>(fp)->isYUV()) {
       continue;
     }
     for (size_t i = 0; i < fp->numTextureSamplers(); ++i) {

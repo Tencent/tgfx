@@ -255,9 +255,10 @@ static std::vector<ScannedProcessor> ScanProcessorHeaders() {
 }
 
 // The pure gate check, factored out so synthetic violations can verify the gate itself. A
-// matcher/structural claim is proven by the name() string or a qualified `ClassName::` reference
-// (the singleton identity form) appearing in the matcher source; a lowering claim by the scanned
-// header declaring lowerToAOT; a runtime-by-design entry by its documented reason.
+// matcher/structural claim is proven by the name() string, a qualified `ClassName::` reference
+// (the singleton identity form), or an `IsProcessor<ClassName>` type check appearing in the
+// matcher source; a lowering claim by the scanned header declaring lowerToAOT; a
+// runtime-by-design entry by its documented reason.
 static std::vector<std::string> EvaluateProcessorClaims(
     const std::vector<ScannedProcessor>& scanned, const ProcessorClaim* claims, size_t claimCount,
     const std::string& matcherSource) {
@@ -280,11 +281,14 @@ static std::vector<std::string> EvaluateProcessorClaims(
     if ((claim->claims & (kMatcher | kStructural)) != 0) {
       bool referenced =
           matcherSource.find(claim->nameString) != std::string::npos ||
-          matcherSource.find(std::string(claim->className) + "::") != std::string::npos;
+          matcherSource.find(std::string(claim->className) + "::") != std::string::npos ||
+          matcherSource.find("IsProcessor<" + std::string(claim->className) + ">") !=
+              std::string::npos;
       if (!referenced) {
         violations.push_back("matcher reference missing for: " + processor.className +
-                             " (expected \"" + claim->nameString + "\" or \"" + claim->className +
-                             "::\" in PermutationMatcher.cpp)");
+                             " (expected \"" + claim->nameString + "\", \"" + claim->className +
+                             "::\", or \"IsProcessor<" + claim->className + ">\" in " +
+                             "PermutationMatcher.cpp)");
       }
     }
     if ((claim->claims & kLowering) != 0 && !processor.hasLowerToAOT) {

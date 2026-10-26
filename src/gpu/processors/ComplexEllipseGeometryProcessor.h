@@ -33,6 +33,7 @@ namespace tgfx {
  */
 class ComplexEllipseGeometryProcessor : public GeometryProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<ComplexEllipseGeometryProcessor> Make(BlockAllocator* allocator, int width,
                                                             int height, bool stroke,
                                                             std::optional<PMColor> commonColor);
@@ -50,8 +51,6 @@ class ComplexEllipseGeometryProcessor : public GeometryProcessor {
   }
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   ComplexEllipseGeometryProcessor(int width, int height, bool stroke,
                                   std::optional<PMColor> commonColor);
 

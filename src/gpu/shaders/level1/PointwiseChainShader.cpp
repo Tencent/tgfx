@@ -25,6 +25,7 @@
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComplexEllipseGeometryProcessor.h"
+#include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/HairlineLineGeometryProcessor.h"
@@ -44,19 +45,19 @@ std::optional<PermutationMatchResult> PointwiseChainShader::Match(const ProgramI
   // chain's attribute order), 3 the sampler-free AtlasText twin, 4 the ellipse layout, 5 the
   // hairline-line layout, 6 / 7 the complex rounded-rect fill / stroke layouts.
   int gpKind = -1;
-  if (gp->name() == "DefaultGeometryProcessor") {
+  if (IsProcessor<DefaultGeometryProcessor>(gp)) {
     gpKind = 0;
-  } else if (gp->name() == "QuadPerEdgeAAGeometryProcessor") {
+  } else if (IsProcessor<QuadPerEdgeAAGeometryProcessor>(gp)) {
     gpKind = 1;
-  } else if (gp->name() == "MeshGeometryProcessor") {
+  } else if (IsProcessor<MeshGeometryProcessor>(gp)) {
     gpKind = 2;
-  } else if (gp->name() == "AtlasTextGeometryProcessor") {
+  } else if (IsProcessor<AtlasTextGeometryProcessor>(gp)) {
     gpKind = 3;
-  } else if (gp->name() == "EllipseGeometryProcessor") {
+  } else if (IsProcessor<EllipseGeometryProcessor>(gp)) {
     gpKind = 4;
-  } else if (gp->name() == "HairlineLineGeometryProcessor") {
+  } else if (IsProcessor<HairlineLineGeometryProcessor>(gp)) {
     gpKind = 5;
-  } else if (gp->name() == "ComplexEllipseGeometryProcessor") {
+  } else if (IsProcessor<ComplexEllipseGeometryProcessor>(gp)) {
     gpKind = static_cast<const ComplexEllipseGeometryProcessor*>(gp)->isStroke() ? 7 : 6;
   }
   if (gpKind < 0 || programInfo->numColorFragmentProcessors() != 1 ||
@@ -64,7 +65,7 @@ std::optional<PermutationMatchResult> PointwiseChainShader::Match(const ProgramI
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
-  if (fp->name() != "AOTPointwiseChainProcessor") {
+  if (!IsProcessor<AOTPointwiseChainProcessor>(fp)) {
     return std::nullopt;
   }
   auto* chain = static_cast<const AOTPointwiseChainProcessor*>(fp);
@@ -91,7 +92,7 @@ std::optional<PermutationMatchResult> PointwiseChainShader::Match(const ProgramI
     // A deferred (task-local) proxy reports zero samplers until it is instantiated; it always
     // binds exactly one when it is (a lazy proxy is internally rendered, hence never multi-plane
     // YUV), so only a multi-sampler leaf is rejected here.
-    if (leaf->name() != "TextureEffect" || leaf->numTextureSamplers() > 1) {
+    if (!IsProcessor<TextureEffect>(leaf) || leaf->numTextureSamplers() > 1) {
       return std::nullopt;
     }
     auto* texture = static_cast<const TextureEffect*>(leaf);

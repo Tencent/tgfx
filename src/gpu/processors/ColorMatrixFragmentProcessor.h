@@ -24,6 +24,7 @@
 namespace tgfx {
 class ColorMatrixFragmentProcessor : public FragmentProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<ColorMatrixFragmentProcessor> Make(BlockAllocator* allocator,
                                                          const std::array<float, 20>& matrix);
 
@@ -36,8 +37,6 @@ class ColorMatrixFragmentProcessor : public FragmentProcessor {
   bool isChannelPermutation() const;
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   explicit ColorMatrixFragmentProcessor(const std::array<float, 20>& matrix)
       : FragmentProcessor(ClassID()), matrix(matrix) {
   }

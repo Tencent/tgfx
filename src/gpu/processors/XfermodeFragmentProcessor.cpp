@@ -98,7 +98,7 @@ void XfermodeFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
   size_t childCount = std::min<size_t>(numChildProcessors(), 2);
   for (size_t i = 0; i < childCount; i++) {
     auto childFP = childProcessor(i);
-    if (childFP == nullptr || childFP->name() != "TextureEffect") {
+    if (childFP == nullptr || !IsProcessor<TextureEffect>(childFP)) {
       continue;
     }
     auto childTE = static_cast<const TextureEffect*>(childFP);

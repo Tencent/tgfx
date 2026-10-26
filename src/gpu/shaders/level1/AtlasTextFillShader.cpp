@@ -48,7 +48,7 @@ std::optional<PermutationMatchResult> AtlasTextFillShader::Match(const ProgramIn
     // mask, or a direct analytic clip (AA rect / rrect) via the runtime clip contract.
     if (!HasDirectAnalyticClipCoverage(programInfo)) {
       auto fp = programInfo->getFragmentProcessor(0);
-      if (fp->name() != "DeviceSpaceTextureEffect") {
+      if (!IsProcessor<DeviceSpaceTextureEffect>(fp)) {
         return std::nullopt;
       }
       auto* mask = static_cast<const DeviceSpaceTextureEffect*>(fp);

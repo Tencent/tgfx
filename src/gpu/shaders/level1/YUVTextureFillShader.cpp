@@ -47,16 +47,16 @@ std::optional<PermutationMatchResult> YUVTextureFillShader::Match(const ProgramI
   }
   auto fp = programInfo->getFragmentProcessor(0);
   const TextureEffect* texture = nullptr;
-  if (fp->name() == "AOTYUVChainProcessor") {
+  if (IsProcessor<AOTYUVChainProcessor>(fp)) {
     // The decomposed color-grade route: the multi-plane source plus folded pointwise slots,
     // all carried by the same YUVTextureFillShader variant set (the operators are per-draw
     // uniform data, so no dimension changes).
     auto* chain = static_cast<const AOTYUVChainProcessor*>(fp);
-    if (chain->source() == nullptr || chain->source()->name() != "TextureEffect") {
+    if (chain->source() == nullptr || !IsProcessor<TextureEffect>(chain->source())) {
       return std::nullopt;
     }
     texture = static_cast<const TextureEffect*>(chain->source());
-  } else if (fp->name() == "TextureEffect") {
+  } else if (IsProcessor<TextureEffect>(fp)) {
     texture = static_cast<const TextureEffect*>(fp);
   } else {
     return std::nullopt;

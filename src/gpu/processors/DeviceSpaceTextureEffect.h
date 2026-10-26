@@ -23,6 +23,7 @@
 namespace tgfx {
 class DeviceSpaceTextureEffect : public FragmentProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<DeviceSpaceTextureEffect> Make(BlockAllocator* allocator,
                                                      std::shared_ptr<TextureProxy> textureProxy,
                                                      const Matrix& uvMatrix);
@@ -50,8 +51,6 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   DeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy, const Matrix& uvMatrix);
 
   size_t onCountTextureSamplers() const override;

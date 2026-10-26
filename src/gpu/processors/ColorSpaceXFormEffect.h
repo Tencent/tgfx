@@ -25,6 +25,7 @@ namespace tgfx {
 
 class ColorSpaceXformEffect : public FragmentProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator, ColorSpace* src,
                                               AlphaType srcAT, ColorSpace* dst, AlphaType dstAT);
 
@@ -46,7 +47,6 @@ class ColorSpaceXformEffect : public FragmentProcessor {
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  private:
-  DEFINE_PROCESSOR_CLASS_ID
   void onSetData(UniformData*, UniformData*) const override;
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
   std::shared_ptr<ColorSpaceXformSteps> colorSpaceXformSteps;

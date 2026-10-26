@@ -31,6 +31,7 @@ class TextureView;
 
 class PerlinNoiseFragmentProcessor : public FragmentProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   // The precompiled PerlinNoiseFillShader carries three pointwise-operator slots: the first is shared with an operator FP composed on top of this
   // processor, the rest are reserved for slot records uploaded by the processor itself.
   static constexpr size_t MaxPointwiseSlots = 3;
@@ -82,8 +83,6 @@ class PerlinNoiseFragmentProcessor : public FragmentProcessor {
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   PerlinNoiseFragmentProcessor(PerlinNoiseType noiseType, int numOctaves, bool stitchTiles,
                                std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,
                                std::shared_ptr<TextureView> permutationsView,

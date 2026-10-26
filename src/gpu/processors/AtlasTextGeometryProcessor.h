@@ -25,6 +25,7 @@
 namespace tgfx {
 class AtlasTextGeometryProcessor : public GeometryProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<AtlasTextGeometryProcessor> Make(BlockAllocator* allocator,
                                                        std::shared_ptr<TextureProxy> textureProxy,
                                                        AAType aa,
@@ -65,8 +66,6 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
   }
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   AtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy, AAType aa,
                              std::optional<PMColor> commonColor, const SamplingOptions& sampling,
                              bool bindAtlasSampler = true);

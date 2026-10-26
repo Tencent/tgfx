@@ -22,7 +22,9 @@
 #include "gpu/PermutationMatcher.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
+#include "gpu/processors/ComposeFragmentProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/processors/PerlinNoiseFragmentProcessor.h"
 
 namespace tgfx {
 
@@ -42,16 +44,16 @@ std::optional<PermutationMatchResult> PerlinNoiseFillShader::Match(const Program
   const FragmentProcessor* perlin = nullptr;
   if (programInfo->numFragmentProcessors() == 1 && programInfo->numColorFragmentProcessors() == 1) {
     auto fp = programInfo->getFragmentProcessor(0);
-    if (fp->name() == "PerlinNoiseFragmentProcessor") {
+    if (IsProcessor<PerlinNoiseFragmentProcessor>(fp)) {
       perlin = fp;
-    } else if (fp->name() == "ComposeFragmentProcessor" && fp->numChildProcessors() == 2 &&
-               fp->childProcessor(0)->name() == "PerlinNoiseFragmentProcessor" &&
+    } else if (IsProcessor<ComposeFragmentProcessor>(fp) && fp->numChildProcessors() == 2 &&
+               IsProcessor<PerlinNoiseFragmentProcessor>(fp->childProcessor(0)) &&
                IsSupportedPointwiseOp(fp->childProcessor(1))) {
       perlin = fp->childProcessor(0);
     }
   } else if (programInfo->numFragmentProcessors() == 2 &&
              programInfo->numColorFragmentProcessors() == 2 &&
-             programInfo->getFragmentProcessor(0)->name() == "PerlinNoiseFragmentProcessor" &&
+             IsProcessor<PerlinNoiseFragmentProcessor>(programInfo->getFragmentProcessor(0)) &&
              IsSupportedPointwiseOp(programInfo->getFragmentProcessor(1))) {
     perlin = programInfo->getFragmentProcessor(0);
   }

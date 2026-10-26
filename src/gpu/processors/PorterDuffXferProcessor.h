@@ -25,6 +25,7 @@
 namespace tgfx {
 class PorterDuffXferProcessor : public XferProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<PorterDuffXferProcessor> Make(BlockAllocator* allocator, BlendMode blend,
                                                     DstTextureInfo dstTextureInfo);
 
@@ -41,8 +42,6 @@ class PorterDuffXferProcessor : public XferProcessor {
   void computeProcessorKey(Context* context, BytesKey* bytesKey) const override;
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   PorterDuffXferProcessor(BlendMode blend, DstTextureInfo dstTextureInfo)
       : XferProcessor(ClassID()), blendMode(blend), dstTextureInfo(std::move(dstTextureInfo)) {
   }

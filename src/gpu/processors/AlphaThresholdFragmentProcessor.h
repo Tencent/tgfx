@@ -23,6 +23,7 @@
 namespace tgfx {
 class AlphaThresholdFragmentProcessor : public FragmentProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<AlphaThresholdFragmentProcessor> Make(BlockAllocator* allocator,
                                                             float threshold);
 
@@ -33,8 +34,6 @@ class AlphaThresholdFragmentProcessor : public FragmentProcessor {
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   explicit AlphaThresholdFragmentProcessor(float threshold)
       : FragmentProcessor(ClassID()), threshold(threshold) {
   }

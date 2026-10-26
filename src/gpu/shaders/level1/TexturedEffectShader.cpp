@@ -22,6 +22,7 @@
 #include "gpu/PermutationMatcher.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
+#include "gpu/processors/ComposeFragmentProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 
@@ -47,7 +48,7 @@ std::optional<PermutationMatchResult> TexturedEffectShader::Match(const ProgramI
   const FragmentProcessor* child1 = nullptr;
   if (programInfo->numFragmentProcessors() == 1 && programInfo->numColorFragmentProcessors() == 1) {
     auto fp = programInfo->getFragmentProcessor(0);
-    if (fp->name() != "ComposeFragmentProcessor" || fp->numChildProcessors() != 2) {
+    if (!IsProcessor<ComposeFragmentProcessor>(fp) || fp->numChildProcessors() != 2) {
       return std::nullopt;
     }
     child0 = fp->childProcessor(0);
@@ -59,7 +60,7 @@ std::optional<PermutationMatchResult> TexturedEffectShader::Match(const ProgramI
   } else {
     return std::nullopt;
   }
-  if (child0->name() != "TextureEffect") {
+  if (!IsProcessor<TextureEffect>(child0)) {
     return std::nullopt;
   }
   auto* te = static_cast<const TextureEffect*>(child0);

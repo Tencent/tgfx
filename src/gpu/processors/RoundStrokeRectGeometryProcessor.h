@@ -25,6 +25,7 @@
 namespace tgfx {
 class RoundStrokeRectGeometryProcessor : public GeometryProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<RoundStrokeRectGeometryProcessor> Make(BlockAllocator* allocator,
                                                              AAType aaType,
                                                              std::optional<PMColor> commonColor,
@@ -51,7 +52,6 @@ class RoundStrokeRectGeometryProcessor : public GeometryProcessor {
   }
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
   RoundStrokeRectGeometryProcessor(AAType aa, std::optional<PMColor> commonColor,
                                    std::optional<Matrix> uvMatrix);
   void onComputeProcessorKey(BytesKey* bytesKey) const override;

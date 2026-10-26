@@ -19,6 +19,8 @@
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/ColorSpaceXformHelper.h"
 #include "gpu/Swizzle.h"
+#include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "gpu/processors/TextureEffect.h"
 #include "gpu/resources/TextureView.h"
 
 namespace tgfx {
@@ -390,7 +392,8 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     }
   }
   for (const auto& child : samplerPadding) {
-    if (child == nullptr || child->name() != "TextureEffect" || child->numTextureSamplers() > 1) {
+    if (child == nullptr || !IsProcessor<TextureEffect>(child.get()) ||
+        child->numTextureSamplers() > 1) {
       return nullptr;
     }
   }
@@ -402,7 +405,7 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     return nullptr;
   }
   if (maskChild != nullptr && !maskChildIsPhantom &&
-      maskChild->name() != "DeviceSpaceTextureEffect") {
+      !IsProcessor<DeviceSpaceTextureEffect>(maskChild.get())) {
     return nullptr;
   }
   if (lutChild != nullptr &&

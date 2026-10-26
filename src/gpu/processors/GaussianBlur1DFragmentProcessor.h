@@ -26,6 +26,7 @@ enum class GaussianBlurDirection { Horizontal, Vertical };
 
 class GaussianBlur1DFragmentProcessor : public Blur1DFragmentProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   /**
    * Creates a gaussian blur processor that samples the child along the given direction with the
    * specified step. sigma is the standard deviation of the gaussian kernel in pixels. Returns
@@ -46,8 +47,6 @@ class GaussianBlur1DFragmentProcessor : public Blur1DFragmentProcessor {
   }
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   GaussianBlur1DFragmentProcessor(PlacementPtr<FragmentProcessor> processor, float sigma,
                                   GaussianBlurDirection direction, float stepLength, int maxSigma);
 

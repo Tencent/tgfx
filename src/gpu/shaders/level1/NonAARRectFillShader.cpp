@@ -52,7 +52,7 @@ std::optional<PermutationMatchResult> NonAARRectFillShader::Match(const ProgramI
       // The textured variant carries the single-tap tiled modes only: the mipmap-repeat 4-tap path
       // and perspective coordinates stay on the runtime route. The textured form never combines
       // with stroke; ComposeNonAARRectFill applies that rejection through the shared predicate.
-      if (fp->name() != "TiledTextureEffect") {
+      if (!IsProcessor<TiledTextureEffect>(fp)) {
         return std::nullopt;
       }
       auto* tte = static_cast<const TiledTextureEffect*>(fp);

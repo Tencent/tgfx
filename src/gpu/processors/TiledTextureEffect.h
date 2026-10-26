@@ -27,6 +27,7 @@
 namespace tgfx {
 class TiledTextureEffect : public FragmentProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<FragmentProcessor> Make(BlockAllocator* allocator,
                                               std::shared_ptr<TextureProxy> textureProxy,
                                               const SamplingArgs& args,
@@ -71,8 +72,6 @@ class TiledTextureEffect : public FragmentProcessor {
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   struct Sampling {
     Sampling(const SamplingSource& source, SamplerState sampler, const Rect& subset);
 

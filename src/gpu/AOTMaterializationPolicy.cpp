@@ -20,6 +20,7 @@
 #include "gpu/BackingFit.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
 
@@ -49,7 +50,7 @@ static bool IsPointwiseBlendLeafLegal(const FragmentProcessor* fp, size_t childI
   if (IsPointwiseBlendLeafMatchable(fp, childIndex)) {
     return true;
   }
-  return childIndex == 0 && fp != nullptr && fp->name() == "TiledTextureEffect";
+  return childIndex == 0 && fp != nullptr && IsProcessor<TiledTextureEffect>(fp);
 }
 
 MaterializationDecision AOTMaterializationPolicy::Evaluate(const FragmentProcessor* child,

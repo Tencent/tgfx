@@ -25,6 +25,7 @@
 namespace tgfx {
 class ClampedGradientEffect : public FragmentProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<ClampedGradientEffect> Make(BlockAllocator* allocator,
                                                   PlacementPtr<FragmentProcessor> colorizer,
                                                   PlacementPtr<FragmentProcessor> gradLayout,
@@ -37,8 +38,6 @@ class ClampedGradientEffect : public FragmentProcessor {
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   ClampedGradientEffect(PlacementPtr<FragmentProcessor> colorizer,
                         PlacementPtr<FragmentProcessor> gradLayout, Color leftBorderColor,
                         Color rightBorderColor);

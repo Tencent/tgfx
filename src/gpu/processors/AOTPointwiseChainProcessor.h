@@ -147,6 +147,7 @@ struct AOTChainDeviceLeaf {
 
 class AOTPointwiseChainProcessor : public FragmentProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   // The maximum instruction storage across the shapes (the noise shape: 32; the gradient shape
   // shares the plain chain's 16). ValidateSlots checks the resolved shape's own capacity.
   static constexpr size_t MaxSlots = NoiseGraphResourceCapacity.instructions;
@@ -311,8 +312,6 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   void emitCode(EmitArgs& args) const override;
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
  private:
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
