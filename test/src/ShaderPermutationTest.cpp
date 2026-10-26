@@ -360,6 +360,7 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
   // The global variant total is not asserted here on purpose: PrecompiledBundleLoad's
   // ExpectBundleEntryCounts already ties every family's reachable set to the bundle's actual
   // entry counts, so a hand-maintained total would only add a number to update on every change.
+
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseChainShader"),
             PointwiseChainShader::Reachable());
   const std::set<std::pair<uint32_t, uint32_t>> maskPairs = {{0, 0}, {0, 1}, {0, 2}};
@@ -402,6 +403,95 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryAllowsIdenticalRegistrations) {
   EXPECT_EQ(ShaderRegistry::All(), factories);
   EXPECT_EQ(ShaderRegistry::Find("PointwiseChainShader"), info);
   EXPECT_EQ(*ShaderRegistry::Enumerate("PointwiseChainShader"), PointwiseChainShader::Reachable());
+}
+
+// Reads a GLSL source file with its #include lines recursively expanded (bounded), so a check can
+// match text that lives in an .inc module. Returns an empty string when the file cannot be opened.
+static std::string ReadExpandedGLSL(const std::string& path, int depth = 0) {
+  std::ifstream file(path);
+  if (!file.is_open()) {
+    return "";
+  }
+  std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  if (depth >= 8) {
+    return text;
+  }
+  auto slash = path.find_last_of('/');
+  const std::string dir = slash == std::string::npos ? "." : path.substr(0, slash);
+  std::string expanded;
+  size_t lineStart = 0;
+  while (lineStart < text.size()) {
+    auto lineEnd = text.find('\n', lineStart);
+    if (lineEnd == std::string::npos) {
+      lineEnd = text.size();
+    }
+    std::string line = text.substr(lineStart, lineEnd - lineStart);
+    static const std::string includePrefix = "#include \"";
+    auto include = line.find(includePrefix);
+    if (include != std::string::npos) {
+      auto nameStart = include + includePrefix.size();
+      auto nameEnd = line.find('"', nameStart);
+      if (nameEnd != std::string::npos) {
+        expanded +=
+            ReadExpandedGLSL(dir + "/" + line.substr(nameStart, nameEnd - nameStart), depth + 1);
+        expanded += '\n';
+        lineStart = lineEnd + 1;
+        continue;
+      }
+    }
+    expanded += line;
+    expanded += '\n';
+    lineStart = lineEnd + 1;
+  }
+  return expanded;
+}
+
+// Returns the offset of the first whole-word occurrence of identifier in text, or npos. A bare
+// substring match would count "HAS_XP" as referenced inside "HAS_XPP" and miss real typos.
+static size_t FindIdentifier(const std::string& text, const std::string& identifier) {
+  auto isWordChar = [](char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
+  };
+  size_t offset = 0;
+  while ((offset = text.find(identifier, offset)) != std::string::npos) {
+    auto before = offset == 0 ? '\0' : text[offset - 1];
+    auto after =
+        offset + identifier.size() >= text.size() ? '\0' : text[offset + identifier.size()];
+    if (!isWordChar(before) && !isWordChar(after)) {
+      return offset;
+    }
+    ++offset;
+  }
+  return std::string::npos;
+}
+
+TGFX_TEST(ShaderPermutationTest, DimensionDefinesAppearInGLSL) {
+  // A dimension's define name that never appears in the family's GLSL means every variant of
+  // that dimension silently compiles to the same code — a typo in the GLSL side of the contract
+  // or a dimension whose branch was replaced by a runtime uniform without removing the axis. The
+  // check is enumeration driven, so a new family is covered without writing another test.
+  const std::string shaderDir = "../src/gpu/shaders/glsl";
+  for (auto& factory : ShaderRegistry::All()) {
+    auto shader = factory();
+    ASSERT_NE(shader, nullptr);
+    auto info = shader->info();
+    SCOPED_TRACE(info.name);
+    std::string text = ReadExpandedGLSL(shaderDir + "/" + info.vertexFile);
+    text += "\n";
+    text += ReadExpandedGLSL(shaderDir + "/" + info.fragmentFile);
+    ASSERT_FALSE(text.empty()) << info.vertexFile << " / " << info.fragmentFile
+                               << " could not be read under " << shaderDir;
+    for (const auto& dimensions : {info.vertDomain, info.fragDomain}) {
+      for (const auto& dimension : dimensions.getDimensions()) {
+        auto defineName =
+            std::visit([](const auto& dim) { return std::string(dim.defineName); }, dimension);
+        EXPECT_NE(FindIdentifier(text, defineName), std::string::npos)
+            << "dimension " << defineName
+            << " is never referenced by the family's GLSL (typo, or the axis became a runtime "
+               "uniform and should be removed from the domain)";
+      }
+    }
+  }
 }
 
 #if GTEST_HAS_DEATH_TEST
