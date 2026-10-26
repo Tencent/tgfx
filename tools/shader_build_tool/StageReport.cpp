@@ -43,7 +43,7 @@ struct StageRecord {
 };
 
 std::string StageSuffix(bool isVertex) {
-  return isVertex ? "_Vert" : "_Frag";
+  return isVertex ? VertexStageSuffix : FragmentStageSuffix;
 }
 
 std::string FormatHashHex(const ShaderKeyHash& hash) {
@@ -159,8 +159,11 @@ bool WriteStageReport(const std::string& path, const std::vector<VariantData>& v
     }
     const auto& domain = record.isVertex ? info->vertDomain : info->fragDomain;
     auto codeHash = ComputeBlobHash(record.codeBlob);
-    auto stageKey = ComputeShaderKeyHash(record.shaderName + StageSuffix(record.isVertex),
-                                         record.permutationIndex, record.profileTag);
+    auto stageKey = record.isVertex ? ComputeVertexKeyHash(record.shaderName, record.permutationIndex,
+                                                           record.profileTag)
+                                    : ComputeFragmentKeyHash(record.shaderName,
+                                                             record.permutationIndex,
+                                                             record.profileTag);
     file << "    {\n";
     file << "      \"identity\": \"" << record.identity << "\",\n";
     file << "      \"shader\": \"" << record.shaderName << "\",\n";

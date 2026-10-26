@@ -153,11 +153,11 @@ std::map<std::pair<uint64_t, uint64_t>, std::set<std::string>, KeyPairLess> Buil
       if (!PermutationCompilesForBackend(info, pair.first, pair.second, profileTag)) {
         continue;
       }
-      auto vertHash = ComputeShaderKeyHash(info.name + "_Vert", pair.first, profileTag);
-      expected[{vertHash.hi, vertHash.lo}].insert(info.name + "_Vert[" +
+      auto vertHash = ComputeVertexKeyHash(info.name, pair.first, profileTag);
+      expected[{vertHash.hi, vertHash.lo}].insert(info.name + VertexStageSuffix + "[" +
                                                   std::to_string(pair.first) + "]");
-      auto fragHash = ComputeShaderKeyHash(info.name + "_Frag", pair.second, profileTag);
-      expected[{fragHash.hi, fragHash.lo}].insert(info.name + "_Frag[" +
+      auto fragHash = ComputeFragmentKeyHash(info.name, pair.second, profileTag);
+      expected[{fragHash.hi, fragHash.lo}].insert(info.name + FragmentStageSuffix + "[" +
                                                   std::to_string(pair.second) + "]");
     }
   }

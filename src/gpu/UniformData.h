@@ -22,22 +22,13 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "gpu/ShaderBindingLayout.h"
 #include "gpu/Uniform.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
-static constexpr char VertexUniformBlockName[] = "VertexUniformBlock";
-static constexpr char FragmentUniformBlockName[] = "FragmentUniformBlock";
-// Descriptor set indices for SPIR-V based backends. Vertex and fragment UBOs use independent
-// sets so each stage can assign dense local bindings without colliding in Vulkan/WebGPU's
-// pipeline-wide resource namespace. Textures use a third set.
-static constexpr int VERTEX_UBO_DESCRIPTOR_SET = 0;
-static constexpr int FRAGMENT_UBO_DESCRIPTOR_SET = 1;
-static constexpr int TEXTURE_DESCRIPTOR_SET = 2;
-static constexpr int VERTEX_UBO_BINDING_POINT = 0;
-static constexpr int FRAGMENT_UBO_BINDING_POINT = 1;
 
 /**
  * An object representing the collection of uniform data in CPU side.

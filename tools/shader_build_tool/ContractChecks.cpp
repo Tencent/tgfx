@@ -395,7 +395,7 @@ size_t ValidateReflectionContracts(const std::vector<VariantData>& variants) {
       // samplers use their registered semantic names instead (SamplerContract in KernelContract.h).
       int nextSamplerIndex = 0;
       for (const auto& sampler : reflection->samplers) {
-        const std::string prefix = "TextureSampler_";
+        const std::string prefix = SamplerContract::TextureSamplerPrefix;
         bool generic = sampler.name.size() > prefix.size() &&
                        sampler.name.compare(0, prefix.size(), prefix) == 0;
         if (generic) {

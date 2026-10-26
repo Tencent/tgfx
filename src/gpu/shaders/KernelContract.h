@@ -89,6 +89,11 @@ constexpr int Blend = 7;
 
 namespace SamplerContract {
 
+// The prefix of every ordinary texture sampler: TextureSampler_<N>, with N dense from zero in
+// declaration order. The runtime emits these names (ProgramBuilder) and shader_build_tool checks
+// the reflected samplers against the same pattern.
+constexpr const char* TextureSamplerPrefix = "TextureSampler_";
+
 // Every semantic sampler name a precompiled kernel may declare. Ordinary texture bindings use the
 // generic TextureSampler_<N> pattern (N dense from zero, checked by shader_build_tool); the names
 // below carry dedicated meaning and appear verbatim in the kernels, the runtime emitters, and the

@@ -129,9 +129,9 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
   std::map<ShaderKeyHash, SeenEntry, HashKeyLess> fragSeen;
 
   for (const auto& v : variants) {
-    // Vertex entry: key = hash(shaderName + "_Vert", vertPermutationIndex, profileTag)
+    // Vertex entry: key = ComputeVertexKeyHash(shaderName, vertPermutationIndex, profileTag)
     auto vertHash =
-        ComputeShaderKeyHash(v.shaderName + "_Vert", v.vertPermutationIndex, v.profileTag);
+        ComputeVertexKeyHash(v.shaderName, v.vertPermutationIndex, v.profileTag);
     auto vertReflBlob = SerializeStageReflection(v.vertexReflection);
     auto vertIt = vertSeen.find(vertHash);
     if (vertIt == vertSeen.end()) {
@@ -151,9 +151,9 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
       return false;
     }
 
-    // Fragment entry: key = hash(shaderName + "_Frag", fragPermutationIndex, profileTag)
+    // Fragment entry: key = ComputeFragmentKeyHash(shaderName, fragPermutationIndex, profileTag)
     auto fragHash =
-        ComputeShaderKeyHash(v.shaderName + "_Frag", v.fragPermutationIndex, v.profileTag);
+        ComputeFragmentKeyHash(v.shaderName, v.fragPermutationIndex, v.profileTag);
     auto fragReflBlob = SerializeStageReflection(v.fragmentReflection);
     auto fragIt = fragSeen.find(fragHash);
     if (fragIt == fragSeen.end()) {

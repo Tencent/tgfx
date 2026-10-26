@@ -18,6 +18,7 @@
 
 #include "ProgramBuilder.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/shaders/KernelContract.h"
 
 namespace tgfx {
 class ProcessorGuard {
@@ -116,7 +117,7 @@ std::string ProgramBuilder::emitAndInstallFragProc(const FragmentProcessor* proc
   int samplerIndex = 0;
   while (const auto subFP = fpIter.next()) {
     for (size_t i = 0; i < subFP->numTextureSamplers(); ++i) {
-      std::string name = "TextureSampler_";
+      std::string name = SamplerContract::TextureSamplerPrefix;
       name += std::to_string(samplerIndex++);
       auto texture = subFP->textureAt(i);
       texSamplers.emplace_back(emitSampler(texture, name));

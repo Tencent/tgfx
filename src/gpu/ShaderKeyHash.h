@@ -99,17 +99,22 @@ inline ShaderKeyHash ComputeBlobHash(const std::vector<uint8_t>& blob) {
   return result;
 }
 
+/// The suffix that tells a vertex stage key from a fragment stage key of the same shader name.
+/// Every place that builds or prints a stage key must use these, not spell the text again.
+inline constexpr char VertexStageSuffix[] = "_Vert";
+inline constexpr char FragmentStageSuffix[] = "_Frag";
+
 /// Computes the vertex shader key hash: hash(shaderName + "_Vert", permutationIndex, profileTag).
 inline ShaderKeyHash ComputeVertexKeyHash(const std::string& shaderName, uint32_t permutationIndex,
                                           const std::string& profileTag) {
-  return ComputeShaderKeyHash(shaderName + "_Vert", permutationIndex, profileTag);
+  return ComputeShaderKeyHash(shaderName + VertexStageSuffix, permutationIndex, profileTag);
 }
 
 /// Computes the fragment shader key hash: hash(shaderName + "_Frag", permutationIndex, profileTag).
 inline ShaderKeyHash ComputeFragmentKeyHash(const std::string& shaderName,
                                             uint32_t permutationIndex,
                                             const std::string& profileTag) {
-  return ComputeShaderKeyHash(shaderName + "_Frag", permutationIndex, profileTag);
+  return ComputeShaderKeyHash(shaderName + FragmentStageSuffix, permutationIndex, profileTag);
 }
 
 }  // namespace tgfx

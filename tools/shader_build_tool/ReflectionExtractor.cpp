@@ -19,6 +19,7 @@
 #include "ReflectionExtractor.h"
 #include <iostream>
 #include <spirv_cross.hpp>
+#include "gpu/ShaderBindingLayout.h"
 #include "gpu/Uniform.h"
 
 namespace tgfx {
@@ -153,13 +154,13 @@ ReflectionResult ExtractReflection(const std::vector<uint32_t>& vertexSPIRV,
 
   if (!vertexSPIRV.empty()) {
     spirv_cross::Compiler vertCompiler(vertexSPIRV);
-    result.vertexReflection.uniforms = ExtractUBOMembers(vertCompiler, "VertexUniformBlock");
+    result.vertexReflection.uniforms = ExtractUBOMembers(vertCompiler, VertexUniformBlockName);
     result.vertexReflection.vertexInputs = ExtractVertexInputs(vertCompiler);
   }
 
   if (!fragmentSPIRV.empty()) {
     spirv_cross::Compiler fragCompiler(fragmentSPIRV);
-    result.fragmentReflection.uniforms = ExtractUBOMembers(fragCompiler, "FragmentUniformBlock");
+    result.fragmentReflection.uniforms = ExtractUBOMembers(fragCompiler, FragmentUniformBlockName);
     result.fragmentReflection.samplers = ExtractSamplers(fragCompiler);
   }
 
