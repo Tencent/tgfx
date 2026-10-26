@@ -96,11 +96,9 @@ std::shared_ptr<Shader> NoiseStyle::getNoiseShader(float contentScale) const {
 }
 
 // Draws a noise layer clipped to content alpha. The shader must already have color, density, and
-// alpha fully baked in. The shader sampling origin is anchored to contentOffset (expressed in the
-// content image's local coordinate space). Callers derive this origin from the layer's surface-space
-// position, so the noise pattern stays stable as tiles, dirty regions, or content image sizes
-// change. A half-image offset is added to preserve the original "centered" feel of the noise
-// relative to the content.
+// alpha fully baked in. The sampling origin is anchored to the content image's offset, so the
+// pattern stays stable as tiles, dirty regions, or content image sizes change. A half-image offset
+// is added to preserve the original "centered" feel of the noise relative to the content.
 static void DrawNoiseLayer(Canvas* canvas, const LayerStyleInput& input,
                            std::shared_ptr<Shader> coloredShader, BlendMode blendMode) {
   auto content = input.content != nullptr ? input.content->image() : nullptr;

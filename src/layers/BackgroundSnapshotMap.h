@@ -33,8 +33,8 @@ class LayerStyle;
 
 /**
  * A snapshot of the background image and its offset captured during the capture pass for a
- * specific (Layer, LayerStyle) pair. Consumed during the consume pass by LayerStyle::draw via
- * LayerStyleInput::extraSource.
+ * specific (Layer, LayerStyle) pair. Consumed during the consume pass from the Base entry of
+ * LayerStyleInput::extraSources.
  */
 struct BackgroundSnapshotEntry {
   std::shared_ptr<Image> image = nullptr;
@@ -117,8 +117,8 @@ struct BackgroundSnapshotMap {
   int renderTargetWidth = 0;
   int renderTargetHeight = 0;
   // Style-space visible region per (Layer, LayerStyle) pair, computed during capture. The style
-  // space depends on the style's excludeChildEffects bucket (each bucket's content image has its
-  // own offset), while every pass in a frame shares it, so one rect per pair bounds the recorded
+  // space follows the recording the style resolves (own geometry, contour fallback or shared
+  // content), while every pass in a frame shares it, so one rect per pair bounds the recorded
   // style output for all passes.
   std::unordered_map<BackgroundSnapshotKey, Rect, BackgroundSnapshotKeyHash> styleVisibleBounds =
       {};

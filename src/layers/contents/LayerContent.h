@@ -47,8 +47,8 @@ class LayerContent {
   /**
    * Checks if the layer content overlaps or intersects with the specified point (localX, localY).
    * The localX and localY coordinates are in the layer's local coordinate space. This method
-   * performs precise hit testing on the actual shape of the layer content. Hit testing follows the
-   * painted content, so the geometries no paint captured never hit: callers query the painters.
+   * performs precise hit testing on the actual shape of the layer content. A geometry no paint
+   * captured hits only when includeUnpaintedGeometry asks for it; painters answer the rest.
    */
   virtual bool hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const = 0;
 

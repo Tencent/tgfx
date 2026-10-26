@@ -4722,8 +4722,8 @@ static std::shared_ptr<Layer> MakeTwoGroupFillStrokePanel(
   return layer;
 }
 
-// Glass is built here with excludeChildEffects set, so its own geometry lands in the
-// excludeChildEffects bucket groups[1] and not in groups[0], the bucket a plain style reads.
+// Glass is built here with excludeChildEffects set, so the style sits in groups[1]. The own-geometry
+// recording itself is layer-wide and shared by both buckets.
 static std::shared_ptr<GlassStyle> MakeOwnGeometryGlass(float refraction, float depth, float frost,
                                                         float dispersion, float splay) {
   auto glass = GlassStyle::Make(refraction, depth, frost, dispersion, splay, 0, 0);
@@ -5386,8 +5386,8 @@ TGFX_TEST_PRIVATE(LayerTest, UnusableBucketOnlyDropsItself) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  // --- With Glass: the bucket whose content records nothing still has own geometry, so the Glass
-  // bucket drives coverage.
+  // --- With Glass: the spread DropShadow is in groups[1] and records nothing; own geometry is
+  // recorded for the whole layer, so the Glass in groups[0] still drives coverage.
   RegionSpec bareGeometry = {};
   bareGeometry.bounds = GlassPanelLocalBounds();
   auto shadow = DropShadowStyle::Make(0, 8, 0, 8, Color::Black());
@@ -5421,9 +5421,9 @@ TGFX_TEST_PRIVATE(LayerTest, UnusableBucketOnlyDropsItself) {
     child->setContents(std::move(childContents));
     layer->addChild(child);
     if (withStyles) {
-      // One style per excludeChildEffects bucket. The bucket-1 style needs the contour (spread makes
-      // it Contour-sourced), which a child holding bare geometry does not provide, so that bucket
-      // records nothing; the bucket-0 style only needs the content image.
+      // One style per excludeChildEffects bucket: bucket-0 needs only the content image, bucket-1
+      // also the contour (spread makes it Contour-sourced). A child holding only bare geometry
+      // paints nothing, so both recordings are empty and neither bucket is usable.
       auto contentStyle = DropShadowStyle::Make(0, 0, 0, 0, Color::Black());
       auto contourStyle = DropShadowStyle::Make(0, 0, 0, 0, Color::Black());
       contourStyle->setSpread(10);
@@ -7075,10 +7075,10 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoverageContract) {
   }
 }
 
-// A layer whose own geometry holds a bare geometry records it through the own-geometry channel, while
-// the same geometry captured by a 0%-alpha painter is recorded through the painter contour. The own
-// geometry is an opaque, hard-edged coverage either way, so both must cover exactly the same pixels,
-// boundary included, on the raster and on rendered pixels. A DISJOINT second painter is the
+// A bare geometry and the same geometry captured by a 0%-alpha painter both end up in the own-geometry
+// recording; the painter additionally reaches the shared contour. The own geometry is an opaque,
+// hard-edged coverage either way, so both must cover exactly the same pixels, boundary included, on
+// the raster and on rendered pixels. A DISJOINT second painter is the
 // non-vacuity control, so the equality cannot pass on the painter simply being dropped.
 TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoincidentPaintersDoNotGrowTheCoveredArea) {
   ContextScope scope;

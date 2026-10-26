@@ -93,9 +93,8 @@ void DrawContent::drawContourInternal(Canvas* canvas, bool antiAlias,
 }
 
 bool DrawContent::contourEqualsOpaqueContent() const {
-  // A geometry no paint captured is drawn by neither the contour nor the content query, so the two
-  // agree on it. Saying otherwise would tell the caller that a bare geometry makes the shared
-  // contour differ from the rendered content, which is exactly the difference it does not have.
+  // A geometry no paint captured is drawn by neither the shared contour nor the content query, so
+  // the two agree on it. A bare geometry must not make them differ.
   if (!painted) {
     return true;
   }

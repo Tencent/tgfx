@@ -65,9 +65,9 @@ void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& pai
 }
 
 void LayerRecorder::addShape(std::shared_ptr<Shape> shape) {
-  // A geometry no paint captured: it is recorded as an opaque fill so the contour and the geometry
-  // queries see its outline, while the paint flag keeps it out of the normal draw and the shared
-  // contour. An empty LayerPaint models that fill, and it is copied, never referenced.
+  // A geometry no paint captured: recorded with an empty paint so queries that include unpainted
+  // geometry see its outline, while the paint flag keeps it out of the normal draw and the shared
+  // contour. The paint is copied, never referenced.
   addShape(std::move(shape), LayerPaint{}, _matrix, false);
 }
 

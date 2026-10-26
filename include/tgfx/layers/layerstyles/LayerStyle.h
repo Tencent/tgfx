@@ -57,7 +57,7 @@ enum class LayerStyleExtraSourceType : uint32_t {
 /**
  * Declares which recording a layerStyle prefers as its content. The style is not guaranteed to
  * receive it: a Geometry style whose layer records no own geometry is handed the shared subtree
- * recording instead (see Geometry). LayerStyleInput::content describes what it actually receives.
+ * contour instead (see Geometry). LayerStyleInput::content describes what it actually receives.
  */
 enum class LayerStyleContentSource {
   /**
@@ -68,7 +68,7 @@ enum class LayerStyleContentSource {
    * The layer's own geometry: the outlines of all of its own painters, including painters with
    * alpha=0, plus the bare geometries no painter captures. Descendants never contribute, so a style
    * keeps covering a layer whose painting is invisible. When the layer has no own geometry the style
-   * falls back to the shared subtree recording, so a layer whose geometry lives in child layers still
+   * falls back to the shared subtree contour, so a layer whose geometry lives in child layers still
    * has coverage.
    */
   Geometry
