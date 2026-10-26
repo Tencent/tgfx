@@ -32,7 +32,6 @@ class QuadPerEdgeAAGeometryProcessor;
 class AOTPointwiseChainProcessor;
 struct PermutationMatchResult;
 struct PermutationVariant;
-struct RoundStrokeRectInputs;
 enum class PermutationMatchFailure;
 
 /// How the draw's sole coverage FP is served. LocalMask is a distinct capability: it needs a
@@ -94,9 +93,6 @@ bool TiledModeSupported(int mode);
 /// Whether a subset-carrying quad's subset is servable by the chain kernel's runtime uniforms.
 bool IsChainQuadSubsetServable(const QuadPerEdgeAAGeometryProcessor* quadGP,
                                const AOTPointwiseChainProcessor* chain);
-
-/// Extracts the RoundStrokeRect rule inputs from the draw's geometry processor.
-std::optional<RoundStrokeRectInputs> ExtractRoundStrokeRect(const ProgramInfo* programInfo);
 
 /// Each family's Match opens with this guard: a kernel that does not apply the write swizzle at
 /// output (ServesAlphaOnly == false) refuses draws onto alpha-only (ALPHA_8) targets, so the

@@ -7,10 +7,10 @@
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
 //  compliance with the License. You may obtain a copy of the License at
 //
-//       https://opensource.org/licenses/BSD-3-Clause
+//      https://opensource.org/licenses/BSD-3-Clause
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. see the license for the specific language governing permissions and
 //  limitations under the license.
 //
@@ -18,26 +18,24 @@
 
 #include "gpu/shaders/level1/QuadColorFillShader.h"
 #include <optional>
-#include <vector>
-#include "gpu/PermutationMatcher.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
-#include "gpu/shaders/PermutationRules.h"
 
 namespace tgfx {
 
-std::optional<PermutationVariant> QuadColorFillShader::Match(const ProgramInfo* programInfo) {
+std::optional<QuadColorFillShader::Inputs> QuadColorFillShader::Extract(
+    const ProgramInfo* programInfo) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != GpClassName) {
+  if (!IsProcessor<QuadPerEdgeAAGeometryProcessor>(gp)) {
     return std::nullopt;
   }
   // Accept either zero fragment processors, a device-space mask, or one direct analytic clip
   // coverage FP (AA rect or rrect). The clip is evaluated by the runtime clip contract uniforms.
-  QuadColorFillInputs inputs;
+  Inputs inputs;
   if (programInfo->numFragmentProcessors() != 0) {
     if (programInfo->numColorFragmentProcessors() != 0) {
       return std::nullopt;
@@ -53,12 +51,7 @@ std::optional<PermutationVariant> QuadColorFillShader::Match(const ProgramInfo* 
     }
   }
   inputs.xpType = GetXPType(programInfo);
-  auto composed = ComposeQuadColorFill(inputs);
-  if (!composed) {
-    return std::nullopt;
-  }
-  auto fragIndex = QuadColorFillShader::FD::domain().encode(composed->fragValues);
-  return PermutationVariant{0, fragIndex};
+  return inputs;
 }
 
 }  // namespace tgfx

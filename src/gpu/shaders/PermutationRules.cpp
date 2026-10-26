@@ -78,62 +78,6 @@ bool PointwiseExtendedChainValuesAllowed(const std::vector<int>& chainFragValues
 
 }  // namespace
 
-std::optional<RuleComposedValues> ComposeRoundStrokeRect(const RoundStrokeRectInputs& inputs) {
-  if (inputs.xpType < XP_NONE) {
-    return std::nullopt;
-  }
-  using VD = RoundStrokeRectFillShader::Dims;
-  using FD = RoundStrokeRectFillShader::FD;
-  RuleComposedValues values;
-  values.vertValues.resize(VD::COUNT);
-  values.vertValues[VD::HAS_UV_MATRIX] = inputs.hasUVMatrix ? 1 : 0;
-  values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_XP] = inputs.xpType;
-  return values;
-}
-
-std::set<std::pair<uint32_t, uint32_t>> EnumerateRoundStrokeRectReachable() {
-  return EnumerateMirroredReachable<RoundStrokeRectFillShader::Dims, RoundStrokeRectFillShader::FD>(
-      nullptr);
-}
-
-std::optional<RuleComposedValues> ComposeQuadColorFill(const QuadColorFillInputs& inputs) {
-  if (inputs.xpType < XP_NONE) {
-    return std::nullopt;
-  }
-  using FD = QuadColorFillShader::FD;
-  RuleComposedValues values;
-  values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_XP] = inputs.xpType;
-  values.fragValues[FD::HAS_MASK_TEXTURE] = inputs.hasMaskTexture ? 1 : 0;
-  return values;
-}
-
-std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadColorFillReachable() {
-  return EnumerateMirroredReachable<EmptyVertDims, QuadColorFillShader::FD>(nullptr);
-}
-
-std::optional<RuleComposedValues> ComposeComplexEllipseFill(
-    const ComplexEllipseFillInputs& inputs) {
-  if (inputs.xpType < XP_NONE) {
-    return std::nullopt;
-  }
-  using VD = ComplexEllipseFillShader::Dims;
-  using FD = ComplexEllipseFillShader::FD;
-  RuleComposedValues values;
-  values.vertValues.resize(VD::COUNT);
-  values.vertValues[VD::STROKE] = inputs.isStroke ? 1 : 0;
-  values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::STROKE] = values.vertValues[VD::STROKE];
-  values.fragValues[FD::HAS_XP] = inputs.xpType;
-  return values;
-}
-
-std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexEllipseFillReachable() {
-  return EnumerateMirroredReachable<ComplexEllipseFillShader::Dims, ComplexEllipseFillShader::FD>(
-      nullptr);
-}
-
 std::optional<RuleComposedValues> ComposeNonAARRectFill(const NonAARRectFillInputs& inputs) {
   if (inputs.xpType < XP_NONE) {
     return std::nullopt;

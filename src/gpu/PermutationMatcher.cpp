@@ -355,31 +355,6 @@ bool IsServableBlurChild(const FragmentProcessor* childFP) {
   return false;
 }
 
-// Extracts the RoundStrokeRect rule's input predicates from the ProgramInfo. Whole-draw
-// rejections (wrong GP kind, unexpected fragment processors, perspective UV) stay here: they
-// route the draw elsewhere and never shape the rule's reachable variant set, which is defined
-// by ComposeRoundStrokeRect in PermutationRules.cpp and shared with the build tool.
-std::optional<RoundStrokeRectInputs> ExtractRoundStrokeRect(const ProgramInfo* programInfo) {
-  auto gp = programInfo->getGeometryProcessor();
-  if (!IsProcessor<RoundStrokeRectGeometryProcessor>(gp)) {
-    return std::nullopt;
-  }
-  // The kernel reads the clip from the runtime clip contract uniforms, so a sole analytic clip is
-  // admitted alongside the FP-free form.
-  if (!HasNoProcessorsOrDirectClip(programInfo)) {
-    return std::nullopt;
-  }
-  auto* rsgp = static_cast<const RoundStrokeRectGeometryProcessor*>(gp);
-  // Skip perspective UV transforms — not covered by precompiled variants.
-  if (rsgp->isUVPerspective()) {
-    return std::nullopt;
-  }
-  RoundStrokeRectInputs inputs;
-  inputs.hasUVMatrix = rsgp->hasUVMatrixTransform();
-  inputs.xpType = GetXPType(programInfo);
-  return inputs;
-}
-
 static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramInfo* programInfo) {
   // OpenGL is served from the bundle profile matching the context (desktop GL or the GLES
   // family: GLES, WebGL, SwiftShader). The precompiled kernels only declare 2D samplers. Desktop GL

@@ -100,34 +100,6 @@ namespace tgfx {
 // ---------------------------------------------------------------------------------------
 
 /**
- * Input contract of the RoundStrokeRectFillShader matcher rule. Only predicates that shape
- * dimension values belong here; whole-draw rejections (wrong geometry processor kind,
- * perspective UV) stay in the runtime Extract step and never affect the reachable set.
- */
-struct RoundStrokeRectInputs {
-  bool hasUVMatrix = false;
-  int xpType = XP_UNSUPPORTED;  // no representable XferProcessor
-};
-
-/**
- * Input contract of the QuadColorFillShader matcher rule. The coverage FP classification
- * (none, direct AARect, or device mask) happens in Extract: only the resulting mask flag and the
- * transfer type shape dimensions.
- */
-struct QuadColorFillInputs {
-  int xpType = XP_UNSUPPORTED;  // -1 = no representable XferProcessor.
-  bool hasMaskTexture = false;  // device-space mask coverage FP present.
-};
-
-/**
- * Input contract of the ComplexEllipseFillShader matcher rule.
- */
-struct ComplexEllipseFillInputs {
-  bool isStroke = false;
-  int xpType = XP_UNSUPPORTED;  // no representable XferProcessor
-};
-
-/**
  * Input contract of the NonAARRectFillShader matcher rule. The TiledTextureEffect shape checks
  * (single-tap modes only, no perspective) happen in Extract; the textured variant never
  * combines with stroke, which Compose enforces.
@@ -254,85 +226,69 @@ struct PointwiseChainInputs {
  * real inputs, while the build tool feeds it every input combination, so the compiled variant
  * list and the matcher's reachable set can never drift apart.
  */
-std::optional<RuleComposedValues> ComposeRoundStrokeRect(const RoundStrokeRectInputs& inputs);
 
 /**
- * Pure mapping for the QuadColorFillShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
+ * Pure mapping for the QuadColorFillShader rule; see the ShaderFamily Compose contract.
  */
-std::optional<RuleComposedValues> ComposeQuadColorFill(const QuadColorFillInputs& inputs);
 
 /**
- * Pure mapping for the ComplexEllipseFillShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
+ * Pure mapping for the ComplexEllipseFillShader rule; see the ShaderFamily Compose contract.
  */
-std::optional<RuleComposedValues> ComposeComplexEllipseFill(const ComplexEllipseFillInputs& inputs);
 
 /**
- * Pure mapping for the NonAARRectFillShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
+ * Pure mapping for the NonAARRectFillShader rule; see the ShaderFamily Compose contract.
  */
 std::optional<RuleComposedValues> ComposeNonAARRectFill(const NonAARRectFillInputs& inputs);
 
 /**
- * Pure mapping for the ComplexNonAARRectFillShader rule; see ComposeRoundStrokeRect for the
- * sharing contract.
+ * Pure mapping for the ComplexNonAARRectFillShader rule; see the ShaderFamily Compose contract.
  */
 std::optional<RuleComposedValues> ComposeComplexNonAARRectFill(
     const ComplexNonAARRectFillInputs& inputs);
 
 /**
- * Pure mapping for the MeshFillShader rule; see ComposeRoundStrokeRect for the sharing contract.
+ * Pure mapping for the MeshFillShader rule; see the ShaderFamily Compose contract.
  */
 std::optional<RuleComposedValues> ComposeMeshFill(const MeshFillInputs& inputs);
 
 /**
- * Pure mapping for the YUVTextureFillShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
+ * Pure mapping for the YUVTextureFillShader rule; see the ShaderFamily Compose contract.
  */
 std::optional<RuleComposedValues> ComposeYUVTextureFill(const YUVTextureFillInputs& inputs);
 
 /**
- * Pure mapping for the ShapeInstancedTextureCoverageShader rule; see ComposeRoundStrokeRect for
- * the sharing contract.
+ * Pure mapping for the ShapeInstancedTextureCoverageShader rule; see the ShaderFamily Compose
+ * contract.
  */
 std::optional<RuleComposedValues> ComposeShapeInstancedTextureCoverage(
     const ShapeInstancedTextureCoverageInputs& inputs);
 
 /**
- * Pure mapping for the ShapeInstancedFillShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
+ * Pure mapping for the ShapeInstancedFillShader rule; see the ShaderFamily Compose contract.
  */
 std::optional<RuleComposedValues> ComposeShapeInstancedFill(const ShapeInstancedFillInputs& inputs);
 
 /**
- * Pure mapping for the QuadTextureFillShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
+ * Pure mapping for the QuadTextureFillShader rule; see the ShaderFamily Compose contract.
  */
 std::optional<RuleComposedValues> ComposeQuadTextureFill(const QuadTextureFillInputs& inputs);
 
 /**
- * Pure mapping for the GlassRefractionShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
+ * Pure mapping for the GlassRefractionShader rule; see the ShaderFamily Compose contract.
  */
 std::optional<RuleComposedValues> ComposeGlassRefraction(const GlassRefractionInputs& inputs);
 
 /**
- * Pure mapping for the AtlasTextFillShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
+ * Pure mapping for the AtlasTextFillShader rule; see the ShaderFamily Compose contract.
  */
 std::optional<RuleComposedValues> ComposeAtlasTextFill(const AtlasTextFillInputs& inputs);
 
 /**
- * Pure mapping for the PointwiseChainShader rule; see ComposeRoundStrokeRect for the sharing
- * contract.
+ * Pure mapping for the PointwiseChainShader rule; see the ShaderFamily Compose contract.
  */
 std::optional<RuleComposedValues> ComposePointwiseChain(const PointwiseChainInputs& inputs);
 
 /** Family enumerators bound alongside their factories by TGFX_REGISTER_SHADER. */
-std::set<std::pair<uint32_t, uint32_t>> EnumerateRoundStrokeRectReachable();
-std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadColorFillReachable();
-std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexEllipseFillReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateNonAARRectFillReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexNonAARRectFillReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateMeshFillReachable();
