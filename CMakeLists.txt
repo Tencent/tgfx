@@ -941,19 +941,29 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
     target_include_directories(tgfx_shader_declarations PUBLIC src include
             ${TGFX_GENERATED_INCLUDE_DIR})
 
+    # The tool is two targets so its parts can be unit tested without running a process:
+    #   shader_build_tool_core  every source of the tool except main.cpp, as a static library
+    #   shader_build_tool       main.cpp only: the command line that drives the library
+    # ShaderBuildToolTest (test/shader_tool) links the library the same way the executable does.
     file(GLOB SHADER_TOOL_FILES CONFIGURE_DEPENDS tools/shader_build_tool/*.cpp)
-    add_executable(shader_build_tool ${SHADER_TOOL_FILES})
-    target_link_libraries(shader_build_tool PRIVATE tgfx_shader_declarations)
-    target_include_directories(shader_build_tool PRIVATE tools/shader_build_tool)
-    target_include_directories(shader_build_tool SYSTEM PRIVATE
+    list(REMOVE_ITEM SHADER_TOOL_FILES
+            ${CMAKE_CURRENT_SOURCE_DIR}/tools/shader_build_tool/main.cpp)
+    add_library(shader_build_tool_core STATIC ${SHADER_TOOL_FILES})
+    target_link_libraries(shader_build_tool_core PUBLIC tgfx_shader_declarations)
+    target_include_directories(shader_build_tool_core PUBLIC tools/shader_build_tool)
+    target_include_directories(shader_build_tool_core SYSTEM PUBLIC
             third_party/shaderc/libshaderc/include
             third_party/SPIRV-Cross)
-    target_compile_options(shader_build_tool PRIVATE ${TGFX_COMPILE_OPTIONS})
+    target_compile_options(shader_build_tool_core PRIVATE ${TGFX_COMPILE_OPTIONS})
     # Keep build-time compiler dependencies isolated from the runtime tgfx archive.
     add_vendor_target(shader-tool-vendor STATIC_VENDORS shaderc SPIRV-Cross zlib)
-    add_dependencies(shader_build_tool shader-tool-vendor)
+    add_dependencies(shader_build_tool_core shader-tool-vendor)
     find_vendor_libraries(shader-tool-vendor STATIC SHADER_TOOL_VENDOR_LIBS)
-    target_link_libraries(shader_build_tool PRIVATE ${SHADER_TOOL_VENDOR_LIBS} tgfx_zstd)
+    target_link_libraries(shader_build_tool_core PUBLIC ${SHADER_TOOL_VENDOR_LIBS} tgfx_zstd)
+
+    add_executable(shader_build_tool tools/shader_build_tool/main.cpp)
+    target_link_libraries(shader_build_tool PRIVATE shader_build_tool_core)
+    target_compile_options(shader_build_tool PRIVATE ${TGFX_COMPILE_OPTIONS})
   endif ()
 
     # Determine which backends to compile based on enabled GPU backends
@@ -995,12 +1005,13 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
 
     if ("webgpu" IN_LIST TGFX_SHADER_BACKENDS AND NOT CMAKE_CROSSCOMPILING)
         tgfx_setup_tint()
-        target_include_directories(shader_build_tool SYSTEM PRIVATE
+        # Tint is used by ShaderCompiler.cpp, which is part of the core library.
+        target_include_directories(shader_build_tool_core SYSTEM PRIVATE
                 third_party/tint third_party/tint/include)
-        target_link_libraries(shader_build_tool PRIVATE libtint)
+        target_link_libraries(shader_build_tool_core PUBLIC libtint)
         # The macro is defined exactly when "webgpu" can appear in --backends, so the
         # non-tint build can never reach the WebGPU translation path.
-        target_compile_definitions(shader_build_tool PRIVATE TGFX_SHADER_TOOL_HAS_TINT=1)
+        target_compile_definitions(shader_build_tool_core PRIVATE TGFX_SHADER_TOOL_HAS_TINT=1)
     endif ()
 
     set(TGFX_SHADER_BUNDLE_DIR "${CMAKE_BINARY_DIR}/generated/shaders")
