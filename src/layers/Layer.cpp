@@ -732,9 +732,9 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
 
   Rect bounds = {};
   if (auto content = getContent()) {
-    // A geometry no paint captured paints nothing, so it belongs to the layer's own geometry rather
-    // than to its content. Only a style drawing from that geometry needs it in the bounds, and only
-    // when the filters and style sources are not mapped against content bounds (excludeEffects).
+    // A geometry no paint captured paints nothing: it stays in the content as an unpainted entry,
+    // but only a style drawing from that geometry needs it in the bounds, and only when the
+    // filters and style sources are not mapped against content bounds (excludeEffects).
     const bool includeUnpaintedGeometry = !excludeEffects && hasOwnGeometryContentStyle();
     auto contentBounds = content->getBounds(includeUnpaintedGeometry);
     bool behindCamera =

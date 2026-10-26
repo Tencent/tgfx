@@ -7936,8 +7936,9 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeUndoesTheRecordingScale) {
       << "the shape lives in layer coordinates, so it does not grow with the content scale";
 }
 
-// The own geometry is not content: nothing draws it, so asking for content bounds -- which is what
-// mapContentBoundsToImage() hands to filters and style sources -- must not include it.
+// The own geometry is not painted content: it is recorded as an unpainted entry, so nothing draws
+// it, and the content bounds -- which is what mapContentBoundsToImage() hands to filters and style
+// sources -- must leave it out.
 TGFX_TEST_PRIVATE(LayerTest, OwnGeometryStaysOutOfContentBounds) {
   const Rect bareBounds = Rect::MakeXYWH(20.0f, 30.0f, 40.0f, 25.0f);
   RegionSpec bareGeometry = {};
