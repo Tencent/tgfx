@@ -480,7 +480,7 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryRejectsConflictingEnumerators) {
                    []() -> std::unique_ptr<PrecompiledShader> {
                      return std::make_unique<PointwiseChainShader>();
                    },
-                   EnumerateMaskFillReachable),
+                   &MaskFillShader::Reachable),
                "conflicting declaration or enumerator for 'PointwiseChainShader'");
 }
 

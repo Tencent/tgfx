@@ -7,10 +7,10 @@
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
 //  compliance with the License. You may obtain a copy of the License at
 //
-//       https://opensource.org/licenses/BSD-3-Clause
+//      https://opensource.org/licenses/BSD-3-Clause
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. see the license for the specific language governing permissions and
 //  limitations under the license.
 //
@@ -18,22 +18,22 @@
 
 #include "gpu/shaders/level1/SolidColorFillShader.h"
 #include <optional>
-#include <vector>
-#include "gpu/PermutationMatcher.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
+#include "gpu/processors/DefaultGeometryProcessor.h"
 
 namespace tgfx {
 
 // The whole runtime-side knowledge of this family in one place: which draws it serves and how the
 // draw's shape maps onto the permutation indices. The pass-through shape (one HAS_XP axis fed by
-// the XferProcessor type) needs no Inputs struct and no Compose function.
-std::optional<PermutationVariant> SolidColorFillShader::Match(const ProgramInfo* programInfo) {
+// the XferProcessor type) keeps a minimal Inputs struct.
+std::optional<SolidColorFillShader::Inputs> SolidColorFillShader::Extract(
+    const ProgramInfo* programInfo) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != GpClassName) {
+  if (!IsProcessor<DefaultGeometryProcessor>(gp)) {
     return std::nullopt;
   }
   // The fill color comes from the DefaultGeometryProcessor Color uniform, so a color fragment
@@ -44,11 +44,10 @@ std::optional<PermutationVariant> SolidColorFillShader::Match(const ProgramInfo*
     return std::nullopt;
   }
   auto xpType = GetXPType(programInfo);
-  if (xpType < 0) {
+  if (xpType < XP_NONE) {
     return std::nullopt;
   }
-  auto fragIndex = FD::domain().encode(std::vector<int>{xpType});
-  return PermutationVariant{0, fragIndex};
+  return Inputs{xpType};
 }
 
 }  // namespace tgfx

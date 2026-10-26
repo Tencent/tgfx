@@ -331,10 +331,7 @@ std::optional<RuleComposedValues> ComposePointwiseChain(const PointwiseChainInpu
 
 /** Family enumerators bound alongside their factories by TGFX_REGISTER_SHADER. */
 std::set<std::pair<uint32_t, uint32_t>> EnumerateRoundStrokeRectReachable();
-std::set<std::pair<uint32_t, uint32_t>> EnumerateMaskFillReachable();
-std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineQuadReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadColorFillReachable();
-std::set<std::pair<uint32_t, uint32_t>> EnumerateSolidColorFillReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexEllipseFillReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateEllipseFillReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateNonAARRectFillReachable();

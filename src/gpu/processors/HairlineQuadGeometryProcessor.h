@@ -34,6 +34,7 @@ namespace tgfx {
  */
 class HairlineQuadGeometryProcessor : public GeometryProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<HairlineQuadGeometryProcessor> Make(BlockAllocator* allocator,
                                                           const PMColor& color,
                                                           const Matrix& viewMatrix,
@@ -49,8 +50,6 @@ class HairlineQuadGeometryProcessor : public GeometryProcessor {
   }
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   HairlineQuadGeometryProcessor(const PMColor& color, const Matrix& viewMatrix,
                                 std::optional<Matrix> uvMatrix, float coverage, AAType aaType);
 

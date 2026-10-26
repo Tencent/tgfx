@@ -97,14 +97,6 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateRoundStrokeRectReachable() {
       nullptr);
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateMaskFillReachable() {
-  return EnumerateMirroredReachable<EmptyVertDims, MaskFillShader::FragDims>(nullptr);
-}
-
-std::set<std::pair<uint32_t, uint32_t>> EnumerateHairlineQuadReachable() {
-  return EnumerateMirroredReachable<EmptyVertDims, HairlineQuadShader::FD>(nullptr);
-}
-
 std::optional<RuleComposedValues> ComposeQuadColorFill(const QuadColorFillInputs& inputs) {
   if (inputs.xpType < XP_NONE) {
     return std::nullopt;
@@ -119,10 +111,6 @@ std::optional<RuleComposedValues> ComposeQuadColorFill(const QuadColorFillInputs
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadColorFillReachable() {
   return EnumerateMirroredReachable<EmptyVertDims, QuadColorFillShader::FD>(nullptr);
-}
-
-std::set<std::pair<uint32_t, uint32_t>> EnumerateSolidColorFillReachable() {
-  return EnumerateMirroredReachable<SolidColorFillShader::VD, SolidColorFillShader::FD>(nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeComplexEllipseFill(
