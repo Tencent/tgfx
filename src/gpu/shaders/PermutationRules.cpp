@@ -62,13 +62,6 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateMirroredReachable(
 // frag domain values; Compose validates its composed values, the enumerator validates each
 // mirrored pair it is about to keep.
 
-// NonAARRectFillShader: the textured variant (a TiledTextureEffect fill) is fill-only; a stroked
-// rect never carries the tiled texture child.
-bool NonAARRectFillValuesAllowed(const std::vector<int>& fragValues) {
-  return !(fragValues[NonAARRectFillShader::FD::TEXTURED] != 0 &&
-           fragValues[NonAARRectFillShader::FD::STROKE] != 0);
-}
-
 // The extended resource kinds (RESOURCE_KIND != 0): the per-quad subset of a strict image draw is
 // a plain-chain capability; the extended kernels have no subset branch. Takes the shared chain
 // frag values.
@@ -77,70 +70,6 @@ bool PointwiseExtendedChainValuesAllowed(const std::vector<int>& chainFragValues
 }
 
 }  // namespace
-
-std::optional<RuleComposedValues> ComposeNonAARRectFill(const NonAARRectFillInputs& inputs) {
-  if (inputs.xpType < XP_NONE) {
-    return std::nullopt;
-  }
-  using VD = NonAARRectFillShader::Dims;
-  using FD = NonAARRectFillShader::FD;
-  RuleComposedValues values;
-  values.vertValues.resize(VD::COUNT);
-  values.vertValues[VD::STROKE] = inputs.isStroke ? 1 : 0;
-  values.vertValues[VD::TEXTURED] = inputs.textured ? 1 : 0;
-  values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::STROKE] = values.vertValues[VD::STROKE];
-  values.fragValues[FD::TEXTURED] = values.vertValues[VD::TEXTURED];
-  values.fragValues[FD::HAS_XP] = inputs.xpType;
-  if (!NonAARRectFillValuesAllowed(values.fragValues)) {
-    return std::nullopt;
-  }
-  return values;
-}
-
-std::set<std::pair<uint32_t, uint32_t>> EnumerateNonAARRectFillReachable() {
-  return EnumerateMirroredReachable<NonAARRectFillShader::Dims, NonAARRectFillShader::FD>(
-      &NonAARRectFillValuesAllowed);
-}
-
-std::optional<RuleComposedValues> ComposeComplexNonAARRectFill(
-    const ComplexNonAARRectFillInputs& inputs) {
-  if (inputs.xpType < XP_NONE) {
-    return std::nullopt;
-  }
-  using VD = ComplexNonAARRectFillShader::Dims;
-  using FD = ComplexNonAARRectFillShader::FD;
-  RuleComposedValues values;
-  values.vertValues.resize(VD::COUNT);
-  values.vertValues[VD::STROKE] = inputs.isStroke ? 1 : 0;
-  values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::STROKE] = values.vertValues[VD::STROKE];
-  values.fragValues[FD::HAS_XP] = inputs.xpType;
-  return values;
-}
-
-std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexNonAARRectFillReachable() {
-  return EnumerateMirroredReachable<ComplexNonAARRectFillShader::Dims,
-                                    ComplexNonAARRectFillShader::FD>(nullptr);
-}
-
-std::optional<RuleComposedValues> ComposeMeshFill(const MeshFillInputs& inputs) {
-  if (inputs.xpType < XP_NONE) {
-    return std::nullopt;
-  }
-  using VD = MeshFillShader::Dims;
-  using FD = MeshFillShader::FD;
-  RuleComposedValues values;
-  values.vertValues.resize(VD::COUNT);
-  values.vertValues[VD::HAS_TEX_COORDS] = inputs.hasTexCoords ? 1 : 0;
-  values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_XP] = inputs.xpType;
-  return values;
-}
-
-std::set<std::pair<uint32_t, uint32_t>> EnumerateMeshFillReachable() {
-  return EnumerateMirroredReachable<MeshFillShader::Dims, MeshFillShader::FD>(nullptr);
-}
 
 std::optional<RuleComposedValues> ComposeYUVTextureFill(const YUVTextureFillInputs& inputs) {
   if (inputs.xpType < XP_NONE || inputs.yuvFormat < 0) {
@@ -177,40 +106,6 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateYUVTextureFillReachable() {
     }
   }
   return result;
-}
-
-std::optional<RuleComposedValues> ComposeShapeInstancedTextureCoverage(
-    const ShapeInstancedTextureCoverageInputs& inputs) {
-  using VD = ShapeInstancedTextureCoverageShader::VD;
-  using FD = ShapeInstancedTextureCoverageShader::FD;
-  RuleComposedValues values;
-  values.vertValues.resize(VD::COUNT);
-  values.vertValues[VD::GRADIENT] = inputs.gradient ? 1 : 0;
-  values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::GRADIENT] = values.vertValues[VD::GRADIENT];
-  return values;
-}
-
-std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedTextureCoverageReachable() {
-  return EnumerateMirroredReachable<ShapeInstancedTextureCoverageShader::Dims,
-                                    ShapeInstancedTextureCoverageShader::FD>(nullptr);
-}
-
-std::optional<RuleComposedValues> ComposeShapeInstancedFill(
-    const ShapeInstancedFillInputs& inputs) {
-  if (inputs.xpType < XP_NONE) {
-    return std::nullopt;
-  }
-  using FD = ShapeInstancedFillShader::FD;
-  RuleComposedValues values;
-  values.fragValues.resize(FD::COUNT);
-  values.fragValues[FD::HAS_XP] = inputs.xpType;
-  return values;
-}
-
-std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedFillReachable() {
-  return EnumerateMirroredReachable<ShapeInstancedFillShader::Dims, ShapeInstancedFillShader::FD>(
-      nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeQuadTextureFill(const QuadTextureFillInputs& inputs) {

@@ -24,6 +24,7 @@
 namespace tgfx {
 class ShapeInstancedGeometryProcessor : public GeometryProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<ShapeInstancedGeometryProcessor> Make(BlockAllocator* allocator, int width,
                                                             int height, AAType aa, bool hasColors,
                                                             const Matrix& uvMatrix,
@@ -42,8 +43,6 @@ class ShapeInstancedGeometryProcessor : public GeometryProcessor {
   }
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   ShapeInstancedGeometryProcessor(int width, int height, AAType aa, bool hasColors,
                                   const Matrix& uvMatrix, const Matrix& viewMatrix);
 

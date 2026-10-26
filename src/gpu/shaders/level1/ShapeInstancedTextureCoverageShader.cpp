@@ -7,10 +7,10 @@
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
 //  compliance with the License. You may obtain a copy of the License at
 //
-//       https://opensource.org/licenses/BSD-3-Clause
+//      https://opensource.org/licenses/BSD-3-Clause
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. see the license for the specific language governing permissions and
 //  limitations under the license.
 //
@@ -18,7 +18,6 @@
 
 #include "gpu/shaders/level1/ShapeInstancedTextureCoverageShader.h"
 #include <optional>
-#include <vector>
 #include "gpu/PermutationMatcher.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
@@ -27,17 +26,20 @@
 #include "gpu/processors/ShapeInstancedGeometryProcessor.h"
 #include "gpu/processors/SingleIntervalGradientColorizer.h"
 #include "gpu/processors/TextureEffect.h"
-#include "gpu/shaders/PermutationRules.h"
 
 namespace tgfx {
 
-std::optional<PermutationVariant> ShapeInstancedTextureCoverageShader::Match(
-    const ProgramInfo* programInfo) {
+static bool IsAnalyticClipKind(const std::optional<CoverageKind>& kind) {
+  return kind && (*kind == CoverageKind::AARect || *kind == CoverageKind::RRect);
+}
+
+std::optional<ShapeInstancedTextureCoverageShader::Inputs>
+ShapeInstancedTextureCoverageShader::Extract(const ProgramInfo* programInfo) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != GpClassName || GetXPType(programInfo) != 0) {
+  if (!IsProcessor<ShapeInstancedGeometryProcessor>(gp) || GetXPType(programInfo) != XP_NONE) {
     return std::nullopt;
   }
   // Two forms: a bare coverage texture, or a single-interval gradient color FP ahead of it.
@@ -68,12 +70,9 @@ std::optional<PermutationVariant> ShapeInstancedTextureCoverageShader::Match(
     auto second = programInfo->getFragmentProcessor(colorCount + 1);
     auto firstKind = ClassifyCoverage(first);
     auto secondKind = ClassifyCoverage(second);
-    auto isClip = [](const std::optional<CoverageKind>& kind) {
-      return kind && (*kind == CoverageKind::AARect || *kind == CoverageKind::RRect);
-    };
-    if (isClip(firstKind) && !isClip(secondKind)) {
+    if (IsAnalyticClipKind(firstKind) && !IsAnalyticClipKind(secondKind)) {
       fp = second;
-    } else if (isClip(secondKind) && !isClip(firstKind)) {
+    } else if (IsAnalyticClipKind(secondKind) && !IsAnalyticClipKind(firstKind)) {
       fp = first;
     } else {
       // Two masks, or two clips, are not a shape this kernel evaluates.
@@ -95,15 +94,7 @@ std::optional<PermutationVariant> ShapeInstancedTextureCoverageShader::Match(
   if (shape->getAAType() != AAType::None) {
     return std::nullopt;
   }
-  ShapeInstancedTextureCoverageInputs inputs;
-  inputs.gradient = gradient != 0;
-  auto composed = ComposeShapeInstancedTextureCoverage(inputs);
-  if (!composed) {
-    return std::nullopt;
-  }
-  auto vertIndex = ShapeInstancedTextureCoverageShader::VD::domain().encode(composed->vertValues);
-  auto fragIndex = ShapeInstancedTextureCoverageShader::FD::domain().encode(composed->fragValues);
-  return PermutationVariant{vertIndex, fragIndex};
+  return Inputs{gradient != 0};
 }
 
 }  // namespace tgfx

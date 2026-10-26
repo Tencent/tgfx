@@ -29,6 +29,7 @@ namespace tgfx {
  */
 class ComplexNonAARRectGeometryProcessor : public GeometryProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<ComplexNonAARRectGeometryProcessor> Make(BlockAllocator* allocator, int width,
                                                                int height, bool stroke,
                                                                std::optional<PMColor> commonColor);
@@ -46,8 +47,6 @@ class ComplexNonAARRectGeometryProcessor : public GeometryProcessor {
   }
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   ComplexNonAARRectGeometryProcessor(int width, int height, bool stroke,
                                      std::optional<PMColor> commonColor);
 

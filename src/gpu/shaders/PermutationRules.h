@@ -100,35 +100,6 @@ namespace tgfx {
 // ---------------------------------------------------------------------------------------
 
 /**
- * Input contract of the NonAARRectFillShader matcher rule. The TiledTextureEffect shape checks
- * (single-tap modes only, no perspective) happen in Extract; the textured variant never
- * combines with stroke, which Compose enforces.
- */
-struct NonAARRectFillInputs {
-  bool isStroke = false;
-  bool textured = false;
-  int xpType = XP_UNSUPPORTED;  // no representable XferProcessor
-};
-
-/**
- * Input contract of the ComplexNonAARRectFillShader matcher rule.
- */
-struct ComplexNonAARRectFillInputs {
-  bool isStroke = false;
-  int xpType = XP_UNSUPPORTED;  // no representable XferProcessor
-};
-
-/**
- * Input contract of the MeshFillShader matcher rule. The color and coverage attributes are
- * unconditional (white baked for meshes without per-vertex colors, a constant 1.0f coverage), so
- * no input fields exist for them.
- */
-struct MeshFillInputs {
-  bool hasTexCoords = false;
-  int xpType = XP_UNSUPPORTED;  // no representable XferProcessor
-};
-
-/**
  * Input contract of the YUVTextureFillShader matcher rule. yuvFormat is the plane layout index
  * (0 = I420, 1 = NV12); unsupported formats map to -1 and are rejected in Compose so the
  * enumeration sees the same rejection as the runtime.
@@ -137,24 +108,6 @@ struct YUVTextureFillInputs {
   bool hasUVMatrix = false;
   int yuvFormat = -1;           // -1 = unsupported plane layout.
   int xpType = XP_UNSUPPORTED;  // -1 = no representable XferProcessor.
-};
-
-/**
- * Input contract of the ShapeInstancedTextureCoverageShader matcher rule. The kernel is
- * EmptyXP-only and the gradient/texture structure checks are whole-draw rejections in Extract.
- * The instance color attribute is unconditional (colorless batches broadcast white), so both
- * forms read the same vColor varying and no color input field exists.
- */
-struct ShapeInstancedTextureCoverageInputs {
-  bool gradient = false;
-};
-
-/**
- * Input contract of the ShapeInstancedFillShader matcher rule. The instance color attribute is
- * unconditional (colorless batches broadcast white), so no color input field exists.
- */
-struct ShapeInstancedFillInputs {
-  int xpType = XP_UNSUPPORTED;  // no representable XferProcessor
 };
 
 /**
@@ -238,18 +191,14 @@ struct PointwiseChainInputs {
 /**
  * Pure mapping for the NonAARRectFillShader rule; see the ShaderFamily Compose contract.
  */
-std::optional<RuleComposedValues> ComposeNonAARRectFill(const NonAARRectFillInputs& inputs);
 
 /**
  * Pure mapping for the ComplexNonAARRectFillShader rule; see the ShaderFamily Compose contract.
  */
-std::optional<RuleComposedValues> ComposeComplexNonAARRectFill(
-    const ComplexNonAARRectFillInputs& inputs);
 
 /**
  * Pure mapping for the MeshFillShader rule; see the ShaderFamily Compose contract.
  */
-std::optional<RuleComposedValues> ComposeMeshFill(const MeshFillInputs& inputs);
 
 /**
  * Pure mapping for the YUVTextureFillShader rule; see the ShaderFamily Compose contract.
@@ -260,13 +209,10 @@ std::optional<RuleComposedValues> ComposeYUVTextureFill(const YUVTextureFillInpu
  * Pure mapping for the ShapeInstancedTextureCoverageShader rule; see the ShaderFamily Compose
  * contract.
  */
-std::optional<RuleComposedValues> ComposeShapeInstancedTextureCoverage(
-    const ShapeInstancedTextureCoverageInputs& inputs);
 
 /**
  * Pure mapping for the ShapeInstancedFillShader rule; see the ShaderFamily Compose contract.
  */
-std::optional<RuleComposedValues> ComposeShapeInstancedFill(const ShapeInstancedFillInputs& inputs);
 
 /**
  * Pure mapping for the QuadTextureFillShader rule; see the ShaderFamily Compose contract.
@@ -289,12 +235,7 @@ std::optional<RuleComposedValues> ComposeAtlasTextFill(const AtlasTextFillInputs
 std::optional<RuleComposedValues> ComposePointwiseChain(const PointwiseChainInputs& inputs);
 
 /** Family enumerators bound alongside their factories by TGFX_REGISTER_SHADER. */
-std::set<std::pair<uint32_t, uint32_t>> EnumerateNonAARRectFillReachable();
-std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexNonAARRectFillReachable();
-std::set<std::pair<uint32_t, uint32_t>> EnumerateMeshFillReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateYUVTextureFillReachable();
-std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedTextureCoverageReachable();
-std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedFillReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadTextureFillReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassRefractionReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateAtlasTextFillReachable();

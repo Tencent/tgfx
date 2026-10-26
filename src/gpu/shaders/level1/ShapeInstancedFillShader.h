@@ -4,41 +4,44 @@
 //
 //  Copyright (C) 2026 Tencent. All rights reserved.
 //
-//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
-//  in compliance with the License. You may obtain a copy of the License at
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
+//  compliance with the License. You may obtain a copy of the License at
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. see the license for the specific language governing permissions and
+//  limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
 #include <optional>
-#include "gpu/shaders/PrecompiledShader.h"
+#include <vector>
+#include "gpu/shaders/ShaderFamily.h"
 
 namespace tgfx {
 
 class ProgramInfo;
-struct PermutationVariant;
 
-class ShapeInstancedFillShader : public PrecompiledShader {
+class ShapeInstancedFillShader : public ShaderFamily<ShapeInstancedFillShader> {
  public:
-  // HAS_COLOR is not a dimension: the instance color attribute is unconditional (colorless
-  // batches broadcast white, matching the runtime codegen's implicit color). HAS_AA is not one
-  // either: the coverage attribute is unconditional (the non-AA path triangles carry a constant
-  // 1.0 slot), so the non-AA modulation by one is the identity.
-  struct Dims {
+  static constexpr const char* Name = "ShapeInstancedFillShader";
+  static constexpr const char* VertFile = "level1/shape_instanced_fill.vert";
+  static constexpr const char* FragFile = "level1/shape_instanced_fill.frag";
+
+  // The one geometry processor this family accepts: reported by info() and compared by Extract.
+  static constexpr const char* GpClassName = "ShapeInstancedGeometryProcessor";
+
+  struct VertDims {
     enum : uint32_t { COUNT };
     static PermutationDomain domain() {
       return PermutationDomain({});
     }
   };
-  using VD = Dims;
+  using VD = VertDims;
 
   struct FragDims {
     enum : uint32_t { HAS_XP, COUNT };
@@ -55,24 +58,28 @@ class ShapeInstancedFillShader : public PrecompiledShader {
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
 
-  /// Runtime matching: does this draw belong to this family? Declared here, defined in
-  /// the family's own .cpp, next to the GLSL it owns.
-  static std::optional<PermutationVariant> Match(const ProgramInfo* programInfo);
+  /// Matcher inputs: only the XferProcessor kind shapes the variant.
+  struct Inputs {
+    int xpType = XP_UNSUPPORTED;
+  };
 
-  // The one geometry processor this family accepts: info() reports it, Match compares against it.
-  static constexpr const char* GpClassName = "ShapeInstancedGeometryProcessor";
-  PrecompiledShaderInfo info() const override {
-    return {"ShapeInstancedFillShader",
-            "level1/shape_instanced_fill.vert",
-            "level1/shape_instanced_fill.frag",
-            VD::domain(),
-            FD::domain(),
-            PermutationDomain({}),
-            GpClassName,
-            ""};
+  /// Pure mapping from inputs to dimension values. Pass-through: every input value lands on the
+  /// domain one-to-one, so the mirrored Reachable default enumerates exactly what Compose emits.
+  static std::optional<RuleComposedValues> Compose(const Inputs& inputs) {
+    if (inputs.xpType < XP_NONE) {
+      return std::nullopt;
+    }
+    RuleComposedValues values;
+    values.fragValues.resize(FD::COUNT);
+    values.fragValues[FD::HAS_XP] = inputs.xpType;
+    return values;
   }
+
+  /// Whole-draw guards (alpha-only target, geometry processor kind, fragment-processor count),
+  /// defined in the family's own .cpp, next to the GLSL it owns.
+  static std::optional<Inputs> Extract(const ProgramInfo* programInfo);
 };
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::ShapeInstancedFillShader, tgfx::EnumerateShapeInstancedFillReachable)
+TGFX_REGISTER_SHADER_FAMILY(tgfx::ShapeInstancedFillShader)
