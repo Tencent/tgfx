@@ -2170,7 +2170,7 @@ TGFX_TEST(AOTEffectTest, PerlinDensityBranchesShareLookupResources) {
 TGFX_TEST(AOTEffectTest, PointwiseResourceKindsAreIndependentAndBounded) {
   using VD = PointwiseChainShader::VD;
   using FD = PointwiseChainShader::FD;
-  PointwiseChainInputs inputs;
+  PointwiseChainShader::Inputs inputs;
   inputs.gpKind = 1;
   inputs.hasCoverage = true;
   inputs.textureCount = 1;
@@ -2179,7 +2179,7 @@ TGFX_TEST(AOTEffectTest, PointwiseResourceKindsAreIndependentAndBounded) {
   std::set<std::pair<uint32_t, uint32_t>> noisePairs;
   for (int xp = 0; xp < 3; ++xp) {
     inputs.xpType = xp;
-    auto composed = ComposePointwiseChain(inputs);
+    auto composed = PointwiseChainShader::Compose(inputs);
     ASSERT_TRUE(composed.has_value());
     EXPECT_EQ(composed->vertValues.size(), VD::COUNT);
     EXPECT_EQ(composed->fragValues.size(), FD::COUNT);
@@ -2191,15 +2191,15 @@ TGFX_TEST(AOTEffectTest, PointwiseResourceKindsAreIndependentAndBounded) {
     // A plain-chain profile never takes the noise module, and an Automatic profile never
     // promotes (the plan layer resolves the profile before matching).
     inputs.resourceProfile = AOTResourceProfile::Automatic;
-    EXPECT_FALSE(ComposePointwiseChain(inputs).has_value());
+    EXPECT_FALSE(PointwiseChainShader::Compose(inputs).has_value());
     inputs.resourceProfile = AOTResourceProfile::Chain;
-    EXPECT_FALSE(ComposePointwiseChain(inputs).has_value());
+    EXPECT_FALSE(PointwiseChainShader::Compose(inputs).has_value());
     inputs.resourceProfile = AOTResourceProfile::NoiseGraph;
     // The mask and coverage-subtree flags are runtime data: they never change the permutation.
     auto masked = inputs;
     masked.hasMask = true;
     masked.hasCoverageSubtree = true;
-    auto maskedValues = ComposePointwiseChain(masked);
+    auto maskedValues = PointwiseChainShader::Compose(masked);
     ASSERT_TRUE(maskedValues.has_value());
     EXPECT_EQ(maskedValues->vertValues, composed->vertValues);
     EXPECT_EQ(maskedValues->fragValues, composed->fragValues);
@@ -2213,7 +2213,7 @@ TGFX_TEST(AOTEffectTest, PointwiseResourceKindsAreIndependentAndBounded) {
     for (int flags = 0; flags < 32; ++flags) {
       for (int xp = 0; xp < 3; ++xp) {
         SCOPED_TRACE(gpKind * 1000 + flags * 10 + xp);
-        PointwiseChainInputs base;
+        PointwiseChainShader::Inputs base;
         base.gpKind = gpKind;
         base.hasCoverage = (flags & 1) != 0;
         base.hasUVCoord = (flags & 2) != 0;
@@ -2221,18 +2221,18 @@ TGFX_TEST(AOTEffectTest, PointwiseResourceKindsAreIndependentAndBounded) {
         base.hasMask = (flags & 8) != 0;
         base.hasCoverageSubtree = (flags & 16) != 0;
         base.xpType = xp;
-        auto chainValues = ComposePointwiseChain(base);
+        auto chainValues = PointwiseChainShader::Compose(base);
         auto tiled = base;
         tiled.resourceProfile = AOTResourceProfile::TiledGraph;
-        auto composed = ComposePointwiseChain(tiled);
+        auto composed = PointwiseChainShader::Compose(tiled);
         ASSERT_EQ(composed.has_value(), chainValues.has_value());
         // Automatic and plain-chain profiles never take the gradient module.
         auto automatic = base;
         automatic.hasGradient = true;
-        EXPECT_FALSE(ComposePointwiseChain(automatic).has_value());
+        EXPECT_FALSE(PointwiseChainShader::Compose(automatic).has_value());
         auto explicitChain = automatic;
         explicitChain.resourceProfile = AOTResourceProfile::Chain;
-        EXPECT_FALSE(ComposePointwiseChain(explicitChain).has_value());
+        EXPECT_FALSE(PointwiseChainShader::Compose(explicitChain).has_value());
         if (!composed) {
           continue;
         }
@@ -2250,13 +2250,13 @@ TGFX_TEST(AOTEffectTest, PointwiseResourceKindsAreIndependentAndBounded) {
         // The gradient kind never takes the noise module.
         auto withNoise = tiled;
         withNoise.hasNoise = true;
-        EXPECT_FALSE(ComposePointwiseChain(withNoise).has_value());
+        EXPECT_FALSE(PointwiseChainShader::Compose(withNoise).has_value());
       }
     }
   }
   // The merged family's reachable set: every plain-chain pair (RESOURCE_KIND 0) plus its gradient
   // twin minus the per-quad subset pairs (a plain-chain capability), plus the three noise pairs.
-  const auto reachable = EnumeratePointwiseChainReachable();
+  const auto reachable = PointwiseChainShader::Reachable();
   std::set<std::pair<uint32_t, uint32_t>> plainPairs;
   size_t chainSubsetPairs = 0;
   for (const auto& indices : reachable) {
@@ -2279,23 +2279,23 @@ TGFX_TEST(AOTEffectTest, PointwiseResourceKindsAreIndependentAndBounded) {
   // The noise kind's fixed quad subset: anything else is rejected.
   auto unsupported = inputs;
   unsupported.gpKind = 0;
-  EXPECT_FALSE(ComposePointwiseChain(unsupported).has_value());
+  EXPECT_FALSE(PointwiseChainShader::Compose(unsupported).has_value());
   unsupported = inputs;
   unsupported.hasUVCoord = true;
-  EXPECT_FALSE(ComposePointwiseChain(unsupported).has_value());
+  EXPECT_FALSE(PointwiseChainShader::Compose(unsupported).has_value());
   unsupported = inputs;
   unsupported.textureCount = 0;
-  EXPECT_FALSE(ComposePointwiseChain(unsupported).has_value());
+  EXPECT_FALSE(PointwiseChainShader::Compose(unsupported).has_value());
   unsupported = inputs;
   unsupported.hasCoverage = false;
-  EXPECT_FALSE(ComposePointwiseChain(unsupported).has_value());
+  EXPECT_FALSE(PointwiseChainShader::Compose(unsupported).has_value());
   unsupported = inputs;
   unsupported.hasGradient = true;
-  EXPECT_FALSE(ComposePointwiseChain(unsupported).has_value());
+  EXPECT_FALSE(PointwiseChainShader::Compose(unsupported).has_value());
   for (int xp : {-1, 3}) {
     unsupported = inputs;
     unsupported.xpType = xp;
-    EXPECT_FALSE(ComposePointwiseChain(unsupported).has_value());
+    EXPECT_FALSE(PointwiseChainShader::Compose(unsupported).has_value());
   }
 }
 

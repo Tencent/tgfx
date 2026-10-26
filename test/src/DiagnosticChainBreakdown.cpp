@@ -12,7 +12,7 @@
 namespace tgfx {
 
 TGFX_TEST(DiagnosticChainBreakdown, Print) {
-  auto pairs = EnumeratePointwiseChainReachable();
+  auto pairs = PointwiseChainShader::Reachable();
   std::printf("[CB] total=%zu\n", pairs.size());
   std::map<std::string, int> byLayout;
   std::map<std::string, int> byCombo;

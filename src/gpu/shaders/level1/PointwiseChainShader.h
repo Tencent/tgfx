@@ -4,27 +4,28 @@
 //
 //  Copyright (C) 2026 Tencent. All rights reserved.
 //
-//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
-//  in compliance with the License. You may obtain a copy of the License at
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
+//  compliance with the License. You may obtain a copy of the License at
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
 //  Unless required by applicable law or agreed to in writing, software distributed under the
-//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the License for the specific language governing permissions
-//  and limitations under the License.
+//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. see the license for the specific language governing permissions and
+//  limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
 #include <optional>
-#include "gpu/shaders/PrecompiledShader.h"
+#include <vector>
+#include "gpu/AOTResourceProfile.h"
+#include "gpu/shaders/ShaderFamily.h"
 
 namespace tgfx {
 
 class ProgramInfo;
-struct PermutationVariant;
 
 /// Precompiled shader that evaluates an arbitrary pointwise DAG (texture and const-color leaves
 /// combined by color-matrix, luma, alpha-threshold, color-space-xform and blend ops) in a single
@@ -54,7 +55,7 @@ struct PermutationVariant;
 ///     shared across draws): the exact common color rides the Color uniform through the
 ///     HasCommonColor runtime uniform, so there is no HAS_COLOR dimension.
 ///   There is no GP_TYPE: the position always goes through the Matrix uniform, which DefaultGP
-///   fills with the view matrix and QuadPerEdgeAAGP fills with identity (bit-exact).
+///     fills with the view matrix and QuadPerEdgeAAGP fills with identity (bit-exact).
 ///   TEXTURE_COUNT (int, 2 values): 0 -> no texture leaves, 1 -> the four-leaf slots (chains
 ///     with 1-3 sampler children bind phantom padding and run them). A zero-leaf chain
 ///     evaluates const-color/blend ops against the geometry color alone.
@@ -70,8 +71,16 @@ struct PermutationVariant;
 ///     chains on the DefaultGP, hairline-line and complex rounded-rect layouts only.
 ///   HAS_SUBSET: mirrored with the vertex stage; leaf 0 clamps to vTexSubset ahead of its Subset
 ///     uniform, as the runtime TextureEffect applies the GP subset of a strict draw.
-class PointwiseChainShader : public PrecompiledShader {
+class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
  public:
+  static constexpr const char* Name = "PointwiseChainShader";
+  static constexpr const char* VertFile = "level1/pointwise_chain.vert";
+  static constexpr const char* FragFile = "level1/pointwise_chain.frag";
+
+  // The kernel implements the GRAY_8 / RG_88 runtime read swizzle through its TextureEffect
+  // leaves, so the matcher may route such texture reads here.
+  static constexpr uint32_t TextureReads = ShaderTextureReadSwizzle;
+
   struct VertDims {
     enum : uint32_t {
       GP_LAYOUT,
@@ -133,23 +142,239 @@ class PointwiseChainShader : public PrecompiledShader {
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = true;
 
-  /// Runtime matching: does this draw belong to this family? Declared here, defined in
-  /// the family's own .cpp, next to the GLSL it owns.
-  static std::optional<PermutationVariant> Match(const ProgramInfo* programInfo);
+  /// Shared input contract for the plain chains and the extended resource kinds. gpKind selects
+  /// (0 = DefaultGP, 1 = QuadPerEdgeAA, 2 = Mesh, 3 = sampler-free AtlasText twin, 4 = Ellipse,
+  /// 5 = HairlineLine, 6 = ComplexEllipse fill, 7 = ComplexEllipse stroke); each profile fixes
+  /// which attribute slots its vertex buffers carry, and Compose rejects profile-inconsistent
+  /// combinations. The chain slot topology (ops, indices) is runtime data; only the leaf-count
+  /// class, the mask flag, the coverage-subtree flag, and the transfer type shape the shared
+  /// dimensions. TiledGraph adds a resource-kind value for its single gradient and three tiled
+  /// recipes; NoiseGraph retains its fixed position-based, common-color AA quad subset.
+  struct Inputs {
+    int gpKind = 0;
+    bool hasCoverage = false;         // DefaultGP: AA coverage; quad/mesh: always true.
+    bool hasUVCoord = false;          // quad/mesh: texCoord slot; atlas: always true.
+    int textureCount = 0;             // domain value: 0 = leaf-free, 1 = four-leaf padded slots.
+    bool hasMask = false;             // device-space mask child present.
+    bool hasCoverageSubtree = false;  // chain coverage subtree present.
+    bool hasSubset = false;           // quad four-leaf chain: per-quad subset of a strict draw.
+    bool hasNoise = false;
+    bool hasGradient = false;  // one gradient belongs to the extended TiledGraph profile.
+    AOTResourceProfile resourceProfile = AOTResourceProfile::Automatic;
+    int xpType = XP_UNSUPPORTED;
+  };
 
-  PrecompiledShaderInfo info() const override {
-    return {"PointwiseChainShader",
-            "level1/pointwise_chain.vert",
-            "level1/pointwise_chain.frag",
-            VD::domain(),
-            FD::domain(),
-            PermutationDomain({}),
-            "",
-            "",
-            ShaderTextureReadSwizzle};
+  /// The extended resource kinds (RESOURCE_KIND != 0): the per-quad subset of a strict image draw
+  /// is a plain-chain capability; the extended kernels have no subset branch.
+  static bool ExtendedValuesAllowed(const std::vector<int>& chainFragValues) {
+    return chainFragValues[FD::HAS_SUBSET] == 0;
+  }
+
+  /// Pure mapping from inputs to dimension values; unsupported combinations return nullopt.
+  static std::optional<RuleComposedValues> Compose(const Inputs& inputs) {
+    auto profile = inputs.resourceProfile;
+    // The plan layer resolves the profile before matching (an Automatic profile never auto-promotes,
+    // as it never did on the pre-merge Graph family's match path): a graph profile selects the
+    // extended resource kind, everything else is a plain chain.
+    int resourceKind = 0;
+    if (profile == AOTResourceProfile::NoiseGraph) {
+      resourceKind = 2;
+    } else if (profile == AOTResourceProfile::TiledGraph) {
+      resourceKind = 1;
+    } else if (inputs.hasNoise || inputs.hasGradient ||
+               (profile != AOTResourceProfile::Automatic && profile != AOTResourceProfile::Chain)) {
+      return std::nullopt;
+    }
+    if (resourceKind == 2 &&
+        (!inputs.hasNoise || inputs.hasGradient || inputs.gpKind != 1 || !inputs.hasCoverage ||
+         inputs.hasUVCoord || inputs.textureCount != 1)) {
+      return std::nullopt;
+    }
+    if (resourceKind == 1 && inputs.hasNoise) {
+      return std::nullopt;
+    }
+    auto values = ComposeGP(inputs);
+    if (!values) {
+      return std::nullopt;
+    }
+    if (resourceKind != 0) {
+      if (!ExtendedValuesAllowed(values->fragValues)) {
+        return std::nullopt;
+      }
+      values->vertValues.resize(VD::COUNT);
+      values->vertValues[VD::HAS_SOURCE_COORDS] = 1;
+    }
+    values->fragValues.resize(FD::COUNT);
+    values->fragValues[FD::RESOURCE_KIND] = resourceKind;
+    return values;
+  }
+
+  /// The enumerable input space the Reachable set maps through Compose: the plain lattice, the
+  /// same lattice under the TiledGraph profile (which Compose restricts to the extended
+  /// subset-free shapes), and the NoiseGraph fixed common-color AA quad subset.
+  static std::vector<Inputs> AllInputs() {
+    std::vector<Inputs> result;
+    const AOTResourceProfile profiles[] = {AOTResourceProfile::Automatic,
+                                           AOTResourceProfile::TiledGraph};
+    for (auto profile : profiles) {
+      for (int gpKind = 0; gpKind <= 7; ++gpKind) {
+        for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
+          for (int hasUVCoord = 0; hasUVCoord <= 1; ++hasUVCoord) {
+            for (int textureCount = 0; textureCount <= 1; ++textureCount) {
+              for (int hasMask = 0; hasMask <= 1; ++hasMask) {
+                for (int xpType = XP_UNSUPPORTED; xpType <= XP_FRAMEBUFFER_FETCH; ++xpType) {
+                  for (int hasSubset = 0; hasSubset <= 1; ++hasSubset) {
+                    Inputs inputs;
+                    inputs.gpKind = gpKind;
+                    inputs.hasCoverage = hasCoverage != 0;
+                    inputs.hasUVCoord = hasUVCoord != 0;
+                    inputs.textureCount = textureCount;
+                    inputs.hasMask = hasMask != 0;
+                    inputs.hasSubset = hasSubset != 0;
+                    inputs.resourceProfile = profile;
+                    inputs.xpType = xpType;
+                    result.push_back(inputs);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    for (int xpType = XP_UNSUPPORTED; xpType <= XP_FRAMEBUFFER_FETCH; ++xpType) {
+      Inputs inputs;
+      inputs.gpKind = 1;
+      inputs.hasCoverage = true;
+      inputs.textureCount = 1;
+      inputs.resourceProfile = AOTResourceProfile::NoiseGraph;
+      inputs.hasNoise = true;
+      inputs.xpType = xpType;
+      result.push_back(inputs);
+    }
+    return result;
+  }
+
+  /// Whole-draw guards (alpha-only target, the GP profile classification, the chain leaf and
+  /// budget shapes), defined in the family's own .cpp, next to the GLSL it owns.
+  static std::optional<Inputs> Extract(const ProgramInfo* programInfo);
+
+ private:
+  static std::optional<RuleComposedValues> ComposeGP(const Inputs& inputs) {
+    if (inputs.xpType < XP_NONE || inputs.xpType > XP_FRAMEBUFFER_FETCH ||
+        inputs.textureCount < 0 || inputs.textureCount > 1) {
+      return std::nullopt;
+    }
+    // Each GP profile fixes the attribute slots its vertex buffers carry. The color attribute is
+    // unconditional on every layout (a white filler where the buffer is shared across draws), so
+    // only the other slots shape dimensions. Quad and Mesh buffers always carry the coverage slot
+    // (providers emit 1.0 for non-AA draws); atlas text buffers ride maskCoord on the uvCoord slot
+    // with no coverage slot; the ellipse layout evaluates coverage per pixel and carries no
+    // coverage or uvCoord attributes; DefaultGP carries none of the quad attributes and takes
+    // coverage from its AA type.
+    int gpLayout = 0;
+    int hasCoverage = 0;
+    int hasUVCoord = 0;
+    switch (inputs.gpKind) {
+      case 0:
+        if (inputs.hasUVCoord) {
+          return std::nullopt;
+        }
+        // The DefaultGP's coverage attribute is unconditional (the non-AA path triangles carry a
+        // constant 1.0 slot), so the matcher always reports coverage: reject the vacuous lattice
+        // cell so the enumeration equals the producible set.
+        if (!inputs.hasCoverage) {
+          return std::nullopt;
+        }
+        hasCoverage = 1;
+        break;
+      case 1:
+      case 2:
+        if (!inputs.hasCoverage) {
+          return std::nullopt;
+        }
+        hasCoverage = 1;
+        hasUVCoord = inputs.hasUVCoord ? 1 : 0;
+        break;
+      case 3:
+        if (inputs.hasCoverage || !inputs.hasUVCoord) {
+          return std::nullopt;
+        }
+        // The atlas chain route exists to sample the atlas coverage leaf: the decomposer always
+        // attaches it, so a leaf-free atlas chain is structurally producible but semantically
+        // vacuous. Rejecting it here keeps the reachable set equal to the compiled set (the gap was
+        // previously masked by the IsBuildablePermutation post-check falling back to JIT).
+        if (inputs.textureCount == 0) {
+          return std::nullopt;
+        }
+        hasUVCoord = 1;
+        break;
+      case 4:
+        if (inputs.hasCoverage || inputs.hasUVCoord) {
+          return std::nullopt;
+        }
+        gpLayout = 1;
+        break;
+      case 5:
+        // HairlineLineGP buffers are (position, edgeDistance, color): the color slot is a white
+        // filler (the exact color rides the Color uniform) and the edge AA is evaluated per pixel
+        // from the edge-distance varying, so no coverage or uvCoord attribute exists.
+        if (inputs.hasCoverage || inputs.hasUVCoord) {
+          return std::nullopt;
+        }
+        gpLayout = 2;
+        break;
+      case 6:
+      case 7:
+        // ComplexEllipseGP buffers are (position, color, ellipseOffset, ellipseRadii, edgeDist,
+        // [strokeWidth]): device-space like the ellipse, with per-pixel coverage and no coverage or
+        // uvCoord attribute. The stroke form (7) adds the strokeWidth attribute, hence its own
+        // layout.
+        if (inputs.hasCoverage || inputs.hasUVCoord) {
+          return std::nullopt;
+        }
+        gpLayout = inputs.gpKind == 6 ? 3 : 4;
+        break;
+      default:
+        return std::nullopt;
+    }
+    // Coverage subtrees draw their unit input from the GP coverage: the rect and mesh layouts supply
+    // it as the vCoverage varying, and the ellipse, hairline and complex rounded-rect layouts
+    // evaluate their per-pixel edge coverage ahead of the chain in the kernel (gpPixelCoverage). The
+    // atlas route never carries a subtree: its glyph leaf rides the clip-coverage register instead
+    // (AOTChainBuilder).
+    // Four-leaf variants apply the mask through a runtime uniform, so the compile-time mask
+    // dimension exists only for leaf-free chains, and those stay on the rect layout without quad
+    // attributes, the hairline layout (a path clip over a solid or gradient hairline) or the
+    // complex rounded-rect layouts.
+    int hasMaskTexture = inputs.textureCount == 0 && inputs.hasMask ? 1 : 0;
+    if (hasMaskTexture != 0 && (gpLayout == 1 || hasUVCoord != 0)) {
+      return std::nullopt;
+    }
+    // The per-quad subset is a QuadPerEdgeAAGP attribute that clamps a texture leaf, so it exists
+    // only on the quad profile with the four-leaf slots.
+    if (inputs.hasSubset && (inputs.gpKind != 1 || inputs.textureCount != 1)) {
+      return std::nullopt;
+    }
+    int hasSubset = inputs.hasSubset ? 1 : 0;
+    RuleComposedValues values;
+    values.vertValues.resize(VD::COUNT);
+    values.vertValues[VD::GP_LAYOUT] = gpLayout;
+    values.vertValues[VD::HAS_COVERAGE] = hasCoverage;
+    values.vertValues[VD::HAS_UV_COORD] = hasUVCoord;
+    values.vertValues[VD::TEXTURE_COUNT] = inputs.textureCount;
+    values.vertValues[VD::HAS_SUBSET] = hasSubset;
+    values.fragValues.resize(FD::COUNT);
+    values.fragValues[FD::GP_LAYOUT] = gpLayout;
+    values.fragValues[FD::HAS_XP] = inputs.xpType;
+    values.fragValues[FD::HAS_COVERAGE] = hasCoverage;
+    values.fragValues[FD::TEXTURE_COUNT] = inputs.textureCount;
+    values.fragValues[FD::HAS_MASK_TEXTURE] = hasMaskTexture;
+    values.fragValues[FD::HAS_SUBSET] = hasSubset;
+    return values;
   }
 };
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::PointwiseChainShader, tgfx::EnumeratePointwiseChainReachable)
+TGFX_REGISTER_SHADER_FAMILY(tgfx::PointwiseChainShader)

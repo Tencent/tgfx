@@ -7,10 +7,10 @@
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
 //  compliance with the License. You may obtain a copy of the License at
 //
-//       https://opensource.org/licenses/BSD-3-Clause
+//      https://opensource.org/licenses/BSD-3-Clause
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. see the license for the specific language governing permissions and
 //  limitations under the license.
 //
@@ -32,11 +32,11 @@
 #include "gpu/processors/MeshGeometryProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
-#include "gpu/shaders/PermutationRules.h"
 
 namespace tgfx {
 
-std::optional<PermutationVariant> PointwiseChainShader::Match(const ProgramInfo* programInfo) {
+std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::Extract(
+    const ProgramInfo* programInfo) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
@@ -104,7 +104,7 @@ std::optional<PermutationVariant> PointwiseChainShader::Match(const ProgramInfo*
       return std::nullopt;
     }
   }
-  PointwiseChainInputs inputs;
+  Inputs inputs;
   inputs.gpKind = gpKind;
   inputs.textureCount = leafCount == 0 ? 0 : 1;
   inputs.hasMask = chain->hasMask();
@@ -153,8 +153,9 @@ std::optional<PermutationVariant> PointwiseChainShader::Match(const ProgramInfo*
     // constant 1.0 slot), so the DefaultGP always reports coverage.
     inputs.hasCoverage = true;
   }
-  auto composed = ComposePointwiseChain(inputs);
-  if (!composed) {
+  // Compose is re-run here only for the miss-reason accounting: an extended-profile draw the rule
+  // cannot place is a coverage gap of the merged family and must be reported as such.
+  if (!Compose(inputs)) {
     if (IsAOTGraphProfile(inputs.resourceProfile)) {
       // A draw the extended resource kinds cannot place is a coverage gap of the merged family,
       // reported as it was on the pre-merge Graph family.
@@ -162,9 +163,7 @@ std::optional<PermutationVariant> PointwiseChainShader::Match(const ProgramInfo*
     }
     return std::nullopt;
   }
-  auto vertIndex = PointwiseChainShader::VD::domain().encode(composed->vertValues);
-  auto fragIndex = PointwiseChainShader::FD::domain().encode(composed->fragValues);
-  return PermutationVariant{vertIndex, fragIndex};
+  return inputs;
 }
 
 }  // namespace tgfx

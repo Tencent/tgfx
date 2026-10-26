@@ -362,7 +362,7 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
   // ExpectBundleEntryCounts already ties every family's reachable set to the bundle's actual
   // entry counts, so a hand-maintained total would only add a number to update on every change.
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseChainShader"),
-            EnumeratePointwiseChainReachable());
+            PointwiseChainShader::Reachable());
   const std::set<std::pair<uint32_t, uint32_t>> maskPairs = {{0, 0}, {0, 1}, {0, 2}};
   EXPECT_EQ(*EnumerateReachablePermutations("MaskFillShader"), maskPairs);
   const std::set<std::pair<uint32_t, uint32_t>> shapeCoveragePairs = {{0, 0}, {1, 1}};
@@ -394,15 +394,15 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryAllowsIdenticalRegistrations) {
       []() -> std::unique_ptr<PrecompiledShader> {
         return std::make_unique<PointwiseChainShader>();
       },
-      EnumeratePointwiseChainReachable);
+      &PointwiseChainShader::Reachable);
   ShaderRegistry::Register(
       []() -> std::unique_ptr<PrecompiledShader> {
         return std::make_unique<PointwiseChainShader>();
       },
-      EnumeratePointwiseChainReachable);
+      &PointwiseChainShader::Reachable);
   EXPECT_EQ(ShaderRegistry::All(), factories);
   EXPECT_EQ(ShaderRegistry::Find("PointwiseChainShader"), info);
-  EXPECT_EQ(*ShaderRegistry::Enumerate("PointwiseChainShader"), EnumeratePointwiseChainReachable());
+  EXPECT_EQ(*ShaderRegistry::Enumerate("PointwiseChainShader"), PointwiseChainShader::Reachable());
 }
 
 #if GTEST_HAS_DEATH_TEST
@@ -469,7 +469,7 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryRejectsConflictingDeclarations) {
       }
     }
     EXPECT_DEATH(
-        ShaderRegistry::Register(MakeRegistryConflictShader, EnumeratePointwiseChainReachable),
+        ShaderRegistry::Register(MakeRegistryConflictShader, &PointwiseChainShader::Reachable),
         "conflicting declaration or enumerator for 'PointwiseChainShader'");
   }
 }
@@ -492,28 +492,28 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryRejectsChangedEnumLabels) {
         info = PointwiseChainShader().info();
         info.name = "RegistryEnumConflict";
         info.fragDomain = PermutationDomain({PermutationEnum("MODE", {"A", "B"})});
-        ShaderRegistry::Register(MakeRegistryConflictShader, EnumeratePointwiseChainReachable);
-        ShaderRegistry::Register(MakeRegistryConflictShader, EnumeratePointwiseChainReachable);
+        ShaderRegistry::Register(MakeRegistryConflictShader, &PointwiseChainShader::Reachable);
+        ShaderRegistry::Register(MakeRegistryConflictShader, &PointwiseChainShader::Reachable);
         info.fragDomain = PermutationDomain({PermutationEnum("MODE", {"B", "A"})});
-        ShaderRegistry::Register(MakeRegistryConflictShader, EnumeratePointwiseChainReachable);
+        ShaderRegistry::Register(MakeRegistryConflictShader, &PointwiseChainShader::Reachable);
       },
       "conflicting declaration or enumerator for 'RegistryEnumConflict'");
 }
 
 TGFX_TEST(ShaderPermutationTest, ShaderRegistryRejectsMissingEntries) {
   ::testing::FLAGS_gtest_death_test_style = "threadsafe";
-  EXPECT_DEATH(ShaderRegistry::Register(nullptr, EnumeratePointwiseChainReachable),
+  EXPECT_DEATH(ShaderRegistry::Register(nullptr, &PointwiseChainShader::Reachable),
                "missing factory or enumerator");
   EXPECT_DEATH(ShaderRegistry::Register(MakeRegistryConflictShader, nullptr),
                "missing factory or enumerator");
   EXPECT_DEATH(
       ShaderRegistry::Register([]() -> std::unique_ptr<PrecompiledShader> { return nullptr; },
-                               EnumeratePointwiseChainReachable),
+                               &PointwiseChainShader::Reachable),
       "factory returned no shader");
   EXPECT_DEATH(
       {
         RegistryConflictInfo().name.clear();
-        ShaderRegistry::Register(MakeRegistryConflictShader, EnumeratePointwiseChainReachable);
+        ShaderRegistry::Register(MakeRegistryConflictShader, &PointwiseChainShader::Reachable);
       },
       "empty family name");
 }
@@ -534,7 +534,7 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
   for (int gpType = 0; gpType < 2; ++gpType) {
     for (int hasCoverage = 0; hasCoverage < 2; ++hasCoverage) {
       for (int xpType = 0; xpType < 3; ++xpType) {
-        PointwiseChainInputs inputs;
+        PointwiseChainShader::Inputs inputs;
         inputs.gpKind = gpType;
         // The DefaultGP's coverage attribute is unconditional (the non-AA path triangles carry
         // a constant 1.0 slot), so coverage is always present for every GP kind.
@@ -542,7 +542,7 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
         inputs.hasGradient = true;
         inputs.resourceProfile = AOTResourceProfile::TiledGraph;
         inputs.xpType = xpType;
-        auto composed = ComposePointwiseChain(inputs);
+        auto composed = PointwiseChainShader::Compose(inputs);
         ASSERT_TRUE(composed.has_value());
         auto vertexIndex = info.vertDomain.encode(composed->vertValues);
         auto fragmentIndex = info.fragDomain.encode(composed->fragValues);
