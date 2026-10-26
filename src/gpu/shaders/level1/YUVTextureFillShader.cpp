@@ -7,10 +7,10 @@
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
 //  compliance with the License. You may obtain a copy of the License at
 //
-//       https://opensource.org/licenses/BSD-3-Clause
+//      https://opensource.org/licenses/BSD-3-Clause
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. see the license for the specific language governing permissions and
 //  limitations under the license.
 //
@@ -18,23 +18,21 @@
 
 #include "gpu/shaders/level1/YUVTextureFillShader.h"
 #include <optional>
-#include <vector>
-#include "gpu/PermutationMatcher.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/processors/AOTYUVChainProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
-#include "gpu/shaders/PermutationRules.h"
 
 namespace tgfx {
 
-std::optional<PermutationVariant> YUVTextureFillShader::Match(const ProgramInfo* programInfo) {
+std::optional<YUVTextureFillShader::Inputs> YUVTextureFillShader::Extract(
+    const ProgramInfo* programInfo) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
   auto gp = programInfo->getGeometryProcessor();
-  if (gp->name() != GpClassName) {
+  if (!IsProcessor<QuadPerEdgeAAGeometryProcessor>(gp)) {
     return std::nullopt;
   }
   auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
@@ -65,7 +63,7 @@ std::optional<PermutationVariant> YUVTextureFillShader::Match(const ProgramInfo*
     return std::nullopt;
   }
   // Only I420 and NV12 have precompiled plane layouts.
-  YUVTextureFillInputs inputs;
+  Inputs inputs;
   inputs.hasUVMatrix = quadGP->hasUVMatrix();
   if (texture->yuvFormat() == YUVFormat::I420) {
     inputs.yuvFormat = 0;
@@ -73,13 +71,7 @@ std::optional<PermutationVariant> YUVTextureFillShader::Match(const ProgramInfo*
     inputs.yuvFormat = 1;
   }
   inputs.xpType = GetXPType(programInfo);
-  auto composed = ComposeYUVTextureFill(inputs);
-  if (!composed) {
-    return std::nullopt;
-  }
-  auto vertIndex = YUVTextureFillShader::VD::domain().encode(composed->vertValues);
-  auto fragIndex = YUVTextureFillShader::FD::domain().encode(composed->fragValues);
-  return PermutationVariant{vertIndex, fragIndex};
+  return inputs;
 }
 
 }  // namespace tgfx

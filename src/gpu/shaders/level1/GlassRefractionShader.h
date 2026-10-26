@@ -4,55 +4,34 @@
 //
 //  Copyright (C) 2026 Tencent. All rights reserved.
 //
-//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
-//  in compliance with the License. You may obtain a copy of the License at
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
+//  compliance with the License. You may obtain a copy of the License at
 //
-//      https://opensource.org/licenses/BSD-3-Clause/
+//      https://opensource.org/licenses/BSD-3-Clause
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. See the License for the specific language governing permissions
-//  and limitations under the License.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. see the license for the specific language governing permissions and
+//  limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
 #include <optional>
-#include "gpu/shaders/PrecompiledShader.h"
+#include <vector>
+#include "gpu/shaders/ShaderFamily.h"
 
 namespace tgfx {
 
 class ProgramInfo;
-struct PermutationVariant;
 
-/// Precompiled shader declaration for GlassRefractionFragmentProcessor, bound to either
-/// EllipseGeometryProcessor in its common-color form (the oval glass terminal draw) or
-/// QuadPerEdgeAAGeometryProcessor in its common-color uvMatrix form (the rect-like glass terminal
-/// draw, whose per-edge vertex coverage replaces the analytic ellipse coverage). That quad form
-/// carries no uvCoord attribute: the matcher rejects the uvCoord form, so the vertex kernel
-/// transforms the position instead. The geometry child
-/// selects the GEOMETRY_KIND compile-time dimension because it changes the sampler layout: the SDF
-/// kinds are purely procedural (source texture only), while the UDF kinds add the height mask and
-/// the edge-light mask. DISPERSION_ON is a compile-time dimension for the same reason the runtime
-/// makes it part of the program key (onComputeProcessorKey folds it into the key, and
-/// GLSLGlassRefractionFragmentProcessor emits one path or the other): a runtime-uniform branch
-/// would keep both paths in one text, and the compiler's cross-branch optimization then shifts the
-/// sampled coordinate by an ULP relative to the runtime's branch-free program. Edge lighting still
-/// rides a runtime uniform — it only adds to a colour already sampled, so it cannot move a texture
-/// coordinate.
-///
-/// Vertex dimensions:
-///   GP_KIND (int, 2 values): 0=Ellipse common color, 1=QuadPerEdgeAA (uvMatrix + edge coverage)
-///
-/// Fragment dimensions:
-///   GP_KIND (int, 2 values): selects the initial-coverage source and the coordinate varying form
-///   GEOMETRY_KIND (int, 3 values): 0=SDF rounded rect, 1=SDF ellipse, 2=UDF (the edge-light mask
-///   is always declared; the EdgeMaskOn runtime uniform gates its taps)
-///   DISPERSION_ON (int, 2 values): 0=single tap, 1=three chromatic taps
-///   HAS_XP (int, 3 values): XferProcessor type
-class GlassRefractionShader : public PrecompiledShader {
+class GlassRefractionShader : public ShaderFamily<GlassRefractionShader> {
  public:
+  static constexpr const char* Name = "GlassRefractionShader";
+  static constexpr const char* VertFile = "level1/glass_refraction.vert";
+  static constexpr const char* FragFile = "level1/glass_refraction.frag";
+
   struct VertDims {
     enum : uint32_t { GP_KIND, COUNT };
     static PermutationDomain domain() {
@@ -75,27 +54,45 @@ class GlassRefractionShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 4, "Update info() when fragment dimensions change.");
+  static_assert(VD::COUNT == 1 && FD::COUNT == 4,
+                "Update the Compose mapping when dimensions change.");
 
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
 
-  /// Runtime matching: does this draw belong to this family? Declared here, defined in
-  /// the family's own .cpp, next to the GLSL it owns.
-  static std::optional<PermutationVariant> Match(const ProgramInfo* programInfo);
+  /// Matcher inputs: the GP kind (ellipse vs uv-matrix quad), the geometry child kind (SDF
+  /// rounded-rect / SDF other / UDF), the dispersion flag, and the XferProcessor kind.
+  struct Inputs {
+    int gpKind = -1;
+    int geometryKind = -1;
+    bool dispersionOn = false;
+    int xpType = XP_UNSUPPORTED;
+  };
 
-  PrecompiledShaderInfo info() const override {
-    return {"GlassRefractionShader",
-            "level1/glass_refraction.vert",
-            "level1/glass_refraction.frag",
-            VD::domain(),
-            FD::domain(),
-            PermutationDomain({}),
-            "",
-            ""};
+  /// Pure mapping from inputs to dimension values. Pass-through: every input value lands on the
+  /// domains one-to-one (GP_KIND mirrors to both stages), so the mirrored Reachable default
+  /// enumerates exactly what Compose emits.
+  static std::optional<RuleComposedValues> Compose(const Inputs& inputs) {
+    if (inputs.gpKind < 0 || inputs.geometryKind < 0 || inputs.xpType < XP_NONE) {
+      return std::nullopt;
+    }
+    RuleComposedValues values;
+    values.fragValues.resize(FD::COUNT);
+    values.fragValues[FD::GP_KIND] = inputs.gpKind;
+    values.fragValues[FD::GEOMETRY_KIND] = inputs.geometryKind;
+    values.fragValues[FD::DISPERSION_ON] = inputs.dispersionOn ? 1 : 0;
+    values.fragValues[FD::HAS_XP] = inputs.xpType;
+    values.vertValues.resize(VD::COUNT);
+    values.vertValues[VD::GP_KIND] = inputs.gpKind;
+    return values;
   }
+
+  /// Whole-draw guards (alpha-only target, the common-color GP forms, the local-mask coverage,
+  /// the refraction and geometry child shapes), defined in the family's own .cpp, next to the
+  /// GLSL it owns.
+  static std::optional<Inputs> Extract(const ProgramInfo* programInfo);
 };
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::GlassRefractionShader, tgfx::EnumerateGlassRefractionReachable)
+TGFX_REGISTER_SHADER_FAMILY(tgfx::GlassRefractionShader)

@@ -4,50 +4,37 @@
 //
 //  Copyright (C) 2026 Tencent. All rights reserved.
 //
-//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
-//  in compliance with the License. You may obtain a copy of the License at
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
+//  compliance with the License. You may obtain a copy of the License at
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. see the license for the specific language governing permissions and
+//  limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
 #include <optional>
-#include "gpu/shaders/PrecompiledShader.h"
+#include <vector>
+#include "gpu/shaders/ShaderFamily.h"
 
 namespace tgfx {
 
 class ProgramInfo;
-struct PermutationVariant;
 
-/// Precompiled shader for QuadPerEdgeAAGeometryProcessor + TextureEffect pipeline.
-/// Covers the common drawImage path where vertices are pre-transformed to device space.
-///
-/// Vertex dimensions (driven by QuadPerEdgeAAGeometryProcessor configuration):
-///   (per-vertex coverage is unconditional: providers emit 1.0 for non-AA draws, so the
-///    vCoverage varying is the only coverage path and HAS_COVERAGE no longer exists)
-///   HAS_UV_COORD       (bool): explicit UV coordinate attribute present
-///   (per-vertex color is unconditional: providers always write a color slot, broadcasting the
-///    record's paint color for uniform-color batches)
-///   HAS_SUBSET         (bool): texture subset attribute present
-///   HAS_LOCAL_MASK     (bool): local-space mask attribute present
-///   (Perspective is handled uniformly: the coord is always emitted as vec3 and divided in the
-///    fragment shader; affine transforms yield z=1 so the divide is a no-op.)
-///
-/// Fragment dimensions:
-///   HAS_SUBSET     (bool): subset clamping active
-///   HAS_XP         (int, 3): the XferProcessor form
-///   HAS_LOCAL_MASK (bool): local-space mask applied
-///   (ALPHA_ONLY and HAS_RGBAAA are runtime uniforms, see below.)
-class QuadTextureFillShader : public PrecompiledShader {
+class QuadTextureFillShader : public ShaderFamily<QuadTextureFillShader> {
  public:
-  // Vertex dimensions
+  static constexpr const char* Name = "QuadTextureFillShader";
+  static constexpr const char* VertFile = "level1/quad_texture_fill.vert";
+  static constexpr const char* FragFile = "level1/quad_texture_fill.frag";
+
+  // The one geometry processor this family accepts: reported by info() and compared by Extract.
+  static constexpr const char* GpClassName = "QuadPerEdgeAAGeometryProcessor";
+
   struct VertDims {
     enum : uint32_t { HAS_UV_COORD, HAS_SUBSET, HAS_LOCAL_MASK, COUNT };
     static PermutationDomain domain() {
@@ -59,12 +46,7 @@ class QuadTextureFillShader : public PrecompiledShader {
     }
   };
   using VD = VertDims;
-  static_assert(VD::COUNT == 3, "Update the Compose mapping when vertex dimensions change.");
 
-  // Fragment dimensions
-  // ALPHA_ONLY and HAS_RGBAAA are intentionally NOT dimensions: both are pure fragment math
-  // (alpha-only replicates .r; RGBAAA adds one coherent-branch alpha sample), so they are runtime
-  // uniforms (AlphaOnly / HasRgbaaa) rather than compile-time permutations, shrinking the variants.
   struct FragDims {
     enum : uint32_t { HAS_SUBSET, HAS_XP, HAS_LOCAL_MASK, COUNT };
     static PermutationDomain domain() {
@@ -76,29 +58,47 @@ class QuadTextureFillShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 3, "Update the Compose mapping when fragment dimensions change.");
+  static_assert(VD::COUNT == 3 && FD::COUNT == 3,
+                "Update the Compose mapping when dimensions change.");
 
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = true;
 
-  /// Runtime matching: does this draw belong to this family? Declared here, defined in
-  /// the family's own .cpp, next to the GLSL it owns.
-  static std::optional<PermutationVariant> Match(const ProgramInfo* programInfo);
+  /// Matcher inputs: the UV-coord and subset presence, the local-mask presence, and the
+  /// XferProcessor kind.
+  struct Inputs {
+    bool hasUVCoord = false;
+    bool hasSubset = false;
+    bool hasLocalMask = false;
+    int xpType = XP_UNSUPPORTED;
+  };
 
-  // The one geometry processor this family accepts: info() reports it, Match compares against it.
-  static constexpr const char* GpClassName = "QuadPerEdgeAAGeometryProcessor";
-  PrecompiledShaderInfo info() const override {
-    return {"QuadTextureFillShader",
-            "level1/quad_texture_fill.vert",
-            "level1/quad_texture_fill.frag",
-            VD::domain(),
-            FD::domain(),
-            PermutationDomain({}),
-            GpClassName,
-            ""};
+  /// Pure mapping from inputs to dimension values. Pass-through: every input value lands on the
+  /// domains one-to-one (HAS_SUBSET and HAS_LOCAL_MASK mirror to both stages), so the mirrored
+  /// Reachable default enumerates exactly what Compose emits.
+  static std::optional<RuleComposedValues> Compose(const Inputs& inputs) {
+    if (inputs.xpType < XP_NONE) {
+      return std::nullopt;
+    }
+    RuleComposedValues values;
+    values.vertValues.resize(VD::COUNT);
+    values.vertValues[VD::HAS_UV_COORD] = inputs.hasUVCoord ? 1 : 0;
+    values.vertValues[VD::HAS_SUBSET] = inputs.hasSubset ? 1 : 0;
+    values.vertValues[VD::HAS_LOCAL_MASK] = inputs.hasLocalMask ? 1 : 0;
+    values.fragValues.resize(FD::COUNT);
+    // ALPHA_ONLY and HAS_RGBAAA are runtime uniforms (set by GLSLTextureEffect::onSetData), not
+    // variants.
+    values.fragValues[FD::HAS_SUBSET] = values.vertValues[VD::HAS_SUBSET];
+    values.fragValues[FD::HAS_XP] = inputs.xpType;
+    values.fragValues[FD::HAS_LOCAL_MASK] = values.vertValues[VD::HAS_LOCAL_MASK];
+    return values;
   }
+
+  /// Whole-draw guards (alpha-only target, geometry processor kind, the color TextureEffect and
+  /// coverage shapes), defined in the family's own .cpp, next to the GLSL it owns.
+  static std::optional<Inputs> Extract(const ProgramInfo* programInfo);
 };
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::QuadTextureFillShader, tgfx::EnumerateQuadTextureFillReachable)
+TGFX_REGISTER_SHADER_FAMILY(tgfx::QuadTextureFillShader)

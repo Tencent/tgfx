@@ -100,54 +100,6 @@ namespace tgfx {
 // ---------------------------------------------------------------------------------------
 
 /**
- * Input contract of the YUVTextureFillShader matcher rule. yuvFormat is the plane layout index
- * (0 = I420, 1 = NV12); unsupported formats map to -1 and are rejected in Compose so the
- * enumeration sees the same rejection as the runtime.
- */
-struct YUVTextureFillInputs {
-  bool hasUVMatrix = false;
-  int yuvFormat = -1;           // -1 = unsupported plane layout.
-  int xpType = XP_UNSUPPORTED;  // -1 = no representable XferProcessor.
-};
-
-/**
- * Input contract of the QuadTextureFillShader matcher rule. The coverage FP classification
- * (device mask = runtime uniform, local mask = dimension, else reject) and the TextureEffect
- * shape checks happen in Extract; alphaOnly / RGBAAA are runtime uniforms.
- */
-struct QuadTextureFillInputs {
-  bool hasUVCoord = false;
-  bool hasSubset = false;
-  bool hasLocalMask = false;
-  int xpType = XP_UNSUPPORTED;  // no representable XferProcessor
-};
-
-/**
- * Input contract of the GlassRefractionShader matcher rule. The GP selects the GP_KIND dimension
- * (0=ellipse common color, 1=quad common color in its uvMatrix form with per-edge coverage)
- * because it changes the vertex attribute layout and the initial-coverage source. The geometry
- * child selects the GEOMETRY_KIND dimension (0=SDF rounded rect, 1=SDF ellipse, 2=UDF, 3=UDF +
- * edge light) because it changes the sampler layout. Dispersion selects DISPERSION_ON because the
- * runtime folds the same predicate into the program key and emits only one tap path; the lighting
- * branch rides a runtime uniform since it cannot move a texture coordinate.
- */
-struct GlassRefractionInputs {
-  int gpKind = -1;              // -1 = unrepresentable geometry processor form.
-  int geometryKind = -1;        // -1 = unrepresentable geometry child.
-  bool dispersionOn = false;    // Mirrors GlassRefractionFragmentProcessor::hasDispersion().
-  int xpType = XP_UNSUPPORTED;  // -1 = no representable XferProcessor.
-};
-
-/**
- * Input contract of the AtlasTextFillShader matcher rule. The optional device-space mask
- * structure checks are whole-draw rejections in Extract; the mask is a runtime uniform.
- */
-struct AtlasTextFillInputs {
-  bool hasCoverage = false;
-  int xpType = XP_UNSUPPORTED;  // no representable XferProcessor
-};
-
-/**
  * Shared input contract for the PointwiseChainShader rule (plain chains and the extended
  * resource kinds). gpKind selects
  * (0 = DefaultGP, 1 = QuadPerEdgeAA, 2 = Mesh, 3 = sampler-free AtlasText twin, 4 = Ellipse,
@@ -203,7 +155,6 @@ struct PointwiseChainInputs {
 /**
  * Pure mapping for the YUVTextureFillShader rule; see the ShaderFamily Compose contract.
  */
-std::optional<RuleComposedValues> ComposeYUVTextureFill(const YUVTextureFillInputs& inputs);
 
 /**
  * Pure mapping for the ShapeInstancedTextureCoverageShader rule; see the ShaderFamily Compose
@@ -217,17 +168,14 @@ std::optional<RuleComposedValues> ComposeYUVTextureFill(const YUVTextureFillInpu
 /**
  * Pure mapping for the QuadTextureFillShader rule; see the ShaderFamily Compose contract.
  */
-std::optional<RuleComposedValues> ComposeQuadTextureFill(const QuadTextureFillInputs& inputs);
 
 /**
  * Pure mapping for the GlassRefractionShader rule; see the ShaderFamily Compose contract.
  */
-std::optional<RuleComposedValues> ComposeGlassRefraction(const GlassRefractionInputs& inputs);
 
 /**
  * Pure mapping for the AtlasTextFillShader rule; see the ShaderFamily Compose contract.
  */
-std::optional<RuleComposedValues> ComposeAtlasTextFill(const AtlasTextFillInputs& inputs);
 
 /**
  * Pure mapping for the PointwiseChainShader rule; see the ShaderFamily Compose contract.
@@ -235,10 +183,6 @@ std::optional<RuleComposedValues> ComposeAtlasTextFill(const AtlasTextFillInputs
 std::optional<RuleComposedValues> ComposePointwiseChain(const PointwiseChainInputs& inputs);
 
 /** Family enumerators bound alongside their factories by TGFX_REGISTER_SHADER. */
-std::set<std::pair<uint32_t, uint32_t>> EnumerateYUVTextureFillReachable();
-std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadTextureFillReachable();
-std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassRefractionReachable();
-std::set<std::pair<uint32_t, uint32_t>> EnumerateAtlasTextFillReachable();
 
 /**
  * Returns every (vertIndex, fragIndex) pair the PointwiseChain rule can ever produce: the plain

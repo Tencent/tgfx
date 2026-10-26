@@ -7,10 +7,10 @@
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
 //  compliance with the License. You may obtain a copy of the License at
 //
-//       https://opensource.org/licenses/BSD-3-Clause
+//      https://opensource.org/licenses/BSD-3-Clause
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. see the license for the specific language governing permissions and
 //  limitations under the license.
 //
@@ -18,20 +18,17 @@
 
 #include "gpu/shaders/level1/GlassRefractionShader.h"
 #include <optional>
-#include <vector>
-#include "gpu/PermutationMatcher.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
-#include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
-#include "gpu/shaders/PermutationRules.h"
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
 #include "layers/processors/GlassShapeGeometryFragmentProcessor.h"
 
 namespace tgfx {
 
-std::optional<PermutationVariant> GlassRefractionShader::Match(const ProgramInfo* programInfo) {
+std::optional<GlassRefractionShader::Inputs> GlassRefractionShader::Extract(
+    const ProgramInfo* programInfo) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
@@ -80,7 +77,7 @@ std::optional<PermutationVariant> GlassRefractionShader::Match(const ProgramInfo
     }
   }
   int xpType = GetXPType(programInfo);
-  if (xpType < 0) {
+  if (xpType < XP_NONE) {
     return std::nullopt;
   }
   auto fp = programInfo->getFragmentProcessor(0);
@@ -116,20 +113,14 @@ std::optional<PermutationVariant> GlassRefractionShader::Match(const ProgramInfo
   if (geometryKind < 0) {
     return std::nullopt;
   }
-  GlassRefractionInputs inputs;
+  Inputs inputs;
   inputs.gpKind = gpKind;
   inputs.geometryKind = geometryKind;
   // Same predicate the runtime folds into the program key, so the compile-time variant tracks the
   // runtime program one-for-one.
   inputs.dispersionOn = refraction->hasDispersion();
   inputs.xpType = xpType;
-  auto composed = ComposeGlassRefraction(inputs);
-  if (!composed) {
-    return std::nullopt;
-  }
-  auto vertIndex = GlassRefractionShader::VD::domain().encode(composed->vertValues);
-  auto fragIndex = GlassRefractionShader::FD::domain().encode(composed->fragValues);
-  return PermutationVariant{vertIndex, fragIndex};
+  return inputs;
 }
 
 }  // namespace tgfx
