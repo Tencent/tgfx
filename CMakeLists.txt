@@ -807,9 +807,10 @@ if (TGFX_EXCLUDE_FILES)
 endif ()
 
 # The one list of shader families: every src/gpu/shaders/level1/<Name>.h that registers <Name> with
-# TGFX_REGISTER_SHADER. Adding a family means adding its header; nothing else lists it. The list is
-# generated into gpu/shaders/AllShaderFamilies.h (the includes plus a TGFX_FOR_EACH_SHADER_FAMILY
-# X-macro) so the registry, the matcher, the build tool and the tests all derive from it.
+# TGFX_REGISTER_SHADER_FAMILY. Adding a family means adding its header; nothing else lists it. The
+# list is generated into gpu/shaders/AllShaderFamilies.h (the includes plus a
+# TGFX_FOR_EACH_SHADER_FAMILY X-macro) so the registry, the matcher, the build tool and the tests
+# all derive from it.
 file(GLOB TGFX_SHADER_FAMILY_HEADERS CONFIGURE_DEPENDS
         ${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/shaders/level1/*.h)
 set(TGFX_SHADER_FAMILY_INCLUDES "")
@@ -817,13 +818,13 @@ set(TGFX_SHADER_FAMILY_ENTRIES "")
 foreach (FAMILY_HEADER ${TGFX_SHADER_FAMILY_HEADERS})
     get_filename_component(FAMILY_NAME "${FAMILY_HEADER}" NAME_WE)
     file(READ "${FAMILY_HEADER}" FAMILY_HEADER_TEXT)
-    if (NOT FAMILY_HEADER_TEXT MATCHES "TGFX_REGISTER_SHADER(_FAMILY)?\\(tgfx::([A-Za-z0-9_]+)[,)]")
+    if (NOT FAMILY_HEADER_TEXT MATCHES "TGFX_REGISTER_SHADER_FAMILY\\(tgfx::([A-Za-z0-9_]+)\\)")
         message(FATAL_ERROR "${FAMILY_HEADER} does not register a shader family with "
-                "TGFX_REGISTER_SHADER or TGFX_REGISTER_SHADER_FAMILY; every header under "
-                "src/gpu/shaders/level1 is a family.")
+                "TGFX_REGISTER_SHADER_FAMILY; every header under src/gpu/shaders/level1 is a "
+                "family.")
     endif ()
-    if (NOT "${CMAKE_MATCH_2}" STREQUAL "${FAMILY_NAME}")
-        message(FATAL_ERROR "${FAMILY_HEADER} registers ${CMAKE_MATCH_2}; a family header must be "
+    if (NOT "${CMAKE_MATCH_1}" STREQUAL "${FAMILY_NAME}")
+        message(FATAL_ERROR "${FAMILY_HEADER} registers ${CMAKE_MATCH_1}; a family header must be "
                 "named after the class it registers.")
     endif ()
     string(APPEND TGFX_SHADER_FAMILY_INCLUDES "#include \"gpu/shaders/level1/${FAMILY_NAME}.h\"\n")
@@ -933,7 +934,6 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
     file(GLOB_RECURSE TGFX_SHADER_DECL_FILES
             src/gpu/shaders/ShaderPermutation.*
             src/gpu/shaders/PrecompiledShader.*
-            src/gpu/shaders/PermutationRules.*
             src/gpu/shaders/level1/*.h)
     add_library(tgfx_shader_declarations STATIC ${TGFX_SHADER_DECL_FILES})
     set_target_properties(tgfx_shader_declarations PROPERTIES PREFIX "")

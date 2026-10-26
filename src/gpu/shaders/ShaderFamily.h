@@ -88,9 +88,8 @@ template <typename T>
 class ShaderFamily : public PrecompiledShader {
  public:
   PrecompiledShaderInfo info() const override {
-    PrecompiledShaderInfo result = {
-        T::Name,         T::VertFile,           T::FragFile, T::VD::domain(),
-        T::FD::domain(), PermutationDomain({}), "",          ""};
+    PrecompiledShaderInfo result = {T::Name,         T::VertFile,     T::FragFile,
+                                    T::VD::domain(), T::FD::domain(), ""};
     if constexpr (FamilyHasGpClassName<T>::value) {
       result.gpClassName = T::GpClassName;
     }

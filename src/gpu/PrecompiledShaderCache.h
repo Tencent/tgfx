@@ -315,7 +315,7 @@ class PrecompiledShaderCache {
     return fragEntries.size();
   }
 
-  /// Returns the profile tag from the loaded bundle header (e.g. "vulkan-android").
+  /// Returns the profile tag from the loaded bundle header (e.g. "vulkan"; see ShaderProfile.h).
   const std::string& profileTag() const {
     return _profileTag;
   }

@@ -52,9 +52,7 @@ struct PrecompiledShaderInfo {
   std::string fragmentFile;
   PermutationDomain vertDomain;
   PermutationDomain fragDomain;
-  PermutationDomain gpDomain;
   std::string gpClassName;
-  std::string declarationFile;
   /// ShaderTextureRead bits this family implements. Zero (the default) declares none.
   uint32_t textureReads = 0;
 };
@@ -97,8 +95,8 @@ class PrecompiledShader {
 };
 
 /**
- * Global registry of all precompiled shader factories. Shaders register themselves at static
- * initialization time via the TGFX_REGISTER_SHADER macro.
+ * Global registry of all precompiled shader factories. Shader families register themselves at
+ * static initialization time via the TGFX_REGISTER_SHADER_FAMILY macro (see ShaderFamily.h).
  */
 class ShaderRegistry {
  public:
@@ -120,26 +118,5 @@ class ShaderRegistry {
 // Internal helper macros for unique name generation.
 #define TGFX_CONCAT_IMPL(a, b) a##b
 #define TGFX_CONCAT(a, b) TGFX_CONCAT_IMPL(a, b)
-
-// Registers the shader factory and its reachable-set provider during static initialization.
-#define TGFX_REGISTER_SHADER_IMPL(ShaderClass, EnumerateFunction, counter)                    \
-  namespace {                                                                                 \
-  struct TGFX_CONCAT(ShaderAutoReg_, counter) {                                               \
-    TGFX_CONCAT(ShaderAutoReg_, counter)() {                                                  \
-      ::tgfx::ShaderRegistry::Register(                                                       \
-          []() -> std::unique_ptr<::tgfx::PrecompiledShader> {                                \
-            return std::make_unique<ShaderClass>();                                           \
-          },                                                                                  \
-          EnumerateFunction);                                                                 \
-    }                                                                                         \
-  };                                                                                          \
-  static TGFX_CONCAT(ShaderAutoReg_, counter) TGFX_CONCAT(shaderAutoRegInstance_, counter){}; \
-  }
-
-/**
- * Registers a shader and its enumerator together. Place this after the shader's class definition.
- */
-#define TGFX_REGISTER_SHADER(ShaderClass, EnumerateFunction) \
-  TGFX_REGISTER_SHADER_IMPL(ShaderClass, EnumerateFunction, __COUNTER__)
 
 }  // namespace tgfx

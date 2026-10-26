@@ -68,7 +68,8 @@ static uint8_t MapSPIRVTypeToFormat(const spirv_cross::SPIRType& type) {
 
 static std::vector<VertexInputEntry> ExtractVertexInputs(spirv_cross::Compiler& compiler) {
   // The runtime vertex binding walks attribute slots by location, so the entries are recorded in
-  // location order; the loader separately requires the locations to be contiguous from zero.
+  // location order; the loader requires the locations to strictly increase (a gap is legal, a
+  // repeated or decreasing location is not).
   std::vector<std::pair<uint32_t, VertexInputEntry>> byLocation;
   auto resources = compiler.get_shader_resources();
   for (auto& input : resources.stage_inputs) {

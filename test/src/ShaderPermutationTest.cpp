@@ -517,7 +517,7 @@ std::unique_ptr<PrecompiledShader> MakeRegistryConflictShader() {
 
 TGFX_TEST(ShaderPermutationTest, ShaderRegistryRejectsConflictingDeclarations) {
   ::testing::FLAGS_gtest_death_test_style = "threadsafe";
-  for (int change = 0; change < 9; ++change) {
+  for (int change = 0; change < 7; ++change) {
     SCOPED_TRACE(change);
     auto& info = RegistryConflictInfo();
     info = PointwiseChainShader().info();
@@ -532,27 +532,21 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryRejectsConflictingDeclarations) {
         info.gpClassName += "changed";
         break;
       case 3:
-        info.declarationFile += "changed";
-        break;
-      case 4:
         info.textureReads ^= ShaderTextureReadSwizzle;
         break;
-      case 5: {
+      case 4: {
         auto dimensions = info.vertDomain.getDimensions();
         std::swap(dimensions[0], dimensions[1]);
         info.vertDomain = PermutationDomain(std::move(dimensions));
         break;
       }
-      case 6: {
+      case 5: {
         auto dimensions = info.fragDomain.getDimensions();
         std::get<PermutationInt>(dimensions[PointwiseChainShader::FD::HAS_XP]).count = 4;
         info.fragDomain = PermutationDomain(std::move(dimensions));
         break;
       }
-      case 7:
-        info.gpDomain = PermutationDomain({PermutationBool("EXTRA_GP_FIELD")});
-        break;
-      case 8: {
+      case 6: {
         auto dimensions = info.fragDomain.getDimensions();
         dimensions[PointwiseChainShader::FD::GP_LAYOUT] = PermutationBool("GP_LAYOUT");
         info.fragDomain = PermutationDomain(std::move(dimensions));

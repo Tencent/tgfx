@@ -80,9 +80,8 @@ static bool SameDomain(const PermutationDomain& left, const PermutationDomain& r
 static bool SameShaderInfo(const PrecompiledShaderInfo& left, const PrecompiledShaderInfo& right) {
   return left.name == right.name && left.vertexFile == right.vertexFile &&
          left.fragmentFile == right.fragmentFile && left.gpClassName == right.gpClassName &&
-         left.declarationFile == right.declarationFile && left.textureReads == right.textureReads &&
-         SameDomain(left.vertDomain, right.vertDomain) &&
-         SameDomain(left.fragDomain, right.fragDomain) && SameDomain(left.gpDomain, right.gpDomain);
+         left.textureReads == right.textureReads && SameDomain(left.vertDomain, right.vertDomain) &&
+         SameDomain(left.fragDomain, right.fragDomain);
 }
 
 bool IsBuildablePermutation(const PrecompiledShaderInfo& info, uint32_t vertIndex,
@@ -123,8 +122,9 @@ void ShaderRegistry::Register(Factory factory, Enumerator enumerator) {
   auto& shaderInfos = GetShaderInfos();
   auto existing = shaderInfos.find(info.name);
   if (existing != shaderInfos.end()) {
-    // Headers register once per translation unit. Their factory lambdas have different addresses,
-    // so compare the declaration and the shared enumerator, not the factory pointer.
+    // The header of a family is included, and registers it again, in every translation unit that
+    // uses it. A repeat must declare the same family, so compare the declaration and the shared
+    // enumerator, not the factory pointer.
     if (existing->second.enumerator != enumerator || !SameShaderInfo(existing->second.info, info)) {
       std::fprintf(stderr, "ShaderRegistry: conflicting declaration or enumerator for '%s'\n",
                    info.name.c_str());
