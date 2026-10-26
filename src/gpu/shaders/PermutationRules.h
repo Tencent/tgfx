@@ -333,7 +333,6 @@ std::optional<RuleComposedValues> ComposePointwiseChain(const PointwiseChainInpu
 std::set<std::pair<uint32_t, uint32_t>> EnumerateRoundStrokeRectReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadColorFillReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexEllipseFillReachable();
-std::set<std::pair<uint32_t, uint32_t>> EnumerateEllipseFillReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateNonAARRectFillReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexNonAARRectFillReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateMeshFillReachable();
@@ -343,8 +342,6 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedTextureCoverageRe
 std::set<std::pair<uint32_t, uint32_t>> EnumerateShapeInstancedFillReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateTiledTextureFillReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadTextureFillReachable();
-std::set<std::pair<uint32_t, uint32_t>> EnumerateGaussianBlur1DReachable();
-std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassUDFTentBlurReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassRefractionReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateTexturedEffectReachable();
 std::set<std::pair<uint32_t, uint32_t>> EnumerateAtlasTextFillReachable();

@@ -4,27 +4,27 @@
 //
 //  Copyright (C) 2026 Tencent. All rights reserved.
 //
-//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
-//  in compliance with the License. You may obtain a copy of the License at
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
+//  compliance with the License. You may obtain a copy of the License at
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. see the license for the specific language governing permissions and
+//  limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
 #include <optional>
-#include "gpu/shaders/PrecompiledShader.h"
+#include <vector>
+#include "gpu/shaders/ShaderFamily.h"
 
 namespace tgfx {
 
 class ProgramInfo;
-struct PermutationVariant;
 
 /// Precompiled shader declaration for GaussianBlur1DFragmentProcessor. Performs a 1D Gaussian blur
 /// by sampling a child texture in a loop. The loop upper bound is a fixed compile-time constant
@@ -41,8 +41,12 @@ struct PermutationVariant;
 ///   (MAX_SIGMA removed — the radius is now a uniform, not a variant dimension)
 ///
 /// Runtime uniforms: Kernel (vec4[KERNEL_VEC4_COUNT]), Radius (int), Step (vec2 direction vector)
-class GaussianBlur1DShader : public PrecompiledShader {
+class GaussianBlur1DShader : public ShaderFamily<GaussianBlur1DShader> {
  public:
+  static constexpr const char* Name = "GaussianBlur1DShader";
+  static constexpr const char* VertFile = "level1/blur_texture.vert";
+  static constexpr const char* FragFile = "level1/gaussian_blur_1d.frag";
+
   struct VertDims {
     enum : uint32_t { COUNT };
     static PermutationDomain domain() {
@@ -64,27 +68,34 @@ class GaussianBlur1DShader : public PrecompiledShader {
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 1, "Update info() when fragment dimensions change.");
+  static_assert(VD::COUNT == 0 && FD::COUNT == 1,
+                "Update the Compose mapping when dimensions change.");
 
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = true;
 
-  /// Runtime matching: does this draw belong to this family? Declared here, defined in
-  /// the family's own .cpp, next to the GLSL it owns.
-  static std::optional<PermutationVariant> Match(const ProgramInfo* programInfo);
+  /// Matcher inputs: only the XferProcessor kind shapes the variant.
+  struct Inputs {
+    int xpType = XP_UNSUPPORTED;
+  };
 
-  PrecompiledShaderInfo info() const override {
-    return {"GaussianBlur1DShader",
-            "level1/blur_texture.vert",
-            "level1/gaussian_blur_1d.frag",
-            VD::domain(),
-            FD::domain(),
-            PermutationDomain({}),
-            "",
-            ""};
+  /// Pure mapping from inputs to dimension values. Pass-through: every input value lands on the
+  /// domain one-to-one, so the mirrored Reachable default enumerates exactly what Compose emits.
+  static std::optional<RuleComposedValues> Compose(const Inputs& inputs) {
+    if (inputs.xpType < XP_NONE) {
+      return std::nullopt;
+    }
+    RuleComposedValues values;
+    values.fragValues.resize(FD::COUNT);
+    values.fragValues[FD::HAS_XP] = inputs.xpType;
+    return values;
   }
+
+  /// Whole-draw guards (alpha-only target, GP kind, the blur child shape and the fixed kernel
+  /// budget), defined in the family's own .cpp, next to the GLSL it owns.
+  static std::optional<Inputs> Extract(const ProgramInfo* programInfo);
 };
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER(tgfx::GaussianBlur1DShader, tgfx::EnumerateGaussianBlur1DReachable)
+TGFX_REGISTER_SHADER_FAMILY(tgfx::GaussianBlur1DShader)

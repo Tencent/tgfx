@@ -134,10 +134,6 @@ std::set<std::pair<uint32_t, uint32_t>> EnumerateComplexEllipseFillReachable() {
       nullptr);
 }
 
-std::set<std::pair<uint32_t, uint32_t>> EnumerateEllipseFillReachable() {
-  return EnumerateMirroredReachable<EllipseFillShader::VD, EllipseFillShader::FD>(nullptr);
-}
-
 std::optional<RuleComposedValues> ComposeNonAARRectFill(const NonAARRectFillInputs& inputs) {
   if (inputs.xpType < XP_NONE) {
     return std::nullopt;
@@ -305,14 +301,6 @@ std::optional<RuleComposedValues> ComposeQuadTextureFill(const QuadTextureFillIn
 
 std::set<std::pair<uint32_t, uint32_t>> EnumerateQuadTextureFillReachable() {
   return EnumerateMirroredReachable<QuadTextureFillShader::VD, QuadTextureFillShader::FD>(nullptr);
-}
-
-std::set<std::pair<uint32_t, uint32_t>> EnumerateGaussianBlur1DReachable() {
-  return EnumerateMirroredReachable<EmptyVertDims, GaussianBlur1DShader::FD>(nullptr);
-}
-
-std::set<std::pair<uint32_t, uint32_t>> EnumerateGlassUDFTentBlurReachable() {
-  return EnumerateMirroredReachable<EmptyVertDims, GlassUDFTentBlurShader::FD>(nullptr);
 }
 
 std::optional<RuleComposedValues> ComposeGlassRefraction(const GlassRefractionInputs& inputs) {
