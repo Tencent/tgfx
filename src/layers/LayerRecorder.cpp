@@ -421,10 +421,9 @@ std::unique_ptr<LayerContent> LayerRecorder::finishRecording() {
   }
 
   // Phase 2: Collect contours from groups, one selection per caliber. A group never mixes the two
-  // kinds of entry -- hasSameGeometry() keeps a painted entry away from a bare one -- so a group is
-  // painted or bare as a whole. The painted caliber therefore selects the representative of every
-  // painted group and nothing at all for a bare one. A table that selects nothing must stay
-  // distinguishable from no table: hasContourTable is what tells them apart.
+  // kinds -- hasSameGeometry() keeps a painted entry away from a bare one -- so it is painted or
+  // bare as a whole, and the painted caliber selects nothing for a bare one. A table that selects
+  // nothing must stay distinguishable from no table: hasContourTable is what tells them apart.
   bool hasContourTable = false;
   std::vector<std::vector<GeometryContent*>> selections = {};
   std::vector<std::vector<GeometryContent*>> paintedSelections = {};

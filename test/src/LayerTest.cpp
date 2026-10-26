@@ -5049,8 +5049,8 @@ TGFX_TEST_PRIVATE(LayerTest, GlassGeometryKeepsInteriorCoverageWithAStroke) {
   const auto glass = GlassStyle::Make(0, 50, 100, 0, 0, 0, 0);
   RegionSpec withStroke = {};
   withStroke.bounds = GlassPanelLocalBounds();
-  // A retained 0%-alpha fill: the stroke painter captures the geometry, so only a painter keeps the
-  // interior in the own geometry.
+  // A retained 0%-alpha fill: the stroke already captures the geometry, so here only a painter
+  // keeps the interior in the own geometry.
   withStroke.fill = RegionFillKind::Transparent;
   withStroke.strokeWidth = strokeWidth;
   withStroke.strokeAlign = StrokeAlign::Outside;
@@ -6964,11 +6964,10 @@ static std::vector<int> RasterizeOwnGeometryAlpha(Context* context,
   return raster;
 }
 
-// Counts the entries of `content` that carry no paint. Such an entry is a geometry no painter
-// captured: it used to live in a parallel list on VectorLayer, and now it is an ordinary content
-// entry that only the own-geometry queries see. The unit is the entry, not the geometry: two bare
-// rectangles recorded under one matrix batch into a single RectsContent and count as one, so a test
-// that needs two entries has to give them different matrices, as the Repeater case below does.
+// Counts the entries of `content` that carry no paint, i.e. geometries no painter captured. The unit
+// is the entry, not the geometry: two bare rectangles recorded under one matrix batch into a single
+// RectsContent and count as one, so a test needing two entries has to give them different matrices,
+// as the Repeater case below does.
 static int CountUnpaintedEntries(const LayerContent* content) {
   TGFX_PRIVATE_ACCESS(if (content != nullptr) {
     auto type = content->type();

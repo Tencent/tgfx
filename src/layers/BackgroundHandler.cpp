@@ -401,14 +401,11 @@ const LayerStyleSource* BackgroundCapturer::cacheLayerStyleSource(
     return nullptr;
   }
   // Wrap each picture-backed image as Rasterized so the first draw uploads a GPU texture and the
-  // second pass reuses it instead of replaying the picture. makeRasterized() on an already-
-  // rasterized image is a no-op, so wrapping content and contour independently still hits one
-  // cache. The own geometry is different: it is recorded once per layer and shared by both buckets,
-  // so the two entries hold the very same Image, and wrapping it per bucket would give one picture
-  // two RasterizedImages -- two GPU caches for one recording. Dedupe it by the image underneath and
-  // hand the one wrapper to every bucket that holds it. The swap replaces the entry images in place,
-  // so the typed sources built from the recording hold stale PictureImage proxies and must be
-  // rebuilt afterwards.
+  // second reuses it; makeRasterized() is a no-op on an already-rasterized image, so content and
+  // contour need no dedupe. The own geometry does: it is recorded once and shared by both buckets,
+  // and wrapping it per bucket would give one recording two GPU caches. Dedupe by the image
+  // underneath. The swap replaces entry images in place, so the typed sources built from them hold
+  // stale PictureImage proxies and must be rebuilt afterwards.
   std::shared_ptr<Image> ownRecording = nullptr;
   std::shared_ptr<Image> ownRasterized = nullptr;
   for (auto& group : source->groups) {

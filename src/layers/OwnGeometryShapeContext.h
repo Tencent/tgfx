@@ -32,15 +32,14 @@
 namespace tgfx {
 
 /**
- * OwnGeometryShapeContext reads back the shape a layer's own-geometry recording covers. It is a
- * read-only DrawContext that plays the finished picture back, so it describes what the recording
- * actually painted instead of re-deriving it from the elements or painters behind it.
+ * OwnGeometryShapeContext reads back the shape a layer's own-geometry recording covers by playing
+ * the finished picture back, so it describes what the recording painted instead of re-deriving it
+ * from the elements or painters behind it.
  *
- * The extraction is conservative: the picture yields a shape only when every draw in it covers the
- * very same outline. Anything the context cannot express as that one outline -- a stroke, a clip, an
- * image shader, a mask filter, an inverse fill, an image, a mesh, or a differently shaped area --
- * rejects the whole extraction, so callers fall back to a non-vector path instead of covering part
- * of the layer.
+ * The extraction is conservative: a shape is yielded only when every draw covers the very same
+ * outline. A stroke, a clip, an image shader, a mask filter, an inverse fill, an image, a mesh or a
+ * differently shaped area rejects the whole extraction, so callers fall back to a non-vector path
+ * instead of covering part of the layer.
  */
 class OwnGeometryShapeContext : public DrawContext, public Picture::AbortCallback {
  public:

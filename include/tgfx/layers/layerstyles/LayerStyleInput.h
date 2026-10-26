@@ -47,10 +47,8 @@ class StyleInputSource {
   /**
    * Creates a plain image source.
    * @param image The source image.
-   * @param imageOffset The top-left corner of the source image, in the frame its role implies: as
-   *                    LayerStyleInput::content it is the image's layer-local origin already
-   *                    multiplied by contentScale, as an extra source it is relative to that
-   *                    content image. See imageOffset().
+   * @param imageOffset The top-left corner of the source image, in the frame its role implies. See
+   *                    imageOffset().
    */
   StyleInputSource(std::shared_ptr<Image> image, Point imageOffset)
       : _type(Type::Base), _image(std::move(image)), _imageOffset(imageOffset) {
@@ -136,9 +134,8 @@ class ContourInputSource : public StyleInputSource {
   /**
    * Creates a contour source.
    * @param image The rasterized contour image.
-   * @param imageOffset The contour image's top-left corner: as the primary content the contour
-   *                    raster's layer-local origin multiplied by contentScale, as an extra source
-   *                    its origin relative to the content image.
+   * @param imageOffset The contour image's top-left corner, in the frame its role implies. See
+   *                    imageOffset().
    * @param contentShape The content shape the spread fallback of this contour was derived from.
    */
   ContourInputSource(std::shared_ptr<Image> image, Point imageOffset,

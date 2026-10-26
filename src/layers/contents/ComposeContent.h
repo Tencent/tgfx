@@ -40,9 +40,8 @@ class ComposeContent : public LayerContent {
    * @param contours The representative of every group for a query that includes the geometries no
    * paint captured.
    * @param paintedContours The representative of every group for a query that excludes them.
-   * Grouping never mixes the two kinds of entry, so a group is painted or bare as a whole: this
-   * table holds the representative of every painted group and is empty where every group is bare,
-   * which is why the selection filter can test the entries one by one.
+   * Grouping never mixes the two kinds, so a group is painted or bare as a whole: this table is
+   * empty where every group is bare, which lets the selection filter test the entries one by one.
    */
   ComposeContent(std::vector<std::unique_ptr<GeometryContent>> contents,
                  size_t foregroundStartIndex, bool hasContourTable,

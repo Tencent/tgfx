@@ -163,11 +163,9 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
   const auto& shapeOption = contour->contentShape();
   if (!shapeOption.has_value() || shapeOption->shape == nullptr) {
     // No single vector outline is available (text, multiple distinct geometries, or layer types
-    // without an exact shape). Fall back to the content recording's bounds: its image and the
-    // style-space origin of that image are both on LayerStyleInput::content, and for layers whose
-    // content is itself a rect (e.g. an opaque image) the bounds are the exact outline. For other
-    // content the bounds carry the rasterization round-out (and for text, the layout box rather
-    // than the ink box).
+    // without an exact shape). Fall back to the content recording's bounds: for content that is
+    // itself a rect (e.g. an opaque image) they are the exact outline; otherwise they carry the
+    // rasterization round-out, and for text the layout box rather than the ink box.
     if (input.content == nullptr || FloatNearlyZero(input.contentScale)) {
       return {nullptr, {}, false};
     }

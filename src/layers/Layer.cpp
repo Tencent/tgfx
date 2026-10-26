@@ -1433,8 +1433,8 @@ bool Layer::canUseSubtreeCache(const DrawArgs& args, BlendMode blendMode) {
   // styles, as they can be efficiently merged during rendering.
   if (_children.empty() && _layerStyles.empty() && _filters.empty()) {
     auto content = getContent();
-    // Content only carries bare geometry when every entry came without a paint, and such content
-    // paints nothing: it is not the drawable content this optimization is about.
+    // Content with no painted entry paints nothing, so it is not the drawable content this
+    // optimization is about.
     if (content == nullptr || !content->hasPaintedContent()) {
       return false;
     }

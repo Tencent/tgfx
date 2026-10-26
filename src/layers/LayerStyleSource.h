@@ -55,9 +55,8 @@ struct LayerStyleSourceEntry {
  *
  * ownSource/contourFallbackSource/contentSource are the typed sources ResolveContentSource picks
  * from. They are built once while the entries are filled, so a style costs no allocation per frame
- * and every producer of the same layer hands out the very same object. Each one follows the image
- * its entry holds at the time it was built, so RefreshTypedSources() must run after anything
- * replaces those entry images.
+ * and every producer of the same layer hands out the same object. Each follows the image its entry
+ * held when it was built, so RefreshTypedSources() must run after anything replaces those images.
  */
 struct LayerStyleSourceGroup {
   LayerStyleSourceEntry content = {};
@@ -135,12 +134,12 @@ struct LayerStyleSource {
 };
 
 /**
- * Rebuilds every typed source of the source from the entries as they are right now. The own-geometry
- * source is built once and handed to both buckets, so the two never wrap the same recording twice.
+ * Rebuilds every typed source from the entries as they are right now. The own-geometry source is
+ * built once and handed to both buckets, so the two never wrap the same recording twice.
  *
- * Refreshing replaces, it does not update: a typed source is cleared first and only rebuilt when its
- * entry still holds an image, so an entry whose image went away leaves no source pointing at the old
- * one. Every source it leaves behind therefore carries a non-null image.
+ * Refreshing replaces, it does not update: a source is cleared first and only rebuilt when its entry
+ * still holds an image, so nothing keeps pointing at an image that went away. Every source it leaves
+ * behind therefore carries a non-null image.
  */
 inline void RefreshTypedSources(LayerStyleSource& source) {
   for (auto& group : source.groups) {

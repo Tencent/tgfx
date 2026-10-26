@@ -71,9 +71,9 @@ class DrawContent : public GeometryContent {
   virtual bool onHasSameGeometry(const GeometryContent* other) const = 0;
 
   /**
-   * Returns true when this entry must stay out of a query. An entry no paint captured paints
-   * nothing, so it only takes part in a query that asks for it; a painter with alpha 0 keeps its
-   * contour but paints nothing either, which the alpha test of the query itself covers.
+   * Returns true when this entry must stay out of a query: an entry no paint captured is excluded
+   * unless the query asks for it. A painter with alpha 0 stays in; hitTestPoint filters it by its
+   * own alpha test.
    */
   bool isExcluded(bool includeUnpaintedGeometry) const {
     return !painted && !includeUnpaintedGeometry;
