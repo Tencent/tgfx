@@ -8110,10 +8110,12 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryIncludesTextGeometry) {
 
 // ===== Own geometry under a transform-only change =====
 //
-// A layer whose style consumes bare geometry paints nothing as content, so getContent() returns null
-// and only the own-geometry gate in Layer::updateRenderBounds() can give it bounds. Moving the layer
-// only marks the transform dirty, so without that gate the bounds stay where they were: the old
-// region is never invalidated and Layer::draw culls the layer against its stale renderBounds.
+// A layer whose style consumes bare geometry paints nothing in the normal draw, yet getContent()
+// is not null: finishRecording() returns a content whose only entry is unpainted. Only the
+// includeUnpaintedGeometry bounds query in Layer::updateRenderBounds() can give the layer bounds.
+// Moving the layer only marks the transform dirty, so without that recompute the bounds stay where
+// they were: the old region is never invalidated and Layer::draw culls the layer against its stale
+// renderBounds.
 
 constexpr int OwnGeometryMoveSurfaceWidth = 300;
 constexpr int OwnGeometryMoveSurfaceHeight = 200;
@@ -8147,8 +8149,9 @@ static std::shared_ptr<Layer> MakeStripedRedBackdrop() {
   return backdrop;
 }
 
-// The layer under test: one rectangle and no painter at all, so its content is empty and the
-// GlassStyle is the only thing that makes it paint anything.
+// The layer under test: one rectangle and no painter at all. Its content is not empty -- the
+// rectangle is recorded as an unpainted entry -- but nothing in it paints in the normal draw, so
+// the GlassStyle is the only thing that makes it paint anything.
 static std::shared_ptr<VectorLayer> MakeBareGeometryGlassLayer(const Rect& bounds) {
   auto group = VectorGroup::Make();
   group->setElements({MakeRectElement(bounds)});
@@ -8195,8 +8198,8 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryLayerMovesItsRenderBounds) {
 
   Rect before = {};
   TGFX_PRIVATE_ACCESS(before = layer->renderBounds;)
-  ASSERT_FALSE(before.isEmpty()) << "the own-geometry gate must give the layer bounds, otherwise "
-                                    "the move below proves nothing";
+  ASSERT_FALSE(before.isEmpty()) << "the unpainted-geometry bounds query must give the layer "
+                                    "bounds, otherwise the move below proves nothing";
 
   layer->setPosition({OwnGeometryMoveDistance, 0.0f});
   displayList.render(surface.get(), false);
