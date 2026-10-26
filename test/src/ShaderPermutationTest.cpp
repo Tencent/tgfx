@@ -338,7 +338,6 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
 #undef TGFX_COUNT_FAMILY
   ASSERT_EQ(factories.size(), familyCount);
   std::set<std::string> names;
-  size_t pairCount = 0;
   for (auto factory : factories) {
     auto shader = factory();
     ASSERT_NE(shader, nullptr);
@@ -353,36 +352,15 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
     auto reachable = EnumerateReachablePermutations(info.name);
     ASSERT_TRUE(reachable.has_value());
     ASSERT_FALSE(reachable->empty());
-    pairCount += reachable->size();
     for (const auto& indices : *reachable) {
       EXPECT_TRUE(IsBuildablePermutation(info, indices.first, indices.second));
     }
     shader.reset();
     EXPECT_EQ(ShaderRegistry::Find(info.name), registered);
   }
-  // ComplexEllipseFillShader keeps 12 variants: its device mask is a runtime uniform, not a
-  // dimension (a dimension would have made it 24 for two observed draws). The hairline-line
-  // pointwise layout (GP_LAYOUT=2) adds 9 plain chain variants (leaf-free, leaf-free with the
-  // device mask, four-leaf; each for the three XP kinds) and their 9 gradient twins. The complex
-  // rounded-rect layouts (GP_LAYOUT=3 fill, 4 stroke) add 15 chain variants each (uniform color:
-  // leaf-free, leaf-free with the device mask, four-leaf; per-vertex color: leaf-free, four-leaf;
-  // each for the three XP kinds) and their 30 TiledGraph twins. The per-quad subset of strict
-  // image draws adds 12 chain variants (the four quad four-leaf vertex forms, uvCoord and per-vertex
-  // color on or off, each for the three XP kinds) with no TiledGraph twin.
-  // The mesh and shape-instanced families dropped their per-vertex-color axes (the color attribute
-  // is unconditional, with a runtime-uniform source pick for mesh), the chain/graph dropped
-  // HAS_COLOR (unconditional color attribute with the HasCommonColor runtime-uniform pick), the
-  // ellipse/complex-ellipse/atlas families dropped HAS_COMMON_COLOR the same way, and mesh also
-  // dropped HAS_COVERAGE (a constant 1.0f slot), removing 96 pairs from the former 440. The
-  // NonAARRect, ComplexNonAARRect and RoundStrokeRect families then dropped HAS_COMMON_COLOR the
-  // same way too (54 -> 27 pairs), removing 27 more, and RoundStrokeRect then dropped HAS_AA (the
-  // coverage and radii attributes unconditional, the ramp picked by the AAEnabled runtime uniform),
-  // removing 6 more. GlassRefraction then merged its edge-lit UDF form (the edge-light mask
-  // sampler declared unconditionally, gated by the EdgeMaskOn runtime uniform), removing 12 more.
-  // The Graph family then merged into the chain (RESOURCE_KIND/HAS_SOURCE_COORDS tail axes), so
-  // the merged family enumerates the 57 plain pairs plus the 51 gradient and 3 noise pairs; the
-  // family count drops but the total stays.
-  EXPECT_EQ(pairCount, 266u);
+  // The global variant total is not asserted here on purpose: PrecompiledBundleLoad's
+  // ExpectBundleEntryCounts already ties every family's reachable set to the bundle's actual
+  // entry counts, so a hand-maintained total would only add a number to update on every change.
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseChainShader"),
             EnumeratePointwiseChainReachable());
   const std::set<std::pair<uint32_t, uint32_t>> maskPairs = {{0, 0}, {0, 1}, {0, 2}};
