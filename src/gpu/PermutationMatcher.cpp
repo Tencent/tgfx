@@ -379,24 +379,33 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
 
 #ifndef NDEBUG
   // Audit pass (debug builds only): ask every family — including the ones the alpha-only gate
-  // below skips — and do not stop at the first acceptor. Two invariants, each a silent bug when
+  // below skips — and do not stop at the first acceptor. Three invariants, each a silent bug when
   // violated (the dispatch order would decide the winner):
   //   1. at most one family accepts a given draw;
   //   2. a family that does not declare ServesAlphaOnly never accepts an alpha-only draw, which
-  //      catches a kernel gaining alpha support without flipping its flag.
+  //      catches a kernel gaining alpha support without flipping its flag;
+  //   3. a Match result lies inside the family's reachable set, which catches Extract producing
+  //      an input combination AllInputs does not enumerate — the bundle would lack the variant
+  //      and the draw would be dropped at runtime.
   // The extra Match calls are pure shape checks; the thread-local failure reason they may record
   // is saved and restored so the rejection accounting is unaffected.
   {
     const auto savedFailure = gPendingMatchFailure;
     int acceptors = 0;
-#define TGFX_AUDIT_FAMILY(Family)                                                       \
-  if (Family::Match(programInfo).has_value()) {                                         \
-    if (alphaOnly && !Family::ServesAlphaOnly) {                                        \
-      assert(false && #Family " accepts an alpha-only draw; flip its ServesAlphaOnly"); \
-    }                                                                                   \
-    if (++acceptors > 1) {                                                              \
-      assert(false && "multiple shader families accept the same draw");                 \
-    }                                                                                   \
+#define TGFX_AUDIT_FAMILY(Family)                                                           \
+  if (auto auditResult = Family::Match(programInfo)) {                                      \
+    if (alphaOnly && !Family::ServesAlphaOnly) {                                            \
+      assert(false && #Family " accepts an alpha-only draw; flip its ServesAlphaOnly");     \
+    }                                                                                       \
+    if (++acceptors > 1) {                                                                  \
+      assert(false && "multiple shader families accept the same draw");                     \
+    }                                                                                       \
+    if (Family::CachedReachable().count(                                                    \
+            {auditResult->vertPermutationIndex, auditResult->fragPermutationIndex}) == 0) { \
+      assert(false && #Family                                                               \
+             " matched a variant outside its reachable set; extend "                        \
+             "its AllInputs");                                                              \
+    }                                                                                       \
   }
     TGFX_FOR_EACH_SHADER_FAMILY(TGFX_AUDIT_FAMILY)
 #undef TGFX_AUDIT_FAMILY

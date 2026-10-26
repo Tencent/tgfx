@@ -133,6 +133,18 @@ class ShaderFamily : public PrecompiledShader {
     }
   }
 
+#ifndef NDEBUG
+  /**
+   * The reachable set computed once per process, for the dispatch-time membership audit: a Match
+   * result outside the set means Extract produces an input combination AllInputs does not
+   * enumerate, so the bundle lacks the variant and the draw would be dropped at runtime.
+   */
+  static const std::set<std::pair<uint32_t, uint32_t>>& CachedReachable() {
+    static const auto set = T::Reachable();
+    return set;
+  }
+#endif
+
  private:
   // A function template, not a plain member: the base is instantiated while T is still
   // incomplete (CRTP), so a signature naming T::Inputs would not compile.
