@@ -40,6 +40,7 @@
 #include "layers/MaskContext.h"
 #include "layers/OffscreenRenderer.h"
 #include "layers/OpaqueContext.h"
+#include "layers/OwnGeometryShapeContext.h"
 #include "layers/RegionTransformer.h"
 #include "layers/RootLayer.h"
 #include "layers/SubtreeCache.h"
@@ -1351,7 +1352,8 @@ std::shared_ptr<Image> Layer::getContentContourImage(const DrawArgs& args, float
 }
 
 std::shared_ptr<Image> Layer::getOwnGeometryImage(const DrawArgs& args, float contentScale,
-                                                  Point* offset) {
+                                                  Point* offset,
+                                                  std::optional<StyledShape>* shape) {
   if (FloatNearlyZero(contentScale)) {
     return nullptr;
   }
@@ -1367,17 +1369,21 @@ std::shared_ptr<Image> Layer::getOwnGeometryImage(const DrawArgs& args, float co
   // Geometries no painter captured paint nothing as content, so only the layer itself can add them.
   onDrawOwnGeometry(contourCanvas);
   auto picture = opaqueContext.finishRecordingAsPicture();
+  // Read the shape back from the picture before it is consumed by the conversion below, so the
+  // shape and the raster describe the very same recording.
+  if (shape != nullptr) {
+    *shape = OwnGeometryShapeContext::Extract(picture, contentScale);
+  }
   auto imageOffset = Point::Zero();
   auto image = ToImageWithOffset(std::move(picture), &imageOffset, nullptr, args.dstColorSpace);
   if (offset) {
     *offset = imageOffset;
   }
+  if (image == nullptr && shape != nullptr) {
+    // No raster means no geometry to describe, whatever the picture held.
+    *shape = std::nullopt;
+  }
   return image;
-}
-
-std::optional<StyledShape> Layer::onGetOwnGeometryShape() {
-  // The base class holds no geometry of its own, so it has no own geometry to describe.
-  return std::nullopt;
 }
 
 Rect Layer::onGetOwnGeometryBounds() {
@@ -1864,19 +1870,17 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   // Layer style source content is an intermediate artifact — skip background capture / consume.
   drawArgs.backgroundHandler = BackgroundHandler::NoOp();
 
-  // Record the own geometry once for both buckets. getOwnGeometryImage() and getOwnGeometryShape()
-  // read only the layer's own content, its own paint and the destination color space -- never
-  // drawArgs.excludeEffects -- so both buckets would otherwise record the very same raster. The
+  // Record the own geometry once for both buckets. The recording and the shape read back from it
+  // depend only on the layer's own content, its own paint and the destination color space -- never
+  // on drawArgs.excludeEffects -- so both buckets would otherwise record the very same raster. The
   // allowsEdgeAntialiasing flag it forwards is dropped by OpaqueContext, so it is not an input
   // either. Keep it that way: making getOwnGeometryImage() depend on the bucket would silently
   // change what both buckets get, not just the one that changed.
   LayerStyleSourceEntry ownGeometryEntry = {};
   std::optional<StyledShape> ownShape = std::nullopt;
   if (layerUsesOwnGeometry) {
-    ownGeometryEntry.image = getOwnGeometryImage(drawArgs, contentScale, &ownGeometryEntry.offset);
-    if (ownGeometryEntry.image != nullptr) {
-      ownShape = getOwnGeometryShape();
-    }
+    ownGeometryEntry.image =
+        getOwnGeometryImage(drawArgs, contentScale, &ownGeometryEntry.offset, &ownShape);
   }
 
   for (int i = 0; i < 2; i++) {
@@ -2411,10 +2415,6 @@ void Layer::updateStaticSubtreeFlags() {
 
 std::optional<StyledShape> Layer::getContentShape() {
   return onGetContentShape();
-}
-
-std::optional<StyledShape> Layer::getOwnGeometryShape() {
-  return onGetOwnGeometryShape();
 }
 
 bool Layer::hasOwnGeometryContentStyle() const {

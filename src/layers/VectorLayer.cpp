@@ -70,7 +70,6 @@ void VectorLayer::setContents(std::vector<std::shared_ptr<VectorElement>> value)
 
 void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
   ownGeometries = {};
-  ownShape = std::nullopt;
   if (_contents.empty()) {
     return;
   }
@@ -81,12 +80,11 @@ void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
       element->apply(&context);
     }
   }
-  // Cache the geometries no painter captured. Three consumers read this list: the own geometry
-  // raster (onDrawOwnGeometry), the own geometry bounds, and the own geometry shape, which can
-  // still include them. The set is taken after every element applied, since MergePath clears
-  // geometries and painters while Repeater clones and reorders them. A captured geometry is drawn
-  // through its painter, so it is not part of the bare geometry; collecting the captures once
-  // keeps the comparison from being quadratic in the geometry count.
+  // Cache the geometries no painter captured. Two consumers read this list: the own geometry raster
+  // (onDrawOwnGeometry) and the own geometry bounds. The set is taken after every element applied,
+  // since MergePath clears geometries and painters while Repeater clones and reorders them. A
+  // captured geometry is drawn through its painter, so it is not part of the bare geometry;
+  // collecting the captures once keeps the comparison from being quadratic in the geometry count.
   std::unordered_set<const Geometry*> capturedGeometries = {};
   capturedGeometries.reserve(context.geometries.size());
   for (const auto& painter : context.painters) {
@@ -103,29 +101,6 @@ void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
       continue;
     }
     ownGeometries.push_back({std::move(shape), geometry->matrix});
-  }
-  // Describe the own geometry while the context is alive: the shape needs the same painters and
-  // geometries it was taken from, so re-applying every element per query would be pure waste.
-  if (!ownGeometries.empty()) {
-    // Geometry no painter captured has an exact outline only when it is the layer's whole own
-    // geometry: a SDF built from it would otherwise disagree with the recorded raster, which also
-    // holds the painters, so those cases let the style take its alpha-mask path instead.
-    if (context.painters.empty() && ownGeometries.size() == 1) {
-      const auto& entry = ownGeometries.front();
-      auto shape = Shape::ApplyMatrix(entry.shape, entry.matrix);
-      if (shape != nullptr) {
-        ownShape = StyledShape::Make(shape, StyledShapeType::Fill, 0.0f, StrokeAlign::Center);
-      }
-    }
-  } else {
-    // The own geometry keeps every painter, including the 0-alpha ones, so its shape must keep that
-    // same painter set or it would describe fewer painters than the raster it is paired with.
-    std::vector<const Painter*> painters = {};
-    for (const auto& painter : context.painters) {
-      DEBUG_ASSERT(painter != nullptr);
-      painters.push_back(painter.get());
-    }
-    ownShape = MakeStyledShape(painters);
   }
   // Render all painters
   for (const auto& painter : context.painters) {
@@ -158,10 +133,6 @@ void VectorLayer::onDrawOwnGeometry(Canvas* canvas) {
 
 std::optional<StyledShape> VectorLayer::onGetContentShape() {
   return computeContentShape();
-}
-
-std::optional<StyledShape> VectorLayer::onGetOwnGeometryShape() {
-  return ownShape;
 }
 
 // Simplifies a painter set that describes a single geometry with a uniform style into one exact

@@ -77,12 +77,6 @@ void SolidLayer::onUpdateContent(LayerRecorder* recorder) {
   recorder->addRRect(rRect, LayerPaint(_color));
 }
 
-std::optional<StyledShape> SolidLayer::onGetOwnGeometryShape() {
-  // The own geometry of this layer is exactly its content: it holds no descendants and no geometry
-  // that a painter leaves uncaptured.
-  return onGetContentShape();
-}
-
 std::optional<StyledShape> SolidLayer::onGetContentShape() {
   if (_width == 0 || _height == 0) {
     return std::nullopt;

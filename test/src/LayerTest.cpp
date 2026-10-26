@@ -57,6 +57,7 @@
 #include "tgfx/layers/layerstyles/NoiseStyle.h"
 #include "tgfx/layers/vectors/Ellipse.h"
 #include "tgfx/layers/vectors/FillStyle.h"
+#include "tgfx/layers/vectors/Gradient.h"
 #include "tgfx/layers/vectors/ImagePattern.h"
 #include "tgfx/layers/vectors/MergePath.h"
 #include "tgfx/layers/vectors/Rectangle.h"
@@ -7337,6 +7338,335 @@ TGFX_TEST_PRIVATE(LayerTest, OwnShapeIsDroppedWhenPaintersCoexist) {
                       auto bareSource = bareOnly->getLayerStyleSource(bareArgs, Matrix::I());
                       ASSERT_TRUE(bareSource != nullptr && bareSource->groups[1] != nullptr);
                       EXPECT_TRUE(bareSource->groups[1]->ownShape.has_value());)
+}
+
+// ===== The own-geometry shape comes out of the own-geometry recording =====
+//
+// The shape a Geometry-sourced style consumes is no longer derived from the elements or painters;
+// it is read back from the very picture the own-geometry raster is made of. The cases below pin what
+// that playback accepts: one outline drawn any number of times collapses to a single shape, and
+// everything the recording cannot express as that one outline rejects the shape while leaving the
+// raster untouched.
+
+// What a Geometry-sourced bucket recorded for `layer`: whether it holds an own-geometry raster and
+// the shape read back from that same recording. matrix is the one getLayerStyleSource() is called
+// with, and its max scale is what the recording is scaled by.
+struct OwnGeometryProbe {
+  bool hasImage = false;
+  std::optional<StyledShape> shape = std::nullopt;
+};
+
+static OwnGeometryProbe ProbeOwnGeometry(Context* context, const std::shared_ptr<Layer>& layer,
+                                         const Matrix& matrix = Matrix::I()) {
+  OwnGeometryProbe probe = {};
+  TGFX_PRIVATE_ACCESS(
+      DrawArgs drawArgs(context); auto source = layer->getLayerStyleSource(drawArgs, matrix);
+      if (source == nullptr) { return probe; } for (auto& group
+                                                    : source->groups) {
+        if (group != nullptr && group->ownGeometry.has_value()) {
+          probe.hasImage = group->ownGeometry->image != nullptr;
+          probe.shape = group->ownShape;
+        }
+      })
+  return probe;
+}
+
+// One rectangle outline painted twice: the retained 0%-alpha fill keeps the geometry in the
+// own-geometry recording next to the visible fill, and both paints draw the very same rectangle. Two
+// draws that agree describe one shape, so the style keeps the SDF path it had before.
+TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeCollapsesDuplicateGeometry) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto rect = Rectangle::Make();
+  rect->setPosition({50.0f, 40.0f});
+  rect->setSize({100.0f, 80.0f});
+  auto group = VectorGroup::Make();
+  group->setElements(
+      {rect, MakeZeroAlphaFill(), FillStyle::Make(SolidColor::Make(Color::White()))});
+  auto layer = VectorLayer::Make();
+  layer->setContents({group});
+  layer->setLayerStyles({MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+
+  auto probe = ProbeOwnGeometry(context, layer);
+  ASSERT_TRUE(probe.hasImage) << "control: the own geometry is recorded";
+  ASSERT_TRUE(probe.shape.has_value())
+      << "two paints over one outline are still a single outline, so the shape must survive";
+  ASSERT_TRUE(probe.shape->shape != nullptr);
+  EXPECT_EQ(probe.shape->shape->getBounds(), Rect::MakeWH(100.0f, 80.0f))
+      << "the shape has to be in layer coordinates, or the SDF would be offset from its pixels";
+}
+
+// One geometry two fill painters captured is drawn once per painter, so the recording hands over
+// the very same Shape instance twice. This covers that same-instance fast path: the second draw
+// reuses the outline already held instead of building the path again.
+TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeCollapsesRepeatedShapeInstance) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  Path path = {};
+  path.addRect(Rect::MakeWH(100.0f, 80.0f));
+  auto shapePath = ShapePath::Make();
+  shapePath->setPath(std::move(path));
+  // Both fills capture the one geometry element, so both draws carry its single Shape instance.
+  auto first = FillStyle::Make(SolidColor::Make(Color::White()));
+  auto second = FillStyle::Make(SolidColor::Make(Color::Red()));
+  auto group = VectorGroup::Make();
+  group->setElements({shapePath, first, second});
+  auto layer = VectorLayer::Make();
+  layer->setContents({group});
+  layer->setLayerStyles({MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+
+  auto probe = ProbeOwnGeometry(context, layer);
+  ASSERT_TRUE(probe.hasImage) << "control: the own geometry is recorded";
+  ASSERT_TRUE(probe.shape.has_value())
+      << "the same shape instance drawn twice is one outline, so the shape must survive";
+  ASSERT_TRUE(probe.shape->shape != nullptr);
+  EXPECT_EQ(probe.shape->shape->getBounds(), Rect::MakeWH(100.0f, 80.0f));
+}
+
+// Two different outlines cannot be one shape, so the style must fall back to the alpha mask -- while
+// the raster it reads keeps covering both regions.
+TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeRejectsDistinctGeometry) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  RegionSpec left = {};
+  left.bounds = Rect::MakeXYWH(10.0f, 10.0f, 40.0f, 30.0f);
+  left.fill = RegionFillKind::Opaque;
+  RegionSpec right = {};
+  right.bounds = Rect::MakeXYWH(70.0f, 40.0f, 40.0f, 30.0f);
+  right.fill = RegionFillKind::Opaque;
+
+  auto panel = MakePanel({left, right}, {MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+  auto probe = ProbeOwnGeometry(context, panel);
+  EXPECT_FALSE(probe.shape.has_value())
+      << "two disjoint outlines have no single-shape expression, so a shape here would cover "
+         "neither of them exactly";
+  EXPECT_TRUE(probe.hasImage) << "dropping the shape must not drop the raster the alpha mask reads";
+
+  // Coverage of the same panel: the fallback keeps drawing over both regions, so the nullopt above
+  // is the shape being dropped and not the recording being empty.
+  auto alpha = RasterizeOwnGeometryAlpha(context, panel);
+  ASSERT_FALSE(alpha.empty());
+  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 30, 25), 255) << "the left region is covered";
+  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 90, 55), 255) << "the right region is covered";
+
+  // Control: either region alone does have a shape, so the rejection above is the second outline.
+  auto singleProbe =
+      ProbeOwnGeometry(context, MakePanel({left}, {MakeOwnGeometryGlass(0, 50, 100, 0, 0)}));
+  EXPECT_TRUE(singleProbe.shape.has_value());
+}
+
+// Two outlines covering the very same box still differ, and treating them as equal would hand the
+// style a shape that covers pixels the layer never painted. This case exists to keep the comparison
+// on the path itself: a bounds comparison passes it.
+TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeRejectsSameBoundsDifferentPaths) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  const Rect sharedBounds = Rect::MakeXYWH(10.0f, 10.0f, 100.0f, 80.0f);
+  RegionSpec rect = {};
+  rect.bounds = sharedBounds;
+  rect.fill = RegionFillKind::Opaque;
+  RegionSpec oval = {};
+  oval.bounds = sharedBounds;
+  oval.fill = RegionFillKind::Opaque;
+  // The ellipse takes its box from its position and size, like the rectangle does.
+  auto ellipse = Ellipse::Make();
+  ellipse->setPosition({sharedBounds.centerX(), sharedBounds.centerY()});
+  ellipse->setSize({sharedBounds.width(), sharedBounds.height()});
+  oval.shape = ellipse;
+
+  // Premise: the two fixtures really do share a bounding box, and each alone has a shape. Without
+  // this, a nullopt below could come from the ellipse failing to resolve a path at all.
+  auto rectProbe =
+      ProbeOwnGeometry(context, MakePanel({rect}, {MakeOwnGeometryGlass(0, 50, 100, 0, 0)}));
+  auto ovalProbe =
+      ProbeOwnGeometry(context, MakePanel({oval}, {MakeOwnGeometryGlass(0, 50, 100, 0, 0)}));
+  ASSERT_TRUE(rectProbe.shape.has_value());
+  ASSERT_TRUE(ovalProbe.shape.has_value());
+  ASSERT_TRUE(rectProbe.shape->shape != nullptr && ovalProbe.shape->shape != nullptr);
+  ASSERT_EQ(rectProbe.shape->shape->getBounds(), ovalProbe.shape->shape->getBounds())
+      << "the fixtures must share a bounding box, or this case is not about same-bounds shapes";
+  EXPECT_NE(rectProbe.shape->shape->getPath(), ovalProbe.shape->shape->getPath())
+      << "the fixtures must differ as paths, or rejecting them would be wrong";
+
+  auto both = MakePanel({oval, rect}, {MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+  // The ellipse comes first so that both outlines reach the recording: the recording drops a draw
+  // whose coverage an earlier one already contains, and the rectangle covers the ellipse entirely.
+  auto probe = ProbeOwnGeometry(context, both);
+  EXPECT_FALSE(probe.shape.has_value())
+      << "a rectangle and its inscribed ellipse share a bounding box and nothing else, so no "
+         "single shape describes both";
+  EXPECT_TRUE(probe.hasImage);
+}
+
+// A brush that samples something other than a flat color does not cover the fill path, so the
+// recording cannot be reduced to the path. This is the unsupported-painter case: an image pattern.
+TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeRejectsUnsupportedPainter) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto image = MakeImage("resources/apitest/checker_128.png");
+  ASSERT_TRUE(image != nullptr);
+  auto makeLayer = [&](const std::shared_ptr<FillStyle>& fill) {
+    Path path = {};
+    path.addRect(Rect::MakeWH(100.0f, 80.0f));
+    auto shape = ShapePath::Make();
+    shape->setPath(std::move(path));
+    auto group = VectorGroup::Make();
+    group->setElements({shape, fill});
+    auto layer = VectorLayer::Make();
+    layer->setContents({group});
+    layer->setLayerStyles({MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+    return layer;
+  };
+
+  auto imageProbe =
+      ProbeOwnGeometry(context, makeLayer(FillStyle::Make(ImagePattern::Make(image))));
+  EXPECT_FALSE(imageProbe.shape.has_value())
+      << "an image-sampled brush covers what the texture holds, not what the path encloses";
+  EXPECT_TRUE(imageProbe.hasImage) << "the raster still covers the geometry it recorded";
+
+  // Control: the same geometry with a flat color does produce a shape, so the rejection above comes
+  // from the brush and not from the fixture.
+  auto flatProbe =
+      ProbeOwnGeometry(context, makeLayer(FillStyle::Make(SolidColor::Make(Color::White()))));
+  ASSERT_TRUE(flatProbe.shape.has_value());
+}
+
+// A gradient brush is not an image brush: the contour recording carries image shaders only, so a
+// gradient painter reaches it as a plain opaque brush. Its coverage is still exactly the fill path,
+// so the geometry stays extractable and the style keeps the SDF path.
+TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeKeepsGradientPainter) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  const Rect bounds = Rect::MakeWH(100.0f, 80.0f);
+  Path path = {};
+  path.addRect(bounds);
+  auto shape = ShapePath::Make();
+  shape->setPath(std::move(path));
+  auto gradient = Gradient::MakeLinear({0.0f, 0.0f}, {1.0f, 0.0f}, {Color::Red(), Color::Blue()});
+  ASSERT_TRUE(gradient != nullptr);
+  auto group = VectorGroup::Make();
+  group->setElements({shape, FillStyle::Make(gradient)});
+  auto layer = VectorLayer::Make();
+  layer->setContents({group});
+  layer->setLayerStyles({MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+
+  auto probe = ProbeOwnGeometry(context, layer);
+  EXPECT_TRUE(probe.hasImage) << "the gradient fill is still recorded as the own geometry raster";
+  ASSERT_TRUE(probe.shape.has_value())
+      << "contour recording drops non-image shaders, so a gradient painter paints a plain opaque "
+         "brush and its geometry stays extractable";
+  ASSERT_TRUE(probe.shape->shape != nullptr);
+  EXPECT_EQ(probe.shape->shape->getBounds(), bounds)
+      << "the shape has to describe the geometry the gradient fills";
+}
+
+// An inside/outside stroke is baked into "expanded fill + clip", so the recording holds a filled
+// shape that is only correct inside the clip. Keeping it would cover the whole doubled stroke width,
+// and this case isolates that clip: the panel carries no fill, so nothing else rejects the shape.
+TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeRejectsAlignedStrokeClip) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  RegionSpec stroked = {};
+  stroked.bounds = Rect::MakeXYWH(20.0f, 20.0f, 100.0f, 80.0f);
+  stroked.strokeWidth = 8.0f;
+  stroked.strokeAlign = StrokeAlign::Outside;
+  auto panel = MakePanel({stroked}, {MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+
+  auto probe = ProbeOwnGeometry(context, panel);
+  EXPECT_FALSE(probe.shape.has_value())
+      << "the clipped expanded fill describes twice the visible stroke band, so it must not be "
+         "handed over as the layer's shape";
+  EXPECT_TRUE(probe.hasImage) << "the band is still recorded, so the alpha mask can draw it";
+
+  // Control: the same rectangle with a centered stroke records a stroke instead of a clip and must
+  // be rejected as well; a fill-only rectangle is the accepted counterpart.
+  RegionSpec centered = stroked;
+  centered.strokeAlign = StrokeAlign::Center;
+  EXPECT_FALSE(
+      ProbeOwnGeometry(context, MakePanel({centered}, {MakeOwnGeometryGlass(0, 50, 100, 0, 0)}))
+          .shape.has_value());
+  RegionSpec filled = {};
+  filled.bounds = stroked.bounds;
+  filled.fill = RegionFillKind::Opaque;
+  EXPECT_TRUE(
+      ProbeOwnGeometry(context, MakePanel({filled}, {MakeOwnGeometryGlass(0, 50, 100, 0, 0)}))
+          .shape.has_value());
+}
+
+// An inverse fill paints the complement of its outline, so the recording covers everything the
+// path leaves out. Read back as a shape it would describe the opposite coverage, so it must be
+// rejected while the raster keeps the complement. The outline is a triangle because the recorder
+// folds a rect/oval/rrect path into a plain rect or rrect record, which drops the fill type before
+// the extraction ever sees it.
+TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeRejectsInverseFillPath) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto makeLayer = [&](PathFillType fillType) {
+    Path path = {};
+    path.moveTo(0.0f, 0.0f);
+    path.lineTo(100.0f, 0.0f);
+    path.lineTo(0.0f, 80.0f);
+    path.close();
+    path.setFillType(fillType);
+    auto shapePath = ShapePath::Make();
+    shapePath->setPath(std::move(path));
+    auto group = VectorGroup::Make();
+    group->setElements({shapePath, FillStyle::Make(SolidColor::Make(Color::White()))});
+    auto layer = VectorLayer::Make();
+    layer->setContents({group});
+    layer->setLayerStyles({MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+    return layer;
+  };
+
+  auto inverseProbe = ProbeOwnGeometry(context, makeLayer(PathFillType::InverseWinding));
+  EXPECT_FALSE(inverseProbe.shape.has_value())
+      << "inverse coverage is the complement of the outline, so handing it over as the layer's "
+         "shape would invert the area the style covers";
+  EXPECT_TRUE(inverseProbe.hasImage)
+      << "the complement is still recorded, so the alpha mask can draw the pixels the layer paints";
+
+  // Control: the very same outline filled the normal way does resolve a shape, so the nullopt above
+  // is the inverse fill type and not the fixture.
+  auto directProbe = ProbeOwnGeometry(context, makeLayer(PathFillType::Winding));
+  ASSERT_TRUE(directProbe.shape.has_value());
+}
+
+// The recording canvas is scaled by the content scale, so the extracted shape has to undo that
+// scale. Without it the shape would be scaled away from the raster it is meant to describe.
+TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeUndoesTheRecordingScale) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  RegionSpec region = {};
+  region.bounds = Rect::MakeXYWH(10.0f, 10.0f, 100.0f, 80.0f);
+  region.fill = RegionFillKind::Opaque;
+  auto panel = MakePanel({region}, {MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+
+  auto identityProbe = ProbeOwnGeometry(context, panel);
+  auto scaledProbe = ProbeOwnGeometry(context, panel, Matrix::MakeScale(2.0f));
+  ASSERT_TRUE(identityProbe.shape.has_value());
+  ASSERT_TRUE(scaledProbe.shape.has_value())
+      << "the content scale must not change whether the recording resolves a shape";
+  ASSERT_TRUE(identityProbe.shape->shape != nullptr && scaledProbe.shape->shape != nullptr);
+  EXPECT_EQ(scaledProbe.shape->shape->getBounds(), identityProbe.shape->shape->getBounds())
+      << "the shape lives in layer coordinates, so it does not grow with the content scale";
 }
 
 // The own geometry is not content: nothing draws it, so asking for content bounds -- which is what

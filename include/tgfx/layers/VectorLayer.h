@@ -71,8 +71,6 @@ class VectorLayer : public Layer {
 
   std::optional<StyledShape> onGetContentShape() override;
 
-  std::optional<StyledShape> onGetOwnGeometryShape() override;
-
  private:
   /** A geometry no painter captured: it paints nothing but is still own geometry. */
   struct OwnGeometry {
@@ -86,9 +84,6 @@ class VectorLayer : public Layer {
 
   std::vector<std::shared_ptr<VectorElement>> _contents = {};
   std::vector<OwnGeometry> ownGeometries = {};
-  // Derived in the same pass that records the own geometries above, so it never has to re-expand the
-  // elements to describe them.
-  std::optional<StyledShape> ownShape = std::nullopt;
 };
 
 }  // namespace tgfx

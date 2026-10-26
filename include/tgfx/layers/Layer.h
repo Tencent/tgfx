@@ -599,13 +599,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
   virtual std::optional<StyledShape> onGetContentShape();
 
   /**
-   * Returns the shape of this layer's own geometry, as defined by
-   * LayerStyleContentSource::Geometry. The base class returns nullopt; an override returns nullopt
-   * when the geometry cannot be expressed as a single StyledShape, as with onGetContentShape().
-   */
-  virtual std::optional<StyledShape> onGetOwnGeometryShape();
-
-  /**
    * Returns the local bounds of the geometries this layer holds although no painter captured them.
    * They are not part of the content, so the layer bounds have to join them explicitly; without that
    * a style drawing from the own geometry would have no bounds to cover. The base class returns an
@@ -725,9 +718,11 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   // Records the layer's own geometry: the contour of its own content (0-alpha painters included)
   // plus the geometries no painter captured. Used as the content of styles that must cover the
-  // layer's own geometry rather than its rendered content.
+  // layer's own geometry rather than its rendered content. When shape is not null, it receives the
+  // outline of that same recording, read back from it so both describe one recording.
   std::shared_ptr<Image> getOwnGeometryImage(const DrawArgs& args, float contentScale,
-                                             Point* offset);
+                                             Point* offset,
+                                             std::optional<StyledShape>* shape = nullptr);
 
   bool hasValidMask() const;
 
@@ -770,8 +765,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void updateStaticSubtreeFlags();
 
   std::optional<StyledShape> getContentShape();
-
-  std::optional<StyledShape> getOwnGeometryShape();
 
   // Whether one of the layer styles declares the layer's own geometry as its content.
   bool hasOwnGeometryContentStyle() const;

@@ -249,8 +249,6 @@ class ShapeLayer : public Layer {
 
   std::optional<StyledShape> onGetContentShape() override;
 
-  std::optional<StyledShape> onGetOwnGeometryShape() override;
-
  private:
   std::shared_ptr<Shape> _shape = nullptr;
   std::vector<std::shared_ptr<ShapeStyle>> _fillStyles = {};
