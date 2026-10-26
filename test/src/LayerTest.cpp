@@ -6970,21 +6970,23 @@ static std::vector<int> RasterizeOwnGeometryAlpha(Context* context,
 // rectangles recorded under one matrix batch into a single RectsContent and count as one, so a test
 // that needs two entries has to give them different matrices, as the Repeater case below does.
 static int CountUnpaintedEntries(const LayerContent* content) {
-  if (content == nullptr) {
-    return 0;
-  }
-  auto type = content->type();
-  if (type == LayerContent::Type::Compose) {
-    int count = 0;
-    for (const auto& child : static_cast<const ComposeContent*>(content)->contents) {
-      count += CountUnpaintedEntries(child.get());
+  TGFX_PRIVATE_ACCESS(if (content != nullptr) {
+    auto type = content->type();
+    if (type == LayerContent::Type::Compose) {
+      int count = 0;
+      for (const auto& child : static_cast<const ComposeContent*>(content)->contents) {
+        count += CountUnpaintedEntries(child.get());
+      }
+      return count;
     }
-    return count;
-  }
-  if (type == LayerContent::Type::Matrix) {
-    return CountUnpaintedEntries(static_cast<const MatrixContent*>(content)->content.get());
-  }
-  return static_cast<const GeometryContent*>(content)->hasPaint() ? 0 : 1;
+    if (type == LayerContent::Type::Matrix) {
+      return CountUnpaintedEntries(static_cast<const MatrixContent*>(content)->content.get());
+    }
+    return static_cast<const GeometryContent*>(content)->hasPaint() ? 0 : 1;
+  })
+  // MSVC builds without TGFX_TEST_ACCESS_PRIVATE compile an empty body; every caller sits in a
+  // TGFX_TEST_PRIVATE case that is not registered there.
+  return 0;
 }
 
 static int CountUnpaintedEntries(const std::shared_ptr<Layer>& layer) {
