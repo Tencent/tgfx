@@ -28,32 +28,48 @@
 namespace tgfx {
 
 /**
- * Extra input source that a LayerStyle may need beyond the primary content image.
+ * A recording a LayerStyle may consume, as its primary content or as an extra source.
  */
 class StyleInputSource {
  public:
   /**
-   * The kind of extra source carried by this object.
+   * The kind of recording carried by this object.
    */
   enum class Type {
-    /** A plain image source, such as the background content below the layer. */
+    /** A plain image recording, such as the shared content or the background below the layer. */
     Base,
-    /** A contour source that additionally carries the shared contour's vector shape. */
+    /** The layer's own geometry, recorded on its own, without its descendants. */
+    Geometry,
+    /** The shared subtree contour, used when the layer records no geometry of its own. */
     Contour
   };
 
   /**
    * Creates a plain image source.
    * @param image The source image.
-   * @param imageOffset The source image offset relative to the content image.
+   * @param imageOffset The top-left corner of the source image, in the frame its role implies: as
+   *                    LayerStyleInput::content it is the image's layer-local origin already
+   *                    multiplied by contentScale, as an extra source it is relative to that
+   *                    content image. See imageOffset().
    */
   StyleInputSource(std::shared_ptr<Image> image, Point imageOffset)
       : _type(Type::Base), _image(std::move(image)), _imageOffset(imageOffset) {
   }
 
-  /** Returns the source kind. */
+  virtual ~StyleInputSource() = default;
+
+  /** Returns the recording kind. */
   Type type() const {
     return _type;
+  }
+
+  /**
+   * Returns the exact vector shape of this recording, or an empty shape when the recording cannot
+   * be expressed as one outline. Only a Geometry source answers it today.
+   */
+  virtual const std::optional<StyledShape>& shape() const {
+    static const std::optional<StyledShape> emptyShape = std::nullopt;
+    return emptyShape;
   }
 
   /** Returns the primary source image. */
@@ -61,7 +77,12 @@ class StyleInputSource {
     return _image;
   }
 
-  /** Returns the primary source image offset relative to the content image. */
+  /**
+   * Returns the top-left corner of the source image. As the primary LayerStyleInput::content it is
+   * the image's layer-local origin multiplied by contentScale: consumers divide that scale back out
+   * and pre-translate by it, so the image lands at offset / contentScale in layer space. As an extra
+   * source it is instead relative to the primary content image, in the same scaled image pixels.
+   */
   Point imageOffset() const {
     return _imageOffset;
   }
@@ -78,23 +99,26 @@ class StyleInputSource {
 };
 
 /**
- * Contour input source with additional vector shape information.
+ * Input source for the layer's own geometry: the raster and the exact shape read back from the very
+ * same recording, so the shape always describes the pixels the style samples.
  */
-class ContourInputSource : public StyleInputSource {
+class GeometryInputSource : public StyleInputSource {
  public:
   /**
-   * Creates a contour source.
-   * @param image The rasterized contour image.
-   * @param imageOffset The contour image offset relative to the content image.
-   * @param shape The optional vector shape corresponding to the contour.
+   * Creates a geometry source.
+   * @param image The rasterized own geometry.
+   * @param imageOffset The own geometry raster's top-left corner in layer-local coordinates already
+   *                    multiplied by contentScale. A Geometry source is only ever the primary
+   *                    content, never an extra source.
+   * @param shape The vector shape of the same recording, or an empty shape when it has none.
    */
-  ContourInputSource(std::shared_ptr<Image> image, Point imageOffset,
-                     std::optional<StyledShape> shape = std::nullopt)
-      : StyleInputSource(Type::Contour, std::move(image), imageOffset), _shape(std::move(shape)) {
+  GeometryInputSource(std::shared_ptr<Image> image, Point imageOffset,
+                      std::optional<StyledShape> shape)
+      : StyleInputSource(Type::Geometry, std::move(image), imageOffset), _shape(std::move(shape)) {
   }
 
-  /** Returns the optional vector shape corresponding to the contour. */
-  const std::optional<StyledShape>& shape() const {
+  /** Returns the vector shape of the same recording, empty when the recording has none. */
+  const std::optional<StyledShape>& shape() const override {
     return _shape;
   }
 
@@ -103,21 +127,47 @@ class ContourInputSource : public StyleInputSource {
 };
 
 /**
+ * Contour input source that additionally carries the content shape used by the generic spread
+ * fallback. That shape is derived from the shared content, so it does not describe this contour
+ * raster; shape() stays empty and only contentShape() reports it (a legacy pairing kept separate).
+ */
+class ContourInputSource : public StyleInputSource {
+ public:
+  /**
+   * Creates a contour source.
+   * @param image The rasterized contour image.
+   * @param imageOffset The contour image's top-left corner: as the primary content the contour
+   *                    raster's layer-local origin multiplied by contentScale, as an extra source
+   *                    its origin relative to the content image.
+   * @param contentShape The content shape the spread fallback of this contour was derived from.
+   */
+  ContourInputSource(std::shared_ptr<Image> image, Point imageOffset,
+                     std::optional<StyledShape> contentShape = std::nullopt)
+      : StyleInputSource(Type::Contour, std::move(image), imageOffset),
+        _contentShape(std::move(contentShape)) {
+  }
+
+  /** Returns the content shape of the shared content, not the shape of this contour raster. */
+  const std::optional<StyledShape>& contentShape() const {
+    return _contentShape;
+  }
+
+ private:
+  std::optional<StyledShape> _contentShape = std::nullopt;
+};
+
+/**
  * Contains the source data that a LayerStyle needs to perform its drawing.
  */
 struct LayerStyleInput {
   /**
-   * The main raster this style resolves: the layer's own geometry when the style declares
-   * LayerStyleContentSource::Geometry and the layer records one, the shared contour when it records
-   * none, and the shared content for every other style. Opaque, as described by OpaqueContext.
+   * The recording this style resolves: the layer's own geometry for a style declaring
+   * LayerStyleContentSource::Geometry, the shared contour when such a layer records no geometry,
+   * and the shared content for every other style. type() says which one was actually recorded;
+   * shape() is set only when that recording has an exact vector expression. nullptr means the
+   * style has nothing to draw and must be skipped.
    */
-  std::shared_ptr<Image> content = nullptr;
-
-  /**
-   * The offset of the content image's top-left corner in pixel coordinates (already scaled by
-   * contentScale). Styles that need a stable sampling origin use this to anchor their pattern.
-   */
-  Point contentOffset = {};
+  std::shared_ptr<StyleInputSource> content = nullptr;
 
   /**
    * The scale factor of the layer content relative to its original size. Some layer styles have
@@ -131,12 +181,6 @@ struct LayerStyleInput {
    * retrieve a source by type.
    */
   std::vector<std::shared_ptr<StyleInputSource>> extraSources = {};
-
-  /**
-   * The vector shape of the own geometry defined by LayerStyleContentSource::Geometry, matching
-   * `content` when that is the own-geometry recording; absent otherwise.
-   */
-  std::optional<StyledShape> ownShape = std::nullopt;
 
   /**
    * Returns the extra source with the specified type, or nullptr when it was not requested or

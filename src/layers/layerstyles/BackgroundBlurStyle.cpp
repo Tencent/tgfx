@@ -113,7 +113,8 @@ void BackgroundBlurStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, f
   backgroundOffset.x += bgOffset.x;
   backgroundOffset.y += bgOffset.y;
 
-  auto maskShader = Shader::MakeImageShader(input.content, TileMode::Decal, TileMode::Decal);
+  auto maskShader =
+      Shader::MakeImageShader(input.content->image(), TileMode::Decal, TileMode::Decal);
 
   // draw blurred background in the mask
   Paint paint = {};

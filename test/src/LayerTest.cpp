@@ -20,8 +20,10 @@
 #include <vector>
 #include "core/Matrix3DUtils.h"
 #include "core/filters/GaussianBlurImageFilter.h"
+#include "core/images/RasterizedImage.h"
 #include "core/shaders/GradientShader.h"
 #include "core/utils/MathExtra.h"
+#include "layers/BackgroundHandler.h"
 #include "layers/DrawArgs.h"
 #include "layers/LayerStyleSource.h"
 #include "layers/OpaqueContext.h"
@@ -5529,7 +5531,7 @@ TGFX_TEST_PRIVATE(LayerTest, GlassWithoutOwnGeometryResolvesToSharedContour) {
       ASSERT_TRUE(group.contour.has_value()); ASSERT_TRUE(group.contour->image != nullptr);
       ASSERT_TRUE(group.content.image != nullptr)
       << "control: the non-Geometry style in this bucket records the shared content";
-      EXPECT_EQ(ResolveContentEntry(group, glass.get()), &*group.contour)
+      EXPECT_EQ(ResolveContentSource(group, glass.get()), group.contourFallbackSource)
       << "Glass must resolve to the shared contour when no own geometry exists";)
 }
 
@@ -6673,7 +6675,7 @@ TGFX_TEST(LayerTest, GlassStyleWithDropShadow) {
 //
 // A parent layer carrying the Glass style whose geometry lives in child layers owns no painter at
 // all, so it records no own geometry and Glass falls back to the shared subtree contour, which is
-// recording that keeps a 0%-alpha fill (see ResolveContentEntry in LayerStyleSource.h). These cases
+// recording that keeps a 0%-alpha fill (see ResolveContentSource in LayerStyleSource.h). These cases
 // pin the final RENDERED pixels over a checker backdrop under the frost-only and the refractive
 // parameter sets.
 
@@ -7222,8 +7224,8 @@ static int OwnGeometryAlphaAt(const std::vector<int>& raster, int x, int y) {
   return raster[static_cast<size_t>(y) * OwnGeometryProbeSize + static_cast<size_t>(x)];
 }
 
-// Records the LayerStyleInput a layer hands to one style, so the per-style gating of
-// LayerStyleInput::ownShape can be asserted without a style that consumes the shape.
+// Records the LayerStyleInput a layer hands to one style, so both the kind of recording and the
+// shape travelling with it can be asserted without a style that consumes them.
 class OwnShapeProbeStyle : public LayerStyle {
  public:
   explicit OwnShapeProbeStyle(LayerStyleContentSource source) : _contentSource(source) {
@@ -7241,25 +7243,36 @@ class OwnShapeProbeStyle : public LayerStyle {
     return _contentSource;
   }
 
-  // Filled in by onDraw, so a passing assertion also proves the style was drawn at all.
+  // Filled in by onDraw, so a passing assertion also proves the style was drawn at all. content is
+  // held by reference count on purpose: it keeps the recording object alive for the identity
+  // assertions of the shared-source cases.
   bool drawn = false;
   bool sawOwnShape = false;
+  bool sawContentImage = false;
+  StyleInputSource::Type contentType = StyleInputSource::Type::Base;
+  std::shared_ptr<StyleInputSource> content = nullptr;
 
  protected:
   void onDraw(Canvas* /*canvas*/, const LayerStyleInput& input, float /*alpha*/,
               BlendMode /*blendMode*/) override {
     drawn = true;
-    sawOwnShape = input.ownShape.has_value();
+    content = input.content;
+    if (input.content == nullptr) {
+      return;
+    }
+    contentType = input.content->type();
+    sawContentImage = input.content->image() != nullptr;
+    sawOwnShape = input.content->shape().has_value();
   }
 
  private:
   LayerStyleContentSource _contentSource = LayerStyleContentSource::All;
 };
 
-// ownShape describes the layer's own geometry, so only a style that declares that content source may
-// receive it. A sibling in the same excludeChildEffects bucket shares the recorded group, and its
-// content is the shared recording, which that shape does not describe: pairing the two would make
-// the sibling read a footprint it never drew.
+// Only the own-geometry recording carries an exact shape, and only a style that declares that
+// content source receives it. A sibling in the same excludeChildEffects bucket shares the recorded
+// group, and its content is the shared recording, which that shape does not describe: pairing the
+// two would make the sibling read a footprint it never drew.
 TGFX_TEST_PRIVATE(LayerTest, OwnShapeIsOnlyGivenToGeometrySourceStyles) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -7298,6 +7311,229 @@ TGFX_TEST_PRIVATE(LayerTest, OwnShapeIsOnlyGivenToGeometrySourceStyles) {
   EXPECT_FALSE(otherStyle->sawOwnShape)
       << "a style drawing from the shared content must not receive an own shape that does not "
          "describe that content";
+}
+
+// ===== The typed content source: which recording a style is handed =====
+
+// A layer painting its own geometry hands a Geometry-sourced style that recording, together with the
+// exact outline read back from it.
+TGFX_TEST_PRIVATE(LayerTest, StyleInputContentIsGeometryForOwnGeometry) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto probe = std::make_shared<OwnShapeProbeStyle>(LayerStyleContentSource::Geometry);
+  probe->setExcludeChildEffects(true);
+  RegionSpec painted = {};
+  painted.bounds = GlassPanelLocalBounds();
+  painted.fill = RegionFillKind::Opaque;
+  ASSERT_TRUE(RenderPanelOverChecker(context, MakePanel({painted}, {probe})) != nullptr);
+
+  ASSERT_TRUE(probe->drawn) << "control: the style has to be drawn, or nothing was asserted";
+  ASSERT_TRUE(probe->content != nullptr) << "a painted layer records own geometry";
+  EXPECT_EQ(probe->contentType, StyleInputSource::Type::Geometry)
+      << "the recording a Geometry-sourced style samples is its own geometry";
+  EXPECT_TRUE(probe->sawContentImage);
+  EXPECT_TRUE(probe->sawOwnShape)
+      << "one rectangle has an exact outline, so it travels with the recording";
+}
+
+// A layer whose geometry lives in its children records no own geometry, so a Geometry-sourced style
+// falls back to the shared contour. That contour is this bucket's own raster and no exact outline
+// describes it, so the shape must stay empty.
+TGFX_TEST_PRIVATE(LayerTest, StyleInputFallbackReportsContourWithoutShape) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto probe = std::make_shared<OwnShapeProbeStyle>(LayerStyleContentSource::Geometry);
+  probe->setExcludeChildEffects(true);
+  auto parent = Layer::Make();
+  parent->setMatrix(Matrix::MakeTrans(GlassPanelLeft, GlassPanelTop));
+  auto child = VectorLayer::Make();
+  RegionSpec painted = {};
+  painted.bounds = GlassPanelLocalBounds();
+  painted.fill = RegionFillKind::Opaque;
+  child->setContents({MakeRegion(painted)});
+  parent->addChild(child);
+  parent->setLayerStyles({probe});
+  ASSERT_TRUE(RenderPanelOverChecker(context, parent) != nullptr);
+
+  ASSERT_TRUE(probe->drawn) << "control: the fallback still draws the style";
+  ASSERT_TRUE(probe->content != nullptr);
+  EXPECT_EQ(probe->contentType, StyleInputSource::Type::Contour)
+      << "a layer painting nothing owns no geometry, so the style is handed the shared contour";
+  EXPECT_TRUE(probe->sawContentImage);
+  EXPECT_FALSE(probe->sawOwnShape)
+      << "the fallback contour is no exact outline, so it must not report a shape";
+}
+
+// A style that does not declare Geometry samples the shared content, whose kind is Base and which
+// carries no shape either.
+TGFX_TEST_PRIVATE(LayerTest, StyleInputContentIsBaseForNonGeometryStyle) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto probe = std::make_shared<OwnShapeProbeStyle>(LayerStyleContentSource::All);
+  probe->setExcludeChildEffects(true);
+  RegionSpec painted = {};
+  painted.bounds = GlassPanelLocalBounds();
+  painted.fill = RegionFillKind::Opaque;
+  ASSERT_TRUE(RenderPanelOverChecker(context, MakePanel({painted}, {probe})) != nullptr);
+
+  ASSERT_TRUE(probe->drawn);
+  ASSERT_TRUE(probe->content != nullptr) << "control: the shared content is drawable";
+  EXPECT_EQ(probe->contentType, StyleInputSource::Type::Base);
+  EXPECT_TRUE(probe->sawContentImage);
+  EXPECT_FALSE(probe->sawOwnShape) << "the shared content has no single exact outline";
+}
+
+// The own geometry is recorded once per layer, so both excludeChildEffects buckets must hand out the
+// very same source object: one recording, one typed wrapper, no per-bucket copy.
+TGFX_TEST_PRIVATE(LayerTest, StyleInputOwnSourceSharedAcrossStyles) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto seesChildren = std::make_shared<OwnShapeProbeStyle>(LayerStyleContentSource::Geometry);
+  seesChildren->setExcludeChildEffects(false);
+  auto seesOwnOnly = std::make_shared<OwnShapeProbeStyle>(LayerStyleContentSource::Geometry);
+  seesOwnOnly->setExcludeChildEffects(true);
+  RegionSpec painted = {};
+  painted.bounds = GlassPanelLocalBounds();
+  painted.fill = RegionFillKind::Opaque;
+  ASSERT_TRUE(RenderPanelOverChecker(context, MakePanel({painted}, {seesChildren, seesOwnOnly})) !=
+              nullptr);
+
+  ASSERT_TRUE(seesChildren->drawn && seesOwnOnly->drawn);
+  ASSERT_TRUE(seesChildren->content != nullptr && seesOwnOnly->content != nullptr);
+  EXPECT_EQ(seesChildren->contentType, StyleInputSource::Type::Geometry);
+  EXPECT_EQ(seesChildren->content, seesOwnOnly->content)
+      << "both buckets must share one own-geometry source instead of wrapping the recording twice";
+}
+
+// Records which image a background-sourced style is handed. A background source makes the layer go
+// through the capture/consume chain, which is the only place the recorded pictures are replaced by
+// their rasterized wrappers.
+class RasterizedContentProbeStyle : public LayerStyle {
+ public:
+  // Filled in by onDraw, so a passing assertion also proves the style was drawn at all.
+  bool drawn = false;
+  bool contentIsRasterized = false;
+  // Held by reference count on purpose: it keeps the wrapper alive for the identity assertion.
+  std::shared_ptr<Image> contentImage = nullptr;
+  StyleInputSource::Type contentType = StyleInputSource::Type::Base;
+
+  LayerStylePosition position() const override {
+    return LayerStylePosition::Below;
+  }
+
+  Rect filterBounds(const Rect& srcRect, float /*contentScale*/) override {
+    return srcRect;
+  }
+
+  uint32_t extraSourceType() const override {
+    return static_cast<uint32_t>(LayerStyleExtraSourceType::Background);
+  }
+
+  LayerStyleContentSource contentSource() const override {
+    return LayerStyleContentSource::Geometry;
+  }
+
+ protected:
+  // A background-sourced style must ask for something outside its content, otherwise the layer tree
+  // skips the whole capture pass on the steady-state path (hasBackgroundStyle() only reads the
+  // accumulated outset there) and the style would never be dispatched. One pixel of full-resolution
+  // backdrop is enough for a probe that draws nothing.
+  Rect filterBackgroundSharp(const Rect& srcRect, float /*contentScale*/) override {
+    auto bounds = srcRect;
+    bounds.outset(1.0f, 1.0f);
+    return bounds;
+  }
+
+  void onDraw(Canvas* /*canvas*/, const LayerStyleInput& input, float /*alpha*/,
+              BlendMode /*blendMode*/) override {
+    drawn = true;
+    if (input.content == nullptr) {
+      return;
+    }
+    contentType = input.content->type();
+    contentImage = input.content->image();
+    contentIsRasterized = std::dynamic_pointer_cast<RasterizedImage>(contentImage) != nullptr;
+  }
+};
+
+// The background chain replaces the recorded pictures with rasterized wrappers so the capture pass
+// uploads a texture the consume pass reuses, and the typed sources built from those recordings must
+// follow them. A style sampling the wrapper the recording used to hold would replay the picture and
+// lose the sharing, so the source has to be rebuilt after the swap: this is the only path that swaps
+// them, and none of the drawLayerStyleDefault cases can see it.
+TGFX_TEST_PRIVATE(LayerTest, StyleInputFollowsRasterizedOwnGeometry) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // One style per excludeChildEffects bucket: the own geometry is recorded once and both entries
+  // hold that one recording, so the swap has to wrap it once and hand the same wrapper out.
+  auto seesChildren = std::make_shared<RasterizedContentProbeStyle>();
+  seesChildren->setExcludeChildEffects(false);
+  auto seesOwnOnly = std::make_shared<RasterizedContentProbeStyle>();
+  seesOwnOnly->setExcludeChildEffects(true);
+  RegionSpec painted = {};
+  painted.bounds = GlassPanelLocalBounds();
+  painted.fill = RegionFillKind::Opaque;
+  ASSERT_TRUE(RenderPanelOverChecker(context, MakePanel({painted}, {seesChildren, seesOwnOnly})) !=
+              nullptr);
+
+  ASSERT_TRUE(seesChildren->drawn && seesOwnOnly->drawn)
+      << "control: the background chain has to draw the style";
+  EXPECT_EQ(seesChildren->contentType, StyleInputSource::Type::Geometry);
+  EXPECT_EQ(seesOwnOnly->contentType, StyleInputSource::Type::Geometry);
+  EXPECT_TRUE(seesChildren->contentIsRasterized && seesOwnOnly->contentIsRasterized)
+      << "both styles must sample the rasterized own geometry, not the picture behind it";
+  EXPECT_TRUE(seesChildren->contentImage == seesOwnOnly->contentImage)
+      << "one recording, one wrapper: both buckets must sample the same image object";
+}
+
+// The swap that wraps the recordings for the capture pass lives in BackgroundHandler, not in any
+// Layer::drawLayerStyleDefault path, so its two invariants need their own case: after the swap every
+// bucket's typed source must hold the entry image, and the recording the buckets share must be
+// wrapped once so both consumers sample one texture.
+TGFX_TEST_PRIVATE(LayerTest, LayerStyleSourceSwapKeepsEntriesAndSourcesInSync) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto seesChildren = std::make_shared<OwnShapeProbeStyle>(LayerStyleContentSource::Geometry);
+  seesChildren->setExcludeChildEffects(false);
+  auto seesOwnOnly = std::make_shared<OwnShapeProbeStyle>(LayerStyleContentSource::Geometry);
+  seesOwnOnly->setExcludeChildEffects(true);
+  RegionSpec painted = {};
+  painted.bounds = GlassPanelLocalBounds();
+  painted.fill = RegionFillKind::Opaque;
+  auto panel = MakePanel({painted}, {seesChildren, seesOwnOnly});
+
+  TGFX_PRIVATE_ACCESS(
+      DrawArgs drawArgs(context); auto source = panel->getLayerStyleSource(drawArgs, Matrix::I());
+      ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
+      ASSERT_TRUE(source->groups[1] != nullptr);
+      ASSERT_TRUE(source->groups[0]->ownGeometry.has_value());
+      ASSERT_TRUE(source->groups[1]->ownGeometry.has_value());
+      auto recording = source->groups[0]->ownGeometry->image; ASSERT_TRUE(recording != nullptr);
+      EXPECT_TRUE(recording == source->groups[1]->ownGeometry->image)
+      << "control: both buckets start from the one own-geometry recording";
+      BackgroundSnapshotMap snapshots = {}; BackgroundCapturer capturer(&snapshots, nullptr);
+      auto* cached = capturer.cacheLayerStyleSource(panel.get(), std::move(source));
+      ASSERT_TRUE(cached != nullptr);
+      EXPECT_TRUE(cached->groups[0]->ownGeometry->image == cached->groups[1]->ownGeometry->image)
+      << "wrapping the shared recording per bucket would give one picture two "
+         "wrappers";
+      ASSERT_TRUE(cached->groups[0]->ownSource != nullptr);
+      EXPECT_TRUE(cached->groups[0]->ownSource->image() == cached->groups[0]->ownGeometry->image)
+      << "the typed source must follow the swapped image, not the picture";
+      ASSERT_TRUE(cached->groups[1]->ownSource != nullptr);
+      EXPECT_TRUE(cached->groups[1]->ownSource->image() == cached->groups[1]->ownGeometry->image);)
 }
 
 // A bare geometry next to a painter has no single exact outline, so the style is handed no own shape

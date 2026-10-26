@@ -132,14 +132,15 @@ struct GlassShapeInfo {
 // alpha — the actually rendered shape, strokes included.
 static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   GlassShapeInfo info;
-  // The SDF shape comes from the layer's own geometry: unlike the shared contour it leaves
-  // descendants out, and it also holds the geometries no painter captured -- the latter only when
-  // the layer has no painter at all and exactly one such geometry, which is when the own shape is
-  // exact.
-  if (!input.ownShape.has_value()) {
+  // The SDF path needs an exact outline of the sampled recording, and only the own-geometry readback
+  // provides one: the shared content and the contour fallback describe no single outline.
+  if (input.content == nullptr || input.content->type() != StyleInputSource::Type::Geometry) {
     return info;
   }
-  const auto& optShape = input.ownShape;
+  const auto& optShape = input.content->shape();
+  if (!optShape.has_value()) {
+    return info;
+  }
   if (optShape->type != StyledShapeType::Fill) {
     return info;
   }
@@ -299,6 +300,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
   if (input.content == nullptr || FloatNearlyZero(input.contentScale)) {
     return;
   }
+  const auto& contentImage = input.content->image();
+  const auto contentOffset = input.content->imageOffset();
   auto bgOffset = backgroundSource->imageOffset();
   // The UDF generation is deferred to the refraction filter, so a missing GPU context
   // at record time (e.g. recording into a Picture) no longer skips the effect. The texture size
@@ -308,8 +311,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
   auto context = surface ? surface->getContext() : nullptr;
   auto maxTextureSize =
       context ? context->gpu()->limits()->maxTextureDimension2D : DefaultMaxTextureSize;
-  auto contentWidth = static_cast<float>(input.content->width());
-  auto contentHeight = static_cast<float>(input.content->height());
+  auto contentWidth = static_cast<float>(contentImage->width());
+  auto contentHeight = static_cast<float>(contentImage->height());
   auto origWidth = contentWidth / input.contentScale;
   auto origHeight = contentHeight / input.contentScale;
   auto origBounds = Rect::MakeWH(origWidth, origHeight);
@@ -526,7 +529,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       // conversion ratio. Both values use origBounds so the shader still operates in layer space.
       float udfPixelToLayerPixelX = origBounds.width() / static_cast<float>(udfWidth);
       float udfPixelToLayerPixelY = origBounds.height() / static_cast<float>(udfHeight);
-      // Blur radius in UDF pixel space. The horizontal pass samples input.content directly into
+      // Blur radius in UDF pixel space. The horizontal pass samples the content image directly into
       // the target UDF core, so resizing does not require an intermediate texture.
       // The radius scales with udfScale, keeping the layer-space radius constant.
       //
@@ -645,7 +648,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       // The UDF distance field is computed from the content image directly: its alpha is the
       // actually rendered shape, strokes included.
       GlassUDFRequest maskRequest = {};
-      maskRequest.source = input.content;
+      maskRequest.source = contentImage;
       maskRequest.coreWidth = udfWidth;
       maskRequest.coreHeight = udfHeight;
       maskRequest.textureRect = fineTextureRect;
@@ -657,7 +660,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       }
       GlassUDFRequest edgeMaskRequest = {};
       if (enableEdgeLighting) {
-        edgeMaskRequest.source = input.content;
+        edgeMaskRequest.source = contentImage;
         edgeMaskRequest.coreWidth = edgeCoreWidth;
         edgeMaskRequest.coreHeight = edgeCoreHeight;
         edgeMaskRequest.textureRect = edgeTextureRect;
@@ -725,7 +728,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     // subtract contentOffset because the content image is cropped to its tight bounds.
     auto drawRRect = shapeInfo.shapeRRect;
     drawRRect.scale(input.contentScale, input.contentScale);
-    drawRRect.offset(-input.contentOffset.x, -input.contentOffset.y);
+    drawRRect.offset(-contentOffset.x, -contentOffset.y);
     canvas->drawRRect(drawRRect, paint);
   } else {
     // AlphaMask path: use the vector path for GPU-native AA when available, avoiding the
@@ -733,11 +736,11 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
     if (shapeInfo.hasPath) {
       auto drawPath = shapeInfo.shapePath;
       auto pathMatrix = Matrix::MakeScale(input.contentScale, input.contentScale);
-      pathMatrix.postTranslate(-input.contentOffset.x, -input.contentOffset.y);
+      pathMatrix.postTranslate(-contentOffset.x, -contentOffset.y);
       drawPath.transform(pathMatrix);
       canvas->drawPath(drawPath, paint);
     } else {
-      auto maskImage = input.content;
+      auto maskImage = contentImage;
       float maskScaleX = 1.0f;
       float maskScaleY = 1.0f;
       auto maskMaxDimension = std::max(maskImage->width(), maskImage->height());
@@ -752,15 +755,15 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
         if (maskImage == nullptr) {
           return;
         }
-        maskScaleX = static_cast<float>(input.content->width()) / static_cast<float>(maskWidth);
-        maskScaleY = static_cast<float>(input.content->height()) / static_cast<float>(maskHeight);
+        maskScaleX = static_cast<float>(contentImage->width()) / static_cast<float>(maskWidth);
+        maskScaleY = static_cast<float>(contentImage->height()) / static_cast<float>(maskHeight);
       }
       auto maskShader = Shader::MakeImageShader(maskImage, TileMode::Decal, TileMode::Decal,
                                                 SamplingOptions(FilterMode::Linear));
       maskShader = maskShader->makeWithMatrix(Matrix::MakeScale(maskScaleX, maskScaleY));
       paint.setMaskFilter(MaskFilter::MakeShader(maskShader, false));
-      auto contentRect = Rect::MakeWH(static_cast<float>(input.content->width()),
-                                      static_cast<float>(input.content->height()));
+      auto contentRect = Rect::MakeWH(static_cast<float>(contentImage->width()),
+                                      static_cast<float>(contentImage->height()));
       canvas->drawRect(contentRect, paint);
     }
   }

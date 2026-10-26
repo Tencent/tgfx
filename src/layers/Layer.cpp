@@ -1936,7 +1936,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
         // Lazy fallback: a layer whose geometry lives in its children records no own geometry, so
         // the style falls back to the shared subtree contour. That contour keeps a descendant's
         // painters with alpha=0, which the shared content drops. A failed recording only skips this
-        // style: ResolveContentEntry then finds neither entry and drops it, while the other styles
+        // style: ResolveContentSource then finds no source and drops it, while the other styles
         // of the bucket keep drawing from the shared content -- provided that recording succeeded,
         // since a failed one leaves group->content empty and drops its siblings as well. This
         // recording does read drawArgs.excludeEffects, so it must stay inside the loop.
@@ -1958,6 +1958,10 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     }
     source->groups[i] = std::move(group);
   }
+  // Typed forms of the recorded entries, built once per layer so neither producer allocates per
+  // style. The contour stands in for a missing own geometry and carries no shape: it is this
+  // bucket's own raster, which no exact outline describes.
+  RefreshTypedSources(*source);
 
   if (source->groups[0] == nullptr && source->groups[1] == nullptr) {
     // Nothing usable was recorded in any bucket: keep the previous fail-closed result so a style
@@ -2060,32 +2064,29 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
     return;
   }
 
-  auto* contentEntry = ResolveContentEntry(*group, layerStyle);
-  if (contentEntry == nullptr) {
+  auto contentSource = ResolveContentSource(*group, layerStyle);
+  if (contentSource == nullptr) {
     return;
   }
   // Apply the content transform matrix to canvas so that rendering happens at the final scale,
   // avoiding blurry results that would come from baking contentScale into a picture recording.
   AutoCanvasRestore restoreCanvas(canvas);
   auto matrix = Matrix::MakeScale(1.f / source->contentScale, 1.f / source->contentScale);
-  matrix.preTranslate(contentEntry->offset.x, contentEntry->offset.y);
+  matrix.preTranslate(contentSource->imageOffset().x, contentSource->imageOffset().y);
   canvas->concat(matrix);
   LayerStyleInput styleInput = {};
-  styleInput.content = contentEntry->image;
-  styleInput.contentOffset = contentEntry->offset;
+  styleInput.content = std::move(contentSource);
   styleInput.contentScale = source->contentScale;
   auto sourceFlags = layerStyle->extraSourceType();
   if (HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour)) {
-    // The Contour source is the shared contour: its raster and the shared content shape describe
-    // the same recording, except that the shape drops the fully transparent solid-color painters
-    // the raster keeps.
+    // The Contour extra source is the shared contour; its contentShape is the legacy spread outline
+    // derived from the shared content side, so it is not this raster's own shape.
     auto contourImage = group->contour.has_value() ? group->contour->image : nullptr;
     auto contourOffset =
-        contourImage ? group->contour->offset - contentEntry->offset : Point::Zero();
+        contourImage ? group->contour->offset - styleInput.content->imageOffset() : Point::Zero();
     styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
         std::move(contourImage), contourOffset, source->contentShape));
   }
-  styleInput.ownShape = ResolveOwnShape(*group, layerStyle);
   layerStyle->draw(canvas, styleInput, alpha);
 }
 

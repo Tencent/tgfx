@@ -267,13 +267,18 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (group == nullptr) {
     return;
   }
-  // The entry the consumer samples: a style that draws from the layer's own geometry takes that
-  // recording, every other style the shared content image. A style that resolves to nothing to draw
-  // is skipped by BOTH sides, so capture and consume keep the same push/pop count.
-  auto* contentEntry = ResolveContentEntry(*group, style);
-  if (contentEntry == nullptr || contentEntry->image == nullptr) {
+  // The recording the consumer samples: a style that draws from the layer's own geometry takes that
+  // recording, every other style the shared content. A style that resolves to nothing to draw is
+  // skipped by BOTH sides, so capture and consume keep the same push/pop count. A resolved source
+  // always carries an image (RefreshTypedSources builds no other kind), so only its absence is left
+  // to test here.
+  auto contentSource = ResolveContentSource(*group, style);
+  if (contentSource == nullptr) {
     return;
   }
+  auto contentOffset = contentSource->imageOffset();
+  auto contentWidth = static_cast<float>(contentSource->image()->width());
+  auto contentHeight = static_cast<float>(contentSource->image()->height());
   auto surfaceScale = bgSource->surfaceScale();
   auto contentScale = source->contentScale;
   auto localToWorld = bgSource->surfaceToWorldMatrix();
@@ -296,10 +301,9 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   // (e.g. a drop shadow).
   DEBUG_ASSERT(!FloatNearlyZero(source->contentScale));
   auto contentScaleToLocal = 1.0f / source->contentScale;
-  auto contentBounds = Rect::MakeXYWH(
-      contentEntry->offset.x * contentScaleToLocal, contentEntry->offset.y * contentScaleToLocal,
-      static_cast<float>(contentEntry->image->width()) * contentScaleToLocal,
-      static_cast<float>(contentEntry->image->height()) * contentScaleToLocal);
+  auto contentBounds =
+      Rect::MakeXYWH(contentOffset.x * contentScaleToLocal, contentOffset.y * contentScaleToLocal,
+                     contentWidth * contentScaleToLocal, contentHeight * contentScaleToLocal);
   auto bounds = contentBounds;
   bounds.scale(contentScale, contentScale);
   bounds.roundOut();
@@ -334,7 +338,6 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
       visibleWorld.join(renderRect);
     }
     auto visibleLocal = worldToLocal.mapRect(visibleWorld);
-    auto& contentOffset = contentEntry->offset;
     snapshots->styleVisibleBounds[BackgroundSnapshotKey{layer, style}] =
         Rect::MakeXYWH(visibleLocal.left * contentScale - contentOffset.x,
                        visibleLocal.top * contentScale - contentOffset.y,
@@ -399,8 +402,15 @@ const LayerStyleSource* BackgroundCapturer::cacheLayerStyleSource(
   }
   // Wrap each picture-backed image as Rasterized so the first draw uploads a GPU texture and the
   // second pass reuses it instead of replaying the picture. makeRasterized() on an already-
-  // rasterized image is a no-op, so wrapping content, contour and own geometry independently still
-  // hits one cache.
+  // rasterized image is a no-op, so wrapping content and contour independently still hits one
+  // cache. The own geometry is different: it is recorded once per layer and shared by both buckets,
+  // so the two entries hold the very same Image, and wrapping it per bucket would give one picture
+  // two RasterizedImages -- two GPU caches for one recording. Dedupe it by the image underneath and
+  // hand the one wrapper to every bucket that holds it. The swap replaces the entry images in place,
+  // so the typed sources built from the recording hold stale PictureImage proxies and must be
+  // rebuilt afterwards.
+  std::shared_ptr<Image> ownRecording = nullptr;
+  std::shared_ptr<Image> ownRasterized = nullptr;
   for (auto& group : source->groups) {
     if (group == nullptr) {
       continue;
@@ -411,9 +421,33 @@ const LayerStyleSource* BackgroundCapturer::cacheLayerStyleSource(
     if (group->contour.has_value() && group->contour->image != nullptr) {
       group->contour->image = group->contour->image->makeRasterized();
     }
-    if (group->ownGeometry.has_value() && group->ownGeometry->image != nullptr) {
-      group->ownGeometry->image = group->ownGeometry->image->makeRasterized();
+    if (!group->ownGeometry.has_value() || group->ownGeometry->image == nullptr) {
+      continue;
     }
+    if (ownRecording == group->ownGeometry->image) {
+      group->ownGeometry->image = ownRasterized;
+      continue;
+    }
+    ownRecording = group->ownGeometry->image;
+    ownRasterized = ownRecording->makeRasterized();
+    group->ownGeometry->image = ownRasterized;
+  }
+  RefreshTypedSources(*source);
+  for (const auto& group : source->groups) {
+    if (group == nullptr) {
+      continue;
+    }
+    // The refreshed sources must follow the entries, or a consumer samples the picture instead of
+    // the shared texture.
+    DEBUG_ASSERT(
+        group->content.image == nullptr ||
+        (group->contentSource != nullptr && group->contentSource->image() == group->content.image));
+    DEBUG_ASSERT(!group->contour.has_value() || group->contour->image == nullptr ||
+                 (group->contourFallbackSource != nullptr &&
+                  group->contourFallbackSource->image() == group->contour->image));
+    DEBUG_ASSERT(
+        !group->ownGeometry.has_value() || group->ownGeometry->image == nullptr ||
+        (group->ownSource != nullptr && group->ownSource->image() == group->ownGeometry->image));
   }
   auto* raw = source.get();
   snapshots->layerStyleSources.emplace(layer, std::move(source));
@@ -443,12 +477,15 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     return;
   }
   // A style that draws from the layer's own geometry consumes that recording, every other style the
-  // shared content image; a group that recorded nothing usable for this style resolves to nullptr so
-  // the style is skipped.
-  auto* contentEntry = ResolveContentEntry(*group, style);
-  if (contentEntry == nullptr || contentEntry->image == nullptr) {
+  // shared content; a group that recorded nothing usable for this style resolves to nullptr so the
+  // style is skipped. A resolved source always carries an image, so testing it is enough.
+  auto contentSource = ResolveContentSource(*group, style);
+  if (contentSource == nullptr) {
     return;
   }
+  const auto contentOffset = contentSource->imageOffset();
+  const auto contentWidth = static_cast<float>(contentSource->image()->width());
+  const auto contentHeight = static_cast<float>(contentSource->image()->height());
   std::shared_ptr<Image> bgImage = nullptr;
   Point bgOffset = {};
   if (snapshots != nullptr) {
@@ -471,10 +508,9 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     // Picture-canvas path: capture was skipped because there is no GPU context. Synthesize the
     // backdrop on the fly by walking ancestors and prior siblings via PictureRecorder.
     auto contentScaleToLocal = 1.0f / source->contentScale;
-    auto contentBounds = Rect::MakeXYWH(
-        contentEntry->offset.x * contentScaleToLocal, contentEntry->offset.y * contentScaleToLocal,
-        static_cast<float>(contentEntry->image->width()) * contentScaleToLocal,
-        static_cast<float>(contentEntry->image->height()) * contentScaleToLocal);
+    auto contentBounds =
+        Rect::MakeXYWH(contentOffset.x * contentScaleToLocal, contentOffset.y * contentScaleToLocal,
+                       contentWidth * contentScaleToLocal, contentHeight * contentScaleToLocal);
     bgImage =
         layer->synthesizeBackgroundImage(args, source->contentScale, contentBounds, &bgOffset);
     if (bgImage == nullptr) {
@@ -483,13 +519,12 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   }
   AutoCanvasRestore restoreCanvas(canvas);
   auto matrix = Matrix::MakeScale(1.f / source->contentScale, 1.f / source->contentScale);
-  matrix.preTranslate(contentEntry->offset.x, contentEntry->offset.y);
+  matrix.preTranslate(contentOffset.x, contentOffset.y);
   canvas->concat(matrix);
 
-  auto backgroundOffset = bgOffset - contentEntry->offset;
+  auto backgroundOffset = bgOffset - contentOffset;
   LayerStyleInput styleInput = {};
-  styleInput.content = contentEntry->image;
-  styleInput.contentOffset = contentEntry->offset;
+  styleInput.content = contentSource;
   styleInput.contentScale = source->contentScale;
   auto sourceFlags = style->extraSourceType();
   styleInput.extraSources.push_back(
@@ -499,12 +534,11 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     Point contourOffset = {};
     if (group->contour.has_value()) {
       contourImage = group->contour->image;
-      contourOffset = group->contour->offset - contentEntry->offset;
+      contourOffset = group->contour->offset - contentOffset;
     }
     styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
         std::move(contourImage), contourOffset, source->contentShape));
   }
-  styleInput.ownShape = ResolveOwnShape(*group, style);
 
   // On the first pass that needs it, rasterize the style's output once and cache it; every
   // pass — this one included — composites the same texture back with SrcOver. The image carries
@@ -531,8 +565,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
         if (picture != nullptr) {
           // Bound the cached texture to the visible region, so small dirty rects do not allocate
           // full-content textures.
-          auto shapeRect = Rect::MakeWH(static_cast<float>(contentEntry->image->width()),
-                                        static_cast<float>(contentEntry->image->height()));
+          auto shapeRect = Rect::MakeWH(contentWidth, contentHeight);
           if (visibleStyle == nullptr || shapeRect.intersect(*visibleStyle)) {
             if (!shapeRect.isEmpty()) {
               CacheStyleOutput(snapshots, args.context, layer, style, picture, recordMatrix,

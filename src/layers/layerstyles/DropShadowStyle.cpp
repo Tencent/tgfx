@@ -121,7 +121,7 @@ void DropShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float
   if (!filter) {
     return;
   }
-  std::shared_ptr<Image> filterSource = input.content;
+  std::shared_ptr<Image> filterSource = input.content->image();
   Point filterSourceOffset = {};
   if (!FloatNearlyZero(_spread)) {
     auto spreadImage = SpreadUtils::MakeSpreadShapeImage(input, _spread);

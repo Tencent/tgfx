@@ -29,6 +29,7 @@
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
+#include "tgfx/layers/layerstyles/LayerStyleInput.h"
 #include "tgfx/layers/layerstyles/StyledShape.h"
 
 namespace tgfx {
@@ -51,6 +52,12 @@ struct LayerStyleSourceEntry {
  * does a bucket kept alive by such a style whose layer paints nothing. contour is only present when
  * at least one Contour-sourced LayerStyle in this bucket requires a distinct contour image, or when
  * it holds the lazy fallback recording of a bucket whose own geometry is empty.
+ *
+ * ownSource/contourFallbackSource/contentSource are the typed sources ResolveContentSource picks
+ * from. They are built once while the entries are filled, so a style costs no allocation per frame
+ * and every producer of the same layer hands out the very same object. Each one follows the image
+ * its entry holds at the time it was built, so RefreshTypedSources() must run after anything
+ * replaces those entry images.
  */
 struct LayerStyleSourceGroup {
   LayerStyleSourceEntry content = {};
@@ -60,8 +67,20 @@ struct LayerStyleSourceGroup {
   // layer and shared by both buckets, because the recording never reads excludeEffects.
   std::optional<LayerStyleSourceEntry> ownGeometry = std::nullopt;
 
-  // Shape of the same own geometry, matching ownGeometry the way contentShape matches content.
+  // Shape of the same own geometry, matching ownGeometry the way contentShape matches content. This
+  // is only the input of RefreshTypedSources(): the copy a style receives travels inside the
+  // GeometryInputSource built from it, and nothing reads this field after that.
   std::optional<StyledShape> ownShape = std::nullopt;
+
+  // The own geometry as a typed source, shared with the other bucket.
+  std::shared_ptr<StyleInputSource> ownSource = nullptr;
+
+  // The contour standing in for a missing own geometry. Contour-sourced and carrying no shape: it
+  // is this bucket's own raster, which no exact outline describes.
+  std::shared_ptr<StyleInputSource> contourFallbackSource = nullptr;
+
+  // The shared content of this bucket.
+  std::shared_ptr<StyleInputSource> contentSource = nullptr;
 };
 
 /**
@@ -73,44 +92,25 @@ inline bool NeedsOwnGeometry(const LayerStyle* style) {
 }
 
 /**
- * Resolves the entry a consumer must use as LayerStyleInput.content: a style declaring
- * LayerStyleContentSource::Geometry gets the layer's own geometry (with the fallbacks described
- * there), every other style keeps the shared content.
+ * Returns the source a consumer must use as LayerStyleInput.content: a style declaring
+ * LayerStyleContentSource::Geometry gets the layer's own geometry, or the bucket's contour when the
+ * layer records no geometry of its own; every other style keeps the shared content.
  *
- * Returns nullptr when the entry carries no image, and the caller must then skip the style.
+ * Returns nullptr when the style has nothing recorded to draw, and the caller must then skip it.
  */
-inline const LayerStyleSourceEntry* ResolveContentEntry(const LayerStyleSourceGroup& group,
-                                                        const LayerStyle* style) {
+inline std::shared_ptr<StyleInputSource> ResolveContentSource(const LayerStyleSourceGroup& group,
+                                                              const LayerStyle* style) {
   DEBUG_ASSERT(style != nullptr);
   if (NeedsOwnGeometry(style)) {
-    if (group.ownGeometry.has_value() && group.ownGeometry->image != nullptr) {
-      return &*group.ownGeometry;
+    if (group.ownSource != nullptr) {
+      return group.ownSource;
     }
     // Only reached when the own recording is empty, e.g. the geometry all lives in child layers.
     // The shared contour answers for it because a retained 0%-alpha fill survives only there:
     // `content` drops painters with alpha <= 0, `contour` keeps them.
-    if (group.contour.has_value() && group.contour->image != nullptr) {
-      return &*group.contour;
-    }
-    return nullptr;
+    return group.contourFallbackSource;
   }
-  return group.content.image != nullptr ? &group.content : nullptr;
-}
-
-/**
- * Resolves the own-geometry shape handed to a style. Only a style that declares
- * LayerStyleContentSource::Geometry consumes the layer's own geometry, and a group may carry the
- * shape for a sibling in the same excludeChildEffects bucket, so every other style must receive an
- * empty shape: its content is the shared recording, and pairing it with an own shape that does not
- * describe that content would make it read bounds it never drew.
- */
-inline std::optional<StyledShape> ResolveOwnShape(const LayerStyleSourceGroup& group,
-                                                  const LayerStyle* style) {
-  DEBUG_ASSERT(style != nullptr);
-  if (!NeedsOwnGeometry(style)) {
-    return std::nullopt;
-  }
-  return group.ownShape;
+  return group.contentSource;
 }
 
 /**
@@ -133,6 +133,52 @@ struct LayerStyleSource {
   // spread). std::nullopt when no LayerStyle needs it.
   std::optional<StyledShape> contentShape = std::nullopt;
 };
+
+/**
+ * Rebuilds every typed source of the source from the entries as they are right now. The own-geometry
+ * source is built once and handed to both buckets, so the two never wrap the same recording twice.
+ *
+ * Refreshing replaces, it does not update: a typed source is cleared first and only rebuilt when its
+ * entry still holds an image, so an entry whose image went away leaves no source pointing at the old
+ * one. Every source it leaves behind therefore carries a non-null image.
+ */
+inline void RefreshTypedSources(LayerStyleSource& source) {
+  for (auto& group : source.groups) {
+    if (group == nullptr) {
+      continue;
+    }
+    group->ownSource = nullptr;
+    group->contourFallbackSource = nullptr;
+    group->contentSource = nullptr;
+  }
+  std::shared_ptr<StyleInputSource> ownSource = nullptr;
+  for (const auto& group : source.groups) {
+    if (group == nullptr) {
+      continue;
+    }
+    if (group->ownGeometry.has_value() && group->ownGeometry->image != nullptr) {
+      ownSource = std::make_shared<GeometryInputSource>(
+          group->ownGeometry->image, group->ownGeometry->offset, group->ownShape);
+      break;
+    }
+  }
+  for (auto& group : source.groups) {
+    if (group == nullptr) {
+      continue;
+    }
+    if (group->ownGeometry.has_value() && group->ownGeometry->image != nullptr) {
+      group->ownSource = ownSource;
+    }
+    if (group->contour.has_value() && group->contour->image != nullptr) {
+      group->contourFallbackSource =
+          std::make_shared<ContourInputSource>(group->contour->image, group->contour->offset);
+    }
+    if (group->content.image != nullptr) {
+      group->contentSource =
+          std::make_shared<StyleInputSource>(group->content.image, group->content.offset);
+    }
+  }
+}
 
 /**
  * Turns a recorded Picture into an Image whose origin is placed at imageBounds (or the picture's

@@ -158,21 +158,25 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
     return {nullptr, {}, false};
   }
   auto contour = static_cast<const ContourInputSource*>(source);
-  const auto& shapeOption = contour->shape();
+  // The legacy content shape of the shared content, not this contour raster's own expression: see
+  // ContourInputSource. The generic shape() of the source stays empty on purpose.
+  const auto& shapeOption = contour->contentShape();
   if (!shapeOption.has_value() || shapeOption->shape == nullptr) {
     // No single vector outline is available (text, multiple distinct geometries, or layer types
-    // without an exact shape). Fall back to the content image's bounds — contentOffset and the
-    // image size are both on LayerStyleInput, so no producer-side channel is needed, and for
-    // layers whose content is itself a rect (e.g. an opaque image) the bounds are the exact
-    // outline. For other content the bounds carry the rasterization round-out (and for text,
-    // the layout box rather than the ink box).
+    // without an exact shape). Fall back to the content recording's bounds: its image and the
+    // style-space origin of that image are both on LayerStyleInput::content, and for layers whose
+    // content is itself a rect (e.g. an opaque image) the bounds are the exact outline. For other
+    // content the bounds carry the rasterization round-out (and for text, the layout box rather
+    // than the ink box).
     if (input.content == nullptr || FloatNearlyZero(input.contentScale)) {
       return {nullptr, {}, false};
     }
+    const auto& contentImage = input.content->image();
+    const auto contentOffset = input.content->imageOffset();
     auto scale = input.contentScale;
-    auto rect = Rect::MakeXYWH(input.contentOffset.x / scale, input.contentOffset.y / scale,
-                               static_cast<float>(input.content->width()) / scale,
-                               static_cast<float>(input.content->height()) / scale);
+    auto rect = Rect::MakeXYWH(contentOffset.x / scale, contentOffset.y / scale,
+                               static_cast<float>(contentImage->width()) / scale,
+                               static_cast<float>(contentImage->height()) / scale);
     if (rect.width() + 2.0f * spread <= 0.0f || rect.height() + 2.0f * spread <= 0.0f) {
       return {nullptr, {}, true};
     }
@@ -188,10 +192,10 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
       return {nullptr, {}, false};
     }
     return {std::move(fallbackImage),
-            {fallbackOffset.x - input.contentOffset.x, fallbackOffset.y - input.contentOffset.y},
+            {fallbackOffset.x - contentOffset.x, fallbackOffset.y - contentOffset.y},
             false};
   }
-  auto& styledShape = *contour->shape();
+  auto& styledShape = *shapeOption;
   DEBUG_ASSERT(styledShape.shape != nullptr);
   if (styledShape.shape == nullptr || styledShape.shape->getPath().isEmpty()) {
     return {nullptr, {}, false};
@@ -200,9 +204,11 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
   // represented in the output and is treated as unavailable.
   auto shapeBounds = styledShape.getBounds();
   shapeBounds.scale(input.contentScale, input.contentScale);
-  auto contentBounds = Rect::MakeXYWH(input.contentOffset.x, input.contentOffset.y,
-                                      static_cast<float>(input.content->width()),
-                                      static_cast<float>(input.content->height()));
+  const auto& contentImage = input.content->image();
+  const auto contentOffset = input.content->imageOffset();
+  auto contentBounds =
+      Rect::MakeXYWH(contentOffset.x, contentOffset.y, static_cast<float>(contentImage->width()),
+                     static_cast<float>(contentImage->height()));
   DEBUG_ASSERT(contentBounds.contains(shapeBounds));
   if (!contentBounds.contains(shapeBounds)) {
     return {nullptr, {}, false};
@@ -257,9 +263,7 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
   if (image == nullptr) {
     return {nullptr, {}, false};
   }
-  return {std::move(image),
-          {offset.x - input.contentOffset.x, offset.y - input.contentOffset.y},
-          false};
+  return {std::move(image), {offset.x - contentOffset.x, offset.y - contentOffset.y}, false};
 }
 
 }  // namespace tgfx
