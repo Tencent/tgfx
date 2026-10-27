@@ -266,7 +266,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * not create a new offscreen image to replace the original layer content. Instead, they add
    * visual elements either below or above the layer content, blending directly with the existing
    * content on the canvas. Each layer style draws from the shared layer content, except one that
-   * declares LayerStyleContentSource::Geometry, which reads the layer's own geometry instead. Layer
+   * declares LayerStyleContentSource::Geometry, which reads the layer's geometry instead. Layer
    * styles are applied before filters. The default value is an empty list.
    */
   const std::vector<std::shared_ptr<LayerStyle>>& layerStyles() const {
@@ -698,13 +698,12 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<Image> getContentContourImage(const DrawArgs& args, float contentScale,
                                                 Point* offset, bool* contourMatchesContent);
 
-  // Records the layer's own geometry: the contour of its own content, which keeps both the
+  // Records the layer's geometry: the contour of its own content, which keeps both the
   // geometries no paint captured and the painters with alpha=0. Used as the content of styles that
-  // must cover the layer's own geometry rather than its rendered content. When shape is not null, it
+  // must cover the layer's geometry rather than its rendered content. When shape is not null, it
   // receives the outline of that same recording, read back from it so both describe one recording.
-  std::shared_ptr<Image> getOwnGeometryImage(const DrawArgs& args, float contentScale,
-                                             Point* offset,
-                                             std::optional<StyledShape>* shape = nullptr);
+  std::shared_ptr<Image> getGeometryImage(const DrawArgs& args, float contentScale, Point* offset,
+                                          std::optional<StyledShape>* shape = nullptr);
 
   bool hasValidMask() const;
 
@@ -748,8 +747,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   std::optional<StyledShape> getContentShape();
 
-  // Whether one of the layer styles declares the layer's own geometry as its content.
-  bool hasOwnGeometryContentStyle() const;
+  // Whether one of the layer styles declares the layer's geometry as its content.
+  bool hasGeometryContentStyle() const;
 
   struct {
     bool dirtyContent : 1;        // layer's content needs updating

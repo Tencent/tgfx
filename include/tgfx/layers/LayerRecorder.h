@@ -35,7 +35,8 @@ class GeometryContent;
  * LayerRecorder records geometries and their paints as layer content. Geometries with invisible
  * paints are still included as part of the layer's contour, but they will not be rendered. A
  * geometry may also be recorded without any paint: it paints nothing and stays out of the shared
- * contour, and only the queries that ask for the layer's own geometry see it.
+ * contour, and only the queries that ask for the layer's geometry see it. Such a geometry is never
+ * batched with a painted one, since a batch has to share a single paint.
  */
 class LayerRecorder {
  public:
@@ -45,55 +46,59 @@ class LayerRecorder {
   /**
    * Adds a rectangle with the specified paint.
    * @param rect The rectangle shape.
-   * @param paint The paint style for the rectangle.
+   * @param paint The paint that captured this geometry. nullptr records the geometry alone: it
+   * paints nothing, contributes no shared contour, and only the queries that ask for the layer's
+   * geometry see it.
    */
-  void addRect(const Rect& rect, const LayerPaint& paint);
+  void addRect(const Rect& rect, const LayerPaint* paint);
 
   /**
    * Adds a rounded rectangle with the specified paint.
    * @param rRect The rounded rectangle shape.
-   * @param paint The paint style for the rounded rectangle.
+   * @param paint The paint that captured this geometry. nullptr records the geometry alone: it
+   * paints nothing, contributes no shared contour, and only the queries that ask for the layer's
+   * geometry see it.
    */
-  void addRRect(const RRect& rRect, const LayerPaint& paint);
+  void addRRect(const RRect& rRect, const LayerPaint* paint);
 
   /**
    * Adds a path with the specified paint.
    * @param path The path shape.
-   * @param paint The paint style for the path.
+   * @param paint The paint that captured this geometry. nullptr records the geometry alone: it
+   * paints nothing, contributes no shared contour, and only the queries that ask for the layer's
+   * geometry see it.
    */
-  void addPath(const Path& path, const LayerPaint& paint);
+  void addPath(const Path& path, const LayerPaint* paint);
 
   /**
    * Adds a shape with the specified paint.
    * @param shape The shape object.
-   * @param paint The paint style for the shape.
+   * @param paint The paint that captured this geometry. nullptr records the geometry alone: it
+   * paints nothing, contributes no shared contour, and only the queries that ask for the layer's
+   * geometry see it.
    */
-  void addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint);
-
-  /**
-   * Adds a shape no paint captured. Such a geometry paints nothing and contributes no shared
-   * contour, but it is still part of the layer's own geometry. It is never batched with a painted
-   * geometry, since the batch would then have to share one paint.
-   * @param shape The shape object.
-   */
-  void addShape(std::shared_ptr<Shape> shape);
+  void addShape(std::shared_ptr<Shape> shape, const LayerPaint* paint);
 
   /**
    * Adds a text blob with the specified paint.
    * @param textBlob The text blob.
-   * @param paint The paint style for the text.
+   * @param paint The paint that captured this geometry. nullptr records the geometry alone: it
+   * paints nothing, contributes no shared contour, and only the queries that ask for the layer's
+   * geometry see it.
    * @param x The x offset of the text blob.
    * @param y The y offset of the text blob.
    */
-  void addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint, float x = 0,
+  void addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint* paint, float x = 0,
                    float y = 0);
 
   /**
    * Adds a mesh with the specified paint.
    * @param mesh The mesh object.
-   * @param paint The paint style for the mesh.
+   * @param paint The paint that captured this geometry. nullptr records the geometry alone: it
+   * paints nothing, contributes no shared contour, and only the queries that ask for the layer's
+   * geometry see it.
    */
-  void addMesh(std::shared_ptr<Mesh> mesh, const LayerPaint& paint);
+  void addMesh(std::shared_ptr<Mesh> mesh, const LayerPaint* paint);
 
   /**
    * Returns the current transformation matrix. If no matrix is set, returns the identity matrix.

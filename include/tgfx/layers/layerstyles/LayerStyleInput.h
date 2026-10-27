@@ -38,7 +38,7 @@ class StyleInputSource {
   enum class Type {
     /** A plain image recording, such as the shared content or the background below the layer. */
     Base,
-    /** The layer's own geometry, recorded on its own, without its descendants. */
+    /** The layer's geometry, recorded on its own, without its descendants. */
     Geometry,
     /** The shared subtree contour, used when the layer records no geometry of its own. */
     Contour
@@ -97,15 +97,15 @@ class StyleInputSource {
 };
 
 /**
- * Input source for the layer's own geometry: the raster and the exact shape read back from the very
+ * Input source for the layer's geometry: the raster and the exact shape read back from the very
  * same recording, so the shape always describes the pixels the style samples.
  */
 class GeometryInputSource : public StyleInputSource {
  public:
   /**
    * Creates a geometry source.
-   * @param image The rasterized own geometry.
-   * @param imageOffset The own geometry raster's top-left corner in layer-local coordinates already
+   * @param image The rasterized geometry.
+   * @param imageOffset The geometry raster's top-left corner in layer-local coordinates already
    *                    multiplied by contentScale. A Geometry source is only ever the primary
    *                    content, never an extra source.
    * @param shape The vector shape of the same recording, or an empty shape when it has none.
@@ -158,7 +158,7 @@ class ContourInputSource : public StyleInputSource {
  */
 struct LayerStyleInput {
   /**
-   * The recording this style resolves: the layer's own geometry for a style declaring
+   * The recording this style resolves: the layer's geometry for a style declaring
    * LayerStyleContentSource::Geometry, the shared contour when such a layer records no geometry,
    * and the shared content for every other style. type() says which one was actually recorded;
    * shape() is set only when that recording has an exact vector expression. nullptr means the

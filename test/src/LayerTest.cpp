@@ -2489,10 +2489,10 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorder) {
   {
     auto surface = Surface::Make(context, 200, 150);
     LayerRecorder recorder = {};
-    recorder.addRect(Rect::MakeXYWH(10, 10, 50, 50), redPaint);
-    recorder.addRect(Rect::MakeXYWH(70, 10, 50, 50), redPaint);
-    recorder.addRect(Rect::MakeXYWH(130, 10, 50, 50), redPaint);
-    recorder.addRect(Rect::MakeXYWH(10, 70, 50, 50), bluePaint);
+    recorder.addRect(Rect::MakeXYWH(10, 10, 50, 50), &redPaint);
+    recorder.addRect(Rect::MakeXYWH(70, 10, 50, 50), &redPaint);
+    recorder.addRect(Rect::MakeXYWH(130, 10, 50, 50), &redPaint);
+    recorder.addRect(Rect::MakeXYWH(10, 70, 50, 50), &bluePaint);
     TGFX_PRIVATE_ACCESS(
         auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
         // Should be ComposeContent with 2 items: RectsContent (3 rects) + RectContent (1 rect)
@@ -2515,10 +2515,10 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorder) {
     auto rRect2 = RRect::MakeRectXY(Rect::MakeXYWH(70, 10, 50, 50), 10, 10);
     auto rRect3 = RRect::MakeRectXY(Rect::MakeXYWH(130, 10, 50, 50), 10, 10);
     auto rRect4 = RRect::MakeRectXY(Rect::MakeXYWH(10, 70, 50, 50), 10, 10);
-    recorder.addRRect(rRect1, redPaint);
-    recorder.addRRect(rRect2, redPaint);
-    recorder.addRRect(rRect3, redPaint);
-    recorder.addRRect(rRect4, bluePaint);
+    recorder.addRRect(rRect1, &redPaint);
+    recorder.addRRect(rRect2, &redPaint);
+    recorder.addRRect(rRect3, &redPaint);
+    recorder.addRRect(rRect4, &bluePaint);
     TGFX_PRIVATE_ACCESS(
         auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
         // Should be ComposeContent with 2 items: RRectsContent (3 rrects) + RRectContent (1 rrect)
@@ -2545,10 +2545,10 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorder) {
     path3.addOval(Rect::MakeXYWH(130, 10, 50, 50));
     Path path4 = {};
     path4.addOval(Rect::MakeXYWH(10, 70, 50, 50));
-    recorder.addPath(path1, redPaint);
-    recorder.addPath(path2, redPaint);
-    recorder.addPath(path3, redPaint);
-    recorder.addPath(path4, bluePaint);
+    recorder.addPath(path1, &redPaint);
+    recorder.addPath(path2, &redPaint);
+    recorder.addPath(path3, &redPaint);
+    recorder.addPath(path4, &bluePaint);
     TGFX_PRIVATE_ACCESS(
         auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
         // Should be ComposeContent with 2 items: RRectsContent (3 red ovals) + RRectContent
@@ -2566,12 +2566,12 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorder) {
   {
     auto surface = Surface::Make(context, 200, 100);
     LayerRecorder recorder = {};
-    recorder.addRect(Rect::MakeXYWH(10, 10, 50, 50), redPaint);
+    recorder.addRect(Rect::MakeXYWH(10, 10, 50, 50), &redPaint);
     auto rRect = RRect::MakeRectXY(Rect::MakeXYWH(70, 10, 50, 50), 10, 10);
-    recorder.addRRect(rRect, redPaint);
+    recorder.addRRect(rRect, &redPaint);
     Path path = {};
     path.addOval(Rect::MakeXYWH(130, 10, 50, 50));
-    recorder.addPath(path, redPaint);
+    recorder.addPath(path, &redPaint);
     TGFX_PRIVATE_ACCESS(
         auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
         // Should be ComposeContent with 2 items: RectContent + RRectsContent (rrect+oval merged)
@@ -2592,7 +2592,7 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorder) {
     ASSERT_TRUE(typeface != nullptr);
     auto font = Font(typeface, 24);
     auto textBlob = TextBlob::MakeFrom("Hello", font);
-    recorder.addTextBlob(textBlob, redPaint, 50, 100);
+    recorder.addTextBlob(textBlob, &redPaint, 50, 100);
     TGFX_PRIVATE_ACCESS(auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
                         // Should be single TextContent
                         EXPECT_EQ(content->type(), LayerContent::Type::Text);
@@ -2609,8 +2609,8 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorder) {
     Path linePath = {};
     linePath.moveTo(10, 10);
     linePath.lineTo(100, 100);
-    recorder.addPath(linePath, redPaint);  // Fill style, should be ignored
-    recorder.addRect(Rect::MakeXYWH(10, 70, 50, 50), bluePaint);
+    recorder.addPath(linePath, &redPaint);  // Fill style, should be ignored
+    recorder.addRect(Rect::MakeXYWH(10, 70, 50, 50), &bluePaint);
     TGFX_PRIVATE_ACCESS(auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
                         // Should be single RectContent (line path ignored)
                         EXPECT_EQ(content->type(), LayerContent::Type::Rect);
@@ -2625,7 +2625,7 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorder) {
     Path linePath = {};
     linePath.moveTo(10, 50);
     linePath.lineTo(190, 50);
-    recorder.addPath(linePath, strokePaint);
+    recorder.addPath(linePath, &strokePaint);
     TGFX_PRIVATE_ACCESS(auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
                         // Should be single RectContent (line converted to rect)
                         EXPECT_EQ(content->type(), LayerContent::Type::Rect);
@@ -2636,7 +2636,7 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorder) {
   // Test 8: Single rect should be RectContent, not RectsContent
   {
     LayerRecorder recorder = {};
-    recorder.addRect(Rect::MakeXYWH(10, 10, 50, 50), redPaint);
+    recorder.addRect(Rect::MakeXYWH(10, 10, 50, 50), &redPaint);
     TGFX_PRIVATE_ACCESS(auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
                         EXPECT_EQ(content->type(), LayerContent::Type::Rect));
   }
@@ -2645,7 +2645,7 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorder) {
   {
     LayerRecorder recorder = {};
     auto rRect = RRect::MakeRectXY(Rect::MakeXYWH(10, 10, 50, 50), 10, 10);
-    recorder.addRRect(rRect, redPaint);
+    recorder.addRRect(rRect, &redPaint);
     TGFX_PRIVATE_ACCESS(auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
                         EXPECT_EQ(content->type(), LayerContent::Type::RRect));
   }
@@ -2654,7 +2654,7 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorder) {
   {
     LayerRecorder recorder = {};
     auto rRect = RRect::MakeRectXY(Rect::MakeXYWH(10, 10, 50, 50), 0, 0);
-    recorder.addRRect(rRect, redPaint);
+    recorder.addRRect(rRect, &redPaint);
     TGFX_PRIVATE_ACCESS(auto content = recorder.finishRecording(); ASSERT_TRUE(content != nullptr);
                         EXPECT_EQ(content->type(), LayerContent::Type::Rect));
   }
@@ -2680,8 +2680,8 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorderMatrix) {
   auto matrix1 = Matrix::MakeRotate(30, 50, 50) * Matrix::MakeScale(1.5f, 0.7f);
   LayerRecorder recorder1 = {};
   recorder1.setMatrix(matrix1);
-  recorder1.addRect(Rect::MakeXYWH(10, 10, 50, 50), redFill);
-  recorder1.addRect(Rect::MakeXYWH(80, 10, 50, 50), redFill);
+  recorder1.addRect(Rect::MakeXYWH(10, 10, 50, 50), &redFill);
+  recorder1.addRect(Rect::MakeXYWH(80, 10, 50, 50), &redFill);
   std::unique_ptr<LayerContent> content1;
   TGFX_PRIVATE_ACCESS(content1 = recorder1.finishRecording();
                       EXPECT_EQ(content1->type(), LayerContent::Type::Matrix);
@@ -2692,9 +2692,9 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorderMatrix) {
   auto matrix2 = Matrix::MakeRotate(60, 50, 50);
   LayerRecorder recorder2 = {};
   recorder2.setMatrix(matrix1);
-  recorder2.addRect(Rect::MakeXYWH(10, 10, 50, 50), blueStroke);
+  recorder2.addRect(Rect::MakeXYWH(10, 10, 50, 50), &blueStroke);
   recorder2.setMatrix(matrix2);
-  recorder2.addRect(Rect::MakeXYWH(80, 10, 50, 50), blueStroke);
+  recorder2.addRect(Rect::MakeXYWH(80, 10, 50, 50), &blueStroke);
   std::unique_ptr<LayerContent> content2;
   TGFX_PRIVATE_ACCESS(content2 = recorder2.finishRecording();
                       EXPECT_EQ(content2->type(), LayerContent::Type::Compose);
@@ -2705,7 +2705,7 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorderMatrix) {
 
   // Test 3: Nullopt matrix should not create MatrixContent
   LayerRecorder recorder3 = {};
-  recorder3.addRect(Rect::MakeXYWH(10, 10, 50, 50), greenFill);
+  recorder3.addRect(Rect::MakeXYWH(10, 10, 50, 50), &greenFill);
   std::unique_ptr<LayerContent> content3;
   TGFX_PRIVATE_ACCESS(content3 = recorder3.finishRecording();
                       EXPECT_EQ(content3->type(), LayerContent::Type::Rect));
@@ -2713,7 +2713,7 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorderMatrix) {
   // Test 4: Identity matrix should not create MatrixContent
   LayerRecorder recorder4 = {};
   recorder4.setMatrix(Matrix::I());
-  recorder4.addRect(Rect::MakeXYWH(10, 10, 50, 50), blueStroke);
+  recorder4.addRect(Rect::MakeXYWH(10, 10, 50, 50), &blueStroke);
   std::unique_ptr<LayerContent> content4;
   TGFX_PRIVATE_ACCESS(content4 = recorder4.finishRecording();
                       EXPECT_EQ(content4->type(), LayerContent::Type::Rect));
@@ -2726,7 +2726,7 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorderMatrix) {
   // Test 6: hitTestPoint with rotated content
   LayerRecorder recorder5 = {};
   recorder5.setMatrix(Matrix::MakeRotate(45, 50, 50));
-  recorder5.addRect(Rect::MakeXYWH(0, 0, 100, 100), greenFill);
+  recorder5.addRect(Rect::MakeXYWH(0, 0, 100, 100), &greenFill);
   std::unique_ptr<LayerContent> content5;
   TGFX_PRIVATE_ACCESS(content5 = recorder5.finishRecording());
   EXPECT_TRUE(content5->hitTestPoint(50, 50, false));
@@ -2760,12 +2760,12 @@ TGFX_TEST_PRIVATE(LayerTest, LayerRecorderMatrix) {
   rectPath.addRect(Rect::MakeWH(50, 50));
   auto scaledShape = Shape::ApplyMatrix(Shape::MakeFrom(rectPath), Matrix::MakeScale(2.0f));
   LayerRecorder recorder6 = {};
-  recorder6.addShape(scaledShape, strokePaint);
+  recorder6.addShape(scaledShape, &strokePaint);
   std::unique_ptr<LayerContent> content6;
   TGFX_PRIVATE_ACCESS(content6 = recorder6.finishRecording());
 
   LayerRecorder recorder7 = {};
-  recorder7.addRect(Rect::MakeWH(100, 100), strokePaint);
+  recorder7.addRect(Rect::MakeWH(100, 100), &strokePaint);
   std::unique_ptr<LayerContent> content7;
   TGFX_PRIVATE_ACCESS(content7 = recorder7.finishRecording());
 
@@ -4095,13 +4095,13 @@ TGFX_TEST_PRIVATE(LayerTest, GlassStyleStrokeContentBounds) {
     vectorLayer->setContents({rectangle, fill, stroke});
     vectorLayer->setLayerStyles({GlassStyle::Make(80, 50, 0, 50, 0, 135, 50)});
     DrawArgs drawArgs(context);
-    // The entry Glass samples is the layer's own geometry: its bucket records no shared content.
+    // The entry Glass samples is the layer's geometry: its bucket records no shared content.
     TGFX_PRIVATE_ACCESS(auto source = vectorLayer->getLayerStyleSource(drawArgs, Matrix::I());
                         ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
-                        ASSERT_TRUE(source->groups[0]->ownGeometry.has_value());
-                        ASSERT_TRUE(source->groups[0]->ownGeometry->image != nullptr);
-                        widths.push_back(source->groups[0]->ownGeometry->image->width());
-                        offsets.push_back(source->groups[0]->ownGeometry->offset.x);)
+                        ASSERT_TRUE(source->groups[0]->geometry.has_value());
+                        ASSERT_TRUE(source->groups[0]->geometry->image != nullptr);
+                        widths.push_back(source->groups[0]->geometry->image->width());
+                        offsets.push_back(source->groups[0]->geometry->offset.x);)
   }
   ASSERT_EQ(widths.size(), 3u);
   EXPECT_EQ(widths[1], 100);
@@ -4206,7 +4206,7 @@ TGFX_TEST(LayerTest, DropShadowSpreadWithoutExactShape) {
   ASSERT_TRUE(outsidePixel.has_value());
   EXPECT_EQ(*outsidePixel, 0u);
 }
-TGFX_TEST_PRIVATE(LayerTest, GlassStyleDeclaresOwnGeometryContentSource) {
+TGFX_TEST_PRIVATE(LayerTest, GlassStyleDeclaresGeometryContentSource) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -4218,7 +4218,7 @@ TGFX_TEST_PRIVATE(LayerTest, GlassStyleDeclaresOwnGeometryContentSource) {
   layer->setLayerStyles({glassStyle});
 
   // Glass declares where its content comes from instead of flagging a source: it draws from the
-  // layer's own geometry and only needs the background on top of that.
+  // layer's geometry and only needs the background on top of that.
   EXPECT_EQ(glassStyle->contentSource(), LayerStyleContentSource::Geometry);
   EXPECT_EQ(glassStyle->extraSourceType(),
             static_cast<uint32_t>(LayerStyleExtraSourceType::Background));
@@ -4226,10 +4226,10 @@ TGFX_TEST_PRIVATE(LayerTest, GlassStyleDeclaresOwnGeometryContentSource) {
   DrawArgs drawArgs(context);
   TGFX_PRIVATE_ACCESS(auto source = layer->getLayerStyleSource(drawArgs, Matrix::I());
                       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
-                      ASSERT_TRUE(source->groups[0]->ownGeometry.has_value());
-                      EXPECT_TRUE(source->groups[0]->ownGeometry->image != nullptr);
-                      EXPECT_TRUE(source->groups[0]->ownShape.has_value())
-                      << "a layered rect has an exact own-geometry shape, so Glass takes the SDF "
+                      ASSERT_TRUE(source->groups[0]->geometry.has_value());
+                      EXPECT_TRUE(source->groups[0]->geometry->image != nullptr);
+                      EXPECT_TRUE(source->groups[0]->geometryShape.has_value())
+                      << "a layered rect has an exact geometry shape, so Glass takes the SDF "
                          "path";
                       EXPECT_FALSE(source->groups[0]->contour.has_value());
                       // Nothing in a Geometry-only bucket reads the shared content, so recording it
@@ -4248,16 +4248,16 @@ TGFX_TEST_PRIVATE(LayerTest, GlassStyleDeclaresOwnGeometryContentSource) {
   TGFX_PRIVATE_ACCESS(auto mixedSource = mixedLayer->getLayerStyleSource(drawArgs, Matrix::I());
                       ASSERT_TRUE(mixedSource != nullptr);
                       ASSERT_TRUE(mixedSource->groups[0] != nullptr);
-                      EXPECT_TRUE(mixedSource->groups[0]->ownGeometry.has_value());
+                      EXPECT_TRUE(mixedSource->groups[0]->geometry.has_value());
                       EXPECT_TRUE(mixedSource->groups[0]->content.image != nullptr)
                       << "a non-Geometry style in the same bucket still needs the shared content";)
 }
 
-// The own-geometry raster and shape of a layer never depend on the excludeChildEffects bucket: the
+// The geometry raster and shape of a layer never depend on the excludeChildEffects bucket: the
 // recording reads the layer's own content, its own paint, the edge-antialiasing flag and the
 // destination color space only. One recording therefore serves both buckets, and the shared image
 // pointer is the observable proof -- recording per bucket again would hand each group its own image.
-TGFX_TEST_PRIVATE(LayerTest, LayerStyleOwnGeometryRecordedOnceForBothBuckets) {
+TGFX_TEST_PRIVATE(LayerTest, LayerStyleGeometryRecordedOnceForBothBuckets) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -4270,7 +4270,7 @@ TGFX_TEST_PRIVATE(LayerTest, LayerStyleOwnGeometryRecordedOnceForBothBuckets) {
   auto group = VectorGroup::Make();
   group->setElements({shape, FillStyle::Make(SolidColor::Make(Color::White()))});
   layer->setContents({group});
-  // Two Geometry-sourced styles landing in the two different buckets, so both buckets need the own
+  // Two Geometry-sourced styles landing in the two different buckets, so both buckets need the
   // geometry and the recording above must serve both.
   auto seesChildren = GlassStyle::Make(0, 50, 100, 0, 0, 0, 0);
   seesChildren->setExcludeChildEffects(false);
@@ -4284,20 +4284,20 @@ TGFX_TEST_PRIVATE(LayerTest, LayerStyleOwnGeometryRecordedOnceForBothBuckets) {
       ASSERT_TRUE(source != nullptr);
       ASSERT_TRUE(source->groups[0] != nullptr) << "the excludeChildEffects=false bucket";
       ASSERT_TRUE(source->groups[1] != nullptr) << "the excludeChildEffects=true bucket";
-      ASSERT_TRUE(source->groups[0]->ownGeometry.has_value());
-      ASSERT_TRUE(source->groups[1]->ownGeometry.has_value());
-      EXPECT_EQ(source->groups[0]->ownGeometry->image, source->groups[1]->ownGeometry->image)
-      << "both buckets must share one own-geometry recording";
-      EXPECT_EQ(source->groups[0]->ownGeometry->offset, source->groups[1]->ownGeometry->offset);
-      EXPECT_TRUE(source->groups[0]->ownShape.has_value());
-      EXPECT_TRUE(source->groups[1]->ownShape.has_value());)
+      ASSERT_TRUE(source->groups[0]->geometry.has_value());
+      ASSERT_TRUE(source->groups[1]->geometry.has_value());
+      EXPECT_EQ(source->groups[0]->geometry->image, source->groups[1]->geometry->image)
+      << "both buckets must share one geometry recording";
+      EXPECT_EQ(source->groups[0]->geometry->offset, source->groups[1]->geometry->offset);
+      EXPECT_TRUE(source->groups[0]->geometryShape.has_value());
+      EXPECT_TRUE(source->groups[1]->geometryShape.has_value());)
 }
 
 // The contrast that keeps the hoisting honest: a layer whose geometry lives in its children records
-// no own geometry, and the lazy contour fallback that answers for it does read
+// no geometry, and the lazy contour fallback that answers for it does read
 // drawArgs.excludeEffects. That fallback must therefore stay per bucket, so the two groups hold two
 // distinct images and hoisting it too would silently collapse them into one.
-TGFX_TEST_PRIVATE(LayerTest, LayerStyleOwnGeometryFallbackStaysPerBucket) {
+TGFX_TEST_PRIVATE(LayerTest, LayerStyleGeometryFallbackStaysPerBucket) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -4324,22 +4324,22 @@ TGFX_TEST_PRIVATE(LayerTest, LayerStyleOwnGeometryFallbackStaysPerBucket) {
       auto source = parent->getLayerStyleSource(drawArgs, Matrix::I());
       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
       ASSERT_TRUE(source->groups[1] != nullptr);
-      EXPECT_FALSE(source->groups[0]->ownGeometry.has_value())
-      << "a layer painting nothing must not record own geometry, otherwise the fallback below is "
+      EXPECT_FALSE(source->groups[0]->geometry.has_value())
+      << "a layer painting nothing must not record geometry, otherwise the fallback below is "
          "never reached";
-      EXPECT_FALSE(source->groups[1]->ownGeometry.has_value());
+      EXPECT_FALSE(source->groups[1]->geometry.has_value());
       ASSERT_TRUE(source->groups[0]->contour.has_value());
       ASSERT_TRUE(source->groups[1]->contour.has_value());
       ASSERT_TRUE(source->groups[0]->contour->image != nullptr);
       ASSERT_TRUE(source->groups[1]->contour->image != nullptr);
       EXPECT_NE(source->groups[0]->contour->image.get(), source->groups[1]->contour->image.get())
       << "the lazy fallback reads excludeChildEffects, so it must stay recorded per bucket; one "
-         "shared image here means the fallback was hoisted along with the own geometry";)
+         "shared image here means the fallback was hoisted along with the geometry";)
 }
 
-// ===== The layer's own geometry: coverage asserted on rendered pixels =====
+// ===== The layer's geometry: coverage asserted on rendered pixels =====
 //
-// A Glass style takes its coverage shape from the layer's own geometry, so the cases below are
+// A Glass style takes its coverage shape from the layer's geometry, so the cases below are
 // written the way the rest of this file is: set an input, render the layer tree over a checker
 // backdrop and assert on the rendered pixels. Baseline::Compare is deliberately not used, because no
 // stored reference images exist for these cases and adding one would require a baseline version
@@ -4347,7 +4347,7 @@ TGFX_TEST_PRIVATE(LayerTest, LayerStyleOwnGeometryFallbackStaysPerBucket) {
 // failure, and every such assertion says why it is there.
 
 // A fill painter that paints nothing while still capturing its geometry: style alpha 0 over a color
-// alpha of 1. The contour keeps it, so the geometry still belongs to the layer's own geometry.
+// alpha of 1. The contour keeps it, so the geometry still belongs to the layer's geometry.
 static std::shared_ptr<FillStyle> MakeZeroAlphaFill() {
   auto fill = FillStyle::Make(SolidColor::Make(Color::White()));
   fill->setAlpha(0.0f);
@@ -4441,7 +4441,7 @@ static Rect GlassPanelLocalBounds() {
 // ===== Shared region fixtures =====
 
 // Which painter a region carries over its geometry.
-//   None        - no painter at all: the geometry joins the layer's own geometry as bare geometry
+//   None        - no painter at all: the geometry joins the layer's geometry as bare geometry
 //                 and contributes nothing to the shared content or contour.
 //   Transparent - a retained 0%-alpha fill: geometry only, but it stays in the shared contour.
 //   TransparentColor - a fully transparent solid color (alpha 0 in the color source), which the
@@ -4657,14 +4657,13 @@ static std::shared_ptr<ShapePath> MakeRectShapePath(const Rect& rect, float radi
 }
 
 // Which fill painter a panel carries next to its stroke: none, or a retained fully transparent fill.
-enum class OwnGeometryFillKind { None, Transparent };
+enum class GeometryFillKind { None, Transparent };
 
 // One rounded rectangle with an optional fill painter and one stroke painter of the given alignment.
 // fillKind selects the painter recorded next to the stroke. styles are attached to the layer: with a
-// Glass style the layer records its own geometry, without one it renders as the glass-off reference.
-static std::shared_ptr<Layer> MakeOwnGeometryStrokePanel(
-    const Rect& rect, float radius, float strokeWidth, StrokeAlign align,
-    OwnGeometryFillKind fillKind,
+// Glass style the layer records its geometry, without one it renders as the glass-off reference.
+static std::shared_ptr<Layer> MakeGeometryStrokePanel(
+    const Rect& rect, float radius, float strokeWidth, StrokeAlign align, GeometryFillKind fillKind,
     const std::vector<std::shared_ptr<LayerStyle>>& styles = {
         GlassStyle::Make(0, 50, 100, 0, 0, 0, 0)}) {
   auto layer = VectorLayer::Make();
@@ -4677,7 +4676,7 @@ static std::shared_ptr<Layer> MakeOwnGeometryStrokePanel(
   stroke->setStrokeWidth(strokeWidth);
   stroke->setStrokeAlign(align);
   std::vector<std::shared_ptr<VectorElement>> elements = {shape};
-  if (fillKind == OwnGeometryFillKind::Transparent) {
+  if (fillKind == GeometryFillKind::Transparent) {
     elements.push_back(MakeZeroAlphaFill());
   }
   elements.push_back(stroke);
@@ -4722,10 +4721,10 @@ static std::shared_ptr<Layer> MakeTwoGroupFillStrokePanel(
   return layer;
 }
 
-// Glass is built here with excludeChildEffects set, so the style sits in groups[1]. The own-geometry
+// Glass is built here with excludeChildEffects set, so the style sits in groups[1]. The geometry
 // recording itself is layer-wide and shared by both buckets.
-static std::shared_ptr<GlassStyle> MakeOwnGeometryGlass(float refraction, float depth, float frost,
-                                                        float dispersion, float splay) {
+static std::shared_ptr<GlassStyle> MakeGeometryGlass(float refraction, float depth, float frost,
+                                                     float dispersion, float splay) {
   auto glass = GlassStyle::Make(refraction, depth, frost, dispersion, splay, 0, 0);
   glass->setExcludeChildEffects(true);
   return glass;
@@ -4787,8 +4786,8 @@ static std::shared_ptr<Layer> MakeGlassChildPanel(GlassChildFillKind fillKind, c
 }
 
 // A layer whose only content is a geometry no painter captures records no visible content, yet its
-// own geometry drives Glass: the coverage follows the geometry and nothing paints. This absorbs the
-// geometry-only case and a two-region own geometry with a hole.
+// geometry drives Glass: the coverage follows the geometry and nothing paints. This absorbs the
+// geometry-only case and a two-region geometry with a hole.
 TGFX_TEST_PRIVATE(LayerTest, GlassGeometryGivesCoverageWithoutAnyFill) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -4834,10 +4833,10 @@ TGFX_TEST_PRIVATE(LayerTest, GlassGeometryGivesCoverageWithoutAnyFill) {
       ASSERT_TRUE(markedSource != nullptr); ASSERT_TRUE(markedSource->groups[0] != nullptr);
       EXPECT_TRUE(markedSource->groups[0]->content.image == nullptr)
       << "bare geometry must not be recorded in the shared content image";
-      ASSERT_TRUE(markedSource->groups[0]->ownGeometry.has_value());
-      EXPECT_TRUE(markedSource->groups[0]->ownGeometry->image != nullptr);
-      EXPECT_TRUE(markedSource->groups[0]->ownShape.has_value())
-      << "a single bare geometry is the whole own geometry, so Glass gets an exact shape";)
+      ASSERT_TRUE(markedSource->groups[0]->geometry.has_value());
+      EXPECT_TRUE(markedSource->groups[0]->geometry->image != nullptr);
+      EXPECT_TRUE(markedSource->groups[0]->geometryShape.has_value())
+      << "a single bare geometry is the whole geometry, so Glass gets an exact shape";)
 
   // Donut arm: a second region with a hole. The coverage follows the union of the two regions, so it
   // frosts both regions and leaves the hole untouched.
@@ -4864,21 +4863,21 @@ TGFX_TEST_PRIVATE(LayerTest, GlassGeometryGivesCoverageWithoutAnyFill) {
   worldA.inset(5.0f, 5.0f);
   const auto areaA = static_cast<int>(worldA.width() * worldA.height());
   EXPECT_GT(CountDifferingPixels(donutPlain.get(), donutGlass.get(), worldA, 16), areaA / 5)
-      << "donut first-region ROI: the multi-region own geometry must cover the first region";
+      << "donut first-region ROI: the multi-region geometry must cover the first region";
   auto worldBandB = Rect::MakeLTRB(
       GlassPanelLeft + regionBBounds.left + 2.0f, GlassPanelTop + regionBBounds.top + 5.0f,
       GlassPanelLeft + holeBounds.left - 2.0f, GlassPanelTop + regionBBounds.bottom - 5.0f);
   const auto areaBandB = static_cast<int>(worldBandB.width() * worldBandB.height());
   EXPECT_GT(CountDifferingPixels(donutPlain.get(), donutGlass.get(), worldBandB, 16), areaBandB / 5)
-      << "donut second-region band ROI: every region of the own geometry must be covered";
+      << "donut second-region band ROI: every region of the geometry must be covered";
   auto worldHole = holeBounds;
   worldHole.offset(GlassPanelLeft, GlassPanelTop);
   worldHole.inset(3.0f, 3.0f);
   EXPECT_EQ(CountDifferingPixels(donutPlain.get(), donutGlass.get(), worldHole, 2), 0)
-      << "donut hole ROI: the hole in the own geometry must stay untouched";
+      << "donut hole ROI: the hole in the geometry must stay untouched";
 }
 
-// The bare geometry belongs to the layer's own geometry alone. Four rendered observables pin that on
+// The bare geometry belongs to the layer's geometry alone. Four rendered observables pin that on
 // the recordings a content-based style consumes: a sibling spread shadow renders identically with and
 // without the bare geometry (in either recording order, and for a region disjoint from the visible
 // fill), the shadow follows the outside stroke band rather than the shape interior, and a real
@@ -4897,7 +4896,7 @@ TGFX_TEST_PRIVATE(LayerTest, GlassGeometryDoesNotLeakIntoSharedRecordings) {
   RegionSpec overlayGeometry = panel;
   overlayGeometry.fill = RegionFillKind::None;
 
-  // The bare geometry overlays the panel's own geometry, so the shadow's source shape and bounds are
+  // The bare geometry overlays the panel's geometry, so the shadow's source shape and bounds are
   // the panel's whether or not the geometry is recorded; a leak would still move the shadow through
   // the grouping of the shared contour.
   auto makeShadowPanel = [&](bool withGeometry, bool geometryFirst) {
@@ -5038,7 +5037,7 @@ TGFX_TEST_PRIVATE(LayerTest, GlassGeometryDoesNotLeakIntoSharedRecordings) {
 }
 
 // A visible outside stroke is the shape the shared content and contour contain, so a Glass driven by
-// them would cover the stroke ring alone. The own geometry is the union of the 0%-alpha fill's
+// them would cover the stroke ring alone. The geometry is the union of the 0%-alpha fill's
 // geometry and the stroke, which is what makes the Glass cover the whole shape.
 TGFX_TEST_PRIVATE(LayerTest, GlassGeometryKeepsInteriorCoverageWithAStroke) {
   ContextScope scope;
@@ -5050,7 +5049,7 @@ TGFX_TEST_PRIVATE(LayerTest, GlassGeometryKeepsInteriorCoverageWithAStroke) {
   RegionSpec withStroke = {};
   withStroke.bounds = GlassPanelLocalBounds();
   // A retained 0%-alpha fill: the stroke already captures the geometry, so here only a painter
-  // keeps the interior in the own geometry.
+  // keeps the interior in the geometry.
   withStroke.fill = RegionFillKind::Transparent;
   withStroke.strokeWidth = strokeWidth;
   withStroke.strokeAlign = StrokeAlign::Outside;
@@ -5074,7 +5073,7 @@ TGFX_TEST_PRIVATE(LayerTest, GlassGeometryKeepsInteriorCoverageWithAStroke) {
       << "deep-interior ROI (0% fill + outside stroke): the Glass must cover the shape inside the "
          "stroke, not only the stroke ring, frosted "
       << frostedDeep << " of " << deepArea;
-  // The coverage ends at the own geometry: a ring-only coverage would spill the effect outside the
+  // The coverage ends at the geometry: a ring-only coverage would spill the effect outside the
   // stroke, where the filled shape has nothing.
   EXPECT_EQ(CountDifferingPixels(control.get(), glassPanel.get(),
                                  Rect::MakeXYWH(GlassPanelLeft - 19.0f, GlassPanelTop - 19.0f,
@@ -5082,12 +5081,12 @@ TGFX_TEST_PRIVATE(LayerTest, GlassGeometryKeepsInteriorCoverageWithAStroke) {
                                  2),
             0)
       << "left-of-panel ROI: the Glass must not cover anything outside the shape and its stroke";
-  // The own geometry is the geometric union of the fill geometry and the outside stroke, so the
+  // The geometry is the geometric union of the fill geometry and the outside stroke, so the
   // shape is a fill-plus-stroke. A wrong classification as a plain fill would make Glass take the
   // analytic SDF of the base path alone, leaving the band outside that path uncovered: bandRoi sits
   // entirely inside the band, whose outer edge is strokeWidth above the panel top.
   EXPECT_GT(CountDifferingPixels(control.get(), glassPanel.get(), bandRoi, 2), 0)
-      << "stroke-band ROI (0% fill + outside stroke): a wrong own-geometry shape classification "
+      << "stroke-band ROI (0% fill + outside stroke): a wrong geometry shape classification "
          "would "
          "leave the band outside the base path uncovered";
 
@@ -5097,7 +5096,7 @@ TGFX_TEST_PRIVATE(LayerTest, GlassGeometryKeepsInteriorCoverageWithAStroke) {
   auto bandGlass = RenderPanelOverChecker(context, MakePanel({strokeOnly}, {glass}));
   ASSERT_TRUE(bandControl != nullptr && bandGlass != nullptr);
   EXPECT_EQ(CountDifferingPixels(bandControl.get(), bandGlass.get(), deepInterior, 16), 0)
-      << "deep-interior ROI (fill removed): the own geometry is the band alone and must not reach "
+      << "deep-interior ROI (fill removed): the geometry is the band alone and must not reach "
          "into the shape";
   EXPECT_GT(CountDifferingPixels(bandControl.get(), bandGlass.get(), bandRoi, 16), 0)
       << "stroke-band ROI (fill removed): the band must still be covered, otherwise the interior "
@@ -5137,13 +5136,13 @@ static SplitSquarePaths MakeSplitSquarePaths(float size) {
   return paths;
 }
 
-// The own geometry rasterizes an opaque, hard-edged coverage: the opaque brush disables
+// The geometry rasterizes an opaque, hard-edged coverage: the opaque brush disables
 // anti-aliasing, so a painter's boundary pixel is fully covered or not covered at all, and
 // abutting painters tile the plane exactly. A rendered comparison can therefore see the coverage's
 // REACH -- every interior pixel has to change and nothing outside the outline may -- and the
 // shared-boundary arm pins that two geometries describing one square render like the single square,
 // through both recording channels (see the shared-boundary case below for why each one is run).
-TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoversItsPainters) {
+TGFX_TEST_PRIVATE(LayerTest, GeometryCoversItsPainters) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -5164,9 +5163,9 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoversItsPainters) {
       {2.0f, 8.0f, StrokeAlign::Outside},  {24.0f, 8.0f, StrokeAlign::Center},
       {24.0f, 8.0f, StrokeAlign::Inside},  {6.0f, 1.0f, StrokeAlign::Center},
   };
-  // A retained 0%-alpha fill keeps the geometry of the shape inside the stroke band in the own
+  // A retained 0%-alpha fill keeps the geometry of the shape inside the stroke band in the
   // geometry; without one the stroke painter is the only outline and the interior is uncovered.
-  const auto fillKind = OwnGeometryFillKind::Transparent;
+  const auto fillKind = GeometryFillKind::Transparent;
 
   // The rendered coverage reaches the whole interior and stops at the outer boundary.
   for (const auto& probe : probes) {
@@ -5179,17 +5178,17 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoversItsPainters) {
         static_cast<int>(interiorRoi.width()) * static_cast<int>(interiorRoi.height());
     const auto glass = GlassStyle::Make(0, 50, 100, 0, 0, 0, 0);
     auto plain = RenderPanelOverChecker(
-        context, MakeOwnGeometryStrokePanel(rect, probe.radius, probe.strokeWidth, probe.align,
-                                            fillKind, {}));
+        context,
+        MakeGeometryStrokePanel(rect, probe.radius, probe.strokeWidth, probe.align, fillKind, {}));
     auto styled = RenderPanelOverChecker(
-        context, MakeOwnGeometryStrokePanel(rect, probe.radius, probe.strokeWidth, probe.align,
-                                            fillKind, {glass}));
+        context, MakeGeometryStrokePanel(rect, probe.radius, probe.strokeWidth, probe.align,
+                                         fillKind, {glass}));
     ASSERT_TRUE(plain != nullptr && styled != nullptr);
     const auto interiorDiff = CountDifferingPixels(plain.get(), styled.get(), interiorRoi, 16);
     EXPECT_EQ(interiorDiff, interiorArea)
         << "interior ROI, r=" << probe.radius << " w=" << probe.strokeWidth
         << " align=" << static_cast<int>(probe.align)
-        << ": every interior pixel must change, so the own geometry covers the whole interior: "
+        << ": every interior pixel must change, so the geometry covers the whole interior: "
         << interiorDiff << " of " << interiorArea << " pixels changed";
     EXPECT_EQ(CountDifferingPixels(plain.get(), styled.get(), outsideRoi, 2), 0)
         << "outside ROI, r=" << probe.radius << " w=" << probe.strokeWidth
@@ -5198,7 +5197,7 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoversItsPainters) {
   }
 
   // Two geometries that share a boundary. Two triangles meet on the diagonal y = x, so together they
-  // describe the same square as the single geometry below. Because the own geometry recording is
+  // describe the same square as the single geometry below. Because the geometry recording is
   // hard-edged, each boundary pixel belongs to one triangle, and the two-geometry outline must
   // render like the single square. Both recording channels run the same comparison: bare geometry,
   // and a retained 0%-alpha painter that captures the geometry -- the channel whose two abutting
@@ -5235,7 +5234,7 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoversItsPainters) {
   }
 }
 
-// A style only covers what its own geometry holds, so the two-group fill/stroke assembly has to
+// A style only covers what its geometry holds, so the two-group fill/stroke assembly has to
 // keep the fill geometry. The arms are the refractive parameter set (100/100/14/100) on
 // a rounded rectangle, the frost-only path at both frost values, and an ellipse, plus a two-region
 // panel whose second region carries a 0%-alpha fill. Every arm pairs its assertion with a band-only
@@ -5275,8 +5274,7 @@ TGFX_TEST_PRIVATE(LayerTest, TwoGroupAssemblyKeepsInteriorCoverage) {
   };
 
   for (const auto& arm : arms) {
-    auto glass =
-        MakeOwnGeometryGlass(arm.refraction, arm.depth, arm.frost, arm.dispersion, arm.splay);
+    auto glass = MakeGeometryGlass(arm.refraction, arm.depth, arm.frost, arm.dispersion, arm.splay);
     auto makePanel = [&](bool withFillGroup, const std::shared_ptr<GlassStyle>& style) {
       if (arm.ellipse) {
         auto makeEllipse = [&]() {
@@ -5323,9 +5321,9 @@ TGFX_TEST_PRIVATE(LayerTest, TwoGroupAssemblyKeepsInteriorCoverage) {
   }
 
   // Two-region panel: the 0% region has to keep its interior coverage when a second, filled region is
-  // recorded in the same own geometry, and dropping the 0% group has to leave the region uncovered.
+  // recorded in the same geometry, and dropping the 0% group has to leave the region uncovered.
   const auto secondRect = Rect::MakeXYWH(10.0f, 10.0f, 40.0f, 40.0f);
-  auto multiRegionGlass = MakeOwnGeometryGlass(100, 100, 14, 100, 0);
+  auto multiRegionGlass = MakeGeometryGlass(100, 100, 14, 100, 0);
   auto makeMultiRegion = [&](bool withZeroAlphaFill, bool withGlass) {
     std::vector<std::shared_ptr<VectorElement>> contents = {};
     if (withZeroAlphaFill) {
@@ -5386,7 +5384,7 @@ TGFX_TEST_PRIVATE(LayerTest, UnusableBucketOnlyDropsItself) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  // --- With Glass: the spread DropShadow is in groups[1] and records nothing; own geometry is
+  // --- With Glass: the spread DropShadow is in groups[1] and records nothing; geometry is
   // recorded for the whole layer, so the Glass in groups[0] still drives coverage.
   RegionSpec bareGeometry = {};
   bareGeometry.bounds = GlassPanelLocalBounds();
@@ -5447,10 +5445,10 @@ TGFX_TEST_PRIVATE(LayerTest, UnusableBucketOnlyDropsItself) {
          "tree must differ from the pristine one";
 }
 
-// A parent whose geometry lives in child layers records no own geometry, so Glass falls back to the
+// A parent whose geometry lives in child layers records no geometry, so Glass falls back to the
 // lazily recorded shared subtree contour. That fallback keeps a child's retained 0%-alpha fill, which
 // survives only in the contour.
-TGFX_TEST_PRIVATE(LayerTest, GlassWithoutOwnGeometryResolvesToSharedContour) {
+TGFX_TEST_PRIVATE(LayerTest, GlassWithoutGeometryResolvesToSharedContour) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -5468,7 +5466,7 @@ TGFX_TEST_PRIVATE(LayerTest, GlassWithoutOwnGeometryResolvesToSharedContour) {
                                       holeRect.right - 2.0f, holeRect.bottom - 2.0f);
   const auto annulusTopRoi = Rect::MakeLTRB(baseRect.left + 2.0f, baseRect.top + 2.0f,
                                             baseRect.right - 2.0f, holeRect.top - 2.0f);
-  const auto glass = MakeOwnGeometryGlass(0, 50, 100, 0, 0);
+  const auto glass = MakeGeometryGlass(0, 50, 100, 0, 0);
 
   auto renderDiff = [&](GlassChildFillKind fillKind, const Rect& roi, int tolerance) {
     auto styled = RenderPanelOverChecker(
@@ -5524,15 +5522,15 @@ TGFX_TEST_PRIVATE(LayerTest, GlassWithoutOwnGeometryResolvesToSharedContour) {
       auto source = panel->getLayerStyleSource(drawArgs, Matrix::I());
       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[1] != nullptr);
       const auto& group = *source->groups[1];
-      // A group with only children must not record own geometry: that is what triggers the lazy
+      // A group with only children must not record geometry: that is what triggers the lazy
       // fallback.
-      EXPECT_FALSE(group.ownGeometry.has_value())
-      << "a group with only children must not record own geometry";
+      EXPECT_FALSE(group.geometry.has_value())
+      << "a group with only children must not record geometry";
       ASSERT_TRUE(group.contour.has_value()); ASSERT_TRUE(group.contour->image != nullptr);
       ASSERT_TRUE(group.content.image != nullptr)
       << "control: the non-Geometry style in this bucket records the shared content";
       EXPECT_EQ(ResolveContentSource(group, glass.get()), group.contourFallbackSource)
-      << "Glass must resolve to the shared contour when no own geometry exists";)
+      << "Glass must resolve to the shared contour when no geometry exists";)
 }
 
 // The merged-mask contract: a fill area and its outside stroke band are merged into a single shape
@@ -5737,7 +5735,7 @@ TGFX_TEST(LayerTest, GlassCoverageKeepsTransparentColorRegion) {
   auto glassPanel =
       RenderPanelOverChecker(context, MakePanel({bareGeometry, transparent}, {glass}));
   ASSERT_TRUE(plain != nullptr && glassPanel != nullptr);
-  // The own geometry keeps every painter of the layer, so a transparent solid color sitting next to
+  // The geometry keeps every painter of the layer, so a transparent solid color sitting next to
   // bare geometry still gets its region covered.
   auto roiA = regionABounds;
   roiA.offset(GlassPanelLeft, GlassPanelTop);
@@ -6674,17 +6672,17 @@ TGFX_TEST(LayerTest, GlassStyleWithDropShadow) {
 // ===== A Glass on a parent whose geometry lives in child layers =====
 //
 // A parent layer carrying the Glass style whose geometry lives in child layers owns no painter at
-// all, so it records no own geometry and Glass falls back to the shared subtree contour, which is
+// all, so it records no geometry and Glass falls back to the shared subtree contour, which is
 // recording that keeps a 0%-alpha fill (see ResolveContentSource in LayerStyleSource.h). These cases
 // pin the final RENDERED pixels over a checker backdrop under the frost-only and the refractive
 // parameter sets.
 
-// Full-parameter counterpart of MakeOwnGeometryGlass for the light-carrying arms: the light angle and
-// intensity survive, where MakeOwnGeometryGlass drops them to 0.
-static std::shared_ptr<GlassStyle> MakeOwnGeometryGlassWithLight(float refraction, float depth,
-                                                                 float frost, float dispersion,
-                                                                 float splay, float lightAngle,
-                                                                 float lightIntensity) {
+// Full-parameter counterpart of MakeGeometryGlass for the light-carrying arms: the light angle and
+// intensity survive, where MakeGeometryGlass drops them to 0.
+static std::shared_ptr<GlassStyle> MakeGeometryGlassWithLight(float refraction, float depth,
+                                                              float frost, float dispersion,
+                                                              float splay, float lightAngle,
+                                                              float lightIntensity) {
   auto glass =
       GlassStyle::Make(refraction, depth, frost, dispersion, splay, lightAngle, lightIntensity);
   glass->setExcludeChildEffects(true);
@@ -6750,8 +6748,8 @@ TGFX_TEST_PRIVATE(LayerTest, GlassParentChildRenderedCoverage) {
   };
 
   for (const auto& arm : arms) {
-    auto glass = MakeOwnGeometryGlassWithLight(arm.refraction, arm.depth, arm.frost, arm.dispersion,
-                                               arm.splay, arm.lightAngle, arm.lightIntensity);
+    auto glass = MakeGeometryGlassWithLight(arm.refraction, arm.depth, arm.frost, arm.dispersion,
+                                            arm.splay, arm.lightAngle, arm.lightIntensity);
     // Core end-to-end proof: with the retained 0% fill the base interior has to light up.
     const auto interiorWithFill = renderDiff(glass, GlassChildFillKind::Full, baseInteriorRoi, 16);
     ASSERT_GE(interiorWithFill, 0) << "interior ROI render failed, " << arm.label;
@@ -6886,7 +6884,7 @@ TGFX_TEST_PRIVATE(LayerTest, CollapsedFillGeometryLeavesBandOnly) {
   };
 
   for (const auto& probe : probes) {
-    const auto glass = MakeOwnGeometryGlass(100, 100, 14, 100, 0);
+    const auto glass = MakeGeometryGlass(100, 100, 14, 100, 0);
     auto styled = RenderPanelOverChecker(
         context, MakeFrameSizeGlassPanel(probe.fillExtent, probe.strokeExtent, probe.shareElement,
                                          rect, strokeWidth, glass));
@@ -6915,15 +6913,15 @@ TGFX_TEST_PRIVATE(LayerTest, CollapsedFillGeometryLeavesBandOnly) {
   }
 }
 
-// ===== The own geometry: bare geometry versus a capturing painter =====
+// ===== The geometry: bare geometry versus a capturing painter =====
 
-// Size of the probe surface RasterizeOwnGeometryAlpha reads the own geometry onto.
-static constexpr int OwnGeometryProbeSize = 200;
+// Size of the probe surface RasterizeGeometryAlpha reads the geometry onto.
+static constexpr int GeometryProbeSize = 200;
 
-// Reads the own-geometry coverage of `panel` onto a fixed probe surface, in layer-local coordinates,
-// and returns its alpha raster. Returns an empty raster when the layer records no own geometry.
-static std::vector<int> RasterizeOwnGeometryAlpha(Context* context,
-                                                  const std::shared_ptr<Layer>& panel) {
+// Reads the geometry coverage of `panel` onto a fixed probe surface, in layer-local coordinates,
+// and returns its alpha raster. Returns an empty raster when the layer records no geometry.
+static std::vector<int> RasterizeGeometryAlpha(Context* context,
+                                               const std::shared_ptr<Layer>& panel) {
   std::vector<int> raster = {};
   if (panel == nullptr) {
     return raster;
@@ -6935,25 +6933,24 @@ static std::vector<int> RasterizeOwnGeometryAlpha(Context* context,
       auto source = panel->getLayerStyleSource(drawArgs, Matrix::I());
       if (source == nullptr) { return raster; } for (auto& group
                                                      : source->groups) {
-        if (group != nullptr && group->ownGeometry.has_value() &&
-            group->ownGeometry->image != nullptr) {
-          image = group->ownGeometry->image;
-          offset = group->ownGeometry->offset;
+        if (group != nullptr && group->geometry.has_value() && group->geometry->image != nullptr) {
+          image = group->geometry->image;
+          offset = group->geometry->offset;
         }
       })
   if (image == nullptr) {
     return raster;
   }
-  auto surface = Surface::Make(context, OwnGeometryProbeSize, OwnGeometryProbeSize);
+  auto surface = Surface::Make(context, GeometryProbeSize, GeometryProbeSize);
   if (surface == nullptr) {
     return raster;
   }
   // The image is cropped to the outline's rounded-out bounds, so its recorded offset puts the
   // raster back into layer-local coordinates.
   surface->getCanvas()->drawImage(image, offset.x, offset.y);
-  auto info = ImageInfo::Make(OwnGeometryProbeSize, OwnGeometryProbeSize, ColorType::RGBA_8888,
+  auto info = ImageInfo::Make(GeometryProbeSize, GeometryProbeSize, ColorType::RGBA_8888,
                               AlphaType::Premultiplied);
-  std::vector<uint32_t> pixels(static_cast<size_t>(OwnGeometryProbeSize) * OwnGeometryProbeSize);
+  std::vector<uint32_t> pixels(static_cast<size_t>(GeometryProbeSize) * GeometryProbeSize);
   if (!surface->readPixels(info, pixels.data())) {
     return raster;
   }
@@ -6997,25 +6994,25 @@ static int CountUnpaintedEntries(const std::shared_ptr<Layer>& layer) {
 
 // Size of each quadrant in the shared-corner case below.
 static constexpr float CornerQuadrantSize = 32.0f;
-// The own geometry records hard coverage in the cases a per-painter rule could get wrong: two
+// The geometry records hard coverage in the cases a per-painter rule could get wrong: two
 // geometries describing one square (bare geometry or a 0%-alpha painter), an image-shaded painter,
 // and four geometries meeting at one corner.
-TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoverageContract) {
+TGFX_TEST_PRIVATE(LayerTest, GeometryCoverageContract) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto glass = MakeOwnGeometryGlass(0, 50, 100, 0, 0);
+  auto glass = MakeGeometryGlass(0, 50, 100, 0, 0);
 
   // Two triangles describing one square must record what the single square records, in both
-  // recording channels (see OwnGeometryCoversItsPainters for the 0.75 seam they guard against).
+  // recording channels (see GeometryCoversItsPainters for the 0.75 seam they guard against).
   constexpr float panelSize = 64.0f;
   const auto paths = MakeSplitSquarePaths(panelSize);
   for (auto fillKind : {RegionFillKind::None, RegionFillKind::Transparent}) {
     auto twoGeometries =
-        RasterizeOwnGeometryAlpha(context, MakePanel({MakePathRegion(paths.upperRight, fillKind),
-                                                      MakePathRegion(paths.lowerLeft, fillKind)},
-                                                     {glass}));
-    auto oneGeometry = RasterizeOwnGeometryAlpha(
+        RasterizeGeometryAlpha(context, MakePanel({MakePathRegion(paths.upperRight, fillKind),
+                                                   MakePathRegion(paths.lowerLeft, fillKind)},
+                                                  {glass}));
+    auto oneGeometry = RasterizeGeometryAlpha(
         context, MakePanel({MakePathRegion(paths.square, fillKind)}, {glass}));
     ASSERT_FALSE(twoGeometries.empty());
     ASSERT_EQ(twoGeometries.size(), oneGeometry.size());
@@ -7045,7 +7042,7 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoverageContract) {
   auto imageLayer = VectorLayer::Make();
   imageLayer->setContents({imageGroup});
   imageLayer->setLayerStyles({glass});
-  auto imageAlpha = RasterizeOwnGeometryAlpha(context, imageLayer);
+  auto imageAlpha = RasterizeGeometryAlpha(context, imageLayer);
   ASSERT_FALSE(imageAlpha.empty());
   for (auto value : imageAlpha) {
     ASSERT_TRUE(value == 0 || value == 255) << "an image painter must record hard coverage";
@@ -7065,7 +7062,7 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoverageContract) {
                    makeQuadrant(0.5f, 0.5f + CornerQuadrantSize),
                    makeQuadrant(0.5f + CornerQuadrantSize, 0.5f + CornerQuadrantSize)},
                   {glass});
-    auto cornerAlpha = RasterizeOwnGeometryAlpha(context, cornerPanel);
+    auto cornerAlpha = RasterizeGeometryAlpha(context, cornerPanel);
     ASSERT_FALSE(cornerAlpha.empty());
     EXPECT_EQ(cornerAlpha[32 * 200 + 32], 255)
         << "fill=" << static_cast<int>(fillKind)
@@ -7075,12 +7072,12 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoverageContract) {
   }
 }
 
-// A bare geometry and the same geometry captured by a 0%-alpha painter both end up in the own-geometry
-// recording; the painter additionally reaches the shared contour. The own geometry is an opaque,
+// A bare geometry and the same geometry captured by a 0%-alpha painter both end up in the geometry
+// recording; the painter additionally reaches the shared contour. The geometry is an opaque,
 // hard-edged coverage either way, so both must cover exactly the same pixels, boundary included, on
 // the raster and on rendered pixels. A DISJOINT second painter is the
 // non-vacuity control, so the equality cannot pass on the painter simply being dropped.
-TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoincidentPaintersDoNotGrowTheCoveredArea) {
+TGFX_TEST_PRIVATE(LayerTest, GeometryCoincidentPaintersDoNotGrowTheCoveredArea) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -7097,7 +7094,7 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoincidentPaintersDoNotGrowTheCoveredAre
     auto bareShape = Rectangle::Make();
     bareShape->setPosition({bareRect.centerX(), bareRect.centerY()});
     bareShape->setSize({bareRect.width(), bareRect.height()});
-    // Bare geometry: no painter captures it, so only the own-geometry channel records it.
+    // Bare geometry: no painter captures it, so only the geometry channel records it.
     std::vector<std::shared_ptr<VectorElement>> elements = {bareShape};
     if (withUserFill && coincidentFill) {
       // A retained 0%-alpha fill on the SAME geometry element: style alpha 0 over a color alpha of
@@ -7111,7 +7108,7 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoincidentPaintersDoNotGrowTheCoveredAre
     std::vector<std::shared_ptr<VectorElement>> contents = {group};
     if (withUserFill && !coincidentFill) {
       // Non-vacuity control: the same 0%-alpha fill, but on its own DISJOINT geometry, so its
-      // painter has to add its own area to the own geometry.
+      // painter has to add its own area to the geometry.
       auto fillShape = Rectangle::Make();
       fillShape->setPosition({disjointRect.centerX(), disjointRect.centerY()});
       fillShape->setSize({disjointRect.width(), disjointRect.height()});
@@ -7136,9 +7133,9 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoincidentPaintersDoNotGrowTheCoveredAre
     return count;
   };
 
-  auto bareOnly = RasterizeOwnGeometryAlpha(context, makePanel(false, false));
-  auto coincident = RasterizeOwnGeometryAlpha(context, makePanel(true, true));
-  auto disjoint = RasterizeOwnGeometryAlpha(context, makePanel(true, false));
+  auto bareOnly = RasterizeGeometryAlpha(context, makePanel(false, false));
+  auto coincident = RasterizeGeometryAlpha(context, makePanel(true, true));
+  auto disjoint = RasterizeGeometryAlpha(context, makePanel(true, false));
   ASSERT_FALSE(bareOnly.empty());
   ASSERT_EQ(bareOnly.size(), coincident.size());
   ASSERT_EQ(bareOnly.size(), disjoint.size());
@@ -7162,7 +7159,7 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoincidentPaintersDoNotGrowTheCoveredAre
          "pixel, boundary included; "
       << differing << " pixels differ";
   // Non-vacuity: the same fixture with the second painter DISJOINT does add its own area, so the
-  // equality above cannot pass on the fill being dropped from the own geometry.
+  // equality above cannot pass on the fill being dropped from the geometry.
   EXPECT_EQ(disjointFull - bareFull, disjointArea)
       << "disjoint-fill outline: the second painter must be recorded, so it has to add exactly its "
          "own "
@@ -7185,12 +7182,12 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryCoincidentPaintersDoNotGrowTheCoveredAre
          "extra fill at all, or the equality above is vacuous";
 }
 
-// A bare geometry only reaches the layer bounds while some style declares the own geometry as its
+// A bare geometry only reaches the layer bounds while some style declares the geometry as its
 // content. Without such a style the layer paints nothing and must stay invisible, so its bounds
 // (and with them the offscreen capture and the dirty region of everything that uses them) stay
 // empty. The gate has to re-arm on both edges, which means removing the style has to drop the
 // cached content bounds as well - hence the same layer is measured with and without the style.
-TGFX_TEST(LayerTest, OwnGeometryBoundsFollowStyleContentSource) {
+TGFX_TEST(LayerTest, GeometryBoundsFollowStyleContentSource) {
   const Rect bareRect = Rect::MakeXYWH(20.0f, 30.0f, 40.0f, 25.0f);
   auto makeGeometry = [&bareRect]() {
     auto rect = Rectangle::Make();
@@ -7222,19 +7219,19 @@ TGFX_TEST(LayerTest, OwnGeometryBoundsFollowStyleContentSource) {
       << "a bare geometry without a Geometry-sourced style must not give the layer any bounds";
   EXPECT_TRUE(layer->getBounds(nullptr, true).isEmpty()) << "tight bounds, no style";
 
-  layer->setLayerStyles({MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+  layer->setLayerStyles({MakeGeometryGlass(0, 50, 100, 0, 0)});
   EXPECT_EQ(layer->getBounds(), bareRect)
-      << "the Glass style consumes the own geometry, so the bounds must cover exactly it";
+      << "the Glass style consumes the geometry, so the bounds must cover exactly it";
   EXPECT_EQ(layer->getBounds(nullptr, true), bareRect)
       << "tight bounds must cover the bare geometry as well";
 
   layer->setLayerStyles({});
   EXPECT_TRUE(layer->getBounds().isEmpty())
-      << "removing the style must drop the own geometry from the bounds again";
+      << "removing the style must drop the geometry from the bounds again";
   EXPECT_TRUE(layer->getBounds(nullptr, true).isEmpty()) << "tight bounds must be dropped again";
 }
 
-// ===== The own geometry: which styles see it, and how it is composited =====
+// ===== The geometry: which styles see it, and how it is composited =====
 
 // A rectangle element covering `bounds`, for the cases below that need geometry and painter in one
 // flat element list (a Repeater or a MergePath only applies to the elements of its own group).
@@ -7245,20 +7242,20 @@ static std::shared_ptr<Rectangle> MakeRectElement(const Rect& bounds) {
   return rect;
 }
 
-// Alpha of an own-geometry raster at (x, y), in layer-local coordinates.
-static int OwnGeometryAlphaAt(const std::vector<int>& raster, int x, int y) {
-  if (x < 0 || y < 0 || x >= OwnGeometryProbeSize || y >= OwnGeometryProbeSize ||
-      raster.size() != static_cast<size_t>(OwnGeometryProbeSize) * OwnGeometryProbeSize) {
+// Alpha of an geometry raster at (x, y), in layer-local coordinates.
+static int GeometryAlphaAt(const std::vector<int>& raster, int x, int y) {
+  if (x < 0 || y < 0 || x >= GeometryProbeSize || y >= GeometryProbeSize ||
+      raster.size() != static_cast<size_t>(GeometryProbeSize) * GeometryProbeSize) {
     return -1;
   }
-  return raster[static_cast<size_t>(y) * OwnGeometryProbeSize + static_cast<size_t>(x)];
+  return raster[static_cast<size_t>(y) * GeometryProbeSize + static_cast<size_t>(x)];
 }
 
 // Records the LayerStyleInput a layer hands to one style, so both the kind of recording and the
 // shape travelling with it can be asserted without a style that consumes them.
-class OwnShapeProbeStyle : public LayerStyle {
+class GeometryShapeProbeStyle : public LayerStyle {
  public:
-  explicit OwnShapeProbeStyle(LayerStyleContentSource source) : _contentSource(source) {
+  explicit GeometryShapeProbeStyle(LayerStyleContentSource source) : _contentSource(source) {
   }
 
   LayerStylePosition position() const override {
@@ -7277,7 +7274,7 @@ class OwnShapeProbeStyle : public LayerStyle {
   // held by reference count on purpose: it keeps the recording object alive for the identity
   // assertions of the shared-source cases.
   bool drawn = false;
-  bool sawOwnShape = false;
+  bool sawGeometryShape = false;
   bool sawContentImage = false;
   StyleInputSource::Type contentType = StyleInputSource::Type::Base;
   std::shared_ptr<StyleInputSource> content = nullptr;
@@ -7292,25 +7289,25 @@ class OwnShapeProbeStyle : public LayerStyle {
     }
     contentType = input.content->type();
     sawContentImage = input.content->image() != nullptr;
-    sawOwnShape = input.content->shape().has_value();
+    sawGeometryShape = input.content->shape().has_value();
   }
 
  private:
   LayerStyleContentSource _contentSource = LayerStyleContentSource::All;
 };
 
-// Only the own-geometry recording carries an exact shape, and only a style that declares that
+// Only the geometry recording carries an exact shape, and only a style that declares that
 // content source receives it. A sibling in the same excludeChildEffects bucket shares the recorded
 // group, and its content is the shared recording, which that shape does not describe: pairing the
 // two would make the sibling read a footprint it never drew.
-TGFX_TEST_PRIVATE(LayerTest, OwnShapeIsOnlyGivenToGeometrySourceStyles) {
+TGFX_TEST_PRIVATE(LayerTest, GeometryShapeIsOnlyGivenToGeometrySourceStyles) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  auto otherStyle = std::make_shared<OwnShapeProbeStyle>(LayerStyleContentSource::All);
-  auto geometryStyle = std::make_shared<OwnShapeProbeStyle>(LayerStyleContentSource::Geometry);
-  // The parent holds one bare geometry and paints nothing itself, so it records exactly one own
+  auto otherStyle = std::make_shared<GeometryShapeProbeStyle>(LayerStyleContentSource::All);
+  auto geometryStyle = std::make_shared<GeometryShapeProbeStyle>(LayerStyleContentSource::Geometry);
+  // The parent holds one bare geometry and paints nothing itself, so it records exactly one
   // geometry outline. The painted child keeps the shared content non-empty, so a style drawing from
   // the content is drawn instead of skipped -- otherwise the assertion below would be vacuous.
   auto parent = VectorLayer::Make();
@@ -7331,28 +7328,28 @@ TGFX_TEST_PRIVATE(LayerTest, OwnShapeIsOnlyGivenToGeometrySourceStyles) {
   TGFX_PRIVATE_ACCESS(
       DrawArgs drawArgs(context); auto source = parent->getLayerStyleSource(drawArgs, Matrix::I());
       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
-      ASSERT_TRUE(source->groups[0]->ownShape.has_value())
-      << "control: the group has to carry the own shape, or the gating below proves nothing";)
+      ASSERT_TRUE(source->groups[0]->geometryShape.has_value())
+      << "control: the group has to carry the geometry shape, or the gating below proves nothing";)
 
   EXPECT_TRUE(geometryStyle->drawn);
   EXPECT_TRUE(otherStyle->drawn) << "control: the shared content must be drawable";
-  EXPECT_TRUE(geometryStyle->sawOwnShape)
-      << "a style declaring LayerStyleContentSource::Geometry must receive the own shape";
-  EXPECT_FALSE(otherStyle->sawOwnShape)
-      << "a style drawing from the shared content must not receive an own shape that does not "
+  EXPECT_TRUE(geometryStyle->sawGeometryShape)
+      << "a style declaring LayerStyleContentSource::Geometry must receive the geometry shape";
+  EXPECT_FALSE(otherStyle->sawGeometryShape)
+      << "a style drawing from the shared content must not receive a geometry shape that does not "
          "describe that content";
 }
 
 // ===== The typed content source: which recording a style is handed =====
 
-// A layer painting its own geometry hands a Geometry-sourced style that recording, together with the
+// A layer painting its geometry hands a Geometry-sourced style that recording, together with the
 // exact outline read back from it.
-TGFX_TEST_PRIVATE(LayerTest, StyleInputContentIsGeometryForOwnGeometry) {
+TGFX_TEST_PRIVATE(LayerTest, StyleInputContentIsGeometrySource) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  auto probe = std::make_shared<OwnShapeProbeStyle>(LayerStyleContentSource::Geometry);
+  auto probe = std::make_shared<GeometryShapeProbeStyle>(LayerStyleContentSource::Geometry);
   probe->setExcludeChildEffects(true);
   RegionSpec painted = {};
   painted.bounds = GlassPanelLocalBounds();
@@ -7360,15 +7357,15 @@ TGFX_TEST_PRIVATE(LayerTest, StyleInputContentIsGeometryForOwnGeometry) {
   ASSERT_TRUE(RenderPanelOverChecker(context, MakePanel({painted}, {probe})) != nullptr);
 
   ASSERT_TRUE(probe->drawn) << "control: the style has to be drawn, or nothing was asserted";
-  ASSERT_TRUE(probe->content != nullptr) << "a painted layer records own geometry";
+  ASSERT_TRUE(probe->content != nullptr) << "a painted layer records geometry";
   EXPECT_EQ(probe->contentType, StyleInputSource::Type::Geometry)
-      << "the recording a Geometry-sourced style samples is its own geometry";
+      << "the recording a Geometry-sourced style samples is its geometry";
   EXPECT_TRUE(probe->sawContentImage);
-  EXPECT_TRUE(probe->sawOwnShape)
+  EXPECT_TRUE(probe->sawGeometryShape)
       << "one rectangle has an exact outline, so it travels with the recording";
 }
 
-// A layer whose geometry lives in its children records no own geometry, so a Geometry-sourced style
+// A layer whose geometry lives in its children records no geometry, so a Geometry-sourced style
 // falls back to the shared contour. That contour is this bucket's own raster and no exact outline
 // describes it, so the shape must stay empty.
 TGFX_TEST_PRIVATE(LayerTest, StyleInputFallbackReportsContourWithoutShape) {
@@ -7376,7 +7373,7 @@ TGFX_TEST_PRIVATE(LayerTest, StyleInputFallbackReportsContourWithoutShape) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  auto probe = std::make_shared<OwnShapeProbeStyle>(LayerStyleContentSource::Geometry);
+  auto probe = std::make_shared<GeometryShapeProbeStyle>(LayerStyleContentSource::Geometry);
   probe->setExcludeChildEffects(true);
   auto parent = Layer::Make();
   parent->setMatrix(Matrix::MakeTrans(GlassPanelLeft, GlassPanelTop));
@@ -7394,7 +7391,7 @@ TGFX_TEST_PRIVATE(LayerTest, StyleInputFallbackReportsContourWithoutShape) {
   EXPECT_EQ(probe->contentType, StyleInputSource::Type::Contour)
       << "a layer painting nothing owns no geometry, so the style is handed the shared contour";
   EXPECT_TRUE(probe->sawContentImage);
-  EXPECT_FALSE(probe->sawOwnShape)
+  EXPECT_FALSE(probe->sawGeometryShape)
       << "the fallback contour is no exact outline, so it must not report a shape";
 }
 
@@ -7405,7 +7402,7 @@ TGFX_TEST_PRIVATE(LayerTest, StyleInputContentIsBaseForNonGeometryStyle) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  auto probe = std::make_shared<OwnShapeProbeStyle>(LayerStyleContentSource::All);
+  auto probe = std::make_shared<GeometryShapeProbeStyle>(LayerStyleContentSource::All);
   probe->setExcludeChildEffects(true);
   RegionSpec painted = {};
   painted.bounds = GlassPanelLocalBounds();
@@ -7416,19 +7413,19 @@ TGFX_TEST_PRIVATE(LayerTest, StyleInputContentIsBaseForNonGeometryStyle) {
   ASSERT_TRUE(probe->content != nullptr) << "control: the shared content is drawable";
   EXPECT_EQ(probe->contentType, StyleInputSource::Type::Base);
   EXPECT_TRUE(probe->sawContentImage);
-  EXPECT_FALSE(probe->sawOwnShape) << "the shared content has no single exact outline";
+  EXPECT_FALSE(probe->sawGeometryShape) << "the shared content has no single exact outline";
 }
 
-// The own geometry is recorded once per layer, so both excludeChildEffects buckets must hand out the
+// The geometry is recorded once per layer, so both excludeChildEffects buckets must hand out the
 // very same source object: one recording, one typed wrapper, no per-bucket copy.
-TGFX_TEST_PRIVATE(LayerTest, StyleInputOwnSourceSharedAcrossStyles) {
+TGFX_TEST_PRIVATE(LayerTest, StyleInputGeometrySourceSharedAcrossStyles) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  auto seesChildren = std::make_shared<OwnShapeProbeStyle>(LayerStyleContentSource::Geometry);
+  auto seesChildren = std::make_shared<GeometryShapeProbeStyle>(LayerStyleContentSource::Geometry);
   seesChildren->setExcludeChildEffects(false);
-  auto seesOwnOnly = std::make_shared<OwnShapeProbeStyle>(LayerStyleContentSource::Geometry);
+  auto seesOwnOnly = std::make_shared<GeometryShapeProbeStyle>(LayerStyleContentSource::Geometry);
   seesOwnOnly->setExcludeChildEffects(true);
   RegionSpec painted = {};
   painted.bounds = GlassPanelLocalBounds();
@@ -7440,7 +7437,7 @@ TGFX_TEST_PRIVATE(LayerTest, StyleInputOwnSourceSharedAcrossStyles) {
   ASSERT_TRUE(seesChildren->content != nullptr && seesOwnOnly->content != nullptr);
   EXPECT_EQ(seesChildren->contentType, StyleInputSource::Type::Geometry);
   EXPECT_EQ(seesChildren->content, seesOwnOnly->content)
-      << "both buckets must share one own-geometry source instead of wrapping the recording twice";
+      << "both buckets must share one geometry source instead of wrapping the recording twice";
 }
 
 // Records which image a background-sourced style is handed. A background source makes the layer go
@@ -7499,12 +7496,12 @@ class RasterizedContentProbeStyle : public LayerStyle {
 // follow them. A style sampling the wrapper the recording used to hold would replay the picture and
 // lose the sharing, so the source has to be rebuilt after the swap: this is the only path that swaps
 // them, and none of the drawLayerStyleDefault cases can see it.
-TGFX_TEST_PRIVATE(LayerTest, StyleInputFollowsRasterizedOwnGeometry) {
+TGFX_TEST_PRIVATE(LayerTest, StyleInputFollowsRasterizedGeometry) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  // One style per excludeChildEffects bucket: the own geometry is recorded once and both entries
+  // One style per excludeChildEffects bucket: the geometry is recorded once and both entries
   // hold that one recording, so the swap has to wrap it once and hand the same wrapper out.
   auto seesChildren = std::make_shared<RasterizedContentProbeStyle>();
   seesChildren->setExcludeChildEffects(false);
@@ -7521,7 +7518,7 @@ TGFX_TEST_PRIVATE(LayerTest, StyleInputFollowsRasterizedOwnGeometry) {
   EXPECT_EQ(seesChildren->contentType, StyleInputSource::Type::Geometry);
   EXPECT_EQ(seesOwnOnly->contentType, StyleInputSource::Type::Geometry);
   EXPECT_TRUE(seesChildren->contentIsRasterized && seesOwnOnly->contentIsRasterized)
-      << "both styles must sample the rasterized own geometry, not the picture behind it";
+      << "both styles must sample the rasterized geometry, not the picture behind it";
   EXPECT_TRUE(seesChildren->contentImage == seesOwnOnly->contentImage)
       << "one recording, one wrapper: both buckets must sample the same image object";
 }
@@ -7535,9 +7532,9 @@ TGFX_TEST_PRIVATE(LayerTest, LayerStyleSourceSwapKeepsEntriesAndSourcesInSync) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  auto seesChildren = std::make_shared<OwnShapeProbeStyle>(LayerStyleContentSource::Geometry);
+  auto seesChildren = std::make_shared<GeometryShapeProbeStyle>(LayerStyleContentSource::Geometry);
   seesChildren->setExcludeChildEffects(false);
-  auto seesOwnOnly = std::make_shared<OwnShapeProbeStyle>(LayerStyleContentSource::Geometry);
+  auto seesOwnOnly = std::make_shared<GeometryShapeProbeStyle>(LayerStyleContentSource::Geometry);
   seesOwnOnly->setExcludeChildEffects(true);
   RegionSpec painted = {};
   painted.bounds = GlassPanelLocalBounds();
@@ -7548,32 +7545,32 @@ TGFX_TEST_PRIVATE(LayerTest, LayerStyleSourceSwapKeepsEntriesAndSourcesInSync) {
       DrawArgs drawArgs(context); auto source = panel->getLayerStyleSource(drawArgs, Matrix::I());
       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
       ASSERT_TRUE(source->groups[1] != nullptr);
-      ASSERT_TRUE(source->groups[0]->ownGeometry.has_value());
-      ASSERT_TRUE(source->groups[1]->ownGeometry.has_value());
-      auto recording = source->groups[0]->ownGeometry->image; ASSERT_TRUE(recording != nullptr);
-      EXPECT_TRUE(recording == source->groups[1]->ownGeometry->image)
-      << "control: both buckets start from the one own-geometry recording";
+      ASSERT_TRUE(source->groups[0]->geometry.has_value());
+      ASSERT_TRUE(source->groups[1]->geometry.has_value());
+      auto recording = source->groups[0]->geometry->image; ASSERT_TRUE(recording != nullptr);
+      EXPECT_TRUE(recording == source->groups[1]->geometry->image)
+      << "control: both buckets start from the one geometry recording";
       BackgroundSnapshotMap snapshots = {}; BackgroundCapturer capturer(&snapshots, nullptr);
       auto* cached = capturer.cacheLayerStyleSource(panel.get(), std::move(source));
       ASSERT_TRUE(cached != nullptr);
-      EXPECT_TRUE(cached->groups[0]->ownGeometry->image == cached->groups[1]->ownGeometry->image)
+      EXPECT_TRUE(cached->groups[0]->geometry->image == cached->groups[1]->geometry->image)
       << "wrapping the shared recording per bucket would give one picture two "
          "wrappers";
-      ASSERT_TRUE(cached->groups[0]->ownSource != nullptr);
-      EXPECT_TRUE(cached->groups[0]->ownSource->image() == cached->groups[0]->ownGeometry->image)
+      ASSERT_TRUE(cached->groups[0]->geometrySource != nullptr);
+      EXPECT_TRUE(cached->groups[0]->geometrySource->image() == cached->groups[0]->geometry->image)
       << "the typed source must follow the swapped image, not the picture";
-      ASSERT_TRUE(cached->groups[1]->ownSource != nullptr);
-      EXPECT_TRUE(cached->groups[1]->ownSource->image() == cached->groups[1]->ownGeometry->image);)
+      ASSERT_TRUE(cached->groups[1]->geometrySource != nullptr); EXPECT_TRUE(
+          cached->groups[1]->geometrySource->image() == cached->groups[1]->geometry->image);)
 }
 
-// A bare geometry next to a painter has no single exact outline, so the style is handed no own shape
+// A bare geometry next to a painter has no single exact outline, so the style is handed no geometry shape
 // and falls back to the alpha-mask path. The raster keeps covering both regions either way.
-TGFX_TEST_PRIVATE(LayerTest, OwnShapeIsDroppedWhenPaintersCoexist) {
+TGFX_TEST_PRIVATE(LayerTest, GeometryShapeIsDroppedWhenPaintersCoexist) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  auto glass = MakeOwnGeometryGlass(0, 50, 100, 0, 0);
+  auto glass = MakeGeometryGlass(0, 50, 100, 0, 0);
   RegionSpec painted = {};
   painted.bounds = Rect::MakeXYWH(20.0f, 20.0f, 40.0f, 30.0f);
   painted.fill = RegionFillKind::Opaque;
@@ -7584,18 +7581,18 @@ TGFX_TEST_PRIVATE(LayerTest, OwnShapeIsDroppedWhenPaintersCoexist) {
   TGFX_PRIVATE_ACCESS(
       DrawArgs drawArgs(context); auto source = both->getLayerStyleSource(drawArgs, Matrix::I());
       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[1] != nullptr);
-      ASSERT_TRUE(source->groups[1]->ownGeometry.has_value());
-      EXPECT_FALSE(source->groups[1]->ownShape.has_value())
+      ASSERT_TRUE(source->groups[1]->geometry.has_value());
+      EXPECT_FALSE(source->groups[1]->geometryShape.has_value())
       << "a painter and a bare geometry together have no single exact outline, so the style must "
          "take the alpha-mask path instead of an SDF that would cover less than the raster";)
 
   // Dropping the shape drops no coverage: the painter contour and the bare geometry are both in the
   // raster the alpha mask reads.
-  auto alpha = RasterizeOwnGeometryAlpha(context, both);
+  auto alpha = RasterizeGeometryAlpha(context, both);
   ASSERT_FALSE(alpha.empty());
-  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 40, 35), 255) << "the painted region is covered";
-  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 120, 115), 255) << "the bare region is covered";
-  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 80, 80), 0) << "the gap between them is not";
+  EXPECT_EQ(GeometryAlphaAt(alpha, 40, 35), 255) << "the painted region is covered";
+  EXPECT_EQ(GeometryAlphaAt(alpha, 120, 115), 255) << "the bare region is covered";
+  EXPECT_EQ(GeometryAlphaAt(alpha, 80, 80), 0) << "the gap between them is not";
 
   // Control: the same bare geometry alone does have an exact outline, so the nullopt above is the
   // painter being present rather than the fixture having no shape at all.
@@ -7603,44 +7600,44 @@ TGFX_TEST_PRIVATE(LayerTest, OwnShapeIsDroppedWhenPaintersCoexist) {
   TGFX_PRIVATE_ACCESS(DrawArgs bareArgs(context);
                       auto bareSource = bareOnly->getLayerStyleSource(bareArgs, Matrix::I());
                       ASSERT_TRUE(bareSource != nullptr && bareSource->groups[1] != nullptr);
-                      EXPECT_TRUE(bareSource->groups[1]->ownShape.has_value());)
+                      EXPECT_TRUE(bareSource->groups[1]->geometryShape.has_value());)
 }
 
-// ===== The own-geometry shape comes out of the own-geometry recording =====
+// ===== The geometry shape comes out of the geometry recording =====
 //
 // The shape a Geometry-sourced style consumes is no longer derived from the elements or painters;
-// it is read back from the very picture the own-geometry raster is made of. The cases below pin what
+// it is read back from the very picture the geometry raster is made of. The cases below pin what
 // that playback accepts: one outline drawn any number of times collapses to a single shape, and
 // everything the recording cannot express as that one outline rejects the shape while leaving the
 // raster untouched.
 
-// What a Geometry-sourced bucket recorded for `layer`: whether it holds an own-geometry raster and
+// What a Geometry-sourced bucket recorded for `layer`: whether it holds an geometry raster and
 // the shape read back from that same recording. matrix is the one getLayerStyleSource() is called
 // with, and its max scale is what the recording is scaled by.
-struct OwnGeometryProbe {
+struct GeometryProbe {
   bool hasImage = false;
   std::optional<StyledShape> shape = std::nullopt;
 };
 
-static OwnGeometryProbe ProbeOwnGeometry(Context* context, const std::shared_ptr<Layer>& layer,
-                                         const Matrix& matrix = Matrix::I()) {
-  OwnGeometryProbe probe = {};
+static GeometryProbe ProbeGeometry(Context* context, const std::shared_ptr<Layer>& layer,
+                                   const Matrix& matrix = Matrix::I()) {
+  GeometryProbe probe = {};
   TGFX_PRIVATE_ACCESS(
       DrawArgs drawArgs(context); auto source = layer->getLayerStyleSource(drawArgs, matrix);
       if (source == nullptr) { return probe; } for (auto& group
                                                     : source->groups) {
-        if (group != nullptr && group->ownGeometry.has_value()) {
-          probe.hasImage = group->ownGeometry->image != nullptr;
-          probe.shape = group->ownShape;
+        if (group != nullptr && group->geometry.has_value()) {
+          probe.hasImage = group->geometry->image != nullptr;
+          probe.shape = group->geometryShape;
         }
       })
   return probe;
 }
 
 // One rectangle outline painted twice: the retained 0%-alpha fill keeps the geometry in the
-// own-geometry recording next to the visible fill, and both paints draw the very same rectangle. Two
+// geometry recording next to the visible fill, and both paints draw the very same rectangle. Two
 // draws that agree describe one shape, so the style keeps the SDF path it had before.
-TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeCollapsesDuplicateGeometry) {
+TGFX_TEST_PRIVATE(LayerTest, GeometryShapeCollapsesDuplicateGeometry) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -7653,10 +7650,10 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeCollapsesDuplicateGeometry) {
       {rect, MakeZeroAlphaFill(), FillStyle::Make(SolidColor::Make(Color::White()))});
   auto layer = VectorLayer::Make();
   layer->setContents({group});
-  layer->setLayerStyles({MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+  layer->setLayerStyles({MakeGeometryGlass(0, 50, 100, 0, 0)});
 
-  auto probe = ProbeOwnGeometry(context, layer);
-  ASSERT_TRUE(probe.hasImage) << "control: the own geometry is recorded";
+  auto probe = ProbeGeometry(context, layer);
+  ASSERT_TRUE(probe.hasImage) << "control: the geometry is recorded";
   ASSERT_TRUE(probe.shape.has_value())
       << "two paints over one outline are still a single outline, so the shape must survive";
   ASSERT_TRUE(probe.shape->shape != nullptr);
@@ -7667,7 +7664,7 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeCollapsesDuplicateGeometry) {
 // One geometry two fill painters captured is drawn once per painter, so the recording hands over
 // the very same Shape instance twice. This covers that same-instance fast path: the second draw
 // reuses the outline already held instead of building the path again.
-TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeCollapsesRepeatedShapeInstance) {
+TGFX_TEST_PRIVATE(LayerTest, GeometryShapeCollapsesRepeatedShapeInstance) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -7683,10 +7680,10 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeCollapsesRepeatedShapeInstance) {
   group->setElements({shapePath, first, second});
   auto layer = VectorLayer::Make();
   layer->setContents({group});
-  layer->setLayerStyles({MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+  layer->setLayerStyles({MakeGeometryGlass(0, 50, 100, 0, 0)});
 
-  auto probe = ProbeOwnGeometry(context, layer);
-  ASSERT_TRUE(probe.hasImage) << "control: the own geometry is recorded";
+  auto probe = ProbeGeometry(context, layer);
+  ASSERT_TRUE(probe.hasImage) << "control: the geometry is recorded";
   ASSERT_TRUE(probe.shape.has_value())
       << "the same shape instance drawn twice is one outline, so the shape must survive";
   ASSERT_TRUE(probe.shape->shape != nullptr);
@@ -7695,7 +7692,7 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeCollapsesRepeatedShapeInstance) {
 
 // Two different outlines cannot be one shape, so the style must fall back to the alpha mask -- while
 // the raster it reads keeps covering both regions.
-TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeRejectsDistinctGeometry) {
+TGFX_TEST_PRIVATE(LayerTest, GeometryShapeRejectsDistinctGeometry) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -7707,8 +7704,8 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeRejectsDistinctGeometry) {
   right.bounds = Rect::MakeXYWH(70.0f, 40.0f, 40.0f, 30.0f);
   right.fill = RegionFillKind::Opaque;
 
-  auto panel = MakePanel({left, right}, {MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
-  auto probe = ProbeOwnGeometry(context, panel);
+  auto panel = MakePanel({left, right}, {MakeGeometryGlass(0, 50, 100, 0, 0)});
+  auto probe = ProbeGeometry(context, panel);
   EXPECT_FALSE(probe.shape.has_value())
       << "two disjoint outlines have no single-shape expression, so a shape here would cover "
          "neither of them exactly";
@@ -7716,21 +7713,21 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeRejectsDistinctGeometry) {
 
   // Coverage of the same panel: the fallback keeps drawing over both regions, so the nullopt above
   // is the shape being dropped and not the recording being empty.
-  auto alpha = RasterizeOwnGeometryAlpha(context, panel);
+  auto alpha = RasterizeGeometryAlpha(context, panel);
   ASSERT_FALSE(alpha.empty());
-  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 30, 25), 255) << "the left region is covered";
-  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 90, 55), 255) << "the right region is covered";
+  EXPECT_EQ(GeometryAlphaAt(alpha, 30, 25), 255) << "the left region is covered";
+  EXPECT_EQ(GeometryAlphaAt(alpha, 90, 55), 255) << "the right region is covered";
 
   // Control: either region alone does have a shape, so the rejection above is the second outline.
   auto singleProbe =
-      ProbeOwnGeometry(context, MakePanel({left}, {MakeOwnGeometryGlass(0, 50, 100, 0, 0)}));
+      ProbeGeometry(context, MakePanel({left}, {MakeGeometryGlass(0, 50, 100, 0, 0)}));
   EXPECT_TRUE(singleProbe.shape.has_value());
 }
 
 // Two outlines covering the very same box still differ, and treating them as equal would hand the
 // style a shape that covers pixels the layer never painted. This case exists to keep the comparison
 // on the path itself: a bounds comparison passes it.
-TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeRejectsSameBoundsDifferentPaths) {
+TGFX_TEST_PRIVATE(LayerTest, GeometryShapeRejectsSameBoundsDifferentPaths) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -7750,10 +7747,8 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeRejectsSameBoundsDifferentPaths) {
 
   // Premise: the two fixtures really do share a bounding box, and each alone has a shape. Without
   // this, a nullopt below could come from the ellipse failing to resolve a path at all.
-  auto rectProbe =
-      ProbeOwnGeometry(context, MakePanel({rect}, {MakeOwnGeometryGlass(0, 50, 100, 0, 0)}));
-  auto ovalProbe =
-      ProbeOwnGeometry(context, MakePanel({oval}, {MakeOwnGeometryGlass(0, 50, 100, 0, 0)}));
+  auto rectProbe = ProbeGeometry(context, MakePanel({rect}, {MakeGeometryGlass(0, 50, 100, 0, 0)}));
+  auto ovalProbe = ProbeGeometry(context, MakePanel({oval}, {MakeGeometryGlass(0, 50, 100, 0, 0)}));
   ASSERT_TRUE(rectProbe.shape.has_value());
   ASSERT_TRUE(ovalProbe.shape.has_value());
   ASSERT_TRUE(rectProbe.shape->shape != nullptr && ovalProbe.shape->shape != nullptr);
@@ -7762,10 +7757,10 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeRejectsSameBoundsDifferentPaths) {
   EXPECT_NE(rectProbe.shape->shape->getPath(), ovalProbe.shape->shape->getPath())
       << "the fixtures must differ as paths, or rejecting them would be wrong";
 
-  auto both = MakePanel({oval, rect}, {MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+  auto both = MakePanel({oval, rect}, {MakeGeometryGlass(0, 50, 100, 0, 0)});
   // The ellipse comes first so that both outlines reach the recording: the recording drops a draw
   // whose coverage an earlier one already contains, and the rectangle covers the ellipse entirely.
-  auto probe = ProbeOwnGeometry(context, both);
+  auto probe = ProbeGeometry(context, both);
   EXPECT_FALSE(probe.shape.has_value())
       << "a rectangle and its inscribed ellipse share a bounding box and nothing else, so no "
          "single shape describes both";
@@ -7774,7 +7769,7 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeRejectsSameBoundsDifferentPaths) {
 
 // A brush that samples something other than a flat color does not cover the fill path, so the
 // recording cannot be reduced to the path. This is the unsupported-painter case: an image pattern.
-TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeRejectsUnsupportedPainter) {
+TGFX_TEST_PRIVATE(LayerTest, GeometryShapeRejectsUnsupportedPainter) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -7790,12 +7785,11 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeRejectsUnsupportedPainter) {
     group->setElements({shape, fill});
     auto layer = VectorLayer::Make();
     layer->setContents({group});
-    layer->setLayerStyles({MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+    layer->setLayerStyles({MakeGeometryGlass(0, 50, 100, 0, 0)});
     return layer;
   };
 
-  auto imageProbe =
-      ProbeOwnGeometry(context, makeLayer(FillStyle::Make(ImagePattern::Make(image))));
+  auto imageProbe = ProbeGeometry(context, makeLayer(FillStyle::Make(ImagePattern::Make(image))));
   EXPECT_FALSE(imageProbe.shape.has_value())
       << "an image-sampled brush covers what the texture holds, not what the path encloses";
   EXPECT_TRUE(imageProbe.hasImage) << "the raster still covers the geometry it recorded";
@@ -7803,14 +7797,14 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeRejectsUnsupportedPainter) {
   // Control: the same geometry with a flat color does produce a shape, so the rejection above comes
   // from the brush and not from the fixture.
   auto flatProbe =
-      ProbeOwnGeometry(context, makeLayer(FillStyle::Make(SolidColor::Make(Color::White()))));
+      ProbeGeometry(context, makeLayer(FillStyle::Make(SolidColor::Make(Color::White()))));
   ASSERT_TRUE(flatProbe.shape.has_value());
 }
 
 // A gradient brush is not an image brush: the contour recording carries image shaders only, so a
 // gradient painter reaches it as a plain opaque brush. Its coverage is still exactly the fill path,
 // so the geometry stays extractable and the style keeps the SDF path.
-TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeKeepsGradientPainter) {
+TGFX_TEST_PRIVATE(LayerTest, GeometryShapeKeepsGradientPainter) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -7826,10 +7820,10 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeKeepsGradientPainter) {
   group->setElements({shape, FillStyle::Make(gradient)});
   auto layer = VectorLayer::Make();
   layer->setContents({group});
-  layer->setLayerStyles({MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+  layer->setLayerStyles({MakeGeometryGlass(0, 50, 100, 0, 0)});
 
-  auto probe = ProbeOwnGeometry(context, layer);
-  EXPECT_TRUE(probe.hasImage) << "the gradient fill is still recorded as the own geometry raster";
+  auto probe = ProbeGeometry(context, layer);
+  EXPECT_TRUE(probe.hasImage) << "the gradient fill is still recorded as the geometry raster";
   ASSERT_TRUE(probe.shape.has_value())
       << "contour recording drops non-image shaders, so a gradient painter paints a plain opaque "
          "brush and its geometry stays extractable";
@@ -7841,7 +7835,7 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeKeepsGradientPainter) {
 // An inside/outside stroke is baked into "expanded fill + clip", so the recording holds a filled
 // shape that is only correct inside the clip. Keeping it would cover the whole doubled stroke width,
 // and this case isolates that clip: the panel carries no fill, so nothing else rejects the shape.
-TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeRejectsAlignedStrokeClip) {
+TGFX_TEST_PRIVATE(LayerTest, GeometryShapeRejectsAlignedStrokeClip) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -7850,9 +7844,9 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeRejectsAlignedStrokeClip) {
   stroked.bounds = Rect::MakeXYWH(20.0f, 20.0f, 100.0f, 80.0f);
   stroked.strokeWidth = 8.0f;
   stroked.strokeAlign = StrokeAlign::Outside;
-  auto panel = MakePanel({stroked}, {MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+  auto panel = MakePanel({stroked}, {MakeGeometryGlass(0, 50, 100, 0, 0)});
 
-  auto probe = ProbeOwnGeometry(context, panel);
+  auto probe = ProbeGeometry(context, panel);
   EXPECT_FALSE(probe.shape.has_value())
       << "the clipped expanded fill describes twice the visible stroke band, so it must not be "
          "handed over as the layer's shape";
@@ -7862,15 +7856,13 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeRejectsAlignedStrokeClip) {
   // be rejected as well; a fill-only rectangle is the accepted counterpart.
   RegionSpec centered = stroked;
   centered.strokeAlign = StrokeAlign::Center;
-  EXPECT_FALSE(
-      ProbeOwnGeometry(context, MakePanel({centered}, {MakeOwnGeometryGlass(0, 50, 100, 0, 0)}))
-          .shape.has_value());
+  EXPECT_FALSE(ProbeGeometry(context, MakePanel({centered}, {MakeGeometryGlass(0, 50, 100, 0, 0)}))
+                   .shape.has_value());
   RegionSpec filled = {};
   filled.bounds = stroked.bounds;
   filled.fill = RegionFillKind::Opaque;
-  EXPECT_TRUE(
-      ProbeOwnGeometry(context, MakePanel({filled}, {MakeOwnGeometryGlass(0, 50, 100, 0, 0)}))
-          .shape.has_value());
+  EXPECT_TRUE(ProbeGeometry(context, MakePanel({filled}, {MakeGeometryGlass(0, 50, 100, 0, 0)}))
+                  .shape.has_value());
 }
 
 // An inverse fill paints the complement of its outline, so the recording covers everything the
@@ -7878,7 +7870,7 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeRejectsAlignedStrokeClip) {
 // rejected while the raster keeps the complement. The outline is a triangle because the recorder
 // folds a rect/oval/rrect path into a plain rect or rrect record, which drops the fill type before
 // the extraction ever sees it.
-TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeRejectsInverseFillPath) {
+TGFX_TEST_PRIVATE(LayerTest, GeometryShapeRejectsInverseFillPath) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -7896,11 +7888,11 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeRejectsInverseFillPath) {
     group->setElements({shapePath, FillStyle::Make(SolidColor::Make(Color::White()))});
     auto layer = VectorLayer::Make();
     layer->setContents({group});
-    layer->setLayerStyles({MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+    layer->setLayerStyles({MakeGeometryGlass(0, 50, 100, 0, 0)});
     return layer;
   };
 
-  auto inverseProbe = ProbeOwnGeometry(context, makeLayer(PathFillType::InverseWinding));
+  auto inverseProbe = ProbeGeometry(context, makeLayer(PathFillType::InverseWinding));
   EXPECT_FALSE(inverseProbe.shape.has_value())
       << "inverse coverage is the complement of the outline, so handing it over as the layer's "
          "shape would invert the area the style covers";
@@ -7909,13 +7901,13 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeRejectsInverseFillPath) {
 
   // Control: the very same outline filled the normal way does resolve a shape, so the nullopt above
   // is the inverse fill type and not the fixture.
-  auto directProbe = ProbeOwnGeometry(context, makeLayer(PathFillType::Winding));
+  auto directProbe = ProbeGeometry(context, makeLayer(PathFillType::Winding));
   ASSERT_TRUE(directProbe.shape.has_value());
 }
 
 // The recording canvas is scaled by the content scale, so the extracted shape has to undo that
 // scale. Without it the shape would be scaled away from the raster it is meant to describe.
-TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeUndoesTheRecordingScale) {
+TGFX_TEST_PRIVATE(LayerTest, GeometryShapeUndoesTheRecordingScale) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -7923,10 +7915,10 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeUndoesTheRecordingScale) {
   RegionSpec region = {};
   region.bounds = Rect::MakeXYWH(10.0f, 10.0f, 100.0f, 80.0f);
   region.fill = RegionFillKind::Opaque;
-  auto panel = MakePanel({region}, {MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+  auto panel = MakePanel({region}, {MakeGeometryGlass(0, 50, 100, 0, 0)});
 
-  auto identityProbe = ProbeOwnGeometry(context, panel);
-  auto scaledProbe = ProbeOwnGeometry(context, panel, Matrix::MakeScale(2.0f));
+  auto identityProbe = ProbeGeometry(context, panel);
+  auto scaledProbe = ProbeGeometry(context, panel, Matrix::MakeScale(2.0f));
   ASSERT_TRUE(identityProbe.shape.has_value());
   ASSERT_TRUE(scaledProbe.shape.has_value())
       << "the content scale must not change whether the recording resolves a shape";
@@ -7935,21 +7927,21 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryShapeUndoesTheRecordingScale) {
       << "the shape lives in layer coordinates, so it does not grow with the content scale";
 }
 
-// The own geometry is not painted content: it is recorded as an unpainted entry, so nothing draws
+// The geometry is not painted content: it is recorded as an unpainted entry, so nothing draws
 // it, and the content bounds -- which is what mapContentBoundsToImage() hands to filters and style
 // sources -- must leave it out.
-TGFX_TEST_PRIVATE(LayerTest, OwnGeometryStaysOutOfContentBounds) {
+TGFX_TEST_PRIVATE(LayerTest, GeometryStaysOutOfContentBounds) {
   const Rect bareBounds = Rect::MakeXYWH(20.0f, 30.0f, 40.0f, 25.0f);
   RegionSpec bareGeometry = {};
   bareGeometry.bounds = bareBounds;
-  auto layer = MakePanel({bareGeometry}, {MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+  auto layer = MakePanel({bareGeometry}, {MakeGeometryGlass(0, 50, 100, 0, 0)});
 
   TGFX_PRIVATE_ACCESS(
       EXPECT_TRUE(layer->computeBounds(Matrix3D::I(), false, true).isEmpty())
           << "content bounds must not include geometry that nothing draws, or the filter mapping "
              "would be computed against pixels that are never rendered";
       EXPECT_EQ(layer->computeBounds(Matrix3D::I(), false, false), bareBounds)
-      << "the bounds the style has to cover still include the own geometry";)
+      << "the bounds the style has to cover still include the geometry";)
 }
 
 // A Repeater clones the accumulated geometries and remaps each painter onto its own clones, so the
@@ -7979,17 +7971,17 @@ TGFX_TEST_PRIVATE(LayerTest, RepeaterKeepsTheBareGeometryDifference) {
                       MakeRectElement(bareBounds), repeater});
   auto layer = VectorLayer::Make();
   layer->setContents({group});
-  layer->setLayerStyles({MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+  layer->setLayerStyles({MakeGeometryGlass(0, 50, 100, 0, 0)});
 
-  auto alpha = RasterizeOwnGeometryAlpha(context, layer);
+  auto alpha = RasterizeGeometryAlpha(context, layer);
   ASSERT_FALSE(alpha.empty());
   EXPECT_EQ(CountUnpaintedEntries(layer), 2)
       << "only the two replicated bare rectangles differ; four would mean the painters no longer "
          "match their clones";
-  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 35, 85), 255) << "the first bare clone is covered";
-  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 115, 85), 255) << "the replicated bare clone is covered";
-  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 35, 35), 255) << "the painted clone stays in the contour";
-  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 165, 165), 0) << "outside every clone stays uncovered";
+  EXPECT_EQ(GeometryAlphaAt(alpha, 35, 85), 255) << "the first bare clone is covered";
+  EXPECT_EQ(GeometryAlphaAt(alpha, 115, 85), 255) << "the replicated bare clone is covered";
+  EXPECT_EQ(GeometryAlphaAt(alpha, 35, 35), 255) << "the painted clone stays in the contour";
+  EXPECT_EQ(GeometryAlphaAt(alpha, 165, 165), 0) << "outside every clone stays uncovered";
 }
 
 // MergePath drops the accumulated painters and adds the merged shape as a new geometry. A painter
@@ -8020,25 +8012,25 @@ TGFX_TEST_PRIVATE(LayerTest, MergePathResultStaysWithItsPainter) {
     group->setElements(std::move(elements));
     auto layer = VectorLayer::Make();
     layer->setContents({group});
-    layer->setLayerStyles({MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+    layer->setLayerStyles({MakeGeometryGlass(0, 50, 100, 0, 0)});
     return layer;
   };
 
   auto merged = makePanel(true);
-  auto alpha = RasterizeOwnGeometryAlpha(context, merged);
+  auto alpha = RasterizeGeometryAlpha(context, merged);
   ASSERT_FALSE(alpha.empty());
   EXPECT_EQ(CountUnpaintedEntries(merged), 0)
       << "the fill after the merge captures the merged shape, so it is content and must not also "
          "be recorded as bare geometry";
   // Asserted on the raster as well: the merged outline covers the union and keeps out of the corner
   // that neither square covers.
-  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 30, 30), 255) << "inside the first rectangle only";
-  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 90, 90), 255) << "inside the second rectangle only";
-  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 60, 60), 255) << "inside the overlap";
-  EXPECT_EQ(OwnGeometryAlphaAt(alpha, 90, 30), 0) << "outside the union";
+  EXPECT_EQ(GeometryAlphaAt(alpha, 30, 30), 255) << "inside the first rectangle only";
+  EXPECT_EQ(GeometryAlphaAt(alpha, 90, 90), 255) << "inside the second rectangle only";
+  EXPECT_EQ(GeometryAlphaAt(alpha, 60, 60), 255) << "inside the overlap";
+  EXPECT_EQ(GeometryAlphaAt(alpha, 90, 30), 0) << "outside the union";
 
   auto mergeAfterFill = makePanel(false);
-  auto mergeAfterFillAlpha = RasterizeOwnGeometryAlpha(context, mergeAfterFill);
+  auto mergeAfterFillAlpha = RasterizeGeometryAlpha(context, mergeAfterFill);
   ASSERT_EQ(mergeAfterFillAlpha.size(), alpha.size());
   EXPECT_EQ(CountUnpaintedEntries(mergeAfterFill), 1)
       << "MergePath clears the painters, so nothing paints the merged shape there";
@@ -8053,12 +8045,12 @@ TGFX_TEST_PRIVATE(LayerTest, MergePathResultStaysWithItsPainter) {
          "channel carries it";
 }
 
-// ===== Text without a painter is own geometry =====
+// ===== Text without a painter is geometry =====
 //
 // A Vector layer holding only text has no painter at all, so Geometry::getShape() turns the text
-// blob into glyph outlines and those outlines are bare geometry: the layer's own geometry, and with
+// blob into glyph outlines and those outlines are bare geometry: the layer's geometry, and with
 // it the coverage a Geometry-source style such as Glass draws from.
-TGFX_TEST_PRIVATE(LayerTest, OwnGeometryIncludesTextGeometry) {
+TGFX_TEST_PRIVATE(LayerTest, GeometryIncludesTextGeometry) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -8076,7 +8068,7 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryIncludesTextGeometry) {
     // Text only, no FillStyle: nothing captures the blob, so no painter owns the glyph outlines.
     layer->setContents({text});
     if (withGlass) {
-      layer->setLayerStyles({MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+      layer->setLayerStyles({MakeGeometryGlass(0, 50, 100, 0, 0)});
     }
     return layer;
   };
@@ -8085,14 +8077,14 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryIncludesTextGeometry) {
   TGFX_PRIVATE_ACCESS(
       DrawArgs drawArgs(context); auto source = panel->getLayerStyleSource(drawArgs, Matrix::I());
       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[1] != nullptr);
-      ASSERT_TRUE(source->groups[1]->ownGeometry.has_value())
-      << "text without a painter is still the layer's own geometry";
-      EXPECT_TRUE(source->groups[1]->ownGeometry->image != nullptr);
-      EXPECT_TRUE(source->groups[1]->ownShape.has_value())
+      ASSERT_TRUE(source->groups[1]->geometry.has_value())
+      << "text without a painter is still the layer's geometry";
+      EXPECT_TRUE(source->groups[1]->geometry->image != nullptr);
+      EXPECT_TRUE(source->groups[1]->geometryShape.has_value())
       << "the glyph outlines fit a single StyledShape, so Glass takes the SDF path";)
 
   // The coverage is the glyph shapes: something is covered, and it is not the whole probe surface.
-  auto alpha = RasterizeOwnGeometryAlpha(context, panel);
+  auto alpha = RasterizeGeometryAlpha(context, panel);
   ASSERT_FALSE(alpha.empty());
   int covered = 0;
   for (auto value : alpha) {
@@ -8102,12 +8094,12 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryIncludesTextGeometry) {
   EXPECT_LT(covered * 2, static_cast<int>(alpha.size()))
       << "a text outline covers its glyphs, not the whole surface; covered=" << covered;
 
-  // Recorded only for a style that consumes the own geometry: the same layer without Glass hands
+  // Recorded only for a style that consumes the geometry: the same layer without Glass hands
   // nothing over, so the geometry above is not produced unconditionally.
   auto plain = makePanel(false);
   TGFX_PRIVATE_ACCESS(DrawArgs plainArgs(context);
                       EXPECT_TRUE(plain->getLayerStyleSource(plainArgs, Matrix::I()) == nullptr)
-                      << "without a Geometry-source style the own geometry is not recorded";)
+                      << "without a Geometry-source style the geometry is not recorded";)
 }
 
 // ===== Own geometry under a transform-only change =====
@@ -8119,29 +8111,29 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryIncludesTextGeometry) {
 // they were: the old region is never invalidated and Layer::draw culls the layer against its stale
 // renderBounds.
 
-constexpr int OwnGeometryMoveSurfaceWidth = 300;
-constexpr int OwnGeometryMoveSurfaceHeight = 200;
-constexpr float OwnGeometryMoveDistance = 100.0f;
+constexpr int GeometryMoveSurfaceWidth = 300;
+constexpr int GeometryMoveSurfaceHeight = 200;
+constexpr float GeometryMoveDistance = 100.0f;
 // Wide enough for the glass to cover the sampled pixel with room to spare, narrow enough that the
 // start and the moved position both stay inside the surface without overlapping.
-constexpr float OwnGeometryPanelSize = 40.0f;
+constexpr float GeometryPanelSize = 40.0f;
 
-static Rect OwnGeometryPanelRect(float left, float top) {
-  return Rect::MakeXYWH(left, top, OwnGeometryPanelSize, OwnGeometryPanelSize);
+static Rect GeometryPanelRect(float left, float top) {
+  return Rect::MakeXYWH(left, top, GeometryPanelSize, GeometryPanelSize);
 }
 
 // The backdrop the glass frosts: an opaque red field crossed by dark red stripes. A uniform field
 // would make the frost invisible -- blurring a constant color changes nothing -- so the stripes are
 // what lets a pixel read tell a frosted region from the plain backdrop.
 static std::shared_ptr<Layer> MakeStripedRedBackdrop() {
-  const Rect fullRect = Rect::MakeWH(OwnGeometryMoveSurfaceWidth, OwnGeometryMoveSurfaceHeight);
+  const Rect fullRect = Rect::MakeWH(GeometryMoveSurfaceWidth, GeometryMoveSurfaceHeight);
   auto base = VectorGroup::Make();
   base->setElements(
       {MakeRectElement(fullRect), FillStyle::Make(SolidColor::Make(Color::FromRGBA(255, 0, 0)))});
   std::vector<std::shared_ptr<VectorElement>> stripes = {};
-  for (float left = 0.0f; left + 12.0f <= OwnGeometryMoveSurfaceWidth; left += 24.0f) {
+  for (float left = 0.0f; left + 12.0f <= GeometryMoveSurfaceWidth; left += 24.0f) {
     stripes.push_back(MakeRectElement(
-        Rect::MakeXYWH(left, 0.0f, 12.0f, static_cast<float>(OwnGeometryMoveSurfaceHeight))));
+        Rect::MakeXYWH(left, 0.0f, 12.0f, static_cast<float>(GeometryMoveSurfaceHeight))));
   }
   stripes.push_back(FillStyle::Make(SolidColor::Make(Color::FromRGBA(48, 0, 0))));
   auto stripeGroup = VectorGroup::Make();
@@ -8159,7 +8151,7 @@ static std::shared_ptr<VectorLayer> MakeBareGeometryGlassLayer(const Rect& bound
   group->setElements({MakeRectElement(bounds)});
   auto layer = VectorLayer::Make();
   layer->setContents({group});
-  layer->setLayerStyles({MakeOwnGeometryGlass(0, 50, 100, 0, 0)});
+  layer->setLayerStyles({MakeGeometryGlass(0, 50, 100, 0, 0)});
   return layer;
 }
 
@@ -8184,13 +8176,13 @@ static int MaxChannelDifference(uint32_t first, uint32_t second) {
   return maxDiff;
 }
 
-TGFX_TEST_PRIVATE(LayerTest, OwnGeometryLayerMovesItsRenderBounds) {
+TGFX_TEST_PRIVATE(LayerTest, GeometryLayerMovesItsRenderBounds) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, OwnGeometryMoveSurfaceWidth, OwnGeometryMoveSurfaceHeight);
+  auto surface = Surface::Make(context, GeometryMoveSurfaceWidth, GeometryMoveSurfaceHeight);
   ASSERT_TRUE(surface != nullptr);
-  const auto panelRect = OwnGeometryPanelRect(20.0f, 20.0f);
+  const auto panelRect = GeometryPanelRect(20.0f, 20.0f);
 
   DisplayList displayList;
   displayList.root()->addChild(MakeStripedRedBackdrop());
@@ -8203,12 +8195,12 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryLayerMovesItsRenderBounds) {
   ASSERT_FALSE(before.isEmpty()) << "the unpainted-geometry bounds query must give the layer "
                                     "bounds, otherwise the move below proves nothing";
 
-  layer->setPosition({OwnGeometryMoveDistance, 0.0f});
+  layer->setPosition({GeometryMoveDistance, 0.0f});
   displayList.render(surface.get(), false);
 
   Rect after = {};
   TGFX_PRIVATE_ACCESS(after = layer->renderBounds;)
-  EXPECT_NEAR(after.left, before.left + OwnGeometryMoveDistance, 0.5f)
+  EXPECT_NEAR(after.left, before.left + GeometryMoveDistance, 0.5f)
       << "moving a bare-geometry layer must move its render bounds; a stale rect leaves the old "
          "region dirty and makes Layer::draw cull the layer at its new place. before="
       << before.left << " after=" << after.left;
@@ -8218,13 +8210,13 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryLayerMovesItsRenderBounds) {
   EXPECT_NEAR(after.height(), before.height(), 0.5f) << "the move must not resize the bounds";
 }
 
-TGFX_TEST_PRIVATE(LayerTest, OwnGeometryLayerFollowsParentTransform) {
+TGFX_TEST_PRIVATE(LayerTest, GeometryLayerFollowsParentTransform) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, OwnGeometryMoveSurfaceWidth, OwnGeometryMoveSurfaceHeight);
+  auto surface = Surface::Make(context, GeometryMoveSurfaceWidth, GeometryMoveSurfaceHeight);
   ASSERT_TRUE(surface != nullptr);
-  const auto panelRect = OwnGeometryPanelRect(20.0f, 20.0f);
+  const auto panelRect = GeometryPanelRect(20.0f, 20.0f);
 
   DisplayList displayList;
   displayList.root()->addChild(MakeStripedRedBackdrop());
@@ -8236,15 +8228,15 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryLayerFollowsParentTransform) {
 
   Rect before = {};
   TGFX_PRIVATE_ACCESS(before = layer->renderBounds;)
-  ASSERT_FALSE(before.isEmpty()) << "the own-geometry gate must give the child bounds";
+  ASSERT_FALSE(before.isEmpty()) << "the geometry gate must give the child bounds";
 
   // The child's own transform is untouched, so its bounds have to follow through childForceDirty.
-  parent->setMatrix(Matrix::MakeTrans(OwnGeometryMoveDistance, 0.0f));
+  parent->setMatrix(Matrix::MakeTrans(GeometryMoveDistance, 0.0f));
   displayList.render(surface.get(), false);
 
   Rect after = {};
   TGFX_PRIVATE_ACCESS(after = layer->renderBounds;)
-  EXPECT_NEAR(after.left, before.left + OwnGeometryMoveDistance, 0.5f)
+  EXPECT_NEAR(after.left, before.left + GeometryMoveDistance, 0.5f)
       << "a parent transform must reach the bare-geometry child's render bounds. before="
       << before.left << " after=" << after.left;
   EXPECT_NEAR(after.top, before.top, 0.5f) << "a horizontal parent move must not shift the bounds";
@@ -8253,18 +8245,18 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryLayerFollowsParentTransform) {
       << "the parent move must not resize the bounds";
 }
 
-TGFX_TEST_PRIVATE(LayerTest, OwnGeometryLayerRedrawsAfterMove) {
+TGFX_TEST_PRIVATE(LayerTest, GeometryLayerRedrawsAfterMove) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  const auto panelRect = OwnGeometryPanelRect(20.0f, 20.0f);
+  const auto panelRect = GeometryPanelRect(20.0f, 20.0f);
   // Big enough that a frosted stripe pattern cannot be mistaken for the plain backdrop.
   constexpr int threshold = 8;
 
   // Reference: the same backdrop with no glass at all, so "the glass was drawn" is measured against
   // the backdrop rather than against a second glass configuration.
   auto referenceSurface =
-      Surface::Make(context, OwnGeometryMoveSurfaceWidth, OwnGeometryMoveSurfaceHeight);
+      Surface::Make(context, GeometryMoveSurfaceWidth, GeometryMoveSurfaceHeight);
   ASSERT_TRUE(referenceSurface != nullptr);
   {
     DisplayList referenceList;
@@ -8272,7 +8264,7 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryLayerRedrawsAfterMove) {
     referenceList.render(referenceSurface.get());
   }
 
-  auto surface = Surface::Make(context, OwnGeometryMoveSurfaceWidth, OwnGeometryMoveSurfaceHeight);
+  auto surface = Surface::Make(context, GeometryMoveSurfaceWidth, GeometryMoveSurfaceHeight);
   ASSERT_TRUE(surface != nullptr);
   DisplayList displayList;
   displayList.root()->addChild(MakeStripedRedBackdrop());
@@ -8282,7 +8274,7 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryLayerRedrawsAfterMove) {
 
   const int startX = static_cast<int>(panelRect.centerX());
   const int centerY = static_cast<int>(panelRect.centerY());
-  const int movedX = startX + static_cast<int>(OwnGeometryMoveDistance);
+  const int movedX = startX + static_cast<int>(GeometryMoveDistance);
   auto referenceStart = ReadPixelValue(referenceSurface.get(), startX, centerY);
   auto referenceMoved = ReadPixelValue(referenceSurface.get(), movedX, centerY);
   auto startBefore = ReadPixelValue(surface.get(), startX, centerY);
@@ -8296,7 +8288,7 @@ TGFX_TEST_PRIVATE(LayerTest, OwnGeometryLayerRedrawsAfterMove) {
 
   // Incremental frame: only the dirty regions are replayed, so the layer has to be drawn at its new
   // place AND the backdrop has to be restored where it used to be.
-  layer->setPosition({OwnGeometryMoveDistance, 0.0f});
+  layer->setPosition({GeometryMoveDistance, 0.0f});
   displayList.render(surface.get(), false);
 
   auto startAfter = ReadPixelValue(surface.get(), startX, centerY);
@@ -8411,7 +8403,7 @@ static int RasterAlphaAt(const std::vector<int>& raster, int size, int x, int y)
 // image behind, which is the same coverage as an image of zeros.
 static std::vector<int> RasterizeSharedContourAlpha(Context* context,
                                                     const std::shared_ptr<Layer>& layer) {
-  auto surface = Surface::Make(context, OwnGeometryProbeSize, OwnGeometryProbeSize);
+  auto surface = Surface::Make(context, GeometryProbeSize, GeometryProbeSize);
   if (surface == nullptr) {
     return {};
   }
@@ -8420,7 +8412,7 @@ static std::vector<int> RasterizeSharedContourAlpha(Context* context,
   TGFX_PRIVATE_ACCESS(DrawArgs drawArgs(context);
                       image = layer->getContentContourImage(drawArgs, 1.0f, &offset, nullptr);)
   if (image == nullptr) {
-    return std::vector<int>(static_cast<size_t>(OwnGeometryProbeSize) * OwnGeometryProbeSize, 0);
+    return std::vector<int>(static_cast<size_t>(GeometryProbeSize) * GeometryProbeSize, 0);
   }
   // The image is cropped to the outline's rounded-out bounds, so its recorded offset puts the raster
   // back into layer-local coordinates.
@@ -8434,7 +8426,7 @@ static std::vector<int> RasterizeContentContourAlpha(Context* context,
                                                      const std::shared_ptr<Layer>& layer,
                                                      bool includeUnpaintedGeometry) {
   std::vector<int> raster = {};
-  auto surface = Surface::Make(context, OwnGeometryProbeSize, OwnGeometryProbeSize);
+  auto surface = Surface::Make(context, GeometryProbeSize, GeometryProbeSize);
   if (surface == nullptr) {
     return raster;
   }
@@ -8467,7 +8459,7 @@ TGFX_TEST_PRIVATE(LayerTest, PaintlessEntryNeverDraws) {
     return layer;
   };
   auto render = [context](const std::shared_ptr<Layer>& layer) {
-    auto surface = Surface::Make(context, OwnGeometryProbeSize, OwnGeometryProbeSize);
+    auto surface = Surface::Make(context, GeometryProbeSize, GeometryProbeSize);
     if (surface == nullptr) {
       return surface;
     }
@@ -8487,7 +8479,7 @@ TGFX_TEST_PRIVATE(LayerTest, PaintlessEntryNeverDraws) {
   auto withBare = render(bareLayer);
   ASSERT_TRUE(painted != nullptr && withBare != nullptr);
   EXPECT_EQ(CountDifferingPixels(painted.get(), withBare.get(),
-                                 Rect::MakeWH(OwnGeometryProbeSize, OwnGeometryProbeSize), 0),
+                                 Rect::MakeWH(GeometryProbeSize, GeometryProbeSize), 0),
             0)
       << "a geometry no paint captured must not add a single pixel to the normal draw";
   auto paintedPixel = ReadPixelValue(painted.get(), static_cast<int>(paintedBounds.centerX()),
@@ -8524,12 +8516,12 @@ TGFX_TEST_PRIVATE(LayerTest, SharedContourExcludesPaintless) {
   auto paintless = RasterizeSharedContourAlpha(context, makeParent(false));
   ASSERT_FALSE(alphaZero.empty());
   ASSERT_EQ(alphaZero.size(), paintless.size());
-  EXPECT_EQ(RasterAlphaAt(alphaZero, OwnGeometryProbeSize, 100, 100), 255)
+  EXPECT_EQ(RasterAlphaAt(alphaZero, GeometryProbeSize, 100, 100), 255)
       << "control: a painter with alpha 0 stays in the contour shared with styles and masks";
-  EXPECT_EQ(RasterAlphaAt(paintless, OwnGeometryProbeSize, 100, 100), 0)
+  EXPECT_EQ(RasterAlphaAt(paintless, GeometryProbeSize, 100, 100), 0)
       << "a geometry no paint captured must stay out of that contour, otherwise a bare descendant "
          "starts covering the parent's style output";
-  EXPECT_EQ(RasterAlphaAt(paintless, OwnGeometryProbeSize, 20, 20), 0)
+  EXPECT_EQ(RasterAlphaAt(paintless, GeometryProbeSize, 20, 20), 0)
       << "the whole contour must stay empty when only bare geometry is present";
 }
 
@@ -8558,9 +8550,9 @@ TGFX_TEST_PRIVATE(LayerTest, ContourRepresentativeFollowsCaliber) {
            "could take the representative slot away from the painted entry";)
     auto paintedCaliber = RasterizeContentContourAlpha(context, layer, false);
     auto allCaliber = RasterizeContentContourAlpha(context, layer, true);
-    EXPECT_EQ(RasterAlphaAt(paintedCaliber, OwnGeometryProbeSize, 100, 100), 255)
+    EXPECT_EQ(RasterAlphaAt(paintedCaliber, GeometryProbeSize, 100, 100), 255)
         << "the painter whose alpha is 0 still draws the contour of the painted caliber";
-    EXPECT_EQ(RasterAlphaAt(allCaliber, OwnGeometryProbeSize, 100, 100), 255);
+    EXPECT_EQ(RasterAlphaAt(allCaliber, GeometryProbeSize, 100, 100), 255);
   }
   // Only bare geometry, two entries sharing one outline. A representative table exists here, and a
   // selection that comes out empty has to mean "draw nothing" rather than "read every entry": the
@@ -8597,9 +8589,9 @@ TGFX_TEST_PRIVATE(LayerTest, ContourRepresentativeFollowsCaliber) {
            "distinguishable from having no table at all";)
     auto paintedCaliber = RasterizeContentContourAlpha(context, layer, false);
     auto allCaliber = RasterizeContentContourAlpha(context, layer, true);
-    EXPECT_EQ(RasterAlphaAt(allCaliber, OwnGeometryProbeSize, 100, 100), 255)
+    EXPECT_EQ(RasterAlphaAt(allCaliber, GeometryProbeSize, 100, 100), 255)
         << "the caliber that includes bare geometry must draw it";
-    EXPECT_EQ(RasterAlphaAt(paintedCaliber, OwnGeometryProbeSize, 100, 100), 0)
+    EXPECT_EQ(RasterAlphaAt(paintedCaliber, GeometryProbeSize, 100, 100), 0)
         << "an empty selection means nothing is drawn, not that every entry is read";
   }
 }

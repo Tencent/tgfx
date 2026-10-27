@@ -267,7 +267,7 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (group == nullptr) {
     return;
   }
-  // The recording the consumer samples: a style that draws from the layer's own geometry takes that
+  // The recording the consumer samples: a style that draws from the layer's geometry takes that
   // recording, every other style the shared content. A style that resolves to nothing to draw is
   // skipped by BOTH sides, so capture and consume keep the same push/pop count. A resolved source
   // always carries an image (RefreshTypedSources builds no other kind), so only its absence is left
@@ -402,12 +402,12 @@ const LayerStyleSource* BackgroundCapturer::cacheLayerStyleSource(
   }
   // Wrap each picture-backed image as Rasterized so the first draw uploads a GPU texture and the
   // second reuses it; makeRasterized() is a no-op on an already-rasterized image, so content and
-  // contour need no dedupe. The own geometry does: it is recorded once and shared by both buckets,
+  // contour need no dedupe. The geometry does: it is recorded once and shared by both buckets,
   // and wrapping it per bucket would give one recording two GPU caches. Dedupe by the image
   // underneath. The swap replaces entry images in place, so the typed sources built from them hold
   // stale PictureImage proxies and must be rebuilt afterwards.
-  std::shared_ptr<Image> ownRecording = nullptr;
-  std::shared_ptr<Image> ownRasterized = nullptr;
+  std::shared_ptr<Image> geometryRecording = nullptr;
+  std::shared_ptr<Image> geometryRasterized = nullptr;
   for (auto& group : source->groups) {
     if (group == nullptr) {
       continue;
@@ -418,16 +418,16 @@ const LayerStyleSource* BackgroundCapturer::cacheLayerStyleSource(
     if (group->contour.has_value() && group->contour->image != nullptr) {
       group->contour->image = group->contour->image->makeRasterized();
     }
-    if (!group->ownGeometry.has_value() || group->ownGeometry->image == nullptr) {
+    if (!group->geometry.has_value() || group->geometry->image == nullptr) {
       continue;
     }
-    if (ownRecording == group->ownGeometry->image) {
-      group->ownGeometry->image = ownRasterized;
+    if (geometryRecording == group->geometry->image) {
+      group->geometry->image = geometryRasterized;
       continue;
     }
-    ownRecording = group->ownGeometry->image;
-    ownRasterized = ownRecording->makeRasterized();
-    group->ownGeometry->image = ownRasterized;
+    geometryRecording = group->geometry->image;
+    geometryRasterized = geometryRecording->makeRasterized();
+    group->geometry->image = geometryRasterized;
   }
   RefreshTypedSources(*source);
   for (const auto& group : source->groups) {
@@ -442,9 +442,9 @@ const LayerStyleSource* BackgroundCapturer::cacheLayerStyleSource(
     DEBUG_ASSERT(!group->contour.has_value() || group->contour->image == nullptr ||
                  (group->contourFallbackSource != nullptr &&
                   group->contourFallbackSource->image() == group->contour->image));
-    DEBUG_ASSERT(
-        !group->ownGeometry.has_value() || group->ownGeometry->image == nullptr ||
-        (group->ownSource != nullptr && group->ownSource->image() == group->ownGeometry->image));
+    DEBUG_ASSERT(!group->geometry.has_value() || group->geometry->image == nullptr ||
+                 (group->geometrySource != nullptr &&
+                  group->geometrySource->image() == group->geometry->image));
   }
   auto* raw = source.get();
   snapshots->layerStyleSources.emplace(layer, std::move(source));
@@ -473,7 +473,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (group == nullptr) {
     return;
   }
-  // A style that draws from the layer's own geometry consumes that recording, every other style the
+  // A style that draws from the layer's geometry consumes that recording, every other style the
   // shared content; a group that recorded nothing usable for this style resolves to nullptr so the
   // style is skipped. A resolved source always carries an image, so testing it is enough.
   auto contentSource = ResolveContentSource(*group, style);

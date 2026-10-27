@@ -33,7 +33,7 @@ class LayerContent {
   virtual ~LayerContent() = default;
 
   /**
-   * Returns the bounds of the content. A geometry no paint captured belongs to the layer's own
+   * Returns the bounds of the content. A geometry no paint captured belongs to the layer's
    * geometry rather than to its painted content, so each query states whether it takes part.
    */
   virtual Rect getBounds(bool includeUnpaintedGeometry) const = 0;

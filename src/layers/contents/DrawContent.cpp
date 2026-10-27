@@ -86,7 +86,7 @@ void DrawContent::drawContourInternal(Canvas* canvas, bool antiAlias,
     }
   } else {
     // A bare geometry has no paint to draw with, so its contour is the opaque white fill the
-    // own-geometry recording has always covered it with.
+    // geometry recording has always covered it with.
     paint.setColor(Color::White());
   }
   onDraw(canvas, paint);

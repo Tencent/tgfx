@@ -48,30 +48,29 @@ LayerRecorder::LayerRecorder() = default;
 
 LayerRecorder::~LayerRecorder() = default;
 
-void LayerRecorder::addRect(const Rect& rect, const LayerPaint& paint) {
-  addRect(rect, paint, _matrix, true);
+void LayerRecorder::addRect(const Rect& rect, const LayerPaint* paint) {
+  LayerPaint fallback = {};
+  addRect(rect, paint != nullptr ? *paint : fallback, _matrix, paint != nullptr);
 }
 
-void LayerRecorder::addRRect(const RRect& rRect, const LayerPaint& paint) {
-  addRRect(rRect, paint, _matrix, true);
+void LayerRecorder::addRRect(const RRect& rRect, const LayerPaint* paint) {
+  LayerPaint fallback = {};
+  addRRect(rRect, paint != nullptr ? *paint : fallback, _matrix, paint != nullptr);
 }
 
-void LayerRecorder::addPath(const Path& path, const LayerPaint& paint) {
-  addPath(path, paint, _matrix, true);
+void LayerRecorder::addPath(const Path& path, const LayerPaint* paint) {
+  LayerPaint fallback = {};
+  addPath(path, paint != nullptr ? *paint : fallback, _matrix, paint != nullptr);
 }
 
-void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint) {
-  addShape(std::move(shape), paint, _matrix, true);
+void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint* paint) {
+  // The paint is copied by the private overload, never referenced, so the caller's paint may be
+  // released as soon as this call returns.
+  LayerPaint fallback = {};
+  addShape(std::move(shape), paint != nullptr ? *paint : fallback, _matrix, paint != nullptr);
 }
 
-void LayerRecorder::addShape(std::shared_ptr<Shape> shape) {
-  // A geometry no paint captured: recorded with an empty paint so queries that include unpainted
-  // geometry see its outline, while the paint flag keeps it out of the normal draw and the shared
-  // contour. The paint is copied, never referenced.
-  addShape(std::move(shape), LayerPaint{}, _matrix, false);
-}
-
-void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint& paint,
+void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint* paint,
                                 float x, float y) {
   if (textBlob == nullptr) {
     return;
@@ -79,31 +78,37 @@ void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerP
   // TextContent does not consume strokeAlign or pathEffect. Callers that need Inside/Outside
   // alignment or a path effect on text must first convert the TextBlob into a Shape (see
   // StrokeStyle::prepareGlyphRun) and route it through addShape().
-  DEBUG_ASSERT(!ComplexStrokeStyle(paint));
+  LayerPaint fallback = {};
+  const LayerPaint& effective = paint != nullptr ? *paint : fallback;
+  const bool hasPaint = paint != nullptr;
+  DEBUG_ASSERT(!ComplexStrokeStyle(effective));
   flushPending();
-  auto& list = paint.placement == LayerPlacement::Foreground ? foregrounds : contents;
+  auto& list = effective.placement == LayerPlacement::Foreground ? foregrounds : contents;
   // The offset only affects the text position, while _matrix affects both
   // the text position and the paint (shader/maskFilter coordinates).
   auto offset = Point::Make(x, y);
   std::unique_ptr<GeometryContent> content =
-      std::make_unique<TextContent>(std::move(textBlob), offset, paint, true);
+      std::make_unique<TextContent>(std::move(textBlob), offset, effective, hasPaint);
   if (!_matrix.isIdentity()) {
     content = std::make_unique<MatrixContent>(std::move(content), _matrix);
   }
   list.push_back(std::move(content));
 }
 
-void LayerRecorder::addMesh(std::shared_ptr<Mesh> mesh, const LayerPaint& paint) {
+void LayerRecorder::addMesh(std::shared_ptr<Mesh> mesh, const LayerPaint* paint) {
   if (mesh == nullptr) {
     return;
   }
   // MeshContent does not consume strokeAlign or pathEffect. There is no reasonable way to apply
   // stroke alignment or a path effect to a Mesh, so reject the paint here.
-  DEBUG_ASSERT(!ComplexStrokeStyle(paint));
+  LayerPaint fallback = {};
+  const LayerPaint& effective = paint != nullptr ? *paint : fallback;
+  const bool hasPaint = paint != nullptr;
+  DEBUG_ASSERT(!ComplexStrokeStyle(effective));
   flushPending();
-  auto& list = paint.placement == LayerPlacement::Foreground ? foregrounds : contents;
+  auto& list = effective.placement == LayerPlacement::Foreground ? foregrounds : contents;
   std::unique_ptr<GeometryContent> content =
-      std::make_unique<MeshContent>(std::move(mesh), paint, true);
+      std::make_unique<MeshContent>(std::move(mesh), effective, hasPaint);
   if (!_matrix.isIdentity()) {
     content = std::make_unique<MatrixContent>(std::move(content), _matrix);
   }

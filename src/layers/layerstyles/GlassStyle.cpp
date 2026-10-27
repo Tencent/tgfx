@@ -132,7 +132,7 @@ struct GlassShapeInfo {
 // alpha — the actually rendered shape, strokes included.
 static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   GlassShapeInfo info;
-  // The SDF path needs an exact outline of the sampled recording, and only the own-geometry readback
+  // The SDF path needs an exact outline of the sampled recording, and only the geometry readback
   // provides one: the shared content and the contour fallback describe no single outline.
   if (input.content == nullptr || input.content->type() != StyleInputSource::Type::Geometry) {
     return info;

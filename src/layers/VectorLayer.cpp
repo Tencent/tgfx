@@ -84,7 +84,7 @@ void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
     painter->draw(recorder);
   }
   // Geometries no painter captured are recorded without a paint: they paint nothing and stay out of
-  // the shared contour, but they are still this layer's own geometry. The set is taken after every
+  // the shared contour, but they are still this layer's geometry. The set is taken after every
   // element applied, since MergePath clears geometries and painters while Repeater clones and
   // reorders them. A captured geometry is drawn through its painter, so it is not bare; collecting
   // the captures once keeps the comparison from being quadratic in the geometry count.
@@ -106,7 +106,7 @@ void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
     // The recorder applies its CTM to the geometry, so the matrix stays a transform instead of
     // being baked into the shape.
     recorder->setMatrix(geometry->matrix);
-    recorder->addShape(std::move(shape));
+    recorder->addShape(std::move(shape), nullptr);
     recorder->resetMatrix();
   }
 }

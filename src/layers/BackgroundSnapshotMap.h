@@ -117,7 +117,7 @@ struct BackgroundSnapshotMap {
   int renderTargetWidth = 0;
   int renderTargetHeight = 0;
   // Style-space visible region per (Layer, LayerStyle) pair, computed during capture. The style
-  // space follows the recording the style resolves (own geometry, contour fallback or shared
+  // space follows the recording the style resolves (geometry, contour fallback or shared
   // content), while every pass in a frame shares it, so one rect per pair bounds the recorded
   // style output for all passes.
   std::unordered_map<BackgroundSnapshotKey, Rect, BackgroundSnapshotKeyHash> styleVisibleBounds =

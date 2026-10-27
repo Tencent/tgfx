@@ -35,7 +35,7 @@ struct GlassRefractionParams;
  * GlassStyle simulates the physical behavior of light passing through a glass surface, producing
  * refraction, chromatic dispersion, frosted blur, and specular highlights. It captures the
  * background content below the layer and renders it with optical distortion shaped by the
- * layer's own geometry.
+ * layer's geometry.
  */
 class GlassStyle : public LayerStyle {
  public:
@@ -137,8 +137,8 @@ class GlassStyle : public LayerStyle {
   }
 
   /**
-   * Glass covers the layer's own geometry rather than its rendered content, so a layer whose
-   * painting is invisible still refracts over its own geometry.
+   * Glass covers the layer's geometry rather than its rendered content, so a layer whose
+   * painting is invisible still refracts over its geometry.
    */
   LayerStyleContentSource contentSource() const override {
     return LayerStyleContentSource::Geometry;

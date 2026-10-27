@@ -32,7 +32,7 @@
 namespace tgfx {
 
 /**
- * OwnGeometryShapeContext reads back the shape a layer's own-geometry recording covers by playing
+ * GeometryShapeContext reads back the shape a layer's geometry recording covers by playing
  * the finished picture back, so it describes what the recording painted instead of re-deriving it
  * from the elements or painters behind it.
  *
@@ -41,7 +41,7 @@ namespace tgfx {
  * differently shaped area rejects the whole extraction, so callers fall back to a non-vector path
  * instead of covering part of the layer.
  */
-class OwnGeometryShapeContext : public DrawContext, public Picture::AbortCallback {
+class GeometryShapeContext : public DrawContext, public Picture::AbortCallback {
  public:
   /**
    * Returns the single shape the picture covers, already in layer coordinates, or nullopt when the
@@ -53,7 +53,7 @@ class OwnGeometryShapeContext : public DrawContext, public Picture::AbortCallbac
     if (picture == nullptr || FloatNearlyZero(contentScale)) {
       return std::nullopt;
     }
-    OwnGeometryShapeContext context = {};
+    GeometryShapeContext context = {};
     context.scale = contentScale;
     // The same object aborts the playback: once a draw rejects the extraction no later record can
     // add a shape back, so the rest of the picture does not have to be read.

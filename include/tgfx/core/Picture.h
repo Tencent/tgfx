@@ -111,6 +111,6 @@ class Picture {
   friend class PDFExportContext;
   friend class OpaqueContext;
   friend class MaskContext;
-  friend class OwnGeometryShapeContext;
+  friend class GeometryShapeContext;
 };
 }  // namespace tgfx

@@ -42,7 +42,7 @@ class GeometryContent : public LayerContent {
 
   /**
    * Returns true if a paint captured this entry. An entry no paint captured is bare geometry: it
-   * paints nothing, contributes no shared contour, and only counts for the layer's own geometry.
+   * paints nothing, contributes no shared contour, and only counts for the layer's geometry.
    */
   virtual bool hasPaint() const = 0;
 };
