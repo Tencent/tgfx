@@ -409,16 +409,22 @@ TEST(LayeringTest, TheCacheKnowsNothingOfShaders) {
 }
 
 TEST(LayeringTest, CoreModulesDependOnNothing) {
-  // core/ is the bottom of the tool: every other sublayer may use it and it may use nothing.
-  // The moment it includes another module the graph has a second bottom, and the layering the
+  // core/ is the bottom of the tool: every other sublayer may use it and it may use nothing
+  // outside itself. A core module depending on another core module keeps that bottom single —
+  // the moment one reaches out of core/, the graph has a second bottom and the layering the
   // other tests assume stops holding.
-  auto graph = ToolModuleGraph();
+  std::set<std::string> coreModules;
   for (const auto& file : FilesIn(ToolDir() + "/core", {".cpp", ".h"})) {
-    auto module = std::filesystem::path(file).stem().string();
+    coreModules.insert(std::filesystem::path(file).stem().string());
+  }
+  auto graph = ToolModuleGraph();
+  for (const auto& module : coreModules) {
     ASSERT_EQ(graph.count(module), 1u) << module << " of core/ is not in the module graph";
-    EXPECT_TRUE(graph[module].empty())
-        << module << " of core/ depends on " << *(graph[module].begin())
-        << "; core is the bottom of the tool";
+    for (const auto& dependency : graph[module]) {
+      EXPECT_EQ(coreModules.count(dependency), 1u)
+          << module << " of core/ depends on " << dependency
+          << "; core is the bottom of the tool and may only use itself";
+    }
   }
 }
 

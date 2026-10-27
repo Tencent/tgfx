@@ -24,11 +24,23 @@
 
 #include <map>
 #include <string>
+#include "core/DiagnosticCodes.h"
 #include "core/Diagnostics.h"
 #include "gtest/gtest.h"
 
 namespace tgfx {
 namespace {
+
+Diagnostic MakeDiagnostic(Severity severity, const char* profile, const char* message) {
+  Diagnostic diagnostic;
+  diagnostic.severity = severity;
+  diagnostic.layer = Layer::Verify;
+  diagnostic.code = DiagnosticCode::Unclassified;
+  diagnostic.profile = profile;
+  diagnostic.shader = "TestShader";
+  diagnostic.message = message;
+  return diagnostic;
+}
 
 TEST(DiagnosticsTest, ACommonErrorCountsEveryRegisteredProfile) {
   Diagnostics diagnostics;
@@ -85,6 +97,76 @@ TEST(DiagnosticsTest, TheCountsComeBackInTagOrder) {
   diagnostics.registerProfile("opengl");
   std::map<std::string, uint64_t> expected = {{"opengl", 0}, {"vulkan", 0}};
   EXPECT_EQ(diagnostics.errorCounts(), expected);
+}
+
+TEST(DiagnosticsTest, AProfileErrorRecordCountsOnlyThatProfile) {
+  Diagnostics diagnostics;
+  diagnostics.registerProfile("opengl");
+  diagnostics.registerProfile("vulkan");
+  diagnostics.report(MakeDiagnostic(Severity::Error, "vulkan", "mismatch"));
+  EXPECT_EQ(diagnostics.errorCounts().at("opengl"), 0u);
+  EXPECT_EQ(diagnostics.errorCounts().at("vulkan"), 1u);
+}
+
+TEST(DiagnosticsTest, ACommonErrorRecordCountsEveryProfileRegisteredAtThatMoment) {
+  // Point-in-time semantics, preserved from the bare map: a profile registered after the record
+  // does not inherit it, which is what keeps the report figures identical to the old counting.
+  Diagnostics diagnostics;
+  diagnostics.registerProfile("opengl");
+  diagnostics.report(MakeDiagnostic(Severity::Error, "", "common"));
+  diagnostics.registerProfile("vulkan");
+  EXPECT_EQ(diagnostics.errorCounts().at("opengl"), 1u);
+  EXPECT_EQ(diagnostics.errorCounts().at("vulkan"), 0u);
+}
+
+TEST(DiagnosticsTest, AWarningIsLoggedButDoesNotFailOrCount) {
+  Diagnostics diagnostics;
+  diagnostics.registerProfile("opengl");
+  diagnostics.report(MakeDiagnostic(Severity::Warning, "opengl", "deprecated"));
+  EXPECT_EQ(diagnostics.errorCounts().at("opengl"), 0u);
+  EXPECT_EQ(diagnostics.count(Severity::Warning), 1u);
+  EXPECT_FALSE(diagnostics.hasErrors());
+}
+
+TEST(DiagnosticsTest, AnUnverifiableRecordFailsTheBuildLikeAnError) {
+  // "Never checked" is not "checked and passed": it must fail the build, and it counts against
+  // the profile so the report shows the build as failed for that backend too.
+  Diagnostics diagnostics;
+  diagnostics.registerProfile("webgpu");
+  diagnostics.report(MakeDiagnostic(Severity::Unverifiable, "webgpu", "could not run"));
+  EXPECT_TRUE(diagnostics.hasErrors());
+  EXPECT_EQ(diagnostics.errorCounts().at("webgpu"), 1u);
+  EXPECT_EQ(diagnostics.count(Severity::Unverifiable), 1u);
+}
+
+TEST(DiagnosticsTest, RecordsKeepReportOrderAndContent) {
+  Diagnostics diagnostics;
+  diagnostics.registerProfile("opengl");
+  diagnostics.report(MakeDiagnostic(Severity::Error, "opengl", "first"));
+  diagnostics.report(MakeDiagnostic(Severity::Warning, "", "second"));
+  diagnostics.report(MakeDiagnostic(Severity::Unverifiable, "metal", "third"));
+  ASSERT_EQ(diagnostics.records().size(), 3u);
+  EXPECT_EQ(diagnostics.records()[0].message, "first");
+  EXPECT_EQ(diagnostics.records()[0].shader, "TestShader");
+  EXPECT_EQ(diagnostics.records()[1].message, "second");
+  EXPECT_EQ(diagnostics.records()[2].message, "third");
+  EXPECT_EQ(diagnostics.records()[2].profile, "metal");
+}
+
+TEST(DiagnosticsTest, TheLegacyRecordersLogUnclassifiedRecords) {
+  // The compatibility entry points route through report(), so a site that has not named its code
+  // yet still shows up in the log with the placeholder code.
+  Diagnostics diagnostics;
+  diagnostics.registerProfile("opengl");
+  diagnostics.recordCommonError();
+  diagnostics.recordProfileError("vulkan");
+  ASSERT_EQ(diagnostics.records().size(), 2u);
+  EXPECT_STREQ(diagnostics.records()[0].code, DiagnosticCode::Unclassified);
+  EXPECT_EQ(diagnostics.records()[0].profile, "");
+  EXPECT_STREQ(diagnostics.records()[1].code, DiagnosticCode::Unclassified);
+  EXPECT_EQ(diagnostics.records()[1].profile, "vulkan");
+  EXPECT_EQ(diagnostics.errorCounts().at("opengl"), 1u);
+  EXPECT_EQ(diagnostics.errorCounts().at("vulkan"), 1u);
 }
 
 }  // namespace
