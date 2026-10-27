@@ -22,6 +22,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include "core/Diagnostics.h"
 
 namespace tgfx {
 
@@ -64,12 +65,14 @@ struct InlineExpansionRecord {
 /// sites is the pattern that multiplied the pointwise kernels' compile time (per-leaf tiled
 /// fetches, per-mode HSL blend helpers, per-channel transfer functions, the XferProcessor blend
 /// next to the loop's blend); funnelling the call sites into one is what removes the copies.
-/// Returns the violation count and prints each violation.
-size_t ValidateInlineExpansion(const std::vector<InlineExpansionRecord>& records);
+/// Reports each violation and each unanalyzable module as a diagnostic and returns the count.
+size_t ValidateInlineExpansion(const std::vector<InlineExpansionRecord>& records,
+                               Diagnostics* diagnostics);
 
 /// Writes the per-variant expansion and every duplicated function to a JSON file. Returns false
-/// when the file cannot be written.
+/// when the file cannot be written, reporting the failure to diagnostics.
 bool WriteInlineExpansionReport(const std::string& path,
-                                const std::vector<InlineExpansionRecord>& records);
+                                const std::vector<InlineExpansionRecord>& records,
+                                Diagnostics* diagnostics);
 
 }  // namespace tgfx

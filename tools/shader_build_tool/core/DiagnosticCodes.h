@@ -42,6 +42,41 @@ namespace DiagnosticCode {
 /// it exists so the record model could land before the call sites did.
 inline constexpr const char* Unclassified = "internal.unclassified";
 
+// ---- verify: the build-time contract checks ------------------------------------------------
+
+/// A variant carries the clip contract but is missing one of its uniform fields.
+inline constexpr const char* VerifyClipField = "verify.clip.missing-field";
+
+/// A GLSL OP_* define disagrees with the C++ op-code constant, or is unparseable/unknown.
+inline constexpr const char* VerifyOpCode = "verify.opcode.mismatch";
+
+/// A GLSL slot capacity disagrees with the C++ resource capacity.
+inline constexpr const char* VerifySlotCapacity = "verify.capacity.mismatch";
+
+/// A shader source refers to a file that does not exist.
+inline constexpr const char* VerifySourceFile = "verify.reference.missing-file";
+
+/// A shader source refers to a shader family that is not registered.
+inline constexpr const char* VerifySourceFamily = "verify.reference.unknown-family";
+
+/// A reflected sampler/uniform violates the reflection contract the loader enforces on read.
+inline constexpr const char* VerifyReflection = "verify.reflection.invalid";
+
+/// A shader resource sits on a set/binding/group the runtime pipeline does not bind there.
+inline constexpr const char* VerifyBindingLayout = "verify.binding.misplaced";
+
+/// A function's duplicated instructions exceed the inline expansion policy.
+inline constexpr const char* VerifyInlinePolicy = "verify.inline-policy";
+
+/// A check could not run at all (a pattern it scans for is absent, a file it reads is not the
+/// format it expects). Reported as Unverifiable, never as a silent skip.
+inline constexpr const char* VerifyNotApplicable = "verify.unverifiable";
+
+// ---- output: writing the artifacts ----------------------------------------------------------
+
+/// An output file (a report, a bundle, a manifest) could not be written.
+inline constexpr const char* OutputWrite = "output.write-failed";
+
 }  // namespace DiagnosticCode
 
 }  // namespace tgfx

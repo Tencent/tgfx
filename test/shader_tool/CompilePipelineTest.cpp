@@ -29,6 +29,7 @@
 #include "InlineExpansion.h"
 #include "compile/ReflectionExtractor.h"
 #include "ShaderCompiler.h"
+#include "core/DiagnosticCodes.h"
 #include "compile/StageCompiler.h"
 #include "gpu/ShaderBindingLayout.h"
 #include "gpu/Uniform.h"
@@ -408,41 +409,48 @@ TEST(InlineExpansionPolicyTest, AFunctionDuplicatedWithinTheLimitPasses) {
   // A small helper called twice duplicates few instructions.
   InlineExpansionRecord record = {"S", 0, Analyze(FragmentCalling(2, 2))};
   ASSERT_TRUE(record.expansion.valid);
-  EXPECT_EQ(ValidateInlineExpansion({record}), 0u);
+  Diagnostics diagnostics;
+  EXPECT_EQ(ValidateInlineExpansion({record}, &diagnostics), 0u);
+  EXPECT_TRUE(diagnostics.records().empty());
 }
 
 TEST(InlineExpansionPolicyTest, AHeavyFunctionWithManyCallSitesIsAViolation) {
   InlineExpansionRecord record = {"HeavyShader", 3, Analyze(FragmentCalling(12, 60))};
   ASSERT_TRUE(record.expansion.valid);
-  ::testing::internal::CaptureStderr();
-  ::testing::internal::CaptureStdout();
-  auto errors = ValidateInlineExpansion({record});
-  auto out = ::testing::internal::GetCapturedStdout();
-  auto err = ::testing::internal::GetCapturedStderr();
+  Diagnostics diagnostics;
+  auto errors = ValidateInlineExpansion({record}, &diagnostics);
   EXPECT_GE(errors, 1u);
-  EXPECT_TRUE(out.find("heavy") != std::string::npos || err.find("heavy") != std::string::npos)
-      << out << err;
+  ASSERT_FALSE(diagnostics.records().empty());
+  EXPECT_STREQ(diagnostics.records()[0].code, DiagnosticCode::VerifyInlinePolicy);
+  EXPECT_EQ(diagnostics.records()[0].shader, "HeavyShader");
+  EXPECT_EQ(diagnostics.records()[0].fragPermutationIndex, 3);
+  EXPECT_NE(diagnostics.records()[0].message.find("duplicated instructions"), std::string::npos);
 }
 
 TEST(InlineExpansionPolicyTest, AHeavyFunctionWithOneCallSiteIsFine) {
   InlineExpansionRecord record = {"S", 0, Analyze(FragmentCalling(1, 60))};
   ASSERT_TRUE(record.expansion.valid);
-  EXPECT_EQ(ValidateInlineExpansion({record}), 0u);
+  Diagnostics diagnostics;
+  EXPECT_EQ(ValidateInlineExpansion({record}, &diagnostics), 0u);
 }
 
 TEST(InlineExpansionPolicyTest, AnUnanalyzableModuleIsAViolationNotASilentPass) {
   // A module the analysis cannot read leaves the policy without coverage, so it fails the build
-  // instead of letting a heavy function through unchecked.
+  // instead of letting a heavy function through unchecked — and it is reported as unverifiable,
+  // not as a policy violation, so the two cannot be confused when reading the log.
   InlineExpansionRecord record;
   record.shaderName = "UnreadableShader";
   record.fragPermutationIndex = 4;
   EXPECT_FALSE(record.expansion.valid);
-  ::testing::internal::CaptureStderr();
-  auto errors = ValidateInlineExpansion({record});
-  auto log = ::testing::internal::GetCapturedStderr();
+  Diagnostics diagnostics;
+  auto errors = ValidateInlineExpansion({record}, &diagnostics);
   EXPECT_EQ(errors, 1u);
-  EXPECT_NE(log.find("UnreadableShader (frag 4)"), std::string::npos) << log;
-  EXPECT_NE(log.find("could not be analyzed"), std::string::npos) << log;
+  ASSERT_EQ(diagnostics.records().size(), 1u);
+  EXPECT_EQ(diagnostics.records()[0].severity, Severity::Unverifiable);
+  EXPECT_STREQ(diagnostics.records()[0].code, DiagnosticCode::VerifyNotApplicable);
+  EXPECT_EQ(diagnostics.records()[0].shader, "UnreadableShader");
+  EXPECT_EQ(diagnostics.records()[0].fragPermutationIndex, 4);
+  EXPECT_NE(diagnostics.records()[0].message.find("could not be analyzed"), std::string::npos);
 }
 
 TEST(InlineExpansionPolicyTest, ViolationsOfOneFunctionAcrossVariantsAreReportedOnce) {
@@ -453,27 +461,30 @@ TEST(InlineExpansionPolicyTest, ViolationsOfOneFunctionAcrossVariantsAreReported
   for (uint32_t variant = 0; variant < 4; ++variant) {
     records.push_back({"HeavyShader", variant, expansion});
   }
-  ::testing::internal::CaptureStderr();
-  auto errors = ValidateInlineExpansion(records);
-  auto log = ::testing::internal::GetCapturedStderr();
-  EXPECT_EQ(errors, 1u) << log;
-  EXPECT_NE(log.find("4 variant(s)"), std::string::npos) << log;
+  Diagnostics diagnostics;
+  auto errors = ValidateInlineExpansion(records, &diagnostics);
+  EXPECT_EQ(errors, 1u);
+  ASSERT_EQ(diagnostics.records().size(), 1u);
+  EXPECT_NE(diagnostics.records()[0].message.find("4 variant(s)"), std::string::npos);
 }
 
 TEST(InlineExpansionPolicyTest, ViolationsOfDifferentShadersAreCountedSeparately) {
   auto expansion = Analyze(FragmentCalling(12, 60));
   ASSERT_TRUE(expansion.valid);
-  ::testing::internal::CaptureStderr();
-  auto errors = ValidateInlineExpansion({{"ShaderA", 0, expansion}, {"ShaderB", 0, expansion}});
-  ::testing::internal::GetCapturedStderr();
+  Diagnostics diagnostics;
+  auto errors =
+      ValidateInlineExpansion({{"ShaderA", 0, expansion}, {"ShaderB", 0, expansion}}, &diagnostics);
   EXPECT_EQ(errors, 2u);
+  EXPECT_EQ(diagnostics.records().size(), 2u);
 }
 
 TEST(InlineExpansionReportTest, TheReportListsEveryVariantAndItsDuplicatedFunctions) {
   auto expansion = Analyze(FragmentCalling(5, 6));
   ASSERT_TRUE(expansion.valid);
   auto path = ::testing::TempDir() + "tgfx_shader_tool_inline_report.json";
-  ASSERT_TRUE(WriteInlineExpansionReport(path, {{"ShaderA", 2, expansion}}));
+  Diagnostics diagnostics;
+  ASSERT_TRUE(WriteInlineExpansionReport(path, {{"ShaderA", 2, expansion}}, &diagnostics));
+  EXPECT_TRUE(diagnostics.records().empty());
   std::ifstream file(path);
   std::stringstream buffer;
   buffer << file.rdbuf();
@@ -487,7 +498,12 @@ TEST(InlineExpansionReportTest, TheReportListsEveryVariantAndItsDuplicatedFuncti
 }
 
 TEST(InlineExpansionReportTest, AnUnwritablePathFailsInsteadOfPretending) {
-  EXPECT_FALSE(WriteInlineExpansionReport("/nonexistent/directory/report.json", {}));
+  Diagnostics diagnostics;
+  EXPECT_FALSE(
+      WriteInlineExpansionReport("/nonexistent/directory/report.json", {}, &diagnostics));
+  ASSERT_EQ(diagnostics.records().size(), 1u);
+  EXPECT_STREQ(diagnostics.records()[0].code, DiagnosticCode::OutputWrite);
+  EXPECT_EQ(diagnostics.records()[0].layer, Layer::Output);
 }
 
 }  // namespace tgfx

@@ -53,4 +53,11 @@ struct BuildReport {
 /// false when the file cannot be written.
 bool WriteReportJson(const BuildReport& report, const std::string& outDir);
 
+/// Renders the recorded diagnostics to stderr, one block per record:
+///   [E][verify] verify.clip.missing-field  shader=X frag=7
+///     carries the clip contract but is missing uniform 'HasClip'
+/// Records without a message are skipped (the compile loop still prints its own context until
+/// its call sites report with messages).
+void PrintDiagnostics(const Diagnostics& diagnostics);
+
 }  // namespace tgfx

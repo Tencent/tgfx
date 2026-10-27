@@ -372,7 +372,9 @@ int RunBuildCommand(const BuildOptions& options) {
   // source references). A rule prints each violation itself; the counts gate the build, so a
   // mismatch fails here instead of surfacing as a runtime upload missing its target.
   if (!options.inlineReportPath.empty() &&
-      !WriteInlineExpansionReport(options.inlineReportPath, report.inlineExpansions)) {
+      !WriteInlineExpansionReport(options.inlineReportPath, report.inlineExpansions,
+                                  &report.diagnostics)) {
+    PrintDiagnostics(report.diagnostics);
     return 1;
   }
   size_t contractErrors = 0;
@@ -380,7 +382,7 @@ int RunBuildCommand(const BuildOptions& options) {
   artifactContext.variants = &report.variants;
   artifactContext.inlineExpansions = &report.inlineExpansions;
   for (const auto& rule : MakeArtifactRules()) {
-    contractErrors += rule->check(artifactContext);
+    contractErrors += rule->check(artifactContext, &report.diagnostics);
   }
   if (!options.reportOnly && !options.shaderDir.empty()) {
     SourceRuleContext sourceContext;
@@ -389,9 +391,10 @@ int RunBuildCommand(const BuildOptions& options) {
       sourceContext.registeredShaders.push_back(factory()->info().name);
     }
     for (const auto& rule : MakeSourceRules()) {
-      contractErrors += rule->check(sourceContext);
+      contractErrors += rule->check(sourceContext, &report.diagnostics);
     }
   }
+  PrintDiagnostics(report.diagnostics);
   if (contractErrors > 0) {
     std::cerr << "Build failed: " << contractErrors << " kernel contract violation(s).\n";
     return 1;

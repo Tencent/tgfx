@@ -108,6 +108,15 @@ inline constexpr uint32_t ProfileTag = 48;        // ProfileTagSize bytes, zero 
 /// The size of the profile tag field, including the zero padding.
 inline constexpr uint32_t ProfileTagSize = 32;
 
+/// Limits of the reflection pool. A stage's reflection serializes its list counts and every name
+/// length as one byte (see SerializeStageReflection), so these are format facts, not policy: the
+/// writer, the loader and shader_build_tool's contract check all read them from here. A change
+/// to a wider field must move them with the format version.
+namespace Reflection {
+inline constexpr uint32_t MaxListEntries = 255;  // uniforms or samplers per stage
+inline constexpr uint32_t MaxNameLength = 255;   // bytes of one uniform/sampler/input name
+}  // namespace Reflection
+
 /// The byte offsets of the fields inside one pool entry.
 namespace EntryOffset {
 inline constexpr uint32_t HashHi = 0;             // u64

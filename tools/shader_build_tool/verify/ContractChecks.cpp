@@ -4,13 +4,13 @@
 //
 //  Copyright (C) 2026 Tencent. All rights reserved.
 //
-//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
-//  in compliance with the License. You may obtain a copy of the License at
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
+//  compliance with the License. You may obtain a copy of the License at
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. see the license for the specific language governing permissions
 //  and limitations under the license.
 //
@@ -20,25 +20,49 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <map>
 #include <regex>
 #include <set>
 #include <sstream>
+#include <utility>
+#include "core/DiagnosticCodes.h"
 #include "gpu/AOTResourceProfile.h"
+#include "gpu/BundleFormat.h"
 #include "gpu/shaders/KernelContract.h"
 
 namespace tgfx {
 
-static bool HasUniform(const StageReflectionData& reflection, const std::string& name) {
+namespace {
+
+// Reports one violation of a contract check. Every check below records through this helper, so
+// the code, the subject and the severity stay in one shape for the cli renderer and the tests.
+void Report(Diagnostics* diagnostics, Severity severity, const char* code,
+            const std::string& shader, const std::string& profile, int vert, int frag,
+            std::string message) {
+  Diagnostic diagnostic;
+  diagnostic.severity = severity;
+  diagnostic.layer = Layer::Verify;
+  diagnostic.code = code;
+  diagnostic.shader = shader;
+  diagnostic.profile = profile;
+  diagnostic.vertPermutationIndex = vert;
+  diagnostic.fragPermutationIndex = frag;
+  diagnostic.message = std::move(message);
+  diagnostics->report(std::move(diagnostic));
+}
+
+bool HasUniform(const StageReflectionData& reflection, const std::string& name) {
   return std::any_of(reflection.uniforms.begin(), reflection.uniforms.end(),
                      [&name](const UniformEntry& entry) { return entry.name == name; });
 }
 
+}  // namespace
+
 // Every shader whose fragment block carries the clip contract marker (HasClip) must declare the
 // whole contract: a missing field means the onSetData writers (which reference the same
 // ClipContract constants) would silently skip their upload and the clip would read stale data.
-size_t ValidateClipContractFields(const std::vector<VariantData>& variants) {
+size_t ValidateClipContractFields(const std::vector<VariantData>& variants,
+                                  Diagnostics* diagnostics) {
   const std::string contractFields[] = {
       ClipContract::Rect,          ClipContract::HasClip, ClipContract::LocalRect,
       ClipContract::RadiiX,        ClipContract::RadiiY,  ClipContract::AntiAlias,
@@ -51,9 +75,9 @@ size_t ValidateClipContractFields(const std::vector<VariantData>& variants) {
     }
     for (const auto& field : contractFields) {
       if (!HasUniform(variant.fragmentReflection, field)) {
-        std::cerr << "[ContractCheck] " << variant.shaderName << " (frag "
-                  << variant.fragPermutationIndex
-                  << ") carries the clip contract but is missing uniform '" << field << "'\n";
+        Report(diagnostics, Severity::Error, DiagnosticCode::VerifyClipField, variant.shaderName,
+               variant.profileTag, -1, static_cast<int>(variant.fragPermutationIndex),
+               "carries the clip contract but is missing uniform '" + field + "'");
         ++errors;
       }
     }
@@ -68,7 +92,7 @@ size_t ValidateClipContractFields(const std::vector<VariantData>& variants) {
 // matches the scan and its value would overwrite the real define's (the parser keeps the LAST
 // occurrence), so a comment could mask a genuine opcode mismatch.
 static std::map<std::string, int> ParseOpDefines(const std::string& source, const char* fileName,
-                                                 size_t* errors) {
+                                                 size_t* errors, Diagnostics* diagnostics) {
   std::map<std::string, int> defines;
   std::string stripped;
   stripped.reserve(source.size());
@@ -112,8 +136,9 @@ static std::map<std::string, int> ParseOpDefines(const std::string& source, cons
       }
     }
     if (!allDigits) {
-      std::cerr << "[ContractCheck] cannot parse " << defineName << " value '" << valueText
-                << "' in " << fileName << " (expected a bare decimal integer)\n";
+      Report(diagnostics, Severity::Error, DiagnosticCode::VerifyOpCode, "", "", -1, -1,
+             "cannot parse " + defineName + " value '" + valueText + "' in " + fileName +
+                 " (expected a bare decimal integer)");
       ++*errors;
     } else {
       defines[defineName] = std::stoi(valueText);
@@ -128,31 +153,38 @@ static std::map<std::string, int> ParseOpDefines(const std::string& source, cons
 // kernel grew an opcode the C++ side has not anchored yet, which would surface as
 // misinterpretation at runtime since the evaluation switches have no default branch).
 static size_t ValidateOpDefines(const std::string& shaderDir, const char* fileName,
-                                const std::map<std::string, int>& expected) {
+                                const std::map<std::string, int>& expected,
+                                Diagnostics* diagnostics) {
   std::ifstream file(shaderDir + "/level1/" + fileName);
   if (!file.is_open()) {
-    std::cerr << "[ContractCheck] cannot open " << fileName << " under " << shaderDir << "\n";
+    // The include itself is gone: nothing can be compared, which is a failed check, not a
+    // passing one.
+    Report(diagnostics, Severity::Unverifiable, DiagnosticCode::VerifyNotApplicable, "", "", -1,
+           -1, std::string("cannot open ") + fileName + " under " + shaderDir);
     return 1;
   }
   std::stringstream buffer;
   buffer << file.rdbuf();
   size_t errors = 0;
-  auto defines = ParseOpDefines(buffer.str(), fileName, &errors);
+  auto defines = ParseOpDefines(buffer.str(), fileName, &errors, diagnostics);
   for (const auto& [name, value] : expected) {
     auto it = defines.find(name);
     if (it == defines.end()) {
-      std::cerr << "[ContractCheck] OP define missing in " << fileName << ": " << name << "\n";
+      Report(diagnostics, Severity::Error, DiagnosticCode::VerifyOpCode, "", "", -1, -1,
+             "OP define missing in " + std::string(fileName) + ": " + name);
       ++errors;
     } else if (it->second != value) {
-      std::cerr << "[ContractCheck] " << name << " is " << it->second << " but the C++ contract "
-                << "says " << value << "\n";
+      Report(diagnostics, Severity::Error, DiagnosticCode::VerifyOpCode, "", "", -1, -1,
+             name + " is " + std::to_string(it->second) + " but the C++ contract says " +
+                 std::to_string(value));
       ++errors;
     }
   }
   for (const auto& [name, value] : defines) {
     if (expected.find(name) == expected.end()) {
-      std::cerr << "[ContractCheck] unknown OP define in " << fileName << ": " << name
-                << " (anchor it in the C++ contract or remove the define)\n";
+      Report(diagnostics, Severity::Error, DiagnosticCode::VerifyOpCode, "", "", -1, -1,
+             "unknown OP define in " + std::string(fileName) + ": " + name +
+                 " (anchor it in the C++ contract or remove the define)");
       ++errors;
     }
   }
@@ -161,7 +193,7 @@ static size_t ValidateOpDefines(const std::string& shaderDir, const char* fileNa
 
 // The chain slot op codes ride the Packed.x selector, so the GLSL OP_* defines and the C++
 // AOTChainOp enum (anchored to the ChainOp constants) must agree value-for-value.
-size_t ValidateChainOpCodes(const std::string& shaderDir) {
+size_t ValidateChainOpCodes(const std::string& shaderDir, Diagnostics* diagnostics) {
   return ValidateOpDefines(shaderDir, "pointwise_chain_ops.inc",
                            {{"OP_COLOR_MATRIX", ChainOp::ColorMatrix},
                             {"OP_LUMA", ChainOp::Luma},
@@ -178,13 +210,14 @@ size_t ValidateChainOpCodes(const std::string& shaderDir) {
                             {"OP_TEX_MODULATE", ChainOp::TexModulate},
                             {"OP_INPUT_OPAQUE", ChainOp::InputOpaque},
                             {"OP_MUL_ALPHA", ChainOp::MulAlpha},
-                            {"OP_PERLIN_NOISE", ChainOp::PerlinNoise}});
+                            {"OP_PERLIN_NOISE", ChainOp::PerlinNoise}},
+                           diagnostics);
 }
 
 // The plain pointwise slot selects its operator the same way, so pointwise_op.inc must agree
 // with the AOTPointwiseOpType enum (anchored to the PointwiseOp constants). Chain-only operators
 // (Texture and the coverage/modulator ops) must not appear here.
-size_t ValidatePointwiseOpCodes(const std::string& shaderDir) {
+size_t ValidatePointwiseOpCodes(const std::string& shaderDir, Diagnostics* diagnostics) {
   return ValidateOpDefines(shaderDir, "pointwise_op.inc",
                            {{"OP_COLOR_MATRIX", PointwiseOp::ColorMatrix},
                             {"OP_LUMA", PointwiseOp::Luma},
@@ -192,21 +225,23 @@ size_t ValidatePointwiseOpCodes(const std::string& shaderDir) {
                             {"OP_COLOR_SPACE_XFORM", PointwiseOp::ColorSpaceXform},
                             {"OP_NONE", PointwiseOp::None},
                             {"OP_CONST_COLOR", PointwiseOp::ConstColor},
-                            {"OP_BLEND", PointwiseOp::Blend}});
+                            {"OP_BLEND", PointwiseOp::Blend}},
+                           diagnostics);
 }
 
 // The GLSL kernels carry their slot capacities as literals behind #ifndef / #if guards while the
 // runtime uploads uniform arrays sized by C++ constants, so a drifted literal reads past (or
 // wastes) what the runtime wrote. Parsing the literal at build time and comparing it to the
 // constant keeps the two in lockstep without injecting extra defines into every variant.
-size_t ValidateSlotCapacities(const std::string& shaderDir) {
+size_t ValidateSlotCapacities(const std::string& shaderDir, Diagnostics* diagnostics) {
   size_t errors = 0;
   const std::regex slotSuffixPattern("#define\\s+TGFX_SLOT_ARRAY_SUFFIX\\s*\\[\\s*(\\d+)\\s*\\]");
   const char* slotKernels[] = {"perlin_noise.frag", "yuv_texture_fill.frag"};
   for (const char* fileName : slotKernels) {
     std::ifstream file(shaderDir + "/level1/" + fileName);
     if (!file.is_open()) {
-      std::cerr << "[ContractCheck] cannot open " << fileName << " under " << shaderDir << "\n";
+      Report(diagnostics, Severity::Unverifiable, DiagnosticCode::VerifyNotApplicable, "", "", -1,
+             -1, std::string("cannot open ") + fileName + " under " + shaderDir);
       ++errors;
       continue;
     }
@@ -215,17 +250,20 @@ size_t ValidateSlotCapacities(const std::string& shaderDir) {
     const std::string text = buffer.str();
     std::smatch match;
     if (!std::regex_search(text, match, slotSuffixPattern)) {
-      std::cerr << "[ContractCheck] " << fileName << " declares no TGFX_SLOT_ARRAY_SUFFIX\n";
+      Report(diagnostics, Severity::Error, DiagnosticCode::VerifySlotCapacity, "", "", -1, -1,
+             std::string(fileName) + " declares no TGFX_SLOT_ARRAY_SUFFIX");
       ++errors;
     } else if (std::stoul(match[1].str()) != MaxPointwiseSlots) {
-      std::cerr << "[ContractCheck] " << fileName << " slot capacity " << match[1].str()
-                << " does not match MaxPointwiseSlots (" << MaxPointwiseSlots << ")\n";
+      Report(diagnostics, Severity::Error, DiagnosticCode::VerifySlotCapacity, "", "", -1, -1,
+             std::string(fileName) + " slot capacity " + match[1].str() +
+                 " does not match MaxPointwiseSlots (" + std::to_string(MaxPointwiseSlots) + ")");
       ++errors;
     }
   }
   std::ifstream chainFile(shaderDir + "/level1/pointwise_chain.frag");
   if (!chainFile.is_open()) {
-    std::cerr << "[ContractCheck] cannot open pointwise_chain.frag under " << shaderDir << "\n";
+    Report(diagnostics, Severity::Unverifiable, DiagnosticCode::VerifyNotApplicable, "", "", -1,
+           -1, std::string("cannot open pointwise_chain.frag under ") + shaderDir);
     return errors + 1;
   }
   std::stringstream chainBuffer;
@@ -238,7 +276,8 @@ size_t ValidateSlotCapacities(const std::string& shaderDir) {
     values.insert(std::stoul((*it)[1].str()));
   }
   if (values.empty()) {
-    std::cerr << "[ContractCheck] pointwise_chain.frag declares no CHAIN_SLOT_CAPACITY\n";
+    Report(diagnostics, Severity::Error, DiagnosticCode::VerifySlotCapacity, "", "", -1, -1,
+           "pointwise_chain.frag declares no CHAIN_SLOT_CAPACITY");
     ++errors;
   }
   const size_t plainCapacity = ChainResourceCapacity.instructions;
@@ -248,15 +287,17 @@ size_t ValidateSlotCapacities(const std::string& shaderDir) {
   // and tiled-graph capacities must share one value; a third distinct capacity needs a new branch
   // and would fail here on purpose.
   if (tiledCapacity != plainCapacity) {
-    std::cerr << "[ContractCheck] TiledGraph capacity " << tiledCapacity
-              << " differs from the plain chain capacity " << plainCapacity
-              << ", which the shader's two-branch capacity #if cannot express\n";
+    Report(diagnostics, Severity::Error, DiagnosticCode::VerifySlotCapacity, "", "", -1, -1,
+           "TiledGraph capacity " + std::to_string(tiledCapacity) +
+               " differs from the plain chain capacity " + std::to_string(plainCapacity) +
+               ", which the shader's two-branch capacity #if cannot express");
     ++errors;
   }
   if (values.count(plainCapacity) == 0 || values.count(noiseCapacity) == 0 ||
       values.size() != (plainCapacity == noiseCapacity ? 1 : 2)) {
-    std::cerr << "[ContractCheck] pointwise_chain.frag capacities do not match the C++ resource"
-              << " capacities (expected " << plainCapacity << " and " << noiseCapacity << ")\n";
+    Report(diagnostics, Severity::Error, DiagnosticCode::VerifySlotCapacity, "", "", -1, -1,
+           "pointwise_chain.frag capacities do not match the C++ resource capacities (expected " +
+               std::to_string(plainCapacity) + " and " + std::to_string(noiseCapacity) + ")");
     ++errors;
   }
   return errors;
@@ -278,7 +319,8 @@ static bool IsExternalShaderName(const std::string& name) {
 }
 
 size_t ValidateShaderSourceReferences(const std::string& shaderDir,
-                                      const std::vector<std::string>& registeredShaders) {
+                                      const std::vector<std::string>& registeredShaders,
+                                      Diagnostics* diagnostics) {
   namespace fs = std::filesystem;
   std::error_code code;
   std::set<std::string> existingFiles;
@@ -295,7 +337,8 @@ size_t ValidateShaderSourceReferences(const std::string& shaderDir,
     }
   }
   if (code || sourcePaths.empty()) {
-    std::cerr << "[ContractCheck] cannot list shader sources under " << shaderDir << "\n";
+    Report(diagnostics, Severity::Unverifiable, DiagnosticCode::VerifyNotApplicable, "", "", -1,
+           -1, "cannot list shader sources under " + shaderDir);
     return 1;
   }
   const std::set<std::string> registered(registeredShaders.begin(), registeredShaders.end());
@@ -326,15 +369,17 @@ size_t ValidateShaderSourceReferences(const std::string& shaderDir,
             (tokenEnd + suffix.size() >= text.size() ||
              !IsIdentifierChar(text[tokenEnd + suffix.size()])) &&
             existingFiles.count(token + suffix) == 0) {
-          std::cerr << "[ContractCheck] " << fileName << " refers to " << token << suffix
-                    << ", which does not exist under " << shaderDir << "\n";
+          Report(diagnostics, Severity::Error, DiagnosticCode::VerifySourceFile, "", "", -1, -1,
+                 fileName + " refers to " + token + suffix +
+                     ", which does not exist under " + shaderDir);
           ++errors;
         }
       }
       if (EndsWith(token, "Shader") && token.size() > 6 && token[0] >= 'A' && token[0] <= 'Z' &&
           !IsExternalShaderName(token) && registered.count(token) == 0) {
-        std::cerr << "[ContractCheck] " << fileName << " refers to shader family " << token
-                  << ", which is not registered (removed or merged into another family?)\n";
+        Report(diagnostics, Severity::Error, DiagnosticCode::VerifySourceFamily, "", "", -1, -1,
+               fileName + " refers to shader family " + token +
+                   ", which is not registered (removed or merged into another family?)");
         ++errors;
       }
       position = tokenEnd;
@@ -346,19 +391,24 @@ size_t ValidateShaderSourceReferences(const std::string& shaderDir,
 // Reflection-level invariants the runtime loader enforces on read: catching them at build time
 // keeps a broken writer from shipping bundles that the loader would reject (or worse, accept with
 // gaps in the sampler binding table).
-size_t ValidateReflectionContracts(const std::vector<VariantData>& variants) {
+size_t ValidateReflectionContracts(const std::vector<VariantData>& variants,
+                                   Diagnostics* diagnostics) {
   size_t errors = 0;
+  const auto maxEntries = BundleFormat::Reflection::MaxListEntries;
+  const auto maxNameLength = BundleFormat::Reflection::MaxNameLength;
   for (const auto& variant : variants) {
     const StageReflectionData* stages[] = {&variant.vertexReflection, &variant.fragmentReflection};
     for (const auto* reflection : stages) {
       // The bundle writer serializes name lengths and per-stage entry counts as uint8
-      // (BundleWriter's WriteU8 sites): values over 255 would wrap silently (a 256-byte name is
-      // written with length 0), so reject them here at build time instead.
-      if (reflection->uniforms.size() > 255 || reflection->samplers.size() > 255) {
-        std::cerr << "[ContractCheck] " << variant.shaderName
-                  << " reflection exceeds the 255-entry serialization limit (uniforms="
-                  << reflection->uniforms.size() << ", samplers=" << reflection->samplers.size()
-                  << ")\n";
+      // (BundleWriter's WriteU8 sites): values over the format's byte would wrap silently (a
+      // 256-byte name is written with length 0), so reject them here at build time instead.
+      if (reflection->uniforms.size() > maxEntries || reflection->samplers.size() > maxEntries) {
+        Report(diagnostics, Severity::Error, DiagnosticCode::VerifyReflection, variant.shaderName,
+               variant.profileTag, -1, -1,
+               "reflection exceeds the " + std::to_string(maxEntries) +
+                   "-entry serialization limit (uniforms=" +
+                   std::to_string(reflection->uniforms.size()) +
+                   ", samplers=" + std::to_string(reflection->samplers.size()) + ")");
         ++errors;
       }
       std::map<std::string, int> seenNames;
@@ -366,26 +416,32 @@ size_t ValidateReflectionContracts(const std::vector<VariantData>& variants) {
         bool isSamplerList = list == &reflection->samplers;
         for (const auto& entry : *list) {
           if (entry.name.find('\0') != std::string::npos) {
-            std::cerr << "[ContractCheck] " << variant.shaderName
-                      << " reflection carries an embedded NUL in a name\n";
+            Report(diagnostics, Severity::Error, DiagnosticCode::VerifyReflection,
+                   variant.shaderName, variant.profileTag, -1, -1,
+                   "reflection carries an embedded NUL in a name");
             ++errors;
             continue;
           }
-          if (entry.name.size() > 255) {
-            std::cerr << "[ContractCheck] " << variant.shaderName << " entry '" << entry.name
-                      << "' exceeds the 255-byte name serialization limit\n";
+          if (entry.name.size() > maxNameLength) {
+            Report(diagnostics, Severity::Error, DiagnosticCode::VerifyReflection,
+                   variant.shaderName, variant.profileTag, -1, -1,
+                   "entry '" + entry.name + "' exceeds the " + std::to_string(maxNameLength) +
+                       "-byte name serialization limit");
             ++errors;
             continue;
           }
           if (++seenNames[entry.name] > 1) {
-            std::cerr << "[ContractCheck] " << variant.shaderName << " declares duplicate name '"
-                      << entry.name << "' in one stage\n";
+            Report(diagnostics, Severity::Error, DiagnosticCode::VerifyReflection,
+                   variant.shaderName, variant.profileTag, -1, -1,
+                   "declares duplicate name '" + entry.name + "' in one stage");
             ++errors;
           }
           if (entry.arraySize < 1 || (isSamplerList && entry.arraySize != 1)) {
-            std::cerr << "[ContractCheck] " << variant.shaderName << " entry '" << entry.name
-                      << "' has arraySize " << entry.arraySize << " (uniforms need >= 1, samplers "
-                      << "need exactly 1)\n";
+            Report(diagnostics, Severity::Error, DiagnosticCode::VerifyReflection,
+                   variant.shaderName, variant.profileTag, -1, -1,
+                   "entry '" + entry.name + "' has arraySize " +
+                       std::to_string(entry.arraySize) +
+                       " (uniforms need >= 1, samplers need exactly 1)");
             ++errors;
           }
         }
@@ -411,14 +467,17 @@ size_t ValidateReflectionContracts(const std::vector<VariantData>& variants) {
           parsed = std::stoi(sampler.name.substr(prefix.size()));
         }
         if (!generic) {
-          std::cerr << "[ContractCheck] " << variant.shaderName << " declares sampler '"
-                    << sampler.name << "' (neither the TextureSampler_<N> pattern nor a "
-                    << "registered semantic name; see SamplerContract in KernelContract.h)\n";
+          Report(diagnostics, Severity::Error, DiagnosticCode::VerifyReflection,
+                 variant.shaderName, variant.profileTag, -1, -1,
+                 "declares sampler '" + sampler.name +
+                     "' (neither the TextureSampler_<N> pattern nor a registered semantic name; "
+                     "see SamplerContract in KernelContract.h)");
           ++errors;
         } else if (parsed != nextSamplerIndex) {
-          std::cerr << "[ContractCheck] " << variant.shaderName << " generic sampler #"
-                    << nextSamplerIndex << " is named '" << sampler.name
-                    << "' (indices must be dense from zero)\n";
+          Report(diagnostics, Severity::Error, DiagnosticCode::VerifyReflection,
+                 variant.shaderName, variant.profileTag, -1, -1,
+                 "generic sampler #" + std::to_string(nextSamplerIndex) + " is named '" +
+                     sampler.name + "' (indices must be dense from zero)");
           ++errors;
         }
         ++nextSamplerIndex;

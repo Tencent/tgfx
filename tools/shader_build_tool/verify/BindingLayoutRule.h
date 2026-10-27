@@ -31,7 +31,7 @@ namespace tgfx {
 /// draw of that variant fails at load.
 class BindingLayoutRule : public ArtifactRule {
  public:
-  size_t check(const ArtifactRuleContext& context) const override;
+  size_t check(const ArtifactRuleContext& context, Diagnostics* diagnostics) const override;
 };
 
 }  // namespace tgfx

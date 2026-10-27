@@ -4,15 +4,15 @@
 //
 //  Copyright (C) 2026 Tencent. All rights reserved.
 //
-//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
-//  in compliance with the License. You may obtain a copy of the License at
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
+//  compliance with the License. You may obtain a copy of the License at
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under
-//  the license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-//  KIND, either express or implied. see the license for the specific language governing
-//  permissions and limitations under the license.
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,29 +30,30 @@ namespace {
 
 class ChainOpCodesRule : public SourceRule {
  public:
-  size_t check(const SourceRuleContext& context) const override {
-    return ValidateChainOpCodes(context.shaderDir);
+  size_t check(const SourceRuleContext& context, Diagnostics* diagnostics) const override {
+    return ValidateChainOpCodes(context.shaderDir, diagnostics);
   }
 };
 
 class PointwiseOpCodesRule : public SourceRule {
  public:
-  size_t check(const SourceRuleContext& context) const override {
-    return ValidatePointwiseOpCodes(context.shaderDir);
+  size_t check(const SourceRuleContext& context, Diagnostics* diagnostics) const override {
+    return ValidatePointwiseOpCodes(context.shaderDir, diagnostics);
   }
 };
 
 class SlotCapacitiesRule : public SourceRule {
  public:
-  size_t check(const SourceRuleContext& context) const override {
-    return ValidateSlotCapacities(context.shaderDir);
+  size_t check(const SourceRuleContext& context, Diagnostics* diagnostics) const override {
+    return ValidateSlotCapacities(context.shaderDir, diagnostics);
   }
 };
 
 class SourceReferencesRule : public SourceRule {
  public:
-  size_t check(const SourceRuleContext& context) const override {
-    return ValidateShaderSourceReferences(context.shaderDir, context.registeredShaders);
+  size_t check(const SourceRuleContext& context, Diagnostics* diagnostics) const override {
+    return ValidateShaderSourceReferences(context.shaderDir, context.registeredShaders,
+                                          diagnostics);
   }
 };
 
@@ -61,22 +62,22 @@ class SourceReferencesRule : public SourceRule {
 
 class ClipContractRule : public ArtifactRule {
  public:
-  size_t check(const ArtifactRuleContext& context) const override {
-    return ValidateClipContractFields(*context.variants);
+  size_t check(const ArtifactRuleContext& context, Diagnostics* diagnostics) const override {
+    return ValidateClipContractFields(*context.variants, diagnostics);
   }
 };
 
 class ReflectionContractRule : public ArtifactRule {
  public:
-  size_t check(const ArtifactRuleContext& context) const override {
-    return ValidateReflectionContracts(*context.variants);
+  size_t check(const ArtifactRuleContext& context, Diagnostics* diagnostics) const override {
+    return ValidateReflectionContracts(*context.variants, diagnostics);
   }
 };
 
 class InlineExpansionRule : public ArtifactRule {
  public:
-  size_t check(const ArtifactRuleContext& context) const override {
-    return ValidateInlineExpansion(*context.inlineExpansions);
+  size_t check(const ArtifactRuleContext& context, Diagnostics* diagnostics) const override {
+    return ValidateInlineExpansion(*context.inlineExpansions, diagnostics);
   }
 };
 

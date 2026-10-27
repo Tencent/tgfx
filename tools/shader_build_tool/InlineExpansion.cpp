@@ -20,10 +20,10 @@
 #include <algorithm>
 #include <fstream>
 #include <functional>
-#include <iostream>
 #include <map>
 #include <set>
 #include <unordered_map>
+#include "core/DiagnosticCodes.h"
 
 namespace tgfx {
 
@@ -173,8 +173,9 @@ InlineExpansion AnalyzeInlineExpansion(const std::vector<uint32_t>& spirv) {
   return result;
 }
 
-size_t ValidateInlineExpansion(const std::vector<InlineExpansionRecord>& records) {
-  // One line per (shader, function) with the worst variant, instead of one per variant.
+size_t ValidateInlineExpansion(const std::vector<InlineExpansionRecord>& records,
+                               Diagnostics* diagnostics) {
+  // One record per (shader, function) with the worst variant, instead of one per variant.
   struct Violation {
     size_t copies = 0;
     size_t instructions = 0;
@@ -186,8 +187,16 @@ size_t ValidateInlineExpansion(const std::vector<InlineExpansionRecord>& records
   size_t invalid = 0;
   for (const auto& record : records) {
     if (!record.expansion.valid) {
-      std::cerr << "[InlineCheck] " << record.shaderName << " (frag "
-                << record.fragPermutationIndex << "): the SPIR-V module could not be analyzed\n";
+      // Not a policy violation: the module itself could not be analyzed, so the check could not
+      // run. Reported as unverifiable rather than folded into the policy count.
+      Diagnostic diagnostic;
+      diagnostic.severity = Severity::Unverifiable;
+      diagnostic.layer = Layer::Verify;
+      diagnostic.code = DiagnosticCode::VerifyNotApplicable;
+      diagnostic.shader = record.shaderName;
+      diagnostic.fragPermutationIndex = static_cast<int>(record.fragPermutationIndex);
+      diagnostic.message = "the SPIR-V module could not be analyzed";
+      diagnostics->report(std::move(diagnostic));
       ++invalid;
       continue;
     }
@@ -208,22 +217,37 @@ size_t ValidateInlineExpansion(const std::vector<InlineExpansionRecord>& records
   }
   for (const auto& entry : violations) {
     const auto& violation = entry.second;
-    std::cerr << "[InlineCheck] " << entry.first.first << ": '" << entry.first.second << "' ("
-              << violation.instructions << " instructions) reaches the driver "
-              << violation.copies << " times in frag " << violation.worstVariant << " ("
-              << violation.variants << " variant(s)), " << violation.duplicated
-              << " duplicated instructions; the limit is " << MaxDuplicatedInstructions
-              << ". Funnel the call sites into one: select the operands, then call once (or run "
-                 "the call in a loop whose pass count is uniform data).\n";
+    Diagnostic diagnostic;
+    diagnostic.severity = Severity::Error;
+    diagnostic.layer = Layer::Verify;
+    diagnostic.code = DiagnosticCode::VerifyInlinePolicy;
+    diagnostic.shader = entry.first.first;
+    diagnostic.fragPermutationIndex = static_cast<int>(violation.worstVariant);
+    diagnostic.message =
+        "'" + entry.first.second + "' (" + std::to_string(violation.instructions) +
+        " instructions) reaches the driver " + std::to_string(violation.copies) +
+        " times in frag " + std::to_string(violation.worstVariant) + " (" +
+        std::to_string(violation.variants) + " variant(s)), " +
+        std::to_string(violation.duplicated) + " duplicated instructions; the limit is " +
+        std::to_string(MaxDuplicatedInstructions) +
+        ". Funnel the call sites into one: select the operands, then call once (or run the call "
+        "in a loop whose pass count is uniform data).";
+    diagnostics->report(std::move(diagnostic));
   }
   return invalid + violations.size();
 }
 
 bool WriteInlineExpansionReport(const std::string& path,
-                                const std::vector<InlineExpansionRecord>& records) {
+                                const std::vector<InlineExpansionRecord>& records,
+                                Diagnostics* diagnostics) {
   std::ofstream file(path);
   if (!file) {
-    std::cerr << "Failed to write the inline expansion report: " << path << "\n";
+    Diagnostic diagnostic;
+    diagnostic.severity = Severity::Error;
+    diagnostic.layer = Layer::Output;
+    diagnostic.code = DiagnosticCode::OutputWrite;
+    diagnostic.message = "cannot write the inline expansion report: " + path;
+    diagnostics->report(std::move(diagnostic));
     return false;
   }
   file << "{\n  \"maxDuplicatedInstructions\": " << MaxDuplicatedInstructions

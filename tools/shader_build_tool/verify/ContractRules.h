@@ -22,6 +22,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "core/Diagnostics.h"
 #include "core/Types.h"
 #include "InlineExpansion.h"
 
@@ -32,10 +33,11 @@ namespace tgfx {
 //   source rules   read the shader text            (op codes, slot capacities, references)
 //   artifact rules read what the build produced    (clip fields, reflection, inline expansion)
 //
-// A rule prints each violation itself and returns the count; the build gates on the sum, so a
-// contract mismatch fails the build instead of surfacing as a runtime miss. The registries
-// below are the only way the build reaches a check — adding one (the binding-layout rule of
-// the layout work, say) means adding it to a registry, not threading a new call through main.
+// A rule reports each violation as a Diagnostic (with its code and subject) and returns the
+// count; the build gates on the sum, so a contract mismatch fails the build instead of
+// surfacing as a runtime miss. Rules never print: the cli renders the records. The registries
+// below are the only way the build reaches a check — adding one means adding it to a registry,
+// not threading a new call through main.
 
 /// The inputs of a source-level rule: the directory the shaders live in and the names of
 /// every registered family.
@@ -56,9 +58,9 @@ class SourceRule {
  public:
   virtual ~SourceRule() = default;
 
-  /// Runs the check against the context. Returns the violation count (0 = clean); the rule
-  /// prints each violation itself.
-  virtual size_t check(const SourceRuleContext& context) const = 0;
+  /// Runs the check against the context, reporting every violation to diagnostics. Returns the
+  /// violation count (0 = clean).
+  virtual size_t check(const SourceRuleContext& context, Diagnostics* diagnostics) const = 0;
 };
 
 /// One contract check over what the build produced.
@@ -66,9 +68,9 @@ class ArtifactRule {
  public:
   virtual ~ArtifactRule() = default;
 
-  /// Runs the check against the context. Returns the violation count (0 = clean); the rule
-  /// prints each violation itself.
-  virtual size_t check(const ArtifactRuleContext& context) const = 0;
+  /// Runs the check against the context, reporting every violation to diagnostics. Returns the
+  /// violation count (0 = clean).
+  virtual size_t check(const ArtifactRuleContext& context, Diagnostics* diagnostics) const = 0;
 };
 
 /// The source rules of one build, in the order their violations print: the chain op codes,

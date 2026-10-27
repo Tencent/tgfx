@@ -166,4 +166,63 @@ bool WriteReportJson(const BuildReport& report, const std::string& outDir) {
   return true;
 }
 
+namespace {
+
+const char* SeverityPrefix(Severity severity) {
+  switch (severity) {
+    case Severity::Error:
+      return "E";
+    case Severity::Warning:
+      return "W";
+    case Severity::Unverifiable:
+      return "U";
+  }
+  return "E";
+}
+
+const char* LayerName(Layer layer) {
+  switch (layer) {
+    case Layer::Sources:
+      return "sources";
+    case Layer::Plan:
+      return "plan";
+    case Layer::Compile:
+      return "compile";
+    case Layer::Emit:
+      return "emit";
+    case Layer::Verify:
+      return "verify";
+    case Layer::Output:
+      return "output";
+    case Layer::Cli:
+      return "cli";
+  }
+  return "cli";
+}
+
+}  // namespace
+
+void PrintDiagnostics(const Diagnostics& diagnostics) {
+  for (const auto& record : diagnostics.records()) {
+    if (record.message.empty()) {
+      continue;
+    }
+    std::cerr << "[" << SeverityPrefix(record.severity) << "][" << LayerName(record.layer) << "] "
+              << (record.code != nullptr ? record.code : "");
+    if (!record.shader.empty()) {
+      std::cerr << "  shader=" << record.shader;
+    }
+    if (!record.profile.empty()) {
+      std::cerr << " profile=" << record.profile;
+    }
+    if (record.vertPermutationIndex >= 0) {
+      std::cerr << " vert=" << record.vertPermutationIndex;
+    }
+    if (record.fragPermutationIndex >= 0) {
+      std::cerr << " frag=" << record.fragPermutationIndex;
+    }
+    std::cerr << "\n  " << record.message << "\n";
+  }
+}
+
 }  // namespace tgfx

@@ -38,9 +38,11 @@ namespace {
 
 const std::string RealShaderDir = std::string(TGFX_SOURCE_DIR) + "/src/gpu/shaders/glsl";
 
-// What a rule reported: the error count it returned and the text it wrote to stderr.
+// What a rule reported: the error count it returned, the diagnostics it recorded, and their
+// messages joined into one text so a test can check why as well as how often.
 struct Report {
   size_t errors = 0;
+  std::vector<Diagnostic> diagnostics;
   std::string log;
 
   bool mentions(const std::string& fragment) const {
@@ -48,45 +50,45 @@ struct Report {
   }
 };
 
-// Captures stderr while a rule runs, so a test can check not only how many errors the rule found
-// but why. Construct it before the call and take the report right after.
-class Capture {
- public:
-  Capture() {
-    ::testing::internal::CaptureStderr();
+Report Finish(size_t errors, const Diagnostics& diagnostics) {
+  Report report;
+  report.errors = errors;
+  report.diagnostics = diagnostics.records();
+  for (const auto& record : report.diagnostics) {
+    report.log += record.message;
+    report.log += '\n';
   }
-
-  Report finish(size_t errors) {
-    Report report;
-    report.errors = errors;
-    report.log = ::testing::internal::GetCapturedStderr();
-    return report;
-  }
-};
+  return report;
+}
 
 Report CheckClip(const std::vector<VariantData>& variants) {
-  Capture capture;
-  return capture.finish(ValidateClipContractFields(variants));
+  Diagnostics diagnostics;
+  auto errors = ValidateClipContractFields(variants, &diagnostics);
+  return Finish(errors, diagnostics);
 }
 
 Report CheckReflection(const std::vector<VariantData>& variants) {
-  Capture capture;
-  return capture.finish(ValidateReflectionContracts(variants));
+  Diagnostics diagnostics;
+  auto errors = ValidateReflectionContracts(variants, &diagnostics);
+  return Finish(errors, diagnostics);
 }
 
 Report CheckChainOps(const std::string& shaderDir) {
-  Capture capture;
-  return capture.finish(ValidateChainOpCodes(shaderDir));
+  Diagnostics diagnostics;
+  auto errors = ValidateChainOpCodes(shaderDir, &diagnostics);
+  return Finish(errors, diagnostics);
 }
 
 Report CheckPointwiseOps(const std::string& shaderDir) {
-  Capture capture;
-  return capture.finish(ValidatePointwiseOpCodes(shaderDir));
+  Diagnostics diagnostics;
+  auto errors = ValidatePointwiseOpCodes(shaderDir, &diagnostics);
+  return Finish(errors, diagnostics);
 }
 
 Report CheckSlotCapacities(const std::string& shaderDir) {
-  Capture capture;
-  return capture.finish(ValidateSlotCapacities(shaderDir));
+  Diagnostics diagnostics;
+  auto errors = ValidateSlotCapacities(shaderDir, &diagnostics);
+  return Finish(errors, diagnostics);
 }
 
 std::vector<std::string> RegisteredShaderNames() {
@@ -99,8 +101,9 @@ std::vector<std::string> RegisteredShaderNames() {
 
 Report CheckReferences(const std::string& shaderDir) {
   auto names = RegisteredShaderNames();
-  Capture capture;
-  return capture.finish(ValidateShaderSourceReferences(shaderDir, names));
+  Diagnostics diagnostics;
+  auto errors = ValidateShaderSourceReferences(shaderDir, names, &diagnostics);
+  return Finish(errors, diagnostics);
 }
 
 UniformEntry Field(const std::string& name, UniformFormat format = UniformFormat::Float4,

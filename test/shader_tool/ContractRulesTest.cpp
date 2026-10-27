@@ -55,8 +55,10 @@ TEST(ContractRulesTest, TheArtifactRegistryHoldsTheFourArtifactRules) {
 TEST(ContractRulesTest, EverySourceRuleIsCleanOnTheRealSources) {
   auto context = RealSourceContext();
   for (const auto& rule : MakeSourceRules()) {
-    EXPECT_EQ(rule->check(context), 0u) << "a source rule reports violations on the sources "
-                                           "the golden bundles were built from";
+    Diagnostics diagnostics;
+    EXPECT_EQ(rule->check(context, &diagnostics), 0u)
+        << "a source rule reports violations on the sources the golden bundles were built from";
+    EXPECT_TRUE(diagnostics.records().empty());
   }
 }
 
@@ -67,7 +69,9 @@ TEST(ContractRulesTest, EveryArtifactRuleIsCleanOnAnEmptyBuild) {
   context.variants = &variants;
   context.inlineExpansions = &expansions;
   for (const auto& rule : MakeArtifactRules()) {
-    EXPECT_EQ(rule->check(context), 0u);
+    Diagnostics diagnostics;
+    EXPECT_EQ(rule->check(context, &diagnostics), 0u);
+    EXPECT_TRUE(diagnostics.records().empty());
   }
 }
 
