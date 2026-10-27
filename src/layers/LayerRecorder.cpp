@@ -193,7 +193,7 @@ void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint* pai
   pendingShape = std::move(shape);
 }
 
-bool LayerRecorder::tryAddSimplifiedMatrixShape(std::shared_ptr<Shape> shape,
+bool LayerRecorder::tryAddSimplifiedMatrixShape(const std::shared_ptr<Shape>& shape,
                                                 const LayerPaint* paint, const Matrix& matrix) {
   auto matrixShape = ShapeUtils::AsMatrixShape(shape.get());
   if (matrixShape == nullptr || !matrixShape->shape->isSimplePath()) {

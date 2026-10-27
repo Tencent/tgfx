@@ -1908,10 +1908,10 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
       // drops painters with alpha=0 and knows nothing about bare geometry. Recording it
       // unconditionally also keeps the coverage independent of any visible descendant.
       if (geometrySource != nullptr) {
-        // Consume the recording hoisted above: both buckets wrap the same source, so the pixels are
-        // neither re-recorded nor duplicated, and the shape read back from that recording reaches
-        // both buckets too. Re-rasterizing in the cache re-wraps each bucket around the same image,
-        // so what stays shared is the image, not the object.
+        // Consume the recording hoisted above: both buckets hold this one source until the cache
+        // re-wraps them, so the pixels are neither re-recorded nor duplicated, and the shape read
+        // back from that recording reaches both buckets too. After that re-wrap each bucket has its
+        // own wrapper around the same rasterized image, so what stays shared is the image.
         group->geometry = geometrySource;
         bucketUsable = true;
       } else if (group->contour == nullptr) {
