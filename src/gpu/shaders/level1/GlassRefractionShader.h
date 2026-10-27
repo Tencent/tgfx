@@ -33,30 +33,25 @@ class GlassRefractionShader : public ShaderFamily<GlassRefractionShader> {
   static constexpr const char* FragFile = "level1/glass_refraction.frag";
 
   struct VertDims {
-    enum : uint32_t { GP_KIND, COUNT };
+    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
+    static inline const PermutationIntDim<VertDims> GP_KIND{"GP_KIND", 2};
     static PermutationDomain domain() {
-      return PermutationDomain({
-          PermutationInt("GP_KIND", 2),
-      });
+      return PermutationDomain({GP_KIND});
     }
   };
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { GP_KIND, GEOMETRY_KIND, DISPERSION_ON, HAS_XP, COUNT };
+    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
+    static inline const PermutationIntDim<FragDims> GP_KIND{"GP_KIND", 2};
+    static inline const PermutationIntDim<FragDims> GEOMETRY_KIND{"GEOMETRY_KIND", 3};
+    static inline const PermutationIntDim<FragDims> DISPERSION_ON{"DISPERSION_ON", 2};
+    static inline const PermutationIntDim<FragDims> HAS_XP{XP_DEFINE_NAME, XP_VALUE_COUNT};
     static PermutationDomain domain() {
-      return PermutationDomain({
-          PermutationInt("GP_KIND", 2),
-          PermutationInt("GEOMETRY_KIND", 3),
-          PermutationInt("DISPERSION_ON", 2),
-          PermutationInt(XP_DEFINE_NAME, XP_VALUE_COUNT),
-      });
+      return PermutationDomain({GP_KIND, GEOMETRY_KIND, DISPERSION_ON, HAS_XP});
     }
   };
   using FD = FragDims;
-  static_assert(VD::COUNT == 1 && FD::COUNT == 4,
-                "Update the Compose mapping when dimensions change.");
-
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
 
@@ -76,14 +71,16 @@ class GlassRefractionShader : public ShaderFamily<GlassRefractionShader> {
     if (inputs.gpKind < 0 || inputs.geometryKind < 0 || inputs.xpType < XP_NONE) {
       return std::nullopt;
     }
+    auto vert = ComposedDims<VertDims>(VertDims::domain());
+    vert.set(VD::GP_KIND, inputs.gpKind);
+    auto frag = ComposedDims<FragDims>(FragDims::domain());
+    frag.set(FD::GP_KIND, inputs.gpKind);
+    frag.set(FD::GEOMETRY_KIND, inputs.geometryKind);
+    frag.set(FD::DISPERSION_ON, inputs.dispersionOn ? 1 : 0);
+    frag.set(FD::HAS_XP, inputs.xpType);
     RuleComposedValues values;
-    values.fragValues.resize(FD::COUNT);
-    values.fragValues[FD::GP_KIND] = inputs.gpKind;
-    values.fragValues[FD::GEOMETRY_KIND] = inputs.geometryKind;
-    values.fragValues[FD::DISPERSION_ON] = inputs.dispersionOn ? 1 : 0;
-    values.fragValues[FD::HAS_XP] = inputs.xpType;
-    values.vertValues.resize(VD::COUNT);
-    values.vertValues[VD::GP_KIND] = inputs.gpKind;
+    values.vertValues = vert.finish();
+    values.fragValues = frag.finish();
     return values;
   }
 

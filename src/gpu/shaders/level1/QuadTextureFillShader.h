@@ -36,31 +36,26 @@ class QuadTextureFillShader : public ShaderFamily<QuadTextureFillShader> {
   static constexpr const char* GpClassName = "QuadPerEdgeAAGeometryProcessor";
 
   struct VertDims {
-    enum : uint32_t { HAS_UV_COORD, HAS_SUBSET, HAS_LOCAL_MASK, COUNT };
+    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
+    static inline const PermutationBoolDim<VertDims> HAS_UV_COORD{"HAS_UV_COORD"};
+    static inline const PermutationBoolDim<VertDims> HAS_SUBSET{"HAS_SUBSET"};
+    static inline const PermutationBoolDim<VertDims> HAS_LOCAL_MASK{"HAS_LOCAL_MASK"};
     static PermutationDomain domain() {
-      return PermutationDomain({
-          PermutationBool("HAS_UV_COORD"),
-          PermutationBool("HAS_SUBSET"),
-          PermutationBool("HAS_LOCAL_MASK"),
-      });
+      return PermutationDomain({HAS_UV_COORD, HAS_SUBSET, HAS_LOCAL_MASK});
     }
   };
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { HAS_SUBSET, HAS_XP, HAS_LOCAL_MASK, COUNT };
+    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
+    static inline const PermutationBoolDim<FragDims> HAS_SUBSET{"HAS_SUBSET"};
+    static inline const PermutationIntDim<FragDims> HAS_XP{XP_DEFINE_NAME, XP_VALUE_COUNT};
+    static inline const PermutationBoolDim<FragDims> HAS_LOCAL_MASK{"HAS_LOCAL_MASK"};
     static PermutationDomain domain() {
-      return PermutationDomain({
-          PermutationBool("HAS_SUBSET"),
-          PermutationInt(XP_DEFINE_NAME, XP_VALUE_COUNT),
-          PermutationBool("HAS_LOCAL_MASK"),
-      });
+      return PermutationDomain({HAS_SUBSET, HAS_XP, HAS_LOCAL_MASK});
     }
   };
   using FD = FragDims;
-  static_assert(VD::COUNT == 3 && FD::COUNT == 3,
-                "Update the Compose mapping when dimensions change.");
-
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = true;
 
@@ -80,17 +75,21 @@ class QuadTextureFillShader : public ShaderFamily<QuadTextureFillShader> {
     if (inputs.xpType < XP_NONE) {
       return std::nullopt;
     }
-    RuleComposedValues values;
-    values.vertValues.resize(VD::COUNT);
-    values.vertValues[VD::HAS_UV_COORD] = inputs.hasUVCoord ? 1 : 0;
-    values.vertValues[VD::HAS_SUBSET] = inputs.hasSubset ? 1 : 0;
-    values.vertValues[VD::HAS_LOCAL_MASK] = inputs.hasLocalMask ? 1 : 0;
-    values.fragValues.resize(FD::COUNT);
+    int hasSubset = inputs.hasSubset ? 1 : 0;
+    int hasLocalMask = inputs.hasLocalMask ? 1 : 0;
+    auto vert = ComposedDims<VertDims>(VertDims::domain());
+    vert.set(VD::HAS_UV_COORD, inputs.hasUVCoord ? 1 : 0);
+    vert.set(VD::HAS_SUBSET, hasSubset);
+    vert.set(VD::HAS_LOCAL_MASK, hasLocalMask);
+    auto frag = ComposedDims<FragDims>(FragDims::domain());
     // ALPHA_ONLY and HAS_RGBAAA are runtime uniforms (set by GLSLTextureEffect::onSetData), not
     // variants.
-    values.fragValues[FD::HAS_SUBSET] = values.vertValues[VD::HAS_SUBSET];
-    values.fragValues[FD::HAS_XP] = inputs.xpType;
-    values.fragValues[FD::HAS_LOCAL_MASK] = values.vertValues[VD::HAS_LOCAL_MASK];
+    frag.set(FD::HAS_SUBSET, hasSubset);
+    frag.set(FD::HAS_XP, inputs.xpType);
+    frag.set(FD::HAS_LOCAL_MASK, hasLocalMask);
+    RuleComposedValues values;
+    values.vertValues = vert.finish();
+    values.fragValues = frag.finish();
     return values;
   }
 

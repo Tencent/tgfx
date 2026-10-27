@@ -36,28 +36,23 @@ class YUVTextureFillShader : public ShaderFamily<YUVTextureFillShader> {
   static constexpr const char* GpClassName = "QuadPerEdgeAAGeometryProcessor";
 
   struct VertDims {
-    enum : uint32_t { HAS_UV_COORD, COUNT };
+    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
+    static inline const PermutationBoolDim<VertDims> HAS_UV_COORD{"HAS_UV_COORD"};
     static PermutationDomain domain() {
-      return PermutationDomain({
-          PermutationBool("HAS_UV_COORD"),
-      });
+      return PermutationDomain({HAS_UV_COORD});
     }
   };
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { YUV_FORMAT, HAS_XP, COUNT };
+    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
+    static inline const PermutationIntDim<FragDims> YUV_FORMAT{"YUV_FORMAT", 2};
+    static inline const PermutationIntDim<FragDims> HAS_XP{XP_DEFINE_NAME, XP_VALUE_COUNT};
     static PermutationDomain domain() {
-      return PermutationDomain({
-          PermutationInt("YUV_FORMAT", 2),
-          PermutationInt(XP_DEFINE_NAME, XP_VALUE_COUNT),
-      });
+      return PermutationDomain({YUV_FORMAT, HAS_XP});
     }
   };
   using FD = FragDims;
-  static_assert(VD::COUNT == 1 && FD::COUNT == 2,
-                "Update the Compose mapping when dimensions change.");
-
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
 
@@ -74,12 +69,14 @@ class YUVTextureFillShader : public ShaderFamily<YUVTextureFillShader> {
     if (inputs.xpType < XP_NONE || inputs.yuvFormat < 0) {
       return std::nullopt;
     }
+    auto vert = ComposedDims<VertDims>(VertDims::domain());
+    vert.set(VD::HAS_UV_COORD, inputs.hasUVMatrix ? 0 : 1);
+    auto frag = ComposedDims<FragDims>(FragDims::domain());
+    frag.set(FD::YUV_FORMAT, inputs.yuvFormat);
+    frag.set(FD::HAS_XP, inputs.xpType);
     RuleComposedValues values;
-    values.vertValues.resize(VD::COUNT);
-    values.vertValues[VD::HAS_UV_COORD] = inputs.hasUVMatrix ? 0 : 1;
-    values.fragValues.resize(FD::COUNT);
-    values.fragValues[FD::YUV_FORMAT] = inputs.yuvFormat;
-    values.fragValues[FD::HAS_XP] = inputs.xpType;
+    values.vertValues = vert.finish();
+    values.fragValues = frag.finish();
     return values;
   }
 
