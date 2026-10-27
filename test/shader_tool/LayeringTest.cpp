@@ -582,4 +582,39 @@ TEST(LayeringTest, TheIncludeScannerReadsRealIncludesOnly) {
       << "the scanner mis-reads the include lines";
 }
 
+// ---- Printing is the cli's job -------------------------------------------------------------
+
+TEST(LayeringTest, NoSublayerPrints) {
+  // A sublayer reports diagnostics (core/Diagnostics.h) and the cli renders them; nothing else
+  // writes to the console. This is a ratchet: the two files below still print, each for a
+  // reason of its own, and each is the remaining debt of the diagnostic migration:
+  //
+  //   BundleVerifier.cpp       the --verify-bundle command's own reporter (a separate command,
+  //                            not the build path, pending migration)
+  //   compile/StageCache.cpp   the cache statistics summary (progress output, pending a stats
+  //                            object the cli renders)
+  const std::set<std::string> allowed = {"BundleVerifier.cpp", "StageCache.cpp"};
+  size_t checked = 0;
+  for (const auto& file : FilesIn(ToolDir(), {".cpp"})) {
+    auto relative = file.substr(ToolDir().size() + 1);
+    if (relative.rfind("cli/", 0) == 0 || relative == "main.cpp") {
+      continue;
+    }
+    auto name = std::filesystem::path(file).filename().string();
+    if (allowed.count(name) == 1) {
+      continue;
+    }
+    std::ifstream source(file);
+    std::stringstream buffer;
+    buffer << source.rdbuf();
+    const auto text = buffer.str();
+    EXPECT_EQ(text.find("std::cout"), std::string::npos)
+        << relative << " prints to stdout; report a diagnostic and let the cli render it";
+    EXPECT_EQ(text.find("std::cerr"), std::string::npos)
+        << relative << " prints to stderr; report a diagnostic and let the cli render it";
+    checked++;
+  }
+  EXPECT_GT(checked, 10u) << "the scan did not reach the sublayers";
+}
+
 }  // namespace tgfx

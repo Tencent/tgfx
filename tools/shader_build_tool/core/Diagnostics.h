@@ -83,13 +83,6 @@ class Diagnostics {
   /// Unverifiable only, on every registered profile when its profile is empty).
   void report(Diagnostic diagnostic);
 
-  /// Counts one error against every registered profile. Kept for call sites that do not name a
-  /// code yet; each one moves to report() with its code as the call sites are migrated.
-  void recordCommonError();
-
-  /// Counts one error against profileTag, creating its entry when it is not registered.
-  void recordProfileError(const std::string& profileTag);
-
   /// The per-profile error counts, keyed by profile tag in tag order. Error and Unverifiable
   /// records count here (both fail the build); warnings do not.
   const std::map<std::string, uint64_t>& errorCounts() const;

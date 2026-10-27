@@ -38,10 +38,6 @@ namespace tgfx {
 
 namespace DiagnosticCode {
 
-/// A site that has no code yet. Every call site must name its code before this one is retired;
-/// it exists so the record model could land before the call sites did.
-inline constexpr const char* Unclassified = "internal.unclassified";
-
 // ---- sources / plan / compile / emit -------------------------------------------------------
 
 /// A shader source, include, or the source directory itself could not be read.
@@ -107,6 +103,20 @@ inline constexpr const char* OutputWrite = "output.write-failed";
 /// Two variants hashed to the same stage key with different content; the writer refuses to drop
 /// either silently.
 inline constexpr const char* OutputDuplicateKey = "output.duplicate-key";
+
+/// Every code above, in declaration order. DiagnosticCodeTest keeps this list and the call sites
+/// in step: a code referenced by a report site must be declared here, and every declared code
+/// must be referenced by at least one site (an unreferenced one is dead, or a site that still
+/// reports through something else).
+inline constexpr const char* AllCodes[] = {
+    SourcesUnreadable,     PlanNoEnumerator,   PlanUnbuildable,
+    CompileGlsl,           CompileCacheDisabled, ReflectUnknownType,
+    EmitFailed,            EmitFormLeak,
+    VerifyClipField,       VerifyOpCode,       VerifySlotCapacity,
+    VerifySourceFile,      VerifySourceFamily, VerifyReflection,
+    VerifyBindingLayout,   VerifyInlinePolicy, VerifyNotApplicable,
+    OutputWrite,           OutputDuplicateKey,
+};
 
 }  // namespace DiagnosticCode
 

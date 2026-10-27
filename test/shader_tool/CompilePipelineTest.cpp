@@ -209,9 +209,17 @@ TEST(CompileGlslTest, TheSameSourceCompilesToTheSameModule) {
 
 // ---- ExtractReflection ----------------------------------------------------------------------
 
+// The tests read the reflection only; a throwaway ledger collects whatever the extractor warns
+// about (an unknown type) without failing the test.
+ReflectionResult ReflectOf(const std::vector<uint32_t>& vertex,
+                           const std::vector<uint32_t>& fragment) {
+  Diagnostics diagnostics;
+  return ExtractReflection(vertex, fragment, &diagnostics);
+}
+
 TEST(ReflectionExtractorTest, TheVertexUniformBlockMembersAreExtracted) {
   auto vertex = MustCompile(VertexSource, ShaderStageType::Vertex);
-  auto reflection = ExtractReflection(vertex, {});
+  auto reflection = ReflectOf(vertex, {});
   const auto& uniforms = reflection.vertexReflection.uniforms;
   ASSERT_EQ(uniforms.size(), 2u);
   EXPECT_TRUE(HasEntry(uniforms, "Matrix", UniformFormat::Float3x3));
@@ -220,7 +228,7 @@ TEST(ReflectionExtractorTest, TheVertexUniformBlockMembersAreExtracted) {
 
 TEST(ReflectionExtractorTest, VertexInputsComeInLocationOrderWithTheirGap) {
   auto vertex = MustCompile(VertexSource, ShaderStageType::Vertex);
-  auto reflection = ExtractReflection(vertex, {});
+  auto reflection = ReflectOf(vertex, {});
   const auto& inputs = reflection.vertexReflection.vertexInputs;
   ASSERT_EQ(inputs.size(), 2u);
   EXPECT_EQ(inputs[0].name, "aPosition");
@@ -233,7 +241,7 @@ TEST(ReflectionExtractorTest, VertexInputsComeInLocationOrderWithTheirGap) {
 
 TEST(ReflectionExtractorTest, TheFragmentUniformBlockKeepsFormatsAndArraySizes) {
   auto fragment = MustCompile(FragmentSource, ShaderStageType::Fragment);
-  auto reflection = ExtractReflection({}, fragment);
+  auto reflection = ReflectOf({}, fragment);
   const auto& uniforms = reflection.fragmentReflection.uniforms;
   ASSERT_EQ(uniforms.size(), 3u);
   EXPECT_TRUE(HasEntry(uniforms, "Color", UniformFormat::Float4));
@@ -243,7 +251,7 @@ TEST(ReflectionExtractorTest, TheFragmentUniformBlockKeepsFormatsAndArraySizes) 
 
 TEST(ReflectionExtractorTest, SamplersAreRecordedInBindingOrderNotDeclarationOrder) {
   auto fragment = MustCompile(FragmentSource, ShaderStageType::Fragment);
-  auto reflection = ExtractReflection({}, fragment);
+  auto reflection = ReflectOf({}, fragment);
   const auto& samplers = reflection.fragmentReflection.samplers;
   ASSERT_EQ(samplers.size(), 2u);
   // TextureSampler_1 is declared first but sits on binding 1.
@@ -268,7 +276,7 @@ TEST(ReflectionExtractorTest, ManySamplersDeclaredBackwardsStillComeInBindingOrd
   }
   source += "}\n";
   auto fragment = MustCompile(source, ShaderStageType::Fragment);
-  auto reflection = ExtractReflection({}, fragment);
+  auto reflection = ReflectOf({}, fragment);
   const auto& samplers = reflection.fragmentReflection.samplers;
   ASSERT_EQ(samplers.size(), static_cast<size_t>(count));
   for (int i = 0; i < count; ++i) {
@@ -289,7 +297,7 @@ TEST(ReflectionExtractorTest, ManyVertexInputsDeclaredBackwardsStillComeInLocati
   }
   source += "  gl_Position = vec4(sum);\n}\n";
   auto vertex = MustCompile(source, ShaderStageType::Vertex);
-  auto reflection = ExtractReflection(vertex, {});
+  auto reflection = ReflectOf(vertex, {});
   const auto& inputs = reflection.vertexReflection.vertexInputs;
   ASSERT_EQ(inputs.size(), static_cast<size_t>(count));
   for (int i = 0; i < count; ++i) {
@@ -304,12 +312,12 @@ TEST(ReflectionExtractorTest, OnlyTheNamedBlockIsReflected) {
                              "layout(std140, set = 0, binding = 0) uniform OtherBlock { vec4 X; };\n"
                              "void main() { gl_Position = X; }\n";
   auto vertex = MustCompile(source, ShaderStageType::Vertex);
-  auto reflection = ExtractReflection(vertex, {});
+  auto reflection = ReflectOf(vertex, {});
   EXPECT_TRUE(reflection.vertexReflection.uniforms.empty());
 }
 
 TEST(ReflectionExtractorTest, EmptyStagesProduceEmptyReflection) {
-  auto reflection = ExtractReflection({}, {});
+  auto reflection = ReflectOf({}, {});
   EXPECT_TRUE(reflection.vertexReflection.uniforms.empty());
   EXPECT_TRUE(reflection.vertexReflection.vertexInputs.empty());
   EXPECT_TRUE(reflection.fragmentReflection.uniforms.empty());

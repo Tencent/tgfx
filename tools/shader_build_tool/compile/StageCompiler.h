@@ -119,7 +119,8 @@ class StageCompiler {
   const ReflectionResult& extractReflection(const std::string& shaderName, uint32_t vertIndex,
                                             uint32_t fragIndex,
                                             const std::vector<uint32_t>& vertSpirv,
-                                            const std::vector<uint32_t>& fragSpirv);
+                                            const std::vector<uint32_t>& fragSpirv,
+                                            Diagnostics* diagnostics);
 
  private:
   struct BlobStage {

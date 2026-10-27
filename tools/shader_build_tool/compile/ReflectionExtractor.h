@@ -20,6 +20,7 @@
 
 #include <cstdint>
 #include <vector>
+#include "core/Diagnostics.h"
 #include "core/Types.h"
 
 namespace tgfx {
@@ -30,8 +31,11 @@ struct ReflectionResult {
 };
 
 /// Extracts reflection data (uniform block members and samplers) from compiled SPIR-V binaries
-/// using spirv-cross. Returns per-stage reflection data for vertex and fragment shaders.
+/// using spirv-cross. Returns per-stage reflection data for vertex and fragment shaders. A
+/// SPIR-V type the mapping does not know falls back to Float and is reported as a warning
+/// diagnostic — the entry would otherwise carry a silently wrong format into the bundle.
 ReflectionResult ExtractReflection(const std::vector<uint32_t>& vertexSPIRV,
-                                   const std::vector<uint32_t>& fragmentSPIRV);
+                                   const std::vector<uint32_t>& fragmentSPIRV,
+                                   Diagnostics* diagnostics);
 
 }  // namespace tgfx

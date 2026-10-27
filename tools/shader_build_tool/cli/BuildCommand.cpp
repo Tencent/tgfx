@@ -221,7 +221,8 @@ ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const BuildOpti
 
     // Extract reflection from SPIR-V (shared across backend passes, like the compiles above).
     const auto& reflection =
-        compiler->extractReflection(info.name, vi, fi, *vertSpirv, fragResult.spirv);
+        compiler->extractReflection(info.name, vi, fi, *vertSpirv, fragResult.spirv,
+                                    diagnostics);
     // Counted only here — after both stages compiled successfully — so compiledCount is the
     // true "compiled" figure, distinct from rawCount (the reachable-permutation total) and
     // independent of backend-level exclusions counted below.

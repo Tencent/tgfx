@@ -17,14 +17,34 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "compile/ReflectionExtractor.h"
-#include <iostream>
 #include <spirv_cross.hpp>
+#include <string>
+#include <utility>
+#include "core/DiagnosticCodes.h"
 #include "gpu/ShaderBindingLayout.h"
 #include "gpu/Uniform.h"
 
 namespace tgfx {
 
-static uint8_t MapSPIRVTypeToFormat(const spirv_cross::SPIRType& type) {
+namespace {
+
+void ReportUnknownType(Diagnostics* diagnostics, const spirv_cross::SPIRType& type) {
+  if (diagnostics == nullptr) {
+    return;
+  }
+  Diagnostic diagnostic;
+  diagnostic.severity = Severity::Warning;
+  diagnostic.layer = Layer::Compile;
+  diagnostic.code = DiagnosticCode::ReflectUnknownType;
+  diagnostic.message = "unknown SPIR-V type (basetype=" + std::to_string(type.basetype) +
+                       " vec=" + std::to_string(type.vecsize) + " col=" +
+                       std::to_string(type.columns) + "); the entry falls back to Float";
+  diagnostics->report(std::move(diagnostic));
+}
+
+}  // namespace
+
+static uint8_t MapSPIRVTypeToFormat(const spirv_cross::SPIRType& type, Diagnostics* diagnostics) {
   if (type.basetype == spirv_cross::SPIRType::Float) {
     if (type.columns > 1) {
       if (type.columns == 2 && type.vecsize == 2) {
@@ -61,12 +81,12 @@ static uint8_t MapSPIRVTypeToFormat(const spirv_cross::SPIRType& type) {
         return static_cast<uint8_t>(UniformFormat::Int4);
     }
   }
-  std::cerr << "WARNING: Unknown SPIR-V type (basetype=" << static_cast<int>(type.basetype)
-            << " vec=" << type.vecsize << " col=" << type.columns << ")\n";
+  ReportUnknownType(diagnostics, type);
   return static_cast<uint8_t>(UniformFormat::Float);
 }
 
-static std::vector<VertexInputEntry> ExtractVertexInputs(spirv_cross::Compiler& compiler) {
+static std::vector<VertexInputEntry> ExtractVertexInputs(spirv_cross::Compiler& compiler,
+                                                        Diagnostics* diagnostics) {
   // The runtime vertex binding walks attribute slots by location, so the entries are recorded in
   // location order; the loader requires the locations to strictly increase (a gap is legal, a
   // repeated or decreasing location is not).
@@ -78,7 +98,7 @@ static std::vector<VertexInputEntry> ExtractVertexInputs(spirv_cross::Compiler& 
     auto location = compiler.get_decoration(input.id, spv::DecorationLocation);
     VertexInputEntry entry;
     entry.name = name;
-    entry.format = MapSPIRVTypeToFormat(type);
+    entry.format = MapSPIRVTypeToFormat(type, diagnostics);
     entry.location = static_cast<uint8_t>(location);
     byLocation.emplace_back(location, std::move(entry));
   }
@@ -93,7 +113,8 @@ static std::vector<VertexInputEntry> ExtractVertexInputs(spirv_cross::Compiler& 
 }
 
 static std::vector<UniformEntry> ExtractUBOMembers(spirv_cross::Compiler& compiler,
-                                                   const std::string& blockName) {
+                                                   const std::string& blockName,
+                                                   Diagnostics* diagnostics) {
   std::vector<UniformEntry> result;
   auto resources = compiler.get_shader_resources();
   for (auto& ubo : resources.uniform_buffers) {
@@ -113,7 +134,7 @@ static std::vector<UniformEntry> ExtractUBOMembers(spirv_cross::Compiler& compil
       std::string memberName = compiler.get_member_name(ubo.base_type_id, i);
       UniformEntry entry;
       entry.name = memberName;
-      entry.format = MapSPIRVTypeToFormat(memberType);
+      entry.format = MapSPIRVTypeToFormat(memberType, diagnostics);
       if (!memberType.array.empty()) {
         entry.arraySize = static_cast<uint16_t>(memberType.array[0]);
       }
@@ -150,18 +171,21 @@ static std::vector<UniformEntry> ExtractSamplers(spirv_cross::Compiler& compiler
 }
 
 ReflectionResult ExtractReflection(const std::vector<uint32_t>& vertexSPIRV,
-                                   const std::vector<uint32_t>& fragmentSPIRV) {
+                                   const std::vector<uint32_t>& fragmentSPIRV,
+                                   Diagnostics* diagnostics) {
   ReflectionResult result;
 
   if (!vertexSPIRV.empty()) {
     spirv_cross::Compiler vertCompiler(vertexSPIRV);
-    result.vertexReflection.uniforms = ExtractUBOMembers(vertCompiler, VertexUniformBlockName);
-    result.vertexReflection.vertexInputs = ExtractVertexInputs(vertCompiler);
+    result.vertexReflection.uniforms =
+        ExtractUBOMembers(vertCompiler, VertexUniformBlockName, diagnostics);
+    result.vertexReflection.vertexInputs = ExtractVertexInputs(vertCompiler, diagnostics);
   }
 
   if (!fragmentSPIRV.empty()) {
     spirv_cross::Compiler fragCompiler(fragmentSPIRV);
-    result.fragmentReflection.uniforms = ExtractUBOMembers(fragCompiler, FragmentUniformBlockName);
+    result.fragmentReflection.uniforms =
+        ExtractUBOMembers(fragCompiler, FragmentUniformBlockName, diagnostics);
     result.fragmentReflection.samplers = ExtractSamplers(fragCompiler);
   }
 

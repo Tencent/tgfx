@@ -142,11 +142,14 @@ const TextStage& StageCompiler::compileWgsl(const std::string& source, ShaderSta
 const ReflectionResult& StageCompiler::extractReflection(const std::string& shaderName,
                                                          uint32_t vertIndex, uint32_t fragIndex,
                                                          const std::vector<uint32_t>& vertSpirv,
-                                                         const std::vector<uint32_t>& fragSpirv) {
+                                                         const std::vector<uint32_t>& fragSpirv,
+                                                         Diagnostics* diagnostics) {
   auto key = std::make_tuple(shaderName, vertIndex, fragIndex);
   auto it = reflectionCache.find(key);
   if (it == reflectionCache.end()) {
-    it = reflectionCache.emplace(std::move(key), ExtractReflection(vertSpirv, fragSpirv)).first;
+    it = reflectionCache
+             .emplace(std::move(key), ExtractReflection(vertSpirv, fragSpirv, diagnostics))
+             .first;
   }
   return it->second;
 }

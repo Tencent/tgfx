@@ -4,8 +4,8 @@
 //
 //  Copyright (C) 2026 Tencent. All rights reserved.
 //
-//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
-//  in compliance with the License. You may obtain a copy of the License at
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
+//  compliance with the License. You may obtain a copy of the License at
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
@@ -16,11 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Diagnostics is the error ledger the compile loop reports through. These tests pin its two
-// counting rules: a common error lands on every profile that takes part in the build, and a
-// profile error lands on that profile alone, whether or not it was registered up front. They
-// also pin that re-registering a profile keeps its count, which is what the per-profile
-// figures in shader_build_report.json rely on when a profile is registered once per build.
+// Diagnostics is the error ledger the build reports through. These tests pin its counting rules:
+// an error whose profile is empty lands on every profile that takes part in the build at that
+// moment, a profile error lands on that profile alone, warnings are logged but never counted,
+// and "unverifiable" fails the build like an error while staying a distinct severity. They also
+// pin that re-registering a profile keeps its count, which is what the per-profile figures in
+// shader_build_report.json rely on.
 
 #include <map>
 #include <string>
@@ -35,7 +36,7 @@ Diagnostic MakeDiagnostic(Severity severity, const char* profile, const char* me
   Diagnostic diagnostic;
   diagnostic.severity = severity;
   diagnostic.layer = Layer::Verify;
-  diagnostic.code = DiagnosticCode::Unclassified;
+  diagnostic.code = DiagnosticCode::CompileGlsl;
   diagnostic.profile = profile;
   diagnostic.shader = "TestShader";
   diagnostic.message = message;
@@ -46,8 +47,8 @@ TEST(DiagnosticsTest, ACommonErrorCountsEveryRegisteredProfile) {
   Diagnostics diagnostics;
   diagnostics.registerProfile("opengl");
   diagnostics.registerProfile("vulkan");
-  diagnostics.recordCommonError();
-  diagnostics.recordCommonError();
+  diagnostics.report(MakeDiagnostic(Severity::Error, "", "common"));
+  diagnostics.report(MakeDiagnostic(Severity::Error, "", "common"));
   EXPECT_EQ(diagnostics.errorCounts().at("opengl"), 2u);
   EXPECT_EQ(diagnostics.errorCounts().at("vulkan"), 2u);
 }
@@ -57,7 +58,7 @@ TEST(DiagnosticsTest, ACommonErrorBeforeAnyRegistrationIsLost) {
   // error recorded before any profile exists changes no figure. The build registers every
   // requested profile before the first compile, so this is the empty-build corner only.
   Diagnostics diagnostics;
-  diagnostics.recordCommonError();
+  diagnostics.report(MakeDiagnostic(Severity::Error, "", "common"));
   EXPECT_TRUE(diagnostics.errorCounts().empty());
 }
 
@@ -65,8 +66,8 @@ TEST(DiagnosticsTest, AProfileErrorCountsOnlyThatProfile) {
   Diagnostics diagnostics;
   diagnostics.registerProfile("opengl");
   diagnostics.registerProfile("vulkan");
-  diagnostics.recordProfileError("vulkan");
-  diagnostics.recordProfileError("vulkan");
+  diagnostics.report(MakeDiagnostic(Severity::Error, "vulkan", "mismatch"));
+  diagnostics.report(MakeDiagnostic(Severity::Error, "vulkan", "mismatch"));
   EXPECT_EQ(diagnostics.errorCounts().at("opengl"), 0u);
   EXPECT_EQ(diagnostics.errorCounts().at("vulkan"), 2u);
 }
@@ -76,7 +77,7 @@ TEST(DiagnosticsTest, AProfileErrorForAnUnregisteredProfileStillShowsUp) {
   // show it rather than zero it out.
   Diagnostics diagnostics;
   diagnostics.registerProfile("opengl");
-  diagnostics.recordProfileError("metal");
+  diagnostics.report(MakeDiagnostic(Severity::Error, "metal", "backend"));
   EXPECT_EQ(diagnostics.errorCounts().at("metal"), 1u);
   EXPECT_EQ(diagnostics.errorCounts().at("opengl"), 0u);
 }
@@ -84,7 +85,7 @@ TEST(DiagnosticsTest, AProfileErrorForAnUnregisteredProfileStillShowsUp) {
 TEST(DiagnosticsTest, RegisteringAProfileTwiceKeepsItsCount) {
   Diagnostics diagnostics;
   diagnostics.registerProfile("opengl");
-  diagnostics.recordProfileError("opengl");
+  diagnostics.report(MakeDiagnostic(Severity::Error, "opengl", "backend"));
   diagnostics.registerProfile("opengl");
   EXPECT_EQ(diagnostics.errorCounts().at("opengl"), 1u);
 }
@@ -97,15 +98,6 @@ TEST(DiagnosticsTest, TheCountsComeBackInTagOrder) {
   diagnostics.registerProfile("opengl");
   std::map<std::string, uint64_t> expected = {{"opengl", 0}, {"vulkan", 0}};
   EXPECT_EQ(diagnostics.errorCounts(), expected);
-}
-
-TEST(DiagnosticsTest, AProfileErrorRecordCountsOnlyThatProfile) {
-  Diagnostics diagnostics;
-  diagnostics.registerProfile("opengl");
-  diagnostics.registerProfile("vulkan");
-  diagnostics.report(MakeDiagnostic(Severity::Error, "vulkan", "mismatch"));
-  EXPECT_EQ(diagnostics.errorCounts().at("opengl"), 0u);
-  EXPECT_EQ(diagnostics.errorCounts().at("vulkan"), 1u);
 }
 
 TEST(DiagnosticsTest, ACommonErrorRecordCountsEveryProfileRegisteredAtThatMoment) {
@@ -151,22 +143,6 @@ TEST(DiagnosticsTest, RecordsKeepReportOrderAndContent) {
   EXPECT_EQ(diagnostics.records()[1].message, "second");
   EXPECT_EQ(diagnostics.records()[2].message, "third");
   EXPECT_EQ(diagnostics.records()[2].profile, "metal");
-}
-
-TEST(DiagnosticsTest, TheLegacyRecordersLogUnclassifiedRecords) {
-  // The compatibility entry points route through report(), so a site that has not named its code
-  // yet still shows up in the log with the placeholder code.
-  Diagnostics diagnostics;
-  diagnostics.registerProfile("opengl");
-  diagnostics.recordCommonError();
-  diagnostics.recordProfileError("vulkan");
-  ASSERT_EQ(diagnostics.records().size(), 2u);
-  EXPECT_STREQ(diagnostics.records()[0].code, DiagnosticCode::Unclassified);
-  EXPECT_EQ(diagnostics.records()[0].profile, "");
-  EXPECT_STREQ(diagnostics.records()[1].code, DiagnosticCode::Unclassified);
-  EXPECT_EQ(diagnostics.records()[1].profile, "vulkan");
-  EXPECT_EQ(diagnostics.errorCounts().at("opengl"), 1u);
-  EXPECT_EQ(diagnostics.errorCounts().at("vulkan"), 1u);
 }
 
 }  // namespace

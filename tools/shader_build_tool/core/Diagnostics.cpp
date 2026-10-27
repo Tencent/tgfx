@@ -41,23 +41,6 @@ void Diagnostics::report(Diagnostic diagnostic) {
   recordLog.push_back(std::move(diagnostic));
 }
 
-void Diagnostics::recordCommonError() {
-  Diagnostic diagnostic;
-  diagnostic.severity = Severity::Error;
-  diagnostic.layer = Layer::Compile;
-  diagnostic.code = DiagnosticCode::Unclassified;
-  report(std::move(diagnostic));
-}
-
-void Diagnostics::recordProfileError(const std::string& profileTag) {
-  Diagnostic diagnostic;
-  diagnostic.severity = Severity::Error;
-  diagnostic.layer = Layer::Compile;
-  diagnostic.code = DiagnosticCode::Unclassified;
-  diagnostic.profile = profileTag;
-  report(std::move(diagnostic));
-}
-
 const std::map<std::string, uint64_t>& Diagnostics::errorCounts() const {
   return profileErrorCounts_;
 }
