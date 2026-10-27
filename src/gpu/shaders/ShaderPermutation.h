@@ -371,21 +371,6 @@ inline constexpr int XP_FRAMEBUFFER_FETCH = 2;
 inline constexpr int XP_VALUE_COUNT = 3;
 
 /**
- * Declares a nested Dims struct containing an enum of dimension indices and a static domain()
- * method. Usage:
- *   TGFX_DEFINE_DIMS(HAS_YUV, ALPHA_ONLY, HAS_RGBAAA)
- * Expands to enum values HAS_YUV=0, ALPHA_ONLY=1, HAS_RGBAAA=2, COUNT=3 and a domain()
- * returning the corresponding PermutationDomain.
- */
-#define TGFX_DEFINE_DIMS(...)                                \
-  struct Dims {                                              \
-    enum : uint32_t { __VA_ARGS__, COUNT };                  \
-    static PermutationDomain domain() {                      \
-      return PermutationDomain::FromBoolNames(#__VA_ARGS__); \
-    }                                                        \
-  }
-
-/**
  * Returns false when a dimension shared by name between the vertex and fragment domains has
  * differing values in the two stages. Such a dimension gates a varying that both stages must
  * declare identically (the vertex emits it only when the fragment consumes it), so mismatched

@@ -35,24 +35,26 @@ class ComplexEllipseFillShader : public ShaderFamily<ComplexEllipseFillShader> {
   // The one geometry processor this family accepts: reported by info() and compared by Extract.
   static constexpr const char* GpClassName = "ComplexEllipseGeometryProcessor";
 
-  TGFX_DEFINE_DIMS(STROKE);
-  using VD = Dims;
+  struct VertDims {
+    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
+    static inline const PermutationBoolDim<VertDims> STROKE{"STROKE"};
+    static PermutationDomain domain() {
+      return PermutationDomain({STROKE});
+    }
+  };
+  using VD = VertDims;
 
   struct FragDims {
     // The device-space mask is a runtime uniform (HasDeviceMask) with a padded dummy sampler: this
     // family is rare, and a HAS_DEVICE_MASK dimension would double all stroke/XP variants for it.
-    enum : uint32_t { STROKE, HAS_XP, COUNT };
+    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
+    static inline const PermutationBoolDim<FragDims> STROKE{"STROKE"};
+    static inline const PermutationIntDim<FragDims> HAS_XP{XP_DEFINE_NAME, XP_VALUE_COUNT};
     static PermutationDomain domain() {
-      return PermutationDomain({
-          PermutationBool("STROKE"),
-          PermutationInt(XP_DEFINE_NAME, XP_VALUE_COUNT),
-      });
+      return PermutationDomain({STROKE, HAS_XP});
     }
   };
   using FD = FragDims;
-  static_assert(VD::COUNT == 1 && FD::COUNT == 2,
-                "Update the Compose mapping when dimensions change.");
-
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
 
@@ -69,12 +71,15 @@ class ComplexEllipseFillShader : public ShaderFamily<ComplexEllipseFillShader> {
     if (inputs.xpType < XP_NONE) {
       return std::nullopt;
     }
+    int isStroke = inputs.isStroke ? 1 : 0;
+    auto vert = ComposedDims<VertDims>(VertDims::domain());
+    vert.set(VD::STROKE, isStroke);
+    auto frag = ComposedDims<FragDims>(FragDims::domain());
+    frag.set(FD::STROKE, isStroke);
+    frag.set(FD::HAS_XP, inputs.xpType);
     RuleComposedValues values;
-    values.vertValues.resize(VD::COUNT);
-    values.vertValues[VD::STROKE] = inputs.isStroke ? 1 : 0;
-    values.fragValues.resize(FD::COUNT);
-    values.fragValues[FD::STROKE] = values.vertValues[VD::STROKE];
-    values.fragValues[FD::HAS_XP] = inputs.xpType;
+    values.vertValues = vert.finish();
+    values.fragValues = frag.finish();
     return values;
   }
 

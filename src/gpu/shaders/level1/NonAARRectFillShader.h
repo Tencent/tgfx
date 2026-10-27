@@ -35,23 +35,26 @@ class NonAARRectFillShader : public ShaderFamily<NonAARRectFillShader> {
   // The one geometry processor this family accepts: reported by info() and compared by Extract.
   static constexpr const char* GpClassName = "NonAARRectGeometryProcessor";
 
-  TGFX_DEFINE_DIMS(STROKE, TEXTURED);
-  using VD = Dims;
+  struct VertDims {
+    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
+    static inline const PermutationBoolDim<VertDims> STROKE{"STROKE"};
+    static inline const PermutationBoolDim<VertDims> TEXTURED{"TEXTURED"};
+    static PermutationDomain domain() {
+      return PermutationDomain({STROKE, TEXTURED});
+    }
+  };
+  using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { STROKE, TEXTURED, HAS_XP, COUNT };
+    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
+    static inline const PermutationBoolDim<FragDims> STROKE{"STROKE"};
+    static inline const PermutationBoolDim<FragDims> TEXTURED{"TEXTURED"};
+    static inline const PermutationIntDim<FragDims> HAS_XP{XP_DEFINE_NAME, XP_VALUE_COUNT};
     static PermutationDomain domain() {
-      return PermutationDomain({
-          PermutationBool("STROKE"),
-          PermutationBool("TEXTURED"),
-          PermutationInt(XP_DEFINE_NAME, XP_VALUE_COUNT),
-      });
+      return PermutationDomain({STROKE, TEXTURED, HAS_XP});
     }
   };
   using FD = FragDims;
-  static_assert(VD::COUNT == 2 && FD::COUNT == 3,
-                "Update the Compose mapping when dimensions change.");
-
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
 
@@ -66,7 +69,11 @@ class NonAARRectFillShader : public ShaderFamily<NonAARRectFillShader> {
   /// the tiled texture child, so the combination stays out of the bundle. Compose and the
   /// mirrored Reachable default both consult this predicate, keeping them in lockstep.
   static bool FragValuesAllowed(const std::vector<int>& fragValues) {
-    return !(fragValues[FD::TEXTURED] != 0 && fragValues[FD::STROKE] != 0);
+    // The signature stays vector-based: ShaderFamily's detection trait and the mirrored
+    // reachable enumeration pass decoded (positional) values; the positions resolve by name.
+    const auto fragDomain = FragDims::domain();
+    return !(fragValues[fragDomain.indexOf(FD::TEXTURED.defineName)] != 0 &&
+             fragValues[fragDomain.indexOf(FD::STROKE.defineName)] != 0);
   }
 
   /// Pure mapping from inputs to dimension values, with the shared rejection above.
@@ -74,14 +81,18 @@ class NonAARRectFillShader : public ShaderFamily<NonAARRectFillShader> {
     if (inputs.xpType < XP_NONE) {
       return std::nullopt;
     }
+    int isStroke = inputs.isStroke ? 1 : 0;
+    int textured = inputs.textured ? 1 : 0;
+    auto vert = ComposedDims<VertDims>(VertDims::domain());
+    vert.set(VD::STROKE, isStroke);
+    vert.set(VD::TEXTURED, textured);
+    auto frag = ComposedDims<FragDims>(FragDims::domain());
+    frag.set(FD::STROKE, isStroke);
+    frag.set(FD::TEXTURED, textured);
+    frag.set(FD::HAS_XP, inputs.xpType);
     RuleComposedValues values;
-    values.vertValues.resize(VD::COUNT);
-    values.vertValues[VD::STROKE] = inputs.isStroke ? 1 : 0;
-    values.vertValues[VD::TEXTURED] = inputs.textured ? 1 : 0;
-    values.fragValues.resize(FD::COUNT);
-    values.fragValues[FD::STROKE] = values.vertValues[VD::STROKE];
-    values.fragValues[FD::TEXTURED] = values.vertValues[VD::TEXTURED];
-    values.fragValues[FD::HAS_XP] = inputs.xpType;
+    values.vertValues = vert.finish();
+    values.fragValues = frag.finish();
     if (!FragValuesAllowed(values.fragValues)) {
       return std::nullopt;
     }

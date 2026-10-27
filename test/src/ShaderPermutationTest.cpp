@@ -285,16 +285,16 @@ TGFX_TEST(ShaderPermutationTest, DefineListForZeroValue) {
   EXPECT_EQ(defines5[2], "Z=1");
 }
 
-TGFX_TEST(ShaderPermutationTest, DefineDimsMacro) {
-  using D = RoundStrokeRectFillShader::Dims;
-  EXPECT_EQ(D::COUNT, 1u);
-  EXPECT_EQ(D::HAS_UV_MATRIX, 0u);
-
-  auto domain = D::domain();
-  EXPECT_EQ(domain.dimensionCount(), static_cast<size_t>(D::COUNT));
+TGFX_TEST(ShaderPermutationTest, TypedVertDimsDeclaresTheSameDomain) {
+  // The handle declarations replace the old enum-plus-domain-list pair; the domain they build
+  // is byte-for-byte the bool domain the family always had.
+  using VD = RoundStrokeRectFillShader::VD;
+  auto domain = VD::domain();
+  EXPECT_EQ(domain.dimensionCount(), 1u);
   EXPECT_EQ(domain.totalCount(), 2u);
+  EXPECT_EQ(domain.defineListFor(1)[0], "HAS_UV_MATRIX=1");
 
-  // Verify domain dimensions match.
+  // The handle declaration is equivalent to the historical bool-names domain.
   auto handDomain = PermutationDomain::FromBoolNames("HAS_UV_MATRIX");
   EXPECT_EQ(handDomain.totalCount(), domain.totalCount());
   EXPECT_EQ(handDomain.dimensionCount(), domain.dimensionCount());

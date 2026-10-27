@@ -36,21 +36,23 @@ class ShapeInstancedTextureCoverageShader
   // The one geometry processor this family accepts: reported by info() and compared by Extract.
   static constexpr const char* GpClassName = "ShapeInstancedGeometryProcessor";
 
-  TGFX_DEFINE_DIMS(GRADIENT);
-  using VD = Dims;
+  struct VertDims {
+    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
+    static inline const PermutationBoolDim<VertDims> GRADIENT{"GRADIENT"};
+    static PermutationDomain domain() {
+      return PermutationDomain({GRADIENT});
+    }
+  };
+  using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { GRADIENT, COUNT };
+    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
+    static inline const PermutationBoolDim<FragDims> GRADIENT{"GRADIENT"};
     static PermutationDomain domain() {
-      return PermutationDomain({
-          PermutationBool("GRADIENT"),
-      });
+      return PermutationDomain({GRADIENT});
     }
   };
   using FD = FragDims;
-  static_assert(VD::COUNT == 1 && FD::COUNT == 1,
-                "Update the Compose mapping when dimensions change.");
-
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
 
@@ -63,11 +65,14 @@ class ShapeInstancedTextureCoverageShader
   /// domains one-to-one (GRADIENT mirrors to both stages), so the mirrored Reachable default
   /// enumerates exactly what Compose emits.
   static std::optional<RuleComposedValues> Compose(const Inputs& inputs) {
+    int gradient = inputs.gradient ? 1 : 0;
+    auto vert = ComposedDims<VertDims>(VertDims::domain());
+    vert.set(VD::GRADIENT, gradient);
+    auto frag = ComposedDims<FragDims>(FragDims::domain());
+    frag.set(FD::GRADIENT, gradient);
     RuleComposedValues values;
-    values.vertValues.resize(VD::COUNT);
-    values.vertValues[VD::GRADIENT] = inputs.gradient ? 1 : 0;
-    values.fragValues.resize(FD::COUNT);
-    values.fragValues[FD::GRADIENT] = values.vertValues[VD::GRADIENT];
+    values.vertValues = vert.finish();
+    values.fragValues = frag.finish();
     return values;
   }
 

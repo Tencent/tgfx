@@ -35,21 +35,23 @@ class MeshFillShader : public ShaderFamily<MeshFillShader> {
   // The one geometry processor this family accepts: reported by info() and compared by Extract.
   static constexpr const char* GpClassName = "MeshGeometryProcessor";
 
-  TGFX_DEFINE_DIMS(HAS_TEX_COORDS);
-  using VD = Dims;
+  struct VertDims {
+    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
+    static inline const PermutationBoolDim<VertDims> HAS_TEX_COORDS{"HAS_TEX_COORDS"};
+    static PermutationDomain domain() {
+      return PermutationDomain({HAS_TEX_COORDS});
+    }
+  };
+  using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t { HAS_XP, COUNT };
+    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
+    static inline const PermutationIntDim<FragDims> HAS_XP{XP_DEFINE_NAME, XP_VALUE_COUNT};
     static PermutationDomain domain() {
-      return PermutationDomain({
-          PermutationInt(XP_DEFINE_NAME, XP_VALUE_COUNT),
-      });
+      return PermutationDomain({HAS_XP});
     }
   };
   using FD = FragDims;
-  static_assert(VD::COUNT == 1 && FD::COUNT == 1,
-                "Update the Compose mapping when dimensions change.");
-
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
 
@@ -65,11 +67,13 @@ class MeshFillShader : public ShaderFamily<MeshFillShader> {
     if (inputs.xpType < XP_NONE) {
       return std::nullopt;
     }
+    auto vert = ComposedDims<VertDims>(VertDims::domain());
+    vert.set(VD::HAS_TEX_COORDS, inputs.hasTexCoords ? 1 : 0);
+    auto frag = ComposedDims<FragDims>(FragDims::domain());
+    frag.set(FD::HAS_XP, inputs.xpType);
     RuleComposedValues values;
-    values.vertValues.resize(VD::COUNT);
-    values.vertValues[VD::HAS_TEX_COORDS] = inputs.hasTexCoords ? 1 : 0;
-    values.fragValues.resize(FD::COUNT);
-    values.fragValues[FD::HAS_XP] = inputs.xpType;
+    values.vertValues = vert.finish();
+    values.fragValues = frag.finish();
     return values;
   }
 

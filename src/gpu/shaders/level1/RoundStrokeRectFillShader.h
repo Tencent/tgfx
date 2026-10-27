@@ -40,24 +40,26 @@ class RoundStrokeRectFillShader : public ShaderFamily<RoundStrokeRectFillShader>
   // no HAS_COMMON_COLOR dimension. The coverage and ellipse-radii attributes are unconditional
   // too (non-AA draws write a 1.0 coverage and zero radii), with the AA ramp selected by the
   // AAEnabled runtime uniform, so there is no HAS_AA dimension either.
-  TGFX_DEFINE_DIMS(HAS_UV_MATRIX);
-  using VD = Dims;
+  struct VertDims {
+    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
+    static inline const PermutationBoolDim<VertDims> HAS_UV_MATRIX{"HAS_UV_MATRIX"};
+    static PermutationDomain domain() {
+      return PermutationDomain({HAS_UV_MATRIX});
+    }
+  };
+  using VD = VertDims;
 
   struct FragDims {
     // HAS_UV_MATRIX stays vertex-only: the fragment stage never branches on it
     // (round_stroke_rect_fill.frag does not reference the define), so it is not part of the
     // fragment domain.
-    enum : uint32_t { HAS_XP, COUNT };
+    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
+    static inline const PermutationIntDim<FragDims> HAS_XP{XP_DEFINE_NAME, XP_VALUE_COUNT};
     static PermutationDomain domain() {
-      return PermutationDomain({
-          PermutationInt(XP_DEFINE_NAME, XP_VALUE_COUNT),
-      });
+      return PermutationDomain({HAS_XP});
     }
   };
   using FD = FragDims;
-  static_assert(VD::COUNT == 1 && FD::COUNT == 1,
-                "Update the Compose mapping when dimensions change.");
-
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
 
@@ -73,11 +75,13 @@ class RoundStrokeRectFillShader : public ShaderFamily<RoundStrokeRectFillShader>
     if (inputs.xpType < XP_NONE) {
       return std::nullopt;
     }
+    auto vert = ComposedDims<VertDims>(VertDims::domain());
+    vert.set(VD::HAS_UV_MATRIX, inputs.hasUVMatrix ? 1 : 0);
+    auto frag = ComposedDims<FragDims>(FragDims::domain());
+    frag.set(FD::HAS_XP, inputs.xpType);
     RuleComposedValues values;
-    values.vertValues.resize(VD::COUNT);
-    values.vertValues[VD::HAS_UV_MATRIX] = inputs.hasUVMatrix ? 1 : 0;
-    values.fragValues.resize(FD::COUNT);
-    values.fragValues[FD::HAS_XP] = inputs.xpType;
+    values.vertValues = vert.finish();
+    values.fragValues = frag.finish();
     return values;
   }
 
