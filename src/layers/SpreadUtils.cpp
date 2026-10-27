@@ -157,6 +157,7 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
   if (source == nullptr) {
     return {nullptr, {}, false};
   }
+  DEBUG_ASSERT(source->type() == StyleInputSource::Type::Contour);
   auto contour = static_cast<const ContourInputSource*>(source);
   // The legacy content shape of the shared content, not this contour raster's own expression: see
   // ContourInputSource. The generic shape() of the source stays empty on purpose.

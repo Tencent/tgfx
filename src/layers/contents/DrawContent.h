@@ -71,7 +71,7 @@ class DrawContent : public GeometryContent {
    * own alpha test.
    */
   bool isExcluded(bool includeUnpaintedGeometry) const {
-    return !color.has_value() && !includeUnpaintedGeometry;
+    return !hasPaint() && !includeUnpaintedGeometry;
   }
 
   /// Nullopt when no paint captured this geometry; a transparent painter is a value with alpha 0.
