@@ -35,9 +35,9 @@
 namespace tgfx {
 
 /**
- * Holds the recordings one excludeChildEffects bucket resolves its styles from. Each is built once.
- * content is null unless some style in the bucket draws from it, contour unless a Contour style
- * needs one or a geometry-less bucket falls back.
+ * Holds the recordings one excludeChildEffects bucket resolves its styles from. content is null
+ * unless some style in the bucket draws from it, contour unless a Contour style needs one or a
+ * geometry-less bucket falls back.
  */
 struct LayerStyleSourceGroup {
   // The shared content of this bucket, as the source a style resolves.

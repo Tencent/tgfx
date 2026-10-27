@@ -45,7 +45,7 @@ enum class LayerStyleExtraSourceType : uint32_t {
   None = 0,
   /**
    * The layerStyle requires the layer contour to be drawn: the shared subtree recording, which
-   * includes geometries from painters with alpha=0.
+   * includes geometries from painters with alpha=0 but leaves out geometries no paint captured.
    */
   Contour = 1 << 0,
   /**
@@ -96,7 +96,8 @@ enum class LayerStyleType {
  *
  * 2. **Contour** (layer contour): Similar to Content, but it also includes geometries from painters
  *    with alpha=0, and it replaces gradient fills with solid color fills (ignoring local
- *    transparency in gradients).
+ *    transparency in gradients). It leaves out geometries no paint captured; only
+ *    LayerStyleContentSource::Geometry covers those.
  *
  * 3. **Background** (layer background): The normally rendered content below the current layer.
  *
