@@ -25,7 +25,7 @@ namespace tgfx {
 
 class PathContent : public DrawContent {
  public:
-  PathContent(Path path, const LayerPaint& paint, bool hasPaint);
+  PathContent(Path path, const LayerPaint* paint);
 
   Rect getBounds(bool includeUnpaintedGeometry) const override;
   Rect getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const override;

@@ -20,8 +20,8 @@
 
 namespace tgfx {
 
-RectContent::RectContent(const Rect& rect, const LayerPaint& paint, bool hasPaint)
-    : DrawContent(paint, hasPaint), rect(rect) {
+RectContent::RectContent(const Rect& rect, const LayerPaint* paint)
+    : DrawContent(paint), rect(rect) {
 }
 
 Rect RectContent::getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const {

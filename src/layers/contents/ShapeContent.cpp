@@ -22,9 +22,10 @@
 
 namespace tgfx {
 
-ShapeContent::ShapeContent(std::shared_ptr<Shape> shape, const LayerPaint& paint, bool hasPaint)
-    : DrawContent(paint, hasPaint), shape(std::move(shape)), pathEffect(paint.pathEffect),
-      strokeAlign(paint.strokeAlign) {
+ShapeContent::ShapeContent(std::shared_ptr<Shape> shape, const LayerPaint* paint)
+    : DrawContent(paint), shape(std::move(shape)),
+      pathEffect(paint != nullptr ? paint->pathEffect : nullptr),
+      strokeAlign(paint != nullptr ? paint->strokeAlign : StrokeAlign::Center) {
   // Build the effect-wrapped shape once at construction so its per-instance unique key stays
   // stable across frames. Rebuilding the EffectShape on every onDraw would invalidate the GPU
   // triangulation/texture caches downstream (StrokeShape's key is derived from the inner shape's

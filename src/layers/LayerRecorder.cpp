@@ -38,10 +38,11 @@ namespace tgfx {
 
 // A stroke style is "complex" when it carries a non-Center alignment or a path effect (e.g. dash).
 // Complex styles cannot be resolved by a plain Canvas stroke call and must be expanded into fill
-// geometry downstream (ShapeContent handles the clip-mask expansion and effect application).
-static bool ComplexStrokeStyle(const LayerPaint& paint) {
-  return paint.style == PaintStyle::Stroke &&
-         (paint.strokeAlign != StrokeAlign::Center || paint.pathEffect != nullptr);
+// geometry downstream (ShapeContent handles the clip-mask expansion and effect application). An
+// entry no paint captured is never complex.
+static bool ComplexStrokeStyle(const LayerPaint* paint) {
+  return paint != nullptr && paint->style == PaintStyle::Stroke &&
+         (paint->strokeAlign != StrokeAlign::Center || paint->pathEffect != nullptr);
 }
 
 LayerRecorder::LayerRecorder() = default;
@@ -49,25 +50,21 @@ LayerRecorder::LayerRecorder() = default;
 LayerRecorder::~LayerRecorder() = default;
 
 void LayerRecorder::addRect(const Rect& rect, const LayerPaint* paint) {
-  LayerPaint fallback = {};
-  addRect(rect, paint != nullptr ? *paint : fallback, _matrix, paint != nullptr);
+  addRect(rect, paint, _matrix);
 }
 
 void LayerRecorder::addRRect(const RRect& rRect, const LayerPaint* paint) {
-  LayerPaint fallback = {};
-  addRRect(rRect, paint != nullptr ? *paint : fallback, _matrix, paint != nullptr);
+  addRRect(rRect, paint, _matrix);
 }
 
 void LayerRecorder::addPath(const Path& path, const LayerPaint* paint) {
-  LayerPaint fallback = {};
-  addPath(path, paint != nullptr ? *paint : fallback, _matrix, paint != nullptr);
+  addPath(path, paint, _matrix);
 }
 
 void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint* paint) {
   // The paint is copied by the private overload, never referenced, so the caller's paint may be
   // released as soon as this call returns.
-  LayerPaint fallback = {};
-  addShape(std::move(shape), paint != nullptr ? *paint : fallback, _matrix, paint != nullptr);
+  addShape(std::move(shape), paint, _matrix);
 }
 
 void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerPaint* paint,
@@ -78,17 +75,17 @@ void LayerRecorder::addTextBlob(std::shared_ptr<TextBlob> textBlob, const LayerP
   // TextContent does not consume strokeAlign or pathEffect. Callers that need Inside/Outside
   // alignment or a path effect on text must first convert the TextBlob into a Shape (see
   // StrokeStyle::prepareGlyphRun) and route it through addShape().
-  LayerPaint fallback = {};
-  const LayerPaint& effective = paint != nullptr ? *paint : fallback;
-  const bool hasPaint = paint != nullptr;
-  DEBUG_ASSERT(!ComplexStrokeStyle(effective));
+  DEBUG_ASSERT(!ComplexStrokeStyle(paint));
   flushPending();
-  auto& list = effective.placement == LayerPlacement::Foreground ? foregrounds : contents;
+  auto& list = (paint != nullptr ? paint->placement : LayerPlacement::Background) ==
+                       LayerPlacement::Foreground
+                   ? foregrounds
+                   : contents;
   // The offset only affects the text position, while _matrix affects both
   // the text position and the paint (shader/maskFilter coordinates).
   auto offset = Point::Make(x, y);
   std::unique_ptr<GeometryContent> content =
-      std::make_unique<TextContent>(std::move(textBlob), offset, effective, hasPaint);
+      std::make_unique<TextContent>(std::move(textBlob), offset, paint);
   if (!_matrix.isIdentity()) {
     content = std::make_unique<MatrixContent>(std::move(content), _matrix);
   }
@@ -101,14 +98,13 @@ void LayerRecorder::addMesh(std::shared_ptr<Mesh> mesh, const LayerPaint* paint)
   }
   // MeshContent does not consume strokeAlign or pathEffect. There is no reasonable way to apply
   // stroke alignment or a path effect to a Mesh, so reject the paint here.
-  LayerPaint fallback = {};
-  const LayerPaint& effective = paint != nullptr ? *paint : fallback;
-  const bool hasPaint = paint != nullptr;
-  DEBUG_ASSERT(!ComplexStrokeStyle(effective));
+  DEBUG_ASSERT(!ComplexStrokeStyle(paint));
   flushPending();
-  auto& list = effective.placement == LayerPlacement::Foreground ? foregrounds : contents;
-  std::unique_ptr<GeometryContent> content =
-      std::make_unique<MeshContent>(std::move(mesh), effective, hasPaint);
+  auto& list = (paint != nullptr ? paint->placement : LayerPlacement::Background) ==
+                       LayerPlacement::Foreground
+                   ? foregrounds
+                   : contents;
+  std::unique_ptr<GeometryContent> content = std::make_unique<MeshContent>(std::move(mesh), paint);
   if (!_matrix.isIdentity()) {
     content = std::make_unique<MatrixContent>(std::move(content), _matrix);
   }
@@ -127,82 +123,78 @@ void LayerRecorder::resetMatrix() {
   _matrix = Matrix::I();
 }
 
-void LayerRecorder::addRect(const Rect& rect, const LayerPaint& paint, const Matrix& matrix,
-                            bool hasPaint) {
+void LayerRecorder::addRect(const Rect& rect, const LayerPaint* paint, const Matrix& matrix) {
   if (rect.isEmpty()) {
     return;
   }
   if (ComplexStrokeStyle(paint)) {
     Path path = {};
     path.addRect(rect);
-    flushPending(PendingType::Shape, paint, matrix, hasPaint);
+    flushPending(PendingType::Shape, paint, matrix);
     pendingShape = Shape::MakeFrom(std::move(path));
     return;
   }
-  if (!canAppend(PendingType::Rect, paint, matrix, hasPaint)) {
-    flushPending(PendingType::Rect, paint, matrix, hasPaint);
+  if (!canAppend(PendingType::Rect, paint, matrix)) {
+    flushPending(PendingType::Rect, paint, matrix);
   }
   pendingRects.push_back(rect);
 }
 
-void LayerRecorder::addRRect(const RRect& rRect, const LayerPaint& paint, const Matrix& matrix,
-                             bool hasPaint) {
+void LayerRecorder::addRRect(const RRect& rRect, const LayerPaint* paint, const Matrix& matrix) {
   if (rRect.rect().isEmpty()) {
     return;
   }
   if (rRect.isRect()) {
-    addRect(rRect.rect(), paint, matrix, hasPaint);
+    addRect(rRect.rect(), paint, matrix);
     return;
   }
   if (ComplexStrokeStyle(paint)) {
     Path path = {};
     path.addRRect(rRect);
-    flushPending(PendingType::Shape, paint, matrix, hasPaint);
+    flushPending(PendingType::Shape, paint, matrix);
     pendingShape = Shape::MakeFrom(std::move(path));
     return;
   }
-  if (!canAppend(PendingType::RRect, paint, matrix, hasPaint)) {
-    flushPending(PendingType::RRect, paint, matrix, hasPaint);
+  if (!canAppend(PendingType::RRect, paint, matrix)) {
+    flushPending(PendingType::RRect, paint, matrix);
   }
   pendingRRects.push_back(rRect);
 }
 
-void LayerRecorder::addPath(const Path& path, const LayerPaint& paint, const Matrix& matrix,
-                            bool hasPaint) {
+void LayerRecorder::addPath(const Path& path, const LayerPaint* paint, const Matrix& matrix) {
   if (path.isEmpty()) {
     return;
   }
-  if (!ComplexStrokeStyle(paint) && tryAddSimplifiedPath(path, paint, matrix, hasPaint)) {
+  if (!ComplexStrokeStyle(paint) && tryAddSimplifiedPath(path, paint, matrix)) {
     return;
   }
-  flushPending(PendingType::Shape, paint, matrix, hasPaint);
+  flushPending(PendingType::Shape, paint, matrix);
   pendingShape = Shape::MakeFrom(path);
 }
 
-void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint,
-                             const Matrix& matrix, bool hasPaint) {
+void LayerRecorder::addShape(std::shared_ptr<Shape> shape, const LayerPaint* paint,
+                             const Matrix& matrix) {
   if (shape == nullptr) {
     return;
   }
   if (ComplexStrokeStyle(paint)) {
-    flushPending(PendingType::Shape, paint, matrix, hasPaint);
+    flushPending(PendingType::Shape, paint, matrix);
     pendingShape = std::move(shape);
     return;
   }
   if (shape->isSimplePath()) {
-    addPath(shape->getPath(), paint, matrix, hasPaint);
+    addPath(shape->getPath(), paint, matrix);
     return;
   }
-  if (tryAddSimplifiedMatrixShape(shape, paint, matrix, hasPaint)) {
+  if (tryAddSimplifiedMatrixShape(shape, paint, matrix)) {
     return;
   }
-  flushPending(PendingType::Shape, paint, matrix, hasPaint);
+  flushPending(PendingType::Shape, paint, matrix);
   pendingShape = std::move(shape);
 }
 
-bool LayerRecorder::tryAddSimplifiedMatrixShape(const std::shared_ptr<Shape>& shape,
-                                                const LayerPaint& paint, const Matrix& matrix,
-                                                bool hasPaint) {
+bool LayerRecorder::tryAddSimplifiedMatrixShape(std::shared_ptr<Shape> shape,
+                                                const LayerPaint* paint, const Matrix& matrix) {
   auto matrixShape = ShapeUtils::AsMatrixShape(shape.get());
   if (matrixShape == nullptr || !matrixShape->shape->isSimplePath()) {
     return false;
@@ -216,7 +208,13 @@ bool LayerRecorder::tryAddSimplifiedMatrixShape(const std::shared_ptr<Shape>& sh
   if (!matrixShape->matrix.invert(&inverseInner)) {
     return false;
   }
-  LayerPaint adjustedPaint = paint;
+  auto combinedMatrix = matrixShape->matrix;
+  combinedMatrix.postConcat(matrix);
+  if (paint == nullptr) {
+    // Nothing was painted, so there is no shader or stroke width to keep in the original space.
+    return tryAddSimplifiedPath(matrixShape->shape->getPath(), nullptr, combinedMatrix);
+  }
+  LayerPaint adjustedPaint = *paint;
   if (adjustedPaint.shader != nullptr) {
     adjustedPaint.shader = adjustedPaint.shader->makeWithMatrix(inverseInner);
   }
@@ -227,34 +225,31 @@ bool LayerRecorder::tryAddSimplifiedMatrixShape(const std::shared_ptr<Shape>& sh
     }
     if (!FloatNearlyEqual(scales.x, 1.0f)) {
       DEBUG_ASSERT(scales.x != 0);
-      adjustedPaint.stroke.width = paint.stroke.width / scales.x;
+      adjustedPaint.stroke.width = paint->stroke.width / scales.x;
     }
   }
-  auto combinedMatrix = matrixShape->matrix;
-  combinedMatrix.postConcat(matrix);
-  return tryAddSimplifiedPath(matrixShape->shape->getPath(), adjustedPaint, combinedMatrix,
-                              hasPaint);
+  return tryAddSimplifiedPath(matrixShape->shape->getPath(), &adjustedPaint, combinedMatrix);
 }
 
-bool LayerRecorder::tryAddSimplifiedPath(const Path& path, const LayerPaint& paint,
-                                         const Matrix& matrix, bool hasPaint) {
+bool LayerRecorder::tryAddSimplifiedPath(const Path& path, const LayerPaint* paint,
+                                         const Matrix& matrix) {
   Point line[2] = {};
   if (path.isLine(line)) {
-    if (paint.style != PaintStyle::Stroke) {
+    if (paint == nullptr || paint->style != PaintStyle::Stroke) {
       return true;
     }
     Rect rect = {};
-    if (StrokeLineToRect(paint.stroke, line, &rect)) {
-      LayerPaint fillPaint = paint;
+    if (StrokeLineToRect(paint->stroke, line, &rect)) {
+      LayerPaint fillPaint = *paint;
       fillPaint.style = PaintStyle::Fill;
-      addRect(rect, fillPaint, matrix, hasPaint);
+      addRect(rect, &fillPaint, matrix);
       return true;
     }
     RRect rRect = {};
-    if (StrokeLineToRRect(paint.stroke, line, &rRect)) {
-      LayerPaint fillPaint = paint;
+    if (StrokeLineToRRect(paint->stroke, line, &rRect)) {
+      LayerPaint fillPaint = *paint;
       fillPaint.style = PaintStyle::Fill;
-      addRRect(rRect, fillPaint, matrix, hasPaint);
+      addRRect(rRect, &fillPaint, matrix);
       return true;
     }
     return false;
@@ -264,91 +259,94 @@ bool LayerRecorder::tryAddSimplifiedPath(const Path& path, const LayerPaint& pai
   // isRect can match an open 4-segment polyline whose stroke (open contour with caps) differs
   // from a closed rectangle stroke, so only forward when the path is closed or there is no
   // stroke (closedness does not affect fill).
-  if (path.isRect(&rect, &closed) && (paint.style != PaintStyle::Stroke || closed)) {
-    addRect(rect, paint, matrix, hasPaint);
+  if (path.isRect(&rect, &closed) &&
+      (paint == nullptr || paint->style != PaintStyle::Stroke || closed)) {
+    addRect(rect, paint, matrix);
     return true;
   }
   RRect rRect = {};
   // isRRect returns false for oval/circle paths, so check isOval explicitly.
   if (path.isOval(&rect)) {
     rRect.setOval(rect);
-    addRRect(rRect, paint, matrix, hasPaint);
+    addRRect(rRect, paint, matrix);
     return true;
   }
   if (path.isRRect(&rRect)) {
-    addRRect(rRect, paint, matrix, hasPaint);
+    addRRect(rRect, paint, matrix);
     return true;
   }
   return false;
 }
 
-bool LayerRecorder::canAppend(PendingType type, const LayerPaint& paint, const Matrix& matrix,
-                              bool hasPaint) const {
+bool LayerRecorder::canAppend(PendingType type, const LayerPaint* paint,
+                              const Matrix& matrix) const {
   if (pendingType != type) {
     return false;
   }
   // A batch shares one paint, so one no paint captured can never join a painted batch: the batch
   // would have to hold a paint that was never given.
-  if (pendingHasPaint != hasPaint) {
+  if (pendingPaint.has_value() != (paint != nullptr)) {
     return false;
   }
   if (pendingMatrix != matrix) {
     return false;
   }
-  if (pendingPaint.placement != paint.placement || pendingPaint.style != paint.style ||
-      pendingPaint.blendMode != paint.blendMode) {
-    return false;
-  }
-  if (pendingPaint.color != paint.color) {
-    return false;
-  }
-  if (pendingPaint.shader != paint.shader) {
-    return false;
-  }
-  if (pendingPaint.style == PaintStyle::Stroke) {
-    if (pendingPaint.stroke.width != paint.stroke.width ||
-        pendingPaint.stroke.cap != paint.stroke.cap ||
-        pendingPaint.stroke.join != paint.stroke.join ||
-        pendingPaint.stroke.miterLimit != paint.stroke.miterLimit) {
+  if (pendingPaint.has_value()) {
+    if (pendingPaint->placement != paint->placement || pendingPaint->style != paint->style ||
+        pendingPaint->blendMode != paint->blendMode) {
       return false;
+    }
+    if (pendingPaint->color != paint->color) {
+      return false;
+    }
+    if (pendingPaint->shader != paint->shader) {
+      return false;
+    }
+    if (pendingPaint->style == PaintStyle::Stroke) {
+      if (pendingPaint->stroke.width != paint->stroke.width ||
+          pendingPaint->stroke.cap != paint->stroke.cap ||
+          pendingPaint->stroke.join != paint->stroke.join ||
+          pendingPaint->stroke.miterLimit != paint->stroke.miterLimit) {
+        return false;
+      }
     }
   }
   return true;
 }
 
-void LayerRecorder::flushPending(PendingType newType, const LayerPaint& newPaint,
-                                 const Matrix& newMatrix, bool newHasPaint) {
+void LayerRecorder::flushPending(PendingType newType, const LayerPaint* newPaint,
+                                 const Matrix& newMatrix) {
   if (pendingType != PendingType::None) {
     std::unique_ptr<GeometryContent> content = nullptr;
-    auto& list = pendingPaint.placement == LayerPlacement::Foreground ? foregrounds : contents;
+    const LayerPaint* pending = pendingPaint.has_value() ? &*pendingPaint : nullptr;
+    auto& list = (pending != nullptr ? pending->placement : LayerPlacement::Background) ==
+                         LayerPlacement::Foreground
+                     ? foregrounds
+                     : contents;
     switch (pendingType) {
       case PendingType::Rect:
         if (pendingRects.size() == 1) {
-          content = std::make_unique<RectContent>(pendingRects[0], pendingPaint, pendingHasPaint);
+          content = std::make_unique<RectContent>(pendingRects[0], pending);
         } else {
-          content = std::make_unique<RectsContent>(std::move(pendingRects), pendingPaint,
-                                                   pendingHasPaint);
+          content = std::make_unique<RectsContent>(std::move(pendingRects), pending);
         }
         pendingRects = {};
         break;
       case PendingType::RRect:
         if (pendingRRects.size() == 1) {
-          content = std::make_unique<RRectContent>(pendingRRects[0], pendingPaint, pendingHasPaint);
+          content = std::make_unique<RRectContent>(pendingRRects[0], pending);
         } else {
-          content = std::make_unique<RRectsContent>(std::move(pendingRRects), pendingPaint,
-                                                    pendingHasPaint);
+          content = std::make_unique<RRectsContent>(std::move(pendingRRects), pending);
         }
         pendingRRects = {};
         break;
       case PendingType::Shape:
         // Route to ShapeContent whenever the paint carries a complex stroke style, even if the
         // shape is a simple path. PathContent otherwise ignores strokeAlign and pathEffect.
-        if (pendingShape->isSimplePath() && !ComplexStrokeStyle(pendingPaint)) {
-          content =
-              std::make_unique<PathContent>(pendingShape->getPath(), pendingPaint, pendingHasPaint);
+        if (pendingShape->isSimplePath() && !ComplexStrokeStyle(pending)) {
+          content = std::make_unique<PathContent>(pendingShape->getPath(), pending);
         } else {
-          content = std::make_unique<ShapeContent>(std::move(pendingShape), pendingPaint,
-                                                   pendingHasPaint);
+          content = std::make_unique<ShapeContent>(std::move(pendingShape), pending);
         }
         pendingShape = nullptr;
         break;
@@ -366,9 +364,8 @@ void LayerRecorder::flushPending(PendingType newType, const LayerPaint& newPaint
     }
   }
   pendingType = newType;
-  pendingPaint = newPaint;
+  pendingPaint = newPaint != nullptr ? std::optional<LayerPaint>(*newPaint) : std::nullopt;
   pendingMatrix = newMatrix;
-  pendingHasPaint = newHasPaint;
 }
 
 // Entries sharing a geometry need one representative draw as they all cover the same outline.

@@ -33,10 +33,9 @@ namespace tgfx {
 class DrawContent : public GeometryContent {
  public:
   /**
-   * @param paint The paint that captured this geometry; ignored when hasPaint is false.
-   * @param hasPaint Whether a paint captured this geometry.
+   * @param paint The paint that captured this geometry, or nullptr when no paint did.
    */
-  explicit DrawContent(const LayerPaint& paint, bool hasPaint);
+  explicit DrawContent(const LayerPaint* paint);
 
   Rect getBounds(bool includeUnpaintedGeometry) const override;
   Rect getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const override = 0;

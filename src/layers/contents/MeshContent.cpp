@@ -21,8 +21,8 @@
 
 namespace tgfx {
 
-MeshContent::MeshContent(std::shared_ptr<Mesh> mesh, const LayerPaint& paint, bool hasPaint)
-    : DrawContent(paint, hasPaint), mesh(std::move(mesh)) {
+MeshContent::MeshContent(std::shared_ptr<Mesh> mesh, const LayerPaint* paint)
+    : DrawContent(paint), mesh(std::move(mesh)) {
 }
 
 Rect MeshContent::onGetBounds() const {

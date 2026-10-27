@@ -26,7 +26,7 @@ namespace tgfx {
 
 class ShapeContent : public DrawContent {
  public:
-  ShapeContent(std::shared_ptr<Shape> shape, const LayerPaint& paint, bool hasPaint);
+  ShapeContent(std::shared_ptr<Shape> shape, const LayerPaint* paint);
 
   Rect getBounds(bool includeUnpaintedGeometry) const override;
   Rect getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const override;

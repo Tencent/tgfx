@@ -22,8 +22,8 @@
 namespace tgfx {
 
 TextContent::TextContent(std::shared_ptr<TextBlob> textBlob, const Point& offset,
-                         const LayerPaint& paint, bool hasPaint)
-    : DrawContent(paint, hasPaint), textBlob(std::move(textBlob)), offset(offset) {
+                         const LayerPaint* paint)
+    : DrawContent(paint), textBlob(std::move(textBlob)), offset(offset) {
 }
 
 Rect TextContent::onGetBounds() const {

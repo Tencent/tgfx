@@ -22,13 +22,13 @@
 
 namespace tgfx {
 
-PathContent::PathContent(Path path, const LayerPaint& paint, bool hasPaint)
-    : DrawContent(paint, hasPaint), path(std::move(path)) {
+PathContent::PathContent(Path path, const LayerPaint* paint)
+    : DrawContent(paint), path(std::move(path)) {
   // PathContent does not consume strokeAlign or pathEffect. Complex stroke styles must be routed
   // to ShapeContent by LayerRecorder. Keep this predicate in sync with
   // LayerRecorder::ComplexStrokeStyle.
-  DEBUG_ASSERT(paint.style != PaintStyle::Stroke ||
-               (paint.strokeAlign == StrokeAlign::Center && paint.pathEffect == nullptr));
+  DEBUG_ASSERT(paint == nullptr || paint->style != PaintStyle::Stroke ||
+               (paint->strokeAlign == StrokeAlign::Center && paint->pathEffect == nullptr));
 }
 
 Rect PathContent::getBounds(bool includeUnpaintedGeometry) const {

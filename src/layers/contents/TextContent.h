@@ -25,8 +25,7 @@ namespace tgfx {
 
 class TextContent : public DrawContent {
  public:
-  TextContent(std::shared_ptr<TextBlob> textBlob, const Point& offset, const LayerPaint& paint,
-              bool hasPaint);
+  TextContent(std::shared_ptr<TextBlob> textBlob, const Point& offset, const LayerPaint* paint);
 
   Rect getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const override;
   bool hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const override;

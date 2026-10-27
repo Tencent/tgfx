@@ -21,8 +21,8 @@
 
 namespace tgfx {
 
-RectsContent::RectsContent(std::vector<Rect> rects, const LayerPaint& paint, bool hasPaint)
-    : DrawContent(paint, hasPaint), rects(std::move(rects)) {
+RectsContent::RectsContent(std::vector<Rect> rects, const LayerPaint* paint)
+    : DrawContent(paint), rects(std::move(rects)) {
 }
 
 Rect RectsContent::getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const {

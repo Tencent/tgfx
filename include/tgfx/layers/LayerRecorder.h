@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/RRect.h"
@@ -124,29 +125,26 @@ class LayerRecorder {
   std::vector<std::unique_ptr<GeometryContent>> foregrounds;
 
   PendingType pendingType = PendingType::None;
-  LayerPaint pendingPaint = {};
-  // Whether a paint captured the pending geometries. A batch only ever holds entries of one kind.
-  bool pendingHasPaint = true;
+  // The paint the pending geometries share; nullopt when no paint captured them. A batch only ever
+  // holds entries of one kind.
+  std::optional<LayerPaint> pendingPaint = std::nullopt;
   // Transformation matrix for the pending geometries.
   Matrix pendingMatrix = Matrix::I();
   std::vector<Rect> pendingRects = {};
   std::vector<RRect> pendingRRects = {};
   std::shared_ptr<Shape> pendingShape = nullptr;
 
-  void addRect(const Rect& rect, const LayerPaint& paint, const Matrix& matrix, bool hasPaint);
-  void addRRect(const RRect& rRect, const LayerPaint& paint, const Matrix& matrix, bool hasPaint);
-  void addPath(const Path& path, const LayerPaint& paint, const Matrix& matrix, bool hasPaint);
-  void addShape(std::shared_ptr<Shape> shape, const LayerPaint& paint, const Matrix& matrix,
-                bool hasPaint);
+  void addRect(const Rect& rect, const LayerPaint* paint, const Matrix& matrix);
+  void addRRect(const RRect& rRect, const LayerPaint* paint, const Matrix& matrix);
+  void addPath(const Path& path, const LayerPaint* paint, const Matrix& matrix);
+  void addShape(std::shared_ptr<Shape> shape, const LayerPaint* paint, const Matrix& matrix);
 
-  bool tryAddSimplifiedPath(const Path& path, const LayerPaint& paint, const Matrix& matrix,
-                            bool hasPaint);
-  bool tryAddSimplifiedMatrixShape(const std::shared_ptr<Shape>& shape, const LayerPaint& paint,
-                                   const Matrix& matrix, bool hasPaint);
-  bool canAppend(PendingType type, const LayerPaint& paint, const Matrix& matrix,
-                 bool hasPaint) const;
-  void flushPending(PendingType newType = PendingType::None, const LayerPaint& newPaint = {},
-                    const Matrix& newMatrix = Matrix::I(), bool newHasPaint = true);
+  bool tryAddSimplifiedPath(const Path& path, const LayerPaint* paint, const Matrix& matrix);
+  bool tryAddSimplifiedMatrixShape(std::shared_ptr<Shape> shape, const LayerPaint* paint,
+                                   const Matrix& matrix);
+  bool canAppend(PendingType type, const LayerPaint* paint, const Matrix& matrix) const;
+  void flushPending(PendingType newType = PendingType::None, const LayerPaint* newPaint = nullptr,
+                    const Matrix& newMatrix = Matrix::I());
 
   std::unique_ptr<LayerContent> finishRecording();
 

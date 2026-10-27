@@ -32,28 +32,27 @@ static bool StrokeEquals(const Stroke* a, const Stroke* b) {
   return *a == *b;
 }
 
-DrawContent::DrawContent(const LayerPaint& paint, bool hasPaint) {
-  // An entry no paint captured holds no paint state at all: reading color, shader, stroke or blend
-  // mode from the (empty) paint would invent a style the layer never asked for. Leaving color empty
-  // says so; its contour draws an opaque white fill of its own.
-  if (hasPaint) {
-    blendMode = paint.blendMode;
-    auto paintShader = paint.shader;
-    if (paintShader) {
-      Color shaderColor = {};
-      if (paintShader->asColor(&shaderColor)) {
-        shaderColor.alpha *= paint.color.alpha;
-        color = shaderColor;
-      } else {
-        color = paint.color;
-        shader = std::move(paintShader);
-      }
+DrawContent::DrawContent(const LayerPaint* paint) {
+  // An entry no paint captured holds no paint state at all: leaving color empty says so.
+  if (paint == nullptr) {
+    return;
+  }
+  blendMode = paint->blendMode;
+  auto paintShader = paint->shader;
+  if (paintShader) {
+    Color shaderColor = {};
+    if (paintShader->asColor(&shaderColor)) {
+      shaderColor.alpha *= paint->color.alpha;
+      color = shaderColor;
     } else {
-      color = paint.color;
+      color = paint->color;
+      shader = std::move(paintShader);
     }
-    if (paint.style == PaintStyle::Stroke) {
-      stroke = std::make_unique<Stroke>(paint.stroke);
-    }
+  } else {
+    color = paint->color;
+  }
+  if (paint->style == PaintStyle::Stroke) {
+    stroke = std::make_unique<Stroke>(paint->stroke);
   }
 }
 
