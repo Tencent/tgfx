@@ -260,18 +260,8 @@ std::shared_ptr<RenderTargetProxy> WebGPUWindow::onCreateRenderTarget(Context* c
   }
 
   auto wgpuSurface = static_cast<WGPUSurface>(_surface);
-  drawableProxy = std::make_shared<WebGPUDrawableProxy>(
+  return std::make_shared<WebGPUDrawableProxy>(
       context, _width, _height, wgpuSurface, WGPUTextureFormat_BGRA8Unorm, PixelFormat::BGRA_8888);
-  return drawableProxy;
-}
-
-void WebGPUWindow::onPresent(Context*) {
-  if (drawableProxy == nullptr) {
-    return;
-  }
-  auto proxy = std::static_pointer_cast<WebGPUDrawableProxy>(drawableProxy);
-  proxy->present();
-  proxy->releaseDrawable();
 }
 
 }  // namespace tgfx

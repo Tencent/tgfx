@@ -270,10 +270,11 @@ RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t 
       _colorSpace(std::move(colorSpace)) {
   if (clearAll) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
-    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags,
-                                                     PMColor::Transparent(), _colorSpace);
-    if (surface && surface->_window) {
-      drawingManager->collectWindow(surface->_window);
+    auto target = surface ? surface->collectFrame(drawingManager, renderTarget) : renderTarget;
+    if (target != nullptr) {
+      renderTarget = std::move(target);
+      opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags,
+                                                       PMColor::Transparent(), _colorSpace);
     }
   }
 }
@@ -485,11 +486,13 @@ OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
   }
   if (opsCompositor == nullptr || opsCompositor->isClosed()) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
+    auto target = surface ? surface->collectFrame(drawingManager, renderTarget) : renderTarget;
+    if (target == nullptr) {
+      return nullptr;
+    }
+    renderTarget = std::move(target);
     opsCompositor =
         drawingManager->addOpsCompositor(renderTarget, renderFlags, std::nullopt, _colorSpace);
-    if (surface && surface->_window) {
-      drawingManager->collectWindow(surface->_window);
-    }
   } else if (discardContent) {
     opsCompositor->discardAll();
   }

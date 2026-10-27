@@ -417,7 +417,10 @@ TGFX_TEST(SVGRenderTest, ComplexSVG) {
 TGFX_TEST(SVGRenderTest, ReferenceStyleSVG) {
   auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/refStyle.svg"));
   ASSERT_TRUE(stream != nullptr);
-  auto SVGDom = SVGDOM::Make(*stream);
+  std::vector<std::shared_ptr<Typeface>> fallbackTypefaceList;
+  fallbackTypefaceList.push_back(
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf")));
+  auto SVGDom = SVGDOM::Make(*stream, TextShaper::Make(fallbackTypefaceList));
   auto rootNode = SVGDom->getRoot();
   ASSERT_TRUE(rootNode != nullptr);
 

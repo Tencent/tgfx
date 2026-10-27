@@ -196,6 +196,11 @@ class SVGNode {
    */
   virtual void appendChild(std::shared_ptr<SVGNode> node) = 0;
 
+  /**
+   * Returns the direct children of the SVG node.
+   */
+  virtual const std::vector<std::shared_ptr<SVGNode>>& getChildren() const = 0;
+
   void addCustomAttribute(const std::string& name, const std::string& value);
 
   /**
@@ -206,6 +211,8 @@ class SVGNode {
   const std::vector<DOMAttribute>& getCustomAttributes() const;
 
  protected:
+  static const std::vector<std::shared_ptr<SVGNode>>& EmptyNodes();
+
   explicit SVGNode(SVGTag tag);
 
   void setAttribute(SVGAttribute attribute, const SVGValue& value);

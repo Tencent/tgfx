@@ -29,10 +29,10 @@ class RenderTargetProxy;
 
 /**
  * Window represents a native displayable resource that can be rendered to by a Device. Use
- * Surface::MakeFrom(context, window) to obtain a Surface for rendering, then call
- * context->submit() to automatically present the result.
+ * Surface::MakeFrom(context, window) to obtain a Surface for rendering. Each batch that draws
+ * into it presents the window's frame automatically when submitted.
  */
-class Window {
+class Window : public std::enable_shared_from_this<Window> {
  public:
   virtual ~Window() = default;
 
@@ -41,6 +41,14 @@ class Window {
    * the process of initializing.
    */
   std::shared_ptr<Device> getDevice();
+
+  /**
+   * Returns true if the window's frames can be read back by Surface::readPixels() and
+   * Surface::asyncReadPixels(). The default implementation returns false.
+   */
+  virtual bool supportsReadback() const {
+    return false;
+  }
 
   /**
    * Returns the color space associated with this Window. Returns nullptr for the default sRGB.
@@ -59,7 +67,9 @@ class Window {
 
  protected:
   std::mutex locker = {};
-  std::shared_ptr<Device> device = nullptr;
+  // Held strongly so a default device created by a factory stays alive; frames hold the window
+  // weakly to avoid a reference cycle.
+  std::shared_ptr<Device> _device = nullptr;
   std::shared_ptr<ColorSpace> _colorSpace = nullptr;
   const bool _vsyncEnabled = true;
 
@@ -75,13 +85,15 @@ class Window {
   virtual std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) = 0;
 
   /**
-   * Called after command buffer submission to present the rendered content. The default
-   * implementation does nothing.
+   * Presents the shared backbuffer after command buffer submission, used by backends whose
+   * frames all target one backbuffer (GL). The default implementation does nothing.
    */
   virtual void onPresent(Context* context);
 
  private:
   friend class DrawingBuffer;
+  friend class DrawingManager;
   friend class Surface;
+  friend class RenderTargetProxy;
 };
 }  // namespace tgfx

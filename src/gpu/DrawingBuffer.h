@@ -10,9 +10,9 @@
 //      https://opensource.org/licenses/BSD-3-Clause
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,6 +28,7 @@
 
 namespace tgfx {
 
+class RenderTargetProxy;
 class Window;
 
 class DrawingBuffer {
@@ -35,7 +36,7 @@ class DrawingBuffer {
   explicit DrawingBuffer(Context* context);
 
   /**
-   * Returns true if there are no tasks in the drawing buffer.
+   * Returns true if there are no tasks or window presentations in the drawing buffer.
    */
   bool empty() const;
 
@@ -65,11 +66,29 @@ class DrawingBuffer {
   std::shared_ptr<CommandBuffer> encode();
 
   /**
-   * Calls onPresent on all windows after command buffer submission.
+   * Attaches the frame acquisition waits of the window frames this batch uses. Called right
+   * before the command buffer is submitted.
    */
-  void presentWindows(Context* context);
+  void attachFrameUsages(Context* context);
+
+  /**
+   * Schedules this batch's window presentations. Called right before the command buffer is
+   * submitted.
+   */
+  void schedulePresents(Context* context);
+
+  /**
+   * Delivers the batch's window presentations after the command buffer submission.
+   */
+  void deliverFrames(Context* context);
 
  private:
+  // Window frames this batch draws into or copies from.
+  std::vector<std::shared_ptr<RenderTargetProxy>> windowUsages = {};
+
+  // Window targets this batch presents, kept alive until the buffer is submitted.
+  std::vector<std::shared_ptr<RenderTargetProxy>> presentables = {};
+
   Context* context = nullptr;
   uint32_t _uniqueID = 0;
   uint64_t _generation = 0;
@@ -82,7 +101,6 @@ class DrawingBuffer {
   std::vector<PlacementPtr<ResourceTask>> resourceTasks = {};
   std::vector<PlacementPtr<RenderTask>> renderTasks = {};
   std::vector<PlacementPtr<AtlasUploadTask>> atlasTasks = {};
-  std::vector<std::weak_ptr<Window>> windows = {};
 
   friend class DrawingManager;
 };

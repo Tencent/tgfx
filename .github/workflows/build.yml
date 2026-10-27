@@ -289,9 +289,6 @@ jobs:
           npm install depsync -g
           depsync
 
-      - name: Sync shaderc sub-dependencies
-        run: python3 third_party/shaderc/utils/git-sync-deps
-
       - name: Build WebGPU
         run: |
           cd web

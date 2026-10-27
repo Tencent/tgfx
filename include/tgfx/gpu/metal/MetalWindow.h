@@ -37,6 +37,7 @@ class MetalWindow : public Window {
    * @param colorSpace An optional color space for rendering. If nullptr, the default sRGB is used.
    * @param vsyncEnabled Whether presentation is synchronized to the display's refresh rate. Fixed
    * for the lifetime of the window. Defaults to true.
+   * @return A new MetalWindow, or nullptr if the layer or device is invalid.
    */
   static std::shared_ptr<MetalWindow> MakeFrom(CAMetalLayer* layer,
                                                std::shared_ptr<MetalDevice> device = nullptr,
@@ -49,19 +50,20 @@ class MetalWindow : public Window {
    * @param colorSpace An optional color space for rendering. If nullptr, the default sRGB is used.
    * @param vsyncEnabled Whether presentation is synchronized to the display's refresh rate. Fixed
    * for the lifetime of the window. Defaults to true.
+   * @return A new MetalWindow, or nullptr if the view, its CAMetalLayer, or the device is invalid.
    */
   static std::shared_ptr<MetalWindow> MakeFrom(MTKView* view,
                                                std::shared_ptr<ColorSpace> colorSpace = nullptr,
                                                bool vsyncEnabled = true);
 
+  bool supportsReadback() const override;
+
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
-  void onPresent(Context* context) override;
 
  private:
   CAMetalLayer* metalLayer = nil;
   MTKView* metalView = nil;
-  std::shared_ptr<RenderTargetProxy> drawableProxy = nullptr;
 
   MetalWindow(std::shared_ptr<Device> device, CAMetalLayer* layer,
               std::shared_ptr<ColorSpace> colorSpace, bool vsyncEnabled);
