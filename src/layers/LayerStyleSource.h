@@ -48,15 +48,16 @@ struct LayerStyleSourceGroup {
   // excludeEffects. Only this source carries a shape, read back from that same recording.
   std::shared_ptr<StyleInputSource> geometry = nullptr;
 
-  // The subtree contour standing in for a missing geometry; carries no shape, because it is this
-  // bucket's own raster, which no exact outline describes.
+  // The shared subtree's contour, standing in for a missing geometry. It carries no contentShape:
+  // that shape exists only on the Contour extra source a consumer builds from it, for spread.
   std::shared_ptr<StyleInputSource> contour = nullptr;
 };
 
 /**
- * Returns whether the style declares the layer's geometry as its content.
+ * Returns whether the style declares the layer's geometry as its content. One style at a time, as
+ * opposed to Layer::hasGeometryStyle(), which asks the same of a layer's whole style list.
  */
-inline bool NeedsGeometry(const LayerStyle* style) {
+inline bool DeclaresGeometry(const LayerStyle* style) {
   DEBUG_ASSERT(style != nullptr);
   return style->contentSource() == LayerStyleContentSource::Geometry;
 }
@@ -71,7 +72,7 @@ inline bool NeedsGeometry(const LayerStyle* style) {
 inline std::shared_ptr<StyleInputSource> ResolveContentSource(const LayerStyleSourceGroup& group,
                                                               const LayerStyle* style) {
   DEBUG_ASSERT(style != nullptr);
-  if (NeedsGeometry(style)) {
+  if (DeclaresGeometry(style)) {
     if (group.geometry != nullptr) {
       return group.geometry;
     }

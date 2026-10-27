@@ -1821,7 +1821,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   bool needsContentShape = false;
   for (const auto& layerStyle : _layerStyles) {
     auto index = static_cast<int>(layerStyle->excludeChildEffects());
-    if (NeedsGeometry(layerStyle.get())) {
+    if (DeclaresGeometry(layerStyle.get())) {
       bucketNeedsGeometry[index] = true;
     } else {
       // Only a style drawing from the shared content needs it recorded: a Geometry-sourced style
@@ -2389,7 +2389,7 @@ void Layer::updateStaticSubtreeFlags() {
 bool Layer::hasGeometryStyle() const {
   for (const auto& style : _layerStyles) {
     DEBUG_ASSERT(style != nullptr);
-    if (NeedsGeometry(style.get())) {
+    if (DeclaresGeometry(style.get())) {
       return true;
     }
   }
