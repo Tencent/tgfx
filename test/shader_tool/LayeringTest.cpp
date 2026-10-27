@@ -586,14 +586,12 @@ TEST(LayeringTest, TheIncludeScannerReadsRealIncludesOnly) {
 
 TEST(LayeringTest, NoSublayerPrints) {
   // A sublayer reports diagnostics (core/Diagnostics.h) and the cli renders them; nothing else
-  // writes to the console. This is a ratchet: the two files below still print, each for a
-  // reason of its own, and each is the remaining debt of the diagnostic migration:
+  // writes to the console. This is a ratchet: the file below still prints, for a reason of its
+  // own, and is the remaining debt of the diagnostic migration:
   //
-  //   BundleVerifier.cpp       the --verify-bundle command's own reporter (a separate command,
-  //                            not the build path, pending migration)
-  //   compile/StageCache.cpp   the cache statistics summary (progress output, pending a stats
-  //                            object the cli renders)
-  const std::set<std::string> allowed = {"BundleVerifier.cpp", "StageCache.cpp"};
+  //   BundleVerifier.cpp   the --verify-bundle command's own reporter (a separate command, not
+  //                        the build path, pending migration)
+  const std::set<std::string> allowed = {"BundleVerifier.cpp"};
   size_t checked = 0;
   for (const auto& file : FilesIn(ToolDir(), {".cpp"})) {
     auto relative = file.substr(ToolDir().size() + 1);

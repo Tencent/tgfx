@@ -108,12 +108,16 @@ class StageCache {
   /// Stores a payload under the key. Write failures only cost the next build a recompile.
   void store(const std::string& key, const std::vector<uint8_t>& payload, StageCacheStats* stats);
 
-  /// Per-kind counters, printed at the end of a build.
+  /// Per-kind counters, rendered by the cli at the end of a build.
   StageCacheStats& stats(const std::string& kind) {
     return kindStats[kind];
   }
 
-  void printSummary() const;
+  /// The per-kind counters, for the cli renderer — printing is the cli's job; the cache only
+  /// counts.
+  const std::map<std::string, StageCacheStats>& allStats() const {
+    return kindStats;
+  }
 
  private:
   std::string entryPath(const std::string& key) const;

@@ -21,7 +21,6 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <iterator>
 #include <system_error>
 #if defined(_WIN32)
@@ -367,22 +366,6 @@ void StageCache::store(const std::string& key, const std::vector<uint8_t>& paylo
     return;
   }
   stats->stored++;
-}
-
-void StageCache::printSummary() const {
-  std::cout << "[stage-cache] "
-            << (persistent() ? "persistent at " + directory : std::string("memory only"));
-  if (persistent()) {
-    std::cout << " (tool " << identity.substr(0, 12) << ")";
-  }
-  std::cout << "\n";
-  for (const auto& entry : kindStats) {
-    const auto& s = entry.second;
-    std::cout << "[stage-cache] " << entry.first << ": requests=" << s.requests
-              << " memory-hits=" << s.memoryHits << " disk-hits=" << s.diskHits
-              << " executed=" << s.executed << " stored=" << s.stored << " corrupt=" << s.corrupt
-              << "\n";
-  }
 }
 
 }  // namespace tgfx

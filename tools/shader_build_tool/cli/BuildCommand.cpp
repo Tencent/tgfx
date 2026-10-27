@@ -495,7 +495,21 @@ int RunBuildCommand(const BuildOptions& options) {
   }
 
   if (compiling) {
-    stageCache.printSummary();
+    // The cache only counts; rendering the summary is the cli's job (NoSublayerPrints).
+    std::cout << "[stage-cache] "
+              << (stageCache.persistent() ? "persistent at " + stageCache.directoryPath()
+                                          : std::string("memory only"));
+    if (stageCache.persistent()) {
+      std::cout << " (tool " << stageCache.toolIdentity().substr(0, 12) << ")";
+    }
+    std::cout << "\n";
+    for (const auto& entry : stageCache.allStats()) {
+      const auto& s = entry.second;
+      std::cout << "[stage-cache] " << entry.first << ": requests=" << s.requests
+                << " memory-hits=" << s.memoryHits << " disk-hits=" << s.diskHits
+                << " executed=" << s.executed << " stored=" << s.stored << " corrupt=" << s.corrupt
+                << "\n";
+    }
   }
   return 0;
 }
