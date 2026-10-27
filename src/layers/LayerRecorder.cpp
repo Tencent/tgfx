@@ -423,8 +423,10 @@ std::unique_ptr<LayerContent> LayerRecorder::finishRecording() {
 
   // Phase 2: one contour selection per group and caliber. A group is painted or bare as a whole
   // (hasSameGeometry() keeps a painted entry away from a bare one), so the painted caliber selects
-  // nothing for a bare group, and hasContourTable keeps that apart from having no table at all.
-  bool hasContourTable = false;
+  // nothing for a bare group. The table is built only when a group collapses several entries into
+  // one representative; the painted table is materialized only when the two calibers actually
+  // select differently.
+  bool buildTable = false;
   std::vector<std::vector<GeometryContent*>> selections = {};
   std::vector<std::vector<GeometryContent*>> paintedSelections = {};
   selections.reserve(groups.size());
@@ -433,22 +435,29 @@ std::unique_ptr<LayerContent> LayerRecorder::finishRecording() {
     selections.push_back(SelectContourRepresentatives(group, true));
     paintedSelections.push_back(SelectContourRepresentatives(group, false));
     if (group.size() > 1 && selections.back().size() == 1) {
-      hasContourTable = true;
+      buildTable = true;
     }
   }
   std::vector<GeometryContent*> contours = {};
-  std::vector<GeometryContent*> paintedContours = {};
-  if (hasContourTable) {
+  std::optional<std::vector<GeometryContent*>> paintedContours = std::nullopt;
+  if (buildTable) {
+    bool paintedDiffers = false;
     for (size_t i = 0; i < groups.size(); i++) {
       contours.insert(contours.end(), selections[i].begin(), selections[i].end());
-      paintedContours.insert(paintedContours.end(), paintedSelections[i].begin(),
-                             paintedSelections[i].end());
+      if (selections[i].size() != paintedSelections[i].size()) {
+        paintedDiffers = true;
+      }
+    }
+    if (paintedDiffers) {
+      std::vector<GeometryContent*> painted = {};
+      for (size_t i = 0; i < groups.size(); i++) {
+        painted.insert(painted.end(), paintedSelections[i].begin(), paintedSelections[i].end());
+      }
+      paintedContours = std::move(painted);
     }
   }
-
   return std::make_unique<ComposeContent>(std::move(allContents), foregroundStartIndex,
-                                          hasContourTable, std::move(contours),
-                                          std::move(paintedContours));
+                                          std::move(contours), std::move(paintedContours));
 }
 
 }  // namespace tgfx

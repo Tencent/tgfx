@@ -8589,10 +8589,11 @@ TGFX_TEST_PRIVATE(LayerTest, ContourRepresentativeFollowsCaliber) {
     TGFX_PRIVATE_ACCESS(
         auto compose = static_cast<const ComposeContent*>(layer->getContent());
         ASSERT_NE(compose, nullptr);
-        EXPECT_FALSE(compose->hasContourTable)
+        EXPECT_TRUE(compose->contours.empty())
         << "a bare entry must not share a group with a painted one, so the two entries above stay "
-           "apart and no representative table is built; a table here would mean a bare duplicate "
-           "could take the representative slot away from the painted entry";)
+           "apart and no representative table is built; an empty table is what makes the queries "
+           "read every entry, and building one here would mean a bare duplicate could take the "
+           "representative slot away from the painted entry";)
     auto paintedCaliber = RasterizeContentContourAlpha(context, layer, false);
     auto allCaliber = RasterizeContentContourAlpha(context, layer, true);
     EXPECT_EQ(RasterAlphaAt(paintedCaliber, GeometryProbeSize, 100, 100), 255)
@@ -8625,13 +8626,15 @@ TGFX_TEST_PRIVATE(LayerTest, ContourRepresentativeFollowsCaliber) {
     TGFX_PRIVATE_ACCESS(
         auto compose = static_cast<const ComposeContent*>(layer->getContent());
         ASSERT_NE(compose, nullptr);
-        ASSERT_TRUE(compose->hasContourTable)
+        ASSERT_FALSE(compose->contours.empty())
         << "two entries sharing one outline must build a representative table";
         EXPECT_EQ(compose->contours.size(), 1u)
         << "the caliber that includes bare geometry keeps one representative for the outline";
-        EXPECT_TRUE(compose->paintedContours.empty())
-        << "the caliber that excludes it selects nothing, and an empty selection must stay "
-           "distinguishable from having no table at all";
+        ASSERT_TRUE(compose->paintedContours.has_value())
+        << "the painted caliber selects nothing here, which must stay distinguishable from having "
+           "no table at all";
+        EXPECT_TRUE(compose->paintedContours->empty())
+        << "the caliber that excludes bare geometry keeps no representative for this outline";
         EXPECT_FALSE(compose->contourEqualsOpaqueContent(true))
         << "a bare entry is covered by the contour only when the query includes it";)
     auto paintedCaliber = RasterizeContentContourAlpha(context, layer, false);

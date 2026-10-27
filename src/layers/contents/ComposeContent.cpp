@@ -21,12 +21,10 @@
 namespace tgfx {
 
 ComposeContent::ComposeContent(std::vector<std::unique_ptr<GeometryContent>> contents,
-                               size_t foregroundStartIndex, bool hasContourTable,
-                               std::vector<GeometryContent*> contours,
-                               std::vector<GeometryContent*> paintedContours)
+                               size_t foregroundStartIndex, std::vector<GeometryContent*> contours,
+                               std::optional<std::vector<GeometryContent*>> paintedContours)
     : contents(std::move(contents)), foregroundStartIndex(foregroundStartIndex),
-      hasContourTable(hasContourTable), contours(std::move(contours)),
-      paintedContours(std::move(paintedContours)) {
+      contours(std::move(contours)), paintedContours(std::move(paintedContours)) {
 }
 
 Rect ComposeContent::getBounds(bool includeUnpaintedGeometry) const {

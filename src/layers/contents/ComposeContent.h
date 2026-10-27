@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <vector>
 #include "layers/contents/GeometryContent.h"
 
@@ -34,15 +35,14 @@ class ComposeContent : public LayerContent {
   /**
    * @param contents Every recorded entry, in draw order.
    * @param foregroundStartIndex Index of the first entry drawn above the children.
-   * @param hasContourTable Whether both representative tables are built; false makes the queries
-   *                        read every entry, which must stay distinct from a table selecting none.
    * @param contours The representative of every group for a query that includes bare geometries.
-   * @param paintedContours The same for a query that excludes them.
+   *                 Empty means no table was built, so the queries read every entry.
+   * @param paintedContours Materialized only when the two calibers select differently, which needs
+   *                        a bare group; nullopt means it equals contours.
    */
   ComposeContent(std::vector<std::unique_ptr<GeometryContent>> contents,
-                 size_t foregroundStartIndex, bool hasContourTable,
-                 std::vector<GeometryContent*> contours,
-                 std::vector<GeometryContent*> paintedContours);
+                 size_t foregroundStartIndex, std::vector<GeometryContent*> contours,
+                 std::optional<std::vector<GeometryContent*>> paintedContours = std::nullopt);
 
   Rect getBounds(bool includeUnpaintedGeometry) const override;
   Rect getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const override;
@@ -64,17 +64,19 @@ class ComposeContent : public LayerContent {
   // Returns the representative table of the requested caliber, or null when no table was built and
   // the caller has to read every entry.
   const std::vector<GeometryContent*>* selectedContours(bool includeUnpaintedGeometry) const {
-    if (!hasContourTable) {
+    if (contours.empty()) {
       return nullptr;
     }
-    return includeUnpaintedGeometry ? &contours : &paintedContours;
+    if (includeUnpaintedGeometry) {
+      return &contours;
+    }
+    return paintedContours.has_value() ? &*paintedContours : &contours;
   }
 
   std::vector<std::unique_ptr<GeometryContent>> contents = {};
   size_t foregroundStartIndex = 0;
-  bool hasContourTable = false;
   std::vector<GeometryContent*> contours = {};
-  std::vector<GeometryContent*> paintedContours = {};
+  std::optional<std::vector<GeometryContent*>> paintedContours = std::nullopt;
 };
 
 }  // namespace tgfx
