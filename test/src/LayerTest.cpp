@@ -7328,7 +7328,10 @@ class GeometryShapeProbeStyle : public LayerStyle {
     }
     contentType = input.content->type();
     sawContentImage = input.content->image() != nullptr;
-    sawGeometryShape = input.content->shape().has_value();
+    if (input.content->type() == StyleInputSource::Type::Geometry) {
+      const auto* geometrySource = static_cast<const GeometryInputSource*>(input.content.get());
+      sawGeometryShape = geometrySource->shape().has_value();
+    }
   }
 
  private:

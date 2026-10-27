@@ -1854,7 +1854,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   // way: making getGeometryImage() depend on the bucket would silently change both.
   Point geometryOffset = {};
   std::optional<StyledShape> geometryShape = std::nullopt;
-  std::shared_ptr<StyleInputSource> geometrySource = nullptr;
+  std::shared_ptr<GeometryInputSource> geometrySource = nullptr;
   if (layerUsesGeometry) {
     auto image = getGeometryImage(drawArgs, contentScale, geometryOffset, geometryShape);
     if (image != nullptr) {

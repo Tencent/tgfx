@@ -135,10 +135,10 @@ static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   GlassShapeInfo info;
   // The SDF path needs an exact outline of the sampled recording, and only the geometry readback
   // provides one: the shared content and the contour fallback describe no single outline.
-  if (input.content == nullptr) {
+  if (input.content == nullptr || input.content->type() != StyleInputSource::Type::Geometry) {
     return info;
   }
-  const auto& optShape = input.content->shape();
+  const auto& optShape = static_cast<const GeometryInputSource*>(input.content.get())->shape();
   if (!optShape.has_value()) {
     return info;
   }

@@ -61,15 +61,6 @@ class StyleInputSource {
     return _type;
   }
 
-  /**
-   * Returns the exact vector shape of this recording, or an empty shape when the recording cannot
-   * be expressed as one outline. Only a Geometry source answers it today.
-   */
-  virtual const std::optional<StyledShape>& shape() const {
-    static const std::optional<StyledShape> emptyShape = std::nullopt;
-    return emptyShape;
-  }
-
   /** Returns the primary source image. */
   const std::shared_ptr<Image>& image() const {
     return _image;
@@ -111,7 +102,7 @@ class GeometryInputSource : public StyleInputSource {
   }
 
   /** Returns the vector shape of the same recording, empty when the recording has none. */
-  const std::optional<StyledShape>& shape() const override {
+  const std::optional<StyledShape>& shape() const {
     return _shape;
   }
 
@@ -122,7 +113,7 @@ class GeometryInputSource : public StyleInputSource {
 /**
  * Contour input source that additionally carries the content shape used by the generic spread
  * fallback. That shape is derived from the shared content, so it does not describe this contour
- * raster; shape() stays empty and only contentShape() reports it (a legacy pairing kept separate).
+ * raster; it has no shape(), and only contentShape() reports it (a legacy pairing kept separate).
  */
 class ContourInputSource : public StyleInputSource {
  public:
@@ -152,8 +143,9 @@ class ContourInputSource : public StyleInputSource {
 struct LayerStyleInput {
   /**
    * The recording this style resolves: the layer's geometry, the shared contour standing in for a
-   * missing geometry, or the shared content. type() reports which one was recorded and shape() is
-   * set only for an exact vector outline. nullptr means nothing to draw, so skip the style.
+   * missing geometry, or the shared content. type() reports which one was recorded, and shape()
+   * exists only on GeometryInputSource, so a consumer that wants the vector outline tests for
+   * Type::Geometry and casts. nullptr means nothing to draw, so skip the style.
    */
   std::shared_ptr<StyleInputSource> content = nullptr;
 

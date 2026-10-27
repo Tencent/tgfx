@@ -160,7 +160,8 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
   DEBUG_ASSERT(source->type() == StyleInputSource::Type::Contour);
   auto contour = static_cast<const ContourInputSource*>(source);
   // The legacy content shape of the shared content, not this contour raster's own expression: see
-  // ContourInputSource. The generic shape() of the source stays empty on purpose.
+  // ContourInputSource. A contour reports its outline only through this channel, never through the
+  // geometry shape().
   const auto& shapeOption = contour->contentShape();
   if (!shapeOption.has_value() || shapeOption->shape == nullptr) {
     // No single vector outline is available (text, multiple distinct geometries, or layer types

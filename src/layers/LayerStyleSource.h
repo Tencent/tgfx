@@ -45,8 +45,9 @@ struct LayerStyleSourceGroup {
 
   // The layer's geometry (LayerStyleContentSource::Geometry), null unless a style needs it. It is
   // recorded once per layer and shared by both buckets, because that recording never reads
-  // excludeEffects. Only this source carries a shape, read back from that same recording.
-  std::shared_ptr<StyleInputSource> geometry = nullptr;
+  // excludeEffects. Only this source carries a shape, read back from that same recording, so the
+  // field keeps the concrete type: it is the only place a shape can be read from.
+  std::shared_ptr<GeometryInputSource> geometry = nullptr;
 
   // The shared subtree's contour, standing in for a missing geometry. It carries no contentShape:
   // that shape exists only on the Contour extra source a consumer builds from it, for spread.
