@@ -126,11 +126,42 @@ static void RecordBuildError(Diagnostics* diagnostics, Layer layer, const char* 
 // source is the shader's text from the build's single read of the sources (nullptr in report-only
 // mode); the bundle's source digest is computed from the same text. compiler owns the stage
 // caches of this build.
+ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
+                                       const BuildOptions& options, const ShaderSource* source,
+                                       StageCompiler* compiler,
+                                       std::vector<VariantData>* outVariants,
+                                       std::vector<InlineExpansionRecord>* outInlineExpansions,
+                                       Diagnostics* diagnostics);
+
 ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const BuildOptions& options,
                               const ShaderSource* source, StageCompiler* compiler,
                               std::vector<VariantData>* outVariants,
                               std::vector<InlineExpansionRecord>* outInlineExpansions,
                               Diagnostics* diagnostics) {
+  // The ledger is the single source of failure counts: the per-shader figure the progress line
+  // and report.json carry is derived from the records this compilation added, so nothing can be
+  // counted without being reported, or reported without being counted. RuleCountingTest pins
+  // the same pairing for the verify rules the build gate reads.
+  const size_t ledgerBefore = diagnostics->records().size();
+  auto report = CompileOneShaderUncounted(info, options, source, compiler, outVariants,
+                                          outInlineExpansions, diagnostics);
+  size_t failures = 0;
+  for (size_t i = ledgerBefore; i < diagnostics->records().size(); i++) {
+    auto severity = diagnostics->records()[i].severity;
+    if (severity == Severity::Error || severity == Severity::Unverifiable) {
+      failures++;
+    }
+  }
+  report.errorCount = static_cast<uint32_t>(failures);
+  return report;
+}
+
+ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
+                                       const BuildOptions& options, const ShaderSource* source,
+                                       StageCompiler* compiler,
+                                       std::vector<VariantData>* outVariants,
+                                       std::vector<InlineExpansionRecord>* outInlineExpansions,
+                                       Diagnostics* diagnostics) {
   ShaderReport report;
   std::set<uint32_t> analyzedFrags;
   report.name = info.name;
@@ -159,7 +190,6 @@ ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const BuildOpti
   if (!plan.variants) {
     RecordBuildError(diagnostics, Layer::Plan, DiagnosticCode::PlanNoEnumerator, info.name, "", -1,
                      -1, "every shader must be migrated to the Compose pattern");
-    report.errorCount++;
     return report;
   }
   if (!plan.unbuildable.empty()) {
@@ -170,7 +200,6 @@ ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const BuildOpti
                        static_cast<int>(pair.first), static_cast<int>(pair.second),
                        "a reachable variant pair the declared domains cannot serve");
     }
-    report.errorCount++;
     return report;
   }
   for (const auto& permutation : *plan.variants) {
@@ -198,7 +227,6 @@ ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const BuildOpti
     if (!vertResult.success) {
       RecordBuildError(diagnostics, Layer::Compile, DiagnosticCode::CompileGlsl, info.name, "",
                        static_cast<int>(vi), -1, vertResult.error);
-      report.errorCount++;
       continue;
     }
     const auto* vertSpirv = &vertResult.spirv;
@@ -209,7 +237,6 @@ ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const BuildOpti
     if (!fragResult.success) {
       RecordBuildError(diagnostics, Layer::Compile, DiagnosticCode::CompileGlsl, info.name, "",
                        static_cast<int>(vi), static_cast<int>(fi), fragResult.error);
-      report.errorCount++;
       continue;
     }
 
@@ -249,9 +276,8 @@ ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const BuildOpti
       input.diagnostics = diagnostics;
       auto stages = emitterEntry.second->emit(input, compiler);
       if (!stages) {
-        // The emitter reported why (with this profile and variant); this is the single place
-        // the failure is counted.
-        report.errorCount++;
+        // The emitter reported why (with this profile and variant); the wrapper counts the
+        // record it added.
         continue;
       }
       VariantData variant;
@@ -360,7 +386,6 @@ int RunBuildCommand(const BuildOptions& options) {
   }
   StageCompiler stageCompiler(&stageCache);
 
-  uint32_t totalErrors = 0;
   for (const auto& factory : factories) {
     auto shader = factory();
     auto info = shader->info();
@@ -379,7 +404,6 @@ int RunBuildCommand(const BuildOptions& options) {
       std::cout << " errors=" << shaderReport.errorCount;
     }
     std::cout << "\n";
-    totalErrors += shaderReport.errorCount;
     report.shaders.push_back(std::move(shaderReport));
   }
 
@@ -407,12 +431,13 @@ int RunBuildCommand(const BuildOptions& options) {
     PrintDiagnostics(report.diagnostics);
     return 1;
   }
-  size_t contractErrors = 0;
   ArtifactRuleContext artifactContext;
   artifactContext.variants = &report.variants;
   artifactContext.inlineExpansions = &report.inlineExpansions;
   for (const auto& rule : MakeArtifactRules()) {
-    contractErrors += rule->check(artifactContext, &report.diagnostics);
+    // Every rule reports each violation as a diagnostic; the returned count is for the tests
+    // (RuleCountingTest pins it to the records the rule added) and is not gated on here.
+    rule->check(artifactContext, &report.diagnostics);
   }
   if (!options.reportOnly && !options.shaderDir.empty()) {
     SourceRuleContext sourceContext;
@@ -421,17 +446,16 @@ int RunBuildCommand(const BuildOptions& options) {
       sourceContext.registeredShaders.push_back(factory()->info().name);
     }
     for (const auto& rule : MakeSourceRules()) {
-      contractErrors += rule->check(sourceContext, &report.diagnostics);
+      rule->check(sourceContext, &report.diagnostics);
     }
   }
   PrintDiagnostics(report.diagnostics);
-  // One summary for every failure source: the old split printed the contract count first and
-  // returned, hiding the compilation count. The hard gates are the diagnostics (every failure
-  // path reports one) with the two legacy counters as a belt.
+  // One summary for every failure source: the ledger is the single gate (every failure path
+  // reports a record — the pairing is pinned by tests — so no separate counters are kept).
   const auto errorCount = report.diagnostics.count(Severity::Error);
   const auto unverifiableCount = report.diagnostics.count(Severity::Unverifiable);
   const auto warningCount = report.diagnostics.count(Severity::Warning);
-  if (contractErrors > 0 || totalErrors > 0 || report.diagnostics.hasErrors()) {
+  if (report.diagnostics.hasErrors()) {
     std::cerr << "Build failed: " << errorCount << " error(s), " << unverifiableCount
               << " unverifiable, " << warningCount
               << " warning(s); the bundles were not written. See shader_build_report.json.\n";

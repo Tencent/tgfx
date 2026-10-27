@@ -27,6 +27,7 @@
 #include <string>
 #include <vector>
 #include "ScratchDir.h"
+#include "FailureAssertions.h"
 #include "verify/ContractChecks.h"
 #include "gpu/Uniform.h"
 #include "gpu/shaders/AllShaderFamilies.h"
@@ -51,6 +52,9 @@ struct Report {
 };
 
 Report Finish(size_t errors, const Diagnostics& diagnostics) {
+  // Every check funnels through here, so the pairing between the returned violation count and
+  // the failing records is pinned once for all of them.
+  EXPECT_EQ(errors, FailuresIn(diagnostics));
   Report report;
   report.errors = errors;
   report.diagnostics = diagnostics.records();

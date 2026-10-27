@@ -30,6 +30,7 @@
 #include "core/DiagnosticCodes.h"
 #include "gpu/ShaderBindingLayout.h"
 #include "gtest/gtest.h"
+#include "FailureAssertions.h"
 #include "verify/BindingLayoutRule.h"
 
 namespace tgfx {
@@ -107,7 +108,9 @@ std::vector<InlineExpansionRecord> noExpansions;
 // stay local, so a test that cares what was reported builds its own Diagnostics.
 size_t CheckVariants(const std::vector<VariantData>& variants) {
   Diagnostics diagnostics;
-  return rule.check(ContextOf(variants, noExpansions), &diagnostics);
+  auto errors = rule.check(ContextOf(variants, noExpansions), &diagnostics);
+  EXPECT_EQ(errors, FailuresIn(diagnostics));
+  return errors;
 }
 
 }  // namespace
@@ -251,6 +254,7 @@ TEST(BindingLayoutRuleTest, AVertexStageWithoutAnEntryPointIsUnverifiable) {
   std::vector<VariantData> variants = {variant};
   Diagnostics diagnostics;
   auto errors = rule.check(ContextOf(variants, noExpansions), &diagnostics);
+  EXPECT_EQ(errors, FailuresIn(diagnostics));
   EXPECT_GE(errors, 1u);
   ASSERT_FALSE(diagnostics.records().empty());
   EXPECT_EQ(diagnostics.records()[0].severity, Severity::Unverifiable);
@@ -269,6 +273,7 @@ TEST(BindingLayoutRuleTest, AVertexStageWithoutQualifiersIsUnverifiable) {
   std::vector<VariantData> variants = {variant};
   Diagnostics diagnostics;
   auto errors = rule.check(ContextOf(variants, noExpansions), &diagnostics);
+  EXPECT_EQ(errors, FailuresIn(diagnostics));
   EXPECT_GE(errors, 1u);
   ASSERT_FALSE(diagnostics.records().empty());
   EXPECT_EQ(diagnostics.records()[0].severity, Severity::Unverifiable);
@@ -287,6 +292,7 @@ TEST(BindingLayoutRuleTest, AnUnparseableVulkanModuleIsUnverifiable) {
   std::vector<VariantData> variants = {variant};
   Diagnostics diagnostics;
   auto errors = rule.check(ContextOf(variants, noExpansions), &diagnostics);
+  EXPECT_EQ(errors, FailuresIn(diagnostics));
   EXPECT_GE(errors, 1u);
   ASSERT_FALSE(diagnostics.records().empty());
   EXPECT_EQ(diagnostics.records()[0].severity, Severity::Unverifiable);

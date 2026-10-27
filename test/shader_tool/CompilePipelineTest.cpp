@@ -34,6 +34,7 @@
 #include "gpu/ShaderBindingLayout.h"
 #include "gpu/Uniform.h"
 #include "gtest/gtest.h"
+#include "FailureAssertions.h"
 
 namespace tgfx {
 namespace {
@@ -427,6 +428,7 @@ TEST(InlineExpansionPolicyTest, AHeavyFunctionWithManyCallSitesIsAViolation) {
   ASSERT_TRUE(record.expansion.valid);
   Diagnostics diagnostics;
   auto errors = ValidateInlineExpansion({record}, &diagnostics);
+  EXPECT_EQ(errors, FailuresIn(diagnostics));
   EXPECT_GE(errors, 1u);
   ASSERT_FALSE(diagnostics.records().empty());
   EXPECT_STREQ(diagnostics.records()[0].code, DiagnosticCode::VerifyInlinePolicy);
@@ -452,6 +454,7 @@ TEST(InlineExpansionPolicyTest, AnUnanalyzableModuleIsAViolationNotASilentPass) 
   EXPECT_FALSE(record.expansion.valid);
   Diagnostics diagnostics;
   auto errors = ValidateInlineExpansion({record}, &diagnostics);
+  EXPECT_EQ(errors, FailuresIn(diagnostics));
   EXPECT_EQ(errors, 1u);
   ASSERT_EQ(diagnostics.records().size(), 1u);
   EXPECT_EQ(diagnostics.records()[0].severity, Severity::Unverifiable);
@@ -471,6 +474,7 @@ TEST(InlineExpansionPolicyTest, ViolationsOfOneFunctionAcrossVariantsAreReported
   }
   Diagnostics diagnostics;
   auto errors = ValidateInlineExpansion(records, &diagnostics);
+  EXPECT_EQ(errors, FailuresIn(diagnostics));
   EXPECT_EQ(errors, 1u);
   ASSERT_EQ(diagnostics.records().size(), 1u);
   EXPECT_NE(diagnostics.records()[0].message.find("4 variant(s)"), std::string::npos);
@@ -482,6 +486,7 @@ TEST(InlineExpansionPolicyTest, ViolationsOfDifferentShadersAreCountedSeparately
   Diagnostics diagnostics;
   auto errors =
       ValidateInlineExpansion({{"ShaderA", 0, expansion}, {"ShaderB", 0, expansion}}, &diagnostics);
+  EXPECT_EQ(errors, FailuresIn(diagnostics));
   EXPECT_EQ(errors, 2u);
   EXPECT_EQ(diagnostics.records().size(), 2u);
 }
