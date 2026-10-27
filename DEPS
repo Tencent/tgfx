@@ -81,6 +81,21 @@
         "dir": "third_party/shaderc"
       },
       {
+        "url": "https://github.com/KhronosGroup/glslang.git",
+        "commit": "697683e6b8871420d7d942b1a2fe233242ab5608",
+        "dir": "third_party/shaderc/third_party/glslang"
+      },
+      {
+        "url": "https://github.com/KhronosGroup/SPIRV-Headers.git",
+        "commit": "aa6cef192b8e693916eb713e7a9ccadf06062ceb",
+        "dir": "third_party/shaderc/third_party/spirv-headers"
+      },
+      {
+        "url": "https://github.com/KhronosGroup/SPIRV-Tools.git",
+        "commit": "a62abcb402009b9ca5975e6167c09f237f630e0e",
+        "dir": "third_party/shaderc/third_party/spirv-tools"
+      },
+      {
         "url": "https://github.com/KhronosGroup/SPIRV-Cross.git",
         "commit": "ebe2aa0cd80f5eb5cd8a605da604cacf72205f3b",
         "dir": "third_party/SPIRV-Cross"
