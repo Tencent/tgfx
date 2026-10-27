@@ -1831,6 +1831,11 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
       needContent[index] = true;
     }
     auto sourceFlags = layerStyle->extraSourceType();
+    // A style that still returns a bit this version no longer knows would silently fall back to
+    // the shared content instead of the geometry it asked for, so make it loud in debug builds.
+    DEBUG_ASSERT((sourceFlags & ~(static_cast<uint32_t>(LayerStyleExtraSourceType::Contour) |
+                                  static_cast<uint32_t>(LayerStyleExtraSourceType::Background))) ==
+                 0);
     if (NeedsContourSource(sourceFlags)) {
       needContour[index] = true;
       needsContentShape = true;

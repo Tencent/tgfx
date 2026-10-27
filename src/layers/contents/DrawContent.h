@@ -75,7 +75,8 @@ class DrawContent : public GeometryContent {
 
   /**
    * Returns true when this entry must stay out of a point query: an entry no paint captured is only
-   * hit-testable when the query asks for it, and a painter whose alpha is 0 never hits.
+   * hit-testable when the query asks for it, and a painter whose alpha is 0 does not hit. Mesh
+   * entries keep their own hit test, which does not look at alpha.
    */
   bool isHiddenFromHitTest(bool includeUnpaintedGeometry) const {
     if (!color.has_value()) {

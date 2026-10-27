@@ -542,6 +542,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * The x and y coordinates are in the root layer's coordinate space, not the parent layer's
    * (unless the parent layer is the root). You can use the globalToLocal() and the localToGlobal()
    * methods to convert points between these coordinate spaces.
+   * A point inside the layer's own geometry hits it even when no paint captured that geometry, as
+   * long as one of the layer's styles declares LayerStyleContentSource::Geometry.
    * @param x The x coordinate to test it against the calling layer.
    * @param y The y coordinate to test it against the calling layer.
    * @param shapeHitTest Whether to check the actual shape of the layer (true) or just the bounding

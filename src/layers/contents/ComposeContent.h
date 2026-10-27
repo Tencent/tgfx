@@ -42,7 +42,7 @@ class ComposeContent : public LayerContent {
    */
   ComposeContent(std::vector<std::unique_ptr<GeometryContent>> contents,
                  size_t foregroundStartIndex, std::vector<GeometryContent*> contours,
-                 std::optional<std::vector<GeometryContent*>> paintedContours = std::nullopt);
+                 std::optional<std::vector<GeometryContent*>> paintedContours);
 
   Rect getBounds(bool includeUnpaintedGeometry) const override;
   Rect getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const override;

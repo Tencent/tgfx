@@ -66,9 +66,9 @@ enum class LayerStyleContentSource {
    */
   All,
   /**
-   * The layer's geometry: the outlines of its own shapes, including shapes filled or stroked with a
-   * transparent paint and geometries added without a paint; descendants never contribute. A layer
-   * with no geometry of its own, e.g. all of it in child layers, falls back to the subtree contour.
+   * The outlines of the layer's own shapes, including ones filled or stroked with a transparent
+   * paint or added with no paint at all, and hit-testable even where no paint captured them.
+   * Descendants never contribute; a layer without own geometry falls back to the subtree contour.
    */
   Geometry
 };
