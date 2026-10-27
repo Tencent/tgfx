@@ -938,7 +938,13 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
     add_library(tgfx_shader_declarations STATIC ${TGFX_SHADER_DECL_FILES})
     set_target_properties(tgfx_shader_declarations PROPERTIES PREFIX "")
     target_compile_options(tgfx_shader_declarations PRIVATE ${TGFX_COMPILE_OPTIONS})
-    target_include_directories(tgfx_shader_declarations PUBLIC src include
+    # The include roots exposed to the tool are `src` — every shared header spells its path as
+    # gpu/... or core/utils/..., and an include path is a directory root, so the per-header
+    # boundary (contract layer plus declaration layer only) is what ShaderBuildToolTest's
+    # LayeringTest enforces, not this list — and the generated dir for
+    # gpu/shaders/AllShaderFamilies.h. The runtime's public API root (`include`, the tgfx/...
+    # headers) is deliberately not exposed: the tool has no business with it.
+    target_include_directories(tgfx_shader_declarations PUBLIC src
             ${TGFX_GENERATED_INCLUDE_DIR})
 
     # The tool is two targets so its parts can be unit tested without running a process:
