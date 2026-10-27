@@ -43,6 +43,7 @@
 #include "gpu/ShaderProfile.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/AllShaderFamilies.h"
+#include "plan/VariantPlanner.h"
 
 namespace tgfx {
 
@@ -276,19 +277,29 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
   std::string vertSource = source != nullptr ? source->vertex : "";
   std::string fragSource = source != nullptr ? source->fragment : "";
 
-  // The compile list comes from the matcher rules' reachable sets (the Compose single source of
-  // truth in the family headers), enumerated at build time. This replaces the former cartesian
-  // domain walk filtered by ShouldCompile; the --audit mode verified both sides agree for every
-  // shader before the switch, so the bundle content is unchanged.
-  auto reachable = EnumerateReachablePermutations(info.name);
-  if (!reachable) {
+  // The variant plan of this family: the Compose-reachable set (the single source of truth the
+  // runtime matcher uses too), validated against the declared domains. The build loop,
+  // --audit and --report-only all get their variants from the planner.
+  auto plan = VariantPlanner::PlanShader(info);
+  if (!plan.variants) {
     std::cerr << "  ERROR: no rule enumerator for " << info.name
               << ": every shader must be migrated to the Compose pattern\n";
     report.errorCount++;
     diagnostics->recordCommonError();
     return report;
   }
-  for (const auto& permutation : *reachable) {
+  if (!plan.unbuildable.empty()) {
+    // A pair the domains cannot serve would compile against a broken vertex/fragment
+    // interface; fail the family closed instead of emitting it.
+    for (const auto& pair : plan.unbuildable) {
+      std::cerr << "  ERROR: unbuildable variant vert=" << pair.first << " frag=" << pair.second
+                << " for " << info.name << "\n";
+    }
+    report.errorCount++;
+    diagnostics->recordCommonError();
+    return report;
+  }
+  for (const auto& permutation : *plan.variants) {
     uint32_t vi = permutation.first;
     uint32_t fi = permutation.second;
 
@@ -451,7 +462,8 @@ static bool WriteReportJson(const BuildReport& report, const std::string& outDir
 // functions can produce must be a structurally valid permutation (indices within the declared
 // domains and mirrored dimensions in agreement), because the compile list is derived directly
 // from these sets. An invalid entry would compile a variant with a broken vertex/fragment
-// interface, so any violation fails the audit.
+// interface, so any violation fails the audit. The audit asks the same planner the build loop
+// does, so the two paths cannot disagree.
 static int RunAuditMode() {
   const auto& factories = ShaderRegistry::All();
   size_t audited = 0;
@@ -459,24 +471,20 @@ static int RunAuditMode() {
   for (const auto& factory : factories) {
     auto shader = factory();
     auto info = shader->info();
-    auto reachable = EnumerateReachablePermutations(info.name);
-    if (!reachable) {
+    auto plan = VariantPlanner::PlanShader(info);
+    if (!plan.variants) {
       std::cerr << "[audit] " << info.name << ": ERROR no rule enumerator\n";
       violations++;
       continue;
     }
     audited++;
-    size_t invalid = 0;
-    for (const auto& pair : *reachable) {
-      if (!IsBuildablePermutation(info, pair.first, pair.second)) {
-        invalid++;
-        violations++;
-        std::cout << "[audit] " << info.name << ": INVALID vert=" << pair.first
-                  << " frag=" << pair.second << " (out of range or mirrored dimensions disagree)\n";
-      }
+    for (const auto& pair : plan.unbuildable) {
+      violations++;
+      std::cout << "[audit] " << info.name << ": INVALID vert=" << pair.first
+                << " frag=" << pair.second << " (out of range or mirrored dimensions disagree)\n";
     }
-    if (invalid == 0) {
-      std::cout << "[audit] " << info.name << ": OK (" << reachable->size()
+    if (plan.unbuildable.empty()) {
+      std::cout << "[audit] " << info.name << ": OK (" << plan.variants->size()
                 << " reachable permutations)\n";
     }
   }
