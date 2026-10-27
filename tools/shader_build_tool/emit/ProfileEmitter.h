@@ -23,7 +23,7 @@
 #include <optional>
 #include <string>
 #include <vector>
-#include "ShaderCompiler.h"
+#include "compile/ShaderCompiler.h"
 #include "compile/StageCompiler.h"
 #include "core/Diagnostics.h"
 #include "gpu/ShaderProfile.h"

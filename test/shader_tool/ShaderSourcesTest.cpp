@@ -25,7 +25,7 @@
 #include <sstream>
 #include <string>
 #include "ScratchDir.h"
-#include "ShaderSources.h"
+#include "core/ShaderSources.h"
 #include "gtest/gtest.h"
 
 namespace tgfx {

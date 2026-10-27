@@ -25,6 +25,7 @@
 #include <set>
 #include <sstream>
 #include <utility>
+#include <utility>
 #include "core/DiagnosticCodes.h"
 #include "gpu/AOTResourceProfile.h"
 #include "gpu/BundleFormat.h"
@@ -485,6 +486,70 @@ size_t ValidateReflectionContracts(const std::vector<VariantData>& variants,
     }
   }
   return errors;
+}
+
+size_t ValidateInlineExpansion(const std::vector<InlineExpansionRecord>& records,
+                               Diagnostics* diagnostics) {
+  // One record per (shader, function) with the worst variant, instead of one per variant.
+  struct Violation {
+    size_t copies = 0;
+    size_t instructions = 0;
+    size_t duplicated = 0;
+    size_t variants = 0;
+    uint32_t worstVariant = 0;
+  };
+  std::map<std::pair<std::string, std::string>, Violation> violations = {};
+  size_t invalid = 0;
+  for (const auto& record : records) {
+    if (!record.expansion.valid) {
+      // Not a policy violation: the module itself could not be analyzed, so the check could not
+      // run. Reported as unverifiable rather than folded into the policy count.
+      Diagnostic diagnostic;
+      diagnostic.severity = Severity::Unverifiable;
+      diagnostic.layer = Layer::Verify;
+      diagnostic.code = DiagnosticCode::VerifyNotApplicable;
+      diagnostic.shader = record.shaderName;
+      diagnostic.fragPermutationIndex = static_cast<int>(record.fragPermutationIndex);
+      diagnostic.message = "the SPIR-V module could not be analyzed";
+      diagnostics->report(std::move(diagnostic));
+      ++invalid;
+      continue;
+    }
+    for (const auto& function : record.expansion.functions) {
+      auto duplicated = DuplicatedInstructions(function);
+      if (duplicated < MaxDuplicatedInstructions) {
+        continue;
+      }
+      auto& violation = violations[{record.shaderName, function.name}];
+      ++violation.variants;
+      if (duplicated > violation.duplicated) {
+        violation.copies = function.copies;
+        violation.instructions = function.instructions;
+        violation.duplicated = duplicated;
+        violation.worstVariant = record.fragPermutationIndex;
+      }
+    }
+  }
+  for (const auto& entry : violations) {
+    const auto& violation = entry.second;
+    Diagnostic diagnostic;
+    diagnostic.severity = Severity::Error;
+    diagnostic.layer = Layer::Verify;
+    diagnostic.code = DiagnosticCode::VerifyInlinePolicy;
+    diagnostic.shader = entry.first.first;
+    diagnostic.fragPermutationIndex = static_cast<int>(violation.worstVariant);
+    diagnostic.message =
+        "'" + entry.first.second + "' (" + std::to_string(violation.instructions) +
+        " instructions) reaches the driver " + std::to_string(violation.copies) +
+        " times in frag " + std::to_string(violation.worstVariant) + " (" +
+        std::to_string(violation.variants) + " variant(s)), " +
+        std::to_string(violation.duplicated) + " duplicated instructions; the limit is " +
+        std::to_string(MaxDuplicatedInstructions) +
+        ". Funnel the call sites into one: select the operands, then call once (or run the call "
+        "in a loop whose pass count is uniform data).";
+    diagnostics->report(std::move(diagnostic));
+  }
+  return invalid + violations.size();
 }
 
 }  // namespace tgfx

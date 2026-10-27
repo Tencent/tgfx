@@ -498,12 +498,14 @@ TEST(LayeringTest, TheSublayersDependOnlyWhereTheArchitectureAllows) {
   //   compile ─▶ core
   //   plan ─▶ core
   //   verify ─▶ core
-  //   output ─▶ core                             (the writers consume the shared data structures)
+  //   output ─▶ core, compile                    (the writers consume the shared data structures;
+  //                                               the manifest's source digest includes the Metal
+  //                                               compiler fingerprint — a compile-layer fact)
   //
   // Everything else is forbidden: verify never compiles, plan never emits, output never reaches
-  // into the stages that produce what it writes, and a sublayer never reaches up into cli. Files
-  // still at the tool root are a transitional layer any sublayer may use, until they move into
-  // theirs; the moment one does, its edges start being checked.
+  // into the stages that produce what it writes, and a sublayer never reaches up into cli. The
+  // tool root holds main.cpp (the command line) and BundleVerifier (the --verify-bundle command,
+  // pending its own migration); the root is where the cli begins, so its includes are unchecked.
   auto allowed = [](const std::string& from, const std::string& to) {
     if (from == to || to.empty() || from.empty()) {
       return true;
@@ -524,7 +526,7 @@ TEST(LayeringTest, TheSublayersDependOnlyWhereTheArchitectureAllows) {
       return to == "core";
     }
     if (from == "output") {
-      return to == "core";
+      return to == "core" || to == "compile";
     }
     return false;
   };

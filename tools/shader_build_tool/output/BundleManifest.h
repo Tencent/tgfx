@@ -21,7 +21,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include "ShaderSources.h"
+#include "core/ShaderSources.h"
 #include "gpu/ShaderProfile.h"
 
 namespace tgfx {

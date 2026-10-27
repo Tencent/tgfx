@@ -30,7 +30,7 @@
 
 #include <iostream>
 #include <string>
-#include "ShaderCompiler.h"
+#include "compile/ShaderCompiler.h"
 #include "cli/AuditCommand.h"
 #include "cli/BuildCommand.h"
 #include "cli/VerifyCommand.h"

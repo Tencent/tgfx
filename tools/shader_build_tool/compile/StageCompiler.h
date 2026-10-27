@@ -23,7 +23,7 @@
 #include <string>
 #include <tuple>
 #include <vector>
-#include "ShaderCompiler.h"
+#include "compile/ShaderCompiler.h"
 #include "compile/ReflectionExtractor.h"
 #include "compile/StageCache.h"
 

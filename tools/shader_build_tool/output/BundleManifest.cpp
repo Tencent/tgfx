@@ -28,8 +28,8 @@
 #include <string>
 #include <vector>
 #include "output/OutputFile.h"
-#include "ShaderCompiler.h"
-#include "ShaderSources.h"
+#include "compile/ShaderCompiler.h"
+#include "core/ShaderSources.h"
 #include "gpu/ShaderBindingLayout.h"
 #include "gpu/BundleFormat.h"
 #include "gpu/PrecompiledBundleIdentity.h"

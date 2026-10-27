@@ -68,4 +68,46 @@ struct VariantData {
   StageReflectionData fragmentReflection;
 };
 
+/// One function of a shader stage, as seen from the stage's entry point.
+struct InlinedFunction {
+  /// The source-level function name (the GLSL name, without the parameter mangling).
+  std::string name;
+  /// Instructions in the function's own body, callees excluded.
+  size_t instructions = 0;
+  /// Copies of the body the driver ends up compiling: GPU compilers inline every call site, so a
+  /// function called from k sites of a function that itself has n copies contributes k * n.
+  size_t copies = 0;
+};
+
+/// The inline expansion of one shader stage, computed by compile/InlineExpansion.
+struct InlineExpansion {
+  bool valid = false;
+  std::vector<InlinedFunction> functions;
+  /// Instructions of every reachable function counted once.
+  size_t ownInstructions = 0;
+  /// Instructions after every call site is inlined.
+  size_t expandedInstructions = 0;
+};
+
+/// One stage analysis together with the variant it belongs to: the compile loop produces the
+/// records, the verify policy and the output report consume them.
+struct InlineExpansionRecord {
+  std::string shaderName;
+  uint32_t fragPermutationIndex = 0;
+  InlineExpansion expansion;
+};
+
+// The duplicated instructions of a function are its own instructions times its copies beyond the
+// first. The limit is on that product, not on the body size: a 135-instruction helper called from
+// eight sites (the former per-mode HSL blend helpers, 945 duplicated instructions) costs the
+// driver as much as a large body called twice. Small pickers duplicated a few times stay below.
+// There are no exceptions: every heavy function the kernels share has a single call site. The
+// constant lives here because the verify rule and the output report both state it (the policy
+// message and the report's header field must never disagree).
+inline constexpr size_t MaxDuplicatedInstructions = 400;
+
+inline size_t DuplicatedInstructions(const InlinedFunction& function) {
+  return function.copies > 1 ? function.instructions * (function.copies - 1) : 0;
+}
+
 }  // namespace tgfx

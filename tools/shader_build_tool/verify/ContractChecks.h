@@ -67,4 +67,15 @@ size_t ValidateShaderSourceReferences(const std::string& shaderDir,
 size_t ValidateReflectionContracts(const std::vector<VariantData>& variants,
                                    Diagnostics* diagnostics);
 
+/// Validates the expansion policy over the fragment stages: the instructions a function adds by
+/// being inlined more than once (its own instructions times its copies beyond the first,
+/// DuplicatedInstructions in core/Types.h) must stay below MaxDuplicatedInstructions, with no
+/// exceptions. A function with several call sites is the pattern that multiplied the pointwise
+/// kernels' compile time (per-leaf tiled fetches, per-mode HSL blend helpers, per-channel transfer
+/// functions, the XferProcessor blend next to the loop's blend); funnelling the call sites into
+/// one is what removes the copies. Reports each violation and each unanalyzable module as a
+/// diagnostic and returns the count.
+size_t ValidateInlineExpansion(const std::vector<InlineExpansionRecord>& records,
+                               Diagnostics* diagnostics);
+
 }  // namespace tgfx

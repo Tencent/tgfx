@@ -20,7 +20,7 @@
 
 #include <cstdint>
 #include <string>
-#include "ShaderCompiler.h"
+#include "compile/ShaderCompiler.h"
 
 namespace tgfx {
 

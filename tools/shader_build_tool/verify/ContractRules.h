@@ -24,7 +24,6 @@
 #include <vector>
 #include "core/Diagnostics.h"
 #include "core/Types.h"
-#include "InlineExpansion.h"
 
 namespace tgfx {
 

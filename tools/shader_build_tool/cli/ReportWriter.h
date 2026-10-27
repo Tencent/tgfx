@@ -22,7 +22,6 @@
 #include <string>
 #include <vector>
 #include "core/Types.h"
-#include "InlineExpansion.h"
 #include "core/Diagnostics.h"
 
 namespace tgfx {

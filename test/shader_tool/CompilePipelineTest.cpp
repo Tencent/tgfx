@@ -26,15 +26,17 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include "InlineExpansion.h"
+#include "compile/InlineExpansion.h"
 #include "compile/ReflectionExtractor.h"
-#include "ShaderCompiler.h"
+#include "compile/ShaderCompiler.h"
 #include "core/DiagnosticCodes.h"
 #include "compile/StageCompiler.h"
 #include "gpu/ShaderBindingLayout.h"
 #include "gpu/Uniform.h"
 #include "gtest/gtest.h"
 #include "FailureAssertions.h"
+#include "output/InlineExpansionReport.h"
+#include "verify/ContractChecks.h"
 
 namespace tgfx {
 namespace {
