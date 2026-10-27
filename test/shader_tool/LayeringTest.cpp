@@ -423,12 +423,14 @@ TEST(LayeringTest, CoreModulesDependOnNothing) {
 }
 
 TEST(LayeringTest, TheWriterDependsOnNoOtherModuleOfTheTool) {
-  // BundleWriter.h holds the data every stage passes along and the writer of the bundle file. It
-  // is the bottom of the tool, and only the output helper sits beneath it.
+  // BundleWriter writes the bundle file; the data structures it serializes travel through
+  // core/Types.h (the bottom of the tool) and the output helper sits beneath it. Anything else
+  // and the writer has grown a dependency of its own.
   auto graph = ToolModuleGraph();
   ASSERT_EQ(graph.count("BundleWriter"), 1u);
+  const std::set<std::string> allowed = {"OutputFile", "Types"};
   for (const auto& dependency : graph["BundleWriter"]) {
-    EXPECT_EQ(dependency, "OutputFile") << "BundleWriter depends on " << dependency;
+    EXPECT_EQ(allowed.count(dependency), 1u) << "BundleWriter depends on " << dependency;
   }
 }
 

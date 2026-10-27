@@ -26,6 +26,8 @@
 #include <string>
 #include <tuple>
 #include <utility>
+#include "BundleWriter.h"
+#include "gpu/ShaderKeyHash.h"
 #include "gpu/shaders/PrecompiledShader.h"
 
 namespace tgfx {

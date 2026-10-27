@@ -18,44 +18,11 @@
 
 #pragma once
 
-#include <cstdint>
 #include <string>
 #include <vector>
-#include "gpu/ShaderKeyHash.h"
+#include "core/Types.h"
 
 namespace tgfx {
-
-struct UniformEntry {
-  std::string name;
-  uint8_t format = 0;      // UniformFormat enum value
-  uint16_t arraySize = 1;  // std140 array element count; 1 when not an array
-};
-
-// One vertex-stage input of a kernel: the attribute slot the runtime vertex binding must match.
-// The location is the single source of truth for how the GL/GLES backends bind attribute slots,
-// so recording it in the bundle lets the loader verify the .vert's declared layout.
-struct VertexInputEntry {
-  std::string name;
-  uint8_t format = 0;   // UniformFormat enum value
-  uint8_t location = 0;
-};
-
-struct StageReflectionData {
-  std::vector<UniformEntry> uniforms;
-  std::vector<UniformEntry> samplers;
-  std::vector<VertexInputEntry> vertexInputs;
-};
-
-struct VariantData {
-  std::string shaderName;
-  uint32_t vertPermutationIndex = 0;
-  uint32_t fragPermutationIndex = 0;
-  std::string profileTag;
-  std::vector<uint8_t> vertexBlob;
-  std::vector<uint8_t> fragmentBlob;
-  StageReflectionData vertexReflection;
-  StageReflectionData fragmentReflection;
-};
 
 /// Serializes stage reflection into the bundle's on-disk reflection format:
 /// [uniformCount:u8][samplerCount:u8][vertexInputCount:u8][reserved:u8] followed by the uniform

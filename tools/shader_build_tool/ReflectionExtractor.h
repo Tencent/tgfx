@@ -20,7 +20,7 @@
 
 #include <cstdint>
 #include <vector>
-#include "BundleWriter.h"
+#include "core/Types.h"
 
 namespace tgfx {
 

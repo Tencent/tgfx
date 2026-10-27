@@ -22,6 +22,7 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include "gpu/ShaderKeyHash.h"
 #include <iterator>
 #include <map>
 #include <optional>

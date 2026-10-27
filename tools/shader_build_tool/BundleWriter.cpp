@@ -27,6 +27,7 @@
 #include "OutputFile.h"
 #include "gpu/BundleFormat.h"
 #include "gpu/PrecompiledBundleIdentity.h"
+#include "gpu/ShaderKeyHash.h"
 #include "zlib.h"
 #include "zstd.h"
 
