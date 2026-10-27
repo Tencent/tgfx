@@ -92,6 +92,87 @@ std::map<std::string, ProfileArtifactStats> CollectArtifactStats(
   return result;
 }
 
+const char* SeverityPrefix(Severity severity) {
+  switch (severity) {
+    case Severity::Error:
+      return "E";
+    case Severity::Warning:
+      return "W";
+    case Severity::Unverifiable:
+      return "U";
+  }
+  return "E";
+}
+
+const char* SeverityName(Severity severity) {
+  switch (severity) {
+    case Severity::Error:
+      return "error";
+    case Severity::Warning:
+      return "warning";
+    case Severity::Unverifiable:
+      return "unverifiable";
+  }
+  return "error";
+}
+
+const char* LayerName(Layer layer) {
+  switch (layer) {
+    case Layer::Sources:
+      return "sources";
+    case Layer::Plan:
+      return "plan";
+    case Layer::Compile:
+      return "compile";
+    case Layer::Emit:
+      return "emit";
+    case Layer::Verify:
+      return "verify";
+    case Layer::Output:
+      return "output";
+    case Layer::Cli:
+      return "cli";
+  }
+  return "cli";
+}
+
+// Escapes a string for the JSON report: quotes, backslashes and control characters. Diagnostics
+// carry compiler stderr, which contains newlines and quotes.
+std::string JsonEscape(const std::string& text) {
+  std::string escaped;
+  escaped.reserve(text.size());
+  for (char ch : text) {
+    switch (ch) {
+      case '"':
+        escaped += "\\\"";
+        break;
+      case '\\':
+        escaped += "\\\\";
+        break;
+      case '\n':
+        escaped += "\\n";
+        break;
+      case '\r':
+        escaped += "\\r";
+        break;
+      case '\t':
+        escaped += "\\t";
+        break;
+      default:
+        if (static_cast<unsigned char>(ch) < 0x20) {
+          escaped += "\\u00";
+          const char* hex = "0123456789abcdef";
+          escaped += hex[(static_cast<unsigned char>(ch) >> 4) & 0xf];
+          escaped += hex[static_cast<unsigned char>(ch) & 0xf];
+        } else {
+          escaped += ch;
+        }
+        break;
+    }
+  }
+  return escaped;
+}
+
 }  // namespace
 
 bool WriteReportJson(const BuildReport& report, const std::string& outDir) {
@@ -160,47 +241,32 @@ bool WriteReportJson(const BuildReport& report, const std::string& outDir) {
     }
     file << "\n";
   }
+  file << "  ],\n  \"diagnostics\": [\n";
+  // Every diagnostic the build recorded, in report order: the machine-readable counterpart of
+  // the human lines cli prints. A failing build writes this array (the report is a debugging
+  // input, not an artifact), while the bundle and manifest are not written at all.
+  for (size_t i = 0; i < report.diagnostics.records().size(); i++) {
+    const auto& record = report.diagnostics.records()[i];
+    file << "    {\n";
+    file << "      \"severity\": \"" << SeverityName(record.severity) << "\",\n";
+    file << "      \"layer\": \"" << LayerName(record.layer) << "\",\n";
+    file << "      \"code\": \"" << JsonEscape(record.code != nullptr ? record.code : "") << "\",\n";
+    file << "      \"shader\": \"" << JsonEscape(record.shader) << "\",\n";
+    file << "      \"profile\": \"" << JsonEscape(record.profile) << "\",\n";
+    file << "      \"vert\": " << record.vertPermutationIndex << ",\n";
+    file << "      \"frag\": " << record.fragPermutationIndex << ",\n";
+    file << "      \"message\": \"" << JsonEscape(record.message) << "\"\n";
+    file << "    }";
+    if (i + 1 < report.diagnostics.records().size()) {
+      file << ",";
+    }
+    file << "\n";
+  }
   file << "  ]\n}\n";
   file.close();
   std::cout << "Report written to: " << path << "\n";
   return true;
 }
-
-namespace {
-
-const char* SeverityPrefix(Severity severity) {
-  switch (severity) {
-    case Severity::Error:
-      return "E";
-    case Severity::Warning:
-      return "W";
-    case Severity::Unverifiable:
-      return "U";
-  }
-  return "E";
-}
-
-const char* LayerName(Layer layer) {
-  switch (layer) {
-    case Layer::Sources:
-      return "sources";
-    case Layer::Plan:
-      return "plan";
-    case Layer::Compile:
-      return "compile";
-    case Layer::Emit:
-      return "emit";
-    case Layer::Verify:
-      return "verify";
-    case Layer::Output:
-      return "output";
-    case Layer::Cli:
-      return "cli";
-  }
-  return "cli";
-}
-
-}  // namespace
 
 void PrintDiagnostics(const Diagnostics& diagnostics) {
   for (const auto& record : diagnostics.records()) {

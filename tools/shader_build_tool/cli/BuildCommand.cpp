@@ -424,13 +424,16 @@ int RunBuildCommand(const BuildOptions& options) {
     }
   }
   PrintDiagnostics(report.diagnostics);
-  if (contractErrors > 0) {
-    std::cerr << "Build failed: " << contractErrors << " kernel contract violation(s).\n";
-    return 1;
-  }
-
-  if (totalErrors > 0) {
-    std::cerr << "Build failed: " << totalErrors << " shader compilation error(s).\n";
+  // One summary for every failure source: the old split printed the contract count first and
+  // returned, hiding the compilation count. The hard gates are the diagnostics (every failure
+  // path reports one) with the two legacy counters as a belt.
+  const auto errorCount = report.diagnostics.count(Severity::Error);
+  const auto unverifiableCount = report.diagnostics.count(Severity::Unverifiable);
+  const auto warningCount = report.diagnostics.count(Severity::Warning);
+  if (contractErrors > 0 || totalErrors > 0 || report.diagnostics.hasErrors()) {
+    std::cerr << "Build failed: " << errorCount << " error(s), " << unverifiableCount
+              << " unverifiable, " << warningCount
+              << " warning(s); the bundles were not written. See shader_build_report.json.\n";
     return 1;
   }
 

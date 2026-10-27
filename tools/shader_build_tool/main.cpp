@@ -38,12 +38,14 @@
 int main(int argc, char** argv) {
   tgfx::BuildOptions options;
   if (!tgfx::ParseArgs(argc, argv, &options)) {
-    return 1;
+    // 2: the tool could not be invoked as asked (bad arguments). 1 stays "the product was
+    // rejected": scripts can tell a usage mistake from a real build failure.
+    return 2;
   }
   std::string targetError;
   if (!tgfx::SetMetalTarget(options.metalSdk, options.metalMinOS, &targetError)) {
     std::cerr << "ERROR: " << targetError << "\n";
-    return 1;
+    return 2;
   }
   if (options.audit) {
     return tgfx::RunAuditCommand();
