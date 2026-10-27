@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ReflectionExtractor.h"
+#include "compile/ReflectionExtractor.h"
 #include <iostream>
 #include <spirv_cross.hpp>
 #include "gpu/ShaderBindingLayout.h"

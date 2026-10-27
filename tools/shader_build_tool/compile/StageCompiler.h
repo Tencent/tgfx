@@ -23,9 +23,9 @@
 #include <string>
 #include <tuple>
 #include <vector>
-#include "ReflectionExtractor.h"
 #include "ShaderCompiler.h"
-#include "StageCache.h"
+#include "compile/ReflectionExtractor.h"
+#include "compile/StageCache.h"
 
 namespace tgfx {
 

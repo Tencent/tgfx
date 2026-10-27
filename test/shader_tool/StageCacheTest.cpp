@@ -31,7 +31,7 @@
 #include <string>
 #include <vector>
 #include "ScratchDir.h"
-#include "StageCache.h"
+#include "compile/StageCache.h"
 #include "gtest/gtest.h"
 
 namespace tgfx {

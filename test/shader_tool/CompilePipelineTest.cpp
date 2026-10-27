@@ -27,7 +27,7 @@
 #include <string>
 #include <vector>
 #include "InlineExpansion.h"
-#include "ReflectionExtractor.h"
+#include "compile/ReflectionExtractor.h"
 #include "ShaderCompiler.h"
 #include "compile/StageCompiler.h"
 #include "gpu/ShaderBindingLayout.h"
