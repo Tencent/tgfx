@@ -66,11 +66,22 @@ class DrawContent : public GeometryContent {
 
   /**
    * Returns true when this entry must stay out of a query: an entry no paint captured is excluded
-   * unless the query asks for it. A painter with alpha 0 stays in; hitTestPoint filters it by its
-   * own alpha test.
+   * unless the query asks for it. A painter with alpha 0 stays in; isHiddenFromHitTest() is what
+   * drops it from a point query.
    */
   bool isExcluded(bool includeUnpaintedGeometry) const {
     return !hasPaint() && !includeUnpaintedGeometry;
+  }
+
+  /**
+   * Returns true when this entry must stay out of a point query: an entry no paint captured is only
+   * hit-testable when the query asks for it, and a painter whose alpha is 0 never hits.
+   */
+  bool isHiddenFromHitTest(bool includeUnpaintedGeometry) const {
+    if (!color.has_value()) {
+      return !includeUnpaintedGeometry;
+    }
+    return color->alpha <= 0;
   }
 
   /// Nullopt when no paint captured this geometry; a transparent painter is a value with alpha 0.

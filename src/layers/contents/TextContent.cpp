@@ -40,10 +40,7 @@ Rect TextContent::getTightBounds(const Matrix& matrix, bool includeUnpaintedGeom
 }
 
 bool TextContent::hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const {
-  if (isExcluded(includeUnpaintedGeometry)) {
-    return false;
-  }
-  if (!color.has_value() || color->alpha <= 0) {
+  if (isHiddenFromHitTest(includeUnpaintedGeometry)) {
     return false;
   }
   auto localPoint = Point::Make(localX - offset.x, localY - offset.y);

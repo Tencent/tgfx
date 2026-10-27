@@ -38,10 +38,7 @@ Rect RRectContent::getTightBounds(const Matrix& matrix, bool includeUnpaintedGeo
 }
 
 bool RRectContent::hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const {
-  if (isExcluded(includeUnpaintedGeometry)) {
-    return false;
-  }
-  if (!color.has_value() || color->alpha <= 0) {
+  if (isHiddenFromHitTest(includeUnpaintedGeometry)) {
     return false;
   }
   return getFilledPath().contains(localX, localY);

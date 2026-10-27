@@ -836,16 +836,17 @@ Matrix3D Layer::getRelativeMatrix3D(const Layer* target) const {
 }
 
 bool Layer::hitTestPoint(float x, float y, bool shapeHitTest) {
-  // Hit testing matches the painted content: a geometry no paint captured paints nothing, and only
-  // a Geometry style may draw it, so it must not become clickable just because a style covers it.
+  // Hit testing follows the same caliber as the bounds: a style declaring the layer's geometry
+  // makes that geometry visible, so it is clickable there too.
+  const bool includeUnpaintedGeometry = hasGeometryStyle();
   if (auto content = getContent()) {
     Point localPoint = globalToLocal(Point::Make(x, y));
     if (shapeHitTest) {
-      if (content->hitTestPoint(localPoint.x, localPoint.y, false)) {
+      if (content->hitTestPoint(localPoint.x, localPoint.y, includeUnpaintedGeometry)) {
         return true;
       }
     } else {
-      if (content->getBounds(false).contains(localPoint.x, localPoint.y)) {
+      if (content->getBounds(includeUnpaintedGeometry).contains(localPoint.x, localPoint.y)) {
         return true;
       }
     }
@@ -2097,8 +2098,8 @@ bool Layer::getLayersUnderPointInternal(float x, float y,
   } else {
     auto content = getContent();
     if (nullptr != content) {
-      // Painted-only caliber, as in hitTestPoint(): unpainted geometry is left out here.
-      auto layerBoundsRect = content->getBounds(false);
+      // Same caliber as hitTestPoint(): a style declaring the geometry makes it hit-testable.
+      auto layerBoundsRect = content->getBounds(hasGeometryStyle());
       auto localPoint = globalToLocal(Point::Make(x, y));
       if (layerBoundsRect.contains(localPoint.x, localPoint.y)) {
         results->push_back(shared_from_this());

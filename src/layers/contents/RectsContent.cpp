@@ -42,10 +42,7 @@ Rect RectsContent::getTightBounds(const Matrix& matrix, bool includeUnpaintedGeo
 }
 
 bool RectsContent::hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const {
-  if (isExcluded(includeUnpaintedGeometry)) {
-    return false;
-  }
-  if (!color.has_value() || color->alpha <= 0) {
+  if (isHiddenFromHitTest(includeUnpaintedGeometry)) {
     return false;
   }
   if (stroke) {

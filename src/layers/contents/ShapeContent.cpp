@@ -101,10 +101,7 @@ Rect ShapeContent::getTightBounds(const Matrix& matrix, bool includeUnpaintedGeo
 }
 
 bool ShapeContent::hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const {
-  if (isExcluded(includeUnpaintedGeometry)) {
-    return false;
-  }
-  if (!color.has_value() || color->alpha <= 0) {
+  if (isHiddenFromHitTest(includeUnpaintedGeometry)) {
     return false;
   }
   auto originalPath = shape->getPath();

@@ -8731,4 +8731,54 @@ TGFX_TEST_PRIVATE(LayerTest, PaintlessEntryNotHitTestable) {
       << "neither must it be clickable through its shape";
 }
 
+// The other side of the gate the test above pins: a style declaring the layer's geometry draws that
+// geometry, so the same point query must answer for it too. Glass is such a style, and the layer
+// without it keeps the paintless entry out -- that contrast is what makes the gate observable.
+TGFX_TEST_PRIVATE(LayerTest, HitTestFollowsTheGeometryCaliber) {
+  const Rect bareBounds = Rect::MakeXYWH(60.0f, 60.0f, 80.0f, 40.0f);
+  const Rect paintedBounds = Rect::MakeXYWH(60.0f, 140.0f, 80.0f, 40.0f);
+  auto makeLayer = [](const Rect& bounds, bool painted, bool withGlass) {
+    std::vector<std::shared_ptr<VectorElement>> elements = {MakeRectElement(bounds)};
+    if (painted) {
+      elements.push_back(FillStyle::Make(SolidColor::Make(Color::White())));
+    }
+    auto group = VectorGroup::Make();
+    group->setElements(std::move(elements));
+    auto layer = VectorLayer::Make();
+    layer->setContents({group});
+    if (withGlass) {
+      layer->setLayerStyles({MakeGeometryGlass(0, 50, 100, 0, 0)});
+    }
+    return layer;
+  };
+
+  auto bareWithGlass = makeLayer(bareBounds, false, true);
+  EXPECT_EQ(CountUnpaintedEntries(bareWithGlass), 1)
+      << "the fixture needs an entry no paint captured, or the caliber is never exercised";
+  EXPECT_TRUE(bareWithGlass->hitTestPoint(bareBounds.centerX(), bareBounds.centerY(), false))
+      << "a geometry style makes the bare geometry visible, so its bounds must be clickable";
+  EXPECT_TRUE(bareWithGlass->hitTestPoint(bareBounds.centerX(), bareBounds.centerY(), true))
+      << "and the same geometry must answer the shape query";
+
+  // Control: the same layer without the style. Without the geometry style nothing draws the entry,
+  // so it stays unclickable and the hits above are attributable to the style alone.
+  auto bareWithoutGlass = makeLayer(bareBounds, false, false);
+  EXPECT_EQ(CountUnpaintedEntries(bareWithoutGlass), 1);
+  EXPECT_FALSE(bareWithoutGlass->hitTestPoint(bareBounds.centerX(), bareBounds.centerY(), false))
+      << "a bare geometry with no style must not be clickable through its bounds";
+  EXPECT_FALSE(bareWithoutGlass->hitTestPoint(bareBounds.centerX(), bareBounds.centerY(), true))
+      << "nor through its shape";
+
+  // Regression: a painted layer answers both queries with and without the style, so the caliber
+  // above only moves the entries no paint captured.
+  for (const auto withGlass : {false, true}) {
+    auto paintedLayer = makeLayer(paintedBounds, true, withGlass);
+    EXPECT_EQ(CountUnpaintedEntries(paintedLayer), 0);
+    EXPECT_TRUE(paintedLayer->hitTestPoint(paintedBounds.centerX(), paintedBounds.centerY(), false))
+        << "a painted layer must stay clickable through its bounds (glass: " << withGlass << ")";
+    EXPECT_TRUE(paintedLayer->hitTestPoint(paintedBounds.centerX(), paintedBounds.centerY(), true))
+        << "and through its shape (glass: " << withGlass << ")";
+  }
+}
+
 }  // namespace tgfx
