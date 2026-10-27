@@ -4449,7 +4449,8 @@ static Rect GlassPanelLocalBounds() {
 //   TransparentColor - a fully transparent solid color (alpha 0 in the color source), which the
 //                      content-shape derivation skips.
 //   Opaque      - a visible fill.
-enum class RegionFillKind { None, Transparent, TransparentColor, Opaque };
+//   Gradient    - a shader fill that fades to fully transparent on its right half.
+enum class RegionFillKind { None, Transparent, TransparentColor, Opaque, Gradient };
 
 // One rectangle region of a panel plus the overrides the special cases need.
 struct RegionSpec {
@@ -4487,6 +4488,16 @@ static std::shared_ptr<VectorGroup> MakeRegion(const RegionSpec& spec) {
     case RegionFillKind::Opaque:
       elements.push_back(FillStyle::Make(SolidColor::Make(Color::White())));
       break;
+    case RegionFillKind::Gradient: {
+      // Fully transparent from its midpoint on, so the right half contributes no visible pixel
+      // while still being part of the geometry. The points are in the gradient's default
+      // normalized space, which maps to this geometry's own bounding box.
+      auto gradient = Gradient::MakeLinear(
+          {0.0f, 0.5f}, {1.0f, 0.5f}, {Color::White(), Color::Transparent(), Color::Transparent()},
+          {0.0f, 0.5f, 1.0f});
+      elements.push_back(FillStyle::Make(std::move(gradient)));
+      break;
+    }
   }
   if (spec.strokeWidth > 0.0f) {
     // Translucent, so the Glass drawn under the band stays observable in a rendered comparison.
@@ -5751,6 +5762,32 @@ TGFX_TEST(LayerTest, GlassCoverageKeepsTransparentColorRegion) {
   EXPECT_GT(CountDifferingPixels(plain.get(), glassPanel.get(), roiB, 16),
             static_cast<int>(roiB.width() * roiB.height()) / 5)
       << "transparent-color region must be covered too";
+}
+
+// The coverage comes from the layer's geometry, not from what the paint renders: a gradient whose
+// right half is fully transparent still gets covered there.
+TGFX_TEST(LayerTest, GlassCoverageIgnoresGradientTransparency) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  const auto glass = GlassStyle::Make(0, 50, 100, 0, 0, 0, 0);
+  const auto bounds = Rect::MakeLTRB(0.0f, 0.0f, 140.0f, 80.0f);
+  RegionSpec gradient = {};
+  gradient.bounds = bounds;
+  gradient.fill = RegionFillKind::Gradient;
+  auto plain = RenderPanelOverChecker(context, MakePanel({gradient}));
+  auto glassPanel = RenderPanelOverChecker(context, MakePanel({gradient}, {glass}));
+  ASSERT_TRUE(plain != nullptr && glassPanel != nullptr);
+  // The opaque left half and the fully transparent right half must both be covered.
+  for (const auto& half :
+       {Rect::MakeLTRB(0.0f, 0.0f, 60.0f, 80.0f), Rect::MakeLTRB(80.0f, 0.0f, 140.0f, 80.0f)}) {
+    auto roi = half;
+    roi.offset(GlassPanelLeft, GlassPanelTop);
+    roi.inset(5.0f, 5.0f);
+    EXPECT_GT(CountDifferingPixels(plain.get(), glassPanel.get(), roi, 16),
+              static_cast<int>(roi.width() * roi.height()) / 5)
+        << "the gradient's stops are geometry too, so the glass must cover them";
+  }
 }
 
 TGFX_TEST(LayerTest, GlassStyleBackgroundOutsets) {
