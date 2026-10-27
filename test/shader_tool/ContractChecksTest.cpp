@@ -26,8 +26,8 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include "ContractChecks.h"
 #include "ScratchDir.h"
+#include "verify/ContractChecks.h"
 #include "gpu/Uniform.h"
 #include "gpu/shaders/AllShaderFamilies.h"
 #include "gpu/shaders/KernelContract.h"

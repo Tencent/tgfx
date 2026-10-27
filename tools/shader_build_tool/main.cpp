@@ -30,7 +30,6 @@
 #include "BundleManifest.h"
 #include "BundleVerifier.h"
 #include "BundleWriter.h"
-#include "ContractChecks.h"
 #include "InlineExpansion.h"
 #include "ReflectionExtractor.h"
 #include "ShaderCompiler.h"
@@ -44,6 +43,7 @@
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/AllShaderFamilies.h"
 #include "plan/VariantPlanner.h"
+#include "verify/ContractRules.h"
 
 namespace tgfx {
 
@@ -583,26 +583,31 @@ int main(int argc, char** argv) {
     }
   }
 
-  // Cross-language contract checks: the clip contract fields and the chain op codes must match
-  // the C++ constants, otherwise the runtime uploads would silently miss their targets.
-  size_t contractErrors = tgfx::ValidateClipContractFields(report.variants);
-  contractErrors += tgfx::ValidateReflectionContracts(report.variants);
-  // A heavy function inlined at several call sites multiplies the driver's compile work on every
-  // backend that compiles at runtime (GL source, Metal AIR, SPIR-V).
+  // Cross-language contract checks, as two rule registries: the artifact rules read what the
+  // build produced (the clip contract fields, the reflection contracts, the inline expansion
+  // policy), the source rules read the shader text (the op codes, the slot capacities, the
+  // source references). A rule prints each violation itself; the counts gate the build, so a
+  // mismatch fails here instead of surfacing as a runtime upload missing its target.
   if (!options.inlineReportPath.empty() &&
       !tgfx::WriteInlineExpansionReport(options.inlineReportPath, report.inlineExpansions)) {
     return 1;
   }
-  contractErrors += tgfx::ValidateInlineExpansion(report.inlineExpansions);
+  size_t contractErrors = 0;
+  tgfx::ArtifactRuleContext artifactContext;
+  artifactContext.variants = &report.variants;
+  artifactContext.inlineExpansions = &report.inlineExpansions;
+  for (const auto& rule : tgfx::MakeArtifactRules()) {
+    contractErrors += rule->check(artifactContext);
+  }
   if (!options.reportOnly && !options.shaderDir.empty()) {
-    contractErrors += tgfx::ValidateChainOpCodes(options.shaderDir);
-    contractErrors += tgfx::ValidatePointwiseOpCodes(options.shaderDir);
-    contractErrors += tgfx::ValidateSlotCapacities(options.shaderDir);
-    std::vector<std::string> registeredShaders;
+    tgfx::SourceRuleContext sourceContext;
+    sourceContext.shaderDir = options.shaderDir;
     for (auto factory : tgfx::ShaderRegistry::All()) {
-      registeredShaders.push_back(factory()->info().name);
+      sourceContext.registeredShaders.push_back(factory()->info().name);
     }
-    contractErrors += tgfx::ValidateShaderSourceReferences(options.shaderDir, registeredShaders);
+    for (const auto& rule : tgfx::MakeSourceRules()) {
+      contractErrors += rule->check(sourceContext);
+    }
   }
   if (contractErrors > 0) {
     std::cerr << "Build failed: " << contractErrors << " kernel contract violation(s).\n";
