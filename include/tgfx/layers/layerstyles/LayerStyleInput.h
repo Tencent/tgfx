@@ -76,10 +76,8 @@ class StyleInputSource {
   }
 
   /**
-   * Returns the top-left corner of the source image. As the primary LayerStyleInput::content it is
-   * the image's layer-local origin multiplied by contentScale: consumers divide that scale back out
-   * and pre-translate by it, so the image lands at offset / contentScale in layer space. As an extra
-   * source it is instead relative to the primary content image, in the same scaled image pixels.
+   * Returns the top-left corner of the source image: the layer-local origin times contentScale as
+   * the primary content, relative to that content image as an extra source, both in scaled pixels.
    */
   Point imageOffset() const {
     return _imageOffset;
@@ -103,11 +101,9 @@ class StyleInputSource {
 class GeometryInputSource : public StyleInputSource {
  public:
   /**
-   * Creates a geometry source.
+   * Creates a geometry source, which is only ever the primary content.
    * @param image The rasterized geometry.
-   * @param imageOffset The geometry raster's top-left corner in layer-local coordinates already
-   *                    multiplied by contentScale. A Geometry source is only ever the primary
-   *                    content, never an extra source.
+   * @param imageOffset Its top-left corner in layer-local coordinates times contentScale.
    * @param shape The vector shape of the same recording, or an empty shape when it has none.
    */
   GeometryInputSource(std::shared_ptr<Image> image, Point imageOffset,

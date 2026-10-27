@@ -183,10 +183,8 @@ class GeometryShapeContext : public DrawContext, public Picture::AbortCallback {
   }
 
   /**
-   * Returns false when this draw cannot contribute to a single shape. Every reason here is about
-   * the pixels not matching the fill path: a stroke widens the outline (and inside/outside
-   * alignment even clips it), a clip keeps only part of it, and an image shader or a mask filter
-   * changes the coverage the brush produces.
+   * Returns false when this draw cannot contribute to a single shape: a stroke, a clip, an image
+   * shader or a mask filter all make the pixels differ from the fill path.
    */
   bool accept(const Brush& brush, const ClipStack& clip, const Stroke* stroke) {
     if (state == State::Rejected) {

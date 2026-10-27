@@ -36,9 +36,8 @@ class ComposeContent : public LayerContent {
    * @param foregroundStartIndex Index of the first entry drawn above the children.
    * @param hasContourTable Whether both representative tables are built; false makes the queries
    *                        read every entry, which must stay distinct from a table selecting none.
-   * @param contours The representative of every group for a query that includes the geometries no
-   * paint captured.
-   * @param paintedContours The representative of every group for a query that excludes them.
+   * @param contours The representative of every group for a query that includes bare geometries.
+   * @param paintedContours The same for a query that excludes them.
    */
   ComposeContent(std::vector<std::unique_ptr<GeometryContent>> contents,
                  size_t foregroundStartIndex, bool hasContourTable,

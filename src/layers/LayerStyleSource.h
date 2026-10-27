@@ -35,15 +35,10 @@
 namespace tgfx {
 
 /**
- * Holds the recordings one excludeChildEffects bucket resolves its styles from, each already in the
- * form a consumer receives. content is populated only when some style in the bucket draws from the
- * shared content; a bucket whose styles all declare LayerStyleContentSource::Geometry leaves it
- * null, as does a bucket kept alive by such a style whose layer paints nothing. contour is only
- * populated when at least one Contour-sourced LayerStyle in this bucket requires a distinct contour
- * image, or when it holds the lazy fallback recording of a bucket whose geometry is empty.
- *
- * Every source is built once while the recordings are made, so a style costs no allocation per
- * frame and every producer of the same layer hands out the same object.
+ * Holds the recordings one excludeChildEffects bucket resolves its styles from. content is null
+ * unless some style in the bucket draws from the shared content; contour is null unless a
+ * Contour-sourced style needs a distinct contour, or it holds the lazy fallback for a bucket whose
+ * geometry is empty. Each source is built once, so a style allocates nothing per frame.
  */
 struct LayerStyleSourceGroup {
   // The shared content of this bucket, as the source a style resolves.

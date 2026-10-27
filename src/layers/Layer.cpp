@@ -1919,13 +1919,10 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
         group->geometry = geometrySource;
         bucketUsable = true;
       } else if (group->contour == nullptr) {
-        // Lazy fallback: a layer whose geometry lives in its children records no geometry, so
-        // the style falls back to the shared subtree contour. That contour keeps a descendant's
-        // painters with alpha=0, which the shared content drops. A failed recording only skips this
-        // style: ResolveContentSource then finds no source and drops it, while the other styles
-        // of the bucket keep drawing from the shared content -- provided that recording succeeded,
-        // since a failed one leaves group->content null and drops its siblings as well. This
-        // recording does read drawArgs.excludeEffects, so it must stay inside the loop.
+        // Lazy fallback: a layer whose geometry lives in children records no geometry, so the
+        // style falls back to the shared subtree contour, which keeps descendants' alpha-0 painters.
+        // A failed recording only skips this style; a failed content recording drops its siblings.
+        // This recording reads drawArgs.excludeEffects, so it must stay inside the loop.
         std::shared_ptr<Image> image = nullptr;
         Point offset = {};
         image = getContentContourImage(drawArgs, contentScale, &offset, nullptr);
