@@ -18,9 +18,9 @@
 
 #pragma once
 
+#include "core/shaders/CustomShader.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/RRect.h"
-#include "tgfx/core/Shader.h"
 
 namespace tgfx {
 
@@ -28,8 +28,10 @@ namespace tgfx {
  * Fills with the inner shadow of a rounded rectangle: the blurred coverage of the mask is
  * complemented and then clipped to the shadow shape, at a cost independent of sigma.
  */
-class RRectInnerShadowShader : public Shader {
+class RRectInnerShadowShader : public CustomShader {
  public:
+  DEFINE_CUSTOM_SHADER_CLASS_ID
+
   /**
    * Creates a shader for the given rounded rectangles. Returns nullptr when the inputs cannot
    * produce a closed-form result. Zero radii on both the shadow and the mask shape produce the
@@ -57,10 +59,6 @@ class RRectInnerShadowShader : public Shader {
   Color color = Color::Transparent();
 
  protected:
-  Type type() const override {
-    return Type::RRectInnerShadow;
-  }
-
   bool isEqual(const Shader* shader) const override;
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(

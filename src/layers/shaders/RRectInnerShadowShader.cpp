@@ -16,13 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/shaders/RRectInnerShadowShader.h"
+#include "layers/shaders/RRectInnerShadowShader.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/Types.h"
-#include "gpu/processors/RRectInnerShadowFragmentProcessor.h"
-#include "gpu/processors/RectInnerShadowFragmentProcessor.h"
+#include "layers/processors/RRectInnerShadowFragmentProcessor.h"
+#include "layers/processors/RectInnerShadowFragmentProcessor.h"
 
 namespace tgfx {
 
@@ -47,16 +47,19 @@ std::shared_ptr<Shader> RRectInnerShadowShader::Make(const RRect& shadowRRect,
 RRectInnerShadowShader::RRectInnerShadowShader(const Rect& shadowRect, const Point& shadowRadius,
                                                const Rect& maskRect, const Point& maskRadius,
                                                float sigmaX, float sigmaY, const Color& color)
-    : shadowRect(shadowRect), shadowRadius(shadowRadius), maskRect(maskRect),
-      maskRadius(maskRadius), sigmaX(sigmaX), sigmaY(sigmaY), color(color) {
+    : CustomShader(ClassID()), shadowRect(shadowRect), shadowRadius(shadowRadius),
+      maskRect(maskRect), maskRadius(maskRadius), sigmaX(sigmaX), sigmaY(sigmaY), color(color) {
 }
 
 bool RRectInnerShadowShader::isEqual(const Shader* shader) const {
-  auto type = Types::Get(shader);
-  if (type != Types::ShaderType::RRectInnerShadow) {
+  if (Types::Get(shader) != Type::Custom) {
     return false;
   }
-  auto* other = static_cast<const RRectInnerShadowShader*>(shader);
+  const auto* customShader = static_cast<const CustomShader*>(shader);
+  if (customShader->classID() != ClassID()) {
+    return false;
+  }
+  const auto* other = static_cast<const RRectInnerShadowShader*>(customShader);
   return shadowRect == other->shadowRect && shadowRadius == other->shadowRadius &&
          maskRect == other->maskRect && maskRadius == other->maskRadius &&
          sigmaX == other->sigmaX && sigmaY == other->sigmaY && color == other->color;

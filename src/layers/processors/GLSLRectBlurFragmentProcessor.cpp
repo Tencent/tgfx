@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLSLRectBlurFragmentProcessor.h"
-#include "GLSLShapeBlurFunctions.h"
+#include "layers/processors/GLSLRectBlurFragmentProcessor.h"
 #include "core/utils/Log.h"
+#include "layers/processors/GLSLShapeBlurFunctions.h"
 
 namespace tgfx {
 
