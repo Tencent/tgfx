@@ -18,6 +18,7 @@
 
 #include "ContractRules.h"
 
+#include "BindingLayoutRule.h"
 #include "ContractChecks.h"
 
 namespace tgfx {
@@ -94,6 +95,7 @@ std::vector<std::unique_ptr<ArtifactRule>> MakeArtifactRules() {
   std::vector<std::unique_ptr<ArtifactRule>> rules;
   rules.push_back(std::make_unique<ClipContractRule>());
   rules.push_back(std::make_unique<ReflectionContractRule>());
+  rules.push_back(std::make_unique<BindingLayoutRule>());
   rules.push_back(std::make_unique<InlineExpansionRule>());
   return rules;
 }

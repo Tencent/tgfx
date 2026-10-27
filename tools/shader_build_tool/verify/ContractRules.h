@@ -77,7 +77,7 @@ class ArtifactRule {
 std::vector<std::unique_ptr<SourceRule>> MakeSourceRules();
 
 /// The artifact rules of one build, in the order their violations print: the clip contract
-/// fields, the reflection contracts, and the inline expansion policy.
+/// fields, the reflection contracts, the binding layout, and the inline expansion policy.
 std::vector<std::unique_ptr<ArtifactRule>> MakeArtifactRules();
 
 }  // namespace tgfx

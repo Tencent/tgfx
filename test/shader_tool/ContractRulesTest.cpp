@@ -48,8 +48,8 @@ TEST(ContractRulesTest, TheSourceRegistryHoldsTheFourSourceRules) {
   EXPECT_EQ(MakeSourceRules().size(), 4u);
 }
 
-TEST(ContractRulesTest, TheArtifactRegistryHoldsTheThreeArtifactRules) {
-  EXPECT_EQ(MakeArtifactRules().size(), 3u);
+TEST(ContractRulesTest, TheArtifactRegistryHoldsTheFourArtifactRules) {
+  EXPECT_EQ(MakeArtifactRules().size(), 4u);
 }
 
 TEST(ContractRulesTest, EverySourceRuleIsCleanOnTheRealSources) {
