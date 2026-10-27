@@ -49,14 +49,13 @@ class VulkanEmitter : public ProfileEmitter {
     const auto& fragOpt = compiler->compileSpirv(expandedFragOpt, ShaderStageType::Fragment,
                                                  input.info->name, input.fragIndex, true);
     if (!vertOpt.success || !fragOpt.success) {
-      // Fallback to unoptimized. The warning is visible but the fallback stays: making it an
-      // error changes what gets stored, which is a behavior change of its own, so it rides
-      // with the rest of the binding-layout work instead of this refactoring.
-      std::cerr << "  WARNING: optimized SPIR-V compilation failed for " << input.info->name
-                << " [vert=" << input.vertIndex << " frag=" << input.fragIndex
-                << "], storing the unoptimized module\n";
-      return EmittedStages{WordsToBytes(*input.vertSpirv),
-                           WordsToBytes(input.fragStage->spirv)};
+      // An optimization failure is an error, not a downgrade: the bundle would silently store
+      // a bigger module that no one asked to store. No current source triggers this — the
+      // golden builds all optimize — so the fail-closed path rides along at no cost.
+      std::cerr << "  optimized SPIR-V compilation failed for " << input.info->name
+                << " [vert=" << input.vertIndex << " frag=" << input.fragIndex << "]: "
+                << (vertOpt.success ? fragOpt.error : vertOpt.error) << "\n";
+      return std::nullopt;
     }
     return EmittedStages{WordsToBytes(vertOpt.spirv), WordsToBytes(fragOpt.spirv)};
   }
