@@ -945,7 +945,9 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
     #   shader_build_tool_core  every source of the tool except main.cpp, as a static library
     #   shader_build_tool       main.cpp only: the command line that drives the library
     # ShaderBuildToolTest (test/shader_tool) links the library the same way the executable does.
-    file(GLOB SHADER_TOOL_FILES CONFIGURE_DEPENDS tools/shader_build_tool/*.cpp)
+    # The sources live in sublayer directories (core/, compile/, ... as the refactoring lands),
+    # so the glob is recursive and a moved file needs no CMake change.
+    file(GLOB_RECURSE SHADER_TOOL_FILES CONFIGURE_DEPENDS tools/shader_build_tool/*.cpp)
     list(REMOVE_ITEM SHADER_TOOL_FILES
             ${CMAKE_CURRENT_SOURCE_DIR}/tools/shader_build_tool/main.cpp)
     add_library(shader_build_tool_core STATIC ${SHADER_TOOL_FILES})

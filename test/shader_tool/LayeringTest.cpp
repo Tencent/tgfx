@@ -95,8 +95,10 @@ std::vector<Include> IncludesOf(const std::string& path) {
 }
 
 std::vector<std::string> FilesIn(const std::string& dir, const std::set<std::string>& extensions) {
+  // Recursive: the tool's sources sit in sublayer directories (core/, compile/, ...), and a
+  // boundary test that skips a sublayer does not check it at all.
   std::vector<std::string> files;
-  for (const auto& item : std::filesystem::directory_iterator(dir)) {
+  for (const auto& item : std::filesystem::recursive_directory_iterator(dir)) {
     if (item.is_regular_file() && extensions.count(item.path().extension().string()) > 0) {
       files.push_back(item.path().string());
     }
@@ -172,6 +174,12 @@ TEST(LayeringTest, TheToolIncludesOnlyAllowedRuntimeHeaders) {
   for (const auto& file : FilesIn(ToolDir(), {".cpp", ".h"})) {
     for (const auto& include : IncludesOf(file)) {
       if (include.system) {
+        continue;
+      }
+      // An include that resolves inside the tool directory itself names one of the tool's own
+      // sublayer headers (core/, compile/, ...), not a runtime header. The "core/" prefix is
+      // ambiguous — the runtime has src/core/ — so existence decides, not the spelling.
+      if (std::filesystem::exists(ToolDir() + "/" + include.target)) {
         continue;
       }
       bool runtimePath = include.target.rfind("gpu/", 0) == 0 ||
@@ -293,15 +301,21 @@ TEST(LayeringTest, TheRuntimeOnlyProfileResolverIsNotUsedByTheTool) {
 
 namespace {
 
-// The include graph between the tool's own files, keyed by module: a .h and its .cpp are one node.
+// The include graph between the tool's own files, keyed by module: a .h and its .cpp are one
+// node. An include names a module of the tool only when it resolves to a file under the tool
+// directory — a plain "Foo.h" written by a sibling file, or a "core/Foo.h" written from another
+// sublayer. The runtime headers ("gpu/...") and third-party headers resolve elsewhere and are
+// not nodes of this graph.
 std::map<std::string, std::set<std::string>> ToolModuleGraph() {
   std::map<std::string, std::set<std::string>> graph;
   for (const auto& file : FilesIn(ToolDir(), {".cpp", ".h"})) {
     auto module = std::filesystem::path(file).stem().string();
     graph[module];
     for (const auto& include : IncludesOf(file)) {
-      if (include.system || include.target.find('/') != std::string::npos ||
-          IsThirdParty(include.target)) {
+      if (include.system || IsThirdParty(include.target)) {
+        continue;
+      }
+      if (!std::filesystem::exists(ToolDir() + "/" + include.target)) {
         continue;
       }
       auto target = std::filesystem::path(include.target).stem().string();
@@ -382,6 +396,20 @@ TEST(LayeringTest, TheCacheKnowsNothingOfShaders) {
   ASSERT_EQ(graph.count("StageCache"), 1u);
   EXPECT_TRUE(graph["StageCache"].empty())
       << "StageCache includes another module of the tool";
+}
+
+TEST(LayeringTest, CoreModulesDependOnNothing) {
+  // core/ is the bottom of the tool: every other sublayer may use it and it may use nothing.
+  // The moment it includes another module the graph has a second bottom, and the layering the
+  // other tests assume stops holding.
+  auto graph = ToolModuleGraph();
+  for (const auto& file : FilesIn(ToolDir() + "/core", {".cpp", ".h"})) {
+    auto module = std::filesystem::path(file).stem().string();
+    ASSERT_EQ(graph.count(module), 1u) << module << " of core/ is not in the module graph";
+    EXPECT_TRUE(graph[module].empty())
+        << module << " of core/ depends on " << *(graph[module].begin())
+        << "; core is the bottom of the tool";
+  }
 }
 
 TEST(LayeringTest, TheWriterDependsOnNoOtherModuleOfTheTool) {

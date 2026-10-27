@@ -39,6 +39,7 @@
 #include "ShaderSources.h"
 #include "StageCache.h"
 #include "StageReport.h"
+#include "core/Diagnostics.h"
 #include "gpu/ShaderProfile.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/AllShaderFamilies.h"
@@ -77,7 +78,8 @@ struct BuildReport {
   std::vector<VariantData> variants;
   // One per compiled fragment permutation, from its unoptimized SPIR-V.
   std::vector<InlineExpansionRecord> inlineExpansions;
-  std::map<std::string, uint64_t> profileErrorCounts;
+  // The per-profile error ledger; the compile loop records through it and the report reads it.
+  Diagnostics diagnostics;
   bool hasErrors = false;
   std::string errorMessage;
 };
@@ -141,17 +143,6 @@ static std::map<std::string, ProfileArtifactStats> CollectArtifactStats(
     }
   }
   return result;
-}
-
-static void RecordCommonArtifactError(std::map<std::string, uint64_t>* profileErrorCounts) {
-  for (auto& profile : *profileErrorCounts) {
-    profile.second++;
-  }
-}
-
-static void RecordBackendArtifactError(const std::string& backend,
-                                       std::map<std::string, uint64_t>* profileErrorCounts) {
-  (*profileErrorCounts)[backend]++;
 }
 
 static void PrintUsage() {
@@ -790,7 +781,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
                                      const ShaderSource* source,
                                      std::vector<VariantData>* outVariants,
                                      std::vector<InlineExpansionRecord>* outInlineExpansions,
-                                     std::map<std::string, uint64_t>* profileErrorCounts) {
+                                     Diagnostics* diagnostics) {
   ShaderReport report;
   std::set<uint32_t> analyzedFrags;
   report.name = info.name;
@@ -814,7 +805,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
     std::cerr << "  ERROR: no rule enumerator for " << info.name
               << ": every shader must be migrated to the Compose pattern\n";
     report.errorCount++;
-    RecordCommonArtifactError(profileErrorCounts);
+    diagnostics->recordCommonError();
     return report;
   }
   for (const auto& permutation : *reachable) {
@@ -835,7 +826,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
     if (!vertResult.success) {
       std::cerr << "  " << vertResult.error << "\n";
       report.errorCount++;
-      RecordCommonArtifactError(profileErrorCounts);
+      diagnostics->recordCommonError();
       continue;
     }
     const auto* vertSpirv = &vertResult.spirv;
@@ -845,7 +836,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
     if (!fragResult.success) {
       std::cerr << "  " << fragResult.error << "\n";
       report.errorCount++;
-      RecordCommonArtifactError(profileErrorCounts);
+      diagnostics->recordCommonError();
       continue;
     }
 
@@ -903,7 +894,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
           std::cerr << "  MSL translation error: "
                     << (mslVert.success ? mslFrag.error : mslVert.error) << "\n";
           report.errorCount++;
-          RecordBackendArtifactError(backend, profileErrorCounts);
+          diagnostics->recordProfileError(backend);
           continue;
         }
         std::string metalError;
@@ -915,7 +906,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
           std::cerr << "  metallib compilation failed for " << info.name << " [vert=" << vi
                     << " frag=" << fi << "]: " << metalError << "\n";
           report.errorCount++;
-          RecordBackendArtifactError(backend, profileErrorCounts);
+          diagnostics->recordProfileError(backend);
           continue;
         }
       } else if (profile == ShaderProfile::WebGPU) {
@@ -930,7 +921,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
           std::cerr << "  WGSL translation error: "
                     << (wgslVert.success ? wgslFrag.error : wgslVert.error) << "\n";
           report.errorCount++;
-          RecordBackendArtifactError(backend, profileErrorCounts);
+          diagnostics->recordProfileError(backend);
           continue;
         }
         vertBlob.assign(wgslVert.wgsl.begin(), wgslVert.wgsl.end());
@@ -950,7 +941,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
             std::cerr << "  direct-GL 330 emission failed (preprocessing or missing #version 450) "
                       << "for " << info.name << " [vert=" << vi << " frag=" << fi << "]\n";
             report.errorCount++;
-            RecordBackendArtifactError(backend, profileErrorCounts);
+            diagnostics->recordProfileError(backend);
             continue;
           }
           // Direct-emission verification is layered, because glslang's 330 front-end is stricter
@@ -1006,7 +997,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
               }
               std::cerr << "\n";
               report.errorCount++;
-              RecordBackendArtifactError(backend, profileErrorCounts);
+              diagnostics->recordProfileError(backend);
               return false;
             }
             return true;
@@ -1030,7 +1021,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
             std::cerr << "  direct-ES emission failed (preprocessing or missing #version 450) "
                       << "for " << info.name << " [vert=" << vi << " frag=" << fi << "]\n";
             report.errorCount++;
-            RecordBackendArtifactError(backend, profileErrorCounts);
+            diagnostics->recordProfileError(backend);
             continue;
           }
           auto esFormLeak = [](const std::string& text) -> const char* {
@@ -1070,7 +1061,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
             std::cerr << "  direct-ES form assertion failed (" << leak << ") for " << info.name
                       << " [vert=" << vi << " frag=" << fi << "]\n";
             report.errorCount++;
-            RecordBackendArtifactError(backend, profileErrorCounts);
+            diagnostics->recordProfileError(backend);
             continue;
           }
           vertBlob.assign(dv.begin(), dv.end());
@@ -1102,7 +1093,7 @@ static bool WriteReportJson(const BuildReport& report, const std::string& outDir
     std::cerr << "Failed to open output file: " << path << "\n";
     return false;
   }
-  auto artifactStats = CollectArtifactStats(report.variants, report.profileErrorCounts);
+  auto artifactStats = CollectArtifactStats(report.variants, report.diagnostics.errorCounts());
   // Per-shader logical stage bytes: each unique (shader, permutationIndex, profile) stage
   // counts once. The profile is part of the key because the same permutation compiles to a
   // different blob per backend (SPIR-V vs metallib vs WGSL): without it, the first backend
@@ -1228,7 +1219,7 @@ int main(int argc, char** argv) {
 
   tgfx::BuildReport report;
   for (auto profile : options.backends) {
-    report.profileErrorCounts.emplace(ProfileTag(profile), 0);
+    report.diagnostics.registerProfile(ProfileTag(profile));
   }
   const auto& factories = tgfx::ShaderRegistry::All();
   if (factories.empty()) {
@@ -1271,7 +1262,7 @@ int main(int argc, char** argv) {
     }
     auto shaderReport =
         tgfx::CompileOneShader(info, options, source, &report.variants, &report.inlineExpansions,
-                               &report.profileErrorCounts);
+                               &report.diagnostics);
     std::cout << "[" << shaderReport.name << "] raw=" << shaderReport.rawCount
               << " compiled=" << shaderReport.compiledCount;
     if (shaderReport.errorCount > 0) {
