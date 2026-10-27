@@ -20,18 +20,30 @@
 #include <algorithm>
 #include <cstdio>
 #include <fstream>
-#include <iostream>
 #include <map>
 #include <set>
 #include <string>
 #include <tuple>
 #include <utility>
 #include "output/BundleWriter.h"
+#include "core/DiagnosticCodes.h"
 #include "gpu/ShaderKeyHash.h"
 #include "gpu/shaders/PrecompiledShader.h"
 
 namespace tgfx {
 namespace {
+
+void ReportOutputFailure(Diagnostics* diagnostics, std::string message) {
+  if (diagnostics == nullptr) {
+    return;
+  }
+  Diagnostic diagnostic;
+  diagnostic.severity = Severity::Error;
+  diagnostic.layer = Layer::Output;
+  diagnostic.code = DiagnosticCode::OutputWrite;
+  diagnostic.message = std::move(message);
+  diagnostics->report(std::move(diagnostic));
+}
 
 struct StageRecord {
   std::string profileTag;
@@ -82,7 +94,8 @@ struct RecordOrder {
 
 }  // namespace
 
-bool WriteStageReport(const std::string& path, const std::vector<VariantData>& variants) {
+bool WriteStageReport(const std::string& path, const std::vector<VariantData>& variants,
+                      Diagnostics* diagnostics) {
   // One record per logical stage (family, stage, permutation index, profile); variants that
   // share a stage keep the first occurrence, which is also how the bundle writer dedupes.
   std::vector<StageRecord> records;
@@ -148,7 +161,7 @@ bool WriteStageReport(const std::string& path, const std::vector<VariantData>& v
 
   std::ofstream file(path);
   if (!file.is_open()) {
-    std::cerr << "Failed to open stage report output file: " << path << "\n";
+    ReportOutputFailure(diagnostics, "cannot open the stage report output file: " + path);
     return false;
   }
   file << "{\n  \"stages\": [\n";
@@ -156,7 +169,8 @@ bool WriteStageReport(const std::string& path, const std::vector<VariantData>& v
   for (const auto& record : records) {
     auto* info = ShaderRegistry::Find(record.shaderName);
     if (info == nullptr) {
-      std::cerr << "Stage report: no registry entry for " << record.shaderName << "\n";
+      ReportOutputFailure(diagnostics,
+                          "the stage report has no registry entry for " + record.shaderName);
       return false;
     }
     const auto& domain = record.isVertex ? info->vertDomain : info->fragDomain;
@@ -212,10 +226,9 @@ bool WriteStageReport(const std::string& path, const std::vector<VariantData>& v
   file << "  ]\n}\n";
   file.close();
   if (!file.good()) {
-    std::cerr << "Stage report write failed (disk full or I/O failure): " << path << "\n";
+    ReportOutputFailure(diagnostics, "the stage report write failed (disk full or I/O): " + path);
     return false;
   }
-  std::cout << "Stage report written to: " << path << "\n";
   return true;
 }
 

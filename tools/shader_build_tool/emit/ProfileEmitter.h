@@ -25,6 +25,7 @@
 #include <vector>
 #include "ShaderCompiler.h"
 #include "compile/StageCompiler.h"
+#include "core/Diagnostics.h"
 #include "gpu/ShaderProfile.h"
 #include "gpu/shaders/PrecompiledShader.h"
 
@@ -61,6 +62,9 @@ struct EmitInput {
   const std::vector<std::string>* fragDefines = nullptr;
   const std::vector<uint32_t>* vertSpirv = nullptr;
   const SpirvStage* fragStage = nullptr;
+  /// Where an emitter reports why it could not produce its storage form. The build always sets
+  /// it; a test that only cares about the returned optional may leave it null.
+  Diagnostics* diagnostics = nullptr;
 };
 
 /// Translates one variant into the storage form of one backend.

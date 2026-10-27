@@ -25,6 +25,7 @@
 #include <string>
 #include <vector>
 #include "compile/StageCompiler.h"
+#include "core/DiagnosticCodes.h"
 #include "emit/ProfileEmitter.h"
 #include "gpu/shaders/AllShaderFamilies.h"
 #include "gpu/shaders/PrecompiledShader.h"
@@ -58,8 +59,10 @@ const PrecompiledShaderInfo* TestFamilyInfo() {
   return nullptr;
 }
 
-EmitInput InputOf(const std::string& vertSource, const std::string& fragSource) {
+EmitInput InputOf(const std::string& vertSource, const std::string& fragSource,
+                  Diagnostics* diagnostics = nullptr) {
   EmitInput input;
+  input.diagnostics = diagnostics;
   input.info = TestFamilyInfo();
   input.vertIndex = 0;
   input.fragIndex = 0;
@@ -98,12 +101,16 @@ TEST(ProfileEmitterTest, AnOptimizationFailureFailsTheVariantInsteadOfFallingBac
   StageCompiler compiler(&cache);
   auto emitter = MakeProfileEmitter(ShaderProfile::Vulkan);
   ASSERT_NE(emitter, nullptr);
-  auto input = InputOf(BrokenVertex, GoodFragment);
-  ::testing::internal::CaptureStderr();
+  Diagnostics diagnostics;
+  auto input = InputOf(BrokenVertex, GoodFragment, &diagnostics);
   auto stages = emitter->emit(input, &compiler);
-  auto log = ::testing::internal::GetCapturedStderr();
   EXPECT_FALSE(stages.has_value());
-  EXPECT_NE(log.find("optimized SPIR-V compilation failed"), std::string::npos) << log;
+  ASSERT_FALSE(diagnostics.records().empty());
+  EXPECT_STREQ(diagnostics.records()[0].code, DiagnosticCode::EmitFailed);
+  EXPECT_EQ(diagnostics.records()[0].layer, Layer::Emit);
+  EXPECT_EQ(diagnostics.records()[0].profile, "vulkan");
+  EXPECT_NE(diagnostics.records()[0].message.find("optimized SPIR-V compilation failed"),
+            std::string::npos);
 }
 
 TEST(ProfileEmitterTest, EveryProfileHasAnEmitter) {

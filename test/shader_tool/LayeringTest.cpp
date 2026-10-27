@@ -434,7 +434,7 @@ TEST(LayeringTest, TheWriterDependsOnNoOtherModuleOfTheTool) {
   // and the writer has grown a dependency of its own.
   auto graph = ToolModuleGraph();
   ASSERT_EQ(graph.count("BundleWriter"), 1u);
-  const std::set<std::string> allowed = {"OutputFile", "Types"};
+  const std::set<std::string> allowed = {"DiagnosticCodes", "Diagnostics", "OutputFile", "Types"};
   for (const auto& dependency : graph["BundleWriter"]) {
     EXPECT_EQ(allowed.count(dependency), 1u) << "BundleWriter depends on " << dependency;
   }
@@ -467,8 +467,8 @@ TEST(LayeringTest, TheProfileEmittersDependOnlyOnTheirDialectAndTheCompiler) {
   // translation has grown a dependency of its own.
   auto graph = ToolModuleGraph();
   ASSERT_EQ(graph.count("ProfileEmitter"), 1u);
-  const std::set<std::string> allowed = {"ShaderCompiler", "StageCompiler", "FormCheck",
-                                         "GLSLDialect"};
+  const std::set<std::string> allowed = {"DiagnosticCodes", "Diagnostics", "ShaderCompiler",
+                                         "StageCompiler", "FormCheck", "GLSLDialect"};
   for (const auto& dependency : graph["ProfileEmitter"]) {
     EXPECT_EQ(allowed.count(dependency), 1u)
         << "ProfileEmitter depends on " << dependency

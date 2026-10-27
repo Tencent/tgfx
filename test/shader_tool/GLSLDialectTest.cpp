@@ -89,7 +89,9 @@ TEST(FoldIntegerExpressionTest, RejectsALiteralBeyondTheInt64Range) {
 }
 
 TEST(EmitDirectGLSLTest, RewritesTheHeaderDropsSetAndBindingAndFoldsLocations) {
-  auto text = EmitDirectGLSL330(FragmentTemplate, ShaderStageType::Fragment);
+  std::string error;
+  auto text = EmitDirectGLSL330(FragmentTemplate, ShaderStageType::Fragment, &error);
+  EXPECT_TRUE(error.empty()) << error;
   ASSERT_FALSE(text.empty());
   EXPECT_NE(text.find("#version 330"), std::string::npos);
   EXPECT_EQ(text.find("#version 450"), std::string::npos);
@@ -102,11 +104,17 @@ TEST(EmitDirectGLSLTest, RewritesTheHeaderDropsSetAndBindingAndFoldsLocations) {
 }
 
 TEST(EmitDirectGLSLTest, FailsClosedWithoutAVersion450Header) {
-  EXPECT_TRUE(EmitDirectGLSL330("void main() {}", ShaderStageType::Fragment).empty());
+  std::string error;
+  EXPECT_TRUE(EmitDirectGLSL330("void main() {}", ShaderStageType::Fragment, &error).empty());
+  // The failure carries its reason to the caller instead of printing it.
+  EXPECT_FALSE(error.empty());
+  EXPECT_NE(error.find("preprocessing failed"), std::string::npos) << error;
 }
 
 TEST(EmitDirectGLSTest, AddsTheESHeaderPrecisionsAndHighpDecoration) {
-  auto text = EmitDirectGLSLES300(FragmentTemplate, ShaderStageType::Fragment, false);
+  std::string error;
+  auto text = EmitDirectGLSLES300(FragmentTemplate, ShaderStageType::Fragment, false, &error);
+  EXPECT_TRUE(error.empty()) << error;
   ASSERT_FALSE(text.empty());
   EXPECT_NE(text.find("#version 300 es"), std::string::npos);
   EXPECT_NE(text.find("precision mediump float;"), std::string::npos);
@@ -126,7 +134,9 @@ void main() {
   fragColor = dstColor;
 }
 )";
-  auto text = EmitDirectGLSLES300(FbfTemplate, ShaderStageType::Fragment, true);
+  std::string error;
+  auto text = EmitDirectGLSLES300(FbfTemplate, ShaderStageType::Fragment, true, &error);
+  EXPECT_TRUE(error.empty()) << error;
   ASSERT_FALSE(text.empty());
   EXPECT_EQ(text.find("subpassInput"), std::string::npos) << text;
   EXPECT_EQ(text.find("subpassLoad"), std::string::npos) << text;

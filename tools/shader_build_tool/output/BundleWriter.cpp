@@ -20,11 +20,12 @@
 #include <algorithm>
 #include <cstring>
 #include <fstream>
-#include <iostream>
 #include <map>
 #include <set>
 #include <sstream>
+#include <utility>
 #include "output/OutputFile.h"
+#include "core/DiagnosticCodes.h"
 #include "gpu/BundleFormat.h"
 #include "gpu/PrecompiledBundleIdentity.h"
 #include "gpu/ShaderKeyHash.h"
@@ -32,6 +33,27 @@
 #include "zstd.h"
 
 namespace tgfx {
+
+namespace {
+
+void ReportWriteFailure(Diagnostics* diagnostics, const char* code, const std::string& shader,
+                        const std::string& profile, int vert, int frag, std::string message) {
+  if (diagnostics == nullptr) {
+    return;
+  }
+  Diagnostic diagnostic;
+  diagnostic.severity = Severity::Error;
+  diagnostic.layer = Layer::Output;
+  diagnostic.code = code;
+  diagnostic.shader = shader;
+  diagnostic.profile = profile;
+  diagnostic.vertPermutationIndex = vert;
+  diagnostic.fragPermutationIndex = frag;
+  diagnostic.message = std::move(message);
+  diagnostics->report(std::move(diagnostic));
+}
+
+}  // namespace
 
 static void WriteU16LE(std::ostream& out, uint16_t val) {
   uint8_t buf[2] = {static_cast<uint8_t>(val & 0xFF), static_cast<uint8_t>((val >> 8) & 0xFF)};
@@ -100,7 +122,8 @@ struct PoolEntry {
 // the written size against BundleFormat::HeaderSize.
 
 bool WriteBundle(const std::string& outPath, const std::string& profileTag,
-                 const std::vector<VariantData>& variants, bool compress) {
+                 const std::vector<VariantData>& variants, bool compress,
+                 Diagnostics* diagnostics) {
   if (variants.empty()) {
     return true;
   }
@@ -146,9 +169,10 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
       reflPool.insert(reflPool.end(), vertReflBlob.begin(), vertReflBlob.end());
       vertPool.push_back(entry);
     } else if (vertIt->second.code != v.vertexBlob || vertIt->second.reflection != vertReflBlob) {
-      std::cerr << "BundleWriter: conflicting content for duplicate vertex key (shader "
-                << v.shaderName << ", vert index " << v.vertPermutationIndex << ", profile "
-                << v.profileTag << "); refusing to silently drop either variant\n";
+      ReportWriteFailure(diagnostics, DiagnosticCode::OutputDuplicateKey, v.shaderName,
+                         v.profileTag, static_cast<int>(v.vertPermutationIndex), -1,
+                         "conflicting content for a duplicate vertex key; refusing to silently "
+                         "drop either variant");
       return false;
     }
 
@@ -168,9 +192,10 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
       reflPool.insert(reflPool.end(), fragReflBlob.begin(), fragReflBlob.end());
       fragPool.push_back(entry);
     } else if (fragIt->second.code != v.fragmentBlob || fragIt->second.reflection != fragReflBlob) {
-      std::cerr << "BundleWriter: conflicting content for duplicate fragment key (shader "
-                << v.shaderName << ", frag index " << v.fragPermutationIndex << ", profile "
-                << v.profileTag << "); refusing to silently drop either variant\n";
+      ReportWriteFailure(diagnostics, DiagnosticCode::OutputDuplicateKey, v.shaderName,
+                         v.profileTag, -1, static_cast<int>(v.fragPermutationIndex),
+                         "conflicting content for a duplicate fragment key; refusing to silently "
+                         "drop either variant");
       return false;
     }
   }
@@ -256,7 +281,8 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
   file.write(tagBuf, sizeof(tagBuf));
   if (static_cast<std::streamoff>(file.tellp()) !=
       static_cast<std::streamoff>(BundleFormat::HeaderSize)) {
-    std::cerr << "BundleWriter: the written header does not match BundleFormat::HeaderSize\n";
+    ReportWriteFailure(diagnostics, DiagnosticCode::OutputWrite, "", profileTag, -1, -1,
+                       "the written header does not match BundleFormat::HeaderSize");
     return false;
   }
 
@@ -292,7 +318,8 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
   // truncated or missing file as a valid bundle.
   std::string error;
   if (!WriteFileIfChanged(outPath, file.str(), nullptr, &error)) {
-    std::cerr << "ERROR: cannot write bundle: " << error << "\n";
+    ReportWriteFailure(diagnostics, DiagnosticCode::OutputWrite, "", profileTag, -1, -1,
+                       "cannot write the bundle: " + error);
     return false;
   }
   return true;

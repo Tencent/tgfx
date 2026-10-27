@@ -18,10 +18,10 @@
 
 #include "ProfileEmitter.h"
 
-#include <iostream>
 #include <utility>
 #include "FormCheck.h"
 #include "GLSLDialect.h"
+#include "core/DiagnosticCodes.h"
 
 namespace tgfx {
 
@@ -31,6 +31,24 @@ namespace {
 std::vector<uint8_t> WordsToBytes(const std::vector<uint32_t>& words) {
   auto* begin = reinterpret_cast<const uint8_t*>(words.data());
   return std::vector<uint8_t>(begin, begin + words.size() * 4);
+}
+
+// Reports one emitter failure against the variant it was producing.
+void ReportFailure(const EmitInput& input, ShaderProfile profile, const char* code,
+                   std::string message) {
+  if (input.diagnostics == nullptr) {
+    return;
+  }
+  Diagnostic diagnostic;
+  diagnostic.severity = Severity::Error;
+  diagnostic.layer = Layer::Emit;
+  diagnostic.code = code;
+  diagnostic.shader = input.info != nullptr ? input.info->name : std::string();
+  diagnostic.profile = ProfileTag(profile);
+  diagnostic.vertPermutationIndex = static_cast<int>(input.vertIndex);
+  diagnostic.fragPermutationIndex = static_cast<int>(input.fragIndex);
+  diagnostic.message = std::move(message);
+  input.diagnostics->report(std::move(diagnostic));
 }
 
 // The Vulkan storage: the same SPIR-V as the common compile, but optimized for size.
@@ -52,9 +70,9 @@ class VulkanEmitter : public ProfileEmitter {
       // An optimization failure is an error, not a downgrade: the bundle would silently store
       // a bigger module that no one asked to store. No current source triggers this — the
       // golden builds all optimize — so the fail-closed path rides along at no cost.
-      std::cerr << "  optimized SPIR-V compilation failed for " << input.info->name
-                << " [vert=" << input.vertIndex << " frag=" << input.fragIndex << "]: "
-                << (vertOpt.success ? fragOpt.error : vertOpt.error) << "\n";
+      ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
+                    "optimized SPIR-V compilation failed: " +
+                        (vertOpt.success ? fragOpt.error : vertOpt.error));
       return std::nullopt;
     }
     return EmittedStages{WordsToBytes(vertOpt.spirv), WordsToBytes(fragOpt.spirv)};
@@ -78,8 +96,8 @@ class MetalEmitter : public ProfileEmitter {
     auto mslFrag =
         TranslateToMSL(input.fragStage->spirv, ShaderStageType::Fragment, &fragMslError);
     if (mslVert.empty() || mslFrag.empty()) {
-      std::cerr << "  MSL translation error: " << (mslVert.empty() ? vertMslError : fragMslError)
-                << "\n";
+      ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
+                    "MSL translation error: " + (mslVert.empty() ? vertMslError : fragMslError));
       return std::nullopt;
     }
     std::string metalError;
@@ -90,9 +108,8 @@ class MetalEmitter : public ProfileEmitter {
           compiler->compileMetallib(mslFrag, ShaderStageType::Fragment, &metalError);
     }
     if (stages.vertexBlob.empty() || stages.fragmentBlob.empty()) {
-      std::cerr << "  metallib compilation failed for " << input.info->name
-                << " [vert=" << input.vertIndex << " frag=" << input.fragIndex
-                << "]: " << metalError << "\n";
+      ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
+                    "metallib compilation failed: " + metalError);
       return std::nullopt;
     }
     return stages;
@@ -117,8 +134,9 @@ class WebGPUEmitter : public ProfileEmitter {
     const auto& wgslFrag = compiler->compileWgsl(expandedFragWgsl, ShaderStageType::Fragment,
                                                  input.info->name, input.fragIndex);
     if (!wgslVert.success || !wgslFrag.success) {
-      std::cerr << "  WGSL translation error: "
-                << (wgslVert.success ? wgslFrag.error : wgslVert.error) << "\n";
+      ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
+                    "WGSL translation error: " +
+                        (wgslVert.success ? wgslFrag.error : wgslVert.error));
       return std::nullopt;
     }
     EmittedStages stages;
@@ -154,14 +172,16 @@ std::optional<EmittedStages> DirectGLSLEmitter::emit(const EmitInput& input, Sta
     // framebuffer-fetch dialect: the fragment stage is translated with it.
     bool fbfVariant = input.info->fragDomain.valueOf(input.fragIndex, XP_DEFINE_NAME) ==
                       XP_FRAMEBUFFER_FETCH;
+    std::string emissionError;
     directVert = EmitDirectGLSLES300(PrependDefines(*input.vertSource, *input.vertDefines),
-                                     ShaderStageType::Vertex, false);
+                                     ShaderStageType::Vertex, false, &emissionError);
     directFrag = EmitDirectGLSLES300(PrependDefines(*input.fragSource, *input.fragDefines),
-                                     ShaderStageType::Fragment, fbfVariant);
+                                     ShaderStageType::Fragment, fbfVariant, &emissionError);
     if (directVert.empty() || directFrag.empty()) {
-      std::cerr << "  direct-ES emission failed (preprocessing or missing #version 450) for "
-                << input.info->name << " [vert=" << input.vertIndex
-                << " frag=" << input.fragIndex << "]\n";
+      auto message = emissionError.empty()
+                         ? std::string("direct-ES emission failed (missing #version 450?)")
+                         : emissionError;
+      ReportFailure(input, profile(), DiagnosticCode::EmitFailed, std::move(message));
       return std::nullopt;
     }
   } else {
@@ -170,14 +190,16 @@ std::optional<EmittedStages> DirectGLSLEmitter::emit(const EmitInput& input, Sta
     // a template using syntax beyond GL 330 (or a leak of Vulkan-only qualifiers like
     // subpassInput into a desktop variant) fails the build here instead of surfacing as a
     // runtime module-creation fallback.
+    std::string emissionError;
     directVert = EmitDirectGLSL330(PrependDefines(*input.vertSource, *input.vertDefines),
-                                   ShaderStageType::Vertex);
+                                   ShaderStageType::Vertex, &emissionError);
     directFrag = EmitDirectGLSL330(PrependDefines(*input.fragSource, *input.fragDefines),
-                                   ShaderStageType::Fragment);
+                                   ShaderStageType::Fragment, &emissionError);
     if (directVert.empty() || directFrag.empty()) {
-      std::cerr << "  direct-GL 330 emission failed (preprocessing or missing #version 450) for "
-                << input.info->name << " [vert=" << input.vertIndex
-                << " frag=" << input.fragIndex << "]\n";
+      auto message = emissionError.empty()
+                         ? std::string("direct-GL 330 emission failed (missing #version 450?)")
+                         : emissionError;
+      ReportFailure(input, profile(), DiagnosticCode::EmitFailed, std::move(message));
       return std::nullopt;
     }
   }
@@ -188,22 +210,20 @@ std::optional<EmittedStages> DirectGLSLEmitter::emit(const EmitInput& input, Sta
   auto fragLeak = FindDirectFormLeak(directFrag, esDialect);
   const DirectFormLeak* leak = vertLeak.reason != nullptr ? &vertLeak : &fragLeak;
   if (leak->reason != nullptr) {
+    std::string message;
     if (esDialect) {
-      std::cerr << "  direct-ES form assertion failed (" << leak->reason << ") for "
-                << input.info->name << " [vert=" << input.vertIndex
-                << " frag=" << input.fragIndex << "]\n";
+      message = std::string("direct-ES form assertion failed (") + leak->reason + ")";
     } else {
       const char* leakStage = vertLeak.reason != nullptr ? "vert" : "frag";
       const std::string& leakText = vertLeak.reason != nullptr ? directVert : directFrag;
-      std::cerr << "  direct-GL 330 form assertion failed (" << leakStage << ", " << leak->reason
-                << ") for " << input.info->name << " [vert=" << input.vertIndex
-                << " frag=" << input.fragIndex << "]";
+      message = std::string("direct-GL 330 form assertion failed (") + leakStage + ", " +
+                leak->reason + ")";
       if (leak->offset > 0) {
         auto echoStart = leak->offset > 40 ? leak->offset - 40 : 0;
-        std::cerr << " [text @ " << leakText.substr(echoStart, 90) << "]";
+        message += " [text @ " + leakText.substr(echoStart, 90) + "]";
       }
-      std::cerr << "\n";
     }
+    ReportFailure(input, profile(), DiagnosticCode::EmitFormLeak, std::move(message));
     return std::nullopt;
   }
   stages.vertexBlob.assign(directVert.begin(), directVert.end());

@@ -20,6 +20,7 @@
 
 #include <string>
 #include <vector>
+#include "core/Diagnostics.h"
 #include "core/Types.h"
 
 namespace tgfx {
@@ -30,7 +31,9 @@ namespace tgfx {
 /// summary counts. The three counts answer different questions and must stay separate:
 /// logicalStages counts declared stage records, uniqueCode counts distinct code blobs, and
 /// uniqueCodeReflection counts distinct code+reflection combinations (reflection can differ
-/// while code matches). Returns false when the output file cannot be written.
-bool WriteStageReport(const std::string& path, const std::vector<VariantData>& variants);
+/// while code matches). Returns false when the output file cannot be written, reporting the
+/// failure to diagnostics.
+bool WriteStageReport(const std::string& path, const std::vector<VariantData>& variants,
+                      Diagnostics* diagnostics);
 
 }  // namespace tgfx

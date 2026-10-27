@@ -150,7 +150,9 @@ TEST_P(BundleRoundTripTest, EveryFieldSurvivesTheLoader) {
     variant.fragmentBlob.resize(variant.fragmentBlob.size() + 2000, 'f');
   }
   auto path = TempPath(compress ? "roundtrip_zstd.bin" : "roundtrip_plain.bin");
-  ASSERT_TRUE(WriteBundle(path, tag, variants, compress));
+  Diagnostics diagnostics;
+  ASSERT_TRUE(WriteBundle(path, tag, variants, compress, &diagnostics));
+  EXPECT_TRUE(diagnostics.records().empty());
   auto bytes = ReadFile(path);
   ASSERT_GT(bytes.size(), BundleFormat::HeaderSize);
 
@@ -186,7 +188,8 @@ TEST_P(BundleRoundTripTest, SharedStagesAreStoredOnce) {
       FullVariant("Shared", 2, 5, tag, "vertex two", "the one fragment"),
   };
   auto path = TempPath(compress ? "shared_zstd.bin" : "shared_plain.bin");
-  ASSERT_TRUE(WriteBundle(path, tag, variants, compress));
+  Diagnostics diagnostics;
+  ASSERT_TRUE(WriteBundle(path, tag, variants, compress, &diagnostics));
   auto bytes = ReadFile(path);
   LoadedBundle bundle;
   ASSERT_TRUE(bundle.cache.loadBundle(bytes.data(), bytes.size()));
@@ -201,7 +204,8 @@ TEST(BundleHeaderTest, TheWriterFillsExactlyTheDocumentedLayout) {
   const std::string tag = ProfileTag(ShaderProfile::WebGPU);
   std::vector<VariantData> variants = {FullVariant("Layout", 0, 0, tag, "vert", "frag")};
   auto path = TempPath("layout.bin");
-  ASSERT_TRUE(WriteBundle(path, tag, variants, false));
+  Diagnostics diagnostics;
+  ASSERT_TRUE(WriteBundle(path, tag, variants, false, &diagnostics));
   auto bytes = ReadFile(path);
   ASSERT_GE(bytes.size(), BundleFormat::HeaderSize);
 
@@ -226,7 +230,9 @@ TEST(BundleHeaderTest, TheWriterFillsExactlyTheDocumentedLayout) {
 TEST(BundleHeaderTest, AnEmptyVariantListWritesNothing) {
   auto path = TempPath("empty.bin");
   std::remove(path.c_str());
-  EXPECT_TRUE(WriteBundle(path, "opengl", {}, false));
+  Diagnostics diagnostics;
+  EXPECT_TRUE(WriteBundle(path, "opengl", {}, false, &diagnostics));
+  EXPECT_TRUE(diagnostics.records().empty());
   EXPECT_TRUE(ReadFile(path).empty());
 }
 

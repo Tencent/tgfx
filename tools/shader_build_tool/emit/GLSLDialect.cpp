@@ -405,21 +405,27 @@ bool FoldIntegerExpression(const std::string& expr, int64_t* value) {
   return IntegerExpressionParser::Evaluate(expr, value);
 }
 
-std::string EmitDirectGLSL330(const std::string& source, ShaderStageType stage) {
-  std::string error;
-  auto preprocessed = PreprocessGLSL(source, stage, &error);
+std::string EmitDirectGLSL330(const std::string& source, ShaderStageType stage,
+                              std::string* error) {
+  std::string preprocessError;
+  auto preprocessed = PreprocessGLSL(source, stage, &preprocessError);
   if (preprocessed.empty()) {
-    std::cerr << "  direct-GL 330 preprocessing failed: " << error << "\n";
+    if (error != nullptr) {
+      *error = "direct-GL 330 preprocessing failed: " + preprocessError;
+    }
     return {};
   }
   return EmitDirectGLSL330Impl(preprocessed, stage, "#version 330", false, false);
 }
 
-std::string EmitDirectGLSLES300(const std::string& source, ShaderStageType stage, bool fbfVariant) {
-  std::string error;
-  auto preprocessed = PreprocessGLSL(source, stage, &error);
+std::string EmitDirectGLSLES300(const std::string& source, ShaderStageType stage, bool fbfVariant,
+                                std::string* error) {
+  std::string preprocessError;
+  auto preprocessed = PreprocessGLSL(source, stage, &preprocessError);
   if (preprocessed.empty()) {
-    std::cerr << "  direct-ES 300 preprocessing failed: " << error << "\n";
+    if (error != nullptr) {
+      *error = "direct-ES 300 preprocessing failed: " + preprocessError;
+    }
     return {};
   }
   return EmitDirectGLSL330Impl(preprocessed, stage, "#version 300 es", true, fbfVariant);

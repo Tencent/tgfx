@@ -42,6 +42,33 @@ namespace DiagnosticCode {
 /// it exists so the record model could land before the call sites did.
 inline constexpr const char* Unclassified = "internal.unclassified";
 
+// ---- sources / plan / compile / emit -------------------------------------------------------
+
+/// A shader source, include, or the source directory itself could not be read.
+inline constexpr const char* SourcesUnreadable = "sources.unreadable";
+
+/// A registered family has no Compose enumerator, so the build cannot plan its variants.
+inline constexpr const char* PlanNoEnumerator = "plan.missing-enumerator";
+
+/// A reachable variant pair the declared domains cannot serve.
+inline constexpr const char* PlanUnbuildable = "plan.unbuildable-permutation";
+
+/// A stage failed to compile to SPIR-V.
+inline constexpr const char* CompileGlsl = "compile.glsl";
+
+/// The persistent stage cache could not be opened; the build runs with the memory cache only.
+inline constexpr const char* CompileCacheDisabled = "compile.cache-disabled";
+
+/// The reflection extractor met a SPIR-V type it does not know and fell back to a default.
+inline constexpr const char* ReflectUnknownType = "compile.reflection-unknown-type";
+
+/// A profile emitter could not produce its storage form for a variant.
+inline constexpr const char* EmitFailed = "emit.failed";
+
+/// The stored text of a dialect variant still carries a form it must not (a surviving set or
+/// binding qualifier, a conditional directive, Vulkan-only syntax).
+inline constexpr const char* EmitFormLeak = "emit.form-leak";
+
 // ---- verify: the build-time contract checks ------------------------------------------------
 
 /// A variant carries the clip contract but is missing one of its uniform fields.
@@ -76,6 +103,10 @@ inline constexpr const char* VerifyNotApplicable = "verify.unverifiable";
 
 /// An output file (a report, a bundle, a manifest) could not be written.
 inline constexpr const char* OutputWrite = "output.write-failed";
+
+/// Two variants hashed to the same stage key with different content; the writer refuses to drop
+/// either silently.
+inline constexpr const char* OutputDuplicateKey = "output.duplicate-key";
 
 }  // namespace DiagnosticCode
 

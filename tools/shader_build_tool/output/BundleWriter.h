@@ -20,6 +20,7 @@
 
 #include <string>
 #include <vector>
+#include "core/Diagnostics.h"
 #include "core/Types.h"
 
 namespace tgfx {
@@ -35,7 +36,10 @@ std::vector<uint8_t> SerializeStageReflection(const StageReflectionData& reflect
 
 /// Writes a v3 shader bundle file with separate vertex and fragment pools.
 /// When compress is true, the data pool is zlib-compressed (compressionType=1 in header).
+/// Failures are reported to diagnostics (output.write-failed, or output.duplicate-key when two
+/// variants collide on one stage key with different content).
 bool WriteBundle(const std::string& outPath, const std::string& profileTag,
-                 const std::vector<VariantData>& variants, bool compress = false);
+                 const std::vector<VariantData>& variants, bool compress,
+                 Diagnostics* diagnostics);
 
 }  // namespace tgfx

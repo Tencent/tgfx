@@ -36,6 +36,7 @@
 #include "output/StageReport.h"
 #include "cli/ReportWriter.h"
 #include "compile/StageCompiler.h"
+#include "core/DiagnosticCodes.h"
 #include "core/Diagnostics.h"
 #include "emit/ProfileEmitter.h"
 #include "gpu/ShaderBindingLayout.h"
@@ -105,6 +106,23 @@ bool ParseProfileList(const std::string& input, std::vector<ShaderProfile>* prof
   return true;
 }
 
+// Reports one build error against the thing it happened to. The build loop keeps running after a
+// failure so one pass surfaces every problem; the recorded errors gate the artifacts at the end.
+static void RecordBuildError(Diagnostics* diagnostics, Layer layer, const char* code,
+                             const std::string& shader, const std::string& profile, int vert,
+                             int frag, std::string message) {
+  Diagnostic diagnostic;
+  diagnostic.severity = Severity::Error;
+  diagnostic.layer = layer;
+  diagnostic.code = code;
+  diagnostic.shader = shader;
+  diagnostic.profile = profile;
+  diagnostic.vertPermutationIndex = vert;
+  diagnostic.fragPermutationIndex = frag;
+  diagnostic.message = std::move(message);
+  diagnostics->report(std::move(diagnostic));
+}
+
 // source is the shader's text from the build's single read of the sources (nullptr in report-only
 // mode); the bundle's source digest is computed from the same text. compiler owns the stage
 // caches of this build.
@@ -139,21 +157,20 @@ ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const BuildOpti
   // --audit and --report-only all get their variants from the planner.
   auto plan = VariantPlanner::PlanShader(info);
   if (!plan.variants) {
-    std::cerr << "  ERROR: no rule enumerator for " << info.name
-              << ": every shader must be migrated to the Compose pattern\n";
+    RecordBuildError(diagnostics, Layer::Plan, DiagnosticCode::PlanNoEnumerator, info.name, "", -1,
+                     -1, "every shader must be migrated to the Compose pattern");
     report.errorCount++;
-    diagnostics->recordCommonError();
     return report;
   }
   if (!plan.unbuildable.empty()) {
     // A pair the domains cannot serve would compile against a broken vertex/fragment
     // interface; fail the family closed instead of emitting it.
     for (const auto& pair : plan.unbuildable) {
-      std::cerr << "  ERROR: unbuildable variant vert=" << pair.first << " frag=" << pair.second
-                << " for " << info.name << "\n";
+      RecordBuildError(diagnostics, Layer::Plan, DiagnosticCode::PlanUnbuildable, info.name, "",
+                       static_cast<int>(pair.first), static_cast<int>(pair.second),
+                       "a reachable variant pair the declared domains cannot serve");
     }
     report.errorCount++;
-    diagnostics->recordCommonError();
     return report;
   }
   for (const auto& permutation : *plan.variants) {
@@ -179,9 +196,9 @@ ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const BuildOpti
     const auto& vertResult = compiler->compileSpirv(PrependDefines(vertSource, vertDefines),
                                                     ShaderStageType::Vertex, info.name, vi, false);
     if (!vertResult.success) {
-      std::cerr << "  " << vertResult.error << "\n";
+      RecordBuildError(diagnostics, Layer::Compile, DiagnosticCode::CompileGlsl, info.name, "",
+                       static_cast<int>(vi), -1, vertResult.error);
       report.errorCount++;
-      diagnostics->recordCommonError();
       continue;
     }
     const auto* vertSpirv = &vertResult.spirv;
@@ -190,9 +207,9 @@ ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const BuildOpti
                                                     ShaderStageType::Fragment, info.name, fi,
                                                     false);
     if (!fragResult.success) {
-      std::cerr << "  " << fragResult.error << "\n";
+      RecordBuildError(diagnostics, Layer::Compile, DiagnosticCode::CompileGlsl, info.name, "",
+                       static_cast<int>(vi), static_cast<int>(fi), fragResult.error);
       report.errorCount++;
-      diagnostics->recordCommonError();
       continue;
     }
 
@@ -228,11 +245,12 @@ ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const BuildOpti
       input.fragDefines = &fragDefines;
       input.vertSpirv = vertSpirv;
       input.fragStage = &fragResult;
+      input.diagnostics = diagnostics;
       auto stages = emitterEntry.second->emit(input, compiler);
       if (!stages) {
-        // The emitter printed why; this is the single place the failure is counted.
+        // The emitter reported why (with this profile and variant); this is the single place
+        // the failure is counted.
         report.errorCount++;
-        diagnostics->recordProfileError(backend);
         continue;
       }
       VariantData variant;
@@ -316,8 +334,10 @@ int RunBuildCommand(const BuildOptions& options) {
     sources = LoadShaderSources(options.shaderDir);
     if (!sources.ok) {
       for (const auto& error : sources.errors) {
-        std::cerr << "  ERROR: " << error << "\n";
+        RecordBuildError(&report.diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable,
+                         "", "", -1, -1, error);
       }
+      PrintDiagnostics(report.diagnostics);
       std::cerr << "Build failed: " << sources.errors.size() << " shader source error(s) in "
                 << options.shaderDir << ".\n";
       return 1;
@@ -329,7 +349,12 @@ int RunBuildCommand(const BuildOptions& options) {
     auto cacheDir = options.cacheDir.empty() ? options.outDir + "/stage_cache" : options.cacheDir;
     std::string cacheError;
     if (!stageCache.open(cacheDir, &cacheError)) {
-      std::cerr << "  WARNING: stage cache disabled, compiling every stage: " << cacheError << "\n";
+      Diagnostic diagnostic;
+      diagnostic.severity = Severity::Warning;
+      diagnostic.layer = Layer::Compile;
+      diagnostic.code = DiagnosticCode::CompileCacheDisabled;
+      diagnostic.message = "stage cache disabled, compiling every stage: " + cacheError;
+      report.diagnostics.report(std::move(diagnostic));
     }
   }
   StageCompiler stageCompiler(&stageCache);
@@ -340,7 +365,9 @@ int RunBuildCommand(const BuildOptions& options) {
     auto info = shader->info();
     const ShaderSource* source = compiling ? sources.find(info.name) : nullptr;
     if (compiling && source == nullptr) {
-      std::cerr << "  ERROR: no loaded source for " << info.name << "\n";
+      RecordBuildError(&report.diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable,
+                       info.name, "", -1, -1, "no loaded source for this family");
+      PrintDiagnostics(report.diagnostics);
       return 1;
     }
     auto shaderReport = CompileOneShader(info, options, source, &stageCompiler, &report.variants,
@@ -361,9 +388,11 @@ int RunBuildCommand(const BuildOptions& options) {
 
   // Must run before the variants are moved into the per-backend bundles below.
   if (!options.stageReportPath.empty() && !report.variants.empty()) {
-    if (!WriteStageReport(options.stageReportPath, report.variants)) {
+    if (!WriteStageReport(options.stageReportPath, report.variants, &report.diagnostics)) {
+      PrintDiagnostics(report.diagnostics);
       return 1;
     }
+    std::cout << "Stage report written to: " << options.stageReportPath << "\n";
   }
 
   // Cross-language contract checks, as two rule registries: the artifact rules read what the
@@ -414,8 +443,8 @@ int RunBuildCommand(const BuildOptions& options) {
     for (const auto& pair : byBackend) {
       std::string filename = "shader_bundle." + pair.first + ".bin";
       std::string path = options.outDir + "/" + filename;
-      if (!WriteBundle(path, pair.first, pair.second, options.compress)) {
-        std::cerr << "Failed to write bundle: " << path << "\n";
+      if (!WriteBundle(path, pair.first, pair.second, options.compress, &report.diagnostics)) {
+        PrintDiagnostics(report.diagnostics);
         return 1;
       }
       std::cout << "Bundle written: " << filename << " (" << pair.second.size() << " entries)\n";
