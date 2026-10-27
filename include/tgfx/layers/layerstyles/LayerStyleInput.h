@@ -40,7 +40,10 @@ class StyleInputSource {
     Base,
     /** The layer's geometry on its own, without its descendants. */
     Geometry,
-    /** The shared subtree contour, used when the layer has no geometry of its own. */
+    /**
+     * The shared subtree contour: delivered to a Geometry style whose layer has no geometry of its
+     * own, and also requested as an extra source by styles that need the subtree outline.
+     */
     Contour
   };
 
