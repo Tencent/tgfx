@@ -1047,6 +1047,11 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
         # them via the tgfx_publish_shader_bundles target.
         message(STATUS "Shader bundles: consuming the published ones from resources/shaders "
                 "(${TGFX_PREBUILT_REASON})")
+        # A published bundle whose toolchain ABI drifted from the code is refused by the runtime
+        # loader at draw time — too late to act on. Check each bundle's ABI against the constant
+        # in PrecompiledBundleIdentity.h here, so a forgotten republish warns at every configure
+        # of a consuming build (the CI verify script catches the same drift only after the push).
+        include("${CMAKE_CURRENT_SOURCE_DIR}/tools/shader_build_tool/PublishedBundleCheck.cmake")
         set(TGFX_PREBUILT_BUNDLE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders")
         set(TGFX_PREBUILT_BUNDLE_FILES "")
         set(TGFX_COPY_BUNDLE_COMMANDS "")
@@ -1061,6 +1066,8 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
                         "from such a build with the tgfx_publish_shader_bundles target and check "
                         "it in.")
             endif ()
+            tgfx_check_published_bundle_abi("${PREBUILT_BUNDLE}"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/PrecompiledBundleIdentity.h")
             list(APPEND TGFX_PREBUILT_BUNDLE_FILES "${PREBUILT_BUNDLE}")
             list(APPEND TGFX_COPY_BUNDLE_COMMANDS
                     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PREBUILT_BUNDLE}"
