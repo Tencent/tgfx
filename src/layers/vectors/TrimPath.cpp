@@ -19,6 +19,7 @@
 #include "tgfx/layers/vectors/TrimPath.h"
 #include "VectorContext.h"
 #include "core/utils/Log.h"
+#include "core/utils/ShapeUtils.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/PathMeasure.h"
 
@@ -85,7 +86,7 @@ static void ApplyTrimContinuous(std::vector<Geometry*>& geometries, float start,
     if (geometry->shape == nullptr) {
       continue;
     }
-    auto path = geometry->shape->getPath();
+    auto path = ShapeUtils::GetContourPath(geometry->shape, 1.0f);
     auto pathMeasure = PathMeasure::MakeFrom(path);
     float length = 0;
     do {

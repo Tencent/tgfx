@@ -34,7 +34,7 @@ class StrokeShape : public Shape {
   }
 
   PathFillType fillType() const override {
-    return shape->fillType();
+    return getPath().getFillType();
   }
 
   Rect onGetBounds() const override;

@@ -19,7 +19,6 @@
 #include "tgfx/core/Path.h"
 #include <algorithm>
 #include <cmath>
-#include <functional>
 #include <limits>
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wfloat-conversion"
@@ -427,13 +426,9 @@ static std::vector<Point> GetArcPoints(float centerX, float centerY, float radiu
                                        float startRadius, float endRadius, int* numBeziers) {
   std::vector<Point> points = {};
   float start = startRadius;
-  std::function<float()> increaseRadius;
-  if (startRadius < endRadius) {
-    increaseRadius = [&] { return std::min(endRadius, start + M_PI_2_F); };
-  } else {
-    increaseRadius = [&] { return std::max(endRadius, start - M_PI_2_F); };
-  }
-  float end = increaseRadius();
+  auto increasing = startRadius < endRadius;
+  float end =
+      increasing ? std::min(endRadius, start + M_PI_2_F) : std::max(endRadius, start - M_PI_2_F);
   float currentX, currentY;
   *numBeziers = 0;
   for (int i = 0; i < 4; i++) {
@@ -460,7 +455,8 @@ static std::vector<Point> GetArcPoints(float centerX, float centerY, float radiu
       break;
     }
     start = end;
-    end = increaseRadius();
+    end =
+        increasing ? std::min(endRadius, start + M_PI_2_F) : std::max(endRadius, start - M_PI_2_F);
   }
   return points;
 }
@@ -528,14 +524,7 @@ void Path::addRRect(const RRect& rRect, bool reversed, unsigned int startIndex) 
   writableRef()->path.addRRect(skRRect, ToSkDirection(reversed), startIndex);
 }
 
-void Path::addPath(const Path& src, PathOp op) {
-  addPath(src, op, nullptr);
-}
-
-void Path::addPath(const Path& src, PathOp op, bool* success) {
-  if (success != nullptr) {
-    *success = true;
-  }
+bool Path::addPath(const Path& src, PathOp op) {
   auto& path = writableRef()->path;
   const auto& newPath = src.pathRef->path;
   if (op == PathOp::Append || op == PathOp::Extend) {
@@ -545,7 +534,7 @@ void Path::addPath(const Path& src, PathOp op, bool* success) {
       auto mode = op == PathOp::Extend ? SkPath::kExtend_AddPathMode : SkPath::kAppend_AddPathMode;
       path.addPath(newPath, mode);
     }
-    return;
+    return true;
   }
   SkPathOp pathOp;
   switch (op) {
@@ -562,651 +551,146 @@ void Path::addPath(const Path& src, PathOp op, bool* success) {
       pathOp = SkPathOp::kUnion_SkPathOp;
       break;
   }
-  auto ok = Op(path, newPath, pathOp, &path);
-  if (success != nullptr) {
-    *success = ok;
-  }
+  return Op(path, newPath, pathOp, &path);
 }
 
-namespace {
+namespace {}
 
-// The number of samples used to flatten a curve while measuring a contour. Only the sign of the
-// area and an approximate bounding box are needed, so this never has to be exact.
-constexpr int CURVE_SAMPLES = 32;
-
-// How many containment candidates a contour is thinned down to. Every one of them has to agree,
-// so this bounds the cost of a containment test without letting a long contour go unrepresented.
-constexpr size_t MAX_PROBE_COUNT = 8;
-
-// One contour split out of a path. The original verb sequence is kept so the contour can be
-// written back without changing its geometry in any way.
-struct ContourInfo {
-  std::vector<Path::Segment> segments = {};
-  bool closed = false;
-  Path path = {};
-  // Bounds of the flattened outline. Used to pick the innermost container.
-  float tightLeft = 0.0f;
-  float tightTop = 0.0f;
-  float tightRight = 0.0f;
-  float tightBottom = 0.0f;
-  // Bounds including control points: a superset of the true area, used as a cheap prefilter.
-  float fatLeft = 0.0f;
-  float fatTop = 0.0f;
-  float fatRight = 0.0f;
-  float fatBottom = 0.0f;
-  // Candidate interior points spread over the contour. A contour counts as nested inside another
-  // only when every one of them lies inside it, so a single point that happens to land on a
-  // boundary or on a crossing cannot decide the relation on its own.
-  std::vector<Point> probes = {};
-  double signedArea = 0.0;
-  // Exact area accumulated per segment, measured in the frame that puts this contour's first point
-  // at (0, 0). Translation leaves the signed area alone but shrinks the cross products, and a thin
-  // outline whose two sides almost cancel would otherwise be decided by a difference far smaller
-  // than the sampling error - flipping the contour the wrong way.
-  double exactArea = 0.0;
-  // Conics have no polynomial area formula, so their contribution is carried as a chord sum plus a
-  // bound on how far the arc can stray from those chords. The sign is trusted only while it is
-  // larger than the bound; otherwise the direction is not decidable and the conversion fails.
-  std::vector<Path::Segment> conics = {};
-  Point origin = {};
-  int depth = 0;
-  bool reverse = false;
+struct PathAreaBounds {
+  size_t index = 0;
+  Rect bounds = {};
+  float start = 0.0f;
+  float end = 0.0f;
 };
 
-Point EvalQuad(const Point& p0, const Point& p1, const Point& p2, float t) {
-  auto u = 1.0f - t;
-  return {u * u * p0.x + 2.0f * u * t * p1.x + t * t * p2.x,
-          u * u * p0.y + 2.0f * u * t * p1.y + t * t * p2.y};
+static bool ComparePathAreaBounds(const PathAreaBounds& first, const PathAreaBounds& second) {
+  return first.start < second.start || (first.start == second.start && first.index < second.index);
 }
 
-Point EvalCubic(const Point& p0, const Point& p1, const Point& p2, const Point& p3, float t) {
-  auto u = 1.0f - t;
-  auto uu = u * u;
-  auto tt = t * t;
-  return {uu * u * p0.x + 3.0f * uu * t * p1.x + 3.0f * u * tt * p2.x + tt * t * p3.x,
-          uu * u * p0.y + 3.0f * uu * t * p1.y + 3.0f * u * tt * p2.y + tt * t * p3.y};
-}
-
-Point EvalConic(const Point& p0, const Point& p1, const Point& p2, float weight, float t) {
-  auto u = 1.0f - t;
-  auto divisor = u * u + 2.0f * weight * u * t + t * t;
-  if (divisor == 0.0f) {
-    return p0;
+static std::vector<PathAreaBounds> SortPathAreaBounds(const std::vector<Path>& paths) {
+  Rect totalBounds = {};
+  std::vector<PathAreaBounds> bounds = {};
+  bounds.reserve(paths.size());
+  for (size_t index = 0; index < paths.size(); ++index) {
+    auto rect = paths[index].getBounds();
+    totalBounds.join(rect);
+    bounds.push_back({index, rect, 0.0f, 0.0f});
   }
-  return {(u * u * p0.x + 2.0f * weight * u * t * p1.x + t * t * p2.x) / divisor,
-          (u * u * p0.y + 2.0f * weight * u * t * p1.y + t * t * p2.y) / divisor};
-}
-
-void GrowBounds(const Point& point, float& left, float& top, float& right, float& bottom) {
-  left = std::min(left, point.x);
-  top = std::min(top, point.y);
-  right = std::max(right, point.x);
-  bottom = std::max(bottom, point.y);
-}
-
-// Kept in double: two finite coordinates can span a range whose product leaves the float range
-// entirely (a 1e19-wide outline), and an overflowing area would stop that outline from ever being
-// picked as a container, so its counters would be read at the wrong depth.
-double BoundsArea(float left, float top, float right, float bottom) {
-  auto width = static_cast<double>(right) - static_cast<double>(left);
-  auto height = static_cast<double>(bottom) - static_cast<double>(top);
-  if (width <= 0.0 || height <= 0.0) {
-    return 0.0;
+  auto horizontal = static_cast<double>(totalBounds.right) - totalBounds.left >=
+                    static_cast<double>(totalBounds.bottom) - totalBounds.top;
+  for (auto& entry : bounds) {
+    entry.start = horizontal ? entry.bounds.left : entry.bounds.top;
+    entry.end = horizontal ? entry.bounds.right : entry.bounds.bottom;
   }
-  return width * height;
+  std::sort(bounds.begin(), bounds.end(), ComparePathAreaBounds);
+  return bounds;
 }
 
-// Signed area of one segment under Green's theorem, integrated exactly instead of by flattening.
-// The integrand of a line, quadratic or cubic is a polynomial, so a three-point Gauss-Legendre
-// rule - exact for polynomials up to degree five - gives the true value. That matters for thin
-// outlines: their area is a small difference between large terms, which sampling gets wrong.
-double ExactSegmentArea(const Path::Segment& segment, const Point& origin) {
-  static constexpr double kNodes[3] = {0.5 - 0.5 * 0.7745966692414834, 0.5,
-                                       0.5 + 0.5 * 0.7745966692414834};
-  static constexpr double kWeights[3] = {5.0 / 18.0, 8.0 / 18.0, 5.0 / 18.0};
-  // The coordinates are moved into the contour's own frame before anything is combined: the sum
-  // below is translation invariant, but its terms are not, and large coordinates leave a thin
-  // contour's sign buried in cancellation.
-  //
-  // The shift has to happen in double. Subtracting in the float fields first rounds the difference
-  // away, so two distinct vertices can collapse into one and the area comes out as exactly zero -
-  // which then reads as "no direction", silently skipping the reversal a counter needed.
-  auto originX = static_cast<double>(origin.x);
-  auto originY = static_cast<double>(origin.y);
-  double area = 0.0;
-  for (int i = 0; i < 3; i++) {
-    auto t = kNodes[i];
-    auto u = 1.0 - t;
-    double x, y, dx, dy;
-    switch (segment.verb) {
-      case PathVerb::Line: {
-        auto x0 = static_cast<double>(segment.points[0].x) - originX;
-        auto y0 = static_cast<double>(segment.points[0].y) - originY;
-        auto x1 = static_cast<double>(segment.points[1].x) - originX;
-        auto y1 = static_cast<double>(segment.points[1].y) - originY;
-        x = x0 + (x1 - x0) * t;
-        y = y0 + (y1 - y0) * t;
-        dx = x1 - x0;
-        dy = y1 - y0;
-        break;
-      }
-      case PathVerb::Quad: {
-        auto x0 = static_cast<double>(segment.points[0].x) - originX;
-        auto y0 = static_cast<double>(segment.points[0].y) - originY;
-        auto x1 = static_cast<double>(segment.points[1].x) - originX;
-        auto y1 = static_cast<double>(segment.points[1].y) - originY;
-        auto x2 = static_cast<double>(segment.points[2].x) - originX;
-        auto y2 = static_cast<double>(segment.points[2].y) - originY;
-        x = u * u * x0 + 2.0 * u * t * x1 + t * t * x2;
-        y = u * u * y0 + 2.0 * u * t * y1 + t * t * y2;
-        dx = 2.0 * u * (x1 - x0) + 2.0 * t * (x2 - x1);
-        dy = 2.0 * u * (y1 - y0) + 2.0 * t * (y2 - y1);
-        break;
-      }
-      case PathVerb::Cubic: {
-        auto x0 = static_cast<double>(segment.points[0].x) - originX;
-        auto y0 = static_cast<double>(segment.points[0].y) - originY;
-        auto x1 = static_cast<double>(segment.points[1].x) - originX;
-        auto y1 = static_cast<double>(segment.points[1].y) - originY;
-        auto x2 = static_cast<double>(segment.points[2].x) - originX;
-        auto y2 = static_cast<double>(segment.points[2].y) - originY;
-        auto x3 = static_cast<double>(segment.points[3].x) - originX;
-        auto y3 = static_cast<double>(segment.points[3].y) - originY;
-        x = u * u * u * x0 + 3.0 * u * u * t * x1 + 3.0 * u * t * t * x2 + t * t * t * x3;
-        y = u * u * u * y0 + 3.0 * u * u * t * y1 + 3.0 * u * t * t * y2 + t * t * t * y3;
-        dx = 3.0 * u * u * (x1 - x0) + 6.0 * u * t * (x2 - x1) + 3.0 * t * t * (x3 - x2);
-        dy = 3.0 * u * u * (y1 - y0) + 6.0 * u * t * (y2 - y1) + 3.0 * t * t * (y3 - y2);
-        break;
-      }
-      default:
-        return 0.0;
-    }
-    area += kWeights[i] * 0.5 * (x * dy - y * dx);
-  }
-  return area;
-}
-
-int SegmentPointCount(PathVerb verb) {
-  switch (verb) {
-    case PathVerb::Line:
-      return 2;
-    case PathVerb::Quad:
-    case PathVerb::Conic:
-      return 3;
-    default:
-      return 4;
-  }
-}
-
-Point SegmentEndPoint(const Path::Segment& segment) {
-  switch (segment.verb) {
-    case PathVerb::Line:
-      return segment.points[1];
-    case PathVerb::Quad:
-    case PathVerb::Conic:
-      return segment.points[2];
-    default:
-      return segment.points[3];
-  }
-}
-
-const Path::Segment* LastCurveSegment(const std::vector<Path::Segment>& segments);
-
-// An outline that was never closed still fills as if it were: both rasterizing and contains()
-// treat the gap between the last point and the start as an implicit edge. That edge carries no
-// separate term here because every area is measured with the contour's start point at the origin,
-// where the edge back to it has a zero cross product.
-
-// One piece of a conic, written in the frame that puts the contour's first point at the origin.
-struct ConicPiece {
-  double x0 = 0.0;
-  double y0 = 0.0;
-  double x1 = 0.0;
-  double y1 = 0.0;
-  double x2 = 0.0;
-  double y2 = 0.0;
-  double weight = 1.0;
-};
-
-// Splits a conic at t == 0.5 with rational de Casteljau. Both halves trace the same points as the
-// original, so their signed areas add back up to it. The weights are rescaled to 1 at both ends,
-// which reparametrises each half but leaves its trace - and therefore its area - untouched.
-void ChopConic(const ConicPiece& piece, ConicPiece* left, ConicPiece* right) {
-  auto divisor = 1.0 + piece.weight;
-  auto ax = (piece.x0 + piece.weight * piece.x1) / divisor;
-  auto ay = (piece.y0 + piece.weight * piece.y1) / divisor;
-  auto bx = (piece.weight * piece.x1 + piece.x2) / divisor;
-  auto by = (piece.weight * piece.y1 + piece.y2) / divisor;
-  auto weight = std::sqrt(0.5 * (1.0 + piece.weight));
-  *left = {piece.x0, piece.y0, ax, ay, 0.5 * (ax + bx), 0.5 * (ay + by), weight};
-  *right = {0.5 * (ax + bx), 0.5 * (ay + by), bx, by, piece.x2, piece.y2, weight};
-}
-
-// Signed area of one conic, as the sum of the chords of its `level` subdivisions plus a bound on
-// how far the true arc can stray from those chords. A conic with a positive weight stays inside its
-// control triangle, so the region between a chord and its arc is contained in that triangle and can
-// never be larger than it. Each extra level quarters the bound.
-//
-// That bound is what makes the sign decidable: when the chord sum is larger than it, no error
-// within the bound can reach past zero. Sampling more finely instead would only shrink the same
-// one-sided error without ever measuring it.
-void ConicAreaWithBound(const ConicPiece& piece, int level, double* area, double* bound) {
-  auto triangle =
-      std::fabs(0.5 * (piece.x0 * (piece.y1 - piece.y2) + piece.x1 * (piece.y2 - piece.y0) +
-                       piece.x2 * (piece.y0 - piece.y1)));
-  if (level <= 0) {
-    *area += 0.5 * (piece.x0 * piece.y2 - piece.x2 * piece.y0);
-    *bound += triangle;
-    return;
-  }
-  ConicPiece left = {};
-  ConicPiece right = {};
-  ChopConic(piece, &left, &right);
-  ConicAreaWithBound(left, level - 1, area, bound);
-  ConicAreaWithBound(right, level - 1, area, bound);
-}
-
-// Highest subdivision level tried before the direction is given up as undecidable. Every level
-// doubles the piece count and quarters the bound, so the last one already costs 4096 pieces per
-// conic; a contour still undecided there is degenerate rather than merely thin.
-constexpr int MaxConicLevel = 12;
-
-// Sums every conic of one contour at the given subdivision level.
-void ConicChainArea(const std::vector<Path::Segment>& conics, const Point& origin, int level,
-                    double* area, double* bound) {
-  auto originX = static_cast<double>(origin.x);
-  auto originY = static_cast<double>(origin.y);
-  for (const auto& segment : conics) {
-    ConicPiece piece = {};
-    piece.x0 = static_cast<double>(segment.points[0].x) - originX;
-    piece.y0 = static_cast<double>(segment.points[0].y) - originY;
-    piece.x1 = static_cast<double>(segment.points[1].x) - originX;
-    piece.y1 = static_cast<double>(segment.points[1].y) - originY;
-    piece.x2 = static_cast<double>(segment.points[2].x) - originX;
-    piece.y2 = static_cast<double>(segment.points[2].y) - originY;
-    piece.weight = static_cast<double>(segment.conicWeight);
-    ConicAreaWithBound(piece, level, area, bound);
-  }
-}
-
-bool DecomposeContours(const Path& path, std::vector<ContourInfo>& contours) {
-  ContourInfo* current = nullptr;
-  auto finish = [](ContourInfo& contour) -> bool {
-    if (contour.conics.empty()) {
-      contour.signedArea = contour.exactArea;
-    } else {
-      // Refine the chord sum until the bound on its error drops below the area itself. Two
-      // samplings agreeing on a sign proved nothing: both are chord sums of the same arc and both
-      // miss it on the same side, so a thin outline can push them past zero together. A bound does
-      // decide it - no error inside the bound can reach zero - and when refinement runs out, the
-      // direction is reported as undecidable rather than guessed.
-      bool decidable = false;
-      for (int level = 0; level <= MaxConicLevel; level++) {
-        double conicArea = 0.0;
-        double conicBound = 0.0;
-        ConicChainArea(contour.conics, contour.origin, level, &conicArea, &conicBound);
-        auto total = contour.exactArea + conicArea;
-        if (std::fabs(total) > conicBound) {
-          contour.signedArea = total;
-          decidable = true;
-          break;
-        }
-      }
-      if (!decidable) {
-        return false;
-      }
-    }
-    if (!contour.closed) {
-      contour.path.close();
-    }
-    if (contour.probes.size() > MAX_PROBE_COUNT) {
-      // Keep an even spread instead of the first few, so the candidates still speak for the whole
-      // contour rather than for one corner of it.
-      std::vector<Point> thinned = {};
-      thinned.reserve(MAX_PROBE_COUNT);
-      auto count = contour.probes.size();
-      for (size_t i = 0; i < MAX_PROBE_COUNT; ++i) {
-        // Stays in integer arithmetic: scaling a size_t through a double loses precision on
-        // 64-bit targets, which is exactly the count this is here to thin.
-        thinned.push_back(contour.probes[i * count / MAX_PROBE_COUNT]);
-      }
-      contour.probes = std::move(thinned);
-    }
+static bool CanConcatenateAreas(const std::vector<Path>& paths) {
+  if (paths.size() <= 1) {
     return true;
-  };
-  for (const auto& segment : path) {
-    if (segment.verb == PathVerb::Move) {
-      if (current != nullptr && !finish(*current)) {
-        return false;
-      }
-      contours.emplace_back();
-      current = &contours.back();
-      current->segments.push_back(segment);
-      current->path.moveTo(segment.points[0]);
-      current->path.setFillType(PathFillType::Winding);
-      current->origin = segment.points[0];
-      current->tightLeft = current->fatLeft = current->tightRight = current->fatRight =
-          segment.points[0].x;
-      current->tightTop = current->fatTop = current->tightBottom = current->fatBottom =
-          segment.points[0].y;
-      continue;
-    }
-    if (current == nullptr) {
+  }
+  auto fillType = paths.front().getFillType();
+  for (const auto& path : paths) {
+    if (path.isInverseFillType() || path.getFillType() != fillType) {
       return false;
-    }
-    if (segment.verb == PathVerb::Close) {
-      current->closed = true;
-      current->segments.push_back(segment);
-      current->path.close();
-      continue;
-    }
-    if (segment.verb != PathVerb::Line && segment.verb != PathVerb::Quad &&
-        segment.verb != PathVerb::Conic && segment.verb != PathVerb::Cubic) {
-      return false;
-    }
-    current->segments.push_back(segment);
-    if (segment.verb == PathVerb::Conic) {
-      if (!std::isfinite(segment.conicWeight) || segment.conicWeight <= 0.0f) {
-        // The error bound rests on the arc staying inside its control triangle, which only holds
-        // for a positive weight. Without it there is no way to tell which way the contour turns.
-        return false;
-      }
-      current->conics.push_back(segment);
-    } else {
-      current->exactArea += ExactSegmentArea(segment, current->origin);
-    }
-    switch (segment.verb) {
-      case PathVerb::Line:
-        current->path.lineTo(segment.points[1]);
-        break;
-      case PathVerb::Quad:
-        current->path.quadTo(segment.points[1], segment.points[2]);
-        break;
-      case PathVerb::Conic:
-        current->path.conicTo(segment.points[1], segment.points[2], segment.conicWeight);
-        break;
-      default:
-        current->path.cubicTo(segment.points[1], segment.points[2], segment.points[3]);
-        break;
-    }
-    auto pointCount = SegmentPointCount(segment.verb);
-    for (int i = 0; i < pointCount; ++i) {
-      const auto& point = segment.points[i];
-      if (!std::isfinite(point.x) || !std::isfinite(point.y)) {
-        // Neither an area nor a containment test means anything here, and guessing a direction
-        // would silently hand back a path that claims a rule it does not follow.
-        return false;
-      }
-      GrowBounds(point, current->fatLeft, current->fatTop, current->fatRight, current->fatBottom);
-    }
-    if (segment.verb != PathVerb::Line) {
-      // Interior samples flatten the curve for the area and the tight bounds. They stop short of
-      // t == 1, so the end point is added separately below.
-      for (int i = 1; i < CURVE_SAMPLES; ++i) {
-        auto t = static_cast<float>(i) / static_cast<float>(CURVE_SAMPLES);
-        Point point = {};
-        switch (segment.verb) {
-          case PathVerb::Quad:
-            point = EvalQuad(segment.points[0], segment.points[1], segment.points[2], t);
-            break;
-          case PathVerb::Conic:
-            point = EvalConic(segment.points[0], segment.points[1], segment.points[2],
-                              segment.conicWeight, t);
-            break;
-          default:
-            point = EvalCubic(segment.points[0], segment.points[1], segment.points[2],
-                              segment.points[3], t);
-            break;
-        }
-        GrowBounds(point, current->tightLeft, current->tightTop, current->tightRight,
-                   current->tightBottom);
-      }
-    }
-    // A line is already flat, so sampling it would only repeat its end point over and over. Every
-    // segment contributes its end point exactly once to the tight bounds.
-    auto endPoint = SegmentEndPoint(segment);
-    GrowBounds(endPoint, current->tightLeft, current->tightTop, current->tightRight,
-               current->tightBottom);
-    // One containment candidate per segment. They are thinned to an even spread once the contour
-    // is complete; a single point cannot be trusted to speak for the whole contour.
-    switch (segment.verb) {
-      case PathVerb::Line:
-        current->probes.push_back({(segment.points[0].x + segment.points[1].x) * 0.5f,
-                                   (segment.points[0].y + segment.points[1].y) * 0.5f});
-        break;
-      case PathVerb::Quad:
-        current->probes.push_back(
-            EvalQuad(segment.points[0], segment.points[1], segment.points[2], 0.5f));
-        break;
-      case PathVerb::Conic:
-        current->probes.push_back(EvalConic(segment.points[0], segment.points[1], segment.points[2],
-                                            segment.conicWeight, 0.5f));
-        break;
-      default:
-        current->probes.push_back(EvalCubic(segment.points[0], segment.points[1], segment.points[2],
-                                            segment.points[3], 0.5f));
-        break;
     }
   }
-  if (current != nullptr && !finish(*current)) {
-    return false;
+  auto sortedBounds = SortPathAreaBounds(paths);
+  std::vector<const PathAreaBounds*> active = {};
+  for (const auto& entry : sortedBounds) {
+    size_t retained = 0;
+    for (const auto* previous : active) {
+      if (previous->end <= entry.start) {
+        continue;
+      }
+      active[retained++] = previous;
+      if (Rect::Intersects(entry.bounds, previous->bounds)) {
+        pk::SkPath intersection;
+        if (!pk::Op(PathRef::ReadAccess(paths[entry.index]),
+                    PathRef::ReadAccess(paths[previous->index]), pk::SkPathOp::kIntersect_SkPathOp,
+                    &intersection) ||
+            !intersection.isEmpty()) {
+          return false;
+        }
+      }
+    }
+    active.resize(retained);
+    active.push_back(&entry);
   }
   return true;
 }
 
-// True when the outer contour is even potentially a container of the inner one. The fat bounds of
-// the outer one enclose its whole area and the tight bounds of the inner one stay inside its area,
-// so failing this test rules the pair out without running the containment test.
-bool MightContain(const ContourInfo& outer, const ContourInfo& inner) {
-  return outer.fatLeft <= inner.tightLeft && outer.fatTop <= inner.tightTop &&
-         outer.fatRight >= inner.tightRight && outer.fatBottom >= inner.tightBottom;
-}
-
-// A closed contour ends with a Close verb, which carries no point, so the last curve decides where
-// the reversed contour has to start.
-const Path::Segment* LastCurveSegment(const std::vector<Path::Segment>& segments) {
-  for (size_t i = segments.size(); i-- > 1;) {
-    if (segments[i].verb != PathVerb::Close) {
-      return &segments[i];
-    }
-  }
-  return nullptr;
-}
-
-void WriteContour(Path& output, const ContourInfo& contour) {
-  const auto& segments = contour.segments;
-  if (segments.size() < 2) {
-    output.moveTo(segments[0].points[0]);
-    output.close();
-    return;
-  }
-  if (!contour.reverse) {
-    output.moveTo(segments[0].points[0]);
-    for (size_t i = 1; i < segments.size(); ++i) {
-      const auto& segment = segments[i];
-      switch (segment.verb) {
-        case PathVerb::Line:
-          output.lineTo(segment.points[1]);
-          break;
-        case PathVerb::Quad:
-          output.quadTo(segment.points[1], segment.points[2]);
-          break;
-        case PathVerb::Conic:
-          output.conicTo(segment.points[1], segment.points[2], segment.conicWeight);
-          break;
-        case PathVerb::Cubic:
-          output.cubicTo(segment.points[1], segment.points[2], segment.points[3]);
-          break;
-        default:
-          break;
-      }
-    }
-  } else {
-    // Walking the loop backwards means starting at the last point of the last segment and emitting
-    // every segment in reverse. A quadratic keeps its control point; a cubic swaps the two.
-    const auto* last = LastCurveSegment(segments);
-    if (last == nullptr) {
-      output.moveTo(segments[0].points[0]);
-      if (contour.closed) {
-        output.close();
-      }
-      return;
-    }
-    auto start = SegmentEndPoint(*last);
-    output.moveTo(start);
-    auto lastIndex = static_cast<size_t>(last - segments.data());
-    for (size_t i = lastIndex + 1; i-- > 1;) {
-      const auto& segment = segments[i];
-      switch (segment.verb) {
-        case PathVerb::Line:
-          output.lineTo(segment.points[0]);
-          break;
-        case PathVerb::Quad:
-          output.quadTo(segment.points[1], segment.points[0]);
-          break;
-        case PathVerb::Conic:
-          output.conicTo(segment.points[1], segment.points[0], segment.conicWeight);
-          break;
-        case PathVerb::Cubic:
-          output.cubicTo(segment.points[2], segment.points[1], segment.points[0]);
-          break;
-        default:
-          break;
-      }
-    }
-  }
-  if (contour.closed) {
-    output.close();
-  }
-}
-
-}  // namespace
-
-bool Path::toWinding() {
-  auto fillType = getFillType();
-  if (fillType == PathFillType::Winding || fillType == PathFillType::InverseWinding) {
+bool Path::addPaths(const std::vector<Path>& sources) {
+  if (sources.empty()) {
     return true;
   }
-  auto targetFillType = fillType == PathFillType::InverseEvenOdd ? PathFillType::InverseWinding
-                                                                 : PathFillType::Winding;
-  // A single contour is filled identically by both rules: one contour is an odd count and a
-  // non-zero sum alike. Only the rule has to change.
-  if (isEmpty()) {
-    setFillType(targetFillType);
-    return true;
-  }
-  std::vector<ContourInfo> contours;
-  if (!DecomposeContours(*this, contours)) {
-    return false;
-  }
-  if (contours.size() < 2) {
-    setFillType(targetFillType);
-    return true;
-  }
-  // A contour counts as nested inside another only when every one of its candidate points lies
-  // inside it. One point agreeing is not enough to speak for the whole contour: candidates that
-  // disagree mean the two contours share area instead of containing each other, and flipping
-  // either of them would change what the path fills.
-  auto containsAllProbes = [](const ContourInfo& outer, const ContourInfo& inner) {
-    if (inner.probes.empty()) {
+  std::vector<Path> operands = {*this};
+  operands.insert(operands.end(), sources.begin(), sources.end());
+  std::vector<Path> nonempty = {};
+  for (const auto& operand : operands) {
+    if (!operand.pathRef->path.isFinite()) {
       return false;
     }
-    for (const auto& probe : inner.probes) {
-      if (!outer.path.contains(probe.x, probe.y)) {
-        return false;
-      }
+    if (!operand.isEmpty() || operand.isInverseFillType()) {
+      nonempty.push_back(operand);
     }
-    return true;
-  };
-  // Resolve each contour's nesting depth. A contour's parent is its innermost container.
-  std::vector<int> depths(contours.size(), -1);
-  std::vector<bool> visiting(contours.size(), false);
-  auto cyclic = false;
-  std::function<int(size_t)> resolveDepth = [&](size_t index) -> int {
-    if (depths[index] >= 0) {
-      return depths[index];
-    }
-    if (visiting[index]) {
-      // Two contours cannot contain each other. Reaching one that is already being resolved means
-      // the containment test contradicted itself, and every depth below would be guesswork.
-      cyclic = true;
-      return 0;
-    }
-    visiting[index] = true;
-    int parent = -1;
-    // Doubles all the way: a container's area may exceed the float range, and starting from the
-    // largest float would silently disqualify exactly those outlines.
-    auto parentArea = std::numeric_limits<double>::max();
-    for (size_t i = 0; i < contours.size(); ++i) {
-      if (i == index) {
-        continue;
-      }
-      if (!MightContain(contours[i], contours[index])) {
-        continue;
-      }
-      if (!containsAllProbes(contours[i], contours[index])) {
-        continue;
-      }
-      auto area = BoundsArea(contours[i].tightLeft, contours[i].tightTop, contours[i].tightRight,
-                             contours[i].tightBottom);
-      if (area < parentArea) {
-        parentArea = area;
-        parent = static_cast<int>(i);
-      }
-    }
-    auto depth = parent < 0 ? 0 : resolveDepth(static_cast<size_t>(parent)) + 1;
-    visiting[index] = false;
-    depths[index] = depth;
-    return depth;
-  };
-  for (size_t i = 0; i < contours.size(); ++i) {
-    contours[i].depth = resolveDepth(i);
   }
-  if (cyclic) {
-    // Report the failure instead of returning a path that claims a rule its geometry does not
-    // follow. The caller keeps its own outline, which is still the better of the two outcomes.
+  if (nonempty.empty()) {
+    return true;
+  }
+  // Whether the sources can simply be concatenated decides what has to be computed. Measuring it
+  // first is what keeps the common case cheap: text that does not overlap never reaches the boolean
+  // pass, and overlapping text never pays for the check that the concatenation reproduces the union
+  // -- both are expensive, and only one of them is ever needed.
+  if (CanConcatenateAreas(nonempty)) {
+    auto result = nonempty.front();
+    for (size_t i = 1; i < nonempty.size(); ++i) {
+      result.addPath(nonempty[i]);
+    }
+    *this = std::move(result);
+    return true;
+  }
+  pk::SkOpBuilder builder;
+  // resolve() may reverse operands while testing its fast path before falling back to Op(). The
+  // neutral first operand ensures each source is resolved under its own fill rule first.
+  builder.add(pk::SkPath(), pk::SkPathOp::kUnion_SkPathOp);
+  for (const auto& source : nonempty) {
+    builder.add(source.pathRef->path, pk::SkPathOp::kUnion_SkPathOp);
+  }
+  pk::SkPath result;
+  if (!builder.resolve(&result)) {
     return false;
   }
-  // Contours that share area without either containing the other - overlapping strokes - are
-  // outside the nesting this conversion reasons about. They are left exactly as they are: both
-  // stay at the outermost depth and keep their own direction, which is how a set of overlapping
-  // strokes is meant to read under winding. Flipping either one by a guessed depth would change
-  // the filled area, so the conversion silently does less here rather than inventing an answer.
-  // Callers that need such an outline made winding-correct have to resolve the overlaps first:
-  // addPath() with a boolean operation does that and orients the result correctly.
-  // Keep the direction the outermost contours already use, so an outline that is already
-  // consistent is left alone.
-  int base = 0;
-  // Doubles, matching BoundsArea: the largest outline may have an area beyond the float range.
-  double baseArea = -1.0;
-  for (const auto& contour : contours) {
-    if (contour.depth != 0 || contour.signedArea == 0.0f) {
-      continue;
+  bool allWinding = true;
+  for (const auto& source : nonempty) {
+    allWinding = allWinding && source.getFillType() == PathFillType::Winding;
+  }
+  if (allWinding) {
+    // Retain contour order only after checking the candidate against the actual union. This is not
+    // a direction heuristic; rejection or a nonempty difference keeps the boolean result instead.
+    // Overlapping sources can still agree on the area -- two rectangles that share a strip are one
+    // outline either way -- and keeping the contours the sources came in with is what keeps such a
+    // run from being redrawn by the union.
+    auto candidate = nonempty.front();
+    for (size_t i = 1; i < nonempty.size(); ++i) {
+      candidate.addPath(nonempty[i]);
     }
-    auto area =
-        BoundsArea(contour.tightLeft, contour.tightTop, contour.tightRight, contour.tightBottom);
-    if (area > baseArea) {
-      baseArea = area;
-      base = contour.signedArea > 0.0f ? 1 : -1;
+    // Only the candidate is read as winding, and the result is left as the union wrote it. Both
+    // sides have to be read the same way for the difference to mean anything, but making them agree
+    // by rewriting the result instead would also make it agree in the cases where it must not:
+    // contours that cancel under winding are exactly why the union came back even-odd, and those
+    // runs have to keep the boolean result. Reading the candidate alone is what makes the check
+    // fail there, which is the answer those runs need.
+    candidate.pathRef->path.setFillType(pk::SkPathFillType::kWinding);
+    pk::SkPath difference;
+    if (pk::Op(PathRef::ReadAccess(candidate), result, pk::SkPathOp::kXOR_SkPathOp, &difference) &&
+        difference.isEmpty()) {
+      *this = std::move(candidate);
+      return true;
     }
   }
-  if (base == 0) {
-    // Every contour has no area, so the path fills nothing and the rule cannot matter.
-    setFillType(targetFillType);
-    return true;
-  }
-  Path result = {};
-  result.setFillType(targetFillType);
-  for (auto& contour : contours) {
-    if (contour.signedArea == 0.0f) {
-      contour.reverse = false;
-    } else {
-      auto expected = contour.depth % 2 == 0 ? base : -base;
-      contour.reverse = (contour.signedArea > 0.0f ? 1 : -1) != expected;
-    }
-    WriteContour(result, contour);
-  }
-  *this = result;
+  writableRef()->path = result;
   return true;
 }
 
@@ -1367,6 +851,32 @@ std::vector<Point> Path::ConvertConicToQuads(const Point& p0, const Point& p1, c
                                              reinterpret_cast<SkPoint*>(quads.data()), pow2);
   quads.resize(1 + (2 * static_cast<size_t>(numQuads)));
   return quads;
+}
+
+bool Path::toWinding() {
+  auto fillType = getFillType();
+  if (fillType == PathFillType::Winding || fillType == PathFillType::InverseWinding) {
+    return true;
+  }
+  auto& path = PathRef::WriteAccess(*this);
+  // AsWinding() decides each contour's direction from the nesting depth it sits at and reverses the
+  // ones that disagree. It copies the curves it was given rather than rebuilding them, so the
+  // geometry survives unchanged. It does not detect self-crossings or contours that cross each
+  // other, so those still come back with the filled area changed; see Path::toWinding().
+  //
+  // The other pathkit entry for this conversion is deliberately not used. SkOpBuilder - add() once
+  // and resolve(), which runs Simplify followed by FixWinding - decides the directions the same
+  // way, but Simplify rebuilds the contours and quantises their coordinates, so a counter a
+  // fraction of a unit wide closes up: PathTest.ToWindingKeepsThinCurveCounter fails under it while
+  // passing here. Only reversing contours is what keeps that geometry.
+  SkPath result;
+  if (!AsWinding(path, &result)) {
+    return false;
+  }
+  result.setFillType(fillType == PathFillType::InverseEvenOdd ? SkPathFillType::kInverseWinding
+                                                              : SkPathFillType::kWinding);
+  path = result;
+  return true;
 }
 
 }  // namespace tgfx

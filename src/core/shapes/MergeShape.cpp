@@ -18,6 +18,7 @@
 
 #include "MergeShape.h"
 #include "core/shapes/AppendShape.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 std::shared_ptr<Shape> Shape::Merge(std::shared_ptr<Shape> first, std::shared_ptr<Shape> second,
@@ -83,7 +84,15 @@ Rect MergeShape::onGetBounds() const {
 Path MergeShape::onGetPath(float resolutionScale) const {
   auto path = first->onGetPath(resolutionScale);
   auto secondPath = second->onGetPath(resolutionScale);
-  path.addPath(secondPath, pathOp);
+  if (!path.addPath(secondPath, pathOp)) {
+    // A failed operation leaves the first operand behind, which is not the merge that was asked
+    // for: reading it as the result would draw one side of the operation as if it were both. An
+    // empty path is the only answer that is wrong in a visible way rather than a silent one, and
+    // it still carries the rule fillType() reports, so nothing downstream reads a mixed result.
+    LOGE("MergeShape::onGetPath() Failed to merge the two shapes; reporting an empty result.");
+    path = {};
+    path.setFillType(fillType());
+  }
   return path;
 }
 

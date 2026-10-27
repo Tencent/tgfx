@@ -36,7 +36,11 @@ class TextShape : public UniqueKeyShape {
     return getPath().getFillType();
   }
 
+  bool isInverseFillType() const override;
+
   Rect onGetBounds() const override;
+
+  bool getGlyphPaths(float resolutionScale, std::vector<Path>* paths) const;
 
  protected:
   Type type() const override {

@@ -26,6 +26,7 @@
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ColorFilter.h"
+#include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
@@ -1637,41 +1638,189 @@ TGFX_TEST_PRIVATE(SVGExportTest, PendingImageEmptyHref){TGFX_PRIVATE_ACCESS({
  * A readback that has been locked once stays ready on desktop backends, so the isReadyToClose()
  * poll must encode its pixels and close() must substitute the token with the PNG data URI.
  */
-TGFX_TEST_PRIVATE(SVGExportTest, PendingImageResolvedOnPoll) {
-  TGFX_PRIVATE_ACCESS({
-    ContextScope scope;
-    auto context = scope.getContext();
-    ASSERT_TRUE(context != nullptr);
+TGFX_TEST_PRIVATE(SVGExportTest, PendingImageResolvedOnPoll){TGFX_PRIVATE_ACCESS({
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
 
-    auto source = Surface::Make(context, 10, 10);
-    ASSERT_TRUE(source != nullptr);
-    source->getCanvas()->clear(Color::Green());
-    auto readback = source->asyncReadPixels(Rect::MakeWH(10, 10));
-    ASSERT_TRUE(readback != nullptr);
-    ASSERT_TRUE(readback->lockPixels(context) != nullptr);
-    readback->unlockPixels(context);
-    ASSERT_TRUE(readback->isReady(context));
+  auto source = Surface::Make(context, 10, 10);
+  ASSERT_TRUE(source != nullptr);
+  source->getCanvas()->clear(Color::Green());
+  auto readback = source->asyncReadPixels(Rect::MakeWH(10, 10));
+  ASSERT_TRUE(readback != nullptr);
+  ASSERT_TRUE(readback->lockPixels(context) != nullptr);
+  readback->unlockPixels(context);
+  ASSERT_TRUE(readback->isReady(context));
 
-    auto SVGStream = MemoryWriteStream::Make();
-    auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(100, 100),
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(100, 100),
+                                    SVGExportFlags::DisablePrettyXML);
+  ASSERT_TRUE(exporter != nullptr);
+  auto* drawContext = exporter->drawContext;
+  auto* pendings = &exporter->pendingImages->images;
+  pendings->push_back(PendingImage::Make(readback, pendings->size(), false, nullptr));
+  auto token = pendings->back().token;
+  drawContext->exportPendingImage(token, 10, 10, Matrix::MakeTrans(45, 45), Brush());
+
+  EXPECT_TRUE(exporter->isReadyToClose());
+  // The poll must release the GPU buffer instead of holding it until close().
+  EXPECT_TRUE(pendings->back().readback == nullptr);
+  EXPECT_FALSE(pendings->back().dataUri.empty());
+
+  exporter->close();
+  auto SVGString = SVGStream->readString();
+  EXPECT_EQ(SVGString.find(token), std::string::npos);
+  EXPECT_NE(SVGString.find("data:image/png;base64,"), std::string::npos);
+})}
+
+TGFX_TEST(SVGExportTest, MixedGlyphRulesKeepTheirFilledAreas) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  Path ring = {};
+  ring.addRect(Rect::MakeLTRB(0.0f, 0.0f, 100.0f, 100.0f));
+  ring.addRect(Rect::MakeLTRB(20.0f, 20.0f, 80.0f, 80.0f));
+  PathTypefaceBuilder builder(100);
+  ASSERT_NE(builder.addGlyph(ring, 100.0f), 0);
+  ring.setFillType(PathFillType::EvenOdd);
+  ASSERT_NE(builder.addGlyph(ring, 100.0f), 0);
+  auto typeface = builder.detach();
+  ASSERT_TRUE(typeface != nullptr);
+  for (bool parityFirst : {false, true}) {
+    GlyphID glyphs[] = {parityFirst ? GlyphID(2) : GlyphID(1),
+                        parityFirst ? GlyphID(1) : GlyphID(2)};
+    Point positions[] = {{0.0f, 0.0f}, {120.0f, 0.0f}};
+    auto stream = MemoryWriteStream::Make();
+    auto exporter = SVGExporter::Make(stream, context, Rect::MakeWH(240.0f, 120.0f),
                                       SVGExportFlags::DisablePrettyXML);
     ASSERT_TRUE(exporter != nullptr);
-    auto* drawContext = exporter->drawContext;
-    auto* pendings = &exporter->pendingImages->images;
-    pendings->push_back(PendingImage::Make(readback, pendings->size(), false, nullptr));
-    auto token = pendings->back().token;
-    drawContext->exportPendingImage(token, 10, 10, Matrix::MakeTrans(45, 45), Brush());
-
-    EXPECT_TRUE(exporter->isReadyToClose());
-    // The poll must release the GPU buffer instead of holding it until close().
-    EXPECT_TRUE(pendings->back().readback == nullptr);
-    EXPECT_FALSE(pendings->back().dataUri.empty());
-
+    Paint paint = {};
+    paint.setColor(Color::Black());
+    exporter->getCanvas()->drawGlyphs(glyphs, positions, 2, Font(typeface, 100.0f), paint);
     exporter->close();
-    auto SVGString = SVGStream->readString();
-    EXPECT_EQ(SVGString.find(token), std::string::npos);
-    EXPECT_NE(SVGString.find("data:image/png;base64,"), std::string::npos);
-  })
+    auto xml = stream->readString();
+    auto pathStart = xml.find("<path ");
+    ASSERT_NE(pathStart, std::string::npos);
+    auto pathEnd = xml.find("/>", pathStart);
+    ASSERT_NE(pathEnd, std::string::npos);
+    auto element = xml.substr(pathStart, pathEnd - pathStart);
+    auto dataStart = element.find(" d=\"");
+    ASSERT_NE(dataStart, std::string::npos);
+    dataStart += 4;
+    auto dataEnd = element.find('"', dataStart);
+    ASSERT_NE(dataEnd, std::string::npos);
+    auto parsed = SVGPathParser::FromSVGString(element.substr(dataStart, dataEnd - dataStart));
+    ASSERT_TRUE(parsed != nullptr);
+    auto exported = *parsed;
+    exported.setFillType(element.find("fill-rule=\"evenodd\"") == std::string::npos
+                             ? PathFillType::Winding
+                             : PathFillType::EvenOdd);
+    EXPECT_EQ(exported.contains(50.0f, 50.0f), !parityFirst);
+    EXPECT_EQ(exported.contains(170.0f, 50.0f), parityFirst);
+    EXPECT_TRUE(exported.contains(10.0f, 50.0f));
+    EXPECT_TRUE(exported.contains(130.0f, 50.0f));
+  }
+}
+
+TGFX_TEST(SVGExportTest, GlyphStrokeKeepsOriginalContourSequence) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  Path rectangle = {};
+  rectangle.addRect(Rect::MakeWH(100.0f, 100.0f));
+  rectangle.setFillType(PathFillType::EvenOdd);
+  PathTypefaceBuilder builder(100);
+  ASSERT_NE(builder.addGlyph(rectangle, 100.0f), 0);
+  auto typeface = builder.detach();
+  ASSERT_TRUE(typeface != nullptr);
+  GlyphID glyphs[] = {1, 1};
+  Point positions[] = {{0.0f, 0.0f}, {50.0f, 0.0f}};
+  auto stream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(stream, context, Rect::MakeWH(240.0f, 120.0f),
+                                    SVGExportFlags::DisablePrettyXML);
+  ASSERT_TRUE(exporter != nullptr);
+  Paint paint = {};
+  paint.setColor(Color::Black());
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(2.0f);
+  exporter->getCanvas()->drawGlyphs(glyphs, positions, 2, Font(typeface, 100.0f), paint);
+  exporter->close();
+  auto xml = stream->readString();
+  auto dataStart = xml.find(" d=\"");
+  ASSERT_NE(dataStart, std::string::npos);
+  dataStart += 4;
+  auto dataEnd = xml.find('"', dataStart);
+  ASSERT_NE(dataEnd, std::string::npos);
+  auto parsed = SVGPathParser::FromSVGString(xml.substr(dataStart, dataEnd - dataStart));
+  ASSERT_TRUE(parsed != nullptr);
+  auto expected = rectangle;
+  auto second = rectangle;
+  second.transform(Matrix::MakeTrans(50.0f, 0.0f));
+  ASSERT_TRUE(expected.addPath(second));
+  EXPECT_EQ(SVGPathParser::ToSVGString(*parsed), SVGPathParser::ToSVGString(expected));
+  EXPECT_NE(xml.find("stroke="), std::string::npos);
+  EXPECT_NE(xml.find("fill=\"none\""), std::string::npos);
+}
+
+TGFX_TEST(SVGExportTest, OverlappingEvenOddGlyphsKeepOverlapFilled) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  Path rectangle = {};
+  rectangle.addRect(Rect::MakeWH(100.0f, 100.0f));
+  rectangle.setFillType(PathFillType::EvenOdd);
+  PathTypefaceBuilder builder(100);
+  ASSERT_NE(builder.addGlyph(rectangle, 100.0f), 0);
+  auto typeface = builder.detach();
+  ASSERT_TRUE(typeface != nullptr);
+  auto stream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(stream, context, Rect::MakeWH(240.0f, 120.0f),
+                                    SVGExportFlags::DisablePrettyXML);
+  ASSERT_TRUE(exporter != nullptr);
+  GlyphID glyphs[] = {1, 1};
+  Point positions[] = {{0.0f, 0.0f}, {50.0f, 0.0f}};
+  Paint paint = {};
+  paint.setColor(Color::Black());
+  exporter->getCanvas()->drawGlyphs(glyphs, positions, 2, Font(typeface, 100.0f), paint);
+  exporter->close();
+  auto xml = stream->readString();
+  auto dataStart = xml.find(" d=\"");
+  ASSERT_NE(dataStart, std::string::npos);
+  dataStart += 4;
+  auto dataEnd = xml.find('"', dataStart);
+  ASSERT_NE(dataEnd, std::string::npos);
+  auto parsed = SVGPathParser::FromSVGString(xml.substr(dataStart, dataEnd - dataStart));
+  ASSERT_TRUE(parsed != nullptr);
+  parsed->setFillType(PathFillType::EvenOdd);
+  EXPECT_NE(xml.find("fill-rule=\"evenodd\""), std::string::npos);
+  EXPECT_TRUE(parsed->contains(25.0f, 50.0f));
+  EXPECT_TRUE(parsed->contains(75.0f, 50.0f));
+  EXPECT_TRUE(parsed->contains(125.0f, 50.0f));
+  EXPECT_FALSE(parsed->contains(175.0f, 50.0f));
+}
+
+TGFX_TEST(SVGExportTest, InverseGlyphFillIsNotWrittenAsOrdinaryFill) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  Path rectangle = {};
+  rectangle.addRect(Rect::MakeWH(100.0f, 100.0f));
+  rectangle.setFillType(PathFillType::InverseEvenOdd);
+  PathTypefaceBuilder builder(100);
+  ASSERT_NE(builder.addGlyph(rectangle, 100.0f), 0);
+  auto typeface = builder.detach();
+  ASSERT_TRUE(typeface != nullptr);
+  auto stream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(stream, context, Rect::MakeWH(240.0f, 120.0f),
+                                    SVGExportFlags::DisablePrettyXML);
+  ASSERT_TRUE(exporter != nullptr);
+  GlyphID glyphs[] = {1};
+  Point positions[] = {{0.0f, 0.0f}};
+  Paint paint = {};
+  paint.setColor(Color::Black());
+  exporter->getCanvas()->drawGlyphs(glyphs, positions, 1, Font(typeface, 100.0f), paint);
+  exporter->close();
+  EXPECT_EQ(stream->readString().find("<path "), std::string::npos);
 }
 
 }  // namespace tgfx

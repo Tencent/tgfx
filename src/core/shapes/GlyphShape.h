@@ -30,9 +30,14 @@ class GlyphShape : public Shape {
 
   PathFillType fillType() const override {
     // Reports the rule the glyph outline itself carries. A typeface cannot state one rule for all
-    // of its glyphs: the path operations behind faux bold can change it. Reading it from the
-    // outline keeps the GPU stencil pass and the CPU rasterizer in agreement. getPath() caches its
-    // result and the draw path needs it anyway, so this costs nothing extra.
+    // of its glyphs: the path operations behind faux bold can change it, so the rule is read from
+    // the outline. onGetPath() records it, so a caller that only asks about the rule - OpsCompositor,
+    // while it is recording - reads it back instead of computing the path again. A cold call still
+    // has to build the path once; there is no cheaper source for the rule.
+    auto cached = cachedFillType.load(std::memory_order_acquire);
+    if (cached >= 0) {
+      return static_cast<PathFillType>(cached);
+    }
     return getPath().getFillType();
   }
 
@@ -50,5 +55,8 @@ class GlyphShape : public Shape {
  private:
   Font font;
   GlyphID glyphID = 0;
+  // The rule onGetPath() produced, or -1 before it has run. Shapes are immutable, so the rule
+  // cannot change once known. Mirrors the way Shape caches its path and bounds.
+  mutable std::atomic<int> cachedFillType = {-1};
 };
 }  // namespace tgfx

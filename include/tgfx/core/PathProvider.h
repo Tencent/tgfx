@@ -48,10 +48,12 @@ class PathProvider {
   virtual Rect getBounds() const = 0;
 
   /**
-   * Returns the fill type of the path. The default implementation returns PathFillType::Winding.
+   * Returns the fill type of the computed path. The default implementation computes getPath().
+   * Providers may override this to return the rule without computing the path, but the returned
+   * value must match getPath().getFillType(). getPath() must not call this default implementation.
    */
   virtual PathFillType fillType() const {
-    return PathFillType::Winding;
+    return getPath().getFillType();
   }
 };
 }  // namespace tgfx

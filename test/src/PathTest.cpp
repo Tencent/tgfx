@@ -27,6 +27,7 @@
 #pragma clang diagnostic ignored "-Wimplicit-int-conversion"
 #include <include/core/SkPath.h>
 #pragma clang diagnostic pop
+#include <include/pathops/SkPathOps.h>
 #include "base/TGFXTest.h"
 #include "core/NoConicsPathIterator.h"
 #include "core/PathRasterizer.h"
@@ -362,17 +363,18 @@ TGFX_TEST(PathTest, IteratorNoConics) {
   ASSERT_EQ(points[4].y, 100.0f);
 }
 
+static Path BuildTestPath(int numConics) {
+  Path path;
+  path.moveTo(0, 0);
+  for (int i = 0; i < numConics; i++) {
+    float x = static_cast<float>(i * 10);
+    path.conicTo(x + 5, 10, x + 10, 0, 0.707107f);
+  }
+  return path;
+}
+
 TGFX_TEST(PathTest, IteratorPerformance) {
   // Build a path with many conics for performance testing
-  auto buildTestPath = [](int numConics) {
-    Path path;
-    path.moveTo(0, 0);
-    for (int i = 0; i < numConics; i++) {
-      float x = static_cast<float>(i * 10);
-      path.conicTo(x + 5, 10, x + 10, 0, 0.707107f);
-    }
-    return path;
-  };
 
   const int iterations = 1000;
   std::vector<int> testSizes = {10, 50, 100, 500, 1000, 5000};
@@ -383,7 +385,7 @@ TGFX_TEST(PathTest, IteratorPerformance) {
   printf("-------------------------------------------------------------------------\n");
 
   for (int numConics : testSizes) {
-    Path path = buildTestPath(numConics);
+    Path path = BuildTestPath(numConics);
     auto& skPath = PathRef::ReadAccess(path);
     int verbCount = skPath.countVerbs();
 
@@ -460,17 +462,43 @@ TGFX_TEST(PathTest, ToWindingReorientsSameDirectionCounters) {
   ExpectRingFilledCorrectly(path, outer, inner, "ring");
 }
 
-TGFX_TEST(PathTest, ToWindingHandlesMultipleNestingLevels) {
-  // Three levels of nesting: filled, hole, filled. The winding directions have to alternate, so a
-  // conversion that only fixed the outermost hole would leave the island filled in.
-  auto outer = Rect::MakeLTRB(0, 0, 1000, 1000);
-  auto middle = Rect::MakeLTRB(150, 150, 850, 850);
-  auto inner = Rect::MakeLTRB(300, 300, 700, 700);
+// 回: three levels of nesting -- filled, hole, filled. The winding directions have to alternate, so
+// a conversion that only fixed the outermost hole would leave the island filled in.
+static Path MakeNestedCounter() {
   Path path = {};
-  path.addRect(outer);
-  path.addRect(middle);
-  path.addRect(inner);
+  path.addRect(Rect::MakeLTRB(0, 0, 1000, 1000));
+  path.addRect(Rect::MakeLTRB(150, 150, 850, 850));
+  path.addRect(Rect::MakeLTRB(300, 300, 700, 700));
   path.setFillType(PathFillType::EvenOdd);
+  return path;
+}
+
+// 品: three rings side by side, each keeping its own counter, so the conversion has to run per
+// contour rather than flipping everything at once. The rectangles come back with the path so a
+// caller can probe each counter without rebuilding the geometry.
+struct IslandsPath {
+  Path path = {};
+  std::vector<Rect> outers = {};
+  std::vector<Rect> inners = {};
+};
+
+static IslandsPath MakeIslands() {
+  IslandsPath islands = {};
+  for (int index = 0; index < 3; index++) {
+    auto left = static_cast<float>(index) * 400.0f;
+    auto outer = Rect::MakeLTRB(left, 0.0f, left + 380.0f, 380.0f);
+    auto inner = Rect::MakeLTRB(left + 80.0f, 80.0f, left + 300.0f, 300.0f);
+    islands.outers.push_back(outer);
+    islands.inners.push_back(inner);
+    islands.path.addRect(outer);
+    islands.path.addRect(inner);
+  }
+  islands.path.setFillType(PathFillType::EvenOdd);
+  return islands;
+}
+
+TGFX_TEST(PathTest, ToWindingHandlesMultipleNestingLevels) {
+  auto path = MakeNestedCounter();
   ASSERT_TRUE(path.toWinding());
   ASSERT_EQ(path.getFillType(), PathFillType::Winding);
   EXPECT_TRUE(path.contains(75, 500)) << "outer ring lost";
@@ -479,25 +507,12 @@ TGFX_TEST(PathTest, ToWindingHandlesMultipleNestingLevels) {
 }
 
 TGFX_TEST(PathTest, ToWindingKeepsSeparateIslands) {
-  // Three rings side by side, as in 品. Each keeps its own counter, so the conversion has to run
-  // per contour rather than flipping everything at once.
-  Path path = {};
-  std::vector<Rect> outers = {};
-  std::vector<Rect> inners = {};
-  for (int index = 0; index < 3; index++) {
-    auto left = static_cast<float>(index) * 400;
-    auto outer = Rect::MakeLTRB(left, 0, left + 380, 380);
-    auto inner = Rect::MakeLTRB(left + 80, 80, left + 300, 300);
-    outers.push_back(outer);
-    inners.push_back(inner);
-    path.addRect(outer);
-    path.addRect(inner);
-  }
-  path.setFillType(PathFillType::EvenOdd);
+  auto islands = MakeIslands();
+  auto path = islands.path;
   ASSERT_TRUE(path.toWinding());
   ASSERT_EQ(path.getFillType(), PathFillType::Winding);
-  for (size_t index = 0; index < outers.size(); index++) {
-    ExpectRingFilledCorrectly(path, outers[index], inners[index],
+  for (size_t index = 0; index < islands.outers.size(); index++) {
+    ExpectRingFilledCorrectly(path, islands.outers[index], islands.inners[index],
                               "island " + std::to_string(index));
   }
 }
@@ -561,23 +576,24 @@ static bool FilledUnderWinding(const Path& path, float x, float y) {
   return probe.contains(x, y);
 }
 
+static void AddCubicCircle(Path& path, float cx, float cy, float r) {
+  const float k = 0.5522847498f;
+  path.moveTo(cx + r, cy);
+  path.cubicTo(cx + r, cy + k * r, cx + k * r, cy + r, cx, cy + r);
+  path.cubicTo(cx - k * r, cy + r, cx - r, cy + k * r, cx - r, cy);
+  path.cubicTo(cx - r, cy - k * r, cx - k * r, cy - r, cx, cy - r);
+  path.cubicTo(cx + k * r, cy - r, cx + r, cy - k * r, cx + r, cy);
+  path.close();
+}
+
 TGFX_TEST(PathTest, ToWindingOrientsCurvedCounters) {
   // Counters bounded by curves: written the way a real font writes them (cubic) and the way tgfx
   // builds them (conic). Both run the same way as the outline around them, so only parity keeps
   // them open, and the flattened area still has to carry the right sign.
-  auto addCubicCircle = [](Path& path, float cx, float cy, float r) {
-    const float k = 0.5522847498f;
-    path.moveTo(cx + r, cy);
-    path.cubicTo(cx + r, cy + k * r, cx + k * r, cy + r, cx, cy + r);
-    path.cubicTo(cx - k * r, cy + r, cx - r, cy + k * r, cx - r, cy);
-    path.cubicTo(cx - r, cy - k * r, cx - k * r, cy - r, cx, cy - r);
-    path.cubicTo(cx + k * r, cy - r, cx + r, cy - k * r, cx + r, cy);
-    path.close();
-  };
   {
     Path path = {};
-    addCubicCircle(path, 500.0f, 500.0f, 500.0f);
-    addCubicCircle(path, 500.0f, 500.0f, 250.0f);
+    AddCubicCircle(path, 500.0f, 500.0f, 500.0f);
+    AddCubicCircle(path, 500.0f, 500.0f, 250.0f);
     path.setFillType(PathFillType::EvenOdd);
     ASSERT_TRUE(FilledUnderWinding(path, 500.0f, 500.0f)) << "test input no longer shows the bug";
     ASSERT_TRUE(path.toWinding());
@@ -618,17 +634,39 @@ TGFX_TEST(PathTest, ToWindingKeepsOrientationFarFromOrigin) {
 
 TGFX_TEST(PathTest, ToWindingLeavesCrossingContoursAlone) {
   // Contours that share area are neither nested nor disjoint. Real glyphs do this: two strokes of
-  // one character overlap where they meet. The conversion must not flip either of them - a guessed
-  // depth would change the filled area - so both stay outermost and keep their own direction,
-  // which is how overlapping strokes read under winding. This documents that behaviour; it is not
-  // a claim that the conversion preserved the even-odd area, and a caller that needs that has to
-  // resolve the overlaps with a boolean operation first.
+  // one character overlap where they meet. Neither is flipped, so both stay outermost and keep the
+  // direction they were drawn with. That is still not enough to keep the even-odd area when they
+  // run the same way: even-odd reads an even crossing count in the intersection and leaves it
+  // empty, while two winding numbers of the same sign add up to a non-zero one and fill it. No
+  // choice of directions can change that, so it is asserted here as the known deviation from the
+  // contract in the header, which holds for outlines whose contours do not cross. Keeping the
+  // even-odd area of these takes a boolean operation - addPath() runs one and orients the result.
   Path path = {};
   path.addRect(Rect::MakeLTRB(0.0f, 0.0f, 600.0f, 600.0f));
   path.addRect(Rect::MakeLTRB(400.0f, 400.0f, 1000.0f, 1000.0f));
   path.setFillType(PathFillType::EvenOdd);
+  ASSERT_FALSE(path.contains(500.0f, 500.0f)) << "input no longer shows the deviation";
   ASSERT_TRUE(path.toWinding());
   EXPECT_EQ(path.getFillType(), PathFillType::Winding);
+  EXPECT_TRUE(path.contains(100.0f, 100.0f)) << "first contour lost";
+  EXPECT_TRUE(path.contains(900.0f, 900.0f)) << "second contour lost";
+  EXPECT_TRUE(path.contains(500.0f, 500.0f)) << "documented deviation: the intersection fills in";
+}
+
+TGFX_TEST(PathTest, ToWindingKeepsAreaOfOppositeOverlappingContours) {
+  // The other way round the area can be kept. Two outermost contours that overlap in opposite
+  // directions leave their intersection empty under even-odd, and under winding as well, because
+  // the two winding numbers cancel there. That only holds while each keeps the direction it was
+  // drawn with: forcing every outermost contour to one shared direction - which neither rule asks
+  // for, winding only wanting a non-zero sum - makes them agree and fills the intersection in.
+  Path path = {};
+  path.addRect(Rect::MakeLTRB(0.0f, 0.0f, 600.0f, 600.0f));
+  path.addRect(Rect::MakeLTRB(400.0f, 400.0f, 1000.0f, 1000.0f), true);
+  path.setFillType(PathFillType::EvenOdd);
+  ASSERT_FALSE(path.contains(500.0f, 500.0f)) << "input no longer shows the case";
+  ASSERT_TRUE(path.toWinding());
+  EXPECT_EQ(path.getFillType(), PathFillType::Winding);
+  EXPECT_FALSE(path.contains(500.0f, 500.0f)) << "intersection filled in";
   EXPECT_TRUE(path.contains(100.0f, 100.0f)) << "first contour lost";
   EXPECT_TRUE(path.contains(900.0f, 900.0f)) << "second contour lost";
 }

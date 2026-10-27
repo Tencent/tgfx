@@ -132,9 +132,12 @@ class Shape {
   virtual PathFillType fillType() const = 0;
 
   /**
-   * Returns true if the PathFillType is InverseWinding or InverseEvenOdd.
+   * Returns true if the PathFillType is InverseWinding or InverseEvenOdd. The default reads
+   * fillType(). A Shape whose rule is only known once its path has been merged overrides this to
+   * answer the one part of the question that can be settled without that merge, so a caller that
+   * only asks whether the Shape fills the whole plane does not pay for computing the path.
    */
-  bool isInverseFillType() const;
+  virtual bool isInverseFillType() const;
 
   /**
    * Returns the bounding box of the Shape. The bounds might be larger than the actual shape because

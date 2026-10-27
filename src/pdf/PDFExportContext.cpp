@@ -343,7 +343,7 @@ bool IsBackgroundBlurStylePattern(const Brush& brush, const Image* image) {
 // By generating the path at the final device font size (fontSize * resolutionScale) and then
 // scaling back to logical coordinates, the path shape matches the GPU-rasterized mask used by
 // InnerShadowStyle and NoiseStyle.
-Path GetGlyphRunPath(const GlyphRun& glyphRun, float resolutionScale) {
+Path GetGlyphRunPath(const GlyphRun& glyphRun, float resolutionScale, bool contoursOnly) {
   if (resolutionScale <= 0.0f) {
     return {};
   }
@@ -355,6 +355,7 @@ Path GetGlyphRunPath(const GlyphRun& glyphRun, float resolutionScale) {
   }
 
   Path path = {};
+  std::vector<Path> sources = {};
   for (size_t index = 0; index < glyphRun.glyphCount; index++) {
     auto glyphID = glyphRun.glyphs[index];
     Path glyphPath = {};
@@ -367,7 +368,15 @@ Path GetGlyphRunPath(const GlyphRun& glyphRun, float resolutionScale) {
       glyphMatrix.postConcat(scaleMatrix);
     }
     glyphPath.transform(glyphMatrix);
-    path.addPath(glyphPath);
+    if (contoursOnly) {
+      path.addPath(glyphPath);
+    } else {
+      sources.push_back(std::move(glyphPath));
+    }
+  }
+  if (!contoursOnly && !path.addPaths(sources)) {
+    LOGE("PDF export: failed to merge glyph fill regions.");
+    return {};
   }
   if (hasScale) {
     auto inverseMatrix = Matrix::MakeScale(1.0f / resolutionScale, 1.0f / resolutionScale);
@@ -604,7 +613,11 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const Matr
 void PDFExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const Matrix& matrix,
                                             const ClipStack& clip, const Brush& brush,
                                             const Stroke* stroke) {
-  auto path = GetGlyphRunPath(glyphRun, matrix.getMaxScale());
+  auto path = GetGlyphRunPath(glyphRun, matrix.getMaxScale(), stroke != nullptr);
+  if (path.isInverseFillType() && stroke == nullptr) {
+    LOGE("PDF export: inverse-filled glyph runs require a finite clipping region.");
+    return;
+  }
   if (path.isEmpty()) {
     return;
   }

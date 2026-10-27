@@ -88,9 +88,13 @@ class Path {
    * Paths that already use the winding rule are left as is. InverseEvenOdd is converted to
    * InverseWinding.
    *
-   * The contours must not cross themselves or each other. This holds for any result of addPath()
-   * with PathOp::Union, Intersect, Difference or XOR, since those operations resolve all
-   * intersections before emitting their contours.
+   * The area is preserved only while the contours do not cross themselves or each other. Where two
+   * outermost contours overlap in the same direction the two rules genuinely disagree - even-odd
+   * leaves the intersection empty and winding fills it - and no choice of directions can reconcile
+   * them, so such an outline has to be resolved with a boolean operation instead: addPath() runs
+   * one and orients the result. Overlapping in opposite directions, and nesting of any depth, do
+   * keep the area. Any result of addPath() with PathOp::Union, Intersect, Difference or XOR meets
+   * the condition, since those operations resolve all intersections before emitting their contours.
    *
    * Returns false if the conversion fails, in which case the path is left unchanged. Callers must
    * check the result: a silent failure leaves an outline that still depends on the even-odd rule.
@@ -381,18 +385,30 @@ class Path {
   void addRRect(const RRect& rRect, bool reversed = false, unsigned startIndex = 0);
 
   /**
-   * Adds a src to this Path.
+   * Adds a src to this Path, reporting whether the operation ran. Only the boolean operations can
+   * fail; Append and Extend always succeed.
+   * @param src the Path to combine with this one.
+   * @param op how to combine them. Append and Extend concatenate the outlines; the rest combine the
+   * filled areas the two paths describe.
+   * @return whether the operation ran. A false result leaves this Path exactly as it was, so it
+   * still holds a usable outline - only the combination was not applied. A true result is not a
+   * promise that every contour made it through: edges that cannot be resolved are left out and the
+   * rest are assembled without them, so a caller that needs the whole outline has to check what it
+   * got rather than assume the operation covered all of it.
    */
-  void addPath(const Path& src, PathOp op = PathOp::Append);
+  bool addPath(const Path& src, PathOp op = PathOp::Append);
 
   /**
-   * Adds a src to this Path, reporting whether the operation ran. Only the boolean operations can
-   * fail: they resolve every intersection first and give up instead of emitting a partial result.
-   * Append and Extend always succeed. On failure this Path is left holding whatever the operation
-   * managed to produce, so callers must treat the reported failure as "the result is unusable"
-   * rather than reading it anyway. success may be nullptr when the caller does not care.
+   * Adds every path in sources to this Path, combining the filled areas they describe. A single
+   * Path carries one fill rule, so concatenating outlines that disagree about theirs would silently
+   * reinterpret some of them: each source is read under the rule it declares and only the areas are
+   * combined. Sources with matching non-inverse rules may keep their contours when their filled
+   * regions are disjoint. Winding contours may also be retained when their concatenation has an
+   * empty symmetric difference with the computed union. Otherwise, the boolean result is used.
+   * @param sources the Paths to add. Empty leaves this Path alone and returns true.
+   * @return whether the combination ran. A false result leaves this Path exactly as it was.
    */
-  void addPath(const Path& src, PathOp op, bool* success);
+  bool addPaths(const std::vector<Path>& sources);
 
   /**
    * Sets Path to its initial state. Internal storage associated with Path is released.
