@@ -89,9 +89,9 @@ std::string PreprocessGLSL(const std::string& source, ShaderStageType stage, std
   return result;
 }
 
-CompileResult CompileGLSL(const std::string& source, ShaderStageType stage,
-                          const std::string& shaderName, uint32_t variantIndex, bool optimize) {
-  CompileResult result;
+std::vector<uint32_t> CompileGLSL(const std::string& source, ShaderStageType stage,
+                                  const std::string& shaderName, uint32_t variantIndex,
+                                  bool optimize, std::string* error) {
   shaderc::Compiler compiler;
   shaderc::CompileOptions options;
   options.SetOptimizationLevel(optimize ? shaderc_optimization_level_performance
@@ -105,19 +105,16 @@ CompileResult CompileGLSL(const std::string& source, ShaderStageType stage,
   auto spvResult = compiler.CompileGlslToSpv(source, shaderKind, filename.c_str(), "main", options);
 
   if (spvResult.GetCompilationStatus() != shaderc_compilation_status_success) {
-    result.success = false;
-    result.error = "[" + shaderName + " variant " + std::to_string(variantIndex) + "] " +
-                   spvResult.GetErrorMessage();
-    return result;
+    *error = "[" + shaderName + " variant " + std::to_string(variantIndex) + "] " +
+             spvResult.GetErrorMessage();
+    return {};
   }
 
-  result.success = true;
-  result.spirv = {spvResult.cbegin(), spvResult.cend()};
-  return result;
+  return {spvResult.cbegin(), spvResult.cend()};
 }
 
-CompileResult TranslateToMSL(const std::vector<uint32_t>& spirv, ShaderStageType stage) {
-  CompileResult result;
+std::string TranslateToMSL(const std::vector<uint32_t>& spirv, ShaderStageType stage,
+                           std::string* error) {
   // spirv-cross uses C++ exceptions internally for error reporting. This catch block is a
   // necessary boundary isolation to convert third-party exceptions into return values, as
   // TGFX project rules forbid exceptions in our own code.
@@ -173,17 +170,14 @@ CompileResult TranslateToMSL(const std::vector<uint32_t>& spirv, ShaderStageType
     // spirv-cross automatically converts subpassInput to [[color(N)]] in MSL without
     // needing explicit resource binding.
 
-    result.msl = mslCompiler.compile();
-    result.success = true;
+    return mslCompiler.compile();
 
   } catch (const spirv_cross::CompilerError& e) {
-    result.success = false;
-    result.error = std::string("spirv-cross MSL error: ") + e.what();
+    *error = std::string("spirv-cross MSL error: ") + e.what();
   } catch (const std::exception& e) {
-    result.success = false;
-    result.error = std::string("spirv-cross exception: ") + e.what();
+    *error = std::string("spirv-cross exception: ") + e.what();
   }
-  return result;
+  return {};
 }
 
 #ifdef TGFX_SHADER_TOOL_HAS_TINT
@@ -353,9 +347,9 @@ static std::vector<uint32_t> compileSPIRVForWGSL(const std::string& source, Shad
 }
 #endif
 
-CompileResult CompileGLSLToWGSL(const std::string& source, ShaderStageType stage,
-                                const std::string& shaderName, uint32_t variantIndex) {
-  CompileResult result;
+std::string CompileGLSLToWGSL(const std::string& source, ShaderStageType stage,
+                              const std::string& shaderName, uint32_t variantIndex,
+                              std::string* error) {
   std::string errorPrefix = "[" + shaderName + " variant " + std::to_string(variantIndex) + "] ";
 #ifdef TGFX_SHADER_TOOL_HAS_TINT
   std::string compileError;
@@ -364,8 +358,8 @@ CompileResult CompileGLSLToWGSL(const std::string& source, ShaderStageType stage
   // would leave holes against the reflection's sampler list.
   auto expandedSource = PreprocessGLSL(source, stage, &compileError);
   if (expandedSource.empty()) {
-    result.error = errorPrefix + "GLSL preprocess: " + compileError;
-    return result;
+    *error = errorPrefix + "GLSL preprocess: " + compileError;
+    return {};
   }
   auto vulkanGLSL = preprocessWebGPU(expandedSource);
   if (const char* dumpDir = std::getenv("TGFX_SHADER_DUMP_DIR")) {
@@ -385,8 +379,8 @@ CompileResult CompileGLSLToWGSL(const std::string& source, ShaderStageType stage
   }
   auto spirv = compileSPIRVForWGSL(vulkanGLSL, stage, &compileError);
   if (spirv.empty()) {
-    result.error = errorPrefix + "GLSL to SPIR-V: " + compileError;
-    return result;
+    *error = errorPrefix + "GLSL to SPIR-V: " + compileError;
+    return {};
   }
   // The reader options mirror WebGPUShaderModule::compileShader so the AOT and JIT paths
   // produce equivalent WGSL from the same shader sources.
@@ -398,31 +392,29 @@ CompileResult CompileGLSLToWGSL(const std::string& source, ShaderStageType stage
     for (const auto& diag : program.Diagnostics()) {
       diagnostics += " " + diag.message.Plain();
     }
-    result.error = errorPrefix + "tint SPIR-V reader:" + diagnostics;
-    return result;
+    *error = errorPrefix + "tint SPIR-V reader:" + diagnostics;
+    return {};
   }
   tint::wgsl::writer::Options writerOptions;
   auto wgslResult = tint::wgsl::writer::Generate(program, writerOptions);
   if (wgslResult != tint::Success) {
-    result.error = errorPrefix + "tint WGSL writer failed to generate WGSL";
-    return result;
+    *error = errorPrefix + "tint WGSL writer failed to generate WGSL";
+    return {};
   }
   if (wgslResult->wgsl.empty()) {
-    result.error = errorPrefix + "tint generated empty WGSL code";
-    return result;
+    *error = errorPrefix + "tint generated empty WGSL code";
+    return {};
   }
-  result.wgsl = std::move(wgslResult->wgsl);
-  result.success = true;
-  return result;
+  return std::move(wgslResult->wgsl);
 #else
   // Unreachable in practice: the CMake wiring defines TGFX_SHADER_TOOL_HAS_TINT exactly when
   // "webgpu" can appear in --backends. Kept explicit so a misconfigured build fails loudly
   // instead of silently emitting an empty WebGPU bundle.
   (void)source;
   (void)stage;
-  result.error =
+  *error =
       errorPrefix + "WebGPU translation is unavailable: build with -DTGFX_BUILD_WEBGPU_BUNDLE=ON";
-  return result;
+  return {};
 #endif
 }
 

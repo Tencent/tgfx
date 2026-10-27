@@ -48,12 +48,12 @@ class Sha256 {
 
 /// Builds the key of one cached compilation from every input that can change its output. Each
 /// field is length prefixed, so different field sequences never produce the same byte stream.
-/// Every key also covers the cache schema and the identity of the running shader_build_tool, so
-/// rebuilding the tool (its translation code, shaderc, SPIRV-Cross or tint, all linked into it)
-/// invalidates every entry.
+/// The key covers the cache schema and the identity of the running shader_build_tool (the
+/// toolIdentity argument — its owner hands it in), so rebuilding the tool (its translation
+/// code, shaderc, SPIRV-Cross or tint, all linked into it) invalidates every entry.
 class StageCacheKey {
  public:
-  explicit StageCacheKey(const std::string& kind);
+  explicit StageCacheKey(const std::string& kind, const std::string& toolIdentity);
   StageCacheKey& add(const std::string& text);
   StageCacheKey& add(const void* data, size_t size);
   StageCacheKey& add(uint64_t value);
@@ -81,7 +81,9 @@ struct StageCacheStats {
 /// that can be read back. Only successful compilations are stored.
 class StageCache {
  public:
-  static StageCache& Get();
+  StageCache();
+  StageCache(const StageCache&) = delete;
+  StageCache& operator=(const StageCache&) = delete;
 
   /// Enables the persistent store under dir. Returns false (and stays memory-only) when the
   /// directory cannot be created or the tool's own identity cannot be determined.
@@ -114,10 +116,6 @@ class StageCache {
   void printSummary() const;
 
  private:
-  StageCache();
-  StageCache(const StageCache&) = delete;
-  StageCache& operator=(const StageCache&) = delete;
-
   std::string entryPath(const std::string& key) const;
 
   std::string directory = {};

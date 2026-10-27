@@ -26,37 +26,9 @@ namespace tgfx {
 
 enum class ShaderStageType { Vertex, Fragment };
 
-struct CompileResult {
-  bool success = false;
-  std::vector<uint32_t> spirv;
-  std::string msl;
-  std::string wgsl;
-  std::string error;
-};
-
-/// Compiles GLSL source (already with #defines prepended) to SPIR-V using shaderc.
-/// When optimize is true, applies performance-level optimization to reduce SPIR-V size.
-CompileResult CompileGLSL(const std::string& source, ShaderStageType stage,
-                          const std::string& shaderName, uint32_t variantIndex,
-                          bool optimize = false);
-
-/// Translates SPIR-V binary to Metal Shading Language via spirv-cross.
-CompileResult TranslateToMSL(const std::vector<uint32_t>& spirv, ShaderStageType stage);
-
-/// Converts #define-expanded template GLSL to WGSL: preprocess into Vulkan GLSL with
-/// separated texture/sampler bindings, compile to SPIR-V via shaderc, then translate to
-/// WGSL via tint. Binding contract (must match WebGPURenderPipeline and the runtime JIT
-/// path in WebGPUShaderModule): group 0; binding 0/1 = vertex/fragment uniform blocks;
-/// per sampler i (declaration order): texture binding = 2+2i, sampler binding = 3+2i.
-CompileResult CompileGLSLToWGSL(const std::string& source, ShaderStageType stage,
-                                const std::string& shaderName, uint32_t variantIndex);
-
-/// Compiles MSL source text to Metal library binary (.metallib) using xcrun metal/metallib, run
-/// without a shell on files in a scratch directory private to this process. Returns an empty
-/// vector on failure, with *error (when given) naming the failed step, its exit status and the
-/// compiler's stderr. Always fails on Windows, which has no Metal toolchain.
-std::vector<uint8_t> CompileMSLToMetallib(const std::string& mslSource, ShaderStageType stage,
-                                          std::string* error = nullptr);
+// The compiler primitives (CompileGLSL, TranslateToMSL, CompileGLSLToWGSL, CompileMSLToMetallib)
+// moved to compile/StageCompiler.h: they are private to the compile sublayer, and StageCompiler
+// is their only caller.
 
 /// Selects the platform the Metal bundle is compiled for: the SDK (macosx, iphoneos or
 /// iphonesimulator) and, optionally, the minimum OS version. A metallib is tied to the platform it

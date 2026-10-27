@@ -37,6 +37,7 @@
 #include "ShaderSources.h"
 #include "StageCache.h"
 #include "StageReport.h"
+#include "compile/StageCompiler.h"
 #include "core/Diagnostics.h"
 #include "emit/FormCheck.h"
 #include "emit/GLSLDialect.h"
@@ -247,159 +248,11 @@ static bool ParseArgs(int argc, char** argv, BuildOptions* options) {
   return true;
 }
 
-// Reuse of compiled stages. Every expensive compilation (GLSL to SPIR-V, the optimized Vulkan
-// SPIR-V, MSL to metallib, GLSL to WGSL) is looked up by a key built from everything that feeds it:
-// the exact text the compiler receives, the stage, the compiler options, and the identity of this
-// tool (see StageCacheKey). The memory layer removes the repeats within one run, such as a vertex
-// permutation shared by many fragment variants; the persistent layer (StageCache) lets a later run
-// skip every stage whose inputs did not change. Failures are only remembered for this run.
-struct SpirvCacheEntry {
-  bool success = false;
-  std::vector<uint32_t> spirv;
-  std::string error;
-};
-static std::map<std::string, SpirvCacheEntry> spirvCache;
-
-static const SpirvCacheEntry& CompileGLSLShared(const std::string& source, ShaderStageType stage,
-                                                const std::string& shaderName,
-                                                uint32_t variantIndex, bool optimize) {
-  const char* kind = optimize ? "spirv-optimized" : "spirv";
-  auto& cache = StageCache::Get();
-  auto& stats = cache.stats(kind);
-  stats.requests++;
-  // shaderc receives shaderName_variant_N as the input file name, so it is part of the input.
-  auto key = StageCacheKey(kind)
-                 .add(shaderName + "_variant_" + std::to_string(variantIndex))
-                 .add(static_cast<uint64_t>(stage))
-                 .add(static_cast<uint64_t>(optimize))
-                 .add(source)
-                 .finish();
-  auto it = spirvCache.find(key);
-  if (it != spirvCache.end()) {
-    stats.memoryHits++;
-    return it->second;
-  }
-  SpirvCacheEntry entry;
-  std::vector<uint8_t> payload;
-  if (cache.load(key, &payload, &stats) && payload.size() % 4 == 0) {
-    entry.success = true;
-    entry.spirv.resize(payload.size() / 4);
-    std::memcpy(entry.spirv.data(), payload.data(), payload.size());
-  } else {
-    stats.executed++;
-    auto result = CompileGLSL(source, stage, shaderName, variantIndex, optimize);
-    entry.success = result.success;
-    entry.spirv = std::move(result.spirv);
-    entry.error = std::move(result.error);
-    if (entry.success) {
-      auto* bytes = reinterpret_cast<const uint8_t*>(entry.spirv.data());
-      cache.store(key, std::vector<uint8_t>(bytes, bytes + entry.spirv.size() * 4), &stats);
-    }
-  }
-  return spirvCache.emplace(std::move(key), std::move(entry)).first->second;
-}
-
-struct BlobCacheEntry {
-  bool success = false;
-  std::vector<uint8_t> bytes;
-  std::string error;
-};
-static std::map<std::string, BlobCacheEntry> blobCache;
-
-// Looks a backend artifact up in both cache layers, or runs compile() and caches what it returns.
-// compile fills bytes and returns true, or returns false with an error.
-template <typename Compile>
-static const BlobCacheEntry& CompileBlobShared(const std::string& kind, std::string key,
-                                               Compile compile) {
-  auto& cache = StageCache::Get();
-  auto& stats = cache.stats(kind);
-  stats.requests++;
-  auto it = blobCache.find(key);
-  if (it != blobCache.end()) {
-    stats.memoryHits++;
-    return it->second;
-  }
-  BlobCacheEntry entry;
-  if (cache.load(key, &entry.bytes, &stats)) {
-    entry.success = true;
-  } else {
-    stats.executed++;
-    entry.success = compile(&entry.bytes, &entry.error);
-    if (entry.success) {
-      cache.store(key, entry.bytes, &stats);
-    }
-  }
-  return blobCache.emplace(std::move(key), std::move(entry)).first->second;
-}
-
-// The Metal compiler's version and the macOS SDK it targets, queried once. Part of every metallib
-// key: a new Xcode can compile the same MSL to different bytes.
-static const std::string& MetalToolchainKey() {
-  static const std::string key = MetalCompilerFingerprint() + "\n" + MetalToolchainVersion();
-  return key;
-}
-
-static std::vector<uint8_t> CompileMetallibShared(const std::string& msl, ShaderStageType stage,
-                                                  std::string* error) {
-  auto key = StageCacheKey("metallib")
-                 .add(MetalToolchainKey())
-                 .add(static_cast<uint64_t>(stage))
-                 .add(msl)
-                 .finish();
-  const auto& entry = CompileBlobShared(
-      "metallib", std::move(key), [&](std::vector<uint8_t>* bytes, std::string* compileError) {
-        *bytes = CompileMSLToMetallib(msl, stage, compileError);
-        return !bytes->empty();
-      });
-  if (!entry.success) {
-    *error = entry.error;
-    return {};
-  }
-  return entry.bytes;
-}
-
-static CompileResult CompileWGSLShared(const std::string& source, ShaderStageType stage,
-                                       const std::string& shaderName, uint32_t variantIndex) {
-  auto key = StageCacheKey("wgsl")
-                 .add(shaderName + "_variant_" + std::to_string(variantIndex))
-                 .add(static_cast<uint64_t>(stage))
-                 .add(source)
-                 .finish();
-  const auto& entry = CompileBlobShared(
-      "wgsl", std::move(key), [&](std::vector<uint8_t>* bytes, std::string* compileError) {
-        auto result = CompileGLSLToWGSL(source, stage, shaderName, variantIndex);
-        if (!result.success) {
-          *compileError = result.error;
-          return false;
-        }
-        bytes->assign(result.wgsl.begin(), result.wgsl.end());
-        return true;
-      });
-  CompileResult result;
-  result.success = entry.success;
-  result.error = entry.error;
-  result.wgsl.assign(entry.bytes.begin(), entry.bytes.end());
-  return result;
-}
-
-static std::map<std::tuple<std::string, uint32_t, uint32_t>, ReflectionResult> reflectionCache;
-
-static const ReflectionResult& ExtractReflectionShared(const std::string& shaderName,
-                                                       uint32_t vertIndex, uint32_t fragIndex,
-                                                       const std::vector<uint32_t>& vertSpirv,
-                                                       const std::vector<uint32_t>& fragSpirv) {
-  auto key = std::make_tuple(shaderName, vertIndex, fragIndex);
-  auto it = reflectionCache.find(key);
-  if (it == reflectionCache.end()) {
-    it = reflectionCache.emplace(std::move(key), ExtractReflection(vertSpirv, fragSpirv)).first;
-  }
-  return it->second;
-}
-
 // source is the shader's text from the build's single read of the sources (nullptr in report-only
-// mode); the bundle's source digest is computed from the same text.
+// mode); the bundle's source digest is computed from the same text. compiler owns the stage
+// caches of this build.
 static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const BuildOptions& options,
-                                     const ShaderSource* source,
+                                     const ShaderSource* source, StageCompiler* compiler,
                                      std::vector<VariantData>* outVariants,
                                      std::vector<InlineExpansionRecord>* outInlineExpansions,
                                      Diagnostics* diagnostics) {
@@ -442,8 +295,8 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
 
     // Compile vertex shader. The shared cache also covers the multiple-frag-per-vert reuse the
     // old per-backend vertCache handled, plus the cross-backend repeats.
-    const auto& vertResult = CompileGLSLShared(PrependDefines(vertSource, vertDefines),
-                                               ShaderStageType::Vertex, info.name, vi, false);
+    const auto& vertResult = compiler->compileSpirv(PrependDefines(vertSource, vertDefines),
+                                                    ShaderStageType::Vertex, info.name, vi, false);
     if (!vertResult.success) {
       std::cerr << "  " << vertResult.error << "\n";
       report.errorCount++;
@@ -452,8 +305,9 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
     }
     const auto* vertSpirv = &vertResult.spirv;
 
-    const auto& fragResult = CompileGLSLShared(PrependDefines(fragSource, fragDefines),
-                                               ShaderStageType::Fragment, info.name, fi, false);
+    const auto& fragResult = compiler->compileSpirv(PrependDefines(fragSource, fragDefines),
+                                                    ShaderStageType::Fragment, info.name, fi,
+                                                    false);
     if (!fragResult.success) {
       std::cerr << "  " << fragResult.error << "\n";
       report.errorCount++;
@@ -469,7 +323,7 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
 
     // Extract reflection from SPIR-V (shared across backend passes, like the compiles above).
     const auto& reflection =
-        ExtractReflectionShared(info.name, vi, fi, *vertSpirv, fragResult.spirv);
+        compiler->extractReflection(info.name, vi, fi, *vertSpirv, fragResult.spirv);
     // Counted only here — after both stages compiled successfully — so compiledCount is the
     // true "compiled" figure, distinct from rawCount (the reachable-permutation total) and
     // independent of backend-level exclusions counted below.
@@ -489,10 +343,10 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
         // Re-compile with optimization for smaller SPIR-V output.
         auto expandedVertOpt = PrependDefines(vertSource, vertDefines);
         const auto& vertOpt =
-            CompileGLSLShared(expandedVertOpt, ShaderStageType::Vertex, info.name, vi, true);
+            compiler->compileSpirv(expandedVertOpt, ShaderStageType::Vertex, info.name, vi, true);
         auto expandedFragOpt = PrependDefines(fragSource, fragDefines);
         const auto& fragOpt =
-            CompileGLSLShared(expandedFragOpt, ShaderStageType::Fragment, info.name, fi, true);
+            compiler->compileSpirv(expandedFragOpt, ShaderStageType::Fragment, info.name, fi, true);
         if (!vertOpt.success || !fragOpt.success) {
           // Fallback to unoptimized if optimization fails.
           auto* vp = reinterpret_cast<const uint8_t*>(vertSpirv->data());
@@ -509,19 +363,21 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
         // The unoptimized SPIR-V is intentional here: xcrun produces byte-identical metallibs
         // whether fed the optimized or unoptimized translation (verified 2026-08-19), so the
         // extra optimized compile would only slow the build down.
-        auto mslVert = TranslateToMSL(*vertSpirv, ShaderStageType::Vertex);
-        auto mslFrag = TranslateToMSL(fragResult.spirv, ShaderStageType::Fragment);
-        if (!mslVert.success || !mslFrag.success) {
+        std::string vertMslError;
+        std::string fragMslError;
+        auto mslVert = TranslateToMSL(*vertSpirv, ShaderStageType::Vertex, &vertMslError);
+        auto mslFrag = TranslateToMSL(fragResult.spirv, ShaderStageType::Fragment, &fragMslError);
+        if (mslVert.empty() || mslFrag.empty()) {
           std::cerr << "  MSL translation error: "
-                    << (mslVert.success ? mslFrag.error : mslVert.error) << "\n";
+                    << (mslVert.empty() ? vertMslError : fragMslError) << "\n";
           report.errorCount++;
           diagnostics->recordProfileError(backend);
           continue;
         }
         std::string metalError;
-        vertBlob = CompileMetallibShared(mslVert.msl, ShaderStageType::Vertex, &metalError);
+        vertBlob = compiler->compileMetallib(mslVert, ShaderStageType::Vertex, &metalError);
         if (!vertBlob.empty()) {
-          fragBlob = CompileMetallibShared(mslFrag.msl, ShaderStageType::Fragment, &metalError);
+          fragBlob = compiler->compileMetallib(mslFrag, ShaderStageType::Fragment, &metalError);
         }
         if (vertBlob.empty() || fragBlob.empty()) {
           std::cerr << "  metallib compilation failed for " << info.name << " [vert=" << vi
@@ -535,9 +391,10 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
         // recompile like the vulkan branch instead of reusing the combined-sampler SPIR-V.
         auto expandedVertWgsl = PrependDefines(vertSource, vertDefines);
         auto expandedFragWgsl = PrependDefines(fragSource, fragDefines);
-        auto wgslVert = CompileWGSLShared(expandedVertWgsl, ShaderStageType::Vertex, info.name, vi);
-        auto wgslFrag =
-            CompileWGSLShared(expandedFragWgsl, ShaderStageType::Fragment, info.name, fi);
+        const auto& wgslVert =
+            compiler->compileWgsl(expandedVertWgsl, ShaderStageType::Vertex, info.name, vi);
+        const auto& wgslFrag =
+            compiler->compileWgsl(expandedFragWgsl, ShaderStageType::Fragment, info.name, fi);
         if (!wgslVert.success || !wgslFrag.success) {
           std::cerr << "  WGSL translation error: "
                     << (wgslVert.success ? wgslFrag.error : wgslVert.error) << "\n";
@@ -545,8 +402,8 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
           diagnostics->recordProfileError(backend);
           continue;
         }
-        vertBlob.assign(wgslVert.wgsl.begin(), wgslVert.wgsl.end());
-        fragBlob.assign(wgslFrag.wgsl.begin(), wgslFrag.wgsl.end());
+        vertBlob.assign(wgslVert.text.begin(), wgslVert.text.end());
+        fragBlob.assign(wgslFrag.text.begin(), wgslFrag.text.end());
       } else if (profile == ShaderProfile::OpenGL || profile == ShaderProfile::OpenGLES) {
         if (profile == ShaderProfile::OpenGL) {
           // Desktop GL direct emission (see EmitDirectGLSL330): store the preprocessed template
@@ -801,13 +658,15 @@ int main(int argc, char** argv) {
     }
   }
 
+  tgfx::StageCache stageCache;
   if (compiling && !options.noCache) {
     auto cacheDir = options.cacheDir.empty() ? options.outDir + "/stage_cache" : options.cacheDir;
     std::string cacheError;
-    if (!tgfx::StageCache::Get().open(cacheDir, &cacheError)) {
+    if (!stageCache.open(cacheDir, &cacheError)) {
       std::cerr << "  WARNING: stage cache disabled, compiling every stage: " << cacheError << "\n";
     }
   }
+  tgfx::StageCompiler stageCompiler(&stageCache);
 
   uint32_t totalErrors = 0;
   for (const auto& factory : factories) {
@@ -818,9 +677,9 @@ int main(int argc, char** argv) {
       std::cerr << "  ERROR: no loaded source for " << info.name << "\n";
       return 1;
     }
-    auto shaderReport =
-        tgfx::CompileOneShader(info, options, source, &report.variants, &report.inlineExpansions,
-                               &report.diagnostics);
+    auto shaderReport = tgfx::CompileOneShader(info, options, source, &stageCompiler,
+                                               &report.variants, &report.inlineExpansions,
+                                               &report.diagnostics);
     std::cout << "[" << shaderReport.name << "] raw=" << shaderReport.rawCount
               << " compiled=" << shaderReport.compiledCount;
     if (shaderReport.errorCount > 0) {
@@ -906,7 +765,7 @@ int main(int argc, char** argv) {
   }
 
   if (compiling) {
-    tgfx::StageCache::Get().printSummary();
+    stageCache.printSummary();
   }
   return 0;
 }

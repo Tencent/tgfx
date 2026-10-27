@@ -429,6 +429,20 @@ TEST(LayeringTest, MainIsTheOnlyModuleNothingElseIncludes) {
   }
 }
 
+TEST(LayeringTest, TheStageCompilerDependsOnlyOnTheCompilePrimitives) {
+  // StageCompiler owns the caches and is the only caller of the compiler primitives, so its
+  // dependencies stop at the primitives, the persistent cache and the reflection extractor —
+  // anything else and the compile layer has grown a side door.
+  auto graph = ToolModuleGraph();
+  ASSERT_EQ(graph.count("StageCompiler"), 1u);
+  const std::set<std::string> allowed = {"ShaderCompiler", "StageCache", "ReflectionExtractor"};
+  for (const auto& dependency : graph["StageCompiler"]) {
+    EXPECT_EQ(allowed.count(dependency), 1u)
+        << "StageCompiler depends on " << dependency
+        << ", which is not part of the compile layer";
+  }
+}
+
 TEST(LayeringTest, TheCycleFinderFindsACycle) {
   // The cycle test passes on a healthy graph, so the finder itself needs a case where it must fail.
   std::map<std::string, std::set<std::string>> graph = {{"a", {"b"}}, {"b", {"c"}}, {"c", {"a"}}};

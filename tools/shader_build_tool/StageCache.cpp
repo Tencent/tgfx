@@ -232,9 +232,9 @@ bool Sha256SelfTest() {
   return true;
 }
 
-StageCacheKey::StageCacheKey(const std::string& kind) {
+StageCacheKey::StageCacheKey(const std::string& kind, const std::string& toolIdentity) {
   add(static_cast<uint64_t>(SchemaVersion));
-  add(StageCache::Get().toolIdentity());
+  add(toolIdentity);
   add(kind);
 }
 
@@ -266,11 +266,6 @@ std::string StageCacheKey::finish() {
 }
 
 StageCache::StageCache() = default;
-
-StageCache& StageCache::Get() {
-  static StageCache cache;
-  return cache;
-}
 
 bool StageCache::open(const std::string& dir, std::string* error) {
   directory.clear();
