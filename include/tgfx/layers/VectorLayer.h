@@ -68,10 +68,6 @@ class VectorLayer : public Layer {
   std::optional<StyledShape> onGetContentShape() override;
 
  private:
-  // Derives the content outline from the painters, skipping the painters that contribute no visible
-  // content and the geometries no painter captured.
-  std::optional<StyledShape> computeContentShape();
-
   std::vector<std::shared_ptr<VectorElement>> _contents = {};
 };
 

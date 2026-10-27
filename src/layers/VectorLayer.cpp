@@ -39,8 +39,6 @@ static inline bool HasTransparentSolidColor(const Painter* painter) {
   return FloatNearlyZero(static_cast<const SolidColor*>(colorSource)->color().alpha);
 }
 
-static std::optional<StyledShape> MakeStyledShape(const std::vector<const Painter*>& painters);
-
 std::shared_ptr<VectorLayer> VectorLayer::Make() {
   return std::shared_ptr<VectorLayer>(new VectorLayer());
 }
@@ -112,13 +110,28 @@ void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
 }
 
 std::optional<StyledShape> VectorLayer::onGetContentShape() {
-  return computeContentShape();
-}
-
-// Simplifies a painter set that describes a single geometry with a uniform style into one exact
-// outline. Anything else has no exact outline: nullopt (consumers fall back to non-vector paths --
-// glass uses the content alpha, spread uses the content bounds).
-static std::optional<StyledShape> MakeStyledShape(const std::vector<const Painter*>& painters) {
+  if (_contents.empty()) {
+    return std::nullopt;
+  }
+  VectorContext context = {};
+  for (const auto& element : _contents) {
+    DEBUG_ASSERT(element != nullptr);
+    if (element->enabled()) {
+      element->apply(&context);
+    }
+  }
+  // The content shape describes what the layer renders, so it drops the painters whose color source
+  // is a fully transparent solid color; any other effectively invisible source, a transparent
+  // gradient for one, stays in.
+  std::vector<const Painter*> painters = {};
+  for (const auto& painter : context.painters) {
+    DEBUG_ASSERT(painter != nullptr);
+    if (!HasTransparentSolidColor(painter.get())) {
+      painters.push_back(painter.get());
+    }
+  }
+  // Anything that does not describe one geometry with a uniform style has no exact outline:
+  // consumers of the content shape fall back to non-vector paths (spread uses the content bounds).
   Geometry* sharedGeometry = nullptr;
   auto hasFill = false;
   std::optional<PainterStyle> strokeStyle = std::nullopt;
@@ -167,30 +180,6 @@ static std::optional<StyledShape> MakeStyledShape(const std::vector<const Painte
     type = StyledShapeType::Stroke;
   }
   return StyledShape::Make(shape, type, strokeWidth, strokeAlign);
-}
-
-std::optional<StyledShape> VectorLayer::computeContentShape() {
-  if (_contents.empty()) {
-    return std::nullopt;
-  }
-  VectorContext context = {};
-  for (const auto& element : _contents) {
-    DEBUG_ASSERT(element != nullptr);
-    if (element->enabled()) {
-      element->apply(&context);
-    }
-  }
-  // The content shape describes what the layer renders, so it drops the painters whose color source
-  // is a fully transparent solid color; any other effectively invisible source, a transparent
-  // gradient for one, stays in.
-  std::vector<const Painter*> painters = {};
-  for (const auto& painter : context.painters) {
-    DEBUG_ASSERT(painter != nullptr);
-    if (!HasTransparentSolidColor(painter.get())) {
-      painters.push_back(painter.get());
-    }
-  }
-  return MakeStyledShape(painters);
 }
 
 }  // namespace tgfx
