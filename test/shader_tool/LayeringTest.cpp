@@ -458,6 +458,71 @@ TEST(LayeringTest, TheProfileEmittersDependOnlyOnTheirDialectAndTheCompiler) {
   }
 }
 
+// ---- The sublayers depend only where the architecture allows ----------------------------------
+
+namespace {
+
+// The sublayer of a file: the directory it sits in under the tool root, or "" for the files
+// not yet migrated into a sublayer.
+std::string SublayerOf(const std::string& path) {
+  auto relative = path.substr(ToolDir().size() + 1);
+  auto slash = relative.find('/');
+  return slash == std::string::npos ? "" : relative.substr(0, slash);
+}
+
+}  // namespace
+
+TEST(LayeringTest, TheSublayersDependOnlyWhereTheArchitectureAllows) {
+  // The direction map of the tool's sublayers:
+  //
+  //   cli ─▶ plan, compile, emit, verify, root   (the command line drives everything)
+  //   emit ─▶ compile, core                      (a dialect is translated through the compiler)
+  //   compile ─▶ core
+  //   plan ─▶ core
+  //   verify ─▶ core
+  //
+  // Everything else is forbidden: verify never compiles, plan never emits, a sublayer never
+  // reaches up into cli. Files still at the tool root are a transitional layer any sublayer
+  // may use, until they move into theirs; the moment one does, its edges start being checked.
+  auto allowed = [](const std::string& from, const std::string& to) {
+    if (from == to || to.empty() || from.empty()) {
+      return true;
+    }
+    if (from == "cli") {
+      return true;
+    }
+    if (from == "emit") {
+      return to == "compile" || to == "core";
+    }
+    if (from == "compile") {
+      return to == "core";
+    }
+    if (from == "plan") {
+      return to == "core";
+    }
+    if (from == "verify") {
+      return to == "core";
+    }
+    return false;
+  };
+  for (const auto& file : FilesIn(ToolDir(), {".cpp", ".h"})) {
+    auto from = SublayerOf(file);
+    for (const auto& include : IncludesOf(file)) {
+      if (include.system || IsThirdParty(include.target)) {
+        continue;
+      }
+      auto path = ToolDir() + "/" + include.target;
+      if (!std::filesystem::exists(path)) {
+        continue;
+      }
+      auto to = SublayerOf(path);
+      EXPECT_TRUE(allowed(from, to))
+          << file << " (sublayer '" << from << "') includes " << include.target
+          << " (sublayer '" << to << "')";
+    }
+  }
+}
+
 TEST(LayeringTest, TheCycleFinderFindsACycle) {
   // The cycle test passes on a healthy graph, so the finder itself needs a case where it must fail.
   std::map<std::string, std::set<std::string>> graph = {{"a", {"b"}}, {"b", {"c"}}, {"c", {"a"}}};
