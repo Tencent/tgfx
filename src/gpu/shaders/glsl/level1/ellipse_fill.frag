@@ -19,7 +19,7 @@
 #define HAS_DEVICE_MASK 0
 #endif
 
-layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
+layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
   // Exact paint color for common-color draws; the broadcast into the per-vertex attribute is
   // 8-bit quantized, so HasCommonColor selects this uniform when set.
   vec4 Color;
@@ -34,7 +34,7 @@ layout(location = 1) in vec4 vEllipseRadii;
 layout(location = 2) in vec4 vColor;
 
 #if HAS_DEVICE_MASK
-layout(set = 1, binding = 0) uniform sampler2D MaskTextureSampler;
+layout(set = TGFX_TEXTURE_SET, binding = 0) uniform sampler2D MaskTextureSampler;
 #define XP_DST_TEX_BINDING 1
 #else
 #define XP_DST_TEX_BINDING 0

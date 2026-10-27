@@ -14,7 +14,7 @@
 #define HAS_XP 0
 #endif
 
-layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
+layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
   vec4 Color;
   vec4 Subset;
 #include "pointwise_op_uniforms.inc"
@@ -24,7 +24,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 layout(location = 0) in vec2 TransformedCoords_0;
 layout(location = 1) in float vCoverage;
 
-layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
+layout(set = TGFX_TEXTURE_SET, binding = 0) uniform sampler2D TextureSampler_0;
 
 #define XP_DST_TEX_BINDING 1
 #define FILL_SOURCE FILL_SOURCE_CLAMPED_TEXTURE

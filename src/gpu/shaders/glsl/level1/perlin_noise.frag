@@ -19,7 +19,7 @@
 
 #define NOISE_FRACTAL 0
 
-layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
+layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
   vec2 baseFrequency;
   vec2 stitchData;
   int NoiseType;
@@ -37,8 +37,8 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 layout(location = 0) in vec2 TransformedCoords_0;
 layout(location = 1) in float vCoverage;
 
-layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;  // permutations (A8)
-layout(set = 1, binding = 1) uniform sampler2D TextureSampler_1;  // noise (RGBA)
+layout(set = TGFX_TEXTURE_SET, binding = 0) uniform sampler2D TextureSampler_0;  // permutations (A8)
+layout(set = TGFX_TEXTURE_SET, binding = 1) uniform sampler2D TextureSampler_1;  // noise (RGBA)
 
 // The two noise lookup samplers occupy bindings 0 and 1, so the XferProcessor dst texture (DST_TEX
 // mode) lands on binding 2.

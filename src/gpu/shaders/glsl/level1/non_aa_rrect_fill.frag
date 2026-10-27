@@ -19,7 +19,7 @@
 #endif
 #define HAS_RUNTIME_CLIP 1
 
-layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
+layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
   vec4 Color;
   int HasCommonColor;
 #if TEXTURED
@@ -39,7 +39,7 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 
 #if TEXTURED
 layout(location = 5) in vec2 TransformedCoords_0;
-layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
+layout(set = TGFX_TEXTURE_SET, binding = 0) uniform sampler2D TextureSampler_0;
 #endif
 
 layout(location = 0) in vec2 vLocalCoord;

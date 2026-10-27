@@ -30,6 +30,7 @@
 // context it has no use for. Without the first, a "constant" header could grow a dependency and
 // drag the same thing in through a side door.
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -255,13 +256,22 @@ TEST(LayeringTest, EveryAllowedHeaderIsUsedByTheTool) {
 
 // ---- The contract layer stays a contract layer ----------------------------------------------
 
-TEST(LayeringTest, ContractHeadersIncludeOnlyTheStandardLibrary) {
+TEST(LayeringTest, ContractHeadersIncludeOnlyTheStandardLibraryAndEachOther) {
   for (const auto& header : ContractHeaders()) {
     auto path = SourceDir + "/src/" + header;
     ASSERT_TRUE(std::filesystem::exists(path)) << header;
     for (const auto& include : IncludesOf(path)) {
-      EXPECT_TRUE(include.system) << header << " includes the project header " << include.target
-                                  << "; a contract header may include only the standard library.";
+      // A contract header may include the standard library and another contract header —
+      // combining pure constants is safe — but nothing else: a runtime class would drag
+      // implementation dependencies into the layer the tool shares.
+      const auto& contractHeaders = ContractHeaders();
+      bool contractInclude =
+          std::find(contractHeaders.begin(), contractHeaders.end(), include.target) !=
+          contractHeaders.end();
+      EXPECT_TRUE(include.system || contractInclude)
+          << header << " includes the project header " << include.target
+          << "; a contract header may include only the standard library and other contract "
+             "headers.";
       if (include.system) {
         // A system include that is not the standard library would be a third party dependency.
         EXPECT_EQ(include.target.find('/'), std::string::npos)

@@ -2,7 +2,7 @@
 // coordinate (CoordTransformMatrix_0). Used by MaskFillShader, whose coverage mask rides the
 // coord-transform mechanism.
 #version 450
-layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
+layout(std140, set = TGFX_VERTEX_UBO_SET, binding = TGFX_VERTEX_UBO_BINDING) uniform VertexUniformBlock {
   vec4 tgfx_RTAdjust;
   mat3 Matrix;
   mat3 CoordTransformMatrix_0;

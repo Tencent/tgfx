@@ -20,7 +20,7 @@
 #define HAS_LOCAL_MASK 0
 #endif
 
-layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
+layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
   vec4 Rect;
   int HasClip;
 #include "rrect_clip_uniforms.inc"
@@ -75,13 +75,13 @@ layout(location = 3) in vec4 vTexSubset;
 layout(location = 4) in vec3 TransformedCoords_1;
 #endif
 
-layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
+layout(set = TGFX_TEXTURE_SET, binding = 0) uniform sampler2D TextureSampler_0;
 
 // The device-mask sampler always occupies binding 1 (padded with the shared dummy when the draw
 // has no mask); the local mask, if any, follows at 2, and the XP dst texture after both.
-layout(set = 1, binding = 1) uniform sampler2D MaskTextureSampler;
+layout(set = TGFX_TEXTURE_SET, binding = 1) uniform sampler2D MaskTextureSampler;
 #if HAS_LOCAL_MASK
-layout(set = 1, binding = 2) uniform sampler2D LocalMaskSampler;
+layout(set = TGFX_TEXTURE_SET, binding = 2) uniform sampler2D LocalMaskSampler;
   #define XP_DST_TEX_BINDING 3
 #else
   #define XP_DST_TEX_BINDING 2

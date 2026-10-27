@@ -37,18 +37,13 @@ extern char** environ;
 #include <spirv_glsl.hpp>
 #include <spirv_msl.hpp>
 #include <spirv_parser.hpp>
+#include "gpu/ShaderBindingLayout.h"
 #ifdef TGFX_SHADER_TOOL_HAS_TINT
 #include "src/tint/lang/spirv/reader/reader.h"
 #include "src/tint/lang/wgsl/writer/writer.h"
 #endif
 
 namespace tgfx {
-
-#ifdef TGFX_SHADER_TOOL_HAS_TINT
-// First binding slot for separated texture/sampler pairs; must match TEXTURE_BINDING_POINT_START
-// in src/gpu/webgpu/WebGPUDefines.h and the bind-group expansion in WebGPURenderPipeline.
-static constexpr int WebGPUTextureBindingStart = 2;
-#endif
 
 std::string PrependDefines(const std::string& source, const std::vector<std::string>& defines) {
   std::string prefix;
@@ -204,16 +199,20 @@ static std::string replaceAllMatches(const std::string& source, const std::regex
   return result;
 }
 
-// Template shaders declare combined image samplers in set 1. The binding expression may be a
-// literal, a preprocessor macro, or a parenthesized macro expansion like "(4 + 1)", so it must
-// tolerate one level of nested parentheses. The original numbers are ignored: bindings are
-// reassigned in declaration order, mirroring the runtime JIT path
-// (WebGPUShaderModule::preprocessGLSL) and the WebGPURenderPipeline bind-group expansion.
-static const char* WebGPUSamplerDeclRegex =
-    R"(layout\s*\(\s*set\s*=\s*1\s*,\s*binding\s*=\s*(?:[^()]|\([^)]*\))*\s*\)\s*uniform\s+(?:sampler2D|CHAIN_LEAF_SAMPLER)\s+(\w+)\s*;)";
+// Template shaders declare combined image samplers in the contract's texture set (the
+// TGFX_TEXTURE_SET macro, expanded by the preprocessor before this pass runs). The binding
+// expression may be a literal, a preprocessor macro, or a parenthesized macro expansion like
+// "(4 + 1)", so it must tolerate one level of nested parentheses. The original numbers are
+// ignored: bindings are reassigned in declaration order (the SamplerBinding packing), mirroring
+// the runtime JIT path (WebGPUShaderModule::preprocessGLSL) and the WebGPURenderPipeline
+// bind-group expansion.
+static std::string WebGPUSamplerDeclPattern() {
+  return R"(layout\s*\(\s*set\s*=\s*)" + std::to_string(TEXTURE_DESCRIPTOR_SET) +
+         R"(\s*,\s*binding\s*=\s*(?:[^()]|\([^)]*\))*\s*\)\s*uniform\s+(?:sampler2D|CHAIN_LEAF_SAMPLER)\s+(\w+)\s*;)";
+}
 
 static std::vector<std::string> collectSamplerNames(const std::string& source) {
-  static std::regex samplerRegex(WebGPUSamplerDeclRegex);
+  static const std::regex samplerRegex(WebGPUSamplerDeclPattern());
   std::vector<std::string> names = {};
   std::smatch match;
   std::string::const_iterator searchStart(source.cbegin());
@@ -226,9 +225,11 @@ static std::vector<std::string> collectSamplerNames(const std::string& source) {
 
 static std::string replaceSeparatedSampler(const std::smatch& match, int& counter) {
   const auto& name = match[1].str();
-  auto textureDecl = "layout(set = 0, binding = " + std::to_string(counter++) +
-                     ") uniform texture2D " + name + ";";
-  auto samplerDecl = "\nlayout(set = 0, binding = " + std::to_string(counter++) +
+  auto set = std::to_string(TEXTURE_DESCRIPTOR_SET);
+  auto textureDecl =
+      "layout(set = " + set + ", binding = " + std::to_string(counter++) + ") uniform texture2D " +
+      name + ";";
+  auto samplerDecl = "\nlayout(set = " + set + ", binding = " + std::to_string(counter++) +
                      ") uniform sampler " + name + "_Sampler;";
   return textureDecl + samplerDecl;
 }
@@ -323,8 +324,8 @@ static std::string preprocessWebGPU(const std::string& source) {
   for (const auto& function : samplerParamFunctions) {
     lookupNames.push_back(function.paramName);
   }
-  static std::regex samplerDeclRegex(WebGPUSamplerDeclRegex);
-  int binding = WebGPUTextureBindingStart;
+  static const std::regex samplerDeclRegex(WebGPUSamplerDeclPattern());
+  int binding = WEBGPU_TEXTURE_BINDING_START;
   result = replaceAllMatches(result, samplerDeclRegex, replaceSeparatedSampler, binding);
   result = rewriteTextureLookups(result, lookupNames);
   return expandSamplerCallArgs(result, samplerParamFunctions, lookupNames);

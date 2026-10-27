@@ -28,7 +28,7 @@
 #endif
 #define HAS_RUNTIME_CLIP 1
 
-layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
+layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
   vec4 Color;
   int StrokeEnabled;
   // Refraction optics (mirrors GlassOpticsP0..P3 of the runtime emission).
@@ -72,12 +72,12 @@ layout(location = 1) in vec4 vEllipseRadii;
 layout(location = 2) in vec2 TransformedCoords_0;
 #endif
 
-layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
+layout(set = TGFX_TEXTURE_SET, binding = 0) uniform sampler2D TextureSampler_0;
 #if GEOMETRY_KIND >= 2
-layout(set = 1, binding = 1) uniform sampler2D MaskSampler;
+layout(set = TGFX_TEXTURE_SET, binding = 1) uniform sampler2D MaskSampler;
 // The edge-light mask is declared unconditionally in the UDF kinds: an edge-lit-off draw binds the
 // shared dummy texture here and EdgeMaskOn stays 0, so the guarded branch below never samples it.
-layout(set = 1, binding = 2) uniform sampler2D EdgeMaskSampler;
+layout(set = TGFX_TEXTURE_SET, binding = 2) uniform sampler2D EdgeMaskSampler;
 #define GLASS_COLOR_SAMPLER_COUNT 3
 #else
 #define GLASS_COLOR_SAMPLER_COUNT 1
@@ -86,7 +86,7 @@ layout(set = 1, binding = 2) uniform sampler2D EdgeMaskSampler;
 // ProgramInfo pads with the dummy texture when the draw has no coverage texture; the XP dst
 // texture always binds last.
 #if GP_KIND == 1
-layout(set = 1, binding = GLASS_COLOR_SAMPLER_COUNT) uniform sampler2D LocalMaskSampler;
+layout(set = TGFX_TEXTURE_SET, binding = GLASS_COLOR_SAMPLER_COUNT) uniform sampler2D LocalMaskSampler;
 #define XP_DST_TEX_BINDING (GLASS_COLOR_SAMPLER_COUNT + 1)
 #else
 #define XP_DST_TEX_BINDING GLASS_COLOR_SAMPLER_COUNT

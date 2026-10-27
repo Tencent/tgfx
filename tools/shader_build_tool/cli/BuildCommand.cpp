@@ -38,6 +38,7 @@
 #include "compile/StageCompiler.h"
 #include "core/Diagnostics.h"
 #include "emit/ProfileEmitter.h"
+#include "gpu/ShaderBindingLayout.h"
 #include "gpu/shaders/AllShaderFamilies.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "plan/VariantPlanner.h"
@@ -165,6 +166,13 @@ ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const BuildOpti
 
     auto vertDefines = vertDomain.defineListFor(vi);
     auto fragDefines = fragDomain.defineListFor(fi);
+    // The binding contract rides in as defines: the templates spell their layout qualifiers
+    // with the TGFX_* macro names, so the numbers exist only in ShaderBindingLayout.h. The
+    // source digest covers the same list, so a value change invalidates every bundle.
+    for (const auto& contractDefine : BindingContractDefines()) {
+      vertDefines.push_back(contractDefine);
+      fragDefines.push_back(contractDefine);
+    }
 
     // Compile vertex shader. The shared cache also covers the multiple-frag-per-vert reuse the
     // old per-backend vertCache handled, plus the cross-backend repeats.

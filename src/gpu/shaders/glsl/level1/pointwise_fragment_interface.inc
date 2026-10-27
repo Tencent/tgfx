@@ -51,19 +51,19 @@ layout(location = CHAIN_TEX_LOC_BASE + 3) in vec3 TransformedCoords_3;
 #endif
 
 #if NTEX >= 1
-layout(set = 1, binding = 0) uniform CHAIN_LEAF_SAMPLER TextureSampler_0;
+layout(set = TGFX_TEXTURE_SET, binding = 0) uniform CHAIN_LEAF_SAMPLER TextureSampler_0;
 #endif
 #if NTEX >= 2
-layout(set = 1, binding = 1) uniform CHAIN_LEAF_SAMPLER TextureSampler_1;
+layout(set = TGFX_TEXTURE_SET, binding = 1) uniform CHAIN_LEAF_SAMPLER TextureSampler_1;
 #endif
 #if NTEX >= 4
-layout(set = 1, binding = 2) uniform CHAIN_LEAF_SAMPLER TextureSampler_2;
-layout(set = 1, binding = 3) uniform CHAIN_LEAF_SAMPLER TextureSampler_3;
+layout(set = TGFX_TEXTURE_SET, binding = 2) uniform CHAIN_LEAF_SAMPLER TextureSampler_2;
+layout(set = TGFX_TEXTURE_SET, binding = 3) uniform CHAIN_LEAF_SAMPLER TextureSampler_3;
 #endif
 #if NTEX > 0 || HAS_MASK_TEXTURE
 // Device-space alpha mask applied after the DAG and before the XP stage (same application point
 // as the legacy blend kernel). Four-leaf variants always bind it (phantom when absent).
-layout(set = 1, binding = NTEX) uniform sampler2D MaskTextureSampler;
+layout(set = TGFX_TEXTURE_SET, binding = NTEX) uniform sampler2D MaskTextureSampler;
 #define XP_DST_TEX_BINDING (NTEX + 1)
 #else
 #define XP_DST_TEX_BINDING NTEX

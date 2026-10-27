@@ -19,7 +19,7 @@
 #define HAS_RUNTIME_DEVICE_MASK 1
 #define HAS_RUNTIME_CLIP 1
 
-layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
+layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
   // Exact paint color for common-color draws; the broadcast into the per-vertex attribute is
   // 8-bit quantized, so HasCommonColor selects this uniform when set.
   vec4 Color;
@@ -37,10 +37,10 @@ layout(location = 2) in vec4 vColor;
 layout(location = 1) in vec4 vColor;
 #endif
 
-layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
+layout(set = TGFX_TEXTURE_SET, binding = 0) uniform sampler2D TextureSampler_0;
 // Always bound: an absent device mask is padded with the shared dummy texture and HasDeviceMask
 // is 0.
-layout(set = 1, binding = 1) uniform sampler2D MaskTextureSampler;
+layout(set = TGFX_TEXTURE_SET, binding = 1) uniform sampler2D MaskTextureSampler;
 #define XP_DST_TEX_BINDING 2
 
 #define FILL_COLOR FILL_COLOR_VARYING_OR_COMMON

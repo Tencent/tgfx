@@ -14,7 +14,7 @@
 #define XP_DST_TEX_BINDING 1
 #endif
 
-layout(set = 1, binding = XP_DST_TEX_BINDING) uniform sampler2D DstTextureSampler;
+layout(set = TGFX_TEXTURE_SET, binding = XP_DST_TEX_BINDING) uniform sampler2D DstTextureSampler;
 #endif
 
 #include "xp_blend_colors.inc"

@@ -9,7 +9,7 @@
 #define HAS_UV_COORD 0
 #endif
 
-layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
+layout(std140, set = TGFX_VERTEX_UBO_SET, binding = TGFX_VERTEX_UBO_BINDING) uniform VertexUniformBlock {
   vec4 tgfx_RTAdjust;
   mat3 CoordTransformMatrix_0;
 };

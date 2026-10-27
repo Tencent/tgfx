@@ -15,7 +15,7 @@
 #endif
 #define HAS_RUNTIME_CLIP 1
 
-layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
+layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
   vec4 Color;
   int HasCommonColor;
   int AAEnabled;

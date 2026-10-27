@@ -17,7 +17,7 @@
 
 #include "pointwise_fragment_config.inc"
 
-layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
+layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
 #include "pointwise_fragment_uniforms.inc"
 #if RESOURCE_KIND == 1
 #include "pointwise_gradient_uniforms.inc"

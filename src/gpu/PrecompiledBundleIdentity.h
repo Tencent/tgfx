@@ -174,7 +174,7 @@ namespace tgfx {
  * input attributes (name, format, location) so the loader can verify the .vert's declared
  * layout, and the reflection blobs and identity hash re-encode; pre-change bundles are refused.
  */
-inline constexpr uint32_t ExpectedToolchainABI = 0x0001001bu;
+inline constexpr uint32_t ExpectedToolchainABI = 0x0001001cu;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

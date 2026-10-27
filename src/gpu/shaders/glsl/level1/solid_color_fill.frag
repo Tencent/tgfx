@@ -10,7 +10,7 @@
 #define HAS_XP 0
 #endif
 
-layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
+layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
   vec4 Color;
   vec4 Rect;
   int HasClip;

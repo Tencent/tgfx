@@ -30,6 +30,7 @@
 #include "OutputFile.h"
 #include "ShaderCompiler.h"
 #include "ShaderSources.h"
+#include "gpu/ShaderBindingLayout.h"
 #include "gpu/BundleFormat.h"
 #include "gpu/PrecompiledBundleIdentity.h"
 #include "gpu/shaders/PrecompiledShader.h"
@@ -133,6 +134,12 @@ SourceDigestResult ComputeSourceDigest(const ShaderSourceSet& sources, ShaderPro
   stream.feedString("tgfx-shader-source-digest-v1");
   stream.feedU32(ExpectedToolchainABI);
   stream.feedString(ProfileTag(profile));
+  // The binding contract macros ride with the digest: a layout value change must invalidate
+  // every bundle even though the shader text did not move, because the compiled resource layout
+  // moved with it.
+  for (const auto& contractDefine : BindingContractDefines()) {
+    stream.feedString(contractDefine);
+  }
   if (profile == ShaderProfile::Metal) {
     stream.feedString(MetalCompilerFingerprint());
   }

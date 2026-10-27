@@ -1036,8 +1036,11 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
     # The toolchain ABI constant rides in a regular header outside the shader directory; a bump
     # changes what the writer stamps into every bundle, so it must trigger a rebuild like a
     # shader-source change (otherwise the bundles keep the old ABI and the runtime rejects them).
+    # The binding layout header joins it for the same reason: the templates get their layout
+    # values injected from it, so a value change must rebuild every bundle.
     list(APPEND TGFX_SHADER_SOURCES
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/PrecompiledBundleIdentity.h")
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/PrecompiledBundleIdentity.h"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/ShaderBindingLayout.h")
     if (TGFX_SHADER_BUNDLES_PREBUILT)
         # This build does not generate bundles; it consumes the ones published under
         # resources/shaders/ (see the reasons above). Publish them from a build that can generate

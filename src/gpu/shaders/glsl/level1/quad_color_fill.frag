@@ -15,7 +15,7 @@
 #define HAS_MASK_TEXTURE 0
 #endif
 
-layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
+layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
   vec4 Rect;
   int HasClip;
 #include "rrect_clip_uniforms.inc"
@@ -40,7 +40,7 @@ layout(location = 1) in vec4 vColor;
 
 // The mask texture (device-space coverage) occupies binding 0; the XP dst texture, if any, follows.
 #if HAS_MASK_TEXTURE
-layout(set = 1, binding = 0) uniform sampler2D MaskTextureSampler;
+layout(set = TGFX_TEXTURE_SET, binding = 0) uniform sampler2D MaskTextureSampler;
   #define XP_DST_TEX_BINDING 1
 #else
   #define XP_DST_TEX_BINDING 0

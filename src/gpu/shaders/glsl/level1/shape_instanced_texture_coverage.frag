@@ -7,7 +7,7 @@
 // a clip coverage FP next to its coverage texture selects the same variant.
 #define HAS_RUNTIME_CLIP 1
 
-layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
+layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
   vec4 Subset;
   int AlphaOnly;
 #include "coverage_uniforms.inc"
@@ -29,7 +29,7 @@ layout(location = 1) in vec4 vColor;
 layout(location = 2) in vec2 GradientCoords;
 #endif
 
-layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
+layout(set = TGFX_TEXTURE_SET, binding = 0) uniform sampler2D TextureSampler_0;
 
 layout(location = 0) out vec4 fragColor;
 

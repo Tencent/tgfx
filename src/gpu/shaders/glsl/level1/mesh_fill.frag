@@ -11,7 +11,7 @@
 #define HAS_XP 0
 #endif
 
-layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
+layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
   // Exact paint color for colorless draws. The per-vertex color attribute is UByte4Normalized
   // and loses precision on fractional colors, so the exact Color uniform is preferred when
   // HasCommonColor is set; otherwise the vColor varying is used (matching the runtime codegen,

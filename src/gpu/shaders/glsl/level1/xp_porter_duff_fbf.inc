@@ -8,7 +8,7 @@
 
 #if HAS_XP == 2
 
-layout(input_attachment_index = 0, set = 2, binding = 0) uniform subpassInput tgfx_SubpassInput;
+layout(input_attachment_index = 0, set = TGFX_FBF_INPUT_SET, binding = 0) uniform subpassInput tgfx_SubpassInput;
 
 vec4 applyPorterDuffXP(vec4 srcColor, vec4 coverage) {
   vec4 dstColor = subpassLoad(tgfx_SubpassInput);

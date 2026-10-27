@@ -74,7 +74,7 @@ layout(location = 5) in vec2 inStrokeWidth;
 // pointwise_fragment_interface.inc.
 #define CHAIN_SUBSET_LOC 6
 
-layout(std140, set = 0, binding = 0) uniform VertexUniformBlock {
+layout(std140, set = TGFX_VERTEX_UBO_SET, binding = TGFX_VERTEX_UBO_BINDING) uniform VertexUniformBlock {
   vec4 tgfx_RTAdjust;
 #if GP_LAYOUT == 0 || GP_LAYOUT == 2
   mat3 Matrix;

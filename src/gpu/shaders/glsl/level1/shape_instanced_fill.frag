@@ -12,7 +12,7 @@
 #endif
 
 #if HAS_XP
-layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
+layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
 #include "xp_uniforms.inc"
 };
 #endif

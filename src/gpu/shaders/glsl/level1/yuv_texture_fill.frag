@@ -18,7 +18,7 @@
 #define HAS_XP 0
 #endif
 
-layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
+layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
   vec4 Rect;
   int HasClip;
 #include "rrect_clip_uniforms.inc"
@@ -49,10 +49,10 @@ layout(location = 0) in vec3 TransformedCoords_0;
 layout(location = 1) in float vCoverage;
 layout(location = 2) in vec4 vColor;
 
-layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
-layout(set = 1, binding = 1) uniform sampler2D TextureSampler_1;
+layout(set = TGFX_TEXTURE_SET, binding = 0) uniform sampler2D TextureSampler_0;
+layout(set = TGFX_TEXTURE_SET, binding = 1) uniform sampler2D TextureSampler_1;
 #if YUV_FORMAT == 0
-layout(set = 1, binding = 2) uniform sampler2D TextureSampler_2;
+layout(set = TGFX_TEXTURE_SET, binding = 2) uniform sampler2D TextureSampler_2;
 #define XP_DST_TEX_BINDING 3
 #else
 #define XP_DST_TEX_BINDING 2

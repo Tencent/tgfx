@@ -27,7 +27,7 @@
 // Mirrors Blur1DFragmentProcessor::KERNEL_VEC4_COUNT: the vec4 capacity of the half-kernel table.
 // The size stays a literal because the reflection extractor does not expand preprocessor macros.
 
-layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
+layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
   vec4 Color;
   // Precomputed normalized half-kernel weights; lane i holds the shared weight of the samples at
   // offsets +i and -i. Slots past the radius stay zero and are never indexed.
@@ -56,11 +56,11 @@ layout(std140, set = 0, binding = 1) uniform FragmentUniformBlock {
 
 layout(location = 0) in vec2 TransformedCoords_0;
 
-layout(set = 1, binding = 0) uniform sampler2D TextureSampler_0;
+layout(set = TGFX_TEXTURE_SET, binding = 0) uniform sampler2D TextureSampler_0;
 
 // Always bound: an absent device mask is padded with the shared dummy texture and HasDeviceMask
 // is 0.
-layout(set = 1, binding = 1) uniform sampler2D MaskTextureSampler;
+layout(set = TGFX_TEXTURE_SET, binding = 1) uniform sampler2D MaskTextureSampler;
 #define XP_DST_TEX_BINDING 2
 #include "xp_porter_duff.inc"
 #include "xp_porter_duff_fbf.inc"
