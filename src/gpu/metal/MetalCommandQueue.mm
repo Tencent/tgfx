@@ -35,6 +35,11 @@ MetalCommandQueue::~MetalCommandQueue() {
   // async completion handlers (which capture `this`) have fired before the object is destroyed.
   [lastSubmittedCommandBuffer waitUntilCompleted];
   [lastSubmittedCommandBuffer release];
+  // Release drawables that were never submitted.
+  for (auto& drawable : pendingDrawables) {
+    [drawable release];
+  }
+  pendingDrawables.clear();
   [commandQueue release];
 }
 
@@ -54,9 +59,10 @@ void MetalCommandQueue::submit(std::shared_ptr<CommandBuffer> commandBuffer) {
         pendingSignalSemaphore = nullptr;
       }
 
-      // Present all pending drawables after the command buffer's GPU work completes.
+      // Present pending drawables after the GPU work; the command buffer keeps them alive.
       for (auto& drawable : pendingDrawables) {
         [metalCommandBuffer->metalCommandBuffer() presentDrawable:drawable];
+        [drawable release];
       }
       pendingDrawables.clear();
 
@@ -194,7 +200,11 @@ void MetalCommandQueue::encodePendingWait(id<MTLCommandBuffer> commandBuffer) {
 }
 
 void MetalCommandQueue::schedulePresent(id<CAMetalDrawable> drawable) {
-  pendingDrawables.push_back(drawable);
+  if (drawable == nil) {
+    return;
+  }
+  // Retained manually under MRC; released in submit() or the destructor.
+  pendingDrawables.push_back([drawable retain]);
 }
 
 void MetalCommandQueue::waitUntilCompleted() {

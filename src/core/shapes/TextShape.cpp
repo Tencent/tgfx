@@ -54,6 +54,47 @@ static bool FillsWholePlane(const Path& path) {
 //  * neither may be inverse, since an inverse outline covers the whole plane and swallows the rest;
 //  * the bounds must not meet, because once they do, two contours running opposite ways cancel
 //    where they cross and the union of the glyphs is lost.
+// Which way an outline runs, taken from the sign of the area it encloses. Only the sign is used, so
+// walking the polygon through each segment's end point -- the chord of a curve -- is enough for any
+// outline a font produces; a curve does not turn a contour around without leaving its bounds.
+static int OutlineDirection(const Path& path) {
+  auto bounds = path.getBounds();
+  if (bounds.isEmpty()) {
+    return 0;
+  }
+  auto originX = static_cast<double>(bounds.centerX());
+  auto originY = static_cast<double>(bounds.centerY());
+  double area = 0.0;
+  Point from = {};
+  auto hasFrom = false;
+  for (const auto& segment : path) {
+    if (segment.verb == PathVerb::Move) {
+      from = segment.points[0];
+      hasFrom = true;
+      continue;
+    }
+    if (!hasFrom || segment.verb == PathVerb::Close) {
+      continue;
+    }
+    auto to = segment.points[1];
+    if (segment.verb == PathVerb::Quad || segment.verb == PathVerb::Conic) {
+      to = segment.points[2];
+    } else if (segment.verb == PathVerb::Cubic) {
+      to = segment.points[3];
+    }
+    auto ax = static_cast<double>(from.x) - originX;
+    auto ay = static_cast<double>(from.y) - originY;
+    auto bx = static_cast<double>(to.x) - originX;
+    auto by = static_cast<double>(to.y) - originY;
+    area += ax * by - bx * ay;
+    from = to;
+  }
+  if (area > 0.0) {
+    return 1;
+  }
+  return area < 0.0 ? -1 : 0;
+}
+
 static bool CanAppendWithoutInteraction(const Path& total, const Path& glyph) {
   if (total.getFillType() != glyph.getFillType()) {
     return false;
@@ -61,9 +102,26 @@ static bool CanAppendWithoutInteraction(const Path& total, const Path& glyph) {
   if (total.isInverseFillType() || glyph.isInverseFillType()) {
     return false;
   }
+  if (total.getFillType() != PathFillType::Winding) {
+    // Parity counts an overlap twice and cancels it, so an even-odd outline is always unioned.
+    // Keeping that unconditional also keeps the merge identical to what it did before the fast
+    // path existed, which matters for outlines that reach this from an embedded format.
+    return false;
+  }
   auto a = total.getBounds();
   auto b = glyph.getBounds();
-  return a.isEmpty() || b.isEmpty() || !a.intersect(b);
+  if (a.isEmpty() || b.isEmpty() || !a.intersect(b)) {
+    // Disjoint bounds cannot touch, so there is no overlap for the merge to resolve.
+    return true;
+  }
+  // Winding keeps an overlap filled, but only while both outlines run the same way: opposite
+  // directions cancel out where they meet, which is what a mirrored or reflected glyph produces.
+  // NOTE: this compares one summed direction per outline, so it is a heuristic, not a proof. See
+  // the review note in the PR: matching the existing screenshots depends on it, and dropping it
+  // makes every faux-bold run unioned instead of appended.
+  auto totalDirection = OutlineDirection(total);
+  auto glyphDirection = OutlineDirection(glyph);
+  return totalDirection != 0 && glyphDirection != 0 && totalDirection == glyphDirection;
 }
 
 Path TextShape::onGetPath(float resolutionScale) const {

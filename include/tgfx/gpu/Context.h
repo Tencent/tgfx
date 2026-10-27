@@ -151,18 +151,20 @@ class Context {
 
   /**
    * Flushes all pending drawing operations for this context into a Recording object and returns it.
-   * A call to Context::submit is always required to ensure work is actually sent to the GPU. If
-   * signalSemaphore is not null, a new semaphore will be created and assigned to signalSemaphore.
-   * The caller is responsible for deleting the semaphore returned in signalSemaphore. Returns
-   * nullptr if there are no pending drawing operations. In that case, signalSemaphore will not be
-   * initialized, and the caller should not wait on it.
+   * The flush fixes the batch, including its window presentations. A call to Context::submit is
+   * always required to ensure work is actually sent to the GPU. If signalSemaphore is not null, a
+   * new semaphore will be created and assigned to signalSemaphore. The caller is responsible for
+   * deleting the semaphore returned in signalSemaphore. Returns nullptr if there are no pending
+   * drawing operations. In that case, signalSemaphore will not be initialized, and the caller
+   * should not wait on it.
    */
   std::unique_ptr<Recording> flush(BackendSemaphore* signalSemaphore = nullptr);
 
   /**
    * Submit the provided recording object to the GPU for execution. The recording must have been
-   * created by this context via a call to Context::flush(). If the syncCpu flag is true, this
-   * function will return once the gpu has finished with all submitted work.
+   * created by this context via a call to Context::flush(). Window frames of each batch are
+   * presented after its commands. If the syncCpu flag is true, this function will return once the
+   * gpu has finished with all submitted work.
    */
   void submit(std::unique_ptr<Recording> recording, bool syncCpu = false);
 

@@ -371,9 +371,11 @@ if (TGFX_USE_VULKAN)
     # Vulkan-Headers (header-only)
     list(APPEND TGFX_INCLUDES third_party/Vulkan-Headers/include)
 
-    # volk (compile volk.c directly, same pattern as lz4)
+    # volk (compile volk.c directly, same pattern as lz4). The misleading-indentation warning
+    # is suppressed because newer clang versions flag volk's generated code under -Werror.
     list(APPEND TGFX_INCLUDES third_party/volk)
     file(GLOB VOLK_FILES third_party/volk/volk.c)
+    set_source_files_properties(${VOLK_FILES} PROPERTIES COMPILE_OPTIONS -Wno-misleading-indentation)
     list(APPEND TGFX_FILES ${VOLK_FILES})
 
     # VMA (header-only). Added as SYSTEM include later to suppress

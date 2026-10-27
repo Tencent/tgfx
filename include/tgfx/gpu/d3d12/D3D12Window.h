@@ -76,9 +76,12 @@ class D3D12Window : public Window {
 
   ~D3D12Window() override;
 
+  bool supportsReadback() const override {
+    return true;
+  }
+
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
-  void onPresent(Context* context) override;
 
  private:
   struct PlatformState;

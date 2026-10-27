@@ -25,6 +25,7 @@
 
 namespace tgfx {
 class DepthStencilTextureView;
+class Window;
 
 /**
  * This class defers the acquisition of render targets until they are actually required.
@@ -116,6 +117,31 @@ class RenderTargetProxy {
   virtual std::shared_ptr<RenderTarget> getRenderTarget() const = 0;
 
   /**
+   * Called before submitting a batch that uses this frame, presented or not, to attach its
+   * acquisition wait. The default implementation does nothing.
+   */
+  virtual void onAttachSubmission(Context* context);
+
+  /**
+   * Called before submitting the batch that presents this frame. The default implementation does
+   * nothing.
+   */
+  virtual void onSchedulePresentation(Context* context);
+
+  /**
+   * Presents this frame after the command buffer submission. The default implementation forwards
+   * to the window if it is still alive.
+   */
+  virtual void onPresentFrame(Context* context);
+
+  /**
+   * Associates this target with the window that created it.
+   */
+  void setPresentingWindow(std::weak_ptr<Window> window) {
+    _presentingWindow = std::move(window);
+  }
+
+  /**
    * Returns the depth/stencil attachment associated with this render target, lazily allocating
    * it on the first call. `sampleCount` must match the colour attachment's sample count — every
    * backend requires all attachments in a render pass to share the same sample count, so callers
@@ -165,6 +191,9 @@ class RenderTargetProxy {
   Matrix getOriginTransform() const;
 
  protected:
+  // Held weakly so the frame does not keep the window and its device alive.
+  std::weak_ptr<Window> _presentingWindow = {};
+
   // Cached stencil attachment, lazily created by getStencil(). Held as a strong reference so
   // the same attachment is reused across the proxy's lifetime.
   std::shared_ptr<DepthStencilTextureView> stencilAttachment = nullptr;

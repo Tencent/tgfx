@@ -864,10 +864,11 @@ bool DecomposeContours(const Path& path, std::vector<ContourInfo>& contours) {
       // contour rather than for one corner of it.
       std::vector<Point> thinned = {};
       thinned.reserve(MAX_PROBE_COUNT);
-      auto stride =
-          static_cast<double>(contour.probes.size()) / static_cast<double>(MAX_PROBE_COUNT);
+      auto count = contour.probes.size();
       for (size_t i = 0; i < MAX_PROBE_COUNT; ++i) {
-        thinned.push_back(contour.probes[static_cast<size_t>(i * stride)]);
+        // Stays in integer arithmetic: scaling a size_t through a double loses precision on
+        // 64-bit targets, which is exactly the count this is here to thin.
+        thinned.push_back(contour.probes[i * count / MAX_PROBE_COUNT]);
       }
       contour.probes = std::move(thinned);
     }

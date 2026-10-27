@@ -25,6 +25,7 @@
 #include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
 #include "tasks/TransferPixelsTask.h"
+#include "tgfx/gpu/Window.h"
 
 namespace tgfx {
 DrawingManager::DrawingManager(Context* context) : context(context) {
@@ -41,6 +42,19 @@ DrawingBuffer* DrawingManager::createDrawingBuffer() {
   }
   currentBuffer = std::make_shared<DrawingBuffer>(context);
   return currentBuffer.get();
+}
+
+void DrawingManager::collectFrameUsage(std::shared_ptr<RenderTargetProxy> renderTarget) {
+  if (renderTarget == nullptr) {
+    return;
+  }
+  auto drawingBuffer = getDrawingBuffer();
+  for (auto& proxy : drawingBuffer->windowUsages) {
+    if (proxy == renderTarget) {
+      return;
+    }
+  }
+  drawingBuffer->windowUsages.push_back(std::move(renderTarget));
 }
 
 bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
@@ -170,18 +184,107 @@ void DrawingManager::addAtlasCellTask(std::shared_ptr<TextureProxy> textureProxy
   atlasUploadTask->addCell(allocator, std::move(codec), atlasOffset);
 }
 
-void DrawingManager::collectWindow(std::weak_ptr<Window> window) {
-  if (window.expired()) {
+DrawingManager::WindowTarget& DrawingManager::windowTargetEntry(
+    const std::shared_ptr<Window>& window) {
+  auto& entry = windowTargets[window.get()];
+  if (entry.window.lock() != window) {
+    // A new window reusing the address of a destroyed one; its old target is unrelated.
+    entry = {window, {}};
+  }
+  return entry;
+}
+
+std::shared_ptr<RenderTargetProxy> DrawingManager::createWindowTarget(
+    std::shared_ptr<Window> window) {
+  if (window == nullptr) {
+    return nullptr;
+  }
+  auto& entry = windowTargetEntry(window);
+  auto current = entry.target.lock();
+  if (current != nullptr && isFrameUsed(current)) {
+    // The current batch already uses the window's frame; every surface joins it.
+    return current;
+  }
+  auto target = window->onCreateRenderTarget(context);
+  if (target == nullptr) {
+    return nullptr;
+  }
+  // Lets the proxy present through the window and detect when the window is gone.
+  target->setPresentingWindow(window);
+  entry.target = target;
+  return target;
+}
+
+std::shared_ptr<RenderTargetProxy> DrawingManager::resolveWindowTarget(
+    const std::shared_ptr<Window>& window, std::shared_ptr<RenderTargetProxy> renderTarget) {
+  if (window == nullptr || renderTarget == nullptr) {
+    return renderTarget;
+  }
+  auto& entry = windowTargetEntry(window);
+  auto current = entry.target.lock();
+  if (current == nullptr) {
+    // No live surface holds a newer target of the window; the caller's target becomes current.
+    entry.target = renderTarget;
+    return renderTarget;
+  }
+  return current;
+}
+
+bool DrawingManager::isFrameUsed(const std::shared_ptr<RenderTargetProxy>& renderTarget) const {
+  if (currentBuffer == nullptr || renderTarget == nullptr) {
+    return false;
+  }
+  for (auto& proxy : currentBuffer->windowUsages) {
+    if (proxy == renderTarget) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void DrawingManager::closeCompositors(const std::shared_ptr<RenderTargetProxy>& renderTarget) {
+  if (renderTarget == nullptr) {
+    return;
+  }
+  // Collect first: makeClosed() removes the compositor from the list.
+  std::vector<std::shared_ptr<OpsCompositor>> openCompositors = {};
+  for (auto& compositor : compositors) {
+    if (compositor->renderTarget == renderTarget) {
+      openCompositors.push_back(compositor);
+    }
+  }
+  for (auto& compositor : openCompositors) {
+    compositor->makeClosed();
+  }
+}
+
+void DrawingManager::collectWindow(std::shared_ptr<Window> window,
+                                   std::shared_ptr<RenderTargetProxy> renderTarget) {
+  if (window == nullptr || renderTarget == nullptr) {
     return;
   }
   auto drawingBuffer = getDrawingBuffer();
-  auto& windows = drawingBuffer->windows;
-  for (const auto& w : windows) {
-    if (!w.owner_before(window) && !window.owner_before(w)) {
+  // Present each window target once per batch.
+  for (auto& pending : drawingBuffer->presentables) {
+    if (pending == renderTarget) {
       return;
     }
   }
-  windows.push_back(std::move(window));
+  drawingBuffer->presentables.push_back(std::move(renderTarget));
+  pendingWindows.push_back(std::move(window));
+}
+
+bool DrawingManager::hasPendingPresentation(
+    const std::shared_ptr<RenderTargetProxy>& renderTarget) const {
+  if (currentBuffer == nullptr || renderTarget == nullptr) {
+    return false;
+  }
+  for (auto& pending : currentBuffer->presentables) {
+    if (pending == renderTarget) {
+      return true;
+    }
+  }
+  return false;
 }
 
 std::shared_ptr<DrawingBuffer> DrawingManager::flush() {
@@ -206,6 +309,13 @@ std::shared_ptr<DrawingBuffer> DrawingManager::flush() {
   auto drawingBuffer = currentBuffer;
   bufferPool.push_back(currentBuffer);
   currentBuffer = nullptr;
+  for (auto iter = windowTargets.begin(); iter != windowTargets.end();) {
+    if (iter->second.window.expired() || iter->second.target.expired()) {
+      iter = windowTargets.erase(iter);
+    } else {
+      ++iter;
+    }
+  }
   return drawingBuffer;
 }
 }  // namespace tgfx

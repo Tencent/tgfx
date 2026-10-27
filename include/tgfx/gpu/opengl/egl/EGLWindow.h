@@ -51,6 +51,10 @@ class EGLWindow : public Window {
    */
   void setPresentationTime(int64_t presentationTime);
 
+  bool supportsReadback() const override {
+    return true;
+  }
+
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
   void onPresent(Context* context) override;
