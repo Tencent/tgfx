@@ -19,6 +19,7 @@
 #include "BackgroundHandler.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/PictureUtils.h"
 #include "layers/BackgroundSnapshotMap.h"
 #include "layers/BackgroundSource.h"
 #include "layers/DrawArgs.h"
@@ -178,8 +179,8 @@ void CacheStyleOutput(BackgroundSnapshotMap* snapshots, Context* context, Layer*
     return;
   }
   Point imageOffset = {};
-  auto image =
-      ToImageWithOffset(std::move(devicePicture), &imageOffset, &deviceShape, dstColorSpace);
+  auto image = PictureUtils::ToImageWithOffset(std::move(devicePicture), &imageOffset, &deviceShape,
+                                               dstColorSpace);
   Matrix drawMatrix = Matrix::I();
   if (image == nullptr || !recordMatrix.invert(&drawMatrix)) {
     return;
@@ -355,7 +356,8 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     return;
   }
   Point offset = {};
-  auto image = ToImageWithOffset(std::move(picture), &offset, &bounds, args.dstColorSpace);
+  auto image =
+      PictureUtils::ToImageWithOffset(std::move(picture), &offset, &bounds, args.dstColorSpace);
   if (image == nullptr) {
     return;
   }

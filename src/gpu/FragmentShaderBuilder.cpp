@@ -50,7 +50,7 @@ std::string FragmentShaderBuilder::emitPerspTextCoord(const ShaderVar& coordVar)
     return coordVar.name();
   }
   if (coordVar.type() == SLType::Float3) {
-    const std::string perspCoordName = "perspCoord2D";
+    const std::string perspCoordName = "persp_" + coordVar.name();
     codeAppendf("highp vec2 %s = %s.xy / %s.z;", perspCoordName.c_str(), coordVar.name().c_str(),
                 coordVar.name().c_str());
     return perspCoordName;

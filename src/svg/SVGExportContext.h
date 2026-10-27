@@ -42,6 +42,8 @@ class ResourceStore;
 class ElementWriter;
 class PictureImage;
 class ColorFilter;
+class RRectBlurShader;
+class RRectInnerShadowShader;
 
 class SVGExportContext : public DrawContext {
  public:
@@ -182,6 +184,17 @@ class SVGExportContext : public DrawContext {
       const std::string& clipID, const std::string& blendStyle, float alpha);
 
   static SVGPathParser::PathEncoding PathEncodingType();
+
+  bool tryDrawRectWithCustomShader(const Rect& rect, const Brush& brush, const Matrix& matrix,
+                                   const ClipStack& clip, const Stroke* stroke);
+
+  void drawRRectBlurShader(const RRectBlurShader& shader, const Matrix& shaderMatrix,
+                           const Matrix& deviceMatrix, const ClipStack& clip,
+                           const Rect& restrictRect, const Brush& brush);
+
+  void drawRRectInnerShadowShader(const RRectInnerShadowShader& shader, const Matrix& shaderMatrix,
+                                  const Matrix& deviceMatrix, const ClipStack& clip,
+                                  const Rect& restrictRect, const Brush& brush);
 
   uint32_t exportFlags = {};
   Context* context = nullptr;
