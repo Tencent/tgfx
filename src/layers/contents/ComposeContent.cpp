@@ -84,15 +84,6 @@ void ComposeContent::drawContourInternal(Canvas* canvas, bool antiAlias,
   }
 }
 
-bool ComposeContent::hasPaintedContent() const {
-  for (const auto& content : contents) {
-    if (content->hasPaintedContent()) {
-      return true;
-    }
-  }
-  return false;
-}
-
 bool ComposeContent::contourEqualsOpaqueContent(bool includeUnpaintedGeometry) const {
   for (const auto& content : contents) {
     if (!content->contourEqualsOpaqueContent(includeUnpaintedGeometry)) {

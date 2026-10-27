@@ -82,13 +82,6 @@ class LayerContent {
   }
 
   /**
-   * Returns true if at least one entry of the content carries a paint. A content that holds only
-   * geometries no paint captured paints nothing, so it is not "drawable content" even though it
-   * exists.
-   */
-  virtual bool hasPaintedContent() const = 0;
-
-  /**
    * Draws the default content of the layer (content below children) to the specified canvas.
    * Returns true if the content has foreground graphics that should be drawn above children
    * by calling drawForeground().

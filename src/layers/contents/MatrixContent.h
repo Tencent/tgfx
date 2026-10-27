@@ -38,7 +38,6 @@ class MatrixContent : public GeometryContent {
   bool contourEqualsOpaqueContent(bool includeUnpaintedGeometry) const override;
   bool hasBlendMode() const override;
   bool hasPaint() const override;
-  bool hasPaintedContent() const override;
   bool hasSameGeometry(const GeometryContent* other) const override;
   const std::shared_ptr<Shader>& getShader() const override;
 

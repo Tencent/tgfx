@@ -77,10 +77,6 @@ bool MatrixContent::hasPaint() const {
   return content->hasPaint();
 }
 
-bool MatrixContent::hasPaintedContent() const {
-  return content->hasPaintedContent();
-}
-
 bool MatrixContent::hasSameGeometry(const GeometryContent* other) const {
   if (other == nullptr || Types::Get(this) != Types::Get(other)) {
     return false;

@@ -157,8 +157,4 @@ bool DrawContent::hasPaint() const {
   return color.has_value();
 }
 
-bool DrawContent::hasPaintedContent() const {
-  return color.has_value();
-}
-
 }  // namespace tgfx
