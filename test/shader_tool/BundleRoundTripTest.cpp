@@ -26,7 +26,7 @@
 #include <iterator>
 #include <string>
 #include <vector>
-#include "BundleVerifier.h"
+#include "verify/BundleVerifier.h"
 #include "output/BundleWriter.h"
 #include "gpu/BundleFormat.h"
 #include "gpu/PrecompiledBundleIdentity.h"

@@ -95,6 +95,40 @@ inline constexpr const char* VerifyInlinePolicy = "verify.inline-policy";
 /// format it expects). Reported as Unverifiable, never as a silent skip.
 inline constexpr const char* VerifyNotApplicable = "verify.unverifiable";
 
+/// A bundle the reader contract rejects: bad magic, an out-of-range format version, a wrong
+/// toolchain ABI, a mismatched profile tag, an inconsistent pool layout, or a data pool that
+/// does not decompress.
+inline constexpr const char* VerifyBundleHeader = "verify.bundle-header";
+
+/// A pool entry that is not a sound stage: outside the file, a duplicate key, a key with no
+/// rule-reachable candidate or several, or a data/reflection range outside its pool.
+inline constexpr const char* VerifyBundlePool = "verify.bundle-pool";
+
+/// A rule-reachable stage key missing from the bundle.
+inline constexpr const char* VerifyBundleMissing = "verify.bundle-missing";
+
+/// The recomputed identity hash disagrees with the stored one: the file changed after writing.
+inline constexpr const char* VerifyBundleIdentity = "verify.bundle-identity";
+
+/// The manifest beside the bundle does not describe exactly that file.
+inline constexpr const char* VerifyManifest = "verify.manifest";
+
+/// The bundle's source digest disagrees with the current sources (or could not be compared):
+/// the bundle is stale.
+inline constexpr const char* VerifyStale = "verify.stale";
+
+/// Freshness was not checked because no --shader-dir was given; a warning, not a failure.
+inline constexpr const char* VerifyFreshnessSkipped = "verify.freshness-skipped";
+
+/// A backend whose bundle was required is absent.
+inline constexpr const char* VerifyRequiredMissing = "verify.required-missing";
+
+/// No bundle was found in the directory the verification was pointed at.
+inline constexpr const char* VerifyNoBundles = "verify.no-bundles";
+
+/// The --require-backends list is empty or names a backend that does not exist.
+inline constexpr const char* VerifyBackendList = "verify.backend-list";
+
 // ---- output: writing the artifacts ----------------------------------------------------------
 
 /// An output file (a report, a bundle, a manifest) could not be written.
@@ -115,6 +149,10 @@ inline constexpr const char* AllCodes[] = {
     VerifyClipField,       VerifyOpCode,       VerifySlotCapacity,
     VerifySourceFile,      VerifySourceFamily, VerifyReflection,
     VerifyBindingLayout,   VerifyInlinePolicy, VerifyNotApplicable,
+    VerifyBundleHeader,    VerifyBundlePool,   VerifyBundleMissing,
+    VerifyBundleIdentity,  VerifyManifest,     VerifyStale,
+    VerifyFreshnessSkipped, VerifyRequiredMissing, VerifyNoBundles,
+    VerifyBackendList,
     OutputWrite,           OutputDuplicateKey,
 };
 

@@ -497,15 +497,16 @@ TEST(LayeringTest, TheSublayersDependOnlyWhereTheArchitectureAllows) {
   //   emit ─▶ compile, core                      (a dialect is translated through the compiler)
   //   compile ─▶ core
   //   plan ─▶ core
-  //   verify ─▶ core
+  //   verify ─▶ core, output                     (the checks read shared data structures; the
+  //                                               bundle verifier reads the manifest the writer
+  //                                               left and recomputes its source digest)
   //   output ─▶ core, compile                    (the writers consume the shared data structures;
   //                                               the manifest's source digest includes the Metal
   //                                               compiler fingerprint — a compile-layer fact)
   //
   // Everything else is forbidden: verify never compiles, plan never emits, output never reaches
   // into the stages that produce what it writes, and a sublayer never reaches up into cli. The
-  // tool root holds main.cpp (the command line) and BundleVerifier (the --verify-bundle command,
-  // pending its own migration); the root is where the cli begins, so its includes are unchecked.
+  // tool root holds main.cpp alone — the command line — and its includes are unchecked.
   auto allowed = [](const std::string& from, const std::string& to) {
     if (from == to || to.empty() || from.empty()) {
       return true;
@@ -523,7 +524,7 @@ TEST(LayeringTest, TheSublayersDependOnlyWhereTheArchitectureAllows) {
       return to == "core";
     }
     if (from == "verify") {
-      return to == "core";
+      return to == "core" || to == "output";
     }
     if (from == "output") {
       return to == "core" || to == "compile";
@@ -588,20 +589,12 @@ TEST(LayeringTest, TheIncludeScannerReadsRealIncludesOnly) {
 
 TEST(LayeringTest, NoSublayerPrints) {
   // A sublayer reports diagnostics (core/Diagnostics.h) and the cli renders them; nothing else
-  // writes to the console. This is a ratchet: the file below still prints, for a reason of its
-  // own, and is the remaining debt of the diagnostic migration:
-  //
-  //   BundleVerifier.cpp   the --verify-bundle command's own reporter (a separate command, not
-  //                        the build path, pending migration)
-  const std::set<std::string> allowed = {"BundleVerifier.cpp"};
+  // writes to the console. No exceptions remain: every check, cache and verifier reports
+  // records, and the two commands render them.
   size_t checked = 0;
   for (const auto& file : FilesIn(ToolDir(), {".cpp"})) {
     auto relative = file.substr(ToolDir().size() + 1);
     if (relative.rfind("cli/", 0) == 0 || relative == "main.cpp") {
-      continue;
-    }
-    auto name = std::filesystem::path(file).filename().string();
-    if (allowed.count(name) == 1) {
       continue;
     }
     std::ifstream source(file);
