@@ -27,7 +27,7 @@
 #include <string>
 #include <vector>
 #include "BundleVerifier.h"
-#include "BundleWriter.h"
+#include "output/BundleWriter.h"
 #include "gpu/BundleFormat.h"
 #include "gpu/PrecompiledBundleIdentity.h"
 #include "gpu/PrecompiledShaderCache.h"

@@ -26,14 +26,14 @@
 #include <set>
 #include <utility>
 #include <vector>
-#include "BundleManifest.h"
-#include "BundleWriter.h"
+#include "output/BundleManifest.h"
+#include "output/BundleWriter.h"
 #include "InlineExpansion.h"
 #include "ReflectionExtractor.h"
 #include "ShaderCompiler.h"
 #include "ShaderSources.h"
 #include "StageCache.h"
-#include "StageReport.h"
+#include "output/StageReport.h"
 #include "cli/ReportWriter.h"
 #include "compile/StageCompiler.h"
 #include "core/Diagnostics.h"

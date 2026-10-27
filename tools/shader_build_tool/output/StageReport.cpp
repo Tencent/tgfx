@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "StageReport.h"
+#include "output/StageReport.h"
 #include <algorithm>
 #include <cstdio>
 #include <fstream>
@@ -26,7 +26,7 @@
 #include <string>
 #include <tuple>
 #include <utility>
-#include "BundleWriter.h"
+#include "output/BundleWriter.h"
 #include "gpu/ShaderKeyHash.h"
 #include "gpu/shaders/PrecompiledShader.h"
 

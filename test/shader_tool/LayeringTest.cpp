@@ -487,15 +487,17 @@ std::string SublayerOf(const std::string& path) {
 TEST(LayeringTest, TheSublayersDependOnlyWhereTheArchitectureAllows) {
   // The direction map of the tool's sublayers:
   //
-  //   cli ─▶ plan, compile, emit, verify, root   (the command line drives everything)
+  //   cli ─▶ plan, compile, emit, verify, output, root   (the command line drives everything)
   //   emit ─▶ compile, core                      (a dialect is translated through the compiler)
   //   compile ─▶ core
   //   plan ─▶ core
   //   verify ─▶ core
+  //   output ─▶ core                             (the writers consume the shared data structures)
   //
-  // Everything else is forbidden: verify never compiles, plan never emits, a sublayer never
-  // reaches up into cli. Files still at the tool root are a transitional layer any sublayer
-  // may use, until they move into theirs; the moment one does, its edges start being checked.
+  // Everything else is forbidden: verify never compiles, plan never emits, output never reaches
+  // into the stages that produce what it writes, and a sublayer never reaches up into cli. Files
+  // still at the tool root are a transitional layer any sublayer may use, until they move into
+  // theirs; the moment one does, its edges start being checked.
   auto allowed = [](const std::string& from, const std::string& to) {
     if (from == to || to.empty() || from.empty()) {
       return true;
@@ -513,6 +515,9 @@ TEST(LayeringTest, TheSublayersDependOnlyWhereTheArchitectureAllows) {
       return to == "core";
     }
     if (from == "verify") {
+      return to == "core";
+    }
+    if (from == "output") {
       return to == "core";
     }
     return false;

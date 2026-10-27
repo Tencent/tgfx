@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "BundleWriter.h"
+#include "output/BundleWriter.h"
 #include <algorithm>
 #include <cstring>
 #include <fstream>
@@ -24,7 +24,7 @@
 #include <map>
 #include <set>
 #include <sstream>
-#include "OutputFile.h"
+#include "output/OutputFile.h"
 #include "gpu/BundleFormat.h"
 #include "gpu/PrecompiledBundleIdentity.h"
 #include "gpu/ShaderKeyHash.h"

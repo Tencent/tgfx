@@ -16,7 +16,7 @@
 //
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "BundleManifest.h"
+#include "output/BundleManifest.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -27,7 +27,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include "OutputFile.h"
+#include "output/OutputFile.h"
 #include "ShaderCompiler.h"
 #include "ShaderSources.h"
 #include "gpu/ShaderBindingLayout.h"

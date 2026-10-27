@@ -22,6 +22,8 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include "output/BundleManifest.h"
+#include "output/BundleWriter.h"
 #include "gpu/ShaderKeyHash.h"
 #include <iterator>
 #include <map>
@@ -30,8 +32,6 @@
 #include <string>
 #include <utility>
 #include <vector>
-#include "BundleManifest.h"
-#include "BundleWriter.h"
 #include "gpu/BundleFormat.h"
 #include "gpu/PrecompiledBundleIdentity.h"
 #include "gpu/ShaderProfile.h"
