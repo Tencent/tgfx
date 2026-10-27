@@ -449,7 +449,7 @@ void Layer::setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value
       std::equal(_layerStyles.begin(), _layerStyles.end(), value.begin())) {
     return;
   }
-  auto hadGeometryContent = needsGeometry();
+  auto hadGeometryStyle = hasGeometryStyle();
   for (const auto& layerStyle : _layerStyles) {
     DEBUG_ASSERT(layerStyle != nullptr);
     layerStyle->detachFromLayer(this);
@@ -462,7 +462,7 @@ void Layer::setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value
     layerStyle->attachToLayer(this);
     _layerStyles.push_back(layerStyle);
   }
-  if (hadGeometryContent != needsGeometry()) {
+  if (hadGeometryStyle != hasGeometryStyle()) {
     // The geometry joins the layer bounds only while a style declares it, and neither
     // invalidateSubtree() nor invalidateTransform() drops contentBounds, so rebuild it here.
     invalidateContent();
@@ -735,7 +735,7 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
     // A geometry no paint captured paints nothing: it stays in the content as an unpainted entry,
     // but only a style drawing from that geometry needs it in the bounds, and only when
     // excludeEffects is false (the content-bounds query leaves it out).
-    const bool includeUnpaintedGeometry = !excludeEffects && needsGeometry();
+    const bool includeUnpaintedGeometry = !excludeEffects && hasGeometryStyle();
     auto contentBounds = content->getBounds(includeUnpaintedGeometry);
     bool behindCamera =
         !isAffine && Matrix3DUtils::IsRectBehindCamera(contentBounds, coordinateMatrix);
@@ -1842,7 +1842,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   // A layer with a geometry style may drop one unusable bucket without cancelling the other; the
   // relaxation is per layer, not per bucket. bucketUsable is no monotone failure flag, but only the
   // geometry branch below revives it, so a layer without such a style stays fail-closed.
-  const bool layerUsesGeometry = needsGeometry();
+  const bool layerUsesGeometry = bucketNeedsGeometry[0] || bucketNeedsGeometry[1];
 
   DrawArgs drawArgs = args;
   drawArgs.render3DContext = nullptr;
@@ -2151,7 +2151,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   auto content = getContent();
   // A transform-only change never sets dirtyContentBounds, so a layer whose bounds come from its
   // geometry rather than from its content has to enter the recompute through this gate as well.
-  const bool hasGeometry = needsGeometry();
+  const bool hasGeometry = hasGeometryStyle();
   if (bitFields.dirtyContentBounds || (forceDirty && (content != nullptr || hasGeometry))) {
     if (contentBounds) {
       _root->invalidateRect(*contentBounds);
@@ -2386,7 +2386,7 @@ void Layer::updateStaticSubtreeFlags() {
   }
 }
 
-bool Layer::needsGeometry() const {
+bool Layer::hasGeometryStyle() const {
   for (const auto& style : _layerStyles) {
     DEBUG_ASSERT(style != nullptr);
     if (NeedsGeometry(style.get())) {

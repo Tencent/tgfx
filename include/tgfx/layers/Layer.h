@@ -744,8 +744,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void updateStaticSubtreeFlags();
 
-  // Whether one of the layer styles declares the layer's geometry as its content.
-  bool needsGeometry() const;
+  // Whether one of the layer styles takes the layer's geometry as its content.
+  bool hasGeometryStyle() const;
 
   struct {
     bool dirtyContent : 1;        // layer's content needs updating
