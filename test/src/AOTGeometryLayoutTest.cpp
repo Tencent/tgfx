@@ -378,6 +378,12 @@ void ExpectLayoutVariant(const LayoutVariant& variant, const char* gpName) {
     // precompiled program (no drop, no runtime program) and render like the runtime.
     const bool pinned = variant.shaderName[0] != '\0';
     using FD = PointwiseChainShader::FD;
+    const auto fragDomain = FD::domain();
+    const size_t gpLayoutPos = fragDomain.indexOf(FD::GP_LAYOUT.defineName);
+    const size_t hasXPPos = fragDomain.indexOf(FD::HAS_XP.defineName);
+    const size_t textureCountPos = fragDomain.indexOf(FD::TEXTURE_COUNT.defineName);
+    const size_t hasMaskTexturePos = fragDomain.indexOf(FD::HAS_MASK_TEXTURE.defineName);
+    const size_t resourceKindPos = fragDomain.indexOf(FD::RESOURCE_KIND.defineName);
     bool served = !pinned;
     std::string seen = {};
     for (const auto& record : cache->hitRecords()) {
@@ -388,14 +394,14 @@ void ExpectLayoutVariant(const LayoutVariant& variant, const char* gpName) {
       if (record.shaderName != variant.shaderName) {
         continue;
       }
-      auto frag = PointwiseChainShader::FD::domain().decode(record.fragPermutationIndex);
-      if (frag.size() < FD::COUNT) {
+      auto frag = fragDomain.decode(record.fragPermutationIndex);
+      if (frag.size() < fragDomain.dimensionCount()) {
         continue;
       }
-      bool resourceMatches = !gradientKind || frag[FD::RESOURCE_KIND] == 1;
-      if (frag[FD::GP_LAYOUT] == variant.gpLayout && frag[FD::HAS_XP] == expectedXP &&
-          frag[FD::TEXTURE_COUNT] == variant.textureCount &&
-          frag[FD::HAS_MASK_TEXTURE] == variant.maskTexture && resourceMatches) {
+      bool resourceMatches = !gradientKind || frag[resourceKindPos] == 1;
+      if (frag[gpLayoutPos] == variant.gpLayout && frag[hasXPPos] == expectedXP &&
+          frag[textureCountPos] == variant.textureCount &&
+          frag[hasMaskTexturePos] == variant.maskTexture && resourceMatches) {
         served = true;
       }
     }

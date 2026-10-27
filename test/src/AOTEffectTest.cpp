@@ -2169,6 +2169,12 @@ TGFX_TEST(AOTEffectTest, PerlinDensityBranchesShareLookupResources) {
 TGFX_TEST(AOTEffectTest, PointwiseResourceKindsAreIndependentAndBounded) {
   using VD = PointwiseChainShader::VD;
   using FD = PointwiseChainShader::FD;
+  const auto vertDomain = VD::domain();
+  const auto fragDomain = FD::domain();
+  const size_t hasXPPos = fragDomain.indexOf(FD::HAS_XP.defineName);
+  const size_t resourceKindPos = fragDomain.indexOf(FD::RESOURCE_KIND.defineName);
+  const size_t sourceCoordsPos = vertDomain.indexOf(VD::HAS_SOURCE_COORDS.defineName);
+  const size_t hasSubsetPos = fragDomain.indexOf(FD::HAS_SUBSET.defineName);
   PointwiseChainShader::Inputs inputs;
   inputs.gpKind = 1;
   inputs.hasCoverage = true;
@@ -2180,13 +2186,13 @@ TGFX_TEST(AOTEffectTest, PointwiseResourceKindsAreIndependentAndBounded) {
     inputs.xpType = xp;
     auto composed = PointwiseChainShader::Compose(inputs);
     ASSERT_TRUE(composed.has_value());
-    EXPECT_EQ(composed->vertValues.size(), VD::COUNT);
-    EXPECT_EQ(composed->fragValues.size(), FD::COUNT);
-    EXPECT_EQ(composed->fragValues[FD::HAS_XP], xp);
-    EXPECT_EQ(composed->fragValues[FD::RESOURCE_KIND], 2);
-    EXPECT_EQ(composed->vertValues[VD::HAS_SOURCE_COORDS], 1);
+    EXPECT_EQ(composed->vertValues.size(), vertDomain.dimensionCount());
+    EXPECT_EQ(composed->fragValues.size(), fragDomain.dimensionCount());
+    EXPECT_EQ(composed->fragValues[hasXPPos], xp);
+    EXPECT_EQ(composed->fragValues[resourceKindPos], 2);
+    EXPECT_EQ(composed->vertValues[sourceCoordsPos], 1);
     noisePairs.insert(
-        {VD::domain().encode(composed->vertValues), FD::domain().encode(composed->fragValues)});
+        {vertDomain.encode(composed->vertValues), fragDomain.encode(composed->fragValues)});
     // A plain-chain profile never takes the noise module, and an Automatic profile never
     // promotes (the plan layer resolves the profile before matching).
     inputs.resourceProfile = AOTResourceProfile::Automatic;
@@ -2236,13 +2242,13 @@ TGFX_TEST(AOTEffectTest, PointwiseResourceKindsAreIndependentAndBounded) {
           continue;
         }
         auto expectedFragment = chainValues->fragValues;
-        expectedFragment[FD::RESOURCE_KIND] = 1;
+        expectedFragment[resourceKindPos] = 1;
         auto expectedVert = chainValues->vertValues;
-        expectedVert[VD::HAS_SOURCE_COORDS] = 1;
+        expectedVert[sourceCoordsPos] = 1;
         EXPECT_EQ(composed->vertValues, expectedVert);
         EXPECT_EQ(composed->fragValues, expectedFragment);
-        auto vertexIndex = VD::domain().encode(composed->vertValues);
-        auto fragmentIndex = FD::domain().encode(composed->fragValues);
+        auto vertexIndex = vertDomain.encode(composed->vertValues);
+        auto fragmentIndex = fragDomain.encode(composed->fragValues);
         EXPECT_TRUE(
             IsBuildablePermutation(PointwiseChainShader().info(), vertexIndex, fragmentIndex));
         gradientPairs.insert({vertexIndex, fragmentIndex});
@@ -2259,10 +2265,10 @@ TGFX_TEST(AOTEffectTest, PointwiseResourceKindsAreIndependentAndBounded) {
   std::set<std::pair<uint32_t, uint32_t>> plainPairs;
   size_t chainSubsetPairs = 0;
   for (const auto& indices : reachable) {
-    auto fragValues = FD::domain().decode(indices.second);
-    if (fragValues[FD::RESOURCE_KIND] == 0) {
+    auto fragValues = fragDomain.decode(indices.second);
+    if (fragValues[resourceKindPos] == 0) {
       plainPairs.insert(indices);
-      chainSubsetPairs += fragValues[FD::HAS_SUBSET] != 0 ? 1 : 0;
+      chainSubsetPairs += fragValues[hasSubsetPos] != 0 ? 1 : 0;
     }
   }
   EXPECT_EQ(plainPairs.size(), 57u);

@@ -82,62 +82,49 @@ class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
   static constexpr uint32_t TextureReads = ShaderTextureReadSwizzle;
 
   struct VertDims {
-    enum : uint32_t {
-      GP_LAYOUT,
-      HAS_COVERAGE,
-      HAS_UV_COORD,
-      TEXTURE_COUNT,
-      HAS_SUBSET,
-      HAS_SOURCE_COORDS,
-      COUNT
-    };
+    // The dimension declarations: each handle is one dimension (typed by this stage), domain()
+    // lists the handles in the bundle's dimension order, and Compose assigns through the handles
+    // by name (ComposedDims) — there is no index enum whose positions could drift from the
+    // domain list.
+    static inline const PermutationIntDim<VertDims> GP_LAYOUT{"GP_LAYOUT", 5};
+    static inline const PermutationBoolDim<VertDims> HAS_COVERAGE{"HAS_COVERAGE"};
+    static inline const PermutationBoolDim<VertDims> HAS_UV_COORD{"HAS_UV_COORD"};
+    // 0 = no texture leaves, 1 = the four-leaf artifacts (chains with 1-3 sampler children bind
+    // phantom padding and run them).
+    static inline const PermutationIntDim<VertDims> TEXTURE_COUNT{"TEXTURE_COUNT", 2};
+    // Appended so every subset-free index keeps its value.
+    static inline const PermutationBoolDim<VertDims> HAS_SUBSET{"HAS_SUBSET"};
+    // The resource kinds (RESOURCE_KIND != 0) carry the SourceCoords varying and reserve
+    // CoordTransformMatrix_0 for the source module. Mirrored from the fragment tail; plain
+    // chains keep their pre-merge indices.
+    static inline const PermutationBoolDim<VertDims> HAS_SOURCE_COORDS{"HAS_SOURCE_COORDS"};
     static PermutationDomain domain() {
-      return PermutationDomain({
-          PermutationInt("GP_LAYOUT", 5),
-          PermutationBool("HAS_COVERAGE"),
-          PermutationBool("HAS_UV_COORD"),
-          // 0 = no texture leaves, 1 = the four-leaf artifacts (chains with 1-3 sampler
-          // children bind phantom padding and run them).
-          PermutationInt("TEXTURE_COUNT", 2),
-          // Appended so every subset-free index keeps its value.
-          PermutationBool("HAS_SUBSET"),
-          // The resource kinds (RESOURCE_KIND != 0) carry the SourceCoords varying and reserve
-          // CoordTransformMatrix_0 for the source module. Mirrored from the fragment tail; plain
-          // chains keep their pre-merge indices.
-          PermutationBool("HAS_SOURCE_COORDS"),
-      });
+      return PermutationDomain(
+          {GP_LAYOUT, HAS_COVERAGE, HAS_UV_COORD, TEXTURE_COUNT, HAS_SUBSET, HAS_SOURCE_COORDS});
     }
   };
   using VD = VertDims;
 
   struct FragDims {
-    enum : uint32_t {
-      GP_LAYOUT,
-      HAS_XP,
-      HAS_COVERAGE,
-      TEXTURE_COUNT,
-      HAS_MASK_TEXTURE,
-      HAS_SUBSET,
-      RESOURCE_KIND,
-      COUNT
-    };
+    // Same declaration shape as VertDims: handles typed by this stage, domain() in bundle order.
+    // RESOURCE_KIND stays last (see its comment) — the order feeds encode(), so it is pinned by
+    // the compiled-space tests, not by an enum.
+    static inline const PermutationIntDim<FragDims> GP_LAYOUT{"GP_LAYOUT", 5};
+    static inline const PermutationIntDim<FragDims> HAS_XP{XP_DEFINE_NAME, XP_VALUE_COUNT};
+    static inline const PermutationBoolDim<FragDims> HAS_COVERAGE{"HAS_COVERAGE"};
+    static inline const PermutationIntDim<FragDims> TEXTURE_COUNT{"TEXTURE_COUNT", 2};
+    static inline const PermutationBoolDim<FragDims> HAS_MASK_TEXTURE{"HAS_MASK_TEXTURE"};
+    static inline const PermutationBoolDim<FragDims> HAS_SUBSET{"HAS_SUBSET"};
+    // 0 = plain chain (16 slots), 1 = gradient source (16 slots), 2 = noise source (32 slots).
+    // Appended last so plain chains keep their pre-merge indices; the noise kind holds the
+    // largest value so a future removal re-encodes nothing below it.
+    static inline const PermutationIntDim<FragDims> RESOURCE_KIND{"RESOURCE_KIND", 3};
     static PermutationDomain domain() {
-      return PermutationDomain({
-          PermutationInt("GP_LAYOUT", 5),
-          PermutationInt(XP_DEFINE_NAME, XP_VALUE_COUNT),
-          PermutationBool("HAS_COVERAGE"),
-          PermutationInt("TEXTURE_COUNT", 2),
-          PermutationBool("HAS_MASK_TEXTURE"),
-          PermutationBool("HAS_SUBSET"),
-          // 0 = plain chain (16 slots), 1 = gradient source (16 slots), 2 = noise source
-          // (32 slots). Appended last so plain chains keep their pre-merge indices; the noise
-          // kind holds the largest value so a future removal re-encodes nothing below it.
-          PermutationInt("RESOURCE_KIND", 3),
-      });
+      return PermutationDomain({GP_LAYOUT, HAS_XP, HAS_COVERAGE, TEXTURE_COUNT, HAS_MASK_TEXTURE,
+                                HAS_SUBSET, RESOURCE_KIND});
     }
   };
   using FD = FragDims;
-  static_assert(FD::COUNT == 7, "Update the Compose mapping when fragment dimensions change.");
 
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = true;
@@ -166,8 +153,8 @@ class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
 
   /// The extended resource kinds (RESOURCE_KIND != 0): the per-quad subset of a strict image draw
   /// is a plain-chain capability; the extended kernels have no subset branch.
-  static bool ExtendedValuesAllowed(const std::vector<int>& chainFragValues) {
-    return chainFragValues[FD::HAS_SUBSET] == 0;
+  static bool ExtendedValuesAllowed(const ComposedDims<FragDims>& chainFrag) {
+    return chainFrag.get(FD::HAS_SUBSET) == 0;
   }
 
   /// Pure mapping from inputs to dimension values; unsupported combinations return nullopt.
@@ -193,19 +180,21 @@ class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
     if (resourceKind == 1 && inputs.hasNoise) {
       return std::nullopt;
     }
-    auto values = ComposeGP(inputs);
-    if (!values) {
+    auto vert = ComposedDims<VertDims>(VertDims::domain());
+    auto frag = ComposedDims<FragDims>(FragDims::domain());
+    if (!ComposeGP(inputs, &vert, &frag)) {
       return std::nullopt;
     }
-    if (resourceKind != 0) {
-      if (!ExtendedValuesAllowed(values->fragValues)) {
-        return std::nullopt;
-      }
-      values->vertValues.resize(VD::COUNT);
-      values->vertValues[VD::HAS_SOURCE_COORDS] = 1;
+    if (resourceKind != 0 && !ExtendedValuesAllowed(frag)) {
+      return std::nullopt;
     }
-    values->fragValues.resize(FD::COUNT);
-    values->fragValues[FD::RESOURCE_KIND] = resourceKind;
+    // Both writes are unconditional — including the plain-chain zeros — because finish() fails
+    // on any dimension left unassigned; a forgotten dimension can no longer read as a silent 0.
+    vert.set(VD::HAS_SOURCE_COORDS, resourceKind != 0 ? 1 : 0);
+    frag.set(FD::RESOURCE_KIND, resourceKind);
+    RuleComposedValues values;
+    values.vertValues = vert.finish();
+    values.fragValues = frag.finish();
     return values;
   }
 
@@ -260,10 +249,11 @@ class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
   static std::optional<Inputs> Extract(const ProgramInfo* programInfo);
 
  private:
-  static std::optional<RuleComposedValues> ComposeGP(const Inputs& inputs) {
+  static bool ComposeGP(const Inputs& inputs, ComposedDims<VertDims>* vert,
+                        ComposedDims<FragDims>* frag) {
     if (inputs.xpType < XP_NONE || inputs.xpType > XP_FRAMEBUFFER_FETCH ||
         inputs.textureCount < 0 || inputs.textureCount > 1) {
-      return std::nullopt;
+      return false;
     }
     // Each GP profile fixes the attribute slots its vertex buffers carry. The color attribute is
     // unconditional on every layout (a white filler where the buffer is shared across draws), so
@@ -278,40 +268,40 @@ class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
     switch (inputs.gpKind) {
       case 0:
         if (inputs.hasUVCoord) {
-          return std::nullopt;
+          return false;
         }
         // The DefaultGP's coverage attribute is unconditional (the non-AA path triangles carry a
         // constant 1.0 slot), so the matcher always reports coverage: reject the vacuous lattice
         // cell so the enumeration equals the producible set.
         if (!inputs.hasCoverage) {
-          return std::nullopt;
+          return false;
         }
         hasCoverage = 1;
         break;
       case 1:
       case 2:
         if (!inputs.hasCoverage) {
-          return std::nullopt;
+          return false;
         }
         hasCoverage = 1;
         hasUVCoord = inputs.hasUVCoord ? 1 : 0;
         break;
       case 3:
         if (inputs.hasCoverage || !inputs.hasUVCoord) {
-          return std::nullopt;
+          return false;
         }
         // The atlas chain route exists to sample the atlas coverage leaf: the decomposer always
         // attaches it, so a leaf-free atlas chain is structurally producible but semantically
         // vacuous. Rejecting it here keeps the reachable set equal to the compiled set (the gap was
         // previously masked by the IsBuildablePermutation post-check falling back to JIT).
         if (inputs.textureCount == 0) {
-          return std::nullopt;
+          return false;
         }
         hasUVCoord = 1;
         break;
       case 4:
         if (inputs.hasCoverage || inputs.hasUVCoord) {
-          return std::nullopt;
+          return false;
         }
         gpLayout = 1;
         break;
@@ -320,7 +310,7 @@ class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
         // filler (the exact color rides the Color uniform) and the edge AA is evaluated per pixel
         // from the edge-distance varying, so no coverage or uvCoord attribute exists.
         if (inputs.hasCoverage || inputs.hasUVCoord) {
-          return std::nullopt;
+          return false;
         }
         gpLayout = 2;
         break;
@@ -331,12 +321,12 @@ class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
         // uvCoord attribute. The stroke form (7) adds the strokeWidth attribute, hence its own
         // layout.
         if (inputs.hasCoverage || inputs.hasUVCoord) {
-          return std::nullopt;
+          return false;
         }
         gpLayout = inputs.gpKind == 6 ? 3 : 4;
         break;
       default:
-        return std::nullopt;
+        return false;
     }
     // Coverage subtrees draw their unit input from the GP coverage: the rect and mesh layouts supply
     // it as the vCoverage varying, and the ellipse, hairline and complex rounded-rect layouts
@@ -349,29 +339,27 @@ class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
     // complex rounded-rect layouts.
     int hasMaskTexture = inputs.textureCount == 0 && inputs.hasMask ? 1 : 0;
     if (hasMaskTexture != 0 && (gpLayout == 1 || hasUVCoord != 0)) {
-      return std::nullopt;
+      return false;
     }
     // The per-quad subset is a QuadPerEdgeAAGP attribute that clamps a texture leaf, so it exists
     // only on the quad profile with the four-leaf slots.
     if (inputs.hasSubset && (inputs.gpKind != 1 || inputs.textureCount != 1)) {
-      return std::nullopt;
+      return false;
     }
-    int hasSubset = inputs.hasSubset ? 1 : 0;
-    RuleComposedValues values;
-    values.vertValues.resize(VD::COUNT);
-    values.vertValues[VD::GP_LAYOUT] = gpLayout;
-    values.vertValues[VD::HAS_COVERAGE] = hasCoverage;
-    values.vertValues[VD::HAS_UV_COORD] = hasUVCoord;
-    values.vertValues[VD::TEXTURE_COUNT] = inputs.textureCount;
-    values.vertValues[VD::HAS_SUBSET] = hasSubset;
-    values.fragValues.resize(FD::COUNT);
-    values.fragValues[FD::GP_LAYOUT] = gpLayout;
-    values.fragValues[FD::HAS_XP] = inputs.xpType;
-    values.fragValues[FD::HAS_COVERAGE] = hasCoverage;
-    values.fragValues[FD::TEXTURE_COUNT] = inputs.textureCount;
-    values.fragValues[FD::HAS_MASK_TEXTURE] = hasMaskTexture;
-    values.fragValues[FD::HAS_SUBSET] = hasSubset;
-    return values;
+    // HAS_SOURCE_COORDS and RESOURCE_KIND are assigned by Compose: they depend on the resource
+    // profile, not the GP mapping.
+    vert->set(VD::GP_LAYOUT, gpLayout);
+    vert->set(VD::HAS_COVERAGE, hasCoverage);
+    vert->set(VD::HAS_UV_COORD, hasUVCoord);
+    vert->set(VD::TEXTURE_COUNT, inputs.textureCount);
+    vert->set(VD::HAS_SUBSET, inputs.hasSubset ? 1 : 0);
+    frag->set(FD::GP_LAYOUT, gpLayout);
+    frag->set(FD::HAS_XP, inputs.xpType);
+    frag->set(FD::HAS_COVERAGE, hasCoverage);
+    frag->set(FD::TEXTURE_COUNT, inputs.textureCount);
+    frag->set(FD::HAS_MASK_TEXTURE, hasMaskTexture);
+    frag->set(FD::HAS_SUBSET, inputs.hasSubset ? 1 : 0);
+    return true;
   }
 };
 

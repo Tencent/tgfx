@@ -13,6 +13,17 @@ namespace tgfx {
 TGFX_TEST(DiagnosticChainBreakdown, Print) {
   auto pairs = PointwiseChainShader::Reachable();
   std::printf("[CB] total=%zu\n", pairs.size());
+  using VD = PointwiseChainShader::VD;
+  using FD = PointwiseChainShader::FD;
+  const auto vertDomain = VD::domain();
+  const auto fragDomain = FD::domain();
+  const size_t vGPLayout = vertDomain.indexOf(VD::GP_LAYOUT.defineName);
+  const size_t vCoverage = vertDomain.indexOf(VD::HAS_COVERAGE.defineName);
+  const size_t vUVCoord = vertDomain.indexOf(VD::HAS_UV_COORD.defineName);
+  const size_t vTextureCount = vertDomain.indexOf(VD::TEXTURE_COUNT.defineName);
+  const size_t vSubset = vertDomain.indexOf(VD::HAS_SUBSET.defineName);
+  const size_t fXP = fragDomain.indexOf(FD::HAS_XP.defineName);
+  const size_t fMask = fragDomain.indexOf(FD::HAS_MASK_TEXTURE.defineName);
   std::map<std::string, int> byLayout;
   std::map<std::string, int> byCombo;
   std::set<uint32_t> verts;
@@ -20,15 +31,13 @@ TGFX_TEST(DiagnosticChainBreakdown, Print) {
   for (const auto& p : pairs) {
     verts.insert(p.first);
     frags.insert(p.second);
-    auto v = PointwiseChainShader::VD::domain().decode(p.first);
-    using VD = PointwiseChainShader::VD;
+    auto v = vertDomain.decode(p.first);
     char key[160];
-    std::snprintf(key, sizeof(key), "GP%d cov%d uv%d tex%d sub%d", v[VD::GP_LAYOUT],
-                  v[VD::HAS_COVERAGE], v[VD::HAS_UV_COORD], v[VD::TEXTURE_COUNT],
-                  v[VD::HAS_SUBSET]);
+    std::snprintf(key, sizeof(key), "GP%d cov%d uv%d tex%d sub%d", v[vGPLayout], v[vCoverage],
+                  v[vUVCoord], v[vTextureCount], v[vSubset]);
     byCombo[key]++;
     char lay[16];
-    std::snprintf(lay, sizeof(lay), "GP%d", v[VD::GP_LAYOUT]);
+    std::snprintf(lay, sizeof(lay), "GP%d", v[vGPLayout]);
     byLayout[lay]++;
   }
   std::printf("[CB] distinct vert stages=%zu distinct frag stages=%zu\n", verts.size(),
@@ -41,10 +50,9 @@ TGFX_TEST(DiagnosticChainBreakdown, Print) {
   }
   std::map<std::string, int> byFrag;
   for (const auto& p : pairs) {
-    auto f = PointwiseChainShader::FD::domain().decode(p.second);
-    using FD = PointwiseChainShader::FD;
+    auto f = fragDomain.decode(p.second);
     char key[96];
-    std::snprintf(key, sizeof(key), "xp%d mask%d", f[FD::HAS_XP], f[FD::HAS_MASK_TEXTURE]);
+    std::snprintf(key, sizeof(key), "xp%d mask%d", f[fXP], f[fMask]);
     byFrag[key]++;
   }
   for (const auto& e : byFrag) {

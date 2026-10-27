@@ -542,13 +542,16 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryRejectsConflictingDeclarations) {
       }
       case 5: {
         auto dimensions = info.fragDomain.getDimensions();
-        std::get<PermutationInt>(dimensions[PointwiseChainShader::FD::HAS_XP]).count = 4;
+        std::get<PermutationInt>(
+            dimensions[info.fragDomain.indexOf(PointwiseChainShader::FD::HAS_XP.defineName)])
+            .count = 4;
         info.fragDomain = PermutationDomain(std::move(dimensions));
         break;
       }
       case 6: {
         auto dimensions = info.fragDomain.getDimensions();
-        dimensions[PointwiseChainShader::FD::GP_LAYOUT] = PermutationBool("GP_LAYOUT");
+        dimensions[info.fragDomain.indexOf(PointwiseChainShader::FD::GP_LAYOUT.defineName)] =
+            PermutationBool("GP_LAYOUT");
         info.fragDomain = PermutationDomain(std::move(dimensions));
         break;
       }
@@ -609,8 +612,13 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
   auto info = shader.info();
   EXPECT_EQ(info.vertDomain.dimensionCount(), 6u);
   EXPECT_EQ(info.fragDomain.dimensionCount(), 7u);
-  EXPECT_EQ(PointwiseChainShader::FD::RESOURCE_KIND, PointwiseChainShader::FD::COUNT - 1);
-  EXPECT_EQ(PointwiseChainShader::VD::HAS_SOURCE_COORDS, PointwiseChainShader::VD::COUNT - 1);
+  // The appended-last dimensions keep the pre-merge variant indices stable (RESOURCE_KIND for
+  // the fragment stage, HAS_SOURCE_COORDS for the vertex stage); the domain order is now the
+  // only ordering authority, so the pin reads the last dimension's name instead of an enum.
+  EXPECT_STREQ(std::get<PermutationInt>(info.fragDomain.getDimensions().back()).defineName,
+               "RESOURCE_KIND");
+  EXPECT_STREQ(std::get<PermutationBool>(info.vertDomain.getDimensions().back()).defineName,
+               "HAS_SOURCE_COORDS");
 
   auto reachable = EnumerateReachablePermutations(info.name);
   ASSERT_TRUE(reachable.has_value());
@@ -633,7 +641,9 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
         auto fragmentIndex = info.fragDomain.encode(composed->fragValues);
         EXPECT_TRUE(IsBuildablePermutation(info, vertexIndex, fragmentIndex));
         EXPECT_EQ(reachable->count({vertexIndex, fragmentIndex}), 1u);
-        EXPECT_EQ(composed->fragValues[PointwiseChainShader::FD::RESOURCE_KIND], 1);
+        EXPECT_EQ(info.fragDomain.valueOf(fragmentIndex,
+                                          PointwiseChainShader::FD::RESOURCE_KIND.defineName),
+                  1);
         vertexIndices.insert(vertexIndex);
         fragmentIndices.insert(fragmentIndex);
       }
@@ -641,6 +651,65 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
   }
   EXPECT_EQ(vertexIndices.size(), 1u);
   EXPECT_EQ(fragmentIndices.size(), 3u);
+}
+
+TGFX_TEST(ShaderPermutationTest, ComposedDimsFinishIgnoresAssignmentOrder) {
+  // Assignment through typed handles resolves positions by name, so the write order cannot
+  // transpose against the domain order: assigning in reverse produces the same vector and the
+  // same encoded index as the declaration order.
+  using FD = PointwiseChainShader::FD;
+  ComposedDims<FD> reversed(FD::domain());
+  reversed.set(FD::RESOURCE_KIND, 2)
+      .set(FD::HAS_SUBSET, 1)
+      .set(FD::HAS_MASK_TEXTURE, 0)
+      .set(FD::TEXTURE_COUNT, 1)
+      .set(FD::HAS_COVERAGE, 1)
+      .set(FD::HAS_XP, 2)
+      .set(FD::GP_LAYOUT, 3);
+  ComposedDims<FD> forward(FD::domain());
+  forward.set(FD::GP_LAYOUT, 3)
+      .set(FD::HAS_XP, 2)
+      .set(FD::HAS_COVERAGE, 1)
+      .set(FD::TEXTURE_COUNT, 1)
+      .set(FD::HAS_MASK_TEXTURE, 0)
+      .set(FD::HAS_SUBSET, 1)
+      .set(FD::RESOURCE_KIND, 2);
+  EXPECT_EQ(reversed.finish(), forward.finish());
+  EXPECT_EQ(reversed.permutationDomain().encode(reversed.finish()),
+            forward.permutationDomain().encode(forward.finish()));
+}
+
+TGFX_TEST(ShaderPermutationTest, ComposedDimsRejectsMissingAssignment) {
+  ::testing::FLAGS_gtest_death_test_style = "threadsafe";
+  // The pre-handle write path zero-filled a forgotten dimension (resize then index writes);
+  // finish() must fail instead of letting it read as a valid 0.
+  using FD = PointwiseChainShader::FD;
+  ComposedDims<FD> partial(FD::domain());
+  partial.set(FD::GP_LAYOUT, 0)
+      .set(FD::HAS_XP, 0)
+      .set(FD::HAS_COVERAGE, 0)
+      .set(FD::TEXTURE_COUNT, 0)
+      .set(FD::HAS_MASK_TEXTURE, 0)
+      .set(FD::HAS_SUBSET, 0);
+  EXPECT_DEATH(partial.finish(), "finish\\(\\) with a declared dimension never assigned");
+}
+
+TGFX_TEST(ShaderPermutationTest, ComposedDimsRejectsUnknownDimensionHandle) {
+  ::testing::FLAGS_gtest_death_test_style = "threadsafe";
+  // A handle whose name is not in the domain the builder was built from fails loudly, where a
+  // typo'd name in the old string queries (valueOf) silently read as 0.
+  using FD = PointwiseChainShader::FD;
+  ComposedDims<FD> frag(FD::domain());
+  const PermutationBoolDim<FD> notDeclared{"NOT_A_DIMENSION"};
+  EXPECT_DEATH(frag.set(notDeclared, 1), "unknown dimension handle");
+}
+
+TGFX_TEST(ShaderPermutationTest, ComposedDimsRejectsOutOfRangeValue) {
+  ::testing::FLAGS_gtest_death_test_style = "threadsafe";
+  // HAS_XP declares three values; 3 is outside the range.
+  using FD = PointwiseChainShader::FD;
+  ComposedDims<FD> frag(FD::domain());
+  EXPECT_DEATH(frag.set(FD::HAS_XP, 3), "dimension value outside the declared range");
 }
 
 TGFX_TEST(ShaderPermutationTest, GradientUniformsExistOnlyInExtendedChainArtifacts) {

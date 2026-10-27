@@ -154,6 +154,19 @@ bool PermutationDomain::hasDimension(const char* defineName) const {
   return false;
 }
 
+size_t PermutationDomain::indexOf(const char* defineName) const {
+  for (size_t i = 0; i < dimensions.size(); i++) {
+    if (std::strcmp(GetDefineName(dimensions[i]), defineName) == 0) {
+      return i;
+    }
+  }
+  return dimensions.size();
+}
+
+int PermutationDomain::valueCountOf(size_t position) const {
+  return GetValueCount(dimensions[position]);
+}
+
 bool MirroredDimsAgree(const PermutationDomain& vertDomain, const PermutationDomain& fragDomain,
                        const std::vector<int>& vertValues, const std::vector<int>& fragValues) {
   const auto& vertDims = vertDomain.getDimensions();
