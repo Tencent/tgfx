@@ -1860,10 +1860,14 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   // allowsEdgeAntialiasing flag it forwards is dropped by OpaqueContext, so it is not an input
   // either. Keep it that way: making getGeometryImage() depend on the bucket would silently
   // change what both buckets get, not just the one that changed.
-  LayerStyleSourceEntry geometryEntry = {};
+  Point geometryOffset = {};
+  std::optional<StyledShape> geometryShape = std::nullopt;
+  std::shared_ptr<StyleInputSource> geometrySource = nullptr;
   if (layerUsesGeometry) {
-    geometryEntry.image =
-        getGeometryImage(drawArgs, contentScale, geometryEntry.offset, geometryEntry.shape);
+    auto image = getGeometryImage(drawArgs, contentScale, geometryOffset, geometryShape);
+    if (image != nullptr) {
+      geometrySource = std::make_shared<GeometryInputSource>(image, geometryOffset, geometryShape);
+    }
   }
 
   for (int i = 0; i < 2; i++) {
@@ -1876,17 +1880,19 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
 
     bool allContourMatch = false;
     if (needContour[i]) {
-      LayerStyleSourceEntry contourEntry = {};
-      contourEntry.image =
-          getContentContourImage(drawArgs, contentScale, &contourEntry.offset, &allContourMatch);
-      if (contourEntry.image == nullptr) {
+      std::shared_ptr<Image> image = nullptr;
+      Point offset = {};
+      image = getContentContourImage(drawArgs, contentScale, &offset, &allContourMatch);
+      if (image == nullptr) {
         bucketUsable = false;
       } else {
+        auto contourSource = std::make_shared<ContourInputSource>(image, offset);
         if (allContourMatch) {
-          group->content = contourEntry;
+          // The contour also answers as content: both roles wrap the same recording.
+          group->content = std::make_shared<StyleInputSource>(image, offset);
           needContent[i] = false;
         }
-        group->contour = std::move(contourEntry);
+        group->contour = std::move(contourSource);
       }
     }
 
@@ -1896,10 +1902,12 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
       contourCanvas->scale(contentScale, contentScale);
       drawContents(drawArgs, contourCanvas, 1.0f);
       auto picture = opaqueContext.finishRecordingAsPicture();
-      group->content.image = ToImageWithOffset(std::move(picture), &group->content.offset, nullptr,
-                                               args.dstColorSpace);
-      if (group->content.image == nullptr) {
+      Point offset = {};
+      auto image = ToImageWithOffset(std::move(picture), &offset, nullptr, args.dstColorSpace);
+      if (image == nullptr) {
         bucketUsable = false;
+      } else {
+        group->content = std::make_shared<StyleInputSource>(image, offset);
       }
     }
 
@@ -1909,25 +1917,25 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
       // captured, so a layer whose painters are all alpha=0, or whose geometries no painter
       // captured, still has geometry to cover. Recording it unconditionally also keeps the
       // coverage independent of any visible descendant.
-      if (geometryEntry.image != nullptr) {
-        // Consume the recording hoisted above: copying the entry shares the image by reference
-        // count, so the pixels are neither re-recorded nor duplicated. The entry carries the shape
-        // read back from that same recording, so the copy hands it to both buckets too.
-        group->geometry = geometryEntry;
+      if (geometrySource != nullptr) {
+        // Consume the recording hoisted above: both buckets hold the one source object, so the
+        // pixels are neither re-recorded nor duplicated, and the shape read back from that same
+        // recording reaches both buckets too.
+        group->geometry = geometrySource;
         bucketUsable = true;
-      } else if (!group->contour.has_value()) {
+      } else if (group->contour == nullptr) {
         // Lazy fallback: a layer whose geometry lives in its children records no geometry, so
         // the style falls back to the shared subtree contour. That contour keeps a descendant's
         // painters with alpha=0, which the shared content drops. A failed recording only skips this
         // style: ResolveContentSource then finds no source and drops it, while the other styles
         // of the bucket keep drawing from the shared content -- provided that recording succeeded,
-        // since a failed one leaves group->content empty and drops its siblings as well. This
+        // since a failed one leaves group->content null and drops its siblings as well. This
         // recording does read drawArgs.excludeEffects, so it must stay inside the loop.
-        LayerStyleSourceEntry contourEntry = {};
-        contourEntry.image =
-            getContentContourImage(drawArgs, contentScale, &contourEntry.offset, nullptr);
-        if (contourEntry.image != nullptr) {
-          group->contour = std::move(contourEntry);
+        std::shared_ptr<Image> image = nullptr;
+        Point offset = {};
+        image = getContentContourImage(drawArgs, contentScale, &offset, nullptr);
+        if (image != nullptr) {
+          group->contour = std::make_shared<ContourInputSource>(image, offset);
           bucketUsable = true;
         }
       }
@@ -1941,10 +1949,6 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     }
     source->groups[i] = std::move(group);
   }
-  // Typed forms of the recorded entries, built once per layer so neither producer allocates per
-  // style. The contour stands in for a missing geometry and carries no shape: it is this
-  // bucket's own raster, which no exact outline describes.
-  RefreshTypedSources(*source);
 
   if (source->groups[0] == nullptr && source->groups[1] == nullptr) {
     // Nothing usable was recorded in any bucket: keep the previous fail-closed result so a style
@@ -2064,9 +2068,10 @@ void Layer::drawLayerStyleDefault(const DrawArgs& /*args*/, Canvas* canvas, floa
   if (HasExtraSource(sourceFlags, LayerStyleExtraSourceType::Contour)) {
     // The Contour extra source is the shared contour; its contentShape is the legacy spread outline
     // derived from the shared content side, so it is not this raster's own shape.
-    auto contourImage = group->contour.has_value() ? group->contour->image : nullptr;
-    auto contourOffset =
-        contourImage ? group->contour->offset - styleInput.content->imageOffset() : Point::Zero();
+    auto contourImage = group->contour != nullptr ? group->contour->image() : nullptr;
+    auto contourOffset = contourImage
+                             ? group->contour->imageOffset() - styleInput.content->imageOffset()
+                             : Point::Zero();
     styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
         std::move(contourImage), contourOffset, source->contentShape));
   }

@@ -4095,13 +4095,13 @@ TGFX_TEST_PRIVATE(LayerTest, GlassStyleStrokeContentBounds) {
     vectorLayer->setContents({rectangle, fill, stroke});
     vectorLayer->setLayerStyles({GlassStyle::Make(80, 50, 0, 50, 0, 135, 50)});
     DrawArgs drawArgs(context);
-    // The entry Glass samples is the layer's geometry: its bucket records no shared content.
+    // The recording Glass samples is the layer's geometry: its bucket records no shared content.
     TGFX_PRIVATE_ACCESS(auto source = vectorLayer->getLayerStyleSource(drawArgs, Matrix::I());
                         ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
-                        ASSERT_TRUE(source->groups[0]->geometry.has_value());
-                        ASSERT_TRUE(source->groups[0]->geometry->image != nullptr);
-                        widths.push_back(source->groups[0]->geometry->image->width());
-                        offsets.push_back(source->groups[0]->geometry->offset.x);)
+                        ASSERT_TRUE(source->groups[0]->geometry != nullptr);
+                        ASSERT_TRUE(source->groups[0]->geometry->image() != nullptr);
+                        widths.push_back(source->groups[0]->geometry->image()->width());
+                        offsets.push_back(source->groups[0]->geometry->imageOffset().x);)
   }
   ASSERT_EQ(widths.size(), 3u);
   EXPECT_EQ(widths[1], 100);
@@ -4226,15 +4226,15 @@ TGFX_TEST_PRIVATE(LayerTest, GlassStyleDeclaresGeometryContentSource) {
   DrawArgs drawArgs(context);
   TGFX_PRIVATE_ACCESS(auto source = layer->getLayerStyleSource(drawArgs, Matrix::I());
                       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
-                      ASSERT_TRUE(source->groups[0]->geometry.has_value());
-                      EXPECT_TRUE(source->groups[0]->geometry->image != nullptr);
-                      EXPECT_TRUE(source->groups[0]->geometry->shape.has_value())
+                      ASSERT_TRUE(source->groups[0]->geometry != nullptr);
+                      EXPECT_TRUE(source->groups[0]->geometry->image() != nullptr);
+                      EXPECT_TRUE(source->groups[0]->geometry->shape().has_value())
                       << "a layered rect has an exact geometry shape, so Glass takes the SDF "
                          "path";
-                      EXPECT_FALSE(source->groups[0]->contour.has_value());
+                      EXPECT_TRUE(source->groups[0]->contour == nullptr);
                       // Nothing in a Geometry-only bucket reads the shared content, so recording it
                       // would rasterize the whole subtree for nobody.
-                      EXPECT_TRUE(source->groups[0]->content.image == nullptr)
+                      EXPECT_TRUE(source->groups[0]->content == nullptr)
                       << "a Geometry-only bucket must not record the shared content";)
 
   // The contrast that keeps the assertion above honest: a bucket holding a style that draws from the
@@ -4248,8 +4248,8 @@ TGFX_TEST_PRIVATE(LayerTest, GlassStyleDeclaresGeometryContentSource) {
   TGFX_PRIVATE_ACCESS(auto mixedSource = mixedLayer->getLayerStyleSource(drawArgs, Matrix::I());
                       ASSERT_TRUE(mixedSource != nullptr);
                       ASSERT_TRUE(mixedSource->groups[0] != nullptr);
-                      EXPECT_TRUE(mixedSource->groups[0]->geometry.has_value());
-                      EXPECT_TRUE(mixedSource->groups[0]->content.image != nullptr)
+                      EXPECT_TRUE(mixedSource->groups[0]->geometry != nullptr);
+                      EXPECT_TRUE(mixedSource->groups[0]->content != nullptr)
                       << "a non-Geometry style in the same bucket still needs the shared content";)
 }
 
@@ -4284,13 +4284,14 @@ TGFX_TEST_PRIVATE(LayerTest, LayerStyleGeometryRecordedOnceForBothBuckets) {
       ASSERT_TRUE(source != nullptr);
       ASSERT_TRUE(source->groups[0] != nullptr) << "the excludeChildEffects=false bucket";
       ASSERT_TRUE(source->groups[1] != nullptr) << "the excludeChildEffects=true bucket";
-      ASSERT_TRUE(source->groups[0]->geometry.has_value());
-      ASSERT_TRUE(source->groups[1]->geometry.has_value());
-      EXPECT_EQ(source->groups[0]->geometry->image, source->groups[1]->geometry->image)
+      ASSERT_TRUE(source->groups[0]->geometry != nullptr);
+      ASSERT_TRUE(source->groups[1]->geometry != nullptr);
+      EXPECT_EQ(source->groups[0]->geometry->image(), source->groups[1]->geometry->image())
       << "both buckets must share one geometry recording";
-      EXPECT_EQ(source->groups[0]->geometry->offset, source->groups[1]->geometry->offset);
-      EXPECT_TRUE(source->groups[0]->geometry->shape.has_value());
-      EXPECT_TRUE(source->groups[1]->geometry->shape.has_value());)
+      EXPECT_EQ(source->groups[0]->geometry->imageOffset(),
+                source->groups[1]->geometry->imageOffset());
+      EXPECT_TRUE(source->groups[0]->geometry->shape().has_value());
+      EXPECT_TRUE(source->groups[1]->geometry->shape().has_value());)
 }
 
 // The contrast that keeps the hoisting honest: a layer whose geometry lives in its children records
@@ -4324,15 +4325,16 @@ TGFX_TEST_PRIVATE(LayerTest, LayerStyleGeometryFallbackStaysPerBucket) {
       auto source = parent->getLayerStyleSource(drawArgs, Matrix::I());
       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
       ASSERT_TRUE(source->groups[1] != nullptr);
-      EXPECT_FALSE(source->groups[0]->geometry.has_value())
+      EXPECT_TRUE(source->groups[0]->geometry == nullptr)
       << "a layer painting nothing must not record geometry, otherwise the fallback below is "
          "never reached";
-      EXPECT_FALSE(source->groups[1]->geometry.has_value());
-      ASSERT_TRUE(source->groups[0]->contour.has_value());
-      ASSERT_TRUE(source->groups[1]->contour.has_value());
-      ASSERT_TRUE(source->groups[0]->contour->image != nullptr);
-      ASSERT_TRUE(source->groups[1]->contour->image != nullptr);
-      EXPECT_NE(source->groups[0]->contour->image.get(), source->groups[1]->contour->image.get())
+      EXPECT_TRUE(source->groups[1]->geometry == nullptr);
+      ASSERT_TRUE(source->groups[0]->contour != nullptr);
+      ASSERT_TRUE(source->groups[1]->contour != nullptr);
+      ASSERT_TRUE(source->groups[0]->contour->image() != nullptr);
+      ASSERT_TRUE(source->groups[1]->contour->image() != nullptr);
+      EXPECT_NE(source->groups[0]->contour->image().get(),
+                source->groups[1]->contour->image().get())
       << "the lazy fallback reads excludeChildEffects, so it must stay recorded per bucket; one "
          "shared image here means the fallback was hoisted along with the geometry";)
 }
@@ -4831,11 +4833,11 @@ TGFX_TEST_PRIVATE(LayerTest, GlassGeometryGivesCoverageWithoutAnyFill) {
       auto markedSource =
           MakePanel({bareGeometry}, {glass})->getLayerStyleSource(drawArgs, Matrix::I());
       ASSERT_TRUE(markedSource != nullptr); ASSERT_TRUE(markedSource->groups[0] != nullptr);
-      EXPECT_TRUE(markedSource->groups[0]->content.image == nullptr)
+      EXPECT_TRUE(markedSource->groups[0]->content == nullptr)
       << "bare geometry must not be recorded in the shared content image";
-      ASSERT_TRUE(markedSource->groups[0]->geometry.has_value());
-      EXPECT_TRUE(markedSource->groups[0]->geometry->image != nullptr);
-      EXPECT_TRUE(markedSource->groups[0]->geometry->shape.has_value())
+      ASSERT_TRUE(markedSource->groups[0]->geometry != nullptr);
+      EXPECT_TRUE(markedSource->groups[0]->geometry->image() != nullptr);
+      EXPECT_TRUE(markedSource->groups[0]->geometry->shape().has_value())
       << "a single bare geometry is the whole geometry, so Glass gets an exact shape";)
 
   // Donut arm: a second region with a hole. The coverage follows the union of the two regions, so it
@@ -5524,12 +5526,12 @@ TGFX_TEST_PRIVATE(LayerTest, GlassWithoutGeometryResolvesToSharedContour) {
       const auto& group = *source->groups[1];
       // A group with only children must not record geometry: that is what triggers the lazy
       // fallback.
-      EXPECT_FALSE(group.geometry.has_value())
+      EXPECT_TRUE(group.geometry == nullptr)
       << "a group with only children must not record geometry";
-      ASSERT_TRUE(group.contour.has_value()); ASSERT_TRUE(group.contour->image != nullptr);
-      ASSERT_TRUE(group.content.image != nullptr)
+      ASSERT_TRUE(group.contour != nullptr); ASSERT_TRUE(group.contour->image() != nullptr);
+      ASSERT_TRUE(group.content != nullptr)
       << "control: the non-Geometry style in this bucket records the shared content";
-      EXPECT_EQ(ResolveContentSource(group, glass.get()), group.contourFallbackSource)
+      EXPECT_EQ(ResolveContentSource(group, glass.get()), group.contour)
       << "Glass must resolve to the shared contour when no geometry exists";)
 }
 
@@ -6933,9 +6935,9 @@ static std::vector<int> RasterizeGeometryAlpha(Context* context,
       auto source = panel->getLayerStyleSource(drawArgs, Matrix::I());
       if (source == nullptr) { return raster; } for (auto& group
                                                      : source->groups) {
-        if (group != nullptr && group->geometry.has_value() && group->geometry->image != nullptr) {
-          image = group->geometry->image;
-          offset = group->geometry->offset;
+        if (group != nullptr && group->geometry != nullptr && group->geometry->image() != nullptr) {
+          image = group->geometry->image();
+          offset = group->geometry->imageOffset();
         }
       })
   if (image == nullptr) {
@@ -7328,9 +7330,9 @@ TGFX_TEST_PRIVATE(LayerTest, GeometryShapeIsOnlyGivenToGeometrySourceStyles) {
   TGFX_PRIVATE_ACCESS(
       DrawArgs drawArgs(context); auto source = parent->getLayerStyleSource(drawArgs, Matrix::I());
       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
-      ASSERT_TRUE(source->groups[0]->geometry.has_value())
+      ASSERT_TRUE(source->groups[0]->geometry != nullptr)
       << "control: the group has to carry the geometry, or the gating below proves nothing";
-      ASSERT_TRUE(source->groups[0]->geometry->shape.has_value())
+      ASSERT_TRUE(source->groups[0]->geometry->shape().has_value())
       << "control: the group has to carry the geometry shape, or the gating below proves nothing";)
 
   EXPECT_TRUE(geometryStyle->drawn);
@@ -7527,9 +7529,9 @@ TGFX_TEST_PRIVATE(LayerTest, StyleInputFollowsRasterizedGeometry) {
 
 // The swap that wraps the recordings for the capture pass lives in BackgroundHandler, not in any
 // Layer::drawLayerStyleDefault path, so its two invariants need their own case: after the swap every
-// bucket's typed source must hold the entry image, and the recording the buckets share must be
+// bucket's source must hold the rasterized image, and the recording the buckets share must be
 // wrapped once so both consumers sample one texture.
-TGFX_TEST_PRIVATE(LayerTest, LayerStyleSourceSwapKeepsEntriesAndSourcesInSync) {
+TGFX_TEST_PRIVATE(LayerTest, LayerStyleSourceSwapSharesOneRasterizedGeometry) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -7547,22 +7549,25 @@ TGFX_TEST_PRIVATE(LayerTest, LayerStyleSourceSwapKeepsEntriesAndSourcesInSync) {
       DrawArgs drawArgs(context); auto source = panel->getLayerStyleSource(drawArgs, Matrix::I());
       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
       ASSERT_TRUE(source->groups[1] != nullptr);
-      ASSERT_TRUE(source->groups[0]->geometry.has_value());
-      ASSERT_TRUE(source->groups[1]->geometry.has_value());
-      auto recording = source->groups[0]->geometry->image; ASSERT_TRUE(recording != nullptr);
-      EXPECT_TRUE(recording == source->groups[1]->geometry->image)
+      ASSERT_TRUE(source->groups[0]->geometry != nullptr);
+      ASSERT_TRUE(source->groups[1]->geometry != nullptr);
+      auto recording = source->groups[0]->geometry->image(); ASSERT_TRUE(recording != nullptr);
+      EXPECT_TRUE(recording == source->groups[1]->geometry->image())
       << "control: both buckets start from the one geometry recording";
       BackgroundSnapshotMap snapshots = {}; BackgroundCapturer capturer(&snapshots, nullptr);
       auto* cached = capturer.cacheLayerStyleSource(panel.get(), std::move(source));
       ASSERT_TRUE(cached != nullptr);
-      EXPECT_TRUE(cached->groups[0]->geometry->image == cached->groups[1]->geometry->image)
+      EXPECT_TRUE(cached->groups[0]->geometry->image() == cached->groups[1]->geometry->image())
       << "wrapping the shared recording per bucket would give one picture two "
          "wrappers";
-      ASSERT_TRUE(cached->groups[0]->geometrySource != nullptr);
-      EXPECT_TRUE(cached->groups[0]->geometrySource->image() == cached->groups[0]->geometry->image)
-      << "the typed source must follow the swapped image, not the picture";
-      ASSERT_TRUE(cached->groups[1]->geometrySource != nullptr); EXPECT_TRUE(
-          cached->groups[1]->geometrySource->image() == cached->groups[1]->geometry->image);)
+      ASSERT_TRUE(cached->groups[0]->geometry != nullptr);
+      EXPECT_TRUE(cached->groups[0]->geometry->image() != recording)
+      << "the cached source must wrap the rasterized image, not the picture";
+      EXPECT_TRUE(cached->groups[0]->geometry->image() == cached->groups[1]->geometry->image())
+      << "both buckets must keep sharing the one rasterized recording";
+      ASSERT_TRUE(cached->groups[1]->geometry != nullptr);
+      EXPECT_TRUE(cached->groups[1]->geometry->shape().has_value())
+      << "the rebuilt sources must keep carrying the shape read back before the swap";)
 }
 
 // A bare geometry next to a painter has no single exact outline, so the style is handed no geometry shape
@@ -7583,8 +7588,8 @@ TGFX_TEST_PRIVATE(LayerTest, GeometryShapeIsDroppedWhenPaintersCoexist) {
   TGFX_PRIVATE_ACCESS(
       DrawArgs drawArgs(context); auto source = both->getLayerStyleSource(drawArgs, Matrix::I());
       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[1] != nullptr);
-      ASSERT_TRUE(source->groups[1]->geometry.has_value());
-      EXPECT_FALSE(source->groups[1]->geometry->shape.has_value())
+      ASSERT_TRUE(source->groups[1]->geometry != nullptr);
+      EXPECT_FALSE(source->groups[1]->geometry->shape().has_value())
       << "a painter and a bare geometry together have no single exact outline, so the style must "
          "take the alpha-mask path instead of an SDF that would cover less than the raster";)
 
@@ -7602,8 +7607,8 @@ TGFX_TEST_PRIVATE(LayerTest, GeometryShapeIsDroppedWhenPaintersCoexist) {
   TGFX_PRIVATE_ACCESS(DrawArgs bareArgs(context);
                       auto bareSource = bareOnly->getLayerStyleSource(bareArgs, Matrix::I());
                       ASSERT_TRUE(bareSource != nullptr && bareSource->groups[1] != nullptr);
-                      ASSERT_TRUE(bareSource->groups[1]->geometry.has_value());
-                      EXPECT_TRUE(bareSource->groups[1]->geometry->shape.has_value());)
+                      ASSERT_TRUE(bareSource->groups[1]->geometry != nullptr);
+                      EXPECT_TRUE(bareSource->groups[1]->geometry->shape().has_value());)
 }
 
 // ===== The geometry shape comes out of the geometry recording =====
@@ -7629,9 +7634,9 @@ static GeometryProbe ProbeGeometry(Context* context, const std::shared_ptr<Layer
       DrawArgs drawArgs(context); auto source = layer->getLayerStyleSource(drawArgs, matrix);
       if (source == nullptr) { return probe; } for (auto& group
                                                     : source->groups) {
-        if (group != nullptr && group->geometry.has_value()) {
-          probe.hasImage = group->geometry->image != nullptr;
-          probe.shape = group->geometry->shape;
+        if (group != nullptr && group->geometry != nullptr) {
+          probe.hasImage = group->geometry->image() != nullptr;
+          probe.shape = group->geometry->shape();
         }
       })
   return probe;
@@ -8080,10 +8085,10 @@ TGFX_TEST_PRIVATE(LayerTest, GeometryIncludesTextGeometry) {
   TGFX_PRIVATE_ACCESS(
       DrawArgs drawArgs(context); auto source = panel->getLayerStyleSource(drawArgs, Matrix::I());
       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[1] != nullptr);
-      ASSERT_TRUE(source->groups[1]->geometry.has_value())
+      ASSERT_TRUE(source->groups[1]->geometry != nullptr)
       << "text without a painter is still the layer's geometry";
-      EXPECT_TRUE(source->groups[1]->geometry->image != nullptr);
-      EXPECT_TRUE(source->groups[1]->geometry->shape.has_value())
+      EXPECT_TRUE(source->groups[1]->geometry->image() != nullptr);
+      EXPECT_TRUE(source->groups[1]->geometry->shape().has_value())
       << "the glyph outlines fit a single StyledShape, so Glass takes the SDF path";)
 
   // The coverage is the glyph shapes: something is covered, and it is not the whole probe surface.

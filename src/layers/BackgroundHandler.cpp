@@ -260,8 +260,8 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
     return;
   }
   // Mirror the consumer's gate so capture and consume push/pop the same (Layer, LayerStyle) keys.
-  // A style whose bucket has no entry for it is skipped by the consumer without advancing its read
-  // cursor; pushing a snapshot here anyway would desynchronize the two counts.
+  // A style whose bucket has no recording for it is skipped by the consumer without advancing its
+  // read cursor; pushing a snapshot here anyway would desynchronize the two counts.
   auto groupIndex = static_cast<int>(style->excludeChildEffects());
   auto* group = source->groups[groupIndex].get();
   if (group == nullptr) {
@@ -270,8 +270,8 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   // The recording the consumer samples: a style that draws from the layer's geometry takes that
   // recording, every other style the shared content. A style that resolves to nothing to draw is
   // skipped by BOTH sides, so capture and consume keep the same push/pop count. A resolved source
-  // always carries an image (RefreshTypedSources builds no other kind), so only its absence is left
-  // to test here.
+  // always carries an image (a source is only built from a successful recording), so only its
+  // absence is left to test here.
   auto contentSource = ResolveContentSource(*group, style);
   if (contentSource == nullptr) {
     return;
@@ -296,7 +296,7 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (FloatNearlyZero(contentScale)) {
     return;
   }
-  // The background must cover exactly the rect of the entry this style resolves (the style's
+  // The background must cover exactly the rect of the recording this style resolves (the style's
   // LayerStyleSource content): layer->getBounds() would also capture this layer's other styles
   // (e.g. a drop shadow).
   DEBUG_ASSERT(!FloatNearlyZero(source->contentScale));
@@ -322,7 +322,7 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   // the capture pass also paints the blur sampling margin, and a style's own output is never
   // visible outside the on-screen rects. Bounding to the widened rects would size the cached
   // texture by that margin, which under zoom grows far past the render target. The offset must
-  // come from the entry the style actually samples; taking it from the shared content image
+  // come from the recording the style actually samples; taking it from the shared content image
   // instead would shift the cached style rect by the difference between the two.
   // The capture-side content offset is rasterized at capture density, which no longer matches
   // the consumer's style space once the background surface is downsampled, so the consumer
@@ -404,47 +404,32 @@ const LayerStyleSource* BackgroundCapturer::cacheLayerStyleSource(
   // second reuses it; makeRasterized() is a no-op on an already-rasterized image, so content and
   // contour need no dedupe. The geometry does: it is recorded once and shared by both buckets,
   // and wrapping it per bucket would give one recording two GPU caches. Dedupe by the image
-  // underneath. The swap replaces entry images in place, so the typed sources built from them hold
-  // stale PictureImage proxies and must be rebuilt afterwards.
+  // underneath. Every recording is then replaced by a source wrapping its rasterized image, so no
+  // consumer keeps sampling a picture-backed original.
   std::shared_ptr<Image> geometryRecording = nullptr;
   std::shared_ptr<Image> geometryRasterized = nullptr;
   for (auto& group : source->groups) {
     if (group == nullptr) {
       continue;
     }
-    if (group->content.image != nullptr) {
-      group->content.image = group->content.image->makeRasterized();
+    if (group->content != nullptr && group->content->image() != nullptr) {
+      group->content = std::make_shared<StyleInputSource>(group->content->image()->makeRasterized(),
+                                                          group->content->imageOffset());
     }
-    if (group->contour.has_value() && group->contour->image != nullptr) {
-      group->contour->image = group->contour->image->makeRasterized();
+    if (group->contour != nullptr && group->contour->image() != nullptr) {
+      group->contour = std::make_shared<ContourInputSource>(
+          group->contour->image()->makeRasterized(), group->contour->imageOffset());
     }
-    if (!group->geometry.has_value() || group->geometry->image == nullptr) {
+    if (group->geometry == nullptr || group->geometry->image() == nullptr) {
       continue;
     }
-    if (geometryRecording == group->geometry->image) {
-      group->geometry->image = geometryRasterized;
-      continue;
+    bool reuse = geometryRecording == group->geometry->image();
+    if (!reuse) {
+      geometryRecording = group->geometry->image();
+      geometryRasterized = geometryRecording->makeRasterized();
     }
-    geometryRecording = group->geometry->image;
-    geometryRasterized = geometryRecording->makeRasterized();
-    group->geometry->image = geometryRasterized;
-  }
-  RefreshTypedSources(*source);
-  for (const auto& group : source->groups) {
-    if (group == nullptr) {
-      continue;
-    }
-    // The refreshed sources must follow the entries, or a consumer samples the picture instead of
-    // the shared texture.
-    DEBUG_ASSERT(
-        group->content.image == nullptr ||
-        (group->contentSource != nullptr && group->contentSource->image() == group->content.image));
-    DEBUG_ASSERT(!group->contour.has_value() || group->contour->image == nullptr ||
-                 (group->contourFallbackSource != nullptr &&
-                  group->contourFallbackSource->image() == group->contour->image));
-    DEBUG_ASSERT(!group->geometry.has_value() || group->geometry->image == nullptr ||
-                 (group->geometrySource != nullptr &&
-                  group->geometrySource->image() == group->geometry->image));
+    group->geometry = std::make_shared<GeometryInputSource>(
+        geometryRasterized, group->geometry->imageOffset(), group->geometry->shape());
   }
   auto* raw = source.get();
   snapshots->layerStyleSources.emplace(layer, std::move(source));
@@ -529,9 +514,9 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if ((sourceFlags & static_cast<uint32_t>(LayerStyleExtraSourceType::Contour)) != 0) {
     std::shared_ptr<Image> contourImage = nullptr;
     Point contourOffset = {};
-    if (group->contour.has_value()) {
-      contourImage = group->contour->image;
-      contourOffset = group->contour->offset - contentOffset;
+    if (group->contour != nullptr) {
+      contourImage = group->contour->image();
+      contourOffset = group->contour->imageOffset() - contentOffset;
     }
     styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
         std::move(contourImage), contourOffset, source->contentShape));
