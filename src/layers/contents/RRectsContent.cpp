@@ -45,7 +45,7 @@ bool RRectsContent::hitTestPoint(float localX, float localY, bool includeUnpaint
   if (isExcluded(includeUnpaintedGeometry)) {
     return false;
   }
-  if (color.alpha <= 0) {
+  if (!color.has_value() || color->alpha <= 0) {
     return false;
   }
   Path path = {};

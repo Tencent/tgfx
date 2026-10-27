@@ -45,7 +45,7 @@ bool RectsContent::hitTestPoint(float localX, float localY, bool includeUnpainte
   if (isExcluded(includeUnpaintedGeometry)) {
     return false;
   }
-  if (color.alpha <= 0) {
+  if (!color.has_value() || color->alpha <= 0) {
     return false;
   }
   if (stroke) {

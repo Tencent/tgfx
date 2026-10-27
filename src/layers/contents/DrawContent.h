@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "layers/contents/GeometryContent.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/layers/LayerPaint.h"
@@ -34,7 +35,8 @@ class DrawContent : public GeometryContent {
   /**
    * @param paint The paint that captured this geometry. Ignored when hasPaint is false: an entry no
    * paint captured holds no paint state, so any read of it would be a read of nothing.
-   * @param hasPaint Whether a paint captured this geometry.
+   * @param hasPaint Whether a paint captured this geometry; when false the entry keeps no paint
+   * state at all.
    */
   explicit DrawContent(const LayerPaint& paint, bool hasPaint);
 
@@ -49,10 +51,6 @@ class DrawContent : public GeometryContent {
   bool hasBlendMode() const override;
   bool hasPaint() const override;
   bool hasPaintedContent() const override;
-
-  const Color& getColor() const {
-    return color;
-  }
 
   const BlendMode& getBlendMode() const {
     return blendMode;
@@ -76,14 +74,14 @@ class DrawContent : public GeometryContent {
    * own alpha test.
    */
   bool isExcluded(bool includeUnpaintedGeometry) const {
-    return !painted && !includeUnpaintedGeometry;
+    return !color.has_value() && !includeUnpaintedGeometry;
   }
 
-  Color color = Color::White();
+  /// Nullopt when no paint captured this geometry; a transparent painter is a value with alpha 0.
+  std::optional<Color> color = std::nullopt;
   std::shared_ptr<Shader> shader = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
   std::unique_ptr<Stroke> stroke = nullptr;
-  bool painted = true;
 };
 
 }  // namespace tgfx

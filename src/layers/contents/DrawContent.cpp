@@ -32,29 +32,28 @@ static bool StrokeEquals(const Stroke* a, const Stroke* b) {
   return *a == *b;
 }
 
-DrawContent::DrawContent(const LayerPaint& paint, bool hasPaint) : painted(hasPaint) {
+DrawContent::DrawContent(const LayerPaint& paint, bool hasPaint) {
   // An entry no paint captured holds no paint state at all: reading color, shader, stroke or blend
-  // mode from the (empty) paint would invent a style the layer never asked for. The defaults it
-  // keeps are exactly what its contour needs: an opaque white fill.
-  if (!painted) {
-    return;
-  }
-  blendMode = paint.blendMode;
-  auto paintShader = paint.shader;
-  if (paintShader) {
-    Color shaderColor = {};
-    if (paintShader->asColor(&shaderColor)) {
-      shaderColor.alpha *= paint.color.alpha;
-      color = shaderColor;
+  // mode from the (empty) paint would invent a style the layer never asked for. Leaving color empty
+  // says so; its contour draws an opaque white fill of its own.
+  if (hasPaint) {
+    blendMode = paint.blendMode;
+    auto paintShader = paint.shader;
+    if (paintShader) {
+      Color shaderColor = {};
+      if (paintShader->asColor(&shaderColor)) {
+        shaderColor.alpha *= paint.color.alpha;
+        color = shaderColor;
+      } else {
+        color = paint.color;
+        shader = std::move(paintShader);
+      }
     } else {
       color = paint.color;
-      shader = std::move(paintShader);
     }
-  } else {
-    color = paint.color;
-  }
-  if (paint.style == PaintStyle::Stroke) {
-    stroke = std::make_unique<Stroke>(paint.stroke);
+    if (paint.style == PaintStyle::Stroke) {
+      stroke = std::make_unique<Stroke>(paint.stroke);
+    }
   }
 }
 
@@ -76,7 +75,7 @@ void DrawContent::drawContourInternal(Canvas* canvas, bool antiAlias,
   }
   Paint paint = {};
   paint.setAntiAlias(antiAlias);
-  if (painted) {
+  if (color.has_value()) {
     if (stroke) {
       paint.setStyle(PaintStyle::Stroke);
       paint.setStroke(*stroke);
@@ -95,10 +94,10 @@ void DrawContent::drawContourInternal(Canvas* canvas, bool antiAlias,
 bool DrawContent::contourEqualsOpaqueContent(bool includeUnpaintedGeometry) const {
   // A bare entry is covered by the contour with an opaque white fill only when the query includes
   // it, while the content never draws it, so the two agree on it only when it is excluded.
-  if (!painted) {
+  if (!color.has_value()) {
     return !includeUnpaintedGeometry;
   }
-  if (color.alpha <= 0) {
+  if (color->alpha <= 0) {
     return false;
   }
   if (shader && !shader->isAImage()) {
@@ -108,13 +107,13 @@ bool DrawContent::contourEqualsOpaqueContent(bool includeUnpaintedGeometry) cons
 }
 
 bool DrawContent::drawDefault(Canvas* canvas, float alpha, bool antiAlias) const {
-  if (!painted || color.alpha <= 0) {
+  if (!color.has_value() || color->alpha <= 0) {
     return false;
   }
   Paint paint = {};
   paint.setAntiAlias(antiAlias);
-  paint.setColor(color);
-  paint.setAlpha(color.alpha * alpha);
+  paint.setColor(*color);
+  paint.setAlpha(color->alpha * alpha);
   if (shader) {
     paint.setShader(shader);
   }
@@ -141,7 +140,7 @@ bool DrawContent::hasSameGeometry(const GeometryContent* other) const {
   auto otherContent = static_cast<const DrawContent*>(other);
   // A bare geometry and a painted one describe the same outline but not the same entry: they must
   // not end up in one group, whose contour representative would then stand for both.
-  if (painted != otherContent->painted) {
+  if (color.has_value() != otherContent->color.has_value()) {
     return false;
   }
   if (!StrokeEquals(stroke.get(), otherContent->stroke.get())) {
@@ -155,11 +154,11 @@ bool DrawContent::hasBlendMode() const {
 }
 
 bool DrawContent::hasPaint() const {
-  return painted;
+  return color.has_value();
 }
 
 bool DrawContent::hasPaintedContent() const {
-  return painted;
+  return color.has_value();
 }
 
 }  // namespace tgfx
