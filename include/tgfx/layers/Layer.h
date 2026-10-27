@@ -700,10 +700,11 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   // Records the layer's geometry: the contour of its own content, which keeps both the
   // geometries no paint captured and the painters with alpha=0. Used as the content of styles that
-  // must cover the layer's geometry rather than its rendered content. When shape is not null, it
-  // receives the outline of that same recording, read back from it so both describe one recording.
-  std::shared_ptr<Image> getGeometryImage(const DrawArgs& args, float contentScale, Point* offset,
-                                          std::optional<StyledShape>* shape = nullptr);
+  // must cover the layer's geometry rather than its rendered content. offset receives the raster's
+  // top-left corner and shape the outline of that same recording, read back from it so both
+  // describe one recording.
+  std::shared_ptr<Image> getGeometryImage(const DrawArgs& args, float contentScale, Point& offset,
+                                          std::optional<StyledShape>& shape);
 
   bool hasValidMask() const;
 
@@ -744,8 +745,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
   void invalidateSubtree();
 
   void updateStaticSubtreeFlags();
-
-  std::optional<StyledShape> getContentShape();
 
   // Whether one of the layer styles declares the layer's geometry as its content.
   bool needsGeometry() const;

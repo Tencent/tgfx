@@ -67,12 +67,7 @@ class LayerContent {
    * The query states which geometries take part, exactly as the drawContour() flag this answer must
    * be paired with: it holds for that one contour, not for every contour the content can draw.
    */
-  virtual bool contourEqualsOpaqueContent(bool includeUnpaintedGeometry) const {
-    // The default answer takes part in no comparison: a content that does not implement this test
-    // must never be reported as matching, whatever the query selects.
-    (void)includeUnpaintedGeometry;
-    return false;
-  }
+  virtual bool contourEqualsOpaqueContent(bool includeUnpaintedGeometry) const = 0;
 
   /**
    * Returns true if any part of the content uses a blend mode other than SrcOver.

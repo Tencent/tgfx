@@ -1346,7 +1346,7 @@ std::shared_ptr<Image> Layer::getContentContourImage(const DrawArgs& args, float
 }
 
 std::shared_ptr<Image> Layer::getGeometryImage(const DrawArgs& args, float contentScale,
-                                               Point* offset, std::optional<StyledShape>* shape) {
+                                               Point& offset, std::optional<StyledShape>& shape) {
   if (FloatNearlyZero(contentScale)) {
     return nullptr;
   }
@@ -1363,17 +1363,13 @@ std::shared_ptr<Image> Layer::getGeometryImage(const DrawArgs& args, float conte
   auto picture = opaqueContext.finishRecordingAsPicture();
   // Read the shape back from the picture before it is consumed by the conversion below, so the
   // shape and the raster describe the very same recording.
-  if (shape != nullptr) {
-    *shape = GeometryShapeContext::Extract(picture, contentScale);
-  }
+  shape = GeometryShapeContext::Extract(picture, contentScale);
   auto imageOffset = Point::Zero();
   auto image = ToImageWithOffset(std::move(picture), &imageOffset, nullptr, args.dstColorSpace);
-  if (offset) {
-    *offset = imageOffset;
-  }
-  if (image == nullptr && shape != nullptr) {
+  offset = imageOffset;
+  if (image == nullptr) {
     // No raster means no geometry to describe, whatever the picture held.
-    *shape = std::nullopt;
+    shape = std::nullopt;
   }
   return image;
 }
@@ -1821,12 +1817,12 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   // layer's geometry, and whether any style needs a content shape.
   bool needContent[2] = {false, false};
   bool needContour[2] = {false, false};
-  bool needsGeometry[2] = {false, false};
+  bool bucketNeedsGeometry[2] = {false, false};
   bool needsContentShape = false;
   for (const auto& layerStyle : _layerStyles) {
     auto index = static_cast<int>(layerStyle->excludeChildEffects());
     if (NeedsGeometry(layerStyle.get())) {
-      needsGeometry[index] = true;
+      bucketNeedsGeometry[index] = true;
     } else {
       // Only a style drawing from the shared content needs it recorded: a Geometry-sourced style
       // reads the geometry instead, so recording content for it would rasterize the subtree for
@@ -1851,7 +1847,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   // flag, but the only step that revives it sits in the geometry branch below, so a layer
   // without such a style keeps the fail-closed contract: one unusable bucket makes the whole source
   // unusable.
-  const bool layerUsesGeometry = needsGeometry[0] || needsGeometry[1];
+  const bool layerUsesGeometry = needsGeometry();
 
   DrawArgs drawArgs = args;
   drawArgs.render3DContext = nullptr;
@@ -1867,11 +1863,11 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   LayerStyleSourceEntry geometryEntry = {};
   if (layerUsesGeometry) {
     geometryEntry.image =
-        getGeometryImage(drawArgs, contentScale, &geometryEntry.offset, &geometryEntry.shape);
+        getGeometryImage(drawArgs, contentScale, geometryEntry.offset, geometryEntry.shape);
   }
 
   for (int i = 0; i < 2; i++) {
-    if (!needContent[i] && !needContour[i] && !needsGeometry[i]) {
+    if (!needContent[i] && !needContour[i] && !bucketNeedsGeometry[i]) {
       continue;
     }
     drawArgs.excludeEffects = static_cast<bool>(i);
@@ -1907,7 +1903,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
       }
     }
 
-    if (needsGeometry[i]) {
+    if (bucketNeedsGeometry[i]) {
       // A style that draws from the geometry always consumes it rather than the shared content:
       // the shared content drops painters with alpha=0 and knows nothing about geometry no painter
       // captured, so a layer whose painters are all alpha=0, or whose geometries no painter
@@ -1957,7 +1953,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   }
 
   if (needsContentShape) {
-    source->contentShape = getContentShape();
+    source->contentShape = onGetContentShape();
   }
 
   return source;
@@ -2398,10 +2394,6 @@ void Layer::updateStaticSubtreeFlags() {
   for (const auto& child : _children) {
     child->updateStaticSubtreeFlags();
   }
-}
-
-std::optional<StyledShape> Layer::getContentShape() {
-  return onGetContentShape();
 }
 
 bool Layer::needsGeometry() const {

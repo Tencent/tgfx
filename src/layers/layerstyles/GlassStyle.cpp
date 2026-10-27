@@ -128,13 +128,14 @@ struct GlassShapeInfo {
 
 // Detects whether the layer's fill surface is a regular shape (RoundedRect or Ellipse) that can
 // use the analytical SDF path. Only fill-only shapes take the analytical path; any stroked
-// content (FillStroke, Stroke) falls back to AlphaMask, whose coverage comes from the content
-// alpha — the actually rendered shape, strokes included.
+// content (FillStroke, Stroke) falls back to AlphaMask, which reads the sampled recording's
+// alpha: the layer's geometry painted as a hard mask. Only image shaders keep transparent holes
+// there; every other shader, a gradient included, is flattened to opaque.
 static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   GlassShapeInfo info;
   // The SDF path needs an exact outline of the sampled recording, and only the geometry readback
   // provides one: the shared content and the contour fallback describe no single outline.
-  if (input.content == nullptr || input.content->type() != StyleInputSource::Type::Geometry) {
+  if (input.content == nullptr) {
     return info;
   }
   const auto& optShape = input.content->shape();
@@ -646,7 +647,7 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       Point edgeTextureOrigin = {edgeTextureRect.left, edgeTextureRect.top};
 
       // The UDF distance field is computed from the content image directly: its alpha is the
-      // actually rendered shape, strokes included.
+      // layer's geometry as a hard mask, so only image shaders keep transparent holes.
       GlassUDFRequest maskRequest = {};
       maskRequest.source = contentImage;
       maskRequest.coreWidth = udfWidth;

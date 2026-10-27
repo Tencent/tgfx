@@ -104,8 +104,7 @@ class GeometryShapeContext : public DrawContext, public Picture::AbortCallback {
     }
     // The same shape instance under the same matrix repeats the outline we already hold, so the
     // path never has to be built again for the painters sharing one geometry.
-    if (shape != nullptr && candidate.hasSource && candidate.source == shape &&
-        candidate.matrix == matrix) {
+    if (shape != nullptr && candidate.source == shape && candidate.matrix == matrix) {
       return;
     }
     if (shape == nullptr) {
@@ -182,7 +181,6 @@ class GeometryShapeContext : public DrawContext, public Picture::AbortCallback {
     Path path = {};
     Matrix matrix = Matrix::I();
     std::shared_ptr<Shape> source = nullptr;
-    bool hasSource = false;
   };
 
   void reject() {
@@ -232,7 +230,6 @@ class GeometryShapeContext : public DrawContext, public Picture::AbortCallback {
       candidate.path = std::move(path);
       candidate.matrix = matrix;
       candidate.source = std::move(source);
-      candidate.hasSource = candidate.source != nullptr;
       state = State::Candidate;
       return;
     }
