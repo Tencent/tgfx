@@ -1854,12 +1854,9 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   // Layer style source content is an intermediate artifact — skip background capture / consume.
   drawArgs.backgroundHandler = BackgroundHandler::NoOp();
 
-  // Record the geometry once for both buckets. The recording and the shape read back from it
-  // depend only on the layer's own content, its own paint and the destination color space -- never
-  // on drawArgs.excludeEffects -- so both buckets would otherwise record the very same raster. The
-  // allowsEdgeAntialiasing flag it forwards is dropped by OpaqueContext, so it is not an input
-  // either. Keep it that way: making getGeometryImage() depend on the bucket would silently
-  // change what both buckets get, not just the one that changed.
+  // Record the geometry once for both buckets: neither the recording nor the shape depends on
+  // drawArgs.excludeEffects, so both buckets would otherwise record the same raster. Keep it that
+  // way: making getGeometryImage() depend on the bucket would silently change both.
   Point geometryOffset = {};
   std::optional<StyledShape> geometryShape = std::nullopt;
   std::shared_ptr<StyleInputSource> geometrySource = nullptr;
@@ -1912,11 +1909,9 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     }
 
     if (bucketNeedsGeometry[i]) {
-      // A style that draws from the geometry always consumes it rather than the shared content:
-      // the shared content drops painters with alpha=0 and knows nothing about geometry no painter
-      // captured, so a layer whose painters are all alpha=0, or whose geometries no painter
-      // captured, still has geometry to cover. Recording it unconditionally also keeps the
-      // coverage independent of any visible descendant.
+      // A style that draws from the geometry consumes it rather than the shared content, which
+      // drops painters with alpha=0 and knows nothing about bare geometry. Recording it
+      // unconditionally also keeps the coverage independent of any visible descendant.
       if (geometrySource != nullptr) {
         // Consume the recording hoisted above: both buckets hold the one source object, so the
         // pixels are neither re-recorded nor duplicated, and the shape read back from that same

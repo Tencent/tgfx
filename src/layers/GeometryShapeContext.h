@@ -32,14 +32,9 @@
 namespace tgfx {
 
 /**
- * GeometryShapeContext reads back the shape a layer's geometry recording covers by playing
- * the finished picture back, so it describes what the recording painted instead of re-deriving it
- * from the elements or painters behind it.
- *
- * The extraction is conservative: a shape is yielded only when every draw covers the very same
- * outline. A stroke, a clip, an image shader, a mask filter, an inverse fill, an image, a mesh or a
- * differently shaped area rejects the whole extraction, so callers fall back to a non-vector path
- * instead of covering part of the layer.
+ * Reads back the shape a layer's geometry recording covers by playing its picture back, instead of
+ * re-deriving it from the elements behind it. Any draw that is not the same outline rejects the
+ * extraction, so callers fall back to a non-vector path rather than covering part of the layer.
  */
 class GeometryShapeContext : public DrawContext, public Picture::AbortCallback {
  public:

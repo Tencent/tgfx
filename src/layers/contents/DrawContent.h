@@ -33,10 +33,8 @@ namespace tgfx {
 class DrawContent : public GeometryContent {
  public:
   /**
-   * @param paint The paint that captured this geometry. Ignored when hasPaint is false: an entry no
-   * paint captured holds no paint state, so any read of it would be a read of nothing.
-   * @param hasPaint Whether a paint captured this geometry; when false the entry keeps no paint
-   * state at all.
+   * @param paint The paint that captured this geometry; ignored when hasPaint is false.
+   * @param hasPaint Whether a paint captured this geometry.
    */
   explicit DrawContent(const LayerPaint& paint, bool hasPaint);
 

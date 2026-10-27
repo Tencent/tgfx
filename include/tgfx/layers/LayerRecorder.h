@@ -32,11 +32,9 @@ class LayerContent;
 class GeometryContent;
 
 /**
- * LayerRecorder records geometries and their paints as layer content. Geometries with invisible
- * paints are still included as part of the layer's contour, but they will not be rendered. A
- * geometry may also be recorded without any paint: it paints nothing and stays out of the shared
- * contour, and only the queries that ask for the layer's geometry see it. Such a geometry is never
- * batched with a painted one, since a batch has to share a single paint.
+ * LayerRecorder records geometries and their paints as layer content. A geometry may also be
+ * recorded without a paint (see GeometryContent::hasPaint()); it is never batched with a painted
+ * one, since a batch has to share a single paint.
  */
 class LayerRecorder {
  public:
@@ -46,45 +44,40 @@ class LayerRecorder {
   /**
    * Adds a rectangle with the specified paint.
    * @param rect The rectangle shape.
-   * @param paint The paint that captured this geometry. nullptr records the geometry alone: it
-   * paints nothing, contributes no shared contour, and only the queries that ask for the layer's
-   * geometry see it.
+   * @param paint The paint that captured this geometry, or nullptr to record the geometry alone
+   *              (see GeometryContent::hasPaint()).
    */
   void addRect(const Rect& rect, const LayerPaint* paint);
 
   /**
    * Adds a rounded rectangle with the specified paint.
    * @param rRect The rounded rectangle shape.
-   * @param paint The paint that captured this geometry. nullptr records the geometry alone: it
-   * paints nothing, contributes no shared contour, and only the queries that ask for the layer's
-   * geometry see it.
+   * @param paint The paint that captured this geometry, or nullptr to record the geometry alone
+   *              (see GeometryContent::hasPaint()).
    */
   void addRRect(const RRect& rRect, const LayerPaint* paint);
 
   /**
    * Adds a path with the specified paint.
    * @param path The path shape.
-   * @param paint The paint that captured this geometry. nullptr records the geometry alone: it
-   * paints nothing, contributes no shared contour, and only the queries that ask for the layer's
-   * geometry see it.
+   * @param paint The paint that captured this geometry, or nullptr to record the geometry alone
+   *              (see GeometryContent::hasPaint()).
    */
   void addPath(const Path& path, const LayerPaint* paint);
 
   /**
    * Adds a shape with the specified paint.
    * @param shape The shape object.
-   * @param paint The paint that captured this geometry. nullptr records the geometry alone: it
-   * paints nothing, contributes no shared contour, and only the queries that ask for the layer's
-   * geometry see it.
+   * @param paint The paint that captured this geometry, or nullptr to record the geometry alone
+   *              (see GeometryContent::hasPaint()).
    */
   void addShape(std::shared_ptr<Shape> shape, const LayerPaint* paint);
 
   /**
    * Adds a text blob with the specified paint.
    * @param textBlob The text blob.
-   * @param paint The paint that captured this geometry. nullptr records the geometry alone: it
-   * paints nothing, contributes no shared contour, and only the queries that ask for the layer's
-   * geometry see it.
+   * @param paint The paint that captured this geometry, or nullptr to record the geometry alone
+   *              (see GeometryContent::hasPaint()).
    * @param x The x offset of the text blob.
    * @param y The y offset of the text blob.
    */
@@ -94,9 +87,8 @@ class LayerRecorder {
   /**
    * Adds a mesh with the specified paint.
    * @param mesh The mesh object.
-   * @param paint The paint that captured this geometry. nullptr records the geometry alone: it
-   * paints nothing, contributes no shared contour, and only the queries that ask for the layer's
-   * geometry see it.
+   * @param paint The paint that captured this geometry, or nullptr to record the geometry alone
+   *              (see GeometryContent::hasPaint()).
    */
   void addMesh(std::shared_ptr<Mesh> mesh, const LayerPaint* paint);
 

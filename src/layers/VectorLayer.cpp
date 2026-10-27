@@ -81,11 +81,9 @@ void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
   for (const auto& painter : context.painters) {
     painter->draw(recorder);
   }
-  // Geometries no painter captured are recorded without a paint: they paint nothing and stay out of
-  // the shared contour, but they are still this layer's geometry. The set is taken after every
+  // Geometries no painter captured are this layer's own geometry; the set is taken after every
   // element applied, since MergePath clears geometries and painters while Repeater clones and
-  // reorders them. A captured geometry is drawn through its painter, so it is not bare; collecting
-  // the captures once keeps the comparison from being quadratic in the geometry count.
+  // reorders them. Collecting the captures once keeps the comparison linear in the geometry count.
   std::unordered_set<const Geometry*> capturedGeometries = {};
   capturedGeometries.reserve(context.geometries.size());
   for (const auto& painter : context.painters) {
