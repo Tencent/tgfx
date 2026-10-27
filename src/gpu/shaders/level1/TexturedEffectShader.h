@@ -47,25 +47,23 @@ class TexturedEffectShader : public ShaderFamily<TexturedEffectShader> {
   struct FragDims {
     // Subset clamping is runtime: the shader always declares Subset and clamps, and the writer
     // uploads the full texture bounds when there is no real subset, so the clamp is a no-op.
-    enum : uint32_t { HAS_XP, COUNT };
+    // One typed handle per dimension; domain() lists them in the bundle's dimension order, and
+    // Compose assigns through the handles by name (ComposedDims) — no index enum to keep
+    // aligned with the domain list.
+    static inline const PermutationIntDim<FragDims> HAS_XP{XP_DEFINE_NAME, XP_VALUE_COUNT};
     static PermutationDomain domain() {
-      return PermutationDomain({
-          PermutationInt(XP_DEFINE_NAME, XP_VALUE_COUNT),
-      });
+      return PermutationDomain({HAS_XP});
     }
   };
 
   struct VertDims {
-    enum : uint32_t { COUNT };
+    // No vertex dimensions: an empty domain, with no handles to keep aligned.
     static PermutationDomain domain() {
       return PermutationDomain({});
     }
   };
   using FD = FragDims;
   using VD = VertDims;
-  static_assert(VD::COUNT == 0 && FD::COUNT == 1,
-                "Update the Compose mapping when dimensions change.");
-
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
 
@@ -80,9 +78,10 @@ class TexturedEffectShader : public ShaderFamily<TexturedEffectShader> {
     if (inputs.xpType < XP_NONE) {
       return std::nullopt;
     }
+    auto frag = ComposedDims<FragDims>(FragDims::domain());
+    frag.set(FD::HAS_XP, inputs.xpType);
     RuleComposedValues values;
-    values.fragValues.resize(FD::COUNT);
-    values.fragValues[FD::HAS_XP] = inputs.xpType;
+    values.fragValues = frag.finish();
     return values;
   }
 
