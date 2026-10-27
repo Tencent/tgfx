@@ -44,8 +44,9 @@ enum class LayerStyleExtraSourceType : uint32_t {
    */
   None = 0,
   /**
-   * The layerStyle requires the layer contour to be drawn: the shared subtree recording, which
-   * includes geometries from painters with alpha=0 but leaves out geometries no paint captured.
+   * The layerStyle requires the layer contour to be drawn: the shared contour of the layer and its
+   * descendants. It includes shapes filled or stroked with a fully transparent paint, but leaves
+   * out geometries added without a paint.
    */
   Contour = 1 << 0,
   /**
@@ -55,9 +56,9 @@ enum class LayerStyleExtraSourceType : uint32_t {
 };
 
 /**
- * Declares which recording a layerStyle prefers as its content. The style is not guaranteed to
- * receive it: a Geometry style whose layer records no geometry is handed the shared subtree
- * contour instead (see Geometry). LayerStyleInput::content describes what it actually receives.
+ * Declares which content a layerStyle prefers. The preference is not guaranteed: a Geometry style
+ * whose layer has no geometry of its own receives the subtree contour instead, which does include
+ * the descendants. LayerStyleInput::content reports what the style actually receives.
  */
 enum class LayerStyleContentSource {
   /**
@@ -65,9 +66,9 @@ enum class LayerStyleContentSource {
    */
   All,
   /**
-   * The layer's geometry: the outlines of all of its own painters, including the ones with alpha=0
-   * and the bare geometries no painter captured; descendants never contribute. A layer that records
-   * no geometry falls back to the shared subtree contour, so coverage still has a source.
+   * The layer's geometry: the outlines of its own shapes, including shapes filled or stroked with a
+   * transparent paint and geometries added without a paint; descendants never contribute. A layer
+   * with no geometry of its own, e.g. all of it in child layers, falls back to the subtree contour.
    */
   Geometry
 };
@@ -94,9 +95,9 @@ enum class LayerStyleType {
  * 1. **Content** (opaque layer content): Renders geometries with normal fills, then converts all
  *    semi-transparent pixels to fully opaque (fully transparent pixels are preserved).
  *
- * 2. **Contour** (layer contour): Similar to Content, but it also includes geometries from painters
- *    with alpha=0, and it replaces gradient fills with solid color fills (ignoring local
- *    transparency in gradients). It leaves out geometries no paint captured; only
+ * 2. **Contour** (layer contour): Similar to Content, but it also includes shapes filled or stroked
+ *    with a fully transparent paint, and it replaces gradient fills with solid color fills (ignoring
+ *    local transparency in gradients). It leaves out geometries added without a paint; only
  *    LayerStyleContentSource::Geometry covers those.
  *
  * 3. **Background** (layer background): The normally rendered content below the current layer.

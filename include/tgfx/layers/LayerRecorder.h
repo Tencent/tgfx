@@ -34,9 +34,8 @@ class GeometryContent;
 
 /**
  * LayerRecorder records geometries and their paints as layer content. A geometry may also be
- * recorded without a paint: it is never drawn, contributes no shared contour, and only queries that
- * ask for the layer's geometry account for it. It never joins a painted batch, which must share one
- * paint.
+ * recorded without a paint: it is never drawn, contributes no shared contour, and only a style
+ * declaring LayerStyleContentSource::Geometry covers it.
  */
 class LayerRecorder {
  public:
@@ -46,37 +45,37 @@ class LayerRecorder {
   /**
    * Adds a rectangle with the specified paint.
    * @param rect The rectangle shape.
-   * @param paint The paint that captured this geometry. Pass nullptr to record the geometry alone:
-   *              it is never drawn, contributes no shared contour, and only queries that ask for
-   *              the layer's geometry account for it.
+   * @param paint The paint for this geometry. Pass nullptr to add the geometry without a paint:
+   *              it is never drawn, contributes no shared contour, and only a style declaring
+   *              LayerStyleContentSource::Geometry covers it.
    */
   void addRect(const Rect& rect, const LayerPaint* paint);
 
   /**
    * Adds a rounded rectangle with the specified paint.
    * @param rRect The rounded rectangle shape.
-   * @param paint Same as addRect(): nullptr records the geometry alone.
+   * @param paint Same as addRect(): nullptr adds the geometry without a paint.
    */
   void addRRect(const RRect& rRect, const LayerPaint* paint);
 
   /**
    * Adds a path with the specified paint.
    * @param path The path shape.
-   * @param paint Same as addRect(): nullptr records the geometry alone.
+   * @param paint Same as addRect(): nullptr adds the geometry without a paint.
    */
   void addPath(const Path& path, const LayerPaint* paint);
 
   /**
    * Adds a shape with the specified paint.
    * @param shape The shape object.
-   * @param paint Same as addRect(): nullptr records the geometry alone.
+   * @param paint Same as addRect(): nullptr adds the geometry without a paint.
    */
   void addShape(std::shared_ptr<Shape> shape, const LayerPaint* paint);
 
   /**
    * Adds a text blob with the specified paint.
    * @param textBlob The text blob.
-   * @param paint Same as addRect(): nullptr records the geometry alone.
+   * @param paint Same as addRect(): nullptr adds the geometry without a paint.
    * @param x The x offset of the text blob.
    * @param y The y offset of the text blob.
    */
@@ -86,7 +85,7 @@ class LayerRecorder {
   /**
    * Adds a mesh with the specified paint.
    * @param mesh The mesh object.
-   * @param paint Same as addRect(): nullptr records the geometry alone.
+   * @param paint Same as addRect(): nullptr adds the geometry without a paint.
    */
   void addMesh(std::shared_ptr<Mesh> mesh, const LayerPaint* paint);
 

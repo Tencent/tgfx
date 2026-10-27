@@ -28,19 +28,19 @@
 namespace tgfx {
 
 /**
- * A recording a LayerStyle may consume, as its primary content or as an extra source.
+ * A source a LayerStyle may consume, as its primary content or as an extra source.
  */
 class StyleInputSource {
  public:
   /**
-   * The kind of recording carried by this object.
+   * The kind of source carried by this object.
    */
   enum class Type {
-    /** A plain image recording, such as the shared content or the background below the layer. */
+    /** A plain image source, such as the shared content or the background below the layer. */
     Base,
-    /** The layer's geometry, recorded on its own, without its descendants. */
+    /** The layer's geometry on its own, without its descendants. */
     Geometry,
-    /** The shared subtree contour, used when the layer records no geometry of its own. */
+    /** The shared subtree contour, used when the layer has no geometry of its own. */
     Contour
   };
 
@@ -56,7 +56,7 @@ class StyleInputSource {
 
   virtual ~StyleInputSource() = default;
 
-  /** Returns the recording kind. */
+  /** Returns the source kind. */
   Type type() const {
     return _type;
   }
@@ -86,22 +86,22 @@ class StyleInputSource {
 };
 
 /**
- * Input source for the layer's geometry: the raster and the exact shape read back from the very
- * same recording, so the shape always describes the pixels the style samples.
+ * Input source for the layer's geometry: its raster, plus the exact outline of the same content
+ * when that content has a single one. The shape always describes the pixels the style samples.
  */
 class GeometryInputSource : public StyleInputSource {
  public:
   /**
    * @param image The rasterized geometry; geometry is only ever the primary content.
    * @param imageOffset Its top-left corner in layer-local coordinates times contentScale.
-   * @param shape The vector shape of the same recording, or empty when it has none.
+   * @param shape The vector shape of the same content, or empty when it has none.
    */
   GeometryInputSource(std::shared_ptr<Image> image, Point imageOffset,
                       std::optional<StyledShape> shape)
       : StyleInputSource(Type::Geometry, std::move(image), imageOffset), _shape(std::move(shape)) {
   }
 
-  /** Returns the vector shape of the same recording, empty when the recording has none. */
+  /** Returns the vector shape of the same content, empty when that content has none. */
   const std::optional<StyledShape>& shape() const {
     return _shape;
   }
@@ -142,9 +142,9 @@ class ContourInputSource : public StyleInputSource {
  */
 struct LayerStyleInput {
   /**
-   * The recording this style resolves: the layer's geometry, the shared contour standing in for a
-   * missing geometry, or the shared content. type() reports which one was recorded, and shape()
-   * exists only on GeometryInputSource, so a consumer that wants the vector outline tests for
+   * The source this style resolves: the layer's geometry, the shared contour standing in for a
+   * missing geometry, or the shared content. type() reports which one it is, and shape() exists
+   * only on GeometryInputSource, so a consumer that wants the vector outline tests for
    * Type::Geometry and casts. nullptr means nothing to draw, so skip the style.
    */
   std::shared_ptr<StyleInputSource> content = nullptr;
