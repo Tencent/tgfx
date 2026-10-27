@@ -408,6 +408,27 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
 
   RenderPipelineDescriptor descriptor = {};
   VertexBufferLayout vertexLayout(programInfo->getVertexAttributes());
+  // The AOT vertex stage declares its inputs at the template's physical slots, which keep holes
+  // where a conditional attribute is compiled out of the variant (e.g. inUVCoord under
+  // HAS_UV_MATRIX=1), while the GP's attribute list filters those slots away — so the natural
+  // dense numbering would renumber the shader's inputs and the pipeline would bind a slot the
+  // shader never declared. The reflected vertex inputs carry the variant's declared locations;
+  // binding them explicitly keeps the pipeline and the shader in agreement.
+  if (!vertBlob->vertexInputs.empty()) {
+    if (vertBlob->vertexInputs.size() != vertexLayout.attributes.size()) {
+      cache->recordFailure(PrecompiledFallbackReason::VertexLayoutMismatch,
+                           MakeFallbackRecord(cache, programInfo, &*matchResult));
+      LOGE(
+          "PrecompiledProgramCreator: vertex interface mismatch for %s[vert=%u]: %zu reflected "
+          "inputs vs %zu runtime attributes",
+          matchResult->shaderName.c_str(), matchResult->vertPermutationIndex,
+          vertBlob->vertexInputs.size(), vertexLayout.attributes.size());
+      return nullptr;
+    }
+    for (const auto& input : vertBlob->vertexInputs) {
+      vertexLayout.shaderLocations.push_back(input.location);
+    }
+  }
   descriptor.vertex.bufferLayouts = {vertexLayout};
   auto& instanceAttributes = programInfo->getInstanceAttributes();
   if (!instanceAttributes.empty()) {

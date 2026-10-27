@@ -162,6 +162,18 @@ class VertexBufferLayout {
    * An array of attributes that describe the data layout within each element of the buffer.
    */
   std::vector<Attribute> attributes = {};
+
+  /**
+   * The shader input slot (location / attribute index) each attribute binds to. Empty (the
+   * default): attributes bind to consecutive slots 0, 1, 2 ... in attribute order, which matches
+   * every shader whose inputs are numbered densely — the runtime-built ones. Non-empty: attribute
+   * j binds to shaderLocations[j]; this is how the precompiled path binds a variant whose inputs
+   * are numbered by physical slot and may skip numbers (a conditional attribute compiled out of
+   * the variant leaves a hole the runtime attribute list filters away). The count must equal
+   * attributes.size() when set, and holes are legal: a pipeline only has to provide the slots
+   * the shader actually reads.
+   */
+  std::vector<uint32_t> shaderLocations = {};
 };
 
 /**

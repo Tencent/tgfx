@@ -166,7 +166,12 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
       WGPUVertexAttribute attr = {};
       attr.format = ToWGPUVertexFormat(layout.attributes[j].format());
       attr.offset = offset;
-      attr.shaderLocation = globalShaderLocation++;
+      // An explicit location list (the precompiled path) binds each attribute to the slot the
+      // shader declares; holes in it are fine — the pipeline only has to cover the slots the
+      // shader reads. Without one, attributes take consecutive slots, matching the runtime-built
+      // shaders, whose inputs are numbered densely.
+      attr.shaderLocation =
+          layout.shaderLocations.empty() ? globalShaderLocation++ : layout.shaderLocations[j];
       attrs.push_back(attr);
       offset += layout.attributes[j].size();
     }

@@ -221,18 +221,21 @@ void MetalRenderPipeline::configureVertexDescriptor(MTLRenderPipelineDescriptor*
                                                     : MTLVertexStepFunctionPerInstance;
     vertexDescriptor.layouts[metalBufferIndex].stepRate = 1;
 
-    // Set vertex attributes with globally unique indices across all buffer layouts
+    // Set vertex attributes with globally unique indices across all buffer layouts. An explicit
+    // location list (the precompiled path) binds each attribute to the slot the shader declares;
+    // holes in it are fine — the descriptor only has to cover the slots the shader reads.
     size_t currentOffset = 0;
     for (size_t attrIndex = 0; attrIndex < layout.attributes.size(); ++attrIndex) {
       const auto& attribute = layout.attributes[attrIndex];
-      if (globalAttributeIndex < MaxVertexAttributes) {
-        vertexDescriptor.attributes[globalAttributeIndex].format =
-            ToMTLVertexFormat(attribute.format());
-        vertexDescriptor.attributes[globalAttributeIndex].offset = currentOffset;
-        vertexDescriptor.attributes[globalAttributeIndex].bufferIndex = metalBufferIndex;
-        currentOffset += attribute.size();
-        globalAttributeIndex++;
+      NSUInteger attributeSlot =
+          layout.shaderLocations.empty() ? globalAttributeIndex : layout.shaderLocations[attrIndex];
+      if (attributeSlot < MaxVertexAttributes) {
+        vertexDescriptor.attributes[attributeSlot].format = ToMTLVertexFormat(attribute.format());
+        vertexDescriptor.attributes[attributeSlot].offset = currentOffset;
+        vertexDescriptor.attributes[attributeSlot].bufferIndex = metalBufferIndex;
       }
+      currentOffset += attribute.size();
+      globalAttributeIndex++;
     }
   }
 

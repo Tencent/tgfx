@@ -350,9 +350,15 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
     vertexBindings.push_back(binding);
 
     uint32_t offset = 0;
-    for (const auto& attr : layout.attributes) {
+    for (size_t j = 0; j < layout.attributes.size(); j++) {
+      const auto& attr = layout.attributes[j];
       VkVertexInputAttributeDescription attrDesc = {};
-      attrDesc.location = globalLocation++;
+      // An explicit location list (the precompiled path) binds each attribute to the slot the
+      // shader declares; holes in it are fine — the input state only has to cover the slots the
+      // shader reads. Without one, attributes take consecutive locations, matching the
+      // runtime-built shaders, whose inputs are numbered densely.
+      attrDesc.location =
+          layout.shaderLocations.empty() ? globalLocation++ : layout.shaderLocations[j];
       attrDesc.binding = i;
       attrDesc.format = AttributeToVkFormat(attr);
       attrDesc.offset = offset;

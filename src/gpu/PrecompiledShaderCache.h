@@ -79,6 +79,9 @@ enum class PrecompiledFallbackReason : uint8_t {
   // swizzle) the matched shader family does not implement (PrecompiledShaderInfo::textureReads).
   // A capability gap of that family, refused instead of drawn with the wrong channels.
   UnsupportedTextureRead,
+  // The variant's reflected vertex inputs do not line up with the runtime geometry processor's
+  // attribute list: the matched variant does not fit the draw's vertex interface.
+  VertexLayoutMismatch,
   Count,
 };
 

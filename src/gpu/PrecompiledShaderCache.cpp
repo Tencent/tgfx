@@ -69,6 +69,8 @@ const char* PrecompiledFallbackReasonName(PrecompiledFallbackReason reason) {
       return "BundleRejected";
     case PrecompiledFallbackReason::UnsupportedTextureRead:
       return "UnsupportedTextureRead";
+    case PrecompiledFallbackReason::VertexLayoutMismatch:
+      return "VertexLayoutMismatch";
     case PrecompiledFallbackReason::Count:
       return "Count";
   }

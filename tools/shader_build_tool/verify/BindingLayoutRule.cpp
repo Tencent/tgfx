@@ -71,6 +71,40 @@ std::vector<GroupBinding> ScanWgslGroupBindings(const std::vector<uint8_t>& blob
 /// SamplerBinding packing.
 size_t CheckWebgpuVariant(const VariantData& variant, size_t* violationCount) {
   size_t errors = 0;
+  // The vertex stage must declare every slot the reflection recorded: the runtime pipeline
+  // binds the reflected locations (see VertexBufferLayout::shaderLocations), so a WGSL that
+  // dropped one would bind an attribute the shader never reads and starve it of the ones it
+  // does read.
+  // The vertex entry parameters of the WGSL must all sit on slots the reflection covers: the
+  // runtime pipeline binds the reflected locations, so a parameter on an uncovered slot would
+  // read whatever the layout happens to leave there. The shaderc performance pass legally drops
+  // inputs the vertex body never uses, so the WGSL may declare fewer parameters than the
+  // reflection — never more, and never outside it.
+  {
+    std::string text(variant.vertexBlob.begin(), variant.vertexBlob.end());
+    std::set<int> reflected;
+    for (const auto& input : variant.vertexReflection.vertexInputs) {
+      reflected.insert(static_cast<int>(input.location));
+    }
+    auto mainAt = text.find("fn main(");
+    auto arrowAt = text.find("->", mainAt == std::string::npos ? 0 : mainAt);
+    if (mainAt != std::string::npos && arrowAt != std::string::npos) {
+      auto params = text.substr(mainAt + 8, arrowAt - mainAt - 8);
+      size_t cursor = 0;
+      while ((cursor = params.find("@location(", cursor)) != std::string::npos) {
+        auto end = params.find(')', cursor);
+        auto slot = std::stoi(params.substr(cursor + 10, end - cursor - 10));
+        if (reflected.count(slot) == 0) {
+          std::cout << "[binding] " << ProfileTagOf(variant) << " " << variant.shaderName
+                    << " [vert=" << variant.vertPermutationIndex
+                    << "]: the WGSL reads vertex slot " << slot
+                    << ", which the reflected vertex inputs do not cover\n";
+          errors++;
+        }
+        cursor = end;
+      }
+    }
+  }
   auto vertBindings = ScanWgslGroupBindings(variant.vertexBlob);
   for (const auto& pair : vertBindings) {
     if (pair.group != VERTEX_UBO_DESCRIPTOR_SET || pair.binding != VERTEX_UBO_BINDING_POINT) {

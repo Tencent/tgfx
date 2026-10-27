@@ -112,6 +112,39 @@ TEST(BindingLayoutRuleTest, BothQualifierOrdersAreUnderstood) {
   EXPECT_EQ(rule.check(ContextOf(variants, noExpansions)), 0u);
 }
 
+TEST(BindingLayoutRuleTest, AWgslWithFewerInputsThanTheReflectionPasses) {
+  // The shaderc performance pass legally drops vertex inputs the body never uses, so the WGSL
+  // entry may declare fewer parameters than the reflection — here slot 4 is gone — as long as
+  // every slot it does read is one the reflection (and so the runtime) covers.
+  VariantData variant = WebgpuVariant(WebgpuFragmentText(1), 1);
+  variant.vertexBlob = BytesOf(
+      "@vertex\nfn main(@location(0) aPosition : vec2f, @location(1) inCoverage : f32, "
+      "@location(2) inEllipseOffset : vec2f, @location(3) inEllipseRadii : vec2f, "
+      "@location(5) inColor : vec4f) -> main_out {\n  return main_out();\n}\n");
+  for (uint32_t location : {0u, 1u, 2u, 3u, 4u, 5u}) {
+    VertexInputEntry input = {};
+    input.location = static_cast<uint8_t>(location);
+    variant.vertexReflection.vertexInputs.push_back(input);
+  }
+  std::vector<VariantData> variants = {variant};
+  EXPECT_EQ(rule.check(ContextOf(variants, noExpansions)), 0u);
+}
+
+TEST(BindingLayoutRuleTest, AWgslVertexSlotOutsideTheReflectionFails) {
+  // A parameter on a slot the reflection does not cover reads whatever the runtime layout
+  // happens to leave there — the misalignment this rule exists to catch.
+  VariantData variant = WebgpuVariant(WebgpuFragmentText(1), 1);
+  variant.vertexBlob = BytesOf(
+      "@vertex\nfn main(@location(0) aPosition : vec2f, @location(7) stray : f32) -> main_out {\n"
+      "  return main_out();\n}\n");
+  VertexInputEntry input = {};
+  input.name = "aPosition";
+  input.location = 0;
+  variant.vertexReflection.vertexInputs.push_back(input);
+  std::vector<VariantData> variants = {variant};
+  EXPECT_GE(rule.check(ContextOf(variants, noExpansions)), 1u);
+}
+
 TEST(BindingLayoutRuleTest, AFragmentResourceInAGroupThePipelineNeverBindsFails) {
   auto text = WebgpuFragmentText(1) + "@binding(0) @group(3) var stray : f32;\n";
   std::vector<VariantData> variants = {WebgpuVariant(text, 1)};
