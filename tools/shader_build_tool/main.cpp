@@ -39,8 +39,7 @@
 #include "StageReport.h"
 #include "compile/StageCompiler.h"
 #include "core/Diagnostics.h"
-#include "emit/FormCheck.h"
-#include "emit/GLSLDialect.h"
+#include "emit/ProfileEmitter.h"
 #include "gpu/ShaderProfile.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/AllShaderFamilies.h"
@@ -265,6 +264,13 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
   report.compiledCount = 0;
   report.errorCount = 0;
 
+  // One emitter per requested backend, built once for the whole shader: the loop below only
+  // feeds them variants.
+  std::vector<std::pair<ShaderProfile, std::unique_ptr<ProfileEmitter>>> emitters;
+  for (auto profile : options.backends) {
+    emitters.emplace_back(profile, MakeProfileEmitter(profile));
+  }
+
   // Unreadable files and broken includes were rejected when the sources were loaded, so a
   // present source is complete.
   std::string vertSource = source != nullptr ? source->vertex : "";
@@ -329,170 +335,38 @@ static ShaderReport CompileOneShader(const PrecompiledShaderInfo& info, const Bu
     // independent of backend-level exclusions counted below.
     report.compiledCount++;
 
-    for (auto profile : options.backends) {
+    for (auto& emitterEntry : emitters) {
+      const ShaderProfile profile = emitterEntry.first;
       const std::string backend = ProfileTag(profile);
       // Profile-specific exclusions (the framebuffer fetch variants) share one source of truth
       // with the closure verifier; see PermutationCompilesForBackend.
       if (!PermutationCompilesForBackend(info, vi, fi, profile)) {
         continue;
       }
-      std::vector<uint8_t> vertBlob;
-      std::vector<uint8_t> fragBlob;
-
-      if (profile == ShaderProfile::Vulkan) {
-        // Re-compile with optimization for smaller SPIR-V output.
-        auto expandedVertOpt = PrependDefines(vertSource, vertDefines);
-        const auto& vertOpt =
-            compiler->compileSpirv(expandedVertOpt, ShaderStageType::Vertex, info.name, vi, true);
-        auto expandedFragOpt = PrependDefines(fragSource, fragDefines);
-        const auto& fragOpt =
-            compiler->compileSpirv(expandedFragOpt, ShaderStageType::Fragment, info.name, fi, true);
-        if (!vertOpt.success || !fragOpt.success) {
-          // Fallback to unoptimized if optimization fails.
-          auto* vp = reinterpret_cast<const uint8_t*>(vertSpirv->data());
-          vertBlob.assign(vp, vp + vertSpirv->size() * 4);
-          auto* fp = reinterpret_cast<const uint8_t*>(fragResult.spirv.data());
-          fragBlob.assign(fp, fp + fragResult.spirv.size() * 4);
-        } else {
-          auto* vp = reinterpret_cast<const uint8_t*>(vertOpt.spirv.data());
-          vertBlob.assign(vp, vp + vertOpt.spirv.size() * 4);
-          auto* fp = reinterpret_cast<const uint8_t*>(fragOpt.spirv.data());
-          fragBlob.assign(fp, fp + fragOpt.spirv.size() * 4);
-        }
-      } else if (profile == ShaderProfile::Metal) {
-        // The unoptimized SPIR-V is intentional here: xcrun produces byte-identical metallibs
-        // whether fed the optimized or unoptimized translation (verified 2026-08-19), so the
-        // extra optimized compile would only slow the build down.
-        std::string vertMslError;
-        std::string fragMslError;
-        auto mslVert = TranslateToMSL(*vertSpirv, ShaderStageType::Vertex, &vertMslError);
-        auto mslFrag = TranslateToMSL(fragResult.spirv, ShaderStageType::Fragment, &fragMslError);
-        if (mslVert.empty() || mslFrag.empty()) {
-          std::cerr << "  MSL translation error: "
-                    << (mslVert.empty() ? vertMslError : fragMslError) << "\n";
-          report.errorCount++;
-          diagnostics->recordProfileError(backend);
-          continue;
-        }
-        std::string metalError;
-        vertBlob = compiler->compileMetallib(mslVert, ShaderStageType::Vertex, &metalError);
-        if (!vertBlob.empty()) {
-          fragBlob = compiler->compileMetallib(mslFrag, ShaderStageType::Fragment, &metalError);
-        }
-        if (vertBlob.empty() || fragBlob.empty()) {
-          std::cerr << "  metallib compilation failed for " << info.name << " [vert=" << vi
-                    << " frag=" << fi << "]: " << metalError << "\n";
-          report.errorCount++;
-          diagnostics->recordProfileError(backend);
-          continue;
-        }
-      } else if (profile == ShaderProfile::WebGPU) {
-        // WebGPU needs its own GLSL form (separated texture/sampler bindings), so re-expand and
-        // recompile like the vulkan branch instead of reusing the combined-sampler SPIR-V.
-        auto expandedVertWgsl = PrependDefines(vertSource, vertDefines);
-        auto expandedFragWgsl = PrependDefines(fragSource, fragDefines);
-        const auto& wgslVert =
-            compiler->compileWgsl(expandedVertWgsl, ShaderStageType::Vertex, info.name, vi);
-        const auto& wgslFrag =
-            compiler->compileWgsl(expandedFragWgsl, ShaderStageType::Fragment, info.name, fi);
-        if (!wgslVert.success || !wgslFrag.success) {
-          std::cerr << "  WGSL translation error: "
-                    << (wgslVert.success ? wgslFrag.error : wgslVert.error) << "\n";
-          report.errorCount++;
-          diagnostics->recordProfileError(backend);
-          continue;
-        }
-        vertBlob.assign(wgslVert.text.begin(), wgslVert.text.end());
-        fragBlob.assign(wgslFrag.text.begin(), wgslFrag.text.end());
-      } else if (profile == ShaderProfile::OpenGL || profile == ShaderProfile::OpenGLES) {
-        if (profile == ShaderProfile::OpenGL) {
-          // Desktop GL direct emission (see EmitDirectGLSL330): store the preprocessed template
-          // in its own 330 spelling. The mandatory compile check below runs the exact stored
-          // text through glslang's OpenGL target, so a template using syntax beyond GL 330 (or
-          // a leak of Vulkan-only qualifiers like subpassInput into a desktop variant) fails
-          // the build here instead of surfacing as a runtime module-creation fallback.
-          auto directVert =
-              EmitDirectGLSL330(PrependDefines(vertSource, vertDefines), ShaderStageType::Vertex);
-          auto directFrag =
-              EmitDirectGLSL330(PrependDefines(fragSource, fragDefines), ShaderStageType::Fragment);
-          if (directVert.empty() || directFrag.empty()) {
-            std::cerr << "  direct-GL 330 emission failed (preprocessing or missing #version 450) "
-                      << "for " << info.name << " [vert=" << vi << " frag=" << fi << "]\n";
-            report.errorCount++;
-            diagnostics->recordProfileError(backend);
-            continue;
-          }
-          // Direct-emission verification is layered, because glslang's 330 front-end is stricter
-          // than the real drivers (it rejects the very no-binding-block / located-out forms the
-          // regenerated 330 output has shipped in for months, and macro-folded layout ids):
-          //   1. Semantics: the common 450 SPIR-V compile above already validates every
-          //      expression of the same preprocessed source.
-          //   2. Form: the shared leak scan (FindDirectFormLeak) fails closed on any transform
-          //      leak (a surviving set/binding qualifier, a Vulkan-only subpassInput reaching a
-          //      desktop variant).
-          //   3. Driver acceptance: the byte-parity consistency suite compiles the stored text
-          //      on the actual GL driver.
-          auto vertLeak = FindDirectFormLeak(directVert, false);
-          auto fragLeak = FindDirectFormLeak(directFrag, false);
-          const char* leakStage = vertLeak.reason != nullptr ? "vert" : "frag";
-          const DirectFormLeak* leak = vertLeak.reason != nullptr ? &vertLeak : &fragLeak;
-          if (leak->reason != nullptr) {
-            const std::string& leakText = vertLeak.reason != nullptr ? directVert : directFrag;
-            std::cerr << "  direct-GL 330 form assertion failed (" << leakStage << ", "
-                      << leak->reason << ") for " << info.name << " [vert=" << vi
-                      << " frag=" << fi << "]";
-            if (leak->offset > 0) {
-              auto echoStart = leak->offset > 40 ? leak->offset - 40 : 0;
-              std::cerr << " [text @ " << leakText.substr(echoStart, 90) << "]";
-            }
-            std::cerr << "\n";
-            report.errorCount++;
-            diagnostics->recordProfileError(backend);
-            continue;
-          }
-          vertBlob.assign(directVert.begin(), directVert.end());
-          fragBlob.assign(directFrag.begin(), directFrag.end());
-        } else {
-          // Direct ES-300 storage (see EmitDirectGLSLES300). The text is preprocessed, so the
-          // shared leak scan (FindDirectFormLeak) sees only live code: the ES header, no
-          // surviving set/binding member, no conditional directive, and no Vulkan subpass syntax
-          // left after the framebuffer-fetch rewrite.
-          bool fbfVariant = info.fragDomain.valueOf(fi, XP_DEFINE_NAME) == XP_FRAMEBUFFER_FETCH;
-          auto dv = EmitDirectGLSLES300(PrependDefines(vertSource, vertDefines),
-                                        ShaderStageType::Vertex, false);
-          auto df = EmitDirectGLSLES300(PrependDefines(fragSource, fragDefines),
-                                        ShaderStageType::Fragment, fbfVariant);
-          if (dv.empty() || df.empty()) {
-            std::cerr << "  direct-ES emission failed (preprocessing or missing #version 450) "
-                      << "for " << info.name << " [vert=" << vi << " frag=" << fi << "]\n";
-            report.errorCount++;
-            diagnostics->recordProfileError(backend);
-            continue;
-          }
-          auto vertLeak = FindDirectFormLeak(dv, true);
-          auto fragLeak = FindDirectFormLeak(df, true);
-          const DirectFormLeak* leak = vertLeak.reason != nullptr ? &vertLeak : &fragLeak;
-          if (leak->reason != nullptr) {
-            std::cerr << "  direct-ES form assertion failed (" << leak->reason << ") for "
-                      << info.name << " [vert=" << vi << " frag=" << fi << "]\n";
-            report.errorCount++;
-            diagnostics->recordProfileError(backend);
-            continue;
-          }
-          vertBlob.assign(dv.begin(), dv.end());
-          fragBlob.assign(df.begin(), df.end());
-        }
-      } else {
+      EmitInput input;
+      input.info = &info;
+      input.vertIndex = vi;
+      input.fragIndex = fi;
+      input.vertSource = &vertSource;
+      input.fragSource = &fragSource;
+      input.vertDefines = &vertDefines;
+      input.fragDefines = &fragDefines;
+      input.vertSpirv = vertSpirv;
+      input.fragStage = &fragResult;
+      auto stages = emitterEntry.second->emit(input, compiler);
+      if (!stages) {
+        // The emitter printed why; this is the single place the failure is counted.
+        report.errorCount++;
+        diagnostics->recordProfileError(backend);
         continue;
       }
-
       VariantData variant;
       variant.shaderName = info.name;
       variant.vertPermutationIndex = vi;
       variant.fragPermutationIndex = fi;
       variant.profileTag = backend;
-      variant.vertexBlob = std::move(vertBlob);
-      variant.fragmentBlob = std::move(fragBlob);
+      variant.vertexBlob = std::move(stages->vertexBlob);
+      variant.fragmentBlob = std::move(stages->fragmentBlob);
       variant.vertexReflection = reflection.vertexReflection;
       variant.fragmentReflection = reflection.fragmentReflection;
       outVariants->push_back(std::move(variant));

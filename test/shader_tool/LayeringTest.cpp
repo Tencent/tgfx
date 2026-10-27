@@ -443,6 +443,21 @@ TEST(LayeringTest, TheStageCompilerDependsOnlyOnTheCompilePrimitives) {
   }
 }
 
+TEST(LayeringTest, TheProfileEmittersDependOnlyOnTheirDialectAndTheCompiler) {
+  // An emitter consumes a compiled variant and produces storage: its dependencies stop at the
+  // compile layer and the two dialect helpers of the emit layer — anything else and a backend's
+  // translation has grown a dependency of its own.
+  auto graph = ToolModuleGraph();
+  ASSERT_EQ(graph.count("ProfileEmitter"), 1u);
+  const std::set<std::string> allowed = {"ShaderCompiler", "StageCompiler", "FormCheck",
+                                         "GLSLDialect"};
+  for (const auto& dependency : graph["ProfileEmitter"]) {
+    EXPECT_EQ(allowed.count(dependency), 1u)
+        << "ProfileEmitter depends on " << dependency
+        << ", which is not the compile layer or a dialect helper";
+  }
+}
+
 TEST(LayeringTest, TheCycleFinderFindsACycle) {
   // The cycle test passes on a healthy graph, so the finder itself needs a case where it must fail.
   std::map<std::string, std::set<std::string>> graph = {{"a", {"b"}}, {"b", {"c"}}, {"c", {"a"}}};
