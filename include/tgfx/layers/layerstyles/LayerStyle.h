@@ -65,11 +65,9 @@ enum class LayerStyleContentSource {
    */
   All,
   /**
-   * The layer's geometry: the outlines of all of its own painters, including painters with
-   * alpha=0, plus the bare geometries no painter captures. Descendants never contribute, so a style
-   * keeps covering a layer whose painting is invisible. When the layer has no geometry the style
-   * falls back to the shared subtree contour, so a layer whose geometry lives in child layers still
-   * has coverage.
+   * The layer's geometry: the outlines of all of its own painters, including the ones with alpha=0
+   * and the bare geometries no painter captured; descendants never contribute. A layer that records
+   * no geometry falls back to the shared subtree contour, so coverage still has a source.
    */
   Geometry
 };

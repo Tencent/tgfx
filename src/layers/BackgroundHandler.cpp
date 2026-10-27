@@ -267,11 +267,9 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (group == nullptr) {
     return;
   }
-  // The recording the consumer samples: a style that draws from the layer's geometry takes that
-  // recording, every other style the shared content. A style that resolves to nothing to draw is
-  // skipped by BOTH sides, so capture and consume keep the same push/pop count. A resolved source
-  // always carries an image (a source is only built from a successful recording), so only its
-  // absence is left to test here.
+  // Capture resolves the recording the consumer will sample from the same inputs, so a style that
+  // resolves to nothing is skipped by both sides and the push/pop counts stay aligned. A resolved
+  // source always carries an image, so only its absence is left to test here.
   auto contentSource = ResolveContentSource(*group, style);
   if (contentSource == nullptr) {
     return;
@@ -400,12 +398,9 @@ const LayerStyleSource* BackgroundCapturer::cacheLayerStyleSource(
   if (source == nullptr) {
     return nullptr;
   }
-  // Wrap each picture-backed image as Rasterized so the first draw uploads a GPU texture and the
-  // second reuses it; makeRasterized() is a no-op on an already-rasterized image, so content and
-  // contour need no dedupe. The geometry does: it is recorded once and shared by both buckets,
-  // and wrapping it per bucket would give one recording two GPU caches. Dedupe by the image
-  // underneath. Every recording is then replaced by a source wrapping its rasterized image, so no
-  // consumer keeps sampling a picture-backed original.
+  // Rasterize so the first draw uploads a GPU texture and the second reuses it. makeRasterized() is
+  // idempotent, so content and contour need no dedupe, geometry does: it is shared by both buckets,
+  // and wrapping it twice would give one recording two GPU caches.
   std::shared_ptr<Image> geometryRecording = nullptr;
   std::shared_ptr<Image> geometryRasterized = nullptr;
   for (auto& group : source->groups) {

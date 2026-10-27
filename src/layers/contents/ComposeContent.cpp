@@ -68,11 +68,9 @@ bool ComposeContent::hitTestPoint(float localX, float localY, bool includeUnpain
 
 void ComposeContent::drawContourInternal(Canvas* canvas, bool antiAlias,
                                          bool includeUnpaintedGeometry) const {
-  // This container is the only entry that sees the whole outline table, so it forwards the recording
-  // to the selected contour entries when a subset was chosen, and otherwise to every content it
-  // holds. The selection depends on the caliber: a group is painted or bare as a whole, so the
-  // caliber that excludes bare geometries selects nothing for a bare group and draws nothing there,
-  // instead of falling back to the entries.
+  // The only entry that sees the whole outline table, so it forwards to the selected entries when a
+  // subset was chosen and otherwise to every content. A caliber that excludes bare geometry selects
+  // nothing for a bare group, so nothing is drawn there rather than falling back to the entries.
   if (auto table = selectedContours(includeUnpaintedGeometry)) {
     for (const auto geometry : *table) {
       geometry->drawContour(canvas, antiAlias, includeUnpaintedGeometry);

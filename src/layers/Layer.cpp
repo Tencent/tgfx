@@ -1839,14 +1839,9 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   auto source = std::make_unique<LayerStyleSource>();
   source->contentScale = contentScale;
 
-  // A layer that carries a style drawing from its geometry may drop a single unusable bucket:
-  // such a bucket can still be driven by the geometry even when the shared content is empty, so
-  // losing one bucket must not cancel the other. The relaxation is per layer rather than per bucket,
-  // so a failed bucket no longer suppresses the styles of the other bucket either -- they draw where
-  // the previous fail-closed contract left them undrawn. bucketUsable is not a monotone failure
-  // flag, but the only step that revives it sits in the geometry branch below, so a layer
-  // without such a style keeps the fail-closed contract: one unusable bucket makes the whole source
-  // unusable.
+  // A layer with a geometry style may drop one unusable bucket without cancelling the other; the
+  // relaxation is per layer, not per bucket. bucketUsable is no monotone failure flag, but only the
+  // geometry branch below revives it, so a layer without such a style stays fail-closed.
   const bool layerUsesGeometry = needsGeometry();
 
   DrawArgs drawArgs = args;
@@ -1919,10 +1914,9 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
         group->geometry = geometrySource;
         bucketUsable = true;
       } else if (group->contour == nullptr) {
-        // Lazy fallback: a layer whose geometry lives in children records no geometry, so the
-        // style falls back to the shared subtree contour, which keeps descendants' alpha-0 painters.
-        // A failed recording only skips this style; a failed content recording drops its siblings.
-        // This recording reads drawArgs.excludeEffects, so it must stay inside the loop.
+        // A layer whose geometry lives in children records none, so fall back to the contour, which
+        // keeps descendants' alpha=0 painters, and a failed recording only skips this style. This
+        // recording reads drawArgs.excludeEffects, so it must stay inside the loop.
         std::shared_ptr<Image> image = nullptr;
         Point offset = {};
         image = getContentContourImage(drawArgs, contentScale, &offset, nullptr);
@@ -2165,10 +2159,9 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
       contentBounds = new Rect();
     }
     if (content) {
-      // Geometry no paint captured is part of the bounds while a style draws from it, which is the
-      // same question computeBounds() asks: only such a style has anything to cover there. The one
-      // exception is computeBounds()'s excludeEffects, where the bounds are mapped against the
-      // content bounds and the bare geometry stays out; this path always keeps it.
+      // Geometry no paint captured is part of the bounds only while a style draws from it, which is
+      // the question computeBounds() asks too, yet computeBounds()'s excludeEffects path drops it
+      // while this path always keeps it.
       *contentBounds = content->getBounds(hasGeometry);
     } else {
       contentBounds->setEmpty();

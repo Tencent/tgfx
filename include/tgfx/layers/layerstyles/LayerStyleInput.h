@@ -101,10 +101,9 @@ class StyleInputSource {
 class GeometryInputSource : public StyleInputSource {
  public:
   /**
-   * Creates a geometry source, which is only ever the primary content.
-   * @param image The rasterized geometry.
+   * @param image The rasterized geometry; geometry is only ever the primary content.
    * @param imageOffset Its top-left corner in layer-local coordinates times contentScale.
-   * @param shape The vector shape of the same recording, or an empty shape when it has none.
+   * @param shape The vector shape of the same recording, or empty when it has none.
    */
   GeometryInputSource(std::shared_ptr<Image> image, Point imageOffset,
                       std::optional<StyledShape> shape)
@@ -128,11 +127,9 @@ class GeometryInputSource : public StyleInputSource {
 class ContourInputSource : public StyleInputSource {
  public:
   /**
-   * Creates a contour source.
    * @param image The rasterized contour image.
-   * @param imageOffset The contour image's top-left corner, in the frame its role implies. See
-   *                    imageOffset().
-   * @param contentShape The content shape the spread fallback of this contour was derived from.
+   * @param imageOffset The contour image's top-left corner; see imageOffset() for its frame.
+   * @param contentShape The content shape this contour's spread fallback was derived from.
    */
   ContourInputSource(std::shared_ptr<Image> image, Point imageOffset,
                      std::optional<StyledShape> contentShape = std::nullopt)
@@ -154,11 +151,9 @@ class ContourInputSource : public StyleInputSource {
  */
 struct LayerStyleInput {
   /**
-   * The recording this style resolves: the layer's geometry for a style declaring
-   * LayerStyleContentSource::Geometry, the shared contour when such a layer records no geometry,
-   * and the shared content for every other style. type() says which one was actually recorded;
-   * shape() is set only when that recording has an exact vector expression. nullptr means the
-   * style has nothing to draw and must be skipped.
+   * The recording this style resolves: the layer's geometry, the shared contour standing in for a
+   * missing geometry, or the shared content. type() reports which one was recorded and shape() is
+   * set only for an exact vector outline. nullptr means nothing to draw, so skip the style.
    */
   std::shared_ptr<StyleInputSource> content = nullptr;
 

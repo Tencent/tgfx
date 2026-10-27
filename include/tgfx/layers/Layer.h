@@ -698,11 +698,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<Image> getContentContourImage(const DrawArgs& args, float contentScale,
                                                 Point* offset, bool* contourMatchesContent);
 
-  // Records the layer's geometry: the contour of its own content, which keeps both the
-  // geometries no paint captured and the painters with alpha=0. Used as the content of styles that
-  // must cover the layer's geometry rather than its rendered content. offset receives the raster's
-  // top-left corner and shape the outline of that same recording, read back from it so both
-  // describe one recording.
+  // Records the layer's geometry, not what it paints: the contour keeps the geometries no paint
+  // captured and the painters with alpha=0. offset and shape describe that one recording, shape
+  // being its outline read back from it.
   std::shared_ptr<Image> getGeometryImage(const DrawArgs& args, float contentScale, Point& offset,
                                           std::optional<StyledShape>& shape);
 

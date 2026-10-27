@@ -371,10 +371,9 @@ void LayerRecorder::flushPending(PendingType newType, const LayerPaint& newPaint
   pendingHasPaint = newHasPaint;
 }
 
-// The contour of one group of entries sharing a geometry needs one representative draw: they all
-// cover the same outline. Image shaders are the exception -- each of them covers a different part of
-// the geometry, so all of them are kept. Entries no paint captured stand for the geometry only when
-// the query includes them, which is what keeps them out of the shared contour.
+// Entries sharing a geometry need one representative draw as they all cover the same outline.
+// Image shaders are the exception: each covers a different part, so all of them are kept. A bare
+// entry stands for the geometry only when the query includes it, which keeps it out of the contour.
 static std::vector<GeometryContent*> SelectContourRepresentatives(
     const std::vector<GeometryContent*>& group, bool includeUnpaintedGeometry) {
   std::vector<GeometryContent*> candidates = {};
@@ -425,10 +424,9 @@ std::unique_ptr<LayerContent> LayerRecorder::finishRecording() {
     }
   }
 
-  // Phase 2: Collect contours from groups, one selection per caliber. A group never mixes the two
-  // kinds -- hasSameGeometry() keeps a painted entry away from a bare one -- so it is painted or
-  // bare as a whole, and the painted caliber selects nothing for a bare one. A table that selects
-  // nothing must stay distinguishable from no table: hasContourTable is what tells them apart.
+  // Phase 2: one contour selection per group and caliber. A group is painted or bare as a whole
+  // (hasSameGeometry() keeps a painted entry away from a bare one), so the painted caliber selects
+  // nothing for a bare group, and hasContourTable keeps that apart from having no table at all.
   bool hasContourTable = false;
   std::vector<std::vector<GeometryContent*>> selections = {};
   std::vector<std::vector<GeometryContent*>> paintedSelections = {};

@@ -35,19 +35,17 @@
 namespace tgfx {
 
 /**
- * Holds the recordings one excludeChildEffects bucket resolves its styles from. content is null
- * unless some style in the bucket draws from the shared content; contour is null unless a
- * Contour-sourced style needs a distinct contour, or it holds the lazy fallback for a bucket whose
- * geometry is empty. Each source is built once, so a style allocates nothing per frame.
+ * Holds the recordings one excludeChildEffects bucket resolves its styles from. Each is built once,
+ * so a style allocates nothing per frame. content is null unless some style in the bucket draws
+ * from it, contour unless a Contour style needs one or a geometry-less bucket falls back.
  */
 struct LayerStyleSourceGroup {
   // The shared content of this bucket, as the source a style resolves.
   std::shared_ptr<StyleInputSource> content = nullptr;
 
-  // The layer's geometry, as defined by LayerStyleContentSource::Geometry. Recorded once per layer
-  // and shared by both buckets, because the recording never reads excludeEffects. Carries the shape
-  // read back from that same recording; only this one does, as a content or contour raster has no
-  // exact outline to describe.
+  // The layer's geometry (LayerStyleContentSource::Geometry), null unless a style needs it. It is
+  // recorded once per layer and shared by both buckets, because that recording never reads
+  // excludeEffects. Only this source carries a shape, read back from that same recording.
   std::shared_ptr<StyleInputSource> geometry = nullptr;
 
   // The subtree contour standing in for a missing geometry; carries no shape, because it is this
