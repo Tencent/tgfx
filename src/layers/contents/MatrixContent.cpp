@@ -65,8 +65,8 @@ void MatrixContent::drawContourInternal(Canvas* canvas, bool antiAlias,
   content->drawContour(canvas, antiAlias, includeUnpaintedGeometry);
 }
 
-bool MatrixContent::contourEqualsOpaqueContent() const {
-  return content->contourEqualsOpaqueContent();
+bool MatrixContent::contourEqualsOpaqueContent(bool includeUnpaintedGeometry) const {
+  return content->contourEqualsOpaqueContent(includeUnpaintedGeometry);
 }
 
 bool MatrixContent::hasBlendMode() const {

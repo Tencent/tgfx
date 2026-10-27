@@ -449,7 +449,7 @@ void Layer::setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value
       std::equal(_layerStyles.begin(), _layerStyles.end(), value.begin())) {
     return;
   }
-  auto hadGeometryContent = hasGeometryContentStyle();
+  auto hadGeometryContent = needsGeometry();
   for (const auto& layerStyle : _layerStyles) {
     DEBUG_ASSERT(layerStyle != nullptr);
     layerStyle->detachFromLayer(this);
@@ -462,7 +462,7 @@ void Layer::setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value
     layerStyle->attachToLayer(this);
     _layerStyles.push_back(layerStyle);
   }
-  if (hadGeometryContent != hasGeometryContentStyle()) {
+  if (hadGeometryContent != needsGeometry()) {
     // The geometry joins the layer bounds only while a style declares it, and neither
     // invalidateSubtree() nor invalidateTransform() drops contentBounds, so rebuild it here.
     invalidateContent();
@@ -735,7 +735,7 @@ Rect Layer::computeBounds(const Matrix3D& coordinateMatrix, bool computeTightBou
     // A geometry no paint captured paints nothing: it stays in the content as an unpainted entry,
     // but only a style drawing from that geometry needs it in the bounds, and only when
     // excludeEffects is false (the content-bounds query leaves it out).
-    const bool includeUnpaintedGeometry = !excludeEffects && hasGeometryContentStyle();
+    const bool includeUnpaintedGeometry = !excludeEffects && needsGeometry();
     auto contentBounds = content->getBounds(includeUnpaintedGeometry);
     bool behindCamera =
         !isAffine && Matrix3DUtils::IsRectBehindCamera(contentBounds, coordinateMatrix);
@@ -1710,7 +1710,8 @@ bool Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, bool conte
   // Draw content's contour
   auto content = getContent();
   if (content) {
-    if (!content->contourEqualsOpaqueContent()) {
+    // The answer is only valid for the contour drawn right below, so the two share one query.
+    if (!content->contourEqualsOpaqueContent(false)) {
       allMatch = false;
     }
     content->drawContour(canvas, bitFields.allowsEdgeAntialiasing, false);
@@ -1820,12 +1821,12 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   // layer's geometry, and whether any style needs a content shape.
   bool needContent[2] = {false, false};
   bool needContour[2] = {false, false};
-  bool needGeometry[2] = {false, false};
+  bool needsGeometry[2] = {false, false};
   bool needsContentShape = false;
   for (const auto& layerStyle : _layerStyles) {
     auto index = static_cast<int>(layerStyle->excludeChildEffects());
     if (NeedsGeometry(layerStyle.get())) {
-      needGeometry[index] = true;
+      needsGeometry[index] = true;
     } else {
       // Only a style drawing from the shared content needs it recorded: a Geometry-sourced style
       // reads the geometry instead, so recording content for it would rasterize the subtree for
@@ -1850,7 +1851,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   // flag, but the only step that revives it sits in the geometry branch below, so a layer
   // without such a style keeps the fail-closed contract: one unusable bucket makes the whole source
   // unusable.
-  const bool layerUsesGeometry = needGeometry[0] || needGeometry[1];
+  const bool layerUsesGeometry = needsGeometry[0] || needsGeometry[1];
 
   DrawArgs drawArgs = args;
   drawArgs.render3DContext = nullptr;
@@ -1864,14 +1865,13 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   // either. Keep it that way: making getGeometryImage() depend on the bucket would silently
   // change what both buckets get, not just the one that changed.
   LayerStyleSourceEntry geometryEntry = {};
-  std::optional<StyledShape> geometryShape = std::nullopt;
   if (layerUsesGeometry) {
     geometryEntry.image =
-        getGeometryImage(drawArgs, contentScale, &geometryEntry.offset, &geometryShape);
+        getGeometryImage(drawArgs, contentScale, &geometryEntry.offset, &geometryEntry.shape);
   }
 
   for (int i = 0; i < 2; i++) {
-    if (!needContent[i] && !needContour[i] && !needGeometry[i]) {
+    if (!needContent[i] && !needContour[i] && !needsGeometry[i]) {
       continue;
     }
     drawArgs.excludeEffects = static_cast<bool>(i);
@@ -1907,7 +1907,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
       }
     }
 
-    if (needGeometry[i]) {
+    if (needsGeometry[i]) {
       // A style that draws from the geometry always consumes it rather than the shared content:
       // the shared content drops painters with alpha=0 and knows nothing about geometry no painter
       // captured, so a layer whose painters are all alpha=0, or whose geometries no painter
@@ -1915,9 +1915,9 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
       // coverage independent of any visible descendant.
       if (geometryEntry.image != nullptr) {
         // Consume the recording hoisted above: copying the entry shares the image by reference
-        // count, so the pixels are neither re-recorded nor duplicated.
+        // count, so the pixels are neither re-recorded nor duplicated. The entry carries the shape
+        // read back from that same recording, so the copy hands it to both buckets too.
         group->geometry = geometryEntry;
-        group->geometryShape = geometryShape;
         bucketUsable = true;
       } else if (!group->contour.has_value()) {
         // Lazy fallback: a layer whose geometry lives in its children records no geometry, so
@@ -2164,7 +2164,7 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
   auto content = getContent();
   // A transform-only change never sets dirtyContentBounds, so a layer whose bounds come from its
   // geometry rather than from its content has to enter the recompute through this gate as well.
-  const bool hasGeometry = hasGeometryContentStyle();
+  const bool hasGeometry = needsGeometry();
   if (bitFields.dirtyContentBounds || (forceDirty && (content != nullptr || hasGeometry))) {
     if (contentBounds) {
       _root->invalidateRect(*contentBounds);
@@ -2404,7 +2404,7 @@ std::optional<StyledShape> Layer::getContentShape() {
   return onGetContentShape();
 }
 
-bool Layer::hasGeometryContentStyle() const {
+bool Layer::needsGeometry() const {
   for (const auto& style : _layerStyles) {
     DEBUG_ASSERT(style != nullptr);
     if (NeedsGeometry(style.get())) {

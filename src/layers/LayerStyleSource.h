@@ -43,6 +43,10 @@ namespace tgfx {
 struct LayerStyleSourceEntry {
   std::shared_ptr<Image> image = nullptr;
   Point offset = {};
+
+  // Shape of the same recording, matching image the way contentShape matches content. Only the
+  // geometry recording fills it: a content or contour raster has no exact outline to describe.
+  std::optional<StyledShape> shape = std::nullopt;
 };
 
 /**
@@ -65,11 +69,6 @@ struct LayerStyleSourceGroup {
   // The layer's geometry, as defined by LayerStyleContentSource::Geometry. Recorded once per
   // layer and shared by both buckets, because the recording never reads excludeEffects.
   std::optional<LayerStyleSourceEntry> geometry = std::nullopt;
-
-  // Shape of the same geometry, matching geometry the way contentShape matches content. This
-  // is only the input of RefreshTypedSources(): the copy a style receives travels inside the
-  // GeometryInputSource built from it, and nothing reads this field after that.
-  std::optional<StyledShape> geometryShape = std::nullopt;
 
   // The geometry as a typed source, shared with the other bucket.
   std::shared_ptr<StyleInputSource> geometrySource = nullptr;
@@ -157,7 +156,7 @@ inline void RefreshTypedSources(LayerStyleSource& source) {
     }
     if (group->geometry.has_value() && group->geometry->image != nullptr) {
       geometrySource = std::make_shared<GeometryInputSource>(
-          group->geometry->image, group->geometry->offset, group->geometryShape);
+          group->geometry->image, group->geometry->offset, group->geometry->shape);
       break;
     }
   }

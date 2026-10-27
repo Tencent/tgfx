@@ -4228,7 +4228,7 @@ TGFX_TEST_PRIVATE(LayerTest, GlassStyleDeclaresGeometryContentSource) {
                       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
                       ASSERT_TRUE(source->groups[0]->geometry.has_value());
                       EXPECT_TRUE(source->groups[0]->geometry->image != nullptr);
-                      EXPECT_TRUE(source->groups[0]->geometryShape.has_value())
+                      EXPECT_TRUE(source->groups[0]->geometry->shape.has_value())
                       << "a layered rect has an exact geometry shape, so Glass takes the SDF "
                          "path";
                       EXPECT_FALSE(source->groups[0]->contour.has_value());
@@ -4289,8 +4289,8 @@ TGFX_TEST_PRIVATE(LayerTest, LayerStyleGeometryRecordedOnceForBothBuckets) {
       EXPECT_EQ(source->groups[0]->geometry->image, source->groups[1]->geometry->image)
       << "both buckets must share one geometry recording";
       EXPECT_EQ(source->groups[0]->geometry->offset, source->groups[1]->geometry->offset);
-      EXPECT_TRUE(source->groups[0]->geometryShape.has_value());
-      EXPECT_TRUE(source->groups[1]->geometryShape.has_value());)
+      EXPECT_TRUE(source->groups[0]->geometry->shape.has_value());
+      EXPECT_TRUE(source->groups[1]->geometry->shape.has_value());)
 }
 
 // The contrast that keeps the hoisting honest: a layer whose geometry lives in its children records
@@ -4835,7 +4835,7 @@ TGFX_TEST_PRIVATE(LayerTest, GlassGeometryGivesCoverageWithoutAnyFill) {
       << "bare geometry must not be recorded in the shared content image";
       ASSERT_TRUE(markedSource->groups[0]->geometry.has_value());
       EXPECT_TRUE(markedSource->groups[0]->geometry->image != nullptr);
-      EXPECT_TRUE(markedSource->groups[0]->geometryShape.has_value())
+      EXPECT_TRUE(markedSource->groups[0]->geometry->shape.has_value())
       << "a single bare geometry is the whole geometry, so Glass gets an exact shape";)
 
   // Donut arm: a second region with a hole. The coverage follows the union of the two regions, so it
@@ -7328,7 +7328,9 @@ TGFX_TEST_PRIVATE(LayerTest, GeometryShapeIsOnlyGivenToGeometrySourceStyles) {
   TGFX_PRIVATE_ACCESS(
       DrawArgs drawArgs(context); auto source = parent->getLayerStyleSource(drawArgs, Matrix::I());
       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[0] != nullptr);
-      ASSERT_TRUE(source->groups[0]->geometryShape.has_value())
+      ASSERT_TRUE(source->groups[0]->geometry.has_value())
+      << "control: the group has to carry the geometry, or the gating below proves nothing";
+      ASSERT_TRUE(source->groups[0]->geometry->shape.has_value())
       << "control: the group has to carry the geometry shape, or the gating below proves nothing";)
 
   EXPECT_TRUE(geometryStyle->drawn);
@@ -7582,7 +7584,7 @@ TGFX_TEST_PRIVATE(LayerTest, GeometryShapeIsDroppedWhenPaintersCoexist) {
       DrawArgs drawArgs(context); auto source = both->getLayerStyleSource(drawArgs, Matrix::I());
       ASSERT_TRUE(source != nullptr); ASSERT_TRUE(source->groups[1] != nullptr);
       ASSERT_TRUE(source->groups[1]->geometry.has_value());
-      EXPECT_FALSE(source->groups[1]->geometryShape.has_value())
+      EXPECT_FALSE(source->groups[1]->geometry->shape.has_value())
       << "a painter and a bare geometry together have no single exact outline, so the style must "
          "take the alpha-mask path instead of an SDF that would cover less than the raster";)
 
@@ -7600,7 +7602,8 @@ TGFX_TEST_PRIVATE(LayerTest, GeometryShapeIsDroppedWhenPaintersCoexist) {
   TGFX_PRIVATE_ACCESS(DrawArgs bareArgs(context);
                       auto bareSource = bareOnly->getLayerStyleSource(bareArgs, Matrix::I());
                       ASSERT_TRUE(bareSource != nullptr && bareSource->groups[1] != nullptr);
-                      EXPECT_TRUE(bareSource->groups[1]->geometryShape.has_value());)
+                      ASSERT_TRUE(bareSource->groups[1]->geometry.has_value());
+                      EXPECT_TRUE(bareSource->groups[1]->geometry->shape.has_value());)
 }
 
 // ===== The geometry shape comes out of the geometry recording =====
@@ -7628,7 +7631,7 @@ static GeometryProbe ProbeGeometry(Context* context, const std::shared_ptr<Layer
                                                     : source->groups) {
         if (group != nullptr && group->geometry.has_value()) {
           probe.hasImage = group->geometry->image != nullptr;
-          probe.shape = group->geometryShape;
+          probe.shape = group->geometry->shape;
         }
       })
   return probe;
@@ -8080,7 +8083,7 @@ TGFX_TEST_PRIVATE(LayerTest, GeometryIncludesTextGeometry) {
       ASSERT_TRUE(source->groups[1]->geometry.has_value())
       << "text without a painter is still the layer's geometry";
       EXPECT_TRUE(source->groups[1]->geometry->image != nullptr);
-      EXPECT_TRUE(source->groups[1]->geometryShape.has_value())
+      EXPECT_TRUE(source->groups[1]->geometry->shape.has_value())
       << "the glyph outlines fit a single StyledShape, so Glass takes the SDF path";)
 
   // The coverage is the glyph shapes: something is covered, and it is not the whole probe surface.
@@ -8586,7 +8589,9 @@ TGFX_TEST_PRIVATE(LayerTest, ContourRepresentativeFollowsCaliber) {
         << "the caliber that includes bare geometry keeps one representative for the outline";
         EXPECT_TRUE(compose->paintedContours.empty())
         << "the caliber that excludes it selects nothing, and an empty selection must stay "
-           "distinguishable from having no table at all";)
+           "distinguishable from having no table at all";
+        EXPECT_FALSE(compose->contourEqualsOpaqueContent(true))
+        << "a bare entry is covered by the contour only when the query includes it";)
     auto paintedCaliber = RasterizeContentContourAlpha(context, layer, false);
     auto allCaliber = RasterizeContentContourAlpha(context, layer, true);
     EXPECT_EQ(RasterAlphaAt(allCaliber, GeometryProbeSize, 100, 100), 255)

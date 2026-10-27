@@ -92,11 +92,11 @@ void DrawContent::drawContourInternal(Canvas* canvas, bool antiAlias,
   onDraw(canvas, paint);
 }
 
-bool DrawContent::contourEqualsOpaqueContent() const {
-  // A geometry no paint captured is drawn by neither the shared contour nor the content query, so
-  // the two agree on it. A bare geometry must not make them differ.
+bool DrawContent::contourEqualsOpaqueContent(bool includeUnpaintedGeometry) const {
+  // A bare entry is covered by the contour with an opaque white fill only when the query includes
+  // it, while the content never draws it, so the two agree on it only when it is excluded.
   if (!painted) {
-    return true;
+    return !includeUnpaintedGeometry;
   }
   if (color.alpha <= 0) {
     return false;

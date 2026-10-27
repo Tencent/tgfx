@@ -35,7 +35,7 @@ class MatrixContent : public GeometryContent {
   bool hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const override;
   bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
   void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
-  bool contourEqualsOpaqueContent() const override;
+  bool contourEqualsOpaqueContent(bool includeUnpaintedGeometry) const override;
   bool hasBlendMode() const override;
   bool hasPaint() const override;
   bool hasPaintedContent() const override;

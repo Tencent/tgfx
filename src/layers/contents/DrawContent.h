@@ -41,7 +41,7 @@ class DrawContent : public GeometryContent {
   Rect getBounds(bool includeUnpaintedGeometry) const override;
   Rect getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const override = 0;
   bool hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const override = 0;
-  bool contourEqualsOpaqueContent() const override;
+  bool contourEqualsOpaqueContent(bool includeUnpaintedGeometry) const override;
   bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
   void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
   const std::shared_ptr<Shader>& getShader() const override;

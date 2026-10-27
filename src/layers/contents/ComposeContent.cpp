@@ -93,9 +93,9 @@ bool ComposeContent::hasPaintedContent() const {
   return false;
 }
 
-bool ComposeContent::contourEqualsOpaqueContent() const {
+bool ComposeContent::contourEqualsOpaqueContent(bool includeUnpaintedGeometry) const {
   for (const auto& content : contents) {
-    if (!content->contourEqualsOpaqueContent()) {
+    if (!content->contourEqualsOpaqueContent(includeUnpaintedGeometry)) {
       return false;
     }
   }
