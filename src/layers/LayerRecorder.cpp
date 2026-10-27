@@ -444,7 +444,9 @@ std::unique_ptr<LayerContent> LayerRecorder::finishRecording() {
     bool paintedDiffers = false;
     for (size_t i = 0; i < groups.size(); i++) {
       contours.insert(contours.end(), selections[i].begin(), selections[i].end());
-      if (selections[i].size() != paintedSelections[i].size()) {
+      // Compared by content rather than by size: two selections of the same size may still hold
+      // different entries, and the painted caliber must not reuse the table in that case.
+      if (selections[i] != paintedSelections[i]) {
         paintedDiffers = true;
       }
     }

@@ -7596,16 +7596,17 @@ TGFX_TEST_PRIVATE(LayerTest, LayerStyleSourceSwapSharesOneRasterizedGeometry) {
       << "control: both buckets start from the one geometry recording";
       BackgroundSnapshotMap snapshots = {}; BackgroundCapturer capturer(&snapshots, nullptr);
       auto* cached = capturer.cacheLayerStyleSource(panel.get(), std::move(source));
-      ASSERT_TRUE(cached != nullptr);
+      ASSERT_TRUE(cached != nullptr); ASSERT_TRUE(cached->groups[0] != nullptr);
+      ASSERT_TRUE(cached->groups[1] != nullptr);
+      ASSERT_TRUE(cached->groups[0]->geometry != nullptr);
+      ASSERT_TRUE(cached->groups[1]->geometry != nullptr);
       EXPECT_TRUE(cached->groups[0]->geometry->image() == cached->groups[1]->geometry->image())
       << "wrapping the shared recording per bucket would give one picture two "
          "wrappers";
-      ASSERT_TRUE(cached->groups[0]->geometry != nullptr);
       EXPECT_TRUE(cached->groups[0]->geometry->image() != recording)
       << "the cached source must wrap the rasterized image, not the picture";
       EXPECT_TRUE(cached->groups[0]->geometry->image() == cached->groups[1]->geometry->image())
       << "both buckets must keep sharing the one rasterized recording";
-      ASSERT_TRUE(cached->groups[1]->geometry != nullptr);
       EXPECT_TRUE(cached->groups[1]->geometry->shape().has_value())
       << "the rebuilt sources must keep carrying the shape read back before the swap";)
 }
@@ -8647,6 +8648,66 @@ TGFX_TEST_PRIVATE(LayerTest, ContourRepresentativeFollowsCaliber) {
     EXPECT_EQ(RasterAlphaAt(paintedCaliber, GeometryProbeSize, 100, 100), 0)
         << "an empty selection means nothing is drawn, not that every entry is read";
   }
+}
+
+// The other side of the caliber split: two painted entries sharing one outline select the same
+// representative in both calibers, so the second table must stay unmaterialized. A nullopt read as
+// "no table at all" would send the painted caliber back to reading every entry.
+TGFX_TEST_PRIVATE(LayerTest, ContourRepresentativeSharedWhenCalibersAgree) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  Path triangle = {};
+  triangle.moveTo(60.0f, 60.0f);
+  triangle.lineTo(140.0f, 60.0f);
+  triangle.lineTo(100.0f, 140.0f);
+  triangle.close();
+  auto makeTriangle = [&triangle]() {
+    auto shape = ShapePath::Make();
+    shape->setPath(triangle);
+    return shape;
+  };
+  // Two shapes rather than two rectangles: consecutive rectangles sharing one paint batch into a
+  // single entry, and one entry leaves nothing to collapse into a representative.
+  auto group = VectorGroup::Make();
+  group->setElements(
+      {makeTriangle(), makeTriangle(), FillStyle::Make(SolidColor::Make(Color::White()))});
+  auto layer = VectorLayer::Make();
+  layer->setContents({group});
+  EXPECT_EQ(CountUnpaintedEntries(layer), 0)
+      << "the fill must paint both shapes, or the painted caliber has nothing to select";
+
+  TGFX_PRIVATE_ACCESS(
+      auto content = layer->getContent(); ASSERT_NE(content, nullptr);
+      ASSERT_EQ(content->type(), LayerContent::Type::Compose)
+      << "the two shapes must stay separate entries, or no representative table is built";
+      auto compose = static_cast<const ComposeContent*>(content);
+      ASSERT_EQ(compose->contents.size(), 2u)
+      << "the fixture needs one entry per shape, both painted by the fill";
+      ASSERT_FALSE(compose->contours.empty())
+      << "two painted entries sharing one outline must build a representative table";
+      EXPECT_EQ(compose->contours.size(), 1u);
+      EXPECT_FALSE(compose->paintedContours.has_value())
+      << "both calibers select the same representative, so no second table is needed";
+      // Read through the selection the draw code uses: an unmaterialized painted table has to mean
+      // "the same as contours", not "no table at all", which would send the painted caliber back to
+      // reading every entry.
+      EXPECT_EQ(compose->selectedContours(false), &compose->contours)
+      << "the painted caliber must reuse the first table when both calibers agree";)
+
+  // Pixel control for the shared table: it must cover the outline in both calibers and nothing
+  // outside it. Two opaque draws over one outline are indistinguishable here, so the single draw is
+  // pinned by the table assertions above, not by these pixels.
+  auto paintedCaliber = RasterizeContentContourAlpha(context, layer, false);
+  auto allCaliber = RasterizeContentContourAlpha(context, layer, true);
+  EXPECT_EQ(RasterAlphaAt(paintedCaliber, GeometryProbeSize, 100, 100), 255)
+      << "the shared representative still draws the outline for the painted caliber";
+  EXPECT_EQ(RasterAlphaAt(allCaliber, GeometryProbeSize, 100, 100), 255)
+      << "and for the caliber that includes bare geometry";
+  EXPECT_EQ(RasterAlphaAt(paintedCaliber, GeometryProbeSize, 20, 20), 0)
+      << "the shared representative must not grow beyond the outline";
+  EXPECT_EQ(RasterAlphaAt(allCaliber, GeometryProbeSize, 20, 20), 0);
 }
 
 TGFX_TEST_PRIVATE(LayerTest, PaintlessEntryNotHitTestable) {
