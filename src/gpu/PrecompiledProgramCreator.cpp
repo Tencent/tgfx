@@ -463,7 +463,10 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
       // to its physical slot where the shader declares it, and park the unread attributes on spare
       // locations past the declared range. A subset whose locations follow the dense convention
       // cannot be mapped this way, so it stays an interface error rather than binding wrongly.
-      uint32_t spareLocation = instanceBase;
+      // The parked slots start after the instance slots: a shader that declares no vertex coverage
+      // (ShapeInstancedTextureCoverageShader) would otherwise park the unread vertex attributes on
+      // the very locations its instance attributes use.
+      uint32_t spareLocation = instanceBase + static_cast<uint32_t>(instanceAttributes.size());
       for (auto location : attributeLocations) {
         bool read = std::any_of(
             vertexInputs.begin(), vertexInputs.end(),
