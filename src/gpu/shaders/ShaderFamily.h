@@ -56,6 +56,13 @@ template <typename T>
 struct FamilyHasBindingFor<T, std::void_t<decltype(T::BindingFor(nullptr, nullptr))>>
     : std::true_type {};
 
+// The XferProcessor counterpart, detected on the same terms.
+template <typename T, typename = void>
+struct FamilyHasXPBindingFor : std::false_type {};
+template <typename T>
+struct FamilyHasXPBindingFor<T, std::void_t<decltype(T::XPBindingFor(nullptr))>> : std::true_type {
+};
+
 template <typename T, typename = void>
 struct FamilyHasAllInputs : std::false_type {};
 template <typename T>

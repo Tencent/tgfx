@@ -84,6 +84,22 @@ class UniformData {
     onSetData(name, data, sizeof(data));
   }
 
+  /**
+   * Like setData(), but tolerates the matrix uniform being absent from this program (see
+   * setDataOptional() for when absence is legitimate).
+   */
+  template <typename T>
+  std::enable_if_t<std::is_same_v<std::decay_t<T>, Matrix>, void> setDataOptional(
+      const std::string& name, const T& matrix) const {
+    float values[9] = {};
+    matrix.get9(values);
+    const float data[] = {
+        values[0], values[3], values[6], 0,         values[1], values[4],
+        values[7], 0,         values[2], values[5], values[8], 0,
+    };
+    onSetData(name, data, sizeof(data), true);
+  }
+
   template <typename T>
   std::enable_if_t<std::is_same_v<std::decay_t<T>, ColorMatrix33>, void> setData(
       const std::string& name, const T& matrix) const {

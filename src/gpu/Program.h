@@ -88,6 +88,18 @@ class Program {
     bindingSelectorValue = selector;
   }
 
+  /**
+   * The XferProcessor selector of the family this program serves: the XP module Bind that takes
+   * over the XP's uniform writes, or null to keep the XP's own setData.
+   */
+  XPBindSelector xpBindingSelector() const {
+    return xpBindingSelectorValue;
+  }
+
+  void setXPBindingSelector(XPBindSelector selector) {
+    xpBindingSelectorValue = selector;
+  }
+
  private:
   BytesKey programKey = {};
   std::list<Program*>::iterator cachedPosition;
@@ -97,6 +109,7 @@ class Program {
   ProgramProvenance provenance = {};
   uint32_t expectedTextureCountValue = 0;
   ModuleBindSelector bindingSelectorValue = nullptr;
+  XPBindSelector xpBindingSelectorValue = nullptr;
 
   friend class GlobalCache;
 };

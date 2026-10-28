@@ -5,6 +5,7 @@
 #pragma once
 #include "gpu/UniformData.h"
 #include "gpu/shaders/modules/ParamHandle.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 
@@ -34,6 +35,12 @@ class ParamWriter {
   void set(const Param<ParamType::Int>& param, int32_t value) {
     if (uniforms != nullptr) {
       uniforms->setDataOptional(param.name, value);
+    }
+  }
+
+  void set(const Param<ParamType::Float3x3>& param, const Matrix& matrix) {
+    if (uniforms != nullptr) {
+      uniforms->setDataOptional(param.name, matrix);
     }
   }
 

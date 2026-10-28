@@ -20,9 +20,13 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
+#include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
+#include "gpu/processors/RectEffect.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/shaders/modules/AnalyticClipModule.h"
 #include "gpu/shaders/modules/ParamWriter.h"
+#include "gpu/shaders/modules/PorterDuffXPModule.h"
 #include "gpu/shaders/modules/TextureSourceModule.h"
 
 namespace tgfx {
@@ -105,6 +109,10 @@ std::optional<QuadTextureFillShader::Inputs> QuadTextureFillShader::Extract(
 
 ModuleBindFn QuadTextureFillShader::BindingFor(const ProgramInfo* programInfo,
                                                const FragmentProcessor* fp) {
+  // The analytic clip (coverage section) feeds the clip module.
+  if (IsProcessor<RectEffect>(fp)) {
+    return &AnalyticClipModule::Bind;
+  }
   // Only the color root, and only non-YUV sources (the YUV fields ride the processor's own
   // writer until their module exists); every other position keeps onSetData.
   if (fp != programInfo->getFragmentProcessor(0) || !IsProcessor<TextureEffect>(fp)) {
@@ -114,6 +122,14 @@ ModuleBindFn QuadTextureFillShader::BindingFor(const ProgramInfo* programInfo,
     return nullptr;
   }
   return &TextureSourceModule::Bind;
+}
+
+XPBindFn QuadTextureFillShader::XPBindingFor(const ProgramInfo* programInfo) {
+  auto* xp = programInfo->getXferProcessor();
+  if (!IsProcessor<PorterDuffXferProcessor>(xp)) {
+    return nullptr;
+  }
+  return &PorterDuffXPModule::Bind;
 }
 
 }  // namespace tgfx

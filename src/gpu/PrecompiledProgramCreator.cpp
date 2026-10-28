@@ -235,6 +235,24 @@ static ModuleBindSelector BindingSelectorFor(const std::string& familyName) {
   return nullptr;
 }
 
+template <typename Family>
+static XPBindSelector XPSelectorOf() {
+  if constexpr (FamilyHasXPBindingFor<Family>::value) {
+    return &Family::XPBindingFor;
+  }
+  return nullptr;
+}
+
+static XPBindSelector XPSelectorFor(const std::string& familyName) {
+#define TGFX_XP_SELECTOR(Family)   \
+  if (familyName == #Family) {     \
+    return XPSelectorOf<Family>(); \
+  }
+  TGFX_FOR_EACH_SHADER_FAMILY(TGFX_XP_SELECTOR)
+#undef TGFX_XP_SELECTOR
+  return nullptr;
+}
+
 std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* context,
                                                                   const ProgramInfo* programInfo,
                                                                   bool* deferredFallback) {
@@ -613,6 +631,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
                                            std::move(fragmentUniformData), provenance);
   program->setExpectedTextureCount(static_cast<uint32_t>(descriptor.layout.textureSamplers.size()));
   program->setBindingSelector(BindingSelectorFor(matchResult->shaderName));
+  program->setXPBindingSelector(XPSelectorFor(matchResult->shaderName));
   return program;
 }
 

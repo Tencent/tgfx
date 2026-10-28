@@ -437,7 +437,13 @@ bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
   }
   const auto processor = getXferProcessor();
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
-  processor->setData(vertexUniformData, fragmentUniformData);
+  auto xpBind =
+      program->xpBindingSelector() != nullptr ? program->xpBindingSelector()(this) : nullptr;
+  if (xpBind != nullptr) {
+    xpBind(processor, &paramWriter);
+  } else {
+    processor->setData(vertexUniformData, fragmentUniformData);
+  }
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, nullptr);
 
   // TGFX_UNIF_DUMP prints the fully-assembled uniform values (after every writer ran) so an A/B

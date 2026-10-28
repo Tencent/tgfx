@@ -37,6 +37,12 @@ class PorterDuffXferProcessor : public XferProcessor {
     return blendMode;
   }
 
+  /** The destination-texture fetch state the precompiled XP uniforms carry (offset into the
+   * shared dst texture); a null proxy means no framebuffer fetch for this draw. */
+  const DstTextureInfo& getDstTextureInfo() const {
+    return dstTextureInfo;
+  }
+
   const TextureView* dstTextureView() const override;
 
   void computeProcessorKey(Context* context, BytesKey* bytesKey) const override;
