@@ -12,6 +12,11 @@ struct DeviceMaskModule {
   static constexpr Param<ParamType::Float3x3> DeviceCoordMatrix{"DeviceCoordMatrix"};
   static constexpr Param<ParamType::Int> HasDeviceMask{"HasDeviceMask"};
   static constexpr Param<ParamType::Float4> DeviceMaskSubset{"DeviceMaskSubset"};
+  // The non-decoy fallbacks: no-op bounds so a bare mask neither clamps nor clips the sample.
+  static constexpr Param<ParamType::Float4> Subset{"Subset"};
+  static constexpr Param<ParamType::Int> AlphaOnly{"AlphaOnly"};
+  static constexpr Param<ParamType::Float4> Rect{"Rect"};
+  static constexpr Param<ParamType::Int> HasClip{"HasClip"};
 
   static void Bind(const FragmentProcessor* processor, ParamWriter* writer);
 };

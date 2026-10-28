@@ -22,10 +22,16 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/processors/ClampedGradientEffect.h"
+#include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/processors/RectEffect.h"
 #include "gpu/processors/ShapeInstancedGeometryProcessor.h"
 #include "gpu/processors/SingleIntervalGradientColorizer.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/shaders/modules/AnalyticClipModule.h"
+#include "gpu/shaders/modules/DeviceMaskModule.h"
+#include "gpu/shaders/modules/ParamWriter.h"
+#include "gpu/shaders/modules/TextureSourceModule.h"
 
 namespace tgfx {
 
@@ -95,6 +101,21 @@ ShapeInstancedTextureCoverageShader::Extract(const ProgramInfo* programInfo) {
     return std::nullopt;
   }
   return Inputs{gradient != 0};
+}
+
+ModuleBindFn ShapeInstancedTextureCoverageShader::BindingFor(const ProgramInfo* /*programInfo*/,
+                                                             const FragmentProcessor* fp) {
+  if (IsProcessor<RectEffect>(fp)) {
+    return &AnalyticClipModule::Bind;
+  }
+  if (IsProcessor<TextureEffect>(fp)) {
+    return &TextureSourceModule::Bind;
+  }
+  if (IsProcessor<DeviceSpaceTextureEffect>(fp)) {
+    return &DeviceMaskModule::Bind;
+  }
+  // The gradient colorizers keep their own writers.
+  return nullptr;
 }
 
 }  // namespace tgfx

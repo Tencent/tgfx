@@ -44,6 +44,12 @@ class ParamWriter {
     }
   }
 
+  /// Whether this program's variant declares the named field. Modules use it to replicate the
+  /// processors' shape-dependent branches (e.g. the device mask's decoy vs fallback writes).
+  bool hasField(const char* name) const {
+    return uniforms != nullptr && uniforms->hasField(name);
+  }
+
  private:
   const UniformData* uniforms = nullptr;
 };

@@ -21,9 +21,11 @@
 #include <optional>
 #include <vector>
 #include "gpu/shaders/ShaderFamily.h"
+#include "gpu/shaders/modules/ParamHandle.h"
 
 namespace tgfx {
 
+class FragmentProcessor;
 class ProgramInfo;
 
 class ShapeInstancedTextureCoverageShader
@@ -55,6 +57,10 @@ class ShapeInstancedTextureCoverageShader
   using FD = FragDims;
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
+
+  /// Resolves a draw's processor to the module Bind that takes over its uniform writes, or
+  /// null to keep the processor's own onSetData.
+  static ModuleBindFn BindingFor(const ProgramInfo* programInfo, const FragmentProcessor* fp);
 
   /// Matcher inputs: the gradient presence ahead of the coverage texture.
   struct Inputs {
