@@ -21,6 +21,8 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/processors/TiledTextureEffect.h"
+#include "gpu/shaders/modules/ParamWriter.h"
+#include "gpu/shaders/modules/TiledSourceModule.h"
 
 namespace tgfx {
 
@@ -58,6 +60,16 @@ std::optional<TiledTextureFillShader::Inputs> TiledTextureFillShader::Extract(
   // ALPHA_ONLY and HAS_STRICT are folded into runtime uniforms (AlphaOnly / Strict), set by
   // GLSLTiledTextureEffect::onSetData; they are no longer compile-time dimensions.
   return Inputs{xpType};
+}
+
+ModuleBindFn TiledTextureFillShader::BindingFor(const ProgramInfo* programInfo,
+                                                const FragmentProcessor* fp) {
+  // The color root is the only processor this kernel's own fields belong to; the XP rides its
+  // separate hook and every other position keeps onSetData.
+  if (fp != programInfo->getFragmentProcessor(0) || !IsProcessor<TiledTextureEffect>(fp)) {
+    return nullptr;
+  }
+  return &TiledSourceModule::Bind;
 }
 
 }  // namespace tgfx

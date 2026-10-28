@@ -69,6 +69,9 @@ class TiledTextureEffect : public FragmentProcessor {
     return coordTransform.matrix.hasPerspective();
   }
 
+  /// The texture view the sampling references; null while the texture is not instantiated yet.
+  const TextureView* getTextureView() const;
+
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:
@@ -93,8 +96,6 @@ class TiledTextureEffect : public FragmentProcessor {
   std::shared_ptr<Texture> onTextureAt(size_t) const override;
 
   SamplerState onSamplerStateAt(size_t) const override;
-
-  const TextureView* getTextureView() const;
 
   // The sampling source for the texture view, or for a pending single-plane upload when the view
   // does not exist yet. Returns false when neither is available.

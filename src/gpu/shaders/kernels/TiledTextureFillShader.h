@@ -21,9 +21,11 @@
 #include <optional>
 #include <vector>
 #include "gpu/shaders/ShaderFamily.h"
+#include "gpu/shaders/modules/ParamHandle.h"
 
 namespace tgfx {
 
+class FragmentProcessor;
 class ProgramInfo;
 
 /// Precompiled shader declaration for TiledTextureEffect. Handles texture sampling with various
@@ -76,6 +78,10 @@ class TiledTextureFillShader : public ShaderFamily<TiledTextureFillShader> {
   using VD = VertDims;
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
+
+  /// Resolves a draw's processor to the module Bind that takes over its uniform writes, or
+  /// null to keep the processor's own onSetData.
+  static ModuleBindFn BindingFor(const ProgramInfo* programInfo, const FragmentProcessor* fp);
 
   /// Matcher inputs: only the XferProcessor kind shapes the variant.
   struct Inputs {
