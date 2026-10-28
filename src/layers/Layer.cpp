@@ -1210,6 +1210,10 @@ std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, bool isCont
   DrawArgs maskArgs = args;
   maskArgs.excludeEffects |= isContourMode;
   maskArgs.backgroundHandler = BackgroundHandler::NoOp();
+  // The mask is always composited in 2D on the current surface. A non-null render3DContext would
+  // make drawChildren stop descending and leave the mask content incomplete. Masks that keep 3D
+  // content start their own context in the maskCanPreserve3D branch below.
+  maskArgs.render3DContext = nullptr;
   auto maskCanPreserve3D = _mask->canPreserve3D();
   // When mask enables 3D context, the full 3D relative matrix is handled by the 3D context.
   // Otherwise, use the 2D projection of the relative matrix on canvas.
@@ -1244,7 +1248,6 @@ std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, bool isCont
 MaskData Layer::getMaskData(const DrawArgs& args, float scale,
                             const std::optional<Rect>& layerClipBounds) {
   DEBUG_ASSERT(_mask != nullptr);
-  DEBUG_ASSERT(args.render3DContext == nullptr);
   auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
   auto isContourMode =
       maskType == LayerMaskType::Contour || maskType == LayerMaskType::ContourInverted;

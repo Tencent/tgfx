@@ -23,11 +23,14 @@
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/Rect.h"
+// Layer must be complete here: LayerDrawFunc is a pointer to a Layer member function, and MSVC
+// lays such a pointer out differently when Layer is incomplete, so addLayer() would disagree
+// across translation units.
+#include "tgfx/layers/Layer.h"
 
 namespace tgfx {
 
 class Context;
-class Layer;
 class DrawArgs;
 
 /**
