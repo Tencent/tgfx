@@ -17,6 +17,8 @@ struct PointwiseOpModule {
   static constexpr Param<ParamType::Float> Kb{"Kb"};
   static constexpr Param<ParamType::Float> Threshold{"Threshold"};
 
+  static constexpr ParamInfo Fields[] = {OpType, ColorMatrix, ColorVector, Kr, Kg, Kb, Threshold};
+
   static void Bind(const FragmentProcessor* processor, ParamWriter* writer);
 };
 

@@ -18,6 +18,9 @@ struct TiledSourceModule {
   static constexpr Param<ParamType::Int> AlphaOnly{"AlphaOnly"};
   static constexpr Param<ParamType::Int> Strict{"Strict"};
 
+  static constexpr ParamInfo Fields[] = {ReadSwizzle, Dimension,   Subset,    Clamp,
+                                         ShaderModeX, ShaderModeY, AlphaOnly, Strict};
+
   static void Bind(const FragmentProcessor* processor, ParamWriter* writer);
 };
 

@@ -11,9 +11,10 @@ struct BlurKernelModule {
   static constexpr Param<ParamType::Float4Array> Kernel{"Kernel"};
   static constexpr Param<ParamType::Int> Radius{"Radius"};
   static constexpr Param<ParamType::Float2> Step{"Step"};
-  static constexpr Param<ParamType::Int> HasDeviceMask{"HasDeviceMask"};
   static constexpr Param<ParamType::Int> TiledChild{"TiledChild"};
   static constexpr Param<ParamType::Int> AlphaChild{"AlphaChild"};
+
+  static constexpr ParamInfo Fields[] = {Kernel, Radius, Step, TiledChild, AlphaChild};
 
   static void Bind(const FragmentProcessor* processor, ParamWriter* writer);
 };

@@ -3,6 +3,7 @@
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ConicGradientLayout.h"
 #include "gpu/processors/SingleIntervalGradientColorizer.h"
+#include "gpu/shaders/modules/DeviceMaskModule.h"
 #include "gpu/shaders/modules/ParamWriter.h"
 
 namespace tgfx {
@@ -21,7 +22,7 @@ void GradientModule::BindEffect(const FragmentProcessor* processor, ParamWriter*
   auto* effect = static_cast<const ClampedGradientEffect*>(processor);
   WriteColor(writer, LeftBorderColor, effect->getLeftBorderColor());
   WriteColor(writer, RightBorderColor, effect->getRightBorderColor());
-  writer->set(HasDeviceMask, 0);
+  writer->set(DeviceMaskModule::HasDeviceMask, 0);
   writer->set(LayoutType, ClampedGradientEffect::LayoutTypeIndex(effect->getGradLayout()->name()));
 }
 

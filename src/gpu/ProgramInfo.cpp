@@ -29,6 +29,9 @@
 #include "gpu/ProgramBuilder.h"
 #include "gpu/ShaderProfileResolver.h"
 #include "gpu/resources/RenderTarget.h"
+#include "gpu/shaders/modules/AnalyticClipModule.h"
+#include "gpu/shaders/modules/DeviceMaskModule.h"
+#include "gpu/shaders/modules/EngineParams.h"
 #include "gpu/shaders/modules/ParamWriter.h"
 #include "tgfx/gpu/GPU.h"
 
@@ -377,12 +380,12 @@ bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
     // runtime-generated shader bakes the swizzle into code and does not declare it, so set it
     // optionally. Set in the base (unmangled) context, like RTAdjust.
     int outputAlphaSwizzle = getOutputSwizzle() == Swizzle::AAAA() ? 1 : 0;
-    fragmentUniformData->setDataOptional("OutputAlphaSwizzle", outputAlphaSwizzle);
-    fragmentUniformData->setDataOptional("HasClip", 0);
+    fragmentUniformData->setDataOptional(EngineParams::OutputAlphaSwizzle.name, outputAlphaSwizzle);
+    fragmentUniformData->setDataOptional(AnalyticClipModule::HasClip.name, 0);
     // Same engine-default treatment as HasClip: only quad_texture_fill declares it, and a
     // present mask FP overwrites it with 1 later in traversal. The color TextureEffect's
     // writer used to carry this default alongside its own fields.
-    fragmentUniformData->setDataOptional("HasDeviceMask", 0);
+    fragmentUniformData->setDataOptional(DeviceMaskModule::HasDeviceMask.name, 0);
   }
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, geometryProcessor);
 

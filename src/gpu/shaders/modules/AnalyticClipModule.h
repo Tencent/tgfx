@@ -18,6 +18,9 @@ struct AnalyticClipModule {
   static constexpr Param<ParamType::Float4> Rect{"Rect"};
   static constexpr Param<ParamType::Int> HasClip{"HasClip"};
 
+  static constexpr ParamInfo Fields[] = {LocalRect,     RadiiX, RadiiY, AntiAlias,
+                                         DeviceToLocal, Rect,   HasClip};
+
   static void Bind(const FragmentProcessor* processor, ParamWriter* writer);
 };
 

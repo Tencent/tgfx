@@ -1,6 +1,7 @@
 // The device-mask module's value binding. See DeviceMaskModule.h for the contract.
 #include "gpu/shaders/modules/DeviceMaskModule.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "gpu/shaders/modules/AnalyticClipModule.h"
 #include "gpu/shaders/modules/ParamWriter.h"
 
 namespace tgfx {
@@ -33,7 +34,7 @@ void DeviceMaskModule::Bind(const FragmentProcessor* processor, ParamWriter* wri
   writer->set(AlphaOnly, mask->isAlphaOnly() ? 1 : 0);
   const float noClip[4] = {-1e9f, -1e9f, 1e9f, 1e9f};
   writer->set(Rect, noClip);
-  writer->set(HasClip, 0);
+  writer->set(AnalyticClipModule::HasClip, 0);
 }
 
 }  // namespace tgfx

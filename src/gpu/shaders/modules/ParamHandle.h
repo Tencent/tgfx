@@ -21,12 +21,24 @@ enum class ParamType : uint8_t {
   Float4x4,
 };
 
+// One field of a parameter set as the build-time reconciliation sees it: the module headers and
+// the parameter catalog list their fields through arrays of these, and the shader build tool
+// checks every reflected uniform name against them (name present, type matching).
+struct ParamInfo {
+  const char* name;
+  ParamType type;
+};
+
 // A typed reference to one field of a module's parameters: the field's name in the reflected
 // uniform block. Declared as a constexpr member of the module, so the name and the value type
 // live in one place.
 template <ParamType Type>
 struct Param {
   const char* name;
+
+  constexpr operator ParamInfo() const {
+    return {name, Type};
+  }
 };
 
 }  // namespace tgfx

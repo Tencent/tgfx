@@ -11,7 +11,6 @@ class FragmentProcessor;
 struct GradientModule {
   static constexpr Param<ParamType::Float4> LeftBorderColor{"leftBorderColor"};
   static constexpr Param<ParamType::Float4> RightBorderColor{"rightBorderColor"};
-  static constexpr Param<ParamType::Int> HasDeviceMask{"HasDeviceMask"};
   static constexpr Param<ParamType::Int> LayoutType{"LayoutType"};
   static constexpr Param<ParamType::Float> Bias{"Bias"};
   static constexpr Param<ParamType::Float> Scale{"Scale"};
@@ -20,6 +19,9 @@ struct GradientModule {
   static constexpr Param<ParamType::Int> ColorizerKind{"ColorizerKind"};
 
   /// The clamped gradient's own record (border colors, mask default, layout branch).
+  static constexpr ParamInfo Fields[] = {
+      LeftBorderColor, RightBorderColor, LayoutType, Bias, Scale, Start, End, ColorizerKind};
+
   static void BindEffect(const FragmentProcessor* processor, ParamWriter* writer);
 
   /// The conic layout's bias/scale pair; other layouts write nothing.

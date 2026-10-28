@@ -12,6 +12,8 @@ struct PorterDuffXPModule {
   static constexpr Param<ParamType::Float2> DstTextureUpperLeft{"DstTextureUpperLeft"};
   static constexpr Param<ParamType::Float2> DstTextureCoordScale{"DstTextureCoordScale"};
 
+  static constexpr ParamInfo Fields[] = {XPBlendMode, DstTextureUpperLeft, DstTextureCoordScale};
+
   static void Bind(const XferProcessor* processor, ParamWriter* writer);
 };
 

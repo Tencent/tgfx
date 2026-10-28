@@ -3,6 +3,7 @@
 #include "gpu/processors/GaussianBlur1DFragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
+#include "gpu/shaders/modules/DeviceMaskModule.h"
 #include "gpu/shaders/modules/ParamWriter.h"
 
 namespace tgfx {
@@ -25,7 +26,7 @@ void BlurKernelModule::Bind(const FragmentProcessor* processor, ParamWriter* wri
   Point step = stepVectors[1] - stepVectors[0];
   const float stepValues[2] = {step.x, step.y};
   writer->set(Step, stepValues);
-  writer->set(HasDeviceMask, 0);
+  writer->set(DeviceMaskModule::HasDeviceMask, 0);
   writer->set(TiledChild, IsProcessor<TiledTextureEffect>(child) ? 1 : 0);
   bool alphaChild = false;
   if (IsProcessor<TextureEffect>(child)) {

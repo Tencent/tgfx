@@ -18,6 +18,9 @@ struct TextureSourceModule {
   static constexpr Param<ParamType::Int> YUVLimitedRange{"YUVLimitedRange"};
   static constexpr Param<ParamType::Float3x3> Mat3ColorConversion{"Mat3ColorConversion"};
 
+  static constexpr ParamInfo Fields[] = {Subset,    SubsetClampOn,   AlphaStart,         AlphaOnly,
+                                         HasRgbaaa, YUVLimitedRange, Mat3ColorConversion};
+
   static void Bind(const FragmentProcessor* processor, ParamWriter* writer);
 };
 
