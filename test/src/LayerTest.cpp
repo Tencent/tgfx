@@ -8143,12 +8143,24 @@ TGFX_TEST_PRIVATE(LayerTest, GeometryIncludesTextGeometry) {
   EXPECT_LT(covered * 2, static_cast<int>(alpha.size()))
       << "a text outline covers its glyphs, not the whole surface; covered=" << covered;
 
-  // Recorded only for a style that consumes the geometry: the same layer without Glass hands
-  // nothing over, so the geometry above is not produced unconditionally.
-  auto plain = makePanel(false);
-  TGFX_PRIVATE_ACCESS(DrawArgs plainArgs(context);
-                      EXPECT_TRUE(plain->getLayerStyleSource(plainArgs, Matrix::I()) == nullptr)
-                      << "without a Geometry-source style the geometry is not recorded";)
+  // Recorded only for a style that consumes the geometry: a style drawing something else still
+  // resolves a source, but hands no geometry over, so the recording above is not unconditional.
+  auto shadowed = makePanel(false);
+  // A painted group keeps the shared content non-empty, since a style drawing something else still
+  // records it. The fill scopes to its own group, so the glyph outlines above stay bare geometry.
+  auto paintedGroup = VectorGroup::Make();
+  paintedGroup->setElements({MakeRectElement(Rect::MakeXYWH(10.0f, 10.0f, 30.0f, 30.0f)),
+                             FillStyle::Make(SolidColor::Make(Color::Red()))});
+  shadowed->setContents({text, paintedGroup});
+  shadowed->setLayerStyles({DropShadowStyle::Make(-20, -20, 0, 0, Color::Black())});
+  std::unique_ptr<LayerStyleSource> shadowSource = nullptr;
+  TGFX_PRIVATE_ACCESS(DrawArgs shadowArgs(context);
+                      shadowSource = shadowed->getLayerStyleSource(shadowArgs, Matrix::I());)
+  ASSERT_TRUE(shadowSource != nullptr) << "a non-geometry style still resolves its own source";
+  for (const auto& group : shadowSource->groups) {
+    EXPECT_TRUE(group == nullptr || group->geometry == nullptr)
+        << "only a style declaring the layer's geometry may record it";
+  }
 }
 
 // ===== Own geometry under a transform-only change =====
@@ -8591,8 +8603,11 @@ TGFX_TEST_PRIVATE(LayerTest, ContourRepresentativeFollowsCaliber) {
     layer->setContents({group});
     EXPECT_EQ(CountUnpaintedEntries(layer), 1);
     TGFX_PRIVATE_ACCESS(
-        auto compose = static_cast<const ComposeContent*>(layer->getContent());
-        ASSERT_NE(compose, nullptr);
+        auto content = layer->getContent(); ASSERT_NE(content, nullptr);
+        ASSERT_EQ(content->type(), LayerContent::Type::Compose)
+        << "the bare entry and the painted one must stay separate, so the recording is a "
+           "ComposeContent";
+        auto compose = static_cast<const ComposeContent*>(content);
         EXPECT_TRUE(compose->contours.empty())
         << "a bare entry must not share a group with a painted one, so the two entries above stay "
            "apart and no representative table is built; an empty table is what makes the queries "
@@ -8628,8 +8643,10 @@ TGFX_TEST_PRIVATE(LayerTest, ContourRepresentativeFollowsCaliber) {
     // wrong representative is invisible in pixels here and only shows up as the painted caliber
     // borrowing a representative that paints nothing.
     TGFX_PRIVATE_ACCESS(
-        auto compose = static_cast<const ComposeContent*>(layer->getContent());
-        ASSERT_NE(compose, nullptr);
+        auto content = layer->getContent(); ASSERT_NE(content, nullptr);
+        ASSERT_EQ(content->type(), LayerContent::Type::Compose)
+        << "two bare entries must stay separate entries, so the recording is a ComposeContent";
+        auto compose = static_cast<const ComposeContent*>(content);
         ASSERT_FALSE(compose->contours.empty())
         << "two entries sharing one outline must build a representative table";
         EXPECT_EQ(compose->contours.size(), 1u)

@@ -62,9 +62,9 @@ class LayerContent {
   }
 
   /**
-   * Returns true when the contour equals the opaque content under the same query: the content is
-   * visible and has no non-opaque non-image shader. The query states which geometries take part, so
-   * the answer holds only for a drawContour() given the same flag, not for every contour.
+   * Returns true when the contour covers exactly what the content draws under the same query. A
+   * bare entry is covered by neither side when the query excludes it, and by the contour only when
+   * it includes it, so the answer holds only for a drawContour() given the same flag.
    */
   virtual bool contourEqualsOpaqueContent(bool includeUnpaintedGeometry) const = 0;
 

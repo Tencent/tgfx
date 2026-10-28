@@ -82,11 +82,8 @@ void DrawContent::drawContourInternal(Canvas* canvas, bool antiAlias,
     if (shader && shader->isAImage()) {
       paint.setShader(shader);
     }
-  } else {
-    // A bare geometry has no paint to draw with, so its contour is the opaque white fill the
-    // geometry recording has always covered it with.
-    paint.setColor(Color::White());
   }
+  // The contour is the default opaque white fill either way: it reports coverage, not appearance.
   onDraw(canvas, paint);
 }
 
