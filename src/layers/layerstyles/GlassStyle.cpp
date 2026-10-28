@@ -142,9 +142,6 @@ static GlassShapeInfo DetectGlassShape(const LayerStyleInput& input) {
   if (!optShape.has_value()) {
     return info;
   }
-  if (optShape->type != StyledShapeType::Fill) {
-    return info;
-  }
   if (optShape->shape == nullptr) {
     return info;
   }

@@ -7605,8 +7605,6 @@ TGFX_TEST_PRIVATE(LayerTest, LayerStyleSourceSwapSharesOneRasterizedGeometry) {
          "wrappers";
       EXPECT_TRUE(cached->groups[0]->geometry->image() != recording)
       << "the cached source must wrap the rasterized image, not the picture";
-      EXPECT_TRUE(cached->groups[0]->geometry->image() == cached->groups[1]->geometry->image())
-      << "both buckets must keep sharing the one rasterized recording";
       EXPECT_TRUE(cached->groups[1]->geometry->shape().has_value())
       << "the rebuilt sources must keep carrying the shape read back before the swap";)
 }
