@@ -398,11 +398,11 @@ const LayerStyleSource* BackgroundCapturer::cacheLayerStyleSource(
   if (source == nullptr) {
     return nullptr;
   }
-  // Rasterize so the first draw uploads a GPU texture and the second reuses it. makeRasterized() is
-  // idempotent, so content and contour need no dedupe, geometry does: it is shared by both buckets,
-  // and wrapping it twice would give one recording two GPU caches.
+  // Rasterize so the first draw uploads a GPU texture and the second reuses it. Wrapping an image
+  // again produces a new image object with its own GPU cache, so the geometry recording, which
+  // both buckets share, is wrapped once.
   std::shared_ptr<Image> geometryRecording = nullptr;
-  std::shared_ptr<Image> geometryRasterized = nullptr;
+  std::shared_ptr<GeometryInputSource> rasterizedGeometry = nullptr;
   for (auto& group : source->groups) {
     if (group == nullptr) {
       continue;
@@ -418,13 +418,11 @@ const LayerStyleSource* BackgroundCapturer::cacheLayerStyleSource(
     if (group->geometry == nullptr || group->geometry->image() == nullptr) {
       continue;
     }
-    bool reuse = geometryRecording == group->geometry->image();
-    if (!reuse) {
+    if (geometryRecording != group->geometry->image()) {
       geometryRecording = group->geometry->image();
-      geometryRasterized = geometryRecording->makeRasterized();
+      rasterizedGeometry = group->geometry->makeRasterized();
     }
-    group->geometry = std::make_shared<GeometryInputSource>(
-        geometryRasterized, group->geometry->imageOffset(), group->geometry->shape());
+    group->geometry = rasterizedGeometry;
   }
   auto* raw = source.get();
   snapshots->layerStyleSources.emplace(layer, std::move(source));

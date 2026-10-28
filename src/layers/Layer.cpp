@@ -36,7 +36,6 @@
 #include "layers/BackgroundSource.h"
 #include "layers/CanvasUtils.h"
 #include "layers/DrawArgs.h"
-#include "layers/GeometryShapeContext.h"
 #include "layers/LayerStyleSource.h"
 #include "layers/MaskContext.h"
 #include "layers/OffscreenRenderer.h"
@@ -1346,8 +1345,8 @@ std::shared_ptr<Image> Layer::getContentContourImage(const DrawArgs& args, float
   return image;
 }
 
-std::shared_ptr<Image> Layer::getGeometryImage(const DrawArgs& args, float contentScale,
-                                               Point& offset, std::optional<StyledShape>& shape) {
+std::shared_ptr<GeometryInputSource> Layer::getGeometryImage(const DrawArgs& args,
+                                                             float contentScale) {
   if (FloatNearlyZero(contentScale)) {
     return nullptr;
   }
@@ -1362,17 +1361,8 @@ std::shared_ptr<Image> Layer::getGeometryImage(const DrawArgs& args, float conte
     content->drawContour(contourCanvas, bitFields.allowsEdgeAntialiasing, true);
   }
   auto picture = opaqueContext.finishRecordingAsPicture();
-  // Read the shape back from the picture before it is consumed by the conversion below, so the
-  // shape and the raster describe the very same recording.
-  shape = GeometryShapeContext::Extract(picture, contentScale);
-  auto imageOffset = Point::Zero();
-  auto image = ToImageWithOffset(std::move(picture), &imageOffset, nullptr, args.dstColorSpace);
-  offset = imageOffset;
-  if (image == nullptr) {
-    // No raster means no geometry to describe, whatever the picture held.
-    shape = std::nullopt;
-  }
-  return image;
+  // The source owns the pairing: the raster and the shape are read from this one picture.
+  return GeometryInputSource::Make(std::move(picture), contentScale, args.dstColorSpace);
 }
 
 bool Layer::shouldPassThroughBackground(BlendMode blendMode) const {
@@ -1858,14 +1848,9 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   // Record the geometry once for both buckets: neither the recording nor the shape depends on
   // drawArgs.excludeEffects, so both buckets would otherwise record the same raster. Keep it that
   // way: making getGeometryImage() depend on the bucket would silently change both.
-  Point geometryOffset = {};
-  std::optional<StyledShape> geometryShape = std::nullopt;
   std::shared_ptr<GeometryInputSource> geometrySource = nullptr;
   if (layerUsesGeometry) {
-    auto image = getGeometryImage(drawArgs, contentScale, geometryOffset, geometryShape);
-    if (image != nullptr) {
-      geometrySource = std::make_shared<GeometryInputSource>(image, geometryOffset, geometryShape);
-    }
+    geometrySource = getGeometryImage(drawArgs, contentScale);
   }
 
   for (int i = 0; i < 2; i++) {

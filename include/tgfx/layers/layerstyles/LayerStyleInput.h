@@ -26,6 +26,8 @@
 #include "tgfx/layers/layerstyles/StyledShape.h"
 
 namespace tgfx {
+class ColorSpace;
+class Picture;
 
 /**
  * A source a LayerStyle may consume, as its primary content or as an extra source.
@@ -41,7 +43,7 @@ class StyleInputSource {
     /** The layer's geometry on its own, without its descendants. */
     Geometry,
     /**
-     * The shared subtree contour: delivered to a Geometry style whose layer has no geometry of its
+     * The shared subtree contour: received by a Geometry style whose layer has no geometry of its
      * own, and also requested as an extra source by styles that need the subtree outline.
      */
     Contour
@@ -89,20 +91,22 @@ class StyleInputSource {
 };
 
 /**
- * Input source for the layer's geometry: its raster, plus the exact outline of the same content
- * when that content has a single one. The shape always describes the pixels the style samples.
+ * Input source for the layer's geometry: its raster plus the exact outline of the same content,
+ * when that content has a single one. The raster is opaque over the geometry except where an image
+ * shader fills it; only that shader keeps the image's own transparent pixels.
  */
 class GeometryInputSource : public StyleInputSource {
  public:
   /**
-   * @param image The rasterized geometry; geometry is only ever the primary content.
-   * @param imageOffset Its top-left corner in layer-local coordinates times contentScale.
-   * @param shape The vector shape of the same content, or empty when it has none.
+   * Builds the source from a recorded picture: rasterizes it and reads the shape back from that
+   * same recording. Returns nullptr when the picture yields no raster.
    */
-  GeometryInputSource(std::shared_ptr<Image> image, Point imageOffset,
-                      std::optional<StyledShape> shape)
-      : StyleInputSource(Type::Geometry, std::move(image), imageOffset), _shape(std::move(shape)) {
-  }
+  static std::shared_ptr<GeometryInputSource> Make(std::shared_ptr<Picture> picture,
+                                                   float contentScale,
+                                                   std::shared_ptr<ColorSpace> colorSpace);
+
+  /** The same recording, rasterized for a GPU cache; the offset and shape are carried over. */
+  std::shared_ptr<GeometryInputSource> makeRasterized() const;
 
   /** Returns the vector shape of the same content, empty when that content has none. */
   const std::optional<StyledShape>& shape() const {
@@ -110,13 +114,18 @@ class GeometryInputSource : public StyleInputSource {
   }
 
  private:
+  GeometryInputSource(std::shared_ptr<Image> image, Point imageOffset,
+                      std::optional<StyledShape> shape)
+      : StyleInputSource(Type::Geometry, std::move(image), imageOffset), _shape(std::move(shape)) {
+  }
+
   std::optional<StyledShape> _shape = std::nullopt;
 };
 
 /**
  * Contour input source that additionally carries the content shape used by the generic spread
  * fallback. That shape is derived from the shared content, so it does not describe this contour
- * raster; it has no shape(), and only contentShape() reports it (a legacy pairing kept separate).
+ * raster; it has no shape(), and only contentShape() reports it.
  */
 class ContourInputSource : public StyleInputSource {
  public:
