@@ -33,34 +33,40 @@ class LayerContent {
   virtual ~LayerContent() = default;
 
   /**
-   * Returns the bounds of the content.
+   * Returns the bounds of the content. A geometry no paint captured belongs to the layer's
+   * geometry rather than to its painted content, so each query states whether it takes part.
    */
-  virtual Rect getBounds() const = 0;
+  virtual Rect getBounds(bool includeUnpaintedGeometry) const = 0;
 
   /**
-   * Returns the tight bounds of the content mapped by Matrix.
+   * Returns the tight bounds of the content mapped by Matrix. As with getBounds(), the geometries
+   * no paint captured take part only when the query asks for them.
    */
-  virtual Rect getTightBounds(const Matrix& matrix) const = 0;
+  virtual Rect getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const = 0;
 
   /**
    * Checks if the layer content overlaps or intersects with the specified point (localX, localY).
    * The localX and localY coordinates are in the layer's local coordinate space. This method
-   * performs precise hit testing on the actual shape of the layer content.
+   * performs precise hit testing on the actual shape of the layer content. A geometry no paint
+   * captured hits only when includeUnpaintedGeometry asks for it; painters answer the rest.
    */
-  virtual bool hitTestPoint(float localX, float localY) const = 0;
+  virtual bool hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const = 0;
 
   /**
-   * Draws the contour of the content to the specified canvas.
+   * Draws the contour of the content to the specified canvas. Unlike the rendered content, the
+   * contour keeps the painters whose alpha is 0. The geometries no paint captured are drawn only
+   * when the query includes them, since a query that excludes them describes what content paints.
    */
-  virtual void drawContour(Canvas* canvas, bool antiAlias) const = 0;
-
-  /**
-   * Returns true if the contour drawing result equals the opaque content drawing result.
-   * This is true when the content is visible and has no non-opaque non-image shader.
-   */
-  virtual bool contourEqualsOpaqueContent() const {
-    return false;
+  void drawContour(Canvas* canvas, bool antiAlias, bool includeUnpaintedGeometry) const {
+    drawContourInternal(canvas, antiAlias, includeUnpaintedGeometry);
   }
+
+  /**
+   * Returns true when the contour covers exactly what the content draws under the same query. A
+   * bare entry is covered by neither side when the query excludes it, and by the contour only when
+   * it includes it, so the answer holds only for a drawContour() given the same flag.
+   */
+  virtual bool contourEqualsOpaqueContent(bool includeUnpaintedGeometry) const = 0;
 
   /**
    * Returns true if any part of the content uses a blend mode other than SrcOver.
@@ -83,6 +89,12 @@ class LayerContent {
   virtual void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const = 0;
 
  protected:
+  /**
+   * Draws the contour. A content that holds several painters forwards to them through this channel.
+   */
+  virtual void drawContourInternal(Canvas* canvas, bool antiAlias,
+                                   bool includeUnpaintedGeometry) const = 0;
+
   enum class Type {
     Rect,
     RRect,

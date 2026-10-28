@@ -90,8 +90,8 @@ bool WebPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, s
   auto dstInfo =
       ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, dstColorSpace);
   auto targetInfo = dstInfo.makeIntersect(0, 0, width(), height());
-  auto imageData = PathRasterizerClass.call<val>("readPixels", targetInfo.width(),
-                                                 targetInfo.height(), path2D, path.getFillType());
+  auto imageData = PathRasterizerClass.call<val>(
+      "readPixels", targetInfo.width(), targetInfo.height(), path2D, path.getFillType(), antiAlias);
   if (!imageData.as<bool>()) {
     return false;
   }

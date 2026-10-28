@@ -218,7 +218,8 @@ void TextLayer::onUpdateContent(LayerRecorder* recorder) {
   if (textBlob == nullptr) {
     return;
   }
-  recorder->addTextBlob(std::move(textBlob), LayerPaint(_textColor));
+  LayerPaint paint = LayerPaint(_textColor);
+  recorder->addTextBlob(std::move(textBlob), &paint);
 }
 
 std::string TextLayer::PreprocessNewLines(const std::string& text) {

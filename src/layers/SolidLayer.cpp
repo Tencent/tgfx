@@ -74,7 +74,8 @@ void SolidLayer::onUpdateContent(LayerRecorder* recorder) {
     return;
   }
   auto rRect = RRect::MakeRectXY(Rect::MakeLTRB(0, 0, _width, _height), _radiusX, _radiusY);
-  recorder->addRRect(rRect, LayerPaint(_color));
+  LayerPaint paint = LayerPaint(_color);
+  recorder->addRRect(rRect, &paint);
 }
 
 std::optional<StyledShape> SolidLayer::onGetContentShape() {

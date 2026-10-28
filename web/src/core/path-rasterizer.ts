@@ -21,7 +21,8 @@ import {ctor} from '../types';
 import {getCanvasProvider} from './canvas-provider';
 
 export class PathRasterizer {
-    public static readPixels(width: number, height: number, path: Path2D, fillType: ctor) {
+    public static readPixels(width: number, height: number, path: Path2D, fillType: ctor,
+                             antiAlias: boolean = true) {
         if (width <= 0 || height <= 0) {
             return null;
         }
@@ -45,6 +46,13 @@ export class PathRasterizer {
         }
         const {data} = context.getImageData(0, 0, width, height);
         provider.releaseCanvas2D(canvas);
+        if (!antiAlias) {
+            // Canvas 2D always antialiases, so hard coverage is binarized here to match the native
+            // rasterizers instead of silently keeping fractional edges.
+            for (let i = 3; i < data.length; i += 4) {
+                data[i] = data[i] >= 128 ? 255 : 0;
+            }
+        }
         return new Uint8Array(data);
     }
 }

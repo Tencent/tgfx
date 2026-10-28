@@ -96,17 +96,16 @@ std::shared_ptr<Shader> NoiseStyle::getNoiseShader(float contentScale) const {
 }
 
 // Draws a noise layer clipped to content alpha. The shader must already have color, density, and
-// alpha fully baked in. The shader sampling origin is anchored to contentOffset (expressed in the
-// content image's local coordinate space). Callers derive this origin from the layer's surface-space
-// position, so the noise pattern stays stable as tiles, dirty regions, or content image sizes
-// change. A half-image offset is added to preserve the original "centered" feel of the noise
-// relative to the content.
-static void DrawNoiseLayer(Canvas* canvas, std::shared_ptr<Image> content,
-                           std::shared_ptr<Shader> coloredShader, BlendMode blendMode,
-                           const Point& contentOffset) {
+// alpha fully baked in. The sampling origin is anchored to the content image's offset, so the
+// pattern stays stable as tiles, dirty regions, or content image sizes change. A half-image offset
+// is added to preserve the original "centered" feel of the noise relative to the content.
+static void DrawNoiseLayer(Canvas* canvas, const LayerStyleInput& input,
+                           std::shared_ptr<Shader> coloredShader, BlendMode blendMode) {
+  auto content = input.content != nullptr ? input.content->image() : nullptr;
   if (coloredShader == nullptr || content == nullptr) {
     return;
   }
+  auto contentOffset = input.content->imageOffset();
   auto width = static_cast<float>(content->width());
   auto height = static_cast<float>(content->height());
   auto samplingMatrix = Matrix::MakeTrans(-1.f * contentOffset.x + width * 0.5f,
@@ -156,7 +155,7 @@ void MonoNoiseStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float 
   Color fillColor = {_color.red, _color.green, _color.blue, finalAlpha};
   auto coloredShader =
       alphaShader->makeWithColorFilter(ColorFilter::Blend(fillColor, BlendMode::SrcIn));
-  DrawNoiseLayer(canvas, input.content, std::move(coloredShader), blendMode, input.contentOffset);
+  DrawNoiseLayer(canvas, input, std::move(coloredShader), blendMode);
 }
 
 // --- DuoNoiseStyle ---
@@ -198,8 +197,7 @@ void DuoNoiseStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float a
       Color fillColor = {_firstColor.red, _firstColor.green, _firstColor.blue, finalAlpha};
       auto coloredShader =
           alphaShader->makeWithColorFilter(ColorFilter::Blend(fillColor, BlendMode::SrcIn));
-      DrawNoiseLayer(canvas, input.content, std::move(coloredShader), blendMode,
-                     input.contentOffset);
+      DrawNoiseLayer(canvas, input, std::move(coloredShader), blendMode);
     }
   }
   {
@@ -209,8 +207,7 @@ void DuoNoiseStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float a
       Color fillColor = {_secondColor.red, _secondColor.green, _secondColor.blue, finalAlpha};
       auto coloredShader =
           alphaShader->makeWithColorFilter(ColorFilter::Blend(fillColor, BlendMode::SrcIn));
-      DrawNoiseLayer(canvas, input.content, std::move(coloredShader), blendMode,
-                     input.contentOffset);
+      DrawNoiseLayer(canvas, input, std::move(coloredShader), blendMode);
     }
   }
 }
@@ -274,7 +271,7 @@ void MultiNoiseStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float
   // clang-format on
   auto alphaScaleFilter = ColorFilter::Matrix(alphaScaleMatrix);
   auto coloredShader = maskedShader->makeWithColorFilter(std::move(alphaScaleFilter));
-  DrawNoiseLayer(canvas, input.content, std::move(coloredShader), blendMode, input.contentOffset);
+  DrawNoiseLayer(canvas, input, std::move(coloredShader), blendMode);
 }
 
 }  // namespace tgfx

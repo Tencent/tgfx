@@ -25,10 +25,10 @@ namespace tgfx {
 
 class MeshContent : public DrawContent {
  public:
-  MeshContent(std::shared_ptr<Mesh> mesh, const LayerPaint& paint);
+  MeshContent(std::shared_ptr<Mesh> mesh, const LayerPaint* paint);
 
-  Rect getTightBounds(const Matrix& matrix) const override;
-  bool hitTestPoint(float localX, float localY) const override;
+  Rect getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const override;
+  bool hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const override;
 
   std::shared_ptr<Mesh> mesh = nullptr;
 

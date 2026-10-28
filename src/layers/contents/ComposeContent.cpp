@@ -21,63 +21,68 @@
 namespace tgfx {
 
 ComposeContent::ComposeContent(std::vector<std::unique_ptr<GeometryContent>> contents,
-                               size_t foregroundStartIndex, std::vector<GeometryContent*> contours)
+                               size_t foregroundStartIndex, std::vector<GeometryContent*> contours,
+                               std::optional<std::vector<GeometryContent*>> paintedContours)
     : contents(std::move(contents)), foregroundStartIndex(foregroundStartIndex),
-      contours(std::move(contours)) {
+      contours(std::move(contours)), paintedContours(std::move(paintedContours)) {
 }
 
-Rect ComposeContent::getBounds() const {
+Rect ComposeContent::getBounds(bool includeUnpaintedGeometry) const {
   auto result = Rect::MakeEmpty();
-  if (!contours.empty()) {
-    for (const auto& content : contours) {
-      result.join(content->getBounds());
+  if (auto table = selectedContours(includeUnpaintedGeometry)) {
+    for (const auto content : *table) {
+      result.join(content->getBounds(includeUnpaintedGeometry));
     }
-  } else {
-    for (const auto& content : contents) {
-      result.join(content->getBounds());
-    }
+    return result;
   }
-  return result;
-}
-
-Rect ComposeContent::getTightBounds(const Matrix& matrix) const {
-  auto result = Rect::MakeEmpty();
-  if (!contours.empty()) {
-    for (const auto& content : contours) {
-      result.join(content->getTightBounds(matrix));
-    }
-  } else {
-    for (const auto& content : contents) {
-      result.join(content->getTightBounds(matrix));
-    }
-  }
-  return result;
-}
-
-bool ComposeContent::hitTestPoint(float localX, float localY) const {
   for (const auto& content : contents) {
-    if (content->hitTestPoint(localX, localY)) {
+    result.join(content->getBounds(includeUnpaintedGeometry));
+  }
+  return result;
+}
+
+Rect ComposeContent::getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const {
+  auto result = Rect::MakeEmpty();
+  if (auto table = selectedContours(includeUnpaintedGeometry)) {
+    for (const auto content : *table) {
+      result.join(content->getTightBounds(matrix, includeUnpaintedGeometry));
+    }
+    return result;
+  }
+  for (const auto& content : contents) {
+    result.join(content->getTightBounds(matrix, includeUnpaintedGeometry));
+  }
+  return result;
+}
+
+bool ComposeContent::hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const {
+  for (const auto& content : contents) {
+    if (content->hitTestPoint(localX, localY, includeUnpaintedGeometry)) {
       return true;
     }
   }
   return false;
 }
 
-void ComposeContent::drawContour(Canvas* canvas, bool antiAlias) const {
-  if (!contours.empty()) {
-    for (const auto geometry : contours) {
-      geometry->drawContour(canvas, antiAlias);
+void ComposeContent::drawContourInternal(Canvas* canvas, bool antiAlias,
+                                         bool includeUnpaintedGeometry) const {
+  // The only entry that sees the whole outline table, so it forwards to the selected entries when a
+  // subset was chosen and otherwise to every content. A caliber that excludes bare geometry selects
+  // nothing for a bare group, so nothing is drawn there rather than falling back to the entries.
+  if (auto table = selectedContours(includeUnpaintedGeometry)) {
+    for (const auto geometry : *table) {
+      geometry->drawContour(canvas, antiAlias, includeUnpaintedGeometry);
     }
-  } else {
-    for (const auto& content : contents) {
-      content->drawContour(canvas, antiAlias);
-    }
+    return;
+  }
+  for (const auto& content : contents) {
+    content->drawContour(canvas, antiAlias, includeUnpaintedGeometry);
   }
 }
 
-bool ComposeContent::contourEqualsOpaqueContent() const {
+bool ComposeContent::contourEqualsOpaqueContent(bool includeUnpaintedGeometry) const {
   for (const auto& content : contents) {
-    if (!content->contourEqualsOpaqueContent()) {
+    if (!content->contourEqualsOpaqueContent(includeUnpaintedGeometry)) {
       return false;
     }
   }

@@ -323,17 +323,18 @@ void OpaqueContext::flushPendingContour(const Contour& contour, const Matrix& ma
 }
 
 /**
- * Converts a brush to "opaque mode" by applying AlphaThreshold filter.
- * Semi-transparent pixels become fully opaque, while fully transparent pixels remain transparent.
+ * Switches a brush to "opaque mode": opaque sampled colors, hard-edged geometric coverage.
  */
 Brush GetOpaqueBrush(const Brush& brush) {
   Color color;
   if (brush.shader && !brush.shader->asColor(&color)) {
     auto opaqueBrush = brush;
     opaqueBrush.colorFilter = ColorFilter::AlphaThreshold(OPAQUE_THRESHOLD);
+    // The filter makes sampled alpha opaque; this flag makes the coverage hard-edged.
+    opaqueBrush.antiAlias = false;
     return opaqueBrush;
   }
-  // Src + coverage AA may cause edge artifacts, use SrcOver instead.
+  // SrcOver for independent painters; coverage is binary because antialiasing is off.
   auto opaqueBrush = Brush(Color::White(), BlendMode::SrcOver, false);
   opaqueBrush.maskFilter = brush.maskFilter;
   return opaqueBrush;

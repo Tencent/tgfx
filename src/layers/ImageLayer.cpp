@@ -45,6 +45,7 @@ void ImageLayer::onUpdateContent(LayerRecorder* recorder) {
   }
   auto rect = Rect::MakeWH(_image->width(), _image->height());
   auto shader = Shader::MakeImageShader(_image, TileMode::Clamp, TileMode::Clamp, _sampling);
-  recorder->addRect(rect, LayerPaint(std::move(shader)));
+  LayerPaint paint = LayerPaint(std::move(shader));
+  recorder->addRect(rect, &paint);
 }
 }  // namespace tgfx

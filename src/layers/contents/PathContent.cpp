@@ -22,16 +22,19 @@
 
 namespace tgfx {
 
-PathContent::PathContent(Path path, const LayerPaint& paint)
+PathContent::PathContent(Path path, const LayerPaint* paint)
     : DrawContent(paint), path(std::move(path)) {
   // PathContent does not consume strokeAlign or pathEffect. Complex stroke styles must be routed
   // to ShapeContent by LayerRecorder. Keep this predicate in sync with
   // LayerRecorder::ComplexStrokeStyle.
-  DEBUG_ASSERT(paint.style != PaintStyle::Stroke ||
-               (paint.strokeAlign == StrokeAlign::Center && paint.pathEffect == nullptr));
+  DEBUG_ASSERT(paint == nullptr || paint->style != PaintStyle::Stroke ||
+               (paint->strokeAlign == StrokeAlign::Center && paint->pathEffect == nullptr));
 }
 
-Rect PathContent::getBounds() const {
+Rect PathContent::getBounds(bool includeUnpaintedGeometry) const {
+  if (isExcluded(includeUnpaintedGeometry)) {
+    return Rect::MakeEmpty();
+  }
   auto bounds = onGetBounds();
   if (stroke) {
     // Path may contain sharp corners, so we need to apply miter limit to the bounds.
@@ -40,14 +43,17 @@ Rect PathContent::getBounds() const {
   return bounds;
 }
 
-Rect PathContent::getTightBounds(const Matrix& matrix) const {
+Rect PathContent::getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const {
+  if (isExcluded(includeUnpaintedGeometry)) {
+    return Rect::MakeEmpty();
+  }
   auto strokedPath = getFilledPath();
   strokedPath.transform(matrix);
   return strokedPath.getBounds();
 }
 
-bool PathContent::hitTestPoint(float localX, float localY) const {
-  if (color.alpha <= 0) {
+bool PathContent::hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const {
+  if (isHiddenFromHitTest(includeUnpaintedGeometry)) {
     return false;
   }
   return getFilledPath().contains(localX, localY);

@@ -61,9 +61,9 @@ struct StyledShape {
   Rect getBounds() const;
 
   /**
-   * The vector shape of the content's contour, or null when the content is too complex to
-   * provide a single precise outline. Treat it as an optimization hint: the main rendering
-   * path must not depend on it.
+   * The exact outline of the content this shape describes, or null when that content has no single
+   * precise outline. Treat it as an optimization hint: the main rendering path must not depend on
+   * it.
    */
   std::shared_ptr<Shape> shape = nullptr;
 
