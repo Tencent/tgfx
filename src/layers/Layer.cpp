@@ -1189,7 +1189,13 @@ bool Layer::prepareMask(const DrawArgs& args, Canvas* canvas,
   }
   auto clipBounds = GetClipBounds(canvas);
   auto contentScale = canvas->getMatrix().getMaxScale();
-  auto maskData = getMaskData(args, contentScale, clipBounds);
+  // Masks are recorded in 2D even when this layer is rasterized as a node of a 3D context, so
+  // detach the mask draw from that context.
+  // Masks are recorded in 2D even when this layer is rasterized as a node of a 3D context, so
+  // detach the mask draw from that context.
+  DrawArgs maskArgs = args;
+  maskArgs.render3DContext = nullptr;
+  auto maskData = getMaskData(maskArgs, contentScale, clipBounds);
   if (maskData.maskFilter == nullptr) {
     if (maskData.clipPath.isEmpty() && !maskData.clipPath.isInverseFillType()) {
       return false;
@@ -1210,10 +1216,6 @@ std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, bool isCont
   DrawArgs maskArgs = args;
   maskArgs.excludeEffects |= isContourMode;
   maskArgs.backgroundHandler = BackgroundHandler::NoOp();
-  // The mask is always composited in 2D on the current surface. A non-null render3DContext would
-  // make drawChildren stop descending and leave the mask content incomplete. Masks that keep 3D
-  // content start their own context in the maskCanPreserve3D branch below.
-  maskArgs.render3DContext = nullptr;
   auto maskCanPreserve3D = _mask->canPreserve3D();
   // When mask enables 3D context, the full 3D relative matrix is handled by the 3D context.
   // Otherwise, use the 2D projection of the relative matrix on canvas.
@@ -1248,6 +1250,9 @@ std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, bool isCont
 MaskData Layer::getMaskData(const DrawArgs& args, float scale,
                             const std::optional<Rect>& layerClipBounds) {
   DEBUG_ASSERT(_mask != nullptr);
+  // Contract: masks are always recorded in 2D on the current surface, whatever context the owner
+  // layer is rasterized in. Callers detach the mask draw from any active 3D context.
+  DEBUG_ASSERT(args.render3DContext == nullptr);
   auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
   auto isContourMode =
       maskType == LayerMaskType::Contour || maskType == LayerMaskType::ContourInverted;
@@ -1622,7 +1627,9 @@ bool Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, bool conte
   if (!contentOnly && hasValidMask()) {
     auto contentScale = canvas->getMatrix().getMaxScale();
     auto clipBounds = GetClipBounds(canvas);
-    auto maskData = getMaskData(args, contentScale, clipBounds);
+    DrawArgs maskArgs = args;
+    maskArgs.render3DContext = nullptr;
+    auto maskData = getMaskData(maskArgs, contentScale, clipBounds);
     if (maskData.maskFilter == nullptr) {
       if (maskData.clipPath.isEmpty() && !maskData.clipPath.isInverseFillType()) {
         return allMatch;
