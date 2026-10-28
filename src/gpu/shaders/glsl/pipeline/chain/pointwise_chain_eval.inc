@@ -11,7 +11,7 @@
 // ColorSpaceXform parameters are shared chain-wide (ChainCSFlags & friends): the matcher
 // guarantees at most one slot per chain uses them.
 
-#include "operator/pointwise_chain_ops.inc"
+#include "operator/op_codes.inc"
 #include "operator/pointwise_math.inc"
 
 #include "coverage/analytic_clip_math.inc"

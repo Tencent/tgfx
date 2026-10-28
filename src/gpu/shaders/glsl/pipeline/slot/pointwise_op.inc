@@ -7,19 +7,11 @@
 //
 // The field names below are plain for single-slot kernels. A multi-slot kernel defines each name
 // to its array-element form (e.g. #define OpType OpType[slot]) before including, so one function
-// body serves every slot; the slot parameter is unused in the scalar form. The operator/flag
-// constants are guarded so repeated inclusion is a no-op rather than a redefinition.
-#ifndef TGFX_POINTWISE_OP_CONSTANTS
-#define TGFX_POINTWISE_OP_CONSTANTS
-#define OP_COLOR_MATRIX 0
-#define OP_LUMA 1
-#define OP_ALPHA_THRESHOLD 2
-#define OP_COLOR_SPACE_XFORM 3
-#define OP_NONE 4
-// Values 6/7 mirror the chain kernel's slot ABI (5 is OP_TEXTURE there, never a pointwise op).
-#define OP_CONST_COLOR 6
-#define OP_BLEND 7
-#endif
+// body serves every slot; the slot parameter is unused in the scalar form. The OP_* constants come
+// from the shared op table; its guard makes the repeated per-slot inclusion of this file a no-op
+// rather than a redefinition. This interpreter dispatches on the AOTPointwiseOpType subset; the
+// chain-only defines in the table are simply unreferenced here.
+#include "operator/op_codes.inc"
 
 // OP_BLEND needs the shared PorterDuff blend math regardless of the kernel's XP state; the
 // include is guarded, so the per-slot re-inclusions of this file stay harmless.

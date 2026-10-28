@@ -77,15 +77,21 @@ Report CheckReflection(const std::vector<VariantData>& variants) {
   return Finish(errors, diagnostics);
 }
 
-Report CheckChainOps(const std::string& shaderDir) {
+Report CheckOpCodes(const std::string& shaderDir) {
   Diagnostics diagnostics;
-  auto errors = ValidateChainOpCodes(shaderDir, &diagnostics);
+  auto errors = ValidateOpCodes(shaderDir, &diagnostics);
   return Finish(errors, diagnostics);
 }
 
-Report CheckPointwiseOps(const std::string& shaderDir) {
+Report CheckSlotOpReferences(const std::string& shaderDir) {
   Diagnostics diagnostics;
-  auto errors = ValidatePointwiseOpCodes(shaderDir, &diagnostics);
+  auto errors = ValidateSlotOpReferences(shaderDir, &diagnostics);
+  return Finish(errors, diagnostics);
+}
+
+Report CheckOpTableExclusivity(const std::string& shaderDir) {
+  Diagnostics diagnostics;
+  auto errors = ValidateOpTableExclusivity(shaderDir, &diagnostics);
   return Finish(errors, diagnostics);
 }
 
@@ -207,76 +213,89 @@ TEST(ClipContractTest, EveryOffendingVariantIsCounted) {
   EXPECT_EQ(CheckClip(variants).errors, 3u);
 }
 
-// ---- ValidateChainOpCodes / ValidatePointwiseOpCodes ----------------------------------------
+// ---- ValidateOpCodes / ValidateSlotOpReferences / ValidateOpTableExclusivity ----------------
 
 TEST_F(DamagedShaderDir, TheRealOpCodesAgreeWithTheContract) {
-  auto chain = CheckChainOps(scratch.dir());
-  EXPECT_EQ(chain.errors, 0u) << chain.log;
-  auto pointwise = CheckPointwiseOps(scratch.dir());
-  EXPECT_EQ(pointwise.errors, 0u) << pointwise.log;
+  auto table = CheckOpCodes(scratch.dir());
+  EXPECT_EQ(table.errors, 0u) << table.log;
+  auto references = CheckSlotOpReferences(scratch.dir());
+  EXPECT_EQ(references.errors, 0u) << references.log;
+  auto exclusivity = CheckOpTableExclusivity(scratch.dir());
+  EXPECT_EQ(exclusivity.errors, 0u) << exclusivity.log;
 }
 
 TEST_F(DamagedShaderDir, ADriftedChainOpValueIsReported) {
-  ASSERT_TRUE(Edit("operator/pointwise_chain_ops.inc", "#define OP_LUMA 1", "#define OP_LUMA 9"));
-  auto report = CheckChainOps(scratch.dir());
+  ASSERT_TRUE(Edit("operator/op_codes.inc", "#define OP_LUMA 1", "#define OP_LUMA 9"));
+  auto report = CheckOpCodes(scratch.dir());
   EXPECT_GE(report.errors, 1u);
   EXPECT_TRUE(report.mentions("OP_LUMA is 9 but the C++ contract says 1")) << report.log;
 }
 
 TEST_F(DamagedShaderDir, ARenamedChainOpIsReportedAsMissingAndAsStray) {
-  ASSERT_TRUE(Edit("operator/pointwise_chain_ops.inc", "#define OP_BLEND", "#define OP_BLENDED"));
-  auto report = CheckChainOps(scratch.dir());
+  ASSERT_TRUE(Edit("operator/op_codes.inc", "#define OP_BLEND", "#define OP_BLENDED"));
+  auto report = CheckOpCodes(scratch.dir());
   EXPECT_EQ(report.errors, 2u) << report.log;
-  EXPECT_TRUE(report.mentions("OP define missing in operator/pointwise_chain_ops.inc: OP_BLEND"))
+  EXPECT_TRUE(report.mentions("OP define missing in operator/op_codes.inc: OP_BLEND"))
       << report.log;
-  EXPECT_TRUE(report.mentions("unknown OP define in operator/pointwise_chain_ops.inc: OP_BLENDED"))
+  EXPECT_TRUE(report.mentions("unknown OP define in operator/op_codes.inc: OP_BLENDED"))
       << report.log;
 }
 
 TEST_F(DamagedShaderDir, AStrayChainOpIsReported) {
-  Append("operator/pointwise_chain_ops.inc", "\n#define OP_EXTRA 99\n");
-  auto report = CheckChainOps(scratch.dir());
+  Append("operator/op_codes.inc", "\n#define OP_EXTRA 99\n");
+  auto report = CheckOpCodes(scratch.dir());
   EXPECT_EQ(report.errors, 1u) << report.log;
-  EXPECT_TRUE(report.mentions("unknown OP define in operator/pointwise_chain_ops.inc: OP_EXTRA"))
+  EXPECT_TRUE(report.mentions("unknown OP define in operator/op_codes.inc: OP_EXTRA"))
       << report.log;
 }
 
 TEST_F(DamagedShaderDir, ANonDecimalOpValueIsReported) {
-  ASSERT_TRUE(
-      Edit("operator/pointwise_chain_ops.inc", "#define OP_LUMA 1", "#define OP_LUMA 0 + 1"));
-  auto report = CheckChainOps(scratch.dir());
+  ASSERT_TRUE(Edit("operator/op_codes.inc", "#define OP_LUMA 1", "#define OP_LUMA 0 + 1"));
+  auto report = CheckOpCodes(scratch.dir());
   EXPECT_GE(report.errors, 1u);
   EXPECT_TRUE(report.mentions("cannot parse OP_LUMA value '0 + 1'")) << report.log;
 }
 
 TEST_F(DamagedShaderDir, ACommentedDefineCannotMaskARealMismatch) {
   // A line comment that repeats a define must not overwrite the value of the real one.
-  ASSERT_TRUE(Edit("operator/pointwise_chain_ops.inc", "#define OP_LUMA 1",
+  ASSERT_TRUE(Edit("operator/op_codes.inc", "#define OP_LUMA 1",
                    "#define OP_LUMA 9\n// #define OP_LUMA 1"));
-  auto report = CheckChainOps(scratch.dir());
+  auto report = CheckOpCodes(scratch.dir());
   EXPECT_GE(report.errors, 1u);
   EXPECT_TRUE(report.mentions("OP_LUMA is 9")) << report.log;
 }
 
 TEST_F(DamagedShaderDir, AMissingOpFileIsReported) {
-  std::filesystem::remove(scratch.dir() + "/operator/pointwise_chain_ops.inc");
-  auto report = CheckChainOps(scratch.dir());
+  std::filesystem::remove(scratch.dir() + "/operator/op_codes.inc");
+  auto report = CheckOpCodes(scratch.dir());
   EXPECT_EQ(report.errors, 1u);
-  EXPECT_TRUE(report.mentions("cannot open operator/pointwise_chain_ops.inc")) << report.log;
+  EXPECT_TRUE(report.mentions("cannot open operator/op_codes.inc")) << report.log;
 }
 
-TEST_F(DamagedShaderDir, ADriftedPointwiseOpValueIsReported) {
-  ASSERT_TRUE(Edit("pipeline/slot/pointwise_op.inc", "#define OP_BLEND 7", "#define OP_BLEND 5"));
-  auto report = CheckPointwiseOps(scratch.dir());
-  EXPECT_GE(report.errors, 1u);
-  EXPECT_TRUE(report.mentions("OP_BLEND is 5 but the C++ contract says 7")) << report.log;
-}
-
-TEST_F(DamagedShaderDir, AChainOnlyOpInThePointwiseFileIsReported) {
-  Append("pipeline/slot/pointwise_op.inc", "\n#define OP_TEXTURE 5\n");
-  auto report = CheckPointwiseOps(scratch.dir());
+TEST_F(DamagedShaderDir, AChainOpReferenceInTheSlotFileIsReported) {
+  // The single-slot interpreter must only dispatch on ops the C++ side can emit into a slot.
+  ASSERT_TRUE(Edit("pipeline/slot/pointwise_op.inc", "opType == OP_LUMA", "opType == OP_TEXTURE"));
+  auto report = CheckSlotOpReferences(scratch.dir());
   EXPECT_EQ(report.errors, 1u) << report.log;
-  EXPECT_TRUE(report.mentions("unknown OP define in pipeline/slot/pointwise_op.inc: OP_TEXTURE"))
+  EXPECT_TRUE(
+      report.mentions("op referenced in pointwise_op.inc is not a pointwise operator: OP_TEXTURE"))
+      << report.log;
+}
+
+TEST_F(DamagedShaderDir, ACommentedOpReferenceInTheSlotFileIsAllowed) {
+  // A comment naming an op is documentation, not a dispatch; the check must not count it.
+  Append("pipeline/slot/pointwise_op.inc", "\n// OP_TEXTURE documents the chain-only op\n");
+  auto report = CheckSlotOpReferences(scratch.dir());
+  EXPECT_EQ(report.errors, 0u) << report.log;
+}
+
+TEST_F(DamagedShaderDir, AnOpDefineOutsideTheOpTableIsReported) {
+  // A second OP_* table anywhere but operator/op_codes.inc could drift from the anchored one.
+  Append("kernels/solid_color_fill.frag", "\n#define OP_LOCAL 77\n");
+  auto report = CheckOpTableExclusivity(scratch.dir());
+  EXPECT_EQ(report.errors, 1u) << report.log;
+  EXPECT_TRUE(
+      report.mentions("OP_* define outside operator/op_codes.inc: kernels/solid_color_fill.frag"))
       << report.log;
 }
 

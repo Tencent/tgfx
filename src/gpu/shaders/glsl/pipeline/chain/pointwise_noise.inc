@@ -1,7 +1,7 @@
 // Perlin noise source module (OP_PERLIN_NOISE), used by the noise resource kind (RESOURCE_KIND 2)
 // of PointwiseChainShader. Pairs with pointwise_noise_uniforms.inc. NoiseModeOctaves.w selects
 // which leaf samplers hold the permutation and gradient lookup textures.
-#include "operator/pointwise_chain_ops.inc"
+#include "operator/op_codes.inc"
 #include "pipeline/chain/pointwise_source_coords.inc"
 
 vec4 aotPerlinPermutation(vec2 coord) {

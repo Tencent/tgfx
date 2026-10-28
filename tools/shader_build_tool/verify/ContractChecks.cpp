@@ -25,7 +25,6 @@
 #include <set>
 #include <sstream>
 #include <utility>
-#include <utility>
 #include "core/DiagnosticCodes.h"
 #include "gpu/AOTResourceProfile.h"
 #include "gpu/BundleFormat.h"
@@ -160,8 +159,8 @@ static size_t ValidateOpDefines(const std::string& shaderDir, const char* fileNa
   if (!file.is_open()) {
     // The include itself is gone: nothing can be compared, which is a failed check, not a
     // passing one.
-    Report(diagnostics, Severity::Unverifiable, DiagnosticCode::VerifyNotApplicable, "", "", -1,
-           -1, std::string("cannot open ") + fileName + " under " + shaderDir);
+    Report(diagnostics, Severity::Unverifiable, DiagnosticCode::VerifyNotApplicable, "", "", -1, -1,
+           std::string("cannot open ") + fileName + " under " + shaderDir);
     return 1;
   }
   std::stringstream buffer;
@@ -192,42 +191,114 @@ static size_t ValidateOpDefines(const std::string& shaderDir, const char* fileNa
   return errors;
 }
 
-// The chain slot op codes ride the Packed.x selector, so the GLSL OP_* defines and the C++
-// AOTChainOp enum (anchored to the ChainOp constants) must agree value-for-value.
-size_t ValidateChainOpCodes(const std::string& shaderDir, Diagnostics* diagnostics) {
-  return ValidateOpDefines(shaderDir, "operator/pointwise_chain_ops.inc",
-                           {{"OP_COLOR_MATRIX", ChainOp::ColorMatrix},
-                            {"OP_LUMA", ChainOp::Luma},
-                            {"OP_ALPHA_THRESHOLD", ChainOp::AlphaThreshold},
-                            {"OP_COLOR_SPACE_XFORM", ChainOp::ColorSpaceXform},
-                            {"OP_NONE", ChainOp::None},
-                            {"OP_TEXTURE", ChainOp::Texture},
-                            {"OP_CONST_COLOR", ChainOp::ConstColor},
-                            {"OP_BLEND", ChainOp::Blend},
-                            {"OP_AARECT_COVERAGE", ChainOp::AARectCoverage},
-                            {"OP_GRADIENT", ChainOp::Gradient},
-                            {"OP_LOCAL_RECT_COVERAGE", ChainOp::LocalRectCoverage},
-                            {"OP_RRECT_COVERAGE", ChainOp::RRectCoverage},
-                            {"OP_TEX_MODULATE", ChainOp::TexModulate},
-                            {"OP_INPUT_OPAQUE", ChainOp::InputOpaque},
-                            {"OP_MUL_ALPHA", ChainOp::MulAlpha},
-                            {"OP_PERLIN_NOISE", ChainOp::PerlinNoise}},
+// The op table is the single definition of the pointwise op codes: its GLSL OP_* defines and the
+// C++ AOTChainOp enum (anchored to the Op constants) must agree value-for-value.
+size_t ValidateOpCodes(const std::string& shaderDir, Diagnostics* diagnostics) {
+  return ValidateOpDefines(shaderDir, "operator/op_codes.inc",
+                           {{"OP_COLOR_MATRIX", Op::ColorMatrix},
+                            {"OP_LUMA", Op::Luma},
+                            {"OP_ALPHA_THRESHOLD", Op::AlphaThreshold},
+                            {"OP_COLOR_SPACE_XFORM", Op::ColorSpaceXform},
+                            {"OP_NONE", Op::None},
+                            {"OP_TEXTURE", Op::Texture},
+                            {"OP_CONST_COLOR", Op::ConstColor},
+                            {"OP_BLEND", Op::Blend},
+                            {"OP_AARECT_COVERAGE", Op::AARectCoverage},
+                            {"OP_GRADIENT", Op::Gradient},
+                            {"OP_LOCAL_RECT_COVERAGE", Op::LocalRectCoverage},
+                            {"OP_RRECT_COVERAGE", Op::RRectCoverage},
+                            {"OP_TEX_MODULATE", Op::TexModulate},
+                            {"OP_INPUT_OPAQUE", Op::InputOpaque},
+                            {"OP_MUL_ALPHA", Op::MulAlpha},
+                            {"OP_PERLIN_NOISE", Op::PerlinNoise}},
                            diagnostics);
 }
 
-// The plain pointwise slot selects its operator the same way, so pointwise_op.inc must agree
-// with the AOTPointwiseOpType enum (anchored to the PointwiseOp constants). Chain-only operators
-// (Texture and the coverage/modulator ops) must not appear here.
-size_t ValidatePointwiseOpCodes(const std::string& shaderDir, Diagnostics* diagnostics) {
-  return ValidateOpDefines(shaderDir, "pipeline/slot/pointwise_op.inc",
-                           {{"OP_COLOR_MATRIX", PointwiseOp::ColorMatrix},
-                            {"OP_LUMA", PointwiseOp::Luma},
-                            {"OP_ALPHA_THRESHOLD", PointwiseOp::AlphaThreshold},
-                            {"OP_COLOR_SPACE_XFORM", PointwiseOp::ColorSpaceXform},
-                            {"OP_NONE", PointwiseOp::None},
-                            {"OP_CONST_COLOR", PointwiseOp::ConstColor},
-                            {"OP_BLEND", PointwiseOp::Blend}},
-                           diagnostics);
+// The single-slot interpreter dispatches on the OP_* references in pointwise_op.inc, so every
+// reference must be an operator the C++ side can emit into a slot (the AOTPointwiseOpType values,
+// anchored to the Op constants). Chain-only operators (Texture and the coverage/modulator ops)
+// must never be referenced here. Line comments are stripped first, so a comment naming an op is
+// documentation, not a dispatch.
+size_t ValidateSlotOpReferences(const std::string& shaderDir, Diagnostics* diagnostics) {
+  std::ifstream file(shaderDir + "/pipeline/slot/pointwise_op.inc");
+  if (!file.is_open()) {
+    Report(diagnostics, Severity::Unverifiable, DiagnosticCode::VerifyNotApplicable, "", "", -1, -1,
+           "cannot open pipeline/slot/pointwise_op.inc under " + shaderDir);
+    return 1;
+  }
+  std::stringstream buffer;
+  buffer << file.rdbuf();
+  const std::string text = buffer.str();
+  std::string stripped;
+  stripped.reserve(text.size());
+  size_t scan = 0;
+  while (scan < text.size()) {
+    auto lineEnd = text.find('\n', scan);
+    auto line = text.substr(scan, (lineEnd == std::string::npos ? text.size() : lineEnd) - scan);
+    auto comment = line.find("//");
+    if (comment != std::string::npos) {
+      line = line.substr(0, comment);
+    }
+    stripped += line;
+    stripped += '\n';
+    scan = lineEnd == std::string::npos ? text.size() : lineEnd + 1;
+  }
+  const std::map<std::string, int> pointwiseOps = {
+      {"OP_COLOR_MATRIX", Op::ColorMatrix},
+      {"OP_LUMA", Op::Luma},
+      {"OP_ALPHA_THRESHOLD", Op::AlphaThreshold},
+      {"OP_COLOR_SPACE_XFORM", Op::ColorSpaceXform},
+      {"OP_NONE", Op::None},
+      {"OP_CONST_COLOR", Op::ConstColor},
+      {"OP_BLEND", Op::Blend},
+  };
+  size_t errors = 0;
+  std::set<std::string> reported;
+  const std::regex referencePattern("\\bOP_[A-Z][A-Z0-9_]*");
+  for (std::sregex_iterator it(stripped.begin(), stripped.end(), referencePattern), end; it != end;
+       ++it) {
+    const std::string name = it->str();
+    if (pointwiseOps.count(name) == 0 && reported.insert(name).second) {
+      Report(diagnostics, Severity::Error, DiagnosticCode::VerifyOpCode, "", "", -1, -1,
+             "op referenced in pointwise_op.inc is not a pointwise operator: " + name);
+      ++errors;
+    }
+  }
+  return errors;
+}
+
+// The op table is the only shader file that may define an OP_* macro: a define anywhere else
+// would be a second table that can drift from the C++ anchor.
+size_t ValidateOpTableExclusivity(const std::string& shaderDir, Diagnostics* diagnostics) {
+  size_t errors = 0;
+  const std::regex definePattern("^[ \t]*#[ \t]*define[ \t]+OP_[A-Z][A-Z0-9_]*");
+  for (std::filesystem::recursive_directory_iterator it(shaderDir), end; it != end; ++it) {
+    if (!it->is_regular_file()) {
+      continue;
+    }
+    const auto path = it->path();
+    const auto extension = path.extension().string();
+    if (extension != ".inc" && extension != ".frag" && extension != ".vert") {
+      continue;
+    }
+    const auto relative = std::filesystem::relative(path, shaderDir).generic_string();
+    if (relative == "operator/op_codes.inc") {
+      continue;
+    }
+    std::ifstream file(path);
+    std::string line;
+    int lineNumber = 0;
+    while (std::getline(file, line)) {
+      ++lineNumber;
+      if (std::regex_search(line, definePattern)) {
+        Report(diagnostics, Severity::Error, DiagnosticCode::VerifyOpCode, "", "", -1, -1,
+               "OP_* define outside operator/op_codes.inc: " + relative + ":" +
+                   std::to_string(lineNumber));
+        ++errors;
+      }
+    }
+  }
+  return errors;
 }
 
 // The GLSL kernels carry their slot capacities as literals behind #ifndef / #if guards while the
@@ -263,8 +334,8 @@ size_t ValidateSlotCapacities(const std::string& shaderDir, Diagnostics* diagnos
   }
   std::ifstream chainFile(shaderDir + "/kernels/pointwise_chain.frag");
   if (!chainFile.is_open()) {
-    Report(diagnostics, Severity::Unverifiable, DiagnosticCode::VerifyNotApplicable, "", "", -1,
-           -1, std::string("cannot open pointwise_chain.frag under ") + shaderDir);
+    Report(diagnostics, Severity::Unverifiable, DiagnosticCode::VerifyNotApplicable, "", "", -1, -1,
+           std::string("cannot open pointwise_chain.frag under ") + shaderDir);
     return errors + 1;
   }
   std::stringstream chainBuffer;
@@ -338,8 +409,8 @@ size_t ValidateShaderSourceReferences(const std::string& shaderDir,
     }
   }
   if (code || sourcePaths.empty()) {
-    Report(diagnostics, Severity::Unverifiable, DiagnosticCode::VerifyNotApplicable, "", "", -1,
-           -1, "cannot list shader sources under " + shaderDir);
+    Report(diagnostics, Severity::Unverifiable, DiagnosticCode::VerifyNotApplicable, "", "", -1, -1,
+           "cannot list shader sources under " + shaderDir);
     return 1;
   }
   const std::set<std::string> registered(registeredShaders.begin(), registeredShaders.end());
@@ -371,8 +442,8 @@ size_t ValidateShaderSourceReferences(const std::string& shaderDir,
              !IsIdentifierChar(text[tokenEnd + suffix.size()])) &&
             existingFiles.count(token + suffix) == 0) {
           Report(diagnostics, Severity::Error, DiagnosticCode::VerifySourceFile, "", "", -1, -1,
-                 fileName + " refers to " + token + suffix +
-                     ", which does not exist under " + shaderDir);
+                 fileName + " refers to " + token + suffix + ", which does not exist under " +
+                     shaderDir);
           ++errors;
         }
       }
@@ -440,8 +511,7 @@ size_t ValidateReflectionContracts(const std::vector<VariantData>& variants,
           if (entry.arraySize < 1 || (isSamplerList && entry.arraySize != 1)) {
             Report(diagnostics, Severity::Error, DiagnosticCode::VerifyReflection,
                    variant.shaderName, variant.profileTag, -1, -1,
-                   "entry '" + entry.name + "' has arraySize " +
-                       std::to_string(entry.arraySize) +
+                   "entry '" + entry.name + "' has arraySize " + std::to_string(entry.arraySize) +
                        " (uniforms need >= 1, samplers need exactly 1)");
             ++errors;
           }
@@ -468,15 +538,15 @@ size_t ValidateReflectionContracts(const std::vector<VariantData>& variants,
           parsed = std::stoi(sampler.name.substr(prefix.size()));
         }
         if (!generic) {
-          Report(diagnostics, Severity::Error, DiagnosticCode::VerifyReflection,
-                 variant.shaderName, variant.profileTag, -1, -1,
+          Report(diagnostics, Severity::Error, DiagnosticCode::VerifyReflection, variant.shaderName,
+                 variant.profileTag, -1, -1,
                  "declares sampler '" + sampler.name +
                      "' (neither the TextureSampler_<N> pattern nor a registered semantic name; "
                      "see SamplerContract in KernelContract.h)");
           ++errors;
         } else if (parsed != nextSamplerIndex) {
-          Report(diagnostics, Severity::Error, DiagnosticCode::VerifyReflection,
-                 variant.shaderName, variant.profileTag, -1, -1,
+          Report(diagnostics, Severity::Error, DiagnosticCode::VerifyReflection, variant.shaderName,
+                 variant.profileTag, -1, -1,
                  "generic sampler #" + std::to_string(nextSamplerIndex) + " is named '" +
                      sampler.name + "' (indices must be dense from zero)");
           ++errors;

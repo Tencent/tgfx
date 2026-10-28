@@ -274,19 +274,20 @@ using AOTEffectParameters =
                  AOTGradientParameters, AOTRRectCoverageParameters>;
 
 // Runtime-selected pointwise operator applied by the fused kernels (PointwiseChain,
-// PerlinNoiseFill and YUVTextureFill). The values mirror the OP_* constants in pointwise_op.inc: the kernels
-// declare every operator's parameter block unconditionally and select at draw time via a uniform,
-// so the operator kind is never a compile-time permutation axis.
+// PerlinNoiseFill and YUVTextureFill). The values are the AOTPointwiseOpType subset of the shared
+// op table (operator/op_codes.inc): the kernels declare every operator's parameter block
+// unconditionally and select at draw time via a uniform, so the operator kind is never a
+// compile-time permutation axis.
 enum class AOTPointwiseOpType : int {
-  ColorMatrix = PointwiseOp::ColorMatrix,
-  Luma = PointwiseOp::Luma,
-  AlphaThreshold = PointwiseOp::AlphaThreshold,
-  ColorSpaceXform = PointwiseOp::ColorSpaceXform,
-  None = PointwiseOp::None,
+  ColorMatrix = Op::ColorMatrix,
+  Luma = Op::Luma,
+  AlphaThreshold = Op::AlphaThreshold,
+  ColorSpaceXform = Op::ColorSpaceXform,
+  None = Op::None,
   // 5 is OP_TEXTURE in the chain kernel's slot ABI and never a pointwise op. 6/7 mirror the
   // chain kernel's OP_CONST_COLOR / OP_BLEND values.
-  ConstColor = PointwiseOp::ConstColor,
-  Blend = PointwiseOp::Blend,
+  ConstColor = Op::ConstColor,
+  Blend = Op::Blend,
 };
 
 /**

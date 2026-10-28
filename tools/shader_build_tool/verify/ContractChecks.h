@@ -35,13 +35,18 @@ namespace tgfx {
 size_t ValidateClipContractFields(const std::vector<VariantData>& variants,
                                   Diagnostics* diagnostics);
 
-/// Validates the OP_* defines in pointwise_chain_ops.inc against the ChainOp constants that
-/// anchor the AOTChainOp enum. Returns the error count.
-size_t ValidateChainOpCodes(const std::string& shaderDir, Diagnostics* diagnostics);
+/// Validates the OP_* defines in operator/op_codes.inc against the Op constants that anchor the
+/// AOTChainOp enum. Returns the error count.
+size_t ValidateOpCodes(const std::string& shaderDir, Diagnostics* diagnostics);
 
-/// Validates the OP_* defines in pointwise_op.inc against the PointwiseOp constants that anchor
-/// the AOTPointwiseOpType enum. Returns the error count.
-size_t ValidatePointwiseOpCodes(const std::string& shaderDir, Diagnostics* diagnostics);
+/// Validates that every OP_* reference in the single-slot interpreter (pointwise_op.inc) is an
+/// operator the C++ side can emit into a slot (the AOTPointwiseOpType values, anchored to the Op
+/// constants). Returns the error count.
+size_t ValidateSlotOpReferences(const std::string& shaderDir, Diagnostics* diagnostics);
+
+/// Validates that operator/op_codes.inc is the only shader file defining an OP_* macro. Returns
+/// the error count.
+size_t ValidateOpTableExclusivity(const std::string& shaderDir, Diagnostics* diagnostics);
 
 /// Validates the slot-capacity literals the GLSL kernels carry against the C++ constants they
 /// must agree with: the TGFX_SLOT_ARRAY_SUFFIX in perlin_noise.frag / yuv_texture_fill.frag must

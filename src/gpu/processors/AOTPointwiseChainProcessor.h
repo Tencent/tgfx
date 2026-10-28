@@ -28,25 +28,25 @@
 namespace tgfx {
 
 /// The runtime operator of one chain slot. The integer values are part of the precompiled kernel
-/// ABI: they must match the OP_* constants in pointwise_chain.inc, which shader_build_tool
-/// validates against the shared ChainOp constants at bundle build time.
+/// ABI: they must match the OP_* constants in operator/op_codes.inc, which shader_build_tool
+/// validates against the shared Op constants at bundle build time.
 enum class AOTChainOp : int {
-  ColorMatrix = ChainOp::ColorMatrix,
-  Luma = ChainOp::Luma,
-  AlphaThreshold = ChainOp::AlphaThreshold,
-  ColorSpaceXform = ChainOp::ColorSpaceXform,
-  None = ChainOp::None,
-  Texture = ChainOp::Texture,
-  ConstColor = ChainOp::ConstColor,
-  Blend = ChainOp::Blend,
-  AARectCoverage = ChainOp::AARectCoverage,
-  Gradient = ChainOp::Gradient,
-  LocalRectCoverage = ChainOp::LocalRectCoverage,
-  RRectCoverage = ChainOp::RRectCoverage,
-  TexModulate = ChainOp::TexModulate,
-  InputOpaque = ChainOp::InputOpaque,
-  MulAlpha = ChainOp::MulAlpha,
-  PerlinNoise = ChainOp::PerlinNoise,
+  ColorMatrix = Op::ColorMatrix,
+  Luma = Op::Luma,
+  AlphaThreshold = Op::AlphaThreshold,
+  ColorSpaceXform = Op::ColorSpaceXform,
+  None = Op::None,
+  Texture = Op::Texture,
+  ConstColor = Op::ConstColor,
+  Blend = Op::Blend,
+  AARectCoverage = Op::AARectCoverage,
+  Gradient = Op::Gradient,
+  LocalRectCoverage = Op::LocalRectCoverage,
+  RRectCoverage = Op::RRectCoverage,
+  TexModulate = Op::TexModulate,
+  InputOpaque = Op::InputOpaque,
+  MulAlpha = Op::MulAlpha,
+  PerlinNoise = Op::PerlinNoise,
 };
 
 /// One node of a pointwise DAG after flattening into the fused kernel's instruction array.

@@ -48,10 +48,14 @@ constexpr const char* DeviceToLocal = "DeviceToLocal";
 
 }  // namespace ClipContract
 
-namespace ChainOp {
+namespace Op {
 
-// The pointwise chain slot op codes, mirrored by the OP_* defines in
-// pointwise_chain_ops.inc and the AOTChainOp enum (which anchors to these constants).
+// The one op table of the pointwise interpreters (chain and slot): the single place an op value
+// is defined. Mirrored by the OP_* defines in operator/op_codes.inc (validated by
+// shader_build_tool, which also rejects any OP_* define elsewhere) and anchored to by the
+// AOTChainOp enum. The single-slot interpreter dispatches on the AOTPointwiseOpType subset of
+// these values, so it deliberately never emits the chain-only ones (Texture, the coverage ops,
+// and the modulators).
 constexpr int ColorMatrix = 0;
 constexpr int Luma = 1;
 constexpr int AlphaThreshold = 2;
@@ -69,23 +73,7 @@ constexpr int InputOpaque = 13;
 constexpr int MulAlpha = 14;
 constexpr int PerlinNoise = 15;
 
-}  // namespace ChainOp
-
-namespace PointwiseOp {
-
-// The plain pointwise-slot operator codes, mirrored by the OP_* defines in pointwise_op.inc and
-// the AOTPointwiseOpType enum (which anchors to these constants). The chain-only operators
-// (Texture=5, the coverage ops, and the modulators) deliberately have no value here: a plain
-// slot never carries them.
-constexpr int ColorMatrix = 0;
-constexpr int Luma = 1;
-constexpr int AlphaThreshold = 2;
-constexpr int ColorSpaceXform = 3;
-constexpr int None = 4;
-constexpr int ConstColor = 6;
-constexpr int Blend = 7;
-
-}  // namespace PointwiseOp
+}  // namespace Op
 
 namespace SamplerContract {
 

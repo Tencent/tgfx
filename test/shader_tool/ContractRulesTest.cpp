@@ -25,8 +25,8 @@
 #include <vector>
 #include "gpu/shaders/AllShaderFamilies.h"
 #include "gpu/shaders/PrecompiledShader.h"
-#include "verify/ContractRules.h"
 #include "gtest/gtest.h"
+#include "verify/ContractRules.h"
 
 namespace tgfx {
 namespace {
@@ -44,8 +44,8 @@ SourceRuleContext RealSourceContext() {
 
 }  // namespace
 
-TEST(ContractRulesTest, TheSourceRegistryHoldsTheFourSourceRules) {
-  EXPECT_EQ(MakeSourceRules().size(), 4u);
+TEST(ContractRulesTest, TheSourceRegistryHoldsTheFiveSourceRules) {
+  EXPECT_EQ(MakeSourceRules().size(), 5u);
 }
 
 TEST(ContractRulesTest, TheArtifactRegistryHoldsTheFourArtifactRules) {

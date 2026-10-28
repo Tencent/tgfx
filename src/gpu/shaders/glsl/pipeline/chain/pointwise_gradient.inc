@@ -1,6 +1,6 @@
 // Gradient source module (OP_GRADIENT), used by the gradient resource kind (RESOURCE_KIND 1) of
 // PointwiseChainShader. Pairs with pointwise_gradient_uniforms.inc.
-#include "operator/pointwise_chain_ops.inc"
+#include "operator/op_codes.inc"
 #include "pipeline/chain/pointwise_source_coords.inc"
 #include "source/gradient_layout.inc"
 #include "source/gradient_colorize.inc"
