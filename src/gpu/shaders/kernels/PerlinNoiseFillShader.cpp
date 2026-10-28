@@ -20,12 +20,16 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
+#include "gpu/processors/AlphaThresholdFragmentProcessor.h"
+#include "gpu/processors/ColorMatrixFragmentProcessor.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/processors/LumaFragmentProcessor.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/shaders/modules/ParamWriter.h"
 #include "gpu/shaders/modules/PerlinNoiseModule.h"
+#include "gpu/shaders/modules/PointwiseOpModule.h"
 #include "gpu/shaders/modules/PorterDuffXPModule.h"
 
 namespace tgfx {
@@ -82,6 +86,12 @@ ModuleBindFn PerlinNoiseFillShader::BindingFor(const ProgramInfo* /*programInfo*
                                                const FragmentProcessor* fp) {
   if (IsProcessor<PerlinNoiseFragmentProcessor>(fp)) {
     return &PerlinNoiseModule::Bind;
+  }
+  // Only the operators the module replicates: a color-space xform keeps its own (already native)
+  // writer, so IsSupportedPointwiseOp alone would be too wide here.
+  if (IsProcessor<ColorMatrixFragmentProcessor>(fp) || IsProcessor<LumaFragmentProcessor>(fp) ||
+      IsProcessor<AlphaThresholdFragmentProcessor>(fp)) {
+    return &PointwiseOpModule::Bind;
   }
   return nullptr;
 }

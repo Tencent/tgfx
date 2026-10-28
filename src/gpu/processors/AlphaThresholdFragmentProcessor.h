@@ -33,6 +33,11 @@ class AlphaThresholdFragmentProcessor : public FragmentProcessor {
 
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
+  /** The alpha cutoff the processor was built with. */
+  float getThreshold() const {
+    return threshold;
+  }
+
  protected:
   explicit AlphaThresholdFragmentProcessor(float threshold)
       : FragmentProcessor(ClassID()), threshold(threshold) {

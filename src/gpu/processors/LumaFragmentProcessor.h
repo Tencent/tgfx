@@ -37,6 +37,19 @@ class LumaFragmentProcessor : public FragmentProcessor {
 
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
+  /** The luminance coefficients the processor was built with. */
+  float getKr() const {
+    return _lumaFactor.kr;
+  }
+
+  float getKg() const {
+    return _lumaFactor.kg;
+  }
+
+  float getKb() const {
+    return _lumaFactor.kb;
+  }
+
  protected:
   LumaFragmentProcessor(std::shared_ptr<ColorSpace> colorSpace);
 

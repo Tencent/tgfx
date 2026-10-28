@@ -36,6 +36,11 @@ class ColorMatrixFragmentProcessor : public FragmentProcessor {
 
   bool isChannelPermutation() const;
 
+  /** The 20-float color matrix: a row-major 4x4 followed by a 4-element bias vector. */
+  const std::array<float, 20>& getMatrix() const {
+    return matrix;
+  }
+
  protected:
   explicit ColorMatrixFragmentProcessor(const std::array<float, 20>& matrix)
       : FragmentProcessor(ClassID()), matrix(matrix) {

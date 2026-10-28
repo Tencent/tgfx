@@ -57,7 +57,8 @@ class ParamWriter {
     }
   }
 
-  void setArrayElement(const Param<ParamType::Int>& param, size_t index, int32_t value) {
+  template <ParamType Type, typename T>
+  void setArrayElement(const Param<Type>& param, size_t index, const T& value) {
     if (uniforms != nullptr) {
       uniforms->setArrayElementOptional(param.name, index, value);
     }
