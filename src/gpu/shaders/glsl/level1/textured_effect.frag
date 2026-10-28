@@ -15,10 +15,7 @@
 #endif
 
 layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
-  // Exact paint color for common-color draws; the broadcast into the per-vertex attribute is
-  // 8-bit quantized, so HasCommonColor selects this uniform when set.
   vec4 Color;
-  int HasCommonColor;
   vec4 Subset;
 #include "pointwise_op_uniforms.inc"
 #include "xp_uniforms.inc"
@@ -26,12 +23,10 @@ layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING)
 
 layout(location = 0) in vec2 TransformedCoords_0;
 layout(location = 1) in float vCoverage;
-layout(location = 2) in vec4 vColor;
 
 layout(set = TGFX_TEXTURE_SET, binding = 0) uniform sampler2D TextureSampler_0;
 
 #define XP_DST_TEX_BINDING 1
-#define FILL_COLOR FILL_COLOR_VARYING_OR_COMMON
 #define FILL_SOURCE FILL_SOURCE_CLAMPED_TEXTURE
 #define FILL_OPERATOR 1
 #define FILL_COVERAGE FILL_COVERAGE_VERTEX
