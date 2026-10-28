@@ -100,6 +100,9 @@ class TextureEffect : public FragmentProcessor {
    */
   void computeSubsetRect(float rect[4]) const;
 
+  /** The YUV planes behind this texture, or null for a single-plane texture. */
+  YUVTextureView* getYUVTexture() const;
+
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:
@@ -118,8 +121,6 @@ class TextureEffect : public FragmentProcessor {
   }
 
   TextureView* getTextureView() const;
-
-  YUVTextureView* getYUVTexture() const;
 
   bool needSubset() const;
 

@@ -1,5 +1,6 @@
 // The texture-source module's value binding. See TextureSourceModule.h for the contract.
 #include "gpu/shaders/modules/TextureSourceModule.h"
+#include "gpu/YUVColorConversion.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/shaders/modules/ParamWriter.h"
 
@@ -24,6 +25,13 @@ void TextureSourceModule::Bind(const FragmentProcessor* processor, ParamWriter* 
   }
   writer->set(AlphaOnly, texture->isAlphaOnly() ? 1 : 0);
   writer->set(HasRgbaaa, texture->hasRGBAAA() ? 1 : 0);
+  auto* yuvTexture = texture->getYUVTexture();
+  if (yuvTexture != nullptr) {
+    writer->set(YUVLimitedRange, IsLimitedYUVColorRange(yuvTexture->yuvColorSpace()) ? 1 : 0);
+    if (auto conversion = YUVColorConversionMatrix(yuvTexture->yuvColorSpace())) {
+      writer->set(Mat3ColorConversion, *conversion);
+    }
+  }
 }
 
 }  // namespace tgfx

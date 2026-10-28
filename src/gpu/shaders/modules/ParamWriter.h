@@ -44,6 +44,12 @@ class ParamWriter {
     }
   }
 
+  void set(const Param<ParamType::Float3x3>& param, const std::array<float, 12>& aligned) {
+    if (uniforms != nullptr) {
+      uniforms->setDataOptional(param.name, aligned);
+    }
+  }
+
   template <size_t N>
   void set(const Param<ParamType::Float4Array>& param, const std::array<float, N>& values) {
     if (uniforms != nullptr) {

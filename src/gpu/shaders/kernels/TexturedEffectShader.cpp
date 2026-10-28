@@ -26,6 +26,7 @@
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/shaders/modules/ParamWriter.h"
 #include "gpu/shaders/modules/PorterDuffXPModule.h"
+#include "gpu/shaders/modules/TextureSourceModule.h"
 
 namespace tgfx {
 
@@ -91,6 +92,14 @@ XPBindFn TexturedEffectShader::XPBindingFor(const ProgramInfo* programInfo) {
     return nullptr;
   }
   return &PorterDuffXPModule::Bind;
+}
+
+ModuleBindFn TexturedEffectShader::BindingFor(const ProgramInfo* /*programInfo*/,
+                                              const FragmentProcessor* fp) {
+  if (IsProcessor<TextureEffect>(fp)) {
+    return &TextureSourceModule::Bind;
+  }
+  return nullptr;
 }
 
 }  // namespace tgfx

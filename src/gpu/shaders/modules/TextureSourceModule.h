@@ -14,6 +14,9 @@ struct TextureSourceModule {
   static constexpr Param<ParamType::Float2> AlphaStart{"AlphaStart"};
   static constexpr Param<ParamType::Int> AlphaOnly{"AlphaOnly"};
   static constexpr Param<ParamType::Int> HasRgbaaa{"HasRgbaaa"};
+  // YUV-only: the limited-range flag and the vec4-aligned conversion matrix.
+  static constexpr Param<ParamType::Int> YUVLimitedRange{"YUVLimitedRange"};
+  static constexpr Param<ParamType::Float3x3> Mat3ColorConversion{"Mat3ColorConversion"};
 
   static void Bind(const FragmentProcessor* processor, ParamWriter* writer);
 };
