@@ -211,6 +211,73 @@ static PrecompiledFallbackReason ToFallbackReason(PermutationMatchFailure failur
   return PrecompiledFallbackReason::Unspecified;
 }
 
+// True when the reflected vertex input at the given location (if the shader reads that slot)
+// carries a format the runtime attribute can serve: half-precision and normalized byte
+// attributes read as their float forms in the precompiled GLSL, everything else must match
+// exactly. A slot with no reflected input (an attribute parked on a spare location) passes.
+static bool VertexInputFormatMatches(const std::vector<VertexInput>& inputs, uint32_t location,
+                                     VertexFormat runtimeFormat, const std::string& shaderName,
+                                     PrecompiledShaderCache* cache, const ProgramInfo* programInfo,
+                                     const PermutationMatchResult* matchResult) {
+  const VertexInput* input = nullptr;
+  for (const auto& candidate : inputs) {
+    if (candidate.location == location) {
+      input = &candidate;
+      break;
+    }
+  }
+  if (input == nullptr) {
+    return true;
+  }
+  UniformFormat reflected = input->format;
+  bool agrees = false;
+  switch (runtimeFormat) {
+    case VertexFormat::Float:
+    case VertexFormat::Half:
+    case VertexFormat::UByteNormalized:
+      agrees = reflected == UniformFormat::Float;
+      break;
+    case VertexFormat::Float2:
+    case VertexFormat::Half2:
+    case VertexFormat::UByte2Normalized:
+      agrees = reflected == UniformFormat::Float2;
+      break;
+    case VertexFormat::Float3:
+    case VertexFormat::Half3:
+    case VertexFormat::UByte3Normalized:
+      agrees = reflected == UniformFormat::Float3;
+      break;
+    case VertexFormat::Float4:
+    case VertexFormat::Half4:
+    case VertexFormat::UByte4Normalized:
+      agrees = reflected == UniformFormat::Float4;
+      break;
+    case VertexFormat::Int:
+      agrees = reflected == UniformFormat::Int;
+      break;
+    case VertexFormat::Int2:
+      agrees = reflected == UniformFormat::Int2;
+      break;
+    case VertexFormat::Int3:
+      agrees = reflected == UniformFormat::Int3;
+      break;
+    case VertexFormat::Int4:
+      agrees = reflected == UniformFormat::Int4;
+      break;
+  }
+  if (agrees) {
+    return true;
+  }
+  cache->recordFailure(PrecompiledFallbackReason::VertexLayoutMismatch,
+                       MakeFallbackRecord(cache, programInfo, matchResult));
+  LOGE(
+      "PrecompiledProgramCreator: vertex format mismatch for %s[vert=%u]: location %u "
+      "reflects format %d but the runtime attribute provides %d",
+      shaderName.c_str(), matchResult->vertPermutationIndex, location, static_cast<int>(reflected),
+      static_cast<int>(runtimeFormat));
+  return false;
+}
+
 std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* context,
                                                                   const ProgramInfo* programInfo,
                                                                   bool* deferredFallback) {
@@ -491,12 +558,37 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
     }
   }
   descriptor.vertex.bufferLayouts = {vertexLayout};
+  uint32_t instanceAttributeBase = instanceBase;
   if (!instanceAttributes.empty()) {
     VertexBufferLayout instanceLayout(instanceAttributes, VertexStepMode::Instance);
     for (size_t index = 0; index < instanceAttributes.size(); ++index) {
       instanceLayout.shaderLocations.push_back(instanceBase + static_cast<uint32_t>(index));
     }
     descriptor.vertex.bufferLayouts.push_back(instanceLayout);
+  }
+  // The location check above says the shader reads the attribute slots the GP provides; the
+  // format check says it reads them with the layout the GP binds. Half-precision and normalized
+  // byte attributes are read as their float forms by the precompiled GLSL, so those map onto the
+  // float formats before the comparison; anything else must match exactly.
+  {
+    bool formatMismatch = false;
+    for (size_t slot = 0; !formatMismatch && slot < vertexLayout.attributes.size() &&
+                          slot < vertexLayout.shaderLocations.size();
+         ++slot) {
+      formatMismatch =
+          !VertexInputFormatMatches(vertBlob->vertexInputs, vertexLayout.shaderLocations[slot],
+                                    vertexLayout.attributes[slot].format(), matchResult->shaderName,
+                                    cache, programInfo, &*matchResult);
+    }
+    for (size_t index = 0; !formatMismatch && index < instanceAttributes.size(); ++index) {
+      formatMismatch = !VertexInputFormatMatches(
+          vertBlob->vertexInputs, instanceAttributeBase + static_cast<uint32_t>(index),
+          instanceAttributes[index].format(), matchResult->shaderName, cache, programInfo,
+          &*matchResult);
+    }
+    if (formatMismatch) {
+      return nullptr;
+    }
   }
   // Precompiled GLSL declares attributes with layout(location=N) matching the flattened order of
   // the runtime attribute list. Names in the template differ from the GeometryProcessor's runtime

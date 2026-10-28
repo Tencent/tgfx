@@ -127,6 +127,7 @@ const std::set<std::string>& AllowedRuntimeHeaders() {
       "gpu/Uniform.h",
       "gpu/shaders/KernelContract.h",
       // declaration layer
+      "gpu/shaders/AllParams.h",
       "gpu/shaders/AllShaderFamilies.h",
       "gpu/shaders/PrecompiledShader.h",
   };

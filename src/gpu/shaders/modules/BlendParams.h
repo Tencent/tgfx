@@ -1,6 +1,6 @@
-// The fused blend path's uniform fields: the blend kernel's mode and operand-role selectors,
-// plus the per-child subset records the precompiled path addresses explicitly (the runtime name
-// suffixes are stripped there, so the two texture children need dedicated fields).
+// The fused blend path's uniform fields: the blend kernel's mode and operand selectors. The
+// child-role and per-child subset fields below serve the runtime-generated programs only (no
+// precompiled variant declares them), so they stay out of the reconciled Fields list.
 #pragma once
 #include "gpu/shaders/modules/ParamHandle.h"
 
@@ -15,9 +15,7 @@ struct BlendParams {
   static constexpr Param<ParamType::Int> Child0AlphaOnly{"Child0AlphaOnly"};
   static constexpr Param<ParamType::Int> Child1AlphaOnly{"Child1AlphaOnly"};
 
-  static constexpr ParamInfo Fields[] = {BlendModeValue, ChildType,    HasLocalMask,
-                                         Child0Subset,   Child1Subset, Child0AlphaOnly,
-                                         Child1AlphaOnly};
+  static constexpr ParamInfo Fields[] = {BlendModeValue, HasLocalMask};
 };
 
 }  // namespace tgfx

@@ -129,6 +129,19 @@ inline constexpr const char* VerifyNoBundles = "verify.no-bundles";
 /// The --require-backends list is empty or names a backend that does not exist.
 inline constexpr const char* VerifyBackendList = "verify.backend-list";
 
+/// A reflected uniform name has no declared writer constant, or the declared type does not match
+/// the reflected format.
+inline constexpr const char* VerifyParamUndeclared = "verify.param.undeclared";
+
+/// A declared parameter constant no variant's reflection carries: the declaration is dead or the
+/// shader dropped the field.
+inline constexpr const char* VerifyParamUnused = "verify.param.unused";
+
+/// A preprocessor condition references an identifier that is neither a family permutation
+/// dimension, a define in the shader sources, nor a whitelisted builtin: a typo would evaluate
+/// silently to zero.
+inline constexpr const char* VerifyMacroUnknown = "verify.macro.unknown";
+
 // ---- output: writing the artifacts ----------------------------------------------------------
 
 /// An output file (a report, a bundle, a manifest) could not be written.
@@ -152,7 +165,8 @@ inline constexpr const char* AllCodes[] = {
     VerifyBundleHeader,    VerifyBundlePool,   VerifyBundleMissing,
     VerifyBundleIdentity,  VerifyManifest,     VerifyStale,
     VerifyFreshnessSkipped, VerifyRequiredMissing, VerifyNoBundles,
-    VerifyBackendList,
+    VerifyBackendList,      VerifyParamUndeclared, VerifyParamUnused,
+    VerifyMacroUnknown,
     OutputWrite,           OutputDuplicateKey,
 };
 

@@ -35,6 +35,10 @@ namespace tgfx {
 size_t ValidateClipContractFields(const std::vector<VariantData>& variants,
                                   Diagnostics* diagnostics);
 
+size_t ValidateFamilyParams(const std::vector<VariantData>& variants, Diagnostics* diagnostics);
+
+size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics);
+
 /// Validates the OP_* defines in operator/op_codes.inc against the Op constants that anchor the
 /// AOTChainOp enum. Returns the error count.
 size_t ValidateOpCodes(const std::string& shaderDir, Diagnostics* diagnostics);

@@ -73,6 +73,20 @@ class ClipContractRule : public ArtifactRule {
   }
 };
 
+class FamilyParamsRule : public ArtifactRule {
+ public:
+  size_t check(const ArtifactRuleContext& context, Diagnostics* diagnostics) const override {
+    return ValidateFamilyParams(*context.variants, diagnostics);
+  }
+};
+
+class MacroNamesRule : public SourceRule {
+ public:
+  size_t check(const SourceRuleContext& context, Diagnostics* diagnostics) const override {
+    return ValidateMacroNames(context.shaderDir, diagnostics);
+  }
+};
+
 class ReflectionContractRule : public ArtifactRule {
  public:
   size_t check(const ArtifactRuleContext& context, Diagnostics* diagnostics) const override {
@@ -96,6 +110,7 @@ std::vector<std::unique_ptr<SourceRule>> MakeSourceRules() {
   rules.push_back(std::make_unique<OpTableExclusivityRule>());
   rules.push_back(std::make_unique<SlotCapacitiesRule>());
   rules.push_back(std::make_unique<SourceReferencesRule>());
+  rules.push_back(std::make_unique<MacroNamesRule>());
   return rules;
 }
 
@@ -105,6 +120,7 @@ std::vector<std::unique_ptr<ArtifactRule>> MakeArtifactRules() {
   rules.push_back(std::make_unique<ReflectionContractRule>());
   rules.push_back(std::make_unique<BindingLayoutRule>());
   rules.push_back(std::make_unique<InlineExpansionRule>());
+  rules.push_back(std::make_unique<FamilyParamsRule>());
   return rules;
 }
 

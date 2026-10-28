@@ -116,6 +116,19 @@ Report CheckReferences(const std::string& shaderDir) {
   return Finish(errors, diagnostics);
 }
 
+
+Report CheckFamilyParams(const std::vector<VariantData>& variants) {
+  Diagnostics diagnostics;
+  auto errors = ValidateFamilyParams(variants, &diagnostics);
+  return Finish(errors, diagnostics);
+}
+
+Report CheckMacroNames(const std::string& shaderDir) {
+  Diagnostics diagnostics;
+  auto errors = ValidateMacroNames(shaderDir, &diagnostics);
+  return Finish(errors, diagnostics);
+}
+
 UniformEntry Field(const std::string& name, UniformFormat format = UniformFormat::Float4,
                    uint16_t arraySize = 1) {
   return UniformEntry{name, static_cast<uint8_t>(format), arraySize};
@@ -492,6 +505,62 @@ TEST(ReflectionContractTest, TheVertexStageIsCheckedToo) {
   auto report = CheckReflection({variant});
   EXPECT_EQ(report.errors, 1u) << report.log;
   EXPECT_TRUE(report.mentions("duplicate name 'Matrix'")) << report.log;
+}
+
+// ---- the declared-name reconciliation -------------------------------------------------------
+
+TEST(FamilyParamsTest, AReflectedNameWithoutADeclarationIsReported) {
+  auto report = CheckFamilyParams({VariantWithFragment({Field("NotARealField")})});
+  EXPECT_TRUE(report.mentions("'NotARealField', which no module or catalog constant declares"))
+      << report.log;
+}
+
+TEST(FamilyParamsTest, ADeclaredTypeMismatchIsReported) {
+  // Subset is declared Float4; a Float2 reflection is a declaration that drifted.
+  auto report = CheckFamilyParams({VariantWithFragment({Field("Subset", UniformFormat::Float2)})});
+  EXPECT_TRUE(report.mentions("reflects format")) << report.log;
+}
+
+TEST(FamilyParamsTest, TheStructuralSuffixResolvesToTheDeclaredBase) {
+  auto report = CheckFamilyParams({VariantWithFragment({Field("Subset_1")})});
+  EXPECT_FALSE(report.mentions("'Subset_1'")) << report.log;
+  EXPECT_FALSE(report.mentions("declared parameter 'Subset' is carried")) << report.log;
+}
+
+TEST(FamilyParamsTest, ADeclaredConstantNoVariantCarriesIsReported) {
+  // Only Subset is reflected, so every other declared constant is unused; AlphaStart is one.
+  auto report = CheckFamilyParams({VariantWithFragment({Field("Subset")})});
+  EXPECT_TRUE(report.mentions("declared parameter 'AlphaStart' is carried by no variant"))
+      << report.log;
+}
+
+TEST(FamilyParamsTest, ANameEndingInDigitsStaysItself) {
+  // GradientThresholds1_7 is itself declared; stripping its trailing digits would resolve it to
+  // nothing and report the wrong reason.
+  auto report = CheckFamilyParams({VariantWithFragment({Field("GradientThresholds1_7")})});
+  EXPECT_FALSE(report.mentions("'GradientThresholds1_7'")) << report.log;
+}
+
+// ---- the macro-name rule --------------------------------------------------------------------
+
+TEST(MacroNamesTest, TheRealSourcesPass) {
+  auto report = CheckMacroNames(RealShaderDir);
+  EXPECT_EQ(report.errors, 0u) << report.log;
+}
+
+TEST(MacroNamesTest, AnUnknownMacroIsReported) {
+  const ScratchDir dir("macro_names_unknown");
+  dir.write("kernels/bad.frag", "#ifdef NOT_A_REAL_MACRO\n#endif\n");
+  auto report = CheckMacroNames(dir.dir());
+  EXPECT_TRUE(report.mentions("conditions on 'NOT_A_REAL_MACRO'")) << report.log;
+}
+
+TEST(MacroNamesTest, AFamilyDimensionAndASourceDefinePass) {
+  const ScratchDir dir("macro_names_known");
+  dir.write("kernels/good.frag",
+            "#define LOCAL_FLAG 1\n#ifdef LOCAL_FLAG\n#endif\n#if defined(HAS_SUBSET)\n#endif\n");
+  auto report = CheckMacroNames(dir.dir());
+  EXPECT_EQ(report.errors, 0u) << report.log;
 }
 
 }  // namespace tgfx

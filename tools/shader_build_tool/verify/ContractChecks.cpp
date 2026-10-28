@@ -28,7 +28,9 @@
 #include "core/DiagnosticCodes.h"
 #include "gpu/AOTResourceProfile.h"
 #include "gpu/BundleFormat.h"
+#include "gpu/shaders/AllParams.h"
 #include "gpu/shaders/KernelContract.h"
+#include "gpu/shaders/PrecompiledShader.h"
 
 namespace tgfx {
 
@@ -620,6 +622,178 @@ size_t ValidateInlineExpansion(const std::vector<InlineExpansionRecord>& records
     diagnostics->report(std::move(diagnostic));
   }
   return invalid + violations.size();
+}
+
+
+// The base name of a reflected field: the runtime's structural suffix (Subset, Subset_1) appends
+// an underscore and digits to the declared name, so the reconciliation resolves both forms.
+static std::string BaseFieldName(const std::string& name) {
+  auto separator = name.find_last_of('_');
+  if (separator == std::string::npos || separator + 1 == name.size() || separator == 0) {
+    return name;
+  }
+  for (size_t index = separator + 1; index < name.size(); ++index) {
+    if (name[index] < '0' || name[index] > '9') {
+      return name;
+    }
+  }
+  return name.substr(0, separator);
+}
+
+// The declared entry for a reflected name, resolved through the exact name first and the
+// structural-suffix-stripped base second: a name like GradientThresholds1_7 is itself declared,
+// while Subset_1 resolves to the declared Subset.
+static const std::pair<const std::string, UniformFormat>* DeclaredEntry(
+    const std::map<std::string, UniformFormat>& formats, const std::string& name) {
+  auto exact = formats.find(name);
+  if (exact != formats.end()) {
+    return &*exact;
+  }
+  auto base = formats.find(BaseFieldName(name));
+  if (base != formats.end()) {
+    return &*base;
+  }
+  return nullptr;
+}
+
+// The declared-name reconciliation, both directions: every reflected uniform field must have a
+// declared writer constant with a matching format (a GLSL typo would otherwise read as zero or
+// stale data at runtime), and every declared constant must appear in some variant (a dead
+// declaration is a drift nobody reconciles any more).
+size_t ValidateFamilyParams(const std::vector<VariantData>& variants,
+                            Diagnostics* diagnostics) {
+  size_t errors = 0;
+  const auto& formats = AllParamFormats();
+  std::set<std::string> usedNames;
+  // A build with no variants carries no reflection at all, so the usage direction has nothing to
+  // say; the name-and-format direction below runs over the (empty) reflection and stays clean.
+  if (variants.empty()) {
+    return 0;
+  }
+  for (const auto& variant : variants) {
+    const StageReflectionData* stages[] = {&variant.vertexReflection, &variant.fragmentReflection};
+    for (const auto* reflection : stages) {
+      for (const auto& entry : reflection->uniforms) {
+        usedNames.insert(entry.name);
+        usedNames.insert(BaseFieldName(entry.name));
+        const auto* declared = DeclaredEntry(formats, entry.name);
+        if (declared == nullptr) {
+          Report(diagnostics, Severity::Error, DiagnosticCode::VerifyParamUndeclared,
+                 variant.shaderName, variant.profileTag, -1, -1,
+                 "reflects uniform '" + entry.name +
+                     "', which no module or catalog constant declares");
+          ++errors;
+        } else if (declared->second != static_cast<UniformFormat>(entry.format)) {
+          Report(diagnostics, Severity::Error, DiagnosticCode::VerifyParamUndeclared,
+                 variant.shaderName, variant.profileTag, -1, -1,
+                 "uniform '" + entry.name + "' reflects format " +
+                     std::to_string(entry.format) + " but the constant '" + declared->first +
+                     "' declares format " + std::to_string(static_cast<int>(declared->second)));
+          ++errors;
+        }
+      }
+    }
+  }
+  for (const auto& declared : formats) {
+    if (usedNames.count(declared.first) == 0) {
+      Report(diagnostics, Severity::Error, DiagnosticCode::VerifyParamUnused, "", "", -1, -1,
+             "declared parameter '" + declared.first + "' is carried by no variant");
+      ++errors;
+    }
+  }
+  return errors;
+}
+
+// The define names of one permutation stage's dimensions: the GLSL conditions may reference any
+// of them, so they join the allowed set of the macro-name rule.
+struct DimensionNameVisitor {
+  const char* operator()(const PermutationBool& dimension) const {
+    return dimension.defineName;
+  }
+  const char* operator()(const PermutationEnum& dimension) const {
+    return dimension.defineName;
+  }
+  const char* operator()(const PermutationInt& dimension) const {
+    return dimension.defineName;
+  }
+};
+
+// The macro-name rule: every identifier a preprocessor condition references must be a family
+// permutation dimension, a define in the shader sources, or a whitelisted builtin. A typo
+// evaluates silently to zero and compiles a wrong variant, so it fails the build instead.
+size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics) {
+  size_t errors = 0;
+  std::set<std::string> allowed;
+  for (const auto& factory : ShaderRegistry::All()) {
+    const auto shader = factory();
+    // The domains are members of the info value, so a local keeps them alive through the loops:
+    // ranging over shader->info().vertDomain.getDimensions() directly would hold a reference into
+    // a destroyed temporary.
+    const auto info = shader->info();
+    for (const auto& dimension : info.vertDomain.getDimensions()) {
+      allowed.insert(std::visit(DimensionNameVisitor(), dimension));
+    }
+    for (const auto& dimension : info.fragDomain.getDimensions()) {
+      allowed.insert(std::visit(DimensionNameVisitor(), dimension));
+    }
+  }
+  allowed.insert("GL_ES");
+  allowed.insert("__VERSION__");
+
+  std::vector<std::string> files;
+  for (std::filesystem::recursive_directory_iterator it(shaderDir), end; it != end; ++it) {
+    if (!it->is_regular_file()) {
+      continue;
+    }
+    const auto extension = it->path().extension().string();
+    if (extension != ".inc" && extension != ".frag" && extension != ".vert") {
+      continue;
+    }
+    files.push_back(it->path().string());
+  }
+  const std::regex definePattern("^[ \t]*#[ \t]*define[ \t]+([A-Za-z_][A-Za-z0-9_]*)");
+  const std::regex conditionPattern(
+      "^[ \\t]*#[ \\t]*(?:ifdef|ifndef|elif|if)\\b[ \\t]*(.*)$");
+  const std::regex identifierPattern("([A-Za-z_][A-Za-z0-9_]*)");
+  // Pass one: the defines of every file join the allowed set, because an includer sees them.
+  for (const auto& file : files) {
+    std::ifstream stream(file);
+    std::string line;
+    while (std::getline(stream, line)) {
+      std::smatch match;
+      if (std::regex_search(line, match, definePattern)) {
+        allowed.insert(match[1].str());
+      }
+    }
+  }
+  // Pass two: every identifier a condition references must be known. The TGFX_ and __ prefixes
+  // are the toolchain's own macros, kept out of the per-family bookkeeping.
+  for (const auto& file : files) {
+    const auto relative = std::filesystem::relative(file, shaderDir).generic_string();
+    std::ifstream stream(file);
+    std::string line;
+    int lineNumber = 0;
+    while (std::getline(stream, line)) {
+      ++lineNumber;
+      std::smatch match;
+      if (!std::regex_search(line, match, conditionPattern)) {
+        continue;
+      }
+      std::sregex_iterator identifier(match[1].first, match[1].second, identifierPattern);
+      for (std::sregex_iterator end; identifier != end; ++identifier) {
+        const auto name = (*identifier)[1].str();
+        if (name == "defined" || name.rfind("TGFX_", 0) == 0 || name.rfind("__", 0) == 0 ||
+            allowed.count(name) > 0) {
+          continue;
+        }
+        Report(diagnostics, Severity::Error, DiagnosticCode::VerifyMacroUnknown, "", "", -1, -1,
+               relative + ":" + std::to_string(lineNumber) + " conditions on '" + name +
+                   "', which no family dimension or source define declares");
+        ++errors;
+      }
+    }
+  }
+  return errors;
 }
 
 }  // namespace tgfx

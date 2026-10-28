@@ -21,19 +21,14 @@ struct ParamCatalog {
   static constexpr Param<ParamType::Int> AAEnabled{"AAEnabled"};
   static constexpr Param<ParamType::Int> StrokeEnabled{"StrokeEnabled"};
 
-  // The gradient colorizers' fields (the chain's prefixed forms live in ChainParams).
-  static constexpr Param<ParamType::Float> Threshold{"threshold"};
-  static constexpr Param<ParamType::Float4> Scale01{"scale01"};
-  static constexpr Param<ParamType::Float4> Bias01{"bias01"};
-  static constexpr Param<ParamType::Float4> Scale23{"scale23"};
-  static constexpr Param<ParamType::Float4> Bias23{"bias23"};
-  static constexpr Param<ParamType::Float4> Thresholds1_7{"thresholds1_7"};
-  static constexpr Param<ParamType::Float4> Thresholds9_13{"thresholds9_13"};
-  static constexpr Param<ParamType::Int> IntervalCount{"IntervalCount"};
-
-  // The const-color processor's fields.
-  static constexpr Param<ParamType::Float4> ConstColor{"ConstColor"};
-  static constexpr Param<ParamType::Int> InputMode{"InputMode"};
+  // Fields the runtime GLSLProcessor writers produce for the precompiled kernels: the GP coord
+  // transform matrices (numbered by slot), the chain's per-slot const-color records, the fused
+  // blend's operand order, and the atlas text size. Their writers stay on the runtime side.
+  static constexpr Param<ParamType::Float3x3> CoordTransformMatrix{"CoordTransformMatrix"};
+  static constexpr Param<ParamType::Float4> ConstColorValue{"ConstColorValue"};
+  static constexpr Param<ParamType::Int> ConstInputMode{"ConstInputMode"};
+  static constexpr Param<ParamType::Int> BlendConstFirst{"BlendConstFirst"};
+  static constexpr Param<ParamType::Float2> AtlasSizeInv{"atlasSizeInv"};
 
   // The chain's prefixed color-space fields (ColorSpaceXformHelper's prefix form).
   static constexpr Param<ParamType::Int> ChainCSFlags{"ChainCSFlags"};
@@ -65,15 +60,14 @@ struct ParamCatalog {
   static constexpr Param<ParamType::Int> InputIsPacked{"InputIsPacked"};
 
   static constexpr ParamInfo Fields[] = {
-      Color,          HasCommonColor, Matrix,        ViewMatrix,     UVMatrix,
-      TexSubsetMatrix, Coverage,      AAEnabled,     StrokeEnabled,  Threshold,
-      Scale01,        Bias01,        Scale23,       Bias23,         Thresholds1_7,
-      Thresholds9_13, IntervalCount, ConstColor,    InputMode,      ChainCSFlags,
-      ChainSrcTF0,    ChainSrcTF1,   ChainSrcTFType, ChainSrcOOTF,  ChainColorXform,
-      ChainDstOOTF,   ChainDstTF0,   ChainDstTF1,   ChainDstTFType, GlassOpticsP0,
-      GlassOpticsP1,  GlassOpticsP2, GlassOpticsP3, LightingOn,     GlassShapeP0,
-      GlassShapeP1,   GlassEdgeSpan, GlassFineMaskUV, GlassEdgeMaskUV, EdgeMaskOn,
-      GlassUDFRadius, GlassUDFStep,  Field,         InputIsPacked};
+      Color,           HasCommonColor, Matrix,          ViewMatrix,      UVMatrix,
+      TexSubsetMatrix, Coverage,       AAEnabled,       StrokeEnabled,   CoordTransformMatrix,
+      ConstColorValue, ConstInputMode, BlendConstFirst, AtlasSizeInv,    ChainCSFlags,
+      ChainSrcTF0,     ChainSrcTF1,    ChainSrcTFType,  ChainSrcOOTF,    ChainColorXform,
+      ChainDstOOTF,    ChainDstTF0,    ChainDstTF1,     ChainDstTFType,  GlassOpticsP0,
+      GlassOpticsP1,   GlassOpticsP2,  GlassOpticsP3,   LightingOn,      GlassShapeP0,
+      GlassShapeP1,    GlassEdgeSpan,  GlassFineMaskUV, GlassEdgeMaskUV, EdgeMaskOn,
+      GlassUDFRadius,  GlassUDFStep,   Field,           InputIsPacked};
 };
 
 }  // namespace tgfx

@@ -20,7 +20,7 @@ struct GradientModule {
 
   /// The clamped gradient's own record (border colors, mask default, layout branch).
   static constexpr ParamInfo Fields[] = {
-      LeftBorderColor, RightBorderColor, LayoutType, Bias, Scale, Start, End, ColorizerKind};
+      LeftBorderColor, RightBorderColor, LayoutType, Bias, Scale, Start, End};
 
   static void BindEffect(const FragmentProcessor* processor, ParamWriter* writer);
 

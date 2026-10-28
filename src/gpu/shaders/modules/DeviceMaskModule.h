@@ -17,8 +17,8 @@ struct DeviceMaskModule {
   static constexpr Param<ParamType::Int> AlphaOnly{"AlphaOnly"};
   static constexpr Param<ParamType::Float4> Rect{"Rect"};
 
-  static constexpr ParamInfo Fields[] = {DeviceCoordMatrix, DeviceMaskSubset, Subset, AlphaOnly,
-                                         Rect};
+  static constexpr ParamInfo Fields[] = {
+      DeviceCoordMatrix, DeviceMaskSubset, Subset, AlphaOnly, Rect, HasDeviceMask};
 
   static void Bind(const FragmentProcessor* processor, ParamWriter* writer);
 };
