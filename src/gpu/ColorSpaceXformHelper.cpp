@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "ColorSpaceXformHelper.h"
 #include "core/utils/Log.h"
+#include "gpu/shaders/modules/ColorSpaceParams.h"
+#include "gpu/shaders/modules/PointwiseOpModule.h"
 namespace tgfx {
 
 int TFTypeToIndex(gfx::skcms_TFType type) {
@@ -66,24 +68,31 @@ void ColorSpaceXformHelper::emitCode(UniformHandler* uniformHandler,
   if (colorSpaceXform) {
     flags = colorSpaceXform->flags;
     if (this->applySrcTF()) {
-      srcTFVar0 = declare(uniformHandler, "SrcTF0", UniformFormat::Float4, shaderStage);
-      srcTFVar1 = declare(uniformHandler, "SrcTF1", UniformFormat::Float4, shaderStage);
+      srcTFVar0 = declare(uniformHandler, ColorSpaceParams::SrcTF0.name, UniformFormat::Float4,
+                          shaderStage);
+      srcTFVar1 = declare(uniformHandler, ColorSpaceParams::SrcTF1.name, UniformFormat::Float4,
+                          shaderStage);
       _srcTFType =
           gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
               &colorSpaceXform->srcTransferFunction));
     }
     if (this->applySrcOOTF()) {
-      srcOOTFVar = declare(uniformHandler, "SrcOOTF", UniformFormat::Float4, shaderStage);
+      srcOOTFVar = declare(uniformHandler, ColorSpaceParams::SrcOOTF.name, UniformFormat::Float4,
+                           shaderStage);
     }
     if (this->applyGamutXform()) {
-      gamutXformVar = declare(uniformHandler, "ColorXform", UniformFormat::Float3x3, shaderStage);
+      gamutXformVar = declare(uniformHandler, ColorSpaceParams::ColorXform.name,
+                              UniformFormat::Float3x3, shaderStage);
     }
     if (this->applyDstOOTF()) {
-      dstOOTFVar = declare(uniformHandler, "DstOOTF", UniformFormat::Float4, shaderStage);
+      dstOOTFVar = declare(uniformHandler, ColorSpaceParams::DstOOTF.name, UniformFormat::Float4,
+                           shaderStage);
     }
     if (this->applyDstTF()) {
-      dstTFVar0 = declare(uniformHandler, "DstTF0", UniformFormat::Float4, shaderStage);
-      dstTFVar1 = declare(uniformHandler, "DstTF1", UniformFormat::Float4, shaderStage);
+      dstTFVar0 = declare(uniformHandler, ColorSpaceParams::DstTF0.name, UniformFormat::Float4,
+                          shaderStage);
+      dstTFVar1 = declare(uniformHandler, ColorSpaceParams::DstTF1.name, UniformFormat::Float4,
+                          shaderStage);
       _dstTFType =
           gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
               &colorSpaceXform->dstTransferFunctionInverse));
@@ -103,9 +112,9 @@ void ColorSpaceXformHelper::setData(UniformData* uniformData,
   // the uniforms of disabled steps, so setDataOptional tolerates their absence there. Disabled
   // steps get identity placeholders: their CSFlags bit is 0, so the shader never reads them.
   static const float Zero4[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-  writeOptional(uniformData, "CSFlags", static_cast<int>(flags.mask()));
+  writeOptional(uniformData, ColorSpaceParams::CSFlags.name, static_cast<int>(flags.mask()));
   // Select the ColorSpaceXform operator in the shared pointwise operator table (absent elsewhere).
-  writeOptional(uniformData, "OpType", 3);
+  writeOptional(uniformData, PointwiseOpModule::OpType.name, 3);
 
   if (this->applySrcTF()) {
     float srcTF0[4] = {
@@ -114,8 +123,8 @@ void ColorSpaceXformHelper::setData(UniformData* uniformData,
     float srcTF1[4] = {colorSpaceXform->srcTransferFunction.d,
                        colorSpaceXform->srcTransferFunction.e,
                        colorSpaceXform->srcTransferFunction.f, 0.0f};
-    writeRequired(uniformData, "SrcTF0", srcTF0);
-    writeRequired(uniformData, "SrcTF1", srcTF1);
+    writeRequired(uniformData, ColorSpaceParams::SrcTF0.name, srcTF0);
+    writeRequired(uniformData, ColorSpaceParams::SrcTF1.name, srcTF1);
     int srcType = TFTypeToIndex(
         gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
             &colorSpaceXform->srcTransferFunction)));
@@ -127,17 +136,17 @@ void ColorSpaceXformHelper::setData(UniformData* uniformData,
           "ColorSpaceXformHelper: unsupported source transfer function; the draw reached the "
           "upload path without the matcher rejecting it");
     }
-    writeOptional(uniformData, "SrcTFType", srcType < 0 ? 0 : srcType);
+    writeOptional(uniformData, ColorSpaceParams::SrcTFType.name, srcType < 0 ? 0 : srcType);
   } else {
-    writeOptional(uniformData, "SrcTF0", Zero4);
-    writeOptional(uniformData, "SrcTF1", Zero4);
-    writeOptional(uniformData, "SrcTFType", 0);
+    writeOptional(uniformData, ColorSpaceParams::SrcTF0.name, Zero4);
+    writeOptional(uniformData, ColorSpaceParams::SrcTF1.name, Zero4);
+    writeOptional(uniformData, ColorSpaceParams::SrcTFType.name, 0);
   }
 
   if (this->applySrcOOTF()) {
-    writeRequired(uniformData, "SrcOOTF", colorSpaceXform->srcOOTF);
+    writeRequired(uniformData, ColorSpaceParams::SrcOOTF.name, colorSpaceXform->srcOOTF);
   } else {
-    writeOptional(uniformData, "SrcOOTF", Zero4);
+    writeOptional(uniformData, ColorSpaceParams::SrcOOTF.name, Zero4);
   }
 
   if (slot >= 0) {
@@ -149,18 +158,20 @@ void ColorSpaceXformHelper::setData(UniformData* uniformData,
     float packed[12] = {m.values[0][0], m.values[1][0], m.values[2][0], 0.0f,
                         m.values[0][1], m.values[1][1], m.values[2][1], 0.0f,
                         m.values[0][2], m.values[1][2], m.values[2][2], 0.0f};
-    uniformData->setArrayElementOptional("ColorXform", static_cast<size_t>(slot), packed);
+    uniformData->setArrayElementOptional(ColorSpaceParams::ColorXform.name,
+                                         static_cast<size_t>(slot), packed);
   } else if (this->applyGamutXform()) {
-    uniformData->setData(prefix + "ColorXform", colorSpaceXform->srcToDstMatrix);
-  } else if (uniformData->hasField(prefix + "ColorXform")) {
+    uniformData->setData(prefix + ColorSpaceParams::ColorXform.name,
+                         colorSpaceXform->srcToDstMatrix);
+  } else if (uniformData->hasField(prefix + ColorSpaceParams::ColorXform.name)) {
     ColorMatrix33 identity = {{{1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}}};
-    uniformData->setData(prefix + "ColorXform", identity);
+    uniformData->setData(prefix + ColorSpaceParams::ColorXform.name, identity);
   }
 
   if (this->applyDstOOTF()) {
-    writeRequired(uniformData, "DstOOTF", colorSpaceXform->dstOOTF);
+    writeRequired(uniformData, ColorSpaceParams::DstOOTF.name, colorSpaceXform->dstOOTF);
   } else {
-    writeOptional(uniformData, "DstOOTF", Zero4);
+    writeOptional(uniformData, ColorSpaceParams::DstOOTF.name, Zero4);
   }
 
   if (this->applyDstTF()) {
@@ -171,8 +182,8 @@ void ColorSpaceXformHelper::setData(UniformData* uniformData,
     float dstTF1[4] = {colorSpaceXform->dstTransferFunctionInverse.d,
                        colorSpaceXform->dstTransferFunctionInverse.e,
                        colorSpaceXform->dstTransferFunctionInverse.f, 0.0f};
-    writeRequired(uniformData, "DstTF0", dstTF0);
-    writeRequired(uniformData, "DstTF1", dstTF1);
+    writeRequired(uniformData, ColorSpaceParams::DstTF0.name, dstTF0);
+    writeRequired(uniformData, ColorSpaceParams::DstTF1.name, dstTF1);
     int dstType = TFTypeToIndex(
         gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
             &colorSpaceXform->dstTransferFunctionInverse)));
@@ -181,11 +192,11 @@ void ColorSpaceXformHelper::setData(UniformData* uniformData,
           "ColorSpaceXformHelper: unsupported destination transfer function; the draw reached "
           "the upload path without the matcher rejecting it");
     }
-    writeOptional(uniformData, "DstTFType", dstType < 0 ? 0 : dstType);
+    writeOptional(uniformData, ColorSpaceParams::DstTFType.name, dstType < 0 ? 0 : dstType);
   } else {
-    writeOptional(uniformData, "DstTF0", Zero4);
-    writeOptional(uniformData, "DstTF1", Zero4);
-    writeOptional(uniformData, "DstTFType", 0);
+    writeOptional(uniformData, ColorSpaceParams::DstTF0.name, Zero4);
+    writeOptional(uniformData, ColorSpaceParams::DstTF1.name, Zero4);
+    writeOptional(uniformData, ColorSpaceParams::DstTFType.name, 0);
   }
 }
 }  // namespace tgfx

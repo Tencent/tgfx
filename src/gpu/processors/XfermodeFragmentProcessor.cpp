@@ -22,6 +22,8 @@
 #include "gpu/UniformData.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/shaders/modules/AnalyticClipModule.h"
+#include "gpu/shaders/modules/BlendParams.h"
 
 namespace tgfx {
 PlacementPtr<FragmentProcessor> XfermodeFragmentProcessor::MakeFromSrcProcessor(
@@ -68,24 +70,24 @@ void XfermodeFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
   if (fragmentUniformData == nullptr) {
     return;
   }
-  if (fragmentUniformData->hasField("BlendModeValue")) {
+  if (fragmentUniformData->hasField(BlendParams::BlendModeValue.name)) {
     int modeInt = static_cast<int>(mode);
-    fragmentUniformData->setArrayElement("BlendModeValue", 0, modeInt);
+    fragmentUniformData->setArrayElement(BlendParams::BlendModeValue.name, 0, modeInt);
   }
   // Selects how the operands map onto the blend's src/dst in the fused chain kernel. The
   // single-child roles (DstChild/SrcChild) share one compiled variant and are told apart here, so
   // this must be written on every draw rather than relying on the uniform buffer's prior contents.
-  if (fragmentUniformData->hasField("ChildType")) {
+  if (fragmentUniformData->hasField(BlendParams::ChildType.name)) {
     int childTypeValue = static_cast<int>(child);
-    fragmentUniformData->setData("ChildType", childTypeValue);
+    fragmentUniformData->setData(BlendParams::ChildType.name, childTypeValue);
   }
-  if (fragmentUniformData->hasField("HasClip")) {
+  if (fragmentUniformData->hasField(AnalyticClipModule::HasClip.name)) {
     int hasClip = 0;
-    fragmentUniformData->setData("HasClip", hasClip);
+    fragmentUniformData->setData(AnalyticClipModule::HasClip.name, hasClip);
   }
   // A kernel that applies a SrcIn local mask through a runtime branch (GlassRefractionShader) only
   // matches this processor as that mask, so its presence is what turns the branch on.
-  fragmentUniformData->setDataOptional("HasLocalMask", 1);
+  fragmentUniformData->setDataOptional(BlendParams::HasLocalMask.name, 1);
   // Populate the per-child subset uniforms for the precompiled blend path. Each plain
   // TextureEffect child that requires subset clamping writes its normalized subset rect into a
   // dedicated uniform (Child0Subset for child[0], Child1Subset for child[1]). Distinct names are
@@ -93,8 +95,10 @@ void XfermodeFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
   // children's own "Subset" emission, the two texture children would collide on a single field and
   // the last writer would overwrite the first. On the ProgramBuilder path these fields do not
   // exist, so hasField() returns false and the writes are skipped.
-  static const char* const subsetFieldNames[] = {"Child0Subset", "Child1Subset"};
-  static const char* const alphaOnlyFieldNames[] = {"Child0AlphaOnly", "Child1AlphaOnly"};
+  static const char* const subsetFieldNames[] = {BlendParams::Child0Subset.name,
+                                                 BlendParams::Child1Subset.name};
+  static const char* const alphaOnlyFieldNames[] = {BlendParams::Child0AlphaOnly.name,
+                                                    BlendParams::Child1AlphaOnly.name};
   size_t childCount = std::min<size_t>(numChildProcessors(), 2);
   for (size_t i = 0; i < childCount; i++) {
     auto childFP = childProcessor(i);

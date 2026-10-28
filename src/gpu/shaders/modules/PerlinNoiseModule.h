@@ -15,8 +15,8 @@ struct PerlinNoiseModule {
   static constexpr Param<ParamType::Int> StitchTiles{"StitchTiles"};
   static constexpr Param<ParamType::Int> OpType{"OpType"};
 
-  static constexpr ParamInfo Fields[] = {BaseFrequency, StitchData, NoiseType, NumOctaves,
-                                         StitchTiles,   OpType};
+  static constexpr ParamInfo Fields[] = {BaseFrequency, StitchData,  NoiseType,
+                                         NumOctaves,    StitchTiles, OpType};
 
   static void Bind(const FragmentProcessor* processor, ParamWriter* writer);
 };
