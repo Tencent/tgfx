@@ -83,7 +83,8 @@ void DrawContent::drawContourInternal(Canvas* canvas, bool antiAlias,
       paint.setShader(shader);
     }
   }
-  // The contour is the default opaque white fill either way: it reports coverage, not appearance.
+  // No colour is set: the brush stays the opaque white Paint default, and OpaqueContext replaces a
+  // solid brush with one before drawing anyway. An image shader above supplies its own coverage.
   onDraw(canvas, paint);
 }
 
