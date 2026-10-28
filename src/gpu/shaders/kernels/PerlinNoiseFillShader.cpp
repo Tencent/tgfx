@@ -25,6 +25,7 @@
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/shaders/modules/ParamWriter.h"
+#include "gpu/shaders/modules/PerlinNoiseModule.h"
 #include "gpu/shaders/modules/PorterDuffXPModule.h"
 
 namespace tgfx {
@@ -75,6 +76,14 @@ XPBindFn PerlinNoiseFillShader::XPBindingFor(const ProgramInfo* programInfo) {
     return nullptr;
   }
   return &PorterDuffXPModule::Bind;
+}
+
+ModuleBindFn PerlinNoiseFillShader::BindingFor(const ProgramInfo* /*programInfo*/,
+                                               const FragmentProcessor* fp) {
+  if (IsProcessor<PerlinNoiseFragmentProcessor>(fp)) {
+    return &PerlinNoiseModule::Bind;
+  }
+  return nullptr;
 }
 
 }  // namespace tgfx

@@ -67,6 +67,10 @@ class PerlinNoiseFillShader : public ShaderFamily<PerlinNoiseFillShader> {
   /// The PorterDuff XP module for PorterDuff draws, null otherwise.
   static XPBindFn XPBindingFor(const ProgramInfo* programInfo);
 
+  /// Resolves a draw's processor to the module Bind that takes over its uniform writes, or
+  /// null to keep the processor's own onSetData.
+  static ModuleBindFn BindingFor(const ProgramInfo* programInfo, const FragmentProcessor* fp);
+
   /// Matcher inputs: only the XferProcessor kind shapes the variant.
   struct Inputs {
     int xpType = XP_UNSUPPORTED;

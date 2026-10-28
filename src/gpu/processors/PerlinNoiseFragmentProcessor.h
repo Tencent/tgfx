@@ -68,6 +68,22 @@ class PerlinNoiseFragmentProcessor : public FragmentProcessor {
     return slotCount;
   }
 
+  PerlinNoiseType getNoiseType() const {
+    return noiseType;
+  }
+
+  int getNumOctaves() const {
+    return numOctaves;
+  }
+
+  bool isStitchTiles() const {
+    return stitchTiles;
+  }
+
+  const PerlinNoiseShader::PaintingData* getPaintingData() const {
+    return paintingData.get();
+  }
+
   const AOTPointwiseSlot& pointwiseSlot(size_t index) const {
     return pointwiseSlots[index];
   }

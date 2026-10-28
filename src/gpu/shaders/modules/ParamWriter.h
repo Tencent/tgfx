@@ -51,10 +51,22 @@ class ParamWriter {
     }
   }
 
+  void setArrayElement(const Param<ParamType::Int>& param, size_t index, int32_t value) {
+    if (uniforms != nullptr) {
+      uniforms->setArrayElementOptional(param.name, index, value);
+    }
+  }
+
   /// Whether this program's variant declares the named field. Modules use it to replicate the
   /// processors' shape-dependent branches (e.g. the device mask's decoy vs fallback writes).
   bool hasField(const char* name) const {
     return uniforms != nullptr && uniforms->hasField(name);
+  }
+
+  /// The raw uniform block, for delegating to shared native writers whose per-element layout
+  /// (e.g. the pointwise slot records) already lives in one place.
+  const UniformData* rawData() const {
+    return uniforms;
   }
 
  private:
