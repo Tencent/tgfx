@@ -8796,4 +8796,39 @@ TGFX_TEST_PRIVATE(LayerTest, HitTestFollowsTheGeometryCaliber) {
   }
 }
 
+// Dirty regions outside the viewport must not rasterize anything: the tiles they reach only get
+// invalidated and are rasterized again once the viewport scrolls back, so no stale pixels may be
+// left behind after the viewport returns.
+TGFX_TEST(LayerTest, TiledDirtyRegionOutsideViewport) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_NE(surface, nullptr);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setTileSize(64);
+  // A large tile pool keeps the tiles covering the first viewport cached while the viewport moves,
+  // so a missing invalidation shows up as stale pixels instead of a reclaimed tile.
+  displayList->setMaxTileCount(400);
+  auto solidLayer = SolidLayer::Make();
+  solidLayer->setColor(Color::Red());
+  solidLayer->setWidth(400);
+  solidLayer->setHeight(400);
+  displayList->root()->addChild(solidLayer);
+  displayList->render(surface.get());
+  // Scroll to the right half of the content so the tiles covering x < 200 stay cached off-screen.
+  displayList->setContentOffset(-200, 0);
+  displayList->render(surface.get());
+  // This dirty region covers both the visible tiles and the cached off-screen ones.
+  solidLayer->setColor(Color::Blue());
+  displayList->render(surface.get());
+  displayList->setContentOffset(0, 0);
+  displayList->render(surface.get());
+  auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  uint32_t pixel = 0;
+  ASSERT_TRUE(surface->readPixels(info, &pixel, 10, 10));
+  EXPECT_EQ(pixel, 0xFFFF0000u) << "off-screen tiles kept stale content after scrolling back";
+}
+
 }  // namespace tgfx

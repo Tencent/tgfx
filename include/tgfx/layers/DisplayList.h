@@ -55,8 +55,10 @@ enum class RenderMode {
    * cached separately. This improves performance by redrawing only the parts of the display list
    * that have changed, and also enables efficient scrolling and zooming using contentOffset and
    * zoomScale. Only the portions of tiles that overlap dirty regions are redrawn, not the entire
-   * tile. Whenever possible, adjacent tiles are combined into a single draw call to reduce the
-   * total number of draw calls. Performance is similar to partial rendering when the viewport isn’t
+   * tile. Dirty regions outside the viewport do not rasterize anything: they only invalidate the
+   * tiles they reach, which are rasterized again once the viewport reaches them. Whenever
+   * possible, adjacent tiles are combined into a single draw call to reduce the total number of
+   * draw calls. Performance is similar to partial rendering when the viewport isn’t
    * zoomed or scrolled, though tiled rendering uses a bit more memory. However, for zooming and
    * scrolling, tiled rendering is much more efficient than partial rendering.
    */
@@ -346,10 +348,11 @@ class DisplayList {
 
   void checkTileCount(Surface* renderSurface);
 
-  std::vector<DrawTask> invalidateTileCaches(const std::vector<Rect>& dirtyRegions);
+  std::vector<DrawTask> invalidateTileCaches(const std::vector<Rect>& dirtyRegions,
+                                             const Rect& viewportRect);
 
-  void invalidateCurrentTileCache(const TileCache* tileCache, const std::vector<Rect>& dirtyRegions,
-                                  std::vector<DrawTask>* tileTasks) const;
+  void invalidateCurrentTileCache(TileCache* tileCache, const std::vector<Rect>& dirtyRegions,
+                                  const Rect& viewportRect, std::vector<DrawTask>* tileTasks);
 
   void recycleCurrentTileTasks(const std::vector<DrawTask>& tileTasks);
 

@@ -378,6 +378,14 @@ static std::vector<Rect> MapDirtyRegions(const std::vector<Rect>& dirtyRegions,
   }
   return dirtyRects;
 }
+
+// Returns the viewport rectangle in zoom space, i.e. the surface rect before the content offset
+// is applied.
+static Rect GetViewportRect(const Surface* surface, const Point& contentOffset) {
+  auto rect = Rect::MakeWH(surface->width(), surface->height());
+  rect.offset(-contentOffset.x, -contentOffset.y);
+  return rect;
+}
 std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
                                              const std::vector<Rect>& dirtyRegions) {
   auto context = surface->getContext();
@@ -436,7 +444,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
     resetCaches();
   }
   checkTileCount(surface);
-  auto tileTasks = invalidateTileCaches(dirtyRegions);
+  auto tileTasks = invalidateTileCaches(dirtyRegions, GetViewportRect(surface, _contentOffset));
   std::vector<Rect> skippedRects = {};
   std::vector<DrawTask> throttleScreenTasks = {};
   auto screenTasks = collectScreenTasks(surface, !dirtyRegions.empty(), autoClear, &tileTasks,
@@ -499,7 +507,8 @@ void DisplayList::checkTileCount(Surface* renderSurface) {
   totalTileCount += width * height;
 }
 
-std::vector<DrawTask> DisplayList::invalidateTileCaches(const std::vector<Rect>& dirtyRegions) {
+std::vector<DrawTask> DisplayList::invalidateTileCaches(const std::vector<Rect>& dirtyRegions,
+                                                        const Rect& viewportRect) {
   if (dirtyRegions.empty()) {
     return {};
   }
@@ -507,7 +516,7 @@ std::vector<DrawTask> DisplayList::invalidateTileCaches(const std::vector<Rect>&
   std::vector<int64_t> emptyScales = {};
   for (auto& [scaleInt, tileCache] : tileCaches) {
     if (scaleInt == _zoomScaleInt) {
-      invalidateCurrentTileCache(tileCache, dirtyRegions, &tileTasks);
+      invalidateCurrentTileCache(tileCache, dirtyRegions, viewportRect, &tileTasks);
       continue;
     }
     auto zoomMatrix = Matrix::MakeScale(ToZoomScaleFloat(scaleInt, _zoomScalePrecision));
@@ -556,22 +565,43 @@ void DisplayList::recycleCurrentTileTasks(const std::vector<DrawTask>& tileTasks
   }
 }
 
-void DisplayList::invalidateCurrentTileCache(const TileCache* tileCache,
+void DisplayList::invalidateCurrentTileCache(TileCache* tileCache,
                                              const std::vector<Rect>& dirtyRegions,
-                                             std::vector<DrawTask>* tileTasks) const {
+                                             const Rect& viewportRect,
+                                             std::vector<DrawTask>* tileTasks) {
   auto zoomMatrix = Matrix::MakeScale(ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision));
   auto dirtyRects = MapDirtyRegions(dirtyRegions, zoomMatrix, true);
   for (auto& dirtyRect : dirtyRects) {
     bool continuous = false;
     auto tiles = tileCache->getTilesUnderRect(dirtyRect, false, &continuous);
-    if (continuous) {
-      tileTasks->emplace_back(std::move(tiles), _tileSize, dirtyRect);
-    } else {
+    if (!Rect::Intersects(dirtyRect, viewportRect)) {
+      // Dirty content outside the viewport only invalidates the tiles it reaches: rasterizing them
+      // now would touch pixels nobody sees, while keeping them would leave stale content behind
+      // for the next time they scroll back into view.
       for (auto& tile : tiles) {
-        auto drawRect = tile->getTileRect(_tileSize);
-        if (drawRect.intersect(dirtyRect)) {
-          tileTasks->emplace_back(tile, _tileSize, drawRect);
+        if (tileCache->removeTile(tile->tileX, tile->tileY)) {
+          emptyTiles.push_back(tile);
         }
+      }
+      continue;
+    }
+    if (continuous && viewportRect.contains(dirtyRect)) {
+      tileTasks->emplace_back(std::move(tiles), _tileSize, dirtyRect);
+      continue;
+    }
+    for (auto& tile : tiles) {
+      auto tileRect = tile->getTileRect(_tileSize);
+      if (!Rect::Intersects(tileRect, viewportRect)) {
+        if (tileCache->removeTile(tile->tileX, tile->tileY)) {
+          emptyTiles.push_back(tile);
+        }
+        continue;
+      }
+      auto drawRect = tileRect;
+      // The unclipped dirty rect is used here so that a tile straddling the viewport edge does not
+      // keep stale pixels in the part outside the viewport.
+      if (drawRect.intersect(dirtyRect)) {
+        tileTasks->emplace_back(tile, _tileSize, drawRect);
       }
     }
   }
