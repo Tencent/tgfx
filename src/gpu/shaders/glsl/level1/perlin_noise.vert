@@ -14,11 +14,6 @@ layout(std140, set = TGFX_VERTEX_UBO_SET, binding = TGFX_VERTEX_UBO_BINDING) uni
 
 layout(location = 0) in vec2 aPosition;
 layout(location = 1) in float inCoverage;
-// The color attribute is declared but never read: the noise kernel generates its color and has no
-// paint-color input, while the geometry processor's attribute list always carries the color slot.
-// The program creator compares the reflected inputs against that list, so the slot must be declared
-// for the interface to line up.
-layout(location = 2) in vec4 inColor;
 
 layout(location = 0) out vec2 TransformedCoords_0;
 layout(location = 1) out float vCoverage;
