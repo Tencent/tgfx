@@ -22,7 +22,10 @@
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/shaders/modules/ParamWriter.h"
+#include "gpu/shaders/modules/PorterDuffXPModule.h"
 
 namespace tgfx {
 
@@ -80,6 +83,14 @@ std::optional<TexturedEffectShader::Inputs> TexturedEffectShader::Extract(
     return std::nullopt;
   }
   return Inputs{xpType};
+}
+
+XPBindFn TexturedEffectShader::XPBindingFor(const ProgramInfo* programInfo) {
+  auto* xp = programInfo->getXferProcessor();
+  if (!IsProcessor<PorterDuffXferProcessor>(xp)) {
+    return nullptr;
+  }
+  return &PorterDuffXPModule::Bind;
 }
 
 }  // namespace tgfx

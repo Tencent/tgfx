@@ -21,6 +21,9 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/processors/HairlineQuadGeometryProcessor.h"
+#include "gpu/processors/PorterDuffXferProcessor.h"
+#include "gpu/shaders/modules/ParamWriter.h"
+#include "gpu/shaders/modules/PorterDuffXPModule.h"
 
 namespace tgfx {
 
@@ -41,6 +44,14 @@ std::optional<HairlineQuadShader::Inputs> HairlineQuadShader::Extract(
     return std::nullopt;
   }
   return Inputs{xpType};
+}
+
+XPBindFn HairlineQuadShader::XPBindingFor(const ProgramInfo* programInfo) {
+  auto* xp = programInfo->getXferProcessor();
+  if (!IsProcessor<PorterDuffXferProcessor>(xp)) {
+    return nullptr;
+  }
+  return &PorterDuffXPModule::Bind;
 }
 
 }  // namespace tgfx

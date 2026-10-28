@@ -21,7 +21,10 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
+#include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/shaders/modules/ParamWriter.h"
+#include "gpu/shaders/modules/PorterDuffXPModule.h"
 
 namespace tgfx {
 
@@ -60,6 +63,14 @@ std::optional<MaskFillShader::Inputs> MaskFillShader::Extract(const ProgramInfo*
     return std::nullopt;
   }
   return Inputs{xpType};
+}
+
+XPBindFn MaskFillShader::XPBindingFor(const ProgramInfo* programInfo) {
+  auto* xp = programInfo->getXferProcessor();
+  if (!IsProcessor<PorterDuffXferProcessor>(xp)) {
+    return nullptr;
+  }
+  return &PorterDuffXPModule::Bind;
 }
 
 }  // namespace tgfx

@@ -21,7 +21,10 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
+#include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
+#include "gpu/shaders/modules/ParamWriter.h"
+#include "gpu/shaders/modules/PorterDuffXPModule.h"
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
 #include "layers/processors/GlassShapeGeometryFragmentProcessor.h"
 
@@ -121,6 +124,14 @@ std::optional<GlassRefractionShader::Inputs> GlassRefractionShader::Extract(
   inputs.dispersionOn = refraction->hasDispersion();
   inputs.xpType = xpType;
   return inputs;
+}
+
+XPBindFn GlassRefractionShader::XPBindingFor(const ProgramInfo* programInfo) {
+  auto* xp = programInfo->getXferProcessor();
+  if (!IsProcessor<PorterDuffXferProcessor>(xp)) {
+    return nullptr;
+  }
+  return &PorterDuffXPModule::Bind;
 }
 
 }  // namespace tgfx

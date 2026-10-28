@@ -22,6 +22,9 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/processors/ComplexEllipseGeometryProcessor.h"
+#include "gpu/processors/PorterDuffXferProcessor.h"
+#include "gpu/shaders/modules/ParamWriter.h"
+#include "gpu/shaders/modules/PorterDuffXPModule.h"
 
 namespace tgfx {
 
@@ -50,6 +53,14 @@ std::optional<ComplexEllipseFillShader::Inputs> ComplexEllipseFillShader::Extrac
   inputs.isStroke = cegp->isStroke();
   inputs.xpType = GetXPType(programInfo);
   return inputs;
+}
+
+XPBindFn ComplexEllipseFillShader::XPBindingFor(const ProgramInfo* programInfo) {
+  auto* xp = programInfo->getXferProcessor();
+  if (!IsProcessor<PorterDuffXferProcessor>(xp)) {
+    return nullptr;
+  }
+  return &PorterDuffXPModule::Bind;
 }
 
 }  // namespace tgfx

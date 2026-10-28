@@ -21,6 +21,7 @@
 #include <optional>
 #include <vector>
 #include "gpu/shaders/ShaderFamily.h"
+#include "gpu/shaders/modules/ParamHandle.h"
 
 namespace tgfx {
 
@@ -54,6 +55,9 @@ class MeshFillShader : public ShaderFamily<MeshFillShader> {
   using FD = FragDims;
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
+
+  /// The PorterDuff XP module for PorterDuff draws, null otherwise.
+  static XPBindFn XPBindingFor(const ProgramInfo* programInfo);
 
   /// Matcher inputs: the tex-coord presence and the XferProcessor kind.
   struct Inputs {

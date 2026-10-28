@@ -20,7 +20,10 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
+#include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/RoundStrokeRectGeometryProcessor.h"
+#include "gpu/shaders/modules/ParamWriter.h"
+#include "gpu/shaders/modules/PorterDuffXPModule.h"
 
 namespace tgfx {
 
@@ -47,6 +50,14 @@ std::optional<RoundStrokeRectFillShader::Inputs> RoundStrokeRectFillShader::Extr
   inputs.hasUVMatrix = rsgp->hasUVMatrixTransform();
   inputs.xpType = GetXPType(programInfo);
   return inputs;
+}
+
+XPBindFn RoundStrokeRectFillShader::XPBindingFor(const ProgramInfo* programInfo) {
+  auto* xp = programInfo->getXferProcessor();
+  if (!IsProcessor<PorterDuffXferProcessor>(xp)) {
+    return nullptr;
+  }
+  return &PorterDuffXPModule::Bind;
 }
 
 }  // namespace tgfx
