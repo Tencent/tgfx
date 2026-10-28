@@ -23,6 +23,7 @@
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
+#include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
 #include "gpu/shaders/modules/DeviceMaskModule.h"
@@ -63,7 +64,7 @@ std::optional<QuadColorFillShader::Inputs> QuadColorFillShader::Extract(
 
 ModuleBindFn QuadColorFillShader::BindingFor(const ProgramInfo* /*programInfo*/,
                                              const FragmentProcessor* fp) {
-  if (IsProcessor<RectEffect>(fp)) {
+  if (IsProcessor<RectEffect>(fp) || IsProcessor<RRectEffect>(fp)) {
     return &AnalyticClipModule::Bind;
   }
   // This kernel declares neither the mask subset decoy nor the Subset/AlphaOnly fallback the

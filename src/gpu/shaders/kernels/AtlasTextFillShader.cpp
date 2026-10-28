@@ -23,6 +23,7 @@
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
+#include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
 #include "gpu/shaders/modules/DeviceMaskModule.h"
@@ -70,7 +71,7 @@ std::optional<AtlasTextFillShader::Inputs> AtlasTextFillShader::Extract(
 
 ModuleBindFn AtlasTextFillShader::BindingFor(const ProgramInfo* /*programInfo*/,
                                              const FragmentProcessor* fp) {
-  if (IsProcessor<RectEffect>(fp)) {
+  if (IsProcessor<RectEffect>(fp) || IsProcessor<RRectEffect>(fp)) {
     return &AnalyticClipModule::Bind;
   }
   if (IsProcessor<DeviceSpaceTextureEffect>(fp)) {

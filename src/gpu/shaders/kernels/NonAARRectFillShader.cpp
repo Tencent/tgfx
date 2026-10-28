@@ -23,6 +23,7 @@
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/NonAARRectGeometryProcessor.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
+#include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
@@ -80,7 +81,7 @@ std::optional<NonAARRectFillShader::Inputs> NonAARRectFillShader::Extract(
 
 ModuleBindFn NonAARRectFillShader::BindingFor(const ProgramInfo* /*programInfo*/,
                                               const FragmentProcessor* fp) {
-  if (IsProcessor<RectEffect>(fp)) {
+  if (IsProcessor<RectEffect>(fp) || IsProcessor<RRectEffect>(fp)) {
     return &AnalyticClipModule::Bind;
   }
   if (IsProcessor<TiledTextureEffect>(fp)) {

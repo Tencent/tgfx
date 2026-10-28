@@ -24,6 +24,7 @@
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
 #include "gpu/processors/ShapeInstancedGeometryProcessor.h"
 #include "gpu/processors/SingleIntervalGradientColorizer.h"
@@ -105,7 +106,7 @@ ShapeInstancedTextureCoverageShader::Extract(const ProgramInfo* programInfo) {
 
 ModuleBindFn ShapeInstancedTextureCoverageShader::BindingFor(const ProgramInfo* /*programInfo*/,
                                                              const FragmentProcessor* fp) {
-  if (IsProcessor<RectEffect>(fp)) {
+  if (IsProcessor<RectEffect>(fp) || IsProcessor<RRectEffect>(fp)) {
     return &AnalyticClipModule::Bind;
   }
   if (IsProcessor<TextureEffect>(fp)) {

@@ -23,6 +23,7 @@
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
+#include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
@@ -112,7 +113,7 @@ std::optional<QuadTextureFillShader::Inputs> QuadTextureFillShader::Extract(
 ModuleBindFn QuadTextureFillShader::BindingFor(const ProgramInfo* programInfo,
                                                const FragmentProcessor* fp) {
   // The analytic clip (coverage section) feeds the clip module.
-  if (IsProcessor<RectEffect>(fp)) {
+  if (IsProcessor<RectEffect>(fp) || IsProcessor<RRectEffect>(fp)) {
     return &AnalyticClipModule::Bind;
   }
   // A device-space mask feeds the mask module; this kernel declares the subset decoy, so the
