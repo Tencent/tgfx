@@ -40,6 +40,16 @@ class GeometryProcessor : public Processor {
     return attributes;
   }
 
+  /**
+   * The physical vertex slot of each entry in vertexAttributes(): setVertexAttributes() drops the
+   * empty attributes but keeps the slot numbering of the declared layout, so an attribute declared
+   * after a slot that a draw does not use keeps its original location. Precompiled shaders number
+   * their inputs by that physical slot, and the program creator binds each attribute to it.
+   */
+  const std::vector<uint32_t>& vertexAttributeLocations() const {
+    return _vertexAttributeLocations;
+  }
+
   const std::vector<Attribute>& instanceAttributes() const {
     return _instanceAttributes;
   }
@@ -159,6 +169,7 @@ class GeometryProcessor : public Processor {
   }
 
   std::vector<Attribute> attributes = {};
+  std::vector<uint32_t> _vertexAttributeLocations = {};
   std::vector<Attribute> _instanceAttributes = {};
   size_t textureSamplerCount = 0;
 };

@@ -42,6 +42,9 @@ void GeometryProcessor::setVertexAttributes(const Attribute* attrs, int attrCoun
     auto& attribute = attrs[i];
     if (!attribute.empty()) {
       attributes.push_back(attribute);
+      // The declared slot survives the empty-attribute filter: a precompiled shader numbers its
+      // inputs by physical slot, so an attribute declared after an unused one keeps its location.
+      _vertexAttributeLocations.push_back(static_cast<uint32_t>(i));
     }
   }
 }

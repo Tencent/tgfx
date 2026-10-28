@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PrecompiledProgramCreator.h"
+#include <algorithm>
 #include <cerrno>
 #include <climits>
 #include <cstdlib>
@@ -410,23 +411,57 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   VertexBufferLayout vertexLayout(programInfo->getVertexAttributes());
   // The AOT vertex stage declares its inputs at the template's physical slots, which keep holes
   // where a conditional attribute is compiled out of the variant (e.g. inUVCoord under
-  // HAS_UV_MATRIX=1), while the GP's attribute list filters those slots away — so the natural
-  // dense numbering would renumber the shader's inputs and the pipeline would bind a slot the
-  // shader never declared. The reflected vertex inputs carry the variant's declared locations;
-  // binding them explicitly keeps the pipeline and the shader in agreement.
+  // HAS_UV_MATRIX=1), while the GP's attribute list filters those slots away. Two numbering
+  // conventions coexist: a template that declares one input per surviving attribute numbers them
+  // densely, while one that always declares a slot for a filtered-away attribute numbers by the
+  // physical slot. A one-to-one interface therefore pairs in order, and only a shader that reads a
+  // strict subset of the attribute list is matched by physical slot.
   if (!vertBlob->vertexInputs.empty()) {
-    if (vertBlob->vertexInputs.size() != vertexLayout.attributes.size()) {
+    auto& inputs = vertBlob->vertexInputs;
+    if (inputs.size() > vertexLayout.attributes.size()) {
       cache->recordFailure(PrecompiledFallbackReason::VertexLayoutMismatch,
                            MakeFallbackRecord(cache, programInfo, &*matchResult));
       LOGE(
           "PrecompiledProgramCreator: vertex interface mismatch for %s[vert=%u]: %zu reflected "
           "inputs vs %zu runtime attributes",
-          matchResult->shaderName.c_str(), matchResult->vertPermutationIndex,
-          vertBlob->vertexInputs.size(), vertexLayout.attributes.size());
+          matchResult->shaderName.c_str(), matchResult->vertPermutationIndex, inputs.size(),
+          vertexLayout.attributes.size());
       return nullptr;
     }
-    for (const auto& input : vertBlob->vertexInputs) {
-      vertexLayout.shaderLocations.push_back(input.location);
+    if (inputs.size() == vertexLayout.attributes.size()) {
+      for (const auto& input : inputs) {
+        vertexLayout.shaderLocations.push_back(input.location);
+      }
+    } else {
+      // The kernel reads a subset: the attributes are shared across kernels, and a kernel that
+      // takes its color from a uniform simply does not declare the color slot. Bind each attribute
+      // to its physical slot where the shader declares it, and park the unread attributes on spare
+      // locations past the declared range. A declared location the geometry processor never
+      // provides is still an interface error.
+      const auto& attributeLocations =
+          programInfo->getGeometryProcessor()->vertexAttributeLocations();
+      uint32_t spareLocation = 0;
+      for (auto location : attributeLocations) {
+        spareLocation = std::max(spareLocation, location + 1);
+      }
+      for (const auto& input : inputs) {
+        if (std::find(attributeLocations.begin(), attributeLocations.end(), input.location) ==
+            attributeLocations.end()) {
+          cache->recordFailure(PrecompiledFallbackReason::VertexLayoutMismatch,
+                               MakeFallbackRecord(cache, programInfo, &*matchResult));
+          LOGE(
+              "PrecompiledProgramCreator: vertex interface mismatch for %s[vert=%u]: declared "
+              "input at location %u, the geometry processor provides no such attribute",
+              matchResult->shaderName.c_str(), matchResult->vertPermutationIndex, input.location);
+          return nullptr;
+        }
+      }
+      for (auto location : attributeLocations) {
+        bool read = std::any_of(inputs.begin(), inputs.end(), [location](const VertexInput& input) {
+          return input.location == location;
+        });
+        vertexLayout.shaderLocations.push_back(read ? location : spareLocation++);
+      }
     }
   }
   descriptor.vertex.bufferLayouts = {vertexLayout};
