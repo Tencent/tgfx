@@ -49,8 +49,7 @@ class PathProvider {
 
   /**
    * Returns the fill type of the computed path. The default implementation computes getPath().
-   * Providers may override this to return the rule without computing the path, but the returned
-   * value must match getPath().getFillType(). getPath() must not call this default implementation.
+   * An override must return the same rule as getPath().getFillType().
    */
   virtual PathFillType fillType() const {
     return getPath().getFillType();

@@ -859,10 +859,13 @@ bool Path::toWinding() {
     return true;
   }
   auto& path = PathRef::WriteAccess(*this);
-  // AsWinding() decides each contour's direction from the nesting depth it sits at and reverses the
-  // ones that disagree. It copies the curves it was given rather than rebuilding them, so the
-  // geometry survives unchanged. It does not detect self-crossings or contours that cross each
-  // other, so those still come back with the filled area changed; see Path::toWinding().
+  // AsWinding() decides each contour's direction from the nesting depth it sits at, reversing the
+  // ones that disagree with the contour containing them. An outermost contour keeps the direction
+  // it already has, so two of them that overlap while running opposite ways still cancel and leave
+  // the overlap empty -- forcing every outermost contour to one shared direction, which no fill
+  // rule asks for, would fill it in. It copies the curves it was given rather than rebuilding them,
+  // so the geometry survives unchanged. It does not detect self-crossings or contours that cross
+  // each other, so those still come back with the filled area changed; see Path::toWinding().
   //
   // The other pathkit entry for this conversion is deliberately not used. SkOpBuilder - add() once
   // and resolve(), which runs Simplify followed by FixWinding - decides the directions the same

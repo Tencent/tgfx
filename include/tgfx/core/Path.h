@@ -80,24 +80,14 @@ class Path {
   void toggleInverseFillType();
 
   /**
-   * Converts this path to an equivalent path that uses the winding fill rule, reorienting its
-   * contours by nesting depth so that the filled area is unchanged. This is what lets an outline
-   * travel through a format that cannot record a fill rule: both winding and even-odd rasterizers
-   * then agree on the result.
+   * Converts this path to an equivalent path that uses the winding fill rule, so that it fills the
+   * same area in formats that cannot record a fill rule. Paths that already use the winding rule
+   * are left as is; InverseEvenOdd becomes InverseWinding.
    *
-   * Paths that already use the winding rule are left as is. InverseEvenOdd is converted to
-   * InverseWinding.
-   *
-   * The area is preserved only while the contours do not cross themselves or each other. Where two
-   * outermost contours overlap in the same direction the two rules genuinely disagree - even-odd
-   * leaves the intersection empty and winding fills it - and no choice of directions can reconcile
-   * them, so such an outline has to be resolved with a boolean operation instead: addPath() runs
-   * one and orients the result. Overlapping in opposite directions, and nesting of any depth, do
-   * keep the area. Any result of addPath() with PathOp::Union, Intersect, Difference or XOR meets
-   * the condition, since those operations resolve all intersections before emitting their contours.
-   *
-   * Returns false if the conversion fails, in which case the path is left unchanged. Callers must
-   * check the result: a silent failure leaves an outline that still depends on the even-odd rule.
+   * The filled area is preserved as long as the contours do not cross each other or themselves.
+   * Contours produced by addPath() with a boolean operation satisfy that condition.
+   * @return true if the conversion succeeded. On failure the path is left unchanged, so callers
+   * must check the result.
    */
   bool toWinding();
 
@@ -385,28 +375,21 @@ class Path {
   void addRRect(const RRect& rRect, bool reversed = false, unsigned startIndex = 0);
 
   /**
-   * Adds a src to this Path, reporting whether the operation ran. Only the boolean operations can
-   * fail; Append and Extend always succeed.
+   * Adds a src to this Path.
    * @param src the Path to combine with this one.
    * @param op how to combine them. Append and Extend concatenate the outlines; the rest combine the
    * filled areas the two paths describe.
-   * @return whether the operation ran. A false result leaves this Path exactly as it was, so it
-   * still holds a usable outline - only the combination was not applied. A true result is not a
-   * promise that every contour made it through: edges that cannot be resolved are left out and the
-   * rest are assembled without them, so a caller that needs the whole outline has to check what it
-   * got rather than assume the operation covered all of it.
+   * @return false if the combination failed, in which case this Path is unchanged. Append and
+   * Extend always succeed, and a true result can still drop contours that could not be resolved.
    */
   bool addPath(const Path& src, PathOp op = PathOp::Append);
 
   /**
-   * Adds every path in sources to this Path, combining the filled areas they describe. A single
-   * Path carries one fill rule, so concatenating outlines that disagree about theirs would silently
-   * reinterpret some of them: each source is read under the rule it declares and only the areas are
-   * combined. Sources with matching non-inverse rules may keep their contours when their filled
-   * regions are disjoint. Winding contours may also be retained when their concatenation has an
-   * empty symmetric difference with the computed union. Otherwise, the boolean result is used.
-   * @param sources the Paths to add. Empty leaves this Path alone and returns true.
-   * @return whether the combination ran. A false result leaves this Path exactly as it was.
+   * Adds every path in sources to this Path, combining the filled areas they describe. Each source
+   * is read under its own fill rule, so sources that declare different rules can be merged into one
+   * Path.
+   * @param sources the Paths to add. Empty leaves this Path alone.
+   * @return false if the combination failed, in which case this Path is unchanged.
    */
   bool addPaths(const std::vector<Path>& sources);
 

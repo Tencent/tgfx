@@ -77,12 +77,13 @@ class PathEffect {
   }
 
  protected:
-  // Applies this effect to a whole set of ordered sources at once, which is what cumulative effects
-  // need: they share one length axis across every source instead of restarting it per path.
-  // @param paths the sources to filter, in the order they were produced. Each successful
-  // filterPath() result is kept as it came back, including any change it made to the fill rule.
-  // @return whether the effect applied. A false result leaves *paths exactly as it was, so the
-  // caller still holds usable outlines - only the effect was not applied.
+  /**
+   * Applies this effect to all the sources at once, in the order they were produced. The default
+   * implementation calls filterPath() on each of them; an effect that has to span the sources - a
+   * trim or a dash measured over the whole run rather than per path - overrides this instead.
+   * @param paths the sources to filter.
+   * @return false if the effect could not be applied, in which case *paths is unchanged.
+   */
   virtual bool filterPaths(std::vector<Path>* paths) const;
 
   friend class ShapeUtils;
