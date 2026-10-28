@@ -1,7 +1,7 @@
 // The texture-source module's value binding. See TextureSourceModule.h for the contract.
-#include "gpu/shaders/modules/source/TextureSourceModule.h"
+#include "gpu/shaders/modules/TextureSourceModule.h"
 #include "gpu/processors/TextureEffect.h"
-#include "gpu/shaders/params/ParamWriter.h"
+#include "gpu/shaders/modules/ParamWriter.h"
 
 namespace tgfx {
 

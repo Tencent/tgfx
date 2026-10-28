@@ -22,10 +22,8 @@
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
-#include "gpu/shaders/modules/coverage/DeviceMaskModule.h"
-#include "gpu/shaders/modules/source/TextureSourceModule.h"
-#include "gpu/shaders/params/BindingPlan.h"
-#include "gpu/shaders/params/PlanBindingsRegistry.h"
+#include "gpu/shaders/modules/ParamWriter.h"
+#include "gpu/shaders/modules/TextureSourceModule.h"
 
 namespace tgfx {
 
@@ -105,33 +103,17 @@ std::optional<QuadTextureFillShader::Inputs> QuadTextureFillShader::Extract(
   return inputs;
 }
 
-bool QuadTextureFillShader::PlanBindings(const ProgramInfo* programInfo,
-                                         BindingPlanBuilder* builder) {
-  // The plan only serves the shape Extract already accepted; anything else keeps the
-  // processors' own onSetData path.
-  auto fp = programInfo->getFragmentProcessor(0);
-  if (!IsProcessor<TextureEffect>(fp)) {
-    return false;
+ModuleBindFn QuadTextureFillShader::BindingFor(const ProgramInfo* programInfo,
+                                               const FragmentProcessor* fp) {
+  // Only the color root, and only non-YUV sources (the YUV fields ride the processor's own
+  // writer until their module exists); every other position keeps onSetData.
+  if (fp != programInfo->getFragmentProcessor(0) || !IsProcessor<TextureEffect>(fp)) {
+    return nullptr;
   }
-  auto* texture = static_cast<const TextureEffect*>(fp);
-  if (texture->isYUV()) {
-    // The YUV fields ride the processor's own writer until their module exists.
-    return false;
+  if (static_cast<const TextureEffect*>(fp)->isYUV()) {
+    return nullptr;
   }
-  builder->add<TextureSourceModule>(fp, TextureSourceModule::FillFields);
-  // The color TextureEffect's writer also carried the runtime device-mask default; keep it
-  // coming, but only when this program's structure carries no mask FP to set it to 1 in
-  // traversal. Mask presence is part of the program key, so the branch is stable for every
-  // draw sharing the program (the plan's Bind runs after the traversal, where an unconditional
-  // default would clobber the mask FP's 1).
-  auto coverage = ClassifyCoverageFP(programInfo);
-  bool hasDeviceMaskFP = coverage && *coverage == CoverageKind::DeviceMask;
-  if (!hasDeviceMaskFP) {
-    builder->addAbsent<DeviceMaskModule>(DeviceMaskModule::DefaultFields);
-  }
-  return true;
+  return &TextureSourceModule::Bind;
 }
-
-TGFX_REGISTER_PLAN_BINDINGS(QuadTextureFillShader)
 
 }  // namespace tgfx

@@ -61,8 +61,6 @@ const char* PrecompiledFallbackReasonName(PrecompiledFallbackReason reason) {
       return "FragmentModuleCreationFailed";
     case PrecompiledFallbackReason::PipelineCreationFailed:
       return "PipelineCreationFailed";
-    case PrecompiledFallbackReason::BindingPlanMismatch:
-      return "BindingPlanMismatch";
     case PrecompiledFallbackReason::Unspecified:
       return "Unspecified";
     case PrecompiledFallbackReason::NoBundleForBackend:

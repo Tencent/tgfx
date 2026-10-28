@@ -21,11 +21,12 @@
 #include <optional>
 #include <vector>
 #include "gpu/shaders/ShaderFamily.h"
+#include "gpu/shaders/modules/ParamHandle.h"
 
 namespace tgfx {
 
+class FragmentProcessor;
 class ProgramInfo;
-class BindingPlanBuilder;
 
 class QuadTextureFillShader : public ShaderFamily<QuadTextureFillShader> {
  public:
@@ -60,11 +61,9 @@ class QuadTextureFillShader : public ShaderFamily<QuadTextureFillShader> {
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = true;
 
-  /// The parameter module instances the kernel binds (the module-binding pilot): the color
-  /// TextureEffect feeds TextureSourceModule, and the runtime device-mask default keeps its
-  /// writer when the program's structure carries no mask FP. YUV sources and shapes Extract
-  /// rejected keep the processors' own onSetData path (returns false).
-  static bool PlanBindings(const ProgramInfo* programInfo, BindingPlanBuilder* builder);
+  /// Resolves a draw's processor to the module Bind that takes over its uniform writes, or
+  /// null to keep the processor's own onSetData (YUV sources and non-color positions).
+  static ModuleBindFn BindingFor(const ProgramInfo* programInfo, const FragmentProcessor* fp);
 
   /// Matcher inputs: the UV-coord and subset presence, the local-mask presence, and the
   /// XferProcessor kind.

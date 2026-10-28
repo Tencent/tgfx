@@ -65,10 +65,6 @@ enum class PrecompiledFallbackReason : uint8_t {
   VertexModuleCreationFailed,
   FragmentModuleCreationFailed,
   PipelineCreationFailed,
-  // The family declared a parameter binding plan the program's reflection cannot serve (a
-  // processor outside the flattened list, a field layout the reflection disagrees with, two
-  // instances on one processor). A family bug, not a coverage gap: fix the declaration.
-  BindingPlanMismatch,
   Unspecified,
   // No bundle is embedded for this backend, so there is nothing to look an artifact up in: the
   // backend has no precompiled shader support (D3D12), or this build embeds none for it

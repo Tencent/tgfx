@@ -35,8 +35,8 @@
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
-#include "gpu/shaders/params/BindingPlan.h"
-#include "gpu/shaders/params/PlanBindingsRegistry.h"
+#include "gpu/shaders/AllShaderFamilies.h"
+#include "gpu/shaders/ShaderFamily.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
@@ -209,6 +209,30 @@ static PrecompiledFallbackReason ToFallbackReason(PermutationMatchFailure failur
       return PrecompiledFallbackReason::Unspecified;
   }
   return PrecompiledFallbackReason::Unspecified;
+}
+
+// A migrated family resolves each processor to the module Bind that takes over its uniform
+// writes; un-migrated families keep the processors' onSetData. Dispatched through the same
+// X-macro the matcher uses — this file is runtime-only, so referencing the family .cpp symbols
+// is safe (the tool compiles the family headers but never links the .cpps).
+// The per-family lookup is a template, so the discarded &Family::BindingFor branch is not
+// instantiated for families that never declared one.
+template <typename Family>
+static ModuleBindSelector SelectorOf() {
+  if constexpr (FamilyHasBindingFor<Family>::value) {
+    return &Family::BindingFor;
+  }
+  return nullptr;
+}
+
+static ModuleBindSelector BindingSelectorFor(const std::string& familyName) {
+#define TGFX_SELECTOR(Family)    \
+  if (familyName == #Family) {   \
+    return SelectorOf<Family>(); \
+  }
+  TGFX_FOR_EACH_SHADER_FAMILY(TGFX_SELECTOR)
+#undef TGFX_SELECTOR
+  return nullptr;
 }
 
 std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* context,
@@ -588,29 +612,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   auto program = std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
                                            std::move(fragmentUniformData), provenance);
   program->setExpectedTextureCount(static_cast<uint32_t>(descriptor.layout.textureSamplers.size()));
-
-  // A migrated family declares its parameter module instances; the resolved plan takes over
-  // those processors' uniform writes (their onSetData is skipped on the draw path). Un-migrated
-  // families register no hook and keep the onSetData path, so nothing changes for them.
-  auto planBindings = PlanBindingsRegistry::Find(matchResult->shaderName);
-  if (planBindings != nullptr) {
-    std::vector<const FragmentProcessor*> flattened;
-    FlattenProcessors(*programInfo, &flattened);
-    BindingPlanBuilder builder(std::move(flattened),
-                               program->getUniformData(ShaderStage::Fragment));
-    if (planBindings(programInfo, &builder)) {
-      auto plan = builder.finish();
-      if (plan == nullptr) {
-        LOGE("PrecompiledProgramCreator: binding plan mismatch for %s[vert=%u,frag=%u]",
-             matchResult->shaderName.c_str(), matchResult->vertPermutationIndex,
-             matchResult->fragPermutationIndex);
-        cache->recordFailure(PrecompiledFallbackReason::BindingPlanMismatch,
-                             MakeFallbackRecord(cache, programInfo, &*matchResult));
-        return nullptr;
-      }
-      program->setBindingPlan(std::move(plan));
-    }
-  }
+  program->setBindingSelector(BindingSelectorFor(matchResult->shaderName));
   return program;
 }
 

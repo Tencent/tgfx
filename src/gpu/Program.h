@@ -20,12 +20,11 @@
 
 #include <list>
 #include "gpu/UniformData.h"
+#include "gpu/shaders/modules/ParamHandle.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/RenderPipeline.h"
 
 namespace tgfx {
-
-class BindingPlan;
 
 enum class ShaderArtifactOrigin : uint8_t {
   RuntimeGeneratedSource,
@@ -77,17 +76,16 @@ class Program {
   }
 
   /**
-   * The parameter binding plan a migrated kernel family declared for this program: which
-   * processor feeds which module instance, with every field resolved to a block offset. Null
-   * while the family has not migrated (its processors keep writing through onSetData) and on
-   * the runtime-generated path.
+   * The module-binding selector of the family this program serves: per processor, the module
+   * Bind that takes over its uniform writes, or null to keep the processor's own onSetData.
+   * Null for un-migrated families and runtime-generated programs.
    */
-  const std::shared_ptr<const BindingPlan>& bindingPlan() const {
-    return _bindingPlan;
+  ModuleBindSelector bindingSelector() const {
+    return bindingSelectorValue;
   }
 
-  void setBindingPlan(std::shared_ptr<const BindingPlan> plan) {
-    _bindingPlan = std::move(plan);
+  void setBindingSelector(ModuleBindSelector selector) {
+    bindingSelectorValue = selector;
   }
 
  private:
@@ -98,7 +96,7 @@ class Program {
   std::unique_ptr<UniformData> fragmentUniformData = nullptr;
   ProgramProvenance provenance = {};
   uint32_t expectedTextureCountValue = 0;
-  std::shared_ptr<const BindingPlan> _bindingPlan = nullptr;
+  ModuleBindSelector bindingSelectorValue = nullptr;
 
   friend class GlobalCache;
 };

@@ -29,7 +29,7 @@
 #include "gpu/ProgramBuilder.h"
 #include "gpu/ShaderProfileResolver.h"
 #include "gpu/resources/RenderTarget.h"
-#include "gpu/shaders/params/BindingPlan.h"
+#include "gpu/shaders/modules/ParamWriter.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
@@ -379,6 +379,10 @@ bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
     int outputAlphaSwizzle = getOutputSwizzle() == Swizzle::AAAA() ? 1 : 0;
     fragmentUniformData->setDataOptional("OutputAlphaSwizzle", outputAlphaSwizzle);
     fragmentUniformData->setDataOptional("HasClip", 0);
+    // Same engine-default treatment as HasClip: only quad_texture_fill declares it, and a
+    // present mask FP overwrites it with 1 later in traversal. The color TextureEffect's
+    // writer used to carry this default alongside its own fields.
+    fragmentUniformData->setDataOptional("HasDeviceMask", 0);
   }
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, geometryProcessor);
 
@@ -399,13 +403,11 @@ bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
   // source and a TiledTextureEffect local mask each got ordinal 0 (empty suffix), and the mask's
   // full-bounds Subset silently overwrote the color's real subset on the precompiled path —
   // the JIT route is immune because its _P{index} name suffix isolates the two writers.
-  // The binding plan (migrated families) takes over the uniform writes of the processors it
-  // binds: their onSetData is skipped here and the plan's Bind runs after the walk. The ordinal
-  // counting below still advances for every processor, so un-bound ones keep the structural
-  // suffixes (Subset / Subset_1, ...) they had before any migration.
-  const auto& bindingPlan = program->bindingPlan();
-  std::vector<const FragmentProcessor*> flattened;
-  uint32_t flattenedIndex = 0;
+  // A migrated family resolves some processors to a module Bind that replaces their onSetData
+  // at the same walk position: the writes land in the same order, and the structural-suffix
+  // addressing (Subset / Subset_1) below applies to the module writes unchanged.
+  const auto bindingSelector = program->bindingSelector();
+  ParamWriter paramWriter(fragmentUniformData);
   std::unordered_map<std::string, int> classOrdinals;
   auto uniformSpaceKey = [](const FragmentProcessor* fp) {
     auto name = fp->name();
@@ -424,11 +426,12 @@ bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
       if (fragmentUniformData != nullptr) {
         fragmentUniformData->structuralSuffix = structural;
       }
-      if (bindingPlan == nullptr || !bindingPlan->bindsFlattened(flattenedIndex)) {
+      auto bind = bindingSelector != nullptr ? bindingSelector(this, fp) : nullptr;
+      if (bind != nullptr) {
+        bind(fp, &paramWriter);
+      } else {
         fp->setData(vertexUniformData, fragmentUniformData);
       }
-      flattened.push_back(fp);
-      ++flattenedIndex;
       fp = iter.next();
     }
   }
@@ -436,12 +439,6 @@ bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
   processor->setData(vertexUniformData, fragmentUniformData);
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, nullptr);
-  if (bindingPlan != nullptr) {
-    // The plan writes through offsets resolved at program creation; the fragment backing store
-    // was mapped by getUniformBuffer above. ProgramInfo is a friend of UniformData.
-    bindingPlan->bind(flattened,
-                      fragmentUniformData != nullptr ? fragmentUniformData->_buffer : nullptr);
-  }
 
   // TGFX_UNIF_DUMP prints the fully-assembled uniform values (after every writer ran) so an A/B
   // run can diff what the two routes actually upload for the same draw shape. Every draw dumps,

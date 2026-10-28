@@ -46,6 +46,16 @@ struct FamilyHasTextureReads : std::false_type {};
 template <typename T>
 struct FamilyHasTextureReads<T, std::void_t<decltype(T::TextureReads)>> : std::true_type {};
 
+// A family migrated to module parameter binding declares a static BindingFor. The detection is
+// instantiated only in runtime translation units (the program creator's X-macro dispatch); the
+// tool compiles the family headers but never links the family .cpps, so nothing here may
+// reference the definition.
+template <typename T, typename = void>
+struct FamilyHasBindingFor : std::false_type {};
+template <typename T>
+struct FamilyHasBindingFor<T, std::void_t<decltype(T::BindingFor(nullptr, nullptr))>>
+    : std::true_type {};
+
 template <typename T, typename = void>
 struct FamilyHasAllInputs : std::false_type {};
 template <typename T>
