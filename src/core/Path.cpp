@@ -623,35 +623,30 @@ static bool CanConcatenateAreas(const std::vector<Path>& paths) {
   return true;
 }
 
-bool Path::addPaths(const std::vector<Path>& sources) {
-  if (sources.empty()) {
-    return true;
-  }
-  std::vector<Path> operands = {*this};
-  operands.insert(operands.end(), sources.begin(), sources.end());
+std::optional<Path> Path::Merge(const std::vector<Path>& sources) {
   std::vector<Path> nonempty = {};
-  for (const auto& operand : operands) {
-    if (!operand.pathRef->path.isFinite()) {
-      return false;
+  for (const auto& source : sources) {
+    if (!source.pathRef->path.isFinite()) {
+      return std::nullopt;
     }
-    if (!operand.isEmpty() || operand.isInverseFillType()) {
-      nonempty.push_back(operand);
+    if (!source.isEmpty() || source.isInverseFillType()) {
+      nonempty.push_back(source);
     }
   }
+  Path merged = {};
   if (nonempty.empty()) {
-    return true;
+    return merged;
   }
   // Whether the sources can simply be concatenated decides what has to be computed. Measuring it
   // first is what keeps the common case cheap: text that does not overlap never reaches the boolean
   // pass, and overlapping text never pays for the check that the concatenation reproduces the union
   // -- both are expensive, and only one of them is ever needed.
   if (CanConcatenateAreas(nonempty)) {
-    auto result = nonempty.front();
+    merged = nonempty.front();
     for (size_t i = 1; i < nonempty.size(); ++i) {
-      result.addPath(nonempty[i]);
+      merged.addPath(nonempty[i]);
     }
-    *this = std::move(result);
-    return true;
+    return merged;
   }
   pk::SkOpBuilder builder;
   // resolve() may reverse operands while testing its fast path before falling back to Op(). The
@@ -662,7 +657,7 @@ bool Path::addPaths(const std::vector<Path>& sources) {
   }
   pk::SkPath result;
   if (!builder.resolve(&result)) {
-    return false;
+    return std::nullopt;
   }
   bool allWinding = true;
   for (const auto& source : nonempty) {
@@ -688,12 +683,11 @@ bool Path::addPaths(const std::vector<Path>& sources) {
     pk::SkPath difference;
     if (pk::Op(PathRef::ReadAccess(candidate), result, pk::SkPathOp::kXOR_SkPathOp, &difference) &&
         difference.isEmpty()) {
-      *this = std::move(candidate);
-      return true;
+      return candidate;
     }
   }
-  writableRef()->path = result;
-  return true;
+  merged.writableRef()->path = result;
+  return merged;
 }
 
 void Path::reset() {

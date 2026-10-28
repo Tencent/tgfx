@@ -84,7 +84,7 @@ bool TextShape::getGlyphPaths(float resolutionScale, std::vector<Path>* paths) c
 }
 
 bool TextShape::isInverseFillType() const {
-  // A run is inverse exactly when one of its glyphs is, because addPaths() only ever unions:
+  // A run is inverse exactly when one of its glyphs is, because Path::Merge() only ever unions:
   // unioning anything with the whole plane leaves the whole plane, and unioning outlines that each
   // cover a finite region cannot cover more than the union of those regions. Settling it from the
   // glyphs alone is what keeps a caller that only asks about the rule - OpsCompositor, while it is
@@ -108,17 +108,19 @@ Path TextShape::onGetPath(float resolutionScale) const {
   if (!getGlyphPaths(resolutionScale, &glyphPaths)) {
     return {};
   }
-  Path result = {};
-  if (!result.addPaths(glyphPaths)) {
+  auto merged = Path::Merge(glyphPaths);
+  if (!merged.has_value()) {
     // An empty result is what Shape::getPath() would cache, while getBounds() still reports the
     // text blob's bounds, so the run would vanish with nothing pointing at why. Appending is what
     // this did before the merge existed: it cannot fail, and a run whose glyphs disagree about the
     // fill rule is then drawn under the first one's rather than not drawn at all.
     LOGE("TextShape::getPath() Failed to merge the glyph outlines; falling back to append.");
+    Path result = {};
     for (const auto& glyphPath : glyphPaths) {
       result.addPath(glyphPath);
     }
+    return result;
   }
-  return result;
+  return std::move(*merged);
 }
 }  // namespace tgfx

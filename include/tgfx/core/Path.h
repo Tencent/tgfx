@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/PathTypes.h"
@@ -385,13 +386,13 @@ class Path {
   bool addPath(const Path& src, PathOp op = PathOp::Append);
 
   /**
-   * Adds every path in sources to this Path, combining the filled areas they describe. Each source
-   * is read under its own fill rule, so sources that declare different rules can be merged into one
-   * Path.
-   * @param sources the Paths to add. Empty leaves this Path alone.
-   * @return false if the combination failed, in which case this Path is unchanged.
+   * Merges the filled areas of the given paths into one. Each path is read under its own fill rule,
+   * so paths that declare different rules can be merged. When the outlines already describe the
+   * merged area, they are kept as they are.
+   * @param sources the paths to merge. Empty produces an empty path.
+   * @return the merged path, or std::nullopt if the merge failed.
    */
-  bool addPaths(const std::vector<Path>& sources);
+  static std::optional<Path> Merge(const std::vector<Path>& sources);
 
   /**
    * Sets Path to its initial state. Internal storage associated with Path is released.

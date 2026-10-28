@@ -374,9 +374,13 @@ Path GetGlyphRunPath(const GlyphRun& glyphRun, float resolutionScale, bool conto
       sources.push_back(std::move(glyphPath));
     }
   }
-  if (!contoursOnly && !path.addPaths(sources)) {
-    LOGE("PDF export: failed to merge glyph fill regions.");
-    return {};
+  if (!contoursOnly) {
+    auto merged = Path::Merge(sources);
+    if (!merged.has_value()) {
+      LOGE("PDF export: failed to merge glyph fill regions.");
+      return {};
+    }
+    path = std::move(*merged);
   }
   if (hasScale) {
     auto inverseMatrix = Matrix::MakeScale(1.0f / resolutionScale, 1.0f / resolutionScale);

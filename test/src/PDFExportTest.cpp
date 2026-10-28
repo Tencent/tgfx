@@ -2045,8 +2045,9 @@ TGFX_TEST(PDFExportTest, MixedGlyphPathFillMatchesDeclaredSourceAreas) {
     auto a = ExportRuleTestRing(parityFirst ? PathFillType::EvenOdd : PathFillType::Winding);
     auto b = ExportRuleTestRing(parityFirst ? PathFillType::Winding : PathFillType::EvenOdd);
     b.transform(Matrix::MakeTrans(120.0f, 0.0f));
-    Path expected = {};
-    ASSERT_TRUE(expected.addPaths({a, b}));
+    auto merged = Path::Merge({a, b});
+    ASSERT_TRUE(merged.has_value());
+    auto expected = std::move(*merged);
     EXPECT_EQ(expected.contains(50.0f, 50.0f), !parityFirst);
     EXPECT_EQ(expected.contains(170.0f, 50.0f), parityFirst);
     auto reference = MemoryWriteStream::Make();

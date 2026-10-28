@@ -53,7 +53,12 @@ bool ApplyFauxBold(Path* path, float boldSize) {
   if (!stroke.applyToPath(&strokePath)) {
     return false;
   }
-  return path->addPaths({strokePath});
+  auto merged = Path::Merge({*path, strokePath});
+  if (!merged.has_value()) {
+    return false;
+  }
+  *path = std::move(*merged);
+  return true;
 }
 
 }  // namespace
@@ -147,7 +152,7 @@ class PathUserScalerContext final : public UserScalerContext {
     if (fauxBold) {
       // Bold the outline in the design coordinates the provider hands out, then rasterize that
       // instead of building a shape per step: combining a glyph with the stroke of itself is a
-      // question about filled area, which is what addPaths() resolves.
+      // question about filled area, which is what Path::Merge() resolves.
       auto glyphPath = pathProvider->getPath();
       if (!ApplyFauxBold(&glyphPath, fauxBoldSize / textScale)) {
         return false;

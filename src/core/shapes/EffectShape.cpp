@@ -47,12 +47,12 @@ Path EffectShape::onGetPath(float resolutionScale) const {
   if (paths.size() == 1) {
     return paths.front();
   }
-  Path result = {};
-  if (!result.addPaths(paths)) {
+  auto merged = Path::Merge(paths);
+  if (!merged.has_value()) {
     LOGE("EffectShape: failed to merge path sources!");
     return {};
   }
-  return result;
+  return std::move(*merged);
 }
 
 }  // namespace tgfx

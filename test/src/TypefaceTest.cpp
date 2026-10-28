@@ -427,7 +427,7 @@ TGFX_TEST(TypefaceTest, FauxBoldKeepsEvenOddGlyphFilled) {
 
 namespace {
 
-// Replica of the merge TextShape::onGetPath() used before it was replaced by Path::addPaths(), so
+// Replica of the merge TextShape::onGetPath() used before it was replaced by Path::Merge(), so
 // the two can be compared on the same outlines without going through a screenshot.
 static int DiagDirection(const Path& path) {
   auto bounds = path.getBounds();
@@ -595,8 +595,9 @@ TGFX_TEST(TypefaceTest, UnionKeepsOppositeDirectionIslandFilled) {
 
   auto oldResult = DiagnosticOldMerge({glyphA, glyphB});
   EXPECT_FALSE(oldResult.contains(2200.0f, 200.0f));
-  Path united = {};
-  ASSERT_TRUE(united.addPaths({glyphA, glyphB}));
+  auto merged = Path::Merge({glyphA, glyphB});
+  ASSERT_TRUE(merged.has_value());
+  auto united = std::move(*merged);
   EXPECT_EQ(united.getFillType(), PathFillType::EvenOdd);
   EXPECT_TRUE(united.contains(2200.0f, 200.0f));
   EXPECT_TRUE(united.contains(500.0f, 500.0f));
@@ -802,8 +803,9 @@ TGFX_TEST(TypefaceTest, AreaUnionKeepsDisjointContoursAndRejectsInvalidSources) 
   b.transform(Matrix::MakeTrans(1200.0f, 0.0f));
   auto expected = a;
   ASSERT_TRUE(expected.addPath(b));
-  Path result = {};
-  ASSERT_TRUE(result.addPaths({a, b}));
+  auto merged = Path::Merge({a, b});
+  ASSERT_TRUE(merged.has_value());
+  auto result = std::move(*merged);
   EXPECT_EQ(result, expected);
   EXPECT_EQ(result.getFillType(), PathFillType::EvenOdd);
   EXPECT_FALSE(result.contains(500.0f, 500.0f));
@@ -811,9 +813,11 @@ TGFX_TEST(TypefaceTest, AreaUnionKeepsDisjointContoursAndRejectsInvalidSources) 
   auto original = result;
   Path invalid = {};
   invalid.moveTo(std::numeric_limits<float>::infinity(), 0.0f);
-  EXPECT_FALSE(result.addPaths({invalid}));
+  EXPECT_FALSE(Path::Merge({invalid}).has_value());
   EXPECT_EQ(result, original);
-  ASSERT_TRUE(result.addPaths({result}));
+  auto selfMerged = Path::Merge({result});
+  ASSERT_TRUE(selfMerged.has_value());
+  result = std::move(*selfMerged);
   EXPECT_TRUE(result.contains(100.0f, 100.0f));
   EXPECT_FALSE(result.contains(500.0f, 500.0f));
 }
@@ -893,8 +897,9 @@ TGFX_TEST(TypefaceTest, AreaUnionKeepsNonIntersectingGlyphsWithOverlappingBounds
   for (size_t i = 1; i < glyphs.size(); ++i) {
     ASSERT_TRUE(expected.addPath(glyphs[i]));
   }
-  Path result = {};
-  ASSERT_TRUE(result.addPaths(glyphs));
+  auto merged = Path::Merge(glyphs);
+  ASSERT_TRUE(merged.has_value());
+  auto result = std::move(*merged);
   EXPECT_EQ(result.getFillType(), PathFillType::Winding);
   EXPECT_EQ(result, expected);
 }
@@ -906,8 +911,9 @@ TGFX_TEST(TypefaceTest, AreaUnionKeepsVerifiedWindingOverlapContours) {
   b.addRect(Rect::MakeLTRB(200.0f, 0.0f, 500.0f, 300.0f));
   auto expected = a;
   ASSERT_TRUE(expected.addPath(b));
-  Path result = {};
-  ASSERT_TRUE(result.addPaths({a, b}));
+  auto merged = Path::Merge({a, b});
+  ASSERT_TRUE(merged.has_value());
+  auto result = std::move(*merged);
   EXPECT_EQ(result, expected);
   EXPECT_EQ(result.getFillType(), PathFillType::Winding);
   EXPECT_TRUE(result.contains(250.0f, 150.0f));
@@ -915,8 +921,9 @@ TGFX_TEST(TypefaceTest, AreaUnionKeepsVerifiedWindingOverlapContours) {
 
   a.setFillType(PathFillType::EvenOdd);
   b.setFillType(PathFillType::EvenOdd);
-  result.reset();
-  ASSERT_TRUE(result.addPaths({a, b}));
+  auto evenOddMerged = Path::Merge({a, b});
+  ASSERT_TRUE(evenOddMerged.has_value());
+  result = std::move(*evenOddMerged);
   EXPECT_EQ(result.getFillType(), PathFillType::EvenOdd);
   EXPECT_TRUE(result.contains(250.0f, 150.0f));
   EXPECT_FLOAT_EQ(DiagnosticLength(result), 1600.0f);
@@ -1185,8 +1192,9 @@ TGFX_TEST(TypefaceTest, OverlappingGlyphMergeIsNotQuadratic) {
       sources.push_back(std::move(path));
     }
     auto start = std::chrono::steady_clock::now();
-    Path result = {};
-    ASSERT_TRUE(result.addPaths(sources));
+    auto merged = Path::Merge(sources);
+    ASSERT_TRUE(merged.has_value());
+    auto result = std::move(*merged);
     auto elapsed =
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
     EXPECT_LT(elapsed, 400.0);
@@ -1207,8 +1215,9 @@ TGFX_TEST(TypefaceTest, DisjointGlyphMergeIsNotQuadratic) {
       sources.push_back(std::move(path));
     }
     auto start = std::chrono::steady_clock::now();
-    Path result = {};
-    ASSERT_TRUE(result.addPaths(sources));
+    auto merged = Path::Merge(sources);
+    ASSERT_TRUE(merged.has_value());
+    auto result = std::move(*merged);
     auto elapsed =
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
     printf("[PERF] 300 disjoint glyphs rule=%d: %.3f ms\n", static_cast<int>(rule), elapsed);
@@ -1233,8 +1242,9 @@ TGFX_TEST(TypefaceTest, DisjointAreaScanPreservesInputContourOrder) {
         ASSERT_TRUE(expected.addPath(path));
         sources.push_back(std::move(path));
       }
-      Path result = {};
-      ASSERT_TRUE(result.addPaths(sources));
+      auto merged = Path::Merge(sources);
+      ASSERT_TRUE(merged.has_value());
+      auto result = std::move(*merged);
       EXPECT_EQ(result.getFillType(), rule);
       EXPECT_EQ(result, expected);
       EXPECT_TRUE(result.contains(5.0f, 5.0f));
@@ -1258,8 +1268,9 @@ TGFX_TEST(TypefaceTest, AreaScanChecksAllActiveBoundsAndEqualStarts) {
         source.transform(Matrix::MakeRotate(90.0f));
       }
     }
-    Path result = {};
-    ASSERT_TRUE(result.addPaths(sources));
+    auto merged = Path::Merge(sources);
+    ASSERT_TRUE(merged.has_value());
+    auto result = std::move(*merged);
     EXPECT_TRUE(result.contains(vertical ? -5.0f : 95.0f, vertical ? 95.0f : 5.0f));
     EXPECT_TRUE(result.contains(vertical ? -25.0f : 25.0f, 25.0f));
   }
@@ -1269,8 +1280,9 @@ TGFX_TEST(TypefaceTest, AreaScanChecksAllActiveBoundsAndEqualStarts) {
   island.setFillType(PathFillType::EvenOdd);
   auto expected = ring;
   ASSERT_TRUE(expected.addPath(island));
-  Path result = {};
-  ASSERT_TRUE(result.addPaths({island, ring}));
+  auto merged = Path::Merge({island, ring});
+  ASSERT_TRUE(merged.has_value());
+  auto result = std::move(*merged);
   EXPECT_TRUE(result.contains(500.0f, 500.0f));
   EXPECT_FALSE(result.contains(250.0f, 500.0f));
   auto difference = result;
@@ -1279,7 +1291,9 @@ TGFX_TEST(TypefaceTest, AreaScanChecksAllActiveBoundsAndEqualStarts) {
   Path sameStart = {};
   sameStart.addRect(Rect::MakeLTRB(0.0f, 0.0f, 500.0f, 1000.0f));
   sameStart.setFillType(PathFillType::EvenOdd);
-  ASSERT_TRUE(result.addPaths({sameStart}));
+  auto extended = Path::Merge({result, sameStart});
+  ASSERT_TRUE(extended.has_value());
+  result = std::move(*extended);
   EXPECT_TRUE(result.contains(250.0f, 500.0f));
   EXPECT_FALSE(result.contains(750.0f, 500.0f));
 }

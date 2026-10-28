@@ -654,9 +654,13 @@ void SVGExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const Matr
       }
     }
   }
-  if (stroke == nullptr && !path.addPaths(sources)) {
-    LOGE("SVG export: failed to merge glyph fill regions.");
-    return;
+  if (stroke == nullptr) {
+    auto merged = Path::Merge(sources);
+    if (!merged.has_value()) {
+      LOGE("SVG export: failed to merge glyph fill regions.");
+      return;
+    }
+    path = std::move(*merged);
   }
   if (path.isInverseFillType() && stroke == nullptr) {
     LOGE("SVG export: inverse-filled glyph runs require a finite clipping region.");
