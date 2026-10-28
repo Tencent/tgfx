@@ -528,7 +528,9 @@ bool Path::addPath(const Path& src, PathOp op) {
   auto& path = writableRef()->path;
   const auto& newPath = src.pathRef->path;
   if (op == PathOp::Append || op == PathOp::Extend) {
-    if (path.isEmpty()) {
+    // An empty inverse path fills the whole plane, so it is not a no-op operand: overwriting it with
+    // the next one would drop the plane. Only a path with neither contours nor an inverse rule is.
+    if (path.isEmpty() && !path.isInverseFillType()) {
       path = newPath;
     } else {
       auto mode = op == PathOp::Extend ? SkPath::kExtend_AddPathMode : SkPath::kAppend_AddPathMode;

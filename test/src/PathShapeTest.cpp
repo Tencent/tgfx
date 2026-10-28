@@ -1193,4 +1193,27 @@ TGFX_TEST(PathShapeTest, RRectPathRoundTrip) {
   EXPECT_TRUE(ovalPath.isOval(nullptr));
 }
 
+TGFX_TEST(PathShapeTest, AppendKeepsAnEmptyInverseShapeFillingThePlane) {
+  // A path with no contour but an inverse rule fills the whole plane. Appending to it must not
+  // treat it as an empty operand and overwrite it, which would drop the plane.
+  Path plane = {};
+  plane.setFillType(PathFillType::InverseEvenOdd);
+  auto planeShape = Shape::MakeFrom(std::move(plane));
+  ASSERT_TRUE(planeShape != nullptr);
+  ASSERT_TRUE(planeShape->isInverseFillType());
+  Path rectPath = {};
+  rectPath.addRect(Rect::MakeLTRB(0, 0, 100, 100));
+  auto rectShape = Shape::MakeFrom(rectPath);
+  ASSERT_TRUE(rectShape != nullptr);
+  auto merged = Shape::Merge(planeShape, rectShape);
+  ASSERT_TRUE(merged != nullptr);
+  // The rule has to agree with the path the shape hands back.
+  EXPECT_TRUE(merged->isInverseFillType());
+  auto path = merged->getPath();
+  EXPECT_EQ(path.getFillType(), PathFillType::InverseEvenOdd);
+  // The rectangle is the hole; everything outside it is still filled.
+  EXPECT_TRUE(path.contains(1000.0f, 1000.0f));
+  EXPECT_FALSE(path.contains(50.0f, 50.0f));
+}
+
 }  // namespace tgfx

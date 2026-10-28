@@ -1074,15 +1074,16 @@ TGFX_TEST(TypefaceTest, ProviderDefaultReportsComputedPathRule) {
   EXPECT_FALSE(shape->getPath().contains(500.0f, 500.0f));
 }
 
-TGFX_TEST(TypefaceTest, AppendReportsRuleAfterEmptyFirstPath) {
+TGFX_TEST(TypefaceTest, AppendReportsRuleOfAnEmptyInverseFirstPath) {
   Path empty = {};
   empty.setFillType(PathFillType::InverseWinding);
   auto first = Shape::MakeFrom(empty);
   auto second = Shape::MakeFrom(MakeRingPath(PathFillType::EvenOdd));
   auto appended = Shape::Merge(first, second, PathOp::Append);
   ASSERT_TRUE(appended != nullptr);
-  EXPECT_EQ(appended->fillType(), PathFillType::EvenOdd);
-  EXPECT_EQ(appended->getPath().getFillType(), PathFillType::EvenOdd);
+  EXPECT_EQ(appended->fillType(), PathFillType::InverseWinding);
+  EXPECT_EQ(appended->getPath().getFillType(), PathFillType::InverseWinding);
+  EXPECT_TRUE(appended->getPath().contains(5000.0f, 5000.0f));
   EXPECT_FALSE(appended->getPath().contains(500.0f, 500.0f));
   std::vector<std::shared_ptr<Shape>> shapes = {nullptr, nullptr};
   EXPECT_EQ(Shape::Merge(shapes), nullptr);
@@ -1140,8 +1141,9 @@ TGFX_TEST(TypefaceTest, ProviderShapeUsesOutlineDespiteIncorrectMetadata) {
 }
 
 TGFX_TEST(TypefaceTest, AppendRuleQueryDoesNotGenerateTrailingContours) {
+  // A plain empty source contributes nothing and is skipped; an inverse one would fill the whole
+  // plane and stop the scan here instead.
   Path empty = {};
-  empty.setFillType(PathFillType::InverseWinding);
   auto emptyProvider = std::make_shared<CountingPathProvider>(empty);
   auto firstProvider = std::make_shared<CountingPathProvider>(MakeRingPath(PathFillType::EvenOdd));
   auto trailingProvider =
