@@ -77,6 +77,7 @@
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
 #include "utils/AOTToleranceCompare.h"
+#include "utils/ProjectPath.h"
 #include "utils/TestUtils.h"
 #include "zlib.h"
 #include "zstd.h"
@@ -472,17 +473,20 @@ TGFX_TEST(ShaderPermutationTest, DimensionDefinesAppearInGLSL) {
   // that dimension silently compiles to the same code — a typo in the GLSL side of the contract
   // or a dimension whose branch was replaced by a runtime uniform without removing the axis. The
   // check is enumeration driven, so a new family is covered without writing another test.
-  const std::string shaderDir = "../src/gpu/shaders/glsl";
+  const std::string shaderDir = ProjectPath::Absolute("src/gpu/shaders/glsl");
   for (auto& factory : ShaderRegistry::All()) {
     auto shader = factory();
     ASSERT_NE(shader, nullptr);
     auto info = shader->info();
     SCOPED_TRACE(info.name);
-    std::string text = ReadExpandedGLSL(shaderDir + "/" + info.vertexFile);
-    text += "\n";
-    text += ReadExpandedGLSL(shaderDir + "/" + info.fragmentFile);
-    ASSERT_FALSE(text.empty()) << info.vertexFile << " / " << info.fragmentFile
-                               << " could not be read under " << shaderDir;
+    // Check each file on its own: a failed read must fail the test, not silently turn every
+    // dimension into a false "never referenced" report.
+    auto vertexText = ReadExpandedGLSL(shaderDir + "/" + info.vertexFile);
+    ASSERT_FALSE(vertexText.empty()) << info.vertexFile << " could not be read under " << shaderDir;
+    auto fragmentText = ReadExpandedGLSL(shaderDir + "/" + info.fragmentFile);
+    ASSERT_FALSE(fragmentText.empty())
+        << info.fragmentFile << " could not be read under " << shaderDir;
+    std::string text = vertexText + "\n" + fragmentText;
     for (const auto& dimensions : {info.vertDomain, info.fragDomain}) {
       for (const auto& dimension : dimensions.getDimensions()) {
         auto defineName =
