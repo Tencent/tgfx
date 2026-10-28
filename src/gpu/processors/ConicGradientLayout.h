@@ -23,6 +23,8 @@
 namespace tgfx {
 class ConicGradientLayout : public FragmentProcessor {
  public:
+  DEFINE_PROCESSOR_CLASS_ID
+
   static PlacementPtr<ConicGradientLayout> Make(BlockAllocator* allocator, Matrix matrix,
                                                 float bias, float scale);
 
@@ -39,8 +41,6 @@ class ConicGradientLayout : public FragmentProcessor {
   }
 
  protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
   ConicGradientLayout(Matrix matrix, float bias, float scale);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;

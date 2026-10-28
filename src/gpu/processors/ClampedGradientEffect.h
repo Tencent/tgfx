@@ -37,6 +37,24 @@ class ClampedGradientEffect : public FragmentProcessor {
 
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
+  /** The colors the effect clamps to outside the gradient's [0, 1] span. */
+  const Color& getLeftBorderColor() const {
+    return leftBorderColor;
+  }
+
+  const Color& getRightBorderColor() const {
+    return rightBorderColor;
+  }
+
+  /** The layout child whose kind selects the kernel's LayoutType branch. */
+  const FragmentProcessor* getGradLayout() const {
+    return childProcessor(gradLayoutIndex);
+  }
+
+  /** The kernel's LayoutType index for a layout processor's name (0 linear, 1 radial, 2 conic,
+   *  3 diamond). Shared with the runtime writer so the mapping lives in one place. */
+  static int LayoutTypeIndex(const std::string& layoutName);
+
  protected:
   ClampedGradientEffect(PlacementPtr<FragmentProcessor> colorizer,
                         PlacementPtr<FragmentProcessor> gradLayout, Color leftBorderColor,

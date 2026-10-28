@@ -34,6 +34,19 @@ ClampedGradientEffect::ClampedGradientEffect(PlacementPtr<FragmentProcessor> col
   gradLayoutIndex = registerChildProcessor(std::move(gradLayout));
 }
 
+int ClampedGradientEffect::LayoutTypeIndex(const std::string& layoutName) {
+  if (layoutName == "RadialGradientLayout") {
+    return 1;
+  }
+  if (layoutName == "ConicGradientLayout") {
+    return 2;
+  }
+  if (layoutName == "DiamondGradientLayout") {
+    return 3;
+  }
+  return 0;
+}
+
 bool ClampedGradientEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
                                        AOTNodeID* output) const {
   if (builder == nullptr || output == nullptr) {

@@ -22,6 +22,7 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/processors/ClampedGradientEffect.h"
+#include "gpu/processors/ConicGradientLayout.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/RRectEffect.h"
@@ -31,6 +32,7 @@
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
 #include "gpu/shaders/modules/DeviceMaskModule.h"
+#include "gpu/shaders/modules/GradientModule.h"
 #include "gpu/shaders/modules/ParamWriter.h"
 #include "gpu/shaders/modules/TextureSourceModule.h"
 
@@ -115,7 +117,15 @@ ModuleBindFn ShapeInstancedTextureCoverageShader::BindingFor(const ProgramInfo* 
   if (IsProcessor<DeviceSpaceTextureEffect>(fp)) {
     return &DeviceMaskModule::Bind;
   }
-  // The gradient colorizers keep their own writers.
+  if (IsProcessor<ClampedGradientEffect>(fp)) {
+    return &GradientModule::BindEffect;
+  }
+  if (IsProcessor<ConicGradientLayout>(fp)) {
+    return &GradientModule::BindConicLayout;
+  }
+  if (IsProcessor<SingleIntervalGradientColorizer>(fp)) {
+    return &GradientModule::BindColorizer;
+  }
   return nullptr;
 }
 
