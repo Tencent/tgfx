@@ -43,6 +43,21 @@ class Blur1DFragmentProcessor : public FragmentProcessor {
   // Number of vec4 uniforms needed to hold the half-kernel.
   static constexpr int KERNEL_VEC4_COUNT = (MAX_KERNEL_SIZE + 3) / 4;
 
+  /**
+   * The packed half-kernel table: kernelRadius + 1 weights, zero-padded to the vec4 array the
+   * shader declares. Shared by the uniform writer and the blur feature module.
+   */
+  std::array<float, 4 * KERNEL_VEC4_COUNT> packedKernel() const {
+    std::array<float, 4 * KERNEL_VEC4_COUNT> data = {};
+    memcpy(data.data(), kernel.data(), static_cast<size_t>(kernelRadius + 1) * sizeof(float));
+    return data;
+  }
+
+  /** The single-sided radius of the kernel. */
+  int getKernelRadius() const {
+    return kernelRadius;
+  }
+
  protected:
   explicit Blur1DFragmentProcessor(uint32_t classID);
 

@@ -46,6 +46,14 @@ class GaussianBlur1DFragmentProcessor : public Blur1DFragmentProcessor {
     return maxSigma;
   }
 
+  GaussianBlurDirection getDirection() const {
+    return direction;
+  }
+
+  float getStepLength() const {
+    return stepLength;
+  }
+
  protected:
   GaussianBlur1DFragmentProcessor(PlacementPtr<FragmentProcessor> processor, float sigma,
                                   GaussianBlurDirection direction, float stepLength, int maxSigma);

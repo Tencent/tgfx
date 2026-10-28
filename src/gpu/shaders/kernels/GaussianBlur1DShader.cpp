@@ -21,6 +21,8 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/processors/GaussianBlur1DFragmentProcessor.h"
+#include "gpu/shaders/modules/BlurKernelModule.h"
+#include "gpu/shaders/modules/ParamWriter.h"
 
 namespace tgfx {
 
@@ -65,6 +67,14 @@ std::optional<GaussianBlur1DShader::Inputs> GaussianBlur1DShader::Extract(
     return std::nullopt;
   }
   return Inputs{xpType};
+}
+
+ModuleBindFn GaussianBlur1DShader::BindingFor(const ProgramInfo* /*programInfo*/,
+                                              const FragmentProcessor* fp) {
+  if (IsProcessor<GaussianBlur1DFragmentProcessor>(fp)) {
+    return &BlurKernelModule::Bind;
+  }
+  return nullptr;
 }
 
 }  // namespace tgfx

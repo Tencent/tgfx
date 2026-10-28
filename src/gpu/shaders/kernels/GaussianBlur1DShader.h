@@ -21,9 +21,11 @@
 #include <optional>
 #include <vector>
 #include "gpu/shaders/ShaderFamily.h"
+#include "gpu/shaders/modules/ParamHandle.h"
 
 namespace tgfx {
 
+class FragmentProcessor;
 class ProgramInfo;
 
 /// Precompiled shader declaration for GaussianBlur1DFragmentProcessor. Performs a 1D Gaussian blur
@@ -71,6 +73,10 @@ class GaussianBlur1DShader : public ShaderFamily<GaussianBlur1DShader> {
   using FD = FragDims;
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = true;
+
+  /// Resolves a draw's processor to the module Bind that takes over its uniform writes, or
+  /// null to keep the processor's own onSetData.
+  static ModuleBindFn BindingFor(const ProgramInfo* programInfo, const FragmentProcessor* fp);
 
   /// Matcher inputs: only the XferProcessor kind shapes the variant.
   struct Inputs {

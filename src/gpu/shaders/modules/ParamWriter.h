@@ -44,6 +44,13 @@ class ParamWriter {
     }
   }
 
+  template <size_t N>
+  void set(const Param<ParamType::Float4Array>& param, const std::array<float, N>& values) {
+    if (uniforms != nullptr) {
+      uniforms->setDataOptional(param.name, values);
+    }
+  }
+
   /// Whether this program's variant declares the named field. Modules use it to replicate the
   /// processors' shape-dependent branches (e.g. the device mask's decoy vs fallback writes).
   bool hasField(const char* name) const {

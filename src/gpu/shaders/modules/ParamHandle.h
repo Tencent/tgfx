@@ -18,6 +18,8 @@ enum class ParamType : uint8_t {
   Float4,
   Int,
   Float3x3,
+  // A float table declared as an array of vec4 (e.g. the blur half-kernel).
+  Float4Array,
 };
 
 // A typed reference to one field of a module's parameters: the field's name in the reflected
