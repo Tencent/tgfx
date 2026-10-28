@@ -52,16 +52,15 @@ layout(location = GP_ELLIPSE_IN_RADII) in vec4 inEllipseRadii;
 layout(location = 2) in vec4 inColor;
 #define CHAIN_TEX_LOC_BASE 1
 #elif GP_LAYOUT >= 3
-// ComplexEllipseGP attribute order: position, color, ellipseOffset, ellipseRadii, edgeDist,
-// [strokeWidth]. Varyings: offsets 0, radii 1, edge distances 2, then the stroke width and the
-// color (pointwise_complex_ellipse_layout.inc).
-#include "geometry/pointwise_complex_ellipse_layout.inc"
-layout(location = 1) in vec4 inColor;
-layout(location = 2) in vec2 inEllipseOffset;
-layout(location = 3) in vec4 inEllipseRadii;
-layout(location = 4) in vec2 inEdgeDist;
+// ComplexEllipseGP: the locations live in gp_complex_ellipse_layout.inc, shared with the
+// dedicated kernel.
+#include "geometry/gp_complex_ellipse_layout.inc"
+layout(location = GP_COMPLEX_IN_COLOR) in vec4 inColor;
+layout(location = GP_COMPLEX_IN_OFFSET) in vec2 inEllipseOffset;
+layout(location = GP_COMPLEX_IN_RADII) in vec4 inEllipseRadii;
+layout(location = GP_COMPLEX_IN_EDGE_DIST) in vec2 inEdgeDist;
 #if GP_LAYOUT == 4
-layout(location = 5) in vec2 inStrokeWidth;
+layout(location = GP_COMPLEX_IN_STROKE) in vec2 inStrokeWidth;
 #endif
 #else
 #define CHAIN_TEX_LOC_BASE 0
@@ -142,13 +141,13 @@ layout(location = GP_ELLIPSE_V_COLOR) out vec4 vColor;
 layout(location = 0) out float vEdgeDistance;
 layout(location = NTEX + 1) out vec4 vColor;
 #elif GP_LAYOUT >= 3
-layout(location = 0) out vec2 vEllipseOffsets;
-layout(location = 1) out vec4 vEllipseRadii;
-layout(location = 2) out vec2 vEdgeDist;
+layout(location = GP_COMPLEX_V_OFFSETS) out vec2 vEllipseOffsets;
+layout(location = GP_COMPLEX_V_RADII) out vec4 vEllipseRadii;
+layout(location = GP_COMPLEX_V_EDGE_DIST) out vec2 vEdgeDist;
 #if GP_LAYOUT == 4
-layout(location = CHAIN_COMPLEX_STROKE_LOC) out vec2 vStrokeWidth;
+layout(location = GP_COMPLEX_V_STROKE) out vec2 vStrokeWidth;
 #endif
-layout(location = CHAIN_COMPLEX_COLOR_LOC) out vec4 vColor;
+layout(location = GP_COMPLEX_V_COLOR) out vec4 vColor;
 #else
 #if HAS_COVERAGE
 layout(location = NTEX) out float vCoverage;

@@ -28,12 +28,14 @@ layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING)
 #include "xp/xp_uniforms.inc"
 };
 
-layout(location = 0) in vec2 vEllipseOffsets;
-layout(location = 1) in vec4 vEllipseRadii;
-layout(location = 2) in vec2 vEdgeDist;
-layout(location = 3) in vec4 vColor;
+#include "geometry/gp_complex_ellipse_layout.inc"
+
+layout(location = GP_COMPLEX_V_OFFSETS) in vec2 vEllipseOffsets;
+layout(location = GP_COMPLEX_V_RADII) in vec4 vEllipseRadii;
+layout(location = GP_COMPLEX_V_EDGE_DIST) in vec2 vEdgeDist;
+layout(location = GP_COMPLEX_V_COLOR) in vec4 vColor;
 #if STROKE
-layout(location = 4) in vec2 vStrokeWidth;
+layout(location = GP_COMPLEX_V_STROKE) in vec2 vStrokeWidth;
 #endif
 
 // The mask sampler is always declared so the runtime branch needs no second variant; when the draw

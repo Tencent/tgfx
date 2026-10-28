@@ -5,7 +5,7 @@
 #ifndef TGFX_POINTWISE_SOURCE_COORDS_INC
 #define TGFX_POINTWISE_SOURCE_COORDS_INC
 // Location 7 sits past every layout's leaf coordinates except the ComplexEllipse ones, which
-// define their own (pointwise_complex_ellipse_layout.inc).
+// define their own (gp_complex_ellipse_layout.inc).
 #ifndef CHAIN_SOURCE_COORDS_LOC
 #define CHAIN_SOURCE_COORDS_LOC 7
 #endif

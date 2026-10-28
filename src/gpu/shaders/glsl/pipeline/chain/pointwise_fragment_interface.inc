@@ -14,15 +14,16 @@ layout(location = 0) in float vEdgeDistance;
 layout(location = NTEX + 1) in vec4 vColor;
 #define CHAIN_TEX_LOC_BASE 1
 #elif GP_LAYOUT >= 3
-// ComplexEllipse fill (3) / stroke (4); the locations live in pointwise_complex_ellipse_layout.inc.
-#include "geometry/pointwise_complex_ellipse_layout.inc"
-layout(location = 0) in vec2 vEllipseOffsets;
-layout(location = 1) in vec4 vEllipseRadii;
-layout(location = 2) in vec2 vEdgeDist;
+// ComplexEllipse fill (3) / stroke (4); the locations live in gp_complex_ellipse_layout.inc,
+// shared with the dedicated kernel.
+#include "geometry/gp_complex_ellipse_layout.inc"
+layout(location = GP_COMPLEX_V_OFFSETS) in vec2 vEllipseOffsets;
+layout(location = GP_COMPLEX_V_RADII) in vec4 vEllipseRadii;
+layout(location = GP_COMPLEX_V_EDGE_DIST) in vec2 vEdgeDist;
 #if GP_LAYOUT == 4
-layout(location = CHAIN_COMPLEX_STROKE_LOC) in vec2 vStrokeWidth;
+layout(location = GP_COMPLEX_V_STROKE) in vec2 vStrokeWidth;
 #endif
-layout(location = CHAIN_COMPLEX_COLOR_LOC) in vec4 vColor;
+layout(location = GP_COMPLEX_V_COLOR) in vec4 vColor;
 #else
 #define CHAIN_TEX_LOC_BASE 0
 #endif
