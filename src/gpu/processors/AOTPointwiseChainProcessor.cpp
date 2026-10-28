@@ -22,6 +22,7 @@
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/resources/TextureView.h"
+#include "gpu/shaders/modules/ChainParams.h"
 
 namespace tgfx {
 namespace {
@@ -35,19 +36,19 @@ static std::array<float, 12> MatrixColumnMajor(const std::array<float, 9>& value
 // Uploads one tiled recipe into the kernel's Tiled<field><suffix> uniform set ("" for the first
 // recipe, "2" for the second).
 static void UploadTiledRecipe(UniformData* uniformData, const AOTTiledTextureRecipe& recipe,
-                              const std::string& suffix) {
-  uniformData->setDataOptional("TiledModeX" + suffix, static_cast<int>(recipe.shaderModeX));
-  uniformData->setDataOptional("TiledModeY" + suffix, static_cast<int>(recipe.shaderModeY));
+                              const ChainParams::TiledRecipeNames& names) {
+  uniformData->setDataOptional(names.modeX, static_cast<int>(recipe.shaderModeX));
+  uniformData->setDataOptional(names.modeY, static_cast<int>(recipe.shaderModeY));
   float subsetRect[] = {recipe.shaderSubset.left, recipe.shaderSubset.top,
                         recipe.shaderSubset.right, recipe.shaderSubset.bottom};
-  uniformData->setDataOptional("TiledSubset" + suffix, subsetRect);
+  uniformData->setDataOptional(names.subset, subsetRect);
   float clampRect[] = {recipe.shaderClamp.left, recipe.shaderClamp.top, recipe.shaderClamp.right,
                        recipe.shaderClamp.bottom};
-  uniformData->setDataOptional("TiledClamp" + suffix, clampRect);
+  uniformData->setDataOptional(names.clamp, clampRect);
   if (recipe.usesShaderDimensions) {
-    uniformData->setDataOptional("TiledDimension" + suffix, recipe.shaderDimensions);
+    uniformData->setDataOptional(names.dimension, recipe.shaderDimensions);
   }
-  uniformData->setDataOptional("TiledStrict" + suffix, recipe.strict ? 1 : 0);
+  uniformData->setDataOptional(names.strict, recipe.strict ? 1 : 0);
 }
 
 static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTChainSlot& slot,
@@ -89,30 +90,30 @@ static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTCha
   // the kernel then skips the chainResults write).
   selector |= (slot.outRegister + 1) << 20;
   int packed[] = {static_cast<int>(slot.op), slot.in0, slot.in1, selector};
-  uniformData->setArrayElementOptional("SlotPacked", index, packed);
+  uniformData->setArrayElementOptional(ChainParams::SlotPacked.name, index, packed);
   switch (slot.op) {
     case AOTChainOp::ColorMatrix: {
       float matrixData[16];
       float vectorData[4];
       PackAOTColorMatrix(slot.colorMatrix.matrix, matrixData, vectorData);
-      uniformData->setArrayElementOptional("SlotColorMatrix", index, matrixData);
-      uniformData->setArrayElementOptional("SlotColorVector", index, vectorData);
+      uniformData->setArrayElementOptional(ChainParams::SlotColorMatrix.name, index, matrixData);
+      uniformData->setArrayElementOptional(ChainParams::SlotColorVector.name, index, vectorData);
       break;
     }
     case AOTChainOp::Luma: {
       float lumaThresh[] = {slot.luma.kr, slot.luma.kg, slot.luma.kb, 0.0f};
-      uniformData->setArrayElementOptional("SlotLumaThresh", index, lumaThresh);
+      uniformData->setArrayElementOptional(ChainParams::SlotLumaThresh.name, index, lumaThresh);
       break;
     }
     case AOTChainOp::AlphaThreshold: {
       float lumaThresh[] = {0.0f, 0.0f, 0.0f, slot.alphaThreshold.threshold};
-      uniformData->setArrayElementOptional("SlotLumaThresh", index, lumaThresh);
+      uniformData->setArrayElementOptional(ChainParams::SlotLumaThresh.name, index, lumaThresh);
       break;
     }
     case AOTChainOp::ConstColor: {
       const auto& color = slot.constColor.color;
       float colorData[] = {color[0], color[1], color[2], color[3]};
-      uniformData->setArrayElementOptional("SlotConstColor", index, colorData);
+      uniformData->setArrayElementOptional(ChainParams::SlotConstColor.name, index, colorData);
       break;
     }
     case AOTChainOp::AARectCoverage: {
@@ -120,8 +121,8 @@ static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTCha
       // at a half-pixel inset to 1 at a half-pixel outset (same as GLSLRectEffect::onSetData).
       const auto& rect = slot.rectCoverage.rect;
       float rectData[] = {rect[0] - 0.5f, rect[1] - 0.5f, rect[2] + 0.5f, rect[3] + 0.5f};
-      uniformData->setArrayElementOptional("CoverageRect", static_cast<size_t>(rectOrdinal),
-                                           rectData);
+      uniformData->setArrayElementOptional(ChainParams::CoverageRect.name,
+                                           static_cast<size_t>(rectOrdinal), rectData);
       break;
     }
     case AOTChainOp::LocalRectCoverage: {
@@ -129,9 +130,9 @@ static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTCha
       // to half a pixel after mapping through the device-to-local matrix.
       const auto& params = slot.localRectCoverage;
       float rectData[] = {params.rect[0], params.rect[1], params.rect[2], params.rect[3]};
-      uniformData->setArrayElementOptional("CoverageLocalRect",
+      uniformData->setArrayElementOptional(ChainParams::CoverageLocalRect.name,
                                            static_cast<size_t>(localRectOrdinal), rectData);
-      uniformData->setArrayElementOptional("CoverageLocalDeviceToLocal",
+      uniformData->setArrayElementOptional(ChainParams::CoverageLocalDeviceToLocal.name,
                                            static_cast<size_t>(localRectOrdinal),
                                            MatrixColumnMajor(params.deviceToLocal));
       break;
@@ -139,16 +140,16 @@ static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTCha
     case AOTChainOp::RRectCoverage: {
       const auto& params = slot.rrectCoverage;
       float rectData[] = {params.rect[0], params.rect[1], params.rect[2], params.rect[3]};
-      uniformData->setArrayElementOptional("CoverageRRectRect", static_cast<size_t>(rrectOrdinal),
-                                           rectData);
-      uniformData->setArrayElementOptional("CoverageRRectRadiiX", static_cast<size_t>(rrectOrdinal),
-                                           params.radiiX);
-      uniformData->setArrayElementOptional("CoverageRRectRadiiY", static_cast<size_t>(rrectOrdinal),
-                                           params.radiiY);
+      uniformData->setArrayElementOptional(ChainParams::CoverageRRectRect.name,
+                                           static_cast<size_t>(rrectOrdinal), rectData);
+      uniformData->setArrayElementOptional(ChainParams::CoverageRRectRadiiX.name,
+                                           static_cast<size_t>(rrectOrdinal), params.radiiX);
+      uniformData->setArrayElementOptional(ChainParams::CoverageRRectRadiiY.name,
+                                           static_cast<size_t>(rrectOrdinal), params.radiiY);
       float antiAliasData[] = {params.antiAlias};
-      uniformData->setArrayElementOptional("CoverageRRectAntiAlias",
+      uniformData->setArrayElementOptional(ChainParams::CoverageRRectAntiAlias.name,
                                            static_cast<size_t>(rrectOrdinal), antiAliasData);
-      uniformData->setArrayElementOptional("CoverageRRectDeviceToLocal",
+      uniformData->setArrayElementOptional(ChainParams::CoverageRRectDeviceToLocal.name,
                                            static_cast<size_t>(rrectOrdinal),
                                            MatrixColumnMajor(params.deviceToLocal));
       break;
@@ -160,31 +161,26 @@ static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTCha
 
 // Writes the extended chain's gradient parameter block.
 static void UploadGradientParams(UniformData* uniformData, const AOTGradientParameters& params) {
-  uniformData->setDataOptional("GradientLayoutType", params.layoutType);
-  uniformData->setDataOptional("GradientBias", params.bias);
-  uniformData->setDataOptional("GradientScale", params.scale);
-  uniformData->setDataOptional("GradientColorizerKind", params.colorizerKind);
-  uniformData->setDataOptional("GradientLeftBorder", params.leftBorder);
-  uniformData->setDataOptional("GradientRightBorder", params.rightBorder);
-  uniformData->setDataOptional("GradientStart", params.start);
-  uniformData->setDataOptional("GradientEnd", params.end);
-  uniformData->setDataOptional("GradientScale01", params.scale01);
-  uniformData->setDataOptional("GradientBias01", params.bias01);
-  uniformData->setDataOptional("GradientScale23", params.scale23);
-  uniformData->setDataOptional("GradientBias23", params.bias23);
-  uniformData->setDataOptional("GradientThreshold", params.threshold);
-  uniformData->setDataOptional("GradientIntervalCount", params.intervalCount);
-  uniformData->setDataOptional("GradientThresholds1_7", params.thresholds1_7);
-  uniformData->setDataOptional("GradientThresholds9_13", params.thresholds9_13);
-  static const char* scaleNames[] = {
-      "GradientScale0_1", "GradientScale2_3",   "GradientScale4_5",   "GradientScale6_7",
-      "GradientScale8_9", "GradientScale10_11", "GradientScale12_13", "GradientScale14_15"};
-  static const char* biasNames[] = {"GradientBias0_1",   "GradientBias2_3",  "GradientBias4_5",
-                                    "GradientBias6_7",   "GradientBias8_9",  "GradientBias10_11",
-                                    "GradientBias12_13", "GradientBias14_15"};
+  uniformData->setDataOptional(ChainParams::GradientLayoutType.name, params.layoutType);
+  uniformData->setDataOptional(ChainParams::GradientBias.name, params.bias);
+  uniformData->setDataOptional(ChainParams::GradientScale.name, params.scale);
+  uniformData->setDataOptional(ChainParams::GradientColorizerKind.name, params.colorizerKind);
+  uniformData->setDataOptional(ChainParams::GradientLeftBorder.name, params.leftBorder);
+  uniformData->setDataOptional(ChainParams::GradientRightBorder.name, params.rightBorder);
+  uniformData->setDataOptional(ChainParams::GradientStart.name, params.start);
+  uniformData->setDataOptional(ChainParams::GradientEnd.name, params.end);
+  uniformData->setDataOptional(ChainParams::GradientScale01.name, params.scale01);
+  uniformData->setDataOptional(ChainParams::GradientBias01.name, params.bias01);
+  uniformData->setDataOptional(ChainParams::GradientScale23.name, params.scale23);
+  uniformData->setDataOptional(ChainParams::GradientBias23.name, params.bias23);
+  uniformData->setDataOptional(ChainParams::GradientThreshold.name, params.threshold);
+  uniformData->setDataOptional(ChainParams::GradientIntervalCount.name, params.intervalCount);
+  uniformData->setDataOptional(ChainParams::GradientThresholds1_7.name, params.thresholds1_7);
+  uniformData->setDataOptional(ChainParams::GradientThresholds9_13.name, params.thresholds9_13);
   for (size_t index = 0; index < 8; ++index) {
-    uniformData->setDataOptional(scaleNames[index], params.scales[index]);
-    uniformData->setDataOptional(biasNames[index], params.biases[index]);
+    const auto& pair = ChainParams::GradientPairs[index];
+    uniformData->setDataOptional(pair.scale, params.scales[index]);
+    uniformData->setDataOptional(pair.bias, params.biases[index]);
   }
 }
 }  // namespace
@@ -527,21 +523,24 @@ void AOTPointwiseChainProcessor::onSetData(UniformData* vertexUniformData,
                                            UniformData* fragmentUniformData) const {
   if (vertexUniformData != nullptr) {
     // Absent in variants without a uvCoord attribute (the field is compiled out there).
-    vertexUniformData->setDataOptional("CoordSourceMask", static_cast<int>(coordSourceMask));
+    vertexUniformData->setDataOptional(ChainParams::CoordSourceMask.name,
+                                       static_cast<int>(coordSourceMask));
   }
   if (fragmentUniformData == nullptr) {
     return;
   }
   // The mask sampler slot is always bound in four-leaf variants; this flag selects the
   // runtime application. Absent in leaf-free variants (compile-time mask there).
-  fragmentUniformData->setDataOptional("HasMaskTexture", hasMaskChild ? 1 : 0);
-  fragmentUniformData->setDataOptional("RootIndex", static_cast<int>(rootSlot));
-  fragmentUniformData->setDataOptional("CoverageRootIndex", coverageRootSlot);
-  fragmentUniformData->setDataOptional("ClipCoverageRegister", clipCoverageRegister);
-  fragmentUniformData->setDataOptional("SlotCount", static_cast<int>(_slotCount));
+  fragmentUniformData->setDataOptional(ChainParams::HasMaskTexture.name, hasMaskChild ? 1 : 0);
+  fragmentUniformData->setDataOptional(ChainParams::RootIndex.name, static_cast<int>(rootSlot));
+  fragmentUniformData->setDataOptional(ChainParams::CoverageRootIndex.name, coverageRootSlot);
+  fragmentUniformData->setDataOptional(ChainParams::ClipCoverageRegister.name,
+                                       clipCoverageRegister);
+  fragmentUniformData->setDataOptional(ChainParams::SlotCount.name, static_cast<int>(_slotCount));
   // Written for every draw (absent in leaf-free variants): a stale mask from an earlier draw
   // would make an ordinary leaf sample in device space.
-  fragmentUniformData->setDataOptional("DeviceLeafMask", static_cast<int>(deviceLeafMask()));
+  fragmentUniformData->setDataOptional(ChainParams::DeviceLeafMask.name,
+                                       static_cast<int>(deviceLeafMask()));
   for (const auto& deviceLeaf : deviceLeaves) {
     // Same mapping as GLSLDeviceSpaceTextureEffect::onSetData: destination fragment coordinates
     // to the texture's sampling space.
@@ -556,7 +555,7 @@ void AOTPointwiseChainProcessor::onSetData(UniformData* vertexUniformData,
         deviceCoordMatrix[0], deviceCoordMatrix[1], deviceCoordMatrix[2],
         deviceCoordMatrix[3], deviceCoordMatrix[4], deviceCoordMatrix[5],
         deviceCoordMatrix[6], deviceCoordMatrix[7], deviceCoordMatrix[8]};
-    fragmentUniformData->setArrayElementOptional("DeviceLeafCoordMatrix",
+    fragmentUniformData->setArrayElementOptional(ChainParams::DeviceLeafCoordMatrix.name,
                                                  static_cast<size_t>(deviceLeaf.leafIndex),
                                                  MatrixColumnMajor(values));
   }
@@ -570,11 +569,11 @@ void AOTPointwiseChainProcessor::onSetData(UniformData* vertexUniformData,
         }
       }
     }
-    fragmentUniformData->setData("LeafReadSwizzles", readSwizzles);
+    fragmentUniformData->setData(ChainParams::LeafReadSwizzles.name, readSwizzles);
   }
   // Each selector names the leaf that reads the matching recipe set; the kernel never reads a set
   // whose selector is -1, so an absent recipe needs no upload.
-  fragmentUniformData->setDataOptional("GradientLUTLeaf", lutLeafIndex);
+  fragmentUniformData->setDataOptional(ChainParams::GradientLUTLeaf.name, lutLeafIndex);
   if (_resourceProfile == AOTResourceProfile::TiledGraph) {
     for (size_t index = 0; index < TiledGraphResourceCapacity.tiledRecipes; ++index) {
       int modes[] = {-1, 0, 0, 0};
@@ -588,18 +587,20 @@ void AOTPointwiseChainProcessor::onSetData(UniformData* vertexUniformData,
         const auto& clamp = tiled.recipe.shaderClamp;
         float subsetData[] = {subset.left, subset.top, subset.right, subset.bottom};
         float clampData[] = {clamp.left, clamp.top, clamp.right, clamp.bottom};
-        fragmentUniformData->setArrayElement("TiledRecipeSubsets", index, subsetData);
-        fragmentUniformData->setArrayElement("TiledRecipeClamps", index, clampData);
-        fragmentUniformData->setArrayElement("TiledRecipeDimensions", index,
+        fragmentUniformData->setArrayElement(ChainParams::TiledRecipeSubsets.name, index,
+                                             subsetData);
+        fragmentUniformData->setArrayElement(ChainParams::TiledRecipeClamps.name, index, clampData);
+        fragmentUniformData->setArrayElement(ChainParams::TiledRecipeDimensions.name, index,
                                              tiled.recipe.shaderDimensions);
       }
-      fragmentUniformData->setArrayElement("TiledRecipeModes", index, modes);
+      fragmentUniformData->setArrayElement(ChainParams::TiledRecipeModes.name, index, modes);
     }
   } else {
-    fragmentUniformData->setDataOptional("TiledLeafIndex", tiledLeaf());
-    fragmentUniformData->setDataOptional("TiledLeafIndex2", tiledLeaf2());
+    fragmentUniformData->setDataOptional(ChainParams::TiledLeafIndex.name, tiledLeaf());
+    fragmentUniformData->setDataOptional(ChainParams::TiledLeafIndex2.name, tiledLeaf2());
     for (size_t index = 0; index < tiledLeaves.size(); ++index) {
-      UploadTiledRecipe(fragmentUniformData, tiledLeaves[index].recipe, index == 0 ? "" : "2");
+      UploadTiledRecipe(fragmentUniformData, tiledLeaves[index].recipe,
+                        index == 0 ? ChainParams::TiledRecipe : ChainParams::TiledRecipe2);
     }
   }
   // Coverage slots consume the CoverageRect / CoverageLocalRect arrays and the CoverageRRect*
@@ -647,8 +648,8 @@ void AOTPointwiseChainProcessor::onSetData(UniformData* vertexUniformData,
                                  static_cast<float>(noise.stitchHeight)};
       int modeOctaves[] = {noise.noiseType, noise.numOctaves, noise.stitchTiles ? 1 : 0,
                            noiseSamplerBase};
-      fragmentUniformData->setDataOptional("NoiseFrequencyStitch", frequencyStitch);
-      fragmentUniformData->setDataOptional("NoiseModeOctaves", modeOctaves);
+      fragmentUniformData->setDataOptional(ChainParams::NoiseFrequencyStitch.name, frequencyStitch);
+      fragmentUniformData->setDataOptional(ChainParams::NoiseModeOctaves.name, modeOctaves);
       break;
     }
   }

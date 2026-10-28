@@ -3,6 +3,7 @@
 #include "gpu/AOTPointwiseSlotWriter.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
 #include "gpu/shaders/KernelContract.h"
+#include "gpu/shaders/modules/ChainParams.h"
 #include "gpu/shaders/modules/ParamWriter.h"
 
 namespace tgfx {
@@ -29,7 +30,7 @@ void PerlinNoiseModule::Bind(const FragmentProcessor* processor, ParamWriter* wr
   for (size_t index = 0; index < MaxPointwiseSlots; ++index) {
     writer->setArrayElement(OpType, index, Op::None);
   }
-  writer->set(PointwiseSlotCount, static_cast<int32_t>(MaxPointwiseSlots));
+  writer->set(ChainParams::PointwiseSlotCount, static_cast<int32_t>(MaxPointwiseSlots));
   for (size_t index = 0; index < perlin->pointwiseSlotCount(); ++index) {
     UploadAOTPointwiseSlot(const_cast<UniformData*>(writer->rawData()), index, MaxPointwiseSlots,
                            perlin->pointwiseSlot(index));

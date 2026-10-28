@@ -18,6 +18,7 @@
 
 #include "gpu/processors/AOTYUVChainProcessor.h"
 #include "gpu/AOTPointwiseSlotWriter.h"
+#include "gpu/shaders/modules/ChainParams.h"
 
 namespace tgfx {
 
@@ -81,7 +82,8 @@ void AOTYUVChainProcessor::onSetData(UniformData*, UniformData* fragmentUniformD
   if (fragmentUniformData == nullptr) {
     return;
   }
-  fragmentUniformData->setDataOptional("PointwiseSlotCount", static_cast<int>(MaxPointwiseSlots));
+  fragmentUniformData->setDataOptional(ChainParams::PointwiseSlotCount.name,
+                                       static_cast<int>(MaxPointwiseSlots));
   for (size_t index = 0; index < MaxPointwiseSlots; ++index) {
     UploadAOTPointwiseSlot(fragmentUniformData, index, MaxPointwiseSlots,
                            index < slotCount ? pointwiseSlots[index] : AOTPointwiseSlot{});

@@ -14,6 +14,9 @@ enum class ParamType : uint8_t {
   Float2,
   Float4,
   Int,
+  // An ivec4 table element (e.g. the chain's per-slot packed records); no writer overload, the
+  // chain uploads it through UniformData's array element path.
+  Int4,
   Float3x3,
   // A float table declared as an array of vec4 (e.g. the blur half-kernel).
   Float4Array,
