@@ -9328,6 +9328,55 @@ TGFX_TEST(AOTRenderConsistencyTest, ShapeInstancedCoverageXPContract) {
   }
 }
 
+// The texture-coverage form of the instanced shape path: the same small path drawn several times
+// batches into one ShapeInstancedDrawOp, and a shape whose largest side stays within the
+// triangulation floor rasterizes into an alpha mask, so the op's coverage is that texture instead
+// of vertex geometry. Both the bare form and the single-interval gradient form select this kernel,
+// which no other test exercises end to end.
+TGFX_TEST(AOTRenderConsistencyTest, ShapeInstancedTextureCoverageMatchesRuntime) {
+  SKIP_ON_SWIFTSHADER_ENV();
+  constexpr int width = 420;
+  constexpr int height = 160;
+  const Path star = MakeStarPath(1.0f);
+  for (int form = 0; form < 2; ++form) {
+    auto scene = [=](Canvas* canvas) {
+      Paint paint = {};
+      paint.setAntiAlias(true);
+      if (form == 1) {
+        paint.setAlpha(255);
+        paint.setShader(Shader::MakeLinearGradient(
+            Point{8, 0}, Point{96, 0},
+            {Color::FromRGBA(255, 210, 60, 255), Color::FromRGBA(70, 140, 255, 255)}, {}));
+      } else {
+        paint.setColor(Color::FromRGBA(220, 60, 40, 255));
+        paint.setAlpha(178);
+      }
+      for (int i = 0; i < 3; ++i) {
+        canvas->save();
+        canvas->translate(14.0f + static_cast<float>(i) * 138.0f, 22.0f);
+        canvas->drawPath(star, paint);
+        canvas->restore();
+      }
+    };
+    Bitmap jit = {};
+    Bitmap aot = {};
+    BrushRenderStats jitStats = {};
+    BrushRenderStats aotStats = {};
+    RenderSceneThroughRoute(scene, width, height, KernelRoute::Runtime, &jit, &jitStats);
+    RenderSceneThroughRoute(scene, width, height, KernelRoute::Dedicated, &aot, &aotStats);
+    auto label =
+        std::string("shape-instanced-texture-coverage ") + (form == 1 ? "gradient" : "solid");
+    SCOPED_TRACE(label);
+    EXPECT_NE(std::find(aotStats.shaders.begin(), aotStats.shaders.end(),
+                        "ShapeInstancedTextureCoverageShader"),
+              aotStats.shaders.end());
+    EXPECT_EQ(aotStats.noMatchingRule, 0u);
+    EXPECT_EQ(aotStats.programs.programBuilderCreations, 0u);
+    EXPECT_EQ(aotStats.draws.droppedDraws, 0u);
+    ExpectBitmapsNear(label.c_str(), aot, jit, width, height, ExperimentTolerance(1));
+  }
+}
+
 // DeviceSpaceTexture path: a complex (non-rect/non-rrect) clip path is rasterized into a texture
 // mask, and a plain solid draw under that clip carries exactly one fragment processor (the
 // device-space clip mask), which is this family's match shape. The probe draws an AA solid rect
