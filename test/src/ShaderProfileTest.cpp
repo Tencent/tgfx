@@ -25,7 +25,7 @@
 #include "gpu/ShaderProfile.h"
 #include "gpu/ShaderProfileResolver.h"
 #include "gpu/shaders/PrecompiledShader.h"
-#include "gpu/shaders/level1/QuadTextureFillShader.h"
+#include "gpu/shaders/kernels/QuadTextureFillShader.h"
 
 namespace tgfx {
 

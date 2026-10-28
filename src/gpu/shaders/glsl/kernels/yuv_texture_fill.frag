@@ -1,0 +1,135 @@
+// YUVTextureFillShader fragment shader
+// Processor layout: QuadPerEdgeAAGeometryProcessor + TextureEffect(YUV) [+ bounded pointwise ops]
+// + EmptyXferProcessor/PorterDuffXP
+// Permutation dimensions (frag): YUV_FORMAT (0=I420 three planes, 1=NV12 two planes), HAS_XP.
+// The plane sampling and conversion mirror GLSLTextureEffect::emitYUVTextureCode; the limited
+// range offset is a runtime uniform (YUVLimitedRange) since it is pure fragment math.
+// The three pointwise-operator slots carry a bounded color-grade tail (ColorMatrix / Luma /
+// AlphaThreshold / ColorSpaceXform): per-slot uniform arrays with a runtime-bound slot loop, so
+// the tail rides the same pass as the plane conversion,
+// so a video frame with a paint color filter never takes the runtime stitching route. A draw
+// with no operators leaves every slot at OP_NONE (a passthrough), byte-identical to before.
+#version 450
+
+#ifndef YUV_FORMAT
+#define YUV_FORMAT 0
+#endif
+#ifndef HAS_XP
+#define HAS_XP 0
+#endif
+
+layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
+  vec4 Rect;
+  int HasClip;
+#include "coverage/rrect_clip_uniforms.inc"
+  // Always present; holds the full texture bounds when the source has no real subset, so the
+  // clamp degenerates to a no-op.
+  vec4 Subset;
+  mat3 Mat3ColorConversion;
+  int YUVLimitedRange;
+  // RGBAAA dual-plane alpha: always declared, only read when HasRgbaaa != 0 (runtime uniform
+  // branch, mirroring QuadTextureFillShader).
+  vec2 AlphaStart;
+  int HasRgbaaa;
+#if HAS_XP
+  vec2 DstTextureUpperLeft;
+  vec2 DstTextureCoordScale;
+  int XPBlendMode;
+#endif
+  int OutputAlphaSwizzle;
+
+  int PointwiseSlotCount;
+
+#define TGFX_SLOT_ARRAY_SUFFIX [3]
+#include "pipeline/slot/pointwise_op_uniforms.inc"
+#undef TGFX_SLOT_ARRAY_SUFFIX
+};
+
+layout(location = 0) in vec3 TransformedCoords_0;
+layout(location = 1) in float vCoverage;
+layout(location = 2) in vec4 vColor;
+
+layout(set = TGFX_TEXTURE_SET, binding = 0) uniform sampler2D TextureSampler_0;
+layout(set = TGFX_TEXTURE_SET, binding = 1) uniform sampler2D TextureSampler_1;
+#if YUV_FORMAT == 0
+layout(set = TGFX_TEXTURE_SET, binding = 2) uniform sampler2D TextureSampler_2;
+#define XP_DST_TEX_BINDING 3
+#else
+#define XP_DST_TEX_BINDING 2
+#endif
+// NOTE: include order is semantic in this file — the interleaved comments below split the
+// include blocks so clang-format's sorting cannot reorder across them. In particular,
+// pointwise_slot_array_bind.inc defines the array-suffix bindings pointwise_op.inc's functions
+// are written against; compiling op before bind yields array/scalar type mismatches.
+#include "xp/xp_porter_duff.inc"
+#include "xp/xp_porter_duff_fbf.inc"
+#include "xp/xp_blend_pass.inc"
+// The clip helper follows the XP includes.
+#include "coverage/clip_coverage.inc"
+
+layout(location = 0) out vec4 fragColor;
+
+#include "pipeline/slot/pointwise_slot_array_bind.inc"
+// The op functions are written against the array bindings above.
+#include "pipeline/slot/pointwise_op.inc"
+#include "pipeline/slot/pointwise_slot_array_unbind.inc"
+#include "pipeline/slot/pointwise_slot_loop.inc"
+
+void main() {
+  vec4 outputColor = vColor;
+
+  highp vec2 texCoord = TransformedCoords_0.xy / TransformedCoords_0.z;
+  highp vec2 finalCoord = clamp(texCoord, Subset.xy, Subset.zw);
+
+  vec3 yuv;
+  yuv.x = texture(TextureSampler_0, finalCoord).r;
+#if YUV_FORMAT == 0
+  yuv.y = texture(TextureSampler_1, finalCoord).r;
+  yuv.z = texture(TextureSampler_2, finalCoord).r;
+#else
+  // The UV plane is an RG_88 texture. The runtime's read is texture(...).rgrg.ra — the ForRead
+  // swizzle replicates (r, g) so .ra nets (U, V); the precompiled sampler is a plain RG8 binding
+  // with no swizzle, where .ra would read (U, 1) and pin V to alpha (: a fixed +0.5
+  // chroma offset on every NV12 draw, maxChannelDiff=71 over half the pixels). .rg reads (U, V)
+  // directly on every backend's plain RG8 binding.
+  yuv.yz = texture(TextureSampler_1, finalCoord).rg;
+#endif
+  if (YUVLimitedRange != 0) {
+    yuv.x -= (16.0 / 255.0);
+  }
+  yuv.yz -= vec2(0.5, 0.5);
+  vec3 rgb = clamp(Mat3ColorConversion * yuv, 0.0, 1.0);
+  vec4 color;
+  if (HasRgbaaa != 0) {
+    // The alpha plane lives in a separate region of the Y plane, reached by AlphaStart. The
+    // remap arithmetic is verbatim from the runtime codegen.
+    highp vec2 alphaVertexColor = finalCoord + AlphaStart;
+    float yuv_a = texture(TextureSampler_0, alphaVertexColor).r;
+    yuv_a = (yuv_a - 16.0 / 255.0) / (219.0 / 255.0 - 1.0 / 255.0);
+    yuv_a = clamp(yuv_a, 0.0, 1.0);
+    color = vec4(rgb * yuv_a, yuv_a);
+  } else {
+    color = vec4(rgb, 1.0);
+  }
+  color = color * outputColor.a;
+
+  // The bounded pointwise tail, mirroring the runtime Compose order (operators apply after the
+  // texture readback, including the paint-alpha multiply above).
+#if HAS_XP
+  // The XferProcessor's advanced blend runs as the tail's last pass (xp_blend_pass.inc).
+  vec4 xpDst = xpReadDstColor();
+  vec4 xpBlended;
+  vec4 result = applyPointwiseSlots(color, xpDst, xpBlended);
+#else
+  vec4 result = applyPointwiseSlots(color);
+#endif
+
+  float totalCoverage = vCoverage * clipCoverage();
+
+#if HAS_XP
+  fragColor = xpCompositeBlendPass(result, xpDst, vec4(totalCoverage), xpBlended);
+#else
+  fragColor = result * totalCoverage;
+#endif
+#include "xp/output_swizzle.inc"
+}

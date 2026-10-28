@@ -60,11 +60,11 @@
 #include "gpu/shaders/AllShaderFamilies.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"
-#include "gpu/shaders/level1/PointwiseChainShader.h"
-#include "gpu/shaders/level1/QuadTextureFillShader.h"
-#include "gpu/shaders/level1/RoundStrokeRectFillShader.h"
-#include "gpu/shaders/level1/ShapeInstancedFillShader.h"
-#include "gpu/shaders/level1/ShapeInstancedTextureCoverageShader.h"
+#include "gpu/shaders/kernels/PointwiseChainShader.h"
+#include "gpu/shaders/kernels/QuadTextureFillShader.h"
+#include "gpu/shaders/kernels/RoundStrokeRectFillShader.h"
+#include "gpu/shaders/kernels/ShapeInstancedFillShader.h"
+#include "gpu/shaders/kernels/ShapeInstancedTextureCoverageShader.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ColorFilter.h"
@@ -325,8 +325,8 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
       // FragDims: HAS_XP(int3) = 3 permutations.
       EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 3u);
       EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 1u);
-      EXPECT_EQ(shaderInfo.vertexFile, "level1/plain_texture.vert");
-      EXPECT_EQ(shaderInfo.fragmentFile, "level1/mask_fill.frag");
+      EXPECT_EQ(shaderInfo.vertexFile, "kernels/plain_texture.vert");
+      EXPECT_EQ(shaderInfo.fragmentFile, "kernels/mask_fill.frag");
     }
   }
   EXPECT_TRUE(foundMaskFill);
@@ -409,8 +409,10 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryAllowsIdenticalRegistrations) {
 }
 
 // Reads a GLSL source file with its #include lines recursively expanded (bounded), so a check can
-// match text that lives in an .inc module. Returns an empty string when the file cannot be opened.
-static std::string ReadExpandedGLSL(const std::string& path, int depth = 0) {
+// match text that lives in an .inc module. Includes resolve against the shader root, matching the
+// build tool. Returns an empty string when the file cannot be opened.
+static std::string ReadExpandedGLSL(const std::string& path, const std::string& shaderDir,
+                                    int depth = 0) {
   std::ifstream file(path);
   if (!file.is_open()) {
     return "";
@@ -419,8 +421,6 @@ static std::string ReadExpandedGLSL(const std::string& path, int depth = 0) {
   if (depth >= 8) {
     return text;
   }
-  auto slash = path.find_last_of('/');
-  const std::string dir = slash == std::string::npos ? "." : path.substr(0, slash);
   std::string expanded;
   size_t lineStart = 0;
   while (lineStart < text.size()) {
@@ -435,8 +435,8 @@ static std::string ReadExpandedGLSL(const std::string& path, int depth = 0) {
       auto nameStart = include + includePrefix.size();
       auto nameEnd = line.find('"', nameStart);
       if (nameEnd != std::string::npos) {
-        expanded +=
-            ReadExpandedGLSL(dir + "/" + line.substr(nameStart, nameEnd - nameStart), depth + 1);
+        expanded += ReadExpandedGLSL(shaderDir + "/" + line.substr(nameStart, nameEnd - nameStart),
+                                     shaderDir, depth + 1);
         expanded += '\n';
         lineStart = lineEnd + 1;
         continue;
@@ -481,9 +481,9 @@ TGFX_TEST(ShaderPermutationTest, DimensionDefinesAppearInGLSL) {
     SCOPED_TRACE(info.name);
     // Check each file on its own: a failed read must fail the test, not silently turn every
     // dimension into a false "never referenced" report.
-    auto vertexText = ReadExpandedGLSL(shaderDir + "/" + info.vertexFile);
+    auto vertexText = ReadExpandedGLSL(shaderDir + "/" + info.vertexFile, shaderDir);
     ASSERT_FALSE(vertexText.empty()) << info.vertexFile << " could not be read under " << shaderDir;
-    auto fragmentText = ReadExpandedGLSL(shaderDir + "/" + info.fragmentFile);
+    auto fragmentText = ReadExpandedGLSL(shaderDir + "/" + info.fragmentFile, shaderDir);
     ASSERT_FALSE(fragmentText.empty())
         << info.fragmentFile << " could not be read under " << shaderDir;
     std::string text = vertexText + "\n" + fragmentText;
@@ -2356,8 +2356,8 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureFillShaderRegistry) {
       // runtime/fallback concerns; HAS_LOCAL_MASK is a mirror dimension.
       EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 3u);
       EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 12u);
-      EXPECT_EQ(shaderInfo.vertexFile, "level1/quad_texture_fill.vert");
-      EXPECT_EQ(shaderInfo.fragmentFile, "level1/quad_texture_fill.frag");
+      EXPECT_EQ(shaderInfo.vertexFile, "kernels/quad_texture_fill.vert");
+      EXPECT_EQ(shaderInfo.fragmentFile, "kernels/quad_texture_fill.frag");
     }
   }
   EXPECT_TRUE(found);

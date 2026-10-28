@@ -26,13 +26,13 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include "ScratchDir.h"
 #include "FailureAssertions.h"
-#include "verify/ContractChecks.h"
+#include "ScratchDir.h"
 #include "gpu/Uniform.h"
 #include "gpu/shaders/AllShaderFamilies.h"
 #include "gpu/shaders/KernelContract.h"
 #include "gtest/gtest.h"
+#include "verify/ContractChecks.h"
 
 namespace tgfx {
 namespace {
@@ -217,33 +217,33 @@ TEST_F(DamagedShaderDir, TheRealOpCodesAgreeWithTheContract) {
 }
 
 TEST_F(DamagedShaderDir, ADriftedChainOpValueIsReported) {
-  ASSERT_TRUE(Edit("level1/pointwise_chain_ops.inc", "#define OP_LUMA 1", "#define OP_LUMA 9"));
+  ASSERT_TRUE(Edit("operator/pointwise_chain_ops.inc", "#define OP_LUMA 1", "#define OP_LUMA 9"));
   auto report = CheckChainOps(scratch.dir());
   EXPECT_GE(report.errors, 1u);
   EXPECT_TRUE(report.mentions("OP_LUMA is 9 but the C++ contract says 1")) << report.log;
 }
 
 TEST_F(DamagedShaderDir, ARenamedChainOpIsReportedAsMissingAndAsStray) {
-  ASSERT_TRUE(Edit("level1/pointwise_chain_ops.inc", "#define OP_BLEND", "#define OP_BLENDED"));
+  ASSERT_TRUE(Edit("operator/pointwise_chain_ops.inc", "#define OP_BLEND", "#define OP_BLENDED"));
   auto report = CheckChainOps(scratch.dir());
   EXPECT_EQ(report.errors, 2u) << report.log;
-  EXPECT_TRUE(report.mentions("OP define missing in pointwise_chain_ops.inc: OP_BLEND"))
+  EXPECT_TRUE(report.mentions("OP define missing in operator/pointwise_chain_ops.inc: OP_BLEND"))
       << report.log;
-  EXPECT_TRUE(report.mentions("unknown OP define in pointwise_chain_ops.inc: OP_BLENDED"))
+  EXPECT_TRUE(report.mentions("unknown OP define in operator/pointwise_chain_ops.inc: OP_BLENDED"))
       << report.log;
 }
 
 TEST_F(DamagedShaderDir, AStrayChainOpIsReported) {
-  Append("level1/pointwise_chain_ops.inc", "\n#define OP_EXTRA 99\n");
+  Append("operator/pointwise_chain_ops.inc", "\n#define OP_EXTRA 99\n");
   auto report = CheckChainOps(scratch.dir());
   EXPECT_EQ(report.errors, 1u) << report.log;
-  EXPECT_TRUE(report.mentions("unknown OP define in pointwise_chain_ops.inc: OP_EXTRA"))
+  EXPECT_TRUE(report.mentions("unknown OP define in operator/pointwise_chain_ops.inc: OP_EXTRA"))
       << report.log;
 }
 
 TEST_F(DamagedShaderDir, ANonDecimalOpValueIsReported) {
   ASSERT_TRUE(
-      Edit("level1/pointwise_chain_ops.inc", "#define OP_LUMA 1", "#define OP_LUMA 0 + 1"));
+      Edit("operator/pointwise_chain_ops.inc", "#define OP_LUMA 1", "#define OP_LUMA 0 + 1"));
   auto report = CheckChainOps(scratch.dir());
   EXPECT_GE(report.errors, 1u);
   EXPECT_TRUE(report.mentions("cannot parse OP_LUMA value '0 + 1'")) << report.log;
@@ -251,7 +251,7 @@ TEST_F(DamagedShaderDir, ANonDecimalOpValueIsReported) {
 
 TEST_F(DamagedShaderDir, ACommentedDefineCannotMaskARealMismatch) {
   // A line comment that repeats a define must not overwrite the value of the real one.
-  ASSERT_TRUE(Edit("level1/pointwise_chain_ops.inc", "#define OP_LUMA 1",
+  ASSERT_TRUE(Edit("operator/pointwise_chain_ops.inc", "#define OP_LUMA 1",
                    "#define OP_LUMA 9\n// #define OP_LUMA 1"));
   auto report = CheckChainOps(scratch.dir());
   EXPECT_GE(report.errors, 1u);
@@ -259,24 +259,25 @@ TEST_F(DamagedShaderDir, ACommentedDefineCannotMaskARealMismatch) {
 }
 
 TEST_F(DamagedShaderDir, AMissingOpFileIsReported) {
-  std::filesystem::remove(scratch.dir() + "/level1/pointwise_chain_ops.inc");
+  std::filesystem::remove(scratch.dir() + "/operator/pointwise_chain_ops.inc");
   auto report = CheckChainOps(scratch.dir());
   EXPECT_EQ(report.errors, 1u);
-  EXPECT_TRUE(report.mentions("cannot open pointwise_chain_ops.inc")) << report.log;
+  EXPECT_TRUE(report.mentions("cannot open operator/pointwise_chain_ops.inc")) << report.log;
 }
 
 TEST_F(DamagedShaderDir, ADriftedPointwiseOpValueIsReported) {
-  ASSERT_TRUE(Edit("level1/pointwise_op.inc", "#define OP_BLEND 7", "#define OP_BLEND 5"));
+  ASSERT_TRUE(Edit("pipeline/slot/pointwise_op.inc", "#define OP_BLEND 7", "#define OP_BLEND 5"));
   auto report = CheckPointwiseOps(scratch.dir());
   EXPECT_GE(report.errors, 1u);
   EXPECT_TRUE(report.mentions("OP_BLEND is 5 but the C++ contract says 7")) << report.log;
 }
 
 TEST_F(DamagedShaderDir, AChainOnlyOpInThePointwiseFileIsReported) {
-  Append("level1/pointwise_op.inc", "\n#define OP_TEXTURE 5\n");
+  Append("pipeline/slot/pointwise_op.inc", "\n#define OP_TEXTURE 5\n");
   auto report = CheckPointwiseOps(scratch.dir());
   EXPECT_EQ(report.errors, 1u) << report.log;
-  EXPECT_TRUE(report.mentions("unknown OP define in pointwise_op.inc: OP_TEXTURE")) << report.log;
+  EXPECT_TRUE(report.mentions("unknown OP define in pipeline/slot/pointwise_op.inc: OP_TEXTURE"))
+      << report.log;
 }
 
 // ---- ValidateSlotCapacities -----------------------------------------------------------------
@@ -287,7 +288,7 @@ TEST_F(DamagedShaderDir, TheRealSlotCapacitiesAgreeWithTheContract) {
 }
 
 TEST_F(DamagedShaderDir, ADriftedSlotSuffixIsReported) {
-  ASSERT_TRUE(Edit("level1/perlin_noise.frag",
+  ASSERT_TRUE(Edit("kernels/perlin_noise.frag",
                    "TGFX_SLOT_ARRAY_SUFFIX [" + std::to_string(MaxPointwiseSlots) + "]",
                    "TGFX_SLOT_ARRAY_SUFFIX [" + std::to_string(MaxPointwiseSlots + 1) + "]"));
   auto report = CheckSlotCapacities(scratch.dir());
@@ -298,7 +299,7 @@ TEST_F(DamagedShaderDir, ADriftedSlotSuffixIsReported) {
 
 TEST_F(DamagedShaderDir, AMissingSlotSuffixIsReported) {
   ASSERT_TRUE(
-      Edit("level1/yuv_texture_fill.frag", "TGFX_SLOT_ARRAY_SUFFIX", "TGFX_SLOT_ARRAY_RENAMED"));
+      Edit("kernels/yuv_texture_fill.frag", "TGFX_SLOT_ARRAY_SUFFIX", "TGFX_SLOT_ARRAY_RENAMED"));
   auto report = CheckSlotCapacities(scratch.dir());
   EXPECT_GE(report.errors, 1u);
   EXPECT_TRUE(report.mentions("yuv_texture_fill.frag declares no TGFX_SLOT_ARRAY_SUFFIX"))
@@ -307,7 +308,7 @@ TEST_F(DamagedShaderDir, AMissingSlotSuffixIsReported) {
 
 TEST_F(DamagedShaderDir, ADriftedChainCapacityIsReported) {
   // Bump every capacity literal of the chain kernel: the contract expects the real ones.
-  auto text = Read("level1/pointwise_chain.frag");
+  auto text = Read("kernels/pointwise_chain.frag");
   const std::string key = "#define CHAIN_SLOT_CAPACITY ";
   size_t position = 0;
   size_t edited = 0;
@@ -320,20 +321,20 @@ TEST_F(DamagedShaderDir, ADriftedChainCapacityIsReported) {
     ++edited;
   }
   ASSERT_GT(edited, 0u);
-  scratch.write("level1/pointwise_chain.frag", text);
+  scratch.write("kernels/pointwise_chain.frag", text);
   auto report = CheckSlotCapacities(scratch.dir());
   EXPECT_GE(report.errors, 1u);
   EXPECT_TRUE(report.mentions("pointwise_chain.frag capacities do not match")) << report.log;
 }
 
 TEST_F(DamagedShaderDir, AMissingChainCapacityIsReported) {
-  auto text = Read("level1/pointwise_chain.frag");
+  auto text = Read("kernels/pointwise_chain.frag");
   const std::string key = "CHAIN_SLOT_CAPACITY";
   size_t position = 0;
   while ((position = text.find(key, position)) != std::string::npos) {
     text.replace(position, key.size(), "CHAIN_SLOT_RENAMED");
   }
-  scratch.write("level1/pointwise_chain.frag", text);
+  scratch.write("kernels/pointwise_chain.frag", text);
   auto report = CheckSlotCapacities(scratch.dir());
   EXPECT_GE(report.errors, 1u);
   EXPECT_TRUE(report.mentions("declares no CHAIN_SLOT_CAPACITY")) << report.log;
@@ -347,22 +348,21 @@ TEST_F(DamagedShaderDir, TheRealSourcesReferenceOnlyThingsThatExist) {
 }
 
 TEST_F(DamagedShaderDir, AReferenceToAMissingFileIsReported) {
-  Append("level1/solid_color_fill.frag", "\n// see removed_header.inc\n");
+  Append("kernels/solid_color_fill.frag", "\n// see removed_header.inc\n");
   auto report = CheckReferences(scratch.dir());
   EXPECT_EQ(report.errors, 1u) << report.log;
-  EXPECT_TRUE(report.mentions("refers to removed_header.inc, which does not exist"))
-      << report.log;
+  EXPECT_TRUE(report.mentions("refers to removed_header.inc, which does not exist")) << report.log;
 }
 
 TEST_F(DamagedShaderDir, AReferenceToAnUnregisteredFamilyIsReported) {
-  Append("level1/solid_color_fill.frag", "\n// formerly GoneAwayShader\n");
+  Append("kernels/solid_color_fill.frag", "\n// formerly GoneAwayShader\n");
   auto report = CheckReferences(scratch.dir());
   EXPECT_EQ(report.errors, 1u) << report.log;
   EXPECT_TRUE(report.mentions("refers to shader family GoneAwayShader")) << report.log;
 }
 
 TEST_F(DamagedShaderDir, PlaceholdersAndExternalNamesAreExempt) {
-  Append("level1/solid_color_fill.frag",
+  Append("kernels/solid_color_fill.frag",
          "\n// <module>_uniforms.inc, pointwise_*.inc, SwiftShader\n");
   auto report = CheckReferences(scratch.dir());
   EXPECT_EQ(report.errors, 0u) << report.log;

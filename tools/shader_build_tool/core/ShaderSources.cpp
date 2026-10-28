@@ -58,11 +58,6 @@ std::string FormatChain(const std::vector<std::string>& chain) {
   return text;
 }
 
-std::string DirectoryOf(const std::string& path) {
-  auto slash = path.rfind('/');
-  return slash == std::string::npos ? "." : path.substr(0, slash);
-}
-
 // Resolves "." and "name/.." segments and repeated slashes without touching the file system, so
 // two spellings of one path compare equal: the cycle check and the file cache key on this form.
 // A ".." that has nothing to remove stays (a relative path can legitimately start with one) and
@@ -99,19 +94,18 @@ std::string NormalizePath(const std::string& path) {
   return text.empty() ? "." : text;
 }
 
-// Expands #include "file" lines. An include resolves against the directory of the file that
-// contains it, as a C preprocessor does: for a top-level shader that is its own directory, and for
-// an include found in a subdirectory it is that subdirectory. (Every include in the current
-// sources sits next to the shaders, where this gives the same text as resolving everything against
-// the top-level directory did.) The output format is unchanged: an expanded include is followed by
-// an extra newline, because the expanded text feeds both the compiler and the published bundles'
-// source digests.
+// Expands #include "file" lines. An include resolves against the shader root — the directory the
+// tool was pointed at — never against the directory of the file containing the include, so a
+// module keeps the same include line wherever it is included from and the organized tree's
+// subdirectories need no "../" spelling. The output format is unchanged: an expanded include is
+// followed by an extra newline, because the expanded text feeds both the compiler and the
+// published bundles' source digests.
 //
 // chain holds the normalized paths of the files being expanded, outermost first. A file that is
 // already on the chain is a cycle, however its path is spelled. Repeating a file that is not on
 // the chain is legal: the slot bind/unbind headers are guardless and included repeatedly on
 // purpose, so no visited set is applied.
-bool ExpandIncludes(const std::string& source, const std::string& currentDir, FileCache* files,
+bool ExpandIncludes(const std::string& source, const std::string& shaderRoot, FileCache* files,
                     std::vector<std::string>* chain, std::string* result, std::string* error) {
   std::istringstream stream(source);
   std::string line;
@@ -123,7 +117,7 @@ bool ExpandIncludes(const std::string& source, const std::string& currentDir, Fi
           quoteStart == std::string::npos ? std::string::npos : line.find('"', quoteStart + 1);
       if (quoteStart != std::string::npos && quoteEnd != std::string::npos) {
         auto includePath = line.substr(quoteStart + 1, quoteEnd - quoteStart - 1);
-        auto fullPath = NormalizePath(currentDir + "/" + includePath);
+        auto fullPath = NormalizePath(shaderRoot + "/" + includePath);
         if (std::find(chain->begin(), chain->end(), fullPath) != chain->end()) {
           chain->push_back(fullPath);
           *error = "include cycle: " + FormatChain(*chain);
@@ -142,8 +136,7 @@ bool ExpandIncludes(const std::string& source, const std::string& currentDir, Fi
         }
         chain->push_back(fullPath);
         std::string expanded;
-        if (!ExpandIncludes(includeContent, DirectoryOf(fullPath), files, chain, &expanded,
-                            error)) {
+        if (!ExpandIncludes(includeContent, shaderRoot, files, chain, &expanded, error)) {
           return false;
         }
         chain->pop_back();
@@ -158,8 +151,8 @@ bool ExpandIncludes(const std::string& source, const std::string& currentDir, Fi
 
 // Reads one top-level shader file and expands its includes. A missing or empty top-level file is
 // an error, as it always was.
-bool LoadStage(const std::string& path, FileCache* files, std::string* expanded,
-               std::string* error) {
+bool LoadStage(const std::string& path, const std::string& shaderRoot, FileCache* files,
+               std::string* expanded, std::string* error) {
   std::string source;
   if (!files->read(path, &source)) {
     *error = "cannot read " + path;
@@ -171,7 +164,7 @@ bool LoadStage(const std::string& path, FileCache* files, std::string* expanded,
   }
   auto normalized = NormalizePath(path);
   std::vector<std::string> chain = {normalized};
-  return ExpandIncludes(source, DirectoryOf(normalized), files, &chain, expanded, error);
+  return ExpandIncludes(source, shaderRoot, files, &chain, expanded, error);
 }
 
 }  // namespace
@@ -197,10 +190,12 @@ ShaderSourceSet LoadShaderSources(const std::string& shaderDir) {
   FileCache files;
   for (auto& shader : set.shaders) {
     std::string error;
-    if (!LoadStage(shaderDir + "/" + shader.info.vertexFile, &files, &shader.vertex, &error)) {
+    if (!LoadStage(shaderDir + "/" + shader.info.vertexFile, shaderDir, &files, &shader.vertex,
+                   &error)) {
       set.errors.push_back(shader.info.name + " vertex: " + error);
     }
-    if (!LoadStage(shaderDir + "/" + shader.info.fragmentFile, &files, &shader.fragment, &error)) {
+    if (!LoadStage(shaderDir + "/" + shader.info.fragmentFile, shaderDir, &files, &shader.fragment,
+                   &error)) {
       set.errors.push_back(shader.info.name + " fragment: " + error);
     }
   }

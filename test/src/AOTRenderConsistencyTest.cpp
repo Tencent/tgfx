@@ -48,7 +48,7 @@
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/resources/DefaultTextureView.h"
-#include "gpu/shaders/level1/PointwiseChainShader.h"
+#include "gpu/shaders/kernels/PointwiseChainShader.h"
 #include "gtest/gtest.h"
 #include "layers/NoiseDensityUtils.h"
 #include "layers/layerstyles/GlassUDF.h"

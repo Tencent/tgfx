@@ -359,7 +359,7 @@ class ComposedDims {
 };
 
 /**
- * The legacy dst-read dimension every level1 family shares: how the destination color reaches
+ * The legacy dst-read dimension every fill family shares: how the destination color reaches
  * the fragment shader. New kernels should follow the DST_KIND vocabulary above instead of adding
  * another HAS_XP domain.
  */

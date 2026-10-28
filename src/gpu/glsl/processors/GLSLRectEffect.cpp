@@ -103,7 +103,7 @@ void GLSLRectEffect::onSetData(UniformData*, UniformData* fragmentUniformData) c
     fragmentUniformData->setData(ClipContract::DeviceToLocal, deviceToLocal());
   }
   if (fragmentUniformData->hasField(ClipContract::Rect) && isDeviceSpaceRect()) {
-    // The precompiled level1 kernels evaluate a direct analytic clip through the shared
+    // The precompiled fill kernels evaluate a direct analytic clip through the shared
     // Rect/HasClip contract (clip_coverage.inc), which expects the device-space rect
     // uploaded half a pixel outward so the coverage ramp centers on the geometric boundary.
     fragmentUniformData->setData(ClipContract::Rect, localRect.makeOutset(0.5f, 0.5f));

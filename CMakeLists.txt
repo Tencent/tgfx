@@ -806,13 +806,13 @@ if (TGFX_EXCLUDE_FILES)
     list(REMOVE_ITEM TGFX_FILES ${TGFX_EXCLUDE_FILES})
 endif ()
 
-# The one list of shader families: every src/gpu/shaders/level1/<Name>.h that registers <Name> with
+# The one list of shader families: every src/gpu/shaders/kernels/<Name>.h that registers <Name> with
 # TGFX_REGISTER_SHADER_FAMILY. Adding a family means adding its header; nothing else lists it. The
 # list is generated into gpu/shaders/AllShaderFamilies.h (the includes plus a
 # TGFX_FOR_EACH_SHADER_FAMILY X-macro) so the registry, the matcher, the build tool and the tests
 # all derive from it.
 file(GLOB TGFX_SHADER_FAMILY_HEADERS CONFIGURE_DEPENDS
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/shaders/level1/*.h)
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/shaders/kernels/*.h)
 set(TGFX_SHADER_FAMILY_INCLUDES "")
 set(TGFX_SHADER_FAMILY_ENTRIES "")
 foreach (FAMILY_HEADER ${TGFX_SHADER_FAMILY_HEADERS})
@@ -820,20 +820,20 @@ foreach (FAMILY_HEADER ${TGFX_SHADER_FAMILY_HEADERS})
     file(READ "${FAMILY_HEADER}" FAMILY_HEADER_TEXT)
     if (NOT FAMILY_HEADER_TEXT MATCHES "TGFX_REGISTER_SHADER_FAMILY\\(tgfx::([A-Za-z0-9_]+)\\)")
         message(FATAL_ERROR "${FAMILY_HEADER} does not register a shader family with "
-                "TGFX_REGISTER_SHADER_FAMILY; every header under src/gpu/shaders/level1 is a "
+                "TGFX_REGISTER_SHADER_FAMILY; every header under src/gpu/shaders/kernels is a "
                 "family.")
     endif ()
     if (NOT "${CMAKE_MATCH_1}" STREQUAL "${FAMILY_NAME}")
         message(FATAL_ERROR "${FAMILY_HEADER} registers ${CMAKE_MATCH_1}; a family header must be "
                 "named after the class it registers.")
     endif ()
-    string(APPEND TGFX_SHADER_FAMILY_INCLUDES "#include \"gpu/shaders/level1/${FAMILY_NAME}.h\"\n")
+    string(APPEND TGFX_SHADER_FAMILY_INCLUDES "#include \"gpu/shaders/kernels/${FAMILY_NAME}.h\"\n")
     string(APPEND TGFX_SHADER_FAMILY_ENTRIES " \\\n  X(${FAMILY_NAME})")
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${FAMILY_HEADER}")
 endforeach ()
 set(TGFX_GENERATED_INCLUDE_DIR "${CMAKE_BINARY_DIR}/generated/include")
 file(CONFIGURE OUTPUT "${TGFX_GENERATED_INCLUDE_DIR}/gpu/shaders/AllShaderFamilies.h" CONTENT
-"// Auto-generated from src/gpu/shaders/level1/*.h by CMakeLists.txt. Do not edit.
+"// Auto-generated from src/gpu/shaders/kernels/*.h by CMakeLists.txt. Do not edit.
 #pragma once
 
 ${TGFX_SHADER_FAMILY_INCLUDES}
@@ -934,7 +934,7 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
     file(GLOB_RECURSE TGFX_SHADER_DECL_FILES
             src/gpu/shaders/ShaderPermutation.*
             src/gpu/shaders/PrecompiledShader.*
-            src/gpu/shaders/level1/*.h)
+            src/gpu/shaders/kernels/*.h)
     add_library(tgfx_shader_declarations STATIC ${TGFX_SHADER_DECL_FILES})
     set_target_properties(tgfx_shader_declarations PROPERTIES PREFIX "")
     target_compile_options(tgfx_shader_declarations PRIVATE ${TGFX_COMPILE_OPTIONS})
@@ -1036,9 +1036,9 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
                 "${TGFX_SHADER_BUNDLE_DIR}/shader_bundle.${B}.manifest")
     endforeach ()
     file(GLOB_RECURSE TGFX_SHADER_SOURCES CONFIGURE_DEPENDS
-            src/gpu/shaders/glsl/level1/*.frag
-            src/gpu/shaders/glsl/level1/*.vert
-            src/gpu/shaders/glsl/level1/*.inc)
+            src/gpu/shaders/glsl/*.frag
+            src/gpu/shaders/glsl/*.vert
+            src/gpu/shaders/glsl/*.inc)
     # The toolchain ABI constant rides in a regular header outside the shader directory; a bump
     # changes what the writer stamps into every bundle, so it must trigger a rebuild like a
     # shader-source change (otherwise the bundles keep the old ABI and the runtime rejects them).

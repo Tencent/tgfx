@@ -156,7 +156,7 @@ static std::map<std::string, int> ParseOpDefines(const std::string& source, cons
 static size_t ValidateOpDefines(const std::string& shaderDir, const char* fileName,
                                 const std::map<std::string, int>& expected,
                                 Diagnostics* diagnostics) {
-  std::ifstream file(shaderDir + "/level1/" + fileName);
+  std::ifstream file(shaderDir + "/" + fileName);
   if (!file.is_open()) {
     // The include itself is gone: nothing can be compared, which is a failed check, not a
     // passing one.
@@ -195,7 +195,7 @@ static size_t ValidateOpDefines(const std::string& shaderDir, const char* fileNa
 // The chain slot op codes ride the Packed.x selector, so the GLSL OP_* defines and the C++
 // AOTChainOp enum (anchored to the ChainOp constants) must agree value-for-value.
 size_t ValidateChainOpCodes(const std::string& shaderDir, Diagnostics* diagnostics) {
-  return ValidateOpDefines(shaderDir, "pointwise_chain_ops.inc",
+  return ValidateOpDefines(shaderDir, "operator/pointwise_chain_ops.inc",
                            {{"OP_COLOR_MATRIX", ChainOp::ColorMatrix},
                             {"OP_LUMA", ChainOp::Luma},
                             {"OP_ALPHA_THRESHOLD", ChainOp::AlphaThreshold},
@@ -219,7 +219,7 @@ size_t ValidateChainOpCodes(const std::string& shaderDir, Diagnostics* diagnosti
 // with the AOTPointwiseOpType enum (anchored to the PointwiseOp constants). Chain-only operators
 // (Texture and the coverage/modulator ops) must not appear here.
 size_t ValidatePointwiseOpCodes(const std::string& shaderDir, Diagnostics* diagnostics) {
-  return ValidateOpDefines(shaderDir, "pointwise_op.inc",
+  return ValidateOpDefines(shaderDir, "pipeline/slot/pointwise_op.inc",
                            {{"OP_COLOR_MATRIX", PointwiseOp::ColorMatrix},
                             {"OP_LUMA", PointwiseOp::Luma},
                             {"OP_ALPHA_THRESHOLD", PointwiseOp::AlphaThreshold},
@@ -237,9 +237,9 @@ size_t ValidatePointwiseOpCodes(const std::string& shaderDir, Diagnostics* diagn
 size_t ValidateSlotCapacities(const std::string& shaderDir, Diagnostics* diagnostics) {
   size_t errors = 0;
   const std::regex slotSuffixPattern("#define\\s+TGFX_SLOT_ARRAY_SUFFIX\\s*\\[\\s*(\\d+)\\s*\\]");
-  const char* slotKernels[] = {"perlin_noise.frag", "yuv_texture_fill.frag"};
+  const char* slotKernels[] = {"kernels/perlin_noise.frag", "kernels/yuv_texture_fill.frag"};
   for (const char* fileName : slotKernels) {
-    std::ifstream file(shaderDir + "/level1/" + fileName);
+    std::ifstream file(shaderDir + "/" + fileName);
     if (!file.is_open()) {
       Report(diagnostics, Severity::Unverifiable, DiagnosticCode::VerifyNotApplicable, "", "", -1,
              -1, std::string("cannot open ") + fileName + " under " + shaderDir);
@@ -261,7 +261,7 @@ size_t ValidateSlotCapacities(const std::string& shaderDir, Diagnostics* diagnos
       ++errors;
     }
   }
-  std::ifstream chainFile(shaderDir + "/level1/pointwise_chain.frag");
+  std::ifstream chainFile(shaderDir + "/kernels/pointwise_chain.frag");
   if (!chainFile.is_open()) {
     Report(diagnostics, Severity::Unverifiable, DiagnosticCode::VerifyNotApplicable, "", "", -1,
            -1, std::string("cannot open pointwise_chain.frag under ") + shaderDir);

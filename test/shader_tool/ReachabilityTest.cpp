@@ -28,7 +28,7 @@
 #include "gpu/shaders/AllShaderFamilies.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"
-#include "gpu/shaders/level1/QuadTextureFillShader.h"
+#include "gpu/shaders/kernels/QuadTextureFillShader.h"
 #include "gtest/gtest.h"
 
 namespace tgfx {
@@ -60,8 +60,8 @@ TEST(FamilyRegistryTest, EveryFamilyIsRegisteredOnceWithItsOwnFiles) {
     EXPECT_TRUE(names.insert(info.name).second) << "duplicate family " << info.name;
     EXPECT_FALSE(info.vertexFile.empty()) << info.name;
     EXPECT_FALSE(info.fragmentFile.empty()) << info.name;
-    EXPECT_EQ(info.vertexFile.rfind("level1/", 0), 0u) << info.name;
-    EXPECT_EQ(info.fragmentFile.rfind("level1/", 0), 0u) << info.name;
+    EXPECT_EQ(info.vertexFile.rfind("kernels/", 0), 0u) << info.name;
+    EXPECT_EQ(info.fragmentFile.rfind("kernels/", 0), 0u) << info.name;
   }
 }
 

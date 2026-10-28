@@ -40,8 +40,7 @@ constexpr char FamilyName[] = "SolidColorFillShader";
 class ShaderSourcesTest : public ::testing::Test {
  protected:
   ShaderSourcesTest() : scratch("sources") {
-    std::filesystem::copy(RealShaderDir, scratch.dir(),
-                          std::filesystem::copy_options::recursive);
+    std::filesystem::copy(RealShaderDir, scratch.dir(), std::filesystem::copy_options::recursive);
   }
 
   std::string Read(const std::string& relativePath) const {
@@ -117,8 +116,7 @@ TEST_F(ShaderSourcesTest, AnIncludeThatCannotBeReadIsAnError) {
   auto set = LoadShaderSources(scratch.dir());
   ASSERT_TRUE(set.ok);
   auto info = set.find(FamilyName)->info;
-  scratch.write(info.fragmentFile,
-                Read(info.fragmentFile) + "\n#include \"no_such_header.inc\"\n");
+  scratch.write(info.fragmentFile, Read(info.fragmentFile) + "\n#include \"no_such_header.inc\"\n");
 
   auto broken = LoadShaderSources(scratch.dir());
   EXPECT_FALSE(broken.ok);
@@ -129,9 +127,11 @@ TEST_F(ShaderSourcesTest, AnIncludeCycleIsAnError) {
   auto set = LoadShaderSources(scratch.dir());
   ASSERT_TRUE(set.ok);
   auto info = set.find(FamilyName)->info;
-  scratch.write("level1/cycle_a.inc", "#include \"cycle_b.inc\"\n");
-  scratch.write("level1/cycle_b.inc", "#include \"cycle_a.inc\"\n");
-  scratch.write(info.vertexFile, Read(info.vertexFile) + "\n#include \"cycle_a.inc\"\n");
+  // Includes resolve against the shader root, so the fixtures state full root-relative paths
+  // even though they sit next to each other in kernels/.
+  scratch.write("kernels/cycle_a.inc", "#include \"kernels/cycle_b.inc\"\n");
+  scratch.write("kernels/cycle_b.inc", "#include \"kernels/cycle_a.inc\"\n");
+  scratch.write(info.vertexFile, Read(info.vertexFile) + "\n#include \"kernels/cycle_a.inc\"\n");
 
   auto broken = LoadShaderSources(scratch.dir());
   EXPECT_FALSE(broken.ok);
@@ -144,8 +144,8 @@ TEST_F(ShaderSourcesTest, ASelfIncludeIsACycle) {
   auto set = LoadShaderSources(scratch.dir());
   ASSERT_TRUE(set.ok);
   auto info = set.find(FamilyName)->info;
-  scratch.write("level1/self.inc", "#include \"self.inc\"\n");
-  scratch.write(info.vertexFile, Read(info.vertexFile) + "\n#include \"self.inc\"\n");
+  scratch.write("kernels/self.inc", "#include \"kernels/self.inc\"\n");
+  scratch.write(info.vertexFile, Read(info.vertexFile) + "\n#include \"kernels/self.inc\"\n");
 
   auto broken = LoadShaderSources(scratch.dir());
   EXPECT_FALSE(broken.ok);
@@ -162,11 +162,12 @@ TEST_F(ShaderSourcesTest, IncludesNestedTooDeepAreAnError) {
   // A chain of distinct files, deeper than the limit: not a cycle, just too deep.
   const int links = 40;
   for (int i = 0; i < links; ++i) {
-    std::string next =
-        i + 1 < links ? "#include \"deep_" + std::to_string(i + 1) + ".inc\"\n" : "// end\n";
-    scratch.write("level1/deep_" + std::to_string(i) + ".inc", next);
+    std::string next = i + 1 < links
+                           ? "#include \"kernels/deep_" + std::to_string(i + 1) + ".inc\"\n"
+                           : "// end\n";
+    scratch.write("kernels/deep_" + std::to_string(i) + ".inc", next);
   }
-  scratch.write(info.vertexFile, Read(info.vertexFile) + "\n#include \"deep_0.inc\"\n");
+  scratch.write(info.vertexFile, Read(info.vertexFile) + "\n#include \"kernels/deep_0.inc\"\n");
 
   auto broken = LoadShaderSources(scratch.dir());
   EXPECT_FALSE(broken.ok);
@@ -180,11 +181,12 @@ TEST_F(ShaderSourcesTest, IncludesWithinTheLimitAreAllowed) {
   // Well inside the limit: the nesting check must not reject legitimate chains.
   const int links = 20;
   for (int i = 0; i < links; ++i) {
-    std::string next =
-        i + 1 < links ? "#include \"shallow_" + std::to_string(i + 1) + ".inc\"\n" : "// end\n";
-    scratch.write("level1/shallow_" + std::to_string(i) + ".inc", next);
+    std::string next = i + 1 < links
+                           ? "#include \"kernels/shallow_" + std::to_string(i + 1) + ".inc\"\n"
+                           : "// end\n";
+    scratch.write("kernels/shallow_" + std::to_string(i) + ".inc", next);
   }
-  scratch.write(info.vertexFile, Read(info.vertexFile) + "\n#include \"shallow_0.inc\"\n");
+  scratch.write(info.vertexFile, Read(info.vertexFile) + "\n#include \"kernels/shallow_0.inc\"\n");
 
   auto loaded = LoadShaderSources(scratch.dir());
   EXPECT_TRUE(loaded.ok) << (loaded.errors.empty() ? "" : loaded.errors[0]);
@@ -195,13 +197,29 @@ TEST_F(ShaderSourcesTest, ARepeatedIncludeThatIsNotACycleIsAllowed) {
   ASSERT_TRUE(set.ok);
   auto info = set.find(FamilyName)->info;
   // The slot headers are guardless and included again and again on purpose.
-  scratch.write("level1/repeat.inc", "// repeated\n");
-  scratch.write(info.vertexFile, Read(info.vertexFile) +
-                                     "\n#include \"repeat.inc\"\n#include \"repeat.inc\"\n"
-                                     "#include \"repeat.inc\"\n");
+  scratch.write("kernels/repeat.inc", "// repeated\n");
+  scratch.write(info.vertexFile,
+                Read(info.vertexFile) +
+                    "\n#include \"kernels/repeat.inc\"\n#include \"kernels/repeat.inc\"\n"
+                    "#include \"kernels/repeat.inc\"\n");
 
   auto repeated = LoadShaderSources(scratch.dir());
   EXPECT_TRUE(repeated.ok) << (repeated.errors.empty() ? "" : repeated.errors[0]);
+}
+
+TEST_F(ShaderSourcesTest, IncludesResolveAgainstTheShaderRootNotTheIncludingFile) {
+  auto set = LoadShaderSources(scratch.dir());
+  ASSERT_TRUE(set.ok);
+  auto info = set.find(FamilyName)->info;
+  // The include rule after the reorganization: every path resolves from the shader root, so a
+  // header in one directory pulls a module from another without a "../" escape.
+  scratch.write("coverage/uses_source.inc", "#include \"source/noop.inc\"\n");
+  scratch.write("source/noop.inc", "// nothing\n");
+  scratch.write(info.fragmentFile,
+                Read(info.fragmentFile) + "\n#include \"coverage/uses_source.inc\"\n");
+
+  auto loaded = LoadShaderSources(scratch.dir());
+  EXPECT_TRUE(loaded.ok) << (loaded.errors.empty() ? "" : loaded.errors[0]);
 }
 
 TEST_F(ShaderSourcesTest, EveryFailureIsReportedNotJustTheFirst) {

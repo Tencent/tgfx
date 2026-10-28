@@ -1,0 +1,26 @@
+// HairlineLineShader fragment entry: HairlineLineGeometryProcessor + EmptyXferProcessor/PorterDuffXP.
+// The pipeline is the shared dedicated one (fill_fragment_main.inc); this file declares the family's
+// interface and selects the steps.
+// Fragment dimensions: HAS_XP.
+#version 450
+
+#ifndef HAS_XP
+#define HAS_XP 0
+#endif
+
+layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
+  vec4 Color;
+  float Coverage;
+  int AAEnabled;
+  vec4 Rect;
+  int HasClip;
+#include "coverage/rrect_clip_uniforms.inc"
+#include "xp/xp_uniforms.inc"
+};
+
+layout(location = 0) in float vEdgeDistance;
+
+#define XP_DST_TEX_BINDING 0
+#define FILL_COVERAGE FILL_COVERAGE_HAIRLINE_LINE
+#define FILL_CLIP 1
+#include "pipeline/fill/fill_fragment_main.inc"
