@@ -47,9 +47,9 @@ layout(location = GP_ELLIPSE_IN_OFFSET) in vec2 inEllipseOffset;
 layout(location = GP_ELLIPSE_IN_RADII) in vec4 inEllipseRadii;
 #define CHAIN_TEX_LOC_BASE GP_ELLIPSE_VARYING_COUNT
 #elif GP_LAYOUT == 2
-// HairlineLineGP attribute order: position, edgeDistance, color. The edge-distance varying
-// occupies location 0, so the leaf coordinates start at 1.
-layout(location = 2) in vec4 inColor;
+// HairlineLineGP: the locations live in gp_hairline_layout.inc, shared with the dedicated kernel.
+#include "geometry/gp_hairline_layout.inc"
+layout(location = GP_HAIRLINE_IN_COLOR) in vec4 inColor;
 #define CHAIN_TEX_LOC_BASE 1
 #elif GP_LAYOUT >= 3
 // ComplexEllipseGP: the locations live in gp_complex_ellipse_layout.inc, shared with the
@@ -127,8 +127,8 @@ layout(location = 1 + HAS_COVERAGE + HAS_UV_COORD) in vec4 inColor;
 layout(location = 2 + HAS_COVERAGE + HAS_UV_COORD) in vec4 texSubset;
 #endif
 #elif GP_LAYOUT == 2
-layout(location = 0) in vec2 aPosition;
-layout(location = 1) in float aEdgeDistance;
+layout(location = GP_HAIRLINE_IN_POSITION) in vec2 aPosition;
+layout(location = GP_HAIRLINE_IN_EDGE) in float aEdgeDistance;
 #else
 layout(location = 0) in vec2 inPosition;
 #endif
@@ -138,7 +138,7 @@ layout(location = GP_ELLIPSE_V_OFFSETS) out vec2 vEllipseOffsets;
 layout(location = GP_ELLIPSE_V_RADII) out vec4 vEllipseRadii;
 layout(location = GP_ELLIPSE_V_COLOR) out vec4 vColor;
 #elif GP_LAYOUT == 2
-layout(location = 0) out float vEdgeDistance;
+layout(location = GP_HAIRLINE_V_EDGE) out float vEdgeDistance;
 layout(location = NTEX + 1) out vec4 vColor;
 #elif GP_LAYOUT >= 3
 layout(location = GP_COMPLEX_V_OFFSETS) out vec2 vEllipseOffsets;

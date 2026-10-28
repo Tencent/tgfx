@@ -10,7 +10,9 @@ layout(location = GP_ELLIPSE_V_RADII) in vec4 vEllipseRadii;
 layout(location = GP_ELLIPSE_V_COLOR) in vec4 vColor;
 #define CHAIN_TEX_LOC_BASE GP_ELLIPSE_VARYING_COUNT
 #elif GP_LAYOUT == 2
-layout(location = 0) in float vEdgeDistance;
+// The locations live in gp_hairline_layout.inc, shared with the dedicated kernel.
+#include "geometry/gp_hairline_layout.inc"
+layout(location = GP_HAIRLINE_V_EDGE) in float vEdgeDistance;
 layout(location = NTEX + 1) in vec4 vColor;
 #define CHAIN_TEX_LOC_BASE 1
 #elif GP_LAYOUT >= 3

@@ -9,10 +9,12 @@ layout(std140, set = TGFX_VERTEX_UBO_SET, binding = TGFX_VERTEX_UBO_BINDING) uni
   mat3 Matrix;
 };
 
-layout(location = 0) in vec2 aPosition;
-layout(location = 1) in float aEdgeDistance;
+#include "geometry/gp_hairline_layout.inc"
 
-layout(location = 0) out float vEdgeDistance;
+layout(location = GP_HAIRLINE_IN_POSITION) in vec2 aPosition;
+layout(location = GP_HAIRLINE_IN_EDGE) in float aEdgeDistance;
+
+layout(location = GP_HAIRLINE_V_EDGE) out float vEdgeDistance;
 
 void main() {
   vEdgeDistance = aEdgeDistance;

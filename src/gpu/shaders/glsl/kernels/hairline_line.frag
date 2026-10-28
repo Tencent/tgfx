@@ -18,7 +18,9 @@ layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING)
 #include "xp/xp_uniforms.inc"
 };
 
-layout(location = 0) in float vEdgeDistance;
+#include "geometry/gp_hairline_layout.inc"
+
+layout(location = GP_HAIRLINE_V_EDGE) in float vEdgeDistance;
 
 #define XP_DST_TEX_BINDING 0
 #define FILL_COVERAGE FILL_COVERAGE_HAIRLINE_LINE
