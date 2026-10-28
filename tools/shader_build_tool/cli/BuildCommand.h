@@ -35,6 +35,8 @@ struct BuildOptions {
   bool compress = false;
   bool audit = false;
   std::string stageReportPath;
+  // Set by --dump-stages: the per-variant stage dump two builds are compared with.
+  std::string stageDumpDir;
   std::string inlineReportPath;
   std::string verifyBundleDir;
   // Set by --require-backends; stays empty (nullopt) when the flag is absent.

@@ -34,6 +34,7 @@
 #include "compile/ReflectionExtractor.h"
 #include "compile/StageCache.h"
 #include "output/InlineExpansionReport.h"
+#include "output/StageDump.h"
 #include "output/StageReport.h"
 #include "cli/ReportWriter.h"
 #include "compile/StageCompiler.h"
@@ -60,6 +61,8 @@ void PrintUsage() {
       << "  --report-only         Only enumerate and report, do not compile\n"
       << "  --audit               Cross-check legacy compile lists against rule-reachable sets\n"
       << "  --stage-report <path> Write the per-stage audit report (requires a full compile)\n"
+      << "  --dump-stages <dir>  Write the per-variant stage dump (code hashes, reflection, and\n"
+      << "                        the expanded include text) two builds are compared with\n"
       << "  --inline-report <path>\n"
       << "                        Write each fragment variant's inline expansion (functions the\n"
       << "                        driver compiles more than once) as JSON\n"
@@ -315,6 +318,8 @@ bool ParseArgs(int argc, char** argv, BuildOptions* options) {
       options->audit = true;
     } else if (std::strcmp(argv[i], "--stage-report") == 0 && i + 1 < argc) {
       options->stageReportPath = argv[++i];
+    } else if (std::strcmp(argv[i], "--dump-stages") == 0 && i + 1 < argc) {
+      options->stageDumpDir = argv[++i];
     } else if (std::strcmp(argv[i], "--inline-report") == 0 && i + 1 < argc) {
       options->inlineReportPath = argv[++i];
     } else if (std::strcmp(argv[i], "--verify-bundle") == 0 && i + 1 < argc) {
@@ -419,6 +424,16 @@ int RunBuildCommand(const BuildOptions& options) {
       return 1;
     }
     std::cout << "Stage report written to: " << options.stageReportPath << "\n";
+  }
+
+  // Must run before the variants are moved into the per-backend bundles below, like the stage
+  // report: the dump reads the same records.
+  if (!options.stageDumpDir.empty() && !report.variants.empty()) {
+    if (!WriteStageDump(options.stageDumpDir, report.variants, sources, &report.diagnostics)) {
+      PrintDiagnostics(report.diagnostics);
+      return 1;
+    }
+    std::cout << "Stage dump written to: " << options.stageDumpDir << "\n";
   }
 
   // Cross-language contract checks, as two rule registries: the artifact rules read what the

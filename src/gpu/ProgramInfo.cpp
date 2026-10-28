@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProgramInfo.h"
+#include <cstdio>
 #include <cstdlib>
 #include <iomanip>
 #include <sstream>
@@ -31,6 +32,20 @@
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
+
+#if DEBUG
+// Prints one bound sampler slot of the TGFX_UNIF_DUMP trace: which texture the slot received, so
+// an A/B run can diff the binding order of two routes for the same draw shape.
+static void DebugDumpSamplerSlot(const char* label, unsigned slot, const Texture* texture,
+                                 bool dummy) {
+  if (label == nullptr || texture == nullptr) {
+    return;
+  }
+  std::printf("[UNIF %s] sampler slot=%u texture=%dx%d format=%d%s\n", label, slot,
+              texture->width(), texture->height(), static_cast<int>(texture->format()),
+              dummy ? " (dummy)" : "");
+}
+#endif
 
 static void EncodeStencilFace(BytesKey& key, const StencilDescriptor& face) {
   key.write(static_cast<uint32_t>(face.compare));
@@ -411,24 +426,18 @@ bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, nullptr);
 
   // TGFX_UNIF_DUMP prints the fully-assembled uniform values (after every writer ran) so an A/B
-  // run can diff what the two routes actually upload for the same draw shape. Filtered to programs
-  // carrying a coord-transform (both routes declare it; the JIT suffixes the name with the
-  // processor index) to keep the output bounded. Diagnostic only.
+  // run can diff what the two routes actually upload for the same draw shape. Every draw dumps,
+  // labeled by the program key, so two builds can be diffed per draw shape without filtering.
+  // Diagnostic only.
 #if DEBUG
   static const char* unifDump = std::getenv("TGFX_UNIF_DUMP");
-  if (unifDump != nullptr && vertexUniformData != nullptr) {
-    bool hasCoordTransform = false;
-    for (const auto& uniform : vertexUniformData->uniforms()) {
-      if (uniform.name().rfind("CoordTransformMatrix_0", 0) == 0) {
-        hasCoordTransform = true;
-        break;
-      }
+  if (unifDump != nullptr) {
+    auto dumpLabel = std::string(unifDump) + " key=" + FormatDiagnosticKey(buildProgramKey());
+    if (vertexUniformData != nullptr) {
+      vertexUniformData->dumpValues(dumpLabel.c_str());
     }
-    if (hasCoordTransform) {
-      vertexUniformData->dumpValues(unifDump);
-      if (fragmentUniformData != nullptr) {
-        fragmentUniformData->dumpValues(unifDump);
-      }
+    if (fragmentUniformData != nullptr) {
+      fragmentUniformData->dumpValues(dumpLabel.c_str());
     }
   }
 #endif
@@ -466,6 +475,9 @@ bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
   bool padHole = expected > samplers.size();
   for (size_t i = 0; i < sequentialCount; ++i) {
     if (padHole && textureBinding == colorSamplerCount) {
+#if DEBUG
+      DebugDumpSamplerSlot(unifDump, textureBinding, cache->getOrCreateDummyTexture().get(), true);
+#endif
       renderPass->setTexture(textureBinding++, cache->getOrCreateDummyTexture(),
                              cache->getOrCreateDummySampler());
     }
@@ -473,6 +485,9 @@ bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
     SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
                                  state.minFilterMode, state.magFilterMode, state.mipmapMode);
     auto sampler = gpu->createSampler(descriptor);
+#if DEBUG
+    DebugDumpSamplerSlot(unifDump, textureBinding, texture.get(), false);
+#endif
     renderPass->setTexture(textureBinding++, texture, sampler);
   }
   if (textureBinding < expected - (holdDst ? 1u : 0u)) {
@@ -480,6 +495,9 @@ bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
     auto dummySampler = cache->getOrCreateDummySampler();
     unsigned stop = expected - (holdDst ? 1u : 0u);
     while (textureBinding < stop) {
+#if DEBUG
+      DebugDumpSamplerSlot(unifDump, textureBinding, dummyTexture.get(), true);
+#endif
       renderPass->setTexture(textureBinding++, dummyTexture, dummySampler);
     }
   }
@@ -488,6 +506,9 @@ bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
     SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
                                  state.minFilterMode, state.magFilterMode, state.mipmapMode);
     auto sampler = gpu->createSampler(descriptor);
+#if DEBUG
+    DebugDumpSamplerSlot(unifDump, textureBinding, texture.get(), false);
+#endif
     renderPass->setTexture(textureBinding, texture, sampler);
   }
   return true;
