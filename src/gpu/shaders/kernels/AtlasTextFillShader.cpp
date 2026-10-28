@@ -25,10 +25,6 @@
 #include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
-#include "gpu/shaders/modules/AnalyticClipModule.h"
-#include "gpu/shaders/modules/DeviceMaskModule.h"
-#include "gpu/shaders/modules/ParamWriter.h"
-#include "gpu/shaders/modules/PorterDuffXPModule.h"
 
 namespace tgfx {
 
@@ -67,25 +63,6 @@ std::optional<AtlasTextFillShader::Inputs> AtlasTextFillShader::Extract(
   inputs.hasCoverage = atgp->getAAType() == AAType::Coverage;
   inputs.xpType = xpType;
   return inputs;
-}
-
-ModuleBindFn AtlasTextFillShader::BindingFor(const ProgramInfo* /*programInfo*/,
-                                             const FragmentProcessor* fp) {
-  if (IsProcessor<RectEffect>(fp) || IsProcessor<RRectEffect>(fp)) {
-    return &AnalyticClipModule::Bind;
-  }
-  if (IsProcessor<DeviceSpaceTextureEffect>(fp)) {
-    return &DeviceMaskModule::Bind;
-  }
-  return nullptr;
-}
-
-XPBindFn AtlasTextFillShader::XPBindingFor(const ProgramInfo* programInfo) {
-  auto* xp = programInfo->getXferProcessor();
-  if (!IsProcessor<PorterDuffXferProcessor>(xp)) {
-    return nullptr;
-  }
-  return &PorterDuffXPModule::Bind;
 }
 
 }  // namespace tgfx

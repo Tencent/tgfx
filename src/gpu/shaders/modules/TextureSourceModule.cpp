@@ -12,6 +12,11 @@ namespace tgfx {
 // stays until the JIT retires and serves the un-migrated families meanwhile.
 void TextureSourceModule::Bind(const FragmentProcessor* processor, ParamWriter* writer) {
   auto* texture = static_cast<const TextureEffect*>(processor);
+  if (!texture->isTextureInstantiated()) {
+    // The texture is not instantiated (a failed or deferred upload): the processor's own writer
+    // returns without touching any field in this state, and so does the module.
+    return;
+  }
   float rect[4] = {};
   texture->computeSubsetRect(rect);
   writer->set(Subset, rect);

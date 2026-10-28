@@ -26,11 +26,6 @@
 #include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
-#include "gpu/shaders/modules/AnalyticClipModule.h"
-#include "gpu/shaders/modules/DeviceMaskModule.h"
-#include "gpu/shaders/modules/ParamWriter.h"
-#include "gpu/shaders/modules/PorterDuffXPModule.h"
-#include "gpu/shaders/modules/TiledSourceModule.h"
 
 namespace tgfx {
 
@@ -77,28 +72,6 @@ std::optional<NonAARRectFillShader::Inputs> NonAARRectFillShader::Extract(
   }
   inputs.xpType = GetXPType(programInfo);
   return inputs;
-}
-
-ModuleBindFn NonAARRectFillShader::BindingFor(const ProgramInfo* /*programInfo*/,
-                                              const FragmentProcessor* fp) {
-  if (IsProcessor<RectEffect>(fp) || IsProcessor<RRectEffect>(fp)) {
-    return &AnalyticClipModule::Bind;
-  }
-  if (IsProcessor<TiledTextureEffect>(fp)) {
-    return &TiledSourceModule::Bind;
-  }
-  if (IsProcessor<DeviceSpaceTextureEffect>(fp)) {
-    return &DeviceMaskModule::Bind;
-  }
-  return nullptr;
-}
-
-XPBindFn NonAARRectFillShader::XPBindingFor(const ProgramInfo* programInfo) {
-  auto* xp = programInfo->getXferProcessor();
-  if (!IsProcessor<PorterDuffXferProcessor>(xp)) {
-    return nullptr;
-  }
-  return &PorterDuffXPModule::Bind;
 }
 
 }  // namespace tgfx

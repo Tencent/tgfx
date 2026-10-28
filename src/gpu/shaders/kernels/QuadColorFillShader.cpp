@@ -25,10 +25,6 @@
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
-#include "gpu/shaders/modules/AnalyticClipModule.h"
-#include "gpu/shaders/modules/DeviceMaskModule.h"
-#include "gpu/shaders/modules/ParamWriter.h"
-#include "gpu/shaders/modules/PorterDuffXPModule.h"
 
 namespace tgfx {
 
@@ -60,27 +56,6 @@ std::optional<QuadColorFillShader::Inputs> QuadColorFillShader::Extract(
   }
   inputs.xpType = GetXPType(programInfo);
   return inputs;
-}
-
-ModuleBindFn QuadColorFillShader::BindingFor(const ProgramInfo* /*programInfo*/,
-                                             const FragmentProcessor* fp) {
-  if (IsProcessor<RectEffect>(fp) || IsProcessor<RRectEffect>(fp)) {
-    return &AnalyticClipModule::Bind;
-  }
-  // This kernel declares neither the mask subset decoy nor the Subset/AlphaOnly fallback the
-  // processor writer takes without one, so the module's decoy branch is the exact behaviour here.
-  if (IsProcessor<DeviceSpaceTextureEffect>(fp)) {
-    return &DeviceMaskModule::Bind;
-  }
-  return nullptr;
-}
-
-XPBindFn QuadColorFillShader::XPBindingFor(const ProgramInfo* programInfo) {
-  auto* xp = programInfo->getXferProcessor();
-  if (!IsProcessor<PorterDuffXferProcessor>(xp)) {
-    return nullptr;
-  }
-  return &PorterDuffXPModule::Bind;
 }
 
 }  // namespace tgfx

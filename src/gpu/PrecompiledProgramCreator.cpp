@@ -211,48 +211,6 @@ static PrecompiledFallbackReason ToFallbackReason(PermutationMatchFailure failur
   return PrecompiledFallbackReason::Unspecified;
 }
 
-// A migrated family resolves each processor to the module Bind that takes over its uniform
-// writes; un-migrated families keep the processors' onSetData. Dispatched through the same
-// X-macro the matcher uses — this file is runtime-only, so referencing the family .cpp symbols
-// is safe (the tool compiles the family headers but never links the .cpps).
-// The per-family lookup is a template, so the discarded &Family::BindingFor branch is not
-// instantiated for families that never declared one.
-template <typename Family>
-static ModuleBindSelector SelectorOf() {
-  if constexpr (FamilyHasBindingFor<Family>::value) {
-    return &Family::BindingFor;
-  }
-  return nullptr;
-}
-
-static ModuleBindSelector BindingSelectorFor(const std::string& familyName) {
-#define TGFX_SELECTOR(Family)    \
-  if (familyName == #Family) {   \
-    return SelectorOf<Family>(); \
-  }
-  TGFX_FOR_EACH_SHADER_FAMILY(TGFX_SELECTOR)
-#undef TGFX_SELECTOR
-  return nullptr;
-}
-
-template <typename Family>
-static XPBindSelector XPSelectorOf() {
-  if constexpr (FamilyHasXPBindingFor<Family>::value) {
-    return &Family::XPBindingFor;
-  }
-  return nullptr;
-}
-
-static XPBindSelector XPSelectorFor(const std::string& familyName) {
-#define TGFX_XP_SELECTOR(Family)   \
-  if (familyName == #Family) {     \
-    return XPSelectorOf<Family>(); \
-  }
-  TGFX_FOR_EACH_SHADER_FAMILY(TGFX_XP_SELECTOR)
-#undef TGFX_XP_SELECTOR
-  return nullptr;
-}
-
 std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* context,
                                                                   const ProgramInfo* programInfo,
                                                                   bool* deferredFallback) {
@@ -630,8 +588,6 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   auto program = std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
                                            std::move(fragmentUniformData), provenance);
   program->setExpectedTextureCount(static_cast<uint32_t>(descriptor.layout.textureSamplers.size()));
-  program->setBindingSelector(BindingSelectorFor(matchResult->shaderName));
-  program->setXPBindingSelector(XPSelectorFor(matchResult->shaderName));
   return program;
 }
 

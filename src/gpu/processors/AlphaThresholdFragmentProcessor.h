@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/shaders/modules/PointwiseOpModule.h"
 
 namespace tgfx {
 class AlphaThresholdFragmentProcessor : public FragmentProcessor {
@@ -29,6 +30,11 @@ class AlphaThresholdFragmentProcessor : public FragmentProcessor {
 
   std::string name() const override {
     return "AlphaStepFragmentProcessor";
+  }
+
+  bool onBindPrecompiled(ParamWriter* writer) const override {
+    PointwiseOpModule::Bind(this, writer);
+    return true;
   }
 
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;

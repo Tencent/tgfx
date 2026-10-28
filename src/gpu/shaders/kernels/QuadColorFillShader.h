@@ -21,7 +21,6 @@
 #include <optional>
 #include <vector>
 #include "gpu/shaders/ShaderFamily.h"
-#include "gpu/shaders/modules/ParamHandle.h"
 
 namespace tgfx {
 
@@ -58,13 +57,6 @@ class QuadColorFillShader : public ShaderFamily<QuadColorFillShader> {
   using FD = FragDims;
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
-
-  /// Resolves a draw's processor to the module Bind that takes over its uniform writes, or
-  /// null to keep the processor's own onSetData.
-  static ModuleBindFn BindingFor(const ProgramInfo* programInfo, const FragmentProcessor* fp);
-
-  /// The PorterDuff XP module for PorterDuff draws, null otherwise.
-  static XPBindFn XPBindingFor(const ProgramInfo* programInfo);
 
   /// Matcher inputs: the XferProcessor kind and the device-mask coverage presence.
   struct Inputs {

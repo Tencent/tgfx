@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include "gpu/shaders/modules/BlurKernelModule.h"
 
 namespace tgfx {
 
@@ -62,4 +63,8 @@ void GaussianBlur1DFragmentProcessor::onComputeProcessorKey(BytesKey* key) const
   key->write(maxSigma);
 }
 
+bool GaussianBlur1DFragmentProcessor::onBindPrecompiled(ParamWriter* writer) const {
+  BlurKernelModule::Bind(this, writer);
+  return true;
+}
 }  // namespace tgfx

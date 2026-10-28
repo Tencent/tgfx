@@ -103,6 +103,10 @@ class TextureEffect : public FragmentProcessor {
   /** The YUV planes behind this texture, or null for a single-plane texture. */
   YUVTextureView* getYUVTexture() const;
 
+  /** False while the texture is not instantiated (a failed or deferred upload leaves it null). */
+  bool isTextureInstantiated() const;
+
+  bool onBindPrecompiled(ParamWriter* writer) const override;
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:

@@ -27,10 +27,6 @@
 #include "gpu/processors/LumaFragmentProcessor.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/TextureEffect.h"
-#include "gpu/shaders/modules/ParamWriter.h"
-#include "gpu/shaders/modules/PointwiseOpModule.h"
-#include "gpu/shaders/modules/PorterDuffXPModule.h"
-#include "gpu/shaders/modules/TextureSourceModule.h"
 
 namespace tgfx {
 
@@ -88,28 +84,6 @@ std::optional<TexturedEffectShader::Inputs> TexturedEffectShader::Extract(
     return std::nullopt;
   }
   return Inputs{xpType};
-}
-
-XPBindFn TexturedEffectShader::XPBindingFor(const ProgramInfo* programInfo) {
-  auto* xp = programInfo->getXferProcessor();
-  if (!IsProcessor<PorterDuffXferProcessor>(xp)) {
-    return nullptr;
-  }
-  return &PorterDuffXPModule::Bind;
-}
-
-ModuleBindFn TexturedEffectShader::BindingFor(const ProgramInfo* /*programInfo*/,
-                                              const FragmentProcessor* fp) {
-  if (IsProcessor<TextureEffect>(fp)) {
-    return &TextureSourceModule::Bind;
-  }
-  // Only the operators the module replicates: a color-space xform keeps its own (already native)
-  // writer, so IsSupportedPointwiseOp alone would be too wide here.
-  if (IsProcessor<ColorMatrixFragmentProcessor>(fp) || IsProcessor<LumaFragmentProcessor>(fp) ||
-      IsProcessor<AlphaThresholdFragmentProcessor>(fp)) {
-    return &PointwiseOpModule::Bind;
-  }
-  return nullptr;
 }
 
 }  // namespace tgfx

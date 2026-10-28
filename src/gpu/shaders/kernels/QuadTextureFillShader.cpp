@@ -26,11 +26,6 @@
 #include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
 #include "gpu/processors/TextureEffect.h"
-#include "gpu/shaders/modules/AnalyticClipModule.h"
-#include "gpu/shaders/modules/DeviceMaskModule.h"
-#include "gpu/shaders/modules/ParamWriter.h"
-#include "gpu/shaders/modules/PorterDuffXPModule.h"
-#include "gpu/shaders/modules/TextureSourceModule.h"
 
 namespace tgfx {
 
@@ -108,36 +103,6 @@ std::optional<QuadTextureFillShader::Inputs> QuadTextureFillShader::Extract(
   inputs.hasLocalMask = hasLocalMask;
   inputs.xpType = xpType;
   return inputs;
-}
-
-ModuleBindFn QuadTextureFillShader::BindingFor(const ProgramInfo* programInfo,
-                                               const FragmentProcessor* fp) {
-  // The analytic clip (coverage section) feeds the clip module.
-  if (IsProcessor<RectEffect>(fp) || IsProcessor<RRectEffect>(fp)) {
-    return &AnalyticClipModule::Bind;
-  }
-  // A device-space mask feeds the mask module; this kernel declares the subset decoy, so the
-  // processor writer would take its shared-kernel branch, which the module replicates.
-  if (IsProcessor<DeviceSpaceTextureEffect>(fp)) {
-    return &DeviceMaskModule::Bind;
-  }
-  // Only the color root, and only non-YUV sources (the YUV fields ride the processor's own
-  // writer until their module exists); every other position keeps onSetData.
-  if (fp != programInfo->getFragmentProcessor(0) || !IsProcessor<TextureEffect>(fp)) {
-    return nullptr;
-  }
-  if (static_cast<const TextureEffect*>(fp)->isYUV()) {
-    return nullptr;
-  }
-  return &TextureSourceModule::Bind;
-}
-
-XPBindFn QuadTextureFillShader::XPBindingFor(const ProgramInfo* programInfo) {
-  auto* xp = programInfo->getXferProcessor();
-  if (!IsProcessor<PorterDuffXferProcessor>(xp)) {
-    return nullptr;
-  }
-  return &PorterDuffXPModule::Bind;
 }
 
 }  // namespace tgfx

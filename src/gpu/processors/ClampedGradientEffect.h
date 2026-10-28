@@ -35,6 +35,7 @@ class ClampedGradientEffect : public FragmentProcessor {
     return "ClampedGradientEffect";
   }
 
+  bool onBindPrecompiled(ParamWriter* writer) const override;
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
   /** The colors the effect clamps to outside the gradient's [0, 1] span. */

@@ -21,7 +21,6 @@
 #include <optional>
 #include <vector>
 #include "gpu/shaders/ShaderFamily.h"
-#include "gpu/shaders/modules/ParamHandle.h"
 
 namespace tgfx {
 
@@ -56,9 +55,6 @@ class HairlineLineShader : public ShaderFamily<HairlineLineShader> {
   using FD = FragDims;
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
-
-  /// The PorterDuff XP module for PorterDuff draws, null otherwise.
-  static XPBindFn XPBindingFor(const ProgramInfo* programInfo);
 
   /// Matcher inputs: only the XferProcessor kind shapes the variant.
   struct Inputs {

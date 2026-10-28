@@ -21,7 +21,6 @@
 #include <optional>
 #include <vector>
 #include "gpu/shaders/ShaderFamily.h"
-#include "gpu/shaders/modules/ParamHandle.h"
 
 namespace tgfx {
 
@@ -63,9 +62,6 @@ class RoundStrokeRectFillShader : public ShaderFamily<RoundStrokeRectFillShader>
   using FD = FragDims;
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
-
-  /// The PorterDuff XP module for PorterDuff draws, null otherwise.
-  static XPBindFn XPBindingFor(const ProgramInfo* programInfo);
 
   /// Matcher inputs: the UV-matrix presence and the XferProcessor kind.
   struct Inputs {

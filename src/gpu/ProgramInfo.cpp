@@ -403,10 +403,11 @@ bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
   // source and a TiledTextureEffect local mask each got ordinal 0 (empty suffix), and the mask's
   // full-bounds Subset silently overwrote the color's real subset on the precompiled path —
   // the JIT route is immune because its _P{index} name suffix isolates the two writers.
-  // A migrated family resolves some processors to a module Bind that replaces their onSetData
-  // at the same walk position: the writes land in the same order, and the structural-suffix
-  // addressing (Subset / Subset_1) below applies to the module writes unchanged.
-  const auto bindingSelector = program->bindingSelector();
+  // A processor whose class overrides onBindPrecompiled resolves to a module Bind that takes over
+  // its onSetData at the same walk position: the writes land in the same order, and the
+  // structural-suffix addressing (Subset / Subset_1) below applies to the module writes unchanged.
+  const bool precompiled =
+      program->getProvenance().shaderArtifact != ShaderArtifactOrigin::RuntimeGeneratedSource;
   ParamWriter paramWriter(fragmentUniformData);
   std::unordered_map<std::string, int> classOrdinals;
   auto uniformSpaceKey = [](const FragmentProcessor* fp) {
@@ -426,9 +427,8 @@ bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
       if (fragmentUniformData != nullptr) {
         fragmentUniformData->structuralSuffix = structural;
       }
-      auto bind = bindingSelector != nullptr ? bindingSelector(this, fp) : nullptr;
-      if (bind != nullptr) {
-        bind(fp, &paramWriter);
+      if (precompiled && fp->bindPrecompiled(&paramWriter)) {
+        // The processor's feature module took over its uniform writes.
       } else {
         fp->setData(vertexUniformData, fragmentUniformData);
       }
@@ -437,10 +437,8 @@ bool ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, Program* progra
   }
   const auto processor = getXferProcessor();
   updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
-  auto xpBind =
-      program->xpBindingSelector() != nullptr ? program->xpBindingSelector()(this) : nullptr;
-  if (xpBind != nullptr) {
-    xpBind(processor, &paramWriter);
+  if (precompiled && processor->onBindPrecompiled(&paramWriter)) {
+    // The XP's feature module took over its uniform writes.
   } else {
     processor->setData(vertexUniformData, fragmentUniformData);
   }

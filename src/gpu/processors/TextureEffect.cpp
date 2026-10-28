@@ -21,6 +21,7 @@
 #include "core/utils/Log.h"
 #include "gpu/AOTEffect.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/shaders/modules/TextureSourceModule.h"
 
 namespace tgfx {
 PlacementPtr<FragmentProcessor> TextureEffect::Make(BlockAllocator* allocator,
@@ -141,6 +142,10 @@ TextureView* TextureEffect::getTextureView() const {
   return textureProxy->getTextureView().get();
 }
 
+bool TextureEffect::isTextureInstantiated() const {
+  return getTextureView() != nullptr;
+}
+
 YUVFormat TextureEffect::yuvFormat() const {
   auto* yuvView = getYUVTexture();
   return yuvView != nullptr ? yuvView->yuvFormat() : YUVFormat::Unknown;
@@ -231,4 +236,8 @@ void TextureEffect::computeSubsetRect(float rect[4]) const {
   }
 }
 
+bool TextureEffect::onBindPrecompiled(ParamWriter* writer) const {
+  TextureSourceModule::Bind(this, writer);
+  return true;
+}
 }  // namespace tgfx

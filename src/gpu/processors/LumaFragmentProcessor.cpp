@@ -19,6 +19,7 @@
 #include "gpu/processors/LumaFragmentProcessor.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "gpu/AOTEffect.h"
+#include "gpu/shaders/modules/PointwiseOpModule.h"
 namespace tgfx {
 void LumaFragmentProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const {
   bytesKey->write(classID());
@@ -66,4 +67,8 @@ LumaFragmentProcessor::LumaFactor LumaFragmentProcessor::AcquireLumaFactorFromCo
   return LumaFactor{};
 }
 
+bool LumaFragmentProcessor::onBindPrecompiled(ParamWriter* writer) const {
+  PointwiseOpModule::Bind(this, writer);
+  return true;
+}
 }  // namespace tgfx

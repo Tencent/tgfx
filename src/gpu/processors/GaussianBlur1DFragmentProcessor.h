@@ -54,6 +54,8 @@ class GaussianBlur1DFragmentProcessor : public Blur1DFragmentProcessor {
     return stepLength;
   }
 
+  bool onBindPrecompiled(ParamWriter* writer) const override;
+
  protected:
   GaussianBlur1DFragmentProcessor(PlacementPtr<FragmentProcessor> processor, float sigma,
                                   GaussianBlurDirection direction, float stepLength, int maxSigma);

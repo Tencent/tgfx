@@ -21,6 +21,7 @@
 #include <cstring>
 #include "gpu/AOTEffect.h"
 #include "gpu/resources/TextureView.h"
+#include "gpu/shaders/modules/PerlinNoiseModule.h"
 
 namespace tgfx {
 
@@ -120,5 +121,10 @@ bool PerlinNoiseFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID
   }
   parameters.lookupData = lookupData;
   return builder->addPerlinNoiseSource(input, parameters, output);
+}
+
+bool PerlinNoiseFragmentProcessor::onBindPrecompiled(ParamWriter* writer) const {
+  PerlinNoiseModule::Bind(this, writer);
+  return true;
 }
 }  // namespace tgfx

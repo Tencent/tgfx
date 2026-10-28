@@ -75,31 +75,6 @@ class Program {
     expectedTextureCountValue = count;
   }
 
-  /**
-   * The module-binding selector of the family this program serves: per processor, the module
-   * Bind that takes over its uniform writes, or null to keep the processor's own onSetData.
-   * Null for un-migrated families and runtime-generated programs.
-   */
-  ModuleBindSelector bindingSelector() const {
-    return bindingSelectorValue;
-  }
-
-  void setBindingSelector(ModuleBindSelector selector) {
-    bindingSelectorValue = selector;
-  }
-
-  /**
-   * The XferProcessor selector of the family this program serves: the XP module Bind that takes
-   * over the XP's uniform writes, or null to keep the XP's own setData.
-   */
-  XPBindSelector xpBindingSelector() const {
-    return xpBindingSelectorValue;
-  }
-
-  void setXPBindingSelector(XPBindSelector selector) {
-    xpBindingSelectorValue = selector;
-  }
-
  private:
   BytesKey programKey = {};
   std::list<Program*>::iterator cachedPosition;
@@ -108,8 +83,6 @@ class Program {
   std::unique_ptr<UniformData> fragmentUniformData = nullptr;
   ProgramProvenance provenance = {};
   uint32_t expectedTextureCountValue = 0;
-  ModuleBindSelector bindingSelectorValue = nullptr;
-  XPBindSelector xpBindingSelectorValue = nullptr;
 
   friend class GlobalCache;
 };

@@ -23,6 +23,7 @@
 #include "gpu/processors/SingleIntervalGradientColorizer.h"
 #include "gpu/processors/TextureGradientColorizer.h"
 #include "gpu/processors/UnrolledBinaryGradientColorizer.h"
+#include "gpu/shaders/modules/GradientModule.h"
 
 namespace tgfx {
 ClampedGradientEffect::ClampedGradientEffect(PlacementPtr<FragmentProcessor> colorizer,
@@ -131,5 +132,10 @@ bool ClampedGradientEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
     return false;
   }
   return builder->addGradientSource(input, parameters, output);
+}
+
+bool ClampedGradientEffect::onBindPrecompiled(ParamWriter* writer) const {
+  GradientModule::BindEffect(this, writer);
+  return true;
 }
 }  // namespace tgfx

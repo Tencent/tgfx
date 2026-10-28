@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RectEffect.h"
+#include "gpu/shaders/modules/AnalyticClipModule.h"
 
 namespace tgfx {
 
@@ -29,4 +30,8 @@ void RectEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   bytesKey->write(static_cast<uint32_t>(_needTransform ? 1 : 0));
 }
 
+bool RectEffect::onBindPrecompiled(ParamWriter* writer) const {
+  AnalyticClipModule::Bind(this, writer);
+  return true;
+}
 }  // namespace tgfx

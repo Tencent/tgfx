@@ -63,6 +63,7 @@ class RectEffect : public FragmentProcessor {
     return _deviceToLocal;
   }
 
+  bool onBindPrecompiled(ParamWriter* writer) const override;
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:

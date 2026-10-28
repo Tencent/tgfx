@@ -30,11 +30,6 @@
 #include "gpu/processors/ShapeInstancedGeometryProcessor.h"
 #include "gpu/processors/SingleIntervalGradientColorizer.h"
 #include "gpu/processors/TextureEffect.h"
-#include "gpu/shaders/modules/AnalyticClipModule.h"
-#include "gpu/shaders/modules/DeviceMaskModule.h"
-#include "gpu/shaders/modules/GradientModule.h"
-#include "gpu/shaders/modules/ParamWriter.h"
-#include "gpu/shaders/modules/TextureSourceModule.h"
 
 namespace tgfx {
 
@@ -104,29 +99,6 @@ ShapeInstancedTextureCoverageShader::Extract(const ProgramInfo* programInfo) {
     return std::nullopt;
   }
   return Inputs{gradient != 0};
-}
-
-ModuleBindFn ShapeInstancedTextureCoverageShader::BindingFor(const ProgramInfo* /*programInfo*/,
-                                                             const FragmentProcessor* fp) {
-  if (IsProcessor<RectEffect>(fp) || IsProcessor<RRectEffect>(fp)) {
-    return &AnalyticClipModule::Bind;
-  }
-  if (IsProcessor<TextureEffect>(fp)) {
-    return &TextureSourceModule::Bind;
-  }
-  if (IsProcessor<DeviceSpaceTextureEffect>(fp)) {
-    return &DeviceMaskModule::Bind;
-  }
-  if (IsProcessor<ClampedGradientEffect>(fp)) {
-    return &GradientModule::BindEffect;
-  }
-  if (IsProcessor<ConicGradientLayout>(fp)) {
-    return &GradientModule::BindConicLayout;
-  }
-  if (IsProcessor<SingleIntervalGradientColorizer>(fp)) {
-    return &GradientModule::BindColorizer;
-  }
-  return nullptr;
 }
 
 }  // namespace tgfx

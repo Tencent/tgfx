@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PorterDuffXferProcessor.h"
+#include "gpu/shaders/modules/PorterDuffXPModule.h"
 
 namespace tgfx {
 const TextureView* PorterDuffXferProcessor::dstTextureView() const {
@@ -29,5 +30,10 @@ void PorterDuffXferProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) 
   if (auto textureView = dstTextureView()) {
     TextureView::ComputeTextureKey(textureView->getTexture(), bytesKey);
   }
+}
+
+bool PorterDuffXferProcessor::onBindPrecompiled(ParamWriter* writer) const {
+  PorterDuffXPModule::Bind(this, writer);
+  return true;
 }
 }  // namespace tgfx

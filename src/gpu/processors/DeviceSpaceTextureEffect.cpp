@@ -18,6 +18,7 @@
 
 #include "DeviceSpaceTextureEffect.h"
 #include "gpu/AOTEffect.h"
+#include "gpu/shaders/modules/DeviceMaskModule.h"
 
 namespace tgfx {
 DeviceSpaceTextureEffect::DeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy,
@@ -50,5 +51,10 @@ size_t DeviceSpaceTextureEffect::onCountTextureSamplers() const {
 std::shared_ptr<Texture> DeviceSpaceTextureEffect::onTextureAt(size_t) const {
   auto textureView = textureProxy->getTextureView();
   return textureView == nullptr ? nullptr : textureView->getTexture();
+}
+
+bool DeviceSpaceTextureEffect::onBindPrecompiled(ParamWriter* writer) const {
+  DeviceMaskModule::Bind(this, writer);
+  return true;
 }
 }  // namespace tgfx

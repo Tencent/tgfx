@@ -6,10 +6,7 @@
 
 namespace tgfx {
 
-class FragmentProcessor;
 class ParamWriter;
-class ProgramInfo;
-class XferProcessor;
 
 // The value kinds a module parameter can carry; the kind pins the writer overload.
 enum class ParamType : uint8_t {
@@ -31,18 +28,5 @@ template <ParamType Type>
 struct Param {
   const char* name;
 };
-
-// One module's value binding: moves a processor's values into the writer. The uniform block's
-// current structural suffix applies, so a second same-class instance addresses its own fields.
-using ModuleBindFn = void (*)(const FragmentProcessor*, ParamWriter*);
-
-// Resolves a draw's processor to the module Bind that takes over its uniform writes, or null
-// to keep the processor's own onSetData. Declared by a migrated family as a static member.
-using ModuleBindSelector = ModuleBindFn (*)(const ProgramInfo*, const FragmentProcessor*);
-
-// The XferProcessor counterpart: the XP sits at one fixed position in the uniform walk, so its
-// selector only needs the draw. Null keeps the XP's own setData.
-using XPBindFn = void (*)(const XferProcessor*, ParamWriter*);
-using XPBindSelector = XPBindFn (*)(const ProgramInfo*);
 
 }  // namespace tgfx

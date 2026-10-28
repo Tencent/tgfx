@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ConicGradientLayout.h"
+#include "gpu/shaders/modules/GradientModule.h"
 
 namespace tgfx {
 ConicGradientLayout::ConicGradientLayout(Matrix matrix, float bias, float scale)
@@ -27,5 +28,10 @@ ConicGradientLayout::ConicGradientLayout(Matrix matrix, float bias, float scale)
 void ConicGradientLayout::onComputeProcessorKey(BytesKey* bytesKey) const {
   const uint32_t flags = coordTransform.matrix.hasPerspective() ? 1 : 0;
   bytesKey->write(flags);
+}
+
+bool ConicGradientLayout::onBindPrecompiled(ParamWriter* writer) const {
+  GradientModule::BindConicLayout(this, writer);
+  return true;
 }
 }  // namespace tgfx

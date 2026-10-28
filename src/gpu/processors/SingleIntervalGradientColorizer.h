@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/shaders/modules/GradientModule.h"
 #include "tgfx/core/Color.h"
 
 namespace tgfx {
@@ -27,6 +28,11 @@ class SingleIntervalGradientColorizer : public FragmentProcessor {
   DEFINE_PROCESSOR_CLASS_ID
   static PlacementPtr<SingleIntervalGradientColorizer> Make(BlockAllocator* allocator, Color start,
                                                             Color end);
+
+  bool onBindPrecompiled(ParamWriter* writer) const override {
+    GradientModule::BindColorizer(this, writer);
+    return true;
+  }
 
   std::string name() const override {
     return "SingleIntervalGradientColorizer";

@@ -153,6 +153,10 @@ void FragmentProcessor::setData(UniformData* vertexUniformData,
   onSetData(vertexUniformData, fragmentUniformData);
 }
 
+bool FragmentProcessor::bindPrecompiled(ParamWriter* writer) const {
+  return onBindPrecompiled(writer);
+}
+
 void FragmentProcessor::emitChild(size_t childIndex, const std::string& inputColor,
                                   std::string* outputColor, EmitArgs& args,
                                   std::function<std::string(std::string_view)> coordFunc) const {

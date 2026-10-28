@@ -26,6 +26,8 @@
 #include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
+class ParamWriter;
+
 struct DstTextureInfo {
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   Point offset = {};
@@ -56,6 +58,14 @@ class XferProcessor : public Processor {
   virtual void emitCode(const EmitArgs& args) const = 0;
 
   virtual void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const = 0;
+
+  /**
+   * Binds the XP's uniform values for a precompiled program through its module. Returns false to
+   * keep the XP's own setData. Runtime-generated programs never call this.
+   */
+  virtual bool onBindPrecompiled(ParamWriter*) const {
+    return false;
+  }
 
  protected:
   explicit XferProcessor(uint32_t classID) : Processor(classID) {

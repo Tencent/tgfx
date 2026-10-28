@@ -34,6 +34,7 @@
 namespace tgfx {
 class AOTNodeBuilder;
 class AOTNodeID;
+class ParamWriter;
 class ProgramInfo;
 class Image;
 class Shader;
@@ -257,6 +258,13 @@ class FragmentProcessor : public Processor {
   void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const;
 
   /**
+   * Binds this processor's uniform values for a precompiled program through its feature module.
+   * Returns false when no module has migrated this processor class, leaving the uniform walk on
+   * the processor's own setData. Runtime-generated programs never call this.
+   */
+  bool bindPrecompiled(ParamWriter* writer) const;
+
+  /**
    * Emit the child with the default input color (solid white)
    */
   void emitChild(size_t childIndex, std::string* outputColor, EmitArgs& parentArgs,
@@ -317,6 +325,14 @@ class FragmentProcessor : public Processor {
   }
 
   virtual void onSetData(UniformData*, UniformData*) const {
+  }
+
+  /**
+   * The precompiled-program counterpart of onSetData: writes the same values through the
+   * processor's feature module instead. The default serves processors no module has migrated.
+   */
+  virtual bool onBindPrecompiled(ParamWriter*) const {
+    return false;
   }
 
  private:

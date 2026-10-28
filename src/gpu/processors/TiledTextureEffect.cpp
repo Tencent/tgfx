@@ -23,6 +23,7 @@
 #include "core/utils/MathExtra.h"
 #include "gpu/AOTEffect.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/shaders/modules/TiledSourceModule.h"
 
 namespace tgfx {
 TiledTextureEffect::ShaderMode TiledTextureEffect::GetShaderMode(TileMode tileMode,
@@ -348,5 +349,10 @@ const TextureView* TiledTextureEffect::getTextureView() const {
     return textureView;
   }
   return nullptr;
+}
+
+bool TiledTextureEffect::onBindPrecompiled(ParamWriter* writer) const {
+  TiledSourceModule::Bind(this, writer);
+  return true;
 }
 }  // namespace tgfx
