@@ -3,10 +3,12 @@
 // (pointwise_source_coords.inc).
 
 #if GP_LAYOUT == 1
-layout(location = 0) in vec2 vEllipseOffsets;
-layout(location = 1) in vec4 vEllipseRadii;
-layout(location = 2) in vec4 vColor;
-#define CHAIN_TEX_LOC_BASE 3
+// The locations live in gp_ellipse_layout.inc, shared with the dedicated kernel.
+#include "geometry/gp_ellipse_layout.inc"
+layout(location = GP_ELLIPSE_V_OFFSETS) in vec2 vEllipseOffsets;
+layout(location = GP_ELLIPSE_V_RADII) in vec4 vEllipseRadii;
+layout(location = GP_ELLIPSE_V_COLOR) in vec4 vColor;
+#define CHAIN_TEX_LOC_BASE GP_ELLIPSE_VARYING_COUNT
 #elif GP_LAYOUT == 2
 layout(location = 0) in float vEdgeDistance;
 layout(location = NTEX + 1) in vec4 vColor;

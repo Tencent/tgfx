@@ -29,9 +29,11 @@ layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING)
 #include "xp/xp_uniforms.inc"
 };
 
-layout(location = 0) in vec2 vEllipseOffsets;
-layout(location = 1) in vec4 vEllipseRadii;
-layout(location = 2) in vec4 vColor;
+#include "geometry/gp_ellipse_layout.inc"
+
+layout(location = GP_ELLIPSE_V_OFFSETS) in vec2 vEllipseOffsets;
+layout(location = GP_ELLIPSE_V_RADII) in vec4 vEllipseRadii;
+layout(location = GP_ELLIPSE_V_COLOR) in vec4 vColor;
 
 #if HAS_DEVICE_MASK
 layout(set = TGFX_TEXTURE_SET, binding = 0) uniform sampler2D MaskTextureSampler;

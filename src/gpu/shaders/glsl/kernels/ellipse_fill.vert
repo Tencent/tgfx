@@ -11,14 +11,16 @@ layout(std140, set = TGFX_VERTEX_UBO_SET, binding = TGFX_VERTEX_UBO_BINDING) uni
   vec4 tgfx_RTAdjust;
 };
 
-layout(location = 0) in vec2 inPosition;
-layout(location = 1) in vec4 inColor;
-layout(location = 2) in vec2 inEllipseOffset;
-layout(location = 3) in vec4 inEllipseRadii;
+#include "geometry/gp_ellipse_layout.inc"
 
-layout(location = 0) out vec2 vEllipseOffsets;
-layout(location = 1) out vec4 vEllipseRadii;
-layout(location = 2) out vec4 vColor;
+layout(location = 0) in vec2 inPosition;
+layout(location = GP_ELLIPSE_IN_COLOR) in vec4 inColor;
+layout(location = GP_ELLIPSE_IN_OFFSET) in vec2 inEllipseOffset;
+layout(location = GP_ELLIPSE_IN_RADII) in vec4 inEllipseRadii;
+
+layout(location = GP_ELLIPSE_V_OFFSETS) out vec2 vEllipseOffsets;
+layout(location = GP_ELLIPSE_V_RADII) out vec4 vEllipseRadii;
+layout(location = GP_ELLIPSE_V_COLOR) out vec4 vColor;
 
 void main() {
   vEllipseOffsets = inEllipseOffset;
