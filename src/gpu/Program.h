@@ -25,6 +25,8 @@
 
 namespace tgfx {
 
+class BindingPlan;
+
 enum class ShaderArtifactOrigin : uint8_t {
   RuntimeGeneratedSource,
   OfflineSource,
@@ -74,6 +76,20 @@ class Program {
     expectedTextureCountValue = count;
   }
 
+  /**
+   * The parameter binding plan a migrated kernel family declared for this program: which
+   * processor feeds which module instance, with every field resolved to a block offset. Null
+   * while the family has not migrated (its processors keep writing through onSetData) and on
+   * the runtime-generated path.
+   */
+  const std::shared_ptr<const BindingPlan>& bindingPlan() const {
+    return _bindingPlan;
+  }
+
+  void setBindingPlan(std::shared_ptr<const BindingPlan> plan) {
+    _bindingPlan = std::move(plan);
+  }
+
  private:
   BytesKey programKey = {};
   std::list<Program*>::iterator cachedPosition;
@@ -82,6 +98,7 @@ class Program {
   std::unique_ptr<UniformData> fragmentUniformData = nullptr;
   ProgramProvenance provenance = {};
   uint32_t expectedTextureCountValue = 0;
+  std::shared_ptr<const BindingPlan> _bindingPlan = nullptr;
 
   friend class GlobalCache;
 };

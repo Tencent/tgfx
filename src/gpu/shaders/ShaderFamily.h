@@ -28,6 +28,7 @@
 
 namespace tgfx {
 
+class BindingPlanBuilder;
 class ProgramInfo;
 
 /**
@@ -45,6 +46,14 @@ template <typename T, typename = void>
 struct FamilyHasTextureReads : std::false_type {};
 template <typename T>
 struct FamilyHasTextureReads<T, std::void_t<decltype(T::TextureReads)>> : std::true_type {};
+
+// A family migrated to module parameter binding declares a static PlanBindings; the base routes
+// the virtual hook to it so the program creation can build the binding plan.
+template <typename T, typename = void>
+struct FamilyHasPlanBindings : std::false_type {};
+template <typename T>
+struct FamilyHasPlanBindings<T, std::void_t<decltype(T::PlanBindings(nullptr, nullptr))>>
+    : std::true_type {};
 
 template <typename T, typename = void>
 struct FamilyHasAllInputs : std::false_type {};
@@ -97,6 +106,13 @@ class ShaderFamily : public PrecompiledShader {
       result.textureReads = T::TextureReads;
     }
     return result;
+  }
+
+  bool planBindings(const ProgramInfo* programInfo, BindingPlanBuilder* builder) const override {
+    if constexpr (FamilyHasPlanBindings<T>::value) {
+      return T::PlanBindings(programInfo, builder);
+    }
+    return false;
   }
 
   /**

@@ -35,6 +35,8 @@
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
+#include "gpu/shaders/PrecompiledShader.h"
+#include "gpu/shaders/params/BindingPlan.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
@@ -207,6 +209,18 @@ static PrecompiledFallbackReason ToFallbackReason(PermutationMatchFailure failur
       return PrecompiledFallbackReason::Unspecified;
   }
   return PrecompiledFallbackReason::Unspecified;
+}
+
+// The family instance a match result named. Families are cheap value objects created from
+// static factories; one lookup per program creation (cache-miss frequency) needs no caching.
+static std::unique_ptr<PrecompiledShader> FindFamilyByName(const std::string& name) {
+  for (auto factory : ShaderRegistry::All()) {
+    auto shader = factory();
+    if (shader->info().name == name) {
+      return shader;
+    }
+  }
+  return nullptr;
 }
 
 std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* context,
@@ -586,6 +600,29 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   auto program = std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
                                            std::move(fragmentUniformData), provenance);
   program->setExpectedTextureCount(static_cast<uint32_t>(descriptor.layout.textureSamplers.size()));
+
+  // A migrated family declares its parameter module instances; the resolved plan takes over
+  // those processors' uniform writes (their onSetData is skipped on the draw path). Un-migrated
+  // families return false and keep the onSetData path, so nothing changes for them.
+  auto family = FindFamilyByName(matchResult->shaderName);
+  if (family != nullptr) {
+    std::vector<const FragmentProcessor*> flattened;
+    FlattenProcessors(*programInfo, &flattened);
+    BindingPlanBuilder builder(std::move(flattened),
+                               program->getUniformData(ShaderStage::Fragment));
+    if (family->planBindings(programInfo, &builder)) {
+      auto plan = builder.finish();
+      if (plan == nullptr) {
+        LOGE("PrecompiledProgramCreator: binding plan mismatch for %s[vert=%u,frag=%u]",
+             matchResult->shaderName.c_str(), matchResult->vertPermutationIndex,
+             matchResult->fragPermutationIndex);
+        cache->recordFailure(PrecompiledFallbackReason::BindingPlanMismatch,
+                             MakeFallbackRecord(cache, programInfo, &*matchResult));
+        return nullptr;
+      }
+      program->setBindingPlan(std::move(plan));
+    }
+  }
   return program;
 }
 

@@ -214,5 +214,6 @@ class UniformData {
   friend class ProgramInfo;
   friend class UniformHandler;
   friend class PrecompiledProgramCreator;
+  friend class BindingPlanBuilder;
 };
 }  // namespace tgfx
