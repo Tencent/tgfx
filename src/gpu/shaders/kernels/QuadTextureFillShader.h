@@ -25,6 +25,7 @@
 namespace tgfx {
 
 class ProgramInfo;
+class BindingPlanBuilder;
 
 class QuadTextureFillShader : public ShaderFamily<QuadTextureFillShader> {
  public:
@@ -58,6 +59,12 @@ class QuadTextureFillShader : public ShaderFamily<QuadTextureFillShader> {
   using FD = FragDims;
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = true;
+
+  /// The parameter module instances the kernel binds (the module-binding pilot): the color
+  /// TextureEffect feeds TextureSourceModule, and the runtime device-mask default keeps its
+  /// writer when the program's structure carries no mask FP. YUV sources and shapes Extract
+  /// rejected keep the processors' own onSetData path (returns false).
+  static bool PlanBindings(const ProgramInfo* programInfo, BindingPlanBuilder* builder);
 
   /// Matcher inputs: the UV-coord and subset presence, the local-mask presence, and the
   /// XferProcessor kind.

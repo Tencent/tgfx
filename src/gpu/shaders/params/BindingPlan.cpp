@@ -47,10 +47,17 @@ bool BindingPlan::bindsFlattened(uint32_t flattenedIndex) const {
 void BindingPlan::bind(const std::vector<const FragmentProcessor*>& flattened,
                        uint8_t* fragmentBuffer) const {
   for (const auto& entry : _entries) {
-    if (entry.bind == nullptr || entry.flattenedIndex >= flattened.size()) {
+    if (entry.bind == nullptr) {
       continue;
     }
     ParamWriter writer(fragmentBuffer, &entry.resolved);
+    if (entry.flattenedIndex == BindingPlanEntry::ABSENT_PROCESSOR) {
+      entry.bind(nullptr, &writer);
+      continue;
+    }
+    if (entry.flattenedIndex >= flattened.size()) {
+      continue;
+    }
     entry.bind(flattened[entry.flattenedIndex], &writer);
   }
 }

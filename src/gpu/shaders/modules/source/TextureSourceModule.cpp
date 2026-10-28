@@ -1,0 +1,29 @@
+// The texture-source module's value binding. See TextureSourceModule.h for the contract.
+#include "gpu/shaders/modules/source/TextureSourceModule.h"
+#include "gpu/processors/TextureEffect.h"
+#include "gpu/shaders/params/ParamWriter.h"
+
+namespace tgfx {
+
+// Moves a TextureEffect's per-texture values into the writer. The semantics replicate
+// GLSLTextureEffect::onSetData field for field — the full-bounds Subset fallback, the
+// value-gated AlphaStart, the clamp gate — so the migration is byte-for-byte; that writer
+// stays until the JIT retires and serves the un-migrated families meanwhile.
+void TextureSourceModule::Bind(const FragmentProcessor* processor, ParamWriter* writer) {
+  auto* texture = static_cast<const TextureEffect*>(processor);
+  float rect[4] = {};
+  texture->computeSubsetRect(rect);
+  writer->set(Subset, rect);
+  writer->set(SubsetClampOn, texture->hasSubset() ? 1 : 0);
+  if (texture->hasRGBAAA()) {
+    // Value-gated exactly like the processor writer: single-plane draws leave the field at its
+    // previous content, which the shader never reads (HasRgbaaa is 0).
+    auto coord = texture->alphaStartCoord();
+    const float alphaStart[2] = {coord.x, coord.y};
+    writer->set(AlphaStart, alphaStart);
+  }
+  writer->set(AlphaOnly, texture->isAlphaOnly() ? 1 : 0);
+  writer->set(HasRgbaaa, texture->hasRGBAAA() ? 1 : 0);
+}
+
+}  // namespace tgfx

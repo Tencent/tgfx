@@ -29,9 +29,6 @@
 
 namespace tgfx {
 
-class BindingPlanBuilder;
-class ProgramInfo;
-
 /**
  * Texture-read semantics a precompiled shader family implements beyond plain RGBA and alpha-only
  * samples. A family declares a capability only when its shader source applies it; MatchPermutation
@@ -95,17 +92,6 @@ class PrecompiledShader {
   virtual ~PrecompiledShader() = default;
 
   virtual PrecompiledShaderInfo info() const = 0;
-
-  /**
-   * Declares the parameter module instances this kernel binds for a draw the family matched:
-   * the builder records each instance's processor and field mask, and the program creation
-   * resolves the fields against the fragment block and attaches the plan to the program. A
-   * migrated family returns true; the default (un-migrated) keeps the processors' onSetData
-   * writes exactly as before.
-   */
-  virtual bool planBindings(const ProgramInfo*, BindingPlanBuilder*) const {
-    return false;
-  }
 };
 
 /**

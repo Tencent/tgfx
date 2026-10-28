@@ -62,6 +62,10 @@ class TextureEffect : public FragmentProcessor {
     return alphaStart != Point::Zero();
   }
 
+  // The alpha-plane offset in texture coordinates (the RGBAAA dual-plane sample shift), as the
+  // precompiled AlphaStart uniform carries it. Zero for a single-plane source.
+  Point alphaStartCoord() const;
+
   bool hasSubset() const {
     return needSubset();
   }

@@ -185,6 +185,16 @@ bool TextureEffect::needSubset() const {
   return false;
 }
 
+Point TextureEffect::alphaStartCoord() const {
+  // The same transform GLSLTextureEffect::onSetData applies to the RGBAAA alpha-plane offset;
+  // lifted here so the module Bind and the processor writer cannot drift apart.
+  auto textureView = getTextureView();
+  if (textureView == nullptr) {
+    return Point::Zero();
+  }
+  return textureView->getTextureCoord(alphaStart.x, alphaStart.y);
+}
+
 void TextureEffect::computeSubsetRect(float rect[4]) const {
   auto textureView = getTextureView();
   auto subsetRect = subset.value_or(Rect::MakeWH(textureProxy->width(), textureProxy->height()));
