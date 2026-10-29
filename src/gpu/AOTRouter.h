@@ -98,14 +98,6 @@ class AOTRouter {
   static bool PlanRequiresTask(const AOTEffectPlan& plan);
 
   /**
-   * Whether the prepare-time inline rewrite takes this color chain as-is. The record-time entries
-   * defer such chains entirely — the rewrite re-expresses them through the same kernel without a
-   * plan task and folds the coverage itself, so neither the fold route, the color route nor the
-   * materialization retry runs for them.
-   */
-  static bool PlanIsInlineRewritable(const std::vector<const FragmentProcessor*>& processors);
-
-  /**
    * Plans processors for the inline rewrite: true when they lower and decompose into a single pass
    * of a kernel whose processor can replace a draw's color list in place (PointwiseChain,
    * PointwiseGraph, or PerlinNoiseFill). A multi-pass plan never qualifies: its intermediate

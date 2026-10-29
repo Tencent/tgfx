@@ -23,6 +23,12 @@
 
 namespace tgfx {
 
+// The kernels the prepare-time inline rewrite can express: one fused chain/graph or perlin
+// processor replacing a draw's color list in place. Every other kernel needs a plan task.
+static bool IsInlineRewritableKernel(AOTKernelKind kernel) {
+  return IsAOTPointwiseDAGKernel(kernel) || kernel == AOTKernelKind::PerlinNoiseFill;
+}
+
 AOTRouteResult AOTRouter::Route(const std::vector<const FragmentProcessor*>& processors,
                                 const SubmitPlan& submit, AOTMaterializationRecorder* producers) {
   AOTEffectGraph graph = {};
@@ -31,41 +37,23 @@ AOTRouteResult AOTRouter::Route(const std::vector<const FragmentProcessor*>& pro
       !AOTEffectDecomposer::Decompose(graph, &plan)) {
     return AOTRouteResult::NoPlan;
   }
-  auto passCount = plan.passes.size();
-  if (passCount == 1) {
-    auto kernel = plan.passes[0].kernel;
-    if (IsAOTPointwiseDAGKernel(kernel) || kernel == AOTKernelKind::PerlinNoiseFill) {
-    }
-  }
-  auto result =
-      submit(graph, plan, producers) ? AOTRouteResult::Submitted : AOTRouteResult::TaskRefused;
-  if (result == AOTRouteResult::Submitted) {
-  }
-  return result;
+  return submit(graph, plan, producers) ? AOTRouteResult::Submitted : AOTRouteResult::TaskRefused;
 }
 
 bool AOTRouter::PlanInlineRewrite(const std::vector<const FragmentProcessor*>& processors,
                                   AOTEffectGraph* graph, AOTEffectPlan* plan) {
   if (!AOTEffectDecomposer::Lower(processors, graph) ||
-      !AOTEffectDecomposer::Decompose(*graph, plan) || plan->passes.size() != 1) {
+      !AOTEffectDecomposer::Decompose(*graph, plan)) {
     return false;
   }
-  auto kernel = plan->passes[0].kernel;
-  return IsAOTPointwiseDAGKernel(kernel) || kernel == AOTKernelKind::PerlinNoiseFill;
+  return !PlanRequiresTask(*plan);
 }
 
 bool AOTRouter::PlanRequiresTask(const AOTEffectPlan& plan) {
   if (plan.passes.size() != 1) {
     return true;
   }
-  auto kernel = plan.passes[0].kernel;
-  return !IsAOTPointwiseDAGKernel(kernel) && kernel != AOTKernelKind::PerlinNoiseFill;
-}
-
-bool AOTRouter::PlanIsInlineRewritable(const std::vector<const FragmentProcessor*>& processors) {
-  AOTEffectGraph graph = {};
-  AOTEffectPlan plan = {};
-  return PlanInlineRewrite(processors, &graph, &plan);
+  return !IsInlineRewritableKernel(plan.passes[0].kernel);
 }
 
 bool AOTRouter::RetryWarranted(const FragmentProcessor* leading, uint32_t renderFlags) {
@@ -101,9 +89,6 @@ AOTRouteResult AOTRouter::RouteWithMaterializedLeading(
   processors.insert(processors.end(), trailing.begin(), trailing.end());
   // The plan task rebuilds its processors from the lowered graph, so the rebuilt leading
   // processor is not needed once Route returns.
-  auto result = Route(processors, submit, &recorder);
-  if (result == AOTRouteResult::Submitted) {
-  }
-  return result;
+  return Route(processors, submit, &recorder);
 }
 }  // namespace tgfx
