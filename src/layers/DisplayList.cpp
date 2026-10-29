@@ -574,17 +574,6 @@ void DisplayList::invalidateCurrentTileCache(TileCache* tileCache,
   for (auto& dirtyRect : dirtyRects) {
     bool continuous = false;
     auto tiles = tileCache->getTilesUnderRect(dirtyRect, false, &continuous);
-    if (!Rect::Intersects(dirtyRect, viewportRect)) {
-      // Dirty content outside the viewport only invalidates the tiles it reaches: rasterizing them
-      // now would touch pixels nobody sees, while keeping them would leave stale content behind
-      // for the next time they scroll back into view.
-      for (auto& tile : tiles) {
-        if (tileCache->removeTile(tile->tileX, tile->tileY)) {
-          emptyTiles.push_back(tile);
-        }
-      }
-      continue;
-    }
     if (continuous && viewportRect.contains(dirtyRect)) {
       tileTasks->emplace_back(std::move(tiles), _tileSize, dirtyRect);
       continue;
@@ -592,6 +581,9 @@ void DisplayList::invalidateCurrentTileCache(TileCache* tileCache,
     for (auto& tile : tiles) {
       auto tileRect = tile->getTileRect(_tileSize);
       if (!Rect::Intersects(tileRect, viewportRect)) {
+        // Dirty content outside the viewport only invalidates the tile: rasterizing it now would
+        // touch pixels nobody sees, while keeping it would leave stale content behind for the next
+        // time it scrolls back into view.
         if (tileCache->removeTile(tile->tileX, tile->tileY)) {
           emptyTiles.push_back(tile);
         }
@@ -629,8 +621,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface, bo
     currentTileCache = new TileCache(_tileSize);
     tileCaches[_zoomScaleInt] = currentTileCache;
   }
-  auto renderRect = Rect::MakeWH(surface->width(), surface->height());
-  renderRect.offset(-_contentOffset.x, -_contentOffset.y);
+  auto renderRect = GetViewportRect(surface, _contentOffset);
 
   auto renderBounds = _root->renderBounds;
   auto zoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
