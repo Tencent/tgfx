@@ -31,10 +31,16 @@ class TextShape : public UniqueKeyShape {
   }
 
   PathFillType fillType() const override {
-    return PathFillType::Winding;
+    // Reports the rule of the merged outline, so it can never disagree with getPath(). onGetPath()
+    // must not call fillType(): getPath() is what computes it, and that would recurse.
+    return getPath().getFillType();
   }
 
+  bool isInverseFillType() const override;
+
   Rect onGetBounds() const override;
+
+  bool getGlyphPaths(float resolutionScale, std::vector<Path>* paths) const;
 
  protected:
   Type type() const override {

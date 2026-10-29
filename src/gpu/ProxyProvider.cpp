@@ -287,8 +287,9 @@ std::shared_ptr<StencilCoverPathProxy> ProxyProvider::createStencilCoverPathProx
   // future instanced batching to share a single GPU buffer across draws of the same shape.
   static const auto StencilCoverPathGeometryType = UniqueID::Next();
   auto vertexKey = UniqueKey::Append(shape->getUniqueKey(), &StencilCoverPathGeometryType, 1);
+  auto fillTypeSlot = findOrCreateStencilCoverFillType(vertexKey);
   if (auto cached = findOrWrapGPUBufferProxy(vertexKey)) {
-    return std::make_shared<StencilCoverPathProxy>(std::move(cached));
+    return std::make_shared<StencilCoverPathProxy>(std::move(cached), std::move(fillTypeSlot));
   }
   auto rasterizer = std::make_unique<StencilCoverPathTessellator>(std::move(shape));
   std::unique_ptr<DataSource<StencilCoverVertexData>> dataSource = nullptr;
@@ -306,10 +307,10 @@ std::shared_ptr<StencilCoverPathProxy> ProxyProvider::createStencilCoverPathProx
   if (!(renderFlags & RenderFlags::DisableCache)) {
     vertexProxy->uniqueKey = vertexKey;
   }
-  auto task = context->drawingAllocator()->make<StencilCoverPathUploadTask>(vertexProxy,
-                                                                            std::move(dataSource));
+  auto task = context->drawingAllocator()->make<StencilCoverPathUploadTask>(
+      vertexProxy, fillTypeSlot, std::move(dataSource));
   context->drawingManager()->addResourceTask(std::move(task));
-  return std::make_shared<StencilCoverPathProxy>(std::move(vertexProxy));
+  return std::make_shared<StencilCoverPathProxy>(std::move(vertexProxy), std::move(fillTypeSlot));
 }
 
 std::shared_ptr<GPUMeshProxy> ProxyProvider::createGPUMeshProxy(
@@ -642,6 +643,29 @@ void ProxyProvider::purgeExpiredProxies() {
       ++item;
     }
   }
+  // A slot has to outlive every proxy: the geometry it describes sits in the resource cache long
+  // after the proxies that drew it are gone, and a cache hit has nobody left to produce the rule -
+  // no tessellator runs on that path. It is dropped only once that geometry is gone from the cache,
+  // which is also when the next draw has to tessellate again and produces a fresh rule.
+  for (auto item = stencilCoverFillTypes.begin(); item != stencilCoverFillTypes.end();) {
+    if (item->second.use_count() == 1 &&
+        Resource::Find<BufferResource>(context, item->first) == nullptr) {
+      item = stencilCoverFillTypes.erase(item);
+    } else {
+      ++item;
+    }
+  }
+}
+
+std::shared_ptr<FillTypeSlot> ProxyProvider::findOrCreateStencilCoverFillType(
+    const UniqueKey& vertexKey) {
+  auto result = stencilCoverFillTypes.find(vertexKey);
+  if (result != stencilCoverFillTypes.end()) {
+    return result->second;
+  }
+  auto slot = std::make_shared<FillTypeSlot>();
+  stencilCoverFillTypes[vertexKey] = slot;
+  return slot;
 }
 
 std::shared_ptr<GPUBufferProxy> ProxyProvider::findOrWrapGPUBufferProxy(

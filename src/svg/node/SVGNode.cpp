@@ -73,8 +73,11 @@ Path SVGNode::asPath(const SVGRenderContext& context) const {
 
   Path path = this->onAsPath(localContext);
   if (auto clipPath = localContext.clipPath(); !clipPath.isEmpty()) {
-    // There is a clip-path present on the current node.
-    path.addPath(clipPath, PathOp::Intersect);
+    // There is a clip-path present on the current node. A failed Intersect leaves the unclipped
+    // path behind, which draws more rather than less, so the node has to contribute nothing.
+    if (!path.addPath(clipPath, PathOp::Intersect)) {
+      return Path();
+    }
   }
 
   return path;

@@ -75,5 +75,17 @@ class PathEffect {
   virtual Rect filterBounds(const Rect& rect) const {
     return rect;
   }
+
+ protected:
+  /**
+   * Applies this effect to all the sources at once, in the order they were produced. The default
+   * implementation calls filterPath() on each of them; an effect that has to span the sources - a
+   * trim or a dash measured over the whole run rather than per path - overrides this instead.
+   * @param paths the sources to filter.
+   * @return false if the effect could not be applied, in which case *paths is unchanged.
+   */
+  virtual bool filterPaths(std::vector<Path>* paths) const;
+
+  friend class ShapeUtils;
 };
 }  // namespace tgfx

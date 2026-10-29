@@ -19,11 +19,16 @@
 #include <hb-subset.h>
 #include <hb.h>
 #include <cstring>
+#include <sstream>
 #include "base/TGFXTest.h"
 #include "core/utils/MD5.h"
 #include "pdf/PDFDocumentImpl.h"
+#include "pdf/PDFExportContext.h"
+#include "pdf/PDFFont.h"
 #include "pdf/PDFTypes.h"
+#include "pdf/PDFUtils.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageFilter.h"
@@ -1940,6 +1945,266 @@ TGFX_TEST(PDFExportTest, ShapeNoiseStyle) {
   surface->getCanvas()->translate(-bounds.left + 50.f, -bounds.top + 50.f);
   root->draw(surface->getCanvas());
   EXPECT_TRUE(Baseline::Compare(surface, "PDFExportTest/ShapeNoiseStyle"));
+}
+
+namespace {
+
+static Path ExportRuleTestRing(PathFillType rule) {
+  Path path = {};
+  path.addRect(Rect::MakeLTRB(0.0f, 0.0f, 100.0f, 100.0f));
+  path.addRect(Rect::MakeLTRB(20.0f, 20.0f, 80.0f, 80.0f));
+  path.setFillType(rule);
+  return path;
+}
+
+static std::string ReadTestCharProc(const std::string& pdf, const std::string& glyphName) {
+  auto dictionary = pdf.find("/CharProcs");
+  if (dictionary == std::string::npos) {
+    return {};
+  }
+  auto reference = pdf.find("/" + glyphName + " ", dictionary);
+  if (reference == std::string::npos) {
+    return {};
+  }
+  std::istringstream input(pdf.substr(reference + glyphName.size() + 2));
+  int object = 0;
+  if (!(input >> object) || object <= 0) {
+    return {};
+  }
+  auto objectStart = pdf.find("\n" + std::to_string(object) + " 0 obj");
+  if (objectStart == std::string::npos) {
+    return {};
+  }
+  auto objectEnd = pdf.find("endobj", objectStart);
+  auto streamStart = pdf.find("stream\n", objectStart);
+  auto streamEnd = pdf.find("endstream", streamStart);
+  if (objectEnd == std::string::npos || streamStart == std::string::npos ||
+      streamEnd == std::string::npos || streamEnd > objectEnd) {
+    return {};
+  }
+  return pdf.substr(streamStart + 7, streamEnd - streamStart - 7);
+}
+
+}  // namespace
+
+TGFX_TEST(PDFExportTest, Type3CharProcUsesActualGlyphFillRule) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  PathTypefaceBuilder builder(100);
+  ASSERT_NE(builder.addGlyph(ExportRuleTestRing(PathFillType::Winding), 100.0f), 0);
+  ASSERT_NE(builder.addGlyph(ExportRuleTestRing(PathFillType::EvenOdd), 100.0f), 0);
+  // PDF reserves glyph zero when calculating the resource range. Keep an unused trailing glyph
+  // so both requested glyphs lie inside that range for a custom typeface.
+  ASSERT_NE(builder.addGlyph(ExportRuleTestRing(PathFillType::Winding), 100.0f), 0);
+  auto typeface = builder.detach();
+  ASSERT_TRUE(typeface != nullptr);
+  auto stream = MemoryWriteStream::Make();
+  PDFMetadata metadata = {};
+  metadata.compressionLevel = PDFMetadata::CompressionLevel::None;
+  auto document = PDFDocument::Make(stream, context, metadata);
+  ASSERT_TRUE(document != nullptr);
+  auto impl = static_cast<PDFDocumentImpl*>(document.get());
+  impl->toUnicodeMap[typeface->uniqueID()] = std::vector<Unichar>(typeface->glyphsCount(), 'A');
+  document->beginPage(240.0f, 120.0f);
+  auto strike = PDFStrike::Make(impl, Font(typeface, 100.0f));
+  ASSERT_TRUE(strike != nullptr);
+  auto font = strike->getFontResource(1);
+  ASSERT_TRUE(font != nullptr);
+  font->noteGlyphUsage(1);
+  font->noteGlyphUsage(2);
+  document->endPage();
+  document->close();
+  auto pdf = stream->readString();
+  ASSERT_NE(pdf.find("/Subtype /Type3"), std::string::npos);
+  auto winding = ReadTestCharProc(pdf, "g1");
+  auto parity = ReadTestCharProc(pdf, "g2");
+  ASSERT_FALSE(winding.empty());
+  ASSERT_FALSE(parity.empty());
+  EXPECT_NE(winding.find("\nf\n"), std::string::npos);
+  EXPECT_EQ(winding.find("\nf*\n"), std::string::npos);
+  EXPECT_NE(parity.find("\nf*\n"), std::string::npos);
+}
+
+TGFX_TEST(PDFExportTest, MixedGlyphPathFillMatchesDeclaredSourceAreas) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  PathTypefaceBuilder builder(100);
+  ASSERT_NE(builder.addGlyph(ExportRuleTestRing(PathFillType::Winding), 100.0f), 0);
+  ASSERT_NE(builder.addGlyph(ExportRuleTestRing(PathFillType::EvenOdd), 100.0f), 0);
+  auto typeface = builder.detach();
+  auto stream = MemoryWriteStream::Make();
+  PDFMetadata metadata = {};
+  metadata.compressionLevel = PDFMetadata::CompressionLevel::None;
+  auto document = PDFDocument::Make(stream, context, metadata);
+  ASSERT_TRUE(document != nullptr);
+  document->beginPage(240.0f, 120.0f);
+  auto impl = static_cast<PDFDocumentImpl*>(document.get());
+  for (bool parityFirst : {false, true}) {
+    auto a = ExportRuleTestRing(parityFirst ? PathFillType::EvenOdd : PathFillType::Winding);
+    auto b = ExportRuleTestRing(parityFirst ? PathFillType::Winding : PathFillType::EvenOdd);
+    b.transform(Matrix::MakeTrans(120.0f, 0.0f));
+    auto merged = Path::Merge({a, b});
+    ASSERT_TRUE(merged.has_value());
+    auto expected = std::move(*merged);
+    EXPECT_EQ(expected.contains(50.0f, 50.0f), !parityFirst);
+    EXPECT_EQ(expected.contains(170.0f, 50.0f), parityFirst);
+    auto reference = MemoryWriteStream::Make();
+    PDFUtils::EmitPath(expected, false, reference);
+    PDFUtils::PaintPath(expected.getFillType(), reference);
+    GlyphID glyphs[] = {parityFirst ? GlyphID(2) : GlyphID(1),
+                        parityFirst ? GlyphID(1) : GlyphID(2)};
+    Point positions[] = {{0.0f, 0.0f}, {120.0f, 0.0f}};
+    auto blob = TextBlob::MakeFrom(glyphs, positions, 2, Font(typeface, 100.0f));
+    for (float scale : {1.0f, 2.0f}) {
+      PDFExportContext exporter(ISize::Make(480, 240), impl);
+      Brush brush(Color::Black(), BlendMode::SrcOver);
+      exporter.drawTextBlob(blob, Matrix::MakeScale(scale), ClipStack(), brush, nullptr);
+      auto data = exporter.getContent();
+      std::string content(static_cast<const char*>(data->data()), data->size());
+      EXPECT_NE(content.find(reference->readString()), std::string::npos);
+    }
+  }
+  document->endPage();
+  document->close();
+}
+
+TGFX_TEST(PDFExportTest, GlyphStrokeKeepsOverlappingContourBoundaries) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  Path rectangle = {};
+  rectangle.addRect(Rect::MakeWH(100.0f, 100.0f));
+  rectangle.setFillType(PathFillType::EvenOdd);
+  PathTypefaceBuilder builder(100);
+  ASSERT_NE(builder.addGlyph(rectangle, 100.0f), 0);
+  auto typeface = builder.detach();
+  ASSERT_TRUE(typeface != nullptr);
+  auto stream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(stream, context, PDFMetadata());
+  ASSERT_TRUE(document != nullptr);
+  document->beginPage(240.0f, 120.0f);
+  auto impl = static_cast<PDFDocumentImpl*>(document.get());
+  GlyphID glyphs[] = {1, 1};
+  Point positions[] = {{0.0f, 0.0f}, {50.0f, 0.0f}};
+  auto blob = TextBlob::MakeFrom(glyphs, positions, 2, Font(typeface, 100.0f));
+  auto second = rectangle;
+  second.transform(Matrix::MakeTrans(50.0f, 0.0f));
+  auto expected = rectangle;
+  ASSERT_TRUE(expected.addPath(second));
+  Stroke stroke(2.0f);
+  ASSERT_TRUE(stroke.applyToPath(&expected));
+  EXPECT_TRUE(expected.contains(100.0f, 50.0f));
+  auto reference = MemoryWriteStream::Make();
+  PDFUtils::EmitPath(expected, false, reference);
+  PDFUtils::PaintPath(expected.getFillType(), reference);
+  PDFExportContext exporter(ISize::Make(240, 120), impl);
+  Brush brush(Color::Black(), BlendMode::SrcOver);
+  exporter.drawTextBlob(blob, Matrix::I(), ClipStack(), brush, &stroke);
+  auto data = exporter.getContent();
+  std::string content(static_cast<const char*>(data->data()), data->size());
+  EXPECT_NE(content.find(reference->readString()), std::string::npos);
+  document->endPage();
+  document->close();
+}
+
+TGFX_TEST(PDFExportTest, OverlappingEvenOddGlyphsExportTheirUnion) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  Path rectangle = {};
+  rectangle.addRect(Rect::MakeWH(100.0f, 100.0f));
+  rectangle.setFillType(PathFillType::EvenOdd);
+  PathTypefaceBuilder builder(100);
+  ASSERT_NE(builder.addGlyph(rectangle, 100.0f), 0);
+  auto typeface = builder.detach();
+  ASSERT_TRUE(typeface != nullptr);
+  auto stream = MemoryWriteStream::Make();
+  auto document = PDFDocument::Make(stream, context, PDFMetadata());
+  ASSERT_TRUE(document != nullptr);
+  document->beginPage(240.0f, 120.0f);
+  GlyphID glyphs[] = {1, 1};
+  Point positions[] = {{0.0f, 0.0f}, {50.0f, 0.0f}};
+  auto blob = TextBlob::MakeFrom(glyphs, positions, 2, Font(typeface, 100.0f));
+  Path expected = {};
+  expected.addRect(Rect::MakeWH(150.0f, 100.0f));
+  expected.setFillType(PathFillType::EvenOdd);
+  auto impl = static_cast<PDFDocumentImpl*>(document.get());
+  PDFExportContext exporter(ISize::Make(240, 120), impl);
+  Brush brush(Color::Black(), BlendMode::SrcOver);
+  exporter.drawTextBlob(blob, Matrix::I(), ClipStack(), brush, nullptr);
+  auto data = exporter.getContent();
+  std::string content(static_cast<const char*>(data->data()), data->size());
+  Path exported = {};
+  std::istringstream lines(content);
+  std::string line;
+  bool painted = false;
+  while (std::getline(lines, line)) {
+    std::istringstream command(line);
+    float x = 0.0f;
+    float y = 0.0f;
+    std::string op;
+    if (command >> x >> y >> op) {
+      if (op == "m") {
+        exported.moveTo(x, y);
+      } else if (op == "l") {
+        exported.lineTo(x, y);
+      }
+    } else if (line == "h") {
+      exported.close();
+    } else if (line == "f*") {
+      exported.setFillType(PathFillType::EvenOdd);
+      painted = true;
+    }
+  }
+  ASSERT_TRUE(painted);
+  EXPECT_TRUE(exported.contains(25.0f, 50.0f));
+  EXPECT_TRUE(exported.contains(75.0f, 50.0f));
+  EXPECT_TRUE(exported.contains(125.0f, 50.0f));
+  EXPECT_FALSE(exported.contains(175.0f, 50.0f));
+  ASSERT_TRUE(exported.addPath(expected, PathOp::XOR));
+  EXPECT_TRUE(exported.isEmpty());
+  document->endPage();
+  document->close();
+}
+
+TGFX_TEST(PDFExportTest, InverseGlyphOutlineIsNotWrittenAsOrdinaryFill) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  PathTypefaceBuilder builder(100);
+  ASSERT_NE(builder.addGlyph(ExportRuleTestRing(PathFillType::InverseEvenOdd), 100.0f), 0);
+  ASSERT_NE(builder.addGlyph(ExportRuleTestRing(PathFillType::Winding), 100.0f), 0);
+  auto typeface = builder.detach();
+  ASSERT_TRUE(typeface != nullptr);
+  auto stream = MemoryWriteStream::Make();
+  PDFMetadata metadata = {};
+  metadata.compressionLevel = PDFMetadata::CompressionLevel::None;
+  auto document = PDFDocument::Make(stream, context, metadata);
+  ASSERT_TRUE(document != nullptr);
+  auto impl = static_cast<PDFDocumentImpl*>(document.get());
+  impl->toUnicodeMap[typeface->uniqueID()] = std::vector<Unichar>(typeface->glyphsCount(), 'A');
+  document->beginPage(240.0f, 120.0f);
+  auto strike = PDFStrike::Make(impl, Font(typeface, 100.0f));
+  ASSERT_TRUE(strike != nullptr);
+  auto font = strike->getFontResource(1);
+  ASSERT_TRUE(font != nullptr);
+  font->noteGlyphUsage(1);
+  GlyphID glyphs[] = {1};
+  Point positions[] = {{0.0f, 0.0f}};
+  auto blob = TextBlob::MakeFrom(glyphs, positions, 1, Font(typeface, 100.0f));
+  PDFExportContext exporter(ISize::Make(240, 120), impl);
+  Brush brush(Color::Black(), BlendMode::SrcOver);
+  exporter.drawTextBlob(blob, Matrix::I(), ClipStack(), brush, nullptr);
+  EXPECT_EQ(exporter.getContent()->size(), 0u);
+  document->endPage();
+  document->close();
+  auto charProc = ReadTestCharProc(stream->readString(), "g1");
+  ASSERT_FALSE(charProc.empty());
+  EXPECT_NE(charProc.find(" d1\n"), std::string::npos);
+  EXPECT_EQ(charProc.find("\nf\n"), std::string::npos);
+  EXPECT_EQ(charProc.find("\nf*\n"), std::string::npos);
 }
 
 }  // namespace tgfx

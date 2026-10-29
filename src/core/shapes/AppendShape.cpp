@@ -42,6 +42,9 @@ std::shared_ptr<Shape> Shape::Merge(const std::vector<std::shared_ptr<Shape>>& s
     }
     AppendShape::Append(&list, shape);
   }
+  if (list.empty()) {
+    return nullptr;
+  }
   if (list.size() == 1) {
     return list.front();
   }
@@ -60,7 +63,22 @@ std::shared_ptr<Shape> AppendShape::MakeFrom(std::shared_ptr<Shape> first,
 }
 
 PathFillType AppendShape::fillType() const {
-  return shapes.front()->fillType();
+  // Rebuilding an outline the caller has not asked for yet is what this must avoid, so it stops at
+  // the first source that contributes anything: one that has a contour, or an empty one that fills
+  // the whole plane. The sources before it are the empty ones, whose paths are cheap to ask for;
+  // the ones after it are never touched. Anything already built stays in the Shape cache, so a
+  // later call reads that rather than rebuilding it.
+  auto rule = PathFillType::Winding;
+  for (const auto& shape : shapes) {
+    auto path = shape->getPath();
+    rule = path.getFillType();
+    // An empty inverse path contributes the whole plane, so it is the one that sets the rule rather
+    // than one of the sources that follow it.
+    if (!path.isEmpty() || path.isInverseFillType()) {
+      break;
+    }
+  }
+  return rule;
 }
 
 Rect AppendShape::onGetBounds() const {
@@ -73,7 +91,8 @@ Rect AppendShape::onGetBounds() const {
 
 Path AppendShape::onGetPath(float resolutionScale) const {
   auto firstShape = shapes.front();
-  // the first path determines the fill type
+  // Append retains the current rule, except that an empty non-inverse path is replaced by the next
+  // operand. An empty inverse one fills the whole plane, so the operands are added to it instead.
   auto path = firstShape->onGetPath(resolutionScale);
   for (size_t i = 1; i < shapes.size(); ++i) {
     path.addPath(shapes[i]->onGetPath(resolutionScale));

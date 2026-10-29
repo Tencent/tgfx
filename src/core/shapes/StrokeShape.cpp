@@ -20,6 +20,7 @@
 #include "core/shapes/MatrixShape.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/ShapeUtils.h"
 #include "core/utils/StrokeUtils.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/resources/ResourceKey.h"
@@ -61,7 +62,7 @@ Path StrokeShape::onGetPath(float resolutionScale) const {
   if (FloatNearlyZero(resolutionScale)) {
     return {};
   }
-  auto path = shape->onGetPath(resolutionScale);
+  auto path = ShapeUtils::GetContourPath(shape, resolutionScale);
   if (IsHairlineStroke(stroke)) {
     Stroke hairlineStroke = stroke;
     // When zoomed in by a matrix shape, reduce the stroke width ahead of time

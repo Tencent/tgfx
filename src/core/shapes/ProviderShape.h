@@ -30,7 +30,7 @@ class ProviderShape : public UniqueKeyShape {
   }
 
   PathFillType fillType() const override {
-    return provider->fillType();
+    return getPath().getFillType();
   }
 
   Rect onGetBounds() const override;

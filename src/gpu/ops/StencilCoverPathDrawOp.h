@@ -67,7 +67,7 @@ class StencilCoverPathDrawOp : public DrawOp {
 
   static PlacementPtr<StencilCoverPathDrawOp> Make(
       std::shared_ptr<StencilCoverPathProxy> geometryProxy, PMColor color, const Matrix& viewMatrix,
-      const Rect& coverLocalBounds, PathFillType fillType);
+      const Rect& coverLocalBounds, bool inverseFill);
 
   bool hasCoverage() const override {
     return true;
@@ -121,26 +121,34 @@ class StencilCoverPathDrawOp : public DrawOp {
   // of the op's scissorRect: even when scissorRect is empty (no user clip), the stencil pass
   // is still confined to the cover area.
   Rect coverDeviceBounds = {};
-  PathFillType fillType = PathFillType::Winding;
+  // Whether the shape fills the outside of its outline. Used only when the tessellator never
+  // reported a rule, which happens when there is no geometry to draw: the stencil pass then leaves
+  // the buffer at zero, and zero is exactly what an inverse fill shades.
+  bool inverseFill = false;
 
   // Stencil-pass GP. Made once at construction time so execute() can reuse it instead of
   // rebuilding the GP on every command-buffer encode pass.
   PlacementPtr<StencilCoverStencilPassGeometryProcessor> stencilGP = nullptr;
 
-  // Pre-computed cover-pass stencil reference value (depends only on fillType).
-  uint32_t coverStencilRef = 0;
-
   StencilCoverPathDrawOp(BlockAllocator* allocator,
                          std::shared_ptr<StencilCoverPathProxy> geometryProxy, PMColor color,
-                         const Matrix& viewMatrix, const Rect& coverLocalBounds,
-                         PathFillType fillType);
+                         const Matrix& viewMatrix, const Rect& coverLocalBounds, bool inverseFill);
+
+  // Returns the rule the geometry is read by. The tessellator reports it together with the
+  // vertices, so it is answered here - while the geometry is being drawn - instead of during
+  // recording, where asking the shape would build the outline a second time.
+  PathFillType resolveFillType() const;
+
+  // The stencil reference the cover pass compares against, derived from the resolved rule.
+  uint32_t coverStencilReference() const;
 
   // Builds the stencil-pass ProgramInfo (stencil GP, no FP chain, no xfer processor, colour
   // writes disabled) and binds the resulting pipeline together with its uniforms and samplers
   // to the render pass. Returns false if program creation fails, in which case the caller
   // should abort the stencil pass. Also constrains the render pass scissor to the cover-quad
   // device bounds so no stencil write escapes the region the cover pass will later zero.
-  bool bindStencilPipeline(RenderPass* renderPass, RenderTarget* renderTarget);
+  bool bindStencilPipeline(RenderPass* renderPass, RenderTarget* renderTarget,
+                           PathFillType fillType);
 
   // Builds the cover-pass ProgramInfo from the op's brush FP chain (colors/coverages) and
   // xfer/blend state, materialises the pipeline, and binds it to the render pass together
@@ -149,7 +157,7 @@ class StencilCoverPathDrawOp : public DrawOp {
   // because StencilCoverPathDrawOp does not derive from StandardDrawOp — the two live on
   // different rails and share only the underlying ProgramInfo/Program utilities. Returns
   // false if program creation fails.
-  bool bindCoverPipeline(RenderPass* renderPass, RenderTarget* renderTarget);
+  bool bindCoverPipeline(RenderPass* renderPass, RenderTarget* renderTarget, PathFillType fillType);
 
   // Sets the render pass scissor to the intersection of the cover-pass device bounds and the
   // op's clip rect. This is stricter than DrawOp::applyScissor(): when the op has no user

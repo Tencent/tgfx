@@ -18,6 +18,7 @@
 
 #include "MergeShape.h"
 #include "core/shapes/AppendShape.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 std::shared_ptr<Shape> Shape::Merge(std::shared_ptr<Shape> first, std::shared_ptr<Shape> second,
@@ -38,6 +39,19 @@ std::shared_ptr<Shape> Shape::Merge(std::shared_ptr<Shape> first, std::shared_pt
 }
 
 PathFillType MergeShape::fillType() const {
+  // A union keeps the outlines it was given when the two areas cannot overlap, and then the rule is
+  // the one both sources already agree on; otherwise the areas are resolved by a boolean operation,
+  // which always writes EvenOdd. The same test decides both, so reporting the rule never has to
+  // build the path first.
+  if (pathOp == PathOp::Union) {
+    auto firstType = first->fillType();
+    if (Path::UnionsByConcatenation(firstType, first->getBounds(), second->fillType(),
+                                    second->getBounds())) {
+      return firstType;
+    }
+    auto inverse = first->isInverseFillType() || second->isInverseFillType();
+    return inverse ? PathFillType::InverseEvenOdd : PathFillType::EvenOdd;
+  }
   bool firstInverse = first->isInverseFillType();
   bool secondInverse = second->isInverseFillType();
   bool inverse = false;
@@ -48,16 +62,14 @@ PathFillType MergeShape::fillType() const {
     case PathOp::Intersect:
       inverse = firstInverse && secondInverse;
       break;
-    case PathOp::Union:
-      inverse = firstInverse || secondInverse;
-      break;
     case PathOp::XOR:
       inverse = firstInverse != secondInverse;
       break;
     default:
       break;
   }
-  // PathOp always produces EvenOdd fill type regardless of input fill types.
+  // Intersect, Difference and XOR always resolve the two areas, and the boolean pass writes the
+  // result as EvenOdd regardless of the rules it was given.
   return inverse ? PathFillType::InverseEvenOdd : PathFillType::EvenOdd;
 }
 
@@ -83,7 +95,20 @@ Rect MergeShape::onGetBounds() const {
 Path MergeShape::onGetPath(float resolutionScale) const {
   auto path = first->onGetPath(resolutionScale);
   auto secondPath = second->onGetPath(resolutionScale);
-  path.addPath(secondPath, pathOp);
+  // fillType() decides a union from the bounds the two shapes report, and those bounds may be larger
+  // than the outlines they contain - a text run reports its em box, whose neighbours nearly always
+  // overlap while the glyph outlines do not. Deciding here from the tighter outline bounds would
+  // concatenate where fillType() promised a boolean result, leaving the shape reporting one rule and
+  // handing out an outline read by another, so the same bounds decide it in both places.
+  if (!path.addPath(secondPath, pathOp, first->getBounds(), second->getBounds())) {
+    // A failed operation leaves the first operand behind, which is not the merge that was asked
+    // for: reading it as the result would draw one side of the operation as if it were both. An
+    // empty path is the only answer that is wrong in a visible way rather than a silent one, and
+    // it still carries the rule fillType() reports, so nothing downstream reads a mixed result.
+    LOGE("MergeShape::onGetPath() Failed to merge the two shapes; reporting an empty result.");
+    path = {};
+    path.setFillType(fillType());
+  }
   return path;
 }
 

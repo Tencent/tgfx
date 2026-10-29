@@ -205,10 +205,18 @@ class ProxyProvider {
  private:
   Context* context = nullptr;
   ResourceKeyMap<std::weak_ptr<ResourceProxy>> proxyMap = {};
+  // The rule each cached stencil-cover geometry was tessellated with, keyed like the vertex buffer
+  // it belongs to. A hit reads the rule from here instead of asking the shape again: the rule came
+  // out of the geometry being reused, so nothing has to be recomputed to answer it. The entries are
+  // keyed by UniqueKey rather than ResourceKey so that the geometry they describe can be looked up
+  // in the resource cache - a slot is only good for as long as that geometry is.
+  std::unordered_map<UniqueKey, std::shared_ptr<FillTypeSlot>, ResourceKeyHasher>
+      stencilCoverFillTypes = {};
   std::shared_ptr<GPUBufferProxy> sharedVertexBuffer = nullptr;
   std::vector<std::shared_ptr<Task>> sharedVertexBufferTasks = {};
   std::shared_ptr<GPUBufferProxy> sharedInstanceBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> findOrWrapGPUBufferProxy(const UniqueKey& uniqueKey);
+  std::shared_ptr<FillTypeSlot> findOrCreateStencilCoverFillType(const UniqueKey& vertexKey);
 
   void addResourceProxy(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey = {});
 

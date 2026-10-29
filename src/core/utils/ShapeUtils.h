@@ -39,6 +39,15 @@ class ShapeUtils {
    */
   static Path GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resolutionScale);
 
+  // FillType and explicit path-combination wrappers form source boundaries for all consumers.
+  static bool GetPathSources(const std::shared_ptr<Shape>& shape, float resolutionScale,
+                             std::vector<Path>* paths);
+
+  static bool ApplyEffectToSources(const PathEffect& effect, std::vector<Path>* paths);
+
+  // Concatenated contours for measurement and stroking only, never for filling or clipping.
+  static Path GetContourPath(const std::shared_ptr<Shape>& shape, float resolutionScale);
+
   /**
    * Calculates the alpha reduction factor for hairline rendering, or returns 1.0 if the shape is
    * not rendered as a hairline.

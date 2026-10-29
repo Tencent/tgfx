@@ -32,7 +32,7 @@ class EffectShape : public UniqueKeyShape {
   }
 
   PathFillType fillType() const override {
-    return shape->fillType();
+    return getPath().getFillType();
   }
 
   Rect onGetBounds() const override;
@@ -47,5 +47,7 @@ class EffectShape : public UniqueKeyShape {
  private:
   std::shared_ptr<Shape> shape = nullptr;
   std::shared_ptr<PathEffect> effect = nullptr;
+
+  friend class ShapeUtils;
 };
 }  // namespace tgfx

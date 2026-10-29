@@ -253,6 +253,9 @@ std::shared_ptr<StencilCoverVertexData> StencilCoverPathTessellator::getData() c
   if (data == nullptr) {
     return nullptr;
   }
-  return std::make_shared<StencilCoverVertexData>(std::move(data), vertices.size());
+  // getPath() above has already built and cached the shape's path, so the rule costs nothing here.
+  // It is read on this thread - the one that owns the geometry - rather than during recording.
+  return std::make_shared<StencilCoverVertexData>(std::move(data), vertices.size(),
+                                                  shape->fillType());
 }
 }  // namespace tgfx

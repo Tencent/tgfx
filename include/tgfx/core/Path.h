@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Matrix3D.h"
 #include "tgfx/core/PathTypes.h"
@@ -78,6 +79,18 @@ class Path {
    * Replaces PathFillType with its inverse.
    */
   void toggleInverseFillType();
+
+  /**
+   * Converts this path to an equivalent path that uses the winding fill rule, so that it fills the
+   * same area in formats that cannot record a fill rule. Paths that already use the winding rule
+   * are left as is; InverseEvenOdd becomes InverseWinding.
+   *
+   * The filled area is preserved as long as the contours do not cross each other or themselves.
+   * Contours produced by addPath() with a boolean operation satisfy that condition.
+   * @return true if the conversion succeeded. On failure the path is left unchanged, so callers
+   * must check the result.
+   */
+  bool toWinding();
 
   /**
    * Returns true if Path contains only one line;
@@ -364,8 +377,51 @@ class Path {
 
   /**
    * Adds a src to this Path.
+   * @param src the Path to combine with this one.
+   * @param op how to combine them. Append and Extend concatenate the outlines; the rest combine the
+   * filled areas the two paths describe.
+   * @return false if the combination failed, in which case this Path is unchanged. Append and
+   * Extend always succeed, and a true result can still drop contours that could not be resolved.
    */
-  void addPath(const Path& src, PathOp op = PathOp::Append);
+  bool addPath(const Path& src, PathOp op = PathOp::Append);
+
+  /**
+   * Adds a src to this Path, deciding a union's fast path from bounds supplied by the caller instead
+   * of the outlines' own bounds. A caller whose bounds only contain the outlines - Shape::getBounds()
+   * may be larger than the shape - needs the decision made here and the decision it reports about the
+   * result to come from the same bounds, otherwise the two can disagree and the result is read by a
+   * rule its outlines were not written for.
+   * @param src the Path to combine with this one.
+   * @param op how to combine them. Append and Extend concatenate the outlines; the rest combine the
+   * filled areas the two paths describe.
+   * @param bounds bounds known to contain this Path's outlines.
+   * @param srcBounds bounds known to contain src's outlines.
+   * @return false if the combination failed, in which case this Path is unchanged. Append and
+   * Extend always succeed, and a true result can still drop contours that could not be resolved.
+   */
+  bool addPath(const Path& src, PathOp op, const Rect& bounds, const Rect& srcBounds);
+
+  /**
+   * Returns true if the union of two filled areas is the concatenation of their outlines, which
+   * holds when they cannot overlap: they share one fill rule, neither fills the whole plane, and
+   * their bounds do not intersect. Both Path::addPath() and the shape that merges two sources use
+   * this one test, so the rule a merge reports and the outline it produces can never disagree.
+   * @param firstFillType the fill rule of the first area.
+   * @param firstBounds the bounds of the first area.
+   * @param secondFillType the fill rule of the second area.
+   * @param secondBounds the bounds of the second area.
+   */
+  static bool UnionsByConcatenation(PathFillType firstFillType, const Rect& firstBounds,
+                                    PathFillType secondFillType, const Rect& secondBounds);
+
+  /**
+   * Merges the filled areas of the given paths into one. Each path is read under its own fill rule,
+   * so paths that declare different rules can be merged. When the outlines already describe the
+   * merged area, they are kept as they are.
+   * @param sources the paths to merge. Empty produces an empty path.
+   * @return the merged path, or std::nullopt if the merge failed.
+   */
+  static std::optional<Path> Merge(const std::vector<Path>& sources);
 
   /**
    * Sets Path to its initial state. Internal storage associated with Path is released.

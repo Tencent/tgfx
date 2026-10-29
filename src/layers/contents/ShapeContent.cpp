@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeContent.h"
+#include "core/utils/ShapeUtils.h"
 #include "core/utils/StrokeUtils.h"
 #include "tgfx/core/Canvas.h"
 
@@ -178,13 +179,7 @@ std::shared_ptr<Shape> ShapeContent::getExpandedStrokeShape() const {
 }
 
 Path ShapeContent::getStrokedPath() const {
-  auto path = shape->getPath();
-  // Ignore filterPath's boolean result and keep `path` unchanged on rejection. This matches the
-  // semantics of EffectShape::onGetPath used by the GPU draw path, so bounds/hit-test agree with
-  // rasterization on the same geometry.
-  if (pathEffect != nullptr) {
-    pathEffect->filterPath(&path);
-  }
+  auto path = ShapeUtils::GetContourPath(drawShape(), 1.0f);
   // Center: the natural 1x stroke already covers the visible band on both sides of the boundary
   // by width/2. Inside/Outside: double the width so callers combining this path with the
   // original geometry (intersect for Inside, difference for Outside) get a band whose visible
