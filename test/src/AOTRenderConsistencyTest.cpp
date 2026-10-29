@@ -4953,6 +4953,99 @@ TGFX_TEST(AOTRenderConsistencyTest, GradientBlendDiffAttribution) {
   EXPECT_GE(fullAOTStats.completeAOTDraws, 1u);
 }
 
+// The materialized-operand route under a transformed canvas: a rotated, scaled draw of the
+// two-gradient blend (guaranteed over the fused budget, so both operands materialize) must
+// reproduce the runtime pixels. The operand's intermediate renders in device space while its
+// gradient consumes the draw's local coordinates, so any device-to-local mapping mistake lands in
+// the pixels, not in the counters. This is the regression line for the planner materialization
+// that replaces the retry (see docs/aot-materialization-plan.md).
+TGFX_TEST(AOTRenderConsistencyTest, TransformedGradientBlendMatchesRuntime) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  constexpr int size = 96;
+  auto renderScene = [&](Bitmap* outBitmap) {
+    auto surface = Surface::Make(context, size, size);
+    ASSERT_TRUE(surface != nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    auto matrix = Matrix::MakeScale(1.3f, 1.3f);
+    matrix.postRotate(20.0f, size * 0.5f, size * 0.5f);
+    canvas->concat(matrix);
+    std::vector<Color> colorsA = {Color(1, 0, 0, 1), Color(0, 0, 1, 1)};
+    std::vector<Color> colorsB = {Color(0, 1, 0, 1), Color(1, 1, 0, 1)};
+    auto gradientA =
+        Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(size, size), colorsA);
+    auto gradientB =
+        Shader::MakeLinearGradient(Point::Make(size, 0), Point::Make(0, size), colorsB);
+    ASSERT_TRUE(gradientA != nullptr && gradientB != nullptr);
+    auto blend = Shader::MakeBlend(BlendMode::Multiply, gradientA, gradientB);
+    ASSERT_TRUE(blend != nullptr);
+    Paint paint = {};
+    paint.setAlpha(51.0f / 255.0f);
+    paint.setShader(blend);
+    canvas->drawRect(Rect::MakeWH(size, size), paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(size, size));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+  };
+  Bitmap reference = {};
+  AOTDrawStats referenceStats = {};
+  {
+    cache->unload();
+    ScopedAOTDeliberateMiss deliberate(context);
+    cache->resetStats();
+    renderScene(&reference);
+    referenceStats = cache->drawStats();
+    EXPECT_EQ(referenceStats.completeAOTDraws, 0u);
+  }
+  Bitmap candidate = {};
+  AOTDrawStats candidateStats = {};
+  {
+    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+    cache->setDecompositionEnabled(true);
+    context->globalCache()->clearPrograms();
+    cache->resetStats();
+    renderScene(&candidate);
+    candidateStats = cache->drawStats();
+  }
+  // Non-vacuous: the AOT materialization must actually serve the draw.
+  EXPECT_GE(candidateStats.completeAOTDraws, 1u);
+  EXPECT_GE(candidateStats.materializedEdges, 1u);
+  auto* pa = static_cast<const uint8_t*>(reference.lockPixels());
+  auto* pb = static_cast<const uint8_t*>(candidate.lockPixels());
+  ASSERT_TRUE(pa != nullptr && pb != nullptr);
+  int maxDiff = 0;
+  size_t overBudget = 0;
+  for (size_t offset = 0; offset < static_cast<size_t>(size) * size * 4; offset += 4) {
+    int pixelDiff = 0;
+    for (size_t channel = 0; channel < 4; ++channel) {
+      auto left = static_cast<int>(pa[offset + channel]);
+      auto right = static_cast<int>(pb[offset + channel]);
+      pixelDiff = std::max(pixelDiff, std::max(left - right, right - left));
+    }
+    maxDiff = std::max(maxDiff, pixelDiff);
+    if (pixelDiff > 2) {
+      overBudget++;
+    }
+  }
+  reference.unlockPixels();
+  candidate.unlockPixels();
+  printf("[TransformedGradientBlend] maxChannelDiff=%d overBudget=%zu completeAOT=%u\n", maxDiff,
+         overBudget, static_cast<unsigned>(candidateStats.completeAOTDraws));
+  // The materialization costs at most the documented 1-LSB quantization per operand; 2 absorbs
+  // the rotated resampling's rounding chain.
+  EXPECT_LE(maxDiff, 2);
+  EXPECT_EQ(overBudget, 0u);
+}
+
 // Guards the single-program first-frame behavior for lazily uploaded images. Historically the
 // first draw of a new image took the plain direct-match route (the chain decomposition refused
 // the un-instantiated view) and the second draw created a second program through the chain
