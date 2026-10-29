@@ -3591,6 +3591,62 @@ TGFX_TEST(AOTRenderConsistencyTest, PlanExecutionFailureIsRecordedNotFatal) {
   }
 }
 
+// A plan's intermediate targets are temporary bytes of the flush cycle that records them: they
+// must land in peakTemporaryBytes at that cycle's settle. Accounting them at execute time (after
+// the settle) would push them into the NEXT cycle's peak, so a frame that only runs plan tasks
+// reports zero.
+TGFX_TEST(AOTRenderConsistencyTest, PlanTemporaryBytesSettleInTheSameFlush) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+  ASSERT_NE(bundleData, nullptr);
+  ASSERT_TRUE(cache->loadBundle(bundleData, bundleBytes));
+  // Drain anything pending from earlier tests so the simultaneously-live total starts at zero.
+  context->flushAndSubmit(true);
+  const std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0,
+                                             1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
+  auto sourceSurface = Surface::Make(context, 64, 64);
+  ASSERT_NE(sourceSurface, nullptr);
+  sourceSurface->getCanvas()->clear(Color::Red());
+  context->flushAndSubmit(true);
+  auto source = context->proxyProvider()->wrapExternalTexture(sourceSurface->getBackendTexture());
+  ASSERT_NE(source, nullptr);
+  cache->setDiagnosticRecordingEnabled(true);
+  cache->resetStats();
+  auto allocator = context->drawingAllocator();
+  // A device-space source plus 63 operators: five chain-kernel passes, four of them materializing
+  // into 64x64 RGBA8 intermediates (16384 bytes each).
+  PlacementPtr<FragmentProcessor> processor =
+      DeviceSpaceTextureEffect::Make(allocator, source, Matrix::I());
+  ASSERT_NE(processor, nullptr);
+  for (int index = 0; index < 63; ++index) {
+    processor =
+        FragmentProcessor::Compose(allocator, std::move(processor),
+                                   ColorMatrixFragmentProcessor::Make(allocator, swapRedBlue));
+  }
+  auto target = RenderTargetProxy::Make(context, 64, 64, false);
+  ASSERT_NE(target, nullptr);
+  ASSERT_TRUE(
+      context->drawingManager()->fillRTWithFP(target, std::move(processor), 0, Point::Zero()));
+  context->flushAndSubmit(true);
+  auto stats = cache->drawStats();
+  EXPECT_EQ(stats.kernelInvocations, 5u);
+  EXPECT_EQ(stats.peakTemporaryBytes, 4u * 64 * 64 * 4);
+  // A second cycle with a plain draw and no offscreen work must report zero temporary bytes: the
+  // plan's bytes belong to the cycle that recorded them and must not leak into the next cycle's
+  // peak. The settle only runs on a real flush, so the cycle redraws the source surface.
+  cache->resetStats();
+  Paint plainPaint = {};
+  sourceSurface->getCanvas()->drawRect(Rect::MakeWH(64, 64), plainPaint);
+  context->flushAndSubmit(true);
+  auto plainStats = cache->drawStats();
+  cache->setDiagnosticRecordingEnabled(false);
+  EXPECT_EQ(plainStats.peakTemporaryBytes, 0u);
+}
+
 // The multi-pass planner never starts a pass at an AlphaThreshold: a pass boundary rounds the
 // threshold's input to RGBA8, and a step function can flip across that rounding. Exact-rational
 // construction: the source is black, a matrix scales alpha to 513/1024, and the threshold is

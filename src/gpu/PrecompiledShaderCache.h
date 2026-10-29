@@ -476,8 +476,9 @@ class PrecompiledShaderCache {
 
   /// Adds `bytes` to the simultaneously-live running total without touching any per-edge or
   /// per-draw counter — for offscreen targets created outside recordMaterializedEdge's path
-  /// (e.g. an offscreen plan's intermediate render targets, which are already counted by
-  /// recordDraw's delta and must not double-count the edge counters).
+  /// (an offscreen plan's intermediate render targets, counted at task creation so they settle
+  /// inside the recording cycle; the task's own recordDraw delta is a different, draw-local view
+  /// of the same bytes).
   void recordActiveTemporaryBytes(uint64_t bytes);
 
   /// Records one draw whose color chain the decomposition route attempted and refused, with the

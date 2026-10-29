@@ -6,6 +6,7 @@
 #include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/AOTMaterializationRecorder.h"
 #include "gpu/DrawingManager.h"
+#include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ops/StandardDrawOp.h"
 #include "gpu/processors/AOTYUVChainProcessor.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
@@ -366,6 +367,20 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(
                    sourceAlpha) ||
       !renderPlan.isWellFormed()) {
     return nullptr;
+  }
+  // The plan's intermediates are temporary bytes of the flush cycle being recorded, so they join
+  // the simultaneously-live set at task creation — the same moment recordMaterializedEdge counts
+  // its own edges. Counting them at execute time (after this cycle's settle) would push them into
+  // the next cycle's peak instead.
+  auto* shaderCache = context->precompiledShaderCache();
+  if (shaderCache != nullptr) {
+    for (const auto& renderPass : renderPlan.passes) {
+      if (renderPass.target != nullptr) {
+        shaderCache->recordActiveTemporaryBytes(static_cast<uint64_t>(renderPass.target->width()) *
+                                                static_cast<uint64_t>(renderPass.target->height()) *
+                                                4);
+      }
+    }
   }
   auto allocator = context->drawingManager()->drawingAllocator();
   auto task =
