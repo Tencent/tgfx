@@ -390,153 +390,188 @@ static bool HasShaderTiling(const AOTTextureParameters& parameters) {
           parameters.tiledRecipe->shaderModeY != TiledTextureShaderMode::None);
 }
 
-// Flattens a single-pass pointwise DAG into the fused chain layout. Texture leaves are placed in
-// the leading slots so that slot k pairs with TextureSampler_k, which keeps sampler indexing
-// static in the kernel. When clipSlots carries analytic clip FPs, their coverage slots form the
-// clip-coverage channel. When coverageGraph is given, its nodes (lowered from the coverage FP with
-// the GeometryCoverage unit as origin) are merged after the color nodes: coverage leaves extend
-// the leading texture block, coverage ops trail the color ops, and coverageRoot becomes the
-// chain's coverage root. checkKernel compares the pass kernel against the profile the color pass
-// needs; the DAG planner clears it to learn that profile.
-static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
-                            const ChainClipSlots& clipSlots, const AOTEffectGraph* coverageGraph,
-                            AOTNodeID coverageRoot, bool coverageLeafFromUVCoord, bool checkKernel,
-                            ChainLayout* layout) {
-  if (layout == nullptr || pass.nodes.empty() || !pass.output.isValid() ||
-      (checkKernel && !IsAOTPointwiseDAGKernel(pass.kernel))) {
+// The shared state of the chain-layout pipeline (see PlanChainLayout): each stage fills part of it
+// and reads what the earlier stages produced, so no shape rule is ever re-derived.
+struct ChainBuildContext {
+  // Pipeline inputs.
+  const AOTEffectGraph* graph = nullptr;
+  const AOTPassDescriptor* pass = nullptr;
+  const ChainClipSlots* clipSlots = nullptr;
+  const AOTEffectGraph* coverageGraph = nullptr;
+  AOTNodeID coverageRoot = AOTNodeID();
+  bool coverageLeafFromUVCoord = false;
+  bool checkKernel = false;
+  ChainLayout* layout = nullptr;
+  // Stage results, consumed by the later stages.
+  std::vector<const AOTEffectNode*> nodes = {};
+  size_t colorCount = 0;
+  size_t covCount = 0;
+  std::vector<bool> inPass = {};
+  std::vector<size_t> slotOf = {};
+  std::vector<size_t> rawSlotOf = {};
+  std::vector<size_t> ordered = {};
+  std::vector<AOTChainSlot> slots = {};
+  bool hasGradient = false;
+  AOTResourceProfile finalProfile = AOTResourceProfile::Automatic;
+  size_t rootIndex = 0;
+  int coverageRootSlot = -1;
+  int clipCoverageSlot = -1;
+  int clipChainInput = -4;
+  AOTChainRegisterAssignment assignment = {};
+};
+
+// Maps one op input edge onto its chain register/designator, in the input's own node space.
+static int MapChainOpInput(const ChainBuildContext* ctx, size_t inputBase, AOTNodeID input) {
+  return MapChainInput(ctx->nodes, ctx->slotOf, inputBase + input.index());
+}
+
+// Stage one: merges the color and coverage node spaces, and admits the pass itself — non-empty
+// with a valid output, every node listed exactly once, and a chain kernel when the caller asked
+// for that check.
+static bool MergeNodeSpaces(ChainBuildContext* ctx) {
+  const auto& pass = *ctx->pass;
+  if (ctx->layout == nullptr || pass.nodes.empty() || !pass.output.isValid() ||
+      (ctx->checkKernel && !IsAOTPointwiseDAGKernel(pass.kernel))) {
     return false;
   }
   // Combined node space: color-graph nodes occupy [0, colorCount), coverage-graph nodes follow.
-  const size_t colorCount = graph.nodeCount();
-  const size_t covCount = coverageGraph != nullptr ? coverageGraph->nodeCount() : 0;
-  if (coverageGraph != nullptr && coverageRoot.index() >= covCount) {
+  ctx->colorCount = ctx->graph->nodeCount();
+  ctx->covCount = ctx->coverageGraph != nullptr ? ctx->coverageGraph->nodeCount() : 0;
+  if (ctx->coverageGraph != nullptr && ctx->coverageRoot.index() >= ctx->covCount) {
     return false;
   }
-  std::vector<const AOTEffectNode*> nodes = {};
-  nodes.reserve(colorCount + covCount);
-  for (size_t index = 0; index < colorCount; ++index) {
-    auto* node = graph.nodeAt(AOTNodeID(static_cast<uint32_t>(index)));
+  ctx->nodes = {};
+  ctx->nodes.reserve(ctx->colorCount + ctx->covCount);
+  for (size_t index = 0; index < ctx->colorCount; ++index) {
+    auto* node = ctx->graph->nodeAt(AOTNodeID(static_cast<uint32_t>(index)));
     if (node == nullptr) {
       return false;
     }
-    nodes.push_back(node);
+    ctx->nodes.push_back(node);
   }
-  for (size_t index = 0; index < covCount; ++index) {
-    auto* node = coverageGraph->nodeAt(AOTNodeID(static_cast<uint32_t>(index)));
+  for (size_t index = 0; index < ctx->covCount; ++index) {
+    auto* node = ctx->coverageGraph->nodeAt(AOTNodeID(static_cast<uint32_t>(index)));
     if (node == nullptr) {
       return false;
     }
-    nodes.push_back(node);
+    ctx->nodes.push_back(node);
   }
   // Every pass node must exist and appear once: a duplicate would encode the same node twice and
   // leave the first copy's consumers reading a stale register.
-  std::vector<bool> inPass(colorCount, false);
+  ctx->inPass.assign(ctx->colorCount, false);
   for (auto nodeID : pass.nodes) {
-    if (nodeID.index() >= colorCount || inPass[nodeID.index()]) {
+    if (nodeID.index() >= ctx->colorCount || ctx->inPass[nodeID.index()]) {
       return false;
     }
-    inPass[nodeID.index()] = true;
+    ctx->inPass[nodeID.index()] = true;
   }
-  if (pass.output.index() >= colorCount || !inPass[pass.output.index()]) {
+  return pass.output.index() < ctx->colorCount && ctx->inPass[pass.output.index()];
+}
+
+// A texture whose input is a computed node (not one of the designators): its sampling needs no
+// computed value, but its modulation must follow the producer, so the node occupies a raw
+// sampling slot in the leading block plus a TEX_MODULATE slot in the op phase.
+static bool HasComputedTextureInput(const ChainBuildContext* ctx, size_t combined) {
+  auto* node = ctx->nodes[combined];
+  if (node->kind != AOTEffectKind::TextureSource || node->inputs.empty()) {
     return false;
   }
-  std::vector<size_t> slotOf(nodes.size(), SIZE_MAX);
+  const size_t inputBase = combined < ctx->colorCount ? 0 : ctx->colorCount;
+  const size_t inputIndex = inputBase + node->inputs[0].index();
+  if (inputIndex >= ctx->nodes.size()) {
+    return false;
+  }
+  auto* inputNode = ctx->nodes[inputIndex];
+  return inputNode->kind != AOTEffectKind::GeometryColor &&
+         inputNode->kind != AOTEffectKind::GeometryColorOpaqueInput &&
+         inputNode->kind != AOTEffectKind::GeometryWhiteInput &&
+         inputNode->kind != AOTEffectKind::GeometryCoverage;
+}
+
+static void CollectChainNode(ChainBuildContext* ctx, size_t combined, bool texturePhase) {
+  if (ctx->nodes[combined]->kind == AOTEffectKind::TextureSource) {
+    if (texturePhase) {
+      ctx->rawSlotOf[combined] = ctx->ordered.size();
+      ctx->ordered.push_back(combined);
+      if (!HasComputedTextureInput(ctx, combined)) {
+        ctx->slotOf[combined] = ctx->rawSlotOf[combined];
+      }
+    } else if (ctx->slotOf[combined] == SIZE_MAX) {
+      ctx->slotOf[combined] = ctx->ordered.size();
+      ctx->ordered.push_back(combined);
+    }
+  } else if (!texturePhase) {
+    ctx->slotOf[combined] = ctx->ordered.size();
+    ctx->ordered.push_back(combined);
+  }
+}
+
+// Stage two: texture leaves first (color pass, then coverage subtree), then the remaining nodes
+// in topological order (color ops, then coverage ops). The two subtrees never reference each
+// other, so this layout keeps every input ahead of its consumer. A computed-input texture
+// appears in both phases: the texture phase holds its raw sampling slot, the op phase its
+// TEX_MODULATE instruction (slotOf points there, so consumers reference the modulated value).
+// Index 0 of the coverage graph is the GeometryCoverage unit, which never becomes a slot.
+// Designator-only input nodes (white / opaque geometry inputs lowered by xfer children) stay out
+// too: their value rides on the input-edge designators, not on a chain slot.
+static void ScheduleChainSlots(ChainBuildContext* ctx) {
+  ctx->slotOf.assign(ctx->nodes.size(), SIZE_MAX);
   // For a computed-input texture node, the leading raw-sampling slot's position (sampler
   // binding); the node's value for consumers is the topologically-ordered TEX_MODULATE slot
   // tracked in slotOf.
-  std::vector<size_t> rawSlotOf(nodes.size(), SIZE_MAX);
-  std::vector<size_t> ordered = {};
-  ordered.reserve(pass.nodes.size() + covCount);
-  // A texture whose input is a computed node (not one of the designators): its sampling needs
-  // no computed value, but its modulation must follow the producer, so the node occupies a raw
-  // sampling slot in the leading block plus a TEX_MODULATE slot in the op phase.
-  auto hasComputedInput = [&](size_t combined) {
-    auto* node = nodes[combined];
-    if (node->kind != AOTEffectKind::TextureSource || node->inputs.empty()) {
-      return false;
+  ctx->rawSlotOf.assign(ctx->nodes.size(), SIZE_MAX);
+  ctx->ordered = {};
+  ctx->ordered.reserve(ctx->pass->nodes.size() + ctx->covCount);
+  for (bool texturePhase : {true, false}) {
+    for (auto nodeID : ctx->pass->nodes) {
+      CollectChainNode(ctx, nodeID.index(), texturePhase);
     }
-    const size_t inputBase = combined < colorCount ? 0 : colorCount;
-    const size_t inputIndex = inputBase + node->inputs[0].index();
-    if (inputIndex >= nodes.size()) {
-      return false;
-    }
-    auto* inputNode = nodes[inputIndex];
-    return inputNode->kind != AOTEffectKind::GeometryColor &&
-           inputNode->kind != AOTEffectKind::GeometryColorOpaqueInput &&
-           inputNode->kind != AOTEffectKind::GeometryWhiteInput &&
-           inputNode->kind != AOTEffectKind::GeometryCoverage;
-  };
-  // Texture leaves first (color pass, then coverage subtree), then the remaining nodes in
-  // topological order (color ops, then coverage ops). The two subtrees never reference each
-  // other, so this layout keeps every input ahead of its consumer. A computed-input texture
-  // appears in both phases: the texture phase holds its raw sampling slot, the op phase its
-  // TEX_MODULATE instruction (slotOf points there, so consumers reference the modulated value).
-  auto collectNode = [&](size_t combined, bool texturePhase) {
-    if (nodes[combined]->kind == AOTEffectKind::TextureSource) {
-      if (texturePhase) {
-        rawSlotOf[combined] = ordered.size();
-        ordered.push_back(combined);
-        if (!hasComputedInput(combined)) {
-          slotOf[combined] = rawSlotOf[combined];
-        }
-      } else if (slotOf[combined] == SIZE_MAX) {
-        slotOf[combined] = ordered.size();
-        ordered.push_back(combined);
-      }
-    } else if (!texturePhase) {
-      slotOf[combined] = ordered.size();
-      ordered.push_back(combined);
-    }
-  };
-  auto collect = [&](bool texturePhase) {
-    for (auto nodeID : pass.nodes) {
-      collectNode(nodeID.index(), texturePhase);
-    }
-    // Index 0 of the coverage graph is the GeometryCoverage unit, which never becomes a slot.
-    // Designator-only input nodes (white / opaque geometry inputs lowered by xfer children) stay
-    // out too: their value rides on the input-edge designators, not on a chain slot.
-    for (size_t index = 1; index < covCount; ++index) {
-      auto kind = nodes[colorCount + index]->kind;
+    for (size_t index = 1; index < ctx->covCount; ++index) {
+      auto kind = ctx->nodes[ctx->colorCount + index]->kind;
       if (kind != AOTEffectKind::GeometryWhiteInput &&
           kind != AOTEffectKind::GeometryColorOpaqueInput) {
-        collectNode(colorCount + index, texturePhase);
+        CollectChainNode(ctx, ctx->colorCount + index, texturePhase);
       }
     }
-  };
-  collect(true);
-  collect(false);
-  std::vector<AOTChainSlot> slots(ordered.size());
+  }
+}
+
+// Stage three: encodes every scheduled node into its chain slot (the per-kind op, its parameter
+// block, and its mapped input registers), collecting the texture leaves, the LUT gradient and the
+// noise source into the layout along the way. Per-kind budgets that need no cross-node state are
+// enforced here (the rect/rrect coverage capacities, the single gradient).
+static bool EncodeChainSlots(ChainBuildContext* ctx) {
+  auto* layout = ctx->layout;
+  ctx->slots.assign(ctx->ordered.size(), AOTChainSlot{});
   size_t rectCoverageCount = 0;
   size_t localRectCoverageCount = 0;
-  bool hasGradient = false;
+  ctx->hasGradient = false;
   // All-ones reproduces the legacy behavior (every target reads the uvCoord attribute when the GP
   // carries one). The atlas-text route clears it and sets only the coverage leaves' bits.
-  layout->coordSourceMask = coverageLeafFromUVCoord ? 0u : ~0u;
+  layout->coordSourceMask = ctx->coverageLeafFromUVCoord ? 0u : ~0u;
   layout->leafNodes.clear();
   layout->tiledLeaves.clear();
   layout->lutGradient = nullptr;
   layout->noise = nullptr;
   layout->deviceLeafIndices.clear();
-  for (size_t index = 0; index < ordered.size(); ++index) {
-    const size_t combined = ordered[index];
-    auto node = nodes[combined];
-    const size_t inputBase = combined < colorCount ? 0 : colorCount;
+  for (size_t index = 0; index < ctx->ordered.size(); ++index) {
+    const size_t combined = ctx->ordered[index];
+    auto node = ctx->nodes[combined];
+    const size_t inputBase = combined < ctx->colorCount ? 0 : ctx->colorCount;
     for (auto input : node->inputs) {
-      if (inputBase + input.index() >= (combined < colorCount ? colorCount : nodes.size())) {
+      if (inputBase + input.index() >=
+          (combined < ctx->colorCount ? ctx->colorCount : ctx->nodes.size())) {
         return false;
       }
     }
-    auto mapInput = [&](AOTNodeID input) {
-      return MapChainInput(nodes, slotOf, inputBase + input.index());
-    };
-    auto& slot = slots[index];
+    auto& slot = ctx->slots[index];
     switch (node->kind) {
       case AOTEffectKind::TextureSource: {
         auto* parameters = std::get_if<AOTTextureParameters>(&node->parameters);
         if (parameters == nullptr || !IsChainTextureLeaf(*parameters)) {
           return false;
         }
-        if (index != rawSlotOf[combined]) {
+        if (index != ctx->rawSlotOf[combined]) {
           // Op-phase entry of a computed-input texture: the explicit modulate instruction.
           // Its input is the producing node's register (any computed node — an upstream
           // texture, a gradient, an operator), and its source is the raw sample prefetched
@@ -544,11 +579,11 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
           // TextureEffect readback: alpha-only is sample.a * inputColor, RGBA is
           // sample * inputColor.a.
           slot.op = AOTChainOp::TexModulate;
-          slot.in0 = mapInput(node->inputs[0]);
-          slot.texModulateSourceSlot = static_cast<int>(rawSlotOf[combined]);
+          slot.in0 = MapChainOpInput(ctx, inputBase, node->inputs[0]);
+          slot.texModulateSourceSlot = static_cast<int>(ctx->rawSlotOf[combined]);
           slot.texModulateAlphaOnly = parameters->isAlphaOnly ? 1 : 0;
-          // A negative producer is a designator after all (hasComputedInput disagreed with
-          // mapInput) or is not part of this pass; both are build errors.
+          // A negative producer is a designator after all (HasComputedTextureInput disagreed
+          // with the mapping) or is not part of this pass; both are build errors.
           if (slot.in0 < 0 || slot.texModulateSourceSlot >= MaxFusedAOTSamplers) {
             return false;
           }
@@ -558,7 +593,7 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
         // Texture-phase entry of a computed-input texture is raw sampling only: the modulation
         // lives in the op-phase TEX_MODULATE slot, so no flags here, and the result register
         // stays dead because only the modulate instruction reads the prefetched sample.
-        const bool rawSamplingOnly = slotOf[combined] != index;
+        const bool rawSamplingOnly = ctx->slotOf[combined] != index;
         if (!rawSamplingOnly) {
           // A texture fed directly by the geometry color is a color source and gets the paint-alpha
           // modulation folded into its read (as the runtime's SrcIn wrap does). Any other texture —
@@ -574,7 +609,7 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
           // The unit is the coverage graph's node 0 (addGeometryCoverage runs first), so within
           // the coverage graph (combined >= colorCount) an input index of 0 is exactly the unit.
           const bool inputIsCoverageUnit =
-              combined >= colorCount && !node->inputs.empty() && node->inputs[0].index() == 0;
+              combined >= ctx->colorCount && !node->inputs.empty() && node->inputs[0].index() == 0;
           if (inputIsCoverageUnit) {
             slot.textureModulateUnit = 1;
           }
@@ -592,7 +627,7 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
           // vec4(inputColor.rgb, 1.0). White inputs (single-child operands, folded masks) and
           // coverage leaves keep the raw splat, matching the runtime emission.
           bool inputIsOpaqueDesignator =
-              !node->inputs.empty() && nodes[inputBase + node->inputs[0].index()]->kind ==
+              !node->inputs.empty() && ctx->nodes[inputBase + node->inputs[0].index()]->kind ==
                                            AOTEffectKind::GeometryColorOpaqueInput;
           if (slot.textureAlphaOnly != 0 && inputIsGeometryColor) {
             slot.textureModulate = 0;
@@ -601,7 +636,7 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
             slot.textureModulateGeometryRGB = 1;
           }
         }
-        if (coverageLeafFromUVCoord && inputBase != 0) {
+        if (ctx->coverageLeafFromUVCoord && inputBase != 0) {
           // Atlas text: the coverage leaf sources its coordinates from the maskCoord attribute
           // (the uvCoord slot), while color leaves and gradients keep the position source.
           layout->coordSourceMask |= 1u << static_cast<uint32_t>(layout->leafNodes.size());
@@ -639,7 +674,7 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
         }
         slot.op = AOTChainOp::ConstColor;
         slot.constColor = *parameters;
-        slot.in0 = mapInput(node->inputs[0]);
+        slot.in0 = MapChainOpInput(ctx, inputBase, node->inputs[0]);
         break;
       }
       case AOTEffectKind::ColorMatrix:
@@ -650,7 +685,7 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
           return false;
         }
         AOTPointwiseSlot pointwise = {};
-        if (!BuildPointwiseSlot(graph, node, &pointwise)) {
+        if (!BuildPointwiseSlot(*ctx->graph, node, &pointwise)) {
           return false;
         }
         // AOTPointwiseOpType and AOTChainOp share values 0..4 by ABI (both mirror the OP_*
@@ -660,7 +695,7 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
         slot.luma = pointwise.luma;
         slot.alphaThreshold = pointwise.alphaThreshold;
         slot.colorSpaceXform = pointwise.colorSpaceXform;
-        slot.in0 = mapInput(node->inputs[0]);
+        slot.in0 = MapChainOpInput(ctx, inputBase, node->inputs[0]);
         break;
       }
       case AOTEffectKind::InputOpaque: {
@@ -668,7 +703,7 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
           return false;
         }
         slot.op = AOTChainOp::InputOpaque;
-        slot.in0 = mapInput(node->inputs[0]);
+        slot.in0 = MapChainOpInput(ctx, inputBase, node->inputs[0]);
         break;
       }
       case AOTEffectKind::MulAlpha: {
@@ -676,8 +711,8 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
           return false;
         }
         slot.op = AOTChainOp::MulAlpha;
-        slot.in0 = mapInput(node->inputs[0]);
-        slot.in1 = mapInput(node->inputs[1]);
+        slot.in0 = MapChainOpInput(ctx, inputBase, node->inputs[0]);
+        slot.in1 = MapChainOpInput(ctx, inputBase, node->inputs[1]);
         break;
       }
       case AOTEffectKind::Blend: {
@@ -692,8 +727,8 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
         }
         slot.op = AOTChainOp::Blend;
         slot.blend = *parameters;
-        slot.in0 = mapInput(node->inputs[0]);
-        slot.in1 = mapInput(node->inputs[1]);
+        slot.in0 = MapChainOpInput(ctx, inputBase, node->inputs[0]);
+        slot.in1 = MapChainOpInput(ctx, inputBase, node->inputs[1]);
         break;
       }
       case AOTEffectKind::RectCoverage: {
@@ -719,7 +754,7 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
           slot.op = AOTChainOp::LocalRectCoverage;
           slot.localRectCoverage = *parameters;
         }
-        slot.in0 = mapInput(node->inputs[0]);
+        slot.in0 = MapChainOpInput(ctx, inputBase, node->inputs[0]);
         break;
       }
       case AOTEffectKind::RRectCoverage: {
@@ -731,7 +766,7 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
         // rrect slot.
         slot.op = AOTChainOp::RRectCoverage;
         slot.rrectCoverage = *parameters;
-        slot.in0 = mapInput(node->inputs[0]);
+        slot.in0 = MapChainOpInput(ctx, inputBase, node->inputs[0]);
         break;
       }
       case AOTEffectKind::GradientSource: {
@@ -741,10 +776,10 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
         }
         // Single-authority budget: AOTPointwiseChainProcessor::MaxGradientSlots (the kernel
         // carries one chain-wide gradient parameter block and one SourceCoords varying).
-        if (hasGradient) {
+        if (ctx->hasGradient) {
           return false;
         }
-        hasGradient = true;
+        ctx->hasGradient = true;
         if (parameters->colorizerKind == 3) {
           // A LUT gradient binds its baked texture as a sampler-only child after the DAG leaves.
           if (parameters->lutProxy == nullptr) {
@@ -754,7 +789,7 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
         }
         slot.op = AOTChainOp::Gradient;
         slot.gradient = *parameters;
-        slot.in0 = mapInput(node->inputs[0]);
+        slot.in0 = MapChainOpInput(ctx, inputBase, node->inputs[0]);
         break;
       }
       default:
@@ -767,12 +802,19 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
       return false;
     }
   }
+  return true;
+}
+
+// Stage four: the pass's resource demand picks the final profile, the family's cross-slot
+// constraints close over it, and the pass output's slot becomes the chain's root.
+static bool ResolveFinalChainProfile(ChainBuildContext* ctx) {
+  auto* layout = ctx->layout;
   // The pass kernel and its declared profile describe the color pass alone; the draw's coverage
   // may only raise the final profile (a coverage gradient or a third tiled leaf moves a Chain pass
   // onto the TiledGraph family, whose budgets are a superset for those fields).
   AOTResourceDemand colorDemand = {};
-  for (auto nodeID : pass.nodes) {
-    const auto* node = nodes[nodeID.index()];
+  for (auto nodeID : ctx->pass->nodes) {
+    const auto* node = ctx->nodes[nodeID.index()];
     if (const auto* texture = std::get_if<AOTTextureParameters>(&node->parameters)) {
       ++colorDemand.leafBindings;
       if (HasShaderTiling(*texture)) {
@@ -787,165 +829,166 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
   }
   colorDemand.noiseSources = layout->noise != nullptr ? 1 : 0;
   colorDemand.leafBindings += colorDemand.noiseSources * 2;
-  auto declaredProfile = pass.resourceProfile;
+  auto declaredProfile = ctx->pass->resourceProfile;
   if (declaredProfile == AOTResourceProfile::Automatic) {
     declaredProfile = SelectAOTResourceProfile(colorDemand);
   }
   if (!FitsAOTResourceProfile(colorDemand, declaredProfile) ||
-      (checkKernel &&
-       IsAOTGraphProfile(declaredProfile) != (pass.kernel == AOTKernelKind::PointwiseGraph))) {
+      (ctx->checkKernel && IsAOTGraphProfile(declaredProfile) !=
+                               (ctx->pass->kernel == AOTKernelKind::PointwiseGraph))) {
     return false;
   }
-  auto finalProfile = declaredProfile;
-  if (finalProfile == AOTResourceProfile::Chain &&
-      (hasGradient || layout->tiledLeaves.size() > ChainResourceCapacity.tiledRecipes)) {
-    if (coverageGraph == nullptr) {
+  ctx->finalProfile = declaredProfile;
+  if (ctx->finalProfile == AOTResourceProfile::Chain &&
+      (ctx->hasGradient || layout->tiledLeaves.size() > ChainResourceCapacity.tiledRecipes)) {
+    if (ctx->coverageGraph == nullptr) {
       return false;
     }
-    finalProfile = AOTResourceProfile::TiledGraph;
+    ctx->finalProfile = AOTResourceProfile::TiledGraph;
   }
   const size_t leafCount = layout->leafNodes.size();
   if ((layout->lutGradient != nullptr && leafCount >= 2) ||
-      (layout->noise != nullptr && (hasGradient || leafCount > 2 || coverageLeafFromUVCoord))) {
+      (layout->noise != nullptr &&
+       (ctx->hasGradient || leafCount > 2 || ctx->coverageLeafFromUVCoord))) {
     return false;
   }
-  size_t rootIndex = slotOf[pass.output.index()];
-  if (rootIndex == SIZE_MAX) {
+  ctx->rootIndex = ctx->slotOf[ctx->pass->output.index()];
+  return ctx->rootIndex != SIZE_MAX;
+}
+
+// Stage five: an early-fold clip arrived as a RectCoverage/RRectCoverage trailing suffix
+// multiplying the color root. Geometric coverage must ride the XP's coverage input instead of the
+// source, so this pops the suffix and rewires it like the narrow clip slots: the innermost link
+// chains from the scalar unit one, outer links chain upward, the color root moves to the node
+// under the suffix, and the outermost link's register becomes the clip-coverage value. The suffix
+// stays in the color chain when the node under it is a designator with no slot (e.g. a bare clip
+// over the geometry color) — that shape keeps the old source-fold form. Walk in NODE-ordinal
+// space (slotOf maps nodes to slots).
+static void RewriteClipSuffix(ChainBuildContext* ctx) {
+  std::vector<size_t> suffixSlots = {};
+  size_t walkNode = ctx->pass->output.index();
+  while (walkNode < ctx->colorCount &&
+         (ctx->nodes[walkNode]->kind == AOTEffectKind::RectCoverage ||
+          ctx->nodes[walkNode]->kind == AOTEffectKind::RRectCoverage)) {
+    if (ctx->nodes[walkNode]->inputs.empty()) {
+      break;
+    }
+    suffixSlots.push_back(ctx->slotOf[walkNode]);
+    walkNode = ctx->nodes[walkNode]->inputs[0].index();
+  }
+  if (suffixSlots.empty() || walkNode >= ctx->colorCount || ctx->slotOf[walkNode] == SIZE_MAX) {
+    return;
+  }
+  ctx->rootIndex = ctx->slotOf[walkNode];
+  for (size_t i = 0; i < suffixSlots.size(); ++i) {
+    ctx->slots[suffixSlots[i]].in0 =
+        i + 1 < suffixSlots.size() ? static_cast<int>(suffixSlots[i + 1]) : -4;
+  }
+  ctx->clipCoverageSlot = static_cast<int>(suffixSlots.front());
+  ctx->clipChainInput = ctx->clipCoverageSlot;
+}
+
+// Stage six: resolves the coverage subtree's root register, and validates the subtree's shape.
+// Accepted roots: a single blend consuming the unit input (the xfer-dst coverage family), a bare
+// texture or gradient consuming the unit alpha, a constant (the inverted shader mask filter whose
+// shader yields no processor: ConstColor in any input mode, the same pmApplyConstColor math as
+// the runtime emission), or an analytic coverage node (RectCoverage / RRectCoverage) closing a
+// chain that starts at the unit. The unit may otherwise feed only texture leaves (their input is
+// unused — blend operands sample raw), the gradient (a blend child, so it reads the opaque -4
+// designator), and analytic coverage nodes. Analytic clip slots may multiply a blend-rooted
+// subtree: the scalar coverage commutes with the pointwise blend result, so the product matches
+// the runtime chain order (verified differentially). Two-child blends keep the plain route rather
+// than risking a wrong value when the GP coverage is below 1.0.
+static bool ResolveCoverageRoot(ChainBuildContext* ctx) {
+  if (ctx->coverageGraph == nullptr) {
+    return true;
+  }
+  const size_t covRootCombined = ctx->colorCount + ctx->coverageRoot.index();
+  auto* covRootNode = ctx->nodes[covRootCombined];
+  const bool rootIsBlend = covRootNode->kind == AOTEffectKind::Blend;
+  const bool rootIsTexture = covRootNode->kind == AOTEffectKind::TextureSource;
+  const bool rootIsGradient = covRootNode->kind == AOTEffectKind::GradientSource;
+  const bool rootIsConstant = covRootNode->kind == AOTEffectKind::ConstColor;
+  const bool rootIsAnalytic = covRootNode->kind == AOTEffectKind::RectCoverage ||
+                              covRootNode->kind == AOTEffectKind::RRectCoverage;
+  if (!rootIsBlend && !rootIsTexture && !rootIsGradient && !rootIsConstant && !rootIsAnalytic) {
     return false;
   }
-  // The clip-coverage channel (kernel: ClipCoverageRegister). The narrow clip slots chain from
-  // the scalar unit one (-4) through clipChainInput — NOT from the coverage unit (-3): the tail
-  // multiplies the clip product in on top of the GP coverage (vCoverage / gpPixelCoverage /
-  // the coverage root), so a clip chain that already starts from the GP coverage would square it
-  // (q * (q * clip)). The clip slots' product is therefore a pure clip value. Early-fold clips
-  // arrive differently — the fold routes the clip coverage into the color graph as a
-  // RectCoverage/RRectCoverage trailing suffix multiplying the root. Geometric coverage must ride
-  // the XP's coverage input instead of the source (), so pop that suffix and rewire it like the
-  // narrow clip slots: the innermost link chains from the unit one, outer links chain upward, the
-  // color root moves to the node under the suffix, and the outermost link's register becomes the
-  // clip-coverage value.
-  int clipCoverageSlot = -1;
-  int clipChainInput = -4;
-  {
-    // Walk in NODE-ordinal space (slotOf maps nodes to slots); the suffix stays in the color
-    // chain when the node under it is a designator with no slot (e.g. a bare clip over the
-    // geometry color) — that shape keeps the old source-fold form, which the entry guards
-    // restrict to SrcOver-class blending.
-    std::vector<size_t> suffixSlots = {};
-    size_t walkNode = pass.output.index();
-    while (walkNode < colorCount && (nodes[walkNode]->kind == AOTEffectKind::RectCoverage ||
-                                     nodes[walkNode]->kind == AOTEffectKind::RRectCoverage)) {
-      if (nodes[walkNode]->inputs.empty()) {
-        break;
+  int coverageBlendCount = 0;
+  bool rootConsumesUnit = false;
+  for (size_t j = 1; j < ctx->covCount; ++j) {
+    auto* node = ctx->nodes[ctx->colorCount + j];
+    if (node->kind == AOTEffectKind::Blend) {
+      ++coverageBlendCount;
+    }
+    for (auto input : node->inputs) {
+      if (input.index() != 0) {
+        continue;
       }
-      suffixSlots.push_back(slotOf[walkNode]);
-      walkNode = nodes[walkNode]->inputs[0].index();
-    }
-    if (!suffixSlots.empty() && walkNode < colorCount && slotOf[walkNode] != SIZE_MAX) {
-      rootIndex = slotOf[walkNode];
-      for (size_t i = 0; i < suffixSlots.size(); ++i) {
-        slots[suffixSlots[i]].in0 =
-            i + 1 < suffixSlots.size() ? static_cast<int>(suffixSlots[i + 1]) : -4;
+      if (ctx->colorCount + j == covRootCombined) {
+        rootConsumesUnit = true;
+        continue;
       }
-      clipCoverageSlot = static_cast<int>(suffixSlots.front());
-      clipChainInput = clipCoverageSlot;
-    }
-  }
-  int coverageRootSlot = -1;
-  if (coverageGraph != nullptr) {
-    // Accepted roots: a single blend consuming the unit input (the xfer-dst coverage family), a
-    // bare texture or gradient consuming the unit alpha, a constant (the inverted shader mask
-    // filter whose shader yields no processor: ConstColor in any input mode, the same
-    // pmApplyConstColor math as the runtime emission), or an analytic coverage node
-    // (RectCoverage / RRectCoverage) closing a chain that starts at the unit. The
-    // unit may otherwise feed only texture leaves (their input is unused — blend operands sample
-    // raw), the gradient (a blend child, so it reads the opaque -4 designator), and analytic
-    // coverage nodes. Analytic clip slots may multiply a blend-rooted subtree: the scalar coverage
-    // commutes with the pointwise blend result, so the product matches the runtime chain order
-    // (verified differentially). Two-child blends keep the plain route rather than risking a wrong
-    // value when the GP coverage is below 1.0.
-    const size_t covRootCombined = colorCount + coverageRoot.index();
-    auto* covRootNode = nodes[covRootCombined];
-    const bool rootIsBlend = covRootNode->kind == AOTEffectKind::Blend;
-    const bool rootIsTexture = covRootNode->kind == AOTEffectKind::TextureSource;
-    const bool rootIsGradient = covRootNode->kind == AOTEffectKind::GradientSource;
-    const bool rootIsConstant = covRootNode->kind == AOTEffectKind::ConstColor;
-    const bool rootIsAnalytic = covRootNode->kind == AOTEffectKind::RectCoverage ||
-                                covRootNode->kind == AOTEffectKind::RRectCoverage;
-    if (!rootIsBlend && !rootIsTexture && !rootIsGradient && !rootIsConstant && !rootIsAnalytic) {
-      return false;
-    }
-    int coverageBlendCount = 0;
-    bool rootConsumesUnit = false;
-    for (size_t j = 1; j < covCount; ++j) {
-      auto* node = nodes[colorCount + j];
-      if (node->kind == AOTEffectKind::Blend) {
-        ++coverageBlendCount;
-      }
-      for (auto input : node->inputs) {
-        if (input.index() != 0) {
-          continue;
-        }
-        if (colorCount + j == covRootCombined) {
-          rootConsumesUnit = true;
-          continue;
-        }
-        if (node->kind != AOTEffectKind::TextureSource &&
-            node->kind != AOTEffectKind::GradientSource &&
-            node->kind != AOTEffectKind::RectCoverage &&
-            node->kind != AOTEffectKind::RRectCoverage) {
-          return false;
-        }
-      }
-    }
-    // An analytic root consumes the previous analytic node rather than the unit, but the chain
-    // still transmits the unit coverage transitively, so only analytic roots may omit a direct
-    // unit input (the blend-count rule already rejects blends under an analytic root).
-    if (coverageBlendCount != (rootIsBlend ? 1 : 0) || (!rootConsumesUnit && !rootIsAnalytic)) {
-      return false;
-    }
-    auto covSlot = slotOf[covRootCombined];
-    if (covSlot == SIZE_MAX) {
-      return false;
-    }
-    coverageRootSlot = static_cast<int>(covSlot);
-    if (coverageLeafFromUVCoord) {
-      // The atlas glyph mask is TRUE coverage in the runtime composite (the dedicated MaskFill
-      // shader carries it as coverage — see AtlasTextNonSrcOverBlendKeepsDstProbe), unlike a
-      // MaskFilter's source-modulating mask, whose subtree keeps the CoverageRootIndex source
-      // route. Route the atlas subtree's root through the clip-coverage register so it rides the
-      // XP's coverage input with the unpremultiplied source. A draw clip then chains on top of
-      // the glyph (glyph * clip), so the glyph register is the clip chain's innermost input. An
-      // early-fold clip suffix sits in the color block, ahead of the glyph slots, and cannot
-      // read the glyph register.
-      if (clipCoverageSlot >= 0) {
+      if (node->kind != AOTEffectKind::TextureSource &&
+          node->kind != AOTEffectKind::GradientSource &&
+          node->kind != AOTEffectKind::RectCoverage && node->kind != AOTEffectKind::RRectCoverage) {
         return false;
       }
-      clipCoverageSlot = coverageRootSlot;
-      clipChainInput = coverageRootSlot;
-      coverageRootSlot = -1;
     }
   }
-  // The narrow clip slots no longer multiply the color root: they chain from the scalar unit one
-  // (-4, the innermost link) so their product is a pure clip coverage value the kernel reads
-  // through ClipCoverageRegister and composites as the XP's coverage input on top of the GP
-  // coverage — folding them into the source was only correct for SrcOver-class blending, and
-  // chaining them from the coverage unit (-3) squared the GP coverage. The color root stays the
-  // pre-clip result.
-  auto appendClipSlot = [&](AOTChainSlot clipSlot) {
-    clipSlot.in0 = clipChainInput;
-    clipChainInput = static_cast<int>(slots.size());
-    clipCoverageSlot = clipChainInput;
-    slots.push_back(clipSlot);
-  };
-  for (auto* deviceRect : clipSlots.deviceRects) {
+  // An analytic root consumes the previous analytic node rather than the unit, but the chain
+  // still transmits the unit coverage transitively, so only analytic roots may omit a direct
+  // unit input (the blend-count rule already rejects blends under an analytic root).
+  if (coverageBlendCount != (rootIsBlend ? 1 : 0) || (!rootConsumesUnit && !rootIsAnalytic)) {
+    return false;
+  }
+  auto covSlot = ctx->slotOf[covRootCombined];
+  if (covSlot == SIZE_MAX) {
+    return false;
+  }
+  ctx->coverageRootSlot = static_cast<int>(covSlot);
+  if (!ctx->coverageLeafFromUVCoord) {
+    return true;
+  }
+  // The atlas glyph mask is TRUE coverage in the runtime composite (the dedicated MaskFill
+  // shader carries it as coverage — see AtlasTextNonSrcOverBlendKeepsDstProbe), unlike a
+  // MaskFilter's source-modulating mask, whose subtree keeps the CoverageRootIndex source
+  // route. Route the atlas subtree's root through the clip-coverage register so it rides the
+  // XP's coverage input with the unpremultiplied source. A draw clip then chains on top of
+  // the glyph (glyph * clip), so the glyph register is the clip chain's innermost input. An
+  // early-fold clip suffix sits in the color block, ahead of the glyph slots, and cannot
+  // read the glyph register.
+  if (ctx->clipCoverageSlot >= 0) {
+    return false;
+  }
+  ctx->clipCoverageSlot = ctx->coverageRootSlot;
+  ctx->clipChainInput = ctx->coverageRootSlot;
+  ctx->coverageRootSlot = -1;
+  return true;
+}
+
+// Stage seven: appends the narrow clip slots (the analytic clip FPs the matcher collected). They
+// never multiply the color root: they chain from the scalar unit one (-4, the innermost link) so
+// their product is a pure clip coverage value the kernel reads through ClipCoverageRegister and
+// composites as the XP's coverage input on top of the GP coverage — folding them into the source
+// was only correct for SrcOver-class blending, and chaining them from the coverage unit (-3)
+// squared the GP coverage. The color root stays the pre-clip result.
+static void AppendChainClipSlot(ChainBuildContext* ctx, AOTChainSlot clipSlot) {
+  clipSlot.in0 = ctx->clipChainInput;
+  ctx->clipChainInput = static_cast<int>(ctx->slots.size());
+  ctx->clipCoverageSlot = ctx->clipChainInput;
+  ctx->slots.push_back(clipSlot);
+}
+
+static void AppendClipSlots(ChainBuildContext* ctx) {
+  for (auto* deviceRect : ctx->clipSlots->deviceRects) {
     AOTChainSlot rectSlot = {};
     rectSlot.op = AOTChainOp::AARectCoverage;
     const auto& rect = deviceRect->getRect();
     rectSlot.rectCoverage.rect = {rect.left, rect.top, rect.right, rect.bottom};
-    appendClipSlot(rectSlot);
+    AppendChainClipSlot(ctx, rectSlot);
   }
-  for (auto* localRect : clipSlots.localRects) {
+  for (auto* localRect : ctx->clipSlots->localRects) {
     AOTChainSlot localRectSlot = {};
     localRectSlot.op = AOTChainOp::LocalRectCoverage;
     const auto& rect = localRect->getRect();
@@ -954,9 +997,9 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
     localRectSlot.localRectCoverage.deviceToLocal = {matrix[0], matrix[1], matrix[2],
                                                      matrix[3], matrix[4], matrix[5],
                                                      matrix[6], matrix[7], matrix[8]};
-    appendClipSlot(localRectSlot);
+    AppendChainClipSlot(ctx, localRectSlot);
   }
-  for (const auto& nonAARect : clipSlots.nonAARects) {
+  for (const auto& nonAARect : ctx->clipSlots->nonAARects) {
     AOTChainSlot rectSlot = {};
     rectSlot.op = AOTChainOp::RRectCoverage;
     const auto& rect = nonAARect.rect;
@@ -965,9 +1008,9 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
     rectSlot.rrectCoverage.deviceToLocal = {matrix[0], matrix[1], matrix[2], matrix[3], matrix[4],
                                             matrix[5], matrix[6], matrix[7], matrix[8]};
     rectSlot.rrectCoverage.antiAlias = 0.0f;
-    appendClipSlot(rectSlot);
+    AppendChainClipSlot(ctx, rectSlot);
   }
-  for (auto* rrectEffect : clipSlots.rrects) {
+  for (auto* rrectEffect : ctx->clipSlots->rrects) {
     AOTChainSlot rrectSlot = {};
     rrectSlot.op = AOTChainOp::RRectCoverage;
     const auto& rect = rrectEffect->getLocalRect();
@@ -981,58 +1024,104 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
     rrectSlot.rrectCoverage.deviceToLocal = {matrix[0], matrix[1], matrix[2], matrix[3], matrix[4],
                                              matrix[5], matrix[6], matrix[7], matrix[8]};
     rrectSlot.rrectCoverage.antiAlias = rrectEffect->isAntiAlias() ? 1.0f : 0.0f;
-    appendClipSlot(rrectSlot);
+    AppendChainClipSlot(ctx, rrectSlot);
   }
-  if (slots.size() > AOTPointwiseChainProcessor::MaxSlots) {
+}
+
+// Stage eight: register allocation. The slot wiring built above uses instruction ordinals; this
+// pass rewrites every reference into the kernel's recycled chainResults registers, so the
+// per-profile instruction budget (16 for Chain and gradient, 32 for noise) and the live-result
+// budget (MaxRegisters) are independent. A DAG exceeding the register budget is refused here.
+static bool AssignChainRegisters(ChainBuildContext* ctx) {
+  if (ctx->slots.size() > AOTPointwiseChainProcessor::MaxSlots) {
     return false;
   }
-  // Register allocation: the slot wiring built above uses instruction ordinals; this pass
-  // rewrites every reference into the kernel's recycled chainResults registers, so the
-  // per-profile instruction budget (16 for Chain and gradient, 32 for noise) and the
-  // live-result budget (MaxRegisters) are independent. A DAG exceeding the register budget is
-  // refused here.
-  std::vector<std::vector<int>> instructionInputs(slots.size());
-  for (size_t index = 0; index < slots.size(); ++index) {
-    for (int input : {slots[index].in0, slots[index].in1}) {
+  std::vector<std::vector<int>> instructionInputs(ctx->slots.size());
+  for (size_t index = 0; index < ctx->slots.size(); ++index) {
+    for (int input : {ctx->slots[index].in0, ctx->slots[index].in1}) {
       if (input >= 0) {
         instructionInputs[index].push_back(input);
       }
     }
   }
-  AOTChainRegisterAssignment assignment = {};
-  if (!AllocateChainRegisters(instructionInputs, static_cast<int>(rootIndex), coverageRootSlot,
-                              clipCoverageSlot, AOTPointwiseChainProcessor::MaxRegisters,
-                              &assignment)) {
+  ctx->assignment = {};
+  if (!AllocateChainRegisters(instructionInputs, static_cast<int>(ctx->rootIndex),
+                              ctx->coverageRootSlot, ctx->clipCoverageSlot,
+                              AOTPointwiseChainProcessor::MaxRegisters, &ctx->assignment)) {
     return false;
   }
-  for (size_t index = 0; index < slots.size(); ++index) {
-    if (slots[index].in0 >= 0) {
-      slots[index].in0 = assignment.outRegister[static_cast<size_t>(slots[index].in0)];
+  for (size_t index = 0; index < ctx->slots.size(); ++index) {
+    if (ctx->slots[index].in0 >= 0) {
+      ctx->slots[index].in0 =
+          ctx->assignment.outRegister[static_cast<size_t>(ctx->slots[index].in0)];
     }
-    if (slots[index].in1 >= 0) {
-      slots[index].in1 = assignment.outRegister[static_cast<size_t>(slots[index].in1)];
+    if (ctx->slots[index].in1 >= 0) {
+      ctx->slots[index].in1 =
+          ctx->assignment.outRegister[static_cast<size_t>(ctx->slots[index].in1)];
     }
-    slots[index].outRegister = assignment.outRegister[index];
+    ctx->slots[index].outRegister = ctx->assignment.outRegister[index];
   }
+  return true;
+}
+
+// Stage nine: the processor's own data rules and the final profile's capacities decide last, on
+// the exact instruction array construction will hand to AOTPointwiseChainProcessor::Make.
+static bool FinalizeChainLayout(ChainBuildContext* ctx) {
+  auto* layout = ctx->layout;
   std::vector<int> tiledLeafIndices = {};
   for (const auto& tiled : layout->tiledLeaves) {
     tiledLeafIndices.push_back(tiled.leafIndex);
   }
-  // The processor's own data rules and the final profile's capacities decide last, on the exact
-  // instruction array construction will hand to AOTPointwiseChainProcessor::Make.
-  if (assignment.rootRegister < 0 ||
+  if (ctx->assignment.rootRegister < 0 ||
       !AOTPointwiseChainProcessor::ValidateSlots(
-          slots, static_cast<size_t>(assignment.rootRegister), assignment.coverageRootRegister,
-          assignment.clipCoverageRegister, leafCount, layout->lutGradient != nullptr,
-          tiledLeafIndices, &finalProfile)) {
+          ctx->slots, static_cast<size_t>(ctx->assignment.rootRegister),
+          ctx->assignment.coverageRootRegister, ctx->assignment.clipCoverageRegister,
+          layout->leafNodes.size(), layout->lutGradient != nullptr, tiledLeafIndices,
+          &ctx->finalProfile)) {
     return false;
   }
-  layout->slots = std::move(slots);
-  layout->rootRegister = static_cast<size_t>(assignment.rootRegister);
-  layout->coverageRootRegister = assignment.coverageRootRegister;
-  layout->clipCoverageRegister = assignment.clipCoverageRegister;
-  layout->profile = finalProfile;
+  layout->slots = std::move(ctx->slots);
+  layout->rootRegister = static_cast<size_t>(ctx->assignment.rootRegister);
+  layout->coverageRootRegister = ctx->assignment.coverageRootRegister;
+  layout->clipCoverageRegister = ctx->assignment.clipCoverageRegister;
+  layout->profile = ctx->finalProfile;
   return true;
+}
+
+// Flattens a single-pass pointwise DAG into the fused chain layout. Texture leaves are placed in
+// the leading slots so that slot k pairs with TextureSampler_k, which keeps sampler indexing
+// static in the kernel. When clipSlots carries analytic clip FPs, their coverage slots form the
+// clip-coverage channel. When coverageGraph is given, its nodes (lowered from the coverage FP with
+// the GeometryCoverage unit as origin) are merged after the color nodes: coverage leaves extend
+// the leading texture block, coverage ops trail the color ops, and coverageRoot becomes the
+// chain's coverage root. checkKernel compares the pass kernel against the profile the color pass
+// needs; the DAG planner clears it to learn that profile.
+static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
+                            const ChainClipSlots& clipSlots, const AOTEffectGraph* coverageGraph,
+                            AOTNodeID coverageRoot, bool coverageLeafFromUVCoord, bool checkKernel,
+                            ChainLayout* layout) {
+  ChainBuildContext ctx = {};
+  ctx.graph = &graph;
+  ctx.pass = &pass;
+  ctx.clipSlots = &clipSlots;
+  ctx.coverageGraph = coverageGraph;
+  ctx.coverageRoot = coverageRoot;
+  ctx.coverageLeafFromUVCoord = coverageLeafFromUVCoord;
+  ctx.checkKernel = checkKernel;
+  ctx.layout = layout;
+  if (!MergeNodeSpaces(&ctx)) {
+    return false;
+  }
+  ScheduleChainSlots(&ctx);
+  if (!EncodeChainSlots(&ctx) || !ResolveFinalChainProfile(&ctx)) {
+    return false;
+  }
+  RewriteClipSuffix(&ctx);
+  if (!ResolveCoverageRoot(&ctx)) {
+    return false;
+  }
+  AppendClipSlots(&ctx);
+  return AssignChainRegisters(&ctx) && FinalizeChainLayout(&ctx);
 }
 
 // The padding state that mirrors the first real leaf's sampler on the phantom children: on
