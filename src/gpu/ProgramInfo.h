@@ -132,6 +132,7 @@ class ProgramInfo {
    */
   void setCullMode(CullMode mode) {
     cullMode = mode;
+    cachedProgramKey.reset();
   }
 
   /**
@@ -151,6 +152,7 @@ class ProgramInfo {
    */
   void setDepthStencil(const DepthStencilDescriptor& descriptor) {
     depthStencil = descriptor;
+    cachedProgramKey.reset();
   }
 
   /**
@@ -169,7 +171,15 @@ class ProgramInfo {
    */
   void setColorWriteMask(uint32_t mask) {
     colorWriteMask = mask;
+    cachedProgramKey.reset();
   }
+
+  /**
+   * The program-cache key, computed once per info and shared by getProgram and the prepare-time
+   * route checks. The setters above invalidate it, so it always reflects the current pipeline
+   * state.
+   */
+  const BytesKey& programKey() const;
 
   // Returns the exact cache key for diagnostics without letting reporting code reconstruct it from
   // effect/pipeline signatures (which omit processor-key details).
@@ -218,6 +228,10 @@ class ProgramInfo {
   void updateProcessorIndices();
 
   BytesKey buildProgramKey() const;
+
+  // The cached program key (see programKey()): an idempotence cache like cachedMatch, invalidated
+  // by the pipeline-state setters.
+  mutable std::optional<BytesKey> cachedProgramKey;
 
   // The cached MatchPermutation outcome (see PermutationMatch.h): filled by the first caller and
   // reused by every later lookup of the same info. Mutable because the lookup entry takes a

@@ -18,6 +18,7 @@
 
 #include "PermutationMatcher.h"
 #include <skcms.h>
+#include <unordered_set>
 #include "ColorSpaceXformHelper.h"
 #include "ShaderMatchHelpers.h"
 #include "gpu/Swizzle.h"
@@ -55,6 +56,7 @@
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
 #include "layers/processors/GlassShapeGeometryFragmentProcessor.h"
 #include "layers/processors/GlassUDFTentBlurFragmentProcessor.h"
+#include "tgfx/core/BytesKey.h"
 
 namespace tgfx {
 
@@ -388,10 +390,13 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
   //      an input combination AllInputs does not enumerate — the bundle would lack the variant
   //      and the draw would be dropped at runtime.
   // The extra Match calls are pure shape checks; the thread-local failure reason they may record
-  // is saved and restored so the rejection accounting is unaffected.
+  // is saved and restored so the rejection accounting is unaffected. The audit runs once per
+  // distinct program shape: repeated prepares of the same shape re-audit nothing.
   {
-    const auto savedFailure = gPendingMatchFailure;
-    int acceptors = 0;
+    static thread_local std::unordered_set<BytesKey, BytesKeyHasher> auditedProgramKeys;
+    if (auditedProgramKeys.insert(programInfo->programKeyForDiagnostics()).second) {
+      const auto savedFailure = gPendingMatchFailure;
+      int acceptors = 0;
 #define TGFX_AUDIT_FAMILY(Family)                                                           \
   if (auto auditResult = Family::Match(programInfo)) {                                      \
     if (alphaOnly && !Family::ServesAlphaOnly) {                                            \
@@ -407,9 +412,10 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
              "its AllInputs");                                                              \
     }                                                                                       \
   }
-    TGFX_FOR_EACH_SHADER_FAMILY(TGFX_AUDIT_FAMILY)
+      TGFX_FOR_EACH_SHADER_FAMILY(TGFX_AUDIT_FAMILY)
 #undef TGFX_AUDIT_FAMILY
-    gPendingMatchFailure = savedFailure;
+      gPendingMatchFailure = savedFailure;
+    }
   }
 #endif
 

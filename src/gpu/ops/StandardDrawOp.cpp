@@ -22,6 +22,7 @@
 #include "gpu/AOTEffectDecomposer.h"
 #include "gpu/AOTPlanExecutor.h"
 #include "gpu/AOTRouter.h"
+#include "gpu/GlobalCache.h"
 #include "gpu/PermutationMatcher.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/Program.h"
@@ -141,9 +142,20 @@ std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
       return nullptr;
     }
   }
-  if (cache->dedicatedKernelsEnabled() && !isInlineRewriteDeferred() &&
-      MatchPermutation(preparedProgramInfo.get()).has_value()) {
-    return nullptr;
+  if (cache->dedicatedKernelsEnabled() && !isInlineRewriteDeferred()) {
+    auto cached =
+        renderTarget->getContext()->globalCache()->findProgram(preparedProgramInfo->programKey());
+    if (cached != nullptr &&
+        cached->getProvenance().program == ProgramOrigin::PrecompiledArtifact) {
+      // The program cache's key-to-program premise: this exact key already resolved to a
+      // precompiled artifact, so the match that produced it succeeded and the plain route serves
+      // the draw — the probe below would only repeat that walk.
+      DEBUG_ASSERT(MatchPermutation(preparedProgramInfo.get()).has_value());
+      return nullptr;
+    }
+    if (MatchPermutation(preparedProgramInfo.get()).has_value()) {
+      return nullptr;
+    }
   }
   // The coverage forms the chain carries are now semantically routed: geometric coverage (the
   // narrow clip slots, the device mask, the atlas glyph subtree via the clip-coverage register,

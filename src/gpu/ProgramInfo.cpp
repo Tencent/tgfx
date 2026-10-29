@@ -163,8 +163,15 @@ std::string ProgramInfo::FormatDiagnosticKey(const BytesKey& key) {
   return stream.str();
 }
 
+const BytesKey& ProgramInfo::programKey() const {
+  if (!cachedProgramKey.has_value()) {
+    cachedProgramKey = buildProgramKey();
+  }
+  return *cachedProgramKey;
+}
+
 BytesKey ProgramInfo::programKeyForDiagnostics() const {
-  return buildProgramKey();
+  return programKey();
 }
 
 BytesKey ProgramInfo::buildProgramKey() const {
@@ -211,8 +218,8 @@ std::shared_ptr<Program> ProgramInfo::getProgram(ProgramLookupMode mode) const {
   auto* shaderCache = context->precompiledShaderCache();
   bool precompiledOnly = mode == ProgramLookupMode::PrecompiledOnly || shaderCache->isLoaded();
 
-  auto programKey = buildProgramKey();
-  auto program = globalCache->findProgram(programKey);
+  const auto& key = programKey();
+  auto program = globalCache->findProgram(key);
   bool cacheKeyOccupied = program != nullptr;
   bool programCreated = false;
   bool deferredFallback = false;
@@ -236,7 +243,7 @@ std::shared_ptr<Program> ProgramInfo::getProgram(ProgramLookupMode mode) const {
     }
     if (programCreated && shaderCache->diagnosticRecordingEnabled() &&
         program->getProvenance().program != ProgramOrigin::PrecompiledArtifact) {
-      shaderCache->recordJITProgram({FormatDiagnosticKey(programKey)});
+      shaderCache->recordJITProgram({FormatDiagnosticKey(key)});
     }
   }
   if (precompiledOnly && program->getProvenance().program != ProgramOrigin::PrecompiledArtifact) {
@@ -248,7 +255,7 @@ std::shared_ptr<Program> ProgramInfo::getProgram(ProgramLookupMode mode) const {
   // artifact for this lookup but must not replace that cache entry and corrupt its LRU bookkeeping.
   if (programCreated && !cacheKeyOccupied) {
     globalCache->addProgram(
-        programKey, program,
+        key, program,
         deferredFallback || context->precompiledShaderCache()->deliberateMissMarking());
   }
   return program;
