@@ -49,9 +49,9 @@ void Painter::draw(LayerRecorder* recorder) {
         recorder->setMatrix(runMatrix);
         for (const auto& paint : emit.paints) {
           if (emit.shape != nullptr) {
-            recorder->addShape(emit.shape, paint);
+            recorder->addShape(emit.shape, &paint);
           } else if (emit.textBlob != nullptr) {
-            recorder->addTextBlob(emit.textBlob, paint);
+            recorder->addTextBlob(emit.textBlob, &paint);
           }
         }
         recorder->resetMatrix();
@@ -75,7 +75,7 @@ void Painter::draw(LayerRecorder* recorder) {
       continue;
     }
     recorder->setMatrix(outerMatrix);
-    recorder->addShape(std::move(shape), paint);
+    recorder->addShape(std::move(shape), &paint);
     recorder->resetMatrix();
   }
 }

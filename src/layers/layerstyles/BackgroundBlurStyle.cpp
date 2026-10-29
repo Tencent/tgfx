@@ -82,7 +82,7 @@ void BackgroundBlurStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, f
   auto imageRect = Rect::MakeWH(bgWidth, bgHeight);
   auto clipBounds = GetClipBounds(canvas);
   if (clipBounds.has_value() && !clipBounds->isEmpty()) {
-    // clipBounds is in layer-local space; bgImage pixels are offset by bgOffset from that space.
+    // clipBounds is in the content image's pixel space; bgImage pixels are offset by bgOffset there.
     imageRect = clipBounds.value();
     imageRect.offset(-bgOffset.x, -bgOffset.y);
     if (!imageRect.intersect(Rect::MakeWH(bgWidth, bgHeight))) {
@@ -113,7 +113,8 @@ void BackgroundBlurStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, f
   backgroundOffset.x += bgOffset.x;
   backgroundOffset.y += bgOffset.y;
 
-  auto maskShader = Shader::MakeImageShader(input.content, TileMode::Decal, TileMode::Decal);
+  auto maskShader =
+      Shader::MakeImageShader(input.content->image(), TileMode::Decal, TileMode::Decal);
 
   // draw blurred background in the mask
   Paint paint = {};

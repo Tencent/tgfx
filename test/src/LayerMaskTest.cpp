@@ -1031,4 +1031,48 @@ TGFX_TEST(LayerMaskTest, MaskPathDrawCountThreshold) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerMaskTest/MaskPathDrawCountThreshold_31"));
 }
 
+// A masked layer inside a 3D context is rasterized as a leaf node of the parent's 3D context, so
+// the mask is recorded while that context is still active. Verify the mask is applied in full
+// without relying on a screenshot baseline.
+TGFX_TEST(LayerMaskTest, MaskUnderPreserve3DParent) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  DisplayList displayList;
+
+  auto parentLayer = SolidLayer::Make();
+  parentLayer->setColor(Color::White());
+  parentLayer->setWidth(200);
+  parentLayer->setHeight(200);
+  parentLayer->setPreserve3D(true);
+
+  auto childLayer = SolidLayer::Make();
+  childLayer->setColor(Color::Red());
+  childLayer->setWidth(200);
+  childLayer->setHeight(200);
+
+  Path maskPath = {};
+  maskPath.addRect(Rect::MakeWH(100, 200));
+  auto maskLayer = ShapeLayer::Make();
+  maskLayer->setPath(maskPath);
+  maskLayer->setFillStyle(ShapeStyle::Make(Color::White()));
+  childLayer->setMask(maskLayer);
+
+  parentLayer->addChild(childLayer);
+  displayList.root()->addChild(parentLayer);
+  displayList.root()->addChild(maskLayer);
+
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  displayList.render(surface.get());
+
+  auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  uint32_t insidePixel = 0;
+  uint32_t outsidePixel = 0;
+  ASSERT_TRUE(surface->readPixels(info, &insidePixel, 25, 100));
+  ASSERT_TRUE(surface->readPixels(info, &outsidePixel, 175, 100));
+  EXPECT_EQ(insidePixel, 0xFF0000FFu);
+  EXPECT_EQ(outsidePixel, 0xFFFFFFFFu);
+}
+
 }  // namespace tgfx

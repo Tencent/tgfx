@@ -25,7 +25,6 @@
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/GammaCorrection.h"
 #include "core/utils/ShapeUtils.h"
-#include "tgfx/core/Buffer.h"
 #include "tgfx/core/Path.h"
 
 namespace tgfx {
@@ -98,6 +97,35 @@ bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   ftPath.setEvenOdd(fillType == PathFillType::EvenOdd || fillType == PathFillType::InverseEvenOdd);
   auto outlines = ftPath.getOutlines();
   auto ftLibrary = FTLibrary::Get();
+  if (!antiAlias) {
+    // A monochrome bitmap drops even-odd holes, because only the smooth rasterizer honors the fill
+    // rule. Render smooth, then binarize.
+    FT_Bitmap bitmap;
+    bitmap.width = static_cast<unsigned>(targetInfo.width());
+    bitmap.rows = static_cast<unsigned>(targetInfo.height());
+    bitmap.pitch = static_cast<int>(targetInfo.rowBytes());
+    bitmap.buffer = static_cast<unsigned char*>(dstPixels);
+    bitmap.pixel_mode = FT_PIXEL_MODE_GRAY;
+    bitmap.num_grays = 256;
+    for (auto& outline : outlines) {
+      FT_Outline_Get_Bitmap(ftLibrary, &(outline->outline), &bitmap);
+    }
+    auto* pixels = static_cast<unsigned char*>(dstPixels);
+    // Area at least half stays. The platform rasterizers use their own hard-edge rules, so curved
+    // edges may differ by a pixel.
+    constexpr unsigned char COVERAGE_THRESHOLD = 128;
+    for (int y = 0; y < targetInfo.height(); y++) {
+      auto* row = pixels + static_cast<size_t>(y) * targetInfo.rowBytes();
+      for (int x = 0; x < targetInfo.width(); x++) {
+        row[x] = row[x] >= COVERAGE_THRESHOLD ? 0xFF : 0x00;
+      }
+    }
+    if (NeedConvertColorSpace(colorSpace(), dstColorSpace)) {
+      ConvertColorSpaceInPlace(width(), height(), colorType, alphaType, dstRowBytes, colorSpace(),
+                               dstColorSpace, dstPixels);
+    }
+    return true;
+  }
   if (!needsGammaCorrection) {
     FT_Bitmap bitmap;
     bitmap.width = static_cast<unsigned>(targetInfo.width());
@@ -117,8 +145,8 @@ bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   }
   auto buffer = static_cast<unsigned char*>(dstPixels);
   auto rows = targetInfo.height();
-  // Antialiasing is always enabled because FreeType generates only 1-bit masks when it's off,
-  // and we haven't implemented conversion from 1-bit to 8-bit masks yet.
+  // Only anti-aliased draws reach this branch; the non-anti-aliased path above binarizes instead.
+  // Gamma correction needs per-pixel coverage, so ask FT for the AA direct raster.
   auto pitch = static_cast<int>(targetInfo.rowBytes());
   FTRasterTarget target = {buffer + (rows - 1) * pitch, pitch,
                            GammaCorrection::GammaTable().data()};

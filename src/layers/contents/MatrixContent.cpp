@@ -26,23 +26,24 @@ MatrixContent::MatrixContent(std::unique_ptr<GeometryContent> content, const Mat
     : content(std::move(content)), matrix(matrix) {
 }
 
-Rect MatrixContent::getBounds() const {
-  return matrix.mapRect(content->getBounds());
+Rect MatrixContent::getBounds(bool includeUnpaintedGeometry) const {
+  return matrix.mapRect(content->getBounds(includeUnpaintedGeometry));
 }
 
-Rect MatrixContent::getTightBounds(const Matrix& parentMatrix) const {
+Rect MatrixContent::getTightBounds(const Matrix& parentMatrix,
+                                   bool includeUnpaintedGeometry) const {
   auto combinedMatrix = matrix;
   combinedMatrix.postConcat(parentMatrix);
-  return content->getTightBounds(combinedMatrix);
+  return content->getTightBounds(combinedMatrix, includeUnpaintedGeometry);
 }
 
-bool MatrixContent::hitTestPoint(float localX, float localY) const {
+bool MatrixContent::hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const {
   Matrix inverse = Matrix::I();
   if (!matrix.invert(&inverse)) {
     return false;
   }
   auto localPoint = inverse.mapXY(localX, localY);
-  return content->hitTestPoint(localPoint.x, localPoint.y);
+  return content->hitTestPoint(localPoint.x, localPoint.y, includeUnpaintedGeometry);
 }
 
 bool MatrixContent::drawDefault(Canvas* canvas, float alpha, bool antiAlias) const {
@@ -57,18 +58,23 @@ void MatrixContent::drawForeground(Canvas* canvas, float alpha, bool antiAlias) 
   content->drawForeground(canvas, alpha, antiAlias);
 }
 
-void MatrixContent::drawContour(Canvas* canvas, bool antiAlias) const {
+void MatrixContent::drawContourInternal(Canvas* canvas, bool antiAlias,
+                                        bool includeUnpaintedGeometry) const {
   AutoCanvasRestore autoRestore(canvas);
   canvas->concat(matrix);
-  content->drawContour(canvas, antiAlias);
+  content->drawContour(canvas, antiAlias, includeUnpaintedGeometry);
 }
 
-bool MatrixContent::contourEqualsOpaqueContent() const {
-  return content->contourEqualsOpaqueContent();
+bool MatrixContent::contourEqualsOpaqueContent(bool includeUnpaintedGeometry) const {
+  return content->contourEqualsOpaqueContent(includeUnpaintedGeometry);
 }
 
 bool MatrixContent::hasBlendMode() const {
   return content->hasBlendMode();
+}
+
+bool MatrixContent::hasPaint() const {
+  return content->hasPaint();
 }
 
 bool MatrixContent::hasSameGeometry(const GeometryContent* other) const {

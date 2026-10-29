@@ -19,6 +19,8 @@
 #pragma once
 
 #include <vector>
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Shape.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/vectors/VectorElement.h"
 

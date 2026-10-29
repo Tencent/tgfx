@@ -259,6 +259,24 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (snapshots == nullptr || bgSource == nullptr || source == nullptr || canvas == nullptr) {
     return;
   }
+  // Mirror the consumer's gate so capture and consume push/pop the same (Layer, LayerStyle) keys.
+  // A style whose bucket has no recording for it is skipped by the consumer without advancing its
+  // read cursor; pushing a snapshot here anyway would desynchronize the two counts.
+  auto groupIndex = static_cast<int>(style->excludeChildEffects());
+  auto* group = source->groups[groupIndex].get();
+  if (group == nullptr) {
+    return;
+  }
+  // Capture resolves the recording the consumer will sample from the same inputs, so a style that
+  // resolves to nothing is skipped by both sides and the push/pop counts stay aligned. A resolved
+  // source always carries an image, so only its absence is left to test here.
+  auto contentSource = ResolveContentSource(*group, style);
+  if (contentSource == nullptr) {
+    return;
+  }
+  auto contentOffset = contentSource->imageOffset();
+  auto contentWidth = static_cast<float>(contentSource->image()->width());
+  auto contentHeight = static_cast<float>(contentSource->image()->height());
   auto surfaceScale = bgSource->surfaceScale();
   auto contentScale = source->contentScale;
   auto localToWorld = bgSource->surfaceToWorldMatrix();
@@ -276,20 +294,14 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (FloatNearlyZero(contentScale)) {
     return;
   }
-  // The background must cover exactly the content rect (the style's LayerStyleSource group):
-  // layer->getBounds() would also capture this layer's other styles (e.g. a drop shadow).
-  auto groupIndex = static_cast<int>(style->excludeChildEffects());
-  auto* group = source->groups[groupIndex].get();
-  if (group == nullptr || group->content.image == nullptr) {
-    return;
-  }
-  auto& contentEntry = group->content;
+  // The background must cover exactly the rect of the recording this style resolves (the style's
+  // LayerStyleSource content): layer->getBounds() would also capture this layer's other styles
+  // (e.g. a drop shadow).
   DEBUG_ASSERT(!FloatNearlyZero(source->contentScale));
   auto contentScaleToLocal = 1.0f / source->contentScale;
-  auto contentBounds = Rect::MakeXYWH(
-      contentEntry.offset.x * contentScaleToLocal, contentEntry.offset.y * contentScaleToLocal,
-      static_cast<float>(contentEntry.image->width()) * contentScaleToLocal,
-      static_cast<float>(contentEntry.image->height()) * contentScaleToLocal);
+  auto contentBounds =
+      Rect::MakeXYWH(contentOffset.x * contentScaleToLocal, contentOffset.y * contentScaleToLocal,
+                     contentWidth * contentScaleToLocal, contentHeight * contentScaleToLocal);
   auto bounds = contentBounds;
   bounds.scale(contentScale, contentScale);
   bounds.roundOut();
@@ -307,8 +319,9 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   // on-screen rects rather than args.renderRects: the latter is widened by maxBackgroundOutset so
   // the capture pass also paints the blur sampling margin, and a style's own output is never
   // visible outside the on-screen rects. Bounding to the widened rects would size the cached
-  // texture by that margin, which under zoom grows far past the render target.
-  auto* visibleGroup = source->groups[static_cast<int>(style->excludeChildEffects())].get();
+  // texture by that margin, which under zoom grows far past the render target. The offset must
+  // come from the recording the style actually samples; taking it from the shared content image
+  // instead would shift the cached style rect by the difference between the two.
   // The capture-side content offset is rasterized at capture density, which no longer matches
   // the consumer's style space once the background surface is downsampled, so the consumer
   // falls back to the unclipped path (visibleStyle == nullptr).
@@ -317,13 +330,12 @@ void BackgroundCapturer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   // called. Sharing also requires an opaque background, which is a DisplayList decision this pass
   // cannot see.
   if (snapshots->multiPass && snapshots->styleShareCompact && surfaceScale == 1.0f &&
-      !snapshots->visibleRects.empty() && visibleGroup != nullptr) {
+      !snapshots->visibleRects.empty()) {
     Rect visibleWorld = Rect::MakeEmpty();
     for (const auto& renderRect : snapshots->visibleRects) {
       visibleWorld.join(renderRect);
     }
     auto visibleLocal = worldToLocal.mapRect(visibleWorld);
-    auto& contentOffset = visibleGroup->content.offset;
     snapshots->styleVisibleBounds[BackgroundSnapshotKey{layer, style}] =
         Rect::MakeXYWH(visibleLocal.left * contentScale - contentOffset.x,
                        visibleLocal.top * contentScale - contentOffset.y,
@@ -386,19 +398,31 @@ const LayerStyleSource* BackgroundCapturer::cacheLayerStyleSource(
   if (source == nullptr) {
     return nullptr;
   }
-  // Wrap each picture-backed image as Rasterized so the first draw uploads a GPU texture and the
-  // second pass reuses it instead of replaying the picture. makeRasterized() on an already-
-  // rasterized image is a no-op, so wrapping content/contour independently still hits one cache.
+  // Rasterize so the first draw uploads a GPU texture and the second reuses it. Wrapping an image
+  // again produces a new image object with its own GPU cache, so the geometry recording, which
+  // both buckets share, is wrapped once.
+  std::shared_ptr<Image> geometryRecording = nullptr;
+  std::shared_ptr<GeometryInputSource> rasterizedGeometry = nullptr;
   for (auto& group : source->groups) {
     if (group == nullptr) {
       continue;
     }
-    if (group->content.image != nullptr) {
-      group->content.image = group->content.image->makeRasterized();
+    if (group->content != nullptr && group->content->image() != nullptr) {
+      group->content = std::make_shared<StyleInputSource>(group->content->image()->makeRasterized(),
+                                                          group->content->imageOffset());
     }
-    if (group->contour.has_value() && group->contour->image != nullptr) {
-      group->contour->image = group->contour->image->makeRasterized();
+    if (group->contour != nullptr && group->contour->image() != nullptr) {
+      group->contour = std::make_shared<ContourInputSource>(
+          group->contour->image()->makeRasterized(), group->contour->imageOffset());
     }
+    if (group->geometry == nullptr || group->geometry->image() == nullptr) {
+      continue;
+    }
+    if (geometryRecording != group->geometry->image()) {
+      geometryRecording = group->geometry->image();
+      rasterizedGeometry = group->geometry->makeRasterized();
+    }
+    group->geometry = rasterizedGeometry;
   }
   auto* raw = source.get();
   snapshots->layerStyleSources.emplace(layer, std::move(source));
@@ -427,7 +451,16 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if (group == nullptr) {
     return;
   }
-  const auto& contentEntry = group->content;
+  // A style that draws from the layer's geometry consumes that recording, every other style the
+  // shared content; a group that recorded nothing usable for this style resolves to nullptr so the
+  // style is skipped. A resolved source always carries an image, so testing it is enough.
+  auto contentSource = ResolveContentSource(*group, style);
+  if (contentSource == nullptr) {
+    return;
+  }
+  const auto contentOffset = contentSource->imageOffset();
+  const auto contentWidth = static_cast<float>(contentSource->image()->width());
+  const auto contentHeight = static_cast<float>(contentSource->image()->height());
   std::shared_ptr<Image> bgImage = nullptr;
   Point bgOffset = {};
   if (snapshots != nullptr) {
@@ -449,14 +482,10 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   } else {
     // Picture-canvas path: capture was skipped because there is no GPU context. Synthesize the
     // backdrop on the fly by walking ancestors and prior siblings via PictureRecorder.
-    if (contentEntry.image == nullptr) {
-      return;
-    }
     auto contentScaleToLocal = 1.0f / source->contentScale;
-    auto contentBounds = Rect::MakeXYWH(
-        contentEntry.offset.x * contentScaleToLocal, contentEntry.offset.y * contentScaleToLocal,
-        static_cast<float>(contentEntry.image->width()) * contentScaleToLocal,
-        static_cast<float>(contentEntry.image->height()) * contentScaleToLocal);
+    auto contentBounds =
+        Rect::MakeXYWH(contentOffset.x * contentScaleToLocal, contentOffset.y * contentScaleToLocal,
+                       contentWidth * contentScaleToLocal, contentHeight * contentScaleToLocal);
     bgImage =
         layer->synthesizeBackgroundImage(args, source->contentScale, contentBounds, &bgOffset);
     if (bgImage == nullptr) {
@@ -465,13 +494,12 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   }
   AutoCanvasRestore restoreCanvas(canvas);
   auto matrix = Matrix::MakeScale(1.f / source->contentScale, 1.f / source->contentScale);
-  matrix.preTranslate(contentEntry.offset.x, contentEntry.offset.y);
+  matrix.preTranslate(contentOffset.x, contentOffset.y);
   canvas->concat(matrix);
 
-  auto backgroundOffset = bgOffset - contentEntry.offset;
+  auto backgroundOffset = bgOffset - contentOffset;
   LayerStyleInput styleInput = {};
-  styleInput.content = contentEntry.image;
-  styleInput.contentOffset = contentEntry.offset;
+  styleInput.content = contentSource;
   styleInput.contentScale = source->contentScale;
   auto sourceFlags = style->extraSourceType();
   styleInput.extraSources.push_back(
@@ -479,9 +507,9 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
   if ((sourceFlags & static_cast<uint32_t>(LayerStyleExtraSourceType::Contour)) != 0) {
     std::shared_ptr<Image> contourImage = nullptr;
     Point contourOffset = {};
-    if (group->contour.has_value()) {
-      contourImage = group->contour->image;
-      contourOffset = group->contour->offset - contentEntry.offset;
+    if (group->contour != nullptr) {
+      contourImage = group->contour->image();
+      contourOffset = group->contour->imageOffset() - contentOffset;
     }
     styleInput.extraSources.push_back(std::make_shared<ContourInputSource>(
         std::move(contourImage), contourOffset, source->contentShape));
@@ -512,8 +540,7 @@ void BackgroundConsumer::drawBackgroundStyle(const DrawArgs& args, Canvas* canva
         if (picture != nullptr) {
           // Bound the cached texture to the visible region, so small dirty rects do not allocate
           // full-content textures.
-          auto shapeRect = Rect::MakeWH(static_cast<float>(contentEntry.image->width()),
-                                        static_cast<float>(contentEntry.image->height()));
+          auto shapeRect = Rect::MakeWH(contentWidth, contentHeight);
           if (visibleStyle == nullptr || shapeRect.intersect(*visibleStyle)) {
             if (!shapeRect.isEmpty()) {
               CacheStyleOutput(snapshots, args.context, layer, style, picture, recordMatrix,

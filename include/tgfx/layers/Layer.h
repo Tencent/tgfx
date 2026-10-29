@@ -39,6 +39,7 @@ class DrawArgs;
 class RegionTransformer;
 class RootLayer;
 class OpaqueContext;
+class GeometryInputSource;
 struct LayerStyleSource;
 struct MaskData;
 class BackgroundSource;
@@ -265,8 +266,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * Returns the list of layer styles applied to the layer. Unlike layer filters, layer styles do
    * not create a new offscreen image to replace the original layer content. Instead, they add
    * visual elements either below or above the layer content, blending directly with the existing
-   * content on the canvas. Each layer style uses the same layer content as input and draws on the
-   * canvas. Layer styles are applied before filters. The default value is an empty list.
+   * content on the canvas. Each layer style draws from the shared layer content, except one that
+   * declares LayerStyleContentSource::Geometry, which reads the layer's geometry instead. Layer
+   * styles are applied before filters. The default value is an empty list.
    */
   const std::vector<std::shared_ptr<LayerStyle>>& layerStyles() const {
     return _layerStyles;
@@ -541,6 +543,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * The x and y coordinates are in the root layer's coordinate space, not the parent layer's
    * (unless the parent layer is the root). You can use the globalToLocal() and the localToGlobal()
    * methods to convert points between these coordinate spaces.
+   * A point inside the layer's own geometry hits it even when no paint captured that geometry, as
+   * long as one of the layer's styles declares LayerStyleContentSource::Geometry.
    * @param x The x coordinate to test it against the calling layer.
    * @param y The y coordinate to test it against the calling layer.
    * @param shapeHitTest Whether to check the actual shape of the layer (true) or just the bounding
@@ -697,6 +701,11 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<Image> getContentContourImage(const DrawArgs& args, float contentScale,
                                                 Point* offset, bool* contourMatchesContent);
 
+  // Records the layer's geometry, not what it paints: the contour keeps the geometries no paint
+  // captured and the painters with alpha=0. The returned source pairs that one recording's raster
+  // with its outline, read back from the same picture.
+  std::shared_ptr<GeometryInputSource> getGeometryImage(const DrawArgs& args, float contentScale);
+
   bool hasValidMask() const;
 
   void updateRenderBounds(std::shared_ptr<RegionTransformer> transformer = nullptr,
@@ -737,7 +746,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void updateStaticSubtreeFlags();
 
-  std::optional<StyledShape> getContentShape();
+  // Whether one of the layer styles takes the layer's geometry as its content.
+  bool hasGeometryStyle() const;
 
   struct {
     bool dirtyContent : 1;        // layer's content needs updating
