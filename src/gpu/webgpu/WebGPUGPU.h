@@ -117,6 +117,21 @@ class WebGPUGPU : public GPU {
 
   const MipmapPipeline* getMipmapPipeline(WGPUTextureFormat format);
 
+  struct PlaceholderBindings {
+    WGPUTexture texture = nullptr;
+    WGPUTextureView view = nullptr;
+    WGPUSampler sampler = nullptr;
+  };
+
+  /**
+   * Returns a lazily created 1x1 texture view and sampler used to complete bind groups whose
+   * pipelines declare texture slots the caller never binds. Guarded shader branches never
+   * sample it, so its contents are irrelevant. The resource is only created once a bind group
+   * actually has missing texture slots; returns nullptr if creation fails, in which case the
+   * caller must abort the bind group update.
+   */
+  const PlaceholderBindings* getPlaceholderBindings();
+
  private:
   // Holds the initial refs created when importing a JS GPUDevice. Declared before the GPU members so
   // it is destroyed after the command queue and other objects using those runtime handles.
@@ -142,6 +157,7 @@ class WebGPUGPU : public GPU {
   std::shared_ptr<ReturnQueue> returnQueue = ReturnQueue::Make();
   std::unordered_map<uint32_t, std::shared_ptr<Sampler>> samplerCache = {};
   std::unordered_map<uint32_t, MipmapPipeline> mipmapPipelineCache = {};
+  PlaceholderBindings placeholderBindings = {};
 };
 
 }  // namespace tgfx
