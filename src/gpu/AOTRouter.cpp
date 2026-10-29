@@ -23,8 +23,9 @@
 
 namespace tgfx {
 
-// The kernels the prepare-time inline rewrite can express: one fused chain/graph or perlin
-// processor replacing a draw's color list in place. Every other kernel needs a plan task.
+// The kernels the prepare-time fused serving can express: one fused chain/graph or perlin
+// processor standing in for a draw's whole color expression. Every other kernel needs a plan
+// task.
 static bool IsInlineRewritableKernel(AOTKernelKind kernel) {
   return IsAOTPointwiseDAGKernel(kernel) || kernel == AOTKernelKind::PerlinNoiseFill;
 }
@@ -38,8 +39,8 @@ AOTRouteResult AOTRouter::Route(const std::vector<const FragmentProcessor*>& pro
     return AOTRouteResult::NoPlan;
   }
   if (producers == nullptr && !PlanRequiresTask(plan)) {
-    // The prepare-time inline rewrite re-expresses this single-pass plan without a task; the
-    // entry's draw stays on the plain route with the deferral flag.
+    // No task is needed: the draw stays on the plain route with the deferral flag, and the
+    // prepare-time plain lookup's fused walk serves it through the committed kernel.
     return AOTRouteResult::Deferred;
   }
   return submit(graph, plan, producers) ? AOTRouteResult::Submitted : AOTRouteResult::TaskRefused;

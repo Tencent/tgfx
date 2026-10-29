@@ -279,11 +279,15 @@ static bool VertexInputFormatMatches(const std::vector<VertexInput>& inputs, uin
   return false;
 }
 
-// The interpreter family carries its own writer (it re-expresses the draw's effect as the fused
-// chain processor every draw); every dedicated family uses the generic precompiled writer.
+// The two re-expressing families carry their own writers (they rebuild the draw's effect as the
+// fused chain or perlin processor every draw); every other family uses the generic precompiled
+// writer.
 static std::unique_ptr<ProgramWriter> MakeProgramWriter(const std::string& shaderName) {
   if (shaderName == PointwiseChainShader::Name) {
     return std::make_unique<ChainProgramWriter>();
+  }
+  if (shaderName == PerlinNoiseFillShader::Name) {
+    return std::make_unique<PerlinProgramWriter>();
   }
   return std::make_unique<PrecompiledProgramWriter>();
 }

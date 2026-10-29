@@ -221,6 +221,22 @@ class ProgramInfo {
    */
   bool samplersAre2D() const;
 
+  /**
+   * Marks this info as belonging to a draw whose record-time AOT entry committed it to a single
+   * fused pass (the chain interpreter or the perlin kernel — the shapes the decomposition planner
+   * defers instead of building a plan task). The matcher walks those two families before the
+   * other dedicated families for such a draw, preserving the committed kernel choice. Set before
+   * the first MatchPermutation call; never mutated afterwards (the cached match outcome shares
+   * the flag).
+   */
+  void markFusedPassCommitted() {
+    fusedPassCommitted = true;
+  }
+
+  bool isFusedPassCommitted() const {
+    return fusedPassCommitted;
+  }
+
  private:
   RenderTarget* renderTarget = nullptr;
   GeometryProcessor* geometryProcessor = nullptr;
@@ -233,6 +249,7 @@ class ProgramInfo {
   CullMode cullMode = CullMode::None;
   DepthStencilDescriptor depthStencil = {};
   uint32_t colorWriteMask = ColorWriteMask::All;
+  bool fusedPassCommitted = false;
 
   void updateProcessorIndices();
 
@@ -252,6 +269,7 @@ class ProgramInfo {
   friend class ProgramWriter;
   friend class RuntimeProgramWriter;
   friend class PrecompiledProgramWriter;
+  friend class ExpressionProgramWriter;
   friend class ChainProgramWriter;
 
   std::vector<SamplerInfo> getSamplers() const;

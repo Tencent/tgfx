@@ -18,10 +18,6 @@
 
 #include "RuntimeDrawTask.h"
 #include "core/utils/ColorSpaceHelper.h"
-#include "gpu/AOTChainBuilder.h"
-#include "gpu/AOTRouter.h"
-#include "gpu/PermutationMatcher.h"
-#include "gpu/PrecompiledShaderCache.h"
 #include "gpu/Program.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
@@ -34,26 +30,6 @@
 #include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
-// The flattening draw is built here rather than by a StandardDrawOp, so it does not get the
-// StandardDrawOp chain rewrite. With a precompiled bundle loaded, a color processor no dedicated
-// kernel serves (a plain texture copy, which TextureFillShader used to serve) is rewritten onto
-// the pointwise chain kernel the same way; nullptr keeps the original processor.
-static PlacementPtr<FragmentProcessor> MakeChainColorProcessor(BlockAllocator* allocator,
-                                                               Context* context,
-                                                               const ProgramInfo& programInfo) {
-  auto cache = context->precompiledShaderCache();
-  if (cache == nullptr || !cache->isLoaded() || MatchPermutation(&programInfo).has_value()) {
-    return nullptr;
-  }
-  std::vector<const FragmentProcessor*> colorProcessors = {programInfo.getFragmentProcessor(0)};
-  AOTEffectGraph graph = {};
-  AOTEffectPlan plan = {};
-  if (!AOTRouter::PlanInlineRewrite(colorProcessors, &graph, &plan) ||
-      !IsAOTPointwiseDAGKernel(plan.passes[0].kernel)) {
-    return nullptr;
-  }
-  return AOTChainBuilder::BuildChainProcessor(allocator, graph, plan.passes[0]);
-}
 
 RuntimeDrawTask::RuntimeDrawTask(BlockAllocator* allocator,
                                  std::shared_ptr<RenderTargetProxy> target,
@@ -164,13 +140,6 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
   auto programInfo =
       std::make_unique<ProgramInfo>(renderTarget.get(), geometryProcessor.get(),
                                     std::move(fragmentProcessors), 1, nullptr, BlendMode::Src);
-  auto chainProcessor = MakeChainColorProcessor(allocator, context, *programInfo);
-  if (chainProcessor != nullptr) {
-    std::vector chainProcessors = {chainProcessor.get()};
-    programInfo =
-        std::make_unique<ProgramInfo>(renderTarget.get(), geometryProcessor.get(),
-                                      std::move(chainProcessors), 1, nullptr, BlendMode::Src);
-  }
   auto program = programInfo->getProgram();
   if (program == nullptr) {
     LOGE("RuntimeDrawTask::GetFlatTextureView() Failed to get the program!");

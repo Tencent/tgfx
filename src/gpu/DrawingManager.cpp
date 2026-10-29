@@ -169,9 +169,9 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
                                          AOTMaterializationRecorder* producers) {
     return submitPlanTask(taskGraph, taskPlan, &drawOp, producers);
   };
-  // A single-pass chain-capable plan is the prepare-time inline rewrite's own shape (the fill's
-  // RectDrawOp is a StandardDrawOp, so the rewrite serves the deferred fill through the same
-  // kernel); deferring skips the plan task and the retry alike.
+  // A single-pass chain-capable plan is the prepare-time fused serving's own shape (the fill's
+  // RectDrawOp is a StandardDrawOp, so the plain lookup's fused walk serves the deferred fill
+  // through the same kernel); deferring skips the plan task and the retry alike.
   bool deferredToInlineRewrite = planned && !AOTRouter::PlanRequiresTask(plan);
   drawOp->setInlineRewriteDeferred(deferredToInlineRewrite);
   // The original tree was already planned above (the diagnostics need the plan too), so its

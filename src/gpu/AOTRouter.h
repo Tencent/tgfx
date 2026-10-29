@@ -47,9 +47,9 @@ enum class AOTRouteResult {
   TaskRefused,
   /// The entry built and enqueued the plan task; it now owns the draw.
   Submitted,
-  /// The plan is the prepare-time inline rewrite's own shape — a single chain-capable pass with no
+  /// The plan is the prepare-time fused serving's own shape — a single chain-capable pass with no
   /// recorded producers — so no task runs for it: the entry keeps its draw on the plain route with
-  /// the inline-rewrite deferral flag, and the rewrite owns the draw at prepare time.
+  /// the deferral flag, and the plain lookup's fused walk serves it at prepare time.
   Deferred,
 };
 
@@ -60,9 +60,10 @@ enum class AOTRouteResult {
  *     OpsCompositor::addDrawOp (on-screen draws) and DrawingManager::fillRTWithFP (offscreen
  *     fills), through Route / RouteWithMaterializedLeading below. A plan task can run several
  *     passes: materialized blend operands and the split-off passes of a long linear chain.
- *   - As an inline rewrite at prepare time (StandardDrawOp::prepareDecomposedProgram), for a draw
- *     that is still on the plain route: its color processors are replaced in place by one fused
- *     kernel processor (PlanInlineRewrite). Single pass only; it also folds coverage processors.
+ *   - Through the plain program lookup at prepare time, for a draw that is still on the plain
+ *     route: the two re-expressing kernels (the chain interpreter and the perlin kernel) rebuild
+ *     the draw's own expression per draw (PlanInlineRewrite decides the shape). Single pass only;
+ *     the chain interpreter also folds coverage processors.
  *
  * Each plan-task entry collects the processors it wants planned and supplies a SubmitPlan callback
  * that turns a plan into a render task for its own destination. The router owns planning and the
@@ -88,8 +89,8 @@ class AOTRouter {
   /**
    * Lowers and decomposes the processors and hands the plan to submit. An original route
    * (producers == nullptr) whose plan needs no task never calls submit and returns Deferred
-   * instead: the prepare-time inline rewrite owns that draw. The materialization retry passes a
-   * recorder, so its plans always run as tasks.
+   * instead: the plain lookup's fused walk owns that draw at prepare time. The materialization
+   * retry passes a recorder, so its plans always run as tasks.
    */
   static AOTRouteResult Route(const std::vector<const FragmentProcessor*>& processors,
                               const SubmitPlan& submit,
@@ -97,18 +98,18 @@ class AOTRouter {
 
   /**
    * Whether a plan can only run as a plan task: more than one pass, or a single pass whose kernel
-   * the prepare-time inline rewrite cannot express (the rewrite replaces a draw's color list with
-   * one fused chain or perlin processor; every other single-pass kernel still needs the task).
-   * Route itself applies this gate to original routes and returns Deferred for the ones it turns
-   * away; the retry's plans always run as tasks regardless.
+   * the prepare-time fused serving cannot express (the fused kernels take a draw's whole color
+   * expression as one chain or perlin processor; every other single-pass kernel still needs the
+   * task). Route itself applies this gate to original routes and returns Deferred for the ones it
+   * turns away; the retry's plans always run as tasks regardless.
    */
   static bool PlanRequiresTask(const AOTEffectPlan& plan);
 
   /**
-   * Plans processors for the inline rewrite: true when they lower and decompose into a single pass
-   * of a kernel whose processor can replace a draw's color list in place (PointwiseChain,
-   * PointwiseGraph, or PerlinNoiseFill). A multi-pass plan never qualifies: its intermediate
-   * passes need a plan task.
+   * Plans processors for the fused serving: true when they lower and decompose into a single pass
+   * of a kernel whose processor can stand in for a draw's whole color expression
+   * (PointwiseChain, PointwiseGraph, or PerlinNoiseFill). A multi-pass plan never qualifies: its
+   * intermediate passes need a plan task.
    */
   static bool PlanInlineRewrite(const std::vector<const FragmentProcessor*>& processors,
                                 AOTEffectGraph* graph, AOTEffectPlan* plan);

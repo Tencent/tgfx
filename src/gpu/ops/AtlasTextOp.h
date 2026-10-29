@@ -40,9 +40,6 @@ class AtlasTextOp final : public StandardDrawOp {
  protected:
   PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
 
-  PlacementPtr<GeometryProcessor> onMakeChainGeometryProcessor(
-      std::vector<PlacementPtr<FragmentProcessor>>* chainCoverageFPs) override;
-
   void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
   Type type() const override {

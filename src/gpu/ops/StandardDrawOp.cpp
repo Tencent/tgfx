@@ -19,33 +19,14 @@
 #include "StandardDrawOp.h"
 #include "core/utils/Log.h"
 #include "gpu/AOTChainBuilder.h"
-#include "gpu/AOTEffectDecomposer.h"
-#include "gpu/AOTPlanExecutor.h"
-#include "gpu/AOTRouter.h"
+#include "gpu/DrawingManager.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PermutationMatcher.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/Program.h"
-#include "gpu/processors/AtlasTextGeometryProcessor.h"
-#include "gpu/processors/ClampedGradientEffect.h"
-#include "gpu/processors/ConstColorProcessor.h"
+#include "gpu/ShaderMatchHelpers.h"
 
 namespace tgfx {
-
-static bool ContainsGradientSource(const FragmentProcessor* processor) {
-  if (processor == nullptr) {
-    return false;
-  }
-  if (IsProcessor<ClampedGradientEffect>(processor)) {
-    return true;
-  }
-  for (size_t index = 0; index < processor->numChildProcessors(); ++index) {
-    if (ContainsGradientSource(processor->childProcessor(index))) {
-      return true;
-    }
-  }
-  return false;
-}
 
 void StandardDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   if (!onPrepare()) {
@@ -96,12 +77,14 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, ProgramLookupMode mode,
     preparedProgramInfo->setDepthStencil(depthStencil);
   }
   onConfigureProgramInfo(*preparedProgramInfo);
-  bool interpreterServed = false;
-  preparedProgram = prepareDecomposedProgram(renderTarget, activeColors, &interpreterServed);
-  preparedViaDecomposition = preparedProgram != nullptr || interpreterServed;
-  if (preparedProgram == nullptr) {
-    preparedProgram = preparedProgramInfo->getProgram(mode);
+  if (isInlineRewriteDeferred()) {
+    preparedProgramInfo->markFusedPassCommitted();
   }
+  preparedViaDecomposition = interpreterServesDraw(renderTarget);
+  if (preparedViaDecomposition && isInlineRewriteDeferred()) {
+    adoptDeferredChainExpression(renderTarget);
+  }
+  preparedProgram = preparedProgramInfo->getProgram(mode);
   if (preparedProgram == nullptr) {
     if (mode == ProgramLookupMode::AllowRuntimeFallback) {
       // The final lookup for this draw (PrecompiledOnly lookups are AOT plan probes, which fall
@@ -118,20 +101,33 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, ProgramLookupMode mode,
   return true;
 }
 
-// When the plain matcher cannot serve the color chain, the chain may still reduce onto the fused
-// pointwise-chain kernel. Rewriting the processors before program lookup keeps the cached program
-// and the per-draw uniform upload driven by the same ProgramInfo, which a post-hoc program swap
-// cannot guarantee. The matcher probe runs first so draws the plain route already serves keep
-// their original funnel accounting. A single coverage FP is folded into the chain (an AA rect clip
-// as a coverage slot, a device-space alpha mask as the mask child, Compose(mask, rect) as both);
-// other coverage forms stay on their original route.
-std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
-    RenderTarget* renderTarget, const ColorProcessorList& activeColors, bool* interpreterServed) {
+// Whether the shader the plain lookup resolved to is one of the AOT route's re-expressing
+// kernels. A deferred draw is committed to one of the two fused kernels, so either counts as the
+// route's direct serving; an ordinary draw only counts the interpreter (the perlin kernel
+// serving a plain noise tree is the dedicated route, not the AOT entry's own).
+static bool IsDirectAOTShader(const std::string& shaderName, bool deferred) {
+  if (shaderName == "PointwiseChainShader") {
+    return true;
+  }
+  return deferred && shaderName == "PerlinNoiseFillShader";
+}
+
+// The AOT entry's per-draw probe: reports whether the route serves this draw through the plain
+// program lookup, for the direct-chain accounting. The two re-expressing kernels — the chain
+// interpreter and the perlin kernel — serve unmodified draws by re-expressing the draw's own
+// tree, so the probe only has to run the matcher and read which family won. A draw the
+// record-time entry deferred to a fused pass walks the fused kernels first (the commitment on
+// the ProgramInfo), which is the kernel choice the retired prepare-time rewrite used to own; the
+// deferred chain shapes additionally adopt the chain expression (see
+// adoptDeferredChainExpression) to keep the rewrite's program-key collapsing.
+bool StandardDrawOp::interpreterServesDraw(RenderTarget* renderTarget) {
   auto cache = renderTarget->getContext()->precompiledShaderCache();
   if (!cache->isLoaded()) {
-    return nullptr;
+    return false;
   }
   if (!cache->decompositionEnabled()) {
+    // Only the interpreter's extended kind serves gradients, so the required gradient lowering
+    // keeps probing with the switch off; every other draw goes straight to the plain lookup.
     bool requiresGradientLowering = false;
     for (size_t index = 0; index < preparedProgramInfo->numFragmentProcessors(); ++index) {
       if (ContainsGradientSource(preparedProgramInfo->getFragmentProcessor(index))) {
@@ -140,134 +136,58 @@ std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
       }
     }
     if (!requiresGradientLowering) {
-      return nullptr;
+      return false;
     }
   }
-  if (cache->dedicatedKernelsEnabled() && !isInlineRewriteDeferred()) {
-    auto cached =
-        renderTarget->getContext()->globalCache()->findProgram(preparedProgramInfo->programKey());
+  auto& globalCache = *renderTarget->getContext()->globalCache();
+  if (!isInlineRewriteDeferred()) {
+    auto cached = globalCache.findProgram(preparedProgramInfo->programKey());
     if (cached != nullptr &&
         cached->getProvenance().program == ProgramOrigin::PrecompiledArtifact) {
       // The program cache's key-to-program premise: this exact key already resolved to a
       // precompiled artifact, so the match that produced it succeeded and the plain route serves
       // the draw — the probe below would only repeat that walk.
       DEBUG_ASSERT(MatchPermutation(preparedProgramInfo.get()).has_value());
-      if (interpreterServed != nullptr && cached->shaderName() == "PointwiseChainShader") {
-        *interpreterServed = true;
-      }
-      return nullptr;
-    }
-    auto probe = MatchPermutation(preparedProgramInfo.get());
-    if (probe.has_value()) {
-      // The interpreter serves this draw through the plain route (its Extract re-expresses the
-      // draw's own tree), so the rewrite has nothing left to own: the direct-chain accounting
-      // follows the plain route instead.
-      if (interpreterServed != nullptr && probe->shaderName == "PointwiseChainShader") {
-        *interpreterServed = true;
-      }
-      return nullptr;
+      return IsDirectAOTShader(cached->shaderName(), false);
     }
   }
-  // The coverage forms the chain carries are now semantically routed: geometric coverage (the
-  // narrow clip slots, the device mask, the atlas glyph subtree via the clip-coverage register,
-  // analytic subtrees via CoverageRootIndex) composites as the XP's coverage input, while a
-  // MaskFilter's source-modulating mask subtree keeps the CoverageRootIndex source route — so no
-  // blend-mode restriction remains here (the interim blend-mode guards are gone; see
-  // NarrowAAClipWithSrcBlendKeepsDstOnEdge and AtlasTextNonSrcOverBlendKeepsDstProbe).
-  std::vector<const FragmentProcessor*> coverageFPs = {};
-  std::vector<PlacementPtr<FragmentProcessor>> ownedChainCoverageFPs = {};
-  // Atlas text: the GP-owned atlas becomes a synthesized coverage leaf (the glyph mask), and the
-  // rewrite needs a sampler-free twin GP. A null override means the draw is not servable this way
-  // (e.g. a color-emoji atlas), so keep the original route. The glyph mask is TRUE coverage in
-  // the runtime composite, and the builder routes the subtree's root through the chain's
-  // clip-coverage register so it composites as the XP's coverage input for every blend mode
-  // (AtlasTextNonSrcOverBlendKeepsDstProbe) — no blend-mode restriction here. A draw clip rides
-  // in front of the glyph leaf as the two-FP [clip, local texture] form; the builder chains the
-  // clip slots on top of the glyph register (glyph * clip).
-  const bool atlasText = IsProcessor<AtlasTextGeometryProcessor>(geometryProcessor.get());
-  // Up to two coverage FPs fold into the chain: a single one lowers as the narrow forms or a
-  // general subtree, and a pair folds as subtree + clip slots or device-mask child. The atlas
-  // glyph leaf takes one of the two positions.
-  if (coverages.size() > (atlasText ? 1u : 2u)) {
-    return nullptr;
+  auto probe = MatchPermutation(preparedProgramInfo.get());
+  return probe.has_value() && IsDirectAOTShader(probe->shaderName, isInlineRewriteDeferred());
+}
+
+// A deferred draw whose fused walk resolved to the chain interpreter adopts the chain expression
+// as its own processor list before the program lookup. Two properties ride on this that the plain
+// tree cannot provide: the chain processor's key collapses draws that share a variant but differ
+// only in their instruction sequences onto one program (the sequence is per-draw uniform data, so
+// interleaved draws share the cached program), and the program cache stays keyed by the chain
+// expression instead of the original tree — the exact keying the retired prepare-time rewrite
+// used. A deferred perlin draw needs no adoption: the perlin key already separates the folded
+// slot structures, so the plain key and the rebuilt key coincide. The expression must build here
+// (the fused probe matched through the same builder); a null result keeps the plain route.
+void StandardDrawOp::adoptDeferredChainExpression(RenderTarget* renderTarget) {
+  auto context = renderTarget->getContext();
+  if (context == nullptr || context->drawingManager() == nullptr) {
+    return;
   }
-  coverageFPs.reserve(coverages.size() + 1);
-  for (auto& coverage : coverages) {
-    coverageFPs.push_back(coverage.get());
+  auto expression = AOTChainBuilder::BuildChainProcessorForInfo(
+      context->drawingManager()->drawingAllocator(), preparedProgramInfo.get());
+  if (expression == nullptr) {
+    return;
   }
-  if (atlasText) {
-    chainGeometryProcessor = onMakeChainGeometryProcessor(&ownedChainCoverageFPs);
-    if (chainGeometryProcessor == nullptr) {
-      return nullptr;
-    }
-    for (auto& fp : ownedChainCoverageFPs) {
-      coverageFPs.push_back(fp.get());
-    }
-  }
-  std::vector<const FragmentProcessor*> colorProcessors = {};
-  colorProcessors.reserve(activeColors.size() + 1);
-  for (auto& color : activeColors) {
-    colorProcessors.push_back(color.get());
-  }
-  PlacementPtr<FragmentProcessor> unitColor = nullptr;
-  if (colorProcessors.empty()) {
-    // A color-free draw (pure mask/clip fill) takes the paint color as-is, which is a one-slot
-    // const-color chain modulating the geometry color.
-    unitColor = ConstColorProcessor::Make(allocator, PMColor::White(), InputMode::ModulateRGBA);
-    if (unitColor == nullptr) {
-      return nullptr;
-    }
-    colorProcessors.push_back(unitColor.get());
-  }
-  AOTEffectGraph graph = {};
-  AOTEffectPlan plan = {};
-  if (!AOTRouter::PlanInlineRewrite(colorProcessors, &graph, &plan)) {
-    return nullptr;
-  }
-  auto kernel = plan.passes[0].kernel;
-  PlacementPtr<FragmentProcessor> chainFP = nullptr;
-  if (kernel == AOTKernelKind::PerlinNoiseFill) {
-    // The perlin kernel carries its own coordinate transform and has no coverage-fold path.
-    if (!coverageFPs.empty()) {
-      return nullptr;
-    }
-    chainFP = AOTChainBuilder::BuildFPForPass(allocator, graph, plan.passes[0]);
-  } else {
-    chainFP = AOTChainBuilder::BuildChainProcessor(allocator, graph, plan.passes[0], coverageFPs,
-                                                   !ownedChainCoverageFPs.empty());
-  }
-  if (chainFP == nullptr) {
-    return nullptr;
-  }
-  std::vector<FragmentProcessor*> rewrittenProcessors = {chainFP.get()};
-  auto* chainGP =
-      chainGeometryProcessor != nullptr ? chainGeometryProcessor.get() : geometryProcessor.get();
-  auto rewrittenInfo = std::make_unique<ProgramInfo>(
-      renderTarget, chainGP, std::move(rewrittenProcessors), 1, xferProcessor.get(), blendMode);
-  // The rewrite only changes the processor expression, never the other pipeline state, so every
+  std::vector<FragmentProcessor*> chainProcessors = {expression.get()};
+  auto chainInfo = std::make_unique<ProgramInfo>(renderTarget, geometryProcessor.get(),
+                                                 std::move(chainProcessors), 1, xferProcessor.get(),
+                                                 blendMode);
+  // The adoption only changes the processor expression, never the other pipeline state, so every
   // non-processor state the original ProgramInfo carries over. A pass with a depth-stencil
   // attachment rejects pipelines that do not declare the format (see the inheritance note in
   // prepare()), and dropping the colour write mask would un-mask a write-disabled draw.
-  rewrittenInfo->setCullMode(cullMode);
-  rewrittenInfo->setDepthStencil(preparedProgramInfo->getDepthStencil());
-  rewrittenInfo->setColorWriteMask(preparedProgramInfo->getColorWriteMask());
-  // Probe before the strict lookup: a chain the matcher rejects (unsupported GP, perspective leaf
-  // transforms) must fall back without recording a diagnostic miss against the rewritten tree,
-  // which would double-count the draw alongside the original tree's own miss record. The cached
-  // probe is what the strict lookup's own match reuses.
-  if (!MatchPermutation(rewrittenInfo.get()).has_value()) {
-    return nullptr;
-  }
-  // Strict lookup: a rewritten draw must resolve to the precompiled chain kernel. Anything else
-  // (cache not loaded, missing artifact) falls back to the original processors.
-  auto rewrittenProgram = rewrittenInfo->getProgram(ProgramLookupMode::PrecompiledOnly);
-  if (rewrittenProgram == nullptr) {
-    return nullptr;
-  }
+  chainInfo->setCullMode(cullMode);
+  chainInfo->setDepthStencil(preparedProgramInfo->getDepthStencil());
+  chainInfo->setColorWriteMask(preparedProgramInfo->getColorWriteMask());
   preparedColors = ColorProcessorList{};
-  preparedColors->emplace_back(std::move(chainFP));
-  preparedProgramInfo = std::move(rewrittenInfo);
-  return rewrittenProgram;
+  preparedColors->emplace_back(std::move(expression));
+  preparedProgramInfo = std::move(chainInfo);
 }
 
 bool StandardDrawOp::prepareForTask(RenderTarget* renderTarget, ProgramLookupMode mode,

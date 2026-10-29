@@ -125,22 +125,42 @@ class PrecompiledProgramWriter : public ProgramWriter {
 };
 
 /**
+ * The shared base of the writers whose routes re-express the draw's effect before uploading: the
+ * per-draw values come from the rebuilt expression (walked in its own tree order, then the xfer
+ * processor), not from the info's original processor list.
+ */
+class ExpressionProgramWriter : public PrecompiledProgramWriter {
+ protected:
+  void writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
+                       UniformData* fragmentUniformData,
+                       const FragmentProcessor* expression) const override;
+};
+
+/**
  * The fused chain kernel's writer: it re-expresses the draw's effect as the chain processor every
  * draw (the structure is stable for a given program key, the values are not), uploads through the
  * processor's own data writer, and binds the expression's leaf-ordered children as the artifact's
  * sampler slots.
  */
-class ChainProgramWriter final : public PrecompiledProgramWriter {
+class ChainProgramWriter final : public ExpressionProgramWriter {
  protected:
   Expression buildExpression(const ProgramInfo& info) const override;
   void writeGeometryProcessor(const ProgramInfo& info, UniformData* vertexUniformData,
                               UniformData* fragmentUniformData,
                               const FragmentProcessor* expression) const override;
-  void writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
-                       UniformData* fragmentUniformData,
-                       const FragmentProcessor* expression) const override;
   void writeSamplers(const ProgramInfo& info, Program* program, RenderPass* renderPass,
                      const FragmentProcessor* expression) const override;
+};
+
+/**
+ * The perlin kernel's writer: it re-expresses the draw's color expression as the perlin processor
+ * with its trailing operators folded into the slot records every draw, and uploads through the
+ * processor's own data writer. The samplers stay the generic precompiled binding (the lookup
+ * textures ride the info's own perlin processor).
+ */
+class PerlinProgramWriter final : public ExpressionProgramWriter {
+ protected:
+  Expression buildExpression(const ProgramInfo& info) const override;
 };
 
 }  // namespace tgfx

@@ -28,16 +28,8 @@ PlacementPtr<AtlasTextGeometryProcessor> AtlasTextGeometryProcessor::Make(
 
 GLSLAtlasTextGeometryProcessor::GLSLAtlasTextGeometryProcessor(
     std::shared_ptr<TextureProxy> textureProxy, AAType aa, std::optional<PMColor> commonColor,
-    const SamplingOptions& sampling, bool bindAtlasSampler)
-    : AtlasTextGeometryProcessor(std::move(textureProxy), aa, commonColor, sampling,
-                                 bindAtlasSampler) {
-}
-
-PlacementPtr<AtlasTextGeometryProcessor> AtlasTextGeometryProcessor::MakeForChain(
-    BlockAllocator* allocator, std::shared_ptr<TextureProxy> textureProxy, AAType aa,
-    std::optional<PMColor> commonColor, const SamplingOptions& sampling) {
-  return allocator->make<GLSLAtlasTextGeometryProcessor>(std::move(textureProxy), aa, commonColor,
-                                                         sampling, false);
+    const SamplingOptions& sampling)
+    : AtlasTextGeometryProcessor(std::move(textureProxy), aa, commonColor, sampling) {
 }
 
 void GLSLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {

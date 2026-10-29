@@ -367,8 +367,8 @@ void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* p
 }
 
 ProgramWriter::Expression ChainProgramWriter::buildExpression(const ProgramInfo& info) const {
-  // Transitional dual form: an info that already carries the chain processor (the prepare-time
-  // rewrite's, or a multi-pass plan task's pass) is its own expression.
+  // Dual form: an info that already carries the chain processor (a multi-pass plan task's pass,
+  // until the plan route retires) is its own expression.
   if (info.numColorFragmentProcessors() == 1 && info.numFragmentProcessors() == 1) {
     auto fp = info.getFragmentProcessor(0);
     if (IsProcessor<AOTPointwiseChainProcessor>(fp)) {
@@ -398,19 +398,20 @@ void ChainProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
   info.geometryProcessor->setData(vertexUniformData, fragmentUniformData, &coordTransformIter);
 }
 
-void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
-                                         UniformData* fragmentUniformData,
-                                         const FragmentProcessor* expression) const {
+void ExpressionProgramWriter::writeProcessors(const ProgramInfo& info,
+                                              UniformData* vertexUniformData,
+                                              UniformData* fragmentUniformData,
+                                              const FragmentProcessor* expression) const {
   if (expression == nullptr) {
     LOGE(
-        "ChainProgramWriter::writeProcessors() the chain expression failed to build; the draw "
-        "renders with unwritten chain uniforms");
+        "ExpressionProgramWriter::writeProcessors() the expression failed to build; the draw "
+        "renders with unwritten kernel uniforms");
     return;
   }
-  // The expression's leaf children carry the artifact's per-leaf uniforms (Subset, AlphaStart,
-  // HasRgbaaa, the coordinate transforms): walk the expression's subtree — the chain root first,
-  // then every leaf in slot order — so each node's module bind runs, exactly as the generic
-  // writer walks an info that carries the chain processor.
+  // The expression's nodes carry the artifact's uniforms (the chain's leaf-ordered per-leaf
+  // records, the perlin kernel's folded slot records): walk the expression's subtree — its root
+  // first, then every node in its own order — so each node's module bind runs, exactly as the
+  // generic writer walks an info that carries the rebuilt processor.
   ParamWriter paramWriter(fragmentUniformData);
   std::unordered_map<std::string, int> classOrdinals;
   FragmentProcessor::Iter iter(expression);
@@ -484,6 +485,19 @@ void ChainProgramWriter::writeSamplers(const ProgramInfo& info, Program* program
     renderPass->setTexture(textureBinding++, dstTextureView->getTexture(), sampler);
   }
   DEBUG_ASSERT(textureBinding == program->expectedTextureCount());
+}
+
+ProgramWriter::Expression PerlinProgramWriter::buildExpression(const ProgramInfo& info) const {
+  auto context = info.getContext();
+  if (context == nullptr || context->drawingManager() == nullptr) {
+    return {};
+  }
+  // The structure is stable for a given program key (the key encodes the whole processor tree);
+  // the values are not, so the folded perlin expression is rebuilt on every draw and the
+  // processor's own data writer uploads them.
+  return {AOTChainBuilder::BuildPerlinProcessorForInfo(
+              context->drawingManager()->drawingAllocator(), &info),
+          nullptr};
 }
 
 }  // namespace tgfx

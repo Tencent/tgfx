@@ -84,10 +84,11 @@ class DrawOp {
   }
 
   /**
-   * Marks a draw the record-time AOT entry deferred to the prepare-time inline rewrite: its color
-   * chain planned as a single fused chain or perlin pass, so the rewrite — not a plan task — owns
-   * it. prepareDecomposedProgram skips the dedicated-kernel probe for such draws (the record-time
-   * entry already committed them to the rewrite's kernel, exactly as the plan task did before).
+   * Marks a draw the record-time AOT entry deferred to a single fused pass: its color chain
+   * planned as one fused chain or perlin pass, so no plan task owns it. The flag carries the
+   * kernel commitment to the prepare-time plain lookup — the matcher walks the two fused kernels
+   * before the other dedicated families for such a draw — and the direct-chain accounting counts
+   * it as the AOT route's own serving.
    */
   void setInlineRewriteDeferred(bool deferred) {
     inlineRewriteDeferred = deferred;

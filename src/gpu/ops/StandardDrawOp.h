@@ -28,8 +28,8 @@ namespace tgfx {
  * chance to veto the whole execution via onPrepare() when runtime inputs turn out to be
  * unusable, then builds the op's ProgramInfo from the geometry processor supplied by
  * onMakeGeometryProcessor() and the color/coverage fragment processors accumulated on DrawOp
- * (rewriting the processor tree onto a precompiled chain kernel when the AOT decomposition
- * serves it), gives subclasses a chance to tweak the resulting ProgramInfo via
+ * (probing whether the AOT route's fused kernels serve the unmodified draw through the plain
+ * program lookup), gives subclasses a chance to tweak the resulting ProgramInfo via
  * onConfigureProgramInfo(), then binds the pipeline (together with uniforms, samplers and
  * scissor) before delegating the actual draw call to onDraw().
  *
@@ -126,19 +126,6 @@ class StandardDrawOp : public DrawOp {
   }
 
   /**
-   * Provides a chain-route geometry processor for the decomposition rewrite, plus any coverage
-   * leaves synthesized from GP-owned textures. AtlasTextOp implements this because its GP owns
-   * the atlas sampler, which ProgramInfo would bind ahead of the chain's leaf samplers; the
-   * returned GP is identical except it claims no sampler. The default returns nullptr, keeping
-   * the draw's own geometry processor for the rewrite.
-   */
-  virtual PlacementPtr<GeometryProcessor> onMakeChainGeometryProcessor(
-      std::vector<PlacementPtr<FragmentProcessor>>* chainCoverageFPs) {
-    (void)chainCoverageFPs;
-    return nullptr;
-  }
-
-  /**
    * Issues draw calls for this op. Invoked after the standard pipeline has been bound to the
    * render pass together with its uniforms, samplers and scissor rectangle. Subclasses only
    * need to bind buffers and call renderPass->draw()/drawIndexed().
@@ -146,14 +133,11 @@ class StandardDrawOp : public DrawOp {
   virtual void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) = 0;
 
  private:
-  std::shared_ptr<Program> prepareDecomposedProgram(RenderTarget* renderTarget,
-                                                    const ColorProcessorList& activeColors,
-                                                    bool* interpreterServed);
+  bool interpreterServesDraw(RenderTarget* renderTarget);
+
+  void adoptDeferredChainExpression(RenderTarget* renderTarget);
 
   PlacementPtr<GeometryProcessor> geometryProcessor = nullptr;
-  // Holds the chain-route twin GP (when an op provides one) for the draw's lifetime: a local
-  // PlacementPtr would run the base destructor at scope exit and devolve the vtable.
-  PlacementPtr<GeometryProcessor> chainGeometryProcessor = nullptr;
   bool geometryProcessorInitialized = false;
   std::optional<ColorProcessorList> preparedColors = std::nullopt;
   std::unique_ptr<ProgramInfo> preparedProgramInfo = nullptr;

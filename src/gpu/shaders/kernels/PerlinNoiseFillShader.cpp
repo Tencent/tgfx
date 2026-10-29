@@ -18,6 +18,8 @@
 
 #include "gpu/shaders/kernels/PerlinNoiseFillShader.h"
 #include <optional>
+#include "gpu/AOTChainBuilder.h"
+#include "gpu/DrawingManager.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
@@ -30,6 +32,23 @@
 
 namespace tgfx {
 
+// Cheap containment pre-gate: the perlin kernel can only serve a tree that actually contains a
+// noise source, and the check keeps every other tree shape out of the planning oracle below.
+static bool ContainsPerlinSource(const FragmentProcessor* processor) {
+  if (processor == nullptr) {
+    return false;
+  }
+  if (IsProcessor<PerlinNoiseFragmentProcessor>(processor)) {
+    return true;
+  }
+  for (size_t index = 0; index < processor->numChildProcessors(); ++index) {
+    if (ContainsPerlinSource(processor->childProcessor(index))) {
+      return true;
+    }
+  }
+  return false;
+}
+
 std::optional<PerlinNoiseFillShader::Inputs> PerlinNoiseFillShader::Extract(
     const ProgramInfo* programInfo) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
@@ -38,29 +57,28 @@ std::optional<PerlinNoiseFillShader::Inputs> PerlinNoiseFillShader::Extract(
   if (!IsPositionOnlyRectGP(programInfo->getGeometryProcessor())) {
     return std::nullopt;
   }
-  // Accept a PerlinNoiseFragmentProcessor optionally followed by one pointwise operator, in the
-  // same two structurally-equivalent forms as TexturedEffectShader::Match:
-  //   (a) a bare PerlinNoiseFragmentProcessor (OpType == OP_NONE, set by the Perlin FP), or
-  //   (b) Compose(Perlin, op) / sequential [Perlin, op] where op is a supported pointwise operator.
-  // The operator is folded into the shared OpType runtime uniform, so the composed case hits the
-  // same PerlinNoiseFillShader variant losslessly (no materialization, no extra compile-time axis).
-  const FragmentProcessor* perlin = nullptr;
-  if (programInfo->numFragmentProcessors() == 1 && programInfo->numColorFragmentProcessors() == 1) {
-    auto fp = programInfo->getFragmentProcessor(0);
-    if (IsProcessor<PerlinNoiseFragmentProcessor>(fp)) {
-      perlin = fp;
-    } else if (IsProcessor<ComposeFragmentProcessor>(fp) && fp->numChildProcessors() == 2 &&
-               IsProcessor<PerlinNoiseFragmentProcessor>(fp->childProcessor(0)) &&
-               IsSupportedPointwiseOp(fp->childProcessor(1))) {
-      perlin = fp->childProcessor(0);
-    }
-  } else if (programInfo->numFragmentProcessors() == 2 &&
-             programInfo->numColorFragmentProcessors() == 2 &&
-             IsProcessor<PerlinNoiseFragmentProcessor>(programInfo->getFragmentProcessor(0)) &&
-             IsSupportedPointwiseOp(programInfo->getFragmentProcessor(1))) {
-    perlin = programInfo->getFragmentProcessor(0);
+  // The perlin kernel carries no coverage-fold path, so every processor must be a color one.
+  if (programInfo->numFragmentProcessors() != programInfo->numColorFragmentProcessors()) {
+    return std::nullopt;
   }
-  if (perlin == nullptr) {
+  bool hasPerlin = false;
+  for (size_t index = 0; !hasPerlin && index < programInfo->numFragmentProcessors(); ++index) {
+    hasPerlin = ContainsPerlinSource(programInfo->getFragmentProcessor(index));
+  }
+  if (!hasPerlin) {
+    return std::nullopt;
+  }
+  // The acceptance oracle: the kernel folds up to three trailing operators (pointwise ops, const
+  // colors, blends whose other operand is a const) after the noise into its slot records, which
+  // is exactly the single-perlin-pass planning. A tree that does not reduce onto that pass (a
+  // chain-shaped blend of computed operands, a fourth operator, a non-perlin root) is rejected
+  // here and stays with the families behind this one.
+  auto context = programInfo->getContext();
+  if (context == nullptr || context->drawingManager() == nullptr) {
+    return std::nullopt;
+  }
+  if (AOTChainBuilder::BuildPerlinProcessorForInfo(context->drawingManager()->drawingAllocator(),
+                                                   programInfo) == nullptr) {
     return std::nullopt;
   }
   int xpType = GetXPType(programInfo);

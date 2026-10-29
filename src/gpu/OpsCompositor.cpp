@@ -1207,7 +1207,7 @@ PlacementPtr<FragmentProcessor> OpsCompositor::makeMaskFP(
 // TextureEffect color and nothing else beside the clip. QuadTextureFill serves that shape through
 // the runtime clip contract, so folding the clip into the pointwise chain would only move a fixed
 // pattern onto the interpreter (and its kilobyte-sized uniform block). The plain route tries the
-// dedicated kernel first and still falls back to the chain rewrite when the matcher refuses.
+// dedicated kernel first and still falls back to the chain interpreter when the matcher refuses.
 static bool IsDedicatedTextureFillCandidate(const DrawOp* op,
                                             const std::vector<const FragmentProcessor*>& colors,
                                             const FragmentProcessor* maskCoverage) {
@@ -1449,7 +1449,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
         // the retry below, which plan from the ORIGINAL color list without the coverage, would
         // silently drop the mask/clip. Go straight to the plain route. A Deferred plan returns
         // before the closure runs, so the coverage never moved and the op keeps it for the
-        // prepare-time rewrite, which folds it itself.
+        // prepare-time fused serving, which folds it itself.
         if (foldResult == AOTRouteResult::Deferred) {
           op->setInlineRewriteDeferred(true);
         }
@@ -1488,8 +1488,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
         cache->recordDecomposeRejection(outcome);
       }
     }
-    // A deferred draw is the prepare-time rewrite's own subject: no retry (the original tree
-    // planned), the plain route carries it to prepare with the deferred flag.
+    // A deferred draw is committed to a fused single pass: no retry (the original tree
+    // planned), the plain route carries it to prepare with the deferral flag.
     if (colorResult == AOTRouteResult::Deferred) {
       op->setInlineRewriteDeferred(true);
       drawOps.emplace_back(std::move(op));

@@ -19,6 +19,7 @@
 #include "PermutationMatcher.h"
 #include <skcms.h>
 #include <string_view>
+#include <type_traits>
 #include <unordered_set>
 #include "ColorSpaceXformHelper.h"
 #include "ShaderMatchHelpers.h"
@@ -373,6 +374,24 @@ bool ContainsGradientSource(const FragmentProcessor* processor) {
   return false;
 }
 
+// Per-family gate of the walk (see MatchPermutationImpl for the switch semantics). A fused-pass
+// committed draw's first phase admits only the two single-pass fused kernels — the interpreter and
+// the perlin kernel; its second phase admits every other dedicated family (the fused ones already
+// rejected the shape and are not retried).
+template <typename Family>
+static bool FamilyWalkEnabled(bool allowDedicated, bool allowInterpreter, bool committed,
+                              bool fusedPhase) {
+  constexpr bool isInterpreter = std::is_same_v<Family, PointwiseChainShader>;
+  constexpr bool isPerlin = std::is_same_v<Family, PerlinNoiseFillShader>;
+  if (committed && fusedPhase) {
+    return (isInterpreter && allowInterpreter) || (isPerlin && allowDedicated);
+  }
+  if (committed) {
+    return !isInterpreter && !isPerlin && allowDedicated;
+  }
+  return isInterpreter ? allowInterpreter : allowDedicated;
+}
+
 static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramInfo* programInfo) {
   // OpenGL is served from the bundle profile matching the context (desktop GL or the GLES
   // family: GLES, WebGL, SwiftShader). The precompiled kernels only declare 2D samplers. Desktop GL
@@ -455,15 +474,26 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
   }
   const bool allowInterpreter =
       shaderCache == nullptr || shaderCache->decompositionEnabled() || hasGradient;
-#define TGFX_TRY_FAMILY(Family)                                                                    \
-  if (!accepted && (!alphaOnly || Family::ServesAlphaOnly) &&                                      \
-      (std::string_view(#Family) == "PointwiseChainShader" ? allowInterpreter : allowDedicated)) { \
-    if (auto result = Family::Match(programInfo)) {                                                \
-      accepted = PermutationMatchResult{#Family, result->vertPermutationIndex,                     \
-                                        result->fragPermutationIndex};                             \
-    }                                                                                              \
+  // A fused-pass-committed draw (its record-time entry planned a single fused pass instead of a
+  // plan task) first walks only the two fused kernels — the interpreter and the perlin kernel —
+  // so a dedicated family cannot steal the committed shape; when neither serves it, the walk
+  // retries the remaining dedicated families in the normal order, which is the strict-fused-then-
+  // plain fallback order the retired prepare-time rewrite used.
+  const bool committed = programInfo->isFusedPassCommitted();
+  bool fusedPhase = committed;
+#define TGFX_TRY_FAMILY(Family)                                                             \
+  if (!accepted && (!alphaOnly || Family::ServesAlphaOnly) &&                               \
+      FamilyWalkEnabled<Family>(allowDedicated, allowInterpreter, committed, fusedPhase)) { \
+    if (auto result = Family::Match(programInfo)) {                                         \
+      accepted = PermutationMatchResult{#Family, result->vertPermutationIndex,              \
+                                        result->fragPermutationIndex};                      \
+    }                                                                                       \
   }
   TGFX_FOR_EACH_SHADER_FAMILY(TGFX_TRY_FAMILY)
+  if (committed && !accepted) {
+    fusedPhase = false;
+    TGFX_FOR_EACH_SHADER_FAMILY(TGFX_TRY_FAMILY)
+  }
 #undef TGFX_TRY_FAMILY
   if (accepted) {
     return accepted;

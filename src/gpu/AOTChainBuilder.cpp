@@ -2006,9 +2006,9 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessorForInfo(
   if (coverageCount > (atlasText ? 1u : 2u)) {
     return nullptr;
   }
-  // The atlas glyph mask joins as a synthesized coverage leaf sourced from the maskCoord attribute
-  // (mirrors AtlasTextOp::onMakeChainGeometryProcessor): only the alpha-only atlas readback is
-  // expressible — a color atlas replaces the output color, which the chain cannot carry.
+  // The atlas glyph mask joins as a synthesized coverage leaf sourced from the maskCoord
+  // attribute: only the alpha-only atlas readback is expressible — a color atlas replaces the
+  // output color, which the chain cannot carry.
   std::vector<PlacementPtr<FragmentProcessor>> ownedCoverageFPs = {};
   std::vector<const FragmentProcessor*> coverageFPs = {};
   coverageFPs.reserve(coverageCount + 1);
@@ -2059,6 +2059,30 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessorForInfo(
   }
   return BuildChainProcessor(allocator, graph, plan.passes[0], coverageFPs,
                              !ownedCoverageFPs.empty());
+}
+
+PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildPerlinProcessorForInfo(
+    BlockAllocator* allocator, const ProgramInfo* programInfo) {
+  if (allocator == nullptr || programInfo == nullptr) {
+    return nullptr;
+  }
+  // The perlin kernel has no coverage-fold path: the perlin family only accepts a draw whose
+  // processors are all color processors.
+  if (programInfo->numFragmentProcessors() != programInfo->numColorFragmentProcessors()) {
+    return nullptr;
+  }
+  std::vector<const FragmentProcessor*> colorProcessors = {};
+  colorProcessors.reserve(programInfo->numColorFragmentProcessors());
+  for (size_t index = 0; index < programInfo->numColorFragmentProcessors(); ++index) {
+    colorProcessors.push_back(programInfo->getFragmentProcessor(index));
+  }
+  AOTEffectGraph graph = {};
+  AOTEffectPlan plan = {};
+  if (!AOTRouter::PlanInlineRewrite(colorProcessors, &graph, &plan) ||
+      plan.passes[0].kernel != AOTKernelKind::PerlinNoiseFill) {
+    return nullptr;
+  }
+  return BuildFPForPass(allocator, graph, plan.passes[0]);
 }
 
 }  // namespace tgfx

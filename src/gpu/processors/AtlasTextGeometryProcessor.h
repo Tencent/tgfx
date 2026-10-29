@@ -35,12 +35,6 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
     return "AtlasTextGeometryProcessor";
   }
 
-  // Chain-route factory: the atlas texture joins the chain as a synthesized coverage leaf, so
-  // the GP must not claim a sampler (ProgramInfo binds GP samplers ahead of the chain's leaves).
-  static PlacementPtr<AtlasTextGeometryProcessor> MakeForChain(
-      BlockAllocator* allocator, std::shared_ptr<TextureProxy> textureProxy, AAType aa,
-      std::optional<PMColor> commonColor, const SamplingOptions& sampling);
-
   AAType getAAType() const {
     return aa;
   }
@@ -67,8 +61,7 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
 
  protected:
   AtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy, AAType aa,
-                             std::optional<PMColor> commonColor, const SamplingOptions& sampling,
-                             bool bindAtlasSampler = true);
+                             std::optional<PMColor> commonColor, const SamplingOptions& sampling);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
