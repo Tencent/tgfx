@@ -218,8 +218,11 @@ static bool DecomposePerlinNoiseChain(const AOTEffectGraph& graph, AOTEffectPlan
     return false;
   }
   auto geometryNode = graph.nodeAt(AOTNodeID(0));
+  auto noiseParameters =
+      std::get_if<AOTPerlinNoiseParameters>(&graph.nodeAt(AOTNodeID(1))->parameters);
   if (geometryNode == nullptr || geometryNode->kind != AOTEffectKind::GeometryColor ||
-      !IsPerlinNoiseSource(graph, AOTNodeID(1))) {
+      !IsPerlinNoiseSource(graph, AOTNodeID(1)) || noiseParameters == nullptr ||
+      noiseParameters->permutationsView == nullptr || noiseParameters->noiseView == nullptr) {
     return false;
   }
   std::vector<AOTNodeID> passNodes = {AOTNodeID(1)};
@@ -430,8 +433,11 @@ bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTEffectPlan* 
   // use their separate graph/chain families within shared budgets, without materialization.
   // A linear chain over one chain pass's budget splits into several chain passes; YUV sources
   // keep their dedicated kernel.
-  // Each planner proposes the plan for its shape; the first one the executor accepts wins, so
-  // every plan Decompose returns passes AOTPlanExecutor::CanExecute.
+  // Each planner is the admission authority for its shape: its own fit checks subsume what
+  // AOTPlanExecutor::CanExecute would re-derive (the DAG planner resolves the profile and kernel
+  // together; the linear planner's fit calls BuildLinearSegment with the same arguments the
+  // executor's segmented admission uses; the perlin planner checks the slot shapes and the lookup
+  // resources). The re-check therefore runs only as a debug assertion.
   if (plan == nullptr) {
     return false;
   }
@@ -439,7 +445,8 @@ bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTEffectPlan* 
   for (Planner planner : {DecomposePerlinNoiseChain, DecomposePointwiseDAG,
                           DecomposeLinearMultiPass, DecomposeYUVChain}) {
     AOTEffectPlan candidate = {};
-    if (planner(graph, &candidate) && AOTPlanExecutor::CanExecute(graph, candidate)) {
+    if (planner(graph, &candidate)) {
+      DEBUG_ASSERT(AOTPlanExecutor::CanExecute(graph, candidate));
       *plan = std::move(candidate);
       return true;
     }
