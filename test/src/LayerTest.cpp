@@ -8823,13 +8823,13 @@ TGFX_TEST(LayerTest, TiledDirtyRegionOutsideViewport) {
   // This dirty region covers both the visible tiles and the cached off-screen ones.
   solidLayer->setColor(Color::Blue());
   displayList->render(surface.get());
-  // The tile containing x = 192 straddles the left viewport edge, so only its off-screen part
-  // (192..200) was reached by the dirty region. It has to be redrawn as well.
+  // The tile covering 192..256 straddles the left viewport edge, so the dirty region only reached
+  // its off-screen part 192..200. Sample inside that part but away from the 192 tile seam.
   displayList->setContentOffset(-190, 0);
   displayList->render(surface.get());
   auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
   uint32_t pixel = 0;
-  ASSERT_TRUE(surface->readPixels(info, &pixel, 2, 10));
+  ASSERT_TRUE(surface->readPixels(info, &pixel, 6, 10));
   EXPECT_EQ(pixel, 0xFFFF0000u) << "the off-screen part of a straddling tile kept stale content";
   displayList->setContentOffset(0, 0);
   displayList->render(surface.get());
