@@ -1191,8 +1191,6 @@ bool Layer::prepareMask(const DrawArgs& args, Canvas* canvas,
   auto contentScale = canvas->getMatrix().getMaxScale();
   // Masks are recorded in 2D even when this layer is rasterized as a node of a 3D context, so
   // detach the mask draw from that context.
-  // Masks are recorded in 2D even when this layer is rasterized as a node of a 3D context, so
-  // detach the mask draw from that context.
   DrawArgs maskArgs = args;
   maskArgs.render3DContext = nullptr;
   auto maskData = getMaskData(maskArgs, contentScale, clipBounds);
@@ -1250,8 +1248,6 @@ std::shared_ptr<Picture> Layer::getMaskPicture(const DrawArgs& args, bool isCont
 MaskData Layer::getMaskData(const DrawArgs& args, float scale,
                             const std::optional<Rect>& layerClipBounds) {
   DEBUG_ASSERT(_mask != nullptr);
-  // Contract: masks are always recorded in 2D on the current surface, whatever context the owner
-  // layer is rasterized in. Callers detach the mask draw from any active 3D context.
   DEBUG_ASSERT(args.render3DContext == nullptr);
   auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
   auto isContourMode =
@@ -1627,6 +1623,8 @@ bool Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, bool conte
   if (!contentOnly && hasValidMask()) {
     auto contentScale = canvas->getMatrix().getMaxScale();
     auto clipBounds = GetClipBounds(canvas);
+    // Masks are recorded in 2D even when this layer is rasterized as a node of a 3D context, so
+    // detach the mask draw from that context.
     DrawArgs maskArgs = args;
     maskArgs.render3DContext = nullptr;
     auto maskData = getMaskData(maskArgs, contentScale, clipBounds);
