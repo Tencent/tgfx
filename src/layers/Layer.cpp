@@ -1205,7 +1205,11 @@ bool Layer::prepareMask(const DrawArgs& args, Canvas* canvas,
   }
   auto clipBounds = GetClipBounds(canvas);
   auto contentScale = canvas->getMatrix().getMaxScale();
-  auto maskData = getMaskData(args, contentScale, clipBounds);
+  // Masks are recorded in 2D even when this layer is rasterized as a node of a 3D context, so
+  // detach the mask draw from that context.
+  DrawArgs maskArgs = args;
+  maskArgs.render3DContext = nullptr;
+  auto maskData = getMaskData(maskArgs, contentScale, clipBounds);
   if (maskData.maskFilter == nullptr) {
     if (maskData.clipPath.isEmpty() && !maskData.clipPath.isInverseFillType()) {
       return false;
@@ -1658,7 +1662,11 @@ bool Layer::drawContourInternal(const DrawArgs& args, Canvas* canvas, bool conte
   if (!contentOnly && hasValidMask()) {
     auto contentScale = canvas->getMatrix().getMaxScale();
     auto clipBounds = GetClipBounds(canvas);
-    auto maskData = getMaskData(args, contentScale, clipBounds);
+    // Masks are recorded in 2D even when this layer is rasterized as a node of a 3D context, so
+    // detach the mask draw from that context.
+    DrawArgs maskArgs = args;
+    maskArgs.render3DContext = nullptr;
+    auto maskData = getMaskData(maskArgs, contentScale, clipBounds);
     if (maskData.maskFilter == nullptr) {
       if (maskData.clipPath.isEmpty() && !maskData.clipPath.isInverseFillType()) {
         return allMatch;
