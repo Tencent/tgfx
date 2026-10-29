@@ -40,9 +40,9 @@ namespace tgfx {
 // the pointwise chain kernel the same way; nullptr keeps the original processor.
 static PlacementPtr<FragmentProcessor> MakeChainColorProcessor(BlockAllocator* allocator,
                                                                Context* context,
-                                                               ProgramInfo& programInfo) {
+                                                               const ProgramInfo& programInfo) {
   auto cache = context->precompiledShaderCache();
-  if (cache == nullptr || !cache->isLoaded() || programInfo.matchAndCache().has_value()) {
+  if (cache == nullptr || !cache->isLoaded() || MatchPermutation(&programInfo).has_value()) {
     return nullptr;
   }
   std::vector<const FragmentProcessor*> colorProcessors = {programInfo.getFragmentProcessor(0)};

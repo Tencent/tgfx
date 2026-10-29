@@ -21,6 +21,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include "gpu/PermutationMatch.h"
 #include "gpu/Program.h"
 #include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
@@ -33,50 +34,10 @@
 
 namespace tgfx {
 
-/**
- * The matched precompiled family of one program shape, as the permutation matcher resolves it
- * (the variant-only form the family Match functions return is PermutationVariant in
- * ShaderPermutation.h).
- */
-struct PermutationMatchResult {
-  std::string shaderName;
-  uint32_t vertPermutationIndex;
-  uint32_t fragPermutationIndex;
-};
-
-enum class PermutationMatchFailure {
-  None,
-  UnsupportedOutputSwizzle,
-  NoMatchingRule,
-  /// A rule matched, but the draw samples a texture whose read semantics (e.g. the GRAY_8 / RG_88
-  /// read swizzle) the matched shader family does not declare in PrecompiledShaderInfo.
-  UnsupportedTextureRead,
-  // Sub-reasons below all report as NoMatchingRule to the coarse fallback category; they exist so
-  // a miss says where it was rejected instead of only "no rule matched". Append only.
-  /// The OpenGL entry gate refused the pipeline (bundle profile mismatch or a non-2D sampler).
-  GlGateRejected,
-  /// The chain path refuses quads that carry a vertex subset attribute.
-  QuadSubset,
-  /// More than one gradient (or gradient + noise) in a single chain pass.
-  GradientOrNoiseBudget,
-  /// The draw carries a coverage FP shape the candidate kernel cannot evaluate.
-  CoverageShape,
-  /// No family matched the geometry processor at all.
-  NoMatchingFamily,
-  /// The pipeline composed, but that combination is not in the enumerated variant set.
-  PermutationNotEnumerated,
-  /// Building the AOT graph failed because a processor has no lowering (the default
-  /// FragmentProcessor::lowerToAOT).
-  MissingLowering,
-};
-
 struct SamplerInfo {
   std::shared_ptr<Texture> texture;
   SamplerState state;
 };
-
-std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo,
-                                                       PermutationMatchFailure* failure = nullptr);
 
 /**
  * Controls whether a program lookup may fall back to runtime shader generation.
@@ -140,14 +101,6 @@ class ProgramInfo {
 
   std::shared_ptr<Program> getProgram(
       ProgramLookupMode mode = ProgramLookupMode::AllowRuntimeFallback) const;
-
-  /**
-   * Matches this info against the precompiled families and caches the outcome on the info: a draw
-   * the prepare-time rewrite probes and then looks up matches once, the later lookup reusing the
-   * cached result instead of re-running the family walk. Declared here, defined next to the
-   * matcher (PermutationMatcher.cpp) so the family dispatch stays in one file.
-   */
-  std::optional<PermutationMatchResult> matchAndCache(PermutationMatchFailure* failure = nullptr);
 
   std::shared_ptr<GPUBuffer> getUniformBuffer(const Program* program, size_t* vertexOffset,
                                               size_t* fragmentOffset) const;
@@ -266,12 +219,10 @@ class ProgramInfo {
 
   BytesKey buildProgramKey() const;
 
-  // The cached permutation match (see matchAndCache): set once by the first matching caller, read
-  // by every later lookup of the same info. matchCached distinguishes "matched and missed" from
-  // "never matched".
-  bool matchCached = false;
-  std::optional<PermutationMatchResult> preMatched;
-  PermutationMatchFailure preMatchedFailure = PermutationMatchFailure::None;
+  // The cached MatchPermutation outcome (see PermutationMatch.h): filled by the first caller and
+  // reused by every later lookup of the same info. Mutable because the lookup entry takes a
+  // const info and the cache is an implementation detail of idempotence, not program state.
+  mutable std::optional<PermutationMatchOutcome> cachedMatch;
 
   friend std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo*,
                                                                 PermutationMatchFailure*);

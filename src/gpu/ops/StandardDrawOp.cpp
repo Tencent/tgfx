@@ -142,7 +142,7 @@ std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
     }
   }
   if (cache->dedicatedKernelsEnabled() && !isInlineRewriteDeferred() &&
-      preparedProgramInfo->matchAndCache().has_value()) {
+      MatchPermutation(preparedProgramInfo.get()).has_value()) {
     return nullptr;
   }
   // The coverage forms the chain carries are now semantically routed: geometric coverage (the
@@ -232,7 +232,7 @@ std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
   // transforms) must fall back without recording a diagnostic miss against the rewritten tree,
   // which would double-count the draw alongside the original tree's own miss record. The cached
   // probe is what the strict lookup's own match reuses.
-  if (!rewrittenInfo->matchAndCache().has_value()) {
+  if (!MatchPermutation(rewrittenInfo.get()).has_value()) {
     return nullptr;
   }
   // Strict lookup: a rewritten draw must resolve to the precompiled chain kernel. Anything else

@@ -499,33 +499,22 @@ static std::optional<PermutationMatchResult> ComputeMatch(const ProgramInfo* pro
 
 std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo,
                                                        PermutationMatchFailure* failure) {
-  // A draw whose prepare-time probe already matched reuses the cached outcome here: the program
-  // creator's lookup then costs nothing, and the probe's failure bookkeeping is not repeated.
-  if (programInfo->matchCached) {
+  // The lookup is idempotent: the first caller runs the walk, and every later caller — the program
+  // creator's lookup, a prepare-time probe — reuses the cached outcome, including the failure
+  // bookkeeping, so a draw the rewrite probes matches once.
+  if (programInfo->cachedMatch) {
     if (failure != nullptr) {
-      *failure = programInfo->preMatchedFailure;
+      *failure = programInfo->cachedMatch->failure;
     }
-    return programInfo->preMatched;
+    return programInfo->cachedMatch->match;
   }
-  return ComputeMatch(programInfo, failure);
-}
-
-std::optional<PermutationMatchResult> ProgramInfo::matchAndCache(PermutationMatchFailure* failure) {
-  if (matchCached) {
-    if (failure != nullptr) {
-      *failure = preMatchedFailure;
-    }
-    return preMatched;
-  }
-  auto failureValue = PermutationMatchFailure::None;
-  auto result = ComputeMatch(this, &failureValue);
-  matchCached = true;
-  preMatched = result;
-  preMatchedFailure = failureValue;
+  auto outcome = PermutationMatchOutcome{};
+  outcome.match = ComputeMatch(programInfo, &outcome.failure);
+  programInfo->cachedMatch = outcome;
   if (failure != nullptr) {
-    *failure = failureValue;
+    *failure = outcome.failure;
   }
-  return result;
+  return outcome.match;
 }
 
 const char* PermutationMatchFailureName(PermutationMatchFailure failure) {
