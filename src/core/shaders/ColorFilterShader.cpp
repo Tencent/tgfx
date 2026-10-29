@@ -18,7 +18,6 @@
 
 #include "ColorFilterShader.h"
 #include "core/utils/Types.h"
-#include "gpu/FPFlattenHelper.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 
@@ -59,21 +58,6 @@ PlacementPtr<FragmentProcessor> ColorFilterShader::asFragmentProcessor(
   }
   // The color filter transforms transparent pixels into non-transparent ones. Use the original
   // shader alpha as a mask to prevent coloring transparent regions.
-  // No construction-time materialization, as in BlendShader: the materialization retry rebuilds
-  // this tree with MaterializeBlendChildren set only when the AOT route refuses the original.
-  if ((args.renderFlags & InternalRenderFlags::MaterializeBlendChildren) != 0) {
-    composed = EnsureSimpleBlendChild(args, std::move(composed));
-    if (composed == nullptr) {
-      return nullptr;
-    }
-    auto alphaSource = FragmentProcessor::Make(shader, args, uvMatrix, dstColorSpace);
-    alphaSource = EnsureSimpleBlendChild(args, std::move(alphaSource), 1);
-    if (alphaSource == nullptr) {
-      return nullptr;
-    }
-    return XfermodeFragmentProcessor::MakeFromTwoProcessors(
-        allocator, std::move(composed), std::move(alphaSource), BlendMode::SrcIn);
-  }
   auto alphaSource = FragmentProcessor::Make(shader, args, uvMatrix, dstColorSpace);
   if (alphaSource == nullptr) {
     return nullptr;

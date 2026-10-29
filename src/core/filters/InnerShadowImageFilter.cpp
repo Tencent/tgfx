@@ -19,7 +19,6 @@
 #include "InnerShadowImageFilter.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/ColorHelper.h"
-#include "gpu/FPFlattenHelper.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
@@ -68,14 +67,6 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcess
     invertShadowMask =
         ConstColorProcessor::Make(allocator, PMColor::Transparent(), InputMode::Ignore);
   }
-  // No construction-time materialization: the materialization retry sets MaterializeBlendChildren
-  // only when the AOT route refuses the original tree.
-  if ((args.renderFlags & InternalRenderFlags::MaterializeBlendChildren) != 0) {
-    invertShadowMask = EnsureSimpleBlendChild(args, std::move(invertShadowMask), 1);
-    if (invertShadowMask == nullptr) {
-      return nullptr;
-    }
-  }
   auto dstColor = ToPMColor(color, source->colorSpace());
   auto colorProcessor = ConstColorProcessor::Make(allocator, dstColor, InputMode::Ignore);
 
@@ -106,19 +97,6 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
   auto blendMode = shadowOnly ? BlendMode::SrcIn : BlendMode::SrcATop;
 
   auto shadowFP = getShadowFragmentProcessor(source, args, sampling, constraint, uvMatrix);
-  // Same materialization gate as getShadowFragmentProcessor above. The
-  // shadow FP is itself a two-child blend (complex), so it is exactly the operand the retry
-  // rewrites before the final SrcIn/SrcATop tree.
-  if ((args.renderFlags & InternalRenderFlags::MaterializeBlendChildren) != 0) {
-    shadowFP = EnsureSimpleBlendChild(args, std::move(shadowFP));
-    if (shadowFP == nullptr) {
-      return nullptr;
-    }
-    imageProcessor = EnsureSimpleBlendChild(args, std::move(imageProcessor), 1);
-    if (imageProcessor == nullptr) {
-      return nullptr;
-    }
-  }
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(allocator, std::move(shadowFP),
                                                           std::move(imageProcessor), blendMode);
 }

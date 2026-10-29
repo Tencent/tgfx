@@ -18,7 +18,6 @@
 
 #include "BlendShader.h"
 #include "core/utils/Types.h"
-#include "gpu/FPFlattenHelper.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 #include "tgfx/gpu/Context.h"
@@ -70,20 +69,6 @@ PlacementPtr<FragmentProcessor> BlendShader::asFragmentProcessor(
   auto fpB = FragmentProcessor::Make(src, args, uvMatrix, dstColorSpace);
   if (fpB == nullptr) {
     return nullptr;
-  }
-  // No construction-time materialization: the original two-child tree survives to the draw, and
-  // the materialization retry (AOTRouter::RouteWithMaterializedLeading) rebuilds this chain with
-  // MaterializeBlendChildren set only when the AOT route refuses the original tree. The plain
-  // route therefore always carries the untouched processors.
-  if ((args.renderFlags & InternalRenderFlags::MaterializeBlendChildren) != 0) {
-    fpB = EnsureSimpleBlendChild(args, std::move(fpB));
-    if (fpB == nullptr) {
-      return nullptr;
-    }
-    fpA = EnsureSimpleBlendChild(args, std::move(fpA), 1);
-    if (fpA == nullptr) {
-      return nullptr;
-    }
   }
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(args.context->drawingAllocator(),
                                                           std::move(fpB), std::move(fpA), mode);

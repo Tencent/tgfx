@@ -223,7 +223,7 @@ class OpsCompositor {
   DstTextureInfo makeDstTextureInfo(const Rect& deviceBounds, AAType aaType);
   void addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, const Brush& brush,
                  const std::optional<Rect>& localBounds, const std::optional<Rect>& deviceBounds,
-                 float drawScale, ColorChainRebuild rebuildColorChain = nullptr);
+                 float drawScale);
 
   void submitDrawOps();
 
@@ -233,8 +233,7 @@ class OpsCompositor {
    * cannot reproduce this draw exactly (see the gate in the implementation).
    */
   bool submitPlanTask(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
-                      const Rect& deviceBounds, PlacementPtr<DrawOp>* op,
-                      AOTMaterializationRecorder* producers);
+                      const Rect& deviceBounds, PlacementPtr<DrawOp>* op);
 
   friend class DrawingManager;
   friend class PendingOpsAutoReset;

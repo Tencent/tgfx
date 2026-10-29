@@ -66,7 +66,9 @@ bool AOTNodeBuilder::addGeometryWhiteInput(AOTNodeID* output) {
 
 bool AOTNodeBuilder::addTextureSource(AOTNodeID input, const AOTTextureParameters& parameters,
                                       AOTNodeID* output) {
-  if (parameters.textureProxy == nullptr) {
+  // An isIntermediate stand-in carries no texture yet (planning admits a cut's replacement before
+  // the producing pass's target exists); every other leaf needs its proxy.
+  if (parameters.textureProxy == nullptr && !parameters.isIntermediate) {
     return false;
   }
   return addUnaryNode(AOTEffectKind::TextureSource, input, parameters, output);

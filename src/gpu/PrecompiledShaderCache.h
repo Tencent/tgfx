@@ -457,28 +457,21 @@ class PrecompiledShaderCache {
   /// invocation of this Draw hit AOT. Called by the decomposition executor (stage 2+).
   void recordDraw(const AOTDrawStats& delta, bool complete);
 
-  /// Records one materialized edge produced outside the decomposition executor, i.e. by an
-  /// inline flatten that renders an FP subtree into an offscreen texture. Unlike recordDraw this
-  /// leaves the Draw-level counters untouched, because an inline flatten is one edge of a Draw
-  /// rather than a Draw of its own. `bytes` is the size of the offscreen target it allocated.
-  void recordMaterializedEdge(uint64_t bytes);
-
   /**
    * Counts a draw dropped because its final program lookup failed (AOTDrawStats::droppedDraws).
    */
   void recordDroppedDraw();
 
-  /// Settles the simultaneously-live materialized bytes accumulated by recordMaterializedEdge
-  /// (and the offscreen plan targets) into peakTemporaryBytes and resets the running total.
-  /// Called once per flush cycle, before the recorded draws execute: the settled value is the
-  /// maximum set of offscreen bytes that coexisted while the frame was being built.
+  /// Settles the simultaneously-live materialized bytes accumulated by recordActiveTemporaryBytes
+  /// into peakTemporaryBytes and resets the running total. Called once per flush cycle, before the
+  /// recorded draws execute: the settled value is the maximum set of offscreen bytes that coexisted
+  /// while the frame was being built.
   void settleActiveTemporaryBytes();
 
   /// Adds `bytes` to the simultaneously-live running total without touching any per-edge or
-  /// per-draw counter — for offscreen targets created outside recordMaterializedEdge's path
-  /// (an offscreen plan's intermediate render targets, counted at task creation so they settle
-  /// inside the recording cycle; the task's own recordDraw delta is a different, draw-local view
-  /// of the same bytes).
+  /// per-draw counter — for an offscreen plan's intermediate render targets, counted at task
+  /// creation so they settle inside the recording cycle; the task's own recordDraw delta is a
+  /// different, draw-local view of the same bytes.
   void recordActiveTemporaryBytes(uint64_t bytes);
 
   /// Records one draw whose color chain the decomposition route attempted and refused, with the

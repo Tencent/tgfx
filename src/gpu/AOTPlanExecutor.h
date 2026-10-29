@@ -29,7 +29,6 @@
 namespace tgfx {
 class Context;
 class RenderTargetProxy;
-class AOTMaterializationRecorder;
 
 class AOTPlanExecutor {
  public:
@@ -73,11 +72,6 @@ class AOTPlanExecutor {
    * For a multi-pass draw, originalDraw must report one uniform geometry color: its alpha is
    * applied in the source pass, while later segments read the intermediate without applying it
    * again. Geometry coverage and blending still execute only in the terminal pass.
-   *
-   * producers, when not null, holds the blend-child materializations recorded while the plan's
-   * processors were built (the materialization retry). They are moved into the task ahead of the
-   * plan's own passes, so they run in the same task as the draw that samples them. They are
-   * consumed even when Make fails; the caller then refuses the retry, so nothing reads them.
    */
   static PlacementPtr<RenderTask> Make(Context* context, uint32_t renderFlags,
                                        const AOTEffectGraph& graph, const AOTEffectPlan& plan,
@@ -86,8 +80,7 @@ class AOTPlanExecutor {
                                        PlacementPtr<DrawOp>* originalDraw,
                                        const Point& fpCoordOffset = Point::Zero(),
                                        bool clearDestination = false,
-                                       const std::optional<Matrix>& deviceToLocal = std::nullopt,
-                                       AOTMaterializationRecorder* producers = nullptr);
+                                       const std::optional<Matrix>& deviceToLocal = std::nullopt);
 
   /**
    * Builds the passes of a plan that passed CanExecute without validating or enqueueing anything:

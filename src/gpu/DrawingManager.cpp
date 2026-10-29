@@ -19,7 +19,6 @@
 #include "DrawingManager.h"
 #include "ProxyProvider.h"
 #include "core/AtlasManager.h"
-#include "gpu/AOTMaterializationRecorder.h"
 #include "gpu/AOTPlanExecutor.h"
 #include "gpu/AOTRouter.h"
 #include "gpu/PrecompiledShaderCache.h"
@@ -128,8 +127,7 @@ bool DrawingManager::planFill(const FragmentProcessor* processor, const Point& c
 
 bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
                                   PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags,
-                                  const Point& coordOffset, OffscreenFillSource source,
-                                  ColorChainRebuild rebuildColorChain) {
+                                  const Point& coordOffset, OffscreenFillSource source) {
   AOTEffectGraph graph = {};
   AOTEffectPlan plan = {};
   OffscreenFillKey diagnosticKey = InvalidOffscreenFillKey;
@@ -139,15 +137,13 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   // op. An offscreen fill owns a fresh target, so the task clears its full backing first and a
   // shader-side sample cannot observe pixels left by an earlier scratch allocation.
   auto submitPlanTask = [&](const AOTEffectGraph& taskGraph, const AOTEffectPlan& taskPlan,
-                            PlacementPtr<DrawOp>* originalDraw,
-                            AOTMaterializationRecorder* producers) {
+                            PlacementPtr<DrawOp>* originalDraw) {
     // The fill covers the target's logical bounds, and its processors see coordinates shifted by
     // coordOffset; the split-off passes of a multi-pass plan reproduce both.
     auto deviceBounds = Rect::MakeWH(static_cast<float>(renderTarget->width()),
                                      static_cast<float>(renderTarget->height()));
-    auto task =
-        AOTPlanExecutor::Make(context, renderFlags, taskGraph, taskPlan, deviceBounds, renderTarget,
-                              originalDraw, coordOffset, true, std::nullopt, producers);
+    auto task = AOTPlanExecutor::Make(context, renderFlags, taskGraph, taskPlan, deviceBounds,
+                                      renderTarget, originalDraw, coordOffset, true, std::nullopt);
     if (task == nullptr) {
       return false;
     }
@@ -155,36 +151,23 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     addGenerateMipmapsTask(renderTarget->asTextureProxy());
     return true;
   };
-  // The retry verdict reads the processor tree, so it must be taken before the processor moves
-  // into the fill's draw op below.
-  bool retryWarranted = isFillRouteCandidate(processor.get()) && rebuildColorChain != nullptr &&
-                        AOTRouter::RetryWarranted(processor.get(), renderFlags);
   auto drawOp =
       makeFillDrawOp(renderTarget, std::move(processor), renderFlags, coordOffset, diagnosticKey);
   if (drawOp == nullptr) {
     return false;
   }
   AOTRouter::SubmitPlan submitFill = [&](const AOTEffectGraph& taskGraph,
-                                         const AOTEffectPlan& taskPlan,
-                                         AOTMaterializationRecorder* producers) {
-    return submitPlanTask(taskGraph, taskPlan, &drawOp, producers);
+                                         const AOTEffectPlan& taskPlan) {
+    return submitPlanTask(taskGraph, taskPlan, &drawOp);
   };
   // A single-pass chain-capable plan is the prepare-time fused serving's own shape (the fill's
   // RectDrawOp is a StandardDrawOp, so the plain lookup's fused walk serves the deferred fill
-  // through the same kernel); deferring skips the plan task and the retry alike.
+  // through the same kernel); deferring skips the plan task.
   bool deferredToInlineRewrite = planned && !AOTRouter::PlanRequiresTask(plan);
   drawOp->setInlineRewriteDeferred(deferredToInlineRewrite);
   // The original tree was already planned above (the diagnostics need the plan too), so its
   // route only has to submit that plan.
-  if (!deferredToInlineRewrite && planned && submitFill(graph, plan, nullptr)) {
-    return true;
-  }
-  // Materialization retry, shared with on-screen draws (AOTRouter::RouteWithMaterializedLeading):
-  // the caller's closure rebuilds the whole fill processor with materialized blend children. A
-  // refused retry is dropped and the plain fill below keeps the ORIGINAL processor.
-  if (!deferredToInlineRewrite && retryWarranted &&
-      AOTRouter::RouteWithMaterializedLeading(context, rebuildColorChain, {}, submitFill) ==
-          AOTRouteResult::Submitted) {
+  if (!deferredToInlineRewrite && planned && submitFill(graph, plan)) {
     return true;
   }
   auto allocator = drawingAllocator();
@@ -216,7 +199,6 @@ void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderT
   if (renderTarget == nullptr || (drawOps.empty() && !clearColor.has_value())) {
     return;
   }
-  commitPendingMaterializations();
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto textureProxy = renderTarget->asTextureProxy();
@@ -233,7 +215,6 @@ void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> rende
   if (renderTarget == nullptr || inputs.empty() || effect == nullptr) {
     return;
   }
-  commitPendingMaterializations();
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto textureProxy = renderTarget->asTextureProxy();
@@ -247,7 +228,6 @@ void DrawingManager::addGenerateMipmapsTask(std::shared_ptr<TextureProxy> textur
   if (textureProxy == nullptr || !textureProxy->hasMipmaps()) {
     return;
   }
-  commitPendingMaterializations();
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto task = allocator->make<GenerateMipmapsTask>(allocator, std::move(textureProxy));
@@ -260,7 +240,6 @@ void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> 
   if (source == nullptr || dest == nullptr) {
     return;
   }
-  commitPendingMaterializations();
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto task = allocator->make<RenderTargetCopyTask>(allocator, std::move(source), std::move(dest),
@@ -273,7 +252,6 @@ void DrawingManager::addTextureCopyTask(std::shared_ptr<TextureProxy> source,
   if (source == nullptr || dest == nullptr) {
     return;
   }
-  commitPendingMaterializations();
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto task = allocator->make<TextureCopyTask>(allocator, std::move(source), std::move(dest));
@@ -286,7 +264,6 @@ void DrawingManager::addTransferPixelsTask(std::shared_ptr<RenderTargetProxy> so
   if (source == nullptr || dest == nullptr || srcRect.isEmpty()) {
     return;
   }
-  commitPendingMaterializations();
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto task =
@@ -298,23 +275,8 @@ void DrawingManager::addRenderTask(PlacementPtr<RenderTask> renderTask) {
   if (renderTask == nullptr) {
     return;
   }
-  commitPendingMaterializations();
   auto drawingBuffer = getDrawingBuffer();
   drawingBuffer->renderTasks.emplace_back(std::move(renderTask));
-}
-
-void DrawingManager::commitPendingMaterializations() {
-  std::vector<AOTMaterializationRecorder*> recorders = {};
-  for (auto recorder = activeRecorder; recorder != nullptr; recorder = recorder->previous) {
-    if (!recorder->empty()) {
-      recorders.push_back(recorder);
-    }
-  }
-  // An outer recorder's producers were recorded before any inner recorder opened, so committing
-  // outermost first keeps every producer ahead of the producers that may sample it.
-  for (auto recorder = recorders.rbegin(); recorder != recorders.rend(); ++recorder) {
-    (*recorder)->commitPending();
-  }
 }
 
 void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask) {
@@ -361,7 +323,6 @@ void DrawingManager::collectWindow(std::weak_ptr<Window> window) {
 }
 
 std::shared_ptr<DrawingBuffer> DrawingManager::flush() {
-  commitPendingMaterializations();
   if (currentBuffer == nullptr && compositors.empty()) {
     return nullptr;
   }

@@ -18,8 +18,6 @@
 
 #include "AOTRouter.h"
 #include "gpu/AOTEffectDecomposer.h"
-#include "gpu/AOTMaterializationPolicy.h"
-#include "gpu/AOTMaterializationRecorder.h"
 
 namespace tgfx {
 
@@ -31,19 +29,19 @@ static bool IsInlineRewritableKernel(AOTKernelKind kernel) {
 }
 
 AOTRouteResult AOTRouter::Route(const std::vector<const FragmentProcessor*>& processors,
-                                const SubmitPlan& submit, AOTMaterializationRecorder* producers) {
+                                const SubmitPlan& submit) {
   AOTEffectGraph graph = {};
   AOTEffectPlan plan = {};
   if (!AOTEffectDecomposer::Lower(processors, &graph) ||
       !AOTEffectDecomposer::Decompose(graph, &plan)) {
     return AOTRouteResult::NoPlan;
   }
-  if (producers == nullptr && !PlanRequiresTask(plan)) {
+  if (!PlanRequiresTask(plan)) {
     // No task is needed: the draw stays on the plain route with the deferral flag, and the
     // prepare-time plain lookup's fused walk serves it through the committed kernel.
     return AOTRouteResult::Deferred;
   }
-  return submit(graph, plan, producers) ? AOTRouteResult::Submitted : AOTRouteResult::TaskRefused;
+  return submit(graph, plan) ? AOTRouteResult::Submitted : AOTRouteResult::TaskRefused;
 }
 
 bool AOTRouter::PlanInlineRewrite(const std::vector<const FragmentProcessor*>& processors,
@@ -60,41 +58,5 @@ bool AOTRouter::PlanRequiresTask(const AOTEffectPlan& plan) {
     return true;
   }
   return !IsInlineRewritableKernel(plan.passes[0].kernel);
-}
-
-bool AOTRouter::RetryWarranted(const FragmentProcessor* leading, uint32_t renderFlags) {
-  if (leading == nullptr || leading->numChildProcessors() != 2 ||
-      leading->name() != "XfermodeFragmentProcessor - two") {
-    return false;
-  }
-  bool nested = (renderFlags & InternalRenderFlags::NestedRasterization) != 0;
-  for (size_t childIndex = 0; childIndex < 2; ++childIndex) {
-    auto decision = AOTMaterializationPolicy::Evaluate(
-        leading->childProcessor(childIndex), MaterializationConsumer::PointwiseBlend, childIndex);
-    if (decision.requiredForCorrectness || (!nested && decision.shouldFlatten)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-AOTRouteResult AOTRouter::RouteWithMaterializedLeading(
-    Context* context, const ColorChainRebuild& rebuildLeading,
-    const std::vector<const FragmentProcessor*>& trailing, const SubmitPlan& submit) {
-  if (context == nullptr || rebuildLeading == nullptr) {
-    return AOTRouteResult::NoPlan;
-  }
-  // Producers recorded during the rebuild stay pending until Route hands them to the entry's plan
-  // task; whatever is still pending when the recorder goes out of scope was refused and is dropped.
-  AOTMaterializationRecorder recorder(context);
-  auto leading = rebuildLeading();
-  if (leading == nullptr) {
-    return AOTRouteResult::NoPlan;
-  }
-  std::vector<const FragmentProcessor*> processors = {leading.get()};
-  processors.insert(processors.end(), trailing.begin(), trailing.end());
-  // The plan task rebuilds its processors from the lowered graph, so the rebuilt leading
-  // processor is not needed once Route returns.
-  return Route(processors, submit, &recorder);
 }
 }  // namespace tgfx

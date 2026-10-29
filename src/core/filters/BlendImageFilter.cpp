@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BlendImageFilter.h"
-#include "gpu/FPFlattenHelper.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 
@@ -66,19 +65,6 @@ PlacementPtr<FragmentProcessor> BlendImageFilter::asFragmentProcessor(
     return DstIsRequired(blendMode) ? nullptr : std::move(shaderFP);
   }
   // The shader acts as the src operand and the source image as the dst operand of the blend.
-  // No construction-time materialization: the materialization retry sets MaterializeBlendChildren
-  // only when the AOT route refuses the original tree, so the plain route always carries the
-  // untouched processors.
-  if ((args.renderFlags & InternalRenderFlags::MaterializeBlendChildren) != 0) {
-    shaderFP = EnsureSimpleBlendChild(args, std::move(shaderFP));
-    if (shaderFP == nullptr) {
-      return nullptr;
-    }
-    sourceFP = EnsureSimpleBlendChild(args, std::move(sourceFP), 1);
-    if (sourceFP == nullptr) {
-      return nullptr;
-    }
-  }
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(allocator, std::move(shaderFP),
                                                           std::move(sourceFP), blendMode);
 }

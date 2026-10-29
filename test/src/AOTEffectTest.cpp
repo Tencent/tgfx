@@ -305,8 +305,11 @@ TGFX_TEST_PRIVATE(AOTEffectTest, CompositorKeepsSelfManagedDrawOutOfFoldAndRetry
     AOTEffectGraph graph;
     bool lowered = AOTEffectDecomposer::Lower({color.get(), applied.coverageFP.get()}, &graph);
     AOTEffectPlan plan;
+    // Both trees decompose: the single gradient as one fused pass, and the over-budget two-gradient
+    // blend (with the folded coverage riding along) through the cut planner, which materializes
+    // one operand and keeps the rest — coverage included — in the main pass.
     bool decomposed = lowered && AOTEffectDecomposer::Decompose(graph, &plan);
-    EXPECT_EQ(decomposed, !needsRetry);
+    EXPECT_TRUE(decomposed);
     PlacementPtr<DrawOp> draw = allocator->make<SelfManagedPipelineDrawOp>(allocator, true);
     auto* original = draw.get();
     auto* buffer = manager->getDrawingBuffer();
@@ -717,7 +720,14 @@ TGFX_TEST(AOTEffectTest, ThreeTiledLeavesUseGraphAndFourthIsRejected) {
   AOTEffectGraph wideGraph;
   ASSERT_TRUE(AOTEffectDecomposer::Lower({tooWide.get()}, &wideGraph));
   AOTEffectPlan widePlan;
-  EXPECT_FALSE(AOTEffectDecomposer::Decompose(wideGraph, &widePlan));
+  // Four tiled leaves exceed the single-pass TiledGraph budget, but the cut planner materializes
+  // the three-leaf operand into its own pass: the main pass keeps the fourth tiled leaf plus the
+  // intermediate (device-sampled), both inside the budget, and the draw stays on the plan route.
+  ASSERT_TRUE(AOTEffectDecomposer::Decompose(wideGraph, &widePlan));
+  ASSERT_EQ(widePlan.passes.size(), 2u);
+  EXPECT_TRUE(widePlan.passes[0].materializesOutput);
+  EXPECT_EQ(widePlan.passes[0].kernel, AOTKernelKind::PointwiseGraph);
+  EXPECT_TRUE(AOTPlanExecutor::CanExecute(wideGraph, widePlan));
 }
 
 TGFX_TEST(AOTEffectTest, DirectProcessorRequiresExplicitThreeRecipeProfile) {
@@ -1860,65 +1870,6 @@ TGFX_TEST(AOTEffectTest, TextureParametersRebuildIsLossless) {
   EXPECT_TRUE(originalKey == rebuiltKey);
 }
 
-static MaterializationDecision EvaluateBlendChild(const FragmentProcessor* child,
-                                                  size_t childIndex) {
-  return AOTMaterializationPolicy::Evaluate(child, MaterializationConsumer::PointwiseBlend,
-                                            childIndex);
-}
-
-// Locks the two predicates the materialization policy reports for a pointwise blend child. They
-// differ on exactly one input: a TiledTextureEffect at the src position is a legal inline child, so
-// correctness does not force materializing it, yet no precompiled blend kernel covers that
-// permutation, so AOT still wants it materialized. Nothing else may separate the two.
-TGFX_TEST(AOTEffectTest, PointwiseBlendChildPolicy) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_NE(context, nullptr);
-  BlockAllocator allocator;
-
-  // An absent child needs nothing.
-  for (size_t childIndex : {size_t(0), size_t(1)}) {
-    auto decision = EvaluateBlendChild(nullptr, childIndex);
-    EXPECT_FALSE(decision.requiredForCorrectness);
-    EXPECT_FALSE(decision.shouldFlatten);
-  }
-
-  // A plain sampled texture is both legal and matchable at either position.
-  auto texture = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
-  ASSERT_NE(texture, nullptr);
-  for (size_t childIndex : {size_t(0), size_t(1)}) {
-    auto decision = EvaluateBlendChild(texture.get(), childIndex);
-    EXPECT_FALSE(decision.requiredForCorrectness);
-    EXPECT_FALSE(decision.shouldFlatten);
-  }
-
-  // A constant color is a matchable src, but the kernels carry no constant-color dst.
-  auto constColor = ConstColorProcessor::Make(&allocator, PMColor::White(), InputMode::Ignore);
-  ASSERT_NE(constColor, nullptr);
-  auto constSrc = EvaluateBlendChild(constColor.get(), 0);
-  EXPECT_FALSE(constSrc.requiredForCorrectness);
-  EXPECT_FALSE(constSrc.shouldFlatten);
-  auto constDst = EvaluateBlendChild(constColor.get(), 1);
-  EXPECT_TRUE(constDst.requiredForCorrectness);
-  EXPECT_TRUE(constDst.shouldFlatten);
-
-  // The one input where the two predicates disagree.
-  auto tiled =
-      MakeTiledTextureProcessor(context, &allocator, TileMode::Repeat, TileMode::Repeat,
-                                PixelFormat::RGBA_8888, SrcRectConstraint::Fast, std::nullopt);
-  ASSERT_NE(tiled, nullptr);
-  auto tiledSrc = EvaluateBlendChild(tiled.get(), 0);
-  EXPECT_FALSE(tiledSrc.requiredForCorrectness);
-  EXPECT_TRUE(tiledSrc.shouldFlatten);
-  auto tiledDst = EvaluateBlendChild(tiled.get(), 1);
-  EXPECT_TRUE(tiledDst.requiredForCorrectness);
-  EXPECT_TRUE(tiledDst.shouldFlatten);
-
-  // The apron is a property of the consumer, so it holds whatever the child is.
-  EXPECT_EQ(EvaluateBlendChild(texture.get(), 0).apronRadius, 1.0f);
-  EXPECT_EQ(EvaluateBlendChild(nullptr, 1).apronRadius, 1.0f);
-}
-
 static PlacementPtr<FragmentProcessor> MakePerlinProcessor(Context* context) {
   auto shader = Shader::MakeTurbulence(0.05f, 0.05f, 3, 6903);
   if (shader == nullptr) {
@@ -2344,7 +2295,8 @@ TGFX_TEST(AOTEffectTest, PerlinDAGMaterializesDistinctNoiseAndPrunesUnusedInputs
     ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
     ASSERT_EQ(plan.passes.size(), 2u);
     EXPECT_TRUE(plan.passes[0].materializesOutput);
-    EXPECT_TRUE(plan.passes[1].materializedInput.isValid());
+    ASSERT_EQ(plan.passes[1].materializedInputs.size(), 1u);
+    EXPECT_TRUE(plan.passes[1].materializedInputs[0].isValid());
     EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
   }
   AOTNodeBuilder builder;

@@ -88,29 +88,23 @@ class AOTChainBuilder {
                                                  const Matrix& uvMatrix);
 
   /**
-   * Builds the main pass of a materialized-operand plan: a copy of the original graph's DAG with
-   * every input edge pointing at the materialized operand subtree replaced by one texture leaf
-   * (fed from the opaque-white designator so the intermediate samples raw — the operand pass
-   * already applied its own modulation), skipping the subtree's own nodes. The returned segment
-   * pass carries the profile and kernel its own graph resolves, which is the pass's real fit.
+   * Builds one pass of a cut plan as a self-contained segment: a copy of the pass's original-graph
+   * nodes with every input edge pointing at a cut node (cutPass.materializedInputs) replaced by
+   * that cut's texture leaf from intermediates (fed from the opaque-white designator so the
+   * intermediate samples raw — the producing pass already applied its own modulation), skipping
+   * the cut subtrees' own nodes. A split-off fill pass evaluates at top-left device positions
+   * while the original draw evaluated at its own coordinate spaces, so its local-coordinate
+   * parameters (the gradient coordMatrix, the noise uvMatrix, plain and tiled texture uvMatrices)
+   * are precomposed with coordToLocal and its device-space texture leaves with deviceToFrag; a
+   * terminal pass runs on the destination and passes identity for both. The returned segment pass
+   * carries the profile and kernel its own graph resolves, which is the pass's real fit, so this
+   * doubles as the plan-time admission: a plan may hand the cut placeholders (isIntermediate
+   * texture parameters) to check the fit before any intermediate exists.
    */
-  static bool BuildDAGSegment(const AOTEffectGraph& graph, const std::vector<AOTNodeID>& mainNodes,
-                              AOTNodeID materializedOperand,
-                              const AOTTextureParameters& intermediateSource,
+  static bool BuildCutSegment(const AOTEffectGraph& graph, const AOTPassDescriptor& cutPass,
+                              const std::vector<AOTTextureParameters>& intermediates,
+                              const Matrix& coordToLocal, const Matrix& deviceToFrag,
                               AOTEffectGraph* segment, AOTPassDescriptor* pass);
-
-  /**
-   * Builds the operand pass of a materialized-operand plan: a copy of the operand subtree with its
-   * local-coordinate parameters (the gradient coordMatrix, the noise uvMatrix) precomposed with
-   * the given mapping, because the split-off fill evaluates at top-left device positions while the
-   * original draw evaluated at its own local coordinates. The mapping is the draw's
-   * device-to-local matrix (identity for an offscreen fill, whose coordinates already match).
-   * Coverage nodes keep their device-space parameters: the fill's positions are already the
-   * device ones.
-   */
-  static bool BuildOperandSegment(const AOTEffectGraph& graph, const AOTPassDescriptor& operandPass,
-                                  const Matrix& deviceToLocal, AOTEffectGraph* segment,
-                                  AOTPassDescriptor* pass);
 
   /**
    * Flattens a single-pass PointwiseChain/PointwiseGraph plan into the shared processor, or returns

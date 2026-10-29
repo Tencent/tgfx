@@ -41,48 +41,6 @@ class InternalRenderFlags {
    * of the resulting image amplifies. Materialization for matchability is skipped under this flag.
    */
   static constexpr uint32_t NestedRasterization = 1u << 16;
-
-  /**
-   * Set by the in-plan materialization retry (OpsCompositor) when it rebuilds a draw's color chain
-   * from the original shader after the plain chain route refused the unmodified tree. BlendShader
-   * materializes its children only under this flag (or the legacy switch), so the original tree on
-   * the op stays untouched until a retry fully succeeds and the fallback path always has the real
-   * original processors to fall back to.
-   */
-  static constexpr uint32_t MaterializeBlendChildren = 1u << 17;
-};
-
-/**
- * Identifies how a child FragmentProcessor is consumed by its parent. The consumer's effect domain
- * determines whether a materialization edge is beneficial and, for neighborhood consumers, how much
- * apron the materialized texture must carry so the consumer's samples remain correct.
- */
-enum class MaterializationConsumer {
-  /// A pointwise blend (XfermodeFragmentProcessor child). The child is sampled at the same
-  /// coordinate as the output, so no apron is required.
-  PointwiseBlend,
-};
-
-/**
- * The decision produced by the materialization policy for a single child in a single consumer
- * context.
- */
-struct MaterializationDecision {
-  /// True when the child cannot be consumed inline at all: the consumer has no valid form that
-  /// accepts it, so materializing is what makes the render correct. Holds regardless of any AOT
-  /// setting.
-  bool requiredForCorrectness = false;
-  /// True when the child should be rendered into an offscreen texture and replaced by a plain
-  /// TextureEffect so both the producer and the downstream consumer become AOT-matchable kernels.
-  /// This covers matchability only, so callers may honor it only while the decomposition route is on.
-  bool shouldFlatten = false;
-  /// Extra ring of pixels the materialized texture must carry around the draw bounds. The draw
-  /// bounds describe the area being painted, not the area the consumer samples: a coordinate landing
-  /// on the boundary can resolve just outside it once the offscreen target is snapped to integers
-  /// and its coordinates are normalized. Without the apron those reads clamp to the edge texels
-  /// instead of returning what the subtree produced there, turning a transparent border opaque. One
-  /// pixel covers that boundary case; a neighborhood consumer needs its full sampling radius.
-  float apronRadius = 0.0f;
 };
 
 /**
@@ -123,28 +81,12 @@ struct MaterializedTarget {
 };
 
 /**
- * AOTMaterializationPolicy is the single authority that decides where to insert materialization
- * edges to convert an otherwise unmatchable FragmentProcessor chain into a sequence of
- * AOT-matchable kernels. Callers at FragmentProcessor-build sites consult it instead of hand-coding
- * their own "is this child simple enough" predicates, so the decomposition behavior stays
- * consistent across BlendShader, ColorFilterShader, image filters, and future sites.
+ * AOTMaterializationPolicy owns the geometry and allocation of materialization edges — the pixel
+ * area an edge captures and the offscreen target it renders into — so the plan executor and every
+ * pass over the same area agree on one capture area and coordinate mapping.
  */
 class AOTMaterializationPolicy {
  public:
-  /**
-   * Decides how the given child must be treated when consumed in the given context. The result
-   * separates the two independent reasons to materialize: requiredForCorrectness, when the consumer
-   * cannot accept the child inline at all, and shouldFlatten, when it could but the resulting
-   * permutation has no precompiled artifact.
-   *
-   * @param child       The child FragmentProcessor, or nullptr for an absent child.
-   * @param consumer    How the child is consumed by its parent.
-   * @param childIndex  The child's position in its parent (0 = src, 1 = dst for a blend).
-   * @return            The materialization decision for this child.
-   */
-  static MaterializationDecision Evaluate(const FragmentProcessor* child,
-                                          MaterializationConsumer consumer, size_t childIndex);
-
   /**
    * Computes the pixel geometry of one materialization edge covering drawBounds grown by
    * apronRadius on every side, snapped out to whole pixels. A caller rendering several passes over

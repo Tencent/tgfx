@@ -128,6 +128,10 @@ struct AOTTextureParameters {
   bool isAlphaOnly = false;
   bool hasRGBAAA = false;
   bool hasPerspective = false;
+  // Marks a pass-boundary stand-in leaf: planning admits a cut's replacement before the
+  // intermediate texture exists, so the leaf carries no proxy and only the fit-relevant facts
+  // (device sampling, identity matrix, no perspective) — construction swaps in the real target.
+  bool isIntermediate = false;
 };
 
 struct AOTColorMatrixParameters {

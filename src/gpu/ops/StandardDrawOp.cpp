@@ -175,9 +175,9 @@ void StandardDrawOp::adoptDeferredChainExpression(RenderTarget* renderTarget) {
     return;
   }
   std::vector<FragmentProcessor*> chainProcessors = {expression.get()};
-  auto chainInfo = std::make_unique<ProgramInfo>(renderTarget, geometryProcessor.get(),
-                                                 std::move(chainProcessors), 1, xferProcessor.get(),
-                                                 blendMode);
+  auto chainInfo =
+      std::make_unique<ProgramInfo>(renderTarget, geometryProcessor.get(),
+                                    std::move(chainProcessors), 1, xferProcessor.get(), blendMode);
   // The adoption only changes the processor expression, never the other pipeline state, so every
   // non-processor state the original ProgramInfo carries over. A pass with a depth-stencil
   // attachment rejects pipelines that do not declare the format (see the inheritance note in

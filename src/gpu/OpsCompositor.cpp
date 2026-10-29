@@ -661,30 +661,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, ClipStack clip, Brush br
           dstColorSpace.get(), AlphaType::Premultiplied);
       drawOp->addColorFP(std::move(xformEffect));
     }
-    // P4 group three: hand addDrawOp a rebuild closure so the materialization retry can also
-    // serve image-driven draws (drawImage builds the leading processor from the image, not from
-    // a brush shader). The closure captures the exact FPArgs the original processor was built
-    // with and adds the MaterializeBlendChildren flag itself. Only build it when the chain route
-    // could actually consume it, so plain configurations pay nothing.
-    ColorChainRebuild rebuildColorChain = nullptr;
-    auto* pendingCache = context->precompiledShaderCache();
-    if (pendingCache != nullptr && pendingCache->isLoaded() &&
-        pendingCache->decompositionEnabled()) {
-      auto image = pendingImage;
-      auto sampling = pendingSampling;
-      auto constraint = pendingConstraint;
-      auto localRect = localBounds;
-      auto scale = drawScale.value_or(1.0f);
-      auto flags = renderFlags;
-      auto* rebuildContext = context;
-      rebuildColorChain = [rebuildContext, flags, localRect, scale, image, sampling, constraint]() {
-        FPArgs retryArgs = {rebuildContext, flags | InternalRenderFlags::MaterializeBlendChildren,
-                            localRect.value_or(Rect::MakeEmpty()), scale};
-        return FragmentProcessor::Make(image, retryArgs, sampling, constraint);
-      };
-    }
     addDrawOp(std::move(drawOp), pendingClip, pendingBrush, localBounds, deviceBounds,
-              drawScale.value_or(1.0f), std::move(rebuildColorChain));
+              drawScale.value_or(1.0f));
     return;
   }
   addDrawOp(std::move(drawOp), pendingClip, pendingBrush, localBounds, deviceBounds,
@@ -1301,8 +1279,7 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
 
 void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, const Brush& brush,
                               const std::optional<Rect>& localBounds,
-                              const std::optional<Rect>& deviceBounds, float drawScale,
-                              ColorChainRebuild rebuildColorChain) {
+                              const std::optional<Rect>& deviceBounds, float drawScale) {
 
   if (op == nullptr || brush.nothingToDraw()) {
     return;
@@ -1318,11 +1295,6 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
 
   FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), drawScale};
   auto colorFilter = brush.colorFilter;
-  // P4 retry semantics: when the color filter is merged into the shader below, the merged
-  // ColorFilterShader (filter + SrcIn alpha mask) must also be what the in-plan materialization
-  // retry rebuilds from — rebuilding from the raw brush.shader would silently drop the filter
-  // and the mask. Keep a shared reference here so the retry can reach it.
-  std::shared_ptr<Shader> mergedShader = nullptr;
   if (brush.shader) {
     auto shader = brush.shader;
     // If the color filter transforms transparent pixels into non-transparent ones, merge it with
@@ -1330,7 +1302,6 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     if (colorFilter && colorFilter->affectsTransparentBlack()) {
       shader = shader->makeWithColorFilter(colorFilter);
       colorFilter = nullptr;
-      mergedShader = shader;
     }
     if (auto processor = FragmentProcessor::Make(shader, args, nullptr, dstColorSpace)) {
       op->addColorFP(std::move(processor));
@@ -1434,10 +1405,10 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     // task's own fallback path (which prepares the op with its own processors) sees the folded
     // tree. A moved coverage stays moved when no task is built: under the fold contract a trailing
     // coverage multiply is pixel-equivalent on the plain route.
-    AOTRouter::SubmitPlan submitFolded = [&](const AOTEffectGraph& graph, const AOTEffectPlan& plan,
-                                             AOTMaterializationRecorder* producers) {
+    AOTRouter::SubmitPlan submitFolded = [&](const AOTEffectGraph& graph,
+                                             const AOTEffectPlan& plan) {
       op->moveCoveragesToColors();
-      return submitPlanTask(graph, plan, *deviceBounds, &op, producers);
+      return submitPlanTask(graph, plan, *deviceBounds, &op);
     };
     if (foldMask) {
       auto foldResult = AOTRouter::Route(foldedProcessors, submitFolded);
@@ -1445,28 +1416,27 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
         return;
       }
       if (foldResult == AOTRouteResult::TaskRefused || foldResult == AOTRouteResult::Deferred) {
-        // The coverage already moved into the op's color processors, so the color-only route and
-        // the retry below, which plan from the ORIGINAL color list without the coverage, would
-        // silently drop the mask/clip. Go straight to the plain route. A Deferred plan returns
-        // before the closure runs, so the coverage never moved and the op keeps it for the
-        // prepare-time fused serving, which folds it itself.
+        // The coverage already moved into the op's color processors, so the color-only route,
+        // which plans from the ORIGINAL color list without the coverage, would silently drop the
+        // mask/clip. Go straight to the plain route. A Deferred plan returns before the closure
+        // runs, so the coverage never moved and the op keeps it for the prepare-time fused
+        // serving, which folds it itself.
         if (foldResult == AOTRouteResult::Deferred) {
           op->setInlineRewriteDeferred(true);
         }
         drawOps.emplace_back(std::move(op));
         return;
       }
-      // The folded tree had no plan and nothing moved: fall through. A draw whose leading
-      // processor the materialization policy would rewrite can still be saved by the retry.
+      // The folded tree had no plan and nothing moved: fall through to the color-only route.
     }
     // The color-only route replaces the color processors with rebuilt Chain/Perlin/YUV FPs whose
     // matchers are all single-FP, so a draw still carrying a coverage FP (clip coverage or an
     // unfoldable mask) can never match and skips it. Coverage from the geometry processor (AA
     // edges of a rect, oval, or path) is no obstacle: the terminal pass keeps the draw's own
     // geometry processor.
-    AOTRouter::SubmitPlan submitColors = [&](const AOTEffectGraph& graph, const AOTEffectPlan& plan,
-                                             AOTMaterializationRecorder* producers) {
-      return submitPlanTask(graph, plan, *deviceBounds, &op, producers);
+    AOTRouter::SubmitPlan submitColors = [&](const AOTEffectGraph& graph,
+                                             const AOTEffectPlan& plan) {
+      return submitPlanTask(graph, plan, *deviceBounds, &op);
     };
     bool coverageFree = !op->hasCoverageProcessors();
     auto colorResult =
@@ -1488,47 +1458,12 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
         cache->recordDecomposeRejection(outcome);
       }
     }
-    // A deferred draw is committed to a fused single pass: no retry (the original tree
-    // planned), the plain route carries it to prepare with the deferral flag.
+    // A deferred draw is committed to a fused single pass: the plain route carries it to prepare
+    // with the deferral flag.
     if (colorResult == AOTRouteResult::Deferred) {
       op->setInlineRewriteDeferred(true);
       drawOps.emplace_back(std::move(op));
       return;
-    }
-    // Materialization retry (AOTRouter::RouteWithMaterializedLeading): the original chain was not
-    // routed, so rebuild its leading processor with materialized blend children and route again.
-    // The retry carries the folded coverage only when the fold contract admits it; other coverage
-    // keeps the original draw intact. A refused retry leaves the original color tree on the op.
-    // Image-driven draws have no brush shader (drawImage builds the leading processor straight
-    // from the image), so their rebuild comes from the closure the flush site captured. Trailing
-    // color processors behind the leading one (e.g. a ColorSpaceXformEffect) ride along.
-    bool canRebuild =
-        (coverageFree || foldMask) && (brush.shader != nullptr || rebuildColorChain != nullptr);
-    if (canRebuild && !colorProcessors.empty() &&
-        AOTRouter::RetryWarranted(colorProcessors[0], args.renderFlags)) {
-      ColorChainRebuild rebuildLeading = rebuildColorChain;
-      if (brush.shader != nullptr) {
-        // Rebuild from the merged shader when a transparent-black color filter was folded into it
-        // (see mergedShader above); otherwise the raw brush.shader is the whole color source.
-        auto shaderForRetry = mergedShader != nullptr ? mergedShader : brush.shader;
-        rebuildLeading = [&, shaderForRetry]() {
-          FPArgs retryArgs = args;
-          retryArgs.renderFlags |= InternalRenderFlags::MaterializeBlendChildren;
-          return FragmentProcessor::Make(shaderForRetry, retryArgs, nullptr, dstColorSpace);
-        };
-      }
-      std::vector<const FragmentProcessor*> trailing(colorProcessors.begin() + 1,
-                                                     colorProcessors.end());
-      if (foldMask) {
-        for (size_t index = colorProcessors.size(); index < foldedProcessors.size(); ++index) {
-          trailing.push_back(foldedProcessors[index]);
-        }
-      }
-      auto& submitRetry = foldMask ? submitFolded : submitColors;
-      if (AOTRouter::RouteWithMaterializedLeading(context, rebuildLeading, trailing, submitRetry) ==
-          AOTRouteResult::Submitted) {
-        return;
-      }
     }
   }
   drawOps.emplace_back(std::move(op));
@@ -1550,8 +1485,7 @@ void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, co
 }
 
 bool OpsCompositor::submitPlanTask(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
-                                   const Rect& deviceBounds, PlacementPtr<DrawOp>* op,
-                                   AOTMaterializationRecorder* producers) {
+                                   const Rect& deviceBounds, PlacementPtr<DrawOp>* op) {
   std::optional<Matrix> deviceToLocal = std::nullopt;
   if (plan.passes.size() > 1) {
     auto drawOp = static_cast<StandardDrawOp*>(op->get());
@@ -1559,7 +1493,7 @@ bool OpsCompositor::submitPlanTask(const AOTEffectGraph& graph, const AOTEffectP
     // passes sample their intermediate without applying it again. Per-vertex colors cannot be
     // reconstructed by the device-aligned fill. A materialized-operand plan keeps the paint alpha
     // in the terminal draw's epilogue instead, so it needs no uniform color.
-    if (!plan.passes.back().materializedInput.isValid() &&
+    if (plan.passes.back().materializedInputs.empty() &&
         !drawOp->uniformGeometryColor().has_value()) {
       return false;
     }
@@ -1573,7 +1507,7 @@ bool OpsCompositor::submitPlanTask(const AOTEffectGraph& graph, const AOTEffectP
     }
   }
   auto task = AOTPlanExecutor::Make(context, renderFlags, graph, plan, deviceBounds, renderTarget,
-                                    op, Point::Zero(), false, deviceToLocal, producers);
+                                    op, Point::Zero(), false, deviceToLocal);
   if (task == nullptr) {
     return false;
   }

@@ -51,18 +51,22 @@ inline bool IsAOTPointwiseDAGKernel(AOTKernelKind kernel) {
   return kernel == AOTKernelKind::PointwiseChain || kernel == AOTKernelKind::PointwiseGraph;
 }
 
+// The pass cap of a cut plan: every pass but the last is one materialization edge, so this bounds
+// both the intermediate memory and the planning work; a shape needing more passes is refused.
+inline constexpr size_t MaxCutPlanPasses = 8;
+
 /**
  * One kernel invocation of a plan. A plan with several passes is a linear chain split into chain
  * passes, each fitting one chain pass: every pass but the last renders into an intermediate RGBA8
  * texture (materializesOutput), and each later pass reads its predecessor's texture in device space
  * as its source (dependencies holds that predecessor's index), so its nodes are operators only.
  *
- * The materialized-operand form instead replaces one over-budget blend operand subtree: pass 0 is
- * the subtree itself (its own fused chain pass over the original graph nodes, materializing into an
- * intermediate), and the main pass re-reads that subtree's root as a texture leaf —
- * materializedInput names the original-graph node the dependency's output texture replaces. The
- * main pass's kernel and profile are resolved when its segment graph is built (the intermediate
- * does not exist at plan time), so their plan-time values are placeholders.
+ * The cut form instead replaces over-budget blend operand subtrees one cut at a time: each pass is a
+ * self-contained fused chain pass over its own original-graph nodes, reading the earlier cuts as
+ * texture leaves — materializedInputs[i] names the original-graph node that dependencies[i]'s output
+ * texture replaces. The passes are in topological order and the last one is the terminal draw (the
+ * only pass that runs on the destination). A pass's kernel and profile are resolved by its segment
+ * build; a plan-time fit check runs the same build over placeholder intermediate leaves.
  */
 struct AOTPassDescriptor {
   AOTKernelKind kernel = AOTKernelKind::PointwiseChain;
@@ -71,7 +75,7 @@ struct AOTPassDescriptor {
   AOTNodeID output = AOTNodeID::Invalid();
   bool materializesOutput = false;
   AOTResourceProfile resourceProfile = AOTResourceProfile::Automatic;
-  AOTNodeID materializedInput = AOTNodeID::Invalid();
+  std::vector<AOTNodeID> materializedInputs = {};
 };
 
 struct AOTEffectPlan {

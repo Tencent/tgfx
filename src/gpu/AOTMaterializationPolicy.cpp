@@ -18,59 +18,8 @@
 
 #include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/BackingFit.h"
-#include "gpu/processors/FragmentProcessor.h"
-#include "gpu/processors/TextureEffect.h"
-#include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
-
-static bool IsPointwiseBlendLeafMatchable(const FragmentProcessor* fp, size_t childIndex) {
-  if (fp == nullptr) {
-    return true;
-  }
-  auto name = fp->name();
-  if (name == "TextureEffect") {
-    auto* te = static_cast<const TextureEffect*>(fp);
-    // The upload task runs before the draw: a pending single-plane view has zero samplers now,
-    // but will be a legal texture leaf when the precompiled blend is prepared.
-    return !te->isYUV() && (te->numTextureSamplers() > 0 || te->hasPendingSinglePlaneUpload());
-  }
-  // ConstColorProcessor is a matchable leaf only at the src position; the precompiled blend kernels
-  // carry a constant-color src variant but not a constant-color dst.
-  if (childIndex == 0 && name == "ConstColorProcessor") {
-    return true;
-  }
-  return false;
-}
-
-// Whether XfermodeFragmentProcessor can take this child inline at all. Wider than matchability: a
-// TiledTextureEffect src is a valid child even though no precompiled blend kernel covers it, so it
-// is legal to keep inline but still worth materializing for AOT.
-static bool IsPointwiseBlendLeafLegal(const FragmentProcessor* fp, size_t childIndex) {
-  if (IsPointwiseBlendLeafMatchable(fp, childIndex)) {
-    return true;
-  }
-  return childIndex == 0 && fp != nullptr && IsProcessor<TiledTextureEffect>(fp);
-}
-
-MaterializationDecision AOTMaterializationPolicy::Evaluate(const FragmentProcessor* child,
-                                                           MaterializationConsumer consumer,
-                                                           size_t childIndex) {
-  MaterializationDecision decision = {};
-  switch (consumer) {
-    case MaterializationConsumer::PointwiseBlend:
-      // A pointwise blend consumes the child at the output coordinate, so it needs no sampling
-      // radius. It still needs the one-pixel boundary apron: an offset shadow mask reads just past
-      // the draw bounds, and without the apron that read clamps to the edge texels and turns the
-      // transparent border opaque. Measured on the full Metal suite, a wider apron changes nothing,
-      // so one pixel is the exact requirement rather than a safety margin.
-      decision.requiredForCorrectness = !IsPointwiseBlendLeafLegal(child, childIndex);
-      decision.shouldFlatten = !IsPointwiseBlendLeafMatchable(child, childIndex);
-      decision.apronRadius = 1.0f;
-      break;
-  }
-  return decision;
-}
 
 MaterializedGeometry AOTMaterializationPolicy::PrepareGeometry(const Rect& drawBounds,
                                                                float apronRadius) {

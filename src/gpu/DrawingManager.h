@@ -31,7 +31,6 @@
 
 namespace tgfx {
 struct RuntimeInputTexture;
-class AOTMaterializationRecorder;
 
 class DrawingManager {
  public:
@@ -65,16 +64,12 @@ class DrawingManager {
 
   /**
    * Fills the render target using the provided fragment processor, and automatically resolves the
-   * render target. Returns false if the render target or fragment processor is nullptr. The
-   * optional rebuild closure lets the in-plan materialization retry re-create the processor with
-   * the MaterializeBlendChildren flag when the chain route refuses the unmodified tree (used by
-   * callers that built the processor from a filter, where no brush shader exists).
+   * render target. Returns false if the render target or fragment processor is nullptr.
    */
   bool fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
                     PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags,
                     const Point& coordOffset = Point::Zero(),
-                    OffscreenFillSource source = OffscreenFillSource::Unknown,
-                    ColorChainRebuild rebuildColorChain = nullptr);
+                    OffscreenFillSource source = OffscreenFillSource::Unknown);
 
   /**
    * Plans an offscreen fill's processor the way fillRTWithFP does, and records the offscreen-fill
@@ -86,14 +81,6 @@ class DrawingManager {
   bool planFill(const FragmentProcessor* processor, const Point& coordOffset,
                 OffscreenFillSource source, AOTEffectGraph* graph, AOTEffectPlan* plan,
                 OffscreenFillKey* diagnosticKey);
-
-  /**
-   * The innermost active AOTMaterializationRecorder, or nullptr. FlattenToTexture records its
-   * producer there instead of rendering it at once.
-   */
-  AOTMaterializationRecorder* materializationRecorder() const {
-    return activeRecorder;
-  }
 
   std::shared_ptr<OpsCompositor> addOpsCompositor(std::shared_ptr<RenderTargetProxy> renderTarget,
                                                   uint32_t renderFlags,
@@ -145,7 +132,6 @@ class DrawingManager {
   std::deque<std::shared_ptr<DrawingBuffer>> bufferPool = {};
   std::list<std::shared_ptr<OpsCompositor>> compositors = {};
   std::unordered_map<TextureProxy*, AtlasUploadTask*> atlasTaskMap = {};
-  AOTMaterializationRecorder* activeRecorder = nullptr;
 
   DrawingBuffer* getDrawingBuffer() {
     return currentBuffer ? currentBuffer.get() : createDrawingBuffer();
@@ -153,17 +139,9 @@ class DrawingManager {
 
   DrawingBuffer* createDrawingBuffer();
 
-  /**
-   * Commits the pending producers of every active recorder, outermost first, as ordinary offscreen
-   * fills. Called before any render task is enqueued, because that task may sample a pending
-   * producer's target; a producer must always be enqueued before anything that reads it.
-   */
-  void commitPendingMaterializations();
-
   bool isFillRouteCandidate(const FragmentProcessor* processor) const;
 
   friend class OpsCompositor;
-  friend class AOTMaterializationRecorder;
   friend class RenderContext;
 };
 }  // namespace tgfx

@@ -430,14 +430,187 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
   return true;
 }
 
-// Planner for an over-budget two-child blend at the root: one operand subtree alone is a legal
-// fused chain pass, so it materializes into pass 0 and the main pass re-reads the operand root as
-// a texture leaf (materializedInput) — the replacement, and with it the main pass's real fit, is
-// resolved when the executor builds the main pass's segment graph (the intermediate texture does
-// not exist at plan time), so this planner's candidates still go through the executor's admission.
-// The operand subtree must stay leaf-free (gradients, noise, pointwise ops and constants only): a
-// texture leaf in the operand would need its sampling remapped through the split-off fill, which
-// the retry's producer path serves today and this planner does not yet.
+// Planner for an over-budget pointwise graph: iteratively cuts one blend operand at a time into
+// its own materializing pass, until the remaining main pass fits one fused chain pass. The cut
+// rule is structural — the operand of the blend nearest the root that is legal to materialize and
+// fits a single pass itself — with no operator-specific cut points and no optimality search; every
+// cut shrinks the remaining graph, so the loop terminates, and the passes come out in topological
+// order (an operand pass may itself read earlier cuts). Admission is by the same segment build
+// construction runs, over placeholder intermediate leaves, so plan-time fit and construction fit
+// cannot drift.
+
+// Collects the nodes reachable from root, stopping at the cut roots: in the collecting pass they
+// resolve to texture leaves, so their subtrees belong to earlier passes. The cut roots themselves
+// are not part of the reachable set.
+static bool CollectReachableStoppingAtCuts(const AOTEffectGraph& graph, AOTNodeID root,
+                                           const std::vector<AOTNodeID>& cutRoots,
+                                           std::vector<bool>* reachable) {
+  if (reachable == nullptr || !root.isValid() || root.index() >= graph.nodeCount()) {
+    return false;
+  }
+  auto isCut = [&cutRoots](AOTNodeID id) {
+    for (auto cut : cutRoots) {
+      if (id == cut) {
+        return true;
+      }
+    }
+    return false;
+  };
+  std::vector<AOTNodeID> pending = {root};
+  while (!pending.empty()) {
+    auto id = pending.back();
+    pending.pop_back();
+    if (isCut(id)) {
+      continue;
+    }
+    const auto* node = graph.nodeAt(id);
+    if (node == nullptr) {
+      return false;
+    }
+    if ((*reachable)[id.index()]) {
+      continue;
+    }
+    (*reachable)[id.index()] = true;
+    if (node->kind != AOTEffectKind::PerlinNoiseSource) {
+      pending.insert(pending.end(), node->inputs.begin(), node->inputs.end());
+    }
+  }
+  return true;
+}
+
+// The placeholder a cut's replacement stands in as during planning: device sampling, identity
+// matrix, no perspective — the facts the fit depends on — with no texture behind it yet.
+static AOTTextureParameters CutIntermediatePlaceholder() {
+  AOTTextureParameters parameters = {};
+  parameters.isIntermediate = true;
+  parameters.samplingKind = AOTTextureSamplingKind::Device;
+  parameters.uvMatrix = Matrix::I();
+  return parameters;
+}
+
+// Whether the subtree at root — with the cut roots standing in as placeholder texture leaves —
+// fits one fused chain pass. Runs the same segment build construction uses, so this is the real
+// admission; on success resolvedPass carries the kernel and resource profile the pass resolves to.
+static bool FitsFusedPass(const AOTEffectGraph& graph, AOTNodeID root,
+                          const std::vector<AOTNodeID>& cutRoots, AOTPassDescriptor* resolvedPass) {
+  if (resolvedPass == nullptr) {
+    return false;
+  }
+  std::vector<bool> reachable(graph.nodeCount(), false);
+  if (!CollectReachableStoppingAtCuts(graph, root, cutRoots, &reachable)) {
+    return false;
+  }
+  AOTPassDescriptor pass = {};
+  pass.output = root;
+  pass.materializedInputs = cutRoots;
+  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+    const auto* node = graph.nodeAt(AOTNodeID(index));
+    if (!reachable[index] || node == nullptr ||
+        node->kind == AOTEffectKind::GeometryColorOpaqueInput ||
+        node->kind == AOTEffectKind::GeometryWhiteInput) {
+      continue;
+    }
+    pass.nodes.push_back(AOTNodeID(index));
+  }
+  if (pass.nodes.empty()) {
+    return false;
+  }
+  std::vector<AOTTextureParameters> placeholders(cutRoots.size(), CutIntermediatePlaceholder());
+  AOTEffectGraph segment = {};
+  AOTPassDescriptor segmentPass = {};
+  if (!AOTChainBuilder::BuildCutSegment(graph, pass, placeholders, Matrix::I(), Matrix::I(),
+                                        &segment, &segmentPass)) {
+    return false;
+  }
+  *resolvedPass = segmentPass;
+  return true;
+}
+
+// A cut candidate must be a self-contained shader value. Its subtree (stopping at earlier cuts)
+// must not reach the geometry color — a materializing fill would bake the paint alpha in, and the
+// terminal epilogue would apply it a second time — and must not carry device coverage nodes,
+// which evaluate the draw's own geometry rather than an operand value. A bare texture leaf or
+// constant is not a candidate: swapping it for an intermediate leaf releases no sampler slot (it
+// occupies one either way) and only adds an RGBA8 quantization step. A bare gradient or noise
+// leaf IS a candidate: their per-kind budgets are released by the cut.
+static bool IsCuttableOperand(const AOTEffectGraph& graph, AOTNodeID operand,
+                              const std::vector<AOTNodeID>& cutRoots) {
+  if (!operand.isValid() || operand.index() == 0 || operand.index() >= graph.nodeCount()) {
+    return false;
+  }
+  const auto* node = graph.nodeAt(operand);
+  if (node == nullptr || node->kind == AOTEffectKind::TextureSource ||
+      node->kind == AOTEffectKind::ConstColor ||
+      node->kind == AOTEffectKind::GeometryColorOpaqueInput ||
+      node->kind == AOTEffectKind::GeometryWhiteInput) {
+    return false;
+  }
+  std::vector<bool> reachable(graph.nodeCount(), false);
+  if (!CollectReachableStoppingAtCuts(graph, operand, cutRoots, &reachable)) {
+    return false;
+  }
+  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+    if (!reachable[index]) {
+      continue;
+    }
+    const auto* subNode = graph.nodeAt(AOTNodeID(index));
+    if (subNode->kind == AOTEffectKind::RectCoverage ||
+        subNode->kind == AOTEffectKind::RRectCoverage) {
+      return false;
+    }
+  }
+  return !reachable[0];
+}
+
+// The next cut: scanning blend nodes from the root side (the graph is SSA in construction order,
+// so the highest node id is the closest to the root) and each blend's inputs in order, the first
+// operand that is legal to materialize and fits a single pass itself. Deterministic, and every
+// cut strictly shrinks the remaining graph.
+static AOTNodeID FindNextCut(const AOTEffectGraph& graph, const std::vector<AOTNodeID>& cutRoots) {
+  std::vector<bool> underCut(graph.nodeCount(), false);
+  for (auto cut : cutRoots) {
+    if (!CollectReachableNodes(graph, cut, &underCut)) {
+      return AOTNodeID::Invalid();
+    }
+  }
+  const auto nodeCount = static_cast<uint32_t>(graph.nodeCount());
+  for (uint32_t index = nodeCount - 1; index >= 1; --index) {
+    if (underCut[index]) {
+      continue;
+    }
+    const auto* node = graph.nodeAt(AOTNodeID(index));
+    if (node == nullptr || node->kind != AOTEffectKind::Blend) {
+      continue;
+    }
+    for (auto input : node->inputs) {
+      if (!IsCuttableOperand(graph, input, cutRoots)) {
+        continue;
+      }
+      AOTPassDescriptor resolved = {};
+      if (!FitsFusedPass(graph, input, cutRoots, &resolved)) {
+        continue;
+      }
+      return input;
+    }
+  }
+  return AOTNodeID::Invalid();
+}
+
+// Lists the pass nodes of the subtree at root with the given cuts: the reachable set minus the
+// designators, in construction order.
+static void AppendCutPassNodes(const AOTEffectGraph& graph, const std::vector<bool>& reachable,
+                               AOTPassDescriptor* pass) {
+  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+    const auto* node = graph.nodeAt(AOTNodeID(index));
+    if (!reachable[index] || node == nullptr ||
+        node->kind == AOTEffectKind::GeometryColorOpaqueInput ||
+        node->kind == AOTEffectKind::GeometryWhiteInput) {
+      continue;
+    }
+    pass->nodes.push_back(AOTNodeID(index));
+  }
+}
+
 static bool DecomposeMaterializedBlend(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
   if (plan == nullptr || graph.nodeCount() < 2) {
     return false;
@@ -446,60 +619,70 @@ static bool DecomposeMaterializedBlend(const AOTEffectGraph& graph, AOTEffectPla
   if (geometryNode == nullptr || geometryNode->kind != AOTEffectKind::GeometryColor) {
     return false;
   }
-  auto* root = graph.nodeAt(graph.root());
-  if (root == nullptr || root->kind != AOTEffectKind::Blend || root->inputs.size() != 2) {
-    return false;
-  }
-  auto blendParams = std::get_if<AOTBlendParameters>(&root->parameters);
-  if (blendParams == nullptr || blendParams->childType != 2) {
-    return false;
-  }
-  std::vector<bool> rootReachable(graph.nodeCount(), false);
-  if (!CollectReachableNodes(graph, graph.root(), &rootReachable)) {
-    return false;
-  }
-  for (auto operand : root->inputs) {
-    std::vector<bool> operandReachable(graph.nodeCount(), false);
-    if (!CollectReachableNodes(graph, operand, &operandReachable)) {
-      continue;
+  AOTEffectPlan result = {};
+  std::vector<AOTNodeID> cutRoots = {};
+  while (true) {
+    AOTPassDescriptor resolved = {};
+    if (FitsFusedPass(graph, graph.root(), cutRoots, &resolved)) {
+      AOTPassDescriptor mainPass = {};
+      mainPass.output = graph.root();
+      mainPass.materializedInputs = cutRoots;
+      mainPass.kernel = resolved.kernel;
+      mainPass.resourceProfile = resolved.resourceProfile;
+      for (size_t dep = 0; dep < cutRoots.size(); ++dep) {
+        mainPass.dependencies.push_back(static_cast<uint32_t>(dep));
+      }
+      std::vector<bool> reachable(graph.nodeCount(), false);
+      if (!CollectReachableStoppingAtCuts(graph, graph.root(), cutRoots, &reachable)) {
+        return false;
+      }
+      AppendCutPassNodes(graph, reachable, &mainPass);
+      if (mainPass.nodes.empty()) {
+        return false;
+      }
+      result.passes.push_back(std::move(mainPass));
+      result.output = graph.root();
+      *plan = std::move(result);
+      return true;
     }
-    bool operandHasTextureLeaf = false;
-    for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
-      operandHasTextureLeaf |= operandReachable[index] &&
-                               graph.nodeAt(AOTNodeID(index))->kind == AOTEffectKind::TextureSource;
+    if (result.passes.size() + 1 >= MaxCutPlanPasses) {
+      return false;
     }
-    if (operandHasTextureLeaf) {
-      continue;
+    auto next = FindNextCut(graph, cutRoots);
+    if (!next.isValid()) {
+      return false;
+    }
+    AOTPassDescriptor resolvedOperand = {};
+    if (!FitsFusedPass(graph, next, cutRoots, &resolvedOperand)) {
+      return false;
     }
     AOTPassDescriptor operandPass = {};
-    if (!PlanReachableSubtree(graph, operand, operandReachable, &operandPass)) {
-      continue;
-    }
-    AOTEffectPlan result = {};
+    operandPass.output = next;
     operandPass.materializesOutput = true;
-    result.passes.push_back(std::move(operandPass));
-    AOTPassDescriptor mainPass = {};
-    mainPass.output = graph.root();
-    mainPass.dependencies = {0};
-    mainPass.materializedInput = operand;
-    for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
-      auto node = graph.nodeAt(AOTNodeID(index));
-      if (!rootReachable[index] || operandReachable[index] ||
-          node->kind == AOTEffectKind::GeometryColorOpaqueInput ||
-          node->kind == AOTEffectKind::GeometryWhiteInput) {
-        continue;
+    operandPass.kernel = resolvedOperand.kernel;
+    operandPass.resourceProfile = resolvedOperand.resourceProfile;
+    std::vector<bool> reachable(graph.nodeCount(), false);
+    if (!CollectReachableStoppingAtCuts(graph, next, cutRoots, &reachable)) {
+      return false;
+    }
+    AppendCutPassNodes(graph, reachable, &operandPass);
+    if (operandPass.nodes.empty()) {
+      return false;
+    }
+    // The cuts this operand reads: the earlier pass indices of the cut roots reachable from it.
+    std::vector<bool> fullReachable(graph.nodeCount(), false);
+    if (!CollectReachableNodes(graph, next, &fullReachable)) {
+      return false;
+    }
+    for (size_t cut = 0; cut < cutRoots.size(); ++cut) {
+      if (fullReachable[cutRoots[cut].index()]) {
+        operandPass.materializedInputs.push_back(cutRoots[cut]);
+        operandPass.dependencies.push_back(static_cast<uint32_t>(cut));
       }
-      mainPass.nodes.push_back(AOTNodeID(index));
     }
-    if (mainPass.nodes.empty()) {
-      continue;
-    }
-    result.passes.push_back(std::move(mainPass));
-    result.output = graph.root();
-    *plan = std::move(result);
-    return true;
+    result.passes.push_back(std::move(operandPass));
+    cutRoots.push_back(next);
   }
-  return false;
 }
 
 bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
@@ -523,17 +706,13 @@ bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTEffectPlan* 
     if (!planner(graph, &candidate)) {
       continue;
     }
-    // The materialized-blend planner defers the main pass's fit to construction (the intermediate
-    // texture does not exist at plan time), so its candidate still goes through the executor's
-    // real admission; the other planners' own fit checks subsume that admission, which therefore
-    // runs only as a debug assertion on them.
-    if (planner == &DecomposeMaterializedBlend) {
-      if (!AOTPlanExecutor::CanExecute(graph, candidate)) {
-        continue;
-      }
-    } else {
-      DEBUG_ASSERT(AOTPlanExecutor::CanExecute(graph, candidate));
-    }
+    // Each planner's own admission subsumes what AOTPlanExecutor::CanExecute would re-derive: the
+    // DAG planner resolves the profile and kernel together, the linear planner's fit calls
+    // BuildLinearSegment with the same arguments the executor's segmented admission uses, the
+    // perlin planner checks the slot shapes and the lookup resources, and the cut planner runs the
+    // same segment build construction uses over placeholder intermediates. The re-check therefore
+    // runs only as a debug assertion.
+    DEBUG_ASSERT(AOTPlanExecutor::CanExecute(graph, candidate));
     *plan = std::move(candidate);
     return true;
   }

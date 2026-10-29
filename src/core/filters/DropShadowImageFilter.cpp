@@ -19,7 +19,6 @@
 #include "DropShadowImageFilter.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/ColorHelper.h"
-#include "gpu/FPFlattenHelper.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
@@ -100,14 +99,6 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::getShadowFragmentProcesso
   if (shadowProcessor == nullptr) {
     return nullptr;
   }
-  // No construction-time materialization: the materialization retry sets MaterializeBlendChildren
-  // only when the AOT route refuses the original tree.
-  if ((args.renderFlags & InternalRenderFlags::MaterializeBlendChildren) != 0) {
-    shadowProcessor = EnsureSimpleBlendChild(args, std::move(shadowProcessor), 1);
-    if (shadowProcessor == nullptr) {
-      return nullptr;
-    }
-  }
   auto allocator = args.context->drawingAllocator();
   auto dstColor = ToPMColor(color, source->colorSpace());
   auto colorProcessor = ConstColorProcessor::Make(allocator, dstColor, InputMode::Ignore);
@@ -129,19 +120,6 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
     return getSourceFragmentProcessor(source, args, sampling, constraint, uvMatrix);
   }
   auto sourceFP = getSourceFragmentProcessor(source, args, sampling, constraint, uvMatrix);
-  // Same materialization gate as getShadowFragmentProcessor above. The
-  // shadow fragment was already returned unmaterialized by that helper; this branch re-applies the
-  // rewrite to both operands of the final SrcOver tree when the retry asks for it.
-  if ((args.renderFlags & InternalRenderFlags::MaterializeBlendChildren) != 0) {
-    sourceFP = EnsureSimpleBlendChild(args, std::move(sourceFP));
-    if (sourceFP == nullptr) {
-      return nullptr;
-    }
-    shadowFragment = EnsureSimpleBlendChild(args, std::move(shadowFragment), 1);
-    if (shadowFragment == nullptr) {
-      return nullptr;
-    }
-  }
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
       args.context->drawingAllocator(), std::move(sourceFP), std::move(shadowFragment),
       BlendMode::SrcOver);

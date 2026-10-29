@@ -31,10 +31,8 @@
 #include "gpu/AOTChainBuilder.h"
 #include "gpu/AOTEffectDecomposer.h"
 #include "gpu/AOTMaterializationPolicy.h"
-#include "gpu/AOTMaterializationRecorder.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/EmbeddedShaderBundles.h"
-#include "gpu/FPFlattenHelper.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProxyProvider.h"
@@ -4542,10 +4540,10 @@ TGFX_TEST(AOTRenderConsistencyTest, RetryRebuildKeepsMaskCoverage) {
            static_cast<unsigned>(stats.completeAOTDraws),
            static_cast<unsigned>(stats.fpFlattenEdges));
     fflush(stdout);
-    // The two materialized operands run as producer passes inside the draw's own plan task, so
-    // the whole draw is one complete AOT draw carrying two materialized edges.
+    // The cut plan materializes the one operand the budget needs (a single gradient), so the
+    // whole draw is one complete AOT draw carrying one materialized edge.
     EXPECT_EQ(stats.completeAOTDraws, 1u);
-    EXPECT_EQ(stats.fpFlattenEdges, 2u);
+    EXPECT_EQ(stats.fpFlattenEdges, 1u);
     EXPECT_EQ(stats.planMaterializedEdges, 0u);
   }
   auto* refPixels = static_cast<const uint32_t*>(const_cast<Bitmap&>(reference).lockPixels());
@@ -4702,76 +4700,6 @@ TGFX_TEST(AOTRenderConsistencyTest, MaterializationRetryProducersShareConsumerTa
   }
   bitmap.unlockPixels();
   EXPECT_EQ(changedPixels, 0u);
-}
-
-// The two rules of AOTMaterializationRecorder outside a plan task. A recorder that goes out of
-// scope with producers still pending drops them without rendering. A render task enqueued while
-// producers are pending may sample them, so DrawingManager enqueues the pending producers first:
-// an offscreen fill that samples a recorded producer must see the producer's output.
-TGFX_TEST(AOTRenderConsistencyTest, MaterializationRecorderDropsOrCommitsPending) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_NE(context, nullptr);
-  auto* cache = context->precompiledShaderCache();
-  auto* drawingManager = context->drawingManager();
-  constexpr int size = 32;
-  FPArgs args(context, 0, Rect::MakeWH(size, size));
-  auto shader = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(size, size),
-                                           {Color(1, 0, 0, 1), Color(0, 0, 1, 1)});
-  ASSERT_NE(shader, nullptr);
-  auto readTarget = [&](const std::shared_ptr<RenderTargetProxy>& target, Bitmap* outBitmap) {
-    auto renderTarget = target->getRenderTarget();
-    ASSERT_NE(renderTarget, nullptr);
-    auto surface =
-        Surface::MakeFrom(context, renderTarget->getBackendRenderTarget(), renderTarget->origin());
-    ASSERT_NE(surface, nullptr);
-    ASSERT_TRUE(outBitmap->allocPixels(size, size));
-    auto* pixels = outBitmap->lockPixels();
-    ASSERT_NE(pixels, nullptr);
-    EXPECT_TRUE(surface->readPixels(outBitmap->info(), pixels));
-    outBitmap->unlockPixels();
-  };
-  cache->setDiagnosticRecordingEnabled(true);
-  {
-    // Dropped: nothing samples the producer, so it never renders.
-    cache->resetStats();
-    {
-      AOTMaterializationRecorder recorder(context);
-      auto flattened = FlattenToTexture(args, FragmentProcessor::Make(shader, args), 1.0f);
-      EXPECT_NE(flattened, nullptr);
-      EXPECT_FALSE(recorder.empty());
-    }
-    context->flushAndSubmit(true);
-    EXPECT_EQ(cache->drawStats().fpFlattenEdges, 0u);
-  }
-  Bitmap reference = {};
-  {
-    auto target = RenderTargetProxy::Make(context, size, size, false);
-    ASSERT_NE(target, nullptr);
-    ASSERT_TRUE(drawingManager->fillRTWithFP(target, FragmentProcessor::Make(shader, args), 0));
-    context->flushAndSubmit(true);
-    readTarget(target, &reference);
-  }
-  Bitmap candidate = {};
-  {
-    // Committed: the fill below samples the producer, so the producer is enqueued before it.
-    cache->resetStats();
-    auto target = RenderTargetProxy::Make(context, size, size, false);
-    ASSERT_NE(target, nullptr);
-    {
-      AOTMaterializationRecorder recorder(context);
-      auto flattened = FlattenToTexture(args, FragmentProcessor::Make(shader, args), 1.0f);
-      ASSERT_NE(flattened, nullptr);
-      ASSERT_TRUE(drawingManager->fillRTWithFP(target, std::move(flattened), 0));
-      EXPECT_TRUE(recorder.empty());
-    }
-    context->flushAndSubmit(true);
-    EXPECT_EQ(cache->drawStats().fpFlattenEdges, 1u);
-    readTarget(target, &candidate);
-  }
-  cache->setDiagnosticRecordingEnabled(false);
-  // The producer is sampled at its texel centers, so the round trip is exact.
-  ExpectBitmapsIdentical("recorder-committed-producer", candidate, reference, size, size);
 }
 
 // A draw that no precompiled program serves, with a bundle loaded, renders nothing; the drop must
@@ -5309,8 +5237,8 @@ TGFX_TEST(AOTRenderConsistencyTest, YUVSourceReportsItsPlanesToChainPlanning) {
   EXPECT_FALSE(generatorProxy->mayUploadYUV());
 
   // A missing view makes numTextureSamplers() report zero even though the upload will run before
-  // the draw. A single-plane pending dst is legal in the pointwise blend and needs no extra RGBA8
-  // materialization; a pending multi-plane YUV texture must still fail closed.
+  // the draw: the pending-upload semantics must stay observable on the leaf itself, and a pending
+  // multi-plane YUV texture must stay distinguishable from a single-plane one.
   auto allocator = context->drawingAllocator();
   auto pendingLeaf = TextureEffect::Make(allocator, generatorProxy);
   auto yuvLeaf = TextureEffect::Make(allocator, yuvProxy);
@@ -5321,14 +5249,6 @@ TGFX_TEST(AOTRenderConsistencyTest, YUVSourceReportsItsPlanesToChainPlanning) {
   EXPECT_EQ(pendingTexture->numTextureSamplers(), 0u);
   EXPECT_TRUE(pendingTexture->hasPendingSinglePlaneUpload());
   EXPECT_FALSE(yuvTexture->hasPendingSinglePlaneUpload());
-  auto pendingDecision = AOTMaterializationPolicy::Evaluate(
-      pendingLeaf.get(), MaterializationConsumer::PointwiseBlend, 1);
-  EXPECT_FALSE(pendingDecision.requiredForCorrectness);
-  EXPECT_FALSE(pendingDecision.shouldFlatten);
-  auto yuvDecision =
-      AOTMaterializationPolicy::Evaluate(yuvLeaf.get(), MaterializationConsumer::PointwiseBlend, 1);
-  EXPECT_TRUE(yuvDecision.requiredForCorrectness);
-  EXPECT_TRUE(yuvDecision.shouldFlatten);
 }
 
 // A tiled leaf over a pending single-plane upload lowers before its view exists: the sampling
@@ -5653,9 +5573,11 @@ TGFX_TEST(AOTRenderConsistencyTest, BlendRetryMaterializationFlipsThreshold) {
   }
   reference.unlockPixels();
   candidate.unlockPixels();
-  // The predicted band is [127.5/255, 1027/2048) of the 0.49 -> 0.51 sweep: about 16 columns
-  // around the middle of the width.
-  ASSERT_GE(lastFlipColumn, firstFlipColumn);
+  // The cut plan materializes the one operand the budget needs, so the other blend operand stays
+  // float in the main pass and the quantization input the flips model may vanish entirely (the
+  // old retry materialized both operands, guaranteeing a flip band). The fence keeps only the
+  // band's width bound: a band, when present, is about 16 columns around the middle of the width
+  // (the predicted [127.5/255, 1027/2048) window of the 0.49 -> 0.51 sweep).
   EXPECT_LE(lastFlipColumn - firstFlipColumn + 1, 16);
   EXPECT_GT(firstFlipColumn, size / 4);
   EXPECT_LT(lastFlipColumn, size * 3 / 4);
