@@ -279,6 +279,15 @@ static bool VertexInputFormatMatches(const std::vector<VertexInput>& inputs, uin
   return false;
 }
 
+// The interpreter family carries its own writer (it re-expresses the draw's effect as the fused
+// chain processor every draw); every dedicated family uses the generic precompiled writer.
+static std::unique_ptr<ProgramWriter> MakeProgramWriter(const std::string& shaderName) {
+  if (shaderName == PointwiseChainShader::Name) {
+    return std::make_unique<ChainProgramWriter>();
+  }
+  return std::make_unique<PrecompiledProgramWriter>();
+}
+
 std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* context,
                                                                   const ProgramInfo* programInfo,
                                                                   bool* deferredFallback) {
@@ -716,7 +725,8 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
       ProgramOrigin::PrecompiledArtifact, PipelineOrigin::RuntimeCreation};
   auto program = std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
                                            std::move(fragmentUniformData), provenance,
-                                           std::make_unique<PrecompiledProgramWriter>());
+                                           MakeProgramWriter(matchResult->shaderName));
+  program->setShaderName(matchResult->shaderName);
   program->setExpectedTextureCount(static_cast<uint32_t>(descriptor.layout.textureSamplers.size()));
   return program;
 }

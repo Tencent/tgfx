@@ -69,6 +69,18 @@ class Program {
     return writerValue.get();
   }
 
+  /**
+   * The precompiled family the program was built from, or empty for runtime-generated programs:
+   * lets a cache hit tell which kernel serves a draw without re-running the matcher walk.
+   */
+  const std::string& shaderName() const {
+    return shaderNameValue;
+  }
+
+  void setShaderName(std::string name) {
+    shaderNameValue = std::move(name);
+  }
+
   UniformData* getUniformData(ShaderStage stage) const;
 
   const ProgramProvenance& getProvenance() const {
@@ -95,6 +107,7 @@ class Program {
   std::unique_ptr<UniformData> vertexUniformData = nullptr;
   std::unique_ptr<UniformData> fragmentUniformData = nullptr;
   std::unique_ptr<ProgramWriter> writerValue = nullptr;
+  std::string shaderNameValue = {};
   ProgramProvenance provenance = {};
   uint32_t expectedTextureCountValue = 0;
 

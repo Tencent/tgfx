@@ -24,13 +24,17 @@
 #include "Program.h"
 #include "ProgramInfo.h"
 #include "core/utils/Log.h"
+#include "gpu/AOTChainBuilder.h"
+#include "gpu/DrawingManager.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/VertexShaderBuilder.h"
+#include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/resources/RenderTarget.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
 #include "gpu/shaders/modules/DeviceMaskModule.h"
 #include "gpu/shaders/modules/EngineParams.h"
 #include "gpu/shaders/modules/ParamWriter.h"
+#include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
@@ -113,17 +117,18 @@ bool ProgramWriter::write(const ProgramInfo& info, RenderPass* renderPass, Progr
 
   beginUniformWrites(vertexUniformData, fragmentUniformData);
 
+  auto expression = buildExpression(info);
+  const FragmentProcessor* expressionFP = expression.get();
+
   auto array = GetRTAdjustArray(info.renderTarget);
   if (vertexUniformData != nullptr) {
     vertexUniformData->setData(RTAdjustName, array);
   }
   writeEngineDefaults(info, fragmentUniformData);
 
-  FragmentProcessor::CoordTransformIter coordTransformIter(&info);
-  info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, info.geometryProcessor);
-  info.geometryProcessor->setData(vertexUniformData, fragmentUniformData, &coordTransformIter);
+  writeGeometryProcessor(info, vertexUniformData, fragmentUniformData, expressionFP);
 
-  writeProcessors(info, vertexUniformData, fragmentUniformData);
+  writeProcessors(info, vertexUniformData, fragmentUniformData, expressionFP);
 
   info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, nullptr);
 
@@ -147,8 +152,12 @@ bool ProgramWriter::write(const ProgramInfo& info, RenderPass* renderPass, Progr
 
   info.bindUniformBufferAndUnloadToGPU(program, std::move(uniformBuffer), renderPass, vertexOffset,
                                        fragmentOffset);
-  writeSamplers(info, program, renderPass);
+  writeSamplers(info, program, renderPass, expressionFP);
   return true;
+}
+
+ProgramWriter::Expression ProgramWriter::buildExpression(const ProgramInfo&) const {
+  return {};
 }
 
 void ProgramWriter::beginUniformWrites(UniformData*, UniformData*) const {
@@ -157,8 +166,17 @@ void ProgramWriter::beginUniformWrites(UniformData*, UniformData*) const {
 void ProgramWriter::writeEngineDefaults(const ProgramInfo&, UniformData*) const {
 }
 
+void ProgramWriter::writeGeometryProcessor(const ProgramInfo& info, UniformData* vertexUniformData,
+                                           UniformData* fragmentUniformData,
+                                           const FragmentProcessor* /*expression*/) const {
+  FragmentProcessor::CoordTransformIter coordTransformIter(&info);
+  info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, info.geometryProcessor);
+  info.geometryProcessor->setData(vertexUniformData, fragmentUniformData, &coordTransformIter);
+}
+
 void RuntimeProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
-                                           UniformData* fragmentUniformData) const {
+                                           UniformData* fragmentUniformData,
+                                           const FragmentProcessor* /*expression*/) const {
   for (auto& fragmentProcessor : info.fragmentProcessors) {
     FragmentProcessor::Iter iter(fragmentProcessor);
     const FragmentProcessor* fp = iter.next();
@@ -174,7 +192,8 @@ void RuntimeProgramWriter::writeProcessors(const ProgramInfo& info, UniformData*
 }
 
 void RuntimeProgramWriter::writeSamplers(const ProgramInfo& info, Program* /*program*/,
-                                         RenderPass* renderPass) const {
+                                         RenderPass* renderPass,
+                                         const FragmentProcessor* /*expression*/) const {
   auto samplers = info.getSamplers();
   auto gpu = info.renderTarget->getContext()->gpu();
 #if DEBUG
@@ -226,7 +245,8 @@ void PrecompiledProgramWriter::writeEngineDefaults(const ProgramInfo& info,
 
 void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
                                                UniformData* vertexUniformData,
-                                               UniformData* fragmentUniformData) const {
+                                               UniformData* fragmentUniformData,
+                                               const FragmentProcessor* /*expression*/) const {
   // Per-processor structural ordinal: on the precompiled path the runtime processor suffix is
   // stripped (skipSuffix), so multiple processors of the same class would write the same
   // base-named per-instance uniforms (a TextureEffect's Subset/AlphaOnly, an
@@ -273,7 +293,8 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
 }
 
 void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* program,
-                                             RenderPass* renderPass) const {
+                                             RenderPass* renderPass,
+                                             const FragmentProcessor* /*expression*/) const {
   auto samplers = info.getSamplers();
   auto expected = program->expectedTextureCount();
   // The dst texture always binds last in the artifact. When the artifact declares more samplers
@@ -343,6 +364,126 @@ void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* p
 #endif
     renderPass->setTexture(textureBinding, texture, sampler);
   }
+}
+
+ProgramWriter::Expression ChainProgramWriter::buildExpression(const ProgramInfo& info) const {
+  // Transitional dual form: an info that already carries the chain processor (the prepare-time
+  // rewrite's, or a multi-pass plan task's pass) is its own expression.
+  if (info.numColorFragmentProcessors() == 1 && info.numFragmentProcessors() == 1) {
+    auto fp = info.getFragmentProcessor(0);
+    if (IsProcessor<AOTPointwiseChainProcessor>(fp)) {
+      return {{}, fp};
+    }
+  }
+  auto context = info.getContext();
+  if (context == nullptr || context->drawingManager() == nullptr) {
+    return {};
+  }
+  // The structure is stable for a given program key (the key encodes the whole processor tree);
+  // the values are not, so the expression is rebuilt on every draw and the chain processor's own
+  // data writer uploads them.
+  return {AOTChainBuilder::BuildChainProcessorForInfo(context->drawingManager()->drawingAllocator(),
+                                                      &info),
+          nullptr};
+}
+
+void ChainProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
+                                                UniformData* vertexUniformData,
+                                                UniformData* fragmentUniformData,
+                                                const FragmentProcessor* expression) const {
+  // The expression's leaf children own the coordinate transforms in leaf order; the info's own
+  // tree orders them differently, so the GP must not consume the tree's iteration.
+  FragmentProcessor::CoordTransformIter coordTransformIter(expression);
+  info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, info.geometryProcessor);
+  info.geometryProcessor->setData(vertexUniformData, fragmentUniformData, &coordTransformIter);
+}
+
+void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
+                                         UniformData* fragmentUniformData,
+                                         const FragmentProcessor* expression) const {
+  if (expression == nullptr) {
+    LOGE(
+        "ChainProgramWriter::writeProcessors() the chain expression failed to build; the draw "
+        "renders with unwritten chain uniforms");
+    return;
+  }
+  // The expression's leaf children carry the artifact's per-leaf uniforms (Subset, AlphaStart,
+  // HasRgbaaa, the coordinate transforms): walk the expression's subtree — the chain root first,
+  // then every leaf in slot order — so each node's module bind runs, exactly as the generic
+  // writer walks an info that carries the chain processor.
+  ParamWriter paramWriter(fragmentUniformData);
+  std::unordered_map<std::string, int> classOrdinals;
+  FragmentProcessor::Iter iter(expression);
+  const FragmentProcessor* fp = iter.next();
+  while (fp) {
+    info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, fp);
+    int ordinal = classOrdinals[UniformSpaceKey(fp)]++;
+    std::string structural = ordinal > 0 ? "_" + std::to_string(ordinal) : "";
+    if (vertexUniformData != nullptr) {
+      vertexUniformData->structuralSuffix = structural;
+    }
+    if (fragmentUniformData != nullptr) {
+      fragmentUniformData->structuralSuffix = structural;
+    }
+    if (fp->bindPrecompiled(&paramWriter)) {
+      // The node's feature module took over its uniform writes.
+    } else {
+      fp->setData(vertexUniformData, fragmentUniformData);
+    }
+    fp = iter.next();
+  }
+  const auto processor = info.getXferProcessor();
+  info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
+  if (processor->onBindPrecompiled(&paramWriter)) {
+    // The XP's feature module took over its uniform writes.
+  } else {
+    processor->setData(vertexUniformData, fragmentUniformData);
+  }
+}
+
+void ChainProgramWriter::writeSamplers(const ProgramInfo& info, Program* program,
+                                       RenderPass* renderPass,
+                                       const FragmentProcessor* expression) const {
+  if (expression == nullptr) {
+    return;
+  }
+  auto gpu = info.renderTarget->getContext()->gpu();
+#if DEBUG
+  const char* unifDump = UnifDumpLabel();
+#endif
+  unsigned textureBinding = 0;
+  // The artifact's sampler order is the expression's child order: the DAG leaves (padded to the
+  // four-leaf slots), the LUT gradient, the noise lookups, the mask child. Each child binds
+  // exactly one texture with its own sampler state.
+  for (size_t index = 0; index < expression->numChildProcessors(); ++index) {
+    auto child = expression->childProcessor(index);
+    if (child->numTextureSamplers() != 1) {
+      LOGE("ChainProgramWriter::writeSamplers() unexpected chain child sampler count");
+      return;
+    }
+    auto state = child->samplerStateAt(0);
+    SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
+                                 state.minFilterMode, state.magFilterMode, state.mipmapMode);
+    auto sampler = gpu->createSampler(descriptor);
+#if DEBUG
+    DebugDumpSamplerSlot(unifDump, textureBinding, child->textureAt(0).get(), false);
+#endif
+    renderPass->setTexture(textureBinding++, child->textureAt(0), sampler);
+  }
+  // The dst texture always binds last.
+  auto dstTextureView =
+      info.xferProcessor != nullptr ? info.xferProcessor->dstTextureView() : nullptr;
+  if (dstTextureView != nullptr) {
+    auto state = SamplerState();
+    SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
+                                 state.minFilterMode, state.magFilterMode, state.mipmapMode);
+    auto sampler = gpu->createSampler(descriptor);
+#if DEBUG
+    DebugDumpSamplerSlot(unifDump, textureBinding, dstTextureView->getTexture().get(), false);
+#endif
+    renderPass->setTexture(textureBinding++, dstTextureView->getTexture(), sampler);
+  }
+  DEBUG_ASSERT(textureBinding == program->expectedTextureCount());
 }
 
 }  // namespace tgfx

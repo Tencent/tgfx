@@ -100,4 +100,9 @@ bool IsChainQuadSubsetServable(const QuadPerEdgeAAGeometryProcessor* quadGP,
 /// gate and the debug audit both rely on this agreement.
 bool RejectsAlphaOnlyTarget(bool servesAlphaOnly, const ProgramInfo* programInfo);
 
+/// True when any fragment processor in the tree is a gradient source (ClampedGradientEffect):
+/// only the interpreter's extended resource kind serves gradients, so the decomposition switch
+/// keeps serving them even when the rest of the interpreter route is switched off.
+bool ContainsGradientSource(const FragmentProcessor* processor);
+
 }  // namespace tgfx

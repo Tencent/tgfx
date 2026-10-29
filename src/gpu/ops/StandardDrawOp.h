@@ -147,7 +147,8 @@ class StandardDrawOp : public DrawOp {
 
  private:
   std::shared_ptr<Program> prepareDecomposedProgram(RenderTarget* renderTarget,
-                                                    const ColorProcessorList& activeColors);
+                                                    const ColorProcessorList& activeColors,
+                                                    bool* interpreterServed);
 
   PlacementPtr<GeometryProcessor> geometryProcessor = nullptr;
   // Holds the chain-route twin GP (when an op provides one) for the draw's lifetime: a local

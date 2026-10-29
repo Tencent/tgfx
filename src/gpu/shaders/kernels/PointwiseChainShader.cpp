@@ -19,6 +19,8 @@
 #include "gpu/shaders/kernels/PointwiseChainShader.h"
 #include <optional>
 #include <vector>
+#include "gpu/AOTChainBuilder.h"
+#include "gpu/DrawingManager.h"
 #include "gpu/PermutationMatcher.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
@@ -60,15 +62,32 @@ std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::Extract(
   } else if (IsProcessor<ComplexEllipseGeometryProcessor>(gp)) {
     gpKind = static_cast<const ComplexEllipseGeometryProcessor*>(gp)->isStroke() ? 7 : 6;
   }
-  if (gpKind < 0 || programInfo->numColorFragmentProcessors() != 1 ||
-      programInfo->numFragmentProcessors() != 1) {
+  if (gpKind < 0) {
     return std::nullopt;
   }
-  auto fp = programInfo->getFragmentProcessor(0);
-  if (!IsProcessor<AOTPointwiseChainProcessor>(fp)) {
-    return std::nullopt;
+  // Dual acceptance: a draw still carrying the chain processor (a multi-pass plan task's pass,
+  // until the plan route retires) reads its shape directly; any other draw is the interpreter's
+  // own subject — the whole effect expression is re-expressed and compiled here.
+  const AOTPointwiseChainProcessor* chain = nullptr;
+  if (programInfo->numColorFragmentProcessors() == 1 && programInfo->numFragmentProcessors() == 1) {
+    auto fp = programInfo->getFragmentProcessor(0);
+    if (IsProcessor<AOTPointwiseChainProcessor>(fp)) {
+      chain = static_cast<const AOTPointwiseChainProcessor*>(fp);
+    }
   }
-  auto* chain = static_cast<const AOTPointwiseChainProcessor*>(fp);
+  PlacementPtr<FragmentProcessor> expression = nullptr;
+  if (chain == nullptr) {
+    auto context = programInfo->getContext();
+    if (context == nullptr || context->drawingManager() == nullptr) {
+      return std::nullopt;
+    }
+    expression = AOTChainBuilder::BuildChainProcessorForInfo(
+        context->drawingManager()->drawingAllocator(), programInfo);
+    if (expression == nullptr) {
+      return std::nullopt;
+    }
+    chain = static_cast<const AOTPointwiseChainProcessor*>(expression.get());
+  }
   auto leafCount = chain->leafCount();
   // Sampler-only padding makes every non-empty chain present exactly four sampler children.
   if (leafCount != 0 && leafCount != 4) {
@@ -130,9 +149,10 @@ std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::Extract(
     inputs.hasUVCoord = meshGP->getHasTexCoords();
     inputs.hasCoverage = true;
   } else if (gpKind == 3) {
-    // Only the sampler-free chain-route twin is servable: a sampler-owning atlas GP would bind
-    // its atlas ahead of the chain's leaf samplers.
-    if (gp->numTextureSamplers() != 0) {
+    // The atlas GP may own its atlas sampler (an unmodified draw) or not (the chain-route twin a
+    // plan task built): the glyph leaf binds through the chain expression either way, so at most
+    // one sampler (the atlas itself) is acceptable.
+    if (gp->numTextureSamplers() > 1) {
       return std::nullopt;
     }
     // Atlas text buffers are (position, maskCoord, color) with no coverage slot; maskCoord

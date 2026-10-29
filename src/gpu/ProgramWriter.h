@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include "core/utils/PlacementPtr.h"
 #include "gpu/UniformData.h"
 
 namespace tgfx {
@@ -51,6 +52,28 @@ class ProgramWriter {
   virtual bool write(const ProgramInfo& info, RenderPass* renderPass, Program* program) const;
 
  protected:
+  /**
+   * A per-draw expression: either an owned re-expression built over the draw's own processors, or
+   * a borrowed processor the info already carries. Exactly one is set; get() returns it or null.
+   */
+  struct Expression {
+    PlacementPtr<FragmentProcessor> owned = {};
+    const FragmentProcessor* borrowed = nullptr;
+
+    const FragmentProcessor* get() const {
+      return borrowed != nullptr ? borrowed : owned.get();
+    }
+  };
+
+  /**
+   * Builds the route's per-draw expression over the draw's own processors. The default returns an
+   * empty expression (the generic routes read the info's processors directly); the chain writer
+   * re-expresses the whole effect as the fused chain processor — or borrows the one the info
+   * already carries — whose leaf-ordered children drive the geometry transforms, the uniform
+   * writes and the sampler bindings.
+   */
+  virtual Expression buildExpression(const ProgramInfo& info) const;
+
   /** Resets per-draw addressing state on the reused UniformData before the base-name writes. */
   virtual void beginUniformWrites(UniformData* vertexUniformData,
                                   UniformData* fragmentUniformData) const;
@@ -58,35 +81,66 @@ class ProgramWriter {
   /** Writes the engine-level default uniforms only this route's shaders declare. */
   virtual void writeEngineDefaults(const ProgramInfo& info, UniformData* fragmentUniformData) const;
 
+  /**
+   * Writes the geometry processor's uniforms. The default feeds the processor the draw's
+   * coordinate transforms in tree order; the chain writer feeds it the expression's leaf-ordered
+   * transforms instead.
+   */
+  virtual void writeGeometryProcessor(const ProgramInfo& info, UniformData* vertexUniformData,
+                                      UniformData* fragmentUniformData,
+                                      const FragmentProcessor* expression) const;
+
   /** Writes the fragment and xfer processors' per-instance uniforms. */
   virtual void writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
-                               UniformData* fragmentUniformData) const = 0;
+                               UniformData* fragmentUniformData,
+                               const FragmentProcessor* expression) const = 0;
 
   /** Binds the draw's textures onto the program's sampler slots. */
-  virtual void writeSamplers(const ProgramInfo& info, Program* program,
-                             RenderPass* renderPass) const = 0;
+  virtual void writeSamplers(const ProgramInfo& info, Program* program, RenderPass* renderPass,
+                             const FragmentProcessor* expression) const = 0;
 };
 
 /** The runtime-generated route: JIT name suffixes and the samplers the draw supplies. */
 class RuntimeProgramWriter final : public ProgramWriter {
  protected:
   void writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
-                       UniformData* fragmentUniformData) const override;
-  void writeSamplers(const ProgramInfo& info, Program* program,
-                     RenderPass* renderPass) const override;
+                       UniformData* fragmentUniformData,
+                       const FragmentProcessor* expression) const override;
+  void writeSamplers(const ProgramInfo& info, Program* program, RenderPass* renderPass,
+                     const FragmentProcessor* expression) const override;
 };
 
 /** The precompiled route: structural ordinals, module binds and the artifact's sampler slots. */
-class PrecompiledProgramWriter final : public ProgramWriter {
+class PrecompiledProgramWriter : public ProgramWriter {
  protected:
   void beginUniformWrites(UniformData* vertexUniformData,
                           UniformData* fragmentUniformData) const override;
   void writeEngineDefaults(const ProgramInfo& info,
                            UniformData* fragmentUniformData) const override;
   void writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
-                       UniformData* fragmentUniformData) const override;
-  void writeSamplers(const ProgramInfo& info, Program* program,
-                     RenderPass* renderPass) const override;
+                       UniformData* fragmentUniformData,
+                       const FragmentProcessor* expression) const override;
+  void writeSamplers(const ProgramInfo& info, Program* program, RenderPass* renderPass,
+                     const FragmentProcessor* expression) const override;
+};
+
+/**
+ * The fused chain kernel's writer: it re-expresses the draw's effect as the chain processor every
+ * draw (the structure is stable for a given program key, the values are not), uploads through the
+ * processor's own data writer, and binds the expression's leaf-ordered children as the artifact's
+ * sampler slots.
+ */
+class ChainProgramWriter final : public PrecompiledProgramWriter {
+ protected:
+  Expression buildExpression(const ProgramInfo& info) const override;
+  void writeGeometryProcessor(const ProgramInfo& info, UniformData* vertexUniformData,
+                              UniformData* fragmentUniformData,
+                              const FragmentProcessor* expression) const override;
+  void writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
+                       UniformData* fragmentUniformData,
+                       const FragmentProcessor* expression) const override;
+  void writeSamplers(const ProgramInfo& info, Program* program, RenderPass* renderPass,
+                     const FragmentProcessor* expression) const override;
 };
 
 }  // namespace tgfx

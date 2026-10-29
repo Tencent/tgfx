@@ -18,9 +18,11 @@
 
 #include "PermutationMatcher.h"
 #include <skcms.h>
+#include <string_view>
 #include <unordered_set>
 #include "ColorSpaceXformHelper.h"
 #include "ShaderMatchHelpers.h"
+#include "gpu/PrecompiledShaderCache.h"
 #include "gpu/Swizzle.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AOTYUVChainProcessor.h"
@@ -356,6 +358,21 @@ bool IsServableBlurChild(const FragmentProcessor* childFP) {
   return false;
 }
 
+bool ContainsGradientSource(const FragmentProcessor* processor) {
+  if (processor == nullptr) {
+    return false;
+  }
+  if (IsProcessor<ClampedGradientEffect>(processor)) {
+    return true;
+  }
+  for (size_t index = 0; index < processor->numChildProcessors(); ++index) {
+    if (ContainsGradientSource(processor->childProcessor(index))) {
+      return true;
+    }
+  }
+  return false;
+}
+
 static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramInfo* programInfo) {
   // OpenGL is served from the bundle profile matching the context (desktop GL or the GLES
   // family: GLES, WebGL, SwiftShader). The precompiled kernels only declare 2D samplers. Desktop GL
@@ -397,20 +414,23 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
     if (auditedProgramKeys.insert(programInfo->programKeyForDiagnostics()).second) {
       const auto savedFailure = gPendingMatchFailure;
       int acceptors = 0;
-#define TGFX_AUDIT_FAMILY(Family)                                                           \
-  if (auto auditResult = Family::Match(programInfo)) {                                      \
-    if (alphaOnly && !Family::ServesAlphaOnly) {                                            \
-      assert(false && #Family " accepts an alpha-only draw; flip its ServesAlphaOnly");     \
-    }                                                                                       \
-    if (++acceptors > 1) {                                                                  \
-      assert(false && "multiple shader families accept the same draw");                     \
-    }                                                                                       \
-    if (Family::CachedReachable().count(                                                    \
-            {auditResult->vertPermutationIndex, auditResult->fragPermutationIndex}) == 0) { \
-      assert(false && #Family                                                               \
-             " matched a variant outside its reachable set; extend "                        \
-             "its AllInputs");                                                              \
-    }                                                                                       \
+#define TGFX_AUDIT_FAMILY(Family)                                                             \
+  if (auto auditResult = Family::Match(programInfo)) {                                        \
+    if (alphaOnly && !Family::ServesAlphaOnly) {                                              \
+      assert(false && #Family " accepts an alpha-only draw; flip its ServesAlphaOnly");       \
+    }                                                                                         \
+    /* The interpreter is the walk's documented fallback: it may accept a draw a dedicated  \
+     * family serves too (that overlap is what the dedicated-kernel toggle A/Bs), so only  \
+     * dedicated families count towards uniqueness. */ \
+    if (++acceptors > 1 && std::string_view(#Family) != "PointwiseChainShader") {             \
+      assert(false && "multiple shader families accept the same draw");                       \
+    }                                                                                         \
+    if (Family::CachedReachable().count(                                                      \
+            {auditResult->vertPermutationIndex, auditResult->fragPermutationIndex}) == 0) {   \
+      assert(false && #Family                                                                 \
+             " matched a variant outside its reachable set; extend "                          \
+             "its AllInputs");                                                                \
+    }                                                                                         \
   }
       TGFX_FOR_EACH_SHADER_FAMILY(TGFX_AUDIT_FAMILY)
 #undef TGFX_AUDIT_FAMILY
@@ -420,12 +440,28 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
 #endif
 
   std::optional<PermutationMatchResult> accepted;
-#define TGFX_TRY_FAMILY(Family)                                                \
-  if (!accepted && (!alphaOnly || Family::ServesAlphaOnly)) {                  \
-    if (auto result = Family::Match(programInfo)) {                            \
-      accepted = PermutationMatchResult{#Family, result->vertPermutationIndex, \
-                                        result->fragPermutationIndex};         \
-    }                                                                          \
+  // The walk tries the dedicated families first and the interpreter last (the entry order in
+  // AllShaderFamilies.h), and the two diagnostic switches exclude their half of that list:
+  // decompositionEnabled gates the interpreter, dedicatedKernelsEnabled gates every dedicated
+  // family.
+  auto* shaderContext = programInfo->getContext();
+  auto* shaderCache = shaderContext != nullptr ? shaderContext->precompiledShaderCache() : nullptr;
+  const bool allowDedicated = shaderCache == nullptr || shaderCache->dedicatedKernelsEnabled();
+  // Gradients keep the interpreter even with the decomposition switch off (only the extended
+  // chain kind serves them), mirroring the required-gradient-lowering the switch always retained.
+  bool hasGradient = false;
+  for (size_t index = 0; !hasGradient && index < programInfo->numFragmentProcessors(); ++index) {
+    hasGradient = ContainsGradientSource(programInfo->getFragmentProcessor(index));
+  }
+  const bool allowInterpreter =
+      shaderCache == nullptr || shaderCache->decompositionEnabled() || hasGradient;
+#define TGFX_TRY_FAMILY(Family)                                                                    \
+  if (!accepted && (!alphaOnly || Family::ServesAlphaOnly) &&                                      \
+      (std::string_view(#Family) == "PointwiseChainShader" ? allowInterpreter : allowDedicated)) { \
+    if (auto result = Family::Match(programInfo)) {                                                \
+      accepted = PermutationMatchResult{#Family, result->vertPermutationIndex,                     \
+                                        result->fragPermutationIndex};                             \
+    }                                                                                              \
   }
   TGFX_FOR_EACH_SHADER_FAMILY(TGFX_TRY_FAMILY)
 #undef TGFX_TRY_FAMILY

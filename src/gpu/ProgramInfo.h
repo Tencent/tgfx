@@ -34,6 +34,8 @@
 
 namespace tgfx {
 
+class Context;
+
 struct SamplerInfo {
   std::shared_ptr<Texture> texture;
   SamplerState state;
@@ -194,6 +196,13 @@ class ProgramInfo {
   Backend backend() const;
 
   /**
+   * Returns the context owning this program's render target, or null when the target is absent.
+   */
+  Context* getContext() const {
+    return renderTarget != nullptr ? renderTarget->getContext() : nullptr;
+  }
+
+  /**
    * Returns the GLSL profile tag ("opengl" for desktop GL, "opengles" for the GLES-family
    * contexts: GLES, WebGL, SwiftShader) the precompiled bundle must serve this context from.
    */
@@ -243,6 +252,7 @@ class ProgramInfo {
   friend class ProgramWriter;
   friend class RuntimeProgramWriter;
   friend class PrecompiledProgramWriter;
+  friend class ChainProgramWriter;
 
   std::vector<SamplerInfo> getSamplers() const;
 

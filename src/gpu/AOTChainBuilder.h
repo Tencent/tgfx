@@ -24,6 +24,8 @@
 
 namespace tgfx {
 
+class ProgramInfo;
+
 /**
  * Rebuilds concrete FragmentProcessors from a decomposed AOT plan: the fused chain kernel for
  * PointwiseChain/PointwiseGraph passes (including every pass of a multi-pass linear plan, through
@@ -126,5 +128,17 @@ class AOTChainBuilder {
       BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
       const std::vector<const FragmentProcessor*>& coverageFPs = {},
       bool coverageLeafFromUVCoord = false);
+
+  /**
+   * Re-expresses a draw's whole effect expression (its color processors, its coverage processors,
+   * and the glyph leaf an AtlasText geometry processor contributes) as the fused chain processor,
+   * without touching the draw. This is the interpreter's view of an unmodified ProgramInfo: the
+   * matcher uses it to decide whether the chain kernel serves the draw, and the chain program
+   * writer rebuilds it per draw to upload the values. Returns nullptr when the expression does not
+   * reduce onto the chain kernel (an unsupported processor, an over-budget shape, a coverage form
+   * the chain cannot carry).
+   */
+  static PlacementPtr<FragmentProcessor> BuildChainProcessorForInfo(BlockAllocator* allocator,
+                                                                    const ProgramInfo* programInfo);
 };
 }  // namespace tgfx

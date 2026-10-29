@@ -231,6 +231,7 @@ class UniformData {
   friend class ProgramWriter;
   friend class RuntimeProgramWriter;
   friend class PrecompiledProgramWriter;
+  friend class ChainProgramWriter;
   friend class UniformHandler;
   friend class PrecompiledProgramCreator;
 };

@@ -134,6 +134,11 @@ FragmentProcessor::CoordTransformIter::CoordTransformIter(const ProgramInfo* pro
   currFP = fpIter.next();
 }
 
+FragmentProcessor::CoordTransformIter::CoordTransformIter(const FragmentProcessor* fp)
+    : fpIter(fp) {
+  currFP = fpIter.next();
+}
+
 const CoordTransform* FragmentProcessor::CoordTransformIter::next() {
   if (!currFP) {
     return nullptr;

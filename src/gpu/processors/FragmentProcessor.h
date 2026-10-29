@@ -177,6 +177,10 @@ class FragmentProcessor : public Processor {
    public:
     explicit CoordTransformIter(const ProgramInfo* programInfo);
 
+    // Iterates the transforms of one subtree instead of a whole ProgramInfo: the chain writer
+    // feeds the GP the re-expressed chain processor's leaf-ordered transforms.
+    explicit CoordTransformIter(const FragmentProcessor* fp);
+
     const CoordTransform* next();
 
    private:

@@ -813,8 +813,7 @@ endif ()
 # all derive from it.
 file(GLOB TGFX_SHADER_FAMILY_HEADERS CONFIGURE_DEPENDS
         ${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/shaders/kernels/*.h)
-set(TGFX_SHADER_FAMILY_INCLUDES "")
-set(TGFX_SHADER_FAMILY_ENTRIES "")
+set(TGFX_SHADER_FAMILY_NAMES "")
 foreach (FAMILY_HEADER ${TGFX_SHADER_FAMILY_HEADERS})
     get_filename_component(FAMILY_NAME "${FAMILY_HEADER}" NAME_WE)
     file(READ "${FAMILY_HEADER}" FAMILY_HEADER_TEXT)
@@ -827,9 +826,19 @@ foreach (FAMILY_HEADER ${TGFX_SHADER_FAMILY_HEADERS})
         message(FATAL_ERROR "${FAMILY_HEADER} registers ${CMAKE_MATCH_1}; a family header must be "
                 "named after the class it registers.")
     endif ()
+    list(APPEND TGFX_SHADER_FAMILY_NAMES ${FAMILY_NAME})
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${FAMILY_HEADER}")
+endforeach ()
+# The generic interpreter is the walk's fallback: every dedicated family is tried before it, so
+# its entry is appended last regardless of the alphabetical file order (the matcher's walk and the
+# diagnostic switches in MatchPermutationImpl rely on this ordering).
+list(REMOVE_ITEM TGFX_SHADER_FAMILY_NAMES PointwiseChainShader)
+list(APPEND TGFX_SHADER_FAMILY_NAMES PointwiseChainShader)
+set(TGFX_SHADER_FAMILY_INCLUDES "")
+set(TGFX_SHADER_FAMILY_ENTRIES "")
+foreach (FAMILY_NAME ${TGFX_SHADER_FAMILY_NAMES})
     string(APPEND TGFX_SHADER_FAMILY_INCLUDES "#include \"gpu/shaders/kernels/${FAMILY_NAME}.h\"\n")
     string(APPEND TGFX_SHADER_FAMILY_ENTRIES " \\\n  X(${FAMILY_NAME})")
-    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${FAMILY_HEADER}")
 endforeach ()
 set(TGFX_GENERATED_INCLUDE_DIR "${CMAKE_BINARY_DIR}/generated/include")
 file(CONFIGURE OUTPUT "${TGFX_GENERATED_INCLUDE_DIR}/gpu/shaders/AllShaderFamilies.h" CONTENT
@@ -837,7 +846,8 @@ file(CONFIGURE OUTPUT "${TGFX_GENERATED_INCLUDE_DIR}/gpu/shaders/AllShaderFamili
 #pragma once
 
 ${TGFX_SHADER_FAMILY_INCLUDES}
-// Calls X(FamilyName) once per registered shader family, in file-name order.
+// Calls X(FamilyName) once per registered shader family: dedicated families in file-name order,
+// then the generic interpreter (PointwiseChainShader) last as the walk's fallback.
 #define TGFX_FOR_EACH_SHADER_FAMILY(X)${TGFX_SHADER_FAMILY_ENTRIES}
 " @ONLY NEWLINE_STYLE UNIX)
 list(APPEND TGFX_INCLUDES ${TGFX_GENERATED_INCLUDE_DIR})

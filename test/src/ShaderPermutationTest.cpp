@@ -2514,7 +2514,10 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
   }
 }
 
-TGFX_TEST(ShaderPermutationTest, ComplexEllipseCoverageFailureIsNotHiddenByChainProbe) {
+// The dedicated ComplexEllipseFill kernel rejects a texture-coverage draw, and the interpreter
+// (whose walk entry comes after every dedicated family) now serves it instead: the shape is no
+// longer a miss, so the draw renders rather than depending on the prepare-time rewrite.
+TGFX_TEST(ShaderPermutationTest, ComplexEllipseTextureCoverageIsServedByChain) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
@@ -2533,16 +2536,15 @@ TGFX_TEST(ShaderPermutationTest, ComplexEllipseCoverageFailureIsNotHiddenByChain
   ProgramInfo rejected(renderTarget.get(), gp.get(), {coverage.get()}, 0, nullptr,
                        BlendMode::SrcOver);
   auto failure = PermutationMatchFailure::None;
-  EXPECT_FALSE(MatchPermutation(&rejected, &failure).has_value());
-  EXPECT_EQ(failure, PermutationMatchFailure::CoverageShape);
+  auto served = MatchPermutation(&rejected, &failure);
+  ASSERT_TRUE(served.has_value());
+  EXPECT_EQ(served->shaderName, "PointwiseChainShader");
 
   ProgramInfo accepted(renderTarget.get(), gp.get(), {}, 0, nullptr, BlendMode::SrcOver);
   auto match = MatchPermutation(&accepted, &failure);
   ASSERT_TRUE(match.has_value());
   EXPECT_EQ(match->shaderName, "ComplexEllipseFillShader");
   EXPECT_EQ(failure, PermutationMatchFailure::None);
-  EXPECT_FALSE(MatchPermutation(&rejected, &failure).has_value());
-  EXPECT_EQ(failure, PermutationMatchFailure::CoverageShape);
 }
 
 TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageShaderRegistry) {
@@ -2719,7 +2721,9 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectPreservesPermutationDomains) {
   }
 }
 
-TGFX_TEST(ShaderPermutationTest, DirectAARectRejectsComposedCoverage) {
+// A Compose(mask, rect) coverage is the chain's documented narrow form (the mask child plus a clip
+// slot), so the interpreter serves it: the shape is no longer a NoMatchingRule miss.
+TGFX_TEST(ShaderPermutationTest, DirectAARectComposedCoverageIsServedByChain) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
@@ -2738,8 +2742,9 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectRejectsComposedCoverage) {
   ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {composed.get()}, 0,
                           nullptr, BlendMode::SrcOver);
   auto failure = PermutationMatchFailure::None;
-  EXPECT_FALSE(MatchPermutation(&programInfo, &failure).has_value());
-  EXPECT_EQ(failure, PermutationMatchFailure::NoMatchingRule);
+  auto served = MatchPermutation(&programInfo, &failure);
+  ASSERT_TRUE(served.has_value());
+  EXPECT_EQ(served->shaderName, "PointwiseChainShader");
 }
 
 // --- MirroredDim: permanent desync guard --------------------------------------------------------

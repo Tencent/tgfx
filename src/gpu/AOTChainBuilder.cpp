@@ -21,11 +21,15 @@
 #include <utility>
 #include <vector>
 #include "gpu/AOTChainRegisterAllocator.h"
+#include "gpu/AOTRouter.h"
 #include "gpu/AOTShapeRules.h"
+#include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AOTYUVChainProcessor.h"
+#include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
+#include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
 #include "gpu/processors/RRectEffect.h"
@@ -1985,6 +1989,76 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessor(
   }
   return BuildChainFP(allocator, graph, pass, clipSlots, maskEffect, &covGraph, covRoot,
                       coverageLeafFromUVCoord);
+}
+
+PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessorForInfo(
+    BlockAllocator* allocator, const ProgramInfo* programInfo) {
+  if (allocator == nullptr || programInfo == nullptr) {
+    return nullptr;
+  }
+  auto gp = programInfo->getGeometryProcessor();
+  if (gp == nullptr) {
+    return nullptr;
+  }
+  const bool atlasText = IsProcessor<AtlasTextGeometryProcessor>(gp);
+  const size_t coverageCount =
+      programInfo->numFragmentProcessors() - programInfo->numColorFragmentProcessors();
+  if (coverageCount > (atlasText ? 1u : 2u)) {
+    return nullptr;
+  }
+  // The atlas glyph mask joins as a synthesized coverage leaf sourced from the maskCoord attribute
+  // (mirrors AtlasTextOp::onMakeChainGeometryProcessor): only the alpha-only atlas readback is
+  // expressible — a color atlas replaces the output color, which the chain cannot carry.
+  std::vector<PlacementPtr<FragmentProcessor>> ownedCoverageFPs = {};
+  std::vector<const FragmentProcessor*> coverageFPs = {};
+  coverageFPs.reserve(coverageCount + 1);
+  for (size_t index = programInfo->numColorFragmentProcessors();
+       index < programInfo->numFragmentProcessors(); ++index) {
+    coverageFPs.push_back(programInfo->getFragmentProcessor(index));
+  }
+  if (atlasText) {
+    auto* atlasGP = static_cast<const AtlasTextGeometryProcessor*>(gp);
+    auto atlasProxy = atlasGP->getTextureProxy();
+    if (atlasProxy == nullptr || !atlasProxy->isAlphaOnly()) {
+      return nullptr;
+    }
+    auto state = atlasGP->getSamplerState();
+    SamplingOptions sampling(state.minFilterMode, state.magFilterMode, state.mipmapMode);
+    SamplingArgs args = {TileMode::Clamp, TileMode::Clamp, sampling, SrcRectConstraint::Fast};
+    // Identity: CoordTransform::getTotalMatrix applies the texture normalization itself, so the
+    // leaf maps maskCoord straight into the atlas's normalized space.
+    auto uvMatrix = Matrix::I();
+    auto atlasLeaf = TextureEffect::Make(allocator, std::move(atlasProxy), args, &uvMatrix);
+    if (atlasLeaf == nullptr) {
+      return nullptr;
+    }
+    coverageFPs.push_back(atlasLeaf.get());
+    ownedCoverageFPs.push_back(std::move(atlasLeaf));
+  }
+  std::vector<const FragmentProcessor*> colorProcessors = {};
+  colorProcessors.reserve(programInfo->numColorFragmentProcessors() + 1);
+  for (size_t index = 0; index < programInfo->numColorFragmentProcessors(); ++index) {
+    colorProcessors.push_back(programInfo->getFragmentProcessor(index));
+  }
+  PlacementPtr<FragmentProcessor> unitColor = nullptr;
+  if (colorProcessors.empty()) {
+    // A color-free draw (pure mask/clip fill) takes the paint color as-is, which is a one-slot
+    // const-color chain modulating the geometry color.
+    unitColor = ConstColorProcessor::Make(allocator, PMColor::White(), InputMode::ModulateRGBA);
+    if (unitColor == nullptr) {
+      return nullptr;
+    }
+    colorProcessors.push_back(unitColor.get());
+  }
+  AOTEffectGraph graph = {};
+  AOTEffectPlan plan = {};
+  if (!AOTRouter::PlanInlineRewrite(colorProcessors, &graph, &plan) ||
+      !IsAOTPointwiseDAGKernel(plan.passes[0].kernel)) {
+    // The perlin kernels have their own families; the chain family only takes the DAG kernels.
+    return nullptr;
+  }
+  return BuildChainProcessor(allocator, graph, plan.passes[0], coverageFPs,
+                             !ownedCoverageFPs.empty());
 }
 
 }  // namespace tgfx

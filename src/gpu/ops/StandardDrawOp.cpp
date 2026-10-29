@@ -96,8 +96,9 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, ProgramLookupMode mode,
     preparedProgramInfo->setDepthStencil(depthStencil);
   }
   onConfigureProgramInfo(*preparedProgramInfo);
-  preparedProgram = prepareDecomposedProgram(renderTarget, activeColors);
-  preparedViaDecomposition = preparedProgram != nullptr;
+  bool interpreterServed = false;
+  preparedProgram = prepareDecomposedProgram(renderTarget, activeColors, &interpreterServed);
+  preparedViaDecomposition = preparedProgram != nullptr || interpreterServed;
   if (preparedProgram == nullptr) {
     preparedProgram = preparedProgramInfo->getProgram(mode);
   }
@@ -125,7 +126,7 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, ProgramLookupMode mode,
 // as a coverage slot, a device-space alpha mask as the mask child, Compose(mask, rect) as both);
 // other coverage forms stay on their original route.
 std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
-    RenderTarget* renderTarget, const ColorProcessorList& activeColors) {
+    RenderTarget* renderTarget, const ColorProcessorList& activeColors, bool* interpreterServed) {
   auto cache = renderTarget->getContext()->precompiledShaderCache();
   if (!cache->isLoaded()) {
     return nullptr;
@@ -151,9 +152,19 @@ std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
       // precompiled artifact, so the match that produced it succeeded and the plain route serves
       // the draw — the probe below would only repeat that walk.
       DEBUG_ASSERT(MatchPermutation(preparedProgramInfo.get()).has_value());
+      if (interpreterServed != nullptr && cached->shaderName() == "PointwiseChainShader") {
+        *interpreterServed = true;
+      }
       return nullptr;
     }
-    if (MatchPermutation(preparedProgramInfo.get()).has_value()) {
+    auto probe = MatchPermutation(preparedProgramInfo.get());
+    if (probe.has_value()) {
+      // The interpreter serves this draw through the plain route (its Extract re-expresses the
+      // draw's own tree), so the rewrite has nothing left to own: the direct-chain accounting
+      // follows the plain route instead.
+      if (interpreterServed != nullptr && probe->shaderName == "PointwiseChainShader") {
+        *interpreterServed = true;
+      }
       return nullptr;
     }
   }
