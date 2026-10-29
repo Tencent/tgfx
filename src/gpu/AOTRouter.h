@@ -89,6 +89,23 @@ class AOTRouter {
                               AOTMaterializationRecorder* producers = nullptr);
 
   /**
+   * Whether a plan can only run as a plan task: more than one pass, or a single pass whose kernel
+   * the prepare-time inline rewrite cannot express (the rewrite replaces a draw's color list with
+   * one fused chain or perlin processor; every other single-pass kernel still needs the task).
+   * A single-pass chain-capable plan is left to the prepare-time rewrite so the record-time entry
+   * never duplicates it; the retry's plans always run as tasks regardless.
+   */
+  static bool PlanRequiresTask(const AOTEffectPlan& plan);
+
+  /**
+   * Whether the prepare-time inline rewrite takes this color chain as-is. The record-time entries
+   * defer such chains entirely — the rewrite re-expresses them through the same kernel without a
+   * plan task and folds the coverage itself, so neither the fold route, the color route nor the
+   * materialization retry runs for them.
+   */
+  static bool PlanIsInlineRewritable(const std::vector<const FragmentProcessor*>& processors);
+
+  /**
    * Plans processors for the inline rewrite: true when they lower and decompose into a single pass
    * of a kernel whose processor can replace a draw's color list in place (PointwiseChain,
    * PointwiseGraph, or PerlinNoiseFill). A multi-pass plan never qualifies: its intermediate

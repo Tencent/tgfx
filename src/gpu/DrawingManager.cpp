@@ -169,15 +169,20 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
                                          AOTMaterializationRecorder* producers) {
     return submitPlanTask(taskGraph, taskPlan, &drawOp, producers);
   };
+  // A single-pass chain-capable plan is the prepare-time inline rewrite's own shape (the fill's
+  // RectDrawOp is a StandardDrawOp, so the rewrite serves the deferred fill through the same
+  // kernel); deferring skips the plan task and the retry alike.
+  bool deferredToInlineRewrite = planned && !AOTRouter::PlanRequiresTask(plan);
+  drawOp->setInlineRewriteDeferred(deferredToInlineRewrite);
   // The original tree was already planned above (the diagnostics need the plan too), so its
   // route only has to submit that plan.
-  if (planned && submitFill(graph, plan, nullptr)) {
+  if (!deferredToInlineRewrite && planned && submitFill(graph, plan, nullptr)) {
     return true;
   }
   // Materialization retry, shared with on-screen draws (AOTRouter::RouteWithMaterializedLeading):
   // the caller's closure rebuilds the whole fill processor with materialized blend children. A
   // refused retry is dropped and the plain fill below keeps the ORIGINAL processor.
-  if (retryWarranted &&
+  if (!deferredToInlineRewrite && retryWarranted &&
       AOTRouter::RouteWithMaterializedLeading(context, rebuildColorChain, {}, submitFill) ==
           AOTRouteResult::Submitted) {
     return true;

@@ -84,6 +84,20 @@ class DrawOp {
   }
 
   /**
+   * Marks a draw the record-time AOT entry deferred to the prepare-time inline rewrite: its color
+   * chain planned as a single fused chain or perlin pass, so the rewrite — not a plan task — owns
+   * it. prepareDecomposedProgram skips the dedicated-kernel probe for such draws (the record-time
+   * entry already committed them to the rewrite's kernel, exactly as the plan task did before).
+   */
+  void setInlineRewriteDeferred(bool deferred) {
+    inlineRewriteDeferred = deferred;
+  }
+
+  bool isInlineRewriteDeferred() const {
+    return inlineRewriteDeferred;
+  }
+
+  /**
    * Moves all coverage processors to the end of the color processor list. Used when a coverage
    * effect is fused into the color chain (e.g., a local texture mask folded into a pointwise
    * chain), which is only valid for blends that do not need a dst texture.
@@ -167,6 +181,7 @@ class DrawOp {
   BlendMode blendMode = BlendMode::SrcOver;
   CullMode cullMode = CullMode::None;
   OffscreenFillKey offscreenFillKey = InvalidOffscreenFillKey;
+  bool inlineRewriteDeferred = false;
 
   DrawOp(BlockAllocator* allocator, AAType aaType) : allocator(allocator), aaType(aaType) {
   }

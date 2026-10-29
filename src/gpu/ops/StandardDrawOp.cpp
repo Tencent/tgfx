@@ -141,7 +141,8 @@ std::shared_ptr<Program> StandardDrawOp::prepareDecomposedProgram(
       return nullptr;
     }
   }
-  if (cache->dedicatedKernelsEnabled() && MatchPermutation(preparedProgramInfo.get()).has_value()) {
+  if (cache->dedicatedKernelsEnabled() && !isInlineRewriteDeferred() &&
+      MatchPermutation(preparedProgramInfo.get()).has_value()) {
     return nullptr;
   }
   // The coverage forms the chain carries are now semantically routed: geometric coverage (the

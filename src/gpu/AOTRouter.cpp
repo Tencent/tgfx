@@ -31,7 +31,17 @@ AOTRouteResult AOTRouter::Route(const std::vector<const FragmentProcessor*>& pro
       !AOTEffectDecomposer::Decompose(graph, &plan)) {
     return AOTRouteResult::NoPlan;
   }
-  return submit(graph, plan, producers) ? AOTRouteResult::Submitted : AOTRouteResult::TaskRefused;
+  auto passCount = plan.passes.size();
+  if (passCount == 1) {
+    auto kernel = plan.passes[0].kernel;
+    if (IsAOTPointwiseDAGKernel(kernel) || kernel == AOTKernelKind::PerlinNoiseFill) {
+    }
+  }
+  auto result =
+      submit(graph, plan, producers) ? AOTRouteResult::Submitted : AOTRouteResult::TaskRefused;
+  if (result == AOTRouteResult::Submitted) {
+  }
+  return result;
 }
 
 bool AOTRouter::PlanInlineRewrite(const std::vector<const FragmentProcessor*>& processors,
@@ -42,6 +52,20 @@ bool AOTRouter::PlanInlineRewrite(const std::vector<const FragmentProcessor*>& p
   }
   auto kernel = plan->passes[0].kernel;
   return IsAOTPointwiseDAGKernel(kernel) || kernel == AOTKernelKind::PerlinNoiseFill;
+}
+
+bool AOTRouter::PlanRequiresTask(const AOTEffectPlan& plan) {
+  if (plan.passes.size() != 1) {
+    return true;
+  }
+  auto kernel = plan.passes[0].kernel;
+  return !IsAOTPointwiseDAGKernel(kernel) && kernel != AOTKernelKind::PerlinNoiseFill;
+}
+
+bool AOTRouter::PlanIsInlineRewritable(const std::vector<const FragmentProcessor*>& processors) {
+  AOTEffectGraph graph = {};
+  AOTEffectPlan plan = {};
+  return PlanInlineRewrite(processors, &graph, &plan);
 }
 
 bool AOTRouter::RetryWarranted(const FragmentProcessor* leading, uint32_t renderFlags) {
@@ -77,6 +101,9 @@ AOTRouteResult AOTRouter::RouteWithMaterializedLeading(
   processors.insert(processors.end(), trailing.begin(), trailing.end());
   // The plan task rebuilds its processors from the lowered graph, so the rebuilt leading
   // processor is not needed once Route returns.
-  return Route(processors, submit, &recorder);
+  auto result = Route(processors, submit, &recorder);
+  if (result == AOTRouteResult::Submitted) {
+  }
+  return result;
 }
 }  // namespace tgfx

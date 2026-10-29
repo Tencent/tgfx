@@ -3563,8 +3563,12 @@ TGFX_TEST(AOTRenderConsistencyTest, PlanExecutionFailureIsRecordedNotFatal) {
     const char* position;
     int operatorCount;
   };
-  for (const auto& injection : {InjectionCase{"last", 2}, InjectionCase{"last", 63},
-                                InjectionCase{"first", 63}, InjectionCase{"middle", 63}}) {
+  // The single-pass (2-operator) injection case is gone: single-pass plans no longer run as plan
+  // tasks — the record-time entry defers them to the prepare-time inline rewrite, so there is no
+  // task whose execution could fail. Only the multi-pass (63-operator) plans still execute as
+  // tasks and exercise the failure path.
+  for (const auto& injection :
+       {InjectionCase{"last", 63}, InjectionCase{"first", 63}, InjectionCase{"middle", 63}}) {
     SCOPED_TRACE(injection.position);
     SCOPED_TRACE(injection.operatorCount);
     ASSERT_EQ(::setenv("TGFX_AOT_TEST_INJECT_PASS_FAILURE", injection.position, 1), 0);
