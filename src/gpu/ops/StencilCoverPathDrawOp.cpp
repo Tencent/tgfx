@@ -162,6 +162,17 @@ StencilCoverPathDrawOp::StencilCoverPathDrawOp(BlockAllocator* allocator,
 PathFillType StencilCoverPathDrawOp::resolveFillType() const {
   auto fillType = geometryProxy->getFillType();
   if (fillType.has_value()) {
+#if DEBUG
+    // The bit recording passed down and the rule the tessellator reported answer the same question
+    // from opposite ends of the pipeline. They are only ever both right, so a disagreement means one
+    // of the two derivations is wrong - and the stencil pass would then read the outline by a rule
+    // the cover pass disagrees with.
+    if (IsInverse(*fillType) != inverseFill) {
+      LOGE(
+          "StencilCoverPathDrawOp::resolveFillType() The inverse bit disagrees with the reported "
+          "fill rule.");
+    }
+#endif
     return *fillType;
   }
   // Nothing was reported, so nothing was drawn into the stencil buffer. An inverse fill covers the
@@ -293,6 +304,15 @@ void StencilCoverPathDrawOp::execute(RenderPass* renderPass, RenderTarget* rende
   }
   auto fillType = resolveFillType();
   if (stencilGPUBuffer != nullptr && stencilVertexCount > 0) {
+    if (!geometryProxy->getFillType().has_value()) {
+      // The fallback is only sound when the stencil pass does not run: an unreported rule means an
+      // outline that never became geometry, whose stencil buffer is still all zeroes. Drawing real
+      // geometry under a guessed rule fills the wrong pixels without anyone noticing, so it is
+      // reported instead of being silently absorbed.
+      LOGE(
+          "StencilCoverPathDrawOp::execute() Drawing geometry whose fill rule was never reported; "
+          "falling back to the default rule.");
+    }
     if (!bindStencilPipeline(renderPass, renderTarget, fillType)) {
       return;
     }

@@ -98,6 +98,43 @@ TGFX_TEST(StencilCoverPathTest, FillTypeSlotOutlivesProxies) {
   EXPECT_EQ(*second->getFillType(), PathFillType::EvenOdd);
 }
 
+// The other half of the lifetime rule: a slot describes one piece of geometry, so when that
+// geometry leaves the resource cache the slot has to go with it - otherwise a later draw would read
+// a rule for an outline that was tessellated again, possibly from a different shape.
+TGFX_TEST(StencilCoverPathTest, FillTypeSlotDroppedWithGeometry) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  Path path;
+  path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
+  path.addRect(Rect::MakeXYWH(20, 20, 60, 60));
+  path.setFillType(PathFillType::EvenOdd);
+  auto shape = Shape::MakeFrom(path);
+  auto provider = context->proxyProvider();
+
+  auto first = provider->createStencilCoverPathProxy(shape, 0);
+  ASSERT_TRUE(first != nullptr);
+  auto surface = Surface::Make(context, 32, 32);
+  ASSERT_TRUE(surface != nullptr);
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setColor(Color{1.f, 0.f, 0.f, 1.f});
+  surface->getCanvas()->drawRect(Rect::MakeWH(32, 32), paint);
+  context->flushAndSubmit();
+  ASSERT_TRUE(first->getFillType().has_value());
+
+  first = nullptr;
+  context->purgeResourcesUntilMemoryTo(0);
+  surface->getCanvas()->drawRect(Rect::MakeWH(32, 32), paint);
+  context->flushAndSubmit();
+
+  auto second = provider->createStencilCoverPathProxy(shape, 0);
+  ASSERT_TRUE(second != nullptr);
+  EXPECT_TRUE(second->getVertexBuffer() == nullptr) << "the geometry should have been purged";
+  EXPECT_FALSE(second->getFillType().has_value()) << "a slot outlived the geometry it describes";
+}
+
 // An outline that never became geometry leaves the stencil buffer at zero. An inverse fill covers
 // the whole cover quad in that case, so it has to keep reading against zero, while every other rule
 // covers nothing. The inverse-ness is the one bit recording passes down.
@@ -468,22 +505,25 @@ TGFX_TEST(StencilCoverPathTest, DrawOp_AllFillTypesProduceValidOpWithExpectedSte
 
   struct Case {
     PathFillType fillType;
+    bool inverseFill;
     uint32_t expectedRef;
     const char* name;
   };
   const Case cases[] = {
-      {PathFillType::Winding, 0, "Winding"},
-      {PathFillType::EvenOdd, 0xFF, "EvenOdd"},
-      {PathFillType::InverseWinding, 0, "InverseWinding"},
-      {PathFillType::InverseEvenOdd, 0, "InverseEvenOdd"},
+      {PathFillType::Winding, false, 0, "Winding"},
+      {PathFillType::EvenOdd, false, 0xFF, "EvenOdd"},
+      {PathFillType::InverseWinding, true, 0, "InverseWinding"},
+      {PathFillType::InverseEvenOdd, true, 0, "InverseEvenOdd"},
   };
   for (const auto& c : cases) {
     auto fillTypeSlot = std::make_shared<FillTypeSlot>();
     fillTypeSlot->set(c.fillType);
     auto caseProxy = std::make_shared<StencilCoverPathProxy>(vertexBufferProxy, fillTypeSlot);
+    // Recording's inverse bit and the reported rule have to agree; an op built from a combination
+    // that cannot occur would trip the op's own consistency check.
     auto op =
         StencilCoverPathDrawOp::Make(caseProxy, PMColor::Transparent(), Matrix::MakeTrans(10, 20),
-                                     Rect::MakeXYWH(10, 20, 100, 80), false);
+                                     Rect::MakeXYWH(10, 20, 100, 80), c.inverseFill);
     ASSERT_TRUE(op != nullptr) << c.name;
     EXPECT_TRUE(op->hasCoverage()) << c.name;
     EXPECT_TRUE(op->needsStencil()) << c.name;
