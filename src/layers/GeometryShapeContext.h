@@ -106,7 +106,10 @@ class GeometryShapeContext : public DrawContext, public Picture::AbortCallback {
       reject();
       return;
     }
-    addPath(shape->getPath(), matrix, std::move(shape));
+    // Read the path before the move: argument evaluation order is unspecified, and moving the shape
+    // first would leave the path being read from an empty pointer.
+    auto path = shape->getPath();
+    addPath(std::move(path), matrix, std::move(shape));
   }
 
   void drawMesh(std::shared_ptr<Mesh>, const Matrix&, const ClipStack&, const Brush&) override {
@@ -147,7 +150,9 @@ class GeometryShapeContext : public DrawContext, public Picture::AbortCallback {
       reject();
       return;
     }
-    addPath(shape->getPath(), matrix, std::move(shape));
+    // Read the path before the move, for the same reason as drawShape().
+    auto path = shape->getPath();
+    addPath(std::move(path), matrix, std::move(shape));
   }
 
   void drawPicture(std::shared_ptr<Picture> picture, const Matrix& matrix,
