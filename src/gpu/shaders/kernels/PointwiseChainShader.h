@@ -134,17 +134,16 @@ class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
   /// 5 = HairlineLine, 6 = ComplexEllipse fill, 7 = ComplexEllipse stroke); each profile fixes
   /// which attribute slots its vertex buffers carry, and Compose rejects profile-inconsistent
   /// combinations. The chain slot topology (ops, indices) is runtime data; only the leaf-count
-  /// class, the mask flag, the coverage-subtree flag, and the transfer type shape the shared
-  /// dimensions. TiledGraph adds a resource-kind value for its single gradient and three tiled
+  /// class, the mask flag, and the transfer type shape the shared dimensions. TiledGraph adds a
+  /// resource-kind value for its single gradient and three tiled
   /// recipes; NoiseGraph retains its fixed position-based, common-color AA quad subset.
   struct Inputs {
     int gpKind = 0;
-    bool hasCoverage = false;         // DefaultGP: AA coverage; quad/mesh: always true.
-    bool hasUVCoord = false;          // quad/mesh: texCoord slot; atlas: always true.
-    int textureCount = 0;             // domain value: 0 = leaf-free, 1 = four-leaf padded slots.
-    bool hasMask = false;             // device-space mask child present.
-    bool hasCoverageSubtree = false;  // chain coverage subtree present.
-    bool hasSubset = false;           // quad four-leaf chain: per-quad subset of a strict draw.
+    bool hasCoverage = false;  // DefaultGP: AA coverage; quad/mesh: always true.
+    bool hasUVCoord = false;   // quad/mesh: texCoord slot; atlas: always true.
+    int textureCount = 0;      // domain value: 0 = leaf-free, 1 = four-leaf padded slots.
+    bool hasMask = false;      // device-space mask child present.
+    bool hasSubset = false;    // quad four-leaf chain: per-quad subset of a strict draw.
     bool hasNoise = false;
     bool hasGradient = false;  // one gradient belongs to the extended TiledGraph profile.
     AOTResourceProfile resourceProfile = AOTResourceProfile::Automatic;

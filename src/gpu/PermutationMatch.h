@@ -58,9 +58,6 @@ enum class PermutationMatchFailure {
   NoMatchingFamily,
   /// The pipeline composed, but that combination is not in the enumerated variant set.
   PermutationNotEnumerated,
-  /// Building the AOT graph failed because a processor has no lowering (the default
-  /// FragmentProcessor::lowerToAOT).
-  MissingLowering,
 };
 
 /**

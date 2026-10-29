@@ -2200,10 +2200,9 @@ TGFX_TEST(AOTEffectTest, PointwiseResourceKindsAreIndependentAndBounded) {
     inputs.resourceProfile = AOTResourceProfile::Chain;
     EXPECT_FALSE(PointwiseChainShader::Compose(inputs).has_value());
     inputs.resourceProfile = AOTResourceProfile::NoiseGraph;
-    // The mask and coverage-subtree flags are runtime data: they never change the permutation.
+    // The mask flag is runtime data: it never changes the permutation.
     auto masked = inputs;
     masked.hasMask = true;
-    masked.hasCoverageSubtree = true;
     auto maskedValues = PointwiseChainShader::Compose(masked);
     ASSERT_TRUE(maskedValues.has_value());
     EXPECT_EQ(maskedValues->vertValues, composed->vertValues);
@@ -2224,7 +2223,6 @@ TGFX_TEST(AOTEffectTest, PointwiseResourceKindsAreIndependentAndBounded) {
         base.hasUVCoord = (flags & 2) != 0;
         base.textureCount = (flags & 4) != 0 ? 1 : 0;
         base.hasMask = (flags & 8) != 0;
-        base.hasCoverageSubtree = (flags & 16) != 0;
         base.xpType = xp;
         auto chainValues = PointwiseChainShader::Compose(base);
         auto tiled = base;

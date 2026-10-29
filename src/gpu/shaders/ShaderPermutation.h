@@ -41,7 +41,8 @@ namespace tgfx {
  * Canonical axes (new kernels may only use these):
  *
  *   Binding axes:
- *     TEXTURE_COUNT  (0/1/2/4)            each texture = one sampler binding + one coord varying
+ *     TEXTURE_COUNT  (0/4)                each texture = one sampler binding + one coord varying;
+ *                                         1-3 leaf chains ride the four-sampler slots as 4
  *     DST_KIND       (None/Texture/FBF)   dst-texture binding vs framebuffer-fetch attachment
  *     MASK_KIND      (None/DeviceTexture) a device mask is one sampler binding
  *
@@ -71,7 +72,10 @@ namespace tgfx {
  *   1. Does it change the number or type of sampler bindings?        -> dimension
  *   2. Does it change the attachment configuration?                  -> dimension
  *   3. Does it change the varying/attribute layout?                  -> dimension
- *   4. None of the above                                             -> runtime uniform
+ *   4. Must the compiled structure mirror the runtime emission exactly
+ *      (one branch exists, never both) to keep pixels identical?     -> dimension
+ *      (GlassRefractionShader's DISPERSION_ON is the precedent)
+ *   5. None of the above                                             -> runtime uniform
  */
 
 /**

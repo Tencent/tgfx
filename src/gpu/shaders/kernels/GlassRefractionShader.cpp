@@ -100,8 +100,10 @@ std::optional<GlassRefractionShader::Inputs> GlassRefractionShader::Extract(
   if (child == nullptr) {
     return std::nullopt;
   }
-  // The geometry child selects the compile-time dimension because it changes the sampler layout;
-  // the dispersion and lighting branches are runtime uniforms and need no dimension.
+  // The geometry child selects the compile-time dimension because it changes the sampler layout.
+  // Dispersion is a compile-time branch too: the runtime emission compiles one path or the other
+  // and never both, so the precompiled variant must mirror that structure exactly to keep pixels
+  // identical (see glass_refraction.frag). Lighting stays a runtime uniform.
   int geometryKind = -1;
   if (IsProcessor<GlassSDFGeometryFragmentProcessor>(child)) {
     auto* sdf = static_cast<const GlassSDFGeometryFragmentProcessor*>(child);

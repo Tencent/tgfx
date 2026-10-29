@@ -54,6 +54,16 @@ class AOTPlanRenderTask : public RenderTask {
   void execute(CommandEncoder* encoder) override;
 
  private:
+  // Test-only fault injection (diagnostics contract): which pass of a plan task fails its
+  // render-pass setup during execution — the first producer pass, a later producer pass, or the
+  // terminal pass onto the destination. Production never sets it, so the environment cannot steer
+  // a release build; the tests that steer it access the member directly.
+  enum class InjectedPassFailure { None, FirstProducer, MiddleProducer, Terminal };
+
+  static InjectedPassFailure injectedPassFailure;
+
+  static bool ShouldInjectFailure(bool isFirstProducer, bool isTerminal);
+
   AOTRenderPlan plan = {};
   std::shared_ptr<RenderTargetProxy> destination = nullptr;
   PlacementPtr<DrawOp> originalDraw = nullptr;

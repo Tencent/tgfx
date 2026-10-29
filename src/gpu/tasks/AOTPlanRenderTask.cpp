@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AOTPlanRenderTask.h"
-#include <cstdlib>
-#include <string>
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ops/StandardDrawOp.h"
 #include "gpu/resources/RenderTarget.h"
@@ -26,24 +24,25 @@
 
 namespace tgfx {
 
-// Fault injection (diagnostics contract): TGFX_AOT_TEST_INJECT_PASS_FAILURE selects which pass of
-// a plan task fails its render-pass setup during execution: "first" (the first producer pass),
-// "middle" (a later producer pass) or "last" (the terminal pass onto the destination). The
-// task must stop after the failure, record the execution-failure diagnostic, and not crash.
-// Test-only.
-static bool InjectFailureAt(bool isFirstProducer, bool isTerminal) {
-  const char* mode = std::getenv("TGFX_AOT_TEST_INJECT_PASS_FAILURE");
-  if (mode == nullptr) {
-    return false;
+// Fault injection (diagnostics contract): the tests select which pass of a plan task fails its
+// render-pass setup during execution — the first producer pass, a later producer pass, or the
+// terminal pass onto the destination. The task must stop after the failure, record the
+// execution-failure diagnostic, and not crash. Test-only: production never sets the hook.
+AOTPlanRenderTask::InjectedPassFailure AOTPlanRenderTask::injectedPassFailure =
+    AOTPlanRenderTask::InjectedPassFailure::None;
+
+bool AOTPlanRenderTask::ShouldInjectFailure(bool isFirstProducer, bool isTerminal) {
+  switch (injectedPassFailure) {
+    case InjectedPassFailure::FirstProducer:
+      return isFirstProducer && !isTerminal;
+    case InjectedPassFailure::MiddleProducer:
+      return !isFirstProducer && !isTerminal;
+    case InjectedPassFailure::Terminal:
+      return isTerminal;
+    case InjectedPassFailure::None:
+      break;
   }
-  std::string value = mode;
-  if (value == "first") {
-    return isFirstProducer && !isTerminal;
-  }
-  if (value == "middle") {
-    return !isFirstProducer && !isTerminal;
-  }
-  return value == "last" && isTerminal;
+  return false;
 }
 
 static bool ExecutePreparedPass(CommandEncoder* encoder, RenderTarget* renderTarget,
@@ -121,7 +120,7 @@ void AOTPlanRenderTask::execute(CommandEncoder* encoder) {
   };
   // Passes run in plan order, which places every producer before the passes that sample it.
   for (size_t index = 0; index < plan.passes.size(); ++index) {
-    if (InjectFailureAt(index == 0, false)) {
+    if (ShouldInjectFailure(index == 0, false)) {
       LOGE("AOTPlanRenderTask::execute() Injected pass failure at producer pass %zu", index);
       recordExecutionFailure();
       return;
@@ -134,7 +133,7 @@ void AOTPlanRenderTask::execute(CommandEncoder* encoder) {
       return;
     }
   }
-  if (InjectFailureAt(plan.passes.empty(), true)) {
+  if (ShouldInjectFailure(plan.passes.empty(), true)) {
     LOGE("AOTPlanRenderTask::execute() Injected pass failure at the terminal pass");
     recordExecutionFailure();
     return;

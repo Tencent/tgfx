@@ -539,8 +539,6 @@ const char* PermutationMatchFailureName(PermutationMatchFailure failure) {
       return "NoMatchingFamily";
     case PermutationMatchFailure::PermutationNotEnumerated:
       return "PermutationNotEnumerated";
-    case PermutationMatchFailure::MissingLowering:
-      return "MissingLowering";
   }
   return "Unknown";
 }

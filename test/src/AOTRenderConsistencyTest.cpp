@@ -49,6 +49,7 @@
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/resources/DefaultTextureView.h"
 #include "gpu/shaders/kernels/PointwiseChainShader.h"
+#include "gpu/tasks/AOTPlanRenderTask.h"
 #include "gtest/gtest.h"
 #include "layers/NoiseDensityUtils.h"
 #include "layers/layerstyles/GlassUDF.h"
@@ -3560,7 +3561,7 @@ TGFX_TEST(AOTRenderConsistencyTest, PlanExecutionFailureIsRecordedNotFatal) {
     return stats;
   };
   struct InjectionCase {
-    const char* position;
+    AOTPlanRenderTask::InjectedPassFailure position;
     int operatorCount;
   };
   // The single-pass (2-operator) injection case is gone: single-pass plans no longer run as plan
@@ -3568,12 +3569,14 @@ TGFX_TEST(AOTRenderConsistencyTest, PlanExecutionFailureIsRecordedNotFatal) {
   // task whose execution could fail. Only the multi-pass (63-operator) plans still execute as
   // tasks and exercise the failure path.
   for (const auto& injection :
-       {InjectionCase{"last", 63}, InjectionCase{"first", 63}, InjectionCase{"middle", 63}}) {
-    SCOPED_TRACE(injection.position);
+       {InjectionCase{AOTPlanRenderTask::InjectedPassFailure::Terminal, 63},
+        InjectionCase{AOTPlanRenderTask::InjectedPassFailure::FirstProducer, 63},
+        InjectionCase{AOTPlanRenderTask::InjectedPassFailure::MiddleProducer, 63}}) {
+    SCOPED_TRACE(static_cast<int>(injection.position));
     SCOPED_TRACE(injection.operatorCount);
-    ASSERT_EQ(::setenv("TGFX_AOT_TEST_INJECT_PASS_FAILURE", injection.position, 1), 0);
+    AOTPlanRenderTask::injectedPassFailure = injection.position;
     auto stats = renderPlan(injection.operatorCount);
-    ::unsetenv("TGFX_AOT_TEST_INJECT_PASS_FAILURE");
+    AOTPlanRenderTask::injectedPassFailure = AOTPlanRenderTask::InjectedPassFailure::None;
     // The failure is observable: counted, and the draw never lands as complete.
     EXPECT_GE(stats.planExecutionFailures, 1u);
     EXPECT_EQ(stats.completeAOTDraws, 0u);
@@ -4621,10 +4624,10 @@ TGFX_TEST(AOTRenderConsistencyTest, MaterializationRetryProducersShareConsumerTa
   paint.setShader(Shader::MakeBlend(BlendMode::Multiply, gradientA, gradientB));
   cache->setDiagnosticRecordingEnabled(true);
   cache->resetStats();
-  ASSERT_EQ(::setenv("TGFX_AOT_TEST_INJECT_PASS_FAILURE", "first", 1), 0);
+  AOTPlanRenderTask::injectedPassFailure = AOTPlanRenderTask::InjectedPassFailure::FirstProducer;
   surface->getCanvas()->drawRect(Rect::MakeWH(size, size), paint);
   context->flushAndSubmit(true);
-  ::unsetenv("TGFX_AOT_TEST_INJECT_PASS_FAILURE");
+  AOTPlanRenderTask::injectedPassFailure = AOTPlanRenderTask::InjectedPassFailure::None;
   auto stats = cache->drawStats();
   cache->setDiagnosticRecordingEnabled(false);
   EXPECT_EQ(stats.planExecutionFailures, 1u);

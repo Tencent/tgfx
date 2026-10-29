@@ -24,6 +24,7 @@
 #include <cstring>
 #include <iomanip>
 #include <sstream>
+#include <vector>
 #include "core/utils/Log.h"
 #include "gpu/AOTEffectDecomposer.h"
 #include "gpu/GlobalCache.h"
@@ -203,7 +204,6 @@ static PrecompiledFallbackReason ToFallbackReason(PermutationMatchFailure failur
     case PermutationMatchFailure::CoverageShape:
     case PermutationMatchFailure::NoMatchingFamily:
     case PermutationMatchFailure::PermutationNotEnumerated:
-    case PermutationMatchFailure::MissingLowering:
       return PrecompiledFallbackReason::NoMatchingRule;
     case PermutationMatchFailure::None:
       return PrecompiledFallbackReason::Unspecified;
@@ -348,41 +348,66 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
 
   // TGFX_AOT_DENY holds a comma-separated list of shader names whose precompiled match is
   // rejected so the draw falls back to the runtime JIT program. Diagnostic only: it isolates a
-  // single kernel family in A/B pixel diffs. Read once per process.
-  static const char* deniedShaders = std::getenv("TGFX_AOT_DENY");
-  if (deniedShaders != nullptr) {
-    std::string name = matchResult->shaderName;
-    size_t begin = 0;
-    while (begin <= std::string(deniedShaders).size()) {
-      auto end = std::string(deniedShaders).find(',', begin);
-      auto token = std::string(deniedShaders).substr(begin, end - begin);
-      // A token of the form "name:vert:frag" additionally pins the permutation indices, so a
-      // single variant of a kernel family can be isolated; a bare "name" denies the whole family.
-      auto sep = token.find(':');
-      bool matched = false;
-      if (sep != std::string::npos) {
-        auto sep2 = token.find(':', sep + 1);
-        if (sep2 != std::string::npos) {
-          int vertIndex = 0;
-          int fragIndex = 0;
-          matched = token.substr(0, sep) == name &&
-                    ParseInt(token.substr(sep + 1, sep2 - sep - 1), &vertIndex) &&
-                    vertIndex == static_cast<int>(matchResult->vertPermutationIndex) &&
-                    ParseInt(token.substr(sep2 + 1), &fragIndex) &&
-                    fragIndex == static_cast<int>(matchResult->fragPermutationIndex);
+  // single kernel family in A/B pixel diffs. Parsed once per process: a token of the form
+  // "name:vert:frag" additionally pins the permutation indices, so a single variant of a kernel
+  // family can be isolated; a bare "name" denies the whole family; anything malformed never
+  // matches.
+  struct DenyToken {
+    std::string name;
+    bool pinned = false;
+    uint32_t vertIndex = 0;
+    uint32_t fragIndex = 0;
+  };
+  struct DenyList {
+    std::vector<DenyToken> tokens;
+    DenyList() {
+      const char* value = std::getenv("TGFX_AOT_DENY");
+      if (value == nullptr) {
+        return;
+      }
+      const std::string list(value);
+      size_t begin = 0;
+      while (begin <= list.size()) {
+        const size_t end = list.find(',', begin);
+        const std::string token =
+            list.substr(begin, end == std::string::npos ? list.size() - begin : end - begin);
+        begin = end == std::string::npos ? list.size() + 1 : end + 1;
+        if (token.empty()) {
+          continue;
         }
-      } else {
-        matched = token == name;
+        const size_t sep = token.find(':');
+        if (sep == std::string::npos) {
+          tokens.push_back(DenyToken{token, false, 0, 0});
+          continue;
+        }
+        const size_t sep2 = token.find(':', sep + 1);
+        if (sep2 == std::string::npos) {
+          continue;
+        }
+        DenyToken parsed = {};
+        parsed.name = token.substr(0, sep);
+        int vertIndex = 0;
+        int fragIndex = 0;
+        if (!ParseInt(token.substr(sep + 1, sep2 - sep - 1), &vertIndex) ||
+            !ParseInt(token.substr(sep2 + 1), &fragIndex)) {
+          continue;
+        }
+        parsed.pinned = true;
+        parsed.vertIndex = static_cast<uint32_t>(vertIndex);
+        parsed.fragIndex = static_cast<uint32_t>(fragIndex);
+        tokens.push_back(std::move(parsed));
       }
-      if (matched) {
-        cache->recordArtifactMiss(PrecompiledFallbackReason::Unspecified,
-                                  MakeFallbackRecord(cache, programInfo, &*matchResult));
-        return nullptr;
-      }
-      if (end == std::string::npos) {
-        break;
-      }
-      begin = end + 1;
+    }
+  };
+  static const DenyList denied;
+  for (const auto& token : denied.tokens) {
+    const bool matched = token.name == matchResult->shaderName &&
+                         (!token.pinned || (token.vertIndex == matchResult->vertPermutationIndex &&
+                                            token.fragIndex == matchResult->fragPermutationIndex));
+    if (matched) {
+      cache->recordArtifactMiss(PrecompiledFallbackReason::Unspecified,
+                                MakeFallbackRecord(cache, programInfo, &*matchResult));
+      return nullptr;
     }
   }
 
@@ -440,19 +465,30 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
         {std::string(FragmentUniformBlockName), static_cast<unsigned>(FRAGMENT_UBO_BINDING_POINT)}};
   }
 
-  if (const char* dumpDir = getenv("TGFX_AOT_DUMP_DIR")) {
+  static const char* dumpDir = std::getenv("TGFX_AOT_DUMP_DIR");
+  if (dumpDir != nullptr) {
     std::string base = std::string(dumpDir) + "/" + matchResult->shaderName + "_v" +
                        std::to_string(matchResult->vertPermutationIndex) + "_f" +
                        std::to_string(matchResult->fragPermutationIndex);
     if (!vertexDesc.code.empty()) {
-      FILE* f = fopen((base + ".vert").c_str(), "w");
-      fwrite(vertexDesc.code.data(), 1, vertexDesc.code.size(), f);
-      fclose(f);
+      std::string path = base + ".vert";
+      FILE* file = fopen(path.c_str(), "w");
+      if (file == nullptr) {
+        LOGE("PrecompiledProgramCreator::CreateProgram() Cannot open dump file %s", path.c_str());
+      } else {
+        fwrite(vertexDesc.code.data(), 1, vertexDesc.code.size(), file);
+        fclose(file);
+      }
     }
     if (!fragmentDesc.code.empty()) {
-      FILE* f = fopen((base + ".frag").c_str(), "w");
-      fwrite(fragmentDesc.code.data(), 1, fragmentDesc.code.size(), f);
-      fclose(f);
+      std::string path = base + ".frag";
+      FILE* file = fopen(path.c_str(), "w");
+      if (file == nullptr) {
+        LOGE("PrecompiledProgramCreator::CreateProgram() Cannot open dump file %s", path.c_str());
+      } else {
+        fwrite(fragmentDesc.code.data(), 1, fragmentDesc.code.size(), file);
+        fclose(file);
+      }
     }
   }
 

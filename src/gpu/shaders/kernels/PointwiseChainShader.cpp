@@ -108,7 +108,6 @@ std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::Extract(
   inputs.gpKind = gpKind;
   inputs.textureCount = leafCount == 0 ? 0 : 1;
   inputs.hasMask = chain->hasMask();
-  inputs.hasCoverageSubtree = chain->coverageRoot() >= 0;
   inputs.hasNoise = chain->hasNoise();
   inputs.hasGradient = gradientCount != 0;
   inputs.resourceProfile = chain->resourceProfile();
