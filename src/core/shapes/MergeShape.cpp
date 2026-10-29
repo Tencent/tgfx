@@ -95,7 +95,12 @@ Rect MergeShape::onGetBounds() const {
 Path MergeShape::onGetPath(float resolutionScale) const {
   auto path = first->onGetPath(resolutionScale);
   auto secondPath = second->onGetPath(resolutionScale);
-  if (!path.addPath(secondPath, pathOp)) {
+  // fillType() decides a union from the bounds the two shapes report, and those bounds may be larger
+  // than the outlines they contain - a text run reports its em box, whose neighbours nearly always
+  // overlap while the glyph outlines do not. Deciding here from the tighter outline bounds would
+  // concatenate where fillType() promised a boolean result, leaving the shape reporting one rule and
+  // handing out an outline read by another, so the same bounds decide it in both places.
+  if (!path.addPath(secondPath, pathOp, first->getBounds(), second->getBounds())) {
     // A failed operation leaves the first operand behind, which is not the merge that was asked
     // for: reading it as the result would draw one side of the operation as if it were both. An
     // empty path is the only answer that is wrong in a visible way rather than a silent one, and

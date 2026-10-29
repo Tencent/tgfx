@@ -386,6 +386,22 @@ class Path {
   bool addPath(const Path& src, PathOp op = PathOp::Append);
 
   /**
+   * Adds a src to this Path, deciding a union's fast path from bounds supplied by the caller instead
+   * of the outlines' own bounds. A caller whose bounds only contain the outlines - Shape::getBounds()
+   * may be larger than the shape - needs the decision made here and the decision it reports about the
+   * result to come from the same bounds, otherwise the two can disagree and the result is read by a
+   * rule its outlines were not written for.
+   * @param src the Path to combine with this one.
+   * @param op how to combine them. Append and Extend concatenate the outlines; the rest combine the
+   * filled areas the two paths describe.
+   * @param bounds bounds known to contain this Path's outlines.
+   * @param srcBounds bounds known to contain src's outlines.
+   * @return false if the combination failed, in which case this Path is unchanged. Append and
+   * Extend always succeed, and a true result can still drop contours that could not be resolved.
+   */
+  bool addPath(const Path& src, PathOp op, const Rect& bounds, const Rect& srcBounds);
+
+  /**
    * Returns true if the union of two filled areas is the concatenation of their outlines, which
    * holds when they cannot overlap: they share one fill rule, neither fills the whole plane, and
    * their bounds do not intersect. Both Path::addPath() and the shape that merges two sources use

@@ -531,6 +531,44 @@ TGFX_TEST(PathShapeTest, IsInverseFillTypeIsAnsweredOnce) {
   EXPECT_EQ(calls, 1);
 }
 
+// A PathProvider is allowed to report bounds that only contain its outlines - that is what a text
+// run does with its em box. Two such shapes whose reported bounds overlap but whose outlines sit
+// apart are the case where a union has to be resolved: deciding the fast path from the tighter
+// outline bounds would concatenate them and hand out an outline carrying a rule the shape does not
+// report.
+class LooseBoundsProvider final : public PathProvider {
+ public:
+  LooseBoundsProvider(const Rect& outline, const Rect& bounds) : outline(outline), bounds(bounds) {
+  }
+
+  Path getPath() const override {
+    Path path = {};
+    path.addRect(outline);
+    return path;
+  }
+
+  Rect getBounds() const override {
+    return bounds;
+  }
+
+ private:
+  Rect outline = {};
+  Rect bounds = {};
+};
+
+TGFX_TEST(PathShapeTest, MergedUnionWithOverlappingBoundsIsResolved) {
+  auto first = Shape::MakeFrom(std::make_shared<LooseBoundsProvider>(
+      Rect::MakeXYWH(0, 0, 10, 10), Rect::MakeXYWH(-50, -50, 120, 120)));
+  auto second = Shape::MakeFrom(std::make_shared<LooseBoundsProvider>(
+      Rect::MakeXYWH(50, 0, 10, 10), Rect::MakeXYWH(-50, -50, 120, 120)));
+  auto merged = Shape::Merge(first, second, PathOp::Union);
+  ASSERT_TRUE(merged != nullptr);
+  EXPECT_EQ(merged->fillType(), PathFillType::EvenOdd);
+  EXPECT_EQ(merged->getPath().getFillType(), PathFillType::EvenOdd);
+  // The union still covers both outlines: resolving the areas must not drop either of them.
+  EXPECT_EQ(merged->getPath().getBounds(), Rect::MakeXYWH(0, 0, 60, 10));
+}
+
 static void ExpectRuleMatchesOutline(const std::shared_ptr<Shape>& shape, const char* name) {
   // Only MergeShape and AppendShape can drift: every other shape answers fillType() from the very
   // path it hands out. These two derive the rule without building the path, so the rule they report

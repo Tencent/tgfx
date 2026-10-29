@@ -538,16 +538,20 @@ bool Path::UnionsByConcatenation(PathFillType firstFillType, const Rect& firstBo
 }
 
 bool Path::addPath(const Path& src, PathOp op) {
+  // The bounds are read before the destination is made writable, which drops its cached bounds:
+  // reading them after that would leave the cache holding the bounds from before the merge.
+  return addPath(src, op, getBounds(), src.getBounds());
+}
+
+bool Path::addPath(const Path& src, PathOp op, const Rect& bounds, const Rect& srcBounds) {
   // Two areas whose bounds cannot meet have nothing to resolve, so their union is the concatenation
   // of their outlines, and the rule both already agree on is the rule the result is read by. Proving
   // the same for outlines whose bounds do meet costs a boolean operation per candidate pair, which
   // is what the batch entry pays for and this one must not: mask accumulation unions one path at a
   // time into a growing one, so nearly every union there does overlap and would pay that twice.
-  // The bounds are read before the destination is made writable, which drops its cached bounds:
-  // reading them after that would leave the cache holding the bounds from before the merge.
   auto unionConcatenates =
       op == PathOp::Union &&
-      Path::UnionsByConcatenation(getFillType(), getBounds(), src.getFillType(), src.getBounds());
+      Path::UnionsByConcatenation(getFillType(), bounds, src.getFillType(), srcBounds);
   auto& path = writableRef()->path;
   const auto& newPath = src.pathRef->path;
   if (op == PathOp::Append || op == PathOp::Extend) {

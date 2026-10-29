@@ -549,8 +549,11 @@ TGFX_TEST(TypefaceTest, UnionDoesNotPreserveContourEffectInputs) {
   second.addRect(Rect::MakeLTRB(200.0f, 0.0f, 500.0f, 300.0f));
   auto ordered = first;
   ASSERT_TRUE(ordered.addPath(second));
-  Path united = {};
-  ASSERT_TRUE(united.addPath(ordered, PathOp::Union));
+  // The union has to be resolved for the comparisons below to say anything about contour effects:
+  // an empty destination takes the operand over unchanged, contours and all, and a union that keeps
+  // them is not what this test is about.
+  Path united = first;
+  ASSERT_TRUE(united.addPath(second, PathOp::Union));
   EXPECT_EQ(united.getFillType(), PathFillType::EvenOdd);
   EXPECT_FLOAT_EQ(DiagnosticLength(ordered), 2400.0f);
   EXPECT_FLOAT_EQ(DiagnosticLength(united), 1600.0f);
@@ -608,7 +611,10 @@ TGFX_TEST(TypefaceTest, FilledAreaEquivalenceDoesNotPreserveTextPathEffects) {
   auto glyphs = DiagnosticGlyphs("Trim", 48.0f, true, "resources/font/NotoSansSC-Regular.otf");
   ASSERT_FALSE(glyphs.empty());
   auto ordered = DiagnosticOldMerge(glyphs);
-  Path united = {};
+  // Same reason as in UnionDoesNotPreserveContourEffectInputs: the destination has to overlap what
+  // is being unioned, otherwise the operand is taken over unchanged and there is no resolved outline
+  // to compare the ordered one against.
+  Path united = glyphs.front();
   ASSERT_TRUE(united.addPath(ordered, PathOp::Union));
   EXPECT_EQ(united.getFillType(), PathFillType::EvenOdd);
   auto difference = ordered;
