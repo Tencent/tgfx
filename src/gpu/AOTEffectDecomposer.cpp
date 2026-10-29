@@ -20,6 +20,7 @@
 #include <algorithm>
 #include "gpu/AOTChainBuilder.h"
 #include "gpu/AOTPlanExecutor.h"
+#include "gpu/AOTShapeRules.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
@@ -105,28 +106,9 @@ bool AOTEffectDecomposer::Lower(const std::vector<const FragmentProcessor*>& pro
   return true;
 }
 
-// The source of a multi-pass linear plan: an affine RGBA texture fed by the geometry color, sampled
-// plainly or in device space.
-static bool IsLinearMultiPassSource(const AOTEffectNode* node) {
-  if (node == nullptr || node->kind != AOTEffectKind::TextureSource || node->inputs.size() != 1 ||
-      node->inputs[0] != AOTNodeID(0)) {
-    return false;
-  }
-  auto parameters = std::get_if<AOTTextureParameters>(&node->parameters);
-  if (parameters == nullptr || parameters->isYUV || parameters->isAlphaOnly ||
-      parameters->hasRGBAAA || parameters->hasPerspective) {
-    return false;
-  }
-  return parameters->samplingKind == AOTTextureSamplingKind::Plain ||
-         parameters->samplingKind == AOTTextureSamplingKind::Device;
-}
-
-static bool IsUnaryPointwiseOp(const AOTEffectNode* node) {
-  return node != nullptr && node->inputs.size() == 1 &&
-         (node->kind == AOTEffectKind::ColorMatrix || node->kind == AOTEffectKind::Luma ||
-          node->kind == AOTEffectKind::AlphaThreshold ||
-          node->kind == AOTEffectKind::ColorSpaceXform);
-}
+// The multi-pass source, the unary pointwise set, the perlin/YUV source shapes and the
+// const-operand blend are shared shape rules (gpu/AOTShapeRules.h) — the same authority the
+// executor's admission checks and the chain builder consume.
 
 // Whether a multi-pass plan may start a new pass at this node. A pass boundary stores the previous
 // pass's output in an RGBA8 target, rounding it to the 1/255 grid. Most operators move by at most
@@ -150,12 +132,12 @@ static bool DecomposeLinearMultiPass(const AOTEffectGraph& graph, AOTEffectPlan*
   }
   auto geometryNode = graph.nodeAt(AOTNodeID(0));
   if (geometryNode == nullptr || geometryNode->kind != AOTEffectKind::GeometryColor ||
-      !IsLinearMultiPassSource(graph.nodeAt(AOTNodeID(1)))) {
+      !IsLinearMultiPassSource(graph, AOTNodeID(1))) {
     return false;
   }
   for (uint32_t index = 2; index < graph.nodeCount(); ++index) {
     auto node = graph.nodeAt(AOTNodeID(index));
-    if (!IsUnaryPointwiseOp(node) || node->inputs[0] != AOTNodeID(index - 1)) {
+    if (!IsUnaryPointwiseOp(node, AOTNodeID(index - 1))) {
       return false;
     }
   }
@@ -221,11 +203,6 @@ static bool DecomposeLinearMultiPass(const AOTEffectGraph& graph, AOTEffectPlan*
   return true;
 }
 
-static bool IsPerlinNoiseSource(const AOTEffectNode* node) {
-  return node != nullptr && node->kind == AOTEffectKind::PerlinNoiseSource &&
-         node->inputs.size() == 1 && node->inputs[0] == AOTNodeID(0);
-}
-
 // Planner for a procedural-noise source: GeometryColor -> PerlinNoiseSource -> [0..3 unary
 // pointwise ops]. PerlinNoiseFillShader carries three pointwise slots (a base OpType record
 // shared with a composed operator FP and two processor-owned records), so up to three operators
@@ -242,7 +219,7 @@ static bool DecomposePerlinNoiseChain(const AOTEffectGraph& graph, AOTEffectPlan
   }
   auto geometryNode = graph.nodeAt(AOTNodeID(0));
   if (geometryNode == nullptr || geometryNode->kind != AOTEffectKind::GeometryColor ||
-      !IsPerlinNoiseSource(graph.nodeAt(AOTNodeID(1)))) {
+      !IsPerlinNoiseSource(graph, AOTNodeID(1))) {
     return false;
   }
   std::vector<AOTNodeID> passNodes = {AOTNodeID(1)};
@@ -263,7 +240,7 @@ static bool DecomposePerlinNoiseChain(const AOTEffectGraph& graph, AOTEffectPlan
     if (slotCount >= MaxPointwiseSlots) {
       return false;
     }
-    if (IsUnaryPointwiseOp(node) && node->inputs.size() == 1 && node->inputs[0] == prev) {
+    if (IsUnaryPointwiseOp(node, prev)) {
       passNodes.push_back(AOTNodeID(index));
       ++slotCount;
       prev = AOTNodeID(index);
@@ -275,15 +252,10 @@ static bool DecomposePerlinNoiseChain(const AOTEffectGraph& graph, AOTEffectPlan
       if (next != nullptr && next->kind == AOTEffectKind::Blend && next->inputs.size() == 2 &&
           ((next->inputs[0] == AOTNodeID(index) && next->inputs[1] == prev) ||
            (next->inputs[1] == AOTNodeID(index) && next->inputs[0] == prev))) {
-        auto blendParams = std::get_if<AOTBlendParameters>(&next->parameters);
-        // A two-child blend needs both operands evaluated, which a single const-operand slot
-        // cannot express.
-        if (blendParams == nullptr || blendParams->childType == 2) {
-          return false;
-        }
-        // The OP_BLEND slot reads the constant straight from its uniform record, so the operand
-        // must not depend on its own input edge.
-        if (!AOTConstColorIsInputIndependent(graph, node)) {
+        // The shared const-operand rule plus the adjacency this planner needs: the constant is
+        // the node right before the blend (the slot's uniform record reads it from the blend's
+        // input edge). An inexpressible pair rejects the chain here, not at the executor.
+        if (!IsConstOperandBlend(graph, next, prev)) {
           return false;
         }
         passNodes.push_back(AOTNodeID(index + 1));
@@ -329,28 +301,19 @@ static bool DecomposeYUVChain(const AOTEffectGraph& graph, AOTEffectPlan* plan) 
     return false;
   }
   auto geometryNode = graph.nodeAt(AOTNodeID(0));
-  if (geometryNode == nullptr || geometryNode->kind != AOTEffectKind::GeometryColor) {
-    return false;
-  }
-  auto sourceNode = graph.nodeAt(AOTNodeID(1));
-  if (sourceNode == nullptr || sourceNode->kind != AOTEffectKind::TextureSource ||
-      sourceNode->inputs.size() != 1 || sourceNode->inputs[0] != AOTNodeID(0)) {
-    return false;
-  }
-  auto parameters = std::get_if<AOTTextureParameters>(&sourceNode->parameters);
-  if (parameters == nullptr || !parameters->isYUV || parameters->hasRGBAAA ||
-      parameters->samplingKind != AOTTextureSamplingKind::Plain) {
+  if (geometryNode == nullptr || geometryNode->kind != AOTEffectKind::GeometryColor ||
+      !IsYUVChainSource(graph, AOTNodeID(1))) {
     return false;
   }
   AOTNodeID prev = AOTNodeID(1);
   for (uint32_t index = 2; index < graph.nodeCount(); ++index) {
     auto node = graph.nodeAt(AOTNodeID(index));
-    if (!IsUnaryPointwiseOp(node) || node->inputs[0] != prev) {
+    if (!IsUnaryPointwiseOp(node, prev)) {
       return false;
     }
     prev = AOTNodeID(index);
   }
-  if (graph.nodeCount() - 2 > 3) {
+  if (graph.nodeCount() - 2 > MaxPointwiseSlots) {
     return false;
   }
   AOTEffectPlan result = {};

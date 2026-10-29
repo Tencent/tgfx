@@ -20,6 +20,7 @@
 #include <utility>
 #include <vector>
 #include "gpu/AOTChainRegisterAllocator.h"
+#include "gpu/AOTShapeRules.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AOTYUVChainProcessor.h"
@@ -482,10 +483,7 @@ static bool HasComputedTextureInput(const ChainBuildContext* ctx, size_t combine
     return false;
   }
   auto* inputNode = ctx->nodes[inputIndex];
-  return inputNode->kind != AOTEffectKind::GeometryColor &&
-         inputNode->kind != AOTEffectKind::GeometryColorOpaqueInput &&
-         inputNode->kind != AOTEffectKind::GeometryWhiteInput &&
-         inputNode->kind != AOTEffectKind::GeometryCoverage;
+  return !IsInputDesignator(inputNode->kind);
 }
 
 static void CollectChainNode(ChainBuildContext* ctx, size_t combined, bool texturePhase) {

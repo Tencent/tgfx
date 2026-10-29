@@ -5,6 +5,7 @@
 #include "gpu/AOTChainBuilder.h"
 #include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/AOTMaterializationRecorder.h"
+#include "gpu/AOTShapeRules.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ops/StandardDrawOp.h"
@@ -17,40 +18,18 @@
 namespace tgfx {
 namespace {
 
-static bool ValidateLinearSource(const AOTEffectGraph& graph, AOTNodeID nodeID) {
-  auto node = graph.nodeAt(nodeID);
-  if (node == nullptr || node->kind != AOTEffectKind::TextureSource || node->inputs.size() != 1) {
-    return false;
-  }
-  auto parameters = std::get_if<AOTTextureParameters>(&node->parameters);
-  auto input = graph.nodeAt(node->inputs[0]);
-  return parameters != nullptr && input != nullptr && input->kind == AOTEffectKind::GeometryColor &&
-         (parameters->samplingKind == AOTTextureSamplingKind::Plain ||
-          parameters->samplingKind == AOTTextureSamplingKind::Device) &&
-         !parameters->isYUV && !parameters->isAlphaOnly && !parameters->hasRGBAAA &&
-         !parameters->hasPerspective;
-}
+// The linear source, the unary pointwise set, the perlin/YUV source shapes and the const-operand
+// blend are shared shape rules (gpu/AOTShapeRules.h) — the same authority the planners and the
+// chain builder consume, so the admission checks below cannot drift from them.
 
-static bool ValidateUnaryPointwiseOp(const AOTEffectGraph& graph, AOTNodeID nodeID,
-                                     AOTNodeID expectedInput) {
+// A perlin pass's source must also carry resolvable lookup tables: the shape rule admits the
+// node, the kernel still needs the two views at bind time.
+static bool HasValidNoiseViews(const AOTEffectGraph& graph, AOTNodeID nodeID) {
   auto node = graph.nodeAt(nodeID);
-  return node != nullptr && node->inputs.size() == 1 && node->inputs[0] == expectedInput &&
-         (node->kind == AOTEffectKind::ColorMatrix || node->kind == AOTEffectKind::Luma ||
-          node->kind == AOTEffectKind::AlphaThreshold ||
-          node->kind == AOTEffectKind::ColorSpaceXform);
-}
-
-static bool ValidatePerlinNoiseSource(const AOTEffectGraph& graph, AOTNodeID nodeID) {
-  auto node = graph.nodeAt(nodeID);
-  if (node == nullptr || node->kind != AOTEffectKind::PerlinNoiseSource ||
-      node->inputs.size() != 1) {
-    return false;
-  }
-  auto parameters = std::get_if<AOTPerlinNoiseParameters>(&node->parameters);
-  auto input = graph.nodeAt(node->inputs[0]);
+  auto parameters =
+      node != nullptr ? std::get_if<AOTPerlinNoiseParameters>(&node->parameters) : nullptr;
   return parameters != nullptr && parameters->permutationsView != nullptr &&
-         parameters->noiseView != nullptr && input != nullptr &&
-         input->kind == AOTEffectKind::GeometryColor;
+         parameters->noiseView != nullptr;
 }
 
 // The operator slots after a linear pass's source: unary pointwise ops chained in order. The perlin
@@ -64,21 +43,12 @@ static bool ValidateLinearSlots(const AOTEffectGraph& graph, const AOTPassDescri
     if (node == nullptr) {
       return false;
     }
-    bool accepted = ValidateUnaryPointwiseOp(graph, pass.nodes[opIndex], expectedInput);
+    bool accepted = IsUnaryPointwiseOp(node, expectedInput);
     if (!accepted && allowConstOperands && node->kind == AOTEffectKind::ConstColor) {
       accepted = node->inputs.size() == 1 && node->inputs[0] == expectedInput;
     }
-    if (!accepted && allowConstOperands && node->kind == AOTEffectKind::Blend &&
-        node->inputs.size() == 2) {
-      auto blendParams = std::get_if<AOTBlendParameters>(&node->parameters);
-      auto* srcNode = graph.nodeAt(node->inputs[0]);
-      auto* dstNode = graph.nodeAt(node->inputs[1]);
-      bool srcIsConst = srcNode != nullptr && srcNode->kind == AOTEffectKind::ConstColor;
-      bool dstIsConst = dstNode != nullptr && dstNode->kind == AOTEffectKind::ConstColor;
-      AOTNodeID chained = srcIsConst ? node->inputs[1] : node->inputs[0];
-      accepted = blendParams != nullptr && blendParams->childType != 2 &&
-                 srcIsConst != dstIsConst && chained == expectedInput &&
-                 AOTConstColorIsInputIndependent(graph, srcIsConst ? srcNode : dstNode);
+    if (!accepted && allowConstOperands) {
+      accepted = IsConstOperandBlend(graph, node, expectedInput);
     }
     if (!accepted) {
       return false;
@@ -86,15 +56,6 @@ static bool ValidateLinearSlots(const AOTEffectGraph& graph, const AOTPassDescri
     expectedInput = pass.nodes[opIndex];
   }
   return true;
-}
-
-static bool ValidateYUVSource(const AOTEffectGraph& graph, AOTNodeID nodeID) {
-  auto node = graph.nodeAt(nodeID);
-  auto parameters =
-      node != nullptr ? std::get_if<AOTTextureParameters>(&node->parameters) : nullptr;
-  return parameters != nullptr && node->kind == AOTEffectKind::TextureSource &&
-         node->inputs.size() == 1 && node->inputs[0] == AOTNodeID(0) && parameters->isYUV &&
-         !parameters->hasRGBAAA && parameters->samplingKind == AOTTextureSamplingKind::Plain;
 }
 
 // The operator nodes of one pass of a multi-pass linear plan: everything after the source in the
@@ -120,7 +81,7 @@ static bool ValidateSegmentedPlan(const AOTEffectGraph& graph, const AOTEffectPl
     }
     size_t firstOp = 0;
     if (index == 0) {
-      if (!pass.dependencies.empty() || !ValidateLinearSource(graph, pass.nodes[0])) {
+      if (!pass.dependencies.empty() || !IsLinearMultiPassSource(graph, pass.nodes[0])) {
         return false;
       }
       source = std::get_if<AOTTextureParameters>(&graph.nodeAt(pass.nodes[0])->parameters);
@@ -134,7 +95,7 @@ static bool ValidateSegmentedPlan(const AOTEffectGraph& graph, const AOTEffectPl
       }
     }
     for (size_t opIndex = firstOp; opIndex < pass.nodes.size(); ++opIndex) {
-      if (!ValidateUnaryPointwiseOp(graph, pass.nodes[opIndex], expectedInput)) {
+      if (!IsUnaryPointwiseOp(graph.nodeAt(pass.nodes[opIndex]), expectedInput)) {
         return false;
       }
       expectedInput = pass.nodes[opIndex];
@@ -204,12 +165,12 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
   }
   switch (pass.kernel) {
     case AOTKernelKind::YUVTextureFill:
-      return pass.nodes.size() <= 1 + MaxPointwiseSlots &&
-             ValidateYUVSource(graph, pass.nodes[0]) && ValidateLinearSlots(graph, pass, false);
+      return pass.nodes.size() <= 1 + MaxPointwiseSlots && IsYUVChainSource(graph, pass.nodes[0]) &&
+             ValidateLinearSlots(graph, pass, false);
     case AOTKernelKind::PerlinNoiseFill:
       return pass.nodes.size() <= 1 + MaxPointwiseSlots &&
-             ValidatePerlinNoiseSource(graph, pass.nodes[0]) &&
-             ValidateLinearSlots(graph, pass, true);
+             IsPerlinNoiseSource(graph, pass.nodes[0]) &&
+             HasValidNoiseViews(graph, pass.nodes[0]) && ValidateLinearSlots(graph, pass, true);
     default:
       return false;
   }
