@@ -19,7 +19,6 @@
 #pragma once
 
 #include <atomic>
-#include <string>
 #include "gpu/resources/ResourceKey.h"
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wfloat-conversion"
@@ -38,27 +37,6 @@ class PathRef {
   static pk::SkPath& WriteAccess(Path& path);
 
   static UniqueKey GetUniqueKey(const Path& path);
-
-  /**
-   * Enables temporary diagnostics in debug builds when TGFX_PATH_DIAGNOSTICS is set to 1.
-   */
-  static bool DiagnosticsEnabled();
-
-  /**
-   * Writes a complete temporary diagnostic block without interleaving other diagnostic blocks.
-   */
-  static void TraceDiagnostics(const char* stage, const std::string& details);
-
-  /**
-   * Records path metadata and contours using an isolated copy to avoid changing live path caches.
-   */
-  static void TracePath(const char* stage, const Path& path);
-
-  /**
-   * Compares an actual union with the previous boolean operation on copies of the same inputs.
-   */
-  static void TraceUnion(const pk::SkPath& first, const pk::SkPath& second,
-                         const pk::SkPath& result, bool concatenates, bool succeeded);
 
   PathRef() = default;
 

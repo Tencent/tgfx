@@ -17,11 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsCompositor.h"
-#include <iomanip>
-#include <limits>
-#include <sstream>
 #include "core/MeshBase.h"
-#include "core/PathRef.h"
 #include "core/VertexMesh.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/ColorSpaceHelper.h"
@@ -1005,45 +1001,6 @@ std::pair<bool, PlacementPtr<FragmentProcessor>> OpsCompositor::tryApplyAnalytic
         break;
     }
   }
-  if (PathRef::DiagnosticsEnabled()) {
-    const auto& shape = element.shape();
-    const char* shapeType = "Empty";
-    switch (shape.type()) {
-      case GeometryShape::Type::Rect:
-        shapeType = "Rect";
-        break;
-      case GeometryShape::Type::RRect:
-        shapeType = "RRect";
-        break;
-      case GeometryShape::Type::Path:
-        shapeType = "Path";
-        break;
-      default:
-        break;
-    }
-    std::ostringstream stream;
-    stream << std::setprecision(std::numeric_limits<float>::max_digits10);
-    stream << "compositor=" << this << " shape=" << shapeType
-           << " analytic=" << (elementFP != nullptr) << " antiAlias=" << element.antiAlias()
-           << " windowMatrix=[";
-    for (int i = 0; i < 9; ++i) {
-      if (i > 0) {
-        stream << ',';
-      }
-      stream << matrix.get(i);
-    }
-    stream << ']';
-    if (shape.type() == GeometryShape::Type::RRect) {
-      const auto& rRect = shape.rRect();
-      const auto& rect = rRect.rect();
-      stream << " bounds=[" << rect.left << ',' << rect.top << ',' << rect.right << ','
-             << rect.bottom << "] radii=";
-      for (const auto& radius : rRect.radii()) {
-        stream << '(' << radius.x << ',' << radius.y << ')';
-      }
-    }
-    PathRef::TraceDiagnostics("OpsCompositor.tryApplyAnalyticFP", stream.str());
-  }
   // No analytic FP for this element (perspective, empty, or path); return the accumulated chain
   // unchanged and report failure.
   if (!elementFP) {
@@ -1059,15 +1016,6 @@ std::pair<bool, PlacementPtr<FragmentProcessor>> OpsCompositor::tryApplyAnalytic
 PlacementPtr<FragmentProcessor> OpsCompositor::getClipMaskFP(
     const std::vector<const ClipElement*>& elements, uint32_t uniqueID, const Rect& clipBound,
     PlacementPtr<FragmentProcessor> inputFP) {
-  if (PathRef::DiagnosticsEnabled()) {
-    std::ostringstream stream;
-    stream << std::setprecision(std::numeric_limits<float>::max_digits10);
-    stream << "compositor=" << this << " clipID=" << uniqueID << " elements=" << elements.size()
-           << " cached=" << (uniqueID == cachedClipID && clipTexture) << " bounds=["
-           << clipBound.left << ',' << clipBound.top << ',' << clipBound.right << ','
-           << clipBound.bottom << ']';
-    PathRef::TraceDiagnostics("OpsCompositor.getClipMaskFP", stream.str());
-  }
   // OpsCompositor is bound to a single RenderTarget, so using uniqueID alone as the cache key
   // (without clipBound) is safe.
   if (uniqueID == cachedClipID && clipTexture) {

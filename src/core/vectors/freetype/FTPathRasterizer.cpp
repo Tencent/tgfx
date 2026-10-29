@@ -17,12 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FTPathRasterizer.h"
-#include <sstream>
 #include "FTLibrary.h"
 #include "FTPath.h"
 #include "FTRasterTarget.h"
 #include "core/NoConicsPathIterator.h"
-#include "core/PathRef.h"
 #include "core/utils/ClearPixels.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/GammaCorrection.h"
@@ -99,26 +97,6 @@ bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, si
   auto fillType = path.getFillType();
   ftPath.setEvenOdd(fillType == PathFillType::EvenOdd || fillType == PathFillType::InverseEvenOdd);
   auto outlines = ftPath.getOutlines();
-  if (PathRef::DiagnosticsEnabled()) {
-    PathRef::TracePath("FTPathRasterizer.transformedInput", path);
-    std::ostringstream stream;
-    stream << "size=" << targetInfo.width() << 'x' << targetInfo.height()
-           << " antiAlias=" << antiAlias << " gammaCorrection=" << needsGammaCorrection
-           << " outlines=" << outlines.size() << " coordinateUnit=1/64px\n";
-    for (size_t index = 0; index < outlines.size(); ++index) {
-      const auto& outline = outlines[index]->outline;
-      stream << "outline=" << index << " flags=" << outline.flags << " points=" << outline.n_points
-             << " contours=" << outline.n_contours << '\n';
-      for (int i = 0; i < outline.n_points; ++i) {
-        stream << "  point=" << i << " xy=(" << outline.points[i].x << ',' << outline.points[i].y
-               << ") tag=" << static_cast<int>(outline.tags[i]) << '\n';
-      }
-      for (int i = 0; i < outline.n_contours; ++i) {
-        stream << "  contour=" << i << " endPoint=" << outline.contours[i] << '\n';
-      }
-    }
-    PathRef::TraceDiagnostics("FTPathRasterizer.quantizedInput", stream.str());
-  }
   auto ftLibrary = FTLibrary::Get();
   if (!needsGammaCorrection) {
     FT_Bitmap bitmap;

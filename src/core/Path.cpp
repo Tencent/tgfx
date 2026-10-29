@@ -548,12 +548,6 @@ bool Path::addPath(const Path& src, PathOp op) {
   auto unionConcatenates =
       op == PathOp::Union &&
       Path::UnionsByConcatenation(getFillType(), getBounds(), src.getFillType(), src.getBounds());
-  std::optional<SkPath> diagnosticFirst;
-  std::optional<SkPath> diagnosticSecond;
-  if (op == PathOp::Union && PathRef::DiagnosticsEnabled()) {
-    diagnosticFirst = pathRef->path;
-    diagnosticSecond = src.pathRef->path;
-  }
   auto& path = writableRef()->path;
   const auto& newPath = src.pathRef->path;
   if (op == PathOp::Append || op == PathOp::Extend) {
@@ -574,9 +568,6 @@ bool Path::addPath(const Path& src, PathOp op) {
     } else {
       path.addPath(newPath, SkPath::kAppend_AddPathMode);
     }
-    if (diagnosticFirst.has_value()) {
-      PathRef::TraceUnion(*diagnosticFirst, *diagnosticSecond, path, true, true);
-    }
     return true;
   }
   SkPathOp pathOp;
@@ -594,11 +585,7 @@ bool Path::addPath(const Path& src, PathOp op) {
       pathOp = SkPathOp::kUnion_SkPathOp;
       break;
   }
-  auto succeeded = Op(path, newPath, pathOp, &path);
-  if (diagnosticFirst.has_value()) {
-    PathRef::TraceUnion(*diagnosticFirst, *diagnosticSecond, path, false, succeeded);
-  }
-  return succeeded;
+  return Op(path, newPath, pathOp, &path);
 }
 
 namespace {}
@@ -691,7 +678,6 @@ std::optional<Path> Path::Merge(const std::vector<Path>& sources) {
     for (size_t i = 1; i < nonempty.size(); ++i) {
       merged.addPath(nonempty[i]);
     }
-    PathRef::TracePath("Path.Merge branch=concatenate", merged);
     return merged;
   }
   pk::SkOpBuilder builder;
@@ -729,12 +715,10 @@ std::optional<Path> Path::Merge(const std::vector<Path>& sources) {
     pk::SkPath difference;
     if (pk::Op(PathRef::ReadAccess(candidate), result, pk::SkPathOp::kXOR_SkPathOp, &difference) &&
         difference.isEmpty()) {
-      PathRef::TracePath("Path.Merge branch=verified-candidate", candidate);
       return candidate;
     }
   }
   merged.writableRef()->path = result;
-  PathRef::TracePath("Path.Merge branch=boolean-result", merged);
   return merged;
 }
 
