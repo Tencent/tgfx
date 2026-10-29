@@ -10613,4 +10613,58 @@ TGFX_TEST(AOTRenderConsistencyTest, AlphaOnlyFillMatchesRuntime) {
                         << ")";
 }
 
+// A round-join stroked rect whose draw carries a UV matrix drops the GP's inUVCoord attribute, so
+// the runtime attribute list keeps the physical-slot numbering with a hole at slot 4 and inColor
+// stays at slot 5 (round_stroke_rect_fill.vert numbers its inputs by that physical slot). The GL
+// pipeline must bind each attribute to the slot the program creator resolved instead of a dense
+// index, or inColor lands on the empty slot and the shader reads the unbound default (0, 0, 0, 1)
+// for every vertex: the stroke renders black instead of the paint color.
+static void RenderRoundStrokeRectOnce(bool useBundle, Bitmap* outBitmap) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  if (useBundle) {
+    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+  } else {
+    cache->unload();
+  }
+  ScopedAOTStatsPause statsPause(context, !useBundle);
+  context->globalCache()->clearPrograms();
+  constexpr int width = 160;
+  constexpr int height = 160;
+  auto surface = Surface::Make(context, width, height);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  canvas->save();
+  Matrix matrix = {};
+  matrix.postRotate(15.0f, static_cast<float>(width) / 2.0f, static_cast<float>(height) / 2.0f);
+  canvas->concat(matrix);
+  Paint paint = {};
+  paint.setColor(Color::Red());
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(12.0f);
+  paint.setLineJoin(LineJoin::Round);
+  canvas->drawRect(Rect::MakeXYWH(40, 40, 80, 80), paint);
+  canvas->restore();
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(outBitmap->allocPixels(width, height));
+  auto* pixels = outBitmap->lockPixels();
+  ASSERT_TRUE(pixels != nullptr);
+  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+  outBitmap->unlockPixels();
+  if (useBundle) {
+    cache->unload();
+  }
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, RoundStrokeRectUvMatrixBindsColorByPhysicalSlot) {
+  Bitmap aotBitmap = {};
+  Bitmap runtimeBitmap = {};
+  RenderRoundStrokeRectOnce(true, &aotBitmap);
+  RenderRoundStrokeRectOnce(false, &runtimeBitmap);
+  ExpectBitmapsIdentical("round-stroke-rect-uv-matrix", aotBitmap, runtimeBitmap, 160, 160);
+}
+
 }  // namespace tgfx
