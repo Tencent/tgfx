@@ -34,6 +34,7 @@
 #include "gpu/PermutationMatcher.h"
 #include "gpu/PrecompiledBundleIdentity.h"
 #include "gpu/PrecompiledShaderCache.h"
+#include "gpu/ProgramWriter.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ShaderKeyHash.h"
 #include "gpu/ShaderProfile.h"
@@ -1201,7 +1202,8 @@ TGFX_TEST(ShaderPermutationTest, ProgramProvenanceSurvivesCacheHits) {
                                              ProgramOrigin::PrecompiledArtifact,
                                              PipelineOrigin::RuntimeCreation};
   auto precompiledProgram =
-      std::make_shared<Program>(nullptr, nullptr, nullptr, precompiledProvenance);
+      std::make_shared<Program>(nullptr, nullptr, nullptr, precompiledProvenance,
+                                std::make_unique<PrecompiledProgramWriter>());
   cache.addProgram(precompiledKey, precompiledProgram);
 
   BytesKey dynamicKey;
@@ -1209,7 +1211,8 @@ TGFX_TEST(ShaderPermutationTest, ProgramProvenanceSurvivesCacheHits) {
   ProgramProvenance dynamicProvenance = {ShaderArtifactOrigin::RuntimeGeneratedSource,
                                          ProgramOrigin::ProgramBuilder,
                                          PipelineOrigin::RuntimeCreation};
-  auto dynamicProgram = std::make_shared<Program>(nullptr, nullptr, nullptr, dynamicProvenance);
+  auto dynamicProgram = std::make_shared<Program>(nullptr, nullptr, nullptr, dynamicProvenance,
+                                                  std::make_unique<RuntimeProgramWriter>());
   cache.addProgram(dynamicKey, dynamicProgram);
 
   auto cachedPrecompiled = cache.findProgram(precompiledKey);

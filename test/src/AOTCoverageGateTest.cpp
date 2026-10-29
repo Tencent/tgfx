@@ -46,6 +46,7 @@
 #include "base/TGFXTest.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PrecompiledShaderCache.h"
+#include "gpu/ProgramWriter.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/Paint.h"
@@ -540,7 +541,8 @@ TGFX_TEST(AOTCoverageGateTest, ProductionMetricsPreserveUnmarkedFailures) {
   excludedKey.write(1u);
   programs.addProgram(excludedKey, nullptr, true);
   EXPECT_EQ(programs.programStats().excludedProgramBuilderCreations, 0u);
-  auto excludedProgram = std::make_shared<Program>(nullptr, nullptr, nullptr, provenance);
+  auto excludedProgram = std::make_shared<Program>(nullptr, nullptr, nullptr, provenance,
+                                                   std::make_unique<RuntimeProgramWriter>());
   programs.addProgram(excludedKey, excludedProgram, true);
   EXPECT_EQ(programs.programStats().programBuilderCreations, 1u);
   EXPECT_EQ(programs.programStats().excludedProgramBuilderCreations, 1u);
@@ -550,7 +552,8 @@ TGFX_TEST(AOTCoverageGateTest, ProductionMetricsPreserveUnmarkedFailures) {
   BytesKey ordinaryKey;
   ordinaryKey.write(2u);
   programs.addProgram(ordinaryKey,
-                      std::make_shared<Program>(nullptr, nullptr, nullptr, provenance));
+                      std::make_shared<Program>(nullptr, nullptr, nullptr, provenance,
+                                                std::make_unique<RuntimeProgramWriter>()));
   const auto& stats = programs.programStats();
   EXPECT_EQ(stats.programBuilderCreations, 2u);
   EXPECT_EQ(stats.excludedProgramBuilderCreations, 1u);
@@ -562,7 +565,9 @@ TGFX_TEST(AOTCoverageGateTest, ProductionMetricsPreserveUnmarkedFailures) {
   programs.setProgramStatsPaused(true);
   BytesKey pausedKey;
   pausedKey.write(3u);
-  programs.addProgram(pausedKey, std::make_shared<Program>(nullptr, nullptr, nullptr, provenance),
+  programs.addProgram(pausedKey,
+                      std::make_shared<Program>(nullptr, nullptr, nullptr, provenance,
+                                                std::make_unique<RuntimeProgramWriter>()),
                       true);
   EXPECT_EQ(stats.programBuilderCreations, 2u);
   EXPECT_EQ(stats.excludedProgramBuilderCreations, 1u);

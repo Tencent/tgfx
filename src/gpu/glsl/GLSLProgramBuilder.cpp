@@ -24,6 +24,7 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProgramSignature.h"
+#include "gpu/ProgramWriter.h"
 #include "gpu/UniformData.h"
 #include "tgfx/gpu/GPU.h"
 
@@ -261,7 +262,8 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   ProgramProvenance provenance = {ShaderArtifactOrigin::RuntimeGeneratedSource,
                                   ProgramOrigin::ProgramBuilder, PipelineOrigin::RuntimeCreation};
   return std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
-                                   std::move(fragmentUniformData), provenance);
+                                   std::move(fragmentUniformData), provenance,
+                                   std::make_unique<RuntimeProgramWriter>());
 }
 
 bool GLSLProgramBuilder::checkSamplerCounts() {

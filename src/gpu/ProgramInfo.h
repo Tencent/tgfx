@@ -240,6 +240,9 @@ class ProgramInfo {
 
   friend std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo*,
                                                                 PermutationMatchFailure*);
+  friend class ProgramWriter;
+  friend class RuntimeProgramWriter;
+  friend class PrecompiledProgramWriter;
 
   std::vector<SamplerInfo> getSamplers() const;
 

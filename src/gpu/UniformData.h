@@ -228,6 +228,9 @@ class UniformData {
 #endif
 
   friend class ProgramInfo;
+  friend class ProgramWriter;
+  friend class RuntimeProgramWriter;
+  friend class PrecompiledProgramWriter;
   friend class UniformHandler;
   friend class PrecompiledProgramCreator;
 };

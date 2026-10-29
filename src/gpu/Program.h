@@ -26,6 +26,8 @@
 
 namespace tgfx {
 
+class ProgramWriter;
+
 enum class ShaderArtifactOrigin : uint8_t {
   RuntimeGeneratedSource,
   OfflineSource,
@@ -50,10 +52,21 @@ struct ProgramProvenance {
 class Program {
  public:
   Program(std::shared_ptr<RenderPipeline> pipeline, std::unique_ptr<UniformData> vertexUniformData,
-          std::unique_ptr<UniformData> fragmentUniformData, ProgramProvenance provenance);
+          std::unique_ptr<UniformData> fragmentUniformData, ProgramProvenance provenance,
+          std::unique_ptr<ProgramWriter> writer);
+  ~Program();
 
   std::shared_ptr<RenderPipeline> getPipeline() const {
     return pipeline;
+  }
+
+  /**
+   * The route-specific writer that uploads this program's per-draw uniforms and samplers:
+   * runtime-generated programs address uniforms through the JIT name suffixes, precompiled
+   * programs through the artifact's structural layout.
+   */
+  const ProgramWriter* writer() const {
+    return writerValue.get();
   }
 
   UniformData* getUniformData(ShaderStage stage) const;
@@ -81,6 +94,7 @@ class Program {
   std::shared_ptr<RenderPipeline> pipeline = nullptr;
   std::unique_ptr<UniformData> vertexUniformData = nullptr;
   std::unique_ptr<UniformData> fragmentUniformData = nullptr;
+  std::unique_ptr<ProgramWriter> writerValue = nullptr;
   ProgramProvenance provenance = {};
   uint32_t expectedTextureCountValue = 0;
 

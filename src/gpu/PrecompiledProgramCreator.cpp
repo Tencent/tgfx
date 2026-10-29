@@ -31,6 +31,7 @@
 #include "gpu/PermutationMatcher.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProgramSignature.h"
+#include "gpu/ProgramWriter.h"
 #include "gpu/ShaderKeyHash.h"
 #include "gpu/UniformData.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
@@ -714,7 +715,8 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
       ArtifactOriginForBackend(context->backend(), vertexDesc, fragmentDesc),
       ProgramOrigin::PrecompiledArtifact, PipelineOrigin::RuntimeCreation};
   auto program = std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
-                                           std::move(fragmentUniformData), provenance);
+                                           std::move(fragmentUniformData), provenance,
+                                           std::make_unique<PrecompiledProgramWriter>());
   program->setExpectedTextureCount(static_cast<uint32_t>(descriptor.layout.textureSamplers.size()));
   return program;
 }
