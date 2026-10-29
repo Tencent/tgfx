@@ -1387,11 +1387,6 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     for (const auto& processor : op->colorProcessors()) {
       colorProcessors.push_back(processor.get());
     }
-    // Set when a route's plan turned out to be the prepare-time inline rewrite's own shape (a
-    // single chain or perlin pass without recorded producers): the submit closures refuse it, the
-    // op keeps its plain-route processors, and the flag below tells prepareDecomposedProgram the
-    // rewrite owns this draw.
-    bool deferredByGate = false;
     // A local texture mask is a pointwise multiply (input * mask.a), so it can be fused into the
     // color chain as an extra blend node with its own texture leaf; an analytic AA-rect clip is the
     // same multiply with a coordinate-derived coverage, fusing as a rect-coverage node. Both forms
@@ -1441,10 +1436,6 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     // coverage multiply is pixel-equivalent on the plain route.
     AOTRouter::SubmitPlan submitFolded = [&](const AOTEffectGraph& graph, const AOTEffectPlan& plan,
                                              AOTMaterializationRecorder* producers) {
-      if (producers == nullptr && !AOTRouter::PlanRequiresTask(plan)) {
-        deferredByGate = true;
-        return false;
-      }
       op->moveCoveragesToColors();
       return submitPlanTask(graph, plan, *deviceBounds, &op, producers);
     };
@@ -1453,11 +1444,13 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
       if (foldResult == AOTRouteResult::Submitted) {
         return;
       }
-      if (foldResult == AOTRouteResult::TaskRefused) {
+      if (foldResult == AOTRouteResult::TaskRefused || foldResult == AOTRouteResult::Deferred) {
         // The coverage already moved into the op's color processors, so the color-only route and
         // the retry below, which plan from the ORIGINAL color list without the coverage, would
-        // silently drop the mask/clip. Go straight to the plain route.
-        if (deferredByGate) {
+        // silently drop the mask/clip. Go straight to the plain route. A Deferred plan returns
+        // before the closure runs, so the coverage never moved and the op keeps it for the
+        // prepare-time rewrite, which folds it itself.
+        if (foldResult == AOTRouteResult::Deferred) {
           op->setInlineRewriteDeferred(true);
         }
         drawOps.emplace_back(std::move(op));
@@ -1473,10 +1466,6 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     // geometry processor.
     AOTRouter::SubmitPlan submitColors = [&](const AOTEffectGraph& graph, const AOTEffectPlan& plan,
                                              AOTMaterializationRecorder* producers) {
-      if (producers == nullptr && !AOTRouter::PlanRequiresTask(plan)) {
-        deferredByGate = true;
-        return false;
-      }
       return submitPlanTask(graph, plan, *deviceBounds, &op, producers);
     };
     bool coverageFree = !op->hasCoverageProcessors();
@@ -1501,7 +1490,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     }
     // A deferred draw is the prepare-time rewrite's own subject: no retry (the original tree
     // planned), the plain route carries it to prepare with the deferred flag.
-    if (deferredByGate) {
+    if (colorResult == AOTRouteResult::Deferred) {
       op->setInlineRewriteDeferred(true);
       drawOps.emplace_back(std::move(op));
       return;

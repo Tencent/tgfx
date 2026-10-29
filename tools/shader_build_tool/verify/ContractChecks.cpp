@@ -665,6 +665,14 @@ size_t ValidateFamilyParams(const std::vector<VariantData>& variants,
   size_t errors = 0;
   const auto& formats = AllParamFormats();
   std::set<std::string> usedNames;
+  // A name the tables declare twice with different formats resolves to whichever entry the table
+  // kept, so the reflection comparison alone could pass on the wrong declaration; reject the
+  // conflict itself instead.
+  for (const auto& name : AllParamConflicts()) {
+    Report(diagnostics, Severity::Error, DiagnosticCode::VerifyParamUndeclared, "", "", -1, -1,
+           "declared parameter '" + name + "' appears with conflicting formats");
+    ++errors;
+  }
   // A build with no variants carries no reflection at all, so the usage direction has nothing to
   // say; the name-and-format direction below runs over the (empty) reflection and stays clean.
   if (variants.empty()) {

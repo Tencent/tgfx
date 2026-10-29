@@ -8,6 +8,7 @@
 
 #include <cstddef>
 #include <map>
+#include <set>
 #include <utility>
 #include "gpu/Uniform.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
@@ -60,8 +61,12 @@ inline bool ParamTypeToUniformFormat(ParamType type, UniformFormat* format) {
 
 // Every declared field table, paired with its length. A module whose Fields are missing from
 // this list is invisible to the reconciliation, so the fields its shader declares would fail the
-// name check — the omission is self-reporting.
-inline std::map<std::string, UniformFormat> BuildParamFormatTable() {
+// name check — the omission is self-reporting. conflicts, when non-null, collects every name
+// declared more than once with different formats: the format table keeps the first entry, and
+// without the list such a conflict would pass silently whenever the reflection happens to match
+// the entry the table kept.
+inline std::map<std::string, UniformFormat> BuildParamFormatTable(
+    std::set<std::string>* conflicts) {
   static const std::pair<const ParamInfo*, size_t> tables[] = {
       {EngineParams::Fields, std::size(EngineParams::Fields)},
       {ChainParams::Fields, std::size(ChainParams::Fields)},
@@ -86,19 +91,31 @@ inline std::map<std::string, UniformFormat> BuildParamFormatTable() {
       if (!ParamTypeToUniformFormat(field.type, &format)) {
         continue;
       }
-      if (result.count(field.name) == 0) {
+      auto existing = result.find(field.name);
+      if (existing == result.end()) {
         result.emplace(field.name, format);
+      } else if (existing->second != format && conflicts != nullptr) {
+        conflicts->insert(field.name);
       }
-      // A duplicate name with a different format is a declaration conflict; the table keeps the
-      // first entry, so the reconciliation flags the mismatch against the reflection.
     }
   }
   return result;
 }
 
 inline const std::map<std::string, UniformFormat>& AllParamFormats() {
-  static const std::map<std::string, UniformFormat> result = BuildParamFormatTable();
+  static const std::map<std::string, UniformFormat> result = BuildParamFormatTable(nullptr);
   return result;
+}
+
+// The names BuildParamFormatTable found declared with conflicting formats (see above): the
+// build-time reconciliation reports each as an error.
+inline const std::set<std::string>& AllParamConflicts() {
+  static const std::set<std::string> conflicts = [] {
+    std::set<std::string> conflicts;
+    BuildParamFormatTable(&conflicts);
+    return conflicts;
+  }();
+  return conflicts;
 }
 
 }  // namespace tgfx

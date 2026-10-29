@@ -47,6 +47,10 @@ enum class AOTRouteResult {
   TaskRefused,
   /// The entry built and enqueued the plan task; it now owns the draw.
   Submitted,
+  /// The plan is the prepare-time inline rewrite's own shape — a single chain-capable pass with no
+  /// recorded producers — so no task runs for it: the entry keeps its draw on the plain route with
+  /// the inline-rewrite deferral flag, and the rewrite owns the draw at prepare time.
+  Deferred,
 };
 
 /**
@@ -82,7 +86,10 @@ class AOTRouter {
                                         AOTMaterializationRecorder* producers)>;
 
   /**
-   * Lowers and decomposes the processors and hands the plan to submit.
+   * Lowers and decomposes the processors and hands the plan to submit. An original route
+   * (producers == nullptr) whose plan needs no task never calls submit and returns Deferred
+   * instead: the prepare-time inline rewrite owns that draw. The materialization retry passes a
+   * recorder, so its plans always run as tasks.
    */
   static AOTRouteResult Route(const std::vector<const FragmentProcessor*>& processors,
                               const SubmitPlan& submit,
@@ -92,8 +99,8 @@ class AOTRouter {
    * Whether a plan can only run as a plan task: more than one pass, or a single pass whose kernel
    * the prepare-time inline rewrite cannot express (the rewrite replaces a draw's color list with
    * one fused chain or perlin processor; every other single-pass kernel still needs the task).
-   * A single-pass chain-capable plan is left to the prepare-time rewrite so the record-time entry
-   * never duplicates it; the retry's plans always run as tasks regardless.
+   * Route itself applies this gate to original routes and returns Deferred for the ones it turns
+   * away; the retry's plans always run as tasks regardless.
    */
   static bool PlanRequiresTask(const AOTEffectPlan& plan);
 

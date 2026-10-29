@@ -37,6 +37,11 @@ AOTRouteResult AOTRouter::Route(const std::vector<const FragmentProcessor*>& pro
       !AOTEffectDecomposer::Decompose(graph, &plan)) {
     return AOTRouteResult::NoPlan;
   }
+  if (producers == nullptr && !PlanRequiresTask(plan)) {
+    // The prepare-time inline rewrite re-expresses this single-pass plan without a task; the
+    // entry's draw stays on the plain route with the deferral flag.
+    return AOTRouteResult::Deferred;
+  }
   return submit(graph, plan, producers) ? AOTRouteResult::Submitted : AOTRouteResult::TaskRefused;
 }
 
