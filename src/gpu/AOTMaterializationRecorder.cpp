@@ -81,7 +81,8 @@ bool AOTMaterializationRecorder::takeProducerPasses(std::vector<AOTRenderPass>* 
     if (pass.drawOp == nullptr) {
       return false;
     }
-    pass.edge = {AOTEdgeSpace::Local, geometry, producer.apronRadius};
+    pass.edge = AOTMaterializedEdge{AOTEdgeSpace::Local, AOTEdgeReason::OperandMaterialize,
+                                    geometry, producer.apronRadius};
     passes->push_back(std::move(pass));
   }
   return true;

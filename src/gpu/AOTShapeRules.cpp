@@ -92,4 +92,28 @@ bool IsInputDesignator(AOTEffectKind kind) {
          kind == AOTEffectKind::GeometryWhiteInput;
 }
 
+bool CollectReachableNodes(const AOTEffectGraph& graph, AOTNodeID root,
+                           std::vector<bool>* reachable) {
+  if (reachable == nullptr || !root.isValid() || root.index() >= graph.nodeCount()) {
+    return false;
+  }
+  std::vector<AOTNodeID> pending = {root};
+  while (!pending.empty()) {
+    auto id = pending.back();
+    pending.pop_back();
+    const auto* node = graph.nodeAt(id);
+    if (node == nullptr) {
+      return false;
+    }
+    if ((*reachable)[id.index()]) {
+      continue;
+    }
+    (*reachable)[id.index()] = true;
+    if (node->kind != AOTEffectKind::PerlinNoiseSource) {
+      pending.insert(pending.end(), node->inputs.begin(), node->inputs.end());
+    }
+  }
+  return true;
+}
+
 }  // namespace tgfx

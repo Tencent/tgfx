@@ -64,4 +64,13 @@ bool IsConstOperandBlend(const AOTEffectGraph& graph, const AOTEffectNode* blend
  */
 bool IsInputDesignator(AOTEffectKind kind);
 
+/**
+ * Marks every node reachable from the given root (inclusive) in the reachable vector, sized to the
+ * graph. A noise source's inputs stay unvisited: the noise designator input never becomes a slot,
+ * and the whole noise node space belongs to the family's shared budgets. Returns false for an
+ * invalid root or a dangling node reference.
+ */
+bool CollectReachableNodes(const AOTEffectGraph& graph, AOTNodeID root,
+                           std::vector<bool>* reachable);
+
 }  // namespace tgfx

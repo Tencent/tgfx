@@ -85,6 +85,31 @@ class AOTChainBuilder {
                                                  const Matrix& uvMatrix);
 
   /**
+   * Builds the main pass of a materialized-operand plan: a copy of the original graph's DAG with
+   * every input edge pointing at the materialized operand subtree replaced by one texture leaf
+   * (fed from the opaque-white designator so the intermediate samples raw — the operand pass
+   * already applied its own modulation), skipping the subtree's own nodes. The returned segment
+   * pass carries the profile and kernel its own graph resolves, which is the pass's real fit.
+   */
+  static bool BuildDAGSegment(const AOTEffectGraph& graph, const std::vector<AOTNodeID>& mainNodes,
+                              AOTNodeID materializedOperand,
+                              const AOTTextureParameters& intermediateSource,
+                              AOTEffectGraph* segment, AOTPassDescriptor* pass);
+
+  /**
+   * Builds the operand pass of a materialized-operand plan: a copy of the operand subtree with its
+   * local-coordinate parameters (the gradient coordMatrix, the noise uvMatrix) precomposed with
+   * the given mapping, because the split-off fill evaluates at top-left device positions while the
+   * original draw evaluated at its own local coordinates. The mapping is the draw's
+   * device-to-local matrix (identity for an offscreen fill, whose coordinates already match).
+   * Coverage nodes keep their device-space parameters: the fill's positions are already the
+   * device ones.
+   */
+  static bool BuildOperandSegment(const AOTEffectGraph& graph, const AOTPassDescriptor& operandPass,
+                                  const Matrix& deviceToLocal, AOTEffectGraph* segment,
+                                  AOTPassDescriptor* pass);
+
+  /**
    * Flattens a single-pass PointwiseChain/PointwiseGraph plan into the shared processor, or returns
    * nullptr if the pass shape exceeds the selected kernel's capabilities. The processor carries
    * the whole DAG in uniforms and resolves to the corresponding independent shader family.

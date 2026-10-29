@@ -2302,7 +2302,7 @@ TGFX_TEST(AOTEffectTest, PointwiseResourceKindsAreIndependentAndBounded) {
   }
 }
 
-TGFX_TEST(AOTEffectTest, PerlinDAGRejectsDistinctNoiseAndPrunesUnusedInputs) {
+TGFX_TEST(AOTEffectTest, PerlinDAGMaterializesDistinctNoiseAndPrunesUnusedInputs) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
@@ -2338,8 +2338,14 @@ TGFX_TEST(AOTEffectTest, PerlinDAGRejectsDistinctNoiseAndPrunesUnusedInputs) {
     ASSERT_TRUE(builder.addBlend(first, second, blend, &root));
     AOTEffectGraph graph;
     ASSERT_TRUE(builder.finish(root, &graph));
+    // Two distinct noise sources exceed the noise family's budget, so the planner materializes
+    // one operand and the main pass fuses the other with the blend over the intermediate.
     AOTEffectPlan plan;
-    EXPECT_FALSE(AOTEffectDecomposer::Decompose(graph, &plan));
+    ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+    ASSERT_EQ(plan.passes.size(), 2u);
+    EXPECT_TRUE(plan.passes[0].materializesOutput);
+    EXPECT_TRUE(plan.passes[1].materializedInput.isValid());
+    EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
   }
   AOTNodeBuilder builder;
   AOTNodeID geometry;

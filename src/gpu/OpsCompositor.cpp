@@ -1554,13 +1554,17 @@ bool OpsCompositor::submitPlanTask(const AOTEffectGraph& graph, const AOTEffectP
                                    AOTMaterializationRecorder* producers) {
   std::optional<Matrix> deviceToLocal = std::nullopt;
   if (plan.passes.size() > 1) {
-    // The first split-off fill receives the draw's uniform input alpha, and later passes sample
-    // their intermediate without applying it again. Per-vertex colors cannot be reconstructed by
-    // the device-aligned fill. A local-space source also needs one affine device-to-local map.
     auto drawOp = static_cast<StandardDrawOp*>(op->get());
-    if (!drawOp->uniformGeometryColor().has_value()) {
+    // The first split-off fill of a linear plan receives the draw's uniform input alpha, and later
+    // passes sample their intermediate without applying it again. Per-vertex colors cannot be
+    // reconstructed by the device-aligned fill. A materialized-operand plan keeps the paint alpha
+    // in the terminal draw's epilogue instead, so it needs no uniform color.
+    if (!plan.passes.back().materializedInput.isValid() &&
+        !drawOp->uniformGeometryColor().has_value()) {
       return false;
     }
+    // A local-space source (or a materialized operand, which evaluates the draw's local
+    // coordinates) also needs one affine device-to-local map.
     if (!AOTPlanExecutor::SamplesDeviceSpace(graph, plan)) {
       deviceToLocal = drawOp->deviceToLocalMatrix();
       if (!deviceToLocal.has_value()) {

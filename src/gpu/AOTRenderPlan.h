@@ -43,12 +43,25 @@ enum class AOTEdgeSpace {
 };
 
 /**
+ * Why an edge exists, which decides how the draw stats count it: the multi-pass linear planner's
+ * device-space splits (planMaterializedEdges) versus a materialized blend operand
+ * (fpFlattenEdges, the same counter the retry's local-space producers feed).
+ */
+enum class AOTEdgeReason {
+  /// A pass the multi-pass linear planner split off.
+  Split,
+  /// A blend operand subtree the planner materialized (budget-driven).
+  OperandMaterialize,
+};
+
+/**
  * The contract of one materialized edge: where its texels live and how much area it captures. Every
  * edge is an RGBA8, top-left-origin, exact-fit target allocated by AOTMaterializationPolicy, so
  * crossing an edge rounds the producer's output to the 1/255 grid.
  */
 struct AOTMaterializedEdge {
   AOTEdgeSpace space = AOTEdgeSpace::Device;
+  AOTEdgeReason reason = AOTEdgeReason::Split;
   /// The captured area and the coordinate offset the producer renders with.
   MaterializedGeometry geometry = {};
   /// The outset already applied to geometry.bounds (see MaterializationDecision::apronRadius).

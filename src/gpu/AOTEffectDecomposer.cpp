@@ -332,33 +332,6 @@ static bool DecomposeYUVChain(const AOTEffectGraph& graph, AOTEffectPlan* plan) 
   return true;
 }
 
-// Marks every node reachable from root (inclusive). A noise source's inputs stay unvisited: the
-// noise designator input never becomes a slot, and the whole noise node space belongs to the
-// family's shared budgets.
-static bool CollectReachableNodes(const AOTEffectGraph& graph, AOTNodeID root,
-                                  std::vector<bool>* reachable) {
-  if (reachable == nullptr || !root.isValid() || root.index() >= graph.nodeCount()) {
-    return false;
-  }
-  std::vector<AOTNodeID> pending = {root};
-  while (!pending.empty()) {
-    auto id = pending.back();
-    pending.pop_back();
-    const auto* node = graph.nodeAt(id);
-    if (node == nullptr) {
-      return false;
-    }
-    if ((*reachable)[id.index()]) {
-      continue;
-    }
-    (*reachable)[id.index()] = true;
-    if (node->kind != AOTEffectKind::PerlinNoiseSource) {
-      pending.insert(pending.end(), node->inputs.begin(), node->inputs.end());
-    }
-  }
-  return true;
-}
-
 // Plans one fused chain pass over the given reachable node set, rooted at subtreeRoot: the shape
 // whitelist (which node kinds a single fused pass may carry), the pass node list (designators
 // excluded) and the chain builder's own profile resolution, so the planner, CanExecute and
