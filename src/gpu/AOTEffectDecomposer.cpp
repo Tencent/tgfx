@@ -332,25 +332,15 @@ static bool DecomposeYUVChain(const AOTEffectGraph& graph, AOTEffectPlan* plan) 
   return true;
 }
 
-// New planner: a pointwise DAG whose only leaves are texture sources / const colors and whose
-// interior nodes are pure pointwise or blend ops. Such a DAG evaluates in a single fused pass (the
-// PointwiseChain kernel) with no intermediate materialization. Resolved plain, tiled and
-// device-space texture leaves are supported; non-pointwise nodes require a different planner.
-static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
-  if (plan == nullptr || graph.nodeCount() < 2) {
+// Marks every node reachable from root (inclusive). A noise source's inputs stay unvisited: the
+// noise designator input never becomes a slot, and the whole noise node space belongs to the
+// family's shared budgets.
+static bool CollectReachableNodes(const AOTEffectGraph& graph, AOTNodeID root,
+                                  std::vector<bool>* reachable) {
+  if (reachable == nullptr || !root.isValid() || root.index() >= graph.nodeCount()) {
     return false;
   }
-  auto geometryNode = graph.nodeAt(AOTNodeID(0));
-  if (geometryNode == nullptr || geometryNode->kind != AOTEffectKind::GeometryColor) {
-    return false;
-  }
-  bool containsNoise = false;
-  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
-    containsNoise |= graph.nodeAt(AOTNodeID(index))->kind == AOTEffectKind::PerlinNoiseSource;
-  }
-  std::vector<bool> reachable(graph.nodeCount(), !containsNoise);
-  std::vector<AOTNodeID> pending =
-      containsNoise ? std::vector<AOTNodeID>{graph.root()} : std::vector<AOTNodeID>{};
+  std::vector<AOTNodeID> pending = {root};
   while (!pending.empty()) {
     auto id = pending.back();
     pending.pop_back();
@@ -358,17 +348,27 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
     if (node == nullptr) {
       return false;
     }
-    if (reachable[id.index()]) {
+    if ((*reachable)[id.index()]) {
       continue;
     }
-    reachable[id.index()] = true;
+    (*reachable)[id.index()] = true;
     if (node->kind != AOTEffectKind::PerlinNoiseSource) {
       pending.insert(pending.end(), node->inputs.begin(), node->inputs.end());
     }
   }
-  // Shape rule only: which node kinds a single fused pass may carry. Leaf parameters, budgets and
-  // the resource profile belong to the chain builder's planner, consulted below, so the planner,
-  // CanExecute and construction cannot count differently.
+  return true;
+}
+
+// Plans one fused chain pass over the given reachable node set, rooted at subtreeRoot: the shape
+// whitelist (which node kinds a single fused pass may carry), the pass node list (designators
+// excluded) and the chain builder's own profile resolution, so the planner, CanExecute and
+// construction cannot count differently. Leaf parameters and budgets belong to the chain builder's
+// planner, consulted through ResolveChainProfile.
+static bool PlanReachableSubtree(const AOTEffectGraph& graph, AOTNodeID subtreeRoot,
+                                 const std::vector<bool>& reachable, AOTPassDescriptor* pass) {
+  if (pass == nullptr) {
+    return false;
+  }
   for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
     if (!reachable[index]) {
       continue;
@@ -404,28 +404,129 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
         return false;
     }
   }
-  AOTEffectPlan result = {};
-  AOTPassDescriptor pass = {};
-  pass.output = graph.root();
+  *pass = {};
+  pass->output = subtreeRoot;
   for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
     auto node = graph.nodeAt(AOTNodeID(index));
     if (!reachable[index] || node->kind == AOTEffectKind::GeometryColorOpaqueInput ||
         node->kind == AOTEffectKind::GeometryWhiteInput) {
       continue;
     }
-    pass.nodes.push_back(AOTNodeID(index));
+    pass->nodes.push_back(AOTNodeID(index));
   }
   AOTResourceProfile profile = AOTResourceProfile::Automatic;
-  if (!AOTChainBuilder::ResolveChainProfile(graph, pass, &profile)) {
+  if (!AOTChainBuilder::ResolveChainProfile(graph, *pass, &profile)) {
     return false;
   }
-  pass.resourceProfile = profile;
-  pass.kernel =
+  pass->resourceProfile = profile;
+  pass->kernel =
       IsAOTGraphProfile(profile) ? AOTKernelKind::PointwiseGraph : AOTKernelKind::PointwiseChain;
+  return true;
+}
+
+// Planner for a pointwise DAG whose only leaves are texture sources / const colors and whose
+// interior nodes are pure pointwise or blend ops. Such a DAG evaluates in a single fused pass (the
+// PointwiseChain kernel) with no intermediate materialization. Resolved plain, tiled and
+// device-space texture leaves are supported; non-pointwise nodes require a different planner.
+// A noise-free graph admits its whole node space (a dead node would still encode as a dead slot);
+// a noise graph keeps to the root-reachable set, which is all the noise family's budgets cover.
+static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
+  if (plan == nullptr || graph.nodeCount() < 2) {
+    return false;
+  }
+  auto geometryNode = graph.nodeAt(AOTNodeID(0));
+  if (geometryNode == nullptr || geometryNode->kind != AOTEffectKind::GeometryColor) {
+    return false;
+  }
+  bool containsNoise = false;
+  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+    containsNoise |= graph.nodeAt(AOTNodeID(index))->kind == AOTEffectKind::PerlinNoiseSource;
+  }
+  std::vector<bool> reachable(graph.nodeCount(), !containsNoise);
+  if (containsNoise && !CollectReachableNodes(graph, graph.root(), &reachable)) {
+    return false;
+  }
+  AOTPassDescriptor pass = {};
+  if (!PlanReachableSubtree(graph, graph.root(), reachable, &pass)) {
+    return false;
+  }
+  AOTEffectPlan result = {};
   result.passes.push_back(std::move(pass));
   result.output = graph.root();
   *plan = std::move(result);
   return true;
+}
+
+// Planner for an over-budget two-child blend at the root: one operand subtree alone is a legal
+// fused chain pass, so it materializes into pass 0 and the main pass re-reads the operand root as
+// a texture leaf (materializedInput) — the replacement, and with it the main pass's real fit, is
+// resolved when the executor builds the main pass's segment graph (the intermediate texture does
+// not exist at plan time), so this planner's candidates still go through the executor's admission.
+// The operand subtree must stay leaf-free (gradients, noise, pointwise ops and constants only): a
+// texture leaf in the operand would need its sampling remapped through the split-off fill, which
+// the retry's producer path serves today and this planner does not yet.
+static bool DecomposeMaterializedBlend(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
+  if (plan == nullptr || graph.nodeCount() < 2) {
+    return false;
+  }
+  auto geometryNode = graph.nodeAt(AOTNodeID(0));
+  if (geometryNode == nullptr || geometryNode->kind != AOTEffectKind::GeometryColor) {
+    return false;
+  }
+  auto* root = graph.nodeAt(graph.root());
+  if (root == nullptr || root->kind != AOTEffectKind::Blend || root->inputs.size() != 2) {
+    return false;
+  }
+  auto blendParams = std::get_if<AOTBlendParameters>(&root->parameters);
+  if (blendParams == nullptr || blendParams->childType != 2) {
+    return false;
+  }
+  std::vector<bool> rootReachable(graph.nodeCount(), false);
+  if (!CollectReachableNodes(graph, graph.root(), &rootReachable)) {
+    return false;
+  }
+  for (auto operand : root->inputs) {
+    std::vector<bool> operandReachable(graph.nodeCount(), false);
+    if (!CollectReachableNodes(graph, operand, &operandReachable)) {
+      continue;
+    }
+    bool operandHasTextureLeaf = false;
+    for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+      operandHasTextureLeaf |= operandReachable[index] &&
+                               graph.nodeAt(AOTNodeID(index))->kind == AOTEffectKind::TextureSource;
+    }
+    if (operandHasTextureLeaf) {
+      continue;
+    }
+    AOTPassDescriptor operandPass = {};
+    if (!PlanReachableSubtree(graph, operand, operandReachable, &operandPass)) {
+      continue;
+    }
+    AOTEffectPlan result = {};
+    operandPass.materializesOutput = true;
+    result.passes.push_back(std::move(operandPass));
+    AOTPassDescriptor mainPass = {};
+    mainPass.output = graph.root();
+    mainPass.dependencies = {0};
+    mainPass.materializedInput = operand;
+    for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+      auto node = graph.nodeAt(AOTNodeID(index));
+      if (!rootReachable[index] || operandReachable[index] ||
+          node->kind == AOTEffectKind::GeometryColorOpaqueInput ||
+          node->kind == AOTEffectKind::GeometryWhiteInput) {
+        continue;
+      }
+      mainPass.nodes.push_back(AOTNodeID(index));
+    }
+    if (mainPass.nodes.empty()) {
+      continue;
+    }
+    result.passes.push_back(std::move(mainPass));
+    result.output = graph.root();
+    *plan = std::move(result);
+    return true;
+  }
+  return false;
 }
 
 bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
@@ -442,14 +543,26 @@ bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTEffectPlan* 
     return false;
   }
   using Planner = bool (*)(const AOTEffectGraph&, AOTEffectPlan*);
-  for (Planner planner : {DecomposePerlinNoiseChain, DecomposePointwiseDAG,
-                          DecomposeLinearMultiPass, DecomposeYUVChain}) {
+  for (Planner planner :
+       {DecomposePerlinNoiseChain, DecomposePointwiseDAG, DecomposeMaterializedBlend,
+        DecomposeLinearMultiPass, DecomposeYUVChain}) {
     AOTEffectPlan candidate = {};
-    if (planner(graph, &candidate)) {
-      DEBUG_ASSERT(AOTPlanExecutor::CanExecute(graph, candidate));
-      *plan = std::move(candidate);
-      return true;
+    if (!planner(graph, &candidate)) {
+      continue;
     }
+    // The materialized-blend planner defers the main pass's fit to construction (the intermediate
+    // texture does not exist at plan time), so its candidate still goes through the executor's
+    // real admission; the other planners' own fit checks subsume that admission, which therefore
+    // runs only as a debug assertion on them.
+    if (planner == &DecomposeMaterializedBlend) {
+      if (!AOTPlanExecutor::CanExecute(graph, candidate)) {
+        continue;
+      }
+    } else {
+      DEBUG_ASSERT(AOTPlanExecutor::CanExecute(graph, candidate));
+    }
+    *plan = std::move(candidate);
+    return true;
   }
   return false;
 }

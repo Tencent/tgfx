@@ -56,6 +56,13 @@ inline bool IsAOTPointwiseDAGKernel(AOTKernelKind kernel) {
  * passes, each fitting one chain pass: every pass but the last renders into an intermediate RGBA8
  * texture (materializesOutput), and each later pass reads its predecessor's texture in device space
  * as its source (dependencies holds that predecessor's index), so its nodes are operators only.
+ *
+ * The materialized-operand form instead replaces one over-budget blend operand subtree: pass 0 is
+ * the subtree itself (its own fused chain pass over the original graph nodes, materializing into an
+ * intermediate), and the main pass re-reads that subtree's root as a texture leaf —
+ * materializedInput names the original-graph node the dependency's output texture replaces. The
+ * main pass's kernel and profile are resolved when its segment graph is built (the intermediate
+ * does not exist at plan time), so their plan-time values are placeholders.
  */
 struct AOTPassDescriptor {
   AOTKernelKind kernel = AOTKernelKind::PointwiseChain;
@@ -64,6 +71,7 @@ struct AOTPassDescriptor {
   AOTNodeID output = AOTNodeID::Invalid();
   bool materializesOutput = false;
   AOTResourceProfile resourceProfile = AOTResourceProfile::Automatic;
+  AOTNodeID materializedInput = AOTNodeID::Invalid();
 };
 
 struct AOTEffectPlan {
