@@ -1035,6 +1035,156 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
   return true;
 }
 
+// The padding state that mirrors the first real leaf's sampler on the phantom children: on
+// OpenGL the wrap/filter modes are texture-object state (not per-unit), so a default-state
+// phantom bound after a real leaf would overwrite e.g. a decal clamp-to-border with
+// clamp-to-edge for the whole draw.
+struct ChainPaddingTexture {
+  std::shared_ptr<TextureProxy> proxy = nullptr;
+  SamplerState state = {};
+};
+
+static SamplingArgs PaddingSamplingArgs(const SamplerState& state) {
+  SamplingOptions sampling(state.minFilterMode, state.magFilterMode, state.mipmapMode);
+  return {state.tileModeX, state.tileModeY, sampling, SrcRectConstraint::Fast};
+}
+
+// One candidate for the padding texture: a resolved texture leaf (its tiled hardware sampler when
+// it has one), or a LUT-gradient-only chain's baked LUT texture — a chain with no TextureSource
+// node (no leaf binding exists there, so the LUT serves as the padding just as it served as the
+// sampler child).
+static void ConsiderPaddingNode(const AOTEffectNode* node, ChainPaddingTexture* padding) {
+  if (padding->proxy != nullptr || node == nullptr) {
+    return;
+  }
+  if (const auto* texture = std::get_if<AOTTextureParameters>(&node->parameters)) {
+    padding->proxy = texture->textureProxy;
+    if (texture->samplingKind == AOTTextureSamplingKind::Tiled &&
+        texture->tiledRecipe.has_value()) {
+      padding->state = texture->tiledRecipe->hardwareSampler;
+    } else {
+      padding->state = texture->samplerState;
+    }
+  } else if (const auto* gradient = std::get_if<AOTGradientParameters>(&node->parameters)) {
+    if (gradient->lutProxy != nullptr) {
+      padding->proxy = gradient->lutProxy;
+    }
+  }
+}
+
+// Picks the padding texture by walking the color graph (only its in-pass nodes when the chain
+// carries noise — the noise graph's whole node space is the family's, so out-of-pass color nodes
+// must not contribute) and the coverage graph. Falls back to the noise tables' first proxy with
+// nearest sampling.
+static ChainPaddingTexture ChoosePaddingTexture(const AOTEffectGraph& graph,
+                                                const AOTPassDescriptor& pass,
+                                                const AOTEffectGraph* coverageGraph,
+                                                const AOTPerlinNoiseParameters* noise,
+                                                std::shared_ptr<TextureProxy> noisePaddingProxy) {
+  ChainPaddingTexture padding = {};
+  for (size_t index = 0; index < graph.nodeCount(); ++index) {
+    AOTNodeID nodeID(static_cast<uint32_t>(index));
+    if (noise != nullptr &&
+        std::find(pass.nodes.begin(), pass.nodes.end(), nodeID) == pass.nodes.end()) {
+      continue;
+    }
+    ConsiderPaddingNode(graph.nodeAt(nodeID), &padding);
+  }
+  for (size_t index = 0; coverageGraph != nullptr && index < coverageGraph->nodeCount(); ++index) {
+    ConsiderPaddingNode(coverageGraph->nodeAt(AOTNodeID(static_cast<uint32_t>(index))), &padding);
+  }
+  if (padding.proxy == nullptr && noisePaddingProxy != nullptr) {
+    padding.proxy = std::move(noisePaddingProxy);
+    padding.state = SamplerState(SamplingOptions(FilterMode::Nearest));
+  }
+  return padding;
+}
+
+// Binds the noise tables' two lookup textures as sampler-only children ahead of the phantom
+// padding. They are real bindings the kernel reads through Nearest lookups; firstProxy reports
+// the first one for the padding fallback. Returns false when a view cannot be wrapped.
+static bool AppendNoiseLookupChildren(BlockAllocator* allocator,
+                                      const AOTPerlinNoiseParameters* noise,
+                                      std::vector<PlacementPtr<FragmentProcessor>>* samplerPadding,
+                                      std::shared_ptr<TextureProxy>* firstProxy) {
+  for (const auto& view : {noise->permutationsView, noise->noiseView}) {
+    if (view == nullptr || view->getContext() == nullptr) {
+      return false;
+    }
+    auto proxy = view->getContext()->proxyProvider()->wrapTextureView(view);
+    if (proxy == nullptr) {
+      return false;
+    }
+    SamplingArgs lookupArgs = {TileMode::Clamp, TileMode::Clamp,
+                               SamplingOptions(FilterMode::Nearest), SrcRectConstraint::Fast};
+    auto matrix = Matrix::I();
+    auto child = TextureEffect::Make(allocator, proxy, lookupArgs, &matrix);
+    if (child == nullptr) {
+      return false;
+    }
+    if (firstProxy != nullptr && *firstProxy == nullptr) {
+      *firstProxy = proxy;
+    }
+    samplerPadding->push_back(std::move(child));
+  }
+  return true;
+}
+
+// Fills the sampler slots up to the four-leaf artifacts' TEXTURE_COUNT with phantom children
+// re-using the padding texture. A chain that already binds four (or none) is left alone.
+static bool PadSamplersToFour(BlockAllocator* allocator, const ChainPaddingTexture& padding,
+                              std::vector<PlacementPtr<FragmentProcessor>>* samplerPadding,
+                              size_t* samplerChildren) {
+  if (*samplerChildren == 0 || *samplerChildren >= 4) {
+    return true;
+  }
+  if (padding.proxy == nullptr) {
+    return false;
+  }
+  auto paddingArgs = PaddingSamplingArgs(padding.state);
+  while (*samplerChildren < 4) {
+    auto phantomMatrix = Matrix::I();
+    auto phantom = TextureEffect::Make(allocator, padding.proxy, paddingArgs, &phantomMatrix);
+    if (phantom == nullptr) {
+      return false;
+    }
+    samplerPadding->push_back(std::move(phantom));
+    ++*samplerChildren;
+  }
+  return true;
+}
+
+// The mask child: the real device-space mask, or — for a mask-free chain that bound all four
+// sampler slots — a phantom there, which the kernel identifies by HasMaskTexture and skips.
+struct ChainMaskChild {
+  PlacementPtr<FragmentProcessor> child = nullptr;
+  bool isPhantom = false;
+};
+
+static bool BuildChainMaskChild(BlockAllocator* allocator,
+                                const DeviceSpaceTextureEffect* maskEffect,
+                                const ChainPaddingTexture& padding, size_t samplerChildren,
+                                ChainMaskChild* result) {
+  if (maskEffect != nullptr) {
+    // The mask child's Subset write routes to the kernel's DeviceMaskSubset decoy, so a leaf's
+    // real subset rect survives in the shared uniform block.
+    result->child = DeviceSpaceTextureEffect::Make(allocator, maskEffect->getTextureProxy(),
+                                                   maskEffect->getUVMatrix());
+    return result->child != nullptr;
+  }
+  if (samplerChildren != 4) {
+    return true;
+  }
+  if (padding.proxy == nullptr) {
+    return false;
+  }
+  auto paddingArgs = PaddingSamplingArgs(padding.state);
+  auto phantomMatrix = Matrix::I();
+  result->child = TextureEffect::Make(allocator, padding.proxy, paddingArgs, &phantomMatrix);
+  result->isPhantom = result->child != nullptr;
+  return result->child != nullptr;
+}
+
 // Rebuilds the fused chain processor from a planned layout: the texture leaves, the LUT and noise
 // sampler-only children, the phantom padding the four-sampler artifacts need and the mask child.
 // Every slot and budget decision was already taken by PlanChainLayout; a failure here can only
@@ -1080,107 +1230,19 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   // e.g. a decal clamp-to-border with clamp-to-edge for the whole draw.
   std::vector<PlacementPtr<FragmentProcessor>> samplerPadding = {};
   std::shared_ptr<TextureProxy> noisePaddingProxy = nullptr;
-  if (layout.noise != nullptr) {
-    for (const auto& view : {layout.noise->permutationsView, layout.noise->noiseView}) {
-      if (view == nullptr || view->getContext() == nullptr) {
-        return nullptr;
-      }
-      auto proxy = view->getContext()->proxyProvider()->wrapTextureView(view);
-      if (proxy == nullptr) {
-        return nullptr;
-      }
-      SamplingArgs lookupArgs = {TileMode::Clamp, TileMode::Clamp,
-                                 SamplingOptions(FilterMode::Nearest), SrcRectConstraint::Fast};
-      auto matrix = Matrix::I();
-      auto child = TextureEffect::Make(allocator, proxy, lookupArgs, &matrix);
-      if (child == nullptr) {
-        return nullptr;
-      }
-      if (noisePaddingProxy == nullptr) {
-        noisePaddingProxy = proxy;
-      }
-      samplerPadding.push_back(std::move(child));
-    }
+  if (layout.noise != nullptr &&
+      !AppendNoiseLookupChildren(allocator, layout.noise, &samplerPadding, &noisePaddingProxy)) {
+    return nullptr;
   }
-  std::shared_ptr<TextureProxy> paddingProxy = nullptr;
-  SamplerState paddingState = {};
-  auto choosePadding = [&](const AOTEffectNode* node) {
-    if (paddingProxy != nullptr || node == nullptr) {
-      return;
-    }
-    if (const auto* texture = std::get_if<AOTTextureParameters>(&node->parameters)) {
-      paddingProxy = texture->textureProxy;
-      if (texture->samplingKind == AOTTextureSamplingKind::Tiled &&
-          texture->tiledRecipe.has_value()) {
-        paddingState = texture->tiledRecipe->hardwareSampler;
-      } else {
-        paddingState = texture->samplerState;
-      }
-    } else if (const auto* gradient = std::get_if<AOTGradientParameters>(&node->parameters)) {
-      // A LUT-gradient-only chain has no TextureSource node; its baked LUT texture serves as
-      // the padding texture just as it served as the phantom before.
-      if (gradient->lutProxy != nullptr) {
-        paddingProxy = gradient->lutProxy;
-      }
-    }
-  };
-  for (size_t index = 0; index < graph.nodeCount(); ++index) {
-    AOTNodeID nodeID(static_cast<uint32_t>(index));
-    if (layout.noise != nullptr &&
-        std::find(pass.nodes.begin(), pass.nodes.end(), nodeID) == pass.nodes.end()) {
-      continue;
-    }
-    choosePadding(graph.nodeAt(nodeID));
-  }
-  for (size_t index = 0; coverageGraph != nullptr && index < coverageGraph->nodeCount(); ++index) {
-    choosePadding(coverageGraph->nodeAt(AOTNodeID(static_cast<uint32_t>(index))));
-  }
-  if (paddingProxy == nullptr && noisePaddingProxy != nullptr) {
-    paddingProxy = noisePaddingProxy;
-    paddingState = SamplerState(SamplingOptions(FilterMode::Nearest));
-  }
-  SamplingOptions paddingSampling(paddingState.minFilterMode, paddingState.magFilterMode,
-                                  paddingState.mipmapMode);
-  SamplingArgs paddingArgs = {paddingState.tileModeX, paddingState.tileModeY, paddingSampling,
-                              SrcRectConstraint::Fast};
+  auto padding =
+      ChoosePaddingTexture(graph, pass, coverageGraph, layout.noise, std::move(noisePaddingProxy));
   size_t samplerChildren = leaves.size() + (lutChild != nullptr ? 1 : 0) + samplerPadding.size();
-  if (samplerChildren > 0 && samplerChildren < 4) {
-    if (paddingProxy == nullptr) {
-      return nullptr;
-    }
-    while (samplerChildren < 4) {
-      auto phantomMatrix = Matrix::I();
-      auto phantom = TextureEffect::Make(allocator, paddingProxy, paddingArgs, &phantomMatrix);
-      if (phantom == nullptr) {
-        return nullptr;
-      }
-      samplerPadding.push_back(std::move(phantom));
-      ++samplerChildren;
-    }
+  if (!PadSamplersToFour(allocator, padding, &samplerPadding, &samplerChildren)) {
+    return nullptr;
   }
-  PlacementPtr<FragmentProcessor> maskChild = nullptr;
-  if (maskEffect != nullptr) {
-    // The mask child's Subset write routes to the kernel's DeviceMaskSubset decoy, so a leaf's
-    // real subset rect survives in the shared uniform block.
-    maskChild = DeviceSpaceTextureEffect::Make(allocator, maskEffect->getTextureProxy(),
-                                               maskEffect->getUVMatrix());
-    if (maskChild == nullptr) {
-      return nullptr;
-    }
-  }
-  // Four-leaf artifacts declare the mask sampler unconditionally, so a mask-free chain binds a
-  // phantom there (re-using the same padding texture) and clears HasMaskTexture at runtime.
-  bool maskChildIsPhantom = false;
-  if (samplerChildren == 4 && maskChild == nullptr) {
-    if (paddingProxy == nullptr) {
-      return nullptr;
-    }
-    auto phantomMatrix = Matrix::I();
-    maskChild = TextureEffect::Make(allocator, paddingProxy, paddingArgs, &phantomMatrix);
-    if (maskChild == nullptr) {
-      return nullptr;
-    }
-    maskChildIsPhantom = true;
+  ChainMaskChild maskChildResult = {};
+  if (!BuildChainMaskChild(allocator, maskEffect, padding, samplerChildren, &maskChildResult)) {
+    return nullptr;
   }
   const auto& tiledLeaves = layout.tiledLeaves;
   const int tiledLeafIndex = tiledLeaves.empty() ? -1 : tiledLeaves[0].leafIndex;
@@ -1204,8 +1266,8 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   }
   return AOTPointwiseChainProcessor::Make(
       allocator, std::move(leaves), layout.slots, layout.rootRegister, tiledLeafIndex, recipePtr,
-      std::move(maskChild), layout.coverageRootRegister, layout.coordSourceMask,
-      std::move(lutChild), lutLeafIndex, std::move(samplerPadding), maskChildIsPhantom,
+      std::move(maskChildResult.child), layout.coverageRootRegister, layout.coordSourceMask,
+      std::move(lutChild), lutLeafIndex, std::move(samplerPadding), maskChildResult.isPhantom,
       layout.clipCoverageRegister, tiledLeafIndex2, recipePtr2, layout.profile,
       additionalTiledLeaves, deviceLeaves);
 }
