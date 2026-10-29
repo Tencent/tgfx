@@ -454,8 +454,10 @@ static uint32_t RequiredTextureReads(const ProgramInfo* programInfo) {
   return required;
 }
 
-std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo,
-                                                       PermutationMatchFailure* failure) {
+// The uncached match: the full family walk plus the post-match validations. Both public entries
+// funnel through here.
+static std::optional<PermutationMatchResult> ComputeMatch(const ProgramInfo* programInfo,
+                                                          PermutationMatchFailure* failure) {
   // Sub-reason carried out of the (deeply nested) TryMatch* helpers: they only return nullopt, so
   // the first rejecting site records why on this thread and the public entry point copies it into
   // the caller's out-parameter.
@@ -491,6 +493,37 @@ std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* progra
   gPendingMatchFailure = PermutationMatchFailure::None;
   if (failure != nullptr) {
     *failure = result ? PermutationMatchFailure::None : matchFailure;
+  }
+  return result;
+}
+
+std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* programInfo,
+                                                       PermutationMatchFailure* failure) {
+  // A draw whose prepare-time probe already matched reuses the cached outcome here: the program
+  // creator's lookup then costs nothing, and the probe's failure bookkeeping is not repeated.
+  if (programInfo->matchCached) {
+    if (failure != nullptr) {
+      *failure = programInfo->preMatchedFailure;
+    }
+    return programInfo->preMatched;
+  }
+  return ComputeMatch(programInfo, failure);
+}
+
+std::optional<PermutationMatchResult> ProgramInfo::matchAndCache(PermutationMatchFailure* failure) {
+  if (matchCached) {
+    if (failure != nullptr) {
+      *failure = preMatchedFailure;
+    }
+    return preMatched;
+  }
+  auto failureValue = PermutationMatchFailure::None;
+  auto result = ComputeMatch(this, &failureValue);
+  matchCached = true;
+  preMatched = result;
+  preMatchedFailure = failureValue;
+  if (failure != nullptr) {
+    *failure = failureValue;
   }
   return result;
 }
