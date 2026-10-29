@@ -120,7 +120,7 @@ uint32_t CoverPassStencilReference(PathFillType fillType) {
 
 PlacementPtr<StencilCoverPathDrawOp> StencilCoverPathDrawOp::Make(
     std::shared_ptr<StencilCoverPathProxy> geometryProxy, PMColor color, const Matrix& viewMatrix,
-    const Rect& coverLocalBounds, PathFillType fillType) {
+    const Rect& coverLocalBounds, bool inverseFill) {
   if (geometryProxy == nullptr) {
     return nullptr;
   }
@@ -130,15 +130,15 @@ PlacementPtr<StencilCoverPathDrawOp> StencilCoverPathDrawOp::Make(
   }
   auto allocator = context->drawingAllocator();
   return allocator->make<StencilCoverPathDrawOp>(allocator, std::move(geometryProxy), color,
-                                                 viewMatrix, coverLocalBounds, fillType);
+                                                 viewMatrix, coverLocalBounds, inverseFill);
 }
 
 StencilCoverPathDrawOp::StencilCoverPathDrawOp(BlockAllocator* allocator,
                                                std::shared_ptr<StencilCoverPathProxy> geometryProxy,
                                                PMColor color, const Matrix& viewMatrix,
-                                               const Rect& coverLocalBounds, PathFillType fillType)
+                                               const Rect& coverLocalBounds, bool inverseFill)
     : DrawOp(allocator, AAType::None), geometryProxy(std::move(geometryProxy)), color(color),
-      viewMatrix(viewMatrix), coverLocalBounds(coverLocalBounds), fillType(fillType) {
+      viewMatrix(viewMatrix), coverLocalBounds(coverLocalBounds), inverseFill(inverseFill) {
   // The cover quad is built in local space — the cover GP applies the view matrix itself, so
   // pre-applying it here would double-transform. Inverse fill draws supply a clip-derived
   // local rect that already covers the inverse region.
@@ -152,7 +152,6 @@ StencilCoverPathDrawOp::StencilCoverPathDrawOp(BlockAllocator* allocator,
   // Pre-compute the per-op state that only depends on construction-time inputs. This keeps
   // execute() limited to the work that genuinely needs the live RenderPass / RenderTarget.
   stencilGP = StencilCoverStencilPassGeometryProcessor::Make(allocator, viewMatrix);
-  coverStencilRef = CoverPassStencilReference(fillType);
   // The cover quad's device-space footprint is the strict upper bound on where the cover
   // pass's Zero op will run, so the stencil pass must be scissored to (at most) the same
   // region — any stencil write outside would leak into subsequent ops sharing the render
@@ -160,8 +159,23 @@ StencilCoverPathDrawOp::StencilCoverPathDrawOp(BlockAllocator* allocator,
   coverDeviceBounds = viewMatrix.mapRect(coverLocalBounds);
 }
 
-bool StencilCoverPathDrawOp::bindStencilPipeline(RenderPass* renderPass,
-                                                 RenderTarget* renderTarget) {
+PathFillType StencilCoverPathDrawOp::resolveFillType() const {
+  auto fillType = geometryProxy->getFillType();
+  if (fillType.has_value()) {
+    return *fillType;
+  }
+  // Nothing was reported, so nothing was drawn into the stencil buffer. An inverse fill covers the
+  // whole quad in that case, and every other rule covers nothing; which of the two inverse rules it
+  // is cannot change the answer, because both read the same all-zero buffer.
+  return inverseFill ? PathFillType::InverseWinding : PathFillType::Winding;
+}
+
+uint32_t StencilCoverPathDrawOp::coverStencilReference() const {
+  return CoverPassStencilReference(resolveFillType());
+}
+
+bool StencilCoverPathDrawOp::bindStencilPipeline(RenderPass* renderPass, RenderTarget* renderTarget,
+                                                 PathFillType fillType) {
   if (stencilGP == nullptr) {
     return false;
   }
@@ -193,7 +207,8 @@ bool StencilCoverPathDrawOp::bindStencilPipeline(RenderPass* renderPass,
   return true;
 }
 
-bool StencilCoverPathDrawOp::bindCoverPipeline(RenderPass* renderPass, RenderTarget* renderTarget) {
+bool StencilCoverPathDrawOp::bindCoverPipeline(RenderPass* renderPass, RenderTarget* renderTarget,
+                                               PathFillType fillType) {
   // Build the cover-pass GP. Runs the brush FP chain over a device-bounds quad; the
   // Loop-Blinn curve test is not needed here because coverage is already locked into the
   // stencil buffer by the stencil pass.
@@ -276,8 +291,9 @@ void StencilCoverPathDrawOp::execute(RenderPass* renderPass, RenderTarget* rende
     stencilVertexCount =
         static_cast<uint32_t>(vertexBufferResource->size() / STENCIL_VERTEX_STRIDE);
   }
+  auto fillType = resolveFillType();
   if (stencilGPUBuffer != nullptr && stencilVertexCount > 0) {
-    if (!bindStencilPipeline(renderPass, renderTarget)) {
+    if (!bindStencilPipeline(renderPass, renderTarget, fillType)) {
       return;
     }
     // Stencil reference is irrelevant for Always + Invert/Inc/Dec, but keep it deterministic.
@@ -292,10 +308,10 @@ void StencilCoverPathDrawOp::execute(RenderPass* renderPass, RenderTarget* rende
   // (see bindCoverPipeline) rather than reusing StandardDrawOp's helper — the two rails are
   // deliberately independent so the "self-managed multi-pass" contract stays visible in the
   // class hierarchy.
-  if (!bindCoverPipeline(renderPass, renderTarget)) {
+  if (!bindCoverPipeline(renderPass, renderTarget, fillType)) {
     return;
   }
-  renderPass->setStencilReference(coverStencilRef);
+  renderPass->setStencilReference(coverStencilReference());
   renderPass->setVertexBuffer(0, coverBuffer->gpuBuffer(), coverQuadBuffer->offset());
   // RectsVertexProvider produces a triangle strip of 4 vertices for non-AA fills.
   renderPass->draw(PrimitiveType::TriangleStrip, 4);

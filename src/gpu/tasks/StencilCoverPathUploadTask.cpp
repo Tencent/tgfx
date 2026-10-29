@@ -23,9 +23,10 @@
 
 namespace tgfx {
 StencilCoverPathUploadTask::StencilCoverPathUploadTask(
-    std::shared_ptr<ResourceProxy> vertexBufferProxy,
+    std::shared_ptr<ResourceProxy> vertexBufferProxy, std::shared_ptr<FillTypeSlot> fillTypeSlot,
     std::unique_ptr<DataSource<StencilCoverVertexData>> source)
-    : ResourceTask(std::move(vertexBufferProxy)), source(std::move(source)) {
+    : ResourceTask(std::move(vertexBufferProxy)), fillTypeSlot(std::move(fillTypeSlot)),
+      source(std::move(source)) {
 }
 
 std::shared_ptr<Resource> StencilCoverPathUploadTask::onMakeResource(Context* context) {
@@ -34,6 +35,9 @@ std::shared_ptr<Resource> StencilCoverPathUploadTask::onMakeResource(Context* co
   }
   auto bezierBuffer = source->getData();
   source = nullptr;
+  if (bezierBuffer != nullptr && fillTypeSlot != nullptr) {
+    fillTypeSlot->set(bezierBuffer->fillType);
+  }
   // StencilCoverPathTessellator::getData already short-circuits to nullptr for any case that would
   // produce an empty buffer (empty path, zero-area bounds, all-degenerate verbs), so a
   // non-null bezierBuffer is guaranteed to carry non-empty vertices. The vertices-null check

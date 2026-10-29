@@ -48,6 +48,86 @@
 #include "tgfx/gpu/GPUFeatures.h"
 #include "utils/TestUtils.h"
 
+// The two cases below deliberately sit outside the master switch: the rule slot and the op's rule
+// resolution are compiled whether or not the render path is enabled, and a suite gated on the switch
+// would leave them untested in CI, where the switch is off by default.
+namespace tgfx {
+
+// A cache hit answers the rule from the slot, so the slot has to live as long as the geometry it
+// describes - not as long as the proxies that drew it. The GPU buffer is owned by the resource cache
+// and outlives every proxy; the slot used to be dropped at the end of the frame that created it,
+// because purgeExpiredProxies() runs on every flush, after which a hit silently fell back to Winding.
+TGFX_TEST(StencilCoverPathTest, FillTypeSlotOutlivesProxies) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  Path path;
+  path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
+  path.addRect(Rect::MakeXYWH(20, 20, 60, 60));
+  path.setFillType(PathFillType::EvenOdd);
+  auto shape = Shape::MakeFrom(path);
+  auto provider = context->proxyProvider();
+
+  auto first = provider->createStencilCoverPathProxy(shape, 0);
+  ASSERT_TRUE(first != nullptr);
+  // Any draw will do: flush() is what runs the upload task and then purges the expired proxies.
+  auto surface = Surface::Make(context, 32, 32);
+  ASSERT_TRUE(surface != nullptr);
+  Paint paint;
+  paint.setAntiAlias(false);
+  paint.setColor(Color{1.f, 0.f, 0.f, 1.f});
+  surface->getCanvas()->drawRect(Rect::MakeWH(32, 32), paint);
+  context->flushAndSubmit();
+  ASSERT_TRUE(first->getFillType().has_value()) << "the upload task did not report the rule";
+  EXPECT_EQ(*first->getFillType(), PathFillType::EvenOdd);
+  // The vertex buffer is owned by the resource cache: it outlives every proxy, and the proxy object
+  // a later hit builds around it is a new one.
+  auto* vertexBuffer = first->getVertexBuffer().get();
+  ASSERT_TRUE(vertexBuffer != nullptr);
+
+  // Frame 2: every proxy is gone, the GPU buffer is not.
+  first = nullptr;
+  surface->getCanvas()->drawRect(Rect::MakeWH(32, 32), paint);
+  context->flushAndSubmit();
+
+  auto second = provider->createStencilCoverPathProxy(shape, 0);
+  ASSERT_TRUE(second != nullptr);
+  EXPECT_EQ(second->getVertexBuffer().get(), vertexBuffer) << "expected a GPU buffer cache hit";
+  ASSERT_TRUE(second->getFillType().has_value()) << "a cache hit lost the fill rule";
+  EXPECT_EQ(*second->getFillType(), PathFillType::EvenOdd);
+}
+
+// An outline that never became geometry leaves the stencil buffer at zero. An inverse fill covers
+// the whole cover quad in that case, so it has to keep reading against zero, while every other rule
+// covers nothing. The inverse-ness is the one bit recording passes down.
+TGFX_TEST(StencilCoverPathTest, DrawOp_InverseFallbackWithoutGeometry) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  Path path;
+  path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
+  auto proxy = context->proxyProvider()->createStencilCoverPathProxy(Shape::MakeFrom(path), 0);
+  ASSERT_TRUE(proxy != nullptr);
+  // Nothing is flushed, so the slot stays unpublished - which is what a shape with no geometry
+  // looks like from the op's side.
+  ASSERT_FALSE(proxy->getFillType().has_value());
+
+  auto inverseOp = StencilCoverPathDrawOp::Make(proxy, PMColor::Transparent(), Matrix::I(),
+                                                Rect::MakeWH(100, 100), true);
+  ASSERT_TRUE(inverseOp != nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(inverseOp->resolveFillType(), PathFillType::InverseWinding);)
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(inverseOp->coverStencilReference(), 0u);)
+
+  auto plainOp = StencilCoverPathDrawOp::Make(proxy, PMColor::Transparent(), Matrix::I(),
+                                              Rect::MakeWH(100, 100), false);
+  ASSERT_TRUE(plainOp != nullptr);
+  TGFX_PRIVATE_ACCESS(EXPECT_EQ(plainOp->resolveFillType(), PathFillType::Winding);)
+}
+
+}  // namespace tgfx
+
 // The entire test file exercises the stencil-and-cover render path. When the master
 // compile-time switch is disabled, the feature is compiled out of the runtime and none of
 // these cases apply — skip the whole translation unit so it does not clutter the test suite.
@@ -341,7 +421,7 @@ TGFX_TEST(StencilCoverPathTest, DrawOp_NullProxyReturnsNull) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto op = StencilCoverPathDrawOp::Make(nullptr, PMColor::Transparent(), Matrix::I(),
-                                         Rect::MakeWH(100, 100), PathFillType::Winding);
+                                         Rect::MakeWH(100, 100), false);
   EXPECT_TRUE(op == nullptr);
 }
 
@@ -358,20 +438,21 @@ TGFX_TEST(StencilCoverPathTest, DrawOp_MakeReturnsValidOp) {
 
   auto op =
       StencilCoverPathDrawOp::Make(geometryProxy, PMColor::Transparent(), Matrix::MakeTrans(10, 20),
-                                   Rect::MakeXYWH(10, 20, 100, 80), PathFillType::EvenOdd);
+                                   Rect::MakeXYWH(10, 20, 100, 80), false);
   ASSERT_TRUE(op != nullptr);
   EXPECT_TRUE(op->hasCoverage());
   EXPECT_TRUE(op->needsStencil());
 }
 
-// Verifies StencilCoverPathDrawOp::Make accepts every PathFillType value and the
+// Verifies StencilCoverPathDrawOp reads every PathFillType the tessellator can report and the
 // per-fill-type cover-pass stencil reference is computed correctly. The reference value
 // drives the GPU stencil compare: non-inverse non-zero fills compare-not-equal against 0,
 // non-inverse even-odd fills compare-equal against 0xFF (interior leaves stencil at all
 // ones via Invert), and inverse fills always compare against 0 to shade the path's
-// exterior. Reads the private coverStencilRef via -fno-access-control. If a future change
-// to CoverPassStencilReference forgets a branch, this test catches it before the visual
-// dispatch tests do.
+// exterior. The rule now arrives with the geometry instead of being passed to Make, so each
+// case publishes it into the slot the proxy reads; the resolved reference is read back through
+// -fno-access-control. If a future change to CoverPassStencilReference forgets a branch, this
+// test catches it before the visual dispatch tests do.
 TGFX_TEST(StencilCoverPathTest, DrawOp_AllFillTypesProduceValidOpWithExpectedStencilRef) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -382,6 +463,8 @@ TGFX_TEST(StencilCoverPathTest, DrawOp_AllFillTypesProduceValidOpWithExpectedSte
   auto shape = Shape::MakeFrom(path);
   auto geometryProxy = context->proxyProvider()->createStencilCoverPathProxy(shape, 0);
   ASSERT_TRUE(geometryProxy != nullptr);
+  auto vertexBufferProxy = geometryProxy->getVertexBufferProxy();
+  ASSERT_TRUE(vertexBufferProxy != nullptr);
 
   struct Case {
     PathFillType fillType;
@@ -395,13 +478,16 @@ TGFX_TEST(StencilCoverPathTest, DrawOp_AllFillTypesProduceValidOpWithExpectedSte
       {PathFillType::InverseEvenOdd, 0, "InverseEvenOdd"},
   };
   for (const auto& c : cases) {
-    auto op = StencilCoverPathDrawOp::Make(geometryProxy, PMColor::Transparent(),
-                                           Matrix::MakeTrans(10, 20),
-                                           Rect::MakeXYWH(10, 20, 100, 80), c.fillType);
+    auto fillTypeSlot = std::make_shared<FillTypeSlot>();
+    fillTypeSlot->set(c.fillType);
+    auto caseProxy = std::make_shared<StencilCoverPathProxy>(vertexBufferProxy, fillTypeSlot);
+    auto op =
+        StencilCoverPathDrawOp::Make(caseProxy, PMColor::Transparent(), Matrix::MakeTrans(10, 20),
+                                     Rect::MakeXYWH(10, 20, 100, 80), false);
     ASSERT_TRUE(op != nullptr) << c.name;
     EXPECT_TRUE(op->hasCoverage()) << c.name;
     EXPECT_TRUE(op->needsStencil()) << c.name;
-    TGFX_PRIVATE_ACCESS(EXPECT_EQ(op->coverStencilRef, c.expectedRef) << c.name;)
+    TGFX_PRIVATE_ACCESS(EXPECT_EQ(op->coverStencilReference(), c.expectedRef) << c.name;)
   }
 }
 

@@ -524,7 +524,36 @@ void Path::addRRect(const RRect& rRect, bool reversed, unsigned int startIndex) 
   writableRef()->path.addRRect(skRRect, ToSkDirection(reversed), startIndex);
 }
 
+bool Path::UnionsByConcatenation(PathFillType firstFillType, const Rect& firstBounds,
+                                 PathFillType secondFillType, const Rect& secondBounds) {
+  if (firstFillType != secondFillType) {
+    return false;
+  }
+  // An inverse area covers the whole plane, so it overlaps whatever the other operand covers.
+  if (firstFillType == PathFillType::InverseWinding ||
+      firstFillType == PathFillType::InverseEvenOdd) {
+    return false;
+  }
+  return !Rect::Intersects(firstBounds, secondBounds);
+}
+
 bool Path::addPath(const Path& src, PathOp op) {
+  // Two areas whose bounds cannot meet have nothing to resolve, so their union is the concatenation
+  // of their outlines, and the rule both already agree on is the rule the result is read by. Proving
+  // the same for outlines whose bounds do meet costs a boolean operation per candidate pair, which
+  // is what the batch entry pays for and this one must not: mask accumulation unions one path at a
+  // time into a growing one, so nearly every union there does overlap and would pay that twice.
+  // The bounds are read before the destination is made writable, which drops its cached bounds:
+  // reading them after that would leave the cache holding the bounds from before the merge.
+  auto unionConcatenates =
+      op == PathOp::Union &&
+      Path::UnionsByConcatenation(getFillType(), getBounds(), src.getFillType(), src.getBounds());
+  std::optional<SkPath> diagnosticFirst;
+  std::optional<SkPath> diagnosticSecond;
+  if (op == PathOp::Union && PathRef::DiagnosticsEnabled()) {
+    diagnosticFirst = pathRef->path;
+    diagnosticSecond = src.pathRef->path;
+  }
   auto& path = writableRef()->path;
   const auto& newPath = src.pathRef->path;
   if (op == PathOp::Append || op == PathOp::Extend) {
@@ -535,6 +564,18 @@ bool Path::addPath(const Path& src, PathOp op) {
     } else {
       auto mode = op == PathOp::Extend ? SkPath::kExtend_AddPathMode : SkPath::kAppend_AddPathMode;
       path.addPath(newPath, mode);
+    }
+    return true;
+  }
+  if (unionConcatenates) {
+    // Appending onto an empty path reads the verb array behind its end, so the operand replaces it.
+    if (path.isEmpty()) {
+      path = newPath;
+    } else {
+      path.addPath(newPath, SkPath::kAppend_AddPathMode);
+    }
+    if (diagnosticFirst.has_value()) {
+      PathRef::TraceUnion(*diagnosticFirst, *diagnosticSecond, path, true, true);
     }
     return true;
   }
@@ -553,7 +594,11 @@ bool Path::addPath(const Path& src, PathOp op) {
       pathOp = SkPathOp::kUnion_SkPathOp;
       break;
   }
-  return Op(path, newPath, pathOp, &path);
+  auto succeeded = Op(path, newPath, pathOp, &path);
+  if (diagnosticFirst.has_value()) {
+    PathRef::TraceUnion(*diagnosticFirst, *diagnosticSecond, path, false, succeeded);
+  }
+  return succeeded;
 }
 
 namespace {}
@@ -646,6 +691,7 @@ std::optional<Path> Path::Merge(const std::vector<Path>& sources) {
     for (size_t i = 1; i < nonempty.size(); ++i) {
       merged.addPath(nonempty[i]);
     }
+    PathRef::TracePath("Path.Merge branch=concatenate", merged);
     return merged;
   }
   pk::SkOpBuilder builder;
@@ -683,10 +729,12 @@ std::optional<Path> Path::Merge(const std::vector<Path>& sources) {
     pk::SkPath difference;
     if (pk::Op(PathRef::ReadAccess(candidate), result, pk::SkPathOp::kXOR_SkPathOp, &difference) &&
         difference.isEmpty()) {
+      PathRef::TracePath("Path.Merge branch=verified-candidate", candidate);
       return candidate;
     }
   }
   merged.writableRef()->path = result;
+  PathRef::TracePath("Path.Merge branch=boolean-result", merged);
   return merged;
 }
 

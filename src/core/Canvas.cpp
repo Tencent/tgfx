@@ -17,10 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Canvas.h"
+#include <iomanip>
+#include <limits>
+#include <sstream>
 #include "core/CanvasState.h"
 #include "core/ClipStack.h"
 #include "core/DrawContext.h"
 #include "core/LayerUnrollContext.h"
+#include "core/PathRef.h"
 #include "core/PictureContext.h"
 #include "core/shapes/StrokeShape.h"
 #include "core/utils/Log.h"
@@ -191,26 +195,50 @@ void Canvas::clipRRect(const RRect& rRect, bool antiAlias) {
   clipStack->clipRRect(rRect, _matrix, antiAlias);
 }
 
+static void TraceClipPath(const char* branch, const Path& path, const Matrix& matrix,
+                          bool antiAlias) {
+  if (!PathRef::DiagnosticsEnabled()) {
+    return;
+  }
+  std::ostringstream stream;
+  stream << std::setprecision(std::numeric_limits<float>::max_digits10);
+  stream << "Canvas.clipPath branch=" << branch << " antiAlias=" << antiAlias << " matrix=[";
+  for (int i = 0; i < 9; ++i) {
+    if (i > 0) {
+      stream << ',';
+    }
+    stream << matrix.get(i);
+  }
+  stream << ']';
+  auto stage = stream.str();
+  PathRef::TracePath(stage.c_str(), path);
+}
+
 void Canvas::clipPath(const Path& path, bool antiAlias) {
   if (path.isInverseFillType()) {
+    TraceClipPath("inverse-path", path, _matrix, antiAlias);
     // Inverse-fill paths cannot be expressed as a simple rect/rrect clip, so fall back to path.
     clipStack->clipPath(path, _matrix, antiAlias);
     return;
   }
 
   if (Rect rect = {}; path.isRect(&rect)) {
+    TraceClipPath("rect", path, _matrix, antiAlias);
     clipStack->clipRect(rect, _matrix, antiAlias);
     return;
   }
   // Ovals and general RRects are treated as separate types, so handle ovals separately.
   if (Rect ovalBounds = {}; path.isOval(&ovalBounds)) {
+    TraceClipPath("oval", path, _matrix, antiAlias);
     clipStack->clipRRect(RRect::MakeOval(ovalBounds), _matrix, antiAlias);
     return;
   }
   if (RRect rRect = {}; path.isRRect(&rRect)) {
+    TraceClipPath("rrect", path, _matrix, antiAlias);
     clipStack->clipRRect(rRect, _matrix, antiAlias);
     return;
   }
+  TraceClipPath("path", path, _matrix, antiAlias);
   clipStack->clipPath(path, _matrix, antiAlias);
 }
 

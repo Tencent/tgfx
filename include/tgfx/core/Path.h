@@ -386,6 +386,19 @@ class Path {
   bool addPath(const Path& src, PathOp op = PathOp::Append);
 
   /**
+   * Returns true if the union of two filled areas is the concatenation of their outlines, which
+   * holds when they cannot overlap: they share one fill rule, neither fills the whole plane, and
+   * their bounds do not intersect. Both Path::addPath() and the shape that merges two sources use
+   * this one test, so the rule a merge reports and the outline it produces can never disagree.
+   * @param firstFillType the fill rule of the first area.
+   * @param firstBounds the bounds of the first area.
+   * @param secondFillType the fill rule of the second area.
+   * @param secondBounds the bounds of the second area.
+   */
+  static bool UnionsByConcatenation(PathFillType firstFillType, const Rect& firstBounds,
+                                    PathFillType secondFillType, const Rect& secondBounds);
+
+  /**
    * Merges the filled areas of the given paths into one. Each path is read under its own fill rule,
    * so paths that declare different rules can be merged. When the outlines already describe the
    * merged area, they are kept as they are.

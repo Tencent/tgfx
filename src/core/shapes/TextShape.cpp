@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextShape.h"
+#include <atomic>
 #include <vector>
 #include "core/GlyphTransform.h"
 #include "core/utils/Log.h"
@@ -91,16 +92,22 @@ bool TextShape::isInverseFillType() const {
   // recording - from paying for the merge, which is the expensive half of getPath(). Which of the
   // two inverse rules the run ends up with is still decided by that merge, so fillType() keeps
   // reading the merged path; this answers only the part that does not depend on it.
-  std::vector<Path> glyphPaths = {};
-  if (!getGlyphPaths(1.0f, &glyphPaths)) {
-    return false;
+  auto cached = cachedInverseFillType.load(std::memory_order_acquire);
+  if (cached >= 0) {
+    return cached != 0;
   }
-  for (const auto& glyphPath : glyphPaths) {
-    if (glyphPath.isInverseFillType()) {
-      return true;
+  bool inverse = false;
+  std::vector<Path> glyphPaths = {};
+  if (getGlyphPaths(1.0f, &glyphPaths)) {
+    for (const auto& glyphPath : glyphPaths) {
+      if (glyphPath.isInverseFillType()) {
+        inverse = true;
+        break;
+      }
     }
   }
-  return false;
+  cachedInverseFillType.store(inverse ? 1 : 0, std::memory_order_release);
+  return inverse;
 }
 
 Path TextShape::onGetPath(float resolutionScale) const {

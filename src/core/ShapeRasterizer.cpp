@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeRasterizer.h"
+#include <sstream>
 #include "core/PathRasterizer.h"
+#include "core/PathRef.h"
 #include "core/PathTriangulator.h"
 #include "utils/Log.h"
 
@@ -40,7 +42,16 @@ std::shared_ptr<ShapeBuffer> ShapeRasterizer::getData() const {
     finalPath.reset();
     finalPath.addRect(Rect::MakeWH(width, height));
   }
-  if (PathTriangulator::ShouldTriangulatePath(finalPath)) {
+  auto triangulate = PathTriangulator::ShouldTriangulatePath(finalPath);
+  if (PathRef::DiagnosticsEnabled()) {
+    auto aa = aaType == AAType::Coverage ? "Coverage" : aaType == AAType::MSAA ? "MSAA" : "None";
+    std::ostringstream stream;
+    stream << "ShapeRasterizer.getData branch=" << (triangulate ? "triangles" : "mask")
+           << " size=" << width << 'x' << height << " aa=" << aa;
+    auto stage = stream.str();
+    PathRef::TracePath(stage.c_str(), finalPath);
+  }
+  if (triangulate) {
     auto triangles = makeTriangles(finalPath);
     if (triangles == nullptr) {
       return nullptr;

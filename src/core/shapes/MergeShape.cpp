@@ -39,6 +39,19 @@ std::shared_ptr<Shape> Shape::Merge(std::shared_ptr<Shape> first, std::shared_pt
 }
 
 PathFillType MergeShape::fillType() const {
+  // A union keeps the outlines it was given when the two areas cannot overlap, and then the rule is
+  // the one both sources already agree on; otherwise the areas are resolved by a boolean operation,
+  // which always writes EvenOdd. The same test decides both, so reporting the rule never has to
+  // build the path first.
+  if (pathOp == PathOp::Union) {
+    auto firstType = first->fillType();
+    if (Path::UnionsByConcatenation(firstType, first->getBounds(), second->fillType(),
+                                    second->getBounds())) {
+      return firstType;
+    }
+    auto inverse = first->isInverseFillType() || second->isInverseFillType();
+    return inverse ? PathFillType::InverseEvenOdd : PathFillType::EvenOdd;
+  }
   bool firstInverse = first->isInverseFillType();
   bool secondInverse = second->isInverseFillType();
   bool inverse = false;
@@ -49,16 +62,14 @@ PathFillType MergeShape::fillType() const {
     case PathOp::Intersect:
       inverse = firstInverse && secondInverse;
       break;
-    case PathOp::Union:
-      inverse = firstInverse || secondInverse;
-      break;
     case PathOp::XOR:
       inverse = firstInverse != secondInverse;
       break;
     default:
       break;
   }
-  // PathOp always produces EvenOdd fill type regardless of input fill types.
+  // Intersect, Difference and XOR always resolve the two areas, and the boolean pass writes the
+  // result as EvenOdd regardless of the rules it was given.
   return inverse ? PathFillType::InverseEvenOdd : PathFillType::EvenOdd;
 }
 

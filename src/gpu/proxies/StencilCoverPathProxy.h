@@ -18,9 +18,45 @@
 
 #pragma once
 
+#include <atomic>
+#include <optional>
 #include "gpu/proxies/GPUBufferProxy.h"
+#include "tgfx/core/PathTypes.h"
 
 namespace tgfx {
+/**
+ * FillTypeSlot carries the fill rule of a stencil-cover geometry from the thread that tessellates
+ * it to the draw ops that consume it. The rule is only known once the outline exists, which happens
+ * after the proxy that needs it has already been created, so the slot starts empty and is published
+ * once. Every proxy sharing one cached geometry shares its slot, which is what lets a second draw
+ * recorded before the first one is uploaded read the rule the first one produces.
+ */
+class FillTypeSlot {
+ public:
+  /**
+   * Returns the published rule, or std::nullopt while the tessellator has not reported one.
+   */
+  std::optional<PathFillType> get() const {
+    auto value = fillType.load(std::memory_order_acquire);
+    if (value < 0) {
+      return std::nullopt;
+    }
+    return static_cast<PathFillType>(value);
+  }
+
+  /**
+   * Publishes the rule. The geometry it belongs to is immutable, so a later report can only repeat
+   * the first one.
+   */
+  void set(PathFillType type) {
+    fillType.store(static_cast<int>(type), std::memory_order_release);
+  }
+
+ private:
+  // The rule as an int so that -1 can stand for "not reported yet".
+  std::atomic<int> fillType = {-1};
+};
+
 /**
  * StencilCoverPathProxy holds the GPU vertex buffer produced by the stencil-and-cover
  * render path. The vertex stream stores per-vertex position together with the
@@ -30,8 +66,9 @@ namespace tgfx {
  */
 class StencilCoverPathProxy {
  public:
-  explicit StencilCoverPathProxy(std::shared_ptr<GPUBufferProxy> vertexBuffer)
-      : vertexBuffer(std::move(vertexBuffer)) {
+  StencilCoverPathProxy(std::shared_ptr<GPUBufferProxy> vertexBuffer,
+                        std::shared_ptr<FillTypeSlot> fillType)
+      : vertexBuffer(std::move(vertexBuffer)), fillType(std::move(fillType)) {
   }
 
   Context* getContext() const {
@@ -54,7 +91,17 @@ class StencilCoverPathProxy {
     return vertexBuffer ? vertexBuffer->getBuffer() : nullptr;
   }
 
+  /**
+   * Returns the rule the vertex stream is read by, or std::nullopt while the tessellator has not
+   * reported it. Reporting it is part of producing the geometry, so a draw op learns the rule from
+   * the geometry it is about to draw instead of asking the shape during recording.
+   */
+  std::optional<PathFillType> getFillType() const {
+    return fillType ? fillType->get() : std::nullopt;
+  }
+
  private:
   std::shared_ptr<GPUBufferProxy> vertexBuffer = nullptr;
+  std::shared_ptr<FillTypeSlot> fillType = nullptr;
 };
 }  // namespace tgfx

@@ -133,7 +133,8 @@ class Shape {
 
   /**
    * Returns true if the PathFillType is InverseWinding or InverseEvenOdd. The default
-   * implementation reads fillType().
+   * implementation reads fillType(). The answer is cached: recording asks for it before any
+   * geometry exists, and a Shape is immutable, so it never changes once known.
    */
   virtual bool isInverseFillType() const;
 
@@ -188,6 +189,12 @@ class Shape {
    * better rendering quality.
    */
   virtual Path onGetPath(float resolutionScale) const = 0;
+
+  // Recording asks whether a shape fills the outside of its outline before its geometry exists, and
+  // the answer cannot change for an immutable shape, so it is answered once and shared by whichever
+  // implementation produced it - the default one reads fillType(), TextShape reads its glyph
+  // outlines. -1 stands for "not answered yet".
+  mutable std::atomic<int> cachedInverseFillType = {-1};
 
   friend class AppendShape;
   friend class StrokeShape;

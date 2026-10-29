@@ -27,8 +27,14 @@ Shape::~Shape() {
 }
 
 bool Shape::isInverseFillType() const {
+  auto cached = cachedInverseFillType.load(std::memory_order_acquire);
+  if (cached >= 0) {
+    return cached != 0;
+  }
   auto type = fillType();
-  return type == PathFillType::InverseWinding || type == PathFillType::InverseEvenOdd;
+  auto inverse = type == PathFillType::InverseWinding || type == PathFillType::InverseEvenOdd;
+  cachedInverseFillType.store(inverse ? 1 : 0, std::memory_order_release);
+  return inverse;
 }
 
 Rect Shape::getBounds() const {

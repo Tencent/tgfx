@@ -37,6 +37,7 @@
 
 #include "DataSource.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/PathTypes.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
@@ -47,12 +48,16 @@ namespace tgfx {
  * The vertex layout is owned by the geometry processors used in the stencil and cover passes.
  */
 struct StencilCoverVertexData {
-  StencilCoverVertexData(std::shared_ptr<Data> vertices, size_t vertexCount)
-      : vertices(std::move(vertices)), vertexCount(vertexCount) {
+  StencilCoverVertexData(std::shared_ptr<Data> vertices, size_t vertexCount, PathFillType fillType)
+      : vertices(std::move(vertices)), vertexCount(vertexCount), fillType(fillType) {
   }
 
   std::shared_ptr<Data> vertices = nullptr;
   size_t vertexCount = 0;
+  // The rule the outline above is read by. It is taken from the shape that produced the outline, so
+  // the rule and the geometry it travels with can never disagree, and a consumer learns the rule
+  // from the geometry instead of asking the shape a second time.
+  PathFillType fillType = PathFillType::Winding;
 };
 
 /**
@@ -90,7 +95,9 @@ class StencilCoverPathTessellator : public DataSource<StencilCoverVertexData> {
 
   /**
    * Builds the bezier vertex stream for the shape. Returns nullptr when the shape produces no
-   * drawable geometry (empty path, zero-area bounds) or when the input shape is null.
+   * drawable geometry (empty path, zero-area bounds) or when the input shape is null. The fill rule
+   * is read from the shape once the outline exists, so it rides along with the vertices rather than
+   * being queried separately while a draw is recorded.
    */
   std::shared_ptr<StencilCoverVertexData> getData() const override;
 
