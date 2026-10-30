@@ -25,8 +25,8 @@
 
 namespace tgfx {
 
-std::optional<EllipseFillShader::Inputs> EllipseFillShader::Extract(
-    const ProgramInfo* programInfo) {
+std::optional<EllipseFillShader::Inputs> EllipseFillShader::Extract(const ProgramInfo* programInfo,
+                                                                    PermutationMatchFailure*) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }

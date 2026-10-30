@@ -25,7 +25,7 @@
 namespace tgfx {
 
 std::optional<ComplexNonAARRectFillShader::Inputs> ComplexNonAARRectFillShader::Extract(
-    const ProgramInfo* programInfo) {
+    const ProgramInfo* programInfo, PermutationMatchFailure*) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }

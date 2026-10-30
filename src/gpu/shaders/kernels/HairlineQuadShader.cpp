@@ -26,7 +26,7 @@
 namespace tgfx {
 
 std::optional<HairlineQuadShader::Inputs> HairlineQuadShader::Extract(
-    const ProgramInfo* programInfo) {
+    const ProgramInfo* programInfo, PermutationMatchFailure*) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }

@@ -29,7 +29,7 @@
 namespace tgfx {
 
 std::optional<GlassRefractionShader::Inputs> GlassRefractionShader::Extract(
-    const ProgramInfo* programInfo) {
+    const ProgramInfo* programInfo, PermutationMatchFailure*) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }

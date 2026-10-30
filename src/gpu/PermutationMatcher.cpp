@@ -64,14 +64,9 @@
 
 namespace tgfx {
 
-// Sub-reason of the most recent rejection on this thread. The TryMatch* helpers only ever return
-// nullopt, so the first rejecting site records why here; MatchPermutation copies it into the
-// caller's out-parameter and clears it. Diagnostic only: no control flow depends on it.
-static thread_local PermutationMatchFailure gPendingMatchFailure = PermutationMatchFailure::None;
-
-std::nullopt_t Fail(PermutationMatchFailure reason) {
-  if (gPendingMatchFailure == PermutationMatchFailure::None) {
-    gPendingMatchFailure = reason;
+std::nullopt_t Fail(PermutationMatchFailure* failure, PermutationMatchFailure reason) {
+  if (*failure == PermutationMatchFailure::None) {
+    *failure = reason;
   }
   return std::nullopt;
 }
@@ -383,7 +378,8 @@ static bool FamilyWalkEnabled(bool allowDedicated, bool allowInterpreter) {
   return std::is_same_v<Family, PointwiseChainShader> ? allowInterpreter : allowDedicated;
 }
 
-static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramInfo* programInfo) {
+static std::optional<PermutationMatchResult> MatchPermutationImpl(
+    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
   // OpenGL is served from the bundle profile matching the context (desktop GL or the GLES
   // family: GLES, WebGL, SwiftShader). The precompiled kernels only declare 2D samplers. Desktop GL
   // rectangle textures are copied into 2D textures where they enter (ProxyProvider::
@@ -393,7 +389,7 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
   // there is no runtime route, so their draws are dropped and counted as droppedDraws.
   if (programInfo->backend() == Backend::OpenGL &&
       (!programInfo->glProfileMatchesCache() || !programInfo->samplersAre2D())) {
-    return Fail(PermutationMatchFailure::GlGateRejected);
+    return Fail(failure, PermutationMatchFailure::GlGateRejected);
   }
 
   // Alpha-only (AAAA, Swizzle::ForWrite(ALPHA_8)) targets: only the kernels that apply the write
@@ -416,35 +412,36 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
   //   3. a Match result lies inside the family's reachable set, which catches Extract producing
   //      an input combination AllInputs does not enumerate — the bundle would lack the variant
   //      and the draw would be dropped at runtime.
-  // The extra Match calls are pure shape checks; the thread-local failure reason they may record
-  // is saved and restored so the rejection accounting is unaffected. The audit runs once per
-  // distinct program shape: repeated prepares of the same shape re-audit nothing.
+  // The extra Match calls are pure shape checks, each writing its rejection into a local slot,
+  // so the walk's own failure accounting is unaffected. The audit runs once per distinct program
+  // shape: repeated prepares of the same shape re-audit nothing.
   {
     static thread_local std::unordered_set<BytesKey, BytesKeyHasher> auditedProgramKeys;
     if (auditedProgramKeys.insert(programInfo->programKeyForDiagnostics()).second) {
-      const auto savedFailure = gPendingMatchFailure;
       int acceptors = 0;
-#define TGFX_AUDIT_FAMILY(Family)                                                             \
-  if (auto auditResult = Family::Match(programInfo)) {                                        \
-    if (alphaOnly && !Family::ServesAlphaOnly) {                                              \
-      assert(false && #Family " accepts an alpha-only draw; flip its ServesAlphaOnly");       \
-    }                                                                                         \
-    /* The interpreter is the walk's documented fallback: it may accept a draw a dedicated  \
-     * family serves too (that overlap is what the dedicated-kernel toggle A/Bs), so only  \
-     * dedicated families count towards uniqueness. */ \
-    if (++acceptors > 1 && std::string_view(#Family) != "PointwiseChainShader") {             \
-      assert(false && "multiple shader families accept the same draw");                       \
-    }                                                                                         \
-    if (Family::CachedReachable().count(                                                      \
-            {auditResult->vertPermutationIndex, auditResult->fragPermutationIndex}) == 0) {   \
-      assert(false && #Family                                                                 \
-             " matched a variant outside its reachable set; extend "                          \
-             "its AllInputs");                                                                \
-    }                                                                                         \
+#define TGFX_AUDIT_FAMILY(Family)                                                               \
+  {                                                                                             \
+    PermutationMatchFailure auditFailure = PermutationMatchFailure::None;                       \
+    if (auto auditResult = Family::Match(programInfo, &auditFailure)) {                         \
+      if (alphaOnly && !Family::ServesAlphaOnly) {                                              \
+        assert(false && #Family " accepts an alpha-only draw; flip its ServesAlphaOnly");       \
+      }                                                                                         \
+      /* The interpreter is the walk's documented fallback: it may accept a draw a dedicated  \
+       * family serves too (that overlap is what the dedicated-kernel toggle A/Bs), so only  \
+       * dedicated families count towards uniqueness. */ \
+      if (++acceptors > 1 && std::string_view(#Family) != "PointwiseChainShader") {             \
+        assert(false && "multiple shader families accept the same draw");                       \
+      }                                                                                         \
+      if (Family::CachedReachable().count(                                                      \
+              {auditResult->vertPermutationIndex, auditResult->fragPermutationIndex}) == 0) {   \
+        assert(false && #Family                                                                 \
+               " matched a variant outside its reachable set; extend "                          \
+               "its AllInputs");                                                                \
+      }                                                                                         \
+    }                                                                                           \
   }
       TGFX_FOR_EACH_SHADER_FAMILY(TGFX_AUDIT_FAMILY)
 #undef TGFX_AUDIT_FAMILY
-      gPendingMatchFailure = savedFailure;
     }
   }
 #endif
@@ -468,7 +465,7 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
 #define TGFX_TRY_FAMILY(Family)                                                \
   if (!accepted && (!alphaOnly || Family::ServesAlphaOnly) &&                  \
       FamilyWalkEnabled<Family>(allowDedicated, allowInterpreter)) {           \
-    if (auto result = Family::Match(programInfo)) {                            \
+    if (auto result = Family::Match(programInfo, failure)) {                   \
       accepted = PermutationMatchResult{#Family, result->vertPermutationIndex, \
                                         result->fragPermutationIndex};         \
     }                                                                          \
@@ -478,7 +475,7 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(const ProgramI
   if (accepted) {
     return accepted;
   }
-  return alphaOnly ? Fail(PermutationMatchFailure::NoMatchingFamily) : std::nullopt;
+  return alphaOnly ? Fail(failure, PermutationMatchFailure::NoMatchingFamily) : std::nullopt;
 }
 
 // The ShaderTextureRead semantics the draw's sampled textures need. YUV planes are excluded: the
@@ -510,10 +507,6 @@ static uint32_t RequiredTextureReads(const ProgramInfo* programInfo) {
 // funnel through here.
 static std::optional<PermutationMatchResult> ComputeMatch(const ProgramInfo* programInfo,
                                                           PermutationMatchFailure* failure) {
-  // Sub-reason carried out of the (deeply nested) TryMatch* helpers: they only return nullopt, so
-  // the first rejecting site records why on this thread and the public entry point copies it into
-  // the caller's out-parameter.
-  gPendingMatchFailure = PermutationMatchFailure::None;
   // Only RGBA and alpha-only (AAAA, Swizzle::ForWrite(ALPHA_8)) render targets are supported. Any
   // other write swizzle would need a mapping the precompiled shaders do not implement.
   auto outputSwizzle = programInfo->getOutputSwizzle();
@@ -523,8 +516,8 @@ static std::optional<PermutationMatchResult> ComputeMatch(const ProgramInfo* pro
     }
     return std::nullopt;
   }
-  auto matchFailure = PermutationMatchFailure::NoMatchingRule;
-  auto result = MatchPermutationImpl(programInfo);
+  auto matchFailure = PermutationMatchFailure::None;
+  auto result = MatchPermutationImpl(programInfo, &matchFailure);
   if (result) {
     auto info = ShaderRegistry::Find(result->shaderName);
     if (info == nullptr || !IsBuildablePermutation(*info, result->vertPermutationIndex,
@@ -538,11 +531,11 @@ static std::optional<PermutationMatchResult> ComputeMatch(const ProgramInfo* pro
       matchFailure = PermutationMatchFailure::UnsupportedTextureRead;
     }
   }
-  if (!result && matchFailure == PermutationMatchFailure::NoMatchingRule &&
-      gPendingMatchFailure != PermutationMatchFailure::None) {
-    matchFailure = gPendingMatchFailure;
+  // No rejecting site recorded a reason: the generic no-matching-rule verdict. (A successful
+  // match above reports None.)
+  if (!result && matchFailure == PermutationMatchFailure::None) {
+    matchFailure = PermutationMatchFailure::NoMatchingRule;
   }
-  gPendingMatchFailure = PermutationMatchFailure::None;
   if (failure != nullptr) {
     *failure = result ? PermutationMatchFailure::None : matchFailure;
   }

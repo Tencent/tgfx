@@ -27,7 +27,7 @@
 namespace tgfx {
 
 std::optional<GaussianBlur1DShader::Inputs> GaussianBlur1DShader::Extract(
-    const ProgramInfo* programInfo) {
+    const ProgramInfo* programInfo, PermutationMatchFailure*) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }

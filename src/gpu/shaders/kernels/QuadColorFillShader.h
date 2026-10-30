@@ -80,7 +80,8 @@ class QuadColorFillShader : public ShaderFamily<QuadColorFillShader> {
 
   /// Whole-draw guards (alpha-only target, geometry processor kind, the coverage FP
   /// classification), defined in the family's own .cpp, next to the GLSL it owns.
-  static std::optional<Inputs> Extract(const ProgramInfo* programInfo);
+  static std::optional<Inputs> Extract(const ProgramInfo* programInfo,
+                                       PermutationMatchFailure* failure);
 };
 
 }  // namespace tgfx

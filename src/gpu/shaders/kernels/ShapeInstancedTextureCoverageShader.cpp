@@ -38,7 +38,8 @@ static bool IsAnalyticClipKind(const std::optional<CoverageKind>& kind) {
 }
 
 std::optional<ShapeInstancedTextureCoverageShader::Inputs>
-ShapeInstancedTextureCoverageShader::Extract(const ProgramInfo* programInfo) {
+ShapeInstancedTextureCoverageShader::Extract(const ProgramInfo* programInfo,
+                                             PermutationMatchFailure* failure) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
@@ -80,7 +81,7 @@ ShapeInstancedTextureCoverageShader::Extract(const ProgramInfo* programInfo) {
       fp = first;
     } else {
       // Two masks, or two clips, are not a shape this kernel evaluates.
-      return Fail(PermutationMatchFailure::CoverageShape);
+      return Fail(failure, PermutationMatchFailure::CoverageShape);
     }
   } else {
     return std::nullopt;

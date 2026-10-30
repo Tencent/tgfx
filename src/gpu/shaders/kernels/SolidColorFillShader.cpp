@@ -28,7 +28,7 @@ namespace tgfx {
 // draw's shape maps onto the permutation indices. The pass-through shape (one HAS_XP axis fed by
 // the XferProcessor type) keeps a minimal Inputs struct.
 std::optional<SolidColorFillShader::Inputs> SolidColorFillShader::Extract(
-    const ProgramInfo* programInfo) {
+    const ProgramInfo* programInfo, PermutationMatchFailure*) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }

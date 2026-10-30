@@ -252,13 +252,18 @@ class ProgramInfo {
 
   BytesKey buildProgramKey() const;
 
-  // The cached program key (see programKey()): an idempotence cache like cachedMatch, invalidated
-  // by the pipeline-state setters.
+  // The three caches below are the one deliberate exemption to the no-mutable rule: each holds an
+  // idempotent derived value (the same inputs always produce the same result), computed lazily
+  // because the key inputs (colorWriteMask, depthStencil, cullMode) are set after construction.
+  // No observable behavior depends on whether a cache is filled, so the object stays semantically
+  // immutable; removing them would mean re-running the matcher walk and rebuilding the
+  // re-expression per consumer, which is exactly the per-draw cost they exist to avoid.
+
+  // The cached program key (see programKey()), invalidated by the pipeline-state setters.
   mutable std::optional<BytesKey> cachedProgramKey;
 
   // The cached MatchPermutation outcome (see PermutationMatch.h): filled by the first caller and
-  // reused by every later lookup of the same info. Mutable because the lookup entry takes a
-  // const info and the cache is an implementation detail of idempotence, not program state.
+  // reused by every later lookup of the same info.
   mutable std::optional<PermutationMatchOutcome> cachedMatch;
 
   // The re-expressing family's cached expression (see the public accessors above).

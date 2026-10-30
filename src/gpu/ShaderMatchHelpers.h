@@ -74,9 +74,9 @@ bool IsServableBlurChild(const FragmentProcessor* childFP);
 /// ColorSpaceXform) that share the TexturedEffect structural class.
 bool IsSupportedPointwiseOp(const FragmentProcessor* fp);
 
-/// Records why a candidate rejected the draw (a thread-local reason consumed by MatchPermutation)
-/// and returns nullopt.
-std::nullopt_t Fail(PermutationMatchFailure reason);
+/// Records why a candidate rejected the draw into the match's failure out-parameter (the first
+/// rejection wins) and returns nullopt.
+std::nullopt_t Fail(PermutationMatchFailure* failure, PermutationMatchFailure reason);
 
 /// Classifies the coverage FP itself (see CoverageKind); nullopt when it cannot be classified.
 std::optional<CoverageKind> ClassifyCoverage(const FragmentProcessor* coverageFP);

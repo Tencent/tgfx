@@ -26,7 +26,7 @@
 namespace tgfx {
 
 std::optional<ShapeInstancedFillShader::Inputs> ShapeInstancedFillShader::Extract(
-    const ProgramInfo* programInfo) {
+    const ProgramInfo* programInfo, PermutationMatchFailure*) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }

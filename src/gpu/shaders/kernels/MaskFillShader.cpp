@@ -26,7 +26,8 @@
 
 namespace tgfx {
 
-std::optional<MaskFillShader::Inputs> MaskFillShader::Extract(const ProgramInfo* programInfo) {
+std::optional<MaskFillShader::Inputs> MaskFillShader::Extract(const ProgramInfo* programInfo,
+                                                              PermutationMatchFailure*) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }

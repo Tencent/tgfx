@@ -29,6 +29,7 @@
 namespace tgfx {
 
 class ProgramInfo;
+enum class PermutationMatchFailure;
 
 /**
  * Detection traits for the optional members a ShaderFamily subclass may declare. A family that
@@ -87,7 +88,8 @@ std::unique_ptr<PrecompiledShader> CreateShaderFamilyInstance() {
  *   struct Inputs              — everything the runtime needs to pick a variant;
  *   static Compose(Inputs)     — pure mapping from inputs to dimension values, inline in the
  *                                header (shader_build_tool links it to enumerate the bundle);
- *   static Extract(ProgramInfo*) — whole-draw guards, defined in the family's .cpp.
+ *   static Extract(ProgramInfo*, failure) — whole-draw guards, defined in the family's .cpp;
+ *                                a rejection records its reason into failure (first wins).
  *
  * Match (Extract → Compose → encode) and Reachable (Compose over the input space, or the
  * mirrored domain product for a pass-through family) both route through the same Compose, so
@@ -112,11 +114,14 @@ class ShaderFamily : public PrecompiledShader {
 
   /**
    * Runtime matching: narrows the draw to Inputs, maps them through Compose, and encodes the
-   * dimension values into variant indices. The dispatch X-macro keeps calling Family::Match, so
-   * migration only changes what the family itself declares.
+   * dimension values into variant indices. A rejecting Extract records why into failure (first
+   * rejection wins); the value is only read when no family accepted the draw. The dispatch
+   * X-macro keeps calling Family::Match, so migration only changes what the family itself
+   * declares.
    */
-  static std::optional<PermutationVariant> Match(const ProgramInfo* programInfo) {
-    const auto inputs = T::Extract(programInfo);
+  static std::optional<PermutationVariant> Match(const ProgramInfo* programInfo,
+                                                 PermutationMatchFailure* failure) {
+    const auto inputs = T::Extract(programInfo, failure);
     if (!inputs) {
       return std::nullopt;
     }

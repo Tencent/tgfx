@@ -93,7 +93,8 @@ class GaussianBlur1DShader : public ShaderFamily<GaussianBlur1DShader> {
 
   /// Whole-draw guards (alpha-only target, GP kind, the blur child shape and the fixed kernel
   /// budget), defined in the family's own .cpp, next to the GLSL it owns.
-  static std::optional<Inputs> Extract(const ProgramInfo* programInfo);
+  static std::optional<Inputs> Extract(const ProgramInfo* programInfo,
+                                       PermutationMatchFailure* failure);
 };
 
 }  // namespace tgfx

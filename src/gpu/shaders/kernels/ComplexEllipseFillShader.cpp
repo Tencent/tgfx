@@ -27,7 +27,7 @@
 namespace tgfx {
 
 std::optional<ComplexEllipseFillShader::Inputs> ComplexEllipseFillShader::Extract(
-    const ProgramInfo* programInfo) {
+    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
@@ -44,7 +44,7 @@ std::optional<ComplexEllipseFillShader::Inputs> ComplexEllipseFillShader::Extrac
   // always-declared MaskTextureSampler (padded with the dummy texture when absent). LocalMask needs
   // a per-vertex UV this geometry does not provide and stays rejected.
   if (!SharedDeviceMaskValue(programInfo)) {
-    return Fail(PermutationMatchFailure::CoverageShape);
+    return Fail(failure, PermutationMatchFailure::CoverageShape);
   }
   auto* cegp = static_cast<const ComplexEllipseGeometryProcessor*>(gp);
   Inputs inputs;

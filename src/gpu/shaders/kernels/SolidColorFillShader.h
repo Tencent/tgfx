@@ -76,7 +76,8 @@ class SolidColorFillShader : public ShaderFamily<SolidColorFillShader> {
 
   /// Whole-draw guards (alpha-only target, geometry processor kind, direct clip shape), defined
   /// in the family's own .cpp (SolidColorFillShader.cpp) next to the GLSL it owns.
-  static std::optional<Inputs> Extract(const ProgramInfo* programInfo);
+  static std::optional<Inputs> Extract(const ProgramInfo* programInfo,
+                                       PermutationMatchFailure* failure);
 };
 
 }  // namespace tgfx

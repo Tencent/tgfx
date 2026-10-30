@@ -38,7 +38,7 @@
 namespace tgfx {
 
 std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::Extract(
-    const ProgramInfo* programInfo) {
+    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
@@ -107,7 +107,7 @@ std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::Extract(
     }
   }
   if (colorSpaceXformCount > 1 || gradientCount > 1) {
-    return Fail(PermutationMatchFailure::GradientOrNoiseBudget);
+    return Fail(failure, PermutationMatchFailure::GradientOrNoiseBudget);
   }
   for (size_t index = 0; index < leafCount; ++index) {
     auto leaf = chain->childProcessor(index);
@@ -138,7 +138,7 @@ std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::Extract(
     auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
     if (quadGP->getHasSubset()) {
       if (!IsChainQuadSubsetServable(quadGP, chain)) {
-        return Fail(PermutationMatchFailure::QuadSubset);
+        return Fail(failure, PermutationMatchFailure::QuadSubset);
       }
       inputs.hasSubset = true;
     }
@@ -181,7 +181,7 @@ std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::Extract(
     if (IsAOTGraphProfile(inputs.resourceProfile)) {
       // A draw the extended resource kinds cannot place is a coverage gap of the merged family,
       // reported as it was on the pre-merge Graph family.
-      return Fail(PermutationMatchFailure::PermutationNotEnumerated);
+      return Fail(failure, PermutationMatchFailure::PermutationNotEnumerated);
     }
     return std::nullopt;
   }

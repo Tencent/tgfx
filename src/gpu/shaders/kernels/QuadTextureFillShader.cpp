@@ -30,7 +30,7 @@
 namespace tgfx {
 
 std::optional<QuadTextureFillShader::Inputs> QuadTextureFillShader::Extract(
-    const ProgramInfo* programInfo) {
+    const ProgramInfo* programInfo, PermutationMatchFailure*) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }

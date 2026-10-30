@@ -247,7 +247,8 @@ class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
 
   /// Whole-draw guards (alpha-only target, the GP profile classification, the chain leaf and
   /// budget shapes), defined in the family's own .cpp, next to the GLSL it owns.
-  static std::optional<Inputs> Extract(const ProgramInfo* programInfo);
+  static std::optional<Inputs> Extract(const ProgramInfo* programInfo,
+                                       PermutationMatchFailure* failure);
 
  private:
   static bool ComposeGP(const Inputs& inputs, ComposedDims<VertDims>* vert,

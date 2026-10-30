@@ -25,7 +25,8 @@
 
 namespace tgfx {
 
-std::optional<MeshFillShader::Inputs> MeshFillShader::Extract(const ProgramInfo* programInfo) {
+std::optional<MeshFillShader::Inputs> MeshFillShader::Extract(const ProgramInfo* programInfo,
+                                                              PermutationMatchFailure*) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }

@@ -30,7 +30,7 @@
 namespace tgfx {
 
 std::optional<NonAARRectFillShader::Inputs> NonAARRectFillShader::Extract(
-    const ProgramInfo* programInfo) {
+    const ProgramInfo* programInfo, PermutationMatchFailure*) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }

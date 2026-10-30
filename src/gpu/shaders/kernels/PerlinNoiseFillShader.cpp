@@ -50,7 +50,7 @@ static bool ContainsPerlinSource(const FragmentProcessor* processor) {
 }
 
 std::optional<PerlinNoiseFillShader::Inputs> PerlinNoiseFillShader::Extract(
-    const ProgramInfo* programInfo) {
+    const ProgramInfo* programInfo, PermutationMatchFailure*) {
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
