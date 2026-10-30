@@ -20,11 +20,29 @@
 
 #include <vector>
 #include "gpu/AOTEffectDecomposer.h"
+#include "gpu/aot/DrawIR.h"
+#include "gpu/aot/Program.h"
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
 
 class ProgramInfo;
+
+/**
+ * The compiled result of one chain pass: the data-only program plus the build-time leaf plan the
+ * processor construction reads (graph node pointers for the texture leaves, the LUT gradient and
+ * noise parameter records, and the device-space leaf indices). The shell-free serving path
+ * replaces the leaf plan with the program's binding table.
+ */
+struct AOTChainCompile {
+  AOTProgram program = {};
+  // Texture leaves in sampler order: leafNodes[k] pairs with slot k and TextureSampler_k.
+  std::vector<const AOTEffectNode*> leafNodes = {};
+  const AOTGradientParameters* lutGradient = nullptr;
+  const AOTPerlinNoiseParameters* noise = nullptr;
+  // Indices into leafNodes of the device-space leaves, in leaf order.
+  std::vector<int> deviceLeafIndices = {};
+};
 
 /**
  * Rebuilds concrete FragmentProcessors from a decomposed AOT plan: the fused chain kernel for
@@ -51,6 +69,19 @@ class AOTChainBuilder {
    */
   static bool PlanChainPass(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
                             bool checkKernel, AOTResourceProfile* outProfile = nullptr);
+
+  /**
+   * Compiles one chain pass — the color graph's pass plus, when given, the draw's classified
+   * coverage terms — into the register-allocated program. This is the single admission entry:
+   * the plan-time checks (AOTPlanExecutor::CanExecute, the DAG planner through PlanChainPass)
+   * and the processor construction run exactly this pipeline, so a plan-time fit and a
+   * construction fit cannot drift. coverageTerms is null or empty for a plan pass (plan passes
+   * carry no draw coverage). checkKernel additionally verifies the pass's declared kernel
+   * against the profile the pass resolves.
+   */
+  static bool Compile(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
+                      const std::vector<AOTCoverageTerm>* coverageTerms, bool checkKernel,
+                      AOTChainCompile* out);
 
   /**
    * Rebuilds the color processor of one self-contained plan pass: the fused chain/graph processor

@@ -241,27 +241,6 @@ static bool IsIdentityMatrix(const std::array<float, 9>& values) {
          values[8] == 1.0f;
 }
 
-// The data-only result of flattening one pointwise DAG pass (plus the draw's folded coverage) onto
-// the fused chain kernel: the register-allocated instruction array, the texture leaves in sampler
-// order and the resolved resource profile. PlanChainLayout produces it without creating any
-// processor, so AOTPlanExecutor::CanExecute and the DAG planner run exactly the encoding, budget,
-// profile and register checks construction runs; BuildChainFP then only creates the processors.
-struct ChainLayout {
-  std::vector<AOTChainSlot> slots = {};
-  // Texture leaves in sampler order: leafNodes[k] pairs with slot k and TextureSampler_k.
-  std::vector<const AOTEffectNode*> leafNodes = {};
-  std::vector<AOTChainTiledLeaf> tiledLeaves = {};
-  const AOTGradientParameters* lutGradient = nullptr;
-  const AOTPerlinNoiseParameters* noise = nullptr;
-  uint32_t coordSourceMask = ~0u;
-  size_t rootRegister = 0;
-  int coverageRootRegister = -1;
-  int clipCoverageRegister = -1;
-  // Indices into leafNodes of the device-space leaves, in leaf order.
-  std::vector<int> deviceLeafIndices = {};
-  AOTResourceProfile profile = AOTResourceProfile::Automatic;
-};
-
 // Whether a texture node's parameters describe a leaf the chain kernel samples itself: a resolved
 // plain leaf (RGBAAA included), a device-space leaf (sampled through DeviceLeafCoordMatrix), or a
 // tiled leaf whose shader wrap modes the kernel's single-tap path implements. YUV planes need their
@@ -313,7 +292,7 @@ struct ChainBuildContext {
   AOTNodeID coverageRoot = AOTNodeID();
   bool coverageLeafFromUVCoord = false;
   bool checkKernel = false;
-  ChainLayout* layout = nullptr;
+  AOTChainCompile* layout = nullptr;
   // Stage results, consumed by the later stages.
   std::vector<const AOTEffectNode*> nodes = {};
   size_t colorCount = 0;
@@ -533,10 +512,10 @@ static bool EncodeTextureSourceSlot(ChainBuildContext* ctx, size_t combined, siz
   if (ctx->coverageLeafFromUVCoord && inputBase != 0) {
     // Atlas text: the coverage leaf sources its coordinates from the maskCoord attribute
     // (the uvCoord slot), while color leaves and gradients keep the position source.
-    layout->coordSourceMask |= 1u << static_cast<uint32_t>(layout->leafNodes.size());
+    layout->program.coordSourceMask |= 1u << static_cast<uint32_t>(layout->leafNodes.size());
   }
   if (HasShaderTiling(*parameters)) {
-    layout->tiledLeaves.push_back(
+    layout->program.tiledLeaves.push_back(
         {static_cast<int>(layout->leafNodes.size()), *parameters->tiledRecipe});
   }
   if (parameters->samplingKind == AOTTextureSamplingKind::Device) {
@@ -805,9 +784,9 @@ static bool EncodeChainSlots(ChainBuildContext* ctx) {
   ctx->hasGradient = false;
   // All-ones reproduces the legacy behavior (every target reads the uvCoord attribute when the GP
   // carries one). The atlas-text route clears it and sets only the coverage leaves' bits.
-  layout->coordSourceMask = ctx->coverageLeafFromUVCoord ? 0u : ~0u;
+  layout->program.coordSourceMask = ctx->coverageLeafFromUVCoord ? 0u : ~0u;
   layout->leafNodes.clear();
-  layout->tiledLeaves.clear();
+  layout->program.tiledLeaves.clear();
   layout->lutGradient = nullptr;
   layout->noise = nullptr;
   layout->deviceLeafIndices.clear();
@@ -864,7 +843,8 @@ static bool ResolveFinalChainProfile(ChainBuildContext* ctx) {
   }
   ctx->finalProfile = declaredProfile;
   if (ctx->finalProfile == AOTResourceProfile::Chain &&
-      (ctx->hasGradient || layout->tiledLeaves.size() > ChainResourceCapacity.tiledRecipes)) {
+      (ctx->hasGradient ||
+       layout->program.tiledLeaves.size() > ChainResourceCapacity.tiledRecipes)) {
     if (ctx->coverageGraph == nullptr) {
       return false;
     }
@@ -1057,7 +1037,7 @@ static bool AssignChainRegisters(ChainBuildContext* ctx) {
 static bool FinalizeChainLayout(ChainBuildContext* ctx) {
   auto* layout = ctx->layout;
   std::vector<int> tiledLeafIndices = {};
-  for (const auto& tiled : layout->tiledLeaves) {
+  for (const auto& tiled : layout->program.tiledLeaves) {
     tiledLeafIndices.push_back(tiled.leafIndex);
   }
   if (ctx->assignment.rootRegister < 0 ||
@@ -1068,11 +1048,11 @@ static bool FinalizeChainLayout(ChainBuildContext* ctx) {
           &ctx->finalProfile)) {
     return false;
   }
-  layout->slots = std::move(ctx->slots);
-  layout->rootRegister = static_cast<size_t>(ctx->assignment.rootRegister);
-  layout->coverageRootRegister = ctx->assignment.coverageRootRegister;
-  layout->clipCoverageRegister = ctx->assignment.clipCoverageRegister;
-  layout->profile = ctx->finalProfile;
+  layout->program.slots = std::move(ctx->slots);
+  layout->program.rootRegister = static_cast<size_t>(ctx->assignment.rootRegister);
+  layout->program.coverageRootRegister = ctx->assignment.coverageRootRegister;
+  layout->program.clipCoverageRegister = ctx->assignment.clipCoverageRegister;
+  layout->program.profile = ctx->finalProfile;
   return true;
 }
 
@@ -1087,7 +1067,7 @@ static bool FinalizeChainLayout(ChainBuildContext* ctx) {
 static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
                             const AOTEffectGraph* coverageGraph, AOTNodeID coverageRoot,
                             bool coverageLeafFromUVCoord, const std::vector<AOTNodeID>& clipLinks,
-                            bool checkKernel, ChainLayout* layout) {
+                            bool checkKernel, AOTChainCompile* layout) {
   ChainBuildContext ctx = {};
   ctx.graph = &graph;
   ctx.pass = &pass;
@@ -1352,7 +1332,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
     }
     coverageGraph = &coverage.graph;
   }
-  ChainLayout layout = {};
+  AOTChainCompile layout = {};
   if (!PlanChainLayout(graph, pass, coverageGraph, coverage.coverageRoot,
                        coverage.coverageLeafFromUVCoord, coverage.clipLinks, true, &layout)) {
     return nullptr;
@@ -1402,7 +1382,7 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   if (!BuildChainMaskChild(allocator, coverage.mask, padding, samplerChildren, &maskChildResult)) {
     return nullptr;
   }
-  const auto& tiledLeaves = layout.tiledLeaves;
+  const auto& tiledLeaves = layout.program.tiledLeaves;
   const int tiledLeafIndex = tiledLeaves.empty() ? -1 : tiledLeaves[0].leafIndex;
   const int tiledLeafIndex2 = tiledLeaves.size() < 2 ? -1 : tiledLeaves[1].leafIndex;
   const AOTTiledTextureRecipe* recipePtr = tiledLeaves.empty() ? nullptr : &tiledLeaves[0].recipe;
@@ -1423,10 +1403,11 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
     deviceLeaves.push_back({leafIndex, parameters->textureProxy, parameters->uvMatrix});
   }
   return AOTPointwiseChainProcessor::Make(
-      allocator, std::move(leaves), layout.slots, layout.rootRegister, tiledLeafIndex, recipePtr,
-      std::move(maskChildResult.child), layout.coverageRootRegister, layout.coordSourceMask,
-      std::move(lutChild), lutLeafIndex, std::move(samplerPadding), maskChildResult.isPhantom,
-      layout.clipCoverageRegister, tiledLeafIndex2, recipePtr2, layout.profile,
+      allocator, std::move(leaves), layout.program.slots, layout.program.rootRegister,
+      tiledLeafIndex, recipePtr, std::move(maskChildResult.child),
+      layout.program.coverageRootRegister, layout.program.coordSourceMask, std::move(lutChild),
+      lutLeafIndex, std::move(samplerPadding), maskChildResult.isPhantom,
+      layout.program.clipCoverageRegister, tiledLeafIndex2, recipePtr2, layout.program.profile,
       additionalTiledLeaves, deviceLeaves);
 }
 
@@ -1434,14 +1415,32 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
 
 bool AOTChainBuilder::PlanChainPass(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
                                     bool checkKernel, AOTResourceProfile* outProfile) {
-  ChainLayout layout = {};
-  if (!PlanChainLayout(graph, pass, nullptr, AOTNodeID(), false, {}, checkKernel, &layout)) {
+  AOTChainCompile compile = {};
+  if (!Compile(graph, pass, nullptr, checkKernel, &compile)) {
     return false;
   }
   if (outProfile != nullptr) {
-    *outProfile = layout.profile;
+    *outProfile = compile.program.profile;
   }
   return true;
+}
+
+bool AOTChainBuilder::Compile(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
+                              const std::vector<AOTCoverageTerm>* coverageTerms, bool checkKernel,
+                              AOTChainCompile* out) {
+  if (out == nullptr) {
+    return false;
+  }
+  ChainCoverageGraph coverage = {};
+  const AOTEffectGraph* coverageGraph = nullptr;
+  if (coverageTerms != nullptr && !coverageTerms->empty()) {
+    if (!MergeCoverageTerms(*coverageTerms, &coverage)) {
+      return false;
+    }
+    coverageGraph = &coverage.graph;
+  }
+  return PlanChainLayout(graph, pass, coverageGraph, coverage.coverageRoot,
+                         coverage.coverageLeafFromUVCoord, coverage.clipLinks, checkKernel, out);
 }
 
 AOTTextureParameters AOTChainBuilder::IntermediateSource(std::shared_ptr<TextureProxy> textureProxy,
