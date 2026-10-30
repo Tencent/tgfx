@@ -1423,8 +1423,9 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     // edges of a rect, oval, or path) is no obstacle: the terminal pass keeps the draw's own
     // geometry processor.
     std::optional<AOTRoutePlan> colors = std::nullopt;
+    AOTDecomposeOutcome rejection = AOTDecomposeOutcome::Trivial;
     if (!op->hasCoverageProcessors()) {
-      colors = AOTRouter::Route(colorProcessors);
+      colors = AOTRouter::Route(colorProcessors, &rejection);
     }
     if (colors.has_value()) {
       if (AOTRouter::PlanRequiresTask(colors->plan)) {
@@ -1433,19 +1434,12 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
         }
       }
       // A single-pass plan needs no task: the plain route's matcher serves it at prepare time.
-    } else if (cache->diagnosticRecordingEnabled()) {
-      // The route was attempted and refused: record the pure-analysis reason so a draw left on
-      // the plain route carries an observable "why" (which processor lacks a lowering, which
-      // shape no planner covers) instead of nothing. Trivial (empty chain) is not a rejection.
-      // A color chain that is routable on its own was refused here only because the draw still
-      // carries coverage the color-only route cannot apply, which is NotRoutable as well.
-      auto analysis = AOTEffectDecomposer::AnalyzeChain(colorProcessors);
-      auto outcome = analysis.outcome == AOTDecomposeOutcome::FusablePointwise
-                         ? AOTDecomposeOutcome::NotRoutable
-                         : analysis.outcome;
-      if (outcome != AOTDecomposeOutcome::Trivial) {
-        cache->recordDecomposeRejection(outcome);
-      }
+    } else if (cache->diagnosticRecordingEnabled() && rejection != AOTDecomposeOutcome::Trivial) {
+      // The route was attempted and refused: the reason comes straight from the attempt — which
+      // processor lacked a lowering or which shape no planner covered — with no second analysis
+      // pass. A draw whose route was never attempted (it still carries coverage) records nothing:
+      // classifying it would require the analysis the production path does not run.
+      cache->recordDecomposeRejection(rejection);
     }
   }
   drawOps.emplace_back(std::move(op));

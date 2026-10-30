@@ -125,10 +125,6 @@ bool StandardDrawOp::executePrepared(RenderPass* renderPass, RenderTarget* rende
     // No uniform backing store: submitting would draw with unwritten (or garbage) uniforms.
     return false;
   }
-  if (offscreenFillKey != InvalidOffscreenFillKey) {
-    auto cache = preparedRenderTarget->getContext()->precompiledShaderCache();
-    cache->recordOffscreenFillProgram(offscreenFillKey, preparedProgram->getProvenance().program);
-  }
   applyScissor(renderPass, renderTarget);
   onDraw(renderPass, renderTarget);
 

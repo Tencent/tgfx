@@ -54,7 +54,7 @@ std::shared_ptr<TextureProxy> TransformImage::lockTextureProxySubset(
                                            AddressOf(sourceMatrix));
   auto drawingManager = args.context->drawingManager();
   if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags,
-                                    Point::Zero(), OffscreenFillSource::TransformImage)) {
+                                    Point::Zero())) {
     return nullptr;
   }
   return renderTarget->asTextureProxy();

@@ -9690,8 +9690,8 @@ static bool ReadBackUDFProxy(Context* context, std::shared_ptr<TextureProxy> pro
   if (fillProcessor == nullptr) {
     return false;
   }
-  if (!context->drawingManager()->fillRTWithFP(target, std::move(fillProcessor), 0, Point::Zero(),
-                                               OffscreenFillSource::Unknown)) {
+  if (!context->drawingManager()->fillRTWithFP(target, std::move(fillProcessor), 0,
+                                               Point::Zero())) {
     return false;
   }
   auto surface = Surface::MakeFrom(target);

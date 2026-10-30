@@ -150,14 +150,6 @@ class AOTEffectDecomposer {
    * @return the per-axis feasibility classification.
    */
   static AOTDecomposeAnalysis Analyze(const ProgramInfo* programInfo);
-
-  /**
-   * Pure analysis of a single color-processor chain (no ProgramInfo needed), classifying whether
-   * the chain reduces onto the current kernel basis. Same classification the audit uses, exposed
-   * separately so the runtime decomposition route can record why a draw fell back to the plain
-   * route at op-construction time, before any ProgramInfo exists.
-   */
-  static AOTAxisAnalysis AnalyzeChain(const std::vector<const FragmentProcessor*>& processors);
 };
 
 }  // namespace tgfx

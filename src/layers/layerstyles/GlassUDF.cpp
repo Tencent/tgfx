@@ -133,7 +133,7 @@ std::shared_ptr<TextureProxy> GenerateGlassUDFTexture(Context* context,
       coarseRadius.x, GlassUDFBlurDirection::Horizontal, GlassUDFMaxTentRadius, false, field);
   if (horizontalProcessor == nullptr ||
       !context->drawingManager()->fillRTWithFP(horizontalTarget, std::move(horizontalProcessor), 0,
-                                               Point::Zero(), OffscreenFillSource::GlassUDF)) {
+                                               Point::Zero())) {
     return nullptr;
   }
   auto verticalMatrix = Matrix::MakeTrans(0.0f, textureRect.top - horizontalRect.top);
@@ -157,7 +157,7 @@ std::shared_ptr<TextureProxy> GenerateGlassUDFTexture(Context* context,
       coarseRadius.y, GlassUDFBlurDirection::Vertical, GlassUDFMaxTentRadius, true, field);
   if (verticalProcessor == nullptr ||
       !context->drawingManager()->fillRTWithFP(verticalTarget, std::move(verticalProcessor), 0,
-                                               Point::Zero(), OffscreenFillSource::GlassUDF)) {
+                                               Point::Zero())) {
     return nullptr;
   }
   auto result = verticalTarget->asTextureProxy();

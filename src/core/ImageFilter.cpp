@@ -63,7 +63,7 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
       asFragmentProcessor(std::move(source), fpArgs, {}, SrcRectConstraint::Fast, &matrix);
   auto drawingManager = args.context->drawingManager();
   if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags,
-                                    Point::Zero(), OffscreenFillSource::ImageFilter)) {
+                                    Point::Zero())) {
     return nullptr;
   }
   return renderTarget->asTextureProxy();

@@ -59,7 +59,6 @@ class DrawingManager {
                                       PlacementPtr<FragmentProcessor> processor,
                                       uint32_t renderFlags,
                                       const Point& coordOffset = Point::Zero(),
-                                      OffscreenFillKey diagnosticKey = InvalidOffscreenFillKey,
                                       float inputAlpha = 1.0f);
 
   /**
@@ -68,19 +67,7 @@ class DrawingManager {
    */
   bool fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
                     PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags,
-                    const Point& coordOffset = Point::Zero(),
-                    OffscreenFillSource source = OffscreenFillSource::Unknown);
-
-  /**
-   * Plans an offscreen fill's processor the way fillRTWithFP does, and records the offscreen-fill
-   * diagnostic when diagnostic recording is on (diagnosticKey receives its key, or
-   * InvalidOffscreenFillKey). Returns true when the fill should take the plan in graph/plan: the
-   * decomposition route is on, the processor is a composite tree (a bare single-source fill is
-   * already served by the direct matchers), and an executable plan exists.
-   */
-  bool planFill(const FragmentProcessor* processor, const Point& coordOffset,
-                OffscreenFillSource source, AOTEffectGraph* graph, AOTEffectPlan* plan,
-                OffscreenFillKey* diagnosticKey);
+                    const Point& coordOffset = Point::Zero());
 
   std::shared_ptr<OpsCompositor> addOpsCompositor(std::shared_ptr<RenderTargetProxy> renderTarget,
                                                   uint32_t renderFlags,

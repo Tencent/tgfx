@@ -99,7 +99,7 @@ std::shared_ptr<TextureProxy> RGBAAAImage::lockTextureProxy(const TPArgs& args) 
   auto processor = asFragmentProcessor(fpArgs, {}, nullptr);
   auto drawingManager = args.context->drawingManager();
   if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags,
-                                    Point::Zero(), OffscreenFillSource::RGBAAAImage)) {
+                                    Point::Zero())) {
     return nullptr;
   }
   return renderTarget->asTextureProxy();

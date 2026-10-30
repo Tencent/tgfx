@@ -62,7 +62,7 @@ static void Blur1D(PlacementPtr<FragmentProcessor> source,
   auto processor = GaussianBlur1DFragmentProcessor::Make(
       context->drawingAllocator(), std::move(source), sigma, direction, stepLength, MAX_BLUR_SIGMA);
   drawingManager->fillRTWithFP(std::move(renderTarget), std::move(processor), renderFlags,
-                               Point::Zero(), OffscreenFillSource::GaussianBlur);
+                               Point::Zero());
 }
 
 std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
@@ -177,7 +177,7 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
   }
   const auto drawingManager = args.context->drawingManager();
   drawingManager->fillRTWithFP(renderTarget, std::move(finalProcessor), args.renderFlags,
-                               Point::Zero(), OffscreenFillSource::GaussianBlur);
+                               Point::Zero());
 
   return renderTarget->asTextureProxy();
 }
@@ -220,8 +220,7 @@ PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::getSourceFragmentProces
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  context->drawingManager()->fillRTWithFP(renderTarget, std::move(fp), renderFlags, Point::Zero(),
-                                          OffscreenFillSource::GaussianBlur);
+  context->drawingManager()->fillRTWithFP(renderTarget, std::move(fp), renderFlags, Point::Zero());
   auto allocator = context->drawingAllocator();
   return TiledTextureEffect::Make(allocator, renderTarget->asTextureProxy(), samplingArgs);
 }

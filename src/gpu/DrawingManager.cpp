@@ -50,7 +50,6 @@ DrawingBuffer* DrawingManager::createDrawingBuffer() {
 PlacementPtr<DrawOp> DrawingManager::makeFillDrawOp(std::shared_ptr<RenderTargetProxy> renderTarget,
                                                     PlacementPtr<FragmentProcessor> processor,
                                                     uint32_t renderFlags, const Point& coordOffset,
-                                                    OffscreenFillKey diagnosticKey,
                                                     float inputAlpha) {
   if (renderTarget == nullptr || processor == nullptr) {
     return nullptr;
@@ -83,9 +82,6 @@ PlacementPtr<DrawOp> DrawingManager::makeFillDrawOp(std::shared_ptr<RenderTarget
   }
   drawOp->addColorFP(std::move(processor));
   drawOp->setBlendMode(BlendMode::Src);
-  if (diagnosticKey != InvalidOffscreenFillKey) {
-    drawOp->setOffscreenFillDiagnostic(diagnosticKey);
-  }
   return drawOp;
 }
 
@@ -96,33 +92,6 @@ bool DrawingManager::isFillRouteCandidate(const FragmentProcessor* processor) co
   auto cache = context->precompiledShaderCache();
   return cache != nullptr && cache->isLoaded() && cache->decompositionEnabled() &&
          processor != nullptr && processor->numChildProcessors() > 0;
-}
-
-bool DrawingManager::planFill(const FragmentProcessor* processor, const Point& coordOffset,
-                              OffscreenFillSource source, AOTEffectGraph* graph,
-                              AOTEffectPlan* plan, OffscreenFillKey* diagnosticKey) {
-  *diagnosticKey = InvalidOffscreenFillKey;
-  auto cache = context->precompiledShaderCache();
-  bool routeCandidate = isFillRouteCandidate(processor);
-  bool recording = cache != nullptr && cache->diagnosticRecordingEnabled();
-  if (processor == nullptr || (!routeCandidate && !recording)) {
-    return false;
-  }
-  std::string blocker;
-  bool lowerSucceeded = AOTEffectDecomposer::Lower({processor}, graph, &blocker);
-  // Decompose only returns plans the executor runs, so this is also the production verdict.
-  bool decomposeSucceeded = lowerSucceeded && AOTEffectDecomposer::Decompose(*graph, plan);
-  if (recording) {
-    std::vector<AOTKernelKind> kernels = {};
-    kernels.reserve(plan->passes.size());
-    for (const auto& pass : plan->passes) {
-      kernels.push_back(pass.kernel);
-    }
-    *diagnosticKey =
-        cache->recordOffscreenFillAnalysis(source, coordOffset != Point::Zero(), processor->name(),
-                                           lowerSucceeded, blocker, decomposeSucceeded, kernels);
-  }
-  return routeCandidate && decomposeSucceeded;
 }
 
 bool DrawingManager::submitFillPlanTask(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
@@ -146,25 +115,23 @@ bool DrawingManager::submitFillPlanTask(const AOTEffectGraph& graph, const AOTEf
 
 bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
                                   PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags,
-                                  const Point& coordOffset, OffscreenFillSource source) {
-  AOTEffectGraph graph = {};
-  AOTEffectPlan plan = {};
-  OffscreenFillKey diagnosticKey = InvalidOffscreenFillKey;
-  bool planned = planFill(processor.get(), coordOffset, source, &graph, &plan, &diagnosticKey);
-  auto drawOp =
-      makeFillDrawOp(renderTarget, std::move(processor), renderFlags, coordOffset, diagnosticKey);
+                                  const Point& coordOffset) {
+  std::optional<AOTRoutePlan> routed = std::nullopt;
+  if (isFillRouteCandidate(processor.get())) {
+    routed = AOTRouter::Route({processor.get()});
+  }
+  auto drawOp = makeFillDrawOp(renderTarget, std::move(processor), renderFlags, coordOffset);
   if (drawOp == nullptr) {
     return false;
   }
-  // The original tree was already planned above (the diagnostics need the plan too), so the
-  // fill's route only has to submit that plan. The plan executor takes ownership of the draw op
-  // on success, so the fill must stop there: falling through to the plain branch would submit a
-  // null op. An offscreen fill owns a fresh target, so the task clears its full backing first and
-  // a shader-side sample cannot observe pixels left by an earlier scratch allocation. A
-  // single-pass chain-capable plan needs no task: the fill's RectDrawOp is a StandardDrawOp, so
-  // the plain lookup serves it at prepare time.
-  if (planned && AOTRouter::PlanRequiresTask(plan) &&
-      submitFillPlanTask(graph, plan, renderFlags, renderTarget, coordOffset, &drawOp)) {
+  // The plan executor takes ownership of the draw op on success, so the fill must stop there:
+  // falling through to the plain branch would submit a null op. An offscreen fill owns a fresh
+  // target, so the task clears its full backing first and a shader-side sample cannot observe
+  // pixels left by an earlier scratch allocation. A single-pass chain-capable plan needs no task:
+  // the fill's RectDrawOp is a StandardDrawOp, so the plain lookup serves it at prepare time.
+  if (routed.has_value() && AOTRouter::PlanRequiresTask(routed->plan) &&
+      submitFillPlanTask(routed->graph, routed->plan, renderFlags, renderTarget, coordOffset,
+                         &drawOp)) {
     return true;
   }
   auto allocator = drawingAllocator();

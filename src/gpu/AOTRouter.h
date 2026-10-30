@@ -56,9 +56,13 @@ class AOTRouter {
    * Lowers and decomposes the processors and returns the graph and plan for them, or nullopt when
    * the processors do not lower or no planner produces an executable plan. What to do with a plan
    * is the caller's: PlanRequiresTask decides between building a render task now and leaving the
-   * draw on the plain route for the prepare-time fused walk.
+   * draw on the plain route for the prepare-time fused walk. failureOutcome, when not null,
+   * receives why an attempt failed (Trivial for an empty chain, BlockedByLowering when a processor
+   * lacks a lowering, UnsupportedShape when no planner covers the lowered shape, FusablePointwise
+   * on success) — the same facts the attempt itself computed, with no second analysis pass.
    */
-  static std::optional<AOTRoutePlan> Route(const std::vector<const FragmentProcessor*>& processors);
+  static std::optional<AOTRoutePlan> Route(const std::vector<const FragmentProcessor*>& processors,
+                                           AOTDecomposeOutcome* failureOutcome = nullptr);
 
   /**
    * Whether a plan can only run as a plan task: more than one pass, or a single pass whose kernel

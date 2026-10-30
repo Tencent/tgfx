@@ -29,11 +29,26 @@ static bool IsFusedServingKernel(AOTKernelKind kernel) {
 }
 
 std::optional<AOTRoutePlan> AOTRouter::Route(
-    const std::vector<const FragmentProcessor*>& processors) {
+    const std::vector<const FragmentProcessor*>& processors, AOTDecomposeOutcome* failureOutcome) {
   AOTRoutePlan routed = {};
-  if (!AOTEffectDecomposer::Lower(processors, &routed.graph) ||
-      !AOTEffectDecomposer::Decompose(routed.graph, &routed.plan)) {
+  std::string blocker;
+  if (!AOTEffectDecomposer::Lower(processors, &routed.graph, &blocker)) {
+    if (failureOutcome != nullptr) {
+      *failureOutcome = processors.empty()
+                            ? AOTDecomposeOutcome::Trivial
+                            : (blocker.empty() ? AOTDecomposeOutcome::UnsupportedShape
+                                               : AOTDecomposeOutcome::BlockedByLowering);
+    }
     return std::nullopt;
+  }
+  if (!AOTEffectDecomposer::Decompose(routed.graph, &routed.plan)) {
+    if (failureOutcome != nullptr) {
+      *failureOutcome = AOTDecomposeOutcome::UnsupportedShape;
+    }
+    return std::nullopt;
+  }
+  if (failureOutcome != nullptr) {
+    *failureOutcome = AOTDecomposeOutcome::FusablePointwise;
   }
   return routed;
 }

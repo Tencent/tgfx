@@ -28,6 +28,7 @@
 #include "gpu/AOTEffectDecomposer.h"
 #include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/AOTPlanExecutor.h"
+#include "gpu/AOTRouter.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/OpsCompositor.h"
 #include "gpu/ProgramInfo.h"
@@ -1245,8 +1246,9 @@ TGFX_TEST(AOTEffectTest, DeviceSpaceLinearChainUsesChainKernel) {
     auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
     EXPECT_EQ(chain->deviceLeafMask(), 1u);
     EXPECT_EQ(chain->childProcessor(0)->name(), "TextureEffect");
-    EXPECT_EQ(AOTEffectDecomposer::AnalyzeChain(processors).outcome,
-              AOTDecomposeOutcome::FusablePointwise);
+    AOTDecomposeOutcome outcome = AOTDecomposeOutcome::Trivial;
+    AOTRouter::Route(processors, &outcome);
+    EXPECT_EQ(outcome, AOTDecomposeOutcome::FusablePointwise);
   }
 
   // Every leaf carries its own device-space coordinate matrix, so a DAG blending two device-space
@@ -3108,15 +3110,16 @@ TGFX_TEST(AOTEffectTest, AdmissionMatrixKeepsPlanningAndConstructionAligned) {
     AOTEffectGraph graph;
     bool lowered = AOTEffectDecomposer::Lower(processors, &graph);
     EXPECT_EQ(lowered, row.lowers);
-    auto analysis = AOTEffectDecomposer::AnalyzeChain(processors);
+    AOTDecomposeOutcome outcome = AOTDecomposeOutcome::Trivial;
+    AOTRouter::Route(processors, &outcome);
     if (!lowered) {
-      EXPECT_NE(analysis.outcome, AOTDecomposeOutcome::FusablePointwise);
+      EXPECT_NE(outcome, AOTDecomposeOutcome::FusablePointwise);
       continue;
     }
     AOTEffectPlan plan;
     bool planned = AOTEffectDecomposer::Decompose(graph, &plan);
     EXPECT_EQ(planned, row.planned);
-    EXPECT_EQ(analysis.outcome == AOTDecomposeOutcome::FusablePointwise, planned);
+    EXPECT_EQ(outcome == AOTDecomposeOutcome::FusablePointwise, planned);
     if (!planned) {
       continue;
     }

@@ -152,53 +152,6 @@ const char* PrecompiledAOTStageName(PrecompiledAOTStage stage);
  * hits AOT (see design §9.2). Atomic fallbacks count planned AOT Draws that execute only the
  * untouched original Draw after strict preparation rejects the whole plan.
  */
-enum class OffscreenFillSource : uint8_t {
-  Unknown,
-  GaussianBlur,
-  GlassUDF,
-  ImageFilter,
-  TransformImage,
-  RGBAAAImage,
-  Count,
-};
-
-const char* OffscreenFillSourceName(OffscreenFillSource source);
-
-using OffscreenFillKey = uint64_t;
-static constexpr OffscreenFillKey InvalidOffscreenFillKey = 0;
-
-struct OffscreenFillCorrelation {
-  OffscreenFillSource source = OffscreenFillSource::Unknown;
-  std::string topLevelProcessor = {};
-  std::string kernelSignature = {};
-  uint64_t calls = 0;
-  uint64_t canExecute = 0;
-  uint64_t precompiledPrograms = 0;
-  uint64_t programBuilderPrograms = 0;
-  uint64_t precompiledCanExecute = 0;
-  uint64_t programBuilderCanExecute = 0;
-};
-
-/// Diagnostic-only aggregate for fillRTWithFP() calls. Static planning fields are sampled before
-/// the processor is moved into a DrawOp; runtime provenance is recorded after DrawOp preparation.
-struct OffscreenFillStats {
-  uint64_t calls = 0;
-  uint64_t coordOffsetNonZero = 0;
-  uint64_t lowerSucceeded = 0;
-  uint64_t decomposeSucceeded = 0;
-  uint64_t canExecute = 0;
-  uint64_t pointwiseChainPlans = 0;
-  uint64_t pointwiseGraphPlans = 0;
-  // Plans that split a linear chain into several chain passes.
-  uint64_t multiPassPlans = 0;
-  uint64_t precompiledPrograms = 0;
-  uint64_t programBuilderPrograms = 0;
-  uint64_t precompiledCanExecute = 0;
-  uint64_t programBuilderCanExecute = 0;
-  std::unordered_map<std::string, uint64_t> lowerBlockers = {};
-  std::unordered_map<std::string, uint64_t> topLevelProcessors = {};
-};
-
 struct AOTDrawStats {
   uint64_t draws = 0;
   uint64_t completeAOTDraws = 0;
@@ -477,17 +430,6 @@ class PrecompiledShaderCache {
   /// Returns a snapshot of accumulated Draw-level metrics since the last reset.
   AOTDrawStats drawStats() const;
 
-  OffscreenFillKey recordOffscreenFillAnalysis(OffscreenFillSource source, bool coordOffsetNonZero,
-                                               const std::string& topLevelProcessor,
-                                               bool lowerSucceeded, const std::string& lowerBlocker,
-                                               bool decomposeSucceeded,
-                                               const std::vector<AOTKernelKind>& kernels);
-  void recordOffscreenFillProgram(OffscreenFillKey key, ProgramOrigin origin);
-  OffscreenFillStats offscreenFillStats() const;
-  std::vector<OffscreenFillCorrelation> offscreenFillCorrelations() const;
-  std::array<OffscreenFillStats, static_cast<size_t>(OffscreenFillSource::Count)>
-  offscreenFillStatsBySource() const;
-
   /// Resets AOT stages, artifact lookups, fallback counters, detailed records, and Draw-level
   /// metrics to zero.
   void resetStats();
@@ -555,18 +497,6 @@ class PrecompiledShaderCache {
   std::vector<JITProgramRecord> _jitProgramRecords = {};
   mutable std::mutex drawStatsMutex = {};
   AOTDrawStats _drawStats = {};
-  struct OffscreenFillStaticRecord {
-    OffscreenFillSource source = OffscreenFillSource::Unknown;
-    std::string topLevelProcessor = {};
-    std::string kernelSignature = {};
-    bool canExecute = false;
-  };
-  mutable std::mutex offscreenFillStatsMutex = {};
-  std::atomic<OffscreenFillKey> _nextOffscreenFillKey{1};
-  std::unordered_map<OffscreenFillKey, OffscreenFillStaticRecord> _offscreenFillRecords = {};
-  std::unordered_map<std::string, OffscreenFillCorrelation> _offscreenFillCorrelations = {};
-  std::array<OffscreenFillStats, static_cast<size_t>(OffscreenFillSource::Count)>
-      _offscreenFillStats = {};
 };
 
 }  // namespace tgfx

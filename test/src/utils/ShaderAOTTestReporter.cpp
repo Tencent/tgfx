@@ -115,8 +115,6 @@ bool AOTCoverageGateMet(const AOTCoverageGateResult& gate, uint64_t precompiledA
 static constexpr size_t FALLBACK_REASON_COUNT =
     static_cast<size_t>(PrecompiledFallbackReason::Count);
 static constexpr size_t AOT_STAGE_COUNT = static_cast<size_t>(PrecompiledAOTStage::Count);
-static constexpr size_t OFFSCREEN_FILL_SOURCE_COUNT =
-    static_cast<size_t>(OffscreenFillSource::Count);
 
 struct ShaderAOTTestResult {
   std::string testName;
@@ -135,8 +133,6 @@ struct ShaderAOTTestResult {
   std::vector<PrecompiledFallbackRecord> fallbackRecords = {};
   std::vector<JITProgramRecord> jitProgramRecords = {};
   AOTDrawStats drawStats = {};
-  std::array<OffscreenFillStats, OFFSCREEN_FILL_SOURCE_COUNT> offscreenFillStats = {};
-  std::vector<OffscreenFillCorrelation> offscreenFillCorrelations = {};
 };
 
 struct ShaderAOTSummary {
@@ -146,47 +142,7 @@ struct ShaderAOTSummary {
   std::array<uint64_t, AOT_STAGE_COUNT> aotStageCounts = {};
   std::array<uint64_t, FALLBACK_REASON_COUNT> fallbackCounts = {};
   AOTDrawStats drawStats = {};
-  std::array<OffscreenFillStats, OFFSCREEN_FILL_SOURCE_COUNT> offscreenFillStats = {};
-  std::unordered_map<std::string, OffscreenFillCorrelation> offscreenFillCorrelations = {};
 };
-
-static void AddOffscreenFillStats(OffscreenFillStats* target, const OffscreenFillStats& source) {
-  target->calls += source.calls;
-  target->coordOffsetNonZero += source.coordOffsetNonZero;
-  target->lowerSucceeded += source.lowerSucceeded;
-  target->decomposeSucceeded += source.decomposeSucceeded;
-  target->canExecute += source.canExecute;
-  target->pointwiseChainPlans += source.pointwiseChainPlans;
-  target->pointwiseGraphPlans += source.pointwiseGraphPlans;
-  target->multiPassPlans += source.multiPassPlans;
-  target->precompiledPrograms += source.precompiledPrograms;
-  target->programBuilderPrograms += source.programBuilderPrograms;
-  target->precompiledCanExecute += source.precompiledCanExecute;
-  target->programBuilderCanExecute += source.programBuilderCanExecute;
-  for (const auto& [name, count] : source.lowerBlockers) {
-    target->lowerBlockers[name] += count;
-  }
-  for (const auto& [name, count] : source.topLevelProcessors) {
-    target->topLevelProcessors[name] += count;
-  }
-}
-
-static void AddOffscreenFillCorrelation(
-    std::unordered_map<std::string, OffscreenFillCorrelation>* target,
-    const OffscreenFillCorrelation& source) {
-  auto key = std::string(OffscreenFillSourceName(source.source)) + "|" + source.topLevelProcessor +
-             "|" + source.kernelSignature;
-  auto& value = (*target)[key];
-  value.source = source.source;
-  value.topLevelProcessor = source.topLevelProcessor;
-  value.kernelSignature = source.kernelSignature;
-  value.calls += source.calls;
-  value.canExecute += source.canExecute;
-  value.precompiledPrograms += source.precompiledPrograms;
-  value.programBuilderPrograms += source.programBuilderPrograms;
-  value.precompiledCanExecute += source.precompiledCanExecute;
-  value.programBuilderCanExecute += source.programBuilderCanExecute;
-}
 
 static void AddDrawStats(AOTDrawStats* target, const AOTDrawStats& source) {
   target->draws += source.draws;
@@ -212,23 +168,6 @@ static void AddDrawStats(AOTDrawStats* target, const AOTDrawStats& source) {
   for (size_t index = 0; index < target->decomposeRejections.size(); ++index) {
     target->decomposeRejections[index] += source.decomposeRejections[index];
   }
-}
-
-static nlohmann::json OffscreenFillStatsToJSON(const OffscreenFillStats& stats) {
-  return {{"calls", stats.calls},
-          {"coordOffsetNonZero", stats.coordOffsetNonZero},
-          {"lowerSucceeded", stats.lowerSucceeded},
-          {"decomposeSucceeded", stats.decomposeSucceeded},
-          {"canExecute", stats.canExecute},
-          {"pointwiseChainPlans", stats.pointwiseChainPlans},
-          {"pointwiseGraphPlans", stats.pointwiseGraphPlans},
-          {"multiPassPlans", stats.multiPassPlans},
-          {"precompiledPrograms", stats.precompiledPrograms},
-          {"programBuilderPrograms", stats.programBuilderPrograms},
-          {"precompiledCanExecute", stats.precompiledCanExecute},
-          {"programBuilderCanExecute", stats.programBuilderCanExecute},
-          {"lowerBlockers", stats.lowerBlockers},
-          {"topLevelProcessors", stats.topLevelProcessors}};
 }
 
 static const char* AOTDecomposeOutcomeName(AOTDecomposeOutcome outcome) {
@@ -758,8 +697,6 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         result.fallbackRecords = cache->fallbackRecords();
         result.jitProgramRecords = cache->jitProgramRecords();
         result.drawStats = cache->drawStats();
-        result.offscreenFillStats = cache->offscreenFillStatsBySource();
-        result.offscreenFillCorrelations = cache->offscreenFillCorrelations();
         cache->setDiagnosticRecordingEnabled(false);
         device->unlock();
       }
@@ -850,12 +787,6 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       }
       AddProgramStats(&summary.programStats, testResult.programStats);
       AddDrawStats(&summary.drawStats, testResult.drawStats);
-      for (size_t i = 0; i < OFFSCREEN_FILL_SOURCE_COUNT; ++i) {
-        AddOffscreenFillStats(&summary.offscreenFillStats[i], testResult.offscreenFillStats[i]);
-      }
-      for (const auto& correlation : testResult.offscreenFillCorrelations) {
-        AddOffscreenFillCorrelation(&summary.offscreenFillCorrelations, correlation);
-      }
       summary.artifactHits += testResult.artifactHits;
       summary.artifactMisses += testResult.artifactMisses;
       for (size_t i = 0; i < AOT_STAGE_COUNT; ++i) {
@@ -1091,38 +1022,6 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         BuildDecompositionAudit(sortedFallbacks, &auditFusableNow, &auditNeedsLowering);
     auto rootCauseProgramKeyAttribution = BuildRootCauseProgramKeyAttribution(testResults);
 
-    nlohmann::json offscreenFillAudit = nlohmann::json::object();
-    for (size_t i = 0; i < OFFSCREEN_FILL_SOURCE_COUNT; ++i) {
-      auto source = static_cast<OffscreenFillSource>(i);
-      offscreenFillAudit[OffscreenFillSourceName(source)] =
-          OffscreenFillStatsToJSON(summary.offscreenFillStats[i]);
-    }
-
-    std::vector<OffscreenFillCorrelation> sortedOffscreenCorrelations = {};
-    sortedOffscreenCorrelations.reserve(summary.offscreenFillCorrelations.size());
-    for (const auto& [key, correlation] : summary.offscreenFillCorrelations) {
-      sortedOffscreenCorrelations.push_back(correlation);
-    }
-    std::sort(sortedOffscreenCorrelations.begin(), sortedOffscreenCorrelations.end(),
-              [](const auto& a, const auto& b) {
-                return a.programBuilderCanExecute != b.programBuilderCanExecute
-                           ? a.programBuilderCanExecute > b.programBuilderCanExecute
-                           : a.calls > b.calls;
-              });
-    nlohmann::json offscreenFillCorrelations = nlohmann::json::array();
-    for (const auto& correlation : sortedOffscreenCorrelations) {
-      offscreenFillCorrelations.push_back(
-          {{"source", OffscreenFillSourceName(correlation.source)},
-           {"topLevelProcessor", correlation.topLevelProcessor},
-           {"kernel", correlation.kernelSignature},
-           {"calls", correlation.calls},
-           {"canExecute", correlation.canExecute},
-           {"precompiledPrograms", correlation.precompiledPrograms},
-           {"programBuilderPrograms", correlation.programBuilderPrograms},
-           {"precompiledCanExecute", correlation.precompiledCanExecute},
-           {"programBuilderCanExecute", correlation.programBuilderCanExecute}});
-    }
-
     nlohmann::json identity = {{"backend", TGFX_BACKEND_NAME},
 #ifdef NDEBUG
                                {"buildType", "release"},
@@ -1206,8 +1105,6 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         {"successfulStructures", std::move(successfulStructuresJSON)},
         {"fallbackEffectsByReason", std::move(fallbackEffectsByReasonJSON)},
         {"fallbackStructures", std::move(fallbackStructuresJSON)},
-        {"offscreenFillAudit", std::move(offscreenFillAudit)},
-        {"offscreenFillCorrelations", std::move(offscreenFillCorrelations)},
         {"decompositionAudit", std::move(decompositionAudit)},
         {"rootCauseProgramKeyAttribution", std::move(rootCauseProgramKeyAttribution)},
         {"tests", std::move(testsJSON)}};

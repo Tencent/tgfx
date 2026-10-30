@@ -195,8 +195,7 @@ static bool AppendMaterializedPass(Context* context, uint32_t renderFlags,
   AOTRenderPass renderPass = {};
   renderPass.target = std::move(materialized.renderTarget);
   renderPass.drawOp = context->drawingManager()->makeFillDrawOp(
-      renderPass.target, std::move(processor), renderFlags, fillOffset, InvalidOffscreenFillKey,
-      inputAlpha);
+      renderPass.target, std::move(processor), renderFlags, fillOffset, inputAlpha);
   if (renderPass.drawOp == nullptr) {
     return false;
   }

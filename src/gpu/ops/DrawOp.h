@@ -79,10 +79,6 @@ class DrawOp {
     coverages.emplace_back(std::move(coverageProcessor));
   }
 
-  void setOffscreenFillDiagnostic(OffscreenFillKey key) {
-    offscreenFillKey = key;
-  }
-
   /**
    * Moves all coverage processors to the end of the color processor list. Used when a coverage
    * effect is fused into the color chain (e.g., a local texture mask folded into a pointwise
@@ -166,7 +162,6 @@ class DrawOp {
   PlacementPtr<XferProcessor> xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
   CullMode cullMode = CullMode::None;
-  OffscreenFillKey offscreenFillKey = InvalidOffscreenFillKey;
 
   DrawOp(BlockAllocator* allocator, AAType aaType) : allocator(allocator), aaType(aaType) {
   }
