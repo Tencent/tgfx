@@ -32,6 +32,7 @@
 #include "gpu/OpsCompositor.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/aot/DrawIR.h"
 #include "gpu/aot/EffectGraph.h"
 #include "gpu/ops/StencilCoverPathDrawOp.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
@@ -270,6 +271,125 @@ TGFX_TEST(AOTEffectTest, NodeCopyReproducesShapeWithoutAdmission) {
                                graph.nodeAt(AOTNodeID(0))->parameters, &output));
   EXPECT_FALSE(builder.addCopy(*graph.nodeAt(AOTNodeID(1)), {color, color},
                                graph.nodeAt(AOTNodeID(1))->parameters, &output));
+}
+
+// The term-kind sequence of one lowered draw, for the classification assertions below.
+static std::vector<AOTCoverageTermKind> CoverageTermKinds(const DrawIR& ir) {
+  std::vector<AOTCoverageTermKind> kinds = {};
+  for (const auto& term : ir.coverage) {
+    kinds.push_back(term.kind);
+  }
+  return kinds;
+}
+
+// LowerDraw classifies each coverage leaf by what it is — not by its position in the coverage
+// stage — and lowers the color side once. These assertions pin the classification the unified
+// coverage routing consumes: analytic clips become their own terms (true coverage), an alpha-only
+// device texture is the device mask, a general leaf keeps the subtree (mask-filter) semantics.
+TGFX_TEST(AOTEffectTest, LowerDrawClassifiesCoverageTerms) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* allocator = context->drawingManager()->drawingAllocator();
+  auto texture = MakeTextureProcessor(context, allocator, PixelFormat::RGBA_8888);
+  auto alphaTexture = MakeTextureProcessor(context, allocator, PixelFormat::ALPHA_8);
+  ASSERT_NE(texture, nullptr);
+  ASSERT_NE(alphaTexture, nullptr);
+  auto colorMatrix = ColorMatrixFragmentProcessor::Make(allocator, IdentityColorMatrix);
+  ASSERT_NE(colorMatrix, nullptr);
+
+  // No coverage: an empty term list and the color chain lowered once.
+  auto none = LowerDraw({texture.get(), colorMatrix.get()}, {}, nullptr, nullptr,
+                        BlendMode::SrcOver, allocator);
+  ASSERT_TRUE(none.has_value());
+  EXPECT_TRUE(none->coverage.empty());
+  EXPECT_GE(none->color.nodeCount(), 3u);
+
+  // A color-free draw synthesizes the unit const color over the geometry color.
+  auto unit = LowerDraw({}, {}, nullptr, nullptr, BlendMode::SrcOver, allocator);
+  ASSERT_TRUE(unit.has_value());
+  EXPECT_EQ(unit->color.nodeCount(), 2u);
+  EXPECT_EQ(unit->color.nodeAt(unit->color.root())->kind, AOTEffectKind::ConstColor);
+
+  // A leaf rect and a leaf rrect are analytic; a Compose of them is one chained analytic term.
+  {
+    auto rect = RectEffect::Make(allocator, Rect::MakeLTRB(1, 2, 30, 40));
+    auto rrect =
+        RRectEffect::Make(allocator, RRect::MakeRectXY(Rect::MakeLTRB(2, 2, 28, 28), 6, 6));
+    auto composed = FragmentProcessor::Compose(allocator, std::move(rect), std::move(rrect));
+    ASSERT_NE(composed, nullptr);
+    auto ir = LowerDraw({texture.get()}, {composed.get()}, nullptr, nullptr, BlendMode::SrcOver,
+                        allocator);
+    ASSERT_TRUE(ir.has_value());
+    EXPECT_EQ(CoverageTermKinds(*ir),
+              std::vector<AOTCoverageTermKind>({AOTCoverageTermKind::Analytic}));
+    ASSERT_EQ(ir->coverage[0].graph.nodeCount(), 3u);  // the unit plus the two links
+    EXPECT_EQ(ir->coverage[0].graph.nodeAt(ir->coverage[0].root)->kind,
+              AOTEffectKind::RRectCoverage);
+  }
+
+  // An alpha-only device-space texture is the device mask; a composed [mask, rect] keeps both.
+  {
+    auto alphaProxy = context->proxyProvider()->createTextureProxy({}, 4, 4, PixelFormat::ALPHA_8);
+    ASSERT_NE(alphaProxy, nullptr);
+    auto mask = DeviceSpaceTextureEffect::Make(allocator, alphaProxy, Matrix::MakeTrans(3, 5));
+    ASSERT_NE(mask, nullptr);
+    auto ir =
+        LowerDraw({texture.get()}, {mask.get()}, nullptr, nullptr, BlendMode::SrcOver, allocator);
+    ASSERT_TRUE(ir.has_value());
+    EXPECT_EQ(CoverageTermKinds(*ir),
+              std::vector<AOTCoverageTermKind>({AOTCoverageTermKind::DeviceMask}));
+    EXPECT_EQ(ir->coverage[0].mask.textureProxy.get(), alphaProxy.get());
+    EXPECT_EQ(ir->coverage[0].mask.samplingKind, AOTTextureSamplingKind::Device);
+
+    auto rect = RectEffect::Make(allocator, Rect::MakeLTRB(1, 2, 30, 40));
+    auto composed = FragmentProcessor::Compose(allocator, std::move(mask), std::move(rect));
+    ASSERT_NE(composed, nullptr);
+    auto both = LowerDraw({texture.get()}, {composed.get()}, nullptr, nullptr, BlendMode::SrcOver,
+                          allocator);
+    ASSERT_TRUE(both.has_value());
+    EXPECT_EQ(CoverageTermKinds(*both),
+              std::vector<AOTCoverageTermKind>(
+                  {AOTCoverageTermKind::DeviceMask, AOTCoverageTermKind::Analytic}));
+  }
+
+  // A general coverage leaf is the subtree term (mask-filter semantics).
+  {
+    auto ir = LowerDraw({texture.get()}, {alphaTexture.get()}, nullptr, nullptr, BlendMode::SrcOver,
+                        allocator);
+    ASSERT_TRUE(ir.has_value());
+    EXPECT_EQ(CoverageTermKinds(*ir),
+              std::vector<AOTCoverageTermKind>({AOTCoverageTermKind::Subtree}));
+    EXPECT_EQ(ir->coverage[0].graph.nodeAt(ir->coverage[0].root)->kind,
+              AOTEffectKind::TextureSource);
+  }
+
+  // Two coverage FPs [analytic, mask] classify per leaf.
+  {
+    auto rect = RectEffect::Make(allocator, Rect::MakeLTRB(1, 2, 30, 40));
+    auto alphaProxy = context->proxyProvider()->createTextureProxy({}, 4, 4, PixelFormat::ALPHA_8);
+    auto mask = DeviceSpaceTextureEffect::Make(allocator, alphaProxy, Matrix::I());
+    ASSERT_NE(mask, nullptr);
+    auto ir = LowerDraw({texture.get()}, {rect.get(), mask.get()}, nullptr, nullptr,
+                        BlendMode::SrcOver, allocator);
+    ASSERT_TRUE(ir.has_value());
+    EXPECT_EQ(CoverageTermKinds(*ir),
+              std::vector<AOTCoverageTermKind>(
+                  {AOTCoverageTermKind::Analytic, AOTCoverageTermKind::DeviceMask}));
+  }
+
+  // A second subtree or a non-alpha-only device texture is rejected.
+  {
+    auto two = LowerDraw({texture.get()}, {texture.get(), texture.get()}, nullptr, nullptr,
+                         BlendMode::SrcOver, allocator);
+    EXPECT_FALSE(two.has_value());
+    auto rgbaProxy = context->proxyProvider()->createTextureProxy({}, 4, 4, PixelFormat::RGBA_8888);
+    auto rgbaMask = DeviceSpaceTextureEffect::Make(allocator, rgbaProxy, Matrix::I());
+    ASSERT_NE(rgbaMask, nullptr);
+    auto rejected = LowerDraw({texture.get()}, {rgbaMask.get()}, nullptr, nullptr,
+                              BlendMode::SrcOver, allocator);
+    EXPECT_FALSE(rejected.has_value());
+  }
 }
 
 TGFX_TEST_PRIVATE(AOTEffectTest, ExecutorRejectsStencilCoverDrawWithoutTakingOwnership) {
