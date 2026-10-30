@@ -19,28 +19,20 @@
 #pragma once
 
 #include <cstdint>
-#include <functional>
+#include <optional>
 #include <vector>
+#include "gpu/AOTEffectDecomposer.h"
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
-class AOTEffectGraph;
-struct AOTEffectPlan;
-class Context;
 
 /**
- * How far one routing attempt got.
+ * One record-time routing outcome: the lowered effect graph and the plan the decomposer produced
+ * for it.
  */
-enum class AOTRouteResult {
-  /// The processors did not lower, or no planner produced an executable plan for them.
-  NoPlan,
-  /// A plan exists, but the entry could not build a render task for it (SubmitPlan returned false).
-  TaskRefused,
-  /// The entry built and enqueued the plan task; it now owns the draw.
-  Submitted,
-  /// The plan is a single chain-capable pass, so no task runs for it: the entry keeps its draw on
-  /// the plain route, and the plain lookup's family walk serves it at prepare time.
-  Deferred,
+struct AOTRoutePlan {
+  AOTEffectGraph graph = {};
+  AOTEffectPlan plan = {};
 };
 
 /**
@@ -48,32 +40,25 @@ enum class AOTRouteResult {
  *
  *   - As a plan task (AOTPlanRenderTask), built at record time by the two entries,
  *     OpsCompositor::addDrawOp (on-screen draws) and DrawingManager::fillRTWithFP (offscreen
- *     fills), through Route below. A plan task can run several passes: materialized blend
- *     operands and the split-off passes of a long linear chain.
+ *     fills), from the plan Route below returns. A plan task can run several passes:
+ *     materialized blend operands and the split-off passes of a long linear chain.
  *   - Through the plain program lookup at prepare time, for a draw that is still on the plain
  *     route: the re-expressing kernels (the chain interpreter and the perlin kernel) rebuild the
  *     draw's own expression per draw (PlanSinglePass decides the shape). Single pass only; the
  *     chain interpreter also folds coverage processors.
  *
- * Each plan-task entry collects the processors it wants planned and supplies a SubmitPlan callback
- * that turns a plan into a render task for its own destination. An entry whose route was not
- * taken (no plan, or no task could be built for it) keeps its original draw for the plain route.
+ * An entry whose route produced no plan, or whose task build was refused, keeps its original draw
+ * for the plain route.
  */
 class AOTRouter {
  public:
   /**
-   * Builds and enqueues the render task for a plan. Returns false, leaving the entry's draw
-   * untouched, when no task can be built for it.
+   * Lowers and decomposes the processors and returns the graph and plan for them, or nullopt when
+   * the processors do not lower or no planner produces an executable plan. What to do with a plan
+   * is the caller's: PlanRequiresTask decides between building a render task now and leaving the
+   * draw on the plain route for the prepare-time fused walk.
    */
-  using SubmitPlan = std::function<bool(const AOTEffectGraph&, const AOTEffectPlan&)>;
-
-  /**
-   * Lowers and decomposes the processors and hands the plan to submit. A plan that needs no task
-   * never calls submit and returns Deferred instead: the plain lookup's fused walk owns that draw
-   * at prepare time.
-   */
-  static AOTRouteResult Route(const std::vector<const FragmentProcessor*>& processors,
-                              const SubmitPlan& submit);
+  static std::optional<AOTRoutePlan> Route(const std::vector<const FragmentProcessor*>& processors);
 
   /**
    * Whether a plan can only run as a plan task: more than one pass, or a single pass whose kernel

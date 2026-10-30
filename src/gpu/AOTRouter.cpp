@@ -28,20 +28,14 @@ static bool IsFusedServingKernel(AOTKernelKind kernel) {
   return IsAOTPointwiseDAGKernel(kernel) || kernel == AOTKernelKind::PerlinNoiseFill;
 }
 
-AOTRouteResult AOTRouter::Route(const std::vector<const FragmentProcessor*>& processors,
-                                const SubmitPlan& submit) {
-  AOTEffectGraph graph = {};
-  AOTEffectPlan plan = {};
-  if (!AOTEffectDecomposer::Lower(processors, &graph) ||
-      !AOTEffectDecomposer::Decompose(graph, &plan)) {
-    return AOTRouteResult::NoPlan;
+std::optional<AOTRoutePlan> AOTRouter::Route(
+    const std::vector<const FragmentProcessor*>& processors) {
+  AOTRoutePlan routed = {};
+  if (!AOTEffectDecomposer::Lower(processors, &routed.graph) ||
+      !AOTEffectDecomposer::Decompose(routed.graph, &routed.plan)) {
+    return std::nullopt;
   }
-  if (!PlanRequiresTask(plan)) {
-    // No task is needed: the draw stays on the plain route with the deferral flag, and the
-    // prepare-time plain lookup's fused walk serves it through the committed kernel.
-    return AOTRouteResult::Deferred;
-  }
-  return submit(graph, plan) ? AOTRouteResult::Submitted : AOTRouteResult::TaskRefused;
+  return routed;
 }
 
 bool AOTRouter::PlanSinglePass(const std::vector<const FragmentProcessor*>& processors,

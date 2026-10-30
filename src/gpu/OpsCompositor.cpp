@@ -1399,27 +1399,23 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     // the plain route with their PorterDuff XP, where the chain's C input composites them.)
     bool foldMask = !foldBlocked && foldedProcessors.size() > colorProcessors.size() &&
                     !BlendModeNeedDstTexture(brush.blendMode, true);
-    // Folding submits the color chain with the coverage moved into it, so the terminal draw must
-    // not apply the coverage again as a coverage processor. The move happens before Make so the
-    // task's own fallback path (which prepares the op with its own processors) sees the folded
-    // tree. A moved coverage stays moved when no task is built: under the fold contract a trailing
-    // coverage multiply is pixel-equivalent on the plain route.
-    AOTRouter::SubmitPlan submitFolded = [&](const AOTEffectGraph& graph,
-                                             const AOTEffectPlan& plan) {
-      op->moveCoveragesToColors();
-      return submitPlanTask(graph, plan, *deviceBounds, &op);
-    };
     if (foldMask) {
-      auto foldResult = AOTRouter::Route(foldedProcessors, submitFolded);
-      if (foldResult == AOTRouteResult::Submitted) {
-        return;
-      }
-      if (foldResult == AOTRouteResult::TaskRefused || foldResult == AOTRouteResult::Deferred) {
-        // The coverage already moved into the op's color processors, so the color-only route,
-        // which plans from the ORIGINAL color list without the coverage, would silently drop the
-        // mask/clip. Go straight to the plain route. A Deferred plan returns before the closure
-        // runs, so the coverage never moved and the op keeps it; the plain route's chain matcher
-        // folds it itself at prepare time.
+      auto folded = AOTRouter::Route(foldedProcessors);
+      if (folded.has_value()) {
+        // A folded plan that needs no task leaves the draw on the plain route with its coverage
+        // still attached: the plain route's chain matcher folds it itself at prepare time. A task
+        // build moves the coverage into the color processors first (the terminal draw must not
+        // apply it again, and the task's own fallback path sees the folded tree) — and once
+        // moved it stays moved: under the fold contract a trailing coverage multiply is
+        // pixel-equivalent on the plain route, so a refused build goes straight there too,
+        // because the color-only route below plans from the ORIGINAL color list and would
+        // silently drop the moved mask/clip.
+        if (AOTRouter::PlanRequiresTask(folded->plan)) {
+          op->moveCoveragesToColors();
+          if (submitPlanTask(folded->graph, folded->plan, *deviceBounds, &op)) {
+            return;
+          }
+        }
         drawOps.emplace_back(std::move(op));
         return;
       }
@@ -1430,17 +1426,18 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     // unfoldable mask) can never match and skips it. Coverage from the geometry processor (AA
     // edges of a rect, oval, or path) is no obstacle: the terminal pass keeps the draw's own
     // geometry processor.
-    AOTRouter::SubmitPlan submitColors = [&](const AOTEffectGraph& graph,
-                                             const AOTEffectPlan& plan) {
-      return submitPlanTask(graph, plan, *deviceBounds, &op);
-    };
-    bool coverageFree = !op->hasCoverageProcessors();
-    auto colorResult =
-        coverageFree ? AOTRouter::Route(colorProcessors, submitColors) : AOTRouteResult::NoPlan;
-    if (colorResult == AOTRouteResult::Submitted) {
-      return;
+    std::optional<AOTRoutePlan> colors = std::nullopt;
+    if (!op->hasCoverageProcessors()) {
+      colors = AOTRouter::Route(colorProcessors);
     }
-    if (colorResult == AOTRouteResult::NoPlan && cache->diagnosticRecordingEnabled()) {
+    if (colors.has_value()) {
+      if (AOTRouter::PlanRequiresTask(colors->plan)) {
+        if (submitPlanTask(colors->graph, colors->plan, *deviceBounds, &op)) {
+          return;
+        }
+      }
+      // A single-pass plan needs no task: the plain route's matcher serves it at prepare time.
+    } else if (cache->diagnosticRecordingEnabled()) {
       // The route was attempted and refused: record the pure-analysis reason so a draw left on
       // the plain route carries an observable "why" (which processor lacks a lowering, which
       // shape no planner covers) instead of nothing. Trivial (empty chain) is not a rejection.
@@ -1453,11 +1450,6 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
       if (outcome != AOTDecomposeOutcome::Trivial) {
         cache->recordDecomposeRejection(outcome);
       }
-    }
-    // A single-pass plan needs no task: the plain route's matcher serves it at prepare time.
-    if (colorResult == AOTRouteResult::Deferred) {
-      drawOps.emplace_back(std::move(op));
-      return;
     }
   }
   drawOps.emplace_back(std::move(op));

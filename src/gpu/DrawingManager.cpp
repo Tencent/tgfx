@@ -125,6 +125,25 @@ bool DrawingManager::planFill(const FragmentProcessor* processor, const Point& c
   return routeCandidate && decomposeSucceeded;
 }
 
+bool DrawingManager::submitFillPlanTask(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
+                                        uint32_t renderFlags,
+                                        const std::shared_ptr<RenderTargetProxy>& renderTarget,
+                                        const Point& coordOffset,
+                                        PlacementPtr<DrawOp>* originalDraw) {
+  // The fill covers the target's logical bounds, and its processors see coordinates shifted by
+  // coordOffset; the split-off passes of a multi-pass plan reproduce both.
+  auto deviceBounds = Rect::MakeWH(static_cast<float>(renderTarget->width()),
+                                   static_cast<float>(renderTarget->height()));
+  auto task = AOTPlanExecutor::Make(context, renderFlags, graph, plan, deviceBounds, renderTarget,
+                                    originalDraw, coordOffset, true, std::nullopt);
+  if (task == nullptr) {
+    return false;
+  }
+  addRenderTask(std::move(task));
+  addGenerateMipmapsTask(renderTarget->asTextureProxy());
+  return true;
+}
+
 bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
                                   PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags,
                                   const Point& coordOffset, OffscreenFillSource source) {
@@ -132,40 +151,20 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   AOTEffectPlan plan = {};
   OffscreenFillKey diagnosticKey = InvalidOffscreenFillKey;
   bool planned = planFill(processor.get(), coordOffset, source, &graph, &plan, &diagnosticKey);
-  // Submits the plan task for the fill's draw op. The plan executor takes ownership of the op on
-  // success, so the fill must stop there: falling through to the plain branch would submit a null
-  // op. An offscreen fill owns a fresh target, so the task clears its full backing first and a
-  // shader-side sample cannot observe pixels left by an earlier scratch allocation.
-  auto submitPlanTask = [&](const AOTEffectGraph& taskGraph, const AOTEffectPlan& taskPlan,
-                            PlacementPtr<DrawOp>* originalDraw) {
-    // The fill covers the target's logical bounds, and its processors see coordinates shifted by
-    // coordOffset; the split-off passes of a multi-pass plan reproduce both.
-    auto deviceBounds = Rect::MakeWH(static_cast<float>(renderTarget->width()),
-                                     static_cast<float>(renderTarget->height()));
-    auto task = AOTPlanExecutor::Make(context, renderFlags, taskGraph, taskPlan, deviceBounds,
-                                      renderTarget, originalDraw, coordOffset, true, std::nullopt);
-    if (task == nullptr) {
-      return false;
-    }
-    addRenderTask(std::move(task));
-    addGenerateMipmapsTask(renderTarget->asTextureProxy());
-    return true;
-  };
   auto drawOp =
       makeFillDrawOp(renderTarget, std::move(processor), renderFlags, coordOffset, diagnosticKey);
   if (drawOp == nullptr) {
     return false;
   }
-  AOTRouter::SubmitPlan submitFill = [&](const AOTEffectGraph& taskGraph,
-                                         const AOTEffectPlan& taskPlan) {
-    return submitPlanTask(taskGraph, taskPlan, &drawOp);
-  };
-  // A single-pass chain-capable plan needs no task: the fill's RectDrawOp is a StandardDrawOp,
-  // so the plain lookup serves it at prepare time.
-  bool singlePass = planned && !AOTRouter::PlanRequiresTask(plan);
-  // The original tree was already planned above (the diagnostics need the plan too), so its
-  // route only has to submit that plan.
-  if (!singlePass && planned && submitFill(graph, plan)) {
+  // The original tree was already planned above (the diagnostics need the plan too), so the
+  // fill's route only has to submit that plan. The plan executor takes ownership of the draw op
+  // on success, so the fill must stop there: falling through to the plain branch would submit a
+  // null op. An offscreen fill owns a fresh target, so the task clears its full backing first and
+  // a shader-side sample cannot observe pixels left by an earlier scratch allocation. A
+  // single-pass chain-capable plan needs no task: the fill's RectDrawOp is a StandardDrawOp, so
+  // the plain lookup serves it at prepare time.
+  if (planned && AOTRouter::PlanRequiresTask(plan) &&
+      submitFillPlanTask(graph, plan, renderFlags, renderTarget, coordOffset, &drawOp)) {
     return true;
   }
   auto allocator = drawingAllocator();

@@ -141,6 +141,11 @@ class DrawingManager {
 
   bool isFillRouteCandidate(const FragmentProcessor* processor) const;
 
+  bool submitFillPlanTask(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
+                          uint32_t renderFlags,
+                          const std::shared_ptr<RenderTargetProxy>& renderTarget,
+                          const Point& coordOffset, PlacementPtr<DrawOp>* originalDraw);
+
   friend class OpsCompositor;
   friend class RenderContext;
 };
