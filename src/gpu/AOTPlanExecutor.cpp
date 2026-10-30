@@ -191,12 +191,10 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
                                DrawOp::ColorProcessorList* terminalColors) {
   auto drawingManager = context->drawingManager();
   auto allocator = drawingManager->drawingAllocator();
-  // One apron pixel: an operand may read just past the draw bounds (a linear-filtered or
-  // decal/repeat texture leaf sampling across the boundary), and without the apron that read
-  // clamps to the intermediate's edge texels instead of what the subtree produced there. The
-  // linear split path needs no apron — its passes are purely pointwise, each output pixel reads
-  // its input at the same pixel — but a cut operand is an arbitrary subtree.
-  auto geometry = AOTMaterializationPolicy::PrepareGeometry(deviceBounds, 1.0f);
+  // No apron: the terminal pass reads each intermediate at its own device pixel
+  // (DeviceSpaceTextureEffect), so producer and consumer stay pixel-aligned, and the fill passes
+  // cover exactly the same snapped bounds — same rule the linear split passes follow.
+  auto geometry = AOTMaterializationPolicy::PrepareGeometry(deviceBounds, 0.0f);
   if (geometry.isEmpty()) {
     return false;
   }
@@ -262,8 +260,7 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
     if (renderPass.drawOp == nullptr) {
       return false;
     }
-    renderPass.edge = AOTMaterializedEdge{AOTEdgeSpace::Device, AOTEdgeReason::OperandMaterialize,
-                                          geometry, 0.0f};
+    renderPass.edge = AOTMaterializedEdge{AOTEdgeReason::OperandMaterialize, geometry};
     passes->push_back(std::move(renderPass));
   }
   return true;
@@ -425,8 +422,7 @@ bool AOTPlanExecutor::BuildPasses(Context* context, uint32_t renderFlags,
     if (renderPass.drawOp == nullptr || previousTexture == nullptr) {
       return false;
     }
-    renderPass.edge =
-        AOTMaterializedEdge{AOTEdgeSpace::Device, AOTEdgeReason::Split, geometry, 0.0f};
+    renderPass.edge = AOTMaterializedEdge{AOTEdgeReason::Split, geometry};
     passes->push_back(std::move(renderPass));
   }
   return true;

@@ -146,16 +146,14 @@ void AOTPlanRenderTask::execute(CommandEncoder* encoder) {
     return;
   }
   if (cache->diagnosticRecordingEnabled()) {
-    // Every producer pass is one materialized edge. The linear planner's device-space splits count
-    // as planMaterializedEdges (and the plan-length histogram); materialized blend operands count
-    // as fpFlattenEdges — the same counter the retry's local-space producers feed, which is why
-    // the local-space fallback exists alongside the explicit reason.
+    // Every producer pass is one materialized edge. The linear planner's splits count as
+    // planMaterializedEdges (and the plan-length histogram); materialized blend operands count as
+    // fpFlattenEdges.
     AOTDrawStats drawStats = {};
     auto edges = plan.passes.size();
     size_t splitEdges = 0;
     for (const auto& pass : plan.passes) {
-      if (pass.edge.reason == AOTEdgeReason::OperandMaterialize ||
-          pass.edge.space == AOTEdgeSpace::Local) {
+      if (pass.edge.reason != AOTEdgeReason::Split) {
         continue;
       }
       splitEdges++;

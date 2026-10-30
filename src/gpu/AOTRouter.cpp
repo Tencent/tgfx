@@ -24,7 +24,7 @@ namespace tgfx {
 // The kernels the prepare-time fused serving can express: one fused chain/graph or perlin
 // processor standing in for a draw's whole color expression. Every other kernel needs a plan
 // task.
-static bool IsInlineRewritableKernel(AOTKernelKind kernel) {
+static bool IsFusedServingKernel(AOTKernelKind kernel) {
   return IsAOTPointwiseDAGKernel(kernel) || kernel == AOTKernelKind::PerlinNoiseFill;
 }
 
@@ -44,10 +44,10 @@ AOTRouteResult AOTRouter::Route(const std::vector<const FragmentProcessor*>& pro
   return submit(graph, plan) ? AOTRouteResult::Submitted : AOTRouteResult::TaskRefused;
 }
 
-bool AOTRouter::PlanInlineRewrite(const std::vector<const FragmentProcessor*>& processors,
-                                  AOTEffectGraph* graph, AOTEffectPlan* plan) {
+bool AOTRouter::PlanSinglePass(const std::vector<const FragmentProcessor*>& processors,
+                               AOTEffectGraph* graph, AOTEffectPlan* plan) {
   if (!AOTEffectDecomposer::Lower(processors, graph) ||
-      !AOTEffectDecomposer::Decompose(*graph, plan)) {
+      !AOTEffectDecomposer::Decompose(*graph, plan, true)) {
     return false;
   }
   return !PlanRequiresTask(*plan);
@@ -57,6 +57,6 @@ bool AOTRouter::PlanRequiresTask(const AOTEffectPlan& plan) {
   if (plan.passes.size() != 1) {
     return true;
   }
-  return !IsInlineRewritableKernel(plan.passes[0].kernel);
+  return !IsFusedServingKernel(plan.passes[0].kernel);
 }
 }  // namespace tgfx

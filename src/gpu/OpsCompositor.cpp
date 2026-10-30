@@ -1422,7 +1422,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
         // runs, so the coverage never moved and the op keeps it for the prepare-time fused
         // serving, which folds it itself.
         if (foldResult == AOTRouteResult::Deferred) {
-          op->setInlineRewriteDeferred(true);
+          op->setFusedPassDeferred(true);
         }
         drawOps.emplace_back(std::move(op));
         return;
@@ -1461,7 +1461,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     // A deferred draw is committed to a fused single pass: the plain route carries it to prepare
     // with the deferral flag.
     if (colorResult == AOTRouteResult::Deferred) {
-      op->setInlineRewriteDeferred(true);
+      op->setFusedPassDeferred(true);
       drawOps.emplace_back(std::move(op));
       return;
     }

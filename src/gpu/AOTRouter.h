@@ -53,7 +53,7 @@ enum class AOTRouteResult {
  *     operands and the split-off passes of a long linear chain.
  *   - Through the plain program lookup at prepare time, for a draw that is still on the plain
  *     route: the two re-expressing kernels (the chain interpreter and the perlin kernel) rebuild
- *     the draw's own expression per draw (PlanInlineRewrite decides the shape). Single pass only;
+ *     the draw's own expression per draw (PlanSinglePass decides the shape). Single pass only;
  *     the chain interpreter also folds coverage processors.
  *
  * Each plan-task entry collects the processors it wants planned and supplies a SubmitPlan callback
@@ -81,7 +81,7 @@ class AOTRouter {
    * the prepare-time fused serving cannot express (the fused kernels take a draw's whole color
    * expression as one chain or perlin processor; every other single-pass kernel still needs the
    * task). Route itself applies this gate to original routes and returns Deferred for the ones it
-   * turns away; the retry's plans always run as tasks regardless.
+   * turns away.
    */
   static bool PlanRequiresTask(const AOTEffectPlan& plan);
 
@@ -89,9 +89,10 @@ class AOTRouter {
    * Plans processors for the fused serving: true when they lower and decompose into a single pass
    * of a kernel whose processor can stand in for a draw's whole color expression
    * (PointwiseChain, PointwiseGraph, or PerlinNoiseFill). A multi-pass plan never qualifies: its
-   * intermediate passes need a plan task.
+   * intermediate passes need a plan task — so only the single-pass planners run, skipping the cut
+   * and linear-split planners whose results this entry would always discard.
    */
-  static bool PlanInlineRewrite(const std::vector<const FragmentProcessor*>& processors,
-                                AOTEffectGraph* graph, AOTEffectPlan* plan);
+  static bool PlanSinglePass(const std::vector<const FragmentProcessor*>& processors,
+                             AOTEffectGraph* graph, AOTEffectPlan* plan);
 };
 }  // namespace tgfx

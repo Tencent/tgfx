@@ -2056,7 +2056,7 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessorForInfo(
   }
   AOTEffectGraph graph = {};
   AOTEffectPlan plan = {};
-  if (!AOTRouter::PlanInlineRewrite(colorProcessors, &graph, &plan) ||
+  if (!AOTRouter::PlanSinglePass(colorProcessors, &graph, &plan) ||
       !IsAOTPointwiseDAGKernel(plan.passes[0].kernel)) {
     // The perlin kernels have their own families; the chain family only takes the DAG kernels.
     return nullptr;
@@ -2082,7 +2082,7 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildPerlinProcessorForInfo(
   }
   AOTEffectGraph graph = {};
   AOTEffectPlan plan = {};
-  if (!AOTRouter::PlanInlineRewrite(colorProcessors, &graph, &plan) ||
+  if (!AOTRouter::PlanSinglePass(colorProcessors, &graph, &plan) ||
       plan.passes[0].kernel != AOTKernelKind::PerlinNoiseFill) {
     return nullptr;
   }

@@ -90,12 +90,12 @@ class DrawOp {
    * before the other dedicated families for such a draw — and the direct-chain accounting counts
    * it as the AOT route's own serving.
    */
-  void setInlineRewriteDeferred(bool deferred) {
-    inlineRewriteDeferred = deferred;
+  void setFusedPassDeferred(bool deferred) {
+    fusedPassDeferred = deferred;
   }
 
-  bool isInlineRewriteDeferred() const {
-    return inlineRewriteDeferred;
+  bool isFusedPassDeferred() const {
+    return fusedPassDeferred;
   }
 
   /**
@@ -182,7 +182,7 @@ class DrawOp {
   BlendMode blendMode = BlendMode::SrcOver;
   CullMode cullMode = CullMode::None;
   OffscreenFillKey offscreenFillKey = InvalidOffscreenFillKey;
-  bool inlineRewriteDeferred = false;
+  bool fusedPassDeferred = false;
 
   DrawOp(BlockAllocator* allocator, AAType aaType) : allocator(allocator), aaType(aaType) {
   }

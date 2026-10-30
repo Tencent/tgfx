@@ -155,9 +155,13 @@ class AOTEffectDecomposer {
 
   /**
    * Decomposes the graph into an execution plan, preferring fusion: a single fused pass is chosen
-   * whenever the graph's shape allows it.
+   * whenever the graph's shape allows it. singlePassOnly skips the cut planner — its plans always
+   * start with a materializing pass and always need a task — for callers that only consume
+   * single-pass plans (the prepare-time fused serving) and would otherwise run its iterative
+   * segment builds only to discard the result.
    */
-  static bool Decompose(const AOTEffectGraph& graph, AOTEffectPlan* plan);
+  static bool Decompose(const AOTEffectGraph& graph, AOTEffectPlan* plan,
+                        bool singlePassOnly = false);
 
   /**
    * Statically classifies whether the color and coverage effect axes of the given draw can be

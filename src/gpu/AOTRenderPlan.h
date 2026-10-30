@@ -27,25 +27,9 @@
 namespace tgfx {
 
 /**
- * The coordinate space a materialized edge is captured in, which decides how its consumer samples
- * it back.
- */
-enum class AOTEdgeSpace {
-  /// Captured over the destination's device bounds. The consumer reads it at its own device pixel
-  /// (DeviceSpaceTextureEffect), so producer and consumer stay pixel-aligned and no apron is
-  /// needed. Used by the passes a multi-pass linear plan splits off.
-  Device,
-  /// Captured in the local coordinate space of the subtree it replaces. The consumer reads it with a
-  /// TextureEffect at the subtree's local coordinates, which can land just outside the captured
-  /// area once it is snapped to integers, so these edges carry an apron. Used by blend-child
-  /// materialization.
-  Local,
-};
-
-/**
  * Why an edge exists, which decides how the draw stats count it: the multi-pass linear planner's
  * device-space splits (planMaterializedEdges) versus a materialized blend operand
- * (fpFlattenEdges, the same counter the retry's local-space producers feed).
+ * (fpFlattenEdges).
  */
 enum class AOTEdgeReason {
   /// A pass the multi-pass linear planner split off.
@@ -55,17 +39,14 @@ enum class AOTEdgeReason {
 };
 
 /**
- * The contract of one materialized edge: where its texels live and how much area it captures. Every
- * edge is an RGBA8, top-left-origin, exact-fit target allocated by AOTMaterializationPolicy, so
- * crossing an edge rounds the producer's output to the 1/255 grid.
+ * The contract of one materialized edge: how much area it captures. Every edge is an RGBA8,
+ * top-left-origin, exact-fit target allocated by AOTMaterializationPolicy, so crossing an edge
+ * rounds the producer's output to the 1/255 grid.
  */
 struct AOTMaterializedEdge {
-  AOTEdgeSpace space = AOTEdgeSpace::Device;
   AOTEdgeReason reason = AOTEdgeReason::Split;
   /// The captured area and the coordinate offset the producer renders with.
   MaterializedGeometry geometry = {};
-  /// The outset already applied to geometry.bounds (see MaterializationDecision::apronRadius).
-  float apronRadius = 0.0f;
 };
 
 /**

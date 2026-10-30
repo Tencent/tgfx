@@ -163,11 +163,11 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   // A single-pass chain-capable plan is the prepare-time fused serving's own shape (the fill's
   // RectDrawOp is a StandardDrawOp, so the plain lookup's fused walk serves the deferred fill
   // through the same kernel); deferring skips the plan task.
-  bool deferredToInlineRewrite = planned && !AOTRouter::PlanRequiresTask(plan);
-  drawOp->setInlineRewriteDeferred(deferredToInlineRewrite);
+  bool deferredToFusedPass = planned && !AOTRouter::PlanRequiresTask(plan);
+  drawOp->setFusedPassDeferred(deferredToFusedPass);
   // The original tree was already planned above (the diagnostics need the plan too), so its
   // route only has to submit that plan.
-  if (!deferredToInlineRewrite && planned && submitFill(graph, plan)) {
+  if (!deferredToFusedPass && planned && submitFill(graph, plan)) {
     return true;
   }
   auto allocator = drawingAllocator();

@@ -77,11 +77,11 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, ProgramLookupMode mode,
     preparedProgramInfo->setDepthStencil(depthStencil);
   }
   onConfigureProgramInfo(*preparedProgramInfo);
-  if (isInlineRewriteDeferred()) {
+  if (isFusedPassDeferred()) {
     preparedProgramInfo->markFusedPassCommitted();
   }
   preparedViaDecomposition = interpreterServesDraw(renderTarget);
-  if (preparedViaDecomposition && isInlineRewriteDeferred()) {
+  if (preparedViaDecomposition && isFusedPassDeferred()) {
     adoptDeferredChainExpression(renderTarget);
   }
   preparedProgram = preparedProgramInfo->getProgram(mode);
@@ -117,9 +117,8 @@ static bool IsDirectAOTShader(const std::string& shaderName, bool deferred) {
 // interpreter and the perlin kernel — serve unmodified draws by re-expressing the draw's own
 // tree, so the probe only has to run the matcher and read which family won. A draw the
 // record-time entry deferred to a fused pass walks the fused kernels first (the commitment on
-// the ProgramInfo), which is the kernel choice the retired prepare-time rewrite used to own; the
-// deferred chain shapes additionally adopt the chain expression (see
-// adoptDeferredChainExpression) to keep the rewrite's program-key collapsing.
+// the ProgramInfo); the deferred chain shapes additionally adopt the chain expression (see
+// adoptDeferredChainExpression) to keep the program-key collapsing.
 bool StandardDrawOp::interpreterServesDraw(RenderTarget* renderTarget) {
   auto cache = renderTarget->getContext()->precompiledShaderCache();
   if (!cache->isLoaded()) {
@@ -140,7 +139,7 @@ bool StandardDrawOp::interpreterServesDraw(RenderTarget* renderTarget) {
     }
   }
   auto& globalCache = *renderTarget->getContext()->globalCache();
-  if (!isInlineRewriteDeferred()) {
+  if (!isFusedPassDeferred()) {
     auto cached = globalCache.findProgram(preparedProgramInfo->programKey());
     if (cached != nullptr &&
         cached->getProvenance().program == ProgramOrigin::PrecompiledArtifact) {
@@ -152,7 +151,7 @@ bool StandardDrawOp::interpreterServesDraw(RenderTarget* renderTarget) {
     }
   }
   auto probe = MatchPermutation(preparedProgramInfo.get());
-  return probe.has_value() && IsDirectAOTShader(probe->shaderName, isInlineRewriteDeferred());
+  return probe.has_value() && IsDirectAOTShader(probe->shaderName, isFusedPassDeferred());
 }
 
 // A deferred draw whose fused walk resolved to the chain interpreter adopts the chain expression
@@ -160,10 +159,10 @@ bool StandardDrawOp::interpreterServesDraw(RenderTarget* renderTarget) {
 // tree cannot provide: the chain processor's key collapses draws that share a variant but differ
 // only in their instruction sequences onto one program (the sequence is per-draw uniform data, so
 // interleaved draws share the cached program), and the program cache stays keyed by the chain
-// expression instead of the original tree — the exact keying the retired prepare-time rewrite
-// used. A deferred perlin draw needs no adoption: the perlin key already separates the folded
-// slot structures, so the plain key and the rebuilt key coincide. The expression must build here
-// (the fused probe matched through the same builder); a null result keeps the plain route.
+// expression instead of the original tree. A deferred perlin draw needs no adoption: the perlin
+// key already separates the folded slot structures, so the plain key and the rebuilt key
+// coincide. The expression must build here (the fused probe matched through the same builder); a
+// null result keeps the plain route.
 void StandardDrawOp::adoptDeferredChainExpression(RenderTarget* renderTarget) {
   auto context = renderTarget->getContext();
   if (context == nullptr || context->drawingManager() == nullptr) {

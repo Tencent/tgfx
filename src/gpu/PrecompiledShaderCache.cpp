@@ -179,8 +179,6 @@ const char* OffscreenFillSourceName(OffscreenFillSource source) {
   switch (source) {
     case OffscreenFillSource::Unknown:
       return "Unknown";
-    case OffscreenFillSource::FPFlatten:
-      return "FPFlatten";
     case OffscreenFillSource::GaussianBlur:
       return "GaussianBlur";
     case OffscreenFillSource::GlassUDF:

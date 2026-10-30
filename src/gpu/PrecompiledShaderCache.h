@@ -158,7 +158,6 @@ const char* PrecompiledAOTStageName(PrecompiledAOTStage stage);
  */
 enum class OffscreenFillSource : uint8_t {
   Unknown,
-  FPFlatten,
   GaussianBlur,
   GlassUDF,
   ImageFilter,
