@@ -38,9 +38,8 @@ enum class AOTRouteResult {
   TaskRefused,
   /// The entry built and enqueued the plan task; it now owns the draw.
   Submitted,
-  /// The plan is the prepare-time fused serving's own shape — a single chain-capable pass — so no
-  /// task runs for it: the entry keeps its draw on the plain route with the deferral flag, and the
-  /// plain lookup's fused walk serves it at prepare time.
+  /// The plan is a single chain-capable pass, so no task runs for it: the entry keeps its draw on
+  /// the plain route, and the plain lookup's family walk serves it at prepare time.
   Deferred,
 };
 
@@ -52,9 +51,9 @@ enum class AOTRouteResult {
  *     fills), through Route below. A plan task can run several passes: materialized blend
  *     operands and the split-off passes of a long linear chain.
  *   - Through the plain program lookup at prepare time, for a draw that is still on the plain
- *     route: the two re-expressing kernels (the chain interpreter and the perlin kernel) rebuild
- *     the draw's own expression per draw (PlanSinglePass decides the shape). Single pass only;
- *     the chain interpreter also folds coverage processors.
+ *     route: the re-expressing kernels (the chain interpreter and the perlin kernel) rebuild the
+ *     draw's own expression per draw (PlanSinglePass decides the shape). Single pass only; the
+ *     chain interpreter also folds coverage processors.
  *
  * Each plan-task entry collects the processors it wants planned and supplies a SubmitPlan callback
  * that turns a plan into a render task for its own destination. An entry whose route was not

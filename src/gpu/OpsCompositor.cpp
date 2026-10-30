@@ -1418,11 +1418,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
         // The coverage already moved into the op's color processors, so the color-only route,
         // which plans from the ORIGINAL color list without the coverage, would silently drop the
         // mask/clip. Go straight to the plain route. A Deferred plan returns before the closure
-        // runs, so the coverage never moved and the op keeps it for the prepare-time fused
-        // serving, which folds it itself.
-        if (foldResult == AOTRouteResult::Deferred) {
-          op->setFusedPassDeferred(true);
-        }
+        // runs, so the coverage never moved and the op keeps it; the plain route's chain matcher
+        // folds it itself at prepare time.
         drawOps.emplace_back(std::move(op));
         return;
       }
@@ -1457,10 +1454,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
         cache->recordDecomposeRejection(outcome);
       }
     }
-    // A deferred draw is committed to a fused single pass: the plain route carries it to prepare
-    // with the deferral flag.
+    // A single-pass plan needs no task: the plain route's matcher serves it at prepare time.
     if (colorResult == AOTRouteResult::Deferred) {
-      op->setFusedPassDeferred(true);
       drawOps.emplace_back(std::move(op));
       return;
     }

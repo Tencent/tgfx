@@ -135,8 +135,6 @@ class StandardDrawOp : public DrawOp {
  private:
   bool interpreterServesDraw(RenderTarget* renderTarget);
 
-  void adoptDeferredChainExpression(RenderTarget* renderTarget);
-
   PlacementPtr<GeometryProcessor> geometryProcessor = nullptr;
   bool geometryProcessorInitialized = false;
   std::optional<ColorProcessorList> preparedColors = std::nullopt;

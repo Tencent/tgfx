@@ -20,12 +20,12 @@
 #include "core/utils/Log.h"
 #include "gpu/AOTChainBuilder.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PermutationMatch.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/Program.h"
 #include "gpu/ShaderMatchHelpers.h"
+#include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/shaders/kernels/PerlinNoiseFillShader.h"
 #include "gpu/shaders/kernels/PointwiseChainShader.h"
 
@@ -80,13 +80,7 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, ProgramLookupMode mode,
     preparedProgramInfo->setDepthStencil(depthStencil);
   }
   onConfigureProgramInfo(*preparedProgramInfo);
-  if (isFusedPassDeferred()) {
-    preparedProgramInfo->markFusedPassCommitted();
-  }
   preparedViaDecomposition = interpreterServesDraw(renderTarget);
-  if (preparedViaDecomposition && isFusedPassDeferred()) {
-    adoptDeferredChainExpression(renderTarget);
-  }
   preparedProgram = preparedProgramInfo->getProgram(mode);
   if (preparedProgram == nullptr) {
     if (mode == ProgramLookupMode::AllowRuntimeFallback) {
@@ -104,24 +98,17 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, ProgramLookupMode mode,
   return true;
 }
 
-// Whether the shader the plain lookup resolved to is one of the AOT route's re-expressing
-// kernels. A deferred draw is committed to one of the two fused kernels, so either counts as the
-// route's direct serving; an ordinary draw only counts the interpreter (the perlin kernel
-// serving a plain noise tree is the dedicated route, not the AOT entry's own).
-static bool IsDirectAOTShader(const std::string& shaderName, bool deferred) {
-  if (shaderName == PointwiseChainShader::Name) {
-    return true;
-  }
-  return deferred && shaderName == PerlinNoiseFillShader::Name;
+// Whether the shader the plain lookup resolved to is the chain interpreter — the AOT route's own
+// direct serving. The perlin kernel serving a plain noise tree is the dedicated route, not the
+// AOT entry's own.
+static bool IsDirectAOTShader(const std::string& shaderName) {
+  return shaderName == PointwiseChainShader::Name;
 }
 
 // The AOT entry's per-draw probe: reports whether the route serves this draw through the plain
-// program lookup, for the direct-chain accounting. The two re-expressing kernels — the chain
-// interpreter and the perlin kernel — serve unmodified draws by re-expressing the draw's own
-// tree, so the probe only has to run the matcher and read which family won. A draw the
-// record-time entry deferred to a fused pass walks the fused kernels first (the commitment on
-// the ProgramInfo); the deferred chain shapes additionally adopt the chain expression (see
-// adoptDeferredChainExpression) to keep the program-key collapsing.
+// program lookup, for the direct-chain accounting. The re-expressing kernels serve unmodified
+// draws by re-expressing the draw's own tree, so the probe only has to run the matcher and read
+// which family won.
 bool StandardDrawOp::interpreterServesDraw(RenderTarget* renderTarget) {
   auto cache = renderTarget->getContext()->precompiledShaderCache();
   if (!cache->isLoaded()) {
@@ -142,57 +129,16 @@ bool StandardDrawOp::interpreterServesDraw(RenderTarget* renderTarget) {
     }
   }
   auto& globalCache = *renderTarget->getContext()->globalCache();
-  if (!isFusedPassDeferred()) {
-    auto cached = globalCache.findProgram(preparedProgramInfo->programKey());
-    if (cached != nullptr &&
-        cached->getProvenance().program == ProgramOrigin::PrecompiledArtifact) {
-      // The program cache's key-to-program premise: this exact key already resolved to a
-      // precompiled artifact, so the match that produced it succeeded and the plain route serves
-      // the draw — the probe below would only repeat that walk.
-      DEBUG_ASSERT(MatchPermutation(preparedProgramInfo.get()).has_value());
-      return IsDirectAOTShader(cached->shaderName(), false);
-    }
+  auto cached = globalCache.findProgram(preparedProgramInfo->programKey());
+  if (cached != nullptr && cached->getProvenance().program == ProgramOrigin::PrecompiledArtifact) {
+    // The program cache's key-to-program premise: this exact key already resolved to a
+    // precompiled artifact, so the match that produced it succeeded and the plain route serves
+    // the draw — the probe below would only repeat that walk.
+    DEBUG_ASSERT(MatchPermutation(preparedProgramInfo.get()).has_value());
+    return IsDirectAOTShader(cached->shaderName());
   }
   auto probe = MatchPermutation(preparedProgramInfo.get());
-  return probe.has_value() && IsDirectAOTShader(probe->shaderName, isFusedPassDeferred());
-}
-
-// A deferred draw whose fused walk resolved to the chain interpreter adopts the chain expression
-// as its own processor list before the program lookup. Two properties ride on this that the plain
-// tree cannot provide: the chain processor's key collapses draws that share a variant but differ
-// only in their instruction sequences onto one program (the sequence is per-draw uniform data, so
-// interleaved draws share the cached program), and the program cache stays keyed by the chain
-// expression instead of the original tree. A deferred perlin draw needs no adoption: the perlin
-// key already separates the folded slot structures, so the plain key and the rebuilt key
-// coincide. The expression must build here (the fused probe matched through the same builder); a
-// null result keeps the plain route.
-void StandardDrawOp::adoptDeferredChainExpression(RenderTarget* renderTarget) {
-  auto context = renderTarget->getContext();
-  if (context == nullptr || context->drawingManager() == nullptr) {
-    return;
-  }
-  // The probe's match walk already built the expression (see the reexpression cache); take it
-  // instead of rebuilding. Only the chain expression is adoptable: a deferred perlin draw adopts
-  // nothing (its key already separates the folded slot structures, so the plain key and the
-  // rebuilt key coincide).
-  auto expression = preparedProgramInfo->takeCachedReexpression();
-  if (expression == nullptr || !IsProcessor<AOTPointwiseChainProcessor>(expression.get())) {
-    return;
-  }
-  std::vector<FragmentProcessor*> chainProcessors = {expression.get()};
-  auto chainInfo =
-      std::make_unique<ProgramInfo>(renderTarget, geometryProcessor.get(),
-                                    std::move(chainProcessors), 1, xferProcessor.get(), blendMode);
-  // The adoption only changes the processor expression, never the other pipeline state, so every
-  // non-processor state the original ProgramInfo carries over. A pass with a depth-stencil
-  // attachment rejects pipelines that do not declare the format (see the inheritance note in
-  // prepare()), and dropping the colour write mask would un-mask a write-disabled draw.
-  chainInfo->setCullMode(cullMode);
-  chainInfo->setDepthStencil(preparedProgramInfo->getDepthStencil());
-  chainInfo->setColorWriteMask(preparedProgramInfo->getColorWriteMask());
-  preparedColors = ColorProcessorList{};
-  preparedColors->emplace_back(std::move(expression));
-  preparedProgramInfo = std::move(chainInfo);
+  return probe.has_value() && IsDirectAOTShader(probe->shaderName);
 }
 
 bool StandardDrawOp::prepareForTask(RenderTarget* renderTarget, ProgramLookupMode mode,

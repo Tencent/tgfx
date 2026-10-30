@@ -84,21 +84,6 @@ class DrawOp {
   }
 
   /**
-   * Marks a draw the record-time AOT entry deferred to a single fused pass: its color chain
-   * planned as one fused chain or perlin pass, so no plan task owns it. The flag carries the
-   * kernel commitment to the prepare-time plain lookup — the matcher walks the two fused kernels
-   * before the other dedicated families for such a draw — and the direct-chain accounting counts
-   * it as the AOT route's own serving.
-   */
-  void setFusedPassDeferred(bool deferred) {
-    fusedPassDeferred = deferred;
-  }
-
-  bool isFusedPassDeferred() const {
-    return fusedPassDeferred;
-  }
-
-  /**
    * Moves all coverage processors to the end of the color processor list. Used when a coverage
    * effect is fused into the color chain (e.g., a local texture mask folded into a pointwise
    * chain), which is only valid for blends that do not need a dst texture.
@@ -182,7 +167,6 @@ class DrawOp {
   BlendMode blendMode = BlendMode::SrcOver;
   CullMode cullMode = CullMode::None;
   OffscreenFillKey offscreenFillKey = InvalidOffscreenFillKey;
-  bool fusedPassDeferred = false;
 
   DrawOp(BlockAllocator* allocator, AAType aaType) : allocator(allocator), aaType(aaType) {
   }
