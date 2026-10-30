@@ -4,26 +4,41 @@ const fs = require('fs');
 const puppeteer = require('puppeteer');
 const AdmZip = require('adm-zip');
 
-const WEB_TEST_DIR = __dirname;
-const PROJECT_ROOT = path.resolve(WEB_TEST_DIR, '../..');
+function ReadOption(name, fallback) {
+  const index = process.argv.findIndex(function(arg) {
+    return arg === name || arg.startsWith(name + '=');
+  });
+  if (index < 0) return fallback;
+  const arg = process.argv[index];
+  return arg.includes('=') ? arg.slice(name.length + 1) : process.argv[index + 1];
+}
+
+const PROJECT_ROOT = path.resolve(__dirname, '../..');
+const WEB_TEST_DIR = path.resolve(ReadOption('--web-root', __dirname));
 const DOWNLOADS_DIR = path.join(WEB_TEST_DIR, '.downloads');
 const PORT = 8082;
-const TEST_URL = `http://127.0.0.1:${PORT}/index.html`;
 const TIMEOUT_MS = 10 * 60 * 1000;
-
-// Determine backend from --backend argument (default: webgl).
-const backendArg = process.argv.find(a => a.startsWith('--backend'));
-const BACKEND = backendArg ? (backendArg.includes('=') ? backendArg.split('=')[1] : process.argv[process.argv.indexOf(backendArg) + 1]) : 'webgl';
+const BACKEND = ReadOption('--backend', 'webgl');
+const MODE = ReadOption('--mode', 'verify');
+const REFERENCE_COMMIT = ReadOption('--reference-commit', '');
+const TEST_URL = `http://127.0.0.1:${PORT}/index.html?mode=${encodeURIComponent(MODE)}` +
+  `&backend=${encodeURIComponent(BACKEND)}&commit=${encodeURIComponent(REFERENCE_COMMIT)}`;
+if (!['verify', 'reference'].includes(MODE) ||
+    (MODE === 'reference' && (!/^[0-9a-f]{40}$/.test(REFERENCE_COMMIT) ||
+      !WEB_TEST_DIR.startsWith(path.join(__dirname, `build-reference-${BACKEND}`) + path.sep)))) {
+  console.error('Reference generation requires a pinned main commit and isolated runtime directory.');
+  process.exit(1);
+}
 const ALLOWED_BACKENDS = new Set(['webgl', 'webgpu']);
 if (!ALLOWED_BACKENDS.has(BACKEND)) {
   console.error(`Invalid backend: "${BACKEND}". Must be one of: ${[...ALLOWED_BACKENDS].join(', ')}`);
   process.exit(1);
 }
 
-// Map downloaded zip files to their extraction destinations.
+const OUTPUT_ROOT = MODE === 'reference' ? path.join(WEB_TEST_DIR, 'output') : path.join(PROJECT_ROOT, 'test');
 const ZIP_DESTINATIONS = {
-  'baseline-out.zip': path.join(PROJECT_ROOT, 'test/baseline-out'),
-  'test-out.zip': path.join(PROJECT_ROOT, 'test/out'),
+  'baseline-out.zip': path.join(OUTPUT_ROOT, 'baseline-out'),
+  'test-out.zip': path.join(OUTPUT_ROOT, 'out'),
 };
 
 function startHttpServer() {
@@ -82,6 +97,11 @@ async function run() {
   let browser = null;
   let testExitCode = 1;
   let runtimeFailed = false;
+  let configurationValid = false;
+  let startedTests = 0;
+  let completedTests = 0;
+  let passedTests = 0;
+  let skippedTests = false;
   const expectedDownloads = new Set();
 
   try {
@@ -141,6 +161,23 @@ async function run() {
     page.on('console', function(msg) {
       const text = msg.text();
       console.log(text);
+      if (text.startsWith('Test configuration: ')) {
+        try {
+          const configuration = JSON.parse(text.slice('Test configuration: '.length));
+          configurationValid = configuration.mode === MODE && configuration.backend === BACKEND &&
+            (MODE !== 'reference' || configuration.commit === REFERENCE_COMMIT);
+          if (!configurationValid) runtimeFailed = true;
+        } catch (error) {
+          runtimeFailed = true;
+        }
+      }
+      const startMatch = text.match(/^\[==========\] Running (\d+) tests? from /);
+      const completeMatch = text.match(/^\[==========\] (\d+) tests? from .* ran\./);
+      const passedMatch = text.match(/^\[\s*PASSED\s*\] (\d+) tests?\./);
+      if (startMatch) startedTests = Number(startMatch[1]);
+      if (completeMatch) completedTests = Number(completeMatch[1]);
+      if (passedMatch) passedTests = Number(passedMatch[1]);
+      if (/^\[\s*SKIPPED\s*\]/.test(text)) skippedTests = true;
       if (/\[WebGPU\] Uncaptured .* error:/.test(text)) {
         runtimeFailed = true;
       }
@@ -211,6 +248,28 @@ async function run() {
       console.error(`  Expected download ${zipName} was not received.`);
     } else {
       console.log(`  ${zipName} not generated (no output files).`);
+    }
+  }
+
+  if (!configurationValid) {
+    runtimeFailed = true;
+    console.error('Missing or mismatched test artifact configuration. Rebuild the test artifacts.');
+  }
+  if (MODE === 'reference') {
+    if (startedTests === 0 || startedTests !== completedTests || completedTests !== passedTests || skippedTests) {
+      runtimeFailed = true;
+      console.error('Reference generation did not pass the complete test suite without skips.');
+    }
+    const zipPath = path.join(DOWNLOADS_DIR, 'reference-cache.zip');
+    if (!expectedDownloads.has('reference-cache.zip') || !fs.existsSync(zipPath)) {
+      runtimeFailed = true;
+      console.error('Complete reference cache archive was not received.');
+    }
+    if (!runtimeFailed && testExitCode === 0) {
+      const { PublishReference } = require('./reference_cache');
+      PublishReference(zipPath, BACKEND, REFERENCE_COMMIT, completedTests);
+    } else {
+      console.error('Reference cache was not changed.');
     }
   }
 

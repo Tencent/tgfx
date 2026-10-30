@@ -1,104 +1,84 @@
 #!/bin/bash
 
-# Internal script for updating web baseline cache. DO NOT call directly.
-# Use the project root entry point instead:
-#   ./update_baseline.sh USE_WEBGL [--skip-images]
-#   ./update_baseline.sh USE_WEBGPU [--skip-images]
-#
-# This script is invoked by the root update_baseline.sh with a backend argument, and
-# optionally --skip-images to omit generating `_base.webp` reference images (cache-only mode).
+# Internal main reference generator. Use ./update_baseline.sh USE_WEBGL or USE_WEBGPU.
+# This does not accept changes from the current branch or modify the tracked baseline version.
+set -eo pipefail
 
-set -e
-
-# Guard against direct invocation.
-if [ -z "$TGFX_WEB_BASELINE_INVOKED" ]; then
-    echo "Error: Do not run this script directly."
-    echo "Use from project root:"
-    echo "  ./update_baseline.sh USE_WEBGL"
-    echo "  ./update_baseline.sh USE_WEBGPU"
+if [ -z "${TGFX_WEB_BASELINE_INVOKED:-}" ]; then
+    echo "Error: Use ./update_baseline.sh USE_WEBGL or USE_WEBGPU from the project root."
     exit 1
 fi
 
 BACKEND=${1:-webgl}
-SKIP_IMAGES_FLAG=""
-if [ "$2" = "--skip-images" ]; then
-    SKIP_IMAGES_FLAG="-DTGFX_SKIP_GENERATE_BASELINE_IMAGES=ON"
-fi
-
 if [ "$BACKEND" != "webgl" ] && [ "$BACKEND" != "webgpu" ]; then
-    echo "Error: Invalid backend '$BACKEND'. Must be 'webgl' or 'webgpu'."
+    echo "Error: Invalid backend '$BACKEND'."
+    exit 1
+fi
+SKIP_IMAGES=OFF
+if [ "${2:-}" = "--skip-images" ]; then
+    SKIP_IMAGES=ON
+elif [ -n "${2:-}" ]; then
+    echo "Error: Unknown option '$2'."
     exit 1
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+cd "$PROJECT_ROOT"
+REFERENCE_COMMIT=$(git rev-parse --verify 'origin/main^{commit}')
+if node "$SCRIPT_DIR/reference_cache.js" --check "$BACKEND" "$REFERENCE_COMMIT"; then
+    echo "Complete $BACKEND reference cache already matches origin/main."
+    exit 0
+fi
 
-# Auto-detect emsdk if not already active.
-if [ -z "$EMSDK" ]; then
+# Reuse installed dependencies only when their definitions match the pinned source.
+if ! git diff --quiet "$REFERENCE_COMMIT" -- DEPS web/package.json web/package-lock.json; then
+    echo "Error: Dependency definitions differ from origin/main. Install matching dependencies first."
+    exit 1
+fi
+if [ ! -d "$PROJECT_ROOT/third_party/vendor_tools" ] || [ ! -f "$PROJECT_ROOT/web/node_modules/rollup/dist/bin/rollup" ]; then
+    echo "Error: Installed C++ dependencies and Web build dependencies are required."
+    exit 1
+fi
+if [ -z "${EMSDK:-}" ]; then
     source "$SCRIPT_DIR/../setup_emsdk.sh"
 fi
 
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-WEB_TEST_DIR="$SCRIPT_DIR"
-BUILD_DIR="$WEB_TEST_DIR/build-${BACKEND}"
-CACHE_VERSION_FILE="$PROJECT_ROOT/test/baseline/.cache/${BACKEND}/version.json"
+# Archive a fixed commit instead of changing or stashing the user's worktree.
+mkdir -p "$SCRIPT_DIR/build-reference-$BACKEND"
+SESSION=$(mktemp -d "$SCRIPT_DIR/build-reference-$BACKEND/run.XXXXXX")
+SOURCE_DIR="$SESSION/source"
+BUILD_DIR="$SESSION/build"
+RUNTIME_DIR="$SESSION/runtime"
+mkdir -p "$SOURCE_DIR" "$RUNTIME_DIR"
+echo "Generating $BACKEND reference from origin/main ${REFERENCE_COMMIT:0:9} in $SESSION"
+git archive "$REFERENCE_COMMIT" | tar -x -C "$SOURCE_DIR"
+node "$SCRIPT_DIR/reference_source.js" "$SOURCE_DIR"
+ln -s "$PROJECT_ROOT/third_party" "$SOURCE_DIR/third_party"
+ln -s "$PROJECT_ROOT/web/node_modules" "$SOURCE_DIR/web/node_modules"
+(
+    cd "$SOURCE_DIR/web"
+    node node_modules/rollup/dist/bin/rollup -c script/rollup.tgfx.js
+)
 
-cd "$PROJECT_ROOT"
-
-# Check if cache is up to date with origin/main.
-if [ -f "$CACHE_VERSION_FILE" ]; then
-    MAIN_VERSION=$(git show origin/main:test/baseline/version.json 2>/dev/null)
-    if [ -n "$MAIN_VERSION" ]; then
-        CACHE_CONTENT=$(cat "$CACHE_VERSION_FILE")
-        if [ "$MAIN_VERSION" = "$CACHE_CONTENT" ]; then
-            exit 0
-        fi
-    fi
-fi
-
-echo "~~~~~~~~~~~~~~~~~~~Update Baseline ($BACKEND) Start~~~~~~~~~~~~~~~~~~~~~"
-CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-CURRENT_COMMIT=$(git rev-parse HEAD)
-# Remove build artifacts before stash to avoid "already exists" conflicts on pop.
-rm -rf "$BUILD_DIR"
-STASH_LIST_BEFORE=$(git stash list)
-git stash push --include-untracked --quiet
-STASH_LIST_AFTER=$(git stash list)
-
-restore_branch() {
-    cd "$PROJECT_ROOT"
-    if [[ $CURRENT_BRANCH == "HEAD" ]]; then
-        git checkout "$CURRENT_COMMIT" --quiet 2>/dev/null || true
-    else
-        git switch "$CURRENT_BRANCH" --quiet 2>/dev/null || true
-    fi
-    if [[ $STASH_LIST_BEFORE != "$STASH_LIST_AFTER" ]]; then
-        git stash pop --index --quiet 2>/dev/null || true
-    fi
-}
-trap restore_branch EXIT
-
-git switch main --quiet
-
-cd "$WEB_TEST_DIR"
-
-echo ""
-echo "Building web tests on main (UPDATE_BASELINE mode, backend: $BACKEND)..."
-rm -rf "$BUILD_DIR"
-
-CMAKE_ARGS="-DTGFX_UPDATE_BASELINE=ON"
+USE_WEBGPU=OFF
 if [ "$BACKEND" = "webgpu" ]; then
-    CMAKE_ARGS="$CMAKE_ARGS -DTGFX_USE_WEBGPU=ON"
+    USE_WEBGPU=ON
 fi
+emcmake cmake -S "$SCRIPT_DIR" -B "$BUILD_DIR" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DTGFX_SOURCE_DIR="$SOURCE_DIR" \
+    -DTGFX_REFERENCE_COMMIT="$REFERENCE_COMMIT" \
+    -DTGFX_UPDATE_BASELINE=ON \
+    -DTGFX_USE_WEBGPU="$USE_WEBGPU" \
+    -DTGFX_SKIP_GENERATE_BASELINE_IMAGES="$SKIP_IMAGES"
+cmake --build "$BUILD_DIR" --parallel 8
+cp "$BUILD_DIR/tgfx-test.js" "$BUILD_DIR/tgfx-test.wasm" "$BUILD_DIR/tgfx-test.data" "$RUNTIME_DIR/"
+cp "$SCRIPT_DIR/index.html" "$RUNTIME_DIR/"
+cp "$SOURCE_DIR/web/lib/tgfx.esm.js" "$RUNTIME_DIR/"
 
-emcmake cmake -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release $CMAKE_ARGS $SKIP_IMAGES_FLAG
-cmake --build "$BUILD_DIR" -- -j 8
-npm run "copy:${BACKEND}"
-
-echo ""
-echo "Running web tests on main..."
-node run_test.js --backend="$BACKEND" || true
-
-cd "$PROJECT_ROOT"
-
-echo "~~~~~~~~~~~~~~~~~~~Update Baseline ($BACKEND) Success~~~~~~~~~~~~~~~~~~~~~"
-echo "Baseline cache updated at: test/baseline/.cache/${BACKEND}/"
+node "$SCRIPT_DIR/run_test.js" --backend="$BACKEND" --mode=reference \
+    --reference-commit="$REFERENCE_COMMIT" --web-root="$RUNTIME_DIR"
+node "$SCRIPT_DIR/reference_cache.js" --check "$BACKEND" "$REFERENCE_COMMIT"
+echo "Reference cache prepared at test/baseline/.cache/$BACKEND/"
+echo "Generation artifacts retained at $SESSION"
