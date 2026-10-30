@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <cstring>
 #include <emscripten.h>
+#include <cstring>
 #include <limits>
 #include <string>
 #include "gpu/webgpu/WebGPUGPU.h"
@@ -187,8 +187,8 @@ static bool SetupUniformBindingTestEnv(UniformBindingTestEnv* env, Context* cont
   }
 
   RenderPipelineDescriptor descriptor = {};
-  descriptor.vertex.bufferLayouts = {VertexBufferLayout({{"aPosition", VertexFormat::Float2}},
-                                                        VertexStepMode::Vertex)};
+  descriptor.vertex.bufferLayouts = {
+      VertexBufferLayout({{"aPosition", VertexFormat::Float2}}, VertexStepMode::Vertex)};
   descriptor.vertex.module = vertexShader;
   descriptor.fragment.module = fragmentShader;
   descriptor.fragment.colorAttachments.push_back({});
@@ -447,8 +447,8 @@ class OptionalSamplerEffect : public RuntimeEffect {
       return false;
     }
     RenderPipelineDescriptor descriptor = {};
-    descriptor.vertex.bufferLayouts = {VertexBufferLayout({{"aPosition", VertexFormat::Float2}},
-                                                          VertexStepMode::Vertex)};
+    descriptor.vertex.bufferLayouts = {
+        VertexBufferLayout({{"aPosition", VertexFormat::Float2}}, VertexStepMode::Vertex)};
     descriptor.vertex.module = vertexShader;
     descriptor.fragment.module = fragmentShader;
     descriptor.fragment.colorAttachments.push_back({});

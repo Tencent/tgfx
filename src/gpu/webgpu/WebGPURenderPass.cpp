@@ -240,9 +240,10 @@ bool WebGPURenderPass::updateBindGroup() {
     // least 4 bytes. The log prints the raw values without computing offset + size.
     if (uniform.size == 0 || uniform.offset > webgpuBuffer->size() ||
         uniform.size > webgpuBuffer->size() - uniform.offset) {
-      LOGE("WebGPURenderPass::updateBindGroup: uniform binding %u has invalid range"
-           " offset=%zu size=%zu for buffer size %zu",
-           binding, uniform.offset, uniform.size, webgpuBuffer->size());
+      LOGE(
+          "WebGPURenderPass::updateBindGroup: uniform binding %u has invalid range"
+          " offset=%zu size=%zu for buffer size %zu",
+          binding, uniform.offset, uniform.size, webgpuBuffer->size());
       return false;
     }
     if (slots->vertexSlot.has_value()) {
@@ -308,8 +309,9 @@ bool WebGPURenderPass::updateBindGroup() {
   if (!missingTextures.empty() || !missingSamplers.empty()) {
     auto* placeholder = _gpu->getPlaceholderBindings();
     if (placeholder == nullptr) {
-      LOGE("WebGPURenderPass::updateBindGroup: failed to create placeholder bindings for"
-           " unbound texture slots");
+      LOGE(
+          "WebGPURenderPass::updateBindGroup: failed to create placeholder bindings for"
+          " unbound texture slots");
       return false;
     }
     for (auto physicalBinding : missingTextures) {
