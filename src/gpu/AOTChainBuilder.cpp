@@ -232,17 +232,6 @@ static int MapChainInput(const std::vector<const AOTEffectNode*>& nodes,
   return slot == SIZE_MAX ? -2 : static_cast<int>(slot);
 }
 
-// A device-space AA RectEffect folds into the chain's dedicated AARectCoverage slot. Other AA
-// rects lower through RectCoverage, while non-AA rects use the existing zero-radius RRectCoverage
-// op with antiAlias=0, so no new shader variant is required.
-static bool IsChainFoldableRectEffect(const FragmentProcessor* fp) {
-  if (fp == nullptr || !IsProcessor<RectEffect>(fp) || fp->numChildProcessors() != 0) {
-    return false;
-  }
-  auto rectEffect = static_cast<const RectEffect*>(fp);
-  return rectEffect->isDeviceSpaceRect() && rectEffect->isAntiAlias();
-}
-
 // Analytic clip FPs folded onto the chain as color-root coverage slots (the two-FP coverage
 // forms). Device-space AA rects use AARectCoverage, local-space AA rects use LocalRectCoverage,
 // and rrects plus non-AA rects use RRectCoverage. The kernel carries two rect parameter sets per
@@ -1880,7 +1869,7 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessor(
   if (coverageFPs.size() == 1) {
     auto* coverage = coverageFPs.front();
     auto coverageName = coverage->name();
-    if (coverageName == "RectEffect" && IsChainFoldableRectEffect(coverage)) {
+    if (coverageName == "RectEffect" && IsDeviceSpaceAARectEffect(coverage)) {
       clipSlots.deviceRects.push_back(static_cast<const RectEffect*>(coverage));
       return BuildChainFP(allocator, graph, pass, clipSlots, nullptr);
     }
@@ -1893,7 +1882,7 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessor(
     }
     if (coverageName == "ComposeFragmentProcessor" && coverage->numChildProcessors() == 2 &&
         IsProcessor<DeviceSpaceTextureEffect>(coverage->childProcessor(0)) &&
-        IsChainFoldableRectEffect(coverage->childProcessor(1))) {
+        IsDeviceSpaceAARectEffect(coverage->childProcessor(1))) {
       maskEffect = static_cast<const DeviceSpaceTextureEffect*>(coverage->childProcessor(0));
       clipSlots.deviceRects.push_back(static_cast<const RectEffect*>(coverage->childProcessor(1)));
       if (!maskEffect->isAlphaOnly() || maskEffect->hasPerspective()) {

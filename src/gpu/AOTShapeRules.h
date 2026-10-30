@@ -22,6 +22,15 @@
 
 namespace tgfx {
 
+class FragmentProcessor;
+
+/**
+ * A leaf RectEffect in its device-space anti-aliased form: the coverage shape the chain kernel
+ * folds into its AARectCoverage slot and the only clip-coverage form the record-time fold moves
+ * into the color chain.
+ */
+bool IsDeviceSpaceAARectEffect(const FragmentProcessor* fp);
+
 /**
  * Whether the node kind is one of the four unary pointwise operators every planner and the
  * executor admit between a source and the chain root.

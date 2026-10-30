@@ -29,6 +29,7 @@
 #include "core/utils/USE.h"
 #include "gpu/AOTEffectDecomposer.h"
 #include "gpu/AOTPlanExecutor.h"
+#include "gpu/AOTShapeRules.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProxyProvider.h"
@@ -1380,14 +1381,9 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
       // clip-mask texture (DeviceSpaceTextureEffect) is device-space sampled and stays a coverage
       // FP, which blocks the fold entirely so the draw keeps the plain route. A bare texture fill
       // under that clip also keeps the plain route, where QuadTextureFill takes it directly.
-      if (IsProcessor<RectEffect>(clipCoverage)) {
-        auto rectEffect = static_cast<const RectEffect*>(clipCoverage);
-        if (rectEffect->isDeviceSpaceRect() && rectEffect->isAntiAlias() &&
-            !IsDedicatedTextureFillCandidate(op.get(), colorProcessors, maskCoverage)) {
-          foldedProcessors.push_back(clipCoverage);
-        } else {
-          foldBlocked = true;
-        }
+      if (IsDeviceSpaceAARectEffect(clipCoverage) &&
+          !IsDedicatedTextureFillCandidate(op.get(), colorProcessors, maskCoverage)) {
+        foldedProcessors.push_back(clipCoverage);
       } else {
         foldBlocked = true;
       }
