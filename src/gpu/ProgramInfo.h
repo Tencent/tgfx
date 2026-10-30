@@ -196,6 +196,26 @@ class ProgramInfo {
   Backend backend() const;
 
   /**
+   * The whole-color-expression processor a re-expressing family (the chain interpreter or the
+   * perlin kernel) built while matching this info, kept so the per-draw value write reuses it
+   * instead of rebuilding it. The match walk stops at the first family that accepts the draw, so
+   * the slot always holds the winner's expression; a family whose acceptance checks fail after
+   * building may leave its (unused) expression behind, which only the winning family's writer
+   * reads. Mutable like the match cache: an idempotence detail, not program state.
+   */
+  void setCachedReexpression(PlacementPtr<FragmentProcessor> expression) const {
+    cachedReexpression = std::move(expression);
+  }
+
+  FragmentProcessor* getCachedReexpression() const {
+    return cachedReexpression.get();
+  }
+
+  PlacementPtr<FragmentProcessor> takeCachedReexpression() const {
+    return std::move(cachedReexpression);
+  }
+
+  /**
    * Returns the context owning this program's render target, or null when the target is absent.
    */
   Context* getContext() const {
@@ -263,6 +283,9 @@ class ProgramInfo {
   // reused by every later lookup of the same info. Mutable because the lookup entry takes a
   // const info and the cache is an implementation detail of idempotence, not program state.
   mutable std::optional<PermutationMatchOutcome> cachedMatch;
+
+  // The re-expressing family's cached expression (see the public accessors above).
+  mutable PlacementPtr<FragmentProcessor> cachedReexpression = {};
 
   friend std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo*,
                                                                 PermutationMatchFailure*);

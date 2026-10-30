@@ -20,6 +20,7 @@
 #include "core/utils/Log.h"
 #include "gpu/AOTChainBuilder.h"
 #include "gpu/DrawingManager.h"
+#include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PermutationMatch.h"
 #include "gpu/PrecompiledShaderCache.h"
@@ -170,9 +171,12 @@ void StandardDrawOp::adoptDeferredChainExpression(RenderTarget* renderTarget) {
   if (context == nullptr || context->drawingManager() == nullptr) {
     return;
   }
-  auto expression = AOTChainBuilder::BuildChainProcessorForInfo(
-      context->drawingManager()->drawingAllocator(), preparedProgramInfo.get());
-  if (expression == nullptr) {
+  // The probe's match walk already built the expression (see the reexpression cache); take it
+  // instead of rebuilding. Only the chain expression is adoptable: a deferred perlin draw adopts
+  // nothing (its key already separates the folded slot structures, so the plain key and the
+  // rebuilt key coincide).
+  auto expression = preparedProgramInfo->takeCachedReexpression();
+  if (expression == nullptr || !IsProcessor<AOTPointwiseChainProcessor>(expression.get())) {
     return;
   }
   std::vector<FragmentProcessor*> chainProcessors = {expression.get()};

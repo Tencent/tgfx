@@ -375,13 +375,15 @@ ProgramWriter::Expression ChainProgramWriter::buildExpression(const ProgramInfo&
       return {{}, fp};
     }
   }
+  // The match walk built the expression while accepting the draw; reuse it for this draw's value
+  // write instead of rebuilding it.
+  if (auto* cached = info.getCachedReexpression()) {
+    return {{}, cached};
+  }
   auto context = info.getContext();
   if (context == nullptr || context->drawingManager() == nullptr) {
     return {};
   }
-  // The structure is stable for a given program key (the key encodes the whole processor tree);
-  // the values are not, so the expression is rebuilt on every draw and the chain processor's own
-  // data writer uploads them.
   return {AOTChainBuilder::BuildChainProcessorForInfo(context->drawingManager()->drawingAllocator(),
                                                       &info),
           nullptr};
@@ -488,13 +490,15 @@ void ChainProgramWriter::writeSamplers(const ProgramInfo& info, Program* program
 }
 
 ProgramWriter::Expression PerlinProgramWriter::buildExpression(const ProgramInfo& info) const {
+  // The match walk built the expression while accepting the draw; reuse it for this draw's value
+  // write instead of rebuilding it.
+  if (auto* cached = info.getCachedReexpression()) {
+    return {{}, cached};
+  }
   auto context = info.getContext();
   if (context == nullptr || context->drawingManager() == nullptr) {
     return {};
   }
-  // The structure is stable for a given program key (the key encodes the whole processor tree);
-  // the values are not, so the folded perlin expression is rebuilt on every draw and the
-  // processor's own data writer uploads them.
   return {AOTChainBuilder::BuildPerlinProcessorForInfo(
               context->drawingManager()->drawingAllocator(), &info),
           nullptr};

@@ -77,10 +77,14 @@ std::optional<PerlinNoiseFillShader::Inputs> PerlinNoiseFillShader::Extract(
   if (context == nullptr || context->drawingManager() == nullptr) {
     return std::nullopt;
   }
-  if (AOTChainBuilder::BuildPerlinProcessorForInfo(context->drawingManager()->drawingAllocator(),
-                                                   programInfo) == nullptr) {
+  auto expression = AOTChainBuilder::BuildPerlinProcessorForInfo(
+      context->drawingManager()->drawingAllocator(), programInfo);
+  if (expression == nullptr) {
     return std::nullopt;
   }
+  // Keep the built expression on the info (see PointwiseChainShader::Extract): the winner's
+  // writer reuses it instead of rebuilding it per draw.
+  programInfo->setCachedReexpression(std::move(expression));
   int xpType = GetXPType(programInfo);
   if (xpType < XP_NONE) {
     return std::nullopt;

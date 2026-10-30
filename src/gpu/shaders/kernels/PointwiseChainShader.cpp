@@ -87,6 +87,9 @@ std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::Extract(
       return std::nullopt;
     }
     chain = static_cast<const AOTPointwiseChainProcessor*>(expression.get());
+    // Keep the built expression on the info: the walk stops here when the acceptance checks below
+    // pass, and the winner's writer reuses it instead of rebuilding it per draw.
+    programInfo->setCachedReexpression(std::move(expression));
   }
   auto leafCount = chain->leafCount();
   // Sampler-only padding makes every non-empty chain present exactly four sampler children.
