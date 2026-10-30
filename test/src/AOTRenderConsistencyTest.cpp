@@ -80,6 +80,7 @@
 #include "tgfx/layers/filters/DropShadowFilter.h"
 #include "tgfx/layers/filters/InnerShadowFilter.h"
 #include "tgfx/layers/layerstyles/GlassStyle.h"
+#include "utils/AOTRouteLedger.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -2088,6 +2089,297 @@ static void ExpectDedicatedAndChainAgree(const char* label,
   ExpectBitmapsNear("dedicated-vs-jit", dedicated, jit, width, height, ExperimentTolerance(1));
   ExpectBitmapsNear("chain-vs-jit", chain, jit, width, height, ExperimentTolerance(1));
   ExpectBitmapsNear("chain-vs-dedicated", chain, dedicated, width, height, ExperimentTolerance(1));
+}
+
+// A ten-point star: a concave AA path that fills through the DefaultGeometryProcessor, the other
+// geometry axis of the coverage-port probe below.
+static Path MakeStarPath() {
+  Path path = {};
+  for (int i = 0; i < 10; ++i) {
+    float angle = StarPi * 0.2f * static_cast<float>(i) - StarPi * 0.5f;
+    float radius = (i % 2 == 0) ? 52.0f : 23.0f;
+    float x = 64.0f + radius * std::cos(angle);
+    float y = 64.0f + radius * std::sin(angle);
+    if (i == 0) {
+      path.moveTo(x, y);
+    } else {
+      path.lineTo(x, y);
+    }
+  }
+  path.close();
+  return path;
+}
+
+// Aggregates one render's hit-record shader names into name -> count, sorted by name so the
+// ledger JSON is stable across runs.
+static std::vector<std::pair<std::string, uint32_t>> CountShaderHits(
+    const std::vector<std::string>& shaders) {
+  std::vector<std::string> sorted = shaders;
+  std::sort(sorted.begin(), sorted.end());
+  std::vector<std::pair<std::string, uint32_t>> counts = {};
+  for (const auto& name : sorted) {
+    if (!counts.empty() && counts.back().first == name) {
+      counts.back().second++;
+    } else {
+      counts.push_back({name, 1});
+    }
+  }
+  return counts;
+}
+
+static RouteLedgerSceneStats MakeLedgerEntry(const char* name, const BrushRenderStats& stats) {
+  RouteLedgerSceneStats entry = {};
+  entry.scene = name;
+  entry.shaderHits = CountShaderHits(stats.shaders);
+  entry.runtimeCompiles = stats.programs.programBuilderCreations;
+  entry.noMatchingRule = stats.noMatchingRule;
+  entry.draws = stats.draws.draws;
+  entry.completeAOTDraws = stats.draws.completeAOTDraws;
+  entry.droppedDraws = stats.draws.droppedDraws;
+  entry.directChainDraws = stats.draws.directChainDraws;
+  entry.offscreenPlanDraws = stats.draws.offscreenPlanDraws;
+  entry.atomicFallbacks = stats.draws.atomicFallbacks;
+  entry.planExecutionFailures = stats.draws.planExecutionFailures;
+  entry.materializedEdges = stats.draws.materializedEdges;
+  entry.planPassHistogram = stats.draws.planPassHistogram;
+  return entry;
+}
+
+// P0 of the IR-unification plan (docs/aot-ir-unification-plan.md): the route ledger. Each scene
+// renders through the production route — bundle loaded, decomposition and dedicated kernels on,
+// exactly what shipping code does — and the outcome (serving families, plan pass histogram,
+// fallback counters) lands in one JSON under test/out. Diffing that file across commits is the
+// V-ledger check: a commit that changes routing shows up as an explicit ledger diff instead of a
+// discovered regression. The per-scene assertions keep the ledger honest: a scene that silently
+// stopped being served would otherwise diff as "fewer shaders", not fail.
+TGFX_TEST(AOTRenderConsistencyTest, RouteLedgerBaseline) {
+  SKIP_ON_SWIFTSHADER_ENV();
+  auto imageA = MakeImage("resources/apitest/imageReplacement.png");
+  auto imageB = MakeImage("resources/apitest/test_timestretch.png");
+  ASSERT_TRUE(imageA != nullptr && imageB != nullptr);
+  auto star = MakeStarPath();
+  struct LedgerScene {
+    const char* name = nullptr;
+    std::function<void(Canvas*)> scene = nullptr;
+  };
+  std::vector<LedgerScene> scenes = {
+      {"solid-rect",
+       [&](Canvas* canvas) {
+         Paint paint = {};
+         paint.setColor(Color::FromRGBA(220, 60, 40, 255));
+         paint.setAntiAlias(true);
+         canvas->drawRect(Rect::MakeLTRB(10.4f, 12.6f, 117.5f, 115.3f), paint);
+       }},
+      {"solid-rect-rrect-clip",
+       [&](Canvas* canvas) {
+         Path clip = {};
+         clip.addRoundRect(Rect::MakeXYWH(22, 18, 88, 92), 18.0f, 14.0f);
+         canvas->clipPath(clip);
+         Paint paint = {};
+         paint.setColor(Color::FromRGBA(70, 140, 220, 255));
+         paint.setAntiAlias(true);
+         canvas->drawRect(Rect::MakeLTRB(10.4f, 12.6f, 117.5f, 115.3f), paint);
+       }},
+      {"image-fill",
+       [&](Canvas* canvas) {
+         Paint paint = {};
+         paint.setAntiAlias(true);
+         canvas->drawImage(imageA, 12.5f, 8.25f, &paint);
+       }},
+      {"image-tiled-shader",
+       [&](Canvas* canvas) {
+         Paint paint = {};
+         paint.setAntiAlias(true);
+         paint.setShader(Shader::MakeImageShader(imageB, TileMode::Repeat, TileMode::Repeat));
+         canvas->drawRect(Rect::MakeLTRB(10.4f, 12.6f, 117.5f, 115.3f), paint);
+       }},
+      {"gradient-fill",
+       [&](Canvas* canvas) {
+         Paint paint = {};
+         paint.setAntiAlias(true);
+         paint.setShader(
+             Shader::MakeLinearGradient(Point{8, 12}, Point{120, 116},
+                                        {Color::White(), Color::FromRGBA(30, 60, 200, 255)}, {}));
+         canvas->drawRect(Rect::MakeLTRB(10.4f, 12.6f, 117.5f, 115.3f), paint);
+       }},
+      {"ellipse-fill",
+       [&](Canvas* canvas) {
+         Paint paint = {};
+         paint.setColor(Color::FromRGBA(220, 60, 40, 255));
+         paint.setAntiAlias(true);
+         canvas->drawOval(Rect::MakeXYWH(8, 14, 112, 100), paint);
+       }},
+      {"ellipse-rrect-clip-multiply",
+       [&](Canvas* canvas) {
+         Path clip = {};
+         clip.addRoundRect(Rect::MakeXYWH(18, 14, 92, 100), 16.0f, 16.0f);
+         canvas->clipPath(clip);
+         Paint paint = {};
+         paint.setColor(Color::FromRGBA(220, 60, 40, 255));
+         paint.setBlendMode(BlendMode::Multiply);
+         paint.setAntiAlias(true);
+         canvas->drawOval(Rect::MakeXYWH(8, 14, 112, 100), paint);
+       }},
+      {"path-fill",
+       [&](Canvas* canvas) {
+         Paint paint = {};
+         paint.setColor(Color::FromRGBA(90, 200, 120, 255));
+         paint.setAntiAlias(true);
+         canvas->drawPath(star, paint);
+       }},
+      {"nested-blend-shader",
+       [&](Canvas* canvas) {
+         auto shaderA = Shader::MakeImageShader(imageA);
+         auto shaderB = Shader::MakeImageShader(imageB);
+         auto inner = Shader::MakeBlend(BlendMode::Screen, shaderA, shaderB);
+         Paint paint = {};
+         paint.setShader(Shader::MakeBlend(BlendMode::Multiply, inner, shaderB));
+         paint.setAlpha(0.6f);
+         canvas->drawRect(Rect::MakeXYWH(12, 12, 104, 104), paint);
+       }},
+      {"image-mask-gradient",
+       [&](Canvas* canvas) {
+         auto maskShader = Shader::MakeLinearGradient(Point{0, 0}, Point{128, 0},
+                                                      {Color::White(), Color::Transparent()}, {});
+         Paint paint = {};
+         paint.setMaskFilter(MaskFilter::MakeShader(maskShader));
+         canvas->drawImage(imageA, 8.5f, 10.25f, &paint);
+       }},
+      {"image-colorfilter",
+       [&](Canvas* canvas) {
+         Paint paint = {};
+         paint.setColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Multiply));
+         canvas->drawImage(imageA, 12.5f, 8.25f, &paint);
+       }},
+  };
+  std::vector<RouteLedgerSceneStats> entries = {};
+  for (const auto& ledgerScene : scenes) {
+    Bitmap bitmap = {};
+    BrushRenderStats stats = {};
+    RenderSceneThroughRoute(ledgerScene.scene, 128, 128, KernelRoute::Dedicated, &bitmap, &stats);
+    entries.push_back(MakeLedgerEntry(ledgerScene.name, stats));
+    EXPECT_EQ(stats.draws.droppedDraws, 0u) << ledgerScene.name;
+    EXPECT_EQ(stats.programs.programBuilderCreations, 0u) << ledgerScene.name;
+    EXPECT_FALSE(stats.shaders.empty()) << ledgerScene.name;
+  }
+  auto path = ProjectPath::Absolute("test/out/aot-route-ledger.json");
+  ASSERT_TRUE(SaveRouteLedgerJSON(path, entries));
+}
+
+// Measures the chain-vs-JIT pixel difference of two bitmaps without asserting, for the probe
+// report below.
+static void ComputeBitmapDiff(const Bitmap& a, const Bitmap& b, int width, int height, int* maxDiff,
+                              uint64_t* diffBytes, uint64_t* totalBytes) {
+  auto* pa = const_cast<Bitmap&>(a).lockPixels();
+  auto* pb = const_cast<Bitmap&>(b).lockPixels();
+  ASSERT_TRUE(pa != nullptr && pb != nullptr);
+  size_t total = static_cast<size_t>(width) * static_cast<size_t>(height) * 4;
+  auto* bytesA = static_cast<const uint8_t*>(pa);
+  auto* bytesB = static_cast<const uint8_t*>(pb);
+  int maximum = 0;
+  uint64_t differing = 0;
+  for (size_t i = 0; i < total; ++i) {
+    int d = std::abs(static_cast<int>(bytesA[i]) - static_cast<int>(bytesB[i]));
+    if (d > 0) {
+      ++differing;
+    }
+    if (d > maximum) {
+      maximum = d;
+    }
+  }
+  const_cast<Bitmap&>(a).unlockPixels();
+  const_cast<Bitmap&>(b).unlockPixels();
+  *maxDiff = maximum;
+  *diffBytes = differing;
+  *totalBytes = total;
+}
+
+// P0 probe matrix for the analytic-clip coverage port (IR-unification plan, expected change ①):
+// a draw whose only coverage is analytic (an rrect clip, a clip under a transform, or a two-clip
+// stack) must composite as true coverage on the XP's coverage input for every blend mode. The
+// SrcOver rows are asserted today — the two port semantics are mathematically equivalent under
+// SrcOver — while the advanced-blend rows are only recorded to the probe report: the current
+// single-analytic form routes through the coverage subtree (source modulation), and the
+// discrepancy this matrix measures is exactly what the unification step (P1.5) fixes. That step
+// promotes the recorded rows to assertions.
+TGFX_TEST(AOTRenderConsistencyTest, AnalyticClipCoveragePortParity) {
+  SKIP_ON_SWIFTSHADER_ENV();
+  constexpr int size = 96;
+  struct ProbeGeometry {
+    const char* name = nullptr;
+    bool oval = false;
+  };
+  const ProbeGeometry geometries[] = {{"path", false}, {"oval", true}};
+  const char* clipNames[] = {"rrect", "transformed-rect", "two-clip"};
+  const BlendMode blends[] = {BlendMode::SrcOver, BlendMode::Src, BlendMode::Multiply,
+                              BlendMode::Darken};
+  const char* blendNames[] = {"SrcOver", "Src", "Multiply", "Darken"};
+  auto star = MakeStarPath();
+  std::vector<ClipPortProbeResult> results = {};
+  for (const auto& geometry : geometries) {
+    for (int clipKind = 0; clipKind < 3; ++clipKind) {
+      for (size_t blendIndex = 0; blendIndex < 4; ++blendIndex) {
+        auto scene = [&](Canvas* canvas) {
+          if (clipKind == 0) {
+            Path clip = {};
+            clip.addRoundRect(Rect::MakeXYWH(14, 12, 68, 72), 14.0f, 14.0f);
+            canvas->clipPath(clip);
+          } else if (clipKind == 1) {
+            canvas->save();
+            canvas->translate(16.0f, 10.0f);
+            canvas->scale(1.25f, 0.85f);
+            canvas->clipRect(Rect::MakeLTRB(4, 6, 72, 82), true);
+            canvas->restore();
+          } else {
+            Path clip = {};
+            clip.addRoundRect(Rect::MakeXYWH(12, 10, 72, 76), 12.0f, 12.0f);
+            canvas->clipPath(clip);
+            canvas->clipRect(Rect::MakeLTRB(24.25f, 18.5f, 83.75f, 77.5f), true);
+          }
+          Paint paint = {};
+          paint.setColor(Color::FromRGBA(220, 60, 40, 255));
+          paint.setBlendMode(blends[blendIndex]);
+          paint.setAntiAlias(true);
+          if (geometry.oval) {
+            canvas->drawOval(Rect::MakeXYWH(6, 10, 84, 76), paint);
+          } else {
+            canvas->drawPath(star, paint);
+          }
+        };
+        std::string label =
+            std::string(geometry.name) + " " + clipNames[clipKind] + " " + blendNames[blendIndex];
+        Bitmap jit = {};
+        Bitmap chain = {};
+        BrushRenderStats jitStats = {};
+        BrushRenderStats chainStats = {};
+        RenderSceneThroughRoute(scene, size, size, KernelRoute::Runtime, &jit, &jitStats);
+        RenderSceneThroughRoute(scene, size, size, KernelRoute::Chain, &chain, &chainStats);
+        ClipPortProbeResult result = {};
+        result.geometry = geometry.name;
+        result.clip = clipNames[clipKind];
+        result.blend = blendNames[blendIndex];
+        result.chainServed = std::find(chainStats.shaders.begin(), chainStats.shaders.end(),
+                                       "PointwiseChainShader") != chainStats.shaders.end();
+        result.droppedDraws = chainStats.draws.droppedDraws;
+        result.runtimeCompiles = chainStats.programs.programBuilderCreations;
+        ComputeBitmapDiff(chain, jit, size, size, &result.maxChannelDiff, &result.diffBytes,
+                          &result.totalBytes);
+        results.push_back(result);
+        if (blends[blendIndex] == BlendMode::SrcOver) {
+          EXPECT_TRUE(result.chainServed) << label;
+          ExpectBitmapsNear(label.c_str(), chain, jit, size, size, ExperimentTolerance(1));
+        } else {
+          printf("[ClipPort] %s: served=%d maxDiff=%d diffBytes=%llu/%llu dropped=%llu\n",
+                 label.c_str(), result.chainServed ? 1 : 0, result.maxChannelDiff,
+                 static_cast<unsigned long long>(result.diffBytes),
+                 static_cast<unsigned long long>(result.totalBytes),
+                 static_cast<unsigned long long>(result.droppedDraws));
+        }
+      }
+    }
+  }
+  auto path = ProjectPath::Absolute("test/out/aot-clip-port-probe.json");
+  ASSERT_TRUE(SaveClipPortProbeJSON(path, results));
 }
 
 // A solid-color ellipse is the other hot dedicated family. EllipseFillShader and the chain's
