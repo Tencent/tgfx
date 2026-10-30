@@ -256,6 +256,27 @@ bool AOTNodeBuilder::addGeometryCoverage(AOTNodeID* output) {
   return true;
 }
 
+bool AOTNodeBuilder::addCopy(const AOTEffectNode& node, const std::vector<AOTNodeID>& inputs,
+                             AOTEffectParameters parameters, AOTNodeID* output) {
+  if (output == nullptr || node.kind == AOTEffectKind::GeometryColor ||
+      node.kind == AOTEffectKind::GeometryCoverage || inputs.size() != node.inputs.size()) {
+    return false;
+  }
+  for (auto input : inputs) {
+    if (!contains(input)) {
+      return false;
+    }
+  }
+  AOTEffectNode copy = {};
+  copy.kind = node.kind;
+  copy.inputs = inputs;
+  copy.parameters = std::move(parameters);
+  auto nodeID = AOTNodeID(static_cast<uint32_t>(nodes.size()));
+  nodes.push_back(std::move(copy));
+  *output = nodeID;
+  return true;
+}
+
 bool AOTNodeBuilder::finish(AOTNodeID root, AOTEffectGraph* graph) const {
   if (graph == nullptr || !contains(root)) {
     return false;

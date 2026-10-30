@@ -25,6 +25,7 @@
 #include "gpu/AOTShapeRules.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/aot/NodeContract.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AOTYUVChainProcessor.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
@@ -1454,16 +1455,33 @@ static AOTNodeID ResolveCopiedInput(const std::unordered_map<uint32_t, AOTNodeID
   return found == builtMap.end() ? AOTNodeID::Invalid() : found->second;
 }
 
+// Precomposes the coordinate matrices a copied node's parameters carry: a plain or tiled texture
+// leaf's uvMatrix, a gradient's coordMatrix and a noise source's uvMatrix with coordToLocal, while
+// a device-sampled texture leaf's uvMatrix is precomposed with deviceLeafRemap instead (it
+// addresses the destination's positions). The device-space coverage parameters stay as they are
+// (the fill's positions are the device ones). Every other parameter block carries no coordinates
+// and passes through unchanged. A terminal pass passes identity for both matrices, because it runs
+// on the destination and sees the original spaces.
+static AOTEffectParameters RemapNodeParameters(AOTEffectParameters parameters,
+                                               const Matrix& coordToLocal,
+                                               const Matrix& deviceLeafRemap) {
+  if (auto* texture = std::get_if<AOTTextureParameters>(&parameters)) {
+    if (texture->samplingKind == AOTTextureSamplingKind::Device) {
+      texture->uvMatrix.preConcat(deviceLeafRemap);
+    } else {
+      texture->uvMatrix.preConcat(coordToLocal);
+    }
+  } else if (auto* gradient = std::get_if<AOTGradientParameters>(&parameters)) {
+    gradient->coordMatrix.preConcat(coordToLocal);
+  } else if (auto* noise = std::get_if<AOTPerlinNoiseParameters>(&parameters)) {
+    noise->uvMatrix.preConcat(coordToLocal);
+  }
+  return parameters;
+}
+
 // Copies one chain node into the builder, resolving its input edges through builtMap (and the cut
-// replacements). The split-off fill's coordinate remap: it evaluates its local-coordinate
-// parameters (the gradient coordMatrix, the noise uvMatrix, a plain/tiled texture leaf's uvMatrix)
-// at top-left device positions while the original draw evaluated them at its own local
-// coordinates, so those are precomposed with coordToLocal. A device-space texture leaf's uvMatrix
-// addresses the destination's positions while the fill's gl_FragCoord is the fill target's pixel
-// space (the device positions minus the shared placement), so it is precomposed with
-// deviceLeafRemap — the device-to-frag flip plus the placement. The device-space coverage
-// parameters stay as they are (the fill's positions are the device ones). A terminal pass passes
-// identity for both, because it runs on the destination and sees the original spaces.
+// replacements). The source node was admitted by its own lowering when the graph was built, so the
+// copy needs no kind-specific admission — only the coordinate remap above.
 static bool CopyChainNode(const AOTEffectGraph& graph, AOTNodeID nodeID,
                           const std::unordered_map<uint32_t, AOTNodeID>& builtMap,
                           const std::vector<AOTNodeID>& cutRoots,
@@ -1474,137 +1492,17 @@ static bool CopyChainNode(const AOTEffectGraph& graph, AOTNodeID nodeID,
   if (node == nullptr || builder == nullptr || copied == nullptr) {
     return false;
   }
-  switch (node->kind) {
-    case AOTEffectKind::GeometryColorOpaqueInput: {
-      if (!node->inputs.empty()) {
-        return false;
-      }
-      return builder->addGeometryColorOpaqueInput(copied);
-    }
-    case AOTEffectKind::GeometryWhiteInput: {
-      if (!node->inputs.empty()) {
-        return false;
-      }
-      return builder->addGeometryWhiteInput(copied);
-    }
-    case AOTEffectKind::TextureSource: {
-      auto* parameters = std::get_if<AOTTextureParameters>(&node->parameters);
-      auto input = ResolveCopiedInput(builtMap, cutRoots, cutLeaves, node->inputs[0]);
-      if (parameters == nullptr || node->inputs.size() != 1 || !input.isValid()) {
-        return false;
-      }
-      auto texture = *parameters;
-      if (texture.samplingKind == AOTTextureSamplingKind::Device) {
-        texture.uvMatrix.preConcat(deviceLeafRemap);
-      } else {
-        texture.uvMatrix.preConcat(coordToLocal);
-      }
-      return builder->addTextureSource(input, texture, copied);
-    }
-    case AOTEffectKind::ColorMatrix: {
-      auto* parameters = std::get_if<AOTColorMatrixParameters>(&node->parameters);
-      auto input = ResolveCopiedInput(builtMap, cutRoots, cutLeaves, node->inputs[0]);
-      if (parameters == nullptr || node->inputs.size() != 1 || !input.isValid()) {
-        return false;
-      }
-      return builder->addColorMatrix(input, *parameters, copied);
-    }
-    case AOTEffectKind::Luma: {
-      auto* parameters = std::get_if<AOTLumaParameters>(&node->parameters);
-      auto input = ResolveCopiedInput(builtMap, cutRoots, cutLeaves, node->inputs[0]);
-      if (parameters == nullptr || node->inputs.size() != 1 || !input.isValid()) {
-        return false;
-      }
-      return builder->addLuma(input, *parameters, copied);
-    }
-    case AOTEffectKind::AlphaThreshold: {
-      auto* parameters = std::get_if<AOTAlphaThresholdParameters>(&node->parameters);
-      auto input = ResolveCopiedInput(builtMap, cutRoots, cutLeaves, node->inputs[0]);
-      if (parameters == nullptr || node->inputs.size() != 1 || !input.isValid()) {
-        return false;
-      }
-      return builder->addAlphaThreshold(input, *parameters, copied);
-    }
-    case AOTEffectKind::ColorSpaceXform: {
-      auto* parameters = std::get_if<AOTColorSpaceXformParameters>(&node->parameters);
-      auto input = ResolveCopiedInput(builtMap, cutRoots, cutLeaves, node->inputs[0]);
-      if (parameters == nullptr || node->inputs.size() != 1 || !input.isValid()) {
-        return false;
-      }
-      return builder->addColorSpaceXform(input, *parameters, copied);
-    }
-    case AOTEffectKind::ConstColor: {
-      auto* parameters = std::get_if<AOTConstColorParameters>(&node->parameters);
-      auto input = ResolveCopiedInput(builtMap, cutRoots, cutLeaves, node->inputs[0]);
-      if (parameters == nullptr || node->inputs.size() != 1 || !input.isValid()) {
-        return false;
-      }
-      return builder->addConstColor(input, *parameters, copied);
-    }
-    case AOTEffectKind::Blend: {
-      auto* parameters = std::get_if<AOTBlendParameters>(&node->parameters);
-      auto srcInput = ResolveCopiedInput(builtMap, cutRoots, cutLeaves, node->inputs[0]);
-      auto dstInput = ResolveCopiedInput(builtMap, cutRoots, cutLeaves, node->inputs[1]);
-      if (parameters == nullptr || node->inputs.size() != 2 || !srcInput.isValid() ||
-          !dstInput.isValid()) {
-        return false;
-      }
-      return builder->addBlend(srcInput, dstInput, *parameters, copied);
-    }
-    case AOTEffectKind::PerlinNoiseSource: {
-      auto* parameters = std::get_if<AOTPerlinNoiseParameters>(&node->parameters);
-      auto input = ResolveCopiedInput(builtMap, cutRoots, cutLeaves, node->inputs[0]);
-      if (parameters == nullptr || node->inputs.size() != 1 || !input.isValid()) {
-        return false;
-      }
-      auto noise = *parameters;
-      noise.uvMatrix.preConcat(coordToLocal);
-      return builder->addPerlinNoiseSource(input, noise, copied);
-    }
-    case AOTEffectKind::GradientSource: {
-      auto* parameters = std::get_if<AOTGradientParameters>(&node->parameters);
-      auto input = ResolveCopiedInput(builtMap, cutRoots, cutLeaves, node->inputs[0]);
-      if (parameters == nullptr || node->inputs.size() != 1 || !input.isValid()) {
-        return false;
-      }
-      auto gradient = *parameters;
-      gradient.coordMatrix.preConcat(coordToLocal);
-      return builder->addGradientSource(input, gradient, copied);
-    }
-    case AOTEffectKind::RectCoverage: {
-      auto* parameters = std::get_if<AOTRectCoverageParameters>(&node->parameters);
-      auto input = ResolveCopiedInput(builtMap, cutRoots, cutLeaves, node->inputs[0]);
-      if (parameters == nullptr || node->inputs.size() != 1 || !input.isValid()) {
-        return false;
-      }
-      return builder->addRectCoverage(input, *parameters, copied);
-    }
-    case AOTEffectKind::RRectCoverage: {
-      auto* parameters = std::get_if<AOTRRectCoverageParameters>(&node->parameters);
-      auto input = ResolveCopiedInput(builtMap, cutRoots, cutLeaves, node->inputs[0]);
-      if (parameters == nullptr || node->inputs.size() != 1 || !input.isValid()) {
-        return false;
-      }
-      return builder->addRRectCoverage(input, *parameters, copied);
-    }
-    case AOTEffectKind::InputOpaque: {
-      auto input = ResolveCopiedInput(builtMap, cutRoots, cutLeaves, node->inputs[0]);
-      if (node->inputs.size() != 1 || !input.isValid()) {
-        return false;
-      }
-      return builder->addInputOpaque(input, copied);
-    }
-    case AOTEffectKind::MulAlpha: {
-      auto valueInput = ResolveCopiedInput(builtMap, cutRoots, cutLeaves, node->inputs[0]);
-      auto alphaInput = ResolveCopiedInput(builtMap, cutRoots, cutLeaves, node->inputs[1]);
-      if (node->inputs.size() != 2 || !valueInput.isValid() || !alphaInput.isValid()) {
-        return false;
-      }
-      return builder->addMulAlpha(valueInput, alphaInput, copied);
-    }
-    default:
+  std::vector<AOTNodeID> inputs = {};
+  inputs.reserve(node->inputs.size());
+  for (auto input : node->inputs) {
+    auto resolved = ResolveCopiedInput(builtMap, cutRoots, cutLeaves, input);
+    if (!resolved.isValid()) {
       return false;
+    }
+    inputs.push_back(resolved);
   }
+  return builder->addCopy(
+      *node, inputs, RemapNodeParameters(node->parameters, coordToLocal, deviceLeafRemap), copied);
 }
 
 // Copies the wanted node set into the builder in original-graph order — the graph is SSA, so every
@@ -1629,8 +1527,7 @@ static bool CopyChainNodes(const AOTEffectGraph& graph, const std::vector<bool>&
     if (node == nullptr) {
       return false;
     }
-    bool isDesignator = node->kind == AOTEffectKind::GeometryColorOpaqueInput ||
-                        node->kind == AOTEffectKind::GeometryWhiteInput;
+    bool isDesignator = TraitsOf(node->kind).inputDesignator;
     if ((!wanted[index] && !isDesignator) || (skip[index] && !isDesignator)) {
       continue;
     }

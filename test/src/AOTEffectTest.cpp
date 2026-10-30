@@ -233,6 +233,45 @@ TGFX_TEST_PRIVATE(AOTEffectTest, ExecutorRejectsSelfManagedDrawWithoutSideEffect
   EXPECT_EQ(draw, nullptr);
 }
 
+// addCopy must reproduce a node one-to-one: same kind, same input count, the caller's inputs and
+// parameter block — no per-kind admission (the source node was admitted when the graph was built)
+// and no dedup (the cut-segment copy relies on the exact 1:1 shape; the per-kind copy switch it
+// replaced could merge equivalent perlin nodes through the builder's dedup). The graph roots and
+// an input-count mismatch are rejected.
+TGFX_TEST(AOTEffectTest, NodeCopyReproducesShapeWithoutAdmission) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto* allocator = context->drawingManager()->drawingAllocator();
+  AOTEffectGraph graph = {};
+  ASSERT_TRUE(BuildTripleGraph(context, allocator, &graph));
+  ASSERT_GE(graph.nodeCount(), 3u);
+  AOTNodeBuilder builder = {};
+  AOTNodeID color = AOTNodeID::Invalid();
+  ASSERT_TRUE(builder.addGeometryColor(&color));
+  std::vector<AOTNodeID> copiedInputs = {color};
+  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+    auto* node = graph.nodeAt(AOTNodeID(index));
+    ASSERT_NE(node, nullptr);
+    AOTNodeID copied = AOTNodeID::Invalid();
+    ASSERT_TRUE(builder.addCopy(*node, copiedInputs, node->parameters, &copied));
+    EXPECT_EQ(copied.index(), index);
+    copiedInputs = {copied};
+  }
+  AOTEffectGraph copy = {};
+  ASSERT_TRUE(builder.finish(AOTNodeID(static_cast<uint32_t>(graph.nodeCount() - 1)), &copy));
+  EXPECT_EQ(copy.nodeCount(), graph.nodeCount());
+  for (uint32_t index = 0; index < graph.nodeCount(); ++index) {
+    EXPECT_EQ(copy.nodeAt(AOTNodeID(index))->kind, graph.nodeAt(AOTNodeID(index))->kind);
+    EXPECT_EQ(copy.nodeAt(AOTNodeID(index))->inputs, graph.nodeAt(AOTNodeID(index))->inputs);
+  }
+  AOTNodeID output = AOTNodeID::Invalid();
+  EXPECT_FALSE(builder.addCopy(*graph.nodeAt(AOTNodeID(0)), {},
+                               graph.nodeAt(AOTNodeID(0))->parameters, &output));
+  EXPECT_FALSE(builder.addCopy(*graph.nodeAt(AOTNodeID(1)), {color, color},
+                               graph.nodeAt(AOTNodeID(1))->parameters, &output));
+}
+
 TGFX_TEST_PRIVATE(AOTEffectTest, ExecutorRejectsStencilCoverDrawWithoutTakingOwnership) {
   ContextScope scope;
   auto context = scope.getContext();

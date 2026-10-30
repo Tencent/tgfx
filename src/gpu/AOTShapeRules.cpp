@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/AOTShapeRules.h"
+#include "gpu/aot/NodeContract.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/RectEffect.h"
 
@@ -115,8 +116,7 @@ bool PlanBakesGeometryAlpha(const AOTEffectGraph& graph, const AOTEffectPlan& pl
 }
 
 bool IsUnaryPointwiseKind(AOTEffectKind kind) {
-  return kind == AOTEffectKind::ColorMatrix || kind == AOTEffectKind::Luma ||
-         kind == AOTEffectKind::AlphaThreshold || kind == AOTEffectKind::ColorSpaceXform;
+  return TraitsOf(kind).unaryPointwise;
 }
 
 bool IsUnaryPointwiseOp(const AOTEffectNode* node, AOTNodeID expectedInput) {
@@ -177,9 +177,7 @@ bool IsConstOperandBlend(const AOTEffectGraph& graph, const AOTEffectNode* blend
 }
 
 bool IsInputDesignator(AOTEffectKind kind) {
-  return kind == AOTEffectKind::GeometryColor || kind == AOTEffectKind::GeometryCoverage ||
-         kind == AOTEffectKind::GeometryColorOpaqueInput ||
-         kind == AOTEffectKind::GeometryWhiteInput;
+  return TraitsOf(kind).inputDesignator;
 }
 
 bool CollectReachableNodes(const AOTEffectGraph& graph, AOTNodeID root,

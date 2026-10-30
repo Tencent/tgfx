@@ -405,6 +405,16 @@ class AOTNodeBuilder {
 
   bool addMulAlpha(AOTNodeID value, AOTNodeID alphaSource, AOTNodeID* output);
 
+  /**
+   * Appends a copy of an already-admitted node: same kind and input count, with the given inputs
+   * and parameter block. The source node passed its kind-specific admission when it was first
+   * added, so none runs again — the caller is responsible for remapping coordinate-carrying
+   * parameters before handing them over. GeometryColor and GeometryCoverage (graph roots) cannot
+   * be copied. The SSA ordering rule (every input precedes its consumer) is enforced by finish().
+   */
+  bool addCopy(const AOTEffectNode& node, const std::vector<AOTNodeID>& inputs,
+               AOTEffectParameters parameters, AOTNodeID* output);
+
   bool finish(AOTNodeID root, AOTEffectGraph* graph) const;
 
   size_t nodeCount() const {

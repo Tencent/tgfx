@@ -22,6 +22,7 @@
 #include "gpu/AOTPlanExecutor.h"
 #include "gpu/AOTShapeRules.h"
 #include "gpu/ProgramInfo.h"
+#include "gpu/aot/NodeContract.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
@@ -369,39 +370,15 @@ static bool PlanReachableSubtree(const AOTEffectGraph& graph, AOTNodeID subtreeR
     if (node == nullptr) {
       return false;
     }
-    switch (node->kind) {
-      case AOTEffectKind::TextureSource:
-      case AOTEffectKind::ColorMatrix:
-      case AOTEffectKind::Luma:
-      case AOTEffectKind::AlphaThreshold:
-      case AOTEffectKind::ColorSpaceXform:
-      case AOTEffectKind::ConstColor:
-      case AOTEffectKind::Blend:
-      case AOTEffectKind::RectCoverage:
-      case AOTEffectKind::RRectCoverage:
-      case AOTEffectKind::GradientSource:
-      case AOTEffectKind::PerlinNoiseSource:
-      // A designator-only input node (two-child xfer children / single-child xfer child) is never
-      // a chain slot; it stays out of the pass node list below.
-      case AOTEffectKind::GeometryColorOpaqueInput:
-      case AOTEffectKind::GeometryWhiteInput:
-      // Explicit input-environment and epilogue instructions for a two-child xfer over a
-      // computed input; real chain slots (OP_INPUT_OPAQUE / OP_MUL_ALPHA).
-      case AOTEffectKind::InputOpaque:
-      case AOTEffectKind::MulAlpha:
-        break;
-      default:
-        // GeometryColor only legal at index 0; anything else (Gather/Neighborhood/External) is not
-        // fusable into one pass.
-        return false;
+    if (!TraitsOf(node->kind).chainFusable) {
+      return false;
     }
   }
   *pass = {};
   pass->output = subtreeRoot;
   for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
     auto node = graph.nodeAt(AOTNodeID(index));
-    if (!reachable[index] || node->kind == AOTEffectKind::GeometryColorOpaqueInput ||
-        node->kind == AOTEffectKind::GeometryWhiteInput) {
+    if (!reachable[index] || TraitsOf(node->kind).inputDesignator) {
       continue;
     }
     pass->nodes.push_back(AOTNodeID(index));
