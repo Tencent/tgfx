@@ -41,7 +41,9 @@ TGFX_TEST(SurfaceRenderTest, ImageSnapshot) {
   ASSERT_TRUE(context != nullptr);
   auto width = 200;
   auto height = 200;
-  auto texture = context->gpu()->createTexture({width, height, PixelFormat::RGBA_8888});
+  auto texture = context->gpu()->createTexture(
+      {width, height, PixelFormat::RGBA_8888, false, 1,
+       TextureUsage::TEXTURE_BINDING | TextureUsage::RENDER_ATTACHMENT});
   ASSERT_TRUE(texture != nullptr);
   auto surface =
       Surface::MakeFrom(context, texture->getBackendTexture(), ImageOrigin::BottomLeft, 4);
@@ -175,7 +177,9 @@ TGFX_TEST(SurfaceRenderTest, ClipPathOrigin) {
   canvas->restore();
   EXPECT_TRUE(Baseline::Compare(topLeftSurface, "SurfaceRenderTest/ClipPathOrigin"));
 
-  auto texture = context->gpu()->createTexture({width, height, PixelFormat::RGBA_8888});
+  auto texture = context->gpu()->createTexture(
+      {width, height, PixelFormat::RGBA_8888, false, 1,
+       TextureUsage::TEXTURE_BINDING | TextureUsage::RENDER_ATTACHMENT});
   ASSERT_TRUE(texture != nullptr);
   auto bottomLeftSurface =
       Surface::MakeFrom(context, texture->getBackendTexture(), ImageOrigin::BottomLeft);

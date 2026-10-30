@@ -138,9 +138,9 @@ std::shared_ptr<Texture> WebGPUGPU::importBackendRenderTarget(
   if (wgpuTexture == nullptr) {
     return nullptr;
   }
-  return WebGPUTexture::MakeFrom(
-      this, wgpuTexture, backendRenderTarget.width(), backendRenderTarget.height(),
-      TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING, false);
+  return WebGPUTexture::MakeFrom(this, wgpuTexture, backendRenderTarget.width(),
+                                 backendRenderTarget.height(), TextureUsage::RENDER_ATTACHMENT,
+                                 false);
 }
 
 std::shared_ptr<Semaphore> WebGPUGPU::importBackendSemaphore(const BackendSemaphore&) {

@@ -1626,9 +1626,12 @@ TGFX_TEST(LayerTest, BottomLeftSurface) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
-  auto texture = context->gpu()->createTexture({200, 200, PixelFormat::RGBA_8888});
+  auto texture = context->gpu()->createTexture(
+      {200, 200, PixelFormat::RGBA_8888, false, 1,
+       TextureUsage::TEXTURE_BINDING | TextureUsage::RENDER_ATTACHMENT});
   ASSERT_TRUE(texture != nullptr);
   auto surface = Surface::MakeFrom(context, texture->getBackendTexture(), ImageOrigin::BottomLeft);
+  ASSERT_TRUE(surface != nullptr);
 
   // parent
   auto parentFrame = tgfx::Rect::MakeXYWH(60, 110, 40, 40);

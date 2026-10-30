@@ -106,7 +106,7 @@ else ()
     set(TGFX_BACKEND_NAME "webgl")
 endif ()
 
-# Preload backend-specific baseline cache if it exists locally (from a previous test run download).
+# Reference caches are read-only inputs and must be provisioned independently of test output.
 set(CACHE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../test/baseline/.cache/${TGFX_BACKEND_NAME})
 set(PRELOAD_CACHE "")
 if (EXISTS ${CACHE_DIR}/md5.json AND EXISTS ${CACHE_DIR}/version.json)
@@ -114,11 +114,15 @@ if (EXISTS ${CACHE_DIR}/md5.json AND EXISTS ${CACHE_DIR}/version.json)
         "SHELL:--preload-file ${CACHE_DIR}/md5.json@/test/baseline/.cache/${TGFX_BACKEND_NAME}/md5.json"
         "SHELL:--preload-file ${CACHE_DIR}/version.json@/test/baseline/.cache/${TGFX_BACKEND_NAME}/version.json"
     )
+    set_property(TARGET tgfx-test APPEND PROPERTY LINK_DEPENDS
+        ${CACHE_DIR}/md5.json ${CACHE_DIR}/version.json)
 else ()
-    message(WARNING "Baseline cache not found at ${CACHE_DIR}/. "
-        "Screenshot tests will pass without actual comparison. "
-        "Run './update_baseline.sh USE_WEBGL' (or USE_WEBGPU) from project root first.")
+    message(WARNING "Baseline reference cache is incomplete at ${CACHE_DIR}/. "
+        "Screenshot comparisons with missing references will fail. "
+        "Provide an approved reference cache before running screenshot tests.")
 endif ()
+set_property(TARGET tgfx-test APPEND PROPERTY LINK_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../test/baseline/version.json)
 
 target_compile_options(tgfx-test PRIVATE
     -fno-rtti

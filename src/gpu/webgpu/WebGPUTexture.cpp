@@ -76,6 +76,19 @@ std::shared_ptr<WebGPUTexture> WebGPUTexture::MakeFrom(WebGPUGPU* gpu, WGPUTextu
   if (gpu == nullptr || texture == nullptr) {
     return nullptr;
   }
+  WGPUTextureUsageFlags requiredUsage = WGPUTextureUsage_None;
+  if (usage & TextureUsage::TEXTURE_BINDING) {
+    requiredUsage |= WGPUTextureUsage_TextureBinding;
+  }
+  if (usage & TextureUsage::RENDER_ATTACHMENT) {
+    requiredUsage |= WGPUTextureUsage_RenderAttachment;
+  }
+  if ((wgpuTextureGetUsage(texture) & requiredUsage) != requiredUsage) {
+    if (adopted) {
+      wgpuTextureRelease(texture);
+    }
+    return nullptr;
+  }
   auto format = wgpuTextureGetFormat(texture);
   auto mipLevelCount = static_cast<int>(wgpuTextureGetMipLevelCount(texture));
   auto sampleCount = static_cast<int>(wgpuTextureGetSampleCount(texture));
