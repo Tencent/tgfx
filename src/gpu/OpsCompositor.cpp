@@ -28,7 +28,6 @@
 #include "core/utils/StrokeUtils.h"
 #include "core/utils/USE.h"
 #include "gpu/AOTEffectDecomposer.h"
-#include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/AOTPlanExecutor.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/PrecompiledShaderCache.h"

@@ -70,6 +70,9 @@ struct PermutationMatchOutcome {
   PermutationMatchFailure failure = PermutationMatchFailure::None;
 };
 
+/// Stable name of a failure value for diagnostics dumps. Never null.
+const char* PermutationMatchFailureName(PermutationMatchFailure failure);
+
 /**
  * Matches the program info against the precompiled families (the full family walk plus the
  * post-match validations) and caches the outcome on the info: the first caller runs the walk, and

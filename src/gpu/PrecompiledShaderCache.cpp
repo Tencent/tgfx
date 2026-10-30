@@ -29,7 +29,7 @@
 #include "ShaderProfileResolver.h"
 #include "core/utils/Log.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/PermutationMatcher.h"
+#include "gpu/PermutationMatch.h"
 #include "gpu/ShaderCaps.h"
 #include "tgfx/gpu/Context.h"
 #include "zlib.h"

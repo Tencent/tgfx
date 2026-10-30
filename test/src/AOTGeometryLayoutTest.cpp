@@ -32,7 +32,7 @@
 #include "base/TGFXTest.h"
 #include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/PermutationMatcher.h"
+#include "gpu/PermutationMatch.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ShaderCaps.h"
 #include "gpu/shaders/kernels/PointwiseChainShader.h"

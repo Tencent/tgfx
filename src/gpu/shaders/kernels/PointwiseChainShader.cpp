@@ -21,7 +21,7 @@
 #include <vector>
 #include "gpu/AOTChainBuilder.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/PermutationMatcher.h"
+#include "gpu/PermutationMatch.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"

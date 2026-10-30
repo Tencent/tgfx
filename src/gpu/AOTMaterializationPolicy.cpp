@@ -34,11 +34,6 @@ MaterializedGeometry AOTMaterializationPolicy::PrepareGeometry(const Rect& drawB
   return geometry;
 }
 
-MaterializedTarget AOTMaterializationPolicy::PrepareTarget(Context* context, const Rect& drawBounds,
-                                                           float apronRadius) {
-  return AllocateTarget(context, PrepareGeometry(drawBounds, apronRadius));
-}
-
 MaterializedTarget AOTMaterializationPolicy::AllocateTarget(Context* context,
                                                             const MaterializedGeometry& geometry) {
   if (context == nullptr || geometry.isEmpty()) {

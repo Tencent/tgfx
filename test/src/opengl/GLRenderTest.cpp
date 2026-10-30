@@ -29,7 +29,7 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/PermutationMatcher.h"
+#include "gpu/PermutationMatch.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/opengl/GLCaps.h"

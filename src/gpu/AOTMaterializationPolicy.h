@@ -29,21 +29,6 @@ namespace tgfx {
 class FragmentProcessor;
 
 /**
- * Internal render flags, carried alongside the public RenderFlags through the same uint32_t. They
- * start high enough to never collide with the public bits.
- */
-class InternalRenderFlags {
- public:
-  /**
-   * Set while replaying a Picture into an offscreen texture. Every draw inside that replay is about
-   * to be rasterized into one RGBA8 target anyway, so materializing a subtree there buys no AOT
-   * match for the outer draw and only adds a second 8-bit quantization step — one that later scaling
-   * of the resulting image amplifies. Materialization for matchability is skipped under this flag.
-   */
-  static constexpr uint32_t NestedRasterization = 1u << 16;
-};
-
-/**
  * The pixel geometry of one materialization edge: the area to capture and the coordinate mapping
  * that keeps the materialized subtree sampling the space it saw inline. Derived purely from the draw
  * bounds and the apron, with no GPU resource attached, so a caller that issues several passes over
@@ -102,10 +87,6 @@ class AOTMaterializationPolicy {
    * survives strict preparation, the inline flatten when it queues its render task).
    */
   static MaterializedTarget AllocateTarget(Context* context, const MaterializedGeometry& geometry);
-
-  /** PrepareGeometry plus AllocateTarget for the single-edge case. */
-  static MaterializedTarget PrepareTarget(Context* context, const Rect& drawBounds,
-                                          float apronRadius);
 };
 
 }  // namespace tgfx

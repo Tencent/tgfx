@@ -28,7 +28,7 @@
 #include "core/DiagnosticCodes.h"
 #include "gpu/AOTResourceProfile.h"
 #include "gpu/BundleFormat.h"
-#include "gpu/shaders/AllParams.h"
+#include "AllParams.h"
 #include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/PrecompiledShader.h"
 

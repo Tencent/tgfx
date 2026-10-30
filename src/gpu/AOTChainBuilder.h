@@ -42,19 +42,15 @@ class AOTChainBuilder {
   /**
    * Pure admission of a PointwiseChain/PointwiseGraph pass without draw coverage. Runs the same
    * slot encoding, closure, budget, profile and register checks BuildChainProcessor runs, but
-   * creates no processor. AOTPlanExecutor::CanExecute relies on it, so a pass admitted here can
-   * only fail at construction when a resource cannot be wrapped (or when the draw's coverage adds
-   * slots this check cannot see).
+   * creates no processor — so plan-time fit and construction fit cannot drift.
+   *
+   * checkKernel also verifies the pass's declared kernel against the profile the pass needs (the
+   * admission form, which AOTPlanExecutor::CanExecute relies on); without it the pass kernel is
+   * ignored and only the fit is checked. outProfile, when not null, receives the resource profile
+   * the pass needs — the planner's form, which picks the kernel from the resolved profile.
    */
-  static bool PlanChainPass(const AOTEffectGraph& graph, const AOTPassDescriptor& pass);
-
-  /**
-   * Same planning as PlanChainPass, ignoring the pass kernel: reports the resource profile (and
-   * so the kernel family) the pass needs. Used by the DAG planner to pick the kernel; returns
-   * false when no profile can carry the pass.
-   */
-  static bool ResolveChainProfile(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
-                                  AOTResourceProfile* profile);
+  static bool PlanChainPass(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
+                            bool checkKernel, AOTResourceProfile* outProfile = nullptr);
 
   /**
    * Rebuilds the color processor of one self-contained plan pass: the fused chain/graph processor

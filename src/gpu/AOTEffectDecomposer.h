@@ -123,30 +123,6 @@ struct AOTDecomposeAnalysis {
   AOTAxisAnalysis coverage = {};
 };
 
-/**
- * Static verdict on whether a NoMatchingRule draw would become matchable if its coverage FPs were
- * folded into the color chain at program-creation time (the decomposed-program route). Pure
- * feasibility classification: it never renders and never mutates state, and is used by the
- * offline audit to size that route before enabling it.
- */
-enum class AOTFoldRouteOutcome {
-  /// The draw has no coverage FPs, so there is nothing to fold.
-  NotApplicable,
-  /// Coverage FPs exist but the xfer processor blends with the destination (PorterDuff), where
-  /// folding coverage into the color chain would change pixels, so the draw must stay as-is.
-  FoldBlockedByXP,
-  /// Some processor in the folded chain has no AOT lowering yet.
-  BlockedByLowering,
-  /// The folded chain lowers, but no planner rule covers its shape.
-  UnsupportedShape,
-  /// The plan is executable, but the fused kernels' matchers do not support this draw's GP.
-  GPIncompatible,
-  /// The draw would decompose, execute, and match if the route were enabled.
-  Routable,
-};
-
-const char* AOTFoldRouteOutcomeName(AOTFoldRouteOutcome outcome);
-
 class AOTEffectDecomposer {
  public:
   /** Lowers a processor chain and optionally reports the first processor missing an implementation. */
@@ -182,18 +158,6 @@ class AOTEffectDecomposer {
    * route at op-construction time, before any ProgramInfo exists.
    */
   static AOTAxisAnalysis AnalyzeChain(const std::vector<const FragmentProcessor*>& processors);
-
-  /**
-   * Statically answers whether the given draw (assumed to have missed every matcher rule) would
-   * become matchable if its coverage FPs were folded into the color chain at program-creation
-   * time. Runs Lower / Decompose on the concatenated
-   * color+coverage processor list and checks the GP against the fused kernels' supported set.
-   * Pure analysis: no rendering, no GPU allocation, no ProgramInfo mutation.
-   *
-   * @param programInfo the draw to analyze; may be null (returns NotApplicable).
-   * @return the fold-route verdict.
-   */
-  static AOTFoldRouteOutcome AnalyzeFoldRoute(const ProgramInfo* programInfo);
 };
 
 }  // namespace tgfx

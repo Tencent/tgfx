@@ -290,7 +290,7 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
   // processors. Clip slots appended from the draw's coverage FPs are not part of the plan; the
   // builder re-plans with them and refuses what no longer fits.
   if (IsAOTPointwiseDAGKernel(pass.kernel)) {
-    return AOTChainBuilder::PlanChainPass(graph, pass);
+    return AOTChainBuilder::PlanChainPass(graph, pass, true);
   }
   // The linear kernels: a source node followed by a bounded run of operator slots.
   if (pass.resourceProfile != AOTResourceProfile::Automatic || pass.output != pass.nodes.back()) {

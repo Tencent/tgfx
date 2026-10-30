@@ -1418,20 +1418,15 @@ static bool LowerAnalyticCoverageFP(const FragmentProcessor* fp,
   return true;
 }
 
-bool AOTChainBuilder::PlanChainPass(const AOTEffectGraph& graph, const AOTPassDescriptor& pass) {
+bool AOTChainBuilder::PlanChainPass(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
+                                    bool checkKernel, AOTResourceProfile* outProfile) {
   ChainLayout layout = {};
-  return PlanChainLayout(graph, pass, {}, nullptr, AOTNodeID(), false, true, &layout);
-}
-
-bool AOTChainBuilder::ResolveChainProfile(const AOTEffectGraph& graph,
-                                          const AOTPassDescriptor& pass,
-                                          AOTResourceProfile* profile) {
-  ChainLayout layout = {};
-  if (profile == nullptr ||
-      !PlanChainLayout(graph, pass, {}, nullptr, AOTNodeID(), false, false, &layout)) {
+  if (!PlanChainLayout(graph, pass, {}, nullptr, AOTNodeID(), false, checkKernel, &layout)) {
     return false;
   }
-  *profile = layout.profile;
+  if (outProfile != nullptr) {
+    *outProfile = layout.profile;
+  }
   return true;
 }
 
@@ -1497,7 +1492,7 @@ bool AOTChainBuilder::BuildLinearSegment(const AOTEffectGraph& graph,
   }
   resultPass.output = result.root();
   AOTResourceProfile profile = AOTResourceProfile::Automatic;
-  if (!ResolveChainProfile(result, resultPass, &profile)) {
+  if (!PlanChainPass(result, resultPass, false, &profile)) {
     return false;
   }
   resultPass.resourceProfile = profile;
@@ -1768,7 +1763,7 @@ static bool FinishSegmentPass(const AOTNodeBuilder& builder, AOTNodeID root,
     resultPass.nodes.push_back(AOTNodeID(index));
   }
   AOTResourceProfile profile = AOTResourceProfile::Automatic;
-  if (!AOTChainBuilder::ResolveChainProfile(built, resultPass, &profile)) {
+  if (!AOTChainBuilder::PlanChainPass(built, resultPass, false, &profile)) {
     return false;
   }
   resultPass.resourceProfile = profile;

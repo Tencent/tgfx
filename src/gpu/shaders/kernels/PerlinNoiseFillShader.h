@@ -62,6 +62,8 @@ class PerlinNoiseFillShader : public ShaderFamily<PerlinNoiseFillShader> {
   using VD = VertDims;
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
+  /// One of the two single-pass re-expressing kernels (see FamilyServesAsFusedPass).
+  static constexpr bool ServesAsFusedPass = true;
 
   /// Matcher inputs: only the XferProcessor kind shapes the variant.
   struct Inputs {

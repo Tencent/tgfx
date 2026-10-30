@@ -19,9 +19,9 @@
 #include <string>
 #include <vector>
 #include "base/TGFXTest.h"
-#include "gpu/AOTClosureVerifier.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gtest/gtest.h"
+#include "utils/AOTClosureVerifier.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {

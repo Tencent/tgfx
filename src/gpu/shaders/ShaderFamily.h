@@ -59,6 +59,17 @@ struct FamilyHasFragValuesAllowed<
     : std::true_type {};
 
 /**
+ * Whether the family is one of the two single-pass re-expressing kernels (the chain interpreter
+ * and the perlin kernel) that can stand in for a draw's whole color expression — the prepare-time
+ * fused serving's own families. Declared through ServesAsFusedPass = true; the single authority
+ * every fused-serving question consults (the matcher's walk order, the direct-chain accounting).
+ */
+template <typename T, typename = void>
+struct FamilyServesAsFusedPass : std::false_type {};
+template <typename T>
+struct FamilyServesAsFusedPass<T, std::void_t<decltype(T::ServesAsFusedPass)>> : std::true_type {};
+
+/**
  * The factory the registration macro installs for a family. A free function template has one
  * address across translation units (ODR-merged), so re-registration from every include site is
  * an exact duplicate the registry accepts.

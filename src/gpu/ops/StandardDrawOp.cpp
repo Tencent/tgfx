@@ -21,10 +21,12 @@
 #include "gpu/AOTChainBuilder.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/PermutationMatcher.h"
+#include "gpu/PermutationMatch.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/Program.h"
 #include "gpu/ShaderMatchHelpers.h"
+#include "gpu/shaders/kernels/PerlinNoiseFillShader.h"
+#include "gpu/shaders/kernels/PointwiseChainShader.h"
 
 namespace tgfx {
 
@@ -106,10 +108,10 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, ProgramLookupMode mode,
 // route's direct serving; an ordinary draw only counts the interpreter (the perlin kernel
 // serving a plain noise tree is the dedicated route, not the AOT entry's own).
 static bool IsDirectAOTShader(const std::string& shaderName, bool deferred) {
-  if (shaderName == "PointwiseChainShader") {
+  if (shaderName == PointwiseChainShader::Name) {
     return true;
   }
-  return deferred && shaderName == "PerlinNoiseFillShader";
+  return deferred && shaderName == PerlinNoiseFillShader::Name;
 }
 
 // The AOT entry's per-draw probe: reports whether the route serves this draw through the plain

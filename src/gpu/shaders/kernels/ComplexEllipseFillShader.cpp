@@ -18,7 +18,7 @@
 
 #include "gpu/shaders/kernels/ComplexEllipseFillShader.h"
 #include <optional>
-#include "gpu/PermutationMatcher.h"
+#include "gpu/PermutationMatch.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/processors/ComplexEllipseGeometryProcessor.h"

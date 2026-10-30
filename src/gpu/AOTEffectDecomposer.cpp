@@ -388,7 +388,7 @@ static bool PlanReachableSubtree(const AOTEffectGraph& graph, AOTNodeID subtreeR
     pass->nodes.push_back(AOTNodeID(index));
   }
   AOTResourceProfile profile = AOTResourceProfile::Automatic;
-  if (!AOTChainBuilder::ResolveChainProfile(graph, *pass, &profile)) {
+  if (!AOTChainBuilder::PlanChainPass(graph, *pass, false, &profile)) {
     return false;
   }
   pass->resourceProfile = profile;
@@ -704,102 +704,6 @@ AOTDecomposeAnalysis AOTEffectDecomposer::Analyze(const ProgramInfo* programInfo
   result.color = ClassifyAxis(colorProcessors);
   result.coverage = ClassifyAxis(coverageProcessors);
   return result;
-}
-
-const char* AOTFoldRouteOutcomeName(AOTFoldRouteOutcome outcome) {
-  switch (outcome) {
-    case AOTFoldRouteOutcome::NotApplicable:
-      return "NotApplicable";
-    case AOTFoldRouteOutcome::FoldBlockedByXP:
-      return "FoldBlockedByXP";
-    case AOTFoldRouteOutcome::BlockedByLowering:
-      return "BlockedByLowering";
-    case AOTFoldRouteOutcome::UnsupportedShape:
-      return "UnsupportedShape";
-    case AOTFoldRouteOutcome::GPIncompatible:
-      return "GPIncompatible";
-    case AOTFoldRouteOutcome::Routable:
-      return "Routable";
-  }
-  return "Unknown";
-}
-
-AOTFoldRouteOutcome AOTEffectDecomposer::AnalyzeFoldRoute(const ProgramInfo* programInfo) {
-  if (programInfo == nullptr) {
-    return AOTFoldRouteOutcome::NotApplicable;
-  }
-  auto total = programInfo->numFragmentProcessors();
-  auto colorCount = programInfo->numColorFragmentProcessors();
-  if (total == colorCount) {
-    return AOTFoldRouteOutcome::NotApplicable;
-  }
-  // Folding coverage into the color chain is only pixel-identical when the blend does not read the
-  // destination: a PorterDuff XP derives its factors from the source alpha, and folding changes
-  // what that alpha is. EmptyXferProcessor (fixed-function pipeline blend) applies coverage as a
-  // plain multiply, which is exactly what the folded chain reproduces.
-  auto xferProcessor = programInfo->getXferProcessor();
-  if (xferProcessor == nullptr || !IsProcessor<EmptyXferProcessor>(xferProcessor)) {
-    return AOTFoldRouteOutcome::FoldBlockedByXP;
-  }
-  std::vector<const FragmentProcessor*> allProcessors;
-  allProcessors.reserve(total);
-  for (size_t i = 0; i < total; ++i) {
-    allProcessors.push_back(programInfo->getFragmentProcessor(i));
-  }
-  AOTEffectGraph graph = {};
-  if (!Lower(allProcessors, &graph)) {
-    return AOTFoldRouteOutcome::BlockedByLowering;
-  }
-  AOTEffectPlan plan = {};
-  if (!Decompose(graph, &plan)) {
-    return AOTFoldRouteOutcome::UnsupportedShape;
-  }
-  auto gp = programInfo->getGeometryProcessor();
-  if (gp == nullptr) {
-    return AOTFoldRouteOutcome::GPIncompatible;
-  }
-  const bool pointwiseDAG =
-      plan.passes.size() == 1 && IsAOTPointwiseDAGKernel(plan.passes[0].kernel);
-  const auto& gpName = gp->name();
-  if (gpName != "DefaultGeometryProcessor" && gpName != "QuadPerEdgeAAGeometryProcessor" &&
-      (!pointwiseDAG ||
-       (gpName != "MeshGeometryProcessor" && gpName != "AtlasTextGeometryProcessor" &&
-        gpName != "EllipseGeometryProcessor" && gpName != "HairlineLineGeometryProcessor" &&
-        gpName != "ComplexEllipseGeometryProcessor"))) {
-    return AOTFoldRouteOutcome::GPIncompatible;
-  }
-  if (pointwiseDAG && gpName == "QuadPerEdgeAAGeometryProcessor" &&
-      static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp)->getHasSubset()) {
-    return AOTFoldRouteOutcome::GPIncompatible;
-  }
-  if (pointwiseDAG && plan.passes[0].resourceProfile == AOTResourceProfile::NoiseGraph) {
-    if (gpName != "QuadPerEdgeAAGeometryProcessor") {
-      return AOTFoldRouteOutcome::GPIncompatible;
-    }
-    const auto* quad = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-    if (!quad->hasCommonColor() || !quad->hasUVMatrix()) {
-      return AOTFoldRouteOutcome::GPIncompatible;
-    }
-  }
-  if (pointwiseDAG && gpName == "AtlasTextGeometryProcessor") {
-    if (gp->numTextureSamplers() != 0) {
-      return AOTFoldRouteOutcome::GPIncompatible;
-    }
-    bool hasLeaf = false;
-    for (auto nodeID : plan.passes[0].nodes) {
-      const auto* node = graph.nodeAt(nodeID);
-      const auto* gradient = std::get_if<AOTGradientParameters>(&node->parameters);
-      if (node->kind == AOTEffectKind::TextureSource ||
-          (gradient != nullptr && gradient->colorizerKind == 3)) {
-        hasLeaf = true;
-        break;
-      }
-    }
-    if (!hasLeaf) {
-      return AOTFoldRouteOutcome::GPIncompatible;
-    }
-  }
-  return AOTFoldRouteOutcome::Routable;
 }
 
 }  // namespace tgfx

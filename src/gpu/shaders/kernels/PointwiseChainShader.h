@@ -128,6 +128,8 @@ class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
 
   /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = true;
+  /// One of the two single-pass re-expressing kernels (see FamilyServesAsFusedPass).
+  static constexpr bool ServesAsFusedPass = true;
 
   /// Shared input contract for the plain chains and the extended resource kinds. gpKind selects
   /// (0 = DefaultGP, 1 = QuadPerEdgeAA, 2 = Mesh, 3 = sampler-free AtlasText twin, 4 = Ellipse,

@@ -632,7 +632,6 @@ static nlohmann::json BuildDecompositionAudit(const std::vector<AggregatedFallba
                                               uint64_t* outFusableNow, uint64_t* outNeedsLowering) {
   std::map<std::string, uint64_t> colorOutcomes;
   std::map<std::string, uint64_t> coverageOutcomes;
-  std::map<std::string, uint64_t> foldRouteOutcomes;
   std::map<std::string, uint64_t> blockingByFP;
   uint64_t analyzed = 0;
   uint64_t fusableNow = 0;
@@ -645,7 +644,6 @@ static nlohmann::json BuildDecompositionAudit(const std::vector<AggregatedFallba
     }
     auto count = fallback.count;
     analyzed += count;
-    foldRouteOutcomes[AOTFoldRouteOutcomeName(record.foldRouteOutcome)] += count;
     const auto& color = record.decomposeAnalysis.color;
     const auto& coverage = record.decomposeAnalysis.coverage;
     colorOutcomes[AOTDecomposeOutcomeName(color.outcome)] += count;
@@ -692,7 +690,6 @@ static nlohmann::json BuildDecompositionAudit(const std::vector<AggregatedFallba
           {"needsNewLowering", needsLowering},
           {"colorOutcomes", colorOutcomes},
           {"coverageOutcomes", coverageOutcomes},
-          {"foldRouteOutcomes", foldRouteOutcomes},
           {"blockingProcessorsRanked", std::move(blockingJSON)},
           {"fusedSamplerBudget", MaxFusedAOTSamplers}};
 }
@@ -1028,7 +1025,6 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         json["decompose"] = {
             {"color", AxisAnalysisToJSON(fallback.record.decomposeAnalysis.color)},
             {"coverage", AxisAnalysisToJSON(fallback.record.decomposeAnalysis.coverage)}};
-        json["foldRoute"] = AOTFoldRouteOutcomeName(fallback.record.foldRouteOutcome);
       }
       fallbackStructuresJSON.push_back(std::move(json));
     }

@@ -16,14 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PermutationMatcher.h"
 #include <skcms.h>
 #include <string_view>
 #include <type_traits>
 #include <unordered_set>
 #include "ColorSpaceXformHelper.h"
 #include "ShaderMatchHelpers.h"
+#include "gpu/PermutationMatch.h"
 #include "gpu/PrecompiledShaderCache.h"
+#include "gpu/ProgramInfo.h"
 #include "gpu/Swizzle.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AOTYUVChainProcessor.h"
@@ -375,19 +376,17 @@ bool ContainsGradientSource(const FragmentProcessor* processor) {
 }
 
 // Per-family gate of the walk (see MatchPermutationImpl for the switch semantics). A fused-pass
-// committed draw's first phase admits only the two single-pass fused kernels — the interpreter and
-// the perlin kernel; its second phase admits every other dedicated family (the fused ones already
-// rejected the shape and are not retried).
+// committed draw walks the two fused kernels first (the interpreter under its own switch, the
+// perlin kernel under the dedicated one); the second phase admits every other dedicated family
+// (the fused ones already rejected the shape and are not retried).
 template <typename Family>
 static bool FamilyWalkEnabled(bool allowDedicated, bool allowInterpreter, bool committed,
                               bool fusedPhase) {
+  constexpr bool isFused = FamilyServesAsFusedPass<Family>::value;
   constexpr bool isInterpreter = std::is_same_v<Family, PointwiseChainShader>;
-  constexpr bool isPerlin = std::is_same_v<Family, PerlinNoiseFillShader>;
-  if (committed && fusedPhase) {
-    return (isInterpreter && allowInterpreter) || (isPerlin && allowDedicated);
-  }
   if (committed) {
-    return !isInterpreter && !isPerlin && allowDedicated;
+    return fusedPhase ? (isFused && (isInterpreter ? allowInterpreter : allowDedicated))
+                      : (!isFused && allowDedicated);
   }
   return isInterpreter ? allowInterpreter : allowDedicated;
 }
