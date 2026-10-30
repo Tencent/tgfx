@@ -139,7 +139,7 @@ static bool SetupUniformBindingTestEnv(UniformBindingTestEnv* env, Context* cont
   auto isDesktop = info->version.find("OpenGL ES") == std::string::npos;
 
   TextureDescriptor textureDesc(size, size, PixelFormat::RGBA_8888, false, 1,
-                                TextureUsage::RENDER_ATTACHMENT);
+                                TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING);
   env->renderTexture = env->gpu->createTexture(textureDesc);
   if (env->renderTexture == nullptr) {
     return false;
