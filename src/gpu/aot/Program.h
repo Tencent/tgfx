@@ -20,10 +20,26 @@
 
 #include <vector>
 #include "gpu/AOTResourceProfile.h"
+#include "gpu/SamplingArgs.h"
 #include "gpu/aot/EffectGraph.h"
 #include "gpu/shaders/KernelContract.h"
 
 namespace tgfx {
+
+/// One sampler-binding child of a chain program, in artifact order: a DAG leaf, the LUT gradient
+/// texture, phantom sampler padding (including the noise lookup tables), or the device mask. The
+/// binding carries exactly the data the child TextureEffect was constructed from, so the uniform
+/// upload reads the program instead of walking processor children.
+struct AOTBinding {
+  enum class Kind { Leaf, Lut, Padding, Mask };
+  Kind kind = Kind::Leaf;
+  std::shared_ptr<TextureProxy> textureProxy = nullptr;
+  /// The child TextureEffect's sampling (Subset, AlphaOnly, RGBAAA derive from it). Mask ignores
+  /// it and reads the matrix instead.
+  SamplingArgs args = {};
+  /// Mask only: the device-space sampling matrix (destination coordinates to the mask's space).
+  Matrix uvMatrix = Matrix::I();
+};
 
 /// The runtime operator of one chain slot. The integer values are part of the precompiled kernel
 /// ABI: they must match the OP_* constants in operator/op_codes.inc, which shader_build_tool
@@ -142,6 +158,8 @@ struct AOTProgram {
   std::vector<AOTChainSlot> slots = {};
   std::vector<AOTChainTiledLeaf> tiledLeaves = {};
   std::vector<AOTChainDeviceLeaf> deviceLeaves = {};
+  /// The sampler-binding children in artifact order (leaves, LUT, padding, mask).
+  std::vector<AOTBinding> bindings = {};
   // Bit k is set when leaf k samples in destination device space; the coord-source mask for the
   // chain vertex stage (bit k sources leaf k from the uvCoord attribute, bit 4 the procedural
   // sources).
@@ -151,6 +169,10 @@ struct AOTProgram {
   int clipCoverageRegister = -1;
   // Sampler index of the LUT gradient child, or -1 when the chain has none.
   int lutLeafIndex = -1;
+  /// Whether the mask binding is a real device mask (a phantom mask slot reads as absent).
+  bool hasMaskTexture = false;
+  /// Sampler index of the noise lookup tables' first binding, or -1 when the chain has none.
+  int noiseSamplerBase = -1;
   AOTResourceProfile profile = AOTResourceProfile::Automatic;
 };
 

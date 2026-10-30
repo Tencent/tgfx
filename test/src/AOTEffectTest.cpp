@@ -890,6 +890,25 @@ TGFX_TEST(AOTEffectTest, ThreeTiledLeavesUseGraphAndFourthIsRejected) {
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(wideGraph, widePlan));
 }
 
+// The direct-construction entry the admission tests use: a program with the given slots and
+// children, mirroring what the chain builder produces for a bare texture chain. The binding table
+// stays empty — these processors are never drawn, so no upload runs over them.
+static PlacementPtr<AOTPointwiseChainProcessor> MakeDirectChain(
+    BlockAllocator* allocator, std::vector<PlacementPtr<FragmentProcessor>> leaves,
+    std::vector<PlacementPtr<FragmentProcessor>> padding, const std::vector<AOTChainSlot>& slots,
+    size_t root, AOTResourceProfile profile,
+    const std::vector<AOTChainTiledLeaf>& tiledLeaves = {}) {
+  AOTProgram program = {};
+  program.slots = slots;
+  program.rootRegister = root;
+  program.profile = profile;
+  program.tiledLeaves = tiledLeaves;
+  AOTPointwiseChainProcessor::AOTChainChildren children = {};
+  children.leaves = std::move(leaves);
+  children.padding = std::move(padding);
+  return AOTPointwiseChainProcessor::Make(allocator, std::move(program), std::move(children));
+}
+
 TGFX_TEST(AOTEffectTest, DirectProcessorRequiresExplicitThreeRecipeProfile) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -913,13 +932,11 @@ TGFX_TEST(AOTEffectTest, DirectProcessorRequiresExplicitThreeRecipeProfile) {
       slots[static_cast<size_t>(index)].op = AOTChainOp::Texture;
       slots[static_cast<size_t>(index)].outRegister = index;
     }
-    std::vector<AOTChainTiledLeaf> extra;
+    std::vector<AOTChainTiledLeaf> tiledLeaves = {{0, *recipe}, {1, *recipe}};
     for (size_t index = 0; index < additionalCount; ++index) {
-      extra.push_back({additionalIndex + static_cast<int>(index), *recipe});
+      tiledLeaves.push_back({additionalIndex + static_cast<int>(index), *recipe});
     }
-    return AOTPointwiseChainProcessor::Make(&allocator, std::move(leaves), slots, 3, 0, recipe,
-                                            nullptr, -1, ~0u, nullptr, -1, {}, false, -1, 1, recipe,
-                                            profile, extra);
+    return MakeDirectChain(&allocator, std::move(leaves), {}, slots, 3, profile, tiledLeaves);
   };
   EXPECT_EQ(build(AOTResourceProfile::Automatic, 2, 1), nullptr);
   EXPECT_EQ(build(AOTResourceProfile::Chain, 2, 1), nullptr);
@@ -969,9 +986,7 @@ TGFX_TEST(AOTEffectTest, DirectGradientProcessorRejectsChainAndAutomaticallySele
   slots[0].gradient.coordMatrix = Matrix::MakeTrans(4, 6);
   for (auto profile : {AOTResourceProfile::Automatic, AOTResourceProfile::Chain,
                        AOTResourceProfile::TiledGraph, AOTResourceProfile::NoiseGraph}) {
-    auto processor =
-        AOTPointwiseChainProcessor::Make(&allocator, {}, slots, 0, -1, nullptr, nullptr, -1, ~0u,
-                                         nullptr, -1, {}, false, -1, -1, nullptr, profile);
+    auto processor = MakeDirectChain(&allocator, {}, {}, slots, 0, profile);
     if (profile == AOTResourceProfile::Chain || profile == AOTResourceProfile::NoiseGraph) {
       EXPECT_EQ(processor, nullptr);
       continue;
@@ -999,9 +1014,7 @@ static PlacementPtr<AOTPointwiseChainProcessor> MakeChainWithTextureLeaves(
       padding.push_back(std::move(texture));
     }
   }
-  return AOTPointwiseChainProcessor::Make(allocator, std::move(leaves), slots, root, -1, nullptr,
-                                          nullptr, -1, ~0u, nullptr, -1, std::move(padding), false,
-                                          -1, -1, nullptr, profile);
+  return MakeDirectChain(allocator, std::move(leaves), std::move(padding), slots, root, profile);
 }
 
 TGFX_TEST(AOTEffectTest, TextureSlotsMustMatchRealLeaves) {
@@ -1084,9 +1097,7 @@ TGFX_TEST(AOTEffectTest, BaseChainOmitsGradientTransformAndExtendedProfilesKeepO
       slots[index].op = AOTChainOp::Texture;
       slots[index].outRegister = static_cast<int>(index);
     }
-    auto processor = AOTPointwiseChainProcessor::Make(&allocator, std::move(leaves), slots, 3, -1,
-                                                      nullptr, nullptr, -1, ~0u, nullptr, -1, {},
-                                                      false, -1, -1, nullptr, profile);
+    auto processor = MakeDirectChain(&allocator, std::move(leaves), {}, slots, 3, profile);
     ASSERT_NE(processor, nullptr);
     EXPECT_EQ(processor->numCoordTransforms(), profile == AOTResourceProfile::Chain ? 0u : 1u);
     if (profile == AOTResourceProfile::TiledGraph) {

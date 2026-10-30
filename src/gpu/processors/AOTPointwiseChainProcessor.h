@@ -90,31 +90,21 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
                             bool hasLUT, const std::vector<int>& tiledLeafIndices,
                             AOTResourceProfile* profile);
 
-  static PlacementPtr<AOTPointwiseChainProcessor> Make(
-      BlockAllocator* allocator, std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
-      const std::vector<AOTChainSlot>& slots, size_t rootSlot, int tiledLeafIndex = -1,
-      const AOTTiledTextureRecipe* tiledRecipe = nullptr,
-      PlacementPtr<FragmentProcessor> maskChild = nullptr, int coverageRootSlot = -1,
-      uint32_t coordSourceMask = ~0u, PlacementPtr<FragmentProcessor> lutChild = nullptr,
-      int lutLeafIndex = -1, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding = {},
-      bool maskChildIsPhantom = false, int clipCoverageRegister = -1, int tiledLeafIndex2 = -1,
-      const AOTTiledTextureRecipe* tiledRecipe2 = nullptr,
-      AOTResourceProfile resourceProfile = AOTResourceProfile::Automatic,
-      const std::vector<AOTChainTiledLeaf>& additionalTiledLeaves = {},
-      const std::vector<AOTChainDeviceLeaf>& deviceLeaves = {});
+  /** The sampler-binding children in artifact order: the DAG leaves, the LUT gradient, the
+   *  phantom/noise-lookup padding, and the (possibly phantom) device mask. */
+  struct AOTChainChildren {
+    std::vector<PlacementPtr<FragmentProcessor>> leaves;
+    PlacementPtr<FragmentProcessor> lut;
+    std::vector<PlacementPtr<FragmentProcessor>> padding;
+    PlacementPtr<FragmentProcessor> mask;
+    bool maskIsPhantom = false;
+  };
 
-  AOTPointwiseChainProcessor(std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
-                             const std::vector<AOTChainSlot>& slots, size_t rootSlot,
-                             int tiledLeafIndex, const AOTTiledTextureRecipe* tiledRecipe,
-                             PlacementPtr<FragmentProcessor> maskChild, int coverageRootSlot,
-                             uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChild,
-                             int lutLeafIndex,
-                             std::vector<PlacementPtr<FragmentProcessor>> samplerPadding,
-                             bool maskChildIsPhantom, int clipCoverageRegister, int tiledLeafIndex2,
-                             const AOTTiledTextureRecipe* tiledRecipe2,
-                             AOTResourceProfile resourceProfile,
-                             const std::vector<AOTChainTiledLeaf>& additionalTiledLeaves,
-                             const std::vector<AOTChainDeviceLeaf>& deviceLeaves);
+  static PlacementPtr<AOTPointwiseChainProcessor> Make(BlockAllocator* allocator,
+                                                       AOTProgram program,
+                                                       AOTChainChildren children);
+
+  AOTPointwiseChainProcessor(AOTProgram program, AOTChainChildren children);
 
   std::string name() const override {
     return "AOTPointwiseChainProcessor";
@@ -138,51 +128,51 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
   }
 
   size_t slotCount() const {
-    return _slotCount;
+    return _program.slots.size();
   }
 
   size_t root() const {
-    return rootSlot;
+    return _program.rootRegister;
   }
 
   // Slot index of the coverage subtree's root, or -1 when the chain carries no coverage subtree.
   // When present, the kernel multiplies the color result by that slot's value instead of the
   // plain coverage modulation.
   int coverageRoot() const {
-    return coverageRootSlot;
+    return _program.coverageRootRegister;
   }
 
   // Register index of the narrow clip slots' product (and the atlas path's glyph-mask subtree
   // root), or -1 when the chain has none. The value is a pure coverage that rides the XP's
   // coverage input — see the kernel's ClipCoverageRegister.
   int clipCoverage() const {
-    return clipCoverageRegister;
+    return _program.clipCoverageRegister;
   }
 
   // Index of the leaf that reads the first shader-side tiling recipe (wrap/border emulation), or
   // -1 when every leaf is plain.
   int tiledLeaf() const {
-    return tiledLeaves.empty() ? -1 : tiledLeaves[0].leafIndex;
+    return _program.tiledLeaves.empty() ? -1 : _program.tiledLeaves[0].leafIndex;
   }
 
   // Index of the leaf that reads the second tiling recipe, or -1 when at most one leaf is tiled.
   int tiledLeaf2() const {
-    return tiledLeaves.size() < 2 ? -1 : tiledLeaves[1].leafIndex;
+    return _program.tiledLeaves.size() < 2 ? -1 : _program.tiledLeaves[1].leafIndex;
   }
 
   AOTResourceProfile resourceProfile() const {
-    return _resourceProfile;
+    return _program.profile;
   }
 
   const std::vector<AOTChainTiledLeaf>& tiledLeafParameters() const {
-    return tiledLeaves;
+    return _program.tiledLeaves;
   }
 
   // Sampler index of the LUT gradient child, or -1 when the chain has none. The LUT child binds a
   // 2D texture into a leaf slot, so a chain carrying one cannot use a rectangle (sampler2DRect)
   // leaf variant.
   int lutLeaf() const {
-    return lutLeafIndex;
+    return _program.lutLeafIndex;
   }
 
   // Bit k is set when leaf k samples in destination device space; zero when every leaf samples
@@ -191,16 +181,16 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
 
   const AOTTiledTextureRecipe& tiledRecipe() const {
     static const AOTTiledTextureRecipe empty = {};
-    return tiledLeaves.empty() ? empty : tiledLeaves[0].recipe;
+    return _program.tiledLeaves.empty() ? empty : _program.tiledLeaves[0].recipe;
   }
 
   const AOTTiledTextureRecipe& tiledRecipe2() const {
     static const AOTTiledTextureRecipe empty = {};
-    return tiledLeaves.size() < 2 ? empty : tiledLeaves[1].recipe;
+    return _program.tiledLeaves.size() < 2 ? empty : _program.tiledLeaves[1].recipe;
   }
 
   const AOTChainSlot& slot(size_t index) const {
-    return slots[index];
+    return _program.slots[index];
   }
 
   void emitCode(EmitArgs& args) const override;
@@ -211,32 +201,13 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
 
   void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 
-  size_t _slotCount = 0;
-  size_t rootSlot = 0;
-  AOTResourceProfile _resourceProfile = AOTResourceProfile::Chain;
-  std::vector<AOTChainTiledLeaf> tiledLeaves = {};
-  std::array<AOTChainSlot, MaxSlots> slots = {};
-  // Kept only to mark the mask's presence; the mask itself is the last registered child.
-  // The mask sampler slot is occupied (real mask or phantom) — four-leaf chains always occupy it.
+  AOTProgram _program = {};
+  // Derived construction state the matcher and writer read until the shell retires.
   bool hasMaskSlotChild = false;
   bool hasMaskChild = false;
+  int noiseSamplerBase = -1;
   // Registered only by extended profiles, ahead of the leaf transforms.
   CoordTransform gradientCoordTransform = {};
-  int coverageRootSlot = -1;
-  // Register index of the narrow clip product / atlas coverage root; -1 when absent.
-  int clipCoverageRegister = -1;
-  // Per-target coordinate source for the chain vertex stage: bit k set sources leaf k from the
-  // uvCoord attribute, bit 4 does the same for the procedural-source coordinates (SourceCoords);
-  // clear bits source from
-  // aPosition. All-ones reproduces the legacy shared-source behavior (quads, meshes); atlas text
-  // sets only the atlas leaf's bit so gradients and image leaves come from position.
-  uint32_t coordSourceMask = ~0u;
-  // Sampler-only child for the LUT gradient colorizer, registered after the DAG leaves (and
-  // counted by leafCount() so the matcher sizes TEXTURE_COUNT for it) but holding no chain slot;
-  // lutLeafIndex is its sampler index, read by the kernel's OP_GRADIENT LUT branch.
-  int lutLeafIndex = -1;
-  int noiseSamplerBase = -1;
-  std::vector<AOTChainDeviceLeaf> deviceLeaves = {};
 };
 
 }  // namespace tgfx

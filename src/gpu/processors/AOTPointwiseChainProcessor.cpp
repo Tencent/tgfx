@@ -19,171 +19,13 @@
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/ColorSpaceXformHelper.h"
 #include "gpu/Swizzle.h"
+#include "gpu/aot/Binder.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/resources/TextureView.h"
 #include "gpu/shaders/modules/ChainParams.h"
 
 namespace tgfx {
-namespace {
-// std140 column packing of a 3x3 matrix stored in Matrix::get9 row-major order, mirroring
-// UniformData::setData(const Matrix&) so chain uploads match the same layout.
-static std::array<float, 12> MatrixColumnMajor(const std::array<float, 9>& values) {
-  return {values[0], values[3], values[6], 0.0f,      values[1], values[4],
-          values[7], 0.0f,      values[2], values[5], values[8], 0.0f};
-}
-
-// Uploads one tiled recipe into the kernel's Tiled<field><suffix> uniform set ("" for the first
-// recipe, "2" for the second).
-static void UploadTiledRecipe(UniformData* uniformData, const AOTTiledTextureRecipe& recipe,
-                              const ChainParams::TiledRecipeNames& names) {
-  uniformData->setDataOptional(names.modeX, static_cast<int>(recipe.shaderModeX));
-  uniformData->setDataOptional(names.modeY, static_cast<int>(recipe.shaderModeY));
-  float subsetRect[] = {recipe.shaderSubset.left, recipe.shaderSubset.top,
-                        recipe.shaderSubset.right, recipe.shaderSubset.bottom};
-  uniformData->setDataOptional(names.subset, subsetRect);
-  float clampRect[] = {recipe.shaderClamp.left, recipe.shaderClamp.top, recipe.shaderClamp.right,
-                       recipe.shaderClamp.bottom};
-  uniformData->setDataOptional(names.clamp, clampRect);
-  if (recipe.usesShaderDimensions) {
-    uniformData->setDataOptional(names.dimension, recipe.shaderDimensions);
-  }
-  uniformData->setDataOptional(names.strict, recipe.strict ? 1 : 0);
-}
-
-static void UploadChainSlot(UniformData* uniformData, size_t index, const AOTChainSlot& slot,
-                            int rectOrdinal, int localRectOrdinal, int rrectOrdinal) {
-  int selector = slot.op == AOTChainOp::Blend
-                     ? slot.blend.blendMode | (slot.blend.multiplyInputAlpha ? 0x100 : 0)
-                     : 0;
-  if (slot.op == AOTChainOp::ConstColor) {
-    selector = slot.constColor.inputMode;
-  }
-  if (slot.op == AOTChainOp::Texture) {
-    // Bit 0: modulate by the paint alpha. Bit 1: alpha-only leaf, splat .r into all channels.
-    // Bit 2: coverage-root leaf, modulate by the coverage unit alpha. Bit 3: alpha-only leaf
-    // modulated by the geometry color's RGB (a two-child blend operand, whose input is
-    // (geom.rgb, 1.0)). Bit 4: alpha-only leaf modulated by the full geometry color (the color
-    // root, whose readback is sample.a * the complete premul input color).
-    selector = slot.textureModulate | (slot.textureAlphaOnly << 1) |
-               (slot.textureModulateUnit << 2) | (slot.textureModulateGeometryRGB << 3) |
-               (slot.textureModulateFullInput << 4);
-  }
-  if (slot.op == AOTChainOp::TexModulate) {
-    // Bit 0: the source leaf is alpha-only. Bits 16-19: the leading raw-sampling slot's index
-    // into chainLeafTex (not Packed.z, which the register allocator rewrites).
-    selector = slot.texModulateAlphaOnly | (slot.texModulateSourceSlot << 16);
-  }
-  if (slot.op == AOTChainOp::AARectCoverage) {
-    // Bits 16-19: the slot's ordinal into the CoverageRect array.
-    selector = rectOrdinal << 16;
-  }
-  if (slot.op == AOTChainOp::LocalRectCoverage) {
-    // Bits 16-19: the slot's ordinal into the CoverageLocalRect arrays.
-    selector = localRectOrdinal << 16;
-  }
-  if (slot.op == AOTChainOp::RRectCoverage) {
-    // Bits 16-19: the slot's ordinal into the CoverageRRect* parameter arrays.
-    selector = rrectOrdinal << 16;
-  }
-  // Bits 20-24: the result register + 1 (0 marks a dead instruction whose result nothing reads;
-  // the kernel then skips the chainResults write).
-  selector |= (slot.outRegister + 1) << 20;
-  int packed[] = {static_cast<int>(slot.op), slot.in0, slot.in1, selector};
-  uniformData->setArrayElementOptional(ChainParams::SlotPacked.name, index, packed);
-  switch (slot.op) {
-    case AOTChainOp::ColorMatrix: {
-      float matrixData[16];
-      float vectorData[4];
-      PackAOTColorMatrix(slot.colorMatrix.matrix, matrixData, vectorData);
-      uniformData->setArrayElementOptional(ChainParams::SlotColorMatrix.name, index, matrixData);
-      uniformData->setArrayElementOptional(ChainParams::SlotColorVector.name, index, vectorData);
-      break;
-    }
-    case AOTChainOp::Luma: {
-      float lumaThresh[] = {slot.luma.kr, slot.luma.kg, slot.luma.kb, 0.0f};
-      uniformData->setArrayElementOptional(ChainParams::SlotLumaThresh.name, index, lumaThresh);
-      break;
-    }
-    case AOTChainOp::AlphaThreshold: {
-      float lumaThresh[] = {0.0f, 0.0f, 0.0f, slot.alphaThreshold.threshold};
-      uniformData->setArrayElementOptional(ChainParams::SlotLumaThresh.name, index, lumaThresh);
-      break;
-    }
-    case AOTChainOp::ConstColor: {
-      const auto& color = slot.constColor.color;
-      float colorData[] = {color[0], color[1], color[2], color[3]};
-      uniformData->setArrayElementOptional(ChainParams::SlotConstColor.name, index, colorData);
-      break;
-    }
-    case AOTChainOp::AARectCoverage: {
-      // The AA math evaluates to 0 at the rect coordinates, so outset by 0.5 to interpolate from 0
-      // at a half-pixel inset to 1 at a half-pixel outset (same as GLSLRectEffect::onSetData).
-      const auto& rect = slot.rectCoverage.rect;
-      float rectData[] = {rect[0] - 0.5f, rect[1] - 0.5f, rect[2] + 0.5f, rect[3] + 0.5f};
-      uniformData->setArrayElementOptional(ChainParams::CoverageRect.name,
-                                           static_cast<size_t>(rectOrdinal), rectData);
-      break;
-    }
-    case AOTChainOp::LocalRectCoverage: {
-      // The local rect keeps its exact coordinates; the kernel's AA ramp clamps each edge distance
-      // to half a pixel after mapping through the device-to-local matrix.
-      const auto& params = slot.localRectCoverage;
-      float rectData[] = {params.rect[0], params.rect[1], params.rect[2], params.rect[3]};
-      uniformData->setArrayElementOptional(ChainParams::CoverageLocalRect.name,
-                                           static_cast<size_t>(localRectOrdinal), rectData);
-      uniformData->setArrayElementOptional(ChainParams::CoverageLocalDeviceToLocal.name,
-                                           static_cast<size_t>(localRectOrdinal),
-                                           MatrixColumnMajor(params.deviceToLocal));
-      break;
-    }
-    case AOTChainOp::RRectCoverage: {
-      const auto& params = slot.rrectCoverage;
-      float rectData[] = {params.rect[0], params.rect[1], params.rect[2], params.rect[3]};
-      uniformData->setArrayElementOptional(ChainParams::CoverageRRectRect.name,
-                                           static_cast<size_t>(rrectOrdinal), rectData);
-      uniformData->setArrayElementOptional(ChainParams::CoverageRRectRadiiX.name,
-                                           static_cast<size_t>(rrectOrdinal), params.radiiX);
-      uniformData->setArrayElementOptional(ChainParams::CoverageRRectRadiiY.name,
-                                           static_cast<size_t>(rrectOrdinal), params.radiiY);
-      float antiAliasData[] = {params.antiAlias};
-      uniformData->setArrayElementOptional(ChainParams::CoverageRRectAntiAlias.name,
-                                           static_cast<size_t>(rrectOrdinal), antiAliasData);
-      uniformData->setArrayElementOptional(ChainParams::CoverageRRectDeviceToLocal.name,
-                                           static_cast<size_t>(rrectOrdinal),
-                                           MatrixColumnMajor(params.deviceToLocal));
-      break;
-    }
-    default:
-      break;
-  }
-}
-
-// Writes the extended chain's gradient parameter block.
-static void UploadGradientParams(UniformData* uniformData, const AOTGradientParameters& params) {
-  uniformData->setDataOptional(ChainParams::GradientLayoutType.name, params.layoutType);
-  uniformData->setDataOptional(ChainParams::GradientBias.name, params.bias);
-  uniformData->setDataOptional(ChainParams::GradientScale.name, params.scale);
-  uniformData->setDataOptional(ChainParams::GradientColorizerKind.name, params.colorizerKind);
-  uniformData->setDataOptional(ChainParams::GradientLeftBorder.name, params.leftBorder);
-  uniformData->setDataOptional(ChainParams::GradientRightBorder.name, params.rightBorder);
-  uniformData->setDataOptional(ChainParams::GradientStart.name, params.start);
-  uniformData->setDataOptional(ChainParams::GradientEnd.name, params.end);
-  uniformData->setDataOptional(ChainParams::GradientScale01.name, params.scale01);
-  uniformData->setDataOptional(ChainParams::GradientBias01.name, params.bias01);
-  uniformData->setDataOptional(ChainParams::GradientScale23.name, params.scale23);
-  uniformData->setDataOptional(ChainParams::GradientBias23.name, params.bias23);
-  uniformData->setDataOptional(ChainParams::GradientThreshold.name, params.threshold);
-  uniformData->setDataOptional(ChainParams::GradientIntervalCount.name, params.intervalCount);
-  uniformData->setDataOptional(ChainParams::GradientThresholds1_7.name, params.thresholds1_7);
-  uniformData->setDataOptional(ChainParams::GradientThresholds9_13.name, params.thresholds9_13);
-  for (size_t index = 0; index < 8; ++index) {
-    const auto& pair = ChainParams::GradientPairs[index];
-    uniformData->setDataOptional(pair.scale, params.scales[index]);
-    uniformData->setDataOptional(pair.bias, params.biases[index]);
-  }
-}
-}  // namespace
 
 bool AOTPointwiseChainProcessor::ValidateSlots(const std::vector<AOTChainSlot>& slots,
                                                size_t rootSlot, int coverageRootSlot,
@@ -349,45 +191,28 @@ bool AOTPointwiseChainProcessor::ValidateSlots(const std::vector<AOTChainSlot>& 
 }
 
 PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
-    BlockAllocator* allocator, std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
-    const std::vector<AOTChainSlot>& slots, size_t rootSlot, int tiledLeafIndex,
-    const AOTTiledTextureRecipe* tiledRecipe, PlacementPtr<FragmentProcessor> maskChild,
-    int coverageRootSlot, uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChild,
-    int lutLeafIndex, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding,
-    bool maskChildIsPhantom, int clipCoverageRegister, int tiledLeafIndex2,
-    const AOTTiledTextureRecipe* tiledRecipe2, AOTResourceProfile profile,
-    const std::vector<AOTChainTiledLeaf>& additionalTiledLeaves,
-    const std::vector<AOTChainDeviceLeaf>& deviceLeaves) {
+    BlockAllocator* allocator, AOTProgram program, AOTChainChildren children) {
   if (allocator == nullptr) {
     return nullptr;
   }
-  auto leafCount = textureLeaves.size();
-  // The recipe pointers belong to the processor-facing signature; the leaf indices they pair
-  // with are checked by ValidateSlots together with the additional recipes.
-  if ((tiledLeafIndex >= 0 && tiledRecipe == nullptr) ||
-      (tiledLeafIndex2 >= 0 && (tiledLeafIndex < 0 || tiledRecipe2 == nullptr))) {
-    return nullptr;
-  }
+  auto leafCount = children.leaves.size();
   std::vector<int> tiledLeafIndices = {};
-  if (tiledLeafIndex >= 0) {
-    tiledLeafIndices.push_back(tiledLeafIndex);
-  }
-  if (tiledLeafIndex2 >= 0) {
-    tiledLeafIndices.push_back(tiledLeafIndex2);
-  }
-  for (const auto& tiled : additionalTiledLeaves) {
+  for (const auto& tiled : program.tiledLeaves) {
     tiledLeafIndices.push_back(tiled.leafIndex);
   }
-  if (!ValidateSlots(slots, rootSlot, coverageRootSlot, clipCoverageRegister, leafCount,
-                     lutChild != nullptr, tiledLeafIndices, &profile)) {
+  AOTResourceProfile profile = program.profile;
+  if (!ValidateSlots(program.slots, program.rootRegister, program.coverageRootRegister,
+                     program.clipCoverageRegister, leafCount, children.lut != nullptr,
+                     tiledLeafIndices, &profile)) {
     return nullptr;
   }
-  for (const auto& leaf : textureLeaves) {
+  program.profile = profile;
+  for (const auto& leaf : children.leaves) {
     if (leaf == nullptr) {
       return nullptr;
     }
   }
-  for (const auto& child : samplerPadding) {
+  for (const auto& child : children.padding) {
     if (child == nullptr || !IsProcessor<TextureEffect>(child.get()) ||
         child->numTextureSamplers() > 1) {
       return nullptr;
@@ -396,33 +221,34 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
   // Sampler-binding children include the DAG leaves plus sampler-only children (the LUT gradient
   // texture and phantom padding). TEXTURE_COUNT exists only as 0 or 4, so any chain with leaves
   // must pad exactly up to the four-sampler artifacts.
-  size_t samplerChildren = leafCount + (lutChild != nullptr ? 1 : 0) + samplerPadding.size();
+  size_t samplerChildren = leafCount + (children.lut != nullptr ? 1 : 0) + children.padding.size();
   if (samplerChildren != 0 && samplerChildren != 4) {
     return nullptr;
   }
-  if (maskChild != nullptr && !maskChildIsPhantom &&
-      !IsProcessor<DeviceSpaceTextureEffect>(maskChild.get())) {
+  if (children.mask != nullptr && !children.maskIsPhantom &&
+      !IsProcessor<DeviceSpaceTextureEffect>(children.mask.get())) {
     return nullptr;
   }
-  if (lutChild != nullptr &&
-      (lutLeafIndex < 0 || lutLeafIndex > 3 || static_cast<size_t>(lutLeafIndex) != leafCount)) {
+  if (children.lut != nullptr && (program.lutLeafIndex < 0 || program.lutLeafIndex > 3 ||
+                                  static_cast<size_t>(program.lutLeafIndex) != leafCount)) {
     return nullptr;
   }
-  for (const auto& slot : slots) {
+  for (const auto& slot : program.slots) {
     if (slot.op != AOTChainOp::PerlinNoise) {
       continue;
     }
     // The two noise lookup tables ride the first two sampler-only children.
-    if (samplerPadding.size() < 2 || samplerPadding[0] == nullptr || samplerPadding[1] == nullptr ||
-        samplerPadding[0]->textureAt(0) != slot.noise.permutationsView->getTexture() ||
-        samplerPadding[1]->textureAt(0) != slot.noise.noiseView->getTexture()) {
+    if (children.padding.size() < 2 || children.padding[0] == nullptr ||
+        children.padding[1] == nullptr ||
+        children.padding[0]->textureAt(0) != slot.noise.permutationsView->getTexture() ||
+        children.padding[1]->textureAt(0) != slot.noise.noiseView->getTexture()) {
       return nullptr;
     }
   }
   // A device-space leaf is one of the DAG leaves (a texture slot), never a sampler-only child, and
   // each leaf takes at most one device-space matrix.
   uint32_t seenDeviceLeaves = 0;
-  for (const auto& deviceLeaf : deviceLeaves) {
+  for (const auto& deviceLeaf : program.deviceLeaves) {
     if (deviceLeaf.leafIndex < 0 || static_cast<size_t>(deviceLeaf.leafIndex) >= leafCount ||
         deviceLeaf.textureProxy == nullptr || deviceLeaf.uvMatrix.hasPerspective()) {
       return nullptr;
@@ -433,64 +259,42 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
     }
     seenDeviceLeaves |= bit;
   }
-  return allocator->make<AOTPointwiseChainProcessor>(
-      std::move(textureLeaves), slots, rootSlot, tiledLeafIndex, tiledRecipe, std::move(maskChild),
-      coverageRootSlot, coordSourceMask, std::move(lutChild), lutLeafIndex,
-      std::move(samplerPadding), maskChildIsPhantom, clipCoverageRegister, tiledLeafIndex2,
-      tiledRecipe2, profile, additionalTiledLeaves, deviceLeaves);
+  return allocator->make<AOTPointwiseChainProcessor>(std::move(program), std::move(children));
 }
 
-AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(
-    std::vector<PlacementPtr<FragmentProcessor>> textureLeaves,
-    const std::vector<AOTChainSlot>& newSlots, size_t rootSlot, int tiledLeafIndex,
-    const AOTTiledTextureRecipe* tiledRecipe, PlacementPtr<FragmentProcessor> maskChildFP,
-    int coverageRootSlot, uint32_t coordSourceMask, PlacementPtr<FragmentProcessor> lutChildFP,
-    int lutLeafIndex, std::vector<PlacementPtr<FragmentProcessor>> samplerPadding,
-    bool maskChildIsPhantom, int clipCoverageRegister, int tiledLeafIndex2,
-    const AOTTiledTextureRecipe* tiledRecipe2, AOTResourceProfile profile,
-    const std::vector<AOTChainTiledLeaf>& additionalTiledLeaves,
-    const std::vector<AOTChainDeviceLeaf>& deviceLeaves)
-    : FragmentProcessor(ClassID()), _slotCount(newSlots.size()), rootSlot(rootSlot),
-      _resourceProfile(profile), hasMaskSlotChild(maskChildFP != nullptr),
-      hasMaskChild(maskChildFP != nullptr && !maskChildIsPhantom),
-      coverageRootSlot(coverageRootSlot), clipCoverageRegister(clipCoverageRegister),
-      coordSourceMask(coordSourceMask), lutLeafIndex(lutLeafIndex), deviceLeaves(deviceLeaves) {
-  if (tiledLeafIndex >= 0 && tiledRecipe != nullptr) {
-    tiledLeaves.push_back({tiledLeafIndex, *tiledRecipe});
-  }
-  if (tiledLeafIndex2 >= 0 && tiledRecipe2 != nullptr) {
-    tiledLeaves.push_back({tiledLeafIndex2, *tiledRecipe2});
-  }
-  tiledLeaves.insert(tiledLeaves.end(), additionalTiledLeaves.begin(), additionalTiledLeaves.end());
-  for (size_t index = 0; index < newSlots.size(); ++index) {
-    slots[index] = newSlots[index];
-    if (slots[index].op == AOTChainOp::Gradient) {
-      gradientCoordTransform = CoordTransform(slots[index].gradient.coordMatrix);
-    } else if (slots[index].op == AOTChainOp::PerlinNoise) {
-      gradientCoordTransform = CoordTransform(slots[index].noise.uvMatrix);
-      noiseSamplerBase = static_cast<int>(textureLeaves.size());
+AOTPointwiseChainProcessor::AOTPointwiseChainProcessor(AOTProgram program,
+                                                       AOTChainChildren children)
+    : FragmentProcessor(ClassID()), _program(std::move(program)),
+      hasMaskSlotChild(children.mask != nullptr),
+      hasMaskChild(children.mask != nullptr && !children.maskIsPhantom) {
+  for (size_t index = 0; index < _program.slots.size(); ++index) {
+    if (_program.slots[index].op == AOTChainOp::Gradient) {
+      gradientCoordTransform = CoordTransform(_program.slots[index].gradient.coordMatrix);
+    } else if (_program.slots[index].op == AOTChainOp::PerlinNoise) {
+      gradientCoordTransform = CoordTransform(_program.slots[index].noise.uvMatrix);
+      noiseSamplerBase = static_cast<int>(children.leaves.size());
     }
   }
-  if (IsAOTGraphProfile(_resourceProfile)) {
+  if (IsAOTGraphProfile(_program.profile)) {
     addCoordTransform(&gradientCoordTransform);
   }
-  for (auto& leaf : textureLeaves) {
+  for (auto& leaf : children.leaves) {
     registerChildProcessor(std::move(leaf));
   }
-  if (lutChildFP != nullptr) {
-    registerChildProcessor(std::move(lutChildFP));
+  if (children.lut != nullptr) {
+    registerChildProcessor(std::move(children.lut));
   }
-  for (auto& phantom : samplerPadding) {
+  for (auto& phantom : children.padding) {
     registerChildProcessor(std::move(phantom));
   }
-  if (maskChildFP != nullptr) {
-    registerChildProcessor(std::move(maskChildFP));
+  if (children.mask != nullptr) {
+    registerChildProcessor(std::move(children.mask));
   }
 }
 
 uint32_t AOTPointwiseChainProcessor::deviceLeafMask() const {
   uint32_t mask = 0;
-  for (const auto& deviceLeaf : deviceLeaves) {
+  for (const auto& deviceLeaf : _program.deviceLeaves) {
     mask |= 1u << static_cast<uint32_t>(deviceLeaf.leafIndex);
   }
   return mask;
@@ -516,143 +320,12 @@ void AOTPointwiseChainProcessor::onComputeProcessorKey(BytesKey* bytesKey) const
   // by effect topology and defeat the variant reuse that is the point of the chain kernel.
   static constexpr uint32_t ChainProgramTag = 0xA07C41A7u;
   bytesKey->write(ChainProgramTag);
-  bytesKey->write(static_cast<uint32_t>(_resourceProfile));
+  bytesKey->write(static_cast<uint32_t>(_program.profile));
 }
 
 void AOTPointwiseChainProcessor::onSetData(UniformData* vertexUniformData,
                                            UniformData* fragmentUniformData) const {
-  if (vertexUniformData != nullptr) {
-    // Absent in variants without a uvCoord attribute (the field is compiled out there).
-    vertexUniformData->setDataOptional(ChainParams::CoordSourceMask.name,
-                                       static_cast<int>(coordSourceMask));
-  }
-  if (fragmentUniformData == nullptr) {
-    return;
-  }
-  // The mask sampler slot is always bound in four-leaf variants; this flag selects the
-  // runtime application. Absent in leaf-free variants (compile-time mask there).
-  fragmentUniformData->setDataOptional(ChainParams::HasMaskTexture.name, hasMaskChild ? 1 : 0);
-  fragmentUniformData->setDataOptional(ChainParams::RootIndex.name, static_cast<int>(rootSlot));
-  fragmentUniformData->setDataOptional(ChainParams::CoverageRootIndex.name, coverageRootSlot);
-  fragmentUniformData->setDataOptional(ChainParams::ClipCoverageRegister.name,
-                                       clipCoverageRegister);
-  fragmentUniformData->setDataOptional(ChainParams::SlotCount.name, static_cast<int>(_slotCount));
-  // Written for every draw (absent in leaf-free variants): a stale mask from an earlier draw
-  // would make an ordinary leaf sample in device space.
-  fragmentUniformData->setDataOptional(ChainParams::DeviceLeafMask.name,
-                                       static_cast<int>(deviceLeafMask()));
-  for (const auto& deviceLeaf : deviceLeaves) {
-    // Same mapping as GLSLDeviceSpaceTextureEffect::onSetData: destination fragment coordinates
-    // to the texture's sampling space.
-    auto textureView = deviceLeaf.textureProxy->getTextureView();
-    if (textureView == nullptr) {
-      continue;
-    }
-    auto deviceCoordMatrix = deviceLeaf.uvMatrix;
-    auto scale = textureView->getTextureCoord(1, 1);
-    deviceCoordMatrix.postScale(scale.x, scale.y);
-    std::array<float, 9> values = {
-        deviceCoordMatrix[0], deviceCoordMatrix[1], deviceCoordMatrix[2],
-        deviceCoordMatrix[3], deviceCoordMatrix[4], deviceCoordMatrix[5],
-        deviceCoordMatrix[6], deviceCoordMatrix[7], deviceCoordMatrix[8]};
-    fragmentUniformData->setArrayElementOptional(ChainParams::DeviceLeafCoordMatrix.name,
-                                                 static_cast<size_t>(deviceLeaf.leafIndex),
-                                                 MatrixColumnMajor(values));
-  }
-  if (leafCount() > 0) {
-    std::array<int, 4> readSwizzles = {};
-    for (size_t index = 0; index < leafCount() && index < _slotCount; ++index) {
-      if (slots[index].op == AOTChainOp::Texture) {
-        auto texture = childProcessor(index)->textureAt(0);
-        if (texture != nullptr) {
-          readSwizzles[index] = AOTReadSwizzleMode(texture->format());
-        }
-      }
-    }
-    fragmentUniformData->setData(ChainParams::LeafReadSwizzles.name, readSwizzles);
-  }
-  // Each selector names the leaf that reads the matching recipe set; the kernel never reads a set
-  // whose selector is -1, so an absent recipe needs no upload.
-  fragmentUniformData->setDataOptional(ChainParams::GradientLUTLeaf.name, lutLeafIndex);
-  if (_resourceProfile == AOTResourceProfile::TiledGraph) {
-    for (size_t index = 0; index < TiledGraphResourceCapacity.tiledRecipes; ++index) {
-      int modes[] = {-1, 0, 0, 0};
-      if (index < tiledLeaves.size()) {
-        const auto& tiled = tiledLeaves[index];
-        modes[0] = tiled.leafIndex;
-        modes[1] = static_cast<int>(tiled.recipe.shaderModeX);
-        modes[2] = static_cast<int>(tiled.recipe.shaderModeY);
-        modes[3] = tiled.recipe.strict ? 1 : 0;
-        const auto& subset = tiled.recipe.shaderSubset;
-        const auto& clamp = tiled.recipe.shaderClamp;
-        float subsetData[] = {subset.left, subset.top, subset.right, subset.bottom};
-        float clampData[] = {clamp.left, clamp.top, clamp.right, clamp.bottom};
-        fragmentUniformData->setArrayElement(ChainParams::TiledRecipeSubsets.name, index,
-                                             subsetData);
-        fragmentUniformData->setArrayElement(ChainParams::TiledRecipeClamps.name, index, clampData);
-        fragmentUniformData->setArrayElement(ChainParams::TiledRecipeDimensions.name, index,
-                                             tiled.recipe.shaderDimensions);
-      }
-      fragmentUniformData->setArrayElement(ChainParams::TiledRecipeModes.name, index, modes);
-    }
-  } else {
-    fragmentUniformData->setDataOptional(ChainParams::TiledLeafIndex.name, tiledLeaf());
-    fragmentUniformData->setDataOptional(ChainParams::TiledLeafIndex2.name, tiledLeaf2());
-    for (size_t index = 0; index < tiledLeaves.size(); ++index) {
-      UploadTiledRecipe(fragmentUniformData, tiledLeaves[index].recipe,
-                        index == 0 ? ChainParams::TiledRecipe : ChainParams::TiledRecipe2);
-    }
-  }
-  // Coverage slots consume the CoverageRect / CoverageLocalRect arrays and the CoverageRRect*
-  // arrays in slot order; the upload assigns the ordinals the same way, so the selector's bits
-  // 16-19 match the array element written here. Fill all declared slots (including inactive ones,
-  // whose OP_NONE marker protects the static texture prefetch), but never probe the 16 absent
-  // indices of a base-chain shader.
-  int rectOrdinal = 0;
-  int localRectOrdinal = 0;
-  int rrectOrdinal = 0;
-  const auto* capacity = GetAOTResourceCapacity(_resourceProfile);
-  for (size_t index = 0; index < capacity->instructions; ++index) {
-    UploadChainSlot(fragmentUniformData, index, slots[index], rectOrdinal, localRectOrdinal,
-                    rrectOrdinal);
-    if (slots[index].op == AOTChainOp::AARectCoverage) {
-      ++rectOrdinal;
-    } else if (slots[index].op == AOTChainOp::LocalRectCoverage) {
-      ++localRectOrdinal;
-    } else if (slots[index].op == AOTChainOp::RRectCoverage) {
-      ++rrectOrdinal;
-    }
-  }
-  // The color-space parameters are one shared chain-wide block, so the kernel supports at most one
-  // color-space op per chain (enforced by the matcher). The helper writes the same field names the
-  // standalone ColorSpaceXformEffect uses, prefixed with "Chain".
-  for (size_t index = 0; index < _slotCount; ++index) {
-    if (slots[index].op == AOTChainOp::ColorSpaceXform) {
-      ColorSpaceXformHelper("Chain").setData(fragmentUniformData,
-                                             slots[index].colorSpaceXform.steps.get());
-      break;
-    }
-  }
-  // The gradient parameters are one shared chain-wide block (at most one gradient slot per chain,
-  // enforced by the builder). The vertex-side coordinate transform travels through the GP-written
-  // CoordTransformMatrix_0 instead (see the constructor).
-  for (size_t index = 0; index < _slotCount; ++index) {
-    if (slots[index].op == AOTChainOp::Gradient) {
-      UploadGradientParams(fragmentUniformData, slots[index].gradient);
-      break;
-    }
-    if (slots[index].op == AOTChainOp::PerlinNoise) {
-      const auto& noise = slots[index].noise;
-      float frequencyStitch[] = {noise.baseFrequencyX, noise.baseFrequencyY,
-                                 static_cast<float>(noise.stitchWidth),
-                                 static_cast<float>(noise.stitchHeight)};
-      int modeOctaves[] = {noise.noiseType, noise.numOctaves, noise.stitchTiles ? 1 : 0,
-                           noiseSamplerBase};
-      fragmentUniformData->setDataOptional(ChainParams::NoiseFrequencyStitch.name, frequencyStitch);
-      fragmentUniformData->setDataOptional(ChainParams::NoiseModeOctaves.name, modeOctaves);
-      break;
-    }
-  }
+  BindChainProgram(_program, vertexUniformData, fragmentUniformData);
 }
 
 }  // namespace tgfx

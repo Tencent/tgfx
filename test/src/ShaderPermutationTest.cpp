@@ -922,9 +922,18 @@ TGFX_TEST(ShaderPermutationTest, LUTGradientWithRealMaskUsesAllLeafSelectors) {
     gradient.gradient.colorizerKind = 3;
     gradient.gradient.lutProxy = lutProxy;
     gradient.gradient.coordMatrix = Matrix::MakeTrans(4, 6);
-    auto processor = AOTPointwiseChainProcessor::Make(
-        &allocator, std::move(leaves), slots, static_cast<size_t>(lutLeaf), -1, nullptr,
-        std::move(mask), -1, ~0u, std::move(lutChild), lutLeaf, std::move(padding));
+    AOTProgram program = {};
+    program.slots = slots;
+    program.rootRegister = static_cast<size_t>(lutLeaf);
+    program.lutLeafIndex = lutLeaf;
+    program.hasMaskTexture = true;
+    AOTPointwiseChainProcessor::AOTChainChildren children = {};
+    children.leaves = std::move(leaves);
+    children.lut = std::move(lutChild);
+    children.padding = std::move(padding);
+    children.mask = std::move(mask);
+    auto processor =
+        AOTPointwiseChainProcessor::Make(&allocator, std::move(program), std::move(children));
     ASSERT_NE(processor, nullptr);
     EXPECT_EQ(processor->resourceProfile(), AOTResourceProfile::TiledGraph);
     EXPECT_EQ(processor->lutLeaf(), lutLeaf);
