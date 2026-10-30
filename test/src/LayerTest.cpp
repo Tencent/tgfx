@@ -3971,6 +3971,60 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     layer->setLayerStyles({MakeShadow(type, 25, 25, 12, 4, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f)});
     displayList.root()->addChild(layer);
   }
+
+  // Case 22: SolidLayer rotated 90 degrees, spread=8 (analytic)
+  for (int i = 0; i < 2; ++i) {
+    auto layer = SolidLayer::Make();
+    layer->setColor(Color::Red());
+    layer->setWidth(100);
+    layer->setHeight(60);
+    layer->setRadiusX(15);
+    layer->setRadiusY(8);
+    auto matrix =
+        Matrix::MakeTrans((i == 0 ? lItemXOffset : rItemXOffset) + 60.0f, cellH * 7 + gap);
+    matrix.preConcat(Matrix::MakeRotate(90));
+    layer->setMatrix(matrix);
+    layer->setLayerStyles({MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f)});
+    displayList.root()->addChild(layer);
+  }
+
+  // Case 23: SolidLayer mirrored along the x axis, spread=8 (analytic)
+  for (int i = 0; i < 2; ++i) {
+    auto layer = SolidLayer::Make();
+    layer->setColor(Color::Red());
+    layer->setWidth(100);
+    layer->setHeight(60);
+    layer->setRadiusX(15);
+    layer->setRadiusY(8);
+    auto matrix =
+        Matrix::MakeTrans(cellW + (i == 0 ? lItemXOffset : rItemXOffset) + 100.0f, cellH * 7 + gap);
+    matrix.preConcat(Matrix::MakeScale(-1.0f, 1.0f));
+    layer->setMatrix(matrix);
+    layer->setLayerStyles({MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f)});
+    displayList.root()->addChild(layer);
+  }
+
+  // Case 24: VectorLayer Rect fill in a group rotated 90 degrees with a non-uniform scale,
+  // spread=8 (analytic)
+  for (int i = 0; i < 2; ++i) {
+    auto vectorLayer = VectorLayer::Make();
+    auto group = VectorGroup::Make();
+    auto rect = Rectangle::Make();
+    rect->setSize({60, 40});
+    rect->setPosition({0, 0});
+    rect->setRoundness(8);
+    auto fill = FillStyle::Make(SolidColor::Make(Color::Red()));
+    group->setElements({rect, fill});
+    group->setRotation(90);
+    group->setScale({1.5f, 1.0f});
+    group->setPosition({90, -30});
+    vectorLayer->setContents({group});
+    vectorLayer->setMatrix(Matrix::MakeTrans(cellW * 2 + (i == 0 ? lItemXOffset : rItemXOffset),
+                                             cellH * 7 + gap + 30.0f));
+    vectorLayer->setLayerStyles(
+        {MakeShadow(type, 25, 25, 3, 3, Color::Green(), i == 0 ? 0.0f : 8.0f)});
+    displayList.root()->addChild(vectorLayer);
+  }
 }
 
 TGFX_TEST(LayerTest, DropShadow) {
@@ -3980,8 +4034,9 @@ TGFX_TEST(LayerTest, DropShadow) {
   constexpr float cellW = 400.0f;
   constexpr float cellH = 120.0f;
   constexpr float gap = 30.0f;
-  auto surface =
-      Surface::Make(context, static_cast<int>(cellW * 3 + gap), static_cast<int>(cellH * 7 + gap));
+  // The last row holds the rotated cases, whose quarter-turned content is taller than a cell.
+  auto surface = Surface::Make(context, static_cast<int>(cellW * 3 + gap),
+                               static_cast<int>(cellH * 8 + gap + 80));
   auto displayList = std::make_unique<DisplayList>();
   BuildShadowTestLayers(*displayList, ShadowType::Drop, cellW, cellH, gap);
   displayList->render(surface.get());
@@ -3995,8 +4050,9 @@ TGFX_TEST(LayerTest, InnerShadow) {
   constexpr float cellW = 400.0f;
   constexpr float cellH = 120.0f;
   constexpr float gap = 30.0f;
-  auto surface =
-      Surface::Make(context, static_cast<int>(cellW * 3 + gap), static_cast<int>(cellH * 7 + gap));
+  // The last row holds the rotated cases, whose quarter-turned content is taller than a cell.
+  auto surface = Surface::Make(context, static_cast<int>(cellW * 3 + gap),
+                               static_cast<int>(cellH * 8 + gap + 80));
   auto displayList = std::make_unique<DisplayList>();
   BuildShadowTestLayers(*displayList, ShadowType::Inner, cellW, cellH, gap);
   displayList->render(surface.get());

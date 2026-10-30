@@ -456,12 +456,75 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
       }
     }
     float outerAlpha = brush.color.alpha;
+    // A knockout mask must apply to the filter chain's output, not to its source: filters like
+    // DropShadowOnly derive their result from SourceAlpha, so masking the source would erase the
+    // result instead of cutting it out. Emit the mask on a group wrapping the whole filter chain,
+    // re-anchored into canvas space (the arriving transform is relative to this draw's local
+    // space). Both the mask region and the invert filter must cover the chain's output bounds so
+    // the shadow fringe outside the contour survives.
+    const auto outputBounds = filter ? filter->filterBounds(bound) : bound;
+    std::string outerMaskID;
+    if (brush.maskFilter != nullptr &&
+        Types::Get(brush.maskFilter.get()) == Types::MaskFilterType::Shader) {
+      const auto* shaderMaskFilter = static_cast<const ShaderMaskFilter*>(brush.maskFilter.get());
+      auto [maskShader, maskMatrix] =
+          ShaderUtils::UnwrapMatrixShader(shaderMaskFilter->getShader());
+      if (shaderMaskFilter->isInverted() &&
+          Types::Get(maskShader.get()) == Types::ShaderType::Image &&
+          Types::Get(static_cast<const ImageShader*>(maskShader.get())->image.get()) ==
+              Types::ImageType::Picture) {
+        const auto* pictureImage = static_cast<const PictureImage*>(
+            static_cast<const ImageShader*>(maskShader.get())->image.get());
+        auto canvasAnchor = matrix;
+        canvasAnchor.preConcat(maskMatrix);
+        if (pictureImage->matrix) {
+          canvasAnchor.preConcat(*pictureImage->matrix);
+        }
+        outerMaskID = resourceBucket->addMask();
+        {
+          ElementWriter maskElement("mask", xmlWriter);
+          maskElement.addAttribute("id", outerMaskID);
+          maskElement.addAttribute("style", "mask-type:alpha");
+          maskElement.addAttribute("maskUnits", "userSpaceOnUse");
+          maskElement.addAttribute("x", outputBounds.x());
+          maskElement.addAttribute("y", outputBounds.y());
+          maskElement.addAttribute("width", outputBounds.width());
+          maskElement.addAttribute("height", outputBounds.height());
+          auto invertID = resourceBucket->addFilter();
+          {
+            ElementWriter filterElement("filter", xmlWriter);
+            filterElement.addAttribute("id", invertID);
+            filterElement.addAttribute("color-interpolation-filters", "sRGB");
+            filterElement.addAttribute("x", outputBounds.x());
+            filterElement.addAttribute("y", outputBounds.y());
+            filterElement.addAttribute("width", outputBounds.width());
+            filterElement.addAttribute("height", outputBounds.height());
+            filterElement.addAttribute("filterUnits", "userSpaceOnUse");
+            ElementWriter invertElement("feColorMatrix", xmlWriter);
+            invertElement.addAttribute("type", "matrix");
+            invertElement.addAttribute("values", "1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 -1 1");
+          }
+          xmlWriter->startElement("g");
+          xmlWriter->addAttribute("filter", "url(#" + invertID + ")");
+          drawPicture(pictureImage->picture, canvasAnchor, ClipStack());
+          xmlWriter->endElement();
+        }
+        outerMaskID = "url(#" + outerMaskID + ")";
+      }
+    }
     {
+      if (!outerMaskID.empty()) {
+        xmlWriter->startElement("g");
+        xmlWriter->addAttribute("mask", outerMaskID);
+      }
       auto groupElements = buildFilterGroupElements(
           filterIDs, resources.filter, needsClip ? clipID : "", outerBlendStyle, outerAlpha);
       // Strip lifted effects from the inner brush so the recursive draw does not re-emit them
       // on a nested <g>, which would both double the effect and reintroduce the isolation issue.
       Brush innerBrush = brush;
+      if (!outerMaskID.empty()) {
+        innerBrush.maskFilter = nullptr;
+      }
       if (!outerBlendStyle.empty()) {
         innerBrush.blendMode = BlendMode::SrcOver;
       }
@@ -476,6 +539,9 @@ void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
       drawImage(filterImage->source, sampling, contentMatrix, needsClip ? ClipStack{} : clip,
                 innerBrush);
       groupElements.clear();
+      if (!outerMaskID.empty()) {
+        xmlWriter->endElement();
+      }
       clipGroupElement = nullptr;
       currentClipPath = {};
     }
@@ -1022,7 +1088,18 @@ void SVGExportContext::drawRRectBlurShader(const RRectBlurShader& shader,
   auto imageMatrix = deviceMatrix;
   imageMatrix.preConcat(shaderMatrix);
   imageMatrix.preTranslate(shapeOffset.x + filterOffset.x, shapeOffset.y + filterOffset.y);
-  drawImage(std::move(shadowImage), {}, imageMatrix, realClip, brush);
+  Brush drawBrush = brush;
+  // The brush's mask is anchored in the shader's draw space, but the drawImage below samples it
+  // in the shadow image's pixel space; re-anchor it so the export can treat it like any other
+  // draw-anchored mask.
+  if (drawBrush.maskFilter != nullptr) {
+    Matrix toImageSpace = {};
+    if (imageMatrix.invert(&toImageSpace)) {
+      toImageSpace.preConcat(deviceMatrix);
+      drawBrush.maskFilter = drawBrush.maskFilter->makeWithMatrix(toImageSpace);
+    }
+  }
+  drawImage(std::move(shadowImage), {}, imageMatrix, realClip, drawBrush);
 }
 
 void SVGExportContext::drawRRectInnerShadowShader(const RRectInnerShadowShader& shader,
