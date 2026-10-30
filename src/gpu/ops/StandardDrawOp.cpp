@@ -18,15 +18,8 @@
 
 #include "StandardDrawOp.h"
 #include "core/utils/Log.h"
-#include "gpu/AOTChainBuilder.h"
-#include "gpu/DrawingManager.h"
-#include "gpu/GlobalCache.h"
-#include "gpu/PermutationMatch.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/Program.h"
-#include "gpu/ShaderMatchHelpers.h"
-#include "gpu/processors/AOTPointwiseChainProcessor.h"
-#include "gpu/shaders/kernels/PerlinNoiseFillShader.h"
 #include "gpu/shaders/kernels/PointwiseChainShader.h"
 
 namespace tgfx {
@@ -35,16 +28,22 @@ void StandardDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget)
   if (!onPrepare()) {
     return;
   }
-  if (!prepare(renderTarget, ProgramLookupMode::AllowRuntimeFallback, std::nullopt,
-               renderPass->depthStencilFormat())) {
+  if (!prepare(renderTarget, std::nullopt, renderPass->depthStencilFormat())) {
     return;
   }
   executePrepared(renderPass, renderTarget);
 }
 
-bool StandardDrawOp::prepare(RenderTarget* renderTarget, ProgramLookupMode mode,
+// Whether the shader the plain lookup resolved to is the chain interpreter — the AOT route's own
+// direct serving. The perlin kernel serving a plain noise tree is the dedicated route, not the
+// AOT entry's own.
+static bool IsDirectAOTShader(const std::string& shaderName) {
+  return shaderName == PointwiseChainShader::Name;
+}
+
+bool StandardDrawOp::prepare(RenderTarget* renderTarget,
                              std::optional<ColorProcessorList> colorOverride,
-                             PixelFormat depthStencilFormat) {
+                             PixelFormat depthStencilFormat, bool isFinalLookup) {
   if (!geometryProcessorInitialized) {
     geometryProcessorInitialized = true;
     geometryProcessor = onMakeGeometryProcessor(renderTarget);
@@ -56,6 +55,7 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, ProgramLookupMode mode,
   preparedProgram = nullptr;
   preparedProgramInfo = nullptr;
   preparedRenderTarget = nullptr;
+  preparedViaDecomposition = false;
   preparedColors = std::move(colorOverride);
   auto& activeColors = preparedColors.has_value() ? *preparedColors : colors;
 
@@ -80,12 +80,11 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, ProgramLookupMode mode,
     preparedProgramInfo->setDepthStencil(depthStencil);
   }
   onConfigureProgramInfo(*preparedProgramInfo);
-  preparedViaDecomposition = interpreterServesDraw(renderTarget);
-  preparedProgram = preparedProgramInfo->getProgram(mode);
+  preparedProgram = preparedProgramInfo->getProgram();
   if (preparedProgram == nullptr) {
-    if (mode == ProgramLookupMode::AllowRuntimeFallback) {
-      // The final lookup for this draw (PrecompiledOnly lookups are AOT plan probes, which fall
-      // back to the original draw): nothing will be drawn, so the drop must be visible.
+    if (isFinalLookup) {
+      // The final lookup for this draw (plan-task pass probes fall back to the original draw):
+      // nothing will be drawn, so the drop must be visible.
       LOGE("StandardDrawOp::prepare() No program for the draw; the draw is dropped!");
       auto cache = renderTarget->getContext()->precompiledShaderCache();
       if (cache->diagnosticRecordingEnabled()) {
@@ -94,61 +93,24 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, ProgramLookupMode mode,
     }
     return false;
   }
+  // The direct-chain accounting derives from the resolved program: the plain lookup served this
+  // draw through the chain interpreter when the program it resolved to is the chain shader.
+  preparedViaDecomposition =
+      preparedProgram->getProvenance().program == ProgramOrigin::PrecompiledArtifact &&
+      IsDirectAOTShader(preparedProgram->shaderName());
   preparedRenderTarget = renderTarget;
   return true;
 }
 
-// Whether the shader the plain lookup resolved to is the chain interpreter — the AOT route's own
-// direct serving. The perlin kernel serving a plain noise tree is the dedicated route, not the
-// AOT entry's own.
-static bool IsDirectAOTShader(const std::string& shaderName) {
-  return shaderName == PointwiseChainShader::Name;
-}
-
-// The AOT entry's per-draw probe: reports whether the route serves this draw through the plain
-// program lookup, for the direct-chain accounting. The re-expressing kernels serve unmodified
-// draws by re-expressing the draw's own tree, so the probe only has to run the matcher and read
-// which family won.
-bool StandardDrawOp::interpreterServesDraw(RenderTarget* renderTarget) {
-  auto cache = renderTarget->getContext()->precompiledShaderCache();
-  if (!cache->isLoaded()) {
-    return false;
-  }
-  if (!cache->decompositionEnabled()) {
-    // Only the interpreter's extended kind serves gradients, so the required gradient lowering
-    // keeps probing with the switch off; every other draw goes straight to the plain lookup.
-    bool requiresGradientLowering = false;
-    for (size_t index = 0; index < preparedProgramInfo->numFragmentProcessors(); ++index) {
-      if (ContainsGradientSource(preparedProgramInfo->getFragmentProcessor(index))) {
-        requiresGradientLowering = true;
-        break;
-      }
-    }
-    if (!requiresGradientLowering) {
-      return false;
-    }
-  }
-  auto& globalCache = *renderTarget->getContext()->globalCache();
-  auto cached = globalCache.findProgram(preparedProgramInfo->programKey());
-  if (cached != nullptr && cached->getProvenance().program == ProgramOrigin::PrecompiledArtifact) {
-    // The program cache's key-to-program premise: this exact key already resolved to a
-    // precompiled artifact, so the match that produced it succeeded and the plain route serves
-    // the draw — the probe below would only repeat that walk.
-    DEBUG_ASSERT(MatchPermutation(preparedProgramInfo.get()).has_value());
-    return IsDirectAOTShader(cached->shaderName());
-  }
-  auto probe = MatchPermutation(preparedProgramInfo.get());
-  return probe.has_value() && IsDirectAOTShader(probe->shaderName);
-}
-
-bool StandardDrawOp::prepareForTask(RenderTarget* renderTarget, ProgramLookupMode mode,
-                                    std::optional<ColorProcessorList> colorOverride) {
+bool StandardDrawOp::prepareForTask(RenderTarget* renderTarget,
+                                    std::optional<ColorProcessorList> colorOverride,
+                                    bool isFinalLookup) {
   // Mirror execute()'s ordering: onPrepare() may veto the op (empty asynchronous buffers);
   // skipping it here would leave those ops drawing from null resources ().
   if (!onPrepare()) {
     return false;
   }
-  return prepare(renderTarget, mode, std::move(colorOverride));
+  return prepare(renderTarget, std::move(colorOverride), PixelFormat::Unknown, isFinalLookup);
 }
 
 bool StandardDrawOp::executePrepared(RenderPass* renderPass, RenderTarget* renderTarget,

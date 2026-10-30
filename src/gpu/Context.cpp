@@ -87,12 +87,6 @@ Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {
       }
     }
   }
-  // TGFX_AOT_DISABLE_DECOMPOSITION keeps the bundle loaded but routes every draw through the plain
-  // matcher/builder path, isolating the dedicated precompiled kernels from the interpreter in A/B
-  // diffs. Diagnostic only; read once per process, mirroring TGFX_AOT_DISABLE above.
-  if (std::getenv("TGFX_AOT_DISABLE_DECOMPOSITION") != nullptr) {
-    _precompiledShaderCache->setDecompositionEnabled(false);
-  }
 }
 
 Context::~Context() {

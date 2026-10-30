@@ -497,11 +497,11 @@ uint32_t AOTPointwiseChainProcessor::deviceLeafMask() const {
 }
 
 void AOTPointwiseChainProcessor::emitCode(EmitArgs& args) const {
-  // This processor is only ever prepared with ProgramLookupMode::PrecompiledOnly through the
-  // decomposition executor; a miss makes the executor re-run the original draw, so the runtime
-  // program builder never sees it. Emitting the DAG for JIT would require porting the blend
-  // emission of XfermodeFragmentProcessor; until a caller needs it, fail loudly instead of
-  // silently producing wrong pixels.
+  // This processor is only ever prepared through the decomposition executor's plan passes; a miss
+  // makes the executor re-run the original draw, so the runtime program builder never sees it.
+  // Emitting the DAG for JIT would require porting the blend emission of
+  // XfermodeFragmentProcessor; until a caller needs it, fail loudly instead of silently producing
+  // wrong pixels.
   LOGE("AOTPointwiseChainProcessor::emitCode() is not supported on the runtime path!");
   args.fragBuilder->codeAppendf("%s = vec4(1.0, 0.0, 1.0, 1.0);", args.outputColor.c_str());
 }

@@ -100,12 +100,11 @@ void AOTPlanRenderTask::execute(CommandEncoder* encoder) {
   bool prepared = true;
   for (size_t index = 0; index < plan.passes.size() && prepared; ++index) {
     auto drawOp = static_cast<StandardDrawOp*>(plan.passes[index].drawOp.get());
-    prepared =
-        drawOp->prepareForTask(renderTargets[index].get(), ProgramLookupMode::PrecompiledOnly);
+    prepared = drawOp->prepareForTask(renderTargets[index].get(), std::nullopt, false);
   }
-  prepared = prepared && static_cast<StandardDrawOp*>(originalDraw.get())
-                             ->prepareForTask(finalTarget.get(), ProgramLookupMode::PrecompiledOnly,
-                                              std::move(plan.terminalColors));
+  prepared =
+      prepared && static_cast<StandardDrawOp*>(originalDraw.get())
+                      ->prepareForTask(finalTarget.get(), std::move(plan.terminalColors), false);
   cache->setMissRecordingPaused(false);
   if (!prepared) {
     executeFallback(encoder, std::move(finalTarget));
@@ -185,7 +184,7 @@ void AOTPlanRenderTask::executeFallback(CommandEncoder* encoder,
     return;
   }
   auto drawOp = static_cast<StandardDrawOp*>(originalDraw.get());
-  if (!drawOp->prepareForTask(finalTarget.get(), ProgramLookupMode::AllowRuntimeFallback)) {
+  if (!drawOp->prepareForTask(finalTarget.get())) {
     return;
   }
   if (!ExecutePreparedPass(encoder, finalTarget.get(), drawOp,

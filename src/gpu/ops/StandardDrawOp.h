@@ -27,10 +27,9 @@ namespace tgfx {
  * subclass issues one draw call" pattern. execute() is final: it first gives the subclass a
  * chance to veto the whole execution via onPrepare() when runtime inputs turn out to be
  * unusable, then builds the op's ProgramInfo from the geometry processor supplied by
- * onMakeGeometryProcessor() and the color/coverage fragment processors accumulated on DrawOp
- * (probing whether the AOT route's fused kernels serve the unmodified draw through the plain
- * program lookup), gives subclasses a chance to tweak the resulting ProgramInfo via
- * onConfigureProgramInfo(), then binds the pipeline (together with uniforms, samplers and
+ * onMakeGeometryProcessor() and the color/coverage fragment processors accumulated on DrawOp,
+ * gives subclasses a chance to tweak the resulting ProgramInfo via onConfigureProgramInfo(), then
+ * binds the pipeline (together with uniforms, samplers and
  * scissor) before delegating the actual draw call to onDraw().
  *
  * Ops that need to run multiple pipelines within a single render pass (for example
@@ -44,12 +43,13 @@ class StandardDrawOp : public DrawOp {
 
   /**
    * Prepares the geometry processor and program for a draw. When colorOverride is present, its
-   * processors replace the op's color processors without modifying them.
+   * processors replace the op's color processors without modifying them. isFinalLookup marks this
+   * as the draw's own last program lookup — its failure drops the draw and is recorded as such —
+   * versus a plan-task pass probe, whose failure falls back to the original draw.
    */
   bool prepare(RenderTarget* renderTarget,
-               ProgramLookupMode mode = ProgramLookupMode::AllowRuntimeFallback,
                std::optional<ColorProcessorList> colorOverride = std::nullopt,
-               PixelFormat depthStencilFormat = PixelFormat::Unknown);
+               PixelFormat depthStencilFormat = PixelFormat::Unknown, bool isFinalLookup = true);
 
   /**
    * Executes a successfully prepared draw and uploads its uniforms and texture samplers. Set
@@ -67,10 +67,13 @@ class StandardDrawOp : public DrawOp {
    * instead of prepare(): prepare() alone skips the onPrepare() lifecycle hook, and ops that
    * validate asynchronously produced buffers there (hairline ops with possibly-empty vertex
    * segments) would reach onDraw() with null buffers — execute() runs the hook, so a
-   * task-driven op must not silently lose it.
+   * task-driven op must not silently lose it. isFinalLookup carries prepare()'s contract: a
+   * plan-task pass probe (false) falls back to the original draw on failure, while the task's
+   * fallback re-run of the original draw (true) drops it.
    */
-  bool prepareForTask(RenderTarget* renderTarget, ProgramLookupMode mode,
-                      std::optional<ColorProcessorList> colorOverride = std::nullopt);
+  bool prepareForTask(RenderTarget* renderTarget,
+                      std::optional<ColorProcessorList> colorOverride = std::nullopt,
+                      bool isFinalLookup = true);
 
   /**
    * The geometry color every fragment of this op receives as its input color, or nullopt when
@@ -133,8 +136,6 @@ class StandardDrawOp : public DrawOp {
   virtual void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) = 0;
 
  private:
-  bool interpreterServesDraw(RenderTarget* renderTarget);
-
   PlacementPtr<GeometryProcessor> geometryProcessor = nullptr;
   bool geometryProcessorInitialized = false;
   std::optional<ColorProcessorList> preparedColors = std::nullopt;

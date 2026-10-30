@@ -2904,8 +2904,8 @@ static void ExpectServedByAOT(const char* label, const ChainServedRenderStats& s
   EXPECT_EQ(stats.draws.atomicFallbacks, 0u) << label;
   EXPECT_TRUE(std::find(stats.shaders.begin(), stats.shaders.end(), "PointwiseChainShader") !=
                   stats.shaders.end() ||
-              std::find(stats.shaders.begin(), stats.shaders.end(),
-                        "TexturedEffectShader") != stats.shaders.end())
+              std::find(stats.shaders.begin(), stats.shaders.end(), "TexturedEffectShader") !=
+                  stats.shaders.end())
       << label;
 }
 
@@ -8863,9 +8863,9 @@ TGFX_TEST(AOTRenderConsistencyTest, DifferentImagesSameEffectShareProgram) {
   fflush(stdout);
   // Format-equal textures still share the program identity (the key does not carry the texture
   // object): one artifact across the two images, and the later lookups hit it. The invariant:
-  // no runtime compilation.
+  // no runtime compilation. One hit per draw: the second draw's single program lookup.
   EXPECT_EQ(stats.precompiledArtifactCreations, 1u);
-  EXPECT_EQ(stats.cacheHits, 2u);
+  EXPECT_EQ(stats.cacheHits, 1u);
   EXPECT_EQ(stats.programBuilderCreations, 0u);
   // Non-vacuous: the renders differ.
   auto* p1 = static_cast<const uint32_t*>(const_cast<Bitmap&>(one).lockPixels());

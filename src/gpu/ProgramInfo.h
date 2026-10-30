@@ -42,16 +42,6 @@ struct SamplerInfo {
 };
 
 /**
- * Controls whether a program lookup may fall back to runtime shader generation.
- */
-enum class ProgramLookupMode {
-  /// Falls back to ProgramBuilder only when no precompiled bundle is loaded.
-  AllowRuntimeFallback,
-  /// Returns only programs whose provenance is ProgramOrigin::PrecompiledArtifact.
-  PrecompiledOnly,
-};
-
-/**
  * This immutable object contains information needed to build a shader program and set API state for
  * a draw.
  */
@@ -101,8 +91,12 @@ class ProgramInfo {
 
   std::string getMangledSuffix(const Processor* processor) const;
 
-  std::shared_ptr<Program> getProgram(
-      ProgramLookupMode mode = ProgramLookupMode::AllowRuntimeFallback) const;
+  /**
+   * Resolves the program for this info from the caches. The lookup policy is the cache's alone:
+   * a loaded precompiled bundle means precompiled-only (a miss drops the draw, no runtime
+   * fallback), while an unloaded cache falls back to runtime shader generation.
+   */
+  std::shared_ptr<Program> getProgram() const;
 
   std::shared_ptr<GPUBuffer> getUniformBuffer(const Program* program, size_t* vertexOffset,
                                               size_t* fragmentOffset) const;

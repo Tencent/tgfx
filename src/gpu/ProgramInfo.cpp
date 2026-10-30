@@ -173,11 +173,13 @@ BytesKey ProgramInfo::buildProgramKey() const {
   return key;
 }
 
-std::shared_ptr<Program> ProgramInfo::getProgram(ProgramLookupMode mode) const {
+std::shared_ptr<Program> ProgramInfo::getProgram() const {
   auto context = renderTarget->getContext();
   auto globalCache = context->globalCache();
   auto* shaderCache = context->precompiledShaderCache();
-  bool precompiledOnly = mode == ProgramLookupMode::PrecompiledOnly || shaderCache->isLoaded();
+  // A loaded bundle is the precompiled-only policy: no runtime fallback, so a miss drops the draw
+  // (see StandardDrawOp::prepare). Without a bundle the runtime builder serves every lookup.
+  bool precompiledOnly = shaderCache->isLoaded();
 
   const auto& key = programKey();
   auto program = globalCache->findProgram(key);
