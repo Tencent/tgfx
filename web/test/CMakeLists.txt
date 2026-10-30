@@ -40,6 +40,9 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 # PLATFORM, ARCH, etc.) are set in this scope. The include_guard(GLOBAL) in vendor.cmake
 # prevents it from running again inside the root CMakeLists.
 include(${TGFX_SOURCE_DIR}/third_party/vendor_tools/vendor.cmake)
+# vendor-build treats a symlinked entry path as a custom configuration entry point.
+# Resolve the tool path so both vendor targets use their configured working directory.
+get_filename_component(VENDOR_TOOLS_DIR "${VENDOR_TOOLS_DIR}" REALPATH)
 add_subdirectory(${TGFX_SOURCE_DIR} ./tgfx)
 
 # Collect test sources (reuse existing tests)

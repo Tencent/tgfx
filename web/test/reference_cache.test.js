@@ -6,6 +6,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const test = require('node:test');
 const vm = require('node:vm');
+const { execFileSync } = require('node:child_process');
 
 const SOURCE = fs.readFileSync(path.join(__dirname, 'reference_cache.js'), 'utf8');
 const COMMIT = 'a'.repeat(40);
@@ -227,4 +228,49 @@ test('invalid LFS pointers are rejected before spawning Git', function() {
   const fixture = CreateLFSFixture(ASSET);
   assert.throws(function() { fixture.api.RestoreLFSFile(Buffer.from('invalid'), 'resources/image.png'); });
   assert.equal(fixture.calls.length, 0);
+});
+
+test('canonical vendor entry preserves the isolated source configuration', function() {
+  const cmake = fs.readFileSync(path.join(__dirname, 'CMakeLists.txt'), 'utf8');
+  const canonicalize = cmake.match(/get_filename_component\(VENDOR_TOOLS_DIR [^\n]+ REALPATH\)/);
+  assert.ok(canonicalize, 'Vendor entry must be canonicalized');
+  assert.ok(canonicalize.index > cmake.indexOf('include(${TGFX_SOURCE_DIR}/third_party/vendor_tools/vendor.cmake)'));
+  assert.ok(canonicalize.index < cmake.indexOf('add_subdirectory(${TGFX_SOURCE_DIR} ./tgfx)'));
+  const tools = fs.realpathSync(path.resolve(__dirname, '../../third_party/vendor_tools'));
+  const entry = path.join(tools, 'vendor-build');
+  const source = fs.readFileSync(entry, 'utf8');
+  const temporary = fs.mkdtempSync(path.join(__dirname, 'build-vendor-path-'));
+  try {
+    const link = path.join(temporary, 'linked-tools');
+    fs.symlinkSync(tools, link, 'dir');
+    const script = path.join(temporary, 'resolve.cmake');
+    const resolvedFile = path.join(temporary, 'resolved-path');
+    fs.writeFileSync(script, `${canonicalize[0]}\nfile(WRITE "${resolvedFile}" "\${VENDOR_TOOLS_DIR}")\n`);
+    execFileSync('cmake', [`-DVENDOR_TOOLS_DIR=${link}`, '-P', script]);
+    const resolved = fs.readFileSync(resolvedFile, 'utf8');
+    assert.equal(resolved, tools);
+    function ResolveConfiguration(invokedEntry) {
+      let config;
+      const modules = {
+        path,
+        './lib/CommandLine': { parse() { return { targets: [] }; } },
+        './lib/Platform': { Create() { return {}; } },
+        './lib/Vendor': class {
+          constructor(file) { config = file; }
+          buildAll() {}
+        },
+      };
+      const scriptBody = source.replace(/^#![^\n]*\n/, '');
+      vm.runInNewContext(`(function() { ${scriptBody} })()`, {
+        __filename: entry,
+        process: { argv: ['node', invokedEntry], env: {}, cwd() { return temporary; } },
+        require(name) { return modules[name]; },
+      });
+      return config;
+    }
+    assert.equal(ResolveConfiguration(path.join(link, 'vendor-build')), path.join(link, 'vendor.json'));
+    assert.equal(ResolveConfiguration(path.join(resolved, 'vendor-build')), path.join(temporary, 'vendor.json'));
+  } finally {
+    fs.rmSync(temporary, { recursive: true, force: true });
+  }
 });
