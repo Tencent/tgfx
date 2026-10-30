@@ -1521,18 +1521,21 @@ static AOTNodeID ResolveCopiedInput(const std::unordered_map<uint32_t, AOTNodeID
 }
 
 // Copies one chain node into the builder, resolving its input edges through builtMap (and the cut
-// replacements). The split-off fill's coordinate remap: it evaluates at top-left device positions
-// while the original draw evaluated at its own coordinate spaces, so every local-coordinate
-// parameter (the gradient coordMatrix, the noise uvMatrix, a plain/tiled texture leaf's uvMatrix)
-// is precomposed with coordToLocal, and a device-space texture leaf's uvMatrix (which reads the
-// destination's fragment coordinates) with deviceToFrag; the device-space coverage parameters stay
-// as they are (the fill's positions are the device ones). A terminal pass passes identity for
-// both, because it runs on the destination and sees the original spaces.
+// replacements). The split-off fill's coordinate remap: it evaluates its local-coordinate
+// parameters (the gradient coordMatrix, the noise uvMatrix, a plain/tiled texture leaf's uvMatrix)
+// at top-left device positions while the original draw evaluated them at its own local
+// coordinates, so those are precomposed with coordToLocal. A device-space texture leaf's uvMatrix
+// addresses the destination's positions while the fill's gl_FragCoord is the fill target's pixel
+// space (the device positions minus the shared placement), so it is precomposed with
+// deviceLeafRemap — the device-to-frag flip plus the placement. The device-space coverage
+// parameters stay as they are (the fill's positions are the device ones). A terminal pass passes
+// identity for both, because it runs on the destination and sees the original spaces.
 static bool CopyChainNode(const AOTEffectGraph& graph, AOTNodeID nodeID,
                           const std::unordered_map<uint32_t, AOTNodeID>& builtMap,
                           const std::vector<AOTNodeID>& cutRoots,
                           const std::vector<AOTNodeID>& cutLeaves, const Matrix& coordToLocal,
-                          const Matrix& deviceToFrag, AOTNodeBuilder* builder, AOTNodeID* copied) {
+                          const Matrix& deviceLeafRemap, AOTNodeBuilder* builder,
+                          AOTNodeID* copied) {
   const auto* node = graph.nodeAt(nodeID);
   if (node == nullptr || builder == nullptr || copied == nullptr) {
     return false;
@@ -1558,7 +1561,7 @@ static bool CopyChainNode(const AOTEffectGraph& graph, AOTNodeID nodeID,
       }
       auto texture = *parameters;
       if (texture.samplingKind == AOTTextureSamplingKind::Device) {
-        texture.uvMatrix.preConcat(deviceToFrag);
+        texture.uvMatrix.preConcat(deviceLeafRemap);
       } else {
         texture.uvMatrix.preConcat(coordToLocal);
       }
@@ -1680,7 +1683,7 @@ static bool CopyChainNode(const AOTEffectGraph& graph, AOTNodeID nodeID,
 static bool CopyChainNodes(const AOTEffectGraph& graph, const std::vector<bool>& wanted,
                            const std::vector<bool>& skip, const std::vector<AOTNodeID>& cutRoots,
                            const std::vector<AOTTextureParameters>& intermediates,
-                           const Matrix& coordToLocal, const Matrix& deviceToFrag,
+                           const Matrix& coordToLocal, const Matrix& deviceLeafRemap,
                            AOTNodeBuilder* builder,
                            std::unordered_map<uint32_t, AOTNodeID>* builtMap) {
   if (cutRoots.size() != intermediates.size()) {
@@ -1716,7 +1719,7 @@ static bool CopyChainNodes(const AOTEffectGraph& graph, const std::vector<bool>&
     }
     AOTNodeID copied = AOTNodeID::Invalid();
     if (!CopyChainNode(graph, AOTNodeID(index), *builtMap, cutRoots, cutLeaves, coordToLocal,
-                       deviceToFrag, builder, &copied)) {
+                       deviceLeafRemap, builder, &copied)) {
       return false;
     }
     (*builtMap)[index] = copied;
@@ -1765,7 +1768,7 @@ static bool FinishSegmentPass(const AOTNodeBuilder& builder, AOTNodeID root,
 
 bool AOTChainBuilder::BuildCutSegment(const AOTEffectGraph& graph, const AOTPassDescriptor& cutPass,
                                       const std::vector<AOTTextureParameters>& intermediates,
-                                      const Matrix& coordToLocal, const Matrix& deviceToFrag,
+                                      const Matrix& coordToLocal, const Matrix& deviceLeafRemap,
                                       AOTEffectGraph* segment, AOTPassDescriptor* pass) {
   if (segment == nullptr || pass == nullptr || cutPass.nodes.empty() ||
       cutPass.materializedInputs.size() != intermediates.size()) {
@@ -1798,7 +1801,7 @@ bool AOTChainBuilder::BuildCutSegment(const AOTEffectGraph& graph, const AOTPass
   }
   std::unordered_map<uint32_t, AOTNodeID> builtMap = {};
   if (!CopyChainNodes(graph, wanted, skip, cutPass.materializedInputs, intermediates, coordToLocal,
-                      deviceToFrag, &builder, &builtMap)) {
+                      deviceLeafRemap, &builder, &builtMap)) {
     return false;
   }
   return FinishSegmentPass(builder, cutPass.output, builtMap, segment, pass);

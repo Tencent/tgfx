@@ -88,18 +88,21 @@ class AOTChainBuilder {
    * nodes with every input edge pointing at a cut node (cutPass.materializedInputs) replaced by
    * that cut's texture leaf from intermediates (fed from the opaque-white designator so the
    * intermediate samples raw — the producing pass already applied its own modulation), skipping
-   * the cut subtrees' own nodes. A split-off fill pass evaluates at top-left device positions
-   * while the original draw evaluated at its own coordinate spaces, so its local-coordinate
-   * parameters (the gradient coordMatrix, the noise uvMatrix, plain and tiled texture uvMatrices)
-   * are precomposed with coordToLocal and its device-space texture leaves with deviceToFrag; a
-   * terminal pass runs on the destination and passes identity for both. The returned segment pass
-   * carries the profile and kernel its own graph resolves, which is the pass's real fit, so this
-   * doubles as the plan-time admission: a plan may hand the cut placeholders (isIntermediate
-   * texture parameters) to check the fit before any intermediate exists.
+   * the cut subtrees' own nodes. A split-off fill pass evaluates its local-coordinate parameters
+   * (the gradient coordMatrix, the noise uvMatrix, plain and tiled texture uvMatrices) at top-left
+   * device positions while the original draw evaluated them at its own local coordinates, so
+   * those are precomposed with coordToLocal; its device-space texture leaves are precomposed with
+   * deviceLeafRemap, the composition mapping the fill target's fragment coordinates back onto the
+   * destination positions the leaves' uvMatrices address (the device-to-frag flip plus the target
+   * placement). A terminal pass runs on the destination and passes identity for both. The
+   * returned segment pass carries the profile and kernel its own graph resolves, which is the
+   * pass's real fit, so this doubles as the plan-time admission: a plan may hand the cut
+   * placeholders (isIntermediate texture parameters) to check the fit before any intermediate
+   * exists.
    */
   static bool BuildCutSegment(const AOTEffectGraph& graph, const AOTPassDescriptor& cutPass,
                               const std::vector<AOTTextureParameters>& intermediates,
-                              const Matrix& coordToLocal, const Matrix& deviceToFrag,
+                              const Matrix& coordToLocal, const Matrix& deviceLeafRemap,
                               AOTEffectGraph* segment, AOTPassDescriptor* pass);
 
   /**

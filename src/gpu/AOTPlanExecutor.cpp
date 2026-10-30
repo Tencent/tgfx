@@ -226,11 +226,19 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
     return false;
   }
   auto deviceToFrag = DeviceToFragCoord(destination);
-  // The fill passes' coordinate remap: they evaluate at top-left device positions, the original
-  // draw evaluated at its own local coordinates — the draw's device-to-local mapping for an
-  // on-screen draw, or the fill's own offset for an offscreen fill (its local frame is the
-  // top-left device one plus fpCoordOffset). The terminal pass runs on the destination and keeps
-  // the original spaces, so both of its remaps are identity.
+  // A fill pass's device-space leaves read gl_FragCoord — the fill target's pixel space, which is
+  // the top-left device positions minus the shared placement — while their uvMatrices address the
+  // destination's positions. The leaf remap is therefore the device-to-frag flip plus the
+  // placement, the same composition the split-off fills apply; without the placement every leaf
+  // samples O pixels off whenever the draw's bounds do not start at the origin.
+  auto deviceLeafRemap = deviceToFrag;
+  deviceLeafRemap.preConcat(Matrix::MakeTrans(geometry.coordOffset.x, geometry.coordOffset.y));
+  // The fill passes' local-space remap: they evaluate their local-coordinate parameters at
+  // top-left device positions, the original draw evaluated them at its own local coordinates —
+  // the draw's device-to-local mapping for an on-screen draw, or the fill's own offset for an
+  // offscreen fill (its local frame is the top-left device one plus fpCoordOffset). The terminal
+  // pass runs on the destination and keeps the original spaces, so both of its remaps are
+  // identity.
   auto coordToLocal = Matrix::I();
   if (deviceToLocal.has_value()) {
     coordToLocal = *deviceToLocal;
@@ -249,12 +257,13 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
       if (target == nullptr) {
         return false;
       }
-      // A fill pass reads an earlier intermediate at the same pixel: its positions are top-left
-      // device ones, the intermediate's pixel space is those minus the shared target placement.
-      // The terminal draw reads its intermediates from the destination's fragment coordinates:
-      // back to top-left device positions first, then into the target's pixel space.
-      auto matrix = Matrix::MakeTrans(-geometry.coordOffset.x, -geometry.coordOffset.y);
+      // A fill pass reads an earlier intermediate at the same target pixel (its fill covers the
+      // target exactly, so gl_FragCoord is already the intermediate's pixel space). The terminal
+      // draw reads its intermediates from the destination's fragment coordinates: back to
+      // top-left device positions first, then into the target's pixel space.
+      auto matrix = Matrix::I();
       if (isTerminal) {
+        matrix = Matrix::MakeTrans(-geometry.coordOffset.x, -geometry.coordOffset.y);
         matrix.preConcat(deviceToFrag);
       }
       intermediates.push_back(
@@ -264,7 +273,7 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
     AOTPassDescriptor segmentPass = {};
     if (!AOTChainBuilder::BuildCutSegment(
             graph, pass, intermediates, isTerminal ? Matrix::I() : coordToLocal,
-            isTerminal ? Matrix::I() : deviceToFrag, &segment, &segmentPass)) {
+            isTerminal ? Matrix::I() : deviceLeafRemap, &segment, &segmentPass)) {
       return false;
     }
     auto processor = AOTChainBuilder::BuildFPForPass(allocator, segment, segmentPass);
