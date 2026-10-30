@@ -74,6 +74,14 @@ class RRectUtils {
    *         matrix is not axis-aligned or the transform cannot produce a valid RRect.
    */
   static std::optional<RRect> TryAxisAlignedTransform(const RRect& src, const Matrix& matrix);
+
+  /**
+   * Returns true when the RRect has any elliptical corner (radiusX != radiusY). Sharp corners
+   * (zero radius) do not count. Smoothed rrects with elliptical corners use a dedicated shader
+   * variant, so batching and dispatch decisions key on this.
+   * @param rRect  the rounded rectangle
+   */
+  static bool HasEllipticalCorner(const RRect& rRect);
 };
 
 }  // namespace tgfx

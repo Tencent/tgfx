@@ -75,7 +75,11 @@ class RRectDrawOp : public StandardDrawOp {
  private:
   size_t rectCount = 0;
   bool hasStroke = false;
+  bool localStroke = false;
   bool isComplex = false;
+  bool hasSmoothness = false;
+  bool elliptical = false;
+  float smoothness = 0.0f;
   size_t indicesPerRRect = 0;
   std::optional<PMColor> commonColor = std::nullopt;
   std::shared_ptr<GPUBufferProxy> indexBufferProxy = nullptr;

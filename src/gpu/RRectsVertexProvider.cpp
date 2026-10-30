@@ -667,6 +667,201 @@ class NonAAComplexRRectsVertexProvider final : public RRectsVertexProvider {
   }
 };
 
+// A stroked record under a non-uniformly scaling matrix is evaluated in the unscaled local
+// frame: the correct stroked shape is the scaled image of the local stroke ring, which a baked
+// uniform-width ring cannot express.
+static bool IsLocalStrokeRecord(const RRectRecord& record, const Stroke* stroke) {
+  if (stroke == nullptr) {
+    return false;
+  }
+  const auto scales = record.viewMatrix.getAxisScales();
+  return scales.x != scales.y;
+}
+
+static bool HasLocalStrokeRecord(const PlacementArray<RRectRecord>& rects,
+                                 const PlacementArray<Stroke>& strokes) {
+  for (size_t i = 0; i < rects.size(); i++) {
+    const auto stroke = i < strokes.size() ? strokes[i].get() : nullptr;
+    if (IsLocalStrokeRecord(*rects[i], stroke)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// The elliptical variant decision must look at the evaluation-frame radii: baked (device-space)
+// radii for fills and uniform-scale strokes (a circular corner under a non-uniform matrix
+// becomes elliptical after baking), local radii for non-uniform strokes. If any record needs
+// per-axis radii, the whole op uses the elliptical layout (circular records write equal x/y
+// radii).
+static bool HasEllipticalCornerInEvalFrame(const PlacementArray<RRectRecord>& rects,
+                                           const PlacementArray<Stroke>& strokes) {
+  for (size_t i = 0; i < rects.size(); i++) {
+    auto& record = rects[i];
+    const auto stroke = i < strokes.size() ? strokes[i].get() : nullptr;
+    const auto scales = record->viewMatrix.getAxisScales();
+    const auto baked = !IsLocalStrokeRecord(*record, stroke);
+    for (const auto& corner : record->rRect.radii()) {
+      const auto rx = corner.x * (baked ? scales.x : 1.0f);
+      const auto ry = corner.y * (baked ? scales.y : 1.0f);
+      if (rx > 0.0f && rx != ry) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+class SmoothRRectsVertexProvider final : public RRectsVertexProvider {
+ public:
+  SmoothRRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool hasColor,
+                             PlacementArray<Stroke>&& strokes,
+                             std::shared_ptr<BlockAllocator> reference,
+                             std::shared_ptr<ColorSpace> colorSpace = nullptr)
+      : RRectsVertexProvider(std::move(rects), aaType, hasColor, std::move(strokes),
+                             std::move(reference), std::move(colorSpace),
+                             HasEllipticalCornerInEvalFrame(rects, strokes),
+                             HasLocalStrokeRecord(rects, strokes)) {
+    _smoothness = this->rects.front()->rRect.smoothness();
+  }
+
+  // The smooth layout (single quad with per-corner scalar radii) is uniform for Simple and
+  // Complex rrects; the flag is only read by the non-smooth GP selection.
+  bool isComplex() const override {
+    return false;
+  }
+
+  size_t vertexCount() const override {
+    // Smooth: 4 vertices per RRect.
+    //   position(2) + localCoord(2) + radii(4) + rectBounds(4) = 12
+    //   Elliptical variant carries per-axis radii: radiiX(4) + radiiY(4) instead of radii(4).
+    //   Optional: color(1), halfStrokeWidth(1), invTranspose(4, localStroke variant only).
+    size_t floatsPerVertex = isElliptical() ? 16 : 12;
+    if (bitFields.hasColor) {
+      floatsPerVertex += 1;
+    }
+    if (bitFields.hasStroke) {
+      floatsPerVertex += 1;
+    }
+    if (bitFields.localStroke) {
+      floatsPerVertex += 4;
+    }
+    return rects.size() * 4 * floatsPerVertex;
+  }
+
+  void getVertices(float* vertices) const override {
+    size_t index = 0;
+    auto steps = MakeColorSpaceXformStepsIfNeeded(bitFields.hasColor, _dstColorSpace);
+
+    size_t currentIndex = 0;
+    for (auto& record : rects) {
+      auto viewMatrix = record->viewMatrix;
+      auto rRect = record->rRect;
+      auto scales = viewMatrix.getAxisScales();
+      auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
+      const auto localStroke = IsLocalStrokeRecord(*record, stroke);
+      float minScale = 1.0f;
+      // Column-major inverse-transpose of the view matrix for the AA distance conversion;
+      // identity for baked records, whose shader distances are already in device pixels.
+      float invTranspose[4] = {1.0f, 0.0f, 0.0f, 1.0f};
+      StrokeParams strokeParams = {};
+      if (localStroke) {
+        // Skip baking: radii, rect bounds and localCoord stay in the original local frame, and
+        // vertex positions are mapped by the full matrix.
+        minScale = viewMatrix.getMinScale();
+        strokeParams.halfStrokeX = 0.5f * stroke->width;
+        strokeParams.halfStrokeY = strokeParams.halfStrokeX;
+        Matrix inverse = {};
+        if (viewMatrix.invert(&inverse)) {
+          // GLSL mat2 fills column-major. The inverse-transpose of the row-major 2x2 part
+          // [[i0, i1], [i3, i4]] is [[i0, i3], [i1, i4]], whose columns are (i0, i1) and
+          // (i3, i4).
+          invTranspose[0] = inverse[0];
+          invTranspose[1] = inverse[1];
+          invTranspose[2] = inverse[3];
+          invTranspose[3] = inverse[4];
+        }
+      } else {
+        strokeParams = ApplyScales(&rRect, &viewMatrix, scales, stroke);
+        // The circular layout requires circular corners after baking; fills under non-uniform
+        // scales legitimately bake to elliptical corners and take the elliptical layout.
+        for (const auto& corner : rRect.radii()) {
+          DEBUG_ASSERT(isElliptical() || corner.x == 0.0f || corner.x == corner.y);
+        }
+      }
+      uint32_t uintColor = 0;
+      if (bitFields.hasColor) {
+        uintColor = ToUintPMColor(record->color, steps.get());
+      }
+
+      const auto& rect = rRect.rect();
+      const auto& radii = rRect.radii();
+      const auto currentAAType = aaType();
+      // Extend the quad so the AA coverage ramp is fully covered. On MSAA, bloat enough to
+      // guarantee any pixel that might be touched by the rRect has full sample coverage.
+      const auto aaBloat = currentAAType == AAType::None
+                               ? 0.0f
+                               : (currentAAType == AAType::MSAA ? FLOAT_SQRT2 : 0.5f);
+      // Strokes extend the quad by the half stroke width to cover the outer edge of the ring.
+      // In the local stroke frame the AA bloat converts by the largest local-per-device factor.
+      const auto aaExtra = localStroke ? aaBloat / minScale : aaBloat;
+      const auto quad =
+          rect.makeOutset(strokeParams.halfStrokeX + aaExtra, strokeParams.halfStrokeY + aaExtra);
+      // Corner positions for a quad: TL, TR, BR, BL
+      const Point corners[] = {
+          {quad.left, quad.top},
+          {quad.right, quad.top},
+          {quad.right, quad.bottom},
+          {quad.left, quad.bottom},
+      };
+      for (int v = 0; v < 4; ++v) {
+        auto point = corners[v];
+        viewMatrix.mapPoints(&point, 1);
+        // position (2 floats)
+        vertices[index++] = point.x;
+        vertices[index++] = point.y;
+        // localCoord (2 floats) - coordinates within the rect for shape evaluation
+        vertices[index++] = corners[v].x;
+        vertices[index++] = corners[v].y;
+        // radii (4 floats) - per-corner circular radii [TL, TR, BR, BL]
+        vertices[index++] = radii[0].x;
+        vertices[index++] = radii[1].x;
+        vertices[index++] = radii[2].x;
+        vertices[index++] = radii[3].x;
+        if (isElliptical()) {
+          // radiiY (4 floats) - per-corner y radii, elliptical variant only
+          vertices[index++] = radii[0].y;
+          vertices[index++] = radii[1].y;
+          vertices[index++] = radii[2].y;
+          vertices[index++] = radii[3].y;
+        }
+        // rectBounds (4 floats)
+        vertices[index++] = rect.left;
+        vertices[index++] = rect.top;
+        vertices[index++] = rect.right;
+        vertices[index++] = rect.bottom;
+        // Optional color
+        if (bitFields.hasColor) {
+          std::memcpy(&vertices[index++], &uintColor, sizeof(uintColor));
+        }
+        // halfStroke (1 float) - only for stroke mode; in the evaluation frame of the record
+        // (baked device pixels, or local units for a localStroke record).
+        if (bitFields.hasStroke) {
+          vertices[index++] = strokeParams.halfStrokeX;
+        }
+        // invTranspose (4 floats) - only for the localStroke variant; identity for baked records.
+        if (bitFields.localStroke) {
+          vertices[index++] = invTranspose[0];
+          vertices[index++] = invTranspose[1];
+          vertices[index++] = invTranspose[2];
+          vertices[index++] = invTranspose[3];
+        }
+      }
+      currentIndex++;
+    }
+  }
+};
+
 PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
     BlockAllocator* allocator, std::vector<PlacementPtr<RRectRecord>>&& rects, AAType aaType,
     std::vector<PlacementPtr<Stroke>>&& strokes, std::shared_ptr<ColorSpace> colorSpace) {
@@ -676,7 +871,9 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
   auto hasColor = false;
   auto hasComplex = false;
   auto& firstColor = rects.front()->color;
+  const auto smoothness = rects.front()->rRect.smoothness();
   for (auto& record : rects) {
+    DEBUG_ASSERT(record->rRect.smoothness() == smoothness);
     if (record->color != firstColor) {
       hasColor = true;
     }
@@ -689,6 +886,11 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
   }
   auto array = allocator->makeArray(std::move(rects));
   auto strokeArray = allocator->makeArray(std::move(strokes));
+  if (smoothness > 0.0f) {
+    return allocator->make<SmoothRRectsVertexProvider>(
+        std::move(array), aaType, hasColor, std::move(strokeArray), allocator->addReference(),
+        std::move(colorSpace));
+  }
   if (aaType == AAType::None) {
     if (hasComplex) {
       return allocator->make<NonAAComplexRRectsVertexProvider>(
@@ -712,11 +914,14 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
 RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType,
                                            bool hasColor, PlacementArray<Stroke>&& strokes,
                                            std::shared_ptr<BlockAllocator> reference,
-                                           std::shared_ptr<ColorSpace> colorSpace)
+                                           std::shared_ptr<ColorSpace> colorSpace, bool elliptical,
+                                           bool localStroke)
     : VertexProvider(std::move(reference)), rects(std::move(rects)), strokes(std::move(strokes)),
       _dstColorSpace(std::move(colorSpace)) {
   bitFields.aaType = static_cast<uint8_t>(aaType);
   bitFields.hasColor = hasColor;
   bitFields.hasStroke = !this->strokes.empty();
+  bitFields.elliptical = elliptical;
+  bitFields.localStroke = localStroke;
 }
 }  // namespace tgfx
