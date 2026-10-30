@@ -7559,6 +7559,8 @@ TGFX_TEST_PRIVATE(LayerTest, StyleInputFollowsRasterizedGeometry) {
 
   ASSERT_TRUE(seesChildren->drawn && seesOwnOnly->drawn)
       << "control: the background chain has to draw the style";
+  ASSERT_TRUE(seesChildren->contentImage != nullptr);
+  ASSERT_TRUE(seesOwnOnly->contentImage != nullptr);
   EXPECT_EQ(seesChildren->contentType, StyleInputSource::Type::Geometry);
   EXPECT_EQ(seesOwnOnly->contentType, StyleInputSource::Type::Geometry);
   TGFX_PRIVATE_ACCESS(
