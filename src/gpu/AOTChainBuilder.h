@@ -28,8 +28,8 @@ class ProgramInfo;
 
 /**
  * Rebuilds concrete FragmentProcessors from a decomposed AOT plan: the fused chain kernel for
- * PointwiseChain/PointwiseGraph passes (including every pass of a multi-pass linear plan, through
- * BuildLinearSegment), the perlin kernel for PerlinNoiseFill and the YUV kernel for
+ * PointwiseChain/PointwiseGraph passes (a multi-pass plan's passes are built as cut segments
+ * through BuildCutSegment), the perlin kernel for PerlinNoiseFill and the YUV kernel for
  * YUVTextureFill. Used by AOTPlanExecutor's task assembly and by the two re-expressing
  * kernels' per-draw views of an unmodified ProgramInfo (BuildChainProcessorForInfo /
  * BuildPerlinProcessorForInfo).
@@ -56,29 +56,17 @@ class AOTChainBuilder {
    * Rebuilds the color processor of one self-contained plan pass: the fused chain/graph processor
    * without draw coverage, or the YUV or perlin processor with the pass's operators folded into
    * its slot records. Returns nullptr when the pass shape cannot be rebuilt. A pass of a
-   * multi-pass plan is not self-contained (it reads its predecessor's output); build it through
-   * BuildLinearSegment first.
+   * multi-pass plan is not self-contained (it reads its predecessors' outputs); build it through
+   * BuildCutSegment first.
    */
   static PlacementPtr<FragmentProcessor> BuildFPForPass(BlockAllocator* allocator,
                                                         const AOTEffectGraph& graph,
                                                         const AOTPassDescriptor& pass);
 
   /**
-   * Builds the self-contained graph one pass of a multi-pass linear plan executes: a texture
-   * source with the given parameters (the plan's source for the first pass, the predecessor's
-   * intermediate thereafter), then copies of the unary operators. The first source consumes the
-   * geometry color; later sources consume the white designator so the original geometry alpha is
-   * not applied again at the terminal draw. On success *pass fits its selected kernel family.
-   */
-  static bool BuildLinearSegment(const AOTEffectGraph& graph,
-                                 const std::vector<AOTNodeID>& operators,
-                                 const AOTTextureParameters& source, AOTEffectGraph* segment,
-                                 AOTPassDescriptor* pass, bool firstPass = true);
-
-  /**
-   * The source a later pass of a multi-pass linear plan reads: its predecessor's RGBA
-   * intermediate, sampled in device space through uvMatrix (destination fragment coordinates to
-   * the intermediate's pixel space).
+   * The source a later pass of a multi-pass plan reads: its predecessor's RGBA intermediate,
+   * sampled in device space through uvMatrix (destination fragment coordinates to the
+   * intermediate's pixel space).
    */
   static AOTTextureParameters IntermediateSource(std::shared_ptr<TextureProxy> textureProxy,
                                                  const Matrix& uvMatrix);

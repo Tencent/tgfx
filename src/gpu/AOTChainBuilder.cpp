@@ -1426,72 +1426,6 @@ bool AOTChainBuilder::PlanChainPass(const AOTEffectGraph& graph, const AOTPassDe
 // RRectCoverage nodes rooted at the GP coverage unit, which is what makes composed multi-clip
 // coverage representable at all. Returns false when the coverage carries anything else.
 
-bool AOTChainBuilder::BuildLinearSegment(const AOTEffectGraph& graph,
-                                         const std::vector<AOTNodeID>& operators,
-                                         const AOTTextureParameters& source,
-                                         AOTEffectGraph* segment, AOTPassDescriptor* pass,
-                                         bool firstPass) {
-  if (segment == nullptr || pass == nullptr) {
-    return false;
-  }
-  AOTNodeBuilder builder = {};
-  AOTNodeID geometry = AOTNodeID::Invalid();
-  AOTNodeID current = AOTNodeID::Invalid();
-  if (!builder.addGeometryColor(&geometry) ||
-      (!firstPass && !builder.addGeometryWhiteInput(&current))) {
-    return false;
-  }
-  if (firstPass) {
-    current = geometry;
-  }
-  if (!builder.addTextureSource(current, source, &current)) {
-    return false;
-  }
-  for (auto nodeID : operators) {
-    const auto* node = graph.nodeAt(nodeID);
-    if (node == nullptr || node->inputs.size() != 1) {
-      return false;
-    }
-    bool added = false;
-    if (const auto* matrix = std::get_if<AOTColorMatrixParameters>(&node->parameters)) {
-      added = node->kind == AOTEffectKind::ColorMatrix &&
-              builder.addColorMatrix(current, *matrix, &current);
-    } else if (const auto* luma = std::get_if<AOTLumaParameters>(&node->parameters)) {
-      added = node->kind == AOTEffectKind::Luma && builder.addLuma(current, *luma, &current);
-    } else if (const auto* threshold =
-                   std::get_if<AOTAlphaThresholdParameters>(&node->parameters)) {
-      added = node->kind == AOTEffectKind::AlphaThreshold &&
-              builder.addAlphaThreshold(current, *threshold, &current);
-    } else if (const auto* xform = std::get_if<AOTColorSpaceXformParameters>(&node->parameters)) {
-      added = node->kind == AOTEffectKind::ColorSpaceXform &&
-              builder.addColorSpaceXform(current, *xform, &current);
-    }
-    if (!added) {
-      return false;
-    }
-  }
-  AOTEffectGraph result = {};
-  if (!builder.finish(current, &result)) {
-    return false;
-  }
-  AOTPassDescriptor resultPass = {};
-  for (uint32_t index = firstPass ? 1 : 2; index < result.nodeCount(); ++index) {
-    // GeometryWhiteInput is a designator, not an instruction slot.
-    resultPass.nodes.push_back(AOTNodeID(index));
-  }
-  resultPass.output = result.root();
-  AOTResourceProfile profile = AOTResourceProfile::Automatic;
-  if (!PlanChainPass(result, resultPass, false, &profile)) {
-    return false;
-  }
-  resultPass.resourceProfile = profile;
-  resultPass.kernel =
-      IsAOTGraphProfile(profile) ? AOTKernelKind::PointwiseGraph : AOTKernelKind::PointwiseChain;
-  *segment = std::move(result);
-  *pass = std::move(resultPass);
-  return true;
-}
-
 AOTTextureParameters AOTChainBuilder::IntermediateSource(std::shared_ptr<TextureProxy> textureProxy,
                                                          const Matrix& uvMatrix) {
   AOTTextureParameters parameters = {};
@@ -1744,8 +1678,8 @@ static bool FinishSegmentPass(const AOTNodeBuilder& builder, AOTNodeID root,
   AOTPassDescriptor resultPass = {};
   resultPass.output = rootMapped;
   // The pass node list is every non-designator node of the segment graph itself — the copy may
-  // have added nodes the caller did not list (the replacement texture leaf), exactly like
-  // BuildLinearSegment lists its whole segment graph.
+  // have added nodes the caller did not list (the replacement texture leaf), so every
+  // non-designator node of the segment graph itself is listed.
   for (uint32_t index = 1; index < built.nodeCount(); ++index) {
     auto* node = built.nodeAt(AOTNodeID(index));
     if (node == nullptr || node->kind == AOTEffectKind::GeometryColorOpaqueInput ||

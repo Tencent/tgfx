@@ -34,6 +34,86 @@ bool IsDeviceSpaceAARectEffect(const FragmentProcessor* fp) {
   return rectEffect->isDeviceSpaceRect() && rectEffect->isAntiAlias();
 }
 
+bool CollectReachableStoppingAtCuts(const AOTEffectGraph& graph, AOTNodeID root,
+                                    const std::vector<AOTNodeID>& cutRoots,
+                                    std::vector<bool>* reachable) {
+  if (reachable == nullptr || !root.isValid() || root.index() >= graph.nodeCount()) {
+    return false;
+  }
+  auto isCut = [&cutRoots](AOTNodeID id) {
+    for (auto cut : cutRoots) {
+      if (id == cut) {
+        return true;
+      }
+    }
+    return false;
+  };
+  std::vector<AOTNodeID> pending = {root};
+  while (!pending.empty()) {
+    auto id = pending.back();
+    pending.pop_back();
+    if (isCut(id)) {
+      continue;
+    }
+    const auto* node = graph.nodeAt(id);
+    if (node == nullptr) {
+      return false;
+    }
+    if ((*reachable)[id.index()]) {
+      continue;
+    }
+    (*reachable)[id.index()] = true;
+    if (node->kind != AOTEffectKind::PerlinNoiseSource) {
+      pending.insert(pending.end(), node->inputs.begin(), node->inputs.end());
+    }
+  }
+  return true;
+}
+
+bool PassReadsGeometryColor(const AOTEffectGraph& graph, const AOTPassDescriptor& pass) {
+  std::vector<bool> reachable(graph.nodeCount(), false);
+  if (!CollectReachableStoppingAtCuts(graph, pass.output, pass.materializedInputs, &reachable)) {
+    return true;
+  }
+  return reachable[0];
+}
+
+bool PassNeedsLocalRemap(const AOTEffectGraph& graph, const AOTPassDescriptor& pass) {
+  std::vector<bool> reachable(graph.nodeCount(), false);
+  if (!CollectReachableStoppingAtCuts(graph, pass.output, pass.materializedInputs, &reachable)) {
+    return true;
+  }
+  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+    if (!reachable[index]) {
+      continue;
+    }
+    const auto* node = graph.nodeAt(AOTNodeID(index));
+    if (node == nullptr) {
+      return true;
+    }
+    if (node->kind == AOTEffectKind::GradientSource ||
+        node->kind == AOTEffectKind::PerlinNoiseSource) {
+      return true;
+    }
+    if (node->kind == AOTEffectKind::TextureSource) {
+      auto* parameters = std::get_if<AOTTextureParameters>(&node->parameters);
+      if (parameters != nullptr && parameters->samplingKind != AOTTextureSamplingKind::Device) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+bool PlanBakesGeometryAlpha(const AOTEffectGraph& graph, const AOTEffectPlan& plan) {
+  for (size_t index = 0; index + 1 < plan.passes.size(); ++index) {
+    if (PassReadsGeometryColor(graph, plan.passes[index])) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool IsUnaryPointwiseKind(AOTEffectKind kind) {
   return kind == AOTEffectKind::ColorMatrix || kind == AOTEffectKind::Luma ||
          kind == AOTEffectKind::AlphaThreshold || kind == AOTEffectKind::ColorSpaceXform;

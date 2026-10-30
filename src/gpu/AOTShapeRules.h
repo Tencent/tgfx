@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/AOTEffect.h"
+#include "gpu/AOTEffectDecomposer.h"
 
 namespace tgfx {
 
@@ -81,5 +82,38 @@ bool IsInputDesignator(AOTEffectKind kind);
  */
 bool CollectReachableNodes(const AOTEffectGraph& graph, AOTNodeID root,
                            std::vector<bool>* reachable);
+
+/**
+ * Marks every node reachable from root, stopping at the cut roots: in the collecting pass they
+ * resolve to texture leaves, so their subtrees belong to earlier passes. The cut roots themselves
+ * are not part of the reachable set. Returns false for an invalid root or a dangling node
+ * reference.
+ */
+bool CollectReachableStoppingAtCuts(const AOTEffectGraph& graph, AOTNodeID root,
+                                    const std::vector<AOTNodeID>& cutRoots,
+                                    std::vector<bool>* reachable);
+
+/**
+ * Whether one pass of a multi-pass plan, with its materialized inputs standing in as texture
+ * leaves, still reads the geometry color: such a fill bakes the draw's uniform input alpha, so
+ * the plan needs a uniform geometry color. Conservative on a malformed pass (treated as reading).
+ */
+bool PassReadsGeometryColor(const AOTEffectGraph& graph, const AOTPassDescriptor& pass);
+
+/**
+ * Whether one pass of a multi-pass plan, with its materialized inputs standing in as texture
+ * leaves, carries a local-coordinate leaf (a plainly-sampled texture, a gradient or a noise
+ * source): the fill pass evaluates those at top-left device positions and needs the
+ * device-to-local remap. Conservative on a malformed pass (treated as needing the remap).
+ */
+bool PassNeedsLocalRemap(const AOTEffectGraph& graph, const AOTPassDescriptor& pass);
+
+/**
+ * Whether any non-terminal pass of a multi-pass plan reads the geometry color: the plan bakes the
+ * draw's uniform input alpha into its fills and needs a uniform geometry color. A plan whose
+ * passes only materialize blend operands keeps the paint alpha in the terminal draw's epilogue
+ * instead and needs no uniform color.
+ */
+bool PlanBakesGeometryAlpha(const AOTEffectGraph& graph, const AOTEffectPlan& plan);
 
 }  // namespace tgfx

@@ -45,12 +45,12 @@ class AOTPlanExecutor {
   static bool CanExecute(const AOTEffectGraph& graph, const AOTEffectPlan& plan);
 
   /**
-   * Whether the plan's passes evaluate in device space only, so its intermediate fills reproduce
-   * what the original draw computes at every pixel whatever its geometry: true for single-pass
-   * plans, and for multi-pass plans whose source samples device space. A multi-pass plan over a
-   * local-coordinate source additionally needs the draw's device-to-local mapping (see Make).
+   * Whether a multi-pass plan's fill passes carry local-coordinate leaves (plainly-sampled
+   * textures, gradients, noise sources): those evaluate at top-left device positions and need the
+   * draw's affine device-to-local mapping (see Make). A plan whose fills only sample device-space
+   * content needs no mapping.
    */
-  static bool SamplesDeviceSpace(const AOTEffectGraph& graph, const AOTEffectPlan& plan);
+  static bool NeedsLocalRemap(const AOTEffectGraph& graph, const AOTEffectPlan& plan);
 
   /**
    * Builds an atomic render task for the plan without enqueueing it: every materializing pass

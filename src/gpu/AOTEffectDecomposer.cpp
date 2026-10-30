@@ -110,6 +110,16 @@ bool AOTEffectDecomposer::Lower(const std::vector<const FragmentProcessor*>& pro
 // const-operand blend are shared shape rules (gpu/AOTShapeRules.h) — the same authority the
 // executor's admission checks and the chain builder consume.
 
+// The placeholder a cut's replacement stands in as during planning: device sampling, identity
+// matrix, no perspective — the facts the fit depends on — with no texture behind it yet.
+static AOTTextureParameters CutIntermediatePlaceholder() {
+  AOTTextureParameters parameters = {};
+  parameters.isIntermediate = true;
+  parameters.samplingKind = AOTTextureSamplingKind::Device;
+  parameters.uvMatrix = Matrix::I();
+  return parameters;
+}
+
 // Whether a multi-pass plan may start a new pass at this node. A pass boundary stores the previous
 // pass's output in an RGBA8 target, rounding it to the 1/255 grid. Most operators move by at most
 // that rounding, but AlphaThreshold is a step function: an input just below the threshold can round
@@ -122,9 +132,10 @@ static bool CanStartPassAt(const AOTEffectNode* node) {
 // Planner for a linear chain one fused pass cannot carry: GeometryColor -> plain or device-space
 // TextureSource -> unary pointwise ops, with more operators than the chain kernel has instructions
 // or more color-space transforms than its parameter block holds. The chain is cut into chain-kernel
-// passes, each as long as fits (AOTChainBuilder::BuildLinearSegment is the fit check), every later
-// pass reading its predecessor's materialized output in device space. A pass ends early when the
-// next one would otherwise start at a node that may not start a pass (CanStartPassAt); the chain is
+// passes, each as long as fits (AOTChainBuilder::BuildCutSegment over the pass's nodes and a
+// placeholder intermediate is the fit check), every later pass reading its predecessor's
+// materialized output through a cut-style materializedInputs edge. A pass ends early when the next
+// one would otherwise start at a node that may not start a pass (CanStartPassAt); the chain is
 // refused when no boundary is left.
 static bool DecomposeLinearMultiPass(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
   if (plan == nullptr || graph.nodeCount() < 2 || graph.root().index() + 1 != graph.nodeCount()) {
@@ -141,19 +152,26 @@ static bool DecomposeLinearMultiPass(const AOTEffectGraph& graph, AOTEffectPlan*
       return false;
     }
   }
-  const auto& source = std::get<AOTTextureParameters>(graph.nodeAt(AOTNodeID(1))->parameters);
-  // A later pass reads an intermediate that does not exist yet; its fit only depends on the
-  // source kind, so the plan's own texture stands in for it.
-  auto intermediate = AOTChainBuilder::IntermediateSource(source.textureProxy, Matrix::I());
+  // A later pass reads an intermediate that does not exist yet; the placeholder carries the facts
+  // the fit depends on, exactly like a blend cut's admission.
+  auto intermediate = CutIntermediatePlaceholder();
   auto fits = [&](uint32_t firstOperator, uint32_t passEnd, bool firstPass) {
-    std::vector<AOTNodeID> operators = {};
-    for (auto index = firstOperator; index < passEnd; ++index) {
-      operators.push_back(AOTNodeID(index));
+    AOTPassDescriptor candidate = {};
+    candidate.output = AOTNodeID(passEnd - 1);
+    if (firstPass) {
+      candidate.nodes.push_back(AOTNodeID(1));
+    } else {
+      candidate.materializedInputs.push_back(AOTNodeID(firstOperator - 1));
     }
+    for (auto index = firstOperator; index < passEnd; ++index) {
+      candidate.nodes.push_back(AOTNodeID(index));
+    }
+    std::vector<AOTTextureParameters> placeholders(candidate.materializedInputs.size(),
+                                                   intermediate);
     AOTEffectGraph segment = {};
     AOTPassDescriptor segmentPass = {};
-    return AOTChainBuilder::BuildLinearSegment(graph, operators, firstPass ? source : intermediate,
-                                               &segment, &segmentPass, firstPass);
+    return AOTChainBuilder::BuildCutSegment(graph, candidate, placeholders, Matrix::I(),
+                                            Matrix::I(), &segment, &segmentPass);
   };
   AOTEffectPlan result = {};
   const auto nodeCount = static_cast<uint32_t>(graph.nodeCount());
@@ -183,6 +201,7 @@ static bool DecomposeLinearMultiPass(const AOTEffectGraph& graph, AOTEffectPlan*
     if (firstPass) {
       pass.nodes.push_back(AOTNodeID(1));
     } else {
+      pass.materializedInputs.push_back(AOTNodeID(firstOperator - 1));
       pass.dependencies.push_back(static_cast<uint32_t>(result.passes.size() - 1));
     }
     for (auto index = firstOperator; index < passEnd; ++index) {
@@ -439,55 +458,6 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
 // construction runs, over placeholder intermediate leaves, so plan-time fit and construction fit
 // cannot drift.
 
-// Collects the nodes reachable from root, stopping at the cut roots: in the collecting pass they
-// resolve to texture leaves, so their subtrees belong to earlier passes. The cut roots themselves
-// are not part of the reachable set.
-static bool CollectReachableStoppingAtCuts(const AOTEffectGraph& graph, AOTNodeID root,
-                                           const std::vector<AOTNodeID>& cutRoots,
-                                           std::vector<bool>* reachable) {
-  if (reachable == nullptr || !root.isValid() || root.index() >= graph.nodeCount()) {
-    return false;
-  }
-  auto isCut = [&cutRoots](AOTNodeID id) {
-    for (auto cut : cutRoots) {
-      if (id == cut) {
-        return true;
-      }
-    }
-    return false;
-  };
-  std::vector<AOTNodeID> pending = {root};
-  while (!pending.empty()) {
-    auto id = pending.back();
-    pending.pop_back();
-    if (isCut(id)) {
-      continue;
-    }
-    const auto* node = graph.nodeAt(id);
-    if (node == nullptr) {
-      return false;
-    }
-    if ((*reachable)[id.index()]) {
-      continue;
-    }
-    (*reachable)[id.index()] = true;
-    if (node->kind != AOTEffectKind::PerlinNoiseSource) {
-      pending.insert(pending.end(), node->inputs.begin(), node->inputs.end());
-    }
-  }
-  return true;
-}
-
-// The placeholder a cut's replacement stands in as during planning: device sampling, identity
-// matrix, no perspective — the facts the fit depends on — with no texture behind it yet.
-static AOTTextureParameters CutIntermediatePlaceholder() {
-  AOTTextureParameters parameters = {};
-  parameters.isIntermediate = true;
-  parameters.samplingKind = AOTTextureSamplingKind::Device;
-  parameters.uvMatrix = Matrix::I();
-  return parameters;
-}
-
 // Plans one self-contained pass of a cut plan over the subtree at root, with the cut roots
 // standing in as placeholder texture leaves. Fills the original-graph node list (designators
 // excluded — they are copied but never listed), the output, the cut edges the subtree actually
@@ -669,7 +639,7 @@ bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTEffectPlan* 
     }
     // Each planner's own admission subsumes what AOTPlanExecutor::CanExecute would re-derive: the
     // DAG planner resolves the profile and kernel together, the linear planner's fit calls
-    // BuildLinearSegment with the same arguments the executor's segmented admission uses, the
+    // BuildCutSegment with the same placeholder admission the executor's validation relies on, the
     // perlin planner checks the slot shapes and the lookup resources, and the cut planner runs the
     // same segment build construction uses over placeholder intermediates. The re-check therefore
     // runs only as a debug assertion.

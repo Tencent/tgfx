@@ -1,5 +1,6 @@
 
 #include "AOTPlanExecutor.h"
+#include <algorithm>
 #include <utility>
 #include <vector>
 #include "gpu/AOTChainBuilder.h"
@@ -57,70 +58,17 @@ static bool ValidateLinearSlots(const AOTEffectGraph& graph, const AOTPassDescri
   return true;
 }
 
-// The operator nodes of one pass of a multi-pass linear plan: everything after the source in the
-// first pass, the whole node list in a later one.
-static std::vector<AOTNodeID> SegmentOperators(const AOTPassDescriptor& pass, bool firstPass) {
-  return {pass.nodes.begin() + (firstPass ? 1 : 0), pass.nodes.end()};
-}
-
-// A linear chain split into chain-kernel passes: the first pass carries the source plus its
-// operators, every later pass operators reading its predecessor's materialized output in device
-// space, and all but the last pass materialize. Every pass must fit one chain pass as its own
-// segment (AOTChainBuilder::BuildLinearSegment, the same check the planner cuts by), and no later
-// pass starts with an AlphaThreshold (see CanStartPassAt in AOTEffectDecomposer.cpp).
-static bool ValidateSegmentedPlan(const AOTEffectGraph& graph, const AOTEffectPlan& plan) {
-  AOTNodeID expectedInput = AOTNodeID::Invalid();
-  const AOTTextureParameters* source = nullptr;
-  for (size_t index = 0; index < plan.passes.size(); ++index) {
-    const auto& pass = plan.passes[index];
-    bool isLast = index + 1 == plan.passes.size();
-    if (!IsAOTPointwiseDAGKernel(pass.kernel) || pass.nodes.empty() ||
-        pass.output != pass.nodes.back() || pass.materializesOutput == isLast) {
-      return false;
-    }
-    size_t firstOp = 0;
-    if (index == 0) {
-      if (!pass.dependencies.empty() || !IsLinearMultiPassSource(graph, pass.nodes[0])) {
-        return false;
-      }
-      source = std::get_if<AOTTextureParameters>(&graph.nodeAt(pass.nodes[0])->parameters);
-      expectedInput = pass.nodes[0];
-      firstOp = 1;
-    } else {
-      auto first = graph.nodeAt(pass.nodes[0]);
-      if (pass.dependencies.size() != 1 || pass.dependencies[0] != index - 1 || first == nullptr ||
-          first->kind == AOTEffectKind::AlphaThreshold) {
-        return false;
-      }
-    }
-    for (size_t opIndex = firstOp; opIndex < pass.nodes.size(); ++opIndex) {
-      if (!IsUnaryPointwiseOp(graph.nodeAt(pass.nodes[opIndex]), expectedInput)) {
-        return false;
-      }
-      expectedInput = pass.nodes[opIndex];
-    }
-    // A later pass's intermediate does not exist yet; its fit only depends on the source kind.
-    auto segmentSource =
-        index == 0 ? *source
-                   : AOTChainBuilder::IntermediateSource(source->textureProxy, Matrix::I());
-    AOTEffectGraph segment = {};
-    AOTPassDescriptor segmentPass = {};
-    if (!AOTChainBuilder::BuildLinearSegment(graph, SegmentOperators(pass, index == 0),
-                                             segmentSource, &segment, &segmentPass, index == 0)) {
-      return false;
-    }
-  }
-  return plan.passes.back().output == plan.output;
-}
-
 // A cut plan: topologically ordered self-contained fused passes, each reading some earlier cuts'
 // output textures as leaves (materializedInputs[i] names the node dependencies[i]'s output
 // replaces), with the last pass running on the destination as the terminal draw. Each pass's own
 // output is its node list's last (the graph is SSA in construction order, so a subtree's root is
 // its highest node). The structure is validated here; the fits were checked by the planner through
-// the same segment build construction runs.
+// the same segment build construction runs. A linear chain split carries the same shape: every
+// later pass's materializedInputs holds its predecessor's output. The pass count is the planners'
+// own policy (the cut planner caps itself at MaxCutPlanPasses, the linear splitter is unbounded),
+// not an executor contract, so it is not re-checked here.
 static bool ValidateCutPlan(const AOTEffectGraph& graph, const AOTEffectPlan& plan) {
-  if (plan.passes.size() < 2 || plan.passes.size() > MaxCutPlanPasses) {
+  if (plan.passes.size() < 2) {
     return false;
   }
   for (size_t index = 0; index < plan.passes.size(); ++index) {
@@ -151,19 +99,31 @@ static bool ValidateCutPlan(const AOTEffectGraph& graph, const AOTEffectPlan& pl
         }
       }
     }
+    // A pass boundary quantizes to the 1/255 grid, and an AlphaThreshold amplifies that rounding
+    // into a step flip (see CanStartPassAt in AOTEffectDecomposer.cpp), so a threshold must share
+    // its pass with the node producing its input: the input may only be a node of the same pass,
+    // the geometry color, or a copied designator — never a value crossing a pass boundary.
+    for (auto nodeID : pass.nodes) {
+      const auto* node = graph.nodeAt(nodeID);
+      if (node == nullptr || node->kind != AOTEffectKind::AlphaThreshold) {
+        continue;
+      }
+      for (auto input : node->inputs) {
+        if (input == AOTNodeID(0)) {
+          continue;
+        }
+        if (std::find(pass.nodes.begin(), pass.nodes.end(), input) != pass.nodes.end()) {
+          continue;
+        }
+        const auto* producer = graph.nodeAt(input);
+        if (producer == nullptr || (producer->kind != AOTEffectKind::GeometryColorOpaqueInput &&
+                                    producer->kind != AOTEffectKind::GeometryWhiteInput)) {
+          return false;
+        }
+      }
+    }
   }
   return true;
-}
-
-static const AOTTextureParameters* FirstPassTexture(const AOTEffectGraph& graph,
-                                                    const AOTEffectPlan& plan) {
-  if (plan.passes.empty() || plan.passes[0].nodes.empty()) {
-    return nullptr;
-  }
-  auto node = graph.nodeAt(plan.passes[0].nodes[0]);
-  return node != nullptr && node->kind == AOTEffectKind::TextureSource
-             ? std::get_if<AOTTextureParameters>(&node->parameters)
-             : nullptr;
 }
 
 // Maps top-left device coordinates of the destination onto its fragment coordinates: identity for
@@ -179,9 +139,9 @@ static Matrix DeviceToFragCoord(const RenderTargetProxy* destination) {
 
 // One non-terminal pass of any multi-pass plan: the target allocation, the fill draw over it and
 // the edge record. The fill's coordOffset keeps the pass's processors seeing the coordinate space
-// they were planned for (the two plan families' conventions: a split pass passes the draw's
-// FP-space offset plus the target placement, a cut pass just the placement); inputAlpha carries
-// the split source pass's paint alpha (a cut operand is a shader value, so it is always 1 — the
+// they were planned for (the fill's FP-space offset plus the target placement for a pass that
+// reads the geometry color, just the placement otherwise); inputAlpha carries the paint alpha a
+// geometry-color-reading fill bakes in (an operand fill is a shader value, so it is always 1 — the
 // terminal draw's epilogue applies the paint alpha exactly once).
 static bool AppendMaterializedPass(Context* context, uint32_t renderFlags,
                                    PlacementPtr<FragmentProcessor> processor,
@@ -204,16 +164,39 @@ static bool AppendMaterializedPass(Context* context, uint32_t renderFlags,
   return true;
 }
 
-// Builds a cut plan's passes: every pass is a copy of its own original-graph nodes with its cuts
-// replaced by the producing passes' intermediate textures, and every pass but the last renders
-// into its own intermediate (a split-off fill at top-left device positions, with the local-space
+// The reason of the edge one fill pass's output creates: the kind of the node that consumes the
+// cut in the dependent pass — a blend operand is a materialized shader value, a unary pointwise
+// operator is the linear planner's split.
+static AOTEdgeReason EdgeReasonForCutConsumer(const AOTEffectGraph& graph,
+                                              const AOTPassDescriptor& consumerPass,
+                                              AOTNodeID cutRoot) {
+  for (auto nodeID : consumerPass.nodes) {
+    const auto* node = graph.nodeAt(nodeID);
+    if (node == nullptr) {
+      continue;
+    }
+    for (auto input : node->inputs) {
+      if (input == cutRoot) {
+        return IsUnaryPointwiseKind(node->kind) ? AOTEdgeReason::Split
+                                                : AOTEdgeReason::OperandMaterialize;
+      }
+    }
+  }
+  return AOTEdgeReason::OperandMaterialize;
+}
+
+// Builds a multi-pass plan's passes: every pass is a copy of its own original-graph nodes with its
+// cuts replaced by the producing passes' intermediate textures, and every pass but the last
+// renders into its own intermediate (a fill at top-left device positions, with the local-space
 // parameters remapped); the last pass's processor becomes the terminal draw's color chain over the
-// destination. The fill passes carry no paint alpha — an operand is a shader value, and the
-// terminal draw's epilogue (multiplyInputAlpha) applies it exactly once.
+// destination. A fill pass that reads the geometry color bakes the draw's uniform input alpha
+// (sourceAlpha) into its output — later passes and the terminal draw read through the opaque-white
+// designator, so the epilogue never re-applies it; an operand-materializing fill carries a shader
+// value with no alpha.
 static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOTEffectGraph& graph,
                                const AOTEffectPlan& plan, const Rect& deviceBounds,
                                const RenderTargetProxy* destination, const Point& fpCoordOffset,
-                               const std::optional<Matrix>& deviceToLocal,
+                               const std::optional<Matrix>& deviceToLocal, float sourceAlpha,
                                std::vector<AOTRenderPass>* passes,
                                DrawOp::ColorProcessorList* terminalColors) {
   auto drawingManager = context->drawingManager();
@@ -284,9 +267,10 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
       terminalColors->emplace_back(std::move(processor));
       return true;
     }
+    auto inputAlpha = PassReadsGeometryColor(graph, pass) ? sourceAlpha : 1.0f;
+    auto edgeReason = EdgeReasonForCutConsumer(graph, plan.passes[index + 1], pass.output);
     if (!AppendMaterializedPass(context, renderFlags, std::move(processor), geometry,
-                                geometry.coordOffset, 1.0f, AOTEdgeReason::OperandMaterialize,
-                                passes)) {
+                                geometry.coordOffset, inputAlpha, edgeReason, passes)) {
       return false;
     }
   }
@@ -300,10 +284,7 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
     return false;
   }
   if (plan.passes.size() > 1) {
-    if (!plan.passes.back().materializedInputs.empty()) {
-      return ValidateCutPlan(graph, plan);
-    }
-    return ValidateSegmentedPlan(graph, plan);
+    return ValidateCutPlan(graph, plan);
   }
   const auto& pass = plan.passes[0];
   if (pass.nodes.empty() || pass.output != plan.output || !pass.dependencies.empty() ||
@@ -336,18 +317,16 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
   }
 }
 
-bool AOTPlanExecutor::SamplesDeviceSpace(const AOTEffectGraph& graph, const AOTEffectPlan& plan) {
+bool AOTPlanExecutor::NeedsLocalRemap(const AOTEffectGraph& graph, const AOTEffectPlan& plan) {
   if (plan.passes.size() <= 1) {
-    return true;
-  }
-  if (!plan.passes.back().materializedInputs.empty()) {
-    // The cut passes evaluate gradients, noise and local texture leaves at the draw's own local
-    // coordinates, so their segments always need the device-to-local mapping (identity included)
-    // to remap them.
     return false;
   }
-  auto texture = FirstPassTexture(graph, plan);
-  return texture != nullptr && texture->samplingKind == AOTTextureSamplingKind::Device;
+  for (size_t index = 0; index + 1 < plan.passes.size(); ++index) {
+    if (PassNeedsLocalRemap(graph, plan.passes[index])) {
+      return true;
+    }
+  }
+  return false;
 }
 
 bool AOTPlanExecutor::BuildPasses(Context* context, uint32_t renderFlags,
@@ -367,86 +346,8 @@ bool AOTPlanExecutor::BuildPasses(Context* context, uint32_t renderFlags,
     terminalColors->emplace_back(std::move(processor));
     return true;
   }
-  if (!plan.passes.back().materializedInputs.empty()) {
-    return BuildCutPlanPasses(context, renderFlags, graph, plan, deviceBounds, destination,
-                              fpCoordOffset, deviceToLocal, passes, terminalColors);
-  }
-  // One geometry for the whole plan: every split-off pass renders into a target of exactly this
-  // size over the draw's device bounds, and the terminal draw samples the last one back at the
-  // same pixel. Every pass is pointwise (an operator reads its input at the output pixel only), so
-  // no apron is needed and the targets stay pixel-aligned with each other.
-  auto geometry = AOTMaterializationPolicy::PrepareGeometry(deviceBounds, 0.0f);
-  if (geometry.isEmpty()) {
-    return false;
-  }
-  // A split-off fill evaluates its processors at local coordinates fragCoord + offset, the same
-  // values the original processors see at the matching destination pixel: the draw's own
-  // FP-space translation (fpCoordOffset, the coordOffset of an offscreen fill) plus the target's
-  // placement on the destination.
-  auto intermediateOffset = geometry.coordOffset + fpCoordOffset;
-  auto deviceToFragCoord = DeviceToFragCoord(destination);
-  std::shared_ptr<TextureProxy> previousTexture = nullptr;
-  for (size_t index = 0; index < plan.passes.size(); ++index) {
-    const auto& pass = plan.passes[index];
-    bool isTerminal = index + 1 == plan.passes.size();
-    AOTTextureParameters source = {};
-    if (index == 0) {
-      // The source pass runs as a split-off fill, so its source must sample what the original
-      // draw samples at the same destination pixel.
-      auto texture = FirstPassTexture(graph, plan);
-      if (texture == nullptr) {
-        return false;
-      }
-      source = *texture;
-      if (source.samplingKind == AOTTextureSamplingKind::Device) {
-        // A device-space source reads fragment coordinates. In the split-off target the fragment
-        // coordinate of a pixel is its top-left device position minus the target's placement;
-        // map it back to the destination's fragment coordinates first.
-        source.uvMatrix.preConcat(deviceToFragCoord);
-        source.uvMatrix.preTranslate(geometry.coordOffset.x, geometry.coordOffset.y);
-      } else if (deviceToLocal.has_value()) {
-        // The fill's local coordinates are top-left device positions (plus fpCoordOffset); the
-        // original draw maps those onto its own local coordinates first.
-        source.uvMatrix.preConcat(*deviceToLocal);
-      }
-    } else {
-      // Split-off passes read each other at the same target pixel. The terminal draw reads the
-      // last one from the destination's fragment coordinates: back to top-left device positions,
-      // then into the target's pixel space.
-      auto matrix = Matrix::I();
-      if (isTerminal) {
-        matrix = Matrix::MakeTrans(-geometry.coordOffset.x, -geometry.coordOffset.y);
-        matrix.preConcat(deviceToFragCoord);
-      }
-      source = AOTChainBuilder::IntermediateSource(previousTexture, matrix);
-    }
-    // Every pass runs on the chain kernel as its own segment: the source above, then this pass's
-    // operators.
-    AOTEffectGraph segment = {};
-    AOTPassDescriptor segmentPass = {};
-    PlacementPtr<FragmentProcessor> processor = nullptr;
-    if (AOTChainBuilder::BuildLinearSegment(graph, SegmentOperators(pass, index == 0), source,
-                                            &segment, &segmentPass, index == 0)) {
-      processor = AOTChainBuilder::BuildFPForPass(allocator, segment, segmentPass);
-    }
-    if (processor == nullptr) {
-      return false;
-    }
-    if (isTerminal) {
-      terminalColors->emplace_back(std::move(processor));
-      break;
-    }
-    if (!AppendMaterializedPass(context, renderFlags, std::move(processor), geometry,
-                                intermediateOffset, index == 0 ? sourceAlpha : 1.0f,
-                                AOTEdgeReason::Split, passes)) {
-      return false;
-    }
-    previousTexture = passes->back().target->asTextureProxy();
-    if (previousTexture == nullptr) {
-      return false;
-    }
-  }
-  return true;
+  return BuildCutPlanPasses(context, renderFlags, graph, plan, deviceBounds, destination,
+                            fpCoordOffset, deviceToLocal, sourceAlpha, passes, terminalColors);
 }
 
 PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t renderFlags,
@@ -475,11 +376,11 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t render
   }
   AOTRenderPlan renderPlan = {};
   float sourceAlpha = 1.0f;
-  if (plan.passes.size() > 1 && plan.passes.back().materializedInputs.empty()) {
-    // Only a uniform geometry alpha can be moved into the split-off source pass. A per-vertex
-    // alpha cannot be reconstructed by a device-aligned full-rect fill. A materialized-operand
-    // plan keeps the paint alpha in the terminal draw's epilogue instead, so it needs no uniform
-    // color at all.
+  if (plan.passes.size() > 1 && PlanBakesGeometryAlpha(graph, plan)) {
+    // Only a uniform geometry alpha can be baked into a fill pass that reads the geometry color.
+    // A per-vertex alpha cannot be reconstructed by a device-aligned full-rect fill. A plan whose
+    // passes only materialize operands keeps the paint alpha in the terminal draw's epilogue
+    // instead, so it needs no uniform color at all.
     auto color = static_cast<StandardDrawOp*>(originalDraw->get())->uniformGeometryColor();
     if (!color.has_value()) {
       return nullptr;
