@@ -84,72 +84,18 @@ bool LowerCoverageRun(const std::vector<const FragmentProcessor*>& leaves, size_
 
 }  // namespace
 
-std::optional<DrawIR> LowerDraw(const std::vector<const FragmentProcessor*>& colorProcessors,
-                                const std::vector<const FragmentProcessor*>& coverageProcessors,
-                                const GeometryProcessor* geometryProcessor,
-                                const XferProcessor* xferProcessor, BlendMode blendMode,
-                                BlockAllocator* allocator) {
+std::optional<std::vector<AOTCoverageTerm>> LowerCoverageTerms(
+    const std::vector<const FragmentProcessor*>& coverageProcessors,
+    const FragmentProcessor* glyphLeaf, BlockAllocator* allocator) {
   if (allocator == nullptr) {
     return std::nullopt;
   }
-  DrawIR ir = {};
-  ir.geometryProcessor = geometryProcessor;
-  ir.xferProcessor = xferProcessor;
-  ir.blendMode = blendMode;
-
-  std::vector<const FragmentProcessor*> colors = colorProcessors;
-  PlacementPtr<FragmentProcessor> unitColor = nullptr;
-  if (colors.empty()) {
-    // A color-free draw (a pure mask or clip fill) takes the paint color as-is, which is a
-    // one-slot const-color chain modulating the geometry color.
-    unitColor = ConstColorProcessor::Make(allocator, PMColor::White(), InputMode::ModulateRGBA);
-    if (unitColor == nullptr) {
-      return std::nullopt;
-    }
-    colors.push_back(unitColor.get());
-  }
-  if (!AOTEffectDecomposer::Lower(colors, &ir.color)) {
-    return std::nullopt;
-  }
-
-  // The atlas glyph mask joins as a synthesized coverage leaf sourced from the maskCoord
-  // attribute: only the alpha-only atlas readback is expressible — a color atlas replaces the
-  // output color, which the chain cannot carry. A null geometry processor contributes none.
-  const bool atlasText =
-      geometryProcessor != nullptr && IsProcessor<AtlasTextGeometryProcessor>(geometryProcessor);
-  if (coverageProcessors.size() > (atlasText ? 1u : 2u)) {
-    return std::nullopt;
-  }
-  std::vector<PlacementPtr<FragmentProcessor>> ownedLeaves = {};
-  std::vector<const FragmentProcessor*> termFPs = coverageProcessors;
-  const FragmentProcessor* glyphLeaf = nullptr;
-  if (atlasText) {
-    auto* atlasGP = static_cast<const AtlasTextGeometryProcessor*>(geometryProcessor);
-    auto atlasProxy = atlasGP->getTextureProxy();
-    if (atlasProxy == nullptr || !atlasProxy->isAlphaOnly()) {
-      return std::nullopt;
-    }
-    auto state = atlasGP->getSamplerState();
-    SamplingOptions sampling(state.minFilterMode, state.magFilterMode, state.mipmapMode);
-    SamplingArgs args = {TileMode::Clamp, TileMode::Clamp, sampling, SrcRectConstraint::Fast};
-    // Identity: CoordTransform::getTotalMatrix applies the texture normalization itself, so the
-    // leaf maps maskCoord straight into the atlas's normalized space.
-    auto uvMatrix = Matrix::I();
-    auto atlasLeaf = TextureEffect::Make(allocator, std::move(atlasProxy), args, &uvMatrix);
-    if (atlasLeaf == nullptr) {
-      return std::nullopt;
-    }
-    glyphLeaf = atlasLeaf.get();
-    ownedLeaves.push_back(std::move(atlasLeaf));
-    termFPs.push_back(glyphLeaf);
-  }
-
   // Classify every leaf by what it is. Analytic leaves chain into runs; a non-analytic leaf
   // closes the pending run and becomes its own term.
   std::vector<AOTCoverageTerm> terms = {};
   bool hasMask = false;
   bool hasSubtree = false;
-  for (auto* termFP : termFPs) {
+  for (auto* termFP : coverageProcessors) {
     std::vector<const FragmentProcessor*> leaves = {};
     FlattenCoverageLeaves(termFP, &leaves);
     size_t runBegin = 0;
@@ -214,7 +160,74 @@ std::optional<DrawIR> LowerDraw(const std::vector<const FragmentProcessor*>& col
       terms.push_back(std::move(term));
     }
   }
-  ir.coverage = std::move(terms);
+  return terms;
+}
+
+std::optional<DrawIR> LowerDraw(const std::vector<const FragmentProcessor*>& colorProcessors,
+                                const std::vector<const FragmentProcessor*>& coverageProcessors,
+                                const GeometryProcessor* geometryProcessor,
+                                const XferProcessor* xferProcessor, BlendMode blendMode,
+                                BlockAllocator* allocator) {
+  if (allocator == nullptr) {
+    return std::nullopt;
+  }
+  DrawIR ir = {};
+  ir.geometryProcessor = geometryProcessor;
+  ir.xferProcessor = xferProcessor;
+  ir.blendMode = blendMode;
+
+  std::vector<const FragmentProcessor*> colors = colorProcessors;
+  PlacementPtr<FragmentProcessor> unitColor = nullptr;
+  if (colors.empty()) {
+    // A color-free draw (a pure mask or clip fill) takes the paint color as-is, which is a
+    // one-slot const-color chain modulating the geometry color.
+    unitColor = ConstColorProcessor::Make(allocator, PMColor::White(), InputMode::ModulateRGBA);
+    if (unitColor == nullptr) {
+      return std::nullopt;
+    }
+    colors.push_back(unitColor.get());
+  }
+  if (!AOTEffectDecomposer::Lower(colors, &ir.color)) {
+    return std::nullopt;
+  }
+
+  // The atlas glyph mask joins as a synthesized coverage leaf sourced from the maskCoord
+  // attribute: only the alpha-only atlas readback is expressible — a color atlas replaces the
+  // output color, which the chain cannot carry. A null geometry processor contributes none.
+  const bool atlasText =
+      geometryProcessor != nullptr && IsProcessor<AtlasTextGeometryProcessor>(geometryProcessor);
+  if (coverageProcessors.size() > (atlasText ? 1u : 2u)) {
+    return std::nullopt;
+  }
+  std::vector<PlacementPtr<FragmentProcessor>> ownedLeaves = {};
+  std::vector<const FragmentProcessor*> termFPs = coverageProcessors;
+  const FragmentProcessor* glyphLeaf = nullptr;
+  if (atlasText) {
+    auto* atlasGP = static_cast<const AtlasTextGeometryProcessor*>(geometryProcessor);
+    auto atlasProxy = atlasGP->getTextureProxy();
+    if (atlasProxy == nullptr || !atlasProxy->isAlphaOnly()) {
+      return std::nullopt;
+    }
+    auto state = atlasGP->getSamplerState();
+    SamplingOptions sampling(state.minFilterMode, state.magFilterMode, state.mipmapMode);
+    SamplingArgs args = {TileMode::Clamp, TileMode::Clamp, sampling, SrcRectConstraint::Fast};
+    // Identity: CoordTransform::getTotalMatrix applies the texture normalization itself, so the
+    // leaf maps maskCoord straight into the atlas's normalized space.
+    auto uvMatrix = Matrix::I();
+    auto atlasLeaf = TextureEffect::Make(allocator, std::move(atlasProxy), args, &uvMatrix);
+    if (atlasLeaf == nullptr) {
+      return std::nullopt;
+    }
+    glyphLeaf = atlasLeaf.get();
+    ownedLeaves.push_back(std::move(atlasLeaf));
+    termFPs.push_back(glyphLeaf);
+  }
+
+  auto terms = LowerCoverageTerms(termFPs, glyphLeaf, allocator);
+  if (!terms.has_value()) {
+    return std::nullopt;
+  }
+  ir.coverage = std::move(*terms);
   return ir;
 }
 

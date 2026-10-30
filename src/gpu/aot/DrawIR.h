@@ -89,4 +89,14 @@ std::optional<DrawIR> LowerDraw(const std::vector<const FragmentProcessor*>& col
                                 const XferProcessor* xferProcessor, BlendMode blendMode,
                                 BlockAllocator* allocator);
 
+/**
+ * The coverage half of LowerDraw alone: flattens Compose recursively and classifies every leaf
+ * into coverage terms (the same rules LowerDraw applies — see its doc). glyphLeaf, when given,
+ * marks one of the coverage processors as the AtlasText glyph leaf (the caller synthesized it
+ * from the geometry processor). Returns nullopt on the same rejections LowerDraw has.
+ */
+std::optional<std::vector<AOTCoverageTerm>> LowerCoverageTerms(
+    const std::vector<const FragmentProcessor*>& coverageProcessors,
+    const FragmentProcessor* glyphLeaf, BlockAllocator* allocator);
+
 }  // namespace tgfx

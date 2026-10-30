@@ -2555,7 +2555,7 @@ TGFX_TEST(AOTEffectTest, RectCoverageFoldsIntoPointwiseChain) {
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
 }
 
-TGFX_TEST(AOTEffectTest, ChainedRectCoverageFeedsFromUnitCoverage) {
+TGFX_TEST(AOTEffectTest, ChainedRectCoverageRidesTheClipChannel) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
@@ -2565,8 +2565,7 @@ TGFX_TEST(AOTEffectTest, ChainedRectCoverageFeedsFromUnitCoverage) {
   ASSERT_NE(texture, nullptr);
   ASSERT_NE(colorMatrix, nullptr);
   // A flat two-leaf analytic coverage Compose (device-space AA rect, then a local-space rect):
-  // LowerAnalyticCoverageFP lowers it as unit -> rect -> rect, so the first rect node consumes
-  // the coverage unit itself while the second is the coverage root.
+  // the shared classifier lowers it as one analytic term, unit -> rect -> rect.
   auto deviceRect = RectEffect::Make(&allocator, Rect::MakeLTRB(10.5f, 10.5f, 90.5f, 90.5f));
   auto localRect =
       RectEffect::Make(&allocator, Rect::MakeLTRB(20, 20, 80, 80), Matrix::MakeTrans(4, 4));
@@ -2583,15 +2582,18 @@ TGFX_TEST(AOTEffectTest, ChainedRectCoverageFeedsFromUnitCoverage) {
       AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0], {coverage.get()});
   ASSERT_NE(processor, nullptr);
   auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
-  // Slots: [texture, colorMatrix, first rect, second rect(coverage root)]. The first analytic
-  // node must read the true GP coverage (the -3 unit designator): the kernel replaces the
-  // plain vCoverage modulation with the coverage root's value, so a chain that starts from
-  // opaque white (-4) instead of the unit silently drops the GP coverage — a GeometryCoverage
-  // value must not depend on which node consumes it.
+  // Slots: [texture, colorMatrix, first rect, second rect]. Under the unified coverage routing
+  // the analytic chain rides the clip-coverage channel: the innermost link chains from the scalar
+  // unit one (-4), the outermost link's register is the ClipCoverageRegister, and there is no
+  // coverage root — the kernel composites the clip product as the XP's coverage input on top of
+  // the GP coverage, so the GP coverage is carried by the clip channel, not dropped.
   ASSERT_GT(chain->slotCount(), 3u);
   EXPECT_EQ(chain->slot(2).op, AOTChainOp::AARectCoverage);
   EXPECT_EQ(chain->slot(3).op, AOTChainOp::LocalRectCoverage);
-  EXPECT_EQ(chain->slot(2).in0, -3);
+  EXPECT_EQ(chain->slot(2).in0, -4);
+  EXPECT_GE(chain->slot(3).in0, 0);
+  EXPECT_EQ(chain->coverageRoot(), -1);
+  EXPECT_GE(chain->clipCoverage(), 0);
 }
 
 static void ExpectComposedClipsWithLocalMask(size_t rectCount, size_t rrectCount,

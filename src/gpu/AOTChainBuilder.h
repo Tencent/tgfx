@@ -98,13 +98,12 @@ class AOTChainBuilder {
    * nullptr if the pass shape exceeds the selected kernel's capabilities. The processor carries
    * the whole DAG in uniforms and resolves to the corresponding independent shader family.
    *
-   * coverageFPs, when non-empty, folds the draw's coverage into the chain. A single FP uses the
-   * narrow forms first (a bare device-space AA RectEffect becomes an AARectCoverage slot, an alpha-only
-   * DeviceSpaceTextureEffect becomes the mask child, Compose(mask, rect) becomes both); anything
-   * else is lowered as a general pointwise coverage subtree rooted at the GP coverage, which the
-   * kernel multiplies into the color result instead of the plain coverage modulation. Two FPs are
-   * accepted in the form [lowerable subtree, alpha-only device mask], folding to subtree + mask
-   * child. Any other coverage form returns nullptr.
+   * coverageFPs, when non-empty, is classified by the shared coverage classifier (the same one
+   * LowerDraw uses): analytic rect/rrect leaves ride the clip-coverage register, an alpha-only
+   * device-space texture becomes the mask child, and anything else lowers as a general coverage
+   * subtree rooted at the GP coverage. coverageLeafFromUVCoord marks the trailing FP as the
+   * AtlasText glyph leaf a caller synthesized from the geometry processor. More than two coverage
+   * FPs returns nullptr.
    */
   static PlacementPtr<FragmentProcessor> BuildChainProcessor(
       BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
@@ -114,11 +113,13 @@ class AOTChainBuilder {
   /**
    * Re-expresses a draw's whole effect expression (its color processors, its coverage processors,
    * and the glyph leaf an AtlasText geometry processor contributes) as the fused chain processor,
-   * without touching the draw. This is the interpreter's view of an unmodified ProgramInfo: the
-   * matcher uses it to decide whether the chain kernel serves the draw, and the chain program
-   * writer rebuilds it per draw to upload the values. Returns nullptr when the expression does not
-   * reduce onto the chain kernel (an unsupported processor, an over-budget shape, a coverage form
-   * the chain cannot carry).
+   * without touching the draw: one LowerDraw produces the color graph and the classified coverage
+   * terms, the single-pass decomposition plans the color side, and the terms merge into the
+   * processor. This is the interpreter's view of an unmodified ProgramInfo: the matcher uses it to
+   * decide whether the chain kernel serves the draw, and the chain program writer rebuilds it per
+   * draw to upload the values. Returns nullptr when the expression does not reduce onto the chain
+   * kernel (an unsupported processor, an over-budget shape, a coverage form the chain cannot
+   * carry).
    */
   static PlacementPtr<FragmentProcessor> BuildChainProcessorForInfo(BlockAllocator* allocator,
                                                                     const ProgramInfo* programInfo);
