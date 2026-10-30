@@ -584,6 +584,9 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
   auto proxy = std::shared_ptr<TextureRenderTargetProxy>(
       new ExternalTextureRenderTargetProxy(backendTexture, format, sampleCount, origin, adopted));
   addResourceProxy(proxy);
+  if (proxy->getRenderTarget() == nullptr) {
+    return nullptr;
+  }
   return proxy;
 }
 

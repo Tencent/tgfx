@@ -4,27 +4,41 @@ const fs = require('fs');
 const puppeteer = require('puppeteer');
 const AdmZip = require('adm-zip');
 
-const WEB_TEST_DIR = __dirname;
-const PROJECT_ROOT = path.resolve(WEB_TEST_DIR, '../..');
+function ReadOption(name, fallback) {
+  const index = process.argv.findIndex(function(arg) {
+    return arg === name || arg.startsWith(name + '=');
+  });
+  if (index < 0) return fallback;
+  const arg = process.argv[index];
+  return arg.includes('=') ? arg.slice(name.length + 1) : process.argv[index + 1];
+}
+
+const PROJECT_ROOT = path.resolve(__dirname, '../..');
+const WEB_TEST_DIR = path.resolve(ReadOption('--web-root', __dirname));
 const DOWNLOADS_DIR = path.join(WEB_TEST_DIR, '.downloads');
 const PORT = 8082;
-const TEST_URL = `http://127.0.0.1:${PORT}/index.html`;
 const TIMEOUT_MS = 10 * 60 * 1000;
-
-// Determine backend from --backend argument (default: webgl).
-const backendArg = process.argv.find(a => a.startsWith('--backend'));
-const BACKEND = backendArg ? (backendArg.includes('=') ? backendArg.split('=')[1] : process.argv[process.argv.indexOf(backendArg) + 1]) : 'webgl';
+const BACKEND = ReadOption('--backend', 'webgl');
+const MODE = ReadOption('--mode', 'verify');
+const REFERENCE_COMMIT = ReadOption('--reference-commit', '');
+const TEST_URL = `http://127.0.0.1:${PORT}/index.html?mode=${encodeURIComponent(MODE)}` +
+  `&backend=${encodeURIComponent(BACKEND)}&commit=${encodeURIComponent(REFERENCE_COMMIT)}`;
+if (!['verify', 'reference'].includes(MODE) ||
+    (MODE === 'reference' && (!/^[0-9a-f]{40}$/.test(REFERENCE_COMMIT) ||
+      !WEB_TEST_DIR.startsWith(path.join(__dirname, `build-reference-${BACKEND}`) + path.sep)))) {
+  console.error('Reference generation requires a pinned main commit and isolated runtime directory.');
+  process.exit(1);
+}
 const ALLOWED_BACKENDS = new Set(['webgl', 'webgpu']);
 if (!ALLOWED_BACKENDS.has(BACKEND)) {
   console.error(`Invalid backend: "${BACKEND}". Must be one of: ${[...ALLOWED_BACKENDS].join(', ')}`);
   process.exit(1);
 }
 
-// Map downloaded zip files to their extraction destinations.
+const OUTPUT_ROOT = MODE === 'reference' ? path.join(WEB_TEST_DIR, 'output') : path.join(PROJECT_ROOT, 'test');
 const ZIP_DESTINATIONS = {
-  'baseline-out.zip': path.join(PROJECT_ROOT, 'test/baseline-out'),
-  'test-out.zip': path.join(PROJECT_ROOT, 'test/out'),
-  'cache-web.zip': path.join(PROJECT_ROOT, `test/baseline/.cache/${BACKEND}`),
+  'baseline-out.zip': path.join(OUTPUT_ROOT, 'baseline-out'),
+  'test-out.zip': path.join(OUTPUT_ROOT, 'out'),
 };
 
 function startHttpServer() {
@@ -82,6 +96,13 @@ async function run() {
 
   let browser = null;
   let testExitCode = 1;
+  let runtimeFailed = false;
+  let configurationValid = false;
+  let startedTests = 0;
+  let completedTests = 0;
+  let passedTests = 0;
+  let skippedTests = false;
+  const expectedDownloads = new Set();
 
   try {
     const launchArgs = [
@@ -109,16 +130,20 @@ async function run() {
     await client.send('Browser.setDownloadBehavior', {
       behavior: 'allow',
       downloadPath: DOWNLOADS_DIR,
+      eventsEnabled: true,
     });
 
-    // Track completed downloads via CDP events.
-    let pendingDownloads = 0;
-    client.on('Browser.downloadWillBegin', () => {
-      pendingDownloads++;
+    const pendingDownloads = new Set();
+    client.on('Browser.downloadWillBegin', function(event) {
+      pendingDownloads.add(event.guid);
     });
-    client.on('Browser.downloadProgress', (event) => {
+    client.on('Browser.downloadProgress', function(event) {
       if (event.state === 'completed' || event.state === 'canceled') {
-        pendingDownloads--;
+        pendingDownloads.delete(event.guid);
+      }
+      if (event.state === 'canceled') {
+        runtimeFailed = true;
+        console.error(`Download canceled: ${event.guid}`);
       }
     });
 
@@ -128,38 +153,58 @@ async function run() {
       resolveTestDone = resolve;
     });
 
-    // Promise that resolves when all page-side download actions complete (cache-web.zip is last).
     let resolvePageDone = null;
-    const pageDone = new Promise((resolve) => {
+    const pageDone = new Promise(function(resolve) {
       resolvePageDone = resolve;
     });
 
-    // Listen to console output and relay to terminal.
-    page.on('console', (msg) => {
+    page.on('console', function(msg) {
       const text = msg.text();
       console.log(text);
+      if (text.startsWith('Test configuration: ')) {
+        try {
+          const configuration = JSON.parse(text.slice('Test configuration: '.length));
+          configurationValid = configuration.mode === MODE && configuration.backend === BACKEND &&
+            (MODE !== 'reference' || configuration.commit === REFERENCE_COMMIT);
+          if (!configurationValid) runtimeFailed = true;
+        } catch (error) {
+          runtimeFailed = true;
+        }
+      }
+      const startMatch = text.match(/^\[==========\] Running (\d+) tests? from /);
+      const completeMatch = text.match(/^\[==========\] (\d+) tests? from .* ran\./);
+      const passedMatch = text.match(/^\[\s*PASSED\s*\] (\d+) tests?\./);
+      if (startMatch) startedTests = Number(startMatch[1]);
+      if (completeMatch) completedTests = Number(completeMatch[1]);
+      if (passedMatch) passedTests = Number(passedMatch[1]);
+      if (/^\[\s*SKIPPED\s*\]/.test(text)) skippedTests = true;
+      if (/\[WebGPU\] Uncaptured .* error:/.test(text)) {
+        runtimeFailed = true;
+      }
       const exitMatch = text.match(/All tests finished with exit code:\s*(\d+)/);
       if (exitMatch) {
         testExitCode = parseInt(exitMatch[1], 10);
+        runtimeFailed = runtimeFailed || testExitCode !== 0;
         resolveTestDone();
       }
-      // cache-web.zip is the last download action in index.html.
-      if (text.includes('Download started: cache-web.zip') ||
-          text.includes('Failed to create cache-web.zip')) {
+      const downloadMatch = text.match(/^Download started: (.+)$/);
+      if (downloadMatch) {
+        expectedDownloads.add(downloadMatch[1]);
+      }
+      if (text === 'Test page actions finished') {
         resolvePageDone();
       }
     });
 
-    // Listen to page errors.
-    page.on('pageerror', (err) => {
+    page.on('pageerror', function(err) {
+      runtimeFailed = true;
       console.error('PAGE ERROR:', err.message);
+      resolveTestDone();
+      resolvePageDone();
     });
 
-    // Navigate to test page. Use a long timeout since WASM loading can take a while.
     console.log(`Opening ${TEST_URL}...`);
-    page.goto(TEST_URL, { timeout: TIMEOUT_MS }).catch((err) => {
-      console.error('Navigation error:', err.message);
-    });
+    await page.goto(TEST_URL, { timeout: TIMEOUT_MS });
 
     // Wait for tests to complete.
     const testTimeout = new Promise((_, reject) => {
@@ -171,20 +216,19 @@ async function run() {
     const pageTimeout = new Promise((_, reject) => {
       setTimeout(() => reject(new Error('Page download actions timed out')), 60000);
     });
-    await Promise.race([pageDone, pageTimeout]).catch((err) => {
-      console.warn(err.message);
-    });
+    await Promise.race([pageDone, pageTimeout]);
 
-    // Wait for pending CDP downloads to finish writing to disk.
     const downloadStart = Date.now();
-    while (pendingDownloads > 0 && Date.now() - downloadStart < 60000) {
-      await new Promise((r) => setTimeout(r, 500));
+    while (pendingDownloads.size > 0 && Date.now() - downloadStart < 60000) {
+      await new Promise(function(resolve) { setTimeout(resolve, 500); });
     }
-
-    // Small delay to ensure all file handles are released.
-    await new Promise((r) => setTimeout(r, 1000));
+    if (pendingDownloads.size > 0) {
+      throw new Error('Downloads did not complete within 60 seconds');
+    }
+    await new Promise(function(resolve) { setTimeout(resolve, 1000); });
 
   } catch (err) {
+    runtimeFailed = true;
     console.error('Test run failed:', err.message);
   } finally {
     if (browser) {
@@ -193,59 +237,39 @@ async function run() {
     server.kill('SIGTERM');
   }
 
-  // Extract downloaded zip files to their destinations.
-  // Preserve the existing baseline version.json so that subsequent runs still compare against
-  // baselines. Merge new md5.json entries into the existing cache so that tests passing on the
-  // current build are recognized as passing on the next rebuild + run cycle.
-  const cacheDir = path.join(PROJECT_ROOT, `test/baseline/.cache/${BACKEND}`);
-  const md5Path = path.join(cacheDir, 'md5.json');
-  const versionPath = path.join(cacheDir, 'version.json');
-  const versionBackupPath = versionPath + '.bak';
-  let existingMd5 = {};
-  if (fs.existsSync(md5Path)) {
-    try {
-      existingMd5 = JSON.parse(fs.readFileSync(md5Path, 'utf8'));
-    } catch (e) { /* ignore parse errors */ }
-  }
-  if (fs.existsSync(versionPath)) {
-    fs.copyFileSync(versionPath, versionBackupPath);
-  }
-
   console.log('\nExtracting downloaded files...');
   for (const [zipName, destDir] of Object.entries(ZIP_DESTINATIONS)) {
     const zipPath = path.join(DOWNLOADS_DIR, zipName);
     if (fs.existsSync(zipPath)) {
       console.log(`  ${zipName} -> ${path.relative(PROJECT_ROOT, destDir)}/`);
       extractZip(zipPath, destDir);
+    } else if (expectedDownloads.has(zipName)) {
+      runtimeFailed = true;
+      console.error(`  Expected download ${zipName} was not received.`);
     } else {
-      console.warn(`  ${zipName} not found, skipping.`);
+      console.log(`  ${zipName} not generated (no output files).`);
     }
   }
 
-  // Restore the baseline version.json after cache-web.zip extraction overwrites it.
-  if (fs.existsSync(versionBackupPath)) {
-    fs.copyFileSync(versionBackupPath, versionPath);
-    fs.unlinkSync(versionBackupPath);
+  if (!configurationValid) {
+    runtimeFailed = true;
+    console.error('Missing or mismatched test artifact configuration. Rebuild the test artifacts.');
   }
-
-  // Merge new MD5 values from the test output into the existing cache.
-  // The test only writes MD5 entries for keys that failed comparison, so we merge them
-  // into the full cache rather than replacing it.
-  if (fs.existsSync(md5Path)) {
-    try {
-      const newMd5 = JSON.parse(fs.readFileSync(md5Path, 'utf8'));
-      for (const [suite, tests] of Object.entries(newMd5)) {
-        if (!existingMd5[suite]) {
-          existingMd5[suite] = {};
-        }
-        for (const [name, md5] of Object.entries(tests)) {
-          existingMd5[suite][name] = md5;
-        }
-      }
-      fs.writeFileSync(md5Path, JSON.stringify(existingMd5, null, 4) + '\n');
-      console.log(`  Merged new MD5 values into .cache/${BACKEND}/md5.json`);
-    } catch (e) {
-      console.warn('  Failed to merge MD5 values:', e.message);
+  if (MODE === 'reference') {
+    if (startedTests === 0 || startedTests !== completedTests || completedTests !== passedTests || skippedTests) {
+      runtimeFailed = true;
+      console.error('Reference generation did not pass the complete test suite without skips.');
+    }
+    const zipPath = path.join(DOWNLOADS_DIR, 'reference-cache.zip');
+    if (!expectedDownloads.has('reference-cache.zip') || !fs.existsSync(zipPath)) {
+      runtimeFailed = true;
+      console.error('Complete reference cache archive was not received.');
+    }
+    if (!runtimeFailed && testExitCode === 0) {
+      const { PublishReference } = require('./reference_cache');
+      PublishReference(zipPath, BACKEND, REFERENCE_COMMIT, completedTests);
+    } else {
+      console.error('Reference cache was not changed.');
     }
   }
 
@@ -254,8 +278,9 @@ async function run() {
     fs.rmSync(DOWNLOADS_DIR, { recursive: true });
   }
 
-  console.log(`\nTest exit code: ${testExitCode}`);
-  process.exit(testExitCode);
+  const exitCode = runtimeFailed ? 1 : testExitCode;
+  console.log(`\nTest exit code: ${exitCode}`);
+  process.exit(exitCode);
 }
 
 run().catch((err) => {

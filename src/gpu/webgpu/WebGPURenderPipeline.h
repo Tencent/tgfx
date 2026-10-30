@@ -48,6 +48,12 @@ class WebGPURenderPipeline : public RenderPipeline, public WebGPUResource {
 
   unsigned getTextureIndex(unsigned binding) const;
 
+  /// Returns the map of public logical sampler bindings to physical bindings declared by the
+  /// pipeline's layout. Used to detect texture slots the caller never binds.
+  const std::unordered_map<unsigned, unsigned>& textureUnitMap() const {
+    return textureUnits;
+  }
+
   /// Returns the per-stage physical bindings for the given public logical binding, or nullptr if
   /// the pipeline does not use that binding.
   const UniformSlotMapping* getUniformSlots(unsigned binding) const;

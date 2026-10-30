@@ -20,7 +20,6 @@
 #include <vector>
 #include "core/Matrix3DUtils.h"
 #include "core/filters/GaussianBlurImageFilter.h"
-#include "core/images/RasterizedImage.h"
 #include "core/shaders/GradientShader.h"
 #include "core/utils/MathExtra.h"
 #include "layers/BackgroundHandler.h"
@@ -1626,9 +1625,12 @@ TGFX_TEST(LayerTest, BottomLeftSurface) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
-  auto texture = context->gpu()->createTexture({200, 200, PixelFormat::RGBA_8888});
+  auto texture = context->gpu()->createTexture(
+      {200, 200, PixelFormat::RGBA_8888, false, 1,
+       TextureUsage::TEXTURE_BINDING | TextureUsage::RENDER_ATTACHMENT});
   ASSERT_TRUE(texture != nullptr);
   auto surface = Surface::MakeFrom(context, texture->getBackendTexture(), ImageOrigin::BottomLeft);
+  ASSERT_TRUE(surface != nullptr);
 
   // parent
   auto parentFrame = tgfx::Rect::MakeXYWH(60, 110, 40, 40);
@@ -7491,7 +7493,6 @@ class RasterizedContentProbeStyle : public LayerStyle {
  public:
   // Filled in by onDraw, so a passing assertion also proves the style was drawn at all.
   bool drawn = false;
-  bool contentIsRasterized = false;
   // Held by reference count on purpose: it keeps the wrapper alive for the identity assertion.
   std::shared_ptr<Image> contentImage = nullptr;
   StyleInputSource::Type contentType = StyleInputSource::Type::Base;
@@ -7531,7 +7532,6 @@ class RasterizedContentProbeStyle : public LayerStyle {
     }
     contentType = input.content->type();
     contentImage = input.content->image();
-    contentIsRasterized = std::dynamic_pointer_cast<RasterizedImage>(contentImage) != nullptr;
   }
 };
 
@@ -7559,10 +7559,14 @@ TGFX_TEST_PRIVATE(LayerTest, StyleInputFollowsRasterizedGeometry) {
 
   ASSERT_TRUE(seesChildren->drawn && seesOwnOnly->drawn)
       << "control: the background chain has to draw the style";
+  ASSERT_TRUE(seesChildren->contentImage != nullptr);
+  ASSERT_TRUE(seesOwnOnly->contentImage != nullptr);
   EXPECT_EQ(seesChildren->contentType, StyleInputSource::Type::Geometry);
   EXPECT_EQ(seesOwnOnly->contentType, StyleInputSource::Type::Geometry);
-  EXPECT_TRUE(seesChildren->contentIsRasterized && seesOwnOnly->contentIsRasterized)
-      << "both styles must sample the rasterized geometry, not the picture behind it";
+  TGFX_PRIVATE_ACCESS(
+      EXPECT_TRUE(seesChildren->contentImage->type() == Image::Type::Rasterized &&
+                  seesOwnOnly->contentImage->type() == Image::Type::Rasterized)
+          << "both styles must sample the rasterized geometry, not the picture behind it";)
   EXPECT_TRUE(seesChildren->contentImage == seesOwnOnly->contentImage)
       << "one recording, one wrapper: both buckets must sample the same image object";
 }

@@ -47,6 +47,22 @@ static void initTests() {
 
 extern "C" {
 
+/**
+ * Returns the compiled test mode, backend, and source revision for the browser runner.
+ */
+EMSCRIPTEN_KEEPALIVE
+const char* GetTestConfiguration() {
+#ifdef UPDATE_BASELINE
+  static const char* mode = "reference";
+#else
+  static const char* mode = "verify";
+#endif
+  static const std::string configuration = std::string("{\"mode\":\"") + mode +
+                                           "\",\"backend\":\"" TGFX_BACKEND_NAME
+                                           "\",\"commit\":\"" TGFX_TEST_COMMIT "\"}";
+  return configuration.c_str();
+}
+
 EMSCRIPTEN_KEEPALIVE
 int RunAllTests() {
   initTests();
@@ -67,5 +83,4 @@ int RunTest(const char* filter) {
   }
   return RUN_ALL_TESTS();
 }
-
 }

@@ -2067,7 +2067,9 @@ TGFX_TEST(StencilCoverPathTest, Dispatch_BottomLeftTargetMatchesTopLeftUnderClip
   EXPECT_TRUE(Baseline::Compare(topLeftSurface, "StencilCoverPath/BottomLeftEquivalence"));
 
   // BottomLeft target built directly from a GPU texture, matching SurfaceRenderTest's pattern.
-  auto texture = context->gpu()->createTexture({SIZE, SIZE, PixelFormat::RGBA_8888});
+  auto texture = context->gpu()->createTexture(
+      {SIZE, SIZE, PixelFormat::RGBA_8888, false, 1,
+       TextureUsage::TEXTURE_BINDING | TextureUsage::RENDER_ATTACHMENT});
   ASSERT_TRUE(texture != nullptr);
   auto bottomLeftSurface =
       Surface::MakeFrom(context, texture->getBackendTexture(), ImageOrigin::BottomLeft);

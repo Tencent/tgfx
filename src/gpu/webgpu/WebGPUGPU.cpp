@@ -138,9 +138,9 @@ std::shared_ptr<Texture> WebGPUGPU::importBackendRenderTarget(
   if (wgpuTexture == nullptr) {
     return nullptr;
   }
-  return WebGPUTexture::MakeFrom(
-      this, wgpuTexture, backendRenderTarget.width(), backendRenderTarget.height(),
-      TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING, false);
+  return WebGPUTexture::MakeFrom(this, wgpuTexture, backendRenderTarget.width(),
+                                 backendRenderTarget.height(), TextureUsage::RENDER_ATTACHMENT,
+                                 false);
 }
 
 std::shared_ptr<Semaphore> WebGPUGPU::importBackendSemaphore(const BackendSemaphore&) {
@@ -201,6 +201,16 @@ void WebGPUGPU::releaseAll(bool releaseGPU) {
       if (mp.shaderModule) wgpuShaderModuleRelease(mp.shaderModule);
     }
     mipmapPipelineCache.clear();
+    if (placeholderBindings.view != nullptr) {
+      wgpuTextureViewRelease(placeholderBindings.view);
+    }
+    if (placeholderBindings.sampler != nullptr) {
+      wgpuSamplerRelease(placeholderBindings.sampler);
+    }
+    if (placeholderBindings.texture != nullptr) {
+      wgpuTextureRelease(placeholderBindings.texture);
+    }
+    placeholderBindings = {};
   }
   if (releaseGPU && !_externallyOwned && webgpuDevice != nullptr) {
     wgpuDeviceRelease(webgpuDevice);
@@ -310,6 +320,46 @@ const WebGPUGPU::MipmapPipeline* WebGPUGPU::getMipmapPipeline(WGPUTextureFormat 
   }
   mipmapPipelineCache[key] = mp;
   return &mipmapPipelineCache[key];
+}
+
+const WebGPUGPU::PlaceholderBindings* WebGPUGPU::getPlaceholderBindings() {
+  if (placeholderBindings.texture != nullptr) {
+    return &placeholderBindings;
+  }
+  WGPUTextureDescriptor textureDesc = {};
+  textureDesc.dimension = WGPUTextureDimension_2D;
+  textureDesc.size = {1, 1, 1};
+  textureDesc.format = WGPUTextureFormat_RGBA8Unorm;
+  textureDesc.mipLevelCount = 1;
+  textureDesc.sampleCount = 1;
+  textureDesc.usage = WGPUTextureUsage_TextureBinding;
+  auto texture = wgpuDeviceCreateTexture(webgpuDevice, &textureDesc);
+  if (texture == nullptr) {
+    return nullptr;
+  }
+  WGPUSamplerDescriptor samplerDesc = {};
+  samplerDesc.addressModeU = WGPUAddressMode_Repeat;
+  samplerDesc.addressModeV = WGPUAddressMode_Repeat;
+  samplerDesc.addressModeW = WGPUAddressMode_Repeat;
+  samplerDesc.minFilter = WGPUFilterMode_Nearest;
+  samplerDesc.magFilter = WGPUFilterMode_Nearest;
+  samplerDesc.mipmapFilter = WGPUMipmapFilterMode_Nearest;
+  samplerDesc.lodMinClamp = 0.0f;
+  samplerDesc.lodMaxClamp = 32.0f;
+  samplerDesc.maxAnisotropy = 1;
+  auto sampler = wgpuDeviceCreateSampler(webgpuDevice, &samplerDesc);
+  if (sampler == nullptr) {
+    wgpuTextureRelease(texture);
+    return nullptr;
+  }
+  auto view = wgpuTextureCreateView(texture, nullptr);
+  if (view == nullptr) {
+    wgpuSamplerRelease(sampler);
+    wgpuTextureRelease(texture);
+    return nullptr;
+  }
+  placeholderBindings = {texture, view, sampler};
+  return &placeholderBindings;
 }
 
 }  // namespace tgfx
