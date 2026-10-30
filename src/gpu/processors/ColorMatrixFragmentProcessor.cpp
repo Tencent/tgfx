@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
-#include "gpu/AOTEffect.h"
+#include "gpu/aot/EffectGraph.h"
 #include "gpu/shaders/modules/PointwiseOpModule.h"
 
 namespace tgfx {

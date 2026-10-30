@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/processors/ConstColorProcessor.h"
-#include "gpu/AOTEffect.h"
+#include "gpu/aot/EffectGraph.h"
 
 namespace tgfx {
 void ConstColorProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {

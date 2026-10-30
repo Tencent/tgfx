@@ -21,8 +21,8 @@
 #include "ConstColorProcessor.h"
 #include "TextureEffect.h"
 #include "core/utils/MathExtra.h"
-#include "gpu/AOTEffect.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/aot/EffectGraph.h"
 #include "gpu/shaders/modules/TiledSourceModule.h"
 
 namespace tgfx {

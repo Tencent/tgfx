@@ -21,8 +21,8 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include "gpu/AOTEffect.h"
 #include "gpu/AOTResourceProfile.h"
+#include "gpu/aot/EffectGraph.h"
 
 namespace tgfx {
 class FragmentProcessor;

@@ -19,7 +19,7 @@
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
 #include <algorithm>
 #include <cstring>
-#include "gpu/AOTEffect.h"
+#include "gpu/aot/EffectGraph.h"
 #include "gpu/resources/TextureView.h"
 #include "gpu/shaders/modules/PerlinNoiseModule.h"
 

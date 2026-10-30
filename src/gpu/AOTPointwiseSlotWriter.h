@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "gpu/AOTEffect.h"
 #include "gpu/UniformData.h"
+#include "gpu/aot/EffectGraph.h"
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {

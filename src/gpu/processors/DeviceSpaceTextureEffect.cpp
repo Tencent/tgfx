@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DeviceSpaceTextureEffect.h"
-#include "gpu/AOTEffect.h"
+#include "gpu/aot/EffectGraph.h"
 #include "gpu/shaders/modules/DeviceMaskModule.h"
 
 namespace tgfx {

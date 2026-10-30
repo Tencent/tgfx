@@ -21,7 +21,7 @@
 #include <memory>
 #include <vector>
 #include "core/shaders/PerlinNoiseShader.h"
-#include "gpu/AOTEffect.h"
+#include "gpu/aot/EffectGraph.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/shaders/KernelContract.h"
 

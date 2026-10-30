@@ -18,8 +18,8 @@
 
 #include "XfermodeFragmentProcessor.h"
 #include <algorithm>
-#include "gpu/AOTEffect.h"
 #include "gpu/UniformData.h"
+#include "gpu/aot/EffectGraph.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"

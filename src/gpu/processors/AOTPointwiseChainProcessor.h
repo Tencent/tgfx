@@ -20,8 +20,8 @@
 
 #include <array>
 #include <vector>
-#include "gpu/AOTEffect.h"
 #include "gpu/AOTResourceProfile.h"
+#include "gpu/aot/EffectGraph.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/shaders/KernelContract.h"
 

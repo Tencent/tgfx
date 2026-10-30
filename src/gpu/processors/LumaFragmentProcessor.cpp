@@ -18,7 +18,7 @@
 
 #include "gpu/processors/LumaFragmentProcessor.h"
 #include "core/utils/ColorSpaceHelper.h"
-#include "gpu/AOTEffect.h"
+#include "gpu/aot/EffectGraph.h"
 #include "gpu/shaders/modules/PointwiseOpModule.h"
 namespace tgfx {
 void LumaFragmentProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const {

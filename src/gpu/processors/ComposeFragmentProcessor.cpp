@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ComposeFragmentProcessor.h"
-#include "gpu/AOTEffect.h"
+#include "gpu/aot/EffectGraph.h"
 
 namespace tgfx {
 PlacementPtr<FragmentProcessor> ComposeFragmentProcessor::Make(

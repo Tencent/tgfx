@@ -18,7 +18,7 @@
 
 #include "GLSLRectEffect.h"
 #include "core/utils/Log.h"
-#include "gpu/AOTEffect.h"
+#include "gpu/aot/EffectGraph.h"
 #include "gpu/shaders/KernelContract.h"
 
 namespace tgfx {

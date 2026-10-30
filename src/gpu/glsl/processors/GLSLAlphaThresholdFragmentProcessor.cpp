@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLAlphaThresholdFragmentProcessor.h"
-#include "gpu/AOTEffect.h"
+#include "gpu/aot/EffectGraph.h"
 
 namespace tgfx {
 PlacementPtr<AlphaThresholdFragmentProcessor> AlphaThresholdFragmentProcessor::Make(

@@ -20,7 +20,7 @@
 
 #include <array>
 #include <vector>
-#include "gpu/AOTEffect.h"
+#include "gpu/aot/EffectGraph.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/shaders/KernelContract.h"
 
