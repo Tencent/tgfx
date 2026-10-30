@@ -177,6 +177,34 @@ static Matrix DeviceToFragCoord(const RenderTargetProxy* destination) {
   return matrix;
 }
 
+// One non-terminal pass of any multi-pass plan: the target allocation, the fill draw over it and
+// the edge record. The fill's coordOffset keeps the pass's processors seeing the coordinate space
+// they were planned for (the two plan families' conventions: a split pass passes the draw's
+// FP-space offset plus the target placement, a cut pass just the placement); inputAlpha carries
+// the split source pass's paint alpha (a cut operand is a shader value, so it is always 1 — the
+// terminal draw's epilogue applies the paint alpha exactly once).
+static bool AppendMaterializedPass(Context* context, uint32_t renderFlags,
+                                   PlacementPtr<FragmentProcessor> processor,
+                                   const MaterializedGeometry& geometry, const Point& fillOffset,
+                                   float inputAlpha, AOTEdgeReason reason,
+                                   std::vector<AOTRenderPass>* passes) {
+  auto materialized = AOTMaterializationPolicy::AllocateTarget(context, geometry);
+  if (materialized.renderTarget == nullptr) {
+    return false;
+  }
+  AOTRenderPass renderPass = {};
+  renderPass.target = std::move(materialized.renderTarget);
+  renderPass.drawOp = context->drawingManager()->makeFillDrawOp(
+      renderPass.target, std::move(processor), renderFlags, fillOffset, InvalidOffscreenFillKey,
+      inputAlpha);
+  if (renderPass.drawOp == nullptr) {
+    return false;
+  }
+  renderPass.edge = AOTMaterializedEdge{reason, geometry};
+  passes->push_back(std::move(renderPass));
+  return true;
+}
+
 // Builds a cut plan's passes: every pass is a copy of its own original-graph nodes with its cuts
 // replaced by the producing passes' intermediate textures, and every pass but the last renders
 // into its own intermediate (a split-off fill at top-left device positions, with the local-space
@@ -248,20 +276,11 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
       terminalColors->emplace_back(std::move(processor));
       return true;
     }
-    auto materialized = AOTMaterializationPolicy::AllocateTarget(context, geometry);
-    if (materialized.renderTarget == nullptr) {
+    if (!AppendMaterializedPass(context, renderFlags, std::move(processor), geometry,
+                                geometry.coordOffset, 1.0f, AOTEdgeReason::OperandMaterialize,
+                                passes)) {
       return false;
     }
-    AOTRenderPass renderPass = {};
-    renderPass.target = std::move(materialized.renderTarget);
-    renderPass.drawOp =
-        drawingManager->makeFillDrawOp(renderPass.target, std::move(processor), renderFlags,
-                                       geometry.coordOffset, InvalidOffscreenFillKey, 1.0f);
-    if (renderPass.drawOp == nullptr) {
-      return false;
-    }
-    renderPass.edge = AOTMaterializedEdge{AOTEdgeReason::OperandMaterialize, geometry};
-    passes->push_back(std::move(renderPass));
   }
   return true;
 }
@@ -409,21 +428,15 @@ bool AOTPlanExecutor::BuildPasses(Context* context, uint32_t renderFlags,
       terminalColors->emplace_back(std::move(processor));
       break;
     }
-    auto materialized = AOTMaterializationPolicy::AllocateTarget(context, geometry);
-    if (materialized.renderTarget == nullptr) {
+    if (!AppendMaterializedPass(context, renderFlags, std::move(processor), geometry,
+                                intermediateOffset, index == 0 ? sourceAlpha : 1.0f,
+                                AOTEdgeReason::Split, passes)) {
       return false;
     }
-    AOTRenderPass renderPass = {};
-    renderPass.target = std::move(materialized.renderTarget);
-    renderPass.drawOp = drawingManager->makeFillDrawOp(
-        renderPass.target, std::move(processor), renderFlags, intermediateOffset,
-        InvalidOffscreenFillKey, index == 0 ? sourceAlpha : 1.0f);
-    previousTexture = renderPass.target->asTextureProxy();
-    if (renderPass.drawOp == nullptr || previousTexture == nullptr) {
+    previousTexture = passes->back().target->asTextureProxy();
+    if (previousTexture == nullptr) {
       return false;
     }
-    renderPass.edge = AOTMaterializedEdge{AOTEdgeReason::Split, geometry};
-    passes->push_back(std::move(renderPass));
   }
   return true;
 }
