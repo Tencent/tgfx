@@ -18,22 +18,12 @@
 
 #include "gpu/AOTShapeRules.h"
 #include "gpu/aot/NodeContract.h"
-#include "gpu/processors/FragmentProcessor.h"
-#include "gpu/processors/RectEffect.h"
 
 namespace tgfx {
 
 // The single authority for the pointwise shapes shared by the planners (AOTEffectDecomposer), the
 // executor's admission checks (AOTPlanExecutor) and the chain builder: before this file each of
 // them carried its own copy, and the copies had already drifted.
-
-bool IsDeviceSpaceAARectEffect(const FragmentProcessor* fp) {
-  if (fp == nullptr || !IsProcessor<RectEffect>(fp) || fp->numChildProcessors() != 0) {
-    return false;
-  }
-  auto rectEffect = static_cast<const RectEffect*>(fp);
-  return rectEffect->isDeviceSpaceRect() && rectEffect->isAntiAlias();
-}
 
 bool CollectReachableStoppingAtCuts(const AOTEffectGraph& graph, AOTNodeID root,
                                     const std::vector<AOTNodeID>& cutRoots,

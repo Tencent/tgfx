@@ -22,7 +22,9 @@
 #include <optional>
 #include <vector>
 #include "gpu/aot/AOTEffectDecomposer.h"
+#include "gpu/aot/DrawIR.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "tgfx/core/BlendMode.h"
 
 namespace tgfx {
 
@@ -63,6 +65,28 @@ class AOTRouter {
    */
   static std::optional<AOTRoutePlan> Route(const std::vector<const FragmentProcessor*>& processors,
                                            AOTDecomposeOutcome* failureOutcome = nullptr);
+
+  /**
+   * Plans a draw whose record-time IR already carries the lowered color graph: the decomposition
+   * runs on ir.color with no second lowering, and the coverage terms stay on the draw — a
+   * multi-pass plan merges them into its terminal pass (see TaskCarriesCoverage). Returns
+   * nullopt when no planner covers the color graph; failureOutcome then receives
+   * AOTDecomposeOutcome::UnsupportedShape (the graph already lowered, so no lowering can block).
+   */
+  static std::optional<AOTEffectPlan> Plan(const DrawIR& ir,
+                                           AOTDecomposeOutcome* failureOutcome = nullptr);
+
+  /**
+   * Whether a plan that needs a task may carry the draw's coverage terms on its terminal pass:
+   * the terminal must be a chain pass (a linear-kernel terminal — YUV or perlin — serves through
+   * a rebuilt processor and cannot merge terms), and the draw's blend must never need a dst
+   * texture with coverage — the exact set the record-time fold admitted, because a Subtree term
+   * (mask-filter semantics) modulates the source, which the coverage composite reproduces only
+   * for those modes. A draw the gate refuses keeps the plain route, coverage attached.
+   */
+  static bool TaskCarriesCoverage(const AOTEffectPlan& plan,
+                                  const std::vector<AOTCoverageTerm>& coverageTerms,
+                                  BlendMode blendMode);
 
   /**
    * Whether a plan can only run as a plan task: more than one pass, or a single pass whose kernel

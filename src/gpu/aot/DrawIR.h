@@ -74,7 +74,9 @@ struct DrawIR {
    * Plan-pass serving: the fused pass descriptor the color graph was cut for (kernel, node list,
    * profile, dependencies). A pass IR carries it so its processor is rebuilt exactly as the
    * planner fit it — never re-planned. A draw IR leaves it empty and its single pass is planned
-   * on demand; a pass IR carries no coverage terms (plan passes never apply draw coverage).
+   * on demand. Intermediate passes carry no coverage terms; the TERMINAL pass of a draw's plan
+   * carries the draw's terms, which its chain program merges exactly as the plain route's
+   * single-pass serving does (see AOTPlanExecutor::Make).
    */
   std::optional<AOTPassDescriptor> passDescriptor = std::nullopt;
 };

@@ -456,7 +456,7 @@ TGFX_TEST_PRIVATE(AOTEffectTest, ExecutorRejectsStencilCoverDrawWithoutTakingOwn
   EXPECT_EQ(buffer->resourceTasks.size(), resourceTasks);
 }
 
-TGFX_TEST_PRIVATE(AOTEffectTest, CompositorKeepsSelfManagedDrawOutOfFoldAndRetry) {
+TGFX_TEST_PRIVATE(AOTEffectTest, CompositorKeepsSelfManagedDrawOutOfPlanRoute) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
@@ -489,11 +489,11 @@ TGFX_TEST_PRIVATE(AOTEffectTest, CompositorKeepsSelfManagedDrawOutOfFoldAndRetry
     auto color = FragmentProcessor::Make(brush.shader, FPArgs(context, 0, Rect::MakeWH(96, 96)));
     ASSERT_NE(color, nullptr);
     AOTEffectGraph graph;
-    bool lowered = AOTEffectDecomposer::Lower({color.get(), applied.coverageFP.get()}, &graph);
+    bool lowered = AOTEffectDecomposer::Lower({color.get()}, &graph);
     AOTEffectPlan plan;
     // Both trees decompose: the single gradient as one fused pass, and the over-budget two-gradient
-    // blend (with the folded coverage riding along) through the cut planner, which materializes
-    // one operand and keeps the rest — coverage included — in the main pass.
+    // blend through the cut planner, which materializes one operand and keeps the rest — the clip
+    // riding along as the terminal pass's coverage terms.
     bool decomposed = lowered && AOTEffectDecomposer::Decompose(graph, &plan);
     EXPECT_TRUE(decomposed);
     PlacementPtr<DrawOp> draw = allocator->make<SelfManagedPipelineDrawOp>(allocator, true);
@@ -2713,43 +2713,39 @@ static PlacementPtr<FragmentProcessor> MakeAdditionalAnalyticClip(BlockAllocator
   }
 }
 
-static void ExpectAdditionalClipPreservesCoverageSuffix(AOTChainOp op, bool withMask) {
+static void ExpectAdditionalClipChainsOntoClipCoverage(AOTChainOp op, bool withMask) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
-  for (size_t suffixCount = 0; suffixCount <= 2; ++suffixCount) {
-    SCOPED_TRACE(suffixCount);
+  for (size_t chainedClipCount = 0; chainedClipCount <= 2; ++chainedClipCount) {
+    SCOPED_TRACE(chainedClipCount);
     SCOPED_TRACE(withMask);
     BlockAllocator allocator;
     auto texture = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
     ASSERT_NE(texture, nullptr);
-    std::vector<PlacementPtr<RRectEffect>> suffixes;
-    std::vector<const FragmentProcessor*> colorProcessors = {texture.get()};
-    for (size_t index = 0; index < suffixCount; ++index) {
-      auto rect = Rect::MakeLTRB(10 + static_cast<float>(index) * 4, 10, 70, 70);
-      auto suffix = RRectEffect::Make(&allocator, RRect::MakeRectXY(rect, 8, 8));
-      ASSERT_NE(suffix, nullptr);
-      colorProcessors.push_back(suffix.get());
-      suffixes.push_back(std::move(suffix));
-    }
     AOTEffectGraph graph;
-    ASSERT_TRUE(AOTEffectDecomposer::Lower(colorProcessors, &graph));
+    ASSERT_TRUE(AOTEffectDecomposer::Lower({texture.get()}, &graph));
     AOTEffectPlan plan;
     ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
     ASSERT_EQ(plan.passes.size(), 1u);
     ASSERT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
-    AOTProgram originalChain = {};
-    ASSERT_TRUE(AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0], {}, false,
-                                                     &originalChain));
-    ASSERT_EQ(originalChain.slots.size(), suffixCount + 1);
-    EXPECT_EQ(originalChain.rootRegister, static_cast<size_t>(originalChain.slots[0].outRegister));
-    EXPECT_EQ(originalChain.coverageRootRegister, -1);
-    EXPECT_EQ(originalChain.clipCoverageRegister,
-              suffixCount == 0 ? -1 : originalChain.slots[suffixCount].outRegister);
 
+    // The draw's clip coverage as one composed coverage tree — the classifier flattens it into
+    // chained analytic terms — with an extra clip of the given kind on top, and optionally a
+    // device-space mask as the second coverage processor.
+    PlacementPtr<FragmentProcessor> clips;
+    for (size_t index = 0; index < chainedClipCount; ++index) {
+      auto rect = Rect::MakeLTRB(10 + static_cast<float>(index) * 4, 10, 70, 70);
+      auto link = RRectEffect::Make(&allocator, RRect::MakeRectXY(rect, 8, 8));
+      ASSERT_NE(link, nullptr);
+      clips = FragmentProcessor::Compose(&allocator, std::move(clips), std::move(link));
+      ASSERT_NE(clips, nullptr);
+    }
     auto additionalClip = MakeAdditionalAnalyticClip(&allocator, op);
     ASSERT_NE(additionalClip, nullptr);
-    std::vector<const FragmentProcessor*> coverageProcessors = {additionalClip.get()};
+    clips = FragmentProcessor::Compose(&allocator, std::move(clips), std::move(additionalClip));
+    ASSERT_NE(clips, nullptr);
+    std::vector<const FragmentProcessor*> coverageProcessors = {clips.get()};
     PlacementPtr<FragmentProcessor> mask;
     if (withMask) {
       auto proxy = context->proxyProvider()->createTextureProxy({}, 2, 2, PixelFormat::ALPHA_8);
@@ -2761,19 +2757,19 @@ static void ExpectAdditionalClipPreservesCoverageSuffix(AOTChainOp op, bool with
     AOTProgram chain = {};
     ASSERT_TRUE(AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0],
                                                      coverageProcessors, false, &chain));
-    ASSERT_EQ(chain.slots.size(), suffixCount + 2);
+    ASSERT_EQ(chain.slots.size(), chainedClipCount + 2);
     EXPECT_EQ(chain.rootRegister, static_cast<size_t>(chain.slots[0].outRegister));
     EXPECT_EQ(chain.coverageRootRegister, -1);
     EXPECT_EQ(chain.hasMaskTexture, withMask);
     int previousCoverage = -4;
-    for (size_t index = 1; index <= suffixCount; ++index) {
-      const auto& suffix = chain.slots[index];
-      EXPECT_EQ(suffix.op, AOTChainOp::RRectCoverage);
-      EXPECT_EQ(suffix.in0, previousCoverage);
-      EXPECT_GE(suffix.outRegister, 0);
-      previousCoverage = suffix.outRegister;
+    for (size_t index = 1; index <= chainedClipCount; ++index) {
+      const auto& link = chain.slots[index];
+      EXPECT_EQ(link.op, AOTChainOp::RRectCoverage);
+      EXPECT_EQ(link.in0, previousCoverage);
+      EXPECT_GE(link.outRegister, 0);
+      previousCoverage = link.outRegister;
     }
-    const auto& appended = chain.slots[suffixCount + 1];
+    const auto& appended = chain.slots[chainedClipCount + 1];
     EXPECT_EQ(appended.op, op);
     EXPECT_EQ(appended.in0, previousCoverage);
     EXPECT_GE(appended.outRegister, 0);
@@ -2781,17 +2777,17 @@ static void ExpectAdditionalClipPreservesCoverageSuffix(AOTChainOp op, bool with
   }
 }
 
-TGFX_TEST(AOTEffectTest, DeviceRectPreservesCoverageSuffix) {
-  ExpectAdditionalClipPreservesCoverageSuffix(AOTChainOp::AARectCoverage, false);
-  ExpectAdditionalClipPreservesCoverageSuffix(AOTChainOp::AARectCoverage, true);
+TGFX_TEST(AOTEffectTest, DeviceRectChainsOntoClipCoverage) {
+  ExpectAdditionalClipChainsOntoClipCoverage(AOTChainOp::AARectCoverage, false);
+  ExpectAdditionalClipChainsOntoClipCoverage(AOTChainOp::AARectCoverage, true);
 }
 
-TGFX_TEST(AOTEffectTest, LocalRectPreservesCoverageSuffix) {
-  ExpectAdditionalClipPreservesCoverageSuffix(AOTChainOp::LocalRectCoverage, true);
+TGFX_TEST(AOTEffectTest, LocalRectChainsOntoClipCoverage) {
+  ExpectAdditionalClipChainsOntoClipCoverage(AOTChainOp::LocalRectCoverage, true);
 }
 
-TGFX_TEST(AOTEffectTest, RRectPreservesCoverageSuffix) {
-  ExpectAdditionalClipPreservesCoverageSuffix(AOTChainOp::RRectCoverage, true);
+TGFX_TEST(AOTEffectTest, RRectChainsOntoClipCoverage) {
+  ExpectAdditionalClipChainsOntoClipCoverage(AOTChainOp::RRectCoverage, true);
 }
 
 TGFX_TEST(AOTEffectTest, WhiteInputFeedsTwoChildBlendChildren) {

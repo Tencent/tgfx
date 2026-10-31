@@ -878,38 +878,6 @@ static bool ResolveFinalChainProfile(ChainBuildContext* ctx) {
   return ctx->rootIndex != SIZE_MAX;
 }
 
-// Stage five: an early-fold clip arrived as a RectCoverage/RRectCoverage trailing suffix
-// multiplying the color root. Geometric coverage must ride the XP's coverage input instead of the
-// source, so this pops the suffix and rewires it like the narrow clip slots: the innermost link
-// chains from the scalar unit one, outer links chain upward, the color root moves to the node
-// under the suffix, and the outermost link's register becomes the clip-coverage value. The suffix
-// stays in the color chain when the node under it is a designator with no slot (e.g. a bare clip
-// over the geometry color) — that shape keeps the old source-fold form. Walk in NODE-ordinal
-// space (slotOf maps nodes to slots).
-static void RewriteClipSuffix(ChainBuildContext* ctx) {
-  std::vector<size_t> suffixSlots = {};
-  size_t walkNode = ctx->pass->output.index();
-  while (walkNode < ctx->colorCount &&
-         (ctx->nodes[walkNode]->kind == AOTEffectKind::RectCoverage ||
-          ctx->nodes[walkNode]->kind == AOTEffectKind::RRectCoverage)) {
-    if (ctx->nodes[walkNode]->inputs.empty()) {
-      break;
-    }
-    suffixSlots.push_back(ctx->slotOf[walkNode]);
-    walkNode = ctx->nodes[walkNode]->inputs[0].index();
-  }
-  if (suffixSlots.empty() || walkNode >= ctx->colorCount || ctx->slotOf[walkNode] == SIZE_MAX) {
-    return;
-  }
-  ctx->rootIndex = ctx->slotOf[walkNode];
-  for (size_t i = 0; i < suffixSlots.size(); ++i) {
-    ctx->slots[suffixSlots[i]].in0 =
-        i + 1 < suffixSlots.size() ? static_cast<int>(suffixSlots[i + 1]) : -4;
-  }
-  ctx->clipCoverageSlot = static_cast<int>(suffixSlots.front());
-  ctx->clipChainInput = ctx->clipCoverageSlot;
-}
-
 // Stage six: resolves the coverage subtree's root register, and validates the subtree's shape.
 // Accepted roots: a single blend consuming the unit input (the xfer-dst coverage family), a bare
 // texture or gradient consuming the unit alpha, a constant (the inverted shader mask filter whose
@@ -1102,7 +1070,6 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
   if (!EncodeChainSlots(&ctx) || !ResolveFinalChainProfile(&ctx)) {
     return false;
   }
-  RewriteClipSuffix(&ctx);
   if (!ResolveCoverageRoot(&ctx)) {
     return false;
   }

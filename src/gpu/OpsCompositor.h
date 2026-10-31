@@ -229,11 +229,14 @@ class OpsCompositor {
 
   /**
    * Builds the AOT plan task for op over deviceBounds and enqueues it after the pending ops.
-   * Returns false, leaving op untouched, when the executor refuses the plan or a multi-pass plan
-   * cannot reproduce this draw exactly (see the gate in the implementation).
+   * terminalCoverage, when non-null, is the draw's coverage terms, merged into the terminal pass's
+   * IR (the executor refuses a terminal they cannot compile onto). Returns false, leaving op
+   * untouched, when the executor refuses the plan or a multi-pass plan cannot reproduce this draw
+   * exactly (see the gate in the implementation).
    */
   bool submitPlanTask(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
-                      const Rect& deviceBounds, PlacementPtr<DrawOp>* op);
+                      const Rect& deviceBounds, PlacementPtr<DrawOp>* op,
+                      const std::vector<AOTCoverageTerm>* terminalCoverage = nullptr);
 
   friend class DrawingManager;
   friend class PendingOpsAutoReset;

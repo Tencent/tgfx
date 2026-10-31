@@ -32,14 +32,6 @@ void DrawOp::adoptLoweredIR(PlacementPtr<DrawIR> passIR) {
   ir = std::move(passIR);
 }
 
-void DrawOp::moveCoveragesToColors() {
-  for (auto& coverage : coverages) {
-    colors.emplace_back(std::move(coverage));
-  }
-  coverages.clear();
-  ir = nullptr;
-}
-
 void DrawOp::tryLowerIR() {
   if (type() == Type::AtlasTextOp) {
     // The atlas glyph leaf is synthesized from the AtlasText geometry processor, which the op

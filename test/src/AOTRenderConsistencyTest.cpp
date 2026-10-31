@@ -4421,6 +4421,100 @@ TGFX_TEST(AOTRenderConsistencyTest, BrushAlphaEntersChainBeforeThreshold) {
   ExpectBitmapsIdentical("brush-alpha-before-threshold", candidate, reference, width, height);
 }
 
+// Renders the two-pass threshold chain (see BrushAlphaEntersChainBeforeThreshold) under a draw
+// coverage: either an anti-aliased device-space rect clip (an Analytic term) or a shader mask
+// filter (a Subtree term). The record-time route merges the classified terms into the terminal
+// pass of the plan task — the shapes the pre-fold route turned away or folded into the color
+// graph. Stats and pixels are compared against the runtime route.
+static void RenderSplitChainWithCoverageOnce(bool useClip, bool useBundle, Bitmap* outBitmap,
+                                             BrushRenderStats* outStats) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  if (useBundle) {
+    auto [bundleData, bundleSize] = EmbeddedShaderBundles::GetBundle(context->backend());
+    ASSERT_NE(bundleData, nullptr);
+    ASSERT_GT(bundleSize, 0u);
+    ASSERT_TRUE(cache->loadBundle(bundleData, bundleSize));
+  } else {
+    cache->unload();
+  }
+  ScopedAOTStatsPause statsPause(context, !useBundle);
+  cache->setDecompositionEnabled(useBundle);
+  cache->setDiagnosticRecordingEnabled(true);
+  cache->resetStats();
+  context->globalCache()->clearPrograms();
+  context->globalCache()->resetProgramStats();
+  auto surface = Surface::Make(context, 128, 128);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  if (useClip) {
+    // Fractional bounds keep the clip anti-aliased: a device-space RectEffect coverage term.
+    canvas->save();
+    canvas->clipRect(Rect::MakeLTRB(10.5f, 10.5f, 117.5f, 117.5f), true);
+  }
+  Paint paint = {};
+  std::shared_ptr<ColorFilter> chain = ColorFilter::AlphaThreshold(0.75f);
+  for (size_t index = 0; index < 15; ++index) {
+    chain = ColorFilter::Compose(chain, ColorFilter::Matrix(NonTrivialScaleBiasMatrix()));
+  }
+  paint.setColorFilter(chain);
+  if (!useClip) {
+    auto maskShader = Shader::MakeLinearGradient(Point{0, 0}, Point{100, 0},
+                                                 {Color::White(), Color::Transparent()}, {});
+    paint.setMaskFilter(MaskFilter::MakeShader(maskShader));
+  }
+  canvas->drawImage(MakeImage("resources/apitest/mandrill_128.png"), 10.3f, 10.4f, &paint);
+  if (useClip) {
+    canvas->restore();
+  }
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(outBitmap->allocPixels(128, 128));
+  auto* pixels = outBitmap->lockPixels();
+  ASSERT_TRUE(pixels != nullptr);
+  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+  outBitmap->unlockPixels();
+  outStats->noMatchingRule = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
+  outStats->draws = cache->drawStats();
+  outStats->programs = context->globalCache()->programStats();
+  cache->setDiagnosticRecordingEnabled(false);
+  cache->setDecompositionEnabled(true);
+  cache->unload();
+  context->globalCache()->clearPrograms();
+}
+
+static void ExpectSplitChainWithCoverageServesThroughTask(bool useClip) {
+  Bitmap reference = {};
+  Bitmap candidate = {};
+  BrushRenderStats referenceStats = {};
+  BrushRenderStats candidateStats = {};
+  RenderSplitChainWithCoverageOnce(useClip, false, &reference, &referenceStats);
+  RenderSplitChainWithCoverageOnce(useClip, true, &candidate, &candidateStats);
+  EXPECT_EQ(candidateStats.noMatchingRule, 0u);
+  EXPECT_EQ(candidateStats.programs.programBuilderCreations, 0u);
+  EXPECT_EQ(candidateStats.draws.completeAOTDraws, 1u);
+  EXPECT_EQ(candidateStats.draws.atomicFallbacks, 0u);
+  // The 17-operator chain needs two passes; the coverage term rides the terminal one. A split
+  // pass quantizes its intermediate to RGBA8, allowing a 1-LSB difference (as for every other
+  // split-chain scene); the coverage math itself is exact.
+  EXPECT_EQ(candidateStats.draws.kernelInvocations, 2u);
+  EXPECT_EQ(candidateStats.draws.planMaterializedEdges, 1u);
+  ExpectBitmapsNear(useClip ? "split-chain-under-aa-clip" : "split-chain-under-shader-mask",
+                    candidate, reference, 128, 128, ExperimentTolerance(1));
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, SplitChainUnderAAClipServesThroughTaskTerminal) {
+  SKIP_ON_SWIFTSHADER_ENV();
+  ExpectSplitChainWithCoverageServesThroughTask(true);
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, SplitChainUnderShaderMaskServesThroughTaskTerminal) {
+  SKIP_ON_SWIFTSHADER_ENV();
+  ExpectSplitChainWithCoverageServesThroughTask(false);
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, RotatedDrawWithLongChainMatchesRuntime) {
   SKIP_ON_SWIFTSHADER_ENV();
   auto image = MakeImage("resources/apitest/mandrill_128.png");

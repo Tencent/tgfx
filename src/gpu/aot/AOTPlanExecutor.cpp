@@ -197,7 +197,8 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
                                const AOTEffectPlan& plan, const Rect& deviceBounds,
                                const RenderTargetProxy* destination, const Point& fpCoordOffset,
                                const std::optional<Matrix>& deviceToLocal, float sourceAlpha,
-                               AOTRenderPlan* renderPlan) {
+                               AOTRenderPlan* renderPlan,
+                               const std::vector<AOTCoverageTerm>* terminalCoverage) {
   auto drawingManager = context->drawingManager();
   auto allocator = drawingManager->drawingAllocator();
   // No apron: the terminal pass reads each intermediate at its own device pixel
@@ -263,6 +264,18 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
     DrawIR passIR = {};
     passIR.color = std::move(segment);
     passIR.passDescriptor = std::move(segmentPass);
+    if (isTerminal && terminalCoverage != nullptr && !terminalCoverage->empty()) {
+      // The draw's coverage terms ride the terminal pass — the same merge the plain route's
+      // single-pass serving applies (CompileChainProgramForInfo), so a multi-pass plan serves
+      // coverage exactly as the fused form would. Admission equals compilation: a terminal the
+      // terms cannot merge into refuses the whole task here, keeping the draw on the plain route
+      // instead of failing at flush time.
+      passIR.coverage = *terminalCoverage;
+      AOTProgram terminalProgram = {};
+      if (!AOTChainBuilder::CompilePassProgram(passIR, &terminalProgram)) {
+        return false;
+      }
+    }
     auto ownedIR = allocator->make<DrawIR>(std::move(passIR));
     if (ownedIR == nullptr) {
       return false;
@@ -339,7 +352,8 @@ bool AOTPlanExecutor::BuildPasses(Context* context, uint32_t renderFlags,
                                   const Rect& deviceBounds, const RenderTargetProxy* destination,
                                   const Point& fpCoordOffset,
                                   const std::optional<Matrix>& deviceToLocal,
-                                  AOTRenderPlan* renderPlan, float sourceAlpha) {
+                                  AOTRenderPlan* renderPlan, float sourceAlpha,
+                                  const std::vector<AOTCoverageTerm>* terminalCoverage) {
   auto drawingManager = context->drawingManager();
   auto allocator = drawingManager->drawingAllocator();
   if (plan.passes.size() == 1) {
@@ -351,6 +365,9 @@ bool AOTPlanExecutor::BuildPasses(Context* context, uint32_t renderFlags,
       DrawIR passIR = {};
       passIR.color = graph;
       passIR.passDescriptor = pass;
+      if (terminalCoverage != nullptr) {
+        passIR.coverage = *terminalCoverage;
+      }
       renderPlan->terminalIR = allocator->make<DrawIR>(std::move(passIR));
       return renderPlan->terminalIR != nullptr;
     }
@@ -363,16 +380,16 @@ bool AOTPlanExecutor::BuildPasses(Context* context, uint32_t renderFlags,
     return true;
   }
   return BuildCutPlanPasses(context, renderFlags, graph, plan, deviceBounds, destination,
-                            fpCoordOffset, deviceToLocal, sourceAlpha, renderPlan);
+                            fpCoordOffset, deviceToLocal, sourceAlpha, renderPlan,
+                            terminalCoverage);
 }
 
-PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t renderFlags,
-                                               const AOTEffectGraph& graph,
-                                               const AOTEffectPlan& plan, const Rect& deviceBounds,
-                                               std::shared_ptr<RenderTargetProxy> destination,
-                                               PlacementPtr<DrawOp>* originalDraw,
-                                               const Point& fpCoordOffset, bool clearDestination,
-                                               const std::optional<Matrix>& deviceToLocal) {
+PlacementPtr<RenderTask> AOTPlanExecutor::Make(
+    Context* context, uint32_t renderFlags, const AOTEffectGraph& graph, const AOTEffectPlan& plan,
+    const Rect& deviceBounds, std::shared_ptr<RenderTargetProxy> destination,
+    PlacementPtr<DrawOp>* originalDraw, const Point& fpCoordOffset, bool clearDestination,
+    const std::optional<Matrix>& deviceToLocal,
+    const std::vector<AOTCoverageTerm>* terminalCoverage) {
   if (context == nullptr || destination == nullptr || destination->getContext() != context ||
       originalDraw == nullptr || *originalDraw == nullptr ||
       (*originalDraw)->type() == DrawOp::Type::StencilCoverPathDrawOp || !CanExecute(graph, plan) ||
@@ -404,7 +421,7 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t render
     sourceAlpha = color->alpha;
   }
   if (!BuildPasses(context, renderFlags, graph, plan, deviceBounds, destination.get(),
-                   fpCoordOffset, deviceToLocal, &renderPlan, sourceAlpha) ||
+                   fpCoordOffset, deviceToLocal, &renderPlan, sourceAlpha, terminalCoverage) ||
       !renderPlan.isWellFormed()) {
     return nullptr;
   }

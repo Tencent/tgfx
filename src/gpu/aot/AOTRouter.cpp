@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/AOTRouter.h"
+#include "gpu/BlendFormula.h"
 #include "gpu/aot/AOTEffectDecomposer.h"
 
 namespace tgfx {
@@ -51,6 +52,33 @@ std::optional<AOTRoutePlan> AOTRouter::Route(
     *failureOutcome = AOTDecomposeOutcome::FusablePointwise;
   }
   return routed;
+}
+
+std::optional<AOTEffectPlan> AOTRouter::Plan(const DrawIR& ir,
+                                             AOTDecomposeOutcome* failureOutcome) {
+  AOTEffectPlan plan = {};
+  if (!AOTEffectDecomposer::Decompose(ir.color, &plan)) {
+    if (failureOutcome != nullptr) {
+      *failureOutcome = AOTDecomposeOutcome::UnsupportedShape;
+    }
+    return std::nullopt;
+  }
+  if (failureOutcome != nullptr) {
+    *failureOutcome = AOTDecomposeOutcome::FusablePointwise;
+  }
+  return plan;
+}
+
+bool AOTRouter::TaskCarriesCoverage(const AOTEffectPlan& plan,
+                                    const std::vector<AOTCoverageTerm>& coverageTerms,
+                                    BlendMode blendMode) {
+  if (coverageTerms.empty()) {
+    return true;
+  }
+  if (plan.passes.empty() || !IsAOTPointwiseDAGKernel(plan.passes.back().kernel)) {
+    return false;
+  }
+  return !BlendModeNeedDstTexture(blendMode, true);
 }
 
 bool AOTRouter::PlanSinglePass(const std::vector<const FragmentProcessor*>& processors,

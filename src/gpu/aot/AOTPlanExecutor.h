@@ -23,6 +23,7 @@
 #include <vector>
 #include "gpu/AOTRenderPlan.h"
 #include "gpu/aot/AOTEffectDecomposer.h"
+#include "gpu/aot/DrawIR.h"
 #include "gpu/ops/DrawOp.h"
 #include "gpu/tasks/RenderTask.h"
 
@@ -73,14 +74,13 @@ class AOTPlanExecutor {
    * applied in the source pass, while later segments read the intermediate without applying it
    * again. Geometry coverage and blending still execute only in the terminal pass.
    */
-  static PlacementPtr<RenderTask> Make(Context* context, uint32_t renderFlags,
-                                       const AOTEffectGraph& graph, const AOTEffectPlan& plan,
-                                       const Rect& deviceBounds,
-                                       std::shared_ptr<RenderTargetProxy> destination,
-                                       PlacementPtr<DrawOp>* originalDraw,
-                                       const Point& fpCoordOffset = Point::Zero(),
-                                       bool clearDestination = false,
-                                       const std::optional<Matrix>& deviceToLocal = std::nullopt);
+  static PlacementPtr<RenderTask> Make(
+      Context* context, uint32_t renderFlags, const AOTEffectGraph& graph,
+      const AOTEffectPlan& plan, const Rect& deviceBounds,
+      std::shared_ptr<RenderTargetProxy> destination, PlacementPtr<DrawOp>* originalDraw,
+      const Point& fpCoordOffset = Point::Zero(), bool clearDestination = false,
+      const std::optional<Matrix>& deviceToLocal = std::nullopt,
+      const std::vector<AOTCoverageTerm>* terminalCoverage = nullptr);
 
   /**
    * Builds the passes of a plan that passed CanExecute without validating or enqueueing anything:
@@ -94,6 +94,7 @@ class AOTPlanExecutor {
                           const AOTEffectPlan& plan, const Rect& deviceBounds,
                           const RenderTargetProxy* destination, const Point& fpCoordOffset,
                           const std::optional<Matrix>& deviceToLocal, AOTRenderPlan* renderPlan,
-                          float sourceAlpha = 1.0f);
+                          float sourceAlpha = 1.0f,
+                          const std::vector<AOTCoverageTerm>* terminalCoverage = nullptr);
 };
 }  // namespace tgfx

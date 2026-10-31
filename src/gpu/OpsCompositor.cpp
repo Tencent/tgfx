@@ -925,26 +925,12 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Brush& brush, bool 
       brush.shader != nullptr && (brush.shader->type() == Shader::Type::ColorFilter ||
                                   brush.shader->type() == Shader::Type::Blend);
   bool hasDecomposableColorSource = hasImageFill || brush.shader != nullptr;
-  // An anti-aliased, non-pixel-aligned rect clip produces a device-space RectEffect coverage FP,
-  // which folds
-  // into the color chain as a rect-coverage node. Pixel-aligned or non-AA rect clips become a
-  // scissor instead and carry no coverage, so they do not need the evaluation.
-  bool clipProducesFoldableCoverage = false;
-  if (pendingClip.state() == ClipState::Rect) {
-    for (const auto& element : pendingClip.elements()) {
-      if (element.isValid()) {
-        // Coinciding bounds mark an exact integer-pixel rect that the clipBounds scissor already
-        // covers, so no coverage FP is produced for it.
-        clipProducesFoldableCoverage = element.shape().isRect() && element.antiAlias() &&
-                                       element.innerBounds() != element.outerBounds();
-        break;
-      }
-    }
-  }
+  // A draw whose route would take a task always carries one of the chain-forming sources below
+  // (a color filter, a filter-composed shader, or a mask filter): a bare single-source fill plans
+  // single-pass and stays on the plain route, so evaluating it would only cost the lowering.
   if (cache != nullptr && cache->isLoaded() && cache->decompositionEnabled() &&
       hasDecomposableColorSource &&
-      (brush.colorFilter != nullptr || hasShaderDerivedChain || brush.maskFilter != nullptr ||
-       clipProducesFoldableCoverage)) {
+      (brush.colorFilter != nullptr || hasShaderDerivedChain || brush.maskFilter != nullptr)) {
     needDeviceBounds = true;
   }
   if (BlendModeNeedDstTexture(brush.blendMode, hasCoverage)) {
@@ -1181,54 +1167,6 @@ PlacementPtr<FragmentProcessor> OpsCompositor::makeMaskFP(
   return FragmentProcessor::Compose(allocator, std::move(maskFP), std::move(inputFP));
 }
 
-// Returns true if a rect draw is a bare texture fill under an analytic clip: exactly one plain
-// TextureEffect color and nothing else beside the clip. QuadTextureFill serves that shape through
-// the runtime clip contract, so folding the clip into the pointwise chain would only move a fixed
-// pattern onto the interpreter (and its kilobyte-sized uniform block). The plain route tries the
-// dedicated kernel first and still falls back to the chain interpreter when the matcher refuses.
-static bool IsDedicatedTextureFillCandidate(const DrawOp* op,
-                                            const std::vector<const FragmentProcessor*>& colors,
-                                            const FragmentProcessor* maskCoverage) {
-  if (op->type() != DrawOp::Type::RectDrawOp || maskCoverage != nullptr || colors.size() != 1 ||
-      !IsProcessor<TextureEffect>(colors[0])) {
-    return false;
-  }
-  return !static_cast<const TextureEffect*>(colors[0])->isYUV();
-}
-
-// Returns true if the coverage FP is a local texture mask whose texture can be fused into a
-// pointwise chain as an extra texture leaf (see the SrcIn/SrcOut check inside).
-static bool IsFoldableLocalMask(const FragmentProcessor* coverageFP) {
-  if (coverageFP == nullptr || coverageFP->name() != "XfermodeFragmentProcessor - dst" ||
-      coverageFP->numChildProcessors() != 1) {
-    return false;
-  }
-  auto* xfermode = static_cast<const XfermodeFragmentProcessor*>(coverageFP);
-  // Both the plain form (SrcIn: input * mask.a) and the inverted form (SrcOut: input *
-  // (1 - mask.a)) fold into a single blend node, which the chain kernel's blend table covers.
-  if (xfermode->getMode() != BlendMode::SrcIn && xfermode->getMode() != BlendMode::SrcOut) {
-    return false;
-  }
-  auto child = coverageFP->childProcessor(0);
-  auto name = child->name();
-  if (name == "TextureEffect") {
-    auto* textureEffect = static_cast<const TextureEffect*>(child);
-    // Alpha-only masks fold fine: the chain kernel splats .r into the alpha channel for such
-    // leaves via their slot selector bit.
-    return !textureEffect->isYUV() && !textureEffect->hasRGBAAA();
-  }
-  if (name == "TiledTextureEffect") {
-    auto* tiledEffect = static_cast<const TiledTextureEffect*>(child);
-    // The chain kernel's tiled path covers the single-tap wrap modes; only the mipmap-repeat
-    // modes (4,5) cannot fold. Alpha-only tiled masks fold via the same .r splat as plain ones.
-    int modeX = 0;
-    int modeY = 0;
-    tiledEffect->getShaderModes(&modeX, &modeY);
-    return modeX != 4 && modeX != 5 && modeY != 4 && modeY != 5;
-  }
-  return false;
-}
-
 DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AAType aaType) {
   if (UsesRuntimeFrameBufferFetch(context)) {
     return {};
@@ -1316,10 +1254,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
       op->addColorFP(std::move(processor));
     }
   }
-  const FragmentProcessor* maskCoverage = nullptr;
   if (brush.maskFilter) {
     if (auto processor = brush.maskFilter->asFragmentProcessor(args, nullptr)) {
-      maskCoverage = processor.get();
       op->addCoverageFP(std::move(processor));
     } else {
       // if mask is empty, nothing to draw
@@ -1327,11 +1263,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     }
   }
 
-  const FragmentProcessor* clipCoverage = nullptr;
   if (appliedClip.coverageFP) {
-    // Keep a raw pointer for the fold evaluation below: addCoverageFP takes ownership, so
-    // appliedClip.coverageFP is null afterwards.
-    clipCoverage = appliedClip.coverageFP.get();
     op->addCoverageFP(std::move(appliedClip.coverageFP));
   }
   if (appliedClip.scissor.has_value()) {
@@ -1352,98 +1284,38 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
   auto cache = context->precompiledShaderCache();
   if (cache != nullptr && cache->isLoaded() && cache->decompositionEnabled() &&
       op->type() != DrawOp::Type::StencilCoverPathDrawOp && deviceBounds.has_value() &&
-      !deviceBounds->isEmpty()) {
+      !deviceBounds->isEmpty() && !op->colorProcessors().empty()) {
     // The single record-time lowering: the op's whole expression (colors, coverages, xfer, blend
-    // mode) lands on a DrawIR every later stage converges on. The route decisions below still
-    // run their own analysis for now; they migrate onto the IR in the steps that follow.
+    // mode) lands on a DrawIR every later stage converges on. The route below plans from that IR
+    // alone — coverage never folds into the color graph: a multi-pass plan carries the classified
+    // terms on its terminal pass, and a single-pass plan stays on the plain route, coverage
+    // processors attached, for the prepare-time fused walk.
     op->tryLowerIR();
-    std::vector<const FragmentProcessor*> colorProcessors;
-    colorProcessors.reserve(op->colorProcessors().size());
-    for (const auto& processor : op->colorProcessors()) {
-      colorProcessors.push_back(processor.get());
-    }
-    // A local texture mask is a pointwise multiply (input * mask.a), so it can be fused into the
-    // color chain as an extra blend node with its own texture leaf; an analytic AA-rect clip is the
-    // same multiply with a coordinate-derived coverage, fusing as a rect-coverage node. Both forms
-    // may fold independently (mask from the brush, clip coverage from the clip stack), and both
-    // fold together when a draw carries the two. Folding is only valid for blends that never need
-    // a dst texture: the PorterDuff XP path composites coverage separately, while
-    // EmptyXferProcessor draws produce identical pixels either way. When the fold is attempted, the
-    // color-only route is skipped: if fusion fails, the plain route still renders the mask
-    // correctly as a trailing color processor.
-    std::vector<const FragmentProcessor*> foldedProcessors = colorProcessors;
-    bool foldBlocked = false;
-    if (maskCoverage != nullptr) {
-      if (IsFoldableLocalMask(maskCoverage)) {
-        foldedProcessors.push_back(maskCoverage);
-      } else {
-        foldBlocked = true;
-      }
-    }
-    if (clipCoverage != nullptr) {
-      // Only the analytic device-space AA-rect clip coverage lowers into the chain today; a
-      // clip-mask texture (DeviceSpaceTextureEffect) is device-space sampled and stays a coverage
-      // FP, which blocks the fold entirely so the draw keeps the plain route. A bare texture fill
-      // under that clip also keeps the plain route, where QuadTextureFill takes it directly.
-      if (IsDeviceSpaceAARectEffect(clipCoverage) &&
-          !IsDedicatedTextureFillCandidate(op.get(), colorProcessors, maskCoverage)) {
-        foldedProcessors.push_back(clipCoverage);
-      } else {
-        foldBlocked = true;
-      }
-    }
-    // The fold's clip coverage rides the chain kernel's clip-coverage channel (composited as the
-    // XP's coverage input — see ClipCoverageRegister in pointwise_chain.frag), so it is correct
-    // for every mode the dst-texture gate below admits; the geometric-clip restriction of the
-    // interim blend-mode guard is gone. (The gate itself keeps dst-reading modes like Src+coverage on
-    // the plain route with their PorterDuff XP, where the chain's C input composites them.)
-    bool foldMask = !foldBlocked && foldedProcessors.size() > colorProcessors.size() &&
-                    !BlendModeNeedDstTexture(brush.blendMode, true);
-    if (foldMask) {
-      auto folded = AOTRouter::Route(foldedProcessors);
-      if (folded.has_value()) {
-        // A folded plan that needs no task leaves the draw on the plain route with its coverage
-        // still attached: the plain route's chain matcher folds it itself at prepare time. A task
-        // build moves the coverage into the color processors first (the terminal draw must not
-        // apply it again, and the task's own fallback path sees the folded tree) — and once
-        // moved it stays moved: under the fold contract a trailing coverage multiply is
-        // pixel-equivalent on the plain route, so a refused build goes straight there too,
-        // because the color-only route below plans from the ORIGINAL color list and would
-        // silently drop the moved mask/clip.
-        if (AOTRouter::PlanRequiresTask(folded->plan)) {
-          op->moveCoveragesToColors();
-          if (submitPlanTask(folded->graph, folded->plan, *deviceBounds, &op)) {
+    const bool coverageFree = !op->hasCoverageProcessors();
+    if (auto* ir = op->loweredIR()) {
+      auto plan = AOTRouter::Plan(*ir);
+      if (plan.has_value()) {
+        if (AOTRouter::PlanRequiresTask(*plan) &&
+            AOTRouter::TaskCarriesCoverage(*plan, ir->coverage, brush.blendMode)) {
+          if (submitPlanTask(ir->color, *plan, *deviceBounds, &op, &ir->coverage)) {
             return;
           }
         }
-        drawOps.emplace_back(std::move(op));
-        return;
+        // A single-pass plan needs no task: the plain route's matcher serves it at prepare time.
+      } else if (coverageFree && cache->diagnosticRecordingEnabled()) {
+        // The color side lowered but no planner covers it — the same fact the color-only attempt
+        // recorded. A draw still carrying coverage processors records nothing: its route was
+        // never a color-only one, and classifying it would require the analysis the production
+        // path does not run.
+        cache->recordDecomposeRejection(AOTDecomposeOutcome::UnsupportedShape);
       }
-      // The folded tree had no plan and nothing moved: fall through to the color-only route.
-    }
-    // The color-only route replaces the color processors with rebuilt Chain/Perlin/YUV FPs whose
-    // matchers are all single-FP, so a draw still carrying a coverage FP (clip coverage or an
-    // unfoldable mask) can never match and skips it. Coverage from the geometry processor (AA
-    // edges of a rect, oval, or path) is no obstacle: the terminal pass keeps the draw's own
-    // geometry processor.
-    std::optional<AOTRoutePlan> colors = std::nullopt;
-    AOTDecomposeOutcome rejection = AOTDecomposeOutcome::Trivial;
-    if (!op->hasCoverageProcessors()) {
-      colors = AOTRouter::Route(colorProcessors, &rejection);
-    }
-    if (colors.has_value()) {
-      if (AOTRouter::PlanRequiresTask(colors->plan)) {
-        if (submitPlanTask(colors->graph, colors->plan, *deviceBounds, &op)) {
-          return;
-        }
-      }
-      // A single-pass plan needs no task: the plain route's matcher serves it at prepare time.
-    } else if (cache->diagnosticRecordingEnabled() && rejection != AOTDecomposeOutcome::Trivial) {
-      // The route was attempted and refused: the reason comes straight from the attempt — which
-      // processor lacked a lowering or which shape no planner covered — with no second analysis
-      // pass. A draw whose route was never attempted (it still carries coverage) records nothing:
-      // classifying it would require the analysis the production path does not run.
-      cache->recordDecomposeRejection(rejection);
+    } else if (coverageFree && op->type() != DrawOp::Type::AtlasTextOp &&
+               cache->diagnosticRecordingEnabled()) {
+      // The color side failed to lower: the same category the FP-walk route recorded, without a
+      // second analysis pass over the processor tree. Atlas-text ops never attempt the lowering
+      // (their glyph leaf needs the geometry processor), so they record nothing here — as they
+      // never did.
+      cache->recordDecomposeRejection(AOTDecomposeOutcome::BlockedByLowering);
     }
   }
   drawOps.emplace_back(std::move(op));
@@ -1465,7 +1337,8 @@ void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, co
 }
 
 bool OpsCompositor::submitPlanTask(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
-                                   const Rect& deviceBounds, PlacementPtr<DrawOp>* op) {
+                                   const Rect& deviceBounds, PlacementPtr<DrawOp>* op,
+                                   const std::vector<AOTCoverageTerm>* terminalCoverage) {
   std::optional<Matrix> deviceToLocal = std::nullopt;
   if (plan.passes.size() > 1) {
     auto drawOp = static_cast<StandardDrawOp*>(op->get());
@@ -1486,7 +1359,7 @@ bool OpsCompositor::submitPlanTask(const AOTEffectGraph& graph, const AOTEffectP
     }
   }
   auto task = AOTPlanExecutor::Make(context, renderFlags, graph, plan, deviceBounds, renderTarget,
-                                    op, Point::Zero(), false, deviceToLocal);
+                                    op, Point::Zero(), false, deviceToLocal, terminalCoverage);
   if (task == nullptr) {
     return false;
   }
