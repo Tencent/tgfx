@@ -26,6 +26,8 @@
 namespace tgfx {
 
 class ProgramInfo;
+struct AOTProgram;
+struct PermutationVariant;
 
 /// Precompiled shader that evaluates an arbitrary pointwise DAG (texture and const-color leaves
 /// combined by color-matrix, luma, alpha-threshold, color-space-xform and blend ops) in a single
@@ -249,6 +251,19 @@ class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
   /// budget shapes), defined in the family's own .cpp, next to the GLSL it owns.
   static std::optional<Inputs> Extract(const ProgramInfo* programInfo,
                                        PermutationMatchFailure* failure);
+
+  /// The variant inputs of one compiled chain program for the draw programInfo describes (its
+  /// geometry and xfer processors and its target). Pure derivation over data the caller already
+  /// compiled; Extract is this plus the expression sourcing.
+  static std::optional<Inputs> DeriveInputs(const AOTProgram& program,
+                                            const ProgramInfo* programInfo,
+                                            PermutationMatchFailure* failure);
+
+  /// The variant one compiled chain program resolves to — the same DeriveInputs and Compose the
+  /// matcher applies, so the AOT route (which holds the program before any cache lookup) and the
+  /// matcher walk cannot disagree. Returns nullopt when the program's shape has no variant.
+  static std::optional<PermutationVariant> MatchProgram(const AOTProgram& program,
+                                                        const ProgramInfo* programInfo);
 
  private:
   static bool ComposeGP(const Inputs& inputs, ComposedDims<VertDims>* vert,

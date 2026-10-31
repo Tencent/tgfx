@@ -22,6 +22,7 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/Program.h"
+#include "gpu/aot/AOTProgramInfo.h"
 #include "gpu/aot/DrawIR.h"
 #include "gpu/shaders/kernels/PointwiseChainShader.h"
 
@@ -81,6 +82,34 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget,
     if (context == nullptr || context->drawingManager() == nullptr) {
       return false;
     }
+    // The AOT route resolves a pass draw before any cache lookup: the pass IR compiles onto the
+    // chain program, whose variant plus the pipeline state form the key. The pass info carries no
+    // processors — the program is the whole expression; the plain route's pass form (the rebuilt
+    // shell as the one color processor) computes the same blend formula, hence the false coverage
+    // bit below.
+    AOTProgram aotProgram = {};
+    if (AOTChainBuilder::CompilePassProgram(*resolvedPassIR, &aotProgram)) {
+      auto passInfo = std::make_unique<ProgramInfo>(renderTarget, geometryProcessor.get(),
+                                                    xferProcessor.get(), blendMode, false);
+      passInfo->setCullMode(cullMode);
+      if (depthStencilFormat != PixelFormat::Unknown) {
+        DepthStencilDescriptor depthStencil = {};
+        depthStencil.format = depthStencilFormat;
+        passInfo->setDepthStencil(depthStencil);
+      }
+      onConfigureProgramInfo(*passInfo);
+      AOTProgramInfo aotInfo(*passInfo, aotProgram);
+      if (aotInfo.valid()) {
+        passInfo->setCachedChainProgram(std::move(aotProgram));
+        preparedProgramInfo = std::move(passInfo);
+        preparedProgram = aotInfo.program();
+        preparedViaDecomposition = true;
+        preparedRenderTarget = renderTarget;
+        return true;
+      }
+    }
+    // The route cannot serve this pass (its shape has no variant, or the bundle lacks it): fall
+    // back to the shell form below.
     preparedPassProcessor = AOTChainBuilder::BuildPassProcessor(
         context->drawingManager()->drawingAllocator(), *resolvedPassIR);
     if (preparedPassProcessor == nullptr) {

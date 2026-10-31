@@ -34,6 +34,17 @@ class PrecompiledProgramCreator {
   // recording. It is false for all other failures and for successful precompiled programs.
   static std::shared_ptr<Program> CreateProgram(Context* context, const ProgramInfo* programInfo,
                                                 bool* deferredFallback = nullptr);
+
+  /**
+   * Creates the Program a resolved match points at: the deny list, the blob lookup, the shader
+   * modules and the pipeline. The caller supplies the match (the plain route from the matcher
+   * walk, the AOT route from the compiled program's variant) and an info carrying the geometry
+   * processor and the pipeline state; no fragment-processor list is read. Returns nullptr when
+   * the variant is denied, missing from the bundle, or fails to build.
+   */
+  static std::shared_ptr<Program> CreateProgramFromMatch(Context* context,
+                                                         const ProgramInfo* programInfo,
+                                                         const PermutationMatchResult& match);
 };
 
 }  // namespace tgfx

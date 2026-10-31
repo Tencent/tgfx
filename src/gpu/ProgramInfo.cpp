@@ -46,6 +46,16 @@ ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometry
     : renderTarget(renderTarget), geometryProcessor(geometryProcessor),
       fragmentProcessors(std::move(fragmentProcessors)), numColorProcessors(numColorProcessors),
       xferProcessor(xferProcessor), blendMode(blendMode) {
+  hasCoverageForBlend = numColorProcessors < this->fragmentProcessors.size();
+  updateProcessorIndices();
+}
+
+ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
+                         XferProcessor* xferProcessor, BlendMode blendMode,
+                         bool blendFormulaHasCoverage)
+    : renderTarget(renderTarget), geometryProcessor(geometryProcessor),
+      xferProcessor(xferProcessor), blendMode(blendMode),
+      hasCoverageForBlend(blendFormulaHasCoverage) {
   updateProcessorIndices();
 }
 
@@ -86,7 +96,7 @@ PipelineColorAttachment ProgramInfo::getPipelineColorAttachment() const {
     return colorAttachment;
   }
   BlendFormula blendFormula = {};
-  if (!BlendModeAsCoeff(blendMode, numColorProcessors < fragmentProcessors.size(), &blendFormula)) {
+  if (!BlendModeAsCoeff(blendMode, hasCoverageForBlend, &blendFormula)) {
     return colorAttachment;
   }
   colorAttachment.blendEnable = true;
@@ -151,26 +161,30 @@ BytesKey ProgramInfo::buildProgramKey() const {
   if (xferProcessor != nullptr) {
     xferProcessor->computeProcessorKey(context, &key);
   }
-  key.write(static_cast<uint32_t>(blendMode));
-  key.write(static_cast<uint32_t>(getOutputSwizzle().asKey()));
-  key.write(static_cast<uint32_t>(cullMode));
-  key.write(static_cast<uint32_t>(renderTarget->format()));
+  writePipelineStateKey(&key);
+  return key;
+}
+
+void ProgramInfo::writePipelineStateKey(BytesKey* key) const {
+  key->write(static_cast<uint32_t>(blendMode));
+  key->write(static_cast<uint32_t>(getOutputSwizzle().asKey()));
+  key->write(static_cast<uint32_t>(cullMode));
+  key->write(static_cast<uint32_t>(renderTarget->format()));
   // Note: if mask or alphaToCoverage from MultisampleDescriptor are used in the pipeline
   // creation, they must also be encoded here.
-  key.write(static_cast<uint32_t>(renderTarget->sampleCount()));
+  key->write(static_cast<uint32_t>(renderTarget->sampleCount()));
   // Pipelines that share shaders but differ in colour write mask or stencil configuration must
   // resolve to distinct cache entries — otherwise the stencil-and-cover stencil/cover passes
   // would silently collapse onto a single program. Keep this section in sync with the fields that
   // are actually written into RenderPipelineDescriptor.
-  key.write(colorWriteMask);
-  key.write(static_cast<uint32_t>(depthStencil.format));
-  key.write(static_cast<uint32_t>(depthStencil.depthCompare));
-  key.write(static_cast<uint32_t>(depthStencil.depthWriteEnabled ? 1 : 0));
-  key.write(depthStencil.stencilReadMask);
-  key.write(depthStencil.stencilWriteMask);
-  EncodeStencilFace(key, depthStencil.stencilFront);
-  EncodeStencilFace(key, depthStencil.stencilBack);
-  return key;
+  key->write(colorWriteMask);
+  key->write(static_cast<uint32_t>(depthStencil.format));
+  key->write(static_cast<uint32_t>(depthStencil.depthCompare));
+  key->write(static_cast<uint32_t>(depthStencil.depthWriteEnabled ? 1 : 0));
+  key->write(depthStencil.stencilReadMask);
+  key->write(depthStencil.stencilWriteMask);
+  EncodeStencilFace(*key, depthStencil.stencilFront);
+  EncodeStencilFace(*key, depthStencil.stencilBack);
 }
 
 std::shared_ptr<Program> ProgramInfo::getProgram() const {

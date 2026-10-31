@@ -355,6 +355,15 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
     return nullptr;
   }
   cache->recordAOTStage(PrecompiledAOTStage::PermutationMatched);
+  return CreateProgramFromMatch(context, programInfo, *matchResult);
+}
+
+std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
+    Context* context, const ProgramInfo* programInfo, const PermutationMatchResult& match) {
+  auto cache = context->precompiledShaderCache();
+  // The callers hold their own match in hand (CreateProgram just ran the walk; the AOT route
+  // derives its variant from the compiled program), so this entry starts past the match.
+  const PermutationMatchResult* matchResult = &match;
 
   // TGFX_AOT_DENY holds a comma-separated list of shader names whose precompiled match is
   // rejected so the draw falls back to the runtime JIT program. Diagnostic only: it isolates a

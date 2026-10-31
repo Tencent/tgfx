@@ -1694,16 +1694,32 @@ bool AOTChainBuilder::BuildCutSegment(const AOTEffectGraph& graph, const AOTPass
   return FinishSegmentPass(builder, cutPass.output, builtMap, segment, pass);
 }
 
-PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildPassProcessor(BlockAllocator* allocator,
-                                                                    const DrawIR& passIR) {
-  if (allocator == nullptr || !passIR.passDescriptor.has_value()) {
-    return nullptr;
+bool AOTChainBuilder::CompilePassProgram(const DrawIR& passIR, AOTProgram* out) {
+  if (out == nullptr || !passIR.passDescriptor.has_value()) {
+    return false;
   }
   const auto& pass = *passIR.passDescriptor;
   if (pass.nodes.empty() || !IsAOTPointwiseDAGKernel(pass.kernel)) {
+    return false;
+  }
+  return CompileChainLayout(passIR.color, pass, &passIR.coverage, out);
+}
+
+PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildPassProcessor(BlockAllocator* allocator,
+                                                                    const DrawIR& passIR) {
+  if (allocator == nullptr) {
     return nullptr;
   }
-  return BuildChainFP(allocator, passIR.color, pass, &passIR.coverage);
+  AOTProgram program = {};
+  if (!CompilePassProgram(passIR, &program)) {
+    return nullptr;
+  }
+  AOTPointwiseChainProcessor::AOTChainChildren children = {};
+  if (!MaterializeChainChildren(allocator, program.samplerChildCount, program.bindings,
+                                &children)) {
+    return nullptr;
+  }
+  return AOTPointwiseChainProcessor::Make(allocator, std::move(program), std::move(children));
 }
 
 PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildFPForPass(BlockAllocator* allocator,

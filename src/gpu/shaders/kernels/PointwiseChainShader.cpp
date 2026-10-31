@@ -41,6 +41,47 @@ std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::Extract(
   if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
     return std::nullopt;
   }
+  if (programInfo->getGeometryProcessor() == nullptr) {
+    return std::nullopt;
+  }
+  // Dual acceptance: a draw still carrying the chain processor (a multi-pass plan task's pass,
+  // until the plan route retires) reads its shape directly; any other draw is the interpreter's
+  // own subject — the whole effect expression is compiled here.
+  const AOTProgram* compiled = nullptr;
+  if (programInfo->numColorFragmentProcessors() == 1 && programInfo->numFragmentProcessors() == 1) {
+    auto fp = programInfo->getFragmentProcessor(0);
+    if (IsProcessor<AOTPointwiseChainProcessor>(fp)) {
+      compiled = &static_cast<const AOTPointwiseChainProcessor*>(fp)->program();
+    }
+  }
+  if (compiled == nullptr) {
+    // Reuse a program this draw already compiled (the AOT route resolves the draw before the
+    // matcher walk runs): the compilation is a pure function of the info's expression.
+    compiled = programInfo->getCachedChainProgram();
+  }
+  if (compiled == nullptr) {
+    auto context = programInfo->getContext();
+    if (context == nullptr || context->drawingManager() == nullptr) {
+      return std::nullopt;
+    }
+    AOTProgram program = {};
+    if (!AOTChainBuilder::CompileChainProgramForInfo(context->drawingManager()->drawingAllocator(),
+                                                     programInfo, &program)) {
+      return std::nullopt;
+    }
+    // Keep the compiled program on the info: the walk stops here when the acceptance checks below
+    // pass, and the winner's writer uploads from it instead of rebuilding the expression per draw.
+    programInfo->setCachedChainProgram(std::move(program));
+    compiled = programInfo->getCachedChainProgram();
+  }
+  return DeriveInputs(*compiled, programInfo, failure);
+}
+
+std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::DeriveInputs(
+    const AOTProgram& program, const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
+  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    return std::nullopt;
+  }
   auto gp = programInfo->getGeometryProcessor();
   // GP profiles: 0 Default, 1 Quad, 2 Mesh (whose vertex buffers follow the
   // chain's attribute order), 3 the sampler-free AtlasText twin, 4 the ellipse layout, 5 the
@@ -64,34 +105,6 @@ std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::Extract(
   if (gpKind < 0) {
     return std::nullopt;
   }
-  // Dual acceptance: a draw still carrying the chain processor (a multi-pass plan task's pass,
-  // until the plan route retires) reads its shape directly; any other draw is the interpreter's
-  // own subject — the whole effect expression is compiled here.
-  const AOTProgram* compiled = nullptr;
-  if (programInfo->numColorFragmentProcessors() == 1 && programInfo->numFragmentProcessors() == 1) {
-    auto fp = programInfo->getFragmentProcessor(0);
-    if (IsProcessor<AOTPointwiseChainProcessor>(fp)) {
-      compiled = &static_cast<const AOTPointwiseChainProcessor*>(fp)->program();
-    }
-  }
-  if (compiled == nullptr) {
-    auto context = programInfo->getContext();
-    if (context == nullptr || context->drawingManager() == nullptr) {
-      return std::nullopt;
-    }
-    AOTProgram program = {};
-    if (!AOTChainBuilder::CompileChainProgramForInfo(context->drawingManager()->drawingAllocator(),
-                                                     programInfo, &program)) {
-      return std::nullopt;
-    }
-    // Keep the compiled program on the info: the walk stops here when the acceptance checks below
-    // pass, and the winner's writer uploads from it instead of rebuilding the expression per draw.
-    programInfo->setCachedChainProgram(std::move(program));
-    compiled = programInfo->getCachedChainProgram();
-  }
-  // Everything below reads the compiled program, never a processor shell: the program is the
-  // single description of what the draw's chain variant needs.
-  const auto& program = *compiled;
   // Sampler-only padding makes every non-empty chain present exactly four sampler children.
   if (program.samplerChildCount != 0 && program.samplerChildCount != 4) {
     return std::nullopt;
@@ -186,6 +199,20 @@ std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::Extract(
     return std::nullopt;
   }
   return inputs;
+}
+
+std::optional<PermutationVariant> PointwiseChainShader::MatchProgram(
+    const AOTProgram& program, const ProgramInfo* programInfo) {
+  auto inputs = DeriveInputs(program, programInfo, nullptr);
+  if (!inputs) {
+    return std::nullopt;
+  }
+  auto composed = Compose(*inputs);
+  if (!composed) {
+    return std::nullopt;
+  }
+  return PermutationVariant{VertDims::domain().encode(composed->vertValues),
+                            FragDims::domain().encode(composed->fragValues)};
 }
 
 }  // namespace tgfx

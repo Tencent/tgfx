@@ -168,6 +168,13 @@ class AOTChainBuilder {
                                          AOTProgram* out);
 
   /**
+   * Compiles one plan pass's IR into the fused chain program and its binding table, without
+   * building the pass's processor: the AOT route resolves a pass draw from the program alone.
+   * Returns false when the IR is not a chain pass or the pass does not compile.
+   */
+  static bool CompilePassProgram(const DrawIR& passIR, AOTProgram* out);
+
+  /**
    * Re-expresses a coverage-free draw's color expression as the perlin kernel processor with its
    * trailing operators (pointwise ops, const colors, const blends) folded into the slot records,
    * without touching the draw. This is the perlin kernel's view of an unmodified ProgramInfo: the

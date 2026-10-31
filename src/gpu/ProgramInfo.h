@@ -53,6 +53,15 @@ class ProgramInfo {
               std::vector<FragmentProcessor*> fragmentProcessors, size_t numColorProcessors,
               XferProcessor* xferProcessor, BlendMode blendMode);
 
+  /**
+   * The AOT route's form: no fragment processors ride the info — the draw's whole expression
+   * travels as a compiled chain program, so the matcher, the program key and the upload never read
+   * the processor list. blendFormulaHasCoverage carries the one fact the pipeline's blend formula
+   * takes from that list on the plain route: whether coverage processors follow the color ones.
+   */
+  ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
+              XferProcessor* xferProcessor, BlendMode blendMode, bool blendFormulaHasCoverage);
+
   size_t numColorFragmentProcessors() const {
     return numColorProcessors;
   }
@@ -99,6 +108,14 @@ class ProgramInfo {
    * fallback), while an unloaded cache falls back to runtime shader generation.
    */
   std::shared_ptr<Program> getProgram() const;
+
+  /**
+   * Writes the pipeline-state fields the program keys carry — everything past the processor keys
+   * (blend mode, output swizzle, cull, target format and samples, colour write mask, depth and
+   * stencil). The plain route's key and the AOT route's key share this tail, so the two routes
+   * encode identical state identically.
+   */
+  void writePipelineStateKey(BytesKey* key) const;
 
   std::shared_ptr<GPUBuffer> getUniformBuffer(const Program* program, size_t* vertexOffset,
                                               size_t* fragmentOffset) const;
@@ -276,6 +293,9 @@ class ProgramInfo {
   size_t numColorProcessors = 0;
   XferProcessor* xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
+  // Whether coverage processors follow the color ones — the only fragment-list fact the pipeline's
+  // blend formula reads (see the AOT-route constructor for the list-free form).
+  bool hasCoverageForBlend = false;
   CullMode cullMode = CullMode::None;
   DepthStencilDescriptor depthStencil = {};
   uint32_t colorWriteMask = ColorWriteMask::All;
