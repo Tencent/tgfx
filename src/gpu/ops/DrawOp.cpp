@@ -28,6 +28,10 @@ DrawOp::DrawOp(BlockAllocator* allocator, AAType aaType) : allocator(allocator),
 
 DrawOp::~DrawOp() = default;
 
+void DrawOp::adoptLoweredIR(PlacementPtr<DrawIR> passIR) {
+  ir = std::move(passIR);
+}
+
 void DrawOp::moveCoveragesToColors() {
   for (auto& coverage : coverages) {
     colors.emplace_back(std::move(coverage));

@@ -1681,6 +1681,18 @@ bool AOTChainBuilder::BuildCutSegment(const AOTEffectGraph& graph, const AOTPass
   return FinishSegmentPass(builder, cutPass.output, builtMap, segment, pass);
 }
 
+PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildPassProcessor(BlockAllocator* allocator,
+                                                                    const DrawIR& passIR) {
+  if (allocator == nullptr || !passIR.passDescriptor.has_value()) {
+    return nullptr;
+  }
+  const auto& pass = *passIR.passDescriptor;
+  if (pass.nodes.empty() || !IsAOTPointwiseDAGKernel(pass.kernel)) {
+    return nullptr;
+  }
+  return BuildChainFP(allocator, passIR.color, pass, &passIR.coverage);
+}
+
 PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildFPForPass(BlockAllocator* allocator,
                                                                 const AOTEffectGraph& graph,
                                                                 const AOTPassDescriptor& pass) {
@@ -1688,7 +1700,10 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildFPForPass(BlockAllocator* 
     return nullptr;
   }
   if (IsAOTPointwiseDAGKernel(pass.kernel)) {
-    return BuildChainFP(allocator, graph, pass, nullptr);
+    // Chain passes travel as pass IRs and are rebuilt through BuildPassProcessor; a DAG single
+    // pass is never a plan task (PlanRequiresTask admits the fused kernels in place), and every
+    // cut-plan pass is rebuilt from its segment. Only the linear kernels reach this entry.
+    return nullptr;
   }
   // The linear kernels: the source node plus its operators folded into the processor's own slot
   // records, one program per pass with no Compose wrapper.

@@ -22,6 +22,7 @@
 #include "gpu/AOTPlanExecutor.h"
 #include "gpu/AOTRouter.h"
 #include "gpu/PrecompiledShaderCache.h"
+#include "gpu/aot/DrawIR.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/GenerateMipmapsTask.h"
@@ -47,13 +48,30 @@ DrawingBuffer* DrawingManager::createDrawingBuffer() {
   return currentBuffer.get();
 }
 
+PlacementPtr<DrawOp> DrawingManager::makePassFillDrawOp(
+    std::shared_ptr<RenderTargetProxy> renderTarget, PlacementPtr<DrawIR> passIR,
+    uint32_t renderFlags, const Point& coordOffset, float inputAlpha) {
+  if (passIR == nullptr) {
+    return nullptr;
+  }
+  auto drawOp = makeFillDrawOp(renderTarget, PlacementPtr<FragmentProcessor>(), renderFlags,
+                               coordOffset, inputAlpha);
+  if (drawOp == nullptr) {
+    return nullptr;
+  }
+  drawOp->adoptLoweredIR(std::move(passIR));
+  return drawOp;
+}
+
 PlacementPtr<DrawOp> DrawingManager::makeFillDrawOp(std::shared_ptr<RenderTargetProxy> renderTarget,
                                                     PlacementPtr<FragmentProcessor> processor,
                                                     uint32_t renderFlags, const Point& coordOffset,
                                                     float inputAlpha) {
-  if (renderTarget == nullptr || processor == nullptr) {
+  if (renderTarget == nullptr) {
     return nullptr;
   }
+  // A null processor is only passed by the plan-pass overload above, which attaches the pass IR
+  // in place of a color processor.
   auto allocator = drawingAllocator();
   auto width = static_cast<float>(renderTarget->width());
   auto height = static_cast<float>(renderTarget->height());
@@ -80,7 +98,9 @@ PlacementPtr<DrawOp> DrawingManager::makeFillDrawOp(std::shared_ptr<RenderTarget
   if (drawOp == nullptr) {
     return nullptr;
   }
-  drawOp->addColorFP(std::move(processor));
+  if (processor != nullptr) {
+    drawOp->addColorFP(std::move(processor));
+  }
   drawOp->setBlendMode(BlendMode::Src);
   return drawOp;
 }

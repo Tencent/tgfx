@@ -21,6 +21,7 @@
 #include <memory>
 #include <vector>
 #include "gpu/AOTMaterializationPolicy.h"
+#include "gpu/aot/DrawIR.h"
 #include "gpu/ops/DrawOp.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 
@@ -70,11 +71,14 @@ struct AOTRenderPass {
  */
 struct AOTRenderPlan {
   std::vector<AOTRenderPass> passes = {};
+  /// The terminal pass of a non-chain plan (YUV or perlin): its color processors.
   DrawOp::ColorProcessorList terminalColors = {};
+  /// The terminal pass of a chain plan: the cut segment's IR, rebuilt at prepare time.
+  PlacementPtr<DrawIR> terminalIR = nullptr;
 
   /**
-   * Whether every pass has a target and a draw, and the terminal pass has color processors. The
-   * pass order is the builder's responsibility and is not checked here.
+   * Whether every pass has a target and a draw, and the terminal pass carries exactly one of its
+   * two forms. The pass order is the builder's responsibility and is not checked here.
    */
   bool isWellFormed() const {
     for (const auto& pass : passes) {
@@ -82,7 +86,7 @@ struct AOTRenderPlan {
         return false;
       }
     }
-    return !terminalColors.empty();
+    return terminalColors.empty() != (terminalIR == nullptr);
   }
 };
 }  // namespace tgfx

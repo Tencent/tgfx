@@ -31,6 +31,7 @@
 
 namespace tgfx {
 struct RuntimeInputTexture;
+struct DrawIR;
 
 class DrawingManager {
  public:
@@ -60,6 +61,18 @@ class DrawingManager {
                                       uint32_t renderFlags,
                                       const Point& coordOffset = Point::Zero(),
                                       float inputAlpha = 1.0f);
+
+  /**
+   * The plan-pass form: the fill draw carries the pass's IR instead of a processor, and the
+   * prepare-time serving rebuilds the processor once (see DrawOp::adoptLoweredIR). Everything
+   * else matches makeFillDrawOp above. Deliberately not an overload: PlacementPtr's cross-type
+   * move constructor makes a derived processor pointer convert to either parameter type, so
+   * overload resolution would be ambiguous at every call site.
+   */
+  PlacementPtr<DrawOp> makePassFillDrawOp(std::shared_ptr<RenderTargetProxy> renderTarget,
+                                          PlacementPtr<DrawIR> passIR, uint32_t renderFlags,
+                                          const Point& coordOffset = Point::Zero(),
+                                          float inputAlpha = 1.0f);
 
   /**
    * Fills the render target using the provided fragment processor, and automatically resolves the

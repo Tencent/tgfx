@@ -22,6 +22,8 @@
 #include "gpu/ProgramInfo.h"
 
 namespace tgfx {
+struct DrawIR;
+
 /**
  * StandardDrawOp is the base class for ops that follow the "framework binds one pipeline,
  * subclass issues one draw call" pattern. execute() is final: it first gives the subclass a
@@ -49,7 +51,8 @@ class StandardDrawOp : public DrawOp {
    */
   bool prepare(RenderTarget* renderTarget,
                std::optional<ColorProcessorList> colorOverride = std::nullopt,
-               PixelFormat depthStencilFormat = PixelFormat::Unknown, bool isFinalLookup = true);
+               PixelFormat depthStencilFormat = PixelFormat::Unknown, bool isFinalLookup = true,
+               const DrawIR* passIR = nullptr);
 
   /**
    * Executes a successfully prepared draw and uploads its uniforms and texture samplers. Set
@@ -73,7 +76,7 @@ class StandardDrawOp : public DrawOp {
    */
   bool prepareForTask(RenderTarget* renderTarget,
                       std::optional<ColorProcessorList> colorOverride = std::nullopt,
-                      bool isFinalLookup = true);
+                      bool isFinalLookup = true, const DrawIR* passIR = nullptr);
 
   /**
    * The geometry color every fragment of this op receives as its input color, or nullopt when
@@ -139,6 +142,9 @@ class StandardDrawOp : public DrawOp {
   PlacementPtr<GeometryProcessor> geometryProcessor = nullptr;
   bool geometryProcessorInitialized = false;
   std::optional<ColorProcessorList> preparedColors = std::nullopt;
+  // The chain processor rebuilt from a plan pass's IR (see prepare's passIR): the info points at
+  // it, so it must outlive the info.
+  PlacementPtr<FragmentProcessor> preparedPassProcessor = nullptr;
   std::unique_ptr<ProgramInfo> preparedProgramInfo = nullptr;
   std::shared_ptr<Program> preparedProgram = nullptr;
   RenderTarget* preparedRenderTarget = nullptr;

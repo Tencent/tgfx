@@ -117,6 +117,14 @@ class DrawOp {
   void tryLowerIR();
 
   /**
+   * Adopts a plan pass's IR: the op's expression is that pass (a cut segment built by the plan
+   * executor), so the fill draw carries IR instead of a processor and the prepare-time serving
+   * rebuilds the processor once. The override replaces any record-time IR and the op's own
+   * processors are ignored while it is set.
+   */
+  void adoptLoweredIR(PlacementPtr<DrawIR> passIR);
+
+  /**
    * Whether the draw produces fractional coverage from any source: its coverage processors, or its
    * geometry processor (analytic AA edges, glyph masks, per-vertex coverage). Decides whether the
    * blend needs a dst texture.

@@ -20,6 +20,7 @@
 
 #include <optional>
 #include <vector>
+#include "gpu/AOTEffectDecomposer.h"
 #include "gpu/aot/EffectGraph.h"
 #include "tgfx/core/BlendMode.h"
 
@@ -69,6 +70,13 @@ struct DrawIR {
   std::vector<AOTCoverageTerm> coverage = {};
   const XferProcessor* xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
+  /**
+   * Plan-pass serving: the fused pass descriptor the color graph was cut for (kernel, node list,
+   * profile, dependencies). A pass IR carries it so its processor is rebuilt exactly as the
+   * planner fit it — never re-planned. A draw IR leaves it empty and its single pass is planned
+   * on demand; a pass IR carries no coverage terms (plan passes never apply draw coverage).
+   */
+  std::optional<AOTPassDescriptor> passDescriptor = std::nullopt;
 };
 
 /**

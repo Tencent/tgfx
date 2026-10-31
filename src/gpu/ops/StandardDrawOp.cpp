@@ -18,8 +18,11 @@
 
 #include "StandardDrawOp.h"
 #include "core/utils/Log.h"
+#include "gpu/AOTChainBuilder.h"
+#include "gpu/DrawingManager.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/Program.h"
+#include "gpu/aot/DrawIR.h"
 #include "gpu/shaders/kernels/PointwiseChainShader.h"
 
 namespace tgfx {
@@ -43,7 +46,8 @@ static bool IsDirectAOTShader(const std::string& shaderName) {
 
 bool StandardDrawOp::prepare(RenderTarget* renderTarget,
                              std::optional<ColorProcessorList> colorOverride,
-                             PixelFormat depthStencilFormat, bool isFinalLookup) {
+                             PixelFormat depthStencilFormat, bool isFinalLookup,
+                             const DrawIR* passIR) {
   if (!geometryProcessorInitialized) {
     geometryProcessorInitialized = true;
     geometryProcessor = onMakeGeometryProcessor(renderTarget);
@@ -57,19 +61,45 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget,
   preparedRenderTarget = nullptr;
   preparedViaDecomposition = false;
   preparedColors = std::move(colorOverride);
+  preparedPassProcessor = nullptr;
   auto& activeColors = preparedColors.has_value() ? *preparedColors : colors;
 
   std::vector<FragmentProcessor*> fragmentProcessors = {};
-  fragmentProcessors.reserve(activeColors.size() + coverages.size());
-  for (auto& color : activeColors) {
-    fragmentProcessors.emplace_back(color.get());
+  size_t colorCount = activeColors.size();
+  // Plan-pass serving: the pass IR describes the expression, so its chain processor is rebuilt
+  // here (once per prepare) instead of travelling through the task as a processor. A fill pass
+  // carries the IR on itself; the terminal pass hands it in from the plan.
+  const DrawIR* resolvedPassIR = passIR;
+  if (resolvedPassIR == nullptr) {
+    auto* lowered = loweredIR();
+    if (lowered != nullptr && lowered->passDescriptor.has_value()) {
+      resolvedPassIR = lowered;
+    }
   }
-  for (auto& coverage : coverages) {
-    fragmentProcessors.emplace_back(coverage.get());
+  if (resolvedPassIR != nullptr) {
+    auto context = renderTarget->getContext();
+    if (context == nullptr || context->drawingManager() == nullptr) {
+      return false;
+    }
+    preparedPassProcessor = AOTChainBuilder::BuildPassProcessor(
+        context->drawingManager()->drawingAllocator(), *resolvedPassIR);
+    if (preparedPassProcessor == nullptr) {
+      return false;
+    }
+    fragmentProcessors.emplace_back(preparedPassProcessor.get());
+    colorCount = 1;
+  } else {
+    fragmentProcessors.reserve(activeColors.size() + coverages.size());
+    for (auto& color : activeColors) {
+      fragmentProcessors.emplace_back(color.get());
+    }
+    for (auto& coverage : coverages) {
+      fragmentProcessors.emplace_back(coverage.get());
+    }
   }
-  preparedProgramInfo = std::make_unique<ProgramInfo>(
-      renderTarget, geometryProcessor.get(), std::move(fragmentProcessors), activeColors.size(),
-      xferProcessor.get(), blendMode);
+  preparedProgramInfo = std::make_unique<ProgramInfo>(renderTarget, geometryProcessor.get(),
+                                                      std::move(fragmentProcessors), colorCount,
+                                                      xferProcessor.get(), blendMode);
   preparedProgramInfo->setCullMode(cullMode);
   if (depthStencilFormat != PixelFormat::Unknown) {
     // Some backends reject a pipeline that declares no depth-stencil format while the pass has a
@@ -110,13 +140,14 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget,
 
 bool StandardDrawOp::prepareForTask(RenderTarget* renderTarget,
                                     std::optional<ColorProcessorList> colorOverride,
-                                    bool isFinalLookup) {
+                                    bool isFinalLookup, const DrawIR* passIR) {
   // Mirror execute()'s ordering: onPrepare() may veto the op (empty asynchronous buffers);
   // skipping it here would leave those ops drawing from null resources ().
   if (!onPrepare()) {
     return false;
   }
-  return prepare(renderTarget, std::move(colorOverride), PixelFormat::Unknown, isFinalLookup);
+  return prepare(renderTarget, std::move(colorOverride), PixelFormat::Unknown, isFinalLookup,
+                 passIR);
 }
 
 bool StandardDrawOp::executePrepared(RenderPass* renderPass, RenderTarget* renderTarget,

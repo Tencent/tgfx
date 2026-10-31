@@ -65,6 +65,20 @@
 
 namespace tgfx {
 
+// The construction form of one pass: a chain pass is rebuilt from its pass IR (the form every
+// production plan carries), the linear kernels through BuildFPForPass.
+static PlacementPtr<FragmentProcessor> BuildProcessorForTest(BlockAllocator* allocator,
+                                                             const AOTEffectGraph& graph,
+                                                             const AOTPassDescriptor& pass) {
+  if (IsAOTPointwiseDAGKernel(pass.kernel)) {
+    DrawIR passIR = {};
+    passIR.color = graph;
+    passIR.passDescriptor = pass;
+    return AOTChainBuilder::BuildPassProcessor(allocator, passIR);
+  }
+  return AOTChainBuilder::BuildFPForPass(allocator, graph, pass);
+}
+
 static constexpr std::array<float, 20> IdentityColorMatrix = {
     1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0,
 };
@@ -649,7 +663,7 @@ TGFX_TEST(AOTEffectTest, TiledHardwareSamplingSnapshotMatchesLowering) {
   EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, wrongFamily));
   EXPECT_EQ(AOTChainBuilder::BuildChainProcessor(&allocator, graph, wrongFamily.passes[0]),
             nullptr);
-  EXPECT_EQ(AOTChainBuilder::BuildFPForPass(&allocator, graph, wrongFamily.passes[0]), nullptr);
+  EXPECT_EQ(BuildProcessorForTest(&allocator, graph, wrongFamily.passes[0]), nullptr);
 }
 
 TGFX_TEST(AOTEffectTest, TiledShaderModesAndStrictSubsetMatchLowering) {
@@ -1410,7 +1424,7 @@ TGFX_TEST(AOTEffectTest, DeviceSpaceLinearChainUsesChainKernel) {
     ASSERT_EQ(plan.passes.size(), 1u);
     EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
     EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
-    auto processor = AOTChainBuilder::BuildFPForPass(&allocator, graph, plan.passes[0]);
+    auto processor = BuildProcessorForTest(&allocator, graph, plan.passes[0]);
     ASSERT_NE(processor, nullptr);
     ASSERT_EQ(processor->name(), "AOTPointwiseChainProcessor");
     auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
@@ -1441,7 +1455,7 @@ TGFX_TEST(AOTEffectTest, DeviceSpaceLinearChainUsesChainKernel) {
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(twoDeviceLeaves, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
   EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
-  auto processor = AOTChainBuilder::BuildFPForPass(&allocator, twoDeviceLeaves, plan.passes[0]);
+  auto processor = BuildProcessorForTest(&allocator, twoDeviceLeaves, plan.passes[0]);
   ASSERT_NE(processor, nullptr);
   ASSERT_EQ(processor->name(), "AOTPointwiseChainProcessor");
   auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
@@ -1481,7 +1495,7 @@ TGFX_TEST(AOTEffectTest, ChainLeavesTakeAlphaOnlyDeviceAndRgbaaaSources) {
     ASSERT_EQ(plan.passes.size(), 1u);
     EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
     EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
-    auto processor = AOTChainBuilder::BuildFPForPass(&allocator, graph, plan.passes[0]);
+    auto processor = BuildProcessorForTest(&allocator, graph, plan.passes[0]);
     ASSERT_NE(processor, nullptr);
     ASSERT_EQ(processor->name(), "AOTPointwiseChainProcessor");
     auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
@@ -1622,7 +1636,7 @@ TGFX_TEST(AOTEffectTest, TwoColorSpaceTransformsSplitIntoChainPasses) {
     ExpectSegmentedChainPlan(graph, plan, 2u);
     EXPECT_EQ(plan.passes[0].nodes.size(), insertLuma ? 3u : 2u);
     EXPECT_EQ(plan.passes[1].nodes, std::vector<AOTNodeID>{graph.root()});
-    EXPECT_NE(AOTChainBuilder::BuildFPForPass(&allocator, graph, plan.passes[0]), nullptr);
+    EXPECT_NE(BuildProcessorForTest(&allocator, graph, plan.passes[0]), nullptr);
     AOTEffectPlan forcedChain = {};
     forcedChain.output = graph.root();
     AOTPassDescriptor pass = {};
@@ -1691,7 +1705,7 @@ TGFX_TEST(AOTEffectTest, LUTBindingBudgetIsNotOrdinaryLeafBudget) {
       EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, forcedChain));
       EXPECT_EQ(AOTChainBuilder::BuildChainProcessor(&allocator, graph, forcedChain.passes[0]),
                 nullptr);
-      EXPECT_EQ(AOTChainBuilder::BuildFPForPass(&allocator, graph, forcedChain.passes[0]), nullptr);
+      EXPECT_EQ(BuildProcessorForTest(&allocator, graph, forcedChain.passes[0]), nullptr);
     }
   }
 }
@@ -2265,9 +2279,9 @@ TGFX_TEST(AOTEffectTest, PerlinDensityBranchesShareLookupResources) {
           EXPECT_EQ(AOTChainBuilder::BuildChainProcessor(context->drawingAllocator(), graph,
                                                          wrongFamily.passes[0]),
                     nullptr);
-          EXPECT_EQ(AOTChainBuilder::BuildFPForPass(context->drawingAllocator(), graph,
-                                                    wrongFamily.passes[0]),
-                    nullptr);
+          EXPECT_EQ(
+              BuildProcessorForTest(context->drawingAllocator(), graph, wrongFamily.passes[0]),
+              nullptr);
           auto rebuilt = AOTChainBuilder::BuildChainProcessor(context->drawingAllocator(), graph,
                                                               plan.passes[0]);
           ASSERT_NE(rebuilt, nullptr);
@@ -3090,7 +3104,7 @@ TGFX_TEST(AOTEffectTest, PerlinNoiseConstBlendFusesToSinglePass) {
   EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PerlinNoiseFill);
   EXPECT_EQ(plan.passes[0].nodes, std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(4)}));
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
-  EXPECT_NE(AOTChainBuilder::BuildFPForPass(&allocator, graph, plan.passes[0]), nullptr);
+  EXPECT_NE(BuildProcessorForTest(&allocator, graph, plan.passes[0]), nullptr);
 }
 
 // The SVG feTurbulence shape with a trailing colorize: Perlin -> luminanceToAlpha -> threshold ->
@@ -3124,7 +3138,7 @@ TGFX_TEST(AOTEffectTest, PerlinNoiseOpsThenConstBlendFusesToSinglePass) {
   EXPECT_EQ(plan.passes[0].nodes,
             std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(2), AOTNodeID(3), AOTNodeID(6)}));
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
-  EXPECT_NE(AOTChainBuilder::BuildFPForPass(&allocator, graph, plan.passes[0]), nullptr);
+  EXPECT_NE(BuildProcessorForTest(&allocator, graph, plan.passes[0]), nullptr);
 }
 
 // The Perlin blend slot uploads the constant operand as-is. An operand whose value depends on its
@@ -3175,8 +3189,7 @@ TGFX_TEST(AOTEffectTest, PerlinNoiseBlendRefusesInputDependentConstOperand) {
   forcedPlan.passes[0].output = AOTNodeID(3);
   forcedPlan.output = modulateGraph.root();
   EXPECT_FALSE(AOTPlanExecutor::CanExecute(modulateGraph, forcedPlan));
-  EXPECT_EQ(AOTChainBuilder::BuildFPForPass(&allocator, modulateGraph, forcedPlan.passes[0]),
-            nullptr);
+  EXPECT_EQ(BuildProcessorForTest(&allocator, modulateGraph, forcedPlan.passes[0]), nullptr);
 }
 
 // Table-driven admission matrix. Each row is one processor chain plus the route it must take; the
@@ -3298,7 +3311,7 @@ TGFX_TEST(AOTEffectTest, AdmissionMatrixKeepsPlanningAndConstructionAligned) {
     ASSERT_EQ(plan.passes.size(), row.passes);
     EXPECT_EQ(plan.passes[0].kernel, row.kernel);
     EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
-    EXPECT_NE(AOTChainBuilder::BuildFPForPass(&allocator, graph, plan.passes[0]), nullptr);
+    EXPECT_NE(BuildProcessorForTest(&allocator, graph, plan.passes[0]), nullptr);
   }
 }
 

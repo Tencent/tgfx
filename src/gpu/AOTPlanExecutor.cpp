@@ -144,7 +144,7 @@ static Matrix DeviceToFragCoord(const RenderTargetProxy* destination) {
 // geometry-color-reading fill bakes in (an operand fill is a shader value, so it is always 1 — the
 // terminal draw's epilogue applies the paint alpha exactly once).
 static bool AppendMaterializedPass(Context* context, uint32_t renderFlags,
-                                   PlacementPtr<FragmentProcessor> processor,
+                                   PlacementPtr<DrawIR> passIR,
                                    const MaterializedGeometry& geometry, const Point& fillOffset,
                                    float inputAlpha, AOTEdgeReason reason,
                                    std::vector<AOTRenderPass>* passes) {
@@ -154,8 +154,8 @@ static bool AppendMaterializedPass(Context* context, uint32_t renderFlags,
   }
   AOTRenderPass renderPass = {};
   renderPass.target = std::move(materialized.renderTarget);
-  renderPass.drawOp = context->drawingManager()->makeFillDrawOp(
-      renderPass.target, std::move(processor), renderFlags, fillOffset, inputAlpha);
+  renderPass.drawOp = context->drawingManager()->makePassFillDrawOp(
+      renderPass.target, std::move(passIR), renderFlags, fillOffset, inputAlpha);
   if (renderPass.drawOp == nullptr) {
     return false;
   }
@@ -197,8 +197,7 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
                                const AOTEffectPlan& plan, const Rect& deviceBounds,
                                const RenderTargetProxy* destination, const Point& fpCoordOffset,
                                const std::optional<Matrix>& deviceToLocal, float sourceAlpha,
-                               std::vector<AOTRenderPass>* passes,
-                               DrawOp::ColorProcessorList* terminalColors) {
+                               AOTRenderPlan* renderPlan) {
   auto drawingManager = context->drawingManager();
   auto allocator = drawingManager->drawingAllocator();
   // No apron: the terminal pass reads each intermediate at its own device pixel
@@ -233,10 +232,10 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
     bool isTerminal = index + 1 == plan.passes.size();
     std::vector<AOTTextureParameters> intermediates = {};
     for (auto dependency : pass.dependencies) {
-      if (dependency >= passes->size()) {
+      if (dependency >= renderPlan->passes.size()) {
         return false;
       }
-      auto target = (*passes)[dependency].target;
+      auto target = renderPlan->passes[dependency].target;
       if (target == nullptr) {
         return false;
       }
@@ -259,18 +258,24 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
             isTerminal ? Matrix::I() : deviceLeafRemap, &segment, &segmentPass)) {
       return false;
     }
-    auto processor = AOTChainBuilder::BuildFPForPass(allocator, segment, segmentPass);
-    if (processor == nullptr) {
+    // The pass travels as its IR: the segment graph plus the descriptor the planner fit. The
+    // processor is rebuilt from it once per prepare, never re-planned.
+    DrawIR passIR = {};
+    passIR.color = std::move(segment);
+    passIR.passDescriptor = std::move(segmentPass);
+    auto ownedIR = allocator->make<DrawIR>(std::move(passIR));
+    if (ownedIR == nullptr) {
       return false;
     }
     if (isTerminal) {
-      terminalColors->emplace_back(std::move(processor));
+      renderPlan->terminalIR = std::move(ownedIR);
       return true;
     }
     auto inputAlpha = PassReadsGeometryColor(graph, pass) ? sourceAlpha : 1.0f;
     auto edgeReason = EdgeReasonForCutConsumer(graph, plan.passes[index + 1], pass.output);
-    if (!AppendMaterializedPass(context, renderFlags, std::move(processor), geometry,
-                                geometry.coordOffset, inputAlpha, edgeReason, passes)) {
+    if (!AppendMaterializedPass(context, renderFlags, std::move(ownedIR), geometry,
+                                geometry.coordOffset, inputAlpha, edgeReason,
+                                &renderPlan->passes)) {
       return false;
     }
   }
@@ -334,20 +339,31 @@ bool AOTPlanExecutor::BuildPasses(Context* context, uint32_t renderFlags,
                                   const Rect& deviceBounds, const RenderTargetProxy* destination,
                                   const Point& fpCoordOffset,
                                   const std::optional<Matrix>& deviceToLocal,
-                                  std::vector<AOTRenderPass>* passes,
-                                  DrawOp::ColorProcessorList* terminalColors, float sourceAlpha) {
+                                  AOTRenderPlan* renderPlan, float sourceAlpha) {
   auto drawingManager = context->drawingManager();
   auto allocator = drawingManager->drawingAllocator();
   if (plan.passes.size() == 1) {
-    auto processor = AOTChainBuilder::BuildFPForPass(allocator, graph, plan.passes[0]);
+    const auto& pass = plan.passes[0];
+    if (IsAOTPointwiseDAGKernel(pass.kernel)) {
+      // Production never reaches this branch (a fused single pass serves its draw in place, and
+      // PlanRequiresTask refuses to build a task for it), but the executor's API contract admits
+      // one: the terminal draw carries the pass IR like any other chain pass.
+      DrawIR passIR = {};
+      passIR.color = graph;
+      passIR.passDescriptor = pass;
+      renderPlan->terminalIR = allocator->make<DrawIR>(std::move(passIR));
+      return renderPlan->terminalIR != nullptr;
+    }
+    // The linear kernels: a YUV or perlin processor as the terminal's color processor.
+    auto processor = AOTChainBuilder::BuildFPForPass(allocator, graph, pass);
     if (processor == nullptr) {
       return false;
     }
-    terminalColors->emplace_back(std::move(processor));
+    renderPlan->terminalColors.emplace_back(std::move(processor));
     return true;
   }
   return BuildCutPlanPasses(context, renderFlags, graph, plan, deviceBounds, destination,
-                            fpCoordOffset, deviceToLocal, sourceAlpha, passes, terminalColors);
+                            fpCoordOffset, deviceToLocal, sourceAlpha, renderPlan);
 }
 
 PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t renderFlags,
@@ -388,8 +404,7 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(Context* context, uint32_t render
     sourceAlpha = color->alpha;
   }
   if (!BuildPasses(context, renderFlags, graph, plan, deviceBounds, destination.get(),
-                   fpCoordOffset, deviceToLocal, &renderPlan.passes, &renderPlan.terminalColors,
-                   sourceAlpha) ||
+                   fpCoordOffset, deviceToLocal, &renderPlan, sourceAlpha) ||
       !renderPlan.isWellFormed()) {
     return nullptr;
   }

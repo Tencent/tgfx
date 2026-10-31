@@ -84,11 +84,23 @@ class AOTChainBuilder {
                       AOTChainCompile* out);
 
   /**
+   * Rebuilds the fused chain processor of one plan pass from its pass IR: the cut segment graph
+   * already carries the intermediate leaves and the carried pass descriptor is the one the
+   * planner fit, so nothing is re-planned. This is the plan-pass serving path — the executor
+   * stores each pass as this IR instead of a processor, and the fill passes and the terminal
+   * draw materialise the processor here, once per prepare. Returns nullptr when the IR is not a
+   * chain pass or the pass does not compile.
+   */
+  static PlacementPtr<FragmentProcessor> BuildPassProcessor(BlockAllocator* allocator,
+                                                            const DrawIR& passIR);
+
+  /**
    * Rebuilds the color processor of one self-contained plan pass: the fused chain/graph processor
    * without draw coverage, or the YUV or perlin processor with the pass's operators folded into
    * its slot records. Returns nullptr when the pass shape cannot be rebuilt. A pass of a
    * multi-pass plan is not self-contained (it reads its predecessors' outputs); build it through
-   * BuildCutSegment first.
+   * BuildCutSegment first. Only the linear kernels (YUV, perlin) are served here: chain passes
+   * are carried as pass IRs and rebuilt through BuildPassProcessor.
    */
   static PlacementPtr<FragmentProcessor> BuildFPForPass(BlockAllocator* allocator,
                                                         const AOTEffectGraph& graph,

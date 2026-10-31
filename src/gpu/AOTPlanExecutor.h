@@ -84,15 +84,16 @@ class AOTPlanExecutor {
 
   /**
    * Builds the passes of a plan that passed CanExecute without validating or enqueueing anything:
-   * appends the split-off passes of a multi-pass plan to passes and the terminal color processors
-   * to terminalColors. The parameters mean what they mean for Make; destination is only read for
-   * its origin. Returns false if a processor, target, or draw cannot be created.
+   * appends the split-off passes of a multi-pass plan to renderPlan->passes — each carrying its
+   * cut segment as a pass IR — and the terminal pass's form to renderPlan->terminalIR (a chain
+   * plan) or renderPlan->terminalColors (a linear-kernel plan). The parameters mean what they
+   * mean for Make; destination is only read for its origin. Returns false if a processor, target,
+   * or draw cannot be created.
    */
   static bool BuildPasses(Context* context, uint32_t renderFlags, const AOTEffectGraph& graph,
                           const AOTEffectPlan& plan, const Rect& deviceBounds,
                           const RenderTargetProxy* destination, const Point& fpCoordOffset,
-                          const std::optional<Matrix>& deviceToLocal,
-                          std::vector<AOTRenderPass>* passes,
-                          DrawOp::ColorProcessorList* terminalColors, float sourceAlpha = 1.0f);
+                          const std::optional<Matrix>& deviceToLocal, AOTRenderPlan* renderPlan,
+                          float sourceAlpha = 1.0f);
 };
 }  // namespace tgfx
