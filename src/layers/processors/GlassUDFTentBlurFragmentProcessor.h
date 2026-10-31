@@ -71,6 +71,8 @@ class GlassUDFTentBlurFragmentProcessor : public FragmentProcessor {
 
   void onComputeProcessorKey(BytesKey* key) const override;
 
+  bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
+
   void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 
   float fineRadius = 0.0f;

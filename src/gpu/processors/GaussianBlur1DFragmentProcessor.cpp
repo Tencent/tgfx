@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include "gpu/aot/EffectGraph.h"
 #include "gpu/shaders/modules/BlurKernelModule.h"
 
 namespace tgfx {
@@ -66,5 +67,24 @@ void GaussianBlur1DFragmentProcessor::onComputeProcessorKey(BytesKey* key) const
 bool GaussianBlur1DFragmentProcessor::onBindPrecompiled(ParamWriter* writer) const {
   BlurKernelModule::Bind(this, writer);
   return true;
+}
+
+bool GaussianBlur1DFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
+                                                 AOTNodeID* output) const {
+  // The blur's math cannot ride the pointwise chain, so it lowers as an opaque-kernel barrier:
+  // the dedicated family's kernel runs it (the planner refuses the graph, keeping the draw on
+  // the plain route), and the family's IR-based matching (P4.2) reads the node. The child
+  // lowers normally — its texture leaf is the natural cut point for a future split (a color
+  // grade under the blur materializes as its own pass).
+  if (builder == nullptr || output == nullptr || numChildProcessors() != 1) {
+    return false;
+  }
+  AOTNodeID childNode = AOTNodeID::Invalid();
+  if (!childProcessor(0)->lowerToAOT(builder, input, &childNode)) {
+    return false;
+  }
+  AOTOpaqueKernelParameters parameters = {};
+  parameters.kernelKind = 0;
+  return builder->addOpaqueKernel(childNode, parameters, output);
 }
 }  // namespace tgfx

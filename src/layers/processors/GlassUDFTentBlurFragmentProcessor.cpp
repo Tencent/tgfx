@@ -18,6 +18,7 @@
 
 #include "layers/processors/GlassUDFTentBlurFragmentProcessor.h"
 #include "core/utils/Log.h"
+#include "gpu/aot/EffectGraph.h"
 
 namespace tgfx {
 
@@ -181,6 +182,19 @@ void GlassUDFTentBlurFragmentProcessor::onSetData(UniformData*,
   if (fragmentUniformData->hasField("InputIsPacked")) {
     fragmentUniformData->setData("InputIsPacked", inputIsPacked ? 1 : 0);
   }
+}
+
+bool GlassUDFTentBlurFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
+                                                   AOTNodeID* output) const {
+  // The tent blur's fine/coarse sources and its packed-input handling stay inside the family's
+  // kernel; the node marks the opaque barrier for the IR (same contract as the refraction —
+  // the planner refuses the graph, the dedicated family serves it).
+  if (builder == nullptr || output == nullptr) {
+    return false;
+  }
+  AOTOpaqueKernelParameters parameters = {};
+  parameters.kernelKind = 2;
+  return builder->addOpaqueKernel(input, parameters, output);
 }
 
 }  // namespace tgfx

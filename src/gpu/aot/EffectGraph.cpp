@@ -243,6 +243,11 @@ bool AOTNodeBuilder::addMulAlpha(AOTNodeID value, AOTNodeID alphaSource, AOTNode
   return addBinaryNode(AOTEffectKind::MulAlpha, value, alphaSource, {}, output);
 }
 
+bool AOTNodeBuilder::addOpaqueKernel(AOTNodeID input, const AOTOpaqueKernelParameters& parameters,
+                                     AOTNodeID* output) {
+  return addUnaryNode(AOTEffectKind::OpaqueKernel, input, parameters, output);
+}
+
 bool AOTNodeBuilder::addGeometryCoverage(AOTNodeID* output) {
   if (output == nullptr || !nodes.empty()) {
     return false;

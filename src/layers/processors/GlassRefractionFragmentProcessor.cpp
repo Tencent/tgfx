@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
+#include "gpu/aot/EffectGraph.h"
 #include "gpu/resources/TextureView.h"
 
 namespace tgfx {
@@ -53,6 +54,21 @@ std::shared_ptr<Texture> GlassRefractionFragmentProcessor::onTextureAt(size_t) c
 
 SamplerState GlassRefractionFragmentProcessor::onSamplerStateAt(size_t) const {
   return SamplerState(TileMode::Clamp, TileMode::Clamp);
+}
+
+bool GlassRefractionFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
+                                                  AOTNodeID* output) const {
+  // The refraction's math, its sampled source and its SDF/UDF geometry child all stay inside the
+  // family's kernel — the node only marks the opaque barrier so the draw carries its IR (the
+  // planner refuses the graph, the dedicated family serves it, and P4.2's matching reads the
+  // node instead of walking the processor tree). The chain input rides along as the modulate
+  // operand, mirroring TextureSource.
+  if (builder == nullptr || output == nullptr) {
+    return false;
+  }
+  AOTOpaqueKernelParameters parameters = {};
+  parameters.kernelKind = 1;
+  return builder->addOpaqueKernel(input, parameters, output);
 }
 
 }  // namespace tgfx

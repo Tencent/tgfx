@@ -1878,6 +1878,7 @@ struct BrushRenderStats {
   AOTDrawStats draws = {};
   ProgramCacheStats programs = {};
   std::vector<std::string> shaders = {};
+  bool blurServed = false;
 };
 
 // Renders the given image with a color filter, brush alpha, and canvas transform, with or without
@@ -10404,6 +10405,78 @@ static Bitmap RenderFiltersScene(Context* renderContext) {
 // inner-shadow filters) as a same-process A/B render: JIT first, then the embedded bundle, on two
 // fresh surfaces. The scene is the deny-bisect attribute of the PointwiseChainShader content-level
 // divergence, so a mismatch here is the minimal in-process reproducer for the chain route.
+// A filtered image drawn under a clip: the blur rides as a live color FP (the filtered image
+// lowers lazily into the processor tree) and the rrect clip as a coverage FP. The dedicated
+// GaussianBlur1D family serves it only when the coverage classification resolves — which, since
+// the matcher reads the record-time IR, requires the blur to lower too (P4.1's opaque node).
+static void RenderBlurredImageUnderClip(Context* context, bool useBundle, Bitmap* outBitmap,
+                                        BrushRenderStats* outStats) {
+  auto* cache = context->precompiledShaderCache();
+  if (useBundle) {
+    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+  } else {
+    cache->unload();
+  }
+  ScopedAOTStatsPause statsPause(context, !useBundle);
+  context->globalCache()->clearPrograms();
+  context->globalCache()->resetProgramStats();
+  cache->setDiagnosticRecordingEnabled(true);
+  cache->resetStats();
+  auto surface = Surface::Make(context, 96, 96);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+  RRect clip = {};
+  clip.setRectXY(Rect::MakeXYWH(8, 8, 80, 80), 16, 16);
+  canvas->clipRRect(clip, true);
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+  auto filtered = image->makeWithFilter(ImageFilter::Blur(4, 4, TileMode::Clamp));
+  ASSERT_NE(filtered, nullptr);
+  canvas->drawImage(filtered, 0, 0);
+  context->flushAndSubmit(true);
+  ASSERT_TRUE(outBitmap->allocPixels(96, 96));
+  auto* pixels = outBitmap->lockPixels();
+  ASSERT_TRUE(pixels != nullptr);
+  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+  outBitmap->unlockPixels();
+  outStats->noMatchingRule = cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule);
+  outStats->draws = cache->drawStats();
+  outStats->programs = context->globalCache()->programStats();
+  bool blurServed = false;
+  for (const auto& hit : cache->hitRecords()) {
+    blurServed |= hit.shaderName == "GaussianBlur1DShader";
+  }
+  outStats->blurServed = blurServed;
+  cache->setDiagnosticRecordingEnabled(false);
+  if (useBundle) {
+    cache->unload();
+  }
+}
+
+TGFX_TEST(AOTRenderConsistencyTest, BlurredImageUnderClipStaysPrecompiled) {
+  SKIP_ON_SWIFTSHADER_ENV();
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  Bitmap jit = {};
+  Bitmap aot = {};
+  BrushRenderStats jitStats = {};
+  BrushRenderStats aotStats = {};
+  RenderBlurredImageUnderClip(context, false, &jit, &jitStats);
+  ResetAOTLowerDrawCount();
+  RenderBlurredImageUnderClip(context, true, &aot, &aotStats);
+  // The blur's record-time lowering runs (the opaque-kernel node carries it): before P4.1 the
+  // blurred fill's LowerDraw failed on the blur processor, leaving the draw without an IR.
+  EXPECT_GE(AOTLowerDrawCount(), 1u);
+  // The dedicated blur family must keep the draw on the precompiled route: no runtime compile,
+  // no dropped draw, and the blur kernel's hit in the records.
+  EXPECT_EQ(aotStats.programs.programBuilderCreations, 0u);
+  EXPECT_EQ(aotStats.noMatchingRule, 0u);
+  EXPECT_EQ(aotStats.draws.droppedDraws, 0u);
+  EXPECT_TRUE(aotStats.blurServed);
+  ExpectBitmapsIdentical("blur-image-under-clip", aot, jit, 96, 96);
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, FiltersSceneAOTMatchesJIT) {
   ContextScope scope;
   auto context = scope.getContext();

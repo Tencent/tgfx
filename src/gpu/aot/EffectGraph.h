@@ -105,6 +105,13 @@ enum class AOTEffectKind {
   // in0 * in1.a — the two-child xfer epilogue's re-multiply by the xfer input's alpha, with a
   // computed input C supplying the alpha. A real chain slot (OP_MUL_ALPHA).
   MulAlpha,
+  // An opaque-kernel operand (GaussianBlur1D, GlassRefraction, GlassUDFTentBlur): the processor's
+  // math cannot be expressed in the pointwise chain, so the node marks the barrier. The planner
+  // refuses such a graph (the dedicated family's kernel runs it on the plain route), and the
+  // family's matching reads the node's facts from the IR instead of walking the processor tree
+  // (P4.2). The chain input rides along as the modulate operand, mirroring TextureSource; the
+  // kernel's own sampled textures and geometry children stay inside the family's kernel.
+  OpaqueKernel,
 };
 
 enum class AOTTextureSamplingKind {
@@ -245,6 +252,14 @@ struct AOTGradientParameters {
   bool hasPerspective = false;
 };
 
+// Opaque-kernel operand (see AOTEffectKind::OpaqueKernel). kernelKind: 0 = GaussianBlur1D,
+// 1 = GlassRefraction, 2 = GlassUDFTentBlur. The shape-level facts the dedicated families'
+// matching needs ride here (P4.2 reads them from the IR); upload values stay on the processor
+// until the bind moves to the contract.
+struct AOTOpaqueKernelParameters {
+  int kernelKind = 0;
+};
+
 // Analytic anti-aliased rect coverage (RectEffect, produced by AA rect clips). Multiplies the
 // input color by a per-fragment coverage computed from gl_FragCoord and the rect, so it is a
 // pointwise node that reads the destination device coordinate directly and needs no texture or
@@ -275,7 +290,7 @@ using AOTEffectParameters =
     std::variant<std::monostate, AOTTextureParameters, AOTColorMatrixParameters, AOTLumaParameters,
                  AOTAlphaThresholdParameters, AOTColorSpaceXformParameters, AOTConstColorParameters,
                  AOTBlendParameters, AOTPerlinNoiseParameters, AOTRectCoverageParameters,
-                 AOTGradientParameters, AOTRRectCoverageParameters>;
+                 AOTGradientParameters, AOTRRectCoverageParameters, AOTOpaqueKernelParameters>;
 
 // Runtime-selected pointwise operator applied by the fused kernels (PointwiseChain,
 // PerlinNoiseFill and YUVTextureFill). The values are the AOTPointwiseOpType subset of the shared
@@ -402,8 +417,9 @@ class AOTNodeBuilder {
   bool addGeometryCoverage(AOTNodeID* output);
 
   bool addInputOpaque(AOTNodeID input, AOTNodeID* output);
-
   bool addMulAlpha(AOTNodeID value, AOTNodeID alphaSource, AOTNodeID* output);
+  bool addOpaqueKernel(AOTNodeID input, const AOTOpaqueKernelParameters& parameters,
+                       AOTNodeID* output);
 
   /**
    * Appends a copy of an already-admitted node: same kind and input count, with the given inputs
