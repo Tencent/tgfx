@@ -266,42 +266,29 @@ void main() {
   deviceMask = texture(MaskTextureSampler, maskCoord.xy).r;
 #endif
 
-#if GP_LAYOUT >= 1
-  // Per-pixel edge AA (ellipse or hairline): the coverage was evaluated ahead of the chain
-  // (gpPixelCoverage). A coverage subtree's root already carries it (its unit input is it), so the
-  // root path folds in only the device mask; the bare path multiplies the whole edge coverage once.
-  highp vec4 pixelFinalCoverage = vec4(deviceMask * gpPixelCoverage);
-  if (CoverageRootIndex >= 0) {
-    pixelFinalCoverage = coverageRootRegister * vec4(deviceMask);
-  }
-  pixelFinalCoverage *= clipCoverage;
-#define TGFX_XP_SRC_COLOR (result * pixelFinalCoverage)
-#define TGFX_XP_SRC_UNPREMUL CHAIN_XP_SRC_UNPREMUL
-#define TGFX_XP_COVERAGE pixelFinalCoverage
-#elif HAS_COVERAGE
-  // A coverage subtree's root already carries the GP coverage (fed in through the -3 unit
-  // input), so it replaces the plain vCoverage modulation instead of doubling it.
-  vec4 finalCoverage = CoverageRootIndex >= 0 ? coverageRootRegister : vec4(vCoverage);
+  // The composition rule shared with the fill pipeline (fill_fragment_main.inc): the coverage
+  // factors fold left in the fixed order — the geometry's own coverage first (a coverage
+  // subtree's root REPLACES it: its -3 unit input already carries the GP coverage, so the plain
+  // modulation must not double it), then the device mask, then the clip product. Floating-point
+  // multiplication commutes exactly but does not associate, so this left-fold order is part of
+  // the contract; it matches the fill pipeline's geometry → device mask → clip order.
+  // The registered exception: on the layouts whose geometry contributes no coverage, the
+  // subtree's root stays a source modulation instead (CHAIN_XP_SRC_UNPREMUL above) — the
+  // runtime's MaskFilter semantics modulate the source, so blend(c*S, D) — not
+  // c*blend(S,D) + (1-c)*D — is the matching semantics there. The atlas glyph subtree rides
+  // the clip-coverage register instead (see ClipCoverageRegister above): the glyph mask is TRUE
+  // coverage in the runtime composite, unlike the MaskFilter's source-modulating mask
+  // (MaskCoverageBlendModesOnOpaqueBackground, byte-parity across Src/SrcOver/Multiply/Darken).
+#if GP_LAYOUT >= 1 || HAS_COVERAGE
+  highp vec4 finalCoverage = CoverageRootIndex >= 0 ? coverageRootRegister : TGFX_CHAIN_UNIT_COVERAGE;
+#else
+  highp vec4 finalCoverage = TGFX_CHAIN_UNIT_COVERAGE;
+#endif
   finalCoverage *= deviceMask;
   finalCoverage *= clipCoverage;
-#define TGFX_XP_SRC_COLOR (result * finalCoverage)
+#define TGFX_XP_SRC_COLOR (CHAIN_XP_SRC_UNPREMUL * finalCoverage)
 #define TGFX_XP_SRC_UNPREMUL CHAIN_XP_SRC_UNPREMUL
 #define TGFX_XP_COVERAGE finalCoverage
-#else
-  // The no-coverage-varying layouts previously left TGFX_XP_COVERAGE at its vec4(1.0) default
-  // with every coverage form (clips, device mask, the coverage subtree) premultiplied into the
-  // source — composites correctly only for SrcOver-class blending. The TRUE coverage forms (the
-  // clip product and the device mask) now ride C with the unpremultiplied source, compositing
-  // through the per-mode forms like every other layout (the clip-fold and atlas defects). A MaskFilter's
-  // coverage subtree stays in the source: the runtime itself modulates the source with it, so
-  // blend(c*S, D) — not c*blend(S,D) + (1-c)*D — is the matching semantics there.
-  vec4 noCovCoverage = clipCoverage * vec4(deviceMask);
-#define TGFX_XP_SRC_COLOR                                                       \
-  (CoverageRootIndex >= 0 ? result * coverageRootRegister * noCovCoverage \
-                          : result * noCovCoverage)
-#define TGFX_XP_SRC_UNPREMUL CHAIN_XP_SRC_UNPREMUL
-#define TGFX_XP_COVERAGE noCovCoverage
-#endif
 #if HAS_XP >= 1
 #define TGFX_XP_DST_COLOR chainXPDst
 #define TGFX_XP_BLENDED xpBlended
