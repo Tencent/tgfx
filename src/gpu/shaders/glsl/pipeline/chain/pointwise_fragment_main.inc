@@ -286,14 +286,13 @@ void main() {
 #endif
   finalCoverage *= deviceMask;
   finalCoverage *= clipCoverage;
-#define TGFX_XP_SRC_COLOR (CHAIN_XP_SRC_UNPREMUL * finalCoverage)
-#define TGFX_XP_SRC_UNPREMUL CHAIN_XP_SRC_UNPREMUL
-#define TGFX_XP_COVERAGE finalCoverage
+#define TGFX_COMPOSE_SRC_UNPREMUL CHAIN_XP_SRC_UNPREMUL
+#define TGFX_COMPOSE_COVERAGE finalCoverage
 #if HAS_XP >= 1
-#define TGFX_XP_DST_COLOR chainXPDst
-#define TGFX_XP_BLENDED xpBlended
+#define TGFX_COMPOSE_DST chainXPDst
+#define TGFX_COMPOSE_BLENDED xpBlended
 #endif
-#include "xp/xp_output.inc"
+#include "coverage/compose.inc"
 #undef CHAIN_XP_SRC_UNPREMUL
 #include "xp/output_swizzle.inc"
 }

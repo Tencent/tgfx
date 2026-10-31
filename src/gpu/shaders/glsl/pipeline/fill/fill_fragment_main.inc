@@ -9,7 +9,8 @@
 //                 FILL_DEVICE_MASK    (FILL_DEVICE_MASK), local mask (FILL_LOCAL_MASK) and clip
 //                 FILL_LOCAL_MASK     (FILL_CLIP), always multiplied in this order
 //                 FILL_CLIP
-//   5. output     xp_output.inc, then the alpha swizzle when FILL_OUTPUT_SWIZZLE
+//   5. output     coverage/compose.inc (the shared composition site), then the alpha swizzle
+//                 when FILL_OUTPUT_SWIZZLE
 //
 // A family entry declares its interface (uniform block, varyings, samplers, XP_DST_TEX_BINDING) in
 // its runtime binding order, selects the steps, and includes this file last. Every selector is a
@@ -323,14 +324,13 @@ void main() {
   totalCoverage = fillMaskStage(totalCoverage);
   totalCoverage = fillClipStage(totalCoverage);
 
-#define TGFX_XP_SRC_COLOR (result * totalCoverage)
-#define TGFX_XP_SRC_UNPREMUL result
-#define TGFX_XP_COVERAGE vec4(totalCoverage)
+#define TGFX_COMPOSE_SRC_UNPREMUL result
+#define TGFX_COMPOSE_COVERAGE vec4(totalCoverage)
 #if FILL_OPERATOR && HAS_XP
-#define TGFX_XP_DST_COLOR xpDst
-#define TGFX_XP_BLENDED xpBlended
+#define TGFX_COMPOSE_DST xpDst
+#define TGFX_COMPOSE_BLENDED xpBlended
 #endif
-#include "xp/xp_output.inc"
+#include "coverage/compose.inc"
 #if FILL_OUTPUT_SWIZZLE
 #include "xp/output_swizzle.inc"
 #endif
