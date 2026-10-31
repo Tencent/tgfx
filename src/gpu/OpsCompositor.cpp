@@ -1353,6 +1353,10 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
   if (cache != nullptr && cache->isLoaded() && cache->decompositionEnabled() &&
       op->type() != DrawOp::Type::StencilCoverPathDrawOp && deviceBounds.has_value() &&
       !deviceBounds->isEmpty()) {
+    // The single record-time lowering: the op's whole expression (colors, coverages, xfer, blend
+    // mode) lands on a DrawIR every later stage converges on. The route decisions below still
+    // run their own analysis for now; they migrate onto the IR in the steps that follow.
+    op->tryLowerIR();
     std::vector<const FragmentProcessor*> colorProcessors;
     colorProcessors.reserve(op->colorProcessors().size());
     for (const auto& processor : op->colorProcessors()) {

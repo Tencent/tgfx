@@ -27,6 +27,9 @@
 #include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
+
+struct DrawIR;
+
 /**
  * DrawOp is the minimal contract every deferred draw operation must satisfy. It exposes only
  * what OpsRenderTask needs to schedule an op inside a render pass: an execute() entry point,
@@ -53,7 +56,7 @@ class DrawOp {
     StencilCoverPathDrawOp,
   };
 
-  virtual ~DrawOp() = default;
+  virtual ~DrawOp();
 
   void setScissorRect(const Rect& rect) {
     scissorRect = rect;
@@ -94,6 +97,27 @@ class DrawOp {
   std::vector<PlacementPtr<FragmentProcessor>>& colorProcessors() {
     return colors;
   }
+
+  /**
+   * The draw's whole expression lowered once at record time: the color graph plus the classified
+   * coverage terms, with the xfer processor and blend mode riding along. Null when the expression
+   * did not lower, or when the op's coverage depends on a geometry processor that is not made
+   * until prepare time (AtlasText's glyph leaf) — in both cases the plain FP path serves the
+   * draw unchanged. Nothing consumes the IR until the prepare-time AOT branch reads it.
+   */
+  const DrawIR* loweredIR() const {
+    return ir.get();
+  }
+
+  /**
+   * Lowers the op's colors, coverages, xfer processor and blend mode into a DrawIR placed on the
+   * drawing allocator. Call once at record time, after those members are set and only while the
+   * precompiled route is active. A lowering failure leaves the IR null — the draw keeps the plain
+   * path, which is exactly the pre-IR behavior. Note: the record-time fold may move the coverages
+   * into the colors afterwards and hand the op to a plan task; the IR keeps classifying the
+   * original expression, which only the plan task's fallback rerun (plain path) ever sees again.
+   */
+  void tryLowerIR();
 
   /**
    * Whether the draw produces fractional coverage from any source: its coverage processors, or its
@@ -160,11 +184,11 @@ class DrawOp {
   std::vector<PlacementPtr<FragmentProcessor>> colors = {};
   std::vector<PlacementPtr<FragmentProcessor>> coverages = {};
   PlacementPtr<XferProcessor> xferProcessor = nullptr;
+  PlacementPtr<DrawIR> ir = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
   CullMode cullMode = CullMode::None;
 
-  DrawOp(BlockAllocator* allocator, AAType aaType) : allocator(allocator), aaType(aaType) {
-  }
+  DrawOp(BlockAllocator* allocator, AAType aaType);
 
   /**
    * Applies the op's scissor rectangle to the render pass. An empty scissor expands to the

@@ -20,8 +20,42 @@
 #include <algorithm>
 #include "core/utils/MathExtra.h"
 #include "gpu/OriginFlip.h"
+#include "gpu/aot/DrawIR.h"
 
 namespace tgfx {
+DrawOp::DrawOp(BlockAllocator* allocator, AAType aaType) : allocator(allocator), aaType(aaType) {
+}
+
+DrawOp::~DrawOp() = default;
+
+void DrawOp::tryLowerIR() {
+  if (type() == Type::AtlasTextOp) {
+    // The atlas glyph leaf is synthesized from the AtlasText geometry processor, which the op
+    // only makes at prepare time (it needs the render target). Such draws keep the plain path
+    // until the geometry contract can carry the glyph mask at record time.
+    return;
+  }
+  std::vector<const FragmentProcessor*> colorList = {};
+  colorList.reserve(colors.size());
+  for (const auto& processor : colors) {
+    colorList.push_back(processor.get());
+  }
+  std::vector<const FragmentProcessor*> coverageList = {};
+  coverageList.reserve(coverages.size());
+  for (const auto& processor : coverages) {
+    coverageList.push_back(processor.get());
+  }
+  // No geometry processor exists at record time, so the IR carries no glyph leaf — matching the
+  // null-GP contract of LowerDraw. A lowering failure leaves the IR null, and the plain FP path
+  // serves the draw exactly as it did before the IR existed.
+  auto lowered =
+      LowerDraw(colorList, coverageList, nullptr, xferProcessor.get(), blendMode, allocator);
+  if (!lowered.has_value()) {
+    return;
+  }
+  ir = allocator->make<DrawIR>(std::move(*lowered));
+}
+
 void DrawOp::applyScissor(RenderPass* renderPass, RenderTarget* renderTarget) const {
   if (scissorRect.isEmpty()) {
     renderPass->setScissorRect(0, 0, renderTarget->width(), renderTarget->height());
