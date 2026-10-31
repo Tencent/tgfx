@@ -21,8 +21,8 @@
 #include <memory>
 #include <optional>
 #include <vector>
-#include "gpu/AOTEffectDecomposer.h"
 #include "gpu/AOTRenderPlan.h"
+#include "gpu/aot/AOTEffectDecomposer.h"
 #include "gpu/ops/DrawOp.h"
 #include "gpu/tasks/RenderTask.h"
 

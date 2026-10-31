@@ -18,10 +18,10 @@
 
 #include "gpu/shaders/kernels/PerlinNoiseFillShader.h"
 #include <optional>
-#include "gpu/AOTChainBuilder.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
+#include "gpu/aot/AOTChainBuilder.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"

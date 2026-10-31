@@ -26,7 +26,6 @@
 #include <sstream>
 #include <vector>
 #include "core/utils/Log.h"
-#include "gpu/AOTEffectDecomposer.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PermutationMatch.h"
 #include "gpu/PrecompiledShaderCache.h"
@@ -34,6 +33,7 @@
 #include "gpu/ProgramWriter.h"
 #include "gpu/ShaderKeyHash.h"
 #include "gpu/UniformData.h"
+#include "gpu/aot/AOTEffectDecomposer.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"

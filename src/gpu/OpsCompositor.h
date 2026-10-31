@@ -20,7 +20,7 @@
 
 #include <functional>
 #include "core/ClipStack.h"
-#include "gpu/AOTRouter.h"
+#include "gpu/aot/AOTRouter.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
 #include "tgfx/core/Brush.h"

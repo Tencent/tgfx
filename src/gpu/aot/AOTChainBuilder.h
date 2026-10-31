@@ -19,7 +19,7 @@
 #pragma once
 
 #include <vector>
-#include "gpu/AOTEffectDecomposer.h"
+#include "gpu/aot/AOTEffectDecomposer.h"
 #include "gpu/aot/DrawIR.h"
 #include "gpu/aot/Program.h"
 #include "gpu/processors/FragmentProcessor.h"

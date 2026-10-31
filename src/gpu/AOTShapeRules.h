@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/AOTEffectDecomposer.h"
+#include "gpu/aot/AOTEffectDecomposer.h"
 #include "gpu/aot/EffectGraph.h"
 
 namespace tgfx {

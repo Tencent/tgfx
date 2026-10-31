@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "AOTPointwiseSlotWriter.h"
+#include "gpu/aot/AOTPointwiseSlotWriter.h"
 #include <unordered_map>
 #include "gpu/ColorSpaceXformHelper.h"
 #include "gpu/glsl/GLSLBlend.h"

@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/processors/AOTYUVChainProcessor.h"
-#include "gpu/AOTPointwiseSlotWriter.h"
+#include "gpu/aot/AOTPointwiseSlotWriter.h"
 #include "gpu/shaders/modules/ChainParams.h"
 
 namespace tgfx {

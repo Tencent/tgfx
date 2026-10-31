@@ -26,10 +26,10 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "gpu/AOTEffectDecomposer.h"
 #include "gpu/Program.h"
 #include "gpu/ShaderCache.h"
 #include "gpu/Uniform.h"
+#include "gpu/aot/AOTEffectDecomposer.h"
 #include "tgfx/gpu/Backend.h"
 
 namespace tgfx {

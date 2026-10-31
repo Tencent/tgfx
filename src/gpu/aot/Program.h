@@ -19,8 +19,8 @@
 #pragma once
 
 #include <vector>
-#include "gpu/AOTResourceProfile.h"
 #include "gpu/SamplingArgs.h"
+#include "gpu/aot/AOTResourceProfile.h"
 #include "gpu/aot/EffectGraph.h"
 #include "gpu/shaders/KernelContract.h"
 

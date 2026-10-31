@@ -18,7 +18,7 @@
 
 #include "GLSLPerlinNoiseFragmentProcessor.h"
 #include "core/shaders/PerlinNoiseShader.h"
-#include "gpu/AOTPointwiseSlotWriter.h"
+#include "gpu/aot/AOTPointwiseSlotWriter.h"
 #include "gpu/resources/TextureView.h"
 
 namespace tgfx {

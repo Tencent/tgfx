@@ -1,13 +1,13 @@
 
-#include "AOTPlanExecutor.h"
+#include "gpu/aot/AOTPlanExecutor.h"
 #include <algorithm>
 #include <utility>
 #include <vector>
-#include "gpu/AOTChainBuilder.h"
 #include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/AOTShapeRules.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/PrecompiledShaderCache.h"
+#include "gpu/aot/AOTChainBuilder.h"
 #include "gpu/ops/StandardDrawOp.h"
 #include "gpu/processors/AOTYUVChainProcessor.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"

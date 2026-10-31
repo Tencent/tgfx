@@ -15,16 +15,16 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#include "AOTChainBuilder.h"
+#include "gpu/aot/AOTChainBuilder.h"
 #include <algorithm>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 #include "gpu/AOTChainRegisterAllocator.h"
-#include "gpu/AOTRouter.h"
 #include "gpu/AOTShapeRules.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/aot/AOTRouter.h"
 #include "gpu/aot/DrawIR.h"
 #include "gpu/aot/NodeContract.h"
 #include "gpu/processors/AOTYUVChainProcessor.h"

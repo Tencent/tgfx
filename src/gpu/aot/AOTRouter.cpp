@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "AOTRouter.h"
-#include "gpu/AOTEffectDecomposer.h"
+#include "gpu/aot/AOTRouter.h"
+#include "gpu/aot/AOTEffectDecomposer.h"
 
 namespace tgfx {
 

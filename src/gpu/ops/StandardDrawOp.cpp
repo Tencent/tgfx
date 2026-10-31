@@ -18,10 +18,10 @@
 
 #include "StandardDrawOp.h"
 #include "core/utils/Log.h"
-#include "gpu/AOTChainBuilder.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/Program.h"
+#include "gpu/aot/AOTChainBuilder.h"
 #include "gpu/aot/AOTProgramInfo.h"
 #include "gpu/aot/DrawIR.h"
 #include "gpu/shaders/kernels/PointwiseChainShader.h"

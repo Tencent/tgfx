@@ -18,7 +18,7 @@
 
 #include "gpu/aot/DrawIR.h"
 #include <atomic>
-#include "gpu/AOTEffectDecomposer.h"
+#include "gpu/aot/AOTEffectDecomposer.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
 #include "gpu/processors/ConstColorProcessor.h"

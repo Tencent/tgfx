@@ -1,6 +1,6 @@
 // The Perlin-noise module's value binding. See PerlinNoiseModule.h for the contract.
 #include "gpu/shaders/modules/PerlinNoiseModule.h"
-#include "gpu/AOTPointwiseSlotWriter.h"
+#include "gpu/aot/AOTPointwiseSlotWriter.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
 #include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/modules/ChainParams.h"

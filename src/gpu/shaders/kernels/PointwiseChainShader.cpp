@@ -19,11 +19,11 @@
 #include "gpu/shaders/kernels/PointwiseChainShader.h"
 #include <optional>
 #include <vector>
-#include "gpu/AOTChainBuilder.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/PermutationMatch.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
+#include "gpu/aot/AOTChainBuilder.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComplexEllipseGeometryProcessor.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"

@@ -26,7 +26,7 @@
 #include <sstream>
 #include <utility>
 #include "core/DiagnosticCodes.h"
-#include "gpu/AOTResourceProfile.h"
+#include "gpu/aot/AOTResourceProfile.h"
 #include "gpu/BundleFormat.h"
 #include "AllParams.h"
 #include "gpu/shaders/KernelContract.h"

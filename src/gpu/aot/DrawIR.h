@@ -20,7 +20,7 @@
 
 #include <optional>
 #include <vector>
-#include "gpu/AOTEffectDecomposer.h"
+#include "gpu/aot/AOTEffectDecomposer.h"
 #include "gpu/aot/EffectGraph.h"
 #include "tgfx/core/BlendMode.h"
 

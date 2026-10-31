@@ -16,12 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/AOTEffectDecomposer.h"
+#include "gpu/aot/AOTEffectDecomposer.h"
 #include <algorithm>
-#include "gpu/AOTChainBuilder.h"
-#include "gpu/AOTPlanExecutor.h"
 #include "gpu/AOTShapeRules.h"
 #include "gpu/ProgramInfo.h"
+#include "gpu/aot/AOTChainBuilder.h"
+#include "gpu/aot/AOTPlanExecutor.h"
 #include "gpu/aot/NodeContract.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"

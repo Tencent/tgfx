@@ -20,7 +20,7 @@
 
 #include <optional>
 #include <vector>
-#include "gpu/AOTResourceProfile.h"
+#include "gpu/aot/AOTResourceProfile.h"
 #include "gpu/shaders/ShaderFamily.h"
 
 namespace tgfx {

@@ -118,7 +118,7 @@ std::string NameOf(const std::string& path) {
 const std::set<std::string>& AllowedRuntimeHeaders() {
   static const std::set<std::string> allowed = {
       // contract layer
-      "gpu/AOTResourceProfile.h",
+      "gpu/aot/AOTResourceProfile.h",
       "gpu/BundleFormat.h",
       "gpu/PrecompiledBundleIdentity.h",
       "gpu/ShaderBindingLayout.h",
@@ -143,7 +143,7 @@ const std::set<std::string>& GeneratedHeaders() {
 // The contract headers: constants and pure functions shared by the tool and the runtime.
 const std::vector<std::string>& ContractHeaders() {
   static const std::vector<std::string> headers = {
-      "gpu/AOTResourceProfile.h",
+      "gpu/aot/AOTResourceProfile.h",
       "gpu/BundleFormat.h",
       "gpu/PrecompiledBundleIdentity.h",
       "gpu/ShaderBindingLayout.h",

@@ -21,7 +21,7 @@
 #include <cstdint>
 #include <optional>
 #include <vector>
-#include "gpu/AOTEffectDecomposer.h"
+#include "gpu/aot/AOTEffectDecomposer.h"
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {

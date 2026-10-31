@@ -21,7 +21,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include "gpu/AOTResourceProfile.h"
+#include "gpu/aot/AOTResourceProfile.h"
 #include "gpu/aot/EffectGraph.h"
 
 namespace tgfx {
