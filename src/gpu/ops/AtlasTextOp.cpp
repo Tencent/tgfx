@@ -65,6 +65,15 @@ PlacementPtr<GeometryProcessor> AtlasTextOp::onMakeGeometryProcessor(RenderTarge
   return AtlasTextGeometryProcessor::Make(allocator, textureProxy, aaType, commonColor, sampling);
 }
 
+std::optional<AOTAtlasGlyphSource> AtlasTextOp::recordTimeAtlasSource() const {
+  // Only the alpha-only atlas readback is expressible on the chain: a color atlas replaces the
+  // output color, so such draws keep the plain path (no IR), exactly as before.
+  if (textureProxy == nullptr || !textureProxy->isAlphaOnly()) {
+    return std::nullopt;
+  }
+  return AOTAtlasGlyphSource{textureProxy, sampling};
+}
+
 void AtlasTextOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   std::shared_ptr<BufferResource> indexBuffer = nullptr;
   if (indexBufferProxy) {

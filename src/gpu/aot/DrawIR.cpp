@@ -167,11 +167,19 @@ std::optional<std::vector<AOTCoverageTerm>> LowerCoverageTerms(
   return terms;
 }
 
-std::optional<DrawIR> LowerDraw(const std::vector<const FragmentProcessor*>& colorProcessors,
-                                const std::vector<const FragmentProcessor*>& coverageProcessors,
-                                const GeometryProcessor* geometryProcessor,
-                                const XferProcessor* xferProcessor, BlendMode blendMode,
-                                BlockAllocator* allocator) {
+namespace {
+
+// The shared lowering core both LowerDraw entries converge on. atlasGlyphLeaf, when non-null, is
+// the already-synthesized AtlasText glyph leaf (ownedLeaves keeps it alive until the terms have
+// copied their plain data out); the atlas coverage-count gate keys on its presence.
+// geometryProcessor rides along on the IR as the caller received it (null at record time).
+std::optional<DrawIR> LowerDrawCore(const std::vector<const FragmentProcessor*>& colorProcessors,
+                                    const std::vector<const FragmentProcessor*>& coverageProcessors,
+                                    const FragmentProcessor* atlasGlyphLeaf,
+                                    std::vector<PlacementPtr<FragmentProcessor>>&& ownedLeaves,
+                                    const GeometryProcessor* geometryProcessor,
+                                    const XferProcessor* xferProcessor, BlendMode blendMode,
+                                    BlockAllocator* allocator) {
   if (allocator == nullptr) {
     return std::nullopt;
   }
@@ -194,19 +202,40 @@ std::optional<DrawIR> LowerDraw(const std::vector<const FragmentProcessor*>& col
   if (!AOTEffectDecomposer::Lower(colors, &ir.color)) {
     return std::nullopt;
   }
+  if (coverageProcessors.size() > (atlasGlyphLeaf != nullptr ? 1u : 2u)) {
+    return std::nullopt;
+  }
+  std::vector<const FragmentProcessor*> termFPs = coverageProcessors;
+  if (atlasGlyphLeaf != nullptr) {
+    termFPs.push_back(atlasGlyphLeaf);
+  }
+  auto terms = LowerCoverageTerms(termFPs, atlasGlyphLeaf, allocator);
+  if (!terms.has_value()) {
+    return std::nullopt;
+  }
+  ir.coverage = std::move(*terms);
+  // The synthesized leaves only had to outlive LowerCoverageTerms; the arena owns the memory.
+  (void)ownedLeaves;
+  lowerDrawCount.fetch_add(1, std::memory_order_relaxed);
+  return ir;
+}
 
+}  // namespace
+
+std::optional<DrawIR> LowerDraw(const std::vector<const FragmentProcessor*>& colorProcessors,
+                                const std::vector<const FragmentProcessor*>& coverageProcessors,
+                                const GeometryProcessor* geometryProcessor,
+                                const XferProcessor* xferProcessor, BlendMode blendMode,
+                                BlockAllocator* allocator) {
+  if (allocator == nullptr) {
+    return std::nullopt;
+  }
   // The atlas glyph mask joins as a synthesized coverage leaf sourced from the maskCoord
   // attribute: only the alpha-only atlas readback is expressible — a color atlas replaces the
   // output color, which the chain cannot carry. A null geometry processor contributes none.
-  const bool atlasText =
-      geometryProcessor != nullptr && IsProcessor<AtlasTextGeometryProcessor>(geometryProcessor);
-  if (coverageProcessors.size() > (atlasText ? 1u : 2u)) {
-    return std::nullopt;
-  }
-  std::vector<PlacementPtr<FragmentProcessor>> ownedLeaves = {};
-  std::vector<const FragmentProcessor*> termFPs = coverageProcessors;
   const FragmentProcessor* glyphLeaf = nullptr;
-  if (atlasText) {
+  std::vector<PlacementPtr<FragmentProcessor>> ownedLeaves = {};
+  if (geometryProcessor != nullptr && IsProcessor<AtlasTextGeometryProcessor>(geometryProcessor)) {
     auto* atlasGP = static_cast<const AtlasTextGeometryProcessor*>(geometryProcessor);
     auto atlasProxy = atlasGP->getTextureProxy();
     if (atlasProxy == nullptr || !atlasProxy->isAlphaOnly()) {
@@ -224,16 +253,32 @@ std::optional<DrawIR> LowerDraw(const std::vector<const FragmentProcessor*>& col
     }
     glyphLeaf = atlasLeaf.get();
     ownedLeaves.push_back(std::move(atlasLeaf));
-    termFPs.push_back(glyphLeaf);
   }
+  return LowerDrawCore(colorProcessors, coverageProcessors, glyphLeaf, std::move(ownedLeaves),
+                       geometryProcessor, xferProcessor, blendMode, allocator);
+}
 
-  auto terms = LowerCoverageTerms(termFPs, glyphLeaf, allocator);
-  if (!terms.has_value()) {
+std::optional<DrawIR> LowerDrawWithAtlas(
+    const std::vector<const FragmentProcessor*>& colorProcessors,
+    const std::vector<const FragmentProcessor*>& coverageProcessors,
+    const AOTAtlasGlyphSource& atlas, const XferProcessor* xferProcessor, BlendMode blendMode,
+    BlockAllocator* allocator) {
+  if (allocator == nullptr || atlas.textureProxy == nullptr || !atlas.textureProxy->isAlphaOnly()) {
     return std::nullopt;
   }
-  ir.coverage = std::move(*terms);
-  lowerDrawCount.fetch_add(1, std::memory_order_relaxed);
-  return ir;
+  SamplingArgs args = {TileMode::Clamp, TileMode::Clamp, atlas.sampling, SrcRectConstraint::Fast};
+  // Identity uvMatrix, same contract as the prepare-time synthesis: CoordTransform applies the
+  // texture normalization itself, so the leaf maps maskCoord straight into the atlas's normalized
+  // space.
+  auto uvMatrix = Matrix::I();
+  auto atlasLeaf = TextureEffect::Make(allocator, atlas.textureProxy, args, &uvMatrix);
+  if (atlasLeaf == nullptr) {
+    return std::nullopt;
+  }
+  std::vector<PlacementPtr<FragmentProcessor>> ownedLeaves = {};
+  ownedLeaves.push_back(std::move(atlasLeaf));
+  return LowerDrawCore(colorProcessors, coverageProcessors, ownedLeaves.back().get(),
+                       std::move(ownedLeaves), nullptr, xferProcessor, blendMode, allocator);
 }
 
 uint64_t AOTLowerDrawCount() {

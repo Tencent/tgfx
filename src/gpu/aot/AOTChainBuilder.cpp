@@ -1875,9 +1875,10 @@ bool AOTChainBuilder::CompileChainProgramForInfo(BlockAllocator* allocator,
     return false;
   }
   // The draw carries its record-time IR: the graph and the classified coverage terms are already
-  // the ones this compile would compute, so the second lowering is skipped entirely. The carried
-  // form has no glyph leaf (an AtlasText geometry processor does not exist at record time) and
-  // atlas-text ops never carry one — the compile below still serves them.
+  // the ones this compile would compute, so the second lowering is skipped entirely. An AtlasText
+  // op's record-time IR carries its glyph term too (the atlas facts come from the op itself, not
+  // the geometry processor); only a draw without a carried IR reaches the FP path below, which
+  // synthesizes the glyph leaf from the geometry processor as before.
   if (auto* carried = programInfo->getCarriedIR()) {
     AOTEffectPlan plan = {};
     if (!AOTEffectDecomposer::Decompose(carried->color, &plan, true) || plan.passes.size() != 1 ||

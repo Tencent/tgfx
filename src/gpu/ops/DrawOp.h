@@ -21,14 +21,13 @@
 #include <optional>
 #include "gpu/AAType.h"
 #include "gpu/PrecompiledShaderCache.h"
+#include "gpu/aot/DrawIR.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XferProcessor.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/RenderPass.h"
 
 namespace tgfx {
-
-struct DrawIR;
 
 /**
  * DrawOp is the minimal contract every deferred draw operation must satisfy. It exposes only
@@ -89,9 +88,8 @@ class DrawOp {
   /**
    * The draw's whole expression lowered once at record time: the color graph plus the classified
    * coverage terms, with the xfer processor and blend mode riding along. Null when the expression
-   * did not lower, or when the op's coverage depends on a geometry processor that is not made
-   * until prepare time (AtlasText's glyph leaf) — in both cases the plain FP path serves the
-   * draw unchanged. Nothing consumes the IR until the prepare-time AOT branch reads it.
+   * did not lower — the plain FP path serves the draw unchanged. Nothing consumes the IR until
+   * the prepare-time AOT branch reads it.
    */
   const DrawIR* loweredIR() const {
     return ir.get();
@@ -101,11 +99,19 @@ class DrawOp {
    * Lowers the op's colors, coverages, xfer processor and blend mode into a DrawIR placed on the
    * drawing allocator. Call once at record time, after those members are set and only while the
    * precompiled route is active. A lowering failure leaves the IR null — the draw keeps the plain
-   * path, which is exactly the pre-IR behavior. Note: the record-time fold may move the coverages
-   * into the colors afterwards and hand the op to a plan task; the IR keeps classifying the
-   * original expression, which only the plan task's fallback rerun (plain path) ever sees again.
+   * path, which is exactly the pre-IR behavior.
    */
   void tryLowerIR();
+
+  /**
+   * The record-time source of the AtlasText glyph leaf: the op's atlas proxy and sampling, which
+   * the prepare-time geometry processor merely re-derives. Nullopt for every other op, and for an
+   * atlas the chain cannot carry (a color atlas replaces the output color): such draws keep the
+   * plain path exactly as before.
+   */
+  virtual std::optional<AOTAtlasGlyphSource> recordTimeAtlasSource() const {
+    return std::nullopt;
+  }
 
   /**
    * Adopts a plan pass's IR: the op's expression is that pass (a cut segment built by the plan

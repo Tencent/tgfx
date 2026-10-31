@@ -924,12 +924,14 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Brush& brush, bool 
   bool hasShaderDerivedChain =
       brush.shader != nullptr && (brush.shader->type() == Shader::Type::ColorFilter ||
                                   brush.shader->type() == Shader::Type::Blend);
-  bool hasDecomposableColorSource = hasImageFill || brush.shader != nullptr;
   // A draw whose route would take a task always carries one of the chain-forming sources below
   // (a color filter, a filter-composed shader, or a mask filter): a bare single-source fill plans
-  // single-pass and stays on the plain route, so evaluating it would only cost the lowering.
+  // single-pass and stays on the plain route, so evaluating it would only cost the lowering. The
+  // color and mask filters no longer require an image or shader beside them: a filtered text or
+  // rect fill is chain-served at prepare anyway, and computing its device bounds is what admits
+  // it to the record-time lowering — without the bounds such draws re-lower at every prepare
+  // (twice on the first one, with nowhere to cache the compiled program).
   if (cache != nullptr && cache->isLoaded() && cache->decompositionEnabled() &&
-      hasDecomposableColorSource &&
       (brush.colorFilter != nullptr || hasShaderDerivedChain || brush.maskFilter != nullptr)) {
     needDeviceBounds = true;
   }

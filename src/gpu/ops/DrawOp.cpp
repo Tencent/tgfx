@@ -33,12 +33,6 @@ void DrawOp::adoptLoweredIR(PlacementPtr<DrawIR> passIR) {
 }
 
 void DrawOp::tryLowerIR() {
-  if (type() == Type::AtlasTextOp) {
-    // The atlas glyph leaf is synthesized from the AtlasText geometry processor, which the op
-    // only makes at prepare time (it needs the render target). Such draws keep the plain path
-    // until the geometry contract can carry the glyph mask at record time.
-    return;
-  }
   std::vector<const FragmentProcessor*> colorList = {};
   colorList.reserve(colors.size());
   for (const auto& processor : colors) {
@@ -49,11 +43,23 @@ void DrawOp::tryLowerIR() {
   for (const auto& processor : coverages) {
     coverageList.push_back(processor.get());
   }
-  // No geometry processor exists at record time, so the IR carries no glyph leaf — matching the
-  // null-GP contract of LowerDraw. A lowering failure leaves the IR null, and the plain FP path
-  // serves the draw exactly as it did before the IR existed.
-  auto lowered =
-      LowerDraw(colorList, coverageList, nullptr, xferProcessor.get(), blendMode, allocator);
+  std::optional<DrawIR> lowered = std::nullopt;
+  if (type() == Type::AtlasTextOp) {
+    // The glyph leaf's atlas facts come from the op itself — the prepare-time geometry processor
+    // only re-derives them. An atlas the chain cannot carry (a color atlas) leaves the IR null:
+    // the plain path serves the draw exactly as before.
+    auto atlas = recordTimeAtlasSource();
+    if (atlas.has_value()) {
+      lowered = LowerDrawWithAtlas(colorList, coverageList, *atlas, xferProcessor.get(), blendMode,
+                                   allocator);
+    }
+  } else {
+    // No geometry processor exists at record time, so the IR carries no glyph leaf — matching the
+    // null-GP contract of LowerDraw. A lowering failure leaves the IR null, and the plain FP path
+    // serves the draw exactly as it did before the IR existed.
+    lowered =
+        LowerDraw(colorList, coverageList, nullptr, xferProcessor.get(), blendMode, allocator);
+  }
   if (!lowered.has_value()) {
     return;
   }

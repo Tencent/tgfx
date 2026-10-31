@@ -24,12 +24,14 @@
 #include "gpu/aot/EffectGraph.h"
 #include "gpu/aot/Program.h"
 #include "tgfx/core/BlendMode.h"
+#include "tgfx/core/SamplingOptions.h"
 
 namespace tgfx {
 
 class BlockAllocator;
 class FragmentProcessor;
 class GeometryProcessor;
+class TextureProxy;
 class XferProcessor;
 
 /** What one coverage term of a draw is, decided once at lowering time by what the term is. */
@@ -92,6 +94,16 @@ struct DrawIR {
 };
 
 /**
+ * The atlas facts a record-time glyph-leaf synthesis needs: an AtlasText op owns its atlas proxy
+ * and sampling from construction, so the record-time LowerDrawWithAtlas entry takes them directly
+ * (the prepare-time LowerDraw entry takes the same facts from the AtlasText geometry processor).
+ */
+struct AOTAtlasGlyphSource {
+  std::shared_ptr<TextureProxy> textureProxy = nullptr;
+  SamplingOptions sampling{};
+};
+
+/**
  * Lowers one draw's whole expression — its color processors, its coverage processors and the
  * glyph leaf an AtlasText geometry processor contributes — into a DrawIR. Compose is flattened
  * recursively and every leaf is classified by what it is, not by its position: a leaf RectEffect
@@ -108,6 +120,19 @@ std::optional<DrawIR> LowerDraw(const std::vector<const FragmentProcessor*>& col
                                 const GeometryProcessor* geometryProcessor,
                                 const XferProcessor* xferProcessor, BlendMode blendMode,
                                 BlockAllocator* allocator);
+
+/**
+ * The record-time entry: same classification and rejections as LowerDraw, but the glyph leaf is
+ * synthesized from the caller's atlas facts — an AtlasText op holds them from construction, so
+ * its IR carries the glyph term without waiting for the prepare-time geometry processor. The
+ * coverage-count gate is the atlas one (at most one coverage processor beside the glyph). A null
+ * or non-alpha-only proxy returns nullopt: such draws keep the plain path, exactly as before.
+ */
+std::optional<DrawIR> LowerDrawWithAtlas(
+    const std::vector<const FragmentProcessor*>& colorProcessors,
+    const std::vector<const FragmentProcessor*>& coverageProcessors,
+    const AOTAtlasGlyphSource& atlas, const XferProcessor* xferProcessor, BlendMode blendMode,
+    BlockAllocator* allocator);
 
 /**
  * Diagnostic counters over LowerDraw: how many successful lowerings have run since the last

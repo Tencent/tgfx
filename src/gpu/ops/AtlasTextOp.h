@@ -37,6 +37,8 @@ class AtlasTextOp final : public StandardDrawOp {
 
   bool hasCoverage() const override;
 
+  std::optional<AOTAtlasGlyphSource> recordTimeAtlasSource() const override;
+
  protected:
   PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
 

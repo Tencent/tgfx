@@ -11030,4 +11030,48 @@ TGFX_TEST(AOTRenderConsistencyTest, RecordTimeIRLoweredExactlyOncePerDraw) {
   cache->unload();
 }
 
+// P4.0's atlas item: an AtlasText draw carries its record-time IR — glyph term included — because
+// the op owns its atlas facts from construction (the prepare-time geometry processor only
+// re-derives them). The count before the flush is the discriminator: an atlas draw used to skip
+// tryLowerIR entirely, so its lowering only happened at prepare through the FP path.
+TGFX_TEST(AOTRenderConsistencyTest, AtlasTextCarriesRecordTimeIR) {
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  auto textBlob = TextBlob::MakeFrom("TGFX", Font(typeface, 50));
+  ASSERT_TRUE(textBlob != nullptr);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+  ScopedAOTStatsPause statsPause(context, false);
+  context->globalCache()->clearPrograms();
+  auto surface = Surface::Make(context, 200, 100);
+  ASSERT_TRUE(surface != nullptr);
+  auto* canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  Paint paint;
+  paint.setColorFilter(ColorFilter::Blend(Color::Red(), BlendMode::Multiply));
+  ResetAOTLowerDrawCount();
+  ResetAOTDecomposerLowerCount();
+  canvas->drawTextBlob(textBlob, 25, 60, paint);
+  // Text rides the compositor's pending-rect batch: the second blob's different brush closes the
+  // first batch, which is when that AtlasTextOp (and thus its record-time IR) comes to exist. The
+  // count here is the discriminator: an atlas draw used to reach zero at this point (tryLowerIR
+  // skipped it; the FP path only lowered at prepare).
+  Paint secondPaint;
+  secondPaint.setColorFilter(ColorFilter::Blend(Color::Blue(), BlendMode::Multiply));
+  canvas->drawTextBlob(textBlob, 25, 60, secondPaint);
+  EXPECT_EQ(AOTLowerDrawCount(), 1u);
+  context->flushAndSubmit(true);
+  // The flush closes the second batch (its atlas draw lowers at record time too — count two) and
+  // prepares both draws from their carried IRs: neither re-lowers, and the decomposer counted
+  // nothing beyond the two record-time lowerings. Before this item both draws lowered through the
+  // FP path at prepare, after the batch close had already skipped them at record time.
+  EXPECT_EQ(AOTLowerDrawCount(), 2u);
+  EXPECT_EQ(AOTDecomposerLowerCount(), 2u);
+  cache->unload();
+}
+
 }  // namespace tgfx
