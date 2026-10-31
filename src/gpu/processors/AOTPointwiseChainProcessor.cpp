@@ -225,6 +225,9 @@ PlacementPtr<AOTPointwiseChainProcessor> AOTPointwiseChainProcessor::Make(
   if (samplerChildren != 0 && samplerChildren != 4) {
     return nullptr;
   }
+  // The variant's TEXTURE_COUNT dimension reads this from the program, so it is filled here from
+  // the children the shell actually binds rather than by each program producer.
+  program.samplerChildCount = static_cast<uint32_t>(samplerChildren);
   if (children.mask != nullptr && !children.maskIsPhantom &&
       !IsProcessor<DeviceSpaceTextureEffect>(children.mask.get())) {
     return nullptr;

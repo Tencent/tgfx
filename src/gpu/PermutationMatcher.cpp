@@ -26,7 +26,7 @@
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/Swizzle.h"
-#include "gpu/processors/AOTPointwiseChainProcessor.h"
+#include "gpu/aot/Program.h"
 #include "gpu/processors/AOTYUVChainProcessor.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
@@ -249,9 +249,7 @@ bool TiledFillModeSupported(int mode) {
   return TiledModeSupported(mode) || mode == 4 || mode == 5;
 }
 
-// Matches the fused pointwise-DAG kernel. The chain processor carries the whole DAG in uniforms,
-// so this rule only validates the parts that are baked into the program: the GP, the leaf count
-// (sampler/varying layout), and that every leaf is a plain sampled texture.
+// Matches the fused pointwise-DAG kernel's per-quad subset capability against the compiled program.
 // A quad's per-quad subset (SrcRectConstraint::Strict) reaches every strict texture of the
 // runtime program as the GP's vTexSubset varying, which the GP transforms with the program's
 // first coordinate transform. The HAS_SUBSET chain variant computes it with leaf 0's transform and
@@ -260,24 +258,32 @@ bool TiledFillModeSupported(int mode) {
 // tiling recipe non-strict. A projective subset stays on the runtime route, as for
 // QuadTextureFillShader: the precompiled vertex stage transforms the subset corners affinely.
 bool IsChainQuadSubsetServable(const QuadPerEdgeAAGeometryProcessor* quadGP,
-                               const AOTPointwiseChainProcessor* chain) {
-  if (chain->leafCount() == 0 || chain->tiledLeaf() == 0 || chain->tiledLeaf2() == 0 ||
-      (chain->deviceLeafMask() & 1u) != 0 || quadGP->getHasUVPerspective()) {
+                               const AOTProgram& program) {
+  if (program.samplerChildCount == 0 || quadGP->getHasUVPerspective()) {
     return false;
   }
-  for (const auto& tiled : chain->tiledLeafParameters()) {
-    if (tiled.recipe.strict) {
+  for (const auto& tiled : program.tiledLeaves) {
+    if (tiled.leafIndex == 0 || tiled.recipe.strict) {
       return false;
     }
   }
-  for (size_t index = 0; index < chain->leafCount(); ++index) {
-    auto leaf = chain->childProcessor(index);
-    if (!IsProcessor<TextureEffect>(leaf)) {
+  for (const auto& deviceLeaf : program.deviceLeaves) {
+    if (deviceLeaf.leafIndex == 0) {
       return false;
     }
-    auto* texture = static_cast<const TextureEffect*>(leaf);
-    bool strict = texture->getConstraint() == SrcRectConstraint::Strict;
-    if (strict != (index == 0) || (index == 0 && texture->hasPerspective())) {
+  }
+  for (size_t index = 0; index < program.samplerChildCount; ++index) {
+    const auto& binding = program.bindings[index];
+    if (binding.kind != AOTBinding::Kind::Leaf) {
+      // A LUT or padding child samples non-strict: it can never be the strict leaf 0 the variant
+      // computes the subset with, and behind leaf 0 it is exactly what the variant needs.
+      if (index == 0) {
+        return false;
+      }
+      continue;
+    }
+    bool strict = binding.args.constraint == SrcRectConstraint::Strict;
+    if (strict != (index == 0) || (index == 0 && binding.uvMatrix.hasPerspective())) {
       return false;
     }
   }

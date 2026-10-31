@@ -33,7 +33,6 @@
 #include "gpu/processors/HairlineLineGeometryProcessor.h"
 #include "gpu/processors/MeshGeometryProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
-#include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
 
@@ -91,53 +90,55 @@ std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::Extract(
     // pass, and the winner's writer reuses it instead of rebuilding it per draw.
     programInfo->setCachedReexpression(std::move(expression));
   }
-  auto leafCount = chain->leafCount();
+  // Everything below reads the compiled program, never the processor shell: the program is the
+  // single description of what the draw's chain variant needs.
+  const auto& program = chain->program();
   // Sampler-only padding makes every non-empty chain present exactly four sampler children.
-  if (leafCount != 0 && leafCount != 4) {
+  if (program.samplerChildCount != 0 && program.samplerChildCount != 4) {
     return std::nullopt;
   }
   // Color-space transforms and gradients each share one chain-wide parameter block.
   int colorSpaceXformCount = 0;
   int gradientCount = 0;
-  for (size_t index = 0; index < chain->slotCount(); ++index) {
-    if (chain->slot(index).op == AOTChainOp::ColorSpaceXform) {
+  for (const auto& slot : program.slots) {
+    if (slot.op == AOTChainOp::ColorSpaceXform) {
       ++colorSpaceXformCount;
-    } else if (chain->slot(index).op == AOTChainOp::Gradient) {
+    } else if (slot.op == AOTChainOp::Gradient) {
       ++gradientCount;
     }
   }
   if (colorSpaceXformCount > 1 || gradientCount > 1) {
     return Fail(failure, PermutationMatchFailure::GradientOrNoiseBudget);
   }
-  for (size_t index = 0; index < leafCount; ++index) {
-    auto leaf = chain->childProcessor(index);
-    // A deferred (task-local) proxy reports zero samplers until it is instantiated; it always
-    // binds exactly one when it is (a lazy proxy is internally rendered, hence never multi-plane
-    // YUV), so only a multi-sampler leaf is rejected here.
-    if (!IsProcessor<TextureEffect>(leaf) || leaf->numTextureSamplers() > 1) {
-      return std::nullopt;
-    }
-    auto* texture = static_cast<const TextureEffect*>(leaf);
+  for (const auto& binding : program.bindings) {
+    // Every leaf binding is a plain sampled texture: the planner refuses multi-plane, swizzled and
+    // non-TileMode sources before a leaf reaches the program. A deferred (task-local) proxy has no
+    // view yet and always binds one sampler once it is instantiated (a lazy proxy is internally
+    // rendered, hence never multi-plane YUV), so only a view that resolves multi-plane is refused.
     // A leaf subset is a runtime uniform (the kernel always clamps, full bounds when absent), an
     // alpha-only leaf splats .r through its slot selector bit, and an RGBAAA leaf reads its alpha
     // area through the per-leaf AlphaStart / HasRgbaaa uniforms, so none needs a variant.
     // Perspective transforms are served: leaf coordinates carry w and divide per-pixel.
-    if (texture->isYUV()) {
+    if (binding.kind != AOTBinding::Kind::Leaf || binding.textureProxy == nullptr) {
+      continue;
+    }
+    auto textureView = binding.textureProxy->getTextureView();
+    if (textureView != nullptr && textureView->isYUV()) {
       return std::nullopt;
     }
   }
   Inputs inputs;
   inputs.gpKind = gpKind;
-  inputs.textureCount = leafCount == 0 ? 0 : 1;
-  inputs.hasMask = chain->hasMask();
-  inputs.hasNoise = chain->hasNoise();
+  inputs.textureCount = program.samplerChildCount == 0 ? 0 : 1;
+  inputs.hasMask = program.hasMaskTexture;
+  inputs.hasNoise = program.noiseSamplerBase >= 0;
   inputs.hasGradient = gradientCount != 0;
-  inputs.resourceProfile = chain->resourceProfile();
+  inputs.resourceProfile = program.profile;
   inputs.xpType = GetXPType(programInfo);
   if (gpKind == 1) {
     auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
     if (quadGP->getHasSubset()) {
-      if (!IsChainQuadSubsetServable(quadGP, chain)) {
+      if (!IsChainQuadSubsetServable(quadGP, program)) {
         return Fail(failure, PermutationMatchFailure::QuadSubset);
       }
       inputs.hasSubset = true;

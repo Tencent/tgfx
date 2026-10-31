@@ -172,6 +172,11 @@ struct AOTProgram {
   int clipCoverageRegister = -1;
   // Sampler index of the LUT gradient child, or -1 when the chain has none.
   int lutLeafIndex = -1;
+  /// The sampler children the TEXTURE_COUNT variant dimension is encoded from: the DAG leaves, the
+  /// LUT gradient texture, the noise lookup tables and the phantom sampler padding — every binding
+  /// except the mask slot child. The artifacts exist only as 0- and 4-sampler forms, so this is 0
+  /// or 4 (the builder pads 1-3 children up to four).
+  uint32_t samplerChildCount = 0;
   /// Whether the mask binding is a real device mask (a phantom mask slot reads as absent).
   bool hasMaskTexture = false;
   /// Sampler index of the noise lookup tables' first binding, or -1 when the chain has none.

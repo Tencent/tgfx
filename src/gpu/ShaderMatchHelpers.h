@@ -29,7 +29,7 @@ class ProgramInfo;
 class GeometryProcessor;
 class FragmentProcessor;
 class QuadPerEdgeAAGeometryProcessor;
-class AOTPointwiseChainProcessor;
+struct AOTProgram;
 struct PermutationMatchResult;
 struct PermutationVariant;
 enum class PermutationMatchFailure;
@@ -90,9 +90,10 @@ bool HasDirectAnalyticClipCoverage(const ProgramInfo* programInfo);
 /// Whether a ShaderMode value is one the blur kernels' shared tiled sampling implements.
 bool TiledModeSupported(int mode);
 
-/// Whether a subset-carrying quad's subset is servable by the chain kernel's runtime uniforms.
+/// Whether a subset-carrying quad's subset is servable by the chain kernel's runtime uniforms; the
+/// decision reads the compiled chain program's binding table and tiled/device leaf records.
 bool IsChainQuadSubsetServable(const QuadPerEdgeAAGeometryProcessor* quadGP,
-                               const AOTPointwiseChainProcessor* chain);
+                               const AOTProgram& program);
 
 /// Each family's Match opens with this guard: a kernel that does not apply the write swizzle at
 /// output (ServesAlphaOnly == false) refuses draws onto alpha-only (ALPHA_8) targets, so the
