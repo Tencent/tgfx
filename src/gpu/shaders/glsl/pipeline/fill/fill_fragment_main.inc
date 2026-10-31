@@ -14,6 +14,13 @@
 // A family entry declares its interface (uniform block, varyings, samplers, XP_DST_TEX_BINDING) in
 // its runtime binding order, selects the steps, and includes this file last. Every selector is a
 // compile-time constant, so each family compiles to its own direct program with no dispatch.
+//
+// The step ladders live in the fill*Stage functions below; main() only assembles them in the fixed
+// order, so no two steps ever interleave their preprocessing. The coverage factors' multiply order
+// is part of the contract — geometry first, then the device mask, the local mask and the clip, each
+// folded left into the running product — because floating-point multiplication does not associate:
+// the chain pipeline's epilogue composes the same left fold (device mask before clip), and any
+// reorder here would surface as a rounding drift against its baselines.
 
 #define FILL_COLOR_UNIFORM 0            // Color uniform
 #define FILL_COLOR_VARYING 1            // vColor varying
@@ -55,7 +62,7 @@
 #define FILL_COVERAGE_VERTEX_MASK 11
 
 #define FILL_DEVICE_MASK_NONE 0
-#define FILL_DEVICE_MASK_ALWAYS 1   // MaskTextureSampler through DeviceCoordMatrix
+#define FILL_DEVICE_MASK_ALWAYS 1  // MaskTextureSampler through DeviceCoordMatrix
 #define FILL_DEVICE_MASK_RUNTIME 2  // the same, when HasDeviceMask != 0
 
 #ifndef FILL_COLOR
@@ -137,11 +144,12 @@ float fillDeviceMaskCoverage() {
 }
 #endif
 
-void main() {
+// Step 1: the input color. Declared by the family's FILL_COLOR selection.
+vec4 fillColorStage() {
 #if FILL_COLOR == FILL_COLOR_UNIFORM
-  vec4 outputColor = Color;
+  return Color;
 #elif FILL_COLOR == FILL_COLOR_WHITE
-  vec4 outputColor = vec4(1.0);
+  return vec4(1.0);
 #else
   vec4 outputColor = vColor;
 #if FILL_COLOR == FILL_COLOR_VARYING_OR_COMMON
@@ -149,8 +157,12 @@ void main() {
     outputColor = Color;
   }
 #endif
+  return outputColor;
 #endif
+}
 
+// Step 2: the color source — the input color itself, or a texture modulated by it.
+vec4 fillSourceStage(vec4 outputColor) {
 #if FILL_SOURCE == FILL_SOURCE_TEXTURE
   highp vec2 finalCoord = TransformedCoords_0.xy / TransformedCoords_0.z;
 #if HAS_SUBSET
@@ -159,11 +171,11 @@ void main() {
   // The Subset clamp follows the runtime TextureEffect's needSubset() gate (SubsetClampOn): an
   // ungated clamp fires on out-of-range coordinates (perspective extrapolation, edge quads),
   // zeroing the mip derivatives and diverging from the runtime codegen.
-  vec4 color = aotTextureSource(TextureSampler_0, finalCoord, outputColor, Subset, SubsetClampOn,
-                                AlphaStart, AlphaOnly, HasRgbaaa, 0);
+  return aotTextureSource(TextureSampler_0, finalCoord, outputColor, Subset, SubsetClampOn,
+                          AlphaStart, AlphaOnly, HasRgbaaa, 0);
 #elif FILL_SOURCE == FILL_SOURCE_CLAMPED_TEXTURE
-  vec4 color = aotTextureSource(TextureSampler_0, TransformedCoords_0, outputColor, Subset, 1,
-                                vec2(0.0), 0, 0, 0);
+  return aotTextureSource(TextureSampler_0, TransformedCoords_0, outputColor, Subset, 1, vec2(0.0),
+                          0, 0, 0);
 #elif FILL_SOURCE == FILL_SOURCE_TILED
   // Tiled texture as the color source, single-tap modes only (the matcher rejects the
   // mipmap-repeat modes for this kernel). Mirrors GLSLTiledTextureEffect's emission: the sample
@@ -181,18 +193,21 @@ void main() {
   } else {
     outputColor = texColor * outputColor.a;
   }
-  vec4 color = outputColor;
+  return outputColor;
 #elif FILL_SOURCE == FILL_SOURCE_TILED_FULL
-  vec4 color = aotTiledFullSample(TransformedCoords_0, outputColor);
+  return aotTiledFullSample(TransformedCoords_0, outputColor);
 #else
-  vec4 color = outputColor;
+  return outputColor;
 #endif
+}
 
+// Step 3: the optional pointwise operator. With a dst-reading XferProcessor in an advanced mode the
+// blend runs as the operator's second pass, so xpBlendColors is inlined once; the pass operands
+// come back through xpDst/xpBlended for the xp_output epilogue.
+vec4 fillOperatorStage(vec4 color, inout vec4 xpDst, inout vec4 xpBlended) {
 #if FILL_OPERATOR && HAS_XP
-  // A dst-reading XferProcessor in an advanced mode runs its blend as one more pass of the
-  // operator loop, so xpBlendColors is inlined once (see xp_blend_pass.inc).
-  vec4 xpDst = xpReadDstColor();
-  vec4 xpBlended = vec4(0.0);
+  xpDst = xpReadDstColor();
+  xpBlended = vec4(0.0);
   vec4 result = color;
   int passCount = xpNeedsBlendPass() ? 2 : 1;
   for (int pass = 0; pass < passCount; ++pass) {
@@ -204,59 +219,57 @@ void main() {
       result = value;
     }
   }
-#define TGFX_XP_DST_COLOR xpDst
-#define TGFX_XP_BLENDED xpBlended
+  return result;
 #elif FILL_OPERATOR
-  vec4 result = applyPointwiseOp(0, color);
+  return applyPointwiseOp(0, color);
 #else
-  vec4 result = color;
+  return color;
 #endif
+}
 
+// Step 4: the geometry's own coverage. The registered exception is the atlas step: a color atlas
+// (AlphaOnly == 0) replaces the color too, so result is inout. Only valid without a pointwise
+// operator: the color replace writes result after the operator stage.
+float fillCoverageStage(inout vec4 result) {
 #if FILL_COVERAGE == FILL_COVERAGE_VERTEX
-  float totalCoverage = vCoverage;
+  return vCoverage;
 #elif FILL_COVERAGE == FILL_COVERAGE_ELLIPSE
-  float totalCoverage = ellipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, StrokeEnabled);
+  return ellipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, StrokeEnabled);
 #elif FILL_COVERAGE == FILL_COVERAGE_MASK
-  float totalCoverage = texture(TextureSampler_0, TransformedCoords_0).r;
+  return texture(TextureSampler_0, TransformedCoords_0).r;
 #elif FILL_COVERAGE == FILL_COVERAGE_VERTEX_MASK
-  float totalCoverage = vCoverage * texture(TextureSampler_0, TransformedCoords_0).r;
+  return vCoverage * texture(TextureSampler_0, TransformedCoords_0).r;
 #elif FILL_COVERAGE == FILL_COVERAGE_HAIRLINE_LINE
-  float totalCoverage = hairlineLineEdgeCoverage(vEdgeDistance, Coverage, AAEnabled);
+  return hairlineLineEdgeCoverage(vEdgeDistance, Coverage, AAEnabled);
 #elif FILL_COVERAGE == FILL_COVERAGE_HAIRLINE_QUAD
-  float totalCoverage = hairlineQuadEdgeCoverage(vHairQuadEdge, Coverage, AAEnabled);
+  return hairlineQuadEdgeCoverage(vHairQuadEdge, Coverage, AAEnabled);
 #elif FILL_COVERAGE == FILL_COVERAGE_RRECT
 #if STROKE
-  float totalCoverage = nonAARRectCoverage(vLocalCoord, vRectBounds, vRadii, vStrokeWidth, true);
+  return nonAARRectCoverage(vLocalCoord, vRectBounds, vRadii, vStrokeWidth, true);
 #else
-  float totalCoverage = nonAARRectCoverage(vLocalCoord, vRectBounds, vRadii, vec2(0.0), false);
+  return nonAARRectCoverage(vLocalCoord, vRectBounds, vRadii, vec2(0.0), false);
 #endif
 #elif FILL_COVERAGE == FILL_COVERAGE_COMPLEX_RRECT
 #if STROKE
-  float totalCoverage =
-      complexRRectCoverage(vLocalCoord, vRectBounds, vXRadii, vYRadii, vStrokeWidth, true);
+  return complexRRectCoverage(vLocalCoord, vRectBounds, vXRadii, vYRadii, vStrokeWidth, true);
 #else
-  float totalCoverage =
-      complexRRectCoverage(vLocalCoord, vRectBounds, vXRadii, vYRadii, vec2(0.0), false);
+  return complexRRectCoverage(vLocalCoord, vRectBounds, vXRadii, vYRadii, vec2(0.0), false);
 #endif
 #elif FILL_COVERAGE == FILL_COVERAGE_COMPLEX_ELLIPSE
 #if STROKE
-  float totalCoverage =
-      complexEllipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, vEdgeDist, vStrokeWidth, true);
+  return complexEllipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, vEdgeDist, vStrokeWidth, true);
 #else
-  float totalCoverage =
-      complexEllipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, vEdgeDist, vec2(0.0), false);
+  return complexEllipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, vEdgeDist, vec2(0.0), false);
 #endif
 #elif FILL_COVERAGE == FILL_COVERAGE_ROUND_STROKE
   // AA is a runtime select (AAEnabled): the non-AA branch reads only the offsets, so the coverage
   // and radii varyings are inert when it is off.
-  float totalCoverage = roundStrokeRectCoverage(vEllipseOffsets, vEllipseRadii, vCoverage,
-                                                AAEnabled != 0);
+  return roundStrokeRectCoverage(vEllipseOffsets, vEllipseRadii, vCoverage, AAEnabled != 0);
 #elif FILL_COVERAGE == FILL_COVERAGE_ATLAS_TEXT
   // The atlas texture carries both: an alpha-only atlas (R8, the glyph mask) contributes its red
   // channel as the coverage and leaves the GP color; a color atlas (color emoji) replaces the
   // color with its unpremultiplied rgb and contributes its alpha. The vertex coverage is read and
-  // then replaced, mirroring the runtime emission. Only valid without a pointwise operator: the
-  // color replace writes `result` after the operator stage.
+  // then replaced, mirroring the runtime emission.
   vec4 atlasTexColor = texture(TextureSampler_0, vTextureCoords);
 #if HAS_COVERAGE
   float totalCoverage = vCoverage;
@@ -269,9 +282,14 @@ void main() {
     result = clamp(vec4(atlasTexColor.rgb / atlasTexColor.a, 1.0), 0.0, 1.0);
     totalCoverage = atlasTexColor.a;
   }
+  return totalCoverage;
 #else
-  float totalCoverage = 1.0;
+  return 1.0;
 #endif
+}
+
+// Step 5: the draw-level coverage factors, folded left in this order: device mask, then local mask.
+float fillMaskStage(float totalCoverage) {
 #if FILL_DEVICE_MASK == FILL_DEVICE_MASK_RUNTIME
   if (HasDeviceMask != 0) {
     totalCoverage *= fillDeviceMaskCoverage();
@@ -283,13 +301,35 @@ void main() {
   highp vec2 localMaskCoord = TransformedCoords_1.xy / TransformedCoords_1.z;
   totalCoverage *= texture(LocalMaskSampler, localMaskCoord).a;
 #endif
+  return totalCoverage;
+}
+
+// Step 6: the analytic draw clip (AA rect or rounded rect through the shared runtime clip
+// contract uniforms).
+float fillClipStage(float totalCoverage) {
 #if FILL_CLIP
   totalCoverage *= clipCoverage();
 #endif
+  return totalCoverage;
+}
+
+void main() {
+  vec4 outputColor = fillColorStage();
+  vec4 color = fillSourceStage(outputColor);
+  vec4 xpDst = vec4(0.0);
+  vec4 xpBlended = vec4(0.0);
+  vec4 result = fillOperatorStage(color, xpDst, xpBlended);
+  float totalCoverage = fillCoverageStage(result);
+  totalCoverage = fillMaskStage(totalCoverage);
+  totalCoverage = fillClipStage(totalCoverage);
 
 #define TGFX_XP_SRC_COLOR (result * totalCoverage)
 #define TGFX_XP_SRC_UNPREMUL result
 #define TGFX_XP_COVERAGE vec4(totalCoverage)
+#if FILL_OPERATOR && HAS_XP
+#define TGFX_XP_DST_COLOR xpDst
+#define TGFX_XP_BLENDED xpBlended
+#endif
 #include "xp/xp_output.inc"
 #if FILL_OUTPUT_SWIZZLE
 #include "xp/output_swizzle.inc"
