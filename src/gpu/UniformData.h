@@ -30,6 +30,8 @@
 
 namespace tgfx {
 
+struct AOTProgram;
+
 /**
  * An object representing the collection of uniform data in CPU side.
  */
@@ -235,5 +237,8 @@ class UniformData {
   friend class ChainProgramWriter;
   friend class UniformHandler;
   friend class PrecompiledProgramCreator;
+  // The shell-free chain binder drives the same structural-suffix addressing the processor-tree
+  // walk maintained; only the per-binding walk needs the direct access.
+  friend void BindChainBindings(const AOTProgram& program, UniformData* fragmentUniformData);
 };
 }  // namespace tgfx

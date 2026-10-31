@@ -23,6 +23,8 @@
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/TextureView.h"
 #include "gpu/shaders/modules/ChainParams.h"
+#include "gpu/shaders/modules/ParamWriter.h"
+#include "gpu/shaders/modules/TextureSourceModule.h"
 
 namespace tgfx {
 namespace {
@@ -341,6 +343,149 @@ void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
       break;
     }
   }
+}
+
+namespace {
+
+// The subset semantics below replicate TextureEffect::needSubset / computeSubsetRect and the
+// module bind's field writes from the binding's own data. The processor-side implementations stay
+// until the shell retires and serve the un-migrated families meanwhile; byte-for-byte parity is
+// what lets the binder take the chain's children over.
+bool BindingNeedsSubset(const std::shared_ptr<TextureProxy>& proxy, const TextureView* view,
+                        const std::optional<Rect>& subset) {
+  auto bounds = Rect::MakeWH(proxy->width(), proxy->height());
+  if (subset.has_value() && !(*subset).contains(bounds)) {
+    return true;
+  }
+  if (proxy->width() != view->width() || proxy->height() != view->height()) {
+    return true;
+  }
+  return view->getTexture()->type() == TextureType::External;
+}
+
+void BindingSubsetRect(const AOTBinding& binding, const TextureView* view, float rect[4]) {
+  auto subsetRect = binding.args.sampleArea.value_or(
+      Rect::MakeWH(binding.textureProxy->width(), binding.textureProxy->height()));
+  if (BindingNeedsSubset(binding.textureProxy, view, binding.args.sampleArea)) {
+    if (binding.args.sampling.magFilterMode == binding.args.sampling.minFilterMode &&
+        binding.args.sampling.magFilterMode == FilterMode::Nearest) {
+      subsetRect.roundOut();
+    }
+    auto type = view->getTexture()->type();
+    // Normally this would just need to take 1/2 a texel off each end, but because the chroma
+    // channels of YUV420 images are subsampled we may need to shrink the crop region by a whole
+    // texel on each side for external textures.
+    auto inset = type == TextureType::External ? 1.0f : 0.5f;
+    subsetRect = subsetRect.makeInset(inset, inset);
+  }
+  rect[0] = subsetRect.left;
+  rect[1] = subsetRect.top;
+  rect[2] = subsetRect.right;
+  rect[3] = subsetRect.bottom;
+  if (view->origin() == ImageOrigin::BottomLeft) {
+    auto height = static_cast<float>(view->height());
+    rect[1] = height - rect[1];
+    rect[3] = height - rect[3];
+    std::swap(rect[1], rect[3]);
+  }
+  auto type = view->getTexture()->type();
+  if (type != TextureType::Rectangle) {
+    auto lt = view->getTextureCoord(rect[0], rect[1]);
+    auto rb = view->getTextureCoord(rect[2], rect[3]);
+    rect[0] = lt.x;
+    rect[1] = lt.y;
+    rect[2] = rb.x;
+    rect[3] = rb.y;
+  }
+}
+
+// The device mask child's writes, replicating GLSLDeviceSpaceTextureEffect::onSetData.
+void BindDeviceMaskBinding(const AOTBinding& binding, UniformData* uniformData) {
+  auto textureView = binding.textureProxy->getTextureView();
+  if (textureView == nullptr) {
+    return;
+  }
+  auto deviceCoordMatrix = binding.uvMatrix;
+  auto scale = textureView->getTextureCoord(1, 1);
+  deviceCoordMatrix.postScale(scale.x, scale.y);
+  uniformData->setData("DeviceCoordMatrix", deviceCoordMatrix);
+  // Kernels with a runtime device mask read this flag; absent in compile-time-mask programs.
+  uniformData->setDataOptional("HasDeviceMask", 1);
+  // Shared precompiled kernels (a device mask alongside texture fills) declare a
+  // DeviceMaskSubset decoy: the mask's Subset/AlphaOnly writes would clobber the leaf processor's
+  // same-named fields, so they are routed there. The decoy is never read — these kernels sample
+  // the mask unclamped, matching the runtime emission.
+  bool sharedKernel = uniformData->hasField("DeviceMaskSubset");
+  if (sharedKernel) {
+    float rect[4] = {0.0f, 0.0f, 1.0f, 1.0f};
+    if (textureView->getTexture()->type() == TextureType::Rectangle) {
+      rect[2] = static_cast<float>(textureView->width());
+      rect[3] = static_cast<float>(textureView->height());
+    }
+    uniformData->setData("DeviceMaskSubset", rect);
+  }
+  if (!sharedKernel && uniformData->hasField("Subset")) {
+    float rect[4] = {0.0f, 0.0f, 1.0f, 1.0f};
+    if (textureView->getTexture()->type() == TextureType::Rectangle) {
+      rect[2] = static_cast<float>(textureView->width());
+      rect[3] = static_cast<float>(textureView->height());
+    }
+    uniformData->setData("Subset", rect);
+  }
+  if (!sharedKernel && uniformData->hasField("AlphaOnly")) {
+    uniformData->setData("AlphaOnly", binding.textureProxy->isAlphaOnly() ? 1 : 0);
+  }
+  if (!sharedKernel && uniformData->hasField("Rect")) {
+    // The shared coverage_output.inc always evaluates the AARect clip term when HAS_COVERAGE >= 1.
+    // A bare device-space mask carries no RectEffect, so upload a rect that covers the whole plane.
+    uniformData->setData("Rect", Rect::MakeLTRB(-1e9f, -1e9f, 1e9f, 1e9f));
+  }
+  if (!sharedKernel && uniformData->hasField("HasClip")) {
+    uniformData->setData("HasClip", 0);
+  }
+}
+
+}  // namespace
+
+void BindChainBindings(const AOTProgram& program, UniformData* fragmentUniformData) {
+  if (fragmentUniformData == nullptr) {
+    return;
+  }
+  ParamWriter writer(fragmentUniformData);
+  // The TextureEffect-class children (leaves, the LUT gradient, the padding) share one
+  // structural-ordinal sequence, exactly as the processor-tree walk numbered them; the device
+  // mask is the only child of its class and keeps the base names.
+  int textureOrdinal = 0;
+  for (const auto& binding : program.bindings) {
+    if (binding.kind == AOTBinding::Kind::Mask) {
+      fragmentUniformData->structuralSuffix = "";
+      BindDeviceMaskBinding(binding, fragmentUniformData);
+      continue;
+    }
+    auto structural = textureOrdinal > 0 ? "_" + std::to_string(textureOrdinal) : "";
+    ++textureOrdinal;
+    fragmentUniformData->structuralSuffix = structural;
+    auto textureView = binding.textureProxy->getTextureView();
+    if (textureView == nullptr) {
+      // The texture is not instantiated (a failed or deferred upload): the module writer returns
+      // without touching any field in this state, and so does the binder.
+      continue;
+    }
+    float rect[4] = {};
+    BindingSubsetRect(binding, textureView.get(), rect);
+    writer.set(TextureSourceModule::Subset, rect);
+    writer.set(TextureSourceModule::SubsetClampOn, binding.args.sampleArea.has_value() ? 1 : 0);
+    if (binding.alphaStart != Point::Zero()) {
+      // Value-gated exactly like the module bind: single-plane draws leave the field at its
+      // previous content, which the shader never reads (HasRgbaaa is 0).
+      auto coord = textureView->getTextureCoord(binding.alphaStart.x, binding.alphaStart.y);
+      const float alphaStart[2] = {coord.x, coord.y};
+      writer.set(TextureSourceModule::AlphaStart, alphaStart);
+    }
+    writer.set(TextureSourceModule::AlphaOnly, binding.textureProxy->isAlphaOnly() ? 1 : 0);
+    writer.set(TextureSourceModule::HasRgbaaa, binding.alphaStart != Point::Zero() ? 1 : 0);
+  }
+  fragmentUniformData->structuralSuffix = "";
 }
 
 }  // namespace tgfx

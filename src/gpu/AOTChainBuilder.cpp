@@ -125,6 +125,7 @@ static ChainLeafChild BuildTextureLeafChild(BlockAllocator* allocator, const AOT
                                               parameters->alphaStart, &uvMatrix);
   child.binding.args = args;
   child.binding.uvMatrix = uvMatrix;
+  child.binding.alphaStart = parameters->alphaStart;
   return child;
 }
 

@@ -148,6 +148,9 @@ class ChainProgramWriter final : public ExpressionProgramWriter {
   void writeGeometryProcessor(const ProgramInfo& info, UniformData* vertexUniformData,
                               UniformData* fragmentUniformData,
                               const FragmentProcessor* expression) const override;
+  void writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
+                       UniformData* fragmentUniformData,
+                       const FragmentProcessor* expression) const override;
   void writeSamplers(const ProgramInfo& info, Program* program, RenderPass* renderPass,
                      const FragmentProcessor* expression) const override;
 };

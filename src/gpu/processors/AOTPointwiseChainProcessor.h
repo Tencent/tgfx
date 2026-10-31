@@ -193,6 +193,11 @@ class AOTPointwiseChainProcessor : public FragmentProcessor {
     return _program.slots[index];
   }
 
+  /** The compiled program the shell carries: the shell-free binder path reads it directly. */
+  const AOTProgram& program() const {
+    return _program;
+  }
+
   void emitCode(EmitArgs& args) const override;
 
  protected:

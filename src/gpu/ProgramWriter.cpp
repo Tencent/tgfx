@@ -28,6 +28,7 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/VertexShaderBuilder.h"
+#include "gpu/aot/Binder.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/resources/RenderTarget.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
@@ -435,6 +436,32 @@ void ExpressionProgramWriter::writeProcessors(const ProgramInfo& info,
     }
     fp = iter.next();
   }
+  const auto processor = info.getXferProcessor();
+  info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
+  if (processor->onBindPrecompiled(&paramWriter)) {
+    // The XP's feature module took over its uniform writes.
+  } else {
+    processor->setData(vertexUniformData, fragmentUniformData);
+  }
+}
+
+void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
+                                         UniformData* fragmentUniformData,
+                                         const FragmentProcessor* expression) const {
+  if (expression == nullptr || !IsProcessor<AOTPointwiseChainProcessor>(expression)) {
+    LOGE(
+        "ChainProgramWriter::writeProcessors() the expression failed to build; the draw "
+        "renders with unwritten kernel uniforms");
+    return;
+  }
+  // The shell-free value write: the expression's whole uniform content comes from the compiled
+  // program — the root block plus every binding's per-child records — so no processor tree is
+  // walked. The xfer processor still writes through its own bind until the xfer contract lands.
+  const auto& program = static_cast<const AOTPointwiseChainProcessor*>(expression)->program();
+  info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, expression);
+  BindChainProgram(program, vertexUniformData, fragmentUniformData);
+  BindChainBindings(program, fragmentUniformData);
+  ParamWriter paramWriter(fragmentUniformData);
   const auto processor = info.getXferProcessor();
   info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
   if (processor->onBindPrecompiled(&paramWriter)) {

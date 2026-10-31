@@ -39,6 +39,9 @@ struct AOTBinding {
   SamplingArgs args = {};
   /// Mask only: the device-space sampling matrix (destination coordinates to the mask's space).
   Matrix uvMatrix = Matrix::I();
+  /// The RGBAAA dual-plane alpha offset, as the child TextureEffect carries it; Point::Zero() for
+  /// a single-plane source (matching TextureEffect::hasRGBAAA).
+  Point alphaStart = Point::Zero();
 };
 
 /// The runtime operator of one chain slot. The integer values are part of the precompiled kernel
