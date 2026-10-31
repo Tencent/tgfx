@@ -107,13 +107,16 @@ struct AOTAtlasGlyphSource {
  * Lowers one draw's whole expression — its color processors, its coverage processors and the
  * glyph leaf an AtlasText geometry processor contributes — into a DrawIR. Compose is flattened
  * recursively and every leaf is classified by what it is, not by its position: a leaf RectEffect
- * or RRectEffect is Analytic, an alpha-only non-perspective DeviceSpaceTextureEffect is DeviceMask,
- * and anything else is Subtree (at most one). A term whose analytic leaves fail to lower falls
- * back to a Subtree term as a whole, matching the previous whole-term acceptance. A null geometry
- * processor contributes no glyph leaf (an AtlasText processor never is). Returns nullopt when the
- * expression does not lower (an unsupported processor, a mask that is not alpha-only or carries
- * perspective, more than one subtree or device mask, or a coverage count the chain never
- * accepted). allocator places the synthesized unit-color and atlas-leaf processors.
+ * or RRectEffect is Analytic, an alpha-only DeviceSpaceTextureEffect is DeviceMask (a perspective
+ * one lowers with its flag set), and anything else is Subtree. A term whose analytic leaves fail
+ * to lower falls back to a Subtree term as a whole, matching the previous whole-term acceptance.
+ * A null geometry processor contributes no glyph leaf (an AtlasText processor never is). The
+ * lowering is total over the coverage expression — a second mask or subtree lowers into its own
+ * term — and returns nullopt only when the expression is semantically inexpressible (an
+ * unsupported processor, a mask that is not alpha-only). The shape limits — at most one mask, one
+ * subtree, an affine mask matrix, the analytic slot capacities — are the compile's rejections
+ * (MergeCoverageTerms, ValidateSlots): admission equals compile success. allocator places the
+ * synthesized unit-color and atlas-leaf processors.
  */
 std::optional<DrawIR> LowerDraw(const std::vector<const FragmentProcessor*>& colorProcessors,
                                 const std::vector<const FragmentProcessor*>& coverageProcessors,

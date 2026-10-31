@@ -404,11 +404,54 @@ TGFX_TEST(AOTEffectTest, LowerDrawClassifiesCoverageTerms) {
                   {AOTCoverageTermKind::Analytic, AOTCoverageTermKind::DeviceMask}));
   }
 
-  // A second subtree or a non-alpha-only device texture is rejected.
+  // The lowering is total: a second subtree, a second mask and a perspective mask all lower into
+  // their own terms — the compile rejects the shapes a kernel cannot carry.
   {
     auto two = LowerDraw({texture.get()}, {texture.get(), texture.get()}, nullptr, nullptr,
                          BlendMode::SrcOver, allocator);
-    EXPECT_FALSE(two.has_value());
+    ASSERT_TRUE(two.has_value());
+    EXPECT_EQ(CoverageTermKinds(*two),
+              std::vector<AOTCoverageTermKind>(
+                  {AOTCoverageTermKind::Subtree, AOTCoverageTermKind::Subtree}));
+
+    auto alphaProxy = context->proxyProvider()->createTextureProxy({}, 4, 4, PixelFormat::ALPHA_8);
+    ASSERT_NE(alphaProxy, nullptr);
+    auto maskA = DeviceSpaceTextureEffect::Make(allocator, alphaProxy, Matrix::MakeTrans(3, 5));
+    auto maskB = DeviceSpaceTextureEffect::Make(allocator, alphaProxy, Matrix::I());
+    ASSERT_NE(maskA, nullptr);
+    ASSERT_NE(maskB, nullptr);
+    auto twoMasks = LowerDraw({texture.get()}, {maskA.get(), maskB.get()}, nullptr, nullptr,
+                              BlendMode::SrcOver, allocator);
+    ASSERT_TRUE(twoMasks.has_value());
+    EXPECT_EQ(CoverageTermKinds(*twoMasks),
+              std::vector<AOTCoverageTermKind>(
+                  {AOTCoverageTermKind::DeviceMask, AOTCoverageTermKind::DeviceMask}));
+
+    auto perspective = Matrix::MakeAll(1, 0, 0, 0, 1, 0, 0.01f, 0, 1);
+    auto perspectiveMask = DeviceSpaceTextureEffect::Make(allocator, alphaProxy, perspective);
+    ASSERT_NE(perspectiveMask, nullptr);
+    auto flagged = LowerDraw({texture.get()}, {perspectiveMask.get()}, nullptr, nullptr,
+                             BlendMode::SrcOver, allocator);
+    ASSERT_TRUE(flagged.has_value());
+    EXPECT_EQ(CoverageTermKinds(*flagged),
+              std::vector<AOTCoverageTermKind>({AOTCoverageTermKind::DeviceMask}));
+    EXPECT_TRUE(flagged->coverage[0].mask.hasPerspective);
+
+    // The compile side rejects all three shapes (at most one mask, an affine mask matrix, at
+    // most one subtree).
+    AOTEffectGraph graph = {};
+    ASSERT_TRUE(AOTEffectDecomposer::Lower({texture.get()}, &graph));
+    AOTEffectPlan plan = {};
+    ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
+    AOTProgram chain = {};
+    EXPECT_FALSE(AOTChainBuilder::CompileChainProgram(
+        allocator, graph, plan.passes[0], {texture.get(), texture.get()}, false, &chain));
+    EXPECT_FALSE(AOTChainBuilder::CompileChainProgram(allocator, graph, plan.passes[0],
+                                                      {maskA.get(), maskB.get()}, false, &chain));
+    EXPECT_FALSE(AOTChainBuilder::CompileChainProgram(allocator, graph, plan.passes[0],
+                                                      {perspectiveMask.get()}, false, &chain));
+
+    // A non-alpha-only device texture stays a semantic rejection of the lowering itself.
     auto rgbaProxy = context->proxyProvider()->createTextureProxy({}, 4, 4, PixelFormat::RGBA_8888);
     auto rgbaMask = DeviceSpaceTextureEffect::Make(allocator, rgbaProxy, Matrix::I());
     ASSERT_NE(rgbaMask, nullptr);

@@ -95,10 +95,11 @@ std::optional<std::vector<AOTCoverageTerm>> LowerCoverageTerms(
     return std::nullopt;
   }
   // Classify every leaf by what it is. Analytic leaves chain into runs; a non-analytic leaf
-  // closes the pending run and becomes its own term.
+  // closes the pending run and becomes its own term. The classification is total: a second mask
+  // or subtree lowers into a second term (the compile's MergeCoverageTerms rejects what a kernel
+  // cannot carry), and a perspective mask lowers with its flag set — shape limits are the
+  // compile's call, never the lowering's (admission equals compile success).
   std::vector<AOTCoverageTerm> terms = {};
-  bool hasMask = false;
-  bool hasSubtree = false;
   for (auto* termFP : coverageProcessors) {
     std::vector<const FragmentProcessor*> leaves = {};
     FlattenCoverageLeaves(termFP, &leaves);
@@ -117,11 +118,9 @@ std::optional<std::vector<AOTCoverageTerm>> LowerCoverageTerms(
         } else {
           // The run's analytic leaves did not lower; the run keeps the subtree semantics the
           // previous whole-term acceptance gave such a shape.
-          if (hasSubtree ||
-              !LowerCoverageRun(leaves, runBegin, index, AOTCoverageTermKind::Subtree, &term)) {
+          if (!LowerCoverageRun(leaves, runBegin, index, AOTCoverageTermKind::Subtree, &term)) {
             return std::nullopt;
           }
-          hasSubtree = true;
           terms.push_back(std::move(term));
         }
       }
@@ -139,24 +138,19 @@ std::optional<std::vector<AOTCoverageTerm>> LowerCoverageTerms(
       }
       if (IsProcessor<DeviceSpaceTextureEffect>(leaf)) {
         auto* mask = static_cast<const DeviceSpaceTextureEffect*>(leaf);
-        if (hasMask || !mask->isAlphaOnly() || mask->hasPerspective()) {
+        if (!mask->isAlphaOnly()) {
           return std::nullopt;
         }
-        hasMask = true;
         AOTCoverageTerm term = {};
         term.kind = AOTCoverageTermKind::DeviceMask;
         term.mask.textureProxy = mask->getTextureProxy();
         term.mask.uvMatrix = mask->getUVMatrix();
         term.mask.samplingKind = AOTTextureSamplingKind::Device;
         term.mask.isAlphaOnly = true;
-        term.mask.hasPerspective = false;
+        term.mask.hasPerspective = mask->hasPerspective();
         terms.push_back(std::move(term));
         continue;
       }
-      if (hasSubtree) {
-        return std::nullopt;
-      }
-      hasSubtree = true;
       AOTCoverageTerm term = {};
       if (!LowerCoverageRun(leaves, index, index + 1, AOTCoverageTermKind::Subtree, &term)) {
         return std::nullopt;
@@ -202,9 +196,9 @@ std::optional<DrawIR> LowerDrawCore(const std::vector<const FragmentProcessor*>&
   if (!AOTEffectDecomposer::Lower(colors, &ir.color)) {
     return std::nullopt;
   }
-  if (coverageProcessors.size() > (atlasGlyphLeaf != nullptr ? 1u : 2u)) {
-    return std::nullopt;
-  }
+  // No coverage-count gate: the IR is total over the coverage expression (a second mask or
+  // subtree lowers into its own term); the compile's MergeCoverageTerms rejects the shapes a
+  // kernel cannot carry.
   std::vector<const FragmentProcessor*> termFPs = coverageProcessors;
   if (atlasGlyphLeaf != nullptr) {
     termFPs.push_back(atlasGlyphLeaf);

@@ -1243,7 +1243,9 @@ static bool MergeCoverageTerms(const std::vector<AOTCoverageTerm>& terms,
         merged->clipLinks.push_back(copied);
       }
     } else if (term.kind == AOTCoverageTermKind::DeviceMask) {
-      if (merged->mask != nullptr) {
+      // The kernel's device-space mask matrix is affine (mat3 without the homogeneous divide), so
+      // a perspective mask cannot ride it — the lowering keeps the flag, the compile rejects.
+      if (merged->mask != nullptr || term.mask.hasPerspective) {
         return false;
       }
       merged->mask = &term.mask;
