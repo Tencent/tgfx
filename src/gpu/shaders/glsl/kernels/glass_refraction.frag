@@ -314,5 +314,4 @@ void main() {
 #endif
 #define TGFX_COVERAGE_SRC_COLOR outputColor
 #include "coverage/coverage_output.inc"
-#include "xp/xp_output.inc"
 }

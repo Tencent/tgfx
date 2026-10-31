@@ -1,15 +1,13 @@
-// Coverage computation — include before xp_output.inc.
+// Coverage fold for the opaque kernels — include at the output point in main().
 // Requires: with HAS_RUNTIME_CLIP, clip_coverage.inc must already be included (file scope) so the
 // clipCoverage() function is available for the HasClip branch.
 // Before including, #define TGFX_COVERAGE_SRC_COLOR to the uncovered color expression.
 // Optionally #define TGFX_INITIAL_COVERAGE to the coverage this draw already carries (e.g. a
-// geometry-AA vCoverage); AARect and mask coverage are then multiplied on top of it. Defaults to
-// vec4(1.0), so shaders with no prior coverage are unaffected.
-// After this file, TGFX_XP_SRC_COLOR is defined for xp_output.inc (coverage-premultiplied color for
-// the non-XP path). When coverage is present, TGFX_XP_SRC_UNPREMUL (the uncovered color) and
-// TGFX_XP_COVERAGE (the computed coverage) are also defined so the XferProcessor path can composite
-// coverage correctly. TGFX_XP_COVERAGE is guarded so a shader that already declared its own coverage
-// (e.g. a vertex vCoverage) keeps it instead of being overridden here.
+// geometry-AA vCoverage); the device-mask and clip terms are then multiplied on top of it.
+// Defaults to vec4(1.0), so shaders with no prior coverage are unaffected.
+// The fold order — the initial coverage first, then the device mask, then the clip — is the
+// shared left-fold contract (see compose.inc); this file ends at that shared composition site,
+// so the caller must NOT include xp_output.inc itself.
 #ifndef TGFX_INITIAL_COVERAGE
 #define TGFX_INITIAL_COVERAGE vec4(1.0)
 #endif
@@ -36,12 +34,11 @@
   }
 
   vec4 _uncoveredColor = TGFX_COVERAGE_SRC_COLOR;
-  vec4 _coveredColor = _uncoveredColor * _coverageResult;
-#define TGFX_XP_SRC_COLOR _coveredColor
-#define TGFX_XP_SRC_UNPREMUL _uncoveredColor
-#ifndef TGFX_XP_COVERAGE
-#define TGFX_XP_COVERAGE _coverageResult
-#endif
+#define TGFX_COMPOSE_SRC_UNPREMUL _uncoveredColor
+#define TGFX_COMPOSE_COVERAGE _coverageResult
+#include "coverage/compose.inc"
 #else
-#define TGFX_XP_SRC_COLOR TGFX_COVERAGE_SRC_COLOR
+#define TGFX_COMPOSE_SRC_UNPREMUL TGFX_COVERAGE_SRC_COLOR
+#define TGFX_COMPOSE_COVERAGE vec4(1.0)
+#include "coverage/compose.inc"
 #endif

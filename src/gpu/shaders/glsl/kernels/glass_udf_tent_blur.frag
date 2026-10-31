@@ -141,5 +141,4 @@ void main() {
 
 #define TGFX_COVERAGE_SRC_COLOR fieldColor
 #include "coverage/coverage_output.inc"
-#include "xp/xp_output.inc"
 }

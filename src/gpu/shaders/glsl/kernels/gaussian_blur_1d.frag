@@ -172,6 +172,5 @@ void main() {
 
 #define TGFX_COVERAGE_SRC_COLOR blurResult
 #include "coverage/coverage_output.inc"
-#include "xp/xp_output.inc"
 #include "xp/output_swizzle.inc"
 }
