@@ -728,7 +728,7 @@ TGFX_TEST(AOTL2AuditTest, InnerShadowQuantizationAttribution) {
 // InnerShadow preserves its nested SrcOut inside SrcATop/SrcIn tree. The tree carries two decal
 // texture leaves (the blurred mask and the source image) whose tiled recipes differ; the chain
 // kernel gives each of its two tiled selectors an independent recipe
-// (AOTPointwiseChainProcessor::MaxShaderTiledChainLeaves), so the unmodified tree fuses into a
+// (the chain kernel's two tiled-recipe slots), so the unmodified tree fuses into a
 // single pass with no materialization and must match the runtime reference byte for byte. Coverage
 // stays strict: the whole tree is served by precompiled programs.
 TGFX_TEST(AOTL2AuditTest, InnerShadowTiledSrcServedByteExact) {

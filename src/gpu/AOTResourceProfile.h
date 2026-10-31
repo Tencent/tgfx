@@ -37,7 +37,7 @@ enum class AOTResourceProfile : uint32_t {
 
 // What a chain pass asks for. Only the fields below differ between the shapes; the limits every
 // shape shares (color-space transform, clip rect and rrect blocks, result registers) are enforced
-// by AOTPointwiseChainProcessor::ValidateSlots.
+// by AOTChainBuilder::ValidateSlots.
 struct AOTResourceDemand {
   size_t instructions = 0;
   size_t leafBindings = 0;  // texture leaves + the LUT gradient + two noise tables.

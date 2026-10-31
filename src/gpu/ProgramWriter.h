@@ -137,14 +137,13 @@ class ExpressionProgramWriter : public PrecompiledProgramWriter {
 };
 
 /**
- * The fused chain kernel's writer: it re-expresses the draw's effect as the chain processor every
- * draw (the structure is stable for a given program key, the values are not), uploads through the
- * processor's own data writer, and binds the expression's leaf-ordered children as the artifact's
- * sampler slots.
+ * The fused chain kernel's writer: the draw's whole uniform content, its vertex transforms and its
+ * sampler bindings all come from the compiled chain program the info carries (uniforms through the
+ * aot binder, transforms from the binding table, samplers in binding order) — no processor tree is
+ * walked. It stays a ProgramWriter until P7 folds the whole writer hierarchy away.
  */
 class ChainProgramWriter final : public ExpressionProgramWriter {
  protected:
-  Expression buildExpression(const ProgramInfo& info) const override;
   void writeGeometryProcessor(const ProgramInfo& info, UniformData* vertexUniformData,
                               UniformData* fragmentUniformData,
                               const FragmentProcessor* expression) const override;

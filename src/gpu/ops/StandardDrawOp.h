@@ -142,9 +142,6 @@ class StandardDrawOp : public DrawOp {
   PlacementPtr<GeometryProcessor> geometryProcessor = nullptr;
   bool geometryProcessorInitialized = false;
   std::optional<ColorProcessorList> preparedColors = std::nullopt;
-  // The chain processor rebuilt from a plan pass's IR (see prepare's passIR): the info points at
-  // it, so it must outlive the info.
-  PlacementPtr<FragmentProcessor> preparedPassProcessor = nullptr;
   std::unique_ptr<ProgramInfo> preparedProgramInfo = nullptr;
   std::shared_ptr<Program> preparedProgram = nullptr;
   RenderTarget* preparedRenderTarget = nullptr;

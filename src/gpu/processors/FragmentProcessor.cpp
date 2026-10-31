@@ -134,11 +134,6 @@ FragmentProcessor::CoordTransformIter::CoordTransformIter(const ProgramInfo* pro
   currFP = fpIter.next();
 }
 
-FragmentProcessor::CoordTransformIter::CoordTransformIter(const FragmentProcessor* fp)
-    : fpIter(fp) {
-  currFP = fpIter.next();
-}
-
 FragmentProcessor::CoordTransformIter::CoordTransformIter(
     const std::vector<CoordTransform>* transformList)
     : transforms(transformList) {

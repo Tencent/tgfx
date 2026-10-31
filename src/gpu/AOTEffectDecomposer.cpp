@@ -23,7 +23,6 @@
 #include "gpu/AOTShapeRules.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/aot/NodeContract.h"
-#include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"

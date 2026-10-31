@@ -32,10 +32,10 @@
 #include "gpu/OpsCompositor.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/aot/Binder.h"
 #include "gpu/aot/DrawIR.h"
 #include "gpu/aot/EffectGraph.h"
 #include "gpu/ops/StencilCoverPathDrawOp.h"
-#include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
@@ -65,17 +65,29 @@
 
 namespace tgfx {
 
-// The construction form of one pass: a chain pass is rebuilt from its pass IR (the form every
-// production plan carries), the linear kernels through BuildFPForPass.
+// The construction forms of one pass: a chain pass compiles from its pass IR (the form every
+// production plan carries), the linear kernels build through BuildFPForPass.
+static bool CompileChainForTest(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
+                                AOTProgram* program) {
+  DrawIR passIR = {};
+  passIR.color = graph;
+  passIR.passDescriptor = pass;
+  return AOTChainBuilder::CompilePassProgram(passIR, program);
+}
+
+// The device-space leaf mask the shell used to expose: bit k is set when leaf k samples in
+// destination device space.
+static uint32_t ChainDeviceLeafMask(const AOTProgram& program) {
+  uint32_t mask = 0;
+  for (const auto& deviceLeaf : program.deviceLeaves) {
+    mask |= 1u << static_cast<uint32_t>(deviceLeaf.leafIndex);
+  }
+  return mask;
+}
+
 static PlacementPtr<FragmentProcessor> BuildProcessorForTest(BlockAllocator* allocator,
                                                              const AOTEffectGraph& graph,
                                                              const AOTPassDescriptor& pass) {
-  if (IsAOTPointwiseDAGKernel(pass.kernel)) {
-    DrawIR passIR = {};
-    passIR.color = graph;
-    passIR.passDescriptor = pass;
-    return AOTChainBuilder::BuildPassProcessor(allocator, passIR);
-  }
   return AOTChainBuilder::BuildFPForPass(allocator, graph, pass);
 }
 
@@ -661,8 +673,9 @@ TGFX_TEST(AOTEffectTest, TiledHardwareSamplingSnapshotMatchesLowering) {
   auto wrongFamily = plan;
   wrongFamily.passes[0].kernel = AOTKernelKind::PointwiseGraph;
   EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, wrongFamily));
-  EXPECT_EQ(AOTChainBuilder::BuildChainProcessor(&allocator, graph, wrongFamily.passes[0]),
-            nullptr);
+  AOTProgram rejectedChain1 = {};
+  EXPECT_FALSE(AOTChainBuilder::CompileChainProgram(&allocator, graph, wrongFamily.passes[0], {},
+                                                    false, &rejectedChain1));
   EXPECT_EQ(BuildProcessorForTest(&allocator, graph, wrongFamily.passes[0]), nullptr);
 }
 
@@ -821,19 +834,20 @@ TGFX_TEST(AOTEffectTest, ChainKeepsIndependentRecipesForTwoTiledLeaves) {
     ASSERT_EQ(plan.passes.size(), 1u);
     EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
     EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
-    auto processor = AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]);
-    ASSERT_NE(processor, nullptr);
-    auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
-    ASSERT_GE(chain->tiledLeaf(), 0);
-    ASSERT_GE(chain->tiledLeaf2(), 0);
-    EXPECT_NE(chain->tiledLeaf(), chain->tiledLeaf2());
+    AOTProgram chain = {};
+    ASSERT_TRUE(
+        AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0], {}, false, &chain));
+    ASSERT_GE((chain.tiledLeaves.empty() ? -1 : chain.tiledLeaves[0].leafIndex), 0);
+    ASSERT_GE((chain.tiledLeaves.size() < 2 ? -1 : chain.tiledLeaves[1].leafIndex), 0);
+    EXPECT_NE((chain.tiledLeaves.empty() ? -1 : chain.tiledLeaves[0].leafIndex),
+              (chain.tiledLeaves.size() < 2 ? -1 : chain.tiledLeaves[1].leafIndex));
     // Whichever leaf lands on which selector, the two selectors carry the two source recipes.
     auto matches = [](const AOTTiledTextureRecipe& recipe, const TiledTextureSampling& source) {
       return recipe.shaderModeX == source.shaderModeX && recipe.shaderModeY == source.shaderModeY &&
              recipe.shaderSubset == source.shaderSubset && recipe.shaderClamp == source.shaderClamp;
     };
-    const auto& first = chain->tiledRecipe();
-    const auto& second = chain->tiledRecipe2();
+    const auto& first = chain.tiledLeaves[0].recipe;
+    const auto& second = chain.tiledLeaves[1].recipe;
     EXPECT_TRUE((matches(first, *srcRecipe) && matches(second, *dstRecipe)) ||
                 (matches(first, *dstRecipe) && matches(second, *srcRecipe)));
   }
@@ -871,20 +885,20 @@ TGFX_TEST(AOTEffectTest, ThreeTiledLeavesUseGraphAndFourthIsRejected) {
   EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseGraph);
   EXPECT_EQ(plan.passes[0].resourceProfile, AOTResourceProfile::TiledGraph);
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
-  auto rebuilt = AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]);
-  ASSERT_NE(rebuilt, nullptr);
-  const auto* chain = static_cast<const AOTPointwiseChainProcessor*>(rebuilt.get());
-  EXPECT_EQ(chain->resourceProfile(), AOTResourceProfile::TiledGraph);
-  EXPECT_EQ(chain->tiledLeafParameters().size(), 3u);
+  AOTProgram chain = {};
+  ASSERT_TRUE(
+      AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0], {}, false, &chain));
+  EXPECT_EQ(chain.profile, AOTResourceProfile::TiledGraph);
+  EXPECT_EQ(chain.tiledLeaves.size(), 3u);
   auto wrongProfile = plan;
   wrongProfile.passes[0].kernel = AOTKernelKind::PointwiseChain;
   wrongProfile.passes[0].resourceProfile = AOTResourceProfile::Chain;
   EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, wrongProfile));
   auto rect = RectEffect::Make(&allocator, Rect::MakeLTRB(1.5f, 1.5f, 6.5f, 4.5f));
   ASSERT_NE(rect, nullptr);
-  EXPECT_EQ(
-      AOTChainBuilder::BuildChainProcessor(&allocator, graph, wrongProfile.passes[0], {rect.get()}),
-      nullptr);
+  AOTProgram rejectedChain2 = {};
+  EXPECT_FALSE(AOTChainBuilder::CompileChainProgram(&allocator, graph, wrongProfile.passes[0],
+                                                    {rect.get()}, false, &rejectedChain2));
 
   auto fourth = makeLeaf();
   ASSERT_NE(fourth, nullptr);
@@ -904,23 +918,29 @@ TGFX_TEST(AOTEffectTest, ThreeTiledLeavesUseGraphAndFourthIsRejected) {
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(wideGraph, widePlan));
 }
 
-// The direct-construction entry the admission tests use: a program with the given slots and
-// children, mirroring what the chain builder produces for a bare texture chain. The binding table
-// stays empty — these processors are never drawn, so no upload runs over them.
-static PlacementPtr<AOTPointwiseChainProcessor> MakeDirectChain(
-    BlockAllocator* allocator, std::vector<PlacementPtr<FragmentProcessor>> leaves,
-    std::vector<PlacementPtr<FragmentProcessor>> padding, const std::vector<AOTChainSlot>& slots,
-    size_t root, AOTResourceProfile profile,
-    const std::vector<AOTChainTiledLeaf>& tiledLeaves = {}) {
+// The direct-construction entry the admission tests use: a program with the given slots and leaf
+// count, mirroring what the compile produces for a bare texture chain, admitted by the same
+// ValidateSlots the compile runs. The binding table stays minimal — these programs are never
+// drawn, so no upload runs over them.
+static std::optional<AOTProgram> MakeDirectChain(
+    size_t leafCount, size_t samplerChildren, const std::vector<AOTChainSlot>& slots, size_t root,
+    AOTResourceProfile profile, const std::vector<AOTChainTiledLeaf>& tiledLeaves = {}) {
   AOTProgram program = {};
   program.slots = slots;
   program.rootRegister = root;
   program.profile = profile;
   program.tiledLeaves = tiledLeaves;
-  AOTPointwiseChainProcessor::AOTChainChildren children = {};
-  children.leaves = std::move(leaves);
-  children.padding = std::move(padding);
-  return AOTPointwiseChainProcessor::Make(allocator, std::move(program), std::move(children));
+  program.samplerChildCount = static_cast<uint32_t>(samplerChildren);
+  std::vector<int> tiledLeafIndices = {};
+  for (const auto& tiled : tiledLeaves) {
+    tiledLeafIndices.push_back(tiled.leafIndex);
+  }
+  if (!AOTChainBuilder::ValidateSlots(program.slots, program.rootRegister,
+                                      program.coverageRootRegister, program.clipCoverageRegister,
+                                      leafCount, false, tiledLeafIndices, &program.profile)) {
+    return std::nullopt;
+  }
+  return program;
 }
 
 TGFX_TEST(AOTEffectTest, DirectProcessorRequiresExplicitThreeRecipeProfile) {
@@ -935,14 +955,8 @@ TGFX_TEST(AOTEffectTest, DirectProcessorRequiresExplicitThreeRecipeProfile) {
   auto recipe = static_cast<TiledTextureEffect*>(tiled.get())->resolveSampling();
   ASSERT_NE(recipe, nullptr);
   auto build = [&](AOTResourceProfile profile, int additionalIndex, size_t additionalCount) {
-    std::vector<PlacementPtr<FragmentProcessor>> leaves;
     std::vector<AOTChainSlot> slots(4);
     for (int index = 0; index < 4; ++index) {
-      auto leaf = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
-      if (leaf == nullptr) {
-        return PlacementPtr<AOTPointwiseChainProcessor>(nullptr);
-      }
-      leaves.push_back(std::move(leaf));
       slots[static_cast<size_t>(index)].op = AOTChainOp::Texture;
       slots[static_cast<size_t>(index)].outRegister = index;
     }
@@ -950,15 +964,15 @@ TGFX_TEST(AOTEffectTest, DirectProcessorRequiresExplicitThreeRecipeProfile) {
     for (size_t index = 0; index < additionalCount; ++index) {
       tiledLeaves.push_back({additionalIndex + static_cast<int>(index), *recipe});
     }
-    return MakeDirectChain(&allocator, std::move(leaves), {}, slots, 3, profile, tiledLeaves);
+    return MakeDirectChain(4, 4, slots, 3, profile, tiledLeaves);
   };
-  EXPECT_EQ(build(AOTResourceProfile::Automatic, 2, 1), nullptr);
-  EXPECT_EQ(build(AOTResourceProfile::Chain, 2, 1), nullptr);
-  EXPECT_NE(build(AOTResourceProfile::TiledGraph, 2, 1), nullptr);
-  EXPECT_EQ(build(AOTResourceProfile::TiledGraph, 1, 1), nullptr);
-  EXPECT_EQ(build(AOTResourceProfile::TiledGraph, 4, 1), nullptr);
-  EXPECT_EQ(build(AOTResourceProfile::TiledGraph, 2, 2), nullptr);
-  EXPECT_EQ(build(static_cast<AOTResourceProfile>(99), 2, 1), nullptr);
+  EXPECT_FALSE(build(AOTResourceProfile::Automatic, 2, 1).has_value());
+  EXPECT_FALSE(build(AOTResourceProfile::Chain, 2, 1).has_value());
+  EXPECT_TRUE(build(AOTResourceProfile::TiledGraph, 2, 1).has_value());
+  EXPECT_FALSE(build(AOTResourceProfile::TiledGraph, 1, 1).has_value());
+  EXPECT_FALSE(build(AOTResourceProfile::TiledGraph, 4, 1).has_value());
+  EXPECT_FALSE(build(AOTResourceProfile::TiledGraph, 2, 2).has_value());
+  EXPECT_FALSE(build(static_cast<AOTResourceProfile>(99), 2, 1).has_value());
 }
 
 TGFX_TEST(AOTEffectTest, ResourceProfilesRejectInvalidAndOverBudgetDemands) {
@@ -1000,35 +1014,24 @@ TGFX_TEST(AOTEffectTest, DirectGradientProcessorRejectsChainAndAutomaticallySele
   slots[0].gradient.coordMatrix = Matrix::MakeTrans(4, 6);
   for (auto profile : {AOTResourceProfile::Automatic, AOTResourceProfile::Chain,
                        AOTResourceProfile::TiledGraph, AOTResourceProfile::NoiseGraph}) {
-    auto processor = MakeDirectChain(&allocator, {}, {}, slots, 0, profile);
+    auto processor = MakeDirectChain(0, 0, slots, 0, profile);
     if (profile == AOTResourceProfile::Chain || profile == AOTResourceProfile::NoiseGraph) {
-      EXPECT_EQ(processor, nullptr);
+      EXPECT_FALSE(processor.has_value());
       continue;
     }
-    ASSERT_NE(processor, nullptr);
-    EXPECT_EQ(processor->resourceProfile(), AOTResourceProfile::TiledGraph);
-    ASSERT_EQ(processor->numCoordTransforms(), 1u);
-    EXPECT_EQ(processor->coordTransform(0)->matrix, slots[0].gradient.coordMatrix);
+    ASSERT_TRUE(processor.has_value());
+    EXPECT_EQ(processor->profile, AOTResourceProfile::TiledGraph);
+    auto transforms = BuildChainCoordTransforms(*processor);
+    ASSERT_EQ(transforms.size(), 1u);
+    EXPECT_EQ(transforms[0].matrix, slots[0].gradient.coordMatrix);
   }
 }
 
-static PlacementPtr<AOTPointwiseChainProcessor> MakeChainWithTextureLeaves(
-    Context* context, BlockAllocator* allocator, size_t leafCount,
-    const std::vector<AOTChainSlot>& slots, size_t root, AOTResourceProfile profile) {
-  std::vector<PlacementPtr<FragmentProcessor>> leaves;
-  std::vector<PlacementPtr<FragmentProcessor>> padding;
-  for (size_t index = 0; index < (leafCount == 0 ? 0u : 4u); ++index) {
-    auto texture = MakeTextureProcessor(context, allocator, PixelFormat::RGBA_8888);
-    if (texture == nullptr) {
-      return nullptr;
-    }
-    if (index < leafCount) {
-      leaves.push_back(std::move(texture));
-    } else {
-      padding.push_back(std::move(texture));
-    }
-  }
-  return MakeDirectChain(allocator, std::move(leaves), std::move(padding), slots, root, profile);
+static std::optional<AOTProgram> MakeChainWithTextureLeaves(size_t leafCount,
+                                                            const std::vector<AOTChainSlot>& slots,
+                                                            size_t root,
+                                                            AOTResourceProfile profile) {
+  return MakeDirectChain(leafCount, leafCount == 0 ? 0 : 4, slots, root, profile);
 }
 
 TGFX_TEST(AOTEffectTest, TextureSlotsMustMatchRealLeaves) {
@@ -1047,17 +1050,14 @@ TGFX_TEST(AOTEffectTest, TextureSlotsMustMatchRealLeaves) {
       slots.back().op = AOTChainOp::ConstColor;
       slots.back().in0 = -1;
       slots.back().outRegister = 0;
-      ASSERT_NE(MakeChainWithTextureLeaves(context, &allocator, leafCount, slots, 0, profile),
-                nullptr);
+      ASSERT_TRUE(MakeChainWithTextureLeaves(leafCount, slots, 0, profile).has_value());
       slots.back().op = AOTChainOp::Texture;
-      EXPECT_EQ(MakeChainWithTextureLeaves(context, &allocator, leafCount, slots, 0, profile),
-                nullptr);
+      EXPECT_FALSE(MakeChainWithTextureLeaves(leafCount, slots, 0, profile).has_value());
       if (leafCount > 0) {
         slots.back().op = AOTChainOp::ConstColor;
         slots[0].op = AOTChainOp::ConstColor;
         slots[0].in0 = -1;
-        EXPECT_EQ(MakeChainWithTextureLeaves(context, &allocator, leafCount, slots, 0, profile),
-                  nullptr);
+        EXPECT_FALSE(MakeChainWithTextureLeaves(leafCount, slots, 0, profile).has_value());
       }
     }
   }
@@ -1080,12 +1080,10 @@ TGFX_TEST(AOTEffectTest, TexModulateRequiresRealTextureSource) {
       slots.back().in0 = -1;
       slots.back().outRegister = 0;
       slots.back().texModulateSourceSlot = static_cast<int>(leafCount);
-      EXPECT_EQ(MakeChainWithTextureLeaves(context, &allocator, leafCount, slots, 0, profile),
-                nullptr);
+      EXPECT_FALSE(MakeChainWithTextureLeaves(leafCount, slots, 0, profile).has_value());
       if (leafCount > 0) {
         slots.back().texModulateSourceSlot = static_cast<int>(leafCount - 1);
-        ASSERT_NE(MakeChainWithTextureLeaves(context, &allocator, leafCount, slots, 0, profile),
-                  nullptr);
+        ASSERT_TRUE(MakeChainWithTextureLeaves(leafCount, slots, 0, profile).has_value());
       }
     }
   }
@@ -1097,38 +1095,34 @@ TGFX_TEST(AOTEffectTest, BaseChainOmitsGradientTransformAndExtendedProfilesKeepO
   ASSERT_NE(context, nullptr);
   BlockAllocator allocator;
   for (auto profile : {AOTResourceProfile::Chain, AOTResourceProfile::TiledGraph}) {
-    std::vector<PlacementPtr<FragmentProcessor>> leaves;
     std::vector<AOTChainSlot> slots(4);
     std::array<Matrix, 4> matrices;
+    AOTProgram program = {};
+    program.profile = profile;
+    program.rootRegister = 3;
+    program.samplerChildCount = 4;
     for (size_t index = 0; index < slots.size(); ++index) {
       matrices[index] = Matrix::MakeTrans(static_cast<float>(index + 1), 6);
       auto proxy = context->proxyProvider()->createTextureProxy({}, 2, 2, PixelFormat::RGBA_8888);
       ASSERT_NE(proxy, nullptr);
-      auto leaf = TextureEffect::Make(&allocator, std::move(proxy), {}, &matrices[index]);
-      ASSERT_NE(leaf, nullptr);
-      matrices[index] = leaf->coordTransform(0)->matrix;
-      leaves.push_back(std::move(leaf));
       slots[index].op = AOTChainOp::Texture;
       slots[index].outRegister = static_cast<int>(index);
+      program.bindings.push_back({AOTBinding::Kind::Leaf, proxy, {}, matrices[index], {}});
     }
-    auto processor = MakeDirectChain(&allocator, std::move(leaves), {}, slots, 3, profile);
-    ASSERT_NE(processor, nullptr);
-    EXPECT_EQ(processor->numCoordTransforms(), profile == AOTResourceProfile::Chain ? 0u : 1u);
+    program.slots = slots;
+    // The transform sequence the artifact's vertex stage consumes: one chain-wide source matrix
+    // for the extended profiles, then one per sampler-binding leaf in leaf order.
+    auto transforms = BuildChainCoordTransforms(program);
+    EXPECT_EQ(transforms.size(), profile == AOTResourceProfile::Chain ? 4u : 5u);
+    size_t base = 0;
     if (profile == AOTResourceProfile::TiledGraph) {
-      EXPECT_EQ(processor->coordTransform(0)->matrix, Matrix::I());
-    }
-    ProgramInfo programInfo(nullptr, nullptr, {processor.get()}, 1, nullptr, BlendMode::SrcOver);
-    FragmentProcessor::CoordTransformIter iter(&programInfo);
-    if (profile == AOTResourceProfile::TiledGraph) {
-      EXPECT_EQ(iter.next(), processor->coordTransform(0));
+      EXPECT_EQ(transforms[0].matrix, Matrix::I());
+      base = 1;
     }
     for (size_t index = 0; index < slots.size(); ++index) {
-      auto transform = iter.next();
-      ASSERT_NE(transform, nullptr);
-      EXPECT_EQ(transform, processor->childProcessor(index)->coordTransform(0));
-      EXPECT_EQ(transform->matrix, matrices[index]);
+      EXPECT_EQ(transforms[base + index].matrix, matrices[index]);
+      EXPECT_EQ(transforms[base + index].textureProxy, program.bindings[index].textureProxy.get());
     }
-    EXPECT_EQ(iter.next(), nullptr);
   }
 }
 
@@ -1190,13 +1184,12 @@ TGFX_TEST(AOTEffectTest, CoverageRecipeCanPromoteChainToGraph) {
   AOTEffectPlan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   EXPECT_EQ(plan.passes[0].resourceProfile, AOTResourceProfile::Chain);
-  auto rebuilt =
-      AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0], {coverage.get()});
-  ASSERT_NE(rebuilt, nullptr);
-  const auto* chain = static_cast<const AOTPointwiseChainProcessor*>(rebuilt.get());
-  EXPECT_EQ(chain->resourceProfile(), AOTResourceProfile::TiledGraph);
-  EXPECT_EQ(chain->tiledLeafParameters().size(), 3u);
-  EXPECT_GE(chain->coverageRoot(), 0);
+  AOTProgram chain = {};
+  ASSERT_TRUE(AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0],
+                                                   {coverage.get()}, false, &chain));
+  EXPECT_EQ(chain.profile, AOTResourceProfile::TiledGraph);
+  EXPECT_EQ(chain.tiledLeaves.size(), 3u);
+  EXPECT_GE(chain.coverageRootRegister, 0);
 }
 
 TGFX_TEST(AOTEffectTest, CoverageGradientPromotesBaseChainToTiledGraph) {
@@ -1219,22 +1212,23 @@ TGFX_TEST(AOTEffectTest, CoverageGradientPromotesBaseChainToTiledGraph) {
   ASSERT_EQ(plan.passes.size(), 1u);
   EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
   EXPECT_EQ(plan.passes[0].resourceProfile, AOTResourceProfile::Chain);
-  auto original = AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]);
-  ASSERT_NE(original, nullptr);
-  EXPECT_EQ(original->numCoordTransforms(), 0u);
-  auto rebuilt =
-      AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0], {coverage.get()});
-  ASSERT_NE(rebuilt, nullptr);
-  const auto* chain = static_cast<const AOTPointwiseChainProcessor*>(rebuilt.get());
-  EXPECT_EQ(chain->resourceProfile(), AOTResourceProfile::TiledGraph);
-  EXPECT_GE(chain->coverageRoot(), 0);
-  ASSERT_EQ(chain->numCoordTransforms(), 1u);
-  EXPECT_EQ(chain->coordTransform(0)->matrix, matrix);
+  AOTProgram original = {};
+  ASSERT_TRUE(AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0], {}, false,
+                                                   &original));
+  EXPECT_TRUE(BuildChainCoordTransforms(original).empty());
+  AOTProgram chain = {};
+  ASSERT_TRUE(AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0],
+                                                   {coverage.get()}, false, &chain));
+  EXPECT_EQ(chain.profile, AOTResourceProfile::TiledGraph);
+  EXPECT_GE(chain.coverageRootRegister, 0);
+  auto transforms = BuildChainCoordTransforms(chain);
+  ASSERT_EQ(transforms.size(), 1u);
+  EXPECT_EQ(transforms[0].matrix, matrix);
   size_t gradientCount = 0;
-  for (size_t index = 0; index < chain->slotCount(); ++index) {
-    if (chain->slot(index).op == AOTChainOp::Gradient) {
+  for (size_t index = 0; index < chain.slots.size(); ++index) {
+    if (chain.slots[index].op == AOTChainOp::Gradient) {
       ++gradientCount;
-      EXPECT_EQ(chain->slot(index).in0, -3);
+      EXPECT_EQ(chain.slots[index].in0, -3);
     }
   }
   EXPECT_EQ(gradientCount, 1u);
@@ -1424,17 +1418,15 @@ TGFX_TEST(AOTEffectTest, DeviceSpaceLinearChainUsesChainKernel) {
     ASSERT_EQ(plan.passes.size(), 1u);
     EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
     EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
-    auto processor = BuildProcessorForTest(&allocator, graph, plan.passes[0]);
-    ASSERT_NE(processor, nullptr);
-    ASSERT_EQ(processor->name(), "AOTPointwiseChainProcessor");
-    auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
-    EXPECT_EQ(chain->deviceLeafMask(), 1u);
-    EXPECT_EQ(chain->childProcessor(0)->name(), "TextureEffect");
+    AOTProgram chain = {};
+    ASSERT_TRUE(CompileChainForTest(graph, plan.passes[0], &chain));
+    EXPECT_EQ(ChainDeviceLeafMask(chain), 1u);
+    ASSERT_EQ(chain.deviceLeaves.size(), 1u);
+    EXPECT_EQ(chain.bindings[0].kind, AOTBinding::Kind::Leaf);
     AOTDecomposeOutcome outcome = AOTDecomposeOutcome::Trivial;
     AOTRouter::Route(processors, &outcome);
     EXPECT_EQ(outcome, AOTDecomposeOutcome::FusablePointwise);
   }
-
   // Every leaf carries its own device-space coordinate matrix, so a DAG blending two device-space
   // sources with different mappings fuses into one chain pass with both leaves in device space.
   AOTNodeBuilder builder;
@@ -1455,11 +1447,9 @@ TGFX_TEST(AOTEffectTest, DeviceSpaceLinearChainUsesChainKernel) {
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(twoDeviceLeaves, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
   EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
-  auto processor = BuildProcessorForTest(&allocator, twoDeviceLeaves, plan.passes[0]);
-  ASSERT_NE(processor, nullptr);
-  ASSERT_EQ(processor->name(), "AOTPointwiseChainProcessor");
-  auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
-  EXPECT_EQ(chain->deviceLeafMask(), 3u);
+  AOTProgram chain = {};
+  ASSERT_TRUE(CompileChainForTest(twoDeviceLeaves, plan.passes[0], &chain));
+  EXPECT_EQ(ChainDeviceLeafMask(chain), 3u);
 }
 
 // The chain takes an alpha-only device-space source and an RGBAAA plain source as leaves. The
@@ -1495,15 +1485,12 @@ TGFX_TEST(AOTEffectTest, ChainLeavesTakeAlphaOnlyDeviceAndRgbaaaSources) {
     ASSERT_EQ(plan.passes.size(), 1u);
     EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
     EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
-    auto processor = BuildProcessorForTest(&allocator, graph, plan.passes[0]);
-    ASSERT_NE(processor, nullptr);
-    ASSERT_EQ(processor->name(), "AOTPointwiseChainProcessor");
-    auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
-    EXPECT_EQ(chain->deviceLeafMask(), testCase.device ? 1u : 0u);
-    ASSERT_EQ(chain->childProcessor(0)->name(), "TextureEffect");
-    auto leaf = static_cast<const TextureEffect*>(chain->childProcessor(0));
-    EXPECT_EQ(leaf->isAlphaOnly(), testCase.device);
-    EXPECT_EQ(leaf->hasRGBAAA(), !testCase.device);
+    AOTProgram chain = {};
+    ASSERT_TRUE(CompileChainForTest(graph, plan.passes[0], &chain));
+    EXPECT_EQ(ChainDeviceLeafMask(chain), testCase.device ? 1u : 0u);
+    ASSERT_EQ(chain.bindings[0].kind, AOTBinding::Kind::Leaf);
+    EXPECT_EQ(chain.bindings[0].textureProxy->isAlphaOnly(), testCase.device);
+    EXPECT_EQ(chain.bindings[0].alphaStart != Point::Zero(), !testCase.device);
   }
 }
 
@@ -1592,13 +1579,16 @@ TGFX_TEST(AOTEffectTest, DAGAdmissionRejectsPassMissingProducer) {
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
   ASSERT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
-  EXPECT_NE(AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]), nullptr);
+  AOTProgram acceptedChain7 = {};
+  EXPECT_TRUE(AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0], {}, false,
+                                                   &acceptedChain7));
 
   auto missingProducer = plan;
   missingProducer.passes[0].nodes = {root};
   EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, missingProducer));
-  EXPECT_EQ(AOTChainBuilder::BuildChainProcessor(&allocator, graph, missingProducer.passes[0]),
-            nullptr);
+  AOTProgram rejectedChain3 = {};
+  EXPECT_FALSE(AOTChainBuilder::CompileChainProgram(&allocator, graph, missingProducer.passes[0],
+                                                    {}, false, &rejectedChain3));
 
   auto duplicated = plan;
   duplicated.passes[0].nodes.push_back(root);
@@ -1636,7 +1626,8 @@ TGFX_TEST(AOTEffectTest, TwoColorSpaceTransformsSplitIntoChainPasses) {
     ExpectSegmentedChainPlan(graph, plan, 2u);
     EXPECT_EQ(plan.passes[0].nodes.size(), insertLuma ? 3u : 2u);
     EXPECT_EQ(plan.passes[1].nodes, std::vector<AOTNodeID>{graph.root()});
-    EXPECT_NE(BuildProcessorForTest(&allocator, graph, plan.passes[0]), nullptr);
+    AOTProgram acceptedPass = {};
+    EXPECT_TRUE(CompileChainForTest(graph, plan.passes[0], &acceptedPass));
     AOTEffectPlan forcedChain = {};
     forcedChain.output = graph.root();
     AOTPassDescriptor pass = {};
@@ -1647,7 +1638,9 @@ TGFX_TEST(AOTEffectTest, TwoColorSpaceTransformsSplitIntoChainPasses) {
     }
     forcedChain.passes.push_back(pass);
     EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, forcedChain));
-    EXPECT_EQ(AOTChainBuilder::BuildChainProcessor(&allocator, graph, pass), nullptr);
+    AOTProgram rejectedChain4 = {};
+    EXPECT_FALSE(
+        AOTChainBuilder::CompileChainProgram(&allocator, graph, pass, {}, false, &rejectedChain4));
   }
 }
 
@@ -1682,30 +1675,31 @@ TGFX_TEST(AOTEffectTest, LUTBindingBudgetIsNotOrdinaryLeafBudget) {
       EXPECT_EQ(plan.passes[0].resourceProfile, AOTResourceProfile::TiledGraph);
       EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
       BlockAllocator allocator;
-      auto rebuilt = AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]);
-      ASSERT_NE(rebuilt, nullptr);
-      const auto* chain = static_cast<const AOTPointwiseChainProcessor*>(rebuilt.get());
-      EXPECT_EQ(chain->resourceProfile(), AOTResourceProfile::TiledGraph);
-      EXPECT_EQ(chain->lutLeaf(), textureCount);
+      AOTProgram chain = {};
+      ASSERT_TRUE(AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0], {}, false,
+                                                       &chain));
+      EXPECT_EQ(chain.profile, AOTResourceProfile::TiledGraph);
+      EXPECT_EQ(chain.lutLeafIndex, textureCount);
       auto maskProxy = context->proxyProvider()->createTextureProxy({}, 2, 2, PixelFormat::ALPHA_8);
       ASSERT_NE(maskProxy, nullptr);
       auto mask = DeviceSpaceTextureEffect::Make(&allocator, std::move(maskProxy), Matrix::I());
       ASSERT_NE(mask, nullptr);
-      auto masked =
-          AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0], {mask.get()});
-      ASSERT_NE(masked, nullptr);
-      const auto* maskedChain = static_cast<const AOTPointwiseChainProcessor*>(masked.get());
-      EXPECT_TRUE(maskedChain->hasMask());
-      EXPECT_EQ(maskedChain->resourceProfile(), AOTResourceProfile::TiledGraph);
-      EXPECT_EQ(maskedChain->lutLeaf(), textureCount);
-      EXPECT_EQ(maskedChain->leafCount(), 4u);
+      AOTProgram maskedChain = {};
+      ASSERT_TRUE(AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0],
+                                                       {mask.get()}, false, &maskedChain));
+      EXPECT_TRUE(maskedChain.hasMaskTexture);
+      EXPECT_EQ(maskedChain.profile, AOTResourceProfile::TiledGraph);
+      EXPECT_EQ(maskedChain.lutLeafIndex, textureCount);
+      EXPECT_EQ(maskedChain.samplerChildCount, 4u);
       auto forcedChain = plan;
       forcedChain.passes[0].kernel = AOTKernelKind::PointwiseChain;
       forcedChain.passes[0].resourceProfile = AOTResourceProfile::Chain;
       EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, forcedChain));
-      EXPECT_EQ(AOTChainBuilder::BuildChainProcessor(&allocator, graph, forcedChain.passes[0]),
-                nullptr);
-      EXPECT_EQ(BuildProcessorForTest(&allocator, graph, forcedChain.passes[0]), nullptr);
+      AOTProgram rejectedChain5 = {};
+      EXPECT_FALSE(AOTChainBuilder::CompileChainProgram(&allocator, graph, forcedChain.passes[0],
+                                                        {}, false, &rejectedChain5));
+      AOTProgram rejectedLinear = {};
+      EXPECT_FALSE(CompileChainForTest(graph, forcedChain.passes[0], &rejectedLinear));
     }
   }
 }
@@ -1958,11 +1952,10 @@ TGFX_TEST(AOTEffectTest, PointwiseDAGUsesProductionSamplerBudget) {
     ASSERT_EQ(acceptedPlan.passes.size(), 1u);
     EXPECT_TRUE(AOTPlanExecutor::CanExecute(acceptedGraph, acceptedPlan));
     BlockAllocator allocator;
-    auto processor =
-        AOTChainBuilder::BuildChainProcessor(&allocator, acceptedGraph, acceptedPlan.passes[0]);
-    ASSERT_NE(processor, nullptr);
-    auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
-    EXPECT_EQ(chain->leafCount(), 4u);
+    AOTProgram chain = {};
+    ASSERT_TRUE(AOTChainBuilder::CompileChainProgram(&allocator, acceptedGraph,
+                                                     acceptedPlan.passes[0], {}, false, &chain));
+    EXPECT_EQ(chain.samplerChildCount, 4u);
   }
 
   AOTEffectGraph rejectedGraph;
@@ -1989,7 +1982,9 @@ TGFX_TEST(AOTEffectTest, ConstColorChainDecomposesToPointwiseChain) {
   // A zero-leaf chain is executable: the kernel's TEXTURE_COUNT domain encodes it, evaluating
   // const-color and blend ops against the geometry color alone.
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
-  EXPECT_TRUE(AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]) != nullptr);
+  AOTProgram builtChain9 = {};
+  EXPECT_TRUE(AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0], {}, false,
+                                                   &builtChain9));
 }
 
 // A plain linear texture chain fits the fused chain kernel's contracts, so the DAG planner
@@ -2276,26 +2271,28 @@ TGFX_TEST(AOTEffectTest, PerlinDensityBranchesShareLookupResources) {
           auto wrongFamily = plan;
           wrongFamily.passes[0].kernel = AOTKernelKind::PointwiseChain;
           EXPECT_FALSE(AOTPlanExecutor::CanExecute(graph, wrongFamily));
-          EXPECT_EQ(AOTChainBuilder::BuildChainProcessor(context->drawingAllocator(), graph,
-                                                         wrongFamily.passes[0]),
-                    nullptr);
+          AOTProgram rejectedChain6 = {};
+          EXPECT_FALSE(AOTChainBuilder::CompileChainProgram(context->drawingAllocator(), graph,
+                                                            wrongFamily.passes[0], {}, false,
+                                                            &rejectedChain6));
           EXPECT_EQ(
               BuildProcessorForTest(context->drawingAllocator(), graph, wrongFamily.passes[0]),
               nullptr);
-          auto rebuilt = AOTChainBuilder::BuildChainProcessor(context->drawingAllocator(), graph,
-                                                              plan.passes[0]);
-          ASSERT_NE(rebuilt, nullptr);
-          const auto* chain = static_cast<const AOTPointwiseChainProcessor*>(rebuilt.get());
-          EXPECT_TRUE(chain->hasNoise());
-          EXPECT_EQ(chain->resourceProfile(), AOTResourceProfile::NoiseGraph);
-          EXPECT_EQ(chain->leafCount(), 4u);
-          ASSERT_EQ(chain->numCoordTransforms(), 1u);
-          EXPECT_EQ(chain->coordTransform(0)->matrix, firstNoise->uvMatrix);
-          ProgramInfo chainInfo(nullptr, nullptr, {rebuilt.get()}, 1, nullptr, BlendMode::SrcOver);
-          FragmentProcessor::CoordTransformIter coordIter(&chainInfo);
-          EXPECT_EQ(coordIter.next(), chain->coordTransform(0));
-          for (size_t leaf = 0; leaf < chain->leafCount(); ++leaf) {
-            EXPECT_EQ(coordIter.next(), chain->childProcessor(leaf)->coordTransform(0));
+          AOTProgram chain = {};
+          ASSERT_TRUE(AOTChainBuilder::CompileChainProgram(context->drawingAllocator(), graph,
+                                                           plan.passes[0], {}, false, &chain));
+          EXPECT_GE(chain.noiseSamplerBase, 0);
+          EXPECT_EQ(chain.profile, AOTResourceProfile::NoiseGraph);
+          EXPECT_EQ(chain.samplerChildCount, 4u);
+          // The transform sequence the artifact's vertex stage consumes: one chain-wide noise
+          // matrix first, then one per sampler-binding child in binding order (the real device
+          // mask contributes none; a phantom mask slot is a plain texture child).
+          auto transforms = BuildChainCoordTransforms(chain);
+          ASSERT_EQ(transforms.size(),
+                    1u + chain.bindings.size() - (chain.hasMaskTexture ? 1u : 0u));
+          EXPECT_EQ(transforms[0].matrix, firstNoise->uvMatrix);
+          for (size_t leaf = 0; leaf < chain.samplerChildCount; ++leaf) {
+            EXPECT_EQ(transforms[1 + leaf].matrix, chain.bindings[leaf].uvMatrix);
           }
         }
       }
@@ -2509,9 +2506,9 @@ TGFX_TEST(AOTEffectTest, PerlinDAGMaterializesDistinctNoiseAndPrunesUnusedInputs
   EXPECT_EQ(plan.passes[0].nodes.size(), 1u);
   EXPECT_EQ(plan.passes[0].output, first);
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
-  auto rebuilt =
-      AOTChainBuilder::BuildChainProcessor(context->drawingAllocator(), graph, plan.passes[0]);
-  ASSERT_NE(rebuilt, nullptr);
+  AOTProgram rebuilt = {};
+  ASSERT_TRUE(AOTChainBuilder::CompileChainProgram(context->drawingAllocator(), graph,
+                                                   plan.passes[0], {}, false, &rebuilt));
 }
 
 TGFX_TEST(AOTEffectTest, BarePerlinNoiseUsesPerlinNoiseFillPlanner) {
@@ -2603,22 +2600,21 @@ TGFX_TEST(AOTEffectTest, ChainedRectCoverageRidesTheClipChannel) {
   AOTEffectPlan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
-  auto processor =
-      AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0], {coverage.get()});
-  ASSERT_NE(processor, nullptr);
-  auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
+  AOTProgram chain = {};
+  ASSERT_TRUE(AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0],
+                                                   {coverage.get()}, false, &chain));
   // Slots: [texture, colorMatrix, first rect, second rect]. Under the unified coverage routing
   // the analytic chain rides the clip-coverage channel: the innermost link chains from the scalar
   // unit one (-4), the outermost link's register is the ClipCoverageRegister, and there is no
   // coverage root — the kernel composites the clip product as the XP's coverage input on top of
   // the GP coverage, so the GP coverage is carried by the clip channel, not dropped.
-  ASSERT_GT(chain->slotCount(), 3u);
-  EXPECT_EQ(chain->slot(2).op, AOTChainOp::AARectCoverage);
-  EXPECT_EQ(chain->slot(3).op, AOTChainOp::LocalRectCoverage);
-  EXPECT_EQ(chain->slot(2).in0, -4);
-  EXPECT_GE(chain->slot(3).in0, 0);
-  EXPECT_EQ(chain->coverageRoot(), -1);
-  EXPECT_GE(chain->clipCoverage(), 0);
+  ASSERT_GT(chain.slots.size(), 3u);
+  EXPECT_EQ(chain.slots[2].op, AOTChainOp::AARectCoverage);
+  EXPECT_EQ(chain.slots[3].op, AOTChainOp::LocalRectCoverage);
+  EXPECT_EQ(chain.slots[2].in0, -4);
+  EXPECT_GE(chain.slots[3].in0, 0);
+  EXPECT_EQ(chain.coverageRootRegister, -1);
+  EXPECT_GE(chain.clipCoverageRegister, 0);
 }
 
 static void ExpectComposedClipsWithLocalMask(size_t rectCount, size_t rrectCount,
@@ -2653,24 +2649,24 @@ static void ExpectComposedClipsWithLocalMask(size_t rectCount, size_t rrectCount
   ASSERT_NE(clips, nullptr);
   auto mask = MakeTextureProcessor(context, &allocator, PixelFormat::ALPHA_8);
   ASSERT_NE(mask, nullptr);
-  auto processor = AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0],
-                                                        {clips.get(), mask.get()});
+  AOTProgram chain = {};
+  bool compiled = AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0],
+                                                       {clips.get(), mask.get()}, false, &chain);
   if (!accepted) {
-    EXPECT_EQ(processor, nullptr);
+    EXPECT_FALSE(compiled);
     return;
   }
-  ASSERT_NE(processor, nullptr);
-  auto* chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
-  ASSERT_EQ(chain->slotCount(), 2 + rectCount + rrectCount);
-  const auto& maskSlot = chain->slot(0);
+  ASSERT_TRUE(compiled);
+  ASSERT_EQ(chain.slots.size(), 2 + rectCount + rrectCount);
+  const auto& maskSlot = chain.slots[0];
   EXPECT_EQ(maskSlot.op, AOTChainOp::Texture);
   EXPECT_EQ(maskSlot.textureAlphaOnly, 1);
   EXPECT_EQ(maskSlot.textureModulateUnit, 1);
-  EXPECT_EQ(chain->coverageRoot(), maskSlot.outRegister);
-  EXPECT_EQ(chain->root(), static_cast<size_t>(chain->slot(1).outRegister));
+  EXPECT_EQ(chain.coverageRootRegister, maskSlot.outRegister);
+  EXPECT_EQ(chain.rootRegister, static_cast<size_t>(chain.slots[1].outRegister));
   int previous = -4;
-  for (size_t index = 2; index < chain->slotCount(); ++index) {
-    const auto& slot = chain->slot(index);
+  for (size_t index = 2; index < chain.slots.size(); ++index) {
+    const auto& slot = chain.slots[index];
     auto expectedRectOp = rectAntiAlias ? AOTChainOp::AARectCoverage : AOTChainOp::RRectCoverage;
     EXPECT_EQ(slot.op, index < 2 + rectCount ? expectedRectOp : AOTChainOp::RRectCoverage);
     if (!rectAntiAlias && index < 2 + rectCount) {
@@ -2685,7 +2681,7 @@ static void ExpectComposedClipsWithLocalMask(size_t rectCount, size_t rrectCount
     EXPECT_GE(slot.outRegister, 0);
     previous = slot.outRegister;
   }
-  EXPECT_EQ(chain->clipCoverage(), previous);
+  EXPECT_EQ(chain.clipCoverageRegister, previous);
 }
 
 TGFX_TEST(AOTEffectTest, ComposedAnalyticClipsWithLocalMaskRespectBudgets) {
@@ -2742,14 +2738,14 @@ static void ExpectAdditionalClipPreservesCoverageSuffix(AOTChainOp op, bool with
     ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
     ASSERT_EQ(plan.passes.size(), 1u);
     ASSERT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
-    auto original = AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]);
-    ASSERT_NE(original, nullptr);
-    auto originalChain = static_cast<const AOTPointwiseChainProcessor*>(original.get());
-    ASSERT_EQ(originalChain->slotCount(), suffixCount + 1);
-    EXPECT_EQ(originalChain->root(), static_cast<size_t>(originalChain->slot(0).outRegister));
-    EXPECT_EQ(originalChain->coverageRoot(), -1);
-    EXPECT_EQ(originalChain->clipCoverage(),
-              suffixCount == 0 ? -1 : originalChain->slot(suffixCount).outRegister);
+    AOTProgram originalChain = {};
+    ASSERT_TRUE(AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0], {}, false,
+                                                     &originalChain));
+    ASSERT_EQ(originalChain.slots.size(), suffixCount + 1);
+    EXPECT_EQ(originalChain.rootRegister, static_cast<size_t>(originalChain.slots[0].outRegister));
+    EXPECT_EQ(originalChain.coverageRootRegister, -1);
+    EXPECT_EQ(originalChain.clipCoverageRegister,
+              suffixCount == 0 ? -1 : originalChain.slots[suffixCount].outRegister);
 
     auto additionalClip = MakeAdditionalAnalyticClip(&allocator, op);
     ASSERT_NE(additionalClip, nullptr);
@@ -2762,27 +2758,26 @@ static void ExpectAdditionalClipPreservesCoverageSuffix(AOTChainOp op, bool with
       ASSERT_NE(mask, nullptr);
       coverageProcessors.push_back(mask.get());
     }
-    auto rebuilt =
-        AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0], coverageProcessors);
-    ASSERT_NE(rebuilt, nullptr);
-    auto chain = static_cast<const AOTPointwiseChainProcessor*>(rebuilt.get());
-    ASSERT_EQ(chain->slotCount(), suffixCount + 2);
-    EXPECT_EQ(chain->root(), static_cast<size_t>(chain->slot(0).outRegister));
-    EXPECT_EQ(chain->coverageRoot(), -1);
-    EXPECT_EQ(chain->hasMask(), withMask);
+    AOTProgram chain = {};
+    ASSERT_TRUE(AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0],
+                                                     coverageProcessors, false, &chain));
+    ASSERT_EQ(chain.slots.size(), suffixCount + 2);
+    EXPECT_EQ(chain.rootRegister, static_cast<size_t>(chain.slots[0].outRegister));
+    EXPECT_EQ(chain.coverageRootRegister, -1);
+    EXPECT_EQ(chain.hasMaskTexture, withMask);
     int previousCoverage = -4;
     for (size_t index = 1; index <= suffixCount; ++index) {
-      const auto& suffix = chain->slot(index);
+      const auto& suffix = chain.slots[index];
       EXPECT_EQ(suffix.op, AOTChainOp::RRectCoverage);
       EXPECT_EQ(suffix.in0, previousCoverage);
       EXPECT_GE(suffix.outRegister, 0);
       previousCoverage = suffix.outRegister;
     }
-    const auto& appended = chain->slot(suffixCount + 1);
+    const auto& appended = chain.slots[suffixCount + 1];
     EXPECT_EQ(appended.op, op);
     EXPECT_EQ(appended.in0, previousCoverage);
     EXPECT_GE(appended.outRegister, 0);
-    EXPECT_EQ(chain->clipCoverage(), appended.outRegister);
+    EXPECT_EQ(chain.clipCoverageRegister, appended.outRegister);
   }
 }
 
@@ -2823,7 +2818,9 @@ TGFX_TEST(AOTEffectTest, WhiteInputFeedsTwoChildBlendChildren) {
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
-  EXPECT_NE(AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]), nullptr);
+  AOTProgram acceptedChain8 = {};
+  EXPECT_TRUE(AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0], {}, false,
+                                                   &acceptedChain8));
 }
 
 // a texture whose runtime input is a computed value — an alpha-only
@@ -2848,24 +2845,24 @@ TGFX_TEST(AOTEffectTest, TextureConsumingComputedInputLowersToChain) {
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
-  auto processor = AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]);
-  ASSERT_NE(processor, nullptr);
-  auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
+  AOTProgram chain = {};
+  ASSERT_TRUE(
+      AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0], {}, false, &chain));
   // Slots: [mask texture (alpha-only color root: bit1 splat + full-input modulate, P1.1
   // semantics), image texture (raw sampling, computed input), TEX_MODULATE]. The modulate
   // instruction reads the image leaf's prefetched sample and the mask slot's result register:
   // the RGBA readback is sample * input.a, in topological order after the producer.
-  ASSERT_GE(chain->slotCount(), 3u);
-  EXPECT_EQ(chain->slot(0).op, AOTChainOp::Texture);
-  EXPECT_EQ(chain->slot(0).textureAlphaOnly, 1);
-  EXPECT_EQ(chain->slot(0).textureModulateFullInput, 1);
-  EXPECT_EQ(chain->slot(1).op, AOTChainOp::Texture);
-  EXPECT_EQ(chain->slot(1).textureModulate, 0);
-  EXPECT_EQ(chain->slot(1).textureAlphaOnly, 0);
-  EXPECT_EQ(chain->slot(2).op, AOTChainOp::TexModulate);
-  EXPECT_EQ(chain->slot(2).texModulateSourceSlot, 1);
-  EXPECT_EQ(chain->slot(2).texModulateAlphaOnly, 0);
-  EXPECT_EQ(chain->slot(2).in0, chain->slot(0).outRegister);
+  ASSERT_GE(chain.slots.size(), 3u);
+  EXPECT_EQ(chain.slots[0].op, AOTChainOp::Texture);
+  EXPECT_EQ(chain.slots[0].textureAlphaOnly, 1);
+  EXPECT_EQ(chain.slots[0].textureModulateFullInput, 1);
+  EXPECT_EQ(chain.slots[1].op, AOTChainOp::Texture);
+  EXPECT_EQ(chain.slots[1].textureModulate, 0);
+  EXPECT_EQ(chain.slots[1].textureAlphaOnly, 0);
+  EXPECT_EQ(chain.slots[2].op, AOTChainOp::TexModulate);
+  EXPECT_EQ(chain.slots[2].texModulateSourceSlot, 1);
+  EXPECT_EQ(chain.slots[2].texModulateAlphaOnly, 0);
+  EXPECT_EQ(chain.slots[2].in0, chain.slots[0].outRegister);
 }
 
 // A two-child xfer whose input is a computed node — a mask texture
@@ -2895,9 +2892,9 @@ TGFX_TEST(AOTEffectTest, TwoChildBlendOverComputedInputLowers) {
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
-  auto processor = AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]);
-  ASSERT_NE(processor, nullptr);
-  auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
+  AOTProgram chain = {};
+  ASSERT_TRUE(
+      AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0], {}, false, &chain));
   // The mask leaf is an alpha-only color root; the two child textures sample raw and modulate
   // through TEX_MODULATE over the InputOpaque node; the blend carries no selector alpha bit;
   // the MulAlpha epilogue reads the blend result and the mask's register.
@@ -2905,8 +2902,8 @@ TGFX_TEST(AOTEffectTest, TwoChildBlendOverComputedInputLowers) {
   int mulAlphaCount = 0;
   int texModulateCount = 0;
   int maskRegister = -1;
-  for (size_t index = 0; index < chain->slotCount(); ++index) {
-    const auto& slot = chain->slot(index);
+  for (size_t index = 0; index < chain.slots.size(); ++index) {
+    const auto& slot = chain.slots[index];
     if (slot.op == AOTChainOp::Texture && slot.textureAlphaOnly != 0) {
       maskRegister = slot.outRegister;
     }
@@ -2961,22 +2958,21 @@ TGFX_TEST(AOTEffectTest, NonRootCoverageTextureModulatesByUnit) {
   AOTEffectPlan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
-  auto processor =
-      AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0], {coverage.get()});
-  ASSERT_NE(processor, nullptr);
-  auto chain = static_cast<const AOTPointwiseChainProcessor*>(processor.get());
+  AOTProgram chain = {};
+  ASSERT_TRUE(AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0],
+                                                   {coverage.get()}, false, &chain));
   // The A8 mask leaf's input is the coverage unit, so it must carry the unit modulation: the
   // runtime multiplies the mask by the unit's alpha exactly once, wherever in the subtree the
   // mask sits — a value that must not depend on which node consumes it.
   int maskSlot = -1;
-  for (size_t index = 0; index < chain->slotCount(); ++index) {
-    if (chain->slot(index).op == AOTChainOp::Texture && chain->slot(index).textureAlphaOnly == 1) {
+  for (size_t index = 0; index < chain.slots.size(); ++index) {
+    if (chain.slots[index].op == AOTChainOp::Texture && chain.slots[index].textureAlphaOnly == 1) {
       ASSERT_EQ(maskSlot, -1);
       maskSlot = static_cast<int>(index);
     }
   }
   ASSERT_GE(maskSlot, 0);
-  EXPECT_EQ(chain->slot(static_cast<size_t>(maskSlot)).textureModulateUnit, 1);
+  EXPECT_EQ(chain.slots[static_cast<size_t>(maskSlot)].textureModulateUnit, 1);
 }
 
 // : the runtime applies Swizzle::ForRead to every
@@ -3015,7 +3011,7 @@ TGFX_TEST(AOTEffectTest, ChainRejectsNonRGBAColorFormats) {
 // TEX_MODULATE instruction after its producer), so a 16-node graph carrying one is 17 encoded
 // instructions and must be refused by CanExecute (and by the DAG planner that consults it) —
 // the pre-fix check compared the node count directly to the budget, then admitted an oversized
-// instruction stream that BuildChainProcessor refused.
+// instruction stream that CompileChainProgram refused.
 TGFX_TEST(AOTEffectTest, ComputedInputExpansionCountsTowardSlotBudget) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -3311,7 +3307,10 @@ TGFX_TEST(AOTEffectTest, AdmissionMatrixKeepsPlanningAndConstructionAligned) {
     ASSERT_EQ(plan.passes.size(), row.passes);
     EXPECT_EQ(plan.passes[0].kernel, row.kernel);
     EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
-    EXPECT_NE(BuildProcessorForTest(&allocator, graph, plan.passes[0]), nullptr);
+    AOTProgram admittedPass = {};
+    EXPECT_TRUE(row.kernel == AOTKernelKind::PerlinNoiseFill
+                    ? BuildProcessorForTest(&allocator, graph, plan.passes[0]) != nullptr
+                    : CompileChainForTest(graph, plan.passes[0], &admittedPass));
   }
 }
 

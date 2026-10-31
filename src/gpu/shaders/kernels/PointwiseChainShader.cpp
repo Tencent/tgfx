@@ -24,7 +24,6 @@
 #include "gpu/PermutationMatch.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
-#include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComplexEllipseGeometryProcessor.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
@@ -44,21 +43,9 @@ std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::Extract(
   if (programInfo->getGeometryProcessor() == nullptr) {
     return std::nullopt;
   }
-  // Dual acceptance: a draw still carrying the chain processor (a multi-pass plan task's pass,
-  // until the plan route retires) reads its shape directly; any other draw is the interpreter's
-  // own subject — the whole effect expression is compiled here.
-  const AOTProgram* compiled = nullptr;
-  if (programInfo->numColorFragmentProcessors() == 1 && programInfo->numFragmentProcessors() == 1) {
-    auto fp = programInfo->getFragmentProcessor(0);
-    if (IsProcessor<AOTPointwiseChainProcessor>(fp)) {
-      compiled = &static_cast<const AOTPointwiseChainProcessor*>(fp)->program();
-    }
-  }
-  if (compiled == nullptr) {
-    // Reuse a program this draw already compiled (the AOT route resolves the draw before the
-    // matcher walk runs): the compilation is a pure function of the info's expression.
-    compiled = programInfo->getCachedChainProgram();
-  }
+  // The interpreter's own subject: the whole effect expression compiles here (a draw this info
+  // already compiled — the AOT route — leaves its program on the cache and is reused as-is).
+  const AOTProgram* compiled = programInfo->getCachedChainProgram();
   if (compiled == nullptr) {
     auto context = programInfo->getContext();
     if (context == nullptr || context->drawingManager() == nullptr) {

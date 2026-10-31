@@ -62,14 +62,13 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget,
   preparedRenderTarget = nullptr;
   preparedViaDecomposition = false;
   preparedColors = std::move(colorOverride);
-  preparedPassProcessor = nullptr;
   auto& activeColors = preparedColors.has_value() ? *preparedColors : colors;
 
   std::vector<FragmentProcessor*> fragmentProcessors = {};
   size_t colorCount = activeColors.size();
-  // Plan-pass serving: the pass IR describes the expression, so its chain processor is rebuilt
-  // here (once per prepare) instead of travelling through the task as a processor. A fill pass
-  // carries the IR on itself; the terminal pass hands it in from the plan.
+  // Plan-pass serving: the pass IR is the whole expression, so the AOT route resolves the draw
+  // from the program it compiles onto — no processor travels through the info. A fill pass carries
+  // the IR on itself; the terminal pass hands it in from the plan.
   const DrawIR* resolvedPassIR = passIR;
   if (resolvedPassIR == nullptr) {
     auto* lowered = loweredIR();
@@ -82,41 +81,34 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget,
     if (context == nullptr || context->drawingManager() == nullptr) {
       return false;
     }
-    // The AOT route resolves a pass draw before any cache lookup: the pass IR compiles onto the
-    // chain program, whose variant plus the pipeline state form the key. The pass info carries no
-    // processors — the program is the whole expression; the plain route's pass form (the rebuilt
-    // shell as the one color processor) computes the same blend formula, hence the false coverage
-    // bit below.
+    // The pass IR compiles onto the chain program, whose variant plus the pipeline state form the
+    // key — everything resolves before any cache lookup. The pass info carries no processors: the
+    // program is the whole expression, and the blend formula's coverage bit is false (the kernel
+    // folds coverage itself).
     AOTProgram aotProgram = {};
-    if (AOTChainBuilder::CompilePassProgram(*resolvedPassIR, &aotProgram)) {
-      auto passInfo = std::make_unique<ProgramInfo>(renderTarget, geometryProcessor.get(),
-                                                    xferProcessor.get(), blendMode, false);
-      passInfo->setCullMode(cullMode);
-      if (depthStencilFormat != PixelFormat::Unknown) {
-        DepthStencilDescriptor depthStencil = {};
-        depthStencil.format = depthStencilFormat;
-        passInfo->setDepthStencil(depthStencil);
-      }
-      onConfigureProgramInfo(*passInfo);
-      AOTProgramInfo aotInfo(*passInfo, aotProgram);
-      if (aotInfo.valid()) {
-        passInfo->setCachedChainProgram(std::move(aotProgram));
-        preparedProgramInfo = std::move(passInfo);
-        preparedProgram = aotInfo.program();
-        preparedViaDecomposition = true;
-        preparedRenderTarget = renderTarget;
-        return true;
-      }
-    }
-    // The route cannot serve this pass (its shape has no variant, or the bundle lacks it): fall
-    // back to the shell form below.
-    preparedPassProcessor = AOTChainBuilder::BuildPassProcessor(
-        context->drawingManager()->drawingAllocator(), *resolvedPassIR);
-    if (preparedPassProcessor == nullptr) {
+    if (!AOTChainBuilder::CompilePassProgram(*resolvedPassIR, &aotProgram)) {
       return false;
     }
-    fragmentProcessors.emplace_back(preparedPassProcessor.get());
-    colorCount = 1;
+    auto passInfo = std::make_unique<ProgramInfo>(renderTarget, geometryProcessor.get(),
+                                                  xferProcessor.get(), blendMode, false);
+    passInfo->setCullMode(cullMode);
+    if (depthStencilFormat != PixelFormat::Unknown) {
+      DepthStencilDescriptor depthStencil = {};
+      depthStencil.format = depthStencilFormat;
+      passInfo->setDepthStencil(depthStencil);
+    }
+    onConfigureProgramInfo(*passInfo);
+    AOTProgramInfo aotInfo(*passInfo, aotProgram);
+    if (!aotInfo.valid()) {
+      // The pass's shape has no variant, or the bundle lacks it: nothing can serve this draw.
+      return false;
+    }
+    passInfo->setCachedChainProgram(std::move(aotProgram));
+    preparedProgramInfo = std::move(passInfo);
+    preparedProgram = aotInfo.program();
+    preparedViaDecomposition = true;
+    preparedRenderTarget = renderTarget;
+    return true;
   } else {
     fragmentProcessors.reserve(activeColors.size() + coverages.size());
     for (auto& color : activeColors) {

@@ -40,7 +40,7 @@
 #include "gpu/ShaderKeyHash.h"
 #include "gpu/ShaderProfile.h"
 #include "gpu/ShaderProfileResolver.h"
-#include "gpu/processors/AOTPointwiseChainProcessor.h"
+#include "gpu/aot/Binder.h"
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ComplexEllipseGeometryProcessor.h"
 #include "gpu/processors/ConstColorProcessor.h"
@@ -810,14 +810,17 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
           if (coverage != nullptr) {
             coverageProcessors.push_back(coverage.get());
           }
-          auto rebuilt = AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0],
-                                                              coverageProcessors);
-          ASSERT_NE(rebuilt, nullptr);
-          ProgramInfo programInfo(renderTarget.get(), gp.get(), {rebuilt.get()}, 1, xp.get(),
-                                  BlendMode::SrcOver);
-          auto match = MatchPermutation(&programInfo);
+          AOTProgram chain = {};
+          ASSERT_TRUE(AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0],
+                                                           coverageProcessors, false, &chain));
+          ProgramInfo programInfo(renderTarget.get(), gp.get(), xp.get(), BlendMode::SrcOver,
+                                  !coverageProcessors.empty());
+          programInfo.setCachedChainProgram(std::move(chain));
+          // The interpreter's own match: a program-holding draw resolves through MatchProgram,
+          // not the family walk (whose dedicated families would claim the empty processor list).
+          auto match = PointwiseChainShader::MatchProgram(*programInfo.getCachedChainProgram(),
+                                                          &programInfo);
           ASSERT_TRUE(match.has_value());
-          EXPECT_EQ(match->shaderName, "PointwiseChainShader");
           ASSERT_LT(match->vertPermutationIndex, info.vertDomain.totalCount());
           ASSERT_LT(match->fragPermutationIndex, info.fragDomain.totalCount());
           auto vertValues = info.vertDomain.decode(match->vertPermutationIndex);
@@ -862,14 +865,16 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
     AOTEffectPlan plan;
     ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
     ASSERT_EQ(plan.passes.size(), 1u);
-    auto rebuilt =
-        AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0], {coverage.get()});
-    ASSERT_NE(rebuilt, nullptr);
-    ProgramInfo programInfo(renderTarget.get(), gp.get(), {rebuilt.get()}, 1, nullptr,
-                            BlendMode::SrcOver);
-    auto match = MatchPermutation(&programInfo);
+    AOTProgram chain = {};
+    ASSERT_TRUE(AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0],
+                                                     {coverage.get()}, false, &chain));
+    ProgramInfo programInfo(renderTarget.get(), gp.get(), nullptr, BlendMode::SrcOver, true);
+    programInfo.setCachedChainProgram(std::move(chain));
+    // The interpreter's own match: a program-holding draw resolves through MatchProgram, not the
+    // family walk (whose dedicated families would claim the empty processor list).
+    auto match =
+        PointwiseChainShader::MatchProgram(*programInfo.getCachedChainProgram(), &programInfo);
     ASSERT_TRUE(match.has_value());
-    EXPECT_EQ(match->shaderName, "PointwiseChainShader");
     EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "RESOURCE_KIND"), 1);
     EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "TEXTURE_COUNT"), 1);
   }
@@ -891,30 +896,19 @@ TGFX_TEST(ShaderPermutationTest, LUTGradientWithRealMaskUsesAllLeafSelectors) {
   for (int lutLeaf = 0; lutLeaf < 4; ++lutLeaf) {
     SCOPED_TRACE(lutLeaf);
     BlockAllocator allocator;
-    std::vector<PlacementPtr<FragmentProcessor>> leaves;
+    std::vector<std::shared_ptr<TextureProxy>> leafProxies;
     std::vector<AOTChainSlot> slots(static_cast<size_t>(lutLeaf) + 1);
     for (int index = 0; index < lutLeaf; ++index) {
       auto proxy = context->proxyProvider()->createTextureProxy({}, 8, 8, PixelFormat::RGBA_8888);
-      auto leaf = TextureEffect::Make(&allocator, std::move(proxy));
-      ASSERT_NE(leaf, nullptr);
-      leaves.push_back(std::move(leaf));
+      ASSERT_NE(proxy, nullptr);
+      leafProxies.push_back(proxy);
       slots[static_cast<size_t>(index)].op = AOTChainOp::Texture;
       slots[static_cast<size_t>(index)].outRegister = index;
     }
     auto lutProxy = context->proxyProvider()->createTextureProxy({}, 8, 1, PixelFormat::RGBA_8888);
     ASSERT_NE(lutProxy, nullptr);
-    auto lutChild = TextureEffect::Make(&allocator, lutProxy);
-    ASSERT_NE(lutChild, nullptr);
-    std::vector<PlacementPtr<FragmentProcessor>> padding;
-    for (int index = lutLeaf + 1; index < 4; ++index) {
-      auto child = TextureEffect::Make(&allocator, lutProxy);
-      ASSERT_NE(child, nullptr);
-      padding.push_back(std::move(child));
-    }
     auto maskProxy = context->proxyProvider()->createTextureProxy({}, 8, 8, PixelFormat::ALPHA_8);
     ASSERT_NE(maskProxy, nullptr);
-    auto mask = DeviceSpaceTextureEffect::Make(&allocator, std::move(maskProxy), Matrix::I());
-    ASSERT_NE(mask, nullptr);
     auto& gradient = slots.back();
     gradient.op = AOTChainOp::Gradient;
     gradient.in0 = -1;
@@ -927,29 +921,44 @@ TGFX_TEST(ShaderPermutationTest, LUTGradientWithRealMaskUsesAllLeafSelectors) {
     program.rootRegister = static_cast<size_t>(lutLeaf);
     program.lutLeafIndex = lutLeaf;
     program.hasMaskTexture = true;
-    AOTPointwiseChainProcessor::AOTChainChildren children = {};
-    children.leaves = std::move(leaves);
-    children.lut = std::move(lutChild);
-    children.padding = std::move(padding);
-    children.mask = std::move(mask);
-    auto processor =
-        AOTPointwiseChainProcessor::Make(&allocator, std::move(program), std::move(children));
-    ASSERT_NE(processor, nullptr);
-    EXPECT_EQ(processor->resourceProfile(), AOTResourceProfile::TiledGraph);
-    EXPECT_EQ(processor->lutLeaf(), lutLeaf);
-    EXPECT_TRUE(processor->hasMask());
-    EXPECT_EQ(processor->leafCount(), 4u);
-    ASSERT_EQ(processor->numCoordTransforms(), 1u);
-    EXPECT_EQ(processor->coordTransform(0)->matrix, gradient.gradient.coordMatrix);
-    EXPECT_EQ(processor->childProcessor(static_cast<size_t>(lutLeaf))->textureAt(0),
-              lutProxy->getTextureView()->getTexture());
+    for (const auto& proxy : leafProxies) {
+      program.bindings.push_back({AOTBinding::Kind::Leaf, proxy, {}, Matrix::I(), {}});
+    }
+    program.bindings.push_back({AOTBinding::Kind::Lut, lutProxy, {}, Matrix::I(), {}});
+    while (program.bindings.size() < 4) {
+      program.bindings.push_back({AOTBinding::Kind::Padding, lutProxy, {}, Matrix::I(), {}});
+    }
+    program.bindings.push_back({AOTBinding::Kind::Mask, maskProxy, {}, Matrix::I(), {}});
+    program.samplerChildCount = 4;
+    // The admission the compile runs on the same data: an Automatic profile resolves onto the
+    // gradient-carrying extended kind, and the slot rules accept the layout.
+    AOTResourceProfile profile = AOTResourceProfile::Automatic;
+    std::vector<int> tiledLeafIndices = {};
+    ASSERT_TRUE(AOTChainBuilder::ValidateSlots(
+        program.slots, program.rootRegister, program.coverageRootRegister,
+        program.clipCoverageRegister, leafProxies.size(), true, tiledLeafIndices, &profile));
+    program.profile = profile;
+    EXPECT_EQ(program.profile, AOTResourceProfile::TiledGraph);
+    EXPECT_EQ(program.lutLeafIndex, lutLeaf);
+    EXPECT_TRUE(program.hasMaskTexture);
+    EXPECT_EQ(program.samplerChildCount, 4u);
+    auto transforms = BuildChainCoordTransforms(program);
+    // The chain-wide gradient matrix first, then one per sampler-binding child (the real device
+    // mask contributes none).
+    ASSERT_EQ(transforms.size(), 1u + program.bindings.size() - (program.hasMaskTexture ? 1u : 0u));
+    EXPECT_EQ(transforms[0].matrix, gradient.gradient.coordMatrix);
+    EXPECT_EQ(
+        program.bindings[static_cast<size_t>(lutLeaf)].textureProxy->getTextureView()->getTexture(),
+        lutProxy->getTextureView()->getTexture());
     auto gp = MakeSingleIntervalGeometry(&allocator, 1, true);
     ASSERT_NE(gp, nullptr);
-    ProgramInfo programInfo(renderTarget.get(), gp.get(), {processor.get()}, 1, nullptr,
-                            BlendMode::SrcOver);
-    auto match = MatchPermutation(&programInfo);
+    ProgramInfo programInfo(renderTarget.get(), gp.get(), nullptr, BlendMode::SrcOver, false);
+    programInfo.setCachedChainProgram(std::move(program));
+    // The interpreter's own match: a program-holding draw resolves through MatchProgram, not the
+    // family walk (whose dedicated families would claim the empty processor list).
+    auto match =
+        PointwiseChainShader::MatchProgram(*programInfo.getCachedChainProgram(), &programInfo);
     ASSERT_TRUE(match.has_value());
-    EXPECT_EQ(match->shaderName, "PointwiseChainShader");
     EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "RESOURCE_KIND"), 1);
     EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "TEXTURE_COUNT"), 1);
   }

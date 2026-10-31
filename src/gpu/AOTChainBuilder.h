@@ -49,7 +49,7 @@ struct AOTChainCompile {
  * PointwiseChain/PointwiseGraph passes (a multi-pass plan's passes are built as cut segments
  * through BuildCutSegment), the perlin kernel for PerlinNoiseFill and the YUV kernel for
  * YUVTextureFill. Used by AOTPlanExecutor's task assembly and by the two re-expressing
- * kernels' per-draw views of an unmodified ProgramInfo (BuildChainProcessorForInfo /
+ * kernels' per-draw views of an unmodified ProgramInfo (CompileChainProgramForInfo /
  * BuildPerlinProcessorForInfo).
  */
 class AOTChainBuilder {
@@ -59,7 +59,7 @@ class AOTChainBuilder {
 
   /**
    * Pure admission of a PointwiseChain/PointwiseGraph pass without draw coverage. Runs the same
-   * slot encoding, closure, budget, profile and register checks BuildChainProcessor runs, but
+   * slot encoding, closure, budget, profile and register checks the compile runs, but
    * creates no processor — so plan-time fit and construction fit cannot drift.
    *
    * checkKernel also verifies the pass's declared kernel against the profile the pass needs (the
@@ -84,23 +84,33 @@ class AOTChainBuilder {
                       AOTChainCompile* out);
 
   /**
-   * Rebuilds the fused chain processor of one plan pass from its pass IR: the cut segment graph
-   * already carries the intermediate leaves and the carried pass descriptor is the one the
-   * planner fit, so nothing is re-planned. This is the plan-pass serving path — the executor
-   * stores each pass as this IR instead of a processor, and the fill passes and the terminal
-   * draw materialise the processor here, once per prepare. Returns nullptr when the IR is not a
-   * chain pass or the pass does not compile.
+   * Compiles one plan pass's IR into the fused chain program and its binding table, without
+   * building the pass's processor: the AOT route resolves a pass draw from the program alone.
+   * Returns false when the IR is not a chain pass or the pass does not compile.
    */
-  static PlacementPtr<FragmentProcessor> BuildPassProcessor(BlockAllocator* allocator,
-                                                            const DrawIR& passIR);
+  static bool CompilePassProgram(const DrawIR& passIR, AOTProgram* out);
 
   /**
-   * Rebuilds the color processor of one self-contained plan pass: the fused chain/graph processor
-   * without draw coverage, or the YUV or perlin processor with the pass's operators folded into
-   * its slot records. Returns nullptr when the pass shape cannot be rebuilt. A pass of a
-   * multi-pass plan is not self-contained (it reads its predecessors' outputs); build it through
-   * BuildCutSegment first. Only the linear kernels (YUV, perlin) are served here: chain passes
-   * are carried as pass IRs and rebuilt through BuildPassProcessor.
+   * Validates an encoded instruction array (register domains, opcodes, selector fields, leaf
+   * layout, per-kind parameter blocks) and resolves its resource profile against the profile
+   * capacities, without looking at any child processor. The planner runs it while planning
+   * (AOTPlanExecutor::CanExecute) and the compile runs it again on the same data, so planning and
+   * compilation cannot disagree on a slot rule or a budget. leafCount is the number of real DAG
+   * texture leaves (slots [0, leafCount) must be OP_TEXTURE), hasLUT whether a LUT gradient child
+   * follows them, and tiledLeafIndices the leaves carrying a shader-side tiling recipe. On success
+   * *profile holds the resolved (non-Automatic) profile.
+   */
+  static bool ValidateSlots(const std::vector<AOTChainSlot>& slots, size_t rootSlot,
+                            int coverageRootSlot, int clipCoverageRegister, size_t leafCount,
+                            bool hasLUT, const std::vector<int>& tiledLeafIndices,
+                            AOTResourceProfile* profile);
+
+  /**
+   * Rebuilds the color processor of one self-contained plan pass: the YUV or perlin processor with
+   * the pass's operators folded into its slot records. Returns nullptr when the pass shape cannot
+   * be rebuilt. A pass of a multi-pass plan is not self-contained (it reads its predecessors'
+   * outputs); build it through BuildCutSegment first. Only the linear kernels (YUV, perlin) are
+   * served here: chain passes are carried as pass IRs and compiled through CompilePassProgram.
    */
   static PlacementPtr<FragmentProcessor> BuildFPForPass(BlockAllocator* allocator,
                                                         const AOTEffectGraph& graph,
@@ -137,21 +147,20 @@ class AOTChainBuilder {
                               AOTEffectGraph* segment, AOTPassDescriptor* pass);
 
   /**
-   * Flattens a single-pass PointwiseChain/PointwiseGraph plan into the shared processor, or returns
-   * nullptr if the pass shape exceeds the selected kernel's capabilities. The processor carries
-   * the whole DAG in uniforms and resolves to the corresponding independent shader family.
+   * Flattens a single-pass PointwiseChain/PointwiseGraph plan into the fused chain program and its
+   * binding table, or returns false if the pass shape exceeds the selected kernel's capabilities.
    *
    * coverageFPs, when non-empty, is classified by the shared coverage classifier (the same one
    * LowerDraw uses): analytic rect/rrect leaves ride the clip-coverage register, an alpha-only
-   * device-space texture becomes the mask child, and anything else lowers as a general coverage
+   * device-space texture becomes the mask binding, and anything else lowers as a general coverage
    * subtree rooted at the GP coverage. coverageLeafFromUVCoord marks the trailing FP as the
    * AtlasText glyph leaf a caller synthesized from the geometry processor. More than two coverage
-   * FPs returns nullptr.
+   * FPs returns false.
    */
-  static PlacementPtr<FragmentProcessor> BuildChainProcessor(
-      BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
-      const std::vector<const FragmentProcessor*>& coverageFPs = {},
-      bool coverageLeafFromUVCoord = false);
+  static bool CompileChainProgram(BlockAllocator* allocator, const AOTEffectGraph& graph,
+                                  const AOTPassDescriptor& pass,
+                                  const std::vector<const FragmentProcessor*>& coverageFPs,
+                                  bool coverageLeafFromUVCoord, AOTProgram* out);
 
   /**
    * Compiles a draw's whole effect expression (its color processors, its coverage processors, and
@@ -166,13 +175,6 @@ class AOTChainBuilder {
    */
   static bool CompileChainProgramForInfo(BlockAllocator* allocator, const ProgramInfo* programInfo,
                                          AOTProgram* out);
-
-  /**
-   * Compiles one plan pass's IR into the fused chain program and its binding table, without
-   * building the pass's processor: the AOT route resolves a pass draw from the program alone.
-   * Returns false when the IR is not a chain pass or the pass does not compile.
-   */
-  static bool CompilePassProgram(const DrawIR& passIR, AOTProgram* out);
 
   /**
    * Re-expresses a coverage-free draw's color expression as the perlin kernel processor with its

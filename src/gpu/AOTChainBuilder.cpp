@@ -27,7 +27,6 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/aot/DrawIR.h"
 #include "gpu/aot/NodeContract.h"
-#include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AOTYUVChainProcessor.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
@@ -55,6 +54,20 @@ bool AOTChainBuilder::IsChainCompatibleTiledMode(TiledTextureShaderMode mode) {
 }
 
 namespace {
+
+// The chain kernel's own capacities, as the fixed-size GLSL arrays declare them: the instruction
+// storage across the shapes (the noise shape: 32; the gradient shape shares the plain chain's 16),
+// the chainResults register file the allocator recycles by last use, and the chain-wide parameter
+// blocks (one gradient, one color-space transform, two device-space and two local rect coverage
+// sets, four rrect array elements). ValidateSlots is the only place that enforces them; the
+// planner and the compile both run it on the same instruction array, so the two cannot disagree.
+constexpr size_t MaxChainSlots = NoiseGraphResourceCapacity.instructions;
+constexpr size_t MaxChainRegisters = 16;
+constexpr size_t MaxChainGradientSlots = TiledGraphResourceCapacity.gradients;
+constexpr size_t MaxChainColorSpaceXformSlots = 1;
+constexpr size_t MaxChainDeviceRectCoverageSlots = 2;
+constexpr size_t MaxChainLocalRectCoverageSlots = 2;
+constexpr size_t MaxChainRRectCoverageSlots = 4;
 
 // The binding record of one TextureSource leaf: a plain leaf sampling through its resolved sampler
 // state, the stand-in leaf of a device-space source, or a tiled leaf whose wrap modes the kernel's
@@ -687,7 +700,7 @@ static bool EncodeGradientSlot(ChainBuildContext* ctx, size_t combined, size_t i
   if (parameters == nullptr || node->inputs.size() != 1) {
     return false;
   }
-  // Single-authority budget: AOTPointwiseChainProcessor::MaxGradientSlots (the kernel
+  // Single-authority budget: MaxChainGradientSlots (the kernel
   // carries one chain-wide gradient parameter block and one SourceCoords varying).
   if (ctx->hasGradient) {
     return false;
@@ -1004,9 +1017,9 @@ static void RouteAnalyticChains(ChainBuildContext* ctx) {
 // Stage eight: register allocation. The slot wiring built above uses instruction ordinals; this
 // pass rewrites every reference into the kernel's recycled chainResults registers, so the
 // per-profile instruction budget (16 for Chain and gradient, 32 for noise) and the live-result
-// budget (MaxRegisters) are independent. A DAG exceeding the register budget is refused here.
+// budget (MaxChainRegisters) are independent. A DAG exceeding the register budget is refused here.
 static bool AssignChainRegisters(ChainBuildContext* ctx) {
-  if (ctx->slots.size() > AOTPointwiseChainProcessor::MaxSlots) {
+  if (ctx->slots.size() > MaxChainSlots) {
     return false;
   }
   std::vector<std::vector<int>> instructionInputs(ctx->slots.size());
@@ -1019,8 +1032,8 @@ static bool AssignChainRegisters(ChainBuildContext* ctx) {
   }
   ctx->assignment = {};
   if (!AllocateChainRegisters(instructionInputs, static_cast<int>(ctx->rootIndex),
-                              ctx->coverageRootSlot, ctx->clipCoverageSlot,
-                              AOTPointwiseChainProcessor::MaxRegisters, &ctx->assignment)) {
+                              ctx->coverageRootSlot, ctx->clipCoverageSlot, MaxChainRegisters,
+                              &ctx->assignment)) {
     return false;
   }
   for (size_t index = 0; index < ctx->slots.size(); ++index) {
@@ -1037,8 +1050,8 @@ static bool AssignChainRegisters(ChainBuildContext* ctx) {
   return true;
 }
 
-// Stage nine: the processor's own data rules and the final profile's capacities decide last, on
-// the exact instruction array construction will hand to AOTPointwiseChainProcessor::Make.
+// Stage nine: the slot rules and the final profile's capacities decide last, on the exact
+// instruction array the compile hands to AOTChainBuilder::ValidateSlots.
 static bool FinalizeChainLayout(ChainBuildContext* ctx) {
   auto* layout = ctx->layout;
   std::vector<int> tiledLeafIndices = {};
@@ -1046,11 +1059,11 @@ static bool FinalizeChainLayout(ChainBuildContext* ctx) {
     tiledLeafIndices.push_back(tiled.leafIndex);
   }
   if (ctx->assignment.rootRegister < 0 ||
-      !AOTPointwiseChainProcessor::ValidateSlots(
-          ctx->slots, static_cast<size_t>(ctx->assignment.rootRegister),
-          ctx->assignment.coverageRootRegister, ctx->assignment.clipCoverageRegister,
-          layout->leafNodes.size(), layout->lutGradient != nullptr, tiledLeafIndices,
-          &ctx->finalProfile)) {
+      !AOTChainBuilder::ValidateSlots(ctx->slots, static_cast<size_t>(ctx->assignment.rootRegister),
+                                      ctx->assignment.coverageRootRegister,
+                                      ctx->assignment.clipCoverageRegister,
+                                      layout->leafNodes.size(), layout->lutGradient != nullptr,
+                                      tiledLeafIndices, &ctx->finalProfile)) {
     return false;
   }
   layout->program.slots = std::move(ctx->slots);
@@ -1386,69 +1399,13 @@ static bool CompileChainLayout(const AOTEffectGraph& graph, const AOTPassDescrip
 
 // The texture processor one binding describes: the same TextureEffect the binding's record was
 // taken from (a plain, tiled or device-space leaf, the LUT gradient, a padding child or the mask
-// slot's phantom).
+// slot's phantom). Only the linear kernels' source leaf still materializes a processor; the chain
+// path consumes the binding table itself.
 static PlacementPtr<FragmentProcessor> MaterializeTextureBinding(BlockAllocator* allocator,
                                                                  const AOTBinding& binding) {
   auto matrix = binding.uvMatrix;
   return TextureEffect::MakeRGBAAA(allocator, binding.textureProxy, binding.args,
                                    binding.alphaStart, &matrix);
-}
-
-// Materializes the sampler children a shell registers from the binding table alone: every binding
-// is a TextureEffect over its proxy, except the real device mask (a DeviceSpaceTextureEffect). The
-// binding past samplerChildCount is the mask slot child — a phantom when it is recorded as padding,
-// which the kernel skips via HasMaskTexture.
-static bool MaterializeChainChildren(BlockAllocator* allocator, size_t samplerChildCount,
-                                     const std::vector<AOTBinding>& bindings,
-                                     AOTPointwiseChainProcessor::AOTChainChildren* children) {
-  if (bindings.size() < samplerChildCount) {
-    return false;
-  }
-  for (size_t index = 0; index < samplerChildCount; ++index) {
-    const auto& binding = bindings[index];
-    auto child = MaterializeTextureBinding(allocator, binding);
-    if (child == nullptr) {
-      return false;
-    }
-    if (binding.kind == AOTBinding::Kind::Leaf) {
-      children->leaves.push_back(std::move(child));
-    } else if (binding.kind == AOTBinding::Kind::Lut) {
-      children->lut = std::move(child);
-    } else {
-      children->padding.push_back(std::move(child));
-    }
-  }
-  if (bindings.size() == samplerChildCount) {
-    return true;
-  }
-  if (bindings.size() != samplerChildCount + 1) {
-    return false;
-  }
-  const auto& mask = bindings[samplerChildCount];
-  if (mask.kind == AOTBinding::Kind::Mask) {
-    children->mask = DeviceSpaceTextureEffect::Make(allocator, mask.textureProxy, mask.uvMatrix);
-    return children->mask != nullptr;
-  }
-  children->mask = MaterializeTextureBinding(allocator, mask);
-  children->maskIsPhantom = children->mask != nullptr;
-  return children->mask != nullptr;
-}
-
-// Rebuilds the fused chain processor from the compiled program: the materialized sampler children
-// plus the program itself.
-static PlacementPtr<FragmentProcessor> BuildChainFP(
-    BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
-    const std::vector<AOTCoverageTerm>* coverageTerms) {
-  AOTProgram program = {};
-  if (!CompileChainLayout(graph, pass, coverageTerms, &program)) {
-    return nullptr;
-  }
-  AOTPointwiseChainProcessor::AOTChainChildren children = {};
-  if (!MaterializeChainChildren(allocator, program.samplerChildCount, program.bindings,
-                                &children)) {
-    return nullptr;
-  }
-  return AOTPointwiseChainProcessor::Make(allocator, std::move(program), std::move(children));
 }
 
 }  // namespace
@@ -1705,23 +1662,6 @@ bool AOTChainBuilder::CompilePassProgram(const DrawIR& passIR, AOTProgram* out) 
   return CompileChainLayout(passIR.color, pass, &passIR.coverage, out);
 }
 
-PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildPassProcessor(BlockAllocator* allocator,
-                                                                    const DrawIR& passIR) {
-  if (allocator == nullptr) {
-    return nullptr;
-  }
-  AOTProgram program = {};
-  if (!CompilePassProgram(passIR, &program)) {
-    return nullptr;
-  }
-  AOTPointwiseChainProcessor::AOTChainChildren children = {};
-  if (!MaterializeChainChildren(allocator, program.samplerChildCount, program.bindings,
-                                &children)) {
-    return nullptr;
-  }
-  return AOTPointwiseChainProcessor::Make(allocator, std::move(program), std::move(children));
-}
-
 PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildFPForPass(BlockAllocator* allocator,
                                                                 const AOTEffectGraph& graph,
                                                                 const AOTPassDescriptor& pass) {
@@ -1729,8 +1669,8 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildFPForPass(BlockAllocator* 
     return nullptr;
   }
   if (IsAOTPointwiseDAGKernel(pass.kernel)) {
-    // Chain passes travel as pass IRs and are rebuilt through BuildPassProcessor; a DAG single
-    // pass is never a plan task (PlanRequiresTask admits the fused kernels in place), and every
+    // Chain passes travel as pass IRs and compile through CompilePassProgram; a DAG single pass
+    // is never a plan task (PlanRequiresTask admits the fused kernels in place), and every
     // cut-plan pass is rebuilt from its segment. Only the linear kernels reach this entry.
     return nullptr;
   }
@@ -1768,17 +1708,18 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildFPForPass(BlockAllocator* 
   }
 }
 
-PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessor(
-    BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
-    const std::vector<const FragmentProcessor*>& coverageFPs, bool coverageLeafFromUVCoord) {
-  if (!IsAOTPointwiseDAGKernel(pass.kernel)) {
-    return nullptr;
+bool AOTChainBuilder::CompileChainProgram(BlockAllocator* allocator, const AOTEffectGraph& graph,
+                                          const AOTPassDescriptor& pass,
+                                          const std::vector<const FragmentProcessor*>& coverageFPs,
+                                          bool coverageLeafFromUVCoord, AOTProgram* out) {
+  if (allocator == nullptr || out == nullptr || !IsAOTPointwiseDAGKernel(pass.kernel)) {
+    return false;
   }
   if (coverageFPs.empty()) {
-    return BuildChainFP(allocator, graph, pass, nullptr);
+    return CompileChainLayout(graph, pass, nullptr, out);
   }
   if (coverageFPs.size() > 2) {
-    return nullptr;
+    return false;
   }
   // The shared coverage classifier decides what each coverage leaf is (the same one LowerDraw
   // uses); coverageLeafFromUVCoord marks the trailing FP as the AtlasText glyph leaf a caller
@@ -1786,9 +1727,175 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessor(
   const FragmentProcessor* glyphLeaf = coverageLeafFromUVCoord ? coverageFPs.back() : nullptr;
   auto terms = LowerCoverageTerms(coverageFPs, glyphLeaf, allocator);
   if (!terms.has_value()) {
-    return nullptr;
+    return false;
   }
-  return BuildChainFP(allocator, graph, pass, &*terms);
+  return CompileChainLayout(graph, pass, &*terms, out);
+}
+
+bool AOTChainBuilder::ValidateSlots(const std::vector<AOTChainSlot>& slots, size_t rootSlot,
+                                    int coverageRootSlot, int clipCoverageRegister,
+                                    size_t leafCount, bool hasLUT,
+                                    const std::vector<int>& tiledLeafIndices,
+                                    AOTResourceProfile* profile) {
+  if (profile == nullptr || slots.empty() || slots.size() > MaxChainSlots) {
+    return false;
+  }
+  // Validation domains are separated (fail-closed): in0/in1 are INPUT selectors and
+  // may carry the kernel's special negative designators (-1 geometry color ... -5 opaque
+  // geometry color) or a result register; outRegister / rootSlot / coverageRootSlot /
+  // clipCoverageRegister are OUTPUT registers and must name a real chainResults slot (>= 0) or
+  // the explicit dead-instruction marker -1 (a raw sampling slot whose result nothing reads —
+  // the computed-input texture's leading fetch). The upload packs the output as
+  // (outRegister + 1) << 20, so any value below -1 would shift left into undefined behavior
+  // instead of being rejected here.
+  const auto validInput = [](int reg) {
+    return reg >= -5 && reg < static_cast<int>(MaxChainRegisters);
+  };
+  const auto validOutput = [](int reg) {
+    return reg >= -1 && reg < static_cast<int>(MaxChainRegisters);
+  };
+  if (rootSlot >= MaxChainRegisters || (coverageRootSlot >= 0 && !validOutput(coverageRootSlot)) ||
+      clipCoverageRegister >= static_cast<int>(MaxChainRegisters) || leafCount > slots.size()) {
+    return false;
+  }
+  for (const auto& slot : slots) {
+    if (!validOutput(slot.outRegister) || !validInput(slot.in0) || !validInput(slot.in1)) {
+      return false;
+    }
+    // Opcode whitelist: the kernel's evaluation switch has no default branch (an unknown value
+    // falls through into the ColorSpaceXform evaluation), so an out-of-enum opcode must be
+    // rejected here rather than silently misinterpreted.
+    switch (slot.op) {
+      case AOTChainOp::ColorMatrix:
+      case AOTChainOp::Luma:
+      case AOTChainOp::AlphaThreshold:
+      case AOTChainOp::ColorSpaceXform:
+      case AOTChainOp::Texture:
+      case AOTChainOp::ConstColor:
+      case AOTChainOp::Blend:
+      case AOTChainOp::AARectCoverage:
+      case AOTChainOp::Gradient:
+      case AOTChainOp::LocalRectCoverage:
+      case AOTChainOp::RRectCoverage:
+      case AOTChainOp::TexModulate:
+      case AOTChainOp::InputOpaque:
+      case AOTChainOp::MulAlpha:
+      case AOTChainOp::PerlinNoise:
+        break;
+      case AOTChainOp::None:
+      default:
+        return false;
+    }
+    // Selector sub-field domains: the upload packs these ints straight into the selector's bit
+    // fields, so an out-of-domain value does not merely misbehave — it bleeds into neighboring
+    // bits (the result register rides bits 20-24, the rrect/tex-source ordinals bits 16-19) and
+    // can index chainResults/chainLeafTex out of bounds in the kernel. The owned API is public
+    // surface, so fail closed here instead of trusting the builder.
+    if (slot.op == AOTChainOp::ConstColor &&
+        (slot.constColor.inputMode < 0 || slot.constColor.inputMode > 2)) {
+      return false;
+    }
+    if (slot.op == AOTChainOp::Blend && (slot.blend.blendMode < 0 || slot.blend.blendMode > 0xFF ||
+                                         slot.blend.childType < 0 || slot.blend.childType > 2)) {
+      return false;
+    }
+    if (slot.op == AOTChainOp::Texture &&
+        ((slot.textureModulate | slot.textureAlphaOnly | slot.textureModulateGeometryRGB |
+          slot.textureModulateFullInput | slot.textureModulateUnit) &
+         ~1) != 0) {
+      return false;
+    }
+    if (slot.op == AOTChainOp::TexModulate &&
+        (slot.texModulateSourceSlot < 0 || slot.texModulateSourceSlot > 3 ||
+         (slot.texModulateAlphaOnly & ~1) != 0)) {
+      return false;
+    }
+    // Required-input checks: the kernel resolves an unmapped input (-2) to vec4(0.0) silently, so
+    // an operator that actually consumes its input must not leave it unmapped. Texture slots
+    // carry flags in in0/in1 rather than register indices, and Texture is exempt.
+    if (slot.op != AOTChainOp::Texture && slot.op != AOTChainOp::PerlinNoise && slot.in0 == -2) {
+      return false;
+    }
+    if ((slot.op == AOTChainOp::Blend || slot.op == AOTChainOp::MulAlpha) && slot.in1 == -2) {
+      return false;
+    }
+  }
+  for (size_t index = 0; index < tiledLeafIndices.size(); ++index) {
+    auto leafIndex = tiledLeafIndices[index];
+    if (leafIndex < 0 || static_cast<size_t>(leafIndex) >= leafCount) {
+      return false;
+    }
+    for (size_t previous = 0; previous < index; ++previous) {
+      if (tiledLeafIndices[previous] == leafIndex) {
+        return false;
+      }
+    }
+  }
+  // Only real DAG leaves have prefetched samples; LUT and padding children do not.
+  for (size_t index = 0; index < slots.size(); ++index) {
+    const auto& slot = slots[index];
+    if ((slot.op == AOTChainOp::Texture) != (index < leafCount)) {
+      return false;
+    }
+    if (slot.op == AOTChainOp::TexModulate &&
+        static_cast<size_t>(slot.texModulateSourceSlot) >= leafCount) {
+      return false;
+    }
+  }
+  size_t localRectSlots = 0;
+  size_t deviceRectSlots = 0;
+  size_t colorSpaceSlots = 0;
+  size_t gradientSlots = 0;
+  size_t noiseSlots = 0;
+  size_t rrectSlots = 0;
+  for (const auto& slot : slots) {
+    if (slot.op == AOTChainOp::ColorSpaceXform &&
+        (!ColorSpaceXformStepsSupported(slot.colorSpaceXform.steps.get()) ||
+         ++colorSpaceSlots > MaxChainColorSpaceXformSlots)) {
+      return false;
+    }
+    if (slot.op == AOTChainOp::PerlinNoise &&
+        (++noiseSlots > 1 || !AOTPerlinNoiseParametersSupported(slot.noise) ||
+         slot.noise.permutationsView == nullptr || slot.noise.noiseView == nullptr ||
+         leafCount > 2 || hasLUT)) {
+      return false;
+    }
+    if (slot.op == AOTChainOp::Gradient && ++gradientSlots > MaxChainGradientSlots) {
+      return false;
+    }
+    if (slot.op == AOTChainOp::AARectCoverage &&
+        ++deviceRectSlots > MaxChainDeviceRectCoverageSlots) {
+      return false;
+    }
+    // The kernel carries two local-rect parameter sets and four rrect array elements.
+    if (slot.op == AOTChainOp::LocalRectCoverage &&
+        ++localRectSlots > MaxChainLocalRectCoverageSlots) {
+      return false;
+    }
+    if (slot.op == AOTChainOp::RRectCoverage && ++rrectSlots > MaxChainRRectCoverageSlots) {
+      return false;
+    }
+  }
+  if (noiseSlots > 0 && gradientSlots > 0) {
+    return false;
+  }
+  auto resolved = *profile;
+  if (resolved == AOTResourceProfile::Automatic) {
+    resolved = noiseSlots > 0      ? AOTResourceProfile::NoiseGraph
+               : gradientSlots > 0 ? AOTResourceProfile::TiledGraph
+                                   : AOTResourceProfile::Chain;
+  }
+  AOTResourceDemand demand = {};
+  demand.instructions = slots.size();
+  demand.leafBindings = leafCount + (hasLUT ? 1u : 0u) + noiseSlots * 2;
+  demand.tiledRecipes = tiledLeafIndices.size();
+  demand.noiseSources = noiseSlots;
+  demand.gradients = gradientSlots;
+  if (!FitsAOTResourceProfile(demand, resolved)) {
+    return false;
+  }
+  *profile = resolved;
+  return true;
 }
 
 bool AOTChainBuilder::CompileChainProgramForInfo(BlockAllocator* allocator,

@@ -181,12 +181,9 @@ class FragmentProcessor : public Processor {
    public:
     explicit CoordTransformIter(const ProgramInfo* programInfo);
 
-    // Iterates the transforms of one subtree instead of a whole ProgramInfo.
-    explicit CoordTransformIter(const FragmentProcessor* fp);
-
-    // Iterates a caller-supplied sequence instead: the chain writer feeds the geometry processor
-    // the leaf-ordered transforms the compiled program's binding table describes, so no processor
-    // exists to walk. The sequence must outlive the iterator.
+    // Iterates a caller-supplied sequence instead of a ProgramInfo: the AOT upload feeds the
+    // geometry processor the leaf-ordered transforms the compiled program's binding table
+    // describes, so no processor exists to walk. The sequence must outlive the iterator.
     explicit CoordTransformIter(const std::vector<CoordTransform>* transforms);
 
     const CoordTransform* next();

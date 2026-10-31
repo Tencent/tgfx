@@ -29,7 +29,6 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/VertexShaderBuilder.h"
 #include "gpu/aot/Binder.h"
-#include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/resources/RenderTarget.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
 #include "gpu/shaders/modules/DeviceMaskModule.h"
@@ -367,16 +366,11 @@ void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* p
   }
 }
 
-// The compiled chain program this draw was accepted with: the program a plan pass's own chain
-// processor carries (its info holds the processor, and its uniforms keep addressing through it),
-// the program the match walk compiled, or — on a program-cache hit, where the matcher never ran
-// for this draw — the program compiled here. The compile is cached on the info, so the transform,
-// uniform and sampler writes share one.
-static const AOTProgram* ChainProgram(const ProgramInfo& info,
-                                      const FragmentProcessor* expression) {
-  if (expression != nullptr && IsProcessor<AOTPointwiseChainProcessor>(expression)) {
-    return &static_cast<const AOTPointwiseChainProcessor*>(expression)->program();
-  }
+// The compiled chain program this draw was accepted with: the program the match walk (or the AOT
+// route, which resolves the draw before any cache lookup) compiled, or — on a program-cache hit,
+// where neither ran for this draw — the program compiled here. The compile is cached on the info,
+// so the transform, uniform and sampler writes share one.
+static const AOTProgram* ChainProgram(const ProgramInfo& info) {
   if (auto* cached = info.getCachedChainProgram()) {
     return cached;
   }
@@ -393,24 +387,11 @@ static const AOTProgram* ChainProgram(const ProgramInfo& info,
   return info.getCachedChainProgram();
 }
 
-ProgramWriter::Expression ChainProgramWriter::buildExpression(const ProgramInfo& info) const {
-  // The value write reads the compiled program, never a re-expression. A plan pass is the one
-  // exception: its info carries the chain processor, and its uniforms must keep addressing
-  // through that processor's mangled suffix.
-  if (info.numColorFragmentProcessors() == 1 && info.numFragmentProcessors() == 1) {
-    auto fp = info.getFragmentProcessor(0);
-    if (IsProcessor<AOTPointwiseChainProcessor>(fp)) {
-      return {{}, fp};
-    }
-  }
-  return {};
-}
-
 void ChainProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
                                                 UniformData* vertexUniformData,
                                                 UniformData* fragmentUniformData,
-                                                const FragmentProcessor* expression) const {
-  const auto* program = ChainProgram(info, expression);
+                                                const FragmentProcessor* /*expression*/) const {
+  const auto* program = ChainProgram(info);
   if (program == nullptr) {
     LOGE(
         "ChainProgramWriter::writeGeometryProcessor() no compiled chain program; the draw renders "
@@ -471,8 +452,8 @@ void ExpressionProgramWriter::writeProcessors(const ProgramInfo& info,
 
 void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
                                          UniformData* fragmentUniformData,
-                                         const FragmentProcessor* expression) const {
-  const auto* program = ChainProgram(info, expression);
+                                         const FragmentProcessor* /*expression*/) const {
+  const auto* program = ChainProgram(info);
   if (program == nullptr) {
     LOGE(
         "ChainProgramWriter::writeProcessors() no compiled chain program; the draw renders with "
@@ -482,7 +463,7 @@ void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* v
   // The shell-free value write: the draw's whole uniform content comes from the compiled program —
   // the root block plus every binding's per-child records — so no processor tree is walked. The
   // xfer processor still writes through its own bind until the xfer contract lands.
-  info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, expression);
+  info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, nullptr);
   BindChainProgram(*program, vertexUniformData, fragmentUniformData);
   BindChainBindings(*program, fragmentUniformData);
   ParamWriter paramWriter(fragmentUniformData);
@@ -497,8 +478,8 @@ void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* v
 
 void ChainProgramWriter::writeSamplers(const ProgramInfo& info, Program* program,
                                        RenderPass* renderPass,
-                                       const FragmentProcessor* expression) const {
-  const auto* chainProgram = ChainProgram(info, expression);
+                                       const FragmentProcessor* /*expression*/) const {
+  const auto* chainProgram = ChainProgram(info);
   if (chainProgram == nullptr) {
     LOGE("ChainProgramWriter::writeSamplers() no compiled chain program; skipping the bindings");
     return;

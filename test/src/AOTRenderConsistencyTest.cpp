@@ -38,7 +38,6 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/aot/DrawIR.h"
 #include "gpu/glsl/GLSLBlend.h"
-#include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
@@ -4200,16 +4199,18 @@ TGFX_TEST(AOTRenderConsistencyTest, TrailingTiledLeafMatchesRuntime) {
     ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
     ASSERT_EQ(plan.passes.size(), 1u);
     ASSERT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
-    auto built = AOTChainBuilder::BuildChainProcessor(&allocator, graph, plan.passes[0]);
-    ASSERT_NE(built, nullptr);
-    auto chain = static_cast<const AOTPointwiseChainProcessor*>(built.get());
-    EXPECT_EQ(chain->leafCount(), 4u);
-    EXPECT_GE(chain->tiledLeaf(), 2) << label;
-    EXPECT_EQ(chain->tiledLeaf2(), -1) << label;
+    AOTProgram program = {};
+    ASSERT_TRUE(AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0], {}, false,
+                                                     &program));
+    EXPECT_EQ(program.samplerChildCount, 4u);
+    ASSERT_EQ(program.tiledLeaves.size(), 1u);
+    EXPECT_GE(program.tiledLeaves[0].leafIndex, 2) << label;
     // The recipe must take the seam-blending shader mode, not a hardware wrap that would bypass
     // the leaf's tiling code.
-    EXPECT_EQ(chain->tiledRecipe().shaderModeX, TiledTextureShaderMode::RepeatLinearNone) << label;
-    EXPECT_EQ(chain->tiledRecipe().shaderModeY, TiledTextureShaderMode::RepeatLinearNone) << label;
+    EXPECT_EQ(program.tiledLeaves[0].recipe.shaderModeX, TiledTextureShaderMode::RepeatLinearNone)
+        << label;
+    EXPECT_EQ(program.tiledLeaves[0].recipe.shaderModeY, TiledTextureShaderMode::RepeatLinearNone)
+        << label;
   }
   constexpr int size = 64;
   auto render = [&](bool useBundle, Bitmap* outBitmap, AOTDrawStats* outDraws) {

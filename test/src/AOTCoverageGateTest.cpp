@@ -142,7 +142,6 @@ const ProcessorClaim ProcessorClaims[] = {
     {"GlassUDFGeometryFragmentProcessor", "GlassUDFGeometryFragmentProcessor", Structural, ""},
     // Executor-rebuilt processors matched by the fused kernel rules, and effect processors
     // served by dedicated matcher rules.
-    {"AOTPointwiseChainProcessor", "AOTPointwiseChainProcessor", Matcher, ""},
     {"GaussianBlur1DFragmentProcessor", "GaussianBlur1DFragmentProcessor", Matcher, ""},
     {"GlassRefractionFragmentProcessor", "GlassRefractionFragmentProcessor", Matcher, ""},
     {"GlassUDFTentBlurFragmentProcessor", "GlassUDFTentBlurFragmentProcessor", Matcher, ""},
