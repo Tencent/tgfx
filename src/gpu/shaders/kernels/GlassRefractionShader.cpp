@@ -67,7 +67,7 @@ std::optional<GlassRefractionShader::Inputs> GlassRefractionShader::Extract(
   // ShaderMaskFilter over a hardware-tiled RGBA texture), applied through the HasLocalMask runtime
   // branch. It needs an affine mask transform, like the background coordinate below.
   if (programInfo->numFragmentProcessors() != 1) {
-    auto coverage = ClassifyCoverageFP(programInfo);
+    auto coverage = ClassifyCoverageTerms(programInfo);
     if (gpKind != 1 || programInfo->numFragmentProcessors() != 2 || !coverage ||
         *coverage != CoverageKind::LocalMask) {
       return std::nullopt;

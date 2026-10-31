@@ -73,6 +73,18 @@ struct DrawIR {
   std::vector<AOTCoverageTerm> coverage = {};
   const XferProcessor* xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
+  /// Whether the draw's color comes from the paint rather than any color processor: the lowering
+  /// synthesized the white unit-color chain for it. A draw with an explicit ConstColorProcessor
+  /// lowers to the same graph, so this fact is what keeps the two apart (the matcher's
+  /// no-processors acceptance reads it).
+  bool colorFromPaint = false;
+  /// The sizes of the processor lists this IR was lowered from. The carried-IR contract requires
+  /// the record-time expression to be complete: an op whose expression grows at prepare (a
+  /// rasterized shape attaches its mask coverage FP only once the shape proxy exists) must not
+  /// serve from the stale IR, so the prepare-side carrier compares these against the op's live
+  /// lists before adopting the IR.
+  size_t colorFPCount = 0;
+  size_t coverageFPCount = 0;
   /**
    * Plan-pass serving: the fused pass descriptor the color graph was cut for (kernel, node list,
    * profile, dependencies). A pass IR carries it so its processor is rebuilt exactly as the

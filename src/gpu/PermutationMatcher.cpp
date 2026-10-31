@@ -26,6 +26,7 @@
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/Swizzle.h"
+#include "gpu/aot/DrawIR.h"
 #include "gpu/aot/Program.h"
 #include "gpu/processors/AOTYUVChainProcessor.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
@@ -92,80 +93,78 @@ int GetXPType(const ProgramInfo* programInfo) {
 }
 
 // Determines whether a texture-based coverage child can be served by the local-space mask path
-// (HAS_LOCAL_MASK): the shader samples it via a coordinate-transform varying and takes .a, relying
-// on the hardware sampler for tiling. That is only valid for an RGBA texture (so .a is the alpha),
-// with no RGBAAA dual-plane and no shader-emitted subset/tile math. A plain TextureEffect always
-// qualifies (hardware tiling + a benign full-bounds Subset); a TiledTextureEffect qualifies only
-// when both axes resolve to the hardware path (ShaderMode::None == 0), i.e. no shader tile math.
-static bool IsLocalMaskChild(const FragmentProcessor* child) {
-  auto name = child->name();
-  if (name == "TextureEffect") {
-    auto* te = static_cast<const TextureEffect*>(child);
-    return !te->isYUV() && !te->isAlphaOnly() && !te->hasRGBAAA() && !te->hasSubset();
-  }
-  if (name == "TiledTextureEffect") {
-    auto* tte = static_cast<const TiledTextureEffect*>(child);
-    if (tte->isAlphaOnly()) {
-      return false;
+// Reads one coverage term's texture facts the way the local-mask kernel needs them: a plain RGBA
+// texture sampled with hardware tiling — no YUV, no alpha-only, no RGBAAA dual-plane, no subset,
+// no shader tile math (the hardware-resolved tiled forms lower as Plain too).
+static bool IsLocalMaskTexture(const AOTTextureParameters& texture) {
+  return texture.samplingKind == AOTTextureSamplingKind::Plain && !texture.isYUV &&
+         !texture.isAlphaOnly && !texture.hasRGBAAA && !texture.subset.has_value();
+}
+
+// Classifies coverage semantics independently of any shader's permutation layout, reading the
+// draw's lowered coverage terms instead of walking coverage FPs. LocalMask is a distinct
+// capability: it needs a local-space varying and sampler and therefore cannot be encoded in the
+// shared three-value HAS_COVERAGE dimension.
+std::optional<CoverageKind> ClassifyCoverageTerm(const AOTCoverageTerm& term) {
+  if (term.kind == AOTCoverageTermKind::Analytic) {
+    // A single link past the unit. A composed clip chain (more links) stays beyond the
+    // single-leaf families, exactly as the FP walk's name check kept it. The link's kind carries
+    // the matcher's old distinction: RectEffect's lowering maps its non-AA form onto a
+    // zero-radius RRectCoverage node (hard edge, pixel-correct), so a RectCoverage node is AA by
+    // construction and an RRectCoverage node covers both the real rrects and that form.
+    if (term.graph.nodeCount() != 2 || !term.root.isValid() || term.root.index() != 1) {
+      return std::nullopt;
     }
-    int modeX = 0;
-    int modeY = 0;
-    tte->getShaderModes(&modeX, &modeY);
-    return modeX == 0 && modeY == 0;
-  }
-  return false;
-}
-
-// A RectEffect serves as chain/AARect coverage in its AA form; both spaces are accepted because
-// the runtime clip contract carries a DeviceToLocal matrix (identity for the device-space form).
-// NonAA rects keep the hard-edge step math out of the contract and stay on the fallback route.
-static bool IsFoldableAARectEffect(const FragmentProcessor* fp) {
-  if (fp == nullptr || !IsProcessor<RectEffect>(fp) || fp->numChildProcessors() != 0) {
-    return false;
-  }
-  auto rectEffect = static_cast<const RectEffect*>(fp);
-  return rectEffect->isAntiAlias();
-}
-
-// Classifies coverage semantics independently of any shader's permutation layout. LocalMask is a
-// distinct capability: it needs a local-space varying and sampler and therefore cannot be encoded
-// in the shared three-value HAS_COVERAGE dimension.
-std::optional<CoverageKind> ClassifyCoverage(const FragmentProcessor* coverageFP) {
-  if (coverageFP == nullptr) {
+    auto* node = term.graph.nodeAt(term.root);
+    if (node == nullptr) {
+      return std::nullopt;
+    }
+    if (node->kind == AOTEffectKind::RectCoverage) {
+      return CoverageKind::AARect;
+    }
+    if (node->kind == AOTEffectKind::RRectCoverage) {
+      return CoverageKind::RRect;
+    }
     return std::nullopt;
   }
-  auto coverageName = coverageFP->name();
-  if (coverageName == "RectEffect" && IsFoldableAARectEffect(coverageFP)) {
-    return CoverageKind::AARect;
+  if (term.kind == AOTCoverageTermKind::DeviceMask) {
+    // Alpha-only by construction (the lowering rejects anything else); perspective flows — the
+    // chain's compile rejects it, the dedicated families sample it correctly.
+    return CoverageKind::DeviceMask;
   }
-  if (coverageName == "RRectEffect" && coverageFP->numChildProcessors() == 0) {
-    // Every rrect parameter rides the runtime clip contract (LocalRect/RadiiX/RadiiY/AntiAlias/
-    // DeviceToLocal), so any leaf RRectEffect classifies without extra conditions; perspective
-    // and degenerate matrices were already rejected at construction.
-    return CoverageKind::RRect;
-  }
-  if (coverageName == "XfermodeFragmentProcessor - dst") {
-    // Only the non-inverted ShaderMaskFilter is input * mask.a (SrcIn). The inverted SrcOut form
-    // needs 1 - mask.a, which the local-mask kernel does not implement.
-    auto* xfermode = static_cast<const XfermodeFragmentProcessor*>(coverageFP);
-    if (xfermode->getMode() != BlendMode::SrcIn || coverageFP->numChildProcessors() != 1 ||
-        !IsLocalMaskChild(coverageFP->childProcessor(0))) {
+  if (term.kind == AOTCoverageTermKind::Subtree) {
+    // The SrcIn ShaderMaskFilter fingerprint: the coverage unit, the white input the runtime
+    // feeds a single-child xfer's child, the plain local texture leaf, and the SrcIn blend that
+    // maps the child onto the dst operand. Anything else under a Subtree term is a general
+    // coverage subtree no dedicated family evaluates.
+    if (term.graph.nodeCount() != 4 || !term.root.isValid() || term.root.index() != 3) {
+      return std::nullopt;
+    }
+    auto* white = term.graph.nodeAt(AOTNodeID(1));
+    auto* texture = term.graph.nodeAt(AOTNodeID(2));
+    auto* blend = term.graph.nodeAt(term.root);
+    if (white == nullptr || texture == nullptr || blend == nullptr ||
+        white->kind != AOTEffectKind::GeometryWhiteInput ||
+        texture->kind != AOTEffectKind::TextureSource || blend->kind != AOTEffectKind::Blend) {
+      return std::nullopt;
+    }
+    auto* textureParams = std::get_if<AOTTextureParameters>(&texture->parameters);
+    auto* blendParams = std::get_if<AOTBlendParameters>(&blend->parameters);
+    if (textureParams == nullptr || blendParams == nullptr ||
+        blendParams->blendMode != static_cast<int>(BlendMode::SrcIn) ||
+        blendParams->childType != 0 || !IsLocalMaskTexture(*textureParams)) {
       return std::nullopt;
     }
     return CoverageKind::LocalMask;
   }
-  if (coverageName == "DeviceSpaceTextureEffect") {
-    auto* dste = static_cast<const DeviceSpaceTextureEffect*>(coverageFP);
-    if (!dste->isAlphaOnly()) {
-      return std::nullopt;
-    }
-    return CoverageKind::DeviceMask;
-  }
   return std::nullopt;
 }
 
-// Classifies the coverage stage of a ProgramInfo carrying at most one coverage FP.
-std::optional<CoverageKind> ClassifyCoverageFP(const ProgramInfo* programInfo) {
+// Classifies the coverage stage of a ProgramInfo carrying at most one coverage FP. The no-coverage
+// case is a count (bare draws lower no IR); the rest reads the carried IR's terms. The atlas glyph
+// term is the geometry processor's own coverage — the matcher never saw it as a coverage FP, and
+// the prepare-time synthesis adds it only for the compile — so it is skipped here.
+std::optional<CoverageKind> ClassifyCoverageTerms(const ProgramInfo* programInfo) {
   auto numFP = programInfo->numFragmentProcessors();
   auto numColorFP = programInfo->numColorFragmentProcessors();
   if (numFP == numColorFP) {
@@ -174,29 +173,50 @@ std::optional<CoverageKind> ClassifyCoverageFP(const ProgramInfo* programInfo) {
   if (numFP != numColorFP + 1) {
     return std::nullopt;
   }
-  return ClassifyCoverage(programInfo->getFragmentProcessor(numColorFP));
+  auto* ir = programInfo->getCarriedIR();
+  if (ir == nullptr) {
+    return std::nullopt;
+  }
+  const AOTCoverageTerm* classified = nullptr;
+  for (const auto& term : ir->coverage) {
+    if (term.kind == AOTCoverageTermKind::Glyph) {
+      continue;
+    }
+    if (classified != nullptr) {
+      return std::nullopt;
+    }
+    classified = &term;
+  }
+  if (classified == nullptr) {
+    return CoverageKind::None;
+  }
+  return ClassifyCoverageTerm(*classified);
 }
 
-// Direct analytic clip coverage: the sole coverage FP is an AA rect or a leaf rrect.
+// Direct analytic clip coverage: the sole coverage term is an AA rect or a leaf rrect.
 bool HasDirectAnalyticClipCoverage(const ProgramInfo* programInfo) {
-  auto coverage = ClassifyCoverageFP(programInfo);
+  auto coverage = ClassifyCoverageTerms(programInfo);
   return coverage == CoverageKind::AARect || coverage == CoverageKind::RRect;
 }
 
 // Kernels whose color comes from the GP Color uniform: a color FP would be silently dropped, so
-// the draw may carry no FP at all or only a direct analytic clip evaluated from the runtime clip
-// contract uniforms.
+// the draw may carry no FP at all (a count — bare draws lower no IR), or only a direct analytic
+// clip evaluated from the runtime clip contract uniforms (the IR's colorFromPaint fact: a draw
+// with an explicit ConstColorProcessor lowers to the same graph, so the fact is what keeps the
+// two apart).
 bool HasNoProcessorsOrDirectClip(const ProgramInfo* programInfo) {
-  return programInfo->numFragmentProcessors() == 0 ||
-         (programInfo->numColorFragmentProcessors() == 0 &&
-          HasDirectAnalyticClipCoverage(programInfo));
+  if (programInfo->numFragmentProcessors() == 0) {
+    return true;
+  }
+  auto* ir = programInfo->getCarriedIR();
+  return ir != nullptr && ir->colorFromPaint && HasDirectAnalyticClipCoverage(programInfo);
 }
 
 // Analytic clip coverage (AA rect or rrect) changes only fragment math, whereas a device-space
 // mask adds a sampler and shifts the terminal XP binding. Kernels using the runtime clip contract
 // therefore compile only this ABI distinction and carry the clip state through uniforms.
 std::optional<int> SharedDeviceMaskValue(const ProgramInfo* programInfo) {
-  auto coverage = ClassifyCoverageFP(programInfo);
+  auto coverage = ClassifyCoverageTerms(programInfo);
   if (!coverage || *coverage == CoverageKind::LocalMask) {
     return std::nullopt;
   }

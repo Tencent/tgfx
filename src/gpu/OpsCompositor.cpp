@@ -930,9 +930,14 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Brush& brush, bool 
   // color and mask filters no longer require an image or shader beside them: a filtered text or
   // rect fill is chain-served at prepare anyway, and computing its device bounds is what admits
   // it to the record-time lowering — without the bounds such draws re-lower at every prepare
-  // (twice on the first one, with nowhere to cache the compiled program).
-  if (cache != nullptr && cache->isLoaded() && cache->decompositionEnabled() &&
-      (brush.colorFilter != nullptr || hasShaderDerivedChain || brush.maskFilter != nullptr)) {
+  // (twice on the first one, with nowhere to cache the compiled program). A clipped draw needs
+  // its bounds for the same reason (P4.0b): the coverage classification reads the record-time
+  // IR's terms, so a clip-carrying draw without an IR fails every dedicated family's walk. The
+  // decomposition toggle no longer gates this (the IR is matching infrastructure, not the
+  // decomposition route): it only turns the route's plan/task arm off.
+  if (cache != nullptr && cache->isLoaded() &&
+      (brush.colorFilter != nullptr || brush.maskFilter != nullptr || hasCoverage ||
+       hasShaderDerivedChain)) {
     needDeviceBounds = true;
   }
   if (BlendModeNeedDstTexture(brush.blendMode, hasCoverage)) {
@@ -1284,9 +1289,9 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
   }
 
   auto cache = context->precompiledShaderCache();
-  if (cache != nullptr && cache->isLoaded() && cache->decompositionEnabled() &&
-      op->type() != DrawOp::Type::StencilCoverPathDrawOp && deviceBounds.has_value() &&
-      !deviceBounds->isEmpty() && !op->colorProcessors().empty()) {
+  if (cache != nullptr && cache->isLoaded() && op->type() != DrawOp::Type::StencilCoverPathDrawOp &&
+      deviceBounds.has_value() && !deviceBounds->isEmpty() &&
+      (!op->colorProcessors().empty() || !op->coverageProcessors().empty())) {
     // The single record-time lowering: the op's whole expression (colors, coverages, xfer, blend
     // mode) lands on a DrawIR every later stage converges on. The route below plans from that IR
     // alone — coverage never folds into the color graph: a multi-pass plan carries the classified
@@ -1294,30 +1299,32 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     // processors attached, for the prepare-time fused walk.
     op->tryLowerIR();
     const bool coverageFree = !op->hasCoverageProcessors();
-    if (auto* ir = op->loweredIR()) {
-      auto plan = AOTRouter::Plan(*ir);
-      if (plan.has_value()) {
-        if (AOTRouter::PlanRequiresTask(*plan) &&
-            AOTRouter::TaskCarriesCoverage(*plan, ir->coverage, brush.blendMode)) {
-          if (submitPlanTask(ir->color, *plan, *deviceBounds, &op, &ir->coverage)) {
-            return;
+    if (cache->decompositionEnabled()) {
+      if (auto* ir = op->loweredIR()) {
+        auto plan = AOTRouter::Plan(*ir);
+        if (plan.has_value()) {
+          if (AOTRouter::PlanRequiresTask(*plan) &&
+              AOTRouter::TaskCarriesCoverage(*plan, ir->coverage, brush.blendMode)) {
+            if (submitPlanTask(ir->color, *plan, *deviceBounds, &op, &ir->coverage)) {
+              return;
+            }
           }
+          // A single-pass plan needs no task: the plain route's matcher serves it at prepare time.
+        } else if (coverageFree && cache->diagnosticRecordingEnabled()) {
+          // The color side lowered but no planner covers it — the same fact the color-only attempt
+          // recorded. A draw still carrying coverage processors records nothing: its route was
+          // never a color-only one, and classifying it would require the analysis the production
+          // path does not run.
+          cache->recordDecomposeRejection(AOTDecomposeOutcome::UnsupportedShape);
         }
-        // A single-pass plan needs no task: the plain route's matcher serves it at prepare time.
-      } else if (coverageFree && cache->diagnosticRecordingEnabled()) {
-        // The color side lowered but no planner covers it — the same fact the color-only attempt
-        // recorded. A draw still carrying coverage processors records nothing: its route was
-        // never a color-only one, and classifying it would require the analysis the production
-        // path does not run.
-        cache->recordDecomposeRejection(AOTDecomposeOutcome::UnsupportedShape);
+      } else if (coverageFree && op->type() != DrawOp::Type::AtlasTextOp &&
+                 cache->diagnosticRecordingEnabled()) {
+        // The color side failed to lower: the same category the FP-walk route recorded, without a
+        // second analysis pass over the processor tree. Atlas-text ops never attempt the lowering
+        // (their glyph leaf needs the geometry processor), so they record nothing here — as they
+        // never did.
+        cache->recordDecomposeRejection(AOTDecomposeOutcome::BlockedByLowering);
       }
-    } else if (coverageFree && op->type() != DrawOp::Type::AtlasTextOp &&
-               cache->diagnosticRecordingEnabled()) {
-      // The color side failed to lower: the same category the FP-walk route recorded, without a
-      // second analysis pass over the processor tree. Atlas-text ops never attempt the lowering
-      // (their glyph leaf needs the geometry processor), so they record nothing here — as they
-      // never did.
-      cache->recordDecomposeRejection(AOTDecomposeOutcome::BlockedByLowering);
     }
   }
   drawOps.emplace_back(std::move(op));

@@ -41,6 +41,7 @@
 #include "gpu/aot/AOTChainBuilder.h"
 #include "gpu/aot/AOTEffectDecomposer.h"
 #include "gpu/aot/Binder.h"
+#include "gpu/aot/DrawIR.h"
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ComplexEllipseGeometryProcessor.h"
 #include "gpu/processors/ConstColorProcessor.h"
@@ -2506,6 +2507,12 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
                        : std::vector<FragmentProcessor*>{coverage.get(), clip.get()};
     ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), processors, 0,
                             nullptr, BlendMode::SrcOver);
+    // The coverage classification reads the record-time IR's terms: lower the same expression the
+    // op would have lowered at record time and carry it, as the plain route's prepare does.
+    std::vector<const FragmentProcessor*> coverageList(processors.begin(), processors.end());
+    auto ir = LowerDraw({}, coverageList, nullptr, nullptr, BlendMode::SrcOver, &allocator);
+    ASSERT_TRUE(ir.has_value());
+    programInfo.setCarriedIR(&*ir);
     auto failure = PermutationMatchFailure::CoverageShape;
     auto match = MatchPermutation(&programInfo, &failure);
     ASSERT_TRUE(match.has_value()) << "clipFirst=" << clipFirst;
@@ -2527,6 +2534,12 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     ASSERT_NE(secondCoverage, nullptr);
     ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(),
                             {coverage.get(), secondCoverage.get()}, 0, nullptr, BlendMode::SrcOver);
+    auto twoMaskIR = LowerDraw({},
+                               {static_cast<const FragmentProcessor*>(coverage.get()),
+                                static_cast<const FragmentProcessor*>(secondCoverage.get())},
+                               nullptr, nullptr, BlendMode::SrcOver, &allocator);
+    ASSERT_TRUE(twoMaskIR.has_value());
+    programInfo.setCarriedIR(&*twoMaskIR);
     auto failure = PermutationMatchFailure::None;
     EXPECT_FALSE(MatchPermutation(&programInfo, &failure).has_value());
     EXPECT_EQ(failure, PermutationMatchFailure::CoverageShape);

@@ -85,6 +85,10 @@ class DrawOp {
     return colors;
   }
 
+  std::vector<PlacementPtr<FragmentProcessor>>& coverageProcessors() {
+    return coverages;
+  }
+
   /**
    * The draw's whole expression lowered once at record time: the color graph plus the classified
    * coverage terms, with the xfer processor and blend mode riding along. Null when the expression

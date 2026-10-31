@@ -181,6 +181,9 @@ std::optional<DrawIR> LowerDrawCore(const std::vector<const FragmentProcessor*>&
   ir.geometryProcessor = geometryProcessor;
   ir.xferProcessor = xferProcessor;
   ir.blendMode = blendMode;
+  ir.colorFromPaint = colorProcessors.empty();
+  ir.colorFPCount = colorProcessors.size();
+  ir.coverageFPCount = coverageProcessors.size();
 
   std::vector<const FragmentProcessor*> colors = colorProcessors;
   PlacementPtr<FragmentProcessor> unitColor = nullptr;

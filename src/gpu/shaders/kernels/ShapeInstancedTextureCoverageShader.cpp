@@ -21,6 +21,7 @@
 #include "gpu/PermutationMatch.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
+#include "gpu/aot/DrawIR.h"
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ConicGradientLayout.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
@@ -71,14 +72,29 @@ ShapeInstancedTextureCoverageShader::Extract(const ProgramInfo* programInfo,
   if (fpCount == colorCount + 1) {
     fp = programInfo->getFragmentProcessor(colorCount);
   } else if (fpCount == colorCount + 2) {
-    auto first = programInfo->getFragmentProcessor(colorCount);
-    auto second = programInfo->getFragmentProcessor(colorCount + 1);
-    auto firstKind = ClassifyCoverage(first);
-    auto secondKind = ClassifyCoverage(second);
-    if (IsAnalyticClipKind(firstKind) && !IsAnalyticClipKind(secondKind)) {
-      fp = second;
-    } else if (IsAnalyticClipKind(secondKind) && !IsAnalyticClipKind(firstKind)) {
-      fp = first;
+    // One coverage texture term, optionally accompanied by an analytic clip term (which rides the
+    // runtime clip contract uniforms, no permutation change). The terms follow the coverage FPs'
+    // order, so the non-analytic term's position names the texture FP.
+    auto* ir = programInfo->getCarriedIR();
+    std::optional<CoverageKind> kinds[2] = {};
+    size_t termCount = 0;
+    if (ir != nullptr) {
+      for (const auto& term : ir->coverage) {
+        if (termCount >= 2) {
+          break;
+        }
+        kinds[termCount++] = ClassifyCoverageTerm(term);
+      }
+    }
+    if (termCount != 2) {
+      // Two FPs lowered to something other than two single terms (a composed clip among them):
+      // not a shape this kernel evaluates.
+      return Fail(failure, PermutationMatchFailure::CoverageShape);
+    }
+    if (IsAnalyticClipKind(kinds[0]) && !IsAnalyticClipKind(kinds[1])) {
+      fp = programInfo->getFragmentProcessor(colorCount + 1);
+    } else if (IsAnalyticClipKind(kinds[1]) && !IsAnalyticClipKind(kinds[0])) {
+      fp = programInfo->getFragmentProcessor(colorCount);
     } else {
       // Two masks, or two clips, are not a shape this kernel evaluates.
       return Fail(failure, PermutationMatchFailure::CoverageShape);

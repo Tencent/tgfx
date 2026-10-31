@@ -48,7 +48,7 @@ std::optional<QuadTextureFillShader::Inputs> QuadTextureFillShader::Extract(
     if (HasDirectAnalyticClipCoverage(programInfo)) {
       // Evaluated through the runtime clip contract uniforms.
     } else {
-      auto coverage = ClassifyCoverageFP(programInfo);
+      auto coverage = ClassifyCoverageTerms(programInfo);
       if (coverage && *coverage == CoverageKind::DeviceMask) {
         // Device masks are a runtime uniform now, so there is nothing to encode.
       } else if (coverage && *coverage == CoverageKind::LocalMask) {

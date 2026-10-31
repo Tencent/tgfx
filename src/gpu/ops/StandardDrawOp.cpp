@@ -133,8 +133,13 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget,
   onConfigureProgramInfo(*preparedProgramInfo);
   // The draw's record-time IR rides along whenever the info's processor list is the unmodified
   // record-time list: the re-expressing families then reuse it instead of lowering a second time.
-  // A color override (a plan task's rebuilt pass colors) describes a different expression.
-  if (!preparedColors.has_value() && loweredIR() != nullptr) {
+  // A color override (a plan task's rebuilt pass colors) describes a different expression, and so
+  // does an expression that grew at prepare — a rasterized shape attaches its mask coverage FP
+  // only once the shape proxy exists (onMakeGeometryProcessor), so the counts the IR was lowered
+  // from must still match the op's live lists.
+  if (!preparedColors.has_value() && loweredIR() != nullptr &&
+      loweredIR()->colorFPCount == activeColors.size() &&
+      loweredIR()->coverageFPCount == coverages.size()) {
     preparedProgramInfo->setCarriedIR(loweredIR());
   }
   preparedProgram = preparedProgramInfo->getProgram();

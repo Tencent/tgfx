@@ -47,7 +47,7 @@ std::optional<QuadColorFillShader::Inputs> QuadColorFillShader::Extract(
     if (HasDirectAnalyticClipCoverage(programInfo)) {
       // No additional sampler or permutation dimension is needed.
     } else {
-      auto coverage = ClassifyCoverageFP(programInfo);
+      auto coverage = ClassifyCoverageTerms(programInfo);
       if (!coverage || *coverage != CoverageKind::DeviceMask) {
         return std::nullopt;
       }

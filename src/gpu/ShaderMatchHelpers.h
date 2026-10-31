@@ -30,6 +30,7 @@ class GeometryProcessor;
 class FragmentProcessor;
 class QuadPerEdgeAAGeometryProcessor;
 struct AOTProgram;
+struct AOTCoverageTerm;
 struct PermutationMatchResult;
 struct PermutationVariant;
 enum class PermutationMatchFailure;
@@ -78,11 +79,13 @@ bool IsSupportedPointwiseOp(const FragmentProcessor* fp);
 /// rejection wins) and returns nullopt.
 std::nullopt_t Fail(PermutationMatchFailure* failure, PermutationMatchFailure reason);
 
-/// Classifies the coverage FP itself (see CoverageKind); nullopt when it cannot be classified.
-std::optional<CoverageKind> ClassifyCoverage(const FragmentProcessor* coverageFP);
+/// Classifies one lowered coverage term (see CoverageKind); nullopt when it cannot be classified.
+std::optional<CoverageKind> ClassifyCoverageTerm(const AOTCoverageTerm& term);
 
-/// Classifies the coverage stage of a ProgramInfo carrying at most one coverage FP.
-std::optional<CoverageKind> ClassifyCoverageFP(const ProgramInfo* programInfo);
+/// Classifies the coverage stage of a ProgramInfo carrying at most one coverage FP: the
+/// no-coverage case is a count, the rest reads the carried IR's terms (the atlas glyph term is
+/// skipped — the geometry processor's own coverage, never a coverage FP).
+std::optional<CoverageKind> ClassifyCoverageTerms(const ProgramInfo* programInfo);
 
 /// Direct analytic clip coverage: the sole coverage FP is an AA rect or a leaf rrect.
 bool HasDirectAnalyticClipCoverage(const ProgramInfo* programInfo);
