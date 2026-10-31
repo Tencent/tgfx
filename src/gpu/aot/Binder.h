@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <vector>
+#include "gpu/CoordTransform.h"
 #include "gpu/UniformData.h"
 #include "gpu/aot/Program.h"
 
@@ -43,5 +45,14 @@ void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
  * that walk, so the upload no longer depends on the child processors existing.
  */
 void BindChainBindings(const AOTProgram& program, UniformData* fragmentUniformData);
+
+/**
+ * The coordinate transforms the chain kernel's vertex stage consumes, in the order the geometry
+ * processor writes them: for an extended profile, the chain-wide gradient/noise matrix first (the
+ * source module reads it through the first transform slot), then one per sampler-binding child
+ * that samples through a transform — every texture leaf, the LUT gradient and the padding. The
+ * device mask samples in destination space and contributes none.
+ */
+std::vector<CoordTransform> BuildChainCoordTransforms(const AOTProgram& program);
 
 }  // namespace tgfx

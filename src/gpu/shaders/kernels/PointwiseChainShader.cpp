@@ -66,33 +66,32 @@ std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::Extract(
   }
   // Dual acceptance: a draw still carrying the chain processor (a multi-pass plan task's pass,
   // until the plan route retires) reads its shape directly; any other draw is the interpreter's
-  // own subject — the whole effect expression is re-expressed and compiled here.
-  const AOTPointwiseChainProcessor* chain = nullptr;
+  // own subject — the whole effect expression is compiled here.
+  const AOTProgram* compiled = nullptr;
   if (programInfo->numColorFragmentProcessors() == 1 && programInfo->numFragmentProcessors() == 1) {
     auto fp = programInfo->getFragmentProcessor(0);
     if (IsProcessor<AOTPointwiseChainProcessor>(fp)) {
-      chain = static_cast<const AOTPointwiseChainProcessor*>(fp);
+      compiled = &static_cast<const AOTPointwiseChainProcessor*>(fp)->program();
     }
   }
-  PlacementPtr<FragmentProcessor> expression = nullptr;
-  if (chain == nullptr) {
+  if (compiled == nullptr) {
     auto context = programInfo->getContext();
     if (context == nullptr || context->drawingManager() == nullptr) {
       return std::nullopt;
     }
-    expression = AOTChainBuilder::BuildChainProcessorForInfo(
-        context->drawingManager()->drawingAllocator(), programInfo);
-    if (expression == nullptr) {
+    AOTProgram program = {};
+    if (!AOTChainBuilder::CompileChainProgramForInfo(context->drawingManager()->drawingAllocator(),
+                                                     programInfo, &program)) {
       return std::nullopt;
     }
-    chain = static_cast<const AOTPointwiseChainProcessor*>(expression.get());
-    // Keep the built expression on the info: the walk stops here when the acceptance checks below
-    // pass, and the winner's writer reuses it instead of rebuilding it per draw.
-    programInfo->setCachedReexpression(std::move(expression));
+    // Keep the compiled program on the info: the walk stops here when the acceptance checks below
+    // pass, and the winner's writer uploads from it instead of rebuilding the expression per draw.
+    programInfo->setCachedChainProgram(std::move(program));
+    compiled = programInfo->getCachedChainProgram();
   }
-  // Everything below reads the compiled program, never the processor shell: the program is the
+  // Everything below reads the compiled program, never a processor shell: the program is the
   // single description of what the draw's chain variant needs.
-  const auto& program = chain->program();
+  const auto& program = *compiled;
   // Sampler-only padding makes every non-empty chain present exactly four sampler children.
   if (program.samplerChildCount != 0 && program.samplerChildCount != 4) {
     return std::nullopt;

@@ -157,6 +157,10 @@ class FragmentProcessor : public Processor {
    */
   class Iter {
    public:
+    // Empty iteration: the starting point of a CoordTransformIter that walks a caller-supplied
+    // transform sequence instead of a processor tree.
+    Iter() = default;
+
     explicit Iter(const FragmentProcessor* fp) {
       fpStack.push_back(fp);
     }
@@ -177,9 +181,13 @@ class FragmentProcessor : public Processor {
    public:
     explicit CoordTransformIter(const ProgramInfo* programInfo);
 
-    // Iterates the transforms of one subtree instead of a whole ProgramInfo: the chain writer
-    // feeds the GP the re-expressed chain processor's leaf-ordered transforms.
+    // Iterates the transforms of one subtree instead of a whole ProgramInfo.
     explicit CoordTransformIter(const FragmentProcessor* fp);
+
+    // Iterates a caller-supplied sequence instead: the chain writer feeds the geometry processor
+    // the leaf-ordered transforms the compiled program's binding table describes, so no processor
+    // exists to walk. The sequence must outlive the iterator.
+    explicit CoordTransformIter(const std::vector<CoordTransform>* transforms);
 
     const CoordTransform* next();
 
@@ -187,6 +195,8 @@ class FragmentProcessor : public Processor {
     const FragmentProcessor* currFP = nullptr;
     size_t currentIndex = 0;
     FragmentProcessor::Iter fpIter;
+    const std::vector<CoordTransform>* transforms = nullptr;
+    size_t transformIndex = 0;
   };
 
   template <typename T, size_t (FragmentProcessor::*COUNT)() const>

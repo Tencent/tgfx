@@ -139,7 +139,18 @@ FragmentProcessor::CoordTransformIter::CoordTransformIter(const FragmentProcesso
   currFP = fpIter.next();
 }
 
+FragmentProcessor::CoordTransformIter::CoordTransformIter(
+    const std::vector<CoordTransform>* transformList)
+    : transforms(transformList) {
+}
+
 const CoordTransform* FragmentProcessor::CoordTransformIter::next() {
+  if (transforms != nullptr) {
+    if (transformIndex >= transforms->size()) {
+      return nullptr;
+    }
+    return &(*transforms)[transformIndex++];
+  }
   if (!currFP) {
     return nullptr;
   }

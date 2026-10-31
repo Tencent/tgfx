@@ -23,6 +23,7 @@
 #include <unordered_map>
 #include "gpu/PermutationMatch.h"
 #include "gpu/Program.h"
+#include "gpu/aot/Program.h"
 #include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/GeometryProcessor.h"
@@ -191,12 +192,26 @@ class ProgramInfo {
   Backend backend() const;
 
   /**
-   * The whole-color-expression processor a re-expressing family (the chain interpreter or the
-   * perlin kernel) built while matching this info, kept so the per-draw value write reuses it
-   * instead of rebuilding it. The match walk stops at the first family that accepts the draw, so
-   * the slot always holds the winner's expression; a family whose acceptance checks fail after
-   * building may leave its (unused) expression behind, which only the winning family's writer
-   * reads. Mutable like the match cache: an idempotence detail, not program state.
+   * The compiled chain program the matcher accepted this draw with, kept so the per-draw upload
+   * (uniforms, samplers, vertex transforms) reads it instead of rebuilding the chain's expression.
+   * Set by the chain family's Extract; a draw this family rejected never fills it. A plan pass
+   * carries its chain processor instead, whose own program() is the same description.
+   */
+  void setCachedChainProgram(AOTProgram program) const {
+    cachedChainProgram = std::move(program);
+  }
+
+  const AOTProgram* getCachedChainProgram() const {
+    return cachedChainProgram.has_value() ? &*cachedChainProgram : nullptr;
+  }
+
+  /**
+   * The whole-color-expression processor the perlin kernel built while matching this info, kept so
+   * the per-draw value write reuses it instead of rebuilding it. The match walk stops at the first
+   * family that accepts the draw, so the slot always holds the winner's expression; a family whose
+   * acceptance checks fail after building may leave its (unused) expression behind, which only the
+   * winning family's writer reads. Mutable like the match cache: an idempotence detail, not
+   * program state.
    */
   void setCachedReexpression(PlacementPtr<FragmentProcessor> expression) const {
     cachedReexpression = std::move(expression);
@@ -269,7 +284,7 @@ class ProgramInfo {
 
   BytesKey buildProgramKey() const;
 
-  // The three caches below are the one deliberate exemption to the no-mutable rule: each holds an
+  // The caches below are the one deliberate exemption to the no-mutable rule: each holds an
   // idempotent derived value (the same inputs always produce the same result), computed lazily
   // because the key inputs (colorWriteMask, depthStencil, cullMode) are set after construction.
   // No observable behavior depends on whether a cache is filled, so the object stays semantically
@@ -283,7 +298,10 @@ class ProgramInfo {
   // reused by every later lookup of the same info.
   mutable std::optional<PermutationMatchOutcome> cachedMatch;
 
-  // The re-expressing family's cached expression (see the public accessors above).
+  // The chain family's compiled program (see the public accessors above).
+  mutable std::optional<AOTProgram> cachedChainProgram = {};
+
+  // The perlin family's cached expression (see the public accessors above).
   mutable PlacementPtr<FragmentProcessor> cachedReexpression = {};
 
   // The draw's record-time DrawIR, attached through setCarriedIR() before first use. Mutable only

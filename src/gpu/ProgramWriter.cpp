@@ -367,36 +367,60 @@ void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* p
   }
 }
 
+// The compiled chain program this draw was accepted with: the program a plan pass's own chain
+// processor carries (its info holds the processor, and its uniforms keep addressing through it),
+// the program the match walk compiled, or — on a program-cache hit, where the matcher never ran
+// for this draw — the program compiled here. The compile is cached on the info, so the transform,
+// uniform and sampler writes share one.
+static const AOTProgram* ChainProgram(const ProgramInfo& info,
+                                      const FragmentProcessor* expression) {
+  if (expression != nullptr && IsProcessor<AOTPointwiseChainProcessor>(expression)) {
+    return &static_cast<const AOTPointwiseChainProcessor*>(expression)->program();
+  }
+  if (auto* cached = info.getCachedChainProgram()) {
+    return cached;
+  }
+  auto context = info.getContext();
+  if (context == nullptr || context->drawingManager() == nullptr) {
+    return nullptr;
+  }
+  AOTProgram program = {};
+  if (!AOTChainBuilder::CompileChainProgramForInfo(context->drawingManager()->drawingAllocator(),
+                                                   &info, &program)) {
+    return nullptr;
+  }
+  info.setCachedChainProgram(std::move(program));
+  return info.getCachedChainProgram();
+}
+
 ProgramWriter::Expression ChainProgramWriter::buildExpression(const ProgramInfo& info) const {
-  // Dual form: an info that already carries the chain processor (a multi-pass plan task's pass,
-  // until the plan route retires) is its own expression.
+  // The value write reads the compiled program, never a re-expression. A plan pass is the one
+  // exception: its info carries the chain processor, and its uniforms must keep addressing
+  // through that processor's mangled suffix.
   if (info.numColorFragmentProcessors() == 1 && info.numFragmentProcessors() == 1) {
     auto fp = info.getFragmentProcessor(0);
     if (IsProcessor<AOTPointwiseChainProcessor>(fp)) {
       return {{}, fp};
     }
   }
-  // The match walk built the expression while accepting the draw; reuse it for this draw's value
-  // write instead of rebuilding it.
-  if (auto* cached = info.getCachedReexpression()) {
-    return {{}, cached};
-  }
-  auto context = info.getContext();
-  if (context == nullptr || context->drawingManager() == nullptr) {
-    return {};
-  }
-  return {AOTChainBuilder::BuildChainProcessorForInfo(context->drawingManager()->drawingAllocator(),
-                                                      &info),
-          nullptr};
+  return {};
 }
 
 void ChainProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
                                                 UniformData* vertexUniformData,
                                                 UniformData* fragmentUniformData,
                                                 const FragmentProcessor* expression) const {
-  // The expression's leaf children own the coordinate transforms in leaf order; the info's own
-  // tree orders them differently, so the GP must not consume the tree's iteration.
-  FragmentProcessor::CoordTransformIter coordTransformIter(expression);
+  const auto* program = ChainProgram(info, expression);
+  if (program == nullptr) {
+    LOGE(
+        "ChainProgramWriter::writeGeometryProcessor() no compiled chain program; the draw renders "
+        "without its coordinate transforms");
+    return;
+  }
+  // The program's binding table describes the artifact's transforms in leaf order; the info's own
+  // processor tree orders them differently, so the GP must not consume the tree's iteration.
+  auto transforms = BuildChainCoordTransforms(*program);
+  FragmentProcessor::CoordTransformIter coordTransformIter(&transforms);
   info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, info.geometryProcessor);
   info.geometryProcessor->setData(vertexUniformData, fragmentUniformData, &coordTransformIter);
 }
@@ -448,19 +472,19 @@ void ExpressionProgramWriter::writeProcessors(const ProgramInfo& info,
 void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
                                          UniformData* fragmentUniformData,
                                          const FragmentProcessor* expression) const {
-  if (expression == nullptr || !IsProcessor<AOTPointwiseChainProcessor>(expression)) {
+  const auto* program = ChainProgram(info, expression);
+  if (program == nullptr) {
     LOGE(
-        "ChainProgramWriter::writeProcessors() the expression failed to build; the draw "
-        "renders with unwritten kernel uniforms");
+        "ChainProgramWriter::writeProcessors() no compiled chain program; the draw renders with "
+        "unwritten kernel uniforms");
     return;
   }
-  // The shell-free value write: the expression's whole uniform content comes from the compiled
-  // program — the root block plus every binding's per-child records — so no processor tree is
-  // walked. The xfer processor still writes through its own bind until the xfer contract lands.
-  const auto& program = static_cast<const AOTPointwiseChainProcessor*>(expression)->program();
+  // The shell-free value write: the draw's whole uniform content comes from the compiled program —
+  // the root block plus every binding's per-child records — so no processor tree is walked. The
+  // xfer processor still writes through its own bind until the xfer contract lands.
   info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, expression);
-  BindChainProgram(program, vertexUniformData, fragmentUniformData);
-  BindChainBindings(program, fragmentUniformData);
+  BindChainProgram(*program, vertexUniformData, fragmentUniformData);
+  BindChainBindings(*program, fragmentUniformData);
   ParamWriter paramWriter(fragmentUniformData);
   const auto processor = info.getXferProcessor();
   info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
@@ -474,7 +498,9 @@ void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* v
 void ChainProgramWriter::writeSamplers(const ProgramInfo& info, Program* program,
                                        RenderPass* renderPass,
                                        const FragmentProcessor* expression) const {
-  if (expression == nullptr) {
+  const auto* chainProgram = ChainProgram(info, expression);
+  if (chainProgram == nullptr) {
+    LOGE("ChainProgramWriter::writeSamplers() no compiled chain program; skipping the bindings");
     return;
   }
   auto gpu = info.renderTarget->getContext()->gpu();
@@ -482,23 +508,24 @@ void ChainProgramWriter::writeSamplers(const ProgramInfo& info, Program* program
   const char* unifDump = UnifDumpLabel();
 #endif
   unsigned textureBinding = 0;
-  // The artifact's sampler order is the expression's child order: the DAG leaves (padded to the
-  // four-leaf slots), the LUT gradient, the noise lookups, the mask child. Each child binds
-  // exactly one texture with its own sampler state.
-  for (size_t index = 0; index < expression->numChildProcessors(); ++index) {
-    auto child = expression->childProcessor(index);
-    if (child->numTextureSamplers() != 1) {
-      LOGE("ChainProgramWriter::writeSamplers() unexpected chain child sampler count");
+  // The artifact's sampler order is the program's binding order: the DAG leaves (padded to the
+  // four-leaf slots), the LUT gradient, the noise lookups, then the mask slot child. Each binding
+  // carries the texture and the sampling its sampler state is built from.
+  for (const auto& binding : chainProgram->bindings) {
+    auto textureView =
+        binding.textureProxy != nullptr ? binding.textureProxy->getTextureView() : nullptr;
+    if (textureView == nullptr || textureView->getTexture() == nullptr) {
+      LOGE("ChainProgramWriter::writeSamplers() a bound texture is not instantiated");
       return;
     }
-    auto state = child->samplerStateAt(0);
+    SamplerState state(binding.args.tileModeX, binding.args.tileModeY, binding.args.sampling);
     SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
                                  state.minFilterMode, state.magFilterMode, state.mipmapMode);
     auto sampler = gpu->createSampler(descriptor);
 #if DEBUG
-    DebugDumpSamplerSlot(unifDump, textureBinding, child->textureAt(0).get(), false);
+    DebugDumpSamplerSlot(unifDump, textureBinding, textureView->getTexture().get(), false);
 #endif
-    renderPass->setTexture(textureBinding++, child->textureAt(0), sampler);
+    renderPass->setTexture(textureBinding++, textureView->getTexture(), sampler);
   }
   // The dst texture always binds last.
   auto dstTextureView =

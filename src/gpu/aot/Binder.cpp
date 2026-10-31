@@ -447,6 +447,33 @@ void BindDeviceMaskBinding(const AOTBinding& binding, UniformData* uniformData) 
 
 }  // namespace
 
+std::vector<CoordTransform> BuildChainCoordTransforms(const AOTProgram& program) {
+  std::vector<CoordTransform> transforms = {};
+  // The extended profiles register one chain-wide transform ahead of the children: the gradient's
+  // coordinate matrix, or the noise source's, as the source module's input. It carries no texture
+  // proxy, so its total matrix is the plain matrix. At most one of the two slots exists.
+  if (IsAOTGraphProfile(program.profile)) {
+    CoordTransform source = {};
+    for (const auto& slot : program.slots) {
+      if (slot.op == AOTChainOp::Gradient) {
+        source = CoordTransform(slot.gradient.coordMatrix);
+      } else if (slot.op == AOTChainOp::PerlinNoise) {
+        source = CoordTransform(slot.noise.uvMatrix);
+      }
+    }
+    transforms.push_back(source);
+  }
+  for (const auto& binding : program.bindings) {
+    // The device mask samples at its DeviceLeafCoordMatrix * gl_FragCoord, so the device-space
+    // effect registers no transform; the phantom mask slot is a plain texture child and does.
+    if (binding.kind == AOTBinding::Kind::Mask) {
+      continue;
+    }
+    transforms.emplace_back(binding.uvMatrix, binding.textureProxy.get(), binding.alphaStart);
+  }
+  return transforms;
+}
+
 void BindChainBindings(const AOTProgram& program, UniformData* fragmentUniformData) {
   if (fragmentUniformData == nullptr) {
     return;

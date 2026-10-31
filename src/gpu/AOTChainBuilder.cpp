@@ -56,27 +56,21 @@ bool AOTChainBuilder::IsChainCompatibleTiledMode(TiledTextureShaderMode mode) {
 
 namespace {
 
-// Rebuilds the texture processor of one TextureSource node plus its binding record: a plain or
-// tiled leaf sampling through its resolved sampler state, or the stand-in leaf of a device-space
-// source. Only a plain leaf may carry the RGBAAA layout: its rebuilt TextureEffect keeps the
-// alpha-area offset and writes it to the kernel's per-leaf AlphaStart / HasRgbaaa fields. The
-// binding carries exactly the data the child TextureEffect was constructed from.
-struct ChainLeafChild {
-  PlacementPtr<FragmentProcessor> processor = nullptr;
-  AOTBinding binding = {};
-};
-
-static ChainLeafChild BuildTextureLeafChild(BlockAllocator* allocator, const AOTEffectNode* node) {
-  ChainLeafChild child = {};
+// The binding record of one TextureSource leaf: a plain leaf sampling through its resolved sampler
+// state, the stand-in leaf of a device-space source, or a tiled leaf whose wrap modes the kernel's
+// single-tap path implements. Only a plain leaf may carry the RGBAAA layout, whose alpha-area
+// offset rides the kernel's per-leaf AlphaStart / HasRgbaaa fields. The record carries exactly the
+// data the leaf's TextureEffect is constructed from (see MaterializeChainChildren).
+static bool BuildTextureLeafBinding(const AOTEffectNode* node, AOTBinding* binding) {
   auto parameters = node != nullptr && node->kind == AOTEffectKind::TextureSource
                         ? std::get_if<AOTTextureParameters>(&node->parameters)
                         : nullptr;
-  if (parameters == nullptr ||
+  if (parameters == nullptr || parameters->textureProxy == nullptr ||
       (parameters->hasRGBAAA && parameters->samplingKind != AOTTextureSamplingKind::Plain)) {
-    return child;
+    return false;
   }
-  child.binding.kind = AOTBinding::Kind::Leaf;
-  child.binding.textureProxy = parameters->textureProxy;
+  binding->kind = AOTBinding::Kind::Leaf;
+  binding->textureProxy = parameters->textureProxy;
   if (parameters->samplingKind == AOTTextureSamplingKind::Device) {
     // The chain kernel samples this leaf at its DeviceLeafCoordMatrix * gl_FragCoord (see
     // AOTChainDeviceLeaf), so the child only binds the texture with the sampler state of a
@@ -87,17 +81,15 @@ static ChainLeafChild BuildTextureLeafChild(BlockAllocator* allocator, const AOT
                          SamplingOptions(FilterMode::Linear, MipmapMode::None),
                          SrcRectConstraint::Fast};
     args.sampleArea = Rect::MakeLTRB(-1e9f, -1e9f, 1e9f, 1e9f);
-    auto uvMatrix = Matrix::I();
-    child.processor = TextureEffect::Make(allocator, parameters->textureProxy, args, &uvMatrix);
-    child.binding.args = args;
-    child.binding.uvMatrix = uvMatrix;
-    return child;
+    binding->args = args;
+    binding->uvMatrix = Matrix::I();
+    return true;
   }
   if (parameters->samplingKind == AOTTextureSamplingKind::Tiled) {
     const auto& recipe = parameters->tiledRecipe;
     if (!recipe.has_value() || !AOTChainBuilder::IsChainCompatibleTiledMode(recipe->shaderModeX) ||
         !AOTChainBuilder::IsChainCompatibleTiledMode(recipe->shaderModeY)) {
-      return child;
+      return false;
     }
     // The hardware sampler performs all tiling (wrap modes and clamp-to-border), so the leaf is a
     // plain TextureEffect carrying the resolved sampler state. The huge sample area makes the
@@ -108,11 +100,9 @@ static ChainLeafChild BuildTextureLeafChild(BlockAllocator* allocator, const AOT
     SamplingArgs args = {recipe->hardwareSampler.tileModeX, recipe->hardwareSampler.tileModeY,
                          sampling, SrcRectConstraint::Fast};
     args.sampleArea = Rect::MakeLTRB(-1e9f, -1e9f, 1e9f, 1e9f);
-    auto uvMatrix = parameters->uvMatrix;
-    child.processor = TextureEffect::Make(allocator, parameters->textureProxy, args, &uvMatrix);
-    child.binding.args = args;
-    child.binding.uvMatrix = uvMatrix;
-    return child;
+    binding->args = args;
+    binding->uvMatrix = parameters->uvMatrix;
+    return true;
   }
   SamplingOptions sampling(parameters->samplerState.minFilterMode,
                            parameters->samplerState.magFilterMode,
@@ -120,13 +110,10 @@ static ChainLeafChild BuildTextureLeafChild(BlockAllocator* allocator, const AOT
   SamplingArgs args = {parameters->samplerState.tileModeX, parameters->samplerState.tileModeY,
                        sampling, parameters->constraint};
   args.sampleArea = parameters->subset;
-  auto uvMatrix = parameters->uvMatrix;
-  child.processor = TextureEffect::MakeRGBAAA(allocator, parameters->textureProxy, args,
-                                              parameters->alphaStart, &uvMatrix);
-  child.binding.args = args;
-  child.binding.uvMatrix = uvMatrix;
-  child.binding.alphaStart = parameters->alphaStart;
-  return child;
+  binding->args = args;
+  binding->uvMatrix = parameters->uvMatrix;
+  binding->alphaStart = parameters->alphaStart;
+  return true;
 }
 
 static bool BuildPointwiseSlot(const AOTEffectGraph& graph, const AOTEffectNode* node,
@@ -1175,12 +1162,10 @@ static ChainPaddingTexture ChoosePaddingTexture(const AOTEffectGraph& graph,
   return padding;
 }
 
-// Binds the noise tables' two lookup textures as sampler-only children ahead of the phantom
+// Records the noise tables' two lookup textures as sampler-only bindings ahead of the phantom
 // padding. They are real bindings the kernel reads through Nearest lookups; firstProxy reports
 // the first one for the padding fallback. Returns false when a view cannot be wrapped.
-static bool AppendNoiseLookupChildren(BlockAllocator* allocator,
-                                      const AOTPerlinNoiseParameters* noise,
-                                      std::vector<PlacementPtr<FragmentProcessor>>* samplerPadding,
+static bool AppendNoiseLookupBindings(const AOTPerlinNoiseParameters* noise,
                                       std::shared_ptr<TextureProxy>* firstProxy,
                                       std::vector<AOTBinding>* bindings) {
   for (const auto& view : {noise->permutationsView, noise->noiseView}) {
@@ -1193,25 +1178,18 @@ static bool AppendNoiseLookupChildren(BlockAllocator* allocator,
     }
     SamplingArgs lookupArgs = {TileMode::Clamp, TileMode::Clamp,
                                SamplingOptions(FilterMode::Nearest), SrcRectConstraint::Fast};
-    auto matrix = Matrix::I();
-    auto child = TextureEffect::Make(allocator, proxy, lookupArgs, &matrix);
-    if (child == nullptr) {
-      return false;
-    }
     if (firstProxy != nullptr && *firstProxy == nullptr) {
       *firstProxy = proxy;
     }
-    samplerPadding->push_back(std::move(child));
-    bindings->push_back({AOTBinding::Kind::Padding, proxy, lookupArgs, matrix});
+    bindings->push_back({AOTBinding::Kind::Padding, proxy, lookupArgs, Matrix::I()});
   }
   return true;
 }
 
-// Fills the sampler slots up to the four-leaf artifacts' TEXTURE_COUNT with phantom children
+// Fills the sampler slots up to the four-leaf artifacts' TEXTURE_COUNT with phantom bindings
 // re-using the padding texture. A chain that already binds four (or none) is left alone.
-static bool PadSamplersToFour(BlockAllocator* allocator, const ChainPaddingTexture& padding,
-                              std::vector<PlacementPtr<FragmentProcessor>>* samplerPadding,
-                              size_t* samplerChildren, std::vector<AOTBinding>* bindings) {
+static bool AppendPaddingBindings(const ChainPaddingTexture& padding, size_t* samplerChildren,
+                                  std::vector<AOTBinding>* bindings) {
   if (*samplerChildren == 0 || *samplerChildren >= 4) {
     return true;
   }
@@ -1220,35 +1198,21 @@ static bool PadSamplersToFour(BlockAllocator* allocator, const ChainPaddingTextu
   }
   auto paddingArgs = PaddingSamplingArgs(padding.state);
   while (*samplerChildren < 4) {
-    auto phantomMatrix = Matrix::I();
-    auto phantom = TextureEffect::Make(allocator, padding.proxy, paddingArgs, &phantomMatrix);
-    if (phantom == nullptr) {
-      return false;
-    }
-    samplerPadding->push_back(std::move(phantom));
-    bindings->push_back({AOTBinding::Kind::Padding, padding.proxy, paddingArgs, phantomMatrix});
+    bindings->push_back({AOTBinding::Kind::Padding, padding.proxy, paddingArgs, Matrix::I()});
     ++*samplerChildren;
   }
   return true;
 }
 
-// The mask child: the real device-space mask, or — for a mask-free chain that bound all four
-// sampler slots — a phantom there, which the kernel identifies by HasMaskTexture and skips.
-struct ChainMaskChild {
-  PlacementPtr<FragmentProcessor> child = nullptr;
-  bool isPhantom = false;
-};
-
-static bool BuildChainMaskChild(BlockAllocator* allocator, const AOTTextureParameters* mask,
-                                const ChainPaddingTexture& padding, size_t samplerChildren,
-                                ChainMaskChild* result, std::vector<AOTBinding>* bindings) {
+// Records the mask slot binding last: the real device-space mask, or — for a mask-free chain that
+// bound all four sampler slots — the phantom the kernel identifies by HasMaskTexture and skips.
+// The phantom is recorded as padding (it is a plain texture child); it is the binding that sits
+// one past samplerChildren, which is how the shell tells it apart.
+static bool AppendMaskBinding(const AOTTextureParameters* mask, const ChainPaddingTexture& padding,
+                              size_t samplerChildren, std::vector<AOTBinding>* bindings) {
   if (mask != nullptr) {
     // The mask child's Subset write routes to the kernel's DeviceMaskSubset decoy, so a leaf's
     // real subset rect survives in the shared uniform block.
-    result->child = DeviceSpaceTextureEffect::Make(allocator, mask->textureProxy, mask->uvMatrix);
-    if (result->child == nullptr) {
-      return false;
-    }
     bindings->push_back({AOTBinding::Kind::Mask, mask->textureProxy, {}, mask->uvMatrix});
     return true;
   }
@@ -1258,14 +1222,9 @@ static bool BuildChainMaskChild(BlockAllocator* allocator, const AOTTextureParam
   if (padding.proxy == nullptr) {
     return false;
   }
-  auto paddingArgs = PaddingSamplingArgs(padding.state);
-  auto phantomMatrix = Matrix::I();
-  result->child = TextureEffect::Make(allocator, padding.proxy, paddingArgs, &phantomMatrix);
-  result->isPhantom = result->child != nullptr;
-  if (result->child != nullptr) {
-    bindings->push_back({AOTBinding::Kind::Padding, padding.proxy, paddingArgs, phantomMatrix});
-  }
-  return result->child != nullptr;
+  bindings->push_back(
+      {AOTBinding::Kind::Padding, padding.proxy, PaddingSamplingArgs(padding.state), Matrix::I()});
+  return true;
 }
 
 // Merges the draw's coverage terms into ONE coverage graph for the layout pipeline: one
@@ -1344,54 +1303,49 @@ static bool MergeCoverageTerms(const std::vector<AOTCoverageTerm>& terms,
   return builder.finish(root, &merged->graph);
 }
 
-// Rebuilds the fused chain processor from a planned layout: the texture leaves, the LUT and noise
-// sampler-only children, the phantom padding the four-sampler artifacts need and the mask child.
-// Every slot and budget decision was already taken by PlanChainLayout; a failure here can only
-// come from a resource that cannot be wrapped into a processor. coverageTerms is null for a plan
-// pass (plan passes carry no draw coverage).
-static PlacementPtr<FragmentProcessor> BuildChainFP(
-    BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
-    const std::vector<AOTCoverageTerm>* coverageTerms) {
+// Compiles one chain pass into the program and its binding table. The table is the single
+// description of the sampler children: it records, in artifact order, the DAG leaves, the LUT
+// gradient texture, the noise lookup tables, the phantom padding the four-sampler artifacts need
+// and the mask slot child. Every slot and budget decision was already taken by PlanChainLayout; a
+// failure here can only come from a resource that cannot be described. coverageTerms is null for a
+// plan pass (plan passes carry no draw coverage).
+static bool CompileChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
+                               const std::vector<AOTCoverageTerm>* coverageTerms, AOTProgram* out) {
   ChainCoverageGraph coverage = {};
   const AOTEffectGraph* coverageGraph = nullptr;
   if (coverageTerms != nullptr && !coverageTerms->empty()) {
     if (!MergeCoverageTerms(*coverageTerms, &coverage)) {
-      return nullptr;
+      return false;
     }
     coverageGraph = &coverage.graph;
   }
   AOTChainCompile layout = {};
   if (!PlanChainLayout(graph, pass, coverageGraph, coverage.coverageRoot,
                        coverage.coverageLeafFromUVCoord, coverage.clipLinks, true, &layout)) {
-    return nullptr;
+    return false;
   }
   AOTProgram program = std::move(layout.program);
   std::vector<AOTBinding> bindings = {};
   bindings.reserve(layout.leafNodes.size() + 5);
-  std::vector<PlacementPtr<FragmentProcessor>> leaves = {};
-  leaves.reserve(layout.leafNodes.size());
   for (auto* node : layout.leafNodes) {
-    auto leaf = BuildTextureLeafChild(allocator, node);
-    if (leaf.processor == nullptr || !IsProcessor<TextureEffect>(leaf.processor.get())) {
-      return nullptr;
+    AOTBinding binding = {};
+    if (!BuildTextureLeafBinding(node, &binding)) {
+      return false;
     }
-    leaves.push_back(std::move(leaf.processor));
-    bindings.push_back(std::move(leaf.binding));
+    bindings.push_back(std::move(binding));
   }
-  // A LUT gradient carries its baked texture as a sampler-only child appended after the DAG
+  // A LUT gradient carries its baked texture as a sampler-only binding appended after the DAG
   // leaves; the OP_GRADIENT LUT branch reads it through the GradientLUTLeaf uniform.
-  PlacementPtr<FragmentProcessor> lutChild = nullptr;
   program.lutLeafIndex = -1;
   if (layout.lutGradient != nullptr) {
-    SamplingOptions lutSampling(FilterMode::Linear, MipmapMode::None);
-    SamplingArgs lutArgs = {TileMode::Clamp, TileMode::Clamp, lutSampling, SrcRectConstraint::Fast};
-    auto lutMatrix = Matrix::I();
-    lutChild = TextureEffect::Make(allocator, layout.lutGradient->lutProxy, lutArgs, &lutMatrix);
-    if (lutChild == nullptr) {
-      return nullptr;
+    if (layout.lutGradient->lutProxy == nullptr) {
+      return false;
     }
-    program.lutLeafIndex = static_cast<int>(leaves.size());
-    bindings.push_back({AOTBinding::Kind::Lut, layout.lutGradient->lutProxy, lutArgs, lutMatrix});
+    SamplingArgs lutArgs = {TileMode::Clamp, TileMode::Clamp,
+                            SamplingOptions(FilterMode::Linear, MipmapMode::None),
+                            SrcRectConstraint::Fast};
+    program.lutLeafIndex = static_cast<int>(bindings.size());
+    bindings.push_back({AOTBinding::Kind::Lut, layout.lutGradient->lutProxy, lutArgs, Matrix::I()});
   }
   // TEXTURE_COUNT exists only as 0 or 4: chains with 1-3 sampler children ride the four-leaf
   // artifacts by binding phantom children that re-use the first leaf's texture. Their DAG slots
@@ -1399,42 +1353,101 @@ static PlacementPtr<FragmentProcessor> BuildChainFP(
   // mirror the first leaf's sampler state: on OpenGL the wrap/filter modes are texture-object
   // state (not per-unit), so a default-state phantom bound after the real leaf would overwrite
   // e.g. a decal clamp-to-border with clamp-to-edge for the whole draw.
-  std::vector<PlacementPtr<FragmentProcessor>> samplerPadding = {};
   std::shared_ptr<TextureProxy> noisePaddingProxy = nullptr;
   if (layout.noise != nullptr &&
-      !AppendNoiseLookupChildren(allocator, layout.noise, &samplerPadding, &noisePaddingProxy,
-                                 &bindings)) {
-    return nullptr;
+      !AppendNoiseLookupBindings(layout.noise, &noisePaddingProxy, &bindings)) {
+    return false;
   }
   auto padding =
       ChoosePaddingTexture(graph, pass, coverageGraph, layout.noise, std::move(noisePaddingProxy));
-  size_t samplerChildren = leaves.size() + (lutChild != nullptr ? 1 : 0) + samplerPadding.size();
-  if (!PadSamplersToFour(allocator, padding, &samplerPadding, &samplerChildren, &bindings)) {
-    return nullptr;
+  size_t samplerChildren = layout.leafNodes.size() + (layout.lutGradient != nullptr ? 1 : 0) +
+                           (layout.noise != nullptr ? 2 : 0);
+  if (!AppendPaddingBindings(padding, &samplerChildren, &bindings) ||
+      !AppendMaskBinding(coverage.mask, padding, samplerChildren, &bindings)) {
+    return false;
   }
-  ChainMaskChild maskChildResult = {};
-  if (!BuildChainMaskChild(allocator, coverage.mask, padding, samplerChildren, &maskChildResult,
-                           &bindings)) {
-    return nullptr;
-  }
-  program.hasMaskTexture = maskChildResult.child != nullptr && !maskChildResult.isPhantom;
-  program.noiseSamplerBase = layout.noise != nullptr ? static_cast<int>(leaves.size()) : -1;
+  program.samplerChildCount = static_cast<uint32_t>(samplerChildren);
+  program.hasMaskTexture = coverage.mask != nullptr;
+  program.noiseSamplerBase =
+      layout.noise != nullptr ? static_cast<int>(layout.leafNodes.size()) : -1;
   program.deviceLeaves.reserve(layout.deviceLeafIndices.size());
   for (auto leafIndex : layout.deviceLeafIndices) {
     const auto* parameters = std::get_if<AOTTextureParameters>(
         &layout.leafNodes[static_cast<size_t>(leafIndex)]->parameters);
     if (parameters == nullptr) {
-      return nullptr;
+      return false;
     }
     program.deviceLeaves.push_back({leafIndex, parameters->textureProxy, parameters->uvMatrix});
   }
   program.bindings = std::move(bindings);
+  *out = std::move(program);
+  return true;
+}
+
+// The texture processor one binding describes: the same TextureEffect the binding's record was
+// taken from (a plain, tiled or device-space leaf, the LUT gradient, a padding child or the mask
+// slot's phantom).
+static PlacementPtr<FragmentProcessor> MaterializeTextureBinding(BlockAllocator* allocator,
+                                                                 const AOTBinding& binding) {
+  auto matrix = binding.uvMatrix;
+  return TextureEffect::MakeRGBAAA(allocator, binding.textureProxy, binding.args,
+                                   binding.alphaStart, &matrix);
+}
+
+// Materializes the sampler children a shell registers from the binding table alone: every binding
+// is a TextureEffect over its proxy, except the real device mask (a DeviceSpaceTextureEffect). The
+// binding past samplerChildCount is the mask slot child — a phantom when it is recorded as padding,
+// which the kernel skips via HasMaskTexture.
+static bool MaterializeChainChildren(BlockAllocator* allocator, size_t samplerChildCount,
+                                     const std::vector<AOTBinding>& bindings,
+                                     AOTPointwiseChainProcessor::AOTChainChildren* children) {
+  if (bindings.size() < samplerChildCount) {
+    return false;
+  }
+  for (size_t index = 0; index < samplerChildCount; ++index) {
+    const auto& binding = bindings[index];
+    auto child = MaterializeTextureBinding(allocator, binding);
+    if (child == nullptr) {
+      return false;
+    }
+    if (binding.kind == AOTBinding::Kind::Leaf) {
+      children->leaves.push_back(std::move(child));
+    } else if (binding.kind == AOTBinding::Kind::Lut) {
+      children->lut = std::move(child);
+    } else {
+      children->padding.push_back(std::move(child));
+    }
+  }
+  if (bindings.size() == samplerChildCount) {
+    return true;
+  }
+  if (bindings.size() != samplerChildCount + 1) {
+    return false;
+  }
+  const auto& mask = bindings[samplerChildCount];
+  if (mask.kind == AOTBinding::Kind::Mask) {
+    children->mask = DeviceSpaceTextureEffect::Make(allocator, mask.textureProxy, mask.uvMatrix);
+    return children->mask != nullptr;
+  }
+  children->mask = MaterializeTextureBinding(allocator, mask);
+  children->maskIsPhantom = children->mask != nullptr;
+  return children->mask != nullptr;
+}
+
+// Rebuilds the fused chain processor from the compiled program: the materialized sampler children
+// plus the program itself.
+static PlacementPtr<FragmentProcessor> BuildChainFP(
+    BlockAllocator* allocator, const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
+    const std::vector<AOTCoverageTerm>* coverageTerms) {
+  AOTProgram program = {};
+  if (!CompileChainLayout(graph, pass, coverageTerms, &program)) {
+    return nullptr;
+  }
   AOTPointwiseChainProcessor::AOTChainChildren children = {};
-  children.leaves = std::move(leaves);
-  children.lut = std::move(lutChild);
-  children.padding = std::move(samplerPadding);
-  children.mask = std::move(maskChildResult.child);
-  children.maskIsPhantom = maskChildResult.isPhantom;
+  if (!MaterializeChainChildren(allocator, program.samplerChildCount, program.bindings,
+                                &children)) {
+    return nullptr;
+  }
   return AOTPointwiseChainProcessor::Make(allocator, std::move(program), std::move(children));
 }
 
@@ -1714,11 +1727,15 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildFPForPass(BlockAllocator* 
   auto sourceNode = graph.nodeAt(pass.nodes[0]);
   switch (pass.kernel) {
     case AOTKernelKind::YUVTextureFill: {
-      auto source = BuildTextureLeafChild(allocator, sourceNode);
-      if (source.processor == nullptr || !IsProcessor<TextureEffect>(source.processor.get())) {
+      AOTBinding binding = {};
+      if (!BuildTextureLeafBinding(sourceNode, &binding)) {
         return nullptr;
       }
-      return AOTYUVChainProcessor::Make(allocator, std::move(source.processor), slots);
+      auto source = MaterializeTextureBinding(allocator, binding);
+      if (source == nullptr || !IsProcessor<TextureEffect>(source.get())) {
+        return nullptr;
+      }
+      return AOTYUVChainProcessor::Make(allocator, std::move(source), slots);
     }
     case AOTKernelKind::PerlinNoiseFill: {
       auto parameters =
@@ -1758,28 +1775,28 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessor(
   return BuildChainFP(allocator, graph, pass, &*terms);
 }
 
-PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessorForInfo(
-    BlockAllocator* allocator, const ProgramInfo* programInfo) {
-  if (allocator == nullptr || programInfo == nullptr) {
-    return nullptr;
+bool AOTChainBuilder::CompileChainProgramForInfo(BlockAllocator* allocator,
+                                                 const ProgramInfo* programInfo, AOTProgram* out) {
+  if (allocator == nullptr || programInfo == nullptr || out == nullptr) {
+    return false;
   }
   auto gp = programInfo->getGeometryProcessor();
   if (gp == nullptr) {
-    return nullptr;
+    return false;
   }
   // The draw carries its record-time IR: the graph and the classified coverage terms are already
-  // the ones this re-expression would compute, so the second lowering is skipped entirely. The
-  // carried form has no glyph leaf (an AtlasText geometry processor does not exist at record
-  // time) and atlas-text ops never carry one — the re-expression below still serves them.
+  // the ones this compile would compute, so the second lowering is skipped entirely. The carried
+  // form has no glyph leaf (an AtlasText geometry processor does not exist at record time) and
+  // atlas-text ops never carry one — the compile below still serves them.
   if (auto* carried = programInfo->getCarriedIR()) {
     AOTEffectPlan plan = {};
     if (!AOTEffectDecomposer::Decompose(carried->color, &plan, true) || plan.passes.size() != 1 ||
         !IsAOTPointwiseDAGKernel(plan.passes[0].kernel)) {
       // The perlin kernels have their own families; the chain family only takes the DAG kernels,
       // and anything the single-pass decomposition cannot fit needs a plan task.
-      return nullptr;
+      return false;
     }
-    return BuildChainFP(allocator, carried->color, plan.passes[0], &carried->coverage);
+    return CompileChainLayout(carried->color, plan.passes[0], &carried->coverage, out);
   }
   std::vector<const FragmentProcessor*> colorProcessors = {};
   colorProcessors.reserve(programInfo->numColorFragmentProcessors() + 1);
@@ -1796,16 +1813,16 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessorForInfo(
   auto ir = LowerDraw(colorProcessors, coverageProcessors, gp, programInfo->getXferProcessor(),
                       BlendMode::SrcOver, allocator);
   if (!ir.has_value()) {
-    return nullptr;
+    return false;
   }
   AOTEffectPlan plan = {};
   if (!AOTEffectDecomposer::Decompose(ir->color, &plan, true) || plan.passes.size() != 1 ||
       !IsAOTPointwiseDAGKernel(plan.passes[0].kernel)) {
     // The perlin kernels have their own families; the chain family only takes the DAG kernels,
     // and anything the single-pass decomposition cannot fit needs a plan task.
-    return nullptr;
+    return false;
   }
-  return BuildChainFP(allocator, ir->color, plan.passes[0], &ir->coverage);
+  return CompileChainLayout(ir->color, plan.passes[0], &ir->coverage, out);
 }
 
 PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildPerlinProcessorForInfo(

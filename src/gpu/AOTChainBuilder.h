@@ -154,18 +154,18 @@ class AOTChainBuilder {
       bool coverageLeafFromUVCoord = false);
 
   /**
-   * Re-expresses a draw's whole effect expression (its color processors, its coverage processors,
-   * and the glyph leaf an AtlasText geometry processor contributes) as the fused chain processor,
-   * without touching the draw: one LowerDraw produces the color graph and the classified coverage
-   * terms, the single-pass decomposition plans the color side, and the terms merge into the
-   * processor. This is the interpreter's view of an unmodified ProgramInfo: the matcher uses it to
-   * decide whether the chain kernel serves the draw, and the chain program writer rebuilds it per
-   * draw to upload the values. Returns nullptr when the expression does not reduce onto the chain
-   * kernel (an unsupported processor, an over-budget shape, a coverage form the chain cannot
-   * carry).
+   * Compiles a draw's whole effect expression (its color processors, its coverage processors, and
+   * the glyph leaf an AtlasText geometry processor contributes) into the fused chain program and
+   * its binding table, without building processors: one LowerDraw produces the color graph and the
+   * classified coverage terms, the single-pass decomposition plans the color side, and the terms
+   * merge into the program. This is the interpreter's view of an unmodified ProgramInfo: the
+   * matcher derives the draw's variant from the program, and the per-draw upload (uniforms,
+   * samplers and the vertex transforms) consumes it. Returns false when the expression does not
+   * reduce onto the chain kernel (an unsupported processor, an over-budget shape, a coverage form
+   * the chain cannot carry).
    */
-  static PlacementPtr<FragmentProcessor> BuildChainProcessorForInfo(BlockAllocator* allocator,
-                                                                    const ProgramInfo* programInfo);
+  static bool CompileChainProgramForInfo(BlockAllocator* allocator, const ProgramInfo* programInfo,
+                                         AOTProgram* out);
 
   /**
    * Re-expresses a coverage-free draw's color expression as the perlin kernel processor with its
