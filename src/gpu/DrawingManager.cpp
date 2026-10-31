@@ -136,9 +136,15 @@ bool DrawingManager::submitFillPlanTask(const AOTEffectGraph& graph, const AOTEf
 bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
                                   PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags,
                                   const Point& coordOffset) {
-  std::optional<AOTRoutePlan> routed = std::nullopt;
+  // The fill's single record-time lowering: its whole color expression lands on a DrawIR the op
+  // carries, and the route below plans from it — no second analysis over the FP tree. A fill has
+  // no coverage and no xfer, and its blend is Src.
+  PlacementPtr<DrawIR> fillIR = nullptr;
   if (isFillRouteCandidate(processor.get())) {
-    routed = AOTRouter::Route({processor.get()});
+    if (auto lowered = LowerDraw({processor.get()}, {}, nullptr, nullptr, BlendMode::Src,
+                                 drawingAllocator())) {
+      fillIR = drawingAllocator()->make<DrawIR>(std::move(*lowered));
+    }
   }
   auto drawOp = makeFillDrawOp(renderTarget, std::move(processor), renderFlags, coordOffset);
   if (drawOp == nullptr) {
@@ -149,10 +155,16 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   // target, so the task clears its full backing first and a shader-side sample cannot observe
   // pixels left by an earlier scratch allocation. A single-pass chain-capable plan needs no task:
   // the fill's RectDrawOp is a StandardDrawOp, so the plain lookup serves it at prepare time.
-  if (routed.has_value() && AOTRouter::PlanRequiresTask(routed->plan) &&
-      submitFillPlanTask(routed->graph, routed->plan, renderFlags, renderTarget, coordOffset,
-                         &drawOp)) {
-    return true;
+  if (fillIR != nullptr) {
+    drawOp->adoptLoweredIR(std::move(fillIR));
+    auto* ir = drawOp->loweredIR();
+    if (auto plan = AOTRouter::Plan(*ir)) {
+      if (AOTRouter::PlanRequiresTask(*plan) &&
+          submitFillPlanTask(ir->color, *plan, renderFlags, renderTarget, coordOffset, &drawOp)) {
+        return true;
+      }
+      // A single-pass plan needs no task: the plain lookup serves the fill at prepare time.
+    }
   }
   auto allocator = drawingAllocator();
   auto drawOps = allocator->makeArray<DrawOp>(&drawOp, 1);

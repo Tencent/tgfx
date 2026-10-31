@@ -29,43 +29,23 @@
 namespace tgfx {
 
 /**
- * One record-time routing outcome: the lowered effect graph and the plan the decomposer produced
- * for it.
- */
-struct AOTRoutePlan {
-  AOTEffectGraph graph = {};
-  AOTEffectPlan plan = {};
-};
-
-/**
  * The AOT routing rules, in one place. A draw reaches the precompiled kernels in one of two ways:
  *
  *   - As a plan task (AOTPlanRenderTask), built at record time by the two entries,
  *     OpsCompositor::addDrawOp (on-screen draws) and DrawingManager::fillRTWithFP (offscreen
- *     fills), from the plan Route below returns. A plan task can run several passes:
- *     materialized blend operands and the split-off passes of a long linear chain.
+ *     fills), from the plan Plan below returns over the draw's record-time IR. A plan task can
+ *     run several passes: materialized blend operands and the split-off passes of a long linear
+ *     chain.
  *   - Through the plain program lookup at prepare time, for a draw that is still on the plain
  *     route: the re-expressing kernels (the chain interpreter and the perlin kernel) rebuild the
  *     draw's own expression per draw (PlanSinglePass decides the shape). Single pass only; the
- *     chain interpreter also folds coverage processors.
+ *     chain interpreter also merges the classified coverage terms.
  *
  * An entry whose route produced no plan, or whose task build was refused, keeps its original draw
  * for the plain route.
  */
 class AOTRouter {
  public:
-  /**
-   * Lowers and decomposes the processors and returns the graph and plan for them, or nullopt when
-   * the processors do not lower or no planner produces an executable plan. What to do with a plan
-   * is the caller's: PlanRequiresTask decides between building a render task now and leaving the
-   * draw on the plain route for the prepare-time fused walk. failureOutcome, when not null,
-   * receives why an attempt failed (Trivial for an empty chain, BlockedByLowering when a processor
-   * lacks a lowering, UnsupportedShape when no planner covers the lowered shape, FusablePointwise
-   * on success) — the same facts the attempt itself computed, with no second analysis pass.
-   */
-  static std::optional<AOTRoutePlan> Route(const std::vector<const FragmentProcessor*>& processors,
-                                           AOTDecomposeOutcome* failureOutcome = nullptr);
-
   /**
    * Plans a draw whose record-time IR already carries the lowered color graph: the decomposition
    * runs on ir.color with no second lowering, and the coverage terms stay on the draw — a

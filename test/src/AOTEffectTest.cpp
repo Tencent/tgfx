@@ -1424,7 +1424,9 @@ TGFX_TEST(AOTEffectTest, DeviceSpaceLinearChainUsesChainKernel) {
     ASSERT_EQ(chain.deviceLeaves.size(), 1u);
     EXPECT_EQ(chain.bindings[0].kind, AOTBinding::Kind::Leaf);
     AOTDecomposeOutcome outcome = AOTDecomposeOutcome::Trivial;
-    AOTRouter::Route(processors, &outcome);
+    auto ir = LowerDraw(processors, {}, nullptr, nullptr, BlendMode::SrcOver, &allocator);
+    ASSERT_TRUE(ir.has_value());
+    EXPECT_TRUE(AOTRouter::Plan(*ir, &outcome).has_value());
     EXPECT_EQ(outcome, AOTDecomposeOutcome::FusablePointwise);
   }
   // Every leaf carries its own device-space coordinate matrix, so a DAG blending two device-space
@@ -3287,8 +3289,14 @@ TGFX_TEST(AOTEffectTest, AdmissionMatrixKeepsPlanningAndConstructionAligned) {
     AOTEffectGraph graph;
     bool lowered = AOTEffectDecomposer::Lower(processors, &graph);
     EXPECT_EQ(lowered, row.lowers);
-    AOTDecomposeOutcome outcome = AOTDecomposeOutcome::Trivial;
-    AOTRouter::Route(processors, &outcome);
+    // The route's IR-form classification: a lowering failure leaves the draw without an IR
+    // (BlockedByLowering at record time), a lowered graph reports exactly what planning finds.
+    AOTDecomposeOutcome outcome = AOTDecomposeOutcome::BlockedByLowering;
+    if (lowered) {
+      DrawIR ir = {};
+      ir.color = graph;
+      AOTRouter::Plan(ir, &outcome);
+    }
     if (!lowered) {
       EXPECT_NE(outcome, AOTDecomposeOutcome::FusablePointwise);
       continue;

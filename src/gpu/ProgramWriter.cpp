@@ -368,11 +368,16 @@ void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* p
 
 // The compiled chain program this draw was accepted with: the program the match walk (or the AOT
 // route, which resolves the draw before any cache lookup) compiled, or — on a program-cache hit,
-// where neither ran for this draw — the program compiled here. The compile is cached on the info,
-// so the transform, uniform and sampler writes share one.
+// where neither ran for this draw — the program compiled here. The compile is cached on the info
+// and on the draw's carried IR, so the transform, uniform and sampler writes share one and a
+// repeated prepare of the same op (a task-fallback rerun, a probe) never recompiles it.
 static const AOTProgram* ChainProgram(const ProgramInfo& info) {
   if (auto* cached = info.getCachedChainProgram()) {
     return cached;
+  }
+  if (auto* carried = info.getCarriedIR();
+      carried != nullptr && carried->compiledProgram.has_value()) {
+    return &*carried->compiledProgram;
   }
   auto context = info.getContext();
   if (context == nullptr || context->drawingManager() == nullptr) {
@@ -384,6 +389,9 @@ static const AOTProgram* ChainProgram(const ProgramInfo& info) {
     return nullptr;
   }
   info.setCachedChainProgram(std::move(program));
+  if (auto* carried = info.getCarriedIR()) {
+    carried->compiledProgram = *info.getCachedChainProgram();
+  }
   return info.getCachedChainProgram();
 }
 

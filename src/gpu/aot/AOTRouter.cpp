@@ -29,31 +29,6 @@ static bool IsFusedServingKernel(AOTKernelKind kernel) {
   return IsAOTPointwiseDAGKernel(kernel) || kernel == AOTKernelKind::PerlinNoiseFill;
 }
 
-std::optional<AOTRoutePlan> AOTRouter::Route(
-    const std::vector<const FragmentProcessor*>& processors, AOTDecomposeOutcome* failureOutcome) {
-  AOTRoutePlan routed = {};
-  std::string blocker;
-  if (!AOTEffectDecomposer::Lower(processors, &routed.graph, &blocker)) {
-    if (failureOutcome != nullptr) {
-      *failureOutcome = processors.empty()
-                            ? AOTDecomposeOutcome::Trivial
-                            : (blocker.empty() ? AOTDecomposeOutcome::UnsupportedShape
-                                               : AOTDecomposeOutcome::BlockedByLowering);
-    }
-    return std::nullopt;
-  }
-  if (!AOTEffectDecomposer::Decompose(routed.graph, &routed.plan)) {
-    if (failureOutcome != nullptr) {
-      *failureOutcome = AOTDecomposeOutcome::UnsupportedShape;
-    }
-    return std::nullopt;
-  }
-  if (failureOutcome != nullptr) {
-    *failureOutcome = AOTDecomposeOutcome::FusablePointwise;
-  }
-  return routed;
-}
-
 std::optional<AOTEffectPlan> AOTRouter::Plan(const DrawIR& ir,
                                              AOTDecomposeOutcome* failureOutcome) {
   AOTEffectPlan plan = {};

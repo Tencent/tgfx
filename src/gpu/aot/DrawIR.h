@@ -22,6 +22,7 @@
 #include <vector>
 #include "gpu/aot/AOTEffectDecomposer.h"
 #include "gpu/aot/EffectGraph.h"
+#include "gpu/aot/Program.h"
 #include "tgfx/core/BlendMode.h"
 
 namespace tgfx {
@@ -79,6 +80,15 @@ struct DrawIR {
    * single-pass serving does (see AOTPlanExecutor::Make).
    */
   std::optional<AOTPassDescriptor> passDescriptor = std::nullopt;
+  /**
+   * The draw's compiled chain program, filled on first use by the plain route's serving (the
+   * matcher's walk or the writer's fallback) and reused across the SAME op's repeated prepares —
+   * a plan-task fallback rerun or a probe re-preparation would otherwise recompile the identical
+   * expression. Mutable like the info caches: an idempotence detail, not draw semantics. Two
+   * distinct draws never share an IR, so cross-draw compilation repeats are the program-signature
+   * cache's problem (P5.0c), not this one. A pass IR leaves it empty.
+   */
+  mutable std::optional<AOTProgram> compiledProgram = std::nullopt;
 };
 
 /**

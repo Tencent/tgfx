@@ -11014,6 +11014,7 @@ TGFX_TEST(AOTRenderConsistencyTest, RecordTimeIRLoweredExactlyOncePerDraw) {
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   ResetAOTLowerDrawCount();
+  ResetAOTDecomposerLowerCount();
   canvas->drawImage(image, 0, 0, &paintA);
   canvas->drawImage(image, 64, 0, &paintB);
   canvas->drawImage(image, 128, 0, &paintA);
@@ -11021,6 +11022,11 @@ TGFX_TEST(AOTRenderConsistencyTest, RecordTimeIRLoweredExactlyOncePerDraw) {
   // One lowering per draw, at record time. A re-introduced prepare-time or writer-time
   // re-expression shows up here as a larger count (it used to be two per cache-hit draw).
   EXPECT_EQ(AOTLowerDrawCount(), 3u);
+  // The decomposer-level counter is the same three lowerings and nothing else: every successful
+  // AOTEffectDecomposer::Lower belongs to one LowerDraw, so a re-introduced second analysis over
+  // the FP tree (the pre-P3.2 Route entry, a prepare-time fallback that lowers instead of reading
+  // the carried IR) shows up here as decomposer count > lower-draw count.
+  EXPECT_EQ(AOTDecomposerLowerCount(), AOTLowerDrawCount());
   cache->unload();
 }
 

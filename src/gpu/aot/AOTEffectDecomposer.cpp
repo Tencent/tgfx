@@ -18,6 +18,7 @@
 
 #include "gpu/aot/AOTEffectDecomposer.h"
 #include <algorithm>
+#include <atomic>
 #include "gpu/AOTShapeRules.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/aot/AOTChainBuilder.h"
@@ -28,6 +29,20 @@
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 
 namespace tgfx {
+
+// Diagnostic only (mirrors AOTLowerDrawCount in DrawIR.cpp): successful AOTEffectDecomposer::Lower
+// runs since the last reset. The single-lowering invariant — every successful lowering belongs to
+// one LowerDraw at record time, with no second analysis over the FP tree at route or prepare time
+// — is assertable by comparing the two counters.
+static std::atomic<uint64_t> decomposerLowerCount = {0};
+
+uint64_t AOTDecomposerLowerCount() {
+  return decomposerLowerCount.load(std::memory_order_relaxed);
+}
+
+void ResetAOTDecomposerLowerCount() {
+  decomposerLowerCount.store(0, std::memory_order_relaxed);
+}
 
 // Counts texture-sampling leaves across the tree. A fused kernel needs one sampler per leaf, so
 // this is the sampler-budget input the audit reports.
@@ -103,6 +118,7 @@ bool AOTEffectDecomposer::Lower(const std::vector<const FragmentProcessor*>& pro
     return false;
   }
   *graph = std::move(result);
+  decomposerLowerCount.fetch_add(1, std::memory_order_relaxed);
   return true;
 }
 
