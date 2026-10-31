@@ -36,6 +36,7 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/aot/DrawIR.h"
 #include "gpu/glsl/GLSLBlend.h"
 #include "gpu/processors/AOTPointwiseChainProcessor.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
@@ -10886,6 +10887,46 @@ TGFX_TEST(AOTRenderConsistencyTest, RoundStrokeRectUvMatrixBindsColorByPhysicalS
   RenderRoundStrokeRectOnce(true, &aotBitmap);
   RenderRoundStrokeRectOnce(false, &runtimeBitmap);
   ExpectBitmapsIdentical("round-stroke-rect-uv-matrix", aotBitmap, runtimeBitmap, 160, 160);
+}
+
+// The single-lowering invariant: every draw's expression is lowered exactly once, at record time,
+// and the carried IR serves both the matcher's first-occurrence run and the cache-hit writer
+// path — neither re-lowers. Three interleaved draws over two program shapes exercise both paths
+// (the two distinct shapes each force a matcher run; the repeated shape's second draw is a pure
+// program-cache hit), and the interleaving defeats any same-paint op merging.
+TGFX_TEST(AOTRenderConsistencyTest, RecordTimeIRLoweredExactlyOncePerDraw) {
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+  const std::array<float, 20> halfRGB = {0.5f, 0, 0,    0, 0, 0, 0.5f, 0, 0, 0,
+                                         0,    0, 0.5f, 0, 0, 0, 0,    0, 1, 0};
+  const std::array<float, 20> quarterRGB = {0.25f, 0, 0,     0, 0, 0, 0.25f, 0, 0, 0,
+                                            0,     0, 0.25f, 0, 0, 0, 0,     0, 1, 0};
+  Paint paintA = {};
+  paintA.setColorFilter(ColorFilter::Matrix(halfRGB));
+  Paint paintB = {};
+  paintB.setColorFilter(ColorFilter::Matrix(quarterRGB));
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto [bundleData, bundleSize] = EmbeddedShaderBundles::GetBundle(context->backend());
+  ASSERT_NE(bundleData, nullptr);
+  ASSERT_GT(bundleSize, 0u);
+  ASSERT_TRUE(cache->loadBundle(bundleData, bundleSize));
+  cache->setDecompositionEnabled(true);
+  context->globalCache()->clearPrograms();
+  auto surface = Surface::Make(context, 192, 64);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  ResetAOTLowerDrawCount();
+  canvas->drawImage(image, 0, 0, &paintA);
+  canvas->drawImage(image, 64, 0, &paintB);
+  canvas->drawImage(image, 128, 0, &paintA);
+  context->flushAndSubmit(true);
+  // One lowering per draw, at record time. A re-introduced prepare-time or writer-time
+  // re-expression shows up here as a larger count (it used to be two per cache-hit draw).
+  EXPECT_EQ(AOTLowerDrawCount(), 3u);
+  cache->unload();
 }
 
 }  // namespace tgfx

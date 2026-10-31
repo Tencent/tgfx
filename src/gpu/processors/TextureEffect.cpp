@@ -78,6 +78,15 @@ bool TextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNode
     if (!hasPendingSinglePlaneUpload()) {
       return false;
     }
+    // The format gate below reads the instantiated view's texture; a pending upload's eventual
+    // format is the proxy's descriptor format (the upload task creates the view from it), so gate
+    // on that here too — a lowering run before the upload completes now refuses exactly the
+    // leaves a post-upload lowering would, and the record-time and prepare-time lowerings of the
+    // same draw cannot disagree on a gray or RG source.
+    if (textureProxy->format() == PixelFormat::GRAY_8 ||
+        textureProxy->format() == PixelFormat::RG_88) {
+      return false;
+    }
     parameters.isYUV = false;
   } else {
     // Format gate (): the runtime applies Swizzle::ForRead to every texture lookup

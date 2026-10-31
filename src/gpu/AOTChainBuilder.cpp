@@ -1752,6 +1752,20 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildChainProcessorForInfo(
   if (gp == nullptr) {
     return nullptr;
   }
+  // The draw carries its record-time IR: the graph and the classified coverage terms are already
+  // the ones this re-expression would compute, so the second lowering is skipped entirely. The
+  // carried form has no glyph leaf (an AtlasText geometry processor does not exist at record
+  // time) and atlas-text ops never carry one — the re-expression below still serves them.
+  if (auto* carried = programInfo->getCarriedIR()) {
+    AOTEffectPlan plan = {};
+    if (!AOTEffectDecomposer::Decompose(carried->color, &plan, true) || plan.passes.size() != 1 ||
+        !IsAOTPointwiseDAGKernel(plan.passes[0].kernel)) {
+      // The perlin kernels have their own families; the chain family only takes the DAG kernels,
+      // and anything the single-pass decomposition cannot fit needs a plan task.
+      return nullptr;
+    }
+    return BuildChainFP(allocator, carried->color, plan.passes[0], &carried->coverage);
+  }
   std::vector<const FragmentProcessor*> colorProcessors = {};
   colorProcessors.reserve(programInfo->numColorFragmentProcessors() + 1);
   for (size_t index = 0; index < programInfo->numColorFragmentProcessors(); ++index) {

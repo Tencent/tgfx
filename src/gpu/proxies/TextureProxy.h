@@ -102,6 +102,15 @@ class TextureProxy : public ResourceProxy {
   }
 
   /**
+   * The pixel format the texture view will be created with. For a pending upload this is the
+   * eventual texture's format (the upload task creates the view from the proxy's descriptor), so
+   * a format decision can be made before the view exists.
+   */
+  virtual PixelFormat format() const {
+    return _format;
+  }
+
+  /**
    * Returns the underlying RenderTargetProxy if this TextureProxy is also a render target proxy;
    * otherwise, returns nullptr.
    */

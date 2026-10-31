@@ -28,6 +28,14 @@ DrawOp::DrawOp(BlockAllocator* allocator, AAType aaType) : allocator(allocator),
 
 DrawOp::~DrawOp() = default;
 
+void DrawOp::moveCoveragesToColors() {
+  for (auto& coverage : coverages) {
+    colors.emplace_back(std::move(coverage));
+  }
+  coverages.clear();
+  ir = nullptr;
+}
+
 void DrawOp::tryLowerIR() {
   if (type() == Type::AtlasTextOp) {
     // The atlas glyph leaf is synthesized from the AtlasText geometry processor, which the op

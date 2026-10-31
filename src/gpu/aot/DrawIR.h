@@ -90,6 +90,15 @@ std::optional<DrawIR> LowerDraw(const std::vector<const FragmentProcessor*>& col
                                 BlockAllocator* allocator);
 
 /**
+ * Diagnostic counters over LowerDraw: how many successful lowerings have run since the last
+ * reset. The single-lowering invariant — a draw is lowered once at record time and its IR is
+ * carried through prepare, with no re-lowering at match or upload time — is assertable with
+ * them. Diagnostic only; nothing on the render path reads these.
+ */
+uint64_t AOTLowerDrawCount();
+void ResetAOTLowerDrawCount();
+
+/**
  * The coverage half of LowerDraw alone: flattens Compose recursively and classifies every leaf
  * into coverage terms (the same rules LowerDraw applies — see its doc). glyphLeaf, when given,
  * marks one of the coverage processors as the AtlasText glyph leaf (the caller synthesized it

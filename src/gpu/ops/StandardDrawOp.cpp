@@ -80,6 +80,12 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget,
     preparedProgramInfo->setDepthStencil(depthStencil);
   }
   onConfigureProgramInfo(*preparedProgramInfo);
+  // The draw's record-time IR rides along whenever the info's processor list is the unmodified
+  // record-time list: the re-expressing families then reuse it instead of lowering a second time.
+  // A color override (a plan task's rebuilt pass colors) describes a different expression.
+  if (!preparedColors.has_value() && loweredIR() != nullptr) {
+    preparedProgramInfo->setCarriedIR(loweredIR());
+  }
   preparedProgram = preparedProgramInfo->getProgram();
   if (preparedProgram == nullptr) {
     if (isFinalLookup) {

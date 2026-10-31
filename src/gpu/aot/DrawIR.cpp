@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/DrawIR.h"
+#include <atomic>
 #include "gpu/AOTEffectDecomposer.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
@@ -31,6 +32,9 @@
 
 namespace tgfx {
 namespace {
+
+// Diagnostic only (see AOTLowerDrawCount): successful LowerDraw runs since the last reset.
+std::atomic<uint64_t> lowerDrawCount = {0};
 
 // Flattens Compose processors recursively: one coverage FP may carry a whole clip stack, and the
 // classifier works per leaf, not per position.
@@ -228,7 +232,16 @@ std::optional<DrawIR> LowerDraw(const std::vector<const FragmentProcessor*>& col
     return std::nullopt;
   }
   ir.coverage = std::move(*terms);
+  lowerDrawCount.fetch_add(1, std::memory_order_relaxed);
   return ir;
+}
+
+uint64_t AOTLowerDrawCount() {
+  return lowerDrawCount.load(std::memory_order_relaxed);
+}
+
+void ResetAOTLowerDrawCount() {
+  lowerDrawCount.store(0, std::memory_order_relaxed);
 }
 
 }  // namespace tgfx

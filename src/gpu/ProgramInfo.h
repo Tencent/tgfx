@@ -35,6 +35,7 @@
 namespace tgfx {
 
 class Context;
+struct DrawIR;
 
 struct SamplerInfo {
   std::shared_ptr<Texture> texture;
@@ -210,6 +211,22 @@ class ProgramInfo {
   }
 
   /**
+   * The draw's record-time lowered expression, attached by StandardDrawOp::prepare from the op
+   * when the draw carries one and its processor list is the unmodified record-time list (no
+   * color override). This is an input, not a cache: set once at construction of the info, read by
+   * the re-expressing families to skip their second lowering. Null for draws that did not lower,
+   * atlas-text draws (whose glyph leaf needs the geometry processor), and every info built with
+   * replaced colors.
+   */
+  void setCarriedIR(const DrawIR* ir) const {
+    carriedIR = ir;
+  }
+
+  const DrawIR* getCarriedIR() const {
+    return carriedIR;
+  }
+
+  /**
    * Returns the context owning this program's render target, or null when the target is absent.
    */
   Context* getContext() const {
@@ -268,6 +285,11 @@ class ProgramInfo {
 
   // The re-expressing family's cached expression (see the public accessors above).
   mutable PlacementPtr<FragmentProcessor> cachedReexpression = {};
+
+  // The draw's record-time DrawIR, attached through setCarriedIR() before first use. Mutable only
+  // so the attachment can happen right after construction (the pipeline-state setters already
+  // run in that window); it is an input, never recomputed, and null unless explicitly attached.
+  mutable const DrawIR* carriedIR = nullptr;
 
   friend std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo*,
                                                                 PermutationMatchFailure*);
