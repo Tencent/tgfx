@@ -24,6 +24,7 @@
 #include "gpu/AOTShapeRules.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/aot/AOTProbeCounters.h"
 #include "gpu/aot/AOTRouter.h"
 #include "gpu/aot/DrawIR.h"
 #include "gpu/aot/NodeContract.h"
@@ -1862,6 +1863,25 @@ bool AOTChainBuilder::ValidateSlots(const std::vector<AOTChainSlot>& slots, size
   demand.gradients = gradientSlots;
   if (!FitsAOTResourceProfile(demand, resolved)) {
     return false;
+  }
+  // P4.4 decision probe (diagnostic only): the constructed noise chain's slot depth — the
+  // 32→16 question is answered by the 17-32 bins staying empty.
+  if (noiseSlots > 0) {
+    auto* probes = AOTProbe();
+    auto depth = demand.instructions;
+    if (depth <= 8) {
+      probes->noiseSlotDepth1To8.fetch_add(1, std::memory_order_relaxed);
+    } else if (depth <= 16) {
+      probes->noiseSlotDepth9To16.fetch_add(1, std::memory_order_relaxed);
+    } else if (depth <= 24) {
+      probes->noiseSlotDepth17To24.fetch_add(1, std::memory_order_relaxed);
+    } else {
+      probes->noiseSlotDepth25To32.fetch_add(1, std::memory_order_relaxed);
+    }
+    auto previous = probes->noiseChainMaxDepth.load(std::memory_order_relaxed);
+    while (depth > previous && !probes->noiseChainMaxDepth.compare_exchange_weak(
+                                   previous, depth, std::memory_order_relaxed)) {
+    }
   }
   *profile = resolved;
   return true;

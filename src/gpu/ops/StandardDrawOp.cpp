@@ -22,8 +22,12 @@
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/Program.h"
 #include "gpu/aot/AOTChainBuilder.h"
+#include "gpu/aot/AOTProbeCounters.h"
 #include "gpu/aot/AOTProgramInfo.h"
 #include "gpu/aot/DrawIR.h"
+#include "gpu/processors/DefaultGeometryProcessor.h"
+#include "gpu/processors/Processor.h"
+#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/shaders/kernels/PointwiseChainShader.h"
 
 namespace tgfx {
@@ -141,6 +145,28 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget,
       loweredIR()->colorFPCount == activeColors.size() &&
       loweredIR()->coverageFPCount == coverages.size()) {
     preparedProgramInfo->setCarriedIR(loweredIR());
+    // P4.4 decision probe (diagnostic only): the noise draw's geometry form, classified where
+    // the real geometry processor and the carried IR finally coexist (record-time GP is null).
+    // Default is the form today's NoiseGraph variants do not cover.
+    bool hasNoise = false;
+    for (uint32_t i = 0; i < loweredIR()->color.nodeCount(); ++i) {
+      auto* node = loweredIR()->color.nodeAt(AOTNodeID(i));
+      hasNoise |= node != nullptr && node->kind == AOTEffectKind::PerlinNoiseSource;
+    }
+    if (hasNoise) {
+      auto* probes = AOTProbe();
+      if (IsProcessor<DefaultGeometryProcessor>(geometryProcessor.get())) {
+        probes->noiseGPDefault.fetch_add(1, std::memory_order_relaxed);
+      } else if (IsProcessor<QuadPerEdgeAAGeometryProcessor>(geometryProcessor.get())) {
+        if (coverages.empty()) {
+          probes->noiseGPQuadNoCoverage.fetch_add(1, std::memory_order_relaxed);
+        } else {
+          probes->noiseGPQuad.fetch_add(1, std::memory_order_relaxed);
+        }
+      } else {
+        probes->noiseGPOther.fetch_add(1, std::memory_order_relaxed);
+      }
+    }
   }
   preparedProgram = preparedProgramInfo->getProgram();
   if (preparedProgram == nullptr) {
