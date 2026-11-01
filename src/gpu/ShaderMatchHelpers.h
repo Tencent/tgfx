@@ -29,6 +29,7 @@ class ProgramInfo;
 class GeometryProcessor;
 class FragmentProcessor;
 class XferProcessor;
+struct DrawIR;
 struct AOTOpaqueKernelParameters;
 struct AOTTextureParameters;
 class QuadPerEdgeAAGeometryProcessor;
@@ -95,8 +96,7 @@ struct OpaqueKernelIRShape {
   const AOTOpaqueKernelParameters* kernel = nullptr;
   const AOTTextureParameters* childTexture = nullptr;
 };
-std::optional<OpaqueKernelIRShape> ReadOpaqueKernelIRShape(const ProgramInfo* programInfo,
-                                                           int kernelKind,
+std::optional<OpaqueKernelIRShape> ReadOpaqueKernelIRShape(const DrawIR* ir, int kernelKind,
                                                            bool requiresTextureChild);
 
 /// Whether the FP is one of the four pointwise operators (ColorMatrix / Luma / AlphaThreshold /

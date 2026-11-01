@@ -89,8 +89,8 @@ std::optional<GlassRefractionShader::Inputs> GlassRefractionShader::Extract(
   // form ((Matrix * vec3(pos, 1)).xy computed in the vertex stage), matching
   // GeometryProcessor::emitTransforms' non-perspective branch — a projective transform makes the
   // runtime emit a vec3 varying divided in the fragment stage, so it must ride the runtime route.
-  auto shape =
-      ReadOpaqueKernelIRShape(programInfo, /*kernelKind=*/1, /*requiresTextureChild=*/false);
+  auto shape = ReadOpaqueKernelIRShape(programInfo->getCarriedIR(), /*kernelKind=*/1,
+                                        /*requiresTextureChild=*/false);
   if (!shape || shape->kernel->geometryKind < 0 || shape->kernel->hasPerspective) {
     return std::nullopt;
   }

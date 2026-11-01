@@ -36,7 +36,8 @@ std::optional<YUVTextureFillShader::Inputs> YUVTextureFillShader::Extract(
 
 std::optional<YUVTextureFillShader::Inputs> YUVTextureFillShader::ExtractFacts(
     const AOTDrawFacts& facts, PermutationMatchFailure*) {
-  if (facts.alphaOnlyTarget) {
+  // The family-relative alpha-only gate (RejectsAlphaOnlyTarget's original semantics).
+  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }
   // The precompiled vert has no texSubset attribute, so subset-carrying quads fall back.

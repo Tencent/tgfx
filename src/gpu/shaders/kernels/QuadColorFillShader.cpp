@@ -32,7 +32,8 @@ std::optional<QuadColorFillShader::Inputs> QuadColorFillShader::Extract(
 
 std::optional<QuadColorFillShader::Inputs> QuadColorFillShader::ExtractFacts(
     const AOTDrawFacts& facts, PermutationMatchFailure*) {
-  if (facts.alphaOnlyTarget) {
+  // The family-relative alpha-only gate (RejectsAlphaOnlyTarget's original semantics).
+  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }
   if (facts.geometry.kind != AOTGeometryKind::QuadPerEdgeAA) {

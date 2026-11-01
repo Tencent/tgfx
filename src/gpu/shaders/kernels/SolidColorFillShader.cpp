@@ -34,7 +34,9 @@ std::optional<SolidColorFillShader::Inputs> SolidColorFillShader::Extract(
 
 std::optional<SolidColorFillShader::Inputs> SolidColorFillShader::ExtractFacts(
     const AOTDrawFacts& facts, PermutationMatchFailure*) {
-  if (facts.alphaOnlyTarget) {
+  // The family-relative alpha-only gate (this kernel applies the output swizzle, so it serves
+  // alpha-only targets — RejectsAlphaOnlyTarget's original semantics).
+  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }
   if (facts.geometry.kind != AOTGeometryKind::Default) {

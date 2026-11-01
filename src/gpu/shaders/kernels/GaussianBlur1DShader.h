@@ -24,6 +24,8 @@
 
 namespace tgfx {
 
+struct AOTDrawFacts;
+
 class FragmentProcessor;
 class ProgramInfo;
 
@@ -95,6 +97,10 @@ class GaussianBlur1DShader : public ShaderFamily<GaussianBlur1DShader> {
   /// budget), defined in the family's own .cpp, next to the GLSL it owns.
   static std::optional<Inputs> Extract(const ProgramInfo* programInfo,
                                        PermutationMatchFailure* failure);
+
+  /// The same acceptance over the draw's extracted facts: the executor-table row's predicate.
+  static std::optional<Inputs> ExtractFacts(const AOTDrawFacts& facts,
+                                            PermutationMatchFailure* failure);
 };
 
 }  // namespace tgfx

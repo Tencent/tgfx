@@ -19,37 +19,42 @@
 #include "gpu/shaders/kernels/GlassUDFTentBlurShader.h"
 #include <optional>
 #include "gpu/ProgramInfo.h"
-#include "gpu/ShaderMatchHelpers.h"
-#include "gpu/processors/PorterDuffXferProcessor.h"
+#include "gpu/aot/AOTDrawFacts.h"
 
 namespace tgfx {
 
 std::optional<GlassUDFTentBlurShader::Inputs> GlassUDFTentBlurShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure*) {
-  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
+  // The executor-table row and the walk share this one body.
+  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
+}
+
+std::optional<GlassUDFTentBlurShader::Inputs> GlassUDFTentBlurShader::ExtractFacts(
+    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+  // The family-relative alpha-only gate (RejectsAlphaOnlyTarget's original semantics).
+  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }
-  auto gp = programInfo->getGeometryProcessor();
-  int gpType = GetGPType(gp);
-  if (gpType < 0) {
+  if (facts.geometry.kind != AOTGeometryKind::Default &&
+      facts.geometry.kind != AOTGeometryKind::QuadPerEdgeAA) {
     return std::nullopt;
   }
-  if (programInfo->numColorFragmentProcessors() != 1) {
+  if (facts.colorFPCount != 1) {
     return std::nullopt;
   }
-  auto coverageType = SharedDeviceMaskValue(programInfo);
-  if (!coverageType) {
+  // The shared device-mask ABI gate (SharedDeviceMaskValue's semantics): an unclassifiable or
+  // local-mask coverage stays on other routes.
+  if (!facts.coverage || *facts.coverage == CoverageKind::LocalMask) {
     return std::nullopt;
   }
-  int xpType = GetXPType(programInfo);
+  int xpType = facts.xpType();
   if (xpType < XP_NONE) {
     return std::nullopt;
   }
   // The color expression reads off the carried IR's opaque-kernel node: the tent blur's barrier
   // over a single servable texture leaf (the horizontal pass reads a plain TextureEffect, the
   // vertical a TiledTextureEffect — the node's child leaf carries the shape).
-  auto shape =
-      ReadOpaqueKernelIRShape(programInfo, /*kernelKind=*/2, /*requiresTextureChild=*/true);
+  auto shape = ReadOpaqueKernelIRShape(facts.ir, /*kernelKind=*/2, /*requiresTextureChild=*/true);
   if (!shape) {
     return std::nullopt;
   }

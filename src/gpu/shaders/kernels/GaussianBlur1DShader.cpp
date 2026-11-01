@@ -10,7 +10,7 @@
 //      https://opensource.org/licenses/BSD-3-Clause
 //
 //  Unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. see the license for the specific language governing permissions and
 //  limitations under the license.
 //
@@ -19,35 +19,42 @@
 #include "gpu/shaders/kernels/GaussianBlur1DShader.h"
 #include <optional>
 #include "gpu/ProgramInfo.h"
-#include "gpu/ShaderMatchHelpers.h"
+#include "gpu/aot/AOTDrawFacts.h"
 
 namespace tgfx {
 
 std::optional<GaussianBlur1DShader::Inputs> GaussianBlur1DShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure*) {
-  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
+  // The executor-table row and the walk share this one body.
+  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
+}
+
+std::optional<GaussianBlur1DShader::Inputs> GaussianBlur1DShader::ExtractFacts(
+    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+  // The family-relative alpha-only gate (this kernel applies the output swizzle, so it serves
+  // alpha-only targets — RejectsAlphaOnlyTarget's original semantics).
+  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }
-  auto gp = programInfo->getGeometryProcessor();
-  int gpType = GetGPType(gp);
-  if (gpType < 0) {
+  if (facts.geometry.kind != AOTGeometryKind::Default &&
+      facts.geometry.kind != AOTGeometryKind::QuadPerEdgeAA) {
     return std::nullopt;
   }
-  if (programInfo->numColorFragmentProcessors() != 1) {
+  if (facts.colorFPCount != 1) {
     return std::nullopt;
   }
-  auto coverageType = SharedDeviceMaskValue(programInfo);
-  if (!coverageType) {
+  // The shared device-mask ABI gate (SharedDeviceMaskValue's semantics): an unclassifiable or
+  // local-mask coverage stays on other routes.
+  if (!facts.coverage || *facts.coverage == CoverageKind::LocalMask) {
     return std::nullopt;
   }
-  int xpType = GetXPType(programInfo);
+  int xpType = facts.xpType();
   if (xpType < XP_NONE) {
     return std::nullopt;
   }
   // The color expression reads off the carried IR's opaque-kernel node: the blur's barrier over
   // a single servable texture leaf (the node IS the contract; no processor-tree walk).
-  auto shape =
-      ReadOpaqueKernelIRShape(programInfo, /*kernelKind=*/0, /*requiresTextureChild=*/true);
+  auto shape = ReadOpaqueKernelIRShape(facts.ir, /*kernelKind=*/0, /*requiresTextureChild=*/true);
   if (!shape) {
     return std::nullopt;
   }
