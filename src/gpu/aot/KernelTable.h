@@ -1,0 +1,59 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
+//  compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#pragma once
+
+#include <optional>
+#include <vector>
+#include "gpu/aot/AOTDrawFacts.h"
+#include "gpu/PermutationMatch.h"
+#include "gpu/shaders/ShaderPermutation.h"
+
+namespace tgfx {
+
+/**
+ * One executor-table row: a dedicated family's acceptance as a function of the draw's extracted
+ * facts. The shape predicates read the IR's plain data (the family's ExtractFacts — the same
+ * body its Extract delegates to), and the compose half stays the family's own, so a row and the
+ * walk it migrated from share one implementation. Rows are tried in table order — the walk
+ * order they migrate from, which is ledger semantics.
+ */
+struct AOTKernelRow {
+  const char* family = nullptr;
+  std::optional<PermutationVariant> (*match)(const AOTDrawFacts&, PermutationMatchFailure*) =
+      nullptr;
+};
+
+/** The table's answer: which row accepted first, and the variant it composed. */
+struct AOTKernelMatch {
+  const AOTKernelRow* row = nullptr;
+  PermutationVariant variant = {};
+};
+
+/**
+ * The migrated dedicated families' rows, in walk order. Lookup applies no walk gates of its
+ * own: alpha-only rejection is a row predicate, and the diagnostic switches stay at the
+ * dispatch site (the dual-run assertion only compares while the dedicated walk is enabled).
+ */
+const std::vector<AOTKernelRow>& KernelTableRows();
+
+/** The first row whose predicate accepts the facts, or nullopt when none does. */
+std::optional<AOTKernelMatch> KernelTableLookup(const AOTDrawFacts& facts,
+                                                PermutationMatchFailure* failure);
+
+}  // namespace tgfx

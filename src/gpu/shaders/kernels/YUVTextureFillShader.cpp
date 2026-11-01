@@ -19,8 +19,8 @@
 #include "gpu/shaders/kernels/YUVTextureFillShader.h"
 #include <optional>
 #include "gpu/ProgramInfo.h"
-#include "gpu/ShaderMatchHelpers.h"
 #include "gpu/aot/AOTChainBuilder.h"
+#include "gpu/aot/AOTDrawFacts.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
@@ -29,34 +29,36 @@
 namespace tgfx {
 
 std::optional<YUVTextureFillShader::Inputs> YUVTextureFillShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure*) {
-  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
+  // The executor-table row and the walk share this one body.
+  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
+}
+
+std::optional<YUVTextureFillShader::Inputs> YUVTextureFillShader::ExtractFacts(
+    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+  if (facts.alphaOnlyTarget) {
     return std::nullopt;
   }
-  auto gp = programInfo->getGeometryProcessor();
-  if (!IsProcessor<QuadPerEdgeAAGeometryProcessor>(gp)) {
-    return std::nullopt;
-  }
-  auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
   // The precompiled vert has no texSubset attribute, so subset-carrying quads fall back.
-  if (quadGP->getHasSubset()) {
+  if (facts.geometry.kind != AOTGeometryKind::QuadPerEdgeAA || facts.geometry.hasSubset) {
     return std::nullopt;
   }
   // The color expression reads off the carried IR: the multi-plane source leaf with the bounded
   // color-grade operators above it (the node IS the contract; no processor-tree walk — the plain
   // bare-source route and the planned color-grade route produce the same graph, so the old
   // dual-form match is gone).
-  auto* ir = programInfo->getCarriedIR();
+  if (facts.ir == nullptr) {
+    return std::nullopt;
+  }
   AOTChainBuilder::AOTYUVTailShape shape = {};
-  if (ir == nullptr || !AOTChainBuilder::CollectYUVTail(ir->color, &shape)) {
+  if (!AOTChainBuilder::CollectYUVTail(facts.ir->color, &shape)) {
     return std::nullopt;
   }
   // No coverage processors (the runtime route stays authoritative for clipped video), and the
   // color processors are exactly the source plus the tail the IR carries — the staleness guard
   // keeps the tree and the graph in agreement.
-  auto colorCount = programInfo->numColorFragmentProcessors();
-  if (colorCount < 1 || colorCount > 1 + shape.ops.size() ||
-      colorCount != programInfo->numFragmentProcessors()) {
+  if (facts.colorFPCount < 1 || facts.colorFPCount > 1 + shape.ops.size() ||
+      facts.colorFPCount != facts.fragmentCount) {
     return std::nullopt;
   }
   int yuvFormat = shape.leaf->yuvFormat;
@@ -66,8 +68,8 @@ std::optional<YUVTextureFillShader::Inputs> YUVTextureFillShader::Extract(
     // upload values that stay on the processor until the node contract lands. A tree that
     // disagrees with the leaf's YUV-ness is a stale record-time lowering: reject.
     const TextureEffect* texture = nullptr;
-    for (size_t index = 0; index < programInfo->numFragmentProcessors(); ++index) {
-      auto* fp = programInfo->getFragmentProcessor(index);
+    for (size_t index = 0; index < facts.fragmentCount; ++index) {
+      auto* fp = facts.info->getFragmentProcessor(index);
       if (IsProcessor<TextureEffect>(fp)) {
         texture = static_cast<const TextureEffect*>(fp);
         break;
@@ -85,9 +87,22 @@ std::optional<YUVTextureFillShader::Inputs> YUVTextureFillShader::Extract(
     }
   }
   Inputs inputs;
-  inputs.hasUVMatrix = quadGP->hasUVMatrix();
+  inputs.hasUVMatrix = facts.geometry.hasUVMatrix;
   inputs.yuvFormat = yuvFormat;
-  inputs.xpType = GetXPType(programInfo);
+  switch (facts.xfer) {
+    case AOTXferKind::None:
+      inputs.xpType = XP_NONE;
+      break;
+    case AOTXferKind::DstTexture:
+      inputs.xpType = XP_DST_TEXTURE;
+      break;
+    case AOTXferKind::FrameBufferFetch:
+      inputs.xpType = XP_FRAMEBUFFER_FETCH;
+      break;
+    case AOTXferKind::Unsupported:
+      inputs.xpType = XP_UNSUPPORTED;
+      break;
+  }
   return inputs;
 }
 

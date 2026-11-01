@@ -29,6 +29,7 @@
 namespace tgfx {
 
 class ProgramInfo;
+struct AOTDrawFacts;
 enum class PermutationMatchFailure;
 
 /**
@@ -122,6 +123,21 @@ class ShaderFamily : public PrecompiledShader {
   static std::optional<PermutationVariant> Match(const ProgramInfo* programInfo,
                                                  PermutationMatchFailure* failure) {
     const auto inputs = T::Extract(programInfo, failure);
+    if (!inputs) {
+      return std::nullopt;
+    }
+    return ComposeToVariant(*inputs);
+  }
+
+  /**
+   * The executor-table entry: the same Extract → Compose → encode pipeline over the draw's
+   * extracted facts instead of the ProgramInfo. A family joins the table by declaring
+   * ExtractFacts; its Extract then delegates to it, so the walk and the table share one body
+   * and cannot disagree.
+   */
+  static std::optional<PermutationVariant> MatchFromFacts(const AOTDrawFacts& facts,
+                                                          PermutationMatchFailure* failure) {
+    const auto inputs = T::ExtractFacts(facts, failure);
     if (!inputs) {
       return std::nullopt;
     }

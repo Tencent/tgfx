@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "gpu/aot/AOTDrawFacts.h"
+#include "gpu/aot/KernelTable.h"
 #include <skcms.h>
 #include <string_view>
 #include <type_traits>
@@ -578,6 +580,31 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(
   }
   TGFX_FOR_EACH_SHADER_FAMILY(TGFX_TRY_FAMILY)
 #undef TGFX_TRY_FAMILY
+#ifndef NDEBUG
+  // Kernel-table dual-run: with the dedicated walk enabled, the table's first acceptor must be
+  // the family the walk chose — the audit's single-acceptor invariant makes the agreement
+  // exact (a dedicated acceptance precludes every other, and a walk rejection precludes the
+  // table's). A disagreement means a row's predicate drifted from its family's Extract.
+  if (allowDedicated) {
+    PermutationMatchFailure tableFailure = PermutationMatchFailure::None;
+    auto table = KernelTableLookup(ExtractAOTDrawFacts(programInfo), &tableFailure);
+    const char* tableFamily = table.has_value() ? table->row->family : nullptr;
+    // Only a table family's acceptance compares by name: a walk acceptance by a family not yet
+    // migrated (or by the interpreter, or none at all) must leave the table empty-handed — the
+    // single-acceptor invariant makes either side's rejection imply the other's.
+    const char* walkFamily = nullptr;
+    if (accepted.has_value()) {
+      for (const auto& row : KernelTableRows()) {
+        if (accepted->shaderName == row.family) {
+          walkFamily = row.family;
+          break;
+        }
+      }
+    }
+    DEBUG_ASSERT((tableFamily == nullptr) == (walkFamily == nullptr) &&
+                 (tableFamily == nullptr || std::string_view(tableFamily) == walkFamily));
+  }
+#endif
   if (accepted) {
     return accepted;
   }

@@ -24,6 +24,7 @@
 
 namespace tgfx {
 
+struct AOTDrawFacts;
 class FragmentProcessor;
 class ProgramInfo;
 
@@ -96,9 +97,14 @@ class YUVTextureFillShader : public ShaderFamily<YUVTextureFillShader> {
   }
 
   /// Whole-draw guards (alpha-only target, geometry processor kind, the YUV source shape),
-  /// defined in the family's own .cpp, next to the GLSL it owns.
+  /// defined in the family's own .cpp, next to the GLSL it owns. Delegates to ExtractFacts —
+  /// the executor-table row and the walk share one body.
   static std::optional<Inputs> Extract(const ProgramInfo* programInfo,
                                        PermutationMatchFailure* failure);
+
+  /// The same acceptance over the draw's extracted facts: the executor-table row's predicate.
+  static std::optional<Inputs> ExtractFacts(const AOTDrawFacts& facts,
+                                            PermutationMatchFailure* failure);
 };
 
 }  // namespace tgfx
