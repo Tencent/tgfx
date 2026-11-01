@@ -31,10 +31,12 @@ namespace tgfx {
  * noiseLowerings: record-time lowerings whose color graph carries a PerlinNoiseSource node
  * (family-independent, once per lowering). The geometry form is classified at PREPARE time —
  * the record-time GP is null for every canvas draw (the geometry descriptor's premise), so
- * noiseGP* counts the op's real geometry processor when it adopts the carried IR: Default is
- * the form the NoiseGraph variants do NOT cover today (the A/B decision), Quad is
- * QuadPerEdgeAA. Prepare-time counting may see one draw more than once (probe re-preparation);
- * the distribution's shape is the input, not the absolute count.
+ * noiseGP* counts the op's real geometry processor when it adopts the carried IR. NOTE: this
+ * is the GP CLASS, not the chain's variant dimensions — a QuadPerEdgeAA draw always carries
+ * the coverage attribute (non-AA quads emit 1.0), so the chain's HAS_COVERAGE dim is true for
+ * every quad; the coverage-FP count is a different fact and intentionally NOT probed here.
+ * Prepare-time counting may see one draw more than once (probe re-preparation); the
+ * distribution's shape is the input, not the absolute count.
  *
  * noiseSlotDepth*: constructed noise-profile chains by instruction-slot depth, plus the deepest
  * observed. ValidateSlots runs per plan-fit AND per compile, so one chain may count more than
@@ -47,7 +49,6 @@ struct AOTProbeCounters {
   std::atomic<uint64_t> noiseLowerings = {0};
   std::atomic<uint64_t> noiseGPDefault = {0};
   std::atomic<uint64_t> noiseGPQuad = {0};
-  std::atomic<uint64_t> noiseGPQuadNoCoverage = {0};
   std::atomic<uint64_t> noiseGPOther = {0};
   std::atomic<uint64_t> noiseSlotDepth1To8 = {0};
   std::atomic<uint64_t> noiseSlotDepth9To16 = {0};

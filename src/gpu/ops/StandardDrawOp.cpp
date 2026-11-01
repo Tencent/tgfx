@@ -158,11 +158,7 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget,
       if (IsProcessor<DefaultGeometryProcessor>(geometryProcessor.get())) {
         probes->noiseGPDefault.fetch_add(1, std::memory_order_relaxed);
       } else if (IsProcessor<QuadPerEdgeAAGeometryProcessor>(geometryProcessor.get())) {
-        if (coverages.empty()) {
-          probes->noiseGPQuadNoCoverage.fetch_add(1, std::memory_order_relaxed);
-        } else {
-          probes->noiseGPQuad.fetch_add(1, std::memory_order_relaxed);
-        }
+        probes->noiseGPQuad.fetch_add(1, std::memory_order_relaxed);
       } else {
         probes->noiseGPOther.fetch_add(1, std::memory_order_relaxed);
       }

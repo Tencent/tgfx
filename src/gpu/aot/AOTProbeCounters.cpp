@@ -36,7 +36,6 @@ void ResetAOTProbes() {
   counters->noiseLowerings.store(0, std::memory_order_relaxed);
   counters->noiseGPDefault.store(0, std::memory_order_relaxed);
   counters->noiseGPQuad.store(0, std::memory_order_relaxed);
-  counters->noiseGPQuadNoCoverage.store(0, std::memory_order_relaxed);
   counters->noiseGPOther.store(0, std::memory_order_relaxed);
   counters->noiseSlotDepth1To8.store(0, std::memory_order_relaxed);
   counters->noiseSlotDepth9To16.store(0, std::memory_order_relaxed);
@@ -51,12 +50,11 @@ void DumpAOTProbes() {
   const auto* counters = AOTProbe();
   auto relaxed = std::memory_order_relaxed;
   printf(
-      "[Probe] noise draws: lowerings=%llu, GP forms (prepare-time) Default=%llu "
-      "QuadPerEdgeAA+coverage=%llu QuadPerEdgeAA-noCoverage=%llu other=%llu\n",
+      "[Probe] noise draws: lowerings=%llu, GP classes (prepare-time) Default=%llu "
+      "QuadPerEdgeAA=%llu other=%llu\n",
       static_cast<unsigned long long>(counters->noiseLowerings.load(relaxed)),
       static_cast<unsigned long long>(counters->noiseGPDefault.load(relaxed)),
       static_cast<unsigned long long>(counters->noiseGPQuad.load(relaxed)),
-      static_cast<unsigned long long>(counters->noiseGPQuadNoCoverage.load(relaxed)),
       static_cast<unsigned long long>(counters->noiseGPOther.load(relaxed)));
   printf(
       "[Probe] noise chains by slot depth: 1-8=%llu 9-16=%llu 17-24=%llu 25-32=%llu "
