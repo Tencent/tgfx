@@ -1,6 +1,6 @@
 // Shared pointwise-operator uniform declarations. Included inside a FragmentUniformBlock by any
 // kernel that applies a runtime-selected pointwise operator (TexturedEffectShader,
-// PerlinNoiseFillShader, YUVTextureFillShader). OpType selects the operator; the remaining fields
+// YUVTextureFillShader). OpType selects the operator; the remaining fields
 // are the per-operator parameters. See pointwise_op.inc for the matching logic and OpType encoding.
 //
 // Single-slot kernels include this with TGFX_SLOT_ARRAY_SUFFIX undefined (scalar fields).

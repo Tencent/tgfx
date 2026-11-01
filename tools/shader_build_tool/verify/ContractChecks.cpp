@@ -310,7 +310,7 @@ size_t ValidateOpTableExclusivity(const std::string& shaderDir, Diagnostics* dia
 size_t ValidateSlotCapacities(const std::string& shaderDir, Diagnostics* diagnostics) {
   size_t errors = 0;
   const std::regex slotSuffixPattern("#define\\s+TGFX_SLOT_ARRAY_SUFFIX\\s*\\[\\s*(\\d+)\\s*\\]");
-  const char* slotKernels[] = {"kernels/perlin_noise.frag", "kernels/yuv_texture_fill.frag"};
+  const char* slotKernels[] = {"kernels/yuv_texture_fill.frag"};
   for (const char* fileName : slotKernels) {
     std::ifstream file(shaderDir + "/" + fileName);
     if (!file.is_open()) {

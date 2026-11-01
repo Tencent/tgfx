@@ -21,7 +21,6 @@
 #include "gpu/shaders/modules/GradientModule.h"
 #include "gpu/shaders/modules/ParamCatalog.h"
 #include "gpu/shaders/modules/ParamHandle.h"
-#include "gpu/shaders/modules/PerlinNoiseModule.h"
 #include "gpu/shaders/modules/PointwiseOpModule.h"
 #include "gpu/shaders/modules/PorterDuffXPModule.h"
 #include "gpu/shaders/modules/TextureSourceModule.h"
@@ -77,7 +76,6 @@ inline std::map<std::string, UniformFormat> BuildParamFormatTable(
       {BlurKernelModule::Fields, std::size(BlurKernelModule::Fields)},
       {DeviceMaskModule::Fields, std::size(DeviceMaskModule::Fields)},
       {GradientModule::Fields, std::size(GradientModule::Fields)},
-      {PerlinNoiseModule::Fields, std::size(PerlinNoiseModule::Fields)},
       {PointwiseOpModule::Fields, std::size(PointwiseOpModule::Fields)},
       {PorterDuffXPModule::Fields, std::size(PorterDuffXPModule::Fields)},
       {TextureSourceModule::Fields, std::size(TextureSourceModule::Fields)},

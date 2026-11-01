@@ -1663,16 +1663,6 @@ PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildFPForPass(BlockAllocator* 
       }
       return AOTYUVChainProcessor::Make(allocator, std::move(source), slots);
     }
-    case AOTKernelKind::PerlinNoiseFill: {
-      auto parameters =
-          sourceNode != nullptr && sourceNode->kind == AOTEffectKind::PerlinNoiseSource
-              ? std::get_if<AOTPerlinNoiseParameters>(&sourceNode->parameters)
-              : nullptr;
-      if (parameters == nullptr || slots.size() > MaxPointwiseSlots) {
-        return nullptr;
-      }
-      return PerlinNoiseFragmentProcessor::MakeFromAOTParameters(allocator, *parameters, slots);
-    }
     default:
       return nullptr;
   }
@@ -1936,30 +1926,6 @@ bool AOTChainBuilder::CompileChainProgramForInfo(BlockAllocator* allocator,
     return false;
   }
   return CompileChainLayout(ir->color, plan.passes[0], &ir->coverage, out);
-}
-
-PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildPerlinProcessorForInfo(
-    BlockAllocator* allocator, const ProgramInfo* programInfo) {
-  if (allocator == nullptr || programInfo == nullptr) {
-    return nullptr;
-  }
-  // The perlin kernel has no coverage-fold path: the perlin family only accepts a draw whose
-  // processors are all color processors.
-  if (programInfo->numFragmentProcessors() != programInfo->numColorFragmentProcessors()) {
-    return nullptr;
-  }
-  std::vector<const FragmentProcessor*> colorProcessors = {};
-  colorProcessors.reserve(programInfo->numColorFragmentProcessors());
-  for (size_t index = 0; index < programInfo->numColorFragmentProcessors(); ++index) {
-    colorProcessors.push_back(programInfo->getFragmentProcessor(index));
-  }
-  AOTEffectGraph graph = {};
-  AOTEffectPlan plan = {};
-  if (!AOTRouter::PlanSinglePass(colorProcessors, &graph, &plan) ||
-      plan.passes[0].kernel != AOTKernelKind::PerlinNoiseFill) {
-    return nullptr;
-  }
-  return BuildFPForPass(allocator, graph, plan.passes[0]);
 }
 
 }  // namespace tgfx

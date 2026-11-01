@@ -154,15 +154,4 @@ class ChainProgramWriter final : public ExpressionProgramWriter {
                      const FragmentProcessor* expression) const override;
 };
 
-/**
- * The perlin kernel's writer: it re-expresses the draw's color expression as the perlin processor
- * with its trailing operators folded into the slot records every draw, and uploads through the
- * processor's own data writer. The samplers stay the generic precompiled binding (the lookup
- * textures ride the info's own perlin processor).
- */
-class PerlinProgramWriter final : public ExpressionProgramWriter {
- protected:
-  Expression buildExpression(const ProgramInfo& info) const override;
-};
-
 }  // namespace tgfx

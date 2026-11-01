@@ -303,8 +303,8 @@ using AOTEffectParameters =
                  AOTBlendParameters, AOTPerlinNoiseParameters, AOTRectCoverageParameters,
                  AOTGradientParameters, AOTRRectCoverageParameters, AOTOpaqueKernelParameters>;
 
-// Runtime-selected pointwise operator applied by the fused kernels (PointwiseChain,
-// PerlinNoiseFill and YUVTextureFill). The values are the AOTPointwiseOpType subset of the shared
+// Runtime-selected pointwise operator applied by the fused kernels (PointwiseChain and
+// YUVTextureFill). The values are the AOTPointwiseOpType subset of the shared
 // op table (operator/op_codes.inc): the kernels declare every operator's parameter block
 // unconditionally and select at draw time via a uniform, so the operator kind is never a
 // compile-time permutation axis.

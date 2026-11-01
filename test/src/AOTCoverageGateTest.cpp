@@ -115,7 +115,7 @@ const ProcessorClaim ProcessorClaims[] = {
     {"AOTYUVChainProcessor", "AOTYUVChainProcessor", Matcher,
      "the YUV color-grade route: matcher-claimed through YUVTextureFillShader::Match"},
     {"LumaFragmentProcessor", "LumaFragmentProcessor", Matcher | Lowering, ""},
-    {"PerlinNoiseFragmentProcessor", "PerlinNoiseFragmentProcessor", Matcher | Lowering, ""},
+    {"PerlinNoiseFragmentProcessor", "PerlinNoiseFragmentProcessor", Lowering, ""},
     {"RectEffect", "RectEffect", Matcher | Lowering, ""},
     {"RRectEffect", "RRectEffect", Matcher | Lowering, ""},
     {"TextureEffect", "TextureEffect", Matcher | Lowering, ""},

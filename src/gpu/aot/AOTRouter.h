@@ -80,7 +80,7 @@ class AOTRouter {
   /**
    * Plans processors for the fused serving: true when they lower and decompose into a single pass
    * of a kernel whose processor can stand in for a draw's whole color expression
-   * (PointwiseChain, PointwiseGraph, or PerlinNoiseFill). A multi-pass plan never qualifies: its
+   * (PointwiseChain or PointwiseGraph). A multi-pass plan never qualifies: its
    * intermediate passes need a plan task — so only the single-pass planners run, skipping the cut
    * and linear-split planners whose results this entry would always discard.
    */

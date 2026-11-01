@@ -53,7 +53,7 @@ size_t ValidateSlotOpReferences(const std::string& shaderDir, Diagnostics* diagn
 size_t ValidateOpTableExclusivity(const std::string& shaderDir, Diagnostics* diagnostics);
 
 /// Validates the slot-capacity literals the GLSL kernels carry against the C++ constants they
-/// must agree with: the TGFX_SLOT_ARRAY_SUFFIX in perlin_noise.frag / yuv_texture_fill.frag must
+/// must agree with: the TGFX_SLOT_ARRAY_SUFFIX in yuv_texture_fill.frag must
 /// equal MaxPointwiseSlots, and the CHAIN_SLOT_CAPACITY defines in pointwise_chain.frag must
 /// equal the AOTResourceCapacity instruction counts (16 for the plain and tiled-graph kinds, 32
 /// for the noise-graph kind). Returns the error count.

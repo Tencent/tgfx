@@ -286,9 +286,6 @@ static std::unique_ptr<ProgramWriter> MakeProgramWriter(const std::string& shade
   if (shaderName == PointwiseChainShader::Name) {
     return std::make_unique<ChainProgramWriter>();
   }
-  if (shaderName == PerlinNoiseFillShader::Name) {
-    return std::make_unique<PerlinProgramWriter>();
-  }
   return std::make_unique<PrecompiledProgramWriter>();
 }
 

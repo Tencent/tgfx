@@ -532,19 +532,4 @@ void ChainProgramWriter::writeSamplers(const ProgramInfo& info, Program* program
   DEBUG_ASSERT(textureBinding == program->expectedTextureCount());
 }
 
-ProgramWriter::Expression PerlinProgramWriter::buildExpression(const ProgramInfo& info) const {
-  // The match walk built the expression while accepting the draw; reuse it for this draw's value
-  // write instead of rebuilding it.
-  if (auto* cached = info.getCachedReexpression()) {
-    return {{}, cached};
-  }
-  auto context = info.getContext();
-  if (context == nullptr || context->drawingManager() == nullptr) {
-    return {};
-  }
-  return {AOTChainBuilder::BuildPerlinProcessorForInfo(
-              context->drawingManager()->drawingAllocator(), &info),
-          nullptr};
-}
-
 }  // namespace tgfx

@@ -1,7 +1,7 @@
 // Shared pointwise-operator logic. Provides applyPointwiseOp(vec4), which applies exactly one
 // premultiplied-in/premultiplied-out pointwise operator selected at runtime by the OpType uniform:
 //   0 = ColorMatrix, 1 = Luma, 2 = AlphaThreshold, 3 = ColorSpaceXform, 4 = None (passthrough).
-// OP_NONE lets a producer kernel (e.g. PerlinNoiseFillShader) emit its raw premultiplied output when
+// OP_NONE lets a producer kernel (e.g. YUVTextureFillShader) emit its raw premultiplied output when
 // no operator FP is composed on top of it, while the same OpType uniform absorbs the composed case.
 // Requires the pointwise_op_uniforms.inc fields to be present in the FragmentUniformBlock.
 //

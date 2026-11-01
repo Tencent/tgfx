@@ -47,10 +47,9 @@ struct AOTChainCompile {
 /**
  * Rebuilds concrete FragmentProcessors from a decomposed AOT plan: the fused chain kernel for
  * PointwiseChain/PointwiseGraph passes (a multi-pass plan's passes are built as cut segments
- * through BuildCutSegment), the perlin kernel for PerlinNoiseFill and the YUV kernel for
- * YUVTextureFill. Used by AOTPlanExecutor's task assembly and by the two re-expressing
- * kernels' per-draw views of an unmodified ProgramInfo (CompileChainProgramForInfo /
- * BuildPerlinProcessorForInfo).
+ * through BuildCutSegment) and the YUV kernel for
+ * YUVTextureFill. Used by AOTPlanExecutor's task assembly and by the re-expressing
+ * chain kernel's per-draw view of an unmodified ProgramInfo (CompileChainProgramForInfo).
  */
 class AOTChainBuilder {
  public:
@@ -175,16 +174,5 @@ class AOTChainBuilder {
    */
   static bool CompileChainProgramForInfo(BlockAllocator* allocator, const ProgramInfo* programInfo,
                                          AOTProgram* out);
-
-  /**
-   * Re-expresses a coverage-free draw's color expression as the perlin kernel processor with its
-   * trailing operators (pointwise ops, const colors, const blends) folded into the slot records,
-   * without touching the draw. This is the perlin kernel's view of an unmodified ProgramInfo: the
-   * family's matcher uses it as the acceptance oracle and its program writer rebuilds it per draw
-   * to upload the values. Returns nullptr when the expression does not reduce onto a single
-   * perlin pass (a non-perlin root, an over-slot shape, any coverage processor).
-   */
-  static PlacementPtr<FragmentProcessor> BuildPerlinProcessorForInfo(
-      BlockAllocator* allocator, const ProgramInfo* programInfo);
 };
 }  // namespace tgfx

@@ -4,39 +4,37 @@
 //
 //  Copyright (C) 2026 Tencent. All rights reserved.
 //
-//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
-//  in compliance with the License. You may obtain a copy of the License at
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
+//  compliance with the License. You may obtain a copy of the License at
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  License is distributed on an "as is" basis, without warranties or conditions of any kind,
 //  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
 #include <memory>
-#include <vector>
 #include "core/shaders/PerlinNoiseShader.h"
 #include "gpu/aot/EffectGraph.h"
 #include "gpu/processors/FragmentProcessor.h"
-#include "gpu/shaders/KernelContract.h"
 
 namespace tgfx {
 class Context;
 class Texture;
 class TextureView;
 
+// The procedural-noise source processor. The precompiled side is served by the pointwise chain's
+// NoiseGraph resource kind: the noise is a leaf in the chain graph (one instruction slot, its
+// parameters in the chain's fixed noise block), and any operators composed above it are ordinary
+// chain slots — the dedicated perlin kernel and its folded slot records were removed with it.
 class PerlinNoiseFragmentProcessor : public FragmentProcessor {
  public:
   DEFINE_PROCESSOR_CLASS_ID
-  // The precompiled PerlinNoiseFillShader carries three pointwise-operator slots: the first is
-  // shared with an operator FP composed on top of this processor, the rest are reserved for slot
-  // records uploaded by the processor itself. The capacity value itself is MaxPointwiseSlots in
-  // KernelContract.h.
 
   static PlacementPtr<PerlinNoiseFragmentProcessor> Make(
       BlockAllocator* allocator, Context* context, PerlinNoiseType noiseType, int numOctaves,
@@ -44,28 +42,23 @@ class PerlinNoiseFragmentProcessor : public FragmentProcessor {
       const Matrix* uvMatrix);
 
   // Rebuilds a PerlinNoiseFragmentProcessor from already-built lookup textures, skipping the
-  // TextureView::MakeAlpha/MakeRGBA upload that Make() performs. Used by AOTPlanExecutor to
-  // reconstruct the processor from a lowered AOTPerlinNoiseParameters, whose permutationsView and
-  // noiseView were captured at lowerToAOT() time and must not be regenerated. slots holds up to
-  // MaxPointwiseSlots pointwise operators applied after the noise, which the processor uploads
-  // into the kernel's OpType/Slot1OpType uniform records; pass an empty vector for a bare noise
-  // source.
+  // TextureView::MakeAlpha/MakeRGBA upload that Make() performs. Used by the chain plan's
+  // executor to reconstruct the processor from a lowered AOTPerlinNoiseParameters, whose
+  // permutationsView and noiseView were captured at lowerToAOT() time and must not be
+  // regenerated.
   static PlacementPtr<PerlinNoiseFragmentProcessor> MakeFromViews(
       BlockAllocator* allocator, PerlinNoiseType noiseType, int numOctaves, bool stitchTiles,
       std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,
       std::shared_ptr<TextureView> permutationsView, std::shared_ptr<TextureView> noiseView,
-      const Matrix* uvMatrix, const std::vector<AOTPointwiseSlot>& slots);
+      const Matrix* uvMatrix);
 
+  // Rebuilds the processor from a lowered AOTPerlinNoiseParameters (the lookup-identity path the
+  // lowering tests exercise; the plan executor's perlin reconstruction went with the kernel).
   static PlacementPtr<PerlinNoiseFragmentProcessor> MakeFromAOTParameters(
-      BlockAllocator* allocator, const AOTPerlinNoiseParameters& parameters,
-      const std::vector<AOTPointwiseSlot>& slots);
+      BlockAllocator* allocator, const AOTPerlinNoiseParameters& parameters);
 
   std::string name() const override {
     return "PerlinNoiseFragmentProcessor";
-  }
-
-  size_t pointwiseSlotCount() const {
-    return slotCount;
   }
 
   PerlinNoiseType getNoiseType() const {
@@ -84,10 +77,6 @@ class PerlinNoiseFragmentProcessor : public FragmentProcessor {
     return paintingData.get();
   }
 
-  const AOTPointwiseSlot& pointwiseSlot(size_t index) const {
-    return pointwiseSlots[index];
-  }
-
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   size_t onCountTextureSamplers() const override {
@@ -98,7 +87,6 @@ class PerlinNoiseFragmentProcessor : public FragmentProcessor {
 
   SamplerState onSamplerStateAt(size_t index) const override;
 
-  bool onBindPrecompiled(ParamWriter* writer) const override;
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:
@@ -106,7 +94,6 @@ class PerlinNoiseFragmentProcessor : public FragmentProcessor {
                                std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,
                                std::shared_ptr<TextureView> permutationsView,
                                std::shared_ptr<TextureView> noiseView, const Matrix* uvMatrix,
-                               const std::vector<AOTPointwiseSlot>& slots,
                                bool hasOriginalLookupData = false);
 
   bool hasOriginalLookupData = false;
@@ -118,7 +105,5 @@ class PerlinNoiseFragmentProcessor : public FragmentProcessor {
   std::shared_ptr<TextureView> permutationsView;
   std::shared_ptr<TextureView> noiseView;
   CoordTransform coordTransform;
-  size_t slotCount = 0;
-  std::array<AOTPointwiseSlot, MaxPointwiseSlots> pointwiseSlots = {};
 };
 }  // namespace tgfx

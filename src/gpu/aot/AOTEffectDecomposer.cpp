@@ -238,97 +238,6 @@ static bool DecomposeLinearMultiPass(const AOTEffectGraph& graph, AOTEffectPlan*
   return true;
 }
 
-// Planner for a procedural-noise source: GeometryColor -> PerlinNoiseSource -> [0..3 unary
-// pointwise ops]. PerlinNoiseFillShader carries three pointwise slots (a base OpType record
-// shared with a composed operator FP and two processor-owned records), so up to three operators
-// fold into a single fused pass with no materialization. Besides the pure pointwise ops, a slot
-// may be a ConstColor op or a Blend whose other operand is a ConstColor node (the side constant
-// stays out of pass.nodes; its value is read from the blend node's inputs at build time).
-// A single-child xfer lowers its constant child from an explicit opaque-white designator
-// (GeometryWhiteInput, see XfermodeFragmentProcessor::lowerToAOT). The designator never becomes a
-// slot, so it is skipped here exactly as the DAG planner skips it; the slot budget, not the raw
-// node count, bounds the pass.
-static bool DecomposePerlinNoiseChain(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
-  if (plan == nullptr || graph.nodeCount() < 2 || graph.root().index() + 1 != graph.nodeCount()) {
-    return false;
-  }
-  auto geometryNode = graph.nodeAt(AOTNodeID(0));
-  auto noiseParameters =
-      std::get_if<AOTPerlinNoiseParameters>(&graph.nodeAt(AOTNodeID(1))->parameters);
-  if (geometryNode == nullptr || geometryNode->kind != AOTEffectKind::GeometryColor ||
-      !IsPerlinNoiseSource(graph, AOTNodeID(1)) || noiseParameters == nullptr ||
-      noiseParameters->permutationsView == nullptr || noiseParameters->noiseView == nullptr) {
-    return false;
-  }
-  std::vector<AOTNodeID> passNodes = {AOTNodeID(1)};
-  AOTNodeID prev = AOTNodeID(1);
-  size_t slotCount = 0;
-  uint32_t index = 2;
-  while (index < graph.nodeCount()) {
-    auto node = graph.nodeAt(AOTNodeID(index));
-    if (node == nullptr) {
-      return false;
-    }
-    if (node->kind == AOTEffectKind::GeometryWhiteInput) {
-      // Designator only; its single consumer (the xfer's constant child) is checked below, and any
-      // other consumer is rejected when the loop reaches it.
-      ++index;
-      continue;
-    }
-    if (slotCount >= MaxPointwiseSlots) {
-      return false;
-    }
-    if (IsUnaryPointwiseOp(node, prev)) {
-      passNodes.push_back(AOTNodeID(index));
-      ++slotCount;
-      prev = AOTNodeID(index);
-      ++index;
-      continue;
-    }
-    if (node->kind == AOTEffectKind::ConstColor && node->inputs.size() == 1) {
-      auto next = index + 1 < graph.nodeCount() ? graph.nodeAt(AOTNodeID(index + 1)) : nullptr;
-      if (next != nullptr && next->kind == AOTEffectKind::Blend && next->inputs.size() == 2 &&
-          ((next->inputs[0] == AOTNodeID(index) && next->inputs[1] == prev) ||
-           (next->inputs[1] == AOTNodeID(index) && next->inputs[0] == prev))) {
-        // The shared const-operand rule plus the adjacency this planner needs: the constant is
-        // the node right before the blend (the slot's uniform record reads it from the blend's
-        // input edge). An inexpressible pair rejects the chain here, not at the executor.
-        if (!IsConstOperandBlend(graph, next, prev)) {
-          return false;
-        }
-        passNodes.push_back(AOTNodeID(index + 1));
-        ++slotCount;
-        prev = AOTNodeID(index + 1);
-        index += 2;
-        continue;
-      }
-      if (node->inputs[0] == prev) {
-        // A const-color op of its own, applied to the chain value (OP_CONST_COLOR honors the
-        // input mode).
-        passNodes.push_back(AOTNodeID(index));
-        ++slotCount;
-        prev = AOTNodeID(index);
-        ++index;
-        continue;
-      }
-    }
-    return false;
-  }
-  if (slotCount > MaxPointwiseSlots || prev != graph.root()) {
-    return false;
-  }
-
-  AOTEffectPlan result = {};
-  AOTPassDescriptor pass = {};
-  pass.kernel = AOTKernelKind::PerlinNoiseFill;
-  pass.nodes = std::move(passNodes);
-  pass.output = pass.nodes.back();
-  result.passes.push_back(std::move(pass));
-  result.output = graph.root();
-  *plan = std::move(result);
-  return true;
-}
-
 // Planner for a YUV video source with a bounded color-grade tail: GeometryColor -> YUV
 // TextureSource -> [0..3 unary pointwise ops]. YUVTextureFillShader carries the plane sampling
 // and conversion plus three pointwise slots, so the color-grade shapes (a paint color filter
@@ -608,17 +517,15 @@ static bool DecomposeMaterializedBlend(const AOTEffectGraph& graph, AOTEffectPla
 
 bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTEffectPlan* plan,
                                     bool singlePassOnly) {
-  // Keep simple noise on the existing compact kernel. Noise DAGs and ordinary pointwise DAGs
-  // use their separate graph/chain families within shared budgets, without materialization.
-  // A linear chain over one chain pass's budget splits into several chain passes; YUV sources
-  // keep their dedicated kernel.
+  // Pointwise DAGs (noise and gradient sources included) run on the chain family within its
+  // budgets, without materialization. A linear chain over one chain pass's budget splits into
+  // several chain passes; YUV sources keep their dedicated kernel.
   if (plan == nullptr) {
     return false;
   }
   using Planner = bool (*)(const AOTEffectGraph&, AOTEffectPlan*);
-  for (Planner planner :
-       {DecomposePerlinNoiseChain, DecomposePointwiseDAG, DecomposeMaterializedBlend,
-        DecomposeLinearMultiPass, DecomposeYUVChain}) {
+  for (Planner planner : {DecomposePointwiseDAG, DecomposeMaterializedBlend,
+                          DecomposeLinearMultiPass, DecomposeYUVChain}) {
     if (singlePassOnly && planner == &DecomposeMaterializedBlend) {
       // The cut planner's plans always start with a materializing pass and always need a task;
       // a single-pass-only caller would run its iterative segment builds only to discard the

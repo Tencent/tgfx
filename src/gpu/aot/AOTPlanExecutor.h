@@ -35,7 +35,7 @@ class AOTPlanExecutor {
  public:
   /**
    * Whether the executor can run this plan with the precompiled kernels: either one pass of a
-   * kernel the executor runs on a draw (PointwiseChain/Graph, PerlinNoiseFill, YUVTextureFill)
+   * kernel the executor runs on a draw (PointwiseChain/Graph, YUVTextureFill)
    * within that kernel's slot and resource budgets, or a linear chain split into several chain
    * passes, each fitting one chain pass. Decompose only returns plans that pass it,
    * so every production entry and every diagnostic that reports a draw as routable share this rule.

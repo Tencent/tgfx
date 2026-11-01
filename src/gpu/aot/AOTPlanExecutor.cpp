@@ -22,16 +22,6 @@ namespace {
 // blend are shared shape rules (gpu/AOTShapeRules.h) — the same authority the planners and the
 // chain builder consume, so the admission checks below cannot drift from them.
 
-// A perlin pass's source must also carry resolvable lookup tables: the shape rule admits the
-// node, the kernel still needs the two views at bind time.
-static bool HasValidNoiseViews(const AOTEffectGraph& graph, AOTNodeID nodeID) {
-  auto node = graph.nodeAt(nodeID);
-  auto parameters =
-      node != nullptr ? std::get_if<AOTPerlinNoiseParameters>(&node->parameters) : nullptr;
-  return parameters != nullptr && parameters->permutationsView != nullptr &&
-         parameters->noiseView != nullptr;
-}
-
 // The operator slots after a linear pass's source: unary pointwise ops chained in order. The perlin
 // kernel additionally carries a const-color op or a blend whose other operand is an input-
 // independent constant (the constant itself stays out of pass.nodes).
@@ -326,10 +316,6 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
     case AOTKernelKind::YUVTextureFill:
       return pass.nodes.size() <= 1 + MaxPointwiseSlots && IsYUVChainSource(graph, pass.nodes[0]) &&
              ValidateLinearSlots(graph, pass, false);
-    case AOTKernelKind::PerlinNoiseFill:
-      return pass.nodes.size() <= 1 + MaxPointwiseSlots &&
-             IsPerlinNoiseSource(graph, pass.nodes[0]) &&
-             HasValidNoiseViews(graph, pass.nodes[0]) && ValidateLinearSlots(graph, pass, true);
     default:
       return false;
   }

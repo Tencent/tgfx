@@ -26,7 +26,7 @@ namespace tgfx {
 // processor standing in for a draw's whole color expression. Every other kernel needs a plan
 // task.
 static bool IsFusedServingKernel(AOTKernelKind kernel) {
-  return IsAOTPointwiseDAGKernel(kernel) || kernel == AOTKernelKind::PerlinNoiseFill;
+  return IsAOTPointwiseDAGKernel(kernel);
 }
 
 std::optional<AOTEffectPlan> AOTRouter::Plan(const DrawIR& ir,

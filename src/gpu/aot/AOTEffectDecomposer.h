@@ -34,11 +34,6 @@ enum class AOTKernelKind {
   // planner, and for every pass of a linear chain the multi-pass planner splits; its kernel
   // artifact is PointwiseChainShader.
   PointwiseChain,
-  // A procedural-noise source (PerlinNoiseFragmentProcessor) optionally followed by up to three
-  // folded pointwise/const/blend operator slots, matching PerlinNoiseFillShader. Produced by
-  // DecomposePerlinNoiseChain; the plan is always a single pass — shapes beyond the slot budget
-  // are rejected rather than split.
-  PerlinNoiseFill,
   // A YUV video source (TextureEffect over an I420/NV12 proxy) optionally followed by up to
   // three bounded pointwise operator slots, matching YUVTextureFillShader's color-grade tail.
   // Produced by DecomposeYUVChain; single pass, over-budget shapes are rejected.

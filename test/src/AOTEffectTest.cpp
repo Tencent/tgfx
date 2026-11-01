@@ -2229,7 +2229,7 @@ TGFX_TEST(AOTEffectTest, PerlinNoiseReconstructionPreservesLookupEvidence) {
       std::get_if<AOTPerlinNoiseParameters>(&graph.nodeAt(AOTNodeID(1))->parameters);
   ASSERT_NE(parameters, nullptr);
   ASSERT_NE(parameters->lookupData, nullptr);
-  auto rebuilt = PerlinNoiseFragmentProcessor::MakeFromAOTParameters(&allocator, *parameters, {});
+  auto rebuilt = PerlinNoiseFragmentProcessor::MakeFromAOTParameters(&allocator, *parameters);
   ASSERT_NE(rebuilt, nullptr);
   AOTEffectGraph rebuiltGraph;
   ASSERT_TRUE(AOTEffectDecomposer::Lower({rebuilt.get()}, &rebuiltGraph));
@@ -2244,7 +2244,7 @@ TGFX_TEST(AOTEffectTest, PerlinNoiseReconstructionPreservesLookupEvidence) {
   auto rawRebuild = PerlinNoiseFragmentProcessor::MakeFromViews(
       &allocator, static_cast<PerlinNoiseType>(parameters->noiseType), parameters->numOctaves,
       parameters->stitchTiles, std::move(paintingData), parameters->permutationsView,
-      parameters->noiseView, &parameters->uvMatrix, {});
+      parameters->noiseView, &parameters->uvMatrix);
   ASSERT_NE(rawRebuild, nullptr);
   AOTEffectGraph rawGraph;
   ASSERT_TRUE(AOTEffectDecomposer::Lower({rawRebuild.get()}, &rawGraph));
@@ -2556,7 +2556,7 @@ TGFX_TEST(AOTEffectTest, PerlinDAGMaterializesDistinctNoiseAndPrunesUnusedInputs
                                                    plan.passes[0], {}, false, &rebuilt));
 }
 
-TGFX_TEST(AOTEffectTest, BarePerlinNoiseUsesPerlinNoiseFillPlanner) {
+TGFX_TEST(AOTEffectTest, BarePerlinNoisePlansOntoTheChainDAG) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
@@ -2569,7 +2569,7 @@ TGFX_TEST(AOTEffectTest, BarePerlinNoiseUsesPerlinNoiseFillPlanner) {
   AOTEffectPlan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
-  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PerlinNoiseFill);
+  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseGraph);
   EXPECT_EQ(plan.passes[0].nodes, std::vector<AOTNodeID>({AOTNodeID(1)}));
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
 }
@@ -2589,7 +2589,7 @@ TGFX_TEST(AOTEffectTest, PerlinNoisePlusOneOpFusesToSinglePass) {
   AOTEffectPlan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
-  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PerlinNoiseFill);
+  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseGraph);
   EXPECT_EQ(plan.passes[0].nodes, std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(2)}));
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
 }
@@ -3103,7 +3103,7 @@ TGFX_TEST(AOTEffectTest, PerlinNoisePlusTwoOpsFusesToSinglePass) {
   AOTEffectPlan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
-  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PerlinNoiseFill);
+  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseGraph);
   EXPECT_EQ(plan.passes[0].nodes,
             std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(2), AOTNodeID(3)}));
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
@@ -3138,10 +3138,12 @@ TGFX_TEST(AOTEffectTest, PerlinNoiseConstBlendFusesToSinglePass) {
   AOTEffectPlan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
-  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PerlinNoiseFill);
-  EXPECT_EQ(plan.passes[0].nodes, std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(4)}));
+  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseGraph);
+  EXPECT_EQ(plan.passes[0].nodes,
+            std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(3), AOTNodeID(4)}));
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
-  EXPECT_NE(BuildProcessorForTest(&allocator, graph, plan.passes[0]), nullptr);
+  AOTProgram admittedPass = {};
+  EXPECT_TRUE(CompileChainForTest(graph, plan.passes[0], &admittedPass));
 }
 
 // The SVG feTurbulence shape with a trailing colorize: Perlin -> luminanceToAlpha -> threshold ->
@@ -3171,18 +3173,18 @@ TGFX_TEST(AOTEffectTest, PerlinNoiseOpsThenConstBlendFusesToSinglePass) {
   AOTEffectPlan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
-  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PerlinNoiseFill);
-  EXPECT_EQ(plan.passes[0].nodes,
-            std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(2), AOTNodeID(3), AOTNodeID(6)}));
+  EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseGraph);
+  EXPECT_EQ(plan.passes[0].nodes, std::vector<AOTNodeID>({AOTNodeID(1), AOTNodeID(2), AOTNodeID(3),
+                                                          AOTNodeID(5), AOTNodeID(6)}));
   EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
-  EXPECT_NE(BuildProcessorForTest(&allocator, graph, plan.passes[0]), nullptr);
+  AOTProgram admittedPass = {};
+  EXPECT_TRUE(CompileChainForTest(graph, plan.passes[0], &admittedPass));
 }
 
-// The Perlin blend slot uploads the constant operand as-is. An operand whose value depends on its
-// input edge (a modulating const fed by the chain value) cannot ride that slot and must be refused
-// by the planner, the executor check, and the builder alike; an Ignore-mode operand fed by the
-// chain value is input-independent and stays accepted.
-TGFX_TEST(AOTEffectTest, PerlinNoiseBlendRefusesInputDependentConstOperand) {
+// A const operand over the noise: the dedicated perlin kernel's slot rule refused an operand whose
+// value depends on its input edge, but the chain's ConstColor op carries the input mode natively —
+// both an Ignore-mode and a Modulate-mode operand plan onto the same fused DAG pass.
+TGFX_TEST(AOTEffectTest, PerlinNoiseBlendServesBothConstInputModes) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
@@ -3208,25 +3210,17 @@ TGFX_TEST(AOTEffectTest, PerlinNoiseBlendRefusesInputDependentConstOperand) {
            builder.addBlend(constant, noise, blendParameters, &blended) &&
            builder.finish(blended, graph);
   };
-  auto servedByPerlin = [&](const AOTEffectGraph& graph) {
+  auto servedByChain = [&](const AOTEffectGraph& graph) {
     AOTEffectPlan plan;
     return AOTEffectDecomposer::Decompose(graph, &plan) && plan.passes.size() == 1 &&
-           plan.passes[0].kernel == AOTKernelKind::PerlinNoiseFill;
+           plan.passes[0].kernel == AOTKernelKind::PointwiseGraph;
   };
   AOTEffectGraph ignoreGraph;
   ASSERT_TRUE(buildGraph(static_cast<int>(InputMode::Ignore), &ignoreGraph));
-  EXPECT_TRUE(servedByPerlin(ignoreGraph));
+  EXPECT_TRUE(servedByChain(ignoreGraph));
   AOTEffectGraph modulateGraph;
   ASSERT_TRUE(buildGraph(static_cast<int>(InputMode::ModulateRGBA), &modulateGraph));
-  EXPECT_FALSE(servedByPerlin(modulateGraph));
-  AOTEffectPlan forcedPlan;
-  forcedPlan.passes.emplace_back();
-  forcedPlan.passes[0].kernel = AOTKernelKind::PerlinNoiseFill;
-  forcedPlan.passes[0].nodes = {AOTNodeID(1), AOTNodeID(3)};
-  forcedPlan.passes[0].output = AOTNodeID(3);
-  forcedPlan.output = modulateGraph.root();
-  EXPECT_FALSE(AOTPlanExecutor::CanExecute(modulateGraph, forcedPlan));
-  EXPECT_EQ(BuildProcessorForTest(&allocator, modulateGraph, forcedPlan.passes[0]), nullptr);
+  EXPECT_TRUE(servedByChain(modulateGraph));
 }
 
 // Table-driven admission matrix. Each row is one processor chain plus the route it must take; the
@@ -3355,9 +3349,7 @@ TGFX_TEST(AOTEffectTest, AdmissionMatrixKeepsPlanningAndConstructionAligned) {
     EXPECT_EQ(plan.passes[0].kernel, row.kernel);
     EXPECT_TRUE(AOTPlanExecutor::CanExecute(graph, plan));
     AOTProgram admittedPass = {};
-    EXPECT_TRUE(row.kernel == AOTKernelKind::PerlinNoiseFill
-                    ? BuildProcessorForTest(&allocator, graph, plan.passes[0]) != nullptr
-                    : CompileChainForTest(graph, plan.passes[0], &admittedPass));
+    EXPECT_TRUE(CompileChainForTest(graph, plan.passes[0], &admittedPass));
   }
 }
 

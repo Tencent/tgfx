@@ -18,7 +18,6 @@
 
 #include "GLSLPerlinNoiseFragmentProcessor.h"
 #include "core/shaders/PerlinNoiseShader.h"
-#include "gpu/aot/AOTPointwiseSlotWriter.h"
 #include "gpu/resources/TextureView.h"
 
 namespace tgfx {
@@ -53,38 +52,30 @@ PlacementPtr<PerlinNoiseFragmentProcessor> PerlinNoiseFragmentProcessor::Make(
 
   return allocator->make<GLSLPerlinNoiseFragmentProcessor>(
       noiseType, numOctaves, stitchTiles, std::move(paintingData), std::move(permutationsView),
-      std::move(noiseView), uvMatrix, std::vector<AOTPointwiseSlot>{}, true);
+      std::move(noiseView), uvMatrix, true);
 }
 
 PlacementPtr<PerlinNoiseFragmentProcessor> PerlinNoiseFragmentProcessor::MakeFromViews(
     BlockAllocator* allocator, PerlinNoiseType noiseType, int numOctaves, bool stitchTiles,
     std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,
     std::shared_ptr<TextureView> permutationsView, std::shared_ptr<TextureView> noiseView,
-    const Matrix* uvMatrix, const std::vector<AOTPointwiseSlot>& slots) {
-  if (paintingData == nullptr || permutationsView == nullptr || noiseView == nullptr ||
-      slots.size() > MaxPointwiseSlots) {
+    const Matrix* uvMatrix) {
+  if (paintingData == nullptr || permutationsView == nullptr || noiseView == nullptr) {
     return nullptr;
-  }
-  for (const auto& slot : slots) {
-    if (slot.type == AOTPointwiseOpType::None ||
-        (slot.type == AOTPointwiseOpType::ColorSpaceXform &&
-         !ColorSpaceXformStepsSupported(slot.colorSpaceXform.steps.get()))) {
-      return nullptr;
-    }
   }
   return allocator->make<GLSLPerlinNoiseFragmentProcessor>(
       noiseType, numOctaves, stitchTiles, std::move(paintingData), std::move(permutationsView),
-      std::move(noiseView), uvMatrix, slots);
+      std::move(noiseView), uvMatrix);
 }
 
 GLSLPerlinNoiseFragmentProcessor::GLSLPerlinNoiseFragmentProcessor(
     PerlinNoiseType noiseType, int numOctaves, bool stitchTiles,
     std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,
     std::shared_ptr<TextureView> permutationsView, std::shared_ptr<TextureView> noiseView,
-    const Matrix* uvMatrix, const std::vector<AOTPointwiseSlot>& slots, bool hasOriginalLookupData)
+    const Matrix* uvMatrix, bool hasOriginalLookupData)
     : PerlinNoiseFragmentProcessor(noiseType, numOctaves, stitchTiles, std::move(paintingData),
                                    std::move(permutationsView), std::move(noiseView), uvMatrix,
-                                   slots, hasOriginalLookupData) {
+                                   hasOriginalLookupData) {
 }
 
 void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
@@ -247,12 +238,6 @@ void GLSLPerlinNoiseFragmentProcessor::emitCode(EmitArgs& args) const {
   // needing unpremultiplied noise should compose an appropriate color matrix.
   fragBuilder->codeAppend("color = clamp(color, 0.0, 1.0);");
   fragBuilder->codeAppendf("%s = vec4(color.rgb * color.aaa, color.a);", args.outputColor.c_str());
-
-  // Apply the slot-record operators after the premultiplied noise, matching the precompiled
-  // kernel's applyPointwiseSlot1(applyPointwiseOp(...)) order. Only reachable when this processor
-  // carries slot records (AOT route fallback safety); a pipeline-built perlin has none and relies
-  // on composed operator FPs instead.
-  EmitAOTPointwiseSlots(args, pointwiseSlots.data(), slotCount, MaxPointwiseSlots, "perlinSlot");
 }
 
 void GLSLPerlinNoiseFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
@@ -260,35 +245,11 @@ void GLSLPerlinNoiseFragmentProcessor::onSetData(UniformData* /*vertexUniformDat
   float baseFreq[2] = {paintingData->baseFrequencyX, paintingData->baseFrequencyY};
   fragmentUniformData->setData("baseFrequency", baseFreq);
 
-  // stitchData is declared unconditionally by the precompiled shader but only when stitchTiles is
-  // set by the runtime-generated shader, so feed it optionally (zero when not stitching).
   float stitchDataValues[2] = {0.0f, 0.0f};
   if (stitchTiles) {
     stitchDataValues[0] = static_cast<float>(paintingData->stitchWidth);
     stitchDataValues[1] = static_cast<float>(paintingData->stitchHeight);
   }
   fragmentUniformData->setDataOptional("stitchData", stitchDataValues);
-
-  // The precompiled PerlinNoiseFillShader folds noiseType / numOctaves / stitchTiles into these runtime
-  // uniforms; the runtime-generated shader bakes them into code and does not declare them, so set
-  // them optionally.
-  fragmentUniformData->setDataOptional("NoiseType", static_cast<int>(noiseType));
-  fragmentUniformData->setDataOptional("NumOctaves", numOctaves);
-  fragmentUniformData->setDataOptional("StitchTiles", stitchTiles ? 1 : 0);
-
-  // Default the shared pointwise operator to NONE (passthrough). When a pointwise operator FP is
-  // composed on top of this shader it is visited after this child in FragmentProcessor::Iter and
-  // overwrites OpType with its own value, so this only takes effect for the pure-noise case.
-  fragmentUniformData->setArrayElementOptional("OpType", 0, Op::None);
-  // Slots 1/2 are owned by this processor and always written here (no other FP knows the layout).
-  fragmentUniformData->setArrayElementOptional("OpType", 1, Op::None);
-  fragmentUniformData->setArrayElementOptional("OpType", 2, Op::None);
-  // Runtime loop bound of the precompiled kernel; a uniform so the slot loop stays rolled and the
-  // operator library exists once in the binary.
-  fragmentUniformData->setDataOptional("PointwiseSlotCount", static_cast<int>(MaxPointwiseSlots));
-
-  for (size_t index = 0; index < slotCount; ++index) {
-    UploadAOTPointwiseSlot(fragmentUniformData, index, MaxPointwiseSlots, pointwiseSlots[index]);
-  }
 }
 }  // namespace tgfx

@@ -21,7 +21,6 @@
 #include <cstring>
 #include "gpu/aot/EffectGraph.h"
 #include "gpu/resources/TextureView.h"
-#include "gpu/shaders/modules/PerlinNoiseModule.h"
 
 namespace tgfx {
 
@@ -29,14 +28,11 @@ PerlinNoiseFragmentProcessor::PerlinNoiseFragmentProcessor(
     PerlinNoiseType noiseType, int numOctaves, bool stitchTiles,
     std::unique_ptr<PerlinNoiseShader::PaintingData> paintingData,
     std::shared_ptr<TextureView> permutationsView, std::shared_ptr<TextureView> noiseView,
-    const Matrix* uvMatrix, const std::vector<AOTPointwiseSlot>& slots, bool hasOriginalLookupData)
+    const Matrix* uvMatrix, bool hasOriginalLookupData)
     : FragmentProcessor(ClassID()), hasOriginalLookupData(hasOriginalLookupData),
       noiseType(noiseType), numOctaves(numOctaves), stitchTiles(stitchTiles),
       paintingData(std::move(paintingData)), permutationsView(std::move(permutationsView)),
-      noiseView(std::move(noiseView)), slotCount(std::min(slots.size(), MaxPointwiseSlots)) {
-  for (size_t index = 0; index < slotCount; ++index) {
-    pointwiseSlots[index] = slots[index];
-  }
+      noiseView(std::move(noiseView)) {
   if (uvMatrix) {
     coordTransform = CoordTransform(*uvMatrix);
   }
@@ -55,16 +51,6 @@ void PerlinNoiseFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) con
     key |= 0x4;
   }
   bytesKey->write(key);
-  // Slot kinds are runtime uniforms in the precompiled kernel, but a runtime-built program would
-  // bake them into code, so the key must separate them.
-  bytesKey->write(static_cast<uint32_t>(slotCount));
-  for (size_t index = 0; index < slotCount; ++index) {
-    bytesKey->write(static_cast<uint32_t>(pointwiseSlots[index].type));
-    if (pointwiseSlots[index].type == AOTPointwiseOpType::ColorSpaceXform) {
-      bytesKey->write(
-          ColorSpaceXformSteps::XFormKey(pointwiseSlots[index].colorSpaceXform.steps.get()));
-    }
-  }
 }
 
 std::shared_ptr<Texture> PerlinNoiseFragmentProcessor::onTextureAt(size_t index) const {
@@ -79,15 +65,14 @@ SamplerState PerlinNoiseFragmentProcessor::onSamplerStateAt(size_t) const {
 }
 
 PlacementPtr<PerlinNoiseFragmentProcessor> PerlinNoiseFragmentProcessor::MakeFromAOTParameters(
-    BlockAllocator* allocator, const AOTPerlinNoiseParameters& parameters,
-    const std::vector<AOTPointwiseSlot>& slots) {
+    BlockAllocator* allocator, const AOTPerlinNoiseParameters& parameters) {
   auto paintingData = std::make_unique<PerlinNoiseShader::PaintingData>(
       parameters.baseFrequencyX, parameters.baseFrequencyY, parameters.stitchWidth,
       parameters.stitchHeight);
   auto processor =
       MakeFromViews(allocator, static_cast<PerlinNoiseType>(parameters.noiseType),
                     parameters.numOctaves, parameters.stitchTiles, std::move(paintingData),
-                    parameters.permutationsView, parameters.noiseView, &parameters.uvMatrix, slots);
+                    parameters.permutationsView, parameters.noiseView, &parameters.uvMatrix);
   if (processor != nullptr) {
     processor->lookupData = parameters.lookupData;
   }
@@ -121,10 +106,5 @@ bool PerlinNoiseFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID
   }
   parameters.lookupData = lookupData;
   return builder->addPerlinNoiseSource(input, parameters, output);
-}
-
-bool PerlinNoiseFragmentProcessor::onBindPrecompiled(ParamWriter* writer) const {
-  PerlinNoiseModule::Bind(this, writer);
-  return true;
 }
 }  // namespace tgfx
