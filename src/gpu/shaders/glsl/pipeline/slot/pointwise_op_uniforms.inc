@@ -9,7 +9,7 @@
 // applyPointwiseOp. The reflection extractor reads flat top-level block members
 // (ReflectionExtractor.cpp), so slots must be flat fields or arrays rather than a nested struct.
 //
-// Field order must stay in sync with AOTPointwiseSlotWriter's uniform writes: the std140 block
+// Field order must stay in sync with the slot binder's uniform writes: the std140 block
 // layout is derived from this order, so reordering changes the binary layout of every including
 // kernel.
 #ifndef TGFX_SLOT_ARRAY_SUFFIX

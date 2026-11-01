@@ -38,7 +38,6 @@ struct ChainParams {
   static constexpr Param<ParamType::Float3x3> DeviceLeafCoordMatrix{"DeviceLeafCoordMatrix"};
   static constexpr Param<ParamType::Int4> LeafReadSwizzles{"LeafReadSwizzles"};
   static constexpr Param<ParamType::Int> GradientLUTLeaf{"GradientLUTLeaf"};
-  static constexpr Param<ParamType::Int> PointwiseSlotCount{"PointwiseSlotCount"};
 
   // The extended resource kinds' recipe tables.
   static constexpr Param<ParamType::Float4> TiledRecipeSubsets{"TiledRecipeSubsets"};
@@ -156,7 +155,6 @@ struct ChainParams {
                                          DeviceLeafCoordMatrix,
                                          LeafReadSwizzles,
                                          GradientLUTLeaf,
-                                         PointwiseSlotCount,
                                          TiledRecipeSubsets,
                                          TiledRecipeClamps,
                                          TiledRecipeDimensions,

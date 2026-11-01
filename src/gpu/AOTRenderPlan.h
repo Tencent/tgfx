@@ -86,7 +86,11 @@ struct AOTRenderPlan {
         return false;
       }
     }
-    return terminalColors.empty() != (terminalIR == nullptr);
+    // The terminal carries a color override, a pass IR, or neither: the YUV family's single-pass
+    // plan leaves both unset — its terminal serves the draw's own expression in place (the
+    // family matches off the carried IR), and the task stays the plan's execution wrapper. Only
+    // the two explicit forms are mutually exclusive.
+    return terminalIR == nullptr || terminalColors.empty();
   }
 };
 }  // namespace tgfx

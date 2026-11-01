@@ -28,6 +28,7 @@
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/Processor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
+#include "gpu/ShaderMatchHelpers.h"
 #include "gpu/shaders/kernels/PointwiseChainShader.h"
 
 namespace tgfx {
@@ -60,6 +61,24 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget,
   if (geometryProcessor == nullptr) {
     return false;
   }
+#if DEBUG
+  // The record-time geometry descriptor must agree with the processor the op actually built:
+  // an op that self-reports wrong would mis-route the executor-table matching silently. The
+  // whole suite runs this on every IR-carrying draw, so the coverage is every drawable shape.
+  if (ir != nullptr) {
+    auto actual = DescribeGeometryProcessor(geometryProcessor.get());
+    // A failure here means a recordTimeGeometry() override is wrong or missing (the record-time
+    // geometry descriptor drifted from the made geometry processor).
+    DEBUG_ASSERT(ir->geometry.kind == actual.kind && ir->geometry.hasCommonColor == actual.hasCommonColor &&
+                 ir->geometry.hasUVMatrix == actual.hasUVMatrix &&
+                 ir->geometry.hasSubset == actual.hasSubset &&
+                 ir->geometry.hasUVPerspective == actual.hasUVPerspective);
+    // The xfer twin: the record-time classification asks the processor's own dst info, the
+    // match-time one the instantiated view — a disagreement means the dst-texture timing
+    // assumption is wrong somewhere, and the executor-table matching would mis-route.
+    DEBUG_ASSERT(ir->xfer == ClassifyXferForMatch(xferProcessor.get()));
+  }
+#endif
 
   preparedProgram = nullptr;
   preparedProgramInfo = nullptr;

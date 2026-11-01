@@ -28,7 +28,6 @@
 #include "gpu/aot/AOTRouter.h"
 #include "gpu/aot/DrawIR.h"
 #include "gpu/aot/NodeContract.h"
-#include "gpu/processors/AOTYUVChainProcessor.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
 #include "gpu/processors/ConstColorProcessor.h"
@@ -127,23 +126,6 @@ static bool BuildTextureLeafBinding(const AOTEffectNode* node, AOTBinding* bindi
   binding->args = args;
   binding->uvMatrix = parameters->uvMatrix;
   binding->alphaStart = parameters->alphaStart;
-  return true;
-}
-
-static bool BuildPointwiseSlot(const AOTEffectGraph& graph, const AOTEffectNode* node,
-                               AOTPointwiseSlot* slot);
-
-// The operator slots of a linear pass: every node after the pass's source, in order.
-static bool BuildLinearSlots(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
-                             std::vector<AOTPointwiseSlot>* slots) {
-  slots->reserve(pass.nodes.size() - 1);
-  for (size_t index = 1; index < pass.nodes.size(); ++index) {
-    AOTPointwiseSlot slot = {};
-    if (!BuildPointwiseSlot(graph, graph.nodeAt(pass.nodes[index]), &slot)) {
-      return false;
-    }
-    slots->push_back(slot);
-  }
   return true;
 }
 
@@ -1371,13 +1353,6 @@ static bool CompileChainLayout(const AOTEffectGraph& graph, const AOTPassDescrip
 // taken from (a plain, tiled or device-space leaf, the LUT gradient, a padding child or the mask
 // slot's phantom). Only the linear kernels' source leaf still materializes a processor; the chain
 // path consumes the binding table itself.
-static PlacementPtr<FragmentProcessor> MaterializeTextureBinding(BlockAllocator* allocator,
-                                                                 const AOTBinding& binding) {
-  auto matrix = binding.uvMatrix;
-  return TextureEffect::MakeRGBAAA(allocator, binding.textureProxy, binding.args,
-                                   binding.alphaStart, &matrix);
-}
-
 }  // namespace
 
 bool AOTChainBuilder::PlanChainPass(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
@@ -1632,40 +1607,99 @@ bool AOTChainBuilder::CompilePassProgram(const DrawIR& passIR, AOTProgram* out) 
   return CompileChainLayout(passIR.color, pass, &passIR.coverage, out);
 }
 
-PlacementPtr<FragmentProcessor> AOTChainBuilder::BuildFPForPass(BlockAllocator* allocator,
-                                                                const AOTEffectGraph& graph,
-                                                                const AOTPassDescriptor& pass) {
-  if (pass.nodes.empty()) {
-    return nullptr;
+bool AOTChainBuilder::CollectYUVTail(const AOTEffectGraph& graph, AOTYUVTailShape* shape) {
+  if (shape == nullptr || !graph.root().isValid() || graph.nodeCount() < 2) {
+    return false;
   }
-  if (IsAOTPointwiseDAGKernel(pass.kernel)) {
-    // Chain passes travel as pass IRs and compile through CompilePassProgram; a DAG single pass
-    // is never a plan task (PlanRequiresTask admits the fused kernels in place), and every
-    // cut-plan pass is rebuilt from its segment. Only the linear kernels reach this entry.
-    return nullptr;
-  }
-  // The linear kernels: the source node plus its operators folded into the processor's own slot
-  // records, one program per pass with no Compose wrapper.
-  std::vector<AOTPointwiseSlot> slots = {};
-  if (!BuildLinearSlots(graph, pass, &slots)) {
-    return nullptr;
-  }
-  auto sourceNode = graph.nodeAt(pass.nodes[0]);
-  switch (pass.kernel) {
-    case AOTKernelKind::YUVTextureFill: {
-      AOTBinding binding = {};
-      if (!BuildTextureLeafBinding(sourceNode, &binding)) {
-        return nullptr;
-      }
-      auto source = MaterializeTextureBinding(allocator, binding);
-      if (source == nullptr || !IsProcessor<TextureEffect>(source.get())) {
-        return nullptr;
-      }
-      return AOTYUVChainProcessor::Make(allocator, std::move(source), slots);
+  std::vector<AOTNodeID> reverseOps = {};
+  size_t colorSpaceOps = 0;
+  auto nodeID = graph.root();
+  auto* node = graph.nodeAt(nodeID);
+  while (node != nullptr && IsUnaryPointwiseKind(node->kind)) {
+    if (node->inputs.size() != 1) {
+      return false;
     }
-    default:
-      return nullptr;
+    if (node->kind == AOTEffectKind::ColorSpaceXform) {
+      auto parameters = std::get_if<AOTColorSpaceXformParameters>(&node->parameters);
+      if (parameters == nullptr || !ColorSpaceXformStepsSupported(parameters->steps.get())) {
+        return false;
+      }
+      // The kernel's color-space parameters are one shared block (the interpreter's contract):
+      // at most one transform per tail.
+      if (++colorSpaceOps > 1) {
+        return false;
+      }
+    }
+    // The slot encoding must be able to express the operator — the same record the chain
+    // builds from the node.
+    AOTPointwiseSlot slot = {};
+    if (!BuildPointwiseSlot(graph, node, &slot)) {
+      return false;
+    }
+    reverseOps.push_back(nodeID);
+    nodeID = node->inputs[0];
+    node = graph.nodeAt(nodeID);
   }
+  // The walk's terminal: the multi-plane source leaf, fed by the geometry color (node 0).
+  if (node == nullptr || node->kind != AOTEffectKind::TextureSource || node->inputs.size() != 1 ||
+      node->inputs[0] != AOTNodeID(0)) {
+    return false;
+  }
+  auto* leaf = std::get_if<AOTTextureParameters>(&node->parameters);
+  auto* geometry = graph.nodeAt(AOTNodeID(0));
+  // The RGBAAA layout stays acceptable here: the kernel serves it (HasRgbaaa / AlphaStart are
+  // runtime uniforms) — the plan admission keeps its own rejection through IsYUVChainSource.
+  if (leaf == nullptr || geometry == nullptr || geometry->kind != AOTEffectKind::GeometryColor ||
+      !leaf->isYUV || leaf->samplingKind != AOTTextureSamplingKind::Plain) {
+    return false;
+  }
+  if (reverseOps.size() > MaxPointwiseSlots) {
+    return false;
+  }
+  // Linearity: the geometry color, the leaf and the operators are the whole graph — an extra
+  // node (a second source, an unaccounted branch) makes the shape unservable.
+  if (graph.nodeCount() != 2 + reverseOps.size()) {
+    return false;
+  }
+  shape->leaf = leaf;
+  shape->ops.assign(reverseOps.rbegin(), reverseOps.rend());
+  return true;
+}
+
+bool AOTChainBuilder::CompileYUVProgramForInfo(const ProgramInfo* info, AOTProgram* out) {
+  if (info == nullptr || out == nullptr) {
+    return false;
+  }
+  auto* ir = info->getCarriedIR();
+  if (ir == nullptr) {
+    return false;
+  }
+  AOTYUVTailShape shape = {};
+  if (!CollectYUVTail(ir->color, &shape)) {
+    return false;
+  }
+  AOTProgram program = {};
+  program.slots.reserve(shape.ops.size());
+  for (auto opID : shape.ops) {
+    AOTPointwiseSlot pointwise = {};
+    if (!BuildPointwiseSlot(ir->color, ir->color.nodeAt(opID), &pointwise)) {
+      return false;
+    }
+    AOTChainSlot slot = {};
+    // AOTPointwiseOpType and AOTChainOp share values 0..4 by ABI (both mirror the OP_*
+    // constants), so the pointwise kinds convert directly. The register fields stay unset: the
+    // tail is linear, array order is dataflow order (the binder packs its own selector).
+    slot.op = static_cast<AOTChainOp>(static_cast<int>(pointwise.type));
+    slot.colorMatrix = pointwise.colorMatrix;
+    slot.luma = pointwise.luma;
+    slot.alphaThreshold = pointwise.alphaThreshold;
+    slot.colorSpaceXform = pointwise.colorSpaceXform;
+    slot.constColor = pointwise.constColor;
+    slot.blend = pointwise.blend;
+    program.slots.push_back(slot);
+  }
+  *out = std::move(program);
+  return true;
 }
 
 bool AOTChainBuilder::CompileChainProgram(BlockAllocator* allocator, const AOTEffectGraph& graph,

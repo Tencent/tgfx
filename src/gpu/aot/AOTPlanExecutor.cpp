@@ -9,7 +9,6 @@
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/aot/AOTChainBuilder.h"
 #include "gpu/ops/StandardDrawOp.h"
-#include "gpu/processors/AOTYUVChainProcessor.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/tasks/AOTPlanRenderTask.h"
@@ -21,32 +20,6 @@ namespace {
 // The linear source, the unary pointwise set, the perlin/YUV source shapes and the const-operand
 // blend are shared shape rules (gpu/AOTShapeRules.h) — the same authority the planners and the
 // chain builder consume, so the admission checks below cannot drift from them.
-
-// The operator slots after a linear pass's source: unary pointwise ops chained in order. The perlin
-// kernel additionally carries a const-color op or a blend whose other operand is an input-
-// independent constant (the constant itself stays out of pass.nodes).
-static bool ValidateLinearSlots(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
-                                bool allowConstOperands) {
-  AOTNodeID expectedInput = pass.nodes[0];
-  for (size_t opIndex = 1; opIndex < pass.nodes.size(); ++opIndex) {
-    auto node = graph.nodeAt(pass.nodes[opIndex]);
-    if (node == nullptr) {
-      return false;
-    }
-    bool accepted = IsUnaryPointwiseOp(node, expectedInput);
-    if (!accepted && allowConstOperands && node->kind == AOTEffectKind::ConstColor) {
-      accepted = node->inputs.size() == 1 && node->inputs[0] == expectedInput;
-    }
-    if (!accepted && allowConstOperands) {
-      accepted = IsConstOperandBlend(graph, node, expectedInput);
-    }
-    if (!accepted) {
-      return false;
-    }
-    expectedInput = pass.nodes[opIndex];
-  }
-  return true;
-}
 
 // A cut plan: topologically ordered self-contained fused passes, each reading some earlier cuts'
 // output textures as leaves (materializedInputs[i] names the node dependencies[i]'s output
@@ -313,9 +286,12 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
     return false;
   }
   switch (pass.kernel) {
-    case AOTKernelKind::YUVTextureFill:
-      return pass.nodes.size() <= 1 + MaxPointwiseSlots && IsYUVChainSource(graph, pass.nodes[0]) &&
-             ValidateLinearSlots(graph, pass, false);
+    case AOTKernelKind::YUVTextureFill: {
+      // The tail's admission runs the same walk its compilation and the family's matching run
+      // (CollectYUVTail), so the three cannot disagree about what a servable tail is.
+      AOTChainBuilder::AOTYUVTailShape shape = {};
+      return AOTChainBuilder::CollectYUVTail(graph, &shape);
+    }
     default:
       return false;
   }
@@ -357,13 +333,13 @@ bool AOTPlanExecutor::BuildPasses(Context* context, uint32_t renderFlags,
       renderPlan->terminalIR = allocator->make<DrawIR>(std::move(passIR));
       return renderPlan->terminalIR != nullptr;
     }
-    // The linear kernels: a YUV or perlin processor as the terminal's color processor.
-    auto processor = AOTChainBuilder::BuildFPForPass(allocator, graph, pass);
-    if (processor == nullptr) {
-      return false;
-    }
-    renderPlan->terminalColors.emplace_back(std::move(processor));
-    return true;
+    // The linear kernel: the terminal draws its own expression. The family matches off the
+    // draw's carried IR and the tail program compiles at prepare (CompileYUVProgramForInfo),
+    // so the task needs no rebuilt color processor and no pass IR — it stays the plan's
+    // execution and diagnostics wrapper. The original tree's TextureEffect still writes the
+    // family's source uniforms through the standard precompiled walk; the operators above it
+    // declare no fields the kernel reads.
+    return pass.kernel == AOTKernelKind::YUVTextureFill;
   }
   return BuildCutPlanPasses(context, renderFlags, graph, plan, deviceBounds, destination,
                             fpCoordOffset, deviceToLocal, sourceAlpha, renderPlan,

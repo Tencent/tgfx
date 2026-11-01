@@ -28,14 +28,33 @@ namespace tgfx {
 class ProgramInfo;
 class GeometryProcessor;
 class FragmentProcessor;
+class XferProcessor;
 struct AOTOpaqueKernelParameters;
 struct AOTTextureParameters;
 class QuadPerEdgeAAGeometryProcessor;
 struct AOTProgram;
 struct AOTCoverageTerm;
+struct AOTGeometryDesc;
+enum class AOTXferKind : uint8_t;
 struct PermutationMatchResult;
 struct PermutationVariant;
 enum class PermutationMatchFailure;
+
+/// Describes a geometry processor's matcher-relevant facts — the prepare-time twin of the
+/// record-time AOTGeometryDesc the op self-reports. The debug assertion in
+/// StandardDrawOp::prepare compares the two, so an op that describes itself wrong fails loudly
+/// instead of mis-routing; the executor-table matching later reads the record-time form only.
+AOTGeometryDesc DescribeGeometryProcessor(const GeometryProcessor* gp);
+
+/// The record-time xfer classification: the dst-texture decision was made when the op was
+/// recorded (the dst-texture processor is built with its proxy, the framebuffer-fetch one with
+/// empty info), so asking the processor's own dst info is exact before anything is instantiated.
+AOTXferKind ClassifyXferRecordTime(const XferProcessor* xp);
+
+/// The prepare-time xfer classification — what GetXPType reports for the draw's info. The
+/// debug assertion compares the two forms, so a record-time classification that would
+/// mis-route the executor-table matching fails loudly.
+AOTXferKind ClassifyXferForMatch(const XferProcessor* xp);
 
 /// How the draw's sole coverage FP is served. LocalMask is a distinct capability: it needs a
 /// local-space varying and sampler and therefore cannot be encoded in the shared runtime clip

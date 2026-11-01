@@ -45,11 +45,11 @@ struct AOTChainCompile {
 };
 
 /**
- * Rebuilds concrete FragmentProcessors from a decomposed AOT plan: the fused chain kernel for
+ * Compiles the interpreter's programs from a decomposed AOT plan: the fused chain kernel for
  * PointwiseChain/PointwiseGraph passes (a multi-pass plan's passes are built as cut segments
- * through BuildCutSegment) and the YUV kernel for
- * YUVTextureFill. Used by AOTPlanExecutor's task assembly and by the re-expressing
- * chain kernel's per-draw view of an unmodified ProgramInfo (CompileChainProgramForInfo).
+ * through BuildCutSegment) and the YUV family's color-grade tail. Used by AOTPlanExecutor's
+ * task assembly and by the re-expressing kernel's per-draw view of an unmodified ProgramInfo
+ * (CompileChainProgramForInfo / CompileYUVProgramForInfo).
  */
 class AOTChainBuilder {
  public:
@@ -105,15 +105,28 @@ class AOTChainBuilder {
                             AOTResourceProfile* profile);
 
   /**
-   * Rebuilds the color processor of one self-contained plan pass: the YUV or perlin processor with
-   * the pass's operators folded into its slot records. Returns nullptr when the pass shape cannot
-   * be rebuilt. A pass of a multi-pass plan is not self-contained (it reads its predecessors'
-   * outputs); build it through BuildCutSegment first. Only the linear kernels (YUV, perlin) are
-   * served here: chain passes are carried as pass IRs and compiled through CompilePassProgram.
+   * The servable YUV tail of a color graph: the multi-plane source leaf with the chain of
+   * bounded unary pointwise operators above it (application order, leaf-side first). One walk
+   * serves the family's matching, the plan's admission and the tail's compilation, so the three
+   * cannot disagree about what a servable tail is. Fails on any non-pointwise node (a blend is
+   * not unary), an operator the slot encoding cannot express, a second color-space transform
+   * (the kernel's CS parameters are one shared block, like the interpreter's), a non-YUV /
+   * non-Plain / RGBAAA leaf, or a tail over MaxPointwiseSlots.
    */
-  static PlacementPtr<FragmentProcessor> BuildFPForPass(BlockAllocator* allocator,
-                                                        const AOTEffectGraph& graph,
-                                                        const AOTPassDescriptor& pass);
+  struct AOTYUVTailShape {
+    const AOTTextureParameters* leaf = nullptr;
+    std::vector<AOTNodeID> ops = {};
+  };
+  static bool CollectYUVTail(const AOTEffectGraph& graph, AOTYUVTailShape* shape);
+
+  /**
+   * Compiles the YUV family's color-grade tail from the draw's carried IR into chain
+   * instruction records (the same slot encoding the interpreter reads): the operators above
+   * the multi-plane source leaf, in application order. The terminal needs no rebuilt processor
+   * — the family matches off the IR and this program drives the tail's uniform upload.
+   * Returns false when the info carries no IR or the tail is not servable.
+   */
+  static bool CompileYUVProgramForInfo(const ProgramInfo* info, AOTProgram* out);
 
   /**
    * The source a later pass of a multi-pass plan reads: its predecessor's RGBA intermediate,

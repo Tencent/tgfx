@@ -25,6 +25,7 @@
 #include "gpu/shaders/modules/ChainParams.h"
 #include "gpu/shaders/modules/ParamWriter.h"
 #include "gpu/shaders/modules/TextureSourceModule.h"
+#include "gpu/shaders/KernelContract.h"
 
 namespace tgfx {
 namespace {
@@ -188,6 +189,74 @@ void UploadGradientParams(UniformData* uniformData, const AOTGradientParameters&
 }
 
 }  // namespace
+
+// One YUV-tail instruction's records (see BindYUVProgram): the chain's uniform arrays with the
+// linear-tail selector — the kernel's macro binding reads exactly these bits.
+void UploadYUVTailSlot(UniformData* uniformData, size_t index, const AOTChainSlot& slot) {
+  int selector = 0;
+  if (slot.op == AOTChainOp::ConstColor) {
+    selector = slot.constColor.inputMode;
+  } else if (slot.op == AOTChainOp::Blend) {
+    selector = slot.blend.blendMode | (slot.blend.childType == 1 ? 0x100 : 0);
+  }
+  int packed[] = {static_cast<int>(slot.op), -2, -2, selector};
+  uniformData->setArrayElementOptional(ChainParams::SlotPacked.name, index, packed);
+  switch (slot.op) {
+    case AOTChainOp::ColorMatrix: {
+      float matrixData[16];
+      float vectorData[4];
+      PackAOTColorMatrix(slot.colorMatrix.matrix, matrixData, vectorData);
+      uniformData->setArrayElementOptional(ChainParams::SlotColorMatrix.name, index, matrixData);
+      uniformData->setArrayElementOptional(ChainParams::SlotColorVector.name, index, vectorData);
+      break;
+    }
+    case AOTChainOp::Luma: {
+      float lumaThresh[] = {slot.luma.kr, slot.luma.kg, slot.luma.kb, 0.0f};
+      uniformData->setArrayElementOptional(ChainParams::SlotLumaThresh.name, index, lumaThresh);
+      break;
+    }
+    case AOTChainOp::AlphaThreshold: {
+      float lumaThresh[] = {0.0f, 0.0f, 0.0f, slot.alphaThreshold.threshold};
+      uniformData->setArrayElementOptional(ChainParams::SlotLumaThresh.name, index, lumaThresh);
+      break;
+    }
+    case AOTChainOp::ConstColor:
+    case AOTChainOp::Blend: {
+      const auto& color = slot.constColor.color;
+      float colorData[] = {color[0], color[1], color[2], color[3]};
+      uniformData->setArrayElementOptional(ChainParams::SlotConstColor.name, index, colorData);
+      break;
+    }
+    default:
+      break;  // ColorSpaceXform rides the shared Chain block below.
+  }
+}
+
+void BindYUVProgram(const AOTProgram& program, UniformData* fragmentUniformData) {
+  if (fragmentUniformData == nullptr) {
+    return;
+  }
+  const auto& slots = program.slots;
+  fragmentUniformData->setDataOptional(ChainParams::SlotCount.name,
+                                       static_cast<int>(slots.size()));
+  // The declared capacity exceeds the real count: the inactive tail carries the OP_NONE marker,
+  // matching the fixed-size storage every multi-slot kernel keeps.
+  AOTChainSlot inactiveSlot = {};
+  for (size_t index = 0; index < MaxPointwiseSlots; ++index) {
+    UploadYUVTailSlot(fragmentUniformData, index,
+                      index < slots.size() ? slots[index] : inactiveSlot);
+  }
+  // The color-space parameters are one shared block (at most one transform per tail, enforced
+  // by the matching walk): the helper writes the same Chain-prefixed fields the interpreter's
+  // binder writes.
+  for (const auto& slot : slots) {
+    if (slot.op == AOTChainOp::ColorSpaceXform) {
+      ColorSpaceXformHelper("Chain").setData(fragmentUniformData,
+                                             slot.colorSpaceXform.steps.get());
+      break;
+    }
+  }
+}
 
 void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
                       UniformData* fragmentUniformData) {

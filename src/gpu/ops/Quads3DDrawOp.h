@@ -45,6 +45,8 @@ class Quads3DDrawOp : public StandardDrawOp {
 
   PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
 
+  AOTGeometryDesc recordTimeGeometry() const override;
+
   void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
   std::optional<PMColor> uniformGeometryColor() const override {

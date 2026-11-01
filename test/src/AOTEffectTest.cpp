@@ -66,7 +66,7 @@
 namespace tgfx {
 
 // The construction forms of one pass: a chain pass compiles from its pass IR (the form every
-// production plan carries), the linear kernels build through BuildFPForPass.
+// production plan carries).
 static bool CompileChainForTest(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
                                 AOTProgram* program) {
   DrawIR passIR = {};
@@ -83,12 +83,6 @@ static uint32_t ChainDeviceLeafMask(const AOTProgram& program) {
     mask |= 1u << static_cast<uint32_t>(deviceLeaf.leafIndex);
   }
   return mask;
-}
-
-static PlacementPtr<FragmentProcessor> BuildProcessorForTest(BlockAllocator* allocator,
-                                                             const AOTEffectGraph& graph,
-                                                             const AOTPassDescriptor& pass) {
-  return AOTChainBuilder::BuildFPForPass(allocator, graph, pass);
 }
 
 static constexpr std::array<float, 20> IdentityColorMatrix = {
@@ -719,7 +713,6 @@ TGFX_TEST(AOTEffectTest, TiledHardwareSamplingSnapshotMatchesLowering) {
   AOTProgram rejectedChain1 = {};
   EXPECT_FALSE(AOTChainBuilder::CompileChainProgram(&allocator, graph, wrongFamily.passes[0], {},
                                                     false, &rejectedChain1));
-  EXPECT_EQ(BuildProcessorForTest(&allocator, graph, wrongFamily.passes[0]), nullptr);
 }
 
 TGFX_TEST(AOTEffectTest, TiledShaderModesAndStrictSubsetMatchLowering) {
@@ -2320,9 +2313,6 @@ TGFX_TEST(AOTEffectTest, PerlinDensityBranchesShareLookupResources) {
           EXPECT_FALSE(AOTChainBuilder::CompileChainProgram(context->drawingAllocator(), graph,
                                                             wrongFamily.passes[0], {}, false,
                                                             &rejectedChain6));
-          EXPECT_EQ(
-              BuildProcessorForTest(context->drawingAllocator(), graph, wrongFamily.passes[0]),
-              nullptr);
           AOTProgram chain = {};
           ASSERT_TRUE(AOTChainBuilder::CompileChainProgram(context->drawingAllocator(), graph,
                                                            plan.passes[0], {}, false, &chain));

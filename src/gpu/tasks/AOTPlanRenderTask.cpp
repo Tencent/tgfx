@@ -102,10 +102,11 @@ void AOTPlanRenderTask::execute(CommandEncoder* encoder) {
     auto drawOp = static_cast<StandardDrawOp*>(plan.passes[index].drawOp.get());
     prepared = drawOp->prepareForTask(renderTargets[index].get(), std::nullopt, false);
   }
-  // The terminal pass serves its chain IR directly (rebuilt at prepare); a linear-kernel plan
-  // still hands its terminal processor through the color override.
+  // The terminal pass serves its chain IR directly (rebuilt at prepare); a plan that set neither
+  // form leaves the original draw's own expression in place — the family matches off the draw's
+  // carried IR, so the terminal prepares through the normal path.
   auto terminalColors =
-      plan.terminalIR != nullptr
+      plan.terminalIR != nullptr || plan.terminalColors.empty()
           ? std::nullopt
           : std::optional<DrawOp::ColorProcessorList>(std::move(plan.terminalColors));
   prepared = prepared && static_cast<StandardDrawOp*>(originalDraw.get())

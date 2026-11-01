@@ -28,7 +28,6 @@
 #include "gpu/Swizzle.h"
 #include "gpu/aot/DrawIR.h"
 #include "gpu/aot/Program.h"
-#include "gpu/processors/AOTYUVChainProcessor.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ClampedGradientEffect.h"
@@ -79,17 +78,45 @@ bool RejectsAlphaOnlyTarget(bool servesAlphaOnly, const ProgramInfo* programInfo
 // Returns XP_NONE for EmptyXferProcessor, XP_DST_TEXTURE / XP_FRAMEBUFFER_FETCH for the
 // PorterDuff modes, or XP_UNSUPPORTED for XP types no kernel can serve.
 int GetXPType(const ProgramInfo* programInfo) {
-  auto xp = programInfo->getXferProcessor();
-  if (xp == EmptyXferProcessor::GetInstance()) {
-    return XP_NONE;
+  switch (ClassifyXferForMatch(programInfo->getXferProcessor())) {
+    case AOTXferKind::None:
+      return XP_NONE;
+    case AOTXferKind::DstTexture:
+      return XP_DST_TEXTURE;
+    case AOTXferKind::FrameBufferFetch:
+      return XP_FRAMEBUFFER_FETCH;
+    case AOTXferKind::Unsupported:
+      break;
+  }
+  return XP_UNSUPPORTED;
+}
+
+AOTXferKind ClassifyXferRecordTime(const XferProcessor* xp) {
+  if (xp == nullptr || xp == EmptyXferProcessor::GetInstance()) {
+    return AOTXferKind::None;
+  }
+  if (IsProcessor<PorterDuffXferProcessor>(xp)) {
+    // The dst-texture decision was made when the op was recorded: a dst-texture processor holds
+    // its proxy, a framebuffer-fetch one holds empty info. Nothing here needs an instantiation.
+    return static_cast<const PorterDuffXferProcessor*>(xp)->getDstTextureInfo().textureProxy !=
+                   nullptr
+               ? AOTXferKind::DstTexture
+               : AOTXferKind::FrameBufferFetch;
+  }
+  return AOTXferKind::Unsupported;
+}
+
+AOTXferKind ClassifyXferForMatch(const XferProcessor* xp) {
+  if (xp == nullptr || xp == EmptyXferProcessor::GetInstance()) {
+    return AOTXferKind::None;
   }
   if (IsProcessor<PorterDuffXferProcessor>(xp)) {
     if (xp->dstTextureView() != nullptr) {
-      return XP_DST_TEXTURE;
+      return AOTXferKind::DstTexture;
     }
-    return XP_FRAMEBUFFER_FETCH;
+    return AOTXferKind::FrameBufferFetch;
   }
-  return XP_UNSUPPORTED;
+  return AOTXferKind::Unsupported;
 }
 
 // Determines whether a texture-based coverage child can be served by the local-space mask path
@@ -232,6 +259,28 @@ int GetGPType(const GeometryProcessor* gp) {
     return 1;
   }
   return -1;
+}
+
+AOTGeometryDesc DescribeGeometryProcessor(const GeometryProcessor* gp) {
+  AOTGeometryDesc desc = {};
+  if (gp == nullptr) {
+    return desc;
+  }
+  auto gpType = GetGPType(gp);
+  if (gpType == 0) {
+    desc.kind = AOTGeometryKind::Default;
+    return desc;
+  }
+  if (gpType != 1) {
+    return desc;
+  }
+  auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+  desc.kind = AOTGeometryKind::QuadPerEdgeAA;
+  desc.hasCommonColor = quadGP->hasCommonColor();
+  desc.hasUVMatrix = quadGP->hasUVMatrix();
+  desc.hasSubset = quadGP->getHasSubset();
+  desc.hasUVPerspective = quadGP->getHasUVPerspective();
+  return desc;
 }
 
 // The position-only rect GP forms the texture and noise fill kernels share: a DefaultGP, or a

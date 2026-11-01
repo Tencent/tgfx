@@ -20,6 +20,7 @@
 #include <algorithm>
 #include "core/utils/MathExtra.h"
 #include "gpu/OriginFlip.h"
+#include "gpu/ShaderMatchHelpers.h"
 #include "gpu/aot/DrawIR.h"
 
 namespace tgfx {
@@ -30,6 +31,12 @@ DrawOp::~DrawOp() = default;
 
 void DrawOp::adoptLoweredIR(PlacementPtr<DrawIR> passIR) {
   ir = std::move(passIR);
+  // The adopting op owns the geometry this IR draws with (a fill's RectDrawOp, a plan pass's
+  // fill draw): the record-time descriptors ride along exactly as tryLowerIR's do.
+  if (ir != nullptr) {
+    ir->geometry = recordTimeGeometry();
+    ir->xfer = ClassifyXferRecordTime(xferProcessor.get());
+  }
 }
 
 void DrawOp::tryLowerIR() {
@@ -63,6 +70,8 @@ void DrawOp::tryLowerIR() {
   if (!lowered.has_value()) {
     return;
   }
+  lowered->geometry = recordTimeGeometry();
+  lowered->xfer = ClassifyXferRecordTime(xferProcessor.get());
   ir = allocator->make<DrawIR>(std::move(*lowered));
 }
 

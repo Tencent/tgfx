@@ -60,18 +60,63 @@ struct AOTCoverageTerm {
 };
 
 /**
+ * The draw's geometry kind as the matchers see it: the two processor classes the precompiled
+ * kernels serve, and everything else.
+ */
+enum class AOTGeometryKind : uint8_t {
+  Other = 0,
+  Default,
+  QuadPerEdgeAA,
+};
+
+/**
+ * The geometry facts a draw's matcher rules read, as plain data. Recorded when the draw is
+ * recorded — the op describes the processor it will build from the same members its
+ * onMakeGeometryProcessor reads (the processor itself is a prepare-time object). The prepare-side
+ * debug assertion compares this against the made processor, so an op that describes itself
+ * wrong fails loudly instead of mis-routing.
+ */
+struct AOTGeometryDesc {
+  AOTGeometryKind kind = AOTGeometryKind::Other;
+  // QuadPerEdgeAA only: the vertex stage's layout facts the matchers read.
+  bool hasCommonColor = false;
+  bool hasUVMatrix = false;
+  bool hasSubset = false;
+  bool hasUVPerspective = false;
+};
+
+/**
+ * The xfer classification the matcher rules read (the XP_* vocabulary's plain-data twin): how
+ * the destination color reaches the fragment shader. Exact at record time — the dst-texture
+ * decision is made when the op is recorded (the dst-texture processor is built with its proxy,
+ * the framebuffer-fetch one with empty info), so asking the processor's own dst info needs
+ * nothing that only exists at prepare.
+ */
+enum class AOTXferKind : uint8_t {
+  Unsupported = 0,
+  None,
+  DstTexture,
+  FrameBufferFetch,
+};
+
+/**
  * One draw's lowered expression: the color graph plus the classified coverage terms. This is the
  * single semantic source the precompiled path converges on — the coverage classification below is
  * the ONE place a coverage effect's semantics (true coverage versus source modulation) are
  * decided, replacing the per-shape enumerations it used to be spread over.
  */
 struct DrawIR {
-  /// The draw's geometry processor. The geometry descriptor (kind, layout, per-draw parameters)
-  /// arrives with the geometry contracts; until then the processor travels with the IR.
+  /// The draw's geometry processor. The record-time descriptor below carries the matcher-relevant
+  /// facts as plain data; the pointer stays until the executor-table matching reads only the
+  /// descriptor (then it drops with the prepare-time walk).
   const GeometryProcessor* geometryProcessor = nullptr;
+  /// The geometry facts, recorded at record time from the op's own state.
+  AOTGeometryDesc geometry = {};
   AOTEffectGraph color = {};
   std::vector<AOTCoverageTerm> coverage = {};
   const XferProcessor* xferProcessor = nullptr;
+  /// The xfer classification, recorded at record time from the op's own xfer processor.
+  AOTXferKind xfer = AOTXferKind::Unsupported;
   BlendMode blendMode = BlendMode::SrcOver;
   /// Whether the draw's color comes from the paint rather than any color processor: the lowering
   /// synthesized the white unit-color chain for it. A draw with an explicit ConstColorProcessor

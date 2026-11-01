@@ -32,6 +32,7 @@
 #include "gpu/ProgramSignature.h"
 #include "gpu/ProgramWriter.h"
 #include "gpu/ShaderKeyHash.h"
+#include "gpu/shaders/kernels/YUVTextureFillShader.h"
 #include "gpu/UniformData.h"
 #include "gpu/aot/AOTEffectDecomposer.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
@@ -279,12 +280,15 @@ static bool VertexInputFormatMatches(const std::vector<VertexInput>& inputs, uin
   return false;
 }
 
-// The two re-expressing families carry their own writers (they rebuild the draw's effect as the
-// fused chain or perlin processor every draw); every other family uses the generic precompiled
-// writer.
+// The re-expressing chain family carries its own writer (it compiles the draw's whole expression
+// into the chain program); the YUV family appends its compiled tail records to the standard walk;
+// every other family uses the generic precompiled writer.
 static std::unique_ptr<ProgramWriter> MakeProgramWriter(const std::string& shaderName) {
   if (shaderName == PointwiseChainShader::Name) {
     return std::make_unique<ChainProgramWriter>();
+  }
+  if (shaderName == YUVTextureFillShader::Name) {
+    return std::make_unique<YUVProgramWriter>();
   }
   return std::make_unique<PrecompiledProgramWriter>();
 }

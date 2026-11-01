@@ -154,4 +154,18 @@ class ChainProgramWriter final : public ExpressionProgramWriter {
                      const FragmentProcessor* expression) const override;
 };
 
+/**
+ * The YUV family's writer: the source leaf's family uniforms and samplers ride the standard
+ * precompiled walk (the tree's TextureEffect writes them — on a planned draw the operators above
+ * it declare no fields the kernel reads, so their writes are no-ops), and the color-grade tail
+ * rides the compiled tail program's chain-encoded instruction records. No rebuilt processor:
+ * the tail's upload no longer depends on one existing.
+ */
+class YUVProgramWriter final : public PrecompiledProgramWriter {
+ protected:
+  void writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
+                       UniformData* fragmentUniformData,
+                       const FragmentProcessor* expression) const override;
+};
+
 }  // namespace tgfx

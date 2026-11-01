@@ -37,6 +37,16 @@ void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
                       UniformData* fragmentUniformData);
 
 /**
+ * Writes the YUV family's compiled tail program (CompileYUVProgramForInfo): SlotCount plus the
+ * chain instruction arrays — the same record layout the interpreter reads, with a linear-tail
+ * selector dialect (bits 0-7 the op's small value — the const-color input mode or the blend
+ * mode — bit 8 the blend's operand order; no register bits, array order is dataflow order) —
+ * and the shared color-space block. Like the chain upload, this reads the program only, never
+ * a FragmentProcessor.
+ */
+void BindYUVProgram(const AOTProgram& program, UniformData* fragmentUniformData);
+
+/**
  * Writes the program's per-binding child uniforms: every sampler-binding child's
  * Subset/AlphaOnly/RGBAAA records (the TextureEffect-class children share one structural-ordinal
  * sequence, exactly as the processor-tree walk numbered them) and the device mask's

@@ -309,7 +309,7 @@ size_t ValidateOpTableExclusivity(const std::string& shaderDir, Diagnostics* dia
 // constant keeps the two in lockstep without injecting extra defines into every variant.
 size_t ValidateSlotCapacities(const std::string& shaderDir, Diagnostics* diagnostics) {
   size_t errors = 0;
-  const std::regex slotSuffixPattern("#define\\s+TGFX_SLOT_ARRAY_SUFFIX\\s*\\[\\s*(\\d+)\\s*\\]");
+  const std::regex yuvCapacityPattern("#define\\s+CHAIN_SLOT_CAPACITY\\s+(\\d+)");
   const char* slotKernels[] = {"kernels/yuv_texture_fill.frag"};
   for (const char* fileName : slotKernels) {
     std::ifstream file(shaderDir + "/" + fileName);
@@ -323,13 +323,13 @@ size_t ValidateSlotCapacities(const std::string& shaderDir, Diagnostics* diagnos
     buffer << file.rdbuf();
     const std::string text = buffer.str();
     std::smatch match;
-    if (!std::regex_search(text, match, slotSuffixPattern)) {
+    if (!std::regex_search(text, match, yuvCapacityPattern)) {
       Report(diagnostics, Severity::Error, DiagnosticCode::VerifySlotCapacity, "", "", -1, -1,
-             std::string(fileName) + " declares no TGFX_SLOT_ARRAY_SUFFIX");
+             std::string(fileName) + " declares no CHAIN_SLOT_CAPACITY");
       ++errors;
     } else if (std::stoul(match[1].str()) != MaxPointwiseSlots) {
       Report(diagnostics, Severity::Error, DiagnosticCode::VerifySlotCapacity, "", "", -1, -1,
-             std::string(fileName) + " slot capacity " + match[1].str() +
+             std::string(fileName) + " tail slot capacity " + match[1].str() +
                  " does not match MaxPointwiseSlots (" + std::to_string(MaxPointwiseSlots) + ")");
       ++errors;
     }

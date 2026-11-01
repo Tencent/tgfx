@@ -65,6 +65,17 @@ bool TextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNode
   parameters.hasRGBAAA = alphaStart != Point::Zero();
   parameters.hasPerspective = coordTransform.matrix.hasPerspective();
   if (textureView == nullptr) {
+    // A pending multi-plane upload: the YUV-ness is exact at proxy creation (only the
+    // ImageBuffer-backed path reports it), while the plane layout exists only once the view
+    // does. Lower the leaf with what is known — the chain refuses it as any YUV leaf, and the
+    // YUV family's matching reads the layout off the tree's TextureEffect at prepare (an
+    // instance-time fact of a pending source, like the upload values that stay on the
+    // processor until the node contract lands).
+    if (textureProxy->mayUploadYUV()) {
+      parameters.isYUV = true;
+      parameters.yuvFormat = -1;
+      return builder->addTextureSource(input, parameters, output);
+    }
     // The view is not instantiated yet. A proxy with a pending upload gets its view before this
     // draw executes (resource tasks run ahead of the draw ops in the same flush), so the chain
     // route can serve it — otherwise the first frame of every lazily uploaded image takes the
@@ -101,6 +112,17 @@ bool TextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNode
       }
     }
     parameters.isYUV = textureView->isYUV();
+    if (parameters.isYUV) {
+      // The multi-plane leaf's variant dimension rides on the node: the family's matching reads
+      // it off the IR (only I420 and NV12 are enumerated; anything else stays -1 and falls back).
+      auto* yuvTexture = getYUVTexture();
+      parameters.yuvFormat =
+          yuvTexture == nullptr
+              ? -1
+              : (yuvTexture->yuvFormat() == YUVFormat::I420
+                     ? 0
+                     : (yuvTexture->yuvFormat() == YUVFormat::NV12 ? 1 : -1));
+    }
   }
   return builder->addTextureSource(input, parameters, output);
 }

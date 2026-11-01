@@ -4,11 +4,12 @@
 // Permutation dimensions (frag): YUV_FORMAT (0=I420 three planes, 1=NV12 two planes), HAS_XP.
 // The plane sampling and conversion mirror GLSLTextureEffect::emitYUVTextureCode; the limited
 // range offset is a runtime uniform (YUVLimitedRange) since it is pure fragment math.
-// The three pointwise-operator slots carry a bounded color-grade tail (ColorMatrix / Luma /
-// AlphaThreshold / ColorSpaceXform): per-slot uniform arrays with a runtime-bound slot loop, so
-// the tail rides the same pass as the plane conversion,
-// so a video frame with a paint color filter never takes the runtime stitching route. A draw
-// with no operators leaves every slot at OP_NONE (a passthrough), byte-identical to before.
+// The color-grade tail carries up to three pointwise operators (ColorMatrix / Luma /
+// AlphaThreshold / ColorSpaceXform / ConstColor): the chain interpreter's instruction records
+// (SlotPacked and the per-op arrays, shared encoding with pointwise_chain.frag) with a
+// runtime-bound slot loop, so the tail rides the same pass as the plane conversion
+// and a video frame with a paint color filter never takes the runtime stitching route. A draw
+// with no operators leaves SlotCount at 0 (the loop never runs), byte-identical to before.
 #version 450
 
 #ifndef YUV_FORMAT
@@ -38,11 +39,26 @@ layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING)
 #endif
   int OutputAlphaSwizzle;
 
-  int PointwiseSlotCount;
-
-#define TGFX_SLOT_ARRAY_SUFFIX [3]
-#include "pipeline/slot/pointwise_op_uniforms.inc"
-#undef TGFX_SLOT_ARRAY_SUFFIX
+  // The color-grade tail rides the chain interpreter's instruction records — the same uniform
+  // arrays pointwise_chain.frag reads, at the tail's own capacity — so one slot encoding serves
+  // every kernel (the array order is dataflow order; the selector packs the op's small value in
+  // bits 0-7 and the blend operand order in bit 8, matching the YUV binder's writes).
+  int SlotCount;
+#define CHAIN_SLOT_CAPACITY 3
+#include "pipeline/chain/pointwise_chain_uniforms.inc"
+#undef CHAIN_SLOT_CAPACITY
+  // Shared color-space parameters, one block tail-wide like the interpreter's: at most one tail
+  // operator may be a color-space transform (enforced by the matching walk).
+  int ChainCSFlags;
+  vec4 ChainSrcTF0;
+  vec4 ChainSrcTF1;
+  int ChainSrcTFType;
+  vec4 ChainSrcOOTF;
+  mat3 ChainColorXform;
+  vec4 ChainDstOOTF;
+  vec4 ChainDstTF0;
+  vec4 ChainDstTF1;
+  int ChainDstTFType;
 };
 
 layout(location = 0) in vec3 TransformedCoords_0;

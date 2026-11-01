@@ -132,6 +132,10 @@ struct AOTTextureParameters {
   Point alphaStart = {};
   std::optional<AOTTiledTextureRecipe> tiledRecipe = std::nullopt;
   bool isYUV = false;
+  // The multi-plane leaf's plane layout: 0 = I420 (three planes), 1 = NV12 (two planes), -1 =
+  // not YUV or an unenumerated format. The YUV family's matching reads this off the IR instead
+  // of walking the processor tree (its YUV_FORMAT variant dimension).
+  int yuvFormat = -1;
   bool isAlphaOnly = false;
   bool hasRGBAAA = false;
   bool hasPerspective = false;

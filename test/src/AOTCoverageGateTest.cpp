@@ -112,8 +112,6 @@ const ProcessorClaim ProcessorClaims[] = {
     {"ConstColorProcessor", "ConstColorProcessor", Lowering,
      "served as a chain slot through the lowering"},
     {"DeviceSpaceTextureEffect", "DeviceSpaceTextureEffect", Matcher | Lowering, ""},
-    {"AOTYUVChainProcessor", "AOTYUVChainProcessor", Matcher,
-     "the YUV color-grade route: matcher-claimed through YUVTextureFillShader::Match"},
     {"LumaFragmentProcessor", "LumaFragmentProcessor", Matcher | Lowering, ""},
     {"PerlinNoiseFragmentProcessor", "PerlinNoiseFragmentProcessor", Lowering, ""},
     {"RectEffect", "RectEffect", Matcher | Lowering, ""},

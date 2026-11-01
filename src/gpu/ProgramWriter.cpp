@@ -395,6 +395,51 @@ static const AOTProgram* ChainProgram(const ProgramInfo& info) {
   return info.getCachedChainProgram();
 }
 
+// The compiled YUV tail program, mirroring ChainProgram's caching: compiled here when neither the
+// info cache nor the carried IR holds one, so a repeated prepare of the same op never recompiles.
+// The cache slot is shared with the chain program — a draw resolves to exactly one of the two
+// families, never both.
+static const AOTProgram* YUVProgram(const ProgramInfo& info) {
+  if (auto* cached = info.getCachedChainProgram()) {
+    return cached;
+  }
+  if (auto* carried = info.getCarriedIR();
+      carried != nullptr && carried->compiledProgram.has_value()) {
+    return &*carried->compiledProgram;
+  }
+  auto context = info.getContext();
+  if (context == nullptr || context->drawingManager() == nullptr) {
+    return nullptr;
+  }
+  AOTProgram program = {};
+  if (!AOTChainBuilder::CompileYUVProgramForInfo(&info, &program)) {
+    return nullptr;
+  }
+  info.setCachedChainProgram(std::move(program));
+  if (auto* carried = info.getCarriedIR()) {
+    carried->compiledProgram = *info.getCachedChainProgram();
+  }
+  return info.getCachedChainProgram();
+}
+
+void YUVProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
+                                       UniformData* fragmentUniformData,
+                                       const FragmentProcessor* expression) const {
+  // The standard walk writes the source leaf's family uniforms (the tree's TextureEffect); the
+  // color-grade operators above it declare no fields the kernel reads, so their writes no-op.
+  PrecompiledProgramWriter::writeProcessors(info, vertexUniformData, fragmentUniformData,
+                                            expression);
+  // The tail's instruction records come from the compiled program — the shell-free value write
+  // the chain route applies to its own slots.
+  auto* program = YUVProgram(info);
+  if (program == nullptr) {
+    LOGE("YUVProgramWriter::writeProcessors() no compiled YUV tail program; the draw renders "
+         "with unwritten tail uniforms");
+    return;
+  }
+  BindYUVProgram(*program, fragmentUniformData);
+}
+
 void ChainProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
                                                 UniformData* vertexUniformData,
                                                 UniformData* fragmentUniformData,
