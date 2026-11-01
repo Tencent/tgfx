@@ -29,6 +29,11 @@
 #include "gpu/processors/Processor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/ShaderMatchHelpers.h"
+#include "gpu/AOTShapeRules.h"
+#include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "gpu/processors/TextureEffect.h"
+#include "gpu/processors/TiledTextureEffect.h"
+
 #include "gpu/shaders/kernels/PointwiseChainShader.h"
 
 namespace tgfx {
@@ -49,6 +54,67 @@ void StandardDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget)
 static bool IsDirectAOTShader(const std::string& shaderName) {
   return shaderName == PointwiseChainShader::Name;
 }
+
+#if DEBUG
+namespace {
+// The texture-batch safety net: for the single-leaf color shape the texture rows read, the IR
+// leaf's record-time facts must agree with the tree's one texture processor. A disagreement is
+// a record-versus-prepare drift (a pending upload's instantiation, a proxy/texture disagreement)
+// that would make the executor-table rows read different facts than the processor walk did.
+// Multi-leaf shapes (blend DAGs, a mask-modulated shader) have no unambiguous correspondence
+// here and are skipped — the rows' shapes are single-leaf.
+void AssertSingleLeafFacts(const DrawIR& ir,
+                            const std::vector<PlacementPtr<FragmentProcessor>>& colors) {
+  const AOTTextureParameters* leaf = nullptr;
+  size_t leafCount = 0;
+  for (uint32_t index = 0; index < ir.color.nodeCount(); ++index) {
+    auto* node = ir.color.nodeAt(AOTNodeID(index));
+    if (node != nullptr && node->kind == AOTEffectKind::TextureSource) {
+      leaf = std::get_if<AOTTextureParameters>(&node->parameters);
+      leafCount++;
+    }
+  }
+  if (leafCount != 1 || leaf == nullptr) {
+    return;
+  }
+  const FragmentProcessor* texture = nullptr;
+  size_t textureCount = 0;
+  for (const auto& color : colors) {
+    FragmentProcessor::Iter iter(color.get());
+    while (auto* fp = iter.next()) {
+      if (IsProcessor<TiledTextureEffect>(fp) || IsProcessor<DeviceSpaceTextureEffect>(fp) ||
+          IsProcessor<TextureEffect>(fp)) {
+        texture = fp;
+        textureCount++;
+      }
+    }
+  }
+  if (textureCount != 1 || texture == nullptr) {
+    return;
+  }
+  auto classOf = [](const FragmentProcessor* fp) {
+    if (IsProcessor<TiledTextureEffect>(fp)) {
+      return AOTTextureSamplingKind::Tiled;
+    }
+    if (IsProcessor<DeviceSpaceTextureEffect>(fp)) {
+      return AOTTextureSamplingKind::Device;
+    }
+    return AOTTextureSamplingKind::Plain;
+  };
+  // A failure here means the leaf's record-time facts drifted from the tree's processor.
+  DEBUG_ASSERT(classOf(texture) == leaf->samplingKind);
+  if (leaf->samplingKind == AOTTextureSamplingKind::Plain) {
+    auto* te = static_cast<const TextureEffect*>(texture);
+    DEBUG_ASSERT(te->isYUV() == leaf->isYUV && te->isAlphaOnly() == leaf->isAlphaOnly &&
+                 te->hasRGBAAA() == leaf->hasRGBAAA && te->hasPerspective() == leaf->hasPerspective);
+  } else if (leaf->samplingKind == AOTTextureSamplingKind::Tiled) {
+    auto* tiled = static_cast<const TiledTextureEffect*>(texture);
+    DEBUG_ASSERT(tiled->isAlphaOnly() == leaf->isAlphaOnly &&
+                 tiled->hasPerspective() == leaf->hasPerspective);
+  }
+}
+}  // namespace
+#endif
 
 bool StandardDrawOp::prepare(RenderTarget* renderTarget,
                              std::optional<ColorProcessorList> colorOverride,
@@ -77,6 +143,11 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget,
     // match-time one the instantiated view — a disagreement means the dst-texture timing
     // assumption is wrong somewhere, and the executor-table matching would mis-route.
     DEBUG_ASSERT(ir->xfer == ClassifyXferForMatch(xferProcessor.get()));
+    // The leaf twin runs only against the unmodified record-time color list — a color override
+    // (a plan task's pass colors) describes a different expression than the record-time IR.
+    if (!colorOverride.has_value()) {
+      AssertSingleLeafFacts(*ir, colors);
+    }
   }
 #endif
 
