@@ -20,57 +20,64 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
-#include "gpu/processors/DeviceSpaceTextureEffect.h"
-#include "gpu/processors/NonAARRectGeometryProcessor.h"
+#include "gpu/aot/AOTChainBuilder.h"
+#include "gpu/aot/AOTDrawFacts.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
-#include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
 
 std::optional<NonAARRectFillShader::Inputs> NonAARRectFillShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure*) {
-  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
+  // The executor-table row and the walk share this one body.
+  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
+}
+
+std::optional<NonAARRectFillShader::Inputs> NonAARRectFillShader::ExtractFacts(
+    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }
-  auto gp = programInfo->getGeometryProcessor();
-  if (!IsProcessor<NonAARRectGeometryProcessor>(gp)) {
+  // The geometry kind IS the contract: RRectDrawOp's non-AA form, no processor-tree walk.
+  if (facts.geometry.kind != AOTGeometryKind::NonAARRect) {
     return std::nullopt;
   }
-  if (programInfo->numFragmentProcessors() > 1) {
+  if (facts.fragmentCount > 1) {
     return std::nullopt;
   }
-  auto* ngp = static_cast<const NonAARRectGeometryProcessor*>(gp);
   Inputs inputs;
-  inputs.isStroke = ngp->isStroke();
-  if (programInfo->numFragmentProcessors() == 1) {
+  inputs.isStroke = facts.geometry.isStroke;
+  if (facts.fragmentCount == 1) {
     // A sole analytic clip (AA rect or rounded rect) rides the runtime clip contract uniforms, so
     // it needs no dimension: the FP is there only to write them.
-    const bool clipOnly = programInfo->numColorFragmentProcessors() == 0 &&
-                          HasDirectAnalyticClipCoverage(programInfo);
+    const bool clipOnly =
+        facts.colorFPCount == 0 && (facts.coverage == CoverageKind::AARect ||
+                                    facts.coverage == CoverageKind::RRect);
     if (!clipOnly) {
-      auto fp = programInfo->getFragmentProcessor(0);
       // The textured variant carries the single-tap tiled modes only: the mipmap-repeat 4-tap path
       // and perspective coordinates stay on the runtime route. The textured form never combines
       // with stroke; Compose applies that rejection through the shared predicate.
-      if (!IsProcessor<TiledTextureEffect>(fp)) {
+      if (facts.ir == nullptr) {
         return std::nullopt;
       }
-      auto* tte = static_cast<const TiledTextureEffect*>(fp);
-      if (tte->hasPerspective()) {
+      AOTChainBuilder::AOTTextureTailShape tail = {};
+      if (!AOTChainBuilder::CollectTextureTail(facts.ir->color, &tail) || !tail.ops.empty()) {
         return std::nullopt;
       }
-      int modeX = 0;
-      int modeY = 0;
-      tte->getShaderModes(&modeX, &modeY);
-      if (!TiledModeSupported(modeX) || !TiledModeSupported(modeY)) {
+      auto* leaf = tail.leaf;
+      if (leaf->samplingKind != AOTTextureSamplingKind::Tiled || leaf->hasPerspective ||
+          !leaf->tiledRecipe.has_value()) {
+        return std::nullopt;
+      }
+      if (!TiledModeSupported(static_cast<int>(leaf->tiledRecipe->shaderModeX)) ||
+          !TiledModeSupported(static_cast<int>(leaf->tiledRecipe->shaderModeY))) {
         return std::nullopt;
       }
       inputs.textured = true;
     }
   }
-  inputs.xpType = GetXPType(programInfo);
+  inputs.xpType = facts.xpType();
   return inputs;
 }
 

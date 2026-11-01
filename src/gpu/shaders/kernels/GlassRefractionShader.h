@@ -87,6 +87,9 @@ class GlassRefractionShader : public ShaderFamily<GlassRefractionShader> {
   /// Whole-draw guards (alpha-only target, the common-color GP forms, the local-mask coverage,
   /// the refraction and geometry child shapes), defined in the family's own .cpp, next to the
   /// GLSL it owns.
+  static std::optional<Inputs> ExtractFacts(const AOTDrawFacts& facts,
+                                            PermutationMatchFailure* failure);
+
   static std::optional<Inputs> Extract(const ProgramInfo* programInfo,
                                        PermutationMatchFailure* failure);
 };

@@ -77,20 +77,12 @@ enum class CoverageKind {
 /// 0 = Empty XferProcessor, 1 = PorterDuff DST_TEX, 2 = PorterDuff FBF, -1 = none representable.
 int GetXPType(const ProgramInfo* programInfo);
 
-/// True when the draw carries no fragment processors at all, or exactly one direct analytic clip
-/// coverage FP (AA rect or rrect) that the runtime clip contract uniforms can evaluate.
-bool HasNoProcessorsOrDirectClip(const ProgramInfo* programInfo);
-
 /// 0 = DefaultGeometryProcessor, 1 = QuadPerEdgeAAGeometryProcessor, -1 = anything else.
 int GetGPType(const GeometryProcessor* gp);
 
 /// True when the GP is a position-only rect form (Default, or a Quad with common color, a UV
 /// matrix and no subset): the plain fill kernels' vertex contract.
 bool IsPositionOnlyRectGP(const GeometryProcessor* gp);
-
-/// 1 when the sole coverage FP is a device-space mask, 0 when there is no coverage FP at all,
-/// nullopt for anything the shared runtime-clip contract cannot evaluate.
-std::optional<int> SharedDeviceMaskValue(const ProgramInfo* programInfo);
 
 /// Whether a ShaderMode value is one the tiled fill kernel implements.
 bool TiledFillModeSupported(int mode);
@@ -120,6 +112,17 @@ std::optional<CoverageKind> ClassifyCoverageTerm(const AOTCoverageTerm& term);
 /// no-coverage case is a count, the rest reads the carried IR's terms (the atlas glyph term is
 /// skipped — the geometry processor's own coverage, never a coverage FP).
 std::optional<CoverageKind> ClassifyCoverageTerms(const ProgramInfo* programInfo);
+
+/// The local-mask texture leaf behind a LocalMask classification (the SrcIn ShaderMaskFilter
+/// fingerprint): the leaf carries the mask transform's perspective fact, so a family that needs an
+/// affine mask reads it off the IR instead of the coverage processor's child transform. Null when
+/// the draw has no such term.
+const AOTTextureParameters* LocalMaskCoverageLeaf(const DrawIR* ir);
+
+/// The device-space mask leaf behind a DeviceMask classification: the term's own sampler facts
+/// (alpha-only, perspective), so a family that needs an affine alpha mask reads them off the IR
+/// instead of the mask processor. Null when the draw has no such term.
+const AOTTextureParameters* DeviceMaskCoverageLeaf(const DrawIR* ir);
 
 /// Direct analytic clip coverage: the sole coverage FP is an AA rect or a leaf rrect.
 bool HasDirectAnalyticClipCoverage(const ProgramInfo* programInfo);

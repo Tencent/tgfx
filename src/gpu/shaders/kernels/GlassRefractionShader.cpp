@@ -20,62 +20,60 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
-#include "gpu/processors/EllipseGeometryProcessor.h"
+#include "gpu/aot/AOTDrawFacts.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
-#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 
 namespace tgfx {
 
 std::optional<GlassRefractionShader::Inputs> GlassRefractionShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure*) {
-  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
+  // The executor-table row and the walk share this one body.
+  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
+}
+
+std::optional<GlassRefractionShader::Inputs> GlassRefractionShader::ExtractFacts(
+    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }
-  auto gp = programInfo->getGeometryProcessor();
-  if (gp == nullptr) {
-    return std::nullopt;
-  }
-  // The GP selects the vertex layout and the initial-coverage source. Both forms must be the
+  // The geometry selects the vertex layout and the initial-coverage source. Both forms must be the
   // common-color attribute layout: the kernels read the Color uniform, and a per-vertex color
   // draw would quantize fractional paint colors through the UByte4 attribute.
   int gpKind = -1;
-  if (IsProcessor<EllipseGeometryProcessor>(gp)) {
-    auto* egp = static_cast<const EllipseGeometryProcessor*>(gp);
-    if (!egp->hasCommonColor()) {
+  if (facts.geometry.kind == AOTGeometryKind::Ellipse) {
+    if (!facts.geometry.hasCommonColor) {
       return std::nullopt;
     }
     gpKind = 0;
-  } else if (IsProcessor<QuadPerEdgeAAGeometryProcessor>(gp)) {
-    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
+  } else if (facts.geometry.kind == AOTGeometryKind::QuadPerEdgeAA) {
     // The uvMatrix form is required: it declares no uvCoord attribute, so the GP transforms the
     // position for the background coordinate, which is what the quad vertex kernel reads. A
     // subset-carrying quad has a different transform contract and stays on the fallback route.
-    if (!quadGP->hasCommonColor() || !quadGP->hasUVMatrix() || quadGP->getHasSubset() ||
-        quadGP->getHasUVPerspective()) {
+    if (!facts.geometry.hasCommonColor || !facts.geometry.hasUVMatrix ||
+        facts.geometry.hasSubset || facts.geometry.hasUVPerspective) {
       return std::nullopt;
     }
     gpKind = 1;
   } else {
     return std::nullopt;
   }
-  if (programInfo->numColorFragmentProcessors() != 1) {
+  if (facts.colorFPCount != 1) {
     return std::nullopt;
   }
   // The only coverage processor the kernel takes is the quad form's local shape mask (a SrcIn
   // ShaderMaskFilter over a hardware-tiled RGBA texture), applied through the HasLocalMask runtime
-  // branch. It needs an affine mask transform, like the background coordinate below.
-  if (programInfo->numFragmentProcessors() != 1) {
-    auto coverage = ClassifyCoverageTerms(programInfo);
-    if (gpKind != 1 || programInfo->numFragmentProcessors() != 2 || !coverage ||
-        *coverage != CoverageKind::LocalMask) {
-      return std::nullopt;
-    }
-    auto mask = programInfo->getFragmentProcessor(1)->childProcessor(0);
-    if (mask->numCoordTransforms() != 1 || mask->coordTransform(0)->matrix.hasPerspective()) {
+  // branch. It needs an affine mask transform, like the background coordinate below — the mask
+  // leaf's perspective fact is read off the IR, exactly what the coverage processor's child
+  // transform reported.
+  if (facts.fragmentCount != 1) {
+    auto* mask = LocalMaskCoverageLeaf(facts.ir);
+    if (gpKind != 1 || facts.fragmentCount != 2 || !facts.coverage ||
+        *facts.coverage != CoverageKind::LocalMask || mask == nullptr ||
+        mask->hasPerspective) {
       return std::nullopt;
     }
   }
-  int xpType = GetXPType(programInfo);
+  const int xpType = facts.xpType();
   if (xpType < XP_NONE) {
     return std::nullopt;
   }
@@ -89,8 +87,8 @@ std::optional<GlassRefractionShader::Inputs> GlassRefractionShader::Extract(
   // form ((Matrix * vec3(pos, 1)).xy computed in the vertex stage), matching
   // GeometryProcessor::emitTransforms' non-perspective branch — a projective transform makes the
   // runtime emit a vec3 varying divided in the fragment stage, so it must ride the runtime route.
-  auto shape = ReadOpaqueKernelIRShape(programInfo->getCarriedIR(), /*kernelKind=*/1,
-                                        /*requiresTextureChild=*/false);
+  auto shape = ReadOpaqueKernelIRShape(facts.ir, /*kernelKind=*/1,
+                                       /*requiresTextureChild=*/false);
   if (!shape || shape->kernel->geometryKind < 0 || shape->kernel->hasPerspective) {
     return std::nullopt;
   }

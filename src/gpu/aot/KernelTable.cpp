@@ -17,10 +17,23 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/KernelTable.h"
+#include "gpu/shaders/kernels/AtlasTextFillShader.h"
+#include "gpu/shaders/kernels/ComplexEllipseFillShader.h"
+#include "gpu/shaders/kernels/ComplexNonAARRectFillShader.h"
+#include "gpu/shaders/kernels/EllipseFillShader.h"
 #include "gpu/shaders/kernels/GaussianBlur1DShader.h"
+#include "gpu/shaders/kernels/GlassRefractionShader.h"
 #include "gpu/shaders/kernels/GlassUDFTentBlurShader.h"
+#include "gpu/shaders/kernels/HairlineLineShader.h"
+#include "gpu/shaders/kernels/HairlineQuadShader.h"
+#include "gpu/shaders/kernels/MaskFillShader.h"
+#include "gpu/shaders/kernels/MeshFillShader.h"
+#include "gpu/shaders/kernels/NonAARRectFillShader.h"
 #include "gpu/shaders/kernels/QuadColorFillShader.h"
 #include "gpu/shaders/kernels/QuadTextureFillShader.h"
+#include "gpu/shaders/kernels/RoundStrokeRectFillShader.h"
+#include "gpu/shaders/kernels/ShapeInstancedFillShader.h"
+#include "gpu/shaders/kernels/ShapeInstancedTextureCoverageShader.h"
 #include "gpu/shaders/kernels/SolidColorFillShader.h"
 #include "gpu/shaders/kernels/TexturedEffectShader.h"
 #include "gpu/shaders/kernels/TiledTextureFillShader.h"
@@ -28,16 +41,30 @@
 
 namespace tgfx {
 
-// The rows, in the walk order their families migrate from (GaussianBlur 5th, GlassUDFTentBlur
-// 7th, QuadColor 13th, QuadTexture 14th, SolidColor 18th, TexturedEffect 19th, TiledTexture
-// 20th, YUV 21st of the dedicated list; MaskFill stays on the walk — its rasterized-shape mask
-// is a prepare-grown coverage, exactly the case the carried IR drops by the staleness guard): every entry's match is the family's own
-// ExtractFacts pipeline, so a row and the walk cannot disagree.
+// The rows, in the walk order their families migrated from (the full dedicated list, 1st through
+// 21st). Two rows read the third channel rather than the carried IR: MaskFill's rasterized-shape
+// mask is a prepare-grown coverage (exactly the case the staleness guard drops), so it reads the
+// live mask facts; the rows otherwise share one body with the walk they replaced, so a row and
+// the walk cannot disagree.
 static const std::vector<AOTKernelRow> rows = {
+    AOTKernelRow{AtlasTextFillShader::Name, AtlasTextFillShader::MatchFromFacts},
+    AOTKernelRow{ComplexEllipseFillShader::Name, ComplexEllipseFillShader::MatchFromFacts},
+    AOTKernelRow{ComplexNonAARRectFillShader::Name, ComplexNonAARRectFillShader::MatchFromFacts},
+    AOTKernelRow{EllipseFillShader::Name, EllipseFillShader::MatchFromFacts},
     AOTKernelRow{GaussianBlur1DShader::Name, GaussianBlur1DShader::MatchFromFacts},
+    AOTKernelRow{GlassRefractionShader::Name, GlassRefractionShader::MatchFromFacts},
     AOTKernelRow{GlassUDFTentBlurShader::Name, GlassUDFTentBlurShader::MatchFromFacts},
+    AOTKernelRow{HairlineLineShader::Name, HairlineLineShader::MatchFromFacts},
+    AOTKernelRow{HairlineQuadShader::Name, HairlineQuadShader::MatchFromFacts},
+    AOTKernelRow{MaskFillShader::Name, MaskFillShader::MatchFromFacts},
+    AOTKernelRow{MeshFillShader::Name, MeshFillShader::MatchFromFacts},
+    AOTKernelRow{NonAARRectFillShader::Name, NonAARRectFillShader::MatchFromFacts},
     AOTKernelRow{QuadColorFillShader::Name, QuadColorFillShader::MatchFromFacts},
     AOTKernelRow{QuadTextureFillShader::Name, QuadTextureFillShader::MatchFromFacts},
+    AOTKernelRow{RoundStrokeRectFillShader::Name, RoundStrokeRectFillShader::MatchFromFacts},
+    AOTKernelRow{ShapeInstancedFillShader::Name, ShapeInstancedFillShader::MatchFromFacts},
+    AOTKernelRow{ShapeInstancedTextureCoverageShader::Name,
+                 ShapeInstancedTextureCoverageShader::MatchFromFacts},
     AOTKernelRow{SolidColorFillShader::Name, SolidColorFillShader::MatchFromFacts},
     AOTKernelRow{TexturedEffectShader::Name, TexturedEffectShader::MatchFromFacts},
     AOTKernelRow{TiledTextureFillShader::Name, TiledTextureFillShader::MatchFromFacts},

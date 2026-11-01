@@ -20,47 +20,48 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
-#include "gpu/processors/AtlasTextGeometryProcessor.h"
-#include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "gpu/aot/AOTDrawFacts.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
-#include "gpu/processors/RRectEffect.h"
-#include "gpu/processors/RectEffect.h"
 
 namespace tgfx {
 
 std::optional<AtlasTextFillShader::Inputs> AtlasTextFillShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure*) {
-  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
+  // The executor-table row and the walk share this one body.
+  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
+}
+
+std::optional<AtlasTextFillShader::Inputs> AtlasTextFillShader::ExtractFacts(
+    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }
-  auto gp = programInfo->getGeometryProcessor();
-  if (!IsProcessor<AtlasTextGeometryProcessor>(gp)) {
+  // The geometry kind IS the contract: AtlasTextOp's glyph processor, no processor-tree walk.
+  if (facts.geometry.kind != AOTGeometryKind::AtlasText) {
     return std::nullopt;
   }
-  if (programInfo->numColorFragmentProcessors() != 0 || programInfo->numFragmentProcessors() > 1) {
+  if (facts.colorFPCount != 0 || facts.fragmentCount > 1) {
     return std::nullopt;
   }
-  int xpType = GetXPType(programInfo);
+  const int xpType = facts.xpType();
   if (xpType < XP_NONE) {
     return std::nullopt;
   }
-  if (programInfo->numFragmentProcessors() == 1) {
-    // A single coverage FP multiplies the atlas glyph coverage: either an alpha-only device-space
-    // mask, or a direct analytic clip (AA rect / rrect) via the runtime clip contract.
-    if (!HasDirectAnalyticClipCoverage(programInfo)) {
-      auto fp = programInfo->getFragmentProcessor(0);
-      if (!IsProcessor<DeviceSpaceTextureEffect>(fp)) {
-        return std::nullopt;
-      }
-      auto* mask = static_cast<const DeviceSpaceTextureEffect*>(fp);
-      if (!mask->isAlphaOnly() || mask->hasPerspective()) {
+  if (facts.fragmentCount == 1) {
+    // A single coverage FP multiplies the atlas glyph coverage: either a direct analytic clip
+    // (AA rect / rrect) via the runtime clip contract, or an alpha-only affine device-space mask
+    // — the mask sampler facts come off the IR's DeviceMask term.
+    const bool directClip =
+        facts.coverage == CoverageKind::AARect || facts.coverage == CoverageKind::RRect;
+    if (!directClip) {
+      auto* mask = DeviceMaskCoverageLeaf(facts.ir);
+      if (mask == nullptr || !mask->isAlphaOnly || mask->hasPerspective) {
         return std::nullopt;
       }
     }
   }
-  auto* atgp = static_cast<const AtlasTextGeometryProcessor*>(gp);
   Inputs inputs;
-  inputs.hasCoverage = atgp->getAAType() == AAType::Coverage;
+  inputs.hasCoverage = facts.geometry.hasCoverage;
   inputs.xpType = xpType;
   return inputs;
 }

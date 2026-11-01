@@ -56,6 +56,13 @@ PlacementPtr<GeometryProcessor> HairlineLineOp::onMakeGeometryProcessor(
                                              aaType);
 }
 
+AOTGeometryDesc HairlineLineOp::recordTimeGeometry() const {
+  // The processor is always a HairlineLineGeometryProcessor; the matchers read no further facts.
+  AOTGeometryDesc desc = {};
+  desc.kind = AOTGeometryKind::HairlineLine;
+  return desc;
+}
+
 bool HairlineLineOp::onPrepare() {
   // The hairline vertex buffer is produced asynchronously and may be empty when the path has
   // no line segments after decomposition. The index buffer comes from the global cache and is

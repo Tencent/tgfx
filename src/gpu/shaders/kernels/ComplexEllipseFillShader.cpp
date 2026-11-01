@@ -21,21 +21,27 @@
 #include "gpu/PermutationMatch.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
-#include "gpu/processors/ComplexEllipseGeometryProcessor.h"
+#include "gpu/aot/AOTDrawFacts.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
 
 std::optional<ComplexEllipseFillShader::Inputs> ComplexEllipseFillShader::Extract(
     const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
-  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+  // The executor-table row and the walk share this one body.
+  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
+}
+
+std::optional<ComplexEllipseFillShader::Inputs> ComplexEllipseFillShader::ExtractFacts(
+    const AOTDrawFacts& facts, PermutationMatchFailure* failure) {
+  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }
-  auto gp = programInfo->getGeometryProcessor();
-  if (!IsProcessor<ComplexEllipseGeometryProcessor>(gp)) {
+  // The geometry kind IS the contract: RRectDrawOp's complex AA form (per-corner radii).
+  if (facts.geometry.kind != AOTGeometryKind::ComplexEllipse) {
     return std::nullopt;
   }
-  if (programInfo->numColorFragmentProcessors() != 0) {
+  if (facts.colorFPCount != 0) {
     return std::nullopt;
   }
   // A sole coverage FP is served through the shared coverage contract, with no dimension either
@@ -43,13 +49,12 @@ std::optional<ComplexEllipseFillShader::Inputs> ComplexEllipseFillShader::Extrac
   // clip_coverage.inc) and a device-space mask is the runtime HasDeviceMask uniform over the
   // always-declared MaskTextureSampler (padded with the dummy texture when absent). LocalMask needs
   // a per-vertex UV this geometry does not provide and stays rejected.
-  if (!SharedDeviceMaskValue(programInfo)) {
+  if (!facts.coverage || *facts.coverage == CoverageKind::LocalMask) {
     return Fail(failure, PermutationMatchFailure::CoverageShape);
   }
-  auto* cegp = static_cast<const ComplexEllipseGeometryProcessor*>(gp);
   Inputs inputs;
-  inputs.isStroke = cegp->isStroke();
-  inputs.xpType = GetXPType(programInfo);
+  inputs.isStroke = facts.geometry.isStroke;
+  inputs.xpType = facts.xpType();
   return inputs;
 }
 

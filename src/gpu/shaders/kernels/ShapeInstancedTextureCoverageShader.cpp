@@ -21,16 +21,8 @@
 #include "gpu/PermutationMatch.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
+#include "gpu/aot/AOTDrawFacts.h"
 #include "gpu/aot/DrawIR.h"
-#include "gpu/processors/ClampedGradientEffect.h"
-#include "gpu/processors/ConicGradientLayout.h"
-#include "gpu/processors/DeviceSpaceTextureEffect.h"
-#include "gpu/processors/FragmentProcessor.h"
-#include "gpu/processors/RRectEffect.h"
-#include "gpu/processors/RectEffect.h"
-#include "gpu/processors/ShapeInstancedGeometryProcessor.h"
-#include "gpu/processors/SingleIntervalGradientColorizer.h"
-#include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
 
@@ -38,81 +30,102 @@ static bool IsAnalyticClipKind(const std::optional<CoverageKind>& kind) {
   return kind && (*kind == CoverageKind::AARect || *kind == CoverageKind::RRect);
 }
 
+// The bare texture leaf of a non-analytic coverage term: the run lowered a single TextureEffect
+// over the geometry-coverage unit, so the graph is exactly the unit plus the texture source.
+static const AOTTextureParameters* BareTextureCoverageLeaf(const AOTCoverageTerm& term) {
+  if (term.kind != AOTCoverageTermKind::Subtree || term.graph.nodeCount() != 2 ||
+      !term.root.isValid() || term.root.index() != 1) {
+    return nullptr;
+  }
+  auto* node = term.graph.nodeAt(term.root);
+  if (node == nullptr || node->kind != AOTEffectKind::TextureSource) {
+    return nullptr;
+  }
+  return std::get_if<AOTTextureParameters>(&node->parameters);
+}
+
 std::optional<ShapeInstancedTextureCoverageShader::Inputs>
 ShapeInstancedTextureCoverageShader::Extract(const ProgramInfo* programInfo,
                                              PermutationMatchFailure* failure) {
-  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+  // The executor-table row and the walk share this one body.
+  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
+}
+
+std::optional<ShapeInstancedTextureCoverageShader::Inputs>
+ShapeInstancedTextureCoverageShader::ExtractFacts(const AOTDrawFacts& facts,
+                                                  PermutationMatchFailure* failure) {
+  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }
-  auto gp = programInfo->getGeometryProcessor();
-  if (!IsProcessor<ShapeInstancedGeometryProcessor>(gp) || GetXPType(programInfo) != XP_NONE) {
+  // The geometry kind IS the contract: ShapeInstancedDrawOp's processor, in its non-AA form —
+  // this kernel carries no AA coverage attribute.
+  if (facts.geometry.kind != AOTGeometryKind::ShapeInstanced || facts.geometry.hasCoverage) {
     return std::nullopt;
   }
-  // Two forms: a bare coverage texture, or a single-interval gradient color FP ahead of it.
+  if (facts.xpType() != XP_NONE) {
+    return std::nullopt;
+  }
+  // Two color forms: the geometry color alone, or a single-interval clamped gradient over it.
+  // The gradient reads the live channel (AOTDrawFacts::liveGradient): a rasterized instanced
+  // shape grows its coverage only at prepare, the staleness guard drops that draw's IR together
+  // with its color graph, and the acceptance must not depend on which of the two happened.
   int gradient = 0;
-  size_t colorCount = programInfo->numColorFragmentProcessors();
-  if (colorCount == 1) {
-    auto colorFP = programInfo->getFragmentProcessor(0);
-    if (!IsProcessor<ClampedGradientEffect>(colorFP) || colorFP->numChildProcessors() != 2 ||
-        !IsProcessor<SingleIntervalGradientColorizer>(colorFP->childProcessor(0))) {
-      return std::nullopt;
-    }
-    auto layout = colorFP->childProcessor(1);
-    if (layout->numCoordTransforms() != 1 || layout->coordTransform(0)->matrix.hasPerspective()) {
+  if (facts.colorFPCount == 1) {
+    if (!facts.liveGradient.present || !facts.liveGradient.singleInterval ||
+        facts.liveGradient.hasPerspective) {
       return std::nullopt;
     }
     gradient = 1;
-  } else if (colorCount != 0) {
+  } else if (facts.colorFPCount != 0) {
     return std::nullopt;
   }
-  // One coverage texture, optionally preceded/followed by an analytic clip. The clip rides the
-  // runtime clip contract uniforms (no permutation change), so both forms select the same variant.
-  auto fpCount = programInfo->numFragmentProcessors();
-  const FragmentProcessor* fp = nullptr;
-  if (fpCount == colorCount + 1) {
-    fp = programInfo->getFragmentProcessor(colorCount);
-  } else if (fpCount == colorCount + 2) {
-    // One coverage texture term, optionally accompanied by an analytic clip term (which rides the
-    // runtime clip contract uniforms, no permutation change). The terms follow the coverage FPs'
-    // order, so the non-analytic term's position names the texture FP.
-    auto* ir = programInfo->getCarriedIR();
-    std::optional<CoverageKind> kinds[2] = {};
-    size_t termCount = 0;
-    if (ir != nullptr) {
-      for (const auto& term : ir->coverage) {
-        if (termCount >= 2) {
-          break;
-        }
-        kinds[termCount++] = ClassifyCoverageTerm(term);
-      }
+  // One coverage texture, optionally accompanied by an analytic clip. The clip rides the runtime
+  // clip contract uniforms (no permutation change), so both forms select the same variant.
+  if (facts.fragmentCount == facts.colorFPCount + 1) {
+    // The sole-coverage form reads the live mask channel for the same reason the gradient does:
+    // the texture may be record-time or the rasterized shape's prepare-grown mask.
+    if (!facts.liveMask.present || !facts.liveMask.hasSampler || facts.liveMask.isYUV ||
+        facts.liveMask.hasRGBAAA) {
+      return std::nullopt;
     }
-    if (termCount != 2) {
-      // Two FPs lowered to something other than two single terms (a composed clip among them):
-      // not a shape this kernel evaluates.
-      return Fail(failure, PermutationMatchFailure::CoverageShape);
+    return Inputs{gradient != 0};
+  }
+  if (facts.fragmentCount != facts.colorFPCount + 2) {
+    return std::nullopt;
+  }
+  // The texture-plus-clip form keeps the term walk (the processor-tree walk could not tell the
+  // two FPs apart either — the terms are what named the texture): the terms follow the coverage
+  // FPs' order, so the non-analytic term's position names the texture.
+  if (facts.ir == nullptr) {
+    return Fail(failure, PermutationMatchFailure::CoverageShape);
+  }
+  const auto& coverage = facts.ir->coverage;
+  std::optional<CoverageKind> kinds[2] = {};
+  size_t termCount = 0;
+  for (const auto& term : coverage) {
+    if (termCount >= 2) {
+      break;
     }
-    if (IsAnalyticClipKind(kinds[0]) && !IsAnalyticClipKind(kinds[1])) {
-      fp = programInfo->getFragmentProcessor(colorCount + 1);
-    } else if (IsAnalyticClipKind(kinds[1]) && !IsAnalyticClipKind(kinds[0])) {
-      fp = programInfo->getFragmentProcessor(colorCount);
-    } else {
-      // Two masks, or two clips, are not a shape this kernel evaluates.
-      return Fail(failure, PermutationMatchFailure::CoverageShape);
-    }
+    kinds[termCount++] = ClassifyCoverageTerm(term);
+  }
+  if (termCount != 2) {
+    // Two FPs lowered to something other than two single terms (a composed clip among them):
+    // not a shape this kernel evaluates.
+    return Fail(failure, PermutationMatchFailure::CoverageShape);
+  }
+  const AOTTextureParameters* textureLeaf = nullptr;
+  if (IsAnalyticClipKind(kinds[0]) && !IsAnalyticClipKind(kinds[1])) {
+    textureLeaf = BareTextureCoverageLeaf(coverage[1]);
+  } else if (IsAnalyticClipKind(kinds[1]) && !IsAnalyticClipKind(kinds[0])) {
+    textureLeaf = BareTextureCoverageLeaf(coverage[0]);
   } else {
-    return std::nullopt;
+    // Two masks, or two clips, are not a shape this kernel evaluates.
+    return Fail(failure, PermutationMatchFailure::CoverageShape);
   }
-  if (!IsProcessor<TextureEffect>(fp)) {
-    return std::nullopt;
-  }
-  auto* texture = static_cast<const TextureEffect*>(fp);
-  if (texture->numTextureSamplers() != 1 || texture->isYUV() || texture->hasRGBAAA()) {
-    return std::nullopt;
-  }
-  auto* shape = static_cast<const ShapeInstancedGeometryProcessor*>(gp);
-  // The color attribute is unconditional (white broadcast for colorless batches), so both forms
-  // read the same vColor varying. This kernel carries no AA coverage attribute.
-  if (shape->getAAType() != AAType::None) {
+  // The old TextureEffect acceptance (a sole sampler, no YUV, no packed-alpha dual plane) reads
+  // off the leaf the run recorded.
+  if (textureLeaf == nullptr || textureLeaf->samplingKind != AOTTextureSamplingKind::Plain ||
+      textureLeaf->isYUV || textureLeaf->hasRGBAAA || textureLeaf->textureProxy == nullptr) {
     return std::nullopt;
   }
   return Inputs{gradient != 0};

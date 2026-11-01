@@ -20,26 +20,31 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
-#include "gpu/processors/ComplexNonAARRectGeometryProcessor.h"
+#include "gpu/aot/AOTDrawFacts.h"
 
 namespace tgfx {
 
 std::optional<ComplexNonAARRectFillShader::Inputs> ComplexNonAARRectFillShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure*) {
-  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
+  // The executor-table row and the walk share this one body.
+  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
+}
+
+std::optional<ComplexNonAARRectFillShader::Inputs> ComplexNonAARRectFillShader::ExtractFacts(
+    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }
-  auto gp = programInfo->getGeometryProcessor();
-  if (!IsProcessor<ComplexNonAARRectGeometryProcessor>(gp)) {
+  // The geometry kind IS the contract: RRectDrawOp's complex non-AA form (per-corner radii).
+  if (facts.geometry.kind != AOTGeometryKind::ComplexNonAARRect) {
     return std::nullopt;
   }
-  if (programInfo->numFragmentProcessors() != 0) {
+  if (facts.fragmentCount != 0) {
     return std::nullopt;
   }
-  auto* cngp = static_cast<const ComplexNonAARRectGeometryProcessor*>(gp);
   Inputs inputs;
-  inputs.isStroke = cngp->isStroke();
-  inputs.xpType = GetXPType(programInfo);
+  inputs.isStroke = facts.geometry.isStroke;
+  inputs.xpType = facts.xpType();
   return inputs;
 }
 

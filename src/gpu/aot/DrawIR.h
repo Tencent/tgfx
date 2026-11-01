@@ -67,6 +67,23 @@ enum class AOTGeometryKind : uint8_t {
   Other = 0,
   Default,
   QuadPerEdgeAA,
+  // The rounded-rect pairs (RRectDrawOp): the non-AA forms at AAType::None and the AA forms, each
+  // in a plain and a per-corner-radii variant.
+  NonAARRect,
+  ComplexNonAARRect,
+  Ellipse,
+  ComplexEllipse,
+  // The hairline line/quad pair (HairlineLineOp / HairlineQuadOp) and the triangle mesh
+  // (MeshDrawOp).
+  HairlineLine,
+  HairlineQuad,
+  Mesh,
+  // The round-capped/joined stroke rect (RectDrawOp's round line join) and the instanced shape
+  // batch (ShapeInstancedDrawOp; two families share this processor).
+  RoundStrokeRect,
+  ShapeInstanced,
+  // The glyph atlas geometry (AtlasTextOp).
+  AtlasText,
 };
 
 /**
@@ -83,6 +100,12 @@ struct AOTGeometryDesc {
   bool hasUVMatrix = false;
   bool hasSubset = false;
   bool hasUVPerspective = false;
+  // The rounded-rect kinds only: the stroke form (the processors' isStroke).
+  bool isStroke = false;
+  // Mesh only: whether the vertex attributes carry texture coordinates.
+  bool hasTexCoords = false;
+  // AtlasText only: whether the processor carries the AA coverage attribute (AAType::Coverage).
+  bool hasCoverage = false;
 };
 
 /**

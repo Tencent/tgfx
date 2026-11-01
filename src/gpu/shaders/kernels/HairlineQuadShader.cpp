@@ -20,24 +20,35 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
-#include "gpu/processors/HairlineQuadGeometryProcessor.h"
+#include "gpu/aot/AOTDrawFacts.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
 
 std::optional<HairlineQuadShader::Inputs> HairlineQuadShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure*) {
-  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
+  // The executor-table row and the walk share this one body.
+  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
+}
+
+std::optional<HairlineQuadShader::Inputs> HairlineQuadShader::ExtractFacts(
+    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }
-  auto gp = programInfo->getGeometryProcessor();
-  if (!IsProcessor<HairlineQuadGeometryProcessor>(gp)) {
+  // The geometry kind IS the contract: HairlineQuadOp's processor, no processor-tree walk.
+  if (facts.geometry.kind != AOTGeometryKind::HairlineQuad) {
     return std::nullopt;
   }
-  if (!HasNoProcessorsOrDirectClip(programInfo)) {
+  // No color processors at all, or a sole direct analytic clip (HasNoProcessorsOrDirectClip's
+  // semantics: a paint-sourced color whose clip the runtime contract uniforms evaluate).
+  const bool directClip =
+      facts.colorFromPaint &&
+      (facts.coverage == CoverageKind::AARect || facts.coverage == CoverageKind::RRect);
+  if (facts.fragmentCount != 0 && !directClip) {
     return std::nullopt;
   }
-  auto xpType = GetXPType(programInfo);
+  const int xpType = facts.xpType();
   if (xpType < XP_NONE) {
     return std::nullopt;
   }

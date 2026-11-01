@@ -28,6 +28,36 @@ namespace tgfx {
 class ProgramInfo;
 
 /**
+ * The live coverage port's raw texture facts — the third channel (see `info`): read off the sole
+ * coverage processor, for draws whose coverage the record-time IR cannot express. A rasterized
+ * shape's mask grows only at prepare (the staleness guard drops exactly that IR), so no term
+ * exists for it; the MaskFill family reads these facts instead. Not a classification: it makes no
+ * claim the IR side would have to mirror — the equivalence between the IR terms and the live tree
+ * constrains classifications only, never raw instance facts.
+ */
+struct AOTLiveMaskFacts {
+  bool present = false;
+  bool alphaOnly = false;
+  bool hasSubset = false;
+  bool isYUV = false;
+  bool hasRGBAAA = false;
+  bool hasSampler = false;
+};
+
+/**
+ * The live color port's gradient facts — the third channel's color-side twin: the sole color
+ * processor read off the live tree, for the draws whose coverage grew at prepare (a rasterized
+ * instanced shape), whose IR the staleness guard drops together with the color graph it carried.
+ * The texture-coverage family reads these instead of the IR's gradient node, so the acceptance
+ * has one description whether the draw carries an IR or not.
+ */
+struct AOTLiveGradientFacts {
+  bool present = false;
+  bool singleInterval = false;
+  bool hasPerspective = false;
+};
+
+/**
  * A draw's matcher facts, extracted once per match: the record-time geometry and xfer
  * descriptors off the carried IR (their prepare-time twins when a draw carries no IR), the
  * target's alpha-only flag, the live processor-list sizes, and the coverage classification.
@@ -53,6 +83,14 @@ struct AOTDrawFacts {
   /// Whether the color expression came from the paint (the IR's fact; a draw with an explicit
   /// ConstColorProcessor lowers to the same graph, so this is what keeps the two apart).
   bool colorFromPaint = false;
+  /// The sole coverage processor's raw texture facts (the third channel — see
+  /// AOTLiveMaskFacts). Extracted whenever the draw carries exactly one coverage FP, live tree or
+  /// not: a recorded mask term carries the same facts on the IR side, and the row that reads this
+  /// channel accepts exactly the draws the processor-tree walk did.
+  AOTLiveMaskFacts liveMask = {};
+  /// The sole color processor's gradient facts (the third channel — see AOTLiveGradientFacts),
+  /// extracted whenever the draw carries exactly one color FP.
+  AOTLiveGradientFacts liveGradient = {};
 
   /// The position-only rect form the texture and noise fill kernels share (IsPositionOnlyRectGP's
   /// semantics): a DefaultGP, or a QuadPerEdgeAA whose coordinate comes from aPosition (a common

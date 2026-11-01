@@ -20,25 +20,31 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
+#include "gpu/aot/AOTDrawFacts.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
-#include "gpu/processors/ShapeInstancedGeometryProcessor.h"
 
 namespace tgfx {
 
 std::optional<ShapeInstancedFillShader::Inputs> ShapeInstancedFillShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure*) {
-  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
+  // The executor-table row and the walk share this one body.
+  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
+}
+
+std::optional<ShapeInstancedFillShader::Inputs> ShapeInstancedFillShader::ExtractFacts(
+    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }
-  auto gp = programInfo->getGeometryProcessor();
-  if (!IsProcessor<ShapeInstancedGeometryProcessor>(gp)) {
+  // The geometry kind IS the contract: ShapeInstancedDrawOp's processor.
+  if (facts.geometry.kind != AOTGeometryKind::ShapeInstanced) {
     return std::nullopt;
   }
-  if (programInfo->numFragmentProcessors() != 0) {
+  if (facts.fragmentCount != 0) {
     return std::nullopt;
   }
   Inputs inputs;
-  inputs.xpType = GetXPType(programInfo);
+  inputs.xpType = facts.xpType();
   return inputs;
 }
 

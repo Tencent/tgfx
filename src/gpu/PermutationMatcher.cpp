@@ -189,6 +189,50 @@ std::optional<CoverageKind> ClassifyCoverageTerm(const AOTCoverageTerm& term) {
   return std::nullopt;
 }
 
+// The local-mask texture leaf of the draw's Subtree coverage term: the same SrcIn ShaderMaskFilter
+// fingerprint ClassifyCoverageTerm recognizes. The leaf carries the mask transform's perspective
+// fact, so a family that needs an affine mask reads it off the IR.
+const AOTTextureParameters* LocalMaskCoverageLeaf(const DrawIR* ir) {
+  if (ir == nullptr) {
+    return nullptr;
+  }
+  for (const auto& term : ir->coverage) {
+    if (term.kind != AOTCoverageTermKind::Subtree || term.graph.nodeCount() != 4 ||
+        !term.root.isValid() || term.root.index() != 3) {
+      continue;
+    }
+    auto* texture = term.graph.nodeAt(AOTNodeID(2));
+    auto* blend = term.graph.nodeAt(term.root);
+    if (texture == nullptr || blend == nullptr || texture->kind != AOTEffectKind::TextureSource ||
+        blend->kind != AOTEffectKind::Blend) {
+      continue;
+    }
+    auto* textureParams = std::get_if<AOTTextureParameters>(&texture->parameters);
+    auto* blendParams = std::get_if<AOTBlendParameters>(&blend->parameters);
+    if (textureParams == nullptr || blendParams == nullptr ||
+        blendParams->blendMode != static_cast<int>(BlendMode::SrcIn) || blendParams->childType != 0 ||
+        !IsLocalMaskTexture(*textureParams)) {
+      continue;
+    }
+    return textureParams;
+  }
+  return nullptr;
+}
+
+// The device-space mask leaf of the draw's DeviceMask coverage term, with the sampler facts the
+// dedicated families read off the mask processor.
+const AOTTextureParameters* DeviceMaskCoverageLeaf(const DrawIR* ir) {
+  if (ir == nullptr) {
+    return nullptr;
+  }
+  for (const auto& term : ir->coverage) {
+    if (term.kind == AOTCoverageTermKind::DeviceMask) {
+      return &term.mask;
+    }
+  }
+  return nullptr;
+}
+
 // Classifies the coverage stage of a ProgramInfo carrying at most one coverage FP. The no-coverage
 // case is a count (bare draws lower no IR); the rest reads the carried IR's terms. The atlas glyph
 // term is the geometry processor's own coverage — the matcher never saw it as a coverage FP, and
@@ -222,35 +266,7 @@ std::optional<CoverageKind> ClassifyCoverageTerms(const ProgramInfo* programInfo
   return ClassifyCoverageTerm(*classified);
 }
 
-// Direct analytic clip coverage: the sole coverage term is an AA rect or a leaf rrect.
-bool HasDirectAnalyticClipCoverage(const ProgramInfo* programInfo) {
-  auto coverage = ClassifyCoverageTerms(programInfo);
-  return coverage == CoverageKind::AARect || coverage == CoverageKind::RRect;
-}
 
-// Kernels whose color comes from the GP Color uniform: a color FP would be silently dropped, so
-// the draw may carry no FP at all (a count — bare draws lower no IR), or only a direct analytic
-// clip evaluated from the runtime clip contract uniforms (the IR's colorFromPaint fact: a draw
-// with an explicit ConstColorProcessor lowers to the same graph, so the fact is what keeps the
-// two apart).
-bool HasNoProcessorsOrDirectClip(const ProgramInfo* programInfo) {
-  if (programInfo->numFragmentProcessors() == 0) {
-    return true;
-  }
-  auto* ir = programInfo->getCarriedIR();
-  return ir != nullptr && ir->colorFromPaint && HasDirectAnalyticClipCoverage(programInfo);
-}
-
-// Analytic clip coverage (AA rect or rrect) changes only fragment math, whereas a device-space
-// mask adds a sampler and shifts the terminal XP binding. Kernels using the runtime clip contract
-// therefore compile only this ABI distinction and carry the clip state through uniforms.
-std::optional<int> SharedDeviceMaskValue(const ProgramInfo* programInfo) {
-  auto coverage = ClassifyCoverageTerms(programInfo);
-  if (!coverage || *coverage == CoverageKind::LocalMask) {
-    return std::nullopt;
-  }
-  return *coverage == CoverageKind::DeviceMask ? 1 : 0;
-}
 
 int GetGPType(const GeometryProcessor* gp) {
   auto name = gp->name();
@@ -271,6 +287,67 @@ AOTGeometryDesc DescribeGeometryProcessor(const GeometryProcessor* gp) {
   auto gpType = GetGPType(gp);
   if (gpType == 0) {
     desc.kind = AOTGeometryKind::Default;
+    return desc;
+  }
+  const auto gpName = gp->name();
+  if (gpName == "NonAARRectGeometryProcessor") {
+    auto* rrectGP = static_cast<const NonAARRectGeometryProcessor*>(gp);
+    desc.kind = AOTGeometryKind::NonAARRect;
+    desc.hasCommonColor = rrectGP->hasCommonColor();
+    desc.isStroke = rrectGP->isStroke();
+    return desc;
+  }
+  if (gpName == "ComplexNonAARRectGeometryProcessor") {
+    auto* rrectGP = static_cast<const ComplexNonAARRectGeometryProcessor*>(gp);
+    desc.kind = AOTGeometryKind::ComplexNonAARRect;
+    desc.hasCommonColor = rrectGP->hasCommonColor();
+    desc.isStroke = rrectGP->isStroke();
+    return desc;
+  }
+  if (gpName == "EllipseGeometryProcessor") {
+    auto* ellipseGP = static_cast<const EllipseGeometryProcessor*>(gp);
+    desc.kind = AOTGeometryKind::Ellipse;
+    desc.hasCommonColor = ellipseGP->hasCommonColor();
+    desc.isStroke = ellipseGP->isStroke();
+    return desc;
+  }
+  if (gpName == "ComplexEllipseGeometryProcessor") {
+    auto* ellipseGP = static_cast<const ComplexEllipseGeometryProcessor*>(gp);
+    desc.kind = AOTGeometryKind::ComplexEllipse;
+    desc.hasCommonColor = ellipseGP->hasCommonColor();
+    desc.isStroke = ellipseGP->isStroke();
+    return desc;
+  }
+  if (gpName == "HairlineLineGeometryProcessor") {
+    desc.kind = AOTGeometryKind::HairlineLine;
+    return desc;
+  }
+  if (gpName == "HairlineQuadGeometryProcessor") {
+    desc.kind = AOTGeometryKind::HairlineQuad;
+    return desc;
+  }
+  if (gpName == "MeshGeometryProcessor") {
+    desc.kind = AOTGeometryKind::Mesh;
+    desc.hasTexCoords = static_cast<const MeshGeometryProcessor*>(gp)->getHasTexCoords();
+    return desc;
+  }
+  if (gpName == "RoundStrokeRectGeometryProcessor") {
+    auto* strokeGP = static_cast<const RoundStrokeRectGeometryProcessor*>(gp);
+    desc.kind = AOTGeometryKind::RoundStrokeRect;
+    desc.hasUVMatrix = strokeGP->hasUVMatrixTransform();
+    desc.hasUVPerspective = strokeGP->isUVPerspective();
+    return desc;
+  }
+  if (gpName == "ShapeInstancedGeometryProcessor") {
+    desc.kind = AOTGeometryKind::ShapeInstanced;
+    desc.hasCoverage =
+        static_cast<const ShapeInstancedGeometryProcessor*>(gp)->getAAType() == AAType::Coverage;
+    return desc;
+  }
+  if (gpName == "AtlasTextGeometryProcessor") {
+    desc.kind = AOTGeometryKind::AtlasText;
+    desc.hasCoverage =
+        static_cast<const AtlasTextGeometryProcessor*>(gp)->getAAType() == AAType::Coverage;
     return desc;
   }
   if (gpType != 1) {

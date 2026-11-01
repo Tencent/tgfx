@@ -96,7 +96,10 @@ PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget
 AOTGeometryDesc RectDrawOp::recordTimeGeometry() const {
   AOTGeometryDesc desc = {};
   if (lineJoin == LineJoin::Round) {
-    // The round-stroke processor is not a matcher-served kind.
+    // The round-stroke processor: the matchers read the UV-matrix presence and perspective.
+    desc.kind = AOTGeometryKind::RoundStrokeRect;
+    desc.hasUVMatrix = uvMatrix.has_value();
+    desc.hasUVPerspective = uvMatrix.has_value() && uvMatrix->hasPerspective();
     return desc;
   }
   // The same members onMakeGeometryProcessor feeds the processor with.

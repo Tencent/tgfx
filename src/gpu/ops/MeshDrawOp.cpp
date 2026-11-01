@@ -43,6 +43,14 @@ PlacementPtr<GeometryProcessor> MeshDrawOp::onMakeGeometryProcessor(RenderTarget
                                      attrs.hasCoverage, color, viewMatrix);
 }
 
+AOTGeometryDesc MeshDrawOp::recordTimeGeometry() const {
+  // The same attribute the processor's constructor reads.
+  AOTGeometryDesc desc = {};
+  desc.kind = AOTGeometryKind::Mesh;
+  desc.hasTexCoords = meshProxy->attributes().hasTexCoords;
+  return desc;
+}
+
 void MeshDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   auto vertexBuffer = meshProxy->getVertexBuffer();
   if (vertexBuffer == nullptr) {

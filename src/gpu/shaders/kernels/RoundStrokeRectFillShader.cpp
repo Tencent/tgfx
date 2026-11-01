@@ -20,33 +20,41 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
+#include "gpu/aot/AOTDrawFacts.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
-#include "gpu/processors/RoundStrokeRectGeometryProcessor.h"
 
 namespace tgfx {
 
 std::optional<RoundStrokeRectFillShader::Inputs> RoundStrokeRectFillShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure*) {
-  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
+  // The executor-table row and the walk share this one body.
+  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
+}
+
+std::optional<RoundStrokeRectFillShader::Inputs> RoundStrokeRectFillShader::ExtractFacts(
+    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }
-  auto gp = programInfo->getGeometryProcessor();
-  if (!IsProcessor<RoundStrokeRectGeometryProcessor>(gp)) {
+  // The geometry kind IS the contract: RectDrawOp's round line join.
+  if (facts.geometry.kind != AOTGeometryKind::RoundStrokeRect) {
     return std::nullopt;
   }
   // The kernel reads the clip from the runtime clip contract uniforms, so a sole analytic clip is
   // admitted alongside the FP-free form.
-  if (!HasNoProcessorsOrDirectClip(programInfo)) {
+  const bool directClip =
+      facts.colorFromPaint &&
+      (facts.coverage == CoverageKind::AARect || facts.coverage == CoverageKind::RRect);
+  if (facts.fragmentCount != 0 && !directClip) {
     return std::nullopt;
   }
-  auto* rsgp = static_cast<const RoundStrokeRectGeometryProcessor*>(gp);
   // Skip perspective UV transforms — not covered by precompiled variants.
-  if (rsgp->isUVPerspective()) {
+  if (facts.geometry.hasUVPerspective) {
     return std::nullopt;
   }
   Inputs inputs;
-  inputs.hasUVMatrix = rsgp->hasUVMatrixTransform();
-  inputs.xpType = GetXPType(programInfo);
+  inputs.hasUVMatrix = facts.geometry.hasUVMatrix;
+  inputs.xpType = facts.xpType();
   return inputs;
 }
 

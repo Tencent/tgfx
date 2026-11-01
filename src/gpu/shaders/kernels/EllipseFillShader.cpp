@@ -20,35 +20,41 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
-#include "gpu/processors/EllipseGeometryProcessor.h"
+#include "gpu/aot/AOTDrawFacts.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
 
-std::optional<EllipseFillShader::Inputs> EllipseFillShader::Extract(const ProgramInfo* programInfo,
-                                                                    PermutationMatchFailure*) {
-  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+std::optional<EllipseFillShader::Inputs> EllipseFillShader::Extract(
+    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
+  // The executor-table row and the walk share this one body.
+  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
+}
+
+std::optional<EllipseFillShader::Inputs> EllipseFillShader::ExtractFacts(
+    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }
-  auto gp = programInfo->getGeometryProcessor();
-  if (!IsProcessor<EllipseGeometryProcessor>(gp)) {
+  // The geometry kind IS the contract: RRectDrawOp's AA form, no processor-tree walk.
+  if (facts.geometry.kind != AOTGeometryKind::Ellipse) {
     return std::nullopt;
   }
-  if (programInfo->numColorFragmentProcessors() != 0) {
+  if (facts.colorFPCount != 0) {
     return std::nullopt;
   }
   // A clip/mask coverage FP is served through the shared HAS_COVERAGE dimension (device-space
   // sampling in coverage_output.inc). LocalMask needs per-vertex UV the ellipse vertex shader does
-  // not provide, so SharedDeviceMaskValue rejects it.
-  auto coverageType = SharedDeviceMaskValue(programInfo);
-  if (!coverageType) {
+  // not provide, so the shared classification rejects it.
+  if (!facts.coverage || *facts.coverage == CoverageKind::LocalMask) {
     return std::nullopt;
   }
-  auto xpType = GetXPType(programInfo);
+  const bool hasDeviceMask = *facts.coverage == CoverageKind::DeviceMask;
+  const int xpType = facts.xpType();
   if (xpType < XP_NONE) {
     return std::nullopt;
   }
-  return Inputs{xpType, *coverageType != 0};
+  return Inputs{xpType, hasDeviceMask};
 }
 
 }  // namespace tgfx

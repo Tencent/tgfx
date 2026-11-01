@@ -131,23 +131,32 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget,
   // The record-time geometry descriptor must agree with the processor the op actually built:
   // an op that self-reports wrong would mis-route the executor-table matching silently. The
   // whole suite runs this on every IR-carrying draw, so the coverage is every drawable shape.
-  if (ir != nullptr) {
+  // The descriptor is asserted only while it is the one being served — the staleness guard's own
+  // window: a color override (a plan task's pass colors) describes a different expression, and an
+  // expression that grew at prepare (a rasterized shape attaches its mask coverage only once the
+  // shape proxy exists) drops the IR from the info. Outside the window the descriptor feeds no
+  // decision — the match facts fall back to the prepare twins — so a stale copy there is inert,
+  // not a mis-route.
+  const bool irServes = !colorOverride.has_value() && loweredIR() != nullptr &&
+                        loweredIR()->colorFPCount == colors.size() &&
+                        loweredIR()->coverageFPCount == coverages.size();
+  if (irServes) {
     auto actual = DescribeGeometryProcessor(geometryProcessor.get());
     // A failure here means a recordTimeGeometry() override is wrong or missing (the record-time
     // geometry descriptor drifted from the made geometry processor).
     DEBUG_ASSERT(ir->geometry.kind == actual.kind && ir->geometry.hasCommonColor == actual.hasCommonColor &&
                  ir->geometry.hasUVMatrix == actual.hasUVMatrix &&
                  ir->geometry.hasSubset == actual.hasSubset &&
-                 ir->geometry.hasUVPerspective == actual.hasUVPerspective);
+                 ir->geometry.hasUVPerspective == actual.hasUVPerspective &&
+                 ir->geometry.isStroke == actual.isStroke &&
+                 ir->geometry.hasTexCoords == actual.hasTexCoords &&
+                 ir->geometry.hasCoverage == actual.hasCoverage);
     // The xfer twin: the record-time classification asks the processor's own dst info, the
     // match-time one the instantiated view — a disagreement means the dst-texture timing
     // assumption is wrong somewhere, and the executor-table matching would mis-route.
     DEBUG_ASSERT(ir->xfer == ClassifyXferForMatch(xferProcessor.get()));
-    // The leaf twin runs only against the unmodified record-time color list — a color override
-    // (a plan task's pass colors) describes a different expression than the record-time IR.
-    if (!colorOverride.has_value()) {
-      AssertSingleLeafFacts(*ir, colors);
-    }
+    // The leaf twin runs against the unmodified record-time color list.
+    AssertSingleLeafFacts(*ir, colors);
   }
 #endif
 

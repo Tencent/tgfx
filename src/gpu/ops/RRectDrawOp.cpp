@@ -81,6 +81,21 @@ PlacementPtr<GeometryProcessor> RRectDrawOp::onMakeGeometryProcessor(RenderTarge
                                         hasStroke, commonColor);
 }
 
+AOTGeometryDesc RRectDrawOp::recordTimeGeometry() const {
+  AOTGeometryDesc desc = {};
+  // The same members onMakeGeometryProcessor feeds the processors with: the AA forms make the
+  // ellipse processors, the non-AA forms the non-AA ones, each with a complex variant for
+  // per-corner radii.
+  if (aaType == AAType::None) {
+    desc.kind = isComplex ? AOTGeometryKind::ComplexNonAARRect : AOTGeometryKind::NonAARRect;
+  } else {
+    desc.kind = isComplex ? AOTGeometryKind::ComplexEllipse : AOTGeometryKind::Ellipse;
+  }
+  desc.hasCommonColor = commonColor.has_value();
+  desc.isStroke = hasStroke;
+  return desc;
+}
+
 void RRectDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   if (indexBufferProxy == nullptr || vertexBufferProxyView == nullptr) {
     return;

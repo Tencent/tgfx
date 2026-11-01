@@ -20,50 +20,44 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
-#include "gpu/processors/DefaultGeometryProcessor.h"
+#include "gpu/aot/AOTDrawFacts.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
-#include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
 
 std::optional<MaskFillShader::Inputs> MaskFillShader::Extract(const ProgramInfo* programInfo,
-                                                              PermutationMatchFailure*) {
-  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+                                                              PermutationMatchFailure* failure) {
+  // The executor-table row and the walk share this one body.
+  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
+}
+
+std::optional<MaskFillShader::Inputs> MaskFillShader::ExtractFacts(const AOTDrawFacts& facts,
+                                                                   PermutationMatchFailure*) {
+  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }
-  auto gp = programInfo->getGeometryProcessor();
-  if (!IsProcessor<DefaultGeometryProcessor>(gp)) {
+  // The geometry kind IS the contract: ShapeDrawOp's DefaultGeometryProcessor.
+  if (facts.geometry.kind != AOTGeometryKind::Default) {
     return std::nullopt;
   }
   // Solid color (from the DefaultGP Color uniform) masked by a single alpha-only coverage
-  // TextureEffect (a rasterized shape mask from ShapeDrawOp). No color fragment processors.
-  //
-  // MaskFill stays on the processor walk by design: its mask is a prepare-grown coverage (the
-  // rasterized shape attaches its TextureEffect only once the shape proxy exists), which is
-  // exactly the case the carried IR drops by the staleness guard — an IR-based row would reject
-  // every draw this family serves. It migrates when the shape rasterization's record-time story
-  // does (the same work that retires the staleness guard's expression-growth case).
-  if (programInfo->numColorFragmentProcessors() != 0) {
+  // texture (a rasterized shape mask from ShapeDrawOp). No color fragment processors.
+  if (facts.colorFPCount != 0 || facts.fragmentCount != 1) {
     return std::nullopt;
   }
-  if (programInfo->numFragmentProcessors() != 1) {
-    return std::nullopt;
-  }
-  auto fp = programInfo->getFragmentProcessor(0);
-  if (!IsProcessor<TextureEffect>(fp)) {
-    return std::nullopt;
-  }
-  auto* te = static_cast<const TextureEffect*>(fp);
-  // Only the simple mask form is supported: a plain alpha-only texture with no subset, no packed
-  // alpha, no YUV. Anything else falls back to ProgramBuilder.
-  if (te->numTextureSamplers() == 0 || te->isYUV() || !te->isAlphaOnly() || te->hasRGBAAA() ||
-      te->hasSubset()) {
+  // The rasterized shape's mask is a prepare-grown coverage: the staleness guard drops exactly
+  // that IR, so no record-time term exists for it. The row reads the live mask port's facts
+  // instead — the third channel (AOTDrawFacts::liveMask), the same escape hatch as the YUV
+  // pending format. Only the simple mask form is supported: a plain alpha-only texture with no
+  // subset, no packed alpha, no YUV. Anything else falls back to ProgramBuilder.
+  if (!facts.liveMask.present || !facts.liveMask.hasSampler || !facts.liveMask.alphaOnly ||
+      facts.liveMask.hasSubset || facts.liveMask.isYUV || facts.liveMask.hasRGBAAA) {
     return std::nullopt;
   }
   // The mask coverage feeds the XferProcessor's coverage lerp, so Porter-Duff blends (DST_TEX and
   // framebuffer-fetch) are supported via the HAS_XP fragment dimension. Only a genuinely
   // unsupported transfer processor (xpType < 0) falls back to ProgramBuilder.
-  auto xpType = GetXPType(programInfo);
+  const int xpType = facts.xpType();
   if (xpType < XP_NONE) {
     return std::nullopt;
   }

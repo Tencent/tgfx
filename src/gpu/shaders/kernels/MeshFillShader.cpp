@@ -20,27 +20,32 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
-#include "gpu/processors/MeshGeometryProcessor.h"
+#include "gpu/aot/AOTDrawFacts.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
 
 std::optional<MeshFillShader::Inputs> MeshFillShader::Extract(const ProgramInfo* programInfo,
-                                                              PermutationMatchFailure*) {
-  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+                                                              PermutationMatchFailure* failure) {
+  // The executor-table row and the walk share this one body.
+  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
+}
+
+std::optional<MeshFillShader::Inputs> MeshFillShader::ExtractFacts(
+    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }
-  auto gp = programInfo->getGeometryProcessor();
-  if (!IsProcessor<MeshGeometryProcessor>(gp)) {
+  // The geometry kind IS the contract: MeshDrawOp's processor, no processor-tree walk.
+  if (facts.geometry.kind != AOTGeometryKind::Mesh) {
     return std::nullopt;
   }
-  if (programInfo->numFragmentProcessors() != 0) {
+  if (facts.fragmentCount != 0) {
     return std::nullopt;
   }
-  auto* mgp = static_cast<const MeshGeometryProcessor*>(gp);
   Inputs inputs;
-  inputs.hasTexCoords = mgp->getHasTexCoords();
-  inputs.xpType = GetXPType(programInfo);
+  inputs.hasTexCoords = facts.geometry.hasTexCoords;
+  inputs.xpType = facts.xpType();
   return inputs;
 }
 
