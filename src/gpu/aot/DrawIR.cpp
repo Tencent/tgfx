@@ -169,20 +169,15 @@ namespace {
 // The shared lowering core both LowerDraw entries converge on. atlasGlyphLeaf, when non-null, is
 // the already-synthesized AtlasText glyph leaf (ownedLeaves keeps it alive until the terms have
 // copied their plain data out); the atlas coverage-count gate keys on its presence.
-// geometryProcessor rides along on the IR as the caller received it (null at record time).
 std::optional<DrawIR> LowerDrawCore(const std::vector<const FragmentProcessor*>& colorProcessors,
                                     const std::vector<const FragmentProcessor*>& coverageProcessors,
                                     const FragmentProcessor* atlasGlyphLeaf,
                                     std::vector<PlacementPtr<FragmentProcessor>>&& ownedLeaves,
-                                    const GeometryProcessor* geometryProcessor,
-                                    const XferProcessor* xferProcessor, BlendMode blendMode,
-                                    BlockAllocator* allocator) {
+                                    BlendMode blendMode, BlockAllocator* allocator) {
   if (allocator == nullptr) {
     return std::nullopt;
   }
   DrawIR ir = {};
-  ir.geometryProcessor = geometryProcessor;
-  ir.xferProcessor = xferProcessor;
   ir.blendMode = blendMode;
   ir.colorFromPaint = colorProcessors.empty();
   ir.colorFPCount = colorProcessors.size();
@@ -250,8 +245,7 @@ std::optional<DrawIR> LowerDrawCore(const std::vector<const FragmentProcessor*>&
 
 std::optional<DrawIR> LowerDraw(const std::vector<const FragmentProcessor*>& colorProcessors,
                                 const std::vector<const FragmentProcessor*>& coverageProcessors,
-                                const GeometryProcessor* geometryProcessor,
-                                const XferProcessor* xferProcessor, BlendMode blendMode,
+                                const GeometryProcessor* geometryProcessor, BlendMode blendMode,
                                 BlockAllocator* allocator) {
   if (allocator == nullptr) {
     return std::nullopt;
@@ -281,13 +275,13 @@ std::optional<DrawIR> LowerDraw(const std::vector<const FragmentProcessor*>& col
     ownedLeaves.push_back(std::move(atlasLeaf));
   }
   return LowerDrawCore(colorProcessors, coverageProcessors, glyphLeaf, std::move(ownedLeaves),
-                       geometryProcessor, xferProcessor, blendMode, allocator);
+                       blendMode, allocator);
 }
 
 std::optional<DrawIR> LowerDrawWithAtlas(
     const std::vector<const FragmentProcessor*>& colorProcessors,
     const std::vector<const FragmentProcessor*>& coverageProcessors,
-    const AOTAtlasGlyphSource& atlas, const XferProcessor* xferProcessor, BlendMode blendMode,
+    const AOTAtlasGlyphSource& atlas, BlendMode blendMode,
     BlockAllocator* allocator) {
   if (allocator == nullptr || atlas.textureProxy == nullptr || !atlas.textureProxy->isAlphaOnly()) {
     return std::nullopt;
@@ -304,7 +298,7 @@ std::optional<DrawIR> LowerDrawWithAtlas(
   std::vector<PlacementPtr<FragmentProcessor>> ownedLeaves = {};
   ownedLeaves.push_back(std::move(atlasLeaf));
   return LowerDrawCore(colorProcessors, coverageProcessors, ownedLeaves.back().get(),
-                       std::move(ownedLeaves), nullptr, xferProcessor, blendMode, allocator);
+                       std::move(ownedLeaves), blendMode, allocator);
 }
 
 uint64_t AOTLowerDrawCount() {

@@ -647,11 +647,8 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(
   }
 #endif
 
-  std::optional<PermutationMatchResult> accepted;
-  // The walk tries the dedicated families first and the interpreter last (the entry order in
-  // AllShaderFamilies.h), and the two diagnostic switches exclude their half of that list:
-  // decompositionEnabled gates the interpreter, dedicatedKernelsEnabled gates every dedicated
-  // family.
+  // The two diagnostic switches keep the retired walk's semantics: dedicatedKernelsEnabled gates
+  // every dedicated family (the whole executor table), decompositionEnabled the interpreter.
   auto* shaderContext = programInfo->getContext();
   auto* shaderCache = shaderContext != nullptr ? shaderContext->precompiledShaderCache() : nullptr;
   const bool allowDedicated = shaderCache == nullptr || shaderCache->dedicatedKernelsEnabled();
@@ -663,43 +660,23 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(
   }
   const bool allowInterpreter =
       shaderCache == nullptr || shaderCache->decompositionEnabled() || hasGradient;
-#define TGFX_TRY_FAMILY(Family)                                                \
-  if (!accepted && (!alphaOnly || Family::ServesAlphaOnly) &&                  \
-      FamilyWalkEnabled<Family>(allowDedicated, allowInterpreter)) {           \
-    if (auto result = Family::Match(programInfo, failure)) {                   \
-      accepted = PermutationMatchResult{#Family, result->vertPermutationIndex, \
-                                        result->fragPermutationIndex};         \
-    }                                                                          \
-  }
-  TGFX_FOR_EACH_SHADER_FAMILY(TGFX_TRY_FAMILY)
-#undef TGFX_TRY_FAMILY
-#ifndef NDEBUG
-  // Kernel-table dual-run: with the dedicated walk enabled, the table's first acceptor must be
-  // the family the walk chose — the audit's single-acceptor invariant makes the agreement
-  // exact (a dedicated acceptance precludes every other, and a walk rejection precludes the
-  // table's). A disagreement means a row's predicate drifted from its family's Extract.
+  // The dedicated families dispatch through the executor table: the rows, in the families' walk
+  // order, each one the family's own ExtractFacts pipeline, with one facts extraction replacing
+  // every family re-deriving the same facts from the processor tree. The gates keep the retired
+  // walk's semantics — alpha-only rejection is a row predicate (the ExtractFacts bodies), and
+  // dedicatedKernelsEnabled gates the whole table.
   if (allowDedicated) {
-    PermutationMatchFailure tableFailure = PermutationMatchFailure::None;
-    auto table = KernelTableLookup(ExtractAOTDrawFacts(programInfo), &tableFailure);
-    const char* tableFamily = table.has_value() ? table->row->family : nullptr;
-    // Only a table family's acceptance compares by name: a walk acceptance by a family not yet
-    // migrated (or by the interpreter, or none at all) must leave the table empty-handed — the
-    // single-acceptor invariant makes either side's rejection imply the other's.
-    const char* walkFamily = nullptr;
-    if (accepted.has_value()) {
-      for (const auto& row : KernelTableRows()) {
-        if (accepted->shaderName == row.family) {
-          walkFamily = row.family;
-          break;
-        }
-      }
+    if (auto table = KernelTableLookup(ExtractAOTDrawFacts(programInfo), failure)) {
+      return PermutationMatchResult{table->row->family, table->variant.vertPermutationIndex,
+                                    table->variant.fragPermutationIndex};
     }
-    DEBUG_ASSERT((tableFamily == nullptr) == (walkFamily == nullptr) &&
-                 (tableFamily == nullptr || std::string_view(tableFamily) == walkFamily));
   }
-#endif
-  if (accepted) {
-    return accepted;
+  // The interpreter stays the walk's documented fallback, tried last.
+  if (allowInterpreter && (!alphaOnly || PointwiseChainShader::ServesAlphaOnly)) {
+    if (auto result = PointwiseChainShader::Match(programInfo, failure)) {
+      return PermutationMatchResult{"PointwiseChainShader", result->vertPermutationIndex,
+                                    result->fragPermutationIndex};
+    }
   }
   return alphaOnly ? Fail(failure, PermutationMatchFailure::NoMatchingFamily) : std::nullopt;
 }

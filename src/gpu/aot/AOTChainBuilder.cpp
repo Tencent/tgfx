@@ -1967,8 +1967,7 @@ bool AOTChainBuilder::CompileChainProgramForInfo(BlockAllocator* allocator,
   }
   // One lowering for the whole draw: the color graph plus the classified coverage terms (the
   // classifier synthesizes the AtlasText glyph leaf from the geometry processor).
-  auto ir = LowerDraw(colorProcessors, coverageProcessors, gp, programInfo->getXferProcessor(),
-                      BlendMode::SrcOver, allocator);
+  auto ir = LowerDraw(colorProcessors, coverageProcessors, gp, BlendMode::SrcOver, allocator);
   if (!ir.has_value()) {
     return false;
   }

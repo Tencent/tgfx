@@ -129,15 +129,10 @@ enum class AOTXferKind : uint8_t {
  * decided, replacing the per-shape enumerations it used to be spread over.
  */
 struct DrawIR {
-  /// The draw's geometry processor. The record-time descriptor below carries the matcher-relevant
-  /// facts as plain data; the pointer stays until the executor-table matching reads only the
-  /// descriptor (then it drops with the prepare-time walk).
-  const GeometryProcessor* geometryProcessor = nullptr;
   /// The geometry facts, recorded at record time from the op's own state.
   AOTGeometryDesc geometry = {};
   AOTEffectGraph color = {};
   std::vector<AOTCoverageTerm> coverage = {};
-  const XferProcessor* xferProcessor = nullptr;
   /// The xfer classification, recorded at record time from the op's own xfer processor.
   AOTXferKind xfer = AOTXferKind::Unsupported;
   BlendMode blendMode = BlendMode::SrcOver;
@@ -200,8 +195,7 @@ struct AOTAtlasGlyphSource {
  */
 std::optional<DrawIR> LowerDraw(const std::vector<const FragmentProcessor*>& colorProcessors,
                                 const std::vector<const FragmentProcessor*>& coverageProcessors,
-                                const GeometryProcessor* geometryProcessor,
-                                const XferProcessor* xferProcessor, BlendMode blendMode,
+                                const GeometryProcessor* geometryProcessor, BlendMode blendMode,
                                 BlockAllocator* allocator);
 
 /**
@@ -214,7 +208,7 @@ std::optional<DrawIR> LowerDraw(const std::vector<const FragmentProcessor*>& col
 std::optional<DrawIR> LowerDrawWithAtlas(
     const std::vector<const FragmentProcessor*>& colorProcessors,
     const std::vector<const FragmentProcessor*>& coverageProcessors,
-    const AOTAtlasGlyphSource& atlas, const XferProcessor* xferProcessor, BlendMode blendMode,
+    const AOTAtlasGlyphSource& atlas, BlendMode blendMode,
     BlockAllocator* allocator);
 
 /**

@@ -57,15 +57,13 @@ void DrawOp::tryLowerIR() {
     // the plain path serves the draw exactly as before.
     auto atlas = recordTimeAtlasSource();
     if (atlas.has_value()) {
-      lowered = LowerDrawWithAtlas(colorList, coverageList, *atlas, xferProcessor.get(), blendMode,
-                                   allocator);
+      lowered = LowerDrawWithAtlas(colorList, coverageList, *atlas, blendMode, allocator);
     }
   } else {
     // No geometry processor exists at record time, so the IR carries no glyph leaf — matching the
     // null-GP contract of LowerDraw. A lowering failure leaves the IR null, and the plain FP path
     // serves the draw exactly as it did before the IR existed.
-    lowered =
-        LowerDraw(colorList, coverageList, nullptr, xferProcessor.get(), blendMode, allocator);
+    lowered = LowerDraw(colorList, coverageList, nullptr, blendMode, allocator);
   }
   if (!lowered.has_value()) {
     return;

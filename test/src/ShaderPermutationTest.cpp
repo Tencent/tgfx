@@ -2513,7 +2513,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     // geometry desc and the xfer kind ride along too — the record-time facts the op's tryLowerIR
     // fills, which the prepare twins derive from the same processors.
     std::vector<const FragmentProcessor*> coverageList(processors.begin(), processors.end());
-    auto ir = LowerDraw({}, coverageList, nullptr, nullptr, BlendMode::SrcOver, &allocator);
+    auto ir = LowerDraw({}, coverageList, nullptr, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
     ir->geometry = DescribeGeometryProcessor(gp.get());
     ir->xfer = ClassifyXferRecordTime(nullptr);
@@ -2542,7 +2542,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     auto twoMaskIR = LowerDraw({},
                                {static_cast<const FragmentProcessor*>(coverage.get()),
                                 static_cast<const FragmentProcessor*>(secondCoverage.get())},
-                               nullptr, nullptr, BlendMode::SrcOver, &allocator);
+                               nullptr, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(twoMaskIR.has_value());
     twoMaskIR->geometry = DescribeGeometryProcessor(gp.get());
     twoMaskIR->xfer = ClassifyXferRecordTime(nullptr);

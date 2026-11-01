@@ -319,14 +319,14 @@ TGFX_TEST(AOTEffectTest, LowerDrawClassifiesCoverageTerms) {
   ASSERT_NE(colorMatrix, nullptr);
 
   // No coverage: an empty term list and the color chain lowered once.
-  auto none = LowerDraw({texture.get(), colorMatrix.get()}, {}, nullptr, nullptr,
+  auto none = LowerDraw({texture.get(), colorMatrix.get()}, {}, nullptr,
                         BlendMode::SrcOver, allocator);
   ASSERT_TRUE(none.has_value());
   EXPECT_TRUE(none->coverage.empty());
   EXPECT_GE(none->color.nodeCount(), 3u);
 
   // A color-free draw synthesizes the unit const color over the geometry color.
-  auto unit = LowerDraw({}, {}, nullptr, nullptr, BlendMode::SrcOver, allocator);
+  auto unit = LowerDraw({}, {}, nullptr, BlendMode::SrcOver, allocator);
   ASSERT_TRUE(unit.has_value());
   EXPECT_EQ(unit->color.nodeCount(), 2u);
   EXPECT_EQ(unit->color.nodeAt(unit->color.root())->kind, AOTEffectKind::ConstColor);
@@ -338,7 +338,7 @@ TGFX_TEST(AOTEffectTest, LowerDrawClassifiesCoverageTerms) {
         RRectEffect::Make(allocator, RRect::MakeRectXY(Rect::MakeLTRB(2, 2, 28, 28), 6, 6));
     auto composed = FragmentProcessor::Compose(allocator, std::move(rect), std::move(rrect));
     ASSERT_NE(composed, nullptr);
-    auto ir = LowerDraw({texture.get()}, {composed.get()}, nullptr, nullptr, BlendMode::SrcOver,
+    auto ir = LowerDraw({texture.get()}, {composed.get()}, nullptr, BlendMode::SrcOver,
                         allocator);
     ASSERT_TRUE(ir.has_value());
     EXPECT_EQ(CoverageTermKinds(*ir),
@@ -355,7 +355,7 @@ TGFX_TEST(AOTEffectTest, LowerDrawClassifiesCoverageTerms) {
     auto mask = DeviceSpaceTextureEffect::Make(allocator, alphaProxy, Matrix::MakeTrans(3, 5));
     ASSERT_NE(mask, nullptr);
     auto ir =
-        LowerDraw({texture.get()}, {mask.get()}, nullptr, nullptr, BlendMode::SrcOver, allocator);
+        LowerDraw({texture.get()}, {mask.get()}, nullptr, BlendMode::SrcOver, allocator);
     ASSERT_TRUE(ir.has_value());
     EXPECT_EQ(CoverageTermKinds(*ir),
               std::vector<AOTCoverageTermKind>({AOTCoverageTermKind::DeviceMask}));
@@ -365,7 +365,7 @@ TGFX_TEST(AOTEffectTest, LowerDrawClassifiesCoverageTerms) {
     auto rect = RectEffect::Make(allocator, Rect::MakeLTRB(1, 2, 30, 40));
     auto composed = FragmentProcessor::Compose(allocator, std::move(mask), std::move(rect));
     ASSERT_NE(composed, nullptr);
-    auto both = LowerDraw({texture.get()}, {composed.get()}, nullptr, nullptr, BlendMode::SrcOver,
+    auto both = LowerDraw({texture.get()}, {composed.get()}, nullptr, BlendMode::SrcOver,
                           allocator);
     ASSERT_TRUE(both.has_value());
     EXPECT_EQ(CoverageTermKinds(*both),
@@ -375,7 +375,7 @@ TGFX_TEST(AOTEffectTest, LowerDrawClassifiesCoverageTerms) {
 
   // A general coverage leaf is the subtree term (mask-filter semantics).
   {
-    auto ir = LowerDraw({texture.get()}, {alphaTexture.get()}, nullptr, nullptr, BlendMode::SrcOver,
+    auto ir = LowerDraw({texture.get()}, {alphaTexture.get()}, nullptr, BlendMode::SrcOver,
                         allocator);
     ASSERT_TRUE(ir.has_value());
     EXPECT_EQ(CoverageTermKinds(*ir),
@@ -390,7 +390,7 @@ TGFX_TEST(AOTEffectTest, LowerDrawClassifiesCoverageTerms) {
     auto alphaProxy = context->proxyProvider()->createTextureProxy({}, 4, 4, PixelFormat::ALPHA_8);
     auto mask = DeviceSpaceTextureEffect::Make(allocator, alphaProxy, Matrix::I());
     ASSERT_NE(mask, nullptr);
-    auto ir = LowerDraw({texture.get()}, {rect.get(), mask.get()}, nullptr, nullptr,
+    auto ir = LowerDraw({texture.get()}, {rect.get(), mask.get()}, nullptr,
                         BlendMode::SrcOver, allocator);
     ASSERT_TRUE(ir.has_value());
     EXPECT_EQ(CoverageTermKinds(*ir),
@@ -401,7 +401,7 @@ TGFX_TEST(AOTEffectTest, LowerDrawClassifiesCoverageTerms) {
   // The lowering is total: a second subtree, a second mask and a perspective mask all lower into
   // their own terms — the compile rejects the shapes a kernel cannot carry.
   {
-    auto two = LowerDraw({texture.get()}, {texture.get(), texture.get()}, nullptr, nullptr,
+    auto two = LowerDraw({texture.get()}, {texture.get(), texture.get()}, nullptr,
                          BlendMode::SrcOver, allocator);
     ASSERT_TRUE(two.has_value());
     EXPECT_EQ(CoverageTermKinds(*two),
@@ -414,7 +414,7 @@ TGFX_TEST(AOTEffectTest, LowerDrawClassifiesCoverageTerms) {
     auto maskB = DeviceSpaceTextureEffect::Make(allocator, alphaProxy, Matrix::I());
     ASSERT_NE(maskA, nullptr);
     ASSERT_NE(maskB, nullptr);
-    auto twoMasks = LowerDraw({texture.get()}, {maskA.get(), maskB.get()}, nullptr, nullptr,
+    auto twoMasks = LowerDraw({texture.get()}, {maskA.get(), maskB.get()}, nullptr,
                               BlendMode::SrcOver, allocator);
     ASSERT_TRUE(twoMasks.has_value());
     EXPECT_EQ(CoverageTermKinds(*twoMasks),
@@ -424,7 +424,7 @@ TGFX_TEST(AOTEffectTest, LowerDrawClassifiesCoverageTerms) {
     auto perspective = Matrix::MakeAll(1, 0, 0, 0, 1, 0, 0.01f, 0, 1);
     auto perspectiveMask = DeviceSpaceTextureEffect::Make(allocator, alphaProxy, perspective);
     ASSERT_NE(perspectiveMask, nullptr);
-    auto flagged = LowerDraw({texture.get()}, {perspectiveMask.get()}, nullptr, nullptr,
+    auto flagged = LowerDraw({texture.get()}, {perspectiveMask.get()}, nullptr,
                              BlendMode::SrcOver, allocator);
     ASSERT_TRUE(flagged.has_value());
     EXPECT_EQ(CoverageTermKinds(*flagged),
@@ -449,7 +449,7 @@ TGFX_TEST(AOTEffectTest, LowerDrawClassifiesCoverageTerms) {
     auto rgbaProxy = context->proxyProvider()->createTextureProxy({}, 4, 4, PixelFormat::RGBA_8888);
     auto rgbaMask = DeviceSpaceTextureEffect::Make(allocator, rgbaProxy, Matrix::I());
     ASSERT_NE(rgbaMask, nullptr);
-    auto rejected = LowerDraw({texture.get()}, {rgbaMask.get()}, nullptr, nullptr,
+    auto rejected = LowerDraw({texture.get()}, {rgbaMask.get()}, nullptr,
                               BlendMode::SrcOver, allocator);
     EXPECT_FALSE(rejected.has_value());
   }
@@ -1460,7 +1460,7 @@ TGFX_TEST(AOTEffectTest, DeviceSpaceLinearChainUsesChainKernel) {
     ASSERT_EQ(chain.deviceLeaves.size(), 1u);
     EXPECT_EQ(chain.bindings[0].kind, AOTBinding::Kind::Leaf);
     AOTDecomposeOutcome outcome = AOTDecomposeOutcome::Trivial;
-    auto ir = LowerDraw(processors, {}, nullptr, nullptr, BlendMode::SrcOver, &allocator);
+    auto ir = LowerDraw(processors, {}, nullptr, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
     EXPECT_TRUE(AOTRouter::Plan(*ir, &outcome).has_value());
     EXPECT_EQ(outcome, AOTDecomposeOutcome::FusablePointwise);
