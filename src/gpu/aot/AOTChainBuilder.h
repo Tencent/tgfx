@@ -105,13 +105,27 @@ class AOTChainBuilder {
                             AOTResourceProfile* profile);
 
   /**
+   * The color graph's linear texture-tail shape: a single texture leaf fed by the geometry
+   * color, with a chain of unary pointwise operators above it (application order, leaf-side
+   * first). One walk serves the texture families' table rows and the YUV tail's checks below —
+   * the shared shape authority. Fails on any non-pointwise node (a blend is not unary), an
+   * operator the slot encoding cannot express, or a shape that is not linear (a second source,
+   * an unaccounted branch). Budget and leaf-kind policies stay with the callers.
+   */
+  struct AOTTextureTailShape {
+    const AOTTextureParameters* leaf = nullptr;
+    std::vector<AOTNodeID> ops = {};
+  };
+  static bool CollectTextureTail(const AOTEffectGraph& graph, AOTTextureTailShape* shape);
+
+  /**
    * The servable YUV tail of a color graph: the multi-plane source leaf with the chain of
    * bounded unary pointwise operators above it (application order, leaf-side first). One walk
    * serves the family's matching, the plan's admission and the tail's compilation, so the three
    * cannot disagree about what a servable tail is. Fails on any non-pointwise node (a blend is
    * not unary), an operator the slot encoding cannot express, a second color-space transform
    * (the kernel's CS parameters are one shared block, like the interpreter's), a non-YUV /
-   * non-Plain / RGBAAA leaf, or a tail over MaxPointwiseSlots.
+   * non-Plain leaf, or a tail over MaxPointwiseSlots.
    */
   struct AOTYUVTailShape {
     const AOTTextureParameters* leaf = nullptr;

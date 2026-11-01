@@ -30,6 +30,7 @@ class GeometryProcessor;
 class FragmentProcessor;
 class XferProcessor;
 struct DrawIR;
+struct ColorSpaceXformSteps;
 struct AOTOpaqueKernelParameters;
 struct AOTTextureParameters;
 class QuadPerEdgeAAGeometryProcessor;
@@ -56,6 +57,11 @@ AOTXferKind ClassifyXferRecordTime(const XferProcessor* xp);
 /// debug assertion compares the two forms, so a record-time classification that would
 /// mis-route the executor-table matching fails loudly.
 AOTXferKind ClassifyXferForMatch(const XferProcessor* xp);
+
+/// Whether a color-space transform's steps fit the single-slot fill kernel's precompiled
+/// evaluation (the transfer functions must be of an indexable type when linearize/encode run) —
+/// IsSupportedPointwiseOp's color-space half, over the IR's steps.
+bool SupportedFillKernelSteps(const ColorSpaceXformSteps* steps);
 
 /// How the draw's sole coverage FP is served. LocalMask is a distinct capability: it needs a
 /// local-space varying and sampler and therefore cannot be encoded in the shared runtime clip

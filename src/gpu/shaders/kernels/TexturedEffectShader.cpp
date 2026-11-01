@@ -19,6 +19,8 @@
 #include "gpu/shaders/kernels/TexturedEffectShader.h"
 #include <optional>
 #include "gpu/ProgramInfo.h"
+#include "gpu/aot/AOTChainBuilder.h"
+#include "gpu/aot/AOTDrawFacts.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
@@ -31,56 +33,58 @@
 namespace tgfx {
 
 std::optional<TexturedEffectShader::Inputs> TexturedEffectShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure*) {
-  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
+  // The executor-table row and the walk share this one body.
+  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
+}
+
+std::optional<TexturedEffectShader::Inputs> TexturedEffectShader::ExtractFacts(
+    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+  // The family-relative alpha-only gate (RejectsAlphaOnlyTarget's original semantics).
+  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }
-  if (!IsPositionOnlyRectGP(programInfo->getGeometryProcessor())) {
+  if (!facts.positionOnlyRect()) {
     return std::nullopt;
   }
-  int xpType = GetXPType(programInfo);
+  int xpType = facts.xpType();
   if (xpType < XP_NONE) {
     return std::nullopt;
   }
-  // Accept two structurally-equivalent forms of "texture followed by one pointwise transform":
-  //   (a) a single ComposeFragmentProcessor(TextureEffect, X), or
-  //   (b) two sequential top-level color processors [TextureEffect, X].
-  // Sequential color processors are chained (each consumes the previous output), so [A, B] produces
-  // the identical result to Compose(A, B) and maps to the same precompiled variant.
-  const FragmentProcessor* child0 = nullptr;
-  const FragmentProcessor* child1 = nullptr;
-  if (programInfo->numFragmentProcessors() == 1 && programInfo->numColorFragmentProcessors() == 1) {
-    auto fp = programInfo->getFragmentProcessor(0);
-    if (!IsProcessor<ComposeFragmentProcessor>(fp) || fp->numChildProcessors() != 2) {
-      return std::nullopt;
-    }
-    child0 = fp->childProcessor(0);
-    child1 = fp->childProcessor(1);
-  } else if (programInfo->numFragmentProcessors() == 2 &&
-             programInfo->numColorFragmentProcessors() == 2) {
-    child0 = programInfo->getFragmentProcessor(0);
-    child1 = programInfo->getFragmentProcessor(1);
-  } else {
+  // The two structurally-equivalent forms the old FP walk matched (a Compose wrapper and a
+  // sequential pair) lower to this ONE graph — texture leaf plus exactly one operator — so the
+  // dual-form match is gone with the IR.
+  if (facts.ir == nullptr) {
     return std::nullopt;
   }
-  if (!IsProcessor<TextureEffect>(child0)) {
+  AOTChainBuilder::AOTTextureTailShape tail = {};
+  if (!AOTChainBuilder::CollectTextureTail(facts.ir->color, &tail) || tail.ops.size() != 1) {
     return std::nullopt;
   }
-  auto* te = static_cast<const TextureEffect*>(child0);
-  if (te->isYUV() || te->isAlphaOnly() || te->hasRGBAAA()) {
+  auto* leaf = tail.leaf;
+  if (leaf->samplingKind != AOTTextureSamplingKind::Plain || leaf->isYUV || leaf->isAlphaOnly ||
+      leaf->hasRGBAAA) {
     return std::nullopt;
   }
   // The precompiled vertex template transforms the coordinate affinely; a projective source must
   // stay off this artifact (the plain templates transform coordinates affinely, with no w division).
-  if (te->hasPerspective()) {
+  if (leaf->hasPerspective) {
     return std::nullopt;
   }
   // All four pointwise operators (ColorMatrix / Luma / AlphaThreshold / ColorSpaceXform) share the
   // same structural class (1 sampler, no CoverageFP, RGBA) and thus the same precompiled shader:
   // TexturedEffectShader. The operator is selected at draw time by the OpType runtime uniform (set
   // by the pointwise FP's onSetData), so it is not a compile-time dimension. The frag index only
-  // encodes HAS_XP; subset clamping is a runtime uniform.
-  if (!IsSupportedPointwiseOp(child1)) {
+  // encodes HAS_XP; subset clamping is a runtime uniform. The color-space one needs the fill
+  // kernel's transfer-function check over the node's steps.
+  auto* op = facts.ir->color.nodeAt(tail.ops[0]);
+  bool supported = op->kind == AOTEffectKind::ColorMatrix || op->kind == AOTEffectKind::Luma ||
+                   op->kind == AOTEffectKind::AlphaThreshold;
+  if (!supported && op->kind == AOTEffectKind::ColorSpaceXform) {
+    auto steps = std::get_if<AOTColorSpaceXformParameters>(&op->parameters);
+    supported = steps != nullptr && SupportedFillKernelSteps(steps->steps.get());
+  }
+  if (!supported) {
     return std::nullopt;
   }
   return Inputs{xpType};

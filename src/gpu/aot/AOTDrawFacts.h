@@ -54,6 +54,15 @@ struct AOTDrawFacts {
   /// ConstColorProcessor lowers to the same graph, so this is what keeps the two apart).
   bool colorFromPaint = false;
 
+  /// The position-only rect form the texture and noise fill kernels share (IsPositionOnlyRectGP's
+  /// semantics): a DefaultGP, or a QuadPerEdgeAA whose coordinate comes from aPosition (a common
+  /// color, a uv matrix, no per-quad subset).
+  bool positionOnlyRect() const {
+    return geometry.kind == AOTGeometryKind::Default ||
+           (geometry.kind == AOTGeometryKind::QuadPerEdgeAA && geometry.hasCommonColor &&
+            geometry.hasUVMatrix && !geometry.hasSubset);
+  }
+
   /// The XP_* vocabulary value (the fill families' shared HAS_XP axis).
   int xpType() const {
     switch (xfer) {

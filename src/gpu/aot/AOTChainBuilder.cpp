@@ -1607,28 +1607,17 @@ bool AOTChainBuilder::CompilePassProgram(const DrawIR& passIR, AOTProgram* out) 
   return CompileChainLayout(passIR.color, pass, &passIR.coverage, out);
 }
 
-bool AOTChainBuilder::CollectYUVTail(const AOTEffectGraph& graph, AOTYUVTailShape* shape) {
+bool AOTChainBuilder::CollectTextureTail(const AOTEffectGraph& graph,
+                                         AOTTextureTailShape* shape) {
   if (shape == nullptr || !graph.root().isValid() || graph.nodeCount() < 2) {
     return false;
   }
   std::vector<AOTNodeID> reverseOps = {};
-  size_t colorSpaceOps = 0;
   auto nodeID = graph.root();
   auto* node = graph.nodeAt(nodeID);
   while (node != nullptr && IsUnaryPointwiseKind(node->kind)) {
     if (node->inputs.size() != 1) {
       return false;
-    }
-    if (node->kind == AOTEffectKind::ColorSpaceXform) {
-      auto parameters = std::get_if<AOTColorSpaceXformParameters>(&node->parameters);
-      if (parameters == nullptr || !ColorSpaceXformStepsSupported(parameters->steps.get())) {
-        return false;
-      }
-      // The kernel's color-space parameters are one shared block (the interpreter's contract):
-      // at most one transform per tail.
-      if (++colorSpaceOps > 1) {
-        return false;
-      }
     }
     // The slot encoding must be able to express the operator — the same record the chain
     // builds from the node.
@@ -1640,20 +1629,14 @@ bool AOTChainBuilder::CollectYUVTail(const AOTEffectGraph& graph, AOTYUVTailShap
     nodeID = node->inputs[0];
     node = graph.nodeAt(nodeID);
   }
-  // The walk's terminal: the multi-plane source leaf, fed by the geometry color (node 0).
+  // The walk's terminal: a texture leaf fed by the geometry color (node 0).
   if (node == nullptr || node->kind != AOTEffectKind::TextureSource || node->inputs.size() != 1 ||
       node->inputs[0] != AOTNodeID(0)) {
     return false;
   }
   auto* leaf = std::get_if<AOTTextureParameters>(&node->parameters);
   auto* geometry = graph.nodeAt(AOTNodeID(0));
-  // The RGBAAA layout stays acceptable here: the kernel serves it (HasRgbaaa / AlphaStart are
-  // runtime uniforms) — the plan admission keeps its own rejection through IsYUVChainSource.
-  if (leaf == nullptr || geometry == nullptr || geometry->kind != AOTEffectKind::GeometryColor ||
-      !leaf->isYUV || leaf->samplingKind != AOTTextureSamplingKind::Plain) {
-    return false;
-  }
-  if (reverseOps.size() > MaxPointwiseSlots) {
+  if (leaf == nullptr || geometry == nullptr || geometry->kind != AOTEffectKind::GeometryColor) {
     return false;
   }
   // Linearity: the geometry color, the leaf and the operators are the whole graph — an extra
@@ -1663,6 +1646,43 @@ bool AOTChainBuilder::CollectYUVTail(const AOTEffectGraph& graph, AOTYUVTailShap
   }
   shape->leaf = leaf;
   shape->ops.assign(reverseOps.rbegin(), reverseOps.rend());
+  return true;
+}
+
+bool AOTChainBuilder::CollectYUVTail(const AOTEffectGraph& graph, AOTYUVTailShape* shape) {
+  if (shape == nullptr) {
+    return false;
+  }
+  AOTTextureTailShape tail = {};
+  if (!CollectTextureTail(graph, &tail)) {
+    return false;
+  }
+  size_t colorSpaceOps = 0;
+  for (auto opID : tail.ops) {
+    auto* node = graph.nodeAt(opID);
+    if (node->kind == AOTEffectKind::ColorSpaceXform) {
+      auto parameters = std::get_if<AOTColorSpaceXformParameters>(&node->parameters);
+      if (parameters == nullptr || !ColorSpaceXformStepsSupported(parameters->steps.get())) {
+        return false;
+      }
+      // The kernel's color-space parameters are one shared block (the interpreter's contract):
+      // at most one transform per tail.
+      if (++colorSpaceOps > 1) {
+        return false;
+      }
+    }
+  }
+  // The multi-plane leaf: a Plain-sampled YUV source (the RGBAAA layout stays acceptable — the
+  // kernel serves it through HasRgbaaa / AlphaStart; the plan admission keeps its own rejection
+  // through IsYUVChainSource).
+  if (!tail.leaf->isYUV || tail.leaf->samplingKind != AOTTextureSamplingKind::Plain) {
+    return false;
+  }
+  if (tail.ops.size() > MaxPointwiseSlots) {
+    return false;
+  }
+  shape->leaf = tail.leaf;
+  shape->ops = std::move(tail.ops);
   return true;
 }
 

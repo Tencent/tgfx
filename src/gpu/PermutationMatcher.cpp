@@ -398,6 +398,27 @@ bool IsSupportedPointwiseOp(const FragmentProcessor* fp) {
   return true;
 }
 
+bool SupportedFillKernelSteps(const ColorSpaceXformSteps* steps) {
+  if (steps == nullptr) {
+    return false;
+  }
+  if (steps->flags.linearize) {
+    int srcIdx = TFTypeToIndex(gfx::skcms_TransferFunction_getType(
+        reinterpret_cast<const gfx::skcms_TransferFunction*>(&steps->srcTransferFunction)));
+    if (srcIdx < 0) {
+      return false;
+    }
+  }
+  if (steps->flags.encode) {
+    int dstIdx = TFTypeToIndex(gfx::skcms_TransferFunction_getType(
+        reinterpret_cast<const gfx::skcms_TransferFunction*>(&steps->dstTransferFunctionInverse)));
+    if (dstIdx < 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // The IR form of a blur kernel's servable child (the old FP-walk IsServableBlurChild's
 // replacement): the opaque node's input must be a single texture leaf whose per-tap sampling the
 // kernels can express. A plain leaf must be Clamp — the kernels clamp plain-child taps to the

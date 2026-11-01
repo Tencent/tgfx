@@ -24,6 +24,8 @@
 
 namespace tgfx {
 
+struct AOTDrawFacts;
+
 class ProgramInfo;
 
 /// Cold "uber" shader for the (1 sampler, no CoverageFP, RGBA) structural class: samples one
@@ -90,6 +92,10 @@ class TexturedEffectShader : public ShaderFamily<TexturedEffectShader> {
   /// it owns.
   static std::optional<Inputs> Extract(const ProgramInfo* programInfo,
                                        PermutationMatchFailure* failure);
+
+  /// The same acceptance over the draw's extracted facts: the executor-table row's predicate.
+  static std::optional<Inputs> ExtractFacts(const AOTDrawFacts& facts,
+                                            PermutationMatchFailure* failure);
 };
 
 }  // namespace tgfx

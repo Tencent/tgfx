@@ -37,6 +37,12 @@ std::optional<MaskFillShader::Inputs> MaskFillShader::Extract(const ProgramInfo*
   }
   // Solid color (from the DefaultGP Color uniform) masked by a single alpha-only coverage
   // TextureEffect (a rasterized shape mask from ShapeDrawOp). No color fragment processors.
+  //
+  // MaskFill stays on the processor walk by design: its mask is a prepare-grown coverage (the
+  // rasterized shape attaches its TextureEffect only once the shape proxy exists), which is
+  // exactly the case the carried IR drops by the staleness guard — an IR-based row would reject
+  // every draw this family serves. It migrates when the shape rasterization's record-time story
+  // does (the same work that retires the staleness guard's expression-growth case).
   if (programInfo->numColorFragmentProcessors() != 0) {
     return std::nullopt;
   }

@@ -18,39 +18,52 @@
 
 #include "gpu/shaders/kernels/TiledTextureFillShader.h"
 #include <optional>
+#include <cstdio>
 #include "gpu/ProgramInfo.h"
+#include "gpu/aot/AOTChainBuilder.h"
+#include "gpu/aot/AOTDrawFacts.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
 
 std::optional<TiledTextureFillShader::Inputs> TiledTextureFillShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure*) {
-  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
+  // The executor-table row and the walk share this one body.
+  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
+}
+
+std::optional<TiledTextureFillShader::Inputs> TiledTextureFillShader::ExtractFacts(
+    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+  // The family-relative alpha-only gate (RejectsAlphaOnlyTarget's original semantics).
+  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }
-  if (!IsPositionOnlyRectGP(programInfo->getGeometryProcessor())) {
+  if (!facts.positionOnlyRect()) {
     return std::nullopt;
   }
-  if (programInfo->numFragmentProcessors() != 1) {
+  if (facts.fragmentCount != 1) {
     return std::nullopt;
   }
-  int xpType = GetXPType(programInfo);
+  int xpType = facts.xpType();
   if (xpType < XP_NONE) {
     return std::nullopt;
   }
-  auto fp = programInfo->getFragmentProcessor(0);
-  if (!IsProcessor<TiledTextureEffect>(fp)) {
+  // The sole color processor is the IR's tiled texture leaf (no operators above it).
+  if (facts.ir == nullptr) {
     return std::nullopt;
   }
-  auto* tte = static_cast<const TiledTextureEffect*>(fp);
-  if (tte->hasPerspective()) {
+  AOTChainBuilder::AOTTextureTailShape tail = {};
+  if (!AOTChainBuilder::CollectTextureTail(facts.ir->color, &tail) || !tail.ops.empty()) {
     return std::nullopt;
   }
-  int modeX = 0;
-  int modeY = 0;
-  tte->getShaderModes(&modeX, &modeY);
-  if (!TiledFillModeSupported(modeX) || !TiledFillModeSupported(modeY)) {
+  auto* leaf = tail.leaf;
+  if (leaf->samplingKind != AOTTextureSamplingKind::Tiled || leaf->hasPerspective ||
+      !leaf->tiledRecipe.has_value()) {
+    return std::nullopt;
+  }
+  if (!TiledFillModeSupported(static_cast<int>(leaf->tiledRecipe->shaderModeX)) ||
+      !TiledFillModeSupported(static_cast<int>(leaf->tiledRecipe->shaderModeY))) {
     return std::nullopt;
   }
   // A both-None (0/0) mode means the hardware sampler already resolves the tiling (e.g. Repeat

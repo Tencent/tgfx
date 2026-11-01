@@ -138,9 +138,15 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
                                   const Point& coordOffset) {
   // The fill's single record-time lowering: its whole color expression lands on a DrawIR the op
   // carries, and the route below plans from it — no second analysis over the FP tree. A fill has
-  // no coverage and no xfer, and its blend is Src.
+  // no coverage and no xfer, and its blend is Src. The IR is unconditional — the executor-table
+  // matching reads it for bare single-source fills too (the direct matchers no longer walk the
+  // tree) — while the PLAN route stays gated to composite trees: a bare fill's single pass
+  // serves in place, exactly as before.
+  auto* shaderCache = context->precompiledShaderCache();
+  const bool precompiledActive = shaderCache != nullptr && shaderCache->isLoaded();
+  const bool planCandidate = isFillRouteCandidate(processor.get());
   PlacementPtr<DrawIR> fillIR = nullptr;
-  if (isFillRouteCandidate(processor.get())) {
+  if (precompiledActive && processor != nullptr) {
     if (auto lowered = LowerDraw({processor.get()}, {}, nullptr, nullptr, BlendMode::Src,
                                  drawingAllocator())) {
       fillIR = drawingAllocator()->make<DrawIR>(std::move(*lowered));
@@ -158,12 +164,14 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   if (fillIR != nullptr) {
     drawOp->adoptLoweredIR(std::move(fillIR));
     auto* ir = drawOp->loweredIR();
-    if (auto plan = AOTRouter::Plan(*ir)) {
-      if (AOTRouter::PlanRequiresTask(*plan) &&
-          submitFillPlanTask(ir->color, *plan, renderFlags, renderTarget, coordOffset, &drawOp)) {
-        return true;
+    if (planCandidate) {
+      if (auto plan = AOTRouter::Plan(*ir)) {
+        if (AOTRouter::PlanRequiresTask(*plan) &&
+            submitFillPlanTask(ir->color, *plan, renderFlags, renderTarget, coordOffset, &drawOp)) {
+          return true;
+        }
+        // A single-pass plan needs no task: the plain lookup serves the fill at prepare time.
       }
-      // A single-pass plan needs no task: the plain lookup serves the fill at prepare time.
     }
   }
   auto allocator = drawingAllocator();

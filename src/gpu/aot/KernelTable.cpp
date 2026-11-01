@@ -20,19 +20,27 @@
 #include "gpu/shaders/kernels/GaussianBlur1DShader.h"
 #include "gpu/shaders/kernels/GlassUDFTentBlurShader.h"
 #include "gpu/shaders/kernels/QuadColorFillShader.h"
+#include "gpu/shaders/kernels/QuadTextureFillShader.h"
 #include "gpu/shaders/kernels/SolidColorFillShader.h"
+#include "gpu/shaders/kernels/TexturedEffectShader.h"
+#include "gpu/shaders/kernels/TiledTextureFillShader.h"
 #include "gpu/shaders/kernels/YUVTextureFillShader.h"
 
 namespace tgfx {
 
 // The rows, in the walk order their families migrate from (GaussianBlur 5th, GlassUDFTentBlur
-// 7th, QuadColor 13th, SolidColor 18th, YUV 21st of the dedicated list): every entry's match is
-// the family's own ExtractFacts pipeline, so a row and the walk cannot disagree.
+// 7th, QuadColor 13th, QuadTexture 14th, SolidColor 18th, TexturedEffect 19th, TiledTexture
+// 20th, YUV 21st of the dedicated list; MaskFill stays on the walk — its rasterized-shape mask
+// is a prepare-grown coverage, exactly the case the carried IR drops by the staleness guard): every entry's match is the family's own
+// ExtractFacts pipeline, so a row and the walk cannot disagree.
 static const std::vector<AOTKernelRow> rows = {
     AOTKernelRow{GaussianBlur1DShader::Name, GaussianBlur1DShader::MatchFromFacts},
     AOTKernelRow{GlassUDFTentBlurShader::Name, GlassUDFTentBlurShader::MatchFromFacts},
     AOTKernelRow{QuadColorFillShader::Name, QuadColorFillShader::MatchFromFacts},
+    AOTKernelRow{QuadTextureFillShader::Name, QuadTextureFillShader::MatchFromFacts},
     AOTKernelRow{SolidColorFillShader::Name, SolidColorFillShader::MatchFromFacts},
+    AOTKernelRow{TexturedEffectShader::Name, TexturedEffectShader::MatchFromFacts},
+    AOTKernelRow{TiledTextureFillShader::Name, TiledTextureFillShader::MatchFromFacts},
     AOTKernelRow{YUVTextureFillShader::Name, YUVTextureFillShader::MatchFromFacts},
 };
 
