@@ -21,7 +21,6 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
-#include "layers/processors/GlassUDFTentBlurFragmentProcessor.h"
 
 namespace tgfx {
 
@@ -46,20 +45,16 @@ std::optional<GlassUDFTentBlurShader::Inputs> GlassUDFTentBlurShader::Extract(
   if (xpType < XP_NONE) {
     return std::nullopt;
   }
-  auto fp = programInfo->getFragmentProcessor(0);
-  if (!IsProcessor<GlassUDFTentBlurFragmentProcessor>(fp)) {
-    return std::nullopt;
-  }
-  auto* tent = static_cast<const GlassUDFTentBlurFragmentProcessor*>(fp);
-  if (tent->numChildProcessors() != 1) {
-    return std::nullopt;
-  }
-  // The horizontal pass reads a plain TextureEffect; the vertical pass a TiledTextureEffect.
-  if (!IsServableBlurChild(tent->childProcessor(0))) {
+  // The color expression reads off the carried IR's opaque-kernel node: the tent blur's barrier
+  // over a single servable texture leaf (the horizontal pass reads a plain TextureEffect, the
+  // vertical a TiledTextureEffect — the node's child leaf carries the shape).
+  auto shape =
+      ReadOpaqueKernelIRShape(programInfo, /*kernelKind=*/2, /*requiresTextureChild=*/true);
+  if (!shape) {
     return std::nullopt;
   }
   // The loop upper bound is the fixed constant 64; a longer max radius exceeds it and falls back.
-  if (tent->getMaxRadius() > 64) {
+  if (shape->kernel->maxRadius > 64) {
     return std::nullopt;
   }
   return Inputs{xpType};

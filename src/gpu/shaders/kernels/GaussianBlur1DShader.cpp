@@ -20,9 +20,6 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
-#include "gpu/processors/GaussianBlur1DFragmentProcessor.h"
-#include "gpu/processors/TextureEffect.h"
-#include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
 
@@ -47,23 +44,18 @@ std::optional<GaussianBlur1DShader::Inputs> GaussianBlur1DShader::Extract(
   if (xpType < XP_NONE) {
     return std::nullopt;
   }
-  auto fp = programInfo->getFragmentProcessor(0);
-  if (!IsProcessor<GaussianBlur1DFragmentProcessor>(fp)) {
-    return std::nullopt;
-  }
-  auto* blur = static_cast<const GaussianBlur1DFragmentProcessor*>(fp);
-  if (blur->numChildProcessors() != 1) {
-    return std::nullopt;
-  }
-  if (!IsServableBlurChild(blur->childProcessor(0))) {
+  // The color expression reads off the carried IR's opaque-kernel node: the blur's barrier over
+  // a single servable texture leaf (the node IS the contract; no processor-tree walk).
+  auto shape =
+      ReadOpaqueKernelIRShape(programInfo, /*kernelKind=*/0, /*requiresTextureChild=*/true);
+  if (!shape) {
     return std::nullopt;
   }
   // The kernel radius is a runtime uniform, not a variant dimension. The precompiled shader uses
   // a fixed maximum kernel (MAX_SIGMA=9 -> radius up to 10) and breaks early at the runtime
   // radius, so any sigma in [1,10] maps to the same variant. Sigma > 10 exceeds the fixed kernel
   // and falls back.
-  int sigma = blur->getMaxSigma();
-  if (sigma < 1 || sigma > 10) {
+  if (shape->kernel->sigma < 1 || shape->kernel->sigma > 10) {
     return std::nullopt;
   }
   return Inputs{xpType};

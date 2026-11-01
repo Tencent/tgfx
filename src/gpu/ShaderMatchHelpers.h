@@ -28,6 +28,8 @@ namespace tgfx {
 class ProgramInfo;
 class GeometryProcessor;
 class FragmentProcessor;
+struct AOTOpaqueKernelParameters;
+struct AOTTextureParameters;
 class QuadPerEdgeAAGeometryProcessor;
 struct AOTProgram;
 struct AOTCoverageTerm;
@@ -67,9 +69,16 @@ std::optional<int> SharedDeviceMaskValue(const ProgramInfo* programInfo);
 /// Whether a ShaderMode value is one the tiled fill kernel implements.
 bool TiledFillModeSupported(int mode);
 
-/// The child a blur kernel samples per tap: a plain Clamp TextureEffect or a supported
-/// TiledTextureEffect (see the definition for the exact restrictions).
-bool IsServableBlurChild(const FragmentProcessor* childFP);
+/// The opaque-kernel families' IR contract (P4.1's barrier node, read by P4.2's matching): the
+/// named kernel's node facts, and — for the blur kernels — the servable texture leaf it reads.
+/// The families walk no processor tree; the node IS the contract.
+struct OpaqueKernelIRShape {
+  const AOTOpaqueKernelParameters* kernel = nullptr;
+  const AOTTextureParameters* childTexture = nullptr;
+};
+std::optional<OpaqueKernelIRShape> ReadOpaqueKernelIRShape(const ProgramInfo* programInfo,
+                                                           int kernelKind,
+                                                           bool requiresTextureChild);
 
 /// Whether the FP is one of the four pointwise operators (ColorMatrix / Luma / AlphaThreshold /
 /// ColorSpaceXform) that share the TexturedEffect structural class.

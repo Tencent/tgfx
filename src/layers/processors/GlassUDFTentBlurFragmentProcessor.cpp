@@ -186,15 +186,21 @@ void GlassUDFTentBlurFragmentProcessor::onSetData(UniformData*,
 
 bool GlassUDFTentBlurFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
                                                    AOTNodeID* output) const {
-  // The tent blur's fine/coarse sources and its packed-input handling stay inside the family's
-  // kernel; the node marks the opaque barrier for the IR (same contract as the refraction —
-  // the planner refuses the graph, the dedicated family serves it).
-  if (builder == nullptr || output == nullptr) {
+  // Same contract as the gaussian blur's opaque node: the active source child lowers into the
+  // graph (a texture leaf — the horizontal pass reads a plain TextureEffect, the vertical a
+  // TiledTextureEffect), everything else stays inside the family's kernel. The matcher reads
+  // the child's servable shape and the radius cap off the node.
+  if (builder == nullptr || output == nullptr || numChildProcessors() != 1) {
+    return false;
+  }
+  AOTNodeID childNode = AOTNodeID::Invalid();
+  if (!childProcessor(0)->lowerToAOT(builder, input, &childNode)) {
     return false;
   }
   AOTOpaqueKernelParameters parameters = {};
   parameters.kernelKind = 2;
-  return builder->addOpaqueKernel(input, parameters, output);
+  parameters.maxRadius = maxRadius;
+  return builder->addOpaqueKernel(childNode, parameters, output);
 }
 
 }  // namespace tgfx

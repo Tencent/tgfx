@@ -347,38 +347,69 @@ bool IsSupportedPointwiseOp(const FragmentProcessor* fp) {
   return true;
 }
 
-// An image plus one pointwise operator. The pointwise chain kernel serves the same shape, but this
-// kernel stays as a fast path: it is what every drawImage of an image whose color space differs
-// from the target takes (the color-space transform is appended automatically, e.g. a Display P3
-// photo on an sRGB surface), and it uploads a few hundred bytes of uniforms with straight-line
-// code where the chain uploads its instruction arrays (about 5 KB) and runs the interpreter loop.
-// The child a blur kernel samples per tap: a plain TextureEffect (inlined texture() call) or a
-// TiledTextureEffect, whose shared tiled_sample.inc tiling is applied per tap. The kernels clamp
-// plain-child taps to the subset (edge stretch), which is only the Clamp tap semantics: a Decal
-// child must return transparent outside its subset — a drop shadow's blurred source is exactly
-// that — so a non-Clamp plain child falls back. Tiled children are limited to the ShaderMode values
-// tiled_sample.inc implements.
-bool IsServableBlurChild(const FragmentProcessor* childFP) {
-  if (childFP == nullptr || childFP->numTextureSamplers() == 0) {
-    return false;
+// The IR form of a blur kernel's servable child (the old FP-walk IsServableBlurChild's
+// replacement): the opaque node's input must be a single texture leaf whose per-tap sampling the
+// kernels can express. A plain leaf must be Clamp — the kernels clamp plain-child taps to the
+// subset (edge stretch), which is only the Clamp tap semantics: a Decal child must return
+// transparent outside its subset, a drop shadow's blurred source is exactly that. A tiled leaf
+// must be non-perspective and limited to the ShaderMode values tiled_sample.inc implements.
+static bool IsServableBlurChildIR(const AOTTextureParameters& child) {
+  if (child.samplingKind == AOTTextureSamplingKind::Plain) {
+    return child.samplerState.tileModeX == TileMode::Clamp &&
+           child.samplerState.tileModeY == TileMode::Clamp;
   }
-  if (IsProcessor<TextureEffect>(childFP)) {
-    TileMode modeX = TileMode::Clamp;
-    TileMode modeY = TileMode::Clamp;
-    static_cast<const TextureEffect*>(childFP)->getTileModes(&modeX, &modeY);
-    return modeX == TileMode::Clamp && modeY == TileMode::Clamp;
-  }
-  if (IsProcessor<TiledTextureEffect>(childFP)) {
-    auto* childTiled = static_cast<const TiledTextureEffect*>(childFP);
-    if (childTiled->hasPerspective()) {
+  if (child.samplingKind == AOTTextureSamplingKind::Tiled) {
+    if (child.hasPerspective) {
       return false;
     }
-    int modeX = 0;
-    int modeY = 0;
-    childTiled->getShaderModes(&modeX, &modeY);
-    return TiledModeSupported(modeX) && TiledModeSupported(modeY);
+    if (!child.tiledRecipe.has_value()) {
+      return false;
+    }
+    return TiledModeSupported(static_cast<int>(child.tiledRecipe->shaderModeX)) &&
+           TiledModeSupported(static_cast<int>(child.tiledRecipe->shaderModeY));
   }
   return false;
+}
+
+// Reads the carried IR's color graph for an opaque-kernel draw (P4.1's barrier node): the color
+// root must be the named kernel's node. The blur kernels require their input to be a single
+// servable texture leaf (returned alongside); the refraction sits directly on the geometry color,
+// with its variant dimensions on the node. Nullopt when the info carries no IR or the shape does
+// not fit — the family walks no processor tree anymore, the node IS the contract.
+std::optional<OpaqueKernelIRShape> ReadOpaqueKernelIRShape(const ProgramInfo* programInfo,
+                                                           int kernelKind,
+                                                           bool requiresTextureChild) {
+  if (programInfo == nullptr) {
+    return std::nullopt;
+  }
+  auto* ir = programInfo->getCarriedIR();
+  if (ir == nullptr) {
+    return std::nullopt;
+  }
+  const auto& graph = ir->color;
+  const auto* root = graph.nodeAt(graph.root());
+  if (root == nullptr || root->kind != AOTEffectKind::OpaqueKernel || root->inputs.size() != 1) {
+    return std::nullopt;
+  }
+  auto* kernel = std::get_if<AOTOpaqueKernelParameters>(&root->parameters);
+  if (kernel == nullptr || kernel->kernelKind != kernelKind) {
+    return std::nullopt;
+  }
+  OpaqueKernelIRShape shape = {};
+  shape.kernel = kernel;
+  if (!requiresTextureChild) {
+    return shape;
+  }
+  const auto* child = graph.nodeAt(root->inputs[0]);
+  if (child == nullptr || child->kind != AOTEffectKind::TextureSource) {
+    return std::nullopt;
+  }
+  auto* texture = std::get_if<AOTTextureParameters>(&child->parameters);
+  if (texture == nullptr || !IsServableBlurChildIR(*texture)) {
+    return std::nullopt;
+  }
+  shape.childTexture = texture;
+  return shape;
 }
 
 bool ContainsGradientSource(const FragmentProcessor* processor) {

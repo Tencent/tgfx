@@ -23,8 +23,6 @@
 #include "gpu/processors/EllipseGeometryProcessor.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
-#include "layers/processors/GlassRefractionFragmentProcessor.h"
-#include "layers/processors/GlassShapeGeometryFragmentProcessor.h"
 
 namespace tgfx {
 
@@ -81,47 +79,25 @@ std::optional<GlassRefractionShader::Inputs> GlassRefractionShader::Extract(
   if (xpType < XP_NONE) {
     return std::nullopt;
   }
-  auto fp = programInfo->getFragmentProcessor(0);
-  if (!IsProcessor<GlassRefractionFragmentProcessor>(fp)) {
-    return std::nullopt;
-  }
-  auto* refraction = static_cast<const GlassRefractionFragmentProcessor*>(fp);
-  if (refraction->numChildProcessors() != 1 || refraction->numTextureSamplers() != 1) {
-    return std::nullopt;
-  }
-  // Both vertex kernels emit the affine coordinate form ((Matrix * vec3(pos, 1)).xy computed in
-  // the vertex stage), matching GeometryProcessor::emitTransforms' non-perspective branch. A
-  // projective transform makes the runtime emit a vec3 varying divided in the fragment stage, so
-  // it must ride the runtime route, as every plain-coordinate kernel does with projective sources.
-  if (fp->numCoordTransforms() > 0 && fp->coordTransform(0)->matrix.hasPerspective()) {
-    return std::nullopt;
-  }
-  auto child = refraction->childProcessor(0);
-  if (child == nullptr) {
-    return std::nullopt;
-  }
-  // The geometry child selects the compile-time dimension because it changes the sampler layout.
-  // Dispersion is a compile-time branch too: the runtime emission compiles one path or the other
-  // and never both, so the precompiled variant must mirror that structure exactly to keep pixels
-  // identical (see glass_refraction.frag). Lighting stays a runtime uniform.
-  int geometryKind = -1;
-  if (IsProcessor<GlassSDFGeometryFragmentProcessor>(child)) {
-    auto* sdf = static_cast<const GlassSDFGeometryFragmentProcessor*>(child);
-    geometryKind = sdf->getShapeType() == GlassShapeType::RoundedRect ? 0 : 1;
-  } else if (IsProcessor<GlassUDFGeometryFragmentProcessor>(child)) {
-    // The UDF kind always declares the edge-light mask sampler; an edge-lit-off draw binds the
-    // shared dummy texture there and clears the EdgeMaskOn runtime uniform.
-    geometryKind = 2;
-  }
-  if (geometryKind < 0) {
+  // The color expression reads off the carried IR's opaque-kernel node: the refraction's barrier
+  // sits directly on the geometry color, with its variant dimensions on the node. The geometry
+  // child selects the compile-time dimension because it changes the sampler layout; dispersion is
+  // a compile-time branch too: the runtime emission compiles one path or the other and never
+  // both, so the precompiled variant must mirror that structure exactly to keep pixels identical
+  // (see glass_refraction.frag). Lighting stays a runtime uniform. The node also carries the
+  // background-coordinate perspective rejection: both vertex kernels emit the affine coordinate
+  // form ((Matrix * vec3(pos, 1)).xy computed in the vertex stage), matching
+  // GeometryProcessor::emitTransforms' non-perspective branch — a projective transform makes the
+  // runtime emit a vec3 varying divided in the fragment stage, so it must ride the runtime route.
+  auto shape =
+      ReadOpaqueKernelIRShape(programInfo, /*kernelKind=*/1, /*requiresTextureChild=*/false);
+  if (!shape || shape->kernel->geometryKind < 0 || shape->kernel->hasPerspective) {
     return std::nullopt;
   }
   Inputs inputs;
   inputs.gpKind = gpKind;
-  inputs.geometryKind = geometryKind;
-  // Same predicate the runtime folds into the program key, so the compile-time variant tracks the
-  // runtime program one-for-one.
-  inputs.dispersionOn = refraction->hasDispersion();
+  inputs.geometryKind = shape->kernel->geometryKind;
+  inputs.dispersionOn = shape->kernel->dispersionOn;
   inputs.xpType = xpType;
   return inputs;
 }

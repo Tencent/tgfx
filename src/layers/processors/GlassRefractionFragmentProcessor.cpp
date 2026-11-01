@@ -19,6 +19,7 @@
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
 #include "gpu/aot/EffectGraph.h"
 #include "gpu/resources/TextureView.h"
+#include "layers/processors/GlassShapeGeometryFragmentProcessor.h"
 
 namespace tgfx {
 
@@ -60,14 +61,30 @@ bool GlassRefractionFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNo
                                                   AOTNodeID* output) const {
   // The refraction's math, its sampled source and its SDF/UDF geometry child all stay inside the
   // family's kernel — the node only marks the opaque barrier so the draw carries its IR (the
-  // planner refuses the graph, the dedicated family serves it, and P4.2's matching reads the
-  // node instead of walking the processor tree). The chain input rides along as the modulate
-  // operand, mirroring TextureSource.
-  if (builder == nullptr || output == nullptr) {
+  // planner refuses the graph, the dedicated family serves it, and the matching reads the node
+  // instead of walking the processor tree). The geometry child's kind and the dispersion branch
+  // are compile-time variant dimensions, so they ride on the node; the chain input stays the
+  // modulate operand, mirroring TextureSource.
+  if (builder == nullptr || output == nullptr || numChildProcessors() != 1 ||
+      numTextureSamplers() != 1) {
     return false;
   }
   AOTOpaqueKernelParameters parameters = {};
   parameters.kernelKind = 1;
+  auto child = childProcessor(0);
+  if (IsProcessor<GlassSDFGeometryFragmentProcessor>(child)) {
+    auto* sdf = static_cast<const GlassSDFGeometryFragmentProcessor*>(child);
+    parameters.geometryKind = sdf->getShapeType() == GlassShapeType::RoundedRect ? 0 : 1;
+  } else if (IsProcessor<GlassUDFGeometryFragmentProcessor>(child)) {
+    // The UDF kind always declares the edge-light mask sampler; an edge-lit-off draw binds the
+    // shared dummy texture there and clears the EdgeMaskOn runtime uniform.
+    parameters.geometryKind = 2;
+  } else {
+    return false;
+  }
+  parameters.dispersionOn = hasDispersion();
+  parameters.hasPerspective = FragmentProcessor::numCoordTransforms() > 0 &&
+                              FragmentProcessor::coordTransform(0)->matrix.hasPerspective();
   return builder->addOpaqueKernel(input, parameters, output);
 }
 

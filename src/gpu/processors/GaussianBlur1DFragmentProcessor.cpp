@@ -85,6 +85,8 @@ bool GaussianBlur1DFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNod
   }
   AOTOpaqueKernelParameters parameters = {};
   parameters.kernelKind = 0;
+  // The fixed kernel caps sigma at 10; the matcher reads the acceptance range off the node.
+  parameters.sigma = maxSigma;
   return builder->addOpaqueKernel(childNode, parameters, output);
 }
 }  // namespace tgfx

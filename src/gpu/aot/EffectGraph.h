@@ -254,10 +254,21 @@ struct AOTGradientParameters {
 
 // Opaque-kernel operand (see AOTEffectKind::OpaqueKernel). kernelKind: 0 = GaussianBlur1D,
 // 1 = GlassRefraction, 2 = GlassUDFTentBlur. The shape-level facts the dedicated families'
-// matching needs ride here (P4.2 reads them from the IR); upload values stay on the processor
-// until the bind moves to the contract.
+// matching needs ride here — the matcher reads them from the IR, not the processor tree;
+// upload values stay on the processor until the bind moves to the contract (P5.-2).
 struct AOTOpaqueKernelParameters {
   int kernelKind = 0;
+  // GaussianBlur1D: the acceptance range is [1, 10] — the precompiled kernel's fixed cap.
+  int sigma = 0;
+  // GlassUDFTentBlur: the loop's fixed bound; a longer radius exceeds it.
+  int maxRadius = 64;
+  // GlassRefraction: the compile-time variant dimensions. geometryKind: 0 = SDF rounded rect,
+  // 1 = SDF other, 2 = UDF (the UDF kind always declares the edge-light mask sampler).
+  int geometryKind = -1;
+  bool dispersionOn = false;
+  // GlassRefraction: the kernel's own background-coordinate transform is projective — the
+  // precompiled vertex kernels emit the affine form only.
+  bool hasPerspective = false;
 };
 
 // Analytic anti-aliased rect coverage (RectEffect, produced by AA rect clips). Multiplies the

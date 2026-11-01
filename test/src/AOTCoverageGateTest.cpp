@@ -136,15 +136,18 @@ const ProcessorClaim ProcessorClaims[] = {
      "ClampedGradientEffect"},
     {"UnrolledBinaryGradientColorizer", "UnrolledBinaryGradientColorizer", ParentLowering, "",
      "ClampedGradientEffect"},
-    // Glass geometry children consumed inside GlassRefractionShader's matcher rule; the matcher
-    // references their names to discriminate the parent's shape.
-    {"GlassSDFGeometryFragmentProcessor", "GlassSDFGeometryFragmentProcessor", Structural, ""},
-    {"GlassUDFGeometryFragmentProcessor", "GlassUDFGeometryFragmentProcessor", Structural, ""},
-    // Executor-rebuilt processors matched by the fused kernel rules, and effect processors
-    // served by dedicated matcher rules.
-    {"GaussianBlur1DFragmentProcessor", "GaussianBlur1DFragmentProcessor", Matcher, ""},
-    {"GlassRefractionFragmentProcessor", "GlassRefractionFragmentProcessor", Matcher, ""},
-    {"GlassUDFTentBlurFragmentProcessor", "GlassUDFTentBlurFragmentProcessor", Matcher, ""},
+    // Glass geometry children consumed inside GlassRefractionFragmentProcessor::lowerToAOT —
+    // the parent's opaque node carries their kind as a variant dimension (the family's matcher
+    // reads the node, not the processor tree).
+    {"GlassSDFGeometryFragmentProcessor", "GlassSDFGeometryFragmentProcessor", ParentLowering, "",
+     "GlassRefractionFragmentProcessor"},
+    {"GlassUDFGeometryFragmentProcessor", "GlassUDFGeometryFragmentProcessor", ParentLowering, "",
+     "GlassRefractionFragmentProcessor"},
+    // Effect processors served by dedicated families: they lower into the IR's opaque-kernel
+    // node, and the family matchers read that node instead of walking the processor tree.
+    {"GaussianBlur1DFragmentProcessor", "GaussianBlur1DFragmentProcessor", Lowering, ""},
+    {"GlassRefractionFragmentProcessor", "GlassRefractionFragmentProcessor", Lowering, ""},
+    {"GlassUDFTentBlurFragmentProcessor", "GlassUDFTentBlurFragmentProcessor", Lowering, ""},
 };
 
 struct ScannedProcessor {
