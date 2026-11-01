@@ -89,20 +89,7 @@ std::optional<YUVTextureFillShader::Inputs> YUVTextureFillShader::ExtractFacts(
   Inputs inputs;
   inputs.hasUVMatrix = facts.geometry.hasUVMatrix;
   inputs.yuvFormat = yuvFormat;
-  switch (facts.xfer) {
-    case AOTXferKind::None:
-      inputs.xpType = XP_NONE;
-      break;
-    case AOTXferKind::DstTexture:
-      inputs.xpType = XP_DST_TEXTURE;
-      break;
-    case AOTXferKind::FrameBufferFetch:
-      inputs.xpType = XP_FRAMEBUFFER_FETCH;
-      break;
-    case AOTXferKind::Unsupported:
-      inputs.xpType = XP_UNSUPPORTED;
-      break;
-  }
+  inputs.xpType = facts.xpType();
   return inputs;
 }
 

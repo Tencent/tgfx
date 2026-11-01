@@ -19,8 +19,7 @@
 #include "gpu/shaders/kernels/SolidColorFillShader.h"
 #include <optional>
 #include "gpu/ProgramInfo.h"
-#include "gpu/ShaderMatchHelpers.h"
-#include "gpu/processors/DefaultGeometryProcessor.h"
+#include "gpu/aot/AOTDrawFacts.h"
 
 namespace tgfx {
 
@@ -28,22 +27,31 @@ namespace tgfx {
 // draw's shape maps onto the permutation indices. The pass-through shape (one HAS_XP axis fed by
 // the XferProcessor type) keeps a minimal Inputs struct.
 std::optional<SolidColorFillShader::Inputs> SolidColorFillShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure*) {
-  if (RejectsAlphaOnlyTarget(ServesAlphaOnly, programInfo)) {
+    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
+  // The executor-table row and the walk share this one body.
+  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
+}
+
+std::optional<SolidColorFillShader::Inputs> SolidColorFillShader::ExtractFacts(
+    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+  if (facts.alphaOnlyTarget) {
     return std::nullopt;
   }
-  auto gp = programInfo->getGeometryProcessor();
-  if (!IsProcessor<DefaultGeometryProcessor>(gp)) {
+  if (facts.geometry.kind != AOTGeometryKind::Default) {
     return std::nullopt;
   }
   // The fill color comes from the DefaultGeometryProcessor Color uniform, so a color fragment
   // processor would be silently dropped and must reject. The only accepted FP is one direct
   // analytic clip coverage FP (AA rect or rrect), which this shader evaluates from the runtime
   // clip contract uniforms.
-  if (!HasNoProcessorsOrDirectClip(programInfo)) {
+  bool noProcessorsOrDirectClip =
+      facts.fragmentCount == 0 ||
+      (facts.colorFromPaint && (facts.coverage == CoverageKind::AARect ||
+                                facts.coverage == CoverageKind::RRect));
+  if (!noProcessorsOrDirectClip) {
     return std::nullopt;
   }
-  auto xpType = GetXPType(programInfo);
+  auto xpType = facts.xpType();
   if (xpType < XP_NONE) {
     return std::nullopt;
   }

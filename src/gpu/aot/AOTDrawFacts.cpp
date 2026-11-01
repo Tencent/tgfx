@@ -28,10 +28,12 @@ AOTDrawFacts ExtractAOTDrawFacts(const ProgramInfo* programInfo) {
   facts.alphaOnlyTarget = programInfo->getOutputSwizzle() == Swizzle::AAAA();
   facts.colorFPCount = programInfo->numColorFragmentProcessors();
   facts.fragmentCount = programInfo->numFragmentProcessors();
+  facts.coverage = ClassifyCoverageTerms(programInfo);
   facts.ir = programInfo->getCarriedIR();
   if (facts.ir != nullptr) {
     facts.geometry = facts.ir->geometry;
     facts.xfer = facts.ir->xfer;
+    facts.colorFromPaint = facts.ir->colorFromPaint;
   } else {
     // A draw without a carried IR still has exact facts: the descriptor twins read the made
     // processor and the xfer the same way the record-time forms would have.

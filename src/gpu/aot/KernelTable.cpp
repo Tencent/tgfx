@@ -17,14 +17,18 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/KernelTable.h"
+#include "gpu/shaders/kernels/QuadColorFillShader.h"
+#include "gpu/shaders/kernels/SolidColorFillShader.h"
 #include "gpu/shaders/kernels/YUVTextureFillShader.h"
 
 namespace tgfx {
 
-// The rows, in the walk order their families migrate from. YUVTextureFillShader is the first
-// migration; every entry's match is the family's own ExtractFacts pipeline, so a row and the
-// walk cannot disagree.
+// The rows, in the walk order their families migrate from (QuadColor 13th, SolidColor 18th,
+// YUV 21st of the dedicated list): every entry's match is the family's own ExtractFacts
+// pipeline, so a row and the walk cannot disagree.
 static const std::vector<AOTKernelRow> rows = {
+    AOTKernelRow{QuadColorFillShader::Name, QuadColorFillShader::MatchFromFacts},
+    AOTKernelRow{SolidColorFillShader::Name, SolidColorFillShader::MatchFromFacts},
     AOTKernelRow{YUVTextureFillShader::Name, YUVTextureFillShader::MatchFromFacts},
 };
 
