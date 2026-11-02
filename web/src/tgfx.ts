@@ -299,6 +299,28 @@ export const createCanvasContext = (GL: EmscriptenGL, canvas: HTMLCanvasElement 
 };
 
 /**
+ * Presents the frame rendered on the calling thread, so the browser can put it on screen at its
+ * next rendering update.
+ *
+ * @param GL The Emscripten GL runtime (module.GL), used by engines that predate worker frames.
+ */
+export const presentCanvasFrame = (GL?: EmscriptenGL) => {
+    // A browser presents the canvas on the rendering update of the thread that owns it. Asking for
+    // one empty frame is enough to run that update, so browsers without a frame loop are covered.
+    if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => {});
+        return;
+    }
+    // Engines that predate worker rAF present through commit() instead, which the spec has since
+    // dropped. The context locked by the caller is the one that was just drawn into.
+    const gl = GL?.currentContext?.GLctx as WebGLRenderingContext | undefined;
+    const commit = (gl as unknown as {commit?: () => void} | undefined)?.commit;
+    if (typeof commit === 'function') {
+        commit.call(gl);
+    }
+};
+
+/**
  * Creates a WebGPU surface for a canvas object. Used for canvases that tgfx cannot reach by
  * selector, such as an OffscreenCanvas on a worker thread; call it on the thread that will do the
  * rendering, since the returned handle is only valid there.

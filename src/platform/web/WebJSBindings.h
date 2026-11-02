@@ -19,7 +19,9 @@
 #pragma once
 
 #include <emscripten/val.h>
+#include <atomic>
 #include <limits>
+#include "core/utils/Log.h"
 
 namespace tgfx {
 
@@ -48,6 +50,23 @@ inline bool ReadCanvasSize(const emscripten::val& canvas, int* width, int* heigh
   *width = static_cast<int>(widthNumber);
   *height = static_cast<int>(heightNumber);
   return true;
+}
+
+/**
+ * Returns whether the JS bundle exports the entry that presents a frame on the calling thread.
+ * Resolve it once per window; the answer cannot change afterwards.
+ */
+inline bool SupportsCanvasPresent() {
+  return HasWebJSBinding("presentCanvasFrame");
+}
+
+/**
+ * Asks the browser for one rendering update on this thread, which is when a canvas this thread owns
+ * is presented. Only call it when SupportsCanvasPresent() holds. The GL runtime is used by engines
+ * that predate worker animation frames.
+ */
+inline void PresentCanvasFrame(const emscripten::val& glRuntime = emscripten::val::undefined()) {
+  emscripten::val::module_property("tgfx").call<void>("presentCanvasFrame", glRuntime);
 }
 
 }  // namespace tgfx

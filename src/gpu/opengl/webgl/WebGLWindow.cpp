@@ -50,6 +50,13 @@ std::shared_ptr<WebGLWindow> WebGLWindow::MakeFrom(emscripten::val canvas,
   }
   auto window = std::shared_ptr<WebGLWindow>(new WebGLWindow(device, std::move(colorSpace)));
   window->canvas = canvas;
+  window->presentSupported = SupportsCanvasPresent();
+  if (!window->presentSupported) {
+    // Rendering still works; without the entry, only the browser presents this canvas.
+    LOGE(
+        "WebGLWindow::MakeFrom The JS binding does not export presentCanvasFrame, frames of this "
+        "window are presented only by the browser.");
+  }
   return window;
 }
 
@@ -79,5 +86,13 @@ std::shared_ptr<RenderTargetProxy> WebGLWindow::onCreateRenderTarget(Context* co
   glInfo.format = GL_RGBA8;
   return RenderTargetProxy::MakeFrom(context, BackendRenderTarget(glInfo, width, height),
                                      ImageOrigin::BottomLeft);
+}
+
+void WebGLWindow::onPresent(Context*) {
+  // The id overload renders on the main thread, which presents by itself.
+  if (!canvas.as<bool>() || !presentSupported) {
+    return;
+  }
+  PresentCanvasFrame(emscripten::val::module_property("GL"));
 }
 }  // namespace tgfx
