@@ -34,7 +34,19 @@ struct AOTExecutorInputs {
   bool hasUVCoord = false;
   bool hasSubset = false;
   bool hasLocalMask = false;
+  bool hasMaskTexture = false;
   int xpType = XP_UNSUPPORTED;
+};
+
+/**
+ * The color expression's shape, as the record admits it. The paint color itself always rides the
+ * geometry processor's Color uniform; what varies is what the draw attaches on top.
+ */
+enum class AOTRecordColorShape : uint8_t {
+  /// No color fragment processors at all: the fill color is the GP's Color uniform.
+  None,
+  /// One bare texture leaf (no operators above it): the sampled color is the draw's color.
+  BareTexture,
 };
 
 /**
@@ -55,14 +67,21 @@ struct AOTExecutorRecord {
   /// Mirrors the family's ServesAlphaOnly: a kernel that does not apply the write swizzle at
   /// output refuses alpha-only targets.
   bool servesAlphaOnly = false;
-  /// The color expression must be one bare texture leaf (no operators above it).
-  bool colorIsBareTexture = false;
+  /// The color expression's shape.
+  AOTRecordColorShape colorShape = AOTRecordColorShape::None;
   /// Admitted coverage kinds, as bits of CoverageKind; any other classification (including an
   /// unclassifiable one) is rejected.
   uint8_t coverageKindMask = 0;
-  /// The local-mask coverage kind also raises the family's local-mask axis (the chain families'
+  /// The admitted coverage must come from the paint (the IR's colorFromPaint fact): a draw whose
+  /// color was lowered from an explicit const-color processor is a different expression and stays
+  /// on other routes.
+  bool coverageRequiresColorFromPaint = false;
+  /// The local-mask coverage kind raises the family's local-mask axis (the chain families'
   /// HAS_LOCAL_MASK); every other admitted kind rides runtime uniforms.
   bool localMaskRaisesAxis = false;
+  /// The device-mask coverage kind raises the family's mask-texture axis (QuadColor's
+  /// HAS_MASK_TEXTURE): the variant then declares the mask sampler.
+  bool deviceMaskRaisesAxis = false;
   /// Reject a GP subset over a projective transform: the precompiled subset path transforms the
   /// subset corners without a perspective divide, so such a draw would clamp to wrong bounds.
   bool rejectsPerspectiveSubset = false;

@@ -22,7 +22,9 @@
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/aot/AOTChainBuilder.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/shaders/kernels/QuadColorFillShader.h"
 #include "gpu/shaders/kernels/QuadTextureFillShader.h"
+#include "gpu/shaders/kernels/SolidColorFillShader.h"
 
 namespace tgfx {
 namespace {
@@ -35,24 +37,59 @@ constexpr uint8_t CoverageBit(CoverageKind kind) {
   return static_cast<uint8_t>(1u << static_cast<uint32_t>(kind));
 }
 
-// The first record: QuadTextureFillShader's acceptance, transcribed. It admits the quad-edge-AA
-// geometry, one bare texture leaf as the color, any of the four coverage classifications (the
-// local mask raises HAS_LOCAL_MASK, the others ride runtime uniforms), refuses a GP subset over a
-// projective transform, and takes the uv-coord axis from the missing uv matrix.
+// QuadTextureFillShader: the quad-edge-AA geometry, one bare texture leaf as the color, any of
+// the four coverage classifications (the local mask raises HAS_LOCAL_MASK, the others ride
+// runtime uniforms), no GP subset over a projective transform, and the uv-coord axis from the
+// missing uv matrix.
 constexpr AOTExecutorRecord kQuadTextureRecord = {
     QuadTextureFillShader::Name,
     GeometryBit(AOTGeometryKind::QuadPerEdgeAA),
     /*servesAlphaOnly=*/true,
-    /*colorIsBareTexture=*/true,
+    AOTRecordColorShape::BareTexture,
     static_cast<uint8_t>(CoverageBit(CoverageKind::AARect) | CoverageBit(CoverageKind::RRect) |
                          CoverageBit(CoverageKind::DeviceMask) |
                          CoverageBit(CoverageKind::LocalMask)),
+    /*coverageRequiresColorFromPaint=*/false,
     /*localMaskRaisesAxis=*/true,
+    /*deviceMaskRaisesAxis=*/false,
     /*rejectsPerspectiveSubset=*/true,
     /*uvCoordFromMissingMatrix=*/true,
 };
 
-const AOTExecutorRecord* const kRecords[] = {&kQuadTextureRecord};
+// SolidColorFillShader: the default geometry fill whose color is the GP's Color uniform. The only
+// fragment processor it takes is one direct analytic clip, and only when the color came from the
+// paint (an explicit const-color processor describes a different expression).
+constexpr AOTExecutorRecord kSolidColorRecord = {
+    SolidColorFillShader::Name,
+    GeometryBit(AOTGeometryKind::Default),
+    /*servesAlphaOnly=*/true,
+    AOTRecordColorShape::None,
+    static_cast<uint8_t>(CoverageBit(CoverageKind::AARect) | CoverageBit(CoverageKind::RRect)),
+    /*coverageRequiresColorFromPaint=*/true,
+    /*localMaskRaisesAxis=*/false,
+    /*deviceMaskRaisesAxis=*/false,
+    /*rejectsPerspectiveSubset=*/false,
+    /*uvCoordFromMissingMatrix=*/false,
+};
+
+// QuadColorFillShader: the quad-edge-AA fill with no color processors; a coverage draw is either a
+// direct analytic clip (runtime uniforms) or a device-space mask, which raises HAS_MASK_TEXTURE.
+constexpr AOTExecutorRecord kQuadColorRecord = {
+    QuadColorFillShader::Name,
+    GeometryBit(AOTGeometryKind::QuadPerEdgeAA),
+    /*servesAlphaOnly=*/false,
+    AOTRecordColorShape::None,
+    static_cast<uint8_t>(CoverageBit(CoverageKind::AARect) | CoverageBit(CoverageKind::RRect) |
+                         CoverageBit(CoverageKind::DeviceMask)),
+    /*coverageRequiresColorFromPaint=*/false,
+    /*localMaskRaisesAxis=*/false,
+    /*deviceMaskRaisesAxis=*/true,
+    /*rejectsPerspectiveSubset=*/false,
+    /*uvCoordFromMissingMatrix=*/false,
+};
+
+const AOTExecutorRecord* const kRecords[] = {&kQuadTextureRecord, &kSolidColorRecord,
+                                             &kQuadColorRecord};
 
 }  // namespace
 
@@ -65,7 +102,10 @@ std::optional<AOTExecutorInputs> MatchExecutorRecord(const AOTExecutorRecord& re
   if (geometryBit >= 32 || (record.geometryKindMask & (1u << geometryBit)) == 0) {
     return std::nullopt;
   }
-  if (record.colorIsBareTexture && facts.colorFPCount != 1) {
+  if (record.colorShape == AOTRecordColorShape::None && facts.colorFPCount != 0) {
+    return std::nullopt;
+  }
+  if (record.colorShape == AOTRecordColorShape::BareTexture && facts.colorFPCount != 1) {
     return std::nullopt;
   }
   AOTExecutorInputs inputs;
@@ -79,14 +119,18 @@ std::optional<AOTExecutorInputs> MatchExecutorRecord(const AOTExecutorRecord& re
     if ((record.coverageKindMask & coverageBit) == 0) {
       return std::nullopt;
     }
-    inputs.hasLocalMask =
-        record.localMaskRaisesAxis && *facts.coverage == CoverageKind::LocalMask;
+    if (record.coverageRequiresColorFromPaint && !facts.colorFromPaint) {
+      return std::nullopt;
+    }
+    inputs.hasLocalMask = record.localMaskRaisesAxis && *facts.coverage == CoverageKind::LocalMask;
+    inputs.hasMaskTexture =
+        record.deviceMaskRaisesAxis && *facts.coverage == CoverageKind::DeviceMask;
   }
   // The color shape: one bare texture leaf (no operators above it). Without an IR the live sole
   // color processor answers the same question; its sampler count guards a failed instantiation,
   // which the IR's leaf existence already implies.
   bool leafHasPerspective = false;
-  if (record.colorIsBareTexture) {
+  if (record.colorShape == AOTRecordColorShape::BareTexture) {
     if (facts.ir != nullptr) {
       AOTChainBuilder::AOTTextureTailShape tail = {};
       if (!AOTChainBuilder::CollectTextureTail(facts.ir->color, &tail) || !tail.ops.empty() ||
