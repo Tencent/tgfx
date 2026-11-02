@@ -11277,6 +11277,28 @@ TGFX_TEST(AOTRenderConsistencyTest, RecordTimeIRLoweredExactlyOncePerDraw) {
   cache->unload();
 }
 
+// A bare single-source fill computes no device bounds (no clip, no filter, no shader-derived
+// chain), so the old bounds gate skipped its record-time lowering entirely and left the
+// prepare-time path to lower it again. Every draw must carry its record-time IR now.
+TGFX_TEST(AOTRenderConsistencyTest, BareImageDrawIsLoweredAtRecord) {
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+  context->globalCache()->clearPrograms();
+  auto surface = Surface::Make(context, 128, 64);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  ResetAOTLowerDrawCount();
+  canvas->drawImage(image, 0, 0);
+  context->flushAndSubmit(true);
+  EXPECT_EQ(AOTLowerDrawCount(), 1u);
+  cache->unload();
+}
+
 // P4.0's atlas item: an AtlasText draw carries its record-time IR — glyph term included — because
 // the op owns its atlas facts from construction (the prepare-time geometry processor only
 // re-derives them). The count before the flush is the discriminator: an atlas draw used to skip

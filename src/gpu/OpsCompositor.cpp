@@ -1289,17 +1289,16 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
   }
 
   auto cache = context->precompiledShaderCache();
-  if (cache != nullptr && cache->isLoaded() && op->type() != DrawOp::Type::StencilCoverPathDrawOp &&
-      deviceBounds.has_value() && !deviceBounds->isEmpty() &&
-      (!op->colorProcessors().empty() || !op->coverageProcessors().empty())) {
+  if (cache != nullptr && cache->isLoaded() && op->type() != DrawOp::Type::StencilCoverPathDrawOp) {
     // The single record-time lowering: the op's whole expression (colors, coverages, xfer, blend
-    // mode) lands on a DrawIR every later stage converges on. The route below plans from that IR
-    // alone — coverage never folds into the color graph: a multi-pass plan carries the classified
-    // terms on its terminal pass, and a single-pass plan stays on the plain route, coverage
-    // processors attached, for the prepare-time fused walk.
+    // mode) lands on a DrawIR every later stage converges on, so the prepare-time serving never
+    // lowers a second time. Device bounds are a plan-task input only (its offscreen targets need
+    // a size), so a draw without bounds keeps its record-time IR on the plain route — coverage
+    // never folds into the color graph: a multi-pass plan carries the classified terms on its
+    // terminal pass, and a single-pass plan stays on the plain route for the prepare-time walk.
     op->tryLowerIR();
     const bool coverageFree = !op->hasCoverageProcessors();
-    if (cache->decompositionEnabled()) {
+    if (cache->decompositionEnabled() && deviceBounds.has_value() && !deviceBounds->isEmpty()) {
       if (auto* ir = op->loweredIR()) {
         auto plan = AOTRouter::Plan(*ir);
         if (plan.has_value()) {
