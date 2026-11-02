@@ -21,6 +21,7 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/aot/AOTDrawFacts.h"
+#include "gpu/aot/ExecutorRecord.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
@@ -33,19 +34,19 @@ std::optional<MeshFillShader::Inputs> MeshFillShader::Extract(const ProgramInfo*
 
 std::optional<MeshFillShader::Inputs> MeshFillShader::ExtractFacts(
     const AOTDrawFacts& facts, PermutationMatchFailure*) {
-  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
+  // The acceptance is the family's executor record: the mesh geometry, no fragment processors,
+  // and the tex-coord axis from the vertex attributes.
+  auto* record = FindExecutorRecord(Name);
+  if (record == nullptr) {
     return std::nullopt;
   }
-  // The geometry kind IS the contract: MeshDrawOp's processor, no processor-tree walk.
-  if (facts.geometry.kind != AOTGeometryKind::Mesh) {
-    return std::nullopt;
-  }
-  if (facts.fragmentCount != 0) {
+  auto matched = MatchExecutorRecord(*record, facts);
+  if (!matched) {
     return std::nullopt;
   }
   Inputs inputs;
-  inputs.hasTexCoords = facts.geometry.hasTexCoords;
-  inputs.xpType = facts.xpType();
+  inputs.hasTexCoords = matched->hasTexCoords;
+  inputs.xpType = matched->xpType;
   return inputs;
 }
 

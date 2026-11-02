@@ -33,6 +33,7 @@ namespace tgfx {
 struct AOTExecutorInputs {
   bool hasUVCoord = false;
   bool hasSubset = false;
+  bool hasTexCoords = false;
   bool hasLocalMask = false;
   bool hasMaskTexture = false;
   int xpType = XP_UNSUPPORTED;
@@ -88,6 +89,8 @@ struct AOTExecutorRecord {
   /// The uv-coord axis is set when the geometry carries no uv matrix (the vertices then read the
   /// uvCoord attribute instead of a transform).
   bool uvCoordFromMissingMatrix = false;
+  /// The tex-coord axis mirrors the geometry's tex-coord attribute presence (the mesh family).
+  bool texCoordsFromGeometry = false;
 };
 
 /**

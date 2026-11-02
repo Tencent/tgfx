@@ -22,6 +22,7 @@
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/aot/AOTChainBuilder.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/shaders/kernels/MeshFillShader.h"
 #include "gpu/shaders/kernels/QuadColorFillShader.h"
 #include "gpu/shaders/kernels/QuadTextureFillShader.h"
 #include "gpu/shaders/kernels/SolidColorFillShader.h"
@@ -88,8 +89,24 @@ constexpr AOTExecutorRecord kQuadColorRecord = {
     /*uvCoordFromMissingMatrix=*/false,
 };
 
+// MeshFillShader: the triangle mesh with no fragment processors; the tex-coord axis mirrors the
+// vertex attributes, and the per-vertex color is an unconditional attribute.
+constexpr AOTExecutorRecord kMeshRecord = {
+    MeshFillShader::Name,
+    GeometryBit(AOTGeometryKind::Mesh),
+    /*servesAlphaOnly=*/false,
+    AOTRecordColorShape::None,
+    /*coverageKindMask=*/0,
+    /*coverageRequiresColorFromPaint=*/false,
+    /*localMaskRaisesAxis=*/false,
+    /*deviceMaskRaisesAxis=*/false,
+    /*rejectsPerspectiveSubset=*/false,
+    /*uvCoordFromMissingMatrix=*/false,
+    /*texCoordsFromGeometry=*/true,
+};
+
 const AOTExecutorRecord* const kRecords[] = {&kQuadTextureRecord, &kSolidColorRecord,
-                                             &kQuadColorRecord};
+                                             &kQuadColorRecord, &kMeshRecord};
 
 }  // namespace
 
@@ -161,6 +178,7 @@ std::optional<AOTExecutorInputs> MatchExecutorRecord(const AOTExecutorRecord& re
   inputs.hasUVCoord = record.uvCoordFromMissingMatrix ? !facts.geometry.hasUVMatrix
                                                       : facts.geometry.hasUVMatrix;
   inputs.hasSubset = facts.geometry.hasSubset;
+  inputs.hasTexCoords = record.texCoordsFromGeometry && facts.geometry.hasTexCoords;
   if (record.rejectsPerspectiveSubset && inputs.hasSubset &&
       (facts.geometry.hasUVPerspective || leafHasPerspective)) {
     return std::nullopt;
