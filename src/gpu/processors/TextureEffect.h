@@ -106,6 +106,11 @@ class TextureEffect : public FragmentProcessor {
   /** False while the texture is not instantiated (a failed or deferred upload leaves it null). */
   bool isTextureInstantiated() const;
 
+  /** The texture proxy this effect samples; the IR-driven bind matches its leaf by it. */
+  std::shared_ptr<TextureProxy> getTextureProxy() const {
+    return textureProxy;
+  }
+
   bool onBindPrecompiled(ParamWriter* writer) const override;
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 

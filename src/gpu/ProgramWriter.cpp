@@ -29,6 +29,8 @@
 #include "gpu/VertexShaderBuilder.h"
 #include "gpu/aot/AOTChainBuilder.h"
 #include "gpu/aot/Binder.h"
+#include "gpu/aot/EffectGraph.h"
+#include "gpu/processors/TextureEffect.h"
 #include "gpu/resources/RenderTarget.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
 #include "gpu/shaders/modules/DeviceMaskModule.h"
@@ -271,6 +273,27 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
   // its onSetData at the same walk position: the writes land in the same order, and the
   // structural-suffix addressing (Subset / Subset_1) applies to the module writes unchanged.
   ParamWriter paramWriter(fragmentUniformData);
+  // The carried IR was lowered from this very processor tree, so its color graph holds one
+  // plain-texture leaf per TextureEffect the walk below visits. A texture write reads its leaf —
+  // the node's recorded facts plus the view its proxy resolves at bind time — instead of the
+  // live processor: the same source the chain route's binding table reads. Leaves are matched by
+  // proxy identity and consumed once; a walk position without a matching leaf keeps the
+  // processor bind (correct, just not IR-driven).
+  std::vector<const AOTTextureParameters*> textureLeaves = {};
+  const auto* carriedIR = info.getCarriedIR();
+  if (carriedIR != nullptr) {
+    for (size_t index = 0; index < carriedIR->color.nodeCount(); ++index) {
+      const auto* node = carriedIR->color.nodeAt(AOTNodeID(static_cast<uint32_t>(index)));
+      if (node == nullptr || node->kind != AOTEffectKind::TextureSource) {
+        continue;
+      }
+      const auto* leaf = std::get_if<AOTTextureParameters>(&node->parameters);
+      if (leaf != nullptr && leaf->textureProxy != nullptr &&
+          leaf->samplingKind == AOTTextureSamplingKind::Plain) {
+        textureLeaves.push_back(leaf);
+      }
+    }
+  }
   std::unordered_map<std::string, int> classOrdinals;
   for (auto& fragmentProcessor : info.fragmentProcessors) {
     FragmentProcessor::Iter iter(fragmentProcessor);
@@ -286,10 +309,24 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
       if (fragmentUniformData != nullptr) {
         fragmentUniformData->structuralSuffix = structural;
       }
-      if (fp->bindPrecompiled(&paramWriter)) {
-        // The processor's feature module took over its uniform writes.
-      } else {
-        fp->setData(vertexUniformData, fragmentUniformData);
+      bool bound = false;
+      if (IsProcessor<TextureEffect>(fp)) {
+        const auto& proxy = static_cast<const TextureEffect*>(fp)->getTextureProxy();
+        for (auto*& candidate : textureLeaves) {
+          if (candidate != nullptr && candidate->textureProxy == proxy) {
+            BindTextureSourceLeaf(*candidate, &paramWriter);
+            candidate = nullptr;
+            bound = true;
+            break;
+          }
+        }
+      }
+      if (!bound) {
+        if (fp->bindPrecompiled(&paramWriter)) {
+          // The processor's feature module took over its uniform writes.
+        } else {
+          fp->setData(vertexUniformData, fragmentUniformData);
+        }
       }
       fp = iter.next();
     }

@@ -20,10 +20,12 @@
 #include <array>
 #include "gpu/ColorSpaceXformHelper.h"
 #include "gpu/Swizzle.h"
+#include "gpu/YUVColorConversion.h"
 #include "gpu/aot/Binder.h"
 #include "gpu/aot/NodeContract.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/TextureView.h"
+#include "gpu/resources/YUVTextureView.h"
 #include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/modules/ChainParams.h"
 #include "gpu/shaders/modules/ParamWriter.h"
@@ -427,12 +429,15 @@ bool BindingNeedsSubset(const std::shared_ptr<TextureProxy>& proxy, const Textur
   return view->getTexture()->type() == TextureType::External;
 }
 
-void BindingSubsetRect(const AOTBinding& binding, const TextureView* view, float rect[4]) {
-  auto subsetRect = binding.args.sampleArea.value_or(
-      Rect::MakeWH(binding.textureProxy->width(), binding.textureProxy->height()));
-  if (BindingNeedsSubset(binding.textureProxy, view, binding.args.sampleArea)) {
-    if (binding.args.sampling.magFilterMode == binding.args.sampling.minFilterMode &&
-        binding.args.sampling.magFilterMode == FilterMode::Nearest) {
+// The sampler kinds the two callers carry (SamplerState on the IR leaf, SamplingOptions on a
+// chain binding) both spell the filter modes the same way, so one template serves both.
+template <typename Sampling>
+void LeafSubsetRect(const std::shared_ptr<TextureProxy>& proxy, const TextureView* view,
+                    const std::optional<Rect>& subset, const Sampling& sampling, float rect[4]) {
+  auto subsetRect = subset.value_or(Rect::MakeWH(proxy->width(), proxy->height()));
+  if (BindingNeedsSubset(proxy, view, subset)) {
+    if (sampling.magFilterMode == sampling.minFilterMode &&
+        sampling.magFilterMode == FilterMode::Nearest) {
       subsetRect.roundOut();
     }
     auto type = view->getTexture()->type();
@@ -461,6 +466,11 @@ void BindingSubsetRect(const AOTBinding& binding, const TextureView* view, float
     rect[2] = rb.x;
     rect[3] = rb.y;
   }
+}
+
+void BindingSubsetRect(const AOTBinding& binding, const TextureView* view, float rect[4]) {
+  LeafSubsetRect(binding.textureProxy, view, binding.args.sampleArea, binding.args.sampling,
+                 rect);
 }
 
 // The device mask child's writes, replicating GLSLDeviceSpaceTextureEffect::onSetData.
@@ -535,6 +545,41 @@ std::vector<CoordTransform> BuildChainCoordTransforms(const AOTProgram& program)
     transforms.emplace_back(binding.uvMatrix, binding.textureProxy.get(), binding.alphaStart);
   }
   return transforms;
+}
+
+// The IR-driven texture write (declared in Binder.h): the leaf carries the record-time facts,
+// the proxy resolves the instance-time view, and the value gating mirrors
+// TextureSourceModule::Bind field for field — byte-for-byte, because the leaf was lowered from
+// that very processor.
+void BindTextureSourceLeaf(const AOTTextureParameters& leaf, ParamWriter* writer) {
+  auto textureView = leaf.textureProxy != nullptr ? leaf.textureProxy->getTextureView() : nullptr;
+  if (textureView == nullptr) {
+    // The texture is not instantiated (a failed or deferred upload): the processor-side module
+    // bind returns without touching any field in this state, and so does this one.
+    return;
+  }
+  float rect[4] = {};
+  LeafSubsetRect(leaf.textureProxy, textureView.get(), leaf.subset, leaf.samplerState, rect);
+  writer->set(TextureSourceModule::Subset, rect);
+  writer->set(TextureSourceModule::SubsetClampOn,
+              BindingNeedsSubset(leaf.textureProxy, textureView.get(), leaf.subset) ? 1 : 0);
+  if (leaf.hasRGBAAA) {
+    // Value-gated exactly like the module bind: single-plane draws leave the field at its
+    // previous content, which the shader never reads (HasRgbaaa is 0).
+    auto coord = textureView->getTextureCoord(leaf.alphaStart.x, leaf.alphaStart.y);
+    const float alphaStart[2] = {coord.x, coord.y};
+    writer->set(TextureSourceModule::AlphaStart, alphaStart);
+  }
+  writer->set(TextureSourceModule::AlphaOnly, leaf.isAlphaOnly ? 1 : 0);
+  writer->set(TextureSourceModule::HasRgbaaa, leaf.hasRGBAAA ? 1 : 0);
+  if (textureView->isYUV()) {
+    auto* yuvView = static_cast<const YUVTextureView*>(textureView.get());
+    writer->set(TextureSourceModule::YUVLimitedRange,
+                IsLimitedYUVColorRange(yuvView->yuvColorSpace()) ? 1 : 0);
+    if (auto conversion = YUVColorConversionMatrix(yuvView->yuvColorSpace())) {
+      writer->set(TextureSourceModule::Mat3ColorConversion, *conversion);
+    }
+  }
 }
 
 void BindChainBindings(const AOTProgram& program, UniformData* fragmentUniformData) {

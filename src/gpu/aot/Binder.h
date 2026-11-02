@@ -26,6 +26,8 @@
 namespace tgfx {
 
 class UniformData;
+class ParamWriter;
+struct AOTTextureParameters;
 
 // The instruction contract's bind column (NodeContract.h's AOTOpContract): one function per op
 // that writes a per-slot parameter block. The caller writes the packed word and its selector with
@@ -73,6 +75,15 @@ void BindYUVProgram(const AOTProgram& program, UniformData* fragmentUniformData)
  * that walk, so the upload no longer depends on the child processors existing.
  */
 void BindChainBindings(const AOTProgram& program, UniformData* fragmentUniformData);
+
+/**
+ * The IR-driven texture write: the leaf's recorded facts (subset, alphaStart, sampling, flags)
+ * plus the view its proxy resolves at bind time, value-gated exactly like
+ * TextureSourceModule::Bind over the live processor — field for field, because the leaf was
+ * lowered from that very processor. This is the fill route's twin of the chain's binding table:
+ * a draw's texture uploads read the IR, not the processor tree.
+ */
+void BindTextureSourceLeaf(const AOTTextureParameters& leaf, ParamWriter* writer);
 
 /**
  * The coordinate transforms the chain kernel's vertex stage consumes, in the order the geometry
