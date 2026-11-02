@@ -27,6 +27,7 @@
 #include "gpu/aot/AOTProbeCounters.h"
 #include "gpu/aot/AOTRouter.h"
 #include "gpu/aot/DrawIR.h"
+#include "gpu/aot/ChainContext.h"
 #include "gpu/aot/NodeContract.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
@@ -280,50 +281,15 @@ static bool HasShaderTiling(const AOTTextureParameters& parameters) {
           parameters.tiledRecipe->shaderModeY != TiledTextureShaderMode::None);
 }
 
-// The shared state of the chain-layout pipeline (see PlanChainLayout): each stage fills part of it
-// and reads what the earlier stages produced, so no shape rule is ever re-derived.
-struct ChainBuildContext {
-  // Pipeline inputs.
-  const AOTEffectGraph* graph = nullptr;
-  const AOTPassDescriptor* pass = nullptr;
-  // The analytic coverage terms' links, as node IDs in the coverage graph, in chain order; they
-  // are encoded as ordinary slots and rewired onto the clip-coverage channel by stage seven.
-  const std::vector<AOTNodeID>* clipLinks = nullptr;
-  const AOTEffectGraph* coverageGraph = nullptr;
-  AOTNodeID coverageRoot = AOTNodeID();
-  bool coverageLeafFromUVCoord = false;
-  bool checkKernel = false;
-  AOTChainCompile* layout = nullptr;
-  // Stage results, consumed by the later stages.
-  std::vector<const AOTEffectNode*> nodes = {};
-  size_t colorCount = 0;
-  size_t covCount = 0;
-  std::vector<bool> inPass = {};
-  std::vector<size_t> slotOf = {};
-  std::vector<size_t> rawSlotOf = {};
-  std::vector<size_t> ordered = {};
-  std::vector<AOTChainSlot> slots = {};
-  bool hasGradient = false;
-  AOTResourceProfile finalProfile = AOTResourceProfile::Automatic;
-  size_t rootIndex = 0;
-  int coverageRootSlot = -1;
-  int clipCoverageSlot = -1;
-  int clipChainInput = -4;
-  // Stage-three budget counters carried across the per-kind encoders.
-  size_t rectCoverageSlots = 0;
-  size_t localRectCoverageSlots = 0;
-  AOTChainRegisterAssignment assignment = {};
-};
-
 // Maps one op input edge onto its chain register/designator, in the input's own node space.
-static int MapChainOpInput(const ChainBuildContext* ctx, size_t inputBase, AOTNodeID input) {
+static int MapChainOpInput(const AOTChainContext* ctx, size_t inputBase, AOTNodeID input) {
   return MapChainInput(ctx->nodes, ctx->slotOf, inputBase + input.index());
 }
 
 // Stage one: merges the color and coverage node spaces, and admits the pass itself — non-empty
 // with a valid output, every node listed exactly once, and a chain kernel when the caller asked
 // for that check.
-static bool MergeNodeSpaces(ChainBuildContext* ctx) {
+static bool MergeNodeSpaces(AOTChainContext* ctx) {
   const auto& pass = *ctx->pass;
   if (ctx->layout == nullptr || pass.nodes.empty() || !pass.output.isValid() ||
       (ctx->checkKernel && !IsAOTPointwiseDAGKernel(pass.kernel))) {
@@ -367,7 +333,7 @@ static bool MergeNodeSpaces(ChainBuildContext* ctx) {
 // A texture whose input is a computed node (not one of the designators): its sampling needs no
 // computed value, but its modulation must follow the producer, so the node occupies a raw
 // sampling slot in the leading block plus a TEX_MODULATE slot in the op phase.
-static bool HasComputedTextureInput(const ChainBuildContext* ctx, size_t combined) {
+static bool HasComputedTextureInput(const AOTChainContext* ctx, size_t combined) {
   auto* node = ctx->nodes[combined];
   if (node->kind != AOTEffectKind::TextureSource || node->inputs.empty()) {
     return false;
@@ -381,7 +347,7 @@ static bool HasComputedTextureInput(const ChainBuildContext* ctx, size_t combine
   return !IsInputDesignator(inputNode->kind);
 }
 
-static void CollectChainNode(ChainBuildContext* ctx, size_t combined, bool texturePhase) {
+static void CollectChainNode(AOTChainContext* ctx, size_t combined, bool texturePhase) {
   if (ctx->nodes[combined]->kind == AOTEffectKind::TextureSource) {
     if (texturePhase) {
       ctx->rawSlotOf[combined] = ctx->ordered.size();
@@ -407,7 +373,7 @@ static void CollectChainNode(ChainBuildContext* ctx, size_t combined, bool textu
 // Index 0 of the coverage graph is the GeometryCoverage unit, which never becomes a slot.
 // Designator-only input nodes (white / opaque geometry inputs lowered by xfer children) stay out
 // too: their value rides on the input-edge designators, not on a chain slot.
-static void ScheduleChainSlots(ChainBuildContext* ctx) {
+static void ScheduleChainSlots(AOTChainContext* ctx) {
   ctx->slotOf.assign(ctx->nodes.size(), SIZE_MAX);
   // For a computed-input texture node, the leading raw-sampling slot's position (sampler
   // binding); the node's value for consumers is the topologically-ordered TEX_MODULATE slot
@@ -431,12 +397,14 @@ static void ScheduleChainSlots(ChainBuildContext* ctx) {
 
 // Stage three's per-kind encoders: each turns one scheduled node into its chain slot and
 // registers the layout side data it carries (texture leaves, the LUT gradient, the noise source).
-// The dispatch rows are indexed by AOTEffectKind and pinned to the enum's size, so adding a kind
-// means writing one encoder and one row — a missing row fails the build. A null row is a kind that
-// never schedules: the graph roots and the input designators stay out of the ordered set.
-using ChainNodeEncoder = bool (*)(ChainBuildContext* ctx, size_t combined, size_t slotIndex);
+// The contract rows live in NodeContract.cpp, indexed by AOTEffectKind and pinned to the enum's
+// size, so adding a kind means writing one encoder and one row — a missing row fails the build. A
+// null row is a kind that never schedules: the graph roots and the input designators stay out of
+// the ordered set. The encoder bodies stay with the pipeline that owns the context, so they sit
+// outside the anonymous namespace (declared in ChainContext.h).
+}  // namespace
 
-static bool EncodeTextureSourceSlot(ChainBuildContext* ctx, size_t combined, size_t index) {
+bool EncodeTextureSourceSlot(AOTChainContext* ctx, size_t combined, size_t index) {
   auto node = ctx->nodes[combined];
   const size_t inputBase = combined < ctx->colorCount ? 0 : ctx->colorCount;
   auto* layout = ctx->layout;
@@ -531,7 +499,7 @@ static bool EncodeTextureSourceSlot(ChainBuildContext* ctx, size_t combined, siz
   return true;
 }
 
-static bool EncodePerlinNoiseSlot(ChainBuildContext* ctx, size_t combined, size_t index) {
+bool EncodePerlinNoiseSlot(AOTChainContext* ctx, size_t combined, size_t index) {
   auto node = ctx->nodes[combined];
   const size_t inputBase = combined < ctx->colorCount ? 0 : ctx->colorCount;
   auto* layout = ctx->layout;
@@ -547,7 +515,7 @@ static bool EncodePerlinNoiseSlot(ChainBuildContext* ctx, size_t combined, size_
   return true;
 }
 
-static bool EncodeConstColorSlot(ChainBuildContext* ctx, size_t combined, size_t index) {
+bool EncodeConstColorSlot(AOTChainContext* ctx, size_t combined, size_t index) {
   auto node = ctx->nodes[combined];
   const size_t inputBase = combined < ctx->colorCount ? 0 : ctx->colorCount;
   auto& slot = ctx->slots[index];
@@ -561,7 +529,7 @@ static bool EncodeConstColorSlot(ChainBuildContext* ctx, size_t combined, size_t
   return true;
 }
 
-static bool EncodeUnaryPointwiseSlot(ChainBuildContext* ctx, size_t combined, size_t index) {
+bool EncodeUnaryPointwiseSlot(AOTChainContext* ctx, size_t combined, size_t index) {
   auto node = ctx->nodes[combined];
   const size_t inputBase = combined < ctx->colorCount ? 0 : ctx->colorCount;
   auto& slot = ctx->slots[index];
@@ -583,7 +551,7 @@ static bool EncodeUnaryPointwiseSlot(ChainBuildContext* ctx, size_t combined, si
   return true;
 }
 
-static bool EncodeInputOpaqueSlot(ChainBuildContext* ctx, size_t combined, size_t index) {
+bool EncodeInputOpaqueSlot(AOTChainContext* ctx, size_t combined, size_t index) {
   auto node = ctx->nodes[combined];
   const size_t inputBase = combined < ctx->colorCount ? 0 : ctx->colorCount;
   auto& slot = ctx->slots[index];
@@ -595,7 +563,7 @@ static bool EncodeInputOpaqueSlot(ChainBuildContext* ctx, size_t combined, size_
   return true;
 }
 
-static bool EncodeMulAlphaSlot(ChainBuildContext* ctx, size_t combined, size_t index) {
+bool EncodeMulAlphaSlot(AOTChainContext* ctx, size_t combined, size_t index) {
   auto node = ctx->nodes[combined];
   const size_t inputBase = combined < ctx->colorCount ? 0 : ctx->colorCount;
   auto& slot = ctx->slots[index];
@@ -608,7 +576,7 @@ static bool EncodeMulAlphaSlot(ChainBuildContext* ctx, size_t combined, size_t i
   return true;
 }
 
-static bool EncodeBlendSlot(ChainBuildContext* ctx, size_t combined, size_t index) {
+bool EncodeBlendSlot(AOTChainContext* ctx, size_t combined, size_t index) {
   auto node = ctx->nodes[combined];
   const size_t inputBase = combined < ctx->colorCount ? 0 : ctx->colorCount;
   auto& slot = ctx->slots[index];
@@ -628,7 +596,7 @@ static bool EncodeBlendSlot(ChainBuildContext* ctx, size_t combined, size_t inde
   return true;
 }
 
-static bool EncodeRectCoverageSlot(ChainBuildContext* ctx, size_t combined, size_t index) {
+bool EncodeRectCoverageSlot(AOTChainContext* ctx, size_t combined, size_t index) {
   auto node = ctx->nodes[combined];
   const size_t inputBase = combined < ctx->colorCount ? 0 : ctx->colorCount;
   auto& slot = ctx->slots[index];
@@ -658,7 +626,7 @@ static bool EncodeRectCoverageSlot(ChainBuildContext* ctx, size_t combined, size
   return true;
 }
 
-static bool EncodeRRectCoverageSlot(ChainBuildContext* ctx, size_t combined, size_t index) {
+bool EncodeRRectCoverageSlot(AOTChainContext* ctx, size_t combined, size_t index) {
   auto node = ctx->nodes[combined];
   const size_t inputBase = combined < ctx->colorCount ? 0 : ctx->colorCount;
   auto& slot = ctx->slots[index];
@@ -674,7 +642,7 @@ static bool EncodeRRectCoverageSlot(ChainBuildContext* ctx, size_t combined, siz
   return true;
 }
 
-static bool EncodeGradientSlot(ChainBuildContext* ctx, size_t combined, size_t index) {
+bool EncodeGradientSlot(AOTChainContext* ctx, size_t combined, size_t index) {
   auto node = ctx->nodes[combined];
   const size_t inputBase = combined < ctx->colorCount ? 0 : ctx->colorCount;
   auto* layout = ctx->layout;
@@ -702,34 +670,10 @@ static bool EncodeGradientSlot(ChainBuildContext* ctx, size_t combined, size_t i
   return true;
 }
 
-static constexpr ChainNodeEncoder ChainEncoders[] = {
-    nullptr,                   // GeometryColor (graph root, never scheduled)
-    EncodeTextureSourceSlot,   // TextureSource
-    EncodeUnaryPointwiseSlot,  // ColorMatrix
-    EncodeUnaryPointwiseSlot,  // Luma
-    EncodeUnaryPointwiseSlot,  // AlphaThreshold
-    EncodeUnaryPointwiseSlot,  // ColorSpaceXform
-    EncodeConstColorSlot,      // ConstColor
-    EncodeBlendSlot,           // Blend
-    EncodePerlinNoiseSlot,     // PerlinNoiseSource
-    EncodeRectCoverageSlot,    // RectCoverage
-    EncodeGradientSlot,        // GradientSource
-    EncodeRRectCoverageSlot,   // RRectCoverage
-    nullptr,                   // GeometryCoverage (graph root, never scheduled)
-    nullptr,                   // GeometryColorOpaqueInput (designator, never scheduled)
-    nullptr,                   // GeometryWhiteInput (designator, never scheduled)
-    EncodeInputOpaqueSlot,     // InputOpaque
-    EncodeMulAlphaSlot,        // MulAlpha
-};
-static_assert(sizeof(ChainEncoders) / sizeof(ChainEncoders[0]) == 17,
-              "every AOTEffectKind needs one encoder row");
-
 // Stage four's per-kind resource demand: a kind that consumes kernel resources adds its demand,
 // every other kind adds none. The noise demand is counted from the layout's noise record instead
 // (the layout owns it after stage three), so its row is null.
-using ChainNodeDemandFn = void (*)(const AOTEffectNode* node, AOTResourceDemand* demand);
-
-static void DemandTextureSource(const AOTEffectNode* node, AOTResourceDemand* demand) {
+void DemandTextureSource(const AOTEffectNode* node, AOTResourceDemand* demand) {
   auto* texture = std::get_if<AOTTextureParameters>(&node->parameters);
   if (texture == nullptr) {
     return;
@@ -740,7 +684,7 @@ static void DemandTextureSource(const AOTEffectNode* node, AOTResourceDemand* de
   }
 }
 
-static void DemandGradientSource(const AOTEffectNode* node, AOTResourceDemand* demand) {
+void DemandGradientSource(const AOTEffectNode* node, AOTResourceDemand* demand) {
   auto* gradient = std::get_if<AOTGradientParameters>(&node->parameters);
   if (gradient == nullptr) {
     return;
@@ -751,33 +695,13 @@ static void DemandGradientSource(const AOTEffectNode* node, AOTResourceDemand* d
   }
 }
 
-static constexpr ChainNodeDemandFn ChainDemands[] = {
-    nullptr,               // GeometryColor
-    DemandTextureSource,   // TextureSource
-    nullptr,               // ColorMatrix
-    nullptr,               // Luma
-    nullptr,               // AlphaThreshold
-    nullptr,               // ColorSpaceXform
-    nullptr,               // ConstColor
-    nullptr,               // Blend
-    nullptr,               // PerlinNoiseSource (counted from the layout's noise record)
-    nullptr,               // RectCoverage
-    DemandGradientSource,  // GradientSource
-    nullptr,               // RRectCoverage
-    nullptr,               // GeometryCoverage
-    nullptr,               // GeometryColorOpaqueInput
-    nullptr,               // GeometryWhiteInput
-    nullptr,               // InputOpaque
-    nullptr,               // MulAlpha
-};
-static_assert(sizeof(ChainDemands) / sizeof(ChainDemands[0]) == 17,
-              "every AOTEffectKind needs one demand row");
+namespace {
 
 // Stage three: encodes every scheduled node into its chain slot (the per-kind op, its parameter
 // block, and its mapped input registers), collecting the texture leaves, the LUT gradient and the
 // noise source into the layout along the way. Per-kind budgets that need no cross-node state are
 // enforced by the encoders (the rect/rrect coverage capacities, the single gradient).
-static bool EncodeChainSlots(ChainBuildContext* ctx) {
+static bool EncodeChainSlots(AOTChainContext* ctx) {
   auto* layout = ctx->layout;
   ctx->slots.assign(ctx->ordered.size(), AOTChainSlot{});
   ctx->rectCoverageSlots = 0;
@@ -801,7 +725,7 @@ static bool EncodeChainSlots(ChainBuildContext* ctx) {
         return false;
       }
     }
-    auto encoder = ChainEncoders[static_cast<size_t>(node->kind)];
+    auto encoder = NodeContractOf(node->kind).encode;
     if (encoder == nullptr || !encoder(ctx, combined, index)) {
       return false;
     }
@@ -818,7 +742,7 @@ static bool EncodeChainSlots(ChainBuildContext* ctx) {
 
 // Stage four: the pass's resource demand picks the final profile, the family's cross-slot
 // constraints close over it, and the pass output's slot becomes the chain's root.
-static bool ResolveFinalChainProfile(ChainBuildContext* ctx) {
+static bool ResolveFinalChainProfile(AOTChainContext* ctx) {
   auto* layout = ctx->layout;
   // The pass kernel and its declared profile describe the color pass alone; the draw's coverage
   // may only raise the final profile (a coverage gradient or a third tiled leaf moves a Chain pass
@@ -826,7 +750,7 @@ static bool ResolveFinalChainProfile(ChainBuildContext* ctx) {
   AOTResourceDemand colorDemand = {};
   for (auto nodeID : ctx->pass->nodes) {
     const auto* node = ctx->nodes[nodeID.index()];
-    auto demand = ChainDemands[static_cast<size_t>(node->kind)];
+    auto demand = NodeContractOf(node->kind).demand;
     if (demand != nullptr) {
       demand(node, &colorDemand);
     }
@@ -872,7 +796,7 @@ static bool ResolveFinalChainProfile(ChainBuildContext* ctx) {
 // subtree: the scalar coverage commutes with the pointwise blend result, so the product matches
 // the runtime chain order (verified differentially). Two-child blends keep the plain route rather
 // than risking a wrong value when the GP coverage is below 1.0.
-static bool ResolveCoverageRoot(ChainBuildContext* ctx) {
+static bool ResolveCoverageRoot(AOTChainContext* ctx) {
   // A coverage graph without a valid root carries only analytic clip links: no coverage subtree
   // exists (the links ride the clip channel), so there is nothing to resolve here.
   if (ctx->coverageGraph == nullptr || !ctx->coverageRoot.isValid()) {
@@ -950,7 +874,7 @@ static bool ResolveCoverageRoot(ChainBuildContext* ctx) {
 // chaining them from the coverage unit (-3) squared the GP coverage. The links were encoded as
 // ordinary slots by stage three; this only rewires their inputs, in chain order, and the color
 // root stays the pre-clip result.
-static void RouteAnalyticChains(ChainBuildContext* ctx) {
+static void RouteAnalyticChains(AOTChainContext* ctx) {
   if (ctx->clipLinks == nullptr) {
     return;
   }
@@ -969,7 +893,7 @@ static void RouteAnalyticChains(ChainBuildContext* ctx) {
 // pass rewrites every reference into the kernel's recycled chainResults registers, so the
 // per-profile instruction budget (16 for Chain and gradient, 32 for noise) and the live-result
 // budget (MaxChainRegisters) are independent. A DAG exceeding the register budget is refused here.
-static bool AssignChainRegisters(ChainBuildContext* ctx) {
+static bool AssignChainRegisters(AOTChainContext* ctx) {
   if (ctx->slots.size() > MaxChainSlots) {
     return false;
   }
@@ -1003,7 +927,7 @@ static bool AssignChainRegisters(ChainBuildContext* ctx) {
 
 // Stage nine: the slot rules and the final profile's capacities decide last, on the exact
 // instruction array the compile hands to AOTChainBuilder::ValidateSlots.
-static bool FinalizeChainLayout(ChainBuildContext* ctx) {
+static bool FinalizeChainLayout(AOTChainContext* ctx) {
   auto* layout = ctx->layout;
   std::vector<int> tiledLeafIndices = {};
   for (const auto& tiled : layout->program.tiledLeaves) {
@@ -1037,7 +961,7 @@ static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor
                             const AOTEffectGraph* coverageGraph, AOTNodeID coverageRoot,
                             bool coverageLeafFromUVCoord, const std::vector<AOTNodeID>& clipLinks,
                             bool checkKernel, AOTChainCompile* layout) {
-  ChainBuildContext ctx = {};
+  AOTChainContext ctx = {};
   ctx.graph = &graph;
   ctx.pass = &pass;
   ctx.coverageGraph = coverageGraph;

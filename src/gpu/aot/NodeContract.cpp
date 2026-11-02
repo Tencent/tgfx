@@ -9,50 +9,108 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions and
-//  limitations under the license.
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. See the License for the specific language governing permissions
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/NodeContract.h"
+#include "gpu/aot/ChainContext.h"
 
 namespace tgfx {
 namespace {
 
-// One row per AOTEffectKind, in enum order. The static_assert pins the row count to the enum, so
-// adding a kind without adding a row fails the build instead of silently reading a stale row.
-constexpr AOTKindTraits KindTraits[] = {
-    {false, true, false, false},  // GeometryColor (graph root, designator)
-    {true, false, false, true},   // TextureSource
-    {true, false, true, false},   // ColorMatrix
-    {true, false, true, false},   // Luma
-    {true, false, true, false},   // AlphaThreshold
-    {true, false, true, false},   // ColorSpaceXform
-    {true, false, false, false},  // ConstColor
-    {true, false, false, false},  // Blend
-    {true, false, false, true},   // PerlinNoiseSource
-    {true, false, false, false},  // RectCoverage
-    {true, false, false, true},   // GradientSource
-    {true, false, false, false},  // RRectCoverage
-    {false, true, false, false},  // GeometryCoverage (graph root, designator)
-    {true, true, false, false},   // GeometryColorOpaqueInput
-    {true, true, false, false},   // GeometryWhiteInput
-    {true, false, false, false},  // InputOpaque
-    {true, false, false, false},  // MulAlpha
+// One row per AOTEffectKind, in enum order: the kind's traits, its encoder and its resource
+// demand. The row count assert pins the table to the enum, so adding a kind without adding a row
+// fails the build instead of silently reading a stale row; the second assert pins the directional
+// rule that a fusable kind must actually be encodable (the "forgot the encoder" failure would
+// otherwise surface at runtime as a silent route fallback).
+constexpr AOTNodeContract KindContracts[] = {
+    // GeometryColor (graph root, designator): never scheduled.
+    {{false, true, false, false}, nullptr, nullptr},
+    {{true, false, false, true}, EncodeTextureSourceSlot, DemandTextureSource},
+    {{true, false, true, false}, EncodeUnaryPointwiseSlot, nullptr},  // ColorMatrix
+    {{true, false, true, false}, EncodeUnaryPointwiseSlot, nullptr},  // Luma
+    {{true, false, true, false}, EncodeUnaryPointwiseSlot, nullptr},  // AlphaThreshold
+    {{true, false, true, false}, EncodeUnaryPointwiseSlot, nullptr},  // ColorSpaceXform
+    {{true, false, false, false}, EncodeConstColorSlot, nullptr},
+    {{true, false, false, false}, EncodeBlendSlot, nullptr},
+    // The noise demand is counted from the layout's noise record instead (the layout owns it
+    // after stage three), so the row carries no demand.
+    {{true, false, false, true}, EncodePerlinNoiseSlot, nullptr},
+    {{true, false, false, false}, EncodeRectCoverageSlot, nullptr},
+    {{true, false, false, true}, EncodeGradientSlot, DemandGradientSource},
+    {{true, false, false, false}, EncodeRRectCoverageSlot, nullptr},
+    // GeometryCoverage (graph root, designator): never scheduled.
+    {{false, true, false, false}, nullptr, nullptr},
+    {{true, true, false, false}, nullptr, nullptr},  // GeometryColorOpaqueInput
+    {{true, true, false, false}, nullptr, nullptr},  // GeometryWhiteInput
+    {{true, false, false, false}, EncodeInputOpaqueSlot, nullptr},
+    {{true, false, false, false}, EncodeMulAlphaSlot, nullptr},
 };
 
-constexpr size_t KindTraitsCount = sizeof(KindTraits) / sizeof(AOTKindTraits);
-static_assert(KindTraitsCount == 17,
-              "every AOTEffectKind needs exactly one traits row in KindTraits");
+constexpr size_t KindContractCount = sizeof(KindContracts) / sizeof(AOTNodeContract);
+static_assert(KindContractCount == 17,
+              "every AOTEffectKind needs exactly one contract row in KindContracts");
+
+constexpr bool EveryFusableKindIsEncodable() {
+  for (const auto& row : KindContracts) {
+    // The designators are fusable (they may appear inside a fused pass as inputs) but never
+    // scheduled, so they are the only fusable rows allowed to leave the encoder null.
+    if (row.traits.chainFusable && !row.traits.inputDesignator && row.encode == nullptr) {
+      return false;
+    }
+  }
+  return true;
+}
+static_assert(EveryFusableKindIsEncodable(),
+              "a scheduled kind must have an encoder; the graph roots and the designators are "
+              "the only rows allowed to leave it null");
+
+// One row per AOTChainOp, in the op ABI value order (Op::* in KernelContract.h): the instruction's
+// uniform write. A separate table on purpose — the instruction vocabulary and the node vocabulary
+// are not one-to-one (see the header).
+constexpr AOTOpContract OpContracts[] = {
+    {},  // ColorMatrix (0)
+    {},  // Luma (1)
+    {},  // AlphaThreshold (2)
+    {},  // ColorSpaceXform (3)
+    {},  // None (4, the inactive-slot marker)
+    {},  // Texture (5)
+    {},  // ConstColor (6)
+    {},  // Blend (7)
+    {},  // AARectCoverage (8)
+    {},  // Gradient (9)
+    {},  // LocalRectCoverage (10)
+    {},  // RRectCoverage (11)
+    {},  // TexModulate (12, synthesized by the texture encoder)
+    {},  // InputOpaque (13)
+    {},  // MulAlpha (14)
+    {},  // PerlinNoise (15)
+};
+
+constexpr size_t OpContractCount = sizeof(OpContracts) / sizeof(AOTOpContract);
+static_assert(OpContractCount == 16,
+              "every AOTChainOp needs exactly one contract row in OpContracts");
 
 }  // namespace
 
-const AOTKindTraits& TraitsOf(AOTEffectKind kind) {
-  static constexpr AOTKindTraits fallback = {};
+const AOTNodeContract& NodeContractOf(AOTEffectKind kind) {
+  static constexpr AOTNodeContract fallback = {};
   auto index = static_cast<size_t>(kind);
-  return index < KindTraitsCount ? KindTraits[index] : fallback;
+  return index < KindContractCount ? KindContracts[index] : fallback;
+}
+
+const AOTOpContract& OpContractOf(AOTChainOp op) {
+  static constexpr AOTOpContract fallback = {};
+  auto index = static_cast<size_t>(op);
+  return index < OpContractCount ? OpContracts[index] : fallback;
+}
+
+const AOTKindTraits& TraitsOf(AOTEffectKind kind) {
+  return NodeContractOf(kind).traits;
 }
 
 }  // namespace tgfx

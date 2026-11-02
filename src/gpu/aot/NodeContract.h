@@ -19,8 +19,13 @@
 #pragma once
 
 #include "gpu/aot/EffectGraph.h"
+#include "gpu/aot/Program.h"
 
 namespace tgfx {
+
+struct AOTChainContext;
+struct AOTResourceDemand;
+class UniformData;
 
 /**
  * Static facts about one AOTEffectKind. Every call site that used to switch or if-chain over node
@@ -41,6 +46,46 @@ struct AOTKindTraits {
   /// coordToLocal (or deviceLeafRemap for a device-sampled texture).
   bool remapsLocalCoords = false;
 };
+
+// The contract implementations' signatures. A kind's encoder turns one scheduled node into its
+// chain slot(s) (0..2 — a computed-input texture emits the raw sample plus a modulate, so the
+// kind-to-op mapping is the encoder's business, never the table's); its demand adds the node's
+// resource demand to the tally.
+using AOTNodeEncoder = bool (*)(AOTChainContext* ctx, size_t combined, size_t slotIndex);
+using AOTNodeDemand = void (*)(const AOTEffectNode* node, AOTResourceDemand* demand);
+/// One chain instruction's uniform write. The packed selector stays with the caller's dialect
+/// (the chain encodes registers, the YUV tail encodes the op's small value), so the table carries
+/// only the parameter block.
+using AOTOpBinder = void (*)(UniformData* uniformData, size_t index, const AOTChainSlot& slot);
+
+/**
+ * One contract row of the expression vocabulary (indexed by AOTEffectKind): the kind's traits,
+ * its encoder and its resource demand. This table and AOTOpContract are the whole of a kind's
+ * AOT contract — a new kind adds one row here, and the directional asserts in NodeContract.cpp
+ * fail the build when a fusable kind has no encoder.
+ */
+struct AOTNodeContract {
+  AOTKindTraits traits = {};
+  AOTNodeEncoder encode = nullptr;
+  AOTNodeDemand demand = nullptr;
+};
+
+/**
+ * One contract row of the instruction vocabulary (indexed by AOTChainOp). Deliberately a second
+ * table: the two vocabularies are not one-to-one — five kinds never emit an instruction (the
+ * graph roots and the designators), and two instructions have no node of their own (None is the
+ * inactive-slot marker, TexModulate is synthesized by the texture encoder). Sharing one row count
+ * would be a false invariant, so each table is pinned to its own enum.
+ */
+struct AOTOpContract {
+  AOTOpBinder bind = nullptr;
+};
+
+/** Returns the contract row of one node kind; the table is the single place its facts live. */
+const AOTNodeContract& NodeContractOf(AOTEffectKind kind);
+
+/** Returns the contract row of one chain instruction. */
+const AOTOpContract& OpContractOf(AOTChainOp op);
 
 /** Returns the traits row of one kind; the table is the single place a kind's facts live. */
 const AOTKindTraits& TraitsOf(AOTEffectKind kind);
