@@ -86,6 +86,20 @@ inline std::optional<ShaderProfile> ParseProfileTag(std::string_view tag) {
 }
 
 /**
+ * The single profile that serves a context: an ES-standard OpenGL context consumes the opengles
+ * bundle even though its backend enum is OpenGL, and every other context consumes its backend's
+ * profile. The bundle loader accepts exactly this profile, so a bundle built for the other GL
+ * dialect is rejected at load time instead of being loaded and then having every draw refused at
+ * match time.
+ */
+inline ShaderProfile RequiredProfile(ShaderProfile backendProfile, bool esProfileContext) {
+  if (backendProfile == ShaderProfile::OpenGL && esProfileContext) {
+    return ShaderProfile::OpenGLES;
+  }
+  return backendProfile;
+}
+
+/**
  * Returns true when draws on this profile can read the destination color through framebuffer
  * fetch, which is what the variants with the framebuffer fetch dst kind (HAS_XP == 2) use.
  * The bundle of a profile without it does not contain those variants: the runtime can never

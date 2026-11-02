@@ -657,18 +657,23 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   // is a property of the context rather than the backend enum, so a cache without a context
   // (standalone parsing) leaves the expected profile unspecified and accepts either GL tag,
   // mirroring the unspecified-identity skip below.
-  bool esProfileContext = _backend == Backend::OpenGL && _context != nullptr &&
-                          ResolveGLShaderProfile(_context->shaderCaps()->usesPrecisionModifiers) ==
-                              ShaderProfile::OpenGLES;
-  bool profileUnspecified = _backend == Backend::OpenGL && _context == nullptr;
-  bool tagAccepted = profileUnspecified ||
-                     (expectedProfile && profileTag == ProfileTag(*expectedProfile)) ||
-                     (esProfileContext && profileTag == ProfileTag(ShaderProfile::OpenGLES));
-  if (expectedProfile && !tagAccepted) {
+  const bool esProfileContext =
+      _backend == Backend::OpenGL && _context != nullptr &&
+      ResolveGLShaderProfile(_context->shaderCaps()->usesPrecisionModifiers) ==
+          ShaderProfile::OpenGLES;
+  const bool profileUnspecified = _backend == Backend::OpenGL && _context == nullptr;
+  // Exactly one profile serves a context: accepting the other GL tag here would load a bundle
+  // every draw is then refused against at match time, which is a silent full-frame loss.
+  const std::optional<ShaderProfile> requiredProfile =
+      profileUnspecified || !expectedProfile
+          ? std::nullopt
+          : std::optional<ShaderProfile>(RequiredProfile(*expectedProfile, esProfileContext));
+  const bool tagAccepted = !requiredProfile || profileTag == ProfileTag(*requiredProfile);
+  if (requiredProfile && !tagAccepted) {
     LOGE(
         "PrecompiledShaderCache: Bundle profile tag '%s' does not match the running backend "
         "(expected '%s')",
-        profileTag.c_str(), ProfileTag(*expectedProfile));
+        profileTag.c_str(), ProfileTag(*requiredProfile));
     return false;
   }
 

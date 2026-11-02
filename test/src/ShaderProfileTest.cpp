@@ -94,4 +94,15 @@ TGFX_TEST(ShaderProfileTest, OpenGLProfileFollowsPrecisionModifiers) {
   EXPECT_EQ(ResolveGLShaderProfile(false), ShaderProfile::OpenGL);
 }
 
+// A context is served by exactly one bundle profile: an ES context must never accept the desktop
+// bundle, because loading it makes every draw fail the match-time GL gate (a silent black frame).
+TGFX_TEST(ShaderProfileTest, RequiredProfileFollowsTheContext) {
+  EXPECT_EQ(RequiredProfile(ShaderProfile::OpenGL, true), ShaderProfile::OpenGLES);
+  EXPECT_EQ(RequiredProfile(ShaderProfile::OpenGL, false), ShaderProfile::OpenGL);
+  EXPECT_EQ(RequiredProfile(ShaderProfile::Metal, true), ShaderProfile::Metal);
+  EXPECT_EQ(RequiredProfile(ShaderProfile::Vulkan, false), ShaderProfile::Vulkan);
+  // The tag of the rejected bundle is not the required one.
+  EXPECT_STRNE(ProfileTag(RequiredProfile(ShaderProfile::OpenGL, true)), "opengl");
+}
+
 }  // namespace tgfx
