@@ -332,14 +332,6 @@ if (TGFX_BUILD_SVG OR TGFX_BUILD_PDF OR ANDROID)
     endif ()
 endif ()
 
-if (WEB)
-    # PrecompiledShaderCache.cpp includes zlib.h unconditionally (it inflates the legacy zlib data
-    # pools of older bundles), whether or not bundles are embedded. Android, iOS and OHOS get the
-    # header from their SDK and the desktop platforms through PNG, but a Web build that does not
-    # decode PNG has neither, and failed to compile with "'zlib.h' file not found".
-    set(TGFX_USE_ZLIB ON)
-endif ()
-
 if (TGFX_USE_ZLIB)
     list(APPEND TGFX_STATIC_VENDORS zlib)
     list(APPEND TGFX_INCLUDES third_party/out/zlib/${INCLUDE_ENTRY})
@@ -896,7 +888,7 @@ endif ()
 # into libtgfx. It is independent of TGFX_BUILD_TESTS so that production builds also benefit
 # from precompiled shaders. Set TGFX_EMBED_SHADER_BUNDLES=OFF to disable embedding entirely.
 # The D3D12 backend has no precompiled shader support (ExpectedProfileTag in
-# src/gpu/PrecompiledBundleIdentity.h has no tag for it, so a bundle could never be loaded), and
+# src/gpu/ShaderBundleContract.h has no tag for it, so a bundle could never be loaded), and
 # its builds used to generate and embed an OpenGL bundle that no D3D12 context can use. Skip the
 # whole section for it: no tool build, no generation, nothing embedded. Contexts report the
 # resulting runtime fallbacks as NoBundleForBackend.
@@ -1053,11 +1045,11 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
     # The toolchain ABI constant rides in a regular header outside the shader directory; a bump
     # changes what the writer stamps into every bundle, so it must trigger a rebuild like a
     # shader-source change (otherwise the bundles keep the old ABI and the runtime rejects them).
-    # The binding layout header joins it for the same reason: the templates get their layout
-    # values injected from it, so a value change must rebuild every bundle.
+    # The contract header joins it for the same reason: it carries the ABI constant and the
+    # binding layout the templates get their values injected from, so a change to either must
+    # rebuild every bundle.
     list(APPEND TGFX_SHADER_SOURCES
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/PrecompiledBundleIdentity.h"
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/ShaderBindingLayout.h")
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/ShaderBundleContract.h")
     if (TGFX_SHADER_BUNDLES_PREBUILT)
         # This build does not generate bundles; it consumes the ones published under
         # resources/shaders/ (see the reasons above). Publish them from a build that can generate
@@ -1066,7 +1058,7 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
                 "(${TGFX_PREBUILT_REASON})")
         # A published bundle whose toolchain ABI drifted from the code is refused by the runtime
         # loader at draw time — too late to act on. Check each bundle's ABI against the constant
-        # in PrecompiledBundleIdentity.h here, so a forgotten republish warns at every configure
+        # in ShaderBundleContract.h here, so a forgotten republish warns at every configure
         # of a consuming build (the CI verify script catches the same drift only after the push).
         include("${CMAKE_CURRENT_SOURCE_DIR}/tools/shader_build_tool/PublishedBundleCheck.cmake")
         set(TGFX_PREBUILT_BUNDLE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders")
@@ -1084,7 +1076,7 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
                         "it in.")
             endif ()
             tgfx_check_published_bundle_abi("${PREBUILT_BUNDLE}"
-                    "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/PrecompiledBundleIdentity.h")
+                    "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/ShaderBundleContract.h")
             list(APPEND TGFX_PREBUILT_BUNDLE_FILES "${PREBUILT_BUNDLE}")
             list(APPEND TGFX_COPY_BUNDLE_COMMANDS
                     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PREBUILT_BUNDLE}"

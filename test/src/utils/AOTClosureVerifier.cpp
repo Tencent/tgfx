@@ -18,7 +18,7 @@
 
 #include "utils/AOTClosureVerifier.h"
 #include <set>
-#include "gpu/ShaderKeyHash.h"
+#include "gpu/ShaderBundleContract.h"
 #include "gpu/shaders/PrecompiledShader.h"
 
 namespace tgfx {

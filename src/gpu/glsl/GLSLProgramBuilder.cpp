@@ -220,6 +220,7 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
   for (const auto& sampler : _uniformHandler.getSamplers()) {
     descriptor.layout.textureSamplers.emplace_back(sampler.name(), textureBinding++);
   }
+#if DEBUG
   // Diagnostics: when TGFX_SHADER_DUMP_DIR is set, dump the final runtime-generated GLSL, uniform
   // blocks (inline in the GLSL), and sampler binding order so a handwritten AOT shader can be
   // diffed against the runtime source. No behavior change when the variable is unset.
@@ -238,6 +239,7 @@ std::shared_ptr<Program> GLSLProgramBuilder::finalize() {
       }
     }
   }
+#endif
   // Although the vertexProvider constructs the rectangle in a counterclockwise order, the model
   // uses a coordinate system with the Y-axis pointing downward, which is opposite to OpenGL's
   // default Y-axis direction (upward). Therefore, it is necessary to define the clockwise

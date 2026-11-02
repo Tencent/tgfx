@@ -119,11 +119,7 @@ const std::set<std::string>& AllowedRuntimeHeaders() {
   static const std::set<std::string> allowed = {
       // contract layer
       "gpu/aot/AOTResourceProfile.h",
-      "gpu/BundleFormat.h",
-      "gpu/PrecompiledBundleIdentity.h",
-      "gpu/ShaderBindingLayout.h",
-      "gpu/ShaderKeyHash.h",
-      "gpu/ShaderProfile.h",
+      "gpu/ShaderBundleContract.h",
       "gpu/Uniform.h",
       "gpu/shaders/KernelContract.h",
       // declaration layer
@@ -144,11 +140,7 @@ const std::set<std::string>& GeneratedHeaders() {
 const std::vector<std::string>& ContractHeaders() {
   static const std::vector<std::string> headers = {
       "gpu/aot/AOTResourceProfile.h",
-      "gpu/BundleFormat.h",
-      "gpu/PrecompiledBundleIdentity.h",
-      "gpu/ShaderBindingLayout.h",
-      "gpu/ShaderKeyHash.h",
-      "gpu/ShaderProfile.h",
+      "gpu/ShaderBundleContract.h",
       "gpu/Uniform.h",
       "gpu/shaders/KernelContract.h",
   };
@@ -286,7 +278,7 @@ TEST(LayeringTest, ContractHeadersIncludeOnlyTheStandardLibraryAndEachOther) {
 
 TEST(LayeringTest, ContractHeadersAreNotRuntimeClasses) {
   // UniformData is a runtime class that happens to share a name prefix with a contract header;
-  // the binding layout lives in ShaderBindingLayout.h exactly so the tool never needs UniformData.
+  // the binding layout lives in ShaderBundleContract.h exactly so the tool never needs UniformData.
   for (const auto& header : ContractHeaders()) {
     EXPECT_EQ(header.find("UniformData"), std::string::npos) << header;
   }
@@ -300,7 +292,7 @@ TEST(LayeringTest, ContractHeadersAreNotRuntimeClasses) {
 }
 
 TEST(LayeringTest, TheRuntimeOnlyProfileResolverIsNotUsedByTheTool) {
-  // ShaderProfileResolver.h depends on the runtime Backend type. The tool uses ShaderProfile.h.
+  // ShaderProfileResolver.h depends on the runtime Backend type. The tool uses ShaderBundleContract.h.
   for (const auto& file : FilesIn(ToolDir(), {".cpp", ".h"})) {
     for (const auto& include : IncludesOf(file)) {
       EXPECT_NE(include.target, "gpu/ShaderProfileResolver.h") << NameOf(file);

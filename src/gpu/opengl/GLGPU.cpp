@@ -225,7 +225,11 @@ std::shared_ptr<ShaderModule> GLGPU::createShaderModule(const ShaderModuleDescri
   }
   // TGFX_JIT_DUMP_DIR saves every runtime-generated shader source for A/B diffs against the
   // precompiled artifacts. Diagnostic only; read once per process.
+#if DEBUG
   static const char* jitDumpDir = std::getenv("TGFX_JIT_DUMP_DIR");
+#else
+  const char* jitDumpDir = nullptr;
+#endif
   if (jitDumpDir != nullptr) {
     static std::atomic<uint32_t> jitShaderCounter{0};
     auto index = jitShaderCounter.fetch_add(1);

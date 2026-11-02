@@ -31,7 +31,7 @@
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProgramSignature.h"
 #include "gpu/ProgramWriter.h"
-#include "gpu/ShaderKeyHash.h"
+#include "gpu/ShaderBundleContract.h"
 #include "gpu/UniformData.h"
 #include "gpu/aot/AOTEffectDecomposer.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
@@ -485,7 +485,11 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
         {std::string(FragmentUniformBlockName), static_cast<unsigned>(FRAGMENT_UBO_BINDING_POINT)}};
   }
 
+#if DEBUG
   static const char* dumpDir = std::getenv("TGFX_AOT_DUMP_DIR");
+#else
+  const char* dumpDir = nullptr;
+#endif
   if (dumpDir != nullptr) {
     std::string base = std::string(dumpDir) + "/" + matchResult->shaderName + "_v" +
                        std::to_string(matchResult->vertPermutationIndex) + "_f" +

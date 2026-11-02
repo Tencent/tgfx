@@ -22,7 +22,7 @@
 #include <string>
 #include <vector>
 #include "core/ShaderSources.h"
-#include "gpu/ShaderProfile.h"
+#include "gpu/ShaderBundleContract.h"
 
 namespace tgfx {
 

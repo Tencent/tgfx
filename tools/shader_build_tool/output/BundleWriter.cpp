@@ -26,10 +26,7 @@
 #include <utility>
 #include "output/OutputFile.h"
 #include "core/DiagnosticCodes.h"
-#include "gpu/BundleFormat.h"
-#include "gpu/PrecompiledBundleIdentity.h"
-#include "gpu/ShaderKeyHash.h"
-#include "zlib.h"
+#include "gpu/ShaderBundleContract.h"
 #include "zstd.h"
 
 namespace tgfx {
@@ -117,7 +114,7 @@ struct PoolEntry {
   uint32_t reflOffset = 0;
 };
 
-// The header and pool entry layout is defined in gpu/BundleFormat.h, shared with the verifier and
+// The header and pool entry layout is defined in gpu/ShaderBundleContract.h, shared with the verifier and
 // the runtime loader. The header is written field by field in that order, and WriteBundle checks
 // the written size against BundleFormat::HeaderSize.
 

@@ -23,7 +23,7 @@
 #include <set>
 #include <sstream>
 #include "core/DiagnosticCodes.h"
-#include "gpu/ShaderKeyHash.h"
+#include "gpu/ShaderBundleContract.h"
 
 namespace tgfx {
 

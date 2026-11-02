@@ -19,13 +19,13 @@
 #pragma once
 
 #include <optional>
-#include "gpu/ShaderProfile.h"
+#include "gpu/ShaderBundleContract.h"
 #include "tgfx/gpu/Backend.h"
 
 namespace tgfx {
 
 // Maps the runtime to the shader profile of the bundle it consumes. This is the runtime side of
-// ShaderProfile.h and depends on the Backend type, so shader_build_tool does not include it.
+// ShaderBundleContract.h and depends on the Backend type, so shader_build_tool does not include it.
 //
 // The mapping from a Backend to a profile is not one to one for OpenGL. The profile of a GL
 // context is a property of the context rather than of the backend enum, so it is resolved from

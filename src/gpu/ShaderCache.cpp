@@ -20,7 +20,6 @@
 #include <cstdlib>
 #include "core/utils/Log.h"
 #include "core/utils/MD5.h"
-#include "gpu/PipelineStore.h"
 #include "tgfx/core/Clock.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/GPU.h"
@@ -164,16 +163,6 @@ ShaderModuleKey MakeShaderModuleKey(const std::string& encoded) {
   return key;
 }
 
-std::string MakeDriverFingerprint(const GPUInfo& info) {
-  std::string out;
-  out.push_back(1);  // Fingerprint format version.
-  AppendU32(&out, static_cast<uint32_t>(info.backend));
-  AppendString(&out, info.vendor);
-  AppendString(&out, info.renderer);
-  AppendString(&out, info.version);
-  return out;
-}
-
 static bool DisabledByEnvironment(const char* layer) {
   const char* value = std::getenv("TGFX_SHADER_CACHE_DISABLE");
   if (value == nullptr) {
@@ -189,10 +178,6 @@ ShaderCache::ShaderCache(Context* context)
 }
 
 ShaderCache::~ShaderCache() = default;
-
-void ShaderCache::setPipelineStore(std::unique_ptr<PipelineStore> store) {
-  _pipelineStore = std::move(store);
-}
 
 void ShaderCache::addPipeline(const PipelineKey& key, std::string encoded,
                               std::shared_ptr<RenderPipeline> pipeline) {
@@ -259,21 +244,9 @@ std::shared_ptr<RenderPipeline> ShaderCache::findOrCreatePipeline(
     *created = false;
     return entry.pipeline;
   }
-  if (_pipelineStore != nullptr) {
-    auto stored = _pipelineStore->findPipeline(key, descriptor);
-    if (stored != nullptr) {
-      _stats.pipelineStoreHits++;
-      *created = false;
-      addPipeline(key, std::move(encoded), stored);
-      return stored;
-    }
-  }
   auto pipeline = createPipeline(descriptor);
   if (pipeline == nullptr) {
     return nullptr;
-  }
-  if (_pipelineStore != nullptr) {
-    _pipelineStore->didCreatePipeline(key, descriptor, pipeline);
   }
   addPipeline(key, std::move(encoded), pipeline);
   return pipeline;

@@ -23,7 +23,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
-#include "gpu/ShaderBindingLayout.h"
+#include "gpu/ShaderBundleContract.h"
 #include "gpu/Uniform.h"
 #include "gpu/aot/AOTParamLayout.h"
 #include "tgfx/core/Color.h"

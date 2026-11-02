@@ -17,7 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
 // The bundle format has two implementations: the writer in shader_build_tool and the loader in the
-// runtime. Both read the layout from gpu/BundleFormat.h, but a constant can be shared and still be
+// runtime. Both read the layout from gpu/ShaderBundleContract.h, but a constant can be shared and still be
 // used differently. These tests write a bundle with the tool and load it with the runtime, then
 // compare every field the writer recorded with what the loader returns.
 
@@ -28,11 +28,8 @@
 #include <vector>
 #include "verify/BundleVerifier.h"
 #include "output/BundleWriter.h"
-#include "gpu/BundleFormat.h"
-#include "gpu/PrecompiledBundleIdentity.h"
+#include "gpu/ShaderBundleContract.h"
 #include "gpu/PrecompiledShaderCache.h"
-#include "gpu/ShaderKeyHash.h"
-#include "gpu/ShaderProfile.h"
 #include "gtest/gtest.h"
 
 namespace tgfx {

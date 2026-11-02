@@ -30,13 +30,9 @@
 #include <vector>
 #include "core/DiagnosticCodes.h"
 #include "core/ShaderSources.h"
-#include "gpu/BundleFormat.h"
-#include "gpu/PrecompiledBundleIdentity.h"
-#include "gpu/ShaderKeyHash.h"
-#include "gpu/ShaderProfile.h"
+#include "gpu/ShaderBundleContract.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "output/BundleManifest.h"
-#include "zlib.h"
 #include "zstd.h"
 
 namespace tgfx {
@@ -133,17 +129,6 @@ bool DecompressDataPool(const std::vector<uint8_t>& fileBytes, const BundleHeade
       return false;
     }
     uncompressed->assign(storedData, storedData + header.dataSize);
-    return true;
-  }
-  if (header.compressionType == BundleFormat::Compression::Zlib) {
-    uncompressed->resize(header.dataSize);
-    auto destLen = static_cast<uLongf>(header.dataSize);
-    auto status =
-        uncompress(reinterpret_cast<Bytef*>(uncompressed->data()), &destLen,
-                   reinterpret_cast<const Bytef*>(storedData), static_cast<uLong>(storedBytes));
-    if (status != Z_OK || destLen != header.dataSize) {
-      return false;
-    }
     return true;
   }
   if (header.compressionType == BundleFormat::Compression::Zstd) {
@@ -307,11 +292,9 @@ BundleCheckResult VerifyOneBundle(const std::string& path, ShaderProfile profile
            "bad magic 0x" + NumberInHex(magic));
     result.violations++;
   }
-  if (header.formatVersion < BundleFormat::MinVerifiableVersion ||
-      header.formatVersion > BundleFormat::CurrentVersion) {
+  if (header.formatVersion != BundleFormat::CurrentVersion) {
     Report(diagnostics, Severity::Error, DiagnosticCode::VerifyBundleHeader, expectedTag.c_str(),
            "format version " + std::to_string(header.formatVersion) + " (expected " +
-               std::to_string(BundleFormat::MinVerifiableVersion) + " to " +
                std::to_string(BundleFormat::CurrentVersion) + ")");
     result.violations++;
   }

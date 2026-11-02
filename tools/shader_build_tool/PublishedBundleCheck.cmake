@@ -2,7 +2,7 @@
 #
 # Data flow (the ABI has one source of truth; nothing here re-states the value):
 #
-#   PrecompiledBundleIdentity.h ──(regex parse)──▶ expected ABI (0x........)
+#   ShaderBundleContract.h ──(regex parse)──▶ expected ABI (0x........)
 #   resources/shaders/*.bin ──(u32 @ offset 16, little endian)──▶ bundle ABI
 #                                    │
 #                    mismatch ──▶ message(WARNING) at configure time
@@ -13,7 +13,7 @@
 # build that consumes the published bundles (TGFX_SHADER_BUNDLES_PREBUILT), before any code runs.
 #
 # The offset and width mirror BundleFormat::Offset::ToolchainABI; the static_asserts in
-# BundleFormat.h pin that layout, and the CMake source list already treats the identity header
+# ShaderBundleContract.h pin that layout, and the CMake source list already treats that header
 # as a rebuild input, so a bumped constant invalidates the bundles built from it too.
 
 function(tgfx_check_published_bundle_abi bundle_path identity_header)

@@ -28,7 +28,7 @@
 #include <utility>
 #include <vector>
 #include "core/DiagnosticCodes.h"
-#include "gpu/ShaderBindingLayout.h"
+#include "gpu/ShaderBundleContract.h"
 #include "gtest/gtest.h"
 #include "FailureAssertions.h"
 #include "verify/BindingLayoutRule.h"

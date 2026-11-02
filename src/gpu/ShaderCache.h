@@ -32,7 +32,6 @@
 namespace tgfx {
 
 class Context;
-class PipelineStore;
 
 /**
  * Counters of the shader cache. They only grow (until resetStats()), so clear() and eviction do
@@ -60,8 +59,6 @@ struct ShaderCacheStats {
   uint64_t pipelineEvictions = 0;
   // Wall time spent inside GPU::createRenderPipeline() for the creations and failures above.
   int64_t pipelineCreationMicros = 0;
-  // L2 misses served by the pipeline store instead of the GPU (see PipelineStore).
-  uint64_t pipelineStoreHits = 0;
 };
 
 /**
@@ -174,16 +171,6 @@ class ShaderCache {
     return pipelineCacheEnabled;
   }
 
-  /**
-   * Sets the store consulted on pipeline cache misses (see PipelineStore), replacing any previous
-   * one; nullptr removes it. No store is set by default. clear() keeps the store.
-   */
-  void setPipelineStore(std::unique_ptr<PipelineStore> store);
-
-  PipelineStore* pipelineStore() const {
-    return _pipelineStore.get();
-  }
-
   const ShaderCacheStats& stats() const {
     return _stats;
   }
@@ -236,7 +223,6 @@ class ShaderCache {
   // Pipeline keys are digests of the full descriptor encoding, in the same form as module keys.
   std::list<ShaderModuleKey> pipelineLRU = {};
   std::unordered_map<ShaderModuleKey, PipelineEntry, ShaderModuleKeyHasher> pipelineMap = {};
-  std::unique_ptr<PipelineStore> _pipelineStore = nullptr;
   ShaderCacheStats _stats = {};
 
   void addPipeline(const PipelineKey& key, std::string encoded,

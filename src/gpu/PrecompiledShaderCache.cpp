@@ -24,15 +24,13 @@
 #include <limits>
 #include <map>
 #include <tuple>
-#include "BundleFormat.h"
-#include "PrecompiledBundleIdentity.h"
+#include "gpu/ShaderBundleContract.h"
 #include "ShaderProfileResolver.h"
 #include "core/utils/Log.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PermutationMatch.h"
 #include "gpu/ShaderCaps.h"
 #include "tgfx/gpu/Context.h"
-#include "zlib.h"
 #include "zstd.h"
 
 namespace tgfx {
@@ -299,7 +297,7 @@ static uint64_t ReadU64LE(const uint8_t* p) {
   return val;
 }
 
-// The header and pool entry layout is defined in BundleFormat.h, shared with the bundle writer.
+// The header and pool entry layout is defined in ShaderBundleContract.h, shared with the bundle writer.
 // Independent bounds for the input/reassembled file and for copied shader/reflection payloads.
 // These are parser limits, not a bound on total process RSS or concurrently retained old bundles.
 static constexpr size_t MAX_BUNDLE_BYTES = 256u * 1024u * 1024u;
@@ -338,8 +336,7 @@ static bool IsValidReflectionFormat(UniformFormat format, bool sampler) {
 }
 
 static bool ReadUniformEntries(const uint8_t* data, size_t maxLen, size_t* offset, uint8_t count,
-                               std::vector<Uniform>& out, bool hasArraySize, bool sampler,
-                               size_t* remainingBytes) {
+                               std::vector<Uniform>& out, bool sampler, size_t* remainingBytes) {
   if (!ConsumePayloadBudget(static_cast<size_t>(count) * sizeof(Uniform), remainingBytes)) {
     return false;
   }
@@ -364,15 +361,12 @@ static bool ReadUniformEntries(const uint8_t* data, size_t maxLen, size_t* offse
     if (!IsValidReflectionFormat(format, sampler)) {
       return false;
     }
-    uint32_t arraySize = 1;
-    if (hasArraySize) {
-      if (maxLen - *offset < 2) {
-        return false;
-      }
-      arraySize =
-          static_cast<uint32_t>(data[*offset]) | (static_cast<uint32_t>(data[*offset + 1]) << 8);
-      *offset += 2;
+    if (maxLen - *offset < 2) {
+      return false;
     }
+    uint32_t arraySize =
+        static_cast<uint32_t>(data[*offset]) | (static_cast<uint32_t>(data[*offset + 1]) << 8);
+    *offset += 2;
     if (arraySize == 0 || (sampler && arraySize != 1)) {
       return false;
     }
@@ -441,26 +435,21 @@ static bool ReadVertexInputEntries(const uint8_t* data, size_t maxLen, size_t* o
 }
 
 static bool ParseStageReflection(const uint8_t* data, size_t maxLen, ShaderStageBlob* blob,
-                                 bool hasArraySize, bool hasVertexInputs, size_t* remainingBytes) {
+                                 size_t* remainingBytes) {
   if (maxLen < 4) {
     return false;
   }
   size_t offset = 0;
   uint8_t uniformCount = data[offset++];
   uint8_t samplerCount = data[offset++];
-  uint8_t vertexInputCount = 0;
-  if (hasVertexInputs) {
-    vertexInputCount = data[offset++];
-  } else {
-    offset += 1;  // reserved
-  }
+  uint8_t vertexInputCount = data[offset++];
   offset += 1;  // reserved
 
-  if (!ReadUniformEntries(data, maxLen, &offset, uniformCount, blob->uniforms, hasArraySize, false,
+  if (!ReadUniformEntries(data, maxLen, &offset, uniformCount, blob->uniforms, false,
                           remainingBytes)) {
     return false;
   }
-  if (!ReadUniformEntries(data, maxLen, &offset, samplerCount, blob->samplers, hasArraySize, true,
+  if (!ReadUniformEntries(data, maxLen, &offset, samplerCount, blob->samplers, true,
                           remainingBytes)) {
     return false;
   }
@@ -496,7 +485,7 @@ static bool LoadPool(const uint8_t* fileData, size_t fileSize, size_t poolOffset
                      size_t reflectionPoolStart,
                      std::unordered_map<PrecompiledShaderCache::HashKey, ShaderStageBlob,
                                         PrecompiledShaderCache::HashKeyHasher>& entries,
-                     bool hasArraySize, bool hasVertexInputs, size_t* remainingBytes) {
+                     size_t* remainingBytes) {
   for (uint32_t i = 0; i < poolCount; i++) {
     size_t entryOff = poolOffset + static_cast<size_t>(i) * BundleFormat::PoolEntrySize;
     if (entryOff > fileSize || BundleFormat::PoolEntrySize > fileSize - entryOff) {
@@ -526,8 +515,8 @@ static bool LoadPool(const uint8_t* fileData, size_t fileSize, size_t poolOffset
         return false;
       }
       size_t absReflOff = reflectionPoolStart + reflOff;
-      if (!ParseStageReflection(fileData + absReflOff, fileSize - absReflOff, &blob, hasArraySize,
-                                hasVertexInputs, remainingBytes)) {
+      if (!ParseStageReflection(fileData + absReflOff, fileSize - absReflOff, &blob,
+                                remainingBytes)) {
         LOGE("PrecompiledShaderCache: Failed to parse reflection for entry %u", i);
         return false;
       }
@@ -608,14 +597,11 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     return false;
   }
   uint16_t formatVersion = ReadU16LE(ptr + BundleFormat::Offset::FormatVersion);
-  if (formatVersion < BundleFormat::MinReadableVersion ||
-      formatVersion > BundleFormat::CurrentVersion) {
-    LOGE("PrecompiledShaderCache: Unsupported format version %u (expected %u to %u)", formatVersion,
-         BundleFormat::MinReadableVersion, BundleFormat::CurrentVersion);
+  if (formatVersion != BundleFormat::CurrentVersion) {
+    LOGE("PrecompiledShaderCache: Unsupported format version %u (expected %u)", formatVersion,
+         BundleFormat::CurrentVersion);
     return false;
   }
-  const bool hasArraySize = formatVersion >= BundleFormat::ArraySizeSinceVersion;
-  const bool hasVertexInputs = formatVersion >= BundleFormat::VertexInputsSinceVersion;
   uint16_t compressionType = ReadU16LE(ptr + BundleFormat::Offset::CompressionType);
   if (compressionType > BundleFormat::Compression::Max) {
     LOGE("PrecompiledShaderCache: Unsupported compression type %u", compressionType);
@@ -709,8 +695,7 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
 
   size_t reflectionPoolStart = reflectionOffset;
 
-  if (compressionType == BundleFormat::Compression::Zlib ||
-      compressionType == BundleFormat::Compression::Zstd) {
+  if (compressionType == BundleFormat::Compression::Zstd) {
     // Only the data pool region is compressed. Compute compressed size from file layout.
     size_t compressedEnd = reflectionOffset > 0 ? static_cast<size_t>(reflectionOffset) : size;
     if (dataPoolStart > size || compressedEnd > size || compressedEnd < dataPoolStart) {
@@ -726,17 +711,9 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     // Decompress into a reassembled buffer: [header+pools | decompressed data | reflection]
     decompressed.resize(dataPoolEnd + reflectionSize);
     std::memcpy(decompressed.data(), ptr, dataPoolStart);
-    bool decompressOK = false;
-    if (compressionType == BundleFormat::Compression::Zlib) {
-      uLongf destLen = static_cast<uLongf>(dataSize);
-      int ret = uncompress(decompressed.data() + dataPoolStart, &destLen, ptr + dataPoolStart,
-                           compressedSize);
-      decompressOK = ret == Z_OK && destLen == static_cast<uLongf>(dataSize);
-    } else {
-      size_t destLen = ZSTD_decompress(decompressed.data() + dataPoolStart, dataSize,
-                                       ptr + dataPoolStart, compressedSize);
-      decompressOK = !ZSTD_isError(destLen) && destLen == dataSize;
-    }
+    size_t destLen = ZSTD_decompress(decompressed.data() + dataPoolStart, dataSize,
+                                     ptr + dataPoolStart, compressedSize);
+    bool decompressOK = !ZSTD_isError(destLen) && destLen == dataSize;
     if (!decompressOK) {
       LOGE("PrecompiledShaderCache: data pool decompression failed (type=%u)", compressionType);
       return false;
@@ -757,10 +734,14 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   }
 
   // Content identity: recompute the writer's identity hash over the loaded view (pool entries,
-  // uncompressed data pool, reflection pool, tag, counts) and reject mismatches. A zero hash
-  // marks a legacy bundle written before the identity contract existed; it still loads with a
-  // warning, keeping old data readable.
-  if (sourceHash != 0) {
+  // uncompressed data pool, reflection pool, tag, counts) and reject mismatches. The hash is
+  // mandatory — bundles written before the identity contract existed are refused with every
+  // other bundle older than CurrentVersion.
+  if (sourceHash == 0) {
+    LOGE("PrecompiledShaderCache: Bundle carries no identity hash; refusing an unverifiable bundle");
+    return false;
+  }
+  {
     uint64_t computed = BundleIdentityHashInit();
     computed = BundleIdentityHashHeader(computed, formatVersion, vertPoolCount, fragPoolCount,
                                         ptr + BundleFormat::Offset::ProfileTag);
@@ -778,20 +759,16 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
           static_cast<unsigned long long>(sourceHash), static_cast<unsigned long long>(computed));
       return false;
     }
-  } else {
-    LOGI("PrecompiledShaderCache: Legacy bundle without an identity hash; skipping verification");
   }
 
   std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> newVertEntries;
   std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> newFragEntries;
   if (!LoadPool(loadPtr, loadSize, vertPoolOffset, vertPoolCount, dataPoolStart, dataPoolEnd,
-                reflectionPoolStart, newVertEntries, hasArraySize, hasVertexInputs,
-                &remainingPayloadBytes)) {
+                reflectionPoolStart, newVertEntries, &remainingPayloadBytes)) {
     return false;
   }
   if (!LoadPool(loadPtr, loadSize, fragPoolOffset, fragPoolCount, dataPoolStart, dataPoolEnd,
-                reflectionPoolStart, newFragEntries, hasArraySize, hasVertexInputs,
-                &remainingPayloadBytes)) {
+                reflectionPoolStart, newFragEntries, &remainingPayloadBytes)) {
     return false;
   }
 

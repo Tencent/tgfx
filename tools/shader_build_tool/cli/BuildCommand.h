@@ -21,7 +21,7 @@
 #include <optional>
 #include <string>
 #include <vector>
-#include "gpu/ShaderProfile.h"
+#include "gpu/ShaderBundleContract.h"
 
 namespace tgfx {
 

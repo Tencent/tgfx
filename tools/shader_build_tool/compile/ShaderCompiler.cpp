@@ -37,7 +37,7 @@ extern char** environ;
 #include <spirv_glsl.hpp>
 #include <spirv_msl.hpp>
 #include <spirv_parser.hpp>
-#include "gpu/ShaderBindingLayout.h"
+#include "gpu/ShaderBundleContract.h"
 #ifdef TGFX_SHADER_TOOL_HAS_TINT
 #include "src/tint/lang/spirv/reader/reader.h"
 #include "src/tint/lang/wgsl/writer/writer.h"

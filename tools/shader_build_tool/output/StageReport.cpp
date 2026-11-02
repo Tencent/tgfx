@@ -27,7 +27,7 @@
 #include <utility>
 #include "output/BundleWriter.h"
 #include "core/DiagnosticCodes.h"
-#include "gpu/ShaderKeyHash.h"
+#include "gpu/ShaderBundleContract.h"
 #include "gpu/shaders/PrecompiledShader.h"
 
 namespace tgfx {

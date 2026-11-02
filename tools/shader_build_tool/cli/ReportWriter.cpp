@@ -25,7 +25,7 @@
 #include <tuple>
 #include <utility>
 #include "output/StageReport.h"
-#include "gpu/ShaderKeyHash.h"
+#include "gpu/ShaderBundleContract.h"
 
 namespace tgfx {
 

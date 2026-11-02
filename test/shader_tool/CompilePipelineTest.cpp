@@ -31,7 +31,7 @@
 #include "compile/ShaderCompiler.h"
 #include "core/DiagnosticCodes.h"
 #include "compile/StageCompiler.h"
-#include "gpu/ShaderBindingLayout.h"
+#include "gpu/ShaderBundleContract.h"
 #include "gpu/Uniform.h"
 #include "gtest/gtest.h"
 #include "FailureAssertions.h"

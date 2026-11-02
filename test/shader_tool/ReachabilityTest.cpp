@@ -24,7 +24,7 @@
 #include <set>
 #include <string>
 #include <vector>
-#include "gpu/ShaderProfile.h"
+#include "gpu/ShaderBundleContract.h"
 #include "gpu/shaders/AllShaderFamilies.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"

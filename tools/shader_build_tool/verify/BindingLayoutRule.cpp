@@ -27,8 +27,7 @@
 #include <utility>
 #include <vector>
 #include "core/DiagnosticCodes.h"
-#include "gpu/ShaderBindingLayout.h"
-#include "gpu/ShaderProfile.h"
+#include "gpu/ShaderBundleContract.h"
 
 namespace tgfx {
 

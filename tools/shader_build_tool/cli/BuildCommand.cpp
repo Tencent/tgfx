@@ -41,7 +41,7 @@
 #include "core/DiagnosticCodes.h"
 #include "core/Diagnostics.h"
 #include "emit/ProfileEmitter.h"
-#include "gpu/ShaderBindingLayout.h"
+#include "gpu/ShaderBundleContract.h"
 #include "gpu/shaders/AllShaderFamilies.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "plan/VariantPlanner.h"
@@ -217,7 +217,7 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
     auto vertDefines = vertDomain.defineListFor(vi);
     auto fragDefines = fragDomain.defineListFor(fi);
     // The binding contract rides in as defines: the templates spell their layout qualifiers
-    // with the TGFX_* macro names, so the numbers exist only in ShaderBindingLayout.h. The
+    // with the TGFX_* macro names, so the numbers exist only in ShaderBundleContract.h. The
     // source digest covers the same list, so a value change invalidates every bundle.
     for (const auto& contractDefine : BindingContractDefines()) {
       vertDefines.push_back(contractDefine);
