@@ -19,6 +19,8 @@
 #include "gpu/aot/Binder.h"
 #include <array>
 #include "gpu/ColorSpaceXformHelper.h"
+#include "gpu/aot/Binder.h"
+#include "gpu/aot/NodeContract.h"
 #include "gpu/Swizzle.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/TextureView.h"
@@ -78,16 +80,22 @@ void UploadChainSlot(UniformData* uniformData, size_t index, const AOTChainSlot&
     // into chainLeafTex (not Packed.z, which the register allocator rewrites).
     selector = slot.texModulateAlphaOnly | (slot.texModulateSourceSlot << 16);
   }
+  // The coverage capacities index their own parameter arrays by the per-kind ordinal, which the
+  // selector also carries; every other instruction's parameter block is indexed by the slot.
+  int ordinal = static_cast<int>(index);
   if (slot.op == AOTChainOp::AARectCoverage) {
     // Bits 16-19: the slot's ordinal into the CoverageRect array.
+    ordinal = rectOrdinal;
     selector = rectOrdinal << 16;
   }
   if (slot.op == AOTChainOp::LocalRectCoverage) {
     // Bits 16-19: the slot's ordinal into the CoverageLocalRect arrays.
+    ordinal = localRectOrdinal;
     selector = localRectOrdinal << 16;
   }
   if (slot.op == AOTChainOp::RRectCoverage) {
     // Bits 16-19: the slot's ordinal into the CoverageRRect* parameter arrays.
+    ordinal = rrectOrdinal;
     selector = rrectOrdinal << 16;
   }
   // Bits 20-24: the result register + 1 (0 marks a dead instruction whose result nothing reads;
@@ -95,71 +103,10 @@ void UploadChainSlot(UniformData* uniformData, size_t index, const AOTChainSlot&
   selector |= (slot.outRegister + 1) << 20;
   int packed[] = {static_cast<int>(slot.op), slot.in0, slot.in1, selector};
   uniformData->setArrayElementOptional(ChainParams::SlotPacked.name, index, packed);
-  switch (slot.op) {
-    case AOTChainOp::ColorMatrix: {
-      float matrixData[16];
-      float vectorData[4];
-      PackAOTColorMatrix(slot.colorMatrix.matrix, matrixData, vectorData);
-      uniformData->setArrayElementOptional(ChainParams::SlotColorMatrix.name, index, matrixData);
-      uniformData->setArrayElementOptional(ChainParams::SlotColorVector.name, index, vectorData);
-      break;
-    }
-    case AOTChainOp::Luma: {
-      float lumaThresh[] = {slot.luma.kr, slot.luma.kg, slot.luma.kb, 0.0f};
-      uniformData->setArrayElementOptional(ChainParams::SlotLumaThresh.name, index, lumaThresh);
-      break;
-    }
-    case AOTChainOp::AlphaThreshold: {
-      float lumaThresh[] = {0.0f, 0.0f, 0.0f, slot.alphaThreshold.threshold};
-      uniformData->setArrayElementOptional(ChainParams::SlotLumaThresh.name, index, lumaThresh);
-      break;
-    }
-    case AOTChainOp::ConstColor: {
-      const auto& color = slot.constColor.color;
-      float colorData[] = {color[0], color[1], color[2], color[3]};
-      uniformData->setArrayElementOptional(ChainParams::SlotConstColor.name, index, colorData);
-      break;
-    }
-    case AOTChainOp::AARectCoverage: {
-      // The AA math evaluates to 0 at the rect coordinates, so outset by 0.5 to interpolate from 0
-      // at a half-pixel inset to 1 at a half-pixel outset (same as GLSLRectEffect::onSetData).
-      const auto& rect = slot.rectCoverage.rect;
-      float rectData[] = {rect[0] - 0.5f, rect[1] - 0.5f, rect[2] + 0.5f, rect[3] + 0.5f};
-      uniformData->setArrayElementOptional(ChainParams::CoverageRect.name,
-                                           static_cast<size_t>(rectOrdinal), rectData);
-      break;
-    }
-    case AOTChainOp::LocalRectCoverage: {
-      // The local rect keeps its exact coordinates; the kernel's AA ramp clamps each edge distance
-      // to half a pixel after mapping through the device-to-local matrix.
-      const auto& params = slot.localRectCoverage;
-      float rectData[] = {params.rect[0], params.rect[1], params.rect[2], params.rect[3]};
-      uniformData->setArrayElementOptional(ChainParams::CoverageLocalRect.name,
-                                           static_cast<size_t>(localRectOrdinal), rectData);
-      uniformData->setArrayElementOptional(ChainParams::CoverageLocalDeviceToLocal.name,
-                                           static_cast<size_t>(localRectOrdinal),
-                                           MatrixColumnMajor(params.deviceToLocal));
-      break;
-    }
-    case AOTChainOp::RRectCoverage: {
-      const auto& params = slot.rrectCoverage;
-      float rectData[] = {params.rect[0], params.rect[1], params.rect[2], params.rect[3]};
-      uniformData->setArrayElementOptional(ChainParams::CoverageRRectRect.name,
-                                           static_cast<size_t>(rrectOrdinal), rectData);
-      uniformData->setArrayElementOptional(ChainParams::CoverageRRectRadiiX.name,
-                                           static_cast<size_t>(rrectOrdinal), params.radiiX);
-      uniformData->setArrayElementOptional(ChainParams::CoverageRRectRadiiY.name,
-                                           static_cast<size_t>(rrectOrdinal), params.radiiY);
-      float antiAliasData[] = {params.antiAlias};
-      uniformData->setArrayElementOptional(ChainParams::CoverageRRectAntiAlias.name,
-                                           static_cast<size_t>(rrectOrdinal), antiAliasData);
-      uniformData->setArrayElementOptional(ChainParams::CoverageRRectDeviceToLocal.name,
-                                           static_cast<size_t>(rrectOrdinal),
-                                           MatrixColumnMajor(params.deviceToLocal));
-      break;
-    }
-    default:
-      break;
+  // The parameter block is the instruction contract's bind column: one function per op that
+  // writes one, a null row for the instructions that carry none (they ride the packed word).
+  if (auto bind = OpContractOf(slot.op).bind) {
+    bind(uniformData, index, ordinal, slot);
   }
 }
 
@@ -190,6 +137,77 @@ void UploadGradientParams(UniformData* uniformData, const AOTGradientParameters&
 
 }  // namespace
 
+// The instruction contract's bind column (declared in Binder.h): each function writes one op's
+// per-slot parameter block into the chain arrays.
+void BindColorMatrixSlot(UniformData* uniformData, size_t index, int /*ordinal*/,
+                         const AOTChainSlot& slot) {
+  float matrixData[16];
+  float vectorData[4];
+  PackAOTColorMatrix(slot.colorMatrix.matrix, matrixData, vectorData);
+  uniformData->setArrayElementOptional(ChainParams::SlotColorMatrix.name, index, matrixData);
+  uniformData->setArrayElementOptional(ChainParams::SlotColorVector.name, index, vectorData);
+}
+
+void BindLumaSlot(UniformData* uniformData, size_t index, int /*ordinal*/,
+                  const AOTChainSlot& slot) {
+  float lumaThresh[] = {slot.luma.kr, slot.luma.kg, slot.luma.kb, 0.0f};
+  uniformData->setArrayElementOptional(ChainParams::SlotLumaThresh.name, index, lumaThresh);
+}
+
+void BindAlphaThresholdSlot(UniformData* uniformData, size_t index, int /*ordinal*/,
+                            const AOTChainSlot& slot) {
+  float lumaThresh[] = {0.0f, 0.0f, 0.0f, slot.alphaThreshold.threshold};
+  uniformData->setArrayElementOptional(ChainParams::SlotLumaThresh.name, index, lumaThresh);
+}
+
+void BindConstColorSlot(UniformData* uniformData, size_t index, int /*ordinal*/,
+                        const AOTChainSlot& slot) {
+  const auto& color = slot.constColor.color;
+  float colorData[] = {color[0], color[1], color[2], color[3]};
+  uniformData->setArrayElementOptional(ChainParams::SlotConstColor.name, index, colorData);
+}
+
+void BindAARectCoverageSlot(UniformData* uniformData, size_t /*index*/, int ordinal,
+                            const AOTChainSlot& slot) {
+  // The AA math evaluates to 0 at the rect coordinates, so outset by 0.5 to interpolate from 0
+  // at a half-pixel inset to 1 at a half-pixel outset (same as GLSLRectEffect::onSetData).
+  const auto& rect = slot.rectCoverage.rect;
+  float rectData[] = {rect[0] - 0.5f, rect[1] - 0.5f, rect[2] + 0.5f, rect[3] + 0.5f};
+  uniformData->setArrayElementOptional(ChainParams::CoverageRect.name,
+                                       static_cast<size_t>(ordinal), rectData);
+}
+
+void BindLocalRectCoverageSlot(UniformData* uniformData, size_t /*index*/, int ordinal,
+                               const AOTChainSlot& slot) {
+  // The local rect keeps its exact coordinates; the kernel's AA ramp clamps each edge distance to
+  // half a pixel after mapping through the device-to-local matrix.
+  const auto& params = slot.localRectCoverage;
+  float rectData[] = {params.rect[0], params.rect[1], params.rect[2], params.rect[3]};
+  uniformData->setArrayElementOptional(ChainParams::CoverageLocalRect.name,
+                                       static_cast<size_t>(ordinal), rectData);
+  uniformData->setArrayElementOptional(ChainParams::CoverageLocalDeviceToLocal.name,
+                                       static_cast<size_t>(ordinal),
+                                       MatrixColumnMajor(params.deviceToLocal));
+}
+
+void BindRRectCoverageSlot(UniformData* uniformData, size_t /*index*/, int ordinal,
+                           const AOTChainSlot& slot) {
+  const auto& params = slot.rrectCoverage;
+  float rectData[] = {params.rect[0], params.rect[1], params.rect[2], params.rect[3]};
+  uniformData->setArrayElementOptional(ChainParams::CoverageRRectRect.name,
+                                       static_cast<size_t>(ordinal), rectData);
+  uniformData->setArrayElementOptional(ChainParams::CoverageRRectRadiiX.name,
+                                       static_cast<size_t>(ordinal), params.radiiX);
+  uniformData->setArrayElementOptional(ChainParams::CoverageRRectRadiiY.name,
+                                       static_cast<size_t>(ordinal), params.radiiY);
+  float antiAliasData[] = {params.antiAlias};
+  uniformData->setArrayElementOptional(ChainParams::CoverageRRectAntiAlias.name,
+                                       static_cast<size_t>(ordinal), antiAliasData);
+  uniformData->setArrayElementOptional(ChainParams::CoverageRRectDeviceToLocal.name,
+                                       static_cast<size_t>(ordinal),
+                                       MatrixColumnMajor(params.deviceToLocal));
+}
+
 // One YUV-tail instruction's records (see BindYUVProgram): the chain's uniform arrays with the
 // linear-tail selector — the kernel's macro binding reads exactly these bits.
 void UploadYUVTailSlot(UniformData* uniformData, size_t index, const AOTChainSlot& slot) {
@@ -201,34 +219,13 @@ void UploadYUVTailSlot(UniformData* uniformData, size_t index, const AOTChainSlo
   }
   int packed[] = {static_cast<int>(slot.op), -2, -2, selector};
   uniformData->setArrayElementOptional(ChainParams::SlotPacked.name, index, packed);
-  switch (slot.op) {
-    case AOTChainOp::ColorMatrix: {
-      float matrixData[16];
-      float vectorData[4];
-      PackAOTColorMatrix(slot.colorMatrix.matrix, matrixData, vectorData);
-      uniformData->setArrayElementOptional(ChainParams::SlotColorMatrix.name, index, matrixData);
-      uniformData->setArrayElementOptional(ChainParams::SlotColorVector.name, index, vectorData);
-      break;
-    }
-    case AOTChainOp::Luma: {
-      float lumaThresh[] = {slot.luma.kr, slot.luma.kg, slot.luma.kb, 0.0f};
-      uniformData->setArrayElementOptional(ChainParams::SlotLumaThresh.name, index, lumaThresh);
-      break;
-    }
-    case AOTChainOp::AlphaThreshold: {
-      float lumaThresh[] = {0.0f, 0.0f, 0.0f, slot.alphaThreshold.threshold};
-      uniformData->setArrayElementOptional(ChainParams::SlotLumaThresh.name, index, lumaThresh);
-      break;
-    }
-    case AOTChainOp::ConstColor:
-    case AOTChainOp::Blend: {
-      const auto& color = slot.constColor.color;
-      float colorData[] = {color[0], color[1], color[2], color[3]};
-      uniformData->setArrayElementOptional(ChainParams::SlotConstColor.name, index, colorData);
-      break;
-    }
-    default:
-      break;  // ColorSpaceXform rides the shared Chain block below.
+  // The parameter block comes from the instruction contract — except the linear tail's Blend,
+  // whose operand is the const color (the chain's blend reads registers, so its row writes
+  // nothing; the tail's dialect supplies the color instead).
+  if (slot.op == AOTChainOp::Blend) {
+    BindConstColorSlot(uniformData, index, static_cast<int>(index), slot);
+  } else if (auto bind = OpContractOf(slot.op).bind) {
+    bind(uniformData, index, static_cast<int>(index), slot);
   }
 }
 

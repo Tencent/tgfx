@@ -27,6 +27,24 @@ namespace tgfx {
 
 class UniformData;
 
+// The instruction contract's bind column (NodeContract.h's AOTOpContract): one function per op
+// that writes a per-slot parameter block. The caller writes the packed word and its selector with
+// its own dialect, then dispatches here with the slot's index and its ordinal into the per-kind
+// parameter array (the coverage capacities; the slot index for every other op).
+void BindColorMatrixSlot(UniformData* uniformData, size_t index, int ordinal,
+                         const AOTChainSlot& slot);
+void BindLumaSlot(UniformData* uniformData, size_t index, int ordinal, const AOTChainSlot& slot);
+void BindAlphaThresholdSlot(UniformData* uniformData, size_t index, int ordinal,
+                            const AOTChainSlot& slot);
+void BindConstColorSlot(UniformData* uniformData, size_t index, int ordinal,
+                        const AOTChainSlot& slot);
+void BindAARectCoverageSlot(UniformData* uniformData, size_t index, int ordinal,
+                            const AOTChainSlot& slot);
+void BindLocalRectCoverageSlot(UniformData* uniformData, size_t index, int ordinal,
+                               const AOTChainSlot& slot);
+void BindRRectCoverageSlot(UniformData* uniformData, size_t index, int ordinal,
+                           const AOTChainSlot& slot);
+
 /**
  * Writes one compiled chain program's uniforms: the vertex-side coord-source mask and every
  * fragment field the kernel reads — the slot records, the coverage arrays, the tiled recipes, the

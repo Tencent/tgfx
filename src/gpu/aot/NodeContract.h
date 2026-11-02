@@ -53,10 +53,13 @@ struct AOTKindTraits {
 // resource demand to the tally.
 using AOTNodeEncoder = bool (*)(AOTChainContext* ctx, size_t combined, size_t slotIndex);
 using AOTNodeDemand = void (*)(const AOTEffectNode* node, AOTResourceDemand* demand);
-/// One chain instruction's uniform write. The packed selector stays with the caller's dialect
-/// (the chain encodes registers, the YUV tail encodes the op's small value), so the table carries
-/// only the parameter block.
-using AOTOpBinder = void (*)(UniformData* uniformData, size_t index, const AOTChainSlot& slot);
+/// One chain instruction's per-slot parameter write. The packed word and its selector stay with
+/// the caller's dialect (the chain encodes result registers, the YUV tail encodes the op's small
+/// value), so the table carries only the parameter arrays: `index` is the slot's index (the
+/// per-op arrays), `ordinal` is its ordinal into a per-kind array (the coverage capacities; the
+/// slot index for every other op). A null row means the instruction writes no parameter block.
+using AOTOpBinder = void (*)(UniformData* uniformData, size_t index, int ordinal,
+                             const AOTChainSlot& slot);
 
 /**
  * One contract row of the expression vocabulary (indexed by AOTEffectKind): the kind's traits,

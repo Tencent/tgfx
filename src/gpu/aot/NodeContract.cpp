@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/NodeContract.h"
+#include "gpu/aot/Binder.h"
 #include "gpu/aot/ChainContext.h"
 
 namespace tgfx {
@@ -73,22 +74,22 @@ static_assert(EveryFusableKindIsEncodable(),
 // uniform write. A separate table on purpose — the instruction vocabulary and the node vocabulary
 // are not one-to-one (see the header).
 constexpr AOTOpContract OpContracts[] = {
-    {},  // ColorMatrix (0)
-    {},  // Luma (1)
-    {},  // AlphaThreshold (2)
-    {},  // ColorSpaceXform (3)
-    {},  // None (4, the inactive-slot marker)
-    {},  // Texture (5)
-    {},  // ConstColor (6)
-    {},  // Blend (7)
-    {},  // AARectCoverage (8)
-    {},  // Gradient (9)
-    {},  // LocalRectCoverage (10)
-    {},  // RRectCoverage (11)
-    {},  // TexModulate (12, synthesized by the texture encoder)
-    {},  // InputOpaque (13)
-    {},  // MulAlpha (14)
-    {},  // PerlinNoise (15)
+    {BindColorMatrixSlot},       // ColorMatrix (0)
+    {BindLumaSlot},              // Luma (1)
+    {BindAlphaThresholdSlot},    // AlphaThreshold (2)
+    {},                          // ColorSpaceXform (3): rides the program-level Chain block
+    {},                          // None (4, the inactive-slot marker)
+    {},                          // Texture (5): the sampler binding carries its records
+    {BindConstColorSlot},        // ConstColor (6)
+    {},                          // Blend (7): the chain's operands are registers
+    {BindAARectCoverageSlot},    // AARectCoverage (8)
+    {},                          // Gradient (9): the program-level gradient block
+    {BindLocalRectCoverageSlot}, // LocalRectCoverage (10)
+    {BindRRectCoverageSlot},     // RRectCoverage (11)
+    {},                          // TexModulate (12, synthesized by the texture encoder)
+    {},                          // InputOpaque (13)
+    {},                          // MulAlpha (14)
+    {},                          // PerlinNoise (15): the program-level noise block
 };
 
 constexpr size_t OpContractCount = sizeof(OpContracts) / sizeof(AOTOpContract);
