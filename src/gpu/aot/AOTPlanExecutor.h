@@ -30,6 +30,7 @@
 namespace tgfx {
 class Context;
 class RenderTargetProxy;
+struct AOTChainCompile;
 
 class AOTPlanExecutor {
  public:
@@ -44,12 +45,14 @@ class AOTPlanExecutor {
    * gap).
    *
    * A single chain pass is admitted by the builder's one compile entry — the same call the build
-   * makes, terminal coverage included — so an admitted single pass is by construction buildable.
+   * makes, terminal coverage included — so an admitted single pass is by construction buildable,
+   * and its compiled program is returned through `compiled` for the build to carry on the pass IR.
    * A multi-pass plan is structurally validated here; its segments compile one per pass when
    * BuildPasses builds them.
    */
   static bool CanExecute(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
-                         const std::vector<AOTCoverageTerm>* terminalCoverage = nullptr);
+                         const std::vector<AOTCoverageTerm>* terminalCoverage = nullptr,
+                         AOTChainCompile* compiled = nullptr);
 
   /**
    * Whether a multi-pass plan's fill passes carry local-coordinate leaves (plainly-sampled
@@ -100,6 +103,7 @@ class AOTPlanExecutor {
                           const RenderTargetProxy* destination, const Point& fpCoordOffset,
                           const std::optional<Matrix>& deviceToLocal, AOTRenderPlan* renderPlan,
                           float sourceAlpha = 1.0f,
-                          const std::vector<AOTCoverageTerm>* terminalCoverage = nullptr);
+                          const std::vector<AOTCoverageTerm>* terminalCoverage = nullptr,
+                          AOTChainCompile* singlePassCompiled = nullptr);
 };
 }  // namespace tgfx

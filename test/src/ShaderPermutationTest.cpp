@@ -817,11 +817,9 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
                                                            coverageProcessors, false, &chain));
           ProgramInfo programInfo(renderTarget.get(), gp.get(), xp.get(), BlendMode::SrcOver,
                                   !coverageProcessors.empty());
-          programInfo.setCachedChainProgram(std::move(chain));
           // The interpreter's own match: a program-holding draw resolves through MatchProgram,
           // not the family walk (whose dedicated families would claim the empty processor list).
-          auto match = PointwiseChainShader::MatchProgram(*programInfo.getCachedChainProgram(),
-                                                          &programInfo);
+          auto match = PointwiseChainShader::MatchProgram(chain, &programInfo);
           ASSERT_TRUE(match.has_value());
           ASSERT_LT(match->vertPermutationIndex, info.vertDomain.totalCount());
           ASSERT_LT(match->fragPermutationIndex, info.fragDomain.totalCount());
@@ -871,11 +869,9 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
     ASSERT_TRUE(AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0],
                                                      {coverage.get()}, false, &chain));
     ProgramInfo programInfo(renderTarget.get(), gp.get(), nullptr, BlendMode::SrcOver, true);
-    programInfo.setCachedChainProgram(std::move(chain));
     // The interpreter's own match: a program-holding draw resolves through MatchProgram, not the
     // family walk (whose dedicated families would claim the empty processor list).
-    auto match =
-        PointwiseChainShader::MatchProgram(*programInfo.getCachedChainProgram(), &programInfo);
+    auto match = PointwiseChainShader::MatchProgram(chain, &programInfo);
     ASSERT_TRUE(match.has_value());
     EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "RESOURCE_KIND"), 1);
     EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "TEXTURE_COUNT"), 1);
@@ -979,11 +975,9 @@ TGFX_TEST(ShaderPermutationTest, LUTGradientWithRealMaskUsesAllLeafSelectors) {
     auto gp = MakeSingleIntervalGeometry(&allocator, 1, true);
     ASSERT_NE(gp, nullptr);
     ProgramInfo programInfo(renderTarget.get(), gp.get(), nullptr, BlendMode::SrcOver, false);
-    programInfo.setCachedChainProgram(std::move(program));
     // The interpreter's own match: a program-holding draw resolves through MatchProgram, not the
     // family walk (whose dedicated families would claim the empty processor list).
-    auto match =
-        PointwiseChainShader::MatchProgram(*programInfo.getCachedChainProgram(), &programInfo);
+    auto match = PointwiseChainShader::MatchProgram(program, &programInfo);
     ASSERT_TRUE(match.has_value());
     EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "RESOURCE_KIND"), 1);
     EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "TEXTURE_COUNT"), 1);

@@ -209,20 +209,6 @@ class ProgramInfo {
   Backend backend() const;
 
   /**
-   * The compiled chain program the matcher accepted this draw with, kept so the per-draw upload
-   * (uniforms, samplers, vertex transforms) reads it instead of rebuilding the chain's expression.
-   * Set by the chain family's Extract; a draw this family rejected never fills it. A plan pass
-   * carries its chain processor instead, whose own program() is the same description.
-   */
-  void setCachedChainProgram(AOTProgram program) const {
-    cachedChainProgram = std::move(program);
-  }
-
-  const AOTProgram* getCachedChainProgram() const {
-    return cachedChainProgram.has_value() ? &*cachedChainProgram : nullptr;
-  }
-
-  /**
    * The draw's record-time lowered expression, attached by StandardDrawOp::prepare from the op
    * when the draw carries one and its processor list is the unmodified record-time list (no
    * color override). This is an input, not a cache: set once at construction of the info, read by
@@ -297,9 +283,6 @@ class ProgramInfo {
   // The cached MatchPermutation outcome (see PermutationMatch.h): filled by the first caller and
   // reused by every later lookup of the same info.
   mutable std::optional<PermutationMatchOutcome> cachedMatch;
-
-  // The chain family's compiled program (see the public accessors above).
-  mutable std::optional<AOTProgram> cachedChainProgram = {};
 
   // The draw's record-time DrawIR, attached through setCarriedIR() before first use. Mutable only
   // so the attachment can happen right after construction (the pipeline-state setters already

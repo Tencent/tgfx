@@ -366,55 +366,44 @@ void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* p
   }
 }
 
-// The compiled chain program this draw was accepted with: the program the match walk (or the AOT
-// route, which resolves the draw before any cache lookup) compiled, or — on a program-cache hit,
-// where neither ran for this draw — the program compiled here. The compile is cached on the info
-// and on the draw's carried IR, so the transform, uniform and sampler writes share one and a
-// repeated prepare of the same op (a task-fallback rerun, a probe) never recompiles it.
+// The compiled chain program this draw resolves to: a plan pass carries it on its IR, a draw the
+// match walk compiled carries it there too, and — on a program-cache hit, where the walk never ran
+// for this draw — it is compiled here once and memoized on the same IR. The transform, uniform and
+// sampler writes then share one description, and a repeated prepare of the same op never recompiles.
 static const AOTProgram* ChainProgram(const ProgramInfo& info) {
-  if (auto* cached = info.getCachedChainProgram()) {
-    return cached;
-  }
-  if (auto* carried = info.getCarriedIR();
-      carried != nullptr && carried->compiledProgram.has_value()) {
-    return &*carried->compiledProgram;
-  }
-  AOTProgram program = {};
-  if (!AOTChainBuilder::CompileChainProgramForInfo(&info, &program)) {
+  auto* carried = info.getCarriedIR();
+  if (carried == nullptr) {
     return nullptr;
   }
-  info.setCachedChainProgram(std::move(program));
-  if (auto* carried = info.getCarriedIR()) {
-    carried->compiledProgram = *info.getCachedChainProgram();
+  if (!carried->program.has_value()) {
+    AOTProgram program = {};
+    if (!AOTChainBuilder::CompileChainProgramForInfo(&info, &program)) {
+      return nullptr;
+    }
+    carried->program = std::move(program);
   }
-  return info.getCachedChainProgram();
+  return &*carried->program;
 }
 
-// The compiled YUV tail program, mirroring ChainProgram's caching: compiled here when neither the
-// info cache nor the carried IR holds one, so a repeated prepare of the same op never recompiles.
-// The cache slot is shared with the chain program — a draw resolves to exactly one of the two
-// families, never both.
+// The compiled YUV tail program, mirroring ChainProgram: kept on the draw's IR, compiled here once
+// when the match never needed to (the family's matching reads IR facts only).
 static const AOTProgram* YUVProgram(const ProgramInfo& info) {
-  if (auto* cached = info.getCachedChainProgram()) {
-    return cached;
-  }
-  if (auto* carried = info.getCarriedIR();
-      carried != nullptr && carried->compiledProgram.has_value()) {
-    return &*carried->compiledProgram;
-  }
-  auto context = info.getContext();
-  if (context == nullptr || context->drawingManager() == nullptr) {
+  auto* carried = info.getCarriedIR();
+  if (carried == nullptr) {
     return nullptr;
   }
-  AOTProgram program = {};
-  if (!AOTChainBuilder::CompileYUVProgramForInfo(&info, &program)) {
-    return nullptr;
+  if (!carried->program.has_value()) {
+    auto context = info.getContext();
+    if (context == nullptr || context->drawingManager() == nullptr) {
+      return nullptr;
+    }
+    AOTProgram program = {};
+    if (!AOTChainBuilder::CompileYUVProgramForInfo(&info, &program)) {
+      return nullptr;
+    }
+    carried->program = std::move(program);
   }
-  info.setCachedChainProgram(std::move(program));
-  if (auto* carried = info.getCarriedIR()) {
-    carried->compiledProgram = *info.getCachedChainProgram();
-  }
-  return info.getCachedChainProgram();
+  return &*carried->program;
 }
 
 void YUVProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,

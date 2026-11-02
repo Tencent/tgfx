@@ -234,11 +234,13 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
       // terms cannot merge into refuses the whole task here, keeping the draw on the plain route
       // instead of failing at flush time.
       passIR.coverage = *terminalCoverage;
-      AOTProgram terminalProgram = {};
-      if (!AOTChainBuilder::CompilePassProgram(passIR, &terminalProgram)) {
-        return false;
-      }
     }
+    // The pass program is built here, once, and travels on the IR: prepare never compiles.
+    AOTProgram passProgram = {};
+    if (!AOTChainBuilder::CompilePassProgram(passIR, &passProgram)) {
+      return false;
+    }
+    passIR.program = std::move(passProgram);
     auto ownedIR = allocator->make<DrawIR>(std::move(passIR));
     if (ownedIR == nullptr) {
       return false;
@@ -261,7 +263,8 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
 }  // namespace
 
 bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
-                                 const std::vector<AOTCoverageTerm>* terminalCoverage) {
+                                 const std::vector<AOTCoverageTerm>* terminalCoverage,
+                                 AOTChainCompile* compiled) {
   if (plan.passes.empty() || !plan.output.isValid() || plan.output != graph.root()) {
     return false;
   }
@@ -278,8 +281,14 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
   // register allocation and binding table the build runs, so an admitted pass is by construction
   // buildable.
   if (IsAOTPointwiseDAGKernel(pass.kernel)) {
-    AOTChainCompile compiled = {};
-    return AOTChainBuilder::Compile(graph, pass, terminalCoverage, true, &compiled);
+    AOTChainCompile result = {};
+    if (!AOTChainBuilder::Compile(graph, pass, terminalCoverage, true, &result)) {
+      return false;
+    }
+    if (compiled != nullptr) {
+      *compiled = std::move(result);
+    }
+    return true;
   }
   // The linear kernels: a source node followed by a bounded run of operator slots.
   if (pass.resourceProfile != AOTResourceProfile::Automatic || pass.output != pass.nodes.back()) {
@@ -315,7 +324,8 @@ bool AOTPlanExecutor::BuildPasses(Context* context, uint32_t renderFlags,
                                   const Point& fpCoordOffset,
                                   const std::optional<Matrix>& deviceToLocal,
                                   AOTRenderPlan* renderPlan, float sourceAlpha,
-                                  const std::vector<AOTCoverageTerm>* terminalCoverage) {
+                                  const std::vector<AOTCoverageTerm>* terminalCoverage,
+                                  AOTChainCompile* singlePassCompiled) {
   auto drawingManager = context->drawingManager();
   auto allocator = drawingManager->drawingAllocator();
   if (plan.passes.size() == 1) {
@@ -329,6 +339,13 @@ bool AOTPlanExecutor::BuildPasses(Context* context, uint32_t renderFlags,
       passIR.passDescriptor = pass;
       if (terminalCoverage != nullptr) {
         passIR.coverage = *terminalCoverage;
+      }
+      // The program admission compiled rides the pass IR. Without an admission result (a direct
+      // BuildPasses caller) the same compile runs here, so a built pass IR is never programless.
+      if (singlePassCompiled != nullptr) {
+        passIR.program = std::move(singlePassCompiled->program);
+      } else if (!AOTChainBuilder::CompilePassProgram(passIR, &passIR.program.emplace())) {
+        return false;
       }
       renderPlan->terminalIR = allocator->make<DrawIR>(std::move(passIR));
       return renderPlan->terminalIR != nullptr;
@@ -354,8 +371,13 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(
     const std::vector<AOTCoverageTerm>* terminalCoverage) {
   if (context == nullptr || destination == nullptr || destination->getContext() != context ||
       originalDraw == nullptr || *originalDraw == nullptr ||
-      (*originalDraw)->type() == DrawOp::Type::StencilCoverPathDrawOp ||
-      !CanExecute(graph, plan, terminalCoverage) ||
+      (*originalDraw)->type() == DrawOp::Type::StencilCoverPathDrawOp) {
+    return nullptr;
+  }
+  // Admission compiles a single chain pass; its program rides the terminal pass IR, so the build
+  // and every prepare read it back instead of compiling the same expression again.
+  AOTChainCompile singlePassCompiled = {};
+  if (!CanExecute(graph, plan, terminalCoverage, &singlePassCompiled) ||
       (deviceToLocal.has_value() && deviceToLocal->hasPerspective())) {
     return nullptr;
   }
@@ -384,7 +406,8 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(
     sourceAlpha = color->alpha;
   }
   if (!BuildPasses(context, renderFlags, graph, plan, deviceBounds, destination.get(),
-                   fpCoordOffset, deviceToLocal, &renderPlan, sourceAlpha, terminalCoverage) ||
+                   fpCoordOffset, deviceToLocal, &renderPlan, sourceAlpha, terminalCoverage,
+                   &singlePassCompiled) ||
       !renderPlan.isWellFormed()) {
     return nullptr;
   }

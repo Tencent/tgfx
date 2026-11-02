@@ -43,30 +43,21 @@ std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::Extract(
   if (programInfo->getGeometryProcessor() == nullptr) {
     return std::nullopt;
   }
-  // The interpreter's own subject: the whole effect expression compiles here (a draw this info
-  // already compiled — the AOT route — leaves its program on the cache and is reused as-is).
-  const AOTProgram* compiled = programInfo->getCachedChainProgram();
-  if (compiled == nullptr) {
-    if (auto* carried = programInfo->getCarriedIR();
-        carried != nullptr && carried->compiledProgram.has_value()) {
-      compiled = &*carried->compiledProgram;
-    }
+  // The interpreter's own subject: the whole effect expression is compiled once and kept on the
+  // carried IR — a plan pass arrives with it, a plain draw fills it on this first match, and every
+  // later prepare of the same op reads it back.
+  auto* carried = programInfo->getCarriedIR();
+  if (carried == nullptr) {
+    return std::nullopt;
   }
-  if (compiled == nullptr) {
+  if (!carried->program.has_value()) {
     AOTProgram program = {};
     if (!AOTChainBuilder::CompileChainProgramForInfo(programInfo, &program)) {
       return std::nullopt;
     }
-    // Keep the compiled program on the info and the carried IR: the walk stops here when the
-    // acceptance checks below pass, the winner's writer uploads from it instead of rebuilding the
-    // expression per draw, and a repeated prepare of the same op reuses it without recompiling.
-    programInfo->setCachedChainProgram(std::move(program));
-    compiled = programInfo->getCachedChainProgram();
-    if (auto* carried = programInfo->getCarriedIR()) {
-      carried->compiledProgram = *compiled;
-    }
+    carried->program = std::move(program);
   }
-  return DeriveInputs(*compiled, programInfo, failure);
+  return DeriveInputs(*carried->program, programInfo, failure);
 }
 
 std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::DeriveInputs(

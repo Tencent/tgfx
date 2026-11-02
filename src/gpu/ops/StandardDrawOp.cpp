@@ -152,12 +152,13 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
     if (context == nullptr || context->drawingManager() == nullptr) {
       return false;
     }
-    // The pass IR compiles onto the chain program, whose variant plus the pipeline state form the
-    // key — everything resolves before any cache lookup. The pass info carries no processors: the
-    // program is the whole expression, and the blend formula's coverage bit is false (the kernel
-    // folds coverage itself).
-    AOTProgram aotProgram = {};
-    if (!AOTChainBuilder::CompilePassProgram(*resolvedPassIR, &aotProgram)) {
+    // The pass IR carries its program from the pass build, whose variant plus the pipeline state
+    // form the key — everything resolves before any cache lookup. The pass info carries no
+    // processors: the program is the whole expression, and the blend formula's coverage bit is
+    // false (the kernel folds coverage itself).
+    if (!resolvedPassIR->program.has_value()) {
+      // A pass IR is compiled when the plan builds it; a missing program means the admission
+      // promise was broken, so the draw is dropped instead of compiled on the spot.
       return false;
     }
     auto passInfo = std::make_unique<ProgramInfo>(renderTarget, geometryProcessor.get(),
@@ -169,12 +170,12 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
       passInfo->setDepthStencil(depthStencil);
     }
     onConfigureProgramInfo(*passInfo);
-    AOTProgramInfo aotInfo(*passInfo, aotProgram);
+    AOTProgramInfo aotInfo(*passInfo, *resolvedPassIR->program);
     if (!aotInfo.valid()) {
       // The pass's shape has no variant, or the bundle lacks it: nothing can serve this draw.
       return false;
     }
-    passInfo->setCachedChainProgram(std::move(aotProgram));
+    passInfo->setCarriedIR(resolvedPassIR);
     preparedProgramInfo = std::move(passInfo);
     preparedProgram = aotInfo.program();
     preparedViaDecomposition = true;

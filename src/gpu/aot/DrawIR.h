@@ -149,14 +149,14 @@ struct DrawIR {
    */
   std::optional<AOTPassDescriptor> passDescriptor = std::nullopt;
   /**
-   * The draw's compiled chain program, filled on first use by the plain route's serving (the
-   * matcher's walk or the writer's fallback) and reused across the SAME op's repeated prepares —
-   * a plan-task fallback rerun or a probe re-preparation would otherwise recompile the identical
-   * expression. Mutable like the info caches: an idempotence detail, not draw semantics. Two
-   * distinct draws never share an IR, so cross-draw compilation repeats are the program-signature
-   * cache's problem (P5.0c), not this one. A pass IR leaves it empty.
+   * The draw's compiled program — the chain interpreter's or the YUV tail's, whichever resolves
+   * this IR. A plan pass carries it from the pass build (admission already compiled the same
+   * expression); a plain draw fills it on its first match, so a repeated prepare of the same op
+   * reads it back instead of recompiling. Mutable only for that write-once memo: the matcher holds
+   * a const ProgramInfo, and an idempotent cache is not draw semantics. Two distinct draws never
+   * share an IR, so cross-draw repeats are the program-signature cache's problem, not this one.
    */
-  mutable std::optional<AOTProgram> compiledProgram = std::nullopt;
+  mutable std::optional<AOTProgram> program = std::nullopt;
 };
 
 /**
