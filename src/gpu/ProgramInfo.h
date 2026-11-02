@@ -223,26 +223,6 @@ class ProgramInfo {
   }
 
   /**
-   * The whole-color-expression processor the perlin kernel built while matching this info, kept so
-   * the per-draw value write reuses it instead of rebuilding it. The match walk stops at the first
-   * family that accepts the draw, so the slot always holds the winner's expression; a family whose
-   * acceptance checks fail after building may leave its (unused) expression behind, which only the
-   * winning family's writer reads. Mutable like the match cache: an idempotence detail, not
-   * program state.
-   */
-  void setCachedReexpression(PlacementPtr<FragmentProcessor> expression) const {
-    cachedReexpression = std::move(expression);
-  }
-
-  FragmentProcessor* getCachedReexpression() const {
-    return cachedReexpression.get();
-  }
-
-  PlacementPtr<FragmentProcessor> takeCachedReexpression() const {
-    return std::move(cachedReexpression);
-  }
-
-  /**
    * The draw's record-time lowered expression, attached by StandardDrawOp::prepare from the op
    * when the draw carries one and its processor list is the unmodified record-time list (no
    * color override). This is an input, not a cache: set once at construction of the info, read by
@@ -320,9 +300,6 @@ class ProgramInfo {
 
   // The chain family's compiled program (see the public accessors above).
   mutable std::optional<AOTProgram> cachedChainProgram = {};
-
-  // The perlin family's cached expression (see the public accessors above).
-  mutable PlacementPtr<FragmentProcessor> cachedReexpression = {};
 
   // The draw's record-time DrawIR, attached through setCarriedIR() before first use. Mutable only
   // so the attachment can happen right after construction (the pipeline-state setters already
