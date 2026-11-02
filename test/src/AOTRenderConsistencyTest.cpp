@@ -590,12 +590,12 @@ TGFX_TEST(AOTRenderConsistencyTest, RGBAStandaloneAndFusedTiledReadControl) {
   ExpectTiledReadFormatMatchesReference(PixelFormat::RGBA_8888, true);
 }
 
-// Default-deny shader texture reads: a plain drawImage of a GRAY_8 / RG_88 texture matches a
-// family that never learned the read swizzle (QuadTextureFill / TextureFill). The matcher must
-// refuse it with UnsupportedTextureRead instead of serving the artifact, which read (g, 0, 0, 1)
-// for gray and (r, g, 0, 1) for RG. A loaded bundle disables runtime program builds, so the
-// refused draw is a recorded miss that writes nothing — never the wrong channels — and a counted
-// drop. The refusal is the point of the test, so the bundle route runs in a deliberate-miss scope.
+// Default-deny shader texture reads: a plain drawImage of a GRAY_8 / RG_88 texture cannot be
+// served by any family — lowering fails closed on those sources, so the matcher reports a miss
+// instead of serving an artifact that would read (g, 0, 0, 1) for gray and (r, g, 0, 1) for RG.
+// A loaded bundle disables runtime program builds, so the refused draw is a recorded miss that
+// writes nothing — never the wrong channels — and a counted drop. The refusal is the point of the
+// test, so the bundle route runs in a deliberate-miss scope.
 static void ExpectPlainReadFormatRefusedWithoutWrongPixels(PixelFormat format) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -647,7 +647,7 @@ static void ExpectPlainReadFormatRefusedWithoutWrongPixels(PixelFormat format) {
     if (useBundle) {
       EXPECT_EQ(cache->drawStats().deliberateDroppedDraws, 1u);
       EXPECT_EQ(cache->drawStats().droppedDraws, 0u);
-      EXPECT_GT(cache->fallbackCount(PrecompiledFallbackReason::UnsupportedTextureRead), 0u);
+      EXPECT_GT(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
       for (const auto& hit : cache->hitRecords()) {
         EXPECT_NE(hit.shaderName, "QuadTextureFillShader");
       }

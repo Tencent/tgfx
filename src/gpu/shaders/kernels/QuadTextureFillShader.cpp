@@ -19,15 +19,8 @@
 #include "gpu/shaders/kernels/QuadTextureFillShader.h"
 #include <optional>
 #include "gpu/ProgramInfo.h"
-#include "gpu/ShaderMatchHelpers.h"
 #include "gpu/aot/AOTChainBuilder.h"
 #include "gpu/aot/AOTDrawFacts.h"
-#include "gpu/processors/DeviceSpaceTextureEffect.h"
-#include "gpu/processors/PorterDuffXferProcessor.h"
-#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
-#include "gpu/processors/RRectEffect.h"
-#include "gpu/processors/RectEffect.h"
-#include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
 
@@ -69,29 +62,9 @@ std::optional<QuadTextureFillShader::Inputs> QuadTextureFillShader::ExtractFacts
     return std::nullopt;
   }
   if (facts.ir == nullptr) {
-    // A draw whose lowering refused (the fail-closed gray/RG plain sources) keeps the walk's
-    // original acceptance: the post-match texture-read check is what refuses it, and the
-    // read-fallback reason that classification depends on must keep firing.
-    if (facts.info == nullptr) {
-      return std::nullopt;
-    }
-    auto* fp = facts.info->getFragmentProcessor(0);
-    if (!IsProcessor<TextureEffect>(fp)) {
-      return std::nullopt;
-    }
-    auto* te = static_cast<const TextureEffect*>(fp);
-    if (te->numTextureSamplers() == 0 || te->isYUV()) {
-      return std::nullopt;
-    }
-    Inputs inputs;
-    inputs.hasUVCoord = !facts.geometry.hasUVMatrix;
-    inputs.hasSubset = facts.geometry.hasSubset;
-    if (inputs.hasSubset && (facts.geometry.hasUVPerspective || te->hasPerspective())) {
-      return std::nullopt;
-    }
-    inputs.hasLocalMask = hasLocalMask;
-    inputs.xpType = xpType;
-    return inputs;
+    // A lowering-refused source (a plain gray/RG read, or a view-less proxy with no pending
+    // upload) has no graph to match: no family serves it.
+    return std::nullopt;
   }
   // The single color processor is the IR's bare texture leaf (no operators above it; the leaf's
   // existence implies its proxy — the failed-instantiation corner the old sampler count guarded

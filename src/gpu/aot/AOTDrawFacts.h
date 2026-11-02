@@ -28,12 +28,12 @@ namespace tgfx {
 class ProgramInfo;
 
 /**
- * The live coverage port's raw texture facts — the third channel (see `info`): read off the sole
- * coverage processor, for draws whose coverage the record-time IR cannot express. A rasterized
- * shape's mask grows only at prepare (the staleness guard drops exactly that IR), so no term
- * exists for it; the MaskFill family reads these facts instead. Not a classification: it makes no
- * claim the IR side would have to mirror — the equivalence between the IR terms and the live tree
- * constrains classifications only, never raw instance facts.
+ * The live coverage port's raw texture facts — the third channel (see `liveMask` below): read off
+ * the sole coverage processor, for draws whose coverage the record-time IR cannot express. A
+ * rasterized shape's mask grows only at prepare (the staleness guard drops exactly that IR), so no
+ * term exists for it; the MaskFill family reads these facts instead. Not a classification: it
+ * makes no claim the IR side would have to mirror — the equivalence between the IR terms and the
+ * live tree constrains classifications only, never raw instance facts.
  */
 struct AOTLiveMaskFacts {
   bool present = false;
@@ -64,13 +64,11 @@ struct AOTLiveGradientFacts {
  * processor-list sizes. The executor-table rows are predicates over this — one extraction
  * replaces every family re-deriving the same facts from the processor tree.
  *
- * `info` stays as the one instance-time escape hatch: a row reads it only for facts the
- * record-time IR cannot carry (a pending multi-plane upload's eventual layout). It shrinks
- * away as the node contracts absorb the instance facts.
+ * The IR is the only record-time source; instance-time facts are read off the made processors
+ * (geometry, xfer) or off the IR node's own proxy (a pending multi-plane upload's layout).
  */
 struct AOTDrawFacts {
   const DrawIR* ir = nullptr;
-  const ProgramInfo* info = nullptr;
   AOTGeometryDesc geometry = {};
   AOTXferKind xfer = AOTXferKind::Unsupported;
   bool alphaOnlyTarget = false;

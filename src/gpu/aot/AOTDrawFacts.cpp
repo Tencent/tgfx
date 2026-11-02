@@ -27,7 +27,6 @@ namespace tgfx {
 
 AOTDrawFacts ExtractAOTDrawFacts(const ProgramInfo* programInfo) {
   AOTDrawFacts facts = {};
-  facts.info = programInfo;
   facts.alphaOnlyTarget = programInfo->getOutputSwizzle() == Swizzle::AAAA();
   facts.colorFPCount = programInfo->numColorFragmentProcessors();
   facts.fragmentCount = programInfo->numFragmentProcessors();
@@ -42,7 +41,7 @@ AOTDrawFacts ExtractAOTDrawFacts(const ProgramInfo* programInfo) {
   facts.xfer = ClassifyXferForMatch(programInfo->getXferProcessor());
   // The third channel: the sole coverage processor's raw texture facts, read live. A
   // prepare-grown mask (the rasterized shape) lowers to no record-time term, so its family reads
-  // these instead of the IR — the same escape hatch as the YUV pending format.
+  // these instead of the IR.
   if (facts.fragmentCount == facts.colorFPCount + 1) {
     auto* fp = programInfo->getFragmentProcessor(static_cast<uint32_t>(facts.colorFPCount));
     if (IsProcessor<TextureEffect>(fp)) {

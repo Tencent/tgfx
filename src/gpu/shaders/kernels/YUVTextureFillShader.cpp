@@ -22,9 +22,8 @@
 #include "gpu/aot/AOTChainBuilder.h"
 #include "gpu/aot/AOTDrawFacts.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
-#include "gpu/processors/RRectEffect.h"
-#include "gpu/processors/RectEffect.h"
-#include "gpu/processors/TextureEffect.h"
+#include "gpu/proxies/TextureProxy.h"
+#include "gpu/resources/YUVTextureView.h"
 
 namespace tgfx {
 
@@ -65,23 +64,18 @@ std::optional<YUVTextureFillShader::Inputs> YUVTextureFillShader::ExtractFacts(
   int yuvFormat = shape.leaf->yuvFormat;
   if (yuvFormat < 0) {
     // A pending multi-plane upload lowers with the layout unknown (it exists only once the
-    // view does): read it off the tree's TextureEffect — an instance-time fact, like the
-    // upload values that stay on the processor until the node contract lands. A tree that
-    // disagrees with the leaf's YUV-ness is a stale record-time lowering: reject.
-    const TextureEffect* texture = nullptr;
-    for (size_t index = 0; index < facts.fragmentCount; ++index) {
-      auto* fp = facts.info->getFragmentProcessor(index);
-      if (IsProcessor<TextureEffect>(fp)) {
-        texture = static_cast<const TextureEffect*>(fp);
-        break;
-      }
-    }
-    if (texture == nullptr || !texture->isYUV()) {
+    // view does): the node's own proxy is the single source — it resolves the same view the
+    // processor wraps, read without going through the processor tree.
+    auto textureView = shape.leaf->textureProxy != nullptr
+                           ? shape.leaf->textureProxy->getTextureView()
+                           : nullptr;
+    if (textureView == nullptr || !textureView->isYUV()) {
       return std::nullopt;
     }
-    if (texture->yuvFormat() == YUVFormat::I420) {
+    auto* yuvView = static_cast<const YUVTextureView*>(textureView.get());
+    if (yuvView->yuvFormat() == YUVFormat::I420) {
       yuvFormat = 0;
-    } else if (texture->yuvFormat() == YUVFormat::NV12) {
+    } else if (yuvView->yuvFormat() == YUVFormat::NV12) {
       yuvFormat = 1;
     } else {
       return std::nullopt;
