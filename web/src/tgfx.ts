@@ -46,6 +46,8 @@ export const createImageFromBytes = (bytes: ArrayBuffer) => {
     return createImage(URL.createObjectURL(blob));
 };
 
+let readPixelFailureWarned = false;
+
 export const readImagePixels = (module: TGFX, image: CanvasImageSource, width: number, height: number): Uint8ClampedArray | null => {
     if (!image) {
         return null;
@@ -70,11 +72,21 @@ export const readImagePixels = (module: TGFX, image: CanvasImageSource, width: n
         }
         return data;
     } catch (error) {
-        // A cross-origin source without CORS taints the canvas, and a tainted canvas must never
-        // return to the shared pool: every later getImageData() on it would keep throwing a
-        // SecurityError. Resetting the size discards the canvas instead of pooling it.
-        canvas.width = 0;
-        canvas.height = 0;
+        if ((error as DOMException)?.name === 'SecurityError') {
+            // A cross-origin source without CORS taints the canvas, and a tainted canvas must never
+            // return to the shared pool: every later getImageData() on it would keep throwing a
+            // SecurityError. Resetting the size discards the canvas instead of pooling it.
+            canvas.width = 0;
+            canvas.height = 0;
+        } else {
+            // A detached ImageBitmap or a zero-sized readback fails without tainting the canvas,
+            // and getCanvas2D() clears the bitmap when the canvas is reused, so it stays poolable.
+            releaseCanvas2D(canvas);
+        }
+        if (!readPixelFailureWarned) {
+            readPixelFailureWarned = true;
+            console.warn('readImagePixels failed:', error);
+        }
         return null;
     }
 };
@@ -256,15 +268,14 @@ export const getBytesFromPath = async (module: TGFX, path: string) => {
     return new Uint8Array(buffer);
 };
 
-// Software adapters such as SwiftShader cannot import external images at all, and there is no
-// adapter info query available on the C++ side to probe for this capability. Latch onto the CPU
-// readback fallback after a few consecutive failures instead of paying for a DOMException per
-// frame. The count resets on the first success and when a new device is imported, so a
-// momentarily unavailable frame or a lost device cannot permanently disable the fast path.
-const EXTERNAL_IMAGE_IMPORT_MAX_FAILURES = 3;
-let externalImageImportFailures = 0;
-let externalImageImportUnsupported = false;
+// Software adapters such as SwiftShader cannot import external images, and the C++ side has no
+// adapter info query to probe for that capability. The fast path is retried on every frame instead
+// of latching onto the readback fallback: a rejected import costs roughly 3.4us when Blink refuses
+// the source before taking a snapshot and at most the ~240us of a successful snapshot, against the
+// ~2.3ms CPU readback that follows, so latching would trade a few percent of an already slow frame
+// for a permanent downgrade after a transient failure.
 let crossOriginUploadWarned = false;
+let fallbackWarned = false;
 
 export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr: number,
                                            width: number, height: number, deviceId?: number) => {
@@ -295,30 +306,28 @@ export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr:
     if (!device || !device.queue) {
         return;
     }
-    if (!externalImageImportUnsupported) {
-        try {
-            device.queue.copyExternalImageToTexture(
-                {source: source},
-                {texture: gpuTexture, premultipliedAlpha: true},
-                [width, height]
-            );
-            externalImageImportFailures = 0;
+    try {
+        device.queue.copyExternalImageToTexture(
+            {source: source},
+            {texture: gpuTexture, premultipliedAlpha: true},
+            [width, height]
+        );
+        return;
+    } catch (error) {
+        // A SecurityError means the source is tainted (cross-origin without CORS), and the CPU
+        // fallback cannot read its pixels either, so skip this frame.
+        if ((error as DOMException)?.name === 'SecurityError') {
+            if (!crossOriginUploadWarned) {
+                crossOriginUploadWarned = true;
+                console.warn('WebGPU video upload skipped a cross-origin video:', error);
+            }
             return;
-        } catch (error) {
-            // A SecurityError means the source is tainted (cross-origin without CORS), and the
-            // CPU fallback cannot read its pixels either, so skip the frame without latching:
-            // one bad video must not downgrade every other video in the session.
-            if ((error as DOMException)?.name === 'SecurityError') {
-                if (!crossOriginUploadWarned) {
-                    crossOriginUploadWarned = true;
-                    console.warn('WebGPU video upload skipped a cross-origin video:', error);
-                }
-                return;
-            }
-            if (++externalImageImportFailures >= EXTERNAL_IMAGE_IMPORT_MAX_FAILURES) {
-                externalImageImportUnsupported = true;
-                console.warn('WebGPU video upload falls back to CPU readback:', error);
-            }
+        }
+        // Any other failure means this adapter cannot import the frame. Fall back for this frame
+        // only and try the fast path again on the next one.
+        if (!fallbackWarned) {
+            fallbackWarned = true;
+            console.warn('WebGPU video upload falls back to CPU readback:', error);
         }
     }
     // Fall back to a CPU readback through a 2D canvas and upload the raw pixels with
@@ -397,9 +406,6 @@ export const importWebGPUDevice = (WebGPU: EmscriptenWebGPU, device: any) => {
     if (!WebGPU || !device || !device.queue) {
         return 0;
     }
-    // A newly imported device must not inherit the fallback latch of a lost one.
-    externalImageImportFailures = 0;
-    externalImageImportUnsupported = false;
     // The command queue has to travel with the device, otherwise the runtime cannot resolve it.
     return WebGPU.mgrDevice.create(device, {queueId: WebGPU.mgrQueue.create(device.queue)});
 };
