@@ -53,20 +53,30 @@ export const readImagePixels = (module: TGFX, image: CanvasImageSource, width: n
     const canvas = getCanvas2D(width, height);
     const ctx = canvas.getContext('2d', {willReadFrequently: true}) as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
     if (!ctx) {
+        releaseCanvas2D(canvas);
         return null;
     }
-    // Use "copy" composite operation to avoid source-over blending artifacts from canvas reuse.
-    // This ensures the image pixels are written directly without compositing with any residual
-    // background, which can cause white fringe on semi-transparent edges.
-    ctx.globalCompositeOperation = 'copy';
-    ctx.drawImage(image, 0, 0, width, height);
-    ctx.globalCompositeOperation = 'source-over';
-    const {data} = ctx.getImageData(0, 0, width, height);
-    releaseCanvas2D(canvas);
-    if (data.length === 0) {
+    try {
+        // Use "copy" composite operation to avoid source-over blending artifacts from canvas reuse.
+        // This ensures the image pixels are written directly without compositing with any residual
+        // background, which can cause white fringe on semi-transparent edges.
+        ctx.globalCompositeOperation = 'copy';
+        ctx.drawImage(image, 0, 0, width, height);
+        ctx.globalCompositeOperation = 'source-over';
+        const {data} = ctx.getImageData(0, 0, width, height);
+        releaseCanvas2D(canvas);
+        if (data.length === 0) {
+            return null;
+        }
+        return data;
+    } catch (error) {
+        // A cross-origin source without CORS taints the canvas, and a tainted canvas must never
+        // return to the shared pool: every later getImageData() on it would keep throwing a
+        // SecurityError. Resetting the size discards the canvas instead of pooling it.
+        canvas.width = 0;
+        canvas.height = 0;
         return null;
     }
-    return new Uint8Array(data);
 };
 
 export const hasWebpSupport = () => {
@@ -246,6 +256,8 @@ export const getBytesFromPath = async (module: TGFX, path: string) => {
     return new Uint8Array(buffer);
 };
 
+let externalImageImportUnsupported = false;
+
 export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr: number,
                                            width: number, height: number, deviceId?: number) => {
     if (!source || !texturePtr) {
@@ -275,36 +287,42 @@ export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr:
     if (!device || !device.queue) {
         return;
     }
-    try {
-        device.queue.copyExternalImageToTexture(
-            {source: source},
-            {texture: gpuTexture, premultipliedAlpha: true},
-            [width, height]
-        );
-    } catch (error) {
-        // Software adapters such as SwiftShader cannot import external images at all, so both
-        // video and canvas sources fail here. Fall back to a CPU readback through a 2D canvas
-        // and upload the raw pixels with writeTexture, which works on any adapter. Video frames
-        // are opaque, so the unpremultiplied readback matches the premultipliedAlpha target.
-        const canvas = getCanvas2D(width, height);
-        const context = canvas.getContext('2d', {willReadFrequently: true}) as
-            CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
-        if (!context) {
-            releaseCanvas2D(canvas);
+    // Software adapters such as SwiftShader cannot import external images at all. There is no
+    // adapter info query available on the C++ side to probe for this capability, so the first
+    // failure is cached and later frames go straight to the CPU readback instead of paying for
+    // a DOMException per frame.
+    if (!externalImageImportUnsupported) {
+        try {
+            device.queue.copyExternalImageToTexture(
+                {source: source},
+                {texture: gpuTexture, premultipliedAlpha: true},
+                [width, height]
+            );
             return;
+        } catch (error) {
+            externalImageImportUnsupported = true;
         }
-        // Use "copy" to write the frame without compositing against any residual content.
-        context.globalCompositeOperation = 'copy';
-        context.drawImage(source, 0, 0, width, height);
-        context.globalCompositeOperation = 'source-over';
-        const {data} = context.getImageData(0, 0, width, height);
-        releaseCanvas2D(canvas);
+    }
+    // Fall back to a CPU readback through a 2D canvas and upload the raw pixels with
+    // writeTexture, which is a staging-buffer upload that works on any adapter. PAG videos pack
+    // the alpha channel into the frame itself, so frames are opaque and the unpremultiplied
+    // readback matches the premultipliedAlpha target. Videos with a real codec alpha channel
+    // (VP9 or AV1 alpha) would render semi-transparent areas too bright here, which is a known
+    // limitation of this fallback.
+    const pixels = readImagePixels(module, source, width, height);
+    if (!pixels) {
+        return;
+    }
+    try {
         device.queue.writeTexture(
             {texture: gpuTexture},
-            data,
+            pixels,
             {bytesPerRow: width * 4, rowsPerImage: height},
             [width, height]
         );
+    } catch (error) {
+        // Blink throws an OperationError when the device is lost. Dropping the frame keeps the
+        // flush alive, and the texture simply keeps its previous content.
     }
 };
 
