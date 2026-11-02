@@ -30,13 +30,13 @@
 #include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PermutationMatch.h"
-#include "gpu/ShaderMatchHelpers.h"
 #include "gpu/PrecompiledBundleIdentity.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProgramWriter.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ShaderKeyHash.h"
+#include "gpu/ShaderMatchHelpers.h"
 #include "gpu/ShaderProfile.h"
 #include "gpu/ShaderProfileResolver.h"
 #include "gpu/aot/AOTChainBuilder.h"
@@ -2508,15 +2508,12 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
                        : std::vector<FragmentProcessor*>{coverage.get(), clip.get()};
     ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), processors, 0,
                             nullptr, BlendMode::SrcOver);
-    // The coverage classification reads the record-time IR's terms: lower the same expression the
-    // op would have lowered at record time and carry it, as the plain route's prepare does. The
-    // geometry desc and the xfer kind ride along too — the record-time facts the op's tryLowerIR
-    // fills, which the prepare twins derive from the same processors.
+    // The coverage classification reads the carried IR's terms: lower the same expression the op
+    // would have lowered at record time and carry it, as the plain route's prepare does. The
+    // geometry and xfer facts the matchers read come off the made processors at match time.
     std::vector<const FragmentProcessor*> coverageList(processors.begin(), processors.end());
     auto ir = LowerDraw({}, coverageList, nullptr, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
-    ir->geometry = DescribeGeometryProcessor(gp.get());
-    ir->xfer = ClassifyXferRecordTime(nullptr);
     programInfo.setCarriedIR(&*ir);
     auto failure = PermutationMatchFailure::CoverageShape;
     auto match = MatchPermutation(&programInfo, &failure);
@@ -2544,8 +2541,6 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
                                 static_cast<const FragmentProcessor*>(secondCoverage.get())},
                                nullptr, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(twoMaskIR.has_value());
-    twoMaskIR->geometry = DescribeGeometryProcessor(gp.get());
-    twoMaskIR->xfer = ClassifyXferRecordTime(nullptr);
     programInfo.setCarriedIR(&*twoMaskIR);
     auto failure = PermutationMatchFailure::None;
     EXPECT_FALSE(MatchPermutation(&programInfo, &failure).has_value());

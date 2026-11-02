@@ -90,13 +90,6 @@ PlacementPtr<GeometryProcessor> ShapeDrawOp::onMakeGeometryProcessor(RenderTarge
                                         renderTarget->height(), aa, viewMatrix, realUVMatrix);
 }
 
-AOTGeometryDesc ShapeDrawOp::recordTimeGeometry() const {
-  // The processor is always a DefaultGeometryProcessor; the matchers read no further facts of it.
-  AOTGeometryDesc desc = {};
-  desc.kind = AOTGeometryKind::Default;
-  return desc;
-}
-
 void ShapeDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   auto vertexBuffer = shapeProxy->getTriangles();
   if (vertexBuffer != nullptr) {

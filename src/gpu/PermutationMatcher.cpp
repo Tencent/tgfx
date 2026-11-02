@@ -16,8 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/aot/AOTDrawFacts.h"
-#include "gpu/aot/KernelTable.h"
 #include <skcms.h>
 #include <string_view>
 #include <type_traits>
@@ -28,7 +26,9 @@
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/Swizzle.h"
+#include "gpu/aot/AOTDrawFacts.h"
 #include "gpu/aot/DrawIR.h"
+#include "gpu/aot/KernelTable.h"
 #include "gpu/aot/Program.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
@@ -91,21 +91,6 @@ int GetXPType(const ProgramInfo* programInfo) {
       break;
   }
   return XP_UNSUPPORTED;
-}
-
-AOTXferKind ClassifyXferRecordTime(const XferProcessor* xp) {
-  if (xp == nullptr || xp == EmptyXferProcessor::GetInstance()) {
-    return AOTXferKind::None;
-  }
-  if (IsProcessor<PorterDuffXferProcessor>(xp)) {
-    // The dst-texture decision was made when the op was recorded: a dst-texture processor holds
-    // its proxy, a framebuffer-fetch one holds empty info. Nothing here needs an instantiation.
-    return static_cast<const PorterDuffXferProcessor*>(xp)->getDstTextureInfo().textureProxy !=
-                   nullptr
-               ? AOTXferKind::DstTexture
-               : AOTXferKind::FrameBufferFetch;
-  }
-  return AOTXferKind::Unsupported;
 }
 
 AOTXferKind ClassifyXferForMatch(const XferProcessor* xp) {
@@ -210,8 +195,8 @@ const AOTTextureParameters* LocalMaskCoverageLeaf(const DrawIR* ir) {
     auto* textureParams = std::get_if<AOTTextureParameters>(&texture->parameters);
     auto* blendParams = std::get_if<AOTBlendParameters>(&blend->parameters);
     if (textureParams == nullptr || blendParams == nullptr ||
-        blendParams->blendMode != static_cast<int>(BlendMode::SrcIn) || blendParams->childType != 0 ||
-        !IsLocalMaskTexture(*textureParams)) {
+        blendParams->blendMode != static_cast<int>(BlendMode::SrcIn) ||
+        blendParams->childType != 0 || !IsLocalMaskTexture(*textureParams)) {
       continue;
     }
     return textureParams;
@@ -266,30 +251,16 @@ std::optional<CoverageKind> ClassifyCoverageTerms(const ProgramInfo* programInfo
   return ClassifyCoverageTerm(*classified);
 }
 
-
-
-int GetGPType(const GeometryProcessor* gp) {
-  auto name = gp->name();
-  if (name == "DefaultGeometryProcessor") {
-    return 0;
-  }
-  if (name == "QuadPerEdgeAAGeometryProcessor") {
-    return 1;
-  }
-  return -1;
-}
-
 AOTGeometryDesc DescribeGeometryProcessor(const GeometryProcessor* gp) {
   AOTGeometryDesc desc = {};
   if (gp == nullptr) {
     return desc;
   }
-  auto gpType = GetGPType(gp);
-  if (gpType == 0) {
+  const auto gpName = gp->name();
+  if (gpName == "DefaultGeometryProcessor") {
     desc.kind = AOTGeometryKind::Default;
     return desc;
   }
-  const auto gpName = gp->name();
   if (gpName == "NonAARRectGeometryProcessor") {
     auto* rrectGP = static_cast<const NonAARRectGeometryProcessor*>(gp);
     desc.kind = AOTGeometryKind::NonAARRect;
@@ -350,7 +321,7 @@ AOTGeometryDesc DescribeGeometryProcessor(const GeometryProcessor* gp) {
         static_cast<const AtlasTextGeometryProcessor*>(gp)->getAAType() == AAType::Coverage;
     return desc;
   }
-  if (gpType != 1) {
+  if (gpName != "QuadPerEdgeAAGeometryProcessor") {
     return desc;
   }
   auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
@@ -360,24 +331,6 @@ AOTGeometryDesc DescribeGeometryProcessor(const GeometryProcessor* gp) {
   desc.hasSubset = quadGP->getHasSubset();
   desc.hasUVPerspective = quadGP->getHasUVPerspective();
   return desc;
-}
-
-// The position-only rect GP forms the texture and noise fill kernels share: a DefaultGP, or a
-// QuadPerEdgeAA GP whose coordinate comes from aPosition (a common color, a uv matrix, no
-// per-quad subset), since those precompiled vertex stages declare aPosition plus the optional AA
-// coverage attribute only.
-bool IsPositionOnlyRectGP(const GeometryProcessor* gp) {
-  int gpType = GetGPType(gp);
-  if (gpType < 0) {
-    return false;
-  }
-  if (gpType == 1) {
-    auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-    if (!quadGP->hasCommonColor() || !quadGP->hasUVMatrix() || quadGP->getHasSubset()) {
-      return false;
-    }
-  }
-  return true;
 }
 
 // ShaderMode values the shared single-tap tiled_sample.inc handles for the blur tap loop:

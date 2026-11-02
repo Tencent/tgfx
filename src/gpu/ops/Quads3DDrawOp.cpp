@@ -72,17 +72,6 @@ PlacementPtr<GeometryProcessor> Quads3DDrawOp::onMakeGeometryProcessor(RenderTar
                                               false);
 }
 
-AOTGeometryDesc Quads3DDrawOp::recordTimeGeometry() const {
-  // The same members onMakeGeometryProcessor feeds the processor with; this op never carries a
-  // per-quad subset (the Make call hardcodes false).
-  AOTGeometryDesc desc = {};
-  desc.kind = AOTGeometryKind::QuadPerEdgeAA;
-  desc.hasCommonColor = commonColor.has_value();
-  desc.hasUVMatrix = uvMatrix.has_value();
-  desc.hasUVPerspective = uvMatrix.has_value() && uvMatrix->hasPerspective();
-  return desc;
-}
-
 void Quads3DDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   std::shared_ptr<BufferResource> indexBuffer = nullptr;
   if (indexBufferProxy) {

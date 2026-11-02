@@ -42,20 +42,12 @@ struct PermutationMatchResult;
 struct PermutationVariant;
 enum class PermutationMatchFailure;
 
-/// Describes a geometry processor's matcher-relevant facts — the prepare-time twin of the
-/// record-time AOTGeometryDesc the op self-reports. The debug assertion in
-/// StandardDrawOp::prepare compares the two, so an op that describes itself wrong fails loudly
-/// instead of mis-routing; the executor-table matching later reads the record-time form only.
+/// Describes a geometry processor's matcher-relevant facts — the one description of the draw's
+/// geometry the executor-table matching reads, taken off the made processor at match time.
 AOTGeometryDesc DescribeGeometryProcessor(const GeometryProcessor* gp);
 
-/// The record-time xfer classification: the dst-texture decision was made when the op was
-/// recorded (the dst-texture processor is built with its proxy, the framebuffer-fetch one with
-/// empty info), so asking the processor's own dst info is exact before anything is instantiated.
-AOTXferKind ClassifyXferRecordTime(const XferProcessor* xp);
-
-/// The prepare-time xfer classification — what GetXPType reports for the draw's info. The
-/// debug assertion compares the two forms, so a record-time classification that would
-/// mis-route the executor-table matching fails loudly.
+/// The xfer classification the matcher facts read — what GetXPType reports for the draw's info,
+/// taken off the made xfer processor at match time.
 AOTXferKind ClassifyXferForMatch(const XferProcessor* xp);
 
 /// Whether a color-space transform's steps fit the single-slot fill kernel's precompiled
@@ -76,13 +68,6 @@ enum class CoverageKind {
 
 /// 0 = Empty XferProcessor, 1 = PorterDuff DST_TEX, 2 = PorterDuff FBF, -1 = none representable.
 int GetXPType(const ProgramInfo* programInfo);
-
-/// 0 = DefaultGeometryProcessor, 1 = QuadPerEdgeAAGeometryProcessor, -1 = anything else.
-int GetGPType(const GeometryProcessor* gp);
-
-/// True when the GP is a position-only rect form (Default, or a Quad with common color, a UV
-/// matrix and no subset): the plain fill kernels' vertex contract.
-bool IsPositionOnlyRectGP(const GeometryProcessor* gp);
 
 /// Whether a ShaderMode value is one the tiled fill kernel implements.
 bool TiledFillModeSupported(int mode);

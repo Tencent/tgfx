@@ -108,17 +108,6 @@ class DrawOp {
   void tryLowerIR();
 
   /**
-   * The geometry facts the op's prepare-time geometry processor will carry, described at record
-   * time (the processor itself does not exist yet). The default reports Other; every op whose
-   * processor is a DefaultGeometryProcessor or a QuadPerEdgeAAGeometryProcessor overrides this
-   * from the same members its onMakeGeometryProcessor reads, so the two cannot drift (asserted
-   * at prepare in debug builds).
-   */
-  virtual AOTGeometryDesc recordTimeGeometry() const {
-    return {};
-  }
-
-  /**
    * The record-time source of the AtlasText glyph leaf: the op's atlas proxy and sampling, which
    * the prepare-time geometry processor merely re-derives. Nullopt for every other op, and for an
    * atlas the chain cannot carry (a color atlas replaces the output color): such draws keep the

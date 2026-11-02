@@ -18,6 +18,7 @@
 
 #include "StandardDrawOp.h"
 #include "core/utils/Log.h"
+#include "gpu/AOTShapeRules.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/Program.h"
@@ -26,14 +27,11 @@
 #include "gpu/aot/AOTProgramInfo.h"
 #include "gpu/aot/DrawIR.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
+#include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/Processor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
-#include "gpu/ShaderMatchHelpers.h"
-#include "gpu/AOTShapeRules.h"
-#include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
-
 #include "gpu/shaders/kernels/PointwiseChainShader.h"
 
 namespace tgfx {
@@ -64,7 +62,7 @@ namespace {
 // Multi-leaf shapes (blend DAGs, a mask-modulated shader) have no unambiguous correspondence
 // here and are skipped — the rows' shapes are single-leaf.
 void AssertSingleLeafFacts(const DrawIR& ir,
-                            const std::vector<PlacementPtr<FragmentProcessor>>& colors) {
+                           const std::vector<PlacementPtr<FragmentProcessor>>& colors) {
   const AOTTextureParameters* leaf = nullptr;
   size_t leafCount = 0;
   for (uint32_t index = 0; index < ir.color.nodeCount(); ++index) {
@@ -106,7 +104,8 @@ void AssertSingleLeafFacts(const DrawIR& ir,
   if (leaf->samplingKind == AOTTextureSamplingKind::Plain) {
     auto* te = static_cast<const TextureEffect*>(texture);
     DEBUG_ASSERT(te->isYUV() == leaf->isYUV && te->isAlphaOnly() == leaf->isAlphaOnly &&
-                 te->hasRGBAAA() == leaf->hasRGBAAA && te->hasPerspective() == leaf->hasPerspective);
+                 te->hasRGBAAA() == leaf->hasRGBAAA &&
+                 te->hasPerspective() == leaf->hasPerspective);
   } else if (leaf->samplingKind == AOTTextureSamplingKind::Tiled) {
     auto* tiled = static_cast<const TiledTextureEffect*>(texture);
     DEBUG_ASSERT(tiled->isAlphaOnly() == leaf->isAlphaOnly &&
@@ -128,34 +127,14 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget,
     return false;
   }
 #if DEBUG
-  // The record-time geometry descriptor must agree with the processor the op actually built:
-  // an op that self-reports wrong would mis-route the executor-table matching silently. The
-  // whole suite runs this on every IR-carrying draw, so the coverage is every drawable shape.
-  // The descriptor is asserted only while it is the one being served — the staleness guard's own
+  // The leaf twin runs while the carried IR is the one being served — the staleness guard's own
   // window: a color override (a plan task's pass colors) describes a different expression, and an
   // expression that grew at prepare (a rasterized shape attaches its mask coverage only once the
-  // shape proxy exists) drops the IR from the info. Outside the window the descriptor feeds no
-  // decision — the match facts fall back to the prepare twins — so a stale copy there is inert,
-  // not a mis-route.
+  // shape proxy exists) drops the IR from the info.
   const bool irServes = !colorOverride.has_value() && loweredIR() != nullptr &&
                         loweredIR()->colorFPCount == colors.size() &&
                         loweredIR()->coverageFPCount == coverages.size();
   if (irServes) {
-    auto actual = DescribeGeometryProcessor(geometryProcessor.get());
-    // A failure here means a recordTimeGeometry() override is wrong or missing (the record-time
-    // geometry descriptor drifted from the made geometry processor).
-    DEBUG_ASSERT(ir->geometry.kind == actual.kind && ir->geometry.hasCommonColor == actual.hasCommonColor &&
-                 ir->geometry.hasUVMatrix == actual.hasUVMatrix &&
-                 ir->geometry.hasSubset == actual.hasSubset &&
-                 ir->geometry.hasUVPerspective == actual.hasUVPerspective &&
-                 ir->geometry.isStroke == actual.isStroke &&
-                 ir->geometry.hasTexCoords == actual.hasTexCoords &&
-                 ir->geometry.hasCoverage == actual.hasCoverage);
-    // The xfer twin: the record-time classification asks the processor's own dst info, the
-    // match-time one the instantiated view — a disagreement means the dst-texture timing
-    // assumption is wrong somewhere, and the executor-table matching would mis-route.
-    DEBUG_ASSERT(ir->xfer == ClassifyXferForMatch(xferProcessor.get()));
-    // The leaf twin runs against the unmodified record-time color list.
     AssertSingleLeafFacts(*ir, colors);
   }
 #endif

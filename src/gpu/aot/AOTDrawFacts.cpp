@@ -34,15 +34,12 @@ AOTDrawFacts ExtractAOTDrawFacts(const ProgramInfo* programInfo) {
   facts.coverage = ClassifyCoverageTerms(programInfo);
   facts.ir = programInfo->getCarriedIR();
   if (facts.ir != nullptr) {
-    facts.geometry = facts.ir->geometry;
-    facts.xfer = facts.ir->xfer;
     facts.colorFromPaint = facts.ir->colorFromPaint;
-  } else {
-    // A draw without a carried IR still has exact facts: the descriptor twins read the made
-    // processor and the xfer the same way the record-time forms would have.
-    facts.geometry = DescribeGeometryProcessor(programInfo->getGeometryProcessor());
-    facts.xfer = ClassifyXferForMatch(programInfo->getXferProcessor());
   }
+  // The geometry and xfer facts are match-time facts: the matching runs after the processors
+  // exist, so they are described off the made processors — one description, no record-time copy.
+  facts.geometry = DescribeGeometryProcessor(programInfo->getGeometryProcessor());
+  facts.xfer = ClassifyXferForMatch(programInfo->getXferProcessor());
   // The third channel: the sole coverage processor's raw texture facts, read live. A
   // prepare-grown mask (the rasterized shape) lowers to no record-time term, so its family reads
   // these instead of the IR — the same escape hatch as the YUV pending format.
@@ -69,11 +66,9 @@ AOTDrawFacts ExtractAOTDrawFacts(const ProgramInfo* programInfo) {
       facts.liveGradient.singleInterval =
           gradient->numChildProcessors() == 2 &&
           IsProcessor<SingleIntervalGradientColorizer>(gradient->childProcessor(0));
-      auto* layout =
-          gradient->numChildProcessors() == 2 ? gradient->childProcessor(1) : nullptr;
-      facts.liveGradient.hasPerspective =
-          layout == nullptr || layout->numCoordTransforms() != 1 ||
-          layout->coordTransform(0)->matrix.hasPerspective();
+      auto* layout = gradient->numChildProcessors() == 2 ? gradient->childProcessor(1) : nullptr;
+      facts.liveGradient.hasPerspective = layout == nullptr || layout->numCoordTransforms() != 1 ||
+                                          layout->coordTransform(0)->matrix.hasPerspective();
     }
   }
   return facts;

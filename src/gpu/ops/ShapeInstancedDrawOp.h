@@ -44,8 +44,6 @@ class ShapeInstancedDrawOp : public StandardDrawOp {
  protected:
   PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
 
-  AOTGeometryDesc recordTimeGeometry() const override;
-
   void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
   Type type() const override {

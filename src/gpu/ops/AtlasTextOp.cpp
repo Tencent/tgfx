@@ -65,14 +65,6 @@ PlacementPtr<GeometryProcessor> AtlasTextOp::onMakeGeometryProcessor(RenderTarge
   return AtlasTextGeometryProcessor::Make(allocator, textureProxy, aaType, commonColor, sampling);
 }
 
-AOTGeometryDesc AtlasTextOp::recordTimeGeometry() const {
-  // The same aaType onMakeGeometryProcessor passes to the processor; both are record-time facts.
-  AOTGeometryDesc desc = {};
-  desc.kind = AOTGeometryKind::AtlasText;
-  desc.hasCoverage = aaType == AAType::Coverage;
-  return desc;
-}
-
 std::optional<AOTAtlasGlyphSource> AtlasTextOp::recordTimeAtlasSource() const {
   // Only the alpha-only atlas readback is expressible on the chain: a color atlas replaces the
   // output color, so such draws keep the plain path (no IR), exactly as before.

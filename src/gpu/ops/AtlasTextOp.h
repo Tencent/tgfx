@@ -40,8 +40,6 @@ class AtlasTextOp final : public StandardDrawOp {
   std::optional<AOTAtlasGlyphSource> recordTimeAtlasSource() const override;
 
  protected:
-  AOTGeometryDesc recordTimeGeometry() const override;
-
   PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
 
   void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;

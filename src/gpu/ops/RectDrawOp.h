@@ -95,8 +95,6 @@ class RectDrawOp : public StandardDrawOp {
     return Type::RectDrawOp;
   }
 
-  AOTGeometryDesc recordTimeGeometry() const override;
-
  private:
   size_t rectCount = 0;
   std::optional<LineJoin> lineJoin = std::nullopt;

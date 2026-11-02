@@ -58,11 +58,11 @@ struct AOTLiveGradientFacts {
 };
 
 /**
- * A draw's matcher facts, extracted once per match: the record-time geometry and xfer
- * descriptors off the carried IR (their prepare-time twins when a draw carries no IR), the
- * target's alpha-only flag, the live processor-list sizes, and the coverage classification.
- * The executor-table rows are predicates over this — one extraction replaces every family
- * re-deriving the same facts from the processor tree.
+ * A draw's matcher facts, extracted once per match: the geometry and xfer described off the made
+ * processors (the matching runs at prepare, where they are the truth), the coverage
+ * classification off the carried IR's terms, the target's alpha-only flag, and the live
+ * processor-list sizes. The executor-table rows are predicates over this — one extraction
+ * replaces every family re-deriving the same facts from the processor tree.
  *
  * `info` stays as the one instance-time escape hatch: a row reads it only for facts the
  * record-time IR cannot carry (a pending multi-plane upload's eventual layout). It shrinks
@@ -92,9 +92,9 @@ struct AOTDrawFacts {
   /// extracted whenever the draw carries exactly one color FP.
   AOTLiveGradientFacts liveGradient = {};
 
-  /// The position-only rect form the texture and noise fill kernels share (IsPositionOnlyRectGP's
-  /// semantics): a DefaultGP, or a QuadPerEdgeAA whose coordinate comes from aPosition (a common
-  /// color, a uv matrix, no per-quad subset).
+  /// The position-only rect form the texture and noise fill kernels share: a DefaultGP, or a
+  /// QuadPerEdgeAA whose coordinate comes from aPosition (a common color, a uv matrix, no
+  /// per-quad subset).
   bool positionOnlyRect() const {
     return geometry.kind == AOTGeometryKind::Default ||
            (geometry.kind == AOTGeometryKind::QuadPerEdgeAA && geometry.hasCommonColor &&

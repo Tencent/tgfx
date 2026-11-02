@@ -56,13 +56,6 @@ PlacementPtr<GeometryProcessor> HairlineQuadOp::onMakeGeometryProcessor(
                                              aaType);
 }
 
-AOTGeometryDesc HairlineQuadOp::recordTimeGeometry() const {
-  // The processor is always a HairlineQuadGeometryProcessor; the matchers read no further facts.
-  AOTGeometryDesc desc = {};
-  desc.kind = AOTGeometryKind::HairlineQuad;
-  return desc;
-}
-
 bool HairlineQuadOp::onPrepare() {
   // The hairline vertex buffer is produced asynchronously and may be empty when the path has
   // no quadratic segments after decomposition. The index buffer comes from the global cache

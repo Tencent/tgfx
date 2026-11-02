@@ -93,24 +93,6 @@ PlacementPtr<GeometryProcessor> RectDrawOp::onMakeGeometryProcessor(RenderTarget
                                               hasSubset);
 }
 
-AOTGeometryDesc RectDrawOp::recordTimeGeometry() const {
-  AOTGeometryDesc desc = {};
-  if (lineJoin == LineJoin::Round) {
-    // The round-stroke processor: the matchers read the UV-matrix presence and perspective.
-    desc.kind = AOTGeometryKind::RoundStrokeRect;
-    desc.hasUVMatrix = uvMatrix.has_value();
-    desc.hasUVPerspective = uvMatrix.has_value() && uvMatrix->hasPerspective();
-    return desc;
-  }
-  // The same members onMakeGeometryProcessor feeds the processor with.
-  desc.kind = AOTGeometryKind::QuadPerEdgeAA;
-  desc.hasCommonColor = commonColor.has_value();
-  desc.hasUVMatrix = uvMatrix.has_value();
-  desc.hasSubset = hasSubset;
-  desc.hasUVPerspective = uvMatrix.has_value() && uvMatrix->hasPerspective();
-  return desc;
-}
-
 static uint16_t GetNumIndicesPerQuad(AAType aaType, const std::optional<LineJoin>& lineJoin) {
   const auto isAA = aaType == AAType::Coverage;
   if (!lineJoin) {

@@ -109,17 +109,6 @@ PlacementPtr<GeometryProcessor> ShapeInstancedDrawOp::onMakeGeometryProcessor(
                                                realUVMatrix, viewMatrix);
 }
 
-AOTGeometryDesc ShapeInstancedDrawOp::recordTimeGeometry() const {
-  // The processor is always a ShapeInstancedGeometryProcessor; the texture-coverage family also
-  // reads its AA form. The rasterized path flips the processor to AAType::None at prepare, but
-  // only by attaching the mask coverage — exactly the growth that drops the IR, so the desc is
-  // asserted (and consumed) solely while it is still the served one.
-  AOTGeometryDesc desc = {};
-  desc.kind = AOTGeometryKind::ShapeInstanced;
-  desc.hasCoverage = aaType == AAType::Coverage;
-  return desc;
-}
-
 void ShapeInstancedDrawOp::onDraw(RenderPass* renderPass, RenderTarget* /*renderTarget*/) {
   auto vertexBuffer = shapeProxy->getTriangles();
   auto instanceBuffer = instanceBufferProxy->getBuffer();

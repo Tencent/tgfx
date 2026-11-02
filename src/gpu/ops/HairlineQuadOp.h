@@ -41,8 +41,6 @@ class HairlineQuadOp final : public StandardDrawOp {
  protected:
   PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
 
-  AOTGeometryDesc recordTimeGeometry() const override;
-
   bool onPrepare() override;
 
   void onDraw(RenderPass* renderPass, RenderTarget* renderTarget) override;

@@ -60,8 +60,8 @@ struct AOTCoverageTerm {
 };
 
 /**
- * The draw's geometry kind as the matchers see it: the two processor classes the precompiled
- * kernels serve, and everything else.
+ * The draw's geometry kind as the matchers see it: one value per processor class the precompiled
+ * kernels serve, and Other for everything else.
  */
 enum class AOTGeometryKind : uint8_t {
   Other = 0,
@@ -87,11 +87,9 @@ enum class AOTGeometryKind : uint8_t {
 };
 
 /**
- * The geometry facts a draw's matcher rules read, as plain data. Recorded when the draw is
- * recorded — the op describes the processor it will build from the same members its
- * onMakeGeometryProcessor reads (the processor itself is a prepare-time object). The prepare-side
- * debug assertion compares this against the made processor, so an op that describes itself
- * wrong fails loudly instead of mis-routing.
+ * The geometry facts a draw's matcher rules read, as plain data. Described off the made geometry
+ * processor at match time (DescribeGeometryProcessor) — the matching runs at prepare, where the
+ * processor itself is the truth, so there is one description and no record-time copy.
  */
 struct AOTGeometryDesc {
   AOTGeometryKind kind = AOTGeometryKind::Other;
@@ -110,10 +108,10 @@ struct AOTGeometryDesc {
 
 /**
  * The xfer classification the matcher rules read (the XP_* vocabulary's plain-data twin): how
- * the destination color reaches the fragment shader. Exact at record time — the dst-texture
- * decision is made when the op is recorded (the dst-texture processor is built with its proxy,
- * the framebuffer-fetch one with empty info), so asking the processor's own dst info needs
- * nothing that only exists at prepare.
+ * the destination color reaches the fragment shader. Classified off the made xfer processor at
+ * match time — the dst-texture decision was made when the op was recorded (a dst-texture
+ * processor holds its proxy, a framebuffer-fetch one empty info), so the processor's own dst
+ * info is exact.
  */
 enum class AOTXferKind : uint8_t {
   Unsupported = 0,
@@ -129,12 +127,8 @@ enum class AOTXferKind : uint8_t {
  * decided, replacing the per-shape enumerations it used to be spread over.
  */
 struct DrawIR {
-  /// The geometry facts, recorded at record time from the op's own state.
-  AOTGeometryDesc geometry = {};
   AOTEffectGraph color = {};
   std::vector<AOTCoverageTerm> coverage = {};
-  /// The xfer classification, recorded at record time from the op's own xfer processor.
-  AOTXferKind xfer = AOTXferKind::Unsupported;
   BlendMode blendMode = BlendMode::SrcOver;
   /// Whether the draw's color comes from the paint rather than any color processor: the lowering
   /// synthesized the white unit-color chain for it. A draw with an explicit ConstColorProcessor
@@ -208,8 +202,7 @@ std::optional<DrawIR> LowerDraw(const std::vector<const FragmentProcessor*>& col
 std::optional<DrawIR> LowerDrawWithAtlas(
     const std::vector<const FragmentProcessor*>& colorProcessors,
     const std::vector<const FragmentProcessor*>& coverageProcessors,
-    const AOTAtlasGlyphSource& atlas, BlendMode blendMode,
-    BlockAllocator* allocator);
+    const AOTAtlasGlyphSource& atlas, BlendMode blendMode, BlockAllocator* allocator);
 
 /**
  * Diagnostic counters over LowerDraw: how many successful lowerings have run since the last
