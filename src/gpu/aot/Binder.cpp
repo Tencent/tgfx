@@ -28,6 +28,7 @@
 #include "gpu/resources/YUVTextureView.h"
 #include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
+#include "gpu/shaders/modules/BlendParams.h"
 #include "gpu/shaders/modules/BlurKernelModule.h"
 #include "gpu/shaders/modules/ChainParams.h"
 #include "gpu/shaders/modules/DeviceMaskModule.h"
@@ -664,7 +665,7 @@ void BindDeviceMaskLeaf(const AOTTextureParameters& mask, ParamWriter* writer) {
   writer->set(AnalyticClipModule::HasClip, 0);
 }
 
-void BindGradientEffectNode(const AOTGradientParameters& params, ParamWriter* writer) {
+void BindGradientNode(const AOTGradientParameters& params, ParamWriter* writer) {
   const float left[4] = {params.leftBorder[0], params.leftBorder[1], params.leftBorder[2],
                          params.leftBorder[3]};
   writer->set(GradientModule::LeftBorderColor, left);
@@ -673,19 +674,24 @@ void BindGradientEffectNode(const AOTGradientParameters& params, ParamWriter* wr
   writer->set(GradientModule::RightBorderColor, right);
   writer->set(DeviceMaskModule::HasDeviceMask, 0);
   writer->set(GradientModule::LayoutType, params.layoutType);
+  if (params.layoutType == 2) {
+    // The conic layout child's fields; other layouts carry none.
+    writer->set(GradientModule::Bias, params.bias);
+    writer->set(GradientModule::Scale, params.scale);
+  }
+  if (params.colorizerKind == 0) {
+    // The single-interval colorizer child's fields; other colorizers carry none.
+    const float start[4] = {params.start[0], params.start[1], params.start[2], params.start[3]};
+    writer->set(GradientModule::Start, start);
+    const float end[4] = {params.end[0], params.end[1], params.end[2], params.end[3]};
+    writer->set(GradientModule::End, end);
+    writer->set(GradientModule::ColorizerKind, params.colorizerKind);
+  }
 }
 
-void BindConicLayoutNode(const AOTGradientParameters& params, ParamWriter* writer) {
-  writer->set(GradientModule::Bias, params.bias);
-  writer->set(GradientModule::Scale, params.scale);
-}
-
-void BindColorizerNode(const AOTGradientParameters& params, ParamWriter* writer) {
-  const float start[4] = {params.start[0], params.start[1], params.start[2], params.start[3]};
-  writer->set(GradientModule::Start, start);
-  const float end[4] = {params.end[0], params.end[1], params.end[2], params.end[3]};
-  writer->set(GradientModule::End, end);
-  writer->set(GradientModule::ColorizerKind, params.colorizerKind);
+void BindBlendNode(const AOTBlendParameters& params, ParamWriter* writer) {
+  writer->setArrayElement(BlendParams::BlendModeValue, 0, params.blendMode);
+  writer->set(BlendParams::ChildType, params.childType);
 }
 
 void BindAlphaThresholdNode(float threshold, ParamWriter* writer) {
@@ -811,15 +817,12 @@ void BindChainBindings(const AOTProgram& program, UniformData* fragmentUniformDa
   int textureOrdinal = 0;
   for (const auto& binding : program.bindings) {
     if (binding.kind == AOTBinding::Kind::Mask) {
-      fragmentUniformData->structuralSuffix = "";
       writer.setInstanceOrdinal(0);
       BindDeviceMaskBinding(binding, fragmentUniformData);
       continue;
     }
-    auto structural = textureOrdinal > 0 ? "_" + std::to_string(textureOrdinal) : "";
     writer.setInstanceOrdinal(static_cast<size_t>(textureOrdinal));
     ++textureOrdinal;
-    fragmentUniformData->structuralSuffix = structural;
     auto textureView = binding.textureProxy->getTextureView();
     if (textureView == nullptr) {
       // The texture is not instantiated (a failed or deferred upload): the module writer returns
@@ -840,7 +843,6 @@ void BindChainBindings(const AOTProgram& program, UniformData* fragmentUniformDa
     writer.set(TextureSourceModule::AlphaOnly, binding.textureProxy->isAlphaOnly() ? 1 : 0);
     writer.set(TextureSourceModule::HasRgbaaa, binding.alphaStart != Point::Zero() ? 1 : 0);
   }
-  fragmentUniformData->structuralSuffix = "";
 }
 
 }  // namespace tgfx

@@ -5,6 +5,7 @@
 // program with a resolved parameter layout the writes go through the offset path (one pointer
 // lookup, no name composition); the name path stays as the authority every miss falls back to.
 #pragma once
+#include <string>
 #include <type_traits>
 #include "gpu/UniformData.h"
 #include "gpu/shaders/modules/ParamHandle.h"
@@ -17,9 +18,9 @@ class ParamWriter {
   explicit ParamWriter(const UniformData* uniforms) : uniforms(uniforms) {
   }
 
-  /// The structural instance the next writes address (Subset / Subset_1 / ...): kept in step
-  /// with the uniform walk's structuralSuffix, so the offset path and the name path address the
-  /// same field.
+  /// The structural instance the next writes address (Subset / Subset_1 / ...): the offset
+  /// path takes it as the slot's instance index, and the name-path fallback composes it into
+  /// the field name, so the two paths address the same field.
   void setInstanceOrdinal(size_t ordinal) {
     instanceOrdinal = ordinal;
   }
@@ -29,7 +30,7 @@ class ParamWriter {
       if (uniforms->writeParamKey(&param, instanceOrdinal, &value, sizeof(value))) {
         return;
       }
-      uniforms->setDataOptional(param.name, value);
+      uniforms->setDataOptional(OrdinalName(param.name), value);
     }
   }
 
@@ -38,7 +39,7 @@ class ParamWriter {
       if (uniforms->writeParamKey(&param, instanceOrdinal, value, sizeof(value))) {
         return;
       }
-      uniforms->setDataOptional(param.name, value);
+      uniforms->setDataOptional(OrdinalName(param.name), value);
     }
   }
 
@@ -47,7 +48,7 @@ class ParamWriter {
       if (uniforms->writeParamKey(&param, instanceOrdinal, value, sizeof(value))) {
         return;
       }
-      uniforms->setDataOptional(param.name, value);
+      uniforms->setDataOptional(OrdinalName(param.name), value);
     }
   }
 
@@ -56,7 +57,7 @@ class ParamWriter {
       if (uniforms->writeParamKey(&param, instanceOrdinal, &value, sizeof(value))) {
         return;
       }
-      uniforms->setDataOptional(param.name, value);
+      uniforms->setDataOptional(OrdinalName(param.name), value);
     }
   }
 
@@ -65,7 +66,7 @@ class ParamWriter {
       if (uniforms->writeParamKey(&param, instanceOrdinal, matrix)) {
         return;
       }
-      uniforms->setDataOptional(param.name, matrix);
+      uniforms->setDataOptional(OrdinalName(param.name), matrix);
     }
   }
 
@@ -74,7 +75,7 @@ class ParamWriter {
       if (uniforms->writeParamKey(&param, instanceOrdinal, aligned.data(), sizeof(aligned))) {
         return;
       }
-      uniforms->setDataOptional(param.name, aligned);
+      uniforms->setDataOptional(OrdinalName(param.name), aligned);
     }
   }
 
@@ -82,7 +83,7 @@ class ParamWriter {
   void set(const Param<ParamType::Float4Array>& param, const std::array<float, N>& values) {
     // The table kinds write whole arrays of varying length; they keep the name path.
     if (uniforms != nullptr) {
-      uniforms->setDataOptional(param.name, values);
+      uniforms->setDataOptional(OrdinalName(param.name), values);
     }
   }
 
@@ -99,7 +100,7 @@ class ParamWriter {
           }
         }
       }
-      uniforms->setArrayElementOptional(param.name, index, value);
+      uniforms->setArrayElementOptional(OrdinalName(param.name), index, value);
     }
   }
 
@@ -116,6 +117,13 @@ class ParamWriter {
   }
 
  private:
+  /// The fallback name the instance ordinal implies: instance 0 keeps the base name, later
+  /// instances append their ordinal ("Subset_1") -- the addressing the kernel's fields declare.
+  std::string OrdinalName(const char* name) const {
+    return instanceOrdinal == 0 ? std::string(name)
+                                : std::string(name) + "_" + std::to_string(instanceOrdinal);
+  }
+
   const UniformData* uniforms = nullptr;
   size_t instanceOrdinal = 0;
 };

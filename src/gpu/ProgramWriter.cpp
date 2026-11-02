@@ -30,19 +30,21 @@
 #include "gpu/aot/AOTChainBuilder.h"
 #include "gpu/aot/Binder.h"
 #include "gpu/aot/EffectGraph.h"
+#include "gpu/ColorSpaceXformHelper.h"
+#include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
 #include "gpu/processors/ConicGradientLayout.h"
+#include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/GaussianBlur1DFragmentProcessor.h"
 #include "gpu/processors/LumaFragmentProcessor.h"
-#include "gpu/processors/PorterDuffXferProcessor.h"
-#include "gpu/processors/AlphaThresholdFragmentProcessor.h"
-#include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/RectEffect.h"
 #include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/SingleIntervalGradientColorizer.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
+#include "gpu/processors/PorterDuffXferProcessor.h"
+#include "gpu/shaders/modules/ColorSpaceParams.h"
 #include "gpu/resources/RenderTarget.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
 #include "gpu/shaders/modules/DeviceMaskModule.h"
@@ -52,6 +54,10 @@
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
+
+// The compiled YUV tail program, mirroring ChainProgram: kept on the draw's IR, compiled here
+// once when the match never needed to (the family's matching reads IR facts only).
+static const AOTProgram* YUVProgram(const ProgramInfo& info);
 
 #if DEBUG
 // Prints one bound sampler slot of the TGFX_UNIF_DUMP trace: which texture the slot received, so
@@ -105,13 +111,6 @@ static AddressMode ToAddressMode(TileMode tileMode) {
       return AddressMode::ClampToBorder;
   }
   return AddressMode::ClampToEdge;
-}
-
-// TextureEffect and TiledTextureEffect must share ONE ordinal sequence: both write the same
-// per-texture uniform names (Subset/AlphaOnly/...).
-static std::string UniformSpaceKey(const FragmentProcessor* fp) {
-  auto name = fp->name();
-  return name == "TiledTextureEffect" ? std::string("TextureEffect") : name;
 }
 
 bool ProgramWriter::write(const ProgramInfo& info, RenderPass* renderPass, Program* program) const {
@@ -226,20 +225,6 @@ void RuntimeProgramWriter::writeSamplers(const ProgramInfo& info, Program* /*pro
   }
 }
 
-void PrecompiledProgramWriter::beginUniformWrites(UniformData* vertexUniformData,
-                                                  UniformData* fragmentUniformData) const {
-  // UniformData is reused across draws, so clear the per-texture structural ordinal left over
-  // from a previous draw before writing the base-name uniforms above (RTAdjust / the engine
-  // defaults). A stale suffix would misdirect those writes (e.g. tgfx_RTAdjust_1) on the
-  // precompiled path.
-  if (vertexUniformData != nullptr) {
-    vertexUniformData->structuralSuffix = "";
-  }
-  if (fragmentUniformData != nullptr) {
-    fragmentUniformData->structuralSuffix = "";
-  }
-}
-
 void PrecompiledProgramWriter::writeEngineDefaults(const ProgramInfo& info,
                                                    UniformData* fragmentUniformData) const {
   if (fragmentUniformData == nullptr) {
@@ -284,10 +269,19 @@ static bool TakeLeafByProxy(std::vector<const AOTTextureParameters*>& leaves,
   return false;
 }
 
-void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
-                                               UniformData* vertexUniformData,
-                                               UniformData* fragmentUniformData,
-                                               const FragmentProcessor* /*expression*/) const {
+// TextureEffect and TiledTextureEffect must share ONE ordinal sequence: both write the same
+// per-texture uniform names (Subset/AlphaOnly/...).
+static std::string UniformSpaceKey(const FragmentProcessor* fp) {
+  auto name = fp->name();
+  return name == "TiledTextureEffect" ? std::string("TextureEffect") : name;
+}
+
+// The tree walk (the S4.4 form): the IR facts bind per processor as the walk visits it, and the
+// processors no IR fact covers -- the glass family's opaque kernels -- keep their setData writes.
+// It serves the IRs the action list cannot yet: anything carrying a non-gaussian opaque kernel.
+void PrecompiledProgramWriter::writeProcessorsByTree(const ProgramInfo& info,
+                                                     UniformData* vertexUniformData,
+                                                     UniformData* fragmentUniformData) const {
   ParamWriter paramWriter(fragmentUniformData);
   const auto* carriedIR = info.getCarriedIR();
   // The carried IR is the lowered form of this very processor tree, so every module-bound
@@ -415,7 +409,6 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
   size_t alphaThresholdCursor = 0;
   size_t gradientCursor = 0;
   size_t blurCursor = 0;
-  const AOTGradientParameters* lastGradient = nullptr;
   for (auto& fragmentProcessor : info.fragmentProcessors) {
     FragmentProcessor::Iter iter(fragmentProcessor);
     const FragmentProcessor* fp = iter.next();
@@ -424,12 +417,6 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
       int ordinal = classOrdinals[UniformSpaceKey(fp)]++;
       std::string structural = ordinal > 0 ? "_" + std::to_string(ordinal) : "";
       paramWriter.setInstanceOrdinal(static_cast<size_t>(ordinal));
-      if (vertexUniformData != nullptr) {
-        vertexUniformData->structuralSuffix = structural;
-      }
-      if (fragmentUniformData != nullptr) {
-        fragmentUniformData->structuralSuffix = structural;
-      }
       bool bound = false;
       if (IsProcessor<TextureEffect>(fp)) {
         auto proxy = static_cast<const TextureEffect*>(fp)->getTextureProxy();
@@ -472,22 +459,11 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
           bound = true;
         }
       } else if (IsProcessor<ClampedGradientEffect>(fp)) {
+        // The merged node writes the effect's fields and, gated by its own discriminators, the
+        // conic layout's and the single-interval colorizer's -- everything the three separate
+        // processors used to bind on their own visits.
         if (gradientCursor < gradients.size()) {
-          lastGradient = gradients[gradientCursor++];
-          BindGradientEffectNode(*lastGradient, &paramWriter);
-          bound = true;
-        }
-      } else if (IsProcessor<ConicGradientLayout>(fp)) {
-        // The layout is a child of the gradient effect the walk just consumed, so its values
-        // are the same gradient node's parameters.
-        if (lastGradient != nullptr) {
-          BindConicLayoutNode(*lastGradient, &paramWriter);
-          bound = true;
-        }
-      } else if (IsProcessor<SingleIntervalGradientColorizer>(fp)) {
-        // The colorizer is the gradient effect's other child; same node, its colorizer fields.
-        if (lastGradient != nullptr) {
-          BindColorizerNode(*lastGradient, &paramWriter);
+          BindGradientNode(*gradients[gradientCursor++], &paramWriter);
           bound = true;
         }
       } else if (IsProcessor<GaussianBlur1DFragmentProcessor>(fp)) {
@@ -516,6 +492,290 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
     BindPorterDuffXfer(static_cast<int>(carriedIR->blendMode), processor, &paramWriter);
   } else {
     processor->setData(vertexUniformData, fragmentUniformData);
+  }
+}
+
+void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
+                                               UniformData* vertexUniformData,
+                                               UniformData* fragmentUniformData,
+                                               const FragmentProcessor* /*expression*/) const {
+  ParamWriter paramWriter(fragmentUniformData);
+  const auto* carriedIR = info.getCarriedIR();
+  if (carriedIR == nullptr) {
+    // A served draw always carries its IR (the match read it); this is the defensive hole.
+    return;
+  }
+  // One bind action per IR fact, collected in the walk's own pre-order (the graph stores its
+  // nodes post-order), so the per-class instance ordinals the kernel's fields address (Subset /
+  // Subset_1, BlendModeValue / BlendModeValue_1) keep the numbering the processor walk used to
+  // compute. The whole upload reads the IR -- no FragmentProcessor is consulted anywhere.
+  struct Action {
+    enum class Kind {
+      PlainLeaf,
+      TiledLeaf,
+      DeviceMask,
+      RectClip,
+      RRectClip,
+      ColorMatrix,
+      Luma,
+      AlphaThreshold,
+      ColorSpaceXform,
+      Blend,
+      Gradient,
+      Blur,
+    } kind = Kind::PlainLeaf;
+    size_t ordinal = 0;
+    const AOTTextureParameters* leaf = nullptr;
+    const AOTTextureParameters* blurChild = nullptr;
+    const AOTRectCoverageParameters* rectClip = nullptr;
+    const AOTRRectCoverageParameters* rrectClip = nullptr;
+    const AOTColorMatrixParameters* colorMatrix = nullptr;
+    const AOTLumaParameters* luma = nullptr;
+    float alphaThreshold = 0.0f;
+    const AOTColorSpaceXformParameters* colorSpaceXform = nullptr;
+    const AOTBlendParameters* blend = nullptr;
+    const AOTGradientParameters* gradient = nullptr;
+    const AOTOpaqueKernelParameters* blur = nullptr;
+  };
+  std::vector<Action> actions = {};
+  size_t textureOrdinal = 0;
+  size_t blendOrdinal = 0;
+  // The glass family's opaque kernels (kind 1/2) still upload through their processors'
+  // setData; an IR carrying one takes the tree walk instead of the action list.
+  bool hasProcessorBoundOpaqueKernel = false;
+  const auto collect = [&](const AOTEffectGraph& graph, auto&& self, AOTNodeID nodeID) -> void {
+    const auto* node = graph.nodeAt(nodeID);
+    Action action = {};
+    bool resolved = false;
+    switch (node->kind) {
+      case AOTEffectKind::TextureSource: {
+        auto* leaf = std::get_if<AOTTextureParameters>(&node->parameters);
+        if (leaf == nullptr || leaf->textureProxy == nullptr) {
+          break;
+        }
+        if (leaf->samplingKind == AOTTextureSamplingKind::Device) {
+          action.kind = Action::Kind::DeviceMask;
+        } else if (leaf->tiledRecipe.has_value()) {
+          action.kind = Action::Kind::TiledLeaf;
+          action.ordinal = textureOrdinal++;
+        } else if (leaf->samplingKind == AOTTextureSamplingKind::Plain) {
+          action.kind = Action::Kind::PlainLeaf;
+          action.ordinal = textureOrdinal++;
+        } else {
+          break;
+        }
+        action.leaf = leaf;
+        resolved = true;
+        break;
+      }
+      case AOTEffectKind::ColorMatrix: {
+        auto* params = std::get_if<AOTColorMatrixParameters>(&node->parameters);
+        if (params != nullptr) {
+          action.kind = Action::Kind::ColorMatrix;
+          action.colorMatrix = params;
+          resolved = true;
+        }
+        break;
+      }
+      case AOTEffectKind::Luma: {
+        auto* params = std::get_if<AOTLumaParameters>(&node->parameters);
+        if (params != nullptr) {
+          action.kind = Action::Kind::Luma;
+          action.luma = params;
+          resolved = true;
+        }
+        break;
+      }
+      case AOTEffectKind::AlphaThreshold: {
+        auto* params = std::get_if<AOTAlphaThresholdParameters>(&node->parameters);
+        if (params != nullptr) {
+          action.kind = Action::Kind::AlphaThreshold;
+          action.alphaThreshold = params->threshold;
+          resolved = true;
+        }
+        break;
+      }
+      case AOTEffectKind::ColorSpaceXform: {
+        auto* params = std::get_if<AOTColorSpaceXformParameters>(&node->parameters);
+        if (params != nullptr) {
+          action.kind = Action::Kind::ColorSpaceXform;
+          action.colorSpaceXform = params;
+          resolved = true;
+        }
+        break;
+      }
+      case AOTEffectKind::Blend: {
+        auto* params = std::get_if<AOTBlendParameters>(&node->parameters);
+        if (params != nullptr) {
+          action.kind = Action::Kind::Blend;
+          action.ordinal = blendOrdinal++;
+          action.blend = params;
+          resolved = true;
+        }
+        break;
+      }
+      case AOTEffectKind::GradientSource: {
+        auto* params = std::get_if<AOTGradientParameters>(&node->parameters);
+        if (params != nullptr) {
+          action.kind = Action::Kind::Gradient;
+          action.gradient = params;
+          resolved = true;
+        }
+        break;
+      }
+      case AOTEffectKind::RectCoverage: {
+        auto* params = std::get_if<AOTRectCoverageParameters>(&node->parameters);
+        if (params != nullptr) {
+          action.kind = Action::Kind::RectClip;
+          action.rectClip = params;
+          resolved = true;
+        }
+        break;
+      }
+      case AOTEffectKind::RRectCoverage: {
+        auto* params = std::get_if<AOTRRectCoverageParameters>(&node->parameters);
+        if (params != nullptr) {
+          action.kind = Action::Kind::RRectClip;
+          action.rrectClip = params;
+          resolved = true;
+        }
+        break;
+      }
+      case AOTEffectKind::OpaqueKernel: {
+        auto* params = std::get_if<AOTOpaqueKernelParameters>(&node->parameters);
+        if (params == nullptr) {
+          break;
+        }
+        action.kind = Action::Kind::Blur;
+        action.blur = params;
+        if (params->kernelKind != 0) {
+          hasProcessorBoundOpaqueKernel = true;
+        }
+        if (!node->inputs.empty()) {
+          const auto* childNode = graph.nodeAt(node->inputs[0]);
+          if (childNode != nullptr && childNode->kind == AOTEffectKind::TextureSource) {
+            action.blurChild = std::get_if<AOTTextureParameters>(&childNode->parameters);
+          }
+        }
+        resolved = true;
+        break;
+      }
+      default:
+        break;
+    }
+    if (resolved) {
+      actions.push_back(action);
+    }
+    for (const auto& input : node->inputs) {
+      self(graph, self, input);
+    }
+  };
+  if (carriedIR->color.root().isValid()) {
+    collect(carriedIR->color, collect, carriedIR->color.root());
+  }
+  if (hasProcessorBoundOpaqueKernel) {
+    writeProcessorsByTree(info, vertexUniformData, fragmentUniformData);
+    return;
+  }
+  for (const auto& term : carriedIR->coverage) {
+    switch (term.kind) {
+      case AOTCoverageTermKind::DeviceMask:
+        if (term.mask.textureProxy != nullptr) {
+          Action action = {};
+          action.kind = Action::Kind::DeviceMask;
+          action.leaf = &term.mask;
+          actions.push_back(action);
+        }
+        break;
+      case AOTCoverageTermKind::Analytic:
+      case AOTCoverageTermKind::Subtree:
+      case AOTCoverageTermKind::Glyph:
+        if (term.root.isValid()) {
+          collect(term.graph, collect, term.root);
+        }
+        break;
+    }
+  }
+  for (const auto& action : actions) {
+    paramWriter.setInstanceOrdinal(action.ordinal);
+    switch (action.kind) {
+      case Action::Kind::PlainLeaf:
+        BindTextureSourceLeaf(*action.leaf, &paramWriter);
+        break;
+      case Action::Kind::TiledLeaf:
+        BindTiledSourceLeaf(*action.leaf, &paramWriter);
+        break;
+      case Action::Kind::DeviceMask:
+        BindDeviceMaskLeaf(*action.leaf, &paramWriter);
+        break;
+      case Action::Kind::RectClip:
+        if (action.rectClip != nullptr) {
+          BindRectClipNode(*action.rectClip, &paramWriter);
+        }
+        break;
+      case Action::Kind::RRectClip:
+        if (action.rrectClip != nullptr) {
+          BindRRectClipNode(*action.rrectClip, &paramWriter);
+        }
+        break;
+      case Action::Kind::ColorMatrix:
+        if (action.colorMatrix != nullptr) {
+          BindColorMatrixNode(*action.colorMatrix, &paramWriter);
+        }
+        break;
+      case Action::Kind::Luma:
+        if (action.luma != nullptr) {
+          BindLumaNode(*action.luma, &paramWriter);
+        }
+        break;
+      case Action::Kind::AlphaThreshold:
+        BindAlphaThresholdNode(action.alphaThreshold, &paramWriter);
+        break;
+      case Action::Kind::ColorSpaceXform:
+        // The shared helper writes the color-space block; the steps object is the one the
+        // lowering recorded, the same object the processor carried.
+        if (action.colorSpaceXform != nullptr && action.colorSpaceXform->steps != nullptr) {
+          ColorSpaceXformHelper helper = {};
+          helper.setData(fragmentUniformData, action.colorSpaceXform->steps.get());
+        }
+        break;
+      case Action::Kind::Blend:
+        if (action.blend != nullptr) {
+          BindBlendNode(*action.blend, &paramWriter);
+        }
+        break;
+      case Action::Kind::Gradient:
+        if (action.gradient != nullptr) {
+          BindGradientNode(*action.gradient, &paramWriter);
+        }
+        break;
+      case Action::Kind::Blur:
+        if (action.blur != nullptr) {
+          BindBlurKernelNode(*action.blur, action.blurChild, &paramWriter);
+        }
+        break;
+    }
+  }
+  const auto processor = info.getXferProcessor();
+  info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
+  paramWriter.setInstanceOrdinal(0);
+  if (IsProcessor<PorterDuffXferProcessor>(processor)) {
+    // The blend mode off the IR; the dst texture's instance-time facts off the made processor --
+    // the same layer the geometry facts read.
+    BindPorterDuffXfer(static_cast<int>(carriedIR->blendMode), processor, &paramWriter);
+  } else {
+    processor->setData(vertexUniformData, fragmentUniformData);
+  }
+  if (bindYUVTail) {
+    // The YUV family's tail instruction records come from the compiled program — the
+    // shell-free value write the chain route applies to its own slots.
+    auto* program = YUVProgram(info);
+    if (program == nullptr) {
+      LOGE("PrecompiledProgramWriter::writeProcessors() no compiled YUV tail program; the draw "
+           "renders with unwritten tail uniforms");
+      return;
+    }
+    BindYUVProgram(*program, fragmentUniformData);
   }
 }
 
@@ -633,24 +893,6 @@ static const AOTProgram* YUVProgram(const ProgramInfo& info) {
   return &*carried->program;
 }
 
-void YUVProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
-                                       UniformData* fragmentUniformData,
-                                       const FragmentProcessor* expression) const {
-  // The standard walk writes the source leaf's family uniforms (the tree's TextureEffect); the
-  // color-grade operators above it declare no fields the kernel reads, so their writes no-op.
-  PrecompiledProgramWriter::writeProcessors(info, vertexUniformData, fragmentUniformData,
-                                            expression);
-  // The tail's instruction records come from the compiled program — the shell-free value write
-  // the chain route applies to its own slots.
-  auto* program = YUVProgram(info);
-  if (program == nullptr) {
-    LOGE(
-        "YUVProgramWriter::writeProcessors() no compiled YUV tail program; the draw renders "
-        "with unwritten tail uniforms");
-    return;
-  }
-  BindYUVProgram(*program, fragmentUniformData);
-}
 
 void ChainProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
                                                 UniformData* vertexUniformData,

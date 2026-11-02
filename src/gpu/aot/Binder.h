@@ -30,6 +30,7 @@ class ParamWriter;
 class XferProcessor;
 struct AOTTextureParameters;
 struct AOTGradientParameters;
+struct AOTBlendParameters;
 struct AOTRectCoverageParameters;
 struct AOTRRectCoverageParameters;
 struct AOTColorMatrixParameters;
@@ -100,9 +101,15 @@ void BindTextureSourceLeaf(const AOTTextureParameters& leaf, ParamWriter* writer
  */
 void BindTiledSourceLeaf(const AOTTextureParameters& leaf, ParamWriter* writer);
 void BindDeviceMaskLeaf(const AOTTextureParameters& mask, ParamWriter* writer);
-void BindGradientEffectNode(const AOTGradientParameters& params, ParamWriter* writer);
-void BindConicLayoutNode(const AOTGradientParameters& params, ParamWriter* writer);
-void BindColorizerNode(const AOTGradientParameters& params, ParamWriter* writer);
+/// The gradient node's whole family of writes: the effect's borders and layout type, the conic
+/// layout's bias/scale (the layout child's fields, only when the layout is conic), and the
+/// single-interval colorizer's start/end (only when the colorizer is single-interval) -- the
+/// node's own discriminators gate exactly the fields the processor walk's three separate binds
+/// wrote.
+void BindGradientNode(const AOTGradientParameters& params, ParamWriter* writer);
+/// The xfer-mode operand: the blend mode value and the operand mapping, gated like the
+/// processor's onSetData.
+void BindBlendNode(const AOTBlendParameters& params, ParamWriter* writer);
 void BindAlphaThresholdNode(float threshold, ParamWriter* writer);
 void BindRectClipNode(const AOTRectCoverageParameters& params, ParamWriter* writer);
 void BindRRectClipNode(const AOTRRectCoverageParameters& params, ParamWriter* writer);

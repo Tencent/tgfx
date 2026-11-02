@@ -375,14 +375,10 @@ void ProgramInfo::updateUniformDataSuffix(UniformData* vertexUniformData,
   auto suffix = getMangledSuffix(processor);
   if (vertexUniformData != nullptr) {
     vertexUniformData->nameSuffix = suffix;
-    // Cleared by default; the fragment-processor loop reassigns it per TextureEffect. This keeps the
-    // geometry processor and xfer processor (and any non-texture FP) on the base uniform names.
-    vertexUniformData->structuralSuffix = "";
   }
 
   if (fragmentUniformData != nullptr) {
     fragmentUniformData->nameSuffix = suffix;
-    fragmentUniformData->structuralSuffix = "";
   }
 }
 }  // namespace tgfx

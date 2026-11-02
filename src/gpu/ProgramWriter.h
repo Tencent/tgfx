@@ -110,11 +110,18 @@ class RuntimeProgramWriter final : public ProgramWriter {
                      const FragmentProcessor* expression) const override;
 };
 
-/** The precompiled route: structural ordinals, module binds and the artifact's sampler slots. */
+/** The precompiled route: the IR-driven walk and the artifact's sampler slots. */
 class PrecompiledProgramWriter : public ProgramWriter {
+ public:
+  /**
+   * The YUV family appends its compiled tail records after the walk (the tail program the
+   * family's matching compiled, or that compiles here once on a cache hit); every other family
+   * uploads the walk's content alone.
+   */
+  explicit PrecompiledProgramWriter(bool bindYUVTail = false) : bindYUVTail(bindYUVTail) {
+  }
+
  protected:
-  void beginUniformWrites(UniformData* vertexUniformData,
-                          UniformData* fragmentUniformData) const override;
   void writeEngineDefaults(const ProgramInfo& info,
                            UniformData* fragmentUniformData) const override;
   void writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
@@ -122,14 +129,13 @@ class PrecompiledProgramWriter : public ProgramWriter {
                        const FragmentProcessor* expression) const override;
   void writeSamplers(const ProgramInfo& info, Program* program, RenderPass* renderPass,
                      const FragmentProcessor* expression) const override;
-};
+  /// The processor-tree fallback for IRs the action list cannot bind (see writeProcessors).
+  void writeProcessorsByTree(const ProgramInfo& info, UniformData* vertexUniformData,
+                             UniformData* fragmentUniformData) const;
 
-/**
- * The shared base of the writers whose routes re-express the draw's effect before uploading.
- * The expression-tree walk it used to carry is gone: the chain writer uploads through the
- * compiled program, so the base keeps only the hierarchy.
- */
-class ExpressionProgramWriter : public PrecompiledProgramWriter {};
+ private:
+  bool bindYUVTail = false;
+};
 
 /**
  * The fused chain kernel's writer: the draw's whole uniform content, its vertex transforms and its
@@ -137,7 +143,7 @@ class ExpressionProgramWriter : public PrecompiledProgramWriter {};
  * aot binder, transforms from the binding table, samplers in binding order) — no processor tree is
  * walked. It stays a ProgramWriter until P7 folds the whole writer hierarchy away.
  */
-class ChainProgramWriter final : public ExpressionProgramWriter {
+class ChainProgramWriter final : public PrecompiledProgramWriter {
  protected:
   void writeGeometryProcessor(const ProgramInfo& info, UniformData* vertexUniformData,
                               UniformData* fragmentUniformData,
@@ -157,10 +163,9 @@ class ChainProgramWriter final : public ExpressionProgramWriter {
  * the tail's upload no longer depends on one existing.
  */
 class YUVProgramWriter final : public PrecompiledProgramWriter {
- protected:
-  void writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
-                       UniformData* fragmentUniformData,
-                       const FragmentProcessor* expression) const override;
+ public:
+  YUVProgramWriter() : PrecompiledProgramWriter(true) {
+  }
 };
 
 }  // namespace tgfx
