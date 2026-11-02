@@ -1159,6 +1159,18 @@ static bool MergeCoverageTerms(const std::vector<AOTCoverageTerm>& terms,
       if (merged->coverageRoot.isValid() || merged->coverageLeafFromUVCoord) {
         return false;
       }
+      // A color glyph replaces the output color, which the chain's coverage composite cannot
+      // express (it only modulates alpha): the chain refuses a non-alpha-only glyph leaf and the
+      // dedicated atlas kernel carries the color-glyph semantics instead.
+      if (term.kind == AOTCoverageTermKind::Glyph) {
+        auto* glyphNode = term.graph.nodeAt(term.root);
+        auto* glyphParameters = glyphNode != nullptr
+                                    ? std::get_if<AOTTextureParameters>(&glyphNode->parameters)
+                                    : nullptr;
+        if (glyphParameters == nullptr || !glyphParameters->isAlphaOnly) {
+          return false;
+        }
+      }
       std::vector<AOTNodeID> mapped(term.graph.nodeCount(), AOTNodeID::Invalid());
       if (term.graph.nodeCount() == 0 || !term.root.isValid() ||
           term.root.index() >= term.graph.nodeCount()) {

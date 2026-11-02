@@ -41,7 +41,9 @@ enum class AOTCoverageTermKind {
   Analytic,
   /// An alpha-only, non-perspective device-space texture mask: the draw's mask port.
   DeviceMask,
-  /// The AtlasText glyph mask, sourced from the maskCoord attribute. True coverage.
+  /// The AtlasText glyph, sourced from the maskCoord attribute. True coverage for an alpha-only
+  /// atlas; a color atlas's glyph replaces the output color, which only the dedicated atlas
+  /// kernel carries (the chain refuses such a leaf).
   Glyph,
   /// A general pointwise coverage subtree rooted at the geometry-coverage unit: mask-filter
   /// semantics, which modulate the source rather than the coverage.
@@ -197,7 +199,8 @@ std::optional<DrawIR> LowerDraw(const std::vector<const FragmentProcessor*>& col
  * synthesized from the caller's atlas facts — an AtlasText op holds them from construction, so
  * its IR carries the glyph term without waiting for the prepare-time geometry processor. The
  * coverage-count gate is the atlas one (at most one coverage processor beside the glyph). A null
- * or non-alpha-only proxy returns nullopt: such draws keep the plain path, exactly as before.
+ * proxy returns nullopt; both atlas flavors lower (the glyph leaf's parameters carry the atlas's
+ * alpha-only fact, the chain refuses a color glyph, the dedicated atlas kernel carries it).
  */
 std::optional<DrawIR> LowerDrawWithAtlas(
     const std::vector<const FragmentProcessor*>& colorProcessors,

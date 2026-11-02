@@ -1649,6 +1649,65 @@ TGFX_TEST(AOTRenderConsistencyTest, AtlasTextUnderAnalyticClip) {
   ExpectBitmapsIdentical("atlas-text-analytic-clip", aotBitmap, runtimeBitmap, 200, 100);
 }
 
+// A color atlas (color emoji) under an analytic clip: the glyph term's leaf carries the atlas's
+// own alpha-only fact, so the draw must be served by the atlas kernel with the clip applied —
+// the chain refuses the color glyph, and nothing may drop the draw.
+TGFX_TEST(AOTRenderConsistencyTest, AtlasTextColorGlyphUnderAnalyticClip) {
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoColorEmoji.ttf"));
+  ASSERT_TRUE(typeface != nullptr);
+  ASSERT_TRUE(typeface->hasColor());
+  auto textBlob = TextBlob::MakeFrom("👻🤡", Font(typeface, 36));
+  ASSERT_TRUE(textBlob != nullptr);
+  uint64_t kernels = 0;
+  auto renderOnce = [&](bool useBundle, Bitmap* outBitmap) {
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
+    if (useBundle) {
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause statsPause(context, !useBundle);
+    context->globalCache()->clearPrograms();
+    auto surface = Surface::Make(context, 200, 100);
+    ASSERT_TRUE(surface != nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    context->flushAndSubmit(true);
+    if (useBundle) {
+      cache->setDiagnosticRecordingEnabled(true);
+      cache->resetStats();
+    }
+    canvas->clipRect(Rect::MakeLTRB(20.5f, 10.5f, 180.5f, 90.5f), true);
+    Paint paint;
+    canvas->drawTextBlob(textBlob, 20, 65, paint);
+    context->flushAndSubmit(true);
+    if (useBundle) {
+      kernels = cache->drawStats().kernelInvocations;
+      EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+      EXPECT_TRUE(cache->jitProgramRecords().empty());
+      cache->setDiagnosticRecordingEnabled(false);
+    }
+    ASSERT_TRUE(outBitmap->allocPixels(200, 100));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+    if (useBundle) {
+      cache->unload();
+    }
+  };
+  Bitmap aotBitmap = {};
+  Bitmap runtimeBitmap = {};
+  renderOnce(true, &aotBitmap);
+  renderOnce(false, &runtimeBitmap);
+  EXPECT_GT(kernels, 0u);
+  ExpectBitmapsIdentical("atlas-text-color-glyph-clip", aotBitmap, runtimeBitmap, 200, 100);
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, MeshTextureAndColorsXferSrcFold) {
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);

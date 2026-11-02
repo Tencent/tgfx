@@ -224,14 +224,15 @@ std::optional<DrawIR> LowerDraw(const std::vector<const FragmentProcessor*>& col
     return std::nullopt;
   }
   // The atlas glyph mask joins as a synthesized coverage leaf sourced from the maskCoord
-  // attribute: only the alpha-only atlas readback is expressible — a color atlas replaces the
-  // output color, which the chain cannot carry. A null geometry processor contributes none.
+  // attribute; the leaf's own parameters carry the atlas's alpha-only fact, so both atlas
+  // flavors lower (the chain refuses a color glyph, the dedicated atlas kernel carries it).
+  // A null geometry processor contributes none.
   const FragmentProcessor* glyphLeaf = nullptr;
   std::vector<PlacementPtr<FragmentProcessor>> ownedLeaves = {};
   if (geometryProcessor != nullptr && IsProcessor<AtlasTextGeometryProcessor>(geometryProcessor)) {
     auto* atlasGP = static_cast<const AtlasTextGeometryProcessor*>(geometryProcessor);
     auto atlasProxy = atlasGP->getTextureProxy();
-    if (atlasProxy == nullptr || !atlasProxy->isAlphaOnly()) {
+    if (atlasProxy == nullptr) {
       return std::nullopt;
     }
     auto state = atlasGP->getSamplerState();
@@ -255,7 +256,7 @@ std::optional<DrawIR> LowerDrawWithAtlas(
     const std::vector<const FragmentProcessor*>& colorProcessors,
     const std::vector<const FragmentProcessor*>& coverageProcessors,
     const AOTAtlasGlyphSource& atlas, BlendMode blendMode, BlockAllocator* allocator) {
-  if (allocator == nullptr || atlas.textureProxy == nullptr || !atlas.textureProxy->isAlphaOnly()) {
+  if (allocator == nullptr || atlas.textureProxy == nullptr) {
     return std::nullopt;
   }
   SamplingArgs args = {TileMode::Clamp, TileMode::Clamp, atlas.sampling, SrcRectConstraint::Fast};
