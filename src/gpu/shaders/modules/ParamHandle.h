@@ -30,6 +30,10 @@ enum class ParamType : uint8_t {
 struct ParamInfo {
   const char* name;
   ParamType type;
+  // The defining Param object's address: the runtime's parameter registry maps it to the
+  // parameter's id, so a writer resolves its slot with one pointer lookup instead of a string
+  // compare. Null for entries not declared through a Param constant.
+  const void* key = nullptr;
 };
 
 // A typed reference to one field of a module's parameters: the field's name in the reflected
@@ -40,7 +44,7 @@ struct Param {
   const char* name;
 
   constexpr operator ParamInfo() const {
-    return {name, Type};
+    return {name, Type, this};
   }
 };
 

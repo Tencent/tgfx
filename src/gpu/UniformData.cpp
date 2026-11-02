@@ -17,7 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "UniformData.h"
+#include <cstdio>
+#include <cstdlib>
+#include <string>
 #include "core/utils/Log.h"
+#include "gpu/aot/AOTParamRegistry.h"
 
 namespace tgfx {
 UniformData::UniformData(std::vector<Uniform> uniforms) : _uniforms(std::move(uniforms)) {
@@ -56,6 +60,46 @@ UniformData::UniformData(std::vector<Uniform> uniforms) : _uniforms(std::move(un
   bufferSize = alignCursor(16);
 }
 
+void UniformData::writeBytes(size_t offset, const void* data, size_t size) const {
+  memcpy(_buffer + offset, data, size);
+#if DEBUG
+  _debugWriteRanges.emplace_back(offset, size);
+#endif
+}
+
+void UniformData::buildParamLayout() {
+  if (_paramLayout == nullptr) {
+    _paramLayout = AOTParamLayout::Resolve(*this);
+  }
+}
+
+bool UniformData::writeParamKey(const void* key, size_t instance, const void* data,
+                                size_t size) const {
+  if (key == nullptr || _paramLayout == nullptr || _buffer == nullptr) {
+    return false;
+  }
+  auto id = ParamIdOf(key);
+  if (id == kNoParamId) {
+    return false;
+  }
+  const auto* slot = _paramLayout->slot(id);
+  if (slot == nullptr || instance >= slot->count || slot->elementSize != size) {
+    return false;
+  }
+  writeBytes(slot->base + instance * slot->stride, data, size);
+  return true;
+}
+
+bool UniformData::writeParamKey(const void* key, size_t instance, const Matrix& matrix) const {
+  float values[9] = {};
+  matrix.get9(values);
+  const float data[] = {
+      values[0], values[3], values[6], 0, values[1], values[4], values[7], 0,
+      values[2], values[5], values[8], 0,
+  };
+  return writeParamKey(key, instance, data, sizeof(data));
+}
+
 void UniformData::setBuffer(void* buffer) {
   _buffer = static_cast<uint8_t*>(buffer);
 #if DEBUG
@@ -83,10 +127,7 @@ void UniformData::onSetArrayElement(const std::string& name, size_t index, const
     }
     return;
   }
-  memcpy(_buffer + field->offset + index * field->elementStride, data, size);
-#if DEBUG
-  _debugWriteRanges.emplace_back(field->offset + index * field->elementStride, size);
-#endif
+  writeBytes(field->offset + index * field->elementStride, data, size);
 }
 
 void UniformData::onSetData(const std::string& name, const void* data, size_t size,
@@ -118,10 +159,7 @@ void UniformData::onSetData(const std::string& name, const void* data, size_t si
     return;
   }
 
-  memcpy(_buffer + field->offset, data, size);
-#if DEBUG
-  _debugWriteRanges.emplace_back(field->offset, size);
-#endif
+  writeBytes(field->offset, data, size);
 }
 
 const UniformData::Field* UniformData::findField(const std::string& key) const {

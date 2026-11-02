@@ -1,8 +1,11 @@
 // The typed writer the module Binds move values through: a thin wrapper over UniformData's
 // optional writes, so a field this program's variant does not declare is skipped exactly like
-// setDataOptional, and the structural-suffix addressing the uniform walk maintains keeps
-// multiple same-class instances (Subset / Subset_1) correct without the module knowing.
+// setDataOptional, and the structural instance addressing the uniform walk maintains keeps
+// multiple same-class instances (Subset / Subset_1) correct without the module knowing. On a
+// program with a resolved parameter layout the writes go through the offset path (one pointer
+// lookup, no name composition); the name path stays as the authority every miss falls back to.
 #pragma once
+#include <type_traits>
 #include "gpu/UniformData.h"
 #include "gpu/shaders/modules/ParamHandle.h"
 #include "tgfx/core/Matrix.h"
@@ -14,44 +17,70 @@ class ParamWriter {
   explicit ParamWriter(const UniformData* uniforms) : uniforms(uniforms) {
   }
 
+  /// The structural instance the next writes address (Subset / Subset_1 / ...): kept in step
+  /// with the uniform walk's structuralSuffix, so the offset path and the name path address the
+  /// same field.
+  void setInstanceOrdinal(size_t ordinal) {
+    instanceOrdinal = ordinal;
+  }
+
   void set(const Param<ParamType::Float>& param, float value) {
     if (uniforms != nullptr) {
+      if (uniforms->writeParamKey(&param, instanceOrdinal, &value, sizeof(value))) {
+        return;
+      }
       uniforms->setDataOptional(param.name, value);
     }
   }
 
   void set(const Param<ParamType::Float2>& param, const float (&value)[2]) {
     if (uniforms != nullptr) {
+      if (uniforms->writeParamKey(&param, instanceOrdinal, value, sizeof(value))) {
+        return;
+      }
       uniforms->setDataOptional(param.name, value);
     }
   }
 
   void set(const Param<ParamType::Float4>& param, const float (&value)[4]) {
     if (uniforms != nullptr) {
+      if (uniforms->writeParamKey(&param, instanceOrdinal, value, sizeof(value))) {
+        return;
+      }
       uniforms->setDataOptional(param.name, value);
     }
   }
 
   void set(const Param<ParamType::Int>& param, int32_t value) {
     if (uniforms != nullptr) {
+      if (uniforms->writeParamKey(&param, instanceOrdinal, &value, sizeof(value))) {
+        return;
+      }
       uniforms->setDataOptional(param.name, value);
     }
   }
 
   void set(const Param<ParamType::Float3x3>& param, const Matrix& matrix) {
     if (uniforms != nullptr) {
+      if (uniforms->writeParamKey(&param, instanceOrdinal, matrix)) {
+        return;
+      }
       uniforms->setDataOptional(param.name, matrix);
     }
   }
 
   void set(const Param<ParamType::Float3x3>& param, const std::array<float, 12>& aligned) {
     if (uniforms != nullptr) {
+      if (uniforms->writeParamKey(&param, instanceOrdinal, aligned.data(), sizeof(aligned))) {
+        return;
+      }
       uniforms->setDataOptional(param.name, aligned);
     }
   }
 
   template <size_t N>
   void set(const Param<ParamType::Float4Array>& param, const std::array<float, N>& values) {
+    // The table kinds write whole arrays of varying length; they keep the name path.
     if (uniforms != nullptr) {
       uniforms->setDataOptional(param.name, values);
     }
@@ -60,6 +89,11 @@ class ParamWriter {
   template <ParamType Type, typename T>
   void setArrayElement(const Param<Type>& param, size_t index, const T& value) {
     if (uniforms != nullptr) {
+      if constexpr (!std::is_same_v<std::decay_t<T>, Matrix>) {
+        if (uniforms->writeParamKey(&param, index, &value, sizeof(value))) {
+          return;
+        }
+      }
       uniforms->setArrayElementOptional(param.name, index, value);
     }
   }
@@ -78,6 +112,7 @@ class ParamWriter {
 
  private:
   const UniformData* uniforms = nullptr;
+  size_t instanceOrdinal = 0;
 };
 
 }  // namespace tgfx

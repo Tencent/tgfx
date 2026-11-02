@@ -549,10 +549,12 @@ void BindChainBindings(const AOTProgram& program, UniformData* fragmentUniformDa
   for (const auto& binding : program.bindings) {
     if (binding.kind == AOTBinding::Kind::Mask) {
       fragmentUniformData->structuralSuffix = "";
+      writer.setInstanceOrdinal(0);
       BindDeviceMaskBinding(binding, fragmentUniformData);
       continue;
     }
     auto structural = textureOrdinal > 0 ? "_" + std::to_string(textureOrdinal) : "";
+    writer.setInstanceOrdinal(static_cast<size_t>(textureOrdinal));
     ++textureOrdinal;
     fragmentUniformData->structuralSuffix = structural;
     auto textureView = binding.textureProxy->getTextureView();

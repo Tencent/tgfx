@@ -236,12 +236,21 @@ void PrecompiledProgramWriter::writeEngineDefaults(const ProgramInfo& info,
   // runtime-generated shader bakes the swizzle into code and does not declare it, so set it
   // optionally. Set in the base (unmangled) context, like RTAdjust.
   int outputAlphaSwizzle = info.getOutputSwizzle() == Swizzle::AAAA() ? 1 : 0;
-  fragmentUniformData->setDataOptional(EngineParams::OutputAlphaSwizzle.name, outputAlphaSwizzle);
-  fragmentUniformData->setDataOptional(AnalyticClipModule::HasClip.name, 0);
+  int zero = 0;
+  if (!fragmentUniformData->writeParamKey(&EngineParams::OutputAlphaSwizzle, 0,
+                                          &outputAlphaSwizzle, sizeof(outputAlphaSwizzle))) {
+    fragmentUniformData->setDataOptional(EngineParams::OutputAlphaSwizzle.name, outputAlphaSwizzle);
+  }
+  if (!fragmentUniformData->writeParamKey(&AnalyticClipModule::HasClip, 0, &zero, sizeof(zero))) {
+    fragmentUniformData->setDataOptional(AnalyticClipModule::HasClip.name, zero);
+  }
   // Same engine-default treatment as HasClip: only quad_texture_fill declares it, and a present
   // mask FP overwrites it with 1 later in traversal. The color TextureEffect's writer used to
   // carry this default alongside its own fields.
-  fragmentUniformData->setDataOptional(DeviceMaskModule::HasDeviceMask.name, 0);
+  if (!fragmentUniformData->writeParamKey(&DeviceMaskModule::HasDeviceMask, 0, &zero,
+                                          sizeof(zero))) {
+    fragmentUniformData->setDataOptional(DeviceMaskModule::HasDeviceMask.name, zero);
+  }
 }
 
 void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
@@ -270,6 +279,7 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
       info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, fp);
       int ordinal = classOrdinals[UniformSpaceKey(fp)]++;
       std::string structural = ordinal > 0 ? "_" + std::to_string(ordinal) : "";
+      paramWriter.setInstanceOrdinal(static_cast<size_t>(ordinal));
       if (vertexUniformData != nullptr) {
         vertexUniformData->structuralSuffix = structural;
       }
@@ -286,6 +296,9 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
   }
   const auto processor = info.getXferProcessor();
   info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
+  // The suffix reset above puts the XP back on the base names; the offset path's instance
+  // ordinal follows it.
+  paramWriter.setInstanceOrdinal(0);
   if (processor->onBindPrecompiled(&paramWriter)) {
     // The XP's feature module took over its uniform writes.
   } else {
@@ -467,6 +480,7 @@ void ExpressionProgramWriter::writeProcessors(const ProgramInfo& info,
     info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, fp);
     int ordinal = classOrdinals[UniformSpaceKey(fp)]++;
     std::string structural = ordinal > 0 ? "_" + std::to_string(ordinal) : "";
+    paramWriter.setInstanceOrdinal(static_cast<size_t>(ordinal));
     if (vertexUniformData != nullptr) {
       vertexUniformData->structuralSuffix = structural;
     }
@@ -482,6 +496,7 @@ void ExpressionProgramWriter::writeProcessors(const ProgramInfo& info,
   }
   const auto processor = info.getXferProcessor();
   info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
+  paramWriter.setInstanceOrdinal(0);
   if (processor->onBindPrecompiled(&paramWriter)) {
     // The XP's feature module took over its uniform writes.
   } else {

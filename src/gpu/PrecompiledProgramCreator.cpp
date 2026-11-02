@@ -659,6 +659,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   if (!vertBlob->uniforms.empty()) {
     vertexUniformData = std::unique_ptr<UniformData>(new UniformData(vertBlob->uniforms));
     vertexUniformData->skipSuffix = true;
+    vertexUniformData->buildParamLayout();
     BindingEntry vertexBinding = {VertexUniformBlockName, VERTEX_UBO_BINDING_POINT,
                                   ShaderVisibility::Vertex};
     descriptor.layout.uniformBlocks.push_back(vertexBinding);
@@ -666,6 +667,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   if (!fragBlob->uniforms.empty()) {
     fragmentUniformData = std::unique_ptr<UniformData>(new UniformData(fragBlob->uniforms));
     fragmentUniformData->skipSuffix = true;
+    fragmentUniformData->buildParamLayout();
     BindingEntry fragmentBinding = {FragmentUniformBlockName, FRAGMENT_UBO_BINDING_POINT,
                                     ShaderVisibility::Fragment};
     descriptor.layout.uniformBlocks.push_back(fragmentBinding);

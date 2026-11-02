@@ -288,6 +288,35 @@ TGFX_TEST(AOTUniformABTest, ComplexClipDeviceMask) {
   EXPECT_TRUE(diff.empty()) << diff;
 }
 
+// A blend of two image shaders in one draw: two TextureSource leaves in one program, the
+// ordinal-addressed instances (Subset / Subset_1, ...) the structural scheme and the layout's
+// (base, stride) form must agree on.
+TGFX_TEST(AOTUniformABTest, BlendTwoImageFills) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto imageA = MakeCheckerImage();
+  auto imageB = MakeCheckerImage();
+  ASSERT_NE(imageA, nullptr);
+  ASSERT_NE(imageB, nullptr);
+  auto diff = PinUniformTrace(context, "BlendTwoImageFills", [&] {
+    auto surface = Surface::Make(context, 64, 64);
+    if (surface == nullptr) {
+      return;
+    }
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::Transparent());
+    Paint paint = {};
+    auto dst = Shader::MakeImageShader(imageA, TileMode::Clamp, TileMode::Clamp);
+    auto src = Shader::MakeImageShader(imageB, TileMode::Repeat, TileMode::Clamp);
+    paint.setShader(Shader::MakeBlend(BlendMode::Multiply, dst, src));
+    canvas->drawRect(Rect::MakeXYWH(2, 2, 60, 26), paint);
+    paint.setShader(Shader::MakeBlend(BlendMode::SrcOver, dst, src));
+    canvas->drawRect(Rect::MakeXYWH(2, 34, 60, 26), paint);
+  });
+  EXPECT_TRUE(diff.empty()) << diff;
+}
+
 // A fill onto an alpha-only target: the OutputAlphaSwizzle engine default takes its non-identity
 // value on the precompiled route.
 TGFX_TEST(AOTUniformABTest, AlphaOnlyTargetFill) {
