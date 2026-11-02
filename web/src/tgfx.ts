@@ -46,7 +46,7 @@ export const createImageFromBytes = (bytes: ArrayBuffer) => {
     return createImage(URL.createObjectURL(blob));
 };
 
-export const readImagePixels = (module: TGFX, image: CanvasImageSource, width: number, height: number) => {
+export const readImagePixels = (module: TGFX, image: CanvasImageSource, width: number, height: number): Uint8ClampedArray | null => {
     if (!image) {
         return null;
     }
@@ -256,7 +256,15 @@ export const getBytesFromPath = async (module: TGFX, path: string) => {
     return new Uint8Array(buffer);
 };
 
+// Software adapters such as SwiftShader cannot import external images at all, and there is no
+// adapter info query available on the C++ side to probe for this capability. Latch onto the CPU
+// readback fallback after a few consecutive failures instead of paying for a DOMException per
+// frame. The count resets on the first success and when a new device is imported, so a
+// momentarily unavailable frame or a lost device cannot permanently disable the fast path.
+const EXTERNAL_IMAGE_IMPORT_MAX_FAILURES = 3;
+let externalImageImportFailures = 0;
 let externalImageImportUnsupported = false;
+let crossOriginUploadWarned = false;
 
 export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr: number,
                                            width: number, height: number, deviceId?: number) => {
@@ -265,7 +273,7 @@ export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr:
     }
     // Videos without a current frame (not loaded or failed to decode) make
     // copyExternalImageToTexture throw an OperationError, so skip the upload entirely.
-    if (source.readyState < 2 || !source.videoWidth || !source.videoHeight) {
+    if (source.readyState < source.HAVE_CURRENT_DATA || !source.videoWidth || !source.videoHeight) {
         return;
     }
     syncVideoFrame(source);
@@ -287,10 +295,6 @@ export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr:
     if (!device || !device.queue) {
         return;
     }
-    // Software adapters such as SwiftShader cannot import external images at all. There is no
-    // adapter info query available on the C++ side to probe for this capability, so the first
-    // failure is cached and later frames go straight to the CPU readback instead of paying for
-    // a DOMException per frame.
     if (!externalImageImportUnsupported) {
         try {
             device.queue.copyExternalImageToTexture(
@@ -298,9 +302,23 @@ export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr:
                 {texture: gpuTexture, premultipliedAlpha: true},
                 [width, height]
             );
+            externalImageImportFailures = 0;
             return;
         } catch (error) {
-            externalImageImportUnsupported = true;
+            // A SecurityError means the source is tainted (cross-origin without CORS), and the
+            // CPU fallback cannot read its pixels either, so skip the frame without latching:
+            // one bad video must not downgrade every other video in the session.
+            if ((error as DOMException)?.name === 'SecurityError') {
+                if (!crossOriginUploadWarned) {
+                    crossOriginUploadWarned = true;
+                    console.warn('WebGPU video upload skipped a cross-origin video:', error);
+                }
+                return;
+            }
+            if (++externalImageImportFailures >= EXTERNAL_IMAGE_IMPORT_MAX_FAILURES) {
+                externalImageImportUnsupported = true;
+                console.warn('WebGPU video upload falls back to CPU readback:', error);
+            }
         }
     }
     // Fall back to a CPU readback through a 2D canvas and upload the raw pixels with
@@ -379,6 +397,9 @@ export const importWebGPUDevice = (WebGPU: EmscriptenWebGPU, device: any) => {
     if (!WebGPU || !device || !device.queue) {
         return 0;
     }
+    // A newly imported device must not inherit the fallback latch of a lost one.
+    externalImageImportFailures = 0;
+    externalImageImportUnsupported = false;
     // The command queue has to travel with the device, otherwise the runtime cannot resolve it.
     return WebGPU.mgrDevice.create(device, {queueId: WebGPU.mgrQueue.create(device.queue)});
 };
