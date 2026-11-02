@@ -11,6 +11,7 @@
 #include <set>
 #include <utility>
 #include "gpu/Uniform.h"
+#include "gpu/aot/ParamCatalog.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
 #include "gpu/shaders/modules/BlendParams.h"
 #include "gpu/shaders/modules/BlurKernelModule.h"
@@ -19,7 +20,6 @@
 #include "gpu/shaders/modules/DeviceMaskModule.h"
 #include "gpu/shaders/modules/EngineParams.h"
 #include "gpu/shaders/modules/GradientModule.h"
-#include "gpu/shaders/modules/ParamCatalog.h"
 #include "gpu/shaders/modules/ParamHandle.h"
 #include "gpu/shaders/modules/PointwiseOpModule.h"
 #include "gpu/shaders/modules/PorterDuffXPModule.h"

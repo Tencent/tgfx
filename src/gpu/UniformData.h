@@ -21,6 +21,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 #include "gpu/ShaderBindingLayout.h"
 #include "gpu/Uniform.h"
@@ -201,6 +202,13 @@ class UniformData {
   bool skipSuffix = false;
   std::unordered_map<std::string, Field> fieldMap = {};
   size_t cursor = 0;
+#if DEBUG
+  // The byte ranges this draw's writes covered (reset by setBuffer, which begins a draw's slice):
+  // UBO slices are carved from a shared, recycled buffer, so a field no writer touches holds
+  // stale bytes from earlier draws. dumpValues() prints those words as '-', so a dumped trace
+  // stays deterministic run to run.
+  mutable std::vector<std::pair<size_t, size_t>> _debugWriteRanges = {};
+#endif
 
   explicit UniformData(std::vector<Uniform> uniforms);
 
@@ -225,7 +233,8 @@ class UniformData {
   void dump() const;
 
   // Prints every field's current value (floats/ints read from the backing buffer), for A/B
-  // diffing the uniforms two routes upload for the same draw. Diagnostic only.
+  // diffing the uniforms two routes upload for the same draw. Words no writer touched this draw
+  // print as '-' (recycled-buffer stale bytes). Diagnostic only.
   void dumpValues(const char* label) const;
 #endif
 

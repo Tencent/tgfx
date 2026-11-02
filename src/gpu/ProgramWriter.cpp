@@ -53,8 +53,9 @@ static void DebugDumpSamplerSlot(const char* label, unsigned slot, const Texture
 }
 
 static const char* UnifDumpLabel() {
-  static const char* label = std::getenv("TGFX_UNIF_DUMP");
-  return label;
+  // Read per call, not cached: the A/B harness toggles the variable around each route within one
+  // process, and a cached first read would freeze whichever route ran first.
+  return std::getenv("TGFX_UNIF_DUMP");
 }
 #endif
 

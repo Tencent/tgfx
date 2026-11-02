@@ -58,6 +58,9 @@ UniformData::UniformData(std::vector<Uniform> uniforms) : _uniforms(std::move(un
 
 void UniformData::setBuffer(void* buffer) {
   _buffer = static_cast<uint8_t*>(buffer);
+#if DEBUG
+  _debugWriteRanges.clear();
+#endif
 }
 
 void UniformData::onSetArrayElement(const std::string& name, size_t index, const void* data,
@@ -81,6 +84,9 @@ void UniformData::onSetArrayElement(const std::string& name, size_t index, const
     return;
   }
   memcpy(_buffer + field->offset + index * field->elementStride, data, size);
+#if DEBUG
+  _debugWriteRanges.emplace_back(field->offset + index * field->elementStride, size);
+#endif
 }
 
 void UniformData::onSetData(const std::string& name, const void* data, size_t size,
@@ -113,6 +119,9 @@ void UniformData::onSetData(const std::string& name, const void* data, size_t si
   }
 
   memcpy(_buffer + field->offset, data, size);
+#if DEBUG
+  _debugWriteRanges.emplace_back(field->offset, size);
+#endif
 }
 
 const UniformData::Field* UniformData::findField(const std::string& key) const {
@@ -238,7 +247,21 @@ void UniformData::dumpValues(const char* label) const {
                  field.format == UniformFormat::Int3 || field.format == UniformFormat::Int4;
     auto wordCount = field.size / 4;
     for (size_t w = 0; w < wordCount; ++w) {
-      auto* p = _buffer + field.offset + w * 4;
+      auto wordOffset = field.offset + w * 4;
+      bool covered = false;
+      for (const auto& range : _debugWriteRanges) {
+        if (wordOffset >= range.first && wordOffset + 4 <= range.first + range.second) {
+          covered = true;
+          break;
+        }
+      }
+      if (!covered) {
+        // The slice is carved from a shared, recycled buffer: an unwritten word holds stale
+        // bytes from an earlier draw, not a value this route uploaded.
+        std::printf("- ");
+        continue;
+      }
+      auto* p = _buffer + wordOffset;
       if (isInt) {
         std::printf("%d ", *reinterpret_cast<const int32_t*>(p));
       } else {

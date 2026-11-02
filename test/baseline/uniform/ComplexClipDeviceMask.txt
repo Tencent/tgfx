@@ -1,0 +1,38 @@
+--- runtime ---
+[DRAW] route=JIT suffix= fields=3
+  tgfx_RTAdjust            = [0.0078125 -1 0.0078125 -1 ]
+  Matrix_P0                = [1 0 0 0 0 1 0 0 -1 -1 1 0 ]
+  CoordTransformMatrix_0_P0 = [0.00724638 0 0 0 0 0.00746269 0 0 -1.86265e-09 -4.19095e-09 1 0 ]
+[DRAW] route=JIT suffix= fields=1
+  Color_P0                 = [1 1 1 1 ]
+[UNIF ab] sampler slot=0 texture=138x134 format=1
+[DRAW] route=JIT suffix= fields=1
+  tgfx_RTAdjust            = [0.0125 -1 0.0125 -1 ]
+[DRAW] route=JIT suffix= fields=2
+  Color_P0                 = [0.784314 0.352941 0.235294 1 ]
+  DeviceCoordMatrix_P1     = [0.00390625 0 0 0 0 0.00390625 0 0 -0.046875 -0.078125 1 0 ]
+[UNIF ab] sampler slot=0 texture=256x256 format=1
+--- aot ---
+[DRAW] route=AOT suffix= fields=3
+  tgfx_RTAdjust            = [0.0078125 -1 0.0078125 -1 ]
+  Matrix                   = [1 0 0 0 0 1 0 0 -1 -1 1 0 ]
+  CoordTransformMatrix_0   = [0.00724638 0 0 0 0 0.00746269 0 0 -1.86265e-09 -4.19095e-09 1 0 ]
+[DRAW] route=AOT suffix= fields=2
+  Color                    = [1 1 1 1 ]
+  OutputAlphaSwizzle       = [1 ]
+[UNIF ab] sampler slot=0 texture=138x134 format=1
+[DRAW] route=AOT suffix= fields=1
+  tgfx_RTAdjust            = [0.0125 -1 0.0125 -1 ]
+[DRAW] route=AOT suffix= fields=11
+  Color                    = [0.784314 0.352941 0.235294 1 ]
+  HasCommonColor           = [1 ]
+  Rect                     = [-1e+09 -1e+09 1e+09 1e+09 ]
+  HasClip                  = [0 ]
+  LocalRect                = [- - - - ]
+  RadiiX                   = [- - - - ]
+  RadiiY                   = [- - - - ]
+  AntiAlias                = [- ]
+  DeviceToLocal            = [- - - - - - - - - - - - ]
+  DeviceCoordMatrix        = [0.00390625 0 0 0 0 0.00390625 0 0 -0.046875 -0.078125 1 0 ]
+  HasDeviceMask            = [1 ]
+[UNIF ab] sampler slot=0 texture=256x256 format=1

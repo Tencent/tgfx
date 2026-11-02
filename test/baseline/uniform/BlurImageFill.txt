@@ -1,0 +1,141 @@
+--- runtime ---
+[DRAW] route=JIT suffix= fields=2
+  tgfx_RTAdjust            = [0.03125 -1 0.03125 -1 ]
+  CoordTransformMatrix_0_P0 = [0.03125 0 0 0 0 0.03125 0 0 -0.3125 -0.3125 1 0 ]
+[DRAW] route=JIT suffix= fields=4
+  Color_P0                 = [1 1 1 1 ]
+  Kernel_P1                = [0.0827185 0.0810805 0.0763588 0.0690923 0.0600659 0.0501713 0.0402634 0.0310452 0.0229988 0.0163699 0.0111947 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ]
+  Radius_P1                = [10 ]
+  Step_P1                  = [0.03125 0 ]
+[UNIF ab] sampler slot=0 texture=32x32 format=5
+[DRAW] route=JIT suffix= fields=2
+  tgfx_RTAdjust            = [0.03125 -1 0.03125 -1 ]
+  CoordTransformMatrix_0_P0 = [0.015625 0 0 0 0 0.015625 0 0 0 0 1 0 ]
+[DRAW] route=JIT suffix= fields=7
+  Color_P0                 = [1 1 1 1 ]
+  Kernel_P1                = [0.0827185 0.0810805 0.0763588 0.0690923 0.0600659 0.0501713 0.0402634 0.0310452 0.0229988 0.0163699 0.0111947 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ]
+  Radius_P1                = [10 ]
+  Step_P1                  = [0 0.015625 ]
+  Subset_P2                = [0 0 52 52 ]
+  Clamp_P2                 = [0.5 0.5 51.5 51.5 ]
+  Dimension_P2             = [0.015625 0.015625 ]
+[UNIF ab] sampler slot=0 texture=64x64 format=4
+[DRAW] route=JIT suffix= fields=2
+  tgfx_RTAdjust            = [0.03125 -1 0.03125 -1 ]
+  CoordTransformMatrix_0_P0 = [0.015625 0 0 0 0 0.015625 0 0 0.03125 0.03125 1 0 ]
+[DRAW] route=JIT suffix= fields=2
+  Color_P0                 = [1 1 1 1 ]
+  Subset_P1                = [0.0078125 0.0078125 0.804688 0.804688 ]
+[UNIF ab] sampler slot=0 texture=64x64 format=4
+[DRAW] route=JIT suffix= fields=2
+  tgfx_RTAdjust            = [0.03125 -1 0.03125 -1 ]
+  CoordTransformMatrix_0_P0 = [0.015625 0 0 0 0 0.015625 0 0 -0.03125 -0.03125 1 0 ]
+[DRAW] route=JIT suffix= fields=2
+  Color_P0                 = [1 1 1 1 ]
+  Subset_P1                = [0.0078125 0.0078125 0.773438 0.773438 ]
+[UNIF ab] sampler slot=0 texture=64x64 format=4
+--- aot ---
+[DRAW] route=AOT suffix= fields=3
+  tgfx_RTAdjust            = [0.03125 -1 0.03125 -1 ]
+  Matrix                   = [1 0 0 0 0 1 0 0 0 0 1 0 ]
+  CoordTransformMatrix_0   = [0.03125 0 0 0 0 0.03125 0 0 -0.3125 -0.3125 1 0 ]
+[DRAW] route=AOT suffix= fields=21
+  Color                    = [1 1 1 1 ]
+  Kernel                   = [0.0827185 0.0810805 0.0763588 0.0690923 0.0600659 0.0501713 0.0402634 0.0310452 0.0229988 0.0163699 0.0111947 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ]
+  Radius                   = [10 ]
+  Step                     = [0.03125 0 ]
+  Subset                   = [0 0 1 1 ]
+  ShaderModeX              = [0 ]
+  ShaderModeY              = [0 ]
+  Clamp                    = [0 0 0 0 ]
+  Dimension                = [- - ]
+  TiledChild               = [1 ]
+  AlphaChild               = [0 ]
+  OutputAlphaSwizzle       = [0 ]
+  Rect                     = [- - - - ]
+  HasClip                  = [0 ]
+  LocalRect                = [- - - - ]
+  RadiiX                   = [- - - - ]
+  RadiiY                   = [- - - - ]
+  AntiAlias                = [- ]
+  DeviceToLocal            = [- - - - - - - - - - - - ]
+  DeviceCoordMatrix        = [- - - - - - - - - - - - ]
+  HasDeviceMask            = [0 ]
+[UNIF ab] sampler slot=0 texture=32x32 format=5
+[UNIF ab] sampler slot=1 texture=1x1 format=4 (dummy)
+[DRAW] route=AOT suffix= fields=3
+  tgfx_RTAdjust            = [0.03125 -1 0.03125 -1 ]
+  Matrix                   = [1 0 0 0 0 1 0 0 0 0 1 0 ]
+  CoordTransformMatrix_0   = [0.015625 0 0 0 0 0.015625 0 0 0 0 1 0 ]
+[DRAW] route=AOT suffix= fields=21
+  Color                    = [1 1 1 1 ]
+  Kernel                   = [0.0827185 0.0810805 0.0763588 0.0690923 0.0600659 0.0501713 0.0402634 0.0310452 0.0229988 0.0163699 0.0111947 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ]
+  Radius                   = [10 ]
+  Step                     = [0 0.015625 ]
+  Subset                   = [0 0 52 52 ]
+  ShaderModeX              = [3 ]
+  ShaderModeY              = [3 ]
+  Clamp                    = [0.5 0.5 51.5 51.5 ]
+  Dimension                = [0.015625 0.015625 ]
+  TiledChild               = [1 ]
+  AlphaChild               = [0 ]
+  OutputAlphaSwizzle       = [0 ]
+  Rect                     = [- - - - ]
+  HasClip                  = [0 ]
+  LocalRect                = [- - - - ]
+  RadiiX                   = [- - - - ]
+  RadiiY                   = [- - - - ]
+  AntiAlias                = [- ]
+  DeviceToLocal            = [- - - - - - - - - - - - ]
+  DeviceCoordMatrix        = [- - - - - - - - - - - - ]
+  HasDeviceMask            = [0 ]
+[UNIF ab] sampler slot=0 texture=64x64 format=4
+[UNIF ab] sampler slot=1 texture=1x1 format=4 (dummy)
+[DRAW] route=AOT suffix= fields=2
+  tgfx_RTAdjust            = [0.03125 -1 0.03125 -1 ]
+  CoordTransformMatrix_0   = [0.015625 0 0 0 0 0.015625 0 0 0.03125 0.03125 1 0 ]
+[DRAW] route=AOT suffix= fields=18
+  Rect                     = [- - - - ]
+  HasClip                  = [0 ]
+  LocalRect                = [- - - - ]
+  RadiiX                   = [- - - - ]
+  RadiiY                   = [- - - - ]
+  AntiAlias                = [- ]
+  DeviceToLocal            = [- - - - - - - - - - - - ]
+  Subset                   = [0.0078125 0.0078125 0.804688 0.804688 ]
+  AlphaStart               = [- - ]
+  DeviceCoordMatrix        = [- - - - - - - - - - - - ]
+  DeviceMaskSubset         = [- - - - ]
+  HasDeviceMask            = [0 ]
+  AlphaOnly                = [0 ]
+  HasRgbaaa                = [0 ]
+  OutputAlphaSwizzle       = [0 ]
+  SubsetClampOn            = [1 ]
+  Color                    = [1 1 1 1 ]
+  HasCommonColor           = [1 ]
+[UNIF ab] sampler slot=0 texture=64x64 format=4
+[UNIF ab] sampler slot=1 texture=1x1 format=4 (dummy)
+[DRAW] route=AOT suffix= fields=2
+  tgfx_RTAdjust            = [0.03125 -1 0.03125 -1 ]
+  CoordTransformMatrix_0   = [0.015625 0 0 0 0 0.015625 0 0 -0.03125 -0.03125 1 0 ]
+[DRAW] route=AOT suffix= fields=18
+  Rect                     = [- - - - ]
+  HasClip                  = [0 ]
+  LocalRect                = [- - - - ]
+  RadiiX                   = [- - - - ]
+  RadiiY                   = [- - - - ]
+  AntiAlias                = [- ]
+  DeviceToLocal            = [- - - - - - - - - - - - ]
+  Subset                   = [0.0078125 0.0078125 0.773438 0.773438 ]
+  AlphaStart               = [- - ]
+  DeviceCoordMatrix        = [- - - - - - - - - - - - ]
+  DeviceMaskSubset         = [- - - - ]
+  HasDeviceMask            = [0 ]
+  AlphaOnly                = [0 ]
+  HasRgbaaa                = [0 ]
+  OutputAlphaSwizzle       = [0 ]
+  SubsetClampOn            = [1 ]
+  Color                    = [1 1 1 1 ]
+  HasCommonColor           = [1 ]
+[UNIF ab] sampler slot=0 texture=64x64 format=4
+[UNIF ab] sampler slot=1 texture=1x1 format=4 (dummy)
