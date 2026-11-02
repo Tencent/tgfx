@@ -36,7 +36,6 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/aot/AOTChainBuilder.h"
 #include "gpu/aot/AOTEffectDecomposer.h"
-#include "gpu/aot/AOTProbeCounters.h"
 #include "gpu/aot/DrawIR.h"
 #include "gpu/glsl/GLSLBlend.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
@@ -10476,119 +10475,6 @@ TGFX_TEST(AOTRenderConsistencyTest, BlurredImageUnderClipStaysPrecompiled) {
   EXPECT_EQ(aotStats.draws.droppedDraws, 0u);
   EXPECT_TRUE(aotStats.blurServed);
   ExpectBitmapsIdentical("blur-image-under-clip", aot, jit, 96, 96);
-}
-
-// P4.4's quantification probe: renders the noise and blur shapes the pending decisions hang on
-// and prints the probe counters (report-only — the assertions live with the decisions the
-// numbers feed). No reset here: the counters stay additive, so the TGFX_PROBE_DUMP=1 exit dump
-// of a full-suite run accumulates every scene the process rendered, this test's included.
-TGFX_TEST(AOTRenderConsistencyTest, P44QuantificationProbe) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto* cache = context->precompiledShaderCache();
-  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
-
-  auto surface = Surface::Make(context, 128, 128);
-  ASSERT_TRUE(surface != nullptr);
-  auto* canvas = surface->getCanvas();
-  // Both geometry forms the NoiseGraph coverage question hangs on: a pixel-aligned rect (the
-  // non-AA Default-GP form today's NoiseGraph variants do not cover) and a rotated rect (the
-  // AA-quad form they do).
-  Paint noisePaint;
-  noisePaint.setShader(Shader::MakeFractalNoise(0.05f, 0.05f, 3, 0));
-  canvas->drawRect(Rect::MakeXYWH(8, 8, 100, 100), noisePaint);
-  context->flushAndSubmit(true);
-  printf("[Probe] after aligned plain noise:\n");
-  DumpAOTProbes();
-  canvas->save();
-  canvas->rotate(15, 64, 64);
-  canvas->drawRect(Rect::MakeXYWH(16, 16, 80, 80), noisePaint);
-  canvas->restore();
-  context->flushAndSubmit(true);
-  printf("[Probe] after rotated plain noise:\n");
-  DumpAOTProbes();
-  // A deeper noise chain: two color filters folded over the noise source (operator slots), in
-  // both geometry forms.
-  const std::array<float, 20> scaleBias = {1.1f, 0, 0,     0, -0.05f, 0, 0.9f, 0,     0, 0.03f,
-                                           0,    0, 1.05f, 0, -0.02f, 0, 0,    0.95f, 0, 0};
-  Paint filteredNoise = noisePaint;
-  filteredNoise.setColorFilter(
-      ColorFilter::Compose(ColorFilter::Matrix(scaleBias), ColorFilter::Luma()));
-  canvas->drawRect(Rect::MakeXYWH(8, 8, 100, 100), filteredNoise);
-  context->flushAndSubmit(true);
-  printf("[Probe] after aligned filtered noise:\n");
-  DumpAOTProbes();
-  canvas->save();
-  canvas->rotate(15, 64, 64);
-  canvas->drawRect(Rect::MakeXYWH(16, 16, 80, 80), filteredNoise);
-  canvas->restore();
-  context->flushAndSubmit(true);
-  printf("[Probe] after rotated filtered noise:\n");
-  DumpAOTProbes();
-  // A chain deeper than the perlin family's three operator slots — the shape only the chain's
-  // NoiseGraph tier serves, so the slot-depth probe finally has a subject.
-  auto deepFilter = ColorFilter::Compose(ColorFilter::Matrix(scaleBias), ColorFilter::Luma());
-  deepFilter = ColorFilter::Compose(deepFilter, ColorFilter::Matrix(scaleBias));
-  deepFilter = ColorFilter::Compose(deepFilter, ColorFilter::Luma());
-  deepFilter = ColorFilter::Compose(deepFilter, ColorFilter::Matrix(scaleBias));
-  Paint deepNoise = noisePaint;
-  deepNoise.setColorFilter(deepFilter);
-  canvas->drawRect(Rect::MakeXYWH(8, 8, 100, 100), deepNoise);
-  context->flushAndSubmit(true);
-  printf("[Probe] after deep noise chain (past the perlin family's three slots):\n");
-  DumpAOTProbes();
-  // The blur/glass scenes (the Tier-2 computed-input question): the blurred image under a clip
-  // and the filters scene's offscreen fills. RenderBlurredImageUnderClip unloads the bundle on
-  // exit, so reload before the filters scene — a bundle-less render would JIT and pollute the
-  // gate.
-  Bitmap bitmap = {};
-  BrushRenderStats stats = {};
-  RenderBlurredImageUnderClip(context, true, &bitmap, &stats);
-  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
-  RenderFiltersScene(context);
-  printf("[Probe] P44QuantificationProbe scene counters:\n");
-  DumpAOTProbes();
-  // Where each noise draw landed: the walk's hit/fallback records name the serving family or the
-  // rejecting one (matchFailure sub-reason included). RenderBlurredImageUnderClip unloads the
-  // bundle on exit, so reload it first — without it every draw below JITs and the records say
-  // nothing about the variant coverage.
-  ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
-  cache->setDiagnosticRecordingEnabled(true);
-  cache->resetStats();
-  {
-    Paint deepOnly = noisePaint;
-    deepOnly.setColorFilter(deepFilter);
-    auto surface2 = Surface::Make(context, 128, 128);
-    canvas = surface2->getCanvas();
-    canvas->drawRect(Rect::MakeXYWH(8, 8, 100, 100), deepOnly);
-    context->flushAndSubmit(true);
-    canvas->save();
-    canvas->rotate(15, 64, 64);
-    canvas->drawRect(Rect::MakeXYWH(16, 16, 80, 80), deepOnly);
-    canvas->restore();
-    context->flushAndSubmit(true);
-    // The flush anomaly check: two identical noise draws recorded back-to-back with a single
-    // flush — the earlier probe runs lost the second draw's record-time lowering this way.
-    cache->resetStats();
-    auto surface3 = Surface::Make(context, 96, 96);
-    auto* canvas3 = surface3->getCanvas();
-    canvas3->drawRect(Rect::MakeXYWH(8, 8, 80, 80), deepOnly);
-    canvas3->drawRect(Rect::MakeXYWH(12, 12, 70, 70), deepOnly);
-    context->flushAndSubmit(true);
-    printf("[Probe] back-to-back (single flush): jitPrograms=%zu hits=%zu misses=%zu\n",
-           cache->jitProgramRecords().size(), cache->hitRecords().size(),
-           cache->fallbackRecords().size());
-  }
-  for (const auto& hit : cache->hitRecords()) {
-    printf("[Probe] HIT %s\n", hit.shaderName.c_str());
-  }
-  for (const auto& miss : cache->fallbackRecords()) {
-    printf("[Probe] MISS %s reason=%d matchFailure=%d\n", miss.shaderName.c_str(),
-           static_cast<int>(miss.reason), static_cast<int>(miss.matchFailure));
-  }
-  printf("[Probe] jitPrograms=%zu\n", cache->jitProgramRecords().size());
-  cache->setDiagnosticRecordingEnabled(false);
 }
 
 TGFX_TEST(AOTRenderConsistencyTest, FiltersSceneAOTMatchesJIT) {

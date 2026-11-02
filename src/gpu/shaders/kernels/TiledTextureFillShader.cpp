@@ -17,12 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/shaders/kernels/TiledTextureFillShader.h"
-#include <optional>
 #include <cstdio>
+#include <optional>
 #include "gpu/ProgramInfo.h"
+#include "gpu/ShaderMatchHelpers.h"
 #include "gpu/aot/AOTChainBuilder.h"
 #include "gpu/aot/AOTDrawFacts.h"
-#include "gpu/ShaderMatchHelpers.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {

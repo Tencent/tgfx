@@ -30,26 +30,26 @@ namespace {
 // otherwise surface at runtime as a silent route fallback).
 constexpr AOTNodeContract KindContracts[] = {
     // GeometryColor (graph root, designator): never scheduled.
-    {{false, true, false, false}, nullptr, nullptr},
-    {{true, false, false, true}, EncodeTextureSourceSlot, DemandTextureSource},
-    {{true, false, true, false}, EncodeUnaryPointwiseSlot, nullptr},  // ColorMatrix
-    {{true, false, true, false}, EncodeUnaryPointwiseSlot, nullptr},  // Luma
-    {{true, false, true, false}, EncodeUnaryPointwiseSlot, nullptr},  // AlphaThreshold
-    {{true, false, true, false}, EncodeUnaryPointwiseSlot, nullptr},  // ColorSpaceXform
-    {{true, false, false, false}, EncodeConstColorSlot, nullptr},
-    {{true, false, false, false}, EncodeBlendSlot, nullptr},
+    {{false, true, false}, nullptr, nullptr},
+    {{true, false, false}, EncodeTextureSourceSlot, DemandTextureSource},
+    {{true, false, true}, EncodeUnaryPointwiseSlot, nullptr},  // ColorMatrix
+    {{true, false, true}, EncodeUnaryPointwiseSlot, nullptr},  // Luma
+    {{true, false, true}, EncodeUnaryPointwiseSlot, nullptr},  // AlphaThreshold
+    {{true, false, true}, EncodeUnaryPointwiseSlot, nullptr},  // ColorSpaceXform
+    {{true, false, false}, EncodeConstColorSlot, nullptr},
+    {{true, false, false}, EncodeBlendSlot, nullptr},
     // The noise demand is counted from the layout's noise record instead (the layout owns it
     // after stage three), so the row carries no demand.
-    {{true, false, false, true}, EncodePerlinNoiseSlot, nullptr},
-    {{true, false, false, false}, EncodeRectCoverageSlot, nullptr},
-    {{true, false, false, true}, EncodeGradientSlot, DemandGradientSource},
-    {{true, false, false, false}, EncodeRRectCoverageSlot, nullptr},
+    {{true, false, false}, EncodePerlinNoiseSlot, nullptr},
+    {{true, false, false}, EncodeRectCoverageSlot, nullptr},
+    {{true, false, false}, EncodeGradientSlot, DemandGradientSource},
+    {{true, false, false}, EncodeRRectCoverageSlot, nullptr},
     // GeometryCoverage (graph root, designator): never scheduled.
-    {{false, true, false, false}, nullptr, nullptr},
-    {{true, true, false, false}, nullptr, nullptr},  // GeometryColorOpaqueInput
-    {{true, true, false, false}, nullptr, nullptr},  // GeometryWhiteInput
-    {{true, false, false, false}, EncodeInputOpaqueSlot, nullptr},
-    {{true, false, false, false}, EncodeMulAlphaSlot, nullptr},
+    {{false, true, false}, nullptr, nullptr},
+    {{true, true, false}, nullptr, nullptr},  // GeometryColorOpaqueInput
+    {{true, true, false}, nullptr, nullptr},  // GeometryWhiteInput
+    {{true, false, false}, EncodeInputOpaqueSlot, nullptr},
+    {{true, false, false}, EncodeMulAlphaSlot, nullptr},
 };
 
 constexpr size_t KindContractCount = sizeof(KindContracts) / sizeof(AOTNodeContract);
@@ -74,22 +74,22 @@ static_assert(EveryFusableKindIsEncodable(),
 // uniform write. A separate table on purpose — the instruction vocabulary and the node vocabulary
 // are not one-to-one (see the header).
 constexpr AOTOpContract OpContracts[] = {
-    {BindColorMatrixSlot},       // ColorMatrix (0)
-    {BindLumaSlot},              // Luma (1)
-    {BindAlphaThresholdSlot},    // AlphaThreshold (2)
-    {},                          // ColorSpaceXform (3): rides the program-level Chain block
-    {},                          // None (4, the inactive-slot marker)
-    {},                          // Texture (5): the sampler binding carries its records
-    {BindConstColorSlot},        // ConstColor (6)
-    {},                          // Blend (7): the chain's operands are registers
-    {BindAARectCoverageSlot},    // AARectCoverage (8)
-    {},                          // Gradient (9): the program-level gradient block
-    {BindLocalRectCoverageSlot}, // LocalRectCoverage (10)
-    {BindRRectCoverageSlot},     // RRectCoverage (11)
-    {},                          // TexModulate (12, synthesized by the texture encoder)
-    {},                          // InputOpaque (13)
-    {},                          // MulAlpha (14)
-    {},                          // PerlinNoise (15): the program-level noise block
+    {BindColorMatrixSlot},        // ColorMatrix (0)
+    {BindLumaSlot},               // Luma (1)
+    {BindAlphaThresholdSlot},     // AlphaThreshold (2)
+    {},                           // ColorSpaceXform (3): rides the program-level Chain block
+    {},                           // None (4, the inactive-slot marker)
+    {},                           // Texture (5): the sampler binding carries its records
+    {BindConstColorSlot},         // ConstColor (6)
+    {},                           // Blend (7): the chain's operands are registers
+    {BindAARectCoverageSlot},     // AARectCoverage (8)
+    {},                           // Gradient (9): the program-level gradient block
+    {BindLocalRectCoverageSlot},  // LocalRectCoverage (10)
+    {BindRRectCoverageSlot},      // RRectCoverage (11)
+    {},                           // TexModulate (12, synthesized by the texture encoder)
+    {},                           // InputOpaque (13)
+    {},                           // MulAlpha (14)
+    {},                           // PerlinNoise (15): the program-level noise block
 };
 
 constexpr size_t OpContractCount = sizeof(OpContracts) / sizeof(AOTOpContract);

@@ -23,13 +23,10 @@
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/Program.h"
 #include "gpu/aot/AOTChainBuilder.h"
-#include "gpu/aot/AOTProbeCounters.h"
 #include "gpu/aot/AOTProgramInfo.h"
 #include "gpu/aot/DrawIR.h"
-#include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/Processor.h"
-#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/shaders/kernels/PointwiseChainShader.h"
@@ -40,7 +37,7 @@ void StandardDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget)
   if (!onPrepare()) {
     return;
   }
-  if (!prepare(renderTarget, std::nullopt, renderPass->depthStencilFormat())) {
+  if (!prepare(renderTarget, renderPass->depthStencilFormat())) {
     return;
   }
   executePrepared(renderPass, renderTarget);
@@ -115,10 +112,8 @@ void AssertSingleLeafFacts(const DrawIR& ir,
 }  // namespace
 #endif
 
-bool StandardDrawOp::prepare(RenderTarget* renderTarget,
-                             std::optional<ColorProcessorList> colorOverride,
-                             PixelFormat depthStencilFormat, bool isFinalLookup,
-                             const DrawIR* passIR) {
+bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStencilFormat,
+                             bool isFinalLookup, const DrawIR* passIR) {
   if (!geometryProcessorInitialized) {
     geometryProcessorInitialized = true;
     geometryProcessor = onMakeGeometryProcessor(renderTarget);
@@ -128,11 +123,9 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget,
   }
 #if DEBUG
   // The leaf twin runs while the carried IR is the one being served — the staleness guard's own
-  // window: a color override (a plan task's pass colors) describes a different expression, and an
-  // expression that grew at prepare (a rasterized shape attaches its mask coverage only once the
-  // shape proxy exists) drops the IR from the info.
-  const bool irServes = !colorOverride.has_value() && loweredIR() != nullptr &&
-                        loweredIR()->colorFPCount == colors.size() &&
+  // window: an expression that grew at prepare (a rasterized shape attaches its mask coverage
+  // only once the shape proxy exists) drops the IR from the info.
+  const bool irServes = loweredIR() != nullptr && loweredIR()->colorFPCount == colors.size() &&
                         loweredIR()->coverageFPCount == coverages.size();
   if (irServes) {
     AssertSingleLeafFacts(*ir, colors);
@@ -143,11 +136,9 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget,
   preparedProgramInfo = nullptr;
   preparedRenderTarget = nullptr;
   preparedViaDecomposition = false;
-  preparedColors = std::move(colorOverride);
-  auto& activeColors = preparedColors.has_value() ? *preparedColors : colors;
 
   std::vector<FragmentProcessor*> fragmentProcessors = {};
-  size_t colorCount = activeColors.size();
+  size_t colorCount = colors.size();
   // Plan-pass serving: the pass IR is the whole expression, so the AOT route resolves the draw
   // from the program it compiles onto — no processor travels through the info. A fill pass carries
   // the IR on itself; the terminal pass hands it in from the plan.
@@ -192,8 +183,8 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget,
     preparedRenderTarget = renderTarget;
     return true;
   } else {
-    fragmentProcessors.reserve(activeColors.size() + coverages.size());
-    for (auto& color : activeColors) {
+    fragmentProcessors.reserve(colors.size() + coverages.size());
+    for (auto& color : colors) {
       fragmentProcessors.emplace_back(color.get());
     }
     for (auto& coverage : coverages) {
@@ -215,32 +206,12 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget,
   onConfigureProgramInfo(*preparedProgramInfo);
   // The draw's record-time IR rides along whenever the info's processor list is the unmodified
   // record-time list: the re-expressing families then reuse it instead of lowering a second time.
-  // A color override (a plan task's rebuilt pass colors) describes a different expression, and so
-  // does an expression that grew at prepare — a rasterized shape attaches its mask coverage FP
-  // only once the shape proxy exists (onMakeGeometryProcessor), so the counts the IR was lowered
-  // from must still match the op's live lists.
-  if (!preparedColors.has_value() && loweredIR() != nullptr &&
-      loweredIR()->colorFPCount == activeColors.size() &&
+  // An expression that grew at prepare — a rasterized shape attaches its mask coverage FP
+  // only once the shape proxy exists (onMakeGeometryProcessor) — describes a different expression,
+  // so the counts the IR was lowered from must still match the op's live lists.
+  if (loweredIR() != nullptr && loweredIR()->colorFPCount == colors.size() &&
       loweredIR()->coverageFPCount == coverages.size()) {
     preparedProgramInfo->setCarriedIR(loweredIR());
-    // P4.4 decision probe (diagnostic only): the noise draw's geometry form, classified where
-    // the real geometry processor and the carried IR finally coexist (record-time GP is null).
-    // Default is the form today's NoiseGraph variants do not cover.
-    bool hasNoise = false;
-    for (uint32_t i = 0; i < loweredIR()->color.nodeCount(); ++i) {
-      auto* node = loweredIR()->color.nodeAt(AOTNodeID(i));
-      hasNoise |= node != nullptr && node->kind == AOTEffectKind::PerlinNoiseSource;
-    }
-    if (hasNoise) {
-      auto* probes = AOTProbe();
-      if (IsProcessor<DefaultGeometryProcessor>(geometryProcessor.get())) {
-        probes->noiseGPDefault.fetch_add(1, std::memory_order_relaxed);
-      } else if (IsProcessor<QuadPerEdgeAAGeometryProcessor>(geometryProcessor.get())) {
-        probes->noiseGPQuad.fetch_add(1, std::memory_order_relaxed);
-      } else {
-        probes->noiseGPOther.fetch_add(1, std::memory_order_relaxed);
-      }
-    }
   }
   preparedProgram = preparedProgramInfo->getProgram();
   if (preparedProgram == nullptr) {
@@ -264,16 +235,14 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget,
   return true;
 }
 
-bool StandardDrawOp::prepareForTask(RenderTarget* renderTarget,
-                                    std::optional<ColorProcessorList> colorOverride,
-                                    bool isFinalLookup, const DrawIR* passIR) {
+bool StandardDrawOp::prepareForTask(RenderTarget* renderTarget, bool isFinalLookup,
+                                    const DrawIR* passIR) {
   // Mirror execute()'s ordering: onPrepare() may veto the op (empty asynchronous buffers);
   // skipping it here would leave those ops drawing from null resources ().
   if (!onPrepare()) {
     return false;
   }
-  return prepare(renderTarget, std::move(colorOverride), PixelFormat::Unknown, isFinalLookup,
-                 passIR);
+  return prepare(renderTarget, PixelFormat::Unknown, isFinalLookup, passIR);
 }
 
 bool StandardDrawOp::executePrepared(RenderPass* renderPass, RenderTarget* renderTarget,

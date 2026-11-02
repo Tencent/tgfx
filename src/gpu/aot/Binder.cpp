@@ -19,15 +19,15 @@
 #include "gpu/aot/Binder.h"
 #include <array>
 #include "gpu/ColorSpaceXformHelper.h"
+#include "gpu/Swizzle.h"
 #include "gpu/aot/Binder.h"
 #include "gpu/aot/NodeContract.h"
-#include "gpu/Swizzle.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/TextureView.h"
+#include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/modules/ChainParams.h"
 #include "gpu/shaders/modules/ParamWriter.h"
 #include "gpu/shaders/modules/TextureSourceModule.h"
-#include "gpu/shaders/KernelContract.h"
 
 namespace tgfx {
 namespace {
@@ -173,8 +173,8 @@ void BindAARectCoverageSlot(UniformData* uniformData, size_t /*index*/, int ordi
   // at a half-pixel inset to 1 at a half-pixel outset (same as GLSLRectEffect::onSetData).
   const auto& rect = slot.rectCoverage.rect;
   float rectData[] = {rect[0] - 0.5f, rect[1] - 0.5f, rect[2] + 0.5f, rect[3] + 0.5f};
-  uniformData->setArrayElementOptional(ChainParams::CoverageRect.name,
-                                       static_cast<size_t>(ordinal), rectData);
+  uniformData->setArrayElementOptional(ChainParams::CoverageRect.name, static_cast<size_t>(ordinal),
+                                       rectData);
 }
 
 void BindLocalRectCoverageSlot(UniformData* uniformData, size_t /*index*/, int ordinal,
@@ -234,8 +234,7 @@ void BindYUVProgram(const AOTProgram& program, UniformData* fragmentUniformData)
     return;
   }
   const auto& slots = program.slots;
-  fragmentUniformData->setDataOptional(ChainParams::SlotCount.name,
-                                       static_cast<int>(slots.size()));
+  fragmentUniformData->setDataOptional(ChainParams::SlotCount.name, static_cast<int>(slots.size()));
   // The declared capacity exceeds the real count: the inactive tail carries the OP_NONE marker,
   // matching the fixed-size storage every multi-slot kernel keeps.
   AOTChainSlot inactiveSlot = {};
@@ -248,8 +247,7 @@ void BindYUVProgram(const AOTProgram& program, UniformData* fragmentUniformData)
   // binder writes.
   for (const auto& slot : slots) {
     if (slot.op == AOTChainOp::ColorSpaceXform) {
-      ColorSpaceXformHelper("Chain").setData(fragmentUniformData,
-                                             slot.colorSpaceXform.steps.get());
+      ColorSpaceXformHelper("Chain").setData(fragmentUniformData, slot.colorSpaceXform.steps.get());
       break;
     }
   }

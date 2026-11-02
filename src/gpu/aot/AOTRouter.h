@@ -38,8 +38,8 @@ namespace tgfx {
  *     chain.
  *   - Through the plain program lookup at prepare time, for a draw that is still on the plain
  *     route: the re-expressing kernels (the chain interpreter and the perlin kernel) rebuild the
- *     draw's own expression per draw (PlanSinglePass decides the shape). Single pass only; the
- *     chain interpreter also merges the classified coverage terms.
+ *     draw's own expression per draw. Single pass only; the chain interpreter also merges the
+ *     classified coverage terms.
  *
  * An entry whose route produced no plan, or whose task build was refused, keeps its original draw
  * for the plain route.
@@ -76,15 +76,5 @@ class AOTRouter {
    * turns away.
    */
   static bool PlanRequiresTask(const AOTEffectPlan& plan);
-
-  /**
-   * Plans processors for the fused serving: true when they lower and decompose into a single pass
-   * of a kernel whose processor can stand in for a draw's whole color expression
-   * (PointwiseChain or PointwiseGraph). A multi-pass plan never qualifies: its
-   * intermediate passes need a plan task — so only the single-pass planners run, skipping the cut
-   * and linear-split planners whose results this entry would always discard.
-   */
-  static bool PlanSinglePass(const std::vector<const FragmentProcessor*>& processors,
-                             AOTEffectGraph* graph, AOTEffectPlan* plan);
 };
 }  // namespace tgfx

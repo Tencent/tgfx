@@ -100,18 +100,13 @@ void AOTPlanRenderTask::execute(CommandEncoder* encoder) {
   bool prepared = true;
   for (size_t index = 0; index < plan.passes.size() && prepared; ++index) {
     auto drawOp = static_cast<StandardDrawOp*>(plan.passes[index].drawOp.get());
-    prepared = drawOp->prepareForTask(renderTargets[index].get(), std::nullopt, false);
+    prepared = drawOp->prepareForTask(renderTargets[index].get(), false);
   }
-  // The terminal pass serves its chain IR directly (rebuilt at prepare); a plan that set neither
-  // form leaves the original draw's own expression in place — the family matches off the draw's
-  // carried IR, so the terminal prepares through the normal path.
-  auto terminalColors =
-      plan.terminalIR != nullptr || plan.terminalColors.empty()
-          ? std::nullopt
-          : std::optional<DrawOp::ColorProcessorList>(std::move(plan.terminalColors));
+  // The terminal pass serves its chain IR directly (rebuilt at prepare); a plan that set no
+  // terminal IR leaves the original draw's own expression in place — the family matches off the
+  // draw's carried IR, so the terminal prepares through the normal path.
   prepared = prepared && static_cast<StandardDrawOp*>(originalDraw.get())
-                             ->prepareForTask(finalTarget.get(), std::move(terminalColors), false,
-                                              plan.terminalIR.get());
+                             ->prepareForTask(finalTarget.get(), false, plan.terminalIR.get());
   cache->setMissRecordingPaused(false);
   if (!prepared) {
     executeFallback(encoder, std::move(finalTarget));

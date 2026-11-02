@@ -116,12 +116,11 @@ bool TextureEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNode
       // The multi-plane leaf's variant dimension rides on the node: the family's matching reads
       // it off the IR (only I420 and NV12 are enumerated; anything else stays -1 and falls back).
       auto* yuvTexture = getYUVTexture();
-      parameters.yuvFormat =
-          yuvTexture == nullptr
-              ? -1
-              : (yuvTexture->yuvFormat() == YUVFormat::I420
-                     ? 0
-                     : (yuvTexture->yuvFormat() == YUVFormat::NV12 ? 1 : -1));
+      parameters.yuvFormat = yuvTexture == nullptr
+                                 ? -1
+                                 : (yuvTexture->yuvFormat() == YUVFormat::I420
+                                        ? 0
+                                        : (yuvTexture->yuvFormat() == YUVFormat::NV12 ? 1 : -1));
     }
   }
   return builder->addTextureSource(input, parameters, output);

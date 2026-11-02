@@ -64,21 +64,20 @@ struct AOTRenderPass {
 
 /**
  * The executable form of an AOT route for one draw: the producer passes, ordered so that every pass
- * comes after the passes whose targets it samples, then the terminal pass, which replays the original draw onto its destination with terminalColors in
- * place of its color processors. The terminal pass may sample any producer. AOTPlanRenderTask runs
+ * comes after the passes whose targets it samples, then the terminal pass, which replays the
+ * original draw onto its destination with the cut segment's terminalIR in place of its own
+ * expression. The terminal pass may sample any producer. AOTPlanRenderTask runs
  * the whole plan as one task, so a producer and the passes that read it can never be split across
  * tasks.
  */
 struct AOTRenderPlan {
   std::vector<AOTRenderPass> passes = {};
-  /// The terminal pass of a non-chain plan (YUV or perlin): its color processors.
-  DrawOp::ColorProcessorList terminalColors = {};
   /// The terminal pass of a chain plan: the cut segment's IR, rebuilt at prepare time.
   PlacementPtr<DrawIR> terminalIR = nullptr;
 
   /**
-   * Whether every pass has a target and a draw, and the terminal pass carries exactly one of its
-   * two forms. The pass order is the builder's responsibility and is not checked here.
+   * Whether every pass has a target and a draw. The pass order is the builder's responsibility
+   * and is not checked here.
    */
   bool isWellFormed() const {
     for (const auto& pass : passes) {
@@ -86,11 +85,7 @@ struct AOTRenderPlan {
         return false;
       }
     }
-    // The terminal carries a color override, a pass IR, or neither: the YUV family's single-pass
-    // plan leaves both unset — its terminal serves the draw's own expression in place (the
-    // family matches off the carried IR), and the task stays the plan's execution wrapper. Only
-    // the two explicit forms are mutually exclusive.
-    return terminalIR == nullptr || terminalColors.empty();
+    return true;
   }
 };
 }  // namespace tgfx

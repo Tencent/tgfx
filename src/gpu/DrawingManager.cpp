@@ -147,8 +147,8 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   const bool planCandidate = isFillRouteCandidate(processor.get());
   PlacementPtr<DrawIR> fillIR = nullptr;
   if (precompiledActive && processor != nullptr) {
-    if (auto lowered = LowerDraw({processor.get()}, {}, nullptr, BlendMode::Src,
-                                 drawingAllocator())) {
+    if (auto lowered =
+            LowerDraw({processor.get()}, {}, nullptr, BlendMode::Src, drawingAllocator())) {
       fillIR = drawingAllocator()->make<DrawIR>(std::move(*lowered));
     }
   }

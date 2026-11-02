@@ -41,23 +41,9 @@ bool IsUnaryPointwiseOp(const AOTEffectNode* node, AOTNodeID expectedInput);
 bool IsLinearMultiPassSource(const AOTEffectGraph& graph, AOTNodeID nodeID);
 
 /**
- * A procedural-noise source fed by the geometry color (node 0).
- */
-bool IsPerlinNoiseSource(const AOTEffectGraph& graph, AOTNodeID nodeID);
-
-/**
  * A YUV video source fed by the geometry color (node 0) and sampled plainly.
  */
 bool IsYUVChainSource(const AOTEffectGraph& graph, AOTNodeID nodeID);
-
-/**
- * A blend whose other operand is an input-independent constant — the const-operand form the
- * slot interpreters carry: a two-child blend is refused (both operands would need evaluation),
- * exactly one side is a ConstColor node, the chained side is the given node, and the constant
- * ignores its own input edge (the slot reads it straight from its uniform record).
- */
-bool IsConstOperandBlend(const AOTEffectGraph& graph, const AOTEffectNode* blend,
-                         AOTNodeID expectedInput);
 
 /**
  * Whether the kind is an input-environment designator (the geometry color, the coverage unit, and

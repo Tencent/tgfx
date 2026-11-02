@@ -109,9 +109,6 @@ const AOTTextureParameters* LocalMaskCoverageLeaf(const DrawIR* ir);
 /// instead of the mask processor. Null when the draw has no such term.
 const AOTTextureParameters* DeviceMaskCoverageLeaf(const DrawIR* ir);
 
-/// Direct analytic clip coverage: the sole coverage FP is an AA rect or a leaf rrect.
-bool HasDirectAnalyticClipCoverage(const ProgramInfo* programInfo);
-
 /// Whether a ShaderMode value is one the blur kernels' shared tiled sampling implements.
 bool TiledModeSupported(int mode);
 

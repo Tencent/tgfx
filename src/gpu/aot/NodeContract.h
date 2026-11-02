@@ -42,9 +42,6 @@ struct AOTKindTraits {
   bool inputDesignator = false;
   /// One of the four unary pointwise operators sharing the OP_* ABI values.
   bool unaryPointwise = false;
-  /// Carries a local-coordinate matrix that a cut-segment copy must precompose with the fill's
-  /// coordToLocal (or deviceLeafRemap for a device-sampled texture).
-  bool remapsLocalCoords = false;
 };
 
 // The contract implementations' signatures. A kind's encoder turns one scheduled node into its

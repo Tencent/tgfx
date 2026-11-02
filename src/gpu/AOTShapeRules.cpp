@@ -129,12 +129,6 @@ bool IsLinearMultiPassSource(const AOTEffectGraph& graph, AOTNodeID nodeID) {
          parameters->samplingKind == AOTTextureSamplingKind::Device;
 }
 
-bool IsPerlinNoiseSource(const AOTEffectGraph& graph, AOTNodeID nodeID) {
-  auto node = graph.nodeAt(nodeID);
-  return node != nullptr && node->kind == AOTEffectKind::PerlinNoiseSource &&
-         node->inputs.size() == 1 && node->inputs[0] == AOTNodeID(0);
-}
-
 bool IsYUVChainSource(const AOTEffectGraph& graph, AOTNodeID nodeID) {
   auto node = graph.nodeAt(nodeID);
   if (node == nullptr || node->kind != AOTEffectKind::TextureSource || node->inputs.size() != 1 ||
@@ -144,26 +138,6 @@ bool IsYUVChainSource(const AOTEffectGraph& graph, AOTNodeID nodeID) {
   auto parameters = std::get_if<AOTTextureParameters>(&node->parameters);
   return parameters != nullptr && parameters->isYUV && !parameters->hasRGBAAA &&
          parameters->samplingKind == AOTTextureSamplingKind::Plain;
-}
-
-bool IsConstOperandBlend(const AOTEffectGraph& graph, const AOTEffectNode* blend,
-                         AOTNodeID expectedInput) {
-  if (blend == nullptr || blend->kind != AOTEffectKind::Blend || blend->inputs.size() != 2) {
-    return false;
-  }
-  auto blendParams = std::get_if<AOTBlendParameters>(&blend->parameters);
-  // A two-child blend needs both operands evaluated, which a single const-operand slot cannot
-  // express.
-  if (blendParams == nullptr || blendParams->childType == 2) {
-    return false;
-  }
-  auto* srcNode = graph.nodeAt(blend->inputs[0]);
-  auto* dstNode = graph.nodeAt(blend->inputs[1]);
-  bool srcIsConst = srcNode != nullptr && srcNode->kind == AOTEffectKind::ConstColor;
-  bool dstIsConst = dstNode != nullptr && dstNode->kind == AOTEffectKind::ConstColor;
-  AOTNodeID chained = srcIsConst ? blend->inputs[1] : blend->inputs[0];
-  return srcIsConst != dstIsConst && chained == expectedInput &&
-         AOTConstColorIsInputIndependent(graph, srcIsConst ? srcNode : dstNode);
 }
 
 bool IsInputDesignator(AOTEffectKind kind) {

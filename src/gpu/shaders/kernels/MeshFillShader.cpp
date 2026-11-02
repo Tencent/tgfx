@@ -31,8 +31,8 @@ std::optional<MeshFillShader::Inputs> MeshFillShader::Extract(const ProgramInfo*
   return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
 }
 
-std::optional<MeshFillShader::Inputs> MeshFillShader::ExtractFacts(
-    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+std::optional<MeshFillShader::Inputs> MeshFillShader::ExtractFacts(const AOTDrawFacts& facts,
+                                                                   PermutationMatchFailure*) {
   if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }

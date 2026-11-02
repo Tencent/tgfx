@@ -19,9 +19,9 @@
 #include "gpu/shaders/kernels/QuadTextureFillShader.h"
 #include <optional>
 #include "gpu/ProgramInfo.h"
+#include "gpu/ShaderMatchHelpers.h"
 #include "gpu/aot/AOTChainBuilder.h"
 #include "gpu/aot/AOTDrawFacts.h"
-#include "gpu/ShaderMatchHelpers.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"

@@ -32,7 +32,6 @@
 #include "gpu/ProgramSignature.h"
 #include "gpu/ProgramWriter.h"
 #include "gpu/ShaderKeyHash.h"
-#include "gpu/shaders/kernels/YUVTextureFillShader.h"
 #include "gpu/UniformData.h"
 #include "gpu/aot/AOTEffectDecomposer.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
@@ -40,6 +39,7 @@
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/shaders/AllShaderFamilies.h"
 #include "gpu/shaders/ShaderFamily.h"
+#include "gpu/shaders/kernels/YUVTextureFillShader.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {

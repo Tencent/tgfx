@@ -22,13 +22,6 @@
 
 namespace tgfx {
 
-// The kernels the prepare-time fused serving can express: one fused chain/graph or perlin
-// processor standing in for a draw's whole color expression. Every other kernel needs a plan
-// task.
-static bool IsFusedServingKernel(AOTKernelKind kernel) {
-  return IsAOTPointwiseDAGKernel(kernel);
-}
-
 std::optional<AOTEffectPlan> AOTRouter::Plan(const DrawIR& ir,
                                              AOTDecomposeOutcome* failureOutcome) {
   AOTEffectPlan plan = {};
@@ -56,19 +49,10 @@ bool AOTRouter::TaskCarriesCoverage(const AOTEffectPlan& plan,
   return !BlendModeNeedDstTexture(blendMode, true);
 }
 
-bool AOTRouter::PlanSinglePass(const std::vector<const FragmentProcessor*>& processors,
-                               AOTEffectGraph* graph, AOTEffectPlan* plan) {
-  if (!AOTEffectDecomposer::Lower(processors, graph) ||
-      !AOTEffectDecomposer::Decompose(*graph, plan, true)) {
-    return false;
-  }
-  return !PlanRequiresTask(*plan);
-}
-
 bool AOTRouter::PlanRequiresTask(const AOTEffectPlan& plan) {
   if (plan.passes.size() != 1) {
     return true;
   }
-  return !IsFusedServingKernel(plan.passes[0].kernel);
+  return !IsAOTPointwiseDAGKernel(plan.passes[0].kernel);
 }
 }  // namespace tgfx

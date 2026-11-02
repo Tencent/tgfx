@@ -19,7 +19,6 @@
 #include "gpu/aot/DrawIR.h"
 #include <atomic>
 #include "gpu/aot/AOTEffectDecomposer.h"
-#include "gpu/aot/AOTProbeCounters.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
 #include "gpu/processors/ConstColorProcessor.h"
@@ -211,32 +210,6 @@ std::optional<DrawIR> LowerDrawCore(const std::vector<const FragmentProcessor*>&
   ir.coverage = std::move(*terms);
   // The synthesized leaves only had to outlive LowerCoverageTerms; the arena owns the memory.
   (void)ownedLeaves;
-  // P4.4 decision probes (diagnostic only, family-independent — every draw passes here exactly
-  // once at record time): the total noise lowerings, and the blur opaque node's input shape (the
-  // Tier-2 cut point's audience). The noise draw's GEOMETRY form is classified at prepare time
-  // (StandardDrawOp::prepare) — the record-time GP is null for every canvas draw.
-  {
-    auto* probes = AOTProbe();
-    for (uint32_t i = 0; i < ir.color.nodeCount(); ++i) {
-      auto* node = ir.color.nodeAt(AOTNodeID(i));
-      if (node != nullptr && node->kind == AOTEffectKind::PerlinNoiseSource) {
-        probes->noiseLowerings.fetch_add(1, std::memory_order_relaxed);
-        break;
-      }
-    }
-    auto* root = ir.color.nodeAt(ir.color.root());
-    if (root != nullptr && root->kind == AOTEffectKind::OpaqueKernel && !root->inputs.empty()) {
-      auto* kernel = std::get_if<AOTOpaqueKernelParameters>(&root->parameters);
-      const auto* child = ir.color.nodeAt(root->inputs[0]);
-      if (kernel != nullptr && kernel->kernelKind == 0) {
-        if (child != nullptr && child->kind == AOTEffectKind::TextureSource) {
-          probes->blurTextureInput.fetch_add(1, std::memory_order_relaxed);
-        } else {
-          probes->blurComputedInput.fetch_add(1, std::memory_order_relaxed);
-        }
-      }
-    }
-  }
   lowerDrawCount.fetch_add(1, std::memory_order_relaxed);
   return ir;
 }
@@ -281,8 +254,7 @@ std::optional<DrawIR> LowerDraw(const std::vector<const FragmentProcessor*>& col
 std::optional<DrawIR> LowerDrawWithAtlas(
     const std::vector<const FragmentProcessor*>& colorProcessors,
     const std::vector<const FragmentProcessor*>& coverageProcessors,
-    const AOTAtlasGlyphSource& atlas, BlendMode blendMode,
-    BlockAllocator* allocator) {
+    const AOTAtlasGlyphSource& atlas, BlendMode blendMode, BlockAllocator* allocator) {
   if (allocator == nullptr || atlas.textureProxy == nullptr || !atlas.textureProxy->isAlphaOnly()) {
     return std::nullopt;
   }

@@ -42,9 +42,8 @@ std::optional<RoundStrokeRectFillShader::Inputs> RoundStrokeRectFillShader::Extr
   }
   // The kernel reads the clip from the runtime clip contract uniforms, so a sole analytic clip is
   // admitted alongside the FP-free form.
-  const bool directClip =
-      facts.colorFromPaint &&
-      (facts.coverage == CoverageKind::AARect || facts.coverage == CoverageKind::RRect);
+  const bool directClip = facts.colorFromPaint && (facts.coverage == CoverageKind::AARect ||
+                                                   facts.coverage == CoverageKind::RRect);
   if (facts.fragmentCount != 0 && !directClip) {
     return std::nullopt;
   }

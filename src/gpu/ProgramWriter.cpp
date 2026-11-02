@@ -433,8 +433,9 @@ void YUVProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* ver
   // the chain route applies to its own slots.
   auto* program = YUVProgram(info);
   if (program == nullptr) {
-    LOGE("YUVProgramWriter::writeProcessors() no compiled YUV tail program; the draw renders "
-         "with unwritten tail uniforms");
+    LOGE(
+        "YUVProgramWriter::writeProcessors() no compiled YUV tail program; the draw renders "
+        "with unwritten tail uniforms");
     return;
   }
   BindYUVProgram(*program, fragmentUniformData);

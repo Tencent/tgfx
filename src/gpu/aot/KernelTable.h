@@ -20,8 +20,8 @@
 
 #include <optional>
 #include <vector>
-#include "gpu/aot/AOTDrawFacts.h"
 #include "gpu/PermutationMatch.h"
+#include "gpu/aot/AOTDrawFacts.h"
 #include "gpu/shaders/ShaderPermutation.h"
 
 namespace tgfx {
@@ -35,8 +35,8 @@ namespace tgfx {
  */
 struct AOTKernelRow {
   const char* family = nullptr;
-  std::optional<PermutationVariant> (*match)(const AOTDrawFacts&, PermutationMatchFailure*) =
-      nullptr;
+  std::optional<PermutationVariant> (*match)(const AOTDrawFacts&,
+                                             PermutationMatchFailure*) = nullptr;
 };
 
 /** The table's answer: which row accepted first, and the variant it composed. */
@@ -44,13 +44,6 @@ struct AOTKernelMatch {
   const AOTKernelRow* row = nullptr;
   PermutationVariant variant = {};
 };
-
-/**
- * The migrated dedicated families' rows, in walk order. Lookup applies no walk gates of its
- * own: alpha-only rejection is a row predicate, and the diagnostic switches stay at the
- * dispatch site (the dual-run assertion only compares while the dedicated walk is enabled).
- */
-const std::vector<AOTKernelRow>& KernelTableRows();
 
 /** The first row whose predicate accepts the facts, or nullopt when none does. */
 std::optional<AOTKernelMatch> KernelTableLookup(const AOTDrawFacts& facts,

@@ -19,9 +19,9 @@
 #include "gpu/shaders/kernels/TexturedEffectShader.h"
 #include <optional>
 #include "gpu/ProgramInfo.h"
+#include "gpu/ShaderMatchHelpers.h"
 #include "gpu/aot/AOTChainBuilder.h"
 #include "gpu/aot/AOTDrawFacts.h"
-#include "gpu/ShaderMatchHelpers.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"

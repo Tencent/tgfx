@@ -168,55 +168,22 @@ void GLSLTextureEffect::onSetData(UniformData* /*vertexUniformData*/,
   if (textureView == nullptr || fragmentUniformData == nullptr) {
     return;
   }
-  // Default for kernels with a runtime device mask (absent elsewhere); a present mask FP
-  // overwrites it with 1 later in traversal.
-  fragmentUniformData->setDataOptional("HasDeviceMask", 0);
   if (alphaStart != Point::Zero()) {
     auto alphaStartValue = textureView->getTextureCoord(alphaStart.x, alphaStart.y);
     fragmentUniformData->setData("AlphaStart", alphaStartValue);
   }
   auto yuvTexture = getYUVTexture();
-  if (yuvTexture != nullptr && fragmentUniformData->hasField("YUVLimitedRange")) {
-    // The runtime codegen bakes the limited-range offset; precompiled programs read it here.
-    int limited = IsLimitedYUVColorRange(yuvTexture->yuvColorSpace()) ? 1 : 0;
-    fragmentUniformData->setData("YUVLimitedRange", limited);
-  }
   if (yuvTexture) {
     if (auto conversion = YUVColorConversionMatrix(yuvTexture->yuvColorSpace())) {
       fragmentUniformData->setData("Mat3ColorConversion", *conversion);
     }
   }
-  // Set the Subset uniform when the shader declares it. The precompiled shader may include the
-  // Subset uniform even when needSubset() is false (GP has subset attribute but TE determined
-  // subset clamping is unnecessary). In that case we use the full texture bounds so the clamp is
-  // a no-op. Kernels without the field (e.g. a leaf-free pointwise chain) skip the write;
-  // needSubset() alone must not force it.
-  if (fragmentUniformData != nullptr && fragmentUniformData->hasField("Subset")) {
+  // Set the Subset uniform when the runtime-generated shader declares it, which happens exactly
+  // when needSubset() holds; the hasField gate mirrors that decision instead of re-deriving it.
+  if (fragmentUniformData->hasField("Subset")) {
     float rect[4];
     computeSubsetRect(rect);
     fragmentUniformData->setData("Subset", rect);
-  }
-  // SubsetClampOn mirrors the runtime TextureEffect's needSubset() gate onto the precompiled
-  // fill kernels: the JIT only clamps when needSubset() holds, so an unconditional clamp in the
-  // kernel diverges on out-of-range coordinates (zeroed mip derivatives, half-texel edge shifts).
-  // Kernels without the field (JIT programs) skip the write.
-  if (fragmentUniformData != nullptr && fragmentUniformData->hasField("SubsetClampOn")) {
-    int subsetClampOn = needSubset() ? 1 : 0;
-    fragmentUniformData->setData("SubsetClampOn", subsetClampOn);
-  }
-  // Alpha-only is a runtime uniform in the precompiled QuadTextureFillShader (folded out of the
-  // permutation set). The runtime GLSL codegen bakes it in and does not declare the field, so this
-  // only fires on the AOT path where the field exists.
-  if (fragmentUniformData->hasField("AlphaOnly")) {
-    int alphaOnlyValue = isAlphaOnly() ? 1 : 0;
-    fragmentUniformData->setData("AlphaOnly", alphaOnlyValue);
-  }
-  // RGBAAA dual-plane is likewise a runtime uniform in the precompiled QuadTextureFillShader. Only
-  // fires on the AOT path where the field exists. AlphaStart (set above when non-zero) supplies the
-  // alpha-plane offset the shader reads when HasRgbaaa != 0.
-  if (fragmentUniformData->hasField("HasRgbaaa")) {
-    int hasRgbaaaValue = hasRGBAAA() ? 1 : 0;
-    fragmentUniformData->setData("HasRgbaaa", hasRgbaaaValue);
   }
 }
 

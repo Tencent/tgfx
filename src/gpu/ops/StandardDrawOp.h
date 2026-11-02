@@ -44,15 +44,12 @@ class StandardDrawOp : public DrawOp {
   void execute(RenderPass* renderPass, RenderTarget* renderTarget) final;
 
   /**
-   * Prepares the geometry processor and program for a draw. When colorOverride is present, its
-   * processors replace the op's color processors without modifying them. isFinalLookup marks this
-   * as the draw's own last program lookup — its failure drops the draw and is recorded as such —
+   * Prepares the geometry processor and program for a draw. isFinalLookup marks this as the
+   * draw's own last program lookup — its failure drops the draw and is recorded as such —
    * versus a plan-task pass probe, whose failure falls back to the original draw.
    */
-  bool prepare(RenderTarget* renderTarget,
-               std::optional<ColorProcessorList> colorOverride = std::nullopt,
-               PixelFormat depthStencilFormat = PixelFormat::Unknown, bool isFinalLookup = true,
-               const DrawIR* passIR = nullptr);
+  bool prepare(RenderTarget* renderTarget, PixelFormat depthStencilFormat = PixelFormat::Unknown,
+               bool isFinalLookup = true, const DrawIR* passIR = nullptr);
 
   /**
    * Executes a successfully prepared draw and uploads its uniforms and texture samplers. Set
@@ -74,9 +71,8 @@ class StandardDrawOp : public DrawOp {
    * plan-task pass probe (false) falls back to the original draw on failure, while the task's
    * fallback re-run of the original draw (true) drops it.
    */
-  bool prepareForTask(RenderTarget* renderTarget,
-                      std::optional<ColorProcessorList> colorOverride = std::nullopt,
-                      bool isFinalLookup = true, const DrawIR* passIR = nullptr);
+  bool prepareForTask(RenderTarget* renderTarget, bool isFinalLookup = true,
+                      const DrawIR* passIR = nullptr);
 
   /**
    * The geometry color every fragment of this op receives as its input color, or nullopt when
@@ -141,7 +137,6 @@ class StandardDrawOp : public DrawOp {
  private:
   PlacementPtr<GeometryProcessor> geometryProcessor = nullptr;
   bool geometryProcessorInitialized = false;
-  std::optional<ColorProcessorList> preparedColors = std::nullopt;
   std::unique_ptr<ProgramInfo> preparedProgramInfo = nullptr;
   std::shared_ptr<Program> preparedProgram = nullptr;
   RenderTarget* preparedRenderTarget = nullptr;

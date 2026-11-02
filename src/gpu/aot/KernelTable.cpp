@@ -71,10 +71,6 @@ static const std::vector<AOTKernelRow> rows = {
     AOTKernelRow{YUVTextureFillShader::Name, YUVTextureFillShader::MatchFromFacts},
 };
 
-const std::vector<AOTKernelRow>& KernelTableRows() {
-  return rows;
-}
-
 std::optional<AOTKernelMatch> KernelTableLookup(const AOTDrawFacts& facts,
                                                 PermutationMatchFailure* failure) {
   for (const auto& row : rows) {

@@ -31,8 +31,8 @@ std::optional<EllipseFillShader::Inputs> EllipseFillShader::Extract(
   return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
 }
 
-std::optional<EllipseFillShader::Inputs> EllipseFillShader::ExtractFacts(
-    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+std::optional<EllipseFillShader::Inputs> EllipseFillShader::ExtractFacts(const AOTDrawFacts& facts,
+                                                                         PermutationMatchFailure*) {
   if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }

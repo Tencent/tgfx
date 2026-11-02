@@ -319,8 +319,8 @@ TGFX_TEST(AOTEffectTest, LowerDrawClassifiesCoverageTerms) {
   ASSERT_NE(colorMatrix, nullptr);
 
   // No coverage: an empty term list and the color chain lowered once.
-  auto none = LowerDraw({texture.get(), colorMatrix.get()}, {}, nullptr,
-                        BlendMode::SrcOver, allocator);
+  auto none =
+      LowerDraw({texture.get(), colorMatrix.get()}, {}, nullptr, BlendMode::SrcOver, allocator);
   ASSERT_TRUE(none.has_value());
   EXPECT_TRUE(none->coverage.empty());
   EXPECT_GE(none->color.nodeCount(), 3u);
@@ -338,8 +338,7 @@ TGFX_TEST(AOTEffectTest, LowerDrawClassifiesCoverageTerms) {
         RRectEffect::Make(allocator, RRect::MakeRectXY(Rect::MakeLTRB(2, 2, 28, 28), 6, 6));
     auto composed = FragmentProcessor::Compose(allocator, std::move(rect), std::move(rrect));
     ASSERT_NE(composed, nullptr);
-    auto ir = LowerDraw({texture.get()}, {composed.get()}, nullptr, BlendMode::SrcOver,
-                        allocator);
+    auto ir = LowerDraw({texture.get()}, {composed.get()}, nullptr, BlendMode::SrcOver, allocator);
     ASSERT_TRUE(ir.has_value());
     EXPECT_EQ(CoverageTermKinds(*ir),
               std::vector<AOTCoverageTermKind>({AOTCoverageTermKind::Analytic}));
@@ -354,8 +353,7 @@ TGFX_TEST(AOTEffectTest, LowerDrawClassifiesCoverageTerms) {
     ASSERT_NE(alphaProxy, nullptr);
     auto mask = DeviceSpaceTextureEffect::Make(allocator, alphaProxy, Matrix::MakeTrans(3, 5));
     ASSERT_NE(mask, nullptr);
-    auto ir =
-        LowerDraw({texture.get()}, {mask.get()}, nullptr, BlendMode::SrcOver, allocator);
+    auto ir = LowerDraw({texture.get()}, {mask.get()}, nullptr, BlendMode::SrcOver, allocator);
     ASSERT_TRUE(ir.has_value());
     EXPECT_EQ(CoverageTermKinds(*ir),
               std::vector<AOTCoverageTermKind>({AOTCoverageTermKind::DeviceMask}));
@@ -365,8 +363,8 @@ TGFX_TEST(AOTEffectTest, LowerDrawClassifiesCoverageTerms) {
     auto rect = RectEffect::Make(allocator, Rect::MakeLTRB(1, 2, 30, 40));
     auto composed = FragmentProcessor::Compose(allocator, std::move(mask), std::move(rect));
     ASSERT_NE(composed, nullptr);
-    auto both = LowerDraw({texture.get()}, {composed.get()}, nullptr, BlendMode::SrcOver,
-                          allocator);
+    auto both =
+        LowerDraw({texture.get()}, {composed.get()}, nullptr, BlendMode::SrcOver, allocator);
     ASSERT_TRUE(both.has_value());
     EXPECT_EQ(CoverageTermKinds(*both),
               std::vector<AOTCoverageTermKind>(
@@ -375,8 +373,8 @@ TGFX_TEST(AOTEffectTest, LowerDrawClassifiesCoverageTerms) {
 
   // A general coverage leaf is the subtree term (mask-filter semantics).
   {
-    auto ir = LowerDraw({texture.get()}, {alphaTexture.get()}, nullptr, BlendMode::SrcOver,
-                        allocator);
+    auto ir =
+        LowerDraw({texture.get()}, {alphaTexture.get()}, nullptr, BlendMode::SrcOver, allocator);
     ASSERT_TRUE(ir.has_value());
     EXPECT_EQ(CoverageTermKinds(*ir),
               std::vector<AOTCoverageTermKind>({AOTCoverageTermKind::Subtree}));
@@ -390,8 +388,8 @@ TGFX_TEST(AOTEffectTest, LowerDrawClassifiesCoverageTerms) {
     auto alphaProxy = context->proxyProvider()->createTextureProxy({}, 4, 4, PixelFormat::ALPHA_8);
     auto mask = DeviceSpaceTextureEffect::Make(allocator, alphaProxy, Matrix::I());
     ASSERT_NE(mask, nullptr);
-    auto ir = LowerDraw({texture.get()}, {rect.get(), mask.get()}, nullptr,
-                        BlendMode::SrcOver, allocator);
+    auto ir = LowerDraw({texture.get()}, {rect.get(), mask.get()}, nullptr, BlendMode::SrcOver,
+                        allocator);
     ASSERT_TRUE(ir.has_value());
     EXPECT_EQ(CoverageTermKinds(*ir),
               std::vector<AOTCoverageTermKind>(
@@ -424,8 +422,8 @@ TGFX_TEST(AOTEffectTest, LowerDrawClassifiesCoverageTerms) {
     auto perspective = Matrix::MakeAll(1, 0, 0, 0, 1, 0, 0.01f, 0, 1);
     auto perspectiveMask = DeviceSpaceTextureEffect::Make(allocator, alphaProxy, perspective);
     ASSERT_NE(perspectiveMask, nullptr);
-    auto flagged = LowerDraw({texture.get()}, {perspectiveMask.get()}, nullptr,
-                             BlendMode::SrcOver, allocator);
+    auto flagged =
+        LowerDraw({texture.get()}, {perspectiveMask.get()}, nullptr, BlendMode::SrcOver, allocator);
     ASSERT_TRUE(flagged.has_value());
     EXPECT_EQ(CoverageTermKinds(*flagged),
               std::vector<AOTCoverageTermKind>({AOTCoverageTermKind::DeviceMask}));
@@ -449,8 +447,8 @@ TGFX_TEST(AOTEffectTest, LowerDrawClassifiesCoverageTerms) {
     auto rgbaProxy = context->proxyProvider()->createTextureProxy({}, 4, 4, PixelFormat::RGBA_8888);
     auto rgbaMask = DeviceSpaceTextureEffect::Make(allocator, rgbaProxy, Matrix::I());
     ASSERT_NE(rgbaMask, nullptr);
-    auto rejected = LowerDraw({texture.get()}, {rgbaMask.get()}, nullptr,
-                              BlendMode::SrcOver, allocator);
+    auto rejected =
+        LowerDraw({texture.get()}, {rgbaMask.get()}, nullptr, BlendMode::SrcOver, allocator);
     EXPECT_FALSE(rejected.has_value());
   }
 }

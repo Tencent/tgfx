@@ -18,7 +18,6 @@
 
 #include <skcms.h>
 #include <string_view>
-#include <type_traits>
 #include <unordered_set>
 #include "ColorSpaceXformHelper.h"
 #include "ShaderMatchHelpers.h"
@@ -527,11 +526,6 @@ bool ContainsGradientSource(const FragmentProcessor* processor) {
 // Per-family gate of the walk (see MatchPermutationImpl for the switch semantics): the two
 // diagnostic switches exclude their half of the family list, decompositionEnabled gating the
 // interpreter and dedicatedKernelsEnabled every dedicated family.
-template <typename Family>
-static bool FamilyWalkEnabled(bool allowDedicated, bool allowInterpreter) {
-  return std::is_same_v<Family, PointwiseChainShader> ? allowInterpreter : allowDedicated;
-}
-
 static std::optional<PermutationMatchResult> MatchPermutationImpl(
     const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
   // OpenGL is served from the bundle profile matching the context (desktop GL or the GLES

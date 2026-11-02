@@ -51,9 +51,8 @@ std::optional<NonAARRectFillShader::Inputs> NonAARRectFillShader::ExtractFacts(
   if (facts.fragmentCount == 1) {
     // A sole analytic clip (AA rect or rounded rect) rides the runtime clip contract uniforms, so
     // it needs no dimension: the FP is there only to write them.
-    const bool clipOnly =
-        facts.colorFPCount == 0 && (facts.coverage == CoverageKind::AARect ||
-                                    facts.coverage == CoverageKind::RRect);
+    const bool clipOnly = facts.colorFPCount == 0 && (facts.coverage == CoverageKind::AARect ||
+                                                      facts.coverage == CoverageKind::RRect);
     if (!clipOnly) {
       // The textured variant carries the single-tap tiled modes only: the mipmap-repeat 4-tap path
       // and perspective coordinates stay on the runtime route. The textured form never combines

@@ -49,8 +49,8 @@ std::optional<GlassRefractionShader::Inputs> GlassRefractionShader::ExtractFacts
     // The uvMatrix form is required: it declares no uvCoord attribute, so the GP transforms the
     // position for the background coordinate, which is what the quad vertex kernel reads. A
     // subset-carrying quad has a different transform contract and stays on the fallback route.
-    if (!facts.geometry.hasCommonColor || !facts.geometry.hasUVMatrix ||
-        facts.geometry.hasSubset || facts.geometry.hasUVPerspective) {
+    if (!facts.geometry.hasCommonColor || !facts.geometry.hasUVMatrix || facts.geometry.hasSubset ||
+        facts.geometry.hasUVPerspective) {
       return std::nullopt;
     }
     gpKind = 1;
@@ -68,8 +68,7 @@ std::optional<GlassRefractionShader::Inputs> GlassRefractionShader::ExtractFacts
   if (facts.fragmentCount != 1) {
     auto* mask = LocalMaskCoverageLeaf(facts.ir);
     if (gpKind != 1 || facts.fragmentCount != 2 || !facts.coverage ||
-        *facts.coverage != CoverageKind::LocalMask || mask == nullptr ||
-        mask->hasPerspective) {
+        *facts.coverage != CoverageKind::LocalMask || mask == nullptr || mask->hasPerspective) {
       return std::nullopt;
     }
   }
