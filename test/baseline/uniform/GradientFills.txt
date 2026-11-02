@@ -25,7 +25,7 @@
   tgfx_RTAdjust            = [0.03125 -1 0.03125 -1 ]
   Matrix                   = [1 0 0 0 0 1 0 0 0 0 1 0 ]
   CoordTransformMatrix_0   = [0.015625 0 0 0 0 0.015625 0 0 0 0 1 0 ]
-[DRAW] route=AOT suffix= fields=68
+[DRAW] route=AOT suffix= fields=69
   Color                    = [1 1 1 1 ]
   HasCommonColor           = [1 ]
   RootIndex                = [0 ]
@@ -33,6 +33,7 @@
   ClipCoverageRegister     = [-1 ]
   SlotCount                = [1 ]
   Subset                   = [- - - - ]
+  SubsetClampOn            = [- ]
   ChainCSFlags             = [- ]
   ChainSrcTF0              = [- - - - ]
   ChainSrcTF1              = [- - - - ]
@@ -98,7 +99,7 @@
   tgfx_RTAdjust            = [0.03125 -1 0.03125 -1 ]
   Matrix                   = [1 0 0 0 0 1 0 0 0 0 1 0 ]
   CoordTransformMatrix_0   = [0.015625 0 0 0 0 0.015625 0 0 0 0 1 0 ]
-[DRAW] route=AOT suffix= fields=68
+[DRAW] route=AOT suffix= fields=69
   Color                    = [1 1 1 1 ]
   HasCommonColor           = [1 ]
   RootIndex                = [0 ]
@@ -106,6 +107,7 @@
   ClipCoverageRegister     = [-1 ]
   SlotCount                = [1 ]
   Subset                   = [- - - - ]
+  SubsetClampOn            = [- ]
   ChainCSFlags             = [- ]
   ChainSrcTF0              = [- - - - ]
   ChainSrcTF1              = [- - - - ]

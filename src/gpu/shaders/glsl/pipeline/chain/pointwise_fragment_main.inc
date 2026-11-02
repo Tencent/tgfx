@@ -26,7 +26,7 @@ highp vec2 chainLeafCoord(vec3 coord, int leafIndex) {
 // with the leaf's own sampler: the body is short, and statically bound per-leaf reads keep the
 // common draw's sampling as direct as it can be.
 vec4 chainPlainLeafFetch(CHAIN_LEAF_SAMPLER texSampler, vec3 coord, vec4 leafSubset,
-                         vec2 leafAlphaStart, int leafHasRgbaaa, int leafIndex) {
+                         vec2 leafAlphaStart, int leafHasRgbaaa, int leafClampOn, int leafIndex) {
   highp vec2 uv = chainLeafCoord(coord, leafIndex);
   int readSwizzle = LeafReadSwizzles[leafIndex];
 #if HAS_SUBSET
@@ -36,7 +36,9 @@ vec4 chainPlainLeafFetch(CHAIN_LEAF_SAMPLER texSampler, vec3 coord, vec4 leafSub
     uv = aotTextureClamp(uv, vTexSubset, true);
   }
 #endif
-  highp vec2 finalCoord = aotTextureClamp(uv, leafSubset, true);
+  // Gated like the fill pipeline's Subset clamp: a leaf the runtime needSubset() does not clamp
+  // (wrap-tiled, device-space) must read its sampler unclamped.
+  highp vec2 finalCoord = aotTextureClamp(uv, leafSubset, leafClampOn != 0);
   vec4 color = aotTextureRead(texSampler, finalCoord, readSwizzle);
   if (leafHasRgbaaa != 0) {
     vec4 alpha = aotTextureRead(texSampler, finalCoord + leafAlphaStart, readSwizzle);
@@ -160,19 +162,19 @@ void main() {
 #if NTEX > 0
   if (SlotPacked[0].x == OP_TEXTURE && !chainLeafIsTiled(0)) {
     chainLeafTex[0] = chainPlainLeafFetch(TextureSampler_0, TransformedCoords_0, Subset,
-                                          AlphaStart, HasRgbaaa, 0);
+                                          AlphaStart, HasRgbaaa, SubsetClampOn, 0);
   }
   if (SlotPacked[1].x == OP_TEXTURE && !chainLeafIsTiled(1)) {
     chainLeafTex[1] = chainPlainLeafFetch(TextureSampler_1, TransformedCoords_1, Subset_1,
-                                          AlphaStart_1, HasRgbaaa_1, 1);
+                                          AlphaStart_1, HasRgbaaa_1, SubsetClampOn_1, 1);
   }
   if (SlotPacked[2].x == OP_TEXTURE && !chainLeafIsTiled(2)) {
     chainLeafTex[2] = chainPlainLeafFetch(TextureSampler_2, TransformedCoords_2, Subset_2,
-                                          AlphaStart_2, HasRgbaaa_2, 2);
+                                          AlphaStart_2, HasRgbaaa_2, SubsetClampOn_2, 2);
   }
   if (SlotPacked[3].x == OP_TEXTURE && !chainLeafIsTiled(3)) {
     chainLeafTex[3] = chainPlainLeafFetch(TextureSampler_3, TransformedCoords_3, Subset_3,
-                                          AlphaStart_3, HasRgbaaa_3, 3);
+                                          AlphaStart_3, HasRgbaaa_3, SubsetClampOn_3, 3);
   }
   int recipeCount = min(SlotCount, CHAIN_TILED_RECIPES);
   for (int recipe = 0; recipe < recipeCount; ++recipe) {

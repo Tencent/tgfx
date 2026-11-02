@@ -173,8 +173,15 @@ namespace tgfx {
  * 0x0001001b: the bundle format moved to v5 — the stage reflection records the vertex stage's
  * input attributes (name, format, location) so the loader can verify the .vert's declared
  * layout, and the reflection blobs and identity hash re-encode; pre-change bundles are refused.
+ *
+ * 0x0001001d: the pointwise chain's fragment uniform block gained the per-leaf SubsetClampOn
+ * fields (SubsetClampOn, _1, _2, _3), so the chain kernel gates its subset clamp on the leaf's
+ * needSubset() value exactly like the fill pipeline and the runtime TextureEffect; the wrap-tiled
+ * and device-space leaves drop their unbounded sample-area decoy and sample their hardware
+ * samplers unclamped. Every chain variant's uniform layout re-encodes; pre-change bundles are
+ * refused.
  */
-inline constexpr uint32_t ExpectedToolchainABI = 0x0001001cu;
+inline constexpr uint32_t ExpectedToolchainABI = 0x0001001du;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

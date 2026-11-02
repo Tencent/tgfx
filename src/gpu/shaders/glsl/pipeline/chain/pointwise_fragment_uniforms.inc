@@ -23,13 +23,21 @@
   ivec4 LeafReadSwizzles;
 #endif
   // Per-leaf subset rects, named for the structural ordinals the TextureEffect writers use.
+  // SubsetClampOn gates each leaf's clamp exactly as the fill pipeline does (and as the runtime
+  // TextureEffect's needSubset() does): an ungated clamp pins wrap-tiled coordinates to the subset
+  // rect and zeroes their mip derivatives, which is why the tiled and device leaves used to need an
+  // unbounded sample-area decoy. A leaf whose gate is 0 reads its hardware sampler unclamped.
   vec4 Subset;
+  int SubsetClampOn;
 #if NTEX >= 2
   vec4 Subset_1;
+  int SubsetClampOn_1;
 #endif
 #if NTEX >= 4
   vec4 Subset_2;
+  int SubsetClampOn_2;
   vec4 Subset_3;
+  int SubsetClampOn_3;
 #endif
 #if NTEX > 0
   // Per-leaf RGBAAA layout (Image::makeRGBAAA), named for the same structural ordinals: the

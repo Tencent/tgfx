@@ -988,6 +988,55 @@ TGFX_TEST(AOTRenderConsistencyTest, PerspectiveChainLeaf) {
   ExpectBitmapsIdentical("perspective-chain-leaf", aotBitmap, runtimeBitmap, 200, 200);
 }
 
+// S4.6 repro: a Repeat-tiled chain leaf whose coordinates leave [0, 1]. The runtime sampler wraps;
+// the precompiled chain kernel's always-on Subset clamp would instead pin them to the leaf's subset
+// rect. That clamp is correct today only because the binder hands a tiled leaf an unbounded sample
+// area — drop that decoy and this scene is the first to break. The unification must keep it green
+// by gating the chain clamp on the leaf's SubsetClampOn, exactly like the fill pipeline.
+TGFX_TEST(AOTRenderConsistencyTest, RepeatTileChainLeaf) {
+  auto imageA = MakeImage("resources/apitest/imageReplacement.png");  // 110x110
+  auto imageB = MakeImage("resources/apitest/test_timestretch.png");  // 1280x720
+  ASSERT_TRUE(imageA != nullptr && imageB != nullptr);
+  auto renderOnce = [&](bool useBundle, Bitmap* outBitmap) {
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
+    if (useBundle) {
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause statsPause(context, !useBundle);
+    context->globalCache()->clearPrograms();
+    auto surface = Surface::Make(context, 240, 240);
+    ASSERT_TRUE(surface != nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    // The 110x110 source repeats across a 220x220 rect, so everything past the first tile samples
+    // outside [0, 1]; the second (huge, clamp-tiled) image forces the two-leaf chain route.
+    auto shaderA = Shader::MakeImageShader(imageA, TileMode::Repeat, TileMode::Repeat);
+    auto shaderB = Shader::MakeImageShader(imageB);
+    Paint paint = {};
+    paint.setShader(Shader::MakeBlend(BlendMode::Multiply, shaderA, shaderB));
+    canvas->drawRect(Rect::MakeWH(220, 220), paint);
+    context->flushAndSubmit(true);
+    ASSERT_TRUE(outBitmap->allocPixels(240, 240));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+    if (useBundle) {
+      cache->unload();
+    }
+  };
+  Bitmap aotBitmap = {};
+  Bitmap runtimeBitmap = {};
+  renderOnce(true, &aotBitmap);
+  renderOnce(false, &runtimeBitmap);
+  ExpectBitmapsIdentical("repeat-tile-chain-leaf", aotBitmap, runtimeBitmap, 240, 240);
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, NestedTwoChildXferFold) {
   if (std::string(TGFX_BACKEND_NAME) != "metal") {
     // Software backends (SwiftShader) serve this shape with LSB-level precision differences;

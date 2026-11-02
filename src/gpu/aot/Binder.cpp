@@ -570,8 +570,16 @@ void BindTextureSourceLeaf(const AOTTextureParameters& leaf, ParamWriter* writer
   float rect[4] = {};
   LeafSubsetRect(leaf.textureProxy, textureView.get(), leaf.subset, leaf.samplerState, rect);
   writer->set(TextureSourceModule::Subset, rect);
-  writer->set(TextureSourceModule::SubsetClampOn,
-              BindingNeedsSubset(leaf.textureProxy, textureView.get(), leaf.subset) ? 1 : 0);
+  bool clampOn = BindingNeedsSubset(leaf.textureProxy, textureView.get(), leaf.subset);
+  if (leaf.samplingKind == AOTTextureSamplingKind::Device ||
+      leaf.samplingKind == AOTTextureSamplingKind::Tiled) {
+    // Same forced-0 as the binding table's unbounded sample area (BuildTextureLeafBinding): the
+    // runtime device-space effect is a bare texture lookup, and a hardware-wrapped leaf's wrap
+    // must not be blunted by a GLSL clamp — neither clamps for any view fact, so these two kinds
+    // never gate their clamp on, whatever needSubset() would say about their view.
+    clampOn = false;
+  }
+  writer->set(TextureSourceModule::SubsetClampOn, clampOn ? 1 : 0);
   if (leaf.hasRGBAAA) {
     // Value-gated exactly like the module bind: single-plane draws leave the field at its
     // previous content, which the shader never reads (HasRgbaaa is 0).

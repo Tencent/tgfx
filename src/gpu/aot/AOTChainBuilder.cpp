@@ -86,9 +86,11 @@ static bool BuildTextureLeafBinding(const AOTEffectNode* node, AOTBinding* bindi
   if (parameters->samplingKind == AOTTextureSamplingKind::Device) {
     // The chain kernel samples this leaf at its DeviceLeafCoordMatrix * gl_FragCoord (see
     // AOTChainDeviceLeaf), so the child only binds the texture with the sampler state of a
-    // DeviceSpaceTextureEffect (clamp, linear, no mipmaps). Its coordinate transform is unused,
-    // and the unbounded sample area makes the kernel's subset clamp a no-op, as the runtime effect
-    // samples unclamped.
+    // DeviceSpaceTextureEffect (clamp, linear, no mipmaps). Its coordinate transform is unused.
+    // The runtime effect's emission is a bare texture lookup — no subset clamp for any view fact
+    // (a smaller-than-proxy view, an External texture) — so this leaf's SubsetClampOn gate must be
+    // 0 unconditionally, not follow needSubset(). The unbounded sample area is what forces it;
+    // without it, a view-mismatched device leaf would gain a clamp the runtime never emits.
     SamplingArgs args = {TileMode::Clamp, TileMode::Clamp,
                          SamplingOptions(FilterMode::Linear, MipmapMode::None),
                          SrcRectConstraint::Fast};
@@ -104,8 +106,9 @@ static bool BuildTextureLeafBinding(const AOTEffectNode* node, AOTBinding* bindi
       return false;
     }
     // The hardware sampler performs all tiling (wrap modes and clamp-to-border), so the leaf is a
-    // plain TextureEffect carrying the resolved sampler state. The huge sample area makes the
-    // chain kernel's always-on Subset clamp a no-op, which the wrap/border modes rely on.
+    // plain TextureEffect carrying the resolved sampler state. A GLSL-side subset clamp would
+    // blunt the wrap at the subset edge, so this leaf's gate stays 0 whatever the view facts say;
+    // the unbounded sample area forces it (the same statement the device leaf makes above).
     SamplingOptions sampling(recipe->hardwareSampler.minFilterMode,
                              recipe->hardwareSampler.magFilterMode,
                              recipe->hardwareSampler.mipmapMode);
