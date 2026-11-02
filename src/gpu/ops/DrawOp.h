@@ -134,6 +134,17 @@ class DrawOp {
   void adoptLoweredIR(PlacementPtr<DrawIR> passIR);
 
   /**
+   * Stores the record-time plan's single in-place pass on the draw's IR, so the matcher compiles
+   * from the plan instead of decomposing the same graph again at prepare. Only the record-time
+   * route calls it, before any prepare; the descriptor is write-once.
+   */
+  void storeSinglePassPlan(const AOTPassDescriptor& pass) {
+    if (ir != nullptr && !ir->passDescriptor.has_value()) {
+      ir->passDescriptor = pass;
+    }
+  }
+
+  /**
    * Whether the draw produces fractional coverage from any source: its coverage processors, or its
    * geometry processor (analytic AA edges, glyph masks, per-vertex coverage). Decides whether the
    * blend needs a dst texture.

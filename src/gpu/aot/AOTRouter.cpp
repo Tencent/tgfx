@@ -37,6 +37,15 @@ std::optional<AOTEffectPlan> AOTRouter::Plan(const DrawIR& ir,
   return plan;
 }
 
+bool AOTRouter::ServesInPlacePass(const AOTEffectPlan& plan) {
+  if (plan.passes.size() != 1 || !IsAOTPointwiseDAGKernel(plan.passes[0].kernel)) {
+    return false;
+  }
+  const auto& pass = plan.passes[0];
+  return !pass.nodes.empty() && pass.output == plan.output && pass.dependencies.empty() &&
+         !pass.materializesOutput;
+}
+
 bool AOTRouter::TaskCarriesCoverage(const AOTEffectPlan& plan,
                                     const std::vector<AOTCoverageTerm>& coverageTerms,
                                     BlendMode blendMode) {

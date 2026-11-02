@@ -57,6 +57,16 @@ class AOTRouter {
                                            AOTDecomposeOutcome* failureOutcome = nullptr);
 
   /**
+   * Whether the plan's single pass is served in place by the prepare-time fused serving: the draw
+   * keeps the plain route and its IR carries the pass descriptor, so the matcher compiles from the
+   * record-time plan instead of decomposing the same graph again at prepare. The conditions mirror
+   * CanExecute's single-pass branch exactly: a plan whose one pass materializes, carries
+   * dependencies, or does not output the plan's root needs a task even at one pass, and a non-chain
+   * kernel (perlin, YUV) has no fused serving — PlanRequiresTask keeps those on the task route.
+   */
+  static bool ServesInPlacePass(const AOTEffectPlan& plan);
+
+  /**
    * Whether a plan that needs a task may carry the draw's coverage terms on its terminal pass:
    * the terminal must be a chain pass (a linear-kernel terminal — YUV or perlin — serves through
    * a rebuilt processor and cannot merge terms), and the draw's blend must never need a dst

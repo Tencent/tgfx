@@ -1851,14 +1851,23 @@ bool AOTChainBuilder::CompileChainProgramForInfo(const ProgramInfo* programInfo,
   if (carried == nullptr) {
     return false;
   }
-  AOTEffectPlan plan = {};
-  if (!AOTEffectDecomposer::Decompose(carried->color, &plan, true) || plan.passes.size() != 1 ||
-      !IsAOTPointwiseDAGKernel(plan.passes[0].kernel)) {
-    // The perlin kernels have their own families; the chain family only takes the DAG kernels,
-    // and anything the single-pass decomposition cannot fit needs a plan task.
-    return false;
+  // A draw the record-time route planned carries its single in-place pass on the IR: compile from
+  // it instead of decomposing the same graph again. An unplanned draw (no device bounds, or no
+  // planner covered it) decomposes here once — the single-pass-only form the fused serving can
+  // express; the perlin kernels have their own families, the chain family only takes the DAG
+  // kernels, and anything the single-pass decomposition cannot fit needs a plan task.
+  AOTPassDescriptor descriptor = {};
+  if (carried->passDescriptor.has_value()) {
+    descriptor = *carried->passDescriptor;
+  } else {
+    AOTEffectPlan plan = {};
+    if (!AOTEffectDecomposer::Decompose(carried->color, &plan, true) || plan.passes.size() != 1 ||
+        !IsAOTPointwiseDAGKernel(plan.passes[0].kernel)) {
+      return false;
+    }
+    descriptor = plan.passes[0];
   }
-  return CompileChainProgramLayout(carried->color, plan.passes[0], &carried->coverage, out);
+  return CompileChainProgramLayout(carried->color, descriptor, &carried->coverage, out);
 }
 
 }  // namespace tgfx

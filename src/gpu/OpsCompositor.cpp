@@ -1302,13 +1302,17 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
       if (auto* ir = op->loweredIR()) {
         auto plan = AOTRouter::Plan(*ir);
         if (plan.has_value()) {
-          if (AOTRouter::PlanRequiresTask(*plan) &&
-              AOTRouter::TaskCarriesCoverage(*plan, ir->coverage, brush.blendMode)) {
+          if (AOTRouter::ServesInPlacePass(*plan)) {
+            // The single pass serves in place at prepare: its descriptor rides the draw's IR, so
+            // the matcher compiles from the record-time plan and never decomposes again.
+            op->storeSinglePassPlan(plan->passes[0]);
+          } else if (AOTRouter::PlanRequiresTask(*plan) &&
+                     AOTRouter::TaskCarriesCoverage(*plan, ir->coverage, brush.blendMode)) {
             if (submitPlanTask(ir->color, *plan, *deviceBounds, &op, &ir->coverage)) {
               return;
             }
           }
-          // A single-pass plan needs no task: the plain route's matcher serves it at prepare time.
+          // Anything else keeps the plain route: the matcher serves it at prepare time.
         } else if (coverageFree && cache->diagnosticRecordingEnabled()) {
           // The color side lowered but no planner covers it — the same fact the color-only attempt
           // recorded. A draw still carrying coverage processors records nothing: its route was

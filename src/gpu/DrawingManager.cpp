@@ -165,11 +165,16 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     auto* ir = drawOp->loweredIR();
     if (planCandidate) {
       if (auto plan = AOTRouter::Plan(*ir)) {
-        if (AOTRouter::PlanRequiresTask(*plan) &&
-            submitFillPlanTask(ir->color, *plan, renderFlags, renderTarget, coordOffset, &drawOp)) {
+        if (AOTRouter::ServesInPlacePass(*plan)) {
+          // The single pass serves in place at prepare: its descriptor rides the fill's IR, so the
+          // matcher compiles from the record-time plan and never decomposes again.
+          drawOp->storeSinglePassPlan(plan->passes[0]);
+        } else if (AOTRouter::PlanRequiresTask(*plan) &&
+                   submitFillPlanTask(ir->color, *plan, renderFlags, renderTarget, coordOffset,
+                                      &drawOp)) {
           return true;
         }
-        // A single-pass plan needs no task: the plain lookup serves the fill at prepare time.
+        // Anything else keeps the plain lookup for the fill at prepare time.
       }
     }
   }
