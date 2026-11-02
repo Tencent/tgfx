@@ -282,11 +282,13 @@ export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr:
             [width, height]
         );
     } catch (error) {
-        // Software adapters such as SwiftShader cannot import video frames directly and throw an
-        // OperationError. Route the frame through a 2D canvas, which uses the CPU readback path.
+        // Software adapters such as SwiftShader cannot import external images at all, so both
+        // video and canvas sources fail here. Fall back to a CPU readback through a 2D canvas
+        // and upload the raw pixels with writeTexture, which works on any adapter. Video frames
+        // are opaque, so the unpremultiplied readback matches the premultipliedAlpha target.
         const canvas = getCanvas2D(width, height);
-        const context = canvas.getContext('2d') as CanvasRenderingContext2D |
-            OffscreenCanvasRenderingContext2D | null;
+        const context = canvas.getContext('2d', {willReadFrequently: true}) as
+            CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
         if (!context) {
             releaseCanvas2D(canvas);
             return;
@@ -295,12 +297,14 @@ export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr:
         context.globalCompositeOperation = 'copy';
         context.drawImage(source, 0, 0, width, height);
         context.globalCompositeOperation = 'source-over';
-        device.queue.copyExternalImageToTexture(
-            {source: canvas},
-            {texture: gpuTexture, premultipliedAlpha: true},
+        const {data} = context.getImageData(0, 0, width, height);
+        releaseCanvas2D(canvas);
+        device.queue.writeTexture(
+            {texture: gpuTexture},
+            data,
+            {bytesPerRow: width * 4, rowsPerImage: height},
             [width, height]
         );
-        releaseCanvas2D(canvas);
     }
 };
 
