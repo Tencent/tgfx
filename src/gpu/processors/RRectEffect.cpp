@@ -31,11 +31,6 @@ void RRectEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   bytesKey->write(static_cast<uint32_t>(_needTransform ? 1 : 0));
 }
 
-bool RRectEffect::onBindPrecompiled(ParamWriter* writer) const {
-  AnalyticClipModule::Bind(this, writer);
-  return true;
-}
-
 bool RRectEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const {
   // Every rrect form (device or local space, AA or hard edge) resolves through runtime uniforms,
   // so the lowering accepts them all; perspective and degenerate matrices were rejected at

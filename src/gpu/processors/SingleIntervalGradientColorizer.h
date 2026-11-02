@@ -29,10 +29,6 @@ class SingleIntervalGradientColorizer : public FragmentProcessor {
   static PlacementPtr<SingleIntervalGradientColorizer> Make(BlockAllocator* allocator, Color start,
                                                             Color end);
 
-  bool onBindPrecompiled(ParamWriter* writer) const override {
-    GradientModule::BindColorizer(this, writer);
-    return true;
-  }
 
   std::string name() const override {
     return "SingleIntervalGradientColorizer";

@@ -32,8 +32,4 @@ void PorterDuffXferProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) 
   }
 }
 
-bool PorterDuffXferProcessor::onBindPrecompiled(ParamWriter* writer) const {
-  PorterDuffXPModule::Bind(this, writer);
-  return true;
-}
 }  // namespace tgfx

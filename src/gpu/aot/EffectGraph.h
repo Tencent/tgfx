@@ -258,8 +258,7 @@ struct AOTGradientParameters {
 
 // Opaque-kernel operand (see AOTEffectKind::OpaqueKernel). kernelKind: 0 = GaussianBlur1D,
 // 1 = GlassRefraction, 2 = GlassUDFTentBlur. The shape-level facts the dedicated families'
-// matching needs ride here — the matcher reads them from the IR, not the processor tree;
-// upload values stay on the processor until the bind moves to the contract (P5.-2).
+// matching needs ride here — the matcher reads them from the IR, not the processor tree.
 struct AOTOpaqueKernelParameters {
   int kernelKind = 0;
   // GaussianBlur1D: the acceptance range is [1, 10] — the precompiled kernel's fixed cap.
@@ -273,6 +272,16 @@ struct AOTOpaqueKernelParameters {
   // GlassRefraction: the kernel's own background-coordinate transform is projective — the
   // precompiled vertex kernels emit the affine form only.
   bool hasPerspective = false;
+  // GaussianBlur1D's upload values (kernelKind 0 only): the packed half-kernel table, its
+  // radius, and the step's length and direction — record-time facts. The step vector itself is
+  // bind-time (it maps through the child's coordinate transform, whose normalization needs the
+  // instantiated view), so the child leaf in the same graph supplies the raw matrix.
+  int kernelRadius = 0;
+  float stepLength = 0.0f;
+  bool vertical = false;
+  // 4 * KERNEL_VEC4_COUNT, with the constant as spelled in Blur1DFragmentProcessor.h
+  // (MAX_KERNEL_RADIUS 64 → MAX_KERNEL_SIZE 65 → 17 vec4s).
+  std::array<float, 68> packedKernel = {};
 };
 
 // Analytic anti-aliased rect coverage (RectEffect, produced by AA rect clips). Multiplies the

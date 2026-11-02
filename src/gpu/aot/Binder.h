@@ -27,7 +27,14 @@ namespace tgfx {
 
 class UniformData;
 class ParamWriter;
+class XferProcessor;
 struct AOTTextureParameters;
+struct AOTGradientParameters;
+struct AOTRectCoverageParameters;
+struct AOTRRectCoverageParameters;
+struct AOTColorMatrixParameters;
+struct AOTLumaParameters;
+struct AOTOpaqueKernelParameters;
 
 // The instruction contract's bind column (NodeContract.h's AOTOpContract): one function per op
 // that writes a per-slot parameter block. The caller writes the packed word and its selector with
@@ -84,6 +91,30 @@ void BindChainBindings(const AOTProgram& program, UniformData* fragmentUniformDa
  * a draw's texture uploads read the IR, not the processor tree.
  */
 void BindTextureSourceLeaf(const AOTTextureParameters& leaf, ParamWriter* writer);
+
+/**
+ * The IR-driven binds of the remaining feature modules, each the field-for-field twin of the
+ * module Bind it replaces over the live processor: the values come from the IR node the
+ * lowering recorded, the instance-time facts from the view the node's proxy resolves. After
+ * these, no AOT-route upload reads a FragmentProcessor's state.
+ */
+void BindTiledSourceLeaf(const AOTTextureParameters& leaf, ParamWriter* writer);
+void BindDeviceMaskLeaf(const AOTTextureParameters& mask, ParamWriter* writer);
+void BindGradientEffectNode(const AOTGradientParameters& params, ParamWriter* writer);
+void BindConicLayoutNode(const AOTGradientParameters& params, ParamWriter* writer);
+void BindColorizerNode(const AOTGradientParameters& params, ParamWriter* writer);
+void BindAlphaThresholdNode(float threshold, ParamWriter* writer);
+void BindRectClipNode(const AOTRectCoverageParameters& params, ParamWriter* writer);
+void BindRRectClipNode(const AOTRRectCoverageParameters& params, ParamWriter* writer);
+void BindColorMatrixNode(const AOTColorMatrixParameters& params, ParamWriter* writer);
+void BindLumaNode(const AOTLumaParameters& params, ParamWriter* writer);
+/// The blur node's upload values plus its child leaf (TiledChild/AlphaChild and the step's
+/// matrix come off the child).
+void BindBlurKernelNode(const AOTOpaqueKernelParameters& params, const AOTTextureParameters* child,
+                        ParamWriter* writer);
+/// The xfer bind: the blend mode off the IR, the dst texture's instance-time facts off the made
+/// processor (the same layer the geometry facts read).
+void BindPorterDuffXfer(int blendMode, const XferProcessor* processor, ParamWriter* writer);
 
 /**
  * The coordinate transforms the chain kernel's vertex stage consumes, in the order the geometry

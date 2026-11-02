@@ -21,7 +21,6 @@ struct TextureSourceModule {
   static constexpr ParamInfo Fields[] = {Subset,    SubsetClampOn,   AlphaStart,         AlphaOnly,
                                          HasRgbaaa, YUVLimitedRange, Mat3ColorConversion};
 
-  static void Bind(const FragmentProcessor* processor, ParamWriter* writer);
 };
 
 }  // namespace tgfx

@@ -40,7 +40,6 @@ class ConicGradientLayout : public FragmentProcessor {
     return scale;
   }
 
-  bool onBindPrecompiled(ParamWriter* writer) const override;
 
  protected:
   ConicGradientLayout(Matrix matrix, float bias, float scale);

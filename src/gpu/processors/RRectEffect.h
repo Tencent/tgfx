@@ -50,7 +50,6 @@ class RRectEffect : public FragmentProcessor {
     return "RRectEffect";
   }
 
-  bool onBindPrecompiled(ParamWriter* writer) const override;
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
   /** The rounded rect in local space, with the axis scales baked in by Make. */

@@ -16,7 +16,6 @@ struct BlurKernelModule {
 
   static constexpr ParamInfo Fields[] = {Kernel, Radius, Step, TiledChild, AlphaChild};
 
-  static void Bind(const FragmentProcessor* processor, ParamWriter* writer);
 };
 
 }  // namespace tgfx

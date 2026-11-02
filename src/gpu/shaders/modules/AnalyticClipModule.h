@@ -21,7 +21,6 @@ struct AnalyticClipModule {
   static constexpr ParamInfo Fields[] = {LocalRect,     RadiiX, RadiiY, AntiAlias,
                                          DeviceToLocal, Rect,   HasClip};
 
-  static void Bind(const FragmentProcessor* processor, ParamWriter* writer);
 };
 
 }  // namespace tgfx

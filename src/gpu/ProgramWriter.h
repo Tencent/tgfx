@@ -125,16 +125,11 @@ class PrecompiledProgramWriter : public ProgramWriter {
 };
 
 /**
- * The shared base of the writers whose routes re-express the draw's effect before uploading: the
- * per-draw values come from the rebuilt expression (walked in its own tree order, then the xfer
- * processor), not from the info's original processor list.
+ * The shared base of the writers whose routes re-express the draw's effect before uploading.
+ * The expression-tree walk it used to carry is gone: the chain writer uploads through the
+ * compiled program, so the base keeps only the hierarchy.
  */
-class ExpressionProgramWriter : public PrecompiledProgramWriter {
- protected:
-  void writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
-                       UniformData* fragmentUniformData,
-                       const FragmentProcessor* expression) const override;
-};
+class ExpressionProgramWriter : public PrecompiledProgramWriter {};
 
 /**
  * The fused chain kernel's writer: the draw's whole uniform content, its vertex transforms and its

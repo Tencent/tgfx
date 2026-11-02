@@ -27,9 +27,17 @@
 #include "gpu/resources/TextureView.h"
 #include "gpu/resources/YUVTextureView.h"
 #include "gpu/shaders/KernelContract.h"
+#include "gpu/shaders/modules/AnalyticClipModule.h"
+#include "gpu/shaders/modules/BlurKernelModule.h"
 #include "gpu/shaders/modules/ChainParams.h"
+#include "gpu/shaders/modules/DeviceMaskModule.h"
+#include "gpu/shaders/modules/GradientModule.h"
 #include "gpu/shaders/modules/ParamWriter.h"
+#include "gpu/shaders/modules/PointwiseOpModule.h"
+#include "gpu/shaders/modules/PorterDuffXPModule.h"
 #include "gpu/shaders/modules/TextureSourceModule.h"
+#include "gpu/shaders/modules/TiledSourceModule.h"
+#include "gpu/processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
 namespace {
@@ -580,6 +588,216 @@ void BindTextureSourceLeaf(const AOTTextureParameters& leaf, ParamWriter* writer
       writer->set(TextureSourceModule::Mat3ColorConversion, *conversion);
     }
   }
+}
+
+// The IR-driven binds of the remaining feature modules (declared in Binder.h): each is the
+// field-for-field twin of the module Bind it replaces, with the values read off the IR node
+// the lowering recorded and the instance-time facts off the view the node's proxy resolves.
+
+namespace {
+
+// The 12-float aligned form ParamWriter's Float3x3 overload uploads, built from an IR node's
+// row-major get9 storage without going through a Matrix.
+std::array<float, 12> AlignedFromRowMajor(const std::array<float, 9>& values) {
+  return {values[0], values[3], values[6], 0, values[1], values[4], values[7],
+          0,         values[2], values[5], values[8], 0};
+}
+
+bool IsIdentityRowMajor(const std::array<float, 9>& values) {
+  return values[0] == 1.f && values[1] == 0.f && values[2] == 0.f && values[3] == 0.f &&
+         values[4] == 1.f && values[5] == 0.f && values[6] == 0.f && values[7] == 0.f &&
+         values[8] == 1.f;
+}
+
+}  // namespace
+
+void BindTiledSourceLeaf(const AOTTextureParameters& leaf, ParamWriter* writer) {
+  if (!leaf.tiledRecipe.has_value()) {
+    return;
+  }
+  const auto& sampling = *leaf.tiledRecipe;
+  auto view = leaf.textureProxy != nullptr ? leaf.textureProxy->getTextureView() : nullptr;
+  if (view != nullptr) {
+    writer->set(TiledSourceModule::ReadSwizzle, AOTReadSwizzleMode(view->getTexture()->format()));
+  }
+  if (sampling.usesShaderDimensions) {
+    const float dimensions[2] = {sampling.shaderDimensions.x, sampling.shaderDimensions.y};
+    writer->set(TiledSourceModule::Dimension, dimensions);
+  }
+  const float subset[4] = {sampling.shaderSubset.left, sampling.shaderSubset.top,
+                           sampling.shaderSubset.right, sampling.shaderSubset.bottom};
+  writer->set(TiledSourceModule::Subset, subset);
+  const float clampRect[4] = {sampling.shaderClamp.left, sampling.shaderClamp.top,
+                              sampling.shaderClamp.right, sampling.shaderClamp.bottom};
+  writer->set(TiledSourceModule::Clamp, clampRect);
+  writer->set(TiledSourceModule::ShaderModeX, static_cast<int32_t>(sampling.shaderModeX));
+  writer->set(TiledSourceModule::ShaderModeY, static_cast<int32_t>(sampling.shaderModeY));
+  writer->set(TiledSourceModule::AlphaOnly, sampling.alphaOnly ? 1 : 0);
+  writer->set(TiledSourceModule::Strict, sampling.strict ? 1 : 0);
+}
+
+void BindDeviceMaskLeaf(const AOTTextureParameters& mask, ParamWriter* writer) {
+  auto textureView = mask.textureProxy != nullptr ? mask.textureProxy->getTextureView() : nullptr;
+  if (textureView == nullptr) {
+    return;
+  }
+  auto deviceCoordMatrix = mask.uvMatrix;
+  auto scale = textureView->getTextureCoord(1, 1);
+  deviceCoordMatrix.postScale(scale.x, scale.y);
+  writer->set(DeviceMaskModule::DeviceCoordMatrix, deviceCoordMatrix);
+  writer->set(DeviceMaskModule::HasDeviceMask, 1);
+  float noOpRect[4] = {0.0f, 0.0f, 1.0f, 1.0f};
+  if (textureView->getTexture()->type() == TextureType::Rectangle) {
+    noOpRect[2] = static_cast<float>(textureView->width());
+    noOpRect[3] = static_cast<float>(textureView->height());
+  }
+  if (writer->hasField("DeviceMaskSubset")) {
+    writer->set(DeviceMaskModule::DeviceMaskSubset, noOpRect);
+    return;
+  }
+  // AlphaOnly belongs to the draw's color source, not to the mask: the kernel samples the mask
+  // as .r unconditionally. The whole-plane clip rect keeps the shared kernel's Subset/Rect
+  // reading no-ops.
+  writer->set(DeviceMaskModule::Subset, noOpRect);
+  const float noClip[4] = {-1e9f, -1e9f, 1e9f, 1e9f};
+  writer->set(AnalyticClipModule::Rect, noClip);
+  writer->set(AnalyticClipModule::HasClip, 0);
+}
+
+void BindGradientEffectNode(const AOTGradientParameters& params, ParamWriter* writer) {
+  const float left[4] = {params.leftBorder[0], params.leftBorder[1], params.leftBorder[2],
+                         params.leftBorder[3]};
+  writer->set(GradientModule::LeftBorderColor, left);
+  const float right[4] = {params.rightBorder[0], params.rightBorder[1], params.rightBorder[2],
+                          params.rightBorder[3]};
+  writer->set(GradientModule::RightBorderColor, right);
+  writer->set(DeviceMaskModule::HasDeviceMask, 0);
+  writer->set(GradientModule::LayoutType, params.layoutType);
+}
+
+void BindConicLayoutNode(const AOTGradientParameters& params, ParamWriter* writer) {
+  writer->set(GradientModule::Bias, params.bias);
+  writer->set(GradientModule::Scale, params.scale);
+}
+
+void BindColorizerNode(const AOTGradientParameters& params, ParamWriter* writer) {
+  const float start[4] = {params.start[0], params.start[1], params.start[2], params.start[3]};
+  writer->set(GradientModule::Start, start);
+  const float end[4] = {params.end[0], params.end[1], params.end[2], params.end[3]};
+  writer->set(GradientModule::End, end);
+  writer->set(GradientModule::ColorizerKind, params.colorizerKind);
+}
+
+void BindAlphaThresholdNode(float threshold, ParamWriter* writer) {
+  writer->setArrayElement(PointwiseOpModule::Threshold, 0, threshold);
+  writer->setArrayElement(PointwiseOpModule::OpType, 0, Op::AlphaThreshold);
+}
+
+void BindRectClipNode(const AOTRectCoverageParameters& params, ParamWriter* writer) {
+  const float localRect[4] = {params.rect[0], params.rect[1], params.rect[2], params.rect[3]};
+  writer->set(AnalyticClipModule::LocalRect, localRect);
+  // The RectCoverage node is the AA form: the lowering routes hard-edged rects through the
+  // rrect node with a zero antiAlias.
+  writer->set(AnalyticClipModule::AntiAlias, 1.0f);
+  // An identity device-to-local is the device-space form's marker: the kernel reads the rect
+  // directly, outset by half a texel for the falloff.
+  if (!IsIdentityRowMajor(params.deviceToLocal)) {
+    writer->set(AnalyticClipModule::DeviceToLocal, AlignedFromRowMajor(params.deviceToLocal));
+  } else {
+    const float deviceRect[4] = {params.rect[0] - 0.5f, params.rect[1] - 0.5f, params.rect[2] + 0.5f,
+                                 params.rect[3] + 0.5f};
+    writer->set(AnalyticClipModule::Rect, deviceRect);
+  }
+  writer->set(AnalyticClipModule::HasClip, IsIdentityRowMajor(params.deviceToLocal) ? 1 : 3);
+}
+
+void BindRRectClipNode(const AOTRRectCoverageParameters& params, ParamWriter* writer) {
+  const float localRect[4] = {params.rect[0], params.rect[1], params.rect[2], params.rect[3]};
+  writer->set(AnalyticClipModule::LocalRect, localRect);
+  const float radiiX[4] = {params.radiiX[0], params.radiiX[1], params.radiiX[2],
+                           params.radiiX[3]};
+  writer->set(AnalyticClipModule::RadiiX, radiiX);
+  const float radiiY[4] = {params.radiiY[0], params.radiiY[1], params.radiiY[2],
+                           params.radiiY[3]};
+  writer->set(AnalyticClipModule::RadiiY, radiiY);
+  writer->set(AnalyticClipModule::AntiAlias, params.antiAlias);
+  writer->set(AnalyticClipModule::DeviceToLocal, AlignedFromRowMajor(params.deviceToLocal));
+  writer->set(AnalyticClipModule::HasClip, 2);
+}
+
+void BindColorMatrixNode(const AOTColorMatrixParameters& params, ParamWriter* writer) {
+  float matrixData[16] = {};
+  float vectorData[4] = {};
+  PackAOTColorMatrix(params.matrix, matrixData, vectorData);
+  writer->setArrayElement(PointwiseOpModule::ColorMatrix, 0, matrixData);
+  writer->setArrayElement(PointwiseOpModule::ColorVector, 0, vectorData);
+  writer->setArrayElement(PointwiseOpModule::OpType, 0, Op::ColorMatrix);
+}
+
+void BindLumaNode(const AOTLumaParameters& params, ParamWriter* writer) {
+  writer->setArrayElement(PointwiseOpModule::Kr, 0, params.kr);
+  writer->setArrayElement(PointwiseOpModule::Kg, 0, params.kg);
+  writer->setArrayElement(PointwiseOpModule::Kb, 0, params.kb);
+  writer->setArrayElement(PointwiseOpModule::OpType, 0, Op::Luma);
+}
+
+void BindBlurKernelNode(const AOTOpaqueKernelParameters& params, const AOTTextureParameters* child,
+                        ParamWriter* writer) {
+  writer->set(BlurKernelModule::Kernel, params.packedKernel);
+  writer->set(BlurKernelModule::Radius, params.kernelRadius);
+  Point stepVectors[] = {{0, 0}, {params.stepLength, 0}};
+  if (params.vertical) {
+    stepVectors[1] = {0, params.stepLength};
+  }
+  if (child != nullptr) {
+    // The child's coordinate transform as it resolves now: the raw matrix the leaf recorded,
+    // normalized by the view its proxy carries (CoordTransform::getTotalMatrix's math,
+    // replicated — a record-time total would miss the normalization of a texture that had not
+    // instantiated yet).
+    auto view =
+        child->textureProxy != nullptr ? child->textureProxy->getTextureView() : nullptr;
+    auto matrix = child->uvMatrix;
+    if (view != nullptr) {
+      auto scale = view->getTextureCoord(1, 1);
+      matrix.postScale(scale.x, scale.y);
+      if (view->origin() == ImageOrigin::BottomLeft) {
+        matrix.postScale(1, -1);
+        auto translate = view->getTextureCoord(0, static_cast<float>(view->height()));
+        matrix.postTranslate(translate.x, translate.y);
+      }
+    }
+    matrix.mapPoints(stepVectors, 2);
+  }
+  Point step = stepVectors[1] - stepVectors[0];
+  const float stepValues[2] = {step.x, step.y};
+  writer->set(BlurKernelModule::Step, stepValues);
+  writer->set(DeviceMaskModule::HasDeviceMask, 0);
+  writer->set(BlurKernelModule::TiledChild,
+              child != nullptr && child->tiledRecipe.has_value() ? 1 : 0);
+  writer->set(BlurKernelModule::AlphaChild, child != nullptr && child->isAlphaOnly ? 1 : 0);
+}
+
+void BindPorterDuffXfer(int blendMode, const XferProcessor* processor, ParamWriter* writer) {
+  writer->set(PorterDuffXPModule::XPBlendMode, blendMode);
+  auto* xp = static_cast<const PorterDuffXferProcessor*>(processor);
+  const auto& dstInfo = xp->getDstTextureInfo();
+  if (dstInfo.textureProxy == nullptr) {
+    return;
+  }
+  auto dstView = dstInfo.textureProxy->getTextureView();
+  if (dstView == nullptr) {
+    return;
+  }
+  const float upperLeft[2] = {dstInfo.offset.x, dstInfo.offset.y};
+  writer->set(PorterDuffXPModule::DstTextureUpperLeft, upperLeft);
+  int width = dstView->width();
+  int height = dstView->height();
+  if (dstView->getTexture()->type() == TextureType::Rectangle) {
+    width = 1;
+    height = 1;
+  }
+  const float scales[2] = {1.f / static_cast<float>(width), 1.f / static_cast<float>(height)};
+  writer->set(PorterDuffXPModule::DstTextureCoordScale, scales);
 }
 
 void BindChainBindings(const AOTProgram& program, UniformData* fragmentUniformData) {

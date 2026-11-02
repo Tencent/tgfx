@@ -31,11 +31,6 @@ void RectEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   bytesKey->write(static_cast<uint32_t>(_needTransform ? 1 : 0));
 }
 
-bool RectEffect::onBindPrecompiled(ParamWriter* writer) const {
-  AnalyticClipModule::Bind(this, writer);
-  return true;
-}
-
 bool RectEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const {
   if (builder == nullptr || output == nullptr) {
     return false;

@@ -90,8 +90,13 @@ class ParamWriter {
   void setArrayElement(const Param<Type>& param, size_t index, const T& value) {
     if (uniforms != nullptr) {
       if constexpr (!std::is_same_v<std::decay_t<T>, Matrix>) {
-        if (uniforms->writeParamKey(&param, index, &value, sizeof(value))) {
-          return;
+        // Only the ordinal-0 instance accelerates: a later ordinal's fields live under an
+        // ordinal-qualified name ("ColorMatrix_1"), a second addressing axis the single
+        // (instance) form of the offset path does not carry.
+        if (instanceOrdinal == 0) {
+          if (uniforms->writeParamKey(&param, index, &value, sizeof(value))) {
+            return;
+          }
         }
       }
       uniforms->setArrayElementOptional(param.name, index, value);

@@ -53,8 +53,4 @@ std::shared_ptr<Texture> DeviceSpaceTextureEffect::onTextureAt(size_t) const {
   return textureView == nullptr ? nullptr : textureView->getTexture();
 }
 
-bool DeviceSpaceTextureEffect::onBindPrecompiled(ParamWriter* writer) const {
-  DeviceMaskModule::Bind(this, writer);
-  return true;
-}
 }  // namespace tgfx

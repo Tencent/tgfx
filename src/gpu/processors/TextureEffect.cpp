@@ -266,8 +266,4 @@ void TextureEffect::computeSubsetRect(float rect[4]) const {
   }
 }
 
-bool TextureEffect::onBindPrecompiled(ParamWriter* writer) const {
-  TextureSourceModule::Bind(this, writer);
-  return true;
-}
 }  // namespace tgfx

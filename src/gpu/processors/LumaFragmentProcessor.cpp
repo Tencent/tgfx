@@ -67,8 +67,4 @@ LumaFragmentProcessor::LumaFactor LumaFragmentProcessor::AcquireLumaFactorFromCo
   return LumaFactor{};
 }
 
-bool LumaFragmentProcessor::onBindPrecompiled(ParamWriter* writer) const {
-  PointwiseOpModule::Bind(this, writer);
-  return true;
-}
 }  // namespace tgfx

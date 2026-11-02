@@ -59,14 +59,6 @@ class XferProcessor : public Processor {
 
   virtual void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const = 0;
 
-  /**
-   * Binds the XP's uniform values for a precompiled program through its module. Returns false to
-   * keep the XP's own setData. Runtime-generated programs never call this.
-   */
-  virtual bool onBindPrecompiled(ParamWriter*) const {
-    return false;
-  }
-
  protected:
   explicit XferProcessor(uint32_t classID) : Processor(classID) {
   }

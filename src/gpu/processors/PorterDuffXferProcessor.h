@@ -47,7 +47,6 @@ class PorterDuffXferProcessor : public XferProcessor {
 
   void computeProcessorKey(Context* context, BytesKey* bytesKey) const override;
 
-  bool onBindPrecompiled(ParamWriter* writer) const override;
 
  protected:
   PorterDuffXferProcessor(BlendMode blend, DstTextureInfo dstTextureInfo)

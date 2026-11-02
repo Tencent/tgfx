@@ -14,7 +14,6 @@ struct PorterDuffXPModule {
 
   static constexpr ParamInfo Fields[] = {XPBlendMode, DstTextureUpperLeft, DstTextureCoordScale};
 
-  static void Bind(const XferProcessor* processor, ParamWriter* writer);
 };
 
 }  // namespace tgfx

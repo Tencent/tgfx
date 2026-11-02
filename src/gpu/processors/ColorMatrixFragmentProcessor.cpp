@@ -58,8 +58,4 @@ bool ColorMatrixFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID
   return builder->addColorMatrix(input, parameters, output);
 }
 
-bool ColorMatrixFragmentProcessor::onBindPrecompiled(ParamWriter* writer) const {
-  PointwiseOpModule::Bind(this, writer);
-  return true;
-}
 }  // namespace tgfx

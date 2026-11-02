@@ -30,7 +30,19 @@
 #include "gpu/aot/AOTChainBuilder.h"
 #include "gpu/aot/Binder.h"
 #include "gpu/aot/EffectGraph.h"
+#include "gpu/processors/ClampedGradientEffect.h"
+#include "gpu/processors/ColorMatrixFragmentProcessor.h"
+#include "gpu/processors/ConicGradientLayout.h"
+#include "gpu/processors/GaussianBlur1DFragmentProcessor.h"
+#include "gpu/processors/LumaFragmentProcessor.h"
+#include "gpu/processors/PorterDuffXferProcessor.h"
+#include "gpu/processors/AlphaThresholdFragmentProcessor.h"
+#include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "gpu/processors/RectEffect.h"
+#include "gpu/processors/RRectEffect.h"
+#include "gpu/processors/SingleIntervalGradientColorizer.h"
 #include "gpu/processors/TextureEffect.h"
+#include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/resources/RenderTarget.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
 #include "gpu/shaders/modules/DeviceMaskModule.h"
@@ -255,46 +267,155 @@ void PrecompiledProgramWriter::writeEngineDefaults(const ProgramInfo& info,
   }
 }
 
+
+// Consumes the first unconsumed leaf whose proxy matches, running the bind on it. The texture
+// leaves are matched by proxy identity rather than walk order so a repeated source (the same
+// image twice) stays correct.
+template <typename Bind>
+static bool TakeLeafByProxy(std::vector<const AOTTextureParameters*>& leaves,
+                            const std::shared_ptr<TextureProxy>& proxy, Bind bind) {
+  for (auto*& candidate : leaves) {
+    if (candidate != nullptr && candidate->textureProxy == proxy) {
+      bind(*candidate);
+      candidate = nullptr;
+      return true;
+    }
+  }
+  return false;
+}
+
 void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
                                                UniformData* vertexUniformData,
                                                UniformData* fragmentUniformData,
                                                const FragmentProcessor* /*expression*/) const {
-  // Per-processor structural ordinal: on the precompiled path the runtime processor suffix is
-  // stripped (skipSuffix), so multiple processors of the same class would write the same
-  // base-named per-instance uniforms (a TextureEffect's Subset/AlphaOnly, an
-  // XfermodeFragmentProcessor's BlendModeValue, a ConstColorProcessor's ConstColor, ...) and
-  // clobber one another. Numbering each processor by its index among same-class processors (in
-  // traversal order) gives the precompiled shader stable, predictable names to address them by
-  // (Subset / Subset_1, BlendModeValue / BlendModeValue_1, ...). The first processor of each
-  // class keeps the base name, so kernels with at most one instance of a class are
-  // byte-for-byte unchanged. On the JIT path structuralSuffix is unused (nameSuffix already
-  // disambiguates by processor index).
-  // A processor whose class overrides onBindPrecompiled resolves to a module Bind that takes over
-  // its onSetData at the same walk position: the writes land in the same order, and the
-  // structural-suffix addressing (Subset / Subset_1) applies to the module writes unchanged.
   ParamWriter paramWriter(fragmentUniformData);
-  // The carried IR was lowered from this very processor tree, so its color graph holds one
-  // plain-texture leaf per TextureEffect the walk below visits. A texture write reads its leaf —
-  // the node's recorded facts plus the view its proxy resolves at bind time — instead of the
-  // live processor: the same source the chain route's binding table reads. Leaves are matched by
-  // proxy identity and consumed once; a walk position without a matching leaf keeps the
-  // processor bind (correct, just not IR-driven).
-  std::vector<const AOTTextureParameters*> textureLeaves = {};
   const auto* carriedIR = info.getCarriedIR();
+  // The carried IR is the lowered form of this very processor tree, so every module-bound
+  // processor reads its values off an IR fact instead of the live object: the texture leaves
+  // and the device mask are matched by proxy identity, the clip / pointwise / gradient / blur
+  // facts by kind in walk order (the order the lowering recorded them, which is the order this
+  // walk visits the processors). A missing fact cannot occur on a served draw -- the IR is this
+  // tree's lowering -- and the setData fallback below stays loud if it ever does. What remains
+  // on the live tree are the setData-based writers (the xfer-mode FP's blend mode, the
+  // color-space helper, the processors that write nothing at all).
+  std::vector<const AOTTextureParameters*> plainLeaves = {};
+  std::vector<const AOTTextureParameters*> tiledLeaves = {};
+  std::vector<const AOTTextureParameters*> deviceMaskLeaves = {};
+  std::vector<const AOTRectCoverageParameters*> rectClips = {};
+  std::vector<const AOTRRectCoverageParameters*> rrectClips = {};
+  std::vector<const AOTColorMatrixParameters*> colorMatrices = {};
+  std::vector<const AOTLumaParameters*> lumas = {};
+  std::vector<float> alphaThresholds = {};
+  std::vector<const AOTGradientParameters*> gradients = {};
+  std::vector<std::pair<const AOTOpaqueKernelParameters*, const AOTTextureParameters*>> blurs =
+      {};
   if (carriedIR != nullptr) {
-    for (size_t index = 0; index < carriedIR->color.nodeCount(); ++index) {
-      const auto* node = carriedIR->color.nodeAt(AOTNodeID(static_cast<uint32_t>(index)));
-      if (node == nullptr || node->kind != AOTEffectKind::TextureSource) {
-        continue;
+    // The graph stores its nodes in build (post-)order -- children before the parents that
+    // consume them -- while the walk below visits the tree pre-order, so the cursor-matched
+    // kinds must be collected in the walk's own order: a recursive descent from the root.
+    const auto collectGraph = [&](const AOTEffectGraph& graph, auto&& self,
+                                  AOTNodeID nodeID) -> void {
+      const auto* node = graph.nodeAt(nodeID);
+      {
+        switch (node->kind) {
+          case AOTEffectKind::TextureSource: {
+            auto* leaf = std::get_if<AOTTextureParameters>(&node->parameters);
+            if (leaf == nullptr || leaf->textureProxy == nullptr) {
+              break;
+            }
+            if (leaf->samplingKind == AOTTextureSamplingKind::Device) {
+              deviceMaskLeaves.push_back(leaf);
+            } else if (leaf->tiledRecipe.has_value()) {
+              tiledLeaves.push_back(leaf);
+            } else if (leaf->samplingKind == AOTTextureSamplingKind::Plain) {
+              plainLeaves.push_back(leaf);
+            }
+            break;
+          }
+          case AOTEffectKind::ColorMatrix:
+            if (auto* params = std::get_if<AOTColorMatrixParameters>(&node->parameters)) {
+              colorMatrices.push_back(params);
+            }
+            break;
+          case AOTEffectKind::Luma:
+            if (auto* params = std::get_if<AOTLumaParameters>(&node->parameters)) {
+              lumas.push_back(params);
+            }
+            break;
+          case AOTEffectKind::AlphaThreshold:
+            if (auto* params = std::get_if<AOTAlphaThresholdParameters>(&node->parameters)) {
+              alphaThresholds.push_back(params->threshold);
+            }
+            break;
+          case AOTEffectKind::GradientSource:
+            if (auto* params = std::get_if<AOTGradientParameters>(&node->parameters)) {
+              gradients.push_back(params);
+            }
+            break;
+          case AOTEffectKind::RectCoverage:
+            if (auto* params = std::get_if<AOTRectCoverageParameters>(&node->parameters)) {
+              rectClips.push_back(params);
+            }
+            break;
+          case AOTEffectKind::RRectCoverage:
+            if (auto* params = std::get_if<AOTRRectCoverageParameters>(&node->parameters)) {
+              rrectClips.push_back(params);
+            }
+            break;
+          case AOTEffectKind::OpaqueKernel: {
+            auto* params = std::get_if<AOTOpaqueKernelParameters>(&node->parameters);
+            const AOTTextureParameters* child = nullptr;
+            if (params != nullptr && !node->inputs.empty()) {
+              const auto* childNode = graph.nodeAt(node->inputs[0]);
+              if (childNode != nullptr && childNode->kind == AOTEffectKind::TextureSource) {
+                child = std::get_if<AOTTextureParameters>(&childNode->parameters);
+              }
+            }
+            if (params != nullptr) {
+              blurs.emplace_back(params, child);
+            }
+            break;
+          }
+          default:
+            break;
+        }
+        for (const auto& input : node->inputs) {
+          self(graph, self, input);
+        }
       }
-      const auto* leaf = std::get_if<AOTTextureParameters>(&node->parameters);
-      if (leaf != nullptr && leaf->textureProxy != nullptr &&
-          leaf->samplingKind == AOTTextureSamplingKind::Plain) {
-        textureLeaves.push_back(leaf);
+    };
+    const auto collectRooted = [&](const AOTEffectGraph& graph) {
+      if (graph.root().isValid()) {
+        collectGraph(graph, collectGraph, graph.root());
+      }
+    };
+    collectRooted(carriedIR->color);
+    for (const auto& term : carriedIR->coverage) {
+      switch (term.kind) {
+        case AOTCoverageTermKind::DeviceMask:
+          if (term.mask.textureProxy != nullptr) {
+            deviceMaskLeaves.push_back(&term.mask);
+          }
+          break;
+        case AOTCoverageTermKind::Analytic:
+        case AOTCoverageTermKind::Subtree:
+        case AOTCoverageTermKind::Glyph:
+          if (term.root.isValid()) {
+            collectGraph(term.graph, collectGraph, term.root);
+          }
+          break;
       }
     }
   }
   std::unordered_map<std::string, int> classOrdinals;
+  size_t rectCursor = 0;
+  size_t rrectCursor = 0;
+  size_t colorMatrixCursor = 0;
+  size_t lumaCursor = 0;
+  size_t alphaThresholdCursor = 0;
+  size_t gradientCursor = 0;
+  size_t blurCursor = 0;
+  const AOTGradientParameters* lastGradient = nullptr;
   for (auto& fragmentProcessor : info.fragmentProcessors) {
     FragmentProcessor::Iter iter(fragmentProcessor);
     const FragmentProcessor* fp = iter.next();
@@ -311,22 +432,75 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
       }
       bool bound = false;
       if (IsProcessor<TextureEffect>(fp)) {
-        const auto& proxy = static_cast<const TextureEffect*>(fp)->getTextureProxy();
-        for (auto*& candidate : textureLeaves) {
-          if (candidate != nullptr && candidate->textureProxy == proxy) {
-            BindTextureSourceLeaf(*candidate, &paramWriter);
-            candidate = nullptr;
-            bound = true;
-            break;
-          }
+        auto proxy = static_cast<const TextureEffect*>(fp)->getTextureProxy();
+        bound = TakeLeafByProxy(plainLeaves, proxy, [&](const AOTTextureParameters& leaf) {
+          BindTextureSourceLeaf(leaf, &paramWriter);
+        });
+      } else if (IsProcessor<TiledTextureEffect>(fp)) {
+        auto proxy = static_cast<const TiledTextureEffect*>(fp)->getTextureProxy();
+        bound = TakeLeafByProxy(tiledLeaves, proxy, [&](const AOTTextureParameters& leaf) {
+          BindTiledSourceLeaf(leaf, &paramWriter);
+        });
+      } else if (IsProcessor<DeviceSpaceTextureEffect>(fp)) {
+        auto proxy = static_cast<const DeviceSpaceTextureEffect*>(fp)->getTextureProxy();
+        bound = TakeLeafByProxy(deviceMaskLeaves, proxy, [&](const AOTTextureParameters& leaf) {
+          BindDeviceMaskLeaf(leaf, &paramWriter);
+        });
+      } else if (IsProcessor<RectEffect>(fp)) {
+        if (rectCursor < rectClips.size()) {
+          BindRectClipNode(*rectClips[rectCursor++], &paramWriter);
+          bound = true;
+        }
+      } else if (IsProcessor<RRectEffect>(fp)) {
+        if (rrectCursor < rrectClips.size()) {
+          BindRRectClipNode(*rrectClips[rrectCursor++], &paramWriter);
+          bound = true;
+        }
+      } else if (IsProcessor<ColorMatrixFragmentProcessor>(fp)) {
+        if (colorMatrixCursor < colorMatrices.size()) {
+          BindColorMatrixNode(*colorMatrices[colorMatrixCursor++], &paramWriter);
+          bound = true;
+        }
+      } else if (IsProcessor<LumaFragmentProcessor>(fp)) {
+        if (lumaCursor < lumas.size()) {
+          BindLumaNode(*lumas[lumaCursor++], &paramWriter);
+          bound = true;
+        }
+      } else if (IsProcessor<AlphaThresholdFragmentProcessor>(fp)) {
+        if (alphaThresholdCursor < alphaThresholds.size()) {
+          BindAlphaThresholdNode(alphaThresholds[alphaThresholdCursor++], &paramWriter);
+          bound = true;
+        }
+      } else if (IsProcessor<ClampedGradientEffect>(fp)) {
+        if (gradientCursor < gradients.size()) {
+          lastGradient = gradients[gradientCursor++];
+          BindGradientEffectNode(*lastGradient, &paramWriter);
+          bound = true;
+        }
+      } else if (IsProcessor<ConicGradientLayout>(fp)) {
+        // The layout is a child of the gradient effect the walk just consumed, so its values
+        // are the same gradient node's parameters.
+        if (lastGradient != nullptr) {
+          BindConicLayoutNode(*lastGradient, &paramWriter);
+          bound = true;
+        }
+      } else if (IsProcessor<SingleIntervalGradientColorizer>(fp)) {
+        // The colorizer is the gradient effect's other child; same node, its colorizer fields.
+        if (lastGradient != nullptr) {
+          BindColorizerNode(*lastGradient, &paramWriter);
+          bound = true;
+        }
+      } else if (IsProcessor<GaussianBlur1DFragmentProcessor>(fp)) {
+        if (blurCursor < blurs.size()) {
+          const auto& blur = blurs[blurCursor++];
+          BindBlurKernelNode(*blur.first, blur.second, &paramWriter);
+          bound = true;
         }
       }
       if (!bound) {
-        if (fp->bindPrecompiled(&paramWriter)) {
-          // The processor's feature module took over its uniform writes.
-        } else {
-          fp->setData(vertexUniformData, fragmentUniformData);
-        }
+        // A setData-based writer, or the impossible missing-IR case (kept loud: the required
+        // uniform lookup logs when the name does not resolve).
+        fp->setData(vertexUniformData, fragmentUniformData);
       }
       fp = iter.next();
     }
@@ -336,8 +510,10 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
   // The suffix reset above puts the XP back on the base names; the offset path's instance
   // ordinal follows it.
   paramWriter.setInstanceOrdinal(0);
-  if (processor->onBindPrecompiled(&paramWriter)) {
-    // The XP's feature module took over its uniform writes.
+  if (carriedIR != nullptr && IsProcessor<PorterDuffXferProcessor>(processor)) {
+    // The blend mode off the IR; the dst texture's instance-time facts off the made processor --
+    // the same layer the geometry facts read.
+    BindPorterDuffXfer(static_cast<int>(carriedIR->blendMode), processor, &paramWriter);
   } else {
     processor->setData(vertexUniformData, fragmentUniformData);
   }
@@ -495,51 +671,6 @@ void ChainProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
   info.geometryProcessor->setData(vertexUniformData, fragmentUniformData, &coordTransformIter);
 }
 
-void ExpressionProgramWriter::writeProcessors(const ProgramInfo& info,
-                                              UniformData* vertexUniformData,
-                                              UniformData* fragmentUniformData,
-                                              const FragmentProcessor* expression) const {
-  if (expression == nullptr) {
-    LOGE(
-        "ExpressionProgramWriter::writeProcessors() the expression failed to build; the draw "
-        "renders with unwritten kernel uniforms");
-    return;
-  }
-  // The expression's nodes carry the artifact's uniforms (the chain's leaf-ordered per-leaf
-  // records, the perlin kernel's folded slot records): walk the expression's subtree — its root
-  // first, then every node in its own order — so each node's module bind runs, exactly as the
-  // generic writer walks an info that carries the rebuilt processor.
-  ParamWriter paramWriter(fragmentUniformData);
-  std::unordered_map<std::string, int> classOrdinals;
-  FragmentProcessor::Iter iter(expression);
-  const FragmentProcessor* fp = iter.next();
-  while (fp) {
-    info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, fp);
-    int ordinal = classOrdinals[UniformSpaceKey(fp)]++;
-    std::string structural = ordinal > 0 ? "_" + std::to_string(ordinal) : "";
-    paramWriter.setInstanceOrdinal(static_cast<size_t>(ordinal));
-    if (vertexUniformData != nullptr) {
-      vertexUniformData->structuralSuffix = structural;
-    }
-    if (fragmentUniformData != nullptr) {
-      fragmentUniformData->structuralSuffix = structural;
-    }
-    if (fp->bindPrecompiled(&paramWriter)) {
-      // The node's feature module took over its uniform writes.
-    } else {
-      fp->setData(vertexUniformData, fragmentUniformData);
-    }
-    fp = iter.next();
-  }
-  const auto processor = info.getXferProcessor();
-  info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
-  paramWriter.setInstanceOrdinal(0);
-  if (processor->onBindPrecompiled(&paramWriter)) {
-    // The XP's feature module took over its uniform writes.
-  } else {
-    processor->setData(vertexUniformData, fragmentUniformData);
-  }
-}
 
 void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
                                          UniformData* fragmentUniformData,
@@ -560,8 +691,9 @@ void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* v
   ParamWriter paramWriter(fragmentUniformData);
   const auto processor = info.getXferProcessor();
   info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
-  if (processor->onBindPrecompiled(&paramWriter)) {
-    // The XP's feature module took over its uniform writes.
+  const auto* chainIR = info.getCarriedIR();
+  if (chainIR != nullptr && IsProcessor<PorterDuffXferProcessor>(processor)) {
+    BindPorterDuffXfer(static_cast<int>(chainIR->blendMode), processor, &paramWriter);
   } else {
     processor->setData(vertexUniformData, fragmentUniformData);
   }

@@ -64,11 +64,6 @@ void GaussianBlur1DFragmentProcessor::onComputeProcessorKey(BytesKey* key) const
   key->write(maxSigma);
 }
 
-bool GaussianBlur1DFragmentProcessor::onBindPrecompiled(ParamWriter* writer) const {
-  BlurKernelModule::Bind(this, writer);
-  return true;
-}
-
 bool GaussianBlur1DFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
                                                  AOTNodeID* output) const {
   // The blur's math cannot ride the pointwise chain, so it lowers as an opaque-kernel barrier:
@@ -87,6 +82,13 @@ bool GaussianBlur1DFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNod
   parameters.kernelKind = 0;
   // The fixed kernel caps sigma at 10; the matcher reads the acceptance range off the node.
   parameters.sigma = maxSigma;
+  // The upload values the blur bind reads off the node (see BlurKernelModule's fields). The
+  // step's matrix is NOT stashed here: its normalization needs the child's instantiated view,
+  // so the bind maps it through the child leaf's recorded matrix at bind time.
+  parameters.kernelRadius = getKernelRadius();
+  parameters.stepLength = getStepLength();
+  parameters.vertical = getDirection() == GaussianBlurDirection::Vertical;
+  parameters.packedKernel = packedKernel();
   return builder->addOpaqueKernel(childNode, parameters, output);
 }
 }  // namespace tgfx

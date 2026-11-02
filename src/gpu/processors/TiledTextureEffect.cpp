@@ -351,8 +351,4 @@ const TextureView* TiledTextureEffect::getTextureView() const {
   return nullptr;
 }
 
-bool TiledTextureEffect::onBindPrecompiled(ParamWriter* writer) const {
-  TiledSourceModule::Bind(this, writer);
-  return true;
-}
 }  // namespace tgfx

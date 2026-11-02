@@ -32,11 +32,6 @@ class AlphaThresholdFragmentProcessor : public FragmentProcessor {
     return "AlphaStepFragmentProcessor";
   }
 
-  bool onBindPrecompiled(ParamWriter* writer) const override {
-    PointwiseOpModule::Bind(this, writer);
-    return true;
-  }
-
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
   /** The alpha cutoff the processor was built with. */

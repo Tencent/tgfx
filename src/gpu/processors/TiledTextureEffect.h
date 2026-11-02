@@ -56,6 +56,11 @@ class TiledTextureEffect : public FragmentProcessor {
   /// Returns the immutable sampling snapshot shared by runtime shader setup and AOT lowering.
   const ResolvedSampling* resolveSampling() const;
 
+  /// The texture proxy this effect samples; the IR-driven bind matches its leaf by it.
+  std::shared_ptr<TextureProxy> getTextureProxy() const {
+    return textureProxy;
+  }
+
   /// Returns the ShaderMode for X/Y axes computed from the resolved sampling state.
   void getShaderModes(int* outModeX, int* outModeY) const;
 
@@ -72,7 +77,6 @@ class TiledTextureEffect : public FragmentProcessor {
   /// The texture view the sampling references; null while the texture is not instantiated yet.
   const TextureView* getTextureView() const;
 
-  bool onBindPrecompiled(ParamWriter* writer) const override;
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:

@@ -30,8 +30,4 @@ void ConicGradientLayout::onComputeProcessorKey(BytesKey* bytesKey) const {
   bytesKey->write(flags);
 }
 
-bool ConicGradientLayout::onBindPrecompiled(ParamWriter* writer) const {
-  GradientModule::BindConicLayout(this, writer);
-  return true;
-}
 }  // namespace tgfx

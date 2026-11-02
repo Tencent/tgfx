@@ -20,7 +20,6 @@ struct DeviceMaskModule {
   static constexpr ParamInfo Fields[] = {
       DeviceCoordMatrix, DeviceMaskSubset, Subset, AlphaOnly, Rect, HasDeviceMask};
 
-  static void Bind(const FragmentProcessor* processor, ParamWriter* writer);
 };
 
 }  // namespace tgfx

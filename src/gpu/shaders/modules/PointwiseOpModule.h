@@ -19,7 +19,6 @@ struct PointwiseOpModule {
 
   static constexpr ParamInfo Fields[] = {OpType, ColorMatrix, ColorVector, Kr, Kg, Kb, Threshold};
 
-  static void Bind(const FragmentProcessor* processor, ParamWriter* writer);
 };
 
 }  // namespace tgfx

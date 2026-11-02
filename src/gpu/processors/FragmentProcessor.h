@@ -273,8 +273,6 @@ class FragmentProcessor : public Processor {
    * Returns false when no module has migrated this processor class, leaving the uniform walk on
    * the processor's own setData. Runtime-generated programs never call this.
    */
-  bool bindPrecompiled(ParamWriter* writer) const;
-
   /**
    * Emit the child with the default input color (solid white)
    */
@@ -336,14 +334,6 @@ class FragmentProcessor : public Processor {
   }
 
   virtual void onSetData(UniformData*, UniformData*) const {
-  }
-
-  /**
-   * The precompiled-program counterpart of onSetData: writes the same values through the
-   * processor's feature module instead. The default serves processors no module has migrated.
-   */
-  virtual bool onBindPrecompiled(ParamWriter*) const {
-    return false;
   }
 
  private:

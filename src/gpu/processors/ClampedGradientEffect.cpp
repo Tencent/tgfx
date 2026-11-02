@@ -133,8 +133,4 @@ bool ClampedGradientEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
   return builder->addGradientSource(input, parameters, output);
 }
 
-bool ClampedGradientEffect::onBindPrecompiled(ParamWriter* writer) const {
-  GradientModule::BindEffect(this, writer);
-  return true;
-}
 }  // namespace tgfx

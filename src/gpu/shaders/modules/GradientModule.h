@@ -22,13 +22,8 @@ struct GradientModule {
   static constexpr ParamInfo Fields[] = {
       LeftBorderColor, RightBorderColor, LayoutType, Bias, Scale, Start, End};
 
-  static void BindEffect(const FragmentProcessor* processor, ParamWriter* writer);
-
   /// The conic layout's bias/scale pair; other layouts write nothing.
-  static void BindConicLayout(const FragmentProcessor* processor, ParamWriter* writer);
-
   /// The single-interval colorizer's endpoints and kind selector.
-  static void BindColorizer(const FragmentProcessor* processor, ParamWriter* writer);
 };
 
 }  // namespace tgfx
