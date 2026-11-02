@@ -20,7 +20,6 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/aot/AOTDrawFacts.h"
-#include "gpu/aot/ExecutorRecord.h"
 #include "gpu/processors/RectEffect.h"
 
 namespace tgfx {
@@ -33,19 +32,30 @@ std::optional<QuadColorFillShader::Inputs> QuadColorFillShader::Extract(
 
 std::optional<QuadColorFillShader::Inputs> QuadColorFillShader::ExtractFacts(
     const AOTDrawFacts& facts, PermutationMatchFailure*) {
-  // The acceptance is the family's executor record: no color processors, and either a direct
-  // analytic clip (runtime uniforms) or a device-space mask, which raises HAS_MASK_TEXTURE.
-  auto* record = FindExecutorRecord(Name);
-  if (record == nullptr) {
+  // The family-relative alpha-only gate (RejectsAlphaOnlyTarget's original semantics).
+  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }
-  auto matched = MatchExecutorRecord(*record, facts);
-  if (!matched) {
+  if (facts.geometry.kind != AOTGeometryKind::QuadPerEdgeAA) {
     return std::nullopt;
   }
+  // Accept either zero fragment processors, a device-space mask, or one direct analytic clip
+  // coverage FP (AA rect or rrect). The clip is evaluated by the runtime clip contract uniforms.
   Inputs inputs;
-  inputs.hasMaskTexture = matched->hasMaskTexture;
-  inputs.xpType = matched->xpType;
+  if (facts.fragmentCount != 0) {
+    if (facts.colorFPCount != 0) {
+      return std::nullopt;
+    }
+    if (facts.coverage == CoverageKind::AARect || facts.coverage == CoverageKind::RRect) {
+      // No additional sampler or permutation dimension is needed.
+    } else {
+      if (facts.coverage != CoverageKind::DeviceMask) {
+        return std::nullopt;
+      }
+      inputs.hasMaskTexture = true;
+    }
+  }
+  inputs.xpType = facts.xpType();
   return inputs;
 }
 

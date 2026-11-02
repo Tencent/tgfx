@@ -20,7 +20,6 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/aot/AOTDrawFacts.h"
-#include "gpu/aot/ExecutorRecord.h"
 
 namespace tgfx {
 
@@ -35,17 +34,30 @@ std::optional<SolidColorFillShader::Inputs> SolidColorFillShader::Extract(
 
 std::optional<SolidColorFillShader::Inputs> SolidColorFillShader::ExtractFacts(
     const AOTDrawFacts& facts, PermutationMatchFailure*) {
-  // The acceptance is the family's executor record (the fill color rides the GP's Color uniform;
-  // the only admitted fragment processor is one paint-sourced analytic clip).
-  auto* record = FindExecutorRecord(Name);
-  if (record == nullptr) {
+  // The family-relative alpha-only gate (this kernel applies the output swizzle, so it serves
+  // alpha-only targets — RejectsAlphaOnlyTarget's original semantics).
+  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }
-  auto matched = MatchExecutorRecord(*record, facts);
-  if (!matched) {
+  if (facts.geometry.kind != AOTGeometryKind::Default) {
     return std::nullopt;
   }
-  return Inputs{matched->xpType};
+  // The fill color comes from the DefaultGeometryProcessor Color uniform, so a color fragment
+  // processor would be silently dropped and must reject. The only accepted FP is one direct
+  // analytic clip coverage FP (AA rect or rrect), which this shader evaluates from the runtime
+  // clip contract uniforms.
+  bool noProcessorsOrDirectClip =
+      facts.fragmentCount == 0 ||
+      (facts.colorFromPaint && (facts.coverage == CoverageKind::AARect ||
+                                facts.coverage == CoverageKind::RRect));
+  if (!noProcessorsOrDirectClip) {
+    return std::nullopt;
+  }
+  auto xpType = facts.xpType();
+  if (xpType < XP_NONE) {
+    return std::nullopt;
+  }
+  return Inputs{xpType};
 }
 
 }  // namespace tgfx

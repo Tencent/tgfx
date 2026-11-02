@@ -19,9 +19,15 @@
 #include "gpu/shaders/kernels/QuadTextureFillShader.h"
 #include <optional>
 #include "gpu/ProgramInfo.h"
-#include "gpu/ShaderMatchHelpers.h"
+#include "gpu/aot/AOTChainBuilder.h"
 #include "gpu/aot/AOTDrawFacts.h"
-#include "gpu/aot/ExecutorRecord.h"
+#include "gpu/ShaderMatchHelpers.h"
+#include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "gpu/processors/PorterDuffXferProcessor.h"
+#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
+#include "gpu/processors/RRectEffect.h"
+#include "gpu/processors/RectEffect.h"
+#include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
 
@@ -31,25 +37,97 @@ std::optional<QuadTextureFillShader::Inputs> QuadTextureFillShader::Extract(
   return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
 }
 
-
 std::optional<QuadTextureFillShader::Inputs> QuadTextureFillShader::ExtractFacts(
     const AOTDrawFacts& facts, PermutationMatchFailure*) {
-  // The acceptance is the family's executor record; the Compose below turns the record's axis
-  // sources into this family's domain values. One record row replaces the previous 90-line
-  // hand-written predicate (its dual-run against this record passed the whole suite unmodified).
-  auto* record = FindExecutorRecord(Name);
-  if (record == nullptr) {
+  // The family-relative alpha-only gate (RejectsAlphaOnlyTarget's original semantics).
+  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }
-  auto matched = MatchExecutorRecord(*record, facts);
-  if (!matched) {
+  if (facts.geometry.kind != AOTGeometryKind::QuadPerEdgeAA) {
     return std::nullopt;
   }
+  // Color must be exactly one TextureEffect. Coverage is optional: a device-space mask maps to
+  // HAS_MASK_TEXTURE, while a local-space texture-alpha mask maps to HAS_LOCAL_MASK.
+  if (facts.colorFPCount != 1) {
+    return std::nullopt;
+  }
+  bool hasLocalMask = false;
+  if (facts.fragmentCount != 1) {
+    if (facts.coverage == CoverageKind::AARect || facts.coverage == CoverageKind::RRect) {
+      // Evaluated through the runtime clip contract uniforms.
+    } else if (facts.coverage == CoverageKind::DeviceMask) {
+      // Device masks are a runtime uniform now, so there is nothing to encode.
+    } else if (facts.coverage == CoverageKind::LocalMask) {
+      hasLocalMask = true;
+    } else {
+      // Unrecognized coverage kinds (including unclassifiable ones) stay on other routes.
+      return std::nullopt;
+    }
+  }
+  int xpType = facts.xpType();
+  if (xpType < XP_NONE) {
+    return std::nullopt;
+  }
+  if (facts.ir == nullptr) {
+    // A draw whose lowering refused (the fail-closed gray/RG plain sources) keeps the walk's
+    // original acceptance: the post-match texture-read check is what refuses it, and the
+    // read-fallback reason that classification depends on must keep firing.
+    if (facts.info == nullptr) {
+      return std::nullopt;
+    }
+    auto* fp = facts.info->getFragmentProcessor(0);
+    if (!IsProcessor<TextureEffect>(fp)) {
+      return std::nullopt;
+    }
+    auto* te = static_cast<const TextureEffect*>(fp);
+    if (te->numTextureSamplers() == 0 || te->isYUV()) {
+      return std::nullopt;
+    }
+    Inputs inputs;
+    inputs.hasUVCoord = !facts.geometry.hasUVMatrix;
+    inputs.hasSubset = facts.geometry.hasSubset;
+    if (inputs.hasSubset && (facts.geometry.hasUVPerspective || te->hasPerspective())) {
+      return std::nullopt;
+    }
+    inputs.hasLocalMask = hasLocalMask;
+    inputs.xpType = xpType;
+    return inputs;
+  }
+  // The single color processor is the IR's bare texture leaf (no operators above it; the leaf's
+  // existence implies its proxy — the failed-instantiation corner the old sampler count guarded
+  // is not a supported state, the uploads run before the draws they feed).
+  AOTChainBuilder::AOTTextureTailShape tail = {};
+  if (!AOTChainBuilder::CollectTextureTail(facts.ir->color, &tail) || !tail.ops.empty() ||
+      tail.leaf->isYUV || tail.leaf->samplingKind != AOTTextureSamplingKind::Plain) {
+    return std::nullopt;
+  }
+  // No color-texture guards are needed for the local mask: the coverage texture writes its
+  // per-texture uniforms (Subset/AlphaOnly/HasRgbaaa) under a distinct structural ordinal
+  // (Subset_1, ...), so it can no longer clobber the color texture's Subset / AlphaOnly slots. The
+  // color may therefore carry a subset, be alpha-only, or use RGBAAA freely.
+  // Subset clamping logic:
+  //   gpSubset=true  -> HAS_SUBSET=1: vertex shader outputs vTexSubset varying, fragment double-
+  //                     clamps by the varying and the Subset uniform.
+  //   gpSubset=false -> HAS_SUBSET=0: fragment always clamps by the Subset uniform alone. The
+  //                     uniform is populated from computeSubsetRect, which yields the full texture
+  //                     bounds when the source has no real subset, so the clamp is a no-op. This
+  //                     subsumes the former HAS_CLAMP_SUBSET dimension.
   Inputs inputs;
-  inputs.hasUVCoord = matched->hasUVCoord;
-  inputs.hasSubset = matched->hasSubset;
-  inputs.hasLocalMask = matched->hasLocalMask;
-  inputs.xpType = matched->xpType;
+  inputs.hasUVCoord = !facts.geometry.hasUVMatrix;
+  inputs.hasSubset = facts.geometry.hasSubset;
+  // The precompiled vTexSubset path transforms the subset corners WITHOUT a perspective divide
+  // (quad_texture_fill.vert: perspLT = (CoordTransformMatrix_0 * vec3(src, 1)).xy), while the
+  // runtime route's emitTransformedPoint divides by w when the transform is projective. A
+  // projective source carrying a GP subset would clamp the texture coordinate to wrong bounds
+  // (one edge-line class of A/B divergence), so it must stay on the runtime route — the same
+  // conservative policy the plain-coordinate kernels apply to projective sources. Projective
+  // draws without a GP subset are fine: TransformedCoords_0 is a vec3 varying that the fragment
+  // shader divides.
+  if (inputs.hasSubset && (facts.geometry.hasUVPerspective || tail.leaf->hasPerspective)) {
+    return std::nullopt;
+  }
+  inputs.hasLocalMask = hasLocalMask;
+  inputs.xpType = xpType;
   return inputs;
 }
 
