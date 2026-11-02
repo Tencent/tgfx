@@ -584,8 +584,12 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
     auto fp = FragmentProcessor::Compose(&allocator, std::move(texture), std::move(matrix));
     ASSERT_NE(gp, nullptr);
     ASSERT_NE(fp, nullptr);
+    // The chain serves a draw from its record-time IR; a ProgramInfo without one is not served.
+    auto ir = LowerDraw({fp.get()}, {}, BlendMode::SrcOver, &allocator);
+    ASSERT_TRUE(ir.has_value());
     ProgramInfo programInfo(renderTarget.get(), gp.get(), {fp.get()}, 1, nullptr,
                             BlendMode::SrcOver);
+    programInfo.setCarriedIR(&*ir);
     EXPECT_TRUE(programInfo.glProfileMatchesCache());
     EXPECT_TRUE(MatchPermutation(&programInfo).has_value());
   }
@@ -646,8 +650,11 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
     ASSERT_NE(gp, nullptr);
     ASSERT_NE(fp, nullptr);
     ASSERT_NE(xp, nullptr);
+    auto ir = LowerDraw({fp.get()}, {}, BlendMode::SrcOver, &allocator);
+    ASSERT_TRUE(ir.has_value());
     ProgramInfo programInfo(renderTarget.get(), gp.get(), {fp.get()}, 1, xp.get(),
                             BlendMode::SrcOver);
+    programInfo.setCarriedIR(&*ir);
     // SrcOver needs no dst readback, so the chain kernel serves this draw.
     EXPECT_TRUE(MatchPermutation(&programInfo).has_value());
   }

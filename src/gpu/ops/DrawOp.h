@@ -108,10 +108,18 @@ class DrawOp {
   void tryLowerIR();
 
   /**
+   * Appends the coverage processors added after the record-time lowering — a rasterized shape
+   * attaches its mask coverage only once the shape proxy exists — as new IR terms, so the carried
+   * IR stays the draw's complete expression. Returns true when the IR now covers the live list;
+   * false when the grown expression does not lower, which leaves the IR unusable for this draw.
+   */
+  bool appendGrownCoverage();
+
+  /**
    * The record-time source of the AtlasText glyph leaf: the op's atlas proxy and sampling, which
-   * the prepare-time geometry processor merely re-derives. Nullopt for every other op, and for an
-   * atlas the chain cannot carry (a color atlas replaces the output color): such draws keep the
-   * plain path exactly as before.
+   * the prepare-time geometry processor merely re-derives. Nullopt for every other op. Both atlas
+   * flavors lower: the glyph leaf's parameters carry the atlas's alpha-only fact, the chain
+   * refuses a color glyph, and the dedicated atlas kernel carries it.
    */
   virtual std::optional<AOTAtlasGlyphSource> recordTimeAtlasSource() const {
     return std::nullopt;

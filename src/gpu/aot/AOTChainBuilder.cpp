@@ -1828,54 +1828,24 @@ bool AOTChainBuilder::ValidateSlots(const std::vector<AOTChainSlot>& slots, size
   return true;
 }
 
-bool AOTChainBuilder::CompileChainProgramForInfo(BlockAllocator* allocator,
-                                                 const ProgramInfo* programInfo, AOTProgram* out) {
-  if (allocator == nullptr || programInfo == nullptr || out == nullptr) {
+bool AOTChainBuilder::CompileChainProgramForInfo(const ProgramInfo* programInfo, AOTProgram* out) {
+  if (programInfo == nullptr || out == nullptr) {
     return false;
   }
-  auto gp = programInfo->getGeometryProcessor();
-  if (gp == nullptr) {
-    return false;
-  }
-  // The draw carries its record-time IR: the graph and the classified coverage terms are already
-  // the ones this compile would compute, so the second lowering is skipped entirely. An AtlasText
-  // op's record-time IR carries its glyph term too (the atlas facts come from the op itself, not
-  // the geometry processor); only a draw without a carried IR reaches the FP path below, which
-  // synthesizes the glyph leaf from the geometry processor as before.
-  if (auto* carried = programInfo->getCarriedIR()) {
-    AOTEffectPlan plan = {};
-    if (!AOTEffectDecomposer::Decompose(carried->color, &plan, true) || plan.passes.size() != 1 ||
-        !IsAOTPointwiseDAGKernel(plan.passes[0].kernel)) {
-      // The perlin kernels have their own families; the chain family only takes the DAG kernels,
-      // and anything the single-pass decomposition cannot fit needs a plan task.
-      return false;
-    }
-    return CompileChainLayout(carried->color, plan.passes[0], &carried->coverage, out);
-  }
-  std::vector<const FragmentProcessor*> colorProcessors = {};
-  colorProcessors.reserve(programInfo->numColorFragmentProcessors() + 1);
-  for (size_t index = 0; index < programInfo->numColorFragmentProcessors(); ++index) {
-    colorProcessors.push_back(programInfo->getFragmentProcessor(index));
-  }
-  std::vector<const FragmentProcessor*> coverageProcessors = {};
-  for (size_t index = programInfo->numColorFragmentProcessors();
-       index < programInfo->numFragmentProcessors(); ++index) {
-    coverageProcessors.push_back(programInfo->getFragmentProcessor(index));
-  }
-  // One lowering for the whole draw: the color graph plus the classified coverage terms (the
-  // classifier synthesizes the AtlasText glyph leaf from the geometry processor).
-  auto ir = LowerDraw(colorProcessors, coverageProcessors, gp, BlendMode::SrcOver, allocator);
-  if (!ir.has_value()) {
+  // The draw's record-time IR is the only input: every draw lowers once at record time, so a
+  // missing IR means the expression is not expressible and no second lowering could fix that.
+  auto* carried = programInfo->getCarriedIR();
+  if (carried == nullptr) {
     return false;
   }
   AOTEffectPlan plan = {};
-  if (!AOTEffectDecomposer::Decompose(ir->color, &plan, true) || plan.passes.size() != 1 ||
+  if (!AOTEffectDecomposer::Decompose(carried->color, &plan, true) || plan.passes.size() != 1 ||
       !IsAOTPointwiseDAGKernel(plan.passes[0].kernel)) {
     // The perlin kernels have their own families; the chain family only takes the DAG kernels,
     // and anything the single-pass decomposition cannot fit needs a plan task.
     return false;
   }
-  return CompileChainLayout(ir->color, plan.passes[0], &ir->coverage, out);
+  return CompileChainLayout(carried->color, plan.passes[0], &carried->coverage, out);
 }
 
 }  // namespace tgfx

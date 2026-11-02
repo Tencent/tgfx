@@ -121,11 +121,10 @@ bool ClampedGradientEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
                                  thresholds9_13.bottom};
   } else if (IsProcessor<TextureGradientColorizer>(colorizerFP)) {
     // LUT colorizer: the baked gradient texture joins the chain as a sampler-only child; the
-    // kernel's OP_GRADIENT LUT branch samples it at the computed t.
+    // kernel's OP_GRADIENT LUT branch samples it at the computed t. The node carries the proxy,
+    // never the view: the LUT upload may still be pending at record time, and the binding
+    // resolves the view when the draw is prepared.
     auto* lut = static_cast<const TextureGradientColorizer*>(colorizerFP);
-    if (lut->getGradient()->getTextureView() == nullptr) {
-      return false;
-    }
     parameters.colorizerKind = 3;
     parameters.lutProxy = lut->getGradient();
   } else {

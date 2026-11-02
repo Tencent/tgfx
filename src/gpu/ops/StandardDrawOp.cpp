@@ -122,11 +122,9 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
     return false;
   }
 #if DEBUG
-  // The leaf twin runs while the carried IR is the one being served — the staleness guard's own
-  // window: an expression that grew at prepare (a rasterized shape attaches its mask coverage
-  // only once the shape proxy exists) drops the IR from the info.
-  const bool irServes = loweredIR() != nullptr && loweredIR()->colorFPCount == colors.size() &&
-                        loweredIR()->coverageFPCount == coverages.size();
+  // The leaf twin runs while the carried IR is the one being served: the color list must be the
+  // record-time one (a grown coverage list is appended to the IR, not compared here).
+  const bool irServes = loweredIR() != nullptr && loweredIR()->colorFPCount == colors.size();
   if (irServes) {
     AssertSingleLeafFacts(*ir, colors);
   }
@@ -204,13 +202,12 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
     preparedProgramInfo->setDepthStencil(depthStencil);
   }
   onConfigureProgramInfo(*preparedProgramInfo);
-  // The draw's record-time IR rides along whenever the info's processor list is the unmodified
-  // record-time list: the re-expressing families then reuse it instead of lowering a second time.
-  // An expression that grew at prepare — a rasterized shape attaches its mask coverage FP
-  // only once the shape proxy exists (onMakeGeometryProcessor) — describes a different expression,
-  // so the counts the IR was lowered from must still match the op's live lists.
+  // The draw's record-time IR is the expression every later stage reads. A coverage processor
+  // attached only at prepare (a rasterized shape's mask, added by onMakeGeometryProcessor) is
+  // appended to the IR's terms instead of dropping the IR — the color graph cannot change after
+  // record time, so a color-count mismatch is the only case the IR does not describe.
   if (loweredIR() != nullptr && loweredIR()->colorFPCount == colors.size() &&
-      loweredIR()->coverageFPCount == coverages.size()) {
+      appendGrownCoverage()) {
     preparedProgramInfo->setCarriedIR(loweredIR());
   }
   preparedProgram = preparedProgramInfo->getProgram();

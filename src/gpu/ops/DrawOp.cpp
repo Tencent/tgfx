@@ -56,12 +56,38 @@ void DrawOp::tryLowerIR() {
     // No geometry processor exists at record time, so the IR carries no glyph leaf — matching the
     // null-GP contract of LowerDraw. A lowering failure leaves the IR null, and the plain FP path
     // serves the draw exactly as it did before the IR existed.
-    lowered = LowerDraw(colorList, coverageList, nullptr, blendMode, allocator);
+    lowered = LowerDraw(colorList, coverageList, blendMode, allocator);
   }
   if (!lowered.has_value()) {
     return;
   }
   ir = allocator->make<DrawIR>(std::move(*lowered));
+}
+
+bool DrawOp::appendGrownCoverage() {
+  if (ir == nullptr) {
+    return false;
+  }
+  if (ir->coverageFPCount == coverages.size()) {
+    return true;
+  }
+  if (ir->coverageFPCount > coverages.size()) {
+    return false;
+  }
+  std::vector<const FragmentProcessor*> grown = {};
+  grown.reserve(coverages.size() - ir->coverageFPCount);
+  for (size_t index = ir->coverageFPCount; index < coverages.size(); ++index) {
+    grown.push_back(coverages[index].get());
+  }
+  auto terms = LowerCoverageTerms(grown, nullptr, allocator);
+  if (!terms.has_value()) {
+    return false;
+  }
+  for (auto& term : *terms) {
+    ir->coverage.emplace_back(std::move(term));
+  }
+  ir->coverageFPCount = coverages.size();
+  return true;
 }
 
 void DrawOp::applyScissor(RenderPass* renderPass, RenderTarget* renderTarget) const {

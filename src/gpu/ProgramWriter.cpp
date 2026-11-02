@@ -379,13 +379,8 @@ static const AOTProgram* ChainProgram(const ProgramInfo& info) {
       carried != nullptr && carried->compiledProgram.has_value()) {
     return &*carried->compiledProgram;
   }
-  auto context = info.getContext();
-  if (context == nullptr || context->drawingManager() == nullptr) {
-    return nullptr;
-  }
   AOTProgram program = {};
-  if (!AOTChainBuilder::CompileChainProgramForInfo(context->drawingManager()->drawingAllocator(),
-                                                   &info, &program)) {
+  if (!AOTChainBuilder::CompileChainProgramForInfo(&info, &program)) {
     return nullptr;
   }
   info.setCachedChainProgram(std::move(program));

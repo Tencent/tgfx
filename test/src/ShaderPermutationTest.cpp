@@ -2536,7 +2536,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     // would have lowered at record time and carry it, as the plain route's prepare does. The
     // geometry and xfer facts the matchers read come off the made processors at match time.
     std::vector<const FragmentProcessor*> coverageList(processors.begin(), processors.end());
-    auto ir = LowerDraw({}, coverageList, nullptr, BlendMode::SrcOver, &allocator);
+    auto ir = LowerDraw({}, coverageList, BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(ir.has_value());
     programInfo.setCarriedIR(&*ir);
     auto failure = PermutationMatchFailure::CoverageShape;
@@ -2563,7 +2563,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     auto twoMaskIR = LowerDraw({},
                                {static_cast<const FragmentProcessor*>(coverage.get()),
                                 static_cast<const FragmentProcessor*>(secondCoverage.get())},
-                               nullptr, BlendMode::SrcOver, &allocator);
+                               BlendMode::SrcOver, &allocator);
     ASSERT_TRUE(twoMaskIR.has_value());
     programInfo.setCarriedIR(&*twoMaskIR);
     auto failure = PermutationMatchFailure::None;
@@ -2591,8 +2591,11 @@ TGFX_TEST(ShaderPermutationTest, ComplexEllipseTextureCoverageIsServedByChain) {
   auto coverage = TextureEffect::Make(&allocator, textureProxy);
   ASSERT_NE(gp, nullptr);
   ASSERT_NE(coverage, nullptr);
+  auto ir = LowerDraw({}, {coverage.get()}, BlendMode::SrcOver, &allocator);
+  ASSERT_TRUE(ir.has_value());
   ProgramInfo rejected(renderTarget.get(), gp.get(), {coverage.get()}, 0, nullptr,
                        BlendMode::SrcOver);
+  rejected.setCarriedIR(&*ir);
   auto failure = PermutationMatchFailure::None;
   auto served = MatchPermutation(&rejected, &failure);
   ASSERT_TRUE(served.has_value());
@@ -2797,8 +2800,12 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectComposedCoverageIsServedByChain) {
   auto composed = FragmentProcessor::Compose(&allocator, std::move(mask), std::move(clip));
   ASSERT_NE(gp, nullptr);
   ASSERT_NE(composed, nullptr);
+  // The chain serves the draw from its record-time IR: coverage is classified off its terms.
+  auto ir = LowerDraw({}, {composed.get()}, BlendMode::SrcOver, &allocator);
+  ASSERT_TRUE(ir.has_value());
   ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {composed.get()}, 0,
                           nullptr, BlendMode::SrcOver);
+  programInfo.setCarriedIR(&*ir);
   auto failure = PermutationMatchFailure::None;
   auto served = MatchPermutation(&programInfo, &failure);
   ASSERT_TRUE(served.has_value());

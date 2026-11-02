@@ -53,13 +53,8 @@ std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::Extract(
     }
   }
   if (compiled == nullptr) {
-    auto context = programInfo->getContext();
-    if (context == nullptr || context->drawingManager() == nullptr) {
-      return std::nullopt;
-    }
     AOTProgram program = {};
-    if (!AOTChainBuilder::CompileChainProgramForInfo(context->drawingManager()->drawingAllocator(),
-                                                     programInfo, &program)) {
+    if (!AOTChainBuilder::CompileChainProgramForInfo(programInfo, &program)) {
       return std::nullopt;
     }
     // Keep the compiled program on the info and the carried IR: the walk stops here when the

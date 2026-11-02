@@ -189,17 +189,14 @@ class AOTChainBuilder {
                                   bool coverageLeafFromUVCoord, AOTProgram* out);
 
   /**
-   * Compiles a draw's whole effect expression (its color processors, its coverage processors, and
-   * the glyph leaf an AtlasText geometry processor contributes) into the fused chain program and
-   * its binding table, without building processors: one LowerDraw produces the color graph and the
-   * classified coverage terms, the single-pass decomposition plans the color side, and the terms
-   * merge into the program. This is the interpreter's view of an unmodified ProgramInfo: the
-   * matcher derives the draw's variant from the program, and the per-draw upload (uniforms,
-   * samplers and the vertex transforms) consumes it. Returns false when the expression does not
-   * reduce onto the chain kernel (an unsupported processor, an over-budget shape, a coverage form
-   * the chain cannot carry).
+   * Compiles a draw's record-time IR (its color graph and classified coverage terms) into the
+   * fused chain program and its binding table, without building processors: the single-pass
+   * decomposition plans the color side and the terms merge into the program. This is the
+   * interpreter's view of the draw: the matcher derives the variant from the program, and the
+   * per-draw upload (uniforms, samplers and the vertex transforms) consumes it. Returns false when
+   * the expression does not reduce onto the chain kernel (a missing IR, an over-budget shape, a
+   * coverage form the chain cannot carry).
    */
-  static bool CompileChainProgramForInfo(BlockAllocator* allocator, const ProgramInfo* programInfo,
-                                         AOTProgram* out);
+  static bool CompileChainProgramForInfo(const ProgramInfo* programInfo, AOTProgram* out);
 };
 }  // namespace tgfx

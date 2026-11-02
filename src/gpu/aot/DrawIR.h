@@ -137,11 +137,11 @@ struct DrawIR {
   /// lowers to the same graph, so this fact is what keeps the two apart (the matcher's
   /// no-processors acceptance reads it).
   bool colorFromPaint = false;
-  /// The sizes of the processor lists this IR was lowered from. The carried-IR contract requires
-  /// the record-time expression to be complete: an op whose expression grows at prepare (a
-  /// rasterized shape attaches its mask coverage FP only once the shape proxy exists) must not
-  /// serve from the stale IR, so the prepare-side carrier compares these against the op's live
-  /// lists before adopting the IR.
+  /// The sizes of the processor lists this IR was lowered from. The color graph cannot change
+  /// after record time, so a color-count mismatch means the IR does not describe this draw. The
+  /// coverage list may grow at prepare (a rasterized shape attaches its mask only once the shape
+  /// proxy exists); `coverageFPCount` is the watermark DrawOp::appendGrownCoverage extends the
+  /// terms from, so the IR stays the draw's complete expression instead of being dropped.
   size_t colorFPCount = 0;
   size_t coverageFPCount = 0;
   /**
@@ -175,24 +175,22 @@ struct AOTAtlasGlyphSource {
 };
 
 /**
- * Lowers one draw's whole expression — its color processors, its coverage processors and the
- * glyph leaf an AtlasText geometry processor contributes — into a DrawIR. Compose is flattened
- * recursively and every leaf is classified by what it is, not by its position: a leaf RectEffect
- * or RRectEffect is Analytic, an alpha-only DeviceSpaceTextureEffect is DeviceMask (a perspective
- * one lowers with its flag set), and anything else is Subtree. A term whose analytic leaves fail
- * to lower falls back to a Subtree term as a whole, matching the previous whole-term acceptance.
- * A null geometry processor contributes no glyph leaf (an AtlasText processor never is). The
- * lowering is total over the coverage expression — a second mask or subtree lowers into its own
- * term — and returns nullopt only when the expression is semantically inexpressible (an
- * unsupported processor, a mask that is not alpha-only). The shape limits — at most one mask, one
- * subtree, an affine mask matrix, the analytic slot capacities — are the compile's rejections
- * (MergeCoverageTerms, ValidateSlots): admission equals compile success. allocator places the
- * synthesized unit-color and atlas-leaf processors.
+ * Lowers one draw's color processors and coverage processors into a DrawIR (no glyph term: an
+ * AtlasText draw lowers through LowerDrawWithAtlas, whose glyph leaf comes from the op itself).
+ * Compose is flattened recursively and every leaf is classified by what it is, not by its
+ * position: a leaf RectEffect or RRectEffect is Analytic, an alpha-only DeviceSpaceTextureEffect
+ * is DeviceMask (a perspective one lowers with its flag set), and anything else is Subtree. A
+ * term whose analytic leaves fail to lower falls back to a Subtree term as a whole, matching the
+ * previous whole-term acceptance. The lowering is total over the coverage expression — a second
+ * mask or subtree lowers into its own term — and returns nullopt only when the expression is
+ * semantically inexpressible (an unsupported processor, a mask that is not alpha-only). The shape
+ * limits — at most one mask, one subtree, an affine mask matrix, the analytic slot capacities —
+ * are the compile's rejections (MergeCoverageTerms, ValidateSlots): admission equals compile
+ * success. allocator places the synthesized unit-color processor.
  */
 std::optional<DrawIR> LowerDraw(const std::vector<const FragmentProcessor*>& colorProcessors,
                                 const std::vector<const FragmentProcessor*>& coverageProcessors,
-                                const GeometryProcessor* geometryProcessor, BlendMode blendMode,
-                                BlockAllocator* allocator);
+                                BlendMode blendMode, BlockAllocator* allocator);
 
 /**
  * The record-time entry: same classification and rejections as LowerDraw, but the glyph leaf is

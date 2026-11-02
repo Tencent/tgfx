@@ -218,38 +218,10 @@ std::optional<DrawIR> LowerDrawCore(const std::vector<const FragmentProcessor*>&
 
 std::optional<DrawIR> LowerDraw(const std::vector<const FragmentProcessor*>& colorProcessors,
                                 const std::vector<const FragmentProcessor*>& coverageProcessors,
-                                const GeometryProcessor* geometryProcessor, BlendMode blendMode,
-                                BlockAllocator* allocator) {
-  if (allocator == nullptr) {
-    return std::nullopt;
-  }
-  // The atlas glyph mask joins as a synthesized coverage leaf sourced from the maskCoord
-  // attribute; the leaf's own parameters carry the atlas's alpha-only fact, so both atlas
-  // flavors lower (the chain refuses a color glyph, the dedicated atlas kernel carries it).
-  // A null geometry processor contributes none.
-  const FragmentProcessor* glyphLeaf = nullptr;
-  std::vector<PlacementPtr<FragmentProcessor>> ownedLeaves = {};
-  if (geometryProcessor != nullptr && IsProcessor<AtlasTextGeometryProcessor>(geometryProcessor)) {
-    auto* atlasGP = static_cast<const AtlasTextGeometryProcessor*>(geometryProcessor);
-    auto atlasProxy = atlasGP->getTextureProxy();
-    if (atlasProxy == nullptr) {
-      return std::nullopt;
-    }
-    auto state = atlasGP->getSamplerState();
-    SamplingOptions sampling(state.minFilterMode, state.magFilterMode, state.mipmapMode);
-    SamplingArgs args = {TileMode::Clamp, TileMode::Clamp, sampling, SrcRectConstraint::Fast};
-    // Identity: CoordTransform::getTotalMatrix applies the texture normalization itself, so the
-    // leaf maps maskCoord straight into the atlas's normalized space.
-    auto uvMatrix = Matrix::I();
-    auto atlasLeaf = TextureEffect::Make(allocator, std::move(atlasProxy), args, &uvMatrix);
-    if (atlasLeaf == nullptr) {
-      return std::nullopt;
-    }
-    glyphLeaf = atlasLeaf.get();
-    ownedLeaves.push_back(std::move(atlasLeaf));
-  }
-  return LowerDrawCore(colorProcessors, coverageProcessors, glyphLeaf, std::move(ownedLeaves),
-                       blendMode, allocator);
+                                BlendMode blendMode, BlockAllocator* allocator) {
+  // No glyph leaf: an AtlasText draw's glyph term comes from the op's own record-time facts
+  // through LowerDrawWithAtlas, which is the only entry that produces one.
+  return LowerDrawCore(colorProcessors, coverageProcessors, nullptr, {}, blendMode, allocator);
 }
 
 std::optional<DrawIR> LowerDrawWithAtlas(
