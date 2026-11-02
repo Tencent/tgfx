@@ -883,6 +883,30 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
   cache->unload();
 }
 
+// MatchProgram runs without a failure sink (a plan pass has no diagnostic recording), so a
+// rejection must be a plain miss instead of dereferencing the null sink.
+TGFX_TEST(ShaderPermutationTest, ProgramMatchRejectsOverBudgetWithoutFailureSink) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_NE(context, nullptr);
+  auto renderTargetProxy = RenderTargetProxy::Make(context, 8, 8, false);
+  ASSERT_NE(renderTargetProxy, nullptr);
+  auto renderTarget = renderTargetProxy->getRenderTarget();
+  ASSERT_NE(renderTarget, nullptr);
+  BlockAllocator allocator;
+  auto gp = MakeSingleIntervalGeometry(&allocator, 0, false);
+  ASSERT_NE(gp, nullptr);
+  AOTProgram program = {};
+  AOTChainSlot gradientSlot = {};
+  gradientSlot.op = AOTChainOp::Gradient;
+  program.slots.push_back(gradientSlot);
+  program.slots.push_back(gradientSlot);
+  ProgramInfo programInfo(renderTarget.get(), gp.get(), nullptr, BlendMode::SrcOver, false);
+  // Two gradient slots exceed the one-gradient budget: this is the rejection path that used to
+  // write through a null failure pointer.
+  EXPECT_FALSE(PointwiseChainShader::MatchProgram(program, &programInfo).has_value());
+}
+
 TGFX_TEST(ShaderPermutationTest, LUTGradientWithRealMaskUsesAllLeafSelectors) {
   ContextScope scope;
   auto context = scope.getContext();

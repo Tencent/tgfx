@@ -66,7 +66,9 @@
 namespace tgfx {
 
 std::nullopt_t Fail(PermutationMatchFailure* failure, PermutationMatchFailure reason) {
-  if (*failure == PermutationMatchFailure::None) {
+  // The match entry points that run without failure accounting (the plan-pass program match)
+  // pass nullptr; failing must still be a plain rejection, never a null dereference.
+  if (failure != nullptr && *failure == PermutationMatchFailure::None) {
     *failure = reason;
   }
   return std::nullopt;

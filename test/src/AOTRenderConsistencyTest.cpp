@@ -1534,6 +1534,121 @@ TGFX_TEST(AOTRenderConsistencyTest, AtlasTextWithClipFoldsGlyphAndClip) {
   }
 }
 
+// The textured-effect kernel applies only the vertex coverage: a clipped texture+operator draw
+// must be served by a family that carries the clip, not by TexturedEffect with the clip dropped.
+TGFX_TEST(AOTRenderConsistencyTest, TexturedEffectRejectsCoverageDraws) {
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  uint64_t kernels = 0;
+  auto renderOnce = [&](bool useBundle, Bitmap* outBitmap) {
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
+    if (useBundle) {
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause statsPause(context, !useBundle);
+    context->globalCache()->clearPrograms();
+    auto surface = Surface::Make(context, 200, 100);
+    ASSERT_TRUE(surface != nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    context->flushAndSubmit(true);
+    if (useBundle) {
+      cache->setDiagnosticRecordingEnabled(true);
+      cache->resetStats();
+    }
+    canvas->clipRect(Rect::MakeLTRB(20.5f, 10.5f, 120.5f, 90.5f), true);
+    Paint paint;
+    paint.setColorFilter(ColorFilter::Matrix(std::array<float, 20>{
+        1.1f, 0, 0, 0, -0.05f, 0, 0.9f, 0, 0, 0.03f, 0, 0, 1.05f, 0, -0.02f, 0, 0, 0, 1.0f, 0}));
+    canvas->drawImage(image, 0, 0, &paint);
+    context->flushAndSubmit(true);
+    if (useBundle) {
+      kernels = cache->drawStats().kernelInvocations;
+      EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+      EXPECT_TRUE(cache->jitProgramRecords().empty());
+      cache->setDiagnosticRecordingEnabled(false);
+    }
+    ASSERT_TRUE(outBitmap->allocPixels(200, 100));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+    if (useBundle) {
+      cache->unload();
+    }
+  };
+  Bitmap aotBitmap = {};
+  Bitmap runtimeBitmap = {};
+  renderOnce(true, &aotBitmap);
+  renderOnce(false, &runtimeBitmap);
+  EXPECT_GT(kernels, 0u);
+  ExpectBitmapsIdentical("textured-effect-coverage-gate", aotBitmap, runtimeBitmap, 200, 100);
+}
+
+// A clipped text draw: the analytic clip is a coverage term, so the glyph family must receive it
+// through the IR's classified terms. This pins the text+coverage serving path.
+TGFX_TEST(AOTRenderConsistencyTest, AtlasTextUnderAnalyticClip) {
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  ASSERT_TRUE(typeface != nullptr);
+  auto textBlob = TextBlob::MakeFrom("TGFX", Font(typeface, 36));
+  ASSERT_TRUE(textBlob != nullptr);
+  uint64_t kernels = 0;
+  auto renderOnce = [&](bool useBundle, Bitmap* outBitmap) {
+    ContextScope scope;
+    auto context = scope.getContext();
+    ASSERT_TRUE(context != nullptr);
+    auto* cache = context->precompiledShaderCache();
+    if (useBundle) {
+      ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
+    } else {
+      cache->unload();
+    }
+    ScopedAOTStatsPause statsPause(context, !useBundle);
+    context->globalCache()->clearPrograms();
+    auto surface = Surface::Make(context, 200, 100);
+    ASSERT_TRUE(surface != nullptr);
+    auto* canvas = surface->getCanvas();
+    canvas->clear(Color::White());
+    context->flushAndSubmit(true);
+    if (useBundle) {
+      cache->setDiagnosticRecordingEnabled(true);
+      cache->resetStats();
+    }
+    Path clipPath = {};
+    clipPath.addOval(Rect::MakeLTRB(10.5f, 10.5f, 190.5f, 90.5f));
+    canvas->clipPath(clipPath, true);
+    Paint paint;
+    canvas->drawTextBlob(textBlob, 20, 65, paint);
+    context->flushAndSubmit(true);
+    if (useBundle) {
+      kernels = cache->drawStats().kernelInvocations;
+      EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u);
+      EXPECT_TRUE(cache->jitProgramRecords().empty());
+      cache->setDiagnosticRecordingEnabled(false);
+    }
+    ASSERT_TRUE(outBitmap->allocPixels(200, 100));
+    auto* pixels = outBitmap->lockPixels();
+    ASSERT_TRUE(pixels != nullptr);
+    ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
+    outBitmap->unlockPixels();
+    if (useBundle) {
+      cache->unload();
+    }
+  };
+  Bitmap aotBitmap = {};
+  Bitmap runtimeBitmap = {};
+  renderOnce(true, &aotBitmap);
+  renderOnce(false, &runtimeBitmap);
+  EXPECT_GT(kernels, 0u);
+  ExpectBitmapsIdentical("atlas-text-analytic-clip", aotBitmap, runtimeBitmap, 200, 100);
+}
+
 TGFX_TEST(AOTRenderConsistencyTest, MeshTextureAndColorsXferSrcFold) {
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);

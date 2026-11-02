@@ -47,6 +47,12 @@ std::optional<TexturedEffectShader::Inputs> TexturedEffectShader::ExtractFacts(
   if (!facts.positionOnlyRect()) {
     return std::nullopt;
   }
+  // The kernel applies only the vertex coverage: a draw carrying any coverage processor (an
+  // analytic clip, a device mask, a coverage subtree) would have it silently dropped, so such
+  // draws must stay off this family.
+  if (facts.fragmentCount != facts.colorFPCount) {
+    return std::nullopt;
+  }
   int xpType = facts.xpType();
   if (xpType < XP_NONE) {
     return std::nullopt;
