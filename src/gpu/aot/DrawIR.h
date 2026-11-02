@@ -132,11 +132,6 @@ struct DrawIR {
   AOTEffectGraph color = {};
   std::vector<AOTCoverageTerm> coverage = {};
   BlendMode blendMode = BlendMode::SrcOver;
-  /// Whether the draw's color comes from the paint rather than any color processor: the lowering
-  /// synthesized the white unit-color chain for it. A draw with an explicit ConstColorProcessor
-  /// lowers to the same graph, so this fact is what keeps the two apart (the matcher's
-  /// no-processors acceptance reads it).
-  bool colorFromPaint = false;
   /// The sizes of the processor lists this IR was lowered from. The color graph cannot change
   /// after record time, so a color-count mismatch means the IR does not describe this draw. The
   /// coverage list may grow at prepare (a rasterized shape attaches its mask only once the shape

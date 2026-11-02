@@ -42,8 +42,8 @@ std::optional<HairlineQuadShader::Inputs> HairlineQuadShader::ExtractFacts(
   }
   // No color processors at all, or a sole direct analytic clip (HasNoProcessorsOrDirectClip's
   // semantics: a paint-sourced color whose clip the runtime contract uniforms evaluate).
-  const bool directClip = facts.colorFromPaint && (facts.coverage == CoverageKind::AARect ||
-                                                   facts.coverage == CoverageKind::RRect);
+  const bool directClip = facts.colorFPCount == 0 && (facts.coverage == CoverageKind::AARect ||
+                                                      facts.coverage == CoverageKind::RRect);
   if (facts.fragmentCount != 0 && !directClip) {
     return std::nullopt;
   }

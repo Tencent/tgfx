@@ -42,10 +42,9 @@
 namespace tgfx {
 
 // The rows, in the walk order their families migrated from (the full dedicated list, 1st through
-// 21st). Two rows read the third channel rather than the carried IR: MaskFill's rasterized-shape
-// mask is a prepare-grown coverage (exactly the case the staleness guard drops), so it reads the
-// live mask facts; the rows otherwise share one body with the walk they replaced, so a row and
-// the walk cannot disagree.
+// 21st). Every row is a predicate over the matcher facts, whose expression source is the carried
+// IR (the prepare-grown coverage is appended to its terms) plus the made GP/XP; a row and the
+// walk it replaced share one body, so they cannot disagree.
 static const std::vector<AOTKernelRow> rows = {
     AOTKernelRow{AtlasTextFillShader::Name, AtlasTextFillShader::MatchFromFacts},
     AOTKernelRow{ComplexEllipseFillShader::Name, ComplexEllipseFillShader::MatchFromFacts},

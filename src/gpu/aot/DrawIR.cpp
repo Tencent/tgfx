@@ -178,7 +178,6 @@ std::optional<DrawIR> LowerDrawCore(const std::vector<const FragmentProcessor*>&
   }
   DrawIR ir = {};
   ir.blendMode = blendMode;
-  ir.colorFromPaint = colorProcessors.empty();
   ir.colorFPCount = colorProcessors.size();
   ir.coverageFPCount = coverageProcessors.size();
 

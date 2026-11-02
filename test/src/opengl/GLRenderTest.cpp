@@ -605,7 +605,11 @@ TGFX_TEST(GLRenderTest, AOTWhitelist) {
     ASSERT_NE(fp, nullptr);
     ProgramInfo programInfo(renderTarget.get(), gp.get(), {fp.get()}, 1, nullptr,
                             BlendMode::SrcOver);
-    // QuadPerEdgeAA + TextureEffect is served by QuadTextureFillShader.
+    // QuadPerEdgeAA + TextureEffect is served by QuadTextureFillShader. The matcher reads the
+    // carried IR, so this info needs the same record-time lowering a draw gets.
+    auto ir = LowerDraw({fp.get()}, {}, BlendMode::SrcOver, &allocator);
+    ASSERT_TRUE(ir.has_value());
+    programInfo.setCarriedIR(&*ir);
     EXPECT_TRUE(MatchPermutation(&programInfo).has_value());
   }
 

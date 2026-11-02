@@ -30,18 +30,17 @@ static bool IsAnalyticClipKind(const std::optional<CoverageKind>& kind) {
   return kind && (*kind == CoverageKind::AARect || *kind == CoverageKind::RRect);
 }
 
-// The bare texture leaf of a non-analytic coverage term: the run lowered a single TextureEffect
-// over the geometry-coverage unit, so the graph is exactly the unit plus the texture source.
-static const AOTTextureParameters* BareTextureCoverageLeaf(const AOTCoverageTerm& term) {
-  if (term.kind != AOTCoverageTermKind::Subtree || term.graph.nodeCount() != 2 ||
-      !term.root.isValid() || term.root.index() != 1) {
+// The gradient form's color graph: the geometry color lowered as the input, then the single
+// GradientSource over it.
+static const AOTGradientParameters* SoleGradientLeaf(const AOTEffectGraph& graph) {
+  if (graph.nodeCount() != 2 || !graph.root().isValid() || graph.root().index() != 1) {
     return nullptr;
   }
-  auto* node = term.graph.nodeAt(term.root);
-  if (node == nullptr || node->kind != AOTEffectKind::TextureSource) {
+  auto* node = graph.nodeAt(graph.root());
+  if (node == nullptr || node->kind != AOTEffectKind::GradientSource) {
     return nullptr;
   }
-  return std::get_if<AOTTextureParameters>(&node->parameters);
+  return std::get_if<AOTGradientParameters>(&node->parameters);
 }
 
 std::optional<ShapeInstancedTextureCoverageShader::Inputs>
@@ -66,13 +65,12 @@ ShapeInstancedTextureCoverageShader::ExtractFacts(const AOTDrawFacts& facts,
     return std::nullopt;
   }
   // Two color forms: the geometry color alone, or a single-interval clamped gradient over it.
-  // The gradient reads the live channel (AOTDrawFacts::liveGradient): a rasterized instanced
-  // shape grows its coverage only at prepare, the staleness guard drops that draw's IR together
-  // with its color graph, and the acceptance must not depend on which of the two happened.
+  // The gradient node in the carried IR is the contract: a single-interval colorizer over an
+  // affine layout (the lowering refuses every other form).
   int gradient = 0;
   if (facts.colorFPCount == 1) {
-    if (!facts.liveGradient.present || !facts.liveGradient.singleInterval ||
-        facts.liveGradient.hasPerspective) {
+    const auto* params = facts.ir != nullptr ? SoleGradientLeaf(facts.ir->color) : nullptr;
+    if (params == nullptr || params->colorizerKind != 0 || params->hasPerspective) {
       return std::nullopt;
     }
     gradient = 1;
@@ -82,10 +80,14 @@ ShapeInstancedTextureCoverageShader::ExtractFacts(const AOTDrawFacts& facts,
   // One coverage texture, optionally accompanied by an analytic clip. The clip rides the runtime
   // clip contract uniforms (no permutation change), so both forms select the same variant.
   if (facts.fragmentCount == facts.colorFPCount + 1) {
-    // The sole-coverage form reads the live mask channel for the same reason the gradient does:
-    // the texture may be record-time or the rasterized shape's prepare-grown mask.
-    if (!facts.liveMask.present || !facts.liveMask.hasSampler || facts.liveMask.isYUV ||
-        facts.liveMask.hasRGBAAA) {
+    // The sole term is the texture leaf — record-time, or the rasterized shape's prepare-grown
+    // mask the lowering appended at prepare.
+    const auto* texture = facts.ir != nullptr && facts.ir->coverage.size() == 1
+                              ? BareTextureCoverageLeaf(facts.ir->coverage[0])
+                              : nullptr;
+    if (texture == nullptr || texture->samplingKind != AOTTextureSamplingKind::Plain ||
+        texture->isYUV || texture->hasRGBAAA || texture->textureProxy == nullptr ||
+        texture->textureProxy->getTextureView() == nullptr) {
       return std::nullopt;
     }
     return Inputs{gradient != 0};

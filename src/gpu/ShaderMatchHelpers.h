@@ -93,6 +93,10 @@ std::nullopt_t Fail(PermutationMatchFailure* failure, PermutationMatchFailure re
 /// Classifies one lowered coverage term (see CoverageKind); nullopt when it cannot be classified.
 std::optional<CoverageKind> ClassifyCoverageTerm(const AOTCoverageTerm& term);
 
+/// The bare texture leaf of a non-analytic coverage term: the run lowered a single TextureEffect
+/// over the geometry-coverage unit, so the graph is exactly the unit plus the texture source.
+const AOTTextureParameters* BareTextureCoverageLeaf(const AOTCoverageTerm& term);
+
 /// Classifies the coverage stage of a ProgramInfo carrying at most one coverage FP: the
 /// no-coverage case is a count, the rest reads the carried IR's terms (the atlas glyph term is
 /// skipped — the geometry processor's own coverage, never a coverage FP).

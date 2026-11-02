@@ -28,44 +28,16 @@ namespace tgfx {
 class ProgramInfo;
 
 /**
- * The live coverage port's raw texture facts — the third channel (see `liveMask` below): read off
- * the sole coverage processor, for draws whose coverage the record-time IR cannot express. A
- * rasterized shape's mask grows only at prepare (the staleness guard drops exactly that IR), so no
- * term exists for it; the MaskFill family reads these facts instead. Not a classification: it
- * makes no claim the IR side would have to mirror — the equivalence between the IR terms and the
- * live tree constrains classifications only, never raw instance facts.
- */
-struct AOTLiveMaskFacts {
-  bool present = false;
-  bool alphaOnly = false;
-  bool hasSubset = false;
-  bool isYUV = false;
-  bool hasRGBAAA = false;
-  bool hasSampler = false;
-};
-
-/**
- * The live color port's gradient facts — the third channel's color-side twin: the sole color
- * processor read off the live tree, for the draws whose coverage grew at prepare (a rasterized
- * instanced shape), whose IR the staleness guard drops together with the color graph it carried.
- * The texture-coverage family reads these instead of the IR's gradient node, so the acceptance
- * has one description whether the draw carries an IR or not.
- */
-struct AOTLiveGradientFacts {
-  bool present = false;
-  bool singleInterval = false;
-  bool hasPerspective = false;
-};
-
-/**
  * A draw's matcher facts, extracted once per match: the geometry and xfer described off the made
  * processors (the matching runs at prepare, where they are the truth), the coverage
  * classification off the carried IR's terms, the target's alpha-only flag, and the live
  * processor-list sizes. The executor-table rows are predicates over this — one extraction
  * replaces every family re-deriving the same facts from the processor tree.
  *
- * The IR is the only record-time source; instance-time facts are read off the made processors
- * (geometry, xfer) or off the IR node's own proxy (a pending multi-plane upload's layout).
+ * The carried IR is the only expression source: record-time lowering makes it total, and the
+ * prepare-grown coverage is appended to its terms. Facts that exist only at instance time are
+ * read off the made processors (geometry, xfer) or off the IR node's own proxy (a pending
+ * multi-plane upload's layout).
  */
 struct AOTDrawFacts {
   const DrawIR* ir = nullptr;
@@ -78,17 +50,6 @@ struct AOTDrawFacts {
   /// terms do not classify. The rows' predicates derive from it — a direct analytic clip is
   /// AARect/RRect, the shared device-mask ABI bit is DeviceMask.
   std::optional<CoverageKind> coverage = std::nullopt;
-  /// Whether the color expression came from the paint (the IR's fact; a draw with an explicit
-  /// ConstColorProcessor lowers to the same graph, so this is what keeps the two apart).
-  bool colorFromPaint = false;
-  /// The sole coverage processor's raw texture facts (the third channel — see
-  /// AOTLiveMaskFacts). Extracted whenever the draw carries exactly one coverage FP, live tree or
-  /// not: a recorded mask term carries the same facts on the IR side, and the row that reads this
-  /// channel accepts exactly the draws the processor-tree walk did.
-  AOTLiveMaskFacts liveMask = {};
-  /// The sole color processor's gradient facts (the third channel — see AOTLiveGradientFacts),
-  /// extracted whenever the draw carries exactly one color FP.
-  AOTLiveGradientFacts liveGradient = {};
 
   /// The position-only rect form the texture and noise fill kernels share: a DefaultGP, or a
   /// QuadPerEdgeAA whose coordinate comes from aPosition (a common color, a uv matrix, no

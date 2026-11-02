@@ -202,6 +202,19 @@ void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderT
   if (renderTarget == nullptr || (drawOps.empty() && !clearColor.has_value())) {
     return;
   }
+  // Ops submitted as a batch (a clip's mask layer, a layer's own render) never pass through
+  // OpsCompositor::addDrawOp, so this is their record-time lowering: the IR exists before the
+  // task prepares them, exactly like a compositor-recorded draw. tryLowerIR is idempotent, so the
+  // ops that already lowered on the compositor route cost one branch. Stencil covers draw no
+  // program and stay unlowered, matching the compositor's own exclusion.
+  auto cache = context != nullptr ? context->precompiledShaderCache() : nullptr;
+  if (cache != nullptr && cache->isLoaded()) {
+    for (auto& op : drawOps) {
+      if (op != nullptr && op->type() != DrawOp::Type::StencilCoverPathDrawOp) {
+        op->tryLowerIR();
+      }
+    }
+  }
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto textureProxy = renderTarget->asTextureProxy();

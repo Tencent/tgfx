@@ -2432,6 +2432,9 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     ASSERT_NE(coverage, nullptr);
     ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {coverage.get()},
                             0, nullptr, BlendMode::SrcOver);
+    auto ir = LowerDraw({}, {coverage.get()}, BlendMode::SrcOver, &allocator);
+    ASSERT_TRUE(ir.has_value());
+    programInfo.setCarriedIR(&*ir);
     auto match = MatchPermutation(&programInfo);
     ASSERT_TRUE(match.has_value());
     EXPECT_EQ(match->shaderName, "ShapeInstancedTextureCoverageShader");
@@ -2453,6 +2456,9 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     ASSERT_NE(coverage, nullptr);
     ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {coverage.get()},
                             0, nullptr, BlendMode::SrcOver);
+    auto ir = LowerDraw({}, {coverage.get()}, BlendMode::SrcOver, &allocator);
+    ASSERT_TRUE(ir.has_value());
+    programInfo.setCarriedIR(&*ir);
     auto match = MatchPermutation(&programInfo);
     ASSERT_TRUE(match.has_value());
     EXPECT_EQ(match->shaderName, "ShapeInstancedTextureCoverageShader");
@@ -2469,6 +2475,9 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     ASSERT_NE(coverage, nullptr);
     ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {coverage.get()},
                             0, nullptr, BlendMode::SrcOver);
+    auto ir = LowerDraw({}, {coverage.get()}, BlendMode::SrcOver, &allocator);
+    ASSERT_TRUE(ir.has_value());
+    programInfo.setCarriedIR(&*ir);
     EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
   }
 
@@ -2483,6 +2492,9 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     ASSERT_NE(coverage, nullptr);
     ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(),
                             {color.get(), coverage.get()}, 1, nullptr, BlendMode::SrcOver);
+    auto ir = LowerDraw({color.get()}, {coverage.get()}, BlendMode::SrcOver, &allocator);
+    ASSERT_TRUE(ir.has_value());
+    programInfo.setCarriedIR(&*ir);
     EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
   }
 
@@ -2495,6 +2507,9 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     ASSERT_NE(coverage, nullptr);
     ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {coverage.get()},
                             0, nullptr, BlendMode::SrcOver);
+    auto ir = LowerDraw({}, {coverage.get()}, BlendMode::SrcOver, &allocator);
+    ASSERT_TRUE(ir.has_value());
+    programInfo.setCarriedIR(&*ir);
     EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
   }
 
@@ -2509,6 +2524,9 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     ASSERT_NE(xp, nullptr);
     ProgramInfo programInfo(renderTargetProxy->getRenderTarget().get(), gp.get(), {coverage.get()},
                             0, xp.get(), BlendMode::SrcOver);
+    auto ir = LowerDraw({}, {coverage.get()}, BlendMode::SrcOver, &allocator);
+    ASSERT_TRUE(ir.has_value());
+    programInfo.setCarriedIR(&*ir);
     EXPECT_FALSE(MatchPermutation(&programInfo).has_value());
   }
 

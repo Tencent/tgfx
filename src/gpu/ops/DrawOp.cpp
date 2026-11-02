@@ -33,6 +33,9 @@ void DrawOp::adoptLoweredIR(PlacementPtr<DrawIR> passIR) {
 }
 
 void DrawOp::tryLowerIR() {
+  if (ir != nullptr) {
+    return;
+  }
   std::vector<const FragmentProcessor*> colorList = {};
   colorList.reserve(colors.size());
   for (const auto& processor : colors) {

@@ -48,7 +48,7 @@ std::optional<SolidColorFillShader::Inputs> SolidColorFillShader::ExtractFacts(
   // clip contract uniforms.
   bool noProcessorsOrDirectClip =
       facts.fragmentCount == 0 ||
-      (facts.colorFromPaint &&
+      (facts.colorFPCount == 0 &&
        (facts.coverage == CoverageKind::AARect || facts.coverage == CoverageKind::RRect));
   if (!noProcessorsOrDirectClip) {
     return std::nullopt;

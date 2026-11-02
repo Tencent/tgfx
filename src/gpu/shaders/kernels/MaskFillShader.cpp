@@ -45,13 +45,16 @@ std::optional<MaskFillShader::Inputs> MaskFillShader::ExtractFacts(const AOTDraw
   if (facts.colorFPCount != 0 || facts.fragmentCount != 1) {
     return std::nullopt;
   }
-  // The rasterized shape's mask is a prepare-grown coverage: the staleness guard drops exactly
-  // that IR, so no record-time term exists for it. The row reads the live mask port's facts
-  // instead — the third channel (AOTDrawFacts::liveMask), the same escape hatch as the YUV
-  // pending format. Only the simple mask form is supported: a plain alpha-only texture with no
-  // subset, no packed alpha, no YUV. Anything else falls back to ProgramBuilder.
-  if (!facts.liveMask.present || !facts.liveMask.hasSampler || !facts.liveMask.alphaOnly ||
-      facts.liveMask.hasSubset || facts.liveMask.isYUV || facts.liveMask.hasRGBAAA) {
+  // The rasterized shape's mask is a prepare-grown coverage: the lowering appends it to the IR's
+  // terms at prepare, so the draw carries exactly one term and it is the mask's texture leaf.
+  // Only the simple mask form is supported: a plain alpha-only texture with no subset, no packed
+  // alpha, no YUV. Anything else falls back to ProgramBuilder.
+  const auto* mask = facts.ir != nullptr && facts.ir->coverage.size() == 1
+                         ? BareTextureCoverageLeaf(facts.ir->coverage[0])
+                         : nullptr;
+  if (mask == nullptr || mask->samplingKind != AOTTextureSamplingKind::Plain ||
+      !mask->isAlphaOnly || mask->subset.has_value() || mask->isYUV || mask->hasRGBAAA ||
+      mask->textureProxy == nullptr || mask->textureProxy->getTextureView() == nullptr) {
     return std::nullopt;
   }
   // The mask coverage feeds the XferProcessor's coverage lerp, so Porter-Duff blends (DST_TEX and
