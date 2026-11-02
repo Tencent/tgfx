@@ -87,7 +87,7 @@ struct AOTEffectPlan {
 enum class AOTDecomposeOutcome {
   /// The axis has no fragment processors (e.g. an empty coverage chain). Nothing to decompose.
   Trivial,
-  /// Lower + Decompose succeed (so AOTPlanExecutor::CanExecute accepts the plan): a production
+  /// Lower + Decompose succeed (so AOTPlanner::Validate accepts the plan): a production
   /// route submits it (matching the precompiled artifact is a separate step).
   FusablePointwise,
   /// Some fragment processor in the tree has no AOT lowering yet. blockingProcessor names the first

@@ -24,7 +24,6 @@
 #include "gpu/AOTShapeRules.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/aot/AOTRouter.h"
 #include "gpu/aot/ChainContext.h"
 #include "gpu/aot/DrawIR.h"
 #include "gpu/aot/NodeContract.h"

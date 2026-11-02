@@ -146,7 +146,7 @@ struct DrawIR {
    * single in-place pass, so the matcher compiles from that plan instead of decomposing again;
    * otherwise its single pass is planned on first match. Intermediate passes carry no coverage
    * terms; the TERMINAL pass of a draw's plan carries the draw's terms, which its chain program
-   * merges exactly as the plain route's single-pass serving does (see AOTPlanExecutor::Make).
+   * merges exactly as the plain route's single-pass serving does (see AOTPlanner::Build).
    */
   std::optional<AOTPassDescriptor> passDescriptor = std::nullopt;
   /**

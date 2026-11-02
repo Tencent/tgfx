@@ -18,12 +18,14 @@
 
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <vector>
-#include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/aot/DrawIR.h"
 #include "gpu/ops/DrawOp.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "tgfx/core/Point.h"
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 
@@ -40,9 +42,37 @@ enum class AOTEdgeReason {
 };
 
 /**
+ * The pixel geometry of one materialization edge: the area to capture and the coordinate mapping
+ * that keeps the materialized subtree sampling the space it saw inline. Derived purely from the
+ * draw bounds and the apron, with no GPU resource attached, so a caller that issues several passes
+ * over the same area computes it once and every pass agrees on it. isEmpty() marks a degenerate
+ * area that cannot back a texture.
+ */
+struct MaterializedGeometry {
+  /// The draw bounds after the apron outset and integer snapping. Its top-left drives both the
+  /// coordOffset below and the translation a consumer needs in its sampling matrix.
+  Rect bounds = {};
+  /// The translation handed to DrawingManager::makeFillDrawOp so the subtree keeps seeing its
+  /// original coordinate space while drawing into an origin-based offscreen target.
+  Point coordOffset = {};
+  int width = 0;
+  int height = 0;
+
+  bool isEmpty() const {
+    return width <= 0 || height <= 0;
+  }
+
+  /// The byte footprint an RGBA8 target of this size occupies, for whichever draw metric the
+  /// caller maintains.
+  uint64_t byteSize() const {
+    return static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * 4;
+  }
+};
+
+/**
  * The contract of one materialized edge: how much area it captures. Every edge is an RGBA8,
- * top-left-origin, exact-fit target allocated by AOTMaterializationPolicy, so crossing an edge
- * rounds the producer's output to the 1/255 grid.
+ * top-left-origin, exact-fit target allocated by the planner's materialization step, so crossing
+ * an edge rounds the producer's output to the 1/255 grid.
  */
 struct AOTMaterializedEdge {
   AOTEdgeReason reason = AOTEdgeReason::Split;

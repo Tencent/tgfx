@@ -20,8 +20,7 @@
 #include "ProxyProvider.h"
 #include "core/AtlasManager.h"
 #include "gpu/PrecompiledShaderCache.h"
-#include "gpu/aot/AOTPlanExecutor.h"
-#include "gpu/aot/AOTRouter.h"
+#include "gpu/aot/AOTPlanner.h"
 #include "gpu/aot/DrawIR.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
@@ -123,7 +122,7 @@ bool DrawingManager::submitFillPlanTask(const AOTEffectGraph& graph, const AOTEf
   // coordOffset; the split-off passes of a multi-pass plan reproduce both.
   auto deviceBounds = Rect::MakeWH(static_cast<float>(renderTarget->width()),
                                    static_cast<float>(renderTarget->height()));
-  auto task = AOTPlanExecutor::Make(context, renderFlags, graph, plan, deviceBounds, renderTarget,
+  auto task = AOTPlanner::Build(context, renderFlags, graph, plan, deviceBounds, renderTarget,
                                     originalDraw, coordOffset, true, std::nullopt);
   if (task == nullptr) {
     return false;
@@ -164,12 +163,12 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     drawOp->adoptLoweredIR(std::move(fillIR));
     auto* ir = drawOp->loweredIR();
     if (planCandidate) {
-      if (auto plan = AOTRouter::Plan(*ir)) {
-        if (AOTRouter::ServesInPlacePass(*plan)) {
+      if (auto plan = AOTPlanner::Plan(*ir)) {
+        if (AOTPlanner::ServesInPlacePass(*plan)) {
           // The single pass serves in place at prepare: its descriptor rides the fill's IR, so the
           // matcher compiles from the record-time plan and never decomposes again.
           drawOp->storeSinglePassPlan(plan->passes[0]);
-        } else if (AOTRouter::PlanRequiresTask(*plan) &&
+        } else if (AOTPlanner::PlanRequiresTask(*plan) &&
                    submitFillPlanTask(ir->color, *plan, renderFlags, renderTarget, coordOffset,
                                       &drawOp)) {
           return true;

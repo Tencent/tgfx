@@ -32,7 +32,7 @@
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/aot/AOTEffectDecomposer.h"
-#include "gpu/aot/AOTPlanExecutor.h"
+#include "gpu/aot/AOTPlanner.h"
 #include "gpu/ops/AtlasTextOp.h"
 #include "gpu/ops/HairlineLineOp.h"
 #include "gpu/ops/HairlineQuadOp.h"
@@ -1300,14 +1300,14 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     const bool coverageFree = !op->hasCoverageProcessors();
     if (cache->decompositionEnabled() && deviceBounds.has_value() && !deviceBounds->isEmpty()) {
       if (auto* ir = op->loweredIR()) {
-        auto plan = AOTRouter::Plan(*ir);
+        auto plan = AOTPlanner::Plan(*ir);
         if (plan.has_value()) {
-          if (AOTRouter::ServesInPlacePass(*plan)) {
+          if (AOTPlanner::ServesInPlacePass(*plan)) {
             // The single pass serves in place at prepare: its descriptor rides the draw's IR, so
             // the matcher compiles from the record-time plan and never decomposes again.
             op->storeSinglePassPlan(plan->passes[0]);
-          } else if (AOTRouter::PlanRequiresTask(*plan) &&
-                     AOTRouter::TaskCarriesCoverage(*plan, ir->coverage, brush.blendMode)) {
+          } else if (AOTPlanner::PlanRequiresTask(*plan) &&
+                     AOTPlanner::TaskCarriesCoverage(*plan, ir->coverage, brush.blendMode)) {
             if (submitPlanTask(ir->color, *plan, *deviceBounds, &op, &ir->coverage)) {
               return;
             }
@@ -1363,14 +1363,14 @@ bool OpsCompositor::submitPlanTask(const AOTEffectGraph& graph, const AOTEffectP
     }
     // A fill pass carrying local-coordinate leaves (a plain texture, a gradient, a noise source)
     // evaluates them at top-left device positions and needs one affine device-to-local map.
-    if (AOTPlanExecutor::NeedsLocalRemap(graph, plan)) {
+    if (AOTPlanner::NeedsLocalRemap(graph, plan)) {
       deviceToLocal = drawOp->deviceToLocalMatrix();
       if (!deviceToLocal.has_value()) {
         return false;
       }
     }
   }
-  auto task = AOTPlanExecutor::Make(context, renderFlags, graph, plan, deviceBounds, renderTarget,
+  auto task = AOTPlanner::Build(context, renderFlags, graph, plan, deviceBounds, renderTarget,
                                     op, Point::Zero(), false, deviceToLocal, terminalCoverage);
   if (task == nullptr) {
     return false;

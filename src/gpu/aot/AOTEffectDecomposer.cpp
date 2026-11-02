@@ -22,7 +22,7 @@
 #include "gpu/AOTShapeRules.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/aot/AOTChainBuilder.h"
-#include "gpu/aot/AOTPlanExecutor.h"
+#include "gpu/aot/AOTPlanner.h"
 #include "gpu/aot/NodeContract.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
@@ -536,13 +536,13 @@ bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTEffectPlan* 
     if (!planner(graph, &candidate)) {
       continue;
     }
-    // Each planner's own admission subsumes what AOTPlanExecutor::CanExecute would re-derive: the
+    // Each planner's own admission subsumes what AOTPlanner::Validate would re-derive: the
     // DAG planner resolves the profile and kernel together, the linear planner's fit calls
-    // BuildCutSegment with the same placeholder admission the executor's validation relies on, the
+    // BuildCutSegment with the same placeholder admission the planner's validation relies on, the
     // perlin planner checks the slot shapes and the lookup resources, and the cut planner runs the
     // same segment build construction uses over placeholder intermediates. The re-check therefore
     // runs only as a debug assertion.
-    DEBUG_ASSERT(AOTPlanExecutor::CanExecute(graph, candidate));
+    DEBUG_ASSERT(AOTPlanner::Validate(graph, candidate));
     *plan = std::move(candidate);
     return true;
   }

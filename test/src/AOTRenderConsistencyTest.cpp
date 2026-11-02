@@ -28,7 +28,6 @@
 #include <vector>
 #include "base/TGFXTest.h"
 #include "core/images/TextureImage.h"
-#include "gpu/AOTMaterializationPolicy.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"

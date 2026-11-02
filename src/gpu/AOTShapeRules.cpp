@@ -22,7 +22,7 @@
 namespace tgfx {
 
 // The single authority for the pointwise shapes shared by the planners (AOTEffectDecomposer), the
-// executor's admission checks (AOTPlanExecutor) and the chain builder: before this file each of
+// planner's admission checks (AOTPlanner) and the chain builder: before this file each of
 // them carried its own copy, and the copies had already drifted.
 
 bool CollectReachableStoppingAtCuts(const AOTEffectGraph& graph, AOTNodeID root,

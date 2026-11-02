@@ -47,7 +47,7 @@ struct AOTChainCompile {
 /**
  * Compiles the interpreter's programs from a decomposed AOT plan: the fused chain kernel for
  * PointwiseChain/PointwiseGraph passes (a multi-pass plan's passes are built as cut segments
- * through BuildCutSegment) and the YUV family's color-grade tail. Used by AOTPlanExecutor's
+ * through BuildCutSegment) and the YUV family's color-grade tail. Used by AOTPlanner's
  * task assembly and by the re-expressing kernel's per-draw view of an unmodified ProgramInfo
  * (CompileChainProgramForInfo / CompileYUVProgramForInfo).
  */
@@ -73,7 +73,7 @@ class AOTChainBuilder {
   /**
    * The one compile entry: the pass's register-allocated program plus, when given, the draw's
    * classified coverage terms and their sampler binding table. Admission
-   * (AOTPlanExecutor::CanExecute) and every build site call exactly this, so an admitted pass is
+   * (AOTPlanner::Validate) and every build site call exactly this, so an admitted pass is
    * by construction a buildable one — the binding stage's resource failures surface at admission
    * instead of at prepare. coverageTerms is null or empty for a plan pass (plan passes carry no
    * draw coverage). checkKernel additionally verifies the pass's declared kernel against the
@@ -94,7 +94,7 @@ class AOTChainBuilder {
    * Validates an encoded instruction array (register domains, opcodes, selector fields, leaf
    * layout, per-kind parameter blocks) and resolves its resource profile against the profile
    * capacities, without looking at any child processor. The planner runs it while planning
-   * (AOTPlanExecutor::CanExecute) and the compile runs it again on the same data, so planning and
+   * (AOTPlanner::Validate) and the compile runs it again on the same data, so planning and
    * compilation cannot disagree on a slot rule or a budget. leafCount is the number of real DAG
    * texture leaves (slots [0, leafCount) must be OP_TEXTURE), hasLUT whether a LUT gradient child
    * follows them, and tiledLeafIndices the leaves carrying a shader-side tiling recipe. On success

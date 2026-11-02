@@ -1,10 +1,29 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
+//  compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/aot/AOTPlanExecutor.h"
+#include "gpu/aot/AOTPlanner.h"
 #include <algorithm>
 #include <utility>
 #include <vector>
-#include "gpu/AOTMaterializationPolicy.h"
+#include "gpu/AOTRenderPlan.h"
 #include "gpu/AOTShapeRules.h"
+#include "gpu/BackingFit.h"
+#include "gpu/BlendFormula.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/aot/AOTChainBuilder.h"
@@ -100,6 +119,49 @@ static Matrix DeviceToFragCoord(const RenderTargetProxy* destination) {
   return matrix;
 }
 
+// The offscreen target one materialization edge renders into, paired with the geometry it was
+// allocated for. A null renderTarget marks a failed allocation.
+struct MaterializedTarget {
+  std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;
+  MaterializedGeometry geometry = {};
+};
+
+// Computes the pixel geometry of one materialization edge covering drawBounds grown by apronRadius
+// on every side, snapped out to whole pixels. A caller rendering several passes over the same area
+// computes it once and reuses it for every pass and for the consumer's sampling matrix, so the
+// capture area and the coordinate mapping cannot disagree.
+static MaterializedGeometry PrepareMaterializedGeometry(const Rect& drawBounds, float apronRadius) {
+  auto bounds = drawBounds;
+  bounds.outset(apronRadius, apronRadius);
+  bounds.roundOut();
+  MaterializedGeometry geometry = {};
+  geometry.bounds = bounds;
+  geometry.coordOffset = Point::Make(bounds.left, bounds.top);
+  geometry.width = static_cast<int>(bounds.width());
+  geometry.height = static_cast<int>(bounds.height());
+  return geometry;
+}
+
+// Allocates one exact-fit offscreen target for the given geometry. BackingFit::Exact is required,
+// not a preference: consumers sample this texture with a translate-only matrix, which is only
+// correct when the backing texture is exactly width x height. An Approx (rounded-up) backing would
+// make the normalized coordinates address a scaled region and read uninitialized padding.
+static MaterializedTarget AllocateMaterializedTarget(Context* context,
+                                                      const MaterializedGeometry& geometry) {
+  if (context == nullptr || geometry.isEmpty()) {
+    return {};
+  }
+  auto renderTarget = RenderTargetProxy::Make(context, geometry.width, geometry.height, false, 1,
+                                              false, ImageOrigin::TopLeft, BackingFit::Exact);
+  if (renderTarget == nullptr) {
+    return {};
+  }
+  MaterializedTarget target = {};
+  target.renderTarget = std::move(renderTarget);
+  target.geometry = geometry;
+  return target;
+}
+
 // One non-terminal pass of any multi-pass plan: the target allocation, the fill draw over it and
 // the edge record. The fill's coordOffset keeps the pass's processors seeing the coordinate space
 // they were planned for (the fill's FP-space offset plus the target placement for a pass that
@@ -111,7 +173,7 @@ static bool AppendMaterializedPass(Context* context, uint32_t renderFlags,
                                    const MaterializedGeometry& geometry, const Point& fillOffset,
                                    float inputAlpha, AOTEdgeReason reason,
                                    std::vector<AOTRenderPass>* passes) {
-  auto materialized = AOTMaterializationPolicy::AllocateTarget(context, geometry);
+  auto materialized = AllocateMaterializedTarget(context, geometry);
   if (materialized.renderTarget == nullptr) {
     return false;
   }
@@ -167,7 +229,7 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
   // No apron: the terminal pass reads each intermediate at its own device pixel
   // (DeviceSpaceTextureEffect), so producer and consumer stay pixel-aligned, and the fill passes
   // cover exactly the same snapped bounds — same rule the linear split passes follow.
-  auto geometry = AOTMaterializationPolicy::PrepareGeometry(deviceBounds, 0.0f);
+  auto geometry = PrepareMaterializedGeometry(deviceBounds, 0.0f);
   if (geometry.isEmpty()) {
     return false;
   }
@@ -229,10 +291,9 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
     passIR.passDescriptor = std::move(segmentPass);
     if (isTerminal && terminalCoverage != nullptr && !terminalCoverage->empty()) {
       // The draw's coverage terms ride the terminal pass — the same merge the plain route's
-      // single-pass serving applies (CompileChainProgramForInfo), so a multi-pass plan serves
-      // coverage exactly as the fused form would. Admission equals compilation: a terminal the
-      // terms cannot merge into refuses the whole task here, keeping the draw on the plain route
-      // instead of failing at flush time.
+      // single-pass serving applies, so a multi-pass plan serves coverage exactly as the fused
+      // form would. Admission equals compilation: a terminal the terms cannot merge into refuses
+      // the whole task here, keeping the draw on the plain route instead of failing at flush time.
       passIR.coverage = *terminalCoverage;
     }
     // The pass program is built here, once, and travels on the IR: prepare never compiles.
@@ -260,11 +321,98 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
   return true;
 }
 
+// The pass IRs of a plan Build already validated: single pass or cut plan, each carrying its
+// compiled program (admission's, when Build passes one in).
+static bool BuildPassIRs(Context* context, uint32_t renderFlags, const AOTEffectGraph& graph,
+                          const AOTEffectPlan& plan, const Rect& deviceBounds,
+                          const RenderTargetProxy* destination, const Point& fpCoordOffset,
+                          const std::optional<Matrix>& deviceToLocal, AOTRenderPlan* renderPlan,
+                          float sourceAlpha, const std::vector<AOTCoverageTerm>* terminalCoverage,
+                          AOTChainCompile* singlePassCompiled) {
+  auto drawingManager = context->drawingManager();
+  auto allocator = drawingManager->drawingAllocator();
+  if (plan.passes.size() == 1) {
+    const auto& pass = plan.passes[0];
+    if (IsAOTPointwiseDAGKernel(pass.kernel)) {
+      // Production never reaches this branch (a fused single pass serves its draw in place, and
+      // PlanRequiresTask refuses to build a task for it), but the API contract admits one: the
+      // terminal draw carries the pass IR like any other chain pass.
+      DrawIR passIR = {};
+      passIR.color = graph;
+      passIR.passDescriptor = pass;
+      if (terminalCoverage != nullptr) {
+        passIR.coverage = *terminalCoverage;
+      }
+      // The program validation compiled rides the pass IR. Without a validation result the same
+      // compile runs here, so a built pass IR is never programless.
+      if (singlePassCompiled != nullptr) {
+        passIR.program = std::move(singlePassCompiled->program);
+      } else if (!AOTChainBuilder::CompilePassProgram(passIR, &passIR.program.emplace())) {
+        return false;
+      }
+      renderPlan->terminalIR = allocator->make<DrawIR>(std::move(passIR));
+      return renderPlan->terminalIR != nullptr;
+    }
+    // The linear kernel: the terminal draws its own expression. The family matches off the
+    // draw's carried IR and the tail program compiles at prepare, so the task needs no rebuilt
+    // color processor and no pass IR — it stays the plan's execution and diagnostics wrapper. The
+    // original tree's TextureEffect still writes the family's source uniforms through the standard
+    // precompiled walk; the operators above it declare no fields the kernel reads.
+    return pass.kernel == AOTKernelKind::YUVTextureFill;
+  }
+  return BuildCutPlanPasses(context, renderFlags, graph, plan, deviceBounds, destination,
+                            fpCoordOffset, deviceToLocal, sourceAlpha, renderPlan,
+                            terminalCoverage);
+}
+
 }  // namespace
 
-bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
-                                 const std::vector<AOTCoverageTerm>* terminalCoverage,
-                                 AOTChainCompile* compiled) {
+std::optional<AOTEffectPlan> AOTPlanner::Plan(const DrawIR& ir,
+                                             AOTDecomposeOutcome* failureOutcome) {
+  AOTEffectPlan plan = {};
+  if (!AOTEffectDecomposer::Decompose(ir.color, &plan)) {
+    if (failureOutcome != nullptr) {
+      *failureOutcome = AOTDecomposeOutcome::UnsupportedShape;
+    }
+    return std::nullopt;
+  }
+  if (failureOutcome != nullptr) {
+    *failureOutcome = AOTDecomposeOutcome::FusablePointwise;
+  }
+  return plan;
+}
+
+bool AOTPlanner::ServesInPlacePass(const AOTEffectPlan& plan) {
+  if (plan.passes.size() != 1 || !IsAOTPointwiseDAGKernel(plan.passes[0].kernel)) {
+    return false;
+  }
+  const auto& pass = plan.passes[0];
+  return !pass.nodes.empty() && pass.output == plan.output && pass.dependencies.empty() &&
+         !pass.materializesOutput;
+}
+
+bool AOTPlanner::TaskCarriesCoverage(const AOTEffectPlan& plan,
+                                     const std::vector<AOTCoverageTerm>& coverageTerms,
+                                     BlendMode blendMode) {
+  if (coverageTerms.empty()) {
+    return true;
+  }
+  if (plan.passes.empty() || !IsAOTPointwiseDAGKernel(plan.passes.back().kernel)) {
+    return false;
+  }
+  return !BlendModeNeedDstTexture(blendMode, true);
+}
+
+bool AOTPlanner::PlanRequiresTask(const AOTEffectPlan& plan) {
+  if (plan.passes.size() != 1) {
+    return true;
+  }
+  return !IsAOTPointwiseDAGKernel(plan.passes[0].kernel);
+}
+
+bool AOTPlanner::Validate(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
+                          const std::vector<AOTCoverageTerm>* terminalCoverage,
+                          AOTChainCompile* compiled) {
   if (plan.passes.empty() || !plan.output.isValid() || plan.output != graph.root()) {
     return false;
   }
@@ -276,9 +424,9 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
       pass.materializesOutput) {
     return false;
   }
-  // PointwiseChain/PointwiseGraph passes fuse the whole DAG. Admission runs the builder's one
+  // PointwiseChain/PointwiseGraph passes fuse the whole DAG. Validation runs the builder's one
   // compile entry with the plan's terminal coverage: the same slot encoding, parameter blocks,
-  // register allocation and binding table the build runs, so an admitted pass is by construction
+  // register allocation and binding table the build runs, so a validated pass is by construction
   // buildable.
   if (IsAOTPointwiseDAGKernel(pass.kernel)) {
     AOTChainCompile result = {};
@@ -296,7 +444,7 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
   }
   switch (pass.kernel) {
     case AOTKernelKind::YUVTextureFill: {
-      // The tail's admission runs the same walk its compilation and the family's matching run
+      // The tail's validation runs the same walk its compilation and the family's matching run
       // (CollectYUVTail), so the three cannot disagree about what a servable tail is.
       AOTChainBuilder::AOTYUVTailShape shape = {};
       return AOTChainBuilder::CollectYUVTail(graph, &shape);
@@ -306,7 +454,7 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
   }
 }
 
-bool AOTPlanExecutor::NeedsLocalRemap(const AOTEffectGraph& graph, const AOTEffectPlan& plan) {
+bool AOTPlanner::NeedsLocalRemap(const AOTEffectGraph& graph, const AOTEffectPlan& plan) {
   if (plan.passes.size() <= 1) {
     return false;
   }
@@ -318,52 +466,7 @@ bool AOTPlanExecutor::NeedsLocalRemap(const AOTEffectGraph& graph, const AOTEffe
   return false;
 }
 
-bool AOTPlanExecutor::BuildPasses(Context* context, uint32_t renderFlags,
-                                  const AOTEffectGraph& graph, const AOTEffectPlan& plan,
-                                  const Rect& deviceBounds, const RenderTargetProxy* destination,
-                                  const Point& fpCoordOffset,
-                                  const std::optional<Matrix>& deviceToLocal,
-                                  AOTRenderPlan* renderPlan, float sourceAlpha,
-                                  const std::vector<AOTCoverageTerm>* terminalCoverage,
-                                  AOTChainCompile* singlePassCompiled) {
-  auto drawingManager = context->drawingManager();
-  auto allocator = drawingManager->drawingAllocator();
-  if (plan.passes.size() == 1) {
-    const auto& pass = plan.passes[0];
-    if (IsAOTPointwiseDAGKernel(pass.kernel)) {
-      // Production never reaches this branch (a fused single pass serves its draw in place, and
-      // PlanRequiresTask refuses to build a task for it), but the executor's API contract admits
-      // one: the terminal draw carries the pass IR like any other chain pass.
-      DrawIR passIR = {};
-      passIR.color = graph;
-      passIR.passDescriptor = pass;
-      if (terminalCoverage != nullptr) {
-        passIR.coverage = *terminalCoverage;
-      }
-      // The program admission compiled rides the pass IR. Without an admission result (a direct
-      // BuildPasses caller) the same compile runs here, so a built pass IR is never programless.
-      if (singlePassCompiled != nullptr) {
-        passIR.program = std::move(singlePassCompiled->program);
-      } else if (!AOTChainBuilder::CompilePassProgram(passIR, &passIR.program.emplace())) {
-        return false;
-      }
-      renderPlan->terminalIR = allocator->make<DrawIR>(std::move(passIR));
-      return renderPlan->terminalIR != nullptr;
-    }
-    // The linear kernel: the terminal draws its own expression. The family matches off the
-    // draw's carried IR and the tail program compiles at prepare (CompileYUVProgramForInfo),
-    // so the task needs no rebuilt color processor and no pass IR — it stays the plan's
-    // execution and diagnostics wrapper. The original tree's TextureEffect still writes the
-    // family's source uniforms through the standard precompiled walk; the operators above it
-    // declare no fields the kernel reads.
-    return pass.kernel == AOTKernelKind::YUVTextureFill;
-  }
-  return BuildCutPlanPasses(context, renderFlags, graph, plan, deviceBounds, destination,
-                            fpCoordOffset, deviceToLocal, sourceAlpha, renderPlan,
-                            terminalCoverage);
-}
-
-PlacementPtr<RenderTask> AOTPlanExecutor::Make(
+PlacementPtr<RenderTask> AOTPlanner::Build(
     Context* context, uint32_t renderFlags, const AOTEffectGraph& graph, const AOTEffectPlan& plan,
     const Rect& deviceBounds, std::shared_ptr<RenderTargetProxy> destination,
     PlacementPtr<DrawOp>* originalDraw, const Point& fpCoordOffset, bool clearDestination,
@@ -374,10 +477,10 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(
       (*originalDraw)->type() == DrawOp::Type::StencilCoverPathDrawOp) {
     return nullptr;
   }
-  // Admission compiles a single chain pass; its program rides the terminal pass IR, so the build
+  // Validation compiles a single chain pass; its program rides the terminal pass IR, so the build
   // and every prepare read it back instead of compiling the same expression again.
   AOTChainCompile singlePassCompiled = {};
-  if (!CanExecute(graph, plan, terminalCoverage, &singlePassCompiled) ||
+  if (!Validate(graph, plan, terminalCoverage, &singlePassCompiled) ||
       (deviceToLocal.has_value() && deviceToLocal->hasPerspective())) {
     return nullptr;
   }
@@ -405,9 +508,9 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(
     }
     sourceAlpha = color->alpha;
   }
-  if (!BuildPasses(context, renderFlags, graph, plan, deviceBounds, destination.get(),
-                   fpCoordOffset, deviceToLocal, &renderPlan, sourceAlpha, terminalCoverage,
-                   &singlePassCompiled) ||
+  if (!BuildPassIRs(context, renderFlags, graph, plan, deviceBounds, destination.get(),
+                    fpCoordOffset, deviceToLocal, &renderPlan, sourceAlpha, terminalCoverage,
+                    &singlePassCompiled) ||
       !renderPlan.isWellFormed()) {
     return nullptr;
   }
