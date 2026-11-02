@@ -18,9 +18,11 @@
 
 #include "gpu/shaders/kernels/QuadTextureFillShader.h"
 #include <optional>
+#include "core/utils/Log.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/aot/AOTChainBuilder.h"
 #include "gpu/aot/AOTDrawFacts.h"
+#include "gpu/aot/ExecutorRecord.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
@@ -37,10 +39,11 @@ std::optional<QuadTextureFillShader::Inputs> QuadTextureFillShader::Extract(
   return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
 }
 
-std::optional<QuadTextureFillShader::Inputs> QuadTextureFillShader::ExtractFacts(
-    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+// The hand-written acceptance, kept as the reference the executor record is dual-run against.
+static std::optional<QuadTextureFillShader::Inputs> ExtractFactsByHand(const AOTDrawFacts& facts,
+                                                                       PermutationMatchFailure*) {
   // The family-relative alpha-only gate (RejectsAlphaOnlyTarget's original semantics).
-  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
+  if (!QuadTextureFillShader::ServesAlphaOnly && facts.alphaOnlyTarget) {
     return std::nullopt;
   }
   if (facts.geometry.kind != AOTGeometryKind::QuadPerEdgeAA) {
@@ -83,7 +86,7 @@ std::optional<QuadTextureFillShader::Inputs> QuadTextureFillShader::ExtractFacts
     if (te->numTextureSamplers() == 0 || te->isYUV()) {
       return std::nullopt;
     }
-    Inputs inputs;
+    QuadTextureFillShader::Inputs inputs;
     inputs.hasUVCoord = !facts.geometry.hasUVMatrix;
     inputs.hasSubset = facts.geometry.hasSubset;
     if (inputs.hasSubset && (facts.geometry.hasUVPerspective || te->hasPerspective())) {
@@ -112,7 +115,7 @@ std::optional<QuadTextureFillShader::Inputs> QuadTextureFillShader::ExtractFacts
   //                     uniform is populated from computeSubsetRect, which yields the full texture
   //                     bounds when the source has no real subset, so the clamp is a no-op. This
   //                     subsumes the former HAS_CLAMP_SUBSET dimension.
-  Inputs inputs;
+  QuadTextureFillShader::Inputs inputs;
   inputs.hasUVCoord = !facts.geometry.hasUVMatrix;
   inputs.hasSubset = facts.geometry.hasSubset;
   // The precompiled vTexSubset path transforms the subset corners WITHOUT a perspective divide
@@ -129,6 +132,29 @@ std::optional<QuadTextureFillShader::Inputs> QuadTextureFillShader::ExtractFacts
   inputs.hasLocalMask = hasLocalMask;
   inputs.xpType = xpType;
   return inputs;
+}
+
+std::optional<QuadTextureFillShader::Inputs> QuadTextureFillShader::ExtractFacts(
+    const AOTDrawFacts& facts, PermutationMatchFailure* failure) {
+  auto byHand = ExtractFactsByHand(facts, failure);
+#if DEBUG
+  // Record dual-run: the executor record must accept exactly what the hand-written predicate
+  // accepts, and derive the same axis sources for every accepted draw. A disagreement means the
+  // record under-describes the family — replacing the predicate with it would change routing, so
+  // the suite (every drawable shape) is the net.
+  if (auto* record = FindExecutorRecord(Name)) {
+    auto byRecord = MatchExecutorRecord(*record, facts);
+    bool agree = byHand.has_value() == byRecord.has_value();
+    if (agree && byHand.has_value()) {
+      agree = byHand->hasUVCoord == byRecord->hasUVCoord &&
+              byHand->hasSubset == byRecord->hasSubset &&
+              byHand->hasLocalMask == byRecord->hasLocalMask &&
+              byHand->xpType == byRecord->xpType;
+    }
+    DEBUG_ASSERT(agree);
+  }
+#endif
+  return byHand;
 }
 
 }  // namespace tgfx
