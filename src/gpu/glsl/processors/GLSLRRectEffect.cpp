@@ -18,7 +18,6 @@
 
 #include "GLSLRRectEffect.h"
 #include "core/utils/Log.h"
-#include "gpu/aot/EffectGraph.h"
 #include "gpu/shaders/KernelContract.h"
 
 namespace tgfx {
@@ -165,26 +164,6 @@ void GLSLRRectEffect::onSetData(UniformData*, UniformData* fragmentUniformData) 
     int hasClip = 2;
     fragmentUniformData->setData(ClipContract::HasClip, hasClip);
   }
-}
-
-bool RRectEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const {
-  // Every rrect form (device or local space, AA or hard edge) resolves through runtime uniforms,
-  // so the lowering accepts them all; perspective and degenerate matrices were rejected at
-  // construction.
-  if (builder == nullptr || output == nullptr) {
-    return false;
-  }
-  AOTRRectCoverageParameters parameters = {};
-  parameters.rect = {localRect.left, localRect.top, localRect.right, localRect.bottom};
-  for (size_t i = 0; i < 4; ++i) {
-    parameters.radiiX[i] = radii[i].x;
-    parameters.radiiY[i] = radii[i].y;
-  }
-  const auto& matrix = deviceToLocal();
-  parameters.deviceToLocal = {matrix[0], matrix[1], matrix[2], matrix[3], matrix[4],
-                              matrix[5], matrix[6], matrix[7], matrix[8]};
-  parameters.antiAlias = antiAlias ? 1.0f : 0.0f;
-  return builder->addRRectCoverage(input, parameters, output);
 }
 
 }  // namespace tgfx

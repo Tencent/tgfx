@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RectEffect.h"
+#include "gpu/aot/EffectGraph.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
 
 namespace tgfx {
@@ -33,5 +34,27 @@ void RectEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
 bool RectEffect::onBindPrecompiled(ParamWriter* writer) const {
   AnalyticClipModule::Bind(this, writer);
   return true;
+}
+
+bool RectEffect::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const {
+  if (builder == nullptr || output == nullptr) {
+    return false;
+  }
+  const auto& matrix = deviceToLocal();
+  if (!antiAlias) {
+    // Reuse the rrect op's runtime antiAlias switch for a hard-edged rect. Zero radii make its
+    // interior distance test identical to RectEffect's inclusive non-AA rectangle.
+    AOTRRectCoverageParameters parameters = {};
+    parameters.rect = {localRect.left, localRect.top, localRect.right, localRect.bottom};
+    parameters.deviceToLocal = {matrix[0], matrix[1], matrix[2], matrix[3], matrix[4],
+                                matrix[5], matrix[6], matrix[7], matrix[8]};
+    parameters.antiAlias = 0.0f;
+    return builder->addRRectCoverage(input, parameters, output);
+  }
+  AOTRectCoverageParameters parameters = {};
+  parameters.rect = {localRect.left, localRect.top, localRect.right, localRect.bottom};
+  parameters.deviceToLocal = {matrix[0], matrix[1], matrix[2], matrix[3], matrix[4],
+                              matrix[5], matrix[6], matrix[7], matrix[8]};
+  return builder->addRectCoverage(input, parameters, output);
 }
 }  // namespace tgfx
