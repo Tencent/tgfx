@@ -90,6 +90,15 @@ const AOTNodeContract& NodeContractOf(AOTEffectKind kind);
 /** Returns the contract row of one chain instruction. */
 const AOTOpContract& OpContractOf(AOTChainOp op);
 
+/**
+ * Whether a value is a schedulable chain instruction: inside the instruction table's bounds and
+ * not the inactive-slot marker. The validity of the op vocabulary is the table's own extent, so a
+ * new instruction is schedulable the moment it gains a row — no separate whitelist to keep in
+ * sync (the kernel's evaluation switch has no default branch, so an out-of-enum opcode must be
+ * rejected here rather than silently misread).
+ */
+bool IsSchedulableChainOp(AOTChainOp op);
+
 /** Returns the traits row of one kind; the table is the single place a kind's facts live. */
 const AOTKindTraits& TraitsOf(AOTEffectKind kind);
 

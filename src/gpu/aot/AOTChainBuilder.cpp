@@ -1700,29 +1700,11 @@ bool AOTChainBuilder::ValidateSlots(const std::vector<AOTChainSlot>& slots, size
     if (!validOutput(slot.outRegister) || !validInput(slot.in0) || !validInput(slot.in1)) {
       return false;
     }
-    // Opcode whitelist: the kernel's evaluation switch has no default branch (an unknown value
-    // falls through into the ColorSpaceXform evaluation), so an out-of-enum opcode must be
-    // rejected here rather than silently misinterpreted.
-    switch (slot.op) {
-      case AOTChainOp::ColorMatrix:
-      case AOTChainOp::Luma:
-      case AOTChainOp::AlphaThreshold:
-      case AOTChainOp::ColorSpaceXform:
-      case AOTChainOp::Texture:
-      case AOTChainOp::ConstColor:
-      case AOTChainOp::Blend:
-      case AOTChainOp::AARectCoverage:
-      case AOTChainOp::Gradient:
-      case AOTChainOp::LocalRectCoverage:
-      case AOTChainOp::RRectCoverage:
-      case AOTChainOp::TexModulate:
-      case AOTChainOp::InputOpaque:
-      case AOTChainOp::MulAlpha:
-      case AOTChainOp::PerlinNoise:
-        break;
-      case AOTChainOp::None:
-      default:
-        return false;
+    // Opcode validity comes from the instruction table's own extent (the kernel's evaluation
+    // switch has no default branch, so an out-of-enum opcode must be rejected here rather than
+    // silently misinterpreted).
+    if (!IsSchedulableChainOp(slot.op)) {
+      return false;
     }
     // Selector sub-field domains: the upload packs these ints straight into the selector's bit
     // fields, so an out-of-domain value does not merely misbehave — it bleeds into neighboring

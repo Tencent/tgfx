@@ -110,6 +110,10 @@ const AOTOpContract& OpContractOf(AOTChainOp op) {
   return index < OpContractCount ? OpContracts[index] : fallback;
 }
 
+bool IsSchedulableChainOp(AOTChainOp op) {
+  return static_cast<size_t>(op) < OpContractCount && op != AOTChainOp::None;
+}
+
 const AOTKindTraits& TraitsOf(AOTEffectKind kind) {
   return NodeContractOf(kind).traits;
 }
