@@ -266,45 +266,14 @@ let externalImageImportFailures = 0;
 let externalImageImportUnsupported = false;
 let crossOriginUploadWarned = false;
 
-// Temporary instrumentation for verifying the software-adapter fallback on CI: whether
-// copyExternalImageToTexture throws synchronously, whether the fallback runs and produces
-// pixels, and whether the latch engages. Read via module.videoUploadStats. Remove after the
-// SwiftShader verification run.
-interface VideoUploadStats {
-    calls: number;
-    notReady: number;
-    noDeviceOrTexture: number;
-    copyAttempts: number;
-    copyThrew: number;
-    lastErrorName: string;
-    asyncErrors: number;
-    fallbackRuns: number;
-    fallbackThrew: number;
-    latchSet: boolean;
-}
-
-const getVideoUploadStats = (): VideoUploadStats => {
-    const module = getTGFXModule() as any;
-    if (!module.videoUploadStats) {
-        module.videoUploadStats = {
-            calls: 0, notReady: 0, noDeviceOrTexture: 0, copyAttempts: 0, copyThrew: 0,
-            lastErrorName: '', asyncErrors: 0, fallbackRuns: 0, fallbackThrew: 0, latchSet: false,
-        } as VideoUploadStats;
-    }
-    return module.videoUploadStats as VideoUploadStats;
-};
-
 export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr: number,
                                            width: number, height: number, deviceId?: number) => {
-    const stats = getVideoUploadStats();
-    stats.calls++;
     if (!source || !texturePtr) {
         return;
     }
     // Videos without a current frame (not loaded or failed to decode) make
     // copyExternalImageToTexture throw an OperationError, so skip the upload entirely.
     if (source.readyState < source.HAVE_CURRENT_DATA || !source.videoWidth || !source.videoHeight) {
-        stats.notReady++;
         return;
     }
     syncVideoFrame(source);
@@ -313,12 +282,10 @@ export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr:
     const module = getTGFXModule() as any;
     const WebGPU = module?.WebGPU;
     if (!WebGPU) {
-        stats.noDeviceOrTexture++;
         return;
     }
     const gpuTexture = WebGPU.mgrTexture?.objects?.[texturePtr]?.object;
     if (!gpuTexture) {
-        stats.noDeviceOrTexture++;
         return;
     }
     // Resolve the GPUDevice that owns the texture. The C++ side passes its WGPUDevice handle so the
@@ -326,49 +293,32 @@ export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr:
     // module's preinitializedWebGPUDevice for the default device path.
     const device = resolveWebGPUDevice(module, deviceId);
     if (!device || !device.queue) {
-        stats.noDeviceOrTexture++;
         return;
     }
     if (!externalImageImportUnsupported) {
-        stats.copyAttempts++;
-        // Temporary instrumentation: observe the async error channel in parallel, to prove the
-        // software-adapter failure is a synchronous throw and never a validation error.
-        device.pushErrorScope('validation');
-        let copied = false;
-        let tainted = false;
         try {
             device.queue.copyExternalImageToTexture(
                 {source: source},
                 {texture: gpuTexture, premultipliedAlpha: true},
                 [width, height]
             );
-            copied = true;
             externalImageImportFailures = 0;
+            return;
         } catch (error) {
-            stats.copyThrew++;
-            stats.lastErrorName = (error as DOMException)?.name ?? '';
             // A SecurityError means the source is tainted (cross-origin without CORS), and the
             // CPU fallback cannot read its pixels either, so skip the frame without latching:
             // one bad video must not downgrade every other video in the session.
             if ((error as DOMException)?.name === 'SecurityError') {
-                tainted = true;
                 if (!crossOriginUploadWarned) {
                     crossOriginUploadWarned = true;
                     console.warn('WebGPU video upload skipped a cross-origin video:', error);
                 }
-            } else if (++externalImageImportFailures >= EXTERNAL_IMAGE_IMPORT_MAX_FAILURES) {
+                return;
+            }
+            if (++externalImageImportFailures >= EXTERNAL_IMAGE_IMPORT_MAX_FAILURES) {
                 externalImageImportUnsupported = true;
-                stats.latchSet = true;
                 console.warn('WebGPU video upload falls back to CPU readback:', error);
             }
-        }
-        device.popErrorScope().then((error: any) => {
-            if (error) {
-                stats.asyncErrors++;
-            }
-        });
-        if (copied || tainted) {
-            return;
         }
     }
     // Fall back to a CPU readback through a 2D canvas and upload the raw pixels with
@@ -377,7 +327,6 @@ export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr:
     // readback matches the premultipliedAlpha target. Videos with a real codec alpha channel
     // (VP9 or AV1 alpha) would render semi-transparent areas too bright here, which is a known
     // limitation of this fallback.
-    stats.fallbackRuns++;
     const pixels = readImagePixels(module, source, width, height);
     if (!pixels) {
         return;
@@ -390,7 +339,6 @@ export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr:
             [width, height]
         );
     } catch (error) {
-        stats.fallbackThrew++;
         // Blink throws an OperationError when the device is lost. Dropping the frame keeps the
         // flush alive, and the texture simply keeps its previous content.
     }
