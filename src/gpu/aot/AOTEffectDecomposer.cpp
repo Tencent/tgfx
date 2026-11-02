@@ -302,7 +302,7 @@ static bool PlanReachableSubtree(const AOTEffectGraph& graph, AOTNodeID subtreeR
   pass->output = subtreeRoot;
   for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
     auto node = graph.nodeAt(AOTNodeID(index));
-    if (!reachable[index] || TraitsOf(node->kind).inputDesignator) {
+    if (!reachable[index] || TraitsOf(node->kind).isInputDesignator()) {
       continue;
     }
     pass->nodes.push_back(AOTNodeID(index));

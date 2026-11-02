@@ -30,37 +30,42 @@ namespace {
 // otherwise surface at runtime as a silent route fallback).
 constexpr AOTNodeContract KindContracts[] = {
     // GeometryColor (graph root, designator): never scheduled.
-    {{false, true, false}, nullptr, nullptr},
-    {{true, false, false}, EncodeTextureSourceSlot, DemandTextureSource},
-    {{true, false, true}, EncodeUnaryPointwiseSlot, nullptr},  // ColorMatrix
-    {{true, false, true}, EncodeUnaryPointwiseSlot, nullptr},  // Luma
-    {{true, false, true}, EncodeUnaryPointwiseSlot, nullptr},  // AlphaThreshold
-    {{true, false, true}, EncodeUnaryPointwiseSlot, nullptr},  // ColorSpaceXform
-    {{true, false, false}, EncodeConstColorSlot, nullptr},
-    {{true, false, false}, EncodeBlendSlot, nullptr},
+    {{false, AOTDesignator::GeometryColor}, nullptr, nullptr},
+    {{true, AOTDesignator::None, false, AOTRemapKind::TextureMatrix}, EncodeTextureSourceSlot,
+     DemandTextureSource},
+    {{true, AOTDesignator::None, true}, EncodeUnaryPointwiseSlot, nullptr},  // ColorMatrix
+    {{true, AOTDesignator::None, true}, EncodeUnaryPointwiseSlot, nullptr},  // Luma
+    {{true, AOTDesignator::None, true}, EncodeUnaryPointwiseSlot, nullptr},  // AlphaThreshold
+    {{true, AOTDesignator::None, true}, EncodeUnaryPointwiseSlot, nullptr},  // ColorSpaceXform
+    {{true}, EncodeConstColorSlot, nullptr},
+    {{true}, EncodeBlendSlot, nullptr},
     // The noise demand is counted from the layout's noise record instead (the layout owns it
     // after stage three), so the row carries no demand.
-    {{true, false, false}, EncodePerlinNoiseSlot, nullptr},
-    {{true, false, false}, EncodeRectCoverageSlot, nullptr},
-    {{true, false, false}, EncodeGradientSlot, DemandGradientSource},
-    {{true, false, false}, EncodeRRectCoverageSlot, nullptr},
+    {{true, AOTDesignator::None, false, AOTRemapKind::LocalMatrix}, EncodePerlinNoiseSlot, nullptr},
+    {{true}, EncodeRectCoverageSlot, nullptr},
+    {{true, AOTDesignator::None, false, AOTRemapKind::LocalMatrix}, EncodeGradientSlot,
+     DemandGradientSource},
+    {{true}, EncodeRRectCoverageSlot, nullptr},
     // GeometryCoverage (graph root, designator): never scheduled.
-    {{false, true, false}, nullptr, nullptr},
-    {{true, true, false}, nullptr, nullptr},  // GeometryColorOpaqueInput
-    {{true, true, false}, nullptr, nullptr},  // GeometryWhiteInput
-    {{true, false, false}, EncodeInputOpaqueSlot, nullptr},
-    {{true, false, false}, EncodeMulAlphaSlot, nullptr},
+    {{false, AOTDesignator::GeometryCoverage}, nullptr, nullptr},
+    {{true, AOTDesignator::OpaqueInput}, nullptr, nullptr},  // GeometryColorOpaqueInput
+    {{true, AOTDesignator::WhiteInput}, nullptr, nullptr},   // GeometryWhiteInput
+    {{true}, EncodeInputOpaqueSlot, nullptr},
+    {{true}, EncodeMulAlphaSlot, nullptr},
+    // The opaque-kernel barrier (blur, glass): the planner refuses a graph containing one, so the
+    // row is never fusable and carries no encoder — the dedicated family reads the node's facts.
+    {{false}, nullptr, nullptr},
 };
 
 constexpr size_t KindContractCount = sizeof(KindContracts) / sizeof(AOTNodeContract);
-static_assert(KindContractCount == 17,
+static_assert(KindContractCount == static_cast<size_t>(AOTEffectKind::OpaqueKernel) + 1,
               "every AOTEffectKind needs exactly one contract row in KindContracts");
 
 constexpr bool EveryFusableKindIsEncodable() {
   for (const auto& row : KindContracts) {
     // The designators are fusable (they may appear inside a fused pass as inputs) but never
     // scheduled, so they are the only fusable rows allowed to leave the encoder null.
-    if (row.traits.chainFusable && !row.traits.inputDesignator && row.encode == nullptr) {
+    if (row.traits.chainFusable && !row.traits.isInputDesignator() && row.encode == nullptr) {
       return false;
     }
   }

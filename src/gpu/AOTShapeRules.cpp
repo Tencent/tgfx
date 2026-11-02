@@ -82,11 +82,11 @@ bool PassNeedsLocalRemap(const AOTEffectGraph& graph, const AOTPassDescriptor& p
     if (node == nullptr) {
       return true;
     }
-    if (node->kind == AOTEffectKind::GradientSource ||
-        node->kind == AOTEffectKind::PerlinNoiseSource) {
+    const auto remap = TraitsOf(node->kind).remap;
+    if (remap == AOTRemapKind::LocalMatrix) {
       return true;
     }
-    if (node->kind == AOTEffectKind::TextureSource) {
+    if (remap == AOTRemapKind::TextureMatrix) {
       auto* parameters = std::get_if<AOTTextureParameters>(&node->parameters);
       if (parameters != nullptr && parameters->samplingKind != AOTTextureSamplingKind::Device) {
         return true;
@@ -141,7 +141,7 @@ bool IsYUVChainSource(const AOTEffectGraph& graph, AOTNodeID nodeID) {
 }
 
 bool IsInputDesignator(AOTEffectKind kind) {
-  return TraitsOf(kind).inputDesignator;
+  return TraitsOf(kind).isInputDesignator();
 }
 
 bool CollectReachableNodes(const AOTEffectGraph& graph, AOTNodeID root,

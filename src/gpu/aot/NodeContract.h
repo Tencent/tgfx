@@ -27,6 +27,26 @@ struct AOTChainContext;
 struct AOTResourceDemand;
 class UniformData;
 
+/// The chain input designator a kind maps to when it appears as an op input. None marks every
+/// scheduled kind; the four designator kinds are never slots, and the two roots are never copied.
+enum class AOTDesignator : int {
+  None = 0,
+  GeometryColor = -1,
+  GeometryCoverage = -3,
+  WhiteInput = -4,
+  OpaqueInput = -5,
+};
+
+/// How a copied node's coordinate parameters follow a pass remap. None: the parameters carry no
+/// coordinates. LocalMatrix: one coordinate matrix precomposed with the local mapping (a gradient's
+/// coordMatrix, a noise source's uvMatrix). TextureMatrix: the uv matrix, precomposed with the
+/// device-leaf mapping for device sampling and with the local mapping otherwise.
+enum class AOTRemapKind : uint8_t {
+  None,
+  LocalMatrix,
+  TextureMatrix,
+};
+
 /**
  * Static facts about one AOTEffectKind. Every call site that used to switch or if-chain over node
  * kinds reads this table instead, so adding a kind means adding one row (a missing row fails the
@@ -37,11 +57,16 @@ struct AOTKindTraits {
   /// are the only kinds excluded; a future non-pointwise kind defaults to false here until its
   /// contract row says otherwise, which keeps it out of fused passes until deliberately admitted.
   bool chainFusable = false;
-  /// An input designator: never a chain slot, excluded from pass node lists. Covers all four
-  /// designator kinds; the two root designators can never be copied or scheduled anyway.
-  bool inputDesignator = false;
+  /// The op-input designator the kind maps to (see MapChainInput); None for scheduled kinds.
+  AOTDesignator designator = AOTDesignator::None;
   /// One of the four unary pointwise operators sharing the OP_* ABI values.
   bool unaryPointwise = false;
+  /// How the kind's coordinate parameters follow a pass remap (see AOTRemapKind).
+  AOTRemapKind remap = AOTRemapKind::None;
+
+  constexpr bool isInputDesignator() const {
+    return designator != AOTDesignator::None;
+  }
 };
 
 // The contract implementations' signatures. A kind's encoder turns one scheduled node into its

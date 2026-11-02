@@ -219,17 +219,9 @@ static bool BuildPointwiseSlot(const AOTEffectGraph& graph, const AOTEffectNode*
 static int MapChainInput(const std::vector<const AOTEffectNode*>& nodes,
                          const std::vector<size_t>& slotOf, size_t nodeIndex) {
   auto* node = nodes[nodeIndex];
-  if (node->kind == AOTEffectKind::GeometryColor) {
-    return -1;
-  }
-  if (node->kind == AOTEffectKind::GeometryCoverage) {
-    return -3;
-  }
-  if (node->kind == AOTEffectKind::GeometryColorOpaqueInput) {
-    return -5;
-  }
-  if (node->kind == AOTEffectKind::GeometryWhiteInput) {
-    return -4;
+  auto designator = static_cast<int>(TraitsOf(node->kind).designator);
+  if (designator != 0) {
+    return designator;
   }
   auto slot = slotOf[nodeIndex];
   return slot == SIZE_MAX ? -2 : static_cast<int>(slot);
@@ -1368,19 +1360,26 @@ static AOTNodeID ResolveCopiedInput(const std::unordered_map<uint32_t, AOTNodeID
 // (the fill's positions are the device ones). Every other parameter block carries no coordinates
 // and passes through unchanged. A terminal pass passes identity for both matrices, because it runs
 // on the destination and sees the original spaces.
-static AOTEffectParameters RemapNodeParameters(AOTEffectParameters parameters,
+static AOTEffectParameters RemapNodeParameters(AOTEffectKind kind, AOTEffectParameters parameters,
                                                const Matrix& coordToLocal,
                                                const Matrix& deviceLeafRemap) {
-  if (auto* texture = std::get_if<AOTTextureParameters>(&parameters)) {
-    if (texture->samplingKind == AOTTextureSamplingKind::Device) {
-      texture->uvMatrix.preConcat(deviceLeafRemap);
-    } else {
-      texture->uvMatrix.preConcat(coordToLocal);
-    }
-  } else if (auto* gradient = std::get_if<AOTGradientParameters>(&parameters)) {
-    gradient->coordMatrix.preConcat(coordToLocal);
-  } else if (auto* noise = std::get_if<AOTPerlinNoiseParameters>(&parameters)) {
-    noise->uvMatrix.preConcat(coordToLocal);
+  switch (TraitsOf(kind).remap) {
+    case AOTRemapKind::LocalMatrix:
+      if (auto* gradient = std::get_if<AOTGradientParameters>(&parameters)) {
+        gradient->coordMatrix.preConcat(coordToLocal);
+      } else if (auto* noise = std::get_if<AOTPerlinNoiseParameters>(&parameters)) {
+        noise->uvMatrix.preConcat(coordToLocal);
+      }
+      break;
+    case AOTRemapKind::TextureMatrix:
+      if (auto* texture = std::get_if<AOTTextureParameters>(&parameters)) {
+        texture->uvMatrix.preConcat(texture->samplingKind == AOTTextureSamplingKind::Device
+                                        ? deviceLeafRemap
+                                        : coordToLocal);
+      }
+      break;
+    case AOTRemapKind::None:
+      break;
   }
   return parameters;
 }
@@ -1408,7 +1407,8 @@ static bool CopyChainNode(const AOTEffectGraph& graph, AOTNodeID nodeID,
     inputs.push_back(resolved);
   }
   return builder->addCopy(
-      *node, inputs, RemapNodeParameters(node->parameters, coordToLocal, deviceLeafRemap), copied);
+      *node, inputs, RemapNodeParameters(node->kind, node->parameters, coordToLocal, deviceLeafRemap),
+      copied);
 }
 
 // Copies the wanted node set into the builder in original-graph order — the graph is SSA, so every
@@ -1433,7 +1433,7 @@ static bool CopyChainNodes(const AOTEffectGraph& graph, const std::vector<bool>&
     if (node == nullptr) {
       return false;
     }
-    bool isDesignator = TraitsOf(node->kind).inputDesignator;
+    bool isDesignator = TraitsOf(node->kind).isInputDesignator();
     if ((!wanted[index] && !isDesignator) || (skip[index] && !isDesignator)) {
       continue;
     }
