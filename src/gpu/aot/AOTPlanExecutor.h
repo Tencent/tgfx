@@ -42,8 +42,14 @@ class AOTPlanExecutor {
    * A multi-pass plan stores each intermediate result in an RGBA8 texture, so a pass boundary
    * quantizes to the 1/255 grid (an AlphaThreshold right after a boundary can flip at the grid
    * gap).
+   *
+   * A single chain pass is admitted by the builder's one compile entry — the same call the build
+   * makes, terminal coverage included — so an admitted single pass is by construction buildable.
+   * A multi-pass plan is structurally validated here; its segments compile one per pass when
+   * BuildPasses builds them.
    */
-  static bool CanExecute(const AOTEffectGraph& graph, const AOTEffectPlan& plan);
+  static bool CanExecute(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
+                         const std::vector<AOTCoverageTerm>* terminalCoverage = nullptr);
 
   /**
    * Whether a multi-pass plan's fill passes carry local-coordinate leaves (plainly-sampled

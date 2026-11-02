@@ -308,7 +308,7 @@ static bool PlanReachableSubtree(const AOTEffectGraph& graph, AOTNodeID subtreeR
     pass->nodes.push_back(AOTNodeID(index));
   }
   AOTResourceProfile profile = AOTResourceProfile::Automatic;
-  if (!AOTChainBuilder::PlanChainPass(graph, *pass, false, &profile)) {
+  if (!AOTChainBuilder::FitsChainPlan(graph, *pass, false, &profile)) {
     return false;
   }
   pass->resourceProfile = profile;

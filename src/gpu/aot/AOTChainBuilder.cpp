@@ -1203,14 +1203,20 @@ static bool MergeCoverageTerms(const std::vector<AOTCoverageTerm>& terms,
   return builder.finish(root, &merged->graph);
 }
 
-// Compiles one chain pass into the program and its binding table. The table is the single
-// description of the sampler children: it records, in artifact order, the DAG leaves, the LUT
-// gradient texture, the noise lookup tables, the phantom padding the four-sampler artifacts need
-// and the mask slot child. Every slot and budget decision was already taken by PlanChainLayout; a
-// failure here can only come from a resource that cannot be described. coverageTerms is null for a
+// The one compile entry: merges the draw's coverage terms, runs the chain planner (slot encoding,
+// parameter blocks, register allocation) and builds the sampler binding table. Admission and build
+// both call this, so an admitted pass is by construction a buildable one — the binding stage can
+// only fail on a resource that cannot be described, and that failure surfaces at admission instead
+// of at prepare. The table is the single description of the sampler children: it records, in
+// artifact order, the DAG leaves, the LUT gradient texture, the noise lookup tables, the phantom
+// padding the four-sampler artifacts need and the mask slot child. coverageTerms is null for a
 // plan pass (plan passes carry no draw coverage).
 static bool CompileChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
-                               const std::vector<AOTCoverageTerm>* coverageTerms, AOTProgram* out) {
+                               const std::vector<AOTCoverageTerm>* coverageTerms, bool checkKernel,
+                               AOTChainCompile* out) {
+  if (out == nullptr) {
+    return false;
+  }
   ChainCoverageGraph coverage = {};
   const AOTEffectGraph* coverageGraph = nullptr;
   if (coverageTerms != nullptr && !coverageTerms->empty()) {
@@ -1221,10 +1227,11 @@ static bool CompileChainLayout(const AOTEffectGraph& graph, const AOTPassDescrip
   }
   AOTChainCompile layout = {};
   if (!PlanChainLayout(graph, pass, coverageGraph, coverage.coverageRoot,
-                       coverage.coverageLeafFromUVCoord, coverage.clipLinks, true, &layout)) {
+                       coverage.coverageLeafFromUVCoord, coverage.clipLinks, checkKernel,
+                       &layout)) {
     return false;
   }
-  AOTProgram program = std::move(layout.program);
+  auto& program = layout.program;
   std::vector<AOTBinding> bindings = {};
   bindings.reserve(layout.leafNodes.size() + 5);
   for (auto* node : layout.leafNodes) {
@@ -1280,7 +1287,22 @@ static bool CompileChainLayout(const AOTEffectGraph& graph, const AOTPassDescrip
     program.deviceLeaves.push_back({leafIndex, parameters->textureProxy, parameters->uvMatrix});
   }
   program.bindings = std::move(bindings);
-  *out = std::move(program);
+  *out = std::move(layout);
+  return true;
+}
+
+// The program-only view of the same entry: every build site that does not keep the leaf facts.
+static bool CompileChainProgramLayout(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
+                                      const std::vector<AOTCoverageTerm>* coverageTerms,
+                                      AOTProgram* out) {
+  if (out == nullptr) {
+    return false;
+  }
+  AOTChainCompile compiled = {};
+  if (!CompileChainLayout(graph, pass, coverageTerms, true, &compiled)) {
+    return false;
+  }
+  *out = std::move(compiled.program);
   return true;
 }
 
@@ -1290,14 +1312,17 @@ static bool CompileChainLayout(const AOTEffectGraph& graph, const AOTPassDescrip
 // path consumes the binding table itself.
 }  // namespace
 
-bool AOTChainBuilder::PlanChainPass(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
+bool AOTChainBuilder::FitsChainPlan(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
                                     bool checkKernel, AOTResourceProfile* outProfile) {
-  AOTChainCompile compile = {};
-  if (!Compile(graph, pass, nullptr, checkKernel, &compile)) {
+  // A fit probe, not an admission: it runs the planner alone (no bindings, no coverage), which is
+  // what the decomposer needs to decide whether a cut fits before any program exists.
+  AOTChainCompile layout = {};
+  if (!PlanChainLayout(graph, pass, nullptr, AOTNodeID::Invalid(), false, {}, checkKernel,
+                       &layout)) {
     return false;
   }
   if (outProfile != nullptr) {
-    *outProfile = compile.program.profile;
+    *outProfile = layout.program.profile;
   }
   return true;
 }
@@ -1305,19 +1330,7 @@ bool AOTChainBuilder::PlanChainPass(const AOTEffectGraph& graph, const AOTPassDe
 bool AOTChainBuilder::Compile(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
                               const std::vector<AOTCoverageTerm>* coverageTerms, bool checkKernel,
                               AOTChainCompile* out) {
-  if (out == nullptr) {
-    return false;
-  }
-  ChainCoverageGraph coverage = {};
-  const AOTEffectGraph* coverageGraph = nullptr;
-  if (coverageTerms != nullptr && !coverageTerms->empty()) {
-    if (!MergeCoverageTerms(*coverageTerms, &coverage)) {
-      return false;
-    }
-    coverageGraph = &coverage.graph;
-  }
-  return PlanChainLayout(graph, pass, coverageGraph, coverage.coverageRoot,
-                         coverage.coverageLeafFromUVCoord, coverage.clipLinks, checkKernel, out);
+  return CompileChainLayout(graph, pass, coverageTerms, checkKernel, out);
 }
 
 AOTTextureParameters AOTChainBuilder::IntermediateSource(std::shared_ptr<TextureProxy> textureProxy,
@@ -1479,7 +1492,7 @@ static bool FinishSegmentPass(const AOTNodeBuilder& builder, AOTNodeID root,
     resultPass.nodes.push_back(AOTNodeID(index));
   }
   AOTResourceProfile profile = AOTResourceProfile::Automatic;
-  if (!AOTChainBuilder::PlanChainPass(built, resultPass, false, &profile)) {
+  if (!AOTChainBuilder::FitsChainPlan(built, resultPass, false, &profile)) {
     return false;
   }
   resultPass.resourceProfile = profile;
@@ -1539,7 +1552,7 @@ bool AOTChainBuilder::CompilePassProgram(const DrawIR& passIR, AOTProgram* out) 
   if (pass.nodes.empty() || !IsAOTPointwiseDAGKernel(pass.kernel)) {
     return false;
   }
-  return CompileChainLayout(passIR.color, pass, &passIR.coverage, out);
+  return CompileChainProgramLayout(passIR.color, pass, &passIR.coverage, out);
 }
 
 bool AOTChainBuilder::CollectTextureTail(const AOTEffectGraph& graph, AOTTextureTailShape* shape) {
@@ -1664,7 +1677,7 @@ bool AOTChainBuilder::CompileChainProgram(BlockAllocator* allocator, const AOTEf
     return false;
   }
   if (coverageFPs.empty()) {
-    return CompileChainLayout(graph, pass, nullptr, out);
+    return CompileChainProgramLayout(graph, pass, nullptr, out);
   }
   if (coverageFPs.size() > 2) {
     return false;
@@ -1677,7 +1690,7 @@ bool AOTChainBuilder::CompileChainProgram(BlockAllocator* allocator, const AOTEf
   if (!terms.has_value()) {
     return false;
   }
-  return CompileChainLayout(graph, pass, &*terms, out);
+  return CompileChainProgramLayout(graph, pass, &*terms, out);
 }
 
 bool AOTChainBuilder::ValidateSlots(const std::vector<AOTChainSlot>& slots, size_t rootSlot,
@@ -1845,7 +1858,7 @@ bool AOTChainBuilder::CompileChainProgramForInfo(const ProgramInfo* programInfo,
     // and anything the single-pass decomposition cannot fit needs a plan task.
     return false;
   }
-  return CompileChainLayout(carried->color, plan.passes[0], &carried->coverage, out);
+  return CompileChainProgramLayout(carried->color, plan.passes[0], &carried->coverage, out);
 }
 
 }  // namespace tgfx

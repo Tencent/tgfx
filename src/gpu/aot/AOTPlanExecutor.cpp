@@ -260,7 +260,8 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
 
 }  // namespace
 
-bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPlan& plan) {
+bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
+                                 const std::vector<AOTCoverageTerm>* terminalCoverage) {
   if (plan.passes.empty() || !plan.output.isValid() || plan.output != graph.root()) {
     return false;
   }
@@ -272,14 +273,13 @@ bool AOTPlanExecutor::CanExecute(const AOTEffectGraph& graph, const AOTEffectPla
       pass.materializesOutput) {
     return false;
   }
-  // PointwiseChain/PointwiseGraph passes fuse the whole DAG. The chain builder's own planner
-  // decides: it runs the slot encoding (including the extra TEX_MODULATE instruction of a
-  // computed-input texture and the closure of every input edge), the per-kind parameter blocks,
-  // the resource profile and the register allocation that construction runs, without creating
-  // processors. Clip slots appended from the draw's coverage FPs are not part of the plan; the
-  // builder re-plans with them and refuses what no longer fits.
+  // PointwiseChain/PointwiseGraph passes fuse the whole DAG. Admission runs the builder's one
+  // compile entry with the plan's terminal coverage: the same slot encoding, parameter blocks,
+  // register allocation and binding table the build runs, so an admitted pass is by construction
+  // buildable.
   if (IsAOTPointwiseDAGKernel(pass.kernel)) {
-    return AOTChainBuilder::PlanChainPass(graph, pass, true);
+    AOTChainCompile compiled = {};
+    return AOTChainBuilder::Compile(graph, pass, terminalCoverage, true, &compiled);
   }
   // The linear kernels: a source node followed by a bounded run of operator slots.
   if (pass.resourceProfile != AOTResourceProfile::Automatic || pass.output != pass.nodes.back()) {
@@ -354,7 +354,8 @@ PlacementPtr<RenderTask> AOTPlanExecutor::Make(
     const std::vector<AOTCoverageTerm>* terminalCoverage) {
   if (context == nullptr || destination == nullptr || destination->getContext() != context ||
       originalDraw == nullptr || *originalDraw == nullptr ||
-      (*originalDraw)->type() == DrawOp::Type::StencilCoverPathDrawOp || !CanExecute(graph, plan) ||
+      (*originalDraw)->type() == DrawOp::Type::StencilCoverPathDrawOp ||
+      !CanExecute(graph, plan, terminalCoverage) ||
       (deviceToLocal.has_value() && deviceToLocal->hasPerspective())) {
     return nullptr;
   }

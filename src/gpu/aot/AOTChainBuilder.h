@@ -57,26 +57,27 @@ class AOTChainBuilder {
   static bool IsChainCompatibleTiledMode(TiledTextureShaderMode mode);
 
   /**
-   * Pure admission of a PointwiseChain/PointwiseGraph pass without draw coverage. Runs the same
-   * slot encoding, closure, budget, profile and register checks the compile runs, but
-   * creates no processor — so plan-time fit and construction fit cannot drift.
+   * A fit probe, not an admission: runs the chain planner (slot encoding, closure, budget,
+   * profile, register allocation) without building the binding table. The decomposer uses it to
+   * decide whether a cut fits before any program exists; every serving decision goes through
+   * Compile below, so a probe success never stands in for a build success.
    *
-   * checkKernel also verifies the pass's declared kernel against the profile the pass needs (the
-   * admission form, which AOTPlanExecutor::CanExecute relies on); without it the pass kernel is
-   * ignored and only the fit is checked. outProfile, when not null, receives the resource profile
-   * the pass needs — the planner's form, which picks the kernel from the resolved profile.
+   * checkKernel also verifies the pass's declared kernel against the profile the pass needs;
+   * without it the pass kernel is ignored and only the fit is checked. outProfile, when not null,
+   * receives the resource profile the pass needs — the planner's form, which picks the kernel from
+   * the resolved profile.
    */
-  static bool PlanChainPass(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
+  static bool FitsChainPlan(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
                             bool checkKernel, AOTResourceProfile* outProfile = nullptr);
 
   /**
-   * Compiles one chain pass — the color graph's pass plus, when given, the draw's classified
-   * coverage terms — into the register-allocated program. This is the single admission entry:
-   * the plan-time checks (AOTPlanExecutor::CanExecute, the DAG planner through PlanChainPass)
-   * and the processor construction run exactly this pipeline, so a plan-time fit and a
-   * construction fit cannot drift. coverageTerms is null or empty for a plan pass (plan passes
-   * carry no draw coverage). checkKernel additionally verifies the pass's declared kernel
-   * against the profile the pass resolves.
+   * The one compile entry: the pass's register-allocated program plus, when given, the draw's
+   * classified coverage terms and their sampler binding table. Admission
+   * (AOTPlanExecutor::CanExecute) and every build site call exactly this, so an admitted pass is
+   * by construction a buildable one — the binding stage's resource failures surface at admission
+   * instead of at prepare. coverageTerms is null or empty for a plan pass (plan passes carry no
+   * draw coverage). checkKernel additionally verifies the pass's declared kernel against the
+   * profile the pass resolves.
    */
   static bool Compile(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
                       const std::vector<AOTCoverageTerm>* coverageTerms, bool checkKernel,
