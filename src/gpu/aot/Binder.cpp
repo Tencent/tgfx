@@ -496,9 +496,8 @@ void BindDeviceMaskBinding(const AOTBinding& binding, UniformData* uniformData) 
     }
     uniformData->setData("Subset", rect);
   }
-  if (!sharedKernel && uniformData->hasField("AlphaOnly")) {
-    uniformData->setData("AlphaOnly", binding.textureProxy->isAlphaOnly() ? 1 : 0);
-  }
+  // AlphaOnly belongs to the draw's color source, not to the mask: the kernel samples the mask as
+  // .r unconditionally, so writing it here would overwrite a color atlas's AlphaOnly=0.
   if (!sharedKernel && uniformData->hasField("Rect")) {
     // The shared coverage_output.inc always evaluates the AARect clip term when HAS_COVERAGE >= 1.
     // A bare device-space mask carries no RectEffect, so upload a rect that covers the whole plane.

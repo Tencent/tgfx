@@ -31,7 +31,10 @@ void DeviceMaskModule::Bind(const FragmentProcessor* processor, ParamWriter* wri
     return;
   }
   writer->set(Subset, noOpRect);
-  writer->set(AlphaOnly, mask->isAlphaOnly() ? 1 : 0);
+  // AlphaOnly belongs to the draw's color source (a texture leaf's readback or a color atlas's
+  // glyph encoding), not to the mask: the kernel samples the mask as .r unconditionally. Writing
+  // it here would overwrite a color atlas's AlphaOnly=0 with the mask's 1 and render the glyphs
+  // as a gray mask.
   const float noClip[4] = {-1e9f, -1e9f, 1e9f, 1e9f};
   writer->set(Rect, noClip);
   writer->set(AnalyticClipModule::HasClip, 0);
