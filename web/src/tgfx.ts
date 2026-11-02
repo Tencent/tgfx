@@ -251,6 +251,11 @@ export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr:
     if (!source || !texturePtr) {
         return;
     }
+    // Videos without a current frame (not loaded or failed to decode) make
+    // copyExternalImageToTexture throw an OperationError, so skip the upload entirely.
+    if (source.readyState < 2 || !source.videoWidth || !source.videoHeight) {
+        return;
+    }
     syncVideoFrame(source);
     // Emscripten maps WGPUTexture C pointers to JS GPUTexture objects via WebGPU.mgrTexture,
     // exported on the module through EXPORTED_RUNTIME_METHODS.
@@ -270,11 +275,33 @@ export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr:
     if (!device || !device.queue) {
         return;
     }
-    device.queue.copyExternalImageToTexture(
-        {source: source},
-        {texture: gpuTexture, premultipliedAlpha: true},
-        [width, height]
-    );
+    try {
+        device.queue.copyExternalImageToTexture(
+            {source: source},
+            {texture: gpuTexture, premultipliedAlpha: true},
+            [width, height]
+        );
+    } catch (error) {
+        // Software adapters such as SwiftShader cannot import video frames directly and throw an
+        // OperationError. Route the frame through a 2D canvas, which uses the CPU readback path.
+        const canvas = getCanvas2D(width, height);
+        const context = canvas.getContext('2d') as CanvasRenderingContext2D |
+            OffscreenCanvasRenderingContext2D | null;
+        if (!context) {
+            releaseCanvas2D(canvas);
+            return;
+        }
+        // Use "copy" to write the frame without compositing against any residual content.
+        context.globalCompositeOperation = 'copy';
+        context.drawImage(source, 0, 0, width, height);
+        context.globalCompositeOperation = 'source-over';
+        device.queue.copyExternalImageToTexture(
+            {source: canvas},
+            {texture: gpuTexture, premultipliedAlpha: true},
+            [width, height]
+        );
+        releaseCanvas2D(canvas);
+    }
 };
 
 /**
