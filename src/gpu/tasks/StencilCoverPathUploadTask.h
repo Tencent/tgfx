@@ -24,10 +24,8 @@
 
 namespace tgfx {
 /**
- * StencilCoverPathUploadTask uploads the bezier vertex stream produced by
- * StencilCoverPathTessellator into a GPU vertex buffer. When the rasterizer reports no drawable
- * geometry, the task resolves to no resource and the bound vertex proxy stays unbacked, which
- * allows the stencil-and-cover render path to gracefully fall back to the legacy pipeline.
+ * Uploads the tessellated vertices and their fill rule into one StencilCoverPathBuffer. If no
+ * geometry is produced, the proxy remains unbacked and only the inverse cover can draw.
  */
 class StencilCoverPathUploadTask : public ResourceTask {
  public:

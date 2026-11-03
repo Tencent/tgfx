@@ -18,7 +18,6 @@
 
 #include "OpsCompositor.h"
 #include "core/MeshBase.h"
-#include "core/PathRef.h"
 #include "core/VertexMesh.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/ColorSpaceHelper.h"
@@ -646,12 +645,16 @@ void OpsCompositor::flushPendingShapeOps() {
   std::optional<Rect> deviceBounds = std::nullopt;
   float drawScale = 1.0f;
   auto [needLocalBounds, needDeviceBounds] = needComputeBounds(pendingBrush, true);
+  // Asked once and reused: a Shape whose rule is only known after its path is merged computes it
+  // from its sources here, and shape below is replaced by a matrix-applied copy before the last
+  // use, so re-asking there would not be asking the same Shape.
+  auto isInverseFill = shape->isInverseFillType();
 
   // Compute the union of all instance bounds in the first instance's local space.
   // offsets are in device space, so convert them to local space using uvMatrix (inverse of
   // shapeMatrix) before offsetting shape bounds.
   Rect shapeBounds = {};
-  if ((needLocalBounds || needDeviceBounds) && !shape->isInverseFillType()) {
+  if ((needLocalBounds || needDeviceBounds) && !isInverseFill) {
     const auto baseBounds = shape->getBounds();
     for (size_t i = 0; i < count; ++i) {
       auto localX = uvMatrix.getScaleX() * offsets[i].x + uvMatrix.getSkewX() * offsets[i].y;
@@ -660,7 +663,7 @@ void OpsCompositor::flushPendingShapeOps() {
     }
   }
   if (needLocalBounds) {
-    if (shape->isInverseFillType()) {
+    if (isInverseFill) {
       localBounds = ToLocalBounds(clipBounds, shapeMatrix);
     } else {
       localBounds = ClipLocalBounds(shapeBounds, shapeMatrix, clipBounds);
@@ -671,8 +674,8 @@ void OpsCompositor::flushPendingShapeOps() {
     drawScale = std::min(shapeMatrix.getMaxScale(), 1.0f);
   }
   if (needDeviceBounds) {
-    deviceBounds = shape->isInverseFillType() ? clipBounds : shapeMatrix.mapRect(shapeBounds);
-    if (!shape->isInverseFillType() && !deviceBounds->intersect(clipBounds)) {
+    deviceBounds = isInverseFill ? clipBounds : shapeMatrix.mapRect(shapeBounds);
+    if (!isInverseFill && !deviceBounds->intersect(clipBounds)) {
       deviceBounds->setEmpty();
     }
   }
@@ -764,9 +767,11 @@ void OpsCompositor::flushPendingStencilCoverOps() {
     }
 
     auto dstColor = ToPMColor(color, dstColorSpace);
-    auto fillType = shape->fillType();
+    // The rule itself is reported by the tessellator that builds the geometry, so recording never
+    // asks the shape for it. Only the inverse-ness travels with the op: it is already known here and
+    // it is the one thing an outline that never became geometry still needs.
     auto drawOp = StencilCoverPathDrawOp::Make(std::move(geometryProxy), dstColor, matrix,
-                                               coverLocalBounds, fillType);
+                                               coverLocalBounds, isInverseFill);
     if (drawOp == nullptr) {
       continue;
     }

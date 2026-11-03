@@ -67,10 +67,11 @@ class BufferResource : public Resource {
     return buffer;
   }
 
- private:
-  std::shared_ptr<GPUBuffer> buffer = nullptr;
-
+ protected:
   explicit BufferResource(std::shared_ptr<GPUBuffer> buffer) : buffer(std::move(buffer)) {
   }
+
+ private:
+  std::shared_ptr<GPUBuffer> buffer = nullptr;
 };
 }  // namespace tgfx

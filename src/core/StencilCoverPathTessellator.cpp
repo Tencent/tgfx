@@ -253,6 +253,7 @@ std::shared_ptr<StencilCoverVertexData> StencilCoverPathTessellator::getData() c
   if (data == nullptr) {
     return nullptr;
   }
-  return std::make_shared<StencilCoverVertexData>(std::move(data), vertices.size());
+  return std::make_shared<StencilCoverVertexData>(std::move(data), vertices.size(),
+                                                  path.getFillType());
 }
 }  // namespace tgfx

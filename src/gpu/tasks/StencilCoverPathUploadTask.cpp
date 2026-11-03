@@ -18,7 +18,7 @@
 
 #include "StencilCoverPathUploadTask.h"
 #include "core/utils/Log.h"
-#include "gpu/resources/BufferResource.h"
+#include "gpu/resources/StencilCoverPathBuffer.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
@@ -34,16 +34,12 @@ std::shared_ptr<Resource> StencilCoverPathUploadTask::onMakeResource(Context* co
   }
   auto bezierBuffer = source->getData();
   source = nullptr;
-  // StencilCoverPathTessellator::getData already short-circuits to nullptr for any case that would
-  // produce an empty buffer (empty path, zero-area bounds, all-degenerate verbs), so a
-  // non-null bezierBuffer is guaranteed to carry non-empty vertices. The vertices-null check
-  // stays as a defensive guard against a future DataSource implementation that does not
-  // honour that contract.
-  if (bezierBuffer == nullptr || bezierBuffer->vertices == nullptr) {
+  if (bezierBuffer == nullptr || bezierBuffer->vertices == nullptr ||
+      bezierBuffer->vertices->size() == 0) {
     return nullptr;
   }
-  auto vertexBuffer =
-      BufferResource::FindOrCreate(context, bezierBuffer->vertices->size(), GPUBufferUsage::VERTEX);
+  auto vertexBuffer = StencilCoverPathBuffer::FindOrCreate(
+      context, bezierBuffer->vertices->size(), bezierBuffer->fillType);
   if (vertexBuffer == nullptr) {
     LOGE("StencilCoverPathUploadTask::onMakeResource() Failed to create vertex buffer!");
     return nullptr;

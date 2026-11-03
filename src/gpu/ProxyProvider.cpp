@@ -288,7 +288,7 @@ std::shared_ptr<StencilCoverPathProxy> ProxyProvider::createStencilCoverPathProx
   static const auto StencilCoverPathGeometryType = UniqueID::Next();
   auto vertexKey = UniqueKey::Append(shape->getUniqueKey(), &StencilCoverPathGeometryType, 1);
   if (auto cached = findOrWrapGPUBufferProxy(vertexKey)) {
-    return std::make_shared<StencilCoverPathProxy>(std::move(cached));
+    return std::shared_ptr<StencilCoverPathProxy>(new StencilCoverPathProxy(std::move(cached)));
   }
   auto rasterizer = std::make_unique<StencilCoverPathTessellator>(std::move(shape));
   std::unique_ptr<DataSource<StencilCoverVertexData>> dataSource = nullptr;
@@ -307,9 +307,9 @@ std::shared_ptr<StencilCoverPathProxy> ProxyProvider::createStencilCoverPathProx
     vertexProxy->uniqueKey = vertexKey;
   }
   auto task = context->drawingAllocator()->make<StencilCoverPathUploadTask>(vertexProxy,
-                                                                            std::move(dataSource));
+                                                                          std::move(dataSource));
   context->drawingManager()->addResourceTask(std::move(task));
-  return std::make_shared<StencilCoverPathProxy>(std::move(vertexProxy));
+  return std::shared_ptr<StencilCoverPathProxy>(new StencilCoverPathProxy(std::move(vertexProxy)));
 }
 
 std::shared_ptr<GPUMeshProxy> ProxyProvider::createGPUMeshProxy(

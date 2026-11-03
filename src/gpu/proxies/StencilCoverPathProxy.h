@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/proxies/GPUBufferProxy.h"
+#include "gpu/resources/StencilCoverPathBuffer.h"
 
 namespace tgfx {
 /**
@@ -30,10 +31,6 @@ namespace tgfx {
  */
 class StencilCoverPathProxy {
  public:
-  explicit StencilCoverPathProxy(std::shared_ptr<GPUBufferProxy> vertexBuffer)
-      : vertexBuffer(std::move(vertexBuffer)) {
-  }
-
   Context* getContext() const {
     return vertexBuffer ? vertexBuffer->getContext() : nullptr;
   }
@@ -47,14 +44,20 @@ class StencilCoverPathProxy {
   }
 
   /**
-   * Returns the underlying vertex buffer resource. May be nullptr while the upload task is
-   * still pending or when the rasterizer produced no drawable geometry.
+   * Returns the vertices and their fill rule, or nullptr while uploading or when no geometry was
+   * produced. The provider creates this proxy only for the dedicated stencil-cover resource type.
    */
-  std::shared_ptr<BufferResource> getVertexBuffer() const {
-    return vertexBuffer ? vertexBuffer->getBuffer() : nullptr;
+  std::shared_ptr<StencilCoverPathBuffer> getVertexBuffer() const {
+    return std::static_pointer_cast<StencilCoverPathBuffer>(vertexBuffer->getBuffer());
   }
 
  private:
+  explicit StencilCoverPathProxy(std::shared_ptr<GPUBufferProxy> vertexBuffer)
+      : vertexBuffer(std::move(vertexBuffer)) {
+  }
+
   std::shared_ptr<GPUBufferProxy> vertexBuffer = nullptr;
+
+  friend class ProxyProvider;
 };
 }  // namespace tgfx
