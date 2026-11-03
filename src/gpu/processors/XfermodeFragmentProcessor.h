@@ -54,14 +54,6 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
-  BlendMode getMode() const {
-    return mode;
-  }
-
-  int getChildType() const {
-    return static_cast<int>(child);
-  }
-
   void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;

@@ -297,11 +297,7 @@ static std::unique_ptr<ProgramWriter> MakeProgramWriter(const std::string& shade
 }
 
 std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* context,
-                                                                  const ProgramInfo* programInfo,
-                                                                  bool* deferredFallback) {
-  if (deferredFallback != nullptr) {
-    *deferredFallback = false;
-  }
+                                                                  const ProgramInfo* programInfo) {
   auto cache = context->precompiledShaderCache();
   cache->recordAOTStage(PrecompiledAOTStage::Attempt);
   if (!cache->isLoaded()) {
@@ -348,9 +344,6 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
                          IsProcessor<DeviceSpaceTextureEffect>(fp);
         if (textureFP && fp->numTextureSamplers() == 0) {
           reason = PrecompiledFallbackReason::DeferredTexture;
-          if (deferredFallback != nullptr) {
-            *deferredFallback = true;
-          }
           break;
         }
       }

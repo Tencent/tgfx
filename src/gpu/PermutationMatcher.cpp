@@ -639,7 +639,7 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(
   // The interpreter stays the walk's documented fallback, tried last.
   if (allowInterpreter && (!alphaOnly || PointwiseChainShader::ServesAlphaOnly)) {
     if (auto result = PointwiseChainShader::Match(programInfo, failure)) {
-      return PermutationMatchResult{"PointwiseChainShader", result->vertPermutationIndex,
+      return PermutationMatchResult{PointwiseChainShader::Name, result->vertPermutationIndex,
                                     result->fragPermutationIndex};
     }
   }

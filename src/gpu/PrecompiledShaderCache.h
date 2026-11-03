@@ -198,8 +198,8 @@ struct AOTDrawStats {
 };
 
 /// Runtime cache that loads precompiled shader bundles and provides O(1) lookup by ShaderKey hash.
-/// Each Context holds one instance. Bundle v3 stores vertex and fragment shaders in separate pools,
-/// enabling M+N storage instead of M*N.
+/// Each Context holds one instance. The bundle stores vertex and fragment shaders in separate
+/// pools, enabling M+N storage instead of M*N.
 class PrecompiledShaderCache {
  public:
   /// The cache is owned by its Context and keeps a back pointer for bundle-generation

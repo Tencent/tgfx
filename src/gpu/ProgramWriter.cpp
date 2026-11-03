@@ -135,20 +135,15 @@ bool ProgramWriter::write(const ProgramInfo& info, RenderPass* renderPass, Progr
     return false;
   }
 
-  beginUniformWrites(vertexUniformData, fragmentUniformData);
-
-  auto expression = buildExpression(info);
-  const FragmentProcessor* expressionFP = expression.get();
-
   auto array = GetRTAdjustArray(info.renderTarget);
   if (vertexUniformData != nullptr) {
     vertexUniformData->setData(RTAdjustName, array);
   }
   writeEngineDefaults(info, fragmentUniformData);
 
-  writeGeometryProcessor(info, vertexUniformData, fragmentUniformData, expressionFP);
+  writeGeometryProcessor(info, vertexUniformData, fragmentUniformData);
 
-  writeProcessors(info, vertexUniformData, fragmentUniformData, expressionFP);
+  writeProcessors(info, vertexUniformData, fragmentUniformData);
 
   info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, nullptr);
 
@@ -172,35 +167,26 @@ bool ProgramWriter::write(const ProgramInfo& info, RenderPass* renderPass, Progr
 
   info.bindUniformBufferAndUnloadToGPU(program, std::move(uniformBuffer), renderPass, vertexOffset,
                                        fragmentOffset);
-  writeSamplers(info, program, renderPass, expressionFP);
+  writeSamplers(info, program, renderPass);
   return true;
-}
-
-ProgramWriter::Expression ProgramWriter::buildExpression(const ProgramInfo&) const {
-  return {};
 }
 
 bool ProgramWriter::canWrite(const ProgramInfo&) const {
   return true;
 }
 
-void ProgramWriter::beginUniformWrites(UniformData*, UniformData*) const {
-}
-
 void ProgramWriter::writeEngineDefaults(const ProgramInfo&, UniformData*) const {
 }
 
 void ProgramWriter::writeGeometryProcessor(const ProgramInfo& info, UniformData* vertexUniformData,
-                                           UniformData* fragmentUniformData,
-                                           const FragmentProcessor* /*expression*/) const {
+                                           UniformData* fragmentUniformData) const {
   FragmentProcessor::CoordTransformIter coordTransformIter(&info);
   info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, info.geometryProcessor);
   info.geometryProcessor->setData(vertexUniformData, fragmentUniformData, &coordTransformIter);
 }
 
 void RuntimeProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
-                                           UniformData* fragmentUniformData,
-                                           const FragmentProcessor* /*expression*/) const {
+                                           UniformData* fragmentUniformData) const {
   for (auto& fragmentProcessor : info.fragmentProcessors) {
     FragmentProcessor::Iter iter(fragmentProcessor);
     const FragmentProcessor* fp = iter.next();
@@ -216,8 +202,7 @@ void RuntimeProgramWriter::writeProcessors(const ProgramInfo& info, UniformData*
 }
 
 void RuntimeProgramWriter::writeSamplers(const ProgramInfo& info, Program* /*program*/,
-                                         RenderPass* renderPass,
-                                         const FragmentProcessor* /*expression*/) const {
+                                         RenderPass* renderPass) const {
   auto samplers = info.getSamplers();
   auto gpu = info.renderTarget->getContext()->gpu();
 #if DEBUG
@@ -505,8 +490,7 @@ void PrecompiledProgramWriter::writeProcessorsByTree(const ProgramInfo& info,
 
 void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
                                                UniformData* vertexUniformData,
-                                               UniformData* fragmentUniformData,
-                                               const FragmentProcessor* /*expression*/) const {
+                                               UniformData* fragmentUniformData) const {
   ParamWriter paramWriter(fragmentUniformData);
   const auto* carriedIR = info.getCarriedIR();
   if (carriedIR == nullptr) {
@@ -789,8 +773,7 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
 }
 
 void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* program,
-                                             RenderPass* renderPass,
-                                             const FragmentProcessor* /*expression*/) const {
+                                             RenderPass* renderPass) const {
   auto samplers = info.getSamplers();
   auto expected = program->expectedTextureCount();
   // The dst texture always binds last in the artifact. When the artifact declares more samplers
@@ -916,8 +899,7 @@ bool ChainProgramWriter::canWrite(const ProgramInfo& info) const {
 
 void ChainProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
                                                 UniformData* vertexUniformData,
-                                                UniformData* fragmentUniformData,
-                                                const FragmentProcessor* /*expression*/) const {
+                                                UniformData* fragmentUniformData) const {
   const auto* program = ChainProgram(info);
   if (program == nullptr) {
     LOGE(
@@ -934,8 +916,7 @@ void ChainProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
 }
 
 void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
-                                         UniformData* fragmentUniformData,
-                                         const FragmentProcessor* /*expression*/) const {
+                                         UniformData* fragmentUniformData) const {
   const auto* program = ChainProgram(info);
   if (program == nullptr) {
     LOGE(
@@ -961,8 +942,7 @@ void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* v
 }
 
 void ChainProgramWriter::writeSamplers(const ProgramInfo& info, Program* program,
-                                       RenderPass* renderPass,
-                                       const FragmentProcessor* /*expression*/) const {
+                                       RenderPass* renderPass) const {
   const auto* chainProgram = ChainProgram(info);
   if (chainProgram == nullptr) {
     LOGE("ChainProgramWriter::writeSamplers() no compiled chain program; skipping the bindings");

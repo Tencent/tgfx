@@ -407,11 +407,12 @@ static_assert(EntryOffset::ReflectionOffset + sizeof(uint32_t) == PoolEntrySize,
 
 /**
  * The toolchain ABI version every bundle records (header offset 16). This is the compatibility
- * gate for everything the content identity hash cannot express on old bundles (hash 0): the
- * reflection layout grammar, the uniform block contracts, and the rule semantics the runtime
- * matchers assume when they turn a pool entry into a program. Bump this constant whenever any of
- * those contracts change in a way that keeps shader names and pool indices stable but changes
- * what the bytes mean; the writer picks the new value up automatically and the loader then
+ * gate for everything the content identity hash cannot express: the reflection layout grammar,
+ * the uniform block contracts, and the rule semantics the runtime matchers assume when they turn
+ * a pool entry into a program. Bump this constant whenever any of those contracts change in a
+ * way that keeps shader names and pool indices stable but changes what the bytes mean; a GLSL
+ * function-body edit that leaves every field, name and index identical does not bump it (the
+ * identity hash covers it). The writer picks the new value up automatically and the loader then
  * refuses every older bundle instead of feeding mismatched layouts to the GPU.
  *
  * Bumping this constant also makes the bundles published under resources/shaders stale: they record

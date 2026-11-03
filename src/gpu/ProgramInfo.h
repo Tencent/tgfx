@@ -294,7 +294,6 @@ class ProgramInfo {
   friend class ProgramWriter;
   friend class RuntimeProgramWriter;
   friend class PrecompiledProgramWriter;
-  friend class ExpressionProgramWriter;
   friend class ChainProgramWriter;
 
   std::vector<SamplerInfo> getSamplers() const;

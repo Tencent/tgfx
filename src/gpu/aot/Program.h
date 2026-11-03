@@ -45,8 +45,8 @@ struct AOTBinding {
 };
 
 /// The runtime operator of one chain slot. The integer values are part of the precompiled kernel
-/// ABI: they must match the OP_* constants in operator/op_codes.inc, which shader_build_tool
-/// validates against the shared Op constants at bundle build time.
+/// ABI: each member assigns its Op constant directly, and shader_build_tool injects the same
+/// values into every compiled variant as the OP_* defines.
 enum class AOTChainOp : int {
   ColorMatrix = Op::ColorMatrix,
   Luma = Op::Luma,

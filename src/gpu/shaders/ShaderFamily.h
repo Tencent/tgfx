@@ -36,7 +36,7 @@ enum class PermutationMatchFailure;
  * Detection traits for the optional members a ShaderFamily subclass may declare. A family that
  * does not declare a member keeps the documented default instead of failing to compile, so a
  * minimal family only carries the mandatory pieces (Name, VertFile, FragFile, VD, FD,
- * ServesAlphaOnly, Inputs, Compose, Extract).
+ * ServesAlphaOnly, Inputs, Compose, ExtractFacts).
  */
 template <typename T, typename = void>
 struct FamilyHasGpClassName : std::false_type {};
@@ -100,8 +100,9 @@ std::unique_ptr<PrecompiledShader> CreateShaderFamilyInstance() {
  *   struct Inputs              — everything the runtime needs to pick a variant;
  *   static Compose(Inputs)     — pure mapping from inputs to dimension values, inline in the
  *                                header (shader_build_tool links it to enumerate the bundle);
- *   static Extract(ProgramInfo*, failure) — whole-draw guards, defined in the family's .cpp;
- *                                a rejection records its reason into failure (first wins).
+ *   static ExtractFacts(facts, failure) — whole-draw guards over the extracted facts, defined
+ *                                in the family's .cpp; a rejection records its reason into
+ *                                failure (first wins).
  *
  * Match (Extract → Compose → encode) and Reachable (Compose over the input space, or the
  * mirrored domain product for a pass-through family) both route through the same Compose, so

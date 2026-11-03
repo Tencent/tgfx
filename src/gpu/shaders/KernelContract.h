@@ -52,11 +52,11 @@ constexpr const char* DeviceToLocal = "DeviceToLocal";
 namespace Op {
 
 // The one op table of the pointwise interpreters (chain and slot): the single place an op value
-// is defined. Mirrored by the OP_* defines in operator/op_codes.inc (validated by
-// shader_build_tool, which also rejects any OP_* define elsewhere) and anchored to by the
-// AOTChainOp enum. The single-slot interpreter dispatches on the AOTPointwiseOpType subset of
-// these values, so it deliberately never emits the chain-only ones (Texture, the coverage ops,
-// and the modulators).
+// is defined. shader_build_tool injects these values into every compiled variant as the OP_*
+// defines (Op::Defines); op_codes.inc only marks the include point, and the AOTChainOp enum
+// anchors to them by assignment. The single-slot interpreter dispatches on the AOTPointwiseOpType
+// subset of these values, so it deliberately never emits the chain-only ones (Texture, the
+// coverage ops, and the modulators).
 constexpr int ColorMatrix = 0;
 constexpr int Luma = 1;
 constexpr int AlphaThreshold = 2;

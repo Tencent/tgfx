@@ -260,7 +260,6 @@ class UniformData {
   friend class AOTParamLayout;
   friend class RuntimeProgramWriter;
   friend class PrecompiledProgramWriter;
-  friend class ExpressionProgramWriter;
   friend class ChainProgramWriter;
   friend class UniformHandler;
   friend class PrecompiledProgramCreator;

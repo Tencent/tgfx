@@ -172,15 +172,6 @@ TextureView* TextureEffect::getTextureView() const {
   return textureProxy->getTextureView().get();
 }
 
-bool TextureEffect::isTextureInstantiated() const {
-  return getTextureView() != nullptr;
-}
-
-YUVFormat TextureEffect::yuvFormat() const {
-  auto* yuvView = getYUVTexture();
-  return yuvView != nullptr ? yuvView->yuvFormat() : YUVFormat::Unknown;
-}
-
 YUVTextureView* TextureEffect::getYUVTexture() const {
   auto textureView = textureProxy->getTextureView().get();
   if (textureView && textureView->isYUV()) {
@@ -218,16 +209,6 @@ bool TextureEffect::needSubset() const {
     return true;
   }
   return false;
-}
-
-Point TextureEffect::alphaStartCoord() const {
-  // The same transform GLSLTextureEffect::onSetData applies to the RGBAAA alpha-plane offset;
-  // lifted here so the module Bind and the processor writer cannot drift apart.
-  auto textureView = getTextureView();
-  if (textureView == nullptr) {
-    return Point::Zero();
-  }
-  return textureView->getTextureCoord(alphaStart.x, alphaStart.y);
 }
 
 void TextureEffect::computeSubsetRect(float rect[4]) const {

@@ -199,13 +199,12 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   auto program = globalCache->findProgram(key);
   bool cacheKeyOccupied = program != nullptr;
   bool programCreated = false;
-  bool deferredFallback = false;
   if (program != nullptr && precompiledOnly &&
       program->getProvenance().program != ProgramOrigin::PrecompiledArtifact) {
     program = nullptr;
   }
   if (program == nullptr) {
-    program = PrecompiledProgramCreator::CreateProgram(context, this, &deferredFallback);
+    program = PrecompiledProgramCreator::CreateProgram(context, this);
     if (program == nullptr && !precompiledOnly) {
       program = ProgramBuilder::CreateProgram(context, this);
     }
@@ -231,9 +230,8 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   // modes. If a runtime program already occupies the key, PrecompiledOnly may return a newly created
   // artifact for this lookup but must not replace that cache entry and corrupt its LRU bookkeeping.
   if (programCreated && !cacheKeyOccupied) {
-    globalCache->addProgram(
-        key, program,
-        deferredFallback || context->precompiledShaderCache()->deliberateMissMarking());
+    globalCache->addProgram(key, program,
+                            context->precompiledShaderCache()->deliberateMissMarking());
   }
   return program;
 }

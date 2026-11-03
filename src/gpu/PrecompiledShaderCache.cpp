@@ -649,11 +649,10 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     return false;
   }
   uint64_t sourceHash = ReadU64LE(ptr + BundleFormat::Offset::IdentityHash);
-  // Toolchain ABI gate (F04): the content identity hash covers the bytes, but a legacy bundle
-  // without a hash (0) carries no self-description. The recorded toolchain version is the one
-  // contract every writer has stamped since the field existed, so a mismatch here means the
-  // bundle's reflection grammar or uniform contracts predate (or postdate) what this runtime
-  // knows how to consume — reject instead of guessing.
+  // Toolchain ABI gate (F04): the content identity hash covers the bytes, but not what they
+  // mean. The recorded toolchain version is the one contract every writer has stamped since the
+  // field existed, so a mismatch here means the bundle's reflection grammar or uniform contracts
+  // predate (or postdate) what this runtime knows how to consume — reject instead of guessing.
   uint32_t toolchainVersion = ReadU32LE(ptr + BundleFormat::Offset::ToolchainABI);
   if (toolchainVersion != ExpectedToolchainABI) {
     LOGE(
@@ -676,8 +675,8 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   // Backend identity: a bundle compiled for a different backend must be rejected outright. The
   // format version says nothing about the code dialect or binary format of the blobs, so a
   // same-name cross-backend bundle would otherwise feed mismatched code to the GPU. A cache
-  // constructed without a backend (standalone parsing in tests) skips this check, mirroring the
-  // legacy-hash skip below: an unspecified identity cannot be verified.
+  // constructed without a backend (standalone parsing in tests) skips this check: an unspecified
+  // identity cannot be verified.
   const auto expectedProfile = ExpectedShaderProfile(_backend);
   // An OpenGL context running the ES standard (GLES devices, SwiftShader, WebGL) must be served
   // from the opengles bundle: the desktop tag only covers desktop GLSL profiles. The GL profile

@@ -30,10 +30,7 @@ namespace tgfx {
 /// the bundle does not contain the required variant.
 class PrecompiledProgramCreator {
  public:
-  // deferredFallback identifies this attempt's by-design miss, independently of diagnostic
-  // recording. It is false for all other failures and for successful precompiled programs.
-  static std::shared_ptr<Program> CreateProgram(Context* context, const ProgramInfo* programInfo,
-                                                bool* deferredFallback = nullptr);
+  static std::shared_ptr<Program> CreateProgram(Context* context, const ProgramInfo* programInfo);
 
   /**
    * Creates the Program a resolved match points at: the deny list, the blob lookup, the shader

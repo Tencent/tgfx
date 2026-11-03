@@ -52,35 +52,10 @@ class TextureEffect : public FragmentProcessor {
     return textureProxy->hasPendingUpload() && !textureProxy->mayUploadYUV();
   }
 
-  // The YUV plane layout of the texture (I420 or NV12), or YUVFormat::Unknown for non-YUV
-  // textures. Used by the precompiled matcher to select the plane-sampling variant.
-  YUVFormat yuvFormat() const;
-
   bool isAlphaOnly() const;
 
   bool hasRGBAAA() const {
     return alphaStart != Point::Zero();
-  }
-
-  // The alpha-plane offset in texture coordinates (the RGBAAA dual-plane sample shift), as the
-  // precompiled AlphaStart uniform carries it. Zero for a single-plane source.
-  Point alphaStartCoord() const;
-
-  bool hasSubset() const {
-    return needSubset();
-  }
-
-  // Strict draws also clamp to the geometry processor's per-quad subset varying.
-  SrcRectConstraint getConstraint() const {
-    return constraint;
-  }
-
-  // The child's tile modes. The precompiled blur kernel clamps plain-child taps to the subset
-  // (edge stretch), which is only the correct tap semantics for Clamp — a Decal child must stay
-  // transparent outside its subset, so matchers use this to keep it off that kernel.
-  void getTileModes(TileMode* modeX, TileMode* modeY) const {
-    *modeX = samplerState.tileModeX;
-    *modeY = samplerState.tileModeY;
   }
 
   // True when the coordinate transform carries a projective matrix. The plain precompiled texture
@@ -96,15 +71,12 @@ class TextureEffect : public FragmentProcessor {
    * The computation applies nearest-filter rounding, a half-texel inset (a full texel for external
    * textures), bottom-left origin flipping, and normalization into texture coordinate space. It
    * lets a parent processor populate a subset uniform declared by a precompiled shader on behalf of
-   * this child texture effect. Only meaningful when hasSubset() is true.
+   * this child texture effect. Only meaningful when needSubset() is true.
    */
   void computeSubsetRect(float rect[4]) const;
 
   /** The YUV planes behind this texture, or null for a single-plane texture. */
   YUVTextureView* getYUVTexture() const;
-
-  /** False while the texture is not instantiated (a failed or deferred upload leaves it null). */
-  bool isTextureInstantiated() const;
 
   /** The texture proxy this effect samples; the IR-driven bind matches its leaf by it. */
   std::shared_ptr<TextureProxy> getTextureProxy() const {

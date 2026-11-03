@@ -44,9 +44,9 @@ struct AOTChainCompile;
  *     run several passes: materialized blend operands and the split-off passes of a long linear
  *     chain.
  *   - Through the plain program lookup at prepare time, for a draw that is still on the plain
- *     route: the re-expressing kernels (the chain interpreter and the perlin kernel) rebuild the
- *     draw's own expression per draw. Single pass only; the chain interpreter also merges the
- *     classified coverage terms.
+ *     route: the re-expressing kernel (the chain interpreter) rebuilds the draw's own expression
+ *     per draw. Single pass only; the chain interpreter also merges the classified coverage
+ *     terms.
  *
  * An entry whose route produced no plan, or whose Build was refused, keeps its original draw for
  * the plain route.

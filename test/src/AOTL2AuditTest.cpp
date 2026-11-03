@@ -980,7 +980,7 @@ static void WalkCoverageStructure(const FragmentProcessor* root, const char* lab
     if (fp->name() == "TextureEffect") {
       (*textureEffectCount)++;
       auto* te = static_cast<const TextureEffect*>(fp);
-      if (te->hasSubset()) {
+      if (te->needSubset()) {
         (*subsetCount)++;
       }
       if (isCoverage && fp->numCoordTransforms() > 0 && *tiledCoordIndex < 0) {

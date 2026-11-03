@@ -539,7 +539,7 @@ bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTEffectPlan* 
     // Each planner's own admission subsumes what AOTPlanner::Validate would re-derive: the
     // DAG planner resolves the profile and kernel together, the linear planner's fit calls
     // BuildCutSegment with the same placeholder admission the planner's validation relies on, the
-    // perlin planner checks the slot shapes and the lookup resources, and the cut planner runs the
+    // YUV planner checks the slot shapes and the lookup resources, and the cut planner runs the
     // same segment build construction uses over placeholder intermediates. The re-check therefore
     // runs only as a debug assertion.
     DEBUG_ASSERT(AOTPlanner::Validate(graph, candidate));

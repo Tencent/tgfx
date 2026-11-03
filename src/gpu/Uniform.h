@@ -29,7 +29,7 @@ namespace tgfx {
  * UniformFormat as one byte in every reflection entry and the runtime loader reads it back. The
  * values are therefore written out and pinned below. Never reorder or renumber an entry, and
  * append new formats at the end; any change to an existing value or to the meaning of a stored
- * format must bump ExpectedToolchainABI in PrecompiledBundleIdentity.h.
+ * format must bump ExpectedToolchainABI in ShaderBundleContract.h.
  */
 enum class UniformFormat {
   Float = 0,                    // 32-bit floating point scalar.
