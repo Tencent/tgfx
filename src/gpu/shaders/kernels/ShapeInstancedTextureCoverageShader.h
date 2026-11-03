@@ -9,76 +9,37 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the license for the specific language governing permissions and
-//  limitations under the license.
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
-#include <optional>
-#include <vector>
-#include "gpu/shaders/ShaderFamily.h"
+#include "gpu/shaders/FillKernel.h"
 
 namespace tgfx {
 
-class FragmentProcessor;
-class ProgramInfo;
-
-class ShapeInstancedTextureCoverageShader
-    : public ShaderFamily<ShapeInstancedTextureCoverageShader> {
+/**
+ * ShapeInstancedTextureCoverageShader: ShapeInstancedDrawOp's instanced shape batch in its
+ * non-AA form, whose coverage comes from a texture (optionally topped by a single-interval
+ * gradient and/or an analytic clip). The coverage texture's and the gradient's facts come off
+ * the carried IR's terms and color graph, so the acceptance is defined in the family's .cpp.
+ */
+class ShapeInstancedTextureCoverageShader : public FillKernel<ShapeInstancedTextureCoverageShader> {
  public:
   static constexpr const char* Name = "ShapeInstancedTextureCoverageShader";
   static constexpr const char* VertFile = "kernels/shape_instanced_texture_coverage.vert";
   static constexpr const char* FragFile = "kernels/shape_instanced_texture_coverage.frag";
-
-  struct VertDims {
-    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
-    static inline const PermutationBoolDim<VertDims> GRADIENT{"GRADIENT"};
-    static PermutationDomain domain() {
-      return PermutationDomain({GRADIENT});
-    }
-  };
-  using VD = VertDims;
-
-  struct FragDims {
-    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
-    static inline const PermutationBoolDim<FragDims> GRADIENT{"GRADIENT"};
-    static PermutationDomain domain() {
-      return PermutationDomain({GRADIENT});
-    }
-  };
-  using FD = FragDims;
-  /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
 
-  /// Matcher inputs: the gradient presence ahead of the coverage texture.
-  struct Inputs {
-    bool gradient = false;
-  };
+  static constexpr Dim vertDims[] = {{"GRADIENT", 2}};
+  static constexpr Dim fragDims[] = {{"GRADIENT", 2}};
 
-  /// Pure mapping from inputs to dimension values. Pass-through: every input value lands on the
-  /// domains one-to-one (GRADIENT mirrors to both stages), so the mirrored Reachable default
-  /// enumerates exactly what Compose emits.
-  static std::optional<RuleComposedValues> Compose(const Inputs& inputs) {
-    int gradient = inputs.gradient ? 1 : 0;
-    auto vert = ComposedDims<VertDims>(VertDims::domain());
-    vert.set(VD::GRADIENT, gradient);
-    auto frag = ComposedDims<FragDims>(FragDims::domain());
-    frag.set(FD::GRADIENT, gradient);
-    RuleComposedValues values;
-    values.vertValues = vert.finish();
-    values.fragValues = frag.finish();
-    return values;
-  }
-
-  /// Whole-draw guards (alpha-only target, the instanced-shape geometry kind in its non-AA form,
-  /// the bare or gradient-topped coverage texture shape), defined in the family's own .cpp, next
-  /// to the GLSL it owns.
-  static std::optional<Inputs> ExtractFacts(const DrawShape& facts,
-                                            PermutationMatchFailure* failure);
+  static bool Accept(const DrawShape& shape);
+  static Variants Select(const DrawShape& shape);
 };
 
 }  // namespace tgfx

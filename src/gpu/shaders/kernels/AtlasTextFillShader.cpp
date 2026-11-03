@@ -9,51 +9,53 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the license for the specific language governing permissions and
-//  limitations under the license.
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/shaders/kernels/AtlasTextFillShader.h"
-#include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/aot/DrawShape.h"
-#include "gpu/processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
 
-std::optional<AtlasTextFillShader::Inputs> AtlasTextFillShader::ExtractFacts(
-    const DrawShape& facts, PermutationMatchFailure*) {
+bool AtlasTextFillShader::Accept(const DrawShape& shape) {
   // The geometry kind IS the contract: AtlasTextOp's glyph processor, no processor-tree walk.
-  if (facts.geometry.kind != GeometryKind::AtlasText) {
-    return std::nullopt;
+  if (shape.geometry.kind != GeometryKind::AtlasText) {
+    return false;
   }
-  if (facts.colorFPCount != 0 || facts.fragmentCount > 1) {
-    return std::nullopt;
+  if (shape.colorFPCount != 0 || shape.fragmentCount > 1) {
+    return false;
   }
-  const int xpType = facts.xpType();
-  if (xpType < XP_NONE) {
-    return std::nullopt;
+  if (shape.xpType() < XP_NONE) {
+    return false;
   }
-  if (facts.fragmentCount == 1) {
+  if (shape.fragmentCount == 1) {
     // A single coverage FP multiplies the atlas glyph coverage: either a direct analytic clip
     // (AA rect / rrect) via the runtime clip contract, or an alpha-only affine device-space mask
     // — the mask sampler facts come off the IR's DeviceMask term.
-    const bool directClip = facts.coverage == Coverage::AARect || facts.coverage == Coverage::RRect;
+    const bool directClip = shape.coverage == Coverage::AARect || shape.coverage == Coverage::RRect;
     if (!directClip) {
-      auto* mask = DeviceMaskCoverageLeaf(facts.ir);
+      auto* mask = DeviceMaskCoverageLeaf(shape.ir);
       if (mask == nullptr || !mask->isAlphaOnly || mask->hasPerspective) {
-        return std::nullopt;
+        return false;
       }
     }
   }
-  Inputs inputs;
-  inputs.hasCoverage = facts.geometry.hasCoverage;
-  inputs.xpType = xpType;
-  return inputs;
+  return true;
+}
+
+Variants AtlasTextFillShader::Select(const DrawShape& shape) {
+  Variants variants;
+  int hasCoverage = shape.geometry.hasCoverage ? 1 : 0;
+  variants.vert("HAS_COVERAGE", hasCoverage)
+      .frag("HAS_COVERAGE", hasCoverage)
+      .frag(XP_DEFINE_NAME, shape.xpType());
+  return variants;
 }
 
 }  // namespace tgfx

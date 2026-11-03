@@ -9,16 +9,14 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the license for the specific language governing permissions and
-//  limitations under the license.
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/shaders/kernels/ShapeInstancedTextureCoverageShader.h"
-#include <optional>
-#include "gpu/PermutationMatch.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/aot/DrawIR.h"
@@ -26,13 +24,15 @@
 
 namespace tgfx {
 
-static bool IsAnalyticClipKind(const std::optional<Coverage>& kind) {
+namespace {
+
+bool IsAnalyticClipKind(const std::optional<Coverage>& kind) {
   return kind && (*kind == Coverage::AARect || *kind == Coverage::RRect);
 }
 
 // The gradient form's color graph: the geometry color lowered as the input, then the single
 // GradientSource over it.
-static const AOTGradientParameters* SoleGradientLeaf(const AOTEffectGraph& graph) {
+const AOTGradientParameters* SoleGradientLeaf(const AOTEffectGraph& graph) {
   if (graph.nodeCount() != 2 || !graph.root().isValid() || graph.root().index() != 1) {
     return nullptr;
   }
@@ -43,55 +43,53 @@ static const AOTGradientParameters* SoleGradientLeaf(const AOTEffectGraph& graph
   return std::get_if<AOTGradientParameters>(&node->parameters);
 }
 
-std::optional<ShapeInstancedTextureCoverageShader::Inputs>
-ShapeInstancedTextureCoverageShader::ExtractFacts(const DrawShape& facts,
-                                                  PermutationMatchFailure* failure) {
+}  // namespace
+
+bool ShapeInstancedTextureCoverageShader::Accept(const DrawShape& shape) {
   // The geometry kind IS the contract: ShapeInstancedDrawOp's processor, in its non-AA form —
   // this kernel carries no AA coverage attribute.
-  if (facts.geometry.kind != GeometryKind::ShapeInstanced || facts.geometry.hasCoverage) {
-    return std::nullopt;
+  if (shape.geometry.kind != GeometryKind::ShapeInstanced || shape.geometry.hasCoverage) {
+    return false;
   }
-  if (facts.xpType() != XP_NONE) {
-    return std::nullopt;
+  if (shape.xpType() != XP_NONE) {
+    return false;
   }
   // Two color forms: the geometry color alone, or a single-interval clamped gradient over it.
   // The gradient node in the carried IR is the contract: a single-interval colorizer over an
   // affine layout (the lowering refuses every other form).
-  int gradient = 0;
-  if (facts.colorFPCount == 1) {
-    const auto* params = facts.ir != nullptr ? SoleGradientLeaf(facts.ir->color) : nullptr;
+  if (shape.colorFPCount == 1) {
+    const auto* params = shape.ir != nullptr ? SoleGradientLeaf(shape.ir->color) : nullptr;
     if (params == nullptr || params->colorizerKind != 0 || params->hasPerspective) {
-      return std::nullopt;
+      return false;
     }
-    gradient = 1;
-  } else if (facts.colorFPCount != 0) {
-    return std::nullopt;
+  } else if (shape.colorFPCount != 0) {
+    return false;
   }
   // One coverage texture, optionally accompanied by an analytic clip. The clip rides the runtime
   // clip contract uniforms (no permutation change), so both forms select the same variant.
-  if (facts.fragmentCount == facts.colorFPCount + 1) {
+  if (shape.fragmentCount == shape.colorFPCount + 1) {
     // The sole term is the texture leaf — record-time, or the rasterized shape's prepare-grown
     // mask the lowering appended at prepare.
-    const auto* texture = facts.ir != nullptr && facts.ir->coverage.size() == 1
-                              ? BareTextureCoverageLeaf(facts.ir->coverage[0])
+    const auto* texture = shape.ir != nullptr && shape.ir->coverage.size() == 1
+                              ? BareTextureCoverageLeaf(shape.ir->coverage[0])
                               : nullptr;
     if (texture == nullptr || texture->samplingKind != AOTTextureSamplingKind::Plain ||
         texture->isYUV || texture->hasRGBAAA || texture->textureProxy == nullptr ||
         texture->textureProxy->getTextureView() == nullptr) {
-      return std::nullopt;
+      return false;
     }
-    return Inputs{gradient != 0};
+    return true;
   }
-  if (facts.fragmentCount != facts.colorFPCount + 2) {
-    return std::nullopt;
+  if (shape.fragmentCount != shape.colorFPCount + 2) {
+    return false;
   }
   // The texture-plus-clip form keeps the term walk (the processor-tree walk could not tell the
   // two FPs apart either — the terms are what named the texture): the terms follow the coverage
   // FPs' order, so the non-analytic term's position names the texture.
-  if (facts.ir == nullptr) {
-    return Fail(failure, PermutationMatchFailure::CoverageShape);
+  if (shape.ir == nullptr) {
+    return false;
   }
-  const auto& coverage = facts.ir->coverage;
+  const auto& coverage = shape.ir->coverage;
   std::optional<Coverage> kinds[2] = {};
   size_t termCount = 0;
   for (const auto& term : coverage) {
@@ -103,7 +101,7 @@ ShapeInstancedTextureCoverageShader::ExtractFacts(const DrawShape& facts,
   if (termCount != 2) {
     // Two FPs lowered to something other than two single terms (a composed clip among them):
     // not a shape this kernel evaluates.
-    return Fail(failure, PermutationMatchFailure::CoverageShape);
+    return false;
   }
   const AOTTextureParameters* textureLeaf = nullptr;
   if (IsAnalyticClipKind(kinds[0]) && !IsAnalyticClipKind(kinds[1])) {
@@ -111,16 +109,18 @@ ShapeInstancedTextureCoverageShader::ExtractFacts(const DrawShape& facts,
   } else if (IsAnalyticClipKind(kinds[1]) && !IsAnalyticClipKind(kinds[0])) {
     textureLeaf = BareTextureCoverageLeaf(coverage[0]);
   } else {
-    // Two masks, or two clips, are not a shape this kernel evaluates.
-    return Fail(failure, PermutationMatchFailure::CoverageShape);
+    return false;
   }
-  // The old TextureEffect acceptance (a sole sampler, no YUV, no packed-alpha dual plane) reads
-  // off the leaf the run recorded.
-  if (textureLeaf == nullptr || textureLeaf->samplingKind != AOTTextureSamplingKind::Plain ||
-      textureLeaf->isYUV || textureLeaf->hasRGBAAA || textureLeaf->textureProxy == nullptr) {
-    return std::nullopt;
-  }
-  return Inputs{gradient != 0};
+  return textureLeaf != nullptr && textureLeaf->samplingKind == AOTTextureSamplingKind::Plain &&
+         !textureLeaf->isYUV && !textureLeaf->hasRGBAAA && textureLeaf->textureProxy != nullptr;
+}
+
+Variants ShapeInstancedTextureCoverageShader::Select(const DrawShape& shape) {
+  // The gradient presence mirrors the acceptance: one color FP is the sole gradient leaf.
+  int gradient = shape.colorFPCount == 1 ? 1 : 0;
+  Variants variants;
+  variants.vert("GRADIENT", gradient).frag("GRADIENT", gradient);
+  return variants;
 }
 
 }  // namespace tgfx

@@ -9,59 +9,58 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the license for the specific language governing permissions and
-//  limitations under the license.
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/shaders/kernels/TiledTextureFillShader.h"
-#include <cstdio>
-#include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/aot/AOTChainBuilder.h"
 #include "gpu/aot/DrawIR.h"
 #include "gpu/aot/DrawShape.h"
-#include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
 
-std::optional<TiledTextureFillShader::Inputs> TiledTextureFillShader::ExtractFacts(
-    const DrawShape& facts, PermutationMatchFailure*) {
-  if (!facts.positionOnlyRect()) {
-    return std::nullopt;
+bool TiledTextureFillShader::Accept(const DrawShape& shape) {
+  if (!shape.positionOnlyRect()) {
+    return false;
   }
-  if (facts.fragmentCount != 1) {
-    return std::nullopt;
+  if (shape.fragmentCount != 1) {
+    return false;
   }
-  int xpType = facts.xpType();
-  if (xpType < XP_NONE) {
-    return std::nullopt;
+  if (shape.xpType() < XP_NONE) {
+    return false;
   }
   // The sole color processor is the IR's tiled texture leaf (no operators above it).
-  if (facts.ir == nullptr) {
-    return std::nullopt;
+  if (shape.ir == nullptr) {
+    return false;
   }
   AOTChainBuilder::AOTTextureTailShape tail = {};
-  if (!AOTChainBuilder::CollectTextureTail(facts.ir->color, &tail) || !tail.ops.empty()) {
-    return std::nullopt;
+  if (!AOTChainBuilder::CollectTextureTail(shape.ir->color, &tail) || !tail.ops.empty()) {
+    return false;
   }
   auto* leaf = tail.leaf;
   if (leaf->samplingKind != AOTTextureSamplingKind::Tiled || leaf->hasPerspective ||
       !leaf->tiledRecipe.has_value()) {
-    return std::nullopt;
+    return false;
   }
   if (!TiledFillModeSupported(static_cast<int>(leaf->tiledRecipe->shaderModeX)) ||
       !TiledFillModeSupported(static_cast<int>(leaf->tiledRecipe->shaderModeY))) {
-    return std::nullopt;
+    return false;
   }
   // A both-None (0/0) mode means the hardware sampler already resolves the tiling (e.g. Repeat
   // with a full-boundary subset), so this kernel serves it like any other mode.
-  // ALPHA_ONLY and HAS_STRICT are folded into runtime uniforms (AlphaOnly / Strict), set by
-  // GLSLTiledTextureEffect::onSetData; they are no longer compile-time dimensions.
-  return Inputs{xpType};
+  return true;
+}
+
+Variants TiledTextureFillShader::Select(const DrawShape& shape) {
+  Variants variants;
+  variants.frag(XP_DEFINE_NAME, shape.xpType());
+  return variants;
 }
 
 }  // namespace tgfx

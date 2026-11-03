@@ -9,76 +9,58 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the license for the specific language governing permissions and
-//  limitations under the license.
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
-#include <optional>
-#include <vector>
-#include "gpu/shaders/ShaderFamily.h"
+#include "gpu/shaders/FillKernel.h"
 
 namespace tgfx {
 
-struct DrawShape;
-class FragmentProcessor;
-class ProgramInfo;
-
-class QuadColorFillShader : public ShaderFamily<QuadColorFillShader> {
+/**
+ * QuadColorFillShader: QuadPerEdgeAAGeometryProcessor with the per-vertex color only. Accepts
+ * zero fragment processors, one direct analytic clip (AA rect or rrect, evaluated by the runtime
+ * clip contract uniforms), or one device-space mask (the HAS_MASK_TEXTURE sampler).
+ */
+class QuadColorFillShader : public FillKernel<QuadColorFillShader> {
  public:
   static constexpr const char* Name = "QuadColorFillShader";
   static constexpr const char* VertFile = "kernels/quad_color_fill.vert";
   static constexpr const char* FragFile = "kernels/quad_color_fill.frag";
-
-  struct VertDims {
-    // No vertex dimensions: an empty domain, with no handles to keep aligned.
-    static PermutationDomain domain() {
-      return PermutationDomain({});
-    }
-  };
-  using VD = VertDims;
-
-  struct FragDims {
-    // One typed handle per dimension; domain() lists them in the bundle's dimension order, and
-    // Compose assigns through the handles by name (ComposedDims) — no index enum to keep
-    // aligned with the domain list.
-    static inline const PermutationIntDim<FragDims> HAS_XP{XP_DEFINE_NAME, XP_VALUE_COUNT};
-    static inline const PermutationBoolDim<FragDims> HAS_MASK_TEXTURE{"HAS_MASK_TEXTURE"};
-    static PermutationDomain domain() {
-      return PermutationDomain({HAS_XP, HAS_MASK_TEXTURE});
-    }
-  };
-  using FD = FragDims;
-  /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
 
-  /// Matcher inputs: the XferProcessor kind and the device-mask coverage presence.
-  struct Inputs {
-    int xpType = XP_UNSUPPORTED;
-    bool hasMaskTexture = false;
-  };
+  /// Fragment dimensions, in the bundle's dimension order:
+  ///   HAS_XP: 0=passthrough, 1=dst texture, 2=framebuffer fetch
+  ///   HAS_MASK_TEXTURE: device-space mask texture binding is present
+  static constexpr Dim fragDims[] = {{XP_DEFINE_NAME, XP_VALUE_COUNT}, {"HAS_MASK_TEXTURE", 2}};
 
-  /// Pure mapping from inputs to dimension values. Pass-through: every input value lands on the
-  /// domain one-to-one, so the mirrored Reachable default enumerates exactly what Compose emits.
-  static std::optional<RuleComposedValues> Compose(const Inputs& inputs) {
-    if (inputs.xpType < XP_NONE) {
-      return std::nullopt;
+  static bool Accept(const DrawShape& shape) {
+    if (shape.geometry.kind != GeometryKind::QuadPerEdgeAA) {
+      return false;
     }
-    auto frag = ComposedDims<FragDims>(FragDims::domain());
-    frag.set(FD::HAS_XP, inputs.xpType);
-    frag.set(FD::HAS_MASK_TEXTURE, inputs.hasMaskTexture ? 1 : 0);
-    RuleComposedValues values;
-    values.fragValues = frag.finish();
-    return values;
+    if (shape.fragmentCount != 0) {
+      if (shape.colorFPCount != 0) {
+        return false;
+      }
+      if (shape.coverage != Coverage::AARect && shape.coverage != Coverage::RRect &&
+          shape.coverage != Coverage::DeviceMask) {
+        return false;
+      }
+    }
+    return shape.xpType() >= XP_NONE;
   }
 
-  /// The same acceptance over the draw's extracted facts: the executor-table row's predicate.
-  static std::optional<Inputs> ExtractFacts(const DrawShape& facts,
-                                            PermutationMatchFailure* failure);
+  static Variants Select(const DrawShape& shape) {
+    Variants variants;
+    variants.frag(XP_DEFINE_NAME, shape.xpType())
+        .frag("HAS_MASK_TEXTURE", shape.coverage == Coverage::DeviceMask ? 1 : 0);
+    return variants;
+  }
 };
 
 }  // namespace tgfx

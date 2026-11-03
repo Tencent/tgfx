@@ -9,75 +9,45 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the license for the specific language governing permissions and
-//  limitations under the license.
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
-#include <optional>
-#include <vector>
-#include "gpu/shaders/ShaderFamily.h"
+#include "gpu/shaders/FillKernel.h"
 
 namespace tgfx {
 
-class ProgramInfo;
-
-class MeshFillShader : public ShaderFamily<MeshFillShader> {
+/**
+ * MeshFillShader: MeshDrawOp's triangle mesh, no fragment processors. The vertex stage's
+ * attribute list carries texture coordinates or not, selected by the HAS_TEX_COORDS dimension.
+ */
+class MeshFillShader : public FillKernel<MeshFillShader> {
  public:
   static constexpr const char* Name = "MeshFillShader";
   static constexpr const char* VertFile = "kernels/mesh_fill.vert";
   static constexpr const char* FragFile = "kernels/mesh_fill.frag";
-
-  struct VertDims {
-    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
-    static inline const PermutationBoolDim<VertDims> HAS_TEX_COORDS{"HAS_TEX_COORDS"};
-    static PermutationDomain domain() {
-      return PermutationDomain({HAS_TEX_COORDS});
-    }
-  };
-  using VD = VertDims;
-
-  struct FragDims {
-    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
-    static inline const PermutationIntDim<FragDims> HAS_XP{XP_DEFINE_NAME, XP_VALUE_COUNT};
-    static PermutationDomain domain() {
-      return PermutationDomain({HAS_XP});
-    }
-  };
-  using FD = FragDims;
-  /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
 
-  /// Matcher inputs: the tex-coord presence and the XferProcessor kind.
-  struct Inputs {
-    bool hasTexCoords = false;
-    int xpType = XP_UNSUPPORTED;
-  };
+  static constexpr Dim vertDims[] = {{"HAS_TEX_COORDS", 2}};
+  /// Fragment dimensions: HAS_XP (0=passthrough, 1=dst texture, 2=framebuffer fetch).
+  static constexpr Dim fragDims[] = {{XP_DEFINE_NAME, XP_VALUE_COUNT}};
 
-  /// Pure mapping from inputs to dimension values. Pass-through: every input value lands on the
-  /// domain one-to-one, so the mirrored Reachable default enumerates exactly what Compose emits.
-  static std::optional<RuleComposedValues> Compose(const Inputs& inputs) {
-    if (inputs.xpType < XP_NONE) {
-      return std::nullopt;
-    }
-    auto vert = ComposedDims<VertDims>(VertDims::domain());
-    vert.set(VD::HAS_TEX_COORDS, inputs.hasTexCoords ? 1 : 0);
-    auto frag = ComposedDims<FragDims>(FragDims::domain());
-    frag.set(FD::HAS_XP, inputs.xpType);
-    RuleComposedValues values;
-    values.vertValues = vert.finish();
-    values.fragValues = frag.finish();
-    return values;
+  static bool Accept(const DrawShape& shape) {
+    return shape.geometry.kind == GeometryKind::Mesh && shape.fragmentCount == 0 &&
+           shape.xpType() >= XP_NONE;
   }
 
-  /// Whole-draw guards (alpha-only target, the mesh geometry kind, fragment-processor count),
-  /// defined in the family's own .cpp, next to the GLSL it owns.
-  static std::optional<Inputs> ExtractFacts(const DrawShape& facts,
-                                            PermutationMatchFailure* failure);
+  static Variants Select(const DrawShape& shape) {
+    Variants variants;
+    variants.vert("HAS_TEX_COORDS", shape.geometry.hasTexCoords ? 1 : 0)
+        .frag(XP_DEFINE_NAME, shape.xpType());
+    return variants;
+  }
 };
 
 }  // namespace tgfx

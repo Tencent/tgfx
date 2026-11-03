@@ -9,83 +9,58 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the license for the specific language governing permissions and
-//  limitations under the license.
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
-#include <optional>
-#include <vector>
-#include "gpu/shaders/ShaderFamily.h"
+#include "gpu/shaders/FillKernel.h"
 
 namespace tgfx {
 
-class ProgramInfo;
-
-class RoundStrokeRectFillShader : public ShaderFamily<RoundStrokeRectFillShader> {
+/**
+ * RoundStrokeRectFillShader: RectDrawOp's round-capped/joined stroke rect. The kernel reads the
+ * clip from the runtime clip contract uniforms, so a sole analytic clip is admitted alongside
+ * the FP-free form. Perspective UV transforms are not covered by precompiled variants. The
+ * color attribute is unconditional and the AA ramp is the AAEnabled runtime uniform, so neither
+ * is a dimension.
+ */
+class RoundStrokeRectFillShader : public FillKernel<RoundStrokeRectFillShader> {
  public:
   static constexpr const char* Name = "RoundStrokeRectFillShader";
   static constexpr const char* VertFile = "kernels/round_stroke_rect_fill.vert";
   static constexpr const char* FragFile = "kernels/round_stroke_rect_fill.frag";
-
-  // The color attribute is unconditional (common-color batches broadcast the paint color; the
-  // exact color rides the Color uniform through the HasCommonColor runtime uniform), so there is
-  // no HAS_COMMON_COLOR dimension. The coverage and ellipse-radii attributes are unconditional
-  // too (non-AA draws write a 1.0 coverage and zero radii), with the AA ramp selected by the
-  // AAEnabled runtime uniform, so there is no HAS_AA dimension either.
-  struct VertDims {
-    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
-    static inline const PermutationBoolDim<VertDims> HAS_UV_MATRIX{"HAS_UV_MATRIX"};
-    static PermutationDomain domain() {
-      return PermutationDomain({HAS_UV_MATRIX});
-    }
-  };
-  using VD = VertDims;
-
-  struct FragDims {
-    // HAS_UV_MATRIX stays vertex-only: the fragment stage never branches on it
-    // (round_stroke_rect_fill.frag does not reference the define), so it is not part of the
-    // fragment domain.
-    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
-    static inline const PermutationIntDim<FragDims> HAS_XP{XP_DEFINE_NAME, XP_VALUE_COUNT};
-    static PermutationDomain domain() {
-      return PermutationDomain({HAS_XP});
-    }
-  };
-  using FD = FragDims;
-  /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
 
-  /// Matcher inputs: the UV-matrix presence and the XferProcessor kind.
-  struct Inputs {
-    bool hasUVMatrix = false;
-    int xpType = XP_UNSUPPORTED;
-  };
+  static constexpr Dim vertDims[] = {{"HAS_UV_MATRIX", 2}};
+  /// Fragment dimensions: HAS_XP (0=passthrough, 1=dst texture, 2=framebuffer fetch).
+  static constexpr Dim fragDims[] = {{XP_DEFINE_NAME, XP_VALUE_COUNT}};
 
-  /// Pure mapping from inputs to dimension values. Pass-through: every input value lands on the
-  /// domain one-to-one, so the mirrored Reachable default enumerates exactly what Compose emits.
-  static std::optional<RuleComposedValues> Compose(const Inputs& inputs) {
-    if (inputs.xpType < XP_NONE) {
-      return std::nullopt;
+  static bool Accept(const DrawShape& shape) {
+    if (shape.geometry.kind != GeometryKind::RoundStrokeRect) {
+      return false;
     }
-    auto vert = ComposedDims<VertDims>(VertDims::domain());
-    vert.set(VD::HAS_UV_MATRIX, inputs.hasUVMatrix ? 1 : 0);
-    auto frag = ComposedDims<FragDims>(FragDims::domain());
-    frag.set(FD::HAS_XP, inputs.xpType);
-    RuleComposedValues values;
-    values.vertValues = vert.finish();
-    values.fragValues = frag.finish();
-    return values;
+    bool directClip = shape.colorFPCount == 0 &&
+                      (shape.coverage == Coverage::AARect || shape.coverage == Coverage::RRect);
+    if (shape.fragmentCount != 0 && !directClip) {
+      return false;
+    }
+    if (shape.geometry.hasUVPerspective) {
+      return false;
+    }
+    return shape.xpType() >= XP_NONE;
   }
 
-  /// Whole-draw guards (alpha-only target, the round-stroke geometry kind, perspective UV),
-  /// defined in the family's own .cpp, next to the GLSL it owns.
-  static std::optional<Inputs> ExtractFacts(const DrawShape& facts,
-                                            PermutationMatchFailure* failure);
+  static Variants Select(const DrawShape& shape) {
+    Variants variants;
+    variants.vert("HAS_UV_MATRIX", shape.geometry.hasUVMatrix ? 1 : 0)
+        .frag(XP_DEFINE_NAME, shape.xpType());
+    return variants;
+  }
 };
 
 }  // namespace tgfx

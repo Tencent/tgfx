@@ -9,72 +9,44 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the license for the specific language governing permissions and
-//  limitations under the license.
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
-#include <optional>
-#include <vector>
-#include "gpu/shaders/ShaderFamily.h"
+#include "gpu/shaders/FillKernel.h"
 
 namespace tgfx {
 
-class ProgramInfo;
-
-class ShapeInstancedFillShader : public ShaderFamily<ShapeInstancedFillShader> {
+/**
+ * ShapeInstancedFillShader: ShapeInstancedDrawOp's instanced shape batch, no fragment
+ * processors. The per-instance attributes carry the shape's coverage (SDF or texture), so the
+ * vertex stage needs no dimension.
+ */
+class ShapeInstancedFillShader : public FillKernel<ShapeInstancedFillShader> {
  public:
   static constexpr const char* Name = "ShapeInstancedFillShader";
   static constexpr const char* VertFile = "kernels/shape_instanced_fill.vert";
   static constexpr const char* FragFile = "kernels/shape_instanced_fill.frag";
-
-  struct VertDims {
-    // No vertex dimensions: an empty domain, with no handles to keep aligned.
-    static PermutationDomain domain() {
-      return PermutationDomain({});
-    }
-  };
-  using VD = VertDims;
-
-  struct FragDims {
-    // One typed handle per dimension; domain() lists them in the bundle's dimension order, and
-    // Compose assigns through the handles by name (ComposedDims) — no index enum to keep
-    // aligned with the domain list.
-    static inline const PermutationIntDim<FragDims> HAS_XP{XP_DEFINE_NAME, XP_VALUE_COUNT};
-    static PermutationDomain domain() {
-      return PermutationDomain({HAS_XP});
-    }
-  };
-  using FD = FragDims;
-  /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
 
-  /// Matcher inputs: only the XferProcessor kind shapes the variant.
-  struct Inputs {
-    int xpType = XP_UNSUPPORTED;
-  };
+  /// Fragment dimensions: HAS_XP (0=passthrough, 1=dst texture, 2=framebuffer fetch).
+  static constexpr Dim fragDims[] = {{XP_DEFINE_NAME, XP_VALUE_COUNT}};
 
-  /// Pure mapping from inputs to dimension values. Pass-through: every input value lands on the
-  /// domain one-to-one, so the mirrored Reachable default enumerates exactly what Compose emits.
-  static std::optional<RuleComposedValues> Compose(const Inputs& inputs) {
-    if (inputs.xpType < XP_NONE) {
-      return std::nullopt;
-    }
-    auto frag = ComposedDims<FragDims>(FragDims::domain());
-    frag.set(FD::HAS_XP, inputs.xpType);
-    RuleComposedValues values;
-    values.fragValues = frag.finish();
-    return values;
+  static bool Accept(const DrawShape& shape) {
+    return shape.geometry.kind == GeometryKind::ShapeInstanced && shape.fragmentCount == 0 &&
+           shape.xpType() >= XP_NONE;
   }
 
-  /// Whole-draw guards (alpha-only target, the instanced-shape geometry kind, fragment-processor
-  /// count), defined in the family's own .cpp, next to the GLSL it owns.
-  static std::optional<Inputs> ExtractFacts(const DrawShape& facts,
-                                            PermutationMatchFailure* failure);
+  static Variants Select(const DrawShape& shape) {
+    Variants variants;
+    variants.frag(XP_DEFINE_NAME, shape.xpType());
+    return variants;
+  }
 };
 
 }  // namespace tgfx

@@ -9,82 +9,74 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the license for the specific language governing permissions and
-//  limitations under the license.
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/shaders/kernels/TexturedEffectShader.h"
-#include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/aot/AOTChainBuilder.h"
 #include "gpu/aot/DrawIR.h"
 #include "gpu/aot/DrawShape.h"
-#include "gpu/processors/AlphaThresholdFragmentProcessor.h"
-#include "gpu/processors/ColorMatrixFragmentProcessor.h"
-#include "gpu/processors/ComposeFragmentProcessor.h"
-#include "gpu/processors/FragmentProcessor.h"
-#include "gpu/processors/LumaFragmentProcessor.h"
-#include "gpu/processors/PorterDuffXferProcessor.h"
-#include "gpu/processors/TextureEffect.h"
 
 namespace tgfx {
 
-std::optional<TexturedEffectShader::Inputs> TexturedEffectShader::ExtractFacts(
-    const DrawShape& facts, PermutationMatchFailure*) {
-  if (!facts.positionOnlyRect()) {
-    return std::nullopt;
+bool TexturedEffectShader::Accept(const DrawShape& shape) {
+  if (!shape.positionOnlyRect()) {
+    return false;
   }
   // The kernel applies only the vertex coverage: a draw carrying any coverage processor (an
   // analytic clip, a device mask, a coverage subtree) would have it silently dropped, so such
   // draws must stay off this family.
-  if (facts.fragmentCount != facts.colorFPCount) {
-    return std::nullopt;
+  if (shape.fragmentCount != shape.colorFPCount) {
+    return false;
   }
-  int xpType = facts.xpType();
-  if (xpType < XP_NONE) {
-    return std::nullopt;
+  if (shape.xpType() < XP_NONE) {
+    return false;
   }
   // The two structurally-equivalent forms the old FP walk matched (a Compose wrapper and a
   // sequential pair) lower to this ONE graph — texture leaf plus exactly one operator — so the
   // dual-form match is gone with the IR.
-  if (facts.ir == nullptr) {
-    return std::nullopt;
+  if (shape.ir == nullptr) {
+    return false;
   }
   AOTChainBuilder::AOTTextureTailShape tail = {};
-  if (!AOTChainBuilder::CollectTextureTail(facts.ir->color, &tail) || tail.ops.size() != 1) {
-    return std::nullopt;
+  if (!AOTChainBuilder::CollectTextureTail(shape.ir->color, &tail) || tail.ops.size() != 1) {
+    return false;
   }
   auto* leaf = tail.leaf;
   if (leaf->samplingKind != AOTTextureSamplingKind::Plain || leaf->isYUV || leaf->isAlphaOnly ||
       leaf->hasRGBAAA) {
-    return std::nullopt;
+    return false;
   }
   // The precompiled vertex template transforms the coordinate affinely; a projective source must
   // stay off this artifact (the plain templates transform coordinates affinely, with no w division).
   if (leaf->hasPerspective) {
-    return std::nullopt;
+    return false;
   }
   // All four pointwise operators (ColorMatrix / Luma / AlphaThreshold / ColorSpaceXform) share the
-  // same structural class (1 sampler, no CoverageFP, RGBA) and thus the same precompiled shader:
-  // TexturedEffectShader. The operator is selected at draw time by the OpType runtime uniform (set
-  // by the pointwise FP's onSetData), so it is not a compile-time dimension. The frag index only
-  // encodes HAS_XP; subset clamping is a runtime uniform. The color-space one needs the fill
-  // kernel's transfer-function check over the node's steps.
-  auto* op = facts.ir->color.nodeAt(tail.ops[0]);
+  // same structural class (1 sampler, no CoverageFP, RGBA) and thus the same precompiled shader.
+  // The operator is selected at draw time by the OpType runtime uniform, so it is not a
+  // compile-time dimension. The color-space one needs the fill kernel's transfer-function check
+  // over the node's steps.
+  auto* op = shape.ir->color.nodeAt(tail.ops[0]);
   bool supported = op->kind == AOTEffectKind::ColorMatrix || op->kind == AOTEffectKind::Luma ||
                    op->kind == AOTEffectKind::AlphaThreshold;
   if (!supported && op->kind == AOTEffectKind::ColorSpaceXform) {
     auto steps = std::get_if<AOTColorSpaceXformParameters>(&op->parameters);
     supported = steps != nullptr && SupportedFillKernelSteps(steps->steps.get());
   }
-  if (!supported) {
-    return std::nullopt;
-  }
-  return Inputs{xpType};
+  return supported;
+}
+
+Variants TexturedEffectShader::Select(const DrawShape& shape) {
+  Variants variants;
+  variants.frag(XP_DEFINE_NAME, shape.xpType());
+  return variants;
 }
 
 }  // namespace tgfx

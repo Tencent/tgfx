@@ -9,52 +9,54 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under the
-//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the license for the specific language governing permissions and
-//  limitations under the license.
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/shaders/kernels/GaussianBlur1DShader.h"
-#include <optional>
 #include "gpu/ProgramInfo.h"
+#include "gpu/ShaderMatchHelpers.h"
+#include "gpu/aot/DrawIR.h"
 #include "gpu/aot/DrawShape.h"
 
 namespace tgfx {
 
-std::optional<GaussianBlur1DShader::Inputs> GaussianBlur1DShader::ExtractFacts(
-    const DrawShape& facts, PermutationMatchFailure*) {
-  if (facts.geometry.kind != GeometryKind::Default &&
-      facts.geometry.kind != GeometryKind::QuadPerEdgeAA) {
-    return std::nullopt;
+bool GaussianBlur1DShader::Accept(const DrawShape& shape) {
+  if (shape.geometry.kind != GeometryKind::Default &&
+      shape.geometry.kind != GeometryKind::QuadPerEdgeAA) {
+    return false;
   }
-  if (facts.colorFPCount != 1) {
-    return std::nullopt;
+  if (shape.colorFPCount != 1) {
+    return false;
   }
   // The shared device-mask ABI gate (SharedDeviceMaskValue's semantics): an unclassifiable or
   // local-mask coverage stays on other routes.
-  if (!facts.coverage || *facts.coverage == Coverage::LocalMask) {
-    return std::nullopt;
+  if (!shape.coverage.has_value() || shape.coverage == Coverage::LocalMask) {
+    return false;
   }
-  int xpType = facts.xpType();
-  if (xpType < XP_NONE) {
-    return std::nullopt;
+  if (shape.xpType() < XP_NONE) {
+    return false;
   }
   // The color expression reads off the carried IR's opaque-kernel node: the blur's barrier over
   // a single servable texture leaf (the node IS the contract; no processor-tree walk).
-  auto shape = ReadOpaqueKernelIRShape(facts.ir, /*kernelKind=*/0, /*requiresTextureChild=*/true);
-  if (!shape) {
-    return std::nullopt;
+  auto irShape = ReadOpaqueKernelIRShape(shape.ir, /*kernelKind=*/0, /*requiresTextureChild=*/true);
+  if (!irShape) {
+    return false;
   }
   // The kernel radius is a runtime uniform, not a variant dimension. The precompiled shader uses
   // a fixed maximum kernel (MAX_SIGMA=9 -> radius up to 10) and breaks early at the runtime
   // radius, so any sigma in [1,10] maps to the same variant. Sigma > 10 exceeds the fixed kernel
   // and falls back.
-  if (shape->kernel->sigma < 1 || shape->kernel->sigma > 10) {
-    return std::nullopt;
-  }
-  return Inputs{xpType};
+  return irShape->kernel->sigma >= 1 && irShape->kernel->sigma <= 10;
+}
+
+Variants GaussianBlur1DShader::Select(const DrawShape& shape) {
+  Variants variants;
+  variants.frag(XP_DEFINE_NAME, shape.xpType());
+  return variants;
 }
 
 }  // namespace tgfx

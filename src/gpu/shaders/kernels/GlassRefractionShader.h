@@ -9,86 +9,46 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the license for the specific language governing permissions and
-//  limitations under the license.
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
-#include <optional>
-#include <vector>
-#include "gpu/shaders/ShaderFamily.h"
+#include "gpu/shaders/FillKernel.h"
 
 namespace tgfx {
 
-class ProgramInfo;
-
-class GlassRefractionShader : public ShaderFamily<GlassRefractionShader> {
+/**
+ * GlassRefractionShader: the refraction effect's opaque-kernel family. The geometry selects the
+ * vertex layout (common-color ellipse vs uv-matrix quad); the refraction barrier's geometry
+ * child and dispersion flag come off the carried IR's opaque-kernel node, so the acceptance and
+ * the IR-derived part of the variant selection are defined in the family's .cpp. Dispersion is
+ * a compile-time branch because the runtime emission compiles one path or the other and never
+ * both — the precompiled variant must mirror that structure exactly to keep pixels identical.
+ */
+class GlassRefractionShader : public FillKernel<GlassRefractionShader> {
  public:
   static constexpr const char* Name = "GlassRefractionShader";
   static constexpr const char* VertFile = "kernels/glass_refraction.vert";
   static constexpr const char* FragFile = "kernels/glass_refraction.frag";
-
-  struct VertDims {
-    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
-    static inline const PermutationIntDim<VertDims> GP_KIND{"GP_KIND", 2};
-    static PermutationDomain domain() {
-      return PermutationDomain({GP_KIND});
-    }
-  };
-  using VD = VertDims;
-
-  struct FragDims {
-    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
-    static inline const PermutationIntDim<FragDims> GP_KIND{"GP_KIND", 2};
-    static inline const PermutationIntDim<FragDims> GEOMETRY_KIND{"GEOMETRY_KIND", 3};
-    static inline const PermutationIntDim<FragDims> DISPERSION_ON{"DISPERSION_ON", 2};
-    static inline const PermutationIntDim<FragDims> HAS_XP{XP_DEFINE_NAME, XP_VALUE_COUNT};
-    static PermutationDomain domain() {
-      return PermutationDomain({GP_KIND, GEOMETRY_KIND, DISPERSION_ON, HAS_XP});
-    }
-  };
-  using FD = FragDims;
-  /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
 
-  /// Matcher inputs: the GP kind (ellipse vs uv-matrix quad), the geometry child kind (SDF
-  /// rounded-rect / SDF other / UDF), the dispersion flag, and the XferProcessor kind.
-  struct Inputs {
-    int gpKind = -1;
-    int geometryKind = -1;
-    bool dispersionOn = false;
-    int xpType = XP_UNSUPPORTED;
-  };
+  /// Dimensions, in the bundle's dimension order:
+  ///   vert: GP_KIND (0=ellipse common-color, 1=uv-matrix quad)
+  ///   frag: GP_KIND (mirrored), GEOMETRY_KIND (0=SDF rounded rect, 1=SDF other, 2=UDF),
+  ///         DISPERSION_ON, HAS_XP
+  static constexpr Dim vertDims[] = {{"GP_KIND", 2}};
+  static constexpr Dim fragDims[] = {{"GP_KIND", 2},
+                                     {"GEOMETRY_KIND", 3},
+                                     {"DISPERSION_ON", 2},
+                                     {XP_DEFINE_NAME, XP_VALUE_COUNT}};
 
-  /// Pure mapping from inputs to dimension values. Pass-through: every input value lands on the
-  /// domains one-to-one (GP_KIND mirrors to both stages), so the mirrored Reachable default
-  /// enumerates exactly what Compose emits.
-  static std::optional<RuleComposedValues> Compose(const Inputs& inputs) {
-    if (inputs.gpKind < 0 || inputs.geometryKind < 0 || inputs.xpType < XP_NONE) {
-      return std::nullopt;
-    }
-    auto vert = ComposedDims<VertDims>(VertDims::domain());
-    vert.set(VD::GP_KIND, inputs.gpKind);
-    auto frag = ComposedDims<FragDims>(FragDims::domain());
-    frag.set(FD::GP_KIND, inputs.gpKind);
-    frag.set(FD::GEOMETRY_KIND, inputs.geometryKind);
-    frag.set(FD::DISPERSION_ON, inputs.dispersionOn ? 1 : 0);
-    frag.set(FD::HAS_XP, inputs.xpType);
-    RuleComposedValues values;
-    values.vertValues = vert.finish();
-    values.fragValues = frag.finish();
-    return values;
-  }
-
-  /// Whole-draw guards (alpha-only target, the common-color GP forms, the local-mask coverage,
-  /// the refraction and geometry child shapes), defined in the family's own .cpp, next to the
-  /// GLSL it owns.
-  static std::optional<Inputs> ExtractFacts(const DrawShape& facts,
-                                            PermutationMatchFailure* failure);
+  static bool Accept(const DrawShape& shape);
+  static Variants Select(const DrawShape& shape);
 };
 
 }  // namespace tgfx

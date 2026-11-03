@@ -9,80 +9,37 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the license for the specific language governing permissions and
-//  limitations under the license.
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
-#include <optional>
-#include <vector>
-#include "gpu/shaders/ShaderFamily.h"
+#include "gpu/shaders/FillKernel.h"
 
 namespace tgfx {
 
-class FragmentProcessor;
-class ProgramInfo;
-
-class AtlasTextFillShader : public ShaderFamily<AtlasTextFillShader> {
+/**
+ * AtlasTextFillShader: AtlasTextOp's glyph processor, at most one coverage FP. A single coverage
+ * FP is either a direct analytic clip (runtime clip contract uniforms) or an alpha-only affine
+ * device-space mask whose sampler facts come off the IR's DeviceMask term — the acceptance reads
+ * the IR, so it is defined in the family's .cpp.
+ */
+class AtlasTextFillShader : public FillKernel<AtlasTextFillShader> {
  public:
   static constexpr const char* Name = "AtlasTextFillShader";
   static constexpr const char* VertFile = "kernels/atlas_text_fill.vert";
   static constexpr const char* FragFile = "kernels/atlas_text_fill.frag";
-
-  struct VertDims {
-    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
-    static inline const PermutationBoolDim<VertDims> HAS_COVERAGE{"HAS_COVERAGE"};
-    static PermutationDomain domain() {
-      return PermutationDomain({HAS_COVERAGE});
-    }
-  };
-  using VD = VertDims;
-
-  struct FragDims {
-    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
-    static inline const PermutationBoolDim<FragDims> HAS_COVERAGE{"HAS_COVERAGE"};
-    static inline const PermutationIntDim<FragDims> HAS_XP{XP_DEFINE_NAME, XP_VALUE_COUNT};
-    static PermutationDomain domain() {
-      return PermutationDomain({HAS_COVERAGE, HAS_XP});
-    }
-  };
-  using FD = FragDims;
-  /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
 
-  /// Matcher inputs: the AA coverage presence and the XferProcessor kind.
-  struct Inputs {
-    bool hasCoverage = false;
-    int xpType = XP_UNSUPPORTED;
-  };
+  static constexpr Dim vertDims[] = {{"HAS_COVERAGE", 2}};
+  static constexpr Dim fragDims[] = {{"HAS_COVERAGE", 2}, {XP_DEFINE_NAME, XP_VALUE_COUNT}};
 
-  /// Pure mapping from inputs to dimension values. Pass-through: every input value lands on the
-  /// domains one-to-one (HAS_COVERAGE mirrors to both stages), so the mirrored Reachable default
-  /// enumerates exactly what Compose emits.
-  static std::optional<RuleComposedValues> Compose(const Inputs& inputs) {
-    if (inputs.xpType < XP_NONE) {
-      return std::nullopt;
-    }
-    int hasCoverage = inputs.hasCoverage ? 1 : 0;
-    auto vert = ComposedDims<VertDims>(VertDims::domain());
-    vert.set(VD::HAS_COVERAGE, hasCoverage);
-    auto frag = ComposedDims<FragDims>(FragDims::domain());
-    frag.set(FD::HAS_COVERAGE, hasCoverage);
-    frag.set(FD::HAS_XP, inputs.xpType);
-    RuleComposedValues values;
-    values.vertValues = vert.finish();
-    values.fragValues = frag.finish();
-    return values;
-  }
-
-  /// Whole-draw guards (alpha-only target, geometry processor kind, the optional sole coverage
-  /// FP), defined in the family's own .cpp, next to the GLSL it owns.
-  static std::optional<Inputs> ExtractFacts(const DrawShape& facts,
-                                            PermutationMatchFailure* failure);
+  static bool Accept(const DrawShape& shape);
+  static Variants Select(const DrawShape& shape);
 };
 
 }  // namespace tgfx

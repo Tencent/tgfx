@@ -9,93 +9,42 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the license for the specific language governing permissions and
-//  limitations under the license.
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
-#include <optional>
-#include <vector>
-#include "gpu/shaders/ShaderFamily.h"
+#include "gpu/shaders/FillKernel.h"
 
 namespace tgfx {
 
-struct DrawShape;
-
-class FragmentProcessor;
-class ProgramInfo;
-
-class QuadTextureFillShader : public ShaderFamily<QuadTextureFillShader> {
+/**
+ * QuadTextureFillShader: QuadPerEdgeAAGeometryProcessor with exactly one TextureEffect color.
+ * Coverage is optional: a device-space mask is a runtime uniform, a local-space texture-alpha
+ * mask maps to HAS_LOCAL_MASK. The color leaf must be the IR's bare plain-sampled texture (no
+ * operators above it), so the acceptance is defined in the family's .cpp.
+ */
+class QuadTextureFillShader : public FillKernel<QuadTextureFillShader> {
  public:
   static constexpr const char* Name = "QuadTextureFillShader";
   static constexpr const char* VertFile = "kernels/quad_texture_fill.vert";
   static constexpr const char* FragFile = "kernels/quad_texture_fill.frag";
-
-  struct VertDims {
-    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
-    static inline const PermutationBoolDim<VertDims> HAS_UV_COORD{"HAS_UV_COORD"};
-    static inline const PermutationBoolDim<VertDims> HAS_SUBSET{"HAS_SUBSET"};
-    static inline const PermutationBoolDim<VertDims> HAS_LOCAL_MASK{"HAS_LOCAL_MASK"};
-    static PermutationDomain domain() {
-      return PermutationDomain({HAS_UV_COORD, HAS_SUBSET, HAS_LOCAL_MASK});
-    }
-  };
-  using VD = VertDims;
-
-  struct FragDims {
-    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
-    static inline const PermutationBoolDim<FragDims> HAS_SUBSET{"HAS_SUBSET"};
-    static inline const PermutationIntDim<FragDims> HAS_XP{XP_DEFINE_NAME, XP_VALUE_COUNT};
-    static inline const PermutationBoolDim<FragDims> HAS_LOCAL_MASK{"HAS_LOCAL_MASK"};
-    static PermutationDomain domain() {
-      return PermutationDomain({HAS_SUBSET, HAS_XP, HAS_LOCAL_MASK});
-    }
-  };
-  using FD = FragDims;
-  /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = true;
 
-  /// Matcher inputs: the UV-coord and subset presence, the local-mask presence, and the
-  /// XferProcessor kind.
-  struct Inputs {
-    bool hasUVCoord = false;
-    bool hasSubset = false;
-    bool hasLocalMask = false;
-    int xpType = XP_UNSUPPORTED;
-  };
+  /// Dimensions, in the bundle's dimension order:
+  ///   vert: HAS_UV_COORD (uvCoord attribute vs matrix), HAS_SUBSET, HAS_LOCAL_MASK
+  ///   frag: HAS_SUBSET, HAS_XP, HAS_LOCAL_MASK
+  static constexpr Dim vertDims[] = {{"HAS_UV_COORD", 2}, {"HAS_SUBSET", 2}, {"HAS_LOCAL_MASK", 2}};
+  static constexpr Dim fragDims[] = {{"HAS_SUBSET", 2},
+                                     {XP_DEFINE_NAME, XP_VALUE_COUNT},
+                                     {"HAS_LOCAL_MASK", 2}};
 
-  /// Pure mapping from inputs to dimension values. Pass-through: every input value lands on the
-  /// domains one-to-one (HAS_SUBSET and HAS_LOCAL_MASK mirror to both stages), so the mirrored
-  /// Reachable default enumerates exactly what Compose emits.
-  static std::optional<RuleComposedValues> Compose(const Inputs& inputs) {
-    if (inputs.xpType < XP_NONE) {
-      return std::nullopt;
-    }
-    int hasSubset = inputs.hasSubset ? 1 : 0;
-    int hasLocalMask = inputs.hasLocalMask ? 1 : 0;
-    auto vert = ComposedDims<VertDims>(VertDims::domain());
-    vert.set(VD::HAS_UV_COORD, inputs.hasUVCoord ? 1 : 0);
-    vert.set(VD::HAS_SUBSET, hasSubset);
-    vert.set(VD::HAS_LOCAL_MASK, hasLocalMask);
-    auto frag = ComposedDims<FragDims>(FragDims::domain());
-    // ALPHA_ONLY and HAS_RGBAAA are runtime uniforms (set by GLSLTextureEffect::onSetData), not
-    // variants.
-    frag.set(FD::HAS_SUBSET, hasSubset);
-    frag.set(FD::HAS_XP, inputs.xpType);
-    frag.set(FD::HAS_LOCAL_MASK, hasLocalMask);
-    RuleComposedValues values;
-    values.vertValues = vert.finish();
-    values.fragValues = frag.finish();
-    return values;
-  }
-
-  /// The same acceptance over the draw's extracted facts: the executor-table row's predicate.
-  static std::optional<Inputs> ExtractFacts(const DrawShape& facts,
-                                            PermutationMatchFailure* failure);
+  static bool Accept(const DrawShape& shape);
+  static Variants Select(const DrawShape& shape);
 };
 
 }  // namespace tgfx

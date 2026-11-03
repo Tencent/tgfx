@@ -38,6 +38,8 @@ struct Dim {
   int count;
 };
 
+class Values;
+
 /**
  * The dimension values a family's Select assigns, addressed by name. A family builds one with
  * vert()/frag() and returns it; Compose encodes it against the declared dims, so a Select that
@@ -66,6 +68,13 @@ class Variants {
     return entries;
   }
 
+  /**
+   * The fragment-stage view of the assigned values: the same predicate view FragValuesAllowed
+   * receives from the mirrored enumeration, so an `allowed` predicate sees one consistent set of
+   * dimensions from both call sites.
+   */
+  Values fragView() const;
+
  private:
   std::vector<Entry> entries;
 };
@@ -92,6 +101,10 @@ class Values {
  public:
   Values() = default;
 
+  void add(const char* name, int value) {
+    entries.emplace_back(name, value);
+  }
+
   explicit Values(const Variants& variants) {
     for (const auto& entry : variants.getEntries()) {
       entries.emplace_back(entry.name, entry.value);
@@ -117,6 +130,16 @@ class Values {
  private:
   std::vector<std::pair<const char*, int>> entries;
 };
+
+inline Values Variants::fragView() const {
+  Values result;
+  for (const auto& entry : entries) {
+    if (!entry.isVert) {
+      result.add(entry.name, entry.value);
+    }
+  }
+  return result;
+}
 
 template <typename T, typename = void>
 struct FamilyHasVertDims : std::false_type {};
@@ -240,7 +263,7 @@ class FillKernel : public ShaderFamily<T> {
     }
     auto variants = T::Select(shape);
     if constexpr (FamilyHasAllowed<T>::value) {
-      if (!T::allowed(Values(variants))) {
+      if (!T::allowed(variants.fragView())) {
         return std::nullopt;
       }
     }
