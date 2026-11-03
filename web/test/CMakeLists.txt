@@ -4,6 +4,20 @@ project(TGFXWebTest)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/check_emscripten.cmake)
 
 set(CMAKE_CXX_STANDARD 17)
+set(TGFX_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../.." CACHE PATH "TGFX source tree")
+get_filename_component(TGFX_SOURCE_DIR "${TGFX_SOURCE_DIR}" ABSOLUTE)
+set(TGFX_REFERENCE_COMMIT "" CACHE STRING "Pinned main commit for reference generation")
+if (TGFX_UPDATE_BASELINE)
+    string(LENGTH "${TGFX_REFERENCE_COMMIT}" REFERENCE_COMMIT_LENGTH)
+    if (NOT REFERENCE_COMMIT_LENGTH EQUAL 40 OR NOT TGFX_REFERENCE_COMMIT MATCHES "^[0-9a-f]+$")
+        message(FATAL_ERROR "Reference generation requires a pinned main commit from update_baseline.sh")
+    endif ()
+    get_filename_component(TOOLING_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." REALPATH)
+    get_filename_component(REFERENCE_ROOT "${TGFX_SOURCE_DIR}" REALPATH)
+    if (REFERENCE_ROOT STREQUAL TOOLING_ROOT)
+        message(FATAL_ERROR "Reference generation requires an isolated main source tree")
+    endif ()
+endif ()
 
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
@@ -25,17 +39,20 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 # Include vendor.cmake before add_subdirectory so that vendor variables (VENDOR_TOOLS_DIR,
 # PLATFORM, ARCH, etc.) are set in this scope. The include_guard(GLOBAL) in vendor.cmake
 # prevents it from running again inside the root CMakeLists.
-include(${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/vendor_tools/vendor.cmake)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../.. ./tgfx)
+include(${TGFX_SOURCE_DIR}/third_party/vendor_tools/vendor.cmake)
+# vendor-build treats a symlinked entry path as a custom configuration entry point.
+# Resolve the tool path so both vendor targets use their configured working directory.
+get_filename_component(VENDOR_TOOLS_DIR "${VENDOR_TOOLS_DIR}" REALPATH)
+add_subdirectory(${TGFX_SOURCE_DIR} ./tgfx)
 
 # Collect test sources (reuse existing tests)
-file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/*.*)
+file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS ${TGFX_SOURCE_DIR}/test/src/*.*)
 
 # Exclude platform-specific directories
-file(GLOB_RECURSE TEST_METAL_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/metal/*.*)
-file(GLOB_RECURSE TEST_OPENGL_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/opengl/*.*)
-file(GLOB_RECURSE TEST_VULKAN_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/vulkan/*.*)
-file(GLOB_RECURSE TEST_D3D12_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/d3d12/*.*)
+file(GLOB_RECURSE TEST_METAL_FILES CONFIGURE_DEPENDS ${TGFX_SOURCE_DIR}/test/src/metal/*.*)
+file(GLOB_RECURSE TEST_OPENGL_FILES CONFIGURE_DEPENDS ${TGFX_SOURCE_DIR}/test/src/opengl/*.*)
+file(GLOB_RECURSE TEST_VULKAN_FILES CONFIGURE_DEPENDS ${TGFX_SOURCE_DIR}/test/src/vulkan/*.*)
+file(GLOB_RECURSE TEST_D3D12_FILES CONFIGURE_DEPENDS ${TGFX_SOURCE_DIR}/test/src/d3d12/*.*)
 if (TEST_METAL_FILES)
     list(REMOVE_ITEM TEST_SOURCES ${TEST_METAL_FILES})
 endif ()
@@ -51,18 +68,18 @@ endif ()
 
 # Include backend-specific test sources
 if (TGFX_USE_WEBGPU)
-    file(GLOB_RECURSE TEST_WEBGL_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/webgl/*.*)
+    file(GLOB_RECURSE TEST_WEBGL_FILES CONFIGURE_DEPENDS ${TGFX_SOURCE_DIR}/test/src/webgl/*.*)
     if (TEST_WEBGL_FILES)
         list(REMOVE_ITEM TEST_SOURCES ${TEST_WEBGL_FILES})
     endif ()
-    file(GLOB_RECURSE TEST_WEBGPU_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/webgpu/*.*)
+    file(GLOB_RECURSE TEST_WEBGPU_FILES CONFIGURE_DEPENDS ${TGFX_SOURCE_DIR}/test/src/webgpu/*.*)
     list(APPEND TEST_SOURCES ${TEST_WEBGPU_FILES})
 else ()
-    file(GLOB_RECURSE TEST_WEBGPU_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/webgpu/*.*)
+    file(GLOB_RECURSE TEST_WEBGPU_FILES CONFIGURE_DEPENDS ${TGFX_SOURCE_DIR}/test/src/webgpu/*.*)
     if (TEST_WEBGPU_FILES)
         list(REMOVE_ITEM TEST_SOURCES ${TEST_WEBGPU_FILES})
     endif ()
-    file(GLOB_RECURSE TEST_WEBGL_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../test/src/webgl/*.*)
+    file(GLOB_RECURSE TEST_WEBGL_FILES CONFIGURE_DEPENDS ${TGFX_SOURCE_DIR}/test/src/webgl/*.*)
     list(APPEND TEST_SOURCES ${TEST_WEBGL_FILES})
 endif ()
 
@@ -87,16 +104,20 @@ endif ()
 file(GLOB WEB_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 
 # Build Google Test and harfbuzz
-add_vendor_target(test-vendor STATIC_VENDORS harfbuzz googletest CONFIG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+add_vendor_target(test-vendor STATIC_VENDORS harfbuzz googletest CONFIG_DIR ${TGFX_SOURCE_DIR})
 find_vendor_libraries(test-vendor STATIC TEST_VENDOR_LIBS)
 
 add_executable(tgfx-test ${TEST_SOURCES} ${WEB_TEST_SOURCES})
 add_dependencies(tgfx-test test-vendor)
 
 # Generate HEAD file with current git commit hash for baseline versioning.
-execute_process(COMMAND git rev-parse --short HEAD
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../..
-    OUTPUT_VARIABLE HEAD_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
+if (TGFX_UPDATE_BASELINE)
+    set(HEAD_COMMIT "${TGFX_REFERENCE_COMMIT}")
+else ()
+    execute_process(COMMAND git rev-parse HEAD
+        WORKING_DIRECTORY ${TGFX_SOURCE_DIR}
+        OUTPUT_VARIABLE HEAD_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
+endif ()
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/HEAD "${HEAD_COMMIT}")
 
 # Determine backend name for baseline cache directory.
@@ -106,19 +127,23 @@ else ()
     set(TGFX_BACKEND_NAME "webgl")
 endif ()
 
-# Preload backend-specific baseline cache if it exists locally (from a previous test run download).
-set(CACHE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../test/baseline/.cache/${TGFX_BACKEND_NAME})
+# Reference caches are read-only inputs and must be provisioned independently of test output.
+set(CACHE_DIR ${TGFX_SOURCE_DIR}/test/baseline/.cache/${TGFX_BACKEND_NAME})
 set(PRELOAD_CACHE "")
-if (EXISTS ${CACHE_DIR}/md5.json AND EXISTS ${CACHE_DIR}/version.json)
+if (NOT TGFX_UPDATE_BASELINE AND EXISTS ${CACHE_DIR}/md5.json AND EXISTS ${CACHE_DIR}/version.json)
     set(PRELOAD_CACHE
         "SHELL:--preload-file ${CACHE_DIR}/md5.json@/test/baseline/.cache/${TGFX_BACKEND_NAME}/md5.json"
         "SHELL:--preload-file ${CACHE_DIR}/version.json@/test/baseline/.cache/${TGFX_BACKEND_NAME}/version.json"
     )
-else ()
-    message(WARNING "Baseline cache not found at ${CACHE_DIR}/. "
-        "Screenshot tests will pass without actual comparison. "
-        "Run './update_baseline.sh USE_WEBGL' (or USE_WEBGPU) from project root first.")
+    set_property(TARGET tgfx-test APPEND PROPERTY LINK_DEPENDS
+        ${CACHE_DIR}/md5.json ${CACHE_DIR}/version.json)
+elseif (NOT TGFX_UPDATE_BASELINE)
+    message(WARNING "Baseline reference cache is incomplete at ${CACHE_DIR}/. "
+        "Screenshot comparisons with missing references will fail. "
+        "Provide an approved reference cache before running screenshot tests.")
 endif ()
+set_property(TARGET tgfx-test APPEND PROPERTY LINK_DEPENDS
+    ${TGFX_SOURCE_DIR}/test/baseline/version.json)
 
 target_compile_options(tgfx-test PRIVATE
     -fno-rtti
@@ -161,6 +186,7 @@ target_compile_definitions(tgfx-test PRIVATE
     ${TGFX_DEFINES}
     $<$<NOT:$<BOOL:${TGFX_SKIP_GENERATE_BASELINE_IMAGES}>>:GENERATE_BASELINE_IMAGES>
     TGFX_BACKEND_NAME="${TGFX_BACKEND_NAME}"
+    TGFX_TEST_COMMIT="${HEAD_COMMIT}"
     $<$<BOOL:${TGFX_UPDATE_BASELINE}>:UPDATE_BASELINE>
     ${ASYNCIFY_COMPILE_DEFS}
 )
@@ -177,13 +203,13 @@ target_link_options(tgfx-test PRIVATE
     -sMAXIMUM_MEMORY=2GB
     -sSTACK_SIZE=1MB
     -sEXPORT_NAME='TGFXTest'
-    -sEXPORTED_FUNCTIONS=['_RunAllTests','_RunTest']
+    -sEXPORTED_FUNCTIONS=['_RunAllTests','_RunTest','_GetTestConfiguration']
     ${WEB_EXPORTED_RUNTIME_METHODS}
     -sMODULARIZE=1
     -sEXPORT_ES6=1
     -sENVIRONMENT=web,worker
-    "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/../../resources@/resources"
-    "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/../../test/baseline/version.json@/test/baseline/version.json"
+    "SHELL:--preload-file ${TGFX_SOURCE_DIR}/resources@/resources"
+    "SHELL:--preload-file ${TGFX_SOURCE_DIR}/test/baseline/version.json@/test/baseline/version.json"
     "SHELL:--preload-file ${CMAKE_CURRENT_BINARY_DIR}/HEAD@/test/baseline/.cache/${TGFX_BACKEND_NAME}/HEAD"
     ${PRELOAD_CACHE}
 )
@@ -201,7 +227,7 @@ else ()
     target_link_options(tgfx-test PRIVATE -Oz)
 endif ()
 
-set(TGFX_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..)
+set(TGFX_ROOT ${TGFX_SOURCE_DIR})
 
 # Convert TGFX_INCLUDES from relative paths (relative to tgfx root) to absolute paths.
 set(TGFX_ABS_INCLUDES)

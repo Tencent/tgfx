@@ -65,7 +65,7 @@ Web 端 accept baseline 后，`accept_baseline.sh` 会自动同步 `version.json
 
 ### Web 端流程
 
-Web 端默认开启 `GENERATE_BASELINE_IMAGES`（可通过 `--skip-images` 关闭），等效于原生的 `UpdateBaseline` 行为：
+Web 普通测试默认开启 `GENERATE_BASELINE_IMAGES`，只控制诊断图片输出，**不等于** `UPDATE_BASELINE`。普通构建显式关闭基准生成模式，只读参考缓存；浏览器还会校验 WASM 中的模式、后端和提交信息。
 
 1. **构建时**：CMake 将以下文件 preload 进 WASM 虚拟 FS：
    - `test/baseline/version.json`（仓库基准版本）
@@ -80,15 +80,16 @@ Web 端默认开启 `GENERATE_BASELINE_IMAGES`（可通过 `--skip-images` 关�
      - **两边都有且版本号不同** → 跳过比较，视为通过（已接受变更）
      - **版本号相同或 key 不存在** → 做实际 MD5 比较，不匹配则测试失败
 
-3. **运行后**：JS 从虚拟 FS 打包下载三个 zip：
+3. **运行后**：普通验证仅下载诊断产物：
 
    | zip | 内容 | 解压目标 |
    |-----|------|---------|
-   | `baseline-out.zip` | baseline 截图 (`_base.webp`) + `md5.json` + `version.json` | `test/baseline-out/` |
-   | `test-out.zip` | 失败截图 + `version.json` | `test/out/` |
-   | `cache-web.zip` | `md5.json` + `version.json` | `test/baseline/.cache/{backend}/` |
+   | `baseline-out.zip` | 诊断图片、失败 MD5 和输出版本（非参考缓存） | `test/baseline-out/` |
+   | `test-out.zip` | 其他测试输出（非空时生成） | `test/out/` |
 
-4. **下次构建**：`test/baseline/.cache/{backend}/` 中的 cache 被 preload 回 WASM，实现跨次运行的 baseline 比对。
+   空目录不生成 ZIP，属于正常情况。未捕获的 WebGPU 错误、页面异常、下载丢失均返回失败，失败 MD5 不会被合并进参考缓存。
+
+4. **重新构建**：独立准备的 `test/baseline/.cache/{backend}/md5.json` 和 `version.json` 被 preload 到 WASM。缺少参考时比较失败，不会静默通过。
 
 ### 更新 Baseline Cache
 
@@ -100,14 +101,16 @@ Web 端默认开启 `GENERATE_BASELINE_IMAGES`（可通过 `--skip-images` 关�
 ./update_baseline.sh USE_WEBGPU
 ```
 
-该命令会：
-1. 暂存当前分支的未提交改动（如有）
-2. 切到 main 分支，以 `UPDATE_BASELINE` 模式构建并运行 web 测试
-3. 生成 baseline cache 到 `test/baseline/.cache/webgl/`（或 `webgpu/`）
-4. 同时生成 baseline 图像到 `test/baseline-out/`，便于本地视觉核对（可用 `--skip-images` 跳过）
-5. 切回当前分支，恢复暂存改动
+该命令固定本地 `origin/main` 引用对应的提交（不会自动 fetch），然后：
+1. 检查缓存的 MD5、版本、来源记录及内容摘要；缺任何一项都重新准备。
+2. 将固定提交解包到 `web/test/build-reference-{backend}/run.*/source`，还原并校验 LFS 资源；不切分支、不 stash。依赖定义必须匹配已安装依赖，JS 绑定从该快照重新构建。
+3. 用当前测试驱动构建该主干的库、测试及资源；参考构建和普通构建目录独立，普通运行产物不被覆盖。
+4. 全量测试成功且没有 GPU 错误、跳过或下载失败后，校验专用 `reference-cache.zip`，将完整缓存事务发布到 `.cache/{backend}/`。`reference.json` 记录来源提交、执行数量及摘要；失败保留旧缓存，不合并部分结果。
+5. 构建和诊断产物保留在该独立目录；`--skip-images` 仅跳过参考图片生成。
 
-之后在当前分支运行 `npm run autotest` 即可对比 main baseline 验证。
+之后在当前分支运行 `npm run test:webgpu`（或 `test:webgl`）重新构建并比较，不能直接运行未重新打包参考输入的旧 WASM。
+
+主干本身的编译、测试或 GPU 错误会阻止缓存发布，必须先修复主干，不能用当前分支输出代替。该流程仅重建主干参考，不改变仓库 `test/baseline/version.json`，不替代用户主动执行 `/accept-baseline` 接受截图变更。
 
 如仅需刷新 cache 而不生成图像（CI 流水线使用此模式），追加 `--skip-images` 参数：
 
