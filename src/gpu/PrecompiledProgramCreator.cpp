@@ -44,9 +44,11 @@
 
 namespace tgfx {
 
+#if DEBUG
 // Parses a decimal int the way std::stoi accepts it (leading whitespace, an optional sign, digits,
 // anything after the digits ignored), but reports failure through the return value. Builds that
 // disable exceptions (Android, web) cannot use std::stoi: it signals bad input by throwing.
+// Debug-only: its one caller is the TGFX_AOT_DENY deny-list below.
 static bool ParseInt(const std::string& text, int* value) {
   const char* begin = text.c_str();
   char* end = nullptr;
@@ -58,6 +60,7 @@ static bool ParseInt(const std::string& text, int* value) {
   *value = static_cast<int>(parsed);
   return true;
 }
+#endif
 
 static ShaderCodeFormat FormatForBackend(Backend backend) {
   switch (backend) {
@@ -381,6 +384,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   // derives its variant from the compiled program), so this entry starts past the match.
   const PermutationMatchResult* matchResult = &match;
 
+#if DEBUG
   // TGFX_AOT_DENY holds a comma-separated list of shader names whose precompiled match is
   // rejected so the draw falls back to the runtime JIT program. Diagnostic only: it isolates a
   // single kernel family in A/B pixel diffs. Parsed once per process: a token of the form
@@ -445,6 +449,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
       return nullptr;
     }
   }
+#endif
 
   auto vertHash = ComputeVertexKeyHash(matchResult->shaderName, matchResult->vertPermutationIndex,
                                        cache->profileTag());

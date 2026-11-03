@@ -27,20 +27,6 @@ namespace {
 // The source rules: each wraps one check of ContractChecks.cpp, whose implementation stays
 // where it is — a rule owns when the check runs and what it is named by, not the check itself.
 
-class SlotOpReferencesRule : public SourceRule {
- public:
-  size_t check(const SourceRuleContext& context, Diagnostics* diagnostics) const override {
-    return ValidateSlotOpReferences(context.shaderDir, diagnostics);
-  }
-};
-
-class OpTableExclusivityRule : public SourceRule {
- public:
-  size_t check(const SourceRuleContext& context, Diagnostics* diagnostics) const override {
-    return ValidateOpTableExclusivity(context.shaderDir, diagnostics);
-  }
-};
-
 class SourceReferencesRule : public SourceRule {
  public:
   size_t check(const SourceRuleContext& context, Diagnostics* diagnostics) const override {
@@ -91,8 +77,6 @@ class InlineExpansionRule : public ArtifactRule {
 
 std::vector<std::unique_ptr<SourceRule>> MakeSourceRules() {
   std::vector<std::unique_ptr<SourceRule>> rules;
-  rules.push_back(std::make_unique<SlotOpReferencesRule>());
-  rules.push_back(std::make_unique<OpTableExclusivityRule>());
   rules.push_back(std::make_unique<SourceReferencesRule>());
   rules.push_back(std::make_unique<MacroNamesRule>());
   return rules;

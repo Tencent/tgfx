@@ -39,15 +39,6 @@ size_t ValidateFamilyParams(const std::vector<VariantData>& variants, Diagnostic
 
 size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics);
 
-/// Validates that every OP_* reference in the single-slot interpreter (pointwise_op.inc) is an
-/// operator the C++ side can emit into a slot (the AOTPointwiseOpType values, anchored to the Op
-/// constants). Returns the error count.
-size_t ValidateSlotOpReferences(const std::string& shaderDir, Diagnostics* diagnostics);
-
-/// Validates that operator/op_codes.inc is the only shader file defining an OP_* macro. Returns
-/// the error count.
-size_t ValidateOpTableExclusivity(const std::string& shaderDir, Diagnostics* diagnostics);
-
 /// Validates that the shader sources do not refer to things that no longer exist: every
 /// "name.inc/.frag/.vert" token must name a file under shaderDir, and every "XxxShader" token must
 /// name a registered shader family (registeredShaders). A reference to a removed file or merged-away

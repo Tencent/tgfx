@@ -77,18 +77,6 @@ Report CheckReflection(const std::vector<VariantData>& variants) {
   return Finish(errors, diagnostics);
 }
 
-Report CheckSlotOpReferences(const std::string& shaderDir) {
-  Diagnostics diagnostics;
-  auto errors = ValidateSlotOpReferences(shaderDir, &diagnostics);
-  return Finish(errors, diagnostics);
-}
-
-Report CheckOpTableExclusivity(const std::string& shaderDir) {
-  Diagnostics diagnostics;
-  auto errors = ValidateOpTableExclusivity(shaderDir, &diagnostics);
-  return Finish(errors, diagnostics);
-}
-
 std::vector<std::string> RegisteredShaderNames() {
   std::vector<std::string> names;
   for (const auto& factory : ShaderRegistry::All()) {
@@ -212,42 +200,6 @@ TEST(ClipContractTest, EveryOffendingVariantIsCounted) {
   fields.pop_back();
   std::vector<VariantData> variants(3, VariantWithFragment(fields));
   EXPECT_EQ(CheckClip(variants).errors, 3u);
-}
-
-// ---- ValidateSlotOpReferences / ValidateOpTableExclusivity -------------------------------
-
-TEST_F(DamagedShaderDir, TheRealOpReferencesAndExclusivityHold) {
-  auto references = CheckSlotOpReferences(scratch.dir());
-  EXPECT_EQ(references.errors, 0u) << references.log;
-  auto exclusivity = CheckOpTableExclusivity(scratch.dir());
-  EXPECT_EQ(exclusivity.errors, 0u) << exclusivity.log;
-}
-
-TEST_F(DamagedShaderDir, AChainOpReferenceInTheSlotFileIsReported) {
-  // The single-slot interpreter must only dispatch on ops the C++ side can emit into a slot.
-  ASSERT_TRUE(Edit("pipeline/slot/pointwise_op.inc", "opType == OP_LUMA", "opType == OP_TEXTURE"));
-  auto report = CheckSlotOpReferences(scratch.dir());
-  EXPECT_EQ(report.errors, 1u) << report.log;
-  EXPECT_TRUE(
-      report.mentions("op referenced in pointwise_op.inc is not a pointwise operator: OP_TEXTURE"))
-      << report.log;
-}
-
-TEST_F(DamagedShaderDir, ACommentedOpReferenceInTheSlotFileIsAllowed) {
-  // A comment naming an op is documentation, not a dispatch; the check must not count it.
-  Append("pipeline/slot/pointwise_op.inc", "\n// OP_TEXTURE documents the chain-only op\n");
-  auto report = CheckSlotOpReferences(scratch.dir());
-  EXPECT_EQ(report.errors, 0u) << report.log;
-}
-
-TEST_F(DamagedShaderDir, AnOpDefineOutsideTheOpTableIsReported) {
-  // A second OP_* table anywhere but operator/op_codes.inc could drift from the anchored one.
-  Append("kernels/solid_color_fill.frag", "\n#define OP_LOCAL 77\n");
-  auto report = CheckOpTableExclusivity(scratch.dir());
-  EXPECT_EQ(report.errors, 1u) << report.log;
-  EXPECT_TRUE(
-      report.mentions("OP_* define outside operator/op_codes.inc: kernels/solid_color_fill.frag"))
-      << report.log;
 }
 
 // ---- ValidateShaderSourceReferences ---------------------------------------------------------

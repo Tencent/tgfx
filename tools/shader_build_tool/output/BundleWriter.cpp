@@ -218,7 +218,7 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
   // Serialize in memory; the file is only replaced when its bytes change (see WriteFileIfChanged).
   std::ostringstream file(std::ios::binary);
 
-  // Optionally compress the data pool with zstd (the legacy zlib path is still readable).
+  // Optionally compress the data pool with zstd.
   std::vector<uint8_t> compressedData;
   uint16_t compressionFlag = BundleFormat::Compression::None;
   const uint8_t* dataToWrite = dataPool.data();
