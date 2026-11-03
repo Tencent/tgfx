@@ -20,6 +20,7 @@
 #include "WebGPUDefines.h"
 #include "WebGPUGPU.h"
 #include "WebGPUUtil.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 
@@ -39,6 +40,8 @@ std::shared_ptr<WebGPUTexture> WebGPUTexture::Make(WebGPUGPU* gpu,
   textureDesc.usage = ToWGPUTextureUsage(descriptor.usage);
   auto texture = wgpuDeviceCreateTexture(gpu->device(), &textureDesc);
   if (texture == nullptr) {
+    LOGE("WebGPUTexture::Make: failed to create %dx%d texture with usage 0x%llx", descriptor.width,
+         descriptor.height, static_cast<unsigned long long>(descriptor.usage));
     return nullptr;
   }
   // Default view includes all mip levels (used for sampling).
@@ -74,6 +77,25 @@ std::shared_ptr<WebGPUTexture> WebGPUTexture::MakeFrom(WebGPUGPU* gpu, WGPUTextu
                                                        int width, int height, uint32_t usage,
                                                        bool adopted) {
   if (gpu == nullptr || texture == nullptr) {
+    return nullptr;
+  }
+  WGPUTextureUsageFlags requiredUsage = WGPUTextureUsage_None;
+  if (usage & TextureUsage::TEXTURE_BINDING) {
+    requiredUsage |= WGPUTextureUsage_TextureBinding;
+  }
+  if (usage & TextureUsage::RENDER_ATTACHMENT) {
+    requiredUsage |= WGPUTextureUsage_RenderAttachment;
+  }
+  auto nativeUsage = wgpuTextureGetUsage(texture);
+  if ((nativeUsage & requiredUsage) != requiredUsage) {
+    LOGE(
+        "WebGPUTexture::MakeFrom: imported texture usage 0x%llx does not cover the required 0x%llx"
+        " (width=%d height=%d)",
+        static_cast<unsigned long long>(nativeUsage),
+        static_cast<unsigned long long>(requiredUsage), width, height);
+    if (adopted) {
+      wgpuTextureRelease(texture);
+    }
     return nullptr;
   }
   auto format = wgpuTextureGetFormat(texture);
