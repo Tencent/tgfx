@@ -54,7 +54,11 @@ Path SVGContainer::onAsPath(const SVGRenderContext& context) const {
 
   for (const auto& child : children) {
     const Path childPath = child->asPath(context);
-    path.addPath(childPath, PathOp::Union);
+    if (!path.addPath(childPath, PathOp::Union)) {
+      // A failed union leaves the children collected so far behind, and that is still the closest
+      // answer available: the alternative is to drop the whole subtree this container contributes.
+      LOGE("SVGContainer::onAsPath() Failed to union a child path; skipping it.");
+    }
   }
 
   this->mapToParent(&path);

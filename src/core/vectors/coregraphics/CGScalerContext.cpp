@@ -309,7 +309,12 @@ bool CGScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItal
       auto strokePath = *path;
       Stroke stroke(textSize * fauxBoldScale);
       stroke.applyToPath(&strokePath);
-      path->addPath(strokePath, PathOp::Union);
+      if (!path->addPath(strokePath, PathOp::Union)) {
+        // A failed union leaves one of the two outlines behind. Both are the same glyph, and the
+        // unemboldened one is the one that is still correct on its own, so keep it and skip the
+        // emboldening rather than drawing a half-merged outline.
+        LOGE("CGScalerContext: failed to merge the faux bold outline; keeping the glyph as is.");
+      }
     }
   } else {
     path->reset();

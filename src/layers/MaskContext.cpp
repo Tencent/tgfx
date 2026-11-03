@@ -100,7 +100,9 @@ bool MaskContext::finish(Path* result) {
         DEBUG_ASSERT(false);
         break;
       case ClipState::WideOpen:
-        maskPath.addPath(record.path, PathOp::Union);
+        if (!maskPath.addPath(record.path, PathOp::Union)) {
+          return false;
+        }
         break;
       case ClipState::Rect: {
         auto clipBounds = record.clip.bounds();
@@ -109,7 +111,9 @@ bool MaskContext::finish(Path* result) {
           break;
         }
         if (clipBounds.contains(pathBounds)) {
-          maskPath.addPath(record.path, PathOp::Union);
+          if (!maskPath.addPath(record.path, PathOp::Union)) {
+            return false;
+          }
           break;
         }
         // Partial intersection, use PathOp.
@@ -118,8 +122,15 @@ bool MaskContext::finish(Path* result) {
       case ClipState::Complex: {
         // Anti-aliasing attributes of clip elements can be safely discarded for mask generation.
         auto clippedPath = record.clip.getClipPath();
-        clippedPath.addPath(record.path, PathOp::Intersect);
-        maskPath.addPath(clippedPath, PathOp::Union);
+        // An Intersect that fails leaves the clip path behind, which is the whole clip rather than
+        // the part of it this record asks for. Unioning that into the mask would widen the mask to
+        // everything the clip allows, so the record has to be dropped instead.
+        if (!clippedPath.addPath(record.path, PathOp::Intersect)) {
+          return false;
+        }
+        if (!maskPath.addPath(clippedPath, PathOp::Union)) {
+          return false;
+        }
         break;
       }
     }

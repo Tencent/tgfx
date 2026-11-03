@@ -514,8 +514,10 @@ void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& s
   dstClip.addRect(dstRect);
   dstClip.transform(matrix);
   auto outerClipPath = clip.getClipPath();
-  if (!outerClipPath.isEmpty()) {
-    dstClip.addPath(outerClipPath, PathOp::Intersect);
+  if (!outerClipPath.isEmpty() && !dstClip.addPath(outerClipPath, PathOp::Intersect)) {
+    // A failed Intersect leaves the destination rectangle behind, which is the unclipped image.
+    // That is the one answer that widens what gets drawn, so drop the drawing instead.
+    return;
   }
   if (dstClip.isEmpty()) {
     return;
@@ -636,6 +638,7 @@ void SVGExportContext::drawTextBlob(std::shared_ptr<TextBlob> textBlob, const Ma
 void SVGExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const Matrix& matrix,
                                             const Brush& brush, const Stroke* stroke) {
   Path path = {};
+  std::vector<Path> sources = {};
   auto& font = glyphRun.font;
   size_t glyphCount = glyphRun.glyphCount;
   for (size_t index = 0; index < glyphCount; ++index) {
@@ -644,8 +647,24 @@ void SVGExportContext::exportGlyphRunAsPath(const GlyphRun& glyphRun, const Matr
     if (font.getPath(glyphID, &glyphPath)) {
       auto glyphMatrix = GetGlyphMatrix(glyphRun, index);
       glyphPath.transform(glyphMatrix);
-      path.addPath(glyphPath);
+      if (stroke != nullptr) {
+        path.addPath(glyphPath);
+      } else {
+        sources.push_back(std::move(glyphPath));
+      }
     }
+  }
+  if (stroke == nullptr) {
+    auto merged = Path::Merge(sources);
+    if (!merged.has_value()) {
+      LOGE("SVG export: failed to merge glyph fill regions.");
+      return;
+    }
+    path = std::move(*merged);
+  }
+  if (path.isInverseFillType() && stroke == nullptr) {
+    LOGE("SVG export: inverse-filled glyph runs require a finite clipping region.");
+    return;
   }
   if (path.isEmpty()) {
     return;
