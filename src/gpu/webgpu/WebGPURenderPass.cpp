@@ -283,12 +283,11 @@ bool WebGPURenderPass::updateBindGroup() {
     groupEntries[TEXTURE_DESCRIPTOR_SET].push_back(samplerEntry);
   }
 
-  // A pipeline may declare texture samplers that the current draw never binds (e.g. a runtime
-  // filter whose optional second input is absent, with sampling guarded by a uniform branch).
-  // GL tolerates the unbound units, but WebGPU requires the bind group to cover every binding
-  // declared by the layout. Fill the remaining texture/sampler slots with a placeholder; the
-  // same guard skips those branches, so it is never sampled. Note that this cannot distinguish
-  // a slot that is declared but intentionally unbound from one the caller forgot to bind.
+  // Pipelines built from a RuntimeEffect may declare texture slots the current draw never binds,
+  // but the bind group must still cover every binding declared by the layout. Fill the remaining
+  // slots with a placeholder; guarded shader branches never sample it. This cannot distinguish a
+  // slot that is declared but intentionally unbound from one the caller forgot to bind, which is
+  // why the caller-visible contract lives in BindingLayout::textureSamplers.
   std::vector<unsigned> missingTextures = {};
   std::vector<unsigned> missingSamplers = {};
   for (const auto& [logicalBinding, physicalBinding] : currentPipeline->textureUnitMap()) {
@@ -307,23 +306,24 @@ bool WebGPURenderPass::updateBindGroup() {
     }
   }
   if (!missingTextures.empty() || !missingSamplers.empty()) {
-    auto* placeholder = _gpu->getPlaceholderBindings();
-    if (placeholder == nullptr) {
+    auto [placeholderView, placeholderSampler] = _gpu->getPlaceholderBindings();
+    if (placeholderView == nullptr || placeholderSampler == nullptr) {
       LOGE(
-          "WebGPURenderPass::updateBindGroup: failed to create placeholder bindings for"
-          " unbound texture slots");
+          "WebGPURenderPass::updateBindGroup: failed to create placeholder bindings for %zu"
+          " unbound textures and %zu unbound samplers",
+          missingTextures.size(), missingSamplers.size());
       return false;
     }
     for (auto physicalBinding : missingTextures) {
       WGPUBindGroupEntry textureEntry = {};
       textureEntry.binding = physicalBinding;
-      textureEntry.textureView = placeholder->view;
+      textureEntry.textureView = placeholderView;
       groupEntries[TEXTURE_DESCRIPTOR_SET].push_back(textureEntry);
     }
     for (auto physicalBinding : missingSamplers) {
       WGPUBindGroupEntry samplerEntry = {};
       samplerEntry.binding = physicalBinding;
-      samplerEntry.sampler = placeholder->sampler;
+      samplerEntry.sampler = placeholderSampler;
       groupEntries[TEXTURE_DESCRIPTOR_SET].push_back(samplerEntry);
     }
   }

@@ -563,4 +563,24 @@ TGFX_TEST(WebGPUUniformBindingTest, UnboundSamplerSlotFilledWithPlaceholder) {
   ExpectColor(color, 0.0f, 0.0f, 1.0f, 1.0f);
 }
 
+// A layer style filter with an optional second input leaves its slot unbound on every draw, so the
+// placeholder must be cached per device instead of being allocated in the render loop.
+TGFX_TEST(WebGPUUniformBindingTest, PlaceholderBindingsAreCachedPerDevice) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  if (context == nullptr) {
+    GTEST_SKIP() << "WebGPU backend not available";
+  }
+  auto gpu = static_cast<WebGPUGPU*>(context->gpu());
+  ASSERT_TRUE(gpu != nullptr);
+
+  auto first = gpu->getPlaceholderBindings();
+  ASSERT_TRUE(first.first != nullptr);
+  ASSERT_TRUE(first.second != nullptr);
+
+  auto second = gpu->getPlaceholderBindings();
+  EXPECT_TRUE(first.first == second.first);
+  EXPECT_TRUE(first.second == second.second);
+}
+
 }  // namespace tgfx

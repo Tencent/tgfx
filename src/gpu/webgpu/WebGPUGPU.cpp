@@ -181,6 +181,10 @@ void WebGPUGPU::processUnreferencedResources() {
 }
 
 void WebGPUGPU::releaseAll(bool releaseGPU) {
+  // Drop the cached placeholders first so they re-enter the return queue like any other resource
+  // and are reclaimed by the drain below, instead of outliving the queue itself.
+  placeholderTexture = nullptr;
+  placeholderSampler = nullptr;
   processUnreferencedResources();
   // Clear caches first. Sampler cache holds shared_ptrs that may trigger ReturnQueue on release,
   // so it must be cleared before resources.clear() invalidates the resource list iterators.
@@ -201,16 +205,6 @@ void WebGPUGPU::releaseAll(bool releaseGPU) {
       if (mp.shaderModule) wgpuShaderModuleRelease(mp.shaderModule);
     }
     mipmapPipelineCache.clear();
-    if (placeholderBindings.view != nullptr) {
-      wgpuTextureViewRelease(placeholderBindings.view);
-    }
-    if (placeholderBindings.sampler != nullptr) {
-      wgpuSamplerRelease(placeholderBindings.sampler);
-    }
-    if (placeholderBindings.texture != nullptr) {
-      wgpuTextureRelease(placeholderBindings.texture);
-    }
-    placeholderBindings = {};
   }
   if (releaseGPU && !_externallyOwned && webgpuDevice != nullptr) {
     wgpuDeviceRelease(webgpuDevice);
@@ -322,44 +316,19 @@ const WebGPUGPU::MipmapPipeline* WebGPUGPU::getMipmapPipeline(WGPUTextureFormat 
   return &mipmapPipelineCache[key];
 }
 
-const WebGPUGPU::PlaceholderBindings* WebGPUGPU::getPlaceholderBindings() {
-  if (placeholderBindings.texture != nullptr) {
-    return &placeholderBindings;
+std::pair<WGPUTextureView, WGPUSampler> WebGPUGPU::getPlaceholderBindings() {
+  if (placeholderTexture == nullptr) {
+    placeholderTexture = createTexture(TextureDescriptor(1, 1, PixelFormat::RGBA_8888));
   }
-  WGPUTextureDescriptor textureDesc = {};
-  textureDesc.dimension = WGPUTextureDimension_2D;
-  textureDesc.size = {1, 1, 1};
-  textureDesc.format = WGPUTextureFormat_RGBA8Unorm;
-  textureDesc.mipLevelCount = 1;
-  textureDesc.sampleCount = 1;
-  textureDesc.usage = WGPUTextureUsage_TextureBinding;
-  auto texture = wgpuDeviceCreateTexture(webgpuDevice, &textureDesc);
-  if (texture == nullptr) {
-    return nullptr;
+  if (placeholderSampler == nullptr) {
+    placeholderSampler = createSampler(SamplerDescriptor());
   }
-  WGPUSamplerDescriptor samplerDesc = {};
-  samplerDesc.addressModeU = WGPUAddressMode_Repeat;
-  samplerDesc.addressModeV = WGPUAddressMode_Repeat;
-  samplerDesc.addressModeW = WGPUAddressMode_Repeat;
-  samplerDesc.minFilter = WGPUFilterMode_Nearest;
-  samplerDesc.magFilter = WGPUFilterMode_Nearest;
-  samplerDesc.mipmapFilter = WGPUMipmapFilterMode_Nearest;
-  samplerDesc.lodMinClamp = 0.0f;
-  samplerDesc.lodMaxClamp = 32.0f;
-  samplerDesc.maxAnisotropy = 1;
-  auto sampler = wgpuDeviceCreateSampler(webgpuDevice, &samplerDesc);
-  if (sampler == nullptr) {
-    wgpuTextureRelease(texture);
-    return nullptr;
+  if (placeholderTexture == nullptr || placeholderSampler == nullptr) {
+    return {nullptr, nullptr};
   }
-  auto view = wgpuTextureCreateView(texture, nullptr);
-  if (view == nullptr) {
-    wgpuSamplerRelease(sampler);
-    wgpuTextureRelease(texture);
-    return nullptr;
-  }
-  placeholderBindings = {texture, view, sampler};
-  return &placeholderBindings;
+  auto texture = std::static_pointer_cast<WebGPUTexture>(placeholderTexture);
+  auto sampler = std::static_pointer_cast<WebGPUSampler>(placeholderSampler);
+  return {texture->webgpuTextureView(), sampler->webgpuSampler()};
 }
 
 }  // namespace tgfx
