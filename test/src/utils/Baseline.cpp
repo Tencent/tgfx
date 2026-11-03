@@ -45,7 +45,7 @@ namespace tgfx {
 
 static const std::string BASELINE_ROOT = ProjectPath::Absolute("test/baseline/");
 static const std::string BASELINE_VERSION_PATH = BASELINE_ROOT + "/version.json";
-static const std::string CACHE_DIR = BASELINE_ROOT + "/.cache/" + TGFX_BACKEND_NAME + "/";
+static const std::string CACHE_DIR = BASELINE_ROOT + ".cache/" + TGFX_BACKEND_NAME + "/";
 static const std::string CACHE_MD5_PATH = CACHE_DIR + "md5.json";
 static const std::string CACHE_VERSION_PATH = CACHE_DIR + "version.json";
 static const std::string GIT_HEAD_PATH = CACHE_DIR + "HEAD";
@@ -322,12 +322,6 @@ static void CreateFolder(const std::string& path) {
 }
 
 void Baseline::TearDown() {
-  if (!cacheAvailable && missingCacheFailures > 0) {
-    LOGE(
-        "Baseline::TearDown() %d screenshot comparisons failed because the reference cache is "
-        "missing. Run './update_baseline.sh %s' and rerun the tests.",
-        missingCacheFailures, GetBackendArgument().c_str());
-  }
 #ifdef UPDATE_BASELINE
   if (!TGFXTest::HasFailure()) {
 #ifdef GENERATE_BASELINE_IMAGES
@@ -362,5 +356,15 @@ void Baseline::TearDown() {
   versionFile.close();
   RemoveEmptyFolder(OUT_ROOT);
 #endif
+}
+
+void Baseline::ReportMissingCache() {
+  if (cacheAvailable || missingCacheFailures == 0) {
+    return;
+  }
+  LOGE(
+      "Baseline: %d screenshot comparisons failed because the reference cache is missing. "
+      "Run './update_baseline.sh %s' and rerun the tests.",
+      missingCacheFailures, GetBackendArgument().c_str());
 }
 }  // namespace tgfx

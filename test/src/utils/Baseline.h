@@ -44,6 +44,12 @@ class Baseline {
                                const std::string& cacheVersion, const std::string& cacheMD5,
                                bool cacheAvailable);
 
+  /**
+   * Reports how many comparisons failed because the reference cache is missing. Call it after all
+   * tests have run so that the hint survives the failure listing printed by the test runner.
+   */
+  static void ReportMissingCache();
+
  private:
   static void SetUp();
 
