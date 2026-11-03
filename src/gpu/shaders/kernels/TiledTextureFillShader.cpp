@@ -27,18 +27,8 @@
 
 namespace tgfx {
 
-std::optional<TiledTextureFillShader::Inputs> TiledTextureFillShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
-  // The executor-table row and the walk share this one body.
-  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
-}
-
 std::optional<TiledTextureFillShader::Inputs> TiledTextureFillShader::ExtractFacts(
     const AOTDrawFacts& facts, PermutationMatchFailure*) {
-  // The family-relative alpha-only gate (RejectsAlphaOnlyTarget's original semantics).
-  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
-    return std::nullopt;
-  }
   if (!facts.positionOnlyRect()) {
     return std::nullopt;
   }

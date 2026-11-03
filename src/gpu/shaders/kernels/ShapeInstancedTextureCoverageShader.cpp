@@ -44,18 +44,8 @@ static const AOTGradientParameters* SoleGradientLeaf(const AOTEffectGraph& graph
 }
 
 std::optional<ShapeInstancedTextureCoverageShader::Inputs>
-ShapeInstancedTextureCoverageShader::Extract(const ProgramInfo* programInfo,
-                                             PermutationMatchFailure* failure) {
-  // The executor-table row and the walk share this one body.
-  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
-}
-
-std::optional<ShapeInstancedTextureCoverageShader::Inputs>
 ShapeInstancedTextureCoverageShader::ExtractFacts(const AOTDrawFacts& facts,
                                                   PermutationMatchFailure* failure) {
-  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
-    return std::nullopt;
-  }
   // The geometry kind IS the contract: ShapeInstancedDrawOp's processor, in its non-AA form —
   // this kernel carries no AA coverage attribute.
   if (facts.geometry.kind != AOTGeometryKind::ShapeInstanced || facts.geometry.hasCoverage) {

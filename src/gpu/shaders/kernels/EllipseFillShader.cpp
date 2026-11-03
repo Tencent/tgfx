@@ -25,17 +25,8 @@
 
 namespace tgfx {
 
-std::optional<EllipseFillShader::Inputs> EllipseFillShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
-  // The executor-table row and the walk share this one body.
-  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
-}
-
 std::optional<EllipseFillShader::Inputs> EllipseFillShader::ExtractFacts(const AOTDrawFacts& facts,
                                                                          PermutationMatchFailure*) {
-  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
-    return std::nullopt;
-  }
   // The geometry kind IS the contract: RRectDrawOp's AA form, no processor-tree walk.
   if (facts.geometry.kind != AOTGeometryKind::Ellipse) {
     return std::nullopt;

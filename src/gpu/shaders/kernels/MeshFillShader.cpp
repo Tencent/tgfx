@@ -25,17 +25,8 @@
 
 namespace tgfx {
 
-std::optional<MeshFillShader::Inputs> MeshFillShader::Extract(const ProgramInfo* programInfo,
-                                                              PermutationMatchFailure* failure) {
-  // The executor-table row and the walk share this one body.
-  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
-}
-
 std::optional<MeshFillShader::Inputs> MeshFillShader::ExtractFacts(const AOTDrawFacts& facts,
                                                                    PermutationMatchFailure*) {
-  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
-    return std::nullopt;
-  }
   // The geometry kind IS the contract: MeshDrawOp's processor, no processor-tree walk.
   if (facts.geometry.kind != AOTGeometryKind::Mesh) {
     return std::nullopt;

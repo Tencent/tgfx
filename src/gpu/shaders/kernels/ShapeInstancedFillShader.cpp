@@ -25,17 +25,8 @@
 
 namespace tgfx {
 
-std::optional<ShapeInstancedFillShader::Inputs> ShapeInstancedFillShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
-  // The executor-table row and the walk share this one body.
-  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
-}
-
 std::optional<ShapeInstancedFillShader::Inputs> ShapeInstancedFillShader::ExtractFacts(
     const AOTDrawFacts& facts, PermutationMatchFailure*) {
-  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
-    return std::nullopt;
-  }
   // The geometry kind IS the contract: ShapeInstancedDrawOp's processor.
   if (facts.geometry.kind != AOTGeometryKind::ShapeInstanced) {
     return std::nullopt;

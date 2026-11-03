@@ -28,17 +28,8 @@
 
 namespace tgfx {
 
-std::optional<NonAARRectFillShader::Inputs> NonAARRectFillShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
-  // The executor-table row and the walk share this one body.
-  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
-}
-
 std::optional<NonAARRectFillShader::Inputs> NonAARRectFillShader::ExtractFacts(
     const AOTDrawFacts& facts, PermutationMatchFailure*) {
-  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
-    return std::nullopt;
-  }
   // The geometry kind IS the contract: RRectDrawOp's non-AA form, no processor-tree walk.
   if (facts.geometry.kind != AOTGeometryKind::NonAARRect) {
     return std::nullopt;

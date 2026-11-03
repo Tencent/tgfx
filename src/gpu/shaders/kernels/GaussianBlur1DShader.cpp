@@ -23,19 +23,8 @@
 
 namespace tgfx {
 
-std::optional<GaussianBlur1DShader::Inputs> GaussianBlur1DShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
-  // The executor-table row and the walk share this one body.
-  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
-}
-
 std::optional<GaussianBlur1DShader::Inputs> GaussianBlur1DShader::ExtractFacts(
     const AOTDrawFacts& facts, PermutationMatchFailure*) {
-  // The family-relative alpha-only gate (this kernel applies the output swizzle, so it serves
-  // alpha-only targets — RejectsAlphaOnlyTarget's original semantics).
-  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
-    return std::nullopt;
-  }
   if (facts.geometry.kind != AOTGeometryKind::Default &&
       facts.geometry.kind != AOTGeometryKind::QuadPerEdgeAA) {
     return std::nullopt;

@@ -25,17 +25,8 @@
 
 namespace tgfx {
 
-std::optional<HairlineLineShader::Inputs> HairlineLineShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
-  // The executor-table row and the walk share this one body.
-  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
-}
-
 std::optional<HairlineLineShader::Inputs> HairlineLineShader::ExtractFacts(
     const AOTDrawFacts& facts, PermutationMatchFailure*) {
-  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
-    return std::nullopt;
-  }
   // The geometry kind IS the contract: HairlineLineOp's processor, no processor-tree walk.
   if (facts.geometry.kind != AOTGeometryKind::HairlineLine) {
     return std::nullopt;

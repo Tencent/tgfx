@@ -90,8 +90,6 @@ class RoundStrokeRectFillShader : public ShaderFamily<RoundStrokeRectFillShader>
   static std::optional<Inputs> ExtractFacts(const AOTDrawFacts& facts,
                                             PermutationMatchFailure* failure);
 
-  static std::optional<Inputs> Extract(const ProgramInfo* programInfo,
-                                       PermutationMatchFailure* failure);
 };
 
 }  // namespace tgfx

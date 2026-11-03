@@ -25,17 +25,8 @@
 
 namespace tgfx {
 
-std::optional<RoundStrokeRectFillShader::Inputs> RoundStrokeRectFillShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
-  // The executor-table row and the walk share this one body.
-  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
-}
-
 std::optional<RoundStrokeRectFillShader::Inputs> RoundStrokeRectFillShader::ExtractFacts(
     const AOTDrawFacts& facts, PermutationMatchFailure*) {
-  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
-    return std::nullopt;
-  }
   // The geometry kind IS the contract: RectDrawOp's round line join.
   if (facts.geometry.kind != AOTGeometryKind::RoundStrokeRect) {
     return std::nullopt;

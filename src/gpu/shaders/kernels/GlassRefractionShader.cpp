@@ -25,17 +25,8 @@
 
 namespace tgfx {
 
-std::optional<GlassRefractionShader::Inputs> GlassRefractionShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
-  // The executor-table row and the walk share this one body.
-  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
-}
-
 std::optional<GlassRefractionShader::Inputs> GlassRefractionShader::ExtractFacts(
     const AOTDrawFacts& facts, PermutationMatchFailure*) {
-  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
-    return std::nullopt;
-  }
   // The geometry selects the vertex layout and the initial-coverage source. Both forms must be the
   // common-color attribute layout: the kernels read the Color uniform, and a per-vertex color
   // draw would quantize fractional paint colors through the UByte4 attribute.

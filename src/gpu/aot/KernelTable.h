@@ -37,6 +37,9 @@ struct AOTKernelRow {
   const char* family = nullptr;
   std::optional<PermutationVariant> (*match)(const AOTDrawFacts&,
                                              PermutationMatchFailure*) = nullptr;
+  // The family's ServesAlphaOnly declaration, hoisted out of the family bodies: the lookup skips
+  // a non-serving row on an alpha-only target, so the gate is stated once instead of 21 times.
+  bool servesAlphaOnly = false;
 };
 
 /** The table's answer: which row accepted first, and the variant it composed. */

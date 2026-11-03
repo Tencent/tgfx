@@ -25,17 +25,8 @@
 
 namespace tgfx {
 
-std::optional<HairlineQuadShader::Inputs> HairlineQuadShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
-  // The executor-table row and the walk share this one body.
-  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
-}
-
 std::optional<HairlineQuadShader::Inputs> HairlineQuadShader::ExtractFacts(
     const AOTDrawFacts& facts, PermutationMatchFailure*) {
-  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
-    return std::nullopt;
-  }
   // The geometry kind IS the contract: HairlineQuadOp's processor, no processor-tree walk.
   if (facts.geometry.kind != AOTGeometryKind::HairlineQuad) {
     return std::nullopt;

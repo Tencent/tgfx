@@ -46,33 +46,37 @@ namespace tgfx {
 // IR (the prepare-grown coverage is appended to its terms) plus the made GP/XP; a row and the
 // walk it replaced share one body, so they cannot disagree.
 static const std::vector<AOTKernelRow> rows = {
-    AOTKernelRow{AtlasTextFillShader::Name, AtlasTextFillShader::MatchFromFacts},
-    AOTKernelRow{ComplexEllipseFillShader::Name, ComplexEllipseFillShader::MatchFromFacts},
-    AOTKernelRow{ComplexNonAARRectFillShader::Name, ComplexNonAARRectFillShader::MatchFromFacts},
-    AOTKernelRow{EllipseFillShader::Name, EllipseFillShader::MatchFromFacts},
-    AOTKernelRow{GaussianBlur1DShader::Name, GaussianBlur1DShader::MatchFromFacts},
-    AOTKernelRow{GlassRefractionShader::Name, GlassRefractionShader::MatchFromFacts},
-    AOTKernelRow{GlassUDFTentBlurShader::Name, GlassUDFTentBlurShader::MatchFromFacts},
-    AOTKernelRow{HairlineLineShader::Name, HairlineLineShader::MatchFromFacts},
-    AOTKernelRow{HairlineQuadShader::Name, HairlineQuadShader::MatchFromFacts},
-    AOTKernelRow{MaskFillShader::Name, MaskFillShader::MatchFromFacts},
-    AOTKernelRow{MeshFillShader::Name, MeshFillShader::MatchFromFacts},
-    AOTKernelRow{NonAARRectFillShader::Name, NonAARRectFillShader::MatchFromFacts},
-    AOTKernelRow{QuadColorFillShader::Name, QuadColorFillShader::MatchFromFacts},
-    AOTKernelRow{QuadTextureFillShader::Name, QuadTextureFillShader::MatchFromFacts},
-    AOTKernelRow{RoundStrokeRectFillShader::Name, RoundStrokeRectFillShader::MatchFromFacts},
-    AOTKernelRow{ShapeInstancedFillShader::Name, ShapeInstancedFillShader::MatchFromFacts},
+    AOTKernelRow{AtlasTextFillShader::Name, AtlasTextFillShader::MatchFromFacts, AtlasTextFillShader::ServesAlphaOnly},
+    AOTKernelRow{ComplexEllipseFillShader::Name, ComplexEllipseFillShader::MatchFromFacts, ComplexEllipseFillShader::ServesAlphaOnly},
+    AOTKernelRow{ComplexNonAARRectFillShader::Name, ComplexNonAARRectFillShader::MatchFromFacts, ComplexNonAARRectFillShader::ServesAlphaOnly},
+    AOTKernelRow{EllipseFillShader::Name, EllipseFillShader::MatchFromFacts, EllipseFillShader::ServesAlphaOnly},
+    AOTKernelRow{GaussianBlur1DShader::Name, GaussianBlur1DShader::MatchFromFacts, GaussianBlur1DShader::ServesAlphaOnly},
+    AOTKernelRow{GlassRefractionShader::Name, GlassRefractionShader::MatchFromFacts, GlassRefractionShader::ServesAlphaOnly},
+    AOTKernelRow{GlassUDFTentBlurShader::Name, GlassUDFTentBlurShader::MatchFromFacts, GlassUDFTentBlurShader::ServesAlphaOnly},
+    AOTKernelRow{HairlineLineShader::Name, HairlineLineShader::MatchFromFacts, HairlineLineShader::ServesAlphaOnly},
+    AOTKernelRow{HairlineQuadShader::Name, HairlineQuadShader::MatchFromFacts, HairlineQuadShader::ServesAlphaOnly},
+    AOTKernelRow{MaskFillShader::Name, MaskFillShader::MatchFromFacts, MaskFillShader::ServesAlphaOnly},
+    AOTKernelRow{MeshFillShader::Name, MeshFillShader::MatchFromFacts, MeshFillShader::ServesAlphaOnly},
+    AOTKernelRow{NonAARRectFillShader::Name, NonAARRectFillShader::MatchFromFacts, NonAARRectFillShader::ServesAlphaOnly},
+    AOTKernelRow{QuadColorFillShader::Name, QuadColorFillShader::MatchFromFacts, QuadColorFillShader::ServesAlphaOnly},
+    AOTKernelRow{QuadTextureFillShader::Name, QuadTextureFillShader::MatchFromFacts, QuadTextureFillShader::ServesAlphaOnly},
+    AOTKernelRow{RoundStrokeRectFillShader::Name, RoundStrokeRectFillShader::MatchFromFacts, RoundStrokeRectFillShader::ServesAlphaOnly},
+    AOTKernelRow{ShapeInstancedFillShader::Name, ShapeInstancedFillShader::MatchFromFacts, ShapeInstancedFillShader::ServesAlphaOnly},
     AOTKernelRow{ShapeInstancedTextureCoverageShader::Name,
-                 ShapeInstancedTextureCoverageShader::MatchFromFacts},
-    AOTKernelRow{SolidColorFillShader::Name, SolidColorFillShader::MatchFromFacts},
-    AOTKernelRow{TexturedEffectShader::Name, TexturedEffectShader::MatchFromFacts},
-    AOTKernelRow{TiledTextureFillShader::Name, TiledTextureFillShader::MatchFromFacts},
-    AOTKernelRow{YUVTextureFillShader::Name, YUVTextureFillShader::MatchFromFacts},
+                 ShapeInstancedTextureCoverageShader::MatchFromFacts,
+                 ShapeInstancedTextureCoverageShader::ServesAlphaOnly},
+    AOTKernelRow{SolidColorFillShader::Name, SolidColorFillShader::MatchFromFacts, SolidColorFillShader::ServesAlphaOnly},
+    AOTKernelRow{TexturedEffectShader::Name, TexturedEffectShader::MatchFromFacts, TexturedEffectShader::ServesAlphaOnly},
+    AOTKernelRow{TiledTextureFillShader::Name, TiledTextureFillShader::MatchFromFacts, TiledTextureFillShader::ServesAlphaOnly},
+    AOTKernelRow{YUVTextureFillShader::Name, YUVTextureFillShader::MatchFromFacts, YUVTextureFillShader::ServesAlphaOnly},
 };
 
 std::optional<AOTKernelMatch> KernelTableLookup(const AOTDrawFacts& facts,
                                                 PermutationMatchFailure* failure) {
   for (const auto& row : rows) {
+    if (facts.alphaOnlyTarget && !row.servesAlphaOnly) {
+      continue;
+    }
     if (auto variant = row.match(facts, failure)) {
       return AOTKernelMatch{&row, *variant};
     }

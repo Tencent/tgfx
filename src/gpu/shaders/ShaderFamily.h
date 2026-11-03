@@ -48,6 +48,17 @@ struct FamilyHasTextureReads : std::false_type {};
 template <typename T>
 struct FamilyHasTextureReads<T, std::void_t<decltype(T::TextureReads)>> : std::true_type {};
 
+/// A family joins the executor table by declaring ExtractFacts over the draw's facts. The
+/// interpreter (PointwiseChainShader) cannot: its acceptance is the carried IR, not the facts.
+template <typename T, typename = void>
+struct FamilyHasExtractFacts : std::false_type {};
+
+template <typename T>
+struct FamilyHasExtractFacts<
+    T, std::void_t<decltype(T::ExtractFacts(std::declval<const AOTDrawFacts&>(),
+                                            std::declval<PermutationMatchFailure*>()))>>
+    : std::true_type {};
+
 template <typename T, typename = void>
 struct FamilyHasAllInputs : std::false_type {};
 template <typename T>
@@ -137,11 +148,19 @@ class ShaderFamily : public PrecompiledShader {
    */
   static std::optional<PermutationVariant> MatchFromFacts(const AOTDrawFacts& facts,
                                                           PermutationMatchFailure* failure) {
-    const auto inputs = T::ExtractFacts(facts, failure);
-    if (!inputs) {
+    if constexpr (!FamilyHasExtractFacts<T>::value) {
+      // Not a table family (the interpreter): the table has no row for it, and the walk calls its
+      // Extract instead.
+      static_cast<void>(facts);
+      static_cast<void>(failure);
       return std::nullopt;
+    } else {
+      const auto inputs = T::ExtractFacts(facts, failure);
+      if (!inputs) {
+        return std::nullopt;
+      }
+      return ComposeToVariant(*inputs);
     }
-    return ComposeToVariant(*inputs);
   }
 
   /**

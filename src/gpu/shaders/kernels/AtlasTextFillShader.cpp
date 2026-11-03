@@ -25,17 +25,8 @@
 
 namespace tgfx {
 
-std::optional<AtlasTextFillShader::Inputs> AtlasTextFillShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
-  // The executor-table row and the walk share this one body.
-  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
-}
-
 std::optional<AtlasTextFillShader::Inputs> AtlasTextFillShader::ExtractFacts(
     const AOTDrawFacts& facts, PermutationMatchFailure*) {
-  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
-    return std::nullopt;
-  }
   // The geometry kind IS the contract: AtlasTextOp's glyph processor, no processor-tree walk.
   if (facts.geometry.kind != AOTGeometryKind::AtlasText) {
     return std::nullopt;

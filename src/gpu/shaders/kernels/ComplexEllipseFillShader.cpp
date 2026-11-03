@@ -26,17 +26,8 @@
 
 namespace tgfx {
 
-std::optional<ComplexEllipseFillShader::Inputs> ComplexEllipseFillShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
-  // The executor-table row and the walk share this one body.
-  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
-}
-
 std::optional<ComplexEllipseFillShader::Inputs> ComplexEllipseFillShader::ExtractFacts(
     const AOTDrawFacts& facts, PermutationMatchFailure* failure) {
-  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
-    return std::nullopt;
-  }
   // The geometry kind IS the contract: RRectDrawOp's complex AA form (per-corner radii).
   if (facts.geometry.kind != AOTGeometryKind::ComplexEllipse) {
     return std::nullopt;

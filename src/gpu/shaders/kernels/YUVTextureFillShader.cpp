@@ -27,18 +27,8 @@
 
 namespace tgfx {
 
-std::optional<YUVTextureFillShader::Inputs> YUVTextureFillShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
-  // The executor-table row and the walk share this one body.
-  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
-}
-
 std::optional<YUVTextureFillShader::Inputs> YUVTextureFillShader::ExtractFacts(
     const AOTDrawFacts& facts, PermutationMatchFailure*) {
-  // The family-relative alpha-only gate (RejectsAlphaOnlyTarget's original semantics).
-  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
-    return std::nullopt;
-  }
   // The precompiled vert has no texSubset attribute, so subset-carrying quads fall back.
   if (facts.geometry.kind != AOTGeometryKind::QuadPerEdgeAA || facts.geometry.hasSubset) {
     return std::nullopt;

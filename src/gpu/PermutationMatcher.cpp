@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <skcms.h>
-#include <string_view>
 #include <unordered_set>
 #include "ColorSpaceXformHelper.h"
 #include "ShaderMatchHelpers.h"
@@ -585,33 +584,30 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(
   const bool alphaOnly = programInfo->getOutputSwizzle() == Swizzle::AAAA();
 
 #ifndef NDEBUG
-  // Audit pass (debug builds only): ask every family — including the ones the alpha-only gate
-  // below skips — and do not stop at the first acceptor. Three invariants, each a silent bug when
-  // violated (the dispatch order would decide the winner):
+  // Audit pass (debug builds only): re-run the executor table's own predicates over the draw's
+  // facts — one extraction per distinct program shape — and do not stop at the first acceptor.
+  // Two invariants, each a silent bug when violated (the dispatch order would decide the winner):
   //   1. at most one family accepts a given draw;
-  //   2. a family that does not declare ServesAlphaOnly never accepts an alpha-only draw, which
-  //      catches a kernel gaining alpha support without flipping its flag;
-  //   3. a Match result lies inside the family's reachable set, which catches Extract producing
-  //      an input combination AllInputs does not enumerate — the bundle would lack the variant
-  //      and the draw would be dropped at runtime.
-  // The extra Match calls are pure shape checks, each writing its rejection into a local slot,
-  // so the walk's own failure accounting is unaffected. The audit runs once per distinct program
-  // shape: repeated prepares of the same shape re-audit nothing.
+  //   2. a Match result lies inside the family's reachable set, which catches an ExtractFacts
+  //      producing an input combination AllInputs does not enumerate — the bundle would lack the
+  //      variant and the draw would be dropped at runtime.
+  // The alpha-only gate is the table row's: the lookup skips a non-serving row, and the audit
+  // skips the same rows so it sees exactly the candidates the dispatch sees. Each family's
+  // rejection goes into a local slot, so the walk's failure accounting is unaffected; repeated
+  // prepares of the same shape re-audit nothing.
   {
     static thread_local std::unordered_set<BytesKey, BytesKeyHasher> auditedProgramKeys;
     if (auditedProgramKeys.insert(programInfo->programKeyForDiagnostics()).second) {
+      // The audit re-runs the table's own predicate over the same facts: one extraction per
+      // shape, every family's ExtractFacts body, no second implementation to drift. The alpha-only
+      // gate is the table row's (a non-serving row is not considered, so it is not audited).
+      const auto auditFacts = ExtractAOTDrawFacts(programInfo);
       int acceptors = 0;
 #define TGFX_AUDIT_FAMILY(Family)                                                               \
-  {                                                                                             \
+  if (!alphaOnly || Family::ServesAlphaOnly) {                                                  \
     PermutationMatchFailure auditFailure = PermutationMatchFailure::None;                       \
-    if (auto auditResult = Family::Match(programInfo, &auditFailure)) {                         \
-      if (alphaOnly && !Family::ServesAlphaOnly) {                                              \
-        assert(false && #Family " accepts an alpha-only draw; flip its ServesAlphaOnly");       \
-      }                                                                                         \
-      /* The interpreter is the walk's documented fallback: it may accept a draw a dedicated  \
-       * family serves too (that overlap is what the dedicated-kernel toggle A/Bs), so only  \
-       * dedicated families count towards uniqueness. */ \
-      if (++acceptors > 1 && std::string_view(#Family) != "PointwiseChainShader") {             \
+    if (auto auditResult = Family::MatchFromFacts(auditFacts, &auditFailure)) {                 \
+      if (++acceptors > 1) {                                                                    \
         assert(false && "multiple shader families accept the same draw");                       \
       }                                                                                         \
       if (Family::CachedReachable().count(                                                      \

@@ -23,18 +23,8 @@
 
 namespace tgfx {
 
-std::optional<GlassUDFTentBlurShader::Inputs> GlassUDFTentBlurShader::Extract(
-    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
-  // The executor-table row and the walk share this one body.
-  return ExtractFacts(ExtractAOTDrawFacts(programInfo), failure);
-}
-
 std::optional<GlassUDFTentBlurShader::Inputs> GlassUDFTentBlurShader::ExtractFacts(
     const AOTDrawFacts& facts, PermutationMatchFailure*) {
-  // The family-relative alpha-only gate (RejectsAlphaOnlyTarget's original semantics).
-  if (!ServesAlphaOnly && facts.alphaOnlyTarget) {
-    return std::nullopt;
-  }
   if (facts.geometry.kind != AOTGeometryKind::Default &&
       facts.geometry.kind != AOTGeometryKind::QuadPerEdgeAA) {
     return std::nullopt;
