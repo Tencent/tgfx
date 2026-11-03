@@ -36,10 +36,6 @@
 #include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/PrecompiledShader.h"
 
-#ifndef TGFX_SHADER_TOOL_SOURCE_HASH
-#define TGFX_SHADER_TOOL_SOURCE_HASH "unversioned"
-#endif
-
 namespace tgfx {
 namespace {
 
@@ -151,13 +147,9 @@ SourceDigestResult ComputeSourceDigest(const ShaderSourceSet& sources, ShaderPro
   for (const auto& capacityDefine : SlotCapacityDefines()) {
     stream.feedString(capacityDefine);
   }
-  // The tool's own build and the vendored SPIRV-Cross are part of the freshness contract: a
-  // rebuilt tool or a bumped translator can change the emitted bytes while the shader text stands
-  // still. The tool-source hash is computed by CMake over the tool's .cpp and .h files.
-  stream.feedString(std::string("tool-source:") + TGFX_SHADER_TOOL_SOURCE_HASH);
-  stream.feedString("spirv-cross-c-api:" + std::to_string(SPVC_C_API_VERSION_MAJOR) + "." +
-                    std::to_string(SPVC_C_API_VERSION_MINOR) + "." +
-                    std::to_string(SPVC_C_API_VERSION_PATCH));
+  // The freshness contract stops at the sources: the tool's own build, the vendored translators
+  // and the compiler versions change what the same text compiles to, and are covered by the
+  // toolchain ABI discipline and by regenerating and comparing the bundle — not by this digest.
   if (profile == ShaderProfile::Metal) {
     stream.feedString(MetalCompilerFingerprint());
   }
@@ -166,7 +158,7 @@ SourceDigestResult ComputeSourceDigest(const ShaderSourceSet& sources, ShaderPro
   // follows static initialization across translation units.
   for (const auto& shader : sources.shaders) {
     const auto& info = shader.info;
-    auto reachable = EnumerateReachablePermutations(info.name);
+    auto reachable = EnumerateBackendStages(info, profile);
     if (!reachable) {
       result.error = "no rule enumerator for " + info.name;
       return result;
@@ -179,9 +171,6 @@ SourceDigestResult ComputeSourceDigest(const ShaderSourceSet& sources, ShaderPro
     auto vertDomain = info.vertDomain;
     auto fragDomain = info.fragDomain;
     for (const auto& permutation : *reachable) {
-      if (!PermutationCompilesForBackend(info, permutation.first, permutation.second, profile)) {
-        continue;
-      }
       stream.feedU32(permutation.first);
       stream.feedU32(permutation.second);
       stream.feedStrings(vertDomain.defineListFor(permutation.first));

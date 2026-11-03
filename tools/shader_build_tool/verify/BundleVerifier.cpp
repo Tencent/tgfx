@@ -153,14 +153,11 @@ std::map<std::pair<uint64_t, uint64_t>, std::set<std::string>, KeyPairLess> Buil
   for (const auto& factory : ShaderRegistry::All()) {
     auto shader = factory();
     auto info = shader->info();
-    auto reachable = EnumerateReachablePermutations(info.name);
+    auto reachable = EnumerateBackendStages(info, profile);
     if (!reachable) {
       continue;
     }
     for (const auto& pair : *reachable) {
-      if (!PermutationCompilesForBackend(info, pair.first, pair.second, profile)) {
-        continue;
-      }
       auto vertHash = ComputeVertexKeyHash(info.name, pair.first, profileTag);
       expected[{vertHash.hi, vertHash.lo}].insert(info.name + VertexStageSuffix + "[" +
                                                   std::to_string(pair.first) + "]");

@@ -34,7 +34,6 @@
 extern char** environ;
 #endif
 #include <shaderc/shaderc.hpp>
-#include <spirv_glsl.hpp>
 #include <spirv_msl.hpp>
 #include <spirv_parser.hpp>
 #include "gpu/ShaderBundleContract.h"

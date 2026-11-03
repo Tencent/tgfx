@@ -29,9 +29,8 @@ namespace tgfx {
 
 /// The variant plan of one shader family: what the build must emit for it.
 ///
-/// The planner is the single enumeration entry of the tool — the build loop, --audit and
-/// --report-only all ask it, so the three paths can never disagree about what a build
-/// contains:
+/// The planner is the single enumeration entry of the tool — every path that needs a family's
+/// variants asks it, so no two consumers can disagree about what a build contains:
 ///
 ///   ShaderRegistry ─▶ VariantPlanner (this layer)
 ///                        ├ the Compose-reachable set, in its fixed (sorted) order

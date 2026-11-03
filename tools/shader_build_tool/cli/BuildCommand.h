@@ -25,15 +25,13 @@
 
 namespace tgfx {
 
-/// The parsed command line of a build run, shared by the three commands (build, audit,
-/// verify) because they share the shader directory and the Metal target options.
+/// The parsed command line of a build run, shared by the two commands (build, verify) because
+/// they share the shader directory and the Metal target options.
 struct BuildOptions {
   std::string shaderDir;
   std::string outDir;
   std::vector<ShaderProfile> backends;
-  bool reportOnly = false;
   bool compress = false;
-  bool audit = false;
   std::string stageReportPath;
   // Set by --dump-stages: the per-variant stage dump two builds are compared with.
   std::string stageDumpDir;

@@ -84,6 +84,15 @@ std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateReachablePermuta
     const std::string& shaderName);
 
 /**
+ * The (vert, frag) index pairs one profile's bundle must contain: the reachable set filtered by
+ * PermutationCompilesForBackend (the framebuffer-fetch exclusion). Every consumer of "what this
+ * backend's bundle holds" asks this one function, so the bundle verifier, the manifest digest
+ * and the closure checks cannot disagree.
+ */
+std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateBackendStages(
+    const PrecompiledShaderInfo& info, ShaderProfile profile);
+
+/**
  * Base class for all precompiled shader declarations. Each concrete shader must override info()
  * to provide its metadata.
  */

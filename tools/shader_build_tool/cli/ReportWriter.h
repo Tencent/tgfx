@@ -43,8 +43,6 @@ struct BuildReport {
   std::vector<InlineExpansionRecord> inlineExpansions;
   // The per-profile error ledger; the compile loop records through it and the report reads it.
   Diagnostics diagnostics;
-  bool hasErrors = false;
-  std::string errorMessage;
 };
 
 /// Writes the build report as <outDir>/shader_build_report.json: the per-shader counts and

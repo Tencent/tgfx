@@ -33,12 +33,12 @@ void ReportUnknownType(Diagnostics* diagnostics, const spirv_cross::SPIRType& ty
     return;
   }
   Diagnostic diagnostic;
-  diagnostic.severity = Severity::Warning;
+  diagnostic.severity = Severity::Error;
   diagnostic.layer = Layer::Compile;
   diagnostic.code = DiagnosticCode::ReflectUnknownType;
   diagnostic.message = "unknown SPIR-V type (basetype=" + std::to_string(type.basetype) +
                        " vec=" + std::to_string(type.vecsize) + " col=" +
-                       std::to_string(type.columns) + "); the entry falls back to Float";
+                       std::to_string(type.columns) + "); no UniformFormat maps to it";
   diagnostics->report(std::move(diagnostic));
 }
 

@@ -73,6 +73,21 @@ const std::map<std::string, RegisteredShader>& ShaderInfos() {
 
 }  // namespace
 
+std::optional<std::set<std::pair<uint32_t, uint32_t>>> EnumerateBackendStages(
+    const PrecompiledShaderInfo& info, ShaderProfile profile) {
+  auto reachable = EnumerateReachablePermutations(info.name);
+  if (!reachable) {
+    return std::nullopt;
+  }
+  std::set<std::pair<uint32_t, uint32_t>> stages = {};
+  for (const auto& pair : *reachable) {
+    if (PermutationCompilesForBackend(info, pair.first, pair.second, profile)) {
+      stages.insert(pair);
+    }
+  }
+  return stages;
+}
+
 bool IsBuildablePermutation(const PrecompiledShaderInfo& info, uint32_t vertIndex,
                             uint32_t fragIndex) {
   if (vertIndex >= info.vertDomain.totalCount() || fragIndex >= info.fragDomain.totalCount()) {

@@ -19,7 +19,7 @@
 // The thin command line of the tool: parse the arguments, pin the Metal target, and hand the
 // run to one of the three commands. Everything the commands do lives in the sublayers:
 //
-//   main ─▶ cli (BuildCommand, VerifyCommand, AuditCommand, ReportWriter)
+//   main ─▶ cli (BuildCommand, VerifyCommand, ReportWriter)
 //             ├─▶ plan        the variants a build must emit
 //             ├─▶ compile     the compiler primitives and the stage caches
 //             ├─▶ emit        the per-backend storage forms
@@ -31,7 +31,6 @@
 #include <iostream>
 #include <string>
 #include "compile/ShaderCompiler.h"
-#include "cli/AuditCommand.h"
 #include "cli/BuildCommand.h"
 #include "cli/VerifyCommand.h"
 
@@ -46,9 +45,6 @@ int main(int argc, char** argv) {
   if (!tgfx::SetMetalTarget(options.metalSdk, options.metalMinOS, &targetError)) {
     std::cerr << "ERROR: " << targetError << "\n";
     return 2;
-  }
-  if (options.audit) {
-    return tgfx::RunAuditCommand();
   }
   if (!options.verifyBundleDir.empty()) {
     return tgfx::RunVerifyCommand(options);

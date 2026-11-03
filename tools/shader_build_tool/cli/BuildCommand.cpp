@@ -59,8 +59,7 @@ void PrintUsage() {
       << "  --out-dir <path>      Output directory for build artifacts\n"
       << "  --backends <list>     Comma-separated backend list "
          "(opengl,opengles,vulkan,metal,webgpu)\n"
-      << "  --report-only         Only enumerate and report, do not compile\n"
-      << "  --audit               Cross-check legacy compile lists against rule-reachable sets\n"
+
       << "  --stage-report <path> Write the per-stage audit report (requires a full compile)\n"
       << "  --dump-stages <dir>  Write the per-variant stage dump (code hashes, reflection, and\n"
       << "                        the expanded include text) two builds are compared with\n"
@@ -211,7 +210,7 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
     uint32_t vi = permutation.first;
     uint32_t fi = permutation.second;
 
-    if (options.reportOnly || vertSource.empty() || fragSource.empty()) {
+    if (vertSource.empty() || fragSource.empty()) {
       continue;
     }
 
@@ -325,10 +324,6 @@ bool ParseArgs(int argc, char** argv, BuildOptions* options) {
         PrintUsage();
         return false;
       }
-    } else if (std::strcmp(argv[i], "--report-only") == 0) {
-      options->reportOnly = true;
-    } else if (std::strcmp(argv[i], "--audit") == 0) {
-      options->audit = true;
     } else if (std::strcmp(argv[i], "--stage-report") == 0 && i + 1 < argc) {
       options->stageReportPath = argv[++i];
     } else if (std::strcmp(argv[i], "--dump-stages") == 0 && i + 1 < argc) {
@@ -375,7 +370,7 @@ int RunBuildCommand(const BuildOptions& options) {
   // Every shader file is read exactly once, here. The compile loop and the manifests' source
   // digests both use this set, so a manifest always describes the text that was compiled.
   ShaderSourceSet sources;
-  const bool compiling = !options.reportOnly && !options.shaderDir.empty();
+  const bool compiling = !options.shaderDir.empty();
   if (compiling) {
     sources = LoadShaderSources(options.shaderDir);
     if (!sources.ok) {
@@ -468,7 +463,7 @@ int RunBuildCommand(const BuildOptions& options) {
     // (RuleCountingTest pins it to the records the rule added) and is not gated on here.
     rule->check(artifactContext, &report.diagnostics);
   }
-  if (!options.reportOnly && !options.shaderDir.empty()) {
+  if (!options.shaderDir.empty()) {
     SourceRuleContext sourceContext;
     sourceContext.shaderDir = options.shaderDir;
     for (auto factory : ShaderRegistry::All()) {
@@ -492,7 +487,7 @@ int RunBuildCommand(const BuildOptions& options) {
   }
 
   // Write bundle files grouped by backend (profileTag)
-  if (!options.reportOnly && !report.variants.empty()) {
+  if (!report.variants.empty()) {
     std::map<std::string, std::vector<VariantData>> byBackend;
     for (auto& v : report.variants) {
       byBackend[v.profileTag].push_back(std::move(v));
