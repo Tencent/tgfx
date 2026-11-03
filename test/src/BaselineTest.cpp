@@ -21,22 +21,31 @@
 
 namespace tgfx {
 
-TGFX_TEST(BaselineTest, MissingReferenceFails) {
-  EXPECT_FALSE(Baseline::CompareReference("pixels", "", "", ""));
-  EXPECT_FALSE(Baseline::CompareReference("pixels", "version", "", "pixels"));
-  EXPECT_FALSE(Baseline::CompareReference("pixels", "", "version", "pixels"));
-  EXPECT_FALSE(Baseline::CompareReference("pixels", "version", "version", ""));
-  EXPECT_FALSE(Baseline::CompareReference("", "version", "version", ""));
+TGFX_TEST(BaselineTest, MissingCacheFails) {
+  EXPECT_FALSE(Baseline::CompareReference("pixels", "version", "version", "pixels", false));
+  EXPECT_FALSE(Baseline::CompareReference("pixels", "version", "", "", false));
+  EXPECT_FALSE(Baseline::CompareReference("pixels", "", "", "", false));
+}
+
+TGFX_TEST(BaselineTest, MissingBaselineFails) {
+  EXPECT_FALSE(Baseline::CompareReference("pixels", "", "", "", true));
+  EXPECT_FALSE(Baseline::CompareReference("pixels", "", "version", "pixels", true));
+}
+
+TGFX_TEST(BaselineTest, NewKeyInAvailableCachePasses) {
+  EXPECT_TRUE(Baseline::CompareReference("pixels", "version", "", "", true));
 }
 
 TGFX_TEST(BaselineTest, MatchingVersionsComparePixels) {
-  EXPECT_TRUE(Baseline::CompareReference("pixels", "version", "version", "pixels"));
-  EXPECT_FALSE(Baseline::CompareReference("different", "version", "version", "pixels"));
+  EXPECT_TRUE(Baseline::CompareReference("pixels", "version", "version", "pixels", true));
+  EXPECT_FALSE(Baseline::CompareReference("different", "version", "version", "pixels", true));
+  EXPECT_FALSE(Baseline::CompareReference("pixels", "version", "version", "", true));
+  EXPECT_FALSE(Baseline::CompareReference("", "version", "version", "", true));
 }
 
 TGFX_TEST(BaselineTest, KnownVersionChangeSkipsPixelComparison) {
-  EXPECT_TRUE(Baseline::CompareReference("different", "new", "old", "pixels"));
-  EXPECT_TRUE(Baseline::CompareReference("different", "new", "old", ""));
+  EXPECT_TRUE(Baseline::CompareReference("different", "new", "old", "pixels", true));
+  EXPECT_TRUE(Baseline::CompareReference("different", "new", "old", "", true));
 }
 
 }  // namespace tgfx

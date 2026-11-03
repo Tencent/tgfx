@@ -65,6 +65,7 @@ static nlohmann::json CacheMD5 = {};
 static nlohmann::json OutputMD5 = {};
 static std::mutex jsonLocker = {};
 static std::string currentVersion;
+static bool cacheAvailable = false;
 
 std::string DumpMD5(const void* bytes, size_t size) {
   auto digest = MD5::Calculate(bytes, size);
@@ -146,9 +147,13 @@ bool Baseline::Compare(const Bitmap& bitmap, const std::string& key) {
 }
 
 bool Baseline::CompareReference(const std::string& md5, const std::string& baselineVersion,
-                                const std::string& cacheVersion, const std::string& cacheMD5) {
-  if (baselineVersion.empty() || cacheVersion.empty()) {
+                                const std::string& cacheVersion, const std::string& cacheMD5,
+                                bool cacheAvailable) {
+  if (baselineVersion.empty() || !cacheAvailable) {
     return false;
+  }
+  if (cacheVersion.empty()) {
+    return true;
   }
   return baselineVersion != cacheVersion || (!cacheMD5.empty() && cacheMD5 == md5);
 }
@@ -162,8 +167,8 @@ static bool CompareVersionAndMd5(const std::string& md5, const std::string& key,
   auto baselineVersion = GetJSONValue(BaselineVersion, key);
   auto cacheVersion = GetJSONValue(CacheVersion, key);
   auto cacheMD5 = GetJSONValue(CacheMD5, key);
-  if (!Baseline::CompareReference(md5, baselineVersion, cacheVersion, cacheMD5)) {
-    if (baselineVersion.empty() || cacheVersion.empty() || cacheMD5.empty()) {
+  if (!Baseline::CompareReference(md5, baselineVersion, cacheVersion, cacheMD5, cacheAvailable)) {
+    if (baselineVersion.empty() || !cacheAvailable || cacheMD5.empty()) {
       LOGE("Baseline::Compare() Missing reference for %s on %s.", key.c_str(), TGFX_BACKEND_NAME);
     }
     SetJSONValue(OutputVersion, key, currentVersion);
@@ -172,6 +177,10 @@ static bool CompareVersionAndMd5(const std::string& md5, const std::string& key,
       callback(false);
     }
     return false;
+  }
+  if (cacheVersion.empty()) {
+    LOGI("Baseline::Compare() %s on %s is not in the reference cache yet, skipping the comparison.",
+         key.c_str(), TGFX_BACKEND_NAME);
   }
   SetJSONValue(OutputVersion, key, baselineVersion);
   if (callback) {
@@ -260,6 +269,7 @@ void Baseline::SetUp() {
     cacheVersionFile >> CacheVersion;
     cacheVersionFile.close();
   }
+  cacheAvailable = CacheVersion.is_object() && !CacheVersion.empty();
   std::ifstream headFile(GIT_HEAD_PATH);
   if (headFile.is_open()) {
     headFile >> currentVersion;
