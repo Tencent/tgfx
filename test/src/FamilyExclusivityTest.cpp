@@ -49,18 +49,18 @@ namespace {
 int CountAcceptingFamilies(const DrawShape& shape, const char** first, const char** second) {
   int count = 0;
   PermutationMatchFailure failure = PermutationMatchFailure::None;
-#define TGFX_COUNT_FAMILY(F)                                                    \
-  if constexpr (FamilyHasExtractFacts<F>::value) {                              \
-    if (!shape.alphaOnlyTarget || F::ServesAlphaOnly) {                         \
-      if (F::MatchFromFacts(shape, &failure)) {                                 \
-        if (count == 0) {                                                       \
-          *first = F::Name;                                                     \
-        } else if (count == 1) {                                                \
-          *second = F::Name;                                                    \
-        }                                                                       \
-        ++count;                                                                \
-      }                                                                         \
-    }                                                                           \
+#define TGFX_COUNT_FAMILY(F)                            \
+  if constexpr (FamilyHasExtractFacts<F>::value) {      \
+    if (!shape.alphaOnlyTarget || F::ServesAlphaOnly) { \
+      if (F::MatchFromFacts(shape, &failure)) {         \
+        if (count == 0) {                               \
+          *first = F::Name;                             \
+        } else if (count == 1) {                        \
+          *second = F::Name;                            \
+        }                                               \
+        ++count;                                        \
+      }                                                 \
+    }                                                   \
   }
   TGFX_FOR_EACH_SHADER_FAMILY(TGFX_COUNT_FAMILY)
 #undef TGFX_COUNT_FAMILY
@@ -71,28 +71,21 @@ int CountAcceptingFamilies(const DrawShape& shape, const char** first, const cha
 
 TGFX_TEST(FamilyExclusivityTest, DedicatedFamiliesArePairwiseExclusiveOverTheFieldSpace) {
   std::vector<const char*> dedicated;
-#define TGFX_COLLECT_DEDICATED(F)          \
+#define TGFX_COLLECT_DEDICATED(F)                  \
   if constexpr (FamilyHasExtractFacts<F>::value) { \
-    dedicated.push_back(F::Name);          \
+    dedicated.push_back(F::Name);                  \
   }
   TGFX_FOR_EACH_SHADER_FAMILY(TGFX_COLLECT_DEDICATED)
 #undef TGFX_COLLECT_DEDICATED
   ASSERT_FALSE(dedicated.empty());
 
-  const GeometryKind kinds[] = {GeometryKind::Other,
-                                GeometryKind::Default,
-                                GeometryKind::QuadPerEdgeAA,
-                                GeometryKind::NonAARRect,
-                                GeometryKind::ComplexNonAARRect,
-                                GeometryKind::Ellipse,
-                                GeometryKind::ComplexEllipse,
-                                GeometryKind::HairlineLine,
-                                GeometryKind::HairlineQuad,
-                                GeometryKind::Mesh,
-                                GeometryKind::RoundStrokeRect,
-                                GeometryKind::ShapeInstanced,
-                                GeometryKind::AtlasText};
-  const Coverage coverages[] = {Coverage::None, Coverage::AARect,  Coverage::RRect,
+  const GeometryKind kinds[] = {
+      GeometryKind::Other,          GeometryKind::Default,           GeometryKind::QuadPerEdgeAA,
+      GeometryKind::NonAARRect,     GeometryKind::ComplexNonAARRect, GeometryKind::Ellipse,
+      GeometryKind::ComplexEllipse, GeometryKind::HairlineLine,      GeometryKind::HairlineQuad,
+      GeometryKind::Mesh,           GeometryKind::RoundStrokeRect,   GeometryKind::ShapeInstanced,
+      GeometryKind::AtlasText};
+  const Coverage coverages[] = {Coverage::None, Coverage::AARect, Coverage::RRect,
                                 Coverage::DeviceMask, Coverage::LocalMask};
   const XferKind xfers[] = {XferKind::Unsupported, XferKind::None, XferKind::DstTexture,
                             XferKind::FrameBufferFetch};
@@ -133,9 +126,9 @@ TGFX_TEST(FamilyExclusivityTest, DedicatedFamiliesArePairwiseExclusiveOverTheFie
                 }
                 if (count > 1) {
                   EXPECT_LE(count, 1)
-                      << first << " and " << second << " both accept kind="
-                      << static_cast<int>(kind) << " bits=" << bits << " coverage="
-                      << (hasCoverageValue != 0 ? static_cast<int>(coverage) : -1)
+                      << first << " and " << second
+                      << " both accept kind=" << static_cast<int>(kind) << " bits=" << bits
+                      << " coverage=" << (hasCoverageValue != 0 ? static_cast<int>(coverage) : -1)
                       << " xfer=" << static_cast<int>(xfer) << " alphaOnly=" << alphaOnly
                       << " colorFPCount=" << pair[0] << " fragmentCount=" << pair[1];
                 }
