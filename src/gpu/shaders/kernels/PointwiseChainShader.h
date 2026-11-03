@@ -30,6 +30,13 @@ class ProgramInfo;
 struct AOTProgram;
 struct PermutationVariant;
 
+/// This family is the AOT interpreter and stays on ShaderFamily by design, not by omission. Its
+/// acceptance is the carried IR's compilability (the chain builder's slot budget and op support),
+/// not a DrawShape predicate, and its Inputs carry the plan layer's AOTResourceProfile decision,
+/// which Select cannot derive from the draw's facts; it is also the only remaining user of
+/// ShaderFamily::Match(ProgramInfo). Migrating it onto FillKernel would force plan decisions
+/// into DrawShape — do not "unify" it without first moving profile resolution into the IR.
+///
 /// Precompiled shader that evaluates an arbitrary pointwise DAG (texture and const-color leaves
 /// combined by color-matrix, luma, alpha-threshold, color-space-xform and blend ops) in a single
 /// fused pass. The DAG shape is runtime data: every node occupies one of 16 instruction slots

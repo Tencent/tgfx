@@ -10,92 +10,39 @@
 //      https://opensource.org/licenses/BSD-3-Clause
 //
 //  Unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the license for the specific language governing permissions and
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. see the license for the specific language governing permissions
 //  limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
-#include <optional>
-#include <vector>
-#include "gpu/shaders/ShaderFamily.h"
+#include "gpu/shaders/FillKernel.h"
 
 namespace tgfx {
 
-struct DrawShape;
-class FragmentProcessor;
-class ProgramInfo;
-
-class YUVTextureFillShader : public ShaderFamily<YUVTextureFillShader> {
+/**
+ * YUVTextureFillShader: multi-plane video fill — a QuadPerEdgeAA quad without a subset, whose
+ * color is the IR's multi-plane source leaf with the bounded color-grade tail above it (the node
+ * IS the contract; no processor-tree walk). A device mask stays a runtime uniform, so the
+ * acceptance is defined in the family's .cpp.
+ */
+class YUVTextureFillShader : public FillKernel<YUVTextureFillShader> {
  public:
   static constexpr const char* Name = "YUVTextureFillShader";
   static constexpr const char* VertFile = "kernels/yuv_texture_fill.vert";
   static constexpr const char* FragFile = "kernels/yuv_texture_fill.frag";
-
-  struct VertDims {
-    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
-    static inline const PermutationBoolDim<VertDims> HAS_UV_COORD{"HAS_UV_COORD"};
-    static PermutationDomain domain() {
-      return PermutationDomain({HAS_UV_COORD});
-    }
-  };
-  using VD = VertDims;
-
-  struct FragDims {
-    // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
-    static inline const PermutationIntDim<FragDims> YUV_FORMAT{"YUV_FORMAT", 2};
-    static inline const PermutationIntDim<FragDims> HAS_XP{XP_DEFINE_NAME, XP_VALUE_COUNT};
-    static PermutationDomain domain() {
-      return PermutationDomain({YUV_FORMAT, HAS_XP});
-    }
-  };
-  using FD = FragDims;
-  /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
 
-  /// Matcher inputs: the UV-matrix form (the vert domain stores the inverted flag), the plane
-  /// format, and the XferProcessor kind.
-  struct Inputs {
-    bool hasUVMatrix = false;
-    int yuvFormat = -1;
-    int xpType = XP_UNSUPPORTED;
-  };
+  /// Dimensions, in the bundle's dimension order:
+  ///   vert: HAS_UV_COORD (the inverted uv-matrix flag: 0 = a uv matrix, 1 = the uvCoord attribute)
+  ///   frag: YUV_FORMAT (0 = I420, 1 = NV12), HAS_XP
+  static constexpr Dim vertDims[] = {{"HAS_UV_COORD", 2}};
+  static constexpr Dim fragDims[] = {{"YUV_FORMAT", 2}, {XP_DEFINE_NAME, XP_VALUE_COUNT}};
 
-  /// Pure mapping from inputs to dimension values.
-  static std::optional<RuleComposedValues> Compose(const Inputs& inputs) {
-    if (inputs.xpType < XP_NONE || inputs.yuvFormat < 0) {
-      return std::nullopt;
-    }
-    auto vert = ComposedDims<VertDims>(VertDims::domain());
-    vert.set(VD::HAS_UV_COORD, inputs.hasUVMatrix ? 0 : 1);
-    auto frag = ComposedDims<FragDims>(FragDims::domain());
-    frag.set(FD::YUV_FORMAT, inputs.yuvFormat);
-    frag.set(FD::HAS_XP, inputs.xpType);
-    RuleComposedValues values;
-    values.vertValues = vert.finish();
-    values.fragValues = frag.finish();
-    return values;
-  }
-
-  /// The enumerable input space the Reachable set maps through Compose (both plane formats, both
-  /// UV forms, every XP kind).
-  static std::vector<Inputs> AllInputs() {
-    std::vector<Inputs> result;
-    for (int hasUVMatrix = 0; hasUVMatrix <= 1; ++hasUVMatrix) {
-      for (int yuvFormat = 0; yuvFormat <= 1; ++yuvFormat) {
-        for (int xpType = XP_NONE; xpType <= XP_FRAMEBUFFER_FETCH; ++xpType) {
-          result.push_back(Inputs{hasUVMatrix != 0, yuvFormat, xpType});
-        }
-      }
-    }
-    return result;
-  }
-
-  /// The same acceptance over the draw's extracted facts: the executor-table row's predicate.
-  static std::optional<Inputs> ExtractFacts(const DrawShape& facts,
-                                            PermutationMatchFailure* failure);
+  static bool Accept(const DrawShape& shape);
+  static Variants Select(const DrawShape& shape);
 };
 
 }  // namespace tgfx

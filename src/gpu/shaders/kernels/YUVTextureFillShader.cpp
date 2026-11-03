@@ -10,72 +10,80 @@
 //      https://opensource.org/licenses/BSD-3-Clause
 //
 //  Unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the license for the specific language governing permissions and
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. see the license for the specific language governing permissions
 //  limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/shaders/kernels/YUVTextureFillShader.h"
-#include <optional>
-#include "gpu/ProgramInfo.h"
 #include "gpu/aot/AOTChainBuilder.h"
 #include "gpu/aot/DrawIR.h"
 #include "gpu/aot/DrawShape.h"
-#include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/YUVTextureView.h"
 
 namespace tgfx {
 
-std::optional<YUVTextureFillShader::Inputs> YUVTextureFillShader::ExtractFacts(
-    const DrawShape& facts, PermutationMatchFailure*) {
+// The shared acceptance walk: the multi-plane tail the color IR must carry (the YUV source leaf
+// with the bounded color-grade operators above it) and the plane format the YUV_FORMAT dimension
+// needs. A pending multi-plane upload lowers with the layout unknown, so the format resolves off
+// the leaf's own proxy — the same view the processor wraps, read without the processor tree.
+static bool CollectYUVFacts(const DrawShape& shape, int* yuvFormat) {
   // The precompiled vert has no texSubset attribute, so subset-carrying quads fall back.
-  if (facts.geometry.kind != GeometryKind::QuadPerEdgeAA || facts.geometry.hasSubset) {
-    return std::nullopt;
+  if (shape.geometry.kind != GeometryKind::QuadPerEdgeAA || shape.geometry.hasSubset) {
+    return false;
   }
-  // The color expression reads off the carried IR: the multi-plane source leaf with the bounded
-  // color-grade operators above it (the node IS the contract; no processor-tree walk — the plain
-  // bare-source route and the planned color-grade route produce the same graph, so the old
-  // dual-form match is gone).
-  if (facts.ir == nullptr) {
-    return std::nullopt;
+  if (shape.ir == nullptr) {
+    return false;
   }
-  AOTChainBuilder::AOTYUVTailShape shape = {};
-  if (!AOTChainBuilder::CollectYUVTail(facts.ir->color, &shape)) {
-    return std::nullopt;
+  AOTChainBuilder::AOTYUVTailShape tail = {};
+  if (!AOTChainBuilder::CollectYUVTail(shape.ir->color, &tail)) {
+    return false;
   }
   // No coverage processors (the runtime route stays authoritative for clipped video), and the
   // color processors are exactly the source plus the tail the IR carries — the staleness guard
   // keeps the tree and the graph in agreement.
-  if (facts.colorFPCount < 1 || facts.colorFPCount > 1 + shape.ops.size() ||
-      facts.colorFPCount != facts.fragmentCount) {
-    return std::nullopt;
+  if (shape.colorFPCount < 1 || shape.colorFPCount > 1 + tail.ops.size() ||
+      shape.colorFPCount != shape.fragmentCount) {
+    return false;
   }
-  int yuvFormat = shape.leaf->yuvFormat;
-  if (yuvFormat < 0) {
-    // A pending multi-plane upload lowers with the layout unknown (it exists only once the
-    // view does): the node's own proxy is the single source — it resolves the same view the
-    // processor wraps, read without going through the processor tree.
+  int format = tail.leaf->yuvFormat;
+  if (format < 0) {
     auto textureView =
-        shape.leaf->textureProxy != nullptr ? shape.leaf->textureProxy->getTextureView() : nullptr;
+        tail.leaf->textureProxy != nullptr ? tail.leaf->textureProxy->getTextureView() : nullptr;
     if (textureView == nullptr || !textureView->isYUV()) {
-      return std::nullopt;
+      return false;
     }
     auto* yuvView = static_cast<const YUVTextureView*>(textureView.get());
     if (yuvView->yuvFormat() == YUVFormat::I420) {
-      yuvFormat = 0;
+      format = 0;
     } else if (yuvView->yuvFormat() == YUVFormat::NV12) {
-      yuvFormat = 1;
+      format = 1;
     } else {
-      return std::nullopt;
+      return false;
     }
   }
-  Inputs inputs;
-  inputs.hasUVMatrix = facts.geometry.hasUVMatrix;
-  inputs.yuvFormat = yuvFormat;
-  inputs.xpType = facts.xpType();
-  return inputs;
+  if (shape.xpType() < XP_NONE) {
+    return false;
+  }
+  *yuvFormat = format;
+  return true;
+}
+
+bool YUVTextureFillShader::Accept(const DrawShape& shape) {
+  int yuvFormat = 0;
+  return CollectYUVFacts(shape, &yuvFormat);
+}
+
+Variants YUVTextureFillShader::Select(const DrawShape& shape) {
+  int yuvFormat = 0;
+  // Accept already validated the tail on the match path; this second walk reads the format back.
+  CollectYUVFacts(shape, &yuvFormat);
+  return Variants()
+      .vert("HAS_UV_COORD", shape.geometry.hasUVMatrix ? 0 : 1)
+      .frag("YUV_FORMAT", yuvFormat)
+      .frag(XP_DEFINE_NAME, shape.xpType());
 }
 
 }  // namespace tgfx
