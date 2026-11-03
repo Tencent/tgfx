@@ -20,6 +20,7 @@
 #ifdef __APPLE__
 #include <CommonCrypto/CommonCrypto.h>
 #endif
+#include <cctype>
 #include <fstream>
 #include <unordered_set>
 #include "base/TGFXTest.h"
@@ -168,7 +169,7 @@ static bool CompareVersionAndMd5(const std::string& md5, const std::string& key,
   auto cacheVersion = GetJSONValue(CacheVersion, key);
   auto cacheMD5 = GetJSONValue(CacheMD5, key);
   if (!Baseline::CompareReference(md5, baselineVersion, cacheVersion, cacheMD5, cacheAvailable)) {
-    if (baselineVersion.empty() || !cacheAvailable || cacheMD5.empty()) {
+    if (cacheAvailable && (baselineVersion.empty() || cacheMD5.empty())) {
       LOGE("Baseline::Compare() Missing reference for %s on %s.", key.c_str(), TGFX_BACKEND_NAME);
     }
     SetJSONValue(OutputVersion, key, currentVersion);
@@ -253,6 +254,19 @@ bool Baseline::Compare(std::shared_ptr<Data> data, const std::string& key) {
   return CompareVersionAndMd5(md5, key, {});
 }
 
+static std::string GetBackendArgument() {
+  std::string argument = "USE_";
+  std::string backendName = TGFX_BACKEND_NAME;
+  for (auto& character : backendName) {
+    if (character == '-') {
+      argument += '_';
+    } else {
+      argument += static_cast<char>(std::toupper(static_cast<unsigned char>(character)));
+    }
+  }
+  return argument;
+}
+
 void Baseline::SetUp() {
   std::ifstream cacheMD5File(CACHE_MD5_PATH);
   if (cacheMD5File.is_open()) {
@@ -270,6 +284,12 @@ void Baseline::SetUp() {
     cacheVersionFile.close();
   }
   cacheAvailable = CacheVersion.is_object() && !CacheVersion.empty();
+  if (!cacheAvailable) {
+    LOGE(
+        "Baseline::SetUp() No reference cache found at %s, so every screenshot test will fail. "
+        "Run './update_baseline.sh %s' to create it.",
+        CACHE_DIR.c_str(), GetBackendArgument().c_str());
+  }
   std::ifstream headFile(GIT_HEAD_PATH);
   if (headFile.is_open()) {
     headFile >> currentVersion;
