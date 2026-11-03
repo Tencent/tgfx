@@ -65,7 +65,7 @@ void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
                       UniformData* fragmentUniformData);
 
 /**
- * Writes the YUV family's compiled tail program (CompileYUVProgramForInfo): SlotCount plus the
+ * Writes the YUV family's compiled tail program (ResolveYUVProgram): SlotCount plus the
  * chain instruction arrays — the same record layout the interpreter reads, with a linear-tail
  * selector dialect (bits 0-7 the op's small value — the const-color input mode or the blend
  * mode — bit 8 the blend's operand order; no register bits, array order is dataflow order) —

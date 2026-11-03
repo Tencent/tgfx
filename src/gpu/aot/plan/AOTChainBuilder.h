@@ -49,7 +49,7 @@ struct AOTChainCompile {
  * PointwiseChain/PointwiseGraph passes (a multi-pass plan's passes are built as cut segments
  * through BuildCutSegment) and the YUV family's color-grade tail. Used by AOTPlanner's
  * task assembly and by the re-expressing kernel's per-draw view of an unmodified ProgramInfo
- * (CompileChainProgramForInfo / CompileYUVProgramForInfo).
+ * (ResolveChainProgram / ResolveYUVProgram).
  */
 class AOTChainBuilder {
  public:
@@ -135,13 +135,14 @@ class AOTChainBuilder {
   static bool CollectYUVTail(const AOTEffectGraph& graph, AOTYUVTailShape* shape);
 
   /**
-   * Compiles the YUV family's color-grade tail from the draw's carried IR into chain
-   * instruction records (the same slot encoding the interpreter reads): the operators above
-   * the multi-plane source leaf, in application order. The terminal needs no rebuilt processor
-   * — the family matches off the IR and this program drives the tail's uniform upload.
-   * Returns false when the info carries no IR or the tail is not servable.
+   * The YUV family's compiled color-grade tail, resolved at most once and memoized on the draw's
+   * IR the same way ResolveChainProgram memoizes the chain program: the operators above the
+   * multi-plane source leaf, in application order, as chain instruction records (the same slot
+   * encoding the interpreter reads). The terminal needs no rebuilt processor — the family matches
+   * off the IR and this program drives the tail's uniform upload. Returns null when the info
+   * carries no IR or the tail is not servable.
    */
-  static bool CompileYUVProgramForInfo(const ProgramInfo* info, AOTProgram* out);
+  static const AOTProgram* ResolveYUVProgram(const ProgramInfo* programInfo);
 
   /**
    * The source a later pass of a multi-pass plan reads: its predecessor's RGBA intermediate,
@@ -190,14 +191,14 @@ class AOTChainBuilder {
                                   bool coverageLeafFromUVCoord, AOTProgram* out);
 
   /**
-   * Compiles a draw's record-time IR (its color graph and classified coverage terms) into the
-   * fused chain program and its binding table, without building processors: the single-pass
-   * decomposition plans the color side and the terms merge into the program. This is the
-   * interpreter's view of the draw: the matcher derives the variant from the program, and the
-   * per-draw upload (uniforms, samplers and the vertex transforms) consumes it. Returns false when
-   * the expression does not reduce onto the chain kernel (a missing IR, an over-budget shape, a
-   * coverage form the chain cannot carry).
+   * The draw's compiled chain program, resolved at most once: a plan pass or an earlier match
+   * already carries it on the IR, and the first caller that needs it compiles it there (the
+   * single-pass decomposition plans the color side, the classified coverage terms merge into the
+   * program) and memoizes it. This is the one entry both the interpreter family's matching and the
+   * writer's chain path consult; there is no second compile site. Returns null when the expression
+   * does not reduce onto the chain kernel (a missing IR, an over-budget shape, a coverage form the
+   * chain cannot carry).
    */
-  static bool CompileChainProgramForInfo(const ProgramInfo* programInfo, AOTProgram* out);
+  static const AOTProgram* ResolveChainProgram(const ProgramInfo* programInfo);
 };
 }  // namespace tgfx

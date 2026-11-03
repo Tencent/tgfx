@@ -1634,7 +1634,7 @@ bool AOTChainBuilder::CollectYUVTail(const AOTEffectGraph& graph, AOTYUVTailShap
   return true;
 }
 
-bool AOTChainBuilder::CompileYUVProgramForInfo(const ProgramInfo* info, AOTProgram* out) {
+static bool CompileYUVProgramForInfo(const ProgramInfo* info, AOTProgram* out) {
   if (info == nullptr || out == nullptr) {
     return false;
   }
@@ -1642,8 +1642,8 @@ bool AOTChainBuilder::CompileYUVProgramForInfo(const ProgramInfo* info, AOTProgr
   if (ir == nullptr) {
     return false;
   }
-  AOTYUVTailShape shape = {};
-  if (!CollectYUVTail(ir->color, &shape)) {
+  AOTChainBuilder::AOTYUVTailShape shape = {};
+  if (!AOTChainBuilder::CollectYUVTail(ir->color, &shape)) {
     return false;
   }
   AOTProgram program = {};
@@ -1842,7 +1842,7 @@ bool AOTChainBuilder::ValidateSlots(const std::vector<AOTChainSlot>& slots, size
   return true;
 }
 
-bool AOTChainBuilder::CompileChainProgramForInfo(const ProgramInfo* programInfo, AOTProgram* out) {
+static bool CompileChainProgramForInfo(const ProgramInfo* programInfo, AOTProgram* out) {
   if (programInfo == nullptr || out == nullptr) {
     return false;
   }
@@ -1869,6 +1869,43 @@ bool AOTChainBuilder::CompileChainProgramForInfo(const ProgramInfo* programInfo,
     descriptor = plan.passes[0];
   }
   return CompileChainProgramLayout(carried->color, descriptor, &carried->coverage, out);
+}
+
+// The memoization both consumers share: the program lives on the draw's IR, the first caller that
+// needs it compiles it, and every later caller — the matcher's second prepare, the writer on a
+// program-cache hit — reads it back. One entry, one compile per draw.
+const AOTProgram* AOTChainBuilder::ResolveChainProgram(const ProgramInfo* programInfo) {
+  auto* carried = programInfo != nullptr ? programInfo->getCarriedIR() : nullptr;
+  if (carried == nullptr) {
+    return nullptr;
+  }
+  if (!carried->program.has_value()) {
+    AOTProgram program = {};
+    if (!CompileChainProgramForInfo(programInfo, &program)) {
+      return nullptr;
+    }
+    carried->program = std::move(program);
+  }
+  return &*carried->program;
+}
+
+const AOTProgram* AOTChainBuilder::ResolveYUVProgram(const ProgramInfo* programInfo) {
+  auto* carried = programInfo != nullptr ? programInfo->getCarriedIR() : nullptr;
+  if (carried == nullptr) {
+    return nullptr;
+  }
+  if (!carried->program.has_value()) {
+    auto context = programInfo->getContext();
+    if (context == nullptr || context->drawingManager() == nullptr) {
+      return nullptr;
+    }
+    AOTProgram program = {};
+    if (!CompileYUVProgramForInfo(programInfo, &program)) {
+      return nullptr;
+    }
+    carried->program = std::move(program);
+  }
+  return &*carried->program;
 }
 
 }  // namespace tgfx

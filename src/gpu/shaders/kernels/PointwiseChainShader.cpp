@@ -44,21 +44,14 @@ std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::Extract(
   if (programInfo->getGeometryProcessor() == nullptr) {
     return std::nullopt;
   }
-  // The interpreter's own subject: the whole effect expression is compiled once and kept on the
-  // carried IR — a plan pass arrives with it, a plain draw fills it on this first match, and every
-  // later prepare of the same op reads it back.
-  auto* carried = programInfo->getCarriedIR();
-  if (carried == nullptr) {
+  // The interpreter's own subject: the whole effect expression resolves through the one compile
+  // entry — a plan pass arrives with its program, a plain draw compiles it on this first match,
+  // and every later prepare of the same op reads it back.
+  const auto* program = AOTChainBuilder::ResolveChainProgram(programInfo);
+  if (program == nullptr) {
     return std::nullopt;
   }
-  if (!carried->program.has_value()) {
-    AOTProgram program = {};
-    if (!AOTChainBuilder::CompileChainProgramForInfo(programInfo, &program)) {
-      return std::nullopt;
-    }
-    carried->program = std::move(program);
-  }
-  return DeriveInputs(*carried->program, programInfo, failure);
+  return DeriveInputs(*program, programInfo, failure);
 }
 
 std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::DeriveInputs(

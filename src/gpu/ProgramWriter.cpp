@@ -59,7 +59,6 @@ namespace tgfx {
 
 // The compiled YUV tail program, mirroring ChainProgram: kept on the draw's IR, compiled here
 // once when the match never needed to (the family's matching reads IR facts only).
-static const AOTProgram* YUVProgram(const ProgramInfo& info);
 
 #if DEBUG
 // Prints one bound sampler slot of the TGFX_UNIF_DUMP trace: which texture the slot received, so
@@ -763,7 +762,7 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
   if (bindYUVTail) {
     // The YUV family's tail instruction records come from the compiled program — the
     // shell-free value write the chain route applies to its own slots.
-    auto* program = YUVProgram(info);
+    auto* program = AOTChainBuilder::ResolveYUVProgram(&info);
     if (program == nullptr) {
       LOGE(
           "PrecompiledProgramWriter::writeProcessors() no compiled YUV tail program; the draw "
@@ -850,59 +849,24 @@ void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* p
 bool PrecompiledProgramWriter::canWrite(const ProgramInfo& info) const {
   // Only the YUV family's tail needs a compiled program beyond the walk's own content; every
   // other family uploads the walk alone.
-  return !bindYUVTail || YUVProgram(info) != nullptr;
+  return !bindYUVTail || AOTChainBuilder::ResolveYUVProgram(&info) != nullptr;
 }
 
-// The compiled chain program this draw resolves to: a plan pass carries it on its IR, a draw the
-// match walk compiled carries it there too, and — on a program-cache hit, where the walk never ran
-// for this draw — it is compiled here once and memoized on the same IR. The transform, uniform and
-// sampler writes then share one description, and a repeated prepare of the same op never recompiles.
-static const AOTProgram* ChainProgram(const ProgramInfo& info) {
-  auto* carried = info.getCarriedIR();
-  if (carried == nullptr) {
-    return nullptr;
-  }
-  if (!carried->program.has_value()) {
-    AOTProgram program = {};
-    if (!AOTChainBuilder::CompileChainProgramForInfo(&info, &program)) {
-      return nullptr;
-    }
-    carried->program = std::move(program);
-  }
-  return &*carried->program;
-}
-
-// The compiled YUV tail program, mirroring ChainProgram: kept on the draw's IR, compiled here once
-// when the match never needed to (the family's matching reads IR facts only).
-static const AOTProgram* YUVProgram(const ProgramInfo& info) {
-  auto* carried = info.getCarriedIR();
-  if (carried == nullptr) {
-    return nullptr;
-  }
-  if (!carried->program.has_value()) {
-    auto context = info.getContext();
-    if (context == nullptr || context->drawingManager() == nullptr) {
-      return nullptr;
-    }
-    AOTProgram program = {};
-    if (!AOTChainBuilder::CompileYUVProgramForInfo(&info, &program)) {
-      return nullptr;
-    }
-    carried->program = std::move(program);
-  }
-  return &*carried->program;
-}
+// The compiled chain program this draw resolves to comes from the one memoized entry
+// (AOTChainBuilder::ResolveChainProgram): a plan pass carries it on its IR, the first match or
+// write compiles it there, and every later caller reads it back — the transform, uniform and
+// sampler writes share one description, and a repeated prepare never recompiles.
 
 bool ChainProgramWriter::canWrite(const ProgramInfo& info) const {
   // The chain kernel's whole uniform content, transforms and sampler order come from the compiled
   // program; without it there is nothing correct to upload.
-  return ChainProgram(info) != nullptr;
+  return AOTChainBuilder::ResolveChainProgram(&info) != nullptr;
 }
 
 void ChainProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
                                                 UniformData* vertexUniformData,
                                                 UniformData* fragmentUniformData) const {
-  const auto* program = ChainProgram(info);
+  const auto* program = AOTChainBuilder::ResolveChainProgram(&info);
   if (program == nullptr) {
     LOGE(
         "ChainProgramWriter::writeGeometryProcessor() no compiled chain program; the draw renders "
@@ -919,7 +883,7 @@ void ChainProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
 
 void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
                                          UniformData* fragmentUniformData) const {
-  const auto* program = ChainProgram(info);
+  const auto* program = AOTChainBuilder::ResolveChainProgram(&info);
   if (program == nullptr) {
     LOGE(
         "ChainProgramWriter::writeProcessors() no compiled chain program; the draw renders with "
@@ -945,7 +909,7 @@ void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* v
 
 void ChainProgramWriter::writeSamplers(const ProgramInfo& info, Program* program,
                                        RenderPass* renderPass) const {
-  const auto* chainProgram = ChainProgram(info);
+  const auto* chainProgram = AOTChainBuilder::ResolveChainProgram(&info);
   if (chainProgram == nullptr) {
     LOGE("ChainProgramWriter::writeSamplers() no compiled chain program; skipping the bindings");
     return;
