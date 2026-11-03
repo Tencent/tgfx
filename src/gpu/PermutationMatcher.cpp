@@ -269,72 +269,71 @@ AOTGeometryDesc DescribeGeometryProcessor(const GeometryProcessor* gp) {
   if (gp == nullptr) {
     return desc;
   }
-  const auto gpName = gp->name();
-  if (gpName == "DefaultGeometryProcessor") {
+  if (IsProcessor<DefaultGeometryProcessor>(gp)) {
     desc.kind = AOTGeometryKind::Default;
     return desc;
   }
-  if (gpName == "NonAARRectGeometryProcessor") {
+  if (IsProcessor<NonAARRectGeometryProcessor>(gp)) {
     auto* rrectGP = static_cast<const NonAARRectGeometryProcessor*>(gp);
     desc.kind = AOTGeometryKind::NonAARRect;
     desc.hasCommonColor = rrectGP->hasCommonColor();
     desc.isStroke = rrectGP->isStroke();
     return desc;
   }
-  if (gpName == "ComplexNonAARRectGeometryProcessor") {
+  if (IsProcessor<ComplexNonAARRectGeometryProcessor>(gp)) {
     auto* rrectGP = static_cast<const ComplexNonAARRectGeometryProcessor*>(gp);
     desc.kind = AOTGeometryKind::ComplexNonAARRect;
     desc.hasCommonColor = rrectGP->hasCommonColor();
     desc.isStroke = rrectGP->isStroke();
     return desc;
   }
-  if (gpName == "EllipseGeometryProcessor") {
+  if (IsProcessor<EllipseGeometryProcessor>(gp)) {
     auto* ellipseGP = static_cast<const EllipseGeometryProcessor*>(gp);
     desc.kind = AOTGeometryKind::Ellipse;
     desc.hasCommonColor = ellipseGP->hasCommonColor();
     desc.isStroke = ellipseGP->isStroke();
     return desc;
   }
-  if (gpName == "ComplexEllipseGeometryProcessor") {
+  if (IsProcessor<ComplexEllipseGeometryProcessor>(gp)) {
     auto* ellipseGP = static_cast<const ComplexEllipseGeometryProcessor*>(gp);
     desc.kind = AOTGeometryKind::ComplexEllipse;
     desc.hasCommonColor = ellipseGP->hasCommonColor();
     desc.isStroke = ellipseGP->isStroke();
     return desc;
   }
-  if (gpName == "HairlineLineGeometryProcessor") {
+  if (IsProcessor<HairlineLineGeometryProcessor>(gp)) {
     desc.kind = AOTGeometryKind::HairlineLine;
     return desc;
   }
-  if (gpName == "HairlineQuadGeometryProcessor") {
+  if (IsProcessor<HairlineQuadGeometryProcessor>(gp)) {
     desc.kind = AOTGeometryKind::HairlineQuad;
     return desc;
   }
-  if (gpName == "MeshGeometryProcessor") {
+  if (IsProcessor<MeshGeometryProcessor>(gp)) {
     desc.kind = AOTGeometryKind::Mesh;
     desc.hasTexCoords = static_cast<const MeshGeometryProcessor*>(gp)->getHasTexCoords();
     return desc;
   }
-  if (gpName == "RoundStrokeRectGeometryProcessor") {
+  if (IsProcessor<RoundStrokeRectGeometryProcessor>(gp)) {
     auto* strokeGP = static_cast<const RoundStrokeRectGeometryProcessor*>(gp);
     desc.kind = AOTGeometryKind::RoundStrokeRect;
     desc.hasUVMatrix = strokeGP->hasUVMatrixTransform();
     desc.hasUVPerspective = strokeGP->isUVPerspective();
     return desc;
   }
-  if (gpName == "ShapeInstancedGeometryProcessor") {
+  if (IsProcessor<ShapeInstancedGeometryProcessor>(gp)) {
     desc.kind = AOTGeometryKind::ShapeInstanced;
     desc.hasCoverage =
         static_cast<const ShapeInstancedGeometryProcessor*>(gp)->getAAType() == AAType::Coverage;
     return desc;
   }
-  if (gpName == "AtlasTextGeometryProcessor") {
+  if (IsProcessor<AtlasTextGeometryProcessor>(gp)) {
     desc.kind = AOTGeometryKind::AtlasText;
     desc.hasCoverage =
         static_cast<const AtlasTextGeometryProcessor*>(gp)->getAAType() == AAType::Coverage;
     return desc;
   }
-  if (gpName != "QuadPerEdgeAAGeometryProcessor") {
+  if (!IsProcessor<QuadPerEdgeAAGeometryProcessor>(gp)) {
     return desc;
   }
   auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
@@ -344,6 +343,27 @@ AOTGeometryDesc DescribeGeometryProcessor(const GeometryProcessor* gp) {
   desc.hasSubset = quadGP->getHasSubset();
   desc.hasUVPerspective = quadGP->getHasUVPerspective();
   return desc;
+}
+
+std::optional<int> PointwiseGpKind(const AOTGeometryDesc& geometry) {
+  switch (geometry.kind) {
+    case AOTGeometryKind::Default:
+      return GpKind::Default;
+    case AOTGeometryKind::QuadPerEdgeAA:
+      return GpKind::QuadPerEdgeAA;
+    case AOTGeometryKind::Mesh:
+      return GpKind::Mesh;
+    case AOTGeometryKind::AtlasText:
+      return GpKind::AtlasText;
+    case AOTGeometryKind::Ellipse:
+      return GpKind::Ellipse;
+    case AOTGeometryKind::HairlineLine:
+      return GpKind::HairlineLine;
+    case AOTGeometryKind::ComplexEllipse:
+      return geometry.isStroke ? GpKind::ComplexEllipseStroke : GpKind::ComplexEllipseFill;
+    default:
+      return std::nullopt;
+  }
 }
 
 // ShaderMode values the shared single-tap tiled_sample.inc handles for the blur tap loop:

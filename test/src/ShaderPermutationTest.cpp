@@ -2098,6 +2098,62 @@ TGFX_TEST(ShaderPermutationTest, CreatorFunnelRecordsArtifactMiss) {
 
   cache->setDiagnosticRecordingEnabled(false);
   cache->unload();
+
+}
+
+TGFX_TEST(ShaderPermutationTest, ProgramMissCacheClearsOnBundleChange) {
+  // The negative cache must never outlive the bundle it was recorded against: a new bundle can
+  // serve a key the old one refused.
+  PrecompiledShaderCache cache(nullptr, Backend::Unknown);
+  BytesKey key;
+  key.write(7);
+  PrecompiledFallbackReason reason = PrecompiledFallbackReason::Unspecified;
+  EXPECT_FALSE(cache.findProgramMiss(key, &reason));
+  cache.recordProgramMiss(key, PrecompiledFallbackReason::NoMatchingRule);
+  ASSERT_TRUE(cache.findProgramMiss(key, &reason));
+  EXPECT_EQ(reason, PrecompiledFallbackReason::NoMatchingRule);
+
+  auto bundle = MakeTestBundle("bounds", 1, 1, 50);
+  ASSERT_TRUE(cache.loadBundle(bundle.data(), bundle.size()));
+  EXPECT_FALSE(cache.findProgramMiss(key, &reason));
+
+  cache.recordProgramMiss(key, PrecompiledFallbackReason::VertexArtifactMissing);
+  ASSERT_TRUE(cache.findProgramMiss(key, &reason));
+  cache.unload();
+  EXPECT_FALSE(cache.findProgramMiss(key, &reason));
+}
+
+TGFX_TEST(ShaderPermutationTest, ARefusedProgramKeyIsNotRematched) {
+  // The negative cache's contract: the first draw with a refused program key walks the rules and
+  // records the fallback; a later draw with the same key is refused from the cache — counted as a
+  // miss, but neither re-matched nor recorded again.
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 128, 128);
+  ASSERT_TRUE(surface != nullptr);
+  auto* cache = context->precompiledShaderCache();
+  cache->setDiagnosticRecordingEnabled(true);
+  auto drawOnce = [&]() {
+    // The program cache would otherwise serve the second draw without ever asking the creator.
+    context->globalCache()->clearPrograms();
+    surface->getCanvas()->drawImage(image, 0, 0);
+    context->flushAndSubmit(true);
+  };
+  drawOnce();
+  if (cache->missCount() == 0) {
+    cache->setDiagnosticRecordingEnabled(false);
+    GTEST_SKIP() << "the bundle serves this draw on this backend";
+  }
+  const auto recordsAfterFirst = cache->fallbackRecords().size();
+  const auto missesAfterFirst = cache->missCount();
+  drawOnce();
+  EXPECT_GT(cache->missCount(), missesAfterFirst);
+  EXPECT_EQ(cache->fallbackRecords().size(), recordsAfterFirst);
+  EXPECT_EQ(cache->aotStageCount(PrecompiledAOTStage::CacheAvailable), 2u);
+  cache->setDiagnosticRecordingEnabled(false);
 }
 
 TGFX_TEST(ShaderPermutationTest, CompressedBundleLoad) {

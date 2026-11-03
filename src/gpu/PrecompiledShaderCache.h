@@ -29,6 +29,7 @@
 #include <utility>
 #include <vector>
 #include "gpu/Program.h"
+#include "tgfx/core/BytesKey.h"
 #include "gpu/ShaderCache.h"
 #include "gpu/Uniform.h"
 #include "gpu/aot/AOTEffectDecomposer.h"
@@ -287,6 +288,16 @@ class PrecompiledShaderCache {
     return _bundle == nullptr ? 0 : _bundle->toolchainABI;
   }
 
+  /// Records a program key the precompiled route refused, with the reason: later draws carrying
+  /// the same key are refused without walking the permutation rules again. Cleared whenever the
+  /// bundle changes, because a new bundle may serve a key the old one refused.
+  bool findProgramMiss(const BytesKey& key, PrecompiledFallbackReason* reason) const;
+  void recordProgramMiss(const BytesKey& key, PrecompiledFallbackReason reason);
+
+  /// Counts a miss served from the negative cache: the cheap counters move, but the per-draw
+  /// fallback record (which formats strings) is not built again.
+  void recordCachedMiss(PrecompiledFallbackReason reason);
+
   /// Returns the number of successful lookups where both vertex and fragment artifacts were found.
   uint32_t hitCount() const {
     return _hitCount.load(std::memory_order_relaxed);
@@ -501,6 +512,8 @@ class PrecompiledShaderCache {
   ShaderCache _shaderCache;
   std::atomic<uint64_t> _generation{0};
   std::shared_ptr<const ParsedBundle> _bundle = nullptr;
+  mutable std::mutex _programMissMutex;
+  std::unordered_map<BytesKey, PrecompiledFallbackReason, BytesKeyHasher> _programMisses;
   // Simultaneously-live materialized-texture accounting (peakTemporaryBytes): materialization
   // edges created during a flush cycle (blend-child flattens, offscreen plan targets) add their
   // bytes to this running total; flush() settles it into peakTemporaryBytes and resets. The

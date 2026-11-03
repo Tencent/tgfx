@@ -20,6 +20,7 @@
 
 #include <optional>
 #include <vector>
+#include "gpu/ShaderMatchHelpers.h"
 #include "gpu/aot/AOTResourceProfile.h"
 #include "gpu/shaders/ShaderFamily.h"
 
@@ -142,7 +143,7 @@ class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
   /// resource-kind value for its single gradient and three tiled
   /// recipes; NoiseGraph retains its fixed position-based, common-color AA quad subset.
   struct Inputs {
-    int gpKind = 0;
+    int gpKind = GpKind::Default;
     bool hasCoverage = false;  // DefaultGP: AA coverage; quad/mesh: always true.
     bool hasUVCoord = false;   // quad/mesh: texCoord slot; atlas: always true.
     int textureCount = 0;      // domain value: 0 = leaf-free, 1 = four-leaf padded slots.
@@ -176,7 +177,8 @@ class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
       return std::nullopt;
     }
     if (resourceKind == 2 &&
-        (!inputs.hasNoise || inputs.hasGradient || inputs.gpKind != 1 || !inputs.hasCoverage ||
+        (!inputs.hasNoise || inputs.hasGradient || inputs.gpKind != GpKind::QuadPerEdgeAA ||
+         !inputs.hasCoverage ||
          inputs.hasUVCoord || inputs.textureCount != 1)) {
       return std::nullopt;
     }
@@ -209,7 +211,7 @@ class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
     const AOTResourceProfile profiles[] = {AOTResourceProfile::Automatic,
                                            AOTResourceProfile::TiledGraph};
     for (auto profile : profiles) {
-      for (int gpKind = 0; gpKind <= 7; ++gpKind) {
+      for (int gpKind = GpKind::Default; gpKind <= GpKind::ComplexEllipseStroke; ++gpKind) {
         for (int hasCoverage = 0; hasCoverage <= 1; ++hasCoverage) {
           for (int hasUVCoord = 0; hasUVCoord <= 1; ++hasUVCoord) {
             for (int textureCount = 0; textureCount <= 1; ++textureCount) {
@@ -236,7 +238,7 @@ class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
     }
     for (int xpType = XP_UNSUPPORTED; xpType <= XP_FRAMEBUFFER_FETCH; ++xpType) {
       Inputs inputs;
-      inputs.gpKind = 1;
+      inputs.gpKind = GpKind::QuadPerEdgeAA;
       inputs.hasCoverage = true;
       inputs.textureCount = 1;
       inputs.resourceProfile = AOTResourceProfile::NoiseGraph;
@@ -340,7 +342,7 @@ class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
         if (inputs.hasCoverage || inputs.hasUVCoord) {
           return false;
         }
-        gpLayout = inputs.gpKind == 6 ? 3 : 4;
+        gpLayout = inputs.gpKind == GpKind::ComplexEllipseFill ? 3 : 4;
         break;
       default:
         return false;
@@ -360,7 +362,7 @@ class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
     }
     // The per-quad subset is a QuadPerEdgeAAGP attribute that clamps a texture leaf, so it exists
     // only on the quad profile with the four-leaf slots.
-    if (inputs.hasSubset && (inputs.gpKind != 1 || inputs.textureCount != 1)) {
+    if (inputs.hasSubset && (inputs.gpKind != GpKind::QuadPerEdgeAA || inputs.textureCount != 1)) {
       return false;
     }
     // HAS_SOURCE_COORDS and RESOURCE_KIND are assigned by Compose: they depend on the resource

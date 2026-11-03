@@ -43,8 +43,26 @@ struct PermutationVariant;
 enum class PermutationMatchFailure;
 
 /// Describes a geometry processor's matcher-relevant facts — the one description of the draw's
-/// geometry the executor-table matching reads, taken off the made processor at match time.
+/// geometry the executor-table matching reads, taken off the made processor at match time. The
+/// type dispatch uses IsProcessor, never name() strings, so a rename cannot silently reclassify.
 AOTGeometryDesc DescribeGeometryProcessor(const GeometryProcessor* gp);
+
+/// The pointwise chain's gpKind axis: one value per vertex layout its kernels have. The numbers are
+/// permutation values baked into the kernels' GP layouts, so they are ABI — append only.
+namespace GpKind {
+inline constexpr int Default = 0;
+inline constexpr int QuadPerEdgeAA = 1;
+inline constexpr int Mesh = 2;
+inline constexpr int AtlasText = 3;
+inline constexpr int Ellipse = 4;
+inline constexpr int HairlineLine = 5;
+inline constexpr int ComplexEllipseFill = 6;
+inline constexpr int ComplexEllipseStroke = 7;
+}  // namespace GpKind
+
+/// Maps the one geometry classification onto the chain's gpKind axis; nullopt when the chain has no
+/// vertex layout for that geometry. The single place the two classifications meet.
+std::optional<int> PointwiseGpKind(const AOTGeometryDesc& geometry);
 
 /// The xfer classification the matcher facts read — what GetXPType reports for the draw's info,
 /// taken off the made xfer processor at match time.

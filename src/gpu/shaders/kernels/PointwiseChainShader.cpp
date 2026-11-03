@@ -66,28 +66,13 @@ std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::DeriveInputs(
     return std::nullopt;
   }
   auto gp = programInfo->getGeometryProcessor();
-  // GP profiles: 0 Default, 1 Quad, 2 Mesh (whose vertex buffers follow the
-  // chain's attribute order), 3 the sampler-free AtlasText twin, 4 the ellipse layout, 5 the
-  // hairline-line layout, 6 / 7 the complex rounded-rect fill / stroke layouts.
-  int gpKind = -1;
-  if (IsProcessor<DefaultGeometryProcessor>(gp)) {
-    gpKind = 0;
-  } else if (IsProcessor<QuadPerEdgeAAGeometryProcessor>(gp)) {
-    gpKind = 1;
-  } else if (IsProcessor<MeshGeometryProcessor>(gp)) {
-    gpKind = 2;
-  } else if (IsProcessor<AtlasTextGeometryProcessor>(gp)) {
-    gpKind = 3;
-  } else if (IsProcessor<EllipseGeometryProcessor>(gp)) {
-    gpKind = 4;
-  } else if (IsProcessor<HairlineLineGeometryProcessor>(gp)) {
-    gpKind = 5;
-  } else if (IsProcessor<ComplexEllipseGeometryProcessor>(gp)) {
-    gpKind = static_cast<const ComplexEllipseGeometryProcessor*>(gp)->isStroke() ? 7 : 6;
-  }
-  if (gpKind < 0) {
+  // The gpKind axis comes from the one geometry classification (DescribeGeometryProcessor), so the
+  // family's vertex-layout choice and the matcher's facts cannot disagree.
+  auto gpKindOptional = PointwiseGpKind(DescribeGeometryProcessor(gp));
+  if (!gpKindOptional.has_value()) {
     return std::nullopt;
   }
+  const int gpKind = *gpKindOptional;
   // Sampler-only padding makes every non-empty chain present exactly four sampler children.
   if (program.samplerChildCount != 0 && program.samplerChildCount != 4) {
     return std::nullopt;
@@ -130,7 +115,7 @@ std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::DeriveInputs(
   inputs.hasGradient = gradientCount != 0;
   inputs.resourceProfile = program.profile;
   inputs.xpType = GetXPType(programInfo);
-  if (gpKind == 1) {
+  if (gpKind == GpKind::QuadPerEdgeAA) {
     auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
     if (quadGP->getHasSubset()) {
       if (!IsChainQuadSubsetServable(quadGP, program)) {
@@ -140,14 +125,14 @@ std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::DeriveInputs(
     }
     inputs.hasUVCoord = !quadGP->hasUVMatrix();
     inputs.hasCoverage = true;
-  } else if (gpKind == 2) {
+  } else if (gpKind == GpKind::Mesh) {
     auto* meshGP = static_cast<const MeshGeometryProcessor*>(gp);
     // Mesh vertex buffers follow the chain's attribute order (position, coverage, texCoord,
     // color): texCoords ride the uvCoord slot and the color slot is unconditional (white for
     // colorless meshes). Mesh buffers always carry the coverage slot (1.0 for vertex meshes).
     inputs.hasUVCoord = meshGP->getHasTexCoords();
     inputs.hasCoverage = true;
-  } else if (gpKind == 3) {
+  } else if (gpKind == GpKind::AtlasText) {
     // The atlas GP may own its atlas sampler (an unmodified draw) or not (the chain-route twin a
     // plan task built): the glyph leaf binds through the chain expression either way, so at most
     // one sampler (the atlas itself) is acceptable.
@@ -158,12 +143,12 @@ std::optional<PointwiseChainShader::Inputs> PointwiseChainShader::DeriveInputs(
     // rides the uvCoord slot and the color slot is unconditional.
     inputs.hasUVCoord = true;
     inputs.hasCoverage = false;
-  } else if (gpKind == 4) {
+  } else if (gpKind == GpKind::Ellipse) {
     inputs.hasCoverage = false;
-  } else if (gpKind == 5) {
+  } else if (gpKind == GpKind::HairlineLine) {
     // The hairline edge AA is per-pixel (edge-distance varying); the color is a uniform.
     inputs.hasCoverage = false;
-  } else if (gpKind == 6 || gpKind == 7) {
+  } else if (gpKind == GpKind::ComplexEllipseFill || gpKind == GpKind::ComplexEllipseStroke) {
     // Per-pixel edge AA like the ellipse; the color attribute is unconditional.
     inputs.hasCoverage = false;
   } else {

@@ -267,6 +267,10 @@ void PrecompiledShaderCache::resetStats() {
 
 void PrecompiledShaderCache::unload() {
   _bundle.reset();
+  {
+    std::lock_guard<std::mutex> lock(_programMissMutex);
+    _programMisses.clear();
+  }
   _generation.fetch_add(1, std::memory_order_relaxed);
   if (_context != nullptr) {
     // Dropping the bundle is a generation change: cached precompiled programs must not outlive
@@ -827,6 +831,10 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   parsed.vertEntries = std::move(newVertEntries);
   parsed.fragEntries = std::move(newFragEntries);
   _bundle = ShareParsedBundle(sourceHash, size, std::move(parsed));
+  {
+    std::lock_guard<std::mutex> lock(_programMissMutex);
+    _programMisses.clear();
+  }
   _generation.fetch_add(1, std::memory_order_relaxed);
   if (_context != nullptr) {
     // A new bundle generation invalidates every cached program: precompiled programs from the
@@ -857,6 +865,36 @@ bool PrecompiledShaderCache::loadBundle(const std::string& path) {
     return false;
   }
   return loadBundle(data.data(), fileSize);
+}
+
+bool PrecompiledShaderCache::findProgramMiss(const BytesKey& key,
+                                             PrecompiledFallbackReason* reason) const {
+  std::lock_guard<std::mutex> lock(_programMissMutex);
+  auto it = _programMisses.find(key);
+  if (it == _programMisses.end()) {
+    return false;
+  }
+  if (reason != nullptr) {
+    *reason = it->second;
+  }
+  return true;
+}
+
+void PrecompiledShaderCache::recordProgramMiss(const BytesKey& key,
+                                               PrecompiledFallbackReason reason) {
+  std::lock_guard<std::mutex> lock(_programMissMutex);
+  _programMisses.emplace(key, reason);
+}
+
+void PrecompiledShaderCache::recordCachedMiss(PrecompiledFallbackReason reason) {
+  if (statsRecordingPaused() || missPaused.load(std::memory_order_relaxed)) {
+    return;
+  }
+  _missCount.fetch_add(1, std::memory_order_relaxed);
+  auto index = static_cast<size_t>(reason);
+  if (index < fallbackCounts.size()) {
+    fallbackCounts[index].fetch_add(1, std::memory_order_relaxed);
+  }
 }
 
 const ShaderStageBlob* PrecompiledShaderCache::findVertex(uint64_t hashHi, uint64_t hashLo) const {

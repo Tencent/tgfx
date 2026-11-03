@@ -321,6 +321,16 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   }
   cache->recordAOTStage(PrecompiledAOTStage::CacheAvailable);
 
+  const auto& programKey = programInfo->programKey();
+  PrecompiledFallbackReason cachedReason = PrecompiledFallbackReason::Unspecified;
+  if (cache->findProgramMiss(programKey, &cachedReason)) {
+    // The first draw with this key walked the rules and was refused; every later draw carrying the
+    // same key gets the same answer, so skip the walk (and the record formatting that goes with
+    // it). The cache drops the entry whenever the bundle changes.
+    cache->recordCachedMiss(cachedReason);
+    return nullptr;
+  }
+
   PermutationMatchFailure matchFailure = PermutationMatchFailure::None;
   auto matchResult = MatchPermutation(programInfo, &matchFailure);
   if (!matchResult) {
@@ -353,6 +363,11 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
       record.decomposeAnalysis = AOTEffectDecomposer::Analyze(programInfo);
     }
     cache->recordArtifactMiss(reason, record);
+    if (reason != PrecompiledFallbackReason::DeferredTexture) {
+      // A deferred texture may be instantiated later, which can make the same key serviceable:
+      // only the definitive refusals enter the negative cache.
+      cache->recordProgramMiss(programKey, reason);
+    }
     return nullptr;
   }
   cache->recordAOTStage(PrecompiledAOTStage::PermutationMatched);
