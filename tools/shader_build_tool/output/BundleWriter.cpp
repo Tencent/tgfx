@@ -27,6 +27,7 @@
 #include "output/OutputFile.h"
 #include "core/DiagnosticCodes.h"
 #include "gpu/ShaderBundleContract.h"
+#include "gpu/shaders/BundleCodec.h"
 #include "zstd.h"
 
 namespace tgfx {
@@ -74,37 +75,25 @@ static void WriteU64LE(std::ostream& out, uint64_t val) {
   out.write(reinterpret_cast<char*>(buf), 8);
 }
 
-static void WriteUniformEntries(std::vector<uint8_t>& blob,
-                                const std::vector<UniformEntry>& entries) {
+// The tool's StageReflectionData mapped onto the codec's neutral entries: the grammar itself
+// lives in BundleCodec, shared with the runtime's parser.
+static void MapEntries(const std::vector<UniformEntry>& entries,
+                       std::vector<BundleReflectionEntry>* out) {
+  out->reserve(entries.size());
   for (const auto& entry : entries) {
-    auto nameLen = static_cast<uint8_t>(entry.name.size());
-    blob.push_back(nameLen);
-    blob.insert(blob.end(), entry.name.begin(), entry.name.end());
-    blob.push_back(entry.format);
-    // v4: array element count (1 for scalars).
-    blob.push_back(static_cast<uint8_t>(entry.arraySize & 0xFF));
-    blob.push_back(static_cast<uint8_t>((entry.arraySize >> 8) & 0xFF));
+    out->push_back(BundleReflectionEntry{entry.name, entry.format, entry.arraySize});
   }
 }
 
 std::vector<uint8_t> SerializeStageReflection(const StageReflectionData& reflection) {
-  std::vector<uint8_t> blob;
-  blob.push_back(static_cast<uint8_t>(reflection.uniforms.size()));
-  blob.push_back(static_cast<uint8_t>(reflection.samplers.size()));
-  // v5: the vertex input count occupies the first reserved byte, so a v4 reader still sees a
-  // byte-identical prefix with zero vertex inputs.
-  blob.push_back(static_cast<uint8_t>(reflection.vertexInputs.size()));
-  blob.push_back(0);  // reserved
-
-  WriteUniformEntries(blob, reflection.uniforms);
-  WriteUniformEntries(blob, reflection.samplers);
+  BundleReflection staged = {};
+  MapEntries(reflection.uniforms, &staged.uniforms);
+  MapEntries(reflection.samplers, &staged.samplers);
+  staged.vertexInputs.reserve(reflection.vertexInputs.size());
   for (const auto& entry : reflection.vertexInputs) {
-    blob.push_back(static_cast<uint8_t>(entry.name.size()));
-    blob.insert(blob.end(), entry.name.begin(), entry.name.end());
-    blob.push_back(entry.format);
-    blob.push_back(entry.location);
+    staged.vertexInputs.push_back(BundleVertexInput{entry.name, entry.format, entry.location});
   }
-  return blob;
+  return SerializeBundleReflection(staged);
 }
 
 struct PoolEntry {

@@ -121,6 +121,7 @@ const std::set<std::string>& AllowedRuntimeHeaders() {
       "gpu/aot/AOTResourceProfile.h",
       "gpu/ShaderBundleContract.h",
       "gpu/Uniform.h",
+      "gpu/shaders/BundleCodec.h",
       "gpu/shaders/KernelContract.h",
       // declaration layer
       "gpu/aot/AOTParamRegistry.h",
@@ -142,6 +143,7 @@ const std::vector<std::string>& ContractHeaders() {
       "gpu/aot/AOTResourceProfile.h",
       "gpu/ShaderBundleContract.h",
       "gpu/Uniform.h",
+      "gpu/shaders/BundleCodec.h",
       "gpu/shaders/KernelContract.h",
   };
   return headers;

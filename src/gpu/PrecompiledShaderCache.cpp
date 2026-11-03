@@ -30,6 +30,7 @@
 #include "gpu/PermutationMatch.h"
 #include "gpu/ShaderBundleContract.h"
 #include "gpu/ShaderCaps.h"
+#include "gpu/shaders/BundleCodec.h"
 #include "tgfx/gpu/Context.h"
 #include "zstd.h"
 
@@ -335,86 +336,57 @@ static bool IsValidReflectionFormat(UniformFormat format, bool sampler) {
   }
 }
 
-static bool ReadUniformEntries(const uint8_t* data, size_t maxLen, size_t* offset, uint8_t count,
-                               std::vector<Uniform>& out, bool sampler, size_t* remainingBytes) {
-  if (!ConsumePayloadBudget(static_cast<size_t>(count) * sizeof(Uniform), remainingBytes)) {
+static bool ParseStageReflection(const uint8_t* data, size_t maxLen, ShaderStageBlob* blob,
+                                 size_t* remainingBytes) {
+  // The byte grammar is single-sourced in BundleCodec (the tool's writer goes through it too);
+  // this side keeps the semantic rules the enum owns: which formats may be uniforms or samplers,
+  // sampler array sizes, and vertex-input locations that strictly increase.
+  BundleReflection reflection = {};
+  if (!ParseBundleReflection(data, maxLen, &reflection)) {
     return false;
   }
-  out.reserve(count);
-  for (uint8_t i = 0; i < count; i++) {
-    if (*offset >= maxLen) {
-      return false;
+  size_t budgetBytes = reflection.uniforms.size() * sizeof(Uniform) +
+                       reflection.samplers.size() * sizeof(Uniform) +
+                       reflection.vertexInputs.size() * sizeof(VertexInput);
+  for (const auto* list : {&reflection.uniforms, &reflection.samplers}) {
+    for (const auto& entry : *list) {
+      budgetBytes += entry.name.size() + 1;
     }
-    uint8_t nameLen = data[(*offset)++];
-    if (nameLen == 0 || static_cast<size_t>(nameLen) + 1 > maxLen - *offset ||
-        !ConsumePayloadBudget(static_cast<size_t>(nameLen) + 1, remainingBytes)) {
-      return false;
-    }
-    std::string name(reinterpret_cast<const char*>(data + *offset), nameLen);
-    if (name.find('\0') != std::string::npos ||
-        std::any_of(out.begin(), out.end(),
-                    [&](const Uniform& uniform) { return uniform.name() == name; })) {
-      return false;
-    }
-    *offset += nameLen;
-    auto format = static_cast<UniformFormat>(data[(*offset)++]);
-    if (!IsValidReflectionFormat(format, sampler)) {
-      return false;
-    }
-    if (maxLen - *offset < 2) {
-      return false;
-    }
-    uint32_t arraySize =
-        static_cast<uint32_t>(data[*offset]) | (static_cast<uint32_t>(data[*offset + 1]) << 8);
-    *offset += 2;
-    if (arraySize == 0 || (sampler && arraySize != 1)) {
-      return false;
-    }
-    out.emplace_back(std::move(name), format, arraySize);
   }
-  return true;
-}
-
-// Reflection format: [uniformCount:u8][samplerCount:u8][vertexInputCount:u8][reserved:u8]
-//                    For each uniform: [nameLen:u8][name:bytes][format:u8]
-//                                      (+[arraySize:u16] since bundle v4)
-//                    For each sampler: [nameLen:u8][name:bytes][format:u8]
-//                                      (+[arraySize:u16] since bundle v4)
-//                    For each vertex input (since bundle v5): [nameLen:u8][name:bytes][format:u8]
-//                                                            [location:u8]
-static bool ReadVertexInputEntries(const uint8_t* data, size_t maxLen, size_t* offset,
-                                   uint8_t count, std::vector<VertexInput>& out,
-                                   size_t* remainingBytes) {
-  if (!ConsumePayloadBudget(static_cast<size_t>(count) * sizeof(VertexInput), remainingBytes)) {
+  for (const auto& entry : reflection.vertexInputs) {
+    budgetBytes += entry.name.size() + 2;
+  }
+  if (!ConsumePayloadBudget(budgetBytes, remainingBytes)) {
     return false;
   }
-  out.reserve(count);
+  blob->uniforms.reserve(reflection.uniforms.size());
+  for (auto& entry : reflection.uniforms) {
+    auto format = static_cast<UniformFormat>(entry.format);
+    if (!IsValidReflectionFormat(format, false) || entry.arraySize == 0) {
+      return false;
+    }
+    blob->uniforms.emplace_back(std::move(entry.name), format,
+                                static_cast<uint32_t>(entry.arraySize));
+  }
+  blob->samplers.reserve(reflection.samplers.size());
+  for (auto& entry : reflection.samplers) {
+    auto format = static_cast<UniformFormat>(entry.format);
+    if (!IsValidReflectionFormat(format, true) || entry.arraySize != 1) {
+      return false;
+    }
+    blob->samplers.emplace_back(std::move(entry.name), format, 1u);
+  }
   bool hasPreviousLocation = false;
   uint32_t previousLocation = 0;
-  for (uint8_t i = 0; i < count; i++) {
-    if (*offset >= maxLen) {
-      return false;
-    }
-    uint8_t nameLen = data[(*offset)++];
-    // One more byte for the location after the format.
-    if (nameLen == 0 || static_cast<size_t>(nameLen) + 2 > maxLen - *offset ||
-        !ConsumePayloadBudget(static_cast<size_t>(nameLen) + 2, remainingBytes)) {
-      return false;
-    }
-    std::string name(reinterpret_cast<const char*>(data + *offset), nameLen);
-    if (name.find('\0') != std::string::npos ||
-        std::any_of(out.begin(), out.end(),
-                    [&](const VertexInput& input) { return input.name == name; })) {
-      return false;
-    }
-    *offset += nameLen;
-    auto format = static_cast<UniformFormat>(data[(*offset)++]);
+  blob->vertexInputs.reserve(reflection.vertexInputs.size());
+  for (auto& entry : reflection.vertexInputs) {
+    auto format = static_cast<UniformFormat>(entry.format);
     if (!IsValidReflectionFormat(format, false)) {
-      LOGE("PrecompiledShaderCache: vertex input '%s' has invalid format %u", name.c_str(),
-           static_cast<uint32_t>(format));
+      LOGE("PrecompiledShaderCache: vertex input '%s' has invalid format %u", entry.name.c_str(),
+           static_cast<uint32_t>(entry.format));
       return false;
     }
-    auto location = static_cast<uint32_t>(data[(*offset)++]);
+    auto location = static_cast<uint32_t>(entry.location);
     // The entries are stored in location order, so a decreasing or duplicated location means the
     // .vert's own layout declarations (or the serialized order) are inconsistent — the backends
     // bind attribute slots by location, and a duplicate would silently leave one slot unbound.
@@ -424,40 +396,12 @@ static bool ReadVertexInputEntries(const uint8_t* data, size_t maxLen, size_t* o
       LOGE(
           "PrecompiledShaderCache: vertex input '%s' location %u does not increase (previous "
           "%u)",
-          name.c_str(), location, previousLocation);
+          entry.name.c_str(), location, previousLocation);
       return false;
     }
     previousLocation = location;
     hasPreviousLocation = true;
-    out.push_back(VertexInput{std::move(name), format, location});
-  }
-  return true;
-}
-
-static bool ParseStageReflection(const uint8_t* data, size_t maxLen, ShaderStageBlob* blob,
-                                 size_t* remainingBytes) {
-  if (maxLen < 4) {
-    return false;
-  }
-  size_t offset = 0;
-  uint8_t uniformCount = data[offset++];
-  uint8_t samplerCount = data[offset++];
-  uint8_t vertexInputCount = data[offset++];
-  offset += 1;  // reserved
-
-  if (!ReadUniformEntries(data, maxLen, &offset, uniformCount, blob->uniforms, false,
-                          remainingBytes)) {
-    return false;
-  }
-  if (!ReadUniformEntries(data, maxLen, &offset, samplerCount, blob->samplers, true,
-                          remainingBytes)) {
-    return false;
-  }
-  if (vertexInputCount > 0) {
-    if (!ReadVertexInputEntries(data, maxLen, &offset, vertexInputCount, blob->vertexInputs,
-                                remainingBytes)) {
-      return false;
-    }
+    blob->vertexInputs.push_back(VertexInput{std::move(entry.name), format, location});
   }
   return true;
 }
