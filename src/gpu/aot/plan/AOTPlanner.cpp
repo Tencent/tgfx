@@ -49,7 +49,7 @@ namespace {
 // later pass's materializedInputs holds its predecessor's output. The pass count is the planners'
 // own policy (the cut planner caps itself at MaxCutPlanPasses, the linear splitter is unbounded),
 // not an executor contract, so it is not re-checked here.
-static bool ValidateCutPlan(const AOTEffectGraph& graph, const AOTEffectPlan& plan) {
+static bool ValidateCutPlan(const AOTEffectGraph& graph, const Plan& plan) {
   if (plan.passes.size() < 2) {
     return false;
   }
@@ -184,7 +184,8 @@ static bool AppendMaterializedPass(Context* context, uint32_t renderFlags,
   if (renderPass.drawOp == nullptr) {
     return false;
   }
-  renderPass.edge = AOTMaterializedEdge{reason, geometry};
+  renderPass.reason = reason;
+  renderPass.geometry = geometry;
   passes->push_back(std::move(renderPass));
   return true;
 }
@@ -193,8 +194,7 @@ static bool AppendMaterializedPass(Context* context, uint32_t renderFlags,
 // cut in the dependent pass — a blend operand is a materialized shader value, a unary pointwise
 // operator is the linear planner's split.
 static AOTEdgeReason EdgeReasonForCutConsumer(const AOTEffectGraph& graph,
-                                              const AOTPassDescriptor& consumerPass,
-                                              AOTNodeID cutRoot) {
+                                              const PassIR& consumerPass, AOTNodeID cutRoot) {
   for (auto nodeID : consumerPass.nodes) {
     const auto* node = graph.nodeAt(nodeID);
     if (node == nullptr) {
@@ -219,7 +219,7 @@ static AOTEdgeReason EdgeReasonForCutConsumer(const AOTEffectGraph& graph,
 // designator, so the epilogue never re-applies it; an operand-materializing fill carries a shader
 // value with no alpha.
 static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOTEffectGraph& graph,
-                               const AOTEffectPlan& plan, const Rect& deviceBounds,
+                               const Plan& plan, const Rect& deviceBounds,
                                const RenderTargetProxy* destination, const Point& fpCoordOffset,
                                const std::optional<Matrix>& deviceToLocal, float sourceAlpha,
                                AOTRenderPlan* renderPlan,
@@ -278,7 +278,7 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
           AOTChainBuilder::IntermediateSource(target->asTextureProxy(), matrix));
     }
     AOTEffectGraph segment = {};
-    AOTPassDescriptor segmentPass = {};
+    PassIR segmentPass = {};
     if (!AOTChainBuilder::BuildCutSegment(
             graph, pass, intermediates, isTerminal ? Matrix::I() : coordToLocal,
             isTerminal ? Matrix::I() : deviceLeafRemap, &segment, &segmentPass)) {
@@ -324,7 +324,7 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
 // The pass IRs of a plan Build already validated: single pass or cut plan, each carrying its
 // compiled program (admission's, when Build passes one in).
 static bool BuildPassIRs(Context* context, uint32_t renderFlags, const AOTEffectGraph& graph,
-                         const AOTEffectPlan& plan, const Rect& deviceBounds,
+                         const Plan& plan, const Rect& deviceBounds,
                          const RenderTargetProxy* destination, const Point& fpCoordOffset,
                          const std::optional<Matrix>& deviceToLocal, AOTRenderPlan* renderPlan,
                          float sourceAlpha, const std::vector<AOTCoverageTerm>* terminalCoverage,
@@ -367,9 +367,8 @@ static bool BuildPassIRs(Context* context, uint32_t renderFlags, const AOTEffect
 
 }  // namespace
 
-std::optional<AOTEffectPlan> AOTPlanner::Plan(const DrawIR& ir,
-                                              AOTDecomposeOutcome* failureOutcome) {
-  AOTEffectPlan plan = {};
+std::optional<Plan> AOTPlanner::MakePlan(const DrawIR& ir, AOTDecomposeOutcome* failureOutcome) {
+  Plan plan = {};
   if (!AOTEffectDecomposer::Decompose(ir.color, &plan)) {
     if (failureOutcome != nullptr) {
       *failureOutcome = AOTDecomposeOutcome::UnsupportedShape;
@@ -382,7 +381,7 @@ std::optional<AOTEffectPlan> AOTPlanner::Plan(const DrawIR& ir,
   return plan;
 }
 
-bool AOTPlanner::ServesInPlacePass(const AOTEffectPlan& plan) {
+bool AOTPlanner::ServesInPlacePass(const Plan& plan) {
   if (plan.passes.size() != 1 || !IsAOTPointwiseDAGKernel(plan.passes[0].kernel)) {
     return false;
   }
@@ -391,7 +390,7 @@ bool AOTPlanner::ServesInPlacePass(const AOTEffectPlan& plan) {
          !pass.materializesOutput;
 }
 
-bool AOTPlanner::TaskCarriesCoverage(const AOTEffectPlan& plan,
+bool AOTPlanner::TaskCarriesCoverage(const Plan& plan,
                                      const std::vector<AOTCoverageTerm>& coverageTerms,
                                      BlendMode blendMode) {
   if (coverageTerms.empty()) {
@@ -403,14 +402,26 @@ bool AOTPlanner::TaskCarriesCoverage(const AOTEffectPlan& plan,
   return !BlendModeNeedDstTexture(blendMode, true);
 }
 
-bool AOTPlanner::PlanRequiresTask(const AOTEffectPlan& plan) {
+bool AOTPlanner::PlanRequiresTask(const Plan& plan) {
   if (plan.passes.size() != 1) {
     return true;
   }
   return !IsAOTPointwiseDAGKernel(plan.passes[0].kernel);
 }
 
-bool AOTPlanner::Validate(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
+AOTRecordRoute AOTPlanner::RouteRecordPlan(const Plan& plan,
+                                           const std::vector<AOTCoverageTerm>& coverageTerms,
+                                           BlendMode blendMode) {
+  if (ServesInPlacePass(plan)) {
+    return AOTRecordRoute::InPlace;
+  }
+  if (PlanRequiresTask(plan) && TaskCarriesCoverage(plan, coverageTerms, blendMode)) {
+    return AOTRecordRoute::Task;
+  }
+  return AOTRecordRoute::Plain;
+}
+
+bool AOTPlanner::Validate(const AOTEffectGraph& graph, const Plan& plan,
                           const std::vector<AOTCoverageTerm>* terminalCoverage,
                           AOTChainCompile* compiled) {
   if (plan.passes.empty() || !plan.output.isValid() || plan.output != graph.root()) {
@@ -454,7 +465,7 @@ bool AOTPlanner::Validate(const AOTEffectGraph& graph, const AOTEffectPlan& plan
   }
 }
 
-bool AOTPlanner::NeedsLocalRemap(const AOTEffectGraph& graph, const AOTEffectPlan& plan) {
+bool AOTPlanner::NeedsLocalRemap(const AOTEffectGraph& graph, const Plan& plan) {
   if (plan.passes.size() <= 1) {
     return false;
   }
@@ -467,7 +478,7 @@ bool AOTPlanner::NeedsLocalRemap(const AOTEffectGraph& graph, const AOTEffectPla
 }
 
 PlacementPtr<RenderTask> AOTPlanner::Build(Context* context, uint32_t renderFlags,
-                                           const AOTEffectGraph& graph, const AOTEffectPlan& plan,
+                                           const AOTEffectGraph& graph, const Plan& plan,
                                            const Rect& deviceBounds,
                                            std::shared_ptr<RenderTargetProxy> destination,
                                            PlacementPtr<DrawOp>* originalDraw,

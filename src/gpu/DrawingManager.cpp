@@ -127,7 +127,7 @@ bool DrawingManager::isFillRouteCandidate(const FragmentProcessor* processor) co
          processor != nullptr && processor->numChildProcessors() > 0;
 }
 
-bool DrawingManager::submitFillPlanTask(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
+bool DrawingManager::submitFillPlanTask(const AOTEffectGraph& graph, const Plan& plan,
                                         uint32_t renderFlags,
                                         const std::shared_ptr<RenderTargetProxy>& renderTarget,
                                         const Point& coordOffset,
@@ -177,17 +177,23 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
     drawOp->adoptLoweredIR(std::move(fillIR));
     auto* ir = drawOp->loweredIR();
     if (planCandidate) {
-      if (auto plan = AOTPlanner::Plan(*ir)) {
-        if (AOTPlanner::ServesInPlacePass(*plan)) {
-          // The single pass serves in place at prepare: its descriptor rides the fill's IR, so the
-          // matcher compiles from the record-time plan and never decomposes again.
-          drawOp->storeSinglePassPlan(plan->passes[0]);
-        } else if (AOTPlanner::PlanRequiresTask(*plan) &&
-                   submitFillPlanTask(ir->color, *plan, renderFlags, renderTarget, coordOffset,
-                                      &drawOp)) {
-          return true;
+      if (auto plan = AOTPlanner::MakePlan(*ir)) {
+        switch (AOTPlanner::RouteRecordPlan(*plan, {}, BlendMode::Src)) {
+          case AOTRecordRoute::InPlace:
+            // The single pass serves in place at prepare: its descriptor rides the fill's IR, so
+            // the matcher compiles from the record-time plan and never decomposes again.
+            drawOp->storeSinglePassPlan(plan->passes[0]);
+            break;
+          case AOTRecordRoute::Task:
+            if (submitFillPlanTask(ir->color, *plan, renderFlags, renderTarget, coordOffset,
+                                   &drawOp)) {
+              return true;
+            }
+            break;
+          case AOTRecordRoute::Plain:
+            // Anything else keeps the plain lookup for the fill at prepare time.
+            break;
         }
-        // Anything else keeps the plain lookup for the fill at prepare time.
       }
     }
   }

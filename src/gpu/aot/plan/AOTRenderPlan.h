@@ -70,26 +70,21 @@ struct MaterializedGeometry {
 };
 
 /**
- * The contract of one materialized edge: how much area it captures. Every edge is an RGBA8,
- * top-left-origin, exact-fit target allocated by the planner's materialization step, so crossing
- * an edge rounds the producer's output to the 1/255 grid.
- */
-struct AOTMaterializedEdge {
-  AOTEdgeReason reason = AOTEdgeReason::Split;
-  /// The captured area and the coordinate offset the producer renders with.
-  MaterializedGeometry geometry = {};
-};
-
-/**
  * One producer pass of an AOTRenderPlan: a fill draw that renders a materialized edge into its own
  * offscreen target. The target is cleared to transparent before the draw. A pass may sample the
  * targets of any earlier pass in the same plan, never a later one.
+ *
+ * The edge contract is inline: every edge is an RGBA8, top-left-origin, exact-fit target
+ * allocated by the planner's materialization step, so crossing it rounds the producer's output to
+ * the 1/255 grid. `geometry` is the captured area and the coordinate offset the producer renders
+ * with.
  */
 struct AOTRenderPass {
   std::shared_ptr<RenderTargetProxy> target = nullptr;
   /// The fill draw (DrawingManager::makeFillDrawOp) that renders the edge into target.
   PlacementPtr<DrawOp> drawOp = nullptr;
-  AOTMaterializedEdge edge = {};
+  AOTEdgeReason reason = AOTEdgeReason::Split;
+  MaterializedGeometry geometry = {};
 };
 
 /**

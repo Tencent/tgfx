@@ -30,7 +30,7 @@
 
 namespace tgfx {
 class AOTEffectGraph;
-struct AOTEffectPlan;
+struct Plan;
 
 /**
  * AppliedClipStatus represents the result of applying a clip to a draw operation.
@@ -234,8 +234,8 @@ class OpsCompositor {
    * untouched, when the executor refuses the plan or a multi-pass plan cannot reproduce this draw
    * exactly (see the gate in the implementation).
    */
-  bool submitPlanTask(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
-                      const Rect& deviceBounds, PlacementPtr<DrawOp>* op,
+  bool submitPlanTask(const AOTEffectGraph& graph, const Plan& plan, const Rect& deviceBounds,
+                      PlacementPtr<DrawOp>* op,
                       const std::vector<AOTCoverageTerm>* terminalCoverage = nullptr);
 
   friend class DrawingManager;

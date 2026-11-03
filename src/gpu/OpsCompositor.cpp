@@ -1300,19 +1300,23 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     const bool coverageFree = !op->hasCoverageProcessors();
     if (cache->aotPolicy().decomposition && deviceBounds.has_value() && !deviceBounds->isEmpty()) {
       if (auto* ir = op->loweredIR()) {
-        auto plan = AOTPlanner::Plan(*ir);
+        auto plan = AOTPlanner::MakePlan(*ir);
         if (plan.has_value()) {
-          if (AOTPlanner::ServesInPlacePass(*plan)) {
-            // The single pass serves in place at prepare: its descriptor rides the draw's IR, so
-            // the matcher compiles from the record-time plan and never decomposes again.
-            op->storeSinglePassPlan(plan->passes[0]);
-          } else if (AOTPlanner::PlanRequiresTask(*plan) &&
-                     AOTPlanner::TaskCarriesCoverage(*plan, ir->coverage, brush.blendMode)) {
-            if (submitPlanTask(ir->color, *plan, *deviceBounds, &op, &ir->coverage)) {
-              return;
-            }
+          switch (AOTPlanner::RouteRecordPlan(*plan, ir->coverage, brush.blendMode)) {
+            case AOTRecordRoute::InPlace:
+              // The single pass serves in place at prepare: its descriptor rides the draw's IR, so
+              // the matcher compiles from the record-time plan and never decomposes again.
+              op->storeSinglePassPlan(plan->passes[0]);
+              break;
+            case AOTRecordRoute::Task:
+              if (submitPlanTask(ir->color, *plan, *deviceBounds, &op, &ir->coverage)) {
+                return;
+              }
+              break;
+            case AOTRecordRoute::Plain:
+              // Anything else keeps the plain route: the matcher serves it at prepare time.
+              break;
           }
-          // Anything else keeps the plain route: the matcher serves it at prepare time.
         } else if (coverageFree && cache->diagnosticRecordingEnabled()) {
           // The color side lowered but no planner covers it — the same fact the color-only attempt
           // recorded. A draw still carrying coverage processors records nothing: its route was
@@ -1348,7 +1352,7 @@ void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, co
   pendingRects.emplace_back(std::move(record));
 }
 
-bool OpsCompositor::submitPlanTask(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
+bool OpsCompositor::submitPlanTask(const AOTEffectGraph& graph, const Plan& plan,
                                    const Rect& deviceBounds, PlacementPtr<DrawOp>* op,
                                    const std::vector<AOTCoverageTerm>* terminalCoverage) {
   std::optional<Matrix> deviceToLocal = std::nullopt;

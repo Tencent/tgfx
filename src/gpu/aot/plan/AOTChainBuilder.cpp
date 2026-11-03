@@ -950,7 +950,7 @@ static bool FinalizeChainLayout(AOTChainContext* ctx) {
 // the leading texture block, coverage ops trail the color ops, and coverageRoot becomes the
 // chain's coverage root. checkKernel compares the pass kernel against the profile the color pass
 // needs; the DAG planner clears it to learn that profile.
-static bool PlanChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
+static bool PlanChainLayout(const AOTEffectGraph& graph, const PassIR& pass,
                             const AOTEffectGraph* coverageGraph, AOTNodeID coverageRoot,
                             bool coverageLeafFromUVCoord, const std::vector<AOTNodeID>& clipLinks,
                             bool checkKernel, AOTChainCompile* layout) {
@@ -1018,8 +1018,7 @@ static void ConsiderPaddingNode(const AOTEffectNode* node, ChainPaddingTexture* 
 // carries noise — the noise graph's whole node space is the family's, so out-of-pass color nodes
 // must not contribute) and the coverage graph. Falls back to the noise tables' first proxy with
 // nearest sampling.
-static ChainPaddingTexture ChoosePaddingTexture(const AOTEffectGraph& graph,
-                                                const AOTPassDescriptor& pass,
+static ChainPaddingTexture ChoosePaddingTexture(const AOTEffectGraph& graph, const PassIR& pass,
                                                 const AOTEffectGraph* coverageGraph,
                                                 const AOTPerlinNoiseParameters* noise,
                                                 std::shared_ptr<TextureProxy> noisePaddingProxy) {
@@ -1205,7 +1204,7 @@ static bool MergeCoverageTerms(const std::vector<AOTCoverageTerm>& terms,
 // artifact order, the DAG leaves, the LUT gradient texture, the noise lookup tables, the phantom
 // padding the four-sampler artifacts need and the mask slot child. coverageTerms is null for a
 // plan pass (plan passes carry no draw coverage).
-static bool CompileChainLayout(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
+static bool CompileChainLayout(const AOTEffectGraph& graph, const PassIR& pass,
                                const std::vector<AOTCoverageTerm>* coverageTerms, bool checkKernel,
                                AOTChainCompile* out) {
   if (out == nullptr) {
@@ -1286,7 +1285,7 @@ static bool CompileChainLayout(const AOTEffectGraph& graph, const AOTPassDescrip
 }
 
 // The program-only view of the same entry: every build site that does not keep the leaf facts.
-static bool CompileChainProgramLayout(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
+static bool CompileChainProgramLayout(const AOTEffectGraph& graph, const PassIR& pass,
                                       const std::vector<AOTCoverageTerm>* coverageTerms,
                                       AOTProgram* out) {
   if (out == nullptr) {
@@ -1306,7 +1305,7 @@ static bool CompileChainProgramLayout(const AOTEffectGraph& graph, const AOTPass
 // path consumes the binding table itself.
 }  // namespace
 
-bool AOTChainBuilder::FitsChainPlan(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
+bool AOTChainBuilder::FitsChainPlan(const AOTEffectGraph& graph, const PassIR& pass,
                                     bool checkKernel, AOTResourceProfile* outProfile) {
   // A fit probe, not an admission: it runs the planner alone (no bindings, no coverage), which is
   // what the decomposer needs to decide whether a cut fits before any program exists.
@@ -1321,7 +1320,7 @@ bool AOTChainBuilder::FitsChainPlan(const AOTEffectGraph& graph, const AOTPassDe
   return true;
 }
 
-bool AOTChainBuilder::Compile(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
+bool AOTChainBuilder::Compile(const AOTEffectGraph& graph, const PassIR& pass,
                               const std::vector<AOTCoverageTerm>* coverageTerms, bool checkKernel,
                               AOTChainCompile* out) {
   return CompileChainLayout(graph, pass, coverageTerms, checkKernel, out);
@@ -1471,7 +1470,7 @@ static bool CopyChainNodes(const AOTEffectGraph& graph, const std::vector<bool>&
 // on — which is the pass's real fit.
 static bool FinishSegmentPass(const AOTNodeBuilder& builder, AOTNodeID root,
                               const std::unordered_map<uint32_t, AOTNodeID>& builtMap,
-                              AOTEffectGraph* segment, AOTPassDescriptor* pass) {
+                              AOTEffectGraph* segment, PassIR* pass) {
   auto rootMapped = ResolveCopiedInput(builtMap, {}, {}, root);
   if (!rootMapped.isValid()) {
     return false;
@@ -1480,7 +1479,7 @@ static bool FinishSegmentPass(const AOTNodeBuilder& builder, AOTNodeID root,
   if (!builder.finish(rootMapped, &built)) {
     return false;
   }
-  AOTPassDescriptor resultPass = {};
+  PassIR resultPass = {};
   resultPass.output = rootMapped;
   // The pass node list is every non-designator node of the segment graph itself — the copy may
   // have added nodes the caller did not list (the replacement texture leaf), so every
@@ -1505,10 +1504,10 @@ static bool FinishSegmentPass(const AOTNodeBuilder& builder, AOTNodeID root,
   return true;
 }
 
-bool AOTChainBuilder::BuildCutSegment(const AOTEffectGraph& graph, const AOTPassDescriptor& cutPass,
+bool AOTChainBuilder::BuildCutSegment(const AOTEffectGraph& graph, const PassIR& cutPass,
                                       const std::vector<AOTTextureParameters>& intermediates,
                                       const Matrix& coordToLocal, const Matrix& deviceLeafRemap,
-                                      AOTEffectGraph* segment, AOTPassDescriptor* pass) {
+                                      AOTEffectGraph* segment, PassIR* pass) {
   if (segment == nullptr || pass == nullptr || cutPass.nodes.empty() ||
       cutPass.materializedInputs.size() != intermediates.size()) {
     return false;
@@ -1672,7 +1671,7 @@ bool AOTChainBuilder::CompileYUVProgramForInfo(const ProgramInfo* info, AOTProgr
 }
 
 bool AOTChainBuilder::CompileChainProgram(BlockAllocator* allocator, const AOTEffectGraph& graph,
-                                          const AOTPassDescriptor& pass,
+                                          const PassIR& pass,
                                           const std::vector<const FragmentProcessor*>& coverageFPs,
                                           bool coverageLeafFromUVCoord, AOTProgram* out) {
   if (allocator == nullptr || out == nullptr || !IsAOTPointwiseDAGKernel(pass.kernel)) {
@@ -1858,11 +1857,11 @@ bool AOTChainBuilder::CompileChainProgramForInfo(const ProgramInfo* programInfo,
   // planner covered it) decomposes here once — the single-pass-only form the fused serving can
   // express; the perlin kernels have their own families, the chain family only takes the DAG
   // kernels, and anything the single-pass decomposition cannot fit needs a plan task.
-  AOTPassDescriptor descriptor = {};
+  PassIR descriptor = {};
   if (carried->passDescriptor.has_value()) {
     descriptor = *carried->passDescriptor;
   } else {
-    AOTEffectPlan plan = {};
+    Plan plan = {};
     if (!AOTEffectDecomposer::Decompose(carried->color, &plan, true) || plan.passes.size() != 1 ||
         !IsAOTPointwiseDAGKernel(plan.passes[0].kernel)) {
       return false;

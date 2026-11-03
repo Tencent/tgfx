@@ -138,7 +138,7 @@ class DrawOp {
    * from the plan instead of decomposing the same graph again at prepare. Only the record-time
    * route calls it, before any prepare; the descriptor is write-once.
    */
-  void storeSinglePassPlan(const AOTPassDescriptor& pass) {
+  void storeSinglePassPlan(const PassIR& pass) {
     if (ir != nullptr && !ir->passDescriptor.has_value()) {
       ir->passDescriptor = pass;
     }

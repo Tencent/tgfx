@@ -77,7 +77,7 @@ static AOTAxisAnalysis ClassifyAxis(const std::vector<const FragmentProcessor*>&
                                                           : AOTDecomposeOutcome::BlockedByLowering;
     return analysis;
   }
-  AOTEffectPlan plan = {};
+  Plan plan = {};
   if (!AOTEffectDecomposer::Decompose(graph, &plan)) {
     analysis.outcome = AOTDecomposeOutcome::UnsupportedShape;
     return analysis;
@@ -153,7 +153,7 @@ static bool CanStartPassAt(const AOTEffectNode* node) {
 // materialized output through a cut-style materializedInputs edge. A pass ends early when the next
 // one would otherwise start at a node that may not start a pass (CanStartPassAt); the chain is
 // refused when no boundary is left.
-static bool DecomposeLinearMultiPass(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
+static bool DecomposeLinearMultiPass(const AOTEffectGraph& graph, Plan* plan) {
   if (plan == nullptr || graph.nodeCount() < 2 || graph.root().index() + 1 != graph.nodeCount()) {
     return false;
   }
@@ -172,7 +172,7 @@ static bool DecomposeLinearMultiPass(const AOTEffectGraph& graph, AOTEffectPlan*
   // the fit depends on, exactly like a blend cut's admission.
   auto intermediate = CutIntermediatePlaceholder();
   auto fits = [&](uint32_t firstOperator, uint32_t passEnd, bool firstPass) {
-    AOTPassDescriptor candidate = {};
+    PassIR candidate = {};
     candidate.output = AOTNodeID(passEnd - 1);
     if (firstPass) {
       candidate.nodes.push_back(AOTNodeID(1));
@@ -185,11 +185,11 @@ static bool DecomposeLinearMultiPass(const AOTEffectGraph& graph, AOTEffectPlan*
     std::vector<AOTTextureParameters> placeholders(candidate.materializedInputs.size(),
                                                    intermediate);
     AOTEffectGraph segment = {};
-    AOTPassDescriptor segmentPass = {};
+    PassIR segmentPass = {};
     return AOTChainBuilder::BuildCutSegment(graph, candidate, placeholders, Matrix::I(),
                                             Matrix::I(), &segment, &segmentPass);
   };
-  AOTEffectPlan result = {};
+  Plan result = {};
   const auto nodeCount = static_cast<uint32_t>(graph.nodeCount());
   uint32_t firstOperator = 2;
   while (true) {
@@ -212,7 +212,7 @@ static bool DecomposeLinearMultiPass(const AOTEffectGraph& graph, AOTEffectPlan*
     if (passEnd == firstOperator && !firstPass) {
       return false;
     }
-    AOTPassDescriptor pass = {};
+    PassIR pass = {};
     pass.kernel = AOTKernelKind::PointwiseChain;
     if (firstPass) {
       pass.nodes.push_back(AOTNodeID(1));
@@ -243,7 +243,7 @@ static bool DecomposeLinearMultiPass(const AOTEffectGraph& graph, AOTEffectPlan*
 // and conversion plus three pointwise slots, so the color-grade shapes (a paint color filter
 // over a video frame) ride a single fused pass. Anything beyond the budget — a blend, a fourth
 // operator, any non-pointwise node — is rejected and keeps the runtime route.
-static bool DecomposeYUVChain(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
+static bool DecomposeYUVChain(const AOTEffectGraph& graph, Plan* plan) {
   if (plan == nullptr || graph.nodeCount() < 3 || graph.root().index() + 1 != graph.nodeCount()) {
     return false;
   }
@@ -263,8 +263,8 @@ static bool DecomposeYUVChain(const AOTEffectGraph& graph, AOTEffectPlan* plan) 
   if (graph.nodeCount() - 2 > MaxPointwiseSlots) {
     return false;
   }
-  AOTEffectPlan result = {};
-  AOTPassDescriptor pass = {};
+  Plan result = {};
+  PassIR pass = {};
   pass.kernel = AOTKernelKind::YUVTextureFill;
   for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
     pass.nodes.push_back(AOTNodeID(index));
@@ -282,7 +282,7 @@ static bool DecomposeYUVChain(const AOTEffectGraph& graph, AOTEffectPlan* plan) 
 // construction cannot count differently. Leaf parameters and budgets belong to the chain builder's
 // planner, consulted through ResolveChainProfile.
 static bool PlanReachableSubtree(const AOTEffectGraph& graph, AOTNodeID subtreeRoot,
-                                 const std::vector<bool>& reachable, AOTPassDescriptor* pass) {
+                                 const std::vector<bool>& reachable, PassIR* pass) {
   if (pass == nullptr) {
     return false;
   }
@@ -323,7 +323,7 @@ static bool PlanReachableSubtree(const AOTEffectGraph& graph, AOTNodeID subtreeR
 // device-space texture leaves are supported; non-pointwise nodes require a different planner.
 // A noise-free graph admits its whole node space (a dead node would still encode as a dead slot);
 // a noise graph keeps to the root-reachable set, which is all the noise family's budgets cover.
-static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
+static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, Plan* plan) {
   if (plan == nullptr || graph.nodeCount() < 2) {
     return false;
   }
@@ -339,11 +339,11 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
   if (containsNoise && !CollectReachableNodes(graph, graph.root(), &reachable)) {
     return false;
   }
-  AOTPassDescriptor pass = {};
+  PassIR pass = {};
   if (!PlanReachableSubtree(graph, graph.root(), reachable, &pass)) {
     return false;
   }
-  AOTEffectPlan result = {};
+  Plan result = {};
   result.passes.push_back(std::move(pass));
   result.output = graph.root();
   *plan = std::move(result);
@@ -366,7 +366,7 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, AOTEffectPlan* pl
 // segment resolves to. Runs the same segment build construction uses, so this is the real
 // admission: plan-time fit and construction fit cannot drift.
 static bool PlanCutPass(const AOTEffectGraph& graph, AOTNodeID root,
-                        const std::vector<AOTNodeID>& cutRoots, AOTPassDescriptor* pass) {
+                        const std::vector<AOTNodeID>& cutRoots, PassIR* pass) {
   if (pass == nullptr) {
     return false;
   }
@@ -374,7 +374,7 @@ static bool PlanCutPass(const AOTEffectGraph& graph, AOTNodeID root,
   if (!CollectReachableStoppingAtCuts(graph, root, cutRoots, &reachable)) {
     return false;
   }
-  AOTPassDescriptor candidate = {};
+  PassIR candidate = {};
   candidate.output = root;
   for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
     const auto* node = graph.nodeAt(AOTNodeID(index));
@@ -403,7 +403,7 @@ static bool PlanCutPass(const AOTEffectGraph& graph, AOTNodeID root,
   std::vector<AOTTextureParameters> placeholders(candidate.materializedInputs.size(),
                                                  CutIntermediatePlaceholder());
   AOTEffectGraph segment = {};
-  AOTPassDescriptor segmentPass = {};
+  PassIR segmentPass = {};
   if (!AOTChainBuilder::BuildCutSegment(graph, candidate, placeholders, Matrix::I(), Matrix::I(),
                                         &segment, &segmentPass)) {
     return false;
@@ -456,7 +456,7 @@ static bool IsCuttableOperand(const AOTEffectGraph& graph, AOTNodeID operand,
 // cut strictly shrinks the remaining graph. On success operandPass is the planned materializing
 // pass for that operand.
 static bool FindNextCut(const AOTEffectGraph& graph, const std::vector<AOTNodeID>& cutRoots,
-                        AOTPassDescriptor* operandPass) {
+                        PassIR* operandPass) {
   std::vector<bool> underCut(graph.nodeCount(), false);
   for (auto cut : cutRoots) {
     if (!CollectReachableNodes(graph, cut, &underCut)) {
@@ -484,7 +484,7 @@ static bool FindNextCut(const AOTEffectGraph& graph, const std::vector<AOTNodeID
   return false;
 }
 
-static bool DecomposeMaterializedBlend(const AOTEffectGraph& graph, AOTEffectPlan* plan) {
+static bool DecomposeMaterializedBlend(const AOTEffectGraph& graph, Plan* plan) {
   if (plan == nullptr || graph.nodeCount() < 2) {
     return false;
   }
@@ -492,10 +492,10 @@ static bool DecomposeMaterializedBlend(const AOTEffectGraph& graph, AOTEffectPla
   if (geometryNode == nullptr || geometryNode->kind != AOTEffectKind::GeometryColor) {
     return false;
   }
-  AOTEffectPlan result = {};
+  Plan result = {};
   std::vector<AOTNodeID> cutRoots = {};
   while (true) {
-    AOTPassDescriptor mainPass = {};
+    PassIR mainPass = {};
     if (PlanCutPass(graph, graph.root(), cutRoots, &mainPass)) {
       result.passes.push_back(std::move(mainPass));
       result.output = graph.root();
@@ -505,7 +505,7 @@ static bool DecomposeMaterializedBlend(const AOTEffectGraph& graph, AOTEffectPla
     if (result.passes.size() + 1 >= MaxCutPlanPasses) {
       return false;
     }
-    AOTPassDescriptor operandPass = {};
+    PassIR operandPass = {};
     if (!FindNextCut(graph, cutRoots, &operandPass)) {
       return false;
     }
@@ -515,15 +515,14 @@ static bool DecomposeMaterializedBlend(const AOTEffectGraph& graph, AOTEffectPla
   }
 }
 
-bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTEffectPlan* plan,
-                                    bool singlePassOnly) {
+bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, Plan* plan, bool singlePassOnly) {
   // Pointwise DAGs (noise and gradient sources included) run on the chain family within its
   // budgets, without materialization. A linear chain over one chain pass's budget splits into
   // several chain passes; YUV sources keep their dedicated kernel.
   if (plan == nullptr) {
     return false;
   }
-  using Planner = bool (*)(const AOTEffectGraph&, AOTEffectPlan*);
+  using Planner = bool (*)(const AOTEffectGraph&, Plan*);
   for (Planner planner : {DecomposePointwiseDAG, DecomposeMaterializedBlend,
                           DecomposeLinearMultiPass, DecomposeYUVChain}) {
     if (singlePassOnly && planner == &DecomposeMaterializedBlend) {
@@ -532,7 +531,7 @@ bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, AOTEffectPlan* 
       // result.
       continue;
     }
-    AOTEffectPlan candidate = {};
+    Plan candidate = {};
     if (!planner(graph, &candidate)) {
       continue;
     }

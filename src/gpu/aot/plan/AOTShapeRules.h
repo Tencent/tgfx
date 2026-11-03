@@ -75,7 +75,7 @@ bool CollectReachableStoppingAtCuts(const AOTEffectGraph& graph, AOTNodeID root,
  * leaves, still reads the geometry color: such a fill bakes the draw's uniform input alpha, so
  * the plan needs a uniform geometry color. Conservative on a malformed pass (treated as reading).
  */
-bool PassReadsGeometryColor(const AOTEffectGraph& graph, const AOTPassDescriptor& pass);
+bool PassReadsGeometryColor(const AOTEffectGraph& graph, const PassIR& pass);
 
 /**
  * Whether one pass of a multi-pass plan, with its materialized inputs standing in as texture
@@ -83,7 +83,7 @@ bool PassReadsGeometryColor(const AOTEffectGraph& graph, const AOTPassDescriptor
  * source): the fill pass evaluates those at top-left device positions and needs the
  * device-to-local remap. Conservative on a malformed pass (treated as needing the remap).
  */
-bool PassNeedsLocalRemap(const AOTEffectGraph& graph, const AOTPassDescriptor& pass);
+bool PassNeedsLocalRemap(const AOTEffectGraph& graph, const PassIR& pass);
 
 /**
  * Whether any non-terminal pass of a multi-pass plan reads the geometry color: the plan bakes the
@@ -91,6 +91,6 @@ bool PassNeedsLocalRemap(const AOTEffectGraph& graph, const AOTPassDescriptor& p
  * passes only materialize blend operands keeps the paint alpha in the terminal draw's epilogue
  * instead and needs no uniform color.
  */
-bool PlanBakesGeometryAlpha(const AOTEffectGraph& graph, const AOTEffectPlan& plan);
+bool PlanBakesGeometryAlpha(const AOTEffectGraph& graph, const Plan& plan);
 
 }  // namespace tgfx

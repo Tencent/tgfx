@@ -27,7 +27,7 @@
 namespace tgfx {
 
 struct AOTChainCompile;
-struct AOTPassDescriptor;
+struct PassIR;
 
 /**
  * The shared state of the chain-layout pipeline (see AOTChainBuilder's PlanChainLayout): each
@@ -38,7 +38,7 @@ struct AOTPassDescriptor;
 struct AOTChainContext {
   // Pipeline inputs.
   const AOTEffectGraph* graph = nullptr;
-  const AOTPassDescriptor* pass = nullptr;
+  const PassIR* pass = nullptr;
   // The analytic coverage terms' links, as node IDs in the coverage graph, in chain order; they
   // are encoded as ordinary slots and rewired onto the clip-coverage channel by stage seven.
   const std::vector<AOTNodeID>* clipLinks = nullptr;

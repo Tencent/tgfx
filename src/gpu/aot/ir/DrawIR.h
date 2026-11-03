@@ -87,7 +87,7 @@ struct DrawIR {
    * terms; the TERMINAL pass of a draw's plan carries the draw's terms, which its chain program
    * merges exactly as the plain route's single-pass serving does (see AOTPlanner::Build).
    */
-  std::optional<AOTPassDescriptor> passDescriptor = std::nullopt;
+  std::optional<PassIR> passDescriptor = std::nullopt;
   /**
    * The draw's compiled program — the chain interpreter's or the YUV tail's, whichever resolves
    * this IR. A plan pass carries it from the pass build (admission already compiled the same

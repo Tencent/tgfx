@@ -61,7 +61,7 @@ bool CollectReachableStoppingAtCuts(const AOTEffectGraph& graph, AOTNodeID root,
   return true;
 }
 
-bool PassReadsGeometryColor(const AOTEffectGraph& graph, const AOTPassDescriptor& pass) {
+bool PassReadsGeometryColor(const AOTEffectGraph& graph, const PassIR& pass) {
   std::vector<bool> reachable(graph.nodeCount(), false);
   if (!CollectReachableStoppingAtCuts(graph, pass.output, pass.materializedInputs, &reachable)) {
     return true;
@@ -69,7 +69,7 @@ bool PassReadsGeometryColor(const AOTEffectGraph& graph, const AOTPassDescriptor
   return reachable[0];
 }
 
-bool PassNeedsLocalRemap(const AOTEffectGraph& graph, const AOTPassDescriptor& pass) {
+bool PassNeedsLocalRemap(const AOTEffectGraph& graph, const PassIR& pass) {
   std::vector<bool> reachable(graph.nodeCount(), false);
   if (!CollectReachableStoppingAtCuts(graph, pass.output, pass.materializedInputs, &reachable)) {
     return true;
@@ -96,7 +96,7 @@ bool PassNeedsLocalRemap(const AOTEffectGraph& graph, const AOTPassDescriptor& p
   return false;
 }
 
-bool PlanBakesGeometryAlpha(const AOTEffectGraph& graph, const AOTEffectPlan& plan) {
+bool PlanBakesGeometryAlpha(const AOTEffectGraph& graph, const Plan& plan) {
   for (size_t index = 0; index + 1 < plan.passes.size(); ++index) {
     if (PassReadsGeometryColor(graph, plan.passes[index])) {
       return true;

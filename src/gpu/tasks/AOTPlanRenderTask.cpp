@@ -154,7 +154,7 @@ void AOTPlanRenderTask::execute(CommandEncoder* encoder) {
     auto edges = plan.passes.size();
     size_t splitEdges = 0;
     for (const auto& pass : plan.passes) {
-      if (pass.edge.reason != AOTEdgeReason::Split) {
+      if (pass.reason != AOTEdgeReason::Split) {
         continue;
       }
       splitEdges++;

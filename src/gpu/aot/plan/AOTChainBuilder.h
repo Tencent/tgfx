@@ -67,8 +67,8 @@ class AOTChainBuilder {
    * receives the resource profile the pass needs — the planner's form, which picks the kernel from
    * the resolved profile.
    */
-  static bool FitsChainPlan(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
-                            bool checkKernel, AOTResourceProfile* outProfile = nullptr);
+  static bool FitsChainPlan(const AOTEffectGraph& graph, const PassIR& pass, bool checkKernel,
+                            AOTResourceProfile* outProfile = nullptr);
 
   /**
    * The one compile entry: the pass's register-allocated program plus, when given, the draw's
@@ -79,7 +79,7 @@ class AOTChainBuilder {
    * draw coverage). checkKernel additionally verifies the pass's declared kernel against the
    * profile the pass resolves.
    */
-  static bool Compile(const AOTEffectGraph& graph, const AOTPassDescriptor& pass,
+  static bool Compile(const AOTEffectGraph& graph, const PassIR& pass,
                       const std::vector<AOTCoverageTerm>* coverageTerms, bool checkKernel,
                       AOTChainCompile* out);
 
@@ -168,10 +168,10 @@ class AOTChainBuilder {
    * placeholders (isIntermediate texture parameters) to check the fit before any intermediate
    * exists.
    */
-  static bool BuildCutSegment(const AOTEffectGraph& graph, const AOTPassDescriptor& cutPass,
+  static bool BuildCutSegment(const AOTEffectGraph& graph, const PassIR& cutPass,
                               const std::vector<AOTTextureParameters>& intermediates,
                               const Matrix& coordToLocal, const Matrix& deviceLeafRemap,
-                              AOTEffectGraph* segment, AOTPassDescriptor* pass);
+                              AOTEffectGraph* segment, PassIR* pass);
 
   /**
    * Flattens a single-pass PointwiseChain/PointwiseGraph plan into the fused chain program and its
@@ -185,7 +185,7 @@ class AOTChainBuilder {
    * FPs returns false.
    */
   static bool CompileChainProgram(BlockAllocator* allocator, const AOTEffectGraph& graph,
-                                  const AOTPassDescriptor& pass,
+                                  const PassIR& pass,
                                   const std::vector<const FragmentProcessor*>& coverageFPs,
                                   bool coverageLeafFromUVCoord, AOTProgram* out);
 

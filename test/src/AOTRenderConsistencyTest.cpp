@@ -4440,7 +4440,7 @@ TGFX_TEST(AOTRenderConsistencyTest, TrailingTiledLeafMatchesRuntime) {
     ASSERT_NE(tree, nullptr);
     AOTEffectGraph graph;
     ASSERT_TRUE(AOTEffectDecomposer::Lower({tree.get()}, &graph));
-    AOTEffectPlan plan;
+    Plan plan;
     ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
     ASSERT_EQ(plan.passes.size(), 1u);
     ASSERT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);

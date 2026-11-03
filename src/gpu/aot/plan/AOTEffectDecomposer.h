@@ -63,7 +63,7 @@ inline constexpr size_t MaxCutPlanPasses = 8;
  * only pass that runs on the destination). A pass's kernel and profile are resolved by its segment
  * build; a plan-time fit check runs the same build over placeholder intermediate leaves.
  */
-struct AOTPassDescriptor {
+struct PassIR {
   AOTKernelKind kernel = AOTKernelKind::PointwiseChain;
   std::vector<AOTNodeID> nodes = {};
   std::vector<uint32_t> dependencies = {};
@@ -73,8 +73,8 @@ struct AOTPassDescriptor {
   std::vector<AOTNodeID> materializedInputs = {};
 };
 
-struct AOTEffectPlan {
-  std::vector<AOTPassDescriptor> passes = {};
+struct Plan {
+  std::vector<PassIR> passes = {};
   AOTNodeID output = AOTNodeID::Invalid();
 };
 
@@ -130,8 +130,7 @@ class AOTEffectDecomposer {
    * single-pass plans (the prepare-time fused serving) and would otherwise run its iterative
    * segment builds only to discard the result.
    */
-  static bool Decompose(const AOTEffectGraph& graph, AOTEffectPlan* plan,
-                        bool singlePassOnly = false);
+  static bool Decompose(const AOTEffectGraph& graph, Plan* plan, bool singlePassOnly = false);
 
   /**
    * Statically classifies whether the color and coverage effect axes of the given draw can be

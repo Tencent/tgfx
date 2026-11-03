@@ -33,6 +33,10 @@ class Context;
 class RenderTargetProxy;
 struct AOTChainCompile;
 
+/// The record-time route one plan takes: served in place at prepare (its descriptor rides the
+/// draw's IR), run as a plan task, or left to the plain lookup at prepare.
+enum class AOTRecordRoute : uint8_t { Plain, InPlace, Task };
+
 /**
  * The record-time route's one planner: the decomposition, the routing predicates, the pass
  * building and the task assembly, in one place. A draw reaches the precompiled kernels in one of
@@ -60,8 +64,7 @@ class AOTPlanner {
    * nullopt when no planner covers the color graph; failureOutcome then receives
    * AOTDecomposeOutcome::UnsupportedShape (the graph already lowered, so no lowering can block).
    */
-  static std::optional<AOTEffectPlan> Plan(const DrawIR& ir,
-                                           AOTDecomposeOutcome* failureOutcome = nullptr);
+  static std::optional<Plan> MakePlan(const DrawIR& ir, AOTDecomposeOutcome* failureOutcome = nullptr);
 
   /**
    * Whether the plan's single pass is served in place by the prepare-time fused serving: the draw
@@ -71,7 +74,7 @@ class AOTPlanner {
    * dependencies, or does not output the plan's root needs a task even at one pass, and a non-chain
    * kernel (perlin, YUV) has no fused serving — PlanRequiresTask keeps those on the task route.
    */
-  static bool ServesInPlacePass(const AOTEffectPlan& plan);
+  static bool ServesInPlacePass(const Plan& plan);
 
   /**
    * Whether a plan that needs a task may carry the draw's coverage terms on its terminal pass:
@@ -81,7 +84,7 @@ class AOTPlanner {
    * (mask-filter semantics) modulates the source, which the coverage composite reproduces only
    * for those modes. A draw the gate refuses keeps the plain route, coverage attached.
    */
-  static bool TaskCarriesCoverage(const AOTEffectPlan& plan,
+  static bool TaskCarriesCoverage(const Plan& plan,
                                   const std::vector<AOTCoverageTerm>& coverageTerms,
                                   BlendMode blendMode);
 
@@ -91,7 +94,18 @@ class AOTPlanner {
    * expression as one chain or perlin processor; every other single-pass kernel still needs the
    * task).
    */
-  static bool PlanRequiresTask(const AOTEffectPlan& plan);
+  static bool PlanRequiresTask(const Plan& plan);
+
+  /**
+   * The record-time route decision, in one place: the two record entries (OpsCompositor's draw
+   * recording and DrawingManager::fillRTWithFP) ask this instead of re-deriving the predicate
+   * chain, so a rule change cannot land on one entry only. A fill passes its empty coverage list
+   * and Src blend; the coverage gate then admits every task-requiring plan, as the fill route
+   * always did.
+   */
+  static AOTRecordRoute RouteRecordPlan(const Plan& plan,
+                                        const std::vector<AOTCoverageTerm>& coverageTerms,
+                                        BlendMode blendMode);
 
   /**
    * The plan type's own well-formedness predicate — the same check Build runs first. Either one
@@ -111,7 +125,7 @@ class AOTPlanner {
    * Build is the serving authority; this predicate exists so the plan's validity has one public
    * definition, which the tests assert on and nothing else needs to re-derive.
    */
-  static bool Validate(const AOTEffectGraph& graph, const AOTEffectPlan& plan,
+  static bool Validate(const AOTEffectGraph& graph, const Plan& plan,
                        const std::vector<AOTCoverageTerm>* terminalCoverage = nullptr,
                        AOTChainCompile* compiled = nullptr);
 
@@ -121,7 +135,7 @@ class AOTPlanner {
    * draw's affine device-to-local mapping (see Build). A plan whose fills only sample device-space
    * content needs no mapping.
    */
-  static bool NeedsLocalRemap(const AOTEffectGraph& graph, const AOTEffectPlan& plan);
+  static bool NeedsLocalRemap(const AOTEffectGraph& graph, const Plan& plan);
 
   /**
    * Builds an atomic render task for the plan without enqueueing it: every materializing pass
@@ -145,11 +159,10 @@ class AOTPlanner {
    * again. Geometry coverage and blending still execute only in the terminal pass.
    */
   static PlacementPtr<RenderTask> Build(
-      Context* context, uint32_t renderFlags, const AOTEffectGraph& graph,
-      const AOTEffectPlan& plan, const Rect& deviceBounds,
-      std::shared_ptr<RenderTargetProxy> destination, PlacementPtr<DrawOp>* originalDraw,
-      const Point& fpCoordOffset = Point::Zero(), bool clearDestination = false,
-      const std::optional<Matrix>& deviceToLocal = std::nullopt,
+      Context* context, uint32_t renderFlags, const AOTEffectGraph& graph, const Plan& plan,
+      const Rect& deviceBounds, std::shared_ptr<RenderTargetProxy> destination,
+      PlacementPtr<DrawOp>* originalDraw, const Point& fpCoordOffset = Point::Zero(),
+      bool clearDestination = false, const std::optional<Matrix>& deviceToLocal = std::nullopt,
       const std::vector<AOTCoverageTerm>* terminalCoverage = nullptr);
 };
 }  // namespace tgfx
