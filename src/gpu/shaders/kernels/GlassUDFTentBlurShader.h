@@ -106,4 +106,3 @@ class GlassUDFTentBlurShader : public ShaderFamily<GlassUDFTentBlurShader> {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER_FAMILY(tgfx::GlassUDFTentBlurShader)

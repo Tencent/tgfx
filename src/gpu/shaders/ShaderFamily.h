@@ -212,26 +212,5 @@ class ShaderFamily : public PrecompiledShader {
   }
 };
 
-// Registers the family factory and its Reachable set during static initialization. Both are
-// stable free-function / static-member addresses, so every translation unit that includes the
-// family header registers an exact duplicate.
-#define TGFX_REGISTER_SHADER_FAMILY_IMPL(ShaderClass, counter)                           \
-  namespace {                                                                            \
-  struct TGFX_CONCAT(ShaderFamilyAutoReg_, counter) {                                    \
-    TGFX_CONCAT(ShaderFamilyAutoReg_, counter)() {                                       \
-      ::tgfx::ShaderRegistry::Register(&::tgfx::CreateShaderFamilyInstance<ShaderClass>, \
-                                       &ShaderClass::Reachable);                         \
-    }                                                                                    \
-  };                                                                                     \
-  static TGFX_CONCAT(ShaderFamilyAutoReg_, counter)                                      \
-      TGFX_CONCAT(shaderFamilyAutoRegInstance_, counter){};                              \
-  }
-
-/**
- * Registers a ShaderFamily subclass. Place after the class definition, outside the namespace:
- *   TGFX_REGISTER_SHADER_FAMILY(tgfx::MyFillShader)
- */
-#define TGFX_REGISTER_SHADER_FAMILY(ShaderClass) \
-  TGFX_REGISTER_SHADER_FAMILY_IMPL(ShaderClass, __COUNTER__)
 
 }  // namespace tgfx

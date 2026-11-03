@@ -100,4 +100,3 @@ class TexturedEffectShader : public ShaderFamily<TexturedEffectShader> {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER_FAMILY(tgfx::TexturedEffectShader)

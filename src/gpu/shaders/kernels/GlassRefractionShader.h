@@ -96,4 +96,3 @@ class GlassRefractionShader : public ShaderFamily<GlassRefractionShader> {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER_FAMILY(tgfx::GlassRefractionShader)

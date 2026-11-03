@@ -95,4 +95,3 @@ class ComplexEllipseFillShader : public ShaderFamily<ComplexEllipseFillShader> {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER_FAMILY(tgfx::ComplexEllipseFillShader)

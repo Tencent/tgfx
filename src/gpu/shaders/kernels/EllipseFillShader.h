@@ -92,4 +92,3 @@ class EllipseFillShader : public ShaderFamily<EllipseFillShader> {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER_FAMILY(tgfx::EllipseFillShader)

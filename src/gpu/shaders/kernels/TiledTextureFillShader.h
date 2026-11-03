@@ -110,4 +110,3 @@ class TiledTextureFillShader : public ShaderFamily<TiledTextureFillShader> {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER_FAMILY(tgfx::TiledTextureFillShader)

@@ -112,4 +112,3 @@ class NonAARRectFillShader : public ShaderFamily<NonAARRectFillShader> {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER_FAMILY(tgfx::NonAARRectFillShader)

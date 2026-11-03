@@ -85,4 +85,3 @@ class HairlineQuadShader : public ShaderFamily<HairlineQuadShader> {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER_FAMILY(tgfx::HairlineQuadShader)

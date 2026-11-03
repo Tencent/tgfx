@@ -93,4 +93,3 @@ class AtlasTextFillShader : public ShaderFamily<AtlasTextFillShader> {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER_FAMILY(tgfx::AtlasTextFillShader)

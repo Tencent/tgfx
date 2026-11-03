@@ -85,4 +85,3 @@ class ShapeInstancedFillShader : public ShaderFamily<ShapeInstancedFillShader> {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER_FAMILY(tgfx::ShapeInstancedFillShader)

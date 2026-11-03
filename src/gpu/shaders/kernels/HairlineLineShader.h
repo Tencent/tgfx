@@ -85,4 +85,3 @@ class HairlineLineShader : public ShaderFamily<HairlineLineShader> {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER_FAMILY(tgfx::HairlineLineShader)

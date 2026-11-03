@@ -384,4 +384,3 @@ class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER_FAMILY(tgfx::PointwiseChainShader)

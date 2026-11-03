@@ -91,4 +91,3 @@ class QuadColorFillShader : public ShaderFamily<QuadColorFillShader> {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER_FAMILY(tgfx::QuadColorFillShader)

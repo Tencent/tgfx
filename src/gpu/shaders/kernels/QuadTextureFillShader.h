@@ -108,4 +108,3 @@ class QuadTextureFillShader : public ShaderFamily<QuadTextureFillShader> {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER_FAMILY(tgfx::QuadTextureFillShader)

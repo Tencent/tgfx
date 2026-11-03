@@ -88,4 +88,3 @@ class MeshFillShader : public ShaderFamily<MeshFillShader> {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER_FAMILY(tgfx::MeshFillShader)

@@ -109,4 +109,3 @@ class YUVTextureFillShader : public ShaderFamily<YUVTextureFillShader> {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER_FAMILY(tgfx::YUVTextureFillShader)

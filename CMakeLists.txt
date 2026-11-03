@@ -801,8 +801,9 @@ if (TGFX_EXCLUDE_FILES)
     list(REMOVE_ITEM TGFX_FILES ${TGFX_EXCLUDE_FILES})
 endif ()
 
-# The one list of shader families: every src/gpu/shaders/kernels/<Name>.h that registers <Name> with
-# TGFX_REGISTER_SHADER_FAMILY. Adding a family means adding its header; nothing else lists it. The
+# The one list of shader families: every src/gpu/shaders/kernels/<Name>.h that declares
+# static constexpr const char* Name = "<Name>". Adding a family means adding its header; nothing
+# else lists it, and no registration step runs at startup. The
 # list is generated into gpu/shaders/AllShaderFamilies.h (the includes plus a
 # TGFX_FOR_EACH_SHADER_FAMILY X-macro) so the registry, the matcher, the build tool and the tests
 # all derive from it.
@@ -812,14 +813,10 @@ set(TGFX_SHADER_FAMILY_NAMES "")
 foreach (FAMILY_HEADER ${TGFX_SHADER_FAMILY_HEADERS})
     get_filename_component(FAMILY_NAME "${FAMILY_HEADER}" NAME_WE)
     file(READ "${FAMILY_HEADER}" FAMILY_HEADER_TEXT)
-    if (NOT FAMILY_HEADER_TEXT MATCHES "TGFX_REGISTER_SHADER_FAMILY\\(tgfx::([A-Za-z0-9_]+)\\)")
-        message(FATAL_ERROR "${FAMILY_HEADER} does not register a shader family with "
-                "TGFX_REGISTER_SHADER_FAMILY; every header under src/gpu/shaders/kernels is a "
-                "family.")
-    endif ()
-    if (NOT "${CMAKE_MATCH_1}" STREQUAL "${FAMILY_NAME}")
-        message(FATAL_ERROR "${FAMILY_HEADER} registers ${CMAKE_MATCH_1}; a family header must be "
-                "named after the class it registers.")
+    if (NOT FAMILY_HEADER_TEXT MATCHES "static constexpr const char\\* Name = \"${FAMILY_NAME}\"")
+        message(FATAL_ERROR "${FAMILY_HEADER} does not declare static constexpr const char* Name = "
+                "\"${FAMILY_NAME}\"; every header under src/gpu/shaders/kernels is a family "
+                "named after its class.")
     endif ()
     list(APPEND TGFX_SHADER_FAMILY_NAMES ${FAMILY_NAME})
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${FAMILY_HEADER}")

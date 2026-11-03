@@ -87,4 +87,3 @@ class SolidColorFillShader : public ShaderFamily<SolidColorFillShader> {
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER_FAMILY(tgfx::SolidColorFillShader)

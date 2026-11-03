@@ -93,4 +93,3 @@ class ComplexNonAARRectFillShader : public ShaderFamily<ComplexNonAARRectFillSha
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER_FAMILY(tgfx::ComplexNonAARRectFillShader)

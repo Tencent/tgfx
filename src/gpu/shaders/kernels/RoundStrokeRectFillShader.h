@@ -96,4 +96,3 @@ class RoundStrokeRectFillShader : public ShaderFamily<RoundStrokeRectFillShader>
 
 }  // namespace tgfx
 
-TGFX_REGISTER_SHADER_FAMILY(tgfx::RoundStrokeRectFillShader)
