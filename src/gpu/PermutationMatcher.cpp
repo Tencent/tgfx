@@ -625,14 +625,14 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(
   }
   const bool allowInterpreter =
       shaderCache == nullptr || shaderCache->decompositionEnabled() || hasGradient;
-  // The dedicated families dispatch through the executor table: the rows, in the families' walk
-  // order, each one the family's own ExtractFacts pipeline, with one facts extraction replacing
-  // every family re-deriving the same facts from the processor tree. The gates keep the retired
-  // walk's semantics — alpha-only rejection is a row predicate (the ExtractFacts bodies), and
+  // The dedicated families dispatch through the executor table: the generated family list, each
+  // entry the family's own ExtractFacts pipeline, with one facts extraction replacing every
+  // family re-deriving the same facts from the processor tree. The gates keep the retired walk's
+  // semantics — alpha-only rejection is a row predicate (the ExtractFacts bodies), and
   // dedicatedKernelsEnabled gates the whole table.
   if (allowDedicated) {
     if (auto table = KernelTableLookup(shape, failure)) {
-      return PermutationMatchResult{table->row->family, table->variant.vertPermutationIndex,
+      return PermutationMatchResult{table->family, table->variant.vertPermutationIndex,
                                     table->variant.fragPermutationIndex};
     }
   }
