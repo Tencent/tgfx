@@ -249,10 +249,6 @@ void PrecompiledShaderCache::unload() {
   }
 }
 
-static uint16_t ReadU16LE(const uint8_t* p) {
-  return static_cast<uint16_t>(static_cast<uint16_t>(p[0]) | (static_cast<uint16_t>(p[1]) << 8));
-}
-
 static uint32_t ReadU32LE(const uint8_t* p) {
   return static_cast<uint32_t>(p[0]) | (static_cast<uint32_t>(p[1]) << 8) |
          (static_cast<uint32_t>(p[2]) << 16) | (static_cast<uint32_t>(p[3]) << 24);
@@ -540,49 +536,54 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   }
 
   const uint8_t* ptr = data;
-  uint32_t magic = ReadU32LE(ptr + BundleFormat::Offset::Magic);
-  if (magic != BundleFormat::Magic) {
+  // The header grammar is single-sourced in BundleCodec (the tool's verifier and manifest go
+  // through the same parser); the checks below are this loader's policy.
+  BundleHeader header = {};
+  if (!ParseBundleHeader(ptr, size, &header)) {
+    LOGE("PrecompiledShaderCache: Bundle header is shorter than the format requires");
+    return false;
+  }
+  if (header.magic != BundleFormat::Magic) {
     LOGE("PrecompiledShaderCache: Invalid magic in bundle data");
     return false;
   }
-  uint16_t formatVersion = ReadU16LE(ptr + BundleFormat::Offset::FormatVersion);
-  if (formatVersion != BundleFormat::CurrentVersion) {
-    LOGE("PrecompiledShaderCache: Unsupported format version %u (expected %u)", formatVersion,
-         BundleFormat::CurrentVersion);
+  if (header.formatVersion != BundleFormat::CurrentVersion) {
+    LOGE("PrecompiledShaderCache: Unsupported format version %u (expected %u)",
+         header.formatVersion, BundleFormat::CurrentVersion);
     return false;
   }
-  uint16_t compressionType = ReadU16LE(ptr + BundleFormat::Offset::CompressionType);
   // The format defines exactly two stored forms (None and Zstd). A value in between (1) names no
   // dialect the loader can interpret: reading it as uncompressed would feed a zstd-compressed
   // data pool to the parser as raw bytes, so it is refused like every other unknown value.
-  if (compressionType != BundleFormat::Compression::None &&
-      compressionType != BundleFormat::Compression::Zstd) {
-    LOGE("PrecompiledShaderCache: Unsupported compression type %u", compressionType);
+  if (header.compressionType != BundleFormat::Compression::None &&
+      header.compressionType != BundleFormat::Compression::Zstd) {
+    LOGE("PrecompiledShaderCache: Unsupported compression type %u", header.compressionType);
     return false;
   }
-  uint64_t sourceHash = ReadU64LE(ptr + BundleFormat::Offset::IdentityHash);
+  uint64_t sourceHash = header.identityHash;
   // Toolchain ABI gate (F04): the content identity hash covers the bytes, but not what they
   // mean. The recorded toolchain version is the one contract every writer has stamped since the
   // field existed, so a mismatch here means the bundle's reflection grammar or uniform contracts
   // predate (or postdate) what this runtime knows how to consume — reject instead of guessing.
-  uint32_t toolchainVersion = ReadU32LE(ptr + BundleFormat::Offset::ToolchainABI);
-  if (toolchainVersion != ExpectedToolchainABI) {
+  if (header.toolchainABI != ExpectedToolchainABI) {
     LOGE(
         "PrecompiledShaderCache: Bundle toolchain ABI 0x%08x does not match the runtime's "
         "0x%08x; the reflection/uniform contracts are incompatible",
-        toolchainVersion, ExpectedToolchainABI);
+        header.toolchainABI, ExpectedToolchainABI);
     return false;
   }
-  uint32_t vertPoolCount = ReadU32LE(ptr + BundleFormat::Offset::VertPoolCount);
-  uint32_t fragPoolCount = ReadU32LE(ptr + BundleFormat::Offset::FragPoolCount);
-  uint32_t vertPoolOffset = ReadU32LE(ptr + BundleFormat::Offset::VertPoolOffset);
-  uint32_t fragPoolOffset = ReadU32LE(ptr + BundleFormat::Offset::FragPoolOffset);
-  uint32_t dataOffset = ReadU32LE(ptr + BundleFormat::Offset::DataOffset);
-  uint32_t dataSize = ReadU32LE(ptr + BundleFormat::Offset::DataSize);
-  uint32_t reflectionOffset = ReadU32LE(ptr + BundleFormat::Offset::ReflectionOffset);
-
-  const char* tagPtr = reinterpret_cast<const char*>(ptr + BundleFormat::Offset::ProfileTag);
-  std::string profileTag(tagPtr, strnlen(tagPtr, BundleFormat::ProfileTagSize));
+  uint32_t vertPoolCount = header.vertPoolCount;
+  uint32_t fragPoolCount = header.fragPoolCount;
+  uint32_t vertPoolOffset = header.vertPoolOffset;
+  uint32_t fragPoolOffset = header.fragPoolOffset;
+  uint32_t dataOffset = header.dataOffset;
+  uint32_t dataSize = header.dataSize;
+  uint32_t reflectionOffset = header.reflectionOffset;
+  const std::string& profileTag = header.profileTag;
+  // The parsed fields the rest of this loader and the cached ParsedBundle carry forward.
+  const uint16_t formatVersion = header.formatVersion;
+  const uint16_t compressionType = header.compressionType;
+  const uint32_t toolchainVersion = header.toolchainABI;
 
   // Backend identity: a bundle compiled for a different backend must be rejected outright. The
   // format version says nothing about the code dialect or binary format of the blobs, so a

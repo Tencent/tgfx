@@ -31,6 +31,7 @@
 #include "core/DiagnosticCodes.h"
 #include "core/ShaderSources.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
+#include "gpu/shaders/BundleCodec.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "output/BundleManifest.h"
 #include "zstd.h"
@@ -45,24 +46,7 @@ struct PoolEntryOnDisk {
   uint32_t reflOffset = 0;
 };
 
-struct BundleHeader {
-  uint16_t formatVersion = 0;
-  uint16_t compressionType = 0;
-  uint64_t identityHash = 0;
-  uint32_t toolchainABI = 0;
-  uint32_t vertPoolCount = 0;
-  uint32_t fragPoolCount = 0;
-  uint32_t vertPoolOffset = 0;
-  uint32_t fragPoolOffset = 0;
-  uint32_t dataOffset = 0;
-  uint32_t dataSize = 0;
-  uint32_t reflectionOffset = 0;
-  std::string profileTag;
-};
-
-uint16_t ReadU16(const std::vector<uint8_t>& data, size_t offset) {
-  return static_cast<uint16_t>(data[offset] | (data[offset + 1] << 8));
-}
+// The header struct is BundleCodec's (shared with the runtime loader and the manifest writer).
 
 uint32_t ReadU32(const std::vector<uint8_t>& data, size_t offset) {
   uint32_t value = 0;
@@ -267,22 +251,14 @@ BundleCheckResult VerifyOneBundle(const std::string& path, ShaderProfile profile
     return result;
   }
 
-  BundleHeader header;
-  auto magic = ReadU32(fileBytes, BundleFormat::Offset::Magic);
-  header.formatVersion = ReadU16(fileBytes, BundleFormat::Offset::FormatVersion);
-  header.compressionType = ReadU16(fileBytes, BundleFormat::Offset::CompressionType);
-  header.identityHash = ReadU64(fileBytes, BundleFormat::Offset::IdentityHash);
-  header.toolchainABI = ReadU32(fileBytes, BundleFormat::Offset::ToolchainABI);
-  header.vertPoolCount = ReadU32(fileBytes, BundleFormat::Offset::VertPoolCount);
-  header.fragPoolCount = ReadU32(fileBytes, BundleFormat::Offset::FragPoolCount);
-  header.vertPoolOffset = ReadU32(fileBytes, BundleFormat::Offset::VertPoolOffset);
-  header.fragPoolOffset = ReadU32(fileBytes, BundleFormat::Offset::FragPoolOffset);
-  header.dataOffset = ReadU32(fileBytes, BundleFormat::Offset::DataOffset);
-  header.dataSize = ReadU32(fileBytes, BundleFormat::Offset::DataSize);
-  header.reflectionOffset = ReadU32(fileBytes, BundleFormat::Offset::ReflectionOffset);
-  auto* tagBytes =
-      reinterpret_cast<const char*>(fileBytes.data()) + BundleFormat::Offset::ProfileTag;
-  header.profileTag = std::string(tagBytes, strnlen(tagBytes, BundleFormat::ProfileTagSize));
+  BundleHeader header = {};
+  if (!ParseBundleHeader(fileBytes.data(), fileBytes.size(), &header)) {
+    Report(diagnostics, Severity::Error, DiagnosticCode::VerifyBundleHeader, expectedTag.c_str(),
+           "unreadable bundle header");
+    result.violations++;
+    return result;
+  }
+  auto magic = header.magic;
 
   if (magic != BundleFormat::Magic) {
     Report(diagnostics, Severity::Error, DiagnosticCode::VerifyBundleHeader, expectedTag.c_str(),

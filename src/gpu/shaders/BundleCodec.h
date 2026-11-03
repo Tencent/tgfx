@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include "gpu/shaders/contract/ShaderBundleContract.h"
 
 namespace tgfx {
 
@@ -69,5 +70,33 @@ std::vector<uint8_t> SerializeBundleReflection(const BundleReflection& reflectio
  * it.
  */
 bool ParseBundleReflection(const uint8_t* data, size_t length, BundleReflection* reflection);
+
+/**
+ * The bundle file header as every reader sees it. The field layout is BundleFormat's (contract
+ * header); this struct is the one extraction of it, shared by the runtime loader, the offline
+ * verifier and the manifest writer. Byte order is little-endian, as the format specifies.
+ */
+struct BundleHeader {
+  uint32_t magic = 0;
+  uint16_t formatVersion = 0;
+  uint16_t compressionType = 0;
+  uint64_t identityHash = 0;
+  uint32_t toolchainABI = 0;
+  uint32_t vertPoolCount = 0;
+  uint32_t fragPoolCount = 0;
+  uint32_t vertPoolOffset = 0;
+  uint32_t fragPoolOffset = 0;
+  uint32_t dataOffset = 0;
+  uint32_t dataSize = 0;
+  uint32_t reflectionOffset = 0;
+  std::string profileTag;
+};
+
+/**
+ * Extracts the header fields. Callers check the size before parsing (the format's own minimum is
+ * BundleFormat::HeaderSize); this returns false for a null buffer or a short one so the check can
+ * also live here.
+ */
+bool ParseBundleHeader(const uint8_t* data, size_t size, BundleHeader* header);
 
 }  // namespace tgfx

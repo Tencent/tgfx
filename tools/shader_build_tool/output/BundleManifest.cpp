@@ -18,6 +18,7 @@
 
 #include "output/BundleManifest.h"
 #include <algorithm>
+#include "gpu/shaders/BundleCodec.h"
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -90,22 +91,6 @@ bool ReadBinaryFile(const std::string& path, std::vector<uint8_t>* bytes) {
   }
   bytes->assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
   return true;
-}
-
-uint32_t ReadLE32(const std::vector<uint8_t>& bytes, size_t offset) {
-  uint32_t value = 0;
-  for (size_t i = 0; i < 4; ++i) {
-    value |= static_cast<uint32_t>(bytes[offset + i]) << (8 * i);
-  }
-  return value;
-}
-
-uint64_t ReadLE64(const std::vector<uint8_t>& bytes, size_t offset) {
-  uint64_t value = 0;
-  for (size_t i = 0; i < 8; ++i) {
-    value |= static_cast<uint64_t>(bytes[offset + i]) << (8 * i);
-  }
-  return value;
 }
 
 bool ParseHex(const std::string& text, uint64_t* value) {
@@ -217,12 +202,11 @@ bool WriteBundleManifest(const std::string& bundlePath, ShaderProfile profile,
   out << "file=" << fileName << "\n";
   out << "fileSize=" << bytes.size() << "\n";
   out << "fileHash=" << Hex64(HashBundleBytes(bytes.data(), bytes.size())) << "\n";
-  out << "identityHash=" << Hex64(ReadLE64(bytes, BundleFormat::Offset::IdentityHash)) << "\n";
-  out << "toolchainABI=" << Hex64(ReadLE32(bytes, BundleFormat::Offset::ToolchainABI)) << "\n";
-  out << "formatVersion="
-      << (bytes[BundleFormat::Offset::FormatVersion] |
-          (bytes[BundleFormat::Offset::FormatVersion + 1] << 8))
-      << "\n";
+  BundleHeader header = {};
+  ParseBundleHeader(bytes.data(), bytes.size(), &header);  // the size is checked above
+  out << "identityHash=" << Hex64(header.identityHash) << "\n";
+  out << "toolchainABI=" << Hex64(header.toolchainABI) << "\n";
+  out << "formatVersion=" << header.formatVersion << "\n";
   out << "sourceDigest=" << Hex64(digest.digest) << "\n";
   out << "shaderCount=" << digest.shaderCount << "\n";
   out << "stageCount=" << digest.stageCount << "\n";
