@@ -52,6 +52,19 @@ Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {
   _atlasManager = new AtlasManager(this);
   _atlasStrikeCache = new AtlasStrikeCache();
   _precompiledShaderCache = new PrecompiledShaderCache(this, _gpu->info()->backend);
+  // The environment knobs the GPU stack reads, inventoried in one place (every diagnostic is
+  // already DEBUG-gated at its read site):
+  //   TGFX_AOT_DISABLE          — skips the embedded bundle; a release escape hatch for a shipped
+  //                               bundle that must be turned off, and the test suite's A/B switch.
+  //   TGFX_AOT_DENY             — a shader-name deny list, read once per process; a production
+  //                               mitigation, so it stays in release builds.
+  //   TGFX_AOT_DUMP_DIR         — DEBUG only, read once: dumps each matched artifact's stages.
+  //   TGFX_UNIF_DUMP            — DEBUG only, read PER CALL on purpose — the A/B harness toggles
+  //                               it around each route within one process, so a cached first
+  //                               read would freeze whichever route ran first.
+  //   TGFX_SHADER_CACHE_DISABLE — the JIT program cache's own layer list; not an AOT knob.
+  //   TGFX_SHADER_DUMP_DIR      — DEBUG only: dumps the runtime-generated GLSL for diffing.
+  //   TGFX_JIT_DUMP_DIR         — DEBUG only, read once: dumps the JIT-linked programs.
   // TGFX_AOT_DISABLE=1 skips the embedded bundle so the runtime route can be exercised directly
   // (test-suite A/B comparisons against the precompiled path).
   if (std::getenv("TGFX_AOT_DISABLE") == nullptr) {
