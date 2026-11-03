@@ -43,6 +43,16 @@ struct FamilyHasTextureReads : std::false_type {};
 template <typename T>
 struct FamilyHasTextureReads<T, std::void_t<decltype(T::TextureReads)>> : std::true_type {};
 
+/// A family explicitly joins the executor table by declaring JoinsKernelTable = true (FillKernel
+/// does). The table and the matcher test this marker instead of detecting ExtractFacts by SFINAE:
+/// a family that forgets to derive FillKernel fails to compile in the table's static_assert rather
+/// than silently dropping out of the table, and the interpreter is the one documented exemption.
+template <typename T, typename = void>
+struct FamilyJoinsKernelTable : std::false_type {};
+template <typename T>
+struct FamilyJoinsKernelTable<T, std::void_t<decltype(T::JoinsKernelTable)>>
+    : std::bool_constant<T::JoinsKernelTable> {};
+
 /// A family joins the executor table by declaring ExtractFacts over the draw's facts. The
 /// interpreter (PointwiseChainShader) cannot: its acceptance is the carried IR, not the facts.
 template <typename T, typename = void>
@@ -136,18 +146,21 @@ class ShaderFamily : public PrecompiledShader {
   /**
    * The executor-table entry: the same Extract → Compose → encode pipeline over the draw's
    * extracted facts instead of the ProgramInfo. A family joins the table by declaring
-   * ExtractFacts; its Extract then delegates to it, so the walk and the table share one body
-   * and cannot disagree.
+   * JoinsKernelTable (FillKernel does); ExtractFacts is mandatory for a table family, and its
+   * Extract delegates to it, so the walk and the table share one body and cannot disagree.
    */
   static std::optional<PermutationVariant> MatchFromFacts(const DrawShape& facts,
                                                           PermutationMatchFailure* failure) {
-    if constexpr (!FamilyHasExtractFacts<T>::value) {
+    if constexpr (!FamilyJoinsKernelTable<T>::value) {
       // Not a table family (the interpreter): the table has no row for it, and the walk calls its
       // Extract instead.
       static_cast<void>(facts);
       static_cast<void>(failure);
       return std::nullopt;
     } else {
+      static_assert(FamilyHasExtractFacts<T>::value,
+                    "a family that joins the kernel table must declare ExtractFacts "
+                    "(FillKernel provides it)");
       const auto inputs = T::ExtractFacts(facts, failure);
       if (!inputs) {
         return std::nullopt;
@@ -178,8 +191,8 @@ class ShaderFamily : public PrecompiledShader {
 
 #ifndef NDEBUG
   /**
-   * The reachable set computed once per process, for the dispatch-time membership audit: a Match
-   * result outside the set means Extract produces an input combination AllInputs does not
+   * The reachable set computed once per process, for the table's debug membership guard: a Match
+   * result outside the set means Extract produced an input combination AllInputs does not
    * enumerate, so the bundle lacks the variant and the draw would be dropped at runtime.
    */
   static const std::set<std::pair<uint32_t, uint32_t>>& CachedReachable() {

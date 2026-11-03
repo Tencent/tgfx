@@ -250,6 +250,11 @@ class FillKernel : public ShaderFamily<T> {
   using VD = FillVertDims<T>;
   using FD = FillFragDims<T>;
 
+  /// Every FillKernel family is a row of the executor table. The table and the matcher test this
+  /// marker instead of detecting ExtractFacts by SFINAE, so a family that forgets to derive
+  /// FillKernel fails to compile rather than silently dropping out of the table.
+  static constexpr bool JoinsKernelTable = true;
+
   static std::optional<DrawShape> ExtractFacts(const DrawShape& shape, PermutationMatchFailure*) {
     if (!T::Accept(shape)) {
       return std::nullopt;

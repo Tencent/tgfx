@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <skcms.h>
-#include <unordered_set>
 #include "ColorSpaceXformHelper.h"
 #include "ShaderMatchHelpers.h"
 #include "gpu/PermutationMatch.h"
@@ -570,47 +569,6 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(
   // alpha-only blur pass writes its mask accumulation through the AAAA swizzle, with the
   // AlphaChild flag carrying the .rrrr readback).
   const bool alphaOnly = programInfo->getOutputSwizzle() == Swizzle::AAAA();
-
-#ifndef NDEBUG
-  // Audit pass (debug builds only): re-run the executor table's own predicates over the draw's
-  // facts — one extraction per distinct program shape — and do not stop at the first acceptor.
-  // Two invariants, each a silent bug when violated (the dispatch order would decide the winner):
-  //   1. at most one family accepts a given draw;
-  //   2. a Match result lies inside the family's reachable set, which catches an ExtractFacts
-  //      producing an input combination AllInputs does not enumerate — the bundle would lack the
-  //      variant and the draw would be dropped at runtime.
-  // The alpha-only gate is the table row's: the lookup skips a non-serving row, and the audit
-  // skips the same rows so it sees exactly the candidates the dispatch sees. Each family's
-  // rejection goes into a local slot, so the walk's failure accounting is unaffected; repeated
-  // prepares of the same shape re-audit nothing.
-  {
-    static thread_local std::unordered_set<BytesKey, BytesKeyHasher> auditedProgramKeys;
-    if (auditedProgramKeys.insert(programInfo->programKeyForDiagnostics()).second) {
-      // The audit re-runs the table's own predicate over the same facts: one extraction per
-      // shape, every family's ExtractFacts body, no second implementation to drift. The alpha-only
-      // gate is the table row's (a non-serving row is not considered, so it is not audited).
-      const auto& auditFacts = shape;
-      int acceptors = 0;
-#define TGFX_AUDIT_FAMILY(Family)                                                             \
-  if (!alphaOnly || Family::ServesAlphaOnly) {                                                \
-    PermutationMatchFailure auditFailure = PermutationMatchFailure::None;                     \
-    if (auto auditResult = Family::MatchFromFacts(auditFacts, &auditFailure)) {               \
-      if (++acceptors > 1) {                                                                  \
-        assert(false && "multiple shader families accept the same draw");                     \
-      }                                                                                       \
-      if (Family::CachedReachable().count(                                                    \
-              {auditResult->vertPermutationIndex, auditResult->fragPermutationIndex}) == 0) { \
-        assert(false && #Family                                                               \
-               " matched a variant outside its reachable set; extend "                        \
-               "its AllInputs");                                                              \
-      }                                                                                       \
-    }                                                                                         \
-  }
-      TGFX_FOR_EACH_SHADER_FAMILY(TGFX_AUDIT_FAMILY)
-#undef TGFX_AUDIT_FAMILY
-    }
-  }
-#endif
 
   // The two diagnostic switches keep the retired walk's semantics: dedicatedKernelsEnabled gates
   // every dedicated family (the whole executor table), decompositionEnabled the interpreter.

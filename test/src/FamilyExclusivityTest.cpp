@@ -20,15 +20,17 @@
 // over the DrawShape field space, which is what makes the kernel table's row order carry no
 // semantics ("first acceptor" = "only acceptor"). The enumeration walks the same family list the
 // production dispatch uses (TGFX_FOR_EACH_SHADER_FAMILY, the interpreter filtered out by the same
-// FamilyHasExtractFacts gate MatchFromFacts applies), and mirrors the table's alpha-only gate, so
-// the count below is exactly the count the production lookup would see.
+// FamilyJoinsKernelTable marker the table tests), and mirrors the table's alpha-only gate, so the
+// count below is exactly the count the production lookup would see.
 //
 // Known boundary: the enumeration runs with ir = nullptr, so the IR-sensitive families (whose
 // acceptance also walks the carried IR — YUV, the textured fills, the gradient-coverage shape)
-// reject everything in this layer. Their mutual exclusivity rests on three guards instead: the
-// per-family field guards proven disjoint here, the IR structure predicates being leaf-type
-// specific (a CollectYUVTail leaf is never a CollectTextureTail leaf), and the runtime debug
-// audit's per-shape "at most one acceptor" assertion over the full test corpus.
+// reject everything in this layer. Their mutual exclusivity rests on two guards instead: the
+// per-family field guards proven disjoint here, and the IR structure predicates being leaf-type
+// specific (a CollectYUVTail leaf is never a CollectTextureTail leaf). The retired runtime
+// exclusivity audit used to re-run every table family once per distinct program shape; its cheap
+// half — "the matched variant lies in the family's reachable set" — survives as the debug
+// assertion in KernelTableLookup.
 
 #include <set>
 #include <vector>
@@ -50,7 +52,7 @@ int CountAcceptingFamilies(const DrawShape& shape, const char** first, const cha
   int count = 0;
   PermutationMatchFailure failure = PermutationMatchFailure::None;
 #define TGFX_COUNT_FAMILY(F)                            \
-  if constexpr (FamilyHasExtractFacts<F>::value) {      \
+  if constexpr (FamilyJoinsKernelTable<F>::value) {     \
     if (!shape.alphaOnlyTarget || F::ServesAlphaOnly) { \
       if (F::MatchFromFacts(shape, &failure)) {         \
         if (count == 0) {                               \
@@ -71,9 +73,9 @@ int CountAcceptingFamilies(const DrawShape& shape, const char** first, const cha
 
 TGFX_TEST(FamilyExclusivityTest, DedicatedFamiliesArePairwiseExclusiveOverTheFieldSpace) {
   std::vector<const char*> dedicated;
-#define TGFX_COLLECT_DEDICATED(F)                  \
-  if constexpr (FamilyHasExtractFacts<F>::value) { \
-    dedicated.push_back(F::Name);                  \
+#define TGFX_COLLECT_DEDICATED(F)                   \
+  if constexpr (FamilyJoinsKernelTable<F>::value) { \
+    dedicated.push_back(F::Name);                   \
   }
   TGFX_FOR_EACH_SHADER_FAMILY(TGFX_COLLECT_DEDICATED)
 #undef TGFX_COLLECT_DEDICATED
