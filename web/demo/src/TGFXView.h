@@ -24,6 +24,12 @@ namespace hello2d {
 class TGFXView : public TGFXBaseView {
  public:
   TGFXView(const std::string& canvasID);
+
+  /**
+   * Creates the view from a canvas object instead of an id, for threads without a DOM.
+   * See TGFXBaseView(emscripten::val).
+   */
+  TGFXView(emscripten::val canvas);
   void registerFonts();
 };
 }  // namespace hello2d

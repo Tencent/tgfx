@@ -27,6 +27,10 @@ EMSCRIPTEN_BINDINGS(TGFXDemo) {
   class_<TGFXBaseView>("TGFXBaseView")
       .function("setImagePath", &TGFXBaseView::setImagePath)
       .function("updateSize", &TGFXBaseView::updateSize)
+      .function("setLayoutDensity", &TGFXBaseView::setLayoutDensity)
+#ifdef TGFX_USE_WEBGPU
+      .function("setWebGPUDevice", &TGFXBaseView::setWebGPUDevice)
+#endif
       .function("updateLayerTree", &TGFXBaseView::updateLayerTree)
       .function("updateZoomScaleAndOffset", &TGFXBaseView::updateZoomScaleAndOffset)
       .function("draw", &TGFXBaseView::draw)
@@ -40,6 +44,12 @@ EMSCRIPTEN_BINDINGS(TGFXDemo) {
                           return std::shared_ptr<TGFXView>(nullptr);
                         }
                         return std::make_shared<TGFXView>(canvasID);
+                      }))
+      .class_function("MakeFromCanvas", optional_override([](const val& canvas) {
+                        if (!canvas.as<bool>()) {
+                          return std::shared_ptr<TGFXView>(nullptr);
+                        }
+                        return std::make_shared<TGFXView>(canvas);
                       }))
       .function("registerFonts", &TGFXView::registerFonts);
 

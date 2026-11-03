@@ -21,7 +21,7 @@
 
 namespace tgfx {
 
-MeshContent::MeshContent(std::shared_ptr<Mesh> mesh, const LayerPaint& paint)
+MeshContent::MeshContent(std::shared_ptr<Mesh> mesh, const LayerPaint* paint)
     : DrawContent(paint), mesh(std::move(mesh)) {
 }
 
@@ -29,11 +29,17 @@ Rect MeshContent::onGetBounds() const {
   return mesh->bounds();
 }
 
-Rect MeshContent::getTightBounds(const Matrix& matrix) const {
+Rect MeshContent::getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const {
+  if (isExcluded(includeUnpaintedGeometry)) {
+    return Rect::MakeEmpty();
+  }
   return std::static_pointer_cast<MeshBase>(mesh)->getTightBounds(matrix);
 }
 
-bool MeshContent::hitTestPoint(float localX, float localY) const {
+bool MeshContent::hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const {
+  if (isExcluded(includeUnpaintedGeometry)) {
+    return false;
+  }
   return std::static_pointer_cast<MeshBase>(mesh)->hitTestPoint(localX, localY);
 }
 

@@ -32,26 +32,34 @@ static bool StrokeEquals(const Stroke* a, const Stroke* b) {
   return *a == *b;
 }
 
-DrawContent::DrawContent(const LayerPaint& paint) : blendMode(paint.blendMode) {
-  auto paintShader = paint.shader;
+DrawContent::DrawContent(const LayerPaint* paint) {
+  // An entry no paint captured holds no paint state at all: leaving color empty says so.
+  if (paint == nullptr) {
+    return;
+  }
+  blendMode = paint->blendMode;
+  auto paintShader = paint->shader;
   if (paintShader) {
     Color shaderColor = {};
     if (paintShader->asColor(&shaderColor)) {
-      shaderColor.alpha *= paint.color.alpha;
+      shaderColor.alpha *= paint->color.alpha;
       color = shaderColor;
     } else {
-      color = paint.color;
+      color = paint->color;
       shader = std::move(paintShader);
     }
   } else {
-    color = paint.color;
+    color = paint->color;
   }
-  if (paint.style == PaintStyle::Stroke) {
-    stroke = std::make_unique<Stroke>(paint.stroke);
+  if (paint->style == PaintStyle::Stroke) {
+    stroke = std::make_unique<Stroke>(paint->stroke);
   }
 }
 
-Rect DrawContent::getBounds() const {
+Rect DrawContent::getBounds(bool includeUnpaintedGeometry) const {
+  if (isExcluded(includeUnpaintedGeometry)) {
+    return Rect::MakeEmpty();
+  }
   auto bounds = onGetBounds();
   if (stroke) {
     ApplyStrokeToBounds(*stroke, &bounds);
@@ -59,21 +67,34 @@ Rect DrawContent::getBounds() const {
   return bounds;
 }
 
-void DrawContent::drawContour(Canvas* canvas, bool antiAlias) const {
+void DrawContent::drawContourInternal(Canvas* canvas, bool antiAlias,
+                                      bool includeUnpaintedGeometry) const {
+  if (isExcluded(includeUnpaintedGeometry)) {
+    return;
+  }
   Paint paint = {};
   paint.setAntiAlias(antiAlias);
-  if (stroke) {
-    paint.setStyle(PaintStyle::Stroke);
-    paint.setStroke(*stroke);
+  if (color.has_value()) {
+    if (stroke) {
+      paint.setStyle(PaintStyle::Stroke);
+      paint.setStroke(*stroke);
+    }
+    if (shader && shader->isAImage()) {
+      paint.setShader(shader);
+    }
   }
-  if (shader && shader->isAImage()) {
-    paint.setShader(shader);
-  }
+  // No colour is set: the brush stays the opaque white Paint default, and OpaqueContext replaces a
+  // solid brush with one before drawing anyway. An image shader above supplies its own coverage.
   onDraw(canvas, paint);
 }
 
-bool DrawContent::contourEqualsOpaqueContent() const {
-  if (color.alpha <= 0) {
+bool DrawContent::contourEqualsOpaqueContent(bool includeUnpaintedGeometry) const {
+  // A bare entry is covered by the contour with an opaque white fill only when the query includes
+  // it, while the content never draws it, so the two agree on it only when it is excluded.
+  if (!color.has_value()) {
+    return !includeUnpaintedGeometry;
+  }
+  if (color->alpha <= 0) {
     return false;
   }
   if (shader && !shader->isAImage()) {
@@ -83,13 +104,13 @@ bool DrawContent::contourEqualsOpaqueContent() const {
 }
 
 bool DrawContent::drawDefault(Canvas* canvas, float alpha, bool antiAlias) const {
-  if (color.alpha <= 0) {
+  if (!color.has_value() || color->alpha <= 0) {
     return false;
   }
   Paint paint = {};
   paint.setAntiAlias(antiAlias);
-  paint.setColor(color);
-  paint.setAlpha(color.alpha * alpha);
+  paint.setColor(*color);
+  paint.setAlpha(color->alpha * alpha);
   if (shader) {
     paint.setShader(shader);
   }
@@ -114,6 +135,11 @@ bool DrawContent::hasSameGeometry(const GeometryContent* other) const {
     return false;
   }
   auto otherContent = static_cast<const DrawContent*>(other);
+  // A bare geometry and a painted one describe the same outline but not the same entry: they must
+  // not end up in one group, whose contour representative would then stand for both.
+  if (color.has_value() != otherContent->color.has_value()) {
+    return false;
+  }
   if (!StrokeEquals(stroke.get(), otherContent->stroke.get())) {
     return false;
   }
@@ -122,6 +148,10 @@ bool DrawContent::hasSameGeometry(const GeometryContent* other) const {
 
 bool DrawContent::hasBlendMode() const {
   return blendMode != BlendMode::SrcOver;
+}
+
+bool DrawContent::hasPaint() const {
+  return color.has_value();
 }
 
 }  // namespace tgfx

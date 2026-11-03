@@ -37,9 +37,23 @@ class TGFXBaseView {
  public:
   TGFXBaseView(const std::string& canvasID);
 
+  /** Creates a view for a non-null HTMLCanvasElement or OffscreenCanvas held by this thread. */
+  TGFXBaseView(emscripten::val canvas);
+
   void setImagePath(const std::string& name, tgfx::NativeImageRef nativeImage);
 
   void updateSize();
+
+  /** Sets backing-store pixels per layout pixel, normally window.devicePixelRatio. */
+  void setLayoutDensity(float density);
+
+#ifdef TGFX_USE_WEBGPU
+  /**
+   * Sets or replaces the GPUDevice used by the view. Required on threads without a default device.
+   * Changes take effect on the next updateSize() or draw(); the caller must keep the device alive.
+   */
+  void setWebGPUDevice(emscripten::val device);
+#endif
 
   void updateLayerTree(int drawIndex);
 
@@ -47,20 +61,10 @@ class TGFXBaseView {
 
   void draw();
 
-  /**
-   * Starts an async readback operation. Submits the GPU copy command and returns a handle
-   * containing the buffer info needed for JS-side mapAsync. Returns an object with:
-   *   bufferHandle: int (WGPUBuffer id for JS WebGPU.mgrBuffer.get())
-   *   bufferSize: int
-   *   width: int, height: int, rowBytes: int
-   * Returns null/undefined if readback cannot be started.
-   */
+  /** Starts pixel readback; returns pixels (WebGL), buffer metadata (WebGPU), or null on failure. */
   emscripten::val startReadback(int srcX, int srcY, int width, int height);
 
-  /**
-   * Finishes a previously started readback. Assumes the buffer is already mapped (JS called
-   * mapAsync and it resolved). Returns a Uint8Array with the pixel data, or null on failure.
-   */
+  /** Returns pixels after the WebGPU buffer is mapped, or null if readback failed. */
   emscripten::val finishReadback();
 
  protected:
@@ -69,7 +73,14 @@ class TGFXBaseView {
  private:
   void applyCenteringTransform();
 
+  // Shared by the constructor paths: builds the platform window from whichever of the canvas object
+  // and the canvas id this view was created with.
+  std::shared_ptr<tgfx::Window> createWindow();
+
   std::string canvasID = "";
+  // Set only when the view was created from a canvas object, in which case canvasID is unused. Named
+  // canvasVal so that it cannot be confused with the tgfx::Canvas that draw() works on.
+  emscripten::val canvasVal;
   std::shared_ptr<tgfx::Window> window = nullptr;
   std::shared_ptr<tgfx::Surface> surface = nullptr;
   tgfx::DisplayList displayList = {};
@@ -79,6 +90,16 @@ class TGFXBaseView {
   int lastSurfaceWidth = 0;
   int lastSurfaceHeight = 0;
   bool presentImmediately = true;
+  bool forceDraw = false;
+  // Zero means "not pushed in yet", in which case draw() falls back to querying the DOM.
+  float layoutDensity = 0.0f;
+#ifdef TGFX_USE_WEBGPU
+  // Set only when a device was pushed in, in which case it is used instead of the default device.
+  emscripten::val webgpuDeviceVal;
+  // The imported form of webgpuDeviceVal. Kept so retries reuse the same runtime registration and
+  // released when the wrapper is destroyed. See createWindow().
+  std::shared_ptr<tgfx::WebGPUDevice> webgpuDevice = nullptr;
+#endif
 
   // Async readback state
   std::shared_ptr<tgfx::SurfaceReadback> pendingReadback = nullptr;

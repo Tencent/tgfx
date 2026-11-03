@@ -22,9 +22,10 @@
 
 namespace tgfx {
 
-ShapeContent::ShapeContent(std::shared_ptr<Shape> shape, const LayerPaint& paint)
-    : DrawContent(paint), shape(std::move(shape)), pathEffect(paint.pathEffect),
-      strokeAlign(paint.strokeAlign) {
+ShapeContent::ShapeContent(std::shared_ptr<Shape> shape, const LayerPaint* paint)
+    : DrawContent(paint), shape(std::move(shape)),
+      pathEffect(paint != nullptr ? paint->pathEffect : nullptr),
+      strokeAlign(paint != nullptr ? paint->strokeAlign : StrokeAlign::Center) {
   // Build the effect-wrapped shape once at construction so its per-instance unique key stays
   // stable across frames. Rebuilding the EffectShape on every onDraw would invalidate the GPU
   // triangulation/texture caches downstream (StrokeShape's key is derived from the inner shape's
@@ -39,7 +40,10 @@ const std::shared_ptr<Shape>& ShapeContent::drawShape() const {
   return effectedShape != nullptr ? effectedShape : shape;
 }
 
-Rect ShapeContent::getBounds() const {
+Rect ShapeContent::getBounds(bool includeUnpaintedGeometry) const {
+  if (isExcluded(includeUnpaintedGeometry)) {
+    return Rect::MakeEmpty();
+  }
   auto bounds = onGetBounds();
   if (!stroke) {
     return bounds;
@@ -73,7 +77,10 @@ Rect ShapeContent::getBounds() const {
   return bounds;
 }
 
-Rect ShapeContent::getTightBounds(const Matrix& matrix) const {
+Rect ShapeContent::getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const {
+  if (isExcluded(includeUnpaintedGeometry)) {
+    return Rect::MakeEmpty();
+  }
   auto originalPath = shape->getPath();
   if (!stroke) {
     originalPath.transform(matrix);
@@ -93,8 +100,8 @@ Rect ShapeContent::getTightBounds(const Matrix& matrix) const {
   return strokedPath.getBounds();
 }
 
-bool ShapeContent::hitTestPoint(float localX, float localY) const {
-  if (color.alpha <= 0) {
+bool ShapeContent::hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const {
+  if (isHiddenFromHitTest(includeUnpaintedGeometry)) {
     return false;
   }
   auto originalPath = shape->getPath();

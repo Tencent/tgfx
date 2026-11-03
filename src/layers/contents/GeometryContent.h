@@ -39,6 +39,12 @@ class GeometryContent : public LayerContent {
    * Returns the shader of this content.
    */
   virtual const std::shared_ptr<Shader>& getShader() const = 0;
+
+  /**
+   * Returns true if a paint captured this entry. An entry no paint captured is bare geometry: it
+   * paints nothing, contributes no shared contour, and only counts for the layer's geometry.
+   */
+  virtual bool hasPaint() const = 0;
 };
 
 }  // namespace tgfx

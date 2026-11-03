@@ -20,7 +20,7 @@ import {getCanvas2D, isCanvas, releaseCanvas2D} from './utils/canvas';
 import {BitmapImage} from './core/bitmap-image';
 import {isInstanceOf} from './utils/type-utils';
 
-import {EmscriptenGL, TGFX, WindowColorSpace} from './types';
+import {EmscriptenGL, EmscriptenGLContextAttributes, EmscriptenWebGPU, TGFX, WindowColorSpace} from './types';
 import type {wx} from './wechat/interfaces';
 import {getTGFXModule} from './tgfx-module';
 
@@ -46,27 +46,49 @@ export const createImageFromBytes = (bytes: ArrayBuffer) => {
     return createImage(URL.createObjectURL(blob));
 };
 
-export const readImagePixels = (module: TGFX, image: CanvasImageSource, width: number, height: number) => {
+let readPixelFailureWarned = false;
+
+export const readImagePixels = (module: TGFX, image: CanvasImageSource, width: number, height: number): Uint8ClampedArray | null => {
     if (!image) {
         return null;
     }
     const canvas = getCanvas2D(width, height);
     const ctx = canvas.getContext('2d', {willReadFrequently: true}) as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
     if (!ctx) {
+        releaseCanvas2D(canvas);
         return null;
     }
-    // Use "copy" composite operation to avoid source-over blending artifacts from canvas reuse.
-    // This ensures the image pixels are written directly without compositing with any residual
-    // background, which can cause white fringe on semi-transparent edges.
-    ctx.globalCompositeOperation = 'copy';
-    ctx.drawImage(image, 0, 0, width, height);
-    ctx.globalCompositeOperation = 'source-over';
-    const {data} = ctx.getImageData(0, 0, width, height);
-    releaseCanvas2D(canvas);
-    if (data.length === 0) {
+    try {
+        // Use "copy" composite operation to avoid source-over blending artifacts from canvas reuse.
+        // This ensures the image pixels are written directly without compositing with any residual
+        // background, which can cause white fringe on semi-transparent edges.
+        ctx.globalCompositeOperation = 'copy';
+        ctx.drawImage(image, 0, 0, width, height);
+        ctx.globalCompositeOperation = 'source-over';
+        const {data} = ctx.getImageData(0, 0, width, height);
+        releaseCanvas2D(canvas);
+        if (data.length === 0) {
+            return null;
+        }
+        return data;
+    } catch (error) {
+        if ((error as DOMException)?.name === 'SecurityError') {
+            // A cross-origin source without CORS taints the canvas, and a tainted canvas must never
+            // return to the shared pool: every later getImageData() on it would keep throwing a
+            // SecurityError. Resetting the size discards the canvas instead of pooling it.
+            canvas.width = 0;
+            canvas.height = 0;
+        } else {
+            // A detached ImageBitmap or a zero-sized readback fails without tainting the canvas,
+            // and getCanvas2D() clears the bitmap when the canvas is reused, so it stays poolable.
+            releaseCanvas2D(canvas);
+        }
+        if (!readPixelFailureWarned) {
+            readPixelFailureWarned = true;
+            console.warn('readImagePixels failed:', error);
+        }
         return null;
     }
-    return new Uint8Array(data);
 };
 
 export const hasWebpSupport = () => {
@@ -124,6 +146,9 @@ export const uploadToTexture = (
 ) => {
     let renderSource = source instanceof BitmapImage ? source.bitmap : source;
     if (!renderSource) return;
+    // Without EXPORTED_RUNTIME_METHODS=GL the runtime object is missing entirely, and dereferencing it
+    // below would throw out of the wasm call instead of letting the caller report the failure.
+    if (!GL) return;
     if (isInstanceOf(renderSource, globalThis.HTMLVideoElement)) {
         syncVideoFrame(renderSource as HTMLVideoElement);
     }
@@ -144,7 +169,9 @@ export const setColorSpace = (
     GL: EmscriptenGL,
     colorSpace: WindowColorSpace
 ) => {
-    if (colorSpace === WindowColorSpace.Others) {
+    // Without EXPORTED_RUNTIME_METHODS=GL the runtime object is missing entirely. Report that as an
+    // unsupported color space so the C++ caller takes its existing fallback path.
+    if (!GL || colorSpace === WindowColorSpace.Others) {
         return false;
     }
     const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
@@ -177,9 +204,11 @@ const resolveWebGPUDevice = (module: any, deviceId?: number): any => {
 // getContext('webgpu') is idempotent and returns the same context object already used by the
 // emscripten WebGPU surface, so reconfiguring it only updates the color space.
 // format, usage and alphaMode are passed in from the C++ side so that the WGPUSurfaceConfiguration
-// stays the single source of truth for the canvas configuration.
+// stays the single source of truth for the canvas configuration. The first parameter is either a
+// canvas selector or the canvas object itself, which is what tgfx passes on a thread that has no
+// document to query, such as a worker.
 export const configureWebGPUColorSpace = (
-    canvasSelector: string,
+    canvasOrSelector: string | HTMLCanvasElement | OffscreenCanvas,
     colorSpace: WindowColorSpace,
     deviceId?: number,
     format?: string,
@@ -189,7 +218,9 @@ export const configureWebGPUColorSpace = (
     if (colorSpace === WindowColorSpace.Others) {
         return false;
     }
-    const canvas = document.querySelector(canvasSelector) as HTMLCanvasElement | null;
+    const canvas = typeof canvasOrSelector === 'string'
+        ? document.querySelector(canvasOrSelector) as HTMLCanvasElement | null
+        : canvasOrSelector;
     if (!canvas) {
         return false;
     }
@@ -237,9 +268,23 @@ export const getBytesFromPath = async (module: TGFX, path: string) => {
     return new Uint8Array(buffer);
 };
 
+// Software adapters such as SwiftShader cannot import external images, and the C++ side has no
+// adapter info query to probe for that capability. The fast path is retried on every frame instead
+// of latching onto the readback fallback: a rejected import costs roughly 3.4us when Blink refuses
+// the source before taking a snapshot and at most the ~240us of a successful snapshot, against the
+// ~2.3ms CPU readback that follows, so latching would trade a few percent of an already slow frame
+// for a permanent downgrade after a transient failure.
+let crossOriginUploadWarned = false;
+let fallbackWarned = false;
+
 export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr: number,
                                            width: number, height: number, deviceId?: number) => {
     if (!source || !texturePtr) {
+        return;
+    }
+    // Videos without a current frame (not loaded or failed to decode) make
+    // copyExternalImageToTexture throw an OperationError, so skip the upload entirely.
+    if (source.readyState < source.HAVE_CURRENT_DATA || !source.videoWidth || !source.videoHeight) {
         return;
     }
     syncVideoFrame(source);
@@ -261,11 +306,108 @@ export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr:
     if (!device || !device.queue) {
         return;
     }
-    device.queue.copyExternalImageToTexture(
-        {source: source},
-        {texture: gpuTexture, premultipliedAlpha: true},
-        [width, height]
-    );
+    try {
+        device.queue.copyExternalImageToTexture(
+            {source: source},
+            {texture: gpuTexture, premultipliedAlpha: true},
+            [width, height]
+        );
+        return;
+    } catch (error) {
+        // A SecurityError means the source is tainted (cross-origin without CORS), and the CPU
+        // fallback cannot read its pixels either, so skip this frame.
+        if ((error as DOMException)?.name === 'SecurityError') {
+            if (!crossOriginUploadWarned) {
+                crossOriginUploadWarned = true;
+                console.warn('WebGPU video upload skipped a cross-origin video:', error);
+            }
+            return;
+        }
+        // Any other failure means this adapter cannot import the frame. Fall back for this frame
+        // only and try the fast path again on the next one.
+        if (!fallbackWarned) {
+            fallbackWarned = true;
+            console.warn('WebGPU video upload falls back to CPU readback:', error);
+        }
+    }
+    // Fall back to a CPU readback through a 2D canvas and upload the raw pixels with
+    // writeTexture, which is a staging-buffer upload that works on any adapter. PAG videos pack
+    // the alpha channel into the frame itself, so frames are opaque and the unpremultiplied
+    // readback matches the premultipliedAlpha target. Videos with a real codec alpha channel
+    // (VP9 or AV1 alpha) would render semi-transparent areas too bright here, which is a known
+    // limitation of this fallback.
+    const pixels = readImagePixels(module, source, width, height);
+    if (!pixels) {
+        return;
+    }
+    try {
+        device.queue.writeTexture(
+            {texture: gpuTexture},
+            pixels,
+            {bytesPerRow: width * 4, rowsPerImage: height},
+            [width, height]
+        );
+    } catch (error) {
+        // Blink throws an OperationError when the device is lost. Dropping the frame keeps the
+        // flush alive, and the texture simply keeps its previous content.
+    }
+};
+
+/**
+ * Creates a WebGL context from a canvas object. Used for canvases that tgfx cannot reach by id, such
+ * as an OffscreenCanvas on a worker thread; call it on the thread that will do the rendering, since
+ * the returned handle is only valid there.
+ *
+ * @param GL The Emscripten GL runtime (module.GL).
+ * @param canvas The canvas to create the context from.
+ * @param webGLContextAttributes The context attributes, mirroring the object Emscripten builds for
+ *     its own context creation.
+ * @return The context handle, or 0 if the context could not be created.
+ */
+export const createCanvasContext = (GL: EmscriptenGL, canvas: HTMLCanvasElement | OffscreenCanvas,
+                                    webGLContextAttributes: EmscriptenGLContextAttributes) => {
+    // Without EXPORTED_RUNTIME_METHODS=GL the runtime object is missing entirely, and this is the
+    // entry point that creates the context, so there is nothing to fall back to.
+    if (!GL || !canvas || typeof canvas.getContext !== 'function') {
+        return 0;
+    }
+    return GL.createContext(canvas, webGLContextAttributes);
+};
+
+/**
+ * Creates a WebGPU surface for a canvas object. Used for canvases that tgfx cannot reach by
+ * selector, such as an OffscreenCanvas on a worker thread; call it on the thread that will do the
+ * rendering, since the returned handle is only valid there.
+ *
+ * @param WebGPU The Emscripten WebGPU runtime (module.WebGPU).
+ * @param canvas The canvas to create the surface from.
+ * @return The surface handle, or 0 if the surface could not be created.
+ */
+export const createWebGPUSurface = (WebGPU: EmscriptenWebGPU,
+                                    canvas: HTMLCanvasElement | OffscreenCanvas) => {
+    if (!WebGPU || !canvas || typeof canvas.getContext !== 'function') {
+        return 0;
+    }
+    const context = canvas.getContext('webgpu') as any;
+    if (!context || typeof context.configure !== 'function') {
+        return 0;
+    }
+    return WebGPU.mgrSurface.create(context);
+};
+
+/**
+ * Registers a GPUDevice with the WebGPU runtime and returns the handle to render with.
+ *
+ * @param WebGPU The Emscripten WebGPU runtime (module.WebGPU).
+ * @param device A GPUDevice obtained from navigator.gpu.
+ * @return The device handle, or 0 if the device is invalid.
+ */
+export const importWebGPUDevice = (WebGPU: EmscriptenWebGPU, device: any) => {
+    if (!WebGPU || !device || !device.queue) {
+        return 0;
+    }
+    // The command queue has to travel with the device, otherwise the runtime cannot resolve it.
+    return WebGPU.mgrDevice.create(device, {queueId: WebGPU.mgrQueue.create(device.queue)});
 };
 
 export {getCanvas2D as createCanvas2D};

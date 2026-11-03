@@ -25,10 +25,10 @@ namespace tgfx {
 
 class TextContent : public DrawContent {
  public:
-  TextContent(std::shared_ptr<TextBlob> textBlob, const Point& offset, const LayerPaint& paint);
+  TextContent(std::shared_ptr<TextBlob> textBlob, const Point& offset, const LayerPaint* paint);
 
-  Rect getTightBounds(const Matrix& matrix) const override;
-  bool hitTestPoint(float localX, float localY) const override;
+  Rect getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const override;
+  bool hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const override;
 
   std::shared_ptr<TextBlob> textBlob = nullptr;
   Point offset = Point::Zero();

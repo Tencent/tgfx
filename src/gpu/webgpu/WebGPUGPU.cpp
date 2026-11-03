@@ -29,17 +29,36 @@
 
 namespace tgfx {
 
-std::unique_ptr<WebGPUGPU> WebGPUGPU::Make(WGPUDevice device, bool externallyOwned) {
+bool HardwareBufferAvailable() {
+  return false;
+}
+
+std::unique_ptr<WebGPUGPU> WebGPUGPU::Make(WGPUDevice device, bool externallyOwned,
+                                           bool ownsRuntimeRegistration) {
   if (device == nullptr) {
     return nullptr;
   }
-  return std::unique_ptr<WebGPUGPU>(new WebGPUGPU(device, externallyOwned));
+  return std::unique_ptr<WebGPUGPU>(
+      new WebGPUGPU(device, externallyOwned, ownsRuntimeRegistration));
 }
 
-WebGPUGPU::WebGPUGPU(WGPUDevice device, bool externallyOwned)
+WebGPUGPU::WebGPUGPU(WGPUDevice device, bool externallyOwned, bool ownsRuntimeRegistration)
     : webgpuDevice(device), _externallyOwned(externallyOwned) {
   caps = std::make_unique<WebGPUCaps>(device);
   commandQueue = std::make_unique<WebGPUCommandQueue>(this);
+  if (ownsRuntimeRegistration) {
+    runtimeRegistration.device = webgpuDevice;
+    runtimeRegistration.queue = commandQueue->webgpuQueue();
+  }
+}
+
+WebGPUGPU::RuntimeRegistration::~RuntimeRegistration() {
+  if (queue != nullptr) {
+    wgpuQueueRelease(queue);
+  }
+  if (device != nullptr) {
+    wgpuDeviceRelease(device);
+  }
 }
 
 WebGPUGPU::~WebGPUGPU() {
@@ -119,9 +138,9 @@ std::shared_ptr<Texture> WebGPUGPU::importBackendRenderTarget(
   if (wgpuTexture == nullptr) {
     return nullptr;
   }
-  return WebGPUTexture::MakeFrom(
-      this, wgpuTexture, backendRenderTarget.width(), backendRenderTarget.height(),
-      TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING, false);
+  return WebGPUTexture::MakeFrom(this, wgpuTexture, backendRenderTarget.width(),
+                                 backendRenderTarget.height(), TextureUsage::RENDER_ATTACHMENT,
+                                 false);
 }
 
 std::shared_ptr<Semaphore> WebGPUGPU::importBackendSemaphore(const BackendSemaphore&) {
@@ -162,6 +181,10 @@ void WebGPUGPU::processUnreferencedResources() {
 }
 
 void WebGPUGPU::releaseAll(bool releaseGPU) {
+  // Drop the cached placeholders first so they re-enter the return queue like any other resource
+  // and are reclaimed by the drain below, instead of outliving the queue itself.
+  placeholderTexture = nullptr;
+  placeholderSampler = nullptr;
   processUnreferencedResources();
   // Clear caches first. Sampler cache holds shared_ptrs that may trigger ReturnQueue on release,
   // so it must be cleared before resources.clear() invalidates the resource list iterators.
@@ -291,6 +314,21 @@ const WebGPUGPU::MipmapPipeline* WebGPUGPU::getMipmapPipeline(WGPUTextureFormat 
   }
   mipmapPipelineCache[key] = mp;
   return &mipmapPipelineCache[key];
+}
+
+std::pair<WGPUTextureView, WGPUSampler> WebGPUGPU::getPlaceholderBindings() {
+  if (placeholderTexture == nullptr) {
+    placeholderTexture = createTexture(TextureDescriptor(1, 1, PixelFormat::RGBA_8888));
+  }
+  if (placeholderSampler == nullptr) {
+    placeholderSampler = createSampler(SamplerDescriptor());
+  }
+  if (placeholderTexture == nullptr || placeholderSampler == nullptr) {
+    return {nullptr, nullptr};
+  }
+  auto texture = std::static_pointer_cast<WebGPUTexture>(placeholderTexture);
+  auto sampler = std::static_pointer_cast<WebGPUSampler>(placeholderSampler);
+  return {texture->webgpuTextureView(), sampler->webgpuSampler()};
 }
 
 }  // namespace tgfx

@@ -31,6 +31,7 @@
 #include "core/PathTriangulator.h"
 #include "core/ShapeRasterizer.h"
 #include "gtest/gtest.h"
+#include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
@@ -136,6 +137,118 @@ TGFX_TEST(PathTest, ZeroDimensionPathRasterization) {
                                                static_cast<int>(bound.height()), path, true);
     ASSERT_TRUE(rasterizer == nullptr);
   }
+}
+
+// ===== PathRasterizer antialiasing contract =====
+
+static constexpr int CoverageSize = 64;
+
+// Rasterizes `path` into a coverage mask. PathRasterizer is where the antiAlias flag is honored, so
+// these cases pin that contract directly instead of observing it through a layer style.
+static std::vector<uint8_t> RasterizeCoverage(const Path& path, bool antiAlias) {
+  auto rasterizer = PathRasterizer::MakeFrom(CoverageSize, CoverageSize, path, antiAlias);
+  if (rasterizer == nullptr) {
+    return {};
+  }
+  auto info =
+      ImageInfo::Make(CoverageSize, CoverageSize, ColorType::ALPHA_8, AlphaType::Premultiplied);
+  std::vector<uint8_t> pixels(static_cast<size_t>(CoverageSize) *
+                              static_cast<size_t>(CoverageSize));
+  if (!rasterizer->readPixels(info, pixels.data())) {
+    return {};
+  }
+  return pixels;
+}
+
+static uint8_t CoverageAt(const std::vector<uint8_t>& pixels, int x, int y) {
+  return pixels[static_cast<size_t>(y) * static_cast<size_t>(CoverageSize) +
+                static_cast<size_t>(x)];
+}
+
+// A donut offset by half a pixel, so its edges cross pixel centers and carry fractional coverage
+// while antialiasing is on.
+static Path MakeHalfPixelDonut(bool evenOdd) {
+  Path donut = {};
+  donut.setFillType(evenOdd ? PathFillType::EvenOdd : PathFillType::Winding);
+  donut.addRect(Rect::MakeXYWH(0.5f, 0.5f, 63.0f, 63.0f));
+  donut.addRect(Rect::MakeXYWH(20.5f, 20.5f, 23.0f, 23.0f), !evenOdd);
+  return donut;
+}
+
+static size_t FractionalCoverageCount(const std::vector<uint8_t>& pixels) {
+  size_t count = 0;
+  for (auto value : pixels) {
+    if (value != 0 && value != 255) {
+      count++;
+    }
+  }
+  return count;
+}
+
+static bool IsBinaryCoverage(const std::vector<uint8_t>& pixels) {
+  return FractionalCoverageCount(pixels) == 0;
+}
+
+// antiAlias == false has to produce a fully binary mask and still honor the fill rule: the mono
+// rasterizer FreeType falls back to ignores even-odd, so both donut spellings are checked.
+TGFX_TEST(PathTest, NonAntiAliasCoverageIsBinary) {
+  Path circle = {};
+  circle.addOval(Rect::MakeXYWH(0.5f, 0.5f, 63.0f, 63.0f));
+  struct Arm {
+    const char* label;
+    Path path;
+    bool hasHole;
+  };
+  const Arm arms[] = {
+      {"circle", circle, false},
+      {"even-odd donut", MakeHalfPixelDonut(true), true},
+      {"winding donut", MakeHalfPixelDonut(false), true},
+  };
+  for (const auto& arm : arms) {
+    auto antialiased = RasterizeCoverage(arm.path, true);
+    auto hard = RasterizeCoverage(arm.path, false);
+    ASSERT_EQ(hard.size(), static_cast<size_t>(CoverageSize) * CoverageSize) << arm.label;
+    ASSERT_EQ(antialiased.size(), hard.size()) << arm.label;
+    EXPECT_GT(FractionalCoverageCount(antialiased), 0U)
+        << arm.label << ": the antialiased mask needs fractional coverage or this proves nothing";
+    EXPECT_TRUE(IsBinaryCoverage(hard)) << arm.label << ": antiAlias == false must binarize";
+    EXPECT_EQ(CoverageAt(hard, 32, 32), arm.hasHole ? 0 : 255) << arm.label;
+    EXPECT_EQ(CoverageAt(hard, 32, 8), 255) << arm.label << ": the body stays covered";
+  }
+}
+
+// Inverse fill types are downgraded to an even-odd intersection with the raster bounds, and separate
+// contours of one path are rasterized together; both keep their meaning without antialiasing.
+TGFX_TEST(PathTest, NonAntiAliasInverseFillAndMultipleContours) {
+  Path inverse = {};
+  inverse.addRect(Rect::MakeXYWH(16.5f, 16.5f, 31.0f, 31.0f));
+  inverse.setFillType(PathFillType::InverseEvenOdd);
+  auto inverted = RasterizeCoverage(inverse, false);
+  ASSERT_EQ(inverted.size(), static_cast<size_t>(CoverageSize) * CoverageSize);
+  EXPECT_EQ(CoverageAt(inverted, 2, 2), 255)
+      << "the inverse fill covers everything outside the rect";
+  EXPECT_EQ(CoverageAt(inverted, 32, 32), 0) << "the rect itself stays excluded";
+  EXPECT_TRUE(IsBinaryCoverage(inverted)) << "antiAlias == false must binarize the coverage";
+
+  Path inverseWinding = {};
+  inverseWinding.addRect(Rect::MakeXYWH(16.5f, 16.5f, 31.0f, 31.0f));
+  inverseWinding.setFillType(PathFillType::InverseWinding);
+  auto invertedWinding = RasterizeCoverage(inverseWinding, false);
+  ASSERT_EQ(invertedWinding.size(), static_cast<size_t>(CoverageSize) * CoverageSize);
+  EXPECT_EQ(CoverageAt(invertedWinding, 2, 2), 255)
+      << "the inverse winding fill covers the outside";
+  EXPECT_EQ(CoverageAt(invertedWinding, 32, 32), 0) << "the rect itself stays excluded";
+  EXPECT_TRUE(IsBinaryCoverage(invertedWinding)) << "antiAlias == false must binarize the coverage";
+
+  Path pair = {};
+  pair.addRect(Rect::MakeXYWH(0.5f, 0.5f, 20.0f, 20.0f));
+  pair.addRect(Rect::MakeXYWH(40.5f, 40.5f, 20.0f, 20.0f));
+  auto separate = RasterizeCoverage(pair, false);
+  ASSERT_EQ(separate.size(), static_cast<size_t>(CoverageSize) * CoverageSize);
+  EXPECT_EQ(CoverageAt(separate, 8, 8), 255) << "the first contour stays covered";
+  EXPECT_EQ(CoverageAt(separate, 48, 48), 255) << "the second contour stays covered";
+  EXPECT_EQ(CoverageAt(separate, 32, 32), 0) << "the gap between the contours stays uncovered";
+  EXPECT_TRUE(IsBinaryCoverage(separate)) << "antiAlias == false must binarize the coverage";
 }
 
 TGFX_TEST(PathTest, ConicTo) {

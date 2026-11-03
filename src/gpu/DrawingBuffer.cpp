@@ -10,17 +10,17 @@
 //      https://opensource.org/licenses/BSD-3-Clause
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
+//  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingBuffer.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/GlobalCache.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/gpu/GPU.h"
-#include "tgfx/gpu/Window.h"
 
 namespace tgfx {
 // We set the maxBlockSize to 2MB because allocating blocks that are too large can cause memory
@@ -59,23 +59,37 @@ std::shared_ptr<CommandBuffer> DrawingBuffer::encode() {
   return commandBuffer;
 }
 
-void DrawingBuffer::presentWindows(Context* context) {
-  for (auto& pendingWindow : windows) {
-    if (auto window = pendingWindow.lock()) {
-      window->onPresent(context);
-    }
+void DrawingBuffer::attachFrameUsages(Context* context) {
+  for (auto& proxy : windowUsages) {
+    proxy->onAttachSubmission(context);
   }
 }
 
+void DrawingBuffer::schedulePresents(Context* context) {
+  for (auto& proxy : presentables) {
+    proxy->onSchedulePresentation(context);
+  }
+}
+
+void DrawingBuffer::deliverFrames(Context* context) {
+  for (auto& proxy : presentables) {
+    proxy->onPresentFrame(context);
+  }
+  presentables.clear();
+  windowUsages.clear();
+}
+
 bool DrawingBuffer::empty() const {
-  return resourceTasks.empty() && renderTasks.empty() && atlasTasks.empty();
+  // Frame usages always come with a task; a pending presentation alone keeps the batch.
+  return resourceTasks.empty() && renderTasks.empty() && atlasTasks.empty() && presentables.empty();
 }
 
 void DrawingBuffer::reset() {
   renderTasks.clear();
   resourceTasks.clear();
   atlasTasks.clear();
-  windows.clear();
+  windowUsages.clear();
+  presentables.clear();
   vertexAllocator.clear(vertexMaxValueTracker.getMaxValue());
   instanceAllocator.clear(instanceMaxValueTracker.getMaxValue());
   drawingAllocator.clear(drawingMaxValueTracker.getMaxValue());

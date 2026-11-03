@@ -35,6 +35,12 @@ export const uploadToTexture = (
   if (!source) {
     return;
   }
+  // Without EXPORTED_RUNTIME_METHODS=GL the runtime object is missing entirely, and dereferencing it
+  // below would throw out of the wasm call instead of letting the caller report the failure. Same
+  // guard as the standard web implementation.
+  if (!GL) {
+    return;
+  }
   const gl = GL.currentContext?.GLctx as WebGL2RenderingContext;
   gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
@@ -79,13 +85,14 @@ export const uploadToTexture = (
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
 };
 
-export const readImagePixels = (module: TGFX, image: CanvasImageSource, width: number, height: number): Uint8Array | null => {
+export const readImagePixels = (module: TGFX, image: CanvasImageSource, width: number, height: number): Uint8ClampedArray | null => {
   if (!image) {
     return null;
   }
   const canvas = getCanvas2D(width, height);
   const ctx = canvas?.getContext('2d', {willReadFrequently: true}) as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
   if (!ctx) {
+    releaseCanvas2D(canvas);
     return null;
   }
   ctx.drawImage(image, 0, 0, width, height);
@@ -94,7 +101,7 @@ export const readImagePixels = (module: TGFX, image: CanvasImageSource, width: n
   if (data.length === 0) {
     return null;
   }
-  return new Uint8Array(data);
+  return data;
 };
 
 export { getSourceSize, isAndroidMiniprogram, getCanvas2D as createCanvas2D, releaseCanvas2D as releaseNativeImage, setColorSpace, hasWebpSupport };

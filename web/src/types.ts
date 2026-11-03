@@ -146,7 +146,15 @@ export interface EmscriptenGLContext {
 }
 
 export type EmscriptenGLContextAttributes =
-    { majorVersion: number; minorVersion: number }
+    {
+        majorVersion: number;
+        minorVersion: number;
+        // Emscripten's own extras, which the WebGL specification does not define.
+        enableExtensionsByDefault?: boolean;
+        explicitSwapControl?: boolean;
+        proxyContextToMainThread?: number;
+        renderViaOffscreenBackBuffer?: boolean;
+    }
     & WebGLContextAttributes;
 
 export interface EmscriptenGL {
@@ -165,10 +173,16 @@ export interface EmscriptenGL {
     textures: (WebGLTexture | null)[];
 }
 
-export interface TGFX extends EmscriptenModule {
+export interface EmscriptenWebGPU {
+    mgrSurface: {create: (context: any) => number};
+    mgrDevice: {create: (device: any, wrapper?: any) => number};
+    mgrQueue: {create: (queue: any) => number};
+    [key: string]: any;
+}
+
+interface TGFXBase extends EmscriptenModule {
     TGFXLineCap: TGFXLineCap;
     TGFXLineJoin: TGFXLineJoin;
-    GL: EmscriptenGL;
     TGFXPathFillType: TGFXPathFillType;
     /**
      * Sets the maximum number of worker threads that can be created for running tasks. Pass zero to
@@ -197,3 +211,11 @@ export interface TGFX extends EmscriptenModule {
 
     [key: string]: any;
 }
+
+/**
+ * A WebAssembly module exposing at least one graphics backend runtime.
+ */
+export type TGFX = TGFXBase & (
+    | { GL: EmscriptenGL; WebGPU?: EmscriptenWebGPU }
+    | { GL?: EmscriptenGL; WebGPU: EmscriptenWebGPU }
+);

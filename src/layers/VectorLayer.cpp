@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/VectorLayer.h"
+#include <unordered_set>
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/Types.h"
@@ -80,6 +81,30 @@ void VectorLayer::onUpdateContent(LayerRecorder* recorder) {
   for (const auto& painter : context.painters) {
     painter->draw(recorder);
   }
+  // Geometries no painter captured are this layer's own geometry; the set is taken after every
+  // element applied, since MergePath clears geometries and painters while Repeater clones and
+  // reorders them. Collecting the captures once keeps the comparison linear in the geometry count.
+  std::unordered_set<const Geometry*> capturedGeometries = {};
+  capturedGeometries.reserve(context.geometries.size());
+  for (const auto& painter : context.painters) {
+    DEBUG_ASSERT(painter != nullptr);
+    capturedGeometries.insert(painter->geometries.begin(), painter->geometries.end());
+  }
+  for (const auto& geometry : context.geometries) {
+    DEBUG_ASSERT(geometry != nullptr);
+    if (capturedGeometries.count(geometry.get()) != 0) {
+      continue;
+    }
+    auto shape = geometry->getShape();
+    if (shape == nullptr) {
+      continue;
+    }
+    // The recorder applies its CTM to the geometry, so the matrix stays a transform instead of
+    // being baked into the shape.
+    recorder->setMatrix(geometry->matrix);
+    recorder->addShape(std::move(shape), nullptr);
+    recorder->resetMatrix();
+  }
 }
 
 std::optional<StyledShape> VectorLayer::onGetContentShape() {
@@ -93,21 +118,22 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
       element->apply(&context);
     }
   }
-  if (context.painters.empty()) {
-    return std::nullopt;
+  // The content shape describes what the layer renders, so it drops the painters whose color source
+  // is a fully transparent solid color; any other effectively invisible source, a transparent
+  // gradient for one, stays in.
+  std::vector<const Painter*> painters = {};
+  for (const auto& painter : context.painters) {
+    DEBUG_ASSERT(painter != nullptr);
+    if (!HasTransparentSolidColor(painter.get())) {
+      painters.push_back(painter.get());
+    }
   }
-
-  // Only a single shared geometry across all painters with a uniform stroke style can be
-  // simplified to a StyledShape. Anything else has no exact outline: nullopt (consumers fall
-  // back to non-vector paths — glass uses the content alpha, spread uses the content bounds).
+  // Anything that does not describe one geometry with a uniform style has no exact outline:
+  // consumers of the content shape fall back to non-vector paths (spread uses the content bounds).
   Geometry* sharedGeometry = nullptr;
   auto hasFill = false;
   std::optional<PainterStyle> strokeStyle = std::nullopt;
-  for (const auto& painter : context.painters) {
-    DEBUG_ASSERT(painter != nullptr);
-    if (HasTransparentSolidColor(painter.get())) {
-      continue;
-    }
+  for (const auto* painter : painters) {
     if (painter->geometries.size() != 1) {
       return std::nullopt;
     }
@@ -128,9 +154,6 @@ std::optional<StyledShape> VectorLayer::onGetContentShape() {
       strokeStyle = style;
     }
   }
-
-  // sharedGeometry stays null when every painter was skipped as invisible, meaning the layer has
-  // no visible content.
   if (sharedGeometry == nullptr) {
     return std::nullopt;
   }

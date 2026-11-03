@@ -26,8 +26,8 @@ namespace tgfx {
 class Canvas;
 
 /**
- * Returns the canvas clip bounds in the layer's local coordinate space, or std::nullopt if the
- * canvas cannot provide a meaningful clip (e.g. no canvas or no surface to derive bounds from).
+ * Returns the canvas clip bounds in the canvas's current local space, or std::nullopt if the canvas
+ * cannot provide a meaningful clip (e.g. no canvas or no surface to derive bounds from).
  */
 std::optional<Rect> GetClipBounds(const Canvas* canvas);
 

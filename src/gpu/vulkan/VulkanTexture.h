@@ -38,7 +38,8 @@ class VulkanTexture : public Texture, public VulkanResource {
 
   static std::shared_ptr<VulkanTexture> MakeFrom(
       VulkanGPU* gpu, VkImage image, VkFormat format, int width, int height, uint32_t usage,
-      bool adopted, VkImageLayout initialLayout = VK_IMAGE_LAYOUT_UNDEFINED);
+      bool adopted, VkImageLayout initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+      std::shared_ptr<VkImageLayout> layoutState = nullptr);
 
   VkImage vulkanImage() const {
     return image;
@@ -57,11 +58,11 @@ class VulkanTexture : public Texture, public VulkanResource {
   }
 
   VkImageLayout currentLayout() const {
-    return layout;
+    return *layoutState;
   }
 
   void setCurrentLayout(VkImageLayout newLayout) {
-    layout = newLayout;
+    *layoutState = newLayout;
   }
 
   /**
@@ -78,7 +79,8 @@ class VulkanTexture : public Texture, public VulkanResource {
  protected:
   VulkanTexture(const TextureDescriptor& descriptor, VkImage image, VkImageView imageView,
                 VkImageView renderImageView, VmaAllocation allocation, VkFormat format,
-                bool adopted, VkImageLayout initialLayout);
+                bool adopted, VkImageLayout initialLayout,
+                std::shared_ptr<VkImageLayout> layoutState = nullptr);
   ~VulkanTexture() override = default;
 
   void onRelease(VulkanGPU* gpu) override;
@@ -88,7 +90,7 @@ class VulkanTexture : public Texture, public VulkanResource {
   VkImageView renderImageView = VK_NULL_HANDLE;
   VmaAllocation allocation = VK_NULL_HANDLE;
   VkFormat format = VK_FORMAT_UNDEFINED;
-  VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
+  std::shared_ptr<VkImageLayout> layoutState;
   bool adopted = true;
 
  private:

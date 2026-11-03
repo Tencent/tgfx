@@ -19,16 +19,26 @@
 #pragma once
 
 #include <emscripten/html5_webgl.h>
+#include <emscripten/val.h>
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace tgfx {
 class WebGLDevice : public GLDevice {
  public:
-  /**
-   * Creates a WebGLDevice from the id of an existing HTMLCanvasElement.
-   */
+  /** Creates a WebGLDevice for a canvas in the document. Main-thread only. */
   static std::shared_ptr<WebGLDevice> MakeFrom(const std::string& canvasID,
+                                               std::shared_ptr<ColorSpace> colorSpace = nullptr);
+
+  /**
+   * Creates a WebGLDevice for a canvas held by the calling thread. The canvas must outlive the
+   * device, which must be used and destroyed on that thread. Returns nullptr if context creation
+   * fails. Web builds require the GL runtime method; see README.md.
+   *
+   * @param canvas An HTMLCanvasElement or OffscreenCanvas.
+   * @param colorSpace Optional rendering color space; defaults to sRGB.
+   */
+  static std::shared_ptr<WebGLDevice> MakeFrom(emscripten::val canvas,
                                                std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   ~WebGLDevice() override;
@@ -42,6 +52,11 @@ class WebGLDevice : public GLDevice {
  private:
   EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context = 0;
   EMSCRIPTEN_WEBGL_CONTEXT_HANDLE oldContext = 0;
+
+  // Shared tail of both MakeFrom() overloads: makes the context current, applies the color space and
+  // wraps the handle into a device that owns it.
+  static std::shared_ptr<WebGLDevice> MakeFromContext(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context,
+                                                      std::shared_ptr<ColorSpace> colorSpace);
 
   static std::shared_ptr<WebGLDevice> Wrap(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context,
                                            bool externallyOwned);

@@ -18,22 +18,33 @@
 
 #include "VulkanSwapchainProxy.h"
 #include "VulkanCommandQueue.h"
-#include "VulkanGPU.h"
+#include "VulkanTexture.h"
 #include "VulkanUtil.h"
 #include "core/utils/Log.h"
-#include "gpu/resources/RenderTarget.h"
-#include "tgfx/gpu/Backend.h"
+#include "gpu/resources/TextureRenderTarget.h"
 
 namespace tgfx {
 
-VulkanSwapchainProxy::VulkanSwapchainProxy(Context* context, VulkanGPU* gpu,
-                                           VkSwapchainKHR swapchain, VkFormat format, int width,
-                                           int height, const std::vector<VkImageView>& imageViews,
-                                           const std::vector<VkImage>& images,
-                                           const VulkanGPU::PresentationSlot& slot)
+VulkanSwapchainProxy::VulkanSwapchainProxy(
+    Context* context, VulkanGPU* gpu, VkSwapchainKHR swapchain, VkFormat format, int width,
+    int height, const std::vector<VkImage>& images,
+    const std::vector<std::shared_ptr<VulkanSwapchainImageState>>& imageStates,
+    std::shared_ptr<bool> outOfDate, std::shared_ptr<uint64_t> swapchainGeneration)
     : _context(context), _gpu(gpu), _swapchain(swapchain), _format(format), _width(width),
-      _height(height), _imageViews(imageViews), _images(images),
-      _imageAvailableSemaphore(slot.imageAvailable), _renderFinishedSemaphore(slot.renderFinished) {
+      _height(height), _images(images), _imageStates(imageStates), _outOfDate(std::move(outOfDate)),
+      _swapchainGeneration(std::move(swapchainGeneration)),
+      _generationValue(*_swapchainGeneration) {
+}
+
+VulkanSwapchainProxy::~VulkanSwapchainProxy() {
+  if (_renderTarget != nullptr && _outOfDate != nullptr) {
+    // An acquired image can only be reclaimed by presenting it, so rebuild the swapchain.
+    *_outOfDate = true;
+  }
+  if (_pendingImageAvailableSemaphore != VK_NULL_HANDLE) {
+    vkDestroySemaphore(_gpu->device(), _pendingImageAvailableSemaphore, nullptr);
+    _pendingImageAvailableSemaphore = VK_NULL_HANDLE;
+  }
 }
 
 Context* VulkanSwapchainProxy::getContext() const {
@@ -69,41 +80,111 @@ std::shared_ptr<TextureView> VulkanSwapchainProxy::getTextureView() const {
 }
 
 std::shared_ptr<RenderTarget> VulkanSwapchainProxy::getRenderTarget() const {
-  if (_renderTarget == nullptr) {
-    // Acquire the next swapchain image. The imageAvailable semaphore is signaled when the
-    // presentation engine releases the image; the GPU waits on it at COLOR_ATTACHMENT_OUTPUT.
-    auto result =
-        vkAcquireNextImageKHR(_gpu->device(), _swapchain, UINT64_MAX, _imageAvailableSemaphore,
-                              VK_NULL_HANDLE, &_currentImageIndex);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-      _outOfDate = true;
-      return nullptr;
-    }
-    if (result == VK_SUBOPTIMAL_KHR) {
-      _outOfDate = true;
-    } else if (result != VK_SUCCESS) {
-      LOGE("VulkanSwapchainProxy: vkAcquireNextImageKHR failed (result=%d).",
-           static_cast<int>(result));
-      return nullptr;
-    }
-
-    // Schedule the present to happen at the end of the next submit(). The submit will wait on
-    // imageAvailable and signal renderFinished; present will wait on renderFinished.
-    auto queue = static_cast<VulkanCommandQueue*>(_context->gpu()->queue());
-    queue->schedulePresent(_swapchain, _currentImageIndex, _images[_currentImageIndex],
-                           _imageAvailableSemaphore, _renderFinishedSemaphore);
-
-    VulkanImageInfo vulkanInfo = {};
-    vulkanInfo.image = reinterpret_cast<uint64_t>(_images[_currentImageIndex]);
-    vulkanInfo.format = static_cast<uint32_t>(_format);
-    vulkanInfo.layout = static_cast<uint32_t>(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    BackendRenderTarget backendRT(vulkanInfo, _width, _height);
-    _renderTarget = RenderTarget::MakeFrom(_context, backendRT, ImageOrigin::TopLeft);
+  auto window = _presentingWindow.lock();
+  if (window == nullptr) {
+    // The window is gone and its swapchain handles are dangling.
+    return nullptr;
   }
+  if (_renderTarget != nullptr) {
+    return _renderTarget;
+  }
+  if (*_swapchainGeneration != _generationValue) {
+    // The swapchain was rebuilt; a new Surface is required.
+    return nullptr;
+  }
+  VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
+  VkSemaphoreCreateInfo semaphoreInfo = {};
+  semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+  if (vkCreateSemaphore(_gpu->device(), &semaphoreInfo, nullptr, &imageAvailableSemaphore) !=
+      VK_SUCCESS) {
+    *_outOfDate = true;
+    return nullptr;
+  }
+  auto result = vkAcquireNextImageKHR(_gpu->device(), _swapchain, UINT64_MAX,
+                                      imageAvailableSemaphore, VK_NULL_HANDLE, &_currentImageIndex);
+  if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+    *_outOfDate = true;
+  }
+  if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+    vkDestroySemaphore(_gpu->device(), imageAvailableSemaphore, nullptr);
+    return nullptr;
+  }
+
+  auto& imageState = _imageStates[_currentImageIndex];
+  auto texture = VulkanTexture::MakeFrom(_gpu, _images[_currentImageIndex], _format, _width,
+                                         _height, TextureUsage::RENDER_ATTACHMENT, false,
+                                         *imageState->layout, imageState->layout);
+  if (texture == nullptr) {
+    vkDeviceWaitIdle(_gpu->device());
+    vkDestroySemaphore(_gpu->device(), imageAvailableSemaphore, nullptr);
+    *_outOfDate = true;
+    return nullptr;
+  }
+  _renderTarget =
+      TextureRenderTarget::MakeFrom(_context, std::move(texture), 1, ImageOrigin::TopLeft, true);
+  if (_renderTarget == nullptr) {
+    vkDeviceWaitIdle(_gpu->device());
+    vkDestroySemaphore(_gpu->device(), imageAvailableSemaphore, nullptr);
+    *_outOfDate = true;
+    return nullptr;
+  }
+
+  // Assign only after all failure paths so releaseFrame() never destroys it twice.
+  _pendingImageAvailableSemaphore = imageAvailableSemaphore;
   return _renderTarget;
 }
 
+void VulkanSwapchainProxy::attachAcquireWait() {
+  // The first submission using the frame waits for its acquisition.
+  if (_renderTarget == nullptr || _pendingImageAvailableSemaphore == VK_NULL_HANDLE) {
+    return;
+  }
+  auto window = _presentingWindow.lock();
+  if (window == nullptr) {
+    // The window is gone; drop the frame.
+    releaseFrame();
+    return;
+  }
+  auto queue = static_cast<VulkanCommandQueue*>(_context->gpu()->queue());
+  queue->scheduleAcquireWait(_pendingImageAvailableSemaphore, _outOfDate);
+  _pendingImageAvailableSemaphore = VK_NULL_HANDLE;
+}
+
+void VulkanSwapchainProxy::onAttachSubmission(Context*) {
+  // Using the frame without presenting it only waits for the acquisition.
+  attachAcquireWait();
+}
+
+void VulkanSwapchainProxy::onSchedulePresentation(Context*) {
+  attachAcquireWait();
+  if (_renderTarget == nullptr) {
+    return;
+  }
+  auto window = _presentingWindow.lock();
+  if (window == nullptr) {
+    releaseFrame();
+    return;
+  }
+  auto& imageState = _imageStates[_currentImageIndex];
+  auto queue = static_cast<VulkanCommandQueue*>(_context->gpu()->queue());
+  queue->schedulePresent(_swapchain, _currentImageIndex, _images[_currentImageIndex],
+                         imageState->presentSemaphore, imageState->layout, _outOfDate);
+}
+
+void VulkanSwapchainProxy::onPresentFrame(Context*) {
+  // End the presented frame so the next use acquires a new image.
+  releaseFrame();
+}
+
+bool VulkanSwapchainProxy::hasPendingFrame() const {
+  return _renderTarget != nullptr;
+}
+
 void VulkanSwapchainProxy::releaseFrame() {
+  if (_pendingImageAvailableSemaphore != VK_NULL_HANDLE) {
+    vkDestroySemaphore(_gpu->device(), _pendingImageAvailableSemaphore, nullptr);
+    _pendingImageAvailableSemaphore = VK_NULL_HANDLE;
+  }
   _renderTarget = nullptr;
 }
 

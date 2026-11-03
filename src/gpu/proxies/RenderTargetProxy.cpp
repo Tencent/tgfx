@@ -22,6 +22,7 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/proxies/ExternalRenderTargetProxy.h"
 #include "gpu/resources/DepthStencilTextureView.h"
+#include "tgfx/gpu/Window.h"
 
 namespace tgfx {
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFrom(
@@ -75,6 +76,18 @@ std::shared_ptr<DepthStencilTextureView> RenderTargetProxy::getOrAllocateStencil
   }
   stencilAttachment = DepthStencilTextureView::Make(getContext(), width, height, sampleCount);
   return stencilAttachment;
+}
+
+void RenderTargetProxy::onAttachSubmission(Context*) {
+}
+
+void RenderTargetProxy::onSchedulePresentation(Context*) {
+}
+
+void RenderTargetProxy::onPresentFrame(Context* context) {
+  if (auto window = _presentingWindow.lock()) {
+    window->onPresent(context);
+  }
 }
 
 Matrix RenderTargetProxy::getOriginTransform() const {

@@ -21,6 +21,7 @@
 #include "core/utils/Log.h"
 #include "gpu/opengl/GLDefines.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "platform/web/WebJSBindings.h"
 
 namespace tgfx {
 
@@ -38,6 +39,20 @@ std::shared_ptr<WebGLWindow> WebGLWindow::MakeFrom(const std::string& canvasID,
   return window;
 }
 
+std::shared_ptr<WebGLWindow> WebGLWindow::MakeFrom(emscripten::val canvas,
+                                                   std::shared_ptr<ColorSpace> colorSpace) {
+  if (!canvas.as<bool>()) {
+    return nullptr;
+  }
+  auto device = WebGLDevice::MakeFrom(canvas, colorSpace);
+  if (device == nullptr) {
+    return nullptr;
+  }
+  auto window = std::shared_ptr<WebGLWindow>(new WebGLWindow(device, std::move(colorSpace)));
+  window->canvas = canvas;
+  return window;
+}
+
 WebGLWindow::WebGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSpace> colorSpace)
     : Window(std::move(device), std::move(colorSpace)) {
 }
@@ -45,7 +60,16 @@ WebGLWindow::WebGLWindow(std::shared_ptr<Device> device, std::shared_ptr<ColorSp
 std::shared_ptr<RenderTargetProxy> WebGLWindow::onCreateRenderTarget(Context* context) {
   int width = 0;
   int height = 0;
-  emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
+  if (canvas.as<bool>()) {
+    // Canvas object path: read the drawing buffer size from the canvas itself. A worker has no DOM,
+    // so the Emscripten canvas lookup used below would not find it.
+    if (!ReadCanvasSize(canvas, &width, &height)) {
+      LOGE("WebGLWindow::onCreateRenderTarget() Canvas size is invalid or out of range.");
+      return nullptr;
+    }
+  } else {
+    emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
+  }
   if (width <= 0 || height <= 0) {
     LOGE("WebGLWindow::onCreateRenderTarget() Can not create a RenderTarget with zero size.");
     return nullptr;

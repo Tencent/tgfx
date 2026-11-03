@@ -26,7 +26,6 @@ namespace tgfx {
 
 struct GlassRefractionParams {
   float dispersion = 0.0f;
-  float lightAngle = 0.0f;
   float lightIntensity = 0.0f;
   float origWidth = 0.0f;
   float origHeight = 0.0f;

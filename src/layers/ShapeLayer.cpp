@@ -221,11 +221,12 @@ void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
     for (const auto& style : _fillStyles) {
       LayerPaint paint(style->color(), style->blendMode());
       paint.shader = style->shader();
-      recorder->addShape(_shape, paint);
+      recorder->addShape(_shape, &paint);
     }
   } else {
     // Create a contour-only content for the shape (transparent color, no shader)
-    recorder->addShape(_shape, LayerPaint(Color::Transparent()));
+    LayerPaint paint = LayerPaint(Color::Transparent());
+    recorder->addShape(_shape, &paint);
   }
 
   if (!_strokeStyles.empty()) {
@@ -245,7 +246,7 @@ void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
       paint.stroke = stroke;
       paint.strokeAlign = strokeAlign;
       paint.pathEffect = dashEffect;
-      recorder->addShape(_shape, paint);
+      recorder->addShape(_shape, &paint);
     }
   }
 }

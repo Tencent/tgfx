@@ -34,7 +34,7 @@ GridBackgroundLayer::GridBackgroundLayer(int width, int height, float density)
 void GridBackgroundLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
   tgfx::LayerPaint backgroundPaint(tgfx::Color::White());
   recorder->addRect(tgfx::Rect::MakeWH(static_cast<float>(_width), static_cast<float>(_height)),
-                    backgroundPaint);
+                    &backgroundPaint);
 
   tgfx::LayerPaint tilePaint(tgfx::Color{0.8f, 0.8f, 0.8f, 1.f});
   int tileSize = 16 * static_cast<int>(_density);
@@ -48,7 +48,7 @@ void GridBackgroundLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
         recorder->addRect(
             tgfx::Rect::MakeXYWH(static_cast<float>(x), static_cast<float>(y),
                                  static_cast<float>(tileSize), static_cast<float>(tileSize)),
-            tilePaint);
+            &tilePaint);
       }
       draw = !draw;
     }

@@ -43,7 +43,9 @@ class VectorElement : public LayerProperty {
    */
   void setEnabled(bool value);
 
- protected:
+  /**
+   * The type of a vector element.
+   */
   enum class Type {
     Rectangle,
     Ellipse,
@@ -61,9 +63,13 @@ class VectorElement : public LayerProperty {
     TextModifier
   };
 
-  VectorElement() = default;
-
+  /**
+   * Returns the type of this vector element.
+   */
   virtual Type type() const = 0;
+
+ protected:
+  VectorElement() = default;
 
   /**
    * Applies this element's effect to the given context. Geometry elements add paths,

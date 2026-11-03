@@ -27,6 +27,15 @@ QGLDrawableProxy::QGLDrawableProxy(Context* context, int width, int height, Pixe
       _origin(origin), _window(window) {
 }
 
+void QGLDrawableProxy::onPresentFrame(Context*) {
+  // Keep the window alive while presenting; drop the presentation once it is gone.
+  auto window = _presentingWindow.lock();
+  if (window == nullptr || _window == nullptr) {
+    return;
+  }
+  _window->presentProxy(this);
+}
+
 Context* QGLDrawableProxy::getContext() const {
   return _context;
 }
@@ -57,10 +66,12 @@ bool QGLDrawableProxy::externallyOwned() const {
 
 void QGLDrawableProxy::ensureTextureRTProxy() const {
   if (textureRTProxy == nullptr) {
-    textureRTProxy = _window->acquireTexture(_context, _width, _height);
-    if (textureRTProxy != nullptr) {
-      _window->presentingProxy = weakThis.lock();
+    // Keep the window alive while resolving; its texture slots dangle once it is gone.
+    auto window = _presentingWindow.lock();
+    if (window == nullptr || _window == nullptr) {
+      return;
     }
+    textureRTProxy = _window->acquireTexture(_context, _width, _height);
   }
 }
 
@@ -88,7 +99,11 @@ std::shared_ptr<RenderTargetProxy> QGLDrawableProxy::getTextureTargetProxy() con
 
 void QGLDrawableProxy::releaseTexture() {
   if (textureRTProxy != nullptr) {
-    _window->reuseTexture(textureRTProxy);
+    // Return the slot only while the window is alive.
+    auto window = _presentingWindow.lock();
+    if (window != nullptr && _window != nullptr) {
+      _window->reuseTexture(textureRTProxy);
+    }
     textureRTProxy = nullptr;
   }
 }

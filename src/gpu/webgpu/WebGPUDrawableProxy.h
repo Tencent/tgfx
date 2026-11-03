@@ -43,6 +43,8 @@ class WebGPUDrawableProxy : public RenderTargetProxy {
   void present();
   void releaseDrawable();
 
+  void onPresentFrame(Context* context) override;
+
  private:
   Context* _context = nullptr;
   int _width = 0;

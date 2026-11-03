@@ -970,9 +970,9 @@ TGFX_TEST(ClipTest, Overview) {
 
         // ---------- Path single-element variants ----------
         case 6:
-          // Cell 6: Pentagon Path NonAA. Visually identical to the AA variant because the FreeType
-          // path rasterizer always produces an 8-bit AA mask and ignores the antiAlias flag (see
-          // FTPathRasterizer::onReadPixels).
+          // Cell 6: Pentagon Path NonAA. With antiAlias off the FreeType rasterizer binarizes the
+          // coverage (see FTPathRasterizer::onReadPixels), so this cell keeps hard edges instead of
+          // matching the AA variant.
           canvas->translate(kCell / 2.f, kCell / 2.f);
           canvas->clipPath(MakePath({{0, -75}, {72, -23}, {44, 60}, {-44, 60}, {-72, -23}}), false);
           canvas->translate(-kCell / 2.f, -kCell / 2.f);

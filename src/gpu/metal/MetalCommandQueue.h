@@ -69,7 +69,7 @@ class MetalCommandQueue : public CommandQueue {
   void encodePendingWait(id<MTLCommandBuffer> commandBuffer);
 
   /**
-   * Schedules a drawable to be presented when the next command buffer is committed.
+   * Schedules a drawable to be presented with the next committed command buffer.
    */
   void schedulePresent(id<CAMetalDrawable> drawable);
 

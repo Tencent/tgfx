@@ -33,13 +33,17 @@ class EAGLWindow : public Window {
                                               std::shared_ptr<GLDevice> device = nullptr,
                                               std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
+  bool supportsReadback() const override {
+    return true;
+  }
+
  protected:
   std::shared_ptr<RenderTargetProxy> onCreateRenderTarget(Context* context) override;
-  void onPresent(Context* context) override;
 
  private:
   CAEAGLLayer* layer = nil;
   std::shared_ptr<EAGLLayerTexture> layerTexture = nullptr;
+  std::weak_ptr<RenderTargetProxy> activeRenderTarget = {};
 
   EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer,
              std::shared_ptr<ColorSpace> colorSpace = nullptr);

@@ -122,7 +122,7 @@ void InnerShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, floa
   if (!filter) {
     return;
   }
-  auto content = input.content->makeWithFilter(filter);
+  auto content = input.content->image()->makeWithFilter(filter);
   DEBUG_ASSERT(content != nullptr);
   if (content == nullptr) {
     return;
