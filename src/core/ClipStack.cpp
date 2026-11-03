@@ -666,8 +666,15 @@ Path ClipStack::getClipPath() const {
   auto& elems = elements();
   for (size_t i = oldestValidIndex(); i < elems.size(); ++i) {
     const auto& element = elems[i];
-    if (element.isValid()) {
-      result.addPath(element.getDevicePath(), PathOp::Intersect);
+    if (!element.isValid()) {
+      continue;
+    }
+    // A failed Intersect leaves the accumulated path behind, which is not this element: applying
+    // the next one would narrow the clip by an element that was never intersected in. Keeping what
+    // the earlier elements narrowed it to is the safer of the two wrong answers, so stop here.
+    if (!result.addPath(element.getDevicePath(), PathOp::Intersect)) {
+      LOGE("ClipStack::getClipPath() Failed to intersect a clip element; keeping the rest.");
+      break;
     }
   }
   return result;
