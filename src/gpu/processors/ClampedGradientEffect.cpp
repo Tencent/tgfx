@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ClampedGradientEffect.h"
-#include "gpu/aot/EffectGraph.h"
+#include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/processors/ConicGradientLayout.h"
 #include "gpu/processors/DualIntervalGradientColorizer.h"
 #include "gpu/processors/SingleIntervalGradientColorizer.h"

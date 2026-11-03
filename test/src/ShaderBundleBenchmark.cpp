@@ -23,7 +23,7 @@
 #endif
 #include <cstdlib>
 #include "gpu/GlobalCache.h"
-#include "gpu/PrecompiledShaderCache.h"
+#include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Clock.h"
 #include "tgfx/core/Font.h"

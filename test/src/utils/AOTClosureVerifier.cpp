@@ -18,8 +18,8 @@
 
 #include "utils/AOTClosureVerifier.h"
 #include <set>
-#include "gpu/ShaderBundleContract.h"
 #include "gpu/shaders/PrecompiledShader.h"
+#include "gpu/shaders/contract/ShaderBundleContract.h"
 
 namespace tgfx {
 

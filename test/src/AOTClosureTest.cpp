@@ -19,7 +19,7 @@
 #include <string>
 #include <vector>
 #include "base/TGFXTest.h"
-#include "gpu/PrecompiledShaderCache.h"
+#include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gtest/gtest.h"
 #include "utils/AOTClosureVerifier.h"
 #include "utils/TestUtils.h"

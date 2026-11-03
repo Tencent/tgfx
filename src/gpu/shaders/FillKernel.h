@@ -23,7 +23,7 @@
 #include <optional>
 #include <utility>
 #include <vector>
-#include "gpu/aot/DrawShape.h"
+#include "gpu/aot/select/DrawShape.h"
 #include "gpu/shaders/ShaderFamily.h"
 
 namespace tgfx {

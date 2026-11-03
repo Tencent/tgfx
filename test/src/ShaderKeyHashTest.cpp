@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Fixed test vectors for the shared shader key/blob encoding (src/gpu/ShaderBundleContract.h). The
+// Fixed test vectors for the shared shader key/blob encoding (src/gpu/shaders/contract/ShaderBundleContract.h). The
 // encoding is the wire contract between offline bundles and the runtime loader: any accidental
 // change to the serialization order, the length prefixes, or the FNV-1a constants silently
 // invalidates every existing bundle, so the golden hashes below pin the exact bytes. Values were
@@ -26,7 +26,7 @@
 #include <cstdint>
 #include <vector>
 #include "base/TGFXTest.h"
-#include "gpu/ShaderBundleContract.h"
+#include "gpu/shaders/contract/ShaderBundleContract.h"
 
 namespace tgfx {
 

@@ -48,7 +48,7 @@ if(XXD_EXECUTABLE)
 "// Auto-generated from ${INPUT_FILE} — do not edit.
 #include <cstddef>
 #include <cstdint>
-#include \"gpu/EmbeddedShaderBundles.h\"
+#include \"gpu/aot/bundle/EmbeddedShaderBundles.h\"
 
 namespace tgfx {
 namespace embedded {
@@ -102,7 +102,7 @@ file(WRITE "${TEMP_FILE}"
 "// Auto-generated from ${INPUT_FILE} — do not edit.
 #include <cstddef>
 #include <cstdint>
-#include \"gpu/EmbeddedShaderBundles.h\"
+#include \"gpu/aot/bundle/EmbeddedShaderBundles.h\"
 
 namespace tgfx {
 namespace embedded {

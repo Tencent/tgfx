@@ -23,9 +23,9 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
-#include "gpu/ShaderBundleContract.h"
 #include "gpu/Uniform.h"
-#include "gpu/aot/AOTParamLayout.h"
+#include "gpu/aot/bind/AOTParamLayout.h"
+#include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ColorSpace.h"
 #include "tgfx/core/Matrix.h"

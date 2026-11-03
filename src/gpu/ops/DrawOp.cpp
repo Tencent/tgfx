@@ -20,7 +20,7 @@
 #include <algorithm>
 #include "core/utils/MathExtra.h"
 #include "gpu/OriginFlip.h"
-#include "gpu/aot/DrawIR.h"
+#include "gpu/aot/ir/DrawIR.h"
 
 namespace tgfx {
 DrawOp::DrawOp(BlockAllocator* allocator, AAType aaType) : allocator(allocator), aaType(aaType) {

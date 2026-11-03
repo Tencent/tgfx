@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "layers/processors/GlassRefractionFragmentProcessor.h"
-#include "gpu/aot/EffectGraph.h"
+#include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/resources/TextureView.h"
 #include "layers/processors/GlassShapeGeometryFragmentProcessor.h"
 

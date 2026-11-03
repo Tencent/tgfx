@@ -20,7 +20,7 @@
 
 #include <memory>
 #include "core/shaders/PerlinNoiseShader.h"
-#include "gpu/aot/EffectGraph.h"
+#include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {

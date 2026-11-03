@@ -1,0 +1,96 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
+//  compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions and
+//  limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#pragma once
+
+#include "gpu/aot/ir/EffectGraph.h"
+#include "gpu/aot/plan/AOTEffectDecomposer.h"
+
+namespace tgfx {
+
+/**
+ * Whether the node kind is one of the four unary pointwise operators every planner and the
+ * executor admit between a source and the chain root.
+ */
+bool IsUnaryPointwiseKind(AOTEffectKind kind);
+
+/**
+ * A unary pointwise operator whose single input is the given node.
+ */
+bool IsUnaryPointwiseOp(const AOTEffectNode* node, AOTNodeID expectedInput);
+
+/**
+ * The source of a multi-pass linear plan: an affine RGBA texture fed by the geometry color
+ * (node 0), sampled plainly or in device space.
+ */
+bool IsLinearMultiPassSource(const AOTEffectGraph& graph, AOTNodeID nodeID);
+
+/**
+ * A YUV video source fed by the geometry color (node 0) and sampled plainly.
+ */
+bool IsYUVChainSource(const AOTEffectGraph& graph, AOTNodeID nodeID);
+
+/**
+ * Whether the kind is an input-environment designator (the geometry color, the coverage unit, and
+ * the two xfer-child inputs) that never becomes a chain slot.
+ */
+bool IsInputDesignator(AOTEffectKind kind);
+
+/**
+ * Marks every node reachable from the given root (inclusive) in the reachable vector, sized to the
+ * graph. A noise source's inputs stay unvisited: the noise designator input never becomes a slot,
+ * and the whole noise node space belongs to the family's shared budgets. Returns false for an
+ * invalid root or a dangling node reference.
+ */
+bool CollectReachableNodes(const AOTEffectGraph& graph, AOTNodeID root,
+                           std::vector<bool>* reachable);
+
+/**
+ * Marks every node reachable from root, stopping at the cut roots: in the collecting pass they
+ * resolve to texture leaves, so their subtrees belong to earlier passes. The cut roots themselves
+ * are not part of the reachable set. Returns false for an invalid root or a dangling node
+ * reference.
+ */
+bool CollectReachableStoppingAtCuts(const AOTEffectGraph& graph, AOTNodeID root,
+                                    const std::vector<AOTNodeID>& cutRoots,
+                                    std::vector<bool>* reachable);
+
+/**
+ * Whether one pass of a multi-pass plan, with its materialized inputs standing in as texture
+ * leaves, still reads the geometry color: such a fill bakes the draw's uniform input alpha, so
+ * the plan needs a uniform geometry color. Conservative on a malformed pass (treated as reading).
+ */
+bool PassReadsGeometryColor(const AOTEffectGraph& graph, const AOTPassDescriptor& pass);
+
+/**
+ * Whether one pass of a multi-pass plan, with its materialized inputs standing in as texture
+ * leaves, carries a local-coordinate leaf (a plainly-sampled texture, a gradient or a noise
+ * source): the fill pass evaluates those at top-left device positions and needs the
+ * device-to-local remap. Conservative on a malformed pass (treated as needing the remap).
+ */
+bool PassNeedsLocalRemap(const AOTEffectGraph& graph, const AOTPassDescriptor& pass);
+
+/**
+ * Whether any non-terminal pass of a multi-pass plan reads the geometry color: the plan bakes the
+ * draw's uniform input alpha into its fills and needs a uniform geometry color. A plan whose
+ * passes only materialize blend operands keeps the paint alpha in the terminal draw's epilogue
+ * instead and needs no uniform color.
+ */
+bool PlanBakesGeometryAlpha(const AOTEffectGraph& graph, const AOTEffectPlan& plan);
+
+}  // namespace tgfx

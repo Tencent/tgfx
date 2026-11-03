@@ -20,8 +20,8 @@
 
 #include <optional>
 #include <vector>
-#include "gpu/ShaderMatchHelpers.h"
 #include "gpu/aot/AOTResourceProfile.h"
+#include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/shaders/ShaderFamily.h"
 
 namespace tgfx {

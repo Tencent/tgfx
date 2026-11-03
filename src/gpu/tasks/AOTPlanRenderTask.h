@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/AOTRenderPlan.h"
+#include "gpu/aot/plan/AOTRenderPlan.h"
 #include "gpu/ops/DrawOp.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/tasks/RenderTask.h"

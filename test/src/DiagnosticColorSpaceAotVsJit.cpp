@@ -7,9 +7,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include "base/TGFXTest.h"
-#include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/PrecompiledShaderCache.h"
+#include "gpu/aot/bundle/EmbeddedShaderBundles.h"
+#include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ColorSpace.h"

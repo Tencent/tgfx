@@ -119,7 +119,7 @@ const std::set<std::string>& AllowedRuntimeHeaders() {
   static const std::set<std::string> allowed = {
       // contract layer
       "gpu/aot/AOTResourceProfile.h",
-      "gpu/ShaderBundleContract.h",
+      "gpu/shaders/contract/ShaderBundleContract.h",
       "gpu/Uniform.h",
       "gpu/shaders/BundleCodec.h",
       "gpu/shaders/KernelContract.h",
@@ -141,7 +141,7 @@ const std::set<std::string>& GeneratedHeaders() {
 const std::vector<std::string>& ContractHeaders() {
   static const std::vector<std::string> headers = {
       "gpu/aot/AOTResourceProfile.h",
-      "gpu/ShaderBundleContract.h",
+      "gpu/shaders/contract/ShaderBundleContract.h",
       "gpu/Uniform.h",
       "gpu/shaders/BundleCodec.h",
       "gpu/shaders/KernelContract.h",
@@ -297,7 +297,7 @@ TEST(LayeringTest, TheRuntimeOnlyProfileResolverIsNotUsedByTheTool) {
   // ShaderProfileResolver.h depends on the runtime Backend type. The tool uses ShaderBundleContract.h.
   for (const auto& file : FilesIn(ToolDir(), {".cpp", ".h"})) {
     for (const auto& include : IncludesOf(file)) {
-      EXPECT_NE(include.target, "gpu/ShaderProfileResolver.h") << NameOf(file);
+      EXPECT_NE(include.target, "gpu/shaders/contract/ShaderProfileResolver.h") << NameOf(file);
     }
   }
 }

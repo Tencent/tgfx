@@ -28,8 +28,8 @@
 #include <vector>
 #include "verify/BundleVerifier.h"
 #include "output/BundleWriter.h"
-#include "gpu/ShaderBundleContract.h"
-#include "gpu/PrecompiledShaderCache.h"
+#include "gpu/shaders/contract/ShaderBundleContract.h"
+#include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gtest/gtest.h"
 
 namespace tgfx {

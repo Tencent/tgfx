@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AOTPlanRenderTask.h"
-#include "gpu/PrecompiledShaderCache.h"
+#include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/ops/StandardDrawOp.h"
 #include "gpu/resources/RenderTarget.h"
 #include "tgfx/gpu/RenderPass.h"

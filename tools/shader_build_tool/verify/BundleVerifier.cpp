@@ -30,7 +30,7 @@
 #include <vector>
 #include "core/DiagnosticCodes.h"
 #include "core/ShaderSources.h"
-#include "gpu/ShaderBundleContract.h"
+#include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "output/BundleManifest.h"
 #include "zstd.h"

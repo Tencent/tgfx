@@ -24,8 +24,8 @@
 #include <string>
 #include <utility>
 #include <vector>
-#include "gpu/ShaderBundleContract.h"
 #include "gpu/shaders/ShaderPermutation.h"
+#include "gpu/shaders/contract/ShaderBundleContract.h"
 
 namespace tgfx {
 

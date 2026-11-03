@@ -20,7 +20,7 @@
 #include <algorithm>
 #include "core/utils/Log.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/aot/EffectGraph.h"
+#include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/shaders/modules/TextureSourceModule.h"
 
 namespace tgfx {

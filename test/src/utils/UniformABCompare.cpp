@@ -25,7 +25,7 @@
 #include <string>
 #include <vector>
 #include "gpu/GlobalCache.h"
-#include "gpu/PrecompiledShaderCache.h"
+#include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gtest/gtest.h"
 #include "tgfx/gpu/Context.h"
 #include "utils/ProjectPath.h"

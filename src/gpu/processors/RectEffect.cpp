@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RectEffect.h"
-#include "gpu/aot/EffectGraph.h"
+#include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
 
 namespace tgfx {

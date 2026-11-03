@@ -19,7 +19,7 @@
 #include "gpu/processors/PerlinNoiseFragmentProcessor.h"
 #include <algorithm>
 #include <cstring>
-#include "gpu/aot/EffectGraph.h"
+#include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/resources/TextureView.h"
 
 namespace tgfx {

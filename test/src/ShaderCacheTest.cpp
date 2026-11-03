@@ -20,8 +20,8 @@
 #include <set>
 #include <unordered_map>
 #include "gpu/GlobalCache.h"
-#include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ShaderCache.h"
+#include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Shader.h"

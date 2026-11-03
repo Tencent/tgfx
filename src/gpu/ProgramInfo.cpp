@@ -22,12 +22,12 @@
 #include "AlignTo.h"
 #include "gpu/BlendFormula.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/PrecompiledProgramCreator.h"
-#include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/ProgramWriter.h"
-#include "gpu/ShaderProfileResolver.h"
+#include "gpu/aot/bundle/PrecompiledProgramCreator.h"
+#include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/resources/RenderTarget.h"
+#include "gpu/shaders/contract/ShaderProfileResolver.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {

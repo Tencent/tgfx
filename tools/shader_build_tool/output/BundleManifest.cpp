@@ -31,7 +31,7 @@
 #include "compile/ShaderCompiler.h"
 #include "core/ShaderSources.h"
 #include <spirv_cross_c.h>
-#include "gpu/ShaderBundleContract.h"
+#include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/aot/AOTResourceProfile.h"
 #include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/PrecompiledShader.h"

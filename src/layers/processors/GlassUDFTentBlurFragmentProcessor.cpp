@@ -18,7 +18,7 @@
 
 #include "layers/processors/GlassUDFTentBlurFragmentProcessor.h"
 #include "core/utils/Log.h"
-#include "gpu/aot/EffectGraph.h"
+#include "gpu/aot/ir/EffectGraph.h"
 
 namespace tgfx {
 

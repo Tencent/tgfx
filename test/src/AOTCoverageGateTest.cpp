@@ -48,8 +48,8 @@
 #include <vector>
 #include "base/TGFXTest.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProgramWriter.h"
+#include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/Paint.h"
@@ -347,7 +347,8 @@ static std::vector<std::string> EvaluateProcessorClaims(
 TGFX_TEST(AOTCoverageGateTest, AllProcessorsAreClaimed) {
   auto scanned = ScanProcessorHeaders();
   ASSERT_FALSE(scanned.empty());
-  auto matcherSource = ReadTextFile(ProjectPath::Absolute("src/gpu/PermutationMatcher.cpp"));
+  auto matcherSource =
+      ReadTextFile(ProjectPath::Absolute("src/gpu/aot/select/PermutationMatcher.cpp"));
   ASSERT_FALSE(matcherSource.empty());
   // The evidence is the classifiers' own bodies, not the file around them: a renamed or moved
   // classifier fails here loudly instead of silently emptying the evidence set.

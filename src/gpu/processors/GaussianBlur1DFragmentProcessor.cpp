@@ -20,7 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
-#include "gpu/aot/EffectGraph.h"
+#include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/shaders/modules/BlurKernelModule.h"
 
 namespace tgfx {

@@ -18,10 +18,10 @@
 
 #include "gpu/shaders/kernels/NonAARRectFillShader.h"
 #include "gpu/ProgramInfo.h"
-#include "gpu/ShaderMatchHelpers.h"
-#include "gpu/aot/AOTChainBuilder.h"
-#include "gpu/aot/DrawIR.h"
-#include "gpu/aot/DrawShape.h"
+#include "gpu/aot/ir/DrawIR.h"
+#include "gpu/aot/plan/AOTChainBuilder.h"
+#include "gpu/aot/select/DrawShape.h"
+#include "gpu/aot/select/ShaderMatchHelpers.h"
 
 namespace tgfx {
 

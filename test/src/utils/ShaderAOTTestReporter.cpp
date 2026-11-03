@@ -31,11 +31,11 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/PrecompiledShaderCache.h"
-#include "gpu/ShaderBundleContract.h"
-#include "gpu/aot/EffectGraph.h"
+#include "gpu/aot/bundle/EmbeddedShaderBundles.h"
+#include "gpu/aot/bundle/PrecompiledShaderCache.h"
+#include "gpu/aot/ir/EffectGraph.h"
+#include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gtest/gtest.h"
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunknown-warning-option"

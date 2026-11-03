@@ -20,7 +20,7 @@
 
 #include <string>
 #include <vector>
-#include "gpu/PrecompiledShaderCache.h"
+#include "gpu/aot/bundle/PrecompiledShaderCache.h"
 
 namespace tgfx {
 

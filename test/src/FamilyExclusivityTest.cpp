@@ -35,9 +35,9 @@
 #include <set>
 #include <vector>
 #include "base/TGFXTest.h"
-#include "gpu/PermutationMatch.h"
-#include "gpu/ShaderMatchHelpers.h"
-#include "gpu/aot/DrawShape.h"
+#include "gpu/aot/select/DrawShape.h"
+#include "gpu/aot/select/PermutationMatch.h"
+#include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/shaders/AllShaderFamilies.h"
 #include "gpu/shaders/ShaderFamily.h"
 #include "gtest/gtest.h"

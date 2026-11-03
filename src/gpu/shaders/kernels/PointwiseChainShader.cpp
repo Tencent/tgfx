@@ -20,11 +20,11 @@
 #include <optional>
 #include <vector>
 #include "gpu/DrawingManager.h"
-#include "gpu/PermutationMatch.h"
 #include "gpu/ProgramInfo.h"
-#include "gpu/ShaderMatchHelpers.h"
-#include "gpu/aot/AOTChainBuilder.h"
-#include "gpu/aot/DrawShape.h"
+#include "gpu/aot/plan/AOTChainBuilder.h"
+#include "gpu/aot/select/DrawShape.h"
+#include "gpu/aot/select/PermutationMatch.h"
+#include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComplexEllipseGeometryProcessor.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"

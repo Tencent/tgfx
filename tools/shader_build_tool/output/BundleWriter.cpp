@@ -26,7 +26,7 @@
 #include <utility>
 #include "output/OutputFile.h"
 #include "core/DiagnosticCodes.h"
-#include "gpu/ShaderBundleContract.h"
+#include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/shaders/BundleCodec.h"
 #include "zstd.h"
 

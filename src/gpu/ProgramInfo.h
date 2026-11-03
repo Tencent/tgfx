@@ -21,9 +21,9 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
-#include "gpu/PermutationMatch.h"
 #include "gpu/Program.h"
-#include "gpu/aot/Program.h"
+#include "gpu/aot/ir/Program.h"
+#include "gpu/aot/select/PermutationMatch.h"
 #include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/GeometryProcessor.h"

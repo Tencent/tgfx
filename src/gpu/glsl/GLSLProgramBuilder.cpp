@@ -22,10 +22,10 @@
 #include <fstream>
 #include <string>
 #include "gpu/GlobalCache.h"
-#include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProgramSignature.h"
 #include "gpu/ProgramWriter.h"
 #include "gpu/UniformData.h"
+#include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {

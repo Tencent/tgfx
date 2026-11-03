@@ -30,7 +30,7 @@
 
 #include <cstdio>
 #include "base/TGFXTest.h"
-#include "gpu/PrecompiledShaderCache.h"
+#include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageFilter.h"

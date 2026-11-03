@@ -41,7 +41,7 @@
 #include "core/DiagnosticCodes.h"
 #include "core/Diagnostics.h"
 #include "emit/ProfileEmitter.h"
-#include "gpu/ShaderBundleContract.h"
+#include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/AllShaderFamilies.h"
 #include "gpu/shaders/PrecompiledShader.h"

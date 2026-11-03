@@ -16,15 +16,15 @@
 //
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-// The shader profile contract (src/gpu/ShaderBundleContract.h, ShaderProfileResolver.h). The tag strings
+// The shader profile contract (src/gpu/shaders/contract/ShaderBundleContract.h, ShaderProfileResolver.h). The tag strings
 // are stored in every bundle header and hashed into every stage key, so the literals below pin
 // them independently of the implementation; they must not be regenerated from it.
 
 #include <string>
 #include "base/TGFXTest.h"
-#include "gpu/ShaderBundleContract.h"
-#include "gpu/ShaderProfileResolver.h"
 #include "gpu/shaders/PrecompiledShader.h"
+#include "gpu/shaders/contract/ShaderBundleContract.h"
+#include "gpu/shaders/contract/ShaderProfileResolver.h"
 #include "gpu/shaders/kernels/QuadTextureFillShader.h"
 
 namespace tgfx {

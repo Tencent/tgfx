@@ -26,7 +26,7 @@
 #include "compile/ShaderCompiler.h"
 #include "compile/StageCompiler.h"
 #include "core/Diagnostics.h"
-#include "gpu/ShaderBundleContract.h"
+#include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/shaders/PrecompiledShader.h"
 
 namespace tgfx {

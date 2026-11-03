@@ -20,7 +20,7 @@
 #include "ComposeFragmentProcessor.h"
 #include "core/utils/Log.h"
 #include "gpu/ProgramInfo.h"
-#include "gpu/aot/EffectGraph.h"
+#include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Shader.h"

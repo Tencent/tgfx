@@ -15,7 +15,7 @@
 #include <utility>
 #include <vector>
 #include "gpu/Uniform.h"
-#include "gpu/aot/ParamCatalog.h"
+#include "gpu/aot/bind/ParamCatalog.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
 #include "gpu/shaders/modules/BlendParams.h"
 #include "gpu/shaders/modules/BlurKernelModule.h"

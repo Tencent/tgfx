@@ -30,11 +30,11 @@
 #include <string>
 #include <vector>
 #include "base/TGFXTest.h"
-#include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/PermutationMatch.h"
-#include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ShaderCaps.h"
+#include "gpu/aot/bundle/EmbeddedShaderBundles.h"
+#include "gpu/aot/bundle/PrecompiledShaderCache.h"
+#include "gpu/aot/select/PermutationMatch.h"
 #include "gpu/shaders/kernels/PointwiseChainShader.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Bitmap.h"

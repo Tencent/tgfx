@@ -211,6 +211,11 @@ file(GLOB_RECURSE SRC_FILES
         src/core/shapes/*.*
         src/core/utils/*.*
         src/gpu/aot/*.*
+        src/gpu/aot/bind/*.*
+        src/gpu/aot/bundle/*.*
+        src/gpu/aot/ir/*.*
+        src/gpu/aot/plan/*.*
+        src/gpu/aot/select/*.*
         src/gpu/glsl/*.*
         src/gpu/ops/*.*
         src/gpu/processors/*.*
@@ -889,7 +894,7 @@ endif ()
 # into libtgfx. It is independent of TGFX_BUILD_TESTS so that production builds also benefit
 # from precompiled shaders. Set TGFX_EMBED_SHADER_BUNDLES=OFF to disable embedding entirely.
 # The D3D12 backend has no precompiled shader support (ExpectedProfileTag in
-# src/gpu/ShaderBundleContract.h has no tag for it, so a bundle could never be loaded), and
+# src/gpu/shaders/contract/ShaderBundleContract.h has no tag for it, so a bundle could never be loaded), and
 # its builds used to generate and embed an OpenGL bundle that no D3D12 context can use. Skip the
 # whole section for it: no tool build, no generation, nothing embedded. Contexts report the
 # resulting runtime fallbacks as NoBundleForBackend.
@@ -1052,7 +1057,7 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
     # binding layout the templates get their values injected from, so a change to either must
     # rebuild every bundle.
     list(APPEND TGFX_SHADER_SOURCES
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/ShaderBundleContract.h")
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/shaders/contract/ShaderBundleContract.h")
     if (TGFX_SHADER_BUNDLES_PREBUILT)
         # This build does not generate bundles; it consumes the ones published under
         # resources/shaders/ (see the reasons above). Publish them from a build that can generate
@@ -1079,7 +1084,7 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
                         "it in.")
             endif ()
             tgfx_check_published_bundle_abi("${PREBUILT_BUNDLE}"
-                    "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/ShaderBundleContract.h")
+                    "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/shaders/contract/ShaderBundleContract.h")
             list(APPEND TGFX_PREBUILT_BUNDLE_FILES "${PREBUILT_BUNDLE}")
             list(APPEND TGFX_COPY_BUNDLE_COMMANDS
                     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PREBUILT_BUNDLE}"
@@ -1237,7 +1242,7 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
     endforeach ()
     file(GENERATE OUTPUT "${TRAMPOLINE_CPP}" CONTENT
 "// Auto-generated — do not edit.
-#include \"gpu/EmbeddedShaderBundles.h\"
+#include \"gpu/aot/bundle/EmbeddedShaderBundles.h\"
 
 namespace tgfx {
 namespace embedded {

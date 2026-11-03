@@ -22,9 +22,9 @@
 #include <fstream>
 #include "ProjectPath.h"
 #include "core/utils/Log.h"
-#include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/PrecompiledShaderCache.h"
+#include "gpu/aot/bundle/EmbeddedShaderBundles.h"
+#include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Stream.h"

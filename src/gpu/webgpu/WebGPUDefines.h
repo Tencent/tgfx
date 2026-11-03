@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/ShaderBundleContract.h"
+#include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "tgfx/gpu/PixelFormat.h"
 
 namespace tgfx {
