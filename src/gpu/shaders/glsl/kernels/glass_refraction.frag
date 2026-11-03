@@ -31,9 +31,10 @@
 layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
   vec4 Color;
   int StrokeEnabled;
-  // Refraction optics (mirrors GlassOpticsP0..P3 of the runtime emission).
+  // Refraction optics (mirrors GlassOpticsP0..P3 of the runtime emission; P1 is the vec2
+  // layer-to-source scale — the light direction moved to GlassLightDir below).
   vec4 GlassOpticsP0;
-  vec4 GlassOpticsP1;
+  vec2 GlassOpticsP1;
   vec4 GlassOpticsP2;
   vec4 GlassOpticsP3;
   // Geometry params (mirrors GlassShapeP0/P1; the UDF-only fields stay declared for the SDF
@@ -43,6 +44,8 @@ layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING)
   vec4 GlassFineMaskUV;
   vec2 GlassEdgeSpan;
   vec4 GlassEdgeMaskUV;
+  // The edge-light direction (sin/cos of lightAngle), shared by both geometry paths.
+  vec2 GlassLightDir;
   // Edge lighting stays a runtime branch: it only adds to an already-sampled colour, so it cannot
   // move a texture coordinate. Dispersion is a compile-time dimension instead (see DISPERSION_ON).
   int LightingOn;
@@ -96,6 +99,20 @@ layout(set = TGFX_TEXTURE_SET, binding = GLASS_COLOR_SAMPLER_COUNT) uniform samp
 #include "xp/xp_porter_duff_fbf.inc"
 #include "coverage/clip_coverage.inc"
 
+// The shared angular edge-light response (mirrors EmitFaceLight): the light-facing edge with
+// coefficient 1 and the back-side rim with 0.6. Shared by the SDF and UDF paths so retuning the
+// coefficients changes both together.
+float glassFaceLight(vec2 n, vec2 l) {
+  float d = dot(n, l);
+  return smoothstep(0.35, 1.0, d) + 0.6 * smoothstep(0.35, 1.0, -d);
+}
+
+// The shared edge-band falloff (mirrors EmitEdgeBand); the band floor is max(1.0, GlassShapeP1.w),
+// assigned by the caller before this runs. Shared so the band slope lives in exactly one place.
+float glassEdgeBandWeight(float edgeDistance, float band) {
+  return smoothstep(-(band + 0.001), -0.2 * band, -edgeDistance);
+}
+
 #if GEOMETRY_KIND <= 1
 
 // The SDF functions and gradient math mirror GLSLGlassSDFGeometryFragmentProcessor::emitCode
@@ -133,12 +150,13 @@ vec4 glassGeometry(vec2 glassUV) {
   vec4 result = vec4(0.0);
   if (outerSDF < 0.0) {
     float edgeDist = -outerSDF;
-    float edgeBand = max(1.0, GlassShapeP1.w);
-    float edgeWeight = 1.0 - smoothstep(0.0, edgeBand, edgeDist);
     float rd = max(GlassShapeP0.w, 0.0001);
     float heightT = clamp((rd - edgeDist) / rd, 0.0, 1.0);
     float offsetDist = min(GlassShapeP1.x * rd * pow(heightT, 3.5), 0.999 * rd);
     float effectiveSplay = GlassShapeP1.y;
+    // Keep a fallback direction so the analytical edge light still evaluates on degenerate
+    // gradient pixels; only the direction computation is gated below, not the light response.
+    vec2 refractDir = vec2(0.0);
 #if GEOMETRY_KIND == 1
     vec2 sdfGradient = vec2(px / (halfW * halfW), py / (halfH * halfH));
     float gradientLength = length(sdfGradient);
@@ -169,11 +187,53 @@ vec4 glassGeometry(vec2 glassUV) {
       float centerDistance = length(vec2(px, py));
       vec2 centerDir =
           centerDistance > 0.001 ? -vec2(px, py) / centerDistance : gradientDir;
-      vec2 refractDir = mix(gradientDir, centerDir, effectiveSplay);
+      refractDir = mix(gradientDir, centerDir, effectiveSplay);
       float refractLength = length(refractDir);
       refractDir = refractLength < 0.000001 ? gradientDir : refractDir / refractLength;
-      result = vec4(refractDir, offsetDist, edgeWeight);
     }
+    // The edge light does not depend on the gradient direction, so it is evaluated outside the
+    // gate above: degenerate gradient pixels keep a zero refraction (refractDir stays (0, 0)) but
+    // still receive the analytical highlight. darkTerm reads the final refractDir assigned inside
+    // the gate. Runtime branch: the SDF emission compiles the flag in (enableEdgeLighting ==
+    // lightIntensity > 0), which this kernel serves as the LightingOn uniform.
+    float lightResponse = 0.0;
+    if (LightingOn != 0) {
+      float edgeBand = max(1.0, GlassShapeP1.w);
+      float edgeWeight = glassEdgeBandWeight(edgeDist, edgeBand);
+      // Shade the two adjacent edge faces separately and blend their responses, rather than
+      // shading a single normalized blend of the two face normals (a blended normal can collapse
+      // to zero at a corner); a rounded corner keeps its exact radial normal.
+#if GEOMETRY_KIND == 0
+      float lightCornerRadius = min(min(halfW, halfH), cornerRadius);
+      float lightQx = abs(px) - (halfW - lightCornerRadius);
+      float lightQy = abs(py) - (halfH - lightCornerRadius);
+      // The corner transition spans one bevel width, a fraction of the edge band.
+      float faceMix = smoothstep(-0.5 * edgeBand, 0.5 * edgeBand, lightQx - lightQy);
+      float faceResponse =
+          faceMix * glassFaceLight(vec2(sign(px), 0.0), GlassLightDir.xy) +
+          (1.0 - faceMix) * glassFaceLight(vec2(0.0, sign(py)), GlassLightDir.xy);
+      vec2 arcVec = sign(vec2(px, py)) * vec2(lightQx, lightQy);
+      float arcLen = length(arcVec);
+      float arcResponse =
+          arcLen > 0.000001 ? glassFaceLight(arcVec / arcLen, GlassLightDir.xy) : 0.0;
+      // The arc response applies only where both q are positive; its weight fades to zero where
+      // the arc normal meets the matching edge-face normal, keeping the branches continuous.
+      float arcWeight = smoothstep(0.0, 0.5 * edgeBand, lightQx) *
+                        smoothstep(0.0, 0.5 * edgeBand, lightQy);
+      float faceLightValue = mix(faceResponse, arcResponse, arcWeight);
+#else
+      vec2 ellipseNormal = vec2(px / (halfW * halfW), py / (halfH * halfH));
+      float ellipseLen = length(ellipseNormal);
+      float faceLightValue =
+          ellipseLen > 0.000001 ? glassFaceLight(ellipseNormal / ellipseLen, GlassLightDir.xy)
+                                : 0.0;
+#endif
+      float edgeLight = edgeWeight * faceLightValue;
+      float bandRamp = heightT * heightT;
+      float darkTerm = dot(refractDir, GlassLightDir.xy) * bandRamp * 0.05;
+      lightResponse = edgeLight + darkTerm;
+    }
+    result = vec4(refractDir, offsetDist, lightResponse);
   }
   return result;
 }
@@ -226,8 +286,10 @@ vec4 glassGeometry(vec2 glassUV) {
              (packedEdgeUp.a - packedEdgeDown.a) / max(GlassEdgeSpan.y, 0.0001));
     float edgeGradientLength = max(length(edgeGradient), 0.0001);
     float edgeDistance = max((edgeHeight - 0.5) / edgeGradientLength, 0.0);
+    // The distance is in layer pixels, so the band is widened by the caller when the layer
+    // renders at a reduced scale (mirrors EmitEdgeBand's floor).
     float edgeBand = max(1.0, GlassShapeP1.w);
-    edgeWeight = 1.0 - smoothstep(0.0, edgeBand, edgeDistance);
+    edgeWeight = glassEdgeBandWeight(edgeDistance, edgeBand);
   }
   vec4 result = vec4(0.0);
   if (gradientLength > 0.000001 && gradientWeight > 0.000001) {
@@ -241,7 +303,11 @@ vec4 glassGeometry(vec2 glassUV) {
     float distance = min(halfW, halfH) * GlassShapeP1.x * GlassShapeP1.z * depthScale *
                      gradientWeight;
     float proximity = (1.0 - height * height) * (1.0 - height * height) * 1.2;
-    result = vec4(refractDir, distance * proximity, edgeWeight);
+    // Same angular response as the analytical path, evaluated on the post-splay normalized
+    // refractDir instead of an analytical face normal. EdgeMaskOn gates the edge field above, so
+    // an edge-lit-off draw keeps edgeWeight 0 and edgeLight stays 0 with no extra branch here.
+    float edgeLight = edgeWeight * glassFaceLight(-refractDir, GlassLightDir.xy);
+    result = vec4(refractDir, distance * proximity, edgeLight);
   }
   return result;
 }
@@ -262,7 +328,7 @@ void main() {
   vec4 geometry = glassGeometry(glassUV);
   vec2 refractDir = geometry.xy;
   float offsetDist = geometry.z;
-  float edgeWeight = geometry.w;
+  float lightResponse = geometry.w;
   vec2 displacement = refractDir * offsetDist;
   displacement = clamp(displacement, vec2(-GlassOpticsP0.w), vec2(GlassOpticsP0.w));
   vec2 uvOffset = vec2(displacement.x * GlassOpticsP1.x, -displacement.y * GlassOpticsP1.y);
@@ -289,12 +355,7 @@ void main() {
 #endif
 
   if (LightingOn != 0) {
-    if (edgeWeight > 0.0) {
-      float NdotL = dot(-refractDir, GlassOpticsP1.zw);
-      float diffuse = smoothstep(0.35, 1.0, NdotL) * edgeWeight * GlassOpticsP2.z;
-      float rim = smoothstep(0.35, 1.0, -NdotL) * edgeWeight * GlassOpticsP2.z * 0.6;
-      finalColor += vec3(diffuse + rim);
-    }
+    finalColor += vec3(lightResponse * GlassOpticsP2.z);
   }
   vec4 outputColor = vec4(finalColor, srcAlpha);
 

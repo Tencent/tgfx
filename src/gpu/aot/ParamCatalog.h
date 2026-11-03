@@ -44,9 +44,12 @@ struct ParamCatalog {
 
   // The Glass processors' fields.
   static constexpr Param<ParamType::Float4> GlassOpticsP0{"GlassOpticsP0"};
-  static constexpr Param<ParamType::Float4> GlassOpticsP1{"GlassOpticsP1"};
+  // The layer-to-source scale; the light direction that used to live in .zw moved to GlassLightDir.
+  static constexpr Param<ParamType::Float2> GlassOpticsP1{"GlassOpticsP1"};
   static constexpr Param<ParamType::Float4> GlassOpticsP2{"GlassOpticsP2"};
   static constexpr Param<ParamType::Float4> GlassOpticsP3{"GlassOpticsP3"};
+  // The edge-light direction (sin/cos of lightAngle), written by both geometry processors.
+  static constexpr Param<ParamType::Float2> GlassLightDir{"GlassLightDir"};
   static constexpr Param<ParamType::Int> LightingOn{"LightingOn"};
   static constexpr Param<ParamType::Float4> GlassShapeP0{"GlassShapeP0"};
   static constexpr Param<ParamType::Float4> GlassShapeP1{"GlassShapeP1"};
@@ -65,7 +68,8 @@ struct ParamCatalog {
       ConstColorValue, ConstInputMode, BlendConstFirst, AtlasSizeInv,    ChainCSFlags,
       ChainSrcTF0,     ChainSrcTF1,    ChainSrcTFType,  ChainSrcOOTF,    ChainColorXform,
       ChainDstOOTF,    ChainDstTF0,    ChainDstTF1,     ChainDstTFType,  GlassOpticsP0,
-      GlassOpticsP1,   GlassOpticsP2,  GlassOpticsP3,   LightingOn,      GlassShapeP0,
+      GlassOpticsP1,   GlassLightDir,  GlassOpticsP2,   GlassOpticsP3,   LightingOn,
+      GlassShapeP0,
       GlassShapeP1,    GlassEdgeSpan,  GlassFineMaskUV, GlassEdgeMaskUV, EdgeMaskOn,
       GlassUDFRadius,  GlassUDFStep,   Field,           InputIsPacked};
 };
