@@ -2,7 +2,8 @@
 
 # Update local baseline cache from remote changes.
 # Run this after pulling main branch that contains baseline changes from others.
-# Without updating the cache, affected tests will be skipped, leading to inaccurate results.
+# Without the cache, screenshot tests fail because a missing reference is reported as a failure
+# instead of a silent pass. Run this script before the tests to create the cache.
 #
 # Usage:
 #   ./update_baseline.sh [<BACKEND>] [--skip-images]
