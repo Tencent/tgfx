@@ -266,11 +266,7 @@ void PrecompiledShaderCache::resetStats() {
 }
 
 void PrecompiledShaderCache::unload() {
-  vertEntries.clear();
-  fragEntries.clear();
-  _profileTag.clear();
-  _bundleIdentityHash = 0;
-  _bundleToolchainABI = 0;
+  _bundle.reset();
   _generation.fetch_add(1, std::memory_order_relaxed);
   if (_context != nullptr) {
     // Dropping the bundle is a generation change: cached precompiled programs must not outlive
@@ -584,6 +580,44 @@ static uint64_t HashPoolEntries(uint64_t state, const uint8_t* pool, uint32_t co
   return state;
 }
 
+std::unordered_map<std::pair<uint64_t, size_t>,
+                   std::weak_ptr<const PrecompiledShaderCache::ParsedBundle>,
+                   PrecompiledShaderCache::SharedBundleKeyHasher>&
+PrecompiledShaderCache::SharedBundleRegistry() {
+  static std::unordered_map<std::pair<uint64_t, size_t>, std::weak_ptr<const ParsedBundle>,
+                            SharedBundleKeyHasher>
+      registry;
+  return registry;
+}
+
+static std::mutex& SharedBundleRegistryMutex() {
+  static std::mutex mutex;
+  return mutex;
+}
+
+std::shared_ptr<const PrecompiledShaderCache::ParsedBundle>
+PrecompiledShaderCache::FindSharedBundle(uint64_t identityHash, size_t size) {
+  std::lock_guard<std::mutex> lock(SharedBundleRegistryMutex());
+  auto it = SharedBundleRegistry().find({identityHash, size});
+  return it == SharedBundleRegistry().end() ? nullptr : it->second.lock();
+}
+
+std::shared_ptr<const PrecompiledShaderCache::ParsedBundle>
+PrecompiledShaderCache::ShareParsedBundle(uint64_t identityHash, size_t size,
+                                          ParsedBundle parsed) {
+  std::lock_guard<std::mutex> lock(SharedBundleRegistryMutex());
+  auto& registry = SharedBundleRegistry();
+  auto it = registry.find({identityHash, size});
+  if (it != registry.end()) {
+    if (auto existing = it->second.lock()) {
+      return existing;
+    }
+  }
+  auto shared = std::make_shared<const ParsedBundle>(std::move(parsed));
+  registry[{identityHash, size}] = shared;
+  return shared;
+}
+
 bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   if (data == nullptr || size < BundleFormat::HeaderSize || size > MAX_BUNDLE_BYTES) {
     LOGE("PrecompiledShaderCache: Bundle size outside parser limits (%zu bytes)", size);
@@ -761,6 +795,20 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     }
   }
 
+  // Content-addressed sharing, after verification: every Context that loads the same bundle bytes
+  // adopts the one parse this process made. The key is the verified identity plus the byte size,
+  // so the registry can never serve content a tampered bundle merely claims.
+  if (auto shared = FindSharedBundle(sourceHash, size)) {
+    _bundle = std::move(shared);
+    _generation.fetch_add(1, std::memory_order_relaxed);
+    if (_context != nullptr) {
+      _context->globalCache()->clearPrograms();
+    }
+    LOGI("PrecompiledShaderCache: Adopted the shared parse of profile=%s (%zu bytes)",
+         _bundle->profileTag.c_str(), size);
+    return true;
+  }
+
   std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> newVertEntries;
   std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> newFragEntries;
   if (!LoadPool(loadPtr, loadSize, vertPoolOffset, vertPoolCount, dataPoolStart, dataPoolEnd,
@@ -772,11 +820,13 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     return false;
   }
 
-  _profileTag = std::move(profileTag);
-  _bundleIdentityHash = sourceHash;
-  _bundleToolchainABI = toolchainVersion;
-  vertEntries = std::move(newVertEntries);
-  fragEntries = std::move(newFragEntries);
+  ParsedBundle parsed;
+  parsed.profileTag = std::move(profileTag);
+  parsed.identityHash = sourceHash;
+  parsed.toolchainABI = toolchainVersion;
+  parsed.vertEntries = std::move(newVertEntries);
+  parsed.fragEntries = std::move(newFragEntries);
+  _bundle = ShareParsedBundle(sourceHash, size, std::move(parsed));
   _generation.fetch_add(1, std::memory_order_relaxed);
   if (_context != nullptr) {
     // A new bundle generation invalidates every cached program: precompiled programs from the
@@ -786,7 +836,7 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     _context->globalCache()->clearPrograms();
   }
   LOGI("PrecompiledShaderCache: Loaded %u vert + %u frag entries (format v%u, profile=%s)",
-       vertPoolCount, fragPoolCount, formatVersion, _profileTag.c_str());
+       vertPoolCount, fragPoolCount, formatVersion, _bundle->profileTag.c_str());
   return true;
 }
 
@@ -810,9 +860,12 @@ bool PrecompiledShaderCache::loadBundle(const std::string& path) {
 }
 
 const ShaderStageBlob* PrecompiledShaderCache::findVertex(uint64_t hashHi, uint64_t hashLo) const {
+  if (_bundle == nullptr) {
+    return nullptr;
+  }
   HashKey key{hashHi, hashLo};
-  auto it = vertEntries.find(key);
-  if (it == vertEntries.end()) {
+  auto it = _bundle->vertEntries.find(key);
+  if (it == _bundle->vertEntries.end()) {
     return nullptr;
   }
   return &it->second;
@@ -820,9 +873,12 @@ const ShaderStageBlob* PrecompiledShaderCache::findVertex(uint64_t hashHi, uint6
 
 const ShaderStageBlob* PrecompiledShaderCache::findFragment(uint64_t hashHi,
                                                             uint64_t hashLo) const {
+  if (_bundle == nullptr) {
+    return nullptr;
+  }
   HashKey key{hashHi, hashLo};
-  auto it = fragEntries.find(key);
-  if (it == fragEntries.end()) {
+  auto it = _bundle->fragEntries.find(key);
+  if (it == _bundle->fragEntries.end()) {
     return nullptr;
   }
   return &it->second;
@@ -866,7 +922,7 @@ bool PrecompiledShaderCache::writeDiagnosticsDump(const std::string& path) const
   out.append("{\n\"schemaVersion\": 2,\n\"identity\": {");
   out.append("\"backend\": " + std::to_string(static_cast<int>(_backend)));
   out.append(", \"profileTag\": ");
-  AppendEscaped(&out, _profileTag);
+  AppendEscaped(&out, _bundle != nullptr ? _bundle->profileTag : std::string());
   out.append(", \"bundleLoaded\": ");
   out.append(isLoaded() ? "true" : "false");
   out.append("},\n\"drawMetrics\": {");

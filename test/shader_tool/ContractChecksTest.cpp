@@ -77,12 +77,6 @@ Report CheckReflection(const std::vector<VariantData>& variants) {
   return Finish(errors, diagnostics);
 }
 
-Report CheckOpCodes(const std::string& shaderDir) {
-  Diagnostics diagnostics;
-  auto errors = ValidateOpCodes(shaderDir, &diagnostics);
-  return Finish(errors, diagnostics);
-}
-
 Report CheckSlotOpReferences(const std::string& shaderDir) {
   Diagnostics diagnostics;
   auto errors = ValidateSlotOpReferences(shaderDir, &diagnostics);
@@ -226,63 +220,13 @@ TEST(ClipContractTest, EveryOffendingVariantIsCounted) {
   EXPECT_EQ(CheckClip(variants).errors, 3u);
 }
 
-// ---- ValidateOpCodes / ValidateSlotOpReferences / ValidateOpTableExclusivity ----------------
+// ---- ValidateSlotOpReferences / ValidateOpTableExclusivity -------------------------------
 
-TEST_F(DamagedShaderDir, TheRealOpCodesAgreeWithTheContract) {
-  auto table = CheckOpCodes(scratch.dir());
-  EXPECT_EQ(table.errors, 0u) << table.log;
+TEST_F(DamagedShaderDir, TheRealOpReferencesAndExclusivityHold) {
   auto references = CheckSlotOpReferences(scratch.dir());
   EXPECT_EQ(references.errors, 0u) << references.log;
   auto exclusivity = CheckOpTableExclusivity(scratch.dir());
   EXPECT_EQ(exclusivity.errors, 0u) << exclusivity.log;
-}
-
-TEST_F(DamagedShaderDir, ADriftedChainOpValueIsReported) {
-  ASSERT_TRUE(Edit("operator/op_codes.inc", "#define OP_LUMA 1", "#define OP_LUMA 9"));
-  auto report = CheckOpCodes(scratch.dir());
-  EXPECT_GE(report.errors, 1u);
-  EXPECT_TRUE(report.mentions("OP_LUMA is 9 but the C++ contract says 1")) << report.log;
-}
-
-TEST_F(DamagedShaderDir, ARenamedChainOpIsReportedAsMissingAndAsStray) {
-  ASSERT_TRUE(Edit("operator/op_codes.inc", "#define OP_BLEND", "#define OP_BLENDED"));
-  auto report = CheckOpCodes(scratch.dir());
-  EXPECT_EQ(report.errors, 2u) << report.log;
-  EXPECT_TRUE(report.mentions("OP define missing in operator/op_codes.inc: OP_BLEND"))
-      << report.log;
-  EXPECT_TRUE(report.mentions("unknown OP define in operator/op_codes.inc: OP_BLENDED"))
-      << report.log;
-}
-
-TEST_F(DamagedShaderDir, AStrayChainOpIsReported) {
-  Append("operator/op_codes.inc", "\n#define OP_EXTRA 99\n");
-  auto report = CheckOpCodes(scratch.dir());
-  EXPECT_EQ(report.errors, 1u) << report.log;
-  EXPECT_TRUE(report.mentions("unknown OP define in operator/op_codes.inc: OP_EXTRA"))
-      << report.log;
-}
-
-TEST_F(DamagedShaderDir, ANonDecimalOpValueIsReported) {
-  ASSERT_TRUE(Edit("operator/op_codes.inc", "#define OP_LUMA 1", "#define OP_LUMA 0 + 1"));
-  auto report = CheckOpCodes(scratch.dir());
-  EXPECT_GE(report.errors, 1u);
-  EXPECT_TRUE(report.mentions("cannot parse OP_LUMA value '0 + 1'")) << report.log;
-}
-
-TEST_F(DamagedShaderDir, ACommentedDefineCannotMaskARealMismatch) {
-  // A line comment that repeats a define must not overwrite the value of the real one.
-  ASSERT_TRUE(Edit("operator/op_codes.inc", "#define OP_LUMA 1",
-                   "#define OP_LUMA 9\n// #define OP_LUMA 1"));
-  auto report = CheckOpCodes(scratch.dir());
-  EXPECT_GE(report.errors, 1u);
-  EXPECT_TRUE(report.mentions("OP_LUMA is 9")) << report.log;
-}
-
-TEST_F(DamagedShaderDir, AMissingOpFileIsReported) {
-  std::filesystem::remove(scratch.dir() + "/operator/op_codes.inc");
-  auto report = CheckOpCodes(scratch.dir());
-  EXPECT_EQ(report.errors, 1u);
-  EXPECT_TRUE(report.mentions("cannot open operator/op_codes.inc")) << report.log;
 }
 
 TEST_F(DamagedShaderDir, AChainOpReferenceInTheSlotFileIsReported) {
@@ -319,22 +263,22 @@ TEST_F(DamagedShaderDir, TheRealSlotCapacitiesAgreeWithTheContract) {
   EXPECT_EQ(report.errors, 0u) << report.log;
 }
 
-TEST_F(DamagedShaderDir, ADriftedSlotSuffixIsReported) {
-  ASSERT_TRUE(Edit("kernels/perlin_noise.frag",
-                   "TGFX_SLOT_ARRAY_SUFFIX [" + std::to_string(MaxPointwiseSlots) + "]",
-                   "TGFX_SLOT_ARRAY_SUFFIX [" + std::to_string(MaxPointwiseSlots + 1) + "]"));
+TEST_F(DamagedShaderDir, ADriftedSlotCapacityIsReported) {
+  ASSERT_TRUE(Edit("kernels/yuv_texture_fill.frag",
+                   "#define CHAIN_SLOT_CAPACITY " + std::to_string(MaxPointwiseSlots),
+                   "#define CHAIN_SLOT_CAPACITY " + std::to_string(MaxPointwiseSlots + 1)));
   auto report = CheckSlotCapacities(scratch.dir());
   EXPECT_EQ(report.errors, 1u) << report.log;
-  EXPECT_TRUE(report.mentions("perlin_noise.frag slot capacity")) << report.log;
+  EXPECT_TRUE(report.mentions("yuv_texture_fill.frag tail slot capacity")) << report.log;
   EXPECT_TRUE(report.mentions("does not match MaxPointwiseSlots")) << report.log;
 }
 
-TEST_F(DamagedShaderDir, AMissingSlotSuffixIsReported) {
+TEST_F(DamagedShaderDir, AMissingSlotCapacityIsReported) {
   ASSERT_TRUE(
-      Edit("kernels/yuv_texture_fill.frag", "TGFX_SLOT_ARRAY_SUFFIX", "TGFX_SLOT_ARRAY_RENAMED"));
+      Edit("kernels/yuv_texture_fill.frag", "CHAIN_SLOT_CAPACITY", "CHAIN_SLOT_CAPACITY_RENAMED"));
   auto report = CheckSlotCapacities(scratch.dir());
   EXPECT_GE(report.errors, 1u);
-  EXPECT_TRUE(report.mentions("yuv_texture_fill.frag declares no TGFX_SLOT_ARRAY_SUFFIX"))
+  EXPECT_TRUE(report.mentions("yuv_texture_fill.frag declares no CHAIN_SLOT_CAPACITY"))
       << report.log;
 }
 

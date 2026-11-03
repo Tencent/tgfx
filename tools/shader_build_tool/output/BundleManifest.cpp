@@ -31,6 +31,7 @@
 #include "compile/ShaderCompiler.h"
 #include "core/ShaderSources.h"
 #include "gpu/ShaderBundleContract.h"
+#include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/PrecompiledShader.h"
 
 namespace tgfx {
@@ -137,6 +138,9 @@ SourceDigestResult ComputeSourceDigest(const ShaderSourceSet& sources, ShaderPro
   // moved with it.
   for (const auto& contractDefine : BindingContractDefines()) {
     stream.feedString(contractDefine);
+  }
+  for (const auto& opDefine : Op::Defines()) {
+    stream.feedString(opDefine);
   }
   if (profile == ShaderProfile::Metal) {
     stream.feedString(MetalCompilerFingerprint());

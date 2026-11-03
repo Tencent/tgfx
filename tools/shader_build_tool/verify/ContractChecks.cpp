@@ -87,135 +87,6 @@ size_t ValidateClipContractFields(const std::vector<VariantData>& variants,
   return errors;
 }
 
-// Parses every "#define OP_<NAME> <decimal>" line of an include into a name->value map. The value
-// must be a bare decimal integer: stoi alone accepts prefixes like "0 + 1", which would silently
-// pass a malformed define. Unparseable or non-standalone values are reported as errors.
-// Line comments are stripped first: a "// #define OP_X ..." mention in a comment otherwise
-// matches the scan and its value would overwrite the real define's (the parser keeps the LAST
-// occurrence), so a comment could mask a genuine opcode mismatch.
-static std::map<std::string, int> ParseOpDefines(const std::string& source, const char* fileName,
-                                                 size_t* errors, Diagnostics* diagnostics) {
-  std::map<std::string, int> defines;
-  std::string stripped;
-  stripped.reserve(source.size());
-  size_t scan = 0;
-  while (scan < source.size()) {
-    auto lineEnd = source.find('\n', scan);
-    auto line =
-        source.substr(scan, (lineEnd == std::string::npos ? source.size() : lineEnd) - scan);
-    auto comment = line.find("//");
-    if (comment != std::string::npos) {
-      line = line.substr(0, comment);
-    }
-    stripped += line;
-    stripped += '\n';
-    scan = lineEnd == std::string::npos ? source.size() : lineEnd + 1;
-  }
-  size_t scanPosition = 0;
-  while (true) {
-    auto defineStart = stripped.find("#define OP_", scanPosition);
-    if (defineStart == std::string::npos) {
-      break;
-    }
-    auto nameStart = defineStart + 8;  // past "#define "
-    auto nameEnd = stripped.find(' ', nameStart);
-    if (nameEnd == std::string::npos) {
-      break;
-    }
-    auto defineName = stripped.substr(nameStart, nameEnd - nameStart);
-    auto valueStart = stripped.find_first_not_of(" \t", nameEnd);
-    auto valueEnd = stripped.find('\n', valueStart);
-    auto valueText = stripped.substr(valueStart, valueEnd - valueStart);
-    while (!valueText.empty() &&
-           (valueText.back() == ' ' || valueText.back() == '\t' || valueText.back() == '\r')) {
-      valueText.pop_back();
-    }
-    bool allDigits = !valueText.empty();
-    for (char ch : valueText) {
-      if (ch < '0' || ch > '9') {
-        allDigits = false;
-        break;
-      }
-    }
-    if (!allDigits) {
-      Report(diagnostics, Severity::Error, DiagnosticCode::VerifyOpCode, "", "", -1, -1,
-             "cannot parse " + defineName + " value '" + valueText + "' in " + fileName +
-                 " (expected a bare decimal integer)");
-      ++*errors;
-    } else {
-      defines[defineName] = std::stoi(valueText);
-    }
-    scanPosition = nameEnd;
-  }
-  return defines;
-}
-
-// Validates one OP_* include against an expected name->value set: every expected define must
-// exist with the exact value, and no other OP_* define may appear (a stray define means the
-// kernel grew an opcode the C++ side has not anchored yet, which would surface as
-// misinterpretation at runtime since the evaluation switches have no default branch).
-static size_t ValidateOpDefines(const std::string& shaderDir, const char* fileName,
-                                const std::map<std::string, int>& expected,
-                                Diagnostics* diagnostics) {
-  std::ifstream file(shaderDir + "/" + fileName);
-  if (!file.is_open()) {
-    // The include itself is gone: nothing can be compared, which is a failed check, not a
-    // passing one.
-    Report(diagnostics, Severity::Unverifiable, DiagnosticCode::VerifyNotApplicable, "", "", -1, -1,
-           std::string("cannot open ") + fileName + " under " + shaderDir);
-    return 1;
-  }
-  std::stringstream buffer;
-  buffer << file.rdbuf();
-  size_t errors = 0;
-  auto defines = ParseOpDefines(buffer.str(), fileName, &errors, diagnostics);
-  for (const auto& [name, value] : expected) {
-    auto it = defines.find(name);
-    if (it == defines.end()) {
-      Report(diagnostics, Severity::Error, DiagnosticCode::VerifyOpCode, "", "", -1, -1,
-             "OP define missing in " + std::string(fileName) + ": " + name);
-      ++errors;
-    } else if (it->second != value) {
-      Report(diagnostics, Severity::Error, DiagnosticCode::VerifyOpCode, "", "", -1, -1,
-             name + " is " + std::to_string(it->second) + " but the C++ contract says " +
-                 std::to_string(value));
-      ++errors;
-    }
-  }
-  for (const auto& [name, value] : defines) {
-    if (expected.find(name) == expected.end()) {
-      Report(diagnostics, Severity::Error, DiagnosticCode::VerifyOpCode, "", "", -1, -1,
-             "unknown OP define in " + std::string(fileName) + ": " + name +
-                 " (anchor it in the C++ contract or remove the define)");
-      ++errors;
-    }
-  }
-  return errors;
-}
-
-// The op table is the single definition of the pointwise op codes: its GLSL OP_* defines and the
-// C++ AOTChainOp enum (anchored to the Op constants) must agree value-for-value.
-size_t ValidateOpCodes(const std::string& shaderDir, Diagnostics* diagnostics) {
-  return ValidateOpDefines(shaderDir, "operator/op_codes.inc",
-                           {{"OP_COLOR_MATRIX", Op::ColorMatrix},
-                            {"OP_LUMA", Op::Luma},
-                            {"OP_ALPHA_THRESHOLD", Op::AlphaThreshold},
-                            {"OP_COLOR_SPACE_XFORM", Op::ColorSpaceXform},
-                            {"OP_NONE", Op::None},
-                            {"OP_TEXTURE", Op::Texture},
-                            {"OP_CONST_COLOR", Op::ConstColor},
-                            {"OP_BLEND", Op::Blend},
-                            {"OP_AARECT_COVERAGE", Op::AARectCoverage},
-                            {"OP_GRADIENT", Op::Gradient},
-                            {"OP_LOCAL_RECT_COVERAGE", Op::LocalRectCoverage},
-                            {"OP_RRECT_COVERAGE", Op::RRectCoverage},
-                            {"OP_TEX_MODULATE", Op::TexModulate},
-                            {"OP_INPUT_OPAQUE", Op::InputOpaque},
-                            {"OP_MUL_ALPHA", Op::MulAlpha},
-                            {"OP_PERLIN_NOISE", Op::PerlinNoise}},
-                           diagnostics);
-}
-
 // The single-slot interpreter dispatches on the OP_* references in pointwise_op.inc, so every
 // reference must be an operator the C++ side can emit into a slot (the AOTPointwiseOpType values,
 // anchored to the Op constants). Chain-only operators (Texture and the coverage/modulator ops)
@@ -269,8 +140,8 @@ size_t ValidateSlotOpReferences(const std::string& shaderDir, Diagnostics* diagn
   return errors;
 }
 
-// The op table is the only shader file that may define an OP_* macro: a define anywhere else
-// would be a second table that can drift from the C++ anchor.
+// The values are injected from KernelContract.h's Op table, so no shader file may define an OP_*
+// macro: a define anywhere would be a second table that can drift from the C++ anchor.
 size_t ValidateOpTableExclusivity(const std::string& shaderDir, Diagnostics* diagnostics) {
   size_t errors = 0;
   const std::regex definePattern("^[ \t]*#[ \t]*define[ \t]+OP_[A-Z][A-Z0-9_]*");
@@ -284,9 +155,6 @@ size_t ValidateOpTableExclusivity(const std::string& shaderDir, Diagnostics* dia
       continue;
     }
     const auto relative = std::filesystem::relative(path, shaderDir).generic_string();
-    if (relative == "operator/op_codes.inc") {
-      continue;
-    }
     std::ifstream file(path);
     std::string line;
     int lineNumber = 0;

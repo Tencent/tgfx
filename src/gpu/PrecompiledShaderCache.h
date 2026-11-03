@@ -22,9 +22,11 @@
 #include <atomic>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 #include "gpu/Program.h"
 #include "gpu/ShaderCache.h"
@@ -248,40 +250,41 @@ class PrecompiledShaderCache {
 
   /// Returns true if at least one bundle has been loaded.
   bool isLoaded() const {
-    return !vertEntries.empty() || !fragEntries.empty();
+    return _bundle != nullptr && (!_bundle->vertEntries.empty() || !_bundle->fragEntries.empty());
   }
 
   /// Returns the total number of loaded entries (vertex + fragment).
   size_t entryCount() const {
-    return vertEntries.size() + fragEntries.size();
+    return _bundle == nullptr ? 0 : _bundle->vertEntries.size() + _bundle->fragEntries.size();
   }
 
   /// Returns the number of vertex shader entries.
   size_t vertexEntryCount() const {
-    return vertEntries.size();
+    return _bundle == nullptr ? 0 : _bundle->vertEntries.size();
   }
 
   /// Returns the number of fragment shader entries.
   size_t fragmentEntryCount() const {
-    return fragEntries.size();
+    return _bundle == nullptr ? 0 : _bundle->fragEntries.size();
   }
 
-  /// Returns the profile tag from the loaded bundle header (e.g. "vulkan"; see ShaderProfile.h).
+  /// Returns the profile tag from the loaded bundle header (e.g. "vulkan"; see
+  /// ShaderBundleContract.h).
   const std::string& profileTag() const {
-    return _profileTag;
+    static const std::string empty;
+    return _bundle == nullptr ? empty : _bundle->profileTag;
   }
 
-  /// Returns the content identity hash recorded in the loaded bundle's header (0 for legacy
-  /// bundles without one). Read-only diagnostics for report binding: it identifies WHICH bundle
-  /// bytes a run consumed, so a report can be attributed to an exact artifact rather than a
-  /// presumed one.
+  /// Returns the content identity hash recorded in the loaded bundle's header. Read-only
+  /// diagnostics for report binding: it identifies WHICH bundle bytes a run consumed, so a report
+  /// can be attributed to an exact artifact rather than a presumed one.
   uint64_t bundleIdentityHash() const {
-    return _bundleIdentityHash;
+    return _bundle == nullptr ? 0 : _bundle->identityHash;
   }
 
   /// Returns the toolchain ABI version of the loaded bundle (0 when no bundle is loaded).
   uint32_t bundleToolchainABI() const {
-    return _bundleToolchainABI;
+    return _bundle == nullptr ? 0 : _bundle->toolchainABI;
   }
 
   /// Returns the number of successful lookups where both vertex and fragment artifacts were found.
@@ -461,13 +464,43 @@ class PrecompiledShaderCache {
   };
 
  private:
+  /// The immutable parse of one bundle. loadBundle() shares one instance per (identity hash, byte
+  /// size) across every cache in the process, so an embedded bundle is parsed once rather than
+  /// once per Context; the parse is contended-free read-only afterwards.
+  struct ParsedBundle {
+    std::string profileTag;
+    uint64_t identityHash = 0;
+    uint32_t toolchainABI = 0;
+    std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> vertEntries;
+    std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> fragEntries;
+  };
+
+  struct SharedBundleKeyHasher {
+    size_t operator()(const std::pair<uint64_t, size_t>& key) const {
+      return static_cast<size_t>(key.first ^ (key.second * 0x9E3779B97F4A7C15ULL));
+    }
+  };
+
+  /// The process-wide parsed-bundle registry: weak pointers keyed by (identity hash, byte size), so
+  /// a bundle stays parsed while any cache holds it and is re-parsed only after every holder is
+  /// gone.
+  static std::unordered_map<std::pair<uint64_t, size_t>, std::weak_ptr<const ParsedBundle>,
+                            SharedBundleKeyHasher>&
+  SharedBundleRegistry();
+
+  /// Returns the process-shared parse for (identityHash, size), or nullptr.
+  static std::shared_ptr<const ParsedBundle> FindSharedBundle(uint64_t identityHash, size_t size);
+
+  /// Returns the process-shared parse for (identityHash, size), registering `parsed` when this is
+  /// the first. `parsed` is consumed only on a miss.
+  static std::shared_ptr<const ParsedBundle> ShareParsedBundle(uint64_t identityHash, size_t size,
+                                                               ParsedBundle parsed);
+
   Context* _context = nullptr;
   Backend _backend = Backend::Unknown;
   ShaderCache _shaderCache;
   std::atomic<uint64_t> _generation{0};
-  std::string _profileTag;
-  uint64_t _bundleIdentityHash = 0;
-  uint32_t _bundleToolchainABI = 0;
+  std::shared_ptr<const ParsedBundle> _bundle = nullptr;
   // Simultaneously-live materialized-texture accounting (peakTemporaryBytes): materialization
   // edges created during a flush cycle (blend-child flattens, offscreen plan targets) add their
   // bytes to this running total; flush() settles it into peakTemporaryBytes and resets. The
@@ -476,8 +509,6 @@ class PrecompiledShaderCache {
   // intermediates), instead of the previous zero that ignored construction-time materialization
   // while the traffic counters recorded hundreds of megabytes over the same edges.
   uint64_t _activeTemporaryBytes = 0;
-  std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> vertEntries;
-  std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> fragEntries;
   std::atomic<uint32_t> _hitCount{0};
   std::atomic<uint32_t> _missCount{0};
   std::array<std::atomic<uint32_t>, static_cast<size_t>(PrecompiledAOTStage::Count)>

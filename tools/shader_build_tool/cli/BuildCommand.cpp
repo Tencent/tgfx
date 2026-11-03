@@ -42,6 +42,7 @@
 #include "core/Diagnostics.h"
 #include "emit/ProfileEmitter.h"
 #include "gpu/ShaderBundleContract.h"
+#include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/AllShaderFamilies.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "plan/VariantPlanner.h"
@@ -222,6 +223,12 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
     for (const auto& contractDefine : BindingContractDefines()) {
       vertDefines.push_back(contractDefine);
       fragDefines.push_back(contractDefine);
+    }
+    // The op table rides in the same way: the kernels use the OP_* macros without defining them,
+    // so their values exist only in KernelContract.h's Op table.
+    for (const auto& opDefine : Op::Defines()) {
+      vertDefines.push_back(opDefine);
+      fragDefines.push_back(opDefine);
     }
 
     // Compile vertex shader. The shared cache also covers the multiple-frag-per-vert reuse the

@@ -19,6 +19,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace tgfx {
 
@@ -72,6 +73,28 @@ constexpr int TexModulate = 12;
 constexpr int InputOpaque = 13;
 constexpr int MulAlpha = 14;
 constexpr int PerlinNoise = 15;
+
+/// The OP_* macros every compiled variant receives. The table above is their only definition, so a
+/// shader source cannot carry a second copy that drifts; shader_build_tool prepends this list to
+/// every stage's defines and covers it with the manifest's source digest.
+inline std::vector<std::string> Defines() {
+  return {"OP_COLOR_MATRIX=" + std::to_string(ColorMatrix),
+          "OP_LUMA=" + std::to_string(Luma),
+          "OP_ALPHA_THRESHOLD=" + std::to_string(AlphaThreshold),
+          "OP_COLOR_SPACE_XFORM=" + std::to_string(ColorSpaceXform),
+          "OP_NONE=" + std::to_string(None),
+          "OP_TEXTURE=" + std::to_string(Texture),
+          "OP_CONST_COLOR=" + std::to_string(ConstColor),
+          "OP_BLEND=" + std::to_string(Blend),
+          "OP_AARECT_COVERAGE=" + std::to_string(AARectCoverage),
+          "OP_GRADIENT=" + std::to_string(Gradient),
+          "OP_LOCAL_RECT_COVERAGE=" + std::to_string(LocalRectCoverage),
+          "OP_RRECT_COVERAGE=" + std::to_string(RRectCoverage),
+          "OP_TEX_MODULATE=" + std::to_string(TexModulate),
+          "OP_INPUT_OPAQUE=" + std::to_string(InputOpaque),
+          "OP_MUL_ALPHA=" + std::to_string(MulAlpha),
+          "OP_PERLIN_NOISE=" + std::to_string(PerlinNoise)};
+}
 
 }  // namespace Op
 
