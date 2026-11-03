@@ -23,7 +23,6 @@
 #include <fstream>
 #include <unordered_set>
 #include "base/TGFXTest.h"
-#include "core/utils/Log.h"
 #include "core/utils/MD5.h"
 #include "core/utils/USE.h"
 #pragma clang diagnostic push
@@ -145,14 +144,6 @@ bool Baseline::Compare(const Bitmap& bitmap, const std::string& key) {
   return Baseline::Compare(pixmap, key);
 }
 
-bool Baseline::CompareReference(const std::string& md5, const std::string& baselineVersion,
-                                const std::string& cacheVersion, const std::string& cacheMD5) {
-  if (baselineVersion.empty() || cacheVersion.empty()) {
-    return false;
-  }
-  return baselineVersion != cacheVersion || (!cacheMD5.empty() && cacheMD5 == md5);
-}
-
 static bool CompareVersionAndMd5(const std::string& md5, const std::string& key,
                                  const std::function<void(bool)>& callback) {
 #ifdef UPDATE_BASELINE
@@ -161,11 +152,8 @@ static bool CompareVersionAndMd5(const std::string& md5, const std::string& key,
 #endif
   auto baselineVersion = GetJSONValue(BaselineVersion, key);
   auto cacheVersion = GetJSONValue(CacheVersion, key);
-  auto cacheMD5 = GetJSONValue(CacheMD5, key);
-  if (!Baseline::CompareReference(md5, baselineVersion, cacheVersion, cacheMD5)) {
-    if (baselineVersion.empty() || cacheVersion.empty() || cacheMD5.empty()) {
-      LOGE("Baseline::Compare() Missing reference for %s on %s.", key.c_str(), TGFX_BACKEND_NAME);
-    }
+  if (baselineVersion.empty() ||
+      (baselineVersion == cacheVersion && GetJSONValue(CacheMD5, key) != md5)) {
     SetJSONValue(OutputVersion, key, currentVersion);
     SetJSONValue(OutputMD5, key, md5);
     if (callback) {
