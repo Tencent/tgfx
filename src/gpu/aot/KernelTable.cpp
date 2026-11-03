@@ -24,13 +24,13 @@ namespace tgfx {
 
 std::optional<AOTKernelMatch> KernelTableLookup(const DrawShape& facts,
                                                 PermutationMatchFailure* failure) {
-#define TGFX_TRY_FAMILY(F)                                                     \
-  if constexpr (FamilyHasExtractFacts<F>::value) {                             \
-    if (!facts.alphaOnlyTarget || F::ServesAlphaOnly) {                        \
-      if (auto variant = F::MatchFromFacts(facts, failure)) {                  \
-        return AOTKernelMatch{F::Name, *variant};                              \
-      }                                                                        \
-    }                                                                          \
+#define TGFX_TRY_FAMILY(F)                                    \
+  if constexpr (FamilyHasExtractFacts<F>::value) {            \
+    if (!facts.alphaOnlyTarget || F::ServesAlphaOnly) {       \
+      if (auto variant = F::MatchFromFacts(facts, failure)) { \
+        return AOTKernelMatch{F::Name, *variant};             \
+      }                                                       \
+    }                                                         \
   }
   TGFX_FOR_EACH_SHADER_FAMILY(TGFX_TRY_FAMILY)
 #undef TGFX_TRY_FAMILY
