@@ -64,7 +64,8 @@ class AOTPlanner {
    * nullopt when no planner covers the color graph; failureOutcome then receives
    * AOTDecomposeOutcome::UnsupportedShape (the graph already lowered, so no lowering can block).
    */
-  static std::optional<Plan> MakePlan(const DrawIR& ir, AOTDecomposeOutcome* failureOutcome = nullptr);
+  static std::optional<Plan> MakePlan(const DrawIR& ir,
+                                      AOTDecomposeOutcome* failureOutcome = nullptr);
 
   /**
    * Whether the plan's single pass is served in place by the prepare-time fused serving: the draw
