@@ -41,13 +41,6 @@ class OpTableExclusivityRule : public SourceRule {
   }
 };
 
-class SlotCapacitiesRule : public SourceRule {
- public:
-  size_t check(const SourceRuleContext& context, Diagnostics* diagnostics) const override {
-    return ValidateSlotCapacities(context.shaderDir, diagnostics);
-  }
-};
-
 class SourceReferencesRule : public SourceRule {
  public:
   size_t check(const SourceRuleContext& context, Diagnostics* diagnostics) const override {
@@ -100,7 +93,6 @@ std::vector<std::unique_ptr<SourceRule>> MakeSourceRules() {
   std::vector<std::unique_ptr<SourceRule>> rules;
   rules.push_back(std::make_unique<SlotOpReferencesRule>());
   rules.push_back(std::make_unique<OpTableExclusivityRule>());
-  rules.push_back(std::make_unique<SlotCapacitiesRule>());
   rules.push_back(std::make_unique<SourceReferencesRule>());
   rules.push_back(std::make_unique<MacroNamesRule>());
   return rules;

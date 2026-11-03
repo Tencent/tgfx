@@ -89,12 +89,6 @@ Report CheckOpTableExclusivity(const std::string& shaderDir) {
   return Finish(errors, diagnostics);
 }
 
-Report CheckSlotCapacities(const std::string& shaderDir) {
-  Diagnostics diagnostics;
-  auto errors = ValidateSlotCapacities(shaderDir, &diagnostics);
-  return Finish(errors, diagnostics);
-}
-
 std::vector<std::string> RegisteredShaderNames() {
   std::vector<std::string> names;
   for (const auto& factory : ShaderRegistry::All()) {
@@ -254,66 +248,6 @@ TEST_F(DamagedShaderDir, AnOpDefineOutsideTheOpTableIsReported) {
   EXPECT_TRUE(
       report.mentions("OP_* define outside operator/op_codes.inc: kernels/solid_color_fill.frag"))
       << report.log;
-}
-
-// ---- ValidateSlotCapacities -----------------------------------------------------------------
-
-TEST_F(DamagedShaderDir, TheRealSlotCapacitiesAgreeWithTheContract) {
-  auto report = CheckSlotCapacities(scratch.dir());
-  EXPECT_EQ(report.errors, 0u) << report.log;
-}
-
-TEST_F(DamagedShaderDir, ADriftedSlotCapacityIsReported) {
-  ASSERT_TRUE(Edit("kernels/yuv_texture_fill.frag",
-                   "#define CHAIN_SLOT_CAPACITY " + std::to_string(MaxPointwiseSlots),
-                   "#define CHAIN_SLOT_CAPACITY " + std::to_string(MaxPointwiseSlots + 1)));
-  auto report = CheckSlotCapacities(scratch.dir());
-  EXPECT_EQ(report.errors, 1u) << report.log;
-  EXPECT_TRUE(report.mentions("yuv_texture_fill.frag tail slot capacity")) << report.log;
-  EXPECT_TRUE(report.mentions("does not match MaxPointwiseSlots")) << report.log;
-}
-
-TEST_F(DamagedShaderDir, AMissingSlotCapacityIsReported) {
-  ASSERT_TRUE(
-      Edit("kernels/yuv_texture_fill.frag", "CHAIN_SLOT_CAPACITY", "CHAIN_SLOT_CAPACITY_RENAMED"));
-  auto report = CheckSlotCapacities(scratch.dir());
-  EXPECT_GE(report.errors, 1u);
-  EXPECT_TRUE(report.mentions("yuv_texture_fill.frag declares no CHAIN_SLOT_CAPACITY"))
-      << report.log;
-}
-
-TEST_F(DamagedShaderDir, ADriftedChainCapacityIsReported) {
-  // Bump every capacity literal of the chain kernel: the contract expects the real ones.
-  auto text = Read("kernels/pointwise_chain.frag");
-  const std::string key = "#define CHAIN_SLOT_CAPACITY ";
-  size_t position = 0;
-  size_t edited = 0;
-  while ((position = text.find(key, position)) != std::string::npos) {
-    auto valueStart = position + key.size();
-    auto valueEnd = text.find_first_not_of("0123456789", valueStart);
-    auto value = std::stoul(text.substr(valueStart, valueEnd - valueStart));
-    text.replace(valueStart, valueEnd - valueStart, std::to_string(value + 1));
-    position = valueStart;
-    ++edited;
-  }
-  ASSERT_GT(edited, 0u);
-  scratch.write("kernels/pointwise_chain.frag", text);
-  auto report = CheckSlotCapacities(scratch.dir());
-  EXPECT_GE(report.errors, 1u);
-  EXPECT_TRUE(report.mentions("pointwise_chain.frag capacities do not match")) << report.log;
-}
-
-TEST_F(DamagedShaderDir, AMissingChainCapacityIsReported) {
-  auto text = Read("kernels/pointwise_chain.frag");
-  const std::string key = "CHAIN_SLOT_CAPACITY";
-  size_t position = 0;
-  while ((position = text.find(key, position)) != std::string::npos) {
-    text.replace(position, key.size(), "CHAIN_SLOT_RENAMED");
-  }
-  scratch.write("kernels/pointwise_chain.frag", text);
-  auto report = CheckSlotCapacities(scratch.dir());
-  EXPECT_GE(report.errors, 1u);
-  EXPECT_TRUE(report.mentions("declares no CHAIN_SLOT_CAPACITY")) << report.log;
 }
 
 // ---- ValidateShaderSourceReferences ---------------------------------------------------------

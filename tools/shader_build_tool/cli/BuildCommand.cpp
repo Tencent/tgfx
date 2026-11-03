@@ -230,6 +230,12 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
       vertDefines.push_back(opDefine);
       fragDefines.push_back(opDefine);
     }
+    // The slot capacities ride in the same way: the kernels size their instruction arrays from
+    // the C++ resource profiles, so a literal cannot drift from what the runtime uploads.
+    for (const auto& capacityDefine : SlotCapacityDefines()) {
+      vertDefines.push_back(capacityDefine);
+      fragDefines.push_back(capacityDefine);
+    }
 
     // Compile vertex shader. The shared cache also covers the multiple-frag-per-vert reuse the
     // old per-backend vertCache handled, plus the cross-backend repeats.

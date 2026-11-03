@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.13)
 project(TGFX)
 
+enable_testing()
+
 if (APPLE)
     enable_language(OBJC OBJCXX)
 endif ()
@@ -959,6 +961,18 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
     file(GLOB_RECURSE SHADER_TOOL_FILES CONFIGURE_DEPENDS tools/shader_build_tool/*.cpp)
     list(REMOVE_ITEM SHADER_TOOL_FILES
             ${CMAKE_CURRENT_SOURCE_DIR}/tools/shader_build_tool/main.cpp)
+    # The tool's own sources are part of the bundle freshness contract: the manifest digest
+    # records a hash of the tool's .cpp and .h files, so a rebuilt tool invalidates the bundles it
+    # would otherwise leave looking fresh.
+    file(GLOB_RECURSE SHADER_TOOL_HEADERS CONFIGURE_DEPENDS tools/shader_build_tool/*.h)
+    set(TGFX_TOOL_HASH_INPUT "")
+    set(TGFX_TOOL_HASH_SOURCES ${SHADER_TOOL_FILES} ${SHADER_TOOL_HEADERS})
+    list(SORT TGFX_TOOL_HASH_SOURCES)
+    foreach(toolSource ${TGFX_TOOL_HASH_SOURCES})
+        file(SHA256 "${toolSource}" toolSourceHash)
+        string(APPEND TGFX_TOOL_HASH_INPUT "${toolSourceHash}")
+    endforeach()
+    string(SHA256 TGFX_SHADER_TOOL_SOURCE_HASH "${TGFX_TOOL_HASH_INPUT}")
     add_library(shader_build_tool_core STATIC ${SHADER_TOOL_FILES})
     target_link_libraries(shader_build_tool_core PUBLIC tgfx_shader_declarations)
     target_include_directories(shader_build_tool_core PUBLIC tools/shader_build_tool)
@@ -966,6 +980,8 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
             third_party/shaderc/libshaderc/include
             third_party/SPIRV-Cross)
     target_compile_options(shader_build_tool_core PRIVATE ${TGFX_COMPILE_OPTIONS})
+    target_compile_definitions(shader_build_tool_core PRIVATE
+            TGFX_SHADER_TOOL_SOURCE_HASH=\"${TGFX_SHADER_TOOL_SOURCE_HASH}\")
     # Keep build-time compiler dependencies isolated from the runtime tgfx archive.
     add_vendor_target(shader-tool-vendor STATIC_VENDORS shaderc SPIRV-Cross zlib)
     add_dependencies(shader_build_tool_core shader-tool-vendor)
@@ -1449,6 +1465,7 @@ if (TGFX_BUILD_TESTS)
                 ${TGFX_INCLUDES} test/shader_tool)
         target_link_options(ShaderBuildToolTest PRIVATE ${TGFX_TEST_LINK_OPTIONS})
         target_link_libraries(ShaderBuildToolTest shader_build_tool_core ${TGFX_TEST_LIBS})
+        add_test(NAME ShaderBuildToolTest COMMAND ShaderBuildToolTest)
     endif ()
     # Minimal embedding consumer (audit F07): links tgfx and nothing else — no forced loading
     # and no whole archive. Its link and startup assertions prove the embedded bundle travels

@@ -20,6 +20,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
+#include <vector>
+#include "gpu/shaders/KernelContract.h"
 
 namespace tgfx {
 
@@ -62,6 +65,17 @@ inline constexpr AOTResourceCapacity NoiseGraphResourceCapacity = {32, 2, 1, 0};
 // The gradient shape shares the plain chain's 16-slot storage: the libpag corpus's heaviest
 // gradient chain needs 7 slots (p100 over 2,468 constructed chains), so 16 keeps ample headroom.
 inline constexpr AOTResourceCapacity TiledGraphResourceCapacity = {16, 3, 0, 1};
+
+/// The slot capacities every compiled variant receives as defines: the kernels spell their
+/// instruction arrays with TGFX_*_SLOT_CAPACITY, so the sizes exist only in the C++ profiles above
+/// (and MaxPointwiseSlots, the YUV tail's capacity) and cannot drift from what the runtime
+/// uploads. shader_build_tool prepends this list to every stage's defines and the manifest's
+/// source digest covers it.
+inline std::vector<std::string> SlotCapacityDefines() {
+  return {"TGFX_CHAIN_SLOT_CAPACITY=" + std::to_string(ChainResourceCapacity.instructions),
+          "TGFX_NOISE_SLOT_CAPACITY=" + std::to_string(NoiseGraphResourceCapacity.instructions),
+          "TGFX_TAIL_SLOT_CAPACITY=" + std::to_string(MaxPointwiseSlots)};
+}
 
 inline const AOTResourceCapacity* GetAOTResourceCapacity(AOTResourceProfile profile) {
   switch (profile) {

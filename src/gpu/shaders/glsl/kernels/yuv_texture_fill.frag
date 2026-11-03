@@ -44,7 +44,7 @@ layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING)
   // every kernel (the array order is dataflow order; the selector packs the op's small value in
   // bits 0-7 and the blend operand order in bit 8, matching the YUV binder's writes).
   int SlotCount;
-#define CHAIN_SLOT_CAPACITY 3
+#define CHAIN_SLOT_CAPACITY TGFX_TAIL_SLOT_CAPACITY
 #include "pipeline/chain/pointwise_chain_uniforms.inc"
 #undef CHAIN_SLOT_CAPACITY
   // Shared color-space parameters, one block tail-wide like the interpreter's: at most one tail

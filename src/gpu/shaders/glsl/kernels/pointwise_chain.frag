@@ -9,10 +9,12 @@
 #ifndef RESOURCE_KIND
 #define RESOURCE_KIND 0
 #endif
+// The capacities are injected by shader_build_tool from the C++ resource profiles
+// (AOTResourceProfile.h), so no literal here can drift from what the runtime uploads.
 #if RESOURCE_KIND == 2
-#define CHAIN_SLOT_CAPACITY 32
+#define CHAIN_SLOT_CAPACITY TGFX_NOISE_SLOT_CAPACITY
 #else
-#define CHAIN_SLOT_CAPACITY 16
+#define CHAIN_SLOT_CAPACITY TGFX_CHAIN_SLOT_CAPACITY
 #endif
 
 #include "pipeline/chain/pointwise_fragment_config.inc"

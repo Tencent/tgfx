@@ -54,7 +54,7 @@ struct DefineNameOf {
 
 TEST(FamilyRegistryTest, EveryFamilyIsRegisteredOnceWithItsOwnFiles) {
   auto families = AllFamilies();
-  EXPECT_EQ(families.size(), 23u);
+  EXPECT_EQ(families.size(), 22u);
   std::set<std::string> names;
   for (const auto& info : families) {
     EXPECT_TRUE(names.insert(info.name).second) << "duplicate family " << info.name;

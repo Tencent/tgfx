@@ -30,9 +30,15 @@
 #include "output/OutputFile.h"
 #include "compile/ShaderCompiler.h"
 #include "core/ShaderSources.h"
+#include <spirv_cross_c.h>
 #include "gpu/ShaderBundleContract.h"
+#include "gpu/aot/AOTResourceProfile.h"
 #include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/PrecompiledShader.h"
+
+#ifndef TGFX_SHADER_TOOL_SOURCE_HASH
+#define TGFX_SHADER_TOOL_SOURCE_HASH "unversioned"
+#endif
 
 namespace tgfx {
 namespace {
@@ -142,6 +148,16 @@ SourceDigestResult ComputeSourceDigest(const ShaderSourceSet& sources, ShaderPro
   for (const auto& opDefine : Op::Defines()) {
     stream.feedString(opDefine);
   }
+  for (const auto& capacityDefine : SlotCapacityDefines()) {
+    stream.feedString(capacityDefine);
+  }
+  // The tool's own build and the vendored SPIRV-Cross are part of the freshness contract: a
+  // rebuilt tool or a bumped translator can change the emitted bytes while the shader text stands
+  // still. The tool-source hash is computed by CMake over the tool's .cpp and .h files.
+  stream.feedString(std::string("tool-source:") + TGFX_SHADER_TOOL_SOURCE_HASH);
+  stream.feedString("spirv-cross-c-api:" + std::to_string(SPVC_C_API_VERSION_MAJOR) + "." +
+                    std::to_string(SPVC_C_API_VERSION_MINOR) + "." +
+                    std::to_string(SPVC_C_API_VERSION_PATCH));
   if (profile == ShaderProfile::Metal) {
     stream.feedString(MetalCompilerFingerprint());
   }

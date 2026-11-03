@@ -70,11 +70,9 @@ inline constexpr const char* EmitFormLeak = "emit.form-leak";
 /// A variant carries the clip contract but is missing one of its uniform fields.
 inline constexpr const char* VerifyClipField = "verify.clip.missing-field";
 
-/// A GLSL OP_* define disagrees with the C++ op-code constant, or is unparseable/unknown.
+/// An OP_* macro is defined outside the injected table, or the single-slot interpreter references
+/// an op the C++ side cannot emit into a slot.
 inline constexpr const char* VerifyOpCode = "verify.opcode.mismatch";
-
-/// A GLSL slot capacity disagrees with the C++ resource capacity.
-inline constexpr const char* VerifySlotCapacity = "verify.capacity.mismatch";
 
 /// A shader source refers to a file that does not exist.
 inline constexpr const char* VerifySourceFile = "verify.reference.missing-file";
@@ -159,7 +157,7 @@ inline constexpr const char* AllCodes[] = {
     SourcesUnreadable,     PlanNoEnumerator,   PlanUnbuildable,
     CompileGlsl,           CompileCacheDisabled, ReflectUnknownType,
     EmitFailed,            EmitFormLeak,
-    VerifyClipField,       VerifyOpCode,       VerifySlotCapacity,
+    VerifyClipField,       VerifyOpCode,
     VerifySourceFile,      VerifySourceFamily, VerifyReflection,
     VerifyBindingLayout,   VerifyInlinePolicy, VerifyNotApplicable,
     VerifyBundleHeader,    VerifyBundlePool,   VerifyBundleMissing,
