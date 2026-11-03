@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MergeShape.h"
+#include "core/PathRef.h"
 #include "core/shapes/AppendShape.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 std::shared_ptr<Shape> Shape::Merge(std::shared_ptr<Shape> first, std::shared_ptr<Shape> second,
@@ -38,27 +40,32 @@ std::shared_ptr<Shape> Shape::Merge(std::shared_ptr<Shape> first, std::shared_pt
 }
 
 PathFillType MergeShape::fillType() const {
-  bool firstInverse = first->isInverseFillType();
-  bool secondInverse = second->isInverseFillType();
-  bool inverse = false;
-  switch (pathOp) {
-    case PathOp::Difference:
-      inverse = firstInverse && !secondInverse;
-      break;
-    case PathOp::Intersect:
-      inverse = firstInverse && secondInverse;
-      break;
-    case PathOp::Union:
-      inverse = firstInverse || secondInverse;
-      break;
-    case PathOp::XOR:
-      inverse = firstInverse != secondInverse;
-      break;
-    default:
-      break;
+  if (pathOp == PathOp::Append || pathOp == PathOp::Extend) {
+    return getPath().getFillType();
   }
-  // PathOp always produces EvenOdd fill type regardless of input fill types.
-  return inverse ? PathFillType::InverseEvenOdd : PathFillType::EvenOdd;
+  if (pathOp == PathOp::Union) {
+    auto firstType = first->fillType();
+    if (PathRef::UnionsByConcatenation(firstType, first->getBounds(), second->fillType(),
+                                      second->getBounds())) {
+      return firstType;
+    }
+  }
+  return isInverseFillType() ? PathFillType::InverseEvenOdd : PathFillType::EvenOdd;
+}
+
+bool MergeShape::isInverseFillType() const {
+  switch (pathOp) {
+    case PathOp::Union:
+      return first->isInverseFillType() || second->isInverseFillType();
+    case PathOp::Intersect:
+      return first->isInverseFillType() && second->isInverseFillType();
+    case PathOp::Difference:
+      return first->isInverseFillType() && !second->isInverseFillType();
+    case PathOp::XOR:
+      return first->isInverseFillType() != second->isInverseFillType();
+    default:
+      return getPath().isInverseFillType();
+  }
 }
 
 Rect MergeShape::onGetBounds() const {
@@ -83,7 +90,20 @@ Rect MergeShape::onGetBounds() const {
 Path MergeShape::onGetPath(float resolutionScale) const {
   auto path = first->onGetPath(resolutionScale);
   auto secondPath = second->onGetPath(resolutionScale);
-  path.addPath(secondPath, pathOp);
+  // fillType() decides a union from the bounds the two shapes report, and those bounds may be larger
+  // than the outlines they contain - a text run reports its em box, whose neighbours nearly always
+  // overlap while the glyph outlines do not. Deciding here from the tighter outline bounds would
+  // concatenate where fillType() promised a boolean result, leaving the shape reporting one rule and
+  // handing out an outline read by another, so the same bounds decide it in both places.
+  if (!PathRef::AddPath(path, secondPath, pathOp, first->getBounds(), second->getBounds())) {
+    // A failed operation leaves the first operand behind, which is not the merge that was asked
+    // for: reading it as the result would draw one side of the operation as if it were both. An
+    // empty path is the only answer that is wrong in a visible way rather than a silent one, and
+    // it still carries the rule fillType() reports, so nothing downstream reads a mixed result.
+    LOGE("MergeShape::onGetPath() Failed to merge the two shapes; reporting an empty result.");
+    path = {};
+    path.setFillType(fillType());
+  }
   return path;
 }
 

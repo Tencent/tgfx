@@ -70,6 +70,7 @@ Path GlyphShape::onGetPath(float resolutionScale) const {
     auto inverseMatrix = Matrix::MakeScale(1.f / resolutionScale, 1.f / resolutionScale);
     path.transform(inverseMatrix);
   }
+  cachedFillType.store(static_cast<int>(path.getFillType()), std::memory_order_release);
   return path;
 }
 

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TrimPathEffect.h"
+#include <algorithm>
 #include <cmath>
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/PathMeasure.h"
@@ -41,6 +42,18 @@ std::shared_ptr<PathEffect> PathEffect::MakeTrim(float start, float end) {
 }
 
 bool TrimPathEffect::filterPath(Path* path) const {
+  if (path == nullptr) {
+    return false;
+  }
+  auto measure = PathMeasure::MakeFrom(*path);
+  float totalLength = 0.0f;
+  do {
+    totalLength += measure->getLength();
+  } while (measure->nextContour());
+  return filterSource(path, totalLength, 0.0f);
+}
+
+bool TrimPathEffect::filterSource(Path* path, float totalLength, float accumulatedLength) const {
   if (path == nullptr) {
     return false;
   }
@@ -71,13 +84,9 @@ bool TrimPathEffect::filterPath(Path* path) const {
   auto fillType = path->getFillType();
   auto pathMeasure = PathMeasure::MakeFrom(*path);
 
-  // Calculate total length and collect contour lengths
-  float totalLength = 0;
   std::vector<float> contourLengths = {};
   do {
-    auto length = pathMeasure->getLength();
-    contourLengths.push_back(length);
-    totalLength += length;
+    contourLengths.push_back(pathMeasure->getLength());
   } while (pathMeasure->nextContour());
 
   if (totalLength <= 0) {
@@ -100,7 +109,6 @@ bool TrimPathEffect::filterPath(Path* path) const {
   // Collect extracted paths per contour for potential reversal
   std::vector<Path> extractedPaths = {};
   pathMeasure = PathMeasure::MakeFrom(*path);
-  float accumulatedLength = 0;
 
   for (auto contourLength : contourLengths) {
     if (contourLength <= 0) {
@@ -182,6 +190,36 @@ bool TrimPathEffect::filterPath(Path* path) const {
 
   tempPath.setFillType(fillType);
   *path = std::move(tempPath);
+  return true;
+}
+
+bool TrimPathEffect::filterPaths(std::vector<Path>* paths) const {
+  if (paths == nullptr) {
+    return false;
+  }
+  float totalLength = 0.0f;
+  std::vector<float> prefixes = {};
+  for (const auto& path : *paths) {
+    prefixes.push_back(totalLength);
+    auto measure = PathMeasure::MakeFrom(path);
+    do {
+      totalLength += measure->getLength();
+    } while (measure->nextContour());
+  }
+  std::vector<Path> result = {};
+  for (size_t i = 0; i < paths->size(); ++i) {
+    auto path = (*paths)[i];
+    if (!filterSource(&path, totalLength, prefixes[i])) {
+      return false;
+    }
+    if (!path.isEmpty() || path.isInverseFillType()) {
+      result.push_back(std::move(path));
+    }
+  }
+  if (end < start) {
+    std::reverse(result.begin(), result.end());
+  }
+  *paths = std::move(result);
   return true;
 }
 

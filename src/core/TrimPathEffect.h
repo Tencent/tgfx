@@ -29,6 +29,9 @@ class TrimPathEffect : public PathEffect {
   bool filterPath(Path* path) const override;
 
  private:
+  bool filterPaths(std::vector<Path>* paths) const override;
+  bool filterSource(Path* path, float totalLength, float accumulatedLength) const;
+
   float start = 0.0f;
   float end = 1.0f;
 };

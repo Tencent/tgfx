@@ -20,6 +20,7 @@
 
 #include <atomic>
 #include "gpu/resources/ResourceKey.h"
+#include "tgfx/core/PathTypes.h"
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wfloat-conversion"
 #pragma clang diagnostic ignored "-Wimplicit-int-conversion"
@@ -37,6 +38,19 @@ class PathRef {
   static pk::SkPath& WriteAccess(Path& path);
 
   static UniqueKey GetUniqueKey(const Path& path);
+
+  /**
+   * Returns whether matching non-inverse rules and disjoint bounds allow a union by concatenation.
+   */
+  static bool UnionsByConcatenation(PathFillType firstFillType, const Rect& firstBounds,
+                                   PathFillType secondFillType, const Rect& secondBounds);
+
+  /**
+   * Combines paths using the supplied conservative bounds to select the union fast path. Returns
+   * false on failure without changing destination. Bounds must be obtained before writing the path.
+   */
+  static bool AddPath(Path& destination, const Path& source, PathOp op, const Rect& bounds,
+                      const Rect& sourceBounds);
 
   PathRef() = default;
 
