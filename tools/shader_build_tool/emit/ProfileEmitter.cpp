@@ -90,22 +90,21 @@ class MetalEmitter : public ProfileEmitter {
     // The unoptimized SPIR-V is intentional here: xcrun produces byte-identical metallibs
     // whether fed the optimized or unoptimized translation (verified 2026-08-19), so the
     // extra optimized compile would only slow the build down.
-    std::string vertMslError;
-    std::string fragMslError;
-    auto mslVert = TranslateToMSL(*input.vertSpirv, ShaderStageType::Vertex, &vertMslError);
-    auto mslFrag =
-        TranslateToMSL(input.fragStage->spirv, ShaderStageType::Fragment, &fragMslError);
-    if (mslVert.empty() || mslFrag.empty()) {
+    const auto& mslVert = compiler->translateMSL(*input.vertSpirv, ShaderStageType::Vertex);
+    const auto& mslFrag =
+        compiler->translateMSL(input.fragStage->spirv, ShaderStageType::Fragment);
+    if (!mslVert.success || !mslFrag.success) {
       ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
-                    "MSL translation error: " + (mslVert.empty() ? vertMslError : fragMslError));
+                    "MSL translation error: " + (!mslVert.success ? mslVert.error : mslFrag.error));
       return std::nullopt;
     }
     std::string metalError;
     EmittedStages stages;
-    stages.vertexBlob = compiler->compileMetallib(mslVert, ShaderStageType::Vertex, &metalError);
+    stages.vertexBlob =
+        compiler->compileMetallib(mslVert.text, ShaderStageType::Vertex, &metalError);
     if (!stages.vertexBlob.empty()) {
       stages.fragmentBlob =
-          compiler->compileMetallib(mslFrag, ShaderStageType::Fragment, &metalError);
+          compiler->compileMetallib(mslFrag.text, ShaderStageType::Fragment, &metalError);
     }
     if (stages.vertexBlob.empty() || stages.fragmentBlob.empty()) {
       ReportFailure(input, profile(), DiagnosticCode::EmitFailed,

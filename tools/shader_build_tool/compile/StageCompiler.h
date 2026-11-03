@@ -114,6 +114,11 @@ class StageCompiler {
   const TextStage& compileWgsl(const std::string& source, ShaderStageType stage,
                                const std::string& shaderName, uint32_t variantIndex);
 
+  /// Translates SPIR-V to MSL, reusing a previous translation of the same module: the emitters
+  /// share one vertex module across many fragment variants, so the translation repeats within a
+  /// run exactly like the compiles above.
+  const TextStage& translateMSL(const std::vector<uint32_t>& spirv, ShaderStageType stage);
+
   /// Extracts the reflection of one variant, shared across backend passes like the compiles
   /// above: the same (family, vert, frag) reflects the same two SPIR-V modules every time.
   const ReflectionResult& extractReflection(const std::string& shaderName, uint32_t vertIndex,
@@ -133,6 +138,7 @@ class StageCompiler {
   std::map<std::string, SpirvStage> spirvCache;
   std::map<std::string, BlobStage> blobCache;
   std::map<std::string, TextStage> wgslCache;
+  std::map<std::string, TextStage> mslCache;
   std::map<std::tuple<std::string, uint32_t, uint32_t>, ReflectionResult> reflectionCache;
 };
 

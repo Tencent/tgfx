@@ -39,7 +39,10 @@
 namespace tgfx {
 namespace {
 
-constexpr uint64_t DigestSeed = 0x54475346534F5552ULL;  // "TGSFSOUR"
+// The manifest's two hash seeds, named once: the source digest's domain separation and the file
+// hash's FNV offset basis. Same algorithm as the bundle identity, different purposes.
+constexpr uint64_t SourceDigestSeed = 0x54475346534F5552ULL;  // "TGSFSOUR"
+constexpr uint64_t FileHashSeed = 0xCBF29CE484222325ULL;
 
 // A canonical byte stream: every string is length prefixed and every integer is fed as fixed
 // width little-endian, so two different field sequences can never produce the same bytes.
@@ -71,7 +74,7 @@ class DigestStream {
     }
   }
 
-  uint64_t state = DigestSeed;
+  uint64_t state = SourceDigestSeed;
 };
 
 std::string Hex64(uint64_t value) {
@@ -185,7 +188,7 @@ SourceDigestResult ComputeSourceDigest(const ShaderSourceSet& sources, ShaderPro
 }
 
 uint64_t HashBundleBytes(const uint8_t* data, size_t size) {
-  return BundleIdentityHashBytes(0xCBF29CE484222325ULL, data, size);
+  return BundleIdentityHashBytes(FileHashSeed, data, size);
 }
 
 std::string ManifestPathFor(const std::string& bundlePath) {

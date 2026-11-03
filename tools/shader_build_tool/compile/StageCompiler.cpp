@@ -139,6 +139,23 @@ const TextStage& StageCompiler::compileWgsl(const std::string& source, ShaderSta
   return it->second;
 }
 
+const TextStage& StageCompiler::translateMSL(const std::vector<uint32_t>& spirv,
+                                             ShaderStageType stage) {
+  // The translation input is the whole module plus the stage, so the key carries both; the
+  // Metal compiler options are fixed process-wide and need no key share.
+  std::string key = "msl:";
+  key += static_cast<char>(stage);
+  key.append(reinterpret_cast<const char*>(spirv.data()), spirv.size() * sizeof(uint32_t));
+  auto it = mslCache.find(key);
+  if (it == mslCache.end()) {
+    TextStage entry = {};
+    entry.text = TranslateToMSL(spirv, stage, &entry.error);
+    entry.success = !entry.text.empty();
+    it = mslCache.emplace(std::move(key), std::move(entry)).first;
+  }
+  return it->second;
+}
+
 const ReflectionResult& StageCompiler::extractReflection(const std::string& shaderName,
                                                          uint32_t vertIndex, uint32_t fragIndex,
                                                          const std::vector<uint32_t>& vertSpirv,
