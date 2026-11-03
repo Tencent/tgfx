@@ -24,11 +24,11 @@
 #include <limits>
 #include <map>
 #include <tuple>
-#include "gpu/ShaderBundleContract.h"
 #include "ShaderProfileResolver.h"
 #include "core/utils/Log.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PermutationMatch.h"
+#include "gpu/ShaderBundleContract.h"
 #include "gpu/ShaderCaps.h"
 #include "tgfx/gpu/Context.h"
 #include "zstd.h"
@@ -607,8 +607,7 @@ PrecompiledShaderCache::FindSharedBundle(uint64_t identityHash, size_t size) {
 }
 
 std::shared_ptr<const PrecompiledShaderCache::ParsedBundle>
-PrecompiledShaderCache::ShareParsedBundle(uint64_t identityHash, size_t size,
-                                          ParsedBundle parsed) {
+PrecompiledShaderCache::ShareParsedBundle(uint64_t identityHash, size_t size, ParsedBundle parsed) {
   std::lock_guard<std::mutex> lock(SharedBundleRegistryMutex());
   auto& registry = SharedBundleRegistry();
   auto it = registry.find({identityHash, size});
@@ -641,7 +640,11 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     return false;
   }
   uint16_t compressionType = ReadU16LE(ptr + BundleFormat::Offset::CompressionType);
-  if (compressionType > BundleFormat::Compression::Max) {
+  // The format defines exactly two stored forms (None and Zstd). A value in between (1) names no
+  // dialect the loader can interpret: reading it as uncompressed would feed a zstd-compressed
+  // data pool to the parser as raw bytes, so it is refused like every other unknown value.
+  if (compressionType != BundleFormat::Compression::None &&
+      compressionType != BundleFormat::Compression::Zstd) {
     LOGE("PrecompiledShaderCache: Unsupported compression type %u", compressionType);
     return false;
   }
@@ -776,7 +779,8 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   // mandatory — bundles written before the identity contract existed are refused with every
   // other bundle older than CurrentVersion.
   if (sourceHash == 0) {
-    LOGE("PrecompiledShaderCache: Bundle carries no identity hash; refusing an unverifiable bundle");
+    LOGE(
+        "PrecompiledShaderCache: Bundle carries no identity hash; refusing an unverifiable bundle");
     return false;
   }
   {
@@ -804,6 +808,12 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   // so the registry can never serve content a tampered bundle merely claims.
   if (auto shared = FindSharedBundle(sourceHash, size)) {
     _bundle = std::move(shared);
+    {
+      // The same reset the fresh-parse path applies below: a program miss recorded against the
+      // previous generation must not keep refusing a key the newly loaded bundle can serve.
+      std::lock_guard<std::mutex> lock(_programMissMutex);
+      _programMisses.clear();
+    }
     _generation.fetch_add(1, std::memory_order_relaxed);
     if (_context != nullptr) {
       _context->globalCache()->clearPrograms();

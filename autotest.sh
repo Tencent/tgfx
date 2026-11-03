@@ -94,6 +94,25 @@ else
   COMPLIE_RESULT=false
 fi
 
+# Unit tests of the offline shader tool: they need no GPU and no baseline environment, so every
+# backend job runs the same host-side suite.
+cmake --build . --target ShaderBuildToolTest -- -j 12
+if test $? -eq 0; then
+  echo "~~~~~~~~~~~~~~~~~~~ShaderBuildToolTest make successed~~~~~~~~~~~~~~~~~~~"
+else
+  echo "~~~~~~~~~~~~~~~~~~~ShaderBuildToolTest make error~~~~~~~~~~~~~~~~~~~"
+  exit 1
+fi
+
+./ShaderBuildToolTest --gtest_output=json:ShaderBuildToolTest.json
+
+if test $? -eq 0; then
+  echo "~~~~~~~~~~~~~~~~~~~ShaderBuildToolTest successed~~~~~~~~~~~~~~~~~~~"
+else
+  echo "~~~~~~~~~~~~~~~~~~~ShaderBuildToolTest Failed~~~~~~~~~~~~~~~~~~~"
+  COMPLIE_RESULT=false
+fi
+
 cp -a $WORKSPACE/build/*.json $WORKSPACE/result/
 
 cd ..

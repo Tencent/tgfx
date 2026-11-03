@@ -561,18 +561,6 @@ bool ContainsGradientSource(const FragmentProcessor* processor) {
 // interpreter and dedicatedKernelsEnabled every dedicated family.
 static std::optional<PermutationMatchResult> MatchPermutationImpl(
     const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
-  // OpenGL is served from the bundle profile matching the context (desktop GL or the GLES
-  // family: GLES, WebGL, SwiftShader). The precompiled kernels only declare 2D samplers. Desktop GL
-  // rectangle textures are copied into 2D textures where they enter (ProxyProvider::
-  // wrapExternalTexture, CGLHardwareTexture, and the dst copy of a rectangle render target), so a
-  // rectangle sampler only reaches this gate through an unconverted view. External (OES) textures
-  // (Android SurfaceTexture and YUV hardware buffers) are not converted yet: with a bundle loaded
-  // there is no runtime route, so their draws are dropped and counted as droppedDraws.
-  if (programInfo->backend() == Backend::OpenGL &&
-      (!programInfo->glProfileMatchesCache() || !programInfo->samplersAre2D())) {
-    return Fail(failure, PermutationMatchFailure::GlGateRejected);
-  }
-
   // Alpha-only (AAAA, Swizzle::ForWrite(ALPHA_8)) targets: only the kernels that apply the write
   // swizzle at output (via the OutputAlphaSwizzle uniform) may serve the draw; the others assume
   // RGBA output. Which kernels those are is each family's own ServesAlphaOnly declaration. The
@@ -603,20 +591,20 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(
       // gate is the table row's (a non-serving row is not considered, so it is not audited).
       const auto auditFacts = ExtractAOTDrawFacts(programInfo);
       int acceptors = 0;
-#define TGFX_AUDIT_FAMILY(Family)                                                               \
-  if (!alphaOnly || Family::ServesAlphaOnly) {                                                  \
-    PermutationMatchFailure auditFailure = PermutationMatchFailure::None;                       \
-    if (auto auditResult = Family::MatchFromFacts(auditFacts, &auditFailure)) {                 \
-      if (++acceptors > 1) {                                                                    \
-        assert(false && "multiple shader families accept the same draw");                       \
-      }                                                                                         \
-      if (Family::CachedReachable().count(                                                      \
-              {auditResult->vertPermutationIndex, auditResult->fragPermutationIndex}) == 0) {   \
-        assert(false && #Family                                                                 \
-               " matched a variant outside its reachable set; extend "                          \
-               "its AllInputs");                                                                \
-      }                                                                                         \
-    }                                                                                           \
+#define TGFX_AUDIT_FAMILY(Family)                                                             \
+  if (!alphaOnly || Family::ServesAlphaOnly) {                                                \
+    PermutationMatchFailure auditFailure = PermutationMatchFailure::None;                     \
+    if (auto auditResult = Family::MatchFromFacts(auditFacts, &auditFailure)) {               \
+      if (++acceptors > 1) {                                                                  \
+        assert(false && "multiple shader families accept the same draw");                     \
+      }                                                                                       \
+      if (Family::CachedReachable().count(                                                    \
+              {auditResult->vertPermutationIndex, auditResult->fragPermutationIndex}) == 0) { \
+        assert(false && #Family                                                               \
+               " matched a variant outside its reachable set; extend "                        \
+               "its AllInputs");                                                              \
+      }                                                                                       \
+    }                                                                                         \
   }
       TGFX_FOR_EACH_SHADER_FAMILY(TGFX_AUDIT_FAMILY)
 #undef TGFX_AUDIT_FAMILY
@@ -683,17 +671,44 @@ static uint32_t RequiredTextureReads(const ProgramInfo* programInfo) {
   return required;
 }
 
+// The acceptance gates every route into a precompiled program shares (see ShaderMatchHelpers.h):
+// the output swizzles the kernels implement, the OpenGL profile/sampler gate, and the matched
+// family's declared texture-read semantics. The OpenGL comment: the precompiled kernels only
+// declare 2D samplers, and desktop GL rectangle textures are copied into 2D textures where they
+// enter (ProxyProvider::wrapExternalTexture, CGLHardwareTexture, and the dst copy of a rectangle
+// render target), so a rectangle sampler only reaches this gate through an unconverted view.
+// External (OES) textures (Android SurfaceTexture and YUV hardware buffers) are not converted
+// yet: with a bundle loaded there is no runtime route, so their draws are dropped and counted as
+// droppedDraws.
+bool AdmitMatchedProgram(const ProgramInfo* programInfo, const PrecompiledShaderInfo* shaderInfo,
+                         PermutationMatchFailure* failure) {
+  auto outputSwizzle = programInfo->getOutputSwizzle();
+  if (outputSwizzle != Swizzle::RGBA() && outputSwizzle != Swizzle::AAAA()) {
+    Fail(failure, PermutationMatchFailure::UnsupportedOutputSwizzle);
+    return false;
+  }
+  if (programInfo->backend() == Backend::OpenGL &&
+      (!programInfo->glProfileMatchesCache() || !programInfo->samplersAre2D())) {
+    Fail(failure, PermutationMatchFailure::GlGateRejected);
+    return false;
+  }
+  if (shaderInfo != nullptr &&
+      (RequiredTextureReads(programInfo) & ~shaderInfo->textureReads) != 0) {
+    // Default deny: the matched family's shader would read these textures without the semantic
+    // the runtime applies, so the draw is a reported miss rather than wrong pixels.
+    Fail(failure, PermutationMatchFailure::UnsupportedTextureRead);
+    return false;
+  }
+  return true;
+}
+
 // The uncached match: the full family walk plus the post-match validations. Both public entries
 // funnel through here.
 static std::optional<PermutationMatchResult> ComputeMatch(const ProgramInfo* programInfo,
                                                           PermutationMatchFailure* failure) {
-  // Only RGBA and alpha-only (AAAA, Swizzle::ForWrite(ALPHA_8)) render targets are supported. Any
-  // other write swizzle would need a mapping the precompiled shaders do not implement.
-  auto outputSwizzle = programInfo->getOutputSwizzle();
-  if (outputSwizzle != Swizzle::RGBA() && outputSwizzle != Swizzle::AAAA()) {
-    if (failure != nullptr) {
-      *failure = PermutationMatchFailure::UnsupportedOutputSwizzle;
-    }
+  // The route-independent gates first, so a draw they refuse reports its reason before any family
+  // walk runs; the texture-read check needs the matched family and runs after the walk.
+  if (!AdmitMatchedProgram(programInfo, nullptr, failure)) {
     return std::nullopt;
   }
   auto matchFailure = PermutationMatchFailure::None;
@@ -704,11 +719,8 @@ static std::optional<PermutationMatchResult> ComputeMatch(const ProgramInfo* pro
                                                    result->fragPermutationIndex)) {
       result.reset();
       matchFailure = PermutationMatchFailure::PermutationNotEnumerated;
-    } else if ((RequiredTextureReads(programInfo) & ~info->textureReads) != 0) {
-      // Default deny: the matched family's shader would read these textures without the
-      // semantic the runtime applies, so the draw is a reported miss rather than wrong pixels.
+    } else if (!AdmitMatchedProgram(programInfo, info, &matchFailure)) {
       result.reset();
-      matchFailure = PermutationMatchFailure::UnsupportedTextureRead;
     }
   }
   // No rejecting site recorded a reason: the generic no-matching-rule verdict. (A successful

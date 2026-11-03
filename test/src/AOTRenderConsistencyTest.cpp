@@ -3699,6 +3699,28 @@ TGFX_TEST(AOTRenderConsistencyTest, BundleIdentityAndGenerationLifecycle) {
   // Failed loads must not change the generation or the loaded state.
   EXPECT_EQ(cache->bundleGeneration(), generation0 + 3u);
   EXPECT_FALSE(cache->isLoaded());
+
+  // Sequence E: an undefined compression type (1) must be refused instead of being read as
+  // uncompressed — a zstd bundle's data pool parsed as raw bytes is garbage, not shaders. The
+  // bytes touched are the u16 little-endian compression field at BundleFormat::Offset::
+  // CompressionType (header offset 6).
+  std::vector<uint8_t> badCompression(bundleData, bundleData + bundleSize);
+  badCompression[6] = 1;
+  badCompression[7] = 0;
+  EXPECT_FALSE(cache->loadBundle(badCompression.data(), badCompression.size()));
+  EXPECT_FALSE(cache->isLoaded());
+
+  // Sequence F: reloading the same bytes adopts the process-wide shared parse; the negative
+  // program cache must not survive the adoption, or a miss recorded before the reload would keep
+  // refusing its key under the new generation.
+  ASSERT_TRUE(cache->loadBundle(bundleData, bundleSize));
+  BytesKey staleMiss = {};
+  staleMiss.write(0xF11Eu);
+  cache->recordProgramMiss(staleMiss, PrecompiledFallbackReason::Unspecified);
+  PrecompiledFallbackReason staleReason = PrecompiledFallbackReason::Unspecified;
+  EXPECT_TRUE(cache->findProgramMiss(staleMiss, &staleReason));
+  ASSERT_TRUE(cache->loadBundle(bundleData, bundleSize));
+  EXPECT_FALSE(cache->findProgramMiss(staleMiss, &staleReason));
 }
 
 // Three pointwise operators on a plain-sampled texture are served by the fused chain kernel in

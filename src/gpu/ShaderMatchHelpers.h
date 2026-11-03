@@ -40,6 +40,7 @@ struct AOTGeometryDesc;
 enum class AOTXferKind : uint8_t;
 struct PermutationMatchResult;
 struct PermutationVariant;
+struct PrecompiledShaderInfo;
 enum class PermutationMatchFailure;
 
 /// Describes a geometry processor's matcher-relevant facts — the one description of the draw's
@@ -149,5 +150,13 @@ bool RejectsAlphaOnlyTarget(bool servesAlphaOnly, const ProgramInfo* programInfo
 /// only the interpreter's extended resource kind serves gradients, so the decomposition switch
 /// keeps serving them even when the rest of the interpreter route is switched off.
 bool ContainsGradientSource(const FragmentProcessor* processor);
+
+/// The acceptance gates every route into a precompiled program must pass, stated once: the output
+/// swizzles the kernels implement, the OpenGL profile/sampler gate, and — when shaderInfo names
+/// the matched family — the texture-read semantics that family declares (default deny, so a null
+/// shaderInfo skips that check and it runs once the family is known). A route that skips one of
+/// these gates would serve a draw the kernels cannot render correctly.
+bool AdmitMatchedProgram(const ProgramInfo* programInfo, const PrecompiledShaderInfo* shaderInfo,
+                         PermutationMatchFailure* failure);
 
 }  // namespace tgfx

@@ -51,6 +51,14 @@ class ProgramWriter {
    */
   virtual bool write(const ProgramInfo& info, RenderPass* renderPass, Program* program) const;
 
+  /**
+   * Whether this writer can produce the program's full uniform content for the draw described by
+   * info. The base accepts every program; the compiled-program routes (the chain kernel, the YUV
+   * tail) refuse a draw whose compiled program is unavailable, so write() fails the draw before
+   * any uniform is written instead of submitting it with unwritten fields.
+   */
+  virtual bool canWrite(const ProgramInfo& info) const;
+
  protected:
   /**
    * A per-draw expression: either an owned re-expression built over the draw's own processors, or
@@ -121,6 +129,8 @@ class PrecompiledProgramWriter : public ProgramWriter {
   explicit PrecompiledProgramWriter(bool bindYUVTail = false) : bindYUVTail(bindYUVTail) {
   }
 
+  bool canWrite(const ProgramInfo& info) const override;
+
  protected:
   void writeEngineDefaults(const ProgramInfo& info,
                            UniformData* fragmentUniformData) const override;
@@ -144,6 +154,9 @@ class PrecompiledProgramWriter : public ProgramWriter {
  * walked. It stays a ProgramWriter until P7 folds the whole writer hierarchy away.
  */
 class ChainProgramWriter final : public PrecompiledProgramWriter {
+ public:
+  bool canWrite(const ProgramInfo& info) const override;
+
  protected:
   void writeGeometryProcessor(const ProgramInfo& info, UniformData* vertexUniformData,
                               UniformData* fragmentUniformData,

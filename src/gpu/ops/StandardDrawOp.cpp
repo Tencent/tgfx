@@ -143,8 +143,7 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
   const DrawIR* resolvedPassIR = passIR;
   if (resolvedPassIR == nullptr) {
     auto* lowered = loweredIR();
-    if (lowered != nullptr && lowered->passDescriptor.has_value() &&
-        lowered->program.has_value()) {
+    if (lowered != nullptr && lowered->passDescriptor.has_value() && lowered->program.has_value()) {
       // A pass IR carries both its descriptor and its program; a draw IR may carry a single
       // in-place pass's descriptor only (the plan rides it, the program compiles on first match).
       resolvedPassIR = lowered;
@@ -161,7 +160,17 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
     // false (the kernel folds coverage itself).
     if (!resolvedPassIR->program.has_value()) {
       // A pass IR is compiled when the plan builds it; a missing program means the admission
-      // promise was broken, so the draw is dropped instead of compiled on the spot.
+      // promise was broken, so the draw is dropped instead of compiled on the spot. A pass probe
+      // (isFinalLookup false) falls back to the original draw, so only the draw's own final
+      // lookup records the drop.
+      if (isFinalLookup) {
+        LOGE(
+            "StandardDrawOp::prepare() the pass carries no compiled program; the draw is dropped!");
+        auto cache = renderTarget->getContext()->precompiledShaderCache();
+        if (cache->diagnosticRecordingEnabled()) {
+          cache->recordDroppedDraw();
+        }
+      }
       return false;
     }
     auto passInfo = std::make_unique<ProgramInfo>(renderTarget, geometryProcessor.get(),
@@ -176,6 +185,16 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
     AOTProgramInfo aotInfo(*passInfo, *resolvedPassIR->program);
     if (!aotInfo.valid()) {
       // The pass's shape has no variant, or the bundle lacks it: nothing can serve this draw.
+      // As above, only the draw's own final lookup records the drop; a probe falls back.
+      if (isFinalLookup) {
+        LOGE(
+            "StandardDrawOp::prepare() the pass program has no serving variant; the draw is "
+            "dropped!");
+        auto cache = renderTarget->getContext()->precompiledShaderCache();
+        if (cache->diagnosticRecordingEnabled()) {
+          cache->recordDroppedDraw();
+        }
+      }
       return false;
     }
     passInfo->setCarriedIR(resolvedPassIR);

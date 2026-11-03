@@ -22,6 +22,7 @@
 #include "gpu/PrecompiledProgramCreator.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProgramInfo.h"
+#include "gpu/ShaderMatchHelpers.h"
 #include "gpu/aot/Program.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/kernels/PointwiseChainShader.h"
@@ -61,6 +62,12 @@ AOTProgramInfo::AOTProgramInfo(const ProgramInfo& info, const AOTProgram& progra
   auto shaderInfo = ShaderRegistry::Find(PointwiseChainShader::Name);
   if (shaderInfo == nullptr || !IsBuildablePermutation(*shaderInfo, variant->vertPermutationIndex,
                                                        variant->fragPermutationIndex)) {
+    return;
+  }
+  // The same acceptance the plain lookup applies: a draw these gates refuse must not slip through
+  // the pass-IR route, or it would render with wrong pixels instead of falling back to the
+  // original draw.
+  if (!AdmitMatchedProgram(&info, shaderInfo, nullptr)) {
     return;
   }
   // From here on the route proceeds like a plain attempt whose match already ran, so the stage

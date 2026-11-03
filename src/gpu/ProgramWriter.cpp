@@ -24,13 +24,13 @@
 #include "Program.h"
 #include "ProgramInfo.h"
 #include "core/utils/Log.h"
+#include "gpu/ColorSpaceXformHelper.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/VertexShaderBuilder.h"
 #include "gpu/aot/AOTChainBuilder.h"
 #include "gpu/aot/Binder.h"
 #include "gpu/aot/EffectGraph.h"
-#include "gpu/ColorSpaceXformHelper.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
@@ -38,15 +38,15 @@
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/GaussianBlur1DFragmentProcessor.h"
 #include "gpu/processors/LumaFragmentProcessor.h"
-#include "gpu/processors/RectEffect.h"
+#include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/RRectEffect.h"
+#include "gpu/processors/RectEffect.h"
 #include "gpu/processors/SingleIntervalGradientColorizer.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
-#include "gpu/processors/PorterDuffXferProcessor.h"
-#include "gpu/shaders/modules/ColorSpaceParams.h"
 #include "gpu/resources/RenderTarget.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
+#include "gpu/shaders/modules/ColorSpaceParams.h"
 #include "gpu/shaders/modules/DeviceMaskModule.h"
 #include "gpu/shaders/modules/EngineParams.h"
 #include "gpu/shaders/modules/ParamWriter.h"
@@ -114,6 +114,12 @@ static AddressMode ToAddressMode(TileMode tileMode) {
 }
 
 bool ProgramWriter::write(const ProgramInfo& info, RenderPass* renderPass, Program* program) const {
+  if (!canWrite(info)) {
+    // The route's compiled program is unavailable: submitting would draw with unwritten (or
+    // garbage) uniform fields. Tell the caller to skip the draw.
+    LOGE("ProgramWriter::write() the program's uniform content is unavailable; skipping the draw");
+    return false;
+  }
   size_t vertexOffset = 0;
   size_t fragmentOffset = 0;
   auto uniformBuffer = info.getUniformBuffer(program, &vertexOffset, &fragmentOffset);
@@ -172,6 +178,10 @@ bool ProgramWriter::write(const ProgramInfo& info, RenderPass* renderPass, Progr
 
 ProgramWriter::Expression ProgramWriter::buildExpression(const ProgramInfo&) const {
   return {};
+}
+
+bool ProgramWriter::canWrite(const ProgramInfo&) const {
+  return true;
 }
 
 void ProgramWriter::beginUniformWrites(UniformData*, UniformData*) const {
@@ -236,8 +246,8 @@ void PrecompiledProgramWriter::writeEngineDefaults(const ProgramInfo& info,
   // optionally. Set in the base (unmangled) context, like RTAdjust.
   int outputAlphaSwizzle = info.getOutputSwizzle() == Swizzle::AAAA() ? 1 : 0;
   int zero = 0;
-  if (!fragmentUniformData->writeParamKey(&EngineParams::OutputAlphaSwizzle, 0,
-                                          &outputAlphaSwizzle, sizeof(outputAlphaSwizzle))) {
+  if (!fragmentUniformData->writeParamKey(&EngineParams::OutputAlphaSwizzle, 0, &outputAlphaSwizzle,
+                                          sizeof(outputAlphaSwizzle))) {
     fragmentUniformData->setDataOptional(EngineParams::OutputAlphaSwizzle.name, outputAlphaSwizzle);
   }
   if (!fragmentUniformData->writeParamKey(&AnalyticClipModule::HasClip, 0, &zero, sizeof(zero))) {
@@ -251,7 +261,6 @@ void PrecompiledProgramWriter::writeEngineDefaults(const ProgramInfo& info,
     fragmentUniformData->setDataOptional(DeviceMaskModule::HasDeviceMask.name, zero);
   }
 }
-
 
 // Consumes the first unconsumed leaf whose proxy matches, running the bind on it. The texture
 // leaves are matched by proxy identity rather than walk order so a repeated source (the same
@@ -301,8 +310,7 @@ void PrecompiledProgramWriter::writeProcessorsByTree(const ProgramInfo& info,
   std::vector<const AOTLumaParameters*> lumas = {};
   std::vector<float> alphaThresholds = {};
   std::vector<const AOTGradientParameters*> gradients = {};
-  std::vector<std::pair<const AOTOpaqueKernelParameters*, const AOTTextureParameters*>> blurs =
-      {};
+  std::vector<std::pair<const AOTOpaqueKernelParameters*, const AOTTextureParameters*>> blurs = {};
   if (carriedIR != nullptr) {
     // The graph stores its nodes in build (post-)order -- children before the parents that
     // consume them -- while the walk below visits the tree pre-order, so the cursor-matched
@@ -771,8 +779,9 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
     // shell-free value write the chain route applies to its own slots.
     auto* program = YUVProgram(info);
     if (program == nullptr) {
-      LOGE("PrecompiledProgramWriter::writeProcessors() no compiled YUV tail program; the draw "
-           "renders with unwritten tail uniforms");
+      LOGE(
+          "PrecompiledProgramWriter::writeProcessors() no compiled YUV tail program; the draw "
+          "renders with unwritten tail uniforms");
       return;
     }
     BindYUVProgram(*program, fragmentUniformData);
@@ -853,6 +862,12 @@ void PrecompiledProgramWriter::writeSamplers(const ProgramInfo& info, Program* p
   }
 }
 
+bool PrecompiledProgramWriter::canWrite(const ProgramInfo& info) const {
+  // Only the YUV family's tail needs a compiled program beyond the walk's own content; every
+  // other family uploads the walk alone.
+  return !bindYUVTail || YUVProgram(info) != nullptr;
+}
+
 // The compiled chain program this draw resolves to: a plan pass carries it on its IR, a draw the
 // match walk compiled carries it there too, and — on a program-cache hit, where the walk never ran
 // for this draw — it is compiled here once and memoized on the same IR. The transform, uniform and
@@ -893,6 +908,11 @@ static const AOTProgram* YUVProgram(const ProgramInfo& info) {
   return &*carried->program;
 }
 
+bool ChainProgramWriter::canWrite(const ProgramInfo& info) const {
+  // The chain kernel's whole uniform content, transforms and sampler order come from the compiled
+  // program; without it there is nothing correct to upload.
+  return ChainProgram(info) != nullptr;
+}
 
 void ChainProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
                                                 UniformData* vertexUniformData,
@@ -912,7 +932,6 @@ void ChainProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
   info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, info.geometryProcessor);
   info.geometryProcessor->setData(vertexUniformData, fragmentUniformData, &coordTransformIter);
 }
-
 
 void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
                                          UniformData* fragmentUniformData,
