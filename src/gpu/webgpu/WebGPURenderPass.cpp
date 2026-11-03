@@ -233,6 +233,19 @@ bool WebGPURenderPass::updateBindGroup() {
     if (slots == nullptr) {
       continue;
     }
+    // Fail fast on out-of-range bindings instead of clamping: a mismatch here means the caller's
+    // struct layout does not match the shader's uniform block, which must surface as an error.
+    // The size check uses subtraction so that offset + size can never wrap around on 32-bit
+    // size_t (wasm32); a zero-length binding is always invalid because a uniform block is at
+    // least 4 bytes. The log prints the raw values without computing offset + size.
+    if (uniform.size == 0 || uniform.offset > webgpuBuffer->size() ||
+        uniform.size > webgpuBuffer->size() - uniform.offset) {
+      LOGE(
+          "WebGPURenderPass::updateBindGroup: uniform binding %u has invalid range"
+          " offset=%zu size=%zu for buffer size %zu",
+          binding, uniform.offset, uniform.size, webgpuBuffer->size());
+      return false;
+    }
     if (slots->vertexSlot.has_value()) {
       WGPUBindGroupEntry entry = {};
       entry.binding = *slots->vertexSlot;
@@ -268,6 +281,51 @@ bool WebGPURenderPass::updateBindGroup() {
     samplerEntry.binding = textureIndex + 1;
     samplerEntry.sampler = webgpuSampler->webgpuSampler();
     groupEntries[TEXTURE_DESCRIPTOR_SET].push_back(samplerEntry);
+  }
+
+  // Pipelines built from a RuntimeEffect may declare texture slots the current draw never binds,
+  // but the bind group must still cover every binding declared by the layout. Fill the remaining
+  // slots with a placeholder; guarded shader branches never sample it. This cannot distinguish a
+  // slot that is declared but intentionally unbound from one the caller forgot to bind, which is
+  // why the caller-visible contract lives in BindingLayout::textureSamplers.
+  std::vector<unsigned> missingTextures = {};
+  std::vector<unsigned> missingSamplers = {};
+  for (const auto& [logicalBinding, physicalBinding] : currentPipeline->textureUnitMap()) {
+    (void)logicalBinding;
+    auto hasTexture = false;
+    auto hasSampler = false;
+    for (const auto& entry : groupEntries[TEXTURE_DESCRIPTOR_SET]) {
+      hasTexture = hasTexture || entry.binding == physicalBinding;
+      hasSampler = hasSampler || entry.binding == physicalBinding + 1;
+    }
+    if (!hasTexture) {
+      missingTextures.push_back(physicalBinding);
+    }
+    if (!hasSampler) {
+      missingSamplers.push_back(physicalBinding + 1);
+    }
+  }
+  if (!missingTextures.empty() || !missingSamplers.empty()) {
+    auto [placeholderView, placeholderSampler] = _gpu->getPlaceholderBindings();
+    if (placeholderView == nullptr || placeholderSampler == nullptr) {
+      LOGE(
+          "WebGPURenderPass::updateBindGroup: failed to create placeholder bindings for %zu"
+          " unbound textures and %zu unbound samplers",
+          missingTextures.size(), missingSamplers.size());
+      return false;
+    }
+    for (auto physicalBinding : missingTextures) {
+      WGPUBindGroupEntry textureEntry = {};
+      textureEntry.binding = physicalBinding;
+      textureEntry.textureView = placeholderView;
+      groupEntries[TEXTURE_DESCRIPTOR_SET].push_back(textureEntry);
+    }
+    for (auto physicalBinding : missingSamplers) {
+      WGPUBindGroupEntry samplerEntry = {};
+      samplerEntry.binding = physicalBinding;
+      samplerEntry.sampler = placeholderSampler;
+      groupEntries[TEXTURE_DESCRIPTOR_SET].push_back(samplerEntry);
+    }
   }
 
   for (unsigned group = 0; group < 3; group++) {
