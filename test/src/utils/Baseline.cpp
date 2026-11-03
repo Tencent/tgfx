@@ -67,6 +67,7 @@ static nlohmann::json OutputMD5 = {};
 static std::mutex jsonLocker = {};
 static std::string currentVersion;
 static bool cacheAvailable = false;
+static int missingCacheFailures = 0;
 
 std::string DumpMD5(const void* bytes, size_t size) {
   auto digest = MD5::Calculate(bytes, size);
@@ -171,6 +172,9 @@ static bool CompareVersionAndMd5(const std::string& md5, const std::string& key,
   if (!Baseline::CompareReference(md5, baselineVersion, cacheVersion, cacheMD5, cacheAvailable)) {
     if (cacheAvailable && (baselineVersion.empty() || cacheMD5.empty())) {
       LOGE("Baseline::Compare() Missing reference for %s on %s.", key.c_str(), TGFX_BACKEND_NAME);
+    }
+    if (!cacheAvailable) {
+      missingCacheFailures++;
     }
     SetJSONValue(OutputVersion, key, currentVersion);
     SetJSONValue(OutputMD5, key, md5);
@@ -318,6 +322,12 @@ static void CreateFolder(const std::string& path) {
 }
 
 void Baseline::TearDown() {
+  if (!cacheAvailable && missingCacheFailures > 0) {
+    LOGE(
+        "Baseline::TearDown() %d screenshot comparisons failed because the reference cache is "
+        "missing. Run './update_baseline.sh %s' and rerun the tests.",
+        missingCacheFailures, GetBackendArgument().c_str());
+  }
 #ifdef UPDATE_BASELINE
   if (!TGFXTest::HasFailure()) {
 #ifdef GENERATE_BASELINE_IMAGES
