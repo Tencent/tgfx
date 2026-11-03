@@ -34,9 +34,6 @@ class QuadColorFillShader : public ShaderFamily<QuadColorFillShader> {
   static constexpr const char* VertFile = "kernels/quad_color_fill.vert";
   static constexpr const char* FragFile = "kernels/quad_color_fill.frag";
 
-  // The one geometry processor this family accepts: reported by info() and compared by Extract.
-  static constexpr const char* GpClassName = "QuadPerEdgeAAGeometryProcessor";
-
   struct VertDims {
     // No vertex dimensions: an empty domain, with no handles to keep aligned.
     static PermutationDomain domain() {

@@ -32,9 +32,6 @@ class ShapeInstancedFillShader : public ShaderFamily<ShapeInstancedFillShader> {
   static constexpr const char* VertFile = "kernels/shape_instanced_fill.vert";
   static constexpr const char* FragFile = "kernels/shape_instanced_fill.frag";
 
-  // The one geometry processor this family accepts: reported by info() and compared by Extract.
-  static constexpr const char* GpClassName = "ShapeInstancedGeometryProcessor";
-
   struct VertDims {
     // No vertex dimensions: an empty domain, with no handles to keep aligned.
     static PermutationDomain domain() {

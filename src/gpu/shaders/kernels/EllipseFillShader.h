@@ -32,9 +32,6 @@ class EllipseFillShader : public ShaderFamily<EllipseFillShader> {
   static constexpr const char* VertFile = "kernels/ellipse_fill.vert";
   static constexpr const char* FragFile = "kernels/ellipse_fill.frag";
 
-  // The one geometry processor this family accepts: reported by info() and compared by Extract.
-  static constexpr const char* GpClassName = "EllipseGeometryProcessor";
-
   // HAS_COMMON_COLOR is not a dimension: the color attribute is unconditional (common-color
   // batches broadcast the paint color), and the color source is the HasCommonColor runtime
   // uniform.

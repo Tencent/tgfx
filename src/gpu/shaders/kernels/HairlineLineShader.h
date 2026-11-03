@@ -32,9 +32,6 @@ class HairlineLineShader : public ShaderFamily<HairlineLineShader> {
   static constexpr const char* VertFile = "kernels/hairline_line.vert";
   static constexpr const char* FragFile = "kernels/hairline_line.frag";
 
-  // The one geometry processor this family accepts: reported by info() and compared by Extract.
-  static constexpr const char* GpClassName = "HairlineLineGeometryProcessor";
-
   struct VertDims {
     // No vertex dimensions: an empty domain, with no handles to keep aligned.
     static PermutationDomain domain() {

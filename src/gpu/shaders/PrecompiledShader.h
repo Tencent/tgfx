@@ -52,7 +52,6 @@ struct PrecompiledShaderInfo {
   std::string fragmentFile;
   PermutationDomain vertDomain;
   PermutationDomain fragDomain;
-  std::string gpClassName;
   /// ShaderTextureRead bits this family implements. Zero (the default) declares none.
   uint32_t textureReads = 0;
 };

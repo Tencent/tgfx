@@ -32,9 +32,6 @@ class ComplexEllipseFillShader : public ShaderFamily<ComplexEllipseFillShader> {
   static constexpr const char* VertFile = "kernels/complex_ellipse_fill.vert";
   static constexpr const char* FragFile = "kernels/complex_ellipse_fill.frag";
 
-  // The one geometry processor this family accepts: reported by info() and compared by Extract.
-  static constexpr const char* GpClassName = "ComplexEllipseGeometryProcessor";
-
   struct VertDims {
     // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
     static inline const PermutationBoolDim<VertDims> STROKE{"STROKE"};

@@ -33,9 +33,6 @@ class AtlasTextFillShader : public ShaderFamily<AtlasTextFillShader> {
   static constexpr const char* VertFile = "kernels/atlas_text_fill.vert";
   static constexpr const char* FragFile = "kernels/atlas_text_fill.frag";
 
-  // The one geometry processor this family accepts: reported by info() and compared by Extract.
-  static constexpr const char* GpClassName = "AtlasTextGeometryProcessor";
-
   struct VertDims {
     // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
     static inline const PermutationBoolDim<VertDims> HAS_COVERAGE{"HAS_COVERAGE"};

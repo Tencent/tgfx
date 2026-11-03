@@ -35,9 +35,6 @@ class QuadTextureFillShader : public ShaderFamily<QuadTextureFillShader> {
   static constexpr const char* VertFile = "kernels/quad_texture_fill.vert";
   static constexpr const char* FragFile = "kernels/quad_texture_fill.frag";
 
-  // The one geometry processor this family accepts: reported by info() and compared by Extract.
-  static constexpr const char* GpClassName = "QuadPerEdgeAAGeometryProcessor";
-
   struct VertDims {
     // One typed handle per dimension; domain() in bundle order (see ShaderPermutation.h).
     static inline const PermutationBoolDim<VertDims> HAS_UV_COORD{"HAS_UV_COORD"};

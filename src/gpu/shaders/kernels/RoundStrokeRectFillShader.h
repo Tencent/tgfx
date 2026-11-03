@@ -32,9 +32,6 @@ class RoundStrokeRectFillShader : public ShaderFamily<RoundStrokeRectFillShader>
   static constexpr const char* VertFile = "kernels/round_stroke_rect_fill.vert";
   static constexpr const char* FragFile = "kernels/round_stroke_rect_fill.frag";
 
-  // The one geometry processor this family accepts: reported by info() and compared by Extract.
-  static constexpr const char* GpClassName = "RoundStrokeRectGeometryProcessor";
-
   // The color attribute is unconditional (common-color batches broadcast the paint color; the
   // exact color rides the Color uniform through the HasCommonColor runtime uniform), so there is
   // no HAS_COMMON_COLOR dimension. The coverage and ellipse-radii attributes are unconditional

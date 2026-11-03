@@ -33,9 +33,6 @@ class SolidColorFillShader : public ShaderFamily<SolidColorFillShader> {
   static constexpr const char* VertFile = "kernels/solid_color_fill.vert";
   static constexpr const char* FragFile = "kernels/solid_color_fill.frag";
 
-  // The one geometry processor this family accepts: reported by info() and compared by Extract.
-  static constexpr const char* GpClassName = "DefaultGeometryProcessor";
-
   struct VertDims {
     // No vertex dimensions: an empty domain, with no handles to keep aligned.
     static PermutationDomain domain() {

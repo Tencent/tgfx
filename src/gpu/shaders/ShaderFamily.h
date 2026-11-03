@@ -39,11 +39,6 @@ enum class PermutationMatchFailure;
  * ServesAlphaOnly, Inputs, Compose, ExtractFacts).
  */
 template <typename T, typename = void>
-struct FamilyHasGpClassName : std::false_type {};
-template <typename T>
-struct FamilyHasGpClassName<T, std::void_t<decltype(T::GpClassName)>> : std::true_type {};
-
-template <typename T, typename = void>
 struct FamilyHasTextureReads : std::false_type {};
 template <typename T>
 struct FamilyHasTextureReads<T, std::void_t<decltype(T::TextureReads)>> : std::true_type {};
@@ -94,7 +89,7 @@ std::unique_ptr<PrecompiledShader> CreateShaderFamilyInstance() {
 
 /**
  * Self-describing precompiled shader family. A subclass declares its identity (Name, VertFile,
- * FragFile, and optionally GpClassName / TextureReads), its permutation dimensions (VD / FD),
+ * FragFile, and optionally TextureReads), its permutation dimensions (VD / FD),
  * whether alpha-only targets are served (ServesAlphaOnly), and the matching contract:
  *
  *   struct Inputs              — everything the runtime needs to pick a variant;
@@ -114,11 +109,8 @@ template <typename T>
 class ShaderFamily : public PrecompiledShader {
  public:
   PrecompiledShaderInfo info() const override {
-    PrecompiledShaderInfo result = {T::Name,         T::VertFile,     T::FragFile,
-                                    T::VD::domain(), T::FD::domain(), ""};
-    if constexpr (FamilyHasGpClassName<T>::value) {
-      result.gpClassName = T::GpClassName;
-    }
+    PrecompiledShaderInfo result = {T::Name, T::VertFile, T::FragFile, T::VD::domain(),
+                                    T::FD::domain()};
     if constexpr (FamilyHasTextureReads<T>::value) {
       result.textureReads = T::TextureReads;
     }
