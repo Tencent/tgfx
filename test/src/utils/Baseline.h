@@ -35,6 +35,12 @@ class Baseline {
 
   static bool Compare(std::shared_ptr<Data> data, const std::string& key);
 
+  /**
+   * Checks a reference without modifying caches, allowing a mismatch only between two known versions.
+   */
+  static bool CompareReference(const std::string& md5, const std::string& baselineVersion,
+                               const std::string& cacheVersion, const std::string& cacheMD5);
+
  private:
   static void SetUp();
 
