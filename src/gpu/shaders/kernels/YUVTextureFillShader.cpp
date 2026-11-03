@@ -20,7 +20,7 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/aot/AOTChainBuilder.h"
-#include "gpu/aot/AOTDrawFacts.h"
+#include "gpu/aot/DrawShape.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/YUVTextureView.h"
@@ -28,9 +28,9 @@
 namespace tgfx {
 
 std::optional<YUVTextureFillShader::Inputs> YUVTextureFillShader::ExtractFacts(
-    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+    const DrawShape& facts, PermutationMatchFailure*) {
   // The precompiled vert has no texSubset attribute, so subset-carrying quads fall back.
-  if (facts.geometry.kind != AOTGeometryKind::QuadPerEdgeAA || facts.geometry.hasSubset) {
+  if (facts.geometry.kind != GeometryKind::QuadPerEdgeAA || facts.geometry.hasSubset) {
     return std::nullopt;
   }
   // The color expression reads off the carried IR: the multi-plane source leaf with the bounded

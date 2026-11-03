@@ -73,7 +73,7 @@ class HairlineLineShader : public ShaderFamily<HairlineLineShader> {
 
   /// Whole-draw guards (alpha-only target, the hairline-line geometry kind, clip shape), defined
   /// in the family's own .cpp, next to the GLSL it owns.
-  static std::optional<Inputs> ExtractFacts(const AOTDrawFacts& facts,
+  static std::optional<Inputs> ExtractFacts(const DrawShape& facts,
                                             PermutationMatchFailure* failure);
 };
 

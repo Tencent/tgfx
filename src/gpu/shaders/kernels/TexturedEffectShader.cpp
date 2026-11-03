@@ -21,7 +21,7 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/aot/AOTChainBuilder.h"
-#include "gpu/aot/AOTDrawFacts.h"
+#include "gpu/aot/DrawShape.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
@@ -33,7 +33,7 @@
 namespace tgfx {
 
 std::optional<TexturedEffectShader::Inputs> TexturedEffectShader::ExtractFacts(
-    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+    const DrawShape& facts, PermutationMatchFailure*) {
   if (!facts.positionOnlyRect()) {
     return std::nullopt;
   }

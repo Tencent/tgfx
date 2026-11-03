@@ -20,15 +20,15 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
-#include "gpu/aot/AOTDrawFacts.h"
+#include "gpu/aot/DrawShape.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
 
-std::optional<MeshFillShader::Inputs> MeshFillShader::ExtractFacts(const AOTDrawFacts& facts,
+std::optional<MeshFillShader::Inputs> MeshFillShader::ExtractFacts(const DrawShape& facts,
                                                                    PermutationMatchFailure*) {
   // The geometry kind IS the contract: MeshDrawOp's processor, no processor-tree walk.
-  if (facts.geometry.kind != AOTGeometryKind::Mesh) {
+  if (facts.geometry.kind != GeometryKind::Mesh) {
     return std::nullopt;
   }
   if (facts.fragmentCount != 0) {

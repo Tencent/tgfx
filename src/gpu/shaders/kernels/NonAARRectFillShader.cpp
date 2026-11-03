@@ -21,7 +21,7 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/aot/AOTChainBuilder.h"
-#include "gpu/aot/AOTDrawFacts.h"
+#include "gpu/aot/DrawShape.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
@@ -29,9 +29,9 @@
 namespace tgfx {
 
 std::optional<NonAARRectFillShader::Inputs> NonAARRectFillShader::ExtractFacts(
-    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+    const DrawShape& facts, PermutationMatchFailure*) {
   // The geometry kind IS the contract: RRectDrawOp's non-AA form, no processor-tree walk.
-  if (facts.geometry.kind != AOTGeometryKind::NonAARRect) {
+  if (facts.geometry.kind != GeometryKind::NonAARRect) {
     return std::nullopt;
   }
   if (facts.fragmentCount > 1) {
@@ -42,8 +42,8 @@ std::optional<NonAARRectFillShader::Inputs> NonAARRectFillShader::ExtractFacts(
   if (facts.fragmentCount == 1) {
     // A sole analytic clip (AA rect or rounded rect) rides the runtime clip contract uniforms, so
     // it needs no dimension: the FP is there only to write them.
-    const bool clipOnly = facts.colorFPCount == 0 && (facts.coverage == CoverageKind::AARect ||
-                                                      facts.coverage == CoverageKind::RRect);
+    const bool clipOnly = facts.colorFPCount == 0 &&
+                          (facts.coverage == Coverage::AARect || facts.coverage == Coverage::RRect);
     if (!clipOnly) {
       // The textured variant carries the single-tap tiled modes only: the mipmap-repeat 4-tap path
       // and perspective coordinates stay on the runtime route. The textured form never combines

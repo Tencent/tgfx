@@ -19,14 +19,14 @@
 #include "gpu/shaders/kernels/GlassUDFTentBlurShader.h"
 #include <optional>
 #include "gpu/ProgramInfo.h"
-#include "gpu/aot/AOTDrawFacts.h"
+#include "gpu/aot/DrawShape.h"
 
 namespace tgfx {
 
 std::optional<GlassUDFTentBlurShader::Inputs> GlassUDFTentBlurShader::ExtractFacts(
-    const AOTDrawFacts& facts, PermutationMatchFailure*) {
-  if (facts.geometry.kind != AOTGeometryKind::Default &&
-      facts.geometry.kind != AOTGeometryKind::QuadPerEdgeAA) {
+    const DrawShape& facts, PermutationMatchFailure*) {
+  if (facts.geometry.kind != GeometryKind::Default &&
+      facts.geometry.kind != GeometryKind::QuadPerEdgeAA) {
     return std::nullopt;
   }
   if (facts.colorFPCount != 1) {
@@ -34,7 +34,7 @@ std::optional<GlassUDFTentBlurShader::Inputs> GlassUDFTentBlurShader::ExtractFac
   }
   // The shared device-mask ABI gate (SharedDeviceMaskValue's semantics): an unclassifiable or
   // local-mask coverage stays on other routes.
-  if (!facts.coverage || *facts.coverage == CoverageKind::LocalMask) {
+  if (!facts.coverage || *facts.coverage == Coverage::LocalMask) {
     return std::nullopt;
   }
   int xpType = facts.xpType();

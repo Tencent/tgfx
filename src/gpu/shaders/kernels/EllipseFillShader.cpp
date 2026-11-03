@@ -20,15 +20,15 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
-#include "gpu/aot/AOTDrawFacts.h"
+#include "gpu/aot/DrawShape.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
 
-std::optional<EllipseFillShader::Inputs> EllipseFillShader::ExtractFacts(const AOTDrawFacts& facts,
+std::optional<EllipseFillShader::Inputs> EllipseFillShader::ExtractFacts(const DrawShape& facts,
                                                                          PermutationMatchFailure*) {
   // The geometry kind IS the contract: RRectDrawOp's AA form, no processor-tree walk.
-  if (facts.geometry.kind != AOTGeometryKind::Ellipse) {
+  if (facts.geometry.kind != GeometryKind::Ellipse) {
     return std::nullopt;
   }
   if (facts.colorFPCount != 0) {
@@ -37,10 +37,10 @@ std::optional<EllipseFillShader::Inputs> EllipseFillShader::ExtractFacts(const A
   // A clip/mask coverage FP is served through the shared HAS_COVERAGE dimension (device-space
   // sampling in coverage_output.inc). LocalMask needs per-vertex UV the ellipse vertex shader does
   // not provide, so the shared classification rejects it.
-  if (!facts.coverage || *facts.coverage == CoverageKind::LocalMask) {
+  if (!facts.coverage || *facts.coverage == Coverage::LocalMask) {
     return std::nullopt;
   }
-  const bool hasDeviceMask = *facts.coverage == CoverageKind::DeviceMask;
+  const bool hasDeviceMask = *facts.coverage == Coverage::DeviceMask;
   const int xpType = facts.xpType();
   if (xpType < XP_NONE) {
     return std::nullopt;

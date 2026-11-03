@@ -19,7 +19,7 @@
 #include "gpu/shaders/kernels/SolidColorFillShader.h"
 #include <optional>
 #include "gpu/ProgramInfo.h"
-#include "gpu/aot/AOTDrawFacts.h"
+#include "gpu/aot/DrawShape.h"
 
 namespace tgfx {
 
@@ -27,8 +27,8 @@ namespace tgfx {
 // draw's shape maps onto the permutation indices. The pass-through shape (one HAS_XP axis fed by
 // the XferProcessor type) keeps a minimal Inputs struct.
 std::optional<SolidColorFillShader::Inputs> SolidColorFillShader::ExtractFacts(
-    const AOTDrawFacts& facts, PermutationMatchFailure*) {
-  if (facts.geometry.kind != AOTGeometryKind::Default) {
+    const DrawShape& facts, PermutationMatchFailure*) {
+  if (facts.geometry.kind != GeometryKind::Default) {
     return std::nullopt;
   }
   // The fill color comes from the DefaultGeometryProcessor Color uniform, so a color fragment
@@ -36,9 +36,8 @@ std::optional<SolidColorFillShader::Inputs> SolidColorFillShader::ExtractFacts(
   // analytic clip coverage FP (AA rect or rrect), which this shader evaluates from the runtime
   // clip contract uniforms.
   bool noProcessorsOrDirectClip =
-      facts.fragmentCount == 0 ||
-      (facts.colorFPCount == 0 &&
-       (facts.coverage == CoverageKind::AARect || facts.coverage == CoverageKind::RRect));
+      facts.fragmentCount == 0 || (facts.colorFPCount == 0 && (facts.coverage == Coverage::AARect ||
+                                                               facts.coverage == Coverage::RRect));
   if (!noProcessorsOrDirectClip) {
     return std::nullopt;
   }

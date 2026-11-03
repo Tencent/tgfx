@@ -37,7 +37,8 @@ class QuadPerEdgeAAGeometryProcessor;
 struct AOTProgram;
 struct AOTCoverageTerm;
 struct AOTGeometryDesc;
-enum class AOTXferKind : uint8_t;
+struct DrawShape;
+enum class XferKind : uint8_t;
 struct PermutationMatchResult;
 struct PermutationVariant;
 struct PrecompiledShaderInfo;
@@ -67,7 +68,7 @@ std::optional<int> PointwiseGpKind(const AOTGeometryDesc& geometry);
 
 /// The xfer classification the matcher facts read — what GetXPType reports for the draw's info,
 /// taken off the made xfer processor at match time.
-AOTXferKind ClassifyXferForMatch(const XferProcessor* xp);
+XferKind ClassifyXferForMatch(const XferProcessor* xp);
 
 /// Whether a color-space transform's steps fit the single-slot fill kernel's precompiled
 /// evaluation (the transfer functions must be of an indexable type when linearize/encode run) —
@@ -77,7 +78,7 @@ bool SupportedFillKernelSteps(const ColorSpaceXformSteps* steps);
 /// How the draw's sole coverage FP is served. LocalMask is a distinct capability: it needs a
 /// local-space varying and sampler and therefore cannot be encoded in the shared runtime clip
 /// contract.
-enum class CoverageKind {
+enum class Coverage {
   None,
   AARect,
   RRect,
@@ -109,8 +110,8 @@ bool IsSupportedPointwiseOp(const FragmentProcessor* fp);
 /// rejection wins) and returns nullopt.
 std::nullopt_t Fail(PermutationMatchFailure* failure, PermutationMatchFailure reason);
 
-/// Classifies one lowered coverage term (see CoverageKind); nullopt when it cannot be classified.
-std::optional<CoverageKind> ClassifyCoverageTerm(const AOTCoverageTerm& term);
+/// Classifies one lowered coverage term (see Coverage); nullopt when it cannot be classified.
+std::optional<Coverage> ClassifyCoverageTerm(const AOTCoverageTerm& term);
 
 /// The bare texture leaf of a non-analytic coverage term: the run lowered a single TextureEffect
 /// over the geometry-coverage unit, so the graph is exactly the unit plus the texture source.
@@ -119,7 +120,7 @@ const AOTTextureParameters* BareTextureCoverageLeaf(const AOTCoverageTerm& term)
 /// Classifies the coverage stage of a ProgramInfo carrying at most one coverage FP: the
 /// no-coverage case is a count, the rest reads the carried IR's terms (the atlas glyph term is
 /// skipped — the geometry processor's own coverage, never a coverage FP).
-std::optional<CoverageKind> ClassifyCoverageTerms(const ProgramInfo* programInfo);
+std::optional<Coverage> ClassifyCoverageTerms(const ProgramInfo* programInfo);
 
 /// The local-mask texture leaf behind a LocalMask classification (the SrcIn ShaderMaskFilter
 /// fingerprint): the leaf carries the mask transform's perspective fact, so a family that needs an
@@ -156,7 +157,8 @@ bool ContainsGradientSource(const FragmentProcessor* processor);
 /// the matched family — the texture-read semantics that family declares (default deny, so a null
 /// shaderInfo skips that check and it runs once the family is known). A route that skips one of
 /// these gates would serve a draw the kernels cannot render correctly.
-bool AdmitMatchedProgram(const ProgramInfo* programInfo, const PrecompiledShaderInfo* shaderInfo,
+bool AdmitMatchedProgram(const ProgramInfo* programInfo, const DrawShape& shape,
+                         const PrecompiledShaderInfo* shaderInfo,
                          PermutationMatchFailure* failure);
 
 }  // namespace tgfx

@@ -24,8 +24,8 @@
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/Swizzle.h"
-#include "gpu/aot/AOTDrawFacts.h"
 #include "gpu/aot/DrawIR.h"
+#include "gpu/aot/DrawShape.h"
 #include "gpu/aot/KernelTable.h"
 #include "gpu/aot/Program.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
@@ -81,29 +81,29 @@ bool RejectsAlphaOnlyTarget(bool servesAlphaOnly, const ProgramInfo* programInfo
 // PorterDuff modes, or XP_UNSUPPORTED for XP types no kernel can serve.
 int GetXPType(const ProgramInfo* programInfo) {
   switch (ClassifyXferForMatch(programInfo->getXferProcessor())) {
-    case AOTXferKind::None:
+    case XferKind::None:
       return XP_NONE;
-    case AOTXferKind::DstTexture:
+    case XferKind::DstTexture:
       return XP_DST_TEXTURE;
-    case AOTXferKind::FrameBufferFetch:
+    case XferKind::FrameBufferFetch:
       return XP_FRAMEBUFFER_FETCH;
-    case AOTXferKind::Unsupported:
+    case XferKind::Unsupported:
       break;
   }
   return XP_UNSUPPORTED;
 }
 
-AOTXferKind ClassifyXferForMatch(const XferProcessor* xp) {
+XferKind ClassifyXferForMatch(const XferProcessor* xp) {
   if (xp == nullptr || xp == EmptyXferProcessor::GetInstance()) {
-    return AOTXferKind::None;
+    return XferKind::None;
   }
   if (IsProcessor<PorterDuffXferProcessor>(xp)) {
     if (xp->dstTextureView() != nullptr) {
-      return AOTXferKind::DstTexture;
+      return XferKind::DstTexture;
     }
-    return AOTXferKind::FrameBufferFetch;
+    return XferKind::FrameBufferFetch;
   }
-  return AOTXferKind::Unsupported;
+  return XferKind::Unsupported;
 }
 
 // Determines whether a texture-based coverage child can be served by the local-space mask path
@@ -119,7 +119,7 @@ static bool IsLocalMaskTexture(const AOTTextureParameters& texture) {
 // draw's lowered coverage terms instead of walking coverage FPs. LocalMask is a distinct
 // capability: it needs a local-space varying and sampler and therefore cannot be encoded in the
 // shared three-value HAS_COVERAGE dimension.
-std::optional<CoverageKind> ClassifyCoverageTerm(const AOTCoverageTerm& term) {
+std::optional<Coverage> ClassifyCoverageTerm(const AOTCoverageTerm& term) {
   if (term.kind == AOTCoverageTermKind::Analytic) {
     // A single link past the unit. A composed clip chain (more links) stays beyond the
     // single-leaf families, exactly as the FP walk's name check kept it. The link's kind carries
@@ -134,17 +134,17 @@ std::optional<CoverageKind> ClassifyCoverageTerm(const AOTCoverageTerm& term) {
       return std::nullopt;
     }
     if (node->kind == AOTEffectKind::RectCoverage) {
-      return CoverageKind::AARect;
+      return Coverage::AARect;
     }
     if (node->kind == AOTEffectKind::RRectCoverage) {
-      return CoverageKind::RRect;
+      return Coverage::RRect;
     }
     return std::nullopt;
   }
   if (term.kind == AOTCoverageTermKind::DeviceMask) {
     // Alpha-only by construction (the lowering rejects anything else); perspective flows — the
     // chain's compile rejects it, the dedicated families sample it correctly.
-    return CoverageKind::DeviceMask;
+    return Coverage::DeviceMask;
   }
   if (term.kind == AOTCoverageTermKind::Subtree) {
     // The SrcIn ShaderMaskFilter fingerprint: the coverage unit, the white input the runtime
@@ -169,7 +169,7 @@ std::optional<CoverageKind> ClassifyCoverageTerm(const AOTCoverageTerm& term) {
         blendParams->childType != 0 || !IsLocalMaskTexture(*textureParams)) {
       return std::nullopt;
     }
-    return CoverageKind::LocalMask;
+    return Coverage::LocalMask;
   }
   return std::nullopt;
 }
@@ -234,11 +234,11 @@ const AOTTextureParameters* DeviceMaskCoverageLeaf(const DrawIR* ir) {
 // case is a count (bare draws lower no IR); the rest reads the carried IR's terms. The atlas glyph
 // term is the geometry processor's own coverage — the matcher never saw it as a coverage FP, and
 // the prepare-time synthesis adds it only for the compile — so it is skipped here.
-std::optional<CoverageKind> ClassifyCoverageTerms(const ProgramInfo* programInfo) {
+std::optional<Coverage> ClassifyCoverageTerms(const ProgramInfo* programInfo) {
   auto numFP = programInfo->numFragmentProcessors();
   auto numColorFP = programInfo->numColorFragmentProcessors();
   if (numFP == numColorFP) {
-    return CoverageKind::None;
+    return Coverage::None;
   }
   if (numFP != numColorFP + 1) {
     return std::nullopt;
@@ -258,7 +258,7 @@ std::optional<CoverageKind> ClassifyCoverageTerms(const ProgramInfo* programInfo
     classified = &term;
   }
   if (classified == nullptr) {
-    return CoverageKind::None;
+    return Coverage::None;
   }
   return ClassifyCoverageTerm(*classified);
 }
@@ -269,65 +269,65 @@ AOTGeometryDesc DescribeGeometryProcessor(const GeometryProcessor* gp) {
     return desc;
   }
   if (IsProcessor<DefaultGeometryProcessor>(gp)) {
-    desc.kind = AOTGeometryKind::Default;
+    desc.kind = GeometryKind::Default;
     return desc;
   }
   if (IsProcessor<NonAARRectGeometryProcessor>(gp)) {
     auto* rrectGP = static_cast<const NonAARRectGeometryProcessor*>(gp);
-    desc.kind = AOTGeometryKind::NonAARRect;
+    desc.kind = GeometryKind::NonAARRect;
     desc.hasCommonColor = rrectGP->hasCommonColor();
     desc.isStroke = rrectGP->isStroke();
     return desc;
   }
   if (IsProcessor<ComplexNonAARRectGeometryProcessor>(gp)) {
     auto* rrectGP = static_cast<const ComplexNonAARRectGeometryProcessor*>(gp);
-    desc.kind = AOTGeometryKind::ComplexNonAARRect;
+    desc.kind = GeometryKind::ComplexNonAARRect;
     desc.hasCommonColor = rrectGP->hasCommonColor();
     desc.isStroke = rrectGP->isStroke();
     return desc;
   }
   if (IsProcessor<EllipseGeometryProcessor>(gp)) {
     auto* ellipseGP = static_cast<const EllipseGeometryProcessor*>(gp);
-    desc.kind = AOTGeometryKind::Ellipse;
+    desc.kind = GeometryKind::Ellipse;
     desc.hasCommonColor = ellipseGP->hasCommonColor();
     desc.isStroke = ellipseGP->isStroke();
     return desc;
   }
   if (IsProcessor<ComplexEllipseGeometryProcessor>(gp)) {
     auto* ellipseGP = static_cast<const ComplexEllipseGeometryProcessor*>(gp);
-    desc.kind = AOTGeometryKind::ComplexEllipse;
+    desc.kind = GeometryKind::ComplexEllipse;
     desc.hasCommonColor = ellipseGP->hasCommonColor();
     desc.isStroke = ellipseGP->isStroke();
     return desc;
   }
   if (IsProcessor<HairlineLineGeometryProcessor>(gp)) {
-    desc.kind = AOTGeometryKind::HairlineLine;
+    desc.kind = GeometryKind::HairlineLine;
     return desc;
   }
   if (IsProcessor<HairlineQuadGeometryProcessor>(gp)) {
-    desc.kind = AOTGeometryKind::HairlineQuad;
+    desc.kind = GeometryKind::HairlineQuad;
     return desc;
   }
   if (IsProcessor<MeshGeometryProcessor>(gp)) {
-    desc.kind = AOTGeometryKind::Mesh;
+    desc.kind = GeometryKind::Mesh;
     desc.hasTexCoords = static_cast<const MeshGeometryProcessor*>(gp)->getHasTexCoords();
     return desc;
   }
   if (IsProcessor<RoundStrokeRectGeometryProcessor>(gp)) {
     auto* strokeGP = static_cast<const RoundStrokeRectGeometryProcessor*>(gp);
-    desc.kind = AOTGeometryKind::RoundStrokeRect;
+    desc.kind = GeometryKind::RoundStrokeRect;
     desc.hasUVMatrix = strokeGP->hasUVMatrixTransform();
     desc.hasUVPerspective = strokeGP->isUVPerspective();
     return desc;
   }
   if (IsProcessor<ShapeInstancedGeometryProcessor>(gp)) {
-    desc.kind = AOTGeometryKind::ShapeInstanced;
+    desc.kind = GeometryKind::ShapeInstanced;
     desc.hasCoverage =
         static_cast<const ShapeInstancedGeometryProcessor*>(gp)->getAAType() == AAType::Coverage;
     return desc;
   }
   if (IsProcessor<AtlasTextGeometryProcessor>(gp)) {
-    desc.kind = AOTGeometryKind::AtlasText;
+    desc.kind = GeometryKind::AtlasText;
     desc.hasCoverage =
         static_cast<const AtlasTextGeometryProcessor*>(gp)->getAAType() == AAType::Coverage;
     return desc;
@@ -336,7 +336,7 @@ AOTGeometryDesc DescribeGeometryProcessor(const GeometryProcessor* gp) {
     return desc;
   }
   auto* quadGP = static_cast<const QuadPerEdgeAAGeometryProcessor*>(gp);
-  desc.kind = AOTGeometryKind::QuadPerEdgeAA;
+  desc.kind = GeometryKind::QuadPerEdgeAA;
   desc.hasCommonColor = quadGP->hasCommonColor();
   desc.hasUVMatrix = quadGP->hasUVMatrix();
   desc.hasSubset = quadGP->getHasSubset();
@@ -346,19 +346,19 @@ AOTGeometryDesc DescribeGeometryProcessor(const GeometryProcessor* gp) {
 
 std::optional<int> PointwiseGpKind(const AOTGeometryDesc& geometry) {
   switch (geometry.kind) {
-    case AOTGeometryKind::Default:
+    case GeometryKind::Default:
       return GpKind::Default;
-    case AOTGeometryKind::QuadPerEdgeAA:
+    case GeometryKind::QuadPerEdgeAA:
       return GpKind::QuadPerEdgeAA;
-    case AOTGeometryKind::Mesh:
+    case GeometryKind::Mesh:
       return GpKind::Mesh;
-    case AOTGeometryKind::AtlasText:
+    case GeometryKind::AtlasText:
       return GpKind::AtlasText;
-    case AOTGeometryKind::Ellipse:
+    case GeometryKind::Ellipse:
       return GpKind::Ellipse;
-    case AOTGeometryKind::HairlineLine:
+    case GeometryKind::HairlineLine:
       return GpKind::HairlineLine;
-    case AOTGeometryKind::ComplexEllipse:
+    case GeometryKind::ComplexEllipse:
       return geometry.isStroke ? GpKind::ComplexEllipseStroke : GpKind::ComplexEllipseFill;
     default:
       return std::nullopt;
@@ -560,7 +560,7 @@ bool ContainsGradientSource(const FragmentProcessor* processor) {
 // diagnostic switches exclude their half of the family list, decompositionEnabled gating the
 // interpreter and dedicatedKernelsEnabled every dedicated family.
 static std::optional<PermutationMatchResult> MatchPermutationImpl(
-    const ProgramInfo* programInfo, PermutationMatchFailure* failure) {
+    const ProgramInfo* programInfo, const DrawShape& shape, PermutationMatchFailure* failure) {
   // Alpha-only (AAAA, Swizzle::ForWrite(ALPHA_8)) targets: only the kernels that apply the write
   // swizzle at output (via the OutputAlphaSwizzle uniform) may serve the draw; the others assume
   // RGBA output. Which kernels those are is each family's own ServesAlphaOnly declaration. The
@@ -589,7 +589,7 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(
       // The audit re-runs the table's own predicate over the same facts: one extraction per
       // shape, every family's ExtractFacts body, no second implementation to drift. The alpha-only
       // gate is the table row's (a non-serving row is not considered, so it is not audited).
-      const auto auditFacts = ExtractAOTDrawFacts(programInfo);
+      const auto& auditFacts = shape;
       int acceptors = 0;
 #define TGFX_AUDIT_FAMILY(Family)                                                             \
   if (!alphaOnly || Family::ServesAlphaOnly) {                                                \
@@ -631,7 +631,7 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(
   // walk's semantics — alpha-only rejection is a row predicate (the ExtractFacts bodies), and
   // dedicatedKernelsEnabled gates the whole table.
   if (allowDedicated) {
-    if (auto table = KernelTableLookup(ExtractAOTDrawFacts(programInfo), failure)) {
+    if (auto table = KernelTableLookup(shape, failure)) {
       return PermutationMatchResult{table->row->family, table->variant.vertPermutationIndex,
                                     table->variant.fragPermutationIndex};
     }
@@ -646,31 +646,6 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(
   return alphaOnly ? Fail(failure, PermutationMatchFailure::NoMatchingFamily) : std::nullopt;
 }
 
-// The ShaderTextureRead semantics the draw's sampled textures need. YUV planes are excluded: the
-// YUV kernels read the plane channels they need (.r / .rg), which the read swizzle preserves.
-static uint32_t RequiredTextureReads(const ProgramInfo* programInfo) {
-  uint32_t required = 0;
-  auto addTexture = [&](const std::shared_ptr<Texture>& texture) {
-    if (texture != nullptr && AOTReadSwizzleMode(texture->format()) != 0) {
-      required |= ShaderTextureReadSwizzle;
-    }
-  };
-  auto gp = programInfo->getGeometryProcessor();
-  for (size_t i = 0; gp != nullptr && i < gp->numTextureSamplers(); ++i) {
-    addTexture(gp->textureAt(i));
-  }
-  FragmentProcessor::Iter iter(programInfo);
-  for (auto fp = iter.next(); fp != nullptr; fp = iter.next()) {
-    if (IsProcessor<TextureEffect>(fp) && static_cast<const TextureEffect*>(fp)->isYUV()) {
-      continue;
-    }
-    for (size_t i = 0; i < fp->numTextureSamplers(); ++i) {
-      addTexture(fp->textureAt(i));
-    }
-  }
-  return required;
-}
-
 // The acceptance gates every route into a precompiled program shares (see ShaderMatchHelpers.h):
 // the output swizzles the kernels implement, the OpenGL profile/sampler gate, and the matched
 // family's declared texture-read semantics. The OpenGL comment: the precompiled kernels only
@@ -680,7 +655,8 @@ static uint32_t RequiredTextureReads(const ProgramInfo* programInfo) {
 // External (OES) textures (Android SurfaceTexture and YUV hardware buffers) are not converted
 // yet: with a bundle loaded there is no runtime route, so their draws are dropped and counted as
 // droppedDraws.
-bool AdmitMatchedProgram(const ProgramInfo* programInfo, const PrecompiledShaderInfo* shaderInfo,
+bool AdmitMatchedProgram(const ProgramInfo* programInfo, const DrawShape& shape,
+                         const PrecompiledShaderInfo* shaderInfo,
                          PermutationMatchFailure* failure) {
   auto outputSwizzle = programInfo->getOutputSwizzle();
   if (outputSwizzle != Swizzle::RGBA() && outputSwizzle != Swizzle::AAAA()) {
@@ -692,8 +668,7 @@ bool AdmitMatchedProgram(const ProgramInfo* programInfo, const PrecompiledShader
     Fail(failure, PermutationMatchFailure::GlGateRejected);
     return false;
   }
-  if (shaderInfo != nullptr &&
-      (RequiredTextureReads(programInfo) & ~shaderInfo->textureReads) != 0) {
+  if (shaderInfo != nullptr && (shape.requiredTextureReads & ~shaderInfo->textureReads) != 0) {
     // Default deny: the matched family's shader would read these textures without the semantic
     // the runtime applies, so the draw is a reported miss rather than wrong pixels.
     Fail(failure, PermutationMatchFailure::UnsupportedTextureRead);
@@ -708,18 +683,19 @@ static std::optional<PermutationMatchResult> ComputeMatch(const ProgramInfo* pro
                                                           PermutationMatchFailure* failure) {
   // The route-independent gates first, so a draw they refuse reports its reason before any family
   // walk runs; the texture-read check needs the matched family and runs after the walk.
-  if (!AdmitMatchedProgram(programInfo, nullptr, failure)) {
+  const auto shape = ExtractDrawShape(programInfo);
+  if (!AdmitMatchedProgram(programInfo, shape, nullptr, failure)) {
     return std::nullopt;
   }
   auto matchFailure = PermutationMatchFailure::None;
-  auto result = MatchPermutationImpl(programInfo, &matchFailure);
+  auto result = MatchPermutationImpl(programInfo, shape, &matchFailure);
   if (result) {
     auto info = ShaderRegistry::Find(result->shaderName);
     if (info == nullptr || !IsBuildablePermutation(*info, result->vertPermutationIndex,
                                                    result->fragPermutationIndex)) {
       result.reset();
       matchFailure = PermutationMatchFailure::PermutationNotEnumerated;
-    } else if (!AdmitMatchedProgram(programInfo, info, &matchFailure)) {
+    } else if (!AdmitMatchedProgram(programInfo, shape, info, &matchFailure)) {
       result.reset();
     }
   }

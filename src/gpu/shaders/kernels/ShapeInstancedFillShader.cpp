@@ -20,15 +20,15 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
-#include "gpu/aot/AOTDrawFacts.h"
+#include "gpu/aot/DrawShape.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
 
 std::optional<ShapeInstancedFillShader::Inputs> ShapeInstancedFillShader::ExtractFacts(
-    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+    const DrawShape& facts, PermutationMatchFailure*) {
   // The geometry kind IS the contract: ShapeInstancedDrawOp's processor.
-  if (facts.geometry.kind != AOTGeometryKind::ShapeInstanced) {
+  if (facts.geometry.kind != GeometryKind::ShapeInstanced) {
     return std::nullopt;
   }
   if (facts.fragmentCount != 0) {

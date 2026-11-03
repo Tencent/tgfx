@@ -29,7 +29,7 @@
 namespace tgfx {
 
 class ProgramInfo;
-struct AOTDrawFacts;
+struct DrawShape;
 enum class PermutationMatchFailure;
 
 /**
@@ -50,7 +50,7 @@ struct FamilyHasExtractFacts : std::false_type {};
 
 template <typename T>
 struct FamilyHasExtractFacts<
-    T, std::void_t<decltype(T::ExtractFacts(std::declval<const AOTDrawFacts&>(),
+    T, std::void_t<decltype(T::ExtractFacts(std::declval<const DrawShape&>(),
                                             std::declval<PermutationMatchFailure*>()))>>
     : std::true_type {};
 
@@ -139,7 +139,7 @@ class ShaderFamily : public PrecompiledShader {
    * ExtractFacts; its Extract then delegates to it, so the walk and the table share one body
    * and cannot disagree.
    */
-  static std::optional<PermutationVariant> MatchFromFacts(const AOTDrawFacts& facts,
+  static std::optional<PermutationVariant> MatchFromFacts(const DrawShape& facts,
                                                           PermutationMatchFailure* failure) {
     if constexpr (!FamilyHasExtractFacts<T>::value) {
       // Not a table family (the interpreter): the table has no row for it, and the walk calls its

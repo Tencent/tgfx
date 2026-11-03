@@ -20,23 +20,23 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
-#include "gpu/aot/AOTDrawFacts.h"
+#include "gpu/aot/DrawShape.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
 
 std::optional<GlassRefractionShader::Inputs> GlassRefractionShader::ExtractFacts(
-    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+    const DrawShape& facts, PermutationMatchFailure*) {
   // The geometry selects the vertex layout and the initial-coverage source. Both forms must be the
   // common-color attribute layout: the kernels read the Color uniform, and a per-vertex color
   // draw would quantize fractional paint colors through the UByte4 attribute.
   int gpKind = -1;
-  if (facts.geometry.kind == AOTGeometryKind::Ellipse) {
+  if (facts.geometry.kind == GeometryKind::Ellipse) {
     if (!facts.geometry.hasCommonColor) {
       return std::nullopt;
     }
     gpKind = 0;
-  } else if (facts.geometry.kind == AOTGeometryKind::QuadPerEdgeAA) {
+  } else if (facts.geometry.kind == GeometryKind::QuadPerEdgeAA) {
     // The uvMatrix form is required: it declares no uvCoord attribute, so the GP transforms the
     // position for the background coordinate, which is what the quad vertex kernel reads. A
     // subset-carrying quad has a different transform contract and stays on the fallback route.
@@ -59,7 +59,7 @@ std::optional<GlassRefractionShader::Inputs> GlassRefractionShader::ExtractFacts
   if (facts.fragmentCount != 1) {
     auto* mask = LocalMaskCoverageLeaf(facts.ir);
     if (gpKind != 1 || facts.fragmentCount != 2 || !facts.coverage ||
-        *facts.coverage != CoverageKind::LocalMask || mask == nullptr || mask->hasPerspective) {
+        *facts.coverage != Coverage::LocalMask || mask == nullptr || mask->hasPerspective) {
       return std::nullopt;
     }
   }

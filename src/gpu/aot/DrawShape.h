@@ -39,43 +39,46 @@ class ProgramInfo;
  * read off the made processors (geometry, xfer) or off the IR node's own proxy (a pending
  * multi-plane upload's layout).
  */
-struct AOTDrawFacts {
+struct DrawShape {
   const DrawIR* ir = nullptr;
   AOTGeometryDesc geometry = {};
-  AOTXferKind xfer = AOTXferKind::Unsupported;
+  XferKind xfer = XferKind::Unsupported;
   bool alphaOnlyTarget = false;
   size_t colorFPCount = 0;
   size_t fragmentCount = 0;
+  /// The ShaderTextureRead bits the draw's sampled textures need (see ShaderTextureRead),
+  /// computed once at extraction so a row's declared capability can be gated against it.
+  uint32_t requiredTextureReads = 0;
   /// The draw's classified coverage (the one ClassifyCoverageTerms computes): nullopt when the
   /// terms do not classify. The rows' predicates derive from it — a direct analytic clip is
   /// AARect/RRect, the shared device-mask ABI bit is DeviceMask.
-  std::optional<CoverageKind> coverage = std::nullopt;
+  std::optional<Coverage> coverage = std::nullopt;
 
   /// The position-only rect form the texture and noise fill kernels share: a DefaultGP, or a
   /// QuadPerEdgeAA whose coordinate comes from aPosition (a common color, a uv matrix, no
   /// per-quad subset).
   bool positionOnlyRect() const {
-    return geometry.kind == AOTGeometryKind::Default ||
-           (geometry.kind == AOTGeometryKind::QuadPerEdgeAA && geometry.hasCommonColor &&
+    return geometry.kind == GeometryKind::Default ||
+           (geometry.kind == GeometryKind::QuadPerEdgeAA && geometry.hasCommonColor &&
             geometry.hasUVMatrix && !geometry.hasSubset);
   }
 
   /// The XP_* vocabulary value (the fill families' shared HAS_XP axis).
   int xpType() const {
     switch (xfer) {
-      case AOTXferKind::None:
+      case XferKind::None:
         return XP_NONE;
-      case AOTXferKind::DstTexture:
+      case XferKind::DstTexture:
         return XP_DST_TEXTURE;
-      case AOTXferKind::FrameBufferFetch:
+      case XferKind::FrameBufferFetch:
         return XP_FRAMEBUFFER_FETCH;
-      case AOTXferKind::Unsupported:
+      case XferKind::Unsupported:
         break;
     }
     return XP_UNSUPPORTED;
   }
 };
 
-AOTDrawFacts ExtractAOTDrawFacts(const ProgramInfo* programInfo);
+DrawShape ExtractDrawShape(const ProgramInfo* programInfo);
 
 }  // namespace tgfx

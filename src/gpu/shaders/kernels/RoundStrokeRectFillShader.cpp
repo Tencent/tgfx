@@ -20,21 +20,21 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
-#include "gpu/aot/AOTDrawFacts.h"
+#include "gpu/aot/DrawShape.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
 
 std::optional<RoundStrokeRectFillShader::Inputs> RoundStrokeRectFillShader::ExtractFacts(
-    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+    const DrawShape& facts, PermutationMatchFailure*) {
   // The geometry kind IS the contract: RectDrawOp's round line join.
-  if (facts.geometry.kind != AOTGeometryKind::RoundStrokeRect) {
+  if (facts.geometry.kind != GeometryKind::RoundStrokeRect) {
     return std::nullopt;
   }
   // The kernel reads the clip from the runtime clip contract uniforms, so a sole analytic clip is
   // admitted alongside the FP-free form.
-  const bool directClip = facts.colorFPCount == 0 && (facts.coverage == CoverageKind::AARect ||
-                                                      facts.coverage == CoverageKind::RRect);
+  const bool directClip = facts.colorFPCount == 0 &&
+                          (facts.coverage == Coverage::AARect || facts.coverage == Coverage::RRect);
   if (facts.fragmentCount != 0 && !directClip) {
     return std::nullopt;
   }

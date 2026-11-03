@@ -20,13 +20,13 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/aot/AOTChainBuilder.h"
-#include "gpu/aot/AOTDrawFacts.h"
+#include "gpu/aot/DrawShape.h"
 
 namespace tgfx {
 
 std::optional<QuadTextureFillShader::Inputs> QuadTextureFillShader::ExtractFacts(
-    const AOTDrawFacts& facts, PermutationMatchFailure*) {
-  if (facts.geometry.kind != AOTGeometryKind::QuadPerEdgeAA) {
+    const DrawShape& facts, PermutationMatchFailure*) {
+  if (facts.geometry.kind != GeometryKind::QuadPerEdgeAA) {
     return std::nullopt;
   }
   // Color must be exactly one TextureEffect. Coverage is optional: a device-space mask maps to
@@ -36,11 +36,11 @@ std::optional<QuadTextureFillShader::Inputs> QuadTextureFillShader::ExtractFacts
   }
   bool hasLocalMask = false;
   if (facts.fragmentCount != 1) {
-    if (facts.coverage == CoverageKind::AARect || facts.coverage == CoverageKind::RRect) {
+    if (facts.coverage == Coverage::AARect || facts.coverage == Coverage::RRect) {
       // Evaluated through the runtime clip contract uniforms.
-    } else if (facts.coverage == CoverageKind::DeviceMask) {
+    } else if (facts.coverage == Coverage::DeviceMask) {
       // Device masks are a runtime uniform now, so there is nothing to encode.
-    } else if (facts.coverage == CoverageKind::LocalMask) {
+    } else if (facts.coverage == Coverage::LocalMask) {
       hasLocalMask = true;
     } else {
       // Unrecognized coverage kinds (including unclassifiable ones) stay on other routes.

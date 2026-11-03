@@ -24,7 +24,7 @@
 
 namespace tgfx {
 
-struct AOTDrawFacts;
+struct DrawShape;
 class ProgramInfo;
 
 class SolidColorFillShader : public ShaderFamily<SolidColorFillShader> {
@@ -73,7 +73,7 @@ class SolidColorFillShader : public ShaderFamily<SolidColorFillShader> {
   }
 
   /// The same acceptance over the draw's extracted facts: the executor-table row's predicate.
-  static std::optional<Inputs> ExtractFacts(const AOTDrawFacts& facts,
+  static std::optional<Inputs> ExtractFacts(const DrawShape& facts,
                                             PermutationMatchFailure* failure);
 };
 

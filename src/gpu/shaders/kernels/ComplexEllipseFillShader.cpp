@@ -21,15 +21,15 @@
 #include "gpu/PermutationMatch.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
-#include "gpu/aot/AOTDrawFacts.h"
+#include "gpu/aot/DrawShape.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
 
 std::optional<ComplexEllipseFillShader::Inputs> ComplexEllipseFillShader::ExtractFacts(
-    const AOTDrawFacts& facts, PermutationMatchFailure* failure) {
+    const DrawShape& facts, PermutationMatchFailure* failure) {
   // The geometry kind IS the contract: RRectDrawOp's complex AA form (per-corner radii).
-  if (facts.geometry.kind != AOTGeometryKind::ComplexEllipse) {
+  if (facts.geometry.kind != GeometryKind::ComplexEllipse) {
     return std::nullopt;
   }
   if (facts.colorFPCount != 0) {
@@ -40,7 +40,7 @@ std::optional<ComplexEllipseFillShader::Inputs> ComplexEllipseFillShader::Extrac
   // clip_coverage.inc) and a device-space mask is the runtime HasDeviceMask uniform over the
   // always-declared MaskTextureSampler (padded with the dummy texture when absent). LocalMask needs
   // a per-vertex UV this geometry does not provide and stays rejected.
-  if (!facts.coverage || *facts.coverage == CoverageKind::LocalMask) {
+  if (!facts.coverage || *facts.coverage == Coverage::LocalMask) {
     return Fail(failure, PermutationMatchFailure::CoverageShape);
   }
   Inputs inputs;

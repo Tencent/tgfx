@@ -65,7 +65,7 @@ struct AOTCoverageTerm {
  * The draw's geometry kind as the matchers see it: one value per processor class the precompiled
  * kernels serve, and Other for everything else.
  */
-enum class AOTGeometryKind : uint8_t {
+enum class GeometryKind : uint8_t {
   Other = 0,
   Default,
   QuadPerEdgeAA,
@@ -94,7 +94,7 @@ enum class AOTGeometryKind : uint8_t {
  * processor itself is the truth, so there is one description and no record-time copy.
  */
 struct AOTGeometryDesc {
-  AOTGeometryKind kind = AOTGeometryKind::Other;
+  GeometryKind kind = GeometryKind::Other;
   // QuadPerEdgeAA only: the vertex stage's layout facts the matchers read.
   bool hasCommonColor = false;
   bool hasUVMatrix = false;
@@ -115,7 +115,7 @@ struct AOTGeometryDesc {
  * processor holds its proxy, a framebuffer-fetch one empty info), so the processor's own dst
  * info is exact.
  */
-enum class AOTXferKind : uint8_t {
+enum class XferKind : uint8_t {
   Unsupported = 0,
   None,
   DstTexture,

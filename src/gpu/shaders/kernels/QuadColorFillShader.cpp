@@ -19,14 +19,14 @@
 #include "gpu/shaders/kernels/QuadColorFillShader.h"
 #include <optional>
 #include "gpu/ProgramInfo.h"
-#include "gpu/aot/AOTDrawFacts.h"
+#include "gpu/aot/DrawShape.h"
 #include "gpu/processors/RectEffect.h"
 
 namespace tgfx {
 
 std::optional<QuadColorFillShader::Inputs> QuadColorFillShader::ExtractFacts(
-    const AOTDrawFacts& facts, PermutationMatchFailure*) {
-  if (facts.geometry.kind != AOTGeometryKind::QuadPerEdgeAA) {
+    const DrawShape& facts, PermutationMatchFailure*) {
+  if (facts.geometry.kind != GeometryKind::QuadPerEdgeAA) {
     return std::nullopt;
   }
   // Accept either zero fragment processors, a device-space mask, or one direct analytic clip
@@ -36,10 +36,10 @@ std::optional<QuadColorFillShader::Inputs> QuadColorFillShader::ExtractFacts(
     if (facts.colorFPCount != 0) {
       return std::nullopt;
     }
-    if (facts.coverage == CoverageKind::AARect || facts.coverage == CoverageKind::RRect) {
+    if (facts.coverage == Coverage::AARect || facts.coverage == Coverage::RRect) {
       // No additional sampler or permutation dimension is needed.
     } else {
-      if (facts.coverage != CoverageKind::DeviceMask) {
+      if (facts.coverage != Coverage::DeviceMask) {
         return std::nullopt;
       }
       inputs.hasMaskTexture = true;

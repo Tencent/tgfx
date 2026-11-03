@@ -21,13 +21,13 @@
 #include "gpu/PermutationMatch.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
-#include "gpu/aot/AOTDrawFacts.h"
 #include "gpu/aot/DrawIR.h"
+#include "gpu/aot/DrawShape.h"
 
 namespace tgfx {
 
-static bool IsAnalyticClipKind(const std::optional<CoverageKind>& kind) {
-  return kind && (*kind == CoverageKind::AARect || *kind == CoverageKind::RRect);
+static bool IsAnalyticClipKind(const std::optional<Coverage>& kind) {
+  return kind && (*kind == Coverage::AARect || *kind == Coverage::RRect);
 }
 
 // The gradient form's color graph: the geometry color lowered as the input, then the single
@@ -44,11 +44,11 @@ static const AOTGradientParameters* SoleGradientLeaf(const AOTEffectGraph& graph
 }
 
 std::optional<ShapeInstancedTextureCoverageShader::Inputs>
-ShapeInstancedTextureCoverageShader::ExtractFacts(const AOTDrawFacts& facts,
+ShapeInstancedTextureCoverageShader::ExtractFacts(const DrawShape& facts,
                                                   PermutationMatchFailure* failure) {
   // The geometry kind IS the contract: ShapeInstancedDrawOp's processor, in its non-AA form —
   // this kernel carries no AA coverage attribute.
-  if (facts.geometry.kind != AOTGeometryKind::ShapeInstanced || facts.geometry.hasCoverage) {
+  if (facts.geometry.kind != GeometryKind::ShapeInstanced || facts.geometry.hasCoverage) {
     return std::nullopt;
   }
   if (facts.xpType() != XP_NONE) {
@@ -92,7 +92,7 @@ ShapeInstancedTextureCoverageShader::ExtractFacts(const AOTDrawFacts& facts,
     return Fail(failure, PermutationMatchFailure::CoverageShape);
   }
   const auto& coverage = facts.ir->coverage;
-  std::optional<CoverageKind> kinds[2] = {};
+  std::optional<Coverage> kinds[2] = {};
   size_t termCount = 0;
   for (const auto& term : coverage) {
     if (termCount >= 2) {

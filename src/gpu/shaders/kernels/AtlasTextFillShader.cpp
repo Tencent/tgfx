@@ -20,15 +20,15 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
-#include "gpu/aot/AOTDrawFacts.h"
+#include "gpu/aot/DrawShape.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
 
 std::optional<AtlasTextFillShader::Inputs> AtlasTextFillShader::ExtractFacts(
-    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+    const DrawShape& facts, PermutationMatchFailure*) {
   // The geometry kind IS the contract: AtlasTextOp's glyph processor, no processor-tree walk.
-  if (facts.geometry.kind != AOTGeometryKind::AtlasText) {
+  if (facts.geometry.kind != GeometryKind::AtlasText) {
     return std::nullopt;
   }
   if (facts.colorFPCount != 0 || facts.fragmentCount > 1) {
@@ -42,8 +42,7 @@ std::optional<AtlasTextFillShader::Inputs> AtlasTextFillShader::ExtractFacts(
     // A single coverage FP multiplies the atlas glyph coverage: either a direct analytic clip
     // (AA rect / rrect) via the runtime clip contract, or an alpha-only affine device-space mask
     // — the mask sampler facts come off the IR's DeviceMask term.
-    const bool directClip =
-        facts.coverage == CoverageKind::AARect || facts.coverage == CoverageKind::RRect;
+    const bool directClip = facts.coverage == Coverage::AARect || facts.coverage == Coverage::RRect;
     if (!directClip) {
       auto* mask = DeviceMaskCoverageLeaf(facts.ir);
       if (mask == nullptr || !mask->isAlphaOnly || mask->hasPerspective) {

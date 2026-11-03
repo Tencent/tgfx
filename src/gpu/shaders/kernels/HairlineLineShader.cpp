@@ -20,21 +20,21 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
-#include "gpu/aot/AOTDrawFacts.h"
+#include "gpu/aot/DrawShape.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
 
 std::optional<HairlineLineShader::Inputs> HairlineLineShader::ExtractFacts(
-    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+    const DrawShape& facts, PermutationMatchFailure*) {
   // The geometry kind IS the contract: HairlineLineOp's processor, no processor-tree walk.
-  if (facts.geometry.kind != AOTGeometryKind::HairlineLine) {
+  if (facts.geometry.kind != GeometryKind::HairlineLine) {
     return std::nullopt;
   }
   // No color processors at all, or a sole direct analytic clip (HasNoProcessorsOrDirectClip's
   // semantics: a paint-sourced color whose clip the runtime contract uniforms evaluate).
-  const bool directClip = facts.colorFPCount == 0 && (facts.coverage == CoverageKind::AARect ||
-                                                      facts.coverage == CoverageKind::RRect);
+  const bool directClip = facts.colorFPCount == 0 &&
+                          (facts.coverage == Coverage::AARect || facts.coverage == Coverage::RRect);
   if (facts.fragmentCount != 0 && !directClip) {
     return std::nullopt;
   }

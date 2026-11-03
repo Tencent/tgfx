@@ -98,7 +98,7 @@ class NonAARRectFillShader : public ShaderFamily<NonAARRectFillShader> {
   }
 
   /// The same acceptance over the draw's extracted facts: the executor-table row's predicate.
-  static std::optional<Inputs> ExtractFacts(const AOTDrawFacts& facts,
+  static std::optional<Inputs> ExtractFacts(const DrawShape& facts,
                                             PermutationMatchFailure* failure);
 };
 

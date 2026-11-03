@@ -73,7 +73,7 @@ class MaskFillShader : public ShaderFamily<MaskFillShader> {
 
   /// Whole-draw guards (alpha-only target, the default geometry kind, the single alpha-only mask
   /// texture shape), defined in the family's own .cpp, next to the GLSL it owns.
-  static std::optional<Inputs> ExtractFacts(const AOTDrawFacts& facts,
+  static std::optional<Inputs> ExtractFacts(const DrawShape& facts,
                                             PermutationMatchFailure* failure);
 };
 

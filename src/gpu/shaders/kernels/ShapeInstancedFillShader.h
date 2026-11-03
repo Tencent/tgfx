@@ -73,7 +73,7 @@ class ShapeInstancedFillShader : public ShaderFamily<ShapeInstancedFillShader> {
 
   /// Whole-draw guards (alpha-only target, the instanced-shape geometry kind, fragment-processor
   /// count), defined in the family's own .cpp, next to the GLSL it owns.
-  static std::optional<Inputs> ExtractFacts(const AOTDrawFacts& facts,
+  static std::optional<Inputs> ExtractFacts(const DrawShape& facts,
                                             PermutationMatchFailure* failure);
 };
 

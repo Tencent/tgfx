@@ -22,13 +22,13 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/aot/AOTChainBuilder.h"
-#include "gpu/aot/AOTDrawFacts.h"
+#include "gpu/aot/DrawShape.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
 
 std::optional<TiledTextureFillShader::Inputs> TiledTextureFillShader::ExtractFacts(
-    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+    const DrawShape& facts, PermutationMatchFailure*) {
   if (!facts.positionOnlyRect()) {
     return std::nullopt;
   }

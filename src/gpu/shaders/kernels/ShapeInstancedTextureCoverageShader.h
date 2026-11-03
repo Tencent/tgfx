@@ -77,7 +77,7 @@ class ShapeInstancedTextureCoverageShader
   /// Whole-draw guards (alpha-only target, the instanced-shape geometry kind in its non-AA form,
   /// the bare or gradient-topped coverage texture shape), defined in the family's own .cpp, next
   /// to the GLSL it owns.
-  static std::optional<Inputs> ExtractFacts(const AOTDrawFacts& facts,
+  static std::optional<Inputs> ExtractFacts(const DrawShape& facts,
                                             PermutationMatchFailure* failure);
 };
 

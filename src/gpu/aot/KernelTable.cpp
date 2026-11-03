@@ -91,7 +91,7 @@ static const std::vector<AOTKernelRow> rows = {
                  YUVTextureFillShader::ServesAlphaOnly},
 };
 
-std::optional<AOTKernelMatch> KernelTableLookup(const AOTDrawFacts& facts,
+std::optional<AOTKernelMatch> KernelTableLookup(const DrawShape& facts,
                                                 PermutationMatchFailure* failure) {
   for (const auto& row : rows) {
     if (facts.alphaOnlyTarget && !row.servesAlphaOnly) {

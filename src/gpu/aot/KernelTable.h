@@ -21,7 +21,7 @@
 #include <optional>
 #include <vector>
 #include "gpu/PermutationMatch.h"
-#include "gpu/aot/AOTDrawFacts.h"
+#include "gpu/aot/DrawShape.h"
 #include "gpu/shaders/ShaderPermutation.h"
 
 namespace tgfx {
@@ -35,8 +35,7 @@ namespace tgfx {
  */
 struct AOTKernelRow {
   const char* family = nullptr;
-  std::optional<PermutationVariant> (*match)(const AOTDrawFacts&,
-                                             PermutationMatchFailure*) = nullptr;
+  std::optional<PermutationVariant> (*match)(const DrawShape&, PermutationMatchFailure*) = nullptr;
   // The family's ServesAlphaOnly declaration, hoisted out of the family bodies: the lookup skips
   // a non-serving row on an alpha-only target, so the gate is stated once instead of 21 times.
   bool servesAlphaOnly = false;
@@ -49,7 +48,7 @@ struct AOTKernelMatch {
 };
 
 /** The first row whose predicate accepts the facts, or nullopt when none does. */
-std::optional<AOTKernelMatch> KernelTableLookup(const AOTDrawFacts& facts,
+std::optional<AOTKernelMatch> KernelTableLookup(const DrawShape& facts,
                                                 PermutationMatchFailure* failure);
 
 }  // namespace tgfx

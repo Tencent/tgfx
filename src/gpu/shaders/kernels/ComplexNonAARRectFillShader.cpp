@@ -20,14 +20,14 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
-#include "gpu/aot/AOTDrawFacts.h"
+#include "gpu/aot/DrawShape.h"
 
 namespace tgfx {
 
 std::optional<ComplexNonAARRectFillShader::Inputs> ComplexNonAARRectFillShader::ExtractFacts(
-    const AOTDrawFacts& facts, PermutationMatchFailure*) {
+    const DrawShape& facts, PermutationMatchFailure*) {
   // The geometry kind IS the contract: RRectDrawOp's complex non-AA form (per-corner radii).
-  if (facts.geometry.kind != AOTGeometryKind::ComplexNonAARRect) {
+  if (facts.geometry.kind != GeometryKind::ComplexNonAARRect) {
     return std::nullopt;
   }
   if (facts.fragmentCount != 0) {

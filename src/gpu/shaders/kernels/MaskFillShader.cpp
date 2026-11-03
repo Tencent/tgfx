@@ -20,15 +20,15 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
-#include "gpu/aot/AOTDrawFacts.h"
+#include "gpu/aot/DrawShape.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
 
-std::optional<MaskFillShader::Inputs> MaskFillShader::ExtractFacts(const AOTDrawFacts& facts,
+std::optional<MaskFillShader::Inputs> MaskFillShader::ExtractFacts(const DrawShape& facts,
                                                                    PermutationMatchFailure*) {
   // The geometry kind IS the contract: ShapeDrawOp's DefaultGeometryProcessor.
-  if (facts.geometry.kind != AOTGeometryKind::Default) {
+  if (facts.geometry.kind != GeometryKind::Default) {
     return std::nullopt;
   }
   // Solid color (from the DefaultGP Color uniform) masked by a single alpha-only coverage

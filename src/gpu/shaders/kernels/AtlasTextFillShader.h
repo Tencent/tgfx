@@ -81,7 +81,7 @@ class AtlasTextFillShader : public ShaderFamily<AtlasTextFillShader> {
 
   /// Whole-draw guards (alpha-only target, geometry processor kind, the optional sole coverage
   /// FP), defined in the family's own .cpp, next to the GLSL it owns.
-  static std::optional<Inputs> ExtractFacts(const AOTDrawFacts& facts,
+  static std::optional<Inputs> ExtractFacts(const DrawShape& facts,
                                             PermutationMatchFailure* failure);
 };
 
