@@ -46,27 +46,49 @@ export const createImageFromBytes = (bytes: ArrayBuffer) => {
     return createImage(URL.createObjectURL(blob));
 };
 
-export const readImagePixels = (module: TGFX, image: CanvasImageSource, width: number, height: number) => {
+let readPixelFailureWarned = false;
+
+export const readImagePixels = (module: TGFX, image: CanvasImageSource, width: number, height: number): Uint8ClampedArray | null => {
     if (!image) {
         return null;
     }
     const canvas = getCanvas2D(width, height);
     const ctx = canvas.getContext('2d', {willReadFrequently: true}) as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
     if (!ctx) {
+        releaseCanvas2D(canvas);
         return null;
     }
-    // Use "copy" composite operation to avoid source-over blending artifacts from canvas reuse.
-    // This ensures the image pixels are written directly without compositing with any residual
-    // background, which can cause white fringe on semi-transparent edges.
-    ctx.globalCompositeOperation = 'copy';
-    ctx.drawImage(image, 0, 0, width, height);
-    ctx.globalCompositeOperation = 'source-over';
-    const {data} = ctx.getImageData(0, 0, width, height);
-    releaseCanvas2D(canvas);
-    if (data.length === 0) {
+    try {
+        // Use "copy" composite operation to avoid source-over blending artifacts from canvas reuse.
+        // This ensures the image pixels are written directly without compositing with any residual
+        // background, which can cause white fringe on semi-transparent edges.
+        ctx.globalCompositeOperation = 'copy';
+        ctx.drawImage(image, 0, 0, width, height);
+        ctx.globalCompositeOperation = 'source-over';
+        const {data} = ctx.getImageData(0, 0, width, height);
+        releaseCanvas2D(canvas);
+        if (data.length === 0) {
+            return null;
+        }
+        return data;
+    } catch (error) {
+        if ((error as DOMException)?.name === 'SecurityError') {
+            // A cross-origin source without CORS taints the canvas, and a tainted canvas must never
+            // return to the shared pool: every later getImageData() on it would keep throwing a
+            // SecurityError. Resetting the size discards the canvas instead of pooling it.
+            canvas.width = 0;
+            canvas.height = 0;
+        } else {
+            // A detached ImageBitmap or a zero-sized readback fails without tainting the canvas,
+            // and getCanvas2D() clears the bitmap when the canvas is reused, so it stays poolable.
+            releaseCanvas2D(canvas);
+        }
+        if (!readPixelFailureWarned) {
+            readPixelFailureWarned = true;
+            console.warn('readImagePixels failed:', error);
+        }
         return null;
     }
-    return new Uint8Array(data);
 };
 
 export const hasWebpSupport = () => {
@@ -246,9 +268,23 @@ export const getBytesFromPath = async (module: TGFX, path: string) => {
     return new Uint8Array(buffer);
 };
 
+// Software adapters such as SwiftShader cannot import external images, and the C++ side has no
+// adapter info query to probe for that capability. The fast path is retried on every frame instead
+// of latching onto the readback fallback: a rejected import costs roughly 3.4us when Blink refuses
+// the source before taking a snapshot and at most the ~240us of a successful snapshot, against the
+// ~2.3ms CPU readback that follows, so latching would trade a few percent of an already slow frame
+// for a permanent downgrade after a transient failure.
+let crossOriginUploadWarned = false;
+let fallbackWarned = false;
+
 export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr: number,
                                            width: number, height: number, deviceId?: number) => {
     if (!source || !texturePtr) {
+        return;
+    }
+    // Videos without a current frame (not loaded or failed to decode) make
+    // copyExternalImageToTexture throw an OperationError, so skip the upload entirely.
+    if (source.readyState < source.HAVE_CURRENT_DATA || !source.videoWidth || !source.videoHeight) {
         return;
     }
     syncVideoFrame(source);
@@ -270,11 +306,51 @@ export const uploadVideoToWebGPUTexture = (source: HTMLVideoElement, texturePtr:
     if (!device || !device.queue) {
         return;
     }
-    device.queue.copyExternalImageToTexture(
-        {source: source},
-        {texture: gpuTexture, premultipliedAlpha: true},
-        [width, height]
-    );
+    try {
+        device.queue.copyExternalImageToTexture(
+            {source: source},
+            {texture: gpuTexture, premultipliedAlpha: true},
+            [width, height]
+        );
+        return;
+    } catch (error) {
+        // A SecurityError means the source is tainted (cross-origin without CORS), and the CPU
+        // fallback cannot read its pixels either, so skip this frame.
+        if ((error as DOMException)?.name === 'SecurityError') {
+            if (!crossOriginUploadWarned) {
+                crossOriginUploadWarned = true;
+                console.warn('WebGPU video upload skipped a cross-origin video:', error);
+            }
+            return;
+        }
+        // Any other failure means this adapter cannot import the frame. Fall back for this frame
+        // only and try the fast path again on the next one.
+        if (!fallbackWarned) {
+            fallbackWarned = true;
+            console.warn('WebGPU video upload falls back to CPU readback:', error);
+        }
+    }
+    // Fall back to a CPU readback through a 2D canvas and upload the raw pixels with
+    // writeTexture, which is a staging-buffer upload that works on any adapter. PAG videos pack
+    // the alpha channel into the frame itself, so frames are opaque and the unpremultiplied
+    // readback matches the premultipliedAlpha target. Videos with a real codec alpha channel
+    // (VP9 or AV1 alpha) would render semi-transparent areas too bright here, which is a known
+    // limitation of this fallback.
+    const pixels = readImagePixels(module, source, width, height);
+    if (!pixels) {
+        return;
+    }
+    try {
+        device.queue.writeTexture(
+            {texture: gpuTexture},
+            pixels,
+            {bytesPerRow: width * 4, rowsPerImage: height},
+            [width, height]
+        );
+    } catch (error) {
+        // Blink throws an OperationError when the device is lost. Dropping the frame keeps the
+        // flush alive, and the texture simply keeps its previous content.
+    }
 };
 
 /**
