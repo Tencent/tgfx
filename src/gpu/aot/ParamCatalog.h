@@ -69,9 +69,8 @@ struct ParamCatalog {
       ChainSrcTF0,     ChainSrcTF1,    ChainSrcTFType,  ChainSrcOOTF,    ChainColorXform,
       ChainDstOOTF,    ChainDstTF0,    ChainDstTF1,     ChainDstTFType,  GlassOpticsP0,
       GlassOpticsP1,   GlassLightDir,  GlassOpticsP2,   GlassOpticsP3,   LightingOn,
-      GlassShapeP0,
-      GlassShapeP1,    GlassEdgeSpan,  GlassFineMaskUV, GlassEdgeMaskUV, EdgeMaskOn,
-      GlassUDFRadius,  GlassUDFStep,   Field,           InputIsPacked};
+      GlassShapeP0,    GlassShapeP1,   GlassEdgeSpan,   GlassFineMaskUV, GlassEdgeMaskUV,
+      EdgeMaskOn,      GlassUDFRadius, GlassUDFStep,    Field,           InputIsPacked};
 };
 
 }  // namespace tgfx
