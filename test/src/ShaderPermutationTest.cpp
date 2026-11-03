@@ -30,11 +30,11 @@
 #include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/PermutationMatch.h"
-#include "gpu/ShaderBundleContract.h"
 #include "gpu/PrecompiledShaderCache.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProgramWriter.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/ShaderBundleContract.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/ShaderProfileResolver.h"
 #include "gpu/aot/AOTChainBuilder.h"
@@ -481,7 +481,6 @@ TGFX_TEST(ShaderPermutationTest, DimensionDefinesAppearInGLSL) {
     }
   }
 }
-
 
 TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientCompiledSpace) {
   PointwiseChainShader shader;
@@ -1656,7 +1655,8 @@ TGFX_TEST(ShaderPermutationTest, BundleRejectsSectionOverlap) {
 
 TGFX_TEST(ShaderPermutationTest, BundleRejectsBlobOutsideDataPool) {
   for (uint16_t compression : {uint16_t{0}, uint16_t{2}}) {
-    auto invalid = CompressTestBundle(MakeReflectedTestBundle(BundleFormat::CurrentVersion), compression);
+    auto invalid =
+        CompressTestBundle(MakeReflectedTestBundle(BundleFormat::CurrentVersion), compression);
     ASSERT_FALSE(invalid.empty());
     TestWriteU32LE(invalid.data() + 80 + 16, 2);
     ExpectBundleRejectedPreservingCache(invalid);
@@ -1820,7 +1820,8 @@ TGFX_TEST(ShaderPermutationTest, BundleRejectsReconstructedSizeOverflow) {
   TestWriteU32LE(invalid.data() + 40, std::numeric_limits<uint32_t>::max());
   ExpectBundleRejectedPreservingCache(invalid);
   for (uint16_t compression : {uint16_t{2}}) {
-    auto compressed = CompressTestBundle(MakeReflectedTestBundle(BundleFormat::CurrentVersion), compression);
+    auto compressed =
+        CompressTestBundle(MakeReflectedTestBundle(BundleFormat::CurrentVersion), compression);
     ASSERT_FALSE(compressed.empty());
     auto dataOffset = TestReadU32LE(compressed.data() + 36);
     for (uint32_t size : {3u, 256u * 1024u * 1024u, 256u * 1024u * 1024u - dataOffset,
@@ -1833,7 +1834,8 @@ TGFX_TEST(ShaderPermutationTest, BundleRejectsReconstructedSizeOverflow) {
 
 TGFX_TEST(ShaderPermutationTest, CompressedBundleRejectsIncorrectDataSize) {
   for (uint16_t compression = 2; compression <= 2; ++compression) {
-    auto original = CompressTestBundle(MakeReflectedTestBundle(BundleFormat::CurrentVersion), compression);
+    auto original =
+        CompressTestBundle(MakeReflectedTestBundle(BundleFormat::CurrentVersion), compression);
     ASSERT_FALSE(original.empty());
     for (uint32_t size : {1u, 3u}) {
       auto invalid = original;
@@ -1850,7 +1852,8 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleRejectsIncorrectDataSize) {
 
 TGFX_TEST(ShaderPermutationTest, CompressedBundleFailedReflectionPreservesCache) {
   for (uint16_t compression = 2; compression <= 2; ++compression) {
-    auto invalid = CompressTestBundle(MakeReflectedTestBundle(BundleFormat::CurrentVersion), compression);
+    auto invalid =
+        CompressTestBundle(MakeReflectedTestBundle(BundleFormat::CurrentVersion), compression);
     ASSERT_FALSE(invalid.empty());
     auto fragPoolOffset = TestReadU32LE(invalid.data() + 32);
     TestWriteU32LE(invalid.data() + fragPoolOffset + 24, std::numeric_limits<uint32_t>::max());
@@ -1860,7 +1863,8 @@ TGFX_TEST(ShaderPermutationTest, CompressedBundleFailedReflectionPreservesCache)
 
 TGFX_TEST(ShaderPermutationTest, CompressedBundleRejectsInvalidOffsetOrder) {
   for (uint16_t compression : {uint16_t{2}}) {
-    auto bundle = CompressTestBundle(MakeReflectedTestBundle(BundleFormat::CurrentVersion), compression);
+    auto bundle =
+        CompressTestBundle(MakeReflectedTestBundle(BundleFormat::CurrentVersion), compression);
     PrecompiledShaderCache cache(nullptr, Backend::Unknown);
     ASSERT_TRUE(cache.loadBundle(bundle.data(), bundle.size()));
     auto generation = cache.bundleGeneration();
@@ -1969,7 +1973,6 @@ TGFX_TEST(ShaderPermutationTest, CreatorFunnelRecordsArtifactMiss) {
 
   cache->setDiagnosticRecordingEnabled(false);
   cache->unload();
-
 }
 
 TGFX_TEST(ShaderPermutationTest, ProgramMissCacheClearsOnBundleChange) {

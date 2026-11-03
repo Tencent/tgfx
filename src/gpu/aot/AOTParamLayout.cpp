@@ -54,8 +54,8 @@ std::unique_ptr<AOTParamLayout> AOTParamLayout::Resolve(const UniformData& unifo
     const UniformData::Field* instances[kMaxOrdinalProbe] = {&first};
     size_t found = 1;
     while (found < kMaxOrdinalProbe) {
-      auto suffixed = uniforms.fieldMap.find(std::string(params[id].name) + "_" +
-                                             std::to_string(found));
+      auto suffixed =
+          uniforms.fieldMap.find(std::string(params[id].name) + "_" + std::to_string(found));
       if (suffixed == uniforms.fieldMap.end()) {
         break;
       }

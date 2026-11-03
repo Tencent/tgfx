@@ -40,7 +40,6 @@ class ConicGradientLayout : public FragmentProcessor {
     return scale;
   }
 
-
  protected:
   ConicGradientLayout(Matrix matrix, float bias, float scale);
 

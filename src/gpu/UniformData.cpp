@@ -94,8 +94,8 @@ bool UniformData::writeParamKey(const void* key, size_t instance, const Matrix& 
   float values[9] = {};
   matrix.get9(values);
   const float data[] = {
-      values[0], values[3], values[6], 0, values[1], values[4], values[7], 0,
-      values[2], values[5], values[8], 0,
+      values[0], values[3], values[6], 0,         values[1], values[4],
+      values[7], 0,         values[2], values[5], values[8], 0,
   };
   return writeParamKey(key, instance, data, sizeof(data));
 }

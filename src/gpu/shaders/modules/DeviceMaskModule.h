@@ -19,7 +19,6 @@ struct DeviceMaskModule {
 
   static constexpr ParamInfo Fields[] = {
       DeviceCoordMatrix, DeviceMaskSubset, Subset, AlphaOnly, Rect, HasDeviceMask};
-
 };
 
 }  // namespace tgfx

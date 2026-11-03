@@ -54,7 +54,6 @@ class GaussianBlur1DFragmentProcessor : public Blur1DFragmentProcessor {
     return stepLength;
   }
 
-
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  protected:

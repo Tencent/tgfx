@@ -180,8 +180,9 @@ std::string PinUniformTrace(Context* context, const std::string& name,
   }
   std::ifstream in(path, std::ios::binary);
   if (!in.good()) {
-    return "no golden at " + path + " — run once with TGFX_ACCEPT_BASELINE set to write it, then "
-                                    "commit it together with the change\n";
+    return "no golden at " + path +
+           " — run once with TGFX_ACCEPT_BASELINE set to write it, then "
+           "commit it together with the change\n";
   }
   std::stringstream buffer;
   buffer << in.rdbuf();

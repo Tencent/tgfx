@@ -31,7 +31,8 @@ namespace {
 constexpr AOTNodeContract KindContracts[] = {
     // GeometryColor (graph root, designator): never scheduled.
     {{false, AOTDesignator::GeometryColor}, nullptr, nullptr},
-    {{true, AOTDesignator::None, false, AOTRemapKind::TextureMatrix}, EncodeTextureSourceSlot,
+    {{true, AOTDesignator::None, false, AOTRemapKind::TextureMatrix},
+     EncodeTextureSourceSlot,
      DemandTextureSource},
     {{true, AOTDesignator::None, true}, EncodeUnaryPointwiseSlot, nullptr},  // ColorMatrix
     {{true, AOTDesignator::None, true}, EncodeUnaryPointwiseSlot, nullptr},  // Luma
@@ -43,7 +44,8 @@ constexpr AOTNodeContract KindContracts[] = {
     // after stage three), so the row carries no demand.
     {{true, AOTDesignator::None, false, AOTRemapKind::LocalMatrix}, EncodePerlinNoiseSlot, nullptr},
     {{true}, EncodeRectCoverageSlot, nullptr},
-    {{true, AOTDesignator::None, false, AOTRemapKind::LocalMatrix}, EncodeGradientSlot,
+    {{true, AOTDesignator::None, false, AOTRemapKind::LocalMatrix},
+     EncodeGradientSlot,
      DemandGradientSource},
     {{true}, EncodeRRectCoverageSlot, nullptr},
     // GeometryCoverage (graph root, designator): never scheduled.

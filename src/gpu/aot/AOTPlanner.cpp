@@ -147,7 +147,7 @@ static MaterializedGeometry PrepareMaterializedGeometry(const Rect& drawBounds, 
 // correct when the backing texture is exactly width x height. An Approx (rounded-up) backing would
 // make the normalized coordinates address a scaled region and read uninitialized padding.
 static MaterializedTarget AllocateMaterializedTarget(Context* context,
-                                                      const MaterializedGeometry& geometry) {
+                                                     const MaterializedGeometry& geometry) {
   if (context == nullptr || geometry.isEmpty()) {
     return {};
   }
@@ -324,11 +324,11 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
 // The pass IRs of a plan Build already validated: single pass or cut plan, each carrying its
 // compiled program (admission's, when Build passes one in).
 static bool BuildPassIRs(Context* context, uint32_t renderFlags, const AOTEffectGraph& graph,
-                          const AOTEffectPlan& plan, const Rect& deviceBounds,
-                          const RenderTargetProxy* destination, const Point& fpCoordOffset,
-                          const std::optional<Matrix>& deviceToLocal, AOTRenderPlan* renderPlan,
-                          float sourceAlpha, const std::vector<AOTCoverageTerm>* terminalCoverage,
-                          AOTChainCompile* singlePassCompiled) {
+                         const AOTEffectPlan& plan, const Rect& deviceBounds,
+                         const RenderTargetProxy* destination, const Point& fpCoordOffset,
+                         const std::optional<Matrix>& deviceToLocal, AOTRenderPlan* renderPlan,
+                         float sourceAlpha, const std::vector<AOTCoverageTerm>* terminalCoverage,
+                         AOTChainCompile* singlePassCompiled) {
   auto drawingManager = context->drawingManager();
   auto allocator = drawingManager->drawingAllocator();
   if (plan.passes.size() == 1) {
@@ -368,7 +368,7 @@ static bool BuildPassIRs(Context* context, uint32_t renderFlags, const AOTEffect
 }  // namespace
 
 std::optional<AOTEffectPlan> AOTPlanner::Plan(const DrawIR& ir,
-                                             AOTDecomposeOutcome* failureOutcome) {
+                                              AOTDecomposeOutcome* failureOutcome) {
   AOTEffectPlan plan = {};
   if (!AOTEffectDecomposer::Decompose(ir.color, &plan)) {
     if (failureOutcome != nullptr) {
@@ -466,12 +466,14 @@ bool AOTPlanner::NeedsLocalRemap(const AOTEffectGraph& graph, const AOTEffectPla
   return false;
 }
 
-PlacementPtr<RenderTask> AOTPlanner::Build(
-    Context* context, uint32_t renderFlags, const AOTEffectGraph& graph, const AOTEffectPlan& plan,
-    const Rect& deviceBounds, std::shared_ptr<RenderTargetProxy> destination,
-    PlacementPtr<DrawOp>* originalDraw, const Point& fpCoordOffset, bool clearDestination,
-    const std::optional<Matrix>& deviceToLocal,
-    const std::vector<AOTCoverageTerm>* terminalCoverage) {
+PlacementPtr<RenderTask> AOTPlanner::Build(Context* context, uint32_t renderFlags,
+                                           const AOTEffectGraph& graph, const AOTEffectPlan& plan,
+                                           const Rect& deviceBounds,
+                                           std::shared_ptr<RenderTargetProxy> destination,
+                                           PlacementPtr<DrawOp>* originalDraw,
+                                           const Point& fpCoordOffset, bool clearDestination,
+                                           const std::optional<Matrix>& deviceToLocal,
+                                           const std::vector<AOTCoverageTerm>* terminalCoverage) {
   if (context == nullptr || destination == nullptr || destination->getContext() != context ||
       originalDraw == nullptr || *originalDraw == nullptr ||
       (*originalDraw)->type() == DrawOp::Type::StencilCoverPathDrawOp) {

@@ -23,6 +23,7 @@
 #include "gpu/YUVColorConversion.h"
 #include "gpu/aot/Binder.h"
 #include "gpu/aot/NodeContract.h"
+#include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/TextureView.h"
 #include "gpu/resources/YUVTextureView.h"
@@ -38,7 +39,6 @@
 #include "gpu/shaders/modules/PorterDuffXPModule.h"
 #include "gpu/shaders/modules/TextureSourceModule.h"
 #include "gpu/shaders/modules/TiledSourceModule.h"
-#include "gpu/processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
 namespace {
@@ -478,8 +478,7 @@ void LeafSubsetRect(const std::shared_ptr<TextureProxy>& proxy, const TextureVie
 }
 
 void BindingSubsetRect(const AOTBinding& binding, const TextureView* view, float rect[4]) {
-  LeafSubsetRect(binding.textureProxy, view, binding.args.sampleArea, binding.args.sampling,
-                 rect);
+  LeafSubsetRect(binding.textureProxy, view, binding.args.sampleArea, binding.args.sampling, rect);
 }
 
 // The device mask child's writes, replicating GLSLDeviceSpaceTextureEffect::onSetData.
@@ -608,8 +607,8 @@ namespace {
 // The 12-float aligned form ParamWriter's Float3x3 overload uploads, built from an IR node's
 // row-major get9 storage without going through a Matrix.
 std::array<float, 12> AlignedFromRowMajor(const std::array<float, 9>& values) {
-  return {values[0], values[3], values[6], 0, values[1], values[4], values[7],
-          0,         values[2], values[5], values[8], 0};
+  return {values[0], values[3], values[6], 0,         values[1], values[4],
+          values[7], 0,         values[2], values[5], values[8], 0};
 }
 
 bool IsIdentityRowMajor(const std::array<float, 9>& values) {
@@ -718,8 +717,8 @@ void BindRectClipNode(const AOTRectCoverageParameters& params, ParamWriter* writ
   if (!IsIdentityRowMajor(params.deviceToLocal)) {
     writer->set(AnalyticClipModule::DeviceToLocal, AlignedFromRowMajor(params.deviceToLocal));
   } else {
-    const float deviceRect[4] = {params.rect[0] - 0.5f, params.rect[1] - 0.5f, params.rect[2] + 0.5f,
-                                 params.rect[3] + 0.5f};
+    const float deviceRect[4] = {params.rect[0] - 0.5f, params.rect[1] - 0.5f,
+                                 params.rect[2] + 0.5f, params.rect[3] + 0.5f};
     writer->set(AnalyticClipModule::Rect, deviceRect);
   }
   writer->set(AnalyticClipModule::HasClip, IsIdentityRowMajor(params.deviceToLocal) ? 1 : 3);
@@ -728,11 +727,9 @@ void BindRectClipNode(const AOTRectCoverageParameters& params, ParamWriter* writ
 void BindRRectClipNode(const AOTRRectCoverageParameters& params, ParamWriter* writer) {
   const float localRect[4] = {params.rect[0], params.rect[1], params.rect[2], params.rect[3]};
   writer->set(AnalyticClipModule::LocalRect, localRect);
-  const float radiiX[4] = {params.radiiX[0], params.radiiX[1], params.radiiX[2],
-                           params.radiiX[3]};
+  const float radiiX[4] = {params.radiiX[0], params.radiiX[1], params.radiiX[2], params.radiiX[3]};
   writer->set(AnalyticClipModule::RadiiX, radiiX);
-  const float radiiY[4] = {params.radiiY[0], params.radiiY[1], params.radiiY[2],
-                           params.radiiY[3]};
+  const float radiiY[4] = {params.radiiY[0], params.radiiY[1], params.radiiY[2], params.radiiY[3]};
   writer->set(AnalyticClipModule::RadiiY, radiiY);
   writer->set(AnalyticClipModule::AntiAlias, params.antiAlias);
   writer->set(AnalyticClipModule::DeviceToLocal, AlignedFromRowMajor(params.deviceToLocal));
@@ -768,8 +765,7 @@ void BindBlurKernelNode(const AOTOpaqueKernelParameters& params, const AOTTextur
     // normalized by the view its proxy carries (CoordTransform::getTotalMatrix's math,
     // replicated — a record-time total would miss the normalization of a texture that had not
     // instantiated yet).
-    auto view =
-        child->textureProxy != nullptr ? child->textureProxy->getTextureView() : nullptr;
+    auto view = child->textureProxy != nullptr ? child->textureProxy->getTextureView() : nullptr;
     auto matrix = child->uvMatrix;
     if (view != nullptr) {
       auto scale = view->getTextureCoord(1, 1);

@@ -186,12 +186,12 @@ TGFX_TEST(AOTUniformABTest, GradientFills) {
     auto* canvas = surface->getCanvas();
     canvas->clear(Color::Transparent());
     Paint paint = {};
-    paint.setShader(Shader::MakeLinearGradient(Point{0, 0}, Point{64, 0},
-                                               {Color::Blue(), Color::Green()}, {}));
+    paint.setShader(
+        Shader::MakeLinearGradient(Point{0, 0}, Point{64, 0}, {Color::Blue(), Color::Green()}, {}));
     canvas->drawRect(Rect::MakeXYWH(2, 2, 60, 26), paint);
     paint.setShader(Shader::MakeLinearGradient(
-        Point{0, 0}, Point{64, 0},
-        {Color::Red(), Color::FromRGBA(255, 220, 0, 255), Color::Blue()}, {0.f, 0.4f, 1.f}));
+        Point{0, 0}, Point{64, 0}, {Color::Red(), Color::FromRGBA(255, 220, 0, 255), Color::Blue()},
+        {0.f, 0.4f, 1.f}));
     canvas->drawRect(Rect::MakeXYWH(2, 34, 60, 26), paint);
   });
   EXPECT_TRUE(diff.empty()) << diff;

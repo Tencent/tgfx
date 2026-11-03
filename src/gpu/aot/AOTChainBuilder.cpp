@@ -1409,8 +1409,8 @@ static bool CopyChainNode(const AOTEffectGraph& graph, AOTNodeID nodeID,
     inputs.push_back(resolved);
   }
   return builder->addCopy(
-      *node, inputs, RemapNodeParameters(node->kind, node->parameters, coordToLocal, deviceLeafRemap),
-      copied);
+      *node, inputs,
+      RemapNodeParameters(node->kind, node->parameters, coordToLocal, deviceLeafRemap), copied);
 }
 
 // Copies the wanted node set into the builder in original-graph order — the graph is SSA, so every

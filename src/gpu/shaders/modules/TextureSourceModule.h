@@ -20,7 +20,6 @@ struct TextureSourceModule {
 
   static constexpr ParamInfo Fields[] = {Subset,    SubsetClampOn,   AlphaStart,         AlphaOnly,
                                          HasRgbaaa, YUVLimitedRange, Mat3ColorConversion};
-
 };
 
 }  // namespace tgfx

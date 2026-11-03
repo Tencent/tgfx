@@ -56,9 +56,8 @@ std::optional<YUVTextureFillShader::Inputs> YUVTextureFillShader::ExtractFacts(
     // A pending multi-plane upload lowers with the layout unknown (it exists only once the
     // view does): the node's own proxy is the single source — it resolves the same view the
     // processor wraps, read without going through the processor tree.
-    auto textureView = shape.leaf->textureProxy != nullptr
-                           ? shape.leaf->textureProxy->getTextureView()
-                           : nullptr;
+    auto textureView =
+        shape.leaf->textureProxy != nullptr ? shape.leaf->textureProxy->getTextureView() : nullptr;
     if (textureView == nullptr || !textureView->isYUV()) {
       return std::nullopt;
     }

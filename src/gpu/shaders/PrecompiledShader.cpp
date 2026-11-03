@@ -18,14 +18,14 @@
 
 #include "gpu/shaders/PrecompiledShader.h"
 #include <cstdio>
-#include <iterator>
-#include "gpu/shaders/AllShaderFamilies.h"
 #include <cstdlib>
 #include <cstring>
+#include <iterator>
 #include <map>
 #include <type_traits>
 #include <utility>
 #include "core/utils/USE.h"
+#include "gpu/shaders/AllShaderFamilies.h"
 
 namespace tgfx {
 
@@ -42,9 +42,7 @@ struct FamilyEntry {
 #define TGFX_FAMILY_ENTRY(ShaderClass) \
   {ShaderClass::Name, &CreateShaderFamilyInstance<ShaderClass>, &ShaderClass::Reachable},
 
-constexpr FamilyEntry FamilyEntries[] = {
-    TGFX_FOR_EACH_SHADER_FAMILY(TGFX_FAMILY_ENTRY)
-};
+constexpr FamilyEntry FamilyEntries[] = {TGFX_FOR_EACH_SHADER_FAMILY(TGFX_FAMILY_ENTRY)};
 
 #undef TGFX_FAMILY_ENTRY
 

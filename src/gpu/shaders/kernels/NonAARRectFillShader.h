@@ -100,11 +100,9 @@ class NonAARRectFillShader : public ShaderFamily<NonAARRectFillShader> {
     return values;
   }
 
-
   /// The same acceptance over the draw's extracted facts: the executor-table row's predicate.
   static std::optional<Inputs> ExtractFacts(const AOTDrawFacts& facts,
                                             PermutationMatchFailure* failure);
 };
 
 }  // namespace tgfx
-

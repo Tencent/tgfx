@@ -86,8 +86,6 @@ class AtlasTextFillShader : public ShaderFamily<AtlasTextFillShader> {
   /// FP), defined in the family's own .cpp, next to the GLSL it owns.
   static std::optional<Inputs> ExtractFacts(const AOTDrawFacts& facts,
                                             PermutationMatchFailure* failure);
-
 };
 
 }  // namespace tgfx
-

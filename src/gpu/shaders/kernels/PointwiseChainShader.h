@@ -178,8 +178,7 @@ class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
     }
     if (resourceKind == 2 &&
         (!inputs.hasNoise || inputs.hasGradient || inputs.gpKind != GpKind::QuadPerEdgeAA ||
-         !inputs.hasCoverage ||
-         inputs.hasUVCoord || inputs.textureCount != 1)) {
+         !inputs.hasCoverage || inputs.hasUVCoord || inputs.textureCount != 1)) {
       return std::nullopt;
     }
     if (resourceKind == 1 && inputs.hasNoise) {
@@ -383,4 +382,3 @@ class PointwiseChainShader : public ShaderFamily<PointwiseChainShader> {
 };
 
 }  // namespace tgfx
-

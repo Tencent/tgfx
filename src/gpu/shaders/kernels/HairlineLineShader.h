@@ -78,8 +78,6 @@ class HairlineLineShader : public ShaderFamily<HairlineLineShader> {
   /// in the family's own .cpp, next to the GLSL it owns.
   static std::optional<Inputs> ExtractFacts(const AOTDrawFacts& facts,
                                             PermutationMatchFailure* failure);
-
 };
 
 }  // namespace tgfx
-

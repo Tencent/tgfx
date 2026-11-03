@@ -15,7 +15,6 @@ struct BlurKernelModule {
   static constexpr Param<ParamType::Int> AlphaChild{"AlphaChild"};
 
   static constexpr ParamInfo Fields[] = {Kernel, Radius, Step, TiledChild, AlphaChild};
-
 };
 
 }  // namespace tgfx

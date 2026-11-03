@@ -1370,8 +1370,8 @@ bool OpsCompositor::submitPlanTask(const AOTEffectGraph& graph, const AOTEffectP
       }
     }
   }
-  auto task = AOTPlanner::Build(context, renderFlags, graph, plan, deviceBounds, renderTarget,
-                                    op, Point::Zero(), false, deviceToLocal, terminalCoverage);
+  auto task = AOTPlanner::Build(context, renderFlags, graph, plan, deviceBounds, renderTarget, op,
+                                Point::Zero(), false, deviceToLocal, terminalCoverage);
   if (task == nullptr) {
     return false;
   }

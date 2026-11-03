@@ -246,8 +246,7 @@ TGFX_TEST_PRIVATE(AOTEffectTest, ExecutorRejectsSelfManagedDrawWithoutSideEffect
   auto color = ConstColorProcessor::Make(allocator, PMColor::White(), InputMode::Ignore);
   auto draw = manager->makeFillDrawOp(destination, std::move(color), 0);
   ASSERT_NE(draw, nullptr);
-  auto task =
-      AOTPlanner::Build(context, 0, graph, plan, Rect::MakeWH(64, 64), destination, &draw);
+  auto task = AOTPlanner::Build(context, 0, graph, plan, Rect::MakeWH(64, 64), destination, &draw);
   EXPECT_NE(task, nullptr);
   EXPECT_EQ(draw, nullptr);
 }
@@ -475,8 +474,7 @@ TGFX_TEST_PRIVATE(AOTEffectTest, ExecutorRejectsStencilCoverDrawWithoutTakingOwn
   auto* buffer = manager->getDrawingBuffer();
   auto renderTasks = buffer->renderTasks.size();
   auto resourceTasks = buffer->resourceTasks.size();
-  auto task =
-      AOTPlanner::Build(context, 0, graph, plan, Rect::MakeWH(64, 64), destination, &draw);
+  auto task = AOTPlanner::Build(context, 0, graph, plan, Rect::MakeWH(64, 64), destination, &draw);
   EXPECT_EQ(task, nullptr);
   EXPECT_EQ(draw.get(), original);
   EXPECT_EQ(allocator->size(), allocated);

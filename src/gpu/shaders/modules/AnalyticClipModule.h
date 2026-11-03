@@ -20,7 +20,6 @@ struct AnalyticClipModule {
 
   static constexpr ParamInfo Fields[] = {LocalRect,     RadiiX, RadiiY, AntiAlias,
                                          DeviceToLocal, Rect,   HasClip};
-
 };
 
 }  // namespace tgfx

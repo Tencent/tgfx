@@ -13,7 +13,6 @@ struct PorterDuffXPModule {
   static constexpr Param<ParamType::Float2> DstTextureCoordScale{"DstTextureCoordScale"};
 
   static constexpr ParamInfo Fields[] = {XPBlendMode, DstTextureUpperLeft, DstTextureCoordScale};
-
 };
 
 }  // namespace tgfx

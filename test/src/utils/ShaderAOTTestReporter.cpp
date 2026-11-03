@@ -33,8 +33,8 @@
 #include <vector>
 #include "gpu/EmbeddedShaderBundles.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/ShaderBundleContract.h"
 #include "gpu/PrecompiledShaderCache.h"
+#include "gpu/ShaderBundleContract.h"
 #include "gpu/aot/EffectGraph.h"
 #include "gtest/gtest.h"
 #pragma clang diagnostic push

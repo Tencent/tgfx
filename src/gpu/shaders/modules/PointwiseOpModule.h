@@ -18,7 +18,6 @@ struct PointwiseOpModule {
   static constexpr Param<ParamType::Float> Threshold{"Threshold"};
 
   static constexpr ParamInfo Fields[] = {OpType, ColorMatrix, ColorVector, Kr, Kg, Kb, Threshold};
-
 };
 
 }  // namespace tgfx

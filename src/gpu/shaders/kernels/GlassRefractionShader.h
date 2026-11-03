@@ -89,8 +89,6 @@ class GlassRefractionShader : public ShaderFamily<GlassRefractionShader> {
   /// GLSL it owns.
   static std::optional<Inputs> ExtractFacts(const AOTDrawFacts& facts,
                                             PermutationMatchFailure* failure);
-
 };
 
 }  // namespace tgfx
-

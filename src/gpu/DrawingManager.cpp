@@ -123,7 +123,7 @@ bool DrawingManager::submitFillPlanTask(const AOTEffectGraph& graph, const AOTEf
   auto deviceBounds = Rect::MakeWH(static_cast<float>(renderTarget->width()),
                                    static_cast<float>(renderTarget->height()));
   auto task = AOTPlanner::Build(context, renderFlags, graph, plan, deviceBounds, renderTarget,
-                                    originalDraw, coordOffset, true, std::nullopt);
+                                originalDraw, coordOffset, true, std::nullopt);
   if (task == nullptr) {
     return false;
   }

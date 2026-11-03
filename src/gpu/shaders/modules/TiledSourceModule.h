@@ -20,7 +20,6 @@ struct TiledSourceModule {
 
   static constexpr ParamInfo Fields[] = {ReadSwizzle, Dimension,   Subset,    Clamp,
                                          ShaderModeX, ShaderModeY, AlphaOnly, Strict};
-
 };
 
 }  // namespace tgfx

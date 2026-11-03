@@ -231,5 +231,4 @@ class ShaderFamily : public PrecompiledShader {
   }
 };
 
-
 }  // namespace tgfx
