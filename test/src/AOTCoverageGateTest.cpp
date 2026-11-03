@@ -22,18 +22,21 @@
 // type set; a newly added class that nobody claimed fails here instead of reaching users as an
 // uncovered effect that silently falls back to runtime compilation.
 //
-// A class is claimed when at least one of the following holds:
-//   - Matcher: a matcher rule serves draws containing it (verified by the name() string or a
-//     qualified `ClassName::` reference appearing in PermutationMatcher.cpp);
-//   - Lowering: the class declares lowerToAOT (verified in its header);
-//   - Structural: it is consumed inside another processor's claim — the glass geometry
-//     children — and the matcher references its name to discriminate the parent's shape;
+// A class is claimed when at least one of the following holds, and every category is proven by a
+// structural fact of the codebase — never by a text occurrence in the matcher, which moves
+// whenever matching is restructured:
+//   - GeometryClassified: DescribeGeometryProcessor (the one geometry classifier) references it;
+//   - XferClassified: ClassifyXferForMatch (the one xfer classifier) references it;
+//   - Lowering: the class declares lowerToAOT (verified in its header), so the FP tree can
+//     become IR;
 //   - ParentLowering: it is consumed by its parent's lowerToAOT (gradient layouts and
 //     colorizers lower inside ClampedGradientEffect), verified by the parent declaring
 //     lowerToAOT and the parent's source referencing the class;
 //   - none of the above (runtime by design), which requires a documented reason.
-// AOTClosureVerifier covers a different axis (registered shaders' reachable sets fit inside the
-// published bundles); this gate covers the processor-type axis and the two checks coexist.
+// The classifier bodies are located by their definitions; a renamed or moved classifier fails
+// the gate loudly instead of silently emptying the evidence set. AOTClosureVerifier covers a
+// different axis (registered shaders' reachable sets fit inside the published bundles); this gate
+// covers the processor-type axis and the two checks coexist.
 
 #include <array>
 #include <cstdlib>
@@ -59,14 +62,13 @@
 namespace tgfx {
 namespace {
 
-constexpr uint32_t Matcher = 1;
-constexpr uint32_t Lowering = 2;
-constexpr uint32_t Structural = 4;
+constexpr uint32_t GeometryClassified = 1;
+constexpr uint32_t XferClassified = 2;
+constexpr uint32_t Lowering = 4;
 constexpr uint32_t ParentLowering = 8;
 
 struct ProcessorClaim {
   const char* className = "";
-  const char* nameString = "";
   uint32_t claims = 0;
   const char* note = "";
   // ParentLowering only: the processor class whose lowerToAOT consumes this one.
@@ -76,76 +78,65 @@ struct ProcessorClaim {
 // The claim manifest. Keep in sync with the processor headers: adding a class without a claim
 // entry (or a reason) fails the gate, and removing a class leaves a stale entry that also fails.
 const ProcessorClaim ProcessorClaims[] = {
-    // Geometry processors, each served by matcher rules for its draw shapes.
-    {"AtlasTextGeometryProcessor", "AtlasTextGeometryProcessor", Matcher, ""},
-    {"ComplexEllipseGeometryProcessor", "ComplexEllipseGeometryProcessor", Matcher, ""},
-    {"ComplexNonAARRectGeometryProcessor", "ComplexNonAARRectGeometryProcessor", Matcher, ""},
-    {"DefaultGeometryProcessor", "DefaultGeometryProcessor", Matcher, ""},
-    {"EllipseGeometryProcessor", "EllipseGeometryProcessor", Matcher, ""},
-    {"HairlineLineGeometryProcessor", "HairlineLineGeometryProcessor", Matcher, ""},
-    {"HairlineQuadGeometryProcessor", "HairlineQuadGeometryProcessor", Matcher, ""},
-    {"MeshGeometryProcessor", "MeshGeometryProcessor", Matcher, ""},
-    {"NonAARRectGeometryProcessor", "NonAARRectGeometryProcessor", Matcher, ""},
-    {"QuadPerEdgeAAGeometryProcessor", "QuadPerEdgeAAGeometryProcessor", Matcher, ""},
-    {"RoundStrokeRectGeometryProcessor", "RoundStrokeRectGeometryProcessor", Matcher, ""},
-    {"ShapeInstancedGeometryProcessor", "ShapeInstancedGeometryProcessor", Matcher, ""},
-    {"StencilCoverCoverPassGeometryProcessor", "StencilCoverCoverPassGeometryProcessor", 0,
+    // Geometry processors: each is classified by DescribeGeometryProcessor.
+    {"AtlasTextGeometryProcessor", GeometryClassified, ""},
+    {"ComplexEllipseGeometryProcessor", GeometryClassified, ""},
+    {"ComplexNonAARRectGeometryProcessor", GeometryClassified, ""},
+    {"DefaultGeometryProcessor", GeometryClassified, ""},
+    {"EllipseGeometryProcessor", GeometryClassified, ""},
+    {"HairlineLineGeometryProcessor", GeometryClassified, ""},
+    {"HairlineQuadGeometryProcessor", GeometryClassified, ""},
+    {"MeshGeometryProcessor", GeometryClassified, ""},
+    {"NonAARRectGeometryProcessor", GeometryClassified, ""},
+    {"QuadPerEdgeAAGeometryProcessor", GeometryClassified, ""},
+    {"RoundStrokeRectGeometryProcessor", GeometryClassified, ""},
+    {"ShapeInstancedGeometryProcessor", GeometryClassified, ""},
+    {"StencilCoverCoverPassGeometryProcessor", 0,
      "the stencil cover path sits behind TGFX_ENABLE_STENCIL_COVER_PATH (off by default) and is "
      "not an AOT route"},
-    {"StencilCoverStencilPassGeometryProcessor", "StencilCoverStencilPassGeometryProcessor", 0,
+    {"StencilCoverStencilPassGeometryProcessor", 0,
      "the stencil cover path sits behind TGFX_ENABLE_STENCIL_COVER_PATH (off by default) and is "
      "not an AOT route"},
-    // Xfer processors: EmptyXferProcessor is claimed through its singleton identity
-    // (EmptyXferProcessor::GetInstance in GetXPType) rather than a name() string.
-    {"EmptyXferProcessor", "EmptyXferProcessor", Matcher, ""},
-    {"PorterDuffXferProcessor", "PorterDuffXferProcessor", Matcher, ""},
-    // Fragment processors carrying an AOT lowering; most are also matcher-served at the top
-    // level. AlphaThresholdFragmentProcessor's name() is "AlphaStepFragmentProcessor" (the name
-    // predates the class rename), and XfermodeFragmentProcessor's name() carries a
-    // " - dst"/" - src" suffix.
-    {"AlphaThresholdFragmentProcessor", "AlphaStepFragmentProcessor", Matcher | Lowering, ""},
-    {"ClampedGradientEffect", "ClampedGradientEffect", Matcher | Lowering, ""},
-    {"ColorMatrixFragmentProcessor", "ColorMatrixFragmentProcessor", Matcher | Lowering, ""},
-    {"ColorSpaceXformEffect", "ColorSpaceXformEffect", Matcher | Lowering, ""},
-    {"ComposeFragmentProcessor", "ComposeFragmentProcessor", Lowering,
-     "structural container: lowers by chaining its children"},
-    {"ConstColorProcessor", "ConstColorProcessor", Lowering,
-     "served as a chain slot through the lowering"},
-    {"DeviceSpaceTextureEffect", "DeviceSpaceTextureEffect", Matcher | Lowering, ""},
-    {"LumaFragmentProcessor", "LumaFragmentProcessor", Matcher | Lowering, ""},
-    {"PerlinNoiseFragmentProcessor", "PerlinNoiseFragmentProcessor", Lowering, ""},
-    {"RectEffect", "RectEffect", Matcher | Lowering, ""},
-    {"RRectEffect", "RRectEffect", Matcher | Lowering, ""},
-    {"TextureEffect", "TextureEffect", Matcher | Lowering, ""},
-    {"TiledTextureEffect", "TiledTextureEffect", Matcher | Lowering, ""},
-    {"XfermodeFragmentProcessor", "XfermodeFragmentProcessor", Matcher | Lowering,
-     "the SrcIn local-mask coverage form is matcher-claimed; two-processor blends lower"},
+    // Xfer processors: ClassifyXferForMatch names both (the empty one through its singleton
+    // identity).
+    {"EmptyXferProcessor", XferClassified, ""},
+    {"PorterDuffXferProcessor", XferClassified, ""},
+    // Fragment processors carrying an AOT lowering: lowerToAOT is the structural fact, and the
+    // families read the resulting IR instead of walking the processor tree.
+    {"AlphaThresholdFragmentProcessor", Lowering, ""},
+    {"ClampedGradientEffect", Lowering, ""},
+    {"ColorMatrixFragmentProcessor", Lowering, ""},
+    {"ColorSpaceXformEffect", Lowering, ""},
+    {"ComposeFragmentProcessor", Lowering, "structural container: lowers by chaining its children"},
+    {"ConstColorProcessor", Lowering, "served as a chain slot through the lowering"},
+    {"DeviceSpaceTextureEffect", Lowering, ""},
+    {"LumaFragmentProcessor", Lowering, ""},
+    {"PerlinNoiseFragmentProcessor", Lowering, ""},
+    {"RectEffect", Lowering, ""},
+    {"RRectEffect", Lowering, ""},
+    {"TextureEffect", Lowering, ""},
+    {"TiledTextureEffect", Lowering, ""},
+    {"XfermodeFragmentProcessor", Lowering,
+     "the SrcIn local-mask coverage form is served; two-processor blends lower"},
     // Gradient parts: ClampedGradientEffect::lowerToAOT reads each layout and colorizer into the
     // gradient node's parameters, so the parent's lowering is their claim.
-    {"ConicGradientLayout", "ConicGradientLayout", ParentLowering, "", "ClampedGradientEffect"},
-    {"DiamondGradientLayout", "DiamondGradientLayout", ParentLowering, "", "ClampedGradientEffect"},
-    {"LinearGradientLayout", "LinearGradientLayout", ParentLowering, "", "ClampedGradientEffect"},
-    {"RadialGradientLayout", "RadialGradientLayout", ParentLowering, "", "ClampedGradientEffect"},
-    {"SingleIntervalGradientColorizer", "SingleIntervalGradientColorizer", ParentLowering, "",
-     "ClampedGradientEffect"},
-    {"DualIntervalGradientColorizer", "DualIntervalGradientColorizer", ParentLowering, "",
-     "ClampedGradientEffect"},
-    {"TextureGradientColorizer", "TextureGradientColorizer", ParentLowering, "",
-     "ClampedGradientEffect"},
-    {"UnrolledBinaryGradientColorizer", "UnrolledBinaryGradientColorizer", ParentLowering, "",
-     "ClampedGradientEffect"},
+    {"ConicGradientLayout", ParentLowering, "", "ClampedGradientEffect"},
+    {"DiamondGradientLayout", ParentLowering, "", "ClampedGradientEffect"},
+    {"LinearGradientLayout", ParentLowering, "", "ClampedGradientEffect"},
+    {"RadialGradientLayout", ParentLowering, "", "ClampedGradientEffect"},
+    {"SingleIntervalGradientColorizer", ParentLowering, "", "ClampedGradientEffect"},
+    {"DualIntervalGradientColorizer", ParentLowering, "", "ClampedGradientEffect"},
+    {"TextureGradientColorizer", ParentLowering, "", "ClampedGradientEffect"},
+    {"UnrolledBinaryGradientColorizer", ParentLowering, "", "ClampedGradientEffect"},
     // Glass geometry children consumed inside GlassRefractionFragmentProcessor::lowerToAOT —
-    // the parent's opaque node carries their kind as a variant dimension (the family's matcher
-    // reads the node, not the processor tree).
-    {"GlassSDFGeometryFragmentProcessor", "GlassSDFGeometryFragmentProcessor", ParentLowering, "",
-     "GlassRefractionFragmentProcessor"},
-    {"GlassUDFGeometryFragmentProcessor", "GlassUDFGeometryFragmentProcessor", ParentLowering, "",
-     "GlassRefractionFragmentProcessor"},
+    // the parent's opaque node carries their kind as a variant dimension.
+    {"GlassSDFGeometryFragmentProcessor", ParentLowering, "", "GlassRefractionFragmentProcessor"},
+    {"GlassUDFGeometryFragmentProcessor", ParentLowering, "", "GlassRefractionFragmentProcessor"},
     // Effect processors served by dedicated families: they lower into the IR's opaque-kernel
     // node, and the family matchers read that node instead of walking the processor tree.
-    {"GaussianBlur1DFragmentProcessor", "GaussianBlur1DFragmentProcessor", Lowering, ""},
-    {"GlassRefractionFragmentProcessor", "GlassRefractionFragmentProcessor", Lowering, ""},
-    {"GlassUDFTentBlurFragmentProcessor", "GlassUDFTentBlurFragmentProcessor", Lowering, ""},
+    {"GaussianBlur1DFragmentProcessor", Lowering, ""},
+    {"GlassRefractionFragmentProcessor", Lowering, ""},
+    {"GlassUDFTentBlurFragmentProcessor", Lowering, ""},
 };
 
 struct ScannedProcessor {
@@ -164,6 +155,31 @@ static std::string ReadTextFile(const std::string& path) {
   std::ostringstream buffer = {};
   buffer << stream.rdbuf();
   return buffer.str();
+}
+
+// Returns the body of the function whose definition begins with `definitionHead` (the signature
+// up to and including the opening brace), or an empty string when the definition is absent. The
+// classifier bodies carry no braces inside strings or comments, so plain counting suffices; a
+// missing definition is itself a gate failure, never a silent pass.
+static std::string ExtractFunctionBody(const std::string& source,
+                                       const std::string& definitionHead) {
+  auto start = source.find(definitionHead);
+  if (start == std::string::npos) {
+    return {};
+  }
+  auto open = start + definitionHead.size() - 1;
+  int depth = 0;
+  for (size_t index = open; index < source.size(); ++index) {
+    if (source[index] == '{') {
+      ++depth;
+    } else if (source[index] == '}') {
+      --depth;
+      if (depth == 0) {
+        return source.substr(open, index - open + 1);
+      }
+    }
+  }
+  return {};
 }
 
 // Returns the name of the class declaration (`class X ... {`) that most closely precedes the
@@ -254,14 +270,15 @@ static std::vector<ScannedProcessor> ScanProcessorHeaders() {
   return result;
 }
 
-// The pure gate check, factored out so synthetic violations can verify the gate itself. A
-// matcher/structural claim is proven by the name() string, a qualified `ClassName::` reference
-// (the singleton identity form), or an `IsProcessor<ClassName>` type check appearing in the
-// matcher source; a lowering claim by the scanned header declaring lowerToAOT; a
-// runtime-by-design entry by its documented reason.
+// The pure gate check, factored out so synthetic violations can verify the gate itself. A claim
+// is proven by a structural fact, never by a text occurrence in the matcher: a geometry claim by
+// the class appearing in DescribeGeometryProcessor's body, an xfer claim by ClassifyXferForMatch's
+// body, a lowering claim by the header declaring lowerToAOT, a parent-lowering claim by the
+// parent's lowerToAOT source consuming the class, and a runtime-by-design entry by its documented
+// reason.
 static std::vector<std::string> EvaluateProcessorClaims(
     const std::vector<ScannedProcessor>& scanned, const ProcessorClaim* claims, size_t claimCount,
-    const std::string& matcherSource) {
+    const std::string& geometryClassifierBody, const std::string& xferClassifierBody) {
   std::vector<std::string> violations = {};
   for (const auto& processor : scanned) {
     const ProcessorClaim* claim = nullptr;
@@ -274,22 +291,20 @@ static std::vector<std::string> EvaluateProcessorClaims(
     if (claim == nullptr) {
       violations.push_back("unclaimed processor class: " + processor.className + " (" +
                            processor.filePath +
-                           ") — add a matcher rule, a lowerToAOT, or a "
-                           "documented runtime-by-design entry");
+                           ") — add a classifier entry, a lowerToAOT, or a documented "
+                           "runtime-by-design entry");
       continue;
     }
-    if ((claim->claims & (Matcher | Structural)) != 0) {
-      bool referenced =
-          matcherSource.find(claim->nameString) != std::string::npos ||
-          matcherSource.find(std::string(claim->className) + "::") != std::string::npos ||
-          matcherSource.find("IsProcessor<" + std::string(claim->className) + ">") !=
-              std::string::npos;
-      if (!referenced) {
-        violations.push_back("matcher reference missing for: " + processor.className +
-                             " (expected \"" + claim->nameString + "\", \"" + claim->className +
-                             "::\", or \"IsProcessor<" + claim->className + ">\" in " +
-                             "PermutationMatcher.cpp)");
-      }
+    if ((claim->claims & GeometryClassified) != 0 &&
+        geometryClassifierBody.find(processor.className) == std::string::npos) {
+      violations.push_back("geometry classifier does not reference: " + processor.className +
+                           " (expected IsProcessor<" + processor.className +
+                           "> in DescribeGeometryProcessor)");
+    }
+    if ((claim->claims & XferClassified) != 0 &&
+        xferClassifierBody.find(processor.className) == std::string::npos) {
+      violations.push_back("xfer classifier does not reference: " + processor.className +
+                           " (expected " + processor.className + " in ClassifyXferForMatch)");
     }
     if ((claim->claims & Lowering) != 0 && !processor.hasLowerToAOT) {
       violations.push_back("lowerToAOT missing for: " + processor.className);
@@ -334,23 +349,17 @@ TGFX_TEST(AOTCoverageGateTest, AllProcessorsAreClaimed) {
   ASSERT_FALSE(scanned.empty());
   auto matcherSource = ReadTextFile(ProjectPath::Absolute("src/gpu/PermutationMatcher.cpp"));
   ASSERT_FALSE(matcherSource.empty());
-  // The per-family match units (src/gpu/shaders/kernels/*Shader.cpp) are matching code too: a
-  // processor referenced only there (e.g. the Perlin family's PerlinNoiseFragmentProcessor) is
-  // claimed, so their sources join the scan.
-  {
-    auto dirPath = std::filesystem::path(ProjectPath::Absolute("src/gpu/shaders/kernels"));
-    std::error_code error = {};
-    for (auto it = std::filesystem::directory_iterator(dirPath, error);
-         it != std::filesystem::directory_iterator(); it.increment(error)) {
-      if (error || !it->is_regular_file() || it->path().extension() != ".cpp") {
-        continue;
-      }
-      matcherSource += "\n" + ReadTextFile(it->path().string());
-    }
-  }
-  auto violations =
-      EvaluateProcessorClaims(scanned, ProcessorClaims,
-                              sizeof(ProcessorClaims) / sizeof(ProcessorClaims[0]), matcherSource);
+  // The evidence is the classifiers' own bodies, not the file around them: a renamed or moved
+  // classifier fails here loudly instead of silently emptying the evidence set.
+  auto geometryClassifier = ExtractFunctionBody(
+      matcherSource, "DescribeGeometryProcessor(const GeometryProcessor* gp) {");
+  auto xferClassifier =
+      ExtractFunctionBody(matcherSource, "ClassifyXferForMatch(const XferProcessor* xp) {");
+  ASSERT_FALSE(geometryClassifier.empty());
+  ASSERT_FALSE(xferClassifier.empty());
+  auto violations = EvaluateProcessorClaims(scanned, ProcessorClaims,
+                                            sizeof(ProcessorClaims) / sizeof(ProcessorClaims[0]),
+                                            geometryClassifier, xferClassifier);
   for (const auto& violation : violations) {
     printf("[CoverageGate] %s\n", violation.c_str());
   }
@@ -358,8 +367,8 @@ TGFX_TEST(AOTCoverageGateTest, AllProcessorsAreClaimed) {
 }
 
 // Verifies the gate itself rejects the violation shapes it exists to catch, using synthetic
-// scan/manifest inputs: a new unclaimed class, a stale manifest entry, a claimed name the
-// matcher never references, and a runtime entry without a reason.
+// scan/manifest inputs: a new unclaimed class, a stale manifest entry, a classified claim the
+// classifier never references, and a runtime entry without a reason.
 TGFX_TEST(AOTCoverageGateTest, GateRejectsSyntheticViolations) {
   std::vector<ScannedProcessor> scanned = {};
   ScannedProcessor good = {};
@@ -388,16 +397,17 @@ TGFX_TEST(AOTCoverageGateTest, GateRejectsSyntheticViolations) {
   scanned.push_back(forgotten);
 
   const ProcessorClaim claims[] = {
-      {"GoodProcessor", "GoodProcessor", Lowering, ""},
-      {"GoodProcessorMissingReference", "GoodProcessorMissingReference", Matcher, ""},
-      {"RemovedProcessor", "RemovedProcessor", Matcher, ""},
-      {"ReasonlessRuntimeProcessor", "ReasonlessRuntimeProcessor", 0, ""},
-      {"ParentProcessor", "ParentProcessor", Lowering, ""},
-      {"ConsumedPart", "ConsumedPart", ParentLowering, "", "ParentProcessor"},
-      {"ForgottenPart", "ForgottenPart", ParentLowering, "", "ParentProcessor"},
+      {"GoodProcessor", Lowering, ""},
+      {"GoodProcessorMissingReference", GeometryClassified, ""},
+      {"RemovedProcessor", GeometryClassified, ""},
+      {"ReasonlessRuntimeProcessor", 0, ""},
+      {"ParentProcessor", Lowering, ""},
+      {"ConsumedPart", ParentLowering, "", "ParentProcessor"},
+      {"ForgottenPart", ParentLowering, "", "ParentProcessor"},
   };
-  // The matcher source deliberately lacks every synthetic name.
-  auto violations = EvaluateProcessorClaims(scanned, claims, 7, "// empty matcher");
+  // The classifier bodies deliberately lack every synthetic name.
+  auto violations =
+      EvaluateProcessorClaims(scanned, claims, 7, "// empty geometry", "// empty xfer");
   EXPECT_EQ(violations.size(), 5u);
   bool sawForgottenPart = false;
   bool sawUnclaimed = false;
@@ -412,7 +422,7 @@ TGFX_TEST(AOTCoverageGateTest, GateRejectsSyntheticViolations) {
         std::string::npos) {
       sawStale = true;
     }
-    if (violation.find("matcher reference missing for: GoodProcessorMissingReference") !=
+    if (violation.find("geometry classifier does not reference: GoodProcessorMissingReference") !=
         std::string::npos) {
       sawMissingReference = true;
     }
