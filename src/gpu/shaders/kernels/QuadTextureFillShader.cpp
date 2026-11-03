@@ -20,6 +20,7 @@
 #include <optional>
 #include "gpu/ProgramInfo.h"
 #include "gpu/aot/AOTChainBuilder.h"
+#include "gpu/aot/DrawIR.h"
 #include "gpu/aot/DrawShape.h"
 
 namespace tgfx {

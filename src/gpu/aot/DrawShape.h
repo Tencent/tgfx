@@ -18,14 +18,76 @@
 
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include "gpu/ShaderMatchHelpers.h"
-#include "gpu/aot/DrawIR.h"
 #include "gpu/shaders/ShaderPermutation.h"
 
 namespace tgfx {
 
 class ProgramInfo;
+struct DrawIR;
+
+/**
+ * The draw's geometry kind as the matchers see it: one value per processor class the precompiled
+ * kernels serve, and Other for everything else.
+ */
+enum class GeometryKind : uint8_t {
+  Other = 0,
+  Default,
+  QuadPerEdgeAA,
+  // The rounded-rect pairs (RRectDrawOp): the non-AA forms at AAType::None and the AA forms, each
+  // in a plain and a per-corner-radii variant.
+  NonAARRect,
+  ComplexNonAARRect,
+  Ellipse,
+  ComplexEllipse,
+  // The hairline line/quad pair (HairlineLineOp / HairlineQuadOp) and the triangle mesh
+  // (MeshDrawOp).
+  HairlineLine,
+  HairlineQuad,
+  Mesh,
+  // The round-capped/joined stroke rect (RectDrawOp's round line join) and the instanced shape
+  // batch (ShapeInstancedDrawOp; two families share this processor).
+  RoundStrokeRect,
+  ShapeInstanced,
+  // The glyph atlas geometry (AtlasTextOp).
+  AtlasText,
+};
+
+/**
+ * The geometry facts a draw's matcher rules read, as plain data. Described off the made geometry
+ * processor at match time (DescribeGeometryProcessor) — the matching runs at prepare, where the
+ * processor itself is the truth, so there is one description and no record-time copy.
+ */
+struct AOTGeometryDesc {
+  GeometryKind kind = GeometryKind::Other;
+  // QuadPerEdgeAA only: the vertex stage's layout facts the matchers read.
+  bool hasCommonColor = false;
+  bool hasUVMatrix = false;
+  bool hasSubset = false;
+  bool hasUVPerspective = false;
+  // The rounded-rect kinds only: the stroke form (the processors' isStroke).
+  bool isStroke = false;
+  // Mesh only: whether the vertex attributes carry texture coordinates.
+  bool hasTexCoords = false;
+  // AtlasText only: whether the processor carries the AA coverage attribute (AAType::Coverage).
+  bool hasCoverage = false;
+};
+
+/**
+ * The xfer classification the matcher rules read (the XP_* vocabulary's plain-data twin): how
+ * the destination color reaches the fragment shader. Classified off the made xfer processor at
+ * match time — the dst-texture decision was made when the op was recorded (a dst-texture
+ * processor holds its proxy, a framebuffer-fetch one empty info), so the processor's own dst
+ * info is exact.
+ */
+enum class XferKind : uint8_t {
+  Unsupported = 0,
+  None,
+  DstTexture,
+  FrameBufferFetch,
+};
 
 /**
  * A draw's matcher facts, extracted once per match: the geometry and xfer described off the made

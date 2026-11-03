@@ -21,6 +21,7 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/aot/AOTChainBuilder.h"
+#include "gpu/aot/DrawIR.h"
 #include "gpu/aot/DrawShape.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"

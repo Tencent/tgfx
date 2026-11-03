@@ -22,6 +22,7 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/aot/AOTChainBuilder.h"
+#include "gpu/aot/DrawIR.h"
 #include "gpu/aot/DrawShape.h"
 #include "gpu/processors/TiledTextureEffect.h"
 

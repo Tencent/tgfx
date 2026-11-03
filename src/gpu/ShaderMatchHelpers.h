@@ -158,7 +158,6 @@ bool ContainsGradientSource(const FragmentProcessor* processor);
 /// shaderInfo skips that check and it runs once the family is known). A route that skips one of
 /// these gates would serve a draw the kernels cannot render correctly.
 bool AdmitMatchedProgram(const ProgramInfo* programInfo, const DrawShape& shape,
-                         const PrecompiledShaderInfo* shaderInfo,
-                         PermutationMatchFailure* failure);
+                         const PrecompiledShaderInfo* shaderInfo, PermutationMatchFailure* failure);
 
 }  // namespace tgfx

@@ -24,6 +24,7 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/ShaderMatchHelpers.h"
 #include "gpu/aot/AOTChainBuilder.h"
+#include "gpu/aot/DrawShape.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComplexEllipseGeometryProcessor.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"

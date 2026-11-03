@@ -9,77 +9,50 @@
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the license for the specific language governing permissions and
-//  limitations under the license.
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
-#include <optional>
-#include <vector>
-#include "gpu/shaders/ShaderFamily.h"
+#include "gpu/shaders/FillKernel.h"
 
 namespace tgfx {
 
-class ProgramInfo;
-
-class EllipseFillShader : public ShaderFamily<EllipseFillShader> {
+/**
+ * EllipseFillShader fragment entry: EllipseGeometryProcessor + EmptyXferProcessor/PorterDuffXP,
+ * no color fragment processor. The ellipse edge coverage is true coverage; a device mask and the
+ * runtime clip multiply into it, a local-mask texture is not served (the vertex stage provides no
+ * per-vertex UV). The color attribute is unconditional and the exact painting color rides the
+ * HasCommonColor runtime uniform, so HAS_COMMON_COLOR is not a dimension.
+ */
+class EllipseFillShader : public FillKernel<EllipseFillShader> {
  public:
   static constexpr const char* Name = "EllipseFillShader";
   static constexpr const char* VertFile = "kernels/ellipse_fill.vert";
   static constexpr const char* FragFile = "kernels/ellipse_fill.frag";
-
-  // HAS_COMMON_COLOR is not a dimension: the color attribute is unconditional (common-color
-  // batches broadcast the paint color), and the color source is the HasCommonColor runtime
-  // uniform.
-  struct VertDims {
-    // No vertex dimensions: an empty domain, with no handles to keep aligned.
-    static PermutationDomain domain() {
-      return PermutationDomain({});
-    }
-  };
-  using VD = VertDims;
-
-  struct FragDims {
-    // One typed handle per dimension; domain() lists them in the bundle's dimension order, and
-    // Compose assigns through the handles by name (ComposedDims) — no index enum to keep
-    // aligned with the domain list.
-    static inline const PermutationIntDim<FragDims> HAS_XP{XP_DEFINE_NAME, XP_VALUE_COUNT};
-    static inline const PermutationBoolDim<FragDims> HAS_DEVICE_MASK{"HAS_DEVICE_MASK"};
-    static PermutationDomain domain() {
-      return PermutationDomain({HAS_XP, HAS_DEVICE_MASK});
-    }
-  };
-  using FD = FragDims;
-  /// Whether alpha-only (AAAA) render targets may be served by this kernel.
   static constexpr bool ServesAlphaOnly = false;
 
-  /// Matcher inputs: the XferProcessor kind and the device-mask coverage presence.
-  struct Inputs {
-    int xpType = XP_UNSUPPORTED;
-    bool hasDeviceMask = false;
-  };
+  /// Fragment dimensions, in the bundle's dimension order:
+  ///   HAS_XP: 0=passthrough, 1=PorterDuff dst texture, 2=PorterDuff framebuffer fetch
+  ///   HAS_DEVICE_MASK: device-space mask texture binding is present
+  static constexpr Dim fragDims[] = {{XP_DEFINE_NAME, XP_VALUE_COUNT}, {"HAS_DEVICE_MASK", 2}};
 
-  /// Pure mapping from inputs to dimension values. Pass-through: every input value lands on the
-  /// domain one-to-one, so the mirrored Reachable default enumerates exactly what Compose emits.
-  static std::optional<RuleComposedValues> Compose(const Inputs& inputs) {
-    if (inputs.xpType < XP_NONE) {
-      return std::nullopt;
-    }
-    auto frag = ComposedDims<FragDims>(FragDims::domain());
-    frag.set(FD::HAS_XP, inputs.xpType);
-    frag.set(FD::HAS_DEVICE_MASK, inputs.hasDeviceMask ? 1 : 0);
-    RuleComposedValues values;
-    values.fragValues = frag.finish();
-    return values;
+  static bool Accept(const DrawShape& shape) {
+    return shape.geometry.kind == GeometryKind::Ellipse && shape.colorFPCount == 0 &&
+           shape.coverage.has_value() && shape.coverage != Coverage::LocalMask &&
+           shape.xpType() >= XP_NONE;
   }
 
-  /// The same acceptance over the draw's extracted facts: the executor-table row's predicate.
-  static std::optional<Inputs> ExtractFacts(const DrawShape& facts,
-                                            PermutationMatchFailure* failure);
+  static Variants Select(const DrawShape& shape) {
+    Variants variants;
+    variants.frag(XP_DEFINE_NAME, shape.xpType())
+        .frag("HAS_DEVICE_MASK", shape.coverage == Coverage::DeviceMask ? 1 : 0);
+    return variants;
+  }
 };
 
 }  // namespace tgfx
