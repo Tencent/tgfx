@@ -1298,7 +1298,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     // terminal pass, and a single-pass plan stays on the plain route for the prepare-time walk.
     op->tryLowerIR();
     const bool coverageFree = !op->hasCoverageProcessors();
-    if (cache->decompositionEnabled() && deviceBounds.has_value() && !deviceBounds->isEmpty()) {
+    if (cache->aotPolicy().decomposition && deviceBounds.has_value() && !deviceBounds->isEmpty()) {
       if (auto* ir = op->loweredIR()) {
         auto plan = AOTPlanner::Plan(*ir);
         if (plan.has_value()) {

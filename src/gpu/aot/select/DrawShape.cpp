@@ -19,7 +19,9 @@
 #include "gpu/aot/select/DrawShape.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/Swizzle.h"
+#include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
+#include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/shaders/PrecompiledShader.h"
@@ -54,6 +56,35 @@ uint32_t RequiredTextureReads(const ProgramInfo* programInfo) {
   return required;
 }
 
+// The color graph names the gradient node; scanning it avoids re-walking the processor tree the
+// lowering already consumed.
+bool GraphHasGradientSource(const AOTEffectGraph& graph) {
+  for (size_t index = 0; index < graph.nodeCount(); ++index) {
+    const auto* node = graph.nodeAt(AOTNodeID(static_cast<uint32_t>(index)));
+    if (node != nullptr && node->kind == AOTEffectKind::GradientSource) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// The no-IR fallback, kept for the paths that match without a carried IR (tests and the
+// pre-lowering probes): the production path reads the IR.
+bool ContainsGradientSource(const FragmentProcessor* processor) {
+  if (processor == nullptr) {
+    return false;
+  }
+  if (IsProcessor<ClampedGradientEffect>(processor)) {
+    return true;
+  }
+  for (size_t index = 0; index < processor->numChildProcessors(); ++index) {
+    if (ContainsGradientSource(processor->childProcessor(index))) {
+      return true;
+    }
+  }
+  return false;
+}
+
 }  // namespace
 
 DrawShape ExtractDrawShape(const ProgramInfo* programInfo) {
@@ -68,6 +99,16 @@ DrawShape ExtractDrawShape(const ProgramInfo* programInfo) {
   // exist, so they are described off the made processors — one description, no record-time copy.
   facts.geometry = DescribeGeometryProcessor(programInfo->getGeometryProcessor());
   facts.xfer = ClassifyXferForMatch(programInfo->getXferProcessor());
+  if (facts.ir != nullptr) {
+    facts.hasGradientSource = GraphHasGradientSource(facts.ir->color);
+  } else {
+    for (size_t index = 0; index < programInfo->numFragmentProcessors(); ++index) {
+      if (ContainsGradientSource(programInfo->getFragmentProcessor(index))) {
+        facts.hasGradientSource = true;
+        break;
+      }
+    }
+  }
   return facts;
 }
 

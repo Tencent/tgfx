@@ -31,6 +31,8 @@
 #include "gpu/aot/bind/Binder.h"
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/aot/plan/AOTChainBuilder.h"
+#include "gpu/aot/select/DrawShape.h"
+#include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
@@ -479,7 +481,7 @@ void PrecompiledProgramWriter::writeProcessorsByTree(const ProgramInfo& info,
   // The suffix reset above puts the XP back on the base names; the offset path's instance
   // ordinal follows it.
   paramWriter.setInstanceOrdinal(0);
-  if (carriedIR != nullptr && IsProcessor<PorterDuffXferProcessor>(processor)) {
+  if (carriedIR != nullptr && ClassifyXferForMatch(processor) != XferKind::None) {
     // The blend mode off the IR; the dst texture's instance-time facts off the made processor --
     // the same layer the geometry facts read.
     BindPorterDuffXfer(static_cast<int>(carriedIR->blendMode), processor, &paramWriter);
@@ -751,7 +753,7 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
   const auto processor = info.getXferProcessor();
   info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
   paramWriter.setInstanceOrdinal(0);
-  if (IsProcessor<PorterDuffXferProcessor>(processor)) {
+  if (ClassifyXferForMatch(processor) != XferKind::None) {
     // The blend mode off the IR; the dst texture's instance-time facts off the made processor --
     // the same layer the geometry facts read.
     BindPorterDuffXfer(static_cast<int>(carriedIR->blendMode), processor, &paramWriter);
@@ -934,7 +936,7 @@ void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* v
   const auto processor = info.getXferProcessor();
   info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
   const auto* chainIR = info.getCarriedIR();
-  if (chainIR != nullptr && IsProcessor<PorterDuffXferProcessor>(processor)) {
+  if (chainIR != nullptr && ClassifyXferForMatch(processor) != XferKind::None) {
     BindPorterDuffXfer(static_cast<int>(chainIR->blendMode), processor, &paramWriter);
   } else {
     processor->setData(vertexUniformData, fragmentUniformData);

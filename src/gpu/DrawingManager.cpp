@@ -123,7 +123,7 @@ bool DrawingManager::isFillRouteCandidate(const FragmentProcessor* processor) co
   // composite processor tree (Compose/Xfermode children). A bare single-source fill is already
   // served by the direct matchers, so it must skip the route and keep its single program lookup.
   auto cache = context->precompiledShaderCache();
-  return cache != nullptr && cache->isLoaded() && cache->decompositionEnabled() &&
+  return cache != nullptr && cache->isLoaded() && cache->aotPolicy().decomposition &&
          processor != nullptr && processor->numChildProcessors() > 0;
 }
 

@@ -540,21 +540,6 @@ std::optional<OpaqueKernelIRShape> ReadOpaqueKernelIRShape(const DrawIR* ir, int
   return shape;
 }
 
-bool ContainsGradientSource(const FragmentProcessor* processor) {
-  if (processor == nullptr) {
-    return false;
-  }
-  if (IsProcessor<ClampedGradientEffect>(processor)) {
-    return true;
-  }
-  for (size_t index = 0; index < processor->numChildProcessors(); ++index) {
-    if (ContainsGradientSource(processor->childProcessor(index))) {
-      return true;
-    }
-  }
-  return false;
-}
-
 // Per-family gate of the walk (see MatchPermutationImpl for the switch semantics): the two
 // diagnostic switches exclude their half of the family list, decompositionEnabled gating the
 // interpreter and dedicatedKernelsEnabled every dedicated family.
@@ -574,15 +559,13 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(
   // every dedicated family (the whole executor table), decompositionEnabled the interpreter.
   auto* shaderContext = programInfo->getContext();
   auto* shaderCache = shaderContext != nullptr ? shaderContext->precompiledShaderCache() : nullptr;
-  const bool allowDedicated = shaderCache == nullptr || shaderCache->dedicatedKernelsEnabled();
+  const auto policy =
+      shaderCache != nullptr ? shaderCache->aotPolicy() : PrecompiledShaderCache::AOTPolicy{};
+  const bool allowDedicated = policy.dedicatedKernels;
   // Gradients keep the interpreter even with the decomposition switch off (only the extended
   // chain kind serves them), mirroring the required-gradient-lowering the switch always retained.
-  bool hasGradient = false;
-  for (size_t index = 0; !hasGradient && index < programInfo->numFragmentProcessors(); ++index) {
-    hasGradient = ContainsGradientSource(programInfo->getFragmentProcessor(index));
-  }
-  const bool allowInterpreter =
-      shaderCache == nullptr || shaderCache->decompositionEnabled() || hasGradient;
+  // The fact was computed once when the draw's facts were extracted.
+  const bool allowInterpreter = policy.decomposition || shape.hasGradientSource;
   // The dedicated families dispatch through the executor table: the generated family list, each
   // entry the family's own ExtractFacts pipeline, with one facts extraction replacing every
   // family re-deriving the same facts from the processor tree. The gates keep the retired walk's
@@ -689,29 +672,7 @@ std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* progra
 }
 
 const char* PermutationMatchFailureName(PermutationMatchFailure failure) {
-  switch (failure) {
-    case PermutationMatchFailure::None:
-      return "None";
-    case PermutationMatchFailure::UnsupportedOutputSwizzle:
-      return "UnsupportedOutputSwizzle";
-    case PermutationMatchFailure::NoMatchingRule:
-      return "NoMatchingRule";
-    case PermutationMatchFailure::UnsupportedTextureRead:
-      return "UnsupportedTextureRead";
-    case PermutationMatchFailure::GlGateRejected:
-      return "GlGateRejected";
-    case PermutationMatchFailure::QuadSubset:
-      return "QuadSubset";
-    case PermutationMatchFailure::GradientOrNoiseBudget:
-      return "GradientOrNoiseBudget";
-    case PermutationMatchFailure::CoverageShape:
-      return "CoverageShape";
-    case PermutationMatchFailure::NoMatchingFamily:
-      return "NoMatchingFamily";
-    case PermutationMatchFailure::PermutationNotEnumerated:
-      return "PermutationNotEnumerated";
-  }
-  return "Unknown";
+  return AOTFailureName(failure);
 }
 
 }  // namespace tgfx

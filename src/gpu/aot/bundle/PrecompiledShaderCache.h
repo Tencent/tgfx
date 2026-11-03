@@ -32,6 +32,7 @@
 #include "gpu/ShaderCache.h"
 #include "gpu/Uniform.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
+#include "gpu/shaders/contract/AOTFailure.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/Backend.h"
 
@@ -56,37 +57,9 @@ struct ShaderStageBlob {
   std::vector<VertexInput> vertexInputs;
 };
 
-enum class PrecompiledFallbackReason : uint8_t {
-  CacheNotLoaded,
-  UnsupportedOutputSwizzle,
-  NoMatchingRule,
-  // The pipeline carries a texture that is not instantiated yet (a lazy/deferred proxy): the
-  // runtime drops such content via a stub program by design, so this is not a coverage gap.
-  DeferredTexture,
-  VertexArtifactMissing,
-  FragmentArtifactMissing,
-  VertexModuleCreationFailed,
-  FragmentModuleCreationFailed,
-  PipelineCreationFailed,
-  Unspecified,
-  // No bundle is embedded for this backend, so there is nothing to look an artifact up in: the
-  // backend has no precompiled shader support (D3D12), or this build embeds none for it
-  // (TGFX_EMBED_SHADER_BUNDLES off, or the generation step produced nothing). A build property,
-  // not a defect of any artifact.
-  NoBundleForBackend,
-  // A bundle is embedded but the cache refused to load it (toolchain ABI, profile tag, identity
-  // hash, malformed layout). Unlike NoBundleForBackend this is a defect of the build's artifact:
-  // every draw falls back to the runtime path until the bundle is regenerated.
-  BundleRejected,
-  // A rule matched, but the draw samples a texture whose read semantics (the GRAY_8 / RG_88 read
-  // swizzle) the matched shader family does not implement (PrecompiledShaderInfo::textureReads).
-  // A capability gap of that family, refused instead of drawn with the wrong channels.
-  UnsupportedTextureRead,
-  // The variant's reflected vertex inputs do not line up with the runtime geometry processor's
-  // attribute list: the matched variant does not fit the draw's vertex interface.
-  VertexLayoutMismatch,
-  Count,
-};
+// The vocabulary lives in gpu/shaders/contract/AOTFailure.h: the cache's fallback categories and the matcher's
+// rejection reasons are one enum, so a new reason is appended once. This name remains as an alias
+// for the cache-side readers.
 
 /// What happened to the bundle embedded in the library when a Context was created.
 enum class EmbeddedBundleState : uint8_t {
@@ -405,6 +378,19 @@ class PrecompiledShaderCache {
 
   bool dedicatedKernelsEnabled() const {
     return _dedicatedKernelsEnabled.load(std::memory_order_relaxed);
+  }
+
+  /// The decisions a consumer branches on, captured once: whether a bundle is loaded and the two
+  /// diagnostic gates. A matcher pass reads this value instead of asking the cache per family.
+  struct AOTPolicy {
+    bool bundleLoaded = false;
+    bool dedicatedKernels = true;
+    bool decomposition = true;
+  };
+
+  AOTPolicy aotPolicy() const {
+    return AOTPolicy{isLoaded(), _dedicatedKernelsEnabled.load(std::memory_order_relaxed),
+                     _decompositionEnabled.load(std::memory_order_relaxed)};
   }
 
   /// Returns a snapshot of successful AOT pipeline records collected since the last reset.

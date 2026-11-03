@@ -212,6 +212,8 @@ static PrecompiledFallbackReason ToFallbackReason(PermutationMatchFailure failur
       return PrecompiledFallbackReason::NoMatchingRule;
     case PermutationMatchFailure::None:
       return PrecompiledFallbackReason::Unspecified;
+    default:
+      return PrecompiledFallbackReason::Unspecified;
   }
   return PrecompiledFallbackReason::Unspecified;
 }

@@ -25,12 +25,12 @@
 #include <utility>
 #include <vector>
 #include "gpu/shaders/PrecompiledShader.h"
+#include "gpu/shaders/contract/AOTFailure.h"
 
 namespace tgfx {
 
 class ProgramInfo;
 struct DrawShape;
-enum class PermutationMatchFailure;
 
 /**
  * Detection traits for the optional members a ShaderFamily subclass may declare. A family that

@@ -19,6 +19,7 @@
 #pragma once
 
 #include <optional>
+#include "gpu/shaders/contract/AOTFailure.h"
 
 // Shared predicates of the per-family Match functions. Declared here and defined once in
 // PermutationMatcher.cpp (their private helper chains stay internal to that translation unit);
@@ -42,7 +43,6 @@ enum class XferKind : uint8_t;
 struct PermutationMatchResult;
 struct PermutationVariant;
 struct PrecompiledShaderInfo;
-enum class PermutationMatchFailure;
 
 /// Describes a geometry processor's matcher-relevant facts — the one description of the draw's
 /// geometry the executor-table matching reads, taken off the made processor at match time. The
@@ -146,11 +146,6 @@ bool IsChainQuadSubsetServable(const QuadPerEdgeAAGeometryProcessor* quadGP,
 /// predicate and the family's declared capability cannot drift apart. The dispatch's alpha-only
 /// gate and the debug audit both rely on this agreement.
 bool RejectsAlphaOnlyTarget(bool servesAlphaOnly, const ProgramInfo* programInfo);
-
-/// True when any fragment processor in the tree is a gradient source (ClampedGradientEffect):
-/// only the interpreter's extended resource kind serves gradients, so the decomposition switch
-/// keeps serving them even when the rest of the interpreter route is switched off.
-bool ContainsGradientSource(const FragmentProcessor* processor);
 
 /// The acceptance gates every route into a precompiled program must pass, stated once: the output
 /// swizzles the kernels implement, the OpenGL profile/sampler gate, and — when shaderInfo names

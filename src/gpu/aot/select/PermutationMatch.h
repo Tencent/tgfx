@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include "gpu/shaders/contract/AOTFailure.h"
 
 namespace tgfx {
 
@@ -37,28 +38,10 @@ struct PermutationMatchResult {
   uint32_t fragPermutationIndex;
 };
 
-enum class PermutationMatchFailure {
-  None,
-  UnsupportedOutputSwizzle,
-  NoMatchingRule,
-  /// A rule matched, but the draw samples a texture whose read semantics (e.g. the GRAY_8 / RG_88
-  /// read swizzle) the matched shader family does not declare in PrecompiledShaderInfo.
-  UnsupportedTextureRead,
-  // Sub-reasons below all report as NoMatchingRule to the coarse fallback category; they exist so
-  // a miss says where it was rejected instead of only "no rule matched". Append only.
-  /// The OpenGL entry gate refused the pipeline (bundle profile mismatch or a non-2D sampler).
-  GlGateRejected,
-  /// The chain path refuses quads that carry a vertex subset attribute.
-  QuadSubset,
-  /// More than one gradient (or gradient + noise) in a single chain pass.
-  GradientOrNoiseBudget,
-  /// The draw carries a coverage FP shape the candidate kernel cannot evaluate.
-  CoverageShape,
-  /// No family matched the geometry processor at all.
-  NoMatchingFamily,
-  /// The pipeline composed, but that combination is not in the enumerated variant set.
-  PermutationNotEnumerated,
-};
+// The vocabulary itself lives in gpu/shaders/contract/AOTFailure.h: the matcher's rejection reasons and the
+// cache's fallback categories are one enum, so a new reason is appended once. The sub-reasons
+// between GlGateRejected and PermutationNotEnumerated still report as NoMatchingRule to the
+// coarse fallback category; they exist so a miss says where it was rejected.
 
 /**
  * One match outcome with its failure reason: the reason is meaningful only when match is nullopt,

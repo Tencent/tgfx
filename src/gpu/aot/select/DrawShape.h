@@ -115,6 +115,10 @@ struct DrawShape {
   /// terms do not classify. The rows' predicates derive from it — a direct analytic clip is
   /// AARect/RRect, the shared device-mask ABI bit is DeviceMask.
   std::optional<Coverage> coverage = std::nullopt;
+  /// The interpreter gate's gradient fact: whether the draw's color expression contains a
+  /// gradient source. Computed at extraction — from the IR when it exists, otherwise from the
+  /// processor tree.
+  bool hasGradientSource = false;
 
   /// The position-only rect form the texture and noise fill kernels share: a DefaultGP, or a
   /// QuadPerEdgeAA whose coordinate comes from aPosition (a common color, a uv matrix, no

@@ -41,39 +41,7 @@ PrecompiledShaderCache::PrecompiledShaderCache(Context* context, Backend backend
 }
 
 const char* PrecompiledFallbackReasonName(PrecompiledFallbackReason reason) {
-  switch (reason) {
-    case PrecompiledFallbackReason::CacheNotLoaded:
-      return "CacheNotLoaded";
-    case PrecompiledFallbackReason::UnsupportedOutputSwizzle:
-      return "UnsupportedOutputSwizzle";
-    case PrecompiledFallbackReason::NoMatchingRule:
-      return "NoMatchingRule";
-    case PrecompiledFallbackReason::DeferredTexture:
-      return "DeferredTexture";
-    case PrecompiledFallbackReason::VertexArtifactMissing:
-      return "VertexArtifactMissing";
-    case PrecompiledFallbackReason::FragmentArtifactMissing:
-      return "FragmentArtifactMissing";
-    case PrecompiledFallbackReason::VertexModuleCreationFailed:
-      return "VertexModuleCreationFailed";
-    case PrecompiledFallbackReason::FragmentModuleCreationFailed:
-      return "FragmentModuleCreationFailed";
-    case PrecompiledFallbackReason::PipelineCreationFailed:
-      return "PipelineCreationFailed";
-    case PrecompiledFallbackReason::Unspecified:
-      return "Unspecified";
-    case PrecompiledFallbackReason::NoBundleForBackend:
-      return "NoBundleForBackend";
-    case PrecompiledFallbackReason::BundleRejected:
-      return "BundleRejected";
-    case PrecompiledFallbackReason::UnsupportedTextureRead:
-      return "UnsupportedTextureRead";
-    case PrecompiledFallbackReason::VertexLayoutMismatch:
-      return "VertexLayoutMismatch";
-    case PrecompiledFallbackReason::Count:
-      return "Count";
-  }
-  return "Unknown";
+  return AOTFailureName(reason);
 }
 
 const char* PrecompiledAOTStageName(PrecompiledAOTStage stage) {
