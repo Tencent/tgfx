@@ -35,10 +35,6 @@
 #include "core/utils/ReturnQueue.h"
 #include "tgfx/gpu/GPU.h"
 
-namespace shaderc {
-class Compiler;
-};
-
 namespace tgfx {
 
 class D3D12CommandQueue;
@@ -74,8 +70,6 @@ class D3D12GPU : public GPU {
   }
 
   CommandQueue* queue() const override;
-
-  const shaderc::Compiler* shaderCompiler() const;
 
   unsigned getDXGIFormat(PixelFormat format) const {
     return PixelFormatToDXGIFormat(format);
@@ -310,7 +304,6 @@ class D3D12GPU : public GPU {
   GPUFeatures _features = {};
   GPULimits _limits = {};
   std::unique_ptr<D3D12CommandQueue> commandQueue = nullptr;
-  std::unique_ptr<shaderc::Compiler> compiler = nullptr;
   std::list<D3D12Resource*> resources = {};
   std::shared_ptr<ReturnQueue> returnQueue = ReturnQueue::Make();
   std::unordered_map<uint32_t, std::shared_ptr<Sampler>> samplerCache = {};

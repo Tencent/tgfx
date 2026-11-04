@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <array>
+#include <cstring>
 #include <memory>
 #include <string>
 #include <vector>
@@ -35,6 +37,16 @@
 #include "utils/TestUtils.h"
 
 namespace tgfx {
+
+// Raw GLSL shader modules and RuntimeEffect effects written in GLSL are an OpenGL-only
+// capability: every other backend consumes precompiled binaries and native shader formats, so
+// these API-level tests skip there. The skip also removes this suite's MSAA / instanced-draw /
+// array-varying coverage on those backends until native shader variants land.
+#define SKIP_UNLESS_RAW_GLSL_MODULES(context)                                  \
+  if ((context)->backend() != Backend::OpenGL) {                               \
+    GTEST_SKIP() << "raw GLSL shader modules require the OpenGL backend "      \
+                    "(MSAA/instancing/array-varying coverage is skipped too)"; \
+  }
 
 namespace {
 
@@ -327,6 +339,7 @@ TGFX_TEST(GPURenderTest, InstancedGridRender) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
+  SKIP_UNLESS_RAW_GLSL_MODULES(context);
   auto gpu = context->gpu();
 
   // Create render texture
@@ -381,6 +394,7 @@ TGFX_TEST(GPURenderTest, StencilMaskRenderPass) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
+  SKIP_UNLESS_RAW_GLSL_MODULES(context);
   auto gpu = context->gpu();
   ASSERT_TRUE(gpu != nullptr);
 
@@ -595,6 +609,7 @@ TGFX_TEST(GPURenderTest, MultisampleCount) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
+  SKIP_UNLESS_RAW_GLSL_MODULES(context);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
 
@@ -626,6 +641,7 @@ TGFX_TEST(GPURenderTest, MultisampleMask) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
+  SKIP_UNLESS_RAW_GLSL_MODULES(context);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
 
@@ -659,6 +675,7 @@ TGFX_TEST(GPURenderTest, AlphaToCoverage) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
+  SKIP_UNLESS_RAW_GLSL_MODULES(context);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
 
@@ -693,6 +710,7 @@ TGFX_TEST(GPURenderTest, ArrayVarying) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
+  SKIP_UNLESS_RAW_GLSL_MODULES(context);
 
   // Use a 200x200 synthetic input so the filtered image is also 200x200. The effect draws an NDC
   // [-0.5, 0.5] quad, which lands a 100x100 rectangle centred in the 200x200 surface with a
@@ -727,6 +745,7 @@ TGFX_TEST(GPURenderTest, VaryingOrderMismatch) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
+  SKIP_UNLESS_RAW_GLSL_MODULES(context);
   auto gpu = context->gpu();
   ASSERT_TRUE(gpu != nullptr);
 
@@ -786,6 +805,7 @@ TGFX_TEST(GPURenderTest, VaryingMismatchRejected) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
+  SKIP_UNLESS_RAW_GLSL_MODULES(context);
   auto gpu = context->gpu();
 
   auto backend = gpu->info()->backend;
@@ -816,6 +836,7 @@ TGFX_TEST(GPURenderTest, UniformBufferBindingMismatch) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
+  SKIP_UNLESS_RAW_GLSL_MODULES(context);
   auto gpu = context->gpu();
   ASSERT_TRUE(gpu != nullptr);
 
@@ -910,6 +931,7 @@ TGFX_TEST(GPURenderTest, UniformBufferMissingDeclarationRejected) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
+  SKIP_UNLESS_RAW_GLSL_MODULES(context);
   auto gpu = context->gpu();
   ASSERT_TRUE(gpu != nullptr);
   auto backend = gpu->info()->backend;
@@ -960,6 +982,7 @@ TGFX_TEST(GPURenderTest, UniformBufferDuplicateLogicalBinding) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
+  SKIP_UNLESS_RAW_GLSL_MODULES(context);
   auto gpu = context->gpu();
   ASSERT_TRUE(gpu != nullptr);
   auto backend = gpu->info()->backend;
@@ -1067,6 +1090,7 @@ TGFX_TEST(GPURenderTest, UniformBufferSharedLayoutStaggeredSlots) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
+  SKIP_UNLESS_RAW_GLSL_MODULES(context);
   auto gpu = context->gpu();
   ASSERT_TRUE(gpu != nullptr);
   auto info = gpu->info();
@@ -1174,6 +1198,459 @@ TGFX_TEST(GPURenderTest, UniformBufferSharedLayoutStaggeredSlots) {
       Surface::MakeFrom(context, renderTexture->getBackendTexture(), ImageOrigin::TopLeft);
   ASSERT_TRUE(surface != nullptr);
   EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/UniformBufferSharedLayoutStaggeredSlots"));
+}
+
+// Proves the per-driver shader contract for the Metal backend: an MSL source module compiles
+// through the Metal driver (no third-party compiler), entry functions are named main0, vertex
+// buffers bind at the high slots the framework uses (slot 0 -> buffer index 30), attributes are
+// addressed by [[attribute(N)]] with N the global attribute index, and a uniform block resolves
+// by name through ShaderModuleDescriptor::uniformSlots. The same contract is documented on
+// ShaderCodeFormat::MSL and RuntimeEffect.
+static constexpr char MSL_SMOKE_VERTEX_SHADER[] = R"(
+#include <metal_stdlib>
+using namespace metal;
+
+struct VertexIn {
+  float2 aPosition [[attribute(0)]];
+  float4 aColor    [[attribute(1)]];
+};
+
+struct VertexOut {
+  float4 position [[position]];
+  float4 color;
+};
+
+vertex VertexOut main0(VertexIn in [[stage_in]],
+                       constant float4& tint [[buffer(0)]]) {
+  VertexOut out;
+  // tgfx clip space is passed through unchanged; the negative y mirrors the GLSL convention the
+  // precompiled artifacts produce (their SPIR-V -> MSL pass sets flip_vert_y).
+  out.position = float4(in.aPosition.x, -in.aPosition.y, 0.0, 1.0);
+  out.color = in.aColor * tint;
+  return out;
+}
+)";
+
+static constexpr char MSL_SMOKE_FRAGMENT_SHADER[] = R"(
+#include <metal_stdlib>
+using namespace metal;
+
+struct VertexOut {
+  float4 position [[position]];
+  float4 color;
+};
+
+fragment float4 main0(VertexOut in [[stage_in]]) {
+  return in.color;
+}
+)";
+
+TGFX_TEST(GPURenderTest, MetalMSLSourceModule) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  if (context->backend() != Backend::Metal) {
+    GTEST_SKIP() << "MSL source modules are a Metal capability";
+  }
+  auto* gpu = context->gpu();
+  ASSERT_TRUE(gpu != nullptr);
+
+  ShaderModuleDescriptor vertexDesc = {};
+  vertexDesc.format = ShaderCodeFormat::MSL;
+  vertexDesc.stage = ShaderStage::Vertex;
+  vertexDesc.code = MSL_SMOKE_VERTEX_SHADER;
+  vertexDesc.uniformSlots = {{"Tint", 0}};
+  auto vertexShader = gpu->createShaderModule(vertexDesc);
+  ASSERT_TRUE(vertexShader != nullptr);
+
+  ShaderModuleDescriptor fragmentDesc = {};
+  fragmentDesc.format = ShaderCodeFormat::MSL;
+  fragmentDesc.stage = ShaderStage::Fragment;
+  fragmentDesc.code = MSL_SMOKE_FRAGMENT_SHADER;
+  auto fragmentShader = gpu->createShaderModule(fragmentDesc);
+  ASSERT_TRUE(fragmentShader != nullptr);
+
+  RenderPipelineDescriptor pipelineDesc = {};
+  VertexBufferLayout vertexLayout(
+      {{"aPosition", VertexFormat::Float2}, {"aColor", VertexFormat::Float4}});
+  pipelineDesc.vertex.bufferLayouts = {vertexLayout};
+  pipelineDesc.vertex.module = vertexShader;
+  pipelineDesc.fragment.module = fragmentShader;
+  pipelineDesc.fragment.colorAttachments.push_back({});
+  pipelineDesc.layout.uniformBlocks = {{"Tint", 0, ShaderVisibility::Vertex}};
+  auto pipeline = gpu->createRenderPipeline(pipelineDesc);
+  ASSERT_TRUE(pipeline != nullptr) << "the MSL module or its uniform block did not resolve";
+
+  constexpr int SIZE = 32;
+  TextureDescriptor targetDesc(SIZE, SIZE, PixelFormat::RGBA_8888, false, 1,
+                               TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING);
+  auto target = gpu->createTexture(targetDesc);
+  ASSERT_TRUE(target != nullptr);
+
+  struct Vertex {
+    float x;
+    float y;
+    float r;
+    float g;
+    float b;
+    float a;
+  };
+  const std::array<Vertex, 3> vertices = {{{-1.0f, -1.0f, 1.0f, 0.0f, 0.0f, 1.0f},
+                                           {0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 1.0f},
+                                           {-1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f}}};
+  auto vertexBuffer = gpu->createBuffer(sizeof(vertices), GPUBufferUsage::VERTEX);
+  ASSERT_TRUE(vertexBuffer != nullptr);
+  auto* vertexData = static_cast<Vertex*>(vertexBuffer->map());
+  ASSERT_TRUE(vertexData != nullptr);
+  memcpy(vertexData, vertices.data(), sizeof(vertices));
+  vertexBuffer->unmap();
+
+  const std::array<float, 4> tint = {1.0f, 1.0f, 1.0f, 1.0f};
+  auto uniformBuffer = gpu->createBuffer(sizeof(tint), GPUBufferUsage::UNIFORM);
+  ASSERT_TRUE(uniformBuffer != nullptr);
+  auto* uniformData = static_cast<float*>(uniformBuffer->map());
+  ASSERT_TRUE(uniformData != nullptr);
+  memcpy(uniformData, tint.data(), sizeof(tint));
+  uniformBuffer->unmap();
+
+  auto encoder = gpu->createCommandEncoder();
+  ASSERT_TRUE(encoder != nullptr);
+  RenderPassDescriptor passDesc(target, LoadAction::Clear, StoreAction::Store,
+                                PMColor::Transparent());
+  auto renderPass = encoder->beginRenderPass(passDesc);
+  ASSERT_TRUE(renderPass != nullptr);
+  renderPass->setPipeline(std::move(pipeline));
+  renderPass->setUniformBuffer(0, uniformBuffer, 0, sizeof(tint));
+  renderPass->setVertexBuffer(0, vertexBuffer);
+  renderPass->draw(PrimitiveType::Triangles, 3, 1);
+  renderPass->end();
+  auto commandBuffer = encoder->finish();
+  ASSERT_TRUE(commandBuffer != nullptr);
+  gpu->queue()->submit(commandBuffer);
+  gpu->queue()->waitUntilCompleted();
+
+  auto surface = Surface::MakeFrom(context, target->getBackendTexture(), ImageOrigin::TopLeft);
+  ASSERT_TRUE(surface != nullptr);
+  auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  uint32_t topLeft = 0;
+  ASSERT_TRUE(surface->readPixels(info, &topLeft, 4, 4));
+  uint32_t bottomRight = 0xDEADBEEF;
+  ASSERT_TRUE(surface->readPixels(info, &bottomRight, SIZE - 5, SIZE - 5));
+  EXPECT_EQ(topLeft, 0xFF0000FFu) << "the MSL triangle did not cover the top-left corner";
+  EXPECT_EQ(bottomRight, 0u) << "the MSL triangle covered the far corner";
+}
+
+// ---------------------------------------------------------------------------------------------
+// Native shader format smoke tests. Each backend accepts only the shader code its driver can
+// consume: MSL text or a metallib on Metal, SPIR-V on Vulkan, WGSL on WebGPU, HLSL or DXBC on
+// D3D12. The scenarios below prove the contract end to end (module -> pipeline -> draw ->
+// pixels) with one shared scene: a full-target triangle whose colour is tinted by one uniform
+// block. The Vulkan / D3D12 / WebGPU cases compile and run on their own platforms; on any other
+// backend they skip.
+// ---------------------------------------------------------------------------------------------
+
+// SPIR-V for the Vulkan case: vulkan1.1 target, entry `main`, one uniform block at set 0 /
+// binding 0, vertex attributes at locations 0 and 1.
+static const uint32_t kSmokeVertexSpirv[] = {
+    0x07230203, 0x00010300, 0x000d000b, 0x00000026, 0x00000000, 0x00020011, 0x00000001, 0x0006000b,
+    0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e, 0x00000000, 0x0003000e, 0x00000000, 0x00000001,
+    0x0009000f, 0x00000000, 0x00000004, 0x6e69616d, 0x00000000, 0x0000000d, 0x00000012, 0x0000001b,
+    0x0000001d, 0x00030047, 0x0000000b, 0x00000002, 0x00050048, 0x0000000b, 0x00000000, 0x0000000b,
+    0x00000000, 0x00050048, 0x0000000b, 0x00000001, 0x0000000b, 0x00000001, 0x00050048, 0x0000000b,
+    0x00000002, 0x0000000b, 0x00000003, 0x00050048, 0x0000000b, 0x00000003, 0x0000000b, 0x00000004,
+    0x00040047, 0x00000012, 0x0000001e, 0x00000000, 0x00040047, 0x0000001b, 0x0000001e, 0x00000000,
+    0x00040047, 0x0000001d, 0x0000001e, 0x00000001, 0x00030047, 0x0000001f, 0x00000002, 0x00050048,
+    0x0000001f, 0x00000000, 0x00000023, 0x00000000, 0x00040047, 0x00000021, 0x00000021, 0x00000000,
+    0x00040047, 0x00000021, 0x00000022, 0x00000000, 0x00020013, 0x00000002, 0x00030021, 0x00000003,
+    0x00000002, 0x00030016, 0x00000006, 0x00000020, 0x00040017, 0x00000007, 0x00000006, 0x00000004,
+    0x00040015, 0x00000008, 0x00000020, 0x00000000, 0x0004002b, 0x00000008, 0x00000009, 0x00000001,
+    0x0004001c, 0x0000000a, 0x00000006, 0x00000009, 0x0006001e, 0x0000000b, 0x00000007, 0x00000006,
+    0x0000000a, 0x0000000a, 0x00040020, 0x0000000c, 0x00000003, 0x0000000b, 0x0004003b, 0x0000000c,
+    0x0000000d, 0x00000003, 0x00040015, 0x0000000e, 0x00000020, 0x00000001, 0x0004002b, 0x0000000e,
+    0x0000000f, 0x00000000, 0x00040017, 0x00000010, 0x00000006, 0x00000002, 0x00040020, 0x00000011,
+    0x00000001, 0x00000010, 0x0004003b, 0x00000011, 0x00000012, 0x00000001, 0x0004002b, 0x00000006,
+    0x00000014, 0x00000000, 0x0004002b, 0x00000006, 0x00000015, 0x3f800000, 0x00040020, 0x00000019,
+    0x00000003, 0x00000007, 0x0004003b, 0x00000019, 0x0000001b, 0x00000003, 0x00040020, 0x0000001c,
+    0x00000001, 0x00000007, 0x0004003b, 0x0000001c, 0x0000001d, 0x00000001, 0x0003001e, 0x0000001f,
+    0x00000007, 0x00040020, 0x00000020, 0x00000002, 0x0000001f, 0x0004003b, 0x00000020, 0x00000021,
+    0x00000002, 0x00040020, 0x00000022, 0x00000002, 0x00000007, 0x00050036, 0x00000002, 0x00000004,
+    0x00000000, 0x00000003, 0x000200f8, 0x00000005, 0x0004003d, 0x00000010, 0x00000013, 0x00000012,
+    0x00050051, 0x00000006, 0x00000016, 0x00000013, 0x00000000, 0x00050051, 0x00000006, 0x00000017,
+    0x00000013, 0x00000001, 0x00070050, 0x00000007, 0x00000018, 0x00000016, 0x00000017, 0x00000014,
+    0x00000015, 0x00050041, 0x00000019, 0x0000001a, 0x0000000d, 0x0000000f, 0x0003003e, 0x0000001a,
+    0x00000018, 0x0004003d, 0x00000007, 0x0000001e, 0x0000001d, 0x00050041, 0x00000022, 0x00000023,
+    0x00000021, 0x0000000f, 0x0004003d, 0x00000007, 0x00000024, 0x00000023, 0x00050085, 0x00000007,
+    0x00000025, 0x0000001e, 0x00000024, 0x0003003e, 0x0000001b, 0x00000025, 0x000100fd, 0x00010038,
+};
+
+static const uint32_t kSmokeFragmentSpirv[] = {
+    0x07230203, 0x00010300, 0x000d000b, 0x0000000d, 0x00000000, 0x00020011, 0x00000001, 0x0006000b,
+    0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e, 0x00000000, 0x0003000e, 0x00000000, 0x00000001,
+    0x0007000f, 0x00000004, 0x00000004, 0x6e69616d, 0x00000000, 0x00000009, 0x0000000b, 0x00030010,
+    0x00000004, 0x00000007, 0x00040047, 0x00000009, 0x0000001e, 0x00000000, 0x00040047, 0x0000000b,
+    0x0000001e, 0x00000000, 0x00020013, 0x00000002, 0x00030021, 0x00000003, 0x00000002, 0x00030016,
+    0x00000006, 0x00000020, 0x00040017, 0x00000007, 0x00000006, 0x00000004, 0x00040020, 0x00000008,
+    0x00000003, 0x00000007, 0x0004003b, 0x00000008, 0x00000009, 0x00000003, 0x00040020, 0x0000000a,
+    0x00000001, 0x00000007, 0x0004003b, 0x0000000a, 0x0000000b, 0x00000001, 0x00050036, 0x00000002,
+    0x00000004, 0x00000000, 0x00000003, 0x000200f8, 0x00000005, 0x0004003d, 0x00000007, 0x0000000c,
+    0x0000000b, 0x0003003e, 0x00000009, 0x0000000c, 0x000100fd, 0x00010038,
+
+};
+
+// Shared scene: a full-target triangle carrying a per-vertex colour, multiplied by a uniform
+// tint. The caller supplies the backend-native modules; the helper wires the pipeline, draws and
+// reads back the centre pixel (expected RGBA_8888 opaque red).
+static bool RenderTintedFullscreenTriangle(Context* context, GPU* gpu,
+                                           const ShaderModuleDescriptor& vertexDesc,
+                                           const ShaderModuleDescriptor& fragmentDesc,
+                                           const std::vector<BindingEntry>& uniformBlocks,
+                                           uint32_t* centrePixel) {
+  auto vertexShader = gpu->createShaderModule(vertexDesc);
+  if (vertexShader == nullptr) {
+    return false;
+  }
+  auto fragmentShader = gpu->createShaderModule(fragmentDesc);
+  if (fragmentShader == nullptr) {
+    return false;
+  }
+  RenderPipelineDescriptor pipelineDesc = {};
+  VertexBufferLayout vertexLayout(
+      {{"aPosition", VertexFormat::Float2}, {"aColor", VertexFormat::Float4}});
+  pipelineDesc.vertex.bufferLayouts = {vertexLayout};
+  pipelineDesc.vertex.module = vertexShader;
+  pipelineDesc.fragment.module = fragmentShader;
+  pipelineDesc.fragment.colorAttachments.push_back({});
+  pipelineDesc.layout.uniformBlocks = uniformBlocks;
+  auto pipeline = gpu->createRenderPipeline(pipelineDesc);
+  if (pipeline == nullptr) {
+    return false;
+  }
+
+  constexpr int SIZE = 32;
+  TextureDescriptor targetDesc(SIZE, SIZE, PixelFormat::RGBA_8888, false, 1,
+                               TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING);
+  auto target = gpu->createTexture(targetDesc);
+  if (target == nullptr) {
+    return false;
+  }
+
+  struct Vertex {
+    float x;
+    float y;
+    float r;
+    float g;
+    float b;
+    float a;
+  };
+  // Full-target triangle: vertices at (-1,-1), (3,-1), (-1,3) cover the whole viewport.
+  const std::array<Vertex, 3> vertices = {{{-1.0f, -1.0f, 1.0f, 0.0f, 0.0f, 1.0f},
+                                           {3.0f, -1.0f, 1.0f, 0.0f, 0.0f, 1.0f},
+                                           {-1.0f, 3.0f, 1.0f, 0.0f, 0.0f, 1.0f}}};
+  auto vertexBuffer = gpu->createBuffer(sizeof(vertices), GPUBufferUsage::VERTEX);
+  if (vertexBuffer == nullptr) {
+    return false;
+  }
+  auto* vertexData = static_cast<Vertex*>(vertexBuffer->map());
+  if (vertexData == nullptr) {
+    return false;
+  }
+  memcpy(vertexData, vertices.data(), sizeof(vertices));
+  vertexBuffer->unmap();
+
+  const std::array<float, 4> tint = {1.0f, 1.0f, 1.0f, 1.0f};
+  auto uniformBuffer = gpu->createBuffer(sizeof(tint), GPUBufferUsage::UNIFORM);
+  if (uniformBuffer == nullptr) {
+    return false;
+  }
+  auto* uniformData = static_cast<float*>(uniformBuffer->map());
+  if (uniformData == nullptr) {
+    return false;
+  }
+  memcpy(uniformData, tint.data(), sizeof(tint));
+  uniformBuffer->unmap();
+
+  auto encoder = gpu->createCommandEncoder();
+  if (encoder == nullptr) {
+    return false;
+  }
+  RenderPassDescriptor passDesc(target, LoadAction::Clear, StoreAction::Store,
+                                PMColor::Transparent());
+  auto renderPass = encoder->beginRenderPass(passDesc);
+  if (renderPass == nullptr) {
+    return false;
+  }
+  renderPass->setPipeline(std::move(pipeline));
+  renderPass->setUniformBuffer(0, uniformBuffer, 0, sizeof(tint));
+  renderPass->setVertexBuffer(0, vertexBuffer);
+  renderPass->draw(PrimitiveType::Triangles, 3, 1);
+  renderPass->end();
+  auto commandBuffer = encoder->finish();
+  if (commandBuffer == nullptr) {
+    return false;
+  }
+  gpu->queue()->submit(commandBuffer);
+  gpu->queue()->waitUntilCompleted();
+
+  auto surface = Surface::MakeFrom(context, target->getBackendTexture(), ImageOrigin::TopLeft);
+  if (surface == nullptr) {
+    return false;
+  }
+  auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  return surface->readPixels(info, centrePixel, SIZE / 2, SIZE / 2);
+}
+
+TGFX_TEST(GPURenderTest, VulkanSpirvSourceModule) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  if (context->backend() != Backend::Vulkan) {
+    GTEST_SKIP() << "SPIR-V modules are a Vulkan capability";
+  }
+  auto* gpu = context->gpu();
+  ASSERT_TRUE(gpu != nullptr);
+
+  ShaderModuleDescriptor vertexDesc = {};
+  vertexDesc.format = ShaderCodeFormat::SPIRV;
+  vertexDesc.stage = ShaderStage::Vertex;
+  vertexDesc.binaryData.assign(
+      reinterpret_cast<const uint8_t*>(kSmokeVertexSpirv),
+      reinterpret_cast<const uint8_t*>(kSmokeVertexSpirv) + sizeof(kSmokeVertexSpirv));
+  vertexDesc.uniformSlots = {{"VertexArgs", 0}};
+
+  ShaderModuleDescriptor fragmentDesc = {};
+  fragmentDesc.format = ShaderCodeFormat::SPIRV;
+  fragmentDesc.stage = ShaderStage::Fragment;
+  fragmentDesc.binaryData.assign(
+      reinterpret_cast<const uint8_t*>(kSmokeFragmentSpirv),
+      reinterpret_cast<const uint8_t*>(kSmokeFragmentSpirv) + sizeof(kSmokeFragmentSpirv));
+
+  uint32_t centrePixel = 0;
+  ASSERT_TRUE(RenderTintedFullscreenTriangle(context, gpu, vertexDesc, fragmentDesc,
+                                             {{"VertexArgs", 0, ShaderVisibility::Vertex}},
+                                             &centrePixel));
+  EXPECT_EQ(centrePixel, 0xFF0000FFu) << "the SPIR-V triangle did not render the tinted colour";
+}
+
+TGFX_TEST(GPURenderTest, D3D12HLSLSourceModule) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  if (context->backend() != Backend::D3D12) {
+    GTEST_SKIP() << "HLSL modules are a D3D12 capability";
+  }
+  auto* gpu = context->gpu();
+  ASSERT_TRUE(gpu != nullptr);
+
+  // Contract: entry `main`, cbuffer at register(b0) reported through uniformSlots, vertex inputs
+  // as TEXCOORD0/TEXCOORD1 in buffer layout order, stage interface through TEXCOORD0.
+  static constexpr char HLSL_VERTEX_SHADER[] = R"(
+cbuffer Tint : register(b0) {
+  float4 tint;
+};
+
+struct VSIn {
+  float2 aPosition : TEXCOORD0;
+  float4 aColor : TEXCOORD1;
+};
+
+struct VSOut {
+  float4 position : SV_Position;
+  float4 color : TEXCOORD0;
+};
+
+VSOut main(VSIn input) {
+  VSOut output;
+  output.position = float4(input.aPosition, 0.0, 1.0);
+  output.color = input.aColor * tint;
+  return output;
+}
+)";
+  static constexpr char HLSL_FRAGMENT_SHADER[] = R"(
+struct PSIn {
+  float4 position : SV_Position;
+  float4 color : TEXCOORD0;
+};
+
+float4 main(PSIn input) : SV_Target {
+  return input.color;
+}
+)";
+  ShaderModuleDescriptor vertexDesc = {};
+  vertexDesc.format = ShaderCodeFormat::HLSL;
+  vertexDesc.stage = ShaderStage::Vertex;
+  vertexDesc.code = HLSL_VERTEX_SHADER;
+  vertexDesc.uniformSlots = {{"Tint", 0}};
+
+  ShaderModuleDescriptor fragmentDesc = {};
+  fragmentDesc.format = ShaderCodeFormat::HLSL;
+  fragmentDesc.stage = ShaderStage::Fragment;
+  fragmentDesc.code = HLSL_FRAGMENT_SHADER;
+
+  uint32_t centrePixel = 0;
+  ASSERT_TRUE(RenderTintedFullscreenTriangle(context, gpu, vertexDesc, fragmentDesc,
+                                             {{"Tint", 0, ShaderVisibility::Vertex}},
+                                             &centrePixel));
+  EXPECT_EQ(centrePixel, 0xFF0000FFu) << "the HLSL triangle did not render the tinted colour";
+}
+
+TGFX_TEST(GPURenderTest, WebGPUWGSLSourceModule) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  if (context->backend() != Backend::WebGPU) {
+    GTEST_SKIP() << "WGSL modules are a WebGPU capability";
+  }
+  auto* gpu = context->gpu();
+  ASSERT_TRUE(gpu != nullptr);
+
+  static constexpr char WGSL_VERTEX_SHADER[] = R"(
+struct VertexIn {
+  @location(0) aPosition: vec2f,
+  @location(1) aColor: vec4f,
+};
+
+struct VertexOut {
+  @builtin(position) position: vec4f,
+  @location(0) color: vec4f,
+};
+
+@group(0) @binding(0) var<uniform> tint: vec4f;
+
+@vertex
+fn main(input: VertexIn) -> VertexOut {
+  var output: VertexOut;
+  output.position = vec4f(input.aPosition, 0.0, 1.0);
+  output.color = input.aColor * tint;
+  return output;
+}
+)";
+  static constexpr char WGSL_FRAGMENT_SHADER[] = R"(
+struct VertexOut {
+  @builtin(position) position: vec4f,
+  @location(0) color: vec4f,
+};
+
+@fragment
+fn main(input: VertexOut) -> @location(0) vec4f {
+  return input.color;
+}
+)";
+  ShaderModuleDescriptor vertexDesc = {};
+  vertexDesc.format = ShaderCodeFormat::WGSL;
+  vertexDesc.stage = ShaderStage::Vertex;
+  vertexDesc.code = WGSL_VERTEX_SHADER;
+  vertexDesc.uniformSlots = {{"Tint", 0}};
+
+  ShaderModuleDescriptor fragmentDesc = {};
+  fragmentDesc.format = ShaderCodeFormat::WGSL;
+  fragmentDesc.stage = ShaderStage::Fragment;
+  fragmentDesc.code = WGSL_FRAGMENT_SHADER;
+
+  uint32_t centrePixel = 0;
+  ASSERT_TRUE(RenderTintedFullscreenTriangle(context, gpu, vertexDesc, fragmentDesc,
+                                             {{"Tint", 0, ShaderVisibility::Vertex}},
+                                             &centrePixel));
+  EXPECT_EQ(centrePixel, 0xFF0000FFu) << "the WGSL triangle did not render the tinted colour";
 }
 
 }  // namespace tgfx

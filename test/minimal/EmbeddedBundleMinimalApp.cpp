@@ -94,9 +94,9 @@ int main() {
     device->unlock();
     return 1;
   }
-  if (stats.programBuilderCreations != 0) {
-    printf("FAIL: a runtime-built program appeared (creations=%u)\n",
-           static_cast<unsigned>(stats.programBuilderCreations));
+  if (context->precompiledShaderCache()->drawStats().droppedDraws != 0) {
+    printf("FAIL: a draw was dropped (droppedDraws=%u)\n",
+           static_cast<unsigned>(context->precompiledShaderCache()->drawStats().droppedDraws));
     device->unlock();
     return 1;
   }

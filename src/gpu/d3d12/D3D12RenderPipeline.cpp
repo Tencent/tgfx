@@ -22,7 +22,7 @@
 #include "D3D12GPU.h"
 #include "D3D12ShaderModule.h"
 #include "core/utils/Log.h"
-#include "gpu/ShaderCompiler.h"
+#include "gpu/ShaderInterface.h"
 #include "tgfx/gpu/ColorWriteMask.h"
 #include "tgfx/gpu/ShaderVisibility.h"
 
@@ -302,7 +302,7 @@ bool D3D12RenderPipeline::createPipelineState(D3D12GPU* gpu,
   }
 
   // Vertex input layout. Semantic names match the SPIRV-Cross HLSL convention of TEXCOORD{N},
-  // where N is the SPIR-V input location assigned by ShaderCompiler::PreprocessGLSL().
+  // where N is the index of the attribute in the pipeline vertex buffer layout.
   std::vector<D3D12_INPUT_ELEMENT_DESC> inputElements;
   uint32_t globalLocation = 0;
   vertexStrides.assign(descriptor.vertex.bufferLayouts.size(), 0);

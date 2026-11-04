@@ -17,131 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MetalShaderModule.h"
-#include <map>
-#include <regex>
-#include <set>
-#include <shaderc/shaderc.hpp>
+#include <string>
 #include "MetalGPU.h"
 #include "core/utils/Log.h"
-#include "gpu/ShaderCompiler.h"
-// Suppress warnings from SPIRV-Cross headers
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wsign-conversion"
-#pragma clang diagnostic ignored "-Weffc++"
-#include <spirv_msl.hpp>
-#include <spirv_parser.hpp>
-#pragma clang diagnostic pop
-#include <string>
+#include "gpu/ShaderInterface.h"
 
 namespace tgfx {
-
-// TODO: The current GLSL -> SPIR-V -> MSL conversion pipeline incurs high runtime compilation
-// overhead. Future improvements may include offline pre-compilation, shader caching, or binary
-// pipeline archive support to reduce latency.
-
-// Collect all specialization constant IDs used in the given SPIR-V binary.
-static std::set<uint32_t> collectSpecConstantIDs(const std::vector<uint32_t>& spirvBinary) {
-  spirv_cross::Parser spvParser(spirvBinary.data(), spirvBinary.size());
-  spvParser.parse();
-  spirv_cross::Compiler compiler(std::move(spvParser.get_parsed_ir()));
-  auto specConstants = compiler.get_specialization_constants();
-  std::set<uint32_t> usedIDs = {};
-  for (auto& sc : specConstants) {
-    usedIDs.insert(sc.constant_id);
-  }
-  return usedIDs;
-}
-
-// Find the smallest non-negative constant_id not in the given set.
-static uint32_t findAvailableConstantID(const std::set<uint32_t>& usedIDs) {
-  uint32_t id = 0;
-  while (usedIDs.count(id) > 0) {
-    id++;
-  }
-  return id;
-}
-
-// Inject a specialization constant for sample mask and gl_SampleMask output into preprocessed GLSL.
-// The constant_id is chosen to avoid collision with any existing specialization constants.
-static std::string injectSampleMask(const std::string& glslCode, uint32_t constantID) {
-  std::string result = glslCode;
-  std::string sampleMaskDecl = "layout(constant_id = " + std::to_string(constantID) +
-                               ") const uint tgfx_SampleMask = 0xFFFFFFFFu;\n";
-  auto versionEnd = result.find('\n');
-  if (versionEnd != std::string::npos) {
-    result.insert(versionEnd + 1, sampleMaskDecl);
-  }
-  auto lastBrace = result.rfind('}');
-  if (lastBrace != std::string::npos) {
-    result.insert(lastBrace, "    gl_SampleMask[0] = int(tgfx_SampleMask);\n");
-  }
-  return result;
-}
-
-// Convert a SPIR-V binary to MSL source code.
-static std::string convertSPIRVToMSL(const std::vector<uint32_t>& spirvBinary, ShaderStage stage) {
-  spirv_cross::Parser spvParser(spirvBinary.data(), spirvBinary.size());
-  spvParser.parse();
-
-  spirv_cross::CompilerMSL mslCompiler(std::move(spvParser.get_parsed_ir()));
-
-  spirv_cross::CompilerMSL::Options mslOptions;
-  mslOptions.set_msl_version(2, 3);
-  mslOptions.enable_decoration_binding = true;
-  // Enable framebuffer fetch so SPIRV-Cross converts subpassInput to [[color(0)]] in MSL.
-  mslOptions.use_framebuffer_fetch_subpasses = true;
-  mslCompiler.set_msl_options(mslOptions);
-
-  auto commonOptions = mslCompiler.get_common_options();
-  commonOptions.vertex.flip_vert_y = true;
-  mslCompiler.set_common_options(commonOptions);
-
-  auto executionModel =
-      (stage == ShaderStage::Vertex) ? spv::ExecutionModelVertex : spv::ExecutionModelFragment;
-
-  struct MslBindingInfo {
-    uint32_t mslBuffer = 0;
-    uint32_t mslTexture = 0;
-    uint32_t mslSampler = 0;
-  };
-  std::map<std::pair<uint32_t, uint32_t>, MslBindingInfo> bindingMap = {};
-
-  auto uboResources = mslCompiler.get_shader_resources().uniform_buffers;
-  for (auto& ubo : uboResources) {
-    uint32_t spvBinding = mslCompiler.get_decoration(ubo.id, spv::DecorationBinding);
-    uint32_t spvDescSet = mslCompiler.get_decoration(ubo.id, spv::DecorationDescriptorSet);
-    auto key = std::make_pair(spvDescSet, spvBinding);
-    bindingMap[key].mslBuffer = spvBinding;
-  }
-
-  auto sampledImages = mslCompiler.get_shader_resources().sampled_images;
-  for (auto& image : sampledImages) {
-    uint32_t spvBinding = mslCompiler.get_decoration(image.id, spv::DecorationBinding);
-    uint32_t spvDescSet = mslCompiler.get_decoration(image.id, spv::DecorationDescriptorSet);
-    auto key = std::make_pair(spvDescSet, spvBinding);
-    bindingMap[key].mslTexture = spvBinding;
-    bindingMap[key].mslSampler = spvBinding;
-  }
-
-  for (auto& [key, info] : bindingMap) {
-    spirv_cross::MSLResourceBinding resourceBinding = {};
-    resourceBinding.stage = executionModel;
-    resourceBinding.desc_set = key.first;
-    resourceBinding.binding = key.second;
-    resourceBinding.msl_buffer = info.mslBuffer;
-    resourceBinding.msl_texture = info.mslTexture;
-    resourceBinding.msl_sampler = info.mslSampler;
-    mslCompiler.add_msl_resource_binding(resourceBinding);
-  }
-
-  std::string mslCode = mslCompiler.compile();
-  if (mslCode.empty()) {
-    LOGE("SPIR-V to MSL conversion failed");
-    return "";
-  }
-
-  return mslCode;
-}
 
 std::shared_ptr<MetalShaderModule> MetalShaderModule::Make(
     MetalGPU* gpu, const ShaderModuleDescriptor& descriptor) {
@@ -153,34 +34,42 @@ std::shared_ptr<MetalShaderModule> MetalShaderModule::Make(
 }
 
 MetalShaderModule::MetalShaderModule(MetalGPU* gpu, const ShaderModuleDescriptor& descriptor)
-    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage), {}),
-      _stage(descriptor.stage),
-      _glslCode(descriptor.stage == ShaderStage::Fragment ? descriptor.code : std::string{}) {
-  if (descriptor.format == ShaderCodeFormat::MSL) {
-    // Precompiled artifacts carry no parseable GLSL for the runtime slot collection to scan, so
-    // the baked block bindings arrive via the descriptor (filled by the pipeline creator from
-    // the offline templates' declared bindings).
-    setUniformSlots(descriptor.uniformSlots);
-    // Precompiled metallib binary: load directly without runtime compilation. The program creator
-    // always passes the bundle blob as binary data, so an empty one is a corrupt entry.
-    if (descriptor.binaryData.empty()) {
-      LOGE("MetalShaderModule: precompiled metallib is empty");
+    : VaryingShaderModule(ExtractModuleVaryingDecls(descriptor), {}), _stage(descriptor.stage) {
+  // Precompiled artifacts and native formats carry no parseable GLSL for the runtime slot
+  // collection to scan, so the block bindings arrive via the descriptor.
+  setUniformSlots(descriptor.uniformSlots);
+  NSError* error = nil;
+  switch (descriptor.format) {
+    case ShaderCodeFormat::METALLIB: {
+      // Precompiled metallib: load directly without compilation.
+      if (descriptor.binaryData.empty()) {
+        LOGE("MetalShaderModule: precompiled metallib is empty");
+        return;
+      }
+      dispatch_data_t data =
+          dispatch_data_create(descriptor.binaryData.data(), descriptor.binaryData.size(),
+                               dispatch_get_global_queue(0, 0), DISPATCH_DATA_DESTRUCTOR_DEFAULT);
+      library = [gpu->device() newLibraryWithData:data error:&error];
+      dispatch_release(data);
+      break;
+    }
+    case ShaderCodeFormat::MSL: {
+      if (descriptor.code.empty()) {
+        LOGE("MetalShaderModule: MSL source is empty");
+        return;
+      }
+      NSString* source = [NSString stringWithUTF8String:descriptor.code.c_str()];
+      library = [gpu->device() newLibraryWithSource:source options:nil error:&error];
+      break;
+    }
+    default:
+      LOGE("MetalShaderModule: unsupported shader format for the Metal backend");
       return;
-    }
-    dispatch_data_t data =
-        dispatch_data_create(descriptor.binaryData.data(), descriptor.binaryData.size(),
-                             dispatch_get_global_queue(0, 0), DISPATCH_DATA_DESTRUCTOR_DEFAULT);
-    NSError* error = nil;
-    library = [gpu->device() newLibraryWithData:data error:&error];
-    dispatch_release(data);
-    if (!library && error) {
-      LOGE("MetalShaderModule: metallib load error: %s", error.localizedDescription.UTF8String);
-    }
-    return;
   }
-  std::string vulkanGLSL = PreprocessGLSL(descriptor.code, descriptor.stage);
-  setUniformSlots(detail::CollectUniformSlots(vulkanGLSL));
-  compileShader(gpu->device(), gpu->shaderCompiler(), vulkanGLSL, descriptor.stage);
+  if (!library) {
+    LOGE("MetalShaderModule: library creation failed: %s",
+         error != nil ? error.localizedDescription.UTF8String : "unknown error");
+  }
 }
 
 void MetalShaderModule::onRelease(MetalGPU*) {
@@ -188,75 +77,6 @@ void MetalShaderModule::onRelease(MetalGPU*) {
     [library release];
     library = nil;
   }
-}
-
-bool MetalShaderModule::compileShader(id<MTLDevice> device, const shaderc::Compiler* compiler,
-                                      const std::string& vulkanGLSL, ShaderStage stage) {
-  auto spirvBinary = CompileGLSLToSPIRV(compiler, vulkanGLSL, stage);
-  if (spirvBinary.empty()) {
-    return false;
-  }
-  std::string mslCode = convertSPIRVToMSL(spirvBinary, stage);
-  if (mslCode.empty()) {
-    return false;
-  }
-
-  NSString* mslSource = [NSString stringWithUTF8String:mslCode.c_str()];
-  NSError* error = nil;
-
-  library = [device newLibraryWithSource:mslSource options:nil error:&error];
-  if (!library) {
-    if (error) {
-      LOGE("Metal shader compilation error: %s", error.localizedDescription.UTF8String);
-      LOGE("MSL code:\n%s", mslCode.c_str());
-    }
-    return false;
-  }
-
-  return true;
-}
-
-SampleMaskCompileResult CompileFragmentShaderWithSampleMask(MetalGPU* gpu,
-                                                            const std::string& glslCode) {
-  SampleMaskCompileResult result = {};
-  if (gpu == nullptr) {
-    return result;
-  }
-  auto device = gpu->device();
-  auto* compiler = gpu->shaderCompiler();
-  auto stage = ShaderStage::Fragment;
-  std::string vulkanGLSL = PreprocessGLSL(glslCode, stage);
-
-  // First pass: compile to SPIR-V and collect used specialization constant IDs.
-  auto spirvBinary = CompileGLSLToSPIRV(compiler, vulkanGLSL, stage);
-  if (spirvBinary.empty()) {
-    return result;
-  }
-  auto usedIDs = collectSpecConstantIDs(spirvBinary);
-  result.constantID = findAvailableConstantID(usedIDs);
-
-  // Second pass: inject sample mask with the chosen constant_id and re-compile.
-  std::string injectedGLSL = injectSampleMask(vulkanGLSL, result.constantID);
-  auto injectedSPIRV = CompileGLSLToSPIRV(compiler, injectedGLSL, stage);
-  if (injectedSPIRV.empty()) {
-    return result;
-  }
-  std::string mslCode = convertSPIRVToMSL(injectedSPIRV, stage);
-  if (mslCode.empty()) {
-    return result;
-  }
-
-  NSString* mslSource = [NSString stringWithUTF8String:mslCode.c_str()];
-  NSError* error = nil;
-  result.library = [device newLibraryWithSource:mslSource options:nil error:&error];
-  if (!result.library) {
-    if (error) {
-      LOGE("Metal shader compilation error (sample mask): %s",
-           error.localizedDescription.UTF8String);
-    }
-    result.library = nil;
-  }
-  return result;
 }
 
 }  // namespace tgfx

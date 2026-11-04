@@ -230,13 +230,6 @@ file(GLOB PLATFORM_COMMON_FILES
         src/platform/*.*)
 list(APPEND TGFX_FILES ${PLATFORM_COMMON_FILES})
 
-if (NOT TGFX_USE_METAL AND NOT TGFX_USE_VULKAN AND NOT TGFX_USE_D3D12)
-    file(GLOB SHADER_COMPILER_FILES src/gpu/ShaderCompiler.cpp)
-    if (SHADER_COMPILER_FILES)
-        list(REMOVE_ITEM TGFX_FILES ${SHADER_COMPILER_FILES})
-    endif ()
-endif ()
-
 if (TGFX_BUILD_SVG)
     file(GLOB_RECURSE SVG_FILES
             src/svg/*.*)
@@ -414,11 +407,6 @@ if (TGFX_USE_VULKAN)
     # VMA (header-only). Added as SYSTEM include later to suppress
     # nullability-extension warnings from vk_mem_alloc.h on Apple Clang.
 
-    # shaderc + SPIRV-Cross (shared with Metal backend)
-    list(APPEND TGFX_STATIC_VENDORS shaderc SPIRV-Cross)
-    list(APPEND TGFX_INCLUDES third_party/shaderc/libshaderc/include)
-    list(APPEND TGFX_INCLUDES third_party/SPIRV-Cross)
-    list(APPEND TGFX_DEFINES SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS)
 elseif (TGFX_USE_OPENGL)
     file(GLOB GFX_PLATFORM_FILES src/gpu/opengl/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
@@ -428,15 +416,6 @@ elseif (TGFX_USE_WEBGPU)
     file(GLOB_RECURSE GFX_PLATFORM_FILES src/gpu/webgpu/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
     list(APPEND TGFX_DEFINES TGFX_USE_WEBGPU)
-    list(APPEND TGFX_STATIC_VENDORS shaderc)
-    list(APPEND TGFX_INCLUDES third_party/shaderc/libshaderc/include)
-    if (NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/shaderc/third_party/glslang)
-        message(FATAL_ERROR "shaderc sub-dependencies not found. Please run ./sync_deps.sh first.")
-    endif ()
-    # Tint: SPIR-V to WGSL shader conversion for WebGPU
-    tgfx_setup_tint()
-    list(APPEND TGFX_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tint/include)
-    list(APPEND TGFX_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tint)
 elseif (APPLE)
     if (TGFX_USE_METAL)
         file(GLOB_RECURSE GFX_PLATFORM_FILES src/gpu/metal/*.*)
@@ -444,11 +423,6 @@ elseif (APPLE)
         find_library(Metal_LIBS Metal REQUIRED)
         list(APPEND TGFX_SHARED_LIBS ${Metal_LIBS})
         list(APPEND TGFX_DEFINES TGFX_USE_METAL)
-        # Add shaderc and SPIRV-Cross for GLSL to MSL conversion
-        list(APPEND TGFX_STATIC_VENDORS shaderc SPIRV-Cross)
-        list(APPEND TGFX_INCLUDES third_party/shaderc/libshaderc/include)
-        list(APPEND TGFX_INCLUDES third_party/SPIRV-Cross)
-        list(APPEND TGFX_DEFINES SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS)
     endif ()
 endif ()
 
@@ -461,11 +435,6 @@ if (TGFX_USE_D3D12)
         # tests run on the WARP software rasterizer instead of expecting a hardware GPU.
         list(APPEND TGFX_DEFINES TGFX_D3D12_USE_WARP)
     endif ()
-    # Add shaderc and SPIRV-Cross for GLSL to HLSL conversion
-    list(APPEND TGFX_STATIC_VENDORS shaderc SPIRV-Cross)
-    list(APPEND TGFX_INCLUDES third_party/shaderc/libshaderc/include)
-    list(APPEND TGFX_INCLUDES third_party/SPIRV-Cross)
-    list(APPEND TGFX_DEFINES SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS)
 endif ()
 
 # Auto-sync shaderc sub-dependencies (glslang, SPIRV-Tools, etc.) if any backend needs shaderc.

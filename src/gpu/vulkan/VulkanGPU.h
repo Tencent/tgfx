@@ -36,10 +36,6 @@
 VK_DEFINE_HANDLE(VmaAllocator)
 VK_DEFINE_HANDLE(VmaAllocation)
 
-namespace shaderc {
-class Compiler;
-}
-
 namespace tgfx {
 
 class VulkanCommandQueue;
@@ -153,8 +149,6 @@ class VulkanGPU : public GPU {
     return _extensions;
   }
 
-  const shaderc::Compiler* shaderCompiler() const;
-
   VkFormat getVkFormat(PixelFormat format) const {
     return caps->getVkFormat(format);
   }
@@ -245,7 +239,6 @@ class VulkanGPU : public GPU {
   // Subsystems
   std::unique_ptr<VulkanCaps> caps;
   std::unique_ptr<VulkanCommandQueue> commandQueue;
-  std::unique_ptr<shaderc::Compiler> compiler;
 
   // Resource tracking (resources list + ReturnQueue for deferred destruction)
   std::shared_ptr<VulkanResource> addResource(VulkanResource* resource);

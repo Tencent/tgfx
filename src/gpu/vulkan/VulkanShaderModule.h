@@ -28,8 +28,8 @@ namespace tgfx {
 class VulkanGPU;
 
 /**
- * Vulkan shader module implementation. Compiles GLSL to SPIR-V via the shared ShaderCompiler, then
- * creates a VkShaderModule from the SPIR-V binary.
+ * Vulkan shader module implementation. Creates a VkShaderModule from a precompiled SPIR-V
+ * binary; runtime GLSL compilation is not supported.
  */
 class VulkanShaderModule : public VaryingShaderModule, public VulkanResource {
  public:

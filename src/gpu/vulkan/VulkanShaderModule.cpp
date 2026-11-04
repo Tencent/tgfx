@@ -19,7 +19,7 @@
 #include "VulkanShaderModule.h"
 #include "VulkanGPU.h"
 #include "core/utils/Log.h"
-#include "gpu/ShaderCompiler.h"
+#include "gpu/ShaderInterface.h"
 
 namespace tgfx {
 
@@ -36,29 +36,26 @@ std::shared_ptr<VulkanShaderModule> VulkanShaderModule::Make(
 }
 
 VulkanShaderModule::VulkanShaderModule(VulkanGPU* gpu, const ShaderModuleDescriptor& descriptor)
-    : VaryingShaderModule(ExtractVaryingDecls(descriptor.code, descriptor.stage), {}) {
+    : VaryingShaderModule(ExtractModuleVaryingDecls(descriptor), {}) {
   VkShaderModuleCreateInfo createInfo = {};
   createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 
-  std::vector<uint32_t> compiledSPIRV;
-  if (descriptor.format == ShaderCodeFormat::SPIRV) {
-    // Precompiled SPIR-V carries no parseable GLSL for the runtime slot collection, so the baked
-    // block bindings arrive via the descriptor (filled by the pipeline creator from the offline
-    // templates' declared bindings).
-    setUniformSlots(descriptor.uniformSlots);
-    createInfo.codeSize = descriptor.binaryData.size();
-    createInfo.pCode = reinterpret_cast<const uint32_t*>(descriptor.binaryData.data());
-  } else {
-    std::string vulkanGLSL = PreprocessGLSL(descriptor.code, descriptor.stage);
-    setUniformSlots(detail::CollectUniformSlots(vulkanGLSL));
-    compiledSPIRV = CompileGLSLToSPIRV(gpu->shaderCompiler(), vulkanGLSL, descriptor.stage);
-    if (compiledSPIRV.empty()) {
-      LOGE("VulkanShaderModule: GLSL to SPIR-V compilation failed.");
-      return;
-    }
-    createInfo.codeSize = compiledSPIRV.size() * sizeof(uint32_t);
-    createInfo.pCode = compiledSPIRV.data();
+  if (descriptor.format != ShaderCodeFormat::SPIRV) {
+    LOGE(
+        "VulkanShaderModule: unsupported shader format; the Vulkan backend only accepts SPIR-V "
+        "binaries (compile GLSL offline with glslc).");
+    return;
   }
+  if (descriptor.binaryData.empty()) {
+    LOGE("VulkanShaderModule: SPIR-V binary is empty.");
+    return;
+  }
+  // Precompiled SPIR-V carries no parseable GLSL for the runtime slot collection, so the baked
+  // block bindings arrive via the descriptor (filled by the pipeline creator from the offline
+  // templates' declared bindings).
+  setUniformSlots(descriptor.uniformSlots);
+  createInfo.codeSize = descriptor.binaryData.size();
+  createInfo.pCode = reinterpret_cast<const uint32_t*>(descriptor.binaryData.data());
 
   auto result = vkCreateShaderModule(gpu->device(), &createInfo, nullptr, &shaderModule);
   if (result != VK_SUCCESS) {

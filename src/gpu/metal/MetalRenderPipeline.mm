@@ -21,7 +21,7 @@
 #include "MetalShaderModule.h"
 #include "MetalUtil.h"
 #include "core/utils/Log.h"
-#include "gpu/ShaderCompiler.h"
+#include "gpu/ShaderInterface.h"
 
 namespace tgfx {
 
@@ -82,10 +82,6 @@ MetalRenderPipeline::MetalRenderPipeline(MetalGPU* gpu,
 }
 
 void MetalRenderPipeline::onRelease(MetalGPU*) {
-  if (sampleMaskLibrary != nil) {
-    [sampleMaskLibrary release];
-    sampleMaskLibrary = nil;
-  }
   if (depthStencilState != nil) {
     [depthStencilState release];
     depthStencilState = nil;
@@ -126,32 +122,16 @@ bool MetalRenderPipeline::createPipelineState(MetalGPU* gpu,
     auto fragmentShader = std::static_pointer_cast<MetalShaderModule>(descriptor.fragment.module);
     bool needsSampleMask = descriptor.multisample.mask != 0xFFFFFFFF;
     if (needsSampleMask) {
-      // Re-compile the fragment shader with sample mask injection using a two-pass approach
-      // that picks a constant_id not conflicting with user-defined specialization constants.
-      auto compileResult = CompileFragmentShaderWithSampleMask(gpu, fragmentShader->glslCode());
-      if (compileResult.library == nil) {
-        LOGE("Metal pipeline creation error: sample mask shader compilation failed");
-        [metalDescriptor.vertexFunction release];
-        [metalDescriptor release];
-        return false;
-      }
-      sampleMaskLibrary = compileResult.library;
-      MTLFunctionConstantValues* constants = [[MTLFunctionConstantValues alloc] init];
-      uint32_t mask = descriptor.multisample.mask;
-      [constants setConstantValue:&mask type:MTLDataTypeUInt atIndex:compileResult.constantID];
-      NSError* funcError = nil;
-      metalDescriptor.fragmentFunction = [sampleMaskLibrary newFunctionWithName:@"main0"
-                                                                 constantValues:constants
-                                                                          error:&funcError];
-      [constants release];
-      if (funcError) {
-        LOGE("Metal fragment function creation error: %s",
-             funcError.localizedDescription.UTF8String);
-      }
-    } else {
-      metalDescriptor.fragmentFunction =
-          [fragmentShader->metalLibrary() newFunctionWithName:@"main0"];
+      // Sample-mask injection requires compiling modified GLSL, which is only possible with the
+      // removed runtime compiler. Precompiled metallibs cannot express a per-pipeline mask, so
+      // fail loudly instead of silently ignoring it.
+      LOGE("Metal pipeline creation error: sample mask requires runtime shader compilation");
+      [metalDescriptor.vertexFunction release];
+      [metalDescriptor release];
+      return false;
     }
+    metalDescriptor.fragmentFunction =
+        [fragmentShader->metalLibrary() newFunctionWithName:@"main0"];
   }
 
   if (metalDescriptor.vertexFunction == nil || metalDescriptor.fragmentFunction == nil) {

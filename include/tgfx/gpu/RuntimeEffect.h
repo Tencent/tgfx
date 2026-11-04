@@ -25,10 +25,27 @@
 namespace tgfx {
 
 /**
- * RuntimeEffect supports creating custom ImageFilter objects with user-provided shader code.
- * Shader code must be written in GLSL with OpenGL ES 3.0 syntax. Use the "#version 300 es"
- * directive, or "#version 150" on desktop OpenGL. The vertex and fragment shader stages must
- * declare matching varyings, otherwise pipeline creation fails on SPIR-V based backends.
+ * RuntimeEffect supports creating custom ImageFilter objects whose shaders are supplied by the
+ * caller and built inside onDraw() through the raw GPU API (GPU::createShaderModule +
+ * GPU::createRenderPipeline + CommandEncoder). tgfx does not translate shader code between
+ * formats at runtime, so the shader must be written in the native form of the backend that will
+ * execute it (ShaderCodeFormat):
+ *   - OpenGL: GLSL text ("#version 300 es", or "#version 150" on desktop OpenGL).
+ *   - Metal:  MSL text with entry functions named `main0`, one source per stage, or a metallib.
+ *             Clip-space positions follow the Metal convention (y up, after the origin transform
+ *             the render target applies), so mirror the y sign the GLSL path produces when porting
+ *             an effect from GLSL.
+ *   - Vulkan: SPIR-V binary translated offline, for example with `glslc --target-env=vulkan1.1`.
+ *             The Vulkan driver cannot compile text.
+ *   - WebGPU: WGSL text.
+ *   - D3D12:  HLSL text with the entry function named `main`, or DXBC bytecode. A cbuffer binds
+ *             any register(bN) as long as uniformSlots reports that N under its name; texture
+ *             samplers use (t{K}, s{K}) with K the index in layout.textureSamplers, and vertex
+ *             inputs use the TEXCOORD{N} semantic with N the attribute's global index.
+ * For every non-GLSL format the descriptor must fill ShaderModuleDescriptor::uniformSlots, and
+ * the entries must match RenderPipelineDescriptor::layout.uniformBlocks. Cross-stage varying
+ * interfaces are validated by this library for GLSL text only; with the native formats the
+ * compiler and the backend validate the interface (a mismatch fails pipeline creation).
  */
 class RuntimeEffect {
  public:

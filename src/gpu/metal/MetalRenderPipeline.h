@@ -79,7 +79,6 @@ class MetalRenderPipeline : public RenderPipeline, public MetalResource {
 
   id<MTLRenderPipelineState> pipelineState = nil;
   id<MTLDepthStencilState> depthStencilState = nil;
-  id<MTLLibrary> sampleMaskLibrary = nil;
   std::unordered_map<unsigned, unsigned> textureUnits = {};
   std::map<unsigned, UniformSlotMapping> uniformSlots = {};
   MTLCullMode cullMode = MTLCullModeNone;

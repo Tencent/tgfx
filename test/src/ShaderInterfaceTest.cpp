@@ -18,7 +18,7 @@
 
 #include <string>
 #include <unordered_map>
-#include "gpu/ShaderCompiler.h"
+#include "gpu/ShaderInterface.h"
 #include "gtest/gtest.h"
 #include "utils/TestUtils.h"
 
@@ -46,7 +46,7 @@ void main() {
 }
 )";
 
-TGFX_TEST(ShaderCompilerTest, ExtractVertexOutputs) {
+TGFX_TEST(ShaderInterfaceTest, ExtractVertexOutputs) {
   auto decls = ExtractVaryingDecls(VERTEX_SHADER, ShaderStage::Vertex);
   EXPECT_EQ(decls.size(), 3u);
   EXPECT_EQ(decls["vRed"], 1);
@@ -54,7 +54,7 @@ TGFX_TEST(ShaderCompilerTest, ExtractVertexOutputs) {
   EXPECT_EQ(decls["vBlue"], 1);
 }
 
-TGFX_TEST(ShaderCompilerTest, ExtractFragmentInputs) {
+TGFX_TEST(ShaderInterfaceTest, ExtractFragmentInputs) {
   auto decls = ExtractVaryingDecls(FRAGMENT_SHADER, ShaderStage::Fragment);
   EXPECT_EQ(decls.size(), 3u);
   EXPECT_EQ(decls["vRed"], 1);
@@ -62,7 +62,7 @@ TGFX_TEST(ShaderCompilerTest, ExtractFragmentInputs) {
   EXPECT_EQ(decls["vBlue"], 1);
 }
 
-TGFX_TEST(ShaderCompilerTest, ExtractArrayVaryings) {
+TGFX_TEST(ShaderInterfaceTest, ExtractArrayVaryings) {
   static constexpr char kVertexShader[] = R"(
 #version 450
 out vec2 vUVs[2];
@@ -75,7 +75,7 @@ void main() {}
   EXPECT_EQ(decls["vAlpha"], 1);
 }
 
-TGFX_TEST(ShaderCompilerTest, ExtractWithQualifiers) {
+TGFX_TEST(ShaderInterfaceTest, ExtractWithQualifiers) {
   static constexpr char kVertexShader[] = R"(
 #version 450
 flat out highp float vId;
@@ -90,7 +90,7 @@ void main() {}
   EXPECT_EQ(decls["vAlpha"], 1);
 }
 
-TGFX_TEST(ShaderCompilerTest, VaryingInterfacesMatch) {
+TGFX_TEST(ShaderInterfaceTest, VaryingInterfacesMatch) {
   auto vertexDecls = ExtractVaryingDecls(VERTEX_SHADER, ShaderStage::Vertex);
   auto fragmentDecls = ExtractVaryingDecls(FRAGMENT_SHADER, ShaderStage::Fragment);
   std::string mismatch;
@@ -98,7 +98,7 @@ TGFX_TEST(ShaderCompilerTest, VaryingInterfacesMatch) {
   EXPECT_TRUE(mismatch.empty());
 }
 
-TGFX_TEST(ShaderCompilerTest, ExtraOutputMismatch) {
+TGFX_TEST(ShaderInterfaceTest, ExtraOutputMismatch) {
   static constexpr char kVertexShader[] = R"(
 #version 450
 out float vUsed;
@@ -117,7 +117,7 @@ void main() {}
   EXPECT_EQ(mismatch, "vertex output 'vUnused' is not consumed by the fragment");
 }
 
-TGFX_TEST(ShaderCompilerTest, ExtraInputMismatch) {
+TGFX_TEST(ShaderInterfaceTest, ExtraInputMismatch) {
   static constexpr char kVertexShader[] = R"(
 #version 450
 out float vUsed;
@@ -136,7 +136,7 @@ void main() {}
   EXPECT_EQ(mismatch, "fragment input 'vExtra' has no matching vertex output");
 }
 
-TGFX_TEST(ShaderCompilerTest, ArrayLengthMismatch) {
+TGFX_TEST(ShaderInterfaceTest, ArrayLengthMismatch) {
   static constexpr char kVertexShader[] = R"(
 #version 450
 out float vColor[2];

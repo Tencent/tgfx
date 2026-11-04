@@ -19,7 +19,6 @@
 #include "D3D12GPU.h"
 #include <dxgi1_4.h>
 #include <algorithm>
-#include <shaderc/shaderc.hpp>
 #include <string>
 #include <vector>
 #include "D3D12Buffer.h"
@@ -173,7 +172,6 @@ D3D12GPU::D3D12GPU(ComPtr<ID3D12Device> device, ComPtr<IDXGIAdapter1> adapter)
     return;
   }
   commandQueue = std::make_unique<D3D12CommandQueue>(this);
-  compiler = std::make_unique<shaderc::Compiler>();
 }
 
 D3D12_GPU_DESCRIPTOR_HANDLE D3D12GPU::allocatePermanentSamplerSlot(const D3D12_SAMPLER_DESC& desc) {
@@ -276,10 +274,6 @@ void D3D12GPU::initLimits() {
 
 CommandQueue* D3D12GPU::queue() const {
   return commandQueue.get();
-}
-
-const shaderc::Compiler* D3D12GPU::shaderCompiler() const {
-  return compiler.get();
 }
 
 bool D3D12GPU::isFormatRenderable(PixelFormat format) const {

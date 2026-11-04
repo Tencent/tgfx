@@ -25,10 +25,6 @@
 #include "gpu/VaryingShaderModule.h"
 #include "tgfx/gpu/ShaderModule.h"
 
-namespace shaderc {
-class Compiler;
-};
-
 namespace tgfx {
 
 class MetalGPU;
@@ -67,13 +63,6 @@ class MetalShaderModule : public VaryingShaderModule, public MetalResource {
     return _stage;
   }
 
-  /**
-   * Returns the original GLSL source code.
-   */
-  const std::string& glslCode() const {
-    return _glslCode;
-  }
-
  protected:
   void onRelease(MetalGPU* gpu) override;
 
@@ -81,26 +70,10 @@ class MetalShaderModule : public VaryingShaderModule, public MetalResource {
   MetalShaderModule(MetalGPU* gpu, const ShaderModuleDescriptor& descriptor);
   ~MetalShaderModule() override = default;
 
-  bool compileShader(id<MTLDevice> device, const shaderc::Compiler* compiler,
-                     const std::string& vulkanGLSL, ShaderStage stage);
-
   id<MTLLibrary> library = nil;
   ShaderStage _stage = ShaderStage::Vertex;
-  std::string _glslCode;
 
   friend class MetalGPU;
 };
-
-struct SampleMaskCompileResult {
-  id<MTLLibrary> library = nil;
-  uint32_t constantID = 0;
-};
-
-// Re-compile a fragment shader GLSL with sample mask injection. The function first compiles the
-// GLSL to SPIR-V to discover which constant_id values are already in use, picks an unused one,
-// injects tgfx_SampleMask + gl_SampleMask output, and re-compiles the modified GLSL to produce
-// a new MTLLibrary. Returns a nil library on failure.
-SampleMaskCompileResult CompileFragmentShaderWithSampleMask(MetalGPU* gpu,
-                                                            const std::string& glslCode);
 
 }  // namespace tgfx

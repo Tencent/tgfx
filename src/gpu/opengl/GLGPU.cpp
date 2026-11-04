@@ -219,6 +219,12 @@ std::shared_ptr<Sampler> GLGPU::createSampler(const SamplerDescriptor& descripto
 }
 
 std::shared_ptr<ShaderModule> GLGPU::createShaderModule(const ShaderModuleDescriptor& descriptor) {
+  if (descriptor.format != ShaderCodeFormat::GLSL) {
+    LOGE(
+        "GLGPU::createShaderModule() unsupported shader format; the OpenGL backend only accepts "
+        "GLSL text.");
+    return nullptr;
+  }
   if (descriptor.code.empty()) {
     LOGE("GLGPU::createShaderModule() shader code is empty!");
     return nullptr;

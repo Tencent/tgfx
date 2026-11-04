@@ -23,7 +23,6 @@
 #include "VulkanGPU.h"
 #include <algorithm>
 #include <cstring>
-#include <shaderc/shaderc.hpp>
 #include <vector>
 #if defined(__ANDROID__)
 #include <dlfcn.h>
@@ -140,7 +139,6 @@ std::unique_ptr<VulkanGPU> VulkanGPU::MakeFrom(VkInstance instance, VkPhysicalDe
   vkCreatePipelineCache(device, &cacheInfo, nullptr, &gpu->vulkanPipelineCache);
   gpu->caps = std::make_unique<VulkanCaps>(physicalDevice, gpu->_extensions);
   gpu->commandQueue = std::make_unique<VulkanCommandQueue>(gpu.get());
-  gpu->compiler = std::make_unique<shaderc::Compiler>();
   return gpu;
 }
 
@@ -177,7 +175,6 @@ bool VulkanGPU::initVulkan() {
   vkCreatePipelineCache(vulkanDevice, &cacheInfo, nullptr, &vulkanPipelineCache);
   caps = std::make_unique<VulkanCaps>(vulkanPhysicalDevice, _extensions);
   commandQueue = std::make_unique<VulkanCommandQueue>(this);
-  compiler = std::make_unique<shaderc::Compiler>();
   return true;
 }
 
@@ -402,10 +399,6 @@ bool VulkanGPU::createAllocator(uint32_t apiVersion) {
     return false;
   }
   return true;
-}
-
-const shaderc::Compiler* VulkanGPU::shaderCompiler() const {
-  return compiler.get();
 }
 
 CommandQueue* VulkanGPU::queue() const {

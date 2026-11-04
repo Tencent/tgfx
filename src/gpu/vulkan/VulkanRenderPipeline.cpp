@@ -21,7 +21,7 @@
 #include "VulkanShaderModule.h"
 #include "VulkanUtil.h"
 #include "core/utils/Log.h"
-#include "gpu/ShaderCompiler.h"
+#include "gpu/ShaderInterface.h"
 #include "gpu/UniformData.h"
 
 namespace tgfx {

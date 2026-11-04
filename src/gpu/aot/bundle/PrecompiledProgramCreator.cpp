@@ -44,12 +44,14 @@
 
 namespace tgfx {
 
-static ShaderCodeFormat FormatForBackend(Backend backend) {
+// The format names the payload the bundle stores. Metal artifacts are precompiled metallibs
+// (binary); the text formats below are what the backend's driver compiles.
+static ShaderCodeFormat FormatForBackend(Backend backend, bool hasBinary) {
   switch (backend) {
     case Backend::Vulkan:
       return ShaderCodeFormat::SPIRV;
     case Backend::Metal:
-      return ShaderCodeFormat::MSL;
+      return hasBinary ? ShaderCodeFormat::METALLIB : ShaderCodeFormat::MSL;
     case Backend::WebGPU:
       return ShaderCodeFormat::WGSL;
     default:
@@ -373,12 +375,12 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   }
   cache->recordArtifactHit();
 
-  auto format = FormatForBackend(context->backend());
+  auto format = FormatForBackend(context->backend(), true);
 
   ShaderModuleDescriptor vertexDesc = {};
   vertexDesc.format = format;
   vertexDesc.stage = ShaderStage::Vertex;
-  if (format == ShaderCodeFormat::SPIRV || format == ShaderCodeFormat::MSL) {
+  if (format == ShaderCodeFormat::SPIRV || format == ShaderCodeFormat::METALLIB) {
     vertexDesc.binaryData = vertBlob->data;
   } else {
     vertexDesc.code = std::string(vertBlob->data.begin(), vertBlob->data.end());
@@ -394,7 +396,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   ShaderModuleDescriptor fragmentDesc = {};
   fragmentDesc.format = format;
   fragmentDesc.stage = ShaderStage::Fragment;
-  if (format == ShaderCodeFormat::SPIRV || format == ShaderCodeFormat::MSL) {
+  if (format == ShaderCodeFormat::SPIRV || format == ShaderCodeFormat::METALLIB) {
     fragmentDesc.binaryData = fragBlob->data;
   } else {
     fragmentDesc.code = std::string(fragBlob->data.begin(), fragBlob->data.end());

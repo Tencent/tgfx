@@ -38,9 +38,8 @@ std::shared_ptr<MetalDevice> MetalDevice::MakeFrom(id<MTLDevice> metalDevice) {
     return nullptr;
   }
   // Fast path: check the registry before creating a MetalGPU, which would build a temporary
-  // MTLCommandQueue, query device capabilities, and start a shaderc::Compiler just to be thrown
-  // away when a live device already exists. Concurrent first creations are still deduplicated
-  // by RegisterNative() below.
+  // MTLCommandQueue and query device capabilities just to be thrown away when a live device
+  // already exists. Concurrent first creations are still deduplicated by RegisterNative() below.
   if (auto existing = Device::FindNative({(__bridge const void*)metalDevice})) {
     return std::static_pointer_cast<MetalDevice>(existing);
   }

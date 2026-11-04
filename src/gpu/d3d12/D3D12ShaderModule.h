@@ -34,29 +34,24 @@ class D3D12GPU;
 /**
  * D3D12 shader module implementation.
  *
- * Compilation pipeline (matching the GLSL-first design used by Vulkan and Metal backends):
- *   1. PreprocessGLSL — assigns explicit binding/location qualifiers (shared with Vulkan/Metal).
- *   2. CompileGLSLToSPIRV — uses shaderc to produce SPIR-V (shared with Vulkan/Metal).
- *   3. SPIR-V -> HLSL — uses spirv_cross::CompilerHLSL targeting shader model 5.0.
- *   4. HLSL -> DXBC — uses D3DCompile with profile vs_5_0 / ps_5_0.
+ * The backend consumes HLSL source compiled at runtime by the system D3DCompiler (D3DCompile,
+ * profiles vs_5_0 / ps_5_0), or pre-compiled DXBC bytecode loaded verbatim. No third-party
+ * compiler is involved. The resulting DXBC blob is consumed by D3D12RenderPipeline via
+ * shaderBytecode().
  *
- * The resulting DXBC blob is consumed by D3D12RenderPipeline via shaderBytecode().
- *
- * HLSL register assignment:
- *   - CBVs: each uniform_buffer entry SPIRV-Cross reports for this stage receives the next
- *     free b{N} register (b0, b1, ...), assigned in declaration order (SPIRV-Cross iterates
- *     resources by SPIR-V id, which matches the order they appear in the GLSL source).
- *     Registers are per-stage: VS b0 and FS b0 do not collide because the D3D12 root signature
- *     distinguishes them via ShaderVisibility.
- *   - SRVs/Samplers: each sampled_image entry receives a paired (t{K}, s{K}) register slot
- *     assigned in the same declaration order, again starting at 0.
- *   - The SPIR-V binding number attached to the source declaration does not influence the HLSL
- *     register number — SPIRV-Cross's default binding-derived mapping is fully overridden here
- *     via add_hlsl_resource_binding. This dense ordering is intentional: it must stay in lock
- *     step with the order D3D12RenderPipeline::createRootSignature walks
- *     BindingLayout::uniformBlocks and BindingLayout::textureSamplers, so the shader's b/t/s
- *     slots correspond one-to-one with the root parameter tables. Reordering either loop, or
- *     changing SPIRV-Cross's resource iteration order, will silently mis-map bindings.
+ * HLSL contract the module expects (documented on ShaderCodeFormat::HLSL):
+ *   - Entry function name: `main`.
+ *   - CBVs: a uniform block binds the register(bN) its HLSL declares; the module reports N
+ *     through uniformSlots so the root signature can use the same value. Registers are
+ *     per-stage: VS b0 and FS b0 do not collide because the root signature distinguishes them
+ *     via ShaderVisibility.
+ *   - SRVs/Samplers: texture samplers bind at paired (t{K}, s{K}) registers, where K is the
+ *     entry's index in BindingLayout::textureSamplers.
+ *   - Vertex inputs use the TEXCOORD{N} semantic, where N is the attribute's global index across
+ *     the pipeline vertex buffer layouts. D3D12RenderPipeline builds the input layout from that
+ *     index, so the semantics must stay in lock step with it.
+ * The mapping is resolved by name against ShaderModuleDescriptor::uniformSlots, so the module
+ * and the pipeline layout must agree on every block name.
  */
 class D3D12ShaderModule : public VaryingShaderModule, public D3D12Resource {
  public:

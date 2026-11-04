@@ -22,7 +22,7 @@
 #include "WebGPUShaderModule.h"
 #include "WebGPUUtil.h"
 #include "core/utils/Log.h"
-#include "gpu/ShaderCompiler.h"
+#include "gpu/ShaderInterface.h"
 #include "gpu/UniformData.h"
 #include "tgfx/gpu/ShaderVisibility.h"
 

@@ -48,8 +48,6 @@ class WebGPUShaderModule : public VaryingShaderModule, public WebGPUResource {
  private:
   WebGPUShaderModule(WebGPUGPU* gpu, const ShaderModuleDescriptor& descriptor);
 
-  bool compileShader(WGPUDevice device, const std::string& vulkanGLSL, ShaderStage stage);
-
   WGPUShaderModule shaderModule = nullptr;
   ShaderStage _stage = ShaderStage::Vertex;
 
