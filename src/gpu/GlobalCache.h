@@ -37,12 +37,6 @@ struct ProgramCacheStats {
   uint64_t cacheHits = 0;
   uint64_t cacheMisses = 0;
   uint64_t precompiledArtifactCreations = 0;
-  uint64_t programBuilderCreations = 0;
-  // Subset of actual builder creations, never inferred from the number of failed AOT attempts.
-  uint64_t excludedProgramBuilderCreations = 0;
-  uint64_t runtimePipelineCreationAttempts = 0;
-  uint64_t runtimePipelineCreationSuccesses = 0;
-  uint64_t runtimePipelineCreationFailures = 0;
 };
 
 /**
@@ -91,8 +85,7 @@ class GlobalCache {
    * Adds a program to the cache with the specified key. The caller must ensure that the key does
    * not already exist in the cache, otherwise the LRU tracking will be corrupted.
    */
-  void addProgram(const BytesKey& programKey, std::shared_ptr<Program> program,
-                  bool excludeFromAOTCoverage = false);
+  void addProgram(const BytesKey& programKey, std::shared_ptr<Program> program);
 
   /**
    * Removes all cached programs. Intended for testing scenarios where a fresh program compilation
@@ -109,22 +102,15 @@ class GlobalCache {
   }
 
   /**
-   * Records the result of one runtime render-pipeline creation attempt.
-   */
-  void recordRuntimePipelineCreation(bool succeeded);
-
-  /**
-   * Resets program request, creation, and runtime pipeline counters without changing cached
-   * programs.
+   * Resets program request and creation counters without changing cached programs.
    */
   void resetProgramStats() {
     _programStats = {};
   }
 
   /**
-   * Pauses program-creation counting. Test reference renders (deliberate runtime compiles with
-   * the bundle unloaded) use this so they do not dilute the cold AOT hit rate, which is meant to
-   * reflect production coverage only.
+   * Pauses program-creation counting. Test reference renders use this so they do not dilute the
+   * cold AOT hit rate, which is meant to reflect production coverage only.
    */
   void setProgramStatsPaused(bool paused) {
     _programStatsPaused.store(paused, std::memory_order_relaxed);

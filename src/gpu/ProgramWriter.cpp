@@ -27,7 +27,6 @@
 #include "gpu/ColorSpaceXformHelper.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/VertexShaderBuilder.h"
 #include "gpu/aot/bind/Binder.h"
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/aot/plan/AOTChainBuilder.h"
@@ -138,7 +137,7 @@ bool ProgramWriter::write(const ProgramInfo& info, RenderPass* renderPass, Progr
 
   auto array = GetRTAdjustArray(info.renderTarget);
   if (vertexUniformData != nullptr) {
-    vertexUniformData->setData(RTAdjustName, array);
+    vertexUniformData->setData(EngineParams::RTAdjust.name, array);
   }
   writeEngineDefaults(info, fragmentUniformData);
 
@@ -184,41 +183,6 @@ void ProgramWriter::writeGeometryProcessor(const ProgramInfo& info, UniformData*
   FragmentProcessor::CoordTransformIter coordTransformIter(&info);
   info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, info.geometryProcessor);
   info.geometryProcessor->setData(vertexUniformData, fragmentUniformData, &coordTransformIter);
-}
-
-void RuntimeProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
-                                           UniformData* fragmentUniformData) const {
-  for (auto& fragmentProcessor : info.fragmentProcessors) {
-    FragmentProcessor::Iter iter(fragmentProcessor);
-    const FragmentProcessor* fp = iter.next();
-    while (fp) {
-      info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, fp);
-      fp->setData(vertexUniformData, fragmentUniformData);
-      fp = iter.next();
-    }
-  }
-  const auto processor = info.getXferProcessor();
-  info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
-  processor->setData(vertexUniformData, fragmentUniformData);
-}
-
-void RuntimeProgramWriter::writeSamplers(const ProgramInfo& info, Program* /*program*/,
-                                         RenderPass* renderPass) const {
-  auto samplers = info.getSamplers();
-  auto gpu = info.renderTarget->getContext()->gpu();
-#if DEBUG
-  const char* unifDump = UnifDumpLabel();
-#endif
-  unsigned textureBinding = 0;
-  for (auto& [texture, state] : samplers) {
-    SamplerDescriptor descriptor(ToAddressMode(state.tileModeX), ToAddressMode(state.tileModeY),
-                                 state.minFilterMode, state.magFilterMode, state.mipmapMode);
-    auto sampler = gpu->createSampler(descriptor);
-#if DEBUG
-    DebugDumpSamplerSlot(unifDump, textureBinding, texture.get(), false);
-#endif
-    renderPass->setTexture(textureBinding++, texture, sampler);
-  }
 }
 
 void PrecompiledProgramWriter::writeEngineDefaults(const ProgramInfo& info,

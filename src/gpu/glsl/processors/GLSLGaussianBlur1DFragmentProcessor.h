@@ -28,8 +28,6 @@ class GLSLGaussianBlur1DFragmentProcessor : public GaussianBlur1DFragmentProcess
                                       GaussianBlurDirection direction, float stepLength,
                                       int maxSigma);
 
-  void emitCode(EmitArgs& args) const override;
-
  private:
   void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };

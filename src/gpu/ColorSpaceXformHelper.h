@@ -21,9 +21,7 @@
 #include <string>
 #include <utility>
 #include "UniformData.h"
-#include "UniformHandler.h"
 #include "core/ColorSpaceXformSteps.h"
-#include "gpu/ShaderVar.h"
 
 namespace tgfx {
 
@@ -47,11 +45,10 @@ int TFTypeToIndex(gfx::skcms_TFType type);
 bool ColorSpaceXformStepsSupported(const ColorSpaceXformSteps* steps);
 
 /**
- * Declares and uploads the uniforms of a color-space transform. All uniform names are prefixed with
- * namePrefix; an empty prefix yields the plain names used by the standalone ColorSpaceXformEffect.
- * When slotIndex >= 0 the plain names are declared and written as per-slot arrays of
- * slotCapacity elements instead, letting a multi-slot kernel give each slot an independent
- * parameter set (SrcTF0[0], SrcTF0[1], ...).
+ * Uploads the uniforms of a color-space transform. All uniform names are prefixed with namePrefix;
+ * an empty prefix yields the plain names used by the standalone ColorSpaceXformEffect. When
+ * slotIndex >= 0 the plain names are written as per-slot arrays instead, letting a multi-slot
+ * kernel give each slot an independent parameter set (SrcTF0[0], SrcTF0[1], ...).
  */
 class ColorSpaceXformHelper {
  public:
@@ -60,18 +57,10 @@ class ColorSpaceXformHelper {
   explicit ColorSpaceXformHelper(std::string namePrefix) : prefix(std::move(namePrefix)) {
   }
 
-  ColorSpaceXformHelper(int slotIndex, uint32_t slotCapacity)
-      : slot(slotIndex), capacity(slotCapacity) {
+  ColorSpaceXformHelper(int slotIndex, uint32_t) : slot(slotIndex) {
   }
-
-  void emitCode(UniformHandler* uniformHandler, const ColorSpaceXformSteps* colorSpaceXform,
-                ShaderStage shaderStage = ShaderStage::Fragment);
 
   void setData(UniformData* uniformData, const ColorSpaceXformSteps* colorSpaceXform);
-
-  bool isNoop() const {
-    return (0 == flags.mask());
-  }
 
   bool applyUnpremul() const {
     return flags.unPremul;
@@ -95,35 +84,6 @@ class ColorSpaceXformHelper {
     return flags.premul;
   }
 
-  gfx::skcms_TFType srcTFType() const {
-    return _srcTFType;
-  }
-  gfx::skcms_TFType dstTFType() const {
-    return _dstTFType;
-  }
-
-  const std::string& srcTFUniform0() const {
-    return srcTFVar0;
-  }
-  const std::string& srcTFUniform1() const {
-    return srcTFVar1;
-  }
-  const std::string& srcOOTFUniform() const {
-    return srcOOTFVar;
-  }
-  const std::string& gamutXformUniform() const {
-    return gamutXformVar;
-  }
-  const std::string& dstOOTFUniform() const {
-    return dstOOTFVar;
-  }
-  const std::string& dstTFUniform0() const {
-    return dstTFVar0;
-  }
-  const std::string& dstTFUniform1() const {
-    return dstTFVar1;
-  }
-
  private:
   template <typename T>
   void writeRequired(UniformData* uniformData, const std::string& field, const T& value) const {
@@ -143,21 +103,8 @@ class ColorSpaceXformHelper {
     }
   }
 
-  std::string declare(UniformHandler* uniformHandler, const std::string& field,
-                      UniformFormat format, ShaderStage stage);
-
   std::string prefix;
   int slot = -1;
-  uint32_t capacity = 0;
-  std::string srcTFVar0;
-  std::string srcTFVar1;
-  std::string srcOOTFVar;
-  std::string gamutXformVar;
-  std::string dstOOTFVar;
-  std::string dstTFVar0;
-  std::string dstTFVar1;
   ColorSpaceXformSteps::Flags flags;
-  gfx::skcms_TFType _srcTFType;
-  gfx::skcms_TFType _dstTFType;
 };
 }  // namespace tgfx

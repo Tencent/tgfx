@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLPorterDuffXferProcessor.h"
-#include "gpu/glsl/GLSLBlend.h"
 
 namespace tgfx {
 PlacementPtr<PorterDuffXferProcessor> PorterDuffXferProcessor::Make(BlockAllocator* allocator,
@@ -29,59 +28,6 @@ PlacementPtr<PorterDuffXferProcessor> PorterDuffXferProcessor::Make(BlockAllocat
 GLSLPorterDuffXferProcessor::GLSLPorterDuffXferProcessor(BlendMode blend,
                                                          DstTextureInfo dstTextureInfo)
     : PorterDuffXferProcessor(blend, std::move(dstTextureInfo)) {
-}
-
-void GLSLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
-  auto fragBuilder = args.fragBuilder;
-  auto uniformHandler = args.uniformHandler;
-
-  // The dst-texture route must not consult dstColor(): on framebuffer-fetch-capable contexts its
-  // name (gl_LastFragData[0] / gl_LastFragColorARM) is not a valid local variable name, and its
-  // call would declare a framebuffer-fetch feature the sampler path never uses. Only the
-  // fetch route (no dst texture) goes through dstColor().
-  std::string dstColor;
-  if (args.dstTextureSamplerHandle.isValid()) {
-    // While shaders typically don't output negative coverage, we use <= as a precaution against
-    // floating point precision errors. We only check the rgb values since the alpha might not be
-    // set when using lcd. If we're using single channel coverage, alpha will match rgb anyway.
-    //
-    // Discarding here also helps batch text draws that need to read from a dst copy for blends.
-    // This is particularly useful when the outer bounding boxes of each letter overlap, though it
-    // doesn't help when actual parts of the text overlap.
-    fragBuilder->codeAppendf("if (%s.r <= 0.0 && %s.g <= 0.0 && %s.b <= 0.0) {",
-                             args.inputCoverage.c_str(), args.inputCoverage.c_str(),
-                             args.inputCoverage.c_str());
-    fragBuilder->codeAppend("discard;");
-    fragBuilder->codeAppend("}");
-
-    auto dstTopLeftName = uniformHandler->addUniform("DstTextureUpperLeft", UniformFormat::Float2,
-                                                     ShaderStage::Fragment);
-    auto dstCoordScaleName = uniformHandler->addUniform(
-        "DstTextureCoordScale", UniformFormat::Float2, ShaderStage::Fragment);
-
-    fragBuilder->codeAppend("// Read color from copy of the destination.\n");
-    std::string dstTexCoord = "_dstTexCoord";
-    fragBuilder->codeAppendf("highp vec2 %s = (gl_FragCoord.xy - %s) * %s;", dstTexCoord.c_str(),
-                             dstTopLeftName.c_str(), dstCoordScaleName.c_str());
-
-    dstColor = "_dstColor";
-    fragBuilder->codeAppendf("vec4 %s = ", dstColor.c_str());
-    fragBuilder->appendTextureLookup(args.dstTextureSamplerHandle, dstTexCoord);
-    fragBuilder->codeAppend(";");
-  } else {
-    dstColor = fragBuilder->dstColor();
-  }
-
-  const char* outColor = "localOutputColor";
-  fragBuilder->codeAppendf("vec4 %s;", outColor);
-  AppendMode(fragBuilder, args.inputColor, args.inputCoverage, dstColor, outColor, blendMode, true);
-
-  if (!BlendModeAsCoeff(blendMode, true)) {
-    fragBuilder->codeAppendf("%s = %s * %s + (vec4(1.0) - %s) * %s;", outColor,
-                             args.inputCoverage.c_str(), outColor, args.inputCoverage.c_str(),
-                             dstColor.c_str());
-  }
-  fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), outColor);
 }
 
 void GLSLPorterDuffXferProcessor::setData(UniformData* /*vertexUniformData*/,

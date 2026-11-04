@@ -54,20 +54,12 @@ Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {
   _precompiledShaderCache = new PrecompiledShaderCache(this, _gpu->info()->backend);
   // The environment knobs the GPU stack reads, inventoried in one place (every diagnostic is
   // already DEBUG-gated at its read site):
-  //   TGFX_AOT_DISABLE          — skips the embedded bundle; a release escape hatch for a shipped
-  //                               bundle that must be turned off, and the test suite's A/B switch.
-  //   TGFX_AOT_DENY             — a shader-name deny list, read once per process; a production
-  //                               mitigation, so it stays in release builds.
   //   TGFX_AOT_DUMP_DIR         — DEBUG only, read once: dumps each matched artifact's stages.
-  //   TGFX_UNIF_DUMP            — DEBUG only, read PER CALL on purpose — the A/B harness toggles
-  //                               it around each route within one process, so a cached first
-  //                               read would freeze whichever route ran first.
-  //   TGFX_SHADER_CACHE_DISABLE — the JIT program cache's own layer list; not an AOT knob.
-  //   TGFX_SHADER_DUMP_DIR      — DEBUG only: dumps the runtime-generated GLSL for diffing.
-  //   TGFX_JIT_DUMP_DIR         — DEBUG only, read once: dumps the JIT-linked programs.
-  // TGFX_AOT_DISABLE=1 skips the embedded bundle so the runtime route can be exercised directly
-  // (test-suite A/B comparisons against the precompiled path).
-  if (std::getenv("TGFX_AOT_DISABLE") == nullptr) {
+  //   TGFX_UNIF_DUMP            — DEBUG only, read PER CALL on purpose — the diagnostic harness
+  //                               toggles it around each route within one process, so a cached
+  //                               first read would freeze whichever route ran first.
+  //   TGFX_SHADER_CACHE_DISABLE — the shader module/pipeline cache's own layer list.
+  {
     auto backend = _gpu->info()->backend;
     auto [bundleData, bundleSize] = EmbeddedShaderBundles::GetBundle(backend);
     if (bundleData != nullptr && bundleSize > 0) {
@@ -80,22 +72,20 @@ Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {
       if (!loaded && !rejectedReported.test_and_set()) {
         LOGE(
             "Context: the precompiled shader bundle embedded for this backend was REJECTED (reason "
-            "logged above). It is damaged or was built for another toolchain; every draw takes "
-            "the runtime shader path until the bundle is regenerated.");
+            "logged above). It is damaged or was built for another toolchain; every draw is "
+            "dropped until the bundle is regenerated.");
       }
     } else {
       _precompiledShaderCache->setEmbeddedBundleState(EmbeddedBundleState::NoBundleForBackend);
       static std::atomic_flag absentReported = ATOMIC_FLAG_INIT;
       if (!absentReported.test_and_set()) {
         if (!ExpectedShaderProfile(backend)) {
-          LOGI(
-              "Context: this backend has no precompiled shader support; draws use the runtime "
-              "shader path.");
+          LOGI("Context: this backend has no precompiled shader support; every draw is dropped.");
         } else {
           LOGI(
               "Context: this build embeds no precompiled shader bundle for this backend "
-              "(TGFX_EMBED_SHADER_BUNDLES is off, or the bundle was not generated); draws use "
-              "the runtime shader path.");
+              "(TGFX_EMBED_SHADER_BUNDLES is off, or the bundle was not generated); every draw "
+              "is dropped.");
         }
       }
     }

@@ -26,8 +26,6 @@ class GLSLShapeInstancedGeometryProcessor : public ShapeInstancedGeometryProcess
   GLSLShapeInstancedGeometryProcessor(int width, int height, AAType aa, bool hasColors,
                                       const Matrix& uvMatrix, const Matrix& viewMatrix);
 
-  void emitCode(EmitArgs& args) const override;
-
   void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
                FPCoordTransformIter* transformIter) const override;
 };

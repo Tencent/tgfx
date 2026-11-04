@@ -28,17 +28,6 @@ GLSLSingleIntervalGradientColorizer::GLSLSingleIntervalGradientColorizer(Color s
     : SingleIntervalGradientColorizer(start, end) {
 }
 
-void GLSLSingleIntervalGradientColorizer::emitCode(EmitArgs& args) const {
-  auto fragBuilder = args.fragBuilder;
-  auto startName =
-      args.uniformHandler->addUniform("start", UniformFormat::Float4, ShaderStage::Fragment);
-  auto endName =
-      args.uniformHandler->addUniform("end", UniformFormat::Float4, ShaderStage::Fragment);
-  fragBuilder->codeAppendf("float t = %s.x;", args.inputColor.c_str());
-  fragBuilder->codeAppendf("%s = (1.0 - t) * %s + t * %s;", args.outputColor.c_str(),
-                           startName.c_str(), endName.c_str());
-}
-
 void GLSLSingleIntervalGradientColorizer::onSetData(UniformData* /*vertexUniformData*/,
                                                     UniformData* fragmentUniformData) const {
   fragmentUniformData->setData("start", start);

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GradientShader.h"
+#include "core/ColorSpaceXformSteps.h"
 #include "core/utils/ColorSpaceHelper.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/Types.h"

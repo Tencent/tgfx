@@ -32,16 +32,6 @@ PlacementPtr<FragmentProcessor> ColorSpaceXformEffect::Make(
   return allocator->make<ColorSpaceXformEffect>(std::move(colorXform));
 }
 
-void ColorSpaceXformEffect::emitCode(EmitArgs& args) const {
-  auto uniformHandler = args.uniformHandler;
-  auto fragBuilder = args.fragBuilder;
-  ColorSpaceXformHelper helper{};
-  helper.emitCode(uniformHandler, colorSpaceXformSteps.get());
-  std::string outputColor;
-  fragBuilder->appendColorGamutXform(&outputColor, args.inputColor.c_str(), &helper);
-  fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), outputColor.c_str());
-}
-
 void ColorSpaceXformEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t key = ColorSpaceXformSteps::XFormKey(colorSpaceXformSteps.get());
   bytesKey->write(key);

@@ -27,8 +27,6 @@ class GLSLRRectEffect : public RRectEffect {
   GLSLRRectEffect(const Rect& localRect, const std::array<Point, 4>& radii,
                   const Matrix& deviceToLocal, bool antiAlias);
 
-  void emitCode(EmitArgs& args) const override;
-
  private:
   void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };

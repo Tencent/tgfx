@@ -31,12 +31,22 @@
 #include <vector>
 #include "base/TGFXTest.h"
 #include "gpu/BlendFormula.h"
-#include "gpu/glsl/GLSLBlend.h"
 #include "tgfx/core/BlendMode.h"
 
 namespace tgfx {
 
 namespace {
+
+static const char* FoldBlendModeName(BlendMode mode) {
+  static const char* ModeStrings[] = {
+      "Clear",       "Src",       "Dst",        "SrcOver",   "DstOver",    "SrcIn",
+      "DstIn",       "SrcOut",    "DstOut",     "SrcATop",   "DstATop",    "Xor",
+      "PlusLighter", "Modulate",  "Screen",     "Overlay",   "Darken",     "Lighten",
+      "ColorDodge",  "ColorBurn", "HardLight",  "SoftLight", "Difference", "Exclusion",
+      "Multiply",    "Hue",       "Saturation", "Color",     "Luminosity", "PlusDarker",
+  };
+  return ModeStrings[static_cast<int>(mode)];
+}
 
 struct FoldVec {
   float r, g, b, a;
@@ -166,7 +176,7 @@ TGFX_TEST(FoldEquivalenceTest, GateAdmittedModesKeepCoverageEquivalence) {
           if (!BlendWithCoverage(S, D, M, mode, &covered) ||
               !BlendWithCoverage(S * M, D, one, mode, &folded) ||
               !NearlyEqual(covered, folded, 1e-5f)) {
-            failures.push_back(std::string("mode ") + BlendModeName(blendMode) + " (" +
+            failures.push_back(std::string("mode ") + FoldBlendModeName(blendMode) + " (" +
                                std::to_string(mode) +
                                "): fold(S*m, D, 1) != f(S, D, m) — the plain-route fallback of "
                                "the coverage fold renders different pixels");

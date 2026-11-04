@@ -22,7 +22,6 @@
 #include "AlignTo.h"
 #include "gpu/BlendFormula.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/ProgramBuilder.h"
 #include "gpu/ProgramWriter.h"
 #include "gpu/aot/bundle/PrecompiledProgramCreator.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
@@ -190,49 +189,20 @@ void ProgramInfo::writePipelineStateKey(BytesKey* key) const {
 std::shared_ptr<Program> ProgramInfo::getProgram() const {
   auto context = renderTarget->getContext();
   auto globalCache = context->globalCache();
-  auto* shaderCache = context->precompiledShaderCache();
-  // A loaded bundle is the precompiled-only policy: no runtime fallback, so a miss drops the draw
-  // (see StandardDrawOp::prepare). Without a bundle the runtime builder serves every lookup.
-  bool precompiledOnly = shaderCache->isLoaded();
 
   const auto& key = programKey();
   auto program = globalCache->findProgram(key);
-  bool cacheKeyOccupied = program != nullptr;
-  bool programCreated = false;
-  if (program != nullptr && precompiledOnly &&
-      program->getProvenance().program != ProgramOrigin::PrecompiledArtifact) {
-    program = nullptr;
+  if (program != nullptr) {
+    return program;
   }
+  // Precompiled artifacts are the only program source: a miss drops the draw (see
+  // StandardDrawOp::prepare).
+  program = PrecompiledProgramCreator::CreateProgram(context, this);
   if (program == nullptr) {
-    program = PrecompiledProgramCreator::CreateProgram(context, this);
-    if (program == nullptr && !precompiledOnly) {
-      program = ProgramBuilder::CreateProgram(context, this);
-    }
-    programCreated = program != nullptr;
-    if (program == nullptr) {
-      if (precompiledOnly) {
-        LOGE("ProgramInfo::getProgram() Precompiled program unavailable!");
-      } else {
-        LOGE("ProgramInfo::getProgram() Failed to create the program!");
-      }
-      return nullptr;
-    }
-    if (programCreated && shaderCache->diagnosticRecordingEnabled() &&
-        program->getProvenance().program != ProgramOrigin::PrecompiledArtifact) {
-      shaderCache->recordJITProgram({FormatDiagnosticKey(key)});
-    }
-  }
-  if (precompiledOnly && program->getProvenance().program != ProgramOrigin::PrecompiledArtifact) {
-    LOGE("ProgramInfo::getProgram() Rejected a non-precompiled program!");
+    LOGE("ProgramInfo::getProgram() Precompiled program unavailable!");
     return nullptr;
   }
-  // Lookup mode is intentionally not part of the key: a precompiled program is valid for both
-  // modes. If a runtime program already occupies the key, PrecompiledOnly may return a newly created
-  // artifact for this lookup but must not replace that cache entry and corrupt its LRU bookkeeping.
-  if (programCreated && !cacheKeyOccupied) {
-    globalCache->addProgram(key, program,
-                            context->precompiledShaderCache()->deliberateMissMarking());
-  }
+  globalCache->addProgram(key, program);
   return program;
 }
 

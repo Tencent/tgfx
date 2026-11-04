@@ -63,7 +63,7 @@ struct ShaderStageBlob {
 
 /// What happened to the bundle embedded in the library when a Context was created.
 enum class EmbeddedBundleState : uint8_t {
-  /// The Context did not try to load one (TGFX_AOT_DISABLE, or a cache built standalone).
+  /// The Context did not try to load one (or the cache was built standalone).
   NotAttempted,
   /// No bundle is embedded for the backend.
   NoBundleForBackend,
@@ -91,10 +91,6 @@ struct PrecompiledHitRecord {
   std::string shaderName;
   uint32_t vertPermutationIndex = std::numeric_limits<uint32_t>::max();
   uint32_t fragPermutationIndex = std::numeric_limits<uint32_t>::max();
-};
-
-struct JITProgramRecord {
-  std::string programKey;
 };
 
 struct PrecompiledFallbackRecord {
@@ -398,8 +394,6 @@ class PrecompiledShaderCache {
 
   /// Returns a snapshot of detailed fallback records collected since the last reset.
   std::vector<PrecompiledFallbackRecord> fallbackRecords() const;
-  void recordJITProgram(const JITProgramRecord& record);
-  std::vector<JITProgramRecord> jitProgramRecords() const;
 
   /// Records the decomposition outcome of one logical Draw. `complete` marks whether every Kernel
   /// invocation of this Draw hit AOT. Called by the decomposition executor (stage 2+).
@@ -434,14 +428,9 @@ class PrecompiledShaderCache {
   /// metrics to zero.
   void resetStats();
 
-  /// Unloads all bundle entries without discarding diagnostic statistics from the current session.
-  /// The shader cache is kept: its entries are content-addressed, so they stay valid whatever
-  /// bundle is loaded next.
-  void unload();
-
   /// Returns the cache of compiled shader modules. It lives here because this object exists for
-  /// every Context and backend, including those with no bundle; it serves the runtime program
-  /// builder as well as the precompiled creator, so it is not specific to precompiled shaders.
+  /// every Context and backend, including those with no bundle; it serves the precompiled
+  /// creator's module and pipeline creation.
   ShaderCache* shaderCache() {
     return &_shaderCache;
   }
@@ -524,7 +513,6 @@ class PrecompiledShaderCache {
   mutable std::mutex diagnosticsMutex = {};
   std::vector<PrecompiledHitRecord> _hitRecords = {};
   std::vector<PrecompiledFallbackRecord> _fallbackRecords = {};
-  std::vector<JITProgramRecord> _jitProgramRecords = {};
   mutable std::mutex drawStatsMutex = {};
   AOTDrawStats _drawStats = {};
 };

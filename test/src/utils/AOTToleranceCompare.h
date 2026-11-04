@@ -87,7 +87,7 @@ class AOTToleranceCompare {
   /**
    * Compares two pixmaps of the same scene under the given tolerance spec.
    *
-   * @param reference  The reference-path render (e.g. ProgramBuilder path).
+   * @param reference  The reference-path render.
    * @param candidate  The AOT-path render to validate.
    * @param spec       The per-effect-class tolerance thresholds.
    * @return           Structured measurements and the pass/fail decision.

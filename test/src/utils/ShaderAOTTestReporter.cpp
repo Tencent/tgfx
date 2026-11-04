@@ -129,7 +129,6 @@ struct ShaderAOTTestResult {
   std::array<uint32_t, FALLBACK_REASON_COUNT> fallbackCounts = {};
   std::vector<PrecompiledHitRecord> hitRecords = {};
   std::vector<PrecompiledFallbackRecord> fallbackRecords = {};
-  std::vector<JITProgramRecord> jitProgramRecords = {};
   AOTDrawStats drawStats = {};
 };
 
@@ -243,23 +242,13 @@ static void AddProgramStats(ProgramCacheStats* target, const ProgramCacheStats& 
   target->cacheHits += source.cacheHits;
   target->cacheMisses += source.cacheMisses;
   target->precompiledArtifactCreations += source.precompiledArtifactCreations;
-  target->programBuilderCreations += source.programBuilderCreations;
-  target->excludedProgramBuilderCreations += source.excludedProgramBuilderCreations;
-  target->runtimePipelineCreationAttempts += source.runtimePipelineCreationAttempts;
-  target->runtimePipelineCreationSuccesses += source.runtimePipelineCreationSuccesses;
-  target->runtimePipelineCreationFailures += source.runtimePipelineCreationFailures;
 }
 
 static nlohmann::json ProgramStatsToJSON(const ProgramCacheStats& stats) {
   return {{"requests", stats.requests},
           {"cacheHits", stats.cacheHits},
           {"cacheMisses", stats.cacheMisses},
-          {"precompiledArtifactCreations", stats.precompiledArtifactCreations},
-          {"programBuilderCreations", stats.programBuilderCreations},
-          {"excludedProgramBuilderCreations", stats.excludedProgramBuilderCreations},
-          {"runtimePipelineCreationAttempts", stats.runtimePipelineCreationAttempts},
-          {"runtimePipelineCreationSuccesses", stats.runtimePipelineCreationSuccesses},
-          {"runtimePipelineCreationFailures", stats.runtimePipelineCreationFailures}};
+          {"precompiledArtifactCreations", stats.precompiledArtifactCreations}};
 }
 
 static nlohmann::json AOTStageCountsToJSON(const std::array<uint64_t, AOT_STAGE_COUNT>& counts) {
@@ -314,7 +303,6 @@ static ConsistencyResult BuildConsistencyChecks(
   const bool artifactHitsMatch = artifactHits == artifactsFound;
   const bool pipelineCreationsMatch = pipelinesCreated == programStats.precompiledArtifactCreations;
   const bool hitRecordsMatch = hitRecordCount == pipelinesCreated;
-  const bool fallbackEventsMatch = fallbackEventCount == programStats.programBuilderCreations;
   const bool fallbackRecordsMatch = fallbackRecordCount == fallbackEventCount;
 
   ConsistencyResult result;
@@ -332,7 +320,6 @@ static ConsistencyResult BuildConsistencyChecks(
       {"artifactHitsMatchArtifactsFound", artifactHitsMatch},
       {"pipelineCreationsMatchPrecompiledPrograms", pipelineCreationsMatch},
       {"hitRecordsMatchPipelineCreations", hitRecordsMatch},
-      {"fallbackEventsMatchProgramBuilderCreationsLegacy", fallbackEventsMatch},
       {"fallbackRecordsMatchFallbackEvents", fallbackRecordsMatch},
       {"deltas",
        {{"aotAttemptsMinusProgramCacheMisses",
@@ -344,9 +331,6 @@ static ConsistencyResult BuildConsistencyChecks(
              static_cast<int64_t>(programStats.precompiledArtifactCreations)},
         {"hitRecordsMinusPipelineCreations",
          static_cast<int64_t>(hitRecordCount) - static_cast<int64_t>(pipelinesCreated)},
-        {"fallbackEventsMinusProgramBuilderCreations",
-         static_cast<int64_t>(fallbackEventCount) -
-             static_cast<int64_t>(programStats.programBuilderCreations)},
         {"fallbackRecordsMinusFallbackEvents",
          static_cast<int64_t>(fallbackRecordCount) - static_cast<int64_t>(fallbackEventCount)}}}};
   return result;
@@ -455,20 +439,12 @@ static nlohmann::json BuildRootCauseProgramKeyAttribution(
     const std::vector<ShaderAOTTestResult>& results) {
   struct Row {
     uint64_t fallbacks = 0;
-    uint64_t jitRecords = 0;
     std::set<std::string> tests;
-    std::set<std::string> jitTests;
     std::set<std::string> effects;
     std::set<std::string> pipelines;
   };
   std::map<std::string, std::map<std::string, Row>> byCategory;
   for (const auto& result : results) {
-    std::map<std::string, uint64_t> jitByKey;
-    for (const auto& jit : result.jitProgramRecords) {
-      jitByKey[jit.programKey]++;
-    }
-    // Keys whose JIT creations this test has already attributed; resets per test result.
-    std::set<std::string> attributed;
     for (const auto& fallback : result.fallbackRecords) {
       if (fallback.reason != PrecompiledFallbackReason::NoMatchingRule) {
         continue;
@@ -487,45 +463,23 @@ static nlohmann::json BuildRootCauseProgramKeyAttribution(
       row.tests.insert(result.testName);
       row.effects.insert(fallback.effectSignature);
       row.pipelines.insert(fallback.pipelineSignature);
-      auto jit = jitByKey.find(key);
-      if (jit != jitByKey.end() && attributed.insert(key).second) {
-        // Attribute a test's JIT creations for this key exactly once: multiple fallback records
-        // for the same key in one test describe the same miss being retried, so adding the full
-        // JIT count per record would multiply the count (two fallbacks + one creation used to
-        // report two creations).
-        row.jitRecords += jit->second;
-        row.jitTests.insert(result.testName);
-      }
     }
   }
   nlohmann::json output = nlohmann::json::object();
   for (const auto& category : byCategory) {
     uint64_t fallbacks = 0;
-    uint64_t jitRecords = 0;
-    uint64_t matchedKeys = 0;
     nlohmann::json rows = nlohmann::json::array();
     for (const auto& item : category.second) {
       const auto& row = item.second;
       fallbacks += row.fallbacks;
-      jitRecords += row.jitRecords;
-      if (row.jitRecords > 0) matchedKeys++;
-      // The program key is a plain "size:hex" string (ProgramKeyForDiagnostics); there is no
-      // embedded route field. The former '\n' split never matched and stoul() parsed the size
-      // prefix as a bogus route number.
       rows.push_back({{"programKey", item.first},
                       {"fallbackOccurrences", row.fallbacks},
-                      {"jitCreationEvents", row.jitRecords},
-                      {"jitKeyMatched", row.jitRecords > 0},
                       {"tests", row.tests},
-                      {"jitTests", row.jitTests},
                       {"effects", row.effects},
                       {"pipelines", row.pipelines}});
     }
     output[category.first] = {{"fallbackOccurrences", fallbacks},
                               {"uniqueFallbackKeys", category.second.size()},
-                              {"matchedJITKeys", matchedKeys},
-                              {"jitCreationEvents", jitRecords},
-                              {"attributionConfidence", "key-match-same-test"},
                               {"rows", std::move(rows)}};
   }
   return output;
@@ -648,9 +602,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       return;
     }
     auto cache = context->precompiledShaderCache();
-    // TGFX_AOT_DISABLE=1 keeps the bundle unloaded so the suite runs the pure JIT route, which
-    // enables whole-suite AOT-vs-JIT A/B comparisons of the failure set.
-    if (!cache->isLoaded() && std::getenv("TGFX_AOT_DISABLE") == nullptr) {
+    if (!cache->isLoaded()) {
       auto bundle = EmbeddedShaderBundles::GetBundle(context->backend());
       if (bundle.first != nullptr && bundle.second > 0) {
         cache->loadBundle(bundle.first, bundle.second);
@@ -691,7 +643,6 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         }
         result.hitRecords = cache->hitRecords();
         result.fallbackRecords = cache->fallbackRecords();
-        result.jitProgramRecords = cache->jitProgramRecords();
         result.drawStats = cache->drawStats();
         cache->setDiagnosticRecordingEnabled(false);
         device->unlock();
@@ -770,9 +721,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       } else if (!testResult.passed) {
         failedTestCount++;
       }
-      if (testResult.programStats.precompiledArtifactCreations +
-              testResult.programStats.programBuilderCreations >
-          0) {
+      if (testResult.programStats.precompiledArtifactCreations > 0) {
         testsWithColdPrograms++;
       }
       if (!testResult.hitRecords.empty()) {
@@ -850,14 +799,6 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
             {{"hits", testResult.artifactHits}, {"misses", testResult.artifactMisses}}},
            {"consistencyChecks", std::move(testConsistency.checks)},
            {"hitRecords", std::move(hitRecordsJSON)},
-           {"jitProgramRecords",
-            [&]() {
-              nlohmann::json records = nlohmann::json::array();
-              for (const auto& record : testResult.jitProgramRecords) {
-                records.push_back({{"programKey", record.programKey}});
-              }
-              return records;
-            }()},
            {"fallbackReasons", FallbackCountsToJSON(testResult.fallbackCounts)},
            {"fallbackRecords", std::move(fallbackRecordsJSON)}});
     }
@@ -982,22 +923,18 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       }
       // Missing diagnostic records stay in the production count. Exclusions cannot borrow
       // successful creations from a different test or from failed PrecompiledOnly probes.
+      // Runtime compilation no longer exists, so the builder-creation inputs are structurally
+      // zero; the gate reduces to misses and dropped draws.
       auto testGate = EvaluateAOTCoverageGate(
           result.fallbackCounts[static_cast<size_t>(PrecompiledFallbackReason::NoMatchingRule)],
-          deliberateNoMatching, environmentCompileFailures,
-          result.programStats.programBuilderCreations,
-          result.programStats.excludedProgramBuilderCreations);
+          deliberateNoMatching, environmentCompileFailures, 0, 0);
       coverageGate.noMatchingRule += testGate.noMatchingRule;
       coverageGate.runtimeCompiles += testGate.runtimeCompiles;
       coverageGate.excludedEnvironment += testGate.excludedEnvironment;
       coverageGate.droppedDraws += result.drawStats.droppedDraws;
       coverageGate.consistent = coverageGate.consistent && testGate.consistent;
     }
-    const auto productionBuilderCreations = coverageGate.runtimeCompiles;
-    const auto coldCreations = summary.programStats.precompiledArtifactCreations +
-                               summary.programStats.programBuilderCreations;
-    const auto productionColdCreations =
-        summary.programStats.precompiledArtifactCreations + productionBuilderCreations;
+    const auto coldCreations = summary.programStats.precompiledArtifactCreations;
     const auto artifactLookups = summary.artifactHits + summary.artifactMisses;
     auto globalConsistency =
         BuildConsistencyChecks(summary.programStats, summary.artifactHits, summary.aotStageCounts,
@@ -1048,9 +985,8 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
            AOTCoverageGateMet(coverageGate, summary.programStats.precompiledArtifactCreations)}}},
         {"metricDefinitions",
          {{"coldAOTHitRate",
-           "precompiledArtifactCreations / (precompiledArtifactCreations + "
-           "programBuilderCreations), excluding deliberate (test fixture) and by-design "
-           "(deferred-texture stub) fallbacks"},
+           "precompiledArtifactCreations among all cold creations, excluding deliberate "
+           "(test fixture) and deferred-texture stub fallbacks"},
           {"artifactLookupHitRate", "artifactHits / (artifactHits + artifactMisses)"},
           {"successfulHit", "AOT render pipeline created successfully"},
           {"cacheHitsExcludedFromColdAOTRate", true}}},
@@ -1067,11 +1003,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
           {"aotStages", AOTStageCountsToJSON(summary.aotStageCounts)},
           {"drawMetrics", DrawStatsToJSON(summary.drawStats)},
           {"coldProgramCreations", coldCreations},
-          {"coldAOTHitRate",
-           Percentage(summary.programStats.precompiledArtifactCreations, productionColdCreations)},
           {"excludedDeliberateOrByDesignFallbacks", excludedFallbacks},
-          {"rawColdAOTHitRate",
-           Percentage(summary.programStats.precompiledArtifactCreations, coldCreations)},
           {"artifactLookups",
            {{"hits", summary.artifactHits},
             {"misses", summary.artifactMisses},
@@ -1104,14 +1036,13 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
     }
 
     std::printf(
-        "\n[Shader AOT][%s] cold=%llu precompiled=%llu fallback=%llu(excluded=%llu) hitRate=%.2f%% "
+        "\n[Shader AOT][%s] cold=%llu precompiled=%llu misses=%llu(excluded=%llu) "
         "cacheHits=%llu hitShaders=%zu hitEffects=%zu missEffects=%zu hitStructures=%zu "
         "missStructures=%zu\n",
-        TGFX_BACKEND_NAME, static_cast<unsigned long long>(productionColdCreations),
+        TGFX_BACKEND_NAME, static_cast<unsigned long long>(coldCreations),
         static_cast<unsigned long long>(summary.programStats.precompiledArtifactCreations),
-        static_cast<unsigned long long>(productionBuilderCreations),
+        static_cast<unsigned long long>(coverageGate.noMatchingRule),
         static_cast<unsigned long long>(excludedFallbacks),
-        Percentage(summary.programStats.precompiledArtifactCreations, productionColdCreations),
         static_cast<unsigned long long>(summary.programStats.cacheHits), sortedShaders.size(),
         sortedHitEffects.size(), fallbackEffectKeys.size(), sortedHitStructures.size(),
         sortedFallbacks.size());

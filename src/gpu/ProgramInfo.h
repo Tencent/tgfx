@@ -22,6 +22,7 @@
 #include <string>
 #include <unordered_map>
 #include "gpu/Program.h"
+#include "gpu/Swizzle.h"
 #include "gpu/aot/ir/Program.h"
 #include "gpu/aot/select/PermutationMatch.h"
 #include "gpu/processors/EmptyXferProcessor.h"
@@ -160,10 +161,8 @@ class ProgramInfo {
   }
 
   /**
-   * Sets the depth/stencil descriptor that will be applied to the render pipeline. Draw ops that
-   * need stencil testing or writing call this before getProgram() so the pipeline descriptor
-   * forwarded by GLSLProgramBuilder picks up the configuration and the program-cache key reflects
-   * the requested stencil state.
+   * Sets the depth/stencil descriptor that will be applied to the render pipeline so the program
+   * cache key reflects the requested stencil state.
    */
   void setDepthStencil(const DepthStencilDescriptor& descriptor) {
     depthStencil = descriptor;
@@ -292,7 +291,6 @@ class ProgramInfo {
   friend std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo*,
                                                                 PermutationMatchFailure*);
   friend class ProgramWriter;
-  friend class RuntimeProgramWriter;
   friend class PrecompiledProgramWriter;
   friend class ChainProgramWriter;
 

@@ -19,9 +19,7 @@
 #pragma once
 
 #include <memory>
-#include "gpu/FragmentShaderBuilder.h"
 #include "gpu/UniformData.h"
-#include "gpu/UniformHandler.h"
 #include "gpu/processors/Processor.h"
 #include "gpu/proxies/TextureProxy.h"
 
@@ -35,27 +33,9 @@ struct DstTextureInfo {
 
 class XferProcessor : public Processor {
  public:
-  struct EmitArgs {
-    EmitArgs(FragmentShaderBuilder* fragBuilder, UniformHandler* uniformHandler,
-             std::string inputColor, std::string inputCoverage, std::string outputColor,
-             const SamplerHandle dstTextureSamplerHandle)
-        : fragBuilder(fragBuilder), uniformHandler(uniformHandler),
-          inputColor(std::move(inputColor)), inputCoverage(std::move(inputCoverage)),
-          outputColor(std::move(outputColor)), dstTextureSamplerHandle(dstTextureSamplerHandle) {
-    }
-    FragmentShaderBuilder* fragBuilder;
-    UniformHandler* uniformHandler;
-    const std::string inputColor;
-    const std::string inputCoverage;
-    const std::string outputColor;
-    const SamplerHandle dstTextureSamplerHandle;
-  };
-
   virtual const TextureView* dstTextureView() const {
     return nullptr;
   }
-
-  virtual void emitCode(const EmitArgs& args) const = 0;
 
   virtual void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const = 0;
 

@@ -22,11 +22,10 @@
 namespace tgfx {
 Program::Program(std::shared_ptr<RenderPipeline> pipeline,
                  std::unique_ptr<UniformData> vertexUniformData,
-                 std::unique_ptr<UniformData> fragmentUniformData, ProgramProvenance provenance,
+                 std::unique_ptr<UniformData> fragmentUniformData,
                  std::unique_ptr<ProgramWriter> writer)
     : pipeline(std::move(pipeline)), vertexUniformData(std::move(vertexUniformData)),
-      fragmentUniformData(std::move(fragmentUniformData)), writerValue(std::move(writer)),
-      provenance(provenance) {
+      fragmentUniformData(std::move(fragmentUniformData)), writerValue(std::move(writer)) {
 }
 
 // Defined here so the header can hold a unique_ptr to the forward-declared ProgramWriter.

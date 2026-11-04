@@ -27,8 +27,6 @@ class GLSLDefaultGeometryProcessor : public DefaultGeometryProcessor {
   GLSLDefaultGeometryProcessor(PMColor color, int width, int height, AAType aa,
                                const Matrix& viewMatrix, const Matrix& uvMatrix);
 
-  void emitCode(EmitArgs& args) const override;
-
   void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
                FPCoordTransformIter* transformIter) const override;
 };

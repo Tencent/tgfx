@@ -369,7 +369,7 @@ TGFX_TEST(GPURenderTest, InstancedGridRender) {
 
 // End-to-end exercise of the stencil-aware pipeline plumbing introduced for the bezier
 // rasterization render path: ProgramInfo's stencil/colourWriteMask cache key contributions,
-// GLSLProgramBuilder forwarding `depthStencil` to the pipeline descriptor, and the GL
+// ProgramInfo forwarding `depthStencil` to the pipeline descriptor, and the GL
 // stencil-state factory's no-op detection (which previously dropped any pipeline whose
 // compare function was Always — exactly the configuration the mask pass uses).
 //
@@ -486,7 +486,7 @@ TGFX_TEST(GPURenderTest, RenderTargetProxyGetStencil) {
 
 // Verifies the setter/getter pair for ProgramInfo's stencil and colour-write-mask state, and
 // that the colour write mask is propagated into the PipelineColorAttachment that
-// GLSLProgramBuilder forwards to the backend. Without this, draw ops that need stencil-only
+// ProgramInfo forwards to the backend. Without this, draw ops that need stencil-only
 // passes (e.g. the bezier-rasterization stencil pass) could call setColorWriteMask(0) yet
 // still emit colour writes downstream.
 TGFX_TEST(GPURenderTest, ProgramInfoStencilAccessors) {

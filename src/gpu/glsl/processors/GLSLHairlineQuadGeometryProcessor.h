@@ -28,8 +28,6 @@ class GLSLHairlineQuadGeometryProcessor : public HairlineQuadGeometryProcessor {
   GLSLHairlineQuadGeometryProcessor(const PMColor& color, const Matrix& viewMatrix,
                                     std::optional<Matrix> uvMatrix, float coverage, AAType aaType);
 
-  void emitCode(EmitArgs& args) const override;
-
  private:
   void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
                FPCoordTransformIter* coordTransformIter) const override;

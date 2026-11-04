@@ -25,7 +25,5 @@ class GLSLXfermodeFragmentProcessor : public XfermodeFragmentProcessor {
  public:
   GLSLXfermodeFragmentProcessor(PlacementPtr<FragmentProcessor> src,
                                 PlacementPtr<FragmentProcessor> dst, BlendMode mode);
-
-  void emitCode(EmitArgs& args) const override;
 };
 }  // namespace tgfx

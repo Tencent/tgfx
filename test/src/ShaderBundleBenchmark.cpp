@@ -42,7 +42,6 @@ namespace tgfx {
 // disabled by default. Run each mode in its own process, because only a process that has not drawn
 // yet has an empty program cache:
 //   ./TGFXFullTest_<Backend> --gtest_also_run_disabled_tests --gtest_filter='ShaderBundleBenchmark.*'
-//   TGFX_AOT_DISABLE=1 ./TGFXFullTest_<Backend> --gtest_also_run_disabled_tests ...
 
 static void DrawScene(Canvas* canvas, const std::shared_ptr<Image>& image,
                       const std::shared_ptr<Typeface>& typeface) {
@@ -112,17 +111,11 @@ static void DrawScene(Canvas* canvas, const std::shared_ptr<Image>& image,
 }
 
 static void PrintStats(const char* label, double ms, const ProgramCacheStats& stats) {
-  std::printf(
-      "[Bench] mode=%s %s ms=%.2f requests=%llu hits=%llu misses=%llu precompiled=%llu "
-      "builder=%llu rtAttempts=%llu rtFailures=%llu\n",
-      std::getenv("TGFX_AOT_DISABLE") != nullptr ? "JIT" : "AOT", label, ms,
-      static_cast<unsigned long long>(stats.requests),
-      static_cast<unsigned long long>(stats.cacheHits),
-      static_cast<unsigned long long>(stats.cacheMisses),
-      static_cast<unsigned long long>(stats.precompiledArtifactCreations),
-      static_cast<unsigned long long>(stats.programBuilderCreations),
-      static_cast<unsigned long long>(stats.runtimePipelineCreationAttempts),
-      static_cast<unsigned long long>(stats.runtimePipelineCreationFailures));
+  std::printf("[Bench] %s ms=%.2f requests=%llu hits=%llu misses=%llu precompiled=%llu\n", label,
+              ms, static_cast<unsigned long long>(stats.requests),
+              static_cast<unsigned long long>(stats.cacheHits),
+              static_cast<unsigned long long>(stats.cacheMisses),
+              static_cast<unsigned long long>(stats.precompiledArtifactCreations));
 }
 
 TGFX_TEST(ShaderBundleBenchmark, DISABLED_FirstFrame) {
@@ -200,8 +193,7 @@ TGFX_TEST(ShaderBundleBenchmark, DISABLED_ColdFrames) {
         "[Bench] mode=%s coldRound%d firstMs=%.2f secondMs=%.2f newPrograms=%llu "
         "moduleRequests=%llu moduleHits=%llu modulesCreated=%llu moduleCreateMs=%.2f "
         "pipelineHits=%llu pipelinesCreated=%llu pipelineCreateMs=%.2f\n",
-        std::getenv("TGFX_AOT_DISABLE") != nullptr ? "JIT" : "AOT", round, firstMicros / 1000.0,
-        secondMicros / 1000.0,
+        "AOT", round, firstMicros / 1000.0, secondMicros / 1000.0,
         static_cast<unsigned long long>(after.cacheMisses - before.cacheMisses),
         static_cast<unsigned long long>(modulesAfter.moduleRequests - modulesBefore.moduleRequests),
         static_cast<unsigned long long>(modulesAfter.moduleHits - modulesBefore.moduleHits),
@@ -245,8 +237,7 @@ TGFX_TEST(ShaderBundleBenchmark, DISABLED_SteadyState) {
   }
   std::sort(submitMs.begin(), submitMs.end());
   std::sort(waitMs.begin(), waitMs.end());
-  std::printf("[Bench] mode=%s steady cpuSubmitMs=%.3f gpuWaitMs=%.3f\n",
-              std::getenv("TGFX_AOT_DISABLE") != nullptr ? "JIT" : "AOT",
+  std::printf("[Bench] mode=%s steady cpuSubmitMs=%.3f gpuWaitMs=%.3f\n", "AOT",
               submitMs[submitMs.size() / 2], waitMs[waitMs.size() / 2]);
   std::fflush(stdout);
 }
@@ -265,7 +256,7 @@ static uint64_t ResidentBytes() {
 }
 
 // Loads the embedded bundle into fresh caches and reports what each load costs in time and in
-// process memory. A Context does exactly this when it is created (unless TGFX_AOT_DISABLE is set),
+// process memory. A Context does exactly this when it is created,
 // so every Context pays this cost again and holds its own copy. The caches are kept alive so the
 // memory they hold adds up.
 TGFX_TEST(ShaderBundleBenchmark, DISABLED_BundleLoad) {

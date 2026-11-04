@@ -33,60 +33,6 @@ GLSLShapeInstancedGeometryProcessor::GLSLShapeInstancedGeometryProcessor(int wid
     : ShapeInstancedGeometryProcessor(width, height, aa, hasColors, uvMatrix, stateMatrix) {
 }
 
-void GLSLShapeInstancedGeometryProcessor::emitCode(EmitArgs& args) const {
-  auto vertBuilder = args.vertBuilder;
-  auto fragBuilder = args.fragBuilder;
-  auto varyingHandler = args.varyingHandler;
-  auto uniformHandler = args.uniformHandler;
-
-  varyingHandler->emitAttributes(*this);
-
-  // Step 1: uvMatrix transforms tessellation-space position back to local space.
-  auto uvMatrixName =
-      uniformHandler->addUniform("UVMatrix", UniformFormat::Float3x3, ShaderStage::Vertex);
-  vertBuilder->codeAppendf("highp vec2 local = (%s * vec3(%s, 1.0)).xy;", uvMatrixName.c_str(),
-                           position.name().c_str());
-
-  // Step 2: transform tessellation-space position directly to device space, then add per-instance
-  // offset. viewMatrix = stateMatrix * uvMatrix, which maps tessellation space to device space in
-  // one step. The offset is already in device space (computed as the difference of translated
-  // positions), so it must be applied after the viewMatrix transform.
-  auto viewMatrixName =
-      uniformHandler->addUniform("ViewMatrix", UniformFormat::Float3x3, ShaderStage::Vertex);
-  std::string positionName = "position";
-  vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy + %s;", positionName.c_str(),
-                           viewMatrixName.c_str(), position.name().c_str(), offset.name().c_str());
-
-  // Emit UV transforms using unshifted local coords. All FP coord transforms (both color shader
-  // and mask coverage) use 'local' without offset, because: (1) mask texture is rasterized at a
-  // fixed position shared by all instances, (2) shader patterns are defined in local space and
-  // are the same for all instances. The offset only affects device-space position.
-  ShaderVar localVar("local", SLType::Float2);
-  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, localVar);
-
-  // Coverage varying for AA.
-  if (aa == AAType::Coverage) {
-    auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
-    vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), coverage.name().c_str());
-    fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
-                             coverageVar.fsIn().c_str());
-  } else {
-    fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
-  }
-
-  // Color: per-instance color or opaque white (overridden by shader FP).
-  if (hasColors) {
-    auto colorVar = varyingHandler->addVarying("InstanceColor", SLType::Float4);
-    vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), instanceColor.name().c_str());
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
-  } else {
-    fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputColor.c_str());
-  }
-
-  // Emit the vertex position to NDC.
-  vertBuilder->emitNormalizedPosition(positionName);
-}
-
 void GLSLShapeInstancedGeometryProcessor::setData(UniformData* vertexUniformData, UniformData*,
                                                   FPCoordTransformIter* transformIter) const {
   vertexUniformData->setData("UVMatrix", uvMatrix);

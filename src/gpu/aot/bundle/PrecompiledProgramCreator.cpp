@@ -44,24 +44,6 @@
 
 namespace tgfx {
 
-#if DEBUG
-// Parses a decimal int the way std::stoi accepts it (leading whitespace, an optional sign, digits,
-// anything after the digits ignored), but reports failure through the return value. Builds that
-// disable exceptions (Android, web) cannot use std::stoi: it signals bad input by throwing.
-// Debug-only: its one caller is the TGFX_AOT_DENY deny-list below.
-static bool ParseInt(const std::string& text, int* value) {
-  const char* begin = text.c_str();
-  char* end = nullptr;
-  errno = 0;
-  long parsed = std::strtol(begin, &end, 10);
-  if (end == begin || errno == ERANGE || parsed < INT_MIN || parsed > INT_MAX) {
-    return false;
-  }
-  *value = static_cast<int>(parsed);
-  return true;
-}
-#endif
-
 static ShaderCodeFormat FormatForBackend(Backend backend) {
   switch (backend) {
     case Backend::Vulkan:
@@ -73,17 +55,6 @@ static ShaderCodeFormat FormatForBackend(Backend backend) {
     default:
       return ShaderCodeFormat::GLSL;
   }
-}
-
-static ShaderArtifactOrigin ArtifactOriginForBackend(
-    Backend backend, const ShaderModuleDescriptor& vertexDescriptor,
-    const ShaderModuleDescriptor& fragmentDescriptor) {
-  auto hasOfflineBinary =
-      !vertexDescriptor.binaryData.empty() && !fragmentDescriptor.binaryData.empty();
-  if ((backend == Backend::Vulkan || backend == Backend::Metal) && hasOfflineBinary) {
-    return ShaderArtifactOrigin::OfflineBinary;
-  }
-  return ShaderArtifactOrigin::OfflineSource;
 }
 
 static void AppendFragmentProcessor(std::stringstream& stream, const FragmentProcessor* processor) {
@@ -304,7 +275,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   cache->recordAOTStage(PrecompiledAOTStage::Attempt);
   if (!cache->isLoaded()) {
     // Say why nothing is loaded: a backend or build with no bundle is by design, a rejected bundle
-    // is a defect that needs regenerating. Anything else (TGFX_AOT_DISABLE, a test that unloaded
+    // is a defect that needs regenerating. Anything else (a standalone cache, for example)
     // the cache) keeps the generic reason.
     auto reason = PrecompiledFallbackReason::CacheNotLoaded;
     switch (cache->embeddedBundleState()) {
@@ -378,73 +349,6 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   // The callers hold their own match in hand (CreateProgram just ran the walk; the AOT route
   // derives its variant from the compiled program), so this entry starts past the match.
   const PermutationMatchResult* matchResult = &match;
-
-#if DEBUG
-  // TGFX_AOT_DENY holds a comma-separated list of shader names whose precompiled match is
-  // rejected so the draw falls back to the runtime JIT program. Diagnostic only: it isolates a
-  // single kernel family in A/B pixel diffs. Parsed once per process: a token of the form
-  // "name:vert:frag" additionally pins the permutation indices, so a single variant of a kernel
-  // family can be isolated; a bare "name" denies the whole family; anything malformed never
-  // matches.
-  struct DenyToken {
-    std::string name;
-    bool pinned = false;
-    uint32_t vertIndex = 0;
-    uint32_t fragIndex = 0;
-  };
-  struct DenyList {
-    std::vector<DenyToken> tokens;
-    DenyList() {
-      const char* value = std::getenv("TGFX_AOT_DENY");
-      if (value == nullptr) {
-        return;
-      }
-      const std::string list(value);
-      size_t begin = 0;
-      while (begin <= list.size()) {
-        const size_t end = list.find(',', begin);
-        const std::string token =
-            list.substr(begin, end == std::string::npos ? list.size() - begin : end - begin);
-        begin = end == std::string::npos ? list.size() + 1 : end + 1;
-        if (token.empty()) {
-          continue;
-        }
-        const size_t sep = token.find(':');
-        if (sep == std::string::npos) {
-          tokens.push_back(DenyToken{token, false, 0, 0});
-          continue;
-        }
-        const size_t sep2 = token.find(':', sep + 1);
-        if (sep2 == std::string::npos) {
-          continue;
-        }
-        DenyToken parsed = {};
-        parsed.name = token.substr(0, sep);
-        int vertIndex = 0;
-        int fragIndex = 0;
-        if (!ParseInt(token.substr(sep + 1, sep2 - sep - 1), &vertIndex) ||
-            !ParseInt(token.substr(sep2 + 1), &fragIndex)) {
-          continue;
-        }
-        parsed.pinned = true;
-        parsed.vertIndex = static_cast<uint32_t>(vertIndex);
-        parsed.fragIndex = static_cast<uint32_t>(fragIndex);
-        tokens.push_back(std::move(parsed));
-      }
-    }
-  };
-  static const DenyList denied;
-  for (const auto& token : denied.tokens) {
-    const bool matched = token.name == matchResult->shaderName &&
-                         (!token.pinned || (token.vertIndex == matchResult->vertPermutationIndex &&
-                                            token.fragIndex == matchResult->fragPermutationIndex));
-    if (matched) {
-      cache->recordArtifactMiss(PrecompiledFallbackReason::Unspecified,
-                                MakeFallbackRecord(cache, programInfo, &*matchResult));
-      return nullptr;
-    }
-  }
-#endif
 
   auto vertHash = ComputeVertexKeyHash(matchResult->shaderName, matchResult->vertPermutationIndex,
                                        cache->profileTag());
@@ -700,11 +604,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   descriptor.multisample.count = programInfo->getSampleCount();
   descriptor.depthStencil = programInfo->getDepthStencil();
 
-  bool pipelineCreated = false;
-  auto pipeline = shaderCache->findOrCreatePipeline(descriptor, &pipelineCreated);
-  if (pipelineCreated) {
-    context->globalCache()->recordRuntimePipelineCreation(pipeline != nullptr);
-  }
+  auto pipeline = shaderCache->findOrCreatePipeline(descriptor);
   if (pipeline == nullptr) {
     // The same shader variant (identical vert/frag artifact) can create successfully for some draws
     // and fail for others, so the mismatch must live in the runtime-derived pipeline state rather
@@ -751,11 +651,8 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   cache->recordAOTStage(PrecompiledAOTStage::PipelineCreated,
                         MakeHitRecord(cache, programInfo, *matchResult));
 
-  ProgramProvenance provenance = {
-      ArtifactOriginForBackend(context->backend(), vertexDesc, fragmentDesc),
-      ProgramOrigin::PrecompiledArtifact, PipelineOrigin::RuntimeCreation};
   auto program = std::make_shared<Program>(std::move(pipeline), std::move(vertexUniformData),
-                                           std::move(fragmentUniformData), provenance,
+                                           std::move(fragmentUniformData),
                                            MakeProgramWriter(matchResult->shaderName));
   program->setShaderName(matchResult->shaderName);
   program->setExpectedTextureCount(static_cast<uint32_t>(descriptor.layout.textureSamplers.size()));

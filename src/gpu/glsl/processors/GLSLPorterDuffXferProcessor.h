@@ -25,8 +25,6 @@ class GLSLPorterDuffXferProcessor : public PorterDuffXferProcessor {
  public:
   GLSLPorterDuffXferProcessor(BlendMode blend, DstTextureInfo dstTextureInfo);
 
-  void emitCode(const EmitArgs& args) const override;
-
   void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };
 }  // namespace tgfx

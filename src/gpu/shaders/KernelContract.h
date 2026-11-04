@@ -101,8 +101,7 @@ inline std::vector<std::string> Defines() {
 namespace SamplerContract {
 
 // The prefix of every ordinary texture sampler: TextureSampler_<N>, with N dense from zero in
-// declaration order. The runtime emits these names (ProgramBuilder) and shader_build_tool checks
-// the reflected samplers against the same pattern.
+// declaration order. shader_build_tool checks the reflected samplers against this pattern.
 constexpr const char* TextureSamplerPrefix = "TextureSampler_";
 
 // Every semantic sampler name a precompiled kernel may declare. Ordinary texture bindings use the

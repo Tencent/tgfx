@@ -27,8 +27,6 @@ class GLSLMeshGeometryProcessor : public MeshGeometryProcessor {
   GLSLMeshGeometryProcessor(bool hasTexCoords, bool hasColors, bool hasCoverage, PMColor color,
                             const Matrix& viewMatrix);
 
-  void emitCode(EmitArgs& args) const override;
-
   void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
                FPCoordTransformIter* transformIter) const override;
 };

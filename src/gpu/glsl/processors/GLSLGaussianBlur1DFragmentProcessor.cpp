@@ -26,32 +26,6 @@
 
 namespace tgfx {
 
-// Returns the shader expression for sampling the child at a coord offset by the gaussian kernel.
-// "offset" is a shader variable declared in the emitted code and "i" is the loop index.
-static std::string GaussianOffsetCoordFunc(std::string_view coord) {
-  return "(" + std::string(coord) + " + offset * float(i))";
-}
-
-// Emits the code that reads the half-kernel weight for the current loop offset into a "weight"
-// variable. The slot and the lane inside it are picked with chains of compile-time indices rather
-// than indexing the uniform array with abs(i) directly: SwiftShader miscompiles a dynamic index
-// into a std140 uniform block array and silently reads zeros, which drops the blur.
-static void AppendKernelWeight(FragmentShaderBuilder* fragBuilder, const std::string& kernelName,
-                               int slotCount) {
-  fragBuilder->codeAppend("int kernelOffset = abs(i);");
-  fragBuilder->codeAppend("int kernelSlot = kernelOffset / 4;");
-  fragBuilder->codeAppendf("vec4 kernelValues = %s[0];", kernelName.c_str());
-  for (int slot = 1; slot < slotCount; ++slot) {
-    fragBuilder->codeAppendf("if (kernelSlot == %d) { kernelValues = %s[%d]; }", slot,
-                             kernelName.c_str(), slot);
-  }
-  fragBuilder->codeAppend("int kernelLane = kernelOffset - kernelSlot * 4;");
-  fragBuilder->codeAppend("float weight = kernelValues.x;");
-  fragBuilder->codeAppend("if (kernelLane == 1) { weight = kernelValues.y; }");
-  fragBuilder->codeAppend("if (kernelLane == 2) { weight = kernelValues.z; }");
-  fragBuilder->codeAppend("if (kernelLane == 3) { weight = kernelValues.w; }");
-}
-
 PlacementPtr<FragmentProcessor> GaussianBlur1DFragmentProcessor::Make(
     BlockAllocator* allocator, PlacementPtr<FragmentProcessor> processor, float sigma,
     GaussianBlurDirection direction, float stepLength, int maxSigma) {
@@ -80,41 +54,6 @@ GLSLGaussianBlur1DFragmentProcessor::GLSLGaussianBlur1DFragmentProcessor(
                                       maxSigma) {
 }
 
-void GLSLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
-  auto fragBuilder = args.fragBuilder;
-
-  // The normalized half-kernel weights are precomputed on the CPU and uploaded as a vec4 array.
-  std::string kernelName = args.uniformHandler->addUniform(
-      "Kernel", UniformFormat::Float4, ShaderStage::Fragment, KERNEL_VEC4_COUNT);
-  std::string radiusName =
-      args.uniformHandler->addUniform("Radius", UniformFormat::Int, ShaderStage::Fragment);
-  std::string texelSizeName =
-      args.uniformHandler->addUniform("Step", UniformFormat::Float2, ShaderStage::Fragment);
-
-  fragBuilder->codeAppendf("vec2 offset = %s;", texelSizeName.c_str());
-  fragBuilder->codeAppendf("int radius = %s;", radiusName.c_str());
-  fragBuilder->codeAppend("vec4 sum = vec4(0.0);");
-
-  // The kernel is symmetric, so abs(i) indexes the half-kernel table. The weights are already
-  // normalized on the CPU, so neither exp() nor the trailing normalization division is needed.
-  fragBuilder->codeAppendf("for (int j = 0; j <= %d; ++j) {", kernelLoopUpperBound());
-  fragBuilder->codeAppend("int i = j - radius;");
-  fragBuilder->codeAppend("if (i > radius) { break; }");
-  // abs(i) never exceeds kernelRadius, which computeKernel() derives as ceil(2 * sigma) and thus
-  // stays within 2 * maxSigma as long as the sigma <= maxSigma contract holds, upheld by the call
-  // site as described in computeKernel(). The loop bound above rests on the same contract, so the
-  // selection chain only has to cover the slots that range can reach.
-  auto maxOffset = std::min(2 * maxSigma, MAX_KERNEL_RADIUS);
-  AppendKernelWeight(fragBuilder, kernelName, std::min(maxOffset / 4 + 1, KERNEL_VEC4_COUNT));
-
-  std::string tempColor = "tempColor";
-  emitChild(0, &tempColor, args, GaussianOffsetCoordFunc);
-
-  fragBuilder->codeAppendf("sum += %s * weight;", tempColor.c_str());
-  fragBuilder->codeAppend("}");
-  fragBuilder->codeAppendf("%s = sum;", args.outputColor.c_str());
-}
-
 void GLSLGaussianBlur1DFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
                                                     UniformData* fragmentUniformData) const {
   auto processor = childProcessor(0);
@@ -136,9 +75,8 @@ void GLSLGaussianBlur1DFragmentProcessor::onSetData(UniformData* /*vertexUniform
   fragmentUniformData->setDataOptional("HasDeviceMask", 0);
   fragmentUniformData->setDataOptional("TiledChild",
                                        IsProcessor<TiledTextureEffect>(processor) ? 1 : 0);
-  // Alpha-only child flag: the kernel splats each tap's sample .rrrr, mirroring the runtime's
-  // Swizzle::ForRead(ALPHA_8) readback. ProgramBuilder layouts do not declare this field, hence
-  // the optional write; the precompiled layout receives the actual value on every draw.
+  // Alpha-only child flag: the kernel splats each tap's sample .rrrr, mirroring the
+  // Swizzle::ForRead(ALPHA_8) readback. The optional write tolerates layouts that omit the field.
   bool alphaChild = false;
   if (IsProcessor<TextureEffect>(processor)) {
     alphaChild = static_cast<const TextureEffect*>(processor)->isAlphaOnly();

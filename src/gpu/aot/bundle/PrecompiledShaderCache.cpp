@@ -129,19 +129,6 @@ std::vector<PrecompiledFallbackRecord> PrecompiledShaderCache::fallbackRecords()
   return _fallbackRecords;
 }
 
-void PrecompiledShaderCache::recordJITProgram(const JITProgramRecord& record) {
-  if (statsRecordingPaused() || !diagnosticRecordingEnabled()) {
-    return;
-  }
-  std::lock_guard<std::mutex> autoLock(diagnosticsMutex);
-  _jitProgramRecords.push_back(record);
-}
-
-std::vector<JITProgramRecord> PrecompiledShaderCache::jitProgramRecords() const {
-  std::lock_guard<std::mutex> autoLock(diagnosticsMutex);
-  return _jitProgramRecords;
-}
-
 void PrecompiledShaderCache::recordDraw(const AOTDrawStats& delta, bool complete) {
   if (statsRecordingPaused()) {
     return;
@@ -231,22 +218,6 @@ void PrecompiledShaderCache::resetStats() {
   std::lock_guard<std::mutex> autoLock(diagnosticsMutex);
   _hitRecords.clear();
   _fallbackRecords.clear();
-  _jitProgramRecords.clear();
-}
-
-void PrecompiledShaderCache::unload() {
-  _bundle.reset();
-  {
-    std::lock_guard<std::mutex> lock(_programMissMutex);
-    _programMisses.clear();
-  }
-  _generation.fetch_add(1, std::memory_order_relaxed);
-  if (_context != nullptr) {
-    // Dropping the bundle is a generation change: cached precompiled programs must not outlive
-    // the bundle that produced them, and clearing also keeps JIT programs from occupying keys
-    // a later bundle could fill.
-    _context->globalCache()->clearPrograms();
-  }
 }
 
 static uint32_t ReadU32LE(const uint8_t* p) {

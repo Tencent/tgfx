@@ -31,13 +31,6 @@ GLSLTextureGradientColorizer::GLSLTextureGradientColorizer(std::shared_ptr<Textu
     : TextureGradientColorizer(std::move(gradient)) {
 }
 
-void GLSLTextureGradientColorizer::emitCode(EmitArgs& args) const {
-  auto fragBuilder = args.fragBuilder;
-  fragBuilder->codeAppendf("highp vec2 coord = vec2(%s.x, 0.5);", args.inputColor.c_str());
-  fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
-  fragBuilder->appendTextureLookup((*args.textureSamplers)[0], "coord");
-  fragBuilder->codeAppend(";");
-}
 void GLSLTextureGradientColorizer::onSetData(UniformData* /*vertexUniformData*/,
                                              UniformData* fragmentUniformData) const {
   // Select the LUT colorizer in the unified gradient kernel (absent in other programs).

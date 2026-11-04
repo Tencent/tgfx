@@ -41,7 +41,6 @@ TGFX_TEST(AOTClosureTest, AllRegisteredShadersAreClosed) {
                   << entry.permutationIndex;
   }
   EXPECT_EQ(result.missingCount, 0u);
-  cache->unload();
 }
 
 }  // namespace tgfx

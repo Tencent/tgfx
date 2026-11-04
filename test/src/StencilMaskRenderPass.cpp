@@ -123,7 +123,7 @@ std::shared_ptr<RenderPipeline> StencilMaskRenderPass::createMaskPipeline(GPU* g
   descriptor.fragment.module = shaders.fragment;
   PipelineColorAttachment colorAttachment = {};
   // Colour is irrelevant for the mask pass — drop every channel so the colour attachment is
-  // untouched. ProgramInfo / GLSLProgramBuilder forwards this mask all the way through to the
+  // untouched. ProgramInfo forwards this mask all the way through to the
   // pipeline descriptor; the test fails (cover pass would draw on top of pass-1 colour) if
   // the plumbing breaks.
   colorAttachment.colorWriteMask = 0;

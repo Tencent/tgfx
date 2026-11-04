@@ -25,8 +25,6 @@ class GLSLTextureGradientColorizer : public TextureGradientColorizer {
  public:
   explicit GLSLTextureGradientColorizer(std::shared_ptr<TextureProxy> gradient);
 
-  void emitCode(EmitArgs& args) const override;
-
  private:
   void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };

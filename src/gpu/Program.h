@@ -28,32 +28,10 @@ namespace tgfx {
 
 class ProgramWriter;
 
-enum class ShaderArtifactOrigin : uint8_t {
-  RuntimeGeneratedSource,
-  OfflineSource,
-  OfflineBinary,
-};
-
-enum class ProgramOrigin : uint8_t {
-  ProgramBuilder,
-  PrecompiledArtifact,
-};
-
-enum class PipelineOrigin : uint8_t {
-  RuntimeCreation,
-};
-
-struct ProgramProvenance {
-  ShaderArtifactOrigin shaderArtifact = ShaderArtifactOrigin::RuntimeGeneratedSource;
-  ProgramOrigin program = ProgramOrigin::ProgramBuilder;
-  PipelineOrigin pipeline = PipelineOrigin::RuntimeCreation;
-};
-
 class Program {
  public:
   Program(std::shared_ptr<RenderPipeline> pipeline, std::unique_ptr<UniformData> vertexUniformData,
-          std::unique_ptr<UniformData> fragmentUniformData, ProgramProvenance provenance,
-          std::unique_ptr<ProgramWriter> writer);
+          std::unique_ptr<UniformData> fragmentUniformData, std::unique_ptr<ProgramWriter> writer);
   ~Program();
 
   std::shared_ptr<RenderPipeline> getPipeline() const {
@@ -61,17 +39,15 @@ class Program {
   }
 
   /**
-   * The route-specific writer that uploads this program's per-draw uniforms and samplers:
-   * runtime-generated programs address uniforms through the JIT name suffixes, precompiled
-   * programs through the artifact's structural layout.
+   * The route-specific writer that uploads this program's per-draw uniforms and samplers.
    */
   const ProgramWriter* writer() const {
     return writerValue.get();
   }
 
   /**
-   * The precompiled family the program was built from, or empty for runtime-generated programs:
-   * lets a cache hit tell which kernel serves a draw without re-running the matcher walk.
+   * The precompiled family the program was built from: lets a cache hit tell which kernel
+   * serves a draw without re-running the matcher walk.
    */
   const std::string& shaderName() const {
     return shaderNameValue;
@@ -83,14 +59,9 @@ class Program {
 
   UniformData* getUniformData(ShaderStage stage) const;
 
-  const ProgramProvenance& getProvenance() const {
-    return provenance;
-  }
-
   /**
    * The number of texture bindings the precompiled artifact declares. Draws providing fewer
-   * textures (e.g. an absent device mask) pad the rest with the shared dummy texture. Zero for
-   * runtime-generated programs, which bind exactly what the draw supplies.
+   * textures (e.g. an absent device mask) pad the rest with the shared dummy texture.
    */
   uint32_t expectedTextureCount() const {
     return expectedTextureCountValue;
@@ -108,7 +79,6 @@ class Program {
   std::unique_ptr<UniformData> fragmentUniformData = nullptr;
   std::unique_ptr<ProgramWriter> writerValue = nullptr;
   std::string shaderNameValue = {};
-  ProgramProvenance provenance = {};
   uint32_t expectedTextureCountValue = 0;
 
   friend class GlobalCache;

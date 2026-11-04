@@ -53,53 +53,6 @@ bool ColorSpaceXformStepsSupported(const ColorSpaceXformSteps* steps) {
   return true;
 }
 
-std::string ColorSpaceXformHelper::declare(UniformHandler* uniformHandler, const std::string& field,
-                                           UniformFormat format, ShaderStage stage) {
-  if (slot >= 0) {
-    auto mangled = uniformHandler->addUniform(field, format, stage, capacity);
-    return mangled + "[" + std::to_string(slot) + "]";
-  }
-  return uniformHandler->addUniform(prefix + field, format, stage);
-}
-
-void ColorSpaceXformHelper::emitCode(UniformHandler* uniformHandler,
-                                     const ColorSpaceXformSteps* colorSpaceXform,
-                                     ShaderStage shaderStage) {
-  if (colorSpaceXform) {
-    flags = colorSpaceXform->flags;
-    if (this->applySrcTF()) {
-      srcTFVar0 = declare(uniformHandler, ColorSpaceParams::SrcTF0.name, UniformFormat::Float4,
-                          shaderStage);
-      srcTFVar1 = declare(uniformHandler, ColorSpaceParams::SrcTF1.name, UniformFormat::Float4,
-                          shaderStage);
-      _srcTFType =
-          gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
-              &colorSpaceXform->srcTransferFunction));
-    }
-    if (this->applySrcOOTF()) {
-      srcOOTFVar = declare(uniformHandler, ColorSpaceParams::SrcOOTF.name, UniformFormat::Float4,
-                           shaderStage);
-    }
-    if (this->applyGamutXform()) {
-      gamutXformVar = declare(uniformHandler, ColorSpaceParams::ColorXform.name,
-                              UniformFormat::Float3x3, shaderStage);
-    }
-    if (this->applyDstOOTF()) {
-      dstOOTFVar = declare(uniformHandler, ColorSpaceParams::DstOOTF.name, UniformFormat::Float4,
-                           shaderStage);
-    }
-    if (this->applyDstTF()) {
-      dstTFVar0 = declare(uniformHandler, ColorSpaceParams::DstTF0.name, UniformFormat::Float4,
-                          shaderStage);
-      dstTFVar1 = declare(uniformHandler, ColorSpaceParams::DstTF1.name, UniformFormat::Float4,
-                          shaderStage);
-      _dstTFType =
-          gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(
-              &colorSpaceXform->dstTransferFunctionInverse));
-    }
-  }
-}
-
 void ColorSpaceXformHelper::setData(UniformData* uniformData,
                                     const ColorSpaceXformSteps* colorSpaceXform) {
   if (!colorSpaceXform) {

@@ -90,27 +90,19 @@ std::string NormalizeTrace(const std::string& raw) {
   return out;
 }
 
-// One route's full trace: the bundle state selects the writers (unloaded = the runtime writers,
-// loaded = the AOT writers), the program cache is cleared so both routes pay the same
-// first-prepare path, and the capture spans the scene and the flush that submits it. Returns an
-// empty string when the route produced no dump — the scene drew nothing, or the bundle is gone.
-std::string RunRoute(Context* context, bool useBundle, const std::function<void()>& draw) {
+// The route's full trace: the program cache is cleared so the capture pays the first-prepare
+// path, and the capture spans the scene and the flush that submits it. Returns an empty string
+// when the route produced no dump — the scene drew nothing, or the bundle is gone.
+std::string RunRoute(Context* context, const std::function<void()>& draw) {
   auto* cache = context->precompiledShaderCache();
-  if (useBundle) {
-    if (!LoadEmbeddedBundle(cache, context->backend())) {
-      return {};
-    }
-  } else {
-    cache->unload();
+  if (!LoadEmbeddedBundle(cache, context->backend())) {
+    return {};
   }
   context->globalCache()->clearPrograms();
   testing::internal::CaptureStdout();
   draw();
   context->flushAndSubmit(true);
   auto captured = testing::internal::GetCapturedStdout();
-  if (useBundle) {
-    cache->unload();
-  }
   return NormalizeTrace(captured);
 }
 
@@ -149,26 +141,20 @@ std::string PinUniformTrace(Context* context, const std::string& name,
     return "no context or scene\n";
   }
   SetDumpLabel("ab");
-  auto runtime = RunRoute(context, false, draw);
-  auto aot = RunRoute(context, true, draw);
+  auto aot = RunRoute(context, draw);
   // A trace that is not even run-to-run stable cannot be pinned — catch that here, not as a
   // mysterious golden diff later.
-  auto runtimeAgain = RunRoute(context, false, draw);
-  auto aotAgain = RunRoute(context, true, draw);
+  auto aotAgain = RunRoute(context, draw);
   SetDumpLabel(nullptr);
-  if (runtime.empty() || aot.empty()) {
-    return "a route produced no uniform dump — the scene drew nothing, or the bundle failed to "
+  if (aot.empty()) {
+    return "the route produced no uniform dump — the scene drew nothing, or the bundle failed to "
            "load\n";
-  }
-  if (runtime != runtimeAgain) {
-    return "the runtime route's trace is not run-to-run stable\n--- first ---\n" + runtime +
-           "--- second ---\n" + runtimeAgain;
   }
   if (aot != aotAgain) {
     return "the AOT route's trace is not run-to-run stable\n--- first ---\n" + aot +
            "--- second ---\n" + aotAgain;
   }
-  auto trace = "--- runtime ---\n" + runtime + "--- aot ---\n" + aot;
+  auto trace = "--- aot ---\n" + aot;
   auto path = GoldenPath(name);
   if (std::getenv("TGFX_ACCEPT_BASELINE") != nullptr) {
     std::error_code ec = {};
@@ -187,6 +173,13 @@ std::string PinUniformTrace(Context* context, const std::string& name,
   std::stringstream buffer;
   buffer << in.rdbuf();
   auto golden = buffer.str();
+  // The goldens predating the runtime-route removal carry both sections; only the AOT section is
+  // still reproducible.
+  const std::string aotSectionMarker = "--- aot ---\n";
+  auto sectionStart = golden.find(aotSectionMarker);
+  if (sectionStart != std::string::npos) {
+    golden = golden.substr(sectionStart);
+  }
   if (golden == trace) {
     return {};
   }

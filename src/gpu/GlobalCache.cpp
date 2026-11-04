@@ -204,21 +204,13 @@ void GlobalCache::resetUniformBuffer() {
   activePacket = reusable;
 }
 
-void GlobalCache::addProgram(const BytesKey& programKey, std::shared_ptr<Program> program,
-                             bool excludeFromAOTCoverage) {
+void GlobalCache::addProgram(const BytesKey& programKey, std::shared_ptr<Program> program) {
   if (program == nullptr) {
     return;
   }
   program->programKey = programKey;
-  if (programStatsPaused()) {
-    // Deliberate reference renders (tests) are excluded from the coverage metrics.
-  } else if (program->getProvenance().program == ProgramOrigin::PrecompiledArtifact) {
+  if (!programStatsPaused()) {
     _programStats.precompiledArtifactCreations++;
-  } else {
-    _programStats.programBuilderCreations++;
-    if (excludeFromAOTCoverage) {
-      _programStats.excludedProgramBuilderCreations++;
-    }
   }
   programLRU.push_front(program.get());
   program->cachedPosition = programLRU.begin();
@@ -233,15 +225,6 @@ void GlobalCache::addProgram(const BytesKey& programKey, std::shared_ptr<Program
 void GlobalCache::clearPrograms() {
   programLRU.clear();
   programMap.clear();
-}
-
-void GlobalCache::recordRuntimePipelineCreation(bool succeeded) {
-  _programStats.runtimePipelineCreationAttempts++;
-  if (succeeded) {
-    _programStats.runtimePipelineCreationSuccesses++;
-  } else {
-    _programStats.runtimePipelineCreationFailures++;
-  }
 }
 
 std::shared_ptr<TextureProxy> GlobalCache::getGradient(const Color* colors, const float* positions,

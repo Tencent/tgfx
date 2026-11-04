@@ -680,7 +680,6 @@ TGFX_TEST(GLRenderTest, EmbeddedAOTCreatesPipeline) {
   SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
   auto cache = context->precompiledShaderCache();
-  cache->unload();
   auto sourceSurface = Surface::Make(context, 8, 8, false, 1, true);
   ASSERT_NE(sourceSurface, nullptr);
   sourceSurface->getCanvas()->clear(Color::Red());
@@ -754,7 +753,6 @@ TGFX_TEST(GLRenderTest, RectangleTextureImportCopiesTo2D) {
     context->flushAndSubmit(true);
     EXPECT_EQ(cache->drawStats().droppedDraws, 0u);
     cache->setDiagnosticRecordingEnabled(false);
-    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
     std::array<uint32_t, width* height> result = {};
     auto info = ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Premultiplied);
     ASSERT_TRUE(surface->readPixels(info, result.data()));
@@ -768,7 +766,6 @@ TGFX_TEST(GLRenderTest, RectangleTextureImportCopiesTo2D) {
       }
     }
   }
-  cache->unload();
   gl->deleteTextures(1, &glInfo.id);
 }
 
@@ -924,19 +921,14 @@ TGFX_TEST(GLRenderTest, HardwareSurfaceSamplingUsesTwoDCopy) {
 
   canvas->clear(Color::FromRGBA(0, 128, 255, 255));
   context->flushAndSubmit(true);
-  auto* cache = context->precompiledShaderCache();
-  bool aotLoaded = cache != nullptr && cache->isLoaded();
-  auto buildsBefore = context->globalCache()->programStats().programBuilderCreations;
+
   Paint paint;
   paint.setColor(Color::FromRGBA(255, 255, 255, 255));
   paint.setBlendMode(BlendMode::Difference);
   canvas->drawRect(Rect::MakeXYWH(0, 0, 32, 16), paint);
   context->flushAndSubmit(true);
   EXPECT_EQ(ReadHardwarePixel(buffer, 8, 8), (std::array<uint8_t, 4>{255, 127, 0, 255}));
-  if (aotLoaded) {
-    // Sampling the rectangle render target in place would force a runtime program build.
-    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, buildsBefore);
-  }
+
   surface = nullptr;
   snapshot = nullptr;
   HardwareBufferRelease(buffer);

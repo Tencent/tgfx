@@ -26,8 +26,6 @@ class GLSLComplexEllipseGeometryProcessor : public ComplexEllipseGeometryProcess
   GLSLComplexEllipseGeometryProcessor(int width, int height, bool stroke,
                                       std::optional<PMColor> commonColor);
 
-  void emitCode(EmitArgs& args) const override;
-
   void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
                FPCoordTransformIter* transformIter) const override;
 };

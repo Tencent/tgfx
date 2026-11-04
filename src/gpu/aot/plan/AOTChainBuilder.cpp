@@ -20,6 +20,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include "gpu/ColorSpaceXformHelper.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/aot/ir/ChainContext.h"

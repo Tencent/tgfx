@@ -42,8 +42,6 @@ class ColorSpaceXformEffect : public FragmentProcessor {
     return colorSpaceXformSteps.get();
   }
 
-  void emitCode(EmitArgs& args) const override;
-
   bool lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input, AOTNodeID* output) const override;
 
  private:

@@ -16,14 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Performance matrix:  Five scenario families, each measured cold (first
-// frame after a program-cache wipe) and hot (steady state after warm-up) on both routes — the
-// precompiled AOT chain and the runtime stitching reference — so every number has a
-// like-for-like counterpart. The output is a table of medians over N_ROUNDS rounds; the raw
-// per-round numbers print too. The suite first asserts routing correctness (the AOT runs really
-// ride the precompiled kernels) so the timings measure the intended path, then applies the
-// calibrated ratio gates in AssertPerformanceGates (see its comment for scope and limits —
-// the budgets bound further degradation; they do not approve the current absolute cost).
+// Performance matrix: five scenario families, each measured cold (first frame after a
+// program-cache wipe) and hot (steady state after warm-up) on the precompiled routes, so the
+// numbers stay comparable across runs against a stored history. The output is a table of medians
+// over N_ROUNDS rounds; the raw per-round numbers print too. The suite first asserts routing
+// correctness (the runs really ride the precompiled kernels) so the timings measure the intended
+// path, then checks that the measurement itself succeeded.
 //
 // Scenarios (plan P7):
 //   1. Short chains of 1-5 operators, steady state: the interpreter + full-slot onSetData upload
@@ -33,7 +31,7 @@
 //      instruction sequences).
 //   3. Mask/clip/blend short chains: the cost of the coverage/XP semantic fixes.
 //   4. Real materialization (dual gradients): passes, intermediate bytes, target switches.
-//   5. Control group: the runtime stitching route running the same scenes.
+//   5. Route contrasts: chain vs dedicated families over the same scenes.
 
 #include <algorithm>
 #include <array>
@@ -85,7 +83,6 @@ struct TimingResult {
   double hotMinMs = 0.0;
   double hotP95Ms = 0.0;
   uint32_t aotDraws = 0;
-  uint32_t runtimePrograms = 0;
   // Routing evidence, snapshotted from the cold window (the only window with diagnostic
   // recording on). The hit list is deduplicated "shader(vN,fN)" — creation events, so a variant
   // appears once regardless of how many draws reused it; the pass-structure counters come from
@@ -119,74 +116,40 @@ double Percentile(std::vector<double> values, double percentile) {
   return values[index];
 }
 
-// Measures one route (useBundle selects AOT vs runtime) over one scene. Cold = ColdSamples
+// Measures one route over one scene. Cold = ColdSamples
 // first frames after clearing the program cache and (for AOT) reloading the bundle — the
 // in-process, program-level cold (process cold is a launch property, not measurable here).
 // Hot = median/p95 over Rounds batches of BatchFrames frames each (a batch shares one
 // surface so per-frame surface setup stays out of the measurement). `size` parameterizes the
 // surface so the fill-rate axis (128 vs 512) is covered by the representative chain scenario.
-// P9 ratio gates. Calibrated 2026-09-22, Apple M4 Pro, Debug build, 10 full-matrix runs per
-// backend (medians/maxima in the manifest) — the budgets are set above the observed maxima so
-// the gate catches FURTHER degradation; they are not an approval of the current absolute cost,
-// and they are not validated on other machines or build types (re-calibrate before relying on
-// them elsewhere):
-//   Metal cold aot/runtime: med 0.03-0.06, max 0.08 → budget 0.15. The bundle carries real
-//     metallib binaries, so pipeline creation from them stays far cheaper than compiling the
-//     JIT tree's MSL; this protects the AOT route's main cold-start advantage.
-//   GL cold aot/runtime:    med 5.7-12.6, max 14.6  → budget 20. The GL bundle stores SOURCE,
-//     so first use compiles the (large) chain kernel while the JIT route compiles a small
-//     specialized tree; currently slower on this axis — the budget only bounds further cold
-//     regressions (bundle/reflection bloat, slower program assembly).
-//   Both hot aot/runtime:   med 1.5-2.7,  max 3.63  → budget 4.0. The chain kernel interprets a
-//     uniform-driven slot program while the JIT route runs a specialized tree; the measured
-//     steady-state ratio lands here. The budget bounds growth of that gap — it does not assert
-//     the current gap is acceptable.
-// A failed or empty measurement fails the gate instead of silently passing with zero ratios.
-void AssertPerformanceGates(Context* context, const std::string& label, const TimingResult& aot,
-                            const TimingResult& runtime) {
-  EXPECT_TRUE(aot.measurementValid) << label << " aot measurement failed (bundle/surface)";
-  EXPECT_TRUE(runtime.measurementValid) << label << " runtime measurement failed (surface)";
-  if (!aot.measurementValid || !runtime.measurementValid) {
+void ExpectMeasurementValid(const std::string& label, const TimingResult& result) {
+  EXPECT_TRUE(result.measurementValid) << label << " measurement failed (bundle/surface)";
+  if (!result.measurementValid) {
     return;
   }
-  EXPECT_GT(aot.coldMedianMs, 0.0) << label << " aot cold timing is zero";
-  EXPECT_GT(aot.hotMedianMs, 0.0) << label << " aot hot timing is zero";
-  EXPECT_GT(runtime.coldMedianMs, 0.0) << label << " runtime cold timing is zero";
-  EXPECT_GT(runtime.hotMedianMs, 0.0) << label << " runtime hot timing is zero";
-  if (runtime.coldMedianMs <= 0.0 || runtime.hotMedianMs <= 0.0 || aot.coldMedianMs <= 0.0 ||
-      aot.hotMedianMs <= 0.0) {
-    return;
-  }
-  const double coldBudget = context->backend() == Backend::Metal ? 0.15 : 20.0;
-  EXPECT_LE(aot.coldMedianMs / runtime.coldMedianMs, coldBudget)
-      << label << " cold ratio (aot/runtime)";
-  EXPECT_LE(aot.hotMedianMs / runtime.hotMedianMs, 4.0) << label << " hot ratio (aot/runtime)";
+  EXPECT_GT(result.coldMedianMs, 0.0) << label << " cold timing is zero";
+  EXPECT_GT(result.hotMedianMs, 0.0) << label << " hot timing is zero";
 }
 
 template <typename Scene>
-TimingResult MeasureRoute(Context* context, PrecompiledShaderCache* cache, bool useBundle,
-                          const Scene& scene, int size = Size, bool decompositionEnabled = true,
+TimingResult MeasureRoute(Context* context, PrecompiledShaderCache* cache, const Scene& scene,
+                          int size = Size, bool decompositionEnabled = true,
                           bool dedicatedKernels = true) {
   TimingResult result = {};
-  if (useBundle) {
-    auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
-    if (!cache->loadBundle(bundleData, bundleBytes)) {
-      return result;
-    }
-    cache->setDecompositionEnabled(decompositionEnabled);
-    cache->setDedicatedKernelsEnabled(dedicatedKernels);
-  } else {
-    cache->unload();
+  auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
+  if (!cache->loadBundle(bundleData, bundleBytes)) {
+    return result;
   }
-  // The runtime route is the measurement's reference, not a production lookup: its compilations
-  // stay counted (runtimePrograms reads them) but are marked deliberate, so the AOT coverage
-  // metrics exclude them.
-  ScopedAOTDeliberateMiss runtimeReference(context, !useBundle);
+  cache->setDecompositionEnabled(decompositionEnabled);
+  cache->setDedicatedKernelsEnabled(dedicatedKernels);
+  // Measurement runs are not production lookups: mark their misses deliberate so the AOT
+  // coverage metrics exclude them.
+  ScopedAOTDeliberateMiss measurementScope(context, true);
   auto surface = Surface::Make(context, size, size);
   if (surface == nullptr) {
     return result;
   }
-  // Cold frames: every program gets looked up (and created on the runtime route). Each sample
+  // Cold frames: every program gets looked up and created. Each sample
   // clears the program cache and the shader cache independently, so every sample compiles its
   // shaders again; the samples' spread (min..max) shows the stability the audit's
   // single-cold-sample design could not.
@@ -203,10 +166,8 @@ TimingResult MeasureRoute(Context* context, PrecompiledShaderCache* cache, bool 
     result.coldSamples.push_back(std::chrono::duration<double, std::milli>(end - start).count());
   }
   result.coldMedianMs = Median(result.coldSamples);
-  auto stats = context->globalCache()->programStats();
   auto drawStats = cache->drawStats();
   result.aotDraws = static_cast<uint32_t>(drawStats.completeAOTDraws);
-  result.runtimePrograms = static_cast<uint32_t>(stats.programBuilderCreations);
   result.draws = static_cast<uint32_t>(drawStats.draws);
   result.directChainDraws = static_cast<uint32_t>(drawStats.directChainDraws);
   result.offscreenPlanDraws = static_cast<uint32_t>(drawStats.offscreenPlanDraws);
@@ -229,8 +190,7 @@ TimingResult MeasureRoute(Context* context, PrecompiledShaderCache* cache, bool 
     result.hitVariants = joined.empty() ? "-" : joined;
   }
   cache->setDiagnosticRecordingEnabled(false);
-  // Hot frames: steady state, programs cached on both routes (the runtime route's program cache
-  // serves its stitched programs). Each sample times
+  // Hot frames: steady state, programs cached. Each sample times
   // BatchFrames frames (the per-frame cost is the sample divided by the batch size).
   constexpr int BatchFrames = 20;
   scene(surface->getCanvas());
@@ -271,9 +231,9 @@ void PrintResult(const char* scenario, const char* route, const TimingResult& re
 #endif
   printf(
       "[P7Perf] %-28s %-8s %7s %4d coldMed=%8.3fms hotMed=%8.3fms hotMin=%8.3fms "
-      "hotP95=%8.3fms aotDraws=%u runtimePrograms=%u\n",
+      "hotP95=%8.3fms aotDraws=%u\n",
       scenario, route, BuildType, size, result.coldMedianMs, result.hotMedianMs, result.hotMinMs,
-      result.hotP95Ms, result.aotDraws, result.runtimePrograms);
+      result.hotP95Ms, result.aotDraws);
   // Routing evidence for the same window: which variants were actually created (scene label is
   // NOT a family name), and the pass structure this scene really executed.
   printf(
@@ -307,9 +267,8 @@ std::shared_ptr<ColorFilter> MakeMatrixChain(size_t opCount) {
 }  // namespace
 
 // Scenarios 1 and 5: short chains of 1-5 operators over an image, steady state. The AOT route
-// rides the PointwiseChain kernel (one fused pass, full 32-slot uniform upload per draw); the
-// runtime route stitches one program per chain depth. Asserts routing first so the timings
-// measure the intended paths.
+// rides the PointwiseChain kernel (one fused pass, full 32-slot uniform upload per draw). Asserts
+// routing first so the timings measure the intended path.
 TGFX_TEST(AOTPerformanceMatrixTest, ShortChainSteadyState) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -334,18 +293,11 @@ TGFX_TEST(AOTPerformanceMatrixTest, ShortChainSteadyState) {
         canvas->drawImage(image, 0, 0, &paint);
         canvas->restore();
       };
-      // Route-order symmetry (audit rule): a discarded runtime measurement first, so the
-      // recorded AOT numbers do not enjoy first-touch resource states the runtime numbers
-      // never see (and vice versa for the second runtime pass).
-      MeasureRoute(context, cache, false, scene, size);
-      auto aot = MeasureRoute(context, cache, true, scene, size);
+      auto aot = MeasureRoute(context, cache, scene, size);
       // Routing check: every AOT frame must be served by the precompiled set.
-      EXPECT_EQ(aot.runtimePrograms, 0u);
       EXPECT_GE(aot.aotDraws, 1u);
-      auto runtime = MeasureRoute(context, cache, false, scene, size);
-      AssertPerformanceGates(context, label, aot, runtime);
+      ExpectMeasurementValid(label, aot);
       PrintResult(label, "aot", aot, size);
-      PrintResult(label, "runtime", runtime, size);
     }
   }
 }
@@ -374,14 +326,9 @@ TGFX_TEST(AOTPerformanceMatrixTest, SameLayoutEffectReuse) {
     two.setColorFilter(ColorFilter::Luma());
     canvas->drawImage(image, 0, 0, &two);
   };
-  // Route-order symmetry (audit rule): a discarded runtime pass first (see ShortChainSteadyState).
-  MeasureRoute(context, cache, false, sceneSameVariant);
-  auto aot = MeasureRoute(context, cache, true, sceneSameVariant);
-  EXPECT_EQ(aot.runtimePrograms, 0u);
-  auto runtime = MeasureRoute(context, cache, false, sceneSameVariant);
-  AssertPerformanceGates(context, "reuse-same-variant", aot, runtime);
+  auto aot = MeasureRoute(context, cache, sceneSameVariant);
+  ExpectMeasurementValid("reuse-same-variant", aot);
   PrintResult("reuse-same-variant", "aot", aot);
-  PrintResult("reuse-same-variant", "runtime", runtime);
 }
 
 // Scenario 3: mask/clip/blend short chains — the shapes the coverage/XP fixes serve (alpha-only
@@ -412,14 +359,9 @@ TGFX_TEST(AOTPerformanceMatrixTest, MaskClipBlendShortChain) {
     paint.setColorFilter(ColorFilter::Matrix(WarmMatrix()));
     canvas->drawImage(maskImage, 0, 0, &paint);
   };
-  // Route-order symmetry (audit rule): a discarded runtime pass first (see ShortChainSteadyState).
-  MeasureRoute(context, cache, false, scene);
-  auto aot = MeasureRoute(context, cache, true, scene);
-  EXPECT_EQ(aot.runtimePrograms, 0u);
-  auto runtime = MeasureRoute(context, cache, false, scene);
-  AssertPerformanceGates(context, "alpha-root-paint-alpha", aot, runtime);
+  auto aot = MeasureRoute(context, cache, scene);
+  ExpectMeasurementValid("alpha-root-paint-alpha", aot);
   PrintResult("alpha-root-paint-alpha", "aot", aot);
-  PrintResult("alpha-root-paint-alpha", "runtime", runtime);
 }
 
 // Scenario 4: real materialization (two gradients under a blend). Records the observable
@@ -443,14 +385,10 @@ TGFX_TEST(AOTPerformanceMatrixTest, DualGradientMaterialization) {
     paint.setShader(Shader::MakeBlend(BlendMode::Multiply, warm, cool));
     canvas->drawRect(Rect::MakeWH(size, size), paint);
   };
-  // Route-order symmetry (audit rule): a discarded runtime pass first (see ShortChainSteadyState).
-  MeasureRoute(context, cache, false, scene);
-  auto aot = MeasureRoute(context, cache, true, scene);
+  auto aot = MeasureRoute(context, cache, scene);
   EXPECT_GE(aot.aotDraws, 1u);
-  auto runtime = MeasureRoute(context, cache, false, scene);
-  AssertPerformanceGates(context, "dual-gradient-blend", aot, runtime);
+  ExpectMeasurementValid("dual-gradient-blend", aot);
   PrintResult("dual-gradient-blend", "aot", aot);
-  PrintResult("dual-gradient-blend", "runtime", runtime);
 }
 
 // Per-family matrix: one representative scene per top-hit family (the chain kernel has its own
@@ -559,25 +497,19 @@ TGFX_TEST(AOTPerformanceMatrixTest, PerFamilyMatrix) {
        }},
   };
   for (const auto& entry : scenes) {
-    // Route-order symmetry (audit rule): a discarded runtime pass first (see ShortChainSteadyState).
-    MeasureRoute(context, cache, false, entry.scene);
-    auto aot = MeasureRoute(context, cache, true, entry.scene);
-    auto runtime = MeasureRoute(context, cache, false, entry.scene);
-    AssertPerformanceGates(context, entry.label, aot, runtime);
+    auto aot = MeasureRoute(context, cache, entry.scene);
+    ExpectMeasurementValid(entry.label, aot);
     PrintResult(entry.label, "aot", aot);
-    PrintResult(entry.label, "runtime", runtime);
   }
 }
 
-// Decomposition of the chain route's steady-state gap, one scene, three routes:
+// Decomposition of the chain route's steady-state gap, one scene, two routes:
 //   (a) bundle + decomposition ON  — the tree is rewritten into the chain kernel (offscreen plan
 //       route, interpreter execution);
 //   (b) bundle + decomposition OFF — the original tree reaches the matcher, so the dedicated
-//       families (QuadTextureFill / TexturedEffect shapes) serve it;
-//   (c) runtime (no bundle)        — JIT reference.
-// (b) vs (c) validates the dedicated route; (a) vs (b) is the chain route's total premium
-// (plan-task overhead + interpreter execution). Route evidence prints with each row so the
-// (b) row's actual family is verified, not assumed.
+//       families (QuadTextureFill / TexturedEffect shapes) serve it.
+// (a) vs (b) is the chain route's total premium (plan-task overhead + interpreter execution).
+// Route evidence prints with each row so the (b) row's actual family is verified, not assumed.
 TGFX_TEST(AOTPerformanceMatrixTest, ChainVsDedicatedDecomposition) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -600,23 +532,14 @@ TGFX_TEST(AOTPerformanceMatrixTest, ChainVsDedicatedDecomposition) {
       canvas->restore();
     };
     // Warm-up run first (audit rule: discard first-touch resource states).
-    MeasureRoute(context, cache, false, scene, size);
-    auto chain = MeasureRoute(context, cache, true, scene, size, true);
-    EXPECT_EQ(chain.runtimePrograms, 0u);
-    auto dedicated = MeasureRoute(context, cache, true, scene, size, false);
-    EXPECT_EQ(dedicated.runtimePrograms, 0u);
-    auto runtime = MeasureRoute(context, cache, false, scene, size);
-    AssertPerformanceGates(context, "chain-route", chain, runtime);
+    auto chain = MeasureRoute(context, cache, scene, size, true);
+    auto dedicated = MeasureRoute(context, cache, scene, size, false);
+    ExpectMeasurementValid("chain-route", chain);
     PrintResult("decomp-chain", "aot", chain, size);
     PrintResult("decomp-dedicated", "aot", dedicated, size);
-    PrintResult("decomp-runtime", "runtime", runtime, size);
-    printf(
-        "[DecompGap] size=%d chainHot=%.3fms dedicatedHot=%.3fms runtimeHot=%.3fms "
-        "chain/dedicated=%.2fx dedicated/runtime=%.2fx chain/runtime=%.2fx\n",
-        size, chain.hotMedianMs, dedicated.hotMedianMs, runtime.hotMedianMs,
-        dedicated.hotMedianMs > 0 ? chain.hotMedianMs / dedicated.hotMedianMs : 0.0,
-        runtime.hotMedianMs > 0 ? dedicated.hotMedianMs / runtime.hotMedianMs : 0.0,
-        runtime.hotMedianMs > 0 ? chain.hotMedianMs / runtime.hotMedianMs : 0.0);
+    printf("[DecompGap] size=%d chainHot=%.3fms dedicatedHot=%.3fms chain/dedicated=%.2fx\n", size,
+           chain.hotMedianMs, dedicated.hotMedianMs,
+           dedicated.hotMedianMs > 0 ? chain.hotMedianMs / dedicated.hotMedianMs : 0.0);
   }
   // The dedicated route above turns the decomposition switch off, and the ContextScope reuses
   // the thread-local cached Context across tests — restore the production default so later
@@ -624,7 +547,7 @@ TGFX_TEST(AOTPerformanceMatrixTest, ChainVsDedicatedDecomposition) {
   cache->setDecompositionEnabled(true);
 }
 
-// The same three routes for the hot dedicated families, with the dedicated family forced off for
+// The same route contrast for the hot dedicated families, with the dedicated family forced off for
 // the chain row. Route evidence prints with each row so a row that silently landed on another
 // family is visible. A path draws as an alpha mask below 162 pixels and as triangles above, so the
 // "path" scene changes family between the two sizes. The "filter" scene is only reachable by the
@@ -702,22 +625,16 @@ TGFX_TEST(AOTPerformanceMatrixTest, DedicatedVsChainHotFamilies) {
                       },
                       false});
     for (const auto& entry : scenes) {
-      MeasureRoute(context, cache, false, entry.draw, size);
-      auto dedicated = MeasureRoute(context, cache, true, entry.draw, size,
-                                    !entry.plainMatcherForDedicated, true);
-      auto chain = MeasureRoute(context, cache, true, entry.draw, size, true, false);
-      auto runtime = MeasureRoute(context, cache, false, entry.draw, size);
-      EXPECT_EQ(dedicated.runtimePrograms, 0u);
-      EXPECT_EQ(chain.runtimePrograms, 0u);
+      auto dedicated =
+          MeasureRoute(context, cache, entry.draw, size, !entry.plainMatcherForDedicated, true);
+      auto chain = MeasureRoute(context, cache, entry.draw, size, true, false);
       PrintResult((entry.name + "-dedicated").c_str(), "aot", dedicated, size);
       PrintResult((entry.name + "-chain").c_str(), "aot", chain, size);
-      PrintResult((entry.name + "-runtime").c_str(), "runtime", runtime, size);
       printf(
-          "[HotFamilyGap] %s size=%d dedicatedHot=%.3fms chainHot=%.3fms runtimeHot=%.3fms "
-          "chain/dedicated=%.2fx dedicated/runtime=%.2fx\n",
-          entry.name.c_str(), size, dedicated.hotMedianMs, chain.hotMedianMs, runtime.hotMedianMs,
-          dedicated.hotMedianMs > 0 ? chain.hotMedianMs / dedicated.hotMedianMs : 0.0,
-          runtime.hotMedianMs > 0 ? dedicated.hotMedianMs / runtime.hotMedianMs : 0.0);
+          "[HotFamilyGap] %s size=%d dedicatedHot=%.3fms chainHot=%.3fms "
+          "chain/dedicated=%.2fx\n",
+          entry.name.c_str(), size, dedicated.hotMedianMs, chain.hotMedianMs,
+          dedicated.hotMedianMs > 0 ? chain.hotMedianMs / dedicated.hotMedianMs : 0.0);
     }
   }
   cache->setDecompositionEnabled(true);

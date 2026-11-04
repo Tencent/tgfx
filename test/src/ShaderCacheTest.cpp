@@ -315,8 +315,6 @@ TGFX_TEST(ShaderCacheTest, RecreatedProgramReusesPipeline) {
   EXPECT_EQ(second.pipelineCreations, first.pipelineCreations);
   EXPECT_EQ(second.pipelineHits - first.pipelineHits,
             second.pipelineRequests - first.pipelineRequests);
-  EXPECT_EQ(secondPrograms.runtimePipelineCreationAttempts,
-            firstPrograms.runtimePipelineCreationAttempts);
   EXPECT_GT(secondPrograms.cacheMisses, firstPrograms.cacheMisses);
 }
 

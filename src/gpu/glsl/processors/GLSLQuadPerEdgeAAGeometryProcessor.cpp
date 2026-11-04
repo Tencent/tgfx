@@ -32,40 +32,6 @@ GLSLQuadPerEdgeAAGeometryProcessor::GLSLQuadPerEdgeAAGeometryProcessor(
     : QuadPerEdgeAAGeometryProcessor(width, height, aa, commonColor, uvMatrix, hasSubset) {
 }
 
-void GLSLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
-  auto vertBuilder = args.vertBuilder;
-  auto fragBuilder = args.fragBuilder;
-  auto varyingHandler = args.varyingHandler;
-  auto uniformHandler = args.uniformHandler;
-
-  varyingHandler->emitAttributes(*this);
-
-  auto& uvCoordsVar = uvCoord.empty() ? position : uvCoord;
-  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(uvCoordsVar));
-
-  if (aa == AAType::Coverage) {
-    auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
-    vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), coverage.name().c_str());
-    fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
-                             coverageVar.fsIn().c_str());
-  } else {
-    fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
-  }
-
-  if (commonColor.has_value()) {
-    auto colorName =
-        args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
-  } else {
-    auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
-    vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), color.name().c_str());
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
-  }
-
-  // Emit the vertex position to the hardware in the normalized window coordinates it expects.
-  args.vertBuilder->emitNormalizedPosition(position.name());
-}
-
 void GLSLQuadPerEdgeAAGeometryProcessor::setData(UniformData* vertexUniformData,
                                                  UniformData* fragmentUniformData,
                                                  FPCoordTransformIter* transformIter) const {
@@ -95,35 +61,6 @@ void GLSLQuadPerEdgeAAGeometryProcessor::onSetTransformData(UniformData* uniform
   if (index == 0 && !subset.empty() && uvCoord.empty()) {
     // Subset only applies to the first image in ProgramInfo.
     uniformData->setData("texSubsetMatrix", coordTransform->getTotalMatrix());
-  }
-}
-
-void GLSLQuadPerEdgeAAGeometryProcessor::onEmitTransform(EmitArgs& args,
-                                                         VertexShaderBuilder* vertexBuilder,
-                                                         VaryingHandler* varyingHandler,
-                                                         UniformHandler* uniformHandler,
-                                                         const std::string& transformUniformName,
-                                                         bool hasPerspective, int index) const {
-  if (index == 0 && !subset.empty()) {
-    auto varying = varyingHandler->addVarying("vTexSubset", SLType::Float4, true);
-    std::string subsetMatrixName = transformUniformName;
-    if (uvCoord.empty()) {
-      subsetMatrixName = uniformHandler->addUniform("texSubsetMatrix", UniformFormat::Float3x3,
-                                                    ShaderStage::Vertex);
-    }
-    const std::string srcLT = "srcLT";
-    const std::string srcRB = "srcRB";
-    const std::string perspLT = "perspLT";
-    const std::string perspRB = "perspRB";
-    vertexBuilder->codeAppendf("highp vec2 %s = %s.xy;", srcLT.c_str(), subset.name().c_str());
-    vertexBuilder->codeAppendf("highp vec2 %s = %s.zw;", srcRB.c_str(), subset.name().c_str());
-    vertexBuilder->emitTransformedPoint(perspLT, srcLT, subsetMatrixName, hasPerspective);
-    vertexBuilder->emitTransformedPoint(perspRB, srcRB, subsetMatrixName, hasPerspective);
-    vertexBuilder->codeAppend("highp vec4 subset = vec4(" + perspLT + ", " + perspRB + ");");
-    vertexBuilder->codeAppend(
-        "subset = vec4(min(subset.xy, subset.zw), max(subset.xy, subset.zw));");
-    vertexBuilder->codeAppendf("%s = subset;", varying.vsOut().c_str());
-    *args.outputSubset = varying.fsIn();
   }
 }
 

@@ -26,8 +26,6 @@ class GLSLConstColorProcessor : public ConstColorProcessor {
  public:
   GLSLConstColorProcessor(PMColor color, InputMode mode);
 
-  void emitCode(EmitArgs& args) const override;
-
  private:
   void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };

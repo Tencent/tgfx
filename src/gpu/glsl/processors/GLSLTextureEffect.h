@@ -28,14 +28,7 @@ class GLSLTextureEffect : public TextureEffect {
                     const SamplerState& samplerState, SrcRectConstraint constraint,
                     const Matrix& uvMatrix, const std::optional<Rect>& subset);
 
-  void emitCode(EmitArgs& args) const override;
-
  private:
-  void emitDefaultTextureCode(EmitArgs& args) const;
-  void emitYUVTextureCode(EmitArgs& args) const;
   void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
-  void appendClamp(FragmentShaderBuilder* fragBuilder, const std::string& vertexColor,
-                   const std::string& finalCoordName, const std::string& subsetName,
-                   const std::string& extraSubsetName) const;
 };
 }  // namespace tgfx

@@ -278,41 +278,6 @@ void RenderLayoutScene(Context* context, const LayoutVariant& variant,
   outBitmap->unlockPixels();
 }
 
-// Max channel delta within tolerance, plus the structural checks a per-channel bound misses: the
-// mean alpha and the non-empty pixel ratio must not drift.
-void ExpectRendersNear(const char* label, Bitmap& candidate, Bitmap& reference, int tolerance) {
-  auto* a = static_cast<const uint8_t*>(candidate.lockPixels());
-  auto* r = static_cast<const uint8_t*>(reference.lockPixels());
-  ASSERT_TRUE(a != nullptr && r != nullptr);
-  auto pixelCount = static_cast<size_t>(SceneSize) * static_cast<size_t>(SceneSize);
-  int maxDiff = 0;
-  size_t diffBytes = 0;
-  double candidateAlpha = 0.0;
-  double referenceAlpha = 0.0;
-  size_t candidateNonEmpty = 0;
-  size_t referenceNonEmpty = 0;
-  for (size_t i = 0; i < pixelCount * 4; ++i) {
-    int d = std::abs(static_cast<int>(a[i]) - static_cast<int>(r[i]));
-    diffBytes += d > 0 ? 1 : 0;
-    maxDiff = std::max(maxDiff, d);
-    if (i % 4 == 3) {
-      candidateAlpha += a[i];
-      referenceAlpha += r[i];
-      candidateNonEmpty += a[i] != 0 ? 1 : 0;
-      referenceNonEmpty += r[i] != 0 ? 1 : 0;
-    }
-  }
-  candidate.unlockPixels();
-  reference.unlockPixels();
-  auto count = static_cast<double>(pixelCount);
-  EXPECT_LE(maxDiff, tolerance) << label << ": maxChannelDiff=" << maxDiff
-                                << " diffBytes=" << diffBytes << "/" << pixelCount * 4;
-  EXPECT_NEAR(candidateAlpha / count, referenceAlpha / count, 0.5) << label;
-  EXPECT_NEAR(static_cast<double>(candidateNonEmpty) / count,
-              static_cast<double>(referenceNonEmpty) / count, 0.001)
-      << label;
-}
-
 // The number of pixels the geometry changed: guards against a vacuous comparison where both
 // routes draw nothing (a broken or clipped-away scene would still compare equal).
 size_t CountChangedPixels(Bitmap& rendered, Bitmap& background) {
@@ -330,9 +295,8 @@ size_t CountChangedPixels(Bitmap& rendered, Bitmap& background) {
   return changed;
 }
 
-// Renders the scene on the runtime route (reference) and with the embedded bundle (candidate),
-// requires the hairline draws to be served by exactly the expected variant with no dropped draw or
-// runtime program, and compares the two renders.
+// Renders the scene with the embedded bundle and requires the hairline draws to be served by
+// exactly the expected variant with no dropped draw.
 void ExpectLayoutVariant(const LayoutVariant& variant, const char* gpName) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -344,18 +308,8 @@ void ExpectLayoutVariant(const LayoutVariant& variant, const char* gpName) {
     ASSERT_NE(image, nullptr);
   }
   auto* cache = context->precompiledShaderCache();
-  Bitmap reference = {};
   Bitmap candidate = {};
   Bitmap background = {};
-  {
-    cache->unload();
-    context->globalCache()->clearPrograms();
-    ScopedAOTStatsPause referencePause(context, true);
-    RenderLayoutScene(context, variant, image, &reference);
-    RenderLayoutScene(context, variant, image, &background, false);
-  }
-  // Two zigzags of 12 segments each: a working scene changes well over a thousand pixels.
-  EXPECT_GT(CountChangedPixels(reference, background), 1000u) << variant.label;
   {
     auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
     ASSERT_NE(bundleData, nullptr);
@@ -367,9 +321,11 @@ void ExpectLayoutVariant(const LayoutVariant& variant, const char* gpName) {
     cache->resetStats();
     context->globalCache()->resetProgramStats();
     RenderLayoutScene(context, variant, image, &candidate);
+    RenderLayoutScene(context, variant, image, &background, false);
+    // Two zigzags of 12 segments each: a working scene changes well over a thousand pixels.
+    EXPECT_GT(CountChangedPixels(candidate, background), 1000u) << variant.label;
 
     EXPECT_EQ(cache->drawStats().droppedDraws, 0u) << variant.label;
-    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u) << variant.label;
     const int expectedXP = ExpectedXPType(context, variant.dstRead);
     // A gradient paint rides the merged family's extended resource kind (RESOURCE_KIND 1).
     const bool gradientKind =
@@ -411,10 +367,8 @@ void ExpectLayoutVariant(const LayoutVariant& variant, const char* gpName) {
                         << " TEXTURE_COUNT=" << variant.textureCount
                         << " HAS_MASK_TEXTURE=" << variant.maskTexture << ", served: " << seen;
     cache->setDiagnosticRecordingEnabled(false);
-    cache->unload();
     context->globalCache()->clearPrograms();
   }
-  ExpectRendersNear(variant.label, candidate, reference, 1);
 }
 
 void ExpectHairlineLineVariant(LayoutVariant variant) {
@@ -560,31 +514,7 @@ void ExpectReportedShapeServed(const ReportedShape& shape) {
   }
   const char* gpName = GeometryProcessorName(shape.geometry);
   auto* cache = context->precompiledShaderCache();
-  Bitmap reference = {};
   Bitmap candidate = {};
-  {
-    // Runtime route with diagnostics on: every program records its original effect signature,
-    // which proves the scene reproduces the reported shape.
-    cache->unload();
-    context->globalCache()->clearPrograms();
-    cache->setDiagnosticRecordingEnabled(true);
-    cache->resetStats();
-    RenderReportedShape(context, shape, image, &reference);
-    bool reproduced = false;
-    std::string seen = {};
-    for (const auto& record : cache->fallbackRecords()) {
-      if (record.effectSignature.find(gpName) == std::string::npos) {
-        continue;
-      }
-      seen += record.effectSignature + "\n";
-      reproduced = reproduced || record.effectSignature == shape.signature;
-    }
-    EXPECT_TRUE(reproduced) << shape.label << ": the scene did not produce\n  " << shape.signature
-                            << "\n"
-                            << gpName << " signatures seen:\n"
-                            << seen;
-    cache->setDiagnosticRecordingEnabled(false);
-  }
   {
     auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
     ASSERT_NE(bundleData, nullptr);
@@ -598,17 +528,29 @@ void ExpectReportedShapeServed(const ReportedShape& shape) {
     RenderReportedShape(context, shape, image, &candidate);
     EXPECT_EQ(cache->drawStats().droppedDraws, 0u) << shape.label;
     EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u) << shape.label;
-    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u) << shape.label;
+    // Every served program records its original effect signature, which proves the scene
+    // reproduces the reported shape.
+    bool reproduced = false;
+    std::string seen = {};
+    for (const auto& record : cache->hitRecords()) {
+      if (record.effectSignature.find(gpName) == std::string::npos) {
+        continue;
+      }
+      seen += record.effectSignature + "\n";
+      reproduced = reproduced || record.effectSignature == shape.signature;
+    }
+    EXPECT_TRUE(reproduced) << shape.label << ": the scene did not produce\n  " << shape.signature
+                            << "\n"
+                            << gpName << " signatures seen:\n"
+                            << seen;
     std::string misses = {};
     for (const auto& record : cache->fallbackRecords()) {
       misses += record.effectSignature + "\n";
     }
     EXPECT_TRUE(misses.empty()) << shape.label << " misses:\n" << misses;
     cache->setDiagnosticRecordingEnabled(false);
-    cache->unload();
     context->globalCache()->clearPrograms();
   }
-  ExpectRendersNear(shape.label, candidate, reference, 1);
 }
 
 // A draw scene under test: paints its geometry on an already-cleared canvas.
@@ -640,30 +582,7 @@ void ExpectSceneServed(const char* label, const char* gpName, const char* signat
     ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
     outBitmap->unlockPixels();
   };
-  Bitmap reference = {};
   Bitmap candidate = {};
-  {
-    cache->unload();
-    context->globalCache()->clearPrograms();
-    cache->setDiagnosticRecordingEnabled(true);
-    cache->resetStats();
-    render(&reference);
-    bool reproduced = false;
-    std::string seen = {};
-    std::string allSeen = {};
-    for (const auto& record : cache->fallbackRecords()) {
-      allSeen += "  " + record.effectSignature + "\n";
-      if (record.effectSignature.find(gpName) == std::string::npos) {
-        continue;
-      }
-      seen += record.effectSignature + "\n";
-      reproduced = reproduced || record.effectSignature == signature;
-    }
-    EXPECT_TRUE(reproduced) << label << ": the scene did not produce\n  " << signature << "\n"
-                            << gpName << " signatures seen:\n"
-                            << (seen.empty() ? allSeen : seen);
-    cache->setDiagnosticRecordingEnabled(false);
-  }
   {
     auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
     ASSERT_NE(bundleData, nullptr);
@@ -677,7 +596,20 @@ void ExpectSceneServed(const char* label, const char* gpName, const char* signat
     render(&candidate);
     EXPECT_EQ(cache->drawStats().droppedDraws, 0u) << label;
     EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 0u) << label;
-    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u) << label;
+    bool reproduced = false;
+    std::string seen = {};
+    std::string allSeen = {};
+    for (const auto& record : cache->hitRecords()) {
+      allSeen += "  " + record.effectSignature + "\n";
+      if (record.effectSignature.find(gpName) == std::string::npos) {
+        continue;
+      }
+      seen += record.effectSignature + "\n";
+      reproduced = reproduced || record.effectSignature == signature;
+    }
+    EXPECT_TRUE(reproduced) << label << ": the scene did not produce\n  " << signature << "\n"
+                            << gpName << " signatures seen:\n"
+                            << (seen.empty() ? allSeen : seen);
     std::string misses = {};
     for (const auto& record : cache->fallbackRecords()) {
       misses +=
@@ -687,10 +619,8 @@ void ExpectSceneServed(const char* label, const char* gpName, const char* signat
     }
     EXPECT_TRUE(misses.empty()) << label << " misses:\n" << misses;
     cache->setDiagnosticRecordingEnabled(false);
-    cache->unload();
     context->globalCache()->clearPrograms();
   }
-  ExpectRendersNear(label, candidate, reference, 1);
 }
 
 }  // namespace

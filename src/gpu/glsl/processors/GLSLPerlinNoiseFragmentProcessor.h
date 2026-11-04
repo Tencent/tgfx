@@ -29,8 +29,6 @@ class GLSLPerlinNoiseFragmentProcessor : public PerlinNoiseFragmentProcessor {
                                    std::shared_ptr<TextureView> noiseView, const Matrix* uvMatrix,
                                    bool hasOriginalLookupData = false);
 
-  void emitCode(EmitArgs& args) const override;
-
  private:
   void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };

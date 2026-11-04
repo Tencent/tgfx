@@ -34,59 +34,6 @@ GLSLMeshGeometryProcessor::GLSLMeshGeometryProcessor(bool hasTexCoords, bool has
     : MeshGeometryProcessor(hasTexCoords, hasColors, hasCoverage, color, viewMatrix) {
 }
 
-void GLSLMeshGeometryProcessor::emitCode(EmitArgs& args) const {
-  auto vertBuilder = args.vertBuilder;
-  auto fragBuilder = args.fragBuilder;
-  auto varyingHandler = args.varyingHandler;
-  auto uniformHandler = args.uniformHandler;
-
-  varyingHandler->emitAttributes(*this);
-
-  auto matrixName =
-      uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
-
-  // Transform position by view matrix
-  std::string positionName = "position";
-  vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
-                           matrixName.c_str(), position.name().c_str());
-
-  // Handle texture coordinates for FragmentProcessor
-  if (hasTexCoords) {
-    // User provided texCoords, pass them through
-    auto texCoordVar = varyingHandler->addVarying("TexCoord", SLType::Float2);
-    vertBuilder->codeAppendf("%s = %s;", texCoordVar.vsOut().c_str(), texCoord.name().c_str());
-    emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(texCoord));
-  } else {
-    // No user texCoords, use position with uvMatrix (like DefaultGeometryProcessor)
-    emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));
-  }
-
-  if (hasColors) {
-    auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
-    vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), color.name().c_str());
-
-    // Output vertex color (will be modulated by FragmentProcessor if texCoords present)
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
-  } else {
-    auto colorName =
-        uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
-  }
-
-  // Handle coverage for anti-aliasing
-  if (hasCoverage) {
-    auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
-    vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), coverage.name().c_str());
-    fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(),
-                             coverageVar.fsIn().c_str());
-  } else {
-    // No coverage for mesh (no anti-aliasing)
-    fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputCoverage.c_str());
-  }
-
-  vertBuilder->emitNormalizedPosition(positionName);
-}
-
 void GLSLMeshGeometryProcessor::setData(UniformData* vertexUniformData,
                                         UniformData* fragmentUniformData,
                                         FPCoordTransformIter* transformIter) const {

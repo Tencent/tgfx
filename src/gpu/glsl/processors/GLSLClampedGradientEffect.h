@@ -29,8 +29,6 @@ class GLSLClampedGradientEffect : public ClampedGradientEffect {
                             PlacementPtr<FragmentProcessor> gradLayout, Color leftBorderColor,
                             Color rightBorderColor);
 
-  void emitCode(EmitArgs& args) const override;
-
  private:
   void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };

@@ -40,65 +40,6 @@ GLSLGlassRefractionFragmentProcessor::GLSLGlassRefractionFragmentProcessor(
                                        coordMatrix) {
 }
 
-void GLSLGlassRefractionFragmentProcessor::emitCode(EmitArgs& args) const {
-  auto* fragBuilder = args.fragBuilder;
-  auto common = args.uniformHandler->addUniform("GlassOpticsP0", UniformFormat::Float4,
-                                                ShaderStage::Fragment);
-  auto layerToSource = args.uniformHandler->addUniform("GlassOpticsP1", UniformFormat::Float2,
-                                                       ShaderStage::Fragment);
-  auto offsets = args.uniformHandler->addUniform("GlassOpticsP2", UniformFormat::Float4,
-                                                 ShaderStage::Fragment);
-  auto geometryMapping = args.uniformHandler->addUniform("GlassOpticsP3", UniformFormat::Float4,
-                                                         ShaderStage::Fragment);
-  auto& sourceSampler = (*args.textureSamplers)[0];
-  auto texCoordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
-
-  fragBuilder->codeAppendf("vec2 sourceUV = %s * %s.xy;", texCoordName.c_str(), common.c_str());
-  fragBuilder->codeAppendf("vec2 glassUV = %s * %s.xy + %s.xy;", texCoordName.c_str(),
-                           offsets.c_str(), geometryMapping.c_str());
-  std::string geometryOutput = "glassGeometry";
-  emitChild(geometryIndex, "vec4(glassUV, 0.0, 0.0)", &geometryOutput, args);
-  // glassGeometry is vec4(refractDir.xy, offsetDist, lightResponse); see the geometry class doc.
-  fragBuilder->codeAppendf("vec2 refractDir = %s.xy;", geometryOutput.c_str());
-  fragBuilder->codeAppendf("float offsetDist = %s.z;", geometryOutput.c_str());
-  fragBuilder->codeAppendf("float lightResponse = %s.w;", geometryOutput.c_str());
-  fragBuilder->codeAppend("vec2 displacement = refractDir * offsetDist;");
-  fragBuilder->codeAppendf("displacement = clamp(displacement, vec2(-%s.w), vec2(%s.w));",
-                           common.c_str(), common.c_str());
-  fragBuilder->codeAppendf("vec2 uvOffset = vec2(displacement.x * %s.x, -displacement.y * %s.y);",
-                           layerToSource.c_str(), layerToSource.c_str());
-
-  fragBuilder->codeAppend("vec3 finalColor;");
-  fragBuilder->codeAppend("float srcAlpha;");
-  if (params.dispersion >= 0.01f) {
-    fragBuilder->codeAppendf("vec2 uvR = sourceUV + uvOffset * (1.0 + %s.z);", common.c_str());
-    fragBuilder->codeAppend("vec2 uvG = sourceUV + uvOffset;");
-    fragBuilder->codeAppendf("vec2 uvB = sourceUV + uvOffset * (1.0 - %s.z);", common.c_str());
-    fragBuilder->codeAppend("vec4 srcG = ");
-    fragBuilder->appendTextureLookup(sourceSampler, "uvG");
-    fragBuilder->codeAppend(";");
-    fragBuilder->codeAppend("finalColor.r = ");
-    fragBuilder->appendTextureLookup(sourceSampler, "uvR");
-    fragBuilder->codeAppend(".r;");
-    fragBuilder->codeAppend("finalColor.g = srcG.g;");
-    fragBuilder->codeAppend("finalColor.b = ");
-    fragBuilder->appendTextureLookup(sourceSampler, "uvB");
-    fragBuilder->codeAppend(".b;");
-    fragBuilder->codeAppend("srcAlpha = srcG.a;");
-  } else {
-    fragBuilder->codeAppend("vec4 srcColor = ");
-    fragBuilder->appendTextureLookup(sourceSampler, "sourceUV + uvOffset");
-    fragBuilder->codeAppend(";");
-    fragBuilder->codeAppend("finalColor = srcColor.rgb;");
-    fragBuilder->codeAppend("srcAlpha = srcColor.a;");
-  }
-
-  if (params.lightIntensity > 0.0f) {
-    fragBuilder->codeAppendf("finalColor += vec3(lightResponse * %s.z);", offsets.c_str());
-  }
-  fragBuilder->codeAppendf("%s = vec4(finalColor, srcAlpha);", args.outputColor.c_str());
-}
-
 void GLSLGlassRefractionFragmentProcessor::onSetData(UniformData*,
                                                      UniformData* fragmentUniformData) const {
   float sourceWidth = static_cast<float>(sourceProxy->width());

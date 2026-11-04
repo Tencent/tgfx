@@ -35,49 +35,6 @@ GLSLHairlineLineGeometryProcessor::GLSLHairlineLineGeometryProcessor(const PMCol
     : HairlineLineGeometryProcessor(color, viewMatrix, uvMatrix, coverage, aaType) {
 }
 
-void GLSLHairlineLineGeometryProcessor::emitCode(EmitArgs& args) const {
-  auto vertBuilder = args.vertBuilder;
-  auto fragBuilder = args.fragBuilder;
-  auto varyingHandler = args.varyingHandler;
-  auto uniformHandler = args.uniformHandler;
-
-  // Emit vertex attributes
-  varyingHandler->emitAttributes(*this);
-
-  // Transform vertex position by view matrix
-  auto matrixName =
-      uniformHandler->addUniform("Matrix", UniformFormat::Float3x3, ShaderStage::Vertex);
-  std::string positionName = "transformedPosition";
-  vertBuilder->codeAppendf("highp vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
-                           matrixName.c_str(), position.name().c_str());
-
-  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler,
-                 ShaderVar(positionName, SLType::Float2));
-  // Pass edge distance to fragment shader for anti-aliasing
-  auto edgeVarying = varyingHandler->addVarying("EdgeDistance", SLType::Float);
-  vertBuilder->codeAppendf("%s = %s;", edgeVarying.vsOut().c_str(), edgeDistance.name().c_str());
-
-  // Fragment shader: calculate anti-aliasing based on edge distance
-  fragBuilder->codeAppendf("highp float edgeAlpha = abs(%s);", edgeVarying.fsIn().c_str());
-  fragBuilder->codeAppend("edgeAlpha = clamp(edgeAlpha, 0.0, 1.0);");
-  auto aaEnabled =
-      uniformHandler->addUniform("AAEnabled", UniformFormat::Int, ShaderStage::Fragment);
-  fragBuilder->codeAppendf("if (%s == 0) { edgeAlpha = edgeAlpha >= 0.5 ? 1.0 : 0.0; }",
-                           aaEnabled.c_str());
-
-  // Output color and coverage
-  auto colorName =
-      uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
-  fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
-  auto coverageScale =
-      uniformHandler->addUniform("Coverage", UniformFormat::Float, ShaderStage::Fragment);
-  fragBuilder->codeAppendf("%s = vec4(%s * edgeAlpha);", args.outputCoverage.c_str(),
-                           coverageScale.c_str());
-
-  // Emit final vertex position
-  vertBuilder->emitNormalizedPosition(positionName);
-}
-
 void GLSLHairlineLineGeometryProcessor::setData(UniformData* vertexUniformData,
                                                 UniformData* fragmentUniformData,
                                                 FPCoordTransformIter* transformIter) const {

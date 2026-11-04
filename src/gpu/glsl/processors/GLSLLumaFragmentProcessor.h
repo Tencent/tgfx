@@ -29,8 +29,6 @@ class GLSLLumaFragmentProcessor : public LumaFragmentProcessor {
   GLSLLumaFragmentProcessor(float kr, float kg, float kb) : LumaFragmentProcessor(kr, kg, kb) {
   }
 
-  void emitCode(EmitArgs& args) const override;
-
  protected:
   void onSetData(UniformData*, UniformData*) const override;
 };

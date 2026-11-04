@@ -217,9 +217,8 @@ std::shared_ptr<RenderPipeline> ShaderCache::createPipeline(
 }
 
 std::shared_ptr<RenderPipeline> ShaderCache::findOrCreatePipeline(
-    const RenderPipelineDescriptor& descriptor, bool* created) {
+    const RenderPipelineDescriptor& descriptor) {
   _stats.pipelineRequests++;
-  *created = true;
   if (!pipelineCacheEnabled) {
     return createPipeline(descriptor);
   }
@@ -241,7 +240,6 @@ std::shared_ptr<RenderPipeline> ShaderCache::findOrCreatePipeline(
 #endif
     pipelineLRU.splice(pipelineLRU.begin(), pipelineLRU, entry.lruPosition);
     _stats.pipelineHits++;
-    *created = false;
     return entry.pipeline;
   }
   auto pipeline = createPipeline(descriptor);

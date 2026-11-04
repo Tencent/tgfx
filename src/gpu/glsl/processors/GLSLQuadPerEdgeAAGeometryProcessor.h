@@ -28,20 +28,10 @@ class GLSLQuadPerEdgeAAGeometryProcessor : public QuadPerEdgeAAGeometryProcessor
                                      std::optional<PMColor> commonColor,
                                      std::optional<Matrix> uvMatrix, bool hasSubset);
 
-  void emitCode(EmitArgs& args) const override;
-
   void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
                FPCoordTransformIter* transformIter) const override;
 
   void onSetTransformData(UniformData* uniformData, const CoordTransform* coordTransform,
                           int index) const override;
-
-  void onEmitTransform(EmitArgs& args, VertexShaderBuilder* vertexBuilder,
-                       VaryingHandler* varyingHandler, UniformHandler* uniformHandler,
-                       const std::string& transformUniformName, bool hasPerspective,
-                       int index) const override;
-
- private:
-  std::optional<std::string> subsetVaryingName = std::nullopt;
 };
 }  // namespace tgfx

@@ -632,7 +632,6 @@ TGFX_TEST(ShaderPermutationTest, GradientUniformsExistOnlyInExtendedChainArtifac
     }
   };
   checkFamily("PointwiseChainShader");
-  cache->unload();
 }
 
 TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
@@ -754,7 +753,6 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
     EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "RESOURCE_KIND"), 1);
     EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "TEXTURE_COUNT"), 1);
   }
-  cache->unload();
 }
 
 // MatchProgram runs without a failure sink (a plan pass has no diagnostic recording), so a
@@ -860,7 +858,6 @@ TGFX_TEST(ShaderPermutationTest, LUTGradientWithRealMaskUsesAllLeafSelectors) {
     EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "RESOURCE_KIND"), 1);
     EXPECT_EQ(info.fragDomain.valueOf(match->fragPermutationIndex, "TEXTURE_COUNT"), 1);
   }
-  cache->unload();
 }
 
 TGFX_TEST(ShaderPermutationTest, QuadTextureLocalMaskRejectsInvertedCoverage) {
@@ -936,110 +933,6 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   std::string expectedTag = BundleTag();
   ExpectBundleEntryCounts(*cache, expectedTag);
   EXPECT_EQ(cache->profileTag(), expectedTag);
-  cache->unload();
-}
-
-TGFX_TEST(ShaderPermutationTest, PrecompiledPerformance) {
-  auto image = MakeImage("resources/apitest/test_timestretch.png");
-  ASSERT_TRUE(image != nullptr);
-  int width = 200;
-  int height = 200;
-
-  // Measure ProgramBuilder path (no bundle).
-  auto startBuilder = std::chrono::steady_clock::now();
-  {
-    ContextScope scope;
-    auto context = scope.getContext();
-    ASSERT_TRUE(context != nullptr);
-    context->precompiledShaderCache()->unload();
-    ScopedAOTStatsPause statsPause(context, true);
-    context->globalCache()->clearPrograms();
-    auto surface = Surface::Make(context, width, height);
-    ASSERT_TRUE(surface != nullptr);
-    surface->getCanvas()->drawImage(image, 0, 0);
-    context->flushAndSubmit(true);
-  }
-  auto endBuilder = std::chrono::steady_clock::now();
-
-  // Measure PrecompiledProgramCreator path (with bundle).
-  auto startPrecompiled = std::chrono::steady_clock::now();
-  {
-    ContextScope scope;
-    auto context = scope.getContext();
-    ASSERT_TRUE(context != nullptr);
-    auto* cache = context->precompiledShaderCache();
-    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
-    context->globalCache()->clearPrograms();
-    auto surface = Surface::Make(context, width, height);
-    ASSERT_TRUE(surface != nullptr);
-    surface->getCanvas()->drawImage(image, 0, 0);
-    context->flushAndSubmit(true);
-    cache->unload();
-  }
-  auto endPrecompiled = std::chrono::steady_clock::now();
-
-  auto builderUs =
-      std::chrono::duration_cast<std::chrono::microseconds>(endBuilder - startBuilder).count();
-  auto precompiledUs =
-      std::chrono::duration_cast<std::chrono::microseconds>(endPrecompiled - startPrecompiled)
-          .count();
-  printf("  ProgramBuilder path:  %lld us\n", static_cast<long long>(builderUs));
-  printf("  Precompiled path:     %lld us\n", static_cast<long long>(precompiledUs));
-  printf("  Speedup:              %.2fx\n",
-         static_cast<double>(builderUs) / static_cast<double>(precompiledUs));
-}
-
-TGFX_TEST(ShaderPermutationTest, PrecompiledRenderConsistency) {
-  auto image = MakeImage("resources/apitest/test_timestretch.png");
-  ASSERT_TRUE(image != nullptr);
-  int width = 200;
-  int height = 200;
-
-  // Pass 1: render with precompiled bundle loaded (PrecompiledProgramCreator path).
-  Bitmap bitmap1;
-  bitmap1.allocPixels(width, height);
-  {
-    ContextScope scope;
-    auto context = scope.getContext();
-    ASSERT_TRUE(context != nullptr);
-    auto* cache = context->precompiledShaderCache();
-    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
-    context->globalCache()->clearPrograms();
-    auto surface = Surface::Make(context, width, height);
-    ASSERT_TRUE(surface != nullptr);
-    surface->getCanvas()->drawImage(image, 0, 0);
-    auto* pixels = bitmap1.lockPixels();
-    ASSERT_TRUE(pixels != nullptr);
-    ASSERT_TRUE(surface->readPixels(bitmap1.info(), pixels));
-    bitmap1.unlockPixels();
-    cache->unload();
-  }
-
-  // Pass 2: render without bundle (ProgramBuilder path).
-  Bitmap bitmap2;
-  bitmap2.allocPixels(width, height);
-  {
-    ContextScope scope;
-    auto context = scope.getContext();
-    ASSERT_TRUE(context != nullptr);
-    ScopedAOTStatsPause statsPause(context, true);
-    context->globalCache()->clearPrograms();
-    auto surface = Surface::Make(context, width, height);
-    ASSERT_TRUE(surface != nullptr);
-    surface->getCanvas()->drawImage(image, 0, 0);
-    auto* pixels = bitmap2.lockPixels();
-    ASSERT_TRUE(pixels != nullptr);
-    ASSERT_TRUE(surface->readPixels(bitmap2.info(), pixels));
-    bitmap2.unlockPixels();
-  }
-
-  // Both paths must produce identical output.
-  size_t totalBytes = static_cast<size_t>(width) * static_cast<size_t>(height) * 4;
-  auto* p1 = bitmap1.lockPixels();
-  auto* p2 = bitmap2.lockPixels();
-  EXPECT_EQ(memcmp(p1, p2, totalBytes), 0);
-  bitmap1.unlockPixels();
-  bitmap2.unlockPixels();
 }
 
 TGFX_TEST(ShaderPermutationTest, ShaderCacheStats) {
@@ -1087,7 +980,6 @@ TGFX_TEST(ShaderPermutationTest, ShaderCacheStats) {
   ASSERT_EQ(fallbackRecords.size(), 1u);
   EXPECT_EQ(fallbackRecords[0].reason, PrecompiledFallbackReason::NoMatchingRule);
 
-  cache.unload();
   EXPECT_EQ(cache.aotStageCount(PrecompiledAOTStage::PipelineCreated), 1u);
   EXPECT_EQ(cache.hitRecords().size(), 1u);
   EXPECT_EQ(cache.fallbackRecords().size(), 1u);
@@ -1109,51 +1001,6 @@ TGFX_TEST(ShaderPermutationTest, ShaderCacheStats) {
   EXPECT_EQ(cache.fallbackCount(PrecompiledFallbackReason::VertexArtifactMissing), 1u);
   EXPECT_EQ(cache.fallbackCount(PrecompiledFallbackReason::VertexModuleCreationFailed), 1u);
   EXPECT_EQ(cache.fallbackCount(PrecompiledFallbackReason::PipelineCreationFailed), 1u);
-}
-
-TGFX_TEST(ShaderPermutationTest, ProgramProvenanceSurvivesCacheHits) {
-  GlobalCache cache(nullptr);
-  BytesKey precompiledKey;
-  precompiledKey.write(1u);
-  ProgramProvenance precompiledProvenance = {ShaderArtifactOrigin::OfflineBinary,
-                                             ProgramOrigin::PrecompiledArtifact,
-                                             PipelineOrigin::RuntimeCreation};
-  auto precompiledProgram =
-      std::make_shared<Program>(nullptr, nullptr, nullptr, precompiledProvenance,
-                                std::make_unique<PrecompiledProgramWriter>());
-  cache.addProgram(precompiledKey, precompiledProgram);
-
-  BytesKey dynamicKey;
-  dynamicKey.write(2u);
-  ProgramProvenance dynamicProvenance = {ShaderArtifactOrigin::RuntimeGeneratedSource,
-                                         ProgramOrigin::ProgramBuilder,
-                                         PipelineOrigin::RuntimeCreation};
-  auto dynamicProgram = std::make_shared<Program>(nullptr, nullptr, nullptr, dynamicProvenance,
-                                                  std::make_unique<RuntimeProgramWriter>());
-  cache.addProgram(dynamicKey, dynamicProgram);
-
-  auto cachedPrecompiled = cache.findProgram(precompiledKey);
-  auto cachedDynamic = cache.findProgram(dynamicKey);
-  ASSERT_TRUE(cachedPrecompiled != nullptr);
-  ASSERT_TRUE(cachedDynamic != nullptr);
-  EXPECT_EQ(cachedPrecompiled->getProvenance().program, ProgramOrigin::PrecompiledArtifact);
-  EXPECT_EQ(cachedDynamic->getProvenance().program, ProgramOrigin::ProgramBuilder);
-  EXPECT_EQ(cachedPrecompiled->getProvenance().shaderArtifact, ShaderArtifactOrigin::OfflineBinary);
-  EXPECT_EQ(cachedDynamic->getProvenance().shaderArtifact,
-            ShaderArtifactOrigin::RuntimeGeneratedSource);
-
-  cache.recordRuntimePipelineCreation(true);
-  cache.recordRuntimePipelineCreation(true);
-  cache.recordRuntimePipelineCreation(false);
-  const auto& stats = cache.programStats();
-  EXPECT_EQ(stats.requests, 2u);
-  EXPECT_EQ(stats.cacheHits, 2u);
-  EXPECT_EQ(stats.cacheMisses, 0u);
-  EXPECT_EQ(stats.precompiledArtifactCreations, 1u);
-  EXPECT_EQ(stats.programBuilderCreations, 1u);
-  EXPECT_EQ(stats.runtimePipelineCreationAttempts, 3u);
-  EXPECT_EQ(stats.runtimePipelineCreationSuccesses, 2u);
-  EXPECT_EQ(stats.runtimePipelineCreationFailures, 1u);
 }
 
 TGFX_TEST(ShaderPermutationTest, EmbeddedBundleLoadFromMemory) {
@@ -1213,17 +1060,17 @@ static void TestWriteU32LE(uint8_t* p, uint32_t val) {
   p[3] = static_cast<uint8_t>((val >> 24) & 0xFF);
 }
 
-// Restores the cache to "unloaded" when it was unloaded on entry, so a guard that has to load the
-// bundle does not turn a TGFX_AOT_DISABLE run into an AOT run for the tests after it.
+// Re-loads the embedded bundle after a test that swaps bundle state, so the thread-local Context
+// the following tests share keeps the production state.
 class ScopedBundleStateRestore {
  public:
-  explicit ScopedBundleStateRestore(PrecompiledShaderCache* cache)
-      : cache(cache), wasLoaded(cache->isLoaded()) {
+  ScopedBundleStateRestore(PrecompiledShaderCache* cache, Backend backend)
+      : cache(cache), backend(backend), wasLoaded(cache->isLoaded()) {
   }
 
   ~ScopedBundleStateRestore() {
-    if (!wasLoaded && cache->isLoaded()) {
-      cache->unload();
+    if (wasLoaded && !cache->isLoaded()) {
+      LoadEmbeddedBundle(cache, backend);
     }
   }
 
@@ -1232,6 +1079,7 @@ class ScopedBundleStateRestore {
 
  private:
   PrecompiledShaderCache* cache = nullptr;
+  Backend backend = Backend::Unknown;
   bool wasLoaded = false;
 };
 
@@ -1274,8 +1122,7 @@ TGFX_TEST(ShaderPermutationTest, EmbeddedBundleIsPresentAndCurrent) {
   // Load it through the Context's own cache, which applies the full acceptance contract (format,
   // ABI, profile tag of this context, content identity hash).
   auto* cache = context->precompiledShaderCache();
-  ScopedBundleStateRestore restore(cache);
-  cache->unload();
+  ScopedBundleStateRestore restore(cache, backend);
   ASSERT_TRUE(LoadEmbeddedBundle(cache, backend))
       << "The cache rejected the embedded \"" << tag << "\" bundle; see the PrecompiledShaderCache "
       << "log lines above for the reason";
@@ -1299,11 +1146,6 @@ TGFX_TEST(ShaderPermutationTest, ContextRecordsTheEmbeddedBundleState) {
     GTEST_SKIP() << "This backend has no precompiled shader bundle";
   }
   auto state = context->precompiledShaderCache()->embeddedBundleState();
-  if (std::getenv("TGFX_AOT_DISABLE") != nullptr) {
-    EXPECT_EQ(state, EmbeddedBundleState::NotAttempted)
-        << "TGFX_AOT_DISABLE skips the embedded bundle, which is not a rejection or an absence";
-    return;
-  }
   auto [data, size] = GetEmbeddedBundle(backend);
   if (data == nullptr || size == 0) {
     EXPECT_EQ(state, EmbeddedBundleState::NoBundleForBackend)
@@ -1327,8 +1169,6 @@ class ScopedEmbeddedStateRestore {
     cache->setEmbeddedBundleState(state);
     if (wasLoaded && !cache->isLoaded()) {
       LoadEmbeddedBundle(cache, backend);
-    } else if (!wasLoaded && cache->isLoaded()) {
-      cache->unload();
     }
     cache->resetStats();
   }
@@ -1343,67 +1183,6 @@ class ScopedEmbeddedStateRestore {
   bool wasLoaded = false;
 };
 
-// A draw that finds no bundle loaded reports WHY, and the answer differs for a backend or build
-// without a bundle (by design) and a bundle the cache refused (a defect to fix).
-TGFX_TEST(ShaderPermutationTest, FallbackReasonSaysWhyNoBundleIsLoaded) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto backend = context->backend();
-  if (backend == Backend::D3D12 || backend == Backend::Unknown) {
-    GTEST_SKIP() << "This backend has no precompiled shader bundle";
-  }
-  auto* cache = context->precompiledShaderCache();
-  if (!cache->isLoaded()) {
-    GTEST_SKIP() << "The embedded bundle is not loaded in this run (TGFX_AOT_DISABLE)";
-  }
-  ScopedEmbeddedStateRestore restore(cache, backend);
-
-  struct Case {
-    EmbeddedBundleState state;
-    PrecompiledFallbackReason expected;
-    const char* name;
-  };
-  const Case cases[] = {
-      {EmbeddedBundleState::NoBundleForBackend, PrecompiledFallbackReason::NoBundleForBackend,
-       "NoBundleForBackend"},
-      {EmbeddedBundleState::Rejected, PrecompiledFallbackReason::BundleRejected, "Rejected"},
-      {EmbeddedBundleState::NotAttempted, PrecompiledFallbackReason::CacheNotLoaded,
-       "NotAttempted"},
-      {EmbeddedBundleState::Loaded, PrecompiledFallbackReason::CacheNotLoaded,
-       "Loaded, then unloaded"},
-  };
-  const PrecompiledFallbackReason checked[] = {PrecompiledFallbackReason::CacheNotLoaded,
-                                               PrecompiledFallbackReason::NoBundleForBackend,
-                                               PrecompiledFallbackReason::BundleRejected};
-  // Every draw below runs with the bundle unloaded on purpose. The fallback counts asserted here
-  // still record; the deliberate marking only keeps them out of the AOT coverage metrics.
-  ScopedAOTDeliberateMiss deliberate(context);
-  for (const auto& testCase : cases) {
-    SCOPED_TRACE(testCase.name);
-    // Unloading drops the cached programs, so the draw below has to create one and goes through
-    // the precompiled attempt, which finds the cache empty.
-    cache->unload();
-    cache->setEmbeddedBundleState(testCase.state);
-    cache->resetStats();
-    auto surface = Surface::Make(context, 64, 64);
-    ASSERT_TRUE(surface != nullptr);
-    Paint paint = {};
-    paint.setColor(Color::FromRGBA(255, 0, 0, 255));
-    surface->getCanvas()->drawRect(Rect::MakeXYWH(8, 8, 40, 40), paint);
-    context->flushAndSubmit(true);
-    EXPECT_GT(cache->fallbackCount(testCase.expected), 0u)
-        << "The draw did not record " << PrecompiledFallbackReasonName(testCase.expected);
-    for (auto reason : checked) {
-      if (reason != testCase.expected) {
-        EXPECT_EQ(cache->fallbackCount(reason), 0u)
-            << "The draw also recorded " << PrecompiledFallbackReasonName(reason) << " while the "
-            << "state was " << testCase.name;
-      }
-    }
-  }
-}
-
 // The same question for a real build that embeds nothing for this backend, with nothing simulated:
 // only meaningful there, so it is skipped in every build that does embed a bundle.
 TGFX_TEST(ShaderPermutationTest, DrawsInABuildWithoutABundleReportNoBundleForBackend) {
@@ -1415,7 +1194,6 @@ TGFX_TEST(ShaderPermutationTest, DrawsInABuildWithoutABundleReportNoBundleForBac
     GTEST_SKIP() << "This build embeds a bundle for the backend (or AOT is disabled)";
   }
   ASSERT_FALSE(cache->isLoaded());
-  cache->unload();  // drops cached programs so the draw below has to create one
   cache->resetStats();
   auto surface = Surface::Make(context, 64, 64);
   ASSERT_TRUE(surface != nullptr);
@@ -1936,7 +1714,6 @@ TGFX_TEST(ShaderPermutationTest, CreatorFunnelRecordsArtifactMiss) {
   auto surface = Surface::Make(context, 200, 200);
   ASSERT_TRUE(surface != nullptr);
   auto* cache = context->precompiledShaderCache();
-  cache->unload();
   image = MakeTexture2DImage(context, image);
   ASSERT_TRUE(image != nullptr);
   auto expectedProfile = ExpectedShaderProfile(context->backend());
@@ -1979,11 +1756,8 @@ TGFX_TEST(ShaderPermutationTest, CreatorFunnelRecordsArtifactMiss) {
   const auto& programStats = context->globalCache()->programStats();
   EXPECT_EQ(programStats.cacheMisses, 1u);
   EXPECT_EQ(programStats.precompiledArtifactCreations, 0u);
-  EXPECT_EQ(programStats.programBuilderCreations, 0u);
-  EXPECT_TRUE(cache->jitProgramRecords().empty());
 
   cache->setDiagnosticRecordingEnabled(false);
-  cache->unload();
 }
 
 TGFX_TEST(ShaderPermutationTest, ProgramMissCacheClearsOnBundleChange) {
@@ -2004,7 +1778,7 @@ TGFX_TEST(ShaderPermutationTest, ProgramMissCacheClearsOnBundleChange) {
 
   cache.recordProgramMiss(key, PrecompiledFallbackReason::VertexArtifactMissing);
   ASSERT_TRUE(cache.findProgramMiss(key, &reason));
-  cache.unload();
+  ASSERT_TRUE(cache.loadBundle(bundle.data(), bundle.size()));
   EXPECT_FALSE(cache.findProgramMiss(key, &reason));
 }
 
@@ -2123,7 +1897,6 @@ TGFX_TEST(ShaderPermutationTest, DrawImageHitsPrecompiledCache) {
   auto surface = Surface::Make(context, 200, 200);
   ASSERT_TRUE(surface != nullptr);
   auto* cache = context->precompiledShaderCache();
-  cache->unload();
   image = MakeTexture2DImage(context, image);
   ASSERT_TRUE(image != nullptr);
   ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
@@ -2154,10 +1927,8 @@ TGFX_TEST(ShaderPermutationTest, DrawImageHitsPrecompiledCache) {
   const auto& programStats = context->globalCache()->programStats();
   EXPECT_EQ(programStats.cacheMisses, 1u);
   EXPECT_EQ(programStats.precompiledArtifactCreations, 1u);
-  EXPECT_EQ(programStats.programBuilderCreations, 0u);
 
   cache->setDiagnosticRecordingEnabled(false);
-  cache->unload();
 }
 
 TGFX_TEST(ShaderPermutationTest, AlphaThresholdHitsPrecompiledCache) {
@@ -2178,7 +1949,6 @@ TGFX_TEST(ShaderPermutationTest, AlphaThresholdHitsPrecompiledCache) {
   surface->getCanvas()->drawRect(Rect::MakeWH(100, 100), paint);
   context->flushAndSubmit(true);
   EXPECT_GT(cache->hitCount(), 0u);
-  cache->unload();
 }
 
 TGFX_TEST(ShaderPermutationTest, LumaHitsPrecompiledCache) {
@@ -2199,7 +1969,6 @@ TGFX_TEST(ShaderPermutationTest, LumaHitsPrecompiledCache) {
   surface->getCanvas()->drawRect(Rect::MakeWH(100, 100), paint);
   context->flushAndSubmit(true);
   EXPECT_GT(cache->hitCount(), 0u);
-  cache->unload();
 }
 
 TGFX_TEST(ShaderPermutationTest, GaussianBlurHitsPrecompiledCache) {
@@ -2223,7 +1992,6 @@ TGFX_TEST(ShaderPermutationTest, GaussianBlurHitsPrecompiledCache) {
   surface->getCanvas()->drawImage(blurredImage, 25, 25);
   context->flushAndSubmit(true);
   EXPECT_GT(cache->hitCount(), 0u);
-  cache->unload();
 }
 
 TGFX_TEST(ShaderPermutationTest, ChainBlendClipHitsPrecompiledCache) {
@@ -2252,7 +2020,6 @@ TGFX_TEST(ShaderPermutationTest, ChainBlendClipHitsPrecompiledCache) {
   context->flushAndSubmit(true);
   printf("  [ChainBlendClip] hit=%u miss=%u\n", cache->hitCount(), cache->missCount());
   EXPECT_GT(cache->hitCount(), 0u);
-  cache->unload();
 }
 
 TGFX_TEST(ShaderPermutationTest, MaskFillHitsPrecompiledCache) {
@@ -2300,7 +2067,6 @@ TGFX_TEST(ShaderPermutationTest, MaskFillHitsPrecompiledCache) {
     printf("  [MaskFill] centerPixel RGBA = %u,%u,%u,%u\n", px[idx], px[idx + 1], px[idx + 2],
            px[idx + 3]);
   }
-  cache->unload();
 }
 
 TGFX_TEST(ShaderPermutationTest, QuadTextureFillShaderRegistry) {
@@ -2784,166 +2550,6 @@ TGFX_TEST(ShaderPermutationTest, MirroredDimsHaveConsistentArity) {
       }
     }
   }
-}
-
-// ---------------------------------------------------------------------------------------
-// AOT-vs-JIT blend mode parity gate.
-//
-// For every BlendMode, renders the same scene twice: once with the precompiled bundle loaded
-// (AOT path, exercising the xpBlendColors table in the precompiled shader) and once with the
-// bundle unloaded (JIT path, exercising the runtime-compiled blend code from GLSLBlend.cpp).
-// The two must agree within 1 LSB per channel. This gate guards any future modification to
-// xp_blend_colors.inc: if a restructuring changes pixel output, this test fails.
-// ---------------------------------------------------------------------------------------
-
-static void RenderBlendParityScene(Context* context, BlendMode mode, Bitmap* outBitmap) {
-  context->globalCache()->clearPrograms();
-  auto surface = Surface::Make(context, 96, 96);
-  ASSERT_TRUE(surface != nullptr);
-  auto canvas = surface->getCanvas();
-
-  // Destination: varying colors so different formula branches are exercised.
-  Color dstColors[] = {
-      Color::Red(),
-      Color::Green(),
-      Color::Blue(),
-      Color::White(),
-      Color::Black(),
-      Color::FromRGBA(255, 0, 255, 255),
-      Color::FromRGBA(128, 128, 0, 255),
-      Color::FromRGBA(128, 128, 128, 255),
-  };
-  for (int i = 0; i < 8; i++) {
-    Paint bgPaint = {};
-    bgPaint.setColor(dstColors[i]);
-    canvas->drawRect(Rect::MakeXYWH(0, i * 12, 96, 12), bgPaint);
-  }
-
-  // Source: one rect with the blend mode covering all destination strips. Only ONE blend-mode
-  // draw per render pass — Metal crashes on the second consecutive PorterDuff draw in a pass
-  // (a pre-existing pipeline issue, not related to this gate).
-  Paint paint = {};
-  paint.setBlendMode(mode);
-  paint.setColor(Color::FromRGBA(100, 150, 200, 180));
-  canvas->drawRect(Rect::MakeWH(96, 96), paint);
-
-  context->flushAndSubmit(true);
-  ASSERT_TRUE(outBitmap->allocPixels(96, 96));
-  auto pixels = outBitmap->lockPixels();
-  ASSERT_TRUE(surface->readPixels(outBitmap->info(), pixels));
-  outBitmap->unlockPixels();
-}
-
-TGFX_TEST(ShaderPermutationTest, BlendModesMatchJIT) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto* cache = context->precompiledShaderCache();
-
-  // Clear is a degenerate mode (result always transparent, no formula branch exercised) and
-  // crashes on Metal's PorterDuff pipeline; skip it.
-  BlendMode modes[] = {
-      BlendMode::Src,        BlendMode::Dst,        BlendMode::SrcOver,   BlendMode::DstOver,
-      BlendMode::SrcIn,      BlendMode::DstIn,      BlendMode::SrcOut,    BlendMode::DstOut,
-      BlendMode::SrcATop,    BlendMode::DstATop,    BlendMode::Xor,       BlendMode::PlusLighter,
-      BlendMode::Modulate,   BlendMode::Screen,     BlendMode::Overlay,   BlendMode::Darken,
-      BlendMode::Lighten,    BlendMode::ColorDodge, BlendMode::ColorBurn, BlendMode::HardLight,
-      BlendMode::SoftLight,  BlendMode::Difference, BlendMode::Exclusion, BlendMode::Multiply,
-      BlendMode::Hue,        BlendMode::Saturation, BlendMode::Color,     BlendMode::Luminosity,
-      BlendMode::PlusDarker,
-  };
-
-  int totalModes = static_cast<int>(sizeof(modes) / sizeof(modes[0]));
-  int failures = 0;
-  int aotHits = 0;
-  int jitOnly = 0;
-
-  for (int i = 0; i < totalModes; i++) {
-    BlendMode mode = modes[i];
-
-    // Reference: JIT path (bundle unloaded).
-    cache->unload();
-    cache->resetStats();
-    context->globalCache()->resetProgramStats();
-    Bitmap referenceBitmap = {};
-    {
-      ScopedAOTStatsPause statsPause(context, true);
-      RenderBlendParityScene(context, mode, &referenceBitmap);
-    }
-
-    // Candidate: AOT path (bundle loaded).
-    ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
-    cache->resetStats();
-    context->globalCache()->resetProgramStats();
-    Bitmap candidateBitmap = {};
-    RenderBlendParityScene(context, mode, &candidateBitmap);
-    uint32_t hits = cache->hitCount();
-    uint32_t misses = cache->missCount();
-    cache->unload();
-
-    Pixmap referencePixmap(referenceBitmap);
-    Pixmap candidatePixmap(candidateBitmap);
-    AOTToleranceSpec spec = {};
-    spec.maxChannelDiff = 1;
-    spec.maxDiffPixelRatio = 1.0;
-    spec.structuralChannelDiff = 2;
-    auto result = AOTToleranceCompare::Compare(referencePixmap, candidatePixmap, spec);
-
-    if (hits > 0) {
-      aotHits++;
-    } else {
-      jitOnly++;
-    }
-    if (!result.passed) {
-      failures++;
-    }
-
-    LOGI("[BLENDGATE] mode=%d hits=%u misses=%u maxDelta=%d structural=%d pass=%d", i, hits, misses,
-         result.maxChannelDiff, result.structuralDifference ? 1 : 0, result.passed ? 1 : 0);
-
-    {
-      // Forensic probe: always dump pixel (0,0) of both renders for every mode, so backend
-      // comparisons can identify which blend formula each side actually executed.
-      auto* refPixels = static_cast<const uint8_t*>(referencePixmap.pixels());
-      auto* candPixels = static_cast<const uint8_t*>(candidatePixmap.pixels());
-      LOGI("[BLENDGATE-P0] mode=%d jit=[%d,%d,%d,%d] aot=[%d,%d,%d,%d]", i, refPixels[0],
-           refPixels[1], refPixels[2], refPixels[3], candPixels[0], candPixels[1], candPixels[2],
-           candPixels[3]);
-    }
-
-    if (!result.passed) {
-      // Forensic dump: first differing pixel with both sides' RGBA, to identify which formula
-      // produced the AOT output.
-      auto* refPixels = static_cast<const uint8_t*>(referencePixmap.pixels());
-      auto* candPixels = static_cast<const uint8_t*>(candidatePixmap.pixels());
-      int totalBytes = static_cast<int>(referencePixmap.width() * referencePixmap.height() * 4);
-      for (int byteIndex = 0; byteIndex < totalBytes; byteIndex += 4) {
-        bool differs = false;
-        for (int c = 0; c < 4; c++) {
-          if (refPixels[byteIndex + c] != candPixels[byteIndex + c]) {
-            differs = true;
-            break;
-          }
-        }
-        if (differs) {
-          int pixelIndex = byteIndex / 4;
-          LOGI("[BLENDGATE-PIXEL] mode=%d pixel=(%d,%d) jit=[%d,%d,%d,%d] aot=[%d,%d,%d,%d]", i,
-               pixelIndex % 96, pixelIndex / 96, refPixels[byteIndex], refPixels[byteIndex + 1],
-               refPixels[byteIndex + 2], refPixels[byteIndex + 3], candPixels[byteIndex],
-               candPixels[byteIndex + 1], candPixels[byteIndex + 2], candPixels[byteIndex + 3]);
-          break;
-        }
-      }
-    }
-
-    EXPECT_TRUE(result.passed) << "BlendMode " << i
-                               << " AOT diverges from JIT, maxDelta=" << result.maxChannelDiff
-                               << " (hits=" << hits << " misses=" << misses << ")";
-  }
-
-  LOGI("[BLENDGATE] summary: total=%d aotServed=%d jitOnly=%d failures=%d", totalModes, aotHits,
-       jitOnly, failures);
-  EXPECT_EQ(failures, 0) << failures << " blend modes diverge between AOT and JIT";
 }
 
 }  // namespace tgfx

@@ -26,9 +26,8 @@ namespace tgfx {
 class Context;
 
 /**
- * The S4 upload-unification gate (plan S1.2): runs one scene on both upload routes — the runtime
- * writers with the bundle unloaded, the AOT writers with it loaded — and pins each route's
- * per-draw TGFX_UNIF_DUMP trace byte-for-byte against the golden under
+ * The S4 upload-unification gate (plan S1.2): runs one scene on the precompiled upload route and
+ * pins its per-draw TGFX_UNIF_DUMP trace byte-for-byte against the golden under
  * test/baseline/uniform/<name>.txt.
  *
  * The trace is normalized to what the refactor must preserve: every dump header (it carries the
@@ -37,16 +36,14 @@ class Context;
  * bindings stay verbatim — a draw one route drops shows up as a shifted sequence instead of an
  * invisible hole.
  *
- * The two routes write different programs by design — the precompiled kernels declare engine
- * defaults (OutputAlphaSwizzle / HasClip / HasDeviceMask) and per-leaf chain records that the
- * runtime-generated shaders bake into code — so each route is pinned against its own golden
- * rather than against the other route. The invariant S4 must hold at every step: migrating a
- * module from name-based writes to offset-based writes changes neither route's trace.
+ * The invariant S4 must hold at every step: migrating a module from name-based writes to
+ * offset-based writes changes the trace, so the golden pins the current writer behavior. Goldens
+ * whose file still carries both route sections are compared on their AOT section alone.
  *
  * `draw` must only issue the draw calls; the harness clears the program cache, flushes and
- * submits once per route, and requires each route's trace to be run-to-run stable before
- * comparing. Returns an empty string on success, otherwise a human-readable diff. Set
- * TGFX_ACCEPT_BASELINE to (re)write the golden.
+ * submits once per run, and requires the trace to be run-to-run stable before comparing.
+ * Returns an empty string on success, otherwise a human-readable diff. Set TGFX_ACCEPT_BASELINE
+ * to (re)write the golden.
  */
 std::string PinUniformTrace(Context* context, const std::string& name,
                             const std::function<void()>& draw);

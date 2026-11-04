@@ -93,8 +93,7 @@ void XfermodeFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
   // dedicated uniform (Child0Subset for child[0], Child1Subset for child[1]). Distinct names are
   // required because the precompiled path strips uniform name suffixes: if we relied on the
   // children's own "Subset" emission, the two texture children would collide on a single field and
-  // the last writer would overwrite the first. On the ProgramBuilder path these fields do not
-  // exist, so hasField() returns false and the writes are skipped.
+  // the last writer would overwrite the first. Layouts without these fields skip the writes.
   static const char* const subsetFieldNames[] = {BlendParams::Child0Subset.name,
                                                  BlendParams::Child1Subset.name};
   static const char* const alphaOnlyFieldNames[] = {BlendParams::Child0AlphaOnly.name,
@@ -112,8 +111,7 @@ void XfermodeFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
       fragmentUniformData->setData(subsetFieldNames[i], rect);
     }
     // Alpha-only stays a runtime semantic flag so the same compiled variant handles
-    // RGBA and R8 operands. ProgramBuilder layouts do not declare this field, hence the optional
-    // write; the precompiled layout receives the actual value on every draw.
+    // RGBA and R8 operands. The optional write tolerates layouts that omit the field.
     fragmentUniformData->setDataOptional(alphaOnlyFieldNames[i], childTE->isAlphaOnly() ? 1 : 0);
   }
 }

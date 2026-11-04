@@ -248,9 +248,7 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
   }
   // The direct-chain accounting derives from the resolved program: the plain lookup served this
   // draw through the chain interpreter when the program it resolved to is the chain shader.
-  preparedViaDecomposition =
-      preparedProgram->getProvenance().program == ProgramOrigin::PrecompiledArtifact &&
-      IsDirectAOTShader(preparedProgram->shaderName());
+  preparedViaDecomposition = IsDirectAOTShader(preparedProgram->shaderName());
   preparedRenderTarget = renderTarget;
   return true;
 }
@@ -287,9 +285,7 @@ bool StandardDrawOp::executePrepared(RenderPass* renderPass, RenderTarget* rende
     if (preparedViaDecomposition) {
       drawDelta.directChainDraws = 1;
     }
-    bool completeAOTDraw =
-        preparedProgram->getProvenance().program == ProgramOrigin::PrecompiledArtifact;
-    cache->recordDraw(drawDelta, completeAOTDraw);
+    cache->recordDraw(drawDelta, true);
   }
   return true;
 }

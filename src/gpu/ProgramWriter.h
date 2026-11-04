@@ -77,15 +77,6 @@ class ProgramWriter {
                              RenderPass* renderPass) const = 0;
 };
 
-/** The runtime-generated route: JIT name suffixes and the samplers the draw supplies. */
-class RuntimeProgramWriter final : public ProgramWriter {
- protected:
-  void writeProcessors(const ProgramInfo& info, UniformData* vertexUniformData,
-                       UniformData* fragmentUniformData) const override;
-  void writeSamplers(const ProgramInfo& info, Program* program,
-                     RenderPass* renderPass) const override;
-};
-
 /** The precompiled route: the IR-driven walk and the artifact's sampler slots. */
 class PrecompiledProgramWriter : public ProgramWriter {
  public:

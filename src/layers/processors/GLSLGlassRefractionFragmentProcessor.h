@@ -29,8 +29,6 @@ class GLSLGlassRefractionFragmentProcessor : public GlassRefractionFragmentProce
                                        const GlassRefractionParams& params,
                                        const Matrix& coordMatrix);
 
-  void emitCode(EmitArgs& args) const override;
-
  private:
   void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };

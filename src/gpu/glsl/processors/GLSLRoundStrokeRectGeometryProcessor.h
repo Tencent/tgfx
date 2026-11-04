@@ -26,8 +26,6 @@ class GLSLRoundStrokeRectGeometryProcessor final : public RoundStrokeRectGeometr
   GLSLRoundStrokeRectGeometryProcessor(AAType aaType, std::optional<PMColor> commonColor,
                                        std::optional<Matrix> uvMatrix);
 
-  void emitCode(EmitArgs&) const override;
-
   void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
                FPCoordTransformIter* coordTransformIter) const override;
 };

@@ -26,8 +26,6 @@ class GLSLRectEffect : public RectEffect {
  public:
   GLSLRectEffect(const Rect& localRect, const Matrix& deviceToLocal, bool antiAlias);
 
-  void emitCode(EmitArgs& args) const override;
-
  private:
   void onSetData(UniformData* vertexUniformData, UniformData* fragmentUniformData) const override;
 };

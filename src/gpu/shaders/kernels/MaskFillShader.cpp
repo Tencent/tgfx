@@ -37,7 +37,7 @@ bool MaskFillShader::Accept(const DrawShape& shape) {
   // The rasterized shape's mask is a prepare-grown coverage: the lowering appends it to the IR's
   // terms at prepare, so the draw carries exactly one term and it is the mask's texture leaf.
   // Only the simple mask form is supported: a plain alpha-only texture with no subset, no packed
-  // alpha, no YUV. Anything else falls back to ProgramBuilder.
+  // alpha, no YUV. Anything else is not served by this kernel.
   const auto* mask = shape.ir != nullptr && shape.ir->coverage.size() == 1
                          ? BareTextureCoverageLeaf(shape.ir->coverage[0])
                          : nullptr;

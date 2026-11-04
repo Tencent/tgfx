@@ -19,12 +19,8 @@
 #pragma once
 
 #include <vector>
-#include "gpu/FragmentShaderBuilder.h"
 #include "gpu/ShaderCaps.h"
-#include "gpu/ShaderVar.h"
 #include "gpu/UniformData.h"
-#include "gpu/VaryingHandler.h"
-#include "gpu/VertexShaderBuilder.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/Processor.h"
 #include "tgfx/gpu/Attribute.h"
@@ -55,51 +51,6 @@ class GeometryProcessor : public Processor {
   }
 
   void computeProcessorKey(Context* context, BytesKey* bytesKey) const override;
-
-  class FPCoordTransformHandler {
-   public:
-    FPCoordTransformHandler(const ProgramInfo* programInfo,
-                            std::vector<ShaderVar>* transformedCoordVars)
-        : iter(programInfo), transformedCoordVars(transformedCoordVars) {
-    }
-
-    const CoordTransform* nextCoordTransform() {
-      return iter.next();
-    }
-
-    // 'args' are constructor params to ShaderVar.
-    template <typename... Args>
-    void specifyCoordsForCurrCoordTransform(Args&&... args) {
-      transformedCoordVars->emplace_back(std::forward<Args>(args)...);
-    }
-
-   private:
-    FragmentProcessor::CoordTransformIter iter;
-    std::vector<ShaderVar>* transformedCoordVars;
-  };
-
-  struct EmitArgs {
-    EmitArgs(VertexShaderBuilder* vertBuilder, FragmentShaderBuilder* fragBuilder,
-             VaryingHandler* varyingHandler, UniformHandler* uniformHandler, const ShaderCaps* caps,
-             std::string outputColor, std::string outputCoverage,
-             FPCoordTransformHandler* transformHandler, std::string* outputSubset)
-        : vertBuilder(vertBuilder), fragBuilder(fragBuilder), varyingHandler(varyingHandler),
-          uniformHandler(uniformHandler), caps(caps), outputColor(std::move(outputColor)),
-          outputCoverage(std::move(outputCoverage)), fpCoordTransformHandler(transformHandler),
-          outputSubset(outputSubset) {
-    }
-    VertexShaderBuilder* vertBuilder;
-    FragmentShaderBuilder* fragBuilder;
-    VaryingHandler* varyingHandler;
-    UniformHandler* uniformHandler;
-    const ShaderCaps* caps;
-    const std::string outputColor;
-    const std::string outputCoverage;
-    FPCoordTransformHandler* fpCoordTransformHandler;
-    std::string* outputSubset = nullptr;
-  };
-
-  virtual void emitCode(EmitArgs&) const = 0;
 
   virtual void setData(UniformData* vertexUniformData, UniformData* fragmentUniformData,
                        FPCoordTransformIter* coordTransformIter) const = 0;
@@ -141,14 +92,6 @@ class GeometryProcessor : public Processor {
   void setTransformDataHelper(const Matrix& uvMatrix, UniformData* uniformData,
                               FPCoordTransformIter* transformIter) const;
 
-  /**
-   * Emit transformed uv coords from the vertex shader as a uniform matrix and varying per
-   * coord-transform. uvCoordsVar must be a 2-component vector.
-   */
-  void emitTransforms(EmitArgs& args, VertexShaderBuilder* vertexBuilder,
-                      VaryingHandler* varyingHandler, UniformHandler* uniformHandler,
-                      const ShaderVar& uvCoordsVar) const;
-
  private:
   virtual void onComputeProcessorKey(BytesKey*) const {
   }
@@ -159,10 +102,6 @@ class GeometryProcessor : public Processor {
 
   virtual SamplerState onSamplerStateAt(size_t) const {
     return {};
-  }
-
-  virtual void onEmitTransform(EmitArgs&, VertexShaderBuilder*, VaryingHandler*, UniformHandler*,
-                               const std::string&, bool, int) const {
   }
 
   virtual void onSetTransformData(UniformData*, const CoordTransform*, int) const {

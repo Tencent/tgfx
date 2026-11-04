@@ -466,44 +466,31 @@ TGFX_TEST(AOTCoverageGateTest, ProductionMetricsPreserveUnmarkedFailures) {
   EXPECT_FALSE(AOTCoverageGateMet(EvaluateAOTCoverageGate(0, 0, 0, 1, 0), 5));
 
   GlobalCache programs(nullptr);
-  ProgramProvenance provenance = {};
-  BytesKey excludedKey;
-  excludedKey.write(1u);
-  programs.addProgram(excludedKey, nullptr, true);
-  EXPECT_EQ(programs.programStats().excludedProgramBuilderCreations, 0u);
-  auto excludedProgram = std::make_shared<Program>(nullptr, nullptr, nullptr, provenance,
-                                                   std::make_unique<RuntimeProgramWriter>());
-  programs.addProgram(excludedKey, excludedProgram, true);
-  EXPECT_EQ(programs.programStats().programBuilderCreations, 1u);
-  EXPECT_EQ(programs.programStats().excludedProgramBuilderCreations, 1u);
-  EXPECT_EQ(programs.findProgram(excludedKey), excludedProgram);
-  EXPECT_EQ(programs.programStats().excludedProgramBuilderCreations, 1u);
+  BytesKey firstKey;
+  firstKey.write(1u);
+  programs.addProgram(firstKey, nullptr);
+  EXPECT_EQ(programs.programStats().precompiledArtifactCreations, 0u);
+  auto firstProgram =
+      std::make_shared<Program>(nullptr, nullptr, nullptr, std::unique_ptr<ProgramWriter>());
+  programs.addProgram(firstKey, firstProgram);
+  EXPECT_EQ(programs.programStats().precompiledArtifactCreations, 1u);
+  EXPECT_EQ(programs.findProgram(firstKey), firstProgram);
 
-  BytesKey ordinaryKey;
-  ordinaryKey.write(2u);
-  programs.addProgram(ordinaryKey,
-                      std::make_shared<Program>(nullptr, nullptr, nullptr, provenance,
-                                                std::make_unique<RuntimeProgramWriter>()));
+  BytesKey secondKey;
+  secondKey.write(2u);
+  programs.addProgram(secondKey, std::make_shared<Program>(nullptr, nullptr, nullptr,
+                                                           std::unique_ptr<ProgramWriter>()));
   const auto& stats = programs.programStats();
-  EXPECT_EQ(stats.programBuilderCreations, 2u);
-  EXPECT_EQ(stats.excludedProgramBuilderCreations, 1u);
-  auto gate = EvaluateAOTCoverageGate(1, 1, 0, stats.programBuilderCreations,
-                                      stats.excludedProgramBuilderCreations);
-  EXPECT_EQ(gate.runtimeCompiles, 1u);
-  EXPECT_FALSE(gate.passed());
+  EXPECT_EQ(stats.precompiledArtifactCreations, 2u);
 
   programs.setProgramStatsPaused(true);
   BytesKey pausedKey;
   pausedKey.write(3u);
-  programs.addProgram(pausedKey,
-                      std::make_shared<Program>(nullptr, nullptr, nullptr, provenance,
-                                                std::make_unique<RuntimeProgramWriter>()),
-                      true);
-  EXPECT_EQ(stats.programBuilderCreations, 2u);
-  EXPECT_EQ(stats.excludedProgramBuilderCreations, 1u);
+  programs.addProgram(pausedKey, std::make_shared<Program>(nullptr, nullptr, nullptr,
+                                                           std::unique_ptr<ProgramWriter>()));
+  EXPECT_EQ(stats.precompiledArtifactCreations, 2u);
   programs.resetProgramStats();
-  EXPECT_EQ(stats.programBuilderCreations, 0u);
-  EXPECT_EQ(stats.excludedProgramBuilderCreations, 0u);
+  EXPECT_EQ(stats.precompiledArtifactCreations, 0u);
 }
 
 TGFX_TEST(AOTCoverageGateTest, DeliberateScopeRestoresNestedState) {
@@ -527,49 +514,5 @@ TGFX_TEST(AOTCoverageGateTest, DeliberateScopeRestoresNestedState) {
   ScopedAOTDeliberateMiss inactive(context, false);
   EXPECT_FALSE(cache->deliberateMissMarking());
 }
-
-// Negative control for the blocking summary gate (0): when TGFX_AOT_TEST_INJECT_MISS is
-// set, this test renders one filtered draw without the bundle and without the stats pause, so
-// its runtime compilation lands in the production metrics. With
-// TGFX_AOT_COVERAGE_GATE=blocking also set, the suite-level summary must then fail the process
-// (exit code 1, BLOCKING line). Without the variables this test is inert, which is how the
-// suite normally runs.
-TGFX_TEST(AOTCoverageGateTest, InjectedMissFailsTheBlockingGate) {
-  auto injection = std::getenv("TGFX_AOT_TEST_INJECT_MISS");
-  if (injection == nullptr) {
-    GTEST_SKIP() << "negative control only runs when TGFX_AOT_TEST_INJECT_MISS is set";
-    return;
-  }
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_NE(context, nullptr);
-  auto* cache = context->precompiledShaderCache();
-  if (std::string(injection) == "mixed-first" || std::string(injection) == "mixed-last") {
-    bool markedFirst = std::string(injection) == "mixed-first";
-    cache->setDiagnosticRecordingEnabled(true);
-    PrecompiledFallbackRecord record = {};
-    record.effectSignature = "InjectedOrdinaryStructure";
-    record.pipelineSignature = record.effectSignature;
-    for (bool marked : {markedFirst, !markedFirst}) {
-      ScopedAOTDeliberateMiss deliberate(context, marked);
-      cache->recordAOTStage(PrecompiledAOTStage::Attempt);
-      cache->recordAOTStage(PrecompiledAOTStage::CacheAvailable);
-      cache->recordArtifactMiss(PrecompiledFallbackReason::NoMatchingRule, record);
-    }
-    EXPECT_EQ(cache->fallbackCount(PrecompiledFallbackReason::NoMatchingRule), 2u);
-    EXPECT_EQ(context->globalCache()->programStats().programBuilderCreations, 0u);
-    return;
-  }
-  cache->unload();
-  cache->setDiagnosticRecordingEnabled(true);
-  auto surface = Surface::Make(context, 64, 64);
-  ASSERT_NE(surface, nullptr);
-  std::array<float, 20> swapRedBlue = {0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0};
-  Paint paint = {};
-  paint.setColorFilter(ColorFilter::Matrix(swapRedBlue));
-  surface->getCanvas()->drawRect(Rect::MakeWH(64, 64), paint);
-  context->flushAndSubmit(true);
-}
-
 }  // namespace
 }  // namespace tgfx

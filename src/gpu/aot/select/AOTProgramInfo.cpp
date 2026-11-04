@@ -99,7 +99,7 @@ AOTProgramInfo::AOTProgramInfo(const ProgramInfo& info, const AOTProgram& progra
     if (resolved == nullptr) {
       return;
     }
-    globalCache->addProgram(key, resolved, cache->deliberateMissMarking());
+    globalCache->addProgram(key, resolved);
   }
   resolvedProgram = resolved;
 }

@@ -116,9 +116,6 @@ class ShapeRejectingFragmentProcessor : public FragmentProcessor {
   bool lowerToAOT(AOTNodeBuilder*, AOTNodeID, AOTNodeID*) const override {
     return false;
   }
-
-  void emitCode(EmitArgs&) const override {
-  }
 };
 
 static AOTAxisAnalysis AnalyzeColorProcessor(FragmentProcessor* processor) {

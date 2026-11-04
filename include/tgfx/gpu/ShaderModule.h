@@ -31,7 +31,7 @@ namespace tgfx {
  */
 enum class ShaderCodeFormat {
   /**
-   * GLSL text source code. This is the default format used by ProgramBuilder.
+   * GLSL text source code.
    */
   GLSL,
   /**
@@ -80,8 +80,7 @@ class ShaderModuleDescriptor {
   std::map<std::string, unsigned> uniformSlots;
 
   /**
-   * The format of the shader code or binary. Defaults to GLSL for backward compatibility with the
-   * existing ProgramBuilder path.
+   * The format of the shader code or binary. Defaults to GLSL text source.
    */
   ShaderCodeFormat format = ShaderCodeFormat::GLSL;
 

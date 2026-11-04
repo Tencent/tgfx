@@ -258,10 +258,8 @@ class UniformData {
   friend class ProgramInfo;
   friend class ProgramWriter;
   friend class AOTParamLayout;
-  friend class RuntimeProgramWriter;
   friend class PrecompiledProgramWriter;
   friend class ChainProgramWriter;
-  friend class UniformHandler;
   friend class PrecompiledProgramCreator;
   // The shell-free chain binder drives the same structural-suffix addressing the processor-tree
   // walk maintained; only the per-binding walk needs the direct access.

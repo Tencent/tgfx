@@ -133,12 +133,10 @@ class ShaderCache {
 
   /**
    * Returns a pipeline for the descriptor: a cached one when an identical descriptor was created
-   * before, otherwise a new one from GPU::createRenderPipeline(). *created is set to whether the
-   * GPU was really asked to create one, so callers count creation attempts, not requests. Returns
-   * nullptr when the GPU fails; failures are not cached, so the next request tries again.
+   * before, otherwise a new one from GPU::createRenderPipeline(). Returns nullptr when the GPU
+   * fails; failures are not cached, so the next request tries again.
    */
-  std::shared_ptr<RenderPipeline> findOrCreatePipeline(const RenderPipelineDescriptor& descriptor,
-                                                       bool* created);
+  std::shared_ptr<RenderPipeline> findOrCreatePipeline(const RenderPipelineDescriptor& descriptor);
 
   /**
    * Returns the content key of a module this cache handed out and still holds, or nullptr for any
