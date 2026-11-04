@@ -289,8 +289,8 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   cache->recordAOTStage(PrecompiledAOTStage::Attempt);
   if (!cache->isLoaded()) {
     // Say why nothing is loaded: a backend or build with no bundle is by design, a rejected bundle
-    // is a defect that needs regenerating. Anything else (a standalone cache, for example)
-    // the cache) keeps the generic reason.
+    // is a defect that needs regenerating. Anything else (a standalone cache, for example) keeps
+    // the generic reason.
     auto reason = PrecompiledFallbackReason::CacheNotLoaded;
     switch (cache->embeddedBundleState()) {
       case EmbeddedBundleState::NoBundleForBackend:
