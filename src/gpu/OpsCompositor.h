@@ -20,7 +20,7 @@
 
 #include <functional>
 #include "core/ClipStack.h"
-#include "gpu/aot/plan/AOTPlanner.h"
+#include "gpu/aot/AOTRouter.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
 #include "tgfx/core/Brush.h"
@@ -29,8 +29,6 @@
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
-class AOTEffectGraph;
-struct Plan;
 
 /**
  * AppliedClipStatus represents the result of applying a clip to a draw operation.
@@ -226,17 +224,6 @@ class OpsCompositor {
                  float drawScale);
 
   void submitDrawOps();
-
-  /**
-   * Builds the AOT plan task for op over deviceBounds and enqueues it after the pending ops.
-   * terminalCoverage, when non-null, is the draw's coverage terms, merged into the terminal pass's
-   * IR (the executor refuses a terminal they cannot compile onto). Returns false, leaving op
-   * untouched, when the executor refuses the plan or a multi-pass plan cannot reproduce this draw
-   * exactly (see the gate in the implementation).
-   */
-  bool submitPlanTask(const AOTEffectGraph& graph, const Plan& plan, const Rect& deviceBounds,
-                      PlacementPtr<DrawOp>* op,
-                      const std::vector<AOTCoverageTerm>* terminalCoverage = nullptr);
 
   friend class DrawingManager;
   friend class PendingOpsAutoReset;

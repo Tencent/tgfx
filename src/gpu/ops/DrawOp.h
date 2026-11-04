@@ -29,6 +29,8 @@
 
 namespace tgfx {
 
+class AOTRouter;
+
 /**
  * DrawOp is the minimal contract every deferred draw operation must satisfy. It exposes only
  * what OpsRenderTask needs to schedule an op inside a render pass: an execute() entry point,
@@ -100,14 +102,6 @@ class DrawOp {
   }
 
   /**
-   * Lowers the op's colors, coverages, xfer processor and blend mode into a DrawIR placed on the
-   * drawing allocator. Call once at record time, after those members are set and only while the
-   * precompiled route is active. A lowering failure leaves the IR null — the draw keeps the plain
-   * path, which is exactly the pre-IR behavior.
-   */
-  void tryLowerIR();
-
-  /**
    * Appends the coverage processors added after the record-time lowering — a rasterized shape
    * attaches its mask coverage only once the shape proxy exists — as new IR terms, so the carried
    * IR stays the draw's complete expression. Returns true when the IR now covers the live list;
@@ -132,17 +126,6 @@ class DrawOp {
    * processors are ignored while it is set.
    */
   void adoptLoweredIR(PlacementPtr<DrawIR> passIR);
-
-  /**
-   * Stores the record-time plan's single in-place pass on the draw's IR, so the matcher compiles
-   * from the plan instead of decomposing the same graph again at prepare. Only the record-time
-   * route calls it, before any prepare; the descriptor is write-once.
-   */
-  void storeSinglePassPlan(const PassIR& pass) {
-    if (ir != nullptr && !ir->passDescriptor.has_value()) {
-      ir->passDescriptor = pass;
-    }
-  }
 
   /**
    * Whether the draw produces fractional coverage from any source: its coverage processors, or its
@@ -224,5 +207,29 @@ class DrawOp {
    * a cover pass outside the cover scissor).
    */
   void applyScissor(RenderPass* renderPass, RenderTarget* renderTarget) const;
+
+ private:
+  // The record-time route's private levers (AOTRouter): the lowering and the in-place pass
+  // annotation belong to that route alone, so nothing else drives them out of order.
+  friend class AOTRouter;
+
+  /**
+   * Lowers the op's colors, coverages, xfer processor and blend mode into a DrawIR placed on the
+   * drawing allocator. Call once at record time, after those members are set and only while the
+   * precompiled route is active. A lowering failure leaves the IR null — the draw keeps the plain
+   * path, which is exactly the pre-IR behavior.
+   */
+  void tryLowerIR();
+
+  /**
+   * Stores the record-time plan's single in-place pass on the draw's IR, so the matcher compiles
+   * from the plan instead of decomposing the same graph again at prepare. Only the record-time
+   * route calls it, before any prepare; the descriptor is write-once.
+   */
+  void storeSinglePassPlan(const PassIR& pass) {
+    if (ir != nullptr && !ir->passDescriptor.has_value()) {
+      ir->passDescriptor = pass;
+    }
+  }
 };
 }  // namespace tgfx

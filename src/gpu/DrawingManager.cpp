@@ -19,9 +19,8 @@
 #include "DrawingManager.h"
 #include "ProxyProvider.h"
 #include "core/AtlasManager.h"
-#include "gpu/aot/bundle/PrecompiledShaderCache.h"
+#include "gpu/aot/AOTRouter.h"
 #include "gpu/aot/ir/DrawIR.h"
-#include "gpu/aot/plan/AOTPlanner.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/GenerateMipmapsTask.h"
@@ -118,84 +117,32 @@ PlacementPtr<DrawOp> DrawingManager::makeFillDrawOp(std::shared_ptr<RenderTarget
   return drawOp;
 }
 
-bool DrawingManager::isFillRouteCandidate(const FragmentProcessor* processor) const {
-  // The decomposition route only pays off for chains the plain route cannot match directly: a
-  // composite processor tree (Compose/Xfermode children). A bare single-source fill is already
-  // served by the direct matchers, so it must skip the route and keep its single program lookup.
-  auto cache = context->precompiledShaderCache();
-  return cache != nullptr && cache->isLoaded() && cache->aotPolicy().decomposition &&
-         processor != nullptr && processor->numChildProcessors() > 0;
-}
-
-bool DrawingManager::submitFillPlanTask(const AOTEffectGraph& graph, const Plan& plan,
-                                        uint32_t renderFlags,
-                                        const std::shared_ptr<RenderTargetProxy>& renderTarget,
-                                        const Point& coordOffset,
-                                        PlacementPtr<DrawOp>* originalDraw) {
-  // The fill covers the target's logical bounds, and its processors see coordinates shifted by
-  // coordOffset; the split-off passes of a multi-pass plan reproduce both.
-  auto deviceBounds = Rect::MakeWH(static_cast<float>(renderTarget->width()),
-                                   static_cast<float>(renderTarget->height()));
-  auto task = AOTPlanner::Build(context, renderFlags, graph, plan, deviceBounds, renderTarget,
-                                originalDraw, coordOffset, true, std::nullopt);
-  if (task == nullptr) {
-    return false;
-  }
-  addRenderTask(std::move(task));
-  addGenerateMipmapsTask(renderTarget->asTextureProxy());
-  return true;
-}
-
 bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarget,
                                   PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags,
                                   const Point& coordOffset) {
-  // The fill's single record-time lowering: its whole color expression lands on a DrawIR the op
-  // carries, and the route below plans from it — no second analysis over the FP tree. A fill has
-  // no coverage and no xfer, and its blend is Src. The IR is unconditional — the executor-table
-  // matching reads it for bare single-source fills too (the direct matchers no longer walk the
-  // tree) — while the PLAN route stays gated to composite trees: a bare fill's single pass
-  // serves in place, exactly as before.
-  auto* shaderCache = context->precompiledShaderCache();
-  const bool precompiledActive = shaderCache != nullptr && shaderCache->isLoaded();
-  const bool planCandidate = isFillRouteCandidate(processor.get());
-  PlacementPtr<DrawIR> fillIR = nullptr;
-  if (precompiledActive && processor != nullptr) {
-    if (auto lowered = LowerDraw({processor.get()}, {}, BlendMode::Src, drawingAllocator())) {
-      fillIR = drawingAllocator()->make<DrawIR>(std::move(*lowered));
-    }
-  }
+  const FragmentProcessor* fillProcessor = processor.get();
   auto drawOp = makeFillDrawOp(renderTarget, std::move(processor), renderFlags, coordOffset);
   if (drawOp == nullptr) {
     return false;
   }
-  // The plan executor takes ownership of the draw op on success, so the fill must stop there:
+  // The record-time AOT route's one entry (see AOTRouter::route): the fill's IR is unconditional
+  // and a plan task takes ownership of the draw op on success, so the fill must stop there —
   // falling through to the plain branch would submit a null op. An offscreen fill owns a fresh
   // target, so the task clears its full backing first and a shader-side sample cannot observe
   // pixels left by an earlier scratch allocation. A single-pass chain-capable plan needs no task:
   // the fill's RectDrawOp is a StandardDrawOp, so the plain lookup serves it at prepare time.
-  if (fillIR != nullptr) {
-    drawOp->adoptLoweredIR(std::move(fillIR));
-    auto* ir = drawOp->loweredIR();
-    if (planCandidate) {
-      if (auto plan = AOTPlanner::MakePlan(*ir)) {
-        switch (AOTPlanner::RouteRecordPlan(*plan, {}, BlendMode::Src)) {
-          case AOTRecordRoute::InPlace:
-            // The single pass serves in place at prepare: its descriptor rides the fill's IR, so
-            // the matcher compiles from the record-time plan and never decomposes again.
-            drawOp->storeSinglePassPlan(plan->passes[0]);
-            break;
-          case AOTRecordRoute::Task:
-            if (submitFillPlanTask(ir->color, *plan, renderFlags, renderTarget, coordOffset,
-                                   &drawOp)) {
-              return true;
-            }
-            break;
-          case AOTRecordRoute::Plain:
-            // Anything else keeps the plain lookup for the fill at prepare time.
-            break;
-        }
-      }
-    }
+  AOTRouteRequest request = {};
+  request.kind = AOTRouteRequest::Kind::Fill;
+  request.target = renderTarget;
+  request.coordOffset = coordOffset;
+  request.renderFlags = renderFlags;
+  request.clearDestination = true;
+  request.processor = fillProcessor;
+  AOTRouter router(context);
+  if (auto task = router.route(&drawOp, request)) {
+    addRenderTask(std::move(task));
+    addGenerateMipmapsTask(renderTarget->asTextureProxy());
+    return true;
   }
   auto allocator = drawingAllocator();
   auto drawOps = allocator->makeArray<DrawOp>(&drawOp, 1);
@@ -227,18 +174,10 @@ void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderT
     return;
   }
   // Ops submitted as a batch (a clip's mask layer, a layer's own render) never pass through
-  // OpsCompositor::addDrawOp, so this is their record-time lowering: the IR exists before the
-  // task prepares them, exactly like a compositor-recorded draw. tryLowerIR is idempotent, so the
-  // ops that already lowered on the compositor route cost one branch. Stencil covers draw no
-  // program and stay unlowered, matching the compositor's own exclusion.
-  auto cache = context != nullptr ? context->precompiledShaderCache() : nullptr;
-  if (cache != nullptr && cache->isLoaded()) {
-    for (auto& op : drawOps) {
-      if (op != nullptr && op->type() != DrawOp::Type::StencilCoverPathDrawOp) {
-        op->tryLowerIR();
-      }
-    }
-  }
+  // OpsCompositor::addDrawOp, so this is their record-time lowering (see AOTRouter::lowerOps):
+  // the IR exists before the task prepares them, exactly like a compositor-recorded draw.
+  AOTRouter router(context);
+  router.lowerOps(drawOps);
   auto drawingBuffer = getDrawingBuffer();
   auto allocator = &drawingBuffer->drawingAllocator;
   auto textureProxy = renderTarget->asTextureProxy();

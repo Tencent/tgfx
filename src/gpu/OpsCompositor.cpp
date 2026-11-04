@@ -29,10 +29,6 @@
 #include "core/utils/USE.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/aot/bundle/PrecompiledShaderCache.h"
-#include "gpu/aot/plan/AOTEffectDecomposer.h"
-#include "gpu/aot/plan/AOTPlanner.h"
-#include "gpu/aot/plan/AOTShapeRules.h"
 #include "gpu/ops/AtlasTextOp.h"
 #include "gpu/ops/HairlineLineOp.h"
 #include "gpu/ops/HairlineQuadOp.h"
@@ -1288,51 +1284,25 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
     op->setXferProcessor(std::move(xferProcessor));
   }
 
-  auto cache = context->precompiledShaderCache();
-  if (cache != nullptr && cache->isLoaded() && op->type() != DrawOp::Type::StencilCoverPathDrawOp) {
-    // The single record-time lowering: the op's whole expression (colors, coverages, xfer, blend
-    // mode) lands on a DrawIR every later stage converges on, so the prepare-time serving never
-    // lowers a second time. Device bounds are a plan-task input only (its offscreen targets need
-    // a size), so a draw without bounds keeps its record-time IR on the plain route — coverage
-    // never folds into the color graph: a multi-pass plan carries the classified terms on its
-    // terminal pass, and a single-pass plan stays on the plain route for the prepare-time walk.
-    op->tryLowerIR();
-    const bool coverageFree = !op->hasCoverageProcessors();
-    if (cache->aotPolicy().decomposition && deviceBounds.has_value() && !deviceBounds->isEmpty()) {
-      if (auto* ir = op->loweredIR()) {
-        auto plan = AOTPlanner::MakePlan(*ir);
-        if (plan.has_value()) {
-          switch (AOTPlanner::RouteRecordPlan(*plan, ir->coverage, brush.blendMode)) {
-            case AOTRecordRoute::InPlace:
-              // The single pass serves in place at prepare: its descriptor rides the draw's IR, so
-              // the matcher compiles from the record-time plan and never decomposes again.
-              op->storeSinglePassPlan(plan->passes[0]);
-              break;
-            case AOTRecordRoute::Task:
-              if (submitPlanTask(ir->color, *plan, *deviceBounds, &op, &ir->coverage)) {
-                return;
-              }
-              break;
-            case AOTRecordRoute::Plain:
-              // Anything else keeps the plain route: the matcher serves it at prepare time.
-              break;
-          }
-        } else if (coverageFree && cache->diagnosticRecordingEnabled()) {
-          // The color side lowered but no planner covers it — the same fact the color-only attempt
-          // recorded. A draw still carrying coverage processors records nothing: its route was
-          // never a color-only one, and classifying it would require the analysis the production
-          // path does not run.
-          cache->recordDecomposeRejection(AOTDecomposeOutcome::UnsupportedShape);
-        }
-      } else if (coverageFree && op->type() != DrawOp::Type::AtlasTextOp &&
-                 cache->diagnosticRecordingEnabled()) {
-        // The color side failed to lower: the same category the FP-walk route recorded, without a
-        // second analysis pass over the processor tree. Atlas-text ops never attempt the lowering
-        // (their glyph leaf needs the geometry processor), so they record nothing here — as they
-        // never did.
-        cache->recordDecomposeRejection(AOTDecomposeOutcome::BlockedByLowering);
-      }
-    }
+  // The record-time AOT route's one entry: a null return leaves the op on the plain route (or
+  // annotated in place for the prepare-time serving), a task return hands the plan's ownership
+  // over for submission.
+  AOTRouteRequest request = {};
+  request.kind = AOTRouteRequest::Kind::Draw;
+  request.target = renderTarget;
+  request.deviceBounds = deviceBounds;
+  request.blend = brush.blendMode;
+  request.renderFlags = renderFlags;
+  AOTRouter router(context);
+  if (auto task = router.route(&op, request)) {
+    submitDrawOps();
+    context->drawingManager()->addRenderTask(std::move(task));
+    // The plan task writes level 0 directly, so a mipmapped target must regenerate its lower
+    // levels afterwards — every other path that renders into a mipmapped render target schedules
+    // this (see addOpsRenderTask), and skipping it leaves downscaled consumers sampling stale
+    // transparent levels.
+    context->drawingManager()->addGenerateMipmapsTask(renderTarget->asTextureProxy());
+    return;
   }
   drawOps.emplace_back(std::move(op));
 }
@@ -1350,36 +1320,6 @@ void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, co
   }
   auto record = drawingAllocator()->make<RectRecord>(rect, matrix, brush.color);
   pendingRects.emplace_back(std::move(record));
-}
-
-bool OpsCompositor::submitPlanTask(const AOTEffectGraph& graph, const Plan& plan,
-                                   const Rect& deviceBounds, PlacementPtr<DrawOp>* op,
-                                   const std::vector<AOTCoverageTerm>* terminalCoverage) {
-  std::optional<Matrix> deviceToLocal = std::nullopt;
-  if (plan.passes.size() > 1) {
-    // A fill pass carrying local-coordinate leaves (a plain texture, a gradient, a noise source)
-    // evaluates them at top-left device positions and needs one affine device-to-local map; the
-    // uniform-geometry-color requirement is enforced inside AOTPlanner::Build.
-    if (AOTPlanner::NeedsLocalRemap(graph, plan)) {
-      deviceToLocal = static_cast<StandardDrawOp*>(op->get())->deviceToLocalMatrix();
-      if (!deviceToLocal.has_value()) {
-        return false;
-      }
-    }
-  }
-  auto task = AOTPlanner::Build(context, renderFlags, graph, plan, deviceBounds, renderTarget, op,
-                                Point::Zero(), false, deviceToLocal, terminalCoverage);
-  if (task == nullptr) {
-    return false;
-  }
-  submitDrawOps();
-  context->drawingManager()->addRenderTask(std::move(task));
-  // The plan task writes level 0 directly, so a mipmapped target must regenerate its lower levels
-  // afterwards — every other path that renders into a mipmapped render target schedules this (see
-  // addOpsRenderTask), and skipping it leaves downscaled consumers sampling stale transparent
-  // levels.
-  context->drawingManager()->addGenerateMipmapsTask(renderTarget->asTextureProxy());
-  return true;
 }
 
 void OpsCompositor::submitDrawOps() {

@@ -192,12 +192,6 @@ class DrawingManager {
 
   DrawingBuffer* createDrawingBuffer();
 
-  bool isFillRouteCandidate(const FragmentProcessor* processor) const;
-
-  bool submitFillPlanTask(const AOTEffectGraph& graph, const Plan& plan, uint32_t renderFlags,
-                          const std::shared_ptr<RenderTargetProxy>& renderTarget,
-                          const Point& coordOffset, PlacementPtr<DrawOp>* originalDraw);
-
   WindowTarget& windowTargetEntry(const std::shared_ptr<Window>& window);
 
   friend class OpsCompositor;
