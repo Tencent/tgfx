@@ -39,16 +39,6 @@
 
 namespace tgfx {
 
-// Raw GLSL shader modules and RuntimeEffect effects written in GLSL are an OpenGL-only
-// capability: every other backend consumes precompiled binaries and native shader formats, so
-// these API-level tests skip there. The skip also removes this suite's MSAA / instanced-draw /
-// array-varying coverage on those backends until native shader variants land.
-#define SKIP_UNLESS_RAW_GLSL_MODULES(context)                                  \
-  if ((context)->backend() != Backend::OpenGL) {                               \
-    GTEST_SKIP() << "raw GLSL shader modules require the OpenGL backend "      \
-                    "(MSAA/instancing/array-varying coverage is skipped too)"; \
-  }
-
 namespace {
 
 // Vertex shader: emits a full-screen quad and passes three constant scalar varyings to the
@@ -94,6 +84,187 @@ static constexpr char VARYING_ORDER_FRAGMENT_SHADER[] = R"(
         }
     )";
 
+// Native variants. For the GLSL path tgfx assigned varying locations by name, so a different
+// declaration order still matched. The native formats declare the interface explicitly and are
+// matched by location/semantic (SPIR-V, WGSL, HLSL) or by struct layout (Metal), so the sources
+// below keep the "different order" shape where the backend supports it and pin the same colour.
+static constexpr char ORDER_MSL_VERTEX_SHADER[] = R"(
+#include <metal_stdlib>
+using namespace metal;
+
+struct VertexIn {
+  float2 inPosition [[attribute(0)]];
+};
+
+struct VertexOut {
+  float4 position [[position]];
+  float vRed;
+  float vGreen;
+  float vBlue;
+};
+
+vertex VertexOut main0(VertexIn in [[stage_in]]) {
+  VertexOut out;
+  out.position = float4(in.inPosition.x, -in.inPosition.y, 0.0, 1.0);
+  out.vRed = 1.0;
+  out.vGreen = 0.5;
+  out.vBlue = 0.25;
+  return out;
+}
+)";
+
+static constexpr char ORDER_MSL_FRAGMENT_SHADER[] = R"(
+#include <metal_stdlib>
+using namespace metal;
+
+struct VertexOut {
+  float4 position [[position]];
+  float vRed;
+  float vGreen;
+  float vBlue;
+};
+
+fragment float4 main0(VertexOut in [[stage_in]]) {
+  return float4(in.vRed, in.vGreen, in.vBlue, 1.0);
+}
+)";
+
+static const uint32_t kOrderVertexSpirv[] = {
+    0x07230203, 0x00010300, 0x000d000b, 0x00000021, 0x00000000, 0x00020011, 0x00000001, 0x0006000b,
+    0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e, 0x00000000, 0x0003000e, 0x00000000, 0x00000001,
+    0x000a000f, 0x00000000, 0x00000004, 0x6e69616d, 0x00000000, 0x0000000d, 0x00000012, 0x0000001c,
+    0x0000001d, 0x0000001f, 0x00030047, 0x0000000b, 0x00000002, 0x00050048, 0x0000000b, 0x00000000,
+    0x0000000b, 0x00000000, 0x00050048, 0x0000000b, 0x00000001, 0x0000000b, 0x00000001, 0x00050048,
+    0x0000000b, 0x00000002, 0x0000000b, 0x00000003, 0x00050048, 0x0000000b, 0x00000003, 0x0000000b,
+    0x00000004, 0x00040047, 0x00000012, 0x0000001e, 0x00000000, 0x00040047, 0x0000001c, 0x0000001e,
+    0x00000000, 0x00040047, 0x0000001d, 0x0000001e, 0x00000001, 0x00040047, 0x0000001f, 0x0000001e,
+    0x00000002, 0x00020013, 0x00000002, 0x00030021, 0x00000003, 0x00000002, 0x00030016, 0x00000006,
+    0x00000020, 0x00040017, 0x00000007, 0x00000006, 0x00000004, 0x00040015, 0x00000008, 0x00000020,
+    0x00000000, 0x0004002b, 0x00000008, 0x00000009, 0x00000001, 0x0004001c, 0x0000000a, 0x00000006,
+    0x00000009, 0x0006001e, 0x0000000b, 0x00000007, 0x00000006, 0x0000000a, 0x0000000a, 0x00040020,
+    0x0000000c, 0x00000003, 0x0000000b, 0x0004003b, 0x0000000c, 0x0000000d, 0x00000003, 0x00040015,
+    0x0000000e, 0x00000020, 0x00000001, 0x0004002b, 0x0000000e, 0x0000000f, 0x00000000, 0x00040017,
+    0x00000010, 0x00000006, 0x00000002, 0x00040020, 0x00000011, 0x00000001, 0x00000010, 0x0004003b,
+    0x00000011, 0x00000012, 0x00000001, 0x0004002b, 0x00000006, 0x00000014, 0x00000000, 0x0004002b,
+    0x00000006, 0x00000015, 0x3f800000, 0x00040020, 0x00000019, 0x00000003, 0x00000007, 0x00040020,
+    0x0000001b, 0x00000003, 0x00000006, 0x0004003b, 0x0000001b, 0x0000001c, 0x00000003, 0x0004003b,
+    0x0000001b, 0x0000001d, 0x00000003, 0x0004002b, 0x00000006, 0x0000001e, 0x3f000000, 0x0004003b,
+    0x0000001b, 0x0000001f, 0x00000003, 0x0004002b, 0x00000006, 0x00000020, 0x3e800000, 0x00050036,
+    0x00000002, 0x00000004, 0x00000000, 0x00000003, 0x000200f8, 0x00000005, 0x0004003d, 0x00000010,
+    0x00000013, 0x00000012, 0x00050051, 0x00000006, 0x00000016, 0x00000013, 0x00000000, 0x00050051,
+    0x00000006, 0x00000017, 0x00000013, 0x00000001, 0x00070050, 0x00000007, 0x00000018, 0x00000016,
+    0x00000017, 0x00000014, 0x00000015, 0x00050041, 0x00000019, 0x0000001a, 0x0000000d, 0x0000000f,
+    0x0003003e, 0x0000001a, 0x00000018, 0x0003003e, 0x0000001c, 0x00000015, 0x0003003e, 0x0000001d,
+    0x0000001e, 0x0003003e, 0x0000001f, 0x00000020, 0x000100fd, 0x00010038,
+};
+
+static const uint32_t kOrderFragmentSpirv[] = {
+    0x07230203, 0x00010300, 0x000d000b, 0x00000013, 0x00000000, 0x00020011, 0x00000001, 0x0006000b,
+    0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e, 0x00000000, 0x0003000e, 0x00000000, 0x00000001,
+    0x0009000f, 0x00000004, 0x00000004, 0x6e69616d, 0x00000000, 0x00000009, 0x0000000b, 0x0000000d,
+    0x0000000f, 0x00030010, 0x00000004, 0x00000007, 0x00040047, 0x00000009, 0x0000001e, 0x00000000,
+    0x00040047, 0x0000000b, 0x0000001e, 0x00000000, 0x00040047, 0x0000000d, 0x0000001e, 0x00000001,
+    0x00040047, 0x0000000f, 0x0000001e, 0x00000002, 0x00020013, 0x00000002, 0x00030021, 0x00000003,
+    0x00000002, 0x00030016, 0x00000006, 0x00000020, 0x00040017, 0x00000007, 0x00000006, 0x00000004,
+    0x00040020, 0x00000008, 0x00000003, 0x00000007, 0x0004003b, 0x00000008, 0x00000009, 0x00000003,
+    0x00040020, 0x0000000a, 0x00000001, 0x00000006, 0x0004003b, 0x0000000a, 0x0000000b, 0x00000001,
+    0x0004003b, 0x0000000a, 0x0000000d, 0x00000001, 0x0004003b, 0x0000000a, 0x0000000f, 0x00000001,
+    0x0004002b, 0x00000006, 0x00000011, 0x3f800000, 0x00050036, 0x00000002, 0x00000004, 0x00000000,
+    0x00000003, 0x000200f8, 0x00000005, 0x0004003d, 0x00000006, 0x0000000c, 0x0000000b, 0x0004003d,
+    0x00000006, 0x0000000e, 0x0000000d, 0x0004003d, 0x00000006, 0x00000010, 0x0000000f, 0x00070050,
+    0x00000007, 0x00000012, 0x0000000c, 0x0000000e, 0x00000010, 0x00000011, 0x0003003e, 0x00000009,
+    0x00000012, 0x000100fd, 0x00010038,
+};
+
+static constexpr char ORDER_WGSL_VERTEX_SHADER[] = R"(
+struct VertexIn {
+  @location(0) inPosition: vec2f,
+};
+
+struct VertexOut {
+  @builtin(position) position: vec4f,
+  @location(0) vRed: f32,
+  @location(1) vGreen: f32,
+  @location(2) vBlue: f32,
+};
+
+@vertex
+fn main(in: VertexIn) -> VertexOut {
+  var out: VertexOut;
+  out.position = vec4f(in.inPosition, 0.0, 1.0);
+  out.vRed = 1.0;
+  out.vGreen = 0.5;
+  out.vBlue = 0.25;
+  return out;
+}
+)";
+
+static constexpr char ORDER_WGSL_FRAGMENT_SHADER[] = R"(
+struct VertexOut {
+  @builtin(position) position: vec4f,
+  @location(2) vBlue: f32,
+  @location(0) vRed: f32,
+  @location(1) vGreen: f32,
+};
+
+@fragment
+fn main(in: VertexOut) -> @location(0) vec4f {
+  return vec4f(in.vRed, in.vGreen, in.vBlue, 1.0);
+}
+)";
+
+static constexpr char ORDER_HLSL_VERTEX_SHADER[] = R"(
+struct VSIn {
+  float2 inPosition : TEXCOORD0;
+};
+
+struct VSOut {
+  float4 position : SV_Position;
+  float vRed : TEXCOORD0;
+  float vGreen : TEXCOORD1;
+  float vBlue : TEXCOORD2;
+};
+
+VSOut main(VSIn input) {
+  VSOut output;
+  output.position = float4(input.inPosition.x, -input.inPosition.y, 0.0, 1.0);
+  output.vRed = 1.0;
+  output.vGreen = 0.5;
+  output.vBlue = 0.25;
+  return output;
+}
+)";
+
+static constexpr char ORDER_HLSL_FRAGMENT_SHADER[] = R"(
+struct PSIn {
+  float4 position : SV_Position;
+  float vBlue : TEXCOORD2;
+  float vRed : TEXCOORD0;
+  float vGreen : TEXCOORD1;
+};
+
+float4 main(PSIn input) : SV_Target {
+  return float4(input.vRed, input.vGreen, input.vBlue, 1.0);
+}
+)";
+
+static const NativeShaderStage kOrderVertexSource = {VARYING_ORDER_VERTEX_SHADER,
+                                                     ORDER_MSL_VERTEX_SHADER,
+                                                     kOrderVertexSpirv,
+                                                     sizeof(kOrderVertexSpirv) / sizeof(uint32_t),
+                                                     ORDER_WGSL_VERTEX_SHADER,
+                                                     ORDER_HLSL_VERTEX_SHADER,
+                                                     {}};
+
+static const NativeShaderStage kOrderFragmentSource = {
+    VARYING_ORDER_FRAGMENT_SHADER,
+    ORDER_MSL_FRAGMENT_SHADER,
+    kOrderFragmentSpirv,
+    sizeof(kOrderFragmentSpirv) / sizeof(uint32_t),
+    ORDER_WGSL_FRAGMENT_SHADER,
+    ORDER_HLSL_FRAGMENT_SHADER,
+    {}};
+
 struct VaryingOrderVertex {
   float x;
   float y;
@@ -107,22 +278,10 @@ static std::string PrefixShaderVersion(const char* body, bool isDesktop) {
 }
 
 static std::shared_ptr<RenderPipeline> CreateVaryingOrderPipeline(GPU* gpu) {
-  auto info = gpu->info();
-  auto isDesktop = info->version.find("OpenGL ES") == std::string::npos;
-
-  ShaderModuleDescriptor vertexModule = {};
-  vertexModule.code = PrefixShaderVersion(VARYING_ORDER_VERTEX_SHADER, isDesktop);
-  vertexModule.stage = ShaderStage::Vertex;
-  auto vertexShader = gpu->createShaderModule(vertexModule);
-  if (vertexShader == nullptr) {
-    return nullptr;
-  }
-
-  ShaderModuleDescriptor fragmentModule = {};
-  fragmentModule.code = PrefixShaderVersion(VARYING_ORDER_FRAGMENT_SHADER, isDesktop);
-  fragmentModule.stage = ShaderStage::Fragment;
-  auto fragmentShader = gpu->createShaderModule(fragmentModule);
-  if (fragmentShader == nullptr) {
+  std::shared_ptr<ShaderModule> vertexShader = nullptr;
+  std::shared_ptr<ShaderModule> fragmentShader = nullptr;
+  if (!CreateNativeShaderModules(gpu, kOrderVertexSource, kOrderFragmentSource, &vertexShader,
+                                 &fragmentShader)) {
     return nullptr;
   }
 
@@ -185,6 +344,160 @@ static constexpr char UNIFORM_BUFFER_BINDING_FRAGMENT_SHADER[] = R"(
         }
     )";
 
+// Native variants: the block names must resolve through ShaderModuleDescriptor::uniformSlots on
+// the non-GLSL paths. Each stage keeps its own dense physical slot (0), so the CPU-side logical
+// bindings (0 and 1) can only reach the right buffer through the name-keyed resolution this test
+// pins.
+static constexpr char UBO_MSL_VERTEX_SHADER[] = R"(
+#include <metal_stdlib>
+using namespace metal;
+
+struct VertexIn {
+  float2 inPosition [[attribute(0)]];
+};
+
+struct VertexArgs {
+  float4 scaleAndFiller;
+};
+
+vertex float4 main0(VertexIn in [[stage_in]], constant VertexArgs& args [[buffer(0)]]) {
+  float2 scaled = in.inPosition * args.scaleAndFiller.xy;
+  return float4(scaled.x, -scaled.y, 0.0, 1.0);
+}
+)";
+
+static constexpr char UBO_MSL_FRAGMENT_SHADER[] = R"(
+#include <metal_stdlib>
+using namespace metal;
+
+struct FragmentArgs {
+  float4 color;
+};
+
+fragment float4 main0(constant FragmentArgs& args [[buffer(0)]]) {
+  return args.color;
+}
+)";
+
+static const uint32_t kUboVertexSpirv[] = {
+    0x07230203, 0x00010300, 0x000d000b, 0x00000023, 0x00000000, 0x00020011, 0x00000001, 0x0006000b,
+    0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e, 0x00000000, 0x0003000e, 0x00000000, 0x00000001,
+    0x0007000f, 0x00000000, 0x00000004, 0x6e69616d, 0x00000000, 0x0000000d, 0x00000012, 0x00030047,
+    0x0000000b, 0x00000002, 0x00050048, 0x0000000b, 0x00000000, 0x0000000b, 0x00000000, 0x00050048,
+    0x0000000b, 0x00000001, 0x0000000b, 0x00000001, 0x00050048, 0x0000000b, 0x00000002, 0x0000000b,
+    0x00000003, 0x00050048, 0x0000000b, 0x00000003, 0x0000000b, 0x00000004, 0x00040047, 0x00000012,
+    0x0000001e, 0x00000000, 0x00030047, 0x00000014, 0x00000002, 0x00050048, 0x00000014, 0x00000000,
+    0x00000023, 0x00000000, 0x00040047, 0x00000016, 0x00000021, 0x00000000, 0x00040047, 0x00000016,
+    0x00000022, 0x00000000, 0x00020013, 0x00000002, 0x00030021, 0x00000003, 0x00000002, 0x00030016,
+    0x00000006, 0x00000020, 0x00040017, 0x00000007, 0x00000006, 0x00000004, 0x00040015, 0x00000008,
+    0x00000020, 0x00000000, 0x0004002b, 0x00000008, 0x00000009, 0x00000001, 0x0004001c, 0x0000000a,
+    0x00000006, 0x00000009, 0x0006001e, 0x0000000b, 0x00000007, 0x00000006, 0x0000000a, 0x0000000a,
+    0x00040020, 0x0000000c, 0x00000003, 0x0000000b, 0x0004003b, 0x0000000c, 0x0000000d, 0x00000003,
+    0x00040015, 0x0000000e, 0x00000020, 0x00000001, 0x0004002b, 0x0000000e, 0x0000000f, 0x00000000,
+    0x00040017, 0x00000010, 0x00000006, 0x00000002, 0x00040020, 0x00000011, 0x00000001, 0x00000010,
+    0x0004003b, 0x00000011, 0x00000012, 0x00000001, 0x0003001e, 0x00000014, 0x00000007, 0x00040020,
+    0x00000015, 0x00000002, 0x00000014, 0x0004003b, 0x00000015, 0x00000016, 0x00000002, 0x00040020,
+    0x00000017, 0x00000002, 0x00000007, 0x0004002b, 0x00000006, 0x0000001c, 0x00000000, 0x0004002b,
+    0x00000006, 0x0000001d, 0x3f800000, 0x00040020, 0x00000021, 0x00000003, 0x00000007, 0x00050036,
+    0x00000002, 0x00000004, 0x00000000, 0x00000003, 0x000200f8, 0x00000005, 0x0004003d, 0x00000010,
+    0x00000013, 0x00000012, 0x00050041, 0x00000017, 0x00000018, 0x00000016, 0x0000000f, 0x0004003d,
+    0x00000007, 0x00000019, 0x00000018, 0x0007004f, 0x00000010, 0x0000001a, 0x00000019, 0x00000019,
+    0x00000000, 0x00000001, 0x00050085, 0x00000010, 0x0000001b, 0x00000013, 0x0000001a, 0x00050051,
+    0x00000006, 0x0000001e, 0x0000001b, 0x00000000, 0x00050051, 0x00000006, 0x0000001f, 0x0000001b,
+    0x00000001, 0x00070050, 0x00000007, 0x00000020, 0x0000001e, 0x0000001f, 0x0000001c, 0x0000001d,
+    0x00050041, 0x00000021, 0x00000022, 0x0000000d, 0x0000000f, 0x0003003e, 0x00000022, 0x00000020,
+    0x000100fd, 0x00010038,
+
+};
+
+static const uint32_t kUboFragmentSpirv[] = {
+    0x07230203, 0x00010300, 0x000d000b, 0x00000012, 0x00000000, 0x00020011, 0x00000001, 0x0006000b,
+    0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e, 0x00000000, 0x0003000e, 0x00000000, 0x00000001,
+    0x0006000f, 0x00000004, 0x00000004, 0x6e69616d, 0x00000000, 0x00000009, 0x00030010, 0x00000004,
+    0x00000007, 0x00040047, 0x00000009, 0x0000001e, 0x00000000, 0x00030047, 0x0000000a, 0x00000002,
+    0x00050048, 0x0000000a, 0x00000000, 0x00000023, 0x00000000, 0x00040047, 0x0000000c, 0x00000021,
+    0x00000000, 0x00040047, 0x0000000c, 0x00000022, 0x00000001, 0x00020013, 0x00000002, 0x00030021,
+    0x00000003, 0x00000002, 0x00030016, 0x00000006, 0x00000020, 0x00040017, 0x00000007, 0x00000006,
+    0x00000004, 0x00040020, 0x00000008, 0x00000003, 0x00000007, 0x0004003b, 0x00000008, 0x00000009,
+    0x00000003, 0x0003001e, 0x0000000a, 0x00000007, 0x00040020, 0x0000000b, 0x00000002, 0x0000000a,
+    0x0004003b, 0x0000000b, 0x0000000c, 0x00000002, 0x00040015, 0x0000000d, 0x00000020, 0x00000001,
+    0x0004002b, 0x0000000d, 0x0000000e, 0x00000000, 0x00040020, 0x0000000f, 0x00000002, 0x00000007,
+    0x00050036, 0x00000002, 0x00000004, 0x00000000, 0x00000003, 0x000200f8, 0x00000005, 0x00050041,
+    0x0000000f, 0x00000010, 0x0000000c, 0x0000000e, 0x0004003d, 0x00000007, 0x00000011, 0x00000010,
+    0x0003003e, 0x00000009, 0x00000011, 0x000100fd, 0x00010038,
+};
+
+static constexpr char UBO_WGSL_VERTEX_SHADER[] = R"(
+struct VertexIn {
+  @location(0) inPosition: vec2f,
+};
+
+struct VertexArgs {
+  scaleAndFiller: vec4f,
+};
+
+@group(0) @binding(0) var<uniform> args: VertexArgs;
+
+@vertex
+fn main(in: VertexIn) -> @builtin(position) vec4f {
+  return vec4f(in.inPosition * args.scaleAndFiller.xy, 0.0, 1.0);
+}
+)";
+
+static constexpr char UBO_WGSL_FRAGMENT_SHADER[] = R"(
+struct FragmentArgs {
+  color: vec4f,
+};
+
+@group(1) @binding(0) var<uniform> args: FragmentArgs;
+
+@fragment
+fn main() -> @location(0) vec4f {
+  return args.color;
+}
+)";
+
+static constexpr char UBO_HLSL_VERTEX_SHADER[] = R"(
+cbuffer VertexArgs : register(b0) {
+  float4 scaleAndFiller;
+};
+
+struct VSIn {
+  float2 inPosition : TEXCOORD0;
+};
+
+float4 main(VSIn input) : SV_Position {
+  float2 scaled = input.inPosition * scaleAndFiller.xy;
+  return float4(scaled.x, -scaled.y, 0.0, 1.0);
+}
+)";
+
+static constexpr char UBO_HLSL_FRAGMENT_SHADER[] = R"(
+cbuffer FragmentArgs : register(b0) {
+  float4 color;
+};
+
+float4 main() : SV_Target {
+  return color;
+}
+)";
+
+static const NativeShaderStage kUboVertexSource = {UNIFORM_BUFFER_BINDING_VERTEX_SHADER,
+                                                   UBO_MSL_VERTEX_SHADER,
+                                                   kUboVertexSpirv,
+                                                   sizeof(kUboVertexSpirv) / sizeof(uint32_t),
+                                                   UBO_WGSL_VERTEX_SHADER,
+                                                   UBO_HLSL_VERTEX_SHADER,
+                                                   {{"VertexArgs", 0}}};
+
+static const NativeShaderStage kUboFragmentSource = {UNIFORM_BUFFER_BINDING_FRAGMENT_SHADER,
+                                                     UBO_MSL_FRAGMENT_SHADER,
+                                                     kUboFragmentSpirv,
+                                                     sizeof(kUboFragmentSpirv) / sizeof(uint32_t),
+                                                     UBO_WGSL_FRAGMENT_SHADER,
+                                                     UBO_HLSL_FRAGMENT_SHADER,
+                                                     {{"FragmentArgs", 0}}};
+
 struct UniformBufferBindingVertex {
   float x;
   float y;
@@ -204,24 +517,17 @@ struct UniformBufferBindingFragmentArgs {
   float a;
 };
 
+static bool CreateUniformBindingShaders(GPU* gpu, std::shared_ptr<ShaderModule>* vertexShader,
+                                        std::shared_ptr<ShaderModule>* fragmentShader) {
+  return CreateNativeShaderModules(gpu, kUboVertexSource, kUboFragmentSource, vertexShader,
+                                   fragmentShader);
+}
+
 static std::shared_ptr<RenderPipeline> CreateUniformBufferBindingPipeline(GPU* gpu,
                                                                           bool explicitLayout) {
-  auto info = gpu->info();
-  auto isDesktop = info->version.find("OpenGL ES") == std::string::npos;
-
-  ShaderModuleDescriptor vertexModule = {};
-  vertexModule.code = PrefixShaderVersion(UNIFORM_BUFFER_BINDING_VERTEX_SHADER, isDesktop);
-  vertexModule.stage = ShaderStage::Vertex;
-  auto vertexShader = gpu->createShaderModule(vertexModule);
-  if (vertexShader == nullptr) {
-    return nullptr;
-  }
-
-  ShaderModuleDescriptor fragmentModule = {};
-  fragmentModule.code = PrefixShaderVersion(UNIFORM_BUFFER_BINDING_FRAGMENT_SHADER, isDesktop);
-  fragmentModule.stage = ShaderStage::Fragment;
-  auto fragmentShader = gpu->createShaderModule(fragmentModule);
-  if (fragmentShader == nullptr) {
+  std::shared_ptr<ShaderModule> vertexShader = nullptr;
+  std::shared_ptr<ShaderModule> fragmentShader = nullptr;
+  if (!CreateUniformBindingShaders(gpu, &vertexShader, &fragmentShader)) {
     return nullptr;
   }
 
@@ -394,7 +700,6 @@ TGFX_TEST(GPURenderTest, StencilMaskRenderPass) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  SKIP_UNLESS_RAW_GLSL_MODULES(context);
   auto gpu = context->gpu();
   ASSERT_TRUE(gpu != nullptr);
 
@@ -745,7 +1050,6 @@ TGFX_TEST(GPURenderTest, VaryingOrderMismatch) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  SKIP_UNLESS_RAW_GLSL_MODULES(context);
   auto gpu = context->gpu();
   ASSERT_TRUE(gpu != nullptr);
 
@@ -798,14 +1102,19 @@ TGFX_TEST(GPURenderTest, VaryingOrderMismatch) {
   EXPECT_TRUE(Baseline::Compare(surface, "GPURenderTest/VaryingOrderMismatch"));
 }
 
-// The vertex stage emits an extra output that the fragment never consumes. SPIR-V based backends
-// (Metal, Vulkan, D3D12, WebGPU) must reject the pipeline at creation instead of silently reading
-// undefined values; OpenGL links varyings by name and silently drops the unused output.
+// The vertex stage emits an extra output that the fragment never consumes. This check is
+// name-based and therefore only exists for GLSL sources: tgfx parses the GLSL interface and
+// rejects the pipeline itself. Native formats are validated by their own compilers instead
+// (SPIR-V/WGSL/D3D12 match by location or semantic, Metal by struct layout), so a name mismatch
+// is not an error there and the test is GL-only by design.
 TGFX_TEST(GPURenderTest, VaryingMismatchRejected) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  SKIP_UNLESS_RAW_GLSL_MODULES(context);
+  if (context->backend() != Backend::OpenGL) {
+    GTEST_SKIP() << "the name-based varying-mismatch check only runs for GLSL sources; native "
+                    "formats rely on their own compilers";
+  }
   auto gpu = context->gpu();
 
   auto backend = gpu->info()->backend;
@@ -836,7 +1145,6 @@ TGFX_TEST(GPURenderTest, UniformBufferBindingMismatch) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  SKIP_UNLESS_RAW_GLSL_MODULES(context);
   auto gpu = context->gpu();
   ASSERT_TRUE(gpu != nullptr);
 
@@ -931,24 +1239,13 @@ TGFX_TEST(GPURenderTest, UniformBufferMissingDeclarationRejected) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  SKIP_UNLESS_RAW_GLSL_MODULES(context);
   auto gpu = context->gpu();
   ASSERT_TRUE(gpu != nullptr);
   auto backend = gpu->info()->backend;
-  auto info = gpu->info();
-  auto isDesktop = info->version.find("OpenGL ES") == std::string::npos;
 
-  ShaderModuleDescriptor vertexModule = {};
-  vertexModule.code = PrefixShaderVersion(UNIFORM_BUFFER_BINDING_VERTEX_SHADER, isDesktop);
-  vertexModule.stage = ShaderStage::Vertex;
-  auto vertexShader = gpu->createShaderModule(vertexModule);
-  ASSERT_TRUE(vertexShader != nullptr);
-
-  ShaderModuleDescriptor fragmentModule = {};
-  fragmentModule.code = PrefixShaderVersion(UNIFORM_BUFFER_BINDING_FRAGMENT_SHADER, isDesktop);
-  fragmentModule.stage = ShaderStage::Fragment;
-  auto fragmentShader = gpu->createShaderModule(fragmentModule);
-  ASSERT_TRUE(fragmentShader != nullptr);
+  std::shared_ptr<ShaderModule> vertexShader = nullptr;
+  std::shared_ptr<ShaderModule> fragmentShader = nullptr;
+  ASSERT_TRUE(CreateUniformBindingShaders(gpu, &vertexShader, &fragmentShader));
 
   RenderPipelineDescriptor descriptor = {};
   Attribute position = {"inPosition", VertexFormat::Float2};
@@ -982,24 +1279,13 @@ TGFX_TEST(GPURenderTest, UniformBufferDuplicateLogicalBinding) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  SKIP_UNLESS_RAW_GLSL_MODULES(context);
   auto gpu = context->gpu();
   ASSERT_TRUE(gpu != nullptr);
   auto backend = gpu->info()->backend;
-  auto info = gpu->info();
-  auto isDesktop = info->version.find("OpenGL ES") == std::string::npos;
 
-  ShaderModuleDescriptor vertexModule = {};
-  vertexModule.code = PrefixShaderVersion(UNIFORM_BUFFER_BINDING_VERTEX_SHADER, isDesktop);
-  vertexModule.stage = ShaderStage::Vertex;
-  auto vertexShader = gpu->createShaderModule(vertexModule);
-  ASSERT_TRUE(vertexShader != nullptr);
-
-  ShaderModuleDescriptor fragmentModule = {};
-  fragmentModule.code = PrefixShaderVersion(UNIFORM_BUFFER_BINDING_FRAGMENT_SHADER, isDesktop);
-  fragmentModule.stage = ShaderStage::Fragment;
-  auto fragmentShader = gpu->createShaderModule(fragmentModule);
-  ASSERT_TRUE(fragmentShader != nullptr);
+  std::shared_ptr<ShaderModule> vertexShader = nullptr;
+  std::shared_ptr<ShaderModule> fragmentShader = nullptr;
+  ASSERT_TRUE(CreateUniformBindingShaders(gpu, &vertexShader, &fragmentShader));
 
   RenderPipelineDescriptor descriptor = {};
   Attribute position = {"inPosition", VertexFormat::Float2};

@@ -19,15 +19,18 @@
 #include "StencilMaskRenderPass.h"
 #include <cmath>
 #include <cstring>
-#include <string>
+#include <memory>
 #include <vector>
 #include "tgfx/gpu/GPU.h"
+#include "utils/NativeShader.h"
 
 namespace tgfx {
 
 // Both passes share a single vertex layout — one Float2 position per vertex in normalized
 // device coordinates. Pass 1 feeds a triangle fan that approximates a centred disc; pass 2
-// feeds two triangles covering the entire viewport.
+// feeds two triangles covering the entire viewport. The native variants mirror the removed
+// GLSL-translation layer: Metal and D3D12 negate the clip-space y, GL/Vulkan/WebGPU pass it
+// through.
 static constexpr char VERTEX_SHADER[] = R"(
         in vec2 inPosition;
         void main() {
@@ -59,6 +62,177 @@ static constexpr char COVER_FRAGMENT_SHADER[] = R"(
         }
     )";
 
+static constexpr char MSL_VERTEX_SHADER[] = R"(
+#include <metal_stdlib>
+using namespace metal;
+
+struct VertexIn {
+  float2 inPosition [[attribute(0)]];
+};
+
+vertex float4 main0(VertexIn in [[stage_in]]) {
+  return float4(in.inPosition.x, -in.inPosition.y, 0.0, 1.0);
+}
+)";
+
+static constexpr char MSL_MASK_FRAGMENT_SHADER[] = R"(
+#include <metal_stdlib>
+using namespace metal;
+
+fragment float4 main0() {
+  return float4(0.0, 0.0, 0.0, 1.0);
+}
+)";
+
+static constexpr char MSL_COVER_FRAGMENT_SHADER[] = R"(
+#include <metal_stdlib>
+using namespace metal;
+
+struct Args {
+  float4 coverColor;
+};
+
+fragment float4 main0(constant Args& args [[buffer(0)]]) {
+  return args.coverColor;
+}
+)";
+
+static const uint32_t kStencilVertexSpirv[] = {
+    0x07230203, 0x00010300, 0x000d000b, 0x0000001b, 0x00000000, 0x00020011, 0x00000001, 0x0006000b,
+    0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e, 0x00000000, 0x0003000e, 0x00000000, 0x00000001,
+    0x0007000f, 0x00000000, 0x00000004, 0x6e69616d, 0x00000000, 0x0000000d, 0x00000012, 0x00030047,
+    0x0000000b, 0x00000002, 0x00050048, 0x0000000b, 0x00000000, 0x0000000b, 0x00000000, 0x00050048,
+    0x0000000b, 0x00000001, 0x0000000b, 0x00000001, 0x00050048, 0x0000000b, 0x00000002, 0x0000000b,
+    0x00000003, 0x00050048, 0x0000000b, 0x00000003, 0x0000000b, 0x00000004, 0x00040047, 0x00000012,
+    0x0000001e, 0x00000000, 0x00020013, 0x00000002, 0x00030021, 0x00000003, 0x00000002, 0x00030016,
+    0x00000006, 0x00000020, 0x00040017, 0x00000007, 0x00000006, 0x00000004, 0x00040015, 0x00000008,
+    0x00000020, 0x00000000, 0x0004002b, 0x00000008, 0x00000009, 0x00000001, 0x0004001c, 0x0000000a,
+    0x00000006, 0x00000009, 0x0006001e, 0x0000000b, 0x00000007, 0x00000006, 0x0000000a, 0x0000000a,
+    0x00040020, 0x0000000c, 0x00000003, 0x0000000b, 0x0004003b, 0x0000000c, 0x0000000d, 0x00000003,
+    0x00040015, 0x0000000e, 0x00000020, 0x00000001, 0x0004002b, 0x0000000e, 0x0000000f, 0x00000000,
+    0x00040017, 0x00000010, 0x00000006, 0x00000002, 0x00040020, 0x00000011, 0x00000001, 0x00000010,
+    0x0004003b, 0x00000011, 0x00000012, 0x00000001, 0x0004002b, 0x00000006, 0x00000014, 0x00000000,
+    0x0004002b, 0x00000006, 0x00000015, 0x3f800000, 0x00040020, 0x00000019, 0x00000003, 0x00000007,
+    0x00050036, 0x00000002, 0x00000004, 0x00000000, 0x00000003, 0x000200f8, 0x00000005, 0x0004003d,
+    0x00000010, 0x00000013, 0x00000012, 0x00050051, 0x00000006, 0x00000016, 0x00000013, 0x00000000,
+    0x00050051, 0x00000006, 0x00000017, 0x00000013, 0x00000001, 0x00070050, 0x00000007, 0x00000018,
+    0x00000016, 0x00000017, 0x00000014, 0x00000015, 0x00050041, 0x00000019, 0x0000001a, 0x0000000d,
+    0x0000000f, 0x0003003e, 0x0000001a, 0x00000018, 0x000100fd, 0x00010038,
+};
+
+static const uint32_t kStencilMaskFragmentSpirv[] = {
+    0x07230203, 0x00010300, 0x000d000b, 0x0000000d, 0x00000000, 0x00020011, 0x00000001, 0x0006000b,
+    0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e, 0x00000000, 0x0003000e, 0x00000000, 0x00000001,
+    0x0006000f, 0x00000004, 0x00000004, 0x6e69616d, 0x00000000, 0x00000009, 0x00030010, 0x00000004,
+    0x00000007, 0x00040047, 0x00000009, 0x0000001e, 0x00000000, 0x00020013, 0x00000002, 0x00030021,
+    0x00000003, 0x00000002, 0x00030016, 0x00000006, 0x00000020, 0x00040017, 0x00000007, 0x00000006,
+    0x00000004, 0x00040020, 0x00000008, 0x00000003, 0x00000007, 0x0004003b, 0x00000008, 0x00000009,
+    0x00000003, 0x0004002b, 0x00000006, 0x0000000a, 0x00000000, 0x0004002b, 0x00000006, 0x0000000b,
+    0x3f800000, 0x0007002c, 0x00000007, 0x0000000c, 0x0000000a, 0x0000000a, 0x0000000a, 0x0000000b,
+    0x00050036, 0x00000002, 0x00000004, 0x00000000, 0x00000003, 0x000200f8, 0x00000005, 0x0003003e,
+    0x00000009, 0x0000000c, 0x000100fd, 0x00010038,
+};
+
+static const uint32_t kStencilCoverFragmentSpirv[] = {
+    0x07230203, 0x00010300, 0x000d000b, 0x00000012, 0x00000000, 0x00020011, 0x00000001, 0x0006000b,
+    0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e, 0x00000000, 0x0003000e, 0x00000000, 0x00000001,
+    0x0006000f, 0x00000004, 0x00000004, 0x6e69616d, 0x00000000, 0x00000009, 0x00030010, 0x00000004,
+    0x00000007, 0x00040047, 0x00000009, 0x0000001e, 0x00000000, 0x00030047, 0x0000000a, 0x00000002,
+    0x00050048, 0x0000000a, 0x00000000, 0x00000023, 0x00000000, 0x00040047, 0x0000000c, 0x00000021,
+    0x00000000, 0x00040047, 0x0000000c, 0x00000022, 0x00000001, 0x00020013, 0x00000002, 0x00030021,
+    0x00000003, 0x00000002, 0x00030016, 0x00000006, 0x00000020, 0x00040017, 0x00000007, 0x00000006,
+    0x00000004, 0x00040020, 0x00000008, 0x00000003, 0x00000007, 0x0004003b, 0x00000008, 0x00000009,
+    0x00000003, 0x0003001e, 0x0000000a, 0x00000007, 0x00040020, 0x0000000b, 0x00000002, 0x0000000a,
+    0x0004003b, 0x0000000b, 0x0000000c, 0x00000002, 0x00040015, 0x0000000d, 0x00000020, 0x00000001,
+    0x0004002b, 0x0000000d, 0x0000000e, 0x00000000, 0x00040020, 0x0000000f, 0x00000002, 0x00000007,
+    0x00050036, 0x00000002, 0x00000004, 0x00000000, 0x00000003, 0x000200f8, 0x00000005, 0x00050041,
+    0x0000000f, 0x00000010, 0x0000000c, 0x0000000e, 0x0004003d, 0x00000007, 0x00000011, 0x00000010,
+    0x0003003e, 0x00000009, 0x00000011, 0x000100fd, 0x00010038,
+};
+
+static constexpr char WGSL_VERTEX_SHADER[] = R"(
+struct VertexIn {
+  @location(0) inPosition: vec2f,
+};
+
+@vertex
+fn main(in: VertexIn) -> @builtin(position) vec4f {
+  return vec4f(in.inPosition, 0.0, 1.0);
+}
+)";
+
+static constexpr char WGSL_MASK_FRAGMENT_SHADER[] = R"(
+@fragment
+fn main() -> @location(0) vec4f {
+  return vec4f(0.0, 0.0, 0.0, 1.0);
+}
+)";
+
+static constexpr char WGSL_COVER_FRAGMENT_SHADER[] = R"(
+struct Args {
+  coverColor: vec4f,
+};
+
+@group(1) @binding(0) var<uniform> args: Args;
+
+@fragment
+fn main() -> @location(0) vec4f {
+  return args.coverColor;
+}
+)";
+
+static constexpr char HLSL_VERTEX_SHADER[] = R"(
+struct VSIn {
+  float2 inPosition : TEXCOORD0;
+};
+
+float4 main(VSIn input) : SV_Position {
+  return float4(input.inPosition.x, -input.inPosition.y, 0.0, 1.0);
+}
+)";
+
+static constexpr char HLSL_MASK_FRAGMENT_SHADER[] = R"(
+float4 main() : SV_Target {
+  return float4(0.0, 0.0, 0.0, 1.0);
+}
+)";
+
+static constexpr char HLSL_COVER_FRAGMENT_SHADER[] = R"(
+cbuffer Args : register(b0) {
+  float4 coverColor;
+};
+
+float4 main() : SV_Target {
+  return coverColor;
+}
+)";
+
+static const NativeShaderStage kVertexSource = {VERTEX_SHADER,
+                                                MSL_VERTEX_SHADER,
+                                                kStencilVertexSpirv,
+                                                sizeof(kStencilVertexSpirv) / sizeof(uint32_t),
+                                                WGSL_VERTEX_SHADER,
+                                                HLSL_VERTEX_SHADER,
+                                                {}};
+
+static const NativeShaderStage kMaskFragmentSource = {
+    MASK_FRAGMENT_SHADER,
+    MSL_MASK_FRAGMENT_SHADER,
+    kStencilMaskFragmentSpirv,
+    sizeof(kStencilMaskFragmentSpirv) / sizeof(uint32_t),
+    WGSL_MASK_FRAGMENT_SHADER,
+    HLSL_MASK_FRAGMENT_SHADER,
+    {}};
+
+static const NativeShaderStage kCoverFragmentSource = {
+    COVER_FRAGMENT_SHADER,
+    MSL_COVER_FRAGMENT_SHADER,
+    kStencilCoverFragmentSpirv,
+    sizeof(kStencilCoverFragmentSpirv) / sizeof(uint32_t),
+    WGSL_COVER_FRAGMENT_SHADER,
+    HLSL_COVER_FRAGMENT_SHADER,
+    {{"Args", 0}}};
+
 // CIRCLE_SEGMENTS is the number of triangles in the fan that approximates the mask disc.
 // 64 is plenty for the small render targets used by the tests; the disc edge is then well
 // within one pixel of a true circle on a 200x200 surface.
@@ -80,23 +254,13 @@ struct CompiledShaders {
   std::shared_ptr<ShaderModule> fragment;
 };
 
-static std::string GetFinalShaderCode(const char* codeSnippet, bool isDesktop) {
-  if (isDesktop) {
-    return std::string("#version 150\n\n") + codeSnippet;
+static CompiledShaders CompileShaders(GPU* gpu, const NativeShaderStage& fragmentSource) {
+  CompiledShaders shaders = {};
+  if (!CreateNativeShaderModules(gpu, kVertexSource, fragmentSource, &shaders.vertex,
+                                 &shaders.fragment)) {
+    return {};
   }
-  return std::string("#version 300 es\n\n") + codeSnippet;
-}
-
-static CompiledShaders CompileShaders(GPU* gpu, const char* fragmentSrc) {
-  auto info = gpu->info();
-  auto isDesktop = info->version.find("OpenGL ES") == std::string::npos;
-  ShaderModuleDescriptor vertexModule = {};
-  vertexModule.code = GetFinalShaderCode(VERTEX_SHADER, isDesktop);
-  vertexModule.stage = ShaderStage::Vertex;
-  ShaderModuleDescriptor fragmentModule = {};
-  fragmentModule.code = GetFinalShaderCode(fragmentSrc, isDesktop);
-  fragmentModule.stage = ShaderStage::Fragment;
-  return {gpu->createShaderModule(vertexModule), gpu->createShaderModule(fragmentModule)};
+  return shaders;
 }
 
 std::shared_ptr<StencilMaskRenderPass> StencilMaskRenderPass::Make(PMColor coverColor) {
@@ -112,7 +276,7 @@ StencilMaskRenderPass::StencilMaskRenderPass(PMColor color)
 // previously the GL stencil-state factory dropped this case via a `compare==Always` shortcut,
 // so reaching this code path end-to-end exercises the fix that A introduces.
 std::shared_ptr<RenderPipeline> StencilMaskRenderPass::createMaskPipeline(GPU* gpu) const {
-  auto shaders = CompileShaders(gpu, MASK_FRAGMENT_SHADER);
+  auto shaders = CompileShaders(gpu, kMaskFragmentSource);
   if (shaders.vertex == nullptr || shaders.fragment == nullptr) {
     return nullptr;
   }
@@ -150,7 +314,7 @@ std::shared_ptr<RenderPipeline> StencilMaskRenderPass::createMaskPipeline(GPU* g
 // covered by pass 1 survive; passOp=Keep so the cover pass does not modify the stencil any
 // further (in case the same buffer is re-used elsewhere).
 std::shared_ptr<RenderPipeline> StencilMaskRenderPass::createCoverPipeline(GPU* gpu) const {
-  auto shaders = CompileShaders(gpu, COVER_FRAGMENT_SHADER);
+  auto shaders = CompileShaders(gpu, kCoverFragmentSource);
   if (shaders.vertex == nullptr || shaders.fragment == nullptr) {
     return nullptr;
   }
