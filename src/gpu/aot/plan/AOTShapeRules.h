@@ -41,11 +41,6 @@ bool IsUnaryPointwiseOp(const AOTEffectNode* node, AOTNodeID expectedInput);
 bool IsLinearMultiPassSource(const AOTEffectGraph& graph, AOTNodeID nodeID);
 
 /**
- * A YUV video source fed by the geometry color (node 0) and sampled plainly.
- */
-bool IsYUVChainSource(const AOTEffectGraph& graph, AOTNodeID nodeID);
-
-/**
  * Whether the kind is an input-environment designator (the geometry color, the coverage unit, and
  * the two xfer-child inputs) that never becomes a chain slot.
  */

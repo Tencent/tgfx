@@ -673,15 +673,21 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
           Plan plan;
           ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
           ASSERT_EQ(plan.passes.size(), 1u);
-          EXPECT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseGraph);
           EXPECT_EQ(plan.passes[0].resourceProfile, AOTResourceProfile::TiledGraph);
           std::vector<const FragmentProcessor*> coverageProcessors;
           if (coverage != nullptr) {
             coverageProcessors.push_back(coverage.get());
           }
+          DrawIR passIR = {};
+          passIR.color = graph;
+          passIR.passDescriptor = plan.passes[0];
+          if (!coverageProcessors.empty()) {
+            auto terms = LowerCoverageTerms(coverageProcessors, nullptr, &allocator);
+            ASSERT_TRUE(terms.has_value());
+            passIR.coverage = std::move(*terms);
+          }
           AOTProgram chain = {};
-          ASSERT_TRUE(AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0],
-                                                           coverageProcessors, false, &chain));
+          ASSERT_TRUE(AOTChainBuilder::CompilePassProgram(passIR, &chain));
           ProgramInfo programInfo(renderTarget.get(), gp.get(), xp.get(), BlendMode::SrcOver,
                                   !coverageProcessors.empty());
           // The interpreter's own match: a program-holding draw resolves through MatchProgram,
@@ -732,9 +738,14 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
     Plan plan;
     ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
     ASSERT_EQ(plan.passes.size(), 1u);
+    DrawIR passIR = {};
+    passIR.color = graph;
+    passIR.passDescriptor = plan.passes[0];
+    auto terms = LowerCoverageTerms({coverage.get()}, nullptr, &allocator);
+    ASSERT_TRUE(terms.has_value());
+    passIR.coverage = std::move(*terms);
     AOTProgram chain = {};
-    ASSERT_TRUE(AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0],
-                                                     {coverage.get()}, false, &chain));
+    ASSERT_TRUE(AOTChainBuilder::CompilePassProgram(passIR, &chain));
     ProgramInfo programInfo(renderTarget.get(), gp.get(), nullptr, BlendMode::SrcOver, true);
     // The interpreter's own match: a program-holding draw resolves through MatchProgram, not the
     // family walk (whose dedicated families would claim the empty processor list).

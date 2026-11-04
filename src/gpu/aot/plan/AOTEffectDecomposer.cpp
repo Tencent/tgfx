@@ -25,8 +25,6 @@
 #include "gpu/aot/plan/AOTPlanner.h"
 #include "gpu/aot/plan/AOTShapeRules.h"
 #include "gpu/processors/FragmentProcessor.h"
-#include "gpu/processors/PerlinNoiseFragmentProcessor.h"
-#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 
 namespace tgfx {
 
@@ -122,9 +120,9 @@ bool AOTEffectDecomposer::Lower(const std::vector<const FragmentProcessor*>& pro
   return true;
 }
 
-// The multi-pass source, the unary pointwise set, the perlin/YUV source shapes and the
-// const-operand blend are shared shape rules (gpu/AOTShapeRules.h) — the same authority the
-// executor's admission checks and the chain builder consume.
+// The multi-pass source, the unary pointwise set and the const-operand blend are shared shape
+// rules (gpu/AOTShapeRules.h) — the same authority the executor's admission checks and the chain
+// builder consume.
 
 // The placeholder a cut's replacement stands in as during planning: device sampling, identity
 // matrix, no perspective — the facts the fit depends on — with no texture behind it yet.
@@ -145,14 +143,35 @@ static bool CanStartPassAt(const AOTEffectNode* node) {
   return node != nullptr && node->kind != AOTEffectKind::AlphaThreshold;
 }
 
+// Whether the linear chain's operator run [firstOperator, passEnd) forms one chain pass, with the
+// pass's head standing in as the source (the first pass) or a placeholder cut edge (later passes):
+// the same segment build construction runs.
+static bool FitsLinearPass(const AOTEffectGraph& graph, const AOTTextureParameters& intermediate,
+                           uint32_t firstOperator, uint32_t passEnd, bool firstPass) {
+  PassIR candidate = {};
+  candidate.output = AOTNodeID(passEnd - 1);
+  if (firstPass) {
+    candidate.nodes.push_back(AOTNodeID(1));
+  } else {
+    candidate.materializedInputs.push_back(AOTNodeID(firstOperator - 1));
+  }
+  for (auto index = firstOperator; index < passEnd; ++index) {
+    candidate.nodes.push_back(AOTNodeID(index));
+  }
+  std::vector<AOTTextureParameters> placeholders(candidate.materializedInputs.size(), intermediate);
+  AOTEffectGraph segment = {};
+  PassIR segmentPass = {};
+  return AOTChainBuilder::BuildCutSegment(graph, candidate, placeholders, Matrix::I(), Matrix::I(),
+                                          &segment, &segmentPass);
+}
+
 // Planner for a linear chain one fused pass cannot carry: GeometryColor -> plain or device-space
 // TextureSource -> unary pointwise ops, with more operators than the chain kernel has instructions
 // or more color-space transforms than its parameter block holds. The chain is cut into chain-kernel
-// passes, each as long as fits (AOTChainBuilder::BuildCutSegment over the pass's nodes and a
-// placeholder intermediate is the fit check), every later pass reading its predecessor's
-// materialized output through a cut-style materializedInputs edge. A pass ends early when the next
-// one would otherwise start at a node that may not start a pass (CanStartPassAt); the chain is
-// refused when no boundary is left.
+// passes, each as long as fits (FitsLinearPass, the same segment build construction runs), every
+// later pass reading its predecessor's materialized output through a cut-style materializedInputs
+// edge. A pass ends early when the next one would otherwise start at a node that may not start a
+// pass (CanStartPassAt); the chain is refused when no boundary is left.
 static bool DecomposeLinearMultiPass(const AOTEffectGraph& graph, Plan* plan) {
   if (plan == nullptr || graph.nodeCount() < 2 || graph.root().index() + 1 != graph.nodeCount()) {
     return false;
@@ -171,35 +190,18 @@ static bool DecomposeLinearMultiPass(const AOTEffectGraph& graph, Plan* plan) {
   // A later pass reads an intermediate that does not exist yet; the placeholder carries the facts
   // the fit depends on, exactly like a blend cut's admission.
   auto intermediate = CutIntermediatePlaceholder();
-  auto fits = [&](uint32_t firstOperator, uint32_t passEnd, bool firstPass) {
-    PassIR candidate = {};
-    candidate.output = AOTNodeID(passEnd - 1);
-    if (firstPass) {
-      candidate.nodes.push_back(AOTNodeID(1));
-    } else {
-      candidate.materializedInputs.push_back(AOTNodeID(firstOperator - 1));
-    }
-    for (auto index = firstOperator; index < passEnd; ++index) {
-      candidate.nodes.push_back(AOTNodeID(index));
-    }
-    std::vector<AOTTextureParameters> placeholders(candidate.materializedInputs.size(),
-                                                   intermediate);
-    AOTEffectGraph segment = {};
-    PassIR segmentPass = {};
-    return AOTChainBuilder::BuildCutSegment(graph, candidate, placeholders, Matrix::I(),
-                                            Matrix::I(), &segment, &segmentPass);
-  };
   Plan result = {};
   const auto nodeCount = static_cast<uint32_t>(graph.nodeCount());
   uint32_t firstOperator = 2;
   while (true) {
     bool firstPass = result.passes.empty();
-    if (firstPass && !fits(firstOperator, firstOperator, true)) {
+    if (firstPass && !FitsLinearPass(graph, intermediate, firstOperator, firstOperator, true)) {
       return false;
     }
     // One past the last node of this pass.
     auto passEnd = firstOperator;
-    while (passEnd < nodeCount && fits(firstOperator, passEnd + 1, firstPass)) {
+    while (passEnd < nodeCount &&
+           FitsLinearPass(graph, intermediate, firstOperator, passEnd + 1, firstPass)) {
       ++passEnd;
     }
     while (passEnd < nodeCount && passEnd > firstOperator &&
@@ -213,7 +215,6 @@ static bool DecomposeLinearMultiPass(const AOTEffectGraph& graph, Plan* plan) {
       return false;
     }
     PassIR pass = {};
-    pass.kernel = AOTKernelKind::PointwiseChain;
     if (firstPass) {
       pass.nodes.push_back(AOTNodeID(1));
     } else {
@@ -233,44 +234,6 @@ static bool DecomposeLinearMultiPass(const AOTEffectGraph& graph, Plan* plan) {
   for (size_t index = 0; index + 1 < result.passes.size(); ++index) {
     result.passes[index].materializesOutput = true;
   }
-  result.output = graph.root();
-  *plan = std::move(result);
-  return true;
-}
-
-// Planner for a YUV video source with a bounded color-grade tail: GeometryColor -> YUV
-// TextureSource -> [0..3 unary pointwise ops]. YUVTextureFillShader carries the plane sampling
-// and conversion plus three pointwise slots, so the color-grade shapes (a paint color filter
-// over a video frame) ride a single fused pass. Anything beyond the budget — a blend, a fourth
-// operator, any non-pointwise node — is rejected and keeps the runtime route.
-static bool DecomposeYUVChain(const AOTEffectGraph& graph, Plan* plan) {
-  if (plan == nullptr || graph.nodeCount() < 3 || graph.root().index() + 1 != graph.nodeCount()) {
-    return false;
-  }
-  auto geometryNode = graph.nodeAt(AOTNodeID(0));
-  if (geometryNode == nullptr || geometryNode->kind != AOTEffectKind::GeometryColor ||
-      !IsYUVChainSource(graph, AOTNodeID(1))) {
-    return false;
-  }
-  AOTNodeID prev = AOTNodeID(1);
-  for (uint32_t index = 2; index < graph.nodeCount(); ++index) {
-    auto node = graph.nodeAt(AOTNodeID(index));
-    if (!IsUnaryPointwiseOp(node, prev)) {
-      return false;
-    }
-    prev = AOTNodeID(index);
-  }
-  if (graph.nodeCount() - 2 > MaxPointwiseSlots) {
-    return false;
-  }
-  Plan result = {};
-  PassIR pass = {};
-  pass.kernel = AOTKernelKind::YUVTextureFill;
-  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
-    pass.nodes.push_back(AOTNodeID(index));
-  }
-  pass.output = graph.root();
-  result.passes.push_back(std::move(pass));
   result.output = graph.root();
   *plan = std::move(result);
   return true;
@@ -308,12 +271,10 @@ static bool PlanReachableSubtree(const AOTEffectGraph& graph, AOTNodeID subtreeR
     pass->nodes.push_back(AOTNodeID(index));
   }
   AOTResourceProfile profile = AOTResourceProfile::Automatic;
-  if (!AOTChainBuilder::FitsChainPlan(graph, *pass, false, &profile)) {
+  if (!AOTChainBuilder::FitsChainPlan(graph, *pass, &profile)) {
     return false;
   }
   pass->resourceProfile = profile;
-  pass->kernel =
-      IsAOTGraphProfile(profile) ? AOTKernelKind::PointwiseGraph : AOTKernelKind::PointwiseChain;
   return true;
 }
 
@@ -408,7 +369,6 @@ static bool PlanCutPass(const AOTEffectGraph& graph, AOTNodeID root,
                                         &segment, &segmentPass)) {
     return false;
   }
-  candidate.kernel = segmentPass.kernel;
   candidate.resourceProfile = segmentPass.resourceProfile;
   *pass = std::move(candidate);
   return true;
@@ -518,13 +478,13 @@ static bool DecomposeMaterializedBlend(const AOTEffectGraph& graph, Plan* plan) 
 bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, Plan* plan, bool singlePassOnly) {
   // Pointwise DAGs (noise and gradient sources included) run on the chain family within its
   // budgets, without materialization. A linear chain over one chain pass's budget splits into
-  // several chain passes; YUV sources keep their dedicated kernel.
+  // several chain passes; YUV sources keep their dedicated family and never plan here.
   if (plan == nullptr) {
     return false;
   }
   using Planner = bool (*)(const AOTEffectGraph&, Plan*);
-  for (Planner planner : {DecomposePointwiseDAG, DecomposeMaterializedBlend,
-                          DecomposeLinearMultiPass, DecomposeYUVChain}) {
+  for (Planner planner :
+       {DecomposePointwiseDAG, DecomposeMaterializedBlend, DecomposeLinearMultiPass}) {
     if (singlePassOnly && planner == &DecomposeMaterializedBlend) {
       // The cut planner's plans always start with a materializing pass and always need a task;
       // a single-pass-only caller would run its iterative segment builds only to discard the
@@ -536,11 +496,10 @@ bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, Plan* plan, boo
       continue;
     }
     // Each planner's own admission subsumes what AOTPlanner::Validate would re-derive: the
-    // DAG planner resolves the profile and kernel together, the linear planner's fit calls
-    // BuildCutSegment with the same placeholder admission the planner's validation relies on, the
-    // YUV planner checks the slot shapes and the lookup resources, and the cut planner runs the
-    // same segment build construction uses over placeholder intermediates. The re-check therefore
-    // runs only as a debug assertion.
+    // DAG planner resolves the profile, the linear planner's fit calls
+    // BuildCutSegment with the same placeholder admission the planner's validation relies on, and
+    // the cut planner runs the same segment build construction uses over placeholder intermediates.
+    // The re-check therefore runs only as a debug assertion.
     DEBUG_ASSERT(AOTPlanner::Validate(graph, candidate));
     *plan = std::move(candidate);
     return true;

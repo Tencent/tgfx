@@ -4443,10 +4443,11 @@ TGFX_TEST(AOTRenderConsistencyTest, TrailingTiledLeafMatchesRuntime) {
     Plan plan;
     ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
     ASSERT_EQ(plan.passes.size(), 1u);
-    ASSERT_EQ(plan.passes[0].kernel, AOTKernelKind::PointwiseChain);
+    DrawIR passIR = {};
+    passIR.color = graph;
+    passIR.passDescriptor = plan.passes[0];
     AOTProgram program = {};
-    ASSERT_TRUE(AOTChainBuilder::CompileChainProgram(&allocator, graph, plan.passes[0], {}, false,
-                                                     &program));
+    ASSERT_TRUE(AOTChainBuilder::CompilePassProgram(passIR, &program));
     EXPECT_EQ(program.samplerChildCount, 4u);
     ASSERT_EQ(program.tiledLeaves.size(), 1u);
     EXPECT_GE(program.tiledLeaves[0].leafIndex, 2) << label;

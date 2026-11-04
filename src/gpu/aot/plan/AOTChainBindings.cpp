@@ -108,12 +108,11 @@ static bool BuildTextureLeafBinding(const AOTEffectNode* node, AOTBinding* bindi
 // clip-coverage channel. When coverageGraph is given, its nodes (lowered from the coverage FP with
 // the GeometryCoverage unit as origin) are merged after the color nodes: coverage leaves extend
 // the leading texture block, coverage ops trail the color ops, and coverageRoot becomes the
-// chain's coverage root. checkKernel compares the pass kernel against the profile the color pass
-// needs; the DAG planner clears it to learn that profile.
+// chain's coverage root.
 bool PlanChainLayout(const AOTEffectGraph& graph, const PassIR& pass,
                      const AOTEffectGraph* coverageGraph, AOTNodeID coverageRoot,
                      bool coverageLeafFromUVCoord, const std::vector<AOTNodeID>& clipLinks,
-                     bool checkKernel, AOTChainCompile* layout) {
+                     AOTChainCompile* layout) {
   AOTChainContext ctx = {};
   ctx.graph = &graph;
   ctx.pass = &pass;
@@ -121,7 +120,6 @@ bool PlanChainLayout(const AOTEffectGraph& graph, const PassIR& pass,
   ctx.coverageRoot = coverageRoot;
   ctx.coverageLeafFromUVCoord = coverageLeafFromUVCoord;
   ctx.clipLinks = &clipLinks;
-  ctx.checkKernel = checkKernel;
   ctx.layout = layout;
   if (!MergeNodeSpaces(&ctx)) {
     return false;
@@ -365,8 +363,7 @@ static bool MergeCoverageTerms(const std::vector<AOTCoverageTerm>& terms,
 // padding the four-sampler artifacts need and the mask slot child. coverageTerms is null for a
 // plan pass (plan passes carry no draw coverage).
 bool CompileChainLayout(const AOTEffectGraph& graph, const PassIR& pass,
-                        const std::vector<AOTCoverageTerm>* coverageTerms, bool checkKernel,
-                        AOTChainCompile* out) {
+                        const std::vector<AOTCoverageTerm>* coverageTerms, AOTChainCompile* out) {
   if (out == nullptr) {
     return false;
   }
@@ -380,8 +377,7 @@ bool CompileChainLayout(const AOTEffectGraph& graph, const PassIR& pass,
   }
   AOTChainCompile layout = {};
   if (!PlanChainLayout(graph, pass, coverageGraph, coverage.coverageRoot,
-                       coverage.coverageLeafFromUVCoord, coverage.clipLinks, checkKernel,
-                       &layout)) {
+                       coverage.coverageLeafFromUVCoord, coverage.clipLinks, &layout)) {
     return false;
   }
   auto& program = layout.program;
@@ -451,7 +447,7 @@ bool CompileChainProgramLayout(const AOTEffectGraph& graph, const PassIR& pass,
     return false;
   }
   AOTChainCompile compiled = {};
-  if (!CompileChainLayout(graph, pass, coverageTerms, true, &compiled)) {
+  if (!CompileChainLayout(graph, pass, coverageTerms, &compiled)) {
     return false;
   }
   *out = std::move(compiled.program);

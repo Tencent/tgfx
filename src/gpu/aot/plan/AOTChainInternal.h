@@ -62,28 +62,27 @@ bool EncodeChainSlots(AOTChainContext* ctx);
 // Stage four: the pass's resource demand picks the final profile.
 bool ResolveFinalChainProfile(AOTChainContext* ctx);
 
-// Stage six: resolves the coverage subtree's root register and validates its shape.
+// Stage five: resolves the coverage subtree's root register and validates its shape.
 bool ResolveCoverageRoot(AOTChainContext* ctx);
 
-// Stage seven: routes the analytic coverage links onto the clip-coverage channel.
+// Stage six: routes the analytic coverage links onto the clip-coverage channel.
 void RouteAnalyticChains(AOTChainContext* ctx);
 
-// Stage eight: register allocation.
+// Stage seven: register allocation.
 bool AssignChainRegisters(AOTChainContext* ctx);
 
-// Stage nine: slot rules and the final profile's capacities.
+// Stage eight: slot rules and the final profile's capacities.
 bool FinalizeChainLayout(AOTChainContext* ctx);
 
-// The pipeline entry: stages one through nine over one merged node space.
+// The pipeline entry: stages one through eight over one merged node space.
 bool PlanChainLayout(const AOTEffectGraph& graph, const PassIR& pass,
                      const AOTEffectGraph* coverageGraph, AOTNodeID coverageRoot,
                      bool coverageLeafFromUVCoord, const std::vector<AOTNodeID>& clipLinks,
-                     bool checkKernel, AOTChainCompile* layout);
+                     AOTChainCompile* layout);
 
 // The one compile entry: the planner plus the sampler binding table.
 bool CompileChainLayout(const AOTEffectGraph& graph, const PassIR& pass,
-                        const std::vector<AOTCoverageTerm>* coverageTerms, bool checkKernel,
-                        AOTChainCompile* out);
+                        const std::vector<AOTCoverageTerm>* coverageTerms, AOTChainCompile* out);
 
 // The program-only view of the same entry.
 bool CompileChainProgramLayout(const AOTEffectGraph& graph, const PassIR& pass,

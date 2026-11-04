@@ -1357,18 +1357,11 @@ bool OpsCompositor::submitPlanTask(const AOTEffectGraph& graph, const Plan& plan
                                    const std::vector<AOTCoverageTerm>* terminalCoverage) {
   std::optional<Matrix> deviceToLocal = std::nullopt;
   if (plan.passes.size() > 1) {
-    auto drawOp = static_cast<StandardDrawOp*>(op->get());
-    // A fill pass that reads the geometry color bakes the draw's uniform input alpha, and later
-    // passes sample their intermediate without applying it again. Per-vertex colors cannot be
-    // reconstructed by the device-aligned fill. A plan whose passes only materialize operands
-    // keeps the paint alpha in the terminal draw's epilogue instead, so it needs no uniform color.
-    if (PlanBakesGeometryAlpha(graph, plan) && !drawOp->uniformGeometryColor().has_value()) {
-      return false;
-    }
     // A fill pass carrying local-coordinate leaves (a plain texture, a gradient, a noise source)
-    // evaluates them at top-left device positions and needs one affine device-to-local map.
+    // evaluates them at top-left device positions and needs one affine device-to-local map; the
+    // uniform-geometry-color requirement is enforced inside AOTPlanner::Build.
     if (AOTPlanner::NeedsLocalRemap(graph, plan)) {
-      deviceToLocal = drawOp->deviceToLocalMatrix();
+      deviceToLocal = static_cast<StandardDrawOp*>(op->get())->deviceToLocalMatrix();
       if (!deviceToLocal.has_value()) {
         return false;
       }

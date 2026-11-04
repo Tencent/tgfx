@@ -60,9 +60,7 @@ bool ResolveFinalChainProfile(AOTChainContext* ctx) {
   if (declaredProfile == AOTResourceProfile::Automatic) {
     declaredProfile = SelectAOTResourceProfile(colorDemand);
   }
-  if (!FitsAOTResourceProfile(colorDemand, declaredProfile) ||
-      (ctx->checkKernel && IsAOTGraphProfile(declaredProfile) !=
-                               (ctx->pass->kernel == AOTKernelKind::PointwiseGraph))) {
+  if (!FitsAOTResourceProfile(colorDemand, declaredProfile)) {
     return false;
   }
   ctx->finalProfile = declaredProfile;
@@ -84,7 +82,7 @@ bool ResolveFinalChainProfile(AOTChainContext* ctx) {
   return ctx->rootIndex != SIZE_MAX;
 }
 
-// Stage six: resolves the coverage subtree's root register, and validates the subtree's shape.
+// Stage five: resolves the coverage subtree's root register, and validates the subtree's shape.
 // Accepted roots: a single blend consuming the unit input (the xfer-dst coverage family), a bare
 // texture or gradient consuming the unit alpha, a constant (the inverted shader mask filter whose
 // shader yields no processor: ConstColor in any input mode, the same pmApplyConstColor math as
@@ -165,7 +163,7 @@ bool ResolveCoverageRoot(AOTChainContext* ctx) {
   return true;
 }
 
-// Stage seven: routes the analytic coverage terms' links onto the clip-coverage channel. They
+// Stage six: routes the analytic coverage terms' links onto the clip-coverage channel. They
 // never multiply the color root: each link chains from ctx->clipChainInput (the scalar unit one,
 // or the glyph register the atlas path set) so their product is a pure clip coverage value the
 // kernel reads through ClipCoverageRegister and composites as the XP's coverage input on top of
@@ -188,7 +186,7 @@ void RouteAnalyticChains(AOTChainContext* ctx) {
   }
 }
 
-// Stage eight: register allocation. The slot wiring built above uses instruction ordinals; this
+// Stage seven: register allocation. The slot wiring built above uses instruction ordinals; this
 // pass rewrites every reference into the kernel's recycled chainResults registers, so the
 // per-profile instruction budget (16 for Chain and gradient, 32 for noise) and the live-result
 // budget (MaxChainRegisters) are independent. A DAG exceeding the register budget is refused here.
@@ -224,7 +222,7 @@ bool AssignChainRegisters(AOTChainContext* ctx) {
   return true;
 }
 
-// Stage nine: the slot rules and the final profile's capacities decide last, on the exact
+// Stage eight: the slot rules and the final profile's capacities decide last, on the exact
 // instruction array the compile hands to AOTChainBuilder::ValidateSlots.
 bool FinalizeChainLayout(AOTChainContext* ctx) {
   auto* layout = ctx->layout;

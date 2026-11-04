@@ -197,12 +197,10 @@ static bool FinishSegmentPass(const AOTNodeBuilder& builder, AOTNodeID root,
     resultPass.nodes.push_back(AOTNodeID(index));
   }
   AOTResourceProfile profile = AOTResourceProfile::Automatic;
-  if (!AOTChainBuilder::FitsChainPlan(built, resultPass, false, &profile)) {
+  if (!AOTChainBuilder::FitsChainPlan(built, resultPass, &profile)) {
     return false;
   }
   resultPass.resourceProfile = profile;
-  resultPass.kernel =
-      IsAOTGraphProfile(profile) ? AOTKernelKind::PointwiseGraph : AOTKernelKind::PointwiseChain;
   *segment = std::move(built);
   *pass = std::move(resultPass);
   return true;

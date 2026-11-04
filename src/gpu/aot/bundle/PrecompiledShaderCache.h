@@ -167,7 +167,7 @@ struct AOTDrawStats {
   // recordDecomposeRejection() only when diagnostic recording is enabled, so a draw that
   // silently fell back to the plain route carries an observable "why" instead of nothing.
   // FusablePointwise never appears here: that outcome means the route was not attempted.
-  std::array<uint64_t, 5> decomposeRejections = {};
+  std::array<uint64_t, 4> decomposeRejections = {};
 };
 
 /// Runtime cache that loads precompiled shader bundles and provides O(1) lookup by ShaderKey hash.

@@ -72,28 +72,24 @@ class AOTPlanner {
    * keeps the plain route and its IR carries the pass descriptor, so the matcher compiles from the
    * record-time plan instead of decomposing the same graph again at prepare. The conditions mirror
    * Validate's single-pass branch exactly: a plan whose one pass materializes, carries
-   * dependencies, or does not output the plan's root needs a task even at one pass, and a non-chain
-   * kernel (perlin, YUV) has no fused serving — PlanRequiresTask keeps those on the task route.
+   * dependencies, or does not output the plan's root needs a task even at one pass.
    */
   static bool ServesInPlacePass(const Plan& plan);
 
   /**
    * Whether a plan that needs a task may carry the draw's coverage terms on its terminal pass:
-   * the terminal must be a chain pass (a linear-kernel terminal — YUV or perlin — serves through a
-   * rebuilt processor and cannot merge terms), and the draw's blend must never need a dst
-   * texture with coverage — the exact set the record-time fold admitted, because a Subtree term
-   * (mask-filter semantics) modulates the source, which the coverage composite reproduces only
-   * for those modes. A draw the gate refuses keeps the plain route, coverage attached.
+   * the draw's blend must never need a dst texture with coverage — the exact set the record-time
+   * fold admitted, because a Subtree term (mask-filter semantics) modulates the source, which the
+   * coverage composite reproduces only for those modes. A draw the gate refuses keeps the plain
+   * route, coverage attached.
    */
   static bool TaskCarriesCoverage(const Plan& plan,
                                   const std::vector<AOTCoverageTerm>& coverageTerms,
                                   BlendMode blendMode);
 
   /**
-   * Whether a plan can only run as a plan task: more than one pass, or a single pass whose kernel
-   * the prepare-time fused serving cannot express (the fused kernels take a draw's whole color
-   * expression as one chain or perlin processor; every other single-pass kernel still needs the
-   * task).
+   * Whether a plan can only run as a plan task: more than one pass. A single fused pass serves
+   * its draw in place at prepare time.
    */
   static bool PlanRequiresTask(const Plan& plan);
 
@@ -110,9 +106,8 @@ class AOTPlanner {
 
   /**
    * The plan type's own well-formedness predicate — the same check Build runs first. Either one
-   * pass of a kernel the fused serving runs on a draw (PointwiseChain/Graph, YUVTextureFill)
-   * within its slot and resource budgets, or a linear chain split into several chain passes, each
-   * fitting one chain pass. Decompose only returns plans that pass it, so every production entry
+   * fused pass within its slot and resource budgets, or a linear chain split into several chain
+   * passes, each fitting one chain pass. Decompose only returns plans that pass it, so every production entry
    * and every diagnostic that reports a draw as routable share this rule. A multi-pass plan stores
    * each intermediate result in an RGBA8 texture, so a pass boundary quantizes to the 1/255 grid
    * (an AlphaThreshold right after a boundary can flip at the grid gap).

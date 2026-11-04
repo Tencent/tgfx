@@ -22,7 +22,6 @@
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/Program.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
-#include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
 
@@ -46,10 +45,10 @@ struct AOTChainCompile {
 
 /**
  * Compiles the interpreter's programs from a decomposed AOT plan: the fused chain kernel for
- * PointwiseChain/PointwiseGraph passes (a multi-pass plan's passes are built as cut segments
- * through BuildCutSegment) and the YUV family's color-grade tail. Used by AOTPlanner's
- * task assembly and by the re-expressing kernel's per-draw view of an unmodified ProgramInfo
- * (ResolveChainProgram / ResolveYUVProgram).
+ * every plan pass (a multi-pass plan's passes are built as cut segments through BuildCutSegment)
+ * and the YUV family's color-grade tail. Used by AOTPlanner's task assembly and by the
+ * re-expressing kernel's per-draw view of an unmodified ProgramInfo (ResolveChainProgram /
+ * ResolveYUVProgram).
  */
 class AOTChainBuilder {
  public:
@@ -60,14 +59,10 @@ class AOTChainBuilder {
    * A fit probe, not an admission: runs the chain planner (slot encoding, closure, budget,
    * profile, register allocation) without building the binding table. The decomposer uses it to
    * decide whether a cut fits before any program exists; every serving decision goes through
-   * Compile below, so a probe success never stands in for a build success.
-   *
-   * checkKernel also verifies the pass's declared kernel against the profile the pass needs;
-   * without it the pass kernel is ignored and only the fit is checked. outProfile, when not null,
-   * receives the resource profile the pass needs — the planner's form, which picks the kernel from
-   * the resolved profile.
+   * Compile below, so a probe success never stands in for a build success. outProfile, when not
+   * null, receives the resource profile the pass needs.
    */
-  static bool FitsChainPlan(const AOTEffectGraph& graph, const PassIR& pass, bool checkKernel,
+  static bool FitsChainPlan(const AOTEffectGraph& graph, const PassIR& pass,
                             AOTResourceProfile* outProfile = nullptr);
 
   /**
@@ -76,17 +71,15 @@ class AOTChainBuilder {
    * (AOTPlanner::Validate) and every build site call exactly this, so an admitted pass is
    * by construction a buildable one — the binding stage's resource failures surface at admission
    * instead of at prepare. coverageTerms is null or empty for a plan pass (plan passes carry no
-   * draw coverage). checkKernel additionally verifies the pass's declared kernel against the
-   * profile the pass resolves.
+   * draw coverage).
    */
   static bool Compile(const AOTEffectGraph& graph, const PassIR& pass,
-                      const std::vector<AOTCoverageTerm>* coverageTerms, bool checkKernel,
-                      AOTChainCompile* out);
+                      const std::vector<AOTCoverageTerm>* coverageTerms, AOTChainCompile* out);
 
   /**
    * Compiles one plan pass's IR into the fused chain program and its binding table, without
    * building the pass's processor: the AOT route resolves a pass draw from the program alone.
-   * Returns false when the IR is not a chain pass or the pass does not compile.
+   * Returns false when the IR carries no pass descriptor or the pass does not compile.
    */
   static bool CompilePassProgram(const DrawIR& passIR, AOTProgram* out);
 
@@ -173,22 +166,6 @@ class AOTChainBuilder {
                               const std::vector<AOTTextureParameters>& intermediates,
                               const Matrix& coordToLocal, const Matrix& deviceLeafRemap,
                               AOTEffectGraph* segment, PassIR* pass);
-
-  /**
-   * Flattens a single-pass PointwiseChain/PointwiseGraph plan into the fused chain program and its
-   * binding table, or returns false if the pass shape exceeds the selected kernel's capabilities.
-   *
-   * coverageFPs, when non-empty, is classified by the shared coverage classifier (the same one
-   * LowerDraw uses): analytic rect/rrect leaves ride the clip-coverage register, an alpha-only
-   * device-space texture becomes the mask binding, and anything else lowers as a general coverage
-   * subtree rooted at the GP coverage. coverageLeafFromUVCoord marks the trailing FP as the
-   * AtlasText glyph leaf a caller synthesized from the geometry processor. More than two coverage
-   * FPs returns false.
-   */
-  static bool CompileChainProgram(BlockAllocator* allocator, const AOTEffectGraph& graph,
-                                  const PassIR& pass,
-                                  const std::vector<const FragmentProcessor*>& coverageFPs,
-                                  bool coverageLeafFromUVCoord, AOTProgram* out);
 
   /**
    * The draw's compiled chain program, resolved at most once: a plan pass or an earlier match

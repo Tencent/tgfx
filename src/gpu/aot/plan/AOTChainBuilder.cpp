@@ -49,12 +49,11 @@ bool AOTChainBuilder::IsChainCompatibleTiledMode(TiledTextureShaderMode mode) {
 }
 
 bool AOTChainBuilder::FitsChainPlan(const AOTEffectGraph& graph, const PassIR& pass,
-                                    bool checkKernel, AOTResourceProfile* outProfile) {
+                                    AOTResourceProfile* outProfile) {
   // A fit probe, not an admission: it runs the planner alone (no bindings, no coverage), which is
   // what the decomposer needs to decide whether a cut fits before any program exists.
   AOTChainCompile layout = {};
-  if (!PlanChainLayout(graph, pass, nullptr, AOTNodeID::Invalid(), false, {}, checkKernel,
-                       &layout)) {
+  if (!PlanChainLayout(graph, pass, nullptr, AOTNodeID::Invalid(), false, {}, &layout)) {
     return false;
   }
   if (outProfile != nullptr) {
@@ -64,9 +63,9 @@ bool AOTChainBuilder::FitsChainPlan(const AOTEffectGraph& graph, const PassIR& p
 }
 
 bool AOTChainBuilder::Compile(const AOTEffectGraph& graph, const PassIR& pass,
-                              const std::vector<AOTCoverageTerm>* coverageTerms, bool checkKernel,
+                              const std::vector<AOTCoverageTerm>* coverageTerms,
                               AOTChainCompile* out) {
-  return CompileChainLayout(graph, pass, coverageTerms, checkKernel, out);
+  return CompileChainLayout(graph, pass, coverageTerms, out);
 }
 
 AOTTextureParameters AOTChainBuilder::IntermediateSource(std::shared_ptr<TextureProxy> textureProxy,
@@ -83,7 +82,7 @@ bool AOTChainBuilder::CompilePassProgram(const DrawIR& passIR, AOTProgram* out) 
     return false;
   }
   const auto& pass = *passIR.passDescriptor;
-  if (pass.nodes.empty() || !IsAOTPointwiseDAGKernel(pass.kernel)) {
+  if (pass.nodes.empty()) {
     return false;
   }
   return CompileChainProgramLayout(passIR.color, pass, &passIR.coverage, out);
@@ -154,8 +153,7 @@ bool AOTChainBuilder::CollectYUVTail(const AOTEffectGraph& graph, AOTYUVTailShap
     }
   }
   // The multi-plane leaf: a Plain-sampled YUV source (the RGBAAA layout stays acceptable — the
-  // kernel serves it through HasRgbaaa / AlphaStart; the plan admission keeps its own rejection
-  // through IsYUVChainSource).
+  // kernel serves it through HasRgbaaa / AlphaStart).
   if (!tail.leaf->isYUV || tail.leaf->samplingKind != AOTTextureSamplingKind::Plain) {
     return false;
   }
@@ -201,30 +199,6 @@ static bool CompileYUVProgramForInfo(const ProgramInfo* info, AOTProgram* out) {
   }
   *out = std::move(program);
   return true;
-}
-
-bool AOTChainBuilder::CompileChainProgram(BlockAllocator* allocator, const AOTEffectGraph& graph,
-                                          const PassIR& pass,
-                                          const std::vector<const FragmentProcessor*>& coverageFPs,
-                                          bool coverageLeafFromUVCoord, AOTProgram* out) {
-  if (allocator == nullptr || out == nullptr || !IsAOTPointwiseDAGKernel(pass.kernel)) {
-    return false;
-  }
-  if (coverageFPs.empty()) {
-    return CompileChainProgramLayout(graph, pass, nullptr, out);
-  }
-  if (coverageFPs.size() > 2) {
-    return false;
-  }
-  // The shared coverage classifier decides what each coverage leaf is (the same one LowerDraw
-  // uses); coverageLeafFromUVCoord marks the trailing FP as the AtlasText glyph leaf a caller
-  // synthesized from the geometry processor.
-  const FragmentProcessor* glyphLeaf = coverageLeafFromUVCoord ? coverageFPs.back() : nullptr;
-  auto terms = LowerCoverageTerms(coverageFPs, glyphLeaf, allocator);
-  if (!terms.has_value()) {
-    return false;
-  }
-  return CompileChainProgramLayout(graph, pass, &*terms, out);
 }
 
 bool AOTChainBuilder::ValidateSlots(const std::vector<AOTChainSlot>& slots, size_t rootSlot,
@@ -388,15 +362,14 @@ static bool CompileChainProgramForInfo(const ProgramInfo* programInfo, AOTProgra
   // A draw the record-time route planned carries its single in-place pass on the IR: compile from
   // it instead of decomposing the same graph again. An unplanned draw (no device bounds, or no
   // planner covered it) decomposes here once — the single-pass-only form the fused serving can
-  // express; the perlin kernels have their own families, the chain family only takes the DAG
-  // kernels, and anything the single-pass decomposition cannot fit needs a plan task.
+  // express; the perlin kernels have their own families, and anything the single-pass
+  // decomposition cannot fit needs a plan task.
   PassIR descriptor = {};
   if (carried->passDescriptor.has_value()) {
     descriptor = *carried->passDescriptor;
   } else {
     Plan plan = {};
-    if (!AOTEffectDecomposer::Decompose(carried->color, &plan, true) || plan.passes.size() != 1 ||
-        !IsAOTPointwiseDAGKernel(plan.passes[0].kernel)) {
+    if (!AOTEffectDecomposer::Decompose(carried->color, &plan, true) || plan.passes.size() != 1) {
       return false;
     }
     descriptor = plan.passes[0];

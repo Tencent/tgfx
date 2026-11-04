@@ -129,17 +129,6 @@ bool IsLinearMultiPassSource(const AOTEffectGraph& graph, AOTNodeID nodeID) {
          parameters->samplingKind == AOTTextureSamplingKind::Device;
 }
 
-bool IsYUVChainSource(const AOTEffectGraph& graph, AOTNodeID nodeID) {
-  auto node = graph.nodeAt(nodeID);
-  if (node == nullptr || node->kind != AOTEffectKind::TextureSource || node->inputs.size() != 1 ||
-      node->inputs[0] != AOTNodeID(0)) {
-    return false;
-  }
-  auto parameters = std::get_if<AOTTextureParameters>(&node->parameters);
-  return parameters != nullptr && parameters->isYUV && !parameters->hasRGBAAA &&
-         parameters->samplingKind == AOTTextureSamplingKind::Plain;
-}
-
 bool IsInputDesignator(AOTEffectKind kind) {
   return TraitsOf(kind).isInputDesignator();
 }

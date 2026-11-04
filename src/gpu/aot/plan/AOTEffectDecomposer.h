@@ -28,24 +28,6 @@ namespace tgfx {
 class FragmentProcessor;
 class ProgramInfo;
 
-enum class AOTKernelKind {
-  // A single fused pass that evaluates a pointwise DAG (texture/const-color leaves combined by
-  // color-matrix, luma and blend ops) via a runtime opcode chain. Produced by the pointwise-DAG
-  // planner, and for every pass of a linear chain the multi-pass planner splits; its kernel
-  // artifact is PointwiseChainShader.
-  PointwiseChain,
-  // A YUV video source (TextureEffect over an I420/NV12 proxy) optionally followed by up to
-  // three bounded pointwise operator slots, matching YUVTextureFillShader's color-grade tail.
-  // Produced by DecomposeYUVChain; single pass, over-budget shapes are rejected.
-  YUVTextureFill,
-  // Extended-resource DAGs use the merged PointwiseChainShader resource kinds.
-  PointwiseGraph,
-};
-
-inline bool IsAOTPointwiseDAGKernel(AOTKernelKind kernel) {
-  return kernel == AOTKernelKind::PointwiseChain || kernel == AOTKernelKind::PointwiseGraph;
-}
-
 // The pass cap of a cut plan: every pass but the last is one materialization edge, so this bounds
 // both the intermediate memory and the planning work; a shape needing more passes is refused.
 inline constexpr size_t MaxCutPlanPasses = 8;
@@ -60,11 +42,10 @@ inline constexpr size_t MaxCutPlanPasses = 8;
  * self-contained fused chain pass over its own original-graph nodes, reading the earlier cuts as
  * texture leaves — materializedInputs[i] names the original-graph node that dependencies[i]'s output
  * texture replaces. The passes are in topological order and the last one is the terminal draw (the
- * only pass that runs on the destination). A pass's kernel and profile are resolved by its segment
+ * only pass that runs on the destination). A pass's resource profile is resolved by its segment
  * build; a plan-time fit check runs the same build over placeholder intermediate leaves.
  */
 struct PassIR {
-  AOTKernelKind kernel = AOTKernelKind::PointwiseChain;
   std::vector<AOTNodeID> nodes = {};
   std::vector<uint32_t> dependencies = {};
   AOTNodeID output = AOTNodeID::Invalid();
@@ -96,9 +77,6 @@ enum class AOTDecomposeOutcome {
   /// The chain lowers, but the current Decompose rules do not yet cover its
   /// shape — the "grow the decomposer" signal.
   UnsupportedShape,
-  /// The color chain plans, but the attempted route still refused the draw: it carries coverage
-  /// that route cannot apply. Recorded by the on-screen color-only route only.
-  NotRoutable,
 };
 
 /** Per-axis feasibility analysis produced by AOTEffectDecomposer::Analyze. */

@@ -44,8 +44,7 @@ namespace tgfx {
 // for that check.
 bool MergeNodeSpaces(AOTChainContext* ctx) {
   const auto& pass = *ctx->pass;
-  if (ctx->layout == nullptr || pass.nodes.empty() || !pass.output.isValid() ||
-      (ctx->checkKernel && !IsAOTPointwiseDAGKernel(pass.kernel))) {
+  if (ctx->layout == nullptr || pass.nodes.empty() || !pass.output.isValid()) {
     return false;
   }
   // Combined node space: color-graph nodes occupy [0, colorCount), coverage-graph nodes follow.

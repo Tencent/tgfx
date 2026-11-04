@@ -79,7 +79,7 @@ struct DrawIR {
   size_t colorFPCount = 0;
   size_t coverageFPCount = 0;
   /**
-   * Plan-pass serving: the fused pass descriptor the color graph was cut for (kernel, node list,
+   * Plan-pass serving: the fused pass descriptor the color graph was cut for (node list,
    * profile, dependencies). A pass IR carries it so its processor is rebuilt exactly as the
    * planner fit it — never re-planned. A draw IR carries it when the record-time route planned a
    * single in-place pass, so the matcher compiles from that plan instead of decomposing again;

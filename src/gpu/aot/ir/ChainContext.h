@@ -45,7 +45,6 @@ struct AOTChainContext {
   const AOTEffectGraph* coverageGraph = nullptr;
   AOTNodeID coverageRoot = AOTNodeID();
   bool coverageLeafFromUVCoord = false;
-  bool checkKernel = false;
   AOTChainCompile* layout = nullptr;
   // Stage results, consumed by the later stages.
   std::vector<const AOTEffectNode*> nodes = {};
