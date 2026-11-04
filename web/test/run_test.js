@@ -24,7 +24,7 @@ if (!ALLOWED_BACKENDS.has(BACKEND)) {
 const ZIP_DESTINATIONS = {
   'baseline-out.zip': path.join(PROJECT_ROOT, 'test/baseline-out'),
   'test-out.zip': path.join(PROJECT_ROOT, 'test/out'),
-  'cache-web.zip': path.join(PROJECT_ROOT, `test/baseline/.cache/${BACKEND}`),
+  'cache-web.zip': path.join(PROJECT_ROOT, 'test/baseline/.cache'),
 };
 
 function startHttpServer() {
@@ -193,24 +193,9 @@ async function run() {
     server.kill('SIGTERM');
   }
 
-  // Extract downloaded zip files to their destinations.
-  // Preserve the existing baseline version.json so that subsequent runs still compare against
-  // baselines. Merge new md5.json entries into the existing cache so that tests passing on the
-  // current build are recognized as passing on the next rebuild + run cycle.
-  const cacheDir = path.join(PROJECT_ROOT, `test/baseline/.cache/${BACKEND}`);
-  const md5Path = path.join(cacheDir, 'md5.json');
-  const versionPath = path.join(cacheDir, 'version.json');
-  const versionBackupPath = versionPath + '.bak';
-  let existingMd5 = {};
-  if (fs.existsSync(md5Path)) {
-    try {
-      existingMd5 = JSON.parse(fs.readFileSync(md5Path, 'utf8'));
-    } catch (e) { /* ignore parse errors */ }
-  }
-  if (fs.existsSync(versionPath)) {
-    fs.copyFileSync(versionPath, versionBackupPath);
-  }
-
+  // Extract downloaded zip files to their destinations. cache-web.zip carries the cache directory
+  // exactly as the run left it: an UPDATE_BASELINE run replaces the cache with the newly generated
+  // one, while a verify run only restores the preloaded cache unchanged.
   console.log('\nExtracting downloaded files...');
   for (const [zipName, destDir] of Object.entries(ZIP_DESTINATIONS)) {
     const zipPath = path.join(DOWNLOADS_DIR, zipName);
@@ -219,33 +204,6 @@ async function run() {
       extractZip(zipPath, destDir);
     } else {
       console.warn(`  ${zipName} not found, skipping.`);
-    }
-  }
-
-  // Restore the baseline version.json after cache-web.zip extraction overwrites it.
-  if (fs.existsSync(versionBackupPath)) {
-    fs.copyFileSync(versionBackupPath, versionPath);
-    fs.unlinkSync(versionBackupPath);
-  }
-
-  // Merge new MD5 values from the test output into the existing cache.
-  // The test only writes MD5 entries for keys that failed comparison, so we merge them
-  // into the full cache rather than replacing it.
-  if (fs.existsSync(md5Path)) {
-    try {
-      const newMd5 = JSON.parse(fs.readFileSync(md5Path, 'utf8'));
-      for (const [suite, tests] of Object.entries(newMd5)) {
-        if (!existingMd5[suite]) {
-          existingMd5[suite] = {};
-        }
-        for (const [name, md5] of Object.entries(tests)) {
-          existingMd5[suite][name] = md5;
-        }
-      }
-      fs.writeFileSync(md5Path, JSON.stringify(existingMd5, null, 4) + '\n');
-      console.log(`  Merged new MD5 values into .cache/${BACKEND}/md5.json`);
-    } catch (e) {
-      console.warn('  Failed to merge MD5 values:', e.message);
     }
   }
 
