@@ -34,6 +34,7 @@
 #include "tgfx/gpu/GPU.h"
 #include "tgfx/gpu/RenderPass.h"
 #include "tgfx/gpu/Texture.h"
+#include "utils/NativeShader.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
@@ -339,7 +340,6 @@ TGFX_TEST(GPURenderTest, InstancedGridRender) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  SKIP_UNLESS_RAW_GLSL_MODULES(context);
   auto gpu = context->gpu();
 
   // Create render texture
@@ -609,7 +609,6 @@ TGFX_TEST(GPURenderTest, MultisampleCount) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  SKIP_UNLESS_RAW_GLSL_MODULES(context);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
 
@@ -641,7 +640,10 @@ TGFX_TEST(GPURenderTest, MultisampleMask) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  SKIP_UNLESS_RAW_GLSL_MODULES(context);
+  if (context->backend() == Backend::Metal) {
+    GTEST_SKIP() << "per-pipeline sample masks need shader injection, which the Metal route no "
+                    "longer compiles at runtime";
+  }
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
 
@@ -675,7 +677,6 @@ TGFX_TEST(GPURenderTest, AlphaToCoverage) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  SKIP_UNLESS_RAW_GLSL_MODULES(context);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
 
@@ -710,7 +711,6 @@ TGFX_TEST(GPURenderTest, ArrayVarying) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  SKIP_UNLESS_RAW_GLSL_MODULES(context);
 
   // Use a 200x200 synthetic input so the filtered image is also 200x200. The effect draws an NDC
   // [-0.5, 0.5] quad, which lands a 100x100 rectangle centred in the 200x200 surface with a
@@ -1068,6 +1068,192 @@ static constexpr char SHARED_STAGGERED_FRAGMENT_SHADER[] = R"(
         }
     )";
 
+// The native variants stagger the shared block's physical slot across stages on purpose: the
+// vertex stage binds PreArgs at slot 0 and SharedArgs at slot 1, while the fragment stage binds
+// SharedArgs at its own slot 0. That drives the vertexSlot != fragmentSlot path in
+// UniformSlotMapping. Metal and D3D12 negate clip-space y (the removed translation layer's
+// flip); GL/Vulkan/WebGPU pass it through.
+static constexpr char STAGGERED_MSL_VERTEX_SHADER[] = R"(
+#include <metal_stdlib>
+using namespace metal;
+
+struct VertexIn {
+  float2 inPosition [[attribute(0)]];
+};
+
+struct PreArgs {
+  float4 vertScale;
+};
+
+struct SharedArgs {
+  float4 scaleAndFiller;
+  float4 color;
+};
+
+vertex float4 main0(VertexIn in [[stage_in]], constant PreArgs& preArgs [[buffer(0)]],
+                    constant SharedArgs& sharedArgs [[buffer(1)]]) {
+  return float4(in.inPosition.x * preArgs.vertScale.xy.x * sharedArgs.scaleAndFiller.xy.x,
+                -in.inPosition.y * preArgs.vertScale.xy.y * sharedArgs.scaleAndFiller.xy.y, 0.0,
+                1.0);
+}
+)";
+
+static constexpr char STAGGERED_MSL_FRAGMENT_SHADER[] = R"(
+#include <metal_stdlib>
+using namespace metal;
+
+struct SharedArgs {
+  float4 scaleAndFiller;
+  float4 color;
+};
+
+fragment float4 main0(constant SharedArgs& sharedArgs [[buffer(0)]]) {
+  return sharedArgs.color;
+}
+)";
+
+static const uint32_t kStaggeredVertexSpirv[] = {
+    0x07230203, 0x00010300, 0x000d000b, 0x0000002a, 0x00000000, 0x00020011, 0x00000001, 0x0006000b,
+    0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e, 0x00000000, 0x0003000e, 0x00000000, 0x00000001,
+    0x0007000f, 0x00000000, 0x00000004, 0x6e69616d, 0x00000000, 0x0000000d, 0x00000012, 0x00030047,
+    0x0000000b, 0x00000002, 0x00050048, 0x0000000b, 0x00000000, 0x0000000b, 0x00000000, 0x00050048,
+    0x0000000b, 0x00000001, 0x0000000b, 0x00000001, 0x00050048, 0x0000000b, 0x00000002, 0x0000000b,
+    0x00000003, 0x00050048, 0x0000000b, 0x00000003, 0x0000000b, 0x00000004, 0x00040047, 0x00000012,
+    0x0000001e, 0x00000000, 0x00030047, 0x00000014, 0x00000002, 0x00050048, 0x00000014, 0x00000000,
+    0x00000023, 0x00000000, 0x00040047, 0x00000016, 0x00000021, 0x00000000, 0x00040047, 0x00000016,
+    0x00000022, 0x00000000, 0x00030047, 0x0000001c, 0x00000002, 0x00050048, 0x0000001c, 0x00000000,
+    0x00000023, 0x00000000, 0x00050048, 0x0000001c, 0x00000001, 0x00000023, 0x00000010, 0x00040047,
+    0x0000001e, 0x00000021, 0x00000001, 0x00040047, 0x0000001e, 0x00000022, 0x00000000, 0x00020013,
+    0x00000002, 0x00030021, 0x00000003, 0x00000002, 0x00030016, 0x00000006, 0x00000020, 0x00040017,
+    0x00000007, 0x00000006, 0x00000004, 0x00040015, 0x00000008, 0x00000020, 0x00000000, 0x0004002b,
+    0x00000008, 0x00000009, 0x00000001, 0x0004001c, 0x0000000a, 0x00000006, 0x00000009, 0x0006001e,
+    0x0000000b, 0x00000007, 0x00000006, 0x0000000a, 0x0000000a, 0x00040020, 0x0000000c, 0x00000003,
+    0x0000000b, 0x0004003b, 0x0000000c, 0x0000000d, 0x00000003, 0x00040015, 0x0000000e, 0x00000020,
+    0x00000001, 0x0004002b, 0x0000000e, 0x0000000f, 0x00000000, 0x00040017, 0x00000010, 0x00000006,
+    0x00000002, 0x00040020, 0x00000011, 0x00000001, 0x00000010, 0x0004003b, 0x00000011, 0x00000012,
+    0x00000001, 0x0003001e, 0x00000014, 0x00000007, 0x00040020, 0x00000015, 0x00000002, 0x00000014,
+    0x0004003b, 0x00000015, 0x00000016, 0x00000002, 0x00040020, 0x00000017, 0x00000002, 0x00000007,
+    0x0004001e, 0x0000001c, 0x00000007, 0x00000007, 0x00040020, 0x0000001d, 0x00000002, 0x0000001c,
+    0x0004003b, 0x0000001d, 0x0000001e, 0x00000002, 0x0004002b, 0x00000006, 0x00000023, 0x00000000,
+    0x0004002b, 0x00000006, 0x00000024, 0x3f800000, 0x00040020, 0x00000028, 0x00000003, 0x00000007,
+    0x00050036, 0x00000002, 0x00000004, 0x00000000, 0x00000003, 0x000200f8, 0x00000005, 0x0004003d,
+    0x00000010, 0x00000013, 0x00000012, 0x00050041, 0x00000017, 0x00000018, 0x00000016, 0x0000000f,
+    0x0004003d, 0x00000007, 0x00000019, 0x00000018, 0x0007004f, 0x00000010, 0x0000001a, 0x00000019,
+    0x00000019, 0x00000000, 0x00000001, 0x00050085, 0x00000010, 0x0000001b, 0x00000013, 0x0000001a,
+    0x00050041, 0x00000017, 0x0000001f, 0x0000001e, 0x0000000f, 0x0004003d, 0x00000007, 0x00000020,
+    0x0000001f, 0x0007004f, 0x00000010, 0x00000021, 0x00000020, 0x00000020, 0x00000000, 0x00000001,
+    0x00050085, 0x00000010, 0x00000022, 0x0000001b, 0x00000021, 0x00050051, 0x00000006, 0x00000025,
+    0x00000022, 0x00000000, 0x00050051, 0x00000006, 0x00000026, 0x00000022, 0x00000001, 0x00070050,
+    0x00000007, 0x00000027, 0x00000025, 0x00000026, 0x00000023, 0x00000024, 0x00050041, 0x00000028,
+    0x00000029, 0x0000000d, 0x0000000f, 0x0003003e, 0x00000029, 0x00000027, 0x000100fd, 0x00010038,
+
+};
+
+static const uint32_t kStaggeredFragmentSpirv[] = {
+    0x07230203, 0x00010300, 0x000d000b, 0x00000012, 0x00000000, 0x00020011, 0x00000001, 0x0006000b,
+    0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e, 0x00000000, 0x0003000e, 0x00000000, 0x00000001,
+    0x0006000f, 0x00000004, 0x00000004, 0x6e69616d, 0x00000000, 0x00000009, 0x00030010, 0x00000004,
+    0x00000007, 0x00040047, 0x00000009, 0x0000001e, 0x00000000, 0x00030047, 0x0000000a, 0x00000002,
+    0x00050048, 0x0000000a, 0x00000000, 0x00000023, 0x00000000, 0x00050048, 0x0000000a, 0x00000001,
+    0x00000023, 0x00000010, 0x00040047, 0x0000000c, 0x00000021, 0x00000000, 0x00040047, 0x0000000c,
+    0x00000022, 0x00000001, 0x00020013, 0x00000002, 0x00030021, 0x00000003, 0x00000002, 0x00030016,
+    0x00000006, 0x00000020, 0x00040017, 0x00000007, 0x00000006, 0x00000004, 0x00040020, 0x00000008,
+    0x00000003, 0x00000007, 0x0004003b, 0x00000008, 0x00000009, 0x00000003, 0x0004001e, 0x0000000a,
+    0x00000007, 0x00000007, 0x00040020, 0x0000000b, 0x00000002, 0x0000000a, 0x0004003b, 0x0000000b,
+    0x0000000c, 0x00000002, 0x00040015, 0x0000000d, 0x00000020, 0x00000001, 0x0004002b, 0x0000000d,
+    0x0000000e, 0x00000001, 0x00040020, 0x0000000f, 0x00000002, 0x00000007, 0x00050036, 0x00000002,
+    0x00000004, 0x00000000, 0x00000003, 0x000200f8, 0x00000005, 0x00050041, 0x0000000f, 0x00000010,
+    0x0000000c, 0x0000000e, 0x0004003d, 0x00000007, 0x00000011, 0x00000010, 0x0003003e, 0x00000009,
+    0x00000011, 0x000100fd, 0x00010038,
+};
+
+static constexpr char STAGGERED_WGSL_VERTEX_SHADER[] = R"(
+struct VertexIn {
+  @location(0) inPosition: vec2f,
+};
+
+struct PreArgs {
+  vertScale: vec4f,
+};
+
+struct SharedArgs {
+  scaleAndFiller: vec4f,
+  color: vec4f,
+};
+
+@group(0) @binding(0) var<uniform> preArgs: PreArgs;
+@group(0) @binding(1) var<uniform> sharedArgs: SharedArgs;
+
+@vertex
+fn main(in: VertexIn) -> @builtin(position) vec4f {
+  let scale = preArgs.vertScale.xy * sharedArgs.scaleAndFiller.xy;
+  return vec4f(in.inPosition * scale, 0.0, 1.0);
+}
+)";
+
+static constexpr char STAGGERED_WGSL_FRAGMENT_SHADER[] = R"(
+struct SharedArgs {
+  scaleAndFiller: vec4f,
+  color: vec4f,
+};
+
+@group(1) @binding(0) var<uniform> sharedArgs: SharedArgs;
+
+@fragment
+fn main() -> @location(0) vec4f {
+  return sharedArgs.color;
+}
+)";
+
+static constexpr char STAGGERED_HLSL_VERTEX_SHADER[] = R"(
+cbuffer PreArgs : register(b0) {
+  float4 vertScale;
+};
+
+cbuffer SharedArgs : register(b1) {
+  float4 scaleAndFiller;
+  float4 color;
+};
+
+struct VSIn {
+  float2 inPosition : TEXCOORD0;
+};
+
+float4 main(VSIn input) : SV_Position {
+  return float4(input.inPosition.x * vertScale.x * scaleAndFiller.x,
+                -input.inPosition.y * vertScale.y * scaleAndFiller.y, 0.0, 1.0);
+}
+)";
+
+static constexpr char STAGGERED_HLSL_FRAGMENT_SHADER[] = R"(
+cbuffer SharedArgs : register(b0) {
+  float4 scaleAndFiller;
+  float4 color;
+};
+
+float4 main() : SV_Target {
+  return color;
+}
+)";
+
+static const NativeShaderStage kStaggeredVertexSource = {
+    SHARED_STAGGERED_VERTEX_SHADER,
+    STAGGERED_MSL_VERTEX_SHADER,
+    kStaggeredVertexSpirv,
+    sizeof(kStaggeredVertexSpirv) / sizeof(uint32_t),
+    STAGGERED_WGSL_VERTEX_SHADER,
+    STAGGERED_HLSL_VERTEX_SHADER,
+    {{"PreArgs", 0}, {"SharedArgs", 1}}};
+
+static const NativeShaderStage kStaggeredFragmentSource = {
+    SHARED_STAGGERED_FRAGMENT_SHADER,
+    STAGGERED_MSL_FRAGMENT_SHADER,
+    kStaggeredFragmentSpirv,
+    sizeof(kStaggeredFragmentSpirv) / sizeof(uint32_t),
+    STAGGERED_WGSL_FRAGMENT_SHADER,
+    STAGGERED_HLSL_FRAGMENT_SHADER,
+    {{"SharedArgs", 0}}};
+
 struct SharedStaggeredArgs {
   float scaleX;
   float scaleY;
@@ -1090,11 +1276,8 @@ TGFX_TEST(GPURenderTest, UniformBufferSharedLayoutStaggeredSlots) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  SKIP_UNLESS_RAW_GLSL_MODULES(context);
   auto gpu = context->gpu();
   ASSERT_TRUE(gpu != nullptr);
-  auto info = gpu->info();
-  auto isDesktop = info->version.find("OpenGL ES") == std::string::npos;
 
   constexpr int SIZE = 200;
   TextureDescriptor renderTextureDesc(
@@ -1103,17 +1286,10 @@ TGFX_TEST(GPURenderTest, UniformBufferSharedLayoutStaggeredSlots) {
   auto renderTexture = gpu->createTexture(renderTextureDesc);
   ASSERT_TRUE(renderTexture != nullptr);
 
-  ShaderModuleDescriptor vertexModule = {};
-  vertexModule.code = PrefixShaderVersion(SHARED_STAGGERED_VERTEX_SHADER, isDesktop);
-  vertexModule.stage = ShaderStage::Vertex;
-  auto vertexShader = gpu->createShaderModule(vertexModule);
-  ASSERT_TRUE(vertexShader != nullptr);
-
-  ShaderModuleDescriptor fragmentModule = {};
-  fragmentModule.code = PrefixShaderVersion(SHARED_STAGGERED_FRAGMENT_SHADER, isDesktop);
-  fragmentModule.stage = ShaderStage::Fragment;
-  auto fragmentShader = gpu->createShaderModule(fragmentModule);
-  ASSERT_TRUE(fragmentShader != nullptr);
+  std::shared_ptr<ShaderModule> vertexShader = nullptr;
+  std::shared_ptr<ShaderModule> fragmentShader = nullptr;
+  ASSERT_TRUE(CreateNativeShaderModules(gpu, kStaggeredVertexSource, kStaggeredFragmentSource,
+                                        &vertexShader, &fragmentShader));
 
   RenderPipelineDescriptor descriptor = {};
   Attribute position = {"inPosition", VertexFormat::Float2};

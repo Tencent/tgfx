@@ -17,9 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CornerPinEffect.h"
-#include <string>
+#include <memory>
 #include "core/utils/UniqueID.h"
 #include "tgfx/gpu/GPU.h"
+#include "utils/NativeShader.h"
 
 namespace tgfx {
 static constexpr size_t CORNER_PIN_VERTEX_SIZE = 20 * sizeof(float);
@@ -46,12 +47,185 @@ static constexpr char CORNER_PIN_FRAGMENT_SHADER[] = R"(
         }
     )";
 
-static std::string GetFinalShaderCode(const char* codeSnippet, bool isDesktop) {
-  if (isDesktop) {
-    return std::string("#version 150\n\n") + codeSnippet;
-  }
-  return std::string("#version 300 es\n\n") + codeSnippet;
+// Native variants of the same effect. Metal and D3D12 negate the clip-space y (the removed
+// translation layer's flip); GL/Vulkan/WebGPU pass it through. The texture sampler binds at the
+// first texture slot of every backend: [[texture(0)]]/[[sampler(0)]] on Metal, set 2 / binding 0
+// on Vulkan, @group(2) texture binding 0 + sampler binding 1 on WebGPU, t0/s0 on D3D12.
+static constexpr char CORNER_PIN_MSL_VERTEX_SHADER[] = R"(
+#include <metal_stdlib>
+using namespace metal;
+
+struct VertexIn {
+  float2 aPosition [[attribute(0)]];
+  float3 aTextureCoord [[attribute(1)]];
+};
+
+struct VertexOut {
+  float4 position [[position]];
+  float3 vertexColor;
+};
+
+vertex VertexOut main0(VertexIn in [[stage_in]]) {
+  VertexOut out;
+  out.position = float4(in.aPosition.x, -in.aPosition.y, 0.0, 1.0);
+  out.vertexColor = in.aTextureCoord;
+  return out;
 }
+)";
+
+static constexpr char CORNER_PIN_MSL_FRAGMENT_SHADER[] = R"(
+#include <metal_stdlib>
+using namespace metal;
+
+struct VertexOut {
+  float4 position [[position]];
+  float3 vertexColor;
+};
+
+fragment float4 main0(VertexOut in [[stage_in]], texture2d<float> sTexture [[texture(0)]],
+                      sampler sTextureSampler [[sampler(0)]]) {
+  return sTexture.sample(sTextureSampler, in.vertexColor.xy / in.vertexColor.z);
+}
+)";
+
+static const uint32_t kCornerPinVertexSpirv[] = {
+    0x07230203, 0x00010300, 0x000d000b, 0x00000028, 0x00000000, 0x00020011, 0x00000001, 0x0006000b,
+    0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e, 0x00000000, 0x0003000e, 0x00000000, 0x00000001,
+    0x0009000f, 0x00000000, 0x00000004, 0x6e69616d, 0x00000000, 0x0000000c, 0x00000018, 0x00000024,
+    0x00000026, 0x00040047, 0x0000000c, 0x0000001e, 0x00000000, 0x00030047, 0x00000016, 0x00000002,
+    0x00050048, 0x00000016, 0x00000000, 0x0000000b, 0x00000000, 0x00050048, 0x00000016, 0x00000001,
+    0x0000000b, 0x00000001, 0x00050048, 0x00000016, 0x00000002, 0x0000000b, 0x00000003, 0x00050048,
+    0x00000016, 0x00000003, 0x0000000b, 0x00000004, 0x00040047, 0x00000024, 0x0000001e, 0x00000000,
+    0x00040047, 0x00000026, 0x0000001e, 0x00000001, 0x00020013, 0x00000002, 0x00030021, 0x00000003,
+    0x00000002, 0x00030016, 0x00000006, 0x00000020, 0x00040017, 0x00000007, 0x00000006, 0x00000003,
+    0x00040017, 0x0000000a, 0x00000006, 0x00000002, 0x00040020, 0x0000000b, 0x00000001, 0x0000000a,
+    0x0004003b, 0x0000000b, 0x0000000c, 0x00000001, 0x0004002b, 0x00000006, 0x0000000e, 0x3f800000,
+    0x00040017, 0x00000012, 0x00000006, 0x00000004, 0x00040015, 0x00000013, 0x00000020, 0x00000000,
+    0x0004002b, 0x00000013, 0x00000014, 0x00000001, 0x0004001c, 0x00000015, 0x00000006, 0x00000014,
+    0x0006001e, 0x00000016, 0x00000012, 0x00000006, 0x00000015, 0x00000015, 0x00040020, 0x00000017,
+    0x00000003, 0x00000016, 0x0004003b, 0x00000017, 0x00000018, 0x00000003, 0x00040015, 0x00000019,
+    0x00000020, 0x00000001, 0x0004002b, 0x00000019, 0x0000001a, 0x00000000, 0x0004002b, 0x00000006,
+    0x0000001d, 0x00000000, 0x00040020, 0x00000021, 0x00000003, 0x00000012, 0x00040020, 0x00000023,
+    0x00000003, 0x00000007, 0x0004003b, 0x00000023, 0x00000024, 0x00000003, 0x00040020, 0x00000025,
+    0x00000001, 0x00000007, 0x0004003b, 0x00000025, 0x00000026, 0x00000001, 0x00050036, 0x00000002,
+    0x00000004, 0x00000000, 0x00000003, 0x000200f8, 0x00000005, 0x0004003d, 0x0000000a, 0x0000000d,
+    0x0000000c, 0x00050051, 0x00000006, 0x0000000f, 0x0000000d, 0x00000000, 0x00050051, 0x00000006,
+    0x00000010, 0x0000000d, 0x00000001, 0x00070050, 0x00000012, 0x00000020, 0x0000000f, 0x00000010,
+    0x0000001d, 0x0000000e, 0x00050041, 0x00000021, 0x00000022, 0x00000018, 0x0000001a, 0x0003003e,
+    0x00000022, 0x00000020, 0x0004003d, 0x00000007, 0x00000027, 0x00000026, 0x0003003e, 0x00000024,
+    0x00000027, 0x000100fd, 0x00010038,
+};
+
+static const uint32_t kCornerPinFragmentSpirv[] = {
+    0x07230203, 0x00010300, 0x000d000b, 0x0000001d, 0x00000000, 0x00020011, 0x00000001, 0x0006000b,
+    0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e, 0x00000000, 0x0003000e, 0x00000000, 0x00000001,
+    0x0007000f, 0x00000004, 0x00000004, 0x6e69616d, 0x00000000, 0x00000009, 0x00000011, 0x00030010,
+    0x00000004, 0x00000007, 0x00040047, 0x00000009, 0x0000001e, 0x00000000, 0x00040047, 0x0000000d,
+    0x00000021, 0x00000000, 0x00040047, 0x0000000d, 0x00000022, 0x00000002, 0x00040047, 0x00000011,
+    0x0000001e, 0x00000000, 0x00020013, 0x00000002, 0x00030021, 0x00000003, 0x00000002, 0x00030016,
+    0x00000006, 0x00000020, 0x00040017, 0x00000007, 0x00000006, 0x00000004, 0x00040020, 0x00000008,
+    0x00000003, 0x00000007, 0x0004003b, 0x00000008, 0x00000009, 0x00000003, 0x00090019, 0x0000000a,
+    0x00000006, 0x00000001, 0x00000000, 0x00000000, 0x00000000, 0x00000001, 0x00000000, 0x0003001b,
+    0x0000000b, 0x0000000a, 0x00040020, 0x0000000c, 0x00000000, 0x0000000b, 0x0004003b, 0x0000000c,
+    0x0000000d, 0x00000000, 0x00040017, 0x0000000f, 0x00000006, 0x00000003, 0x00040020, 0x00000010,
+    0x00000001, 0x0000000f, 0x0004003b, 0x00000010, 0x00000011, 0x00000001, 0x00040017, 0x00000012,
+    0x00000006, 0x00000002, 0x00040015, 0x00000015, 0x00000020, 0x00000000, 0x0004002b, 0x00000015,
+    0x00000016, 0x00000002, 0x00040020, 0x00000017, 0x00000001, 0x00000006, 0x00050036, 0x00000002,
+    0x00000004, 0x00000000, 0x00000003, 0x000200f8, 0x00000005, 0x0004003d, 0x0000000b, 0x0000000e,
+    0x0000000d, 0x0004003d, 0x0000000f, 0x00000013, 0x00000011, 0x0007004f, 0x00000012, 0x00000014,
+    0x00000013, 0x00000013, 0x00000000, 0x00000001, 0x00050041, 0x00000017, 0x00000018, 0x00000011,
+    0x00000016, 0x0004003d, 0x00000006, 0x00000019, 0x00000018, 0x00050050, 0x00000012, 0x0000001a,
+    0x00000019, 0x00000019, 0x00050088, 0x00000012, 0x0000001b, 0x00000014, 0x0000001a, 0x00050057,
+    0x00000007, 0x0000001c, 0x0000000e, 0x0000001b, 0x0003003e, 0x00000009, 0x0000001c, 0x000100fd,
+    0x00010038,
+};
+
+static constexpr char CORNER_PIN_WGSL_VERTEX_SHADER[] = R"(
+struct VertexIn {
+  @location(0) aPosition: vec2f,
+  @location(1) aTextureCoord: vec3f,
+};
+
+struct VertexOut {
+  @builtin(position) position: vec4f,
+  @location(0) vertexColor: vec3f,
+};
+
+@vertex
+fn main(in: VertexIn) -> VertexOut {
+  var out: VertexOut;
+  out.position = vec4f(in.aPosition, 0.0, 1.0);
+  out.vertexColor = in.aTextureCoord;
+  return out;
+}
+)";
+
+static constexpr char CORNER_PIN_WGSL_FRAGMENT_SHADER[] = R"(
+@group(2) @binding(0) var sTexture: texture_2d<f32>;
+@group(2) @binding(1) var sTextureSampler: sampler;
+
+struct VertexOut {
+  @builtin(position) position: vec4f,
+  @location(0) vertexColor: vec3f,
+};
+
+@fragment
+fn main(in: VertexOut) -> @location(0) vec4f {
+  let uv = in.vertexColor.xy / in.vertexColor.z;
+  return textureSample(sTexture, sTextureSampler, uv);
+}
+)";
+
+static constexpr char CORNER_PIN_HLSL_VERTEX_SHADER[] = R"(
+struct VSIn {
+  float2 aPosition : TEXCOORD0;
+  float3 aTextureCoord : TEXCOORD1;
+};
+
+struct VSOut {
+  float4 position : SV_Position;
+  float3 vertexColor : TEXCOORD0;
+};
+
+VSOut main(VSIn input) {
+  VSOut output;
+  output.position = float4(input.aPosition.x, -input.aPosition.y, 0.0, 1.0);
+  output.vertexColor = input.aTextureCoord;
+  return output;
+}
+)";
+
+static constexpr char CORNER_PIN_HLSL_FRAGMENT_SHADER[] = R"(
+Texture2D sTexture : register(t0);
+SamplerState sTextureSampler : register(s0);
+
+struct PSIn {
+  float4 position : SV_Position;
+  float3 vertexColor : TEXCOORD0;
+};
+
+float4 main(PSIn input) : SV_Target {
+  float2 uv = input.vertexColor.xy / input.vertexColor.z;
+  return sTexture.Sample(sTextureSampler, uv);
+}
+)";
+
+static const NativeShaderStage kVertexSource = {CORNER_PIN_VERTEX_SHADER,
+                                                CORNER_PIN_MSL_VERTEX_SHADER,
+                                                kCornerPinVertexSpirv,
+                                                sizeof(kCornerPinVertexSpirv) / sizeof(uint32_t),
+                                                CORNER_PIN_WGSL_VERTEX_SHADER,
+                                                CORNER_PIN_HLSL_VERTEX_SHADER,
+                                                {}};
+
+static const NativeShaderStage kFragmentSource = {
+    CORNER_PIN_FRAGMENT_SHADER,
+    CORNER_PIN_MSL_FRAGMENT_SHADER,
+    kCornerPinFragmentSpirv,
+    sizeof(kCornerPinFragmentSpirv) / sizeof(uint32_t),
+    CORNER_PIN_WGSL_FRAGMENT_SHADER,
+    CORNER_PIN_HLSL_FRAGMENT_SHADER,
+    {}};
 
 std::shared_ptr<CornerPinEffect> CornerPinEffect::Make(EffectCache* cache, const Point& upperLeft,
                                                        const Point& upperRight,
@@ -89,20 +263,10 @@ Rect CornerPinEffect::filterBounds(const Rect&, MapDirection mapDirection) const
 }
 
 std::shared_ptr<RenderPipeline> CornerPinEffect::createPipeline(GPU* gpu) const {
-  auto info = gpu->info();
-  auto isDesktop = info->version.find("OpenGL ES") == std::string::npos;
-  ShaderModuleDescriptor vertexModule = {};
-  vertexModule.code = GetFinalShaderCode(CORNER_PIN_VERTEX_SHADER, isDesktop);
-  vertexModule.stage = ShaderStage::Vertex;
-  auto vertexShader = gpu->createShaderModule(vertexModule);
-  if (vertexShader == nullptr) {
-    return nullptr;
-  }
-  ShaderModuleDescriptor fragmentModule = {};
-  fragmentModule.code = GetFinalShaderCode(CORNER_PIN_FRAGMENT_SHADER, isDesktop);
-  fragmentModule.stage = ShaderStage::Fragment;
-  auto fragmentShader = gpu->createShaderModule(fragmentModule);
-  if (fragmentShader == nullptr) {
+  std::shared_ptr<ShaderModule> vertexShader = nullptr;
+  std::shared_ptr<ShaderModule> fragmentShader = nullptr;
+  if (!CreateNativeShaderModules(gpu, kVertexSource, kFragmentSource, &vertexShader,
+                                 &fragmentShader)) {
     return nullptr;
   }
   RenderPipelineDescriptor descriptor = {};

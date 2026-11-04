@@ -334,9 +334,6 @@ TGFX_TEST(FilterTest, RuntimeEffect) {
   auto context = scope.getContext();
   EffectCache effectCache = {};
   ASSERT_TRUE(context != nullptr);
-  if (context->backend() != Backend::OpenGL) {
-    GTEST_SKIP() << "the GLSL RuntimeEffect source requires the OpenGL backend";
-  }
   auto image = MakeImage("resources/assets/bridge.jpg");
   ASSERT_TRUE(image != nullptr);
   auto surface = Surface::Make(context, 720, 720);
