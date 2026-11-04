@@ -53,7 +53,7 @@ WebGPUShaderModule::WebGPUShaderModule(WebGPUGPU* gpu, const ShaderModuleDescrip
   moduleDesc.nextInChain = &wgslDescriptor.chain;
   shaderModule = wgpuDeviceCreateShaderModule(gpu->device(), &moduleDesc);
   if (shaderModule == nullptr) {
-    LOGE("WebGPUShaderModule: precompiled WGSL creation failed");
+    LOGE("WebGPUShaderModule: WGSL module creation failed");
   }
 }
 

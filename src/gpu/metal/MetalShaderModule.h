@@ -40,9 +40,10 @@ static constexpr unsigned VertexBufferIndexStart = 30;
 static constexpr unsigned MaxVertexAttributes = 31;
 
 /**
- * Metal shader module implementation with GLSL to MSL conversion. It compiles the GLSL source into
- * an MTLLibrary and retains the original GLSL code so that MetalRenderPipeline can re-compile with
- * sample mask injection when needed.
+ * Metal shader module implementation. It loads a precompiled metallib binary or compiles MSL text,
+ * and both paths use `main0` as the entry function name (the offline toolchain's naming, which
+ * MetalRenderPipeline looks up). Per-pipeline sample masks are not supported: expressing one would
+ * require recompiling the shader with an injected constant, which the precompiled route removed.
  */
 class MetalShaderModule : public VaryingShaderModule, public MetalResource {
  public:

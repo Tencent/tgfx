@@ -100,7 +100,9 @@ class FragmentDescriptor {
   std::shared_ptr<ShaderModule> module = nullptr;
 
   /**
-   * The name of the entry point function in the shader code.
+   * The name of the entry point function in the shader code. Honored by the WebGPU backend only:
+   * Metal always looks up `main0` (the offline toolchain's naming; MSL sources must use it),
+   * while Vulkan and D3D12 always use `main` (SPIR-V entry points and the D3DCompile entry name).
    */
   std::string entryPoint = "main";
 
@@ -193,7 +195,9 @@ class VertexDescriptor {
   std::shared_ptr<ShaderModule> module = nullptr;
 
   /**
-   * The name of the entry point function in the shader code.
+   * The name of the entry point function in the shader code. Honored by the WebGPU backend only:
+   * Metal always looks up `main0` (the offline toolchain's naming; MSL sources must use it),
+   * while Vulkan and D3D12 always use `main` (SPIR-V entry points and the D3DCompile entry name).
    */
   std::string entryPoint = "main";
 

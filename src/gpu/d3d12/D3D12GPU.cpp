@@ -367,7 +367,9 @@ std::shared_ptr<ShaderModule> D3D12GPU::createShaderModule(
     const ShaderModuleDescriptor& descriptor) {
   ShaderCacheKey key = {};
   key.stage = static_cast<uint32_t>(descriptor.stage);
+  key.format = static_cast<uint32_t>(descriptor.format);
   key.code = descriptor.code;
+  key.binary.assign(descriptor.binaryData.begin(), descriptor.binaryData.end());
   if (auto it = shaderModuleCache.find(key); it != shaderModuleCache.end()) {
     return it->second;
   }

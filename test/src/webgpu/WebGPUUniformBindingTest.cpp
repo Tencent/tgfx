@@ -36,22 +36,25 @@
 
 namespace tgfx {
 
-static std::string PrefixShaderVersion(const char* body, bool isDesktop) {
-  if (isDesktop) {
-    return std::string("#version 150\n\n") + body;
-  }
-  return std::string("#version 300 es\n\n") + body;
-}
-
 // A full-screen quad in NDC (TriangleStrip: BL, BR, TL, TR). The fragment stage receives the
 // quad position remapped to 0..1 texture coordinates.
 static constexpr char QUAD_VERTEX_SHADER[] = R"(
-    in vec2 aPosition;
-    out vec2 vertexColor;
-    void main() {
-        gl_Position = vec4(aPosition, 0.0, 1.0);
-        vertexColor = aPosition * 0.5 + 0.5;
-    }
+struct VertexIn {
+  @location(0) aPosition: vec2f,
+};
+
+struct VertexOut {
+  @builtin(position) position: vec4f,
+  @location(0) vertexColor: vec2f,
+};
+
+@vertex
+fn main(in: VertexIn) -> VertexOut {
+  var out: VertexOut;
+  out.position = vec4f(in.aPosition, 0.0, 1.0);
+  out.vertexColor = in.aPosition * 0.5 + 0.5;
+  return out;
+}
 )";
 
 static constexpr float QUAD_VERTICES[] = {
@@ -135,8 +138,6 @@ static bool SetupUniformBindingTestEnv(UniformBindingTestEnv* env, Context* cont
                                        UniformBlockKind kind) {
   env->context = context;
   env->gpu = context->gpu();
-  auto info = env->gpu->info();
-  auto isDesktop = info->version.find("OpenGL ES") == std::string::npos;
 
   TextureDescriptor textureDesc(size, size, PixelFormat::RGBA_8888, false, 1,
                                 TextureUsage::RENDER_ATTACHMENT | TextureUsage::TEXTURE_BINDING);
@@ -146,7 +147,8 @@ static bool SetupUniformBindingTestEnv(UniformBindingTestEnv* env, Context* cont
   }
 
   auto vertexModule = ShaderModuleDescriptor();
-  vertexModule.code = PrefixShaderVersion(QUAD_VERTEX_SHADER, isDesktop);
+  vertexModule.format = ShaderCodeFormat::WGSL;
+  vertexModule.code = QUAD_VERTEX_SHADER;
   vertexModule.stage = ShaderStage::Vertex;
   auto vertexShader = env->gpu->createShaderModule(vertexModule);
   if (vertexShader == nullptr) {
@@ -154,33 +156,36 @@ static bool SetupUniformBindingTestEnv(UniformBindingTestEnv* env, Context* cont
   }
 
   static constexpr char VEC4_FRAGMENT_SHADER[] = R"(
-        precision mediump float;
-        in vec2 vertexColor;
-        layout(std140) uniform Args {
-            vec4 color;
-        };
-        out vec4 tgfx_FragColor;
-        void main() {
-            tgfx_FragColor = color;
-        }
-    )";
+struct Args {
+  color: vec4f,
+};
+
+@group(1) @binding(0) var<uniform> args: Args;
+
+@fragment
+fn main() -> @location(0) vec4f {
+  return args.color;
+}
+)";
   static constexpr char VEC2_FLOAT_FRAGMENT_SHADER[] = R"(
-        precision mediump float;
-        in vec2 vertexColor;
-        layout(std140) uniform Args {
-            vec2 center;
-            float amount;
-        };
-        out vec4 tgfx_FragColor;
-        void main() {
-            tgfx_FragColor = vec4(center, amount, 1.0);
-        }
-    )";
+struct Args {
+  center: vec2f,
+  amount: f32,
+};
+
+@group(1) @binding(0) var<uniform> args: Args;
+
+@fragment
+fn main() -> @location(0) vec4f {
+  return vec4f(args.center, args.amount, 1.0);
+}
+)";
   auto fragmentModule = ShaderModuleDescriptor();
-  fragmentModule.code = PrefixShaderVersion(
-      kind == UniformBlockKind::Vec4Color ? VEC4_FRAGMENT_SHADER : VEC2_FLOAT_FRAGMENT_SHADER,
-      isDesktop);
+  fragmentModule.format = ShaderCodeFormat::WGSL;
+  fragmentModule.code =
+      kind == UniformBlockKind::Vec4Color ? VEC4_FRAGMENT_SHADER : VEC2_FLOAT_FRAGMENT_SHADER;
   fragmentModule.stage = ShaderStage::Fragment;
+  fragmentModule.uniformSlots = {{"Args", 0}};
   auto fragmentShader = env->gpu->createShaderModule(fragmentModule);
   if (fragmentShader == nullptr) {
     return false;
@@ -400,21 +405,29 @@ TGFX_TEST(WebGPUUniformBindingTest, Vec2FloatBlockRendersWithTailPadding) {
 // layout declares both samplers, and the guarded branch keeps any placeholder binding from
 // ever being sampled.
 static constexpr char OPTIONAL_SAMPLER_FRAGMENT_SHADER[] = R"(
-    precision mediump float;
-    in vec2 vertexColor;
-    uniform sampler2D sTexture;
-    uniform sampler2D sOriginalTexture;
-    layout(std140) uniform Args {
-        vec4 useOriginalTexture;
-    };
-    out vec4 tgfx_FragColor;
-    void main() {
-        vec4 color = texture(sTexture, vertexColor);
-        if (useOriginalTexture.x > 0.5) {
-            color = texture(sOriginalTexture, vertexColor);
-        }
-        tgfx_FragColor = color;
-    }
+struct Args {
+  useOriginalTexture: vec4f,
+};
+
+@group(1) @binding(0) var<uniform> args: Args;
+@group(2) @binding(0) var sTexture: texture_2d<f32>;
+@group(2) @binding(1) var sTextureSampler: sampler;
+@group(2) @binding(2) var sOriginalTexture: texture_2d<f32>;
+@group(2) @binding(3) var sOriginalTextureSampler: sampler;
+
+struct VertexOut {
+  @builtin(position) position: vec4f,
+  @location(0) vertexColor: vec2f,
+};
+
+@fragment
+fn main(in: VertexOut) -> @location(0) vec4f {
+  var color = textureSample(sTexture, sTextureSampler, in.vertexColor);
+  if (args.useOriginalTexture.x > 0.5) {
+    color = textureSample(sOriginalTexture, sOriginalTextureSampler, in.vertexColor);
+  }
+  return color;
+}
 )";
 
 class OptionalSamplerEffect : public RuntimeEffect {
@@ -430,18 +443,19 @@ class OptionalSamplerEffect : public RuntimeEffect {
       return false;
     }
     auto gpu = encoder->gpu();
-    auto info = gpu->info();
-    auto isDesktop = info->version.find("OpenGL ES") == std::string::npos;
     auto vertexModule = ShaderModuleDescriptor();
-    vertexModule.code = PrefixShaderVersion(QUAD_VERTEX_SHADER, isDesktop);
+    vertexModule.format = ShaderCodeFormat::WGSL;
+    vertexModule.code = QUAD_VERTEX_SHADER;
     vertexModule.stage = ShaderStage::Vertex;
     auto vertexShader = gpu->createShaderModule(vertexModule);
     if (vertexShader == nullptr) {
       return false;
     }
     auto fragmentModule = ShaderModuleDescriptor();
-    fragmentModule.code = PrefixShaderVersion(OPTIONAL_SAMPLER_FRAGMENT_SHADER, isDesktop);
+    fragmentModule.format = ShaderCodeFormat::WGSL;
+    fragmentModule.code = OPTIONAL_SAMPLER_FRAGMENT_SHADER;
     fragmentModule.stage = ShaderStage::Fragment;
+    fragmentModule.uniformSlots = {{"Args", 0}};
     auto fragmentShader = gpu->createShaderModule(fragmentModule);
     if (fragmentShader == nullptr) {
       return false;

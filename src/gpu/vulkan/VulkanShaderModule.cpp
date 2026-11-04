@@ -46,8 +46,8 @@ VulkanShaderModule::VulkanShaderModule(VulkanGPU* gpu, const ShaderModuleDescrip
         "binaries (compile GLSL offline with glslc).");
     return;
   }
-  if (descriptor.binaryData.empty()) {
-    LOGE("VulkanShaderModule: SPIR-V binary is empty.");
+  if (descriptor.binaryData.empty() || descriptor.binaryData.size() % sizeof(uint32_t) != 0) {
+    LOGE("VulkanShaderModule: SPIR-V binary is empty or not a multiple of 4 bytes.");
     return;
   }
   // Precompiled SPIR-V carries no parseable GLSL for the runtime slot collection, so the baked

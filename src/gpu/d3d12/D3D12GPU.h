@@ -310,18 +310,27 @@ class D3D12GPU : public GPU {
 
   // Cache compiled shader modules. The upper layer's Program cache does not deduplicate
   // individual vertex/fragment stages, so unrelated programs sharing one stage would otherwise
-  // re-run the GLSL -> SPIR-V -> HLSL -> DXBC chain on every build.
+  // repeat the HLSL compile / DXBC copy on every build. The key covers every payload field:
+  // DXBC modules carry their code in binaryData with an empty code string, so a stage+code key
+  // would collide across distinct binaries.
   struct ShaderCacheKey {
     uint32_t stage = 0;
+    uint32_t format = 0;
     std::string code;
+    std::string binary;
     bool operator==(const ShaderCacheKey& other) const {
-      return stage == other.stage && code == other.code;
+      return stage == other.stage && format == other.format && code == other.code &&
+             binary == other.binary;
     }
   };
   struct ShaderCacheKeyHash {
     size_t operator()(const ShaderCacheKey& k) const noexcept {
-      return std::hash<std::string>{}(k.code) ^
-             (static_cast<size_t>(k.stage) * 0x9E3779B97F4A7C15ull);
+      size_t hash = std::hash<std::string>{}(k.code);
+      hash ^=
+          std::hash<std::string>{}(k.binary) + 0x9E3779B97F4A7C15ull + (hash << 6) + (hash >> 2);
+      hash ^= static_cast<size_t>(k.stage) * 0x9E3779B97F4A7C15ull;
+      hash ^= static_cast<size_t>(k.format) * 0xC2B2AE3D27D4EB4Full;
+      return hash;
     }
   };
   std::unordered_map<ShaderCacheKey, std::shared_ptr<D3D12ShaderModule>, ShaderCacheKeyHash>
