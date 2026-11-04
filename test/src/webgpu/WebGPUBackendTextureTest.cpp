@@ -133,9 +133,11 @@ TGFX_TEST(WebGPUBackendTextureTest, AttachmentOnlyRenderTargetIsAccepted) {
   EXPECT_FALSE(imported->getBackendTexture().isValid());
   WebGPUTextureInfo textureInfo = {};
   ASSERT_TRUE(target.getWebGPUTextureInfo(&textureInfo));
-  BackendTexture invalidTexture(textureInfo, 16, 16);
-  EXPECT_TRUE(Image::MakeFrom(context, invalidTexture) == nullptr);
-  EXPECT_TRUE(Surface::MakeFrom(context, invalidTexture, ImageOrigin::TopLeft) == nullptr);
+  BackendTexture backendTexture(textureInfo, 16, 16);
+  // Sampling the attachment-only texture is rejected, but wrapping it as a Surface only
+  // requires the render attachment usage.
+  EXPECT_TRUE(Image::MakeFrom(context, backendTexture) == nullptr);
+  ExpectGreenSurface(Surface::MakeFrom(context, backendTexture, ImageOrigin::TopLeft));
   ExpectGreenSurface(Surface::MakeFrom(context, target, ImageOrigin::TopLeft));
 }
 
