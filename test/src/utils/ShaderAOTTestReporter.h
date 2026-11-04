@@ -25,11 +25,10 @@ namespace tgfx {
 struct AOTCoverageGateResult {
   uint64_t noMatchingRule = 0;
   uint64_t runtimeCompiles = 0;
-  // Exclusions are surfaced (never silently dropped): by-design misses are documented non-AOT
-  // routes (the stencil-and-cover GPs), environment compile failures are SwiftShader's compiler
-  // memory limit on fully-unrolled AOT artifacts. Each excluded miss pairs with exactly one
-  // fallback runtime compilation, so the runtimeCompiles total drops by the same amounts.
-  uint64_t excludedByDesign = 0;
+  // Exclusions are surfaced (never silently dropped): environment compile failures are
+  // SwiftShader's compiler memory limit on fully-unrolled AOT artifacts. Each excluded miss
+  // pairs with exactly one fallback runtime compilation, so the runtimeCompiles total drops by
+  // the same amounts.
   uint64_t excludedEnvironment = 0;
   // Draws that rendered nothing (AOTDrawStats::droppedDraws, deliberate drops excluded).
   uint64_t droppedDraws = 0;
@@ -42,7 +41,6 @@ struct AOTCoverageGateResult {
 
 AOTCoverageGateResult EvaluateAOTCoverageGate(uint64_t rawNoMatchingRule,
                                               uint64_t deliberateNoMatchingRule,
-                                              uint64_t byDesignNoMatchingRule,
                                               uint64_t environmentCompileFailures,
                                               uint64_t rawBuilderCreations,
                                               uint64_t excludedBuilderCreations);

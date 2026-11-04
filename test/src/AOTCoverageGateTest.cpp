@@ -91,12 +91,6 @@ const ProcessorClaim ProcessorClaims[] = {
     {"QuadPerEdgeAAGeometryProcessor", GeometryClassified, ""},
     {"RoundStrokeRectGeometryProcessor", GeometryClassified, ""},
     {"ShapeInstancedGeometryProcessor", GeometryClassified, ""},
-    {"StencilCoverCoverPassGeometryProcessor", 0,
-     "the stencil cover path sits behind TGFX_ENABLE_STENCIL_COVER_PATH (off by default) and is "
-     "not an AOT route"},
-    {"StencilCoverStencilPassGeometryProcessor", 0,
-     "the stencil cover path sits behind TGFX_ENABLE_STENCIL_COVER_PATH (off by default) and is "
-     "not an AOT route"},
     // Xfer processors: ClassifyXferForMatch names both (the empty one through its singleton
     // identity).
     {"EmptyXferProcessor", XferClassified, ""},
@@ -442,39 +436,34 @@ TGFX_TEST(AOTCoverageGateTest, GateRejectsSyntheticViolations) {
 }
 
 TGFX_TEST(AOTCoverageGateTest, ProductionMetricsPreserveUnmarkedFailures) {
-  EXPECT_TRUE(EvaluateAOTCoverageGate(0, 0, 0, 0, 0, 0).passed());
-  EXPECT_TRUE(EvaluateAOTCoverageGate(1, 1, 0, 0, 2, 2).passed());
-  auto mixed = EvaluateAOTCoverageGate(2, 1, 0, 0, 2, 1);
+  EXPECT_TRUE(EvaluateAOTCoverageGate(0, 0, 0, 0, 0).passed());
+  EXPECT_TRUE(EvaluateAOTCoverageGate(1, 1, 0, 2, 2).passed());
+  auto mixed = EvaluateAOTCoverageGate(2, 1, 0, 2, 1);
   EXPECT_EQ(mixed.noMatchingRule, 1u);
   EXPECT_EQ(mixed.runtimeCompiles, 1u);
   EXPECT_FALSE(mixed.passed());
-  EXPECT_FALSE(EvaluateAOTCoverageGate(1, 0, 0, 0, 0, 0).passed());
-  EXPECT_FALSE(EvaluateAOTCoverageGate(0, 0, 1, 0, 0, 0).passed());
-  EXPECT_FALSE(EvaluateAOTCoverageGate(0, 1, 0, 0, 0, 0).consistent);
-  EXPECT_FALSE(EvaluateAOTCoverageGate(0, 0, 0, 1, 0, 0).passed());
-  // By-design and environment exclusions pair with their fallback compilations: the strict
-  // counts drop, the exclusion counts surface, and an unpaired miss still fails.
-  auto byDesign = EvaluateAOTCoverageGate(2, 0, 2, 0, 3, 1);
-  EXPECT_TRUE(byDesign.passed());
-  EXPECT_EQ(byDesign.excludedByDesign, 2u);
-  EXPECT_EQ(byDesign.excludedEnvironment, 0u);
-  auto environment = EvaluateAOTCoverageGate(0, 0, 0, 3, 3, 0);
+  EXPECT_FALSE(EvaluateAOTCoverageGate(1, 0, 0, 0, 0).passed());
+  EXPECT_FALSE(EvaluateAOTCoverageGate(0, 1, 0, 0, 0).consistent);
+  EXPECT_FALSE(EvaluateAOTCoverageGate(0, 0, 1, 0, 0).passed());
+  // Environment exclusions pair with their fallback compilations: the strict counts drop, the
+  // exclusion count surfaces, and an unpaired miss still fails.
+  auto environment = EvaluateAOTCoverageGate(0, 0, 3, 3, 0);
   EXPECT_TRUE(environment.passed());
   EXPECT_EQ(environment.excludedEnvironment, 3u);
   // An exclusion may never hide a miss it cannot pair with: subtracting more builder creations
   // than exist flips consistency instead of clamping the count to zero.
-  EXPECT_FALSE(EvaluateAOTCoverageGate(2, 0, 2, 0, 1, 0).consistent);
-  EXPECT_FALSE(EvaluateAOTCoverageGate(0, 0, 0, 0, 0, 1).passed());
+  EXPECT_FALSE(EvaluateAOTCoverageGate(0, 0, 3, 1, 0).consistent);
+  EXPECT_FALSE(EvaluateAOTCoverageGate(0, 0, 0, 0, 1).passed());
   // A dropped draw fails the gate even with no miss and no runtime compilation: it rendered
   // nothing, whatever the reason its program lookup failed.
-  auto dropped = EvaluateAOTCoverageGate(0, 0, 0, 0, 0, 0);
+  auto dropped = EvaluateAOTCoverageGate(0, 0, 0, 0, 0);
   dropped.droppedDraws = 1;
   EXPECT_FALSE(dropped.passed());
   // A run with no miss is only evidence of coverage when it also served a precompiled program:
   // drawing nothing (or only excluded draws) is vacuous, not met.
-  EXPECT_FALSE(AOTCoverageGateMet(EvaluateAOTCoverageGate(0, 0, 0, 0, 0, 0), 0));
-  EXPECT_TRUE(AOTCoverageGateMet(EvaluateAOTCoverageGate(0, 0, 0, 0, 0, 0), 1));
-  EXPECT_FALSE(AOTCoverageGateMet(EvaluateAOTCoverageGate(0, 0, 0, 0, 1, 0), 5));
+  EXPECT_FALSE(AOTCoverageGateMet(EvaluateAOTCoverageGate(0, 0, 0, 0, 0), 0));
+  EXPECT_TRUE(AOTCoverageGateMet(EvaluateAOTCoverageGate(0, 0, 0, 0, 0), 1));
+  EXPECT_FALSE(AOTCoverageGateMet(EvaluateAOTCoverageGate(0, 0, 0, 1, 0), 5));
 
   GlobalCache programs(nullptr);
   ProgramProvenance provenance = {};
@@ -498,7 +487,7 @@ TGFX_TEST(AOTCoverageGateTest, ProductionMetricsPreserveUnmarkedFailures) {
   const auto& stats = programs.programStats();
   EXPECT_EQ(stats.programBuilderCreations, 2u);
   EXPECT_EQ(stats.excludedProgramBuilderCreations, 1u);
-  auto gate = EvaluateAOTCoverageGate(1, 1, 0, 0, stats.programBuilderCreations,
+  auto gate = EvaluateAOTCoverageGate(1, 1, 0, stats.programBuilderCreations,
                                       stats.excludedProgramBuilderCreations);
   EXPECT_EQ(gate.runtimeCompiles, 1u);
   EXPECT_FALSE(gate.passed());

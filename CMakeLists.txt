@@ -36,7 +36,6 @@ option(TGFX_EMBED_SHADER_BUNDLES "Embed precompiled shader bundles into libtgfx"
 option(TGFX_BUILD_WEBGPU_BUNDLE "Generate the WebGPU shader bundle in native builds" OFF)
 option(TGFX_WEB_PREBUILT_BUNDLES
         "Web builds use the bundles published under resources/shaders instead of generating them" OFF)
-option(TGFX_ENABLE_STENCIL_COVER_PATH "Enable the stencil-and-cover GPU path renderer for non-antialiased fills" OFF)
 
 # EMSCRIPTEN_PTHREADS can be set by vendor tools for building the wasm-mt architecture.
 if (NOT WEB OR EMSCRIPTEN_PTHREADS)
@@ -199,7 +198,6 @@ message("TGFX_USE_WEBP_ENCODE: ${TGFX_USE_WEBP_ENCODE}")
 message("TGFX_BUILD_TESTS: ${TGFX_BUILD_TESTS}")
 message("TGFX_BUILD_FRAMEWORK: ${TGFX_BUILD_FRAMEWORK}")
 message("TGFX_USE_TEXT_GAMMA_CORRECTION: ${TGFX_USE_TEXT_GAMMA_CORRECTION}")
-message("TGFX_ENABLE_STENCIL_COVER_PATH: ${TGFX_ENABLE_STENCIL_COVER_PATH}")
 
 file(GLOB_RECURSE TGFX_HEADERS include/*.h)
 list(APPEND TGFX_FILES ${TGFX_HEADERS})
@@ -346,10 +344,6 @@ endif ()
 
 if (TGFX_USE_THREADS)
     list(APPEND TGFX_DEFINES TGFX_USE_THREADS)
-endif ()
-
-if (TGFX_ENABLE_STENCIL_COVER_PATH)
-    list(APPEND TGFX_DEFINES TGFX_ENABLE_STENCIL_COVER_PATH)
 endif ()
 
 if (TGFX_USE_FREETYPE)

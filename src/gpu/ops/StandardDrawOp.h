@@ -34,9 +34,8 @@ struct DrawIR;
  * binds the pipeline (together with uniforms, samplers and
  * scissor) before delegating the actual draw call to onDraw().
  *
- * Ops that need to run multiple pipelines within a single render pass (for example
- * StencilCoverPathDrawOp, which runs a stencil pass followed by a cover pass) must not derive
- * from this class — they should inherit from DrawOp directly and take full responsibility for
+ * Ops that need to run multiple pipelines within a single render pass must not derive from
+ * this class — they should inherit from DrawOp directly and take full responsibility for
  * pipeline binding inside their own execute() implementation.
  */
 class StandardDrawOp : public DrawOp {

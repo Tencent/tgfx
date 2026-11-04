@@ -456,8 +456,7 @@ PlacementPtr<RenderTask> AOTPlanner::Build(Context* context, uint32_t renderFlag
                                            const std::optional<Matrix>& deviceToLocal,
                                            const std::vector<AOTCoverageTerm>* terminalCoverage) {
   if (context == nullptr || destination == nullptr || destination->getContext() != context ||
-      originalDraw == nullptr || *originalDraw == nullptr ||
-      (*originalDraw)->type() == DrawOp::Type::StencilCoverPathDrawOp) {
+      originalDraw == nullptr || *originalDraw == nullptr) {
     return nullptr;
   }
   // Validation compiles a single chain pass; its program rides the terminal pass IR, so the build

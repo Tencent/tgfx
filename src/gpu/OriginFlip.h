@@ -26,11 +26,10 @@ namespace tgfx {
 
 // Converts a rect from canvas top-left device space to the render target's backend scissor space.
 // For ImageOrigin::TopLeft targets this is a no-op; for ImageOrigin::BottomLeft targets the rect
-// is Y-flipped around the render target's height. Draw ops keep their scissorRect / stencil
-// footprints in canvas top-left space throughout their lifetime and call this helper only at the
-// backend boundary (immediately before RenderPass::setScissorRect), so that intermediate math
-// (e.g. StencilCoverPathDrawOp::getStencilResolveBounds intersecting scissorRect with the cover
-// device bounds) stays in a single, consistent coordinate space.
+// is Y-flipped around the render target's height. Draw ops keep their scissorRect in canvas
+// top-left space throughout their lifetime and call this helper only at the backend boundary
+// (immediately before RenderPass::setScissorRect), so that intermediate math stays in a single,
+// consistent coordinate space.
 //
 // Mirrors the transform produced by RenderTargetProxy::getOriginTransform(): a scale(1,-1)
 // composed with translate(0, height). On a realized RenderTarget, height() equals the proxy's

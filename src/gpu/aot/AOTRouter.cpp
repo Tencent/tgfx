@@ -44,7 +44,7 @@ void AOTRouter::lowerOps(PlacementArray<DrawOp>& ops) {
     return;
   }
   for (auto& op : ops) {
-    if (op != nullptr && op->type() != DrawOp::Type::StencilCoverPathDrawOp) {
+    if (op != nullptr) {
       op->tryLowerIR();
     }
   }
@@ -54,8 +54,7 @@ PlacementPtr<RenderTask> AOTRouter::routeDraw(PlacementPtr<DrawOp>* op,
                                               const AOTRouteRequest& request) {
   auto* drawOp = op->get();
   auto cache = _context->precompiledShaderCache();
-  if (cache == nullptr || !cache->isLoaded() ||
-      drawOp->type() == DrawOp::Type::StencilCoverPathDrawOp) {
+  if (cache == nullptr || !cache->isLoaded()) {
     return nullptr;
   }
   // The single record-time lowering: the op's whole expression (colors, coverages, xfer, blend
