@@ -103,6 +103,13 @@ class PermutationEnum {
       : defineName(defineName), valueNames(valueNames) {
   }
 
+  /// Used by PermutationEnumDim's conversion operator, which holds the names as a vector. The
+  /// template member only instantiates in builds that consume an enum dimension (currently the
+  /// WebGPU family set), so a native-only build never compiles this overload's caller.
+  PermutationEnum(const char* defineName, const std::vector<const char*>& valueNames)
+      : defineName(defineName), valueNames(valueNames) {
+  }
+
   int valueCount() const {
     return static_cast<int>(valueNames.size());
   }

@@ -557,6 +557,9 @@ TGFX_TEST(ShaderPermutationTest, ComposedDimsFinishIgnoresAssignmentOrder) {
             forward.permutationDomain().encode(forward.finish()));
 }
 
+// Death tests need fork/exec, which Emscripten does not provide; GTEST_HAS_DEATH_TEST is 0 for
+// wasm builds, where these compile out.
+#if GTEST_HAS_DEATH_TEST
 TGFX_TEST(ShaderPermutationTest, ComposedDimsRejectsMissingAssignment) {
   ::testing::FLAGS_gtest_death_test_style = "threadsafe";
   // The pre-handle write path zero-filled a forgotten dimension (resize then index writes);
@@ -589,6 +592,7 @@ TGFX_TEST(ShaderPermutationTest, ComposedDimsRejectsOutOfRangeValue) {
   ComposedDims<FD> frag(FD::domain());
   EXPECT_DEATH(frag.set(FD::HAS_XP, 3), "dimension value outside the declared range");
 }
+#endif
 
 TGFX_TEST(ShaderPermutationTest, GradientUniformsExistOnlyInExtendedChainArtifacts) {
   ContextScope scope;

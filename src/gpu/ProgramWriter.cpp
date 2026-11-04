@@ -873,6 +873,8 @@ void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* v
 
 void ChainProgramWriter::writeSamplers(const ProgramInfo& info, Program* program,
                                        RenderPass* renderPass) const {
+  // `program` is read by DEBUG_ASSERT only, which Release builds compile out.
+  (void)program;
   const auto* chainProgram = AOTChainBuilder::ResolveChainProgram(&info);
   if (chainProgram == nullptr) {
     LOGE("ChainProgramWriter::writeSamplers() no compiled chain program; skipping the bindings");

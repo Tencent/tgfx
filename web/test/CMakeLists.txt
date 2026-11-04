@@ -142,13 +142,11 @@ endif ()
 # Enabling Asyncify on WebGL causes function signature mismatch crashes in indirect calls.
 if (TGFX_USE_WEBGPU)
     # Asyncify is needed to synchronously wait for WebGPU async buffer mapping.
-    # ASYNCIFY_REMOVE excludes shader compilation libraries (shaderc, glslang, tint, spvtools)
-    # from instrumentation. These are pure CPU computation and never participate in async
-    # operations. Without this exclusion, Asyncify corrupts their execution state.
+    # The runtime library no longer links a shader compiler (shaderc/glslang/tint), so the
+    # former ASYNCIFY_REMOVE list over those symbols is gone with them.
     set(ASYNCIFY_LINK_OPTIONS
         -sASYNCIFY=1
         -sASYNCIFY_STACK_SIZE=262144
-        "-sASYNCIFY_REMOVE=['shaderc*','glslang*','spv::*','spvtools*','tint::*','Glslang*','TShader*','Compile*ToSpv*','SpvCompilat*']"
     )
     set(ASYNCIFY_COMPILE_DEFS TGFX_USE_ASYNCIFY)
     target_compile_definitions(tgfx PUBLIC TGFX_USE_ASYNCIFY)

@@ -828,9 +828,6 @@ if (TGFX_USE_VULKAN)
 endif ()
 merge_libraries_into(tgfx ${TGFX_STATIC_LIBS} "$<TARGET_FILE:tgfx_zstd>")
 target_link_libraries(tgfx PUBLIC ${TGFX_SHARED_LIBS})
-if (TGFX_USE_WEBGPU)
-    target_link_libraries(tgfx PUBLIC libtint)
-endif ()
 set_target_properties(tgfx PROPERTIES PREFIX "")
 
 if (TGFX_BUILD_FRAMEWORK)
@@ -1140,8 +1137,11 @@ if (TGFX_EMBED_SHADER_BUNDLES)
                 DEPENDS ${TGFX_SHADER_TOOL_DEPENDS} ${TGFX_SHADER_SOURCES}
                 COMMENT "Compiling precompiled shader bundles (${TGFX_SHADER_BACKENDS})")
     endif ()
-    add_custom_target(tgfx_shader_bundles DEPENDS ${TGFX_SHADER_BUNDLE_STAMP}
-            ${TGFX_SHADER_BUNDLE_FILES})
+    # Depend on the stamp only: the bundle files are BYPRODUCTS of the rule that writes the stamp,
+    # and the Makefile generators cannot resolve a direct dependency on a byproduct that does not
+    # exist yet on the first build ("No rule to make target"). The stamp is touched after the tool
+    # succeeds, so its presence guarantees the files exist.
+    add_custom_target(tgfx_shader_bundles DEPENDS ${TGFX_SHADER_BUNDLE_STAMP})
     if (NOT TGFX_SHADER_BUNDLES_PREBUILT)
         # Republishes the bundles under resources/shaders/ for the builds that consume them (Web
         # with TGFX_WEB_PREBUILT_BUNDLES, cross builds on a Linux host). It runs
