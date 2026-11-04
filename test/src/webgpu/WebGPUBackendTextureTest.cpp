@@ -155,6 +155,33 @@ TGFX_TEST(WebGPUBackendTextureTest, RenderableTextureSurfaceIsAccepted) {
       Surface::MakeFrom(context, texture->getBackendTexture(), ImageOrigin::BottomLeft, 4));
 }
 
+TGFX_TEST(WebGPUBackendTextureTest, MinimalUsageHostTextureSurfaceIsAccepted) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  if (context == nullptr) {
+    GTEST_SKIP() << "WebGPU backend not available";
+  }
+  auto gpu = static_cast<WebGPUGPU*>(context->gpu());
+  // Embedders wrap host textures with only the usage they need (RENDER_ATTACHMENT for drawing
+  // and COPY_SRC for readbacks). Such textures must be wrappable as a Surface.
+  WGPUTextureDescriptor descriptor = {};
+  descriptor.dimension = WGPUTextureDimension_2D;
+  descriptor.size = {16, 16, 1};
+  descriptor.format = WGPUTextureFormat_RGBA8Unorm;
+  descriptor.mipLevelCount = 1;
+  descriptor.sampleCount = 1;
+  descriptor.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc;
+  auto texture = wgpuDeviceCreateTexture(gpu->device(), &descriptor);
+  ASSERT_TRUE(texture != nullptr);
+  WebGPUTextureInfo info = {};
+  info.texture = texture;
+  info.format = static_cast<uint32_t>(descriptor.format);
+  BackendTexture backendTexture(info, 16, 16);
+  { ExpectGreenSurface(Surface::MakeFrom(context, backendTexture, ImageOrigin::TopLeft)); }
+  gpu->processUnreferencedResources();
+  wgpuTextureRelease(texture);
+}
+
 TGFX_TEST(WebGPUBackendTextureTest, SamplingImportDoesNotRequireCopyUsage) {
   ContextScope scope;
   auto context = scope.getContext();
