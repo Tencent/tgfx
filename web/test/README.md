@@ -77,8 +77,10 @@ Web 端默认开启 `GENERATE_BASELINE_IMAGES`（可通过 `--skip-images` 关�
    - 若 `test/out/` 中已有 `_base` 图且 cache 的 version、MD5 均匹配 → 直接复用，不重新生成
    - 否则生成新的 `_base` 图到 `test/baseline-out/`
    - 比较 `version.json`（仓库）与 `.cache/{backend}/version.json`（cache）的版本号：
+     - **cache 整体不存在或为空** → 测试失败（没有参考可比）
+     - **cache 存在但缺少该 key** → 视为新增用例，跳过比较并提示
      - **两边都有且版本号不同** → 跳过比较，视为通过（已接受变更）
-     - **版本号相同或 key 不存在** → 做实际 MD5 比较，不匹配则测试失败
+     - **版本号相同** → 做实际 MD5 比较，不匹配则测试失败
 
 3. **运行后**：JS 从虚拟 FS 打包下载三个 zip：
 
@@ -86,7 +88,7 @@ Web 端默认开启 `GENERATE_BASELINE_IMAGES`（可通过 `--skip-images` 关�
    |-----|------|---------|
    | `baseline-out.zip` | baseline 截图 (`_base.webp`) + `md5.json` + `version.json` | `test/baseline-out/` |
    | `test-out.zip` | 失败截图 + `version.json` | `test/out/` |
-   | `cache-web.zip` | `md5.json` + `version.json` | `test/baseline/.cache/{backend}/` |
+   | `cache-web.zip` | `.cache/{backend}/` 下的 `md5.json` + `version.json` + `HEAD` | `test/baseline/.cache/` |
 
 4. **下次构建**：`test/baseline/.cache/{backend}/` 中的 cache 被 preload 回 WASM，实现跨次运行的 baseline 比对。
 
