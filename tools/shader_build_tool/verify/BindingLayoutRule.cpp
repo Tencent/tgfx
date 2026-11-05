@@ -286,8 +286,7 @@ struct HlslRegisters {
   std::set<int> samplers;  // register(sN)
 };
 
-HlslRegisters ScanHlslRegisters(const std::vector<uint8_t>& blob) {
-  std::string text(blob.begin(), blob.end());
+HlslRegisters ScanHlslRegisters(const std::string& text) {
   HlslRegisters registers;
   std::smatch match;
   auto scan = [&](const std::string& pattern, std::set<int>* out) {
@@ -306,8 +305,19 @@ HlslRegisters ScanHlslRegisters(const std::vector<uint8_t>& blob) {
 
 size_t CheckD3D12Variant(const VariantData& variant, Diagnostics* diagnostics) {
   size_t errors = 0;
-  auto checkStage = [&](const std::vector<uint8_t>& blob, const char* stage, int expectedCbuffer) {
-    auto registers = ScanHlslRegisters(blob);
+  auto checkStage = [&](const std::vector<uint8_t>& blob, const char* stage, const char* entry,
+                        int expectedCbuffer) {
+    std::string text(blob.begin(), blob.end());
+    // Every emitted stage writes its obligatory system-value output, so a blob without one is a
+    // scan that read nothing usable: reported as unverifiable instead of passing vacuously.
+    if (text.find(entry) == std::string::npos) {
+      Report(diagnostics, Severity::Unverifiable, DiagnosticCode::VerifyNotApplicable, variant,
+             std::string(stage) + " stage carries no " + entry +
+                 ", so the HLSL register check could not run");
+      errors++;
+      return;
+    }
+    auto registers = ScanHlslRegisters(text);
     for (auto cbuffer : registers.cbuffers) {
       if (cbuffer != expectedCbuffer) {
         Report(diagnostics, Severity::Error, DiagnosticCode::VerifyBindingLayout, variant,
@@ -330,8 +340,8 @@ size_t CheckD3D12Variant(const VariantData& variant, Diagnostics* diagnostics) {
       }
     }
   };
-  checkStage(variant.vertexBlob, "vertex", VERTEX_UBO_BINDING_POINT);
-  checkStage(variant.fragmentBlob, "fragment", FRAGMENT_UBO_BINDING_POINT);
+  checkStage(variant.vertexBlob, "vertex", "SV_Position", VERTEX_UBO_BINDING_POINT);
+  checkStage(variant.fragmentBlob, "fragment", "SV_Target", FRAGMENT_UBO_BINDING_POINT);
   return errors;
 }
 

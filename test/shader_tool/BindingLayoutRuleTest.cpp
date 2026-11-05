@@ -229,6 +229,83 @@ TEST(BindingLayoutRuleTest, AVulkanUboOnTheWrongBindingFails) {
   EXPECT_GE(CheckVariants(variants), 1u);
 }
 
+// The D3D12 storage is HLSL, whose registers the root signature is built from. `vertexText` and
+// `fragmentText` are the register-carrying parts of the emitted sources; the surrounding HLSL does
+// not affect the rule.
+VariantData D3D12Variant(const std::string& vertexText, const std::string& fragmentText) {
+  VariantData variant;
+  variant.shaderName = "TestShader";
+  variant.profileTag = "d3d12";
+  variant.vertexBlob = BytesOf(vertexText);
+  variant.fragmentBlob = BytesOf(fragmentText);
+  return variant;
+}
+
+TEST(BindingLayoutRuleTest, AContractD3D12VariantPasses) {
+  auto variant = D3D12Variant(
+      "cbuffer VertexUniformBlock : register(b0) { float4x4 m; };\n"
+      "float4 main(float2 p : TEXCOORD0) : SV_Position { return 0; }\n",
+      "cbuffer FragmentUniformBlock : register(b1) { float4 c; };\n"
+      "Texture2D<float4> TextureSampler_0 : register(t0);\n"
+      "SamplerState TextureSampler_0_sampler : register(s0);\n"
+      "Texture2D<float4> TextureSampler_1 : register(t1);\n"
+      "SamplerState TextureSampler_1_sampler : register(s1);\n"
+      "float4 main() : SV_Target { return c; }\n");
+  std::vector<VariantData> variants = {variant};
+  EXPECT_EQ(CheckVariants(variants), 0u);
+}
+
+TEST(BindingLayoutRuleTest, AD3D12VertexStageWithoutACBufferPasses) {
+  // A kernel whose vertex stage reads no uniform block declares no cbuffer at all, which is legal.
+  auto variant = D3D12Variant("float4 main(float2 p : TEXCOORD0) : SV_Position { return 0; }\n",
+                              "cbuffer FragmentUniformBlock : register(b1) { float4 c; };\n"
+                              "float4 main() : SV_Target { return c; }\n");
+  std::vector<VariantData> variants = {variant};
+  EXPECT_EQ(CheckVariants(variants), 0u);
+}
+
+TEST(BindingLayoutRuleTest, AD3D12FragmentUboOnTheVertexRegisterFails) {
+  // Both cbuffers at b0 would make the fragment root parameter address a register the bytecode
+  // never reads: the pipeline uploads the uniform and the shader sees zeros.
+  auto variant = D3D12Variant(
+      "cbuffer VertexUniformBlock : register(b0) { float4x4 m; };\n"
+      "float4 main(float2 p : TEXCOORD0) : SV_Position { return 0; }\n",
+      "cbuffer FragmentUniformBlock : register(b0) { float4 c; };\n"
+      "float4 main() : SV_Target { return c; }\n");
+  std::vector<VariantData> variants = {variant};
+  EXPECT_GE(CheckVariants(variants), 1u);
+}
+
+TEST(BindingLayoutRuleTest, AD3D12TextureWithoutAMatchingSamplerFails) {
+  // The pipeline binds the SRV and the Sampler through two separate descriptor tables on the same
+  // index; a sampler register that did not follow its texture register breaks that pairing.
+  auto variant = D3D12Variant(
+      "cbuffer VertexUniformBlock : register(b0) { float4x4 m; };\n"
+      "float4 main(float2 p : TEXCOORD0) : SV_Position { return 0; }\n",
+      "cbuffer FragmentUniformBlock : register(b1) { float4 c; };\n"
+      "Texture2D<float4> TextureSampler_0 : register(t0);\n"
+      "SamplerState TextureSampler_0_sampler : register(s1);\n"
+      "float4 main() : SV_Target { return c; }\n");
+  std::vector<VariantData> variants = {variant};
+  EXPECT_GE(CheckVariants(variants), 1u);
+}
+
+TEST(BindingLayoutRuleTest, AD3D12StageWithoutAnEntryPointIsUnverifiable) {
+  // A blob with no system-value output is not HLSL this rule can read: reported as unverifiable
+  // instead of passing with zero registers found.
+  auto variant = D3D12Variant("cbuffer VertexUniformBlock : register(b0) { float4x4 m; };\n",
+                              "float4 main() : SV_Target { return 0; }\n");
+  std::vector<VariantData> variants = {variant};
+  Diagnostics diagnostics;
+  auto errors = rule.check(ContextOf(variants, noExpansions), &diagnostics);
+  EXPECT_EQ(errors, FailuresIn(diagnostics));
+  EXPECT_GE(errors, 1u);
+  ASSERT_FALSE(diagnostics.records().empty());
+  EXPECT_EQ(diagnostics.records()[0].severity, Severity::Unverifiable);
+  EXPECT_STREQ(diagnostics.records()[0].code, DiagnosticCode::VerifyNotApplicable);
+  EXPECT_NE(diagnostics.records()[0].message.find("SV_Position"), std::string::npos);
+}
+
 TEST(BindingLayoutRuleTest, VariantsOfUncheckedProfilesAreIgnored) {
   // The GL/GLES storage carries no set or binding and MSL only the binding numbers, so the
   // rule reads neither; an unparseable profile tag is skipped the same way.
