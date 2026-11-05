@@ -17,8 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeUtils.h"
+#include <algorithm>
+#include "core/shapes/EffectShape.h"
+#include "core/shapes/Matrix3DShape.h"
 #include "core/shapes/MatrixShape.h"
+#include "core/shapes/ReverseShape.h"
 #include "core/shapes/StrokeShape.h"
+#include "core/shapes/TextShape.h"
+#include "core/utils/Log.h"
 #include "core/utils/StrokeUtils.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Shape.h"
@@ -30,6 +36,86 @@ Path ShapeUtils::GetShapeRenderingPath(std::shared_ptr<Shape> shape, float resol
     return {};
   }
   return shape->onGetPath(resolutionScale);
+}
+
+bool ShapeUtils::GetPathSources(const std::shared_ptr<Shape>& shape, float resolutionScale,
+                                std::vector<Path>* paths) {
+  if (shape == nullptr || paths == nullptr) {
+    return false;
+  }
+  switch (shape->type()) {
+    case Shape::Type::Text:
+      return std::static_pointer_cast<TextShape>(shape)->getGlyphPaths(resolutionScale, paths);
+    case Shape::Type::Matrix: {
+      auto wrapper = std::static_pointer_cast<MatrixShape>(shape);
+      if (!GetPathSources(wrapper->shape, resolutionScale * wrapper->matrix.getMaxScale(), paths)) {
+        return false;
+      }
+      for (auto& path : *paths) {
+        path.transform(wrapper->matrix);
+      }
+      return true;
+    }
+    case Shape::Type::Matrix3D: {
+      auto wrapper = std::static_pointer_cast<Matrix3DShape>(shape);
+      if (!GetPathSources(wrapper->shape, resolutionScale, paths)) {
+        return false;
+      }
+      for (auto& path : *paths) {
+        path.transform3D(wrapper->matrix);
+      }
+      return true;
+    }
+    case Shape::Type::Effect: {
+      auto wrapper = std::static_pointer_cast<EffectShape>(shape);
+      if (!GetPathSources(wrapper->shape, resolutionScale, paths)) {
+        return false;
+      }
+      ApplyEffectToSources(*wrapper->effect, paths);
+      return true;
+    }
+    case Shape::Type::Reverse: {
+      auto wrapper = std::static_pointer_cast<ReverseShape>(shape);
+      if (!GetPathSources(wrapper->shape, resolutionScale, paths)) {
+        return false;
+      }
+      std::reverse(paths->begin(), paths->end());
+      for (auto& path : *paths) {
+        path.reverse();
+      }
+      return true;
+    }
+    default:
+      // FillType reinterprets the whole combined path. It and explicit combinations establish a
+      // source boundary before subsequent effects, regardless of whether the result is stroked.
+      *paths = {shape->onGetPath(resolutionScale)};
+      return true;
+  }
+}
+
+bool ShapeUtils::ApplyEffectToSources(const PathEffect& effect, std::vector<Path>* paths) {
+  if (paths == nullptr) {
+    return false;
+  }
+  auto result = *paths;
+  if (!effect.filterPaths(&result)) {
+    LOGE("ShapeUtils: path effect rejected the sources; keeping the original contours.");
+    return false;
+  }
+  *paths = std::move(result);
+  return true;
+}
+
+Path ShapeUtils::GetContourPath(const std::shared_ptr<Shape>& shape, float resolutionScale) {
+  std::vector<Path> paths = {};
+  if (!GetPathSources(shape, resolutionScale, &paths)) {
+    return {};
+  }
+  Path contours = {};
+  for (const auto& path : paths) {
+    contours.addPath(path);
+  }
+  return contours;
 }
 
 float ShapeUtils::CalculateAlphaReduceFactorIfHairline(std::shared_ptr<Shape> shape) {

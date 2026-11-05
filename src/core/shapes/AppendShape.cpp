@@ -42,6 +42,9 @@ std::shared_ptr<Shape> Shape::Merge(const std::vector<std::shared_ptr<Shape>>& s
     }
     AppendShape::Append(&list, shape);
   }
+  if (list.empty()) {
+    return nullptr;
+  }
   if (list.size() == 1) {
     return list.front();
   }
@@ -60,7 +63,33 @@ std::shared_ptr<Shape> AppendShape::MakeFrom(std::shared_ptr<Shape> first,
 }
 
 PathFillType AppendShape::fillType() const {
-  return shapes.front()->fillType();
+  auto rule = PathFillType::Winding;
+  for (const auto& shape : shapes) {
+    auto path = shape->getPath();
+    rule = path.getFillType();
+    // An empty inverse path contributes the whole plane and establishes the appended rule.
+    if (!path.isEmpty() || path.isInverseFillType()) {
+      break;
+    }
+  }
+  return rule;
+}
+
+bool AppendShape::isInverseFillType() const {
+  size_t inverseIndex = 0;
+  while (inverseIndex < shapes.size() && !shapes[inverseIndex]->isInverseFillType()) {
+    ++inverseIndex;
+  }
+  if (inverseIndex == shapes.size()) {
+    return false;
+  }
+  // Bounds cannot distinguish an empty path from a nonempty degenerate contour.
+  for (size_t i = 0; i < inverseIndex; ++i) {
+    if (!shapes[i]->getPath().isEmpty()) {
+      return false;
+    }
+  }
+  return true;
 }
 
 Rect AppendShape::onGetBounds() const {
@@ -73,7 +102,8 @@ Rect AppendShape::onGetBounds() const {
 
 Path AppendShape::onGetPath(float resolutionScale) const {
   auto firstShape = shapes.front();
-  // the first path determines the fill type
+  // Append retains the current rule, except that an empty non-inverse path is replaced by the next
+  // operand. An empty inverse one fills the whole plane, so the operands are added to it instead.
   auto path = firstShape->onGetPath(resolutionScale);
   for (size_t i = 1; i < shapes.size(); ++i) {
     path.addPath(shapes[i]->onGetPath(resolutionScale));

@@ -32,9 +32,15 @@ class SkPathEffectWrapper : public PathEffect {
     if (path == nullptr) {
       return false;
     }
-    auto& skPath = PathRef::WriteAccess(*path);
+    auto fillType = path->getFillType();
+    SkPath result;
     SkStrokeRec rec(SkStrokeRec::kHairline_InitStyle);
-    return pathEffect->filterPath(&skPath, skPath, &rec, nullptr);
+    if (!pathEffect->filterPath(&result, PathRef::ReadAccess(*path), &rec, nullptr)) {
+      return false;
+    }
+    PathRef::WriteAccess(*path) = result;
+    path->setFillType(fillType);
+    return true;
   }
 
  private:
@@ -51,6 +57,20 @@ std::shared_ptr<PathEffect> PathEffect::MakeDash(const float* intervals, int cou
     return nullptr;
   }
   return std::shared_ptr<PathEffect>(new SkPathEffectWrapper(std::move(effect)));
+}
+
+bool PathEffect::filterPaths(std::vector<Path>* paths) const {
+  if (paths == nullptr) {
+    return false;
+  }
+  auto result = *paths;
+  for (auto& path : result) {
+    if (!filterPath(&path)) {
+      return false;
+    }
+  }
+  *paths = std::move(result);
+  return true;
 }
 
 std::shared_ptr<PathEffect> PathEffect::MakeCorner(float radius) {

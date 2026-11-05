@@ -523,15 +523,50 @@ void Path::addRRect(const RRect& rRect, bool reversed, unsigned int startIndex) 
   writableRef()->path.addRRect(skRRect, ToSkDirection(reversed), startIndex);
 }
 
+bool PathRef::UnionsByConcatenation(PathFillType firstFillType, const Rect& firstBounds,
+                                    PathFillType secondFillType, const Rect& secondBounds) {
+  if (firstFillType != secondFillType) {
+    return false;
+  }
+  // Inverse fills extend outside their bounds, so disjoint bounds do not prove disjoint areas.
+  if (firstFillType == PathFillType::InverseWinding ||
+      firstFillType == PathFillType::InverseEvenOdd) {
+    return false;
+  }
+  return !Rect::Intersects(firstBounds, secondBounds);
+}
+
 bool Path::addPath(const Path& src, PathOp op) {
-  auto& path = writableRef()->path;
-  const auto& newPath = src.pathRef->path;
+  // The bounds are read before the destination is made writable, which drops its cached bounds:
+  // reading them after that would leave the cache holding the bounds from before the merge.
+  return PathRef::AddPath(*this, src, op, getBounds(), src.getBounds());
+}
+
+bool PathRef::AddPath(Path& destination, const Path& source, PathOp op, const Rect& bounds,
+                      const Rect& sourceBounds) {
+  // Testing disjoint bounds avoids paying for a boolean operation twice during mask accumulation.
+  auto unionConcatenates =
+      op == PathOp::Union &&
+      UnionsByConcatenation(destination.getFillType(), bounds, source.getFillType(), sourceBounds);
+  auto& path = WriteAccess(destination);
+  const auto& newPath = ReadAccess(source);
   if (op == PathOp::Append || op == PathOp::Extend) {
-    if (path.isEmpty()) {
+    // An empty inverse path fills the whole plane, so it is not a no-op operand: overwriting it with
+    // the next one would drop the plane. Only a path with neither contours nor an inverse rule is.
+    if (path.isEmpty() && !path.isInverseFillType()) {
       path = newPath;
     } else {
       auto mode = op == PathOp::Extend ? SkPath::kExtend_AddPathMode : SkPath::kAppend_AddPathMode;
       path.addPath(newPath, mode);
+    }
+    return true;
+  }
+  if (unionConcatenates) {
+    // Appending onto an empty path reads the verb array behind its end, so the operand replaces it.
+    if (path.isEmpty()) {
+      path = newPath;
+    } else {
+      path.addPath(newPath, SkPath::kAppend_AddPathMode);
     }
     return true;
   }
