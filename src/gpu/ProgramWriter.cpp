@@ -135,17 +135,7 @@ bool ProgramWriter::write(const ProgramInfo& info, RenderPass* renderPass, Progr
     return false;
   }
 
-  auto array = GetRTAdjustArray(info.renderTarget);
-  if (vertexUniformData != nullptr) {
-    vertexUniformData->setData(EngineParams::RTAdjust.name, array);
-  }
-  writeEngineDefaults(info, fragmentUniformData);
-
-  writeGeometryProcessor(info, vertexUniformData, fragmentUniformData);
-
-  writeProcessors(info, vertexUniformData, fragmentUniformData);
-
-  info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, nullptr);
+  writeUniformValues(info, vertexUniformData, fragmentUniformData);
 
   // TGFX_UNIF_DUMP prints the fully-assembled uniform values (after every writer ran) so an A/B
   // run can diff what the two routes actually upload for the same draw shape. Every draw dumps,
@@ -173,6 +163,21 @@ bool ProgramWriter::write(const ProgramInfo& info, RenderPass* renderPass, Progr
 
 bool ProgramWriter::canWrite(const ProgramInfo&) const {
   return true;
+}
+
+void ProgramWriter::writeUniformValues(const ProgramInfo& info, UniformData* vertexUniformData,
+                                       UniformData* fragmentUniformData) const {
+  auto array = GetRTAdjustArray(info.renderTarget);
+  if (vertexUniformData != nullptr) {
+    vertexUniformData->setData(EngineParams::RTAdjust.name, array);
+  }
+  writeEngineDefaults(info, fragmentUniformData);
+
+  writeGeometryProcessor(info, vertexUniformData, fragmentUniformData);
+
+  writeProcessors(info, vertexUniformData, fragmentUniformData);
+
+  info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, nullptr);
 }
 
 void ProgramWriter::writeEngineDefaults(const ProgramInfo&, UniformData*) const {

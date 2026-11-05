@@ -75,6 +75,16 @@ class ProgramWriter {
   /** Binds the draw's textures onto the program's sampler slots. */
   virtual void writeSamplers(const ProgramInfo& info, Program* program,
                              RenderPass* renderPass) const = 0;
+
+  /**
+   * Writes every per-draw uniform value of the draw described by info into the two uniform data
+   * objects, without any GPU-side work: no uniform buffer is mapped and no sampler is bound. The
+   * upload path (write) feeds it the program's uniform data; the specialization capture feeds it a
+   * CPU scratch buffer, so the values a specialized shader folds and the values the upload writes
+   * come from one and the same code path.
+   */
+  void writeUniformValues(const ProgramInfo& info, UniformData* vertexUniformData,
+                          UniformData* fragmentUniformData) const;
 };
 
 /** The precompiled route: the IR-driven walk and the artifact's sampler slots. */
