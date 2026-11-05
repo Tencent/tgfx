@@ -556,7 +556,8 @@ TGFX_TEST(PathShapeTest, AppendInverseQueryUsesOnlyNecessaryPaths) {
         firstPath.setFillType(firstInverse ? PathFillType::InverseWinding : PathFillType::Winding);
         Path secondPath = {};
         secondPath.addRect(Rect::MakeWH(20, 20));
-        secondPath.setFillType(secondInverse ? PathFillType::InverseEvenOdd : PathFillType::EvenOdd);
+        secondPath.setFillType(secondInverse ? PathFillType::InverseEvenOdd
+                                             : PathFillType::EvenOdd);
         int firstCalls = 0;
         int secondCalls = 0;
         auto first = std::make_shared<RuleCountingShape>(firstPath, &firstCalls);

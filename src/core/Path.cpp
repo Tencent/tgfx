@@ -524,7 +524,7 @@ void Path::addRRect(const RRect& rRect, bool reversed, unsigned int startIndex) 
 }
 
 bool PathRef::UnionsByConcatenation(PathFillType firstFillType, const Rect& firstBounds,
-                                   PathFillType secondFillType, const Rect& secondBounds) {
+                                    PathFillType secondFillType, const Rect& secondBounds) {
   if (firstFillType != secondFillType) {
     return false;
   }
@@ -546,8 +546,8 @@ bool PathRef::AddPath(Path& destination, const Path& source, PathOp op, const Re
                       const Rect& sourceBounds) {
   // Testing disjoint bounds avoids paying for a boolean operation twice during mask accumulation.
   auto unionConcatenates =
-      op == PathOp::Union && UnionsByConcatenation(destination.getFillType(), bounds,
-                                                 source.getFillType(), sourceBounds);
+      op == PathOp::Union &&
+      UnionsByConcatenation(destination.getFillType(), bounds, source.getFillType(), sourceBounds);
   auto& path = WriteAccess(destination);
   const auto& newPath = ReadAccess(source);
   if (op == PathOp::Append || op == PathOp::Extend) {

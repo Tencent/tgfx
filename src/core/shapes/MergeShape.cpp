@@ -46,7 +46,7 @@ PathFillType MergeShape::fillType() const {
   if (pathOp == PathOp::Union) {
     auto firstType = first->fillType();
     if (PathRef::UnionsByConcatenation(firstType, first->getBounds(), second->fillType(),
-                                      second->getBounds())) {
+                                       second->getBounds())) {
       return firstType;
     }
   }

@@ -43,7 +43,7 @@ class PathRef {
    * Returns whether matching non-inverse rules and disjoint bounds allow a union by concatenation.
    */
   static bool UnionsByConcatenation(PathFillType firstFillType, const Rect& firstBounds,
-                                   PathFillType secondFillType, const Rect& secondBounds);
+                                    PathFillType secondFillType, const Rect& secondBounds);
 
   /**
    * Combines paths using the supplied conservative bounds to select the union fast path. Returns
