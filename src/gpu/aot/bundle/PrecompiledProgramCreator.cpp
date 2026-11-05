@@ -30,7 +30,9 @@
 #include "gpu/ProgramSignature.h"
 #include "gpu/ProgramWriter.h"
 #include "gpu/UniformData.h"
+#include "gpu/aot/bundle/ChainSpecializer.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
+#include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "gpu/aot/select/PermutationMatch.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
@@ -420,6 +422,31 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   }
 
 #if DEBUG
+  // Demo-stage runtime specialization of the chain interpreter (TGFX_AOT_SPECIALIZE=1): rewrite
+  // the chain fragment's specialization regions with this draw's folded constants, so the driver
+  // eliminates the unused op branches and register traffic. Any surprise keeps the generic
+  // artifact — the rewrite returns an empty string and nothing below changes.
+  bool chainSpecialized = false;
+  std::string chainGenericCode;
+  if (ChainSpecializationEnabled() && matchResult->shaderName == PointwiseChainShader::Name &&
+      fragmentDesc.format == ShaderCodeFormat::GLSL && !fragmentDesc.code.empty()) {
+    const auto* carriedIR = programInfo->getCarriedIR();
+    if (carriedIR != nullptr && carriedIR->program.has_value()) {
+      auto specialized = SpecializeChainFragmentGLSL(fragmentDesc.code, *carriedIR->program);
+      if (!specialized.empty()) {
+        chainGenericCode = fragmentDesc.code;
+        fragmentDesc.code = std::move(specialized);
+        chainSpecialized = true;
+        LOGI("ChainSpecializer: fragment %zu -> %zu bytes (slots=%zu)", chainGenericCode.size(),
+             fragmentDesc.code.size(), carriedIR->program->slots.size());
+      } else {
+        LOGI("ChainSpecializer: artifact not specializable, keeping generic text");
+      }
+    }
+  }
+#endif
+
+#if DEBUG
   static const char* dumpDir = std::getenv("TGFX_AOT_DUMP_DIR");
 #else
   const char* dumpDir = nullptr;
@@ -461,6 +488,16 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   }
   cache->recordAOTStage(PrecompiledAOTStage::VertexModuleCreated);
   auto fragmentShader = shaderCache->findOrCreateModule(fragmentDesc);
+#if DEBUG
+  // The specialized chain fragment is plain GLSL that some ES compilers reject (SwiftShader's
+  // compiler runs out of memory on the unrolled slot blocks, for one). The specialization is an
+  // optimization only: fall back to the generic artifact and keep the draw.
+  if (fragmentShader == nullptr && chainSpecialized) {
+    LOGI("ChainSpecializer: specialized fragment failed to compile; falling back to generic");
+    fragmentDesc.code = std::move(chainGenericCode);
+    fragmentShader = shaderCache->findOrCreateModule(fragmentDesc);
+  }
+#endif
   if (fragmentShader == nullptr) {
     cache->recordFailure(PrecompiledFallbackReason::FragmentModuleCreationFailed,
                          MakeFallbackRecord(cache, programInfo, &*matchResult));

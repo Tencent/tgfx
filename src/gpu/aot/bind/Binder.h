@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <array>
 #include <vector>
 #include "gpu/CoordTransform.h"
 #include "gpu/UniformData.h"
@@ -54,6 +55,13 @@ void BindLocalRectCoverageSlot(UniformData* uniformData, size_t index, int ordin
                                const AOTChainSlot& slot);
 void BindRRectCoverageSlot(UniformData* uniformData, size_t index, int ordinal,
                            const AOTChainSlot& slot);
+
+/**
+ * The pure encoding of one compiled chain program's instruction words — (op, in0, in1, selector)
+ * per declared slot including the OP_NONE tail — shared by the uniform upload and the runtime
+ * chain specializer, so a specialized shader folds exactly the constants the interpreter reads.
+ */
+std::vector<std::array<int, 4>> EncodeChainSlots(const AOTProgram& program);
 
 /**
  * Writes one compiled chain program's uniforms: the vertex-side coord-source mask and every

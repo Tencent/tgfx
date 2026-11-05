@@ -125,7 +125,85 @@ highp float gpPixelCoverage = 1.0;
 #else
 #define TGFX_CHAIN_UNIT_COVERAGE vec4(1.0)
 #endif
+// Structural accessors (specialization region). The generic bodies read the uniform block, so an
+// unspecialized compile is behaviorally identical to reading the members directly (the compiler
+// inlines them away). The runtime specialization pass replaces this whole region between the
+// tgfx pragmas with folded constants — every read site below goes through these accessors only.
+#pragma tgfx_spec_accessors begin
+int chainSlotCount() { return SlotCount; }
+ivec4 chainSlot(int slot) { return SlotPacked[slot]; }
+int chainRootIndex() { return RootIndex; }
+int chainCoverageRootIndex() { return CoverageRootIndex; }
+int chainClipRegister() { return ClipCoverageRegister; }
+#pragma tgfx_spec_accessors end
 #include "pipeline/chain/pointwise_chain_eval.inc"
+
+// The XferProcessor source without coverage: the root, times the coverage subtree root in the
+// layouts without a coverage varying (see the epilogue below).
+#if GP_LAYOUT >= 1 || HAS_COVERAGE
+#define CHAIN_XP_SRC_UNPREMUL result
+#else
+#define CHAIN_XP_SRC_UNPREMUL \
+  (chainCoverageRootIndex() >= 0 ? result * coverageRootRegister : result)
+#endif
+
+// Slot executor (specialization region). The generic body keeps the runtime loop — the compiler
+// cannot unroll it because the bound is uniform data. The specialization pass replaces the region
+// with one call site per slot (literal slot indices), which lets the op dispatch, the register
+// reads and the result-register writes fold to constants without relying on driver unrolling.
+#pragma tgfx_spec_executor begin
+void chainRunSlots(out vec4 result, out vec4 clipRegister, out vec4 coverageRootRegister
+#if HAS_XP >= 1
+                   ,
+                   out vec4 xpBlended
+#endif
+) {
+  result = vec4(0.0);
+  clipRegister = vec4(0.0);
+  coverageRootRegister = vec4(0.0);
+#if HAS_XP >= 1
+  xpBlended = vec4(0.0);
+  // With an advanced XferProcessor mode the loop runs one pass past the instructions: slot
+  // SlotCount blends the XferProcessor source with the dst at evalChainSlot's OP_BLEND site
+  // (xp_blend_pass.inc). The pass count stays uniform data, so the loop is not unrolled.
+  int passCount = chainSlotCount() + (xpNeedsBlendPass() ? 1 : 0);
+#else
+  int passCount = chainSlotCount();
+#endif
+  for (int i = 0; i < passCount; ++i) {
+#if HAS_XP >= 1
+    if (i == chainSlotCount()) {
+      chainXPSrc = CHAIN_XP_SRC_UNPREMUL;
+    }
+#endif
+    // Bits 20-24 of the selector carry the result register + 1 (0 = dead instruction, skip the
+    // write). The value is evaluated before the write, so a consumer may share a register with
+    // its just-released producer.
+    vec4 value = evalChainSlot(i);
+#if HAS_XP >= 1
+    if (i == chainSlotCount()) {
+      xpBlended = value;
+    } else
+#endif
+    {
+      int outRegister = (chainSlot(i).w >> 20) & 0x1F;
+      if (outRegister != 0) {
+        int written = outRegister - 1;
+        chainResults[written] = value;
+        if (written == chainRootIndex()) {
+          result = value;
+        }
+        if (written == chainClipRegister()) {
+          clipRegister = value;
+        }
+        if (written == chainCoverageRootIndex()) {
+          coverageRootRegister = value;
+        }
+      }
+    }
+  }
+}
+#pragma tgfx_spec_executor end
 
 void main() {
 #if GP_LAYOUT == 1
@@ -160,89 +238,51 @@ void main() {
   // used recipe set off. The leaf index, the loop bound and the tiled test are uniform across the
   // draw, so every texture read stays in uniform control flow.
 #if NTEX > 0
-  if (SlotPacked[0].x == OP_TEXTURE && !chainLeafIsTiled(0)) {
+  if (chainSlot(0).x == OP_TEXTURE && !chainLeafIsTiled(0)) {
     chainLeafTex[0] = chainPlainLeafFetch(TextureSampler_0, TransformedCoords_0, Subset,
                                           AlphaStart, HasRgbaaa, SubsetClampOn, 0);
   }
-  if (SlotPacked[1].x == OP_TEXTURE && !chainLeafIsTiled(1)) {
+  if (chainSlot(1).x == OP_TEXTURE && !chainLeafIsTiled(1)) {
     chainLeafTex[1] = chainPlainLeafFetch(TextureSampler_1, TransformedCoords_1, Subset_1,
                                           AlphaStart_1, HasRgbaaa_1, SubsetClampOn_1, 1);
   }
-  if (SlotPacked[2].x == OP_TEXTURE && !chainLeafIsTiled(2)) {
+  if (chainSlot(2).x == OP_TEXTURE && !chainLeafIsTiled(2)) {
     chainLeafTex[2] = chainPlainLeafFetch(TextureSampler_2, TransformedCoords_2, Subset_2,
                                           AlphaStart_2, HasRgbaaa_2, SubsetClampOn_2, 2);
   }
-  if (SlotPacked[3].x == OP_TEXTURE && !chainLeafIsTiled(3)) {
+  if (chainSlot(3).x == OP_TEXTURE && !chainLeafIsTiled(3)) {
     chainLeafTex[3] = chainPlainLeafFetch(TextureSampler_3, TransformedCoords_3, Subset_3,
                                           AlphaStart_3, HasRgbaaa_3, SubsetClampOn_3, 3);
   }
-  int recipeCount = min(SlotCount, CHAIN_TILED_RECIPES);
+  int recipeCount = min(chainSlotCount(), CHAIN_TILED_RECIPES);
   for (int recipe = 0; recipe < recipeCount; ++recipe) {
     int leaf = chainTiledRecipeLeaf(recipe);
-    if (leaf >= 0 && leaf < NTEX && SlotPacked[leaf].x == OP_TEXTURE) {
+    if (leaf >= 0 && leaf < NTEX && chainSlot(leaf).x == OP_TEXTURE) {
       chainLeafTex[leaf] = chainTiledLeafFetch(leaf);
     }
   }
 #endif
   // The three registers the epilogue consumes (root, clip coverage, coverage subtree root) are
-  // captured as the loop writes them instead of being read back as chainResults[<uniform>] after
-  // the loop. Registers are reused, so "the last write to that register" is exactly what the
-  // read-back returned. The capture is required, not cosmetic: on the Apple desktop GL driver, the
-  // zero-coverage discard in applyPorterDuffXP (xp_porter_duff.inc) killed every fragment of the
-  // draw while the coverage came from that read-back, although the same expression selected the
-  // correct colour when no discard was present. Capturing inside the loop avoids it.
-  vec4 result = vec4(0.0);
-  vec4 clipRegister = vec4(0.0);
-  vec4 coverageRootRegister = vec4(0.0);
-  // The XferProcessor source without coverage: the root, times the coverage subtree root in the
-  // layouts without a coverage varying (see the epilogue below).
-#if GP_LAYOUT >= 1 || HAS_COVERAGE
-#define CHAIN_XP_SRC_UNPREMUL result
-#else
-#define CHAIN_XP_SRC_UNPREMUL (CoverageRootIndex >= 0 ? result * coverageRootRegister : result)
-#endif
+  // captured as chainRunSlots writes them instead of being read back as
+  // chainResults[<uniform>] after the loop. Registers are reused, so "the last write to that
+  // register" is exactly what the read-back returned. The capture is required, not cosmetic: on
+  // the Apple desktop GL driver, the zero-coverage discard in applyPorterDuffXP
+  // (xp_porter_duff.inc) killed every fragment of the draw while the coverage came from that
+  // read-back, although the same expression selected the correct colour when no discard was
+  // present. Capturing inside the loop avoids it.
+  vec4 result;
+  vec4 clipRegister;
+  vec4 coverageRootRegister;
 #if HAS_XP >= 1
-  // With an advanced XferProcessor mode the loop runs one pass past the instructions: slot
-  // SlotCount blends the XferProcessor source with the dst at evalChainSlot's OP_BLEND site
-  // (xp_blend_pass.inc). The pass count stays uniform data, so the loop is not unrolled.
+  vec4 xpBlended;
   chainXPDst = xpReadDstColor();
-  vec4 xpBlended = vec4(0.0);
-  int passCount = SlotCount + (xpNeedsBlendPass() ? 1 : 0);
-#else
-  int passCount = SlotCount;
 #endif
-  for (int i = 0; i < passCount; ++i) {
+  chainRunSlots(result, clipRegister, coverageRootRegister
 #if HAS_XP >= 1
-    if (i == SlotCount) {
-      chainXPSrc = CHAIN_XP_SRC_UNPREMUL;
-    }
+                ,
+                xpBlended
 #endif
-    // Bits 20-24 of the selector carry the result register + 1 (0 = dead instruction, skip the
-    // write). The value is evaluated before the write, so a consumer may share a register with
-    // its just-released producer.
-    vec4 value = evalChainSlot(i);
-#if HAS_XP >= 1
-    if (i == SlotCount) {
-      xpBlended = value;
-    } else
-#endif
-    {
-      int outRegister = (SlotPacked[i].w >> 20) & 0x1F;
-      if (outRegister != 0) {
-        int written = outRegister - 1;
-        chainResults[written] = value;
-        if (written == RootIndex) {
-          result = value;
-        }
-        if (written == ClipCoverageRegister) {
-          clipRegister = value;
-        }
-        if (written == CoverageRootIndex) {
-          coverageRootRegister = value;
-        }
-      }
-    }
-  }
+  );
 
   // The narrow clip slots chain from the scalar unit one (-4) instead of multiplying the color
   // root, so their product is the pure clip coverage (see ClipCoverageRegister above). The atlas
@@ -251,7 +291,7 @@ void main() {
   // TGFX_XP_COVERAGE), unlike a MaskFilter's source-modulating mask, whose subtree keeps the
   // CoverageRootIndex source route (MaskCoverageBlendModesOnOpaqueBackground, byte-parity across
   // Src/SrcOver/Multiply/Darken).
-  vec4 clipCoverage = ClipCoverageRegister >= 0 ? clipRegister : vec4(1.0);
+  vec4 clipCoverage = chainClipRegister() >= 0 ? clipRegister : vec4(1.0);
 
   // The device-space mask is draw COVERAGE (a clip/mask on the whole draw), so it multiplies the
   // coverage chain like the runtime's DeviceSpaceTextureEffect compositing — never the bare color.
@@ -282,7 +322,8 @@ void main() {
   // coverage in the runtime composite, unlike the MaskFilter's source-modulating mask
   // (MaskCoverageBlendModesOnOpaqueBackground, byte-parity across Src/SrcOver/Multiply/Darken).
 #if GP_LAYOUT >= 1 || HAS_COVERAGE
-  highp vec4 finalCoverage = CoverageRootIndex >= 0 ? coverageRootRegister : TGFX_CHAIN_UNIT_COVERAGE;
+  highp vec4 finalCoverage = chainCoverageRootIndex() >= 0 ? coverageRootRegister
+                                                           : TGFX_CHAIN_UNIT_COVERAGE;
 #else
   highp vec4 finalCoverage = TGFX_CHAIN_UNIT_COVERAGE;
 #endif

@@ -68,8 +68,11 @@ void UploadTiledRecipe(UniformData* uniformData, const AOTTiledTextureRecipe& re
   uniformData->setDataOptional(names.strict, recipe.strict ? 1 : 0);
 }
 
-void UploadChainSlot(UniformData* uniformData, size_t index, const AOTChainSlot& slot,
-                     int rectOrdinal, int localRectOrdinal, int rrectOrdinal) {
+// Pure slot encoding shared by the uniform upload and the runtime chain specializer: the packed
+// instruction word (op, in0, in1, selector) exactly as UploadChainSlot writes it, so a
+// specialized shader folds the same constants the interpreter would read at runtime.
+static std::array<int, 4> EncodeChainSlotPacked(const AOTChainSlot& slot, int rectOrdinal,
+                                                int localRectOrdinal, int rrectOrdinal) {
   int selector = slot.op == AOTChainOp::Blend
                      ? slot.blend.blendMode | (slot.blend.multiplyInputAlpha ? 0x100 : 0)
                      : 0;
@@ -78,7 +81,7 @@ void UploadChainSlot(UniformData* uniformData, size_t index, const AOTChainSlot&
   }
   if (slot.op == AOTChainOp::Texture) {
     // Bit 0: modulate by the paint alpha. Bit 1: alpha-only leaf, splat .r into all channels.
-    // Bit 2: coverage-root leaf, modulate by the coverage unit alpha. Bit 3: alpha-only leaf
+    // Bit 2: coverage-root leaf, modulated by the coverage unit alpha. Bit 3: alpha-only leaf
     // modulated by the geometry color's RGB (a two-child blend operand, whose input is
     // (geom.rgb, 1.0)). Bit 4: alpha-only leaf modulated by the full geometry color (the color
     // root, whose readback is sample.a * the complete premul input color).
@@ -92,30 +95,38 @@ void UploadChainSlot(UniformData* uniformData, size_t index, const AOTChainSlot&
     selector = slot.texModulateAlphaOnly | (slot.texModulateSourceSlot << 16);
   }
   // The coverage capacities index their own parameter arrays by the per-kind ordinal, which the
-  // selector also carries; every other instruction's parameter block is indexed by the slot.
-  int ordinal = static_cast<int>(index);
+  // selector also carries (bits 16-19); every other instruction's parameter block is indexed by
+  // the slot.
   if (slot.op == AOTChainOp::AARectCoverage) {
-    // Bits 16-19: the slot's ordinal into the CoverageRect array.
-    ordinal = rectOrdinal;
     selector = rectOrdinal << 16;
   }
   if (slot.op == AOTChainOp::LocalRectCoverage) {
-    // Bits 16-19: the slot's ordinal into the CoverageLocalRect arrays.
-    ordinal = localRectOrdinal;
     selector = localRectOrdinal << 16;
   }
   if (slot.op == AOTChainOp::RRectCoverage) {
-    // Bits 16-19: the slot's ordinal into the CoverageRRect* parameter arrays.
-    ordinal = rrectOrdinal;
     selector = rrectOrdinal << 16;
   }
   // Bits 20-24: the result register + 1 (0 marks a dead instruction whose result nothing reads;
   // the kernel then skips the chainResults write).
   selector |= (slot.outRegister + 1) << 20;
-  int packed[] = {static_cast<int>(slot.op), slot.in0, slot.in1, selector};
+  return {static_cast<int>(slot.op), slot.in0, slot.in1, selector};
+}
+
+void UploadChainSlot(UniformData* uniformData, size_t index, const AOTChainSlot& slot,
+                     int rectOrdinal, int localRectOrdinal, int rrectOrdinal) {
+  auto packed = EncodeChainSlotPacked(slot, rectOrdinal, localRectOrdinal, rrectOrdinal);
   uniformData->setArrayElementOptional(ChainParams::SlotPacked.name, index, packed);
   // The parameter block is the instruction contract's bind column: one function per op that
   // writes one, a null row for the instructions that carry none (they ride the packed word).
+  // Coverage ops index their per-kind parameter arrays by the ordinal the selector carries.
+  int ordinal = static_cast<int>(index);
+  if (slot.op == AOTChainOp::AARectCoverage) {
+    ordinal = rectOrdinal;
+  } else if (slot.op == AOTChainOp::LocalRectCoverage) {
+    ordinal = localRectOrdinal;
+  } else if (slot.op == AOTChainOp::RRectCoverage) {
+    ordinal = rrectOrdinal;
+  }
   if (auto bind = OpContractOf(slot.op).bind) {
     bind(uniformData, index, ordinal, slot);
   }
@@ -418,6 +429,33 @@ void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
       break;
     }
   }
+}
+
+std::vector<std::array<int, 4>> EncodeChainSlots(const AOTProgram& program) {
+  std::vector<std::array<int, 4>> packed;
+  const auto* capacity = GetAOTResourceCapacity(program.profile);
+  if (capacity == nullptr) {
+    return packed;
+  }
+  // The declared capacity exceeds the real slot count: the inactive tail carries the OP_NONE
+  // marker, exactly as BindChainProgram uploads it — a specialized shader folds the same words.
+  int rectOrdinal = 0;
+  int localRectOrdinal = 0;
+  int rrectOrdinal = 0;
+  AOTChainSlot inactiveSlot = {};
+  packed.reserve(capacity->instructions);
+  for (size_t index = 0; index < capacity->instructions; ++index) {
+    const auto& slot = index < program.slots.size() ? program.slots[index] : inactiveSlot;
+    packed.push_back(EncodeChainSlotPacked(slot, rectOrdinal, localRectOrdinal, rrectOrdinal));
+    if (slot.op == AOTChainOp::AARectCoverage) {
+      ++rectOrdinal;
+    } else if (slot.op == AOTChainOp::LocalRectCoverage) {
+      ++localRectOrdinal;
+    } else if (slot.op == AOTChainOp::RRectCoverage) {
+      ++rrectOrdinal;
+    }
+  }
+  return packed;
 }
 
 namespace {
