@@ -4,13 +4,13 @@
   CoordTransformMatrix_0_P0 = [0.03125 0 0 0 0 0.03125 0 0 0 0 1 0 ]
 [DRAW] route=JIT suffix= fields=1
   Color_P0                 = [1 1 1 1 ]
-[UNIF ab] sampler slot=0 texture=32x32 format=5
+[UNIF ab] sampler slot=0 texture=32x32 format=rgba8
 [DRAW] route=JIT suffix= fields=2
   tgfx_RTAdjust            = [0.03125 -1 0.03125 -1 ]
   CoordTransformMatrix_0_P0 = [0.03125 0 0 0 0 0.03125 0 0 0 0 1 0 ]
 [DRAW] route=JIT suffix= fields=1
   Color_P0                 = [1 1 1 1 ]
-[UNIF ab] sampler slot=0 texture=32x32 format=5
+[UNIF ab] sampler slot=0 texture=32x32 format=rgba8
 --- aot ---
 [DRAW] route=AOT suffix= fields=3
   tgfx_RTAdjust            = [0.03125 -1 0.03125 -1 ]
@@ -26,7 +26,7 @@
   AlphaOnly                = [0 ]
   Strict                   = [0 ]
   ReadSwizzle              = [0 ]
-[UNIF ab] sampler slot=0 texture=32x32 format=5
+[UNIF ab] sampler slot=0 texture=32x32 format=rgba8
 [DRAW] route=AOT suffix= fields=3
   tgfx_RTAdjust            = [0.03125 -1 0.03125 -1 ]
   Matrix                   = [1 0 0 0 0 1 0 0 0 0 1 0 ]
@@ -41,4 +41,4 @@
   AlphaOnly                = [0 ]
   Strict                   = [0 ]
   ReadSwizzle              = [0 ]
-[UNIF ab] sampler slot=0 texture=32x32 format=5
+[UNIF ab] sampler slot=0 texture=32x32 format=rgba8

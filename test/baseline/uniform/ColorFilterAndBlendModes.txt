@@ -4,7 +4,7 @@
   CoordTransformMatrix_0_P0 = [0.03125 0 0 0 0 0.03125 0 0 0 0 1 0 ]
 [DRAW] route=JIT suffix= fields=1
   Color_P0                 = [1 1 1 1 ]
-[UNIF ab] sampler slot=0 texture=32x32 format=5
+[UNIF ab] sampler slot=0 texture=32x32 format=rgba8
 [DRAW] route=JIT suffix= fields=1
   tgfx_RTAdjust            = [0.03125 -1 0.03125 -1 ]
 [DRAW] route=JIT suffix= fields=2
@@ -22,7 +22,7 @@
   Color_P0                 = [0.470588 0.784314 0.352941 1 ]
   DstTextureUpperLeft_P1   = [0 0 ]
   DstTextureCoordScale_P1  = [0.015625 0.015625 ]
-[UNIF ab] sampler slot=0 texture=64x64 format=4
+[UNIF ab] sampler slot=0 texture=64x64 format=rgba8
 [DRAW] route=JIT suffix= fields=1
   tgfx_RTAdjust            = [0.03125 -1 0.03125 -1 ]
 [DRAW] route=JIT suffix= fields=1
@@ -50,8 +50,8 @@
   SubsetClampOn            = [0 ]
   Color                    = [1 1 1 1 ]
   HasCommonColor           = [1 ]
-[UNIF ab] sampler slot=0 texture=32x32 format=5
-[UNIF ab] sampler slot=1 texture=1x1 format=4 (dummy)
+[UNIF ab] sampler slot=0 texture=32x32 format=rgba8
+[UNIF ab] sampler slot=1 texture=1x1 format=rgba8 (dummy)
 [DRAW] route=AOT suffix= fields=2
   tgfx_RTAdjust            = [0.03125 -1 0.03125 -1 ]
   Matrix                   = [1 0 0 0 0 1 0 0 0 0 1 0 ]
@@ -167,7 +167,7 @@
   DstTextureUpperLeft      = [0 0 ]
   DstTextureCoordScale     = [0.015625 0.015625 ]
   XPBlendMode              = [24 ]
-[UNIF ab] sampler slot=0 texture=64x64 format=4
+[UNIF ab] sampler slot=0 texture=64x64 format=rgba8
 [DRAW] route=AOT suffix= fields=1
   tgfx_RTAdjust            = [0.03125 -1 0.03125 -1 ]
 [DRAW] route=AOT suffix= fields=9

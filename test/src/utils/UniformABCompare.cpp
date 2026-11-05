@@ -19,6 +19,7 @@
 #include "UniformABCompare.h"
 #include <algorithm>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -28,6 +29,7 @@
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gtest/gtest.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/PixelFormat.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestUtils.h"
 
@@ -63,17 +65,48 @@ std::vector<std::string> SplitLines(const std::string& text) {
   return lines;
 }
 
+// A sampler line's texture-format number, rewritten to the channel-family semantic it denotes.
+// Backends pick their own native channel order when uploading the same image (the golden's author
+// uploaded BGRA where D3D12 uploads RGBA), so the raw PixelFormat value is backend noise the
+// pinned trace must not carry: what the trace protects is "this slot bound a texture of such
+// size and such channel family", not "the driver happens to prefer this byte order". A format
+// outside the known families keeps its number, so an unexpected upload is still a visible drift.
+std::string NormalizeSamplerLine(const std::string& line) {
+  static const std::pair<int, const char*> families[] = {
+      {static_cast<int>(PixelFormat::RGBA_8888), "rgba8"},
+      {static_cast<int>(PixelFormat::BGRA_8888), "rgba8"},
+      {static_cast<int>(PixelFormat::ALPHA_8), "alpha8"},
+      {static_cast<int>(PixelFormat::GRAY_8), "alpha8"},
+  };
+  auto pos = line.find("format=");
+  if (pos == std::string::npos) {
+    return line;
+  }
+  auto numberStart = pos + strlen("format=");
+  auto numberEnd = line.find_first_not_of("0123456789", numberStart);
+  if (numberEnd == std::string::npos) {
+    numberEnd = line.size();
+  }
+  auto number = atoi(line.c_str() + numberStart);
+  for (const auto& family : families) {
+    if (family.first == number) {
+      return line.substr(0, numberStart) + family.second + line.substr(numberEnd);
+    }
+  }
+  return line;
+}
+
 // One route's dump, normalized to the pinned form: a dump header (it carries the program key,
 // whose ClassIDs are link-order noise, plus the writer's route/suffix tags) becomes a positional
-// [DRAW] marker, a sampler-slot line stays verbatim, and a value line keeps its field name and
-// values in offset order. A draw one route drops shows up as a shifted sequence instead of an
-// invisible hole; everything else the run prints (logs) is dropped.
+// [DRAW] marker, a sampler-slot line keeps everything but its pixel-format number, and a value
+// line keeps its field name and values in offset order. A draw one route drops shows up as a
+// shifted sequence instead of an invisible hole; everything else the run prints (logs) is dropped.
 std::string NormalizeTrace(const std::string& raw) {
   std::string out;
   for (const auto& line : SplitLines(raw)) {
     if (line.rfind("[UNIF ", 0) == 0) {
       if (line.find("sampler slot=") != std::string::npos) {
-        out += line + '\n';
+        out += NormalizeSamplerLine(line) + '\n';
       } else {
         // Keep the writer context (route, the structural/suffix tags, the field count), drop only
         // the label — it embeds the program key, whose ClassIDs are link-order noise.
