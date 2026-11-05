@@ -863,7 +863,7 @@ TGFX_TEST(ShaderPermutationTest, LUTGradientWithRealMaskUsesAllLeafSelectors) {
   }
 }
 
-TGFX_TEST(ShaderPermutationTest, QuadTextureLocalMaskRejectsInvertedCoverage) {
+TGFX_TEST(ShaderPermutationTest, QuadTextureLocalMaskServesBothCoveragePolarities) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
@@ -897,10 +897,15 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureLocalMaskRejectsInvertedCoverage) {
     ASSERT_TRUE(lowered.has_value());
     programInfo.setCarriedIR(&*lowered);
     auto match = MatchPermutation(&programInfo);
+    // Both polarities are servable: an inverted local mask lowers to an SrcOut xfer node the IR
+    // expresses, so the walk claims the draw through the chain family (the xfer operator rides
+    // the pointwise table) instead of the dedicated local-mask kernel. The pre-IR matcher
+    // rejected the inverted form because its tree walk could not see the operator, not because
+    // the shader cannot evaluate it; what matters is that neither polarity is dropped.
+    ASSERT_TRUE(match.has_value()) << (inverted ? "inverted" : "straight");
     if (inverted) {
-      EXPECT_FALSE(match.has_value());
+      EXPECT_EQ(match->shaderName, "PointwiseChainShader");
     } else {
-      ASSERT_TRUE(match.has_value());
       EXPECT_EQ(match->shaderName, "QuadTextureFillShader");
     }
   }
