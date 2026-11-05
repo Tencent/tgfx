@@ -30,7 +30,8 @@
 namespace tgfx {
 
 // Reads the int32 stored at the field named `name` in the data's buffer. Uses the private field map
-// (accessible in tests via -fno-access-control) to locate the offset.
+// to locate the offset, so it exists only where the test build can reach private members.
+TGFX_PRIVATE_ACCESS(
 static int32_t ReadInt(const UniformData& data, uint8_t* buffer, const std::string& name) {
   const auto* field = data.findField(name);
   EXPECT_NE(field, nullptr);
@@ -38,8 +39,10 @@ static int32_t ReadInt(const UniformData& data, uint8_t* buffer, const std::stri
   std::memcpy(&value, buffer + field->offset, sizeof(value));
   return value;
 }
+)
 
-TGFX_TEST(UniformDataTest, SetDataOptionalBehavior) {
+TGFX_TEST_PRIVATE(UniformDataTest, SetDataOptionalBehavior) {
+  TGFX_PRIVATE_ACCESS(
   std::vector<Uniform> uniforms = {Uniform("Present", UniformFormat::Int),
                                    Uniform("Sentinel", UniformFormat::Int)};
   UniformData data(uniforms);
@@ -63,6 +66,7 @@ TGFX_TEST(UniformDataTest, SetDataOptionalBehavior) {
   // 3. Required setData for an existing uniform still writes (baseline behavior unchanged).
   data.setData("Present", static_cast<int32_t>(7));
   EXPECT_EQ(ReadInt(data, buffer.data(), "Present"), 7);
+  )
 }
 
 // Verifies that the std140 layout rules applied by UniformData match the GPU-side uniform block:

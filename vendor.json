@@ -419,7 +419,8 @@
         "targets": [
           "spirv-cross-core",
           "spirv-cross-glsl",
-          "spirv-cross-hlsl"
+          "spirv-cross-hlsl",
+          "spirv-cross-msl"
         ],
         "arguments": [
           "-DSPIRV_CROSS_ENABLE_TESTS=OFF",

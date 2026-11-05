@@ -2825,7 +2825,10 @@ TGFX_TEST(AOTEffectTest, NonRootCoverageTextureModulatesByUnit) {
 // image), which this test environment cannot construct — the format gate itself is the shipped
 // behavior; a hardware-buffer-capable environment should extend this test with a pixel-level
 // gray-image draw asserting the runtime route serves it.
-TGFX_TEST(AOTEffectTest, ChainRejectsNonRGBAColorFormats) {
+TGFX_TEST_PRIVATE(AOTEffectTest, ChainRejectsNonRGBAColorFormats) {
+  // getTextureView() is protected: the probe needs the private-access build, which MSVC does not
+  // offer, so this case is registered only where the test build can reach it.
+  TGFX_PRIVATE_ACCESS(
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
@@ -2845,6 +2848,7 @@ TGFX_TEST(AOTEffectTest, ChainRejectsNonRGBAColorFormats) {
     // The lowering must refuse the leaf (no swizzle contract on the chain's plain path).
     EXPECT_FALSE(AOTEffectDecomposer::Lower({grayLeaf.get(), colorMatrix.get()}, &graph));
   }
+  )
 }
 
 // Audit A6: the admission budget must count FINAL ENCODED instructions,

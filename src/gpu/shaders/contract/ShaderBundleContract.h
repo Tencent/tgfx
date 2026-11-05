@@ -67,8 +67,8 @@ enum class ShaderProfile { OpenGL, OpenGLES, Vulkan, Metal, WebGPU, D3D12 };
 
 /// Every profile, in the order the tool reports them.
 inline constexpr ShaderProfile AllShaderProfiles[] = {
-    ShaderProfile::OpenGL, ShaderProfile::OpenGLES, ShaderProfile::Vulkan, ShaderProfile::Metal,
-    ShaderProfile::WebGPU, ShaderProfile::D3D12};
+    ShaderProfile::OpenGL, ShaderProfile::OpenGLES, ShaderProfile::Vulkan,
+    ShaderProfile::Metal,  ShaderProfile::WebGPU,   ShaderProfile::D3D12};
 
 /**
  * Returns the tag of the profile: the text stored in the bundle header and used for the bundle

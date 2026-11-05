@@ -181,8 +181,12 @@ static std::string ExtractFunctionBody(const std::string& source,
 // declarations (they carry a semicolon before any brace) and `friend class` mentions (they have
 // a `friend ` prefix).
 static std::string OwningClassBefore(const std::string& text, size_t position) {
+  // The line anchor is spelled as an explicit "(?:^|\n)" instead of the multiline flag: MSVC's
+  // <regex> has never implemented std::regex_constants::multiline, so the flag is unavailable
+  // there. Without multiline "^" matches only the start of the string, and the alternative covers
+  // every other line start, which is the same language.
   static const std::regex classPattern =
-      std::regex("^\\s*class\\s+(\\w+)[^{;]*\\{", std::regex_constants::multiline);
+      std::regex("(?:^|\\n)[ \\t]*class\\s+(\\w+)[^{;]*\\{");
   std::string owner = {};
   auto begin = std::sregex_iterator(text.begin(), text.end(), classPattern);
   auto end = std::sregex_iterator();

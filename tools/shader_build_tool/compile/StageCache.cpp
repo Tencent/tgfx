@@ -24,6 +24,9 @@
 #include <iterator>
 #include <system_error>
 #if defined(_WIN32)
+// NOMINMAX must be defined before windows.h to prevent min/max macro pollution (the same guard
+// WGLDefines.h uses): std::min below breaks with C2589 otherwise.
+#define NOMINMAX
 #include <process.h>
 #include <windows.h>
 #elif defined(__APPLE__)
