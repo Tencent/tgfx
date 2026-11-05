@@ -856,18 +856,7 @@ endif ()
 # This section builds shader_build_tool, generates precompiled shader bundles, and embeds them
 # into libtgfx. It is independent of TGFX_BUILD_TESTS so that production builds also benefit
 # from precompiled shaders. Set TGFX_EMBED_SHADER_BUNDLES=OFF to disable embedding entirely.
-# The D3D12 backend has no precompiled shader support (ExpectedProfileTag in
-# src/gpu/shaders/contract/ShaderBundleContract.h has no tag for it, so a bundle could never be loaded), and
-# its builds used to generate and embed an OpenGL bundle that no D3D12 context can use. Skip the
-# whole section for it: no tool build, no generation, nothing embedded. Contexts report the
-# resulting runtime fallbacks as NoBundleForBackend.
-set(TGFX_BUNDLES_SUPPORTED ON)
-if (TGFX_USE_D3D12)
-    set(TGFX_BUNDLES_SUPPORTED OFF)
-    message(STATUS "Shader bundles: not generated, the D3D12 backend has no precompiled shader "
-            "support")
-endif ()
-if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
+if (TGFX_EMBED_SHADER_BUNDLES)
   # Where the bundles come from. They are generated during the build by shader_build_tool, which
   # reuses everything that is still up to date and compiles what is not. The tool runs on the build
   # host only. A cross build (Android, iOS, OHOS, Web) must not compile it with the target
@@ -959,6 +948,9 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
     if (TGFX_USE_WEBGPU)
         list(APPEND TGFX_SHADER_BACKENDS "webgpu")
     endif ()
+    if (TGFX_USE_D3D12)
+        list(APPEND TGFX_SHADER_BACKENDS "d3d12")
+    endif ()
     # The GL bundle profile follows the build target: GLES-family environments (Android,
     # WebGL, SwiftShader, ANGLE, OHOS, iOS) consume the ES 300 bundle; desktop builds keep
     # the GLSL 330 one. Only one GL profile is embedded per build. When no dedicated GPU
@@ -979,7 +971,7 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
             list(APPEND TGFX_SHADER_BACKENDS "webgpu")
         endif ()
     endif ()
-    if (NOT TGFX_USE_VULKAN AND NOT TGFX_USE_METAL AND NOT TGFX_USE_WEBGPU)
+    if (NOT TGFX_USE_VULKAN AND NOT TGFX_USE_METAL AND NOT TGFX_USE_WEBGPU AND NOT TGFX_USE_D3D12)
         list(APPEND TGFX_SHADER_BACKENDS ${TGFX_GL_RUNTIME_BACKEND})
     endif ()
     # Pass all backends as the single comma-separated argument expected by shader_build_tool.
@@ -1174,6 +1166,8 @@ if (TGFX_EMBED_SHADER_BUNDLES AND TGFX_BUNDLES_SUPPORTED)
             set(BACKEND_ENUM "Vulkan")
         elseif (B STREQUAL "webgpu")
             set(BACKEND_ENUM "WebGPU")
+        elseif (B STREQUAL "d3d12")
+            set(BACKEND_ENUM "D3D12")
         elseif (B STREQUAL "opengles")
             # The ES profile bundle registers under the same Backend::OpenGL key; the runtime
             # serves it only to ES contexts (ProgramInfo glProfileMatchesCache).
