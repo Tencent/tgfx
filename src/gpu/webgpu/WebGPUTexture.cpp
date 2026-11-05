@@ -79,12 +79,15 @@ std::shared_ptr<WebGPUTexture> WebGPUTexture::MakeFrom(WebGPUGPU* gpu, WGPUTextu
   if (gpu == nullptr || texture == nullptr) {
     return nullptr;
   }
+  // Validate only the immediate hard requirement: an attachment import must be renderable, and
+  // a pure sampling import must be bindable. TEXTURE_BINDING is not checked when combined with
+  // RENDER_ATTACHMENT because render-target wrappers declare it as a superset, while snapshots
+  // of externally owned targets go through texture copies instead of sampling.
   WGPUTextureUsageFlags requiredUsage = WGPUTextureUsage_None;
-  if (usage & TextureUsage::TEXTURE_BINDING) {
-    requiredUsage |= WGPUTextureUsage_TextureBinding;
-  }
   if (usage & TextureUsage::RENDER_ATTACHMENT) {
     requiredUsage |= WGPUTextureUsage_RenderAttachment;
+  } else if (usage & TextureUsage::TEXTURE_BINDING) {
+    requiredUsage |= WGPUTextureUsage_TextureBinding;
   }
   auto nativeUsage = wgpuTextureGetUsage(texture);
   if ((nativeUsage & requiredUsage) != requiredUsage) {
