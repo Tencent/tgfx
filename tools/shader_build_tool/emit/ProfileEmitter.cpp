@@ -257,7 +257,10 @@ std::optional<EmittedStages> DirectGLSLEmitter::emit(const EmitInput& input, Sta
   std::string directFrag;
   if (esDialect) {
     // Direct ES-300 storage (see EmitDirectGLSLES300). The fbf variants carry the
-    // framebuffer-fetch dialect: the fragment stage is translated with it.
+    // framebuffer-fetch dialect: the fragment stage is translated with it. The generic fragment
+    // source (input.fragSource) already carries the generated const TGFX_SPEC declarations in
+    // their plain text form — GL keeps them verbatim for the runtime injection to rewrite,
+    // this backend's counterpart of the Vulkan family's pipeline-constant injection.
     bool fbfVariant = input.info->fragDomain.valueOf(input.fragIndex, XP_DEFINE_NAME) ==
                       XP_FRAMEBUFFER_FETCH;
     std::string emissionError;
@@ -277,7 +280,8 @@ std::optional<EmittedStages> DirectGLSLEmitter::emit(const EmitInput& input, Sta
     // its own 330 spelling. The form check below fails the variant on any transform leak, so
     // a template using syntax beyond GL 330 (or a leak of Vulkan-only qualifiers like
     // subpassInput into a desktop variant) fails the build here instead of surfacing as a
-    // runtime module-creation fallback.
+    // runtime module-creation fallback. The generic fragment source's const TGFX_SPEC
+    // declarations survive the 330 translation verbatim, for the runtime injection to rewrite.
     std::string emissionError;
     directVert = EmitDirectGLSL330(PrependDefines(*input.vertSource, *input.vertDefines),
                                    ShaderStageType::Vertex, &emissionError);

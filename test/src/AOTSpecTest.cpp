@@ -121,7 +121,9 @@ const AOTToleranceSpec OneLsbTolerance() {
 
 // The specialization's ground contract: with the values injected and the executor's guards
 // folded, the specialized program must produce the pixels the generic interpreter produces for
-// the same draw.
+// the same draw. The dedicated kernels stay off so the chain family serves the scene (a small
+// canvas keeps the decomposition router on the plain route, where the kernel table's dedicated
+// families would otherwise accept the draw first).
 TGFX_TEST(AOTSpecTest, SpecializationMatchesGenericPixels) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -129,6 +131,7 @@ TGFX_TEST(AOTSpecTest, SpecializationMatchesGenericPixels) {
   auto image = MakeGradientImage();
   ASSERT_NE(image, nullptr);
   auto* cache = context->precompiledShaderCache();
+  cache->setDedicatedKernelsEnabled(false);
 
   cache->setSpecializationEnabled(false);
   auto generic = RenderScene(context, image, true);
@@ -148,6 +151,7 @@ TGFX_TEST(AOTSpecTest, SpecializationMatchesGenericPixels) {
   EXPECT_TRUE(result.passed) << "specialized pixels differ from the generic form: maxChannelDiff="
                              << result.maxChannelDiff << " diffPixels=" << result.diffPixelCount
                              << "/" << result.totalPixelCount;
+  cache->setDedicatedKernelsEnabled(true);
 }
 
 // Two chain shapes of one variant: the specialization bytes must reach the program key, or the
@@ -160,6 +164,7 @@ TGFX_TEST(AOTSpecTest, SpecializationSeparatesChainShapes) {
   auto image = MakeGradientImage();
   ASSERT_NE(image, nullptr);
   auto* cache = context->precompiledShaderCache();
+  cache->setDedicatedKernelsEnabled(false);
 
   cache->setSpecializationEnabled(false);
   auto genericMatrix = RenderScene(context, image, true);
@@ -195,6 +200,7 @@ TGFX_TEST(AOTSpecTest, SpecializationSeparatesChainShapes) {
          "maxChannelDiff="
       << lumaResult.maxChannelDiff << " diffPixels=" << lumaResult.diffPixelCount << "/"
       << lumaResult.totalPixelCount;
+  cache->setDedicatedKernelsEnabled(true);
 }
 
 }  // namespace tgfx

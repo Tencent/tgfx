@@ -182,6 +182,10 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
       passInfo->setDepthStencil(depthStencil);
     }
     onConfigureProgramInfo(*passInfo);
+    // The AOT program resolution (and the specialization capture it runs) consults the carried
+    // IR through the writer's canWrite, so the IR must ride the pass info before the resolution
+    // — the second set below is then idempotent and keeps the ownership flow unchanged.
+    passInfo->setCarriedIR(resolvedPassIR);
     AOTProgramInfo aotInfo(*passInfo, *resolvedPassIR->program);
     if (!aotInfo.valid()) {
       // The pass's shape has no variant, or the bundle lacks it: nothing can serve this draw.

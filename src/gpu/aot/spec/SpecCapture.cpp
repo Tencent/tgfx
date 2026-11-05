@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/spec/SpecCapture.h"
+#include <cstdlib>
 #include <cstring>
+#include "core/utils/Log.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProgramWriter.h"
 #include "gpu/UniformData.h"
@@ -84,22 +86,33 @@ SpecValues SpecCapture::Capture(Context* context, const ProgramInfo& info,
   scratch->fragmentUniformData->setBuffer(scratch->fragmentBuffer.data());
   writer->writeUniformValues(info, scratch->vertexUniformData.get(),
                              scratch->fragmentUniformData.get());
-  scratch->fragmentUniformData->setBuffer(nullptr);
-  if (scratch->vertexUniformData != nullptr) {
-    scratch->vertexUniformData->setBuffer(nullptr);
-  }
   result.values.reserve(1);
   result.values.push_back(1);  // The master switch: the injected compile is specialized.
   for (const auto& field : fragBlob->specFields) {
     const auto words = field.arraySize == 1 ? 1u : field.arraySize * 4u;
     for (uint32_t word = 0; word < words; ++word) {
       int32_t value = 0;
+      // Read back while the scratch buffer is still attached: the values are read from the very
+      // bytes the writers wrote, which is the single-source guarantee.
       if (!scratch->fragmentUniformData->readInt32(field.name, word, &value)) {
         return SpecValues();
       }
       result.values.push_back(value);
     }
   }
+  scratch->fragmentUniformData->setBuffer(nullptr);
+  if (scratch->vertexUniformData != nullptr) {
+    scratch->vertexUniformData->setBuffer(nullptr);
+  }
+#if DEBUG
+  if (std::getenv("TGFX_SPEC_DUMP") != nullptr) {
+    std::string text;
+    for (auto value : result.values) {
+      text += " " + std::to_string(value);
+    }
+    LOGI("SpecCapture: %s[frag=%u] values:%s", shaderName.c_str(), fragIndex, text.c_str());
+  }
+#endif
   return result;
 }
 

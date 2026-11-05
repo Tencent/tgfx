@@ -33,6 +33,7 @@
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "gpu/aot/select/PermutationMatch.h"
+#include "gpu/aot/spec/SpecCapture.h"
 #include "gpu/aot/spec/SpecInject.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/TextureEffect.h"
@@ -355,7 +356,16 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
     return nullptr;
   }
   cache->recordAOTStage(PrecompiledAOTStage::PermutationMatched);
-  return CreateProgramFromMatch(context, programInfo, *matchResult);
+  // The plain route's key is the processor tree, which already determines the chain shape, so
+  // the specialization values need not join the key here — unlike the pass-IR route, whose key
+  // carries no fragment list (see AOTProgramInfo). GL-only in this stage, like the pass-IR route.
+  SpecValues spec = {};
+  if (context->backend() == Backend::OpenGL) {
+    spec =
+        SpecCapture::Capture(context, *programInfo, matchResult->shaderName,
+                             matchResult->vertPermutationIndex, matchResult->fragPermutationIndex);
+  }
+  return CreateProgramFromMatch(context, programInfo, *matchResult, spec.empty() ? nullptr : &spec);
 }
 
 std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
