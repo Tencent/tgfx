@@ -128,7 +128,7 @@ async function run() {
       resolveTestDone = resolve;
     });
 
-    // Promise that resolves when all page-side download actions complete (cache-web.zip is last).
+    // Promise that resolves once index.html logs 'Page actions complete' after all downloads.
     let resolvePageDone = null;
     const pageDone = new Promise((resolve) => {
       resolvePageDone = resolve;
@@ -143,9 +143,9 @@ async function run() {
         testExitCode = parseInt(exitMatch[1], 10);
         resolveTestDone();
       }
-      // cache-web.zip is the last download action in index.html.
-      if (text.includes('Download started: cache-web.zip') ||
-          text.includes('Failed to create cache-web.zip')) {
+      // index.html prints 'Page actions complete' on every path after tests and downloads
+      // settle, so this fires even when a zip is skipped or fails to build.
+      if (text.includes('Page actions complete')) {
         resolvePageDone();
       }
     });
