@@ -54,6 +54,10 @@ static ShaderCodeFormat FormatForBackend(Backend backend, bool hasBinary) {
       return hasBinary ? ShaderCodeFormat::METALLIB : ShaderCodeFormat::MSL;
     case Backend::WebGPU:
       return ShaderCodeFormat::WGSL;
+    case Backend::D3D12:
+      // The d3d12 bundle stores HLSL text, which D3DCompile turns into DXBC when the module is
+      // created. Unlike Metal there is no binary alternative yet, so hasBinary does not apply.
+      return ShaderCodeFormat::HLSL;
     default:
       return ShaderCodeFormat::GLSL;
   }

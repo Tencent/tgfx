@@ -46,8 +46,9 @@ inline std::optional<ShaderProfile> ExpectedShaderProfile(Backend backend) {
       return ShaderProfile::Vulkan;
     case Backend::WebGPU:
       return ShaderProfile::WebGPU;
-    case Backend::Unknown:
     case Backend::D3D12:
+      return ShaderProfile::D3D12;
+    case Backend::Unknown:
       return std::nullopt;
   }
   return std::nullopt;

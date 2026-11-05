@@ -87,7 +87,7 @@ TGFX_TEST(ShaderProfileTest, BackendToProfile) {
   EXPECT_EQ(ExpectedShaderProfile(Backend::Metal), ShaderProfile::Metal);
   EXPECT_EQ(ExpectedShaderProfile(Backend::Vulkan), ShaderProfile::Vulkan);
   EXPECT_EQ(ExpectedShaderProfile(Backend::WebGPU), ShaderProfile::WebGPU);
-  EXPECT_FALSE(ExpectedShaderProfile(Backend::D3D12).has_value());
+  EXPECT_EQ(ExpectedShaderProfile(Backend::D3D12), ShaderProfile::D3D12);
   EXPECT_FALSE(ExpectedShaderProfile(Backend::Unknown).has_value());
 }
 

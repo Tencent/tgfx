@@ -68,8 +68,8 @@ enum class AOTFailure : uint8_t {
   FragmentModuleCreationFailed,
   PipelineCreationFailed,
   Unspecified,
-  /// No bundle is embedded for this backend, so there is nothing to look an artifact up in: the
-  /// backend has no precompiled shader support (D3D12), or this build embeds none for it.
+  /// No bundle is embedded for this backend, so there is nothing to look an artifact up in: this
+  /// build embeds none for it.
   NoBundleForBackend,
   /// A bundle is embedded but the cache refused to load it (toolchain ABI, profile tag, identity
   /// hash, malformed layout).
