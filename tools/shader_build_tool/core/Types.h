@@ -52,10 +52,24 @@ struct VertexInputEntry {
   uint8_t location = 0;
 };
 
+/// One uniform field the runtime may freeze at pipeline creation: name matches the UBO member and
+/// the SPEC_<name>() call sites; firstId is where the generated constant ids start (element-major,
+/// four ids per ivec4 element for arrays; id 0 is the master switch).
+struct SpecEntry {
+  std::string name;
+  uint8_t format = 0;      // UniformFormat enum value
+  uint16_t arraySize = 1;  // std140 array element count; 1 when not an array
+  uint16_t firstId = 0;
+};
+
 struct StageReflectionData {
   std::vector<UniformEntry> uniforms;
   std::vector<UniformEntry> samplers;
   std::vector<VertexInputEntry> vertexInputs;
+  /// The spec table (fragment stages only): the int/ivec4 fields the source reads through
+  /// SPEC_<name>() accessors, so the runtime can freeze them at pipeline creation. Empty for
+  /// stages whose source carries no specialization include point.
+  std::vector<SpecEntry> specEntries;
 };
 
 struct VariantData {

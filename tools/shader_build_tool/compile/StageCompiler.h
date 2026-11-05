@@ -143,12 +143,15 @@ class StageCompiler {
                                    std::string* error);
 
   /// Extracts the reflection of one variant, shared across backend passes like the compiles
-  /// above: the same (family, vert, frag) reflects the same two SPIR-V modules every time.
+  /// above: the same (family, vert, frag) reflects the same two SPIR-V modules every time. The
+  /// specDialect flag reflects the constant_id-dialect module of the same variant instead, under
+  /// its own cache key.
   const ReflectionResult& extractReflection(const std::string& shaderName, uint32_t vertIndex,
                                             uint32_t fragIndex,
                                             const std::vector<uint32_t>& vertSpirv,
                                             const std::vector<uint32_t>& fragSpirv,
-                                            Diagnostics* diagnostics);
+                                            Diagnostics* diagnostics,
+                                            bool specDialect = false);
 
  private:
   struct BlobStage {
@@ -163,7 +166,7 @@ class StageCompiler {
   std::map<std::string, TextStage> wgslCache;
   std::map<std::string, TextStage> mslCache;
   std::map<std::string, TextStage> hlslCache;
-  std::map<std::tuple<std::string, uint32_t, uint32_t>, ReflectionResult> reflectionCache;
+  std::map<std::tuple<std::string, uint32_t, uint32_t, bool>, ReflectionResult> reflectionCache;
 };
 
 }  // namespace tgfx

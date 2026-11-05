@@ -30,6 +30,7 @@
 #include "output/BundleWriter.h"
 #include "compile/InlineExpansion.h"
 #include "compile/ShaderCompiler.h"
+#include "compile/SpecCodegen.h"
 #include "core/ShaderSources.h"
 #include "compile/ReflectionExtractor.h"
 #include "compile/StageCache.h"
@@ -118,17 +119,33 @@ bool ParseProfileList(const std::string& input, std::vector<ShaderProfile>* prof
 static void RecordBuildError(Diagnostics* diagnostics, Layer layer, const char* code,
                              const std::string& shader, const std::string& profile, int vert,
                              int frag, std::string message) {
-  Diagnostic diagnostic;
-  diagnostic.severity = Severity::Error;
-  diagnostic.layer = layer;
-  diagnostic.code = code;
-  diagnostic.shader = shader;
-  diagnostic.profile = profile;
-  diagnostic.vertPermutationIndex = vert;
-  diagnostic.fragPermutationIndex = frag;
-  diagnostic.message = std::move(message);
-  diagnostics->report(std::move(diagnostic));
-}
+                             Diagnostic diagnostic;
+                             diagnostic.severity = Severity::Error;
+                             diagnostic.layer = layer;
+                             diagnostic.code = code;
+                             diagnostic.shader = shader;
+                             diagnostic.profile = profile;
+                             diagnostic.vertPermutationIndex = vert;
+                             diagnostic.fragPermutationIndex = frag;
+                             diagnostic.message = std::move(message);
+                             diagnostics->report(std::move(diagnostic));
+                             }
+
+                             // UniformEntry carries no operator==: the layout check compares the two reflections field by
+                             // field (name, format and array size are the whole layout contract a stage's reflection states).
+                             static bool SameReflectionEntries(const std::vector<UniformEntry>& left,
+                                         const std::vector<UniformEntry>& right) {
+                             if (left.size() != right.size()) {
+                             return false;
+                             }
+                             for (size_t i = 0; i < left.size(); ++i) {
+                             if (left[i].name != right[i].name || left[i].format != right[i].format ||
+                             left[i].arraySize != right[i].arraySize) {
+                             return false;
+                             }
+                             }
+                             return true;
+                             }
 
 // source is the shader's text from the build's single read of the sources (nullptr in report-only
 // mode); the bundle's source digest is computed from the same text. compiler owns the stage
@@ -190,6 +207,15 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
   std::string vertSource = source != nullptr ? source->vertex : "";
   std::string fragSource = source != nullptr ? source->fragment : "";
 
+  // The specialization scan runs once per family: it collects the SPEC_<name>() fields the
+  // fragment reads and checks none of them is read directly (a direct read would escape the
+  // folding a specialized compile performs). A family without the include marker scans empty
+  // and every source below stays the template itself.
+  const auto specUsage = ScanSpecUsage(fragSource, info.name, diagnostics);
+  // The largest specialized array this family's variants declare; the unrolled call-site check
+  // below compares the template's site count against it.
+  uint16_t maxSpecArraySize = 0;
+
   // The variant plan of this family: the Compose-reachable set (the single source of truth the
   // runtime matcher uses too), validated against the declared domains. The build loop,
   // --audit and --report-only all get their variants from the planner.
@@ -250,9 +276,18 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
     }
     const auto* vertSpirv = &vertResult.spirv;
 
-    const auto& fragResult = compiler->compileSpirv(PrependDefines(fragSource, fragDefines),
-                                                    ShaderStageType::Fragment, info.name, fi,
-                                                    false);
+    // The specialization pipeline (families carrying the include marker): the stub pass compiles
+    // the marker replaced by pass-through macros — semantically today's source — and its
+    // reflection states the layout and the array sizes; the real forms are then generated from
+    // it (the generic include for the GL text emitters, the constant_id dialect for the
+    // Vulkan-family emitters). A family without the marker compiles the template itself.
+    std::string fragCompileSource = fragSource;
+    if (specUsage.present) {
+      fragCompileSource = ReplaceSpecMarker(fragSource, GenerateSpecStubInclude(specUsage));
+    }
+    const auto& fragResult =
+        compiler->compileSpirv(PrependDefines(fragCompileSource, fragDefines),
+                               ShaderStageType::Fragment, info.name, fi, false);
     if (!fragResult.success) {
       RecordBuildError(diagnostics, Layer::Compile, DiagnosticCode::CompileGlsl, info.name, "",
                        static_cast<int>(vi), static_cast<int>(fi), fragResult.error);
@@ -274,6 +309,46 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
     // independent of backend-level exclusions counted below.
     report.compiledCount++;
 
+    std::string genericFragSource = fragSource;
+    std::string specFragSource;
+    std::vector<SpecEntry> specEntries = {};
+    if (specUsage.present) {
+      specEntries = MakeSpecEntries(specUsage, reflection.fragmentReflection, info.name, fi,
+                                    diagnostics);
+      genericFragSource = ReplaceSpecMarker(fragSource, GenerateSpecInclude(specEntries, false));
+      specFragSource = ReplaceSpecMarker(fragSource, GenerateSpecInclude(specEntries, true));
+      for (const auto& entry : specEntries) {
+        if (entry.arraySize > maxSpecArraySize) {
+          maxSpecArraySize = entry.arraySize;
+        }
+      }
+      // The spec dialect must not move a uniform or a sampler: the specialized program has to
+      // stay a drop-in replacement of the generic one, layout included. Reflect the spec compile
+      // and compare it against the stub pass's reflection.
+      const auto& specFragResult =
+          compiler->compileSpirv(PrependDefines(specFragSource, fragDefines),
+                                 ShaderStageType::Fragment, info.name, fi, false);
+      if (!specFragResult.success) {
+        RecordBuildError(diagnostics, Layer::Compile, DiagnosticCode::CompileGlsl, info.name, "",
+                         static_cast<int>(vi), static_cast<int>(fi),
+                         "spec-dialect compile failed: " + specFragResult.error);
+        continue;
+      }
+      const auto& specReflection =
+          compiler->extractReflection(info.name, vi, fi, *vertSpirv, specFragResult.spirv,
+                                      diagnostics, true);
+      if (!SameReflectionEntries(specReflection.fragmentReflection.uniforms,
+                                 reflection.fragmentReflection.uniforms) ||
+          !SameReflectionEntries(specReflection.fragmentReflection.samplers,
+                                 reflection.fragmentReflection.samplers)) {
+        RecordBuildError(diagnostics, Layer::Compile, DiagnosticCode::SpecLayoutDrift, info.name,
+                         "", static_cast<int>(vi), static_cast<int>(fi),
+                         "the constant_id dialect changed the uniform block or the samplers "
+                         "against the generic compile");
+        continue;
+      }
+    }
+
     for (auto& emitterEntry : emitters) {
       const ShaderProfile profile = emitterEntry.first;
       const std::string backend = ProfileTag(profile);
@@ -287,11 +362,12 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
       input.vertIndex = vi;
       input.fragIndex = fi;
       input.vertSource = &vertSource;
-      input.fragSource = &fragSource;
+      input.fragSource = &genericFragSource;
       input.vertDefines = &vertDefines;
       input.fragDefines = &fragDefines;
       input.vertSpirv = vertSpirv;
       input.fragStage = &fragResult;
+      input.fragSpecSource = specFragSource.empty() ? nullptr : &specFragSource;
       input.diagnostics = diagnostics;
       auto stages = emitterEntry.second->emit(input, compiler);
       if (!stages) {
@@ -309,8 +385,19 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
       variant.fragmentBlob = std::move(stages->fragmentBlob);
       variant.vertexReflection = reflection.vertexReflection;
       variant.fragmentReflection = reflection.fragmentReflection;
+      variant.fragmentReflection.specEntries = specEntries;
       outVariants->push_back(std::move(variant));
     }
+  }
+  if (specUsage.present && maxSpecArraySize > 0) {
+    // The unrolled executor's call sites live in the family's template (one #define plus one site
+    // per slot of the largest capacity; the smaller capacities compile a subset through the
+    // CHAIN_SLOT_CAPACITY guard), so the count check runs once per family against the largest
+    // capacity. The chain family's token is CHAIN_RUN_AT — family knowledge that stays here until
+    // a second spec family generalizes it.
+    CheckSpecUnrolledCallSites(fragSource, "CHAIN_RUN_AT",
+                               static_cast<uint32_t>(maxSpecArraySize) + 1, info.name, 0,
+                               diagnostics);
   }
   return report;
 }

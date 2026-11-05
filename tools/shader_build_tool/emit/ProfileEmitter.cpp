@@ -64,7 +64,12 @@ class VulkanEmitter : public ProfileEmitter {
     auto expandedVertOpt = PrependDefines(*input.vertSource, *input.vertDefines);
     const auto& vertOpt = compiler->compileSpirv(expandedVertOpt, ShaderStageType::Vertex,
                                                  input.info->name, input.vertIndex, true);
-    auto expandedFragOpt = PrependDefines(*input.fragSource, *input.fragDefines);
+    // The spec dialect keeps the layout(constant_id) declarations as OpSpecConstant + SpecId, so
+    // the runtime injects one chain shape's values through VkSpecializationInfo at pipeline
+    // creation; the defaults keep an un-injected compile generic.
+    const auto& fragSource =
+        input.fragSpecSource != nullptr ? *input.fragSpecSource : *input.fragSource;
+    auto expandedFragOpt = PrependDefines(fragSource, *input.fragDefines);
     const auto& fragOpt = compiler->compileSpirv(expandedFragOpt, ShaderStageType::Fragment,
                                                  input.info->name, input.fragIndex, true);
     if (!vertOpt.success || !fragOpt.success) {
@@ -131,9 +136,13 @@ class WebGPUEmitter : public ProfileEmitter {
 
   std::optional<EmittedStages> emit(const EmitInput& input, StageCompiler* compiler) override {
     // WebGPU needs its own GLSL form (separated texture/sampler bindings), so re-expand and
-    // recompile like the vulkan branch instead of reusing the combined-sampler SPIR-V.
+    // recompile like the vulkan branch instead of reusing the combined-sampler SPIR-V. The spec
+    // dialect survives the tint translation as WGSL override constants, so a future runtime
+    // injection can reach them through the pipeline's constant entries.
     auto expandedVertWgsl = PrependDefines(*input.vertSource, *input.vertDefines);
-    auto expandedFragWgsl = PrependDefines(*input.fragSource, *input.fragDefines);
+    const auto& fragSource =
+        input.fragSpecSource != nullptr ? *input.fragSpecSource : *input.fragSource;
+    auto expandedFragWgsl = PrependDefines(fragSource, *input.fragDefines);
     const auto& wgslVert = compiler->compileWgsl(expandedVertWgsl, ShaderStageType::Vertex,
                                                  input.info->name, input.vertIndex);
     const auto& wgslFrag = compiler->compileWgsl(expandedFragWgsl, ShaderStageType::Fragment,
@@ -162,21 +171,54 @@ class D3D12Emitter : public ProfileEmitter {
 
   std::optional<EmittedStages> emit(const EmitInput& input, StageCompiler* compiler) override {
     const auto& hlslVert = compiler->translateHLSL(*input.vertSpirv, ShaderStageType::Vertex);
-    const auto& hlslFrag =
-        compiler->translateHLSL(input.fragStage->spirv, ShaderStageType::Fragment);
-    if (!hlslVert.success || !hlslFrag.success) {
+    if (!hlslVert.success) {
       ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
-                    "HLSL translation error: " +
-                        (!hlslVert.success ? hlslVert.error : hlslFrag.error));
+                    "HLSL translation error: " + hlslVert.error);
       return std::nullopt;
     }
+    // The spec dialect re-compiles the fragment to SPIR-V here: SPIRV-Cross's HLSL writer emits
+    // each constant_id as a SPIRV_CROSS_CONSTANT_ID_<id> #ifndef/#define macro block, so the
+    // runtime specializes by prepending its own #define prefix and D3DCompile's preprocessor
+    // folds the value in. A silent fallback to the common SPIR-V would emit a macro-less HLSL
+    // whose runtime injection never matches, so a recompile failure is loud.
+    if (input.fragSpecSource != nullptr) {
+      const auto& specFrag =
+          compiler->compileSpirv(PrependDefines(*input.fragSpecSource, *input.fragDefines),
+                                 ShaderStageType::Fragment, input.info->name, input.fragIndex,
+                                 false);
+      if (!specFrag.success) {
+        ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
+                      "spec-dialect fragment recompile failed: " + specFrag.error);
+        return std::nullopt;
+      }
+      const auto& hlslFrag = compiler->translateHLSL(specFrag.spirv, ShaderStageType::Fragment);
+      if (!hlslFrag.success) {
+        ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
+                      "HLSL translation error: " + hlslFrag.error);
+        return std::nullopt;
+      }
+      return EmitHlslStages(input, compiler, hlslVert.text, hlslFrag.text);
+    }
+    const auto& hlslFrag =
+        compiler->translateHLSL(input.fragStage->spirv, ShaderStageType::Fragment);
+    if (!hlslFrag.success) {
+      ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
+                    "HLSL translation error: " + hlslFrag.error);
+      return std::nullopt;
+    }
+    return EmitHlslStages(input, compiler, hlslVert.text, hlslFrag.text);
+  }
+
+ private:
+  std::optional<EmittedStages> EmitHlslStages(const EmitInput& input, StageCompiler* compiler,
+                                              const std::string& vertText,
+                                              const std::string& fragText) {
     EmittedStages stages;
     if (D3D12UsesDxbc()) {
       std::string dxbcError;
-      stages.vertexBlob = compiler->compileDxbc(hlslVert.text, ShaderStageType::Vertex, &dxbcError);
+      stages.vertexBlob = compiler->compileDxbc(vertText, ShaderStageType::Vertex, &dxbcError);
       if (!stages.vertexBlob.empty()) {
-        stages.fragmentBlob =
-            compiler->compileDxbc(hlslFrag.text, ShaderStageType::Fragment, &dxbcError);
+        stages.fragmentBlob = compiler->compileDxbc(fragText, ShaderStageType::Fragment, &dxbcError);
       }
       if (stages.vertexBlob.empty() || stages.fragmentBlob.empty()) {
         ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
@@ -186,8 +228,8 @@ class D3D12Emitter : public ProfileEmitter {
       stages.payloadKind = BundleFormat::Payload::Binary;
       return stages;
     }
-    stages.vertexBlob.assign(hlslVert.text.begin(), hlslVert.text.end());
-    stages.fragmentBlob.assign(hlslFrag.text.begin(), hlslFrag.text.end());
+    stages.vertexBlob.assign(vertText.begin(), vertText.end());
+    stages.fragmentBlob.assign(fragText.begin(), fragText.end());
     return stages;
   }
 };

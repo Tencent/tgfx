@@ -58,6 +58,19 @@ inline constexpr const char* CompileCacheDisabled = "compile.cache-disabled";
 /// The reflection extractor met a SPIR-V type it does not know and fell back to a default.
 inline constexpr const char* ReflectUnknownType = "compile.reflection-unknown-type";
 
+/// A specialized uniform is read directly instead of through its SPEC_ accessor, so the read
+/// escapes the folding a specialized compile performs.
+inline constexpr const char* SpecRawRead = "spec.raw-read";
+
+/// A SPEC_ name has no matching int or ivec4 member in the uniform block.
+inline constexpr const char* SpecUnknownField = "spec.unknown-field";
+
+/// The unrolled executor's call-site count does not match the specialized array's capacity.
+inline constexpr const char* SpecUnrollCount = "spec.unroll-count";
+
+/// The uniform layout differs between the generic and the spec-dialect compile.
+inline constexpr const char* SpecLayoutDrift = "spec.layout-drift";
+
 /// A profile emitter could not produce its storage form for a variant.
 inline constexpr const char* EmitFailed = "emit.failed";
 
@@ -156,6 +169,8 @@ inline constexpr const char* AllCodes[] = {
     SourcesUnreadable,     PlanNoEnumerator,   PlanUnbuildable,
     CompileGlsl,           CompileCacheDisabled, ReflectUnknownType,
     EmitFailed,            EmitFormLeak,
+    SpecRawRead,           SpecUnknownField,  SpecUnrollCount,
+    SpecLayoutDrift,
     VerifyClipField,
     VerifySourceFile,      VerifySourceFamily, VerifyReflection,
     VerifyBindingLayout,   VerifyInlinePolicy, VerifyNotApplicable,

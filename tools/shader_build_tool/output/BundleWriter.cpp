@@ -85,10 +85,19 @@ static void MapEntries(const std::vector<UniformEntry>& entries,
   }
 }
 
+static void MapSpecEntries(const std::vector<SpecEntry>& entries,
+                           std::vector<BundleSpecEntry>* out) {
+  out->reserve(entries.size());
+  for (const auto& entry : entries) {
+    out->push_back(BundleSpecEntry{entry.name, entry.format, entry.arraySize, entry.firstId});
+  }
+}
+
 std::vector<uint8_t> SerializeStageReflection(const StageReflectionData& reflection) {
   BundleReflection staged = {};
   MapEntries(reflection.uniforms, &staged.uniforms);
   MapEntries(reflection.samplers, &staged.samplers);
+  MapSpecEntries(reflection.specEntries, &staged.specEntries);
   staged.vertexInputs.reserve(reflection.vertexInputs.size());
   for (const auto& entry : reflection.vertexInputs) {
     staged.vertexInputs.push_back(BundleVertexInput{entry.name, entry.format, entry.location});

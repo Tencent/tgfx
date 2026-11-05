@@ -33,6 +33,13 @@ layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING)
 #include "xp/xp_uniforms.inc"
 };
 
+// The specialization include point: shader_build_tool replaces this line with the generated
+// SPEC_<field>() accessors (see compile/SpecCodegen). Every structural int field the kernel wants
+// the runtime to freeze is read through SPEC_<field>() only, so a specialized compile folds it
+// while the generic compile reads the uniform. The pragma never reaches a compiler: every compile
+// path consumes the already-replaced text.
+#pragma tgfx_spec_include
+
 #include "pipeline/chain/pointwise_fragment_interface.inc"
 
 #if RESOURCE_KIND == 1

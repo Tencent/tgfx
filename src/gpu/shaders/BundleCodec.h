@@ -29,9 +29,10 @@ namespace tgfx {
  * The reflection pool's serialized grammar, single-sourced: the tool's writer and the runtime's
  * loader both go through this file, so a grammar change is one edit instead of two that must be
  * kept in agreement. The byte layout is a format fact of the bundle (see ShaderBundleContract.h):
- * [uniformCount:u8][samplerCount:u8][vertexInputCount:u8][reserved:u8], then per uniform and per
+ * [uniformCount:u8][samplerCount:u8][vertexInputCount:u8][specCount:u8], then per uniform and per
  * sampler [nameLen:u8][name][format:u8][arraySize:u16 LE], then per vertex input
- * [nameLen:u8][name][format:u8][location:u8].
+ * [nameLen:u8][name][format:u8][location:u8], then per spec entry
+ * [nameLen:u8][name][format:u8][arraySize:u16 LE][firstId:u16 LE].
  *
  * The codec is byte-level only. The format byte is an opaque UniformFormat value (the tool links
  * no Uniform.h), so the semantic rules — which formats may be uniforms, which samplers, sampler
@@ -53,11 +54,22 @@ struct BundleVertexInput {
   uint8_t location = 0;
 };
 
+/// One uniform field the runtime may freeze at pipeline creation (the spec table). firstId is
+/// where the constant ids start; an array consumes four ids per element, element-major, and id 0
+/// is the master switch (never referenced by an entry).
+struct BundleSpecEntry {
+  std::string name;
+  uint8_t format = 0;      ///< UniformFormat enum value, opaque here
+  uint16_t arraySize = 1;  ///< std140 array element count; 1 when not an array
+  uint16_t firstId = 0;
+};
+
 /// One stage's reflection as the bundle stores it.
 struct BundleReflection {
   std::vector<BundleReflectionEntry> uniforms;
   std::vector<BundleReflectionEntry> samplers;
   std::vector<BundleVertexInput> vertexInputs;
+  std::vector<BundleSpecEntry> specEntries;
 };
 
 /// Serializes one stage's reflection into the pool's byte grammar.

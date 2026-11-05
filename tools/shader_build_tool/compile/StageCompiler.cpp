@@ -210,8 +210,11 @@ const ReflectionResult& StageCompiler::extractReflection(const std::string& shad
                                                          uint32_t vertIndex, uint32_t fragIndex,
                                                          const std::vector<uint32_t>& vertSpirv,
                                                          const std::vector<uint32_t>& fragSpirv,
-                                                         Diagnostics* diagnostics) {
-  auto key = std::make_tuple(shaderName, vertIndex, fragIndex);
+                                                         Diagnostics* diagnostics,
+                                                         bool specDialect) {
+  // The spec dialect reflects the same variant through a different module, so it caches under
+  // its own key: the layout check the build performs compares the two side by side.
+  auto key = std::make_tuple(shaderName, vertIndex, fragIndex, specDialect);
   auto it = reflectionCache.find(key);
   if (it == reflectionCache.end()) {
     it = reflectionCache

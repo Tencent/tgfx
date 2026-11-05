@@ -65,6 +65,12 @@ struct EmitInput {
   const std::vector<std::string>* fragDefines = nullptr;
   const std::vector<uint32_t>* vertSpirv = nullptr;
   const SpirvStage* fragStage = nullptr;
+  /// The constant_id dialect of the fragment source, present only for families carrying the
+  /// specialization include marker. Vulkan, D3D12 and WebGPU compile it (the stored artifact then
+  /// carries OpSpecConstant / the SPIRV-Cross macro blocks / WGSL overrides, all defaulting to
+  /// the generic behavior until the runtime injects values); Metal and the GL text emitters stay
+  /// on fragSource.
+  const std::string* fragSpecSource = nullptr;
   /// Where an emitter reports why it could not produce its storage form. The build always sets
   /// it; a test that only cares about the returned optional may leave it null.
   Diagnostics* diagnostics = nullptr;

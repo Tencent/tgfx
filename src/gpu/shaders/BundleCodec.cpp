@@ -89,7 +89,8 @@ std::vector<uint8_t> SerializeBundleReflection(const BundleReflection& reflectio
   // v5: the vertex input count occupies the first reserved byte, so a v4 reader still sees a
   // byte-identical prefix with zero vertex inputs.
   blob.push_back(static_cast<uint8_t>(reflection.vertexInputs.size()));
-  blob.push_back(0);  // reserved
+  // v7: the spec table occupies the second reserved byte the same way.
+  blob.push_back(static_cast<uint8_t>(reflection.specEntries.size()));
 
   WriteEntries(blob, reflection.uniforms);
   WriteEntries(blob, reflection.samplers);
@@ -98,6 +99,15 @@ std::vector<uint8_t> SerializeBundleReflection(const BundleReflection& reflectio
     blob.insert(blob.end(), entry.name.begin(), entry.name.end());
     blob.push_back(entry.format);
     blob.push_back(entry.location);
+  }
+  for (const auto& entry : reflection.specEntries) {
+    blob.push_back(static_cast<uint8_t>(entry.name.size()));
+    blob.insert(blob.end(), entry.name.begin(), entry.name.end());
+    blob.push_back(entry.format);
+    blob.push_back(static_cast<uint8_t>(entry.arraySize & 0xFF));
+    blob.push_back(static_cast<uint8_t>((entry.arraySize >> 8) & 0xFF));
+    blob.push_back(static_cast<uint8_t>(entry.firstId & 0xFF));
+    blob.push_back(static_cast<uint8_t>((entry.firstId >> 8) & 0xFF));
   }
   return blob;
 }
@@ -132,7 +142,7 @@ bool ParseBundleReflection(const uint8_t* data, size_t length, BundleReflection*
   uint8_t uniformCount = data[offset++];
   uint8_t samplerCount = data[offset++];
   uint8_t vertexInputCount = data[offset++];
-  offset += 1;  // reserved
+  uint8_t specCount = data[offset++];
 
   if (!ReadEntries(data, length, &offset, uniformCount, &reflection->uniforms) ||
       !ReadEntries(data, length, &offset, samplerCount, &reflection->samplers)) {
@@ -158,6 +168,33 @@ bool ParseBundleReflection(const uint8_t* data, size_t length, BundleReflection*
     auto format = data[offset++];
     auto location = data[offset++];
     reflection->vertexInputs.push_back(BundleVertexInput{std::move(name), format, location});
+  }
+  reflection->specEntries.reserve(specCount);
+  for (uint8_t i = 0; i < specCount; i++) {
+    if (offset >= length) {
+      return false;
+    }
+    uint8_t nameLen = data[offset++];
+    // The name is followed by the format byte, the two array-size bytes and the two first-id
+    // bytes.
+    if (nameLen == 0 || static_cast<size_t>(nameLen) + 5 > length - offset) {
+      return false;
+    }
+    std::string name(reinterpret_cast<const char*>(data + offset), nameLen);
+    if (name.find('\0') != std::string::npos ||
+        std::any_of(reflection->specEntries.begin(), reflection->specEntries.end(),
+                    [&name](const BundleSpecEntry& entry) { return entry.name == name; })) {
+      return false;
+    }
+    offset += nameLen;
+    auto format = data[offset++];
+    uint16_t arraySize = static_cast<uint16_t>(static_cast<uint16_t>(data[offset]) |
+                                               static_cast<uint16_t>(data[offset + 1] << 8));
+    offset += 2;
+    uint16_t firstId = static_cast<uint16_t>(static_cast<uint16_t>(data[offset]) |
+                                             static_cast<uint16_t>(data[offset + 1] << 8));
+    offset += 2;
+    reflection->specEntries.push_back(BundleSpecEntry{std::move(name), format, arraySize, firstId});
   }
   return true;
 }

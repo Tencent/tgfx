@@ -127,6 +127,54 @@ highp float gpPixelCoverage = 1.0;
 #endif
 #include "pipeline/chain/pointwise_chain_eval.inc"
 
+// The XferProcessor source without coverage: the root, times the coverage subtree root in the
+// layouts without a coverage varying (see the epilogue below).
+#if GP_LAYOUT >= 1 || HAS_COVERAGE
+#define CHAIN_XP_SRC_UNPREMUL result
+#else
+#define CHAIN_XP_SRC_UNPREMUL \
+  (SPEC_CoverageRootIndex() >= 0 ? result * coverageRootRegister : result)
+#endif
+
+// One slot's register write-back, shared by the loop and the unrolled executor so the two forms
+// cannot disagree: bits 20-24 of the selector carry the result register + 1 (0 = dead
+// instruction, skip the write). The value is evaluated before the write, so a consumer may share
+// a register with its just-released producer.
+#define CHAIN_SLOT_WRITE(n, value)                    \
+  {                                                   \
+    int outRegister = (SPEC_SlotPacked(n).w >> 20) & 0x1F; \
+    if (outRegister != 0) {                           \
+      int written = outRegister - 1;                  \
+      chainResults[written] = value;                  \
+      if (written == SPEC_RootIndex()) {              \
+        result = value;                               \
+      }                                               \
+      if (written == SPEC_ClipCoverageRegister()) {   \
+        clipRegister = value;                         \
+      }                                               \
+      if (written == SPEC_CoverageRootIndex()) {      \
+        coverageRootRegister = value;                 \
+      }                                               \
+    }                                                 \
+  }
+
+// Evaluates slot n and writes its register. The unrolled executor calls this with literal n, so a
+// specialized compile folds the accessor reads, the op dispatch and the register index to
+// constants; the generic compile never calls it (the loop below runs instead).
+void chainRunSlotAt(int n, inout vec4 result, inout vec4 clipRegister,
+                    inout vec4 coverageRootRegister) {
+  vec4 value = evalChainSlot(n);
+  CHAIN_SLOT_WRITE(n, value)
+}
+
+// One unrolled call site. The guards and the literal indices are what let the driver delete the
+// out-of-range call sites entirely once the specialization constants are injected — the static
+// reduction the generic loop's runtime trip counter can never provide.
+#define CHAIN_RUN_AT(n)                                                    \
+  if (SPEC_SlotCount() > n) {                                              \
+    chainRunSlotAt(n, result, clipRegister, coverageRootRegister);         \
+  }
+
 void main() {
 #if GP_LAYOUT == 1
   // The ellipse edge coverage depends only on varyings, so it is evaluated ahead of the chain:
@@ -160,26 +208,26 @@ void main() {
   // used recipe set off. The leaf index, the loop bound and the tiled test are uniform across the
   // draw, so every texture read stays in uniform control flow.
 #if NTEX > 0
-  if (SlotPacked[0].x == OP_TEXTURE && !chainLeafIsTiled(0)) {
+  if (SPEC_SlotPacked(0).x == OP_TEXTURE && !chainLeafIsTiled(0)) {
     chainLeafTex[0] = chainPlainLeafFetch(TextureSampler_0, TransformedCoords_0, Subset,
                                           AlphaStart, HasRgbaaa, SubsetClampOn, 0);
   }
-  if (SlotPacked[1].x == OP_TEXTURE && !chainLeafIsTiled(1)) {
+  if (SPEC_SlotPacked(1).x == OP_TEXTURE && !chainLeafIsTiled(1)) {
     chainLeafTex[1] = chainPlainLeafFetch(TextureSampler_1, TransformedCoords_1, Subset_1,
                                           AlphaStart_1, HasRgbaaa_1, SubsetClampOn_1, 1);
   }
-  if (SlotPacked[2].x == OP_TEXTURE && !chainLeafIsTiled(2)) {
+  if (SPEC_SlotPacked(2).x == OP_TEXTURE && !chainLeafIsTiled(2)) {
     chainLeafTex[2] = chainPlainLeafFetch(TextureSampler_2, TransformedCoords_2, Subset_2,
                                           AlphaStart_2, HasRgbaaa_2, SubsetClampOn_2, 2);
   }
-  if (SlotPacked[3].x == OP_TEXTURE && !chainLeafIsTiled(3)) {
+  if (SPEC_SlotPacked(3).x == OP_TEXTURE && !chainLeafIsTiled(3)) {
     chainLeafTex[3] = chainPlainLeafFetch(TextureSampler_3, TransformedCoords_3, Subset_3,
                                           AlphaStart_3, HasRgbaaa_3, SubsetClampOn_3, 3);
   }
-  int recipeCount = min(SlotCount, CHAIN_TILED_RECIPES);
+  int recipeCount = min(SPEC_SlotCount(), CHAIN_TILED_RECIPES);
   for (int recipe = 0; recipe < recipeCount; ++recipe) {
     int leaf = chainTiledRecipeLeaf(recipe);
-    if (leaf >= 0 && leaf < NTEX && SlotPacked[leaf].x == OP_TEXTURE) {
+    if (leaf >= 0 && leaf < NTEX && SPEC_SlotPacked(leaf).x == OP_TEXTURE) {
       chainLeafTex[leaf] = chainTiledLeafFetch(leaf);
     }
   }
@@ -194,52 +242,91 @@ void main() {
   vec4 result = vec4(0.0);
   vec4 clipRegister = vec4(0.0);
   vec4 coverageRootRegister = vec4(0.0);
-  // The XferProcessor source without coverage: the root, times the coverage subtree root in the
-  // layouts without a coverage varying (see the epilogue below).
-#if GP_LAYOUT >= 1 || HAS_COVERAGE
-#define CHAIN_XP_SRC_UNPREMUL result
-#else
-#define CHAIN_XP_SRC_UNPREMUL (CoverageRootIndex >= 0 ? result * coverageRootRegister : result)
-#endif
 #if HAS_XP >= 1
   // With an advanced XferProcessor mode the loop runs one pass past the instructions: slot
   // SlotCount blends the XferProcessor source with the dst at evalChainSlot's OP_BLEND site
   // (xp_blend_pass.inc). The pass count stays uniform data, so the loop is not unrolled.
   chainXPDst = xpReadDstColor();
   vec4 xpBlended = vec4(0.0);
-  int passCount = SlotCount + (xpNeedsBlendPass() ? 1 : 0);
-#else
-  int passCount = SlotCount;
 #endif
-  for (int i = 0; i < passCount; ++i) {
+// The unrolled executor rides behind a tool-set macro: the stub pass (reflection and the inline
+// policy) compiles the loop alone, while the generic and the spec forms compile both — the
+// generic GL driver then folds the branch away through the master-switch constant. The default
+// keeps the unrolled form in whenever the macro is not injected, so a bare compile never loses
+// the specialization machinery.
+#ifndef TGFX_SPEC_UNROLLED_EXECUTOR
+#define TGFX_SPEC_UNROLLED_EXECUTOR 1
+#endif
+#if TGFX_SPEC_UNROLLED_EXECUTOR
+  if (SPEC_ACTIVE()) {
+    // The specialized executor: one call site per slot with literal indices. Once the runtime
+    // injects the values, every guard and every selector word becomes a compile-time constant, so
+    // the driver deletes the out-of-range call sites entirely.
+    CHAIN_RUN_AT(0)
+    CHAIN_RUN_AT(1)
+    CHAIN_RUN_AT(2)
+    CHAIN_RUN_AT(3)
+    CHAIN_RUN_AT(4)
+    CHAIN_RUN_AT(5)
+    CHAIN_RUN_AT(6)
+    CHAIN_RUN_AT(7)
+    CHAIN_RUN_AT(8)
+    CHAIN_RUN_AT(9)
+    CHAIN_RUN_AT(10)
+    CHAIN_RUN_AT(11)
+    CHAIN_RUN_AT(12)
+    CHAIN_RUN_AT(13)
+    CHAIN_RUN_AT(14)
+    CHAIN_RUN_AT(15)
+#if CHAIN_SLOT_CAPACITY > 16
+    CHAIN_RUN_AT(16)
+    CHAIN_RUN_AT(17)
+    CHAIN_RUN_AT(18)
+    CHAIN_RUN_AT(19)
+    CHAIN_RUN_AT(20)
+    CHAIN_RUN_AT(21)
+    CHAIN_RUN_AT(22)
+    CHAIN_RUN_AT(23)
+    CHAIN_RUN_AT(24)
+    CHAIN_RUN_AT(25)
+    CHAIN_RUN_AT(26)
+    CHAIN_RUN_AT(27)
+    CHAIN_RUN_AT(28)
+    CHAIN_RUN_AT(29)
+    CHAIN_RUN_AT(30)
+    CHAIN_RUN_AT(31)
+#endif
 #if HAS_XP >= 1
-    if (i == SlotCount) {
+    if (xpNeedsBlendPass()) {
       chainXPSrc = CHAIN_XP_SRC_UNPREMUL;
+      xpBlended = evalChainSlot(SPEC_SlotCount());
     }
 #endif
-    // Bits 20-24 of the selector carry the result register + 1 (0 = dead instruction, skip the
-    // write). The value is evaluated before the write, so a consumer may share a register with
-    // its just-released producer.
-    vec4 value = evalChainSlot(i);
-#if HAS_XP >= 1
-    if (i == SlotCount) {
-      xpBlended = value;
-    } else
+  } else
 #endif
-    {
-      int outRegister = (SlotPacked[i].w >> 20) & 0x1F;
-      if (outRegister != 0) {
-        int written = outRegister - 1;
-        chainResults[written] = value;
-        if (written == RootIndex) {
-          result = value;
-        }
-        if (written == ClipCoverageRegister) {
-          clipRegister = value;
-        }
-        if (written == CoverageRootIndex) {
-          coverageRootRegister = value;
-        }
+  {
+    // The generic executor: the runtime loop over uniform data. The compiler cannot unroll it
+    // because the bound is uniform data; this is the zero-compile path every unspecialized
+    // compile runs.
+#if HAS_XP >= 1
+    int passCount = SPEC_SlotCount() + (xpNeedsBlendPass() ? 1 : 0);
+#else
+    int passCount = SPEC_SlotCount();
+#endif
+    for (int i = 0; i < passCount; ++i) {
+#if HAS_XP >= 1
+      if (i == SPEC_SlotCount()) {
+        chainXPSrc = CHAIN_XP_SRC_UNPREMUL;
+      }
+#endif
+      vec4 value = evalChainSlot(i);
+#if HAS_XP >= 1
+      if (i == SPEC_SlotCount()) {
+        xpBlended = value;
+      } else
+#endif
+      {
+        CHAIN_SLOT_WRITE(i, value)
       }
     }
   }
@@ -251,7 +338,7 @@ void main() {
   // TGFX_XP_COVERAGE), unlike a MaskFilter's source-modulating mask, whose subtree keeps the
   // CoverageRootIndex source route (MaskCoverageBlendModesOnOpaqueBackground, byte-parity across
   // Src/SrcOver/Multiply/Darken).
-  vec4 clipCoverage = ClipCoverageRegister >= 0 ? clipRegister : vec4(1.0);
+  vec4 clipCoverage = SPEC_ClipCoverageRegister() >= 0 ? clipRegister : vec4(1.0);
 
   // The device-space mask is draw COVERAGE (a clip/mask on the whole draw), so it multiplies the
   // coverage chain like the runtime's DeviceSpaceTextureEffect compositing — never the bare color.
@@ -282,7 +369,8 @@ void main() {
   // coverage in the runtime composite, unlike the MaskFilter's source-modulating mask
   // (MaskCoverageBlendModesOnOpaqueBackground, byte-parity across Src/SrcOver/Multiply/Darken).
 #if GP_LAYOUT >= 1 || HAS_COVERAGE
-  highp vec4 finalCoverage = CoverageRootIndex >= 0 ? coverageRootRegister : TGFX_CHAIN_UNIT_COVERAGE;
+  highp vec4 finalCoverage =
+      SPEC_CoverageRootIndex() >= 0 ? coverageRootRegister : TGFX_CHAIN_UNIT_COVERAGE;
 #else
   highp vec4 finalCoverage = TGFX_CHAIN_UNIT_COVERAGE;
 #endif

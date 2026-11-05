@@ -338,6 +338,33 @@ static bool ParseStageReflection(const uint8_t* data, size_t maxLen, ShaderStage
     hasPreviousLocation = true;
     blob->vertexInputs.push_back(VertexInput{std::move(entry.name), format, location});
   }
+  blob->specFields.reserve(reflection.specEntries.size());
+  for (auto& entry : reflection.specEntries) {
+    auto format = static_cast<UniformFormat>(entry.format);
+    // Only the two integer shapes can fold: a specialized read must return exactly what the
+    // uniform read returned, so float fields never enter the table.
+    if (format != UniformFormat::Int && format != UniformFormat::Int4) {
+      LOGE("PrecompiledShaderCache: spec field '%s' has a non-integer format %u",
+           entry.name.c_str(), static_cast<uint32_t>(entry.format));
+      return false;
+    }
+    if (entry.arraySize == 0) {
+      LOGE("PrecompiledShaderCache: spec field '%s' has array size 0", entry.name.c_str());
+      return false;
+    }
+    auto firstId = static_cast<uint32_t>(entry.firstId);
+    if (firstId == 0) {
+      // Id 0 is the master switch and never belongs to an entry.
+      LOGE("PrecompiledShaderCache: spec field '%s' claims the master-switch id 0",
+           entry.name.c_str());
+      return false;
+    }
+    if (!ConsumePayloadBudget(entry.name.size() + 6, remainingBytes)) {
+      return false;
+    }
+    blob->specFields.push_back(SpecFieldInfo{std::move(entry.name), format,
+                                             static_cast<uint32_t>(entry.arraySize), firstId});
+  }
   return true;
 }
 

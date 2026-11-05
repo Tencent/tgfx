@@ -341,10 +341,10 @@ namespace BundleFormat {
 inline constexpr uint32_t Magic = 0x54475346u;
 
 /// The only version the writer produces, the runtime loader reads, and --verify-bundle accepts.
-/// Older versions carried no array sizes (v3), no vertex input reflection (v4) or no payload
-/// format field (v5) and were read through compatibility branches the loader no longer has; they
-/// are refused instead.
-inline constexpr uint16_t CurrentVersion = 6;
+/// Older versions carried no array sizes (v3), no vertex input reflection (v4), no payload
+/// format field (v5), no spec table (v6) or both reserved reflection bytes (pre-v5) and were read
+/// through compatibility branches the loader no longer has; they are refused instead.
+inline constexpr uint16_t CurrentVersion = 7;
 
 /// The size of the fixed header.
 inline constexpr uint32_t HeaderSize = 84;
@@ -478,7 +478,7 @@ inline bool ProfileAllowsPayload(ShaderProfile profile, uint16_t payloadFormat) 
  * whose recorded ABI is not this value. The same goes for any change to a shader source or to its
  * variant rules, which changes the source digest the manifests record.
  */
-inline constexpr uint32_t ExpectedToolchainABI = 0x0001001eu;
+inline constexpr uint32_t ExpectedToolchainABI = 0x0001001fu;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

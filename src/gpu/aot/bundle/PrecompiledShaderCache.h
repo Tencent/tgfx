@@ -50,11 +50,22 @@ struct VertexInput {
   uint32_t location = 0;
 };
 
+/// One uniform field the runtime may freeze at pipeline creation (the spec table a bundle's
+/// fragment stage carries). firstId is where the injected constant ids start; an ivec4 array
+/// consumes four ids per element, element-major, and id 0 is the master switch.
+struct SpecFieldInfo {
+  std::string name;
+  UniformFormat format = UniformFormat::Int;
+  uint32_t arraySize = 1;
+  uint32_t firstId = 0;
+};
+
 struct ShaderStageBlob {
   std::vector<uint8_t> data;
   std::vector<Uniform> uniforms;
   std::vector<Uniform> samplers;
   std::vector<VertexInput> vertexInputs;
+  std::vector<SpecFieldInfo> specFields;
 };
 
 // The vocabulary lives in gpu/shaders/contract/AOTFailure.h: the cache's fallback categories and the matcher's

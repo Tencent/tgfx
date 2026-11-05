@@ -34,13 +34,13 @@ vec4 chainXPDst = vec4(0.0);
 vec4 evalChainSlot(int slot) {
   ivec4 Packed;
 #if HAS_XP >= 1
-  if (slot == SlotCount) {
+  if (slot == SPEC_SlotCount()) {
     Packed = ivec4(OP_BLEND, -4, -4, XPBlendMode);
   } else {
-    Packed = SlotPacked[slot];
+    Packed = SPEC_SlotPacked(slot);
   }
 #else
-  Packed = SlotPacked[slot];
+  Packed = SPEC_SlotPacked(slot);
 #endif
   if (Packed.x == OP_NONE) {
     return vec4(0.0);
@@ -124,7 +124,7 @@ vec4 evalChainSlot(int slot) {
     vec4 blendSrc = in0;
     vec4 blendDst = in1;
 #if HAS_XP >= 1
-    if (slot == SlotCount) {
+    if (slot == SPEC_SlotCount()) {
       blendSrc = chainXPSrc;
       blendDst = chainXPDst;
     }
