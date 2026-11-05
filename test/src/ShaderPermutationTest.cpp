@@ -1086,6 +1086,29 @@ class ScopedBundleStateRestore {
   bool wasLoaded = false;
 };
 
+// The stronger sibling of ScopedBundleStateRestore: a test that REPLACES the loaded bundle (a fake
+// one loaded to provoke a miss) leaves isLoaded() true, so the "restore when unloaded" guard above
+// does not fire. This one puts the embedded bundle back no matter what the test left in the cache,
+// because the thread-local Context the next test locks shares that cache: without the reload,
+// every later draw of the same suite runs against the fake bundle.
+class ScopedEmbeddedBundleReload {
+ public:
+  ScopedEmbeddedBundleReload(PrecompiledShaderCache* cache, Backend backend)
+      : cache(cache), backend(backend) {
+  }
+
+  ~ScopedEmbeddedBundleReload() {
+    LoadEmbeddedBundle(cache, backend);
+  }
+
+  ScopedEmbeddedBundleReload(const ScopedEmbeddedBundleReload&) = delete;
+  ScopedEmbeddedBundleReload& operator=(const ScopedEmbeddedBundleReload&) = delete;
+
+ private:
+  PrecompiledShaderCache* cache = nullptr;
+  Backend backend = Backend::Unknown;
+};
+
 static std::string HexU32(uint32_t value) {
   char buffer[16] = {};
   std::snprintf(buffer, sizeof(buffer), "0x%08x", value);
@@ -1741,6 +1764,10 @@ TGFX_TEST(ShaderPermutationTest, CreatorFunnelRecordsArtifactMiss) {
   auto surface = Surface::Make(context, 200, 200);
   ASSERT_TRUE(surface != nullptr);
   auto* cache = context->precompiledShaderCache();
+  // The fake bundle loaded below must not outlive this test: the thread-local Context (and with it
+  // this cache) is shared by every later ContextScope of the suite, and a draw against the fake
+  // bundle turns their hits into VertexArtifactMissing misses.
+  ScopedEmbeddedBundleReload reloadEmbedded(cache, context->backend());
   image = MakeTexture2DImage(context, image);
   ASSERT_TRUE(image != nullptr);
   auto expectedProfile = ExpectedShaderProfile(context->backend());
