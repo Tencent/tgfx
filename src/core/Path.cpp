@@ -19,7 +19,6 @@
 #include "tgfx/core/Path.h"
 #include <algorithm>
 #include <cmath>
-#include <limits>
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wfloat-conversion"
 #pragma clang diagnostic ignored "-Wimplicit-int-conversion"
@@ -554,8 +553,6 @@ bool Path::addPath(const Path& src, PathOp op) {
   return Op(path, newPath, pathOp, &path);
 }
 
-namespace {}
-
 struct PathAreaBounds {
   size_t index = 0;
   Rect bounds = {};
@@ -677,7 +674,7 @@ std::optional<Path> Path::Merge(const std::vector<Path>& sources) {
     // contours that cancel under winding are exactly why the union came back even-odd, and those
     // runs have to keep the boolean result. Reading the candidate alone is what makes the check
     // fail there, which is the answer those runs need.
-    candidate.pathRef->path.setFillType(pk::SkPathFillType::kWinding);
+    PathRef::WriteAccess(candidate).setFillType(pk::SkPathFillType::kWinding);
     pk::SkPath difference;
     if (pk::Op(PathRef::ReadAccess(candidate), result, pk::SkPathOp::kXOR_SkPathOp, &difference) &&
         difference.isEmpty()) {
