@@ -26,7 +26,7 @@ std::pair<std::shared_ptr<Shader>, Matrix> ShaderUtils::UnwrapMatrixShader(
     std::shared_ptr<Shader> shader) {
   Matrix matrix = Matrix::I();
   auto current = std::move(shader);
-  while (Types::Get(current.get()) == Types::ShaderType::Matrix) {
+  while (current != nullptr && Types::Get(current.get()) == Types::ShaderType::Matrix) {
     const auto* matrixShader = static_cast<const MatrixShader*>(current.get());
     matrix.preConcat(matrixShader->matrix);
     current = matrixShader->source;

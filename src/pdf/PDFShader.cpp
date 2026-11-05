@@ -18,7 +18,7 @@
 
 #include "PDFShader.h"
 #include "core/shaders/ImageShader.h"
-#include "core/shaders/MatrixShader.h"
+#include "core/utils/ShaderUtils.h"
 #include "core/utils/Types.h"
 #include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFExportContext.h"
@@ -102,13 +102,9 @@ PDFIndirectReference PDFShader::Make(PDFDocumentImpl* doc, const std::shared_ptr
   DEBUG_ASSERT(shader);
   DEBUG_ASSERT(doc);
   // Unwrap MatrixShader layers to find the underlying shader and accumulate the matrix.
-  auto unwrappedShader = shader;
+  auto [unwrappedShader, shaderMatrix] = ShaderUtils::UnwrapMatrixShader(shader);
   auto combinedTransform = canvasTransform;
-  while (Types::Get(unwrappedShader.get()) == Types::ShaderType::Matrix) {
-    const auto matrixShader = static_cast<const MatrixShader*>(unwrappedShader.get());
-    combinedTransform.preConcat(matrixShader->matrix);
-    unwrappedShader = matrixShader->source;
-  }
+  combinedTransform.preConcat(shaderMatrix);
   auto shaderType = Types::Get(unwrappedShader.get());
   if (shaderType == Types::ShaderType::Gradient) {
     const auto gradientShader = static_cast<const GradientShader*>(unwrappedShader.get());

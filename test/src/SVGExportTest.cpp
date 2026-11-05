@@ -729,49 +729,112 @@ TGFX_TEST(SVGExportTest, LayerShadow) {
   EXPECT_TRUE(context != nullptr);
 
   auto SVGStream = MemoryWriteStream::Make();
-  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(400, 400));
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(525, 315));
   auto canvas = exporter->getCanvas();
 
   auto displayList = std::make_unique<DisplayList>();
 
   auto rootLayer = Layer::Make();
-  rootLayer->setMatrix(Matrix::MakeTrans(30, 30));
+  rootLayer->setMatrix(Matrix::MakeTrans(65, 60));
 
-  auto dropShadowLayer = ShapeLayer::Make();
-  auto dropShadowStyle = DropShadowStyle::Make(10, 10, 10, 10, Color::Blue(), false);
   Path rect;
   rect.addRect(Rect::MakeWH(50, 50));
-  dropShadowLayer->setPath(rect);
-  dropShadowLayer->setFillStyle(ShapeStyle::Make(Color::Red()));
-  dropShadowLayer->setLayerStyles({dropShadowStyle});
-  rootLayer->addChild(dropShadowLayer);
+  auto fillStyle = ShapeStyle::Make(Color::Red());
 
-  auto innerShadowLayer = ShapeLayer::Make();
-  auto innerShadowStyle = InnerShadowStyle::Make(10, 10, 10, 10, Color::Blue());
-  innerShadowLayer->setMatrix(Matrix::MakeTrans(200, 0));
-  innerShadowLayer->setPath(rect);
-  innerShadowLayer->setFillStyle(ShapeStyle::Make(Color::Red()));
-  innerShadowLayer->setLayerStyles({innerShadowStyle});
-  rootLayer->addChild(innerShadowLayer);
+  // Case 1: Opaque drop shadow.
+  {
+    auto layer = ShapeLayer::Make();
+    auto style = DropShadowStyle::Make(10, 10, 10, 10, Color::Blue(), true);
+    layer->setPath(rect);
+    layer->setFillStyle(fillStyle);
+    layer->setLayerStyles({style});
+    rootLayer->addChild(layer);
+  }
 
-  // Non-zero spread on exact rects: covered by the analytic shadow path.
-  auto spreadDropShadowLayer = ShapeLayer::Make();
-  auto spreadDropShadowStyle = DropShadowStyle::Make(10, 10, 10, 10, Color::Blue(), false);
-  spreadDropShadowStyle->setSpread(5);
-  spreadDropShadowLayer->setMatrix(Matrix::MakeTrans(0, 150));
-  spreadDropShadowLayer->setPath(rect);
-  spreadDropShadowLayer->setFillStyle(ShapeStyle::Make(Color::Red()));
-  spreadDropShadowLayer->setLayerStyles({spreadDropShadowStyle});
-  rootLayer->addChild(spreadDropShadowLayer);
+  // Case 2: Translucent drop shadow with reduced blur.
+  {
+    auto layer = ShapeLayer::Make();
+    auto style = DropShadowStyle::Make(10, 10, 2, 2, Color::Blue(), false);
+    layer->setMatrix(Matrix::MakeTrans(120, 0));
+    layer->setAlpha(0.5f);
+    layer->setPath(rect);
+    layer->setFillStyle(fillStyle);
+    layer->setLayerStyles({style});
+    rootLayer->addChild(layer);
+  }
 
-  auto spreadInnerShadowLayer = ShapeLayer::Make();
-  auto spreadInnerShadowStyle = InnerShadowStyle::Make(10, 10, 10, 10, Color::Blue());
-  spreadInnerShadowStyle->setSpread(5);
-  spreadInnerShadowLayer->setMatrix(Matrix::MakeTrans(200, 150));
-  spreadInnerShadowLayer->setPath(rect);
-  spreadInnerShadowLayer->setFillStyle(ShapeStyle::Make(Color::Red()));
-  spreadInnerShadowLayer->setLayerStyles({spreadInnerShadowStyle});
-  rootLayer->addChild(spreadInnerShadowLayer);
+  // Case 3: Translucent drop shadow with reduced blur, shown behind the layer.
+  {
+    auto layer = ShapeLayer::Make();
+    auto style = DropShadowStyle::Make(10, 10, 2, 2, Color::Blue(), true);
+    layer->setMatrix(Matrix::MakeTrans(240, 0));
+    layer->setAlpha(0.5f);
+    layer->setPath(rect);
+    layer->setFillStyle(fillStyle);
+    layer->setLayerStyles({style});
+    rootLayer->addChild(layer);
+  }
+
+  // Case 4: Opaque inner shadow.
+  {
+    auto layer = ShapeLayer::Make();
+    auto style = InnerShadowStyle::Make(10, 10, 10, 10, Color::Blue());
+    layer->setMatrix(Matrix::MakeTrans(360, 0));
+    layer->setPath(rect);
+    layer->setFillStyle(fillStyle);
+    layer->setLayerStyles({style});
+    rootLayer->addChild(layer);
+  }
+
+  // Case 5: Drop shadow with spread on the analytic path.
+  {
+    auto layer = ShapeLayer::Make();
+    auto style = DropShadowStyle::Make(10, 10, 10, 10, Color::Blue(), true);
+    style->setSpread(5);
+    layer->setMatrix(Matrix::MakeTrans(0, 120));
+    layer->setPath(rect);
+    layer->setFillStyle(fillStyle);
+    layer->setLayerStyles({style});
+    rootLayer->addChild(layer);
+  }
+
+  // Case 6: Translucent drop shadow with spread and reduced blur.
+  {
+    auto layer = ShapeLayer::Make();
+    auto style = DropShadowStyle::Make(10, 10, 2, 2, Color::Blue(), false);
+    style->setSpread(5);
+    layer->setMatrix(Matrix::MakeTrans(120, 120));
+    layer->setAlpha(0.5f);
+    layer->setPath(rect);
+    layer->setFillStyle(fillStyle);
+    layer->setLayerStyles({style});
+    rootLayer->addChild(layer);
+  }
+
+  // Case 7: Translucent drop shadow with spread and reduced blur, shown behind the layer.
+  {
+    auto layer = ShapeLayer::Make();
+    auto style = DropShadowStyle::Make(10, 10, 2, 2, Color::Blue(), true);
+    style->setSpread(5);
+    layer->setMatrix(Matrix::MakeTrans(240, 120));
+    layer->setAlpha(0.5f);
+    layer->setPath(rect);
+    layer->setFillStyle(fillStyle);
+    layer->setLayerStyles({style});
+    rootLayer->addChild(layer);
+  }
+
+  // Case 8: Inner shadow with spread.
+  {
+    auto layer = ShapeLayer::Make();
+    auto style = InnerShadowStyle::Make(10, 10, 10, 10, Color::Blue());
+    style->setSpread(5);
+    layer->setMatrix(Matrix::MakeTrans(360, 120));
+    layer->setPath(rect);
+    layer->setFillStyle(fillStyle);
+    layer->setLayerStyles({style});
+    rootLayer->addChild(layer);
+  }
 
   displayList->root()->addChild(rootLayer);
   displayList->root()->draw(canvas);

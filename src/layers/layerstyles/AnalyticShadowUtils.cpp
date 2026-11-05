@@ -21,6 +21,7 @@
 #include "core/RRectUtils.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/ShapeUtils.h"
 #include "layers/SpreadUtils.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/RRect.h"
@@ -74,7 +75,7 @@ std::optional<RRect> AnalyticShadowUtils::MakeShadowShape(const LayerStyleInput&
     return std::nullopt;
   }
 
-  auto [shape, shapeMatrix] = SpreadUtils::UnwrapMatrixShape(styledShape.shape);
+  auto [shape, shapeMatrix] = ShapeUtils::UnwrapMatrixShape(styledShape.shape);
   DEBUG_ASSERT(shape != nullptr);
   if (shape == nullptr) {
     return std::nullopt;

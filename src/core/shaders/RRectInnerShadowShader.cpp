@@ -16,13 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "layers/shaders/RRectInnerShadowShader.h"
+#include "core/shaders/RRectInnerShadowShader.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/Types.h"
-#include "layers/processors/RRectInnerShadowFragmentProcessor.h"
-#include "layers/processors/RectInnerShadowFragmentProcessor.h"
+#include "gpu/processors/RRectInnerShadowFragmentProcessor.h"
+#include "gpu/processors/RectInnerShadowFragmentProcessor.h"
 
 namespace tgfx {
 

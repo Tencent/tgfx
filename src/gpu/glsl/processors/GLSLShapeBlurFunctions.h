@@ -18,23 +18,25 @@
 
 #pragma once
 
+#include <string>
 #include "gpu/FragmentShaderBuilder.h"
 #include "tgfx/core/Point.h"
 
 namespace tgfx {
 
 /**
- * Each emitting function below may be called at most once per FragmentShaderBuilder, and the
- * rectangle and rounded-rect variants of a group are mutually exclusive on one builder:
+ * Each emitting function below may be called at most once per fragment processor, and the
+ * rectangle and rounded-rect variants of a group are mutually exclusive within one processor:
  * AppendRectBlurFunctions with AppendRRectBlurFunctions, and AppendRectMaskFunctions with
  * AppendRRectMaskFunctions.
  */
 
 /**
- * Emits:
- *   float shapeBlurRectCoverage(vec2 coord, vec2 halfSize);
+ * Emits the rectangle blur coverage function and returns its name. The function has the
+ * signature:
+ *   float name(vec2 coord, vec2 halfSize);
  */
-void AppendRectBlurFunctions(FragmentShaderBuilder* fragBuilder);
+std::string AppendRectBlurFunctions(FragmentShaderBuilder* fragBuilder);
 
 /**
  * Returns the number of quadrature points the rounded-rect coverage form should use for a corner
@@ -43,26 +45,40 @@ void AppendRectBlurFunctions(FragmentShaderBuilder* fragBuilder);
 int GetRRectBlurQuadratureCount(const Point& cornerOverSigma);
 
 /**
- * Emits:
- *   float shapeBlurRRectCoverage(vec2 coord, vec2 halfSize, vec2 corner);
+ * Emits the rounded-rect blur coverage function and returns its name. The function has the
+ * signature:
+ *   float name(vec2 coord, vec2 halfSize, vec2 corner);
  * @param quadratureCount the number of quadrature points the coverage form uses along the axis it
  * does not solve in closed form. GetRRectBlurQuadratureCount gives the value to pass.
  */
-void AppendRRectBlurFunctions(FragmentShaderBuilder* fragBuilder, int quadratureCount);
+std::string AppendRRectBlurFunctions(FragmentShaderBuilder* fragBuilder, int quadratureCount);
 
 /**
- * Emits:
- *   float shapeMaskRectSDF(vec2 p, vec2 halfSize);
- *   float shapeMaskCoverage(float sdf);
+ * Names of the mask functions emitted by AppendRectMaskFunctions and AppendRRectMaskFunctions.
  */
-void AppendRectMaskFunctions(FragmentShaderBuilder* fragBuilder);
+struct ShapeMaskFunctionNames {
+  /**
+   * The signed distance function. For a rectangle it has the signature:
+   *   float sdf(vec2 p, vec2 halfSize);
+   * For a rounded rect it has the signature:
+   *   float sdf(vec2 p, vec2 halfSize, vec2 corner);
+   */
+  std::string sdf;
+  /**
+   * The function that converts a signed distance to coverage. It has the signature:
+   *   float coverage(float sdf);
+   */
+  std::string coverage;
+};
 
 /**
- * Emits:
- *   float shapeMaskRRectSDF(vec2 p, vec2 halfSize, vec2 corner);
- *   float shapeMaskRectSDF(vec2 p, vec2 halfSize);
- *   float shapeMaskCoverage(float sdf);
+ * Emits the rectangle mask functions and returns their names.
  */
-void AppendRRectMaskFunctions(FragmentShaderBuilder* fragBuilder);
+ShapeMaskFunctionNames AppendRectMaskFunctions(FragmentShaderBuilder* fragBuilder);
+
+/**
+ * Emits the rounded-rect mask functions and returns their names.
+ */
+ShapeMaskFunctionNames AppendRRectMaskFunctions(FragmentShaderBuilder* fragBuilder);
 
 }  // namespace tgfx

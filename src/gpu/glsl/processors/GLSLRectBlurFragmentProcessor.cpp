@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "layers/processors/GLSLRectBlurFragmentProcessor.h"
+#include "GLSLRectBlurFragmentProcessor.h"
+#include "GLSLShapeBlurFunctions.h"
 #include "core/utils/Log.h"
-#include "layers/processors/GLSLShapeBlurFunctions.h"
 
 namespace tgfx {
 
@@ -38,7 +38,7 @@ GLSLRectBlurFragmentProcessor::GLSLRectBlurFragmentProcessor(const Point& halfSi
 
 void GLSLRectBlurFragmentProcessor::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
-  AppendRectBlurFunctions(fragBuilder);
+  auto coverageName = AppendRectBlurFunctions(fragBuilder);
 
   auto halfSizeName = args.uniformHandler->addUniform("HalfSizeOverSigma", UniformFormat::Float2,
                                                       ShaderStage::Fragment);
@@ -46,7 +46,7 @@ void GLSLRectBlurFragmentProcessor::emitCode(EmitArgs& args) const {
       args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
 
   auto coordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
-  fragBuilder->codeAppendf("highp float coverage = shapeBlurRectCoverage(%s, %s);",
+  fragBuilder->codeAppendf("highp float coverage = %s(%s, %s);", coverageName.c_str(),
                            coordName.c_str(), halfSizeName.c_str());
   fragBuilder->codeAppendf("%s = %s * coverage;", args.outputColor.c_str(), colorName.c_str());
   // Only the input alpha is consumed; the shadow color comes from the uniform.

@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "layers/processors/GLSLRRectInnerShadowFragmentProcessor.h"
+#include "GLSLRRectInnerShadowFragmentProcessor.h"
+#include "GLSLShapeBlurFunctions.h"
 #include "core/utils/Log.h"
-#include "layers/processors/GLSLShapeBlurFunctions.h"
 
 namespace tgfx {
 
@@ -47,8 +47,8 @@ GLSLRRectInnerShadowFragmentProcessor::GLSLRRectInnerShadowFragmentProcessor(
 
 void GLSLRRectInnerShadowFragmentProcessor::emitCode(EmitArgs& args) const {
   auto fragBuilder = args.fragBuilder;
-  AppendRRectBlurFunctions(fragBuilder, quadratureCount);
-  AppendRRectMaskFunctions(fragBuilder);
+  auto blurCoverageName = AppendRRectBlurFunctions(fragBuilder, quadratureCount);
+  auto maskNames = AppendRRectMaskFunctions(fragBuilder);
 
   auto maskHalfName = args.uniformHandler->addUniform("MaskHalfOverSigma", UniformFormat::Float2,
                                                       ShaderStage::Fragment);
@@ -63,10 +63,10 @@ void GLSLRRectInnerShadowFragmentProcessor::emitCode(EmitArgs& args) const {
 
   auto shadowCoordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[0]);
   auto maskCoordName = fragBuilder->emitPerspTextCoord((*args.transformedCoords)[1]);
-  fragBuilder->codeAppendf("highp float coverage = 1.0 - shapeBlurRRectCoverage(%s, %s, %s);",
+  fragBuilder->codeAppendf("highp float coverage = 1.0 - %s(%s, %s, %s);", blurCoverageName.c_str(),
                            maskCoordName.c_str(), maskHalfName.c_str(), maskCornerName.c_str());
-  fragBuilder->codeAppendf("coverage *= shapeMaskCoverage(shapeMaskRRectSDF(%s, %s, %s));",
-                           shadowCoordName.c_str(), shadowHalfName.c_str(),
+  fragBuilder->codeAppendf("coverage *= %s(%s(%s, %s, %s));", maskNames.coverage.c_str(),
+                           maskNames.sdf.c_str(), shadowCoordName.c_str(), shadowHalfName.c_str(),
                            shadowCornerName.c_str());
   fragBuilder->codeAppendf("%s = %s * coverage;", args.outputColor.c_str(), colorName.c_str());
   // Only the input alpha is consumed; the shadow color comes from the uniform.

@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "layers/processors/RectInnerShadowFragmentProcessor.h"
+#include "gpu/processors/RectInnerShadowFragmentProcessor.h"
 
 namespace tgfx {
 class GLSLRectInnerShadowFragmentProcessor : public RectInnerShadowFragmentProcessor {

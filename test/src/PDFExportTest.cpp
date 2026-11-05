@@ -1115,11 +1115,24 @@ TGFX_TEST(PDFExportTest, DropShadowLayer) {
   layerD->setLayerStyles({spreadInnerStyle});
   root->addChild(layerD);
 
+  // Case 5: drop shadow with rotation and non-uniform scale
+  auto layerE = ShapeLayer::Make();
+  Path pathE;
+  pathE.addRect(Rect::MakeWH(100.f, 100.f));
+  layerE->setPath(pathE);
+  layerE->setFillStyle(ShapeStyle::Make(Color::FromRGBA(255, 0, 0, 127)));
+  auto transformedMatrix = Matrix::MakeTrans(1250.f, 50.f);
+  transformedMatrix.preConcat(Matrix::MakeRotate(30.f));
+  transformedMatrix.preConcat(Matrix::MakeScale(2.f, 1.5f));
+  layerE->setMatrix(transformedMatrix);
+  layerE->setLayerStyles({DropShadowStyle::Make(20.f, 20.f, 10.f, 10.f, Color::Blue(), false)});
+  root->addChild(layerE);
+
   auto PDFStream = MemoryWriteStream::Make();
   auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
 
   // Page 1: rectangles
-  auto canvas = document->beginPage(1250.f, 350.f);
+  auto canvas = document->beginPage(1500.f, 400.f);
   canvas->drawColor(Color::FromRGBA(200, 200, 200));
   root->draw(canvas);
   document->endPage();

@@ -3971,6 +3971,28 @@ static inline void BuildShadowTestLayers(DisplayList& displayList, ShadowType ty
     layer->setLayerStyles({MakeShadow(type, 25, 25, 12, 4, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f)});
     displayList.root()->addChild(layer);
   }
+
+  // Case 22: VectorLayer Rect fill in a group rotated 90 degrees with a non-uniform scale, on a
+  // layer rotated 30 degrees, spread=8 (analytic)
+  for (int i = 0; i < 2; ++i) {
+    auto vectorLayer = VectorLayer::Make();
+    auto group = VectorGroup::Make();
+    auto rect = Rectangle::Make();
+    rect->setSize({60, 40});
+    rect->setPosition({50, -10});
+    rect->setRoundness(8);
+    auto fill = FillStyle::Make(SolidColor::Make(Color::Red()));
+    group->setElements({rect, fill});
+    group->setRotation(90);
+    group->setScale({1.5f, 1.0f});
+    vectorLayer->setContents({group});
+    auto matrix = Matrix::MakeTrans((i == 0 ? lItemXOffset : rItemXOffset), cellH * 7 + gap);
+    matrix.preConcat(Matrix::MakeRotate(-45));
+    vectorLayer->setMatrix(matrix);
+    vectorLayer->setLayerStyles(
+        {MakeShadow(type, 25, 25, 3, 3, YELLOW_COLOR, i == 0 ? 0.0f : 8.0f)});
+    displayList.root()->addChild(vectorLayer);
+  }
 }
 
 TGFX_TEST(LayerTest, DropShadow) {
@@ -3981,7 +4003,7 @@ TGFX_TEST(LayerTest, DropShadow) {
   constexpr float cellH = 120.0f;
   constexpr float gap = 30.0f;
   auto surface =
-      Surface::Make(context, static_cast<int>(cellW * 3 + gap), static_cast<int>(cellH * 7 + gap));
+      Surface::Make(context, static_cast<int>(cellW * 3 + gap), static_cast<int>(cellH * 8 + gap));
   auto displayList = std::make_unique<DisplayList>();
   BuildShadowTestLayers(*displayList, ShadowType::Drop, cellW, cellH, gap);
   displayList->render(surface.get());
@@ -3996,7 +4018,7 @@ TGFX_TEST(LayerTest, InnerShadow) {
   constexpr float cellH = 120.0f;
   constexpr float gap = 30.0f;
   auto surface =
-      Surface::Make(context, static_cast<int>(cellW * 3 + gap), static_cast<int>(cellH * 7 + gap));
+      Surface::Make(context, static_cast<int>(cellW * 3 + gap), static_cast<int>(cellH * 8 + gap));
   auto displayList = std::make_unique<DisplayList>();
   BuildShadowTestLayers(*displayList, ShadowType::Inner, cellW, cellH, gap);
   displayList->render(surface.get());

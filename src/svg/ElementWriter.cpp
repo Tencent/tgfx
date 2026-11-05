@@ -28,7 +28,6 @@
 #include "core/filters/LumaColorFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
 #include "core/shaders/ColorFilterShader.h"
-#include "core/shaders/MatrixShader.h"
 #include "core/shaders/PerlinNoiseShader.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/ColorSpaceHelper.h"
@@ -311,6 +310,15 @@ Resources ElementWriter::addColorFilterResource(const std::shared_ptr<ColorFilte
     }
     resources.filter = "url(#" + filterID + ")";
   }
+  return resources;
+}
+
+Resources ElementWriter::addMaskResource(const std::shared_ptr<MaskFilter>& maskFilter,
+                                         Context* context, SVGExportContext* svgContext,
+                                         std::vector<PendingImage>* pendings, const Matrix& matrix,
+                                         const Rect& bounds) {
+  Resources resources;
+  addMaskResources(maskFilter, &resources, context, svgContext, pendings, matrix, bounds);
   return resources;
 }
 
@@ -876,27 +884,18 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
     return;
   }
   // Unwrap MatrixShader to get the actual shader type and accumulated matrix.
-  const Shader* blendShader = filter->shader.get();
-  Matrix shaderMatrix = Matrix::I();
-  while (blendShader && Types::Get(blendShader) == Types::ShaderType::Matrix) {
-    auto matrixShader = static_cast<const MatrixShader*>(blendShader);
-    shaderMatrix = shaderMatrix * matrixShader->matrix;
-    blendShader = matrixShader->source.get();
-  }
-  auto shaderType = Types::Get(blendShader);
+  auto [blendShader, shaderMatrix] = ShaderUtils::UnwrapMatrixShader(filter->shader);
+  auto shaderType = Types::Get(blendShader.get());
   if (shaderType == Types::ShaderType::ColorFilter) {
-    auto colorFilterShader = static_cast<const ColorFilterShader*>(blendShader);
+    auto colorFilterShader = static_cast<const ColorFilterShader*>(blendShader.get());
     // Unwrap the inner shader's MatrixShader layer.
-    const Shader* innerShader = colorFilterShader->shader.get();
-    Matrix innerMatrix = shaderMatrix;
-    while (innerShader && Types::Get(innerShader) == Types::ShaderType::Matrix) {
-      auto ms = static_cast<const MatrixShader*>(innerShader);
-      innerMatrix = innerMatrix * ms->matrix;
-      innerShader = ms->source.get();
-    }
+    auto [innerShader, innerShaderMatrix] =
+        ShaderUtils::UnwrapMatrixShader(colorFilterShader->shader);
+    auto innerMatrix = shaderMatrix;
+    innerMatrix.preConcat(innerShaderMatrix);
     // Step 1: Emit inner shader as a filter primitive.
     auto shaderResult =
-        emitShaderAsPrimitive(innerShader, innerMatrix, filterBounds, context, pendings);
+        emitShaderAsPrimitive(innerShader.get(), innerMatrix, filterBounds, context, pendings);
     if (shaderResult.empty()) {
       reportUnsupportedElement("Unsupported inner shader in ColorFilterShader BlendImageFilter");
       return;
@@ -921,7 +920,7 @@ void ElementWriter::addBlendImageFilter(const BlendImageFilter* filter,
   // Color, PerlinNoise, Gradient, Image shaders share the same pattern:
   // emit shader as filter primitive, then blend with source.
   auto resultName =
-      emitShaderAsPrimitive(blendShader, shaderMatrix, filterBounds, context, pendings);
+      emitShaderAsPrimitive(blendShader.get(), shaderMatrix, filterBounds, context, pendings);
   if (resultName.empty()) {
     reportUnsupportedElement("Unsupported shader type in BlendImageFilter");
     return;
@@ -1106,18 +1105,12 @@ Resources ElementWriter::addResources(const Brush& brush, Context* context,
   if (auto shader = brush.shader) {
     // Unwrap all Matrix and ColorFilter layers to find the leaf shader type.
     // Only PerlinNoise leaf shaders skip defs (they use filter primitives instead).
-    const Shader* leaf = shader.get();
-    while (leaf) {
-      auto leafType = Types::Get(leaf);
-      if (leafType == Types::ShaderType::Matrix) {
-        leaf = static_cast<const MatrixShader*>(leaf)->source.get();
-      } else if (leafType == Types::ShaderType::ColorFilter) {
-        leaf = static_cast<const ColorFilterShader*>(leaf)->shader.get();
-      } else {
-        break;
-      }
+    auto leaf = ShaderUtils::UnwrapMatrixShader(shader).first;
+    while (leaf != nullptr && Types::Get(leaf.get()) == Types::ShaderType::ColorFilter) {
+      auto colorFilterShader = static_cast<const ColorFilterShader*>(leaf.get());
+      leaf = ShaderUtils::UnwrapMatrixShader(colorFilterShader->shader).first;
     }
-    bool needsDefs = !leaf || Types::Get(leaf) != Types::ShaderType::PerlinNoise;
+    bool needsDefs = leaf == nullptr || Types::Get(leaf.get()) != Types::ShaderType::PerlinNoise;
     if (needsDefs) {
       ElementWriter defs("defs", writer);
       addShaderResources(shader, context, &resources, pendings);
@@ -1145,7 +1138,7 @@ Resources ElementWriter::addResources(const Brush& brush, Context* context,
       filterElement.addAttribute("width", "100%");
       filterElement.addAttribute("height", "100%");
       if (shaderNeedsFilter) {
-        addShaderFilterPrimitives(brush.shader.get());
+        addShaderFilterPrimitives(brush.shader);
       }
       if (hasColorFilter) {
         addColorFilterPrimitives(brush.colorFilter);
@@ -1206,23 +1199,20 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Co
   }
 }
 
-void ElementWriter::addShaderFilterPrimitives(const Shader* shader) {
-  const Shader* inner = shader;
-  while (inner && Types::Get(inner) == Types::ShaderType::Matrix) {
-    inner = static_cast<const MatrixShader*>(inner)->source.get();
-  }
-  if (!inner) {
+void ElementWriter::addShaderFilterPrimitives(const std::shared_ptr<Shader>& shader) {
+  auto inner = ShaderUtils::UnwrapMatrixShader(shader).first;
+  if (inner == nullptr) {
     return;
   }
-  auto type = Types::Get(inner);
+  auto type = Types::Get(inner.get());
   switch (type) {
     case Types::ShaderType::PerlinNoise:
-      addPerlinNoisePrimitives(inner);
+      addPerlinNoisePrimitives(inner.get());
       break;
     case Types::ShaderType::ColorFilter: {
-      auto colorFilterShader = static_cast<const ColorFilterShader*>(inner);
+      auto colorFilterShader = static_cast<const ColorFilterShader*>(inner.get());
       // Recurse into the inner shader for its filter primitives.
-      addShaderFilterPrimitives(colorFilterShader->shader.get());
+      addShaderFilterPrimitives(colorFilterShader->shader);
       // Then append the ColorFilterShader's own color filter primitives.
       if (colorFilterShader->colorFilter) {
         addColorFilterPrimitives(colorFilterShader->colorFilter);
@@ -1431,31 +1421,38 @@ void ElementWriter::addImageShaderResources(const ImageShader* shader, const Mat
 void ElementWriter::addMaskResources(const std::shared_ptr<MaskFilter>& maskFilter,
                                      Resources* resources, Context* context,
                                      SVGExportContext* svgContext,
-                                     std::vector<PendingImage>* pendings) {
+                                     std::vector<PendingImage>* pendings, const Matrix& matrix,
+                                     const std::optional<Rect>& bounds) {
   if (Types::Get(maskFilter.get()) != Types::MaskFilterType::Shader) {
     return;
   }
 
   auto maskShaderFilter = static_cast<const ShaderMaskFilter*>(maskFilter.get());
-  auto maskShader = maskShaderFilter->getShader();
+  auto [maskShader, shaderMatrix] = ShaderUtils::UnwrapMatrixShader(maskShaderFilter->getShader());
+  auto contentMatrix = matrix;
+  contentMatrix.preConcat(shaderMatrix);
   auto type = Types::Get(maskShader.get());
 
   bool inverse = maskShaderFilter->isInverted();
   std::string filterID;
   if (inverse) {
-    // A picture mask's effective area is its image extent, not the replayed content's bounds.
     const auto invertFilter = ImageFilter::ColorFilter(
         ColorFilter::Matrix({1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, -1, 1}));
-    std::optional<Rect> bound;
-    if (type == Types::ShaderType::Image &&
+    auto filterBounds = bounds;
+    // Without an explicit mask region, use the PictureImage extent rather than the replayed
+    // content's bounds as the effective mask area.
+    if (!filterBounds.has_value() && type == Types::ShaderType::Image &&
         Types::Get(static_cast<const ImageShader*>(maskShader.get())->image.get()) ==
             Types::ImageType::Picture) {
       const auto* pictureImage = static_cast<const PictureImage*>(
           static_cast<const ImageShader*>(maskShader.get())->image.get());
-      bound = Rect::MakeWH(static_cast<float>(pictureImage->width()),
-                           static_cast<float>(pictureImage->height()));
+      filterBounds = shaderMatrix.mapRect(Rect::MakeWH(static_cast<float>(pictureImage->width()),
+                                                       static_cast<float>(pictureImage->height())));
     }
-    filterID = emitFilterElement(invertFilter, nullptr, context, false, bound);
+    if (filterBounds.has_value()) {
+      filterBounds = matrix.mapRect(*filterBounds);
+    }
+    filterID = emitFilterElement(invertFilter, nullptr, context, false, filterBounds);
     DEBUG_ASSERT(!filterID.empty());
     filterID = "url(#" + filterID + ")";
   }
@@ -1473,7 +1470,7 @@ void ElementWriter::addMaskResources(const std::shared_ptr<MaskFilter>& maskFilt
       maskElement.addAttribute("width", "100%");
       maskElement.addAttribute("height", "100%");
 
-      addImageMaskResources(imageShader, filterID, context, svgContext, pendings);
+      addImageMaskResources(imageShader, contentMatrix, filterID, context, svgContext, pendings);
 
       resources->mask = "url(#" + maskID + ")";
       break;
@@ -1488,34 +1485,33 @@ void ElementWriter::addMaskResources(const std::shared_ptr<MaskFilter>& maskFilt
       maskElement.addAttribute("width", "100%");
       maskElement.addAttribute("height", "100%");
 
-      addShaderMaskResources(maskShader, filterID, context, pendings);
+      addShaderMaskResources(maskShader->makeWithMatrix(contentMatrix), filterID, context,
+                             pendings);
 
       resources->mask = "url(#" + maskID + ")";
       break;
     }
     default:
-      // TODO (YGaurora): The mask filter can be expanded to support shaders. Once shaders are
-      // supported, the corresponding mask filter will also be supported.
       reportUnsupportedElement("unsupported mask filter");
   }
 }
 
-void ElementWriter::addImageMaskResources(const ImageShader* imageShader,
+void ElementWriter::addImageMaskResources(const ImageShader* imageShader, const Matrix& matrix,
                                           const std::string& filterID, Context* context,
                                           SVGExportContext* svgContext,
                                           std::vector<PendingImage>* pendings) {
   auto image = imageShader->image;
   Types::ImageType type = Types::Get(image.get());
   if (type == Types::ImageType::Picture) {
-    addPictureImageMaskResources(static_cast<const PictureImage*>(image.get()), filterID,
+    addPictureImageMaskResources(static_cast<const PictureImage*>(image.get()), matrix, filterID,
                                  svgContext);
   } else {
-    addRenderImageMaskResources(imageShader, filterID, context, pendings);
+    addRenderImageMaskResources(imageShader, matrix, filterID, context, pendings);
   }
 }
 
 void ElementWriter::addPictureImageMaskResources(const PictureImage* pictureImage,
-                                                 const std::string& filterID,
+                                                 const Matrix& matrix, const std::string& filterID,
                                                  SVGExportContext* svgContext) {
   auto picture = pictureImage->picture;
   auto pictureBound = picture->getBounds();
@@ -1531,32 +1527,46 @@ void ElementWriter::addPictureImageMaskResources(const PictureImage* pictureImag
     {
       writer->startElement("rect");
       addRectAttributes(imageBound);
+      if (!matrix.isIdentity()) {
+        writer->addAttribute("transform", ToSVGTransform(matrix));
+      }
       writer->endElement();
     }
     writer->endElement();
   }
 
-  auto matrix = Matrix::I();
+  auto pictureMatrix = matrix;
   if (pictureImage->matrix) {
-    matrix = *pictureImage->matrix;
+    pictureMatrix.preConcat(*pictureImage->matrix);
   }
 
+  // Clip to the image extent before applying the filter so the mask covers the filter's entire
+  // output region. SVG applies filter before clip when both are on the same element, so the clip
+  // needs a nested group to enforce this order.
+  bool nestClip = !filterID.empty() && !clipID.empty();
   writer->startElement("g");
-  if (!clipID.empty()) {
-    writer->addAttribute("clip-path", "url(#" + clipID + ")");
-  }
   if (!filterID.empty()) {
     writer->addAttribute("filter", filterID);
   }
-  svgContext->drawPicture(picture, matrix, ClipStack());
+  if (nestClip) {
+    writer->startElement("g");
+  }
+  if (!clipID.empty()) {
+    writer->addAttribute("clip-path", "url(#" + clipID + ")");
+  }
+  svgContext->drawPicture(picture, pictureMatrix, ClipStack());
+  if (nestClip) {
+    writer->endElement();
+  }
   writer->endElement();
 }
 
 void ElementWriter::addRenderImageMaskResources(const ImageShader* imageShader,
-                                                const std::string& filterID, Context* context,
+                                                const Matrix& matrix, const std::string& filterID,
+                                                Context* context,
                                                 std::vector<PendingImage>* pendings) {
   Resources resources;
-  addImageShaderResources(imageShader, {}, context, &resources, pendings);
+  addImageShaderResources(imageShader, matrix, context, &resources, pendings);
 
   writer->startElement("rect");
   addAttribute("fill", resources.paintColor);

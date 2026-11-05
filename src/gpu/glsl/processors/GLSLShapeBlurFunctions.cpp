@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "layers/processors/GLSLShapeBlurFunctions.h"
+#include "GLSLShapeBlurFunctions.h"
 #include <algorithm>
 #include <string>
 
@@ -31,8 +31,9 @@ static constexpr int HIGH_QUADRATURE_COUNT = 8;
 // The corner semi-axis ratio above which the high count is used instead of the low one.
 static constexpr float SEMI_AXIS_RATIO_THRESHOLD = 2.0f;
 
-// Emits the kernel helpers shared by the rectangle and rounded-rect forms.
-static inline void AppendKernelFunctions(FragmentShaderBuilder* fragBuilder) {
+// Emits the kernel helpers shared by the rectangle and rounded-rect forms and returns the name of
+// the CDF function.
+static std::string AppendKernelFunctions(FragmentShaderBuilder* fragBuilder) {
   // Approximates erf with the rational form from Hastings (1955), published as Abramowitz & Stegun
   // formula 7.1.27 (p. 299).
   //   x       the argument
@@ -40,8 +41,10 @@ static inline void AppendKernelFunctions(FragmentShaderBuilder* fragBuilder) {
   //
   // Valid for 0 <= x < inf with a stated error bound of 5e-4. The sign is applied afterwards since
   // erf is odd.
+  auto erfName = fragBuilder->getMangledFunctionName("shapeBlurErf");
+  // clang-format off
   fragBuilder->addFunction(R"(
-highp float shapeBlurErf(highp float x) {
+highp float )" + erfName + R"((highp float x) {
   highp float ax = abs(x);
   highp float d = 1.0 + ax * (0.278393 + ax * (0.230389 + ax * (0.000972 + ax * 0.078108)));
   highp float d2 = d * d;
@@ -49,6 +52,7 @@ highp float shapeBlurErf(highp float x) {
   return x >= 0.0 ? positiveBranch : -positiveBranch;
 }
 )");
+  // clang-format on
 
   // Computes the CDF of the Gaussian truncated to +/- 2 and renormalized over that window.
   //   u       the sigma-normalized coordinate
@@ -59,21 +63,25 @@ highp float shapeBlurErf(highp float x) {
   // constants, written as literals in the code: 0.02275013 is Phi(-2), the tail mass cut off at
   // the left end, and 0.95449974 is Phi(2) - Phi(-2), the mass kept inside the window;
   // 0.70710678 is 1 / sqrt(2).
+  auto cdfName = fragBuilder->getMangledFunctionName("shapeBlurCDF");
+  // clang-format off
   fragBuilder->addFunction(R"(
-highp float shapeBlurCDF(highp float u) {
+highp float )" + cdfName + R"((highp float u) {
   if (u <= -2.0) {
     return 0.0;
   }
   if (u >= 2.0) {
     return 1.0;
   }
-  return (0.5 * (1.0 + shapeBlurErf(u * 0.70710678)) - 0.02275013) / 0.95449974;
+  return (0.5 * (1.0 + )" + erfName + R"((u * 0.70710678)) - 0.02275013) / 0.95449974;
 }
 )");
+  // clang-format on
+  return cdfName;
 }
 
-void AppendRectBlurFunctions(FragmentShaderBuilder* fragBuilder) {
-  AppendKernelFunctions(fragBuilder);
+std::string AppendRectBlurFunctions(FragmentShaderBuilder* fragBuilder) {
+  auto cdfName = AppendKernelFunctions(fragBuilder);
 
   // Computes the closed-form coverage of a rectangle.
   //   coord     the sigma-normalized point, relative to the rectangle center
@@ -85,13 +93,18 @@ void AppendRectBlurFunctions(FragmentShaderBuilder* fragBuilder) {
   //   C(p) = (CDF(px - x0) - CDF(px - x1)) * (CDF(py - y0) - CDF(py - y1))
   // The rectangle is centered at the origin, so x0 = -halfSize.x, x1 = +halfSize.x: the arguments
   // below are px - x0 = lo.x and px - x1 = hi.x, and likewise for y.
+  auto coverageName = fragBuilder->getMangledFunctionName("shapeBlurRectCoverage");
+  // clang-format off
   fragBuilder->addFunction(R"(
-highp float shapeBlurRectCoverage(highp vec2 coord, highp vec2 halfSize) {
+highp float )" + coverageName + R"((highp vec2 coord, highp vec2 halfSize) {
   highp vec2 lo = coord + halfSize;
   highp vec2 hi = coord - halfSize;
-  return (shapeBlurCDF(lo.x) - shapeBlurCDF(hi.x)) * (shapeBlurCDF(lo.y) - shapeBlurCDF(hi.y));
+  return ()" + cdfName + R"((lo.x) - )" + cdfName + R"((hi.x)) *
+         ()" + cdfName + R"((lo.y) - )" + cdfName + R"((hi.y));
 }
 )");
+  // clang-format on
+  return coverageName;
 }
 
 int GetRRectBlurQuadratureCount(const Point& cornerOverSigma) {
@@ -112,8 +125,8 @@ int GetRRectBlurQuadratureCount(const Point& cornerOverSigma) {
   return ratio > SEMI_AXIS_RATIO_THRESHOLD ? HIGH_QUADRATURE_COUNT : LOW_QUADRATURE_COUNT;
 }
 
-void AppendRRectBlurFunctions(FragmentShaderBuilder* fragBuilder, int quadratureCount) {
-  AppendKernelFunctions(fragBuilder);
+std::string AppendRRectBlurFunctions(FragmentShaderBuilder* fragBuilder, int quadratureCount) {
+  auto cdfName = AppendKernelFunctions(fragBuilder);
 
   // Computes the coverage at a point convolved along one axis alone, bounded by the shape's half
   // extent at that point's cross coordinate. "Along" names the axis being convolved and "cross" the
@@ -135,17 +148,20 @@ void AppendRRectBlurFunctions(FragmentShaderBuilder* fragBuilder, int quadrature
   // needs no branch: delta = 0 makes the sqrt term rc and w collapses to ha.
   //
   // Callers guarantee cornerAlong <= halfAlong and cornerCross <= halfCross.
+  auto sliceName = fragBuilder->getMangledFunctionName("shapeBlurSliceCoverage");
+  // clang-format off
   fragBuilder->addFunction(R"(
-highp float shapeBlurSliceCoverage(highp float alongCoord, highp float crossCoord,
+highp float )" + sliceName + R"((highp float alongCoord, highp float crossCoord,
                              highp float cornerAlong, highp float cornerCross,
                              highp float halfAlong, highp float halfCross) {
   highp float delta = min(halfCross - cornerCross - abs(crossCoord), 0.0);
   highp float ratio = cornerAlong / max(cornerCross, 1e-6);
   highp float curved = halfAlong - cornerAlong +
                        ratio * sqrt(max(0.0, cornerCross * cornerCross - delta * delta));
-  return shapeBlurCDF(alongCoord + curved) - shapeBlurCDF(alongCoord - curved);
+  return )" + cdfName + R"((alongCoord + curved) - )" + cdfName + R"((alongCoord - curved);
 }
 )");
+  // clang-format on
 
   // Computes the coverage of a rounded rectangle.
   //   coord     the sigma-normalized point, relative to the shape center
@@ -169,14 +185,15 @@ highp float shapeBlurSliceCoverage(highp float alongCoord, highp float crossCoor
   //
   // Coverage is always 1 inside the shape inset by the kernel support of 2, so the quadrature can
   // be skipped there. Subtracting the corner keeps this box test inside that inset shape.
-  auto quadrature = std::string(R"(
-highp float shapeBlurRRectCoverage(highp vec2 coord, highp vec2 halfSize, highp vec2 corner) {
+  auto coverageName = fragBuilder->getMangledFunctionName("shapeBlurRRectCoverage");
+  // clang-format off
+  auto quadrature = R"(
+highp float )" + coverageName + R"((highp vec2 coord, highp vec2 halfSize, highp vec2 corner) {
   if (all(lessThan(abs(coord), halfSize - (corner + vec2(2.0))))) {
     return 1.0;
   }
 
-  const int N = )") +
-                    std::to_string(quadratureCount) + R"(;
+  const int N = )" + std::to_string(quadratureCount) + R"(;
   highp float lo;
   highp float hi;
   bool swapAxes;
@@ -202,23 +219,25 @@ highp float shapeBlurRRectCoverage(highp vec2 coord, highp vec2 halfSize, highp 
     highp float weight = exp(-0.5 * s * s);
     highp float span;
     if (swapAxes) {
-      span = shapeBlurSliceCoverage(coord.y, coord.x - s, corner.y, corner.x, halfSize.y,
+      span = )" + sliceName + R"((coord.y, coord.x - s, corner.y, corner.x, halfSize.y,
                                     halfSize.x);
     } else {
-      span = shapeBlurSliceCoverage(coord.x, coord.y - s, corner.x, corner.y, halfSize.x,
+      span = )" + sliceName + R"((coord.x, coord.y - s, corner.x, corner.y, halfSize.x,
                                     halfSize.y);
     }
     accum += span * weight;
     weightSum += weight;
     s += step;
   }
-  return accum * (shapeBlurCDF(end) - shapeBlurCDF(start)) / weightSum;
+  return accum * ()" + cdfName + R"((end) - )" + cdfName + R"((start)) / weightSum;
 }
 )";
+  // clang-format on
   fragBuilder->addFunction(quadrature);
+  return coverageName;
 }
 
-void AppendRectMaskFunctions(FragmentShaderBuilder* fragBuilder) {
+ShapeMaskFunctionNames AppendRectMaskFunctions(FragmentShaderBuilder* fragBuilder) {
   // Returns the signed distance to a rectangle.
   //   p         the point in content pixels, relative to the rectangle center
   //   halfSize  the half size on x and y, in content pixels
@@ -226,25 +245,32 @@ void AppendRectMaskFunctions(FragmentShaderBuilder* fragBuilder) {
   //
   // The mask helpers work in content pixels rather than the sigma-normalized space the blur forms
   // above use.
+  auto sdfName = fragBuilder->getMangledFunctionName("shapeMaskRectSDF");
+  // clang-format off
   fragBuilder->addFunction(R"(
-highp float shapeMaskRectSDF(highp vec2 p, highp vec2 halfSize) {
+highp float )" + sdfName + R"((highp vec2 p, highp vec2 halfSize) {
   highp vec2 d = abs(p) - halfSize;
   return length(max(d, vec2(0.0))) + min(max(d.x, d.y), 0.0);
 }
 )");
+  // clang-format on
 
   // Converts a signed distance to coverage over a one pixel wide linear ramp.
   //   sdf     the signed distance in content pixels, positive outside the shape
   //   return  the coverage at that distance, in [0, 1]
+  auto coverageName = fragBuilder->getMangledFunctionName("shapeMaskCoverage");
+  // clang-format off
   fragBuilder->addFunction(R"(
-highp float shapeMaskCoverage(highp float sdf) {
+highp float )" + coverageName + R"((highp float sdf) {
   return clamp(0.5 - sdf, 0.0, 1.0);
 }
 )");
+  // clang-format on
+  return {sdfName, coverageName};
 }
 
-void AppendRRectMaskFunctions(FragmentShaderBuilder* fragBuilder) {
-  AppendRectMaskFunctions(fragBuilder);
+ShapeMaskFunctionNames AppendRRectMaskFunctions(FragmentShaderBuilder* fragBuilder) {
+  auto rectNames = AppendRectMaskFunctions(fragBuilder);
 
   // Returns the signed distance to a rounded rectangle.
   //   p         the point in content pixels, relative to the shape center
@@ -259,13 +285,15 @@ void AppendRRectMaskFunctions(FragmentShaderBuilder* fragBuilder) {
   //
   // The radii are clamped so a radius larger than the shape degenerates to a stadium rather than
   // inverting the inner rectangle, and kept away from zero so the division stays finite.
+  auto sdfName = fragBuilder->getMangledFunctionName("shapeMaskRRectSDF");
+  // clang-format off
   fragBuilder->addFunction(R"(
-highp float shapeMaskRRectSDF(highp vec2 p, highp vec2 halfSize, highp vec2 corner) {
+highp float )" + sdfName + R"((highp vec2 p, highp vec2 halfSize, highp vec2 corner) {
   highp vec2 r = max(min(corner, halfSize), vec2(1e-6));
   highp vec2 inner = halfSize - r;
   highp vec2 d = abs(p) - inner;
   if (d.x <= 0.0 || d.y <= 0.0) {
-    return shapeMaskRectSDF(p, halfSize);
+    return )" + rectNames.sdf + R"((p, halfSize);
   }
   highp vec2 offset = d / r;
   highp float test = dot(offset, offset) - 1.0;
@@ -273,6 +301,8 @@ highp float shapeMaskRRectSDF(highp vec2 p, highp vec2 halfSize, highp vec2 corn
   return test / max(length(grad), 1e-20);
 }
 )");
+  // clang-format on
+  return {sdfName, rectNames.coverage};
 }
 
 }  // namespace tgfx

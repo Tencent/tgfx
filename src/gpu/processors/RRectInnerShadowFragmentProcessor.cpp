@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "layers/processors/RRectInnerShadowFragmentProcessor.h"
+#include "gpu/processors/RRectInnerShadowFragmentProcessor.h"
 
 namespace tgfx {
 

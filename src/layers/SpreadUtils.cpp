@@ -18,7 +18,6 @@
 
 #include "layers/SpreadUtils.h"
 #include <algorithm>
-#include "core/shapes/MatrixShape.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/PictureUtils.h"
@@ -45,16 +44,6 @@ float SpreadUtils::StrokeOutset(float width, StrokeAlign align) {
       return 0.0f;
   }
   return 0.0f;
-}
-
-std::pair<std::shared_ptr<Shape>, Matrix> SpreadUtils::UnwrapMatrixShape(
-    std::shared_ptr<Shape> shape) {
-  auto matrix = Matrix::I();
-  while (auto* ms = ShapeUtils::AsMatrixShape(shape.get())) {
-    matrix.preConcat(ms->matrix);
-    shape = ms->shape;
-  }
-  return {std::move(shape), matrix};
 }
 
 RRect SpreadUtils::MakeSpreadRRect(const RRect& rRect, Point distance) {
@@ -194,7 +183,7 @@ SpreadUtils::SpreadResult SpreadUtils::MakeSpreadShapeImage(const LayerStyleInpu
   if (!contentBounds.contains(shapeBounds)) {
     return {nullptr, {}, false};
   }
-  auto [shape, shapeMatrix] = UnwrapMatrixShape(styledShape.shape);
+  auto [shape, shapeMatrix] = ShapeUtils::UnwrapMatrixShape(styledShape.shape);
   DEBUG_ASSERT(shape != nullptr);
   if (shape == nullptr) {
     return {nullptr, {}, false};

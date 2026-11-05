@@ -16,13 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "layers/shaders/RRectBlurShader.h"
+#include "core/shaders/RRectBlurShader.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/Types.h"
-#include "layers/processors/RRectBlurFragmentProcessor.h"
-#include "layers/processors/RectBlurFragmentProcessor.h"
+#include "gpu/processors/RRectBlurFragmentProcessor.h"
+#include "gpu/processors/RectBlurFragmentProcessor.h"
 
 namespace tgfx {
 

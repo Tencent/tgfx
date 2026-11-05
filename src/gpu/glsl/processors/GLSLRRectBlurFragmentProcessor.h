@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "layers/processors/RRectBlurFragmentProcessor.h"
+#include "gpu/processors/RRectBlurFragmentProcessor.h"
 
 namespace tgfx {
 class GLSLRRectBlurFragmentProcessor : public RRectBlurFragmentProcessor {

@@ -19,7 +19,6 @@
 #pragma once
 
 #include <memory>
-#include <utility>
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
@@ -48,13 +47,6 @@ class SpreadUtils {
    * Returns the outward expansion distance from the path boundary caused by the stroke.
    */
   static float StrokeOutset(float width, StrokeAlign align);
-
-  /**
-   * Peels off the nested MatrixShape wrappers from a shape, returning the innermost unwrapped shape
-   * together with the accumulated matrix. The returned matrix maps the returned shape's local
-   * space to the space where the passed-in shape is used.
-   */
-  static std::pair<std::shared_ptr<Shape>, Matrix> UnwrapMatrixShape(std::shared_ptr<Shape> shape);
 
   /**
    * Applies spread to a rounded rectangle: the bounds are outset per axis by the given amount,
