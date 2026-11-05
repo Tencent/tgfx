@@ -34,6 +34,7 @@
 extern char** environ;
 #endif
 #include <shaderc/shaderc.hpp>
+#include <spirv_hlsl.hpp>
 #include <spirv_msl.hpp>
 #include <spirv_parser.hpp>
 #include "gpu/shaders/contract/ShaderBundleContract.h"
@@ -168,6 +169,72 @@ std::string TranslateToMSL(const std::vector<uint32_t>& spirv, ShaderStageType s
 
   } catch (const spirv_cross::CompilerError& e) {
     *error = std::string("spirv-cross MSL error: ") + e.what();
+  } catch (const std::exception& e) {
+    *error = std::string("spirv-cross exception: ") + e.what();
+  }
+  return {};
+}
+
+std::string TranslateToHLSL(const std::vector<uint32_t>& spirv, ShaderStageType stage,
+                            std::string* error) {
+  // Same exception boundary as TranslateToMSL: spirv-cross reports through exceptions internally
+  // and tgfx code does not use them.
+  try {
+    spirv_cross::Parser parser(spirv);
+    parser.parse();
+    spirv_cross::CompilerHLSL hlslCompiler(std::move(parser.get_parsed_ir()));
+
+    spirv_cross::CompilerHLSL::Options hlslOptions;
+    // Shader model 5.0 is what D3D12ShaderModule asks D3DCompile for (vs_5_0 / ps_5_0), and the
+    // highest model that still produces DXBC. SM 5.1+ would need DXIL.
+    hlslOptions.shader_model = 50;
+    hlslCompiler.set_hlsl_options(hlslOptions);
+
+    auto commonOptions = hlslCompiler.get_common_options();
+    // The templates are Vulkan GLSL, whose clip space has +y pointing down. Direct3D, like Metal,
+    // has +y pointing up, so the emitted vertex shader must negate it. The other backends keep the
+    // axis untouched, which is why this lives here and not in the shared sources.
+    commonOptions.vertex.flip_vert_y = true;
+    hlslCompiler.set_common_options(commonOptions);
+
+    auto executionModel = (stage == ShaderStageType::Vertex) ? spv::ExecutionModelVertex
+                                                             : spv::ExecutionModelFragment;
+
+    // Pin every register explicitly instead of letting spirv-cross assign them. The D3D12 root
+    // signature is built from the same logical bindings (see D3D12RenderPipeline.h), so an
+    // automatic assignment that happened to disagree would produce a pipeline whose CBV and
+    // descriptor-table registers do not match the bytecode.
+    auto resources = hlslCompiler.get_shader_resources();
+    for (auto& ubo : resources.uniform_buffers) {
+      uint32_t spvBinding = hlslCompiler.get_decoration(ubo.id, spv::DecorationBinding);
+      uint32_t spvDescSet = hlslCompiler.get_decoration(ubo.id, spv::DecorationDescriptorSet);
+      spirv_cross::HLSLResourceBinding binding = {};
+      binding.stage = executionModel;
+      binding.desc_set = spvDescSet;
+      binding.binding = spvBinding;
+      binding.cbv.register_binding = spvBinding;
+      hlslCompiler.add_hlsl_resource_binding(binding);
+    }
+
+    for (auto& image : resources.sampled_images) {
+      uint32_t spvBinding = hlslCompiler.get_decoration(image.id, spv::DecorationBinding);
+      uint32_t spvDescSet = hlslCompiler.get_decoration(image.id, spv::DecorationDescriptorSet);
+      spirv_cross::HLSLResourceBinding binding = {};
+      binding.stage = executionModel;
+      binding.desc_set = spvDescSet;
+      binding.binding = spvBinding;
+      // A combined image sampler becomes Texture2D at register(t{i}) plus a SamplerState at
+      // register(s{i}). Both are pinned so the pipeline's separate SRV and Sampler descriptor
+      // tables address the same index, which is what SamplerBinding(D3D12, i) == {i, i} states.
+      binding.srv.register_binding = spvBinding;
+      binding.sampler.register_binding = spvBinding;
+      hlslCompiler.add_hlsl_resource_binding(binding);
+    }
+
+    return hlslCompiler.compile();
+
+  } catch (const spirv_cross::CompilerError& e) {
+    *error = std::string("spirv-cross HLSL error: ") + e.what();
   } catch (const std::exception& e) {
     *error = std::string("spirv-cross exception: ") + e.what();
   }

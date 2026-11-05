@@ -28,7 +28,9 @@ namespace tgfx {
 /// binding decorations, and both are checked against ShaderBindingLayout.h — the same values
 /// the runtime's three-set pipeline layout is built from. A mismatch is what the layout drift
 /// of the pre-contract era was: the runtime binds a group the shader never declared, and every
-/// draw of that variant fails at load.
+/// draw of that variant fails at load. The HLSL of the D3D12 variants is scanned for its
+/// register(bN)/register(tN)/register(sN) qualifiers, checked against the same binding points the
+/// D3D12 root signature builds its CBV and descriptor tables from.
 class BindingLayoutRule : public ArtifactRule {
  public:
   size_t check(const ArtifactRuleContext& context, Diagnostics* diagnostics) const override;

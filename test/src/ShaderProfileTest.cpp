@@ -35,6 +35,7 @@ TGFX_TEST(ShaderProfileTest, TagsAreStable) {
   EXPECT_STREQ(ProfileTag(ShaderProfile::Vulkan), "vulkan");
   EXPECT_STREQ(ProfileTag(ShaderProfile::Metal), "metal");
   EXPECT_STREQ(ProfileTag(ShaderProfile::WebGPU), "webgpu");
+  EXPECT_STREQ(ProfileTag(ShaderProfile::D3D12), "d3d12");
 }
 
 TGFX_TEST(ShaderProfileTest, ParseRoundTripsEveryProfile) {
@@ -45,7 +46,7 @@ TGFX_TEST(ShaderProfileTest, ParseRoundTripsEveryProfile) {
     EXPECT_EQ(*parsed, profile);
     count++;
   }
-  EXPECT_EQ(count, 5u);
+  EXPECT_EQ(count, 6u);
 }
 
 TGFX_TEST(ShaderProfileTest, ParseRejectsUnknownTags) {
@@ -53,7 +54,7 @@ TGFX_TEST(ShaderProfileTest, ParseRejectsUnknownTags) {
   EXPECT_FALSE(ParseProfileTag("OpenGL").has_value());
   EXPECT_FALSE(ParseProfileTag("opengl ").has_value());
   EXPECT_FALSE(ParseProfileTag("vulkan-android").has_value());
-  EXPECT_FALSE(ParseProfileTag("d3d12").has_value());
+  EXPECT_FALSE(ParseProfileTag("dx12").has_value());
 }
 
 TGFX_TEST(ShaderProfileTest, FramebufferFetchSupport) {
@@ -62,6 +63,7 @@ TGFX_TEST(ShaderProfileTest, FramebufferFetchSupport) {
   EXPECT_FALSE(ProfileSupportsFramebufferFetch(ShaderProfile::OpenGL));
   EXPECT_FALSE(ProfileSupportsFramebufferFetch(ShaderProfile::Vulkan));
   EXPECT_FALSE(ProfileSupportsFramebufferFetch(ShaderProfile::WebGPU));
+  EXPECT_FALSE(ProfileSupportsFramebufferFetch(ShaderProfile::D3D12));
 }
 
 TGFX_TEST(ShaderProfileTest, FramebufferFetchVariantsFollowTheProfileRule) {

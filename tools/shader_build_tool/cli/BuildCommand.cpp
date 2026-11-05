@@ -58,7 +58,7 @@ void PrintUsage() {
       << "  --shader-dir <path>   Directory containing shader sources\n"
       << "  --out-dir <path>      Output directory for build artifacts\n"
       << "  --backends <list>     Comma-separated backend list "
-         "(opengl,opengles,vulkan,metal,webgpu)\n"
+         "(opengl,opengles,vulkan,metal,webgpu,d3d12)\n"
 
       << "  --stage-report <path> Write the per-stage audit report (requires a full compile)\n"
       << "  --dump-stages <dir>  Write the per-variant stage dump (code hashes, reflection, and\n"

@@ -277,6 +277,64 @@ size_t CheckVulkanVariant(const VariantData& variant, Diagnostics* diagnostics) 
   return errors;
 }
 
+// The register numbers a HLSL blob declares: one entry per register(prefixN) qualifier. The
+// translator pins them (see TranslateToHLSL), and the root signature is built from the same
+// logical bindings, so a disagreement makes the pipeline bind a slot the bytecode never reads.
+struct HlslRegisters {
+  std::set<int> cbuffers;  // register(bN)
+  std::set<int> textures;  // register(tN)
+  std::set<int> samplers;  // register(sN)
+};
+
+HlslRegisters ScanHlslRegisters(const std::vector<uint8_t>& blob) {
+  std::string text(blob.begin(), blob.end());
+  HlslRegisters registers;
+  std::smatch match;
+  auto scan = [&](const std::string& pattern, std::set<int>* out) {
+    std::regex regex(pattern);
+    std::string::const_iterator searchStart(text.cbegin());
+    while (std::regex_search(searchStart, text.cend(), match, regex)) {
+      out->insert(std::stoi(match[1].str()));
+      searchStart = match.suffix().first;
+    }
+  };
+  scan(R"(register\s*\(\s*b(\d+)\s*\))", &registers.cbuffers);
+  scan(R"(register\s*\(\s*t(\d+)\s*\))", &registers.textures);
+  scan(R"(register\s*\(\s*s(\d+)\s*\))", &registers.samplers);
+  return registers;
+}
+
+size_t CheckD3D12Variant(const VariantData& variant, Diagnostics* diagnostics) {
+  size_t errors = 0;
+  auto checkStage = [&](const std::vector<uint8_t>& blob, const char* stage, int expectedCbuffer) {
+    auto registers = ScanHlslRegisters(blob);
+    for (auto cbuffer : registers.cbuffers) {
+      if (cbuffer != expectedCbuffer) {
+        Report(diagnostics, Severity::Error, DiagnosticCode::VerifyBindingLayout, variant,
+               std::string(stage) + " uniform block bound to register(b" +
+                   std::to_string(cbuffer) + "), expected register(b" +
+                   std::to_string(expectedCbuffer) +
+                   "); the root signature builds its CBV from that binding point");
+        errors++;
+      }
+    }
+    // A combined image sampler expands to Texture2D at t{i} plus a SamplerState at s{i}. If the
+    // sampler register did not follow the texture one, the pipeline's SRV and Sampler descriptor
+    // tables would address different indices for the same binding.
+    for (auto texture : registers.textures) {
+      if (registers.samplers.count(texture) == 0) {
+        Report(diagnostics, Severity::Error, DiagnosticCode::VerifyBindingLayout, variant,
+               std::string(stage) + " texture register(t" + std::to_string(texture) +
+                   ") has no matching register(s" + std::to_string(texture) + ")");
+        errors++;
+      }
+    }
+  };
+  checkStage(variant.vertexBlob, "vertex", VERTEX_UBO_BINDING_POINT);
+  checkStage(variant.fragmentBlob, "fragment", FRAGMENT_UBO_BINDING_POINT);
+  return errors;
+}
+
 }  // namespace
 
 size_t BindingLayoutRule::check(const ArtifactRuleContext& context,
@@ -291,6 +349,8 @@ size_t BindingLayoutRule::check(const ArtifactRuleContext& context,
       violations += CheckWebgpuVariant(variant, diagnostics);
     } else if (*profile == ShaderProfile::Vulkan) {
       violations += CheckVulkanVariant(variant, diagnostics);
+    } else if (*profile == ShaderProfile::D3D12) {
+      violations += CheckD3D12Variant(variant, diagnostics);
     }
     // The GL and GLES storage carries no set or binding (the emitters strip the qualifiers and
     // the form check rejects any survivor), and MSL carries only the binding numbers — the

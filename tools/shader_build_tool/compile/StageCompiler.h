@@ -71,6 +71,14 @@ std::vector<uint32_t> CompileGLSL(const std::string& source, ShaderStageType sta
 std::string TranslateToMSL(const std::vector<uint32_t>& spirv, ShaderStageType stage,
                            std::string* error);
 
+/// Translates SPIR-V binary to Direct3D HLSL (shader model 5.0) via spirv-cross. The result keeps
+/// the tgfx binding contract the D3D12 backend expects: each uniform block binds register(bN) with
+/// N equal to its logical binding point, and each combined sampler i binds register(t{i}) with
+/// register(s{i}) pinned to the same index. The clip-space y axis is flipped, as Direct3D and
+/// Metal need.
+std::string TranslateToHLSL(const std::vector<uint32_t>& spirv, ShaderStageType stage,
+                            std::string* error);
+
 /// Converts #define-expanded template GLSL to WGSL: preprocess into Vulkan GLSL with
 /// separated texture/sampler bindings, compile to SPIR-V via shaderc, then translate to
 /// WGSL via tint. Binding contract (must match WebGPURenderPipeline and the runtime JIT
@@ -119,6 +127,10 @@ class StageCompiler {
   /// run exactly like the compiles above.
   const TextStage& translateMSL(const std::vector<uint32_t>& spirv, ShaderStageType stage);
 
+  /// Translates SPIR-V to HLSL, reusing a previous translation of the same module under the same
+  /// sharing rule as translateMSL.
+  const TextStage& translateHLSL(const std::vector<uint32_t>& spirv, ShaderStageType stage);
+
   /// Extracts the reflection of one variant, shared across backend passes like the compiles
   /// above: the same (family, vert, frag) reflects the same two SPIR-V modules every time.
   const ReflectionResult& extractReflection(const std::string& shaderName, uint32_t vertIndex,
@@ -139,6 +151,7 @@ class StageCompiler {
   std::map<std::string, BlobStage> blobCache;
   std::map<std::string, TextStage> wgslCache;
   std::map<std::string, TextStage> mslCache;
+  std::map<std::string, TextStage> hlslCache;
   std::map<std::tuple<std::string, uint32_t, uint32_t>, ReflectionResult> reflectionCache;
 };
 

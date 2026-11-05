@@ -59,12 +59,16 @@ namespace tgfx {
 //
 // The tag strings are stored in every bundle header and are part of every stage key hash, so
 // they are fixed forever. ShaderProfileTest pins them.
-enum class ShaderProfile { OpenGL, OpenGLES, Vulkan, Metal, WebGPU };
+// D3D12 carries the Direct3D 5.0 shader model payload, as HLSL text or precompiled DXBC bytecode.
+// The D3D11 backend consumes the same bundle when it is added: both API levels share the SM 5.0
+// register model (b/t/s), and their binding differences live in the pipeline layer, not the
+// shader, so one profile serves both rather than one profile per API.
+enum class ShaderProfile { OpenGL, OpenGLES, Vulkan, Metal, WebGPU, D3D12 };
 
 /// Every profile, in the order the tool reports them.
 inline constexpr ShaderProfile AllShaderProfiles[] = {
     ShaderProfile::OpenGL, ShaderProfile::OpenGLES, ShaderProfile::Vulkan, ShaderProfile::Metal,
-    ShaderProfile::WebGPU};
+    ShaderProfile::WebGPU, ShaderProfile::D3D12};
 
 /**
  * Returns the tag of the profile: the text stored in the bundle header and used for the bundle
@@ -83,6 +87,8 @@ inline const char* ProfileTag(ShaderProfile profile) {
       return "metal";
     case ShaderProfile::WebGPU:
       return "webgpu";
+    case ShaderProfile::D3D12:
+      return "d3d12";
   }
   return "";
 }
@@ -122,11 +128,13 @@ inline ShaderProfile RequiredProfile(ShaderProfile backendProfile, bool esProfil
  *
  * Metal reads the destination through the subpassInput to [[color(0)]] translation. OpenGLES uses
  * the GL_EXT_shader_framebuffer_fetch dialect. WGSL cannot express the fetch at all. Desktop
- * OpenGL has no such path. The Vulkan backend never wires the chain: ShaderCaps leaves
- * frameBufferFetchSupport false there and the render pass has no input attachment binding, so a
- * draw always resolves a dst texture. The Vulkan variants are excluded, not deleted: the GLSL
- * sources and the matcher rules keep enumerating them, so supporting the fetch on Vulkan later
- * needs the caps flag, the render pass wiring and this function returning true.
+ * OpenGL has no such path. D3D12 has no such path either: SM 5.0 can only write SV_Target, never
+ * read it, so its bundle excludes the fetch variants the same way. The Vulkan backend never wires
+ * the chain: ShaderCaps leaves frameBufferFetchSupport false there and the render pass has no
+ * input attachment binding, so a draw always resolves a dst texture. The Vulkan variants are
+ * excluded, not deleted: the GLSL sources and the matcher rules keep enumerating them, so
+ * supporting the fetch on Vulkan later needs the caps flag, the render pass wiring and this
+ * function returning true.
  */
 inline bool ProfileSupportsFramebufferFetch(ShaderProfile profile) {
   switch (profile) {
@@ -136,6 +144,7 @@ inline bool ProfileSupportsFramebufferFetch(ShaderProfile profile) {
     case ShaderProfile::OpenGL:
     case ShaderProfile::Vulkan:
     case ShaderProfile::WebGPU:
+    case ShaderProfile::D3D12:
       return false;
   }
   return false;
@@ -282,7 +291,8 @@ inline constexpr int WEBGPU_TEXTURE_BINDING_START = 0;
 /// The bindings of the separated texture/sampler pair i of one profile's texture set. WebGPU
 /// packs the pairs interleaved from WEBGPU_TEXTURE_BINDING_START; the combined-sampler profiles
 /// (GLSL, Vulkan SPIR-V, MSL) keep the template's declaration-order bindings, which reflection
-/// reports dense from zero.
+/// reports dense from zero. HLSL joins them as register(t{i}) / register(s{i}) on the D3D12 root
+/// signature, so the joined numbers are what the pipeline lays out.
 inline std::pair<int, int> SamplerBinding(ShaderProfile profile, int i) {
   switch (profile) {
     case ShaderProfile::WebGPU:
@@ -291,6 +301,7 @@ inline std::pair<int, int> SamplerBinding(ShaderProfile profile, int i) {
     case ShaderProfile::OpenGLES:
     case ShaderProfile::Vulkan:
     case ShaderProfile::Metal:
+    case ShaderProfile::D3D12:
       return {i, i};
   }
   return {i, i};

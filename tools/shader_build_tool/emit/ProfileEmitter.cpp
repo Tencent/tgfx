@@ -145,6 +145,32 @@ class WebGPUEmitter : public ProfileEmitter {
   }
 };
 
+// The D3D12 storage: HLSL translated from the same unoptimized SPIR-V Metal consumes, kept as text
+// for D3DCompile to compile at module creation time. The registers are pinned by TranslateToHLSL to
+// the logical binding points the root signature builder derives from the same layout.
+class D3D12Emitter : public ProfileEmitter {
+ public:
+  ShaderProfile profile() const override {
+    return ShaderProfile::D3D12;
+  }
+
+  std::optional<EmittedStages> emit(const EmitInput& input, StageCompiler* compiler) override {
+    const auto& hlslVert = compiler->translateHLSL(*input.vertSpirv, ShaderStageType::Vertex);
+    const auto& hlslFrag =
+        compiler->translateHLSL(input.fragStage->spirv, ShaderStageType::Fragment);
+    if (!hlslVert.success || !hlslFrag.success) {
+      ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
+                    "HLSL translation error: " +
+                        (!hlslVert.success ? hlslVert.error : hlslFrag.error));
+      return std::nullopt;
+    }
+    EmittedStages stages;
+    stages.vertexBlob.assign(hlslVert.text.begin(), hlslVert.text.end());
+    stages.fragmentBlob.assign(hlslFrag.text.begin(), hlslFrag.text.end());
+    return stages;
+  }
+};
+
 // The GL and GLES storage: the template's own dialect spelling (GLSL 330 / ES 300) instead of
 // text regenerated from SPIR-V, checked against its dialect's form contract before it is kept.
 class DirectGLSLEmitter : public ProfileEmitter {
@@ -244,6 +270,8 @@ std::unique_ptr<ProfileEmitter> MakeProfileEmitter(ShaderProfile profile) {
       return std::make_unique<DirectGLSLEmitter>(false);
     case ShaderProfile::OpenGLES:
       return std::make_unique<DirectGLSLEmitter>(true);
+    case ShaderProfile::D3D12:
+      return std::make_unique<D3D12Emitter>();
   }
   return nullptr;
 }

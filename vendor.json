@@ -298,7 +298,8 @@
         "targets": [
           "spirv-cross-core",
           "spirv-cross-glsl",
-          "spirv-cross-msl"
+          "spirv-cross-msl",
+          "spirv-cross-hlsl"
         ],
         "arguments": [
           "-DSPIRV_CROSS_ENABLE_TESTS=OFF",
@@ -316,7 +317,8 @@
         "targets": [
           "spirv-cross-core",
           "spirv-cross-glsl",
-          "spirv-cross-msl"
+          "spirv-cross-msl",
+          "spirv-cross-hlsl"
         ],
         "arguments": [
           "-DSPIRV_CROSS_ENABLE_TESTS=OFF",
@@ -349,7 +351,8 @@
       "cmake": {
         "targets": [
           "spirv-cross-core",
-          "spirv-cross-glsl"
+          "spirv-cross-glsl",
+          "spirv-cross-hlsl"
         ],
         "arguments": [
           "-DSPIRV_CROSS_ENABLE_TESTS=OFF",
@@ -382,7 +385,8 @@
       "cmake": {
         "targets": [
           "spirv-cross-core",
-          "spirv-cross-glsl"
+          "spirv-cross-glsl",
+          "spirv-cross-hlsl"
         ],
         "arguments": [
           "-DSPIRV_CROSS_ENABLE_TESTS=OFF",

@@ -156,6 +156,23 @@ const TextStage& StageCompiler::translateMSL(const std::vector<uint32_t>& spirv,
   return it->second;
 }
 
+const TextStage& StageCompiler::translateHLSL(const std::vector<uint32_t>& spirv,
+                                              ShaderStageType stage) {
+  // Same key shape as translateMSL: the translation input is the whole module plus the stage, and
+  // the HLSL options are fixed process-wide.
+  std::string key = "hlsl:";
+  key += static_cast<char>(stage);
+  key.append(reinterpret_cast<const char*>(spirv.data()), spirv.size() * sizeof(uint32_t));
+  auto it = hlslCache.find(key);
+  if (it == hlslCache.end()) {
+    TextStage entry = {};
+    entry.text = TranslateToHLSL(spirv, stage, &entry.error);
+    entry.success = !entry.text.empty();
+    it = hlslCache.emplace(std::move(key), std::move(entry)).first;
+  }
+  return it->second;
+}
+
 const ReflectionResult& StageCompiler::extractReflection(const std::string& shaderName,
                                                          uint32_t vertIndex, uint32_t fragIndex,
                                                          const std::vector<uint32_t>& vertSpirv,
