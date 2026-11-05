@@ -73,14 +73,15 @@ void MeshLayer::onUpdateContent(LayerRecorder* recorder) {
 
   if (_fillStyles.empty()) {
     // Render with vertex colors only (use white as base color)
-    recorder->addMesh(_mesh, LayerPaint(Color::White()));
+    LayerPaint paint = LayerPaint(Color::White());
+    recorder->addMesh(_mesh, &paint);
   } else {
     // Note: If the mesh has vertex colors, they take priority over fillStyle colors.
     // The fillStyle shader (if any) will be modulated with vertex colors.
     for (const auto& style : _fillStyles) {
       LayerPaint paint(style->color(), style->blendMode());
       paint.shader = style->shader();
-      recorder->addMesh(_mesh, paint);
+      recorder->addMesh(_mesh, &paint);
     }
   }
 }

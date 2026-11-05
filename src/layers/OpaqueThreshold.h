@@ -19,5 +19,8 @@
 #pragma once
 
 namespace tgfx {
+/**
+ * Sampled color alpha at or above this becomes fully opaque. Geometric coverage has its own rule.
+ */
 static constexpr float OPAQUE_THRESHOLD = 1.0f / 256.0f;
 }  // namespace tgfx

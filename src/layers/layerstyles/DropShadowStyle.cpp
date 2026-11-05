@@ -181,7 +181,7 @@ void DropShadowStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float
   if (!filter) {
     return;
   }
-  std::shared_ptr<Image> filterSource = input.content;
+  std::shared_ptr<Image> filterSource = input.content->image();
   Point filterSourceOffset = {};
   if (!FloatNearlyZero(_spread)) {
     // contentShape covers only the layer's own content, not its children: a shadow derived from it

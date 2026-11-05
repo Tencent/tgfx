@@ -35,6 +35,21 @@ class Baseline {
 
   static bool Compare(std::shared_ptr<Data> data, const std::string& key);
 
+  /**
+   * Checks a reference without modifying caches. A key missing from an available cache is treated as
+   * a newly added test and passes, allowing a mismatch only between two known versions, while a
+   * missing baseline or an unavailable cache fails.
+   */
+  static bool CompareReference(const std::string& md5, const std::string& baselineVersion,
+                               const std::string& cacheVersion, const std::string& cacheMD5,
+                               bool cacheAvailable);
+
+  /**
+   * Reports how many comparisons failed because the reference cache is missing. Call it after all
+   * tests have run so that the hint survives the failure listing printed by the test runner.
+   */
+  static void ReportMissingCache();
+
  private:
   static void SetUp();
 

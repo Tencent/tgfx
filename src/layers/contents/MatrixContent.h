@@ -30,14 +30,14 @@ class MatrixContent : public GeometryContent {
  public:
   MatrixContent(std::unique_ptr<GeometryContent> content, const Matrix& matrix);
 
-  Rect getBounds() const override;
-  Rect getTightBounds(const Matrix& matrix) const override;
-  bool hitTestPoint(float localX, float localY) const override;
+  Rect getBounds(bool includeUnpaintedGeometry) const override;
+  Rect getTightBounds(const Matrix& matrix, bool includeUnpaintedGeometry) const override;
+  bool hitTestPoint(float localX, float localY, bool includeUnpaintedGeometry) const override;
   bool drawDefault(Canvas* canvas, float alpha, bool antiAlias) const override;
   void drawForeground(Canvas* canvas, float alpha, bool antiAlias) const override;
-  void drawContour(Canvas* canvas, bool antiAlias) const override;
-  bool contourEqualsOpaqueContent() const override;
+  bool contourEqualsOpaqueContent(bool includeUnpaintedGeometry) const override;
   bool hasBlendMode() const override;
+  bool hasPaint() const override;
   bool hasSameGeometry(const GeometryContent* other) const override;
   const std::shared_ptr<Shader>& getShader() const override;
 
@@ -45,6 +45,9 @@ class MatrixContent : public GeometryContent {
   Matrix matrix = Matrix::I();
 
  protected:
+  void drawContourInternal(Canvas* canvas, bool antiAlias,
+                           bool includeUnpaintedGeometry) const override;
+
   Type type() const override {
     return Type::Matrix;
   }

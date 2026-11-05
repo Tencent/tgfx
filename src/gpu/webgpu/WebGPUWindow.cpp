@@ -84,6 +84,12 @@ std::shared_ptr<WebGPUWindow> WebGPUWindow::MakeFrom(emscripten::val canvas,
     LOGE("WebGPUWindow::MakeFrom The JS binding does not export createWebGPUSurface.");
     return nullptr;
   }
+  if (!HasWebJSBinding("presentCanvasFrame")) {
+    // Rendering still works; only a thread that runs no frame loop would never present.
+    LOGE(
+        "WebGPUWindow::MakeFrom The JS binding does not export presentCanvasFrame, frames of this "
+        "window are presented only by the browser.");
+  }
   return MakeFromCanvas(std::move(canvas), "", std::move(device), std::move(colorSpace));
 }
 
@@ -260,8 +266,9 @@ std::shared_ptr<RenderTargetProxy> WebGPUWindow::onCreateRenderTarget(Context* c
   }
 
   auto wgpuSurface = static_cast<WGPUSurface>(_surface);
-  return std::make_shared<WebGPUDrawableProxy>(
-      context, _width, _height, wgpuSurface, WGPUTextureFormat_BGRA8Unorm, PixelFormat::BGRA_8888);
+  return std::make_shared<WebGPUDrawableProxy>(context, _width, _height, wgpuSurface,
+                                               WGPUTextureFormat_BGRA8Unorm, PixelFormat::BGRA_8888,
+                                               SupportsCanvasPresent());
 }
 
 }  // namespace tgfx

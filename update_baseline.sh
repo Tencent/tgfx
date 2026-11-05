@@ -2,7 +2,8 @@
 
 # Update local baseline cache from remote changes.
 # Run this after pulling main branch that contains baseline changes from others.
-# Without updating the cache, affected tests will be skipped, leading to inaccurate results.
+# Without the cache, screenshot tests fail because a missing reference is reported as a failure
+# instead of a silent pass. Run this script before the tests to create the cache.
 #
 # Usage:
 #   ./update_baseline.sh [<BACKEND>] [--skip-images]
@@ -20,7 +21,7 @@
 #   --skip-images   Skip writing baseline `_base.webp` images. The cache
 #                   (md5.json + version.json) is still refreshed, which is
 #                   all the CI pipelines need. Local runs omit this to also
-#                   produce baseline-out/ images for visual inspection.
+#                   produce test/out/ images for visual inspection.
 
 {
   # Parse arguments: separate the backend keyword from the --skip-images flag so callers may
@@ -111,7 +112,7 @@
       TARGET_SUFFIX="OpenGL" ;;
   esac
 
-  # Default to generating baseline images so local users get baseline-out/ for inspection.
+  # Default to generating baseline images so local users get test/out/ for inspection.
   # CI pipelines pass --skip-images because they only need the cache (md5.json + version.json).
   SKIP_IMAGES_FLAG=""
   if [ "$SKIP_IMAGES" = "1" ]; then
@@ -158,8 +159,8 @@
 
   if [ "$COMPLIE_RESULT" == false ]; then
     mkdir -p result
-    # Copy test output for CI diagnostic upload (if it exists).
-    # UpdateBaseline may not produce test/out/ — it writes to .cache/ instead.
+    # Copy test output for CI diagnostic upload (if it exists). Runs with --skip-images
+    # generate no images, and failed runs remove test/out/ in TearDown, so it may be absent.
     if [ -d test/out ]; then
       cp -r test/out result
     fi

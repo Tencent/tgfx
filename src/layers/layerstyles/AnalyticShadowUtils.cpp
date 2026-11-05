@@ -59,10 +59,10 @@ std::optional<RRect> AnalyticShadowUtils::MakeShadowShape(const LayerStyleInput&
     return std::nullopt;
   }
   auto* contour = static_cast<const ContourInputSource*>(source);
-  if (!contour->shape().has_value()) {
+  if (!contour->contentShape().has_value()) {
     return std::nullopt;
   }
-  auto& styledShape = *contour->shape();
+  auto& styledShape = *contour->contentShape();
   if (styledShape.shape == nullptr) {
     return std::nullopt;
   }
@@ -98,11 +98,13 @@ std::optional<RRect> AnalyticShadowUtils::MakeShadowShape(const LayerStyleInput&
     return std::nullopt;
   }
   // Shift the origin to the content image's top-left corner.
-  result->offset(-input.contentOffset.x, -input.contentOffset.y);
+  const auto contentOffset = input.content->imageOffset();
+  result->offset(-contentOffset.x, -contentOffset.y);
   // The contour outlines the layer's content and is expected to stay within the content image; a
   // shape exceeding it is treated as unavailable.
-  const auto contentBounds = Rect::MakeWH(static_cast<float>(input.content->width()),
-                                          static_cast<float>(input.content->height()));
+  const auto& contentImage = input.content->image();
+  const auto contentBounds = Rect::MakeWH(static_cast<float>(contentImage->width()),
+                                          static_cast<float>(contentImage->height()));
   DEBUG_ASSERT(contentBounds.contains(result->rect()));
   if (!contentBounds.contains(result->rect())) {
     return std::nullopt;

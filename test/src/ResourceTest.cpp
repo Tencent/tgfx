@@ -166,6 +166,7 @@ class TaskWaitGate final : public Task {
   bool released = false;
 };
 
+#ifdef TGFX_USE_THREADS
 class TaskWaitCaller {
  public:
   explicit TaskWaitCaller(std::shared_ptr<Task> task, uint64_t timeout = 0)
@@ -272,6 +273,7 @@ TGFX_TEST_PRIVATE(ResourceTest, TaskWaitTimeoutUsesFixedDeadline) {
   task->release();
   EXPECT_TRUE(task->wait());
 }
+#endif
 
 TGFX_TEST(ResourceTest, TaskWaitQueuedAndCanceled) {
   auto queued = std::make_shared<TaskWaitGate>();

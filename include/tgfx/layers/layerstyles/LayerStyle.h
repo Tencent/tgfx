@@ -44,13 +44,33 @@ enum class LayerStyleExtraSourceType : uint32_t {
    */
   None = 0,
   /**
-   * The layerStyle requires the layer contour to be drawn.
+   * The layerStyle requires the layer contour to be drawn: the shared contour of the layer and its
+   * descendants. It includes shapes filled or stroked with a fully transparent paint, but leaves
+   * out geometries added without a paint.
    */
   Contour = 1 << 0,
   /**
    * The layerStyle requires the background content.
    */
   Background = 1 << 1
+};
+
+/**
+ * Declares which content a layerStyle prefers. The preference is not guaranteed: a Geometry style
+ * whose layer has no geometry of its own receives the subtree contour instead, which does include
+ * the descendants. LayerStyleInput::content reports what the style actually receives.
+ */
+enum class LayerStyleContentSource {
+  /**
+   * The content the layer renders: its own content plus its descendants (the default).
+   */
+  All,
+  /**
+   * The outlines of the layer's own shapes, including ones filled or stroked with a transparent
+   * paint or added with no paint at all, and hit-testable even where no paint captured them.
+   * Descendants never contribute; a layer without own geometry falls back to the subtree contour.
+   */
+  Geometry
 };
 
 enum class LayerStyleType {
@@ -75,11 +95,15 @@ enum class LayerStyleType {
  * 1. **Content** (opaque layer content): Renders geometries with normal fills, then converts all
  *    semi-transparent pixels to fully opaque (fully transparent pixels are preserved).
  *
- * 2. **Contour** (layer contour): Similar to Content, but with two differences:
- *    - Includes geometries from painters with alpha=0
- *    - Replaces gradient fills with solid color fills (ignoring local transparency in gradients)
+ * 2. **Contour** (layer contour): Similar to Content, but it also includes shapes filled or stroked
+ *    with a fully transparent paint, and it replaces gradient fills with solid color fills (ignoring
+ *    local transparency in gradients). It leaves out geometries added without a paint; only
+ *    LayerStyleContentSource::Geometry covers those.
  *
  * 3. **Background** (layer background): The normally rendered content below the current layer.
+ *
+ * A layerStyle may declare LayerStyleContentSource::Geometry instead: it then consumes the layer's
+ * geometry in place of the content above, as described by LayerStyleContentSource::Geometry.
  */
 class LayerStyle : public LayerProperty {
  public:
@@ -144,6 +168,14 @@ class LayerStyle : public LayerProperty {
    */
   virtual uint32_t extraSourceType() const {
     return static_cast<uint32_t>(LayerStyleExtraSourceType::None);
+  }
+
+  /**
+   * Returns where this layer style takes its content image from.
+   * Default is LayerStyleContentSource::All.
+   */
+  virtual LayerStyleContentSource contentSource() const {
+    return LayerStyleContentSource::All;
   }
 
   /**

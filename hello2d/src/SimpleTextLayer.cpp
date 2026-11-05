@@ -110,12 +110,13 @@ void SimpleTextLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
       tgfx::Path linePath;
       linePath.moveTo(left, linePosition);
       linePath.lineTo(right, linePosition);
-      recorder->addPath(linePath, lineLayerPaint);
+      recorder->addPath(linePath, &lineLayerPaint);
     }
 
     if (richText.type == Element::Type::Text) {
       for (const auto& paint : richText.paints) {
-        recorder->addTextBlob(richText.textBlob, ToLayerPaint(paint));
+        auto textPaint = ToLayerPaint(paint);
+        recorder->addTextBlob(richText.textBlob, &textPaint);
       }
     } else {
       if (richText.image) {
@@ -131,7 +132,7 @@ void SimpleTextLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
           m.postTranslate(richText.imageRect.left, richText.imageRect.top);
           imagePaint.shader = tgfx::Shader::MakeImageShader(richText.image)->makeWithMatrix(m);
         }
-        recorder->addPath(imagePath, imagePaint);
+        recorder->addPath(imagePath, &imagePaint);
       }
     }
 
@@ -139,7 +140,7 @@ void SimpleTextLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
       tgfx::Path linePath;
       linePath.moveTo(left, linePosition);
       linePath.lineTo(right, linePosition);
-      recorder->addPath(linePath, lineLayerPaint);
+      recorder->addPath(linePath, &lineLayerPaint);
     }
   }
 }
