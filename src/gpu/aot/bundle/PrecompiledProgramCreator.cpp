@@ -429,16 +429,21 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   bool chainSpecialized = false;
   std::string chainGenericCode;
   if (ChainSpecializationEnabled() && matchResult->shaderName == PointwiseChainShader::Name &&
-      fragmentDesc.format == ShaderCodeFormat::GLSL && !fragmentDesc.code.empty()) {
+      !fragmentDesc.code.empty() &&
+      (fragmentDesc.format == ShaderCodeFormat::GLSL || fragmentDesc.format == ShaderCodeFormat::MSL)) {
     const auto* carriedIR = programInfo->getCarriedIR();
     if (carriedIR != nullptr && carriedIR->program.has_value()) {
-      auto specialized = SpecializeChainFragmentGLSL(fragmentDesc.code, *carriedIR->program);
+      auto specialized =
+          fragmentDesc.format == ShaderCodeFormat::MSL
+              ? SpecializeChainFragmentMSL(fragmentDesc.code, *carriedIR->program)
+              : SpecializeChainFragmentGLSL(fragmentDesc.code, *carriedIR->program);
       if (!specialized.empty()) {
         chainGenericCode = fragmentDesc.code;
         fragmentDesc.code = std::move(specialized);
         chainSpecialized = true;
-        LOGI("ChainSpecializer: fragment %zu -> %zu bytes (slots=%zu)", chainGenericCode.size(),
-             fragmentDesc.code.size(), carriedIR->program->slots.size());
+        LOGI("ChainSpecializer: fragment %zu -> %zu bytes (slots=%zu, %s)",
+             chainGenericCode.size(), fragmentDesc.code.size(), carriedIR->program->slots.size(),
+             fragmentDesc.format == ShaderCodeFormat::MSL ? "MSL" : "GLSL");
       } else {
         LOGI("ChainSpecializer: artifact not specializable, keeping generic text");
       }

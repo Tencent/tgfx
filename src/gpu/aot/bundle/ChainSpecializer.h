@@ -47,4 +47,11 @@ bool ChainSpecializationEnabled();
  */
 std::string SpecializeChainFragmentGLSL(const std::string& artifactText, const AOTProgram& program);
 
+/**
+ * The MSL-text form of the same pass (TGFX_METAL_EMIT_MSL bundles): rewrites the SPIRV-Cross
+ * function bodies for the structural accessors and the slot executor with folded constants.
+ * Same empty-string contract as the GLSL form.
+ */
+std::string SpecializeChainFragmentMSL(const std::string& artifactText, const AOTProgram& program);
+
 }  // namespace tgfx
