@@ -405,6 +405,15 @@ static std::vector<uint32_t> compileSPIRVForWGSL(const std::string& source, Shad
   shaderc::Compiler compiler;
   shaderc::CompileOptions options;
   options.SetOptimizationLevel(shaderc_optimization_level_performance);
+  // Keep the OpName debug info: tint's SPIR-V reader uses it to carry function and member names
+  // into the WGSL output. Without it every identifier becomes a generated x_N/fieldN, and the
+  // runtime chain-specialization pass loses its function-name anchors (the MSL path keeps names
+  // for the same reason — its SPIR-V is compiled unoptimized).
+  options.SetGenerateDebugInfo();
+  // The chain shader's accessors carry a second dialect under TGFX_SPEC_CONSTANTS: the structural
+  // ints become specialization constants, which tint translates to WGSL override constants (its
+  // SpecId handling). The other shaders have no such #ifdef, so the define is inert for them.
+  options.AddMacroDefinition("TGFX_SPEC_CONSTANTS", "1");
   options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_1);
   auto shaderKind =
       (stage == ShaderStageType::Vertex) ? shaderc_vertex_shader : shaderc_fragment_shader;
@@ -423,10 +432,15 @@ std::string CompileGLSLToWGSL(const std::string& source, ShaderStageType stage,
   std::string errorPrefix = "[" + shaderName + " variant " + std::to_string(variantIndex) + "] ";
 #ifdef TGFX_SHADER_TOOL_HAS_TINT
   std::string compileError;
+  // The chain shader's accessors carry a second dialect under TGFX_SPEC_CONSTANTS: the
+  // structural ints become specialization constants, which tint translates into WGSL override
+  // constants (its SpecId handling). The define must ride the preprocessor (it consumes the
+  // line, so the expanded text carries no trace); other shaders have no such #ifdef.
+  auto specSource = PrependDefines(source, {"TGFX_SPEC_CONSTANTS=1"});
   // Template shaders wrap conditional sampler declarations in #if blocks; the regex passes of
   // preprocessWebGPU must see only the live declarations, or the reassigned binding numbers
   // would leave holes against the reflection's sampler list.
-  auto expandedSource = PreprocessGLSL(source, stage, &compileError);
+  auto expandedSource = PreprocessGLSL(specSource, stage, &compileError);
   if (expandedSource.empty()) {
     *error = errorPrefix + "GLSL preprocess: " + compileError;
     return {};

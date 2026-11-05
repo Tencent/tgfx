@@ -130,11 +130,189 @@ highp float gpPixelCoverage = 1.0;
 // inlines them away). The runtime specialization pass replaces this whole region between the
 // tgfx pragmas with folded constants — every read site below goes through these accessors only.
 #pragma tgfx_spec_accessors begin
+#ifdef TGFX_SPEC_CONSTANTS
+// WebGPU path: tint's SPIR-V reader inlines every function and renames all identifiers, so the
+// text-rewrite specialization cannot anchor on function names in WGSL. This profile instead
+// uses the platform's native mechanism: specialization constants survive the translation as
+// WGSL override constants, and the browser folds them at pipeline creation. CHAIN_SPECIALIZED
+// is the master switch: 0 (the default) keeps the generic tier-0 behavior reading the uniform
+// block; the runtime injects 1 plus the structural values per chain shape.
+//
+// Two tint reader constraints shape this code:
+// - Any expression a spec constant takes part in at compile time becomes OpSpecConstantOp,
+//   which tint's reader rejects outright (crbug.com/tint/111). So every comparison routes
+//   through a plain local variable first: the store is a normal instruction, the comparison a
+//   runtime IEqual — and after the browser injects the pipeline constants it propagates and
+//   folds all the same.
+// - Spec-constant composites (an ivec4 built from spec ids) are equally unsupported, so the
+//   slot words are assembled from four scalar locals.
+layout(constant_id = 0) const int CHAIN_SPECIALIZED = 0;
+layout(constant_id = 1) const int SC_SlotCount = 0;
+layout(constant_id = 2) const int SC_RootIndex = 0;
+layout(constant_id = 3) const int SC_CoverageRoot = 0;
+layout(constant_id = 4) const int SC_ClipReg = 0;
+layout(constant_id = 10) const int SC_S0_0 = 0;
+layout(constant_id = 11) const int SC_S0_1 = 0;
+layout(constant_id = 12) const int SC_S0_2 = 0;
+layout(constant_id = 13) const int SC_S0_3 = 0;
+layout(constant_id = 14) const int SC_S1_0 = 0;
+layout(constant_id = 15) const int SC_S1_1 = 0;
+layout(constant_id = 16) const int SC_S1_2 = 0;
+layout(constant_id = 17) const int SC_S1_3 = 0;
+layout(constant_id = 18) const int SC_S2_0 = 0;
+layout(constant_id = 19) const int SC_S2_1 = 0;
+layout(constant_id = 20) const int SC_S2_2 = 0;
+layout(constant_id = 21) const int SC_S2_3 = 0;
+layout(constant_id = 22) const int SC_S3_0 = 0;
+layout(constant_id = 23) const int SC_S3_1 = 0;
+layout(constant_id = 24) const int SC_S3_2 = 0;
+layout(constant_id = 25) const int SC_S3_3 = 0;
+layout(constant_id = 26) const int SC_S4_0 = 0;
+layout(constant_id = 27) const int SC_S4_1 = 0;
+layout(constant_id = 28) const int SC_S4_2 = 0;
+layout(constant_id = 29) const int SC_S4_3 = 0;
+layout(constant_id = 30) const int SC_S5_0 = 0;
+layout(constant_id = 31) const int SC_S5_1 = 0;
+layout(constant_id = 32) const int SC_S5_2 = 0;
+layout(constant_id = 33) const int SC_S5_3 = 0;
+layout(constant_id = 34) const int SC_S6_0 = 0;
+layout(constant_id = 35) const int SC_S6_1 = 0;
+layout(constant_id = 36) const int SC_S6_2 = 0;
+layout(constant_id = 37) const int SC_S6_3 = 0;
+layout(constant_id = 38) const int SC_S7_0 = 0;
+layout(constant_id = 39) const int SC_S7_1 = 0;
+layout(constant_id = 40) const int SC_S7_2 = 0;
+layout(constant_id = 41) const int SC_S7_3 = 0;
+layout(constant_id = 42) const int SC_S8_0 = 0;
+layout(constant_id = 43) const int SC_S8_1 = 0;
+layout(constant_id = 44) const int SC_S8_2 = 0;
+layout(constant_id = 45) const int SC_S8_3 = 0;
+layout(constant_id = 46) const int SC_S9_0 = 0;
+layout(constant_id = 47) const int SC_S9_1 = 0;
+layout(constant_id = 48) const int SC_S9_2 = 0;
+layout(constant_id = 49) const int SC_S9_3 = 0;
+layout(constant_id = 50) const int SC_S10_0 = 0;
+layout(constant_id = 51) const int SC_S10_1 = 0;
+layout(constant_id = 52) const int SC_S10_2 = 0;
+layout(constant_id = 53) const int SC_S10_3 = 0;
+layout(constant_id = 54) const int SC_S11_0 = 0;
+layout(constant_id = 55) const int SC_S11_1 = 0;
+layout(constant_id = 56) const int SC_S11_2 = 0;
+layout(constant_id = 57) const int SC_S11_3 = 0;
+layout(constant_id = 58) const int SC_S12_0 = 0;
+layout(constant_id = 59) const int SC_S12_1 = 0;
+layout(constant_id = 60) const int SC_S12_2 = 0;
+layout(constant_id = 61) const int SC_S12_3 = 0;
+layout(constant_id = 62) const int SC_S13_0 = 0;
+layout(constant_id = 63) const int SC_S13_1 = 0;
+layout(constant_id = 64) const int SC_S13_2 = 0;
+layout(constant_id = 65) const int SC_S13_3 = 0;
+layout(constant_id = 66) const int SC_S14_0 = 0;
+layout(constant_id = 67) const int SC_S14_1 = 0;
+layout(constant_id = 68) const int SC_S14_2 = 0;
+layout(constant_id = 69) const int SC_S14_3 = 0;
+layout(constant_id = 70) const int SC_S15_0 = 0;
+layout(constant_id = 71) const int SC_S15_1 = 0;
+layout(constant_id = 72) const int SC_S15_2 = 0;
+layout(constant_id = 73) const int SC_S15_3 = 0;
+int chainSlotCount() {
+  int spec = CHAIN_SPECIALIZED;
+  if (spec == 1) { return SC_SlotCount; }
+  return SlotCount;
+}
+int chainRootIndex() {
+  int spec = CHAIN_SPECIALIZED;
+  if (spec == 1) { return SC_RootIndex; }
+  return RootIndex;
+}
+int chainCoverageRootIndex() {
+  int spec = CHAIN_SPECIALIZED;
+  if (spec == 1) { return SC_CoverageRoot; }
+  return CoverageRootIndex;
+}
+int chainClipRegister() {
+  int spec = CHAIN_SPECIALIZED;
+  if (spec == 1) { return SC_ClipReg; }
+  return ClipCoverageRegister;
+}
+ivec4 chainSlot(int slot) {
+  int spec = CHAIN_SPECIALIZED;
+  if (spec == 1) {
+    if (slot == 0) {
+      int a = SC_S0_0; int b = SC_S0_1; int c = SC_S0_2; int d = SC_S0_3;
+      return ivec4(a, b, c, d);
+    }
+    if (slot == 1) {
+      int a = SC_S1_0; int b = SC_S1_1; int c = SC_S1_2; int d = SC_S1_3;
+      return ivec4(a, b, c, d);
+    }
+    if (slot == 2) {
+      int a = SC_S2_0; int b = SC_S2_1; int c = SC_S2_2; int d = SC_S2_3;
+      return ivec4(a, b, c, d);
+    }
+    if (slot == 3) {
+      int a = SC_S3_0; int b = SC_S3_1; int c = SC_S3_2; int d = SC_S3_3;
+      return ivec4(a, b, c, d);
+    }
+    if (slot == 4) {
+      int a = SC_S4_0; int b = SC_S4_1; int c = SC_S4_2; int d = SC_S4_3;
+      return ivec4(a, b, c, d);
+    }
+    if (slot == 5) {
+      int a = SC_S5_0; int b = SC_S5_1; int c = SC_S5_2; int d = SC_S5_3;
+      return ivec4(a, b, c, d);
+    }
+    if (slot == 6) {
+      int a = SC_S6_0; int b = SC_S6_1; int c = SC_S6_2; int d = SC_S6_3;
+      return ivec4(a, b, c, d);
+    }
+    if (slot == 7) {
+      int a = SC_S7_0; int b = SC_S7_1; int c = SC_S7_2; int d = SC_S7_3;
+      return ivec4(a, b, c, d);
+    }
+    if (slot == 8) {
+      int a = SC_S8_0; int b = SC_S8_1; int c = SC_S8_2; int d = SC_S8_3;
+      return ivec4(a, b, c, d);
+    }
+    if (slot == 9) {
+      int a = SC_S9_0; int b = SC_S9_1; int c = SC_S9_2; int d = SC_S9_3;
+      return ivec4(a, b, c, d);
+    }
+    if (slot == 10) {
+      int a = SC_S10_0; int b = SC_S10_1; int c = SC_S10_2; int d = SC_S10_3;
+      return ivec4(a, b, c, d);
+    }
+    if (slot == 11) {
+      int a = SC_S11_0; int b = SC_S11_1; int c = SC_S11_2; int d = SC_S11_3;
+      return ivec4(a, b, c, d);
+    }
+    if (slot == 12) {
+      int a = SC_S12_0; int b = SC_S12_1; int c = SC_S12_2; int d = SC_S12_3;
+      return ivec4(a, b, c, d);
+    }
+    if (slot == 13) {
+      int a = SC_S13_0; int b = SC_S13_1; int c = SC_S13_2; int d = SC_S13_3;
+      return ivec4(a, b, c, d);
+    }
+    if (slot == 14) {
+      int a = SC_S14_0; int b = SC_S14_1; int c = SC_S14_2; int d = SC_S14_3;
+      return ivec4(a, b, c, d);
+    }
+    if (slot == 15) {
+      int a = SC_S15_0; int b = SC_S15_1; int c = SC_S15_2; int d = SC_S15_3;
+      return ivec4(a, b, c, d);
+    }
+    return ivec4(4, -2, -2, 0);
+  }
+  return SlotPacked[slot];
+}
+#else
 int chainSlotCount() { return SlotCount; }
 ivec4 chainSlot(int slot) { return SlotPacked[slot]; }
 int chainRootIndex() { return RootIndex; }
 int chainCoverageRootIndex() { return CoverageRootIndex; }
 int chainClipRegister() { return ClipCoverageRegister; }
+#endif
 #pragma tgfx_spec_accessors end
 #include "pipeline/chain/pointwise_chain_eval.inc"
 
