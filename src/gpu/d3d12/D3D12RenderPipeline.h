@@ -41,15 +41,19 @@ class D3D12GPU;
  *                        numbers passed by GLSL programs) to root-parameter indices and texture
  *                        unit ordinals consumed by D3D12RenderPass.
  *
- * Root signature layout produced for every pipeline (matches the SPIR-V -> HLSL register
- * convention used by D3D12ShaderModule):
+ * Root signature layout produced for every pipeline (matches the HLSL register convention the
+ * precompiled d3d12 bundle is emitted with, see TranslateToHLSL):
  *
- *   root parameter 0 : CBV  (b0)                             [VertexUniformBlock, optional]
- *   root parameter 1 : CBV  (b0)                             [FragmentUniformBlock, optional]
+ *   root parameter 0 : CBV  (b{vertex slot})                 [VertexUniformBlock, optional]
+ *   root parameter 1 : CBV  (b{fragment slot})               [FragmentUniformBlock, optional]
  *   root parameter 2..2N+1 : per texture sampler binding, two consecutive DescriptorTables —
  *                {SRV t{i}} then {Sampler s{i}}. SRV and Sampler descriptor tables
  *                            cannot share one root parameter because they reference different
  *                            descriptor heap types.
+ *
+ * The CBV registers are not hardcoded: each comes from the module's
+ * ShaderModuleDescriptor::uniformSlots, which a precompiled module reports as the block's logical
+ * binding point (b0 for VertexUniformBlock, b1 for FragmentUniformBlock).
  *
  * ShaderVisibility for every root parameter comes from the BindingEntry's visibility field
  * (ToD3D12ShaderVisibility), not a fixed stage. UBO root parameters are CBVs with raw GPU
