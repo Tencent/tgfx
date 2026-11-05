@@ -31,10 +31,9 @@ static CGColorSpaceRef CreateNamedColorSpace(const ColorSpace* colorSpace) {
     return CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
   }
   if (ColorSpace::Equals(colorSpace, ColorSpace::SRGBLinear().get())) {
-    if (@available(macOS 10.14, iOS 12.0, *)) {
-      return CGColorSpaceCreateWithName(kCGColorSpaceExtendedLinearSRGB);
-    }
-    return nullptr;
+    // The non-extended space, not kCGColorSpaceExtendedLinearSRGB: CreateCGColorSpace() also serves
+    // the 8-bit CGBitmapContextCreate() call sites, and an extended space makes that return null.
+    return CGColorSpaceCreateWithName(kCGColorSpaceLinearSRGB);
   }
   if (ColorSpace::Equals(colorSpace, ColorSpace::DisplayP3().get())) {
     return CGColorSpaceCreateWithName(kCGColorSpaceDisplayP3);
@@ -61,11 +60,11 @@ CGColorSpaceRef CreateCGColorSpace(const std::shared_ptr<ColorSpace>& colorSpace
         }
       }
     }
+    // ColorSpace::toICCProfile() only writes the TRC tags when the transfer function is sRGB-like,
+    // so color spaces with gamma 2.2 or any other curve produce an invalid profile and end up here.
+    LOGE("CreateCGColorSpace() failed to build a color space, falling back to sRGB. Gamuts other "
+         "than sRGB, sRGB Linear and Display P3 are not supported on this platform.");
   }
-  // ColorSpace::toICCProfile() only writes the TRC tags for sRGB-like transfer functions, so color
-  // spaces with a linear or gamma 2.2 curve produce an invalid profile and end up here.
-  LOGE("CreateCGColorSpace() failed to build a color space, falling back to sRGB. Gamuts other "
-       "than sRGB, sRGB Linear and Display P3 are not supported on this platform.");
   return CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
 }
 }  // namespace tgfx
