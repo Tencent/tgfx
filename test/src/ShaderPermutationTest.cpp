@@ -890,6 +890,12 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureLocalMaskRejectsInvertedCoverage) {
     ASSERT_NE(coverage, nullptr);
     ProgramInfo programInfo(renderTarget.get(), gp.get(), {color.get(), coverage.get()}, 1, nullptr,
                             BlendMode::SrcOver);
+    // The matcher reads the draw's lowering graph through the carried IR; a hand-built ProgramInfo
+    // carries none, and the families reject an IR-less shape outright. Lower the same processors
+    // the way StandardDrawOp would and attach the result before matching.
+    auto lowered = LowerDraw({color.get()}, {coverage.get()}, BlendMode::SrcOver, &allocator);
+    ASSERT_TRUE(lowered.has_value());
+    programInfo.setCarriedIR(&*lowered);
     auto match = MatchPermutation(&programInfo);
     if (inverted) {
       EXPECT_FALSE(match.has_value());
@@ -2412,6 +2418,20 @@ TGFX_TEST(ShaderPermutationTest, EffectDecomposerTripleFP) {
 }
 
 static void ExpectDirectAARectMatch(ProgramInfo* programInfo, const char* shaderName) {
+  // The matcher reads the draw's lowering graph through the carried IR; a hand-built ProgramInfo
+  // carries none, and the families reject an IR-less shape outright. Lower the same processors
+  // the way StandardDrawOp would — the color list is the leading numColorFragmentProcessors()
+  // entries, the coverage list is the rest — and attach the result before matching.
+  std::vector<const FragmentProcessor*> color = {};
+  std::vector<const FragmentProcessor*> coverage = {};
+  for (size_t i = 0; i < programInfo->numFragmentProcessors(); i++) {
+    auto* fp = programInfo->getFragmentProcessor(i);
+    (i < programInfo->numColorFragmentProcessors() ? color : coverage).push_back(fp);
+  }
+  BlockAllocator allocator;
+  auto lowered = LowerDraw(color, coverage, BlendMode::SrcOver, &allocator);
+  ASSERT_TRUE(lowered.has_value());
+  programInfo->setCarriedIR(&*lowered);
   auto match = MatchPermutation(programInfo);
   ASSERT_TRUE(match.has_value());
   EXPECT_EQ(match->shaderName, shaderName);
