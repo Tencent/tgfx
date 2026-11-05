@@ -21,6 +21,7 @@
 #include <d3dcompiler.h>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include "D3D12Resource.h"
 #include "D3D12Util.h"
 #include "gpu/VaryingShaderModule.h"
@@ -47,9 +48,10 @@ class D3D12GPU;
  *     via ShaderVisibility.
  *   - SRVs/Samplers: texture samplers bind at paired (t{K}, s{K}) registers, where K is the
  *     entry's index in BindingLayout::textureSamplers.
- *   - Vertex inputs use the TEXCOORD{N} semantic, where N is the attribute's global index across
- *     the pipeline vertex buffer layouts. D3D12RenderPipeline builds the input layout from that
- *     index, so the semantics must stay in lock step with it.
+ *   - Vertex inputs use the TEXCOORD{N} semantic, where N is the input's slot as the pipeline's
+ *     shaderLocations list declares it (the physical SPIR-V location; consecutive when the list
+ *     is empty). D3D12RenderPipeline builds the input layout from that slot and against this
+ *     module's reflected input signature, so the semantics must stay in lock step with it.
  * The mapping is resolved by name against ShaderModuleDescriptor::uniformSlots, so the module
  * and the pipeline layout must agree on every block name.
  */
@@ -57,6 +59,19 @@ class D3D12ShaderModule : public VaryingShaderModule, public D3D12Resource {
  public:
   static std::shared_ptr<D3D12ShaderModule> Make(D3D12GPU* gpu,
                                                  const ShaderModuleDescriptor& descriptor);
+
+  /**
+   * Returns true when the vertex shader's input signature declares the TEXCOORD{semanticIndex}
+   * slot. D3D12 requires every input element to exist in the signature (CreateGraphicsPipeline-
+   * State returns E_INVALIDARG otherwise), so the pipeline drops the elements the signature does
+   * not carry — the slots a precompiled variant compiled out, or an attribute parked on a spare
+   * location. Always true for a non-vertex stage or a module whose signature could not be
+   * reflected: failing open keeps the unfiltered behaviour rather than silently unbinding
+   * everything.
+   */
+  bool hasInputSemantic(uint32_t semanticIndex) const {
+    return !_signatureKnown || _inputSemantics.count(semanticIndex) > 0;
+  }
 
   /**
    * Returns the compiled DXBC bytecode in the form expected by D3D12 pipeline state descriptors.
@@ -92,6 +107,16 @@ class D3D12ShaderModule : public VaryingShaderModule, public D3D12Resource {
 
   ShaderStage _stage = ShaderStage::Vertex;
   ComPtr<ID3DBlob> bytecode = nullptr;
+  /// The TEXCOORD semantic indices the vertex shader's input signature declares. Filled by
+  /// reflection once the bytecode exists; empty for fragment modules.
+  std::unordered_set<uint32_t> _inputSemantics = {};
+  /// False while the signature is unknown (a non-vertex stage, or reflection failed); see
+  /// hasInputSemantic for what that means.
+  bool _signatureKnown = false;
+
+  /// Reflects the bytecode's input signature into _inputSemantics. Called once, at the end of
+  /// construction, whichever path produced the bytecode.
+  void collectInputSemantics();
 #ifdef TGFX_D3D12_DEBUG_LAYER
   std::string _hlslSource;
 #endif

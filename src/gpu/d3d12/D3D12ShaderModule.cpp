@@ -19,6 +19,7 @@
 #include "D3D12ShaderModule.h"
 #include <cstring>
 #include <utility>
+#include <d3d12shader.h>
 #include "D3D12GPU.h"
 #include "core/utils/Log.h"
 #include "gpu/ShaderInterface.h"
@@ -105,6 +106,39 @@ D3D12ShaderModule::D3D12ShaderModule(D3D12GPU* gpu, const ShaderModuleDescriptor
           "text or DXBC bytecode.");
       return;
   }
+  collectInputSemantics();
+}
+
+void D3D12ShaderModule::collectInputSemantics() {
+  // Only the vertex stage has an input signature the pipeline's input layout must match.
+  if (_stage != ShaderStage::Vertex || bytecode == nullptr) {
+    return;
+  }
+  ComPtr<ID3D12ShaderReflection> reflection = nullptr;
+  if (FAILED(D3DReflect(bytecode->GetBufferPointer(), bytecode->GetBufferSize(),
+                        IID_PPV_ARGS(&reflection)))) {
+    // Leave _signatureKnown false: hasInputSemantic then reports true for everything, which is
+    // the unfiltered behaviour that predates signature filtering.
+    LOGE("D3D12ShaderModule: D3DReflect failed; the input layout will not be filtered.");
+    return;
+  }
+  D3D12_SHADER_DESC shaderDesc = {};
+  if (FAILED(reflection->GetDesc(&shaderDesc))) {
+    LOGE("D3D12ShaderModule: reading the reflection description failed.");
+    return;
+  }
+  for (UINT i = 0; i < shaderDesc.InputParameters; i++) {
+    D3D12_SIGNATURE_PARAMETER_DESC param = {};
+    if (FAILED(reflection->GetInputParameterDesc(i, &param))) {
+      continue;
+    }
+    // The pipeline emits TEXCOORD semantics only (see D3D12RenderPipeline); a signature entry
+    // under another semantic is nothing it could bind, so it is not collected.
+    if (std::strcmp(param.SemanticName, "TEXCOORD") == 0) {
+      _inputSemantics.insert(param.SemanticIndex);
+    }
+  }
+  _signatureKnown = true;
 }
 
 void D3D12ShaderModule::onRelease(D3D12GPU*) {

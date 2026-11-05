@@ -302,26 +302,52 @@ bool D3D12RenderPipeline::createPipelineState(D3D12GPU* gpu,
   }
 
   // Vertex input layout. Semantic names match the SPIRV-Cross HLSL convention of TEXCOORD{N},
-  // where N is the index of the attribute in the pipeline vertex buffer layout.
+  // where N is the attribute's shader input slot: the explicit shaderLocations list when the
+  // descriptor carries one (the precompiled path, whose variants may skip numbers — a
+  // conditional attribute compiled out of the variant leaves a hole), consecutive indices
+  // otherwise (the runtime-built shaders' dense convention). The same data flow the
+  // Vulkan/Metal/OpenGL/WebGPU pipelines use.
+  for (const auto& layout : descriptor.vertex.bufferLayouts) {
+    if (!layout.shaderLocations.empty() &&
+        layout.shaderLocations.size() != layout.attributes.size()) {
+      LOGE("D3D12RenderPipeline: shaderLocations (%zu) and attributes (%zu) disagree; the layout "
+           "contract requires equal counts when the slot list is set.",
+           layout.shaderLocations.size(), layout.attributes.size());
+      return false;
+    }
+  }
   std::vector<D3D12_INPUT_ELEMENT_DESC> inputElements;
   uint32_t globalLocation = 0;
   vertexStrides.assign(descriptor.vertex.bufferLayouts.size(), 0);
   for (uint32_t i = 0; i < static_cast<uint32_t>(descriptor.vertex.bufferLayouts.size()); i++) {
     const auto& layout = descriptor.vertex.bufferLayouts[i];
     uint32_t offset = 0;
-    for (const auto& attr : layout.attributes) {
+    for (size_t j = 0; j < layout.attributes.size(); j++) {
+      const auto& attr = layout.attributes[j];
+      const uint32_t attributeOffset = offset;
+      offset += static_cast<uint32_t>(attr.size());
+      uint32_t semanticIndex = layout.shaderLocations.empty() ? globalLocation++
+                                                              : layout.shaderLocations[j];
+      // D3D12 requires every input element to reference a semantic the vertex shader's input
+      // signature actually declares (CreateGraphicsPipelineState returns E_INVALIDARG
+      // otherwise), which is stricter than the other backends: an attribute parked on a spare
+      // location the shader never reads — the precompiled subset convention — is left out of
+      // the layout instead of bound. Its bytes still advance the offset above, so the
+      // buffer-side layout is unchanged.
+      if (!vertexShader->hasInputSemantic(semanticIndex)) {
+        continue;
+      }
       D3D12_INPUT_ELEMENT_DESC element = {};
       element.SemanticName = "TEXCOORD";
-      element.SemanticIndex = globalLocation++;
+      element.SemanticIndex = semanticIndex;
       element.Format = ToD3D12VertexFormat(attr.format());
       element.InputSlot = i;
-      element.AlignedByteOffset = offset;
+      element.AlignedByteOffset = attributeOffset;
       element.InputSlotClass = (layout.stepMode == VertexStepMode::Instance)
                                    ? D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA
                                    : D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
       element.InstanceDataStepRate = (layout.stepMode == VertexStepMode::Instance) ? 1 : 0;
       inputElements.push_back(element);
-      offset += static_cast<uint32_t>(attr.size());
     }
     // Fall back to the computed attribute total when the descriptor leaves stride at zero, which
     // is the same convention the Vulkan/Metal backends use.
