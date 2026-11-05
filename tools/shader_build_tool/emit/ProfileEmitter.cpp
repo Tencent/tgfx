@@ -168,13 +168,32 @@ class D3D12Emitter : public ProfileEmitter {
   }
 
   std::optional<EmittedStages> emit(const EmitInput& input, StageCompiler* compiler) override {
+    // The vertex stage translates from the common unoptimized SPIR-V, but the fragment stage
+    // re-compiles with TGFX_SPEC_CONSTANTS=1 (the same second dialect VulkanEmitter produces):
+    // the chain shader's structural ints become layout(constant_id) declarations, glslang keeps
+    // them as OpSpecConstant + SpecId, and SPIRV-Cross's HLSL writer emits each as a
+    // SPIRV_CROSS_CONSTANT_ID_<id> #ifndef/#define macro block (spirv_hlsl.cpp:1508). The
+    // runtime specialization pass then overrides every default by prepending its own #define
+    // prefix, and D3DCompile's preprocessor folds the constants away. A fragment recompile
+    // failure is loud: silently falling back to the common SPIR-V would emit a macro-less
+    // HLSL whose runtime guard never matches, and specialization would silently stop working.
     const auto& hlslVert = compiler->translateHLSL(*input.vertSpirv, ShaderStageType::Vertex);
-    const auto& hlslFrag =
-        compiler->translateHLSL(input.fragStage->spirv, ShaderStageType::Fragment);
-    if (!hlslVert.success || !hlslFrag.success) {
+    auto fragDefines = *input.fragDefines;
+    fragDefines.push_back("TGFX_SPEC_CONSTANTS=1");
+    auto expandedFrag = PrependDefines(*input.fragSource, fragDefines);
+    const auto& fragSpirv = compiler->compileSpirv(expandedFrag, ShaderStageType::Fragment,
+                                                   input.info->name, input.fragIndex, false);
+    if (!hlslVert.success || !fragSpirv.success) {
       ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
-                    "HLSL translation error: " +
-                        (!hlslVert.success ? hlslVert.error : hlslFrag.error));
+                    hlslVert.success ? ("TGFX_SPEC_CONSTANTS fragment recompile failed: " +
+                                        fragSpirv.error)
+                                     : ("HLSL translation error: " + hlslVert.error));
+      return std::nullopt;
+    }
+    const auto& hlslFrag = compiler->translateHLSL(fragSpirv.spirv, ShaderStageType::Fragment);
+    if (!hlslFrag.success) {
+      ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
+                    "HLSL translation error: " + hlslFrag.error);
       return std::nullopt;
     }
     EmittedStages stages;
