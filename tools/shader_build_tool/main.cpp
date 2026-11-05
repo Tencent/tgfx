@@ -46,6 +46,10 @@ int main(int argc, char** argv) {
     std::cerr << "ERROR: " << targetError << "\n";
     return 2;
   }
+  if (!tgfx::SetD3D12ShaderFormat(options.d3d12ShaderFormat, &targetError)) {
+    std::cerr << "ERROR: " << targetError << "\n";
+    return 2;
+  }
   if (!options.verifyBundleDir.empty()) {
     return tgfx::RunVerifyCommand(options);
   }

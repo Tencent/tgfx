@@ -26,6 +26,9 @@ option(TGFX_USE_OPENGL "Use OpenGL as the GPU backend" ON)
 option(TGFX_USE_METAL "Use Metal as the GPU backend on Apple platforms" OFF)
 option(TGFX_USE_D3D12 "Use D3D12 as the GPU backend on Windows" OFF)
 option(TGFX_D3D12_USE_WARP "Force the D3D12 backend onto the WARP software rasterizer (CI only)" OFF)
+set(TGFX_D3D12_SHADER_FORMAT "dxbc" CACHE STRING
+        "What a d3d12 bundle stores: dxbc (bytecode, no first-use compile) or hlsl (source)")
+set_property(CACHE TGFX_D3D12_SHADER_FORMAT PROPERTY STRINGS dxbc hlsl)
 option(TGFX_USE_WEBGPU "Use WebGPU as the GPU backend on web platform" OFF)
 option(TGFX_USE_QT "Enable building with the Qt framework." OFF)
 option(TGFX_USE_SWIFTSHADER "Enable building with the SwiftShader library" OFF)
@@ -988,6 +991,14 @@ if (TGFX_EMBED_SHADER_BUNDLES)
         target_compile_definitions(shader_build_tool_core PRIVATE TGFX_SHADER_TOOL_HAS_TINT=1)
     endif ()
 
+    if ("d3d12" IN_LIST TGFX_SHADER_BACKENDS AND WIN32)
+        # The d3d12 bundle defaults to DXBC, which the tool produces with the same compiler the
+        # backend uses. The macro is defined exactly when "d3d12" can appear in --backends, so a
+        # host without D3DCompiler never reaches the compile path and refuses the dxbc format.
+        target_compile_definitions(shader_build_tool_core PRIVATE TGFX_SHADER_TOOL_HAS_D3DCOMPILER=1)
+        target_link_libraries(shader_build_tool_core PUBLIC d3dcompiler)
+    endif ()
+
     set(TGFX_SHADER_BUNDLE_DIR "${CMAKE_BINARY_DIR}/generated/shaders")
     file(MAKE_DIRECTORY ${TGFX_SHADER_BUNDLE_DIR})
 
@@ -1096,6 +1107,14 @@ if (TGFX_EMBED_SHADER_BUNDLES)
         # pipeline on an iOS device or in the simulator), so an iOS build compiles it for its own
         # SDK and deployment target. macOS builds keep the tool's defaults.
         set(TGFX_SHADER_TOOL_METAL_ARGS "")
+        # What a d3d12 bundle stores. dxbc removes the first-use compile from the backend; hlsl
+        # keeps the source so the backend compiles it. The tool refuses dxbc on a host that cannot
+        # produce it rather than quietly writing the other form.
+        set(TGFX_SHADER_TOOL_FORMAT_ARGS "")
+        if ("d3d12" IN_LIST TGFX_SHADER_BACKENDS)
+            list(APPEND TGFX_SHADER_TOOL_FORMAT_ARGS
+                    --d3d12-shader-format ${TGFX_D3D12_SHADER_FORMAT})
+        endif ()
         if (IOS AND "metal" IN_LIST TGFX_SHADER_BACKENDS)
             string(TOLOWER "${CMAKE_OSX_SYSROOT};${SDK_NAME}" TGFX_IOS_SDK_HINT)
             if (TGFX_IOS_SDK_HINT MATCHES "simulator")
@@ -1115,6 +1134,7 @@ if (TGFX_EMBED_SHADER_BUNDLES)
                         --out-dir ${TGFX_SHADER_BUNDLE_DIR}
                         --backends ${TGFX_SHADER_BACKENDS_ARG}
                         ${TGFX_SHADER_TOOL_METAL_ARGS}
+                        ${TGFX_SHADER_TOOL_FORMAT_ARGS}
                         --compress
                 COMMAND ${CMAKE_COMMAND} -E touch ${TGFX_SHADER_BUNDLE_STAMP}
                 DEPENDS ${TGFX_SHADER_TOOL_DEPENDS} ${TGFX_SHADER_SOURCES}

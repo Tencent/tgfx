@@ -21,6 +21,7 @@
 #include <utility>
 #include "FormCheck.h"
 #include "GLSLDialect.h"
+#include "compile/StageCompiler.h"
 #include "core/DiagnosticCodes.h"
 
 namespace tgfx {
@@ -170,6 +171,21 @@ class D3D12Emitter : public ProfileEmitter {
       return std::nullopt;
     }
     EmittedStages stages;
+    if (D3D12UsesDxbc()) {
+      std::string dxbcError;
+      stages.vertexBlob = compiler->compileDxbc(hlslVert.text, ShaderStageType::Vertex, &dxbcError);
+      if (!stages.vertexBlob.empty()) {
+        stages.fragmentBlob =
+            compiler->compileDxbc(hlslFrag.text, ShaderStageType::Fragment, &dxbcError);
+      }
+      if (stages.vertexBlob.empty() || stages.fragmentBlob.empty()) {
+        ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
+                      "DXBC compilation failed: " + dxbcError);
+        return std::nullopt;
+      }
+      stages.payloadKind = BundleFormat::Payload::Binary;
+      return stages;
+    }
     stages.vertexBlob.assign(hlslVert.text.begin(), hlslVert.text.end());
     stages.fragmentBlob.assign(hlslFrag.text.begin(), hlslFrag.text.end());
     return stages;

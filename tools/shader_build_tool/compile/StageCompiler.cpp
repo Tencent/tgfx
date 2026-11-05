@@ -139,6 +139,39 @@ const TextStage& StageCompiler::compileWgsl(const std::string& source, ShaderSta
   return it->second;
 }
 
+std::vector<uint8_t> StageCompiler::compileDxbc(const std::string& hlsl, ShaderStageType stage,
+                                                std::string* error) {
+  auto key = StageCacheKey("dxbc", persistentCache->toolIdentity())
+                 .add(HLSLCompilerFingerprint())
+                 .add(static_cast<uint64_t>(stage))
+                 .add(hlsl)
+                 .finish();
+  auto& stats = persistentCache->stats("dxbc");
+  stats.requests++;
+  auto it = blobCache.find(key);
+  if (it == blobCache.end()) {
+    BlobStage entry;
+    if (persistentCache->load(key, &entry.bytes, &stats)) {
+      entry.success = true;
+    } else {
+      stats.executed++;
+      entry.bytes = CompileHLSLToDXBC(hlsl, stage, &entry.error);
+      entry.success = !entry.bytes.empty();
+      if (entry.success) {
+        persistentCache->store(key, entry.bytes, &stats);
+      }
+    }
+    it = blobCache.emplace(std::move(key), std::move(entry)).first;
+  } else {
+    stats.memoryHits++;
+  }
+  if (!it->second.success) {
+    *error = it->second.error;
+    return {};
+  }
+  return it->second.bytes;
+}
+
 const TextStage& StageCompiler::translateMSL(const std::vector<uint32_t>& spirv,
                                              ShaderStageType stage) {
   // The translation input is the whole module plus the stage, so the key carries both; the

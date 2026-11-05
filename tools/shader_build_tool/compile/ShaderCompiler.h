@@ -49,6 +49,17 @@ std::string MetalCompilerFingerprint();
 /// a toolchain update recompiles them.
 std::string MetalToolchainVersion();
 
+/// Selects what the d3d12 bundle stores: "dxbc" for the bytecode compiled offline, "hlsl" for the
+/// source the backend compiles at module creation. Returns false with *error on an unknown value.
+bool SetD3D12ShaderFormat(const std::string& format, std::string* error);
+
+/// True when the d3d12 bundle stores DXBC bytecode instead of HLSL source.
+bool D3D12UsesDxbc();
+
+/// Describes how the d3d12 payload is produced. Part of the profile's source digest, so switching
+/// between the two forms, or changing the compiler invocation, rebuilds the bundle.
+std::string HLSLCompilerFingerprint();
+
 /// Prepends #define directives to shader source from a list of "NAME=value" strings.
 std::string PrependDefines(const std::string& source, const std::vector<std::string>& defines);
 

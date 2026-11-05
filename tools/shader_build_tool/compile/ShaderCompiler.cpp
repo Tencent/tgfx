@@ -37,6 +37,9 @@ extern char** environ;
 #include <spirv_hlsl.hpp>
 #include <spirv_msl.hpp>
 #include <spirv_parser.hpp>
+#ifdef TGFX_SHADER_TOOL_HAS_D3DCOMPILER
+#include <d3dcompiler.h>
+#endif
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #ifdef TGFX_SHADER_TOOL_HAS_TINT
 #include "src/tint/lang/spirv/reader/reader.h"
@@ -703,6 +706,102 @@ std::string MetalToolchainVersion() {
     version += output;
   }
   return version;
+#endif
+}
+
+// --- Direct3D HLSL to DXBC ---------------------------------------------------------------
+//
+// A d3d12 bundle holds either the HLSL text (the backend's D3DCompile at module creation) or the
+// DXBC bytecode compiled here. The offline form removes the per-process compile from the first
+// frame; it is produced with the same compiler and flags the backend uses, so the two paths differ
+// only in when the work happens. Invoked in-process rather than by spawning fxc: no command line to
+// quote, no SDK path to discover, and the bytecode is exactly what the runtime would have made.
+static bool gD3D12UseDxbc = false;
+
+bool SetD3D12ShaderFormat(const std::string& format, std::string* error) {
+  if (format == "hlsl") {
+    gD3D12UseDxbc = false;
+    return true;
+  }
+  if (format != "dxbc") {
+    *error = "unknown D3D12 shader format \"" + format + "\" (expected dxbc or hlsl)";
+    return false;
+  }
+#if defined(TGFX_SHADER_TOOL_HAS_D3DCOMPILER)
+  gD3D12UseDxbc = true;
+  return true;
+#else
+  // Refuse rather than silently producing the other form: a build that asked for bytecode and got
+  // source would look successful while shipping a bundle with different first-frame behaviour.
+  *error = "the dxbc D3D12 shader format needs D3DCompiler, which this host does not provide; "
+           "configure with TGFX_D3D12_SHADER_FORMAT=hlsl";
+  (void)gD3D12UseDxbc;
+  return false;
+#endif
+}
+
+bool D3D12UsesDxbc() {
+  return gD3D12UseDxbc;
+}
+
+std::string HLSLCompilerFingerprint() {
+  // States the chosen payload form, so flipping TGFX_D3D12_SHADER_FORMAT invalidates the source
+  // digest and the bundle is rebuilt instead of being reused with the other form's bytes.
+  return std::string("format=") + (gD3D12UseDxbc ? "dxbc" : "hlsl") +
+         ";compile=D3DCompile strictness|optimization_level3 entry=main";
+}
+
+static const char* HlslStageProfile(ShaderStageType stage) {
+  return stage == ShaderStageType::Vertex ? "vs_5_0" : "ps_5_0";
+}
+
+std::vector<uint8_t> CompileHLSLToDXBC(const std::string& hlslSource, ShaderStageType stage,
+                                       std::string* error) {
+  std::string localError;
+  if (error == nullptr) {
+    error = &localError;
+  }
+  const char* stageName = stage == ShaderStageType::Vertex ? "vertex" : "fragment";
+#if defined(TGFX_SHADER_TOOL_HAS_D3DCOMPILER)
+  // The flags are fixed, never DEBUG: the bytecode ships in a bundle, so the tool's own build
+  // configuration must not change it. D3DCOMPILE_DEBUG would embed debug info and make the blob
+  // differ between the tool's Debug and Release builds.
+  UINT flags = D3DCOMPILE_ENABLE_STRICTNESS | D3DCOMPILE_OPTIMIZATION_LEVEL3;
+  ID3DBlob* codeBlob = nullptr;
+  ID3DBlob* errorBlob = nullptr;
+  auto hr = D3DCompile(hlslSource.data(), hlslSource.size(), nullptr, nullptr, nullptr, "main",
+                       HlslStageProfile(stage), flags, 0, &codeBlob, &errorBlob);
+  if (FAILED(hr)) {
+    char code[16] = {};
+    std::snprintf(code, sizeof(code), "0x%08X", static_cast<unsigned>(hr));
+    std::string message = std::string("D3DCompile failed (HRESULT=") + code + ")";
+    if (errorBlob != nullptr) {
+      message += ": ";
+      message.append(static_cast<const char*>(errorBlob->GetBufferPointer()),
+                     errorBlob->GetBufferSize());
+      errorBlob->Release();
+    }
+    *error = std::string("compiling the ") + stageName + " stage: " + message;
+    if (codeBlob != nullptr) {
+      codeBlob->Release();
+    }
+    return {};
+  }
+  if (errorBlob != nullptr) {
+    errorBlob->Release();
+  }
+  const auto* bytes = static_cast<const uint8_t*>(codeBlob->GetBufferPointer());
+  std::vector<uint8_t> data(bytes, bytes + codeBlob->GetBufferSize());
+  codeBlob->Release();
+  if (data.empty()) {
+    *error = std::string("the ") + stageName + " DXBC blob is empty";
+  }
+  return data;
+#else
+  (void)hlslSource;
+  *error = std::string("cannot compile the ") + stageName +
+           " stage to DXBC: this build of shader_build_tool has no D3DCompiler";
+  return {};
 #endif
 }
 

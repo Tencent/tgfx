@@ -78,7 +78,10 @@ void PrintUsage() {
       << "  --no-cache            Compile every stage, reading and writing no persistent cache\n"
       << "  --metal-sdk <sdk>     Platform of the Metal bundle: macosx (default), iphoneos or\n"
       << "                        iphonesimulator. A metallib only works on its own platform\n"
-      << "  --metal-min-os <ver>  Minimum OS version of the Metal bundle, e.g. 15.0\n";
+      << "  --metal-min-os <ver>  Minimum OS version of the Metal bundle, e.g. 15.0\n"
+      << "  --d3d12-shader-format <form>\n"
+      << "                        What a d3d12 bundle stores: dxbc (default, bytecode compiled\n"
+      << "                        here) or hlsl (source the backend compiles at module creation)\n";
 }
 
 std::vector<std::string> SplitByComma(const std::string& input) {
@@ -345,6 +348,8 @@ bool ParseArgs(int argc, char** argv, BuildOptions* options) {
       options->metalSdk = argv[++i];
     } else if (std::strcmp(argv[i], "--metal-min-os") == 0 && i + 1 < argc) {
       options->metalMinOS = argv[++i];
+    } else if (std::strcmp(argv[i], "--d3d12-shader-format") == 0 && i + 1 < argc) {
+      options->d3d12ShaderFormat = argv[++i];
     } else {
       std::cerr << "Unknown option: " << argv[i] << "\n";
       PrintUsage();

@@ -66,6 +66,33 @@ TGFX_TEST(ShaderProfileTest, FramebufferFetchSupport) {
   EXPECT_FALSE(ProfileSupportsFramebufferFetch(ShaderProfile::D3D12));
 }
 
+TGFX_TEST(ShaderProfileTest, PayloadFormsFollowTheProfileRule) {
+  // Vulkan stores SPIR-V words and the GL/WGSL profiles store driver source; only Metal and D3D12
+  // support both a precompiled container and the source their driver compiles.
+  for (auto profile : AllShaderProfiles) {
+    SCOPED_TRACE(ProfileTag(profile));
+    switch (profile) {
+      case ShaderProfile::Vulkan:
+        EXPECT_FALSE(ProfileAllowsPayload(profile, BundleFormat::Payload::Text));
+        EXPECT_TRUE(ProfileAllowsPayload(profile, BundleFormat::Payload::Binary));
+        break;
+      case ShaderProfile::Metal:
+      case ShaderProfile::D3D12:
+        EXPECT_TRUE(ProfileAllowsPayload(profile, BundleFormat::Payload::Text));
+        EXPECT_TRUE(ProfileAllowsPayload(profile, BundleFormat::Payload::Binary));
+        break;
+      case ShaderProfile::OpenGL:
+      case ShaderProfile::OpenGLES:
+      case ShaderProfile::WebGPU:
+        EXPECT_TRUE(ProfileAllowsPayload(profile, BundleFormat::Payload::Text));
+        EXPECT_FALSE(ProfileAllowsPayload(profile, BundleFormat::Payload::Binary));
+        break;
+    }
+    // A value past the last defined form names nothing the runtime could pick.
+    EXPECT_FALSE(ProfileAllowsPayload(profile, BundleFormat::Payload::Max + 1));
+  }
+}
+
 TGFX_TEST(ShaderProfileTest, FramebufferFetchVariantsFollowTheProfileRule) {
   auto info = QuadTextureFillShader().info();
   const auto& fragDomain = info.fragDomain;

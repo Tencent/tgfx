@@ -140,6 +140,11 @@ SourceDigestResult ComputeSourceDigest(const ShaderSourceSet& sources, ShaderPro
   // toolchain ABI discipline and by regenerating and comparing the bundle — not by this digest.
   if (profile == ShaderProfile::Metal) {
     stream.feedString(MetalCompilerFingerprint());
+  } else if (profile == ShaderProfile::D3D12) {
+    // D3D12 supports both a source form and a compiled form, so the digest must record which one
+    // this build produces: switching between them otherwise leaves a bundle whose digest matches
+    // while its bytes mean something else.
+    stream.feedString(HLSLCompilerFingerprint());
   }
 
   // The set is ordered by shader name, so the digest does not depend on registration order, which

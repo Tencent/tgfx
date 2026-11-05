@@ -88,6 +88,12 @@ std::string CompileGLSLToWGSL(const std::string& source, ShaderStageType stage,
                               const std::string& shaderName, uint32_t variantIndex,
                               std::string* error);
 
+/// Compiles HLSL source to DXBC bytecode with the system D3DCompiler, using the same flags the
+/// D3D12 backend passes when it compiles the source form. Always fails on a host without
+/// D3DCompiler, which is why the source form stays the fallback.
+std::vector<uint8_t> CompileHLSLToDXBC(const std::string& hlslSource, ShaderStageType stage,
+                                       std::string* error);
+
 /// Compiles MSL source text to Metal library binary (.metallib) using xcrun metal/metallib, run
 /// without a shell on files in a scratch directory private to this process. Returns an empty
 /// vector on failure, with *error naming the failed step, its exit status and the compiler's
@@ -130,6 +136,11 @@ class StageCompiler {
   /// Translates SPIR-V to HLSL, reusing a previous translation of the same module under the same
   /// sharing rule as translateMSL.
   const TextStage& translateHLSL(const std::vector<uint32_t>& spirv, ShaderStageType stage);
+
+  /// Compiles HLSL text to DXBC, reusing a previous compilation. The key carries the compiler
+  /// fingerprint because the flags are part of what decides the bytecode.
+  std::vector<uint8_t> compileDxbc(const std::string& hlsl, ShaderStageType stage,
+                                   std::string* error);
 
   /// Extracts the reflection of one variant, shared across backend passes like the compiles
   /// above: the same (family, vert, frag) reflects the same two SPIR-V modules every time.

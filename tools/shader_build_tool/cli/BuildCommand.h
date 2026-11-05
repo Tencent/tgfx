@@ -44,6 +44,10 @@ struct BuildOptions {
   bool noCache = false;
   // The platform the Metal bundle is compiled for (see SetMetalTarget).
   std::string metalSdk = "macosx";
+  /// What a d3d12 bundle stores: dxbc (bytecode compiled here, the default) or hlsl (source the
+  /// backend compiles). Requesting dxbc on a host without D3DCompiler fails the build rather than
+  /// quietly producing the other form.
+  std::string d3d12ShaderFormat = "dxbc";
   std::string metalMinOS;
 };
 
