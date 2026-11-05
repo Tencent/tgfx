@@ -125,6 +125,9 @@ static Backend TestBackend() {
   if (backend == "webgpu") {
     return Backend::WebGPU;
   }
+  if (backend == "d3d12") {
+    return Backend::D3D12;
+  }
   return Backend::Unknown;
 }
 
@@ -1098,7 +1101,7 @@ TGFX_TEST(ShaderPermutationTest, EmbeddedBundleIsPresentAndCurrent) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto backend = context->backend();
-  if (backend == Backend::D3D12 || backend == Backend::Unknown) {
+  if (backend == Backend::Unknown) {
     GTEST_SKIP() << "This backend has no precompiled shader bundle";
   }
   const std::string tag = BundleTag();
@@ -1108,7 +1111,8 @@ TGFX_TEST(ShaderPermutationTest, EmbeddedBundleIsPresentAndCurrent) {
       << "No \"" << tag
       << "\" bundle is embedded in this build. Either TGFX_EMBED_SHADER_BUNDLES is OFF or the "
          "bundle generation step did not produce one; every AOT test fails without it.";
-  ASSERT_GE(size, 80u) << "The embedded \"" << tag << "\" bundle is smaller than its header";
+  ASSERT_GE(size, BundleFormat::HeaderSize)
+      << "The embedded \"" << tag << "\" bundle is smaller than its header";
 
   // The ABI is read from the raw header first so a mismatch reports both numbers, instead of the
   // loader's log line that the test output usually buries.
@@ -1142,7 +1146,7 @@ TGFX_TEST(ShaderPermutationTest, ContextRecordsTheEmbeddedBundleState) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto backend = context->backend();
-  if (backend == Backend::D3D12 || backend == Backend::Unknown) {
+  if (backend == Backend::Unknown) {
     GTEST_SKIP() << "This backend has no precompiled shader bundle";
   }
   auto state = context->precompiledShaderCache()->embeddedBundleState();

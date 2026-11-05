@@ -592,6 +592,14 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
         profileTag.c_str(), ProfileTag(*requiredProfile));
     return false;
   }
+  // The profile fixes which payload forms are legal (see ProfileAllowsPayload). A kind outside it
+  // is refused at load instead of being handed to the backend as a format it cannot be: a Vulkan
+  // bundle claiming text, for example, would have its SPIR-V words read through the text field.
+  if (requiredProfile && !ProfileAllowsPayload(*requiredProfile, header.payloadFormat)) {
+    LOGE("PrecompiledShaderCache: Payload format %u is not one the '%s' profile can store",
+         header.payloadFormat, profileTag.c_str());
+    return false;
+  }
 
   const uint8_t* loadPtr = ptr;
   size_t loadSize = size;

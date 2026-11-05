@@ -719,25 +719,21 @@ std::string MetalToolchainVersion() {
 static bool gD3D12UseDxbc = false;
 
 bool SetD3D12ShaderFormat(const std::string& format, std::string* error) {
+  // The flag is accepted on every host, including ones that cannot produce DXBC: the digest and
+  // the verifier both need to state which form a bundle holds, and neither compiles anything. The
+  // availability check happens where the bytecode is actually produced (CompileHLSLToDXBC), so a
+  // host without D3DCompiler still fails the build that genuinely asked for bytecode — it just
+  // does not fail every unrelated build of every other profile.
+  if (format == "dxbc") {
+    gD3D12UseDxbc = true;
+    return true;
+  }
   if (format == "hlsl") {
     gD3D12UseDxbc = false;
     return true;
   }
-  if (format != "dxbc") {
-    *error = "unknown D3D12 shader format \"" + format + "\" (expected dxbc or hlsl)";
-    return false;
-  }
-#if defined(TGFX_SHADER_TOOL_HAS_D3DCOMPILER)
-  gD3D12UseDxbc = true;
-  return true;
-#else
-  // Refuse rather than silently producing the other form: a build that asked for bytecode and got
-  // source would look successful while shipping a bundle with different first-frame behaviour.
-  *error = "the dxbc D3D12 shader format needs D3DCompiler, which this host does not provide; "
-           "configure with TGFX_D3D12_SHADER_FORMAT=hlsl";
-  (void)gD3D12UseDxbc;
+  *error = "unknown D3D12 shader format \"" + format + "\" (expected dxbc or hlsl)";
   return false;
-#endif
 }
 
 bool D3D12UsesDxbc() {
