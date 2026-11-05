@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include "gpu/shaders/contract/ShaderBundleContract.h"
 
 namespace tgfx {
 
@@ -62,6 +63,9 @@ struct VariantData {
   uint32_t vertPermutationIndex = 0;
   uint32_t fragPermutationIndex = 0;
   std::string profileTag;
+  /// One of BundleFormat::Payload: what the two blobs hold. A profile's emitters all produce the
+  /// same kind, and the writer states it once in the bundle header.
+  uint16_t payloadKind = BundleFormat::Payload::Text;
   std::vector<uint8_t> vertexBlob;
   std::vector<uint8_t> fragmentBlob;
   StageReflectionData vertexReflection;

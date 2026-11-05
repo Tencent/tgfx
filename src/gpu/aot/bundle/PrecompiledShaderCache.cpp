@@ -531,6 +531,12 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     LOGE("PrecompiledShaderCache: Unsupported compression type %u", header.compressionType);
     return false;
   }
+  // The payload kind decides which ShaderCodeFormat the blobs are handed to the backend as. An
+  // unknown value names no form the loader could pick, so it is refused like the other enum fields.
+  if (header.payloadFormat > BundleFormat::Payload::Max) {
+    LOGE("PrecompiledShaderCache: Unsupported payload format %u", header.payloadFormat);
+    return false;
+  }
   uint64_t sourceHash = header.identityHash;
   // Toolchain ABI gate (F04): the content identity hash covers the bytes, but not what they
   // mean. The recorded toolchain version is the one contract every writer has stamped since the
@@ -721,6 +727,7 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
   parsed.profileTag = std::move(profileTag);
   parsed.identityHash = sourceHash;
   parsed.toolchainABI = toolchainVersion;
+  parsed.payloadFormat = header.payloadFormat;
   parsed.vertEntries = std::move(newVertEntries);
   parsed.fragEntries = std::move(newFragEntries);
   _bundle = ShareParsedBundle(sourceHash, size, std::move(parsed));

@@ -282,6 +282,16 @@ BundleCheckResult VerifyOneBundle(const std::string& path, ShaderProfile profile
            "embedded profile tag \"" + header.profileTag + "\" does not match the backend");
     result.violations++;
   }
+  // The profile fixes which payload forms are legal: a GL or WGSL bundle is always driver source,
+  // a Vulkan bundle is always SPIR-V words, and Metal and D3D12 may be either. A kind outside the
+  // allowed set would make the runtime hand the blobs to the backend as the wrong format.
+  if (header.payloadFormat > BundleFormat::Payload::Max ||
+      !ProfileAllowsPayload(profile, header.payloadFormat)) {
+    Report(diagnostics, Severity::Error, DiagnosticCode::VerifyBundleHeader, expectedTag.c_str(),
+           "payload format " + std::to_string(header.payloadFormat) +
+               " is not one this profile can store");
+    result.violations++;
+  }
   // All layout arithmetic runs in size_t: the u32 fields can carry counts whose 28-byte strides
   // overflow 32 bits (0x40000000 entries wrap to zero), which would otherwise slip past these
   // checks and read past the end of the file below.

@@ -218,6 +218,12 @@ class PrecompiledShaderCache {
     _embeddedBundleState = state;
   }
 
+  /// What the loaded bundle's code blobs hold, one of BundleFormat::Payload. Reports the text form
+  /// before any bundle is loaded.
+  uint16_t payloadFormat() const {
+    return _bundle == nullptr ? BundleFormat::Payload::Text : _bundle->payloadFormat;
+  }
+
   /// Returns true if at least one bundle has been loaded.
   bool isLoaded() const {
     return _bundle != nullptr && (!_bundle->vertEntries.empty() || !_bundle->fragEntries.empty());
@@ -457,6 +463,7 @@ class PrecompiledShaderCache {
     std::string profileTag;
     uint64_t identityHash = 0;
     uint32_t toolchainABI = 0;
+    uint16_t payloadFormat = BundleFormat::Payload::Text;
     std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> vertEntries;
     std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> fragEntries;
   };

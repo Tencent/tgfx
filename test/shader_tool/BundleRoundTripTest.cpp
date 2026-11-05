@@ -224,6 +224,42 @@ TEST(BundleHeaderTest, TheWriterFillsExactlyTheDocumentedLayout) {
   std::remove(path.c_str());
 }
 
+TEST(BundleHeaderTest, ThePayloadFormatFollowsTheProfileTag) {
+  const std::string tag = ProfileTag(ShaderProfile::Metal);
+  for (uint16_t kind : {BundleFormat::Payload::Text, BundleFormat::Payload::Binary}) {
+    SCOPED_TRACE(kind);
+    auto variant = FullVariant("Payload", 0, 0, tag, "vert", "frag");
+    variant.payloadKind = kind;
+    std::vector<VariantData> variants = {variant};
+    auto path = TempPath(kind == BundleFormat::Payload::Binary ? "payload_binary.bin"
+                                                              : "payload_text.bin");
+    Diagnostics diagnostics;
+    ASSERT_TRUE(WriteBundle(path, tag, variants, false, &diagnostics));
+    auto bytes = ReadFile(path);
+    ASSERT_GE(bytes.size(), BundleFormat::HeaderSize);
+    const auto offset = BundleFormat::Offset::PayloadFormat;
+    // The field sits directly behind the profile tag, followed by the reserved half-word that
+    // keeps the header 4-byte aligned.
+    EXPECT_EQ(offset, BundleFormat::Offset::ProfileTag + BundleFormat::ProfileTagSize);
+    EXPECT_EQ(bytes[offset] | (bytes[offset + 1] << 8), kind);
+    EXPECT_EQ(bytes[offset + 2] | (bytes[offset + 3] << 8), 0);
+    std::remove(path.c_str());
+  }
+}
+
+TEST(BundleHeaderTest, AVariantListThatDisagreesOnThePayloadKindFails) {
+  const std::string tag = ProfileTag(ShaderProfile::Metal);
+  auto text = FullVariant("Mixed", 0, 0, tag, "vert", "frag");
+  auto binary = FullVariant("Mixed", 1, 0, tag, "vert", "frag");
+  binary.payloadKind = BundleFormat::Payload::Binary;
+  std::vector<VariantData> variants = {text, binary};
+  auto path = TempPath("mixed_payload.bin");
+  Diagnostics diagnostics;
+  EXPECT_FALSE(WriteBundle(path, tag, variants, false, &diagnostics));
+  EXPECT_FALSE(diagnostics.records().empty());
+  std::remove(path.c_str());
+}
+
 TEST(BundleHeaderTest, AnEmptyVariantListWritesNothing) {
   auto path = TempPath("empty.bin");
   std::remove(path.c_str());

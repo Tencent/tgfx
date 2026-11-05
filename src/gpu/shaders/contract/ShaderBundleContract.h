@@ -341,12 +341,13 @@ namespace BundleFormat {
 inline constexpr uint32_t Magic = 0x54475346u;
 
 /// The only version the writer produces, the runtime loader reads, and --verify-bundle accepts.
-/// Older versions carried no array sizes (v3) or no vertex input reflection (v4) and were read
-/// through compatibility branches the loader no longer has; they are refused instead.
-inline constexpr uint16_t CurrentVersion = 5;
+/// Older versions carried no array sizes (v3), no vertex input reflection (v4) or no payload
+/// format field (v5) and were read through compatibility branches the loader no longer has; they
+/// are refused instead.
+inline constexpr uint16_t CurrentVersion = 6;
 
 /// The size of the fixed header.
-inline constexpr uint32_t HeaderSize = 80;
+inline constexpr uint32_t HeaderSize = 84;
 
 /// The size of one pool entry: hashHi(8) + hashLo(8) + dataOffset(4) + dataSize(4) +
 /// reflectionOffset(4).
@@ -375,7 +376,20 @@ inline constexpr uint32_t DataOffset = 36;        // u32
 inline constexpr uint32_t DataSize = 40;          // u32, uncompressed size of the data pool
 inline constexpr uint32_t ReflectionOffset = 44;  // u32, 0 when the bundle has no reflection
 inline constexpr uint32_t ProfileTag = 48;        // ProfileTagSize bytes, zero padded
+inline constexpr uint32_t PayloadFormat = 80;     // u16, see Payload
 }  // namespace Offset
+
+// What the data pool holds for this profile. A profile's payload is uniform across its stages and
+// variants, so the kind is a header field rather than a per-entry one: the runtime reads it once
+// and picks ShaderCodeFormat from it instead of assuming a form per backend.
+namespace Payload {
+/// Driver-native source text: GLSL, MSL, WGSL or HLSL.
+inline constexpr uint16_t Text = 0;
+/// Precompiled container: SPIR-V words, a metallib or DXBC bytecode.
+inline constexpr uint16_t Binary = 1;
+/// The largest value the loader accepts.
+inline constexpr uint16_t Max = Binary;
+}  // namespace Payload
 
 /// The size of the profile tag field, including the zero padding.
 inline constexpr uint32_t ProfileTagSize = 32;
@@ -398,12 +412,41 @@ inline constexpr uint32_t DataSize = 20;          // u32
 inline constexpr uint32_t ReflectionOffset = 24;  // u32, relative to the reflection pool
 }  // namespace EntryOffset
 
-static_assert(Offset::ProfileTag + ProfileTagSize == HeaderSize,
+static_assert(Offset::PayloadFormat == Offset::ProfileTag + ProfileTagSize,
+              "the payload format field follows the profile tag");
+// PayloadFormat is a u16 followed by a u16 of reserved space, keeping the header 4-byte aligned.
+static_assert(Offset::PayloadFormat + 2 * sizeof(uint16_t) == HeaderSize,
               "the header fields must tile the header exactly");
 static_assert(EntryOffset::ReflectionOffset + sizeof(uint32_t) == PoolEntrySize,
               "the entry fields must tile the pool entry exactly");
 
 }  // namespace BundleFormat
+
+/**
+ * Returns true when a bundle of the given profile may declare the given payload form. The profile
+ * fixes which forms are legal: Vulkan stores only SPIR-V words, and the GL and WGSL profiles store
+ * only driver source, while Metal (MSL or metallib) and D3D12 (HLSL or DXBC) support both a
+ * precompiled container and the driver-native source the driver compiles. A kind outside the
+ * profile's set would make the runtime hand the blobs to the backend as the wrong format.
+ */
+inline bool ProfileAllowsPayload(ShaderProfile profile, uint16_t payloadFormat) {
+  if (payloadFormat > BundleFormat::Payload::Max) {
+    return false;
+  }
+  const bool binary = payloadFormat == BundleFormat::Payload::Binary;
+  switch (profile) {
+    case ShaderProfile::Vulkan:
+      return binary;
+    case ShaderProfile::OpenGL:
+    case ShaderProfile::OpenGLES:
+    case ShaderProfile::WebGPU:
+      return !binary;
+    case ShaderProfile::Metal:
+    case ShaderProfile::D3D12:
+      return true;
+  }
+  return false;
+}
 
 // ---------------------------------------------------------------------------------------------
 // Bundle identity: the content hash and the toolchain ABI.
@@ -435,7 +478,7 @@ static_assert(EntryOffset::ReflectionOffset + sizeof(uint32_t) == PoolEntrySize,
  * whose recorded ABI is not this value. The same goes for any change to a shader source or to its
  * variant rules, which changes the source digest the manifests record.
  */
-inline constexpr uint32_t ExpectedToolchainABI = 0x0001001du;
+inline constexpr uint32_t ExpectedToolchainABI = 0x0001001eu;
 
 inline uint64_t BundleIdentityHashInit() {
   return 0x54475346424E4443ULL;  // "TGSF BNDC"

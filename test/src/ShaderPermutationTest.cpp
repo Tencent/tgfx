@@ -1223,14 +1223,14 @@ static void SetTestBundleIdentity(std::vector<uint8_t>* bundle);
 
 static std::vector<uint8_t> MakeTestBundle(const std::string& profileTag, uint32_t vertCount,
                                            uint32_t fragCount, uint32_t hashSeed) {
-  constexpr uint32_t HeaderSize = 80;
-  constexpr uint32_t PoolEntrySize = 28;
+  constexpr uint32_t HeaderSize = BundleFormat::HeaderSize;
+  constexpr uint32_t PoolEntrySize = BundleFormat::PoolEntrySize;
   auto fragPoolOffset = HeaderSize + vertCount * PoolEntrySize;
   auto dataOffset = fragPoolOffset + fragCount * PoolEntrySize;
   auto dataSize = vertCount + fragCount;
   std::vector<uint8_t> bundle(dataOffset + dataSize, 0);
-  TestWriteU32LE(bundle.data(), 0x54475346);
-  TestWriteU16LE(bundle.data() + 4, 5);
+  TestWriteU32LE(bundle.data(), BundleFormat::Magic);
+  TestWriteU16LE(bundle.data() + 4, BundleFormat::CurrentVersion);
   TestWriteU32LE(bundle.data() + 16, ExpectedToolchainABI);
   TestWriteU32LE(bundle.data() + 20, vertCount);
   TestWriteU32LE(bundle.data() + 24, fragCount);
@@ -1447,9 +1447,10 @@ TGFX_TEST(ShaderPermutationTest, BundleRejectsBlobOutsideDataPool) {
     auto invalid =
         CompressTestBundle(MakeReflectedTestBundle(BundleFormat::CurrentVersion), compression);
     ASSERT_FALSE(invalid.empty());
-    TestWriteU32LE(invalid.data() + 80 + 16, 2);
+    TestWriteU32LE(invalid.data() + BundleFormat::HeaderSize + 16, 2);
     ExpectBundleRejectedPreservingCache(invalid);
-    TestWriteU32LE(invalid.data() + 80 + 16, std::numeric_limits<uint32_t>::max());
+    TestWriteU32LE(invalid.data() + BundleFormat::HeaderSize + 16,
+                   std::numeric_limits<uint32_t>::max());
     ExpectBundleRejectedPreservingCache(invalid);
   }
 }
@@ -1459,9 +1460,10 @@ TGFX_TEST(ShaderPermutationTest, BundleRejectsReflectionOutsidePool) {
     auto invalid = MakeReflectedTestBundle(BundleFormat::CurrentVersion);
     auto reflectionSize =
         static_cast<uint32_t>(invalid.size()) - TestReadU32LE(invalid.data() + 44);
-    TestWriteU32LE(invalid.data() + 80 + 24, reflectionSize);
+    TestWriteU32LE(invalid.data() + BundleFormat::HeaderSize + 24, reflectionSize);
     ExpectBundleRejectedPreservingCache(invalid);
-    TestWriteU32LE(invalid.data() + 80 + 24, std::numeric_limits<uint32_t>::max());
+    TestWriteU32LE(invalid.data() + BundleFormat::HeaderSize + 24,
+                   std::numeric_limits<uint32_t>::max());
     ExpectBundleRejectedPreservingCache(invalid);
   }
 }
@@ -1578,6 +1580,27 @@ TGFX_TEST(ShaderPermutationTest, BundleRejectsIncompatibleToolchainABI) {
   EXPECT_NE(cache.findVertex(50, 0), nullptr);
 }
 
+TGFX_TEST(ShaderPermutationTest, BundleRejectsUnknownPayloadFormat) {
+  // The payload kind decides which ShaderCodeFormat the blobs are handed to the backend as, so a
+  // value past the last defined form names nothing the loader could pick.
+  for (uint16_t stamped : {uint16_t{BundleFormat::Payload::Max + 1}, uint16_t{0xFFFF}}) {
+    SCOPED_TRACE(stamped);
+    auto bundle = MakeTestBundle("payload", 1, 0, 50);
+    TestWriteU16LE(bundle.data() + BundleFormat::Offset::PayloadFormat, stamped);
+    ExpectBundleRejectedPreservingCache(bundle);
+  }
+  // Both defined forms load: the field states what the blobs hold, it does not gate the profile.
+  for (uint16_t stamped : {BundleFormat::Payload::Text, BundleFormat::Payload::Binary}) {
+    SCOPED_TRACE(stamped);
+    auto bundle = MakeTestBundle("payload", 1, 0, 50);
+    TestWriteU16LE(bundle.data() + BundleFormat::Offset::PayloadFormat, stamped);
+    PrecompiledShaderCache cache(nullptr, Backend::Unknown);
+    ASSERT_TRUE(cache.loadBundle(bundle.data(), bundle.size()));
+    EXPECT_EQ(cache.payloadFormat(), stamped);
+    EXPECT_NE(cache.findVertex(50, 0), nullptr);
+  }
+}
+
 TGFX_TEST(ShaderPermutationTest, BundleRejectsAllocationAmplification) {
   constexpr uint32_t BlobSize = 1024u * 1024u;
   constexpr uint32_t EntryCount = 257;
@@ -1589,8 +1612,8 @@ TGFX_TEST(ShaderPermutationTest, BundleRejectsAllocationAmplification) {
   PrecompiledShaderCache cache(nullptr, Backend::Unknown);
   ASSERT_TRUE(cache.loadBundle(bundle.data(), bundle.size()));
   for (uint32_t index = 0; index < EntryCount; ++index) {
-    TestWriteU32LE(bundle.data() + 80 + index * 28 + 16, 0);
-    TestWriteU32LE(bundle.data() + 80 + index * 28 + 20, BlobSize);
+    TestWriteU32LE(bundle.data() + BundleFormat::HeaderSize + index * 28 + 16, 0);
+    TestWriteU32LE(bundle.data() + BundleFormat::HeaderSize + index * 28 + 20, BlobSize);
   }
   auto generation = cache.bundleGeneration();
   EXPECT_FALSE(cache.loadBundle(bundle.data(), bundle.size()));

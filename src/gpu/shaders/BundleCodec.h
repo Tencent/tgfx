@@ -90,6 +90,8 @@ struct BundleHeader {
   uint32_t dataSize = 0;
   uint32_t reflectionOffset = 0;
   std::string profileTag;
+  /// What the data pool holds, one of BundleFormat::Payload.
+  uint16_t payloadFormat = 0;
 };
 
 /**

@@ -120,6 +120,7 @@ bool ParseBundleHeader(const uint8_t* data, size_t size, BundleHeader* header) {
   header->reflectionOffset = ReadHeaderU32(data, BundleFormat::Offset::ReflectionOffset);
   const auto* tag = reinterpret_cast<const char*>(data + BundleFormat::Offset::ProfileTag);
   header->profileTag.assign(tag, strnlen(tag, BundleFormat::ProfileTagSize));
+  header->payloadFormat = ReadHeaderU16(data, BundleFormat::Offset::PayloadFormat);
   return true;
 }
 

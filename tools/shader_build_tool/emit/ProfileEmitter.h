@@ -46,6 +46,9 @@ namespace tgfx {
 struct EmittedStages {
   std::vector<uint8_t> vertexBlob;
   std::vector<uint8_t> fragmentBlob;
+  /// One of BundleFormat::Payload. Emitters that can produce either form (a text source the driver
+  /// compiles, or a precompiled container) state which one they chose.
+  uint16_t payloadKind = BundleFormat::Payload::Text;
 };
 
 /// Everything an emitter consumes to emit one variant. The pointees belong to the caller and

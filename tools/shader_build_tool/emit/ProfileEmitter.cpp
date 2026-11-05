@@ -75,7 +75,11 @@ class VulkanEmitter : public ProfileEmitter {
                         (vertOpt.success ? fragOpt.error : vertOpt.error));
       return std::nullopt;
     }
-    return EmittedStages{WordsToBytes(vertOpt.spirv), WordsToBytes(fragOpt.spirv)};
+    EmittedStages stages;
+    stages.payloadKind = BundleFormat::Payload::Binary;
+    stages.vertexBlob = WordsToBytes(vertOpt.spirv);
+    stages.fragmentBlob = WordsToBytes(fragOpt.spirv);
+    return stages;
   }
 };
 
@@ -100,6 +104,7 @@ class MetalEmitter : public ProfileEmitter {
     }
     std::string metalError;
     EmittedStages stages;
+    stages.payloadKind = BundleFormat::Payload::Binary;
     stages.vertexBlob =
         compiler->compileMetallib(mslVert.text, ShaderStageType::Vertex, &metalError);
     if (!stages.vertexBlob.empty()) {

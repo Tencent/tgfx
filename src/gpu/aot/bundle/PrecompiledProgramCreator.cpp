@@ -44,23 +44,31 @@
 
 namespace tgfx {
 
-// The format names the payload the bundle stores. Metal artifacts are precompiled metallibs
-// (binary); the text formats below are what the backend's driver compiles.
-static ShaderCodeFormat FormatForBackend(Backend backend, bool hasBinary) {
+// The format names the payload the bundle stores. The backend picks the dialect and the bundle
+// header says whether that dialect arrives as driver source text or as a precompiled container;
+// Metal and D3D12 support both forms, so their choice is read from the bundle rather than assumed.
+static ShaderCodeFormat FormatForBackend(Backend backend, uint16_t payloadFormat) {
+  const bool binary = payloadFormat == BundleFormat::Payload::Binary;
   switch (backend) {
     case Backend::Vulkan:
       return ShaderCodeFormat::SPIRV;
     case Backend::Metal:
-      return hasBinary ? ShaderCodeFormat::METALLIB : ShaderCodeFormat::MSL;
+      return binary ? ShaderCodeFormat::METALLIB : ShaderCodeFormat::MSL;
     case Backend::WebGPU:
       return ShaderCodeFormat::WGSL;
     case Backend::D3D12:
-      // The d3d12 bundle stores HLSL text, which D3DCompile turns into DXBC when the module is
-      // created. Unlike Metal there is no binary alternative yet, so hasBinary does not apply.
-      return ShaderCodeFormat::HLSL;
+      return binary ? ShaderCodeFormat::DXBC : ShaderCodeFormat::HLSL;
     default:
       return ShaderCodeFormat::GLSL;
   }
+}
+
+// Which descriptor field carries the blob. Derived from the format rather than from the bundle's
+// payload field so the two can never disagree: a format that names a container reads binaryData,
+// a format that names driver source reads code.
+static bool IsBinaryFormat(ShaderCodeFormat format) {
+  return format == ShaderCodeFormat::SPIRV || format == ShaderCodeFormat::METALLIB ||
+         format == ShaderCodeFormat::DXBC;
 }
 
 static void AppendFragmentProcessor(std::stringstream& stream, const FragmentProcessor* processor) {
@@ -379,12 +387,13 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   }
   cache->recordArtifactHit();
 
-  auto format = FormatForBackend(context->backend(), true);
+  auto format = FormatForBackend(context->backend(), cache->payloadFormat());
+  const bool binaryPayload = IsBinaryFormat(format);
 
   ShaderModuleDescriptor vertexDesc = {};
   vertexDesc.format = format;
   vertexDesc.stage = ShaderStage::Vertex;
-  if (format == ShaderCodeFormat::SPIRV || format == ShaderCodeFormat::METALLIB) {
+  if (binaryPayload) {
     vertexDesc.binaryData = vertBlob->data;
   } else {
     vertexDesc.code = std::string(vertBlob->data.begin(), vertBlob->data.end());
@@ -400,7 +409,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   ShaderModuleDescriptor fragmentDesc = {};
   fragmentDesc.format = format;
   fragmentDesc.stage = ShaderStage::Fragment;
-  if (format == ShaderCodeFormat::SPIRV || format == ShaderCodeFormat::METALLIB) {
+  if (binaryPayload) {
     fragmentDesc.binaryData = fragBlob->data;
   } else {
     fragmentDesc.code = std::string(fragBlob->data.begin(), fragBlob->data.end());

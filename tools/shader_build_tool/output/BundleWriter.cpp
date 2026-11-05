@@ -114,6 +114,18 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
     return true;
   }
 
+  // The payload kind is a header field, so every variant of a bundle must agree on it: a bundle
+  // that mixed text and binary blobs would have no single answer for what the data pool holds.
+  const uint16_t payloadKind = variants.front().payloadKind;
+  for (const auto& v : variants) {
+    if (v.payloadKind != payloadKind) {
+      ReportWriteFailure(diagnostics, DiagnosticCode::OutputWrite, "", profileTag, -1, -1,
+                         "the variants disagree on the payload kind; one bundle cannot hold both "
+                         "text and binary code blobs");
+      return false;
+    }
+  }
+
   // Build separate vert and frag entries with deduplication by hash.
   std::vector<uint8_t> dataPool;
   std::vector<uint8_t> reflPool;
@@ -265,6 +277,8 @@ bool WriteBundle(const std::string& outPath, const std::string& profileTag,
   WriteU32LE(file, actualReflectionOffset);
   static_assert(sizeof(tagBuf) == BundleFormat::ProfileTagSize, "the tag buffer is the tag field");
   file.write(tagBuf, sizeof(tagBuf));
+  WriteU16LE(file, payloadKind);
+  WriteU16LE(file, 0);  // reserved, keeps the header 4-byte aligned
   if (static_cast<std::streamoff>(file.tellp()) !=
       static_cast<std::streamoff>(BundleFormat::HeaderSize)) {
     ReportWriteFailure(diagnostics, DiagnosticCode::OutputWrite, "", profileTag, -1, -1,

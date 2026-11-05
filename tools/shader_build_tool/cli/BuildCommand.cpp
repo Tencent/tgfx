@@ -301,6 +301,7 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
       variant.vertPermutationIndex = vi;
       variant.fragPermutationIndex = fi;
       variant.profileTag = backend;
+      variant.payloadKind = stages->payloadKind;
       variant.vertexBlob = std::move(stages->vertexBlob);
       variant.fragmentBlob = std::move(stages->fragmentBlob);
       variant.vertexReflection = reflection.vertexReflection;
