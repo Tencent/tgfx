@@ -185,8 +185,7 @@ static std::string OwningClassBefore(const std::string& text, size_t position) {
   // <regex> has never implemented std::regex_constants::multiline, so the flag is unavailable
   // there. Without multiline "^" matches only the start of the string, and the alternative covers
   // every other line start, which is the same language.
-  static const std::regex classPattern =
-      std::regex("(?:^|\\n)[ \\t]*class\\s+(\\w+)[^{;]*\\{");
+  static const std::regex classPattern = std::regex("(?:^|\\n)[ \\t]*class\\s+(\\w+)[^{;]*\\{");
   std::string owner = {};
   auto begin = std::sregex_iterator(text.begin(), text.end(), classPattern);
   auto end = std::sregex_iterator();

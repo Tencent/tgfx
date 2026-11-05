@@ -2829,26 +2829,23 @@ TGFX_TEST_PRIVATE(AOTEffectTest, ChainRejectsNonRGBAColorFormats) {
   // getTextureView() is protected: the probe needs the private-access build, which MSVC does not
   // offer, so this case is registered only where the test build can reach it.
   TGFX_PRIVATE_ACCESS(
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_NE(context, nullptr);
-  BlockAllocator allocator;
-  auto colorMatrix = ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix);
-  ASSERT_NE(colorMatrix, nullptr);
-  for (auto format : {PixelFormat::GRAY_8, PixelFormat::RG_88}) {
-    auto grayLeaf = MakeTextureProcessor(context, &allocator, format);
-    if (grayLeaf == nullptr ||
-        static_cast<const TextureEffect*>(grayLeaf.get())->getTextureView() == nullptr) {
-      // No view can be instantiated for this format here (no upload source exists): the gate's
-      // observable behavior needs a HardwareBuffer-backed environment.
-      continue;
-    }
-    SCOPED_TRACE(static_cast<int>(format));
-    AOTEffectGraph graph = {};
-    // The lowering must refuse the leaf (no swizzle contract on the chain's plain path).
-    EXPECT_FALSE(AOTEffectDecomposer::Lower({grayLeaf.get(), colorMatrix.get()}, &graph));
-  }
-  )
+      ContextScope scope; auto context = scope.getContext(); ASSERT_NE(context, nullptr);
+      BlockAllocator allocator;
+      auto colorMatrix = ColorMatrixFragmentProcessor::Make(&allocator, IdentityColorMatrix);
+      ASSERT_NE(colorMatrix, nullptr); for (auto format
+                                            : {PixelFormat::GRAY_8, PixelFormat::RG_88}) {
+        auto grayLeaf = MakeTextureProcessor(context, &allocator, format);
+        if (grayLeaf == nullptr ||
+            static_cast<const TextureEffect*>(grayLeaf.get())->getTextureView() == nullptr) {
+          // No view can be instantiated for this format here (no upload source exists): the gate's
+          // observable behavior needs a HardwareBuffer-backed environment.
+          continue;
+        }
+        SCOPED_TRACE(static_cast<int>(format));
+        AOTEffectGraph graph = {};
+        // The lowering must refuse the leaf (no swizzle contract on the chain's plain path).
+        EXPECT_FALSE(AOTEffectDecomposer::Lower({grayLeaf.get(), colorMatrix.get()}, &graph));
+      })
 }
 
 // Audit A6: the admission budget must count FINAL ENCODED instructions,

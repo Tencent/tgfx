@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "D3D12ShaderModule.h"
+#include <d3d12shader.h>
 #include <cstring>
 #include <utility>
-#include <d3d12shader.h>
 #include "D3D12GPU.h"
 #include "core/utils/Log.h"
 #include "gpu/ShaderInterface.h"

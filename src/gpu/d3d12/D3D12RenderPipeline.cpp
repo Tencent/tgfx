@@ -310,9 +310,10 @@ bool D3D12RenderPipeline::createPipelineState(D3D12GPU* gpu,
   for (const auto& layout : descriptor.vertex.bufferLayouts) {
     if (!layout.shaderLocations.empty() &&
         layout.shaderLocations.size() != layout.attributes.size()) {
-      LOGE("D3D12RenderPipeline: shaderLocations (%zu) and attributes (%zu) disagree; the layout "
-           "contract requires equal counts when the slot list is set.",
-           layout.shaderLocations.size(), layout.attributes.size());
+      LOGE(
+          "D3D12RenderPipeline: shaderLocations (%zu) and attributes (%zu) disagree; the layout "
+          "contract requires equal counts when the slot list is set.",
+          layout.shaderLocations.size(), layout.attributes.size());
       return false;
     }
   }
@@ -326,8 +327,8 @@ bool D3D12RenderPipeline::createPipelineState(D3D12GPU* gpu,
       const auto& attr = layout.attributes[j];
       const uint32_t attributeOffset = offset;
       offset += static_cast<uint32_t>(attr.size());
-      uint32_t semanticIndex = layout.shaderLocations.empty() ? globalLocation++
-                                                              : layout.shaderLocations[j];
+      uint32_t semanticIndex =
+          layout.shaderLocations.empty() ? globalLocation++ : layout.shaderLocations[j];
       // D3D12 requires every input element to reference a semantic the vertex shader's input
       // signature actually declares (CreateGraphicsPipelineState returns E_INVALIDARG
       // otherwise), which is stricter than the other backends: an attribute parked on a spare
