@@ -26,8 +26,9 @@ option(TGFX_USE_OPENGL "Use OpenGL as the GPU backend" ON)
 option(TGFX_USE_METAL "Use Metal as the GPU backend on Apple platforms" OFF)
 option(TGFX_USE_D3D12 "Use D3D12 as the GPU backend on Windows" OFF)
 option(TGFX_D3D12_USE_WARP "Force the D3D12 backend onto the WARP software rasterizer (CI only)" OFF)
-set(TGFX_D3D12_SHADER_FORMAT "dxbc" CACHE STRING
-        "What a d3d12 bundle stores: dxbc (bytecode, no first-use compile) or hlsl (source)")
+set(TGFX_D3D12_SHADER_FORMAT "hlsl" CACHE STRING
+        "What a d3d12 bundle stores: hlsl (source, the default — the specialization pass rewrites \
+the text before D3DCompile) or dxbc (bytecode, no first-use compile but no specialization)")
 set_property(CACHE TGFX_D3D12_SHADER_FORMAT PROPERTY STRINGS dxbc hlsl)
 option(TGFX_USE_WEBGPU "Use WebGPU as the GPU backend on web platform" OFF)
 option(TGFX_USE_QT "Enable building with the Qt framework." OFF)

@@ -327,4 +327,40 @@ std::vector<std::pair<std::string, double>> MakeChainSpecializationConstants(
   return constants;
 }
 
+std::string SpecializeChainFragmentHLSL(const std::string& artifactText,
+                                        const AOTProgram& program) {
+  if (program.slots.empty()) {
+    return "";
+  }
+  auto packed = EncodeChainSlots(program);
+  if (packed.empty()) {
+    return "";
+  }
+  // SPIRV-Cross rendered the spec constants as #ifndef SPIRV_CROSS_CONSTANT_ID_<id> /
+  // #define ... default / #endif blocks (spirv_hlsl.cpp:1508); an artifact without the master
+  // switch's block is not a specializable chain — the caller keeps the generic text.
+  if (artifactText.find("SPIRV_CROSS_CONSTANT_ID_0") == std::string::npos) {
+    return "";
+  }
+  // The override prefix goes in front of the whole text, ahead of every #ifndef: D3DCompile's
+  // preprocessor then folds each macro into the static const the writer declared from it, and
+  // the compiler eliminates the op branches the draw does not use. The id assignment mirrors
+  // the accessors' layout(constant_id) declarations: 0 the master switch, 1-4 the structural
+  // indices, 10.. the slot table — the same words the Vulkan path feeds VkSpecializationInfo.
+  std::string prefix = "#define SPIRV_CROSS_CONSTANT_ID_0 1\n";
+  prefix += "#define SPIRV_CROSS_CONSTANT_ID_1 " + std::to_string(program.slots.size()) + "\n";
+  prefix += "#define SPIRV_CROSS_CONSTANT_ID_2 " + std::to_string(program.rootRegister) + "\n";
+  prefix +=
+      "#define SPIRV_CROSS_CONSTANT_ID_3 " + std::to_string(program.coverageRootRegister) + "\n";
+  prefix +=
+      "#define SPIRV_CROSS_CONSTANT_ID_4 " + std::to_string(program.clipCoverageRegister) + "\n";
+  for (size_t s = 0; s < packed.size(); ++s) {
+    for (int c = 0; c < 4; ++c) {
+      prefix += "#define SPIRV_CROSS_CONSTANT_ID_" + std::to_string(10 + s * 4 + c) + " " +
+                std::to_string(packed[s][static_cast<size_t>(c)]) + "\n";
+    }
+  }
+  return prefix + artifactText;
+}
+
 }  // namespace tgfx

@@ -434,7 +434,9 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
            ? !fragmentDesc.binaryData.empty()
            : !fragmentDesc.code.empty()) &&
       (fragmentDesc.format == ShaderCodeFormat::GLSL ||
-       fragmentDesc.format == ShaderCodeFormat::WGSL || fragmentDesc.format == ShaderCodeFormat::SPIRV)) {
+       fragmentDesc.format == ShaderCodeFormat::WGSL ||
+       fragmentDesc.format == ShaderCodeFormat::SPIRV ||
+       fragmentDesc.format == ShaderCodeFormat::HLSL)) {
     const auto* carriedIR = programInfo->getCarriedIR();
     if (carriedIR != nullptr && carriedIR->program.has_value()) {
       if (fragmentDesc.format == ShaderCodeFormat::SPIRV) {
@@ -448,7 +450,9 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
       auto specialized =
           fragmentDesc.format == ShaderCodeFormat::WGSL
               ? SpecializeChainFragmentWGSL(fragmentDesc.code, *carriedIR->program)
-              : SpecializeChainFragmentGLSL(fragmentDesc.code, *carriedIR->program);
+              : fragmentDesc.format == ShaderCodeFormat::HLSL
+                    ? SpecializeChainFragmentHLSL(fragmentDesc.code, *carriedIR->program)
+                    : SpecializeChainFragmentGLSL(fragmentDesc.code, *carriedIR->program);
       if (!specialized.empty()) {
         chainGenericCode = fragmentDesc.code;
         fragmentDesc.code = std::move(specialized);

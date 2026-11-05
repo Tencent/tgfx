@@ -68,6 +68,17 @@ std::string SpecializeChainFragmentWGSL(const std::string& artifactText, const A
 std::vector<std::pair<std::string, double>> MakeChainSpecializationConstantsVulkan(
     const AOTProgram& program);
 
+/**
+ * The D3D12 form: the HLSL artifact carries the spec constants as SPIRV_CROSS_CONSTANT_ID_<id>
+ * #ifndef/#define macro blocks, so the specialization is a #define prefix prepended in front of
+ * the whole text — D3DCompile's preprocessor folds each value into the static const the writer
+ * declared from it, and the compiler eliminates the unused op branches. The prefix covers the
+ * master switch (id 0), the structural indices (1-4) and the slot table (10..73). Empty when the
+ * program is not a specializable chain or the artifact carries no macro blocks; the caller then
+ * keeps the generic text.
+ */
+std::string SpecializeChainFragmentHLSL(const std::string& artifactText, const AOTProgram& program);
+
 std::vector<std::pair<std::string, double>> MakeChainSpecializationConstants(const AOTProgram& program);
 
 }  // namespace tgfx
