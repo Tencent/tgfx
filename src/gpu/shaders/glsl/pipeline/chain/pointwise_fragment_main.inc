@@ -330,6 +330,161 @@ int chainClipRegister() { return ClipCoverageRegister; }
 // with one call site per slot (literal slot indices), which lets the op dispatch, the register
 // reads and the result-register writes fold to constants without relying on driver unrolling.
 #pragma tgfx_spec_executor begin
+#ifdef TGFX_SPEC_CONSTANTS
+// The specialization executor: one call site per slot with literal indices, guarded by the
+// SC_SlotCount specialization constant. Once the runtime injects the values, every guard and
+// every selector word becomes a compile-time constant, so the driver's specialization step
+// deletes the out-of-range call sites entirely — the static reduction the generic loop's
+// runtime trip counter can never provide.
+void chainRunSlotAt(int n, out vec4 result, out vec4 clipRegister,
+                    out vec4 coverageRootRegister
+#if HAS_XP >= 1
+                    , out vec4 xpBlended
+#endif
+) {
+  ivec4 Packed = chainSlot(n);
+  vec4 value = evalChainSlot(n);
+  int outRegister = (Packed.w >> 20) & 0x1F;
+  if (outRegister != 0) {
+    int written = outRegister - 1;
+    chainResults[written] = value;
+    if (written == chainRootIndex()) {
+      result = value;
+    }
+    if (written == chainClipRegister()) {
+      clipRegister = value;
+    }
+    if (written == chainCoverageRootIndex()) {
+      coverageRootRegister = value;
+    }
+  }
+}
+void chainRunSlots(out vec4 result, out vec4 clipRegister, out vec4 coverageRootRegister
+#if HAS_XP >= 1
+                   ,
+                   out vec4 xpBlended
+#endif
+) {
+  result = vec4(0.0);
+  clipRegister = vec4(0.0);
+  coverageRootRegister = vec4(0.0);
+#if HAS_XP >= 1
+  xpBlended = vec4(0.0);
+#endif
+    if (chainSlotCount() > 0) {
+    chainRunSlotAt(0, result, clipRegister, coverageRootRegister
+#if HAS_XP >= 1
+        , xpBlended
+#endif
+        );
+  }
+    if (chainSlotCount() > 1) {
+    chainRunSlotAt(1, result, clipRegister, coverageRootRegister
+#if HAS_XP >= 1
+        , xpBlended
+#endif
+        );
+  }
+    if (chainSlotCount() > 2) {
+    chainRunSlotAt(2, result, clipRegister, coverageRootRegister
+#if HAS_XP >= 1
+        , xpBlended
+#endif
+        );
+  }
+    if (chainSlotCount() > 3) {
+    chainRunSlotAt(3, result, clipRegister, coverageRootRegister
+#if HAS_XP >= 1
+        , xpBlended
+#endif
+        );
+  }
+    if (chainSlotCount() > 4) {
+    chainRunSlotAt(4, result, clipRegister, coverageRootRegister
+#if HAS_XP >= 1
+        , xpBlended
+#endif
+        );
+  }
+    if (chainSlotCount() > 5) {
+    chainRunSlotAt(5, result, clipRegister, coverageRootRegister
+#if HAS_XP >= 1
+        , xpBlended
+#endif
+        );
+  }
+    if (chainSlotCount() > 6) {
+    chainRunSlotAt(6, result, clipRegister, coverageRootRegister
+#if HAS_XP >= 1
+        , xpBlended
+#endif
+        );
+  }
+    if (chainSlotCount() > 7) {
+    chainRunSlotAt(7, result, clipRegister, coverageRootRegister
+#if HAS_XP >= 1
+        , xpBlended
+#endif
+        );
+  }
+    if (chainSlotCount() > 8) {
+    chainRunSlotAt(8, result, clipRegister, coverageRootRegister
+#if HAS_XP >= 1
+        , xpBlended
+#endif
+        );
+  }
+    if (chainSlotCount() > 9) {
+    chainRunSlotAt(9, result, clipRegister, coverageRootRegister
+#if HAS_XP >= 1
+        , xpBlended
+#endif
+        );
+  }
+    if (chainSlotCount() > 10) {
+    chainRunSlotAt(10, result, clipRegister, coverageRootRegister
+#if HAS_XP >= 1
+        , xpBlended
+#endif
+        );
+  }
+    if (chainSlotCount() > 11) {
+    chainRunSlotAt(11, result, clipRegister, coverageRootRegister
+#if HAS_XP >= 1
+        , xpBlended
+#endif
+        );
+  }
+    if (chainSlotCount() > 12) {
+    chainRunSlotAt(12, result, clipRegister, coverageRootRegister
+#if HAS_XP >= 1
+        , xpBlended
+#endif
+        );
+  }
+    if (chainSlotCount() > 13) {
+    chainRunSlotAt(13, result, clipRegister, coverageRootRegister
+#if HAS_XP >= 1
+        , xpBlended
+#endif
+        );
+  }
+    if (chainSlotCount() > 14) {
+    chainRunSlotAt(14, result, clipRegister, coverageRootRegister
+#if HAS_XP >= 1
+        , xpBlended
+#endif
+        );
+  }
+    if (chainSlotCount() > 15) {
+    chainRunSlotAt(15, result, clipRegister, coverageRootRegister
+#if HAS_XP >= 1
+        , xpBlended
+#endif
+        );
+  }
+}
+#else
 void chainRunSlots(out vec4 result, out vec4 clipRegister, out vec4 coverageRootRegister
 #if HAS_XP >= 1
                    ,
@@ -381,6 +536,7 @@ void chainRunSlots(out vec4 result, out vec4 clipRegister, out vec4 coverageRoot
     }
   }
 }
+#endif
 #pragma tgfx_spec_executor end
 
 void main() {

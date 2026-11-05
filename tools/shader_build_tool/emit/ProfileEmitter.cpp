@@ -110,17 +110,6 @@ class MetalEmitter : public ProfileEmitter {
                     "MSL translation error: " + (!mslVert.success ? mslVert.error : mslFrag.error));
       return std::nullopt;
     }
-    // Demo (TGFX_METAL_EMIT_MSL): store the translated MSL text instead of compiling a
-    // metallib. The runtime recognizes a non-MTLB Metal blob as MSL text and compiles it with
-    // newLibraryWithSource, which lets the runtime chain-specialization pass rewrite the text
-    // the same way it rewrites the GL profile.
-    static const bool emitMslText = std::getenv("TGFX_METAL_EMIT_MSL") != nullptr;
-    if (emitMslText) {
-      EmittedStages stages;
-      stages.vertexBlob.assign(mslVert.text.begin(), mslVert.text.end());
-      stages.fragmentBlob.assign(mslFrag.text.begin(), mslFrag.text.end());
-      return stages;
-    }
     std::string metalError;
     EmittedStages stages;
     stages.payloadKind = BundleFormat::Payload::Binary;
