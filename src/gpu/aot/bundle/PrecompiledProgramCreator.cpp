@@ -33,6 +33,7 @@
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "gpu/aot/select/PermutationMatch.h"
+#include "gpu/aot/spec/SpecInject.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
@@ -273,7 +274,7 @@ static bool VertexInputFormatMatches(const std::vector<VertexInput>& inputs, uin
 // The re-expressing chain family carries its own writer (it compiles the draw's whole expression
 // into the chain program); the YUV family appends its compiled tail records to the standard walk;
 // every other family uses the generic precompiled writer.
-static std::unique_ptr<ProgramWriter> MakeProgramWriter(const std::string& shaderName) {
+std::unique_ptr<ProgramWriter> MakeProgramWriter(const std::string& shaderName) {
   if (shaderName == PointwiseChainShader::Name) {
     return std::make_unique<ChainProgramWriter>();
   }
@@ -358,7 +359,8 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
 }
 
 std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
-    Context* context, const ProgramInfo* programInfo, const PermutationMatchResult& match) {
+    Context* context, const ProgramInfo* programInfo, const PermutationMatchResult& match,
+    const SpecValues* spec) {
   auto cache = context->precompiledShaderCache();
   // The callers hold their own match in hand (CreateProgram just ran the walk; the AOT route
   // derives its variant from the compiled program), so this entry starts past the match.
@@ -414,6 +416,23 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   } else {
     fragmentDesc.code = std::string(fragBlob->data.begin(), fragBlob->data.end());
   }
+  // The GLSL text backends specialize by rewriting the generated TGFX_SPEC_<id> declarations to
+  // this draw's captured values, the master switch first; the driver's compiler then folds every
+  // accessor read and the unrolled executor's guards. Other formats (v1: the SPIR-V family's
+  // pipeline-constant injection is not wired yet) and a failed injection keep the generic text.
+  bool specInjected = false;
+  if (spec != nullptr && !spec->empty() && format == ShaderCodeFormat::GLSL) {
+    auto specialized = InjectSpecGLSL(fragmentDesc.code, fragBlob->specFields, *spec);
+    if (!specialized.empty()) {
+      fragmentDesc.code = std::move(specialized);
+      specInjected = true;
+    } else {
+      LOGE(
+          "PrecompiledProgramCreator: specialization injection found no TGFX_SPEC declarations "
+          "for %s[frag=%u]; serving the generic form",
+          matchResult->shaderName.c_str(), matchResult->fragPermutationIndex);
+    }
+  }
   if (!fragBlob->uniforms.empty()) {
     fragmentDesc.uniformSlots = {
         {std::string(FragmentUniformBlockName), static_cast<unsigned>(FRAGMENT_UBO_BINDING_POINT)}};
@@ -462,6 +481,17 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   cache->recordAOTStage(PrecompiledAOTStage::VertexModuleCreated);
   auto fragmentShader = shaderCache->findOrCreateModule(fragmentDesc);
   if (fragmentShader == nullptr) {
+    if (specInjected) {
+      // A specialized module that does not compile must not drop the draw: the generic text of
+      // the same variant always compiled, so serve it (this recursion carries no spec and cannot
+      // loop). The caller caches the returned program under the specialization-bearing key, so
+      // this shape never retries the failing compile.
+      LOGE(
+          "PrecompiledProgramCreator: the specialized fragment of %s[frag=%u] failed to compile; "
+          "falling back to the generic form",
+          matchResult->shaderName.c_str(), matchResult->fragPermutationIndex);
+      return CreateProgramFromMatch(context, programInfo, match, nullptr);
+    }
     cache->recordFailure(PrecompiledFallbackReason::FragmentModuleCreationFailed,
                          MakeFallbackRecord(cache, programInfo, &*matchResult));
     LOGE("PrecompiledProgramCreator: Failed to create fragment shader module for %s[frag=%u]",
@@ -621,6 +651,15 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
 
   auto pipeline = shaderCache->findOrCreatePipeline(descriptor);
   if (pipeline == nullptr) {
+    if (specInjected) {
+      // Same contract as the module failure above: a specialized pipeline that does not build
+      // falls back to the generic form rather than dropping the draw.
+      LOGE(
+          "PrecompiledProgramCreator: the specialized pipeline of %s[frag=%u] failed to create; "
+          "falling back to the generic form",
+          matchResult->shaderName.c_str(), matchResult->fragPermutationIndex);
+      return CreateProgramFromMatch(context, programInfo, match, nullptr);
+    }
     // The same shader variant (identical vert/frag artifact) can create successfully for some draws
     // and fail for others, so the mismatch must live in the runtime-derived pipeline state rather
     // than the compiled modules. Dump every state field the descriptor carries so a failing draw

@@ -19,6 +19,7 @@
 #include "UniformData.h"
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <string>
 #include "core/utils/Log.h"
 #include "gpu/aot/AOTParamRegistry.h"
@@ -173,6 +174,17 @@ const UniformData::Field* UniformData::findField(const std::string& key) const {
 bool UniformData::hasField(const std::string& name) const {
   const auto key = skipSuffix ? name : name + nameSuffix;
   return findField(key) != nullptr;
+}
+
+bool UniformData::readInt32(const std::string& name, size_t wordIndex, int32_t* value) const {
+  const auto key = skipSuffix ? name : name + nameSuffix;
+  const auto* field = findField(key);
+  if (field == nullptr || _buffer == nullptr || value == nullptr ||
+      wordIndex >= field->size / sizeof(int32_t)) {
+    return false;
+  }
+  std::memcpy(value, _buffer + field->offset + wordIndex * sizeof(int32_t), sizeof(int32_t));
+  return true;
 }
 
 size_t UniformData::alignCursor(size_t alignment) const {

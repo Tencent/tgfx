@@ -56,6 +56,20 @@ class ProgramWriter {
    */
   virtual bool canWrite(const ProgramInfo& info) const;
 
+  /**
+   * Writes every per-draw uniform value of the draw described by info into the two uniform data
+   * objects, without any GPU-side work: no uniform buffer is mapped and no sampler is bound. The
+   * upload path (write) feeds it the program's uniform data; the specialization capture feeds it a
+   * CPU scratch buffer, so the values a specialized shader folds and the values the upload writes
+   * come from one and the same code path.
+   * @param info               The draw's processor tree and pipeline state.
+   * @param vertexUniformData  The vertex stage's uniform data, over any writable buffer; may be
+   *                           null only when the stage declares no uniforms.
+   * @param fragmentUniformData  The fragment stage's uniform data, over any writable buffer.
+   */
+  void writeUniformValues(const ProgramInfo& info, UniformData* vertexUniformData,
+                          UniformData* fragmentUniformData) const;
+
  protected:
   /** Writes the engine-level default uniforms only this route's shaders declare. */
   virtual void writeEngineDefaults(const ProgramInfo& info, UniformData* fragmentUniformData) const;
@@ -75,16 +89,6 @@ class ProgramWriter {
   /** Binds the draw's textures onto the program's sampler slots. */
   virtual void writeSamplers(const ProgramInfo& info, Program* program,
                              RenderPass* renderPass) const = 0;
-
-  /**
-   * Writes every per-draw uniform value of the draw described by info into the two uniform data
-   * objects, without any GPU-side work: no uniform buffer is mapped and no sampler is bound. The
-   * upload path (write) feeds it the program's uniform data; the specialization capture feeds it a
-   * CPU scratch buffer, so the values a specialized shader folds and the values the upload writes
-   * come from one and the same code path.
-   */
-  void writeUniformValues(const ProgramInfo& info, UniformData* vertexUniformData,
-                          UniformData* fragmentUniformData) const;
 };
 
 /** The precompiled route: the IR-driven walk and the artifact's sampler slots. */

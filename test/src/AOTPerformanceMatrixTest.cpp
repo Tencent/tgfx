@@ -547,6 +547,60 @@ TGFX_TEST(AOTPerformanceMatrixTest, ChainVsDedicatedDecomposition) {
   cache->setDecompositionEnabled(true);
 }
 
+// The specialization gain on the fill-rate-bound chain scenario: one scene, three rows — the
+// dedicated family, the generic chain interpreter, and the specialized chain (the values frozen
+// at pipeline creation, the unrolled executor's guards folded). The sizes go past the CPU-bound
+// 128/512 pair so the fragment cost the fold removes is visible.
+TGFX_TEST(AOTPerformanceMatrixTest, ChainSpecializationGain) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  SKIP_ON_SWIFTSHADER(context);
+  ASSERT_NE(context, nullptr);
+  auto* cache = context->precompiledShaderCache();
+  auto image = MakeImage("resources/apitest/mandrill_128.png");
+  ASSERT_NE(image, nullptr);
+
+  for (int size : {512, 1024}) {
+    for (size_t opCount : {size_t{1}, size_t{5}}) {
+      const float scale = static_cast<float>(size) / 128.0f;
+      auto filter = MakeMatrixChain(opCount);
+      auto scene = [&](Canvas* canvas) {
+        canvas->save();
+        canvas->scale(scale, scale);
+        Paint paint = {};
+        paint.setColorFilter(filter);
+        canvas->drawImage(image, 0, 0, &paint);
+        canvas->restore();
+      };
+      // The dedicated row turns the decomposition rewrite off so the sequential
+      // [TextureEffect, ColorMatrix] tree lands on the dedicated family; the chain rows turn
+      // the dedicated kernels off so the fused chain kernel serves the scene.
+      cache->setSpecializationEnabled(false);
+      auto dedicated = MeasureRoute(context, cache, scene, size, false);
+      auto chainGeneric = MeasureRoute(context, cache, scene, size, true, false);
+      cache->setSpecializationEnabled(true);
+      auto chainSpecialized = MeasureRoute(context, cache, scene, size, true, false);
+      cache->setSpecializationEnabled(false);
+
+      ExpectMeasurementValid("dedicated", dedicated);
+      ExpectMeasurementValid("chain-generic", chainGeneric);
+      ExpectMeasurementValid("chain-specialized", chainSpecialized);
+      PrintResult("dedicated", "aot", dedicated, size);
+      PrintResult("chain-generic", "aot", chainGeneric, size);
+      PrintResult("chain-specialized", "aot", chainSpecialized, size);
+      printf(
+          "[SpecGap] ops=%zu size=%d genericHot=%.3fms specializedHot=%.3fms "
+          "generic/specialized=%.2fx dedicatedHot=%.3fms specialized/dedicated=%.2fx\n",
+          opCount, size, chainGeneric.hotMedianMs, chainSpecialized.hotMedianMs,
+          chainSpecialized.hotMedianMs > 0 ? chainGeneric.hotMedianMs / chainSpecialized.hotMedianMs
+                                           : 0.0,
+          dedicated.hotMedianMs,
+          dedicated.hotMedianMs > 0 ? chainSpecialized.hotMedianMs / dedicated.hotMedianMs : 0.0);
+    }
+  }
+  cache->setDecompositionEnabled(true);
+}
+
 // The same route contrast for the hot dedicated families, with the dedicated family forced off for
 // the chain row. Route evidence prints with each row so a row that silently landed on another
 // family is visible. A path draws as an alpha mask below 162 pixels and as triangles above, so the

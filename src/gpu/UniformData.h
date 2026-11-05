@@ -190,6 +190,15 @@ class UniformData {
    */
   bool hasField(const std::string& name) const;
 
+  /**
+   * Reads one 32-bit word of a uniform field back from the current buffer, addressing the field
+   * by name and the word by its index within it (a scalar holds one word, an ivec4 array four
+   * words per element). The specialization capture reads what the writers wrote, so the values a
+   * specialized shader folds and the values the upload writes are one and the same bytes.
+   * Returns false when the field is absent, the index is out of range, or no buffer is set.
+   */
+  bool readInt32(const std::string& name, size_t wordIndex, int32_t* value) const;
+
  private:
   struct Field {
     std::string name = "";
@@ -261,6 +270,7 @@ class UniformData {
   friend class PrecompiledProgramWriter;
   friend class ChainProgramWriter;
   friend class PrecompiledProgramCreator;
+  friend class SpecCapture;
   // The shell-free chain binder drives the same structural-suffix addressing the processor-tree
   // walk maintained; only the per-binding walk needs the direct access.
   friend void BindChainBindings(const AOTProgram& program, UniformData* fragmentUniformData);

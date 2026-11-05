@@ -25,10 +25,12 @@
 #include "gpu/aot/ir/Program.h"
 #include "gpu/aot/select/DrawShape.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
+#include "gpu/aot/spec/SpecCapture.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/kernels/PointwiseChainShader.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
 namespace {
@@ -89,13 +91,28 @@ AOTProgramInfo::AOTProgramInfo(const ProgramInfo& info, const AOTProgram& progra
   }
   info.getXferProcessor()->computeProcessorKey(context, &key);
   info.writePipelineStateKey(&key);
+  // The variant's identity does not name the chain's shape: two effect trees of one variant
+  // (same GP, same XP, same slot-count class) encode different chains, so the structural words
+  // this draw captured must join the key or the second shape would silently reuse the first
+  // shape's specialized program. The capture runs the draw's own uniform writers over a CPU
+  // scratch buffer (SpecCapture), so the key and the fold share one source of values. GL-only in
+  // this stage: the SPIR-V-family backends inject at pipeline creation and are wired next.
+  SpecValues spec = {};
+  if (context->backend() == Backend::OpenGL) {
+    spec = SpecCapture::Capture(context, info, PointwiseChainShader::Name,
+                                variant->vertPermutationIndex, variant->fragPermutationIndex);
+  }
+  if (!spec.empty()) {
+    spec.writeKey(&key);
+  }
 
   auto globalCache = context->globalCache();
   auto resolved = globalCache->findProgram(key);
   if (resolved == nullptr) {
     PermutationMatchResult match = {PointwiseChainShader::Name, variant->vertPermutationIndex,
                                     variant->fragPermutationIndex};
-    resolved = PrecompiledProgramCreator::CreateProgramFromMatch(context, &info, match);
+    resolved = PrecompiledProgramCreator::CreateProgramFromMatch(context, &info, match,
+                                                                 spec.empty() ? nullptr : &spec);
     if (resolved == nullptr) {
       return;
     }

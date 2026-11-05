@@ -22,6 +22,7 @@
 #include <atomic>
 #include <cstdint>
 #include <limits>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -31,6 +32,7 @@
 #include "gpu/Program.h"
 #include "gpu/ShaderCache.h"
 #include "gpu/Uniform.h"
+#include "gpu/UniformData.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "gpu/shaders/contract/AOTFailure.h"
 #include "tgfx/core/BytesKey.h"
@@ -452,11 +454,41 @@ class PrecompiledShaderCache {
     return &_shaderCache;
   }
 
+  /// Whether the AOT route may specialize a precompiled variant with the draw's structural
+  /// uniform values before creating its program. Off by default: specialization trades a
+  /// synchronous compile of the hot shape for a leaner specialized program, so the caller opts
+  /// in (the perf matrix and the specialization A/B tests flip it).
+  bool specializationEnabled() const {
+    return _specializationEnabled;
+  }
+
+  void setSpecializationEnabled(bool enabled) {
+    _specializationEnabled = enabled;
+  }
+
+  /// The specialization capture's per-variant scratch: uniform data backed by CPU buffers, so
+  /// the capture runs the very writers the upload runs without touching any GPU object. One
+  /// scratch per fragment stage key, rebuilt whenever the bundle changes.
+  struct SpecScratch {
+    std::unique_ptr<UniformData> vertexUniformData;
+    std::unique_ptr<UniformData> fragmentUniformData;
+    std::vector<uint8_t> vertexBuffer;
+    std::vector<uint8_t> fragmentBuffer;
+  };
+
+  /// Returns the capture scratch of one (vertex, fragment) stage pair, creating it from the two
+  /// stages' reflected uniforms on first use. Returns nullptr when either stage has no blob.
+  SpecScratch* findOrCreateSpecScratch(uint64_t vertHi, uint64_t vertLo, uint64_t fragHi,
+                                       uint64_t fragLo);
+
   struct HashKey {
     uint64_t hi;
     uint64_t lo;
     bool operator==(const HashKey& other) const {
       return hi == other.hi && lo == other.lo;
+    }
+    bool operator<(const HashKey& other) const {
+      return hi != other.hi ? hi < other.hi : lo < other.lo;
     }
   };
 
@@ -504,6 +536,11 @@ class PrecompiledShaderCache {
   Backend _backend = Backend::Unknown;
   ShaderCache _shaderCache;
   std::atomic<uint64_t> _generation{0};
+  /// The specialization capture's per-(vertex, fragment)-stage scratch, keyed by the two stage
+  /// hashes and dropped whenever a bundle load replaces the stage blobs (the reflected uniforms
+  /// the scratch was built from may no longer be the same).
+  std::map<std::pair<HashKey, HashKey>, std::unique_ptr<SpecScratch>> _specScratch;
+  bool _specializationEnabled = false;
   std::shared_ptr<const ParsedBundle> _bundle = nullptr;
   mutable std::mutex _programMissMutex;
   std::unordered_map<BytesKey, PrecompiledFallbackReason, BytesKeyHasher> _programMisses;

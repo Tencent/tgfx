@@ -738,6 +738,7 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
       std::lock_guard<std::mutex> lock(_programMissMutex);
       _programMisses.clear();
     }
+    _specScratch.clear();
     _generation.fetch_add(1, std::memory_order_relaxed);
     if (_context != nullptr) {
       _context->globalCache()->clearPrograms();
@@ -770,6 +771,7 @@ bool PrecompiledShaderCache::loadBundle(const uint8_t* data, size_t size) {
     std::lock_guard<std::mutex> lock(_programMissMutex);
     _programMisses.clear();
   }
+  _specScratch.clear();
   _generation.fetch_add(1, std::memory_order_relaxed);
   if (_context != nullptr) {
     // A new bundle generation invalidates every cached program: precompiled programs from the
@@ -855,6 +857,23 @@ const ShaderStageBlob* PrecompiledShaderCache::findFragment(uint64_t hashHi,
     return nullptr;
   }
   return &it->second;
+}
+
+PrecompiledShaderCache::SpecScratch* PrecompiledShaderCache::findOrCreateSpecScratch(
+    uint64_t vertHi, uint64_t vertLo, uint64_t fragHi, uint64_t fragLo) {
+  if (_bundle == nullptr) {
+    return nullptr;
+  }
+  const std::pair<HashKey, HashKey> key = {HashKey{vertHi, vertLo}, HashKey{fragHi, fragLo}};
+  if (_bundle->vertEntries.find(key.first) == _bundle->vertEntries.end() ||
+      _bundle->fragEntries.find(key.second) == _bundle->fragEntries.end()) {
+    return nullptr;
+  }
+  auto it = _specScratch.find(key);
+  if (it == _specScratch.end()) {
+    it = _specScratch.emplace(key, std::make_unique<SpecScratch>()).first;
+  }
+  return it->second.get();
 }
 
 }  // namespace tgfx

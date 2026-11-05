@@ -21,9 +21,12 @@
 #include <memory>
 #include "gpu/Program.h"
 #include "gpu/ProgramInfo.h"
+#include "gpu/aot/spec/SpecValues.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
+
+class ProgramWriter;
 
 /// Attempts to create a Program from a precompiled shader bundle. Returns nullptr if the
 /// PrecompiledShaderCache is empty, the ProgramInfo does not match any known permutation, or
@@ -38,10 +41,23 @@ class PrecompiledProgramCreator {
    * walk, the AOT route from the compiled program's variant) and an info carrying the geometry
    * processor and the pipeline state; no fragment-processor list is read. Returns nullptr when
    * the variant is denied, missing from the bundle, or fails to build.
+   *
+   * When spec carries captured values (see SpecCapture) and the backend stores GLSL text, the
+   * fragment source is specialized before compilation; a specialized module or pipeline that
+   * fails to build falls back to this call with a null spec, so specialization stays strictly an
+   * optimization.
    */
   static std::shared_ptr<Program> CreateProgramFromMatch(Context* context,
                                                          const ProgramInfo* programInfo,
-                                                         const PermutationMatchResult& match);
+                                                         const PermutationMatchResult& match,
+                                                         const SpecValues* spec = nullptr);
 };
+
+/**
+ * The writer one family's programs own: the chain family's fused writer, the YUV family's tail
+ * writer, or the generic precompiled walk. Shared with the specialization capture, which must
+ * run the very writers the draw's upload will run.
+ */
+std::unique_ptr<ProgramWriter> MakeProgramWriter(const std::string& shaderName);
 
 }  // namespace tgfx
