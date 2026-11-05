@@ -236,11 +236,16 @@ VSOut main(VSIn input) {
 )";
 
 static constexpr char ORDER_HLSL_FRAGMENT_SHADER[] = R"(
+// The HLSL form keeps the struct members in VS declaration order: D3D12 validates the PS input
+// signature's semantic sequence against the VS output signature, so the shuffled-declaration form
+// the GLSL/MSL variants use is not a legal program here. The contract under test is unaffected —
+// HLSL pairs by semantic, so the fragment still reads whatever T0/T1/T2 carry, which is exactly
+// the location-based matching the GLSL path's shuffled declaration exercises.
 struct PSIn {
   float4 position : SV_Position;
-  float vBlue : TEXCOORD2;
   float vRed : TEXCOORD0;
   float vGreen : TEXCOORD1;
+  float vBlue : TEXCOORD2;
 };
 
 float4 main(PSIn input) : SV_Target {
