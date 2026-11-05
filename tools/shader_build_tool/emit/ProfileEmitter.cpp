@@ -65,7 +65,13 @@ class VulkanEmitter : public ProfileEmitter {
     auto expandedVertOpt = PrependDefines(*input.vertSource, *input.vertDefines);
     const auto& vertOpt = compiler->compileSpirv(expandedVertOpt, ShaderStageType::Vertex,
                                                  input.info->name, input.vertIndex, true);
-    auto expandedFragOpt = PrependDefines(*input.fragSource, *input.fragDefines);
+    // The chain shader's accessors carry a second dialect under TGFX_SPEC_CONSTANTS: the
+    // structural ints become layout(constant_id) declarations, which glslang keeps in the
+    // SPIR-V as OpSpecConstant + SpecId. The runtime then injects one chain shape's values
+    // through VkSpecializationInfo at pipeline creation. Other shaders have no such #ifdef.
+    auto fragDefines = *input.fragDefines;
+    fragDefines.push_back("TGFX_SPEC_CONSTANTS=1");
+    auto expandedFragOpt = PrependDefines(*input.fragSource, fragDefines);
     const auto& fragOpt = compiler->compileSpirv(expandedFragOpt, ShaderStageType::Fragment,
                                                  input.info->name, input.fragIndex, true);
     if (!vertOpt.success || !fragOpt.success) {

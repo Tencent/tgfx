@@ -305,6 +305,12 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
                                           VkPrimitiveTopology topology, VkPipeline* outPipeline) {
   // Shader stages
   std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
+  // The chain-specialization pass feeds SpecId/value pairs through the pipeline's
+  // specialization entries (the descriptor's name field carries the SpecId). The buffers live
+  // at function scope because vkCreateGraphicsPipelines reads them during the call below.
+  std::vector<VkSpecializationMapEntry> specEntries;
+  std::vector<int32_t> specValues;
+  VkSpecializationInfo specInfo = {};
 
   if (descriptor.vertex.module) {
     auto vertexShader = std::static_pointer_cast<VulkanShaderModule>(descriptor.vertex.module);
@@ -331,6 +337,21 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
     stage.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
     stage.module = fragmentShader->vulkanShaderModule();
     stage.pName = "main";
+    if (!descriptor.fragment.constants.empty()) {
+      specValues.reserve(descriptor.fragment.constants.size());
+      specEntries.reserve(descriptor.fragment.constants.size());
+      for (const auto& idAndValue : descriptor.fragment.constants) {
+        specEntries.push_back({static_cast<uint32_t>(strtoul(idAndValue.first.c_str(), nullptr, 10)),
+                               static_cast<uint32_t>(specValues.size() * sizeof(int32_t)),
+                               sizeof(int32_t)});
+        specValues.push_back(static_cast<int32_t>(idAndValue.second));
+      }
+      specInfo.mapEntryCount = static_cast<uint32_t>(specEntries.size());
+      specInfo.pMapEntries = specEntries.data();
+      specInfo.dataSize = specValues.size() * sizeof(int32_t);
+      specInfo.pData = specValues.data();
+      stage.pSpecializationInfo = &specInfo;
+    }
     shaderStages.push_back(stage);
   }
 

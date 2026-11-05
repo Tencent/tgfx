@@ -64,6 +64,16 @@ std::string SpecializeChainFragmentMSL(const std::string& artifactText, const AO
  */
 std::string SpecializeChainFragmentWGSL(const std::string& artifactText, const AOTProgram& program);
 
+/**
+ * The Vulkan form: the SPIR-V artifact keeps its SpecId slots untouched; this returns the
+ * (SpecId-as-string, value) table the runtime feeds to VkSpecializationInfo at pipeline
+ * creation — the ids match the accessors' constant_id assignment (0 = master switch,
+ * 1-4 = counts/indices, 10..73 = the slot table). Empty when the program is not a
+ * specializable chain.
+ */
+std::vector<std::pair<std::string, double>> MakeChainSpecializationConstantsVulkan(
+    const AOTProgram& program);
+
 std::vector<std::pair<std::string, double>> MakeChainSpecializationConstants(const AOTProgram& program);
 
 }  // namespace tgfx

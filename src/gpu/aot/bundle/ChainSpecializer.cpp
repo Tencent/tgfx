@@ -458,6 +458,28 @@ std::string SpecializeChainFragmentMSL(const std::string& artifactText,
   return text;
 }
 
+std::vector<std::pair<std::string, double>> MakeChainSpecializationConstantsVulkan(
+    const AOTProgram& program) {
+  std::vector<std::pair<std::string, double>> constants;
+  auto packed = EncodeChainSlots(program);
+  if (packed.empty()) {
+    return constants;
+  }
+  // The SpecId assignment mirrors the accessors' layout(constant_id) declarations.
+  constants.emplace_back("0", 1);
+  constants.emplace_back("1", static_cast<double>(program.slots.size()));
+  constants.emplace_back("2", static_cast<double>(program.rootRegister));
+  constants.emplace_back("3", static_cast<double>(program.coverageRootRegister));
+  constants.emplace_back("4", static_cast<double>(program.clipCoverageRegister));
+  for (size_t s = 0; s < packed.size(); ++s) {
+    for (int c = 0; c < 4; ++c) {
+      constants.emplace_back(std::to_string(10 + s * 4 + static_cast<size_t>(c)),
+                             static_cast<double>(packed[s][static_cast<size_t>(c)]));
+    }
+  }
+  return constants;
+}
+
 std::string SpecializeChainFragmentWGSL(const std::string& artifactText,
                                         const AOTProgram& program) {
   auto packed = EncodeChainSlots(program);

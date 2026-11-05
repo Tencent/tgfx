@@ -430,11 +430,21 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   std::string chainGenericCode;
   std::vector<std::pair<std::string, double>> chainSpecialConstants;
   if (ChainSpecializationEnabled() && matchResult->shaderName == PointwiseChainShader::Name &&
-      !fragmentDesc.code.empty() &&
+      (fragmentDesc.format == ShaderCodeFormat::SPIRV
+           ? !fragmentDesc.binaryData.empty()
+           : !fragmentDesc.code.empty()) &&
       (fragmentDesc.format == ShaderCodeFormat::GLSL || fragmentDesc.format == ShaderCodeFormat::MSL ||
-       fragmentDesc.format == ShaderCodeFormat::WGSL)) {
+       fragmentDesc.format == ShaderCodeFormat::WGSL || fragmentDesc.format == ShaderCodeFormat::SPIRV)) {
     const auto* carriedIR = programInfo->getCarriedIR();
     if (carriedIR != nullptr && carriedIR->program.has_value()) {
+      if (fragmentDesc.format == ShaderCodeFormat::SPIRV) {
+        // The Vulkan artifact keeps its SpecId slots; the values ride the pipeline's
+        // specialization entries instead of the module bytes.
+        chainSpecialConstants = MakeChainSpecializationConstantsVulkan(*carriedIR->program);
+        chainSpecialized = !chainSpecialConstants.empty();
+        LOGI("ChainSpecializer: %d spec constants for %zu slots (Vulkan)",
+             static_cast<int>(chainSpecialConstants.size()), carriedIR->program->slots.size());
+      } else {
       auto specialized =
           fragmentDesc.format == ShaderCodeFormat::WGSL
               ? SpecializeChainFragmentWGSL(fragmentDesc.code, *carriedIR->program)
@@ -450,6 +460,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
              static_cast<int>(fragmentDesc.format));
       } else {
         LOGI("ChainSpecializer: artifact not specializable, keeping generic text");
+      }
       }
     }
   }
