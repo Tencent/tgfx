@@ -747,9 +747,13 @@ std::string HLSLCompilerFingerprint() {
          ";compile=D3DCompile strictness|optimization_level3 entry=main";
 }
 
+#if defined(TGFX_SHADER_TOOL_HAS_D3DCOMPILER)
+// Only the DXBC path below consumes the profile string, so the helper rides the same
+// availability macro — without it every non-Windows host build would flag it unused.
 static const char* HlslStageProfile(ShaderStageType stage) {
   return stage == ShaderStageType::Vertex ? "vs_5_0" : "ps_5_0";
 }
+#endif
 
 std::vector<uint8_t> CompileHLSLToDXBC(const std::string& hlslSource, ShaderStageType stage,
                                        std::string* error) {
