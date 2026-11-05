@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <utility>
 
 #include <memory>
 #include <string>
@@ -105,6 +106,13 @@ class FragmentDescriptor {
    * while Vulkan and D3D12 always use `main` (SPIR-V entry points and the D3DCompile entry name).
    */
   std::string entryPoint = "main";
+
+  /**
+   * Override-constant values for the fragment stage, keyed by the WGSL override name.
+   * Honored by the WebGPU backend only (the chain-specialization pass feeds it); other
+   * backends ignore it.
+   */
+  std::vector<std::pair<std::string, double>> constants = {};
 
   /**
    * An array of PipelineColorAttachment objects that define the color attachments for the render

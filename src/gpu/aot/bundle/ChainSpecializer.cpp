@@ -21,6 +21,9 @@
 #include <algorithm>
 #include <array>
 #include <cstdlib>
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
 #include <utility>
 #include <vector>
 #include "gpu/aot/bind/Binder.h"
@@ -30,8 +33,15 @@ namespace tgfx {
 
 bool ChainSpecializationEnabled() {
   static const bool enabled = [] {
+#ifdef __EMSCRIPTEN__
+    // The wasm build has no environment: the demo pages opt in with ?aotspec=1.
+    return EM_ASM_INT({
+      return new URLSearchParams(location.search).get('aotspec') === '1' ? 1 : 0;
+    }, 0) != 0;
+#else
     const char* value = std::getenv("TGFX_AOT_SPECIALIZE");
     return value != nullptr && value[0] == '1';
+#endif
   }();
   return enabled;
 }
@@ -446,6 +456,68 @@ std::string SpecializeChainFragmentMSL(const std::string& artifactText,
     text.replace(span.begin, span.end - span.begin, replacement);
   }
   return text;
+}
+
+std::string SpecializeChainFragmentWGSL(const std::string& artifactText,
+                                        const AOTProgram& program) {
+  auto packed = EncodeChainSlots(program);
+  if (packed.empty()) {
+    return "";
+  }
+  // tint's WGSL keeps the override declarations verbatim (names and ids), so the specialization
+  // is a handful of default-value rewrites — the same shape as the GL text path. Each override
+  // appears exactly once per artifact; the trailing literal is replaced in place.
+  std::string text = artifactText;
+  auto setDefault = [&text](const std::string& name, long value) -> bool {
+    auto anchor = text.find("override " + name + " : i32 = ");
+    if (anchor == std::string::npos) {
+      return false;
+    }
+    auto valueStart = anchor + ("override " + name + " : i32 = ").size();
+    auto end = text.find('i', valueStart);
+    if (end == std::string::npos) {
+      return false;
+    }
+    text.replace(valueStart, end - valueStart, std::to_string(value));
+    return true;
+  };
+  if (!setDefault("CHAIN_SPECIALIZED", 1) || !setDefault("SC_SlotCount",
+                                                         static_cast<long>(program.slots.size())) ||
+      !setDefault("SC_RootIndex", static_cast<long>(program.rootRegister)) ||
+      !setDefault("SC_CoverageRoot", static_cast<long>(program.coverageRootRegister)) ||
+      !setDefault("SC_ClipReg", static_cast<long>(program.clipCoverageRegister))) {
+    return "";
+  }
+  for (size_t s = 0; s < packed.size(); ++s) {
+    for (int c = 0; c < 4; ++c) {
+      if (!setDefault("SC_S" + std::to_string(s) + "_" + std::to_string(c),
+                      static_cast<long>(packed[s][static_cast<size_t>(c)]))) {
+        return "";
+      }
+    }
+  }
+  return text;
+}
+
+std::vector<std::pair<std::string, double>> MakeChainSpecializationConstants(
+    const AOTProgram& program) {
+  std::vector<std::pair<std::string, double>> constants;
+  auto packed = EncodeChainSlots(program);
+  if (packed.empty()) {
+    return constants;
+  }
+  constants.emplace_back("CHAIN_SPECIALIZED", 1);
+  constants.emplace_back("SC_SlotCount", static_cast<double>(program.slots.size()));
+  constants.emplace_back("SC_RootIndex", static_cast<double>(program.rootRegister));
+  constants.emplace_back("SC_CoverageRoot", static_cast<double>(program.coverageRootRegister));
+  constants.emplace_back("SC_ClipReg", static_cast<double>(program.clipCoverageRegister));
+  for (size_t s = 0; s < packed.size(); ++s) {
+    for (int c = 0; c < 4; ++c) {
+      constants.emplace_back("SC_S" + std::to_string(s) + "_" + std::to_string(c),
+                             static_cast<double>(packed[s][static_cast<size_t>(c)]));
+    }
+  }
+  return constants;
 }
 
 }  // namespace tgfx

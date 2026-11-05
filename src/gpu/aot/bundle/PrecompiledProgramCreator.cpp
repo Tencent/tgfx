@@ -428,22 +428,26 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   // artifact — the rewrite returns an empty string and nothing below changes.
   bool chainSpecialized = false;
   std::string chainGenericCode;
+  std::vector<std::pair<std::string, double>> chainSpecialConstants;
   if (ChainSpecializationEnabled() && matchResult->shaderName == PointwiseChainShader::Name &&
       !fragmentDesc.code.empty() &&
-      (fragmentDesc.format == ShaderCodeFormat::GLSL || fragmentDesc.format == ShaderCodeFormat::MSL)) {
+      (fragmentDesc.format == ShaderCodeFormat::GLSL || fragmentDesc.format == ShaderCodeFormat::MSL ||
+       fragmentDesc.format == ShaderCodeFormat::WGSL)) {
     const auto* carriedIR = programInfo->getCarriedIR();
     if (carriedIR != nullptr && carriedIR->program.has_value()) {
       auto specialized =
-          fragmentDesc.format == ShaderCodeFormat::MSL
+          fragmentDesc.format == ShaderCodeFormat::WGSL
+              ? SpecializeChainFragmentWGSL(fragmentDesc.code, *carriedIR->program)
+          : fragmentDesc.format == ShaderCodeFormat::MSL
               ? SpecializeChainFragmentMSL(fragmentDesc.code, *carriedIR->program)
               : SpecializeChainFragmentGLSL(fragmentDesc.code, *carriedIR->program);
       if (!specialized.empty()) {
         chainGenericCode = fragmentDesc.code;
         fragmentDesc.code = std::move(specialized);
         chainSpecialized = true;
-        LOGI("ChainSpecializer: fragment %zu -> %zu bytes (slots=%zu, %s)",
+        LOGI("ChainSpecializer: fragment %zu -> %zu bytes (slots=%zu, fmt=%d)",
              chainGenericCode.size(), fragmentDesc.code.size(), carriedIR->program->slots.size(),
-             fragmentDesc.format == ShaderCodeFormat::MSL ? "MSL" : "GLSL");
+             static_cast<int>(fragmentDesc.format));
       } else {
         LOGI("ChainSpecializer: artifact not specializable, keeping generic text");
       }
@@ -632,6 +636,11 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   descriptor.vertex.bindAttributesByLocation = true;
   descriptor.vertex.module = vertexShader;
   descriptor.fragment.module = fragmentShader;
+#if DEBUG
+  if (chainSpecialized && !chainSpecialConstants.empty()) {
+    descriptor.fragment.constants = std::move(chainSpecialConstants);
+  }
+#endif
   descriptor.fragment.colorAttachments.push_back(programInfo->getPipelineColorAttachment());
 
   std::unique_ptr<UniformData> vertexUniformData = nullptr;

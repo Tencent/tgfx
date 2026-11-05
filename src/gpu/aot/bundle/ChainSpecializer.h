@@ -19,6 +19,8 @@
 #pragma once
 
 #include <string>
+#include <utility>
+#include <vector>
 #include "gpu/aot/ir/Program.h"
 
 namespace tgfx {
@@ -53,5 +55,15 @@ std::string SpecializeChainFragmentGLSL(const std::string& artifactText, const A
  * Same empty-string contract as the GLSL form.
  */
 std::string SpecializeChainFragmentMSL(const std::string& artifactText, const AOTProgram& program);
+
+/**
+ * The WebGPU form of the same pass: the WGSL artifact stays untouched (tint carries the
+ * specialization slots as override constants); this returns the (name, value) table to inject at
+ * pipeline creation — CHAIN_SPECIALIZED plus the structural values. Empty when the program is not
+ * a specializable chain.
+ */
+std::string SpecializeChainFragmentWGSL(const std::string& artifactText, const AOTProgram& program);
+
+std::vector<std::pair<std::string, double>> MakeChainSpecializationConstants(const AOTProgram& program);
 
 }  // namespace tgfx
