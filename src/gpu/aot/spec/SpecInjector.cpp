@@ -49,19 +49,48 @@ class PipelineConstantInjector final : public SpecInjector {
   }
 };
 
+/// Driver source text without the rewrite marker (HLSL): prepends one define per constant.
+/// SPIRV-Cross's HLSL writer emits each SpecId as an `#ifndef SPIRV_CROSS_CONSTANT_ID_<id>`
+/// block, so a define in front of the text folds the value into D3DCompiler's preprocessor pass.
+class DefinePrefixInjector final : public SpecInjector {
+ public:
+  bool Apply(const std::string& code, const std::vector<SpecFieldInfo>& fields,
+             const SpecValues& values, SpecInjection* injection) const override {
+    injection->constants.clear();
+    AppendSpecConstants(fields, values, &injection->constants);
+    if (injection->constants.empty()) {
+      return false;
+    }
+    std::string prefix;
+    for (const auto& entry : injection->constants) {
+      prefix += "#define SPIRV_CROSS_CONSTANT_ID_" + entry.first + " " +
+                std::to_string(static_cast<int>(entry.second)) + "\n";
+    }
+    injection->constants.clear();
+    injection->code = prefix + code;
+    return true;
+  }
+};
+
 }  // namespace
 
 const SpecInjector* FindSpecInjector(ShaderCodeFormat format) {
   static const SourceRewriteInjector sourceRewrite;
   static const PipelineConstantInjector pipelineConstants;
+  static const DefinePrefixInjector definePrefix;
   switch (format) {
     case ShaderCodeFormat::GLSL:
       return &sourceRewrite;
+    case ShaderCodeFormat::HLSL:
+      return &definePrefix;
     case ShaderCodeFormat::METALLIB:
+    case ShaderCodeFormat::SPIRV:
+    case ShaderCodeFormat::WGSL:
+      // The pipeline carries the table: Metal's function constants, Vulkan's specialization map
+      // and WebGPU's pipeline constants all take the SpecId-keyed list at creation time.
       return &pipelineConstants;
     default:
-      // MSL/DXBC/HLSL/WGSL/SPIRV: the channels exist but are not wired to a consumer yet, so the
-      // draw serves the generic form instead of a specialization nothing would read.
+      // MSL/DXBC: a precompiled container cannot take values, so the draw keeps the generic form.
       return nullptr;
   }
 }

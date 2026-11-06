@@ -221,6 +221,22 @@ bool WebGPURenderPipeline::createPipelineState(WebGPUGPU* gpu,
   fragmentState.targetCount = colorTargets.size();
   fragmentState.targets = colorTargets.data();
 
+  // The pipeline constants: the WGSL overrides carry the SpecIds the artifact declares, the same
+  // key vocabulary Metal and Vulkan use. The keys point into the descriptor, which outlives the
+  // pipeline creation call.
+  std::vector<WGPUConstantEntry> specConstants;
+  if (!descriptor.fragment.constants.empty()) {
+    specConstants.reserve(descriptor.fragment.constants.size());
+    for (const auto& constant : descriptor.fragment.constants) {
+      WGPUConstantEntry entry = {};
+      entry.key = constant.first.c_str();
+      entry.value = constant.second;
+      specConstants.push_back(entry);
+    }
+    fragmentState.constantCount = specConstants.size();
+    fragmentState.constants = specConstants.data();
+  }
+
   // Configure depth stencil state.
   WGPUDepthStencilState depthStencilState = {};
   bool hasDepthStencil = (descriptor.depthStencil.format != PixelFormat::Unknown);
