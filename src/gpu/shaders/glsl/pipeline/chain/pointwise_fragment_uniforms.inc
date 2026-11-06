@@ -54,10 +54,6 @@
 #endif
   // Shared ColorSpaceXform parameters; at most one slot per chain may be OP_COLOR_SPACE_XFORM.
 #include "pipeline/chain/pointwise_cs_uniforms.inc"
-  // The per-slot data pool: TGFX_CHAIN_DATA_SLOT_WORDS vec4 words per slot, holding whichever
-  // operator's parameters that slot carries. Each operator's layout exists only in ChainOps.h,
-  // and the readers the instruction table calls come from the same declarations.
-  vec4 ChainData[CHAIN_SLOT_CAPACITY * TGFX_CHAIN_DATA_SLOT_WORDS];
 #if NTEX > 0
   // Four-leaf variants always bind the mask sampler (a phantom when the chain has no mask);
   // HasMaskTexture selects the application at runtime.

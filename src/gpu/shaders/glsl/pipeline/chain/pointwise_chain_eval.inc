@@ -125,8 +125,7 @@ vec4 evalChainSlot(int slot) {
     // The shared dispatch owns the operator-to-register mapping
     // (operator/pointwise_color_dispatch.inc); this interpreter supplies the slot's register
     // values and the selector word (the ConstColor input mode rides its low byte).
-    return evalPointwiseColorOp(Packed.x, in0, SlotMat[slot], SlotVec0[slot], SlotVec1[slot],
-                                SlotVec2[slot], Packed.w);
+    return evalPointwiseColorOp(Packed.x, in0, dataAt, Packed.w);
   }
   if (Packed.x == OP_BLEND) {
     vec4 blendSrc = in0;

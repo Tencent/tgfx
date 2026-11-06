@@ -41,6 +41,9 @@ layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING)
 #include "pipeline/chain/pointwise_cs_uniforms.inc"
 };
 
+// The operator parameter layouts and their pool readers, generated from contract/ChainOps.h.
+#pragma tgfx_chain_ops
+
 layout(location = 0) in vec3 TransformedCoords_0;
 layout(location = 1) in float vCoverage;
 layout(location = 2) in vec4 vColor;

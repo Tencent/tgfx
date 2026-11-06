@@ -1,7 +1,7 @@
 // Declares the chain instructions' uniform fields as std140 arrays inside the FragmentUniformBlock,
 // so the instruction evaluation can be a single shared function parameterized by instruction index.
 // Included once. Per-instruction footprint: SlotPacked (op, two input register indices, selector)
-// and the parameter registers SlotMat / SlotVec0..2, 128 bytes per slot.
+// and one data-pool block of TGFX_CHAIN_DATA_SLOT_WORDS vec4 words.
 // CHAIN_SLOT_CAPACITY is 16 for the base chain and the gradient, 32 for the noise shape. The
 // result registers live in the fixed-size chainResults array, recycled by last use. std140 layout
 // is derived from this order, but all access goes through the field names via reflection, so the
@@ -16,7 +16,7 @@
 //   SlotVec1    ConstColor: the constant; Blend: the constant operand
 //   SlotVec2    Luma: .rgb; AlphaThreshold: .a
   ivec4 SlotPacked[CHAIN_SLOT_CAPACITY];
-  mat4 SlotMat[CHAIN_SLOT_CAPACITY];
-  vec4 SlotVec0[CHAIN_SLOT_CAPACITY];
-  vec4 SlotVec1[CHAIN_SLOT_CAPACITY];
-  vec4 SlotVec2[CHAIN_SLOT_CAPACITY];
+  // The per-slot parameter pool: TGFX_CHAIN_DATA_SLOT_WORDS vec4 words per slot, holding whichever
+  // operator's parameters that slot carries. Each operator's layout exists only in ChainOps.h and
+  // the readers come from the same declarations.
+  vec4 ChainData[CHAIN_SLOT_CAPACITY * TGFX_CHAIN_DATA_SLOT_WORDS];

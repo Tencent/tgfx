@@ -37,20 +37,22 @@ vec4 applyPointwiseOp(int slot, vec4 color) {
     return color;
   }
   vec4 result;
+  // The slot's parameter block in the data pool: one block per slot, whatever operator it holds.
+  int dataAt = slot * TGFX_CHAIN_DATA_SLOT_WORDS;
   if (opType == OP_COLOR_MATRIX || opType == OP_LUMA || opType == OP_ALPHA_THRESHOLD ||
       opType == OP_CONST_COLOR) {
-    // The shared dispatch owns the operator-to-register mapping
-    // (operator/pointwise_color_dispatch.inc); this interpreter supplies the slot's registers.
-    result = evalPointwiseColorOp(opType, color, SlotMat[slot], SlotVec0[slot], SlotVec1[slot],
-                                  SlotVec2[slot], SlotPacked[slot].w);
+    // The shared dispatch owns the operator-to-parameter mapping
+    // (operator/pointwise_color_dispatch.inc); this interpreter supplies the slot's pool offset.
+    result = evalPointwiseColorOp(opType, color, dataAt, SlotPacked[slot].w);
   } else if (opType == OP_BLEND) {
     // Blend with a constant operand held in SlotVec1; the selector's bit 8 picks the operand order
     // (the slot kernel's meaning of that bit; the chain's Blend reads register operands instead).
     // Select the arguments before the call so the compiler inlines xpBlendColors once instead of
     // twice (one per ternary branch).
     bool constFirst = ((SlotPacked[slot].w >> 8) & 1) != 0;
-    vec4 blendSrc = constFirst ? SlotVec1[slot] : color;
-    vec4 blendDst = constFirst ? color : SlotVec1[slot];
+    vec4 constOperand = chainLoadBlend(dataAt).color;
+    vec4 blendSrc = constFirst ? constOperand : color;
+    vec4 blendDst = constFirst ? color : constOperand;
     int blendMode = SlotPacked[slot].w & 0xFF;
 #if HAS_XP >= 1
     if (xpPass) {

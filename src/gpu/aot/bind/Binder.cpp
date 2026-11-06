@@ -158,30 +158,35 @@ void UploadPointwiseSlot(UniformData* uniformData, const AOTChainSlot& slot) {
 // per-slot parameter block into the chain arrays.
 void BindColorMatrixSlot(UniformData* uniformData, size_t index, int /*ordinal*/,
                          const AOTChainSlot& slot) {
-  float matrixData[16];
-  float vectorData[4];
-  PackAOTColorMatrix(slot.colorMatrix.matrix, matrixData, vectorData);
-  uniformData->setArrayElementOptional(ChainParams::SlotMat.name, index, matrixData);
-  uniformData->setArrayElementOptional(ChainParams::SlotVec0.name, index, vectorData);
+  ChainISA::ColorMatrixData data = {};
+  float translate[4] = {};
+  PackAOTColorMatrix(slot.colorMatrix.matrix, data.linear.m, translate);
+  data.translate = {translate[0], translate[1], translate[2], translate[3]};
+  UploadSlotData(uniformData, index, data, ChainISA::PackColorMatrix);
 }
 
 void BindLumaSlot(UniformData* uniformData, size_t index, int /*ordinal*/,
                   const AOTChainSlot& slot) {
-  float lumaThresh[] = {slot.luma.kr, slot.luma.kg, slot.luma.kb, 0.0f};
-  uniformData->setArrayElementOptional(ChainParams::SlotVec2.name, index, lumaThresh);
+  ChainISA::LumaData data = {};
+  data.kr = slot.luma.kr;
+  data.kg = slot.luma.kg;
+  data.kb = slot.luma.kb;
+  UploadSlotData(uniformData, index, data, ChainISA::PackLuma);
 }
 
 void BindAlphaThresholdSlot(UniformData* uniformData, size_t index, int /*ordinal*/,
                             const AOTChainSlot& slot) {
-  float lumaThresh[] = {0.0f, 0.0f, 0.0f, slot.alphaThreshold.threshold};
-  uniformData->setArrayElementOptional(ChainParams::SlotVec2.name, index, lumaThresh);
+  ChainISA::AlphaThresholdData data = {};
+  data.threshold = slot.alphaThreshold.threshold;
+  UploadSlotData(uniformData, index, data, ChainISA::PackAlphaThreshold);
 }
 
 void BindConstColorSlot(UniformData* uniformData, size_t index, int /*ordinal*/,
                         const AOTChainSlot& slot) {
   const auto& color = slot.constColor.color;
-  float colorData[] = {color[0], color[1], color[2], color[3]};
-  uniformData->setArrayElementOptional(ChainParams::SlotVec1.name, index, colorData);
+  ChainISA::ConstColorData data = {};
+  data.color = {color[0], color[1], color[2], color[3]};
+  UploadSlotData(uniformData, index, data, ChainISA::PackConstColor);
 }
 
 void BindAARectCoverageSlot(UniformData* uniformData, size_t index, int /*ordinal*/,
@@ -242,7 +247,11 @@ void UploadYUVTailSlot(UniformData* uniformData, size_t index, const AOTChainSlo
   // whose operand is the const color (the chain's blend reads registers, so its row writes
   // nothing; the tail's dialect supplies the color instead).
   if (slot.op == AOTChainOp::Blend) {
-    BindConstColorSlot(uniformData, index, static_cast<int>(index), slot);
+    // The tail's blend operand is the const color, packed into the Blend block's color field.
+    const auto& color = slot.constColor.color;
+    ChainISA::BlendData data = {};
+    data.color = {color[0], color[1], color[2], color[3]};
+    UploadSlotData(uniformData, index, data, ChainISA::PackBlend);
   } else if (auto bind = OpContractOf(slot.op).bind) {
     bind(uniformData, index, static_cast<int>(index), slot);
   }

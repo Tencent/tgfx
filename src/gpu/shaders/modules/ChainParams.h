@@ -13,10 +13,6 @@ struct ChainParams {
   // whole parameter area belongs to it. The allocation table (which operator reads which register)
   // lives in pointwise_chain_uniforms.inc; a new operator picks a free register there.
   static constexpr Param<ParamType::Int4> SlotPacked{"SlotPacked"};
-  static constexpr Param<ParamType::Float4x4> SlotMat{"SlotMat"};
-  static constexpr Param<ParamType::Float4> SlotVec0{"SlotVec0"};
-  static constexpr Param<ParamType::Float4> SlotVec1{"SlotVec1"};
-  static constexpr Param<ParamType::Float4> SlotVec2{"SlotVec2"};
 
   // The per-slot data pool: one block of words per slot, holding whichever operator's parameters
   // that slot carries. The block layout lives only in contract/ChainOps.h.
@@ -128,10 +124,6 @@ struct ChainParams {
                                                     TiledDimension2.name, TiledStrict2.name};
 
   static constexpr ParamInfo Fields[] = {SlotPacked,
-                                         SlotMat,
-                                         SlotVec0,
-                                         SlotVec1,
-                                         SlotVec2,
                                          ChainData,
                                          CoordSourceMask,
                                          HasMaskTexture,
