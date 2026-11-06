@@ -25,6 +25,7 @@
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 

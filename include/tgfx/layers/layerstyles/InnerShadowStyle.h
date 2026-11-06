@@ -131,6 +131,9 @@ class InnerShadowStyle : public LayerStyle {
   void drawWithSpread(Canvas* canvas, const LayerStyleInput& input, float alpha,
                       BlendMode blendMode);
 
+  bool tryDrawAnalytic(Canvas* canvas, const LayerStyleInput& input, float alpha,
+                       BlendMode blendMode);
+
   std::shared_ptr<ImageFilter> getShadowFilter(float scale);
 
   void invalidateFilter();

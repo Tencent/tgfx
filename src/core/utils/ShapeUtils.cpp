@@ -43,24 +43,11 @@ float ShapeUtils::CalculateAlphaReduceFactorIfHairline(std::shared_ptr<Shape> sh
 
 std::tuple<std::shared_ptr<StrokeShape>, Matrix> ShapeUtils::DecomposeStrokeShape(
     std::shared_ptr<Shape> shape) {
-  std::shared_ptr<StrokeShape> strokeShape = nullptr;
-  Matrix matrix = Matrix::I();
-
-  if (!shape) {
-    return {strokeShape, matrix};
+  auto [innerShape, matrix] = UnwrapMatrixShape(std::move(shape));
+  if (innerShape == nullptr || innerShape->type() != Shape::Type::Stroke) {
+    return {nullptr, Matrix::I()};
   }
-
-  if (shape->type() == Shape::Type::Matrix) {
-    auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
-    if (matrixShape->shape->type() == Shape::Type::Stroke) {
-      strokeShape = std::static_pointer_cast<StrokeShape>(matrixShape->shape);
-      matrix = matrixShape->matrix;
-    }
-  } else if (shape->type() == Shape::Type::Stroke) {
-    strokeShape = std::static_pointer_cast<StrokeShape>(shape);
-  }
-
-  return {strokeShape, matrix};
+  return {std::static_pointer_cast<StrokeShape>(innerShape), matrix};
 }
 
 const MatrixShape* ShapeUtils::AsMatrixShape(const Shape* shape) {
@@ -68,6 +55,16 @@ const MatrixShape* ShapeUtils::AsMatrixShape(const Shape* shape) {
     return static_cast<const MatrixShape*>(shape);
   }
   return nullptr;
+}
+
+std::pair<std::shared_ptr<Shape>, Matrix> ShapeUtils::UnwrapMatrixShape(
+    std::shared_ptr<Shape> shape) {
+  auto matrix = Matrix::I();
+  while (auto* matrixShape = AsMatrixShape(shape.get())) {
+    matrix.preConcat(matrixShape->matrix);
+    shape = matrixShape->shape;
+  }
+  return {std::move(shape), matrix};
 }
 
 }  // namespace tgfx
