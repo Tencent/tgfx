@@ -29,11 +29,11 @@
   // unbounded sample-area decoy. A leaf whose gate is 0 reads its hardware sampler unclamped.
   vec4 Subset;
   int SubsetClampOn;
-#if NTEX >= 2
+  // A chain has either no texture leaf or all four (NTEX is 0 or 4), so one guard covers leaves
+  // 1..3; a two- or three-leaf shape does not exist.
+#if NTEX > 0
   vec4 Subset_1;
   int SubsetClampOn_1;
-#endif
-#if NTEX >= 4
   vec4 Subset_2;
   int SubsetClampOn_2;
   vec4 Subset_3;

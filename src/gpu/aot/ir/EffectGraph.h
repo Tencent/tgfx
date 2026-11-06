@@ -319,7 +319,7 @@ using AOTEffectParameters = std::variant<std::monostate, AOTTextureParameters,
 
 // Runtime-selected pointwise operator applied by the fused kernels (PointwiseChain and
 // YUVTextureFill). The values are the AOTPointwiseOpType subset of the shared
-// op table (operator/op_codes.inc): the kernels declare every operator's parameter block
+// op table (injected as OP_* defines): the kernels declare every operator's parameter block
 // unconditionally and select at draw time via a uniform, so the operator kind is never a
 // compile-time permutation axis. The members generate from the op list; None is the pass-through
 // marker the slot interpreters also use.

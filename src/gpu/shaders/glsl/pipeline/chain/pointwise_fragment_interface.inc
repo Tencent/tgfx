@@ -44,26 +44,19 @@ layout(location = NTEX + 1) in vec4 vColor;
 layout(location = 6) in vec4 vTexSubset;
 #endif
 
-#if NTEX >= 1
+// A chain either has no texture leaf or all four: TEXTURE_COUNT is a 0/1 switch and NTEX is
+// derived from it as 0/4, so the unused samplers of a four-leaf variant are bound as phantoms
+// rather than compiled out.
+#if NTEX > 0
 layout(location = CHAIN_TEX_LOC_BASE + 0) in vec3 TransformedCoords_0;
-#endif
-#if NTEX >= 2
 layout(location = CHAIN_TEX_LOC_BASE + 1) in vec3 TransformedCoords_1;
-#endif
-#if NTEX >= 4
 layout(location = CHAIN_TEX_LOC_BASE + 2) in vec3 TransformedCoords_2;
 layout(location = CHAIN_TEX_LOC_BASE + 3) in vec3 TransformedCoords_3;
-#endif
 
-#if NTEX >= 1
-layout(set = TGFX_TEXTURE_SET, binding = 0) uniform CHAIN_LEAF_SAMPLER TextureSampler_0;
-#endif
-#if NTEX >= 2
-layout(set = TGFX_TEXTURE_SET, binding = 1) uniform CHAIN_LEAF_SAMPLER TextureSampler_1;
-#endif
-#if NTEX >= 4
-layout(set = TGFX_TEXTURE_SET, binding = 2) uniform CHAIN_LEAF_SAMPLER TextureSampler_2;
-layout(set = TGFX_TEXTURE_SET, binding = 3) uniform CHAIN_LEAF_SAMPLER TextureSampler_3;
+layout(set = TGFX_TEXTURE_SET, binding = 0) uniform sampler2D TextureSampler_0;
+layout(set = TGFX_TEXTURE_SET, binding = 1) uniform sampler2D TextureSampler_1;
+layout(set = TGFX_TEXTURE_SET, binding = 2) uniform sampler2D TextureSampler_2;
+layout(set = TGFX_TEXTURE_SET, binding = 3) uniform sampler2D TextureSampler_3;
 #endif
 #if NTEX > 0 || HAS_MASK_TEXTURE
 // Device-space alpha mask applied after the DAG and before the XP stage (same application point

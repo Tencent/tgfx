@@ -25,7 +25,7 @@ highp vec2 chainLeafCoord(vec3 coord, int leafIndex) {
 // coordinate, as GLSLTextureEffect::emitDefaultTextureCode does. main() calls this once per leaf
 // with the leaf's own sampler: the body is short, and statically bound per-leaf reads keep the
 // common draw's sampling as direct as it can be.
-vec4 chainPlainLeafFetch(CHAIN_LEAF_SAMPLER texSampler, vec3 coord, vec4 leafSubset,
+vec4 chainPlainLeafFetch(sampler2D texSampler, vec3 coord, vec4 leafSubset,
                          vec2 leafAlphaStart, int leafHasRgbaaa, int leafClampOn, int leafIndex) {
   highp vec2 uv = chainLeafCoord(coord, leafIndex);
   int readSwizzle = LeafReadSwizzles[leafIndex];

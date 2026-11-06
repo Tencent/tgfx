@@ -76,8 +76,8 @@ namespace Op {
 
 // The op values of the chain interpreter and the pointwise slot interpreters: every one derives
 // from ChainISA's single list (contract/ChainISA.h), which is also the list Defines() turns into
-// the OP_* defines every compiled variant receives; op_codes.inc only marks the include point,
-// and the AOTChainOp enum anchors to these values by assignment. The single-slot interpreter
+// the OP_* defines every compiled variant receives, and the AOTChainOp enum anchors to these
+// values by assignment. The single-slot interpreter
 // dispatches on the AOTPointwiseOpType subset, so it deliberately never emits the chain-only
 // operators (Texture, the coverage ops, the modulators). The pointwise color operators also have
 // an IR mirror (the list above), which the asserts below keep aligned with the ABI values.

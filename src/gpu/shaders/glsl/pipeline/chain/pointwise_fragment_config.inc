@@ -28,8 +28,8 @@
 // the same texture-leaf count share a variant. Intermediate results live in 16 recycled registers
 // (AOTChainRegisterAllocator), independent of the instruction count. Texture leaves occupy
 // instructions 0..NTEX-1 and each samples its own sampler, keeping sampler indexing static.
-// TEXTURE_COUNT encodes 0/1/2/4 leaves; a zero-leaf chain evaluates const-color and blend ops
-// against the geometry color alone. With HAS_MASK_TEXTURE a device-space alpha mask child is
+// TEXTURE_COUNT is a 0/1 switch that NTEX turns into 0/4 leaves: the variant has either no
+// texture leaf or all four, so a reader never has to reason about 2- and 3-leaf shapes. With HAS_MASK_TEXTURE a device-space alpha mask child is
 // sampled after the DAG and before the XP stage.
 // Leaf subset rects are runtime uniforms (Subset / Subset_1 / ... following the structural ordinal
 // convention); a leaf without a real subset uploads the full texture bounds, so the clamp is a
@@ -54,7 +54,6 @@
 #ifndef HAS_SUBSET
 #define HAS_SUBSET 0
 #endif
-#define CHAIN_LEAF_SAMPLER sampler2D
 
 #if TEXTURE_COUNT == 0
 #define NTEX 0

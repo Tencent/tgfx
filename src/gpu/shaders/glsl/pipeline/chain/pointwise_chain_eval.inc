@@ -13,7 +13,6 @@
 
 #pragma tgfx_spec_reader
 
-#include "operator/op_codes.inc"
 #include "operator/pointwise_math.inc"
 #include "operator/pointwise_color_dispatch.inc"
 

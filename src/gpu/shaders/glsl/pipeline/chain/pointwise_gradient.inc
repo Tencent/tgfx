@@ -1,6 +1,5 @@
 // Gradient source module (OP_GRADIENT), used by the gradient resource kind (RESOURCE_KIND 1) of
 // PointwiseChainShader. Pairs with pointwise_gradient_uniforms.inc.
-#include "operator/op_codes.inc"
 #include "pipeline/chain/pointwise_source_coords.inc"
 #include "source/gradient_layout.inc"
 #include "source/gradient_colorize.inc"
@@ -49,19 +48,15 @@ bool evalGradientSlot(ivec4 Packed, vec4 in0, out vec4 value) {
     if (GradientLUTLeaf == 0) {
       gradColor = texture(TextureSampler_0, lutCoord);
     }
-#if NTEX > 1
     if (GradientLUTLeaf == 1) {
       gradColor = texture(TextureSampler_1, lutCoord);
     }
-#endif
-#if NTEX > 2
     if (GradientLUTLeaf == 2) {
       gradColor = texture(TextureSampler_2, lutCoord);
     }
     if (GradientLUTLeaf == 3) {
       gradColor = texture(TextureSampler_3, lutCoord);
     }
-#endif
 #endif
   } else {
     gradColor = gradientColorizeUnrolled(
