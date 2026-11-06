@@ -499,6 +499,15 @@ size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics
         pendingIfndef = match[1].str();
         continue;
       }
+      // Blank lines and line comments do not break the #ifndef/#define adjacency: a hand-written
+      // guard may separate the two by a comment. Any other line (an #endif, another directive,
+      // code) closes the guard, so a later unrelated #define of the same name is not mistaken
+      // for one.
+      const auto firstChar = line.find_first_not_of(" \t");
+      const auto content = firstChar == std::string::npos ? std::string() : line.substr(firstChar);
+      if (content.empty() || content.rfind("//", 0) == 0) {
+        continue;
+      }
       if (std::regex_search(line, match, definePattern)) {
         const auto name = match[1].str();
         if (kernelFile && name == pendingIfndef && !guardDefaultWhitelist.count(name)) {

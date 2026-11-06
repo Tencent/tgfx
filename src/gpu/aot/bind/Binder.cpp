@@ -150,15 +150,10 @@ void UploadGradientParams(UniformData* uniformData, const AOTGradientParameters&
 void UploadPointwiseSlot(UniformData* uniformData, const AOTChainSlot& slot) {
   // One pointwise operator as chain slot 0: the packed word and the parameter registers the slot
   // interpreter reads (pointwise_op.inc). A single-operator kernel (TexturedEffect) and the chain
-  // thus share one parameter ABI.
+  // thus share one parameter ABI. The single-operator kernels accept the four color operators
+  // only; a Blend's operand encoding belongs to UploadYUVTailSlot, whose selector bit 8 carries
+  // the operand order where the chain's carries multiplyInputAlpha.
   UploadChainSlot(uniformData, 0, slot, -1, -1, -1);
-  if (slot.op == AOTChainOp::Blend) {
-    // The slot interpreter's Blend reads its constant operand from SlotVec1 (a chain Blend's
-    // operands are registers, so its bind row writes no parameter block).
-    const auto& color = slot.constColor.color;
-    float colorData[] = {color[0], color[1], color[2], color[3]};
-    uniformData->setArrayElementOptional(ChainParams::SlotVec1.name, 0, colorData);
-  }
 }
 
 // The instruction contract's bind column (declared in Binder.h): each function writes one op's

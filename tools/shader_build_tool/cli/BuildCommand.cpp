@@ -209,16 +209,21 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
 
   // The unrolled executor's call sites are generated, not counted: every
   // `#pragma tgfx_spec_unroll` line becomes one guarded call per slot of the largest declared
-  // capacity, so the template carries no site list to keep in sync with a profile.
-  if (!fragSource.empty()) {
-    auto expanded = ExpandUnrollPragmas(fragSource);
+  // capacity, so the template carries no site list to keep in sync with a profile. Both stages
+  // expand — a pragma the tool expanded in only one stage would silently drop the other stage's
+  // call sites, because a GLSL compiler ignores an unknown pragma.
+  for (auto* stage : {&vertSource, &fragSource}) {
+    if (stage->empty()) {
+      continue;
+    }
+    auto expanded = ExpandUnrollPragmas(*stage);
     if (expanded.empty()) {
       RecordBuildError(diagnostics, Layer::Compile, DiagnosticCode::CompileGlsl, info.name, "",
                        -1, -1, "malformed #pragma tgfx_spec_unroll (expected <fn> <capacity> "
                                "<guard> (<args>))");
       return report;
     }
-    fragSource = std::move(expanded);
+    *stage = std::move(expanded);
   }
 
   // The specialization scan runs once per family: it collects the SPEC_<name>() fields the
