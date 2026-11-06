@@ -12,13 +12,6 @@
 // with no operators leaves SlotCount at 0 (the loop never runs), byte-identical to before.
 #version 450
 
-#ifndef YUV_FORMAT
-#define YUV_FORMAT 0
-#endif
-#ifndef HAS_XP
-#define HAS_XP 0
-#endif
-
 layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
   vec4 Rect;
   int HasClip;

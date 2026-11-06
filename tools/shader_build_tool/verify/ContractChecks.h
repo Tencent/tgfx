@@ -45,6 +45,11 @@ size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics
 /// reason. Reports verify.pointwise-dispatch and returns the violation count.
 size_t ValidatePointwiseDispatch(const std::string& shaderDir, Diagnostics* diagnostics);
 
+/// Checks the dimensions both stages declare: the two declarations must agree on kind and value
+/// count (they build one value per variant). Reports verify.macro.unknown and returns the
+/// violation count.
+size_t ValidateMirroredDimensions(Diagnostics* diagnostics);
+
 /// Validates that the shader sources do not refer to things that no longer exist: every
 /// "name.inc/.frag/.vert" token must name a file under shaderDir, and every "XxxShader" token must
 /// name a registered shader family (registeredShaders). A reference to a removed file or merged-away

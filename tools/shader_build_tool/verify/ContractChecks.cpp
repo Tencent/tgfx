@@ -441,11 +441,10 @@ struct DimensionNameVisitor {
 // permutation dimension, a define in the shader sources, or a whitelisted builtin. A typo
 // evaluates silently to zero and compiles a wrong variant, so it fails the build instead.
 // Two further invariants ride the same scan:
-//   1. A kernel file's guard default (`#ifndef X` / `#define X 0`) is the dimension-default
-//      pattern, so X must be a dimension some family declares — otherwise the name silently
-//      self-legitimizes (pass one would whitelist its own define) and every variant compiles
-//      with the default value. MAX_SIGMA is the one non-dimension constant that uses the same
-//      guard pattern, by its kernel's declaration.
+//   1. A kernel file must not carry guard defaults (`#ifndef X` / `#define X 0`): every build
+//      prepends the variant's dimension defines before the source, so a guard is inert and only
+//      drifts from the family's Dim declaration (the defaults live there now). MAX_SIGMA is the
+//      one fixed compile-time constant that still uses the guard pattern, whitelisted by name.
 //   2. A declared dimension no preprocessor condition ever references compiles identical code
 //      for every value and only multiplies the bundle, so it fails the build as dead.
 size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics) {
@@ -502,12 +501,13 @@ size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics
       }
       if (std::regex_search(line, match, definePattern)) {
         const auto name = match[1].str();
-        if (kernelFile && name == pendingIfndef && !declaredDimensions.count(name) &&
-            !guardDefaultWhitelist.count(name)) {
+        if (kernelFile && name == pendingIfndef && !guardDefaultWhitelist.count(name)) {
           Report(diagnostics, Severity::Error, DiagnosticCode::VerifyMacroUnknown, "", "", -1, -1,
                  relative + " defaults '" + name +
-                     "' with the #ifndef pattern, but no family dimension declares it; either "
-                     "declare the dimension in the family's Dim arrays or remove the guard");
+                     "' with the #ifndef pattern. The build prepends every declared dimension's "
+                     "define before the source, so a kernel guard is inert and only drifts from "
+                     "the family's Dim declaration; remove the #ifndef/#define/#endif block "
+                     "(whitelist: MAX_SIGMA, a fixed compile-time constant)");
           ++errors;
         } else {
           allowed.insert(name);
@@ -551,6 +551,69 @@ size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics
                  "' is declared by a family but no preprocessor condition references it; every "
                  "value compiles identical code, so the dimension only multiplies the bundle");
       ++errors;
+    }
+  }
+  return errors;
+}
+
+namespace {
+
+// The shape of one dimension: its name, its kind and its value count (the enum value names join
+// the signature, because two stages agreeing on the count but not on the names would still build
+// different values for the same name).
+struct DimensionSignatureVisitor {
+  std::string operator()(const PermutationBool& dimension) const {
+    return std::string(dimension.defineName) + ":bool:2";
+  }
+  std::string operator()(const PermutationEnum& dimension) const {
+    std::string result =
+        std::string(dimension.defineName) + ":enum:" + std::to_string(dimension.valueNames.size());
+    for (const auto* value : dimension.valueNames) {
+      result += '|';
+      result += value;
+    }
+    return result;
+  }
+  std::string operator()(const PermutationInt& dimension) const {
+    return std::string(dimension.defineName) + ":int:" + std::to_string(dimension.count);
+  }
+};
+
+std::string DimensionNameOf(const std::string& signature) {
+  const auto separator = signature.find(':');
+  return separator == std::string::npos ? signature : signature.substr(0, separator);
+}
+
+}  // namespace
+
+// The mirrored-dimension rule: a dimension both stages declare builds one value (the vertex and
+// fragment stages are compiled from the same permutation), so the two declarations must agree on
+// kind and value count. The runtime MirroredDimsAgree assert catches the mismatch only when the
+// two values happen to differ; a declaration that cannot produce a differing pair (same count,
+// renamed values) would slip through, and the build-time check is where the author can fix it.
+size_t ValidateMirroredDimensions(Diagnostics* diagnostics) {
+  size_t errors = 0;
+  for (const auto& factory : ShaderRegistry::All()) {
+    const auto shader = factory();
+    const auto info = shader->info();
+    std::map<std::string, std::string> vertexDimensions;
+    for (const auto& dimension : info.vertDomain.getDimensions()) {
+      const auto signature = std::visit(DimensionSignatureVisitor(), dimension);
+      vertexDimensions.emplace(DimensionNameOf(signature), signature);
+    }
+    for (const auto& dimension : info.fragDomain.getDimensions()) {
+      const auto signature = std::visit(DimensionSignatureVisitor(), dimension);
+      const auto name = DimensionNameOf(signature);
+      const auto vertex = vertexDimensions.find(name);
+      if (vertex != vertexDimensions.end() && vertex->second != signature) {
+        Report(diagnostics, Severity::Error, DiagnosticCode::VerifyMacroUnknown, "", "", -1, -1,
+               "family '" + std::string(info.name) + "' mirrors dimension '" + name +
+                   "' with different declarations ('" + vertex->second + "' in the vertex "
+                   "domain, '" + signature +
+                   "' in the fragment domain); both stages build the same value, so kind and "
+                   "value count must match");
+        ++errors;
+      }
     }
   }
   return errors;

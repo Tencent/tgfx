@@ -8,13 +8,6 @@
 // HAS_COLOR nor HAS_COVERAGE exists as a dimension.
 #version 450
 
-#ifndef HAS_XP
-#define HAS_XP 0
-#endif
-#ifndef HAS_MASK_TEXTURE
-#define HAS_MASK_TEXTURE 0
-#endif
-
 layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
   vec4 Rect;
   int HasClip;

@@ -10,12 +10,6 @@
 // Fragment dimensions: STROKE, HAS_XP (int, 3).
 #version 450
 
-#ifndef STROKE
-#define STROKE 0
-#endif
-#ifndef HAS_XP
-#define HAS_XP 0
-#endif
 #define HAS_RUNTIME_CLIP 1
 #define HAS_RUNTIME_DEVICE_MASK 1
 

@@ -8,15 +8,6 @@
 // exact Color uniform when HasCommonColor != 0, the (8-bit quantized) vColor varying otherwise.
 #version 450
 
-#ifndef STROKE
-#define STROKE 0
-#endif
-#ifndef TEXTURED
-#define TEXTURED 0
-#endif
-#ifndef HAS_XP
-#define HAS_XP 0
-#endif
 #define HAS_RUNTIME_CLIP 1
 
 layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {

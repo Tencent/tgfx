@@ -7,10 +7,6 @@
 // the HasCommonColor runtime uniform (the broadcast is 8-bit quantized).
 #version 450
 
-#ifndef HAS_COVERAGE
-#define HAS_COVERAGE 0
-#endif
-
 layout(std140, set = TGFX_VERTEX_UBO_SET, binding = TGFX_VERTEX_UBO_BINDING) uniform VertexUniformBlock {
   vec4 tgfx_RTAdjust;
   vec2 atlasSizeInv;

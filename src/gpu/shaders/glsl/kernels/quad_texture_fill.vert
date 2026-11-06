@@ -6,16 +6,6 @@
 // is 1.0 and the division is a no-op; this lets one shader serve both affine and perspective.
 #version 450
 
-#ifndef HAS_UV_COORD
-#define HAS_UV_COORD 0
-#endif
-#ifndef HAS_SUBSET
-#define HAS_SUBSET 0
-#endif
-#ifndef HAS_LOCAL_MASK
-#define HAS_LOCAL_MASK 0
-#endif
-
 layout(std140, set = TGFX_VERTEX_UBO_SET, binding = TGFX_VERTEX_UBO_BINDING) uniform VertexUniformBlock {
   vec4 tgfx_RTAdjust;
   mat3 CoordTransformMatrix_0;

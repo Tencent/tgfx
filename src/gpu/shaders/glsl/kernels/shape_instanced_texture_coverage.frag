@@ -1,8 +1,5 @@
 #version 450
 
-#ifndef GRADIENT
-#define GRADIENT 0
-#endif
 // An analytic clip (AA rect / rrect) rides the runtime clip contract uniforms, so a draw carrying
 // a clip coverage FP next to its coverage texture selects the same variant.
 #define HAS_RUNTIME_CLIP 1

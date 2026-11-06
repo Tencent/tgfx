@@ -7,10 +7,6 @@
 // Fragment dimensions: HAS_XP (int, 3).
 #version 450
 
-#ifndef HAS_XP
-#define HAS_XP 0
-#endif
-
 #if HAS_XP
 layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
 #include "xp/xp_uniforms.inc"

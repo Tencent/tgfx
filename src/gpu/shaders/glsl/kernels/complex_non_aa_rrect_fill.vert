@@ -7,10 +7,6 @@
 // uniform, selected by the HasCommonColor runtime uniform.
 #version 450
 
-#ifndef STROKE
-#define STROKE 0
-#endif
-
 layout(std140, set = TGFX_VERTEX_UBO_SET, binding = TGFX_VERTEX_UBO_BINDING) uniform VertexUniformBlock {
   vec4 tgfx_RTAdjust;
 };

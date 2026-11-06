@@ -66,6 +66,13 @@ class PointwiseDispatchRule : public SourceRule {
   }
 };
 
+class MirroredDimensionsRule : public SourceRule {
+ public:
+  size_t check(const SourceRuleContext&, Diagnostics* diagnostics) const override {
+    return ValidateMirroredDimensions(diagnostics);
+  }
+};
+
 class ReflectionContractRule : public ArtifactRule {
  public:
   size_t check(const ArtifactRuleContext& context, Diagnostics* diagnostics) const override {
@@ -87,6 +94,7 @@ std::vector<std::unique_ptr<SourceRule>> MakeSourceRules() {
   rules.push_back(std::make_unique<SourceReferencesRule>());
   rules.push_back(std::make_unique<MacroNamesRule>());
   rules.push_back(std::make_unique<PointwiseDispatchRule>());
+  rules.push_back(std::make_unique<MirroredDimensionsRule>());
   return rules;
 }
 

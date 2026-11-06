@@ -8,9 +8,6 @@
 //   The tiled-child tap path is a runtime uniform branch (TiledChild), mirroring GaussianBlur1D.
 #version 450
 
-#ifndef HAS_XP
-#define HAS_XP 0
-#endif
 #define HAS_RUNTIME_CLIP 1
 #define HAS_RUNTIME_DEVICE_MASK 1
 

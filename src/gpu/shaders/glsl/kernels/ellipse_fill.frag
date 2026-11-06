@@ -10,14 +10,8 @@
 //   HAS_DEVICE_MASK: device-space mask texture binding is present
 #version 450
 
-#ifndef HAS_XP
-#define HAS_XP 0
-#endif
 // coverage_uniforms.inc declares the runtime clip contract fields (Rect, HasClip, rrect).
 #define HAS_RUNTIME_CLIP 1
-#ifndef HAS_DEVICE_MASK
-#define HAS_DEVICE_MASK 0
-#endif
 
 layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
   // Exact paint color for common-color draws; the broadcast into the per-vertex attribute is

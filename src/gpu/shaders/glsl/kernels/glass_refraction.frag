@@ -17,15 +17,6 @@
 // cannot move a texture coordinate.
 #version 450
 
-#ifndef GP_KIND
-#define GP_KIND 0
-#endif
-#ifndef GEOMETRY_KIND
-#define GEOMETRY_KIND 0
-#endif
-#ifndef HAS_XP
-#define HAS_XP 0
-#endif
 #define HAS_RUNTIME_CLIP 1
 
 layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {

@@ -10,16 +10,6 @@
 //                 real subset, so the clamp is a no-op.
 #version 450
 
-#ifndef HAS_SUBSET
-#define HAS_SUBSET 0
-#endif
-#ifndef HAS_XP
-#define HAS_XP 0
-#endif
-#ifndef HAS_LOCAL_MASK
-#define HAS_LOCAL_MASK 0
-#endif
-
 layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
   vec4 Rect;
   int HasClip;

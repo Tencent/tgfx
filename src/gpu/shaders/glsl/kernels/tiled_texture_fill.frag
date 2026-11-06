@@ -8,10 +8,6 @@
 // Fragment dimensions: HAS_XP (int, 3).
 #version 450
 
-#ifndef HAS_XP
-#define HAS_XP 0
-#endif
-
 layout(location = 0) in vec2 TransformedCoords_0;
 layout(location = 1) in float vCoverage;
 

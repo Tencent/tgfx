@@ -6,9 +6,6 @@
 // Everything else is the shared pointwise core (see pointwise_fragment_config.inc).
 #version 450
 
-#ifndef RESOURCE_KIND
-#define RESOURCE_KIND 0
-#endif
 // The capacities are injected by shader_build_tool from the C++ resource profiles
 // (AOTResourceProfile.h), so no literal here can drift from what the runtime uploads.
 #if RESOURCE_KIND == 2

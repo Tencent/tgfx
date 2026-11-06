@@ -7,10 +7,6 @@
 // reads it only when the draw carries a mask (HasLocalMask).
 #version 450
 
-#ifndef GP_KIND
-#define GP_KIND 0
-#endif
-
 layout(std140, set = TGFX_VERTEX_UBO_SET, binding = TGFX_VERTEX_UBO_BINDING) uniform VertexUniformBlock {
   vec4 tgfx_RTAdjust;
   mat3 CoordTransformMatrix_0;

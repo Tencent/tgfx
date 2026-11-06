@@ -16,9 +16,6 @@
 #ifndef MAX_SIGMA
 #define MAX_SIGMA 9
 #endif
-#ifndef HAS_XP
-#define HAS_XP 0
-#endif
 #define HAS_RUNTIME_CLIP 1
 #define HAS_RUNTIME_DEVICE_MASK 1
 // Mirrors Blur1DFragmentProcessor::KERNEL_VEC4_COUNT: the vec4 capacity of the half-kernel table.

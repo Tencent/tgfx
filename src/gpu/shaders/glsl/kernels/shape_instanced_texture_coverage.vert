@@ -1,8 +1,5 @@
 #version 450
 
-#ifndef GRADIENT
-#define GRADIENT 0
-#endif
 // The instance color attribute is unconditional: colorless batches broadcast white, so every
 // variant binds the color in a single form.
 

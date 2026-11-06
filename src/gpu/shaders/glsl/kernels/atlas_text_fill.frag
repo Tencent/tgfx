@@ -10,12 +10,6 @@
 // Fragment dimensions: HAS_COVERAGE, HAS_XP (int, 3).
 #version 450
 
-#ifndef HAS_COVERAGE
-#define HAS_COVERAGE 0
-#endif
-#ifndef HAS_XP
-#define HAS_XP 0
-#endif
 #define HAS_RUNTIME_DEVICE_MASK 1
 #define HAS_RUNTIME_CLIP 1
 
