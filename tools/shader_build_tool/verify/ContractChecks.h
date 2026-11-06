@@ -39,6 +39,12 @@ size_t ValidateFamilyParams(const std::vector<VariantData>& variants, Diagnostic
 
 size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics);
 
+/// Checks the shared pointwise dispatch (operator/pointwise_color_dispatch.inc) against the op
+/// list: every operator needs an `op == OP_<NAME>` branch or a `tgfx_pointwise_exempt <Name>:
+/// <reason>` entry, every branch must name a listed operator, and an exemption must state its
+/// reason. Reports verify.pointwise-dispatch and returns the violation count.
+size_t ValidatePointwiseDispatch(const std::string& shaderDir, Diagnostics* diagnostics);
+
 /// Validates that the shader sources do not refer to things that no longer exist: every
 /// "name.inc/.frag/.vert" token must name a file under shaderDir, and every "XxxShader" token must
 /// name a registered shader family (registeredShaders). A reference to a removed file or merged-away

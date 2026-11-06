@@ -13,6 +13,7 @@
 
 #include "operator/op_codes.inc"
 #include "operator/pointwise_math.inc"
+#include "operator/pointwise_color_dispatch.inc"
 
 #include "coverage/analytic_clip_math.inc"
 
@@ -115,10 +116,13 @@ vec4 evalChainSlot(int slot) {
     // rather than the selector's fixed geometry-alpha bit.
     return in0 * in1.a;
   }
-  if (Packed.x == OP_CONST_COLOR) {
-    // The input mode occupies the selector's low bits; bits 20-24 carry the result register.
-    int constMode = Packed.w & 0xF;
-    return pmApplyConstColor(SlotVec1[slot], in0, constMode);
+  if (Packed.x == OP_CONST_COLOR || Packed.x == OP_COLOR_MATRIX || Packed.x == OP_LUMA ||
+      Packed.x == OP_ALPHA_THRESHOLD) {
+    // The shared dispatch owns the operator-to-register mapping
+    // (operator/pointwise_color_dispatch.inc); this interpreter supplies the slot's register
+    // values and the selector word (the ConstColor input mode rides its low byte).
+    return evalPointwiseColorOp(Packed.x, in0, SlotMat[slot], SlotVec0[slot], SlotVec1[slot],
+                                SlotVec2[slot], Packed.w);
   }
   if (Packed.x == OP_BLEND) {
     vec4 blendSrc = in0;
@@ -136,16 +140,6 @@ vec4 evalChainSlot(int slot) {
       blendResult *= TGFX_CHAIN_GEOM_COLOR.a;
     }
     return blendResult;
-  }
-  vec4 color = in0;
-  if (Packed.x == OP_COLOR_MATRIX) {
-    return pmApplyColorMatrix(color, SlotMat[slot], SlotVec0[slot]);
-  }
-  if (Packed.x == OP_LUMA) {
-    return pmApplyLuma(color, SlotVec2[slot].rgb);
-  }
-  if (Packed.x == OP_ALPHA_THRESHOLD) {
-    return pmApplyAlphaThreshold(color, SlotVec2[slot].a);
   }
   if (Packed.x == OP_AARECT_COVERAGE) {
     // Analytic AA-rect coverage (identical math to GLSLRectEffect): falloff from the fragment's
@@ -180,7 +174,9 @@ vec4 evalChainSlot(int slot) {
   if (evalResourceSlot(Packed, in0, resourceValue)) {
     return resourceValue;
   }
-  // OP_COLOR_SPACE_XFORM
+  // OP_COLOR_SPACE_XFORM (the registered exception: its parameters are the program-level block,
+  // not per-slot registers, so it does not ride the shared dispatch)
+  vec4 color = in0;
   PM_APPLY_COLOR_SPACE_XFORM(color, ChainCSFlags, ChainSrcTF0, ChainSrcTF1, ChainSrcTFType,
                              ChainSrcOOTF, ChainColorXform, ChainDstOOTF, ChainDstTF0,
                              ChainDstTF1, ChainDstTFType)

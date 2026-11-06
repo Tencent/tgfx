@@ -152,6 +152,11 @@ inline constexpr const char* VerifyParamUnused = "verify.param.unused";
 /// silently to zero.
 inline constexpr const char* VerifyMacroUnknown = "verify.macro.unknown";
 
+/// The shared pointwise dispatch (operator/pointwise_color_dispatch.inc) does not match the op
+/// list: an operator lacks a branch or a reasoned exemption, or a branch names no listed
+/// operator.
+inline constexpr const char* VerifyPointwiseDispatch = "verify.pointwise-dispatch";
+
 // ---- output: writing the artifacts ----------------------------------------------------------
 
 /// An output file (a report, a bundle, a manifest) could not be written.
@@ -178,7 +183,7 @@ inline constexpr const char* AllCodes[] = {
     VerifyBundleIdentity,  VerifyManifest,     VerifyStale,
     VerifyFreshnessSkipped, VerifyRequiredMissing, VerifyNoBundles,
     VerifyBackendList,      VerifyParamUndeclared, VerifyParamUnused,
-    VerifyMacroUnknown,
+    VerifyMacroUnknown,     VerifyPointwiseDispatch,
     OutputWrite,           OutputDuplicateKey,
 };
 

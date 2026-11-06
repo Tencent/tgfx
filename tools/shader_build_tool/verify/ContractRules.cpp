@@ -59,6 +59,13 @@ class MacroNamesRule : public SourceRule {
   }
 };
 
+class PointwiseDispatchRule : public SourceRule {
+ public:
+  size_t check(const SourceRuleContext& context, Diagnostics* diagnostics) const override {
+    return ValidatePointwiseDispatch(context.shaderDir, diagnostics);
+  }
+};
+
 class ReflectionContractRule : public ArtifactRule {
  public:
   size_t check(const ArtifactRuleContext& context, Diagnostics* diagnostics) const override {
@@ -79,6 +86,7 @@ std::vector<std::unique_ptr<SourceRule>> MakeSourceRules() {
   std::vector<std::unique_ptr<SourceRule>> rules;
   rules.push_back(std::make_unique<SourceReferencesRule>());
   rules.push_back(std::make_unique<MacroNamesRule>());
+  rules.push_back(std::make_unique<PointwiseDispatchRule>());
   return rules;
 }
 

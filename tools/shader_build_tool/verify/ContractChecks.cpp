@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <map>
 #include <regex>
 #include <set>
@@ -549,6 +550,87 @@ size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics
              "dimension '" + dimension +
                  "' is declared by a family but no preprocessor condition references it; every "
                  "value compiles identical code, so the dimension only multiplies the bundle");
+      ++errors;
+    }
+  }
+  return errors;
+}
+
+// The pointwise dispatch rule: the shared GLSL dispatch must cover the op list. An operator needs
+// an `op == OP_<NAME>` branch or a `tgfx_pointwise_exempt <Name>: <reason>` entry (the reason is
+// mandatory: an exemption is a design decision, and the file is where it is written down). A
+// branch or exemption naming no listed operator fails too, so renaming or removing an operator
+// cannot leave a dead arm or a stale note behind.
+size_t ValidatePointwiseDispatch(const std::string& shaderDir, Diagnostics* diagnostics) {
+  const std::string relative = "operator/pointwise_color_dispatch.inc";
+  const auto path = std::filesystem::path(shaderDir) / relative;
+  std::ifstream stream(path);
+  if (!stream) {
+    Report(diagnostics, Severity::Error, DiagnosticCode::VerifyPointwiseDispatch, "", "", -1, -1,
+           relative + " is missing; the pointwise interpreters include the shared dispatch");
+    return 1;
+  }
+  const std::string text((std::istreambuf_iterator<char>(stream)),
+                         std::istreambuf_iterator<char>());
+  const std::regex branchPattern("op[ \\t]*==[ \\t]*OP_([A-Z0-9_]+)");
+  const std::regex exemptionPattern(
+      "tgfx_pointwise_exempt[ \\t]+([A-Za-z_][A-Za-z0-9_]*)[ \\t]*:[ \\t]*([^\\r\\n]*)");
+  std::set<std::string> dispatched;
+  for (std::sregex_iterator it(text.begin(), text.end(), branchPattern), end; it != end; ++it) {
+    dispatched.insert((*it)[1].str());
+  }
+  std::map<std::string, std::string> exemptions;
+  for (std::sregex_iterator it(text.begin(), text.end(), exemptionPattern), end; it != end; ++it) {
+    exemptions.emplace((*it)[1].str(), (*it)[2].str());
+  }
+  size_t errors = 0;
+  std::set<std::string> listed;
+  for (const auto& name : Op::PointwiseOpNames()) {
+    listed.insert(name);
+    if (dispatched.count(Op::PointwiseDefineName(name)) != 0) {
+      continue;
+    }
+    const auto exemption = exemptions.find(name);
+    if (exemption == exemptions.end()) {
+      Report(diagnostics, Severity::Error, DiagnosticCode::VerifyPointwiseDispatch, "", "", -1,
+             -1,
+             relative + " has no dispatch branch for operator '" + name +
+                 "' and no tgfx_pointwise_exempt entry; add a branch or state why the call "
+                 "sites dispatch it");
+      ++errors;
+      continue;
+    }
+    if (exemption->second.find_first_not_of(" \t") == std::string::npos) {
+      Report(diagnostics, Severity::Error, DiagnosticCode::VerifyPointwiseDispatch, "", "", -1,
+             -1,
+             "operator '" + name +
+                 "' is exempt from the shared dispatch without a reason; state why on its "
+                 "tgfx_pointwise_exempt line");
+      ++errors;
+    }
+  }
+  for (const auto& define : dispatched) {
+    bool known = false;
+    for (const auto& name : listed) {
+      if (Op::PointwiseDefineName(name) == define) {
+        known = true;
+        break;
+      }
+    }
+    if (!known) {
+      Report(diagnostics, Severity::Error, DiagnosticCode::VerifyPointwiseDispatch, "", "", -1,
+             -1,
+             "dispatch branch 'OP_" + define +
+                 "' names no operator of the op list; remove the branch or restore the operator");
+      ++errors;
+    }
+  }
+  for (const auto& entry : exemptions) {
+    if (listed.count(entry.first) == 0) {
+      Report(diagnostics, Severity::Error, DiagnosticCode::VerifyPointwiseDispatch, "", "", -1,
+             -1,
+             "exemption for '" + entry.first +
+                 "' names no operator of the op list; remove the entry");
       ++errors;
     }
   }

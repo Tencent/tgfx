@@ -17,6 +17,7 @@
 // include is guarded, so the per-slot re-inclusions of this file stay harmless.
 #include "xp/xp_blend_colors.inc"
 #include "operator/pointwise_math.inc"
+#include "operator/pointwise_color_dispatch.inc"
 
 // Applies the selected pointwise operator to a premultiplied color and returns a premultiplied color.
 #if HAS_XP >= 1
@@ -33,15 +34,15 @@ vec4 applyPointwiseOp(int slot, vec4 color) {
     return color;
   }
   vec4 result;
-  if (opType == OP_COLOR_MATRIX) {
-    result = pmApplyColorMatrix(color, ColorMatrix, ColorVector);
-  } else if (opType == OP_LUMA) {
-    result = pmApplyLuma(color, vec3(Kr, Kg, Kb));
-  } else if (opType == OP_ALPHA_THRESHOLD) {
-    result = pmApplyAlphaThreshold(color, Threshold);
-  } else if (opType == OP_CONST_COLOR) {
-    // Matches the chain kernel's const-color op and the runtime ConstColorProcessor emission.
-    result = pmApplyConstColor(ConstColorValue, color, ConstInputMode);
+  if (opType == OP_COLOR_MATRIX || opType == OP_LUMA || opType == OP_ALPHA_THRESHOLD ||
+      opType == OP_CONST_COLOR) {
+    // The shared dispatch owns the operator-to-register mapping
+    // (operator/pointwise_color_dispatch.inc). This interpreter supplies the values under the
+    // same register names the chain arrays use: a single-slot kernel's scalar fields, or the
+    // alias macros that map a multi-slot kernel onto the chain arrays. The luma/threshold
+    // scalars assemble into the v2 register the dispatch reads.
+    result = evalPointwiseColorOp(opType, color, ColorMatrix, ColorVector, ConstColorValue,
+                                  vec4(Kr, Kg, Kb, Threshold), ConstInputMode);
   } else if (opType == OP_BLEND) {
     // Blend with a constant operand; the operand order follows the source fragment processor's
     // child position (BlendConstFirst mirrors XfermodeFragmentProcessor::Child). Select the

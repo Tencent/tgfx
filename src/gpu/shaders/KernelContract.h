@@ -136,12 +136,23 @@ static_assert(detail::AbiValuesUnique(), "two ops share one ABI value");
 static_assert(None == 4 && Texture == 5 && PerlinNoise == 15,
               "the op ABI values are frozen bundle compatibility");
 
+/// The operator names of the op list, in list order. shader_build_tool checks the shared GLSL
+/// dispatch (operator/pointwise_color_dispatch.inc) against this set, so an operator cannot join
+/// the list without a dispatch branch (or a declared exemption in that file).
+inline std::vector<std::string> PointwiseOpNames() {
+  return {
+#define TGFX_OP_NAME(name, id, params, member, passBoundarySensitive) #name,
+      TGFX_POINTWISE_OPS(TGFX_OP_NAME)
+#undef TGFX_OP_NAME
+  };
+}
+
 /// The OP_* macro name of a pointwise operator: CamelCase to SCREAMING_SNAKE (ColorSpaceXform to
 /// COLOR_SPACE_XFORM). The chain vocabulary's names carry consecutive capitals (AARectCoverage)
 /// and are spelled out explicitly below instead.
-inline std::string PointwiseDefineName(const char* name) {
+inline std::string PointwiseDefineName(const std::string& name) {
   std::string result;
-  for (size_t i = 0; name[i] != '\0'; ++i) {
+  for (size_t i = 0; i < name.size(); ++i) {
     const char c = name[i];
     if (c >= 'A' && c <= 'Z' && i > 0) {
       result.push_back('_');
