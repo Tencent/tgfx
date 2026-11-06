@@ -294,9 +294,7 @@ TGFX_CHAIN_DECLARE_OP(InputOpaque, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIE
 
 TGFX_CHAIN_DECLARE_OP(MulAlpha, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS)
 
-#define TGFX_PERLIN_NOISE_DATA(T) \
-  T(Float4, frequencyStitch)      \
-  T(Matrix3, uvMatrix)
+#define TGFX_PERLIN_NOISE_DATA(T) T(Float4, frequencyStitch)
 #define TGFX_PERLIN_NOISE_STRUCTURE(T) \
   T(Int32, noiseType)                  \
   T(Int32, numOctaves)                 \

@@ -428,12 +428,13 @@ void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
     }
     if (slots[index].op == AOTChainOp::PerlinNoise) {
       const auto& noise = slots[index].noise;
-      float frequencyStitch[] = {noise.baseFrequencyX, noise.baseFrequencyY,
-                                 static_cast<float>(noise.stitchWidth),
-                                 static_cast<float>(noise.stitchHeight)};
+      ChainISA::PerlinNoiseData data = {};
+      data.frequencyStitch = {noise.baseFrequencyX, noise.baseFrequencyY,
+                              static_cast<float>(noise.stitchWidth),
+                              static_cast<float>(noise.stitchHeight)};
+      UploadSlotData(fragmentUniformData, index, data, ChainISA::PackPerlinNoise);
       int modeOctaves[] = {noise.noiseType, noise.numOctaves, noise.stitchTiles ? 1 : 0,
                            program.noiseSamplerBase};
-      fragmentUniformData->setDataOptional(ChainParams::NoiseFrequencyStitch.name, frequencyStitch);
       fragmentUniformData->setDataOptional(ChainParams::NoiseModeOctaves.name, modeOctaves);
       break;
     }

@@ -164,7 +164,7 @@ vec4 evalChainSlot(int slot) {
     return aotApplyRRectCoverage(in0, d.rect, d.radiiX, d.radiiY, d.antiAlias, d.deviceToLocal);
   }
   vec4 resourceValue = vec4(0.0);
-  if (evalResourceSlot(Packed, in0, resourceValue)) {
+  if (evalResourceSlot(Packed, in0, dataAt, resourceValue)) {
     return resourceValue;
   }
   // OP_COLOR_SPACE_XFORM (the registered exception: its parameters are the program-level block,

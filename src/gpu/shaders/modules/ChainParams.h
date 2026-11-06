@@ -53,7 +53,6 @@ struct ChainParams {
   static constexpr Param<ParamType::Int> TiledStrict2{"TiledStrict2"};
 
   // The noise resource kind's selectors.
-  static constexpr Param<ParamType::Float4> NoiseFrequencyStitch{"NoiseFrequencyStitch"};
   static constexpr Param<ParamType::Int4> NoiseModeOctaves{"NoiseModeOctaves"};
 
   // The gradient resource kind's parameter block.
@@ -109,8 +108,7 @@ struct ChainParams {
                                          TiledClamp2,
                                          TiledDimension2,
                                          TiledStrict2,
-                                         NoiseFrequencyStitch,
-                                         NoiseModeOctaves,
+                                          NoiseModeOctaves,
                                          GradientLayoutType,
                                          GradientColorizerKind,
                                          GradientIntervalCount};

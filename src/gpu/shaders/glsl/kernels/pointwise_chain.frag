@@ -48,7 +48,7 @@ layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING)
 #endif
 #include "pipeline/chain/pointwise_gradient.inc"
 
-bool evalResourceSlot(ivec4 Packed, vec4 in0, out vec4 value) {
+bool evalResourceSlot(ivec4 Packed, vec4 in0, int /*dataAt*/, out vec4 value) {
   return evalGradientSlot(Packed, in0, value);
 }
 #elif RESOURCE_KIND == 2
@@ -57,15 +57,15 @@ bool evalResourceSlot(ivec4 Packed, vec4 in0, out vec4 value) {
 #endif
 #include "pipeline/chain/pointwise_noise.inc"
 
-bool evalResourceSlot(ivec4 Packed, vec4 in0, out vec4 value) {
-  return evalNoiseSlot(Packed, value);
+bool evalResourceSlot(ivec4 Packed, vec4 in0, int dataAt, out vec4 value) {
+  return evalNoiseSlot(Packed, dataAt, value);
 }
 #else
 #if NTEX > 0
 #include "pipeline/chain/pointwise_tiled2.inc"
 #endif
 
-bool evalResourceSlot(ivec4 Packed, vec4 in0, out vec4 value) {
+bool evalResourceSlot(ivec4 Packed, vec4 in0, int /*dataAt*/, out vec4 value) {
   value = vec4(0.0);
   return false;
 }
