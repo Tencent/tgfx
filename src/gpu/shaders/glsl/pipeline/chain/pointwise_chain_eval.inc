@@ -45,6 +45,8 @@ vec4 evalChainSlot(int slot) {
 #else
   Packed = SPEC_SlotPacked(slot);
 #endif
+  // This slot's parameter block in the data pool: one block per slot, whatever operator it holds.
+  int dataAt = slot * TGFX_CHAIN_DATA_SLOT_WORDS;
   if (Packed.x == OP_NONE) {
     return vec4(0.0);
   }
@@ -146,31 +148,21 @@ vec4 evalChainSlot(int slot) {
   if (Packed.x == OP_AARECT_COVERAGE) {
     // Analytic AA-rect coverage (identical math to GLSLRectEffect): falloff from the fragment's
     // distance to the rect edges, evaluated in destination device coordinates via gl_FragCoord.
-    // Bits 16-19 of the selector carry this slot's ordinal into the CoverageRect array.
-    int rectOrdinal = (Packed.w >> 16) & 0xF;
+    AARectCoverageData d = chainLoadAARectCoverage(dataAt);
     highp vec4 dists4 =
-        clamp(vec4(1.0, 1.0, -1.0, -1.0) * vec4(gl_FragCoord.xyxy - CoverageRect[rectOrdinal]),
-              0.0, 1.0);
+        clamp(vec4(1.0, 1.0, -1.0, -1.0) * vec4(gl_FragCoord.xyxy - d.rect), 0.0, 1.0);
     highp vec2 dists2 = dists4.xy + dists4.zw - 1.0;
     return in0 * (dists2.x * dists2.y);
   }
   if (Packed.x == OP_LOCAL_RECT_COVERAGE) {
     // Analytic AA-rect coverage in the clip's local space: map gl_FragCoord through the
-    // device-to-local matrix, then the shared separable half-pixel ramp. Bits 16-19 carry the
-    // slot's ordinal into the CoverageLocalRect arrays.
-    int localRectOrdinal = (Packed.w >> 16) & 0xF;
-    return in0 * vec4(analyticLocalRectCoverage(CoverageLocalRect[localRectOrdinal],
-                                                CoverageLocalDeviceToLocal[localRectOrdinal]));
+    // device-to-local matrix, then the shared separable half-pixel ramp.
+    LocalRectCoverageData d = chainLoadLocalRectCoverage(dataAt);
+    return in0 * vec4(analyticLocalRectCoverage(d.rect, d.deviceToLocal));
   }
   if (Packed.x == OP_RRECT_COVERAGE) {
-    // Analytic rrect coverage; bits 16-19 of the selector carry this slot's ordinal into the
-    // CoverageRRect* parameter arrays.
-    int rrectOrdinal = (Packed.w >> 16) & 0xF;
-    return aotApplyRRectCoverage(in0, CoverageRRectRect[rrectOrdinal],
-                                 CoverageRRectRadiiX[rrectOrdinal],
-                                 CoverageRRectRadiiY[rrectOrdinal],
-                                 CoverageRRectAntiAlias[rrectOrdinal],
-                                 CoverageRRectDeviceToLocal[rrectOrdinal]);
+    RRectCoverageData d = chainLoadRRectCoverage(dataAt);
+    return aotApplyRRectCoverage(in0, d.rect, d.radiiX, d.radiiY, d.antiAlias, d.deviceToLocal);
   }
   vec4 resourceValue = vec4(0.0);
   if (evalResourceSlot(Packed, in0, resourceValue)) {

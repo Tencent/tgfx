@@ -36,9 +36,6 @@ inline constexpr size_t MaxChainSlots = NoiseGraphResourceCapacity.instructions;
 inline constexpr size_t MaxChainRegisters = 16;
 inline constexpr size_t MaxChainGradientSlots = TiledGraphResourceCapacity.gradients;
 inline constexpr size_t MaxChainColorSpaceXformSlots = 1;
-inline constexpr size_t MaxChainDeviceRectCoverageSlots = 2;
-inline constexpr size_t MaxChainLocalRectCoverageSlots = 2;
-inline constexpr size_t MaxChainRRectCoverageSlots = 4;
 
 // The chain-layout pipeline, split by stage across AOTChainSchedule/Encode/Allocate/Bindings.cpp.
 // PlanChainLayout is the only caller that runs the stages in order; every other entry point

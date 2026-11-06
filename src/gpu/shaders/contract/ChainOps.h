@@ -36,10 +36,6 @@ namespace ChainISA {
 // word counts and the capacity checks below all derive from those. Nothing here is consumed yet:
 // the encoder and the GLSL generator are the next steps.
 
-struct Float1 {
-  float x = 0.0f;
-};
-
 struct Float2 {
   float x = 0.0f;
   float y = 0.0f;
@@ -74,7 +70,7 @@ struct Float4Array8 {
 using Int32 = int32_t;
 
 // The word cost of one field type, in the pool's vec4 units.
-#define TGFX_CHAIN_WORD_COUNT_Float1 1
+#define TGFX_CHAIN_WORD_COUNT_float 1
 #define TGFX_CHAIN_WORD_COUNT_Float2 1
 #define TGFX_CHAIN_WORD_COUNT_Float3 1
 #define TGFX_CHAIN_WORD_COUNT_Float4 1
@@ -90,6 +86,86 @@ using Int32 = int32_t;
 #define TGFX_CHAIN_DATA_WORDS(type, name) +TGFX_CHAIN_WORD_COUNT_##type
 #define TGFX_CHAIN_STRUCT_FIELD(type, name) +1
 
+// Packing writes one field per word, in declaration order: the same walk the generated GLSL
+// readers perform, so the two sides cannot disagree about an offset. A mat3 occupies three words
+// as its columns, which is the dense column order a std140 mat3 has.
+#define TGFX_CHAIN_PACK_float(value, out) \
+  do {                                    \
+    (out)[0] = (value);                   \
+    (out)[1] = 0.0f;                      \
+    (out)[2] = 0.0f;                      \
+    (out)[3] = 0.0f;                      \
+  } while (0)
+#define TGFX_CHAIN_PACK_Float2(value, out)  \
+  do {                                  \
+    (out)[0] = (value).x;                     \
+    (out)[1] = (value).y;                     \
+    (out)[2] = 0.0f;                      \
+    (out)[3] = 0.0f;                      \
+  } while (0)
+#define TGFX_CHAIN_PACK_Float3(value, out)  \
+  do {                                  \
+    (out)[0] = (value).x;                     \
+    (out)[1] = (value).y;                     \
+    (out)[2] = (value).z;                     \
+    (out)[3] = 0.0f;                      \
+  } while (0)
+#define TGFX_CHAIN_PACK_Float4(value, out)  \
+  do {                                  \
+    (out)[0] = (value).x;                     \
+    (out)[1] = (value).y;                     \
+    (out)[2] = (value).z;                     \
+    (out)[3] = (value).w;                     \
+  } while (0)
+#define TGFX_CHAIN_PACK_Matrix3(value, out)     \
+  do {                                    \
+    (out)[0] = (value).m[0];                    \
+    (out)[1] = (value).m[1];                    \
+    (out)[2] = (value).m[2];                    \
+    (out)[3] = 0.0f;                        \
+    (out)[4] = (value).m[3];                    \
+    (out)[5] = (value).m[4];                    \
+    (out)[6] = (value).m[5];                    \
+    (out)[7] = 0.0f;                        \
+    (out)[8] = (value).m[6];                    \
+    (out)[9] = (value).m[7];                    \
+    (out)[10] = (value).m[8];                   \
+    (out)[11] = 0.0f;                       \
+  } while (0)
+#define TGFX_CHAIN_PACK_Matrix4(value, out)     \
+  do {                                    \
+    for (int column = 0; column < 4; ++column) { \
+      for (int row = 0; row < 4; ++row) {        \
+        (out)[column * 4 + row] = (value).m[column * 4 + row]; \
+      }                                            \
+    }                                              \
+  } while (0)
+#define TGFX_CHAIN_PACK_Float4Array8(value, out)             \
+  do {                                                 \
+    for (int index = 0; index < 8; ++index) {          \
+      (out)[index * 4 + 0] = (value).v[index].x;             \
+      (out)[index * 4 + 1] = (value).v[index].y;             \
+      (out)[index * 4 + 2] = (value).v[index].z;             \
+      (out)[index * 4 + 3] = (value).v[index].w;             \
+    }                                                  \
+  } while (0)
+#define TGFX_CHAIN_PACK_Int32(value, out) \
+  do {                              \
+    (out)[0] = static_cast<float>(v); \
+    (out)[1] = 0.0f;                  \
+    (out)[2] = 0.0f;                  \
+    (out)[3] = 0.0f;                  \
+  } while (0)
+
+#define TGFX_CHAIN_PACK_FIELD(type, name)                     \
+  {                                                           \
+    TGFX_CHAIN_PACK_##type(data.name, words + at * 4);        \
+    at += TGFX_CHAIN_WORD_COUNT_##type;                       \
+  }
+
+/// The data-pool stride of one slot: the widest operator a single slot can carry.
+inline constexpr int PoolSlotWords = 7;
+
 #define TGFX_CHAIN_DECLARE_OP(name, dataFields, structureFields)                            \
   struct name##Data {                                                                       \
     dataFields(TGFX_CHAIN_DATA_MEMBER)                                                      \
@@ -101,7 +177,14 @@ using Int32 = int32_t;
   inline constexpr int name##StructureFields = 0 structureFields(TGFX_CHAIN_STRUCT_FIELD);   \
   static_assert(name##DataWords <= DataCapacity, #name " data exceeds the chain data pool"); \
   static_assert(name##StructureFields <= StructureCapacity,                                  \
-                #name " declares more structural fields than a slot has columns");
+                #name " declares more structural fields than a slot has columns");          \
+  inline void Pack##name(const name##Data& data, float* words) {                             \
+    (void)data;                                                                              \
+    (void)words;                                                                             \
+    int at = 0;                                                                              \
+    (void)at;                                                                                \
+    dataFields(TGFX_CHAIN_PACK_FIELD)                                                        \
+  }
 
 #define TGFX_CHAIN_EMPTY_FIELDS(T)
 
@@ -113,12 +196,12 @@ using Int32 = int32_t;
 TGFX_CHAIN_DECLARE_OP(ColorMatrix, TGFX_COLOR_MATRIX_DATA, TGFX_CHAIN_EMPTY_FIELDS)
 
 #define TGFX_LUMA_DATA(T) \
-  T(Float1, kr)           \
-  T(Float1, kg)           \
-  T(Float1, kb)
+  T(float, kr)           \
+  T(float, kg)           \
+  T(float, kb)
 TGFX_CHAIN_DECLARE_OP(Luma, TGFX_LUMA_DATA, TGFX_CHAIN_EMPTY_FIELDS)
 
-#define TGFX_ALPHA_THRESHOLD_DATA(T) T(Float1, threshold)
+#define TGFX_ALPHA_THRESHOLD_DATA(T) T(float, threshold)
 TGFX_CHAIN_DECLARE_OP(AlphaThreshold, TGFX_ALPHA_THRESHOLD_DATA, TGFX_CHAIN_EMPTY_FIELDS)
 
 #define TGFX_COLOR_SPACE_XFORM_DATA(T) \
@@ -173,9 +256,9 @@ TGFX_CHAIN_DECLARE_OP(AARectCoverage, TGFX_AARECT_COVERAGE_DATA, TGFX_CHAIN_EMPT
   T(Float4, bias01)            \
   T(Float4, scale23)           \
   T(Float4, bias23)            \
-  T(Float1, threshold)         \
-  T(Float1, bias)              \
-  T(Float1, scale)             \
+  T(float, threshold)         \
+  T(float, bias)              \
+  T(float, scale)             \
   T(Float4, thresholds1_7)     \
   T(Float4, thresholds9_13)    \
   T(Float4Array8, scales)      \
@@ -198,7 +281,7 @@ TGFX_CHAIN_DECLARE_OP(LocalRectCoverage, TGFX_LOCAL_RECT_COVERAGE_DATA, TGFX_CHA
   T(Float4, radiiX)                 \
   T(Float4, radiiY)                 \
   T(Matrix3, deviceToLocal)         \
-  T(Float1, antiAlias)
+  T(float, antiAlias)
 TGFX_CHAIN_DECLARE_OP(RRectCoverage, TGFX_RRECT_COVERAGE_DATA, TGFX_CHAIN_EMPTY_FIELDS)
 
 #define TGFX_TEX_MODULATE_STRUCTURE(T) \
@@ -219,6 +302,45 @@ TGFX_CHAIN_DECLARE_OP(MulAlpha, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS
   T(Int32, stitchTiles)                \
   T(Int32, lutLeaf)
 TGFX_CHAIN_DECLARE_OP(PerlinNoise, TGFX_PERLIN_NOISE_DATA, TGFX_PERLIN_NOISE_STRUCTURE)
+
+// The slot stride must hold every operator a slot can carry inside the pool region. The gradient
+// and the color-space transform are the two registered exceptions: they use chain-wide regions
+// instead of a per-slot block.
+static_assert(AARectCoverageDataWords <= PoolSlotWords, "coverage exceeds the slot stride");
+static_assert(LocalRectCoverageDataWords <= PoolSlotWords, "coverage exceeds the slot stride");
+static_assert(RRectCoverageDataWords <= PoolSlotWords, "coverage exceeds the slot stride");
+static_assert(ColorMatrixDataWords <= PoolSlotWords, "a pointwise operator exceeds the slot stride");
+static_assert(GradientDataWords > PoolSlotWords, "the gradient must own a chain-wide region");
+static_assert(ColorSpaceXformDataWords > PoolSlotWords,
+              "the color-space transform must own a chain-wide region");
+
+// The generator's walk: every operator with the data field list that declares it. The row set is
+// the same as TGFX_CHAIN_OPS; the count assert below keeps the two aligned, and a row whose
+// declaration is missing fails at the name lookup.
+#define TGFX_CHAIN_OP_FIELD_LISTS(X)                    \
+  X(ColorMatrix, TGFX_COLOR_MATRIX_DATA)                \
+  X(Luma, TGFX_LUMA_DATA)                               \
+  X(AlphaThreshold, TGFX_ALPHA_THRESHOLD_DATA)          \
+  X(ColorSpaceXform, TGFX_COLOR_SPACE_XFORM_DATA)       \
+  X(None, TGFX_CHAIN_EMPTY_FIELDS)                      \
+  X(Texture, TGFX_TEXTURE_DATA)                         \
+  X(ConstColor, TGFX_CONST_COLOR_DATA)                  \
+  X(Blend, TGFX_BLEND_DATA)                             \
+  X(AARectCoverage, TGFX_AARECT_COVERAGE_DATA)          \
+  X(Gradient, TGFX_GRADIENT_DATA)                       \
+  X(LocalRectCoverage, TGFX_LOCAL_RECT_COVERAGE_DATA)   \
+  X(RRectCoverage, TGFX_RRECT_COVERAGE_DATA)            \
+  X(TexModulate, TGFX_CHAIN_EMPTY_FIELDS)               \
+  X(InputOpaque, TGFX_CHAIN_EMPTY_FIELDS)               \
+  X(MulAlpha, TGFX_CHAIN_EMPTY_FIELDS)                  \
+  X(PerlinNoise, TGFX_PERLIN_NOISE_DATA)
+
+inline constexpr int FieldListCount = 0
+#define TGFX_CHAIN_FIELD_LIST_COUNT(name, data) +1
+    TGFX_CHAIN_OP_FIELD_LISTS(TGFX_CHAIN_FIELD_LIST_COUNT)
+#undef TGFX_CHAIN_FIELD_LIST_COUNT
+    ;
+static_assert(FieldListCount == OpCount, "the field-list table and the op table disagree");
 
 // Every row of the op table must have its parameter declaration above: a row without one fails
 // here instead of surfacing as a missing operator in the encoder.

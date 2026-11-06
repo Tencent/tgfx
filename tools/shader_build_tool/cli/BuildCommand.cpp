@@ -41,6 +41,7 @@
 #include "compile/StageCompiler.h"
 #include "core/DiagnosticCodes.h"
 #include "core/Diagnostics.h"
+#include "emit/ChainOpsGLSL.h"
 #include "emit/ProfileEmitter.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/shaders/KernelContract.h"
@@ -224,6 +225,9 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
       return report;
     }
     *stage = std::move(expanded);
+    // The chain data-pool layout rides in the same way: a stage carrying the marker receives the
+    // structs and readers generated from the C++ operator declarations.
+    *stage = ExpandChainOpsPragma(*stage);
   }
 
   // The specialization scan runs once per family: it collects the SPEC_<name>() fields the

@@ -395,21 +395,12 @@ bool EncodeRectCoverageSlot(AOTChainContext* ctx, size_t combined, size_t index)
   if (parameters == nullptr || node->inputs.size() != 1) {
     return false;
   }
+  // Every coverage slot owns its own data-pool block, so the only limits are the slot and
+  // register budgets the whole chain shares.
   if (IsIdentityMatrix(parameters->deviceToLocal)) {
-    // The kernel carries two CoverageRect array elements per space (the largest clip stack
-    // either space produces in practice); a third one keeps the runtime route.
-    if (ctx->rectCoverageSlots >= 2) {
-      return false;
-    }
-    ++ctx->rectCoverageSlots;
     slot.op = AOTChainOp::AARectCoverage;
     slot.rectCoverage = *parameters;
   } else {
-    // Same for the local-space form through the CoverageLocalRect array.
-    if (ctx->localRectCoverageSlots >= 2) {
-      return false;
-    }
-    ++ctx->localRectCoverageSlots;
     slot.op = AOTChainOp::LocalRectCoverage;
     slot.localRectCoverage = *parameters;
   }
@@ -425,8 +416,6 @@ bool EncodeRRectCoverageSlot(AOTChainContext* ctx, size_t combined, size_t index
   if (parameters == nullptr || node->inputs.size() != 1) {
     return false;
   }
-  // The kernel carries four CoverageRRect* array elements; ValidateSlots rejects a fifth
-  // rrect slot.
   slot.op = AOTChainOp::RRectCoverage;
   slot.rrectCoverage = *parameters;
   slot.in0 = MapChainOpInput(ctx, inputBase, node->inputs[0]);
@@ -493,8 +482,6 @@ void DemandGradientSource(const AOTEffectNode* node, AOTResourceDemand* demand) 
 bool EncodeChainSlots(AOTChainContext* ctx) {
   auto* layout = ctx->layout;
   ctx->slots.assign(ctx->ordered.size(), AOTChainSlot{});
-  ctx->rectCoverageSlots = 0;
-  ctx->localRectCoverageSlots = 0;
   ctx->hasGradient = false;
   // All-ones reproduces the legacy behavior (every target reads the uvCoord attribute when the GP
   // carries one). The atlas-text route clears it and sets only the coverage leaves' bits.

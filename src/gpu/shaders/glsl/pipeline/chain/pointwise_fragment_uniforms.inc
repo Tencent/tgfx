@@ -54,20 +54,10 @@
 #endif
   // Shared ColorSpaceXform parameters; at most one slot per chain may be OP_COLOR_SPACE_XFORM.
 #include "pipeline/chain/pointwise_cs_uniforms.inc"
-  // AA-rect clip parameters, two slots per space (selector bits 16-19 carry the slot's ordinal
-  // into these arrays). CoverageRect is in destination device coordinates and already carries the
-  // 0.5 outset for the AA falloff. CoverageLocalRect keeps exact coordinates; the kernel maps
-  // gl_FragCoord through CoverageLocalDeviceToLocal before the half-pixel AA ramp.
-  vec4 CoverageRect[2];
-  vec4 CoverageLocalRect[2];
-  mat3 CoverageLocalDeviceToLocal[2];
-  // RRect clip parameter arrays for OP_RRECT_COVERAGE, indexed by the slot's rrect ordinal
-  // (selector bits 16-19); at most four such slots per chain.
-  vec4 CoverageRRectRect[4];
-  vec4 CoverageRRectRadiiX[4];
-  vec4 CoverageRRectRadiiY[4];
-  float CoverageRRectAntiAlias[4];
-  mat3 CoverageRRectDeviceToLocal[4];
+  // The per-slot data pool: TGFX_CHAIN_DATA_SLOT_WORDS vec4 words per slot, holding whichever
+  // operator's parameters that slot carries. Each operator's layout exists only in ChainOps.h,
+  // and the readers the instruction table calls come from the same declarations.
+  vec4 ChainData[CHAIN_SLOT_CAPACITY * TGFX_CHAIN_DATA_SLOT_WORDS];
 #if NTEX > 0
   // Four-leaf variants always bind the mask sampler (a phantom when the chain has no mask);
   // HasMaskTexture selects the application at runtime.

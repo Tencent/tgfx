@@ -18,17 +18,9 @@ struct ChainParams {
   static constexpr Param<ParamType::Float4> SlotVec1{"SlotVec1"};
   static constexpr Param<ParamType::Float4> SlotVec2{"SlotVec2"};
 
-  // The runtime clip channels the chain composites as its coverage input.
-  static constexpr Param<ParamType::Float4> CoverageRect{"CoverageRect"};
-  static constexpr Param<ParamType::Float4> CoverageLocalRect{"CoverageLocalRect"};
-  static constexpr Param<ParamType::Float3x3> CoverageLocalDeviceToLocal{
-      "CoverageLocalDeviceToLocal"};
-  static constexpr Param<ParamType::Float4> CoverageRRectRect{"CoverageRRectRect"};
-  static constexpr Param<ParamType::Float4> CoverageRRectRadiiX{"CoverageRRectRadiiX"};
-  static constexpr Param<ParamType::Float4> CoverageRRectRadiiY{"CoverageRRectRadiiY"};
-  static constexpr Param<ParamType::Float> CoverageRRectAntiAlias{"CoverageRRectAntiAlias"};
-  static constexpr Param<ParamType::Float3x3> CoverageRRectDeviceToLocal{
-      "CoverageRRectDeviceToLocal"};
+  // The per-slot data pool: one block of words per slot, holding whichever operator's parameters
+  // that slot carries. The block layout lives only in contract/ChainOps.h.
+  static constexpr Param<ParamType::Float4> ChainData{"ChainData"};
 
   // The interpreter's shape selectors.
   static constexpr Param<ParamType::Int> CoordSourceMask{"CoordSourceMask"};
@@ -140,14 +132,7 @@ struct ChainParams {
                                          SlotVec0,
                                          SlotVec1,
                                          SlotVec2,
-                                         CoverageRect,
-                                         CoverageLocalRect,
-                                         CoverageLocalDeviceToLocal,
-                                         CoverageRRectRect,
-                                         CoverageRRectRadiiX,
-                                         CoverageRRectRadiiY,
-                                         CoverageRRectAntiAlias,
-                                         CoverageRRectDeviceToLocal,
+                                         ChainData,
                                          CoordSourceMask,
                                          HasMaskTexture,
                                          RootIndex,

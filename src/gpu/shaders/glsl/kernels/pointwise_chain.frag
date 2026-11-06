@@ -30,6 +30,9 @@ layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING)
 #include "xp/xp_uniforms.inc"
 };
 
+// The operator parameter layouts and their pool readers, generated from contract/ChainOps.h.
+#pragma tgfx_chain_ops
+
 // The specialization include point: shader_build_tool replaces this line with the generated
 // SPEC_<field>() accessors (see compile/SpecCodegen). Every structural int field the kernel wants
 // the runtime to freeze is read through SPEC_<field>() only, so a specialized compile folds it

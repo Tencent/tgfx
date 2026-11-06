@@ -294,12 +294,9 @@ bool AOTChainBuilder::ValidateSlots(const std::vector<AOTChainSlot>& slots, size
       return false;
     }
   }
-  size_t localRectSlots = 0;
-  size_t deviceRectSlots = 0;
   size_t colorSpaceSlots = 0;
   size_t gradientSlots = 0;
   size_t noiseSlots = 0;
-  size_t rrectSlots = 0;
   for (const auto& slot : slots) {
     if (slot.op == AOTChainOp::ColorSpaceXform &&
         (!ColorSpaceXformStepsSupported(slot.colorSpaceXform.steps.get()) ||
@@ -313,18 +310,6 @@ bool AOTChainBuilder::ValidateSlots(const std::vector<AOTChainSlot>& slots, size
       return false;
     }
     if (slot.op == AOTChainOp::Gradient && ++gradientSlots > MaxChainGradientSlots) {
-      return false;
-    }
-    if (slot.op == AOTChainOp::AARectCoverage &&
-        ++deviceRectSlots > MaxChainDeviceRectCoverageSlots) {
-      return false;
-    }
-    // The kernel carries two local-rect parameter sets and four rrect array elements.
-    if (slot.op == AOTChainOp::LocalRectCoverage &&
-        ++localRectSlots > MaxChainLocalRectCoverageSlots) {
-      return false;
-    }
-    if (slot.op == AOTChainOp::RRectCoverage && ++rrectSlots > MaxChainRRectCoverageSlots) {
       return false;
     }
   }

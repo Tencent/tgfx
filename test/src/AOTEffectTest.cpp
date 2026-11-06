@@ -2534,18 +2534,18 @@ static void ExpectComposedClipsWithLocalMask(size_t rectCount, size_t rrectCount
   EXPECT_EQ(chain.clipCoverageRegister, previous);
 }
 
-TGFX_TEST(AOTEffectTest, ComposedAnalyticClipsWithLocalMaskRespectBudgets) {
+TGFX_TEST(AOTEffectTest, ComposedAnalyticClipsWithLocalMaskFitTheSlotBudgets) {
+  // Every coverage slot owns its own data-pool block, so the old per-kind ordinal budgets are
+  // gone: the only remaining limits are the chain's shared slot and register budgets.
   ExpectComposedClipsWithLocalMask(1, 1, true, true);
   ExpectComposedClipsWithLocalMask(1, 4, true, true);
-  // Two rects per space fit the CoverageRect arrays; a third one stays on the runtime route.
   ExpectComposedClipsWithLocalMask(2, 1, true, true);
-  ExpectComposedClipsWithLocalMask(3, 0, true, false);
-  ExpectComposedClipsWithLocalMask(1, 5, true, false);
-  // Non-AA rects fold through the zero-radius rrect op and share the four RRectCoverage slots
-  // with rounded rects.
+  ExpectComposedClipsWithLocalMask(3, 0, true, true);
+  ExpectComposedClipsWithLocalMask(1, 5, true, true);
+  // Non-AA rects fold through the zero-radius rrect op, indistinguishable from rounded rects.
   ExpectComposedClipsWithLocalMask(1, 1, false, true);
   ExpectComposedClipsWithLocalMask(4, 0, false, true);
-  ExpectComposedClipsWithLocalMask(5, 0, false, false);
+  ExpectComposedClipsWithLocalMask(5, 0, false, true);
 }
 
 static PlacementPtr<FragmentProcessor> MakeAdditionalAnalyticClip(BlockAllocator* allocator,
