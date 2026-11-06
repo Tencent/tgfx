@@ -190,6 +190,8 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
   auto context = renderTarget->getContext();
   auto globalCache = context->globalCache();
 
+  // The plain key only ever holds generic programs (the creator caches a specialized program
+  // under its structure-bearing key), so this fast path is correct for every chain shape.
   const auto& key = programKey();
   auto program = globalCache->findProgram(key);
   if (program != nullptr) {
@@ -202,7 +204,6 @@ std::shared_ptr<Program> ProgramInfo::getProgram() const {
     LOGE("ProgramInfo::getProgram() Precompiled program unavailable!");
     return nullptr;
   }
-  globalCache->addProgram(key, program);
   return program;
 }
 

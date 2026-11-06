@@ -337,14 +337,34 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
     return nullptr;
   }
   cache->recordAOTStage(PrecompiledAOTStage::PermutationMatched);
-  // The plain route's key is the processor tree, which already determines the chain shape, so
-  // the specialization values need not join the key here — unlike the pass-IR route, whose key
-  // carries no fragment list (see AOTProgramInfo). Both routes resolve through the same entry,
-  // so they cannot disagree about whether this draw specializes.
+  // The specialization values are part of the program's identity: the processor tree cannot tell
+  // two chain shapes apart (a rect clip's anti-alias flag, for one, is not in it), so a program
+  // built for one shape must never answer the other. A specialized program is therefore cached
+  // under the structure-bearing key only, which leaves the plain key holding generic programs —
+  // those render correctly for every shape, so a plain-key hit is always safe.
   const SpecValues spec =
       SpecResolver::Resolve(context, *programInfo, matchResult->shaderName,
                             matchResult->vertPermutationIndex, matchResult->fragPermutationIndex);
-  return CreateProgramFromMatch(context, programInfo, *matchResult, spec.empty() ? nullptr : &spec);
+  if (spec.empty()) {
+    auto program = CreateProgramFromMatch(context, programInfo, *matchResult, nullptr);
+    if (program != nullptr) {
+      context->globalCache()->addProgram(programInfo->programKey(), program);
+    }
+    return program;
+  }
+  const BytesKey plainKey = programInfo->programKey();
+  BytesKey specializedKey = plainKey;
+  spec.writeKey(&specializedKey);
+  if (auto cached = context->globalCache()->findProgram(specializedKey)) {
+    return cached;
+  }
+  auto program = CreateProgramFromMatch(context, programInfo, *matchResult, &spec);
+  if (program != nullptr) {
+    // A specialization that failed to build still returns the generic form (see the fallback
+    // below); caching it under this key keeps the failing compile from being retried.
+    context->globalCache()->addProgram(specializedKey, program);
+  }
+  return program;
 }
 
 namespace {
