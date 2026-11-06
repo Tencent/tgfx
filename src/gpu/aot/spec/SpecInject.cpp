@@ -68,4 +68,21 @@ std::string InjectSpecGLSL(const std::string& code, const std::vector<SpecFieldI
   return text;
 }
 
+void AppendSpecConstants(const std::vector<SpecFieldInfo>& fields, const SpecValues& values,
+                         std::vector<std::pair<std::string, double>>* constants) {
+  if (values.empty() || values.values[0] != 1) {
+    return;
+  }
+  constants->emplace_back("0", 1.0);
+  size_t next = 1;
+  for (const auto& field : fields) {
+    const auto words = field.arraySize == 1 ? 1u : field.arraySize * 4u;
+    for (uint32_t word = 0; word < words; ++word) {
+      const auto value = next < values.values.size() ? values.values[next] : 0;
+      ++next;
+      constants->emplace_back(std::to_string(field.firstId + word), static_cast<double>(value));
+    }
+  }
+}
+
 }  // namespace tgfx

@@ -124,6 +124,14 @@ bool EncodeRenderPipelineDescriptor(
     return false;
   }
   AppendString(out, fragment.entryPoint);
+  // The specialization constants are part of the pipeline's identity: a specialized pipeline and
+  // its generic form share the module (the same metallib/SPIR-V blob) and differ only here, so
+  // two chain shapes must not collide onto one pipeline.
+  AppendU32(out, static_cast<uint32_t>(fragment.constants.size()));
+  for (const auto& constant : fragment.constants) {
+    AppendString(out, constant.first);
+    AppendU32(out, static_cast<uint32_t>(static_cast<int64_t>(constant.second)));
+  }
   AppendU32(out, static_cast<uint32_t>(fragment.colorAttachments.size()));
   for (const auto& color : fragment.colorAttachments) {
     AppendU32(out, static_cast<uint32_t>(color.format));

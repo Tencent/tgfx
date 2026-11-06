@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 #include "tgfx/gpu/Attribute.h"
 #include "tgfx/gpu/BlendFactor.h"
@@ -105,6 +106,17 @@ class FragmentDescriptor {
    * while Vulkan and D3D12 always use `main` (SPIR-V entry points and the D3DCompile entry name).
    */
   std::string entryPoint = "main";
+
+  /**
+   * The pipeline-creation-time specialization constants of the fragment stage, as (key, value)
+   * pairs. The key names the constant the way the consuming backend resolves it: the SpecId in
+   * decimal for the Metal function constants (each SpecId-decorated SPIR-V constant becomes an
+   * MSL function constant whose index carries the SpecId) and for the Vulkan specialization
+   * map. A precompiled shader that declares no specialization constants leaves this empty, and
+   * an entry the artifact does not declare is ignored by the backend. The values are integers;
+   * the double storage matches the WebGPU pipeline-constant entry type.
+   */
+  std::vector<std::pair<std::string, double>> constants = {};
 
   /**
    * An array of PipelineColorAttachment objects that define the color attachments for the render

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MetalRenderPipeline.h"
+#include <cstdlib>
 #include "MetalGPU.h"
 #include "MetalShaderModule.h"
 #include "MetalUtil.h"
@@ -24,6 +25,39 @@
 #include "gpu/ShaderInterface.h"
 
 namespace tgfx {
+
+// Resolves the fragment function with this pipeline's specialization constants: every
+// SpecId-decorated constant of the precompiled fragment became an MSL function constant whose
+// index carries the SpecId, and the descriptor's entries key by that id. A constant without a
+// matching entry keeps its compiled default (0, the generic form's value), so a partial table
+// degrades to the un-specialized behavior rather than a wrong value.
+static id<MTLFunction> NewFragmentFunction(id<MTLLibrary> library,
+                                           const RenderPipelineDescriptor& descriptor) {
+  // Metal resolves a function that declares constants only through the constantValues entry
+  // point, even for the generic form: an empty table leaves every constant at its compiled
+  // default (0, the un-specialized value), so the generic path and the specialized path share
+  // one code route and only the table differs.
+  MTLFunctionConstantValues* constantValues = [[MTLFunctionConstantValues alloc] init];
+  for (const auto& entry : descriptor.fragment.constants) {
+    char* end = nullptr;
+    const unsigned long index = std::strtoul(entry.first.c_str(), &end, 10);
+    if (end == nullptr || *end != '\0') {
+      continue;
+    }
+    int value = static_cast<int>(entry.second);
+    [constantValues setConstantValue:&value type:MTLDataTypeInt atIndex:index];
+  }
+  NSError* error = nil;
+  id<MTLFunction> function = [library newFunctionWithName:@"main0"
+                                           constantValues:constantValues
+                                                    error:&error];
+  if (function == nil && error != nil) {
+    LOGE("MetalRenderPipeline: specialized function creation failed: %s",
+         error.localizedDescription.UTF8String);
+  }
+  [constantValues release];
+  return function;
+}
 
 std::shared_ptr<MetalRenderPipeline> MetalRenderPipeline::Make(
     MetalGPU* gpu, const RenderPipelineDescriptor& descriptor) {
@@ -131,7 +165,7 @@ bool MetalRenderPipeline::createPipelineState(MetalGPU* gpu,
       return false;
     }
     metalDescriptor.fragmentFunction =
-        [fragmentShader->metalLibrary() newFunctionWithName:@"main0"];
+        NewFragmentFunction(fragmentShader->metalLibrary(), descriptor);
   }
 
   if (metalDescriptor.vertexFunction == nil || metalDescriptor.fragmentFunction == nil) {

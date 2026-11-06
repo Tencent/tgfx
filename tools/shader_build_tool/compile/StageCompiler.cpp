@@ -75,6 +75,17 @@ const SpirvStage& StageCompiler::compileSpirv(const std::string& source, ShaderS
 
 std::vector<uint8_t> StageCompiler::compileMetallib(const std::string& msl, ShaderStageType stage,
                                                     std::string* error) {
+  if (const char* dumpDir = std::getenv("TGFX_SHADER_DUMP_DIR")) {
+    static std::atomic<int> dumpCounter{0};
+    std::string base = std::string(dumpDir) + "/msl_" +
+                       (stage == ShaderStageType::Vertex ? "vert" : "frag") + "_" +
+                       std::to_string(dumpCounter++) + ".metal";
+    FILE* f = fopen(base.c_str(), "w");
+    if (f) {
+      fwrite(msl.data(), 1, msl.size(), f);
+      fclose(f);
+    }
+  }
   auto key = StageCacheKey("metallib", persistentCache->toolIdentity())
                  .add(MetalToolchainKey())
                  .add(static_cast<uint64_t>(stage))

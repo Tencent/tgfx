@@ -360,7 +360,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   // the specialization values need not join the key here — unlike the pass-IR route, whose key
   // carries no fragment list (see AOTProgramInfo). GL-only in this stage, like the pass-IR route.
   SpecValues spec = {};
-  if (context->backend() == Backend::OpenGL) {
+  if (context->backend() == Backend::OpenGL || context->backend() == Backend::Metal) {
     spec =
         SpecCapture::Capture(context, *programInfo, matchResult->shaderName,
                              matchResult->vertPermutationIndex, matchResult->fragPermutationIndex);
@@ -428,9 +428,12 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   }
   // The GLSL text backends specialize by rewriting the generated TGFX_SPEC_<id> declarations to
   // this draw's captured values, the master switch first; the driver's compiler then folds every
-  // accessor read and the unrolled executor's guards. Other formats (v1: the SPIR-V family's
-  // pipeline-constant injection is not wired yet) and a failed injection keep the generic text.
+  // accessor read and the unrolled executor's guards. The metallib backend carries the same
+  // values through the pipeline's fragment-constant table (MTLFunctionConstantValues), resolved
+  // at function creation. Other formats (v1: Vulkan's SPIR-V specialization map is not wired
+  // yet) and a failed injection keep the generic text.
   bool specInjected = false;
+  std::vector<std::pair<std::string, double>> specConstants = {};
   if (spec != nullptr && !spec->empty() && format == ShaderCodeFormat::GLSL) {
     auto specialized = InjectSpecGLSL(fragmentDesc.code, fragBlob->specFields, *spec);
     if (!specialized.empty()) {
@@ -442,6 +445,9 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
           "for %s[frag=%u]; serving the generic form",
           matchResult->shaderName.c_str(), matchResult->fragPermutationIndex);
     }
+  } else if (spec != nullptr && !spec->empty() && format == ShaderCodeFormat::METALLIB) {
+    AppendSpecConstants(fragBlob->specFields, *spec, &specConstants);
+    specInjected = true;
   }
   if (!fragBlob->uniforms.empty()) {
     fragmentDesc.uniformSlots = {
@@ -630,6 +636,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   descriptor.vertex.bindAttributesByLocation = true;
   descriptor.vertex.module = vertexShader;
   descriptor.fragment.module = fragmentShader;
+  descriptor.fragment.constants = std::move(specConstants);
   descriptor.fragment.colorAttachments.push_back(programInfo->getPipelineColorAttachment());
 
   std::unique_ptr<UniformData> vertexUniformData = nullptr;

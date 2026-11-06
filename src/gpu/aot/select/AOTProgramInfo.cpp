@@ -98,7 +98,7 @@ AOTProgramInfo::AOTProgramInfo(const ProgramInfo& info, const AOTProgram& progra
   // scratch buffer (SpecCapture), so the key and the fold share one source of values. GL-only in
   // this stage: the SPIR-V-family backends inject at pipeline creation and are wired next.
   SpecValues spec = {};
-  if (context->backend() == Backend::OpenGL) {
+  if (context->backend() == Backend::OpenGL || context->backend() == Backend::Metal) {
     spec = SpecCapture::Capture(context, info, PointwiseChainShader::Name,
                                 variant->vertPermutationIndex, variant->fragPermutationIndex);
   }

@@ -40,4 +40,17 @@ namespace tgfx {
 std::string InjectSpecGLSL(const std::string& code, const std::vector<SpecFieldInfo>& fields,
                            const SpecValues& values);
 
+/**
+ * Appends the captured values to a pipeline's fragment-constant table, keyed the way the
+ * pipeline-constant backends resolve them: the SpecId in decimal (Metal's MSL function
+ * constants carry the SpecId as their index; the Vulkan specialization map keys by SpecId).
+ * The master switch is id 0, then every field's words in spec-table order — the same order the
+ * values hold.
+ * @param fields    The variant's spec table (the id assignment order).
+ * @param values    The captured values (the master switch first).
+ * @param constants The table to append to.
+ */
+void AppendSpecConstants(const std::vector<SpecFieldInfo>& fields, const SpecValues& values,
+                         std::vector<std::pair<std::string, double>>* constants);
+
 }  // namespace tgfx

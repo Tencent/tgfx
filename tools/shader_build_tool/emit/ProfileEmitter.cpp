@@ -101,21 +101,56 @@ class MetalEmitter : public ProfileEmitter {
     // whether fed the optimized or unoptimized translation (verified 2026-08-19), so the
     // extra optimized compile would only slow the build down.
     const auto& mslVert = compiler->translateMSL(*input.vertSpirv, ShaderStageType::Vertex);
-    const auto& mslFrag =
-        compiler->translateMSL(input.fragStage->spirv, ShaderStageType::Fragment);
-    if (!mslVert.success || !mslFrag.success) {
+    if (!mslVert.success) {
       ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
-                    "MSL translation error: " + (!mslVert.success ? mslVert.error : mslFrag.error));
+                    "MSL translation error: " + mslVert.error);
       return std::nullopt;
     }
+    // The chain fragment re-compiles with the spec dialect (the same second dialect the
+    // D3D12 emitter produces): SPIRV-Cross's MSL writer turns each SpecId-decorated
+    // OpSpecConstant into an MSL function constant, so the runtime resolves this draw's
+    // values through MTLFunctionConstantValues at pipeline creation and the Metal compiler
+    // folds them into the specialized function. Other families keep the common SPIR-V.
+    if (input.fragSpecSource != nullptr) {
+      const auto& specFrag =
+          compiler->compileSpirv(PrependDefines(*input.fragSpecSource, *input.fragDefines),
+                                 ShaderStageType::Fragment, input.info->name, input.fragIndex,
+                                 false);
+      if (!specFrag.success) {
+        ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
+                      "spec-dialect fragment recompile failed: " + specFrag.error);
+        return std::nullopt;
+      }
+      const auto& mslFragSpec = compiler->translateMSL(specFrag.spirv, ShaderStageType::Fragment);
+      if (!mslFragSpec.success) {
+        ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
+                      "spec-dialect MSL translation error: " + mslFragSpec.error);
+        return std::nullopt;
+      }
+      return CompileMetallibPair(compiler, input, mslVert.text, mslFragSpec.text);
+    }
+    const auto& mslFrag =
+        compiler->translateMSL(input.fragStage->spirv, ShaderStageType::Fragment);
+    if (!mslFrag.success) {
+      ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
+                    "MSL translation error: " + mslFrag.error);
+      return std::nullopt;
+    }
+    return CompileMetallibPair(compiler, input, mslVert.text, mslFrag.text);
+  }
+
+ private:
+  std::optional<EmittedStages> CompileMetallibPair(StageCompiler* compiler, const EmitInput& input,
+                                                   const std::string& mslVert,
+                                                   const std::string& mslFrag) {
     std::string metalError;
     EmittedStages stages;
     stages.payloadKind = BundleFormat::Payload::Binary;
     stages.vertexBlob =
-        compiler->compileMetallib(mslVert.text, ShaderStageType::Vertex, &metalError);
+        compiler->compileMetallib(mslVert, ShaderStageType::Vertex, &metalError);
     if (!stages.vertexBlob.empty()) {
       stages.fragmentBlob =
-          compiler->compileMetallib(mslFrag.text, ShaderStageType::Fragment, &metalError);
+          compiler->compileMetallib(mslFrag, ShaderStageType::Fragment, &metalError);
     }
     if (stages.vertexBlob.empty() || stages.fragmentBlob.empty()) {
       ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
