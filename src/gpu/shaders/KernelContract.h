@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include "gpu/shaders/contract/ChainISA.h"
 
 namespace tgfx {
 
@@ -60,71 +61,78 @@ constexpr const char* DeviceToLocal = "DeviceToLocal";
 // per-slot parameter member name, and pass-boundary sensitivity — an operator that amplifies the
 // 1/255 pass-boundary rounding into a visible flip (a step function) must share its pass with its
 // input's producer (IsPassBoundarySensitive; see AOTEffectDecomposer's CanStartPassAt).
-#define TGFX_POINTWISE_OPS(X)                                                 \
-  X(ColorMatrix, 0, AOTColorMatrixParameters, colorMatrix, false)             \
-  X(Luma, 1, AOTLumaParameters, luma, false)                                  \
-  X(AlphaThreshold, 2, AOTAlphaThresholdParameters, alphaThreshold, true)     \
-  X(ColorSpaceXform, 3, AOTColorSpaceXformParameters, colorSpaceXform, false) \
-  X(ConstColor, 6, AOTConstColorParameters, constColor, false)                \
-  X(Blend, 7, AOTBlendParameters, blend, false)
+#define TGFX_POINTWISE_OPS(X)                                                       \
+  X(ColorMatrix, ChainISA::ColorMatrix, AOTColorMatrixParameters, colorMatrix, false) \
+  X(Luma, ChainISA::Luma, AOTLumaParameters, luma, false)                            \
+  X(AlphaThreshold, ChainISA::AlphaThreshold, AOTAlphaThresholdParameters,           \
+    alphaThreshold, true)                                                            \
+  X(ColorSpaceXform, ChainISA::ColorSpaceXform, AOTColorSpaceXformParameters,        \
+    colorSpaceXform, false)                                                          \
+  X(ConstColor, ChainISA::ConstColor, AOTConstColorParameters, constColor, false)    \
+  X(Blend, ChainISA::Blend, AOTBlendParameters, blend, false)
 
 namespace Op {
 
-// The one op table of the pointwise interpreters (chain and slot): the single place an op value
-// is defined. shader_build_tool injects these values into every compiled variant as the OP_*
-// defines (Op::Defines); op_codes.inc only marks the include point, and the AOTChainOp enum
-// anchors to them by assignment. The single-slot interpreter dispatches on the AOTPointwiseOpType
-// subset of these values, so it deliberately never emits the chain-only ones (Texture, the
-// coverage ops, and the modulators). The pointwise color operators come from the list above; the
-// rest is the chain interpreter's instruction vocabulary (pass-through marker, texture, the
-// coverage ops, the modulators, the noise source), which has no IR mirror to keep in sync.
-#define TGFX_OP_CONSTANT(name, id, params, member, passBoundarySensitive) constexpr int name = id;
-TGFX_POINTWISE_OPS(TGFX_OP_CONSTANT)
+// The op values of the chain interpreter and the pointwise slot interpreters: every one derives
+// from ChainISA's single list (contract/ChainISA.h), which is also the list Defines() turns into
+// the OP_* defines every compiled variant receives; op_codes.inc only marks the include point,
+// and the AOTChainOp enum anchors to these values by assignment. The single-slot interpreter
+// dispatches on the AOTPointwiseOpType subset, so it deliberately never emits the chain-only
+// operators (Texture, the coverage ops, the modulators). The pointwise color operators also have
+// an IR mirror (the list above), which the asserts below keep aligned with the ABI values.
+#define TGFX_OP_CONSTANT(name, id, inputs, sensitive, defineName) constexpr int name = ChainISA::name;
+TGFX_CHAIN_OPS(TGFX_OP_CONSTANT)
 #undef TGFX_OP_CONSTANT
-constexpr int None = 4;
-constexpr int Texture = 5;
-constexpr int AARectCoverage = 8;
-constexpr int Gradient = 9;
-constexpr int LocalRectCoverage = 10;
-constexpr int RRectCoverage = 11;
-constexpr int TexModulate = 12;
-constexpr int InputOpaque = 13;
-constexpr int MulAlpha = 14;
-constexpr int PerlinNoise = 15;
 
 namespace detail {
 
-// The ABI value set, split the way the declarations are: the list's pointwise operators and the
-// chain vocabulary. The asserts below pin uniqueness and the historical values — the OP_* values
-// are part of every shipped variant's encoding (slot words, uniform OpType), so renumbering
-// invalidates every bundle rather than failing loudly.
+// The ABI value set in table order. The asserts below pin uniqueness, ascending order and the
+// historical values — the OP_* values are part of every shipped variant's encoding (slot words,
+// uniform OpType), so renumbering invalidates every bundle rather than failing loudly.
+constexpr int AbiValues[] = {
+#define TGFX_OP_ABI_ROW(name, id, inputs, sensitive, defineName) id,
+    TGFX_CHAIN_OPS(TGFX_OP_ABI_ROW)
+#undef TGFX_OP_ABI_ROW
+};
+constexpr size_t AbiValueCount = sizeof(AbiValues) / sizeof(int);
+
 constexpr int PointwiseAbiValues[] = {
 #define TGFX_OP_ABI_VALUE(name, id, params, member, passBoundarySensitive) id,
     TGFX_POINTWISE_OPS(TGFX_OP_ABI_VALUE)
 #undef TGFX_OP_ABI_VALUE
 };
-constexpr int VocabularyAbiValues[] = {
-    None,          Texture,     AARectCoverage, Gradient, LocalRectCoverage,
-    RRectCoverage, TexModulate, InputOpaque,    MulAlpha, PerlinNoise};
 
 constexpr bool AbiValuesUnique() {
-  for (size_t i = 0; i < sizeof(PointwiseAbiValues) / sizeof(int); ++i) {
-    for (size_t j = i + 1; j < sizeof(PointwiseAbiValues) / sizeof(int); ++j) {
-      if (PointwiseAbiValues[i] == PointwiseAbiValues[j]) {
-        return false;
-      }
-    }
-    for (size_t j = 0; j < sizeof(VocabularyAbiValues) / sizeof(int); ++j) {
-      if (PointwiseAbiValues[i] == VocabularyAbiValues[j]) {
+  for (size_t i = 0; i < AbiValueCount; ++i) {
+    for (size_t j = i + 1; j < AbiValueCount; ++j) {
+      if (AbiValues[i] == AbiValues[j]) {
         return false;
       }
     }
   }
-  for (size_t i = 0; i < sizeof(VocabularyAbiValues) / sizeof(int); ++i) {
-    for (size_t j = i + 1; j < sizeof(VocabularyAbiValues) / sizeof(int); ++j) {
-      if (VocabularyAbiValues[i] == VocabularyAbiValues[j]) {
-        return false;
+  return true;
+}
+
+constexpr bool AbiValuesAscending() {
+  for (size_t i = 1; i < AbiValueCount; ++i) {
+    if (AbiValues[i] <= AbiValues[i - 1]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+constexpr bool PointwiseValuesInAbiSet() {
+  for (size_t i = 0; i < sizeof(PointwiseAbiValues) / sizeof(int); ++i) {
+    bool found = false;
+    for (size_t j = 0; j < AbiValueCount; ++j) {
+      if (PointwiseAbiValues[i] == AbiValues[j]) {
+        found = true;
+        break;
       }
+    }
+    if (!found) {
+      return false;
     }
   }
   return true;
@@ -133,6 +141,9 @@ constexpr bool AbiValuesUnique() {
 }  // namespace detail
 
 static_assert(detail::AbiValuesUnique(), "two ops share one ABI value");
+static_assert(detail::AbiValuesAscending(), "the op table must stay in ascending ABI order");
+static_assert(detail::PointwiseValuesInAbiSet(), "an IR operator is missing from ChainISA");
+static_assert(static_cast<int>(detail::AbiValueCount) == ChainISA::OpCount, "op count mismatch");
 static_assert(None == 4 && Texture == 5 && PerlinNoise == 15,
               "the op ABI values are frozen bundle compatibility");
 
@@ -147,55 +158,30 @@ inline std::vector<std::string> PointwiseOpNames() {
   };
 }
 
-/// The OP_* macro name of a pointwise operator: CamelCase to SCREAMING_SNAKE (ColorSpaceXform to
-/// COLOR_SPACE_XFORM). The chain vocabulary's names carry consecutive capitals (AARectCoverage)
-/// and are spelled out explicitly below instead.
-inline std::string PointwiseDefineName(const std::string& name) {
-  std::string result;
-  for (size_t i = 0; i < name.size(); ++i) {
-    const char c = name[i];
-    if (c >= 'A' && c <= 'Z' && i > 0) {
-      result.push_back('_');
-    }
-    result.push_back(static_cast<char>(c >= 'a' && c <= 'z' ? c - 'a' + 'A' : c));
+/// The OP_* macro spelling of an operator, from the table: the tool relates an operator's name to
+/// its define while checking the shared GLSL dispatch against the op list. Returns an empty
+/// string for a name the table does not carry.
+inline std::string DefineName(const std::string& name) {
+#define TGFX_OP_DEFINE_LOOKUP(opName, id, inputs, sensitive, defineName) \
+  if (name == #opName) {                                                 \
+    return #defineName;                                                  \
   }
-  return result;
+  TGFX_CHAIN_OPS(TGFX_OP_DEFINE_LOOKUP)
+#undef TGFX_OP_DEFINE_LOOKUP
+  return {};
 }
 
-/// The OP_* macros every compiled variant receives. The table above is their only definition, so a
-/// shader source cannot carry a second copy that drifts; shader_build_tool prepends this list to
-/// every stage's defines and covers it with the manifest's source digest. The output is sorted by
-/// ABI value, so it is byte-identical regardless of how the two tables above are ordered.
+/// The OP_* macros every compiled variant receives, in table order (ascending by ABI value, as the
+/// asserts above require), so the output is byte-identical whatever order the rows were written.
+/// The table is their only definition: no shader source can carry a second copy that drifts, and
+/// shader_build_tool prepends this list to every stage's defines.
 inline std::vector<std::string> Defines() {
-  struct Entry {
-    int value;
-    const char* name;
-    const char* define;
-  };
-  std::vector<Entry> entries = {
-#define TGFX_OP_DEFINE(name, id, params, member, passBoundarySensitive) {id, #name, ""},
-      TGFX_POINTWISE_OPS(TGFX_OP_DEFINE)
-#undef TGFX_OP_DEFINE
-          {None, "None", "NONE"},
-      {Texture, "Texture", "TEXTURE"},
-      {AARectCoverage, "AARectCoverage", "AARECT_COVERAGE"},
-      {Gradient, "Gradient", "GRADIENT"},
-      {LocalRectCoverage, "LocalRectCoverage", "LOCAL_RECT_COVERAGE"},
-      {RRectCoverage, "RRectCoverage", "RRECT_COVERAGE"},
-      {TexModulate, "TexModulate", "TEX_MODULATE"},
-      {InputOpaque, "InputOpaque", "INPUT_OPAQUE"},
-      {MulAlpha, "MulAlpha", "MUL_ALPHA"},
-      {PerlinNoise, "PerlinNoise", "PERLIN_NOISE"},
-  };
-  std::stable_sort(entries.begin(), entries.end(),
-                   [](const Entry& a, const Entry& b) { return a.value < b.value; });
   std::vector<std::string> defines;
-  defines.reserve(entries.size());
-  for (const auto& entry : entries) {
-    const std::string define =
-        entry.define[0] != '\0' ? std::string(entry.define) : PointwiseDefineName(entry.name);
-    defines.push_back("OP_" + define + "=" + std::to_string(entry.value));
-  }
+  defines.reserve(static_cast<size_t>(ChainISA::OpCount));
+#define TGFX_OP_DEFINE(opName, id, inputs, sensitive, defineName) \
+  defines.push_back("OP_" + std::string(#defineName) + "=" + std::to_string(id));
+  TGFX_CHAIN_OPS(TGFX_OP_DEFINE)
+#undef TGFX_OP_DEFINE
   return defines;
 }
 

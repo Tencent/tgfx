@@ -659,7 +659,7 @@ size_t ValidatePointwiseDispatch(const std::string& shaderDir, Diagnostics* diag
   std::set<std::string> listed;
   for (const auto& name : Op::PointwiseOpNames()) {
     listed.insert(name);
-    if (dispatched.count(Op::PointwiseDefineName(name)) != 0) {
+    if (dispatched.count(Op::DefineName(name)) != 0) {
       continue;
     }
     const auto exemption = exemptions.find(name);
@@ -684,7 +684,7 @@ size_t ValidatePointwiseDispatch(const std::string& shaderDir, Diagnostics* diag
   for (const auto& define : dispatched) {
     bool known = false;
     for (const auto& name : listed) {
-      if (Op::PointwiseDefineName(name) == define) {
+      if (Op::DefineName(name) == define) {
         known = true;
         break;
       }
