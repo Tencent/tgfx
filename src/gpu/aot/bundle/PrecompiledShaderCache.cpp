@@ -38,12 +38,14 @@ namespace tgfx {
 
 namespace {
 
-// The run-wide opt-in for specialization: absent or 0 keeps the generic default, any other value
-// turns it on. The cost audit runs one full suite each way without a code change.
+// Specialization is on by default. The resolver's format gate decides which backends can consume
+// the values — today the GLSL text rewrite and Metal's function constants; a backend without an
+// injector keeps the generic form regardless of this switch. TGFX_AOT_SPECIALIZE=0 turns it off
+// for a run, which the cost audit and the A/B tests use.
 bool SpecializationRequestedByEnvironment() {
   const char* value = std::getenv("TGFX_AOT_SPECIALIZE");
   if (value == nullptr) {
-    return false;
+    return true;
   }
   std::string text = value;
   return text != "0" && text != "false" && text != "off";

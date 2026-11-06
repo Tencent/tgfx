@@ -457,10 +457,9 @@ class PrecompiledShaderCache {
   }
 
   /// Whether the AOT route may specialize a precompiled variant with the draw's structural
-  /// uniform values before creating its program. Off by default: specialization trades a
-  /// synchronous compile of the hot shape for a leaner specialized program, so the caller opts
-  /// in (the perf matrix and the specialization A/B tests flip it, and TGFX_AOT_SPECIALIZE=1
-  /// turns it on for a whole run without touching code).
+  /// uniform values before creating its program. On by default, and the resolver's format gate
+  /// keeps it to the backends whose stored form can consume the values (GLSL text rewrite, Metal
+  /// function constants); TGFX_AOT_SPECIALIZE=0 turns it off for a whole run.
   bool specializationEnabled() const {
     return _specializationEnabled;
   }
