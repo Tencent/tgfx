@@ -237,8 +237,7 @@ void GLSLGlassSDFGeometryFragmentProcessor::onSetData(UniformData*,
                                                       UniformData* fragmentUniformData) const {
   float shapeData[4] = {params.halfW, params.halfH, params.cornerRadius, params.glassThickness};
   fragmentUniformData->setData("GlassShapeP0", shapeData);
-  float effectData[4] = {params.refractionFactor, params.splay, params.depthRatio,
-                         params.edgeBandLayerPixels};
+  float effectData[4] = {params.refractionFactor, params.splay, 0.0f, params.edgeBandLayerPixels};
   fragmentUniformData->setData("GlassShapeP1", effectData);
   float angle = params.lightAngle * static_cast<float>(M_PI) / 180.0f;
   float lightDirData[2] = {std::sin(angle), std::cos(angle)};
@@ -278,6 +277,8 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
                                                   ShaderStage::Fragment);
   auto edgeMaskUV = args.uniformHandler->addUniform("GlassEdgeMaskUV", UniformFormat::Float4,
                                                     ShaderStage::Fragment);
+  auto gradientRadius = args.uniformHandler->addUniform("GlassGradientRadius", UniformFormat::Float,
+                                                        ShaderStage::Fragment);
   auto lightDir = args.uniformHandler->addUniform("GlassLightDir", UniformFormat::Float2,
                                                   ShaderStage::Fragment);
   auto& maskSampler = (*args.textureSamplers)[0];
@@ -293,8 +294,7 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->appendTextureLookup(maskSampler, "fineUV");
   fragBuilder->codeAppend(";");
   fragBuilder->codeAppend("float height = dot(packedCenter.rgb, UNPACK24);");
-  fragBuilder->codeAppendf("float gradientBase = %s.z * 3.0 + 1.0;", effect.c_str());
-  fragBuilder->codeAppendf("vec2 gradientStep = gradientBase * %s.zw;", shape.c_str());
+  fragBuilder->codeAppendf("vec2 gradientStep = vec2(max(%s, 0.0001));", gradientRadius.c_str());
   fragBuilder->codeAppendf(
       "vec2 gradientUVStep = gradientStep * vec2(0.5 / halfW, 0.5 / halfH) * %s.xy;",
       fineMaskUV.c_str());
@@ -361,10 +361,14 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("  float refractLength = length(refractDir);");
   fragBuilder->codeAppend(
       "  refractDir = refractLength < 0.000001 ? gradientDir : refractDir / refractLength;");
-  fragBuilder->codeAppendf("  float depthScale = smoothstep(0.0, 0.1, %s.z);", effect.c_str());
   fragBuilder->codeAppendf(
-      "  float distance = min(halfW, halfH) * %s.x * %s.z * depthScale * gradientWeight;",
-      effect.c_str(), effect.c_str());
+      "  float normalizedThickness = clamp(%s.z / max(min(halfW, halfH), 0.0001), 0.0, 1.0);",
+      effect.c_str());
+  fragBuilder->codeAppend("  float depthScale = smoothstep(0.0, 0.1, normalizedThickness);");
+  fragBuilder->codeAppendf("  float distance = %s.z * %s.x * depthScale * gradientWeight;",
+                           effect.c_str(), effect.c_str());
+  // Proximity can raise the profile above the physical bound; the refraction pass clamps the final
+  // displacement to maxDisplacement, which also sizes the background-filter outset.
   fragBuilder->codeAppend(
       "  float proximity = (1.0 - height * height) * (1.0 - height * height) * 1.2;");
   fragBuilder->codeAppend("  float edgeLight = 0.0;");
@@ -385,9 +389,11 @@ void GLSLGlassUDFGeometryFragmentProcessor::onSetData(UniformData*,
   float shapeData[4] = {params.halfW, params.halfH, params.udfPixelToLayerPixelX,
                         params.udfPixelToLayerPixelY};
   fragmentUniformData->setData("GlassShapeP0", shapeData);
-  float effectData[4] = {params.refractionFactor, params.splay, params.depthRatio,
+  float effectData[4] = {params.refractionFactor, params.splay, params.glassThickness,
                          params.edgeBandLayerPixels};
   fragmentUniformData->setData("GlassShapeP1", effectData);
+  float gradientRadiusData = params.gradientSampleRadiusLayerPixels;
+  fragmentUniformData->setData("GlassGradientRadius", gradientRadiusData);
   float angle = params.lightAngle * static_cast<float>(M_PI) / 180.0f;
   float lightDirData[2] = {std::sin(angle), std::cos(angle)};
   fragmentUniformData->setData("GlassLightDir", lightDirData);
