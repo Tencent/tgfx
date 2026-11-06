@@ -38,10 +38,7 @@ class SVGFeFlood : public SVGFe {
 
  protected:
   std::shared_ptr<ImageFilter> onMakeImageFilter(
-      const SVGRenderContext& /*context*/,
-      const SVGFilterContext& /*filterContext*/) const override {
-    return nullptr;
-  };
+      const SVGRenderContext& context, const SVGFilterContext& filterContext) const override;
 
   std::vector<SVGFeInputType> getInputs() const override {
     return {};

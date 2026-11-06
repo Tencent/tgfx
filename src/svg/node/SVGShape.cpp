@@ -20,7 +20,6 @@
 #include <memory>
 #include "core/utils/Log.h"
 #include "svg/SVGRenderContext.h"
-#include "tgfx/core/Size.h"
 
 namespace tgfx {
 
@@ -30,13 +29,8 @@ SVGShape::SVGShape(SVGTag t) : INHERITED(t) {
 void SVGShape::onRender(const SVGRenderContext& context) const {
   const auto fillType = context.presentationContext()._inherited.FillRule->asFillType();
 
-  auto selfRect = onObjectBoundingBox(context);
-  auto lengthContext = context.lengthContext();
-  lengthContext.setViewPort(Size::Make(selfRect.width(), selfRect.height()));
-  auto paintContext = SVGRenderContext::CopyForPaint(context, context.canvas(), lengthContext);
-
-  auto fillPaint = paintContext.fillPaint();
-  auto strokePaint = paintContext.strokePaint();
+  auto fillPaint = context.fillPaint();
+  auto strokePaint = context.strokePaint();
 
   if (fillPaint.has_value()) {
     onDrawFill(context.canvas(), context.lengthContext(), *fillPaint, fillType);

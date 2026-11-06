@@ -57,19 +57,23 @@ std::shared_ptr<ImageFilter> SVGFilter::buildFilterDAG(const SVGRenderContext& c
                                  PrimitiveUnits);
   SVGRenderContext localContext(context);
   this->applyProperties(&localContext);
-  if (auto dropShadowFilter = buildDropShadowFilter(localContext, filterContext)) {
-    return dropShadowFilter;
+
+  // Whitespace between primitives parses into text literal nodes; match and build only against
+  // the actual filter effect nodes.
+  std::vector<std::shared_ptr<SVGNode>> feNodes;
+  for (const auto& child : children) {
+    if (SVGFe::IsFilterEffect(child)) {
+      feNodes.push_back(child);
+    }
   }
-  if (auto innerShadowFilter = buildInnerShadowFilter(localContext, filterContext)) {
-    return innerShadowFilter;
+
+  auto effects = recognizeEffectChain(localContext, filterContext, feNodes);
+  if (!effects.empty()) {
+    return ImageFilter::Compose(effects);
   }
 
   SVGColorspace cs = SVGColorspace::SRGB;
-  for (const auto& child : children) {
-    if (!SVGFe::IsFilterEffect(child)) {
-      continue;
-    }
-
+  for (const auto& child : feNodes) {
     const auto& feNode = static_cast<const SVGFe&>(*child);
     const auto& feResultType = feNode.getResult();
 
@@ -99,43 +103,77 @@ std::shared_ptr<ImageFilter> SVGFilter::buildFilterDAG(const SVGRenderContext& c
   return filter;
 }
 
+std::vector<std::shared_ptr<ImageFilter>> SVGFilter::recognizeEffectChain(
+    const SVGRenderContext& context, const SVGFilterContext& filterContext,
+    const std::vector<std::shared_ptr<SVGNode>>& feNodes) const {
+  std::vector<std::shared_ptr<ImageFilter>> effects;
+  size_t segmentStart = 0;
+  for (size_t i = 0; i < feNodes.size(); i++) {
+    // A blend that merges the current result back with the source graphic closes one effect.
+    // The chain end also closes the current segment (drop-shadow-only / inner-shadow-only
+    // chains have no such blend).
+    bool isSegmentEnd = i + 1 == feNodes.size();
+    if (!isSegmentEnd && feNodes[i]->tag() == SVGTag::FeBlend) {
+      const auto& blendNode = static_cast<const SVGFeBlend&>(*feNodes[i]);
+      isSegmentEnd = blendNode.getIn().type() == SVGFeInputType::Type::SourceGraphic;
+    }
+    if (!isSegmentEnd) {
+      continue;
+    }
+    std::vector<std::shared_ptr<SVGNode>> segment(
+        feNodes.begin() + static_cast<std::ptrdiff_t>(segmentStart),
+        feNodes.begin() + static_cast<std::ptrdiff_t>(i + 1));
+    auto effect = buildDropShadowFilter(context, filterContext, segment);
+    if (!effect) {
+      effect = buildInnerShadowFilter(context, filterContext, segment);
+    }
+    if (!effect) {
+      return {};
+    }
+    effects.push_back(effect);
+    segmentStart = i + 1;
+  }
+  return effects;
+}
+
 std::shared_ptr<ImageFilter> SVGFilter::buildDropShadowFilter(
-    const SVGRenderContext& context, const SVGFilterContext& filterContext) const {
-  if (children.size() < 3) {
+    const SVGRenderContext& context, const SVGFilterContext& filterContext,
+    const std::vector<std::shared_ptr<SVGNode>>& feNodes) const {
+  if (feNodes.size() < 3) {
     return nullptr;
   }
 
   size_t blurIndex = 0;
-  for (size_t i = 0; i < children.size(); i++) {
-    if (children[i]->tag() == SVGTag::FeGaussianBlur && i >= 1 &&
-        children[i - 1]->tag() == SVGTag::FeOffset) {
+  for (size_t i = 0; i < feNodes.size(); i++) {
+    if (feNodes[i]->tag() == SVGTag::FeGaussianBlur && i >= 1 &&
+        feNodes[i - 1]->tag() == SVGTag::FeOffset) {
       blurIndex = i;
       break;
     }
   }
 
-  if (blurIndex < 1 || blurIndex == children.size() - 1) {
+  if (blurIndex < 1 || blurIndex == feNodes.size() - 1) {
     return nullptr;
   }
 
   std::shared_ptr<SVGFeOffset> offsetFe =
-      std::static_pointer_cast<SVGFeOffset>(children[blurIndex - 1]);
+      std::static_pointer_cast<SVGFeOffset>(feNodes[blurIndex - 1]);
   std::shared_ptr<SVGFeGaussianBlur> blurFe =
-      std::static_pointer_cast<SVGFeGaussianBlur>(children[blurIndex]);
+      std::static_pointer_cast<SVGFeGaussianBlur>(feNodes[blurIndex]);
   std::shared_ptr<SVGFeColorMatrix> colorMatrixFe = nullptr;
 
   size_t colorMatrixIndex = 0;
-  if (blurIndex + 1 < children.size() && children[blurIndex + 1]->tag() == SVGTag::FeColorMatrix) {
-    colorMatrixFe = std::static_pointer_cast<SVGFeColorMatrix>(children[blurIndex + 1]);
+  if (blurIndex + 1 < feNodes.size() && feNodes[blurIndex + 1]->tag() == SVGTag::FeColorMatrix) {
+    colorMatrixFe = std::static_pointer_cast<SVGFeColorMatrix>(feNodes[blurIndex + 1]);
     colorMatrixIndex = blurIndex + 1;
-  } else if (blurIndex + 2 < children.size() &&
-             children[blurIndex + 1]->tag() == SVGTag::FeComposite &&
-             children[blurIndex + 2]->tag() == SVGTag::FeColorMatrix) {
-    auto compositeFe = std::static_pointer_cast<SVGFeComposite>(children[blurIndex + 1]);
+  } else if (blurIndex + 2 < feNodes.size() &&
+             feNodes[blurIndex + 1]->tag() == SVGTag::FeComposite &&
+             feNodes[blurIndex + 2]->tag() == SVGTag::FeColorMatrix) {
+    auto compositeFe = std::static_pointer_cast<SVGFeComposite>(feNodes[blurIndex + 1]);
     if (compositeFe->getOperator() == SVGFeCompositeOperator::Arithmetic) {
       return nullptr;
     }
-    colorMatrixFe = std::static_pointer_cast<SVGFeColorMatrix>(children[blurIndex + 2]);
+    colorMatrixFe = std::static_pointer_cast<SVGFeColorMatrix>(feNodes[blurIndex + 2]);
     colorMatrixIndex = blurIndex + 2;
   } else {
     return nullptr;
@@ -154,9 +192,9 @@ std::shared_ptr<ImageFilter> SVGFilter::buildDropShadowFilter(
   // When exporting, DropShadow (shadowOnly=false) appends a <feBlend mode="normal"> to composite
   // the shadow with the original graphic, while DropShadowOnly omits it. Check for its presence
   // and mode to distinguish the two modes during import.
-  if (colorMatrixIndex + 1 < children.size() &&
-      children[colorMatrixIndex + 1]->tag() == SVGTag::FeBlend) {
-    auto blendFe = std::static_pointer_cast<SVGFeBlend>(children[colorMatrixIndex + 1]);
+  if (colorMatrixIndex + 1 < feNodes.size() &&
+      feNodes[colorMatrixIndex + 1]->tag() == SVGTag::FeBlend) {
+    auto blendFe = std::static_pointer_cast<SVGFeBlend>(feNodes[colorMatrixIndex + 1]);
     if (blendFe->getBlendMode() == SVGFeBlend::Mode::Normal) {
       return ImageFilter::DropShadow(dx, dy, blurrinessX, blurrinessY, color);
     }
@@ -165,35 +203,36 @@ std::shared_ptr<ImageFilter> SVGFilter::buildDropShadowFilter(
 }
 
 std::shared_ptr<ImageFilter> SVGFilter::buildInnerShadowFilter(
-    const SVGRenderContext& context, const SVGFilterContext& filterContext) const {
-  if (children.size() < 4) {
+    const SVGRenderContext& context, const SVGFilterContext& filterContext,
+    const std::vector<std::shared_ptr<SVGNode>>& feNodes) const {
+  if (feNodes.size() < 4) {
     return nullptr;
   }
   size_t compositeIndex = 0;
-  for (size_t i = 0; i < children.size(); i++) {
-    if (children[i]->tag() == SVGTag::FeComposite) {
-      auto compositeFe = std::static_pointer_cast<SVGFeComposite>(children[i]);
+  for (size_t i = 0; i < feNodes.size(); i++) {
+    if (feNodes[i]->tag() == SVGTag::FeComposite) {
+      auto compositeFe = std::static_pointer_cast<SVGFeComposite>(feNodes[i]);
       if (compositeFe->getOperator() == SVGFeCompositeOperator::Arithmetic) {
         compositeIndex = i;
         break;
       }
     }
   }
-  if (compositeIndex < 2 || compositeIndex + 1 >= children.size()) {
+  if (compositeIndex < 2 || compositeIndex + 1 >= feNodes.size()) {
     return nullptr;
   }
-  if (children[compositeIndex + 1]->tag() == SVGTag::FeColorMatrix) {
+  if (feNodes[compositeIndex + 1]->tag() == SVGTag::FeColorMatrix) {
     std::shared_ptr<SVGFeGaussianBlur> blurFe;
     std::shared_ptr<SVGFeOffset> offsetFe;
 
-    if (children[compositeIndex - 2]->tag() == SVGTag::FeGaussianBlur &&
-        children[compositeIndex - 1]->tag() == SVGTag::FeOffset) {
-      blurFe = std::static_pointer_cast<SVGFeGaussianBlur>(children[compositeIndex - 2]);
-      offsetFe = std::static_pointer_cast<SVGFeOffset>(children[compositeIndex - 1]);
-    } else if (children[compositeIndex - 2]->tag() == SVGTag::FeOffset &&
-               children[compositeIndex - 1]->tag() == SVGTag::FeGaussianBlur) {
-      offsetFe = std::static_pointer_cast<SVGFeOffset>(children[compositeIndex - 2]);
-      blurFe = std::static_pointer_cast<SVGFeGaussianBlur>(children[compositeIndex - 1]);
+    if (feNodes[compositeIndex - 2]->tag() == SVGTag::FeGaussianBlur &&
+        feNodes[compositeIndex - 1]->tag() == SVGTag::FeOffset) {
+      blurFe = std::static_pointer_cast<SVGFeGaussianBlur>(feNodes[compositeIndex - 2]);
+      offsetFe = std::static_pointer_cast<SVGFeOffset>(feNodes[compositeIndex - 1]);
+    } else if (feNodes[compositeIndex - 2]->tag() == SVGTag::FeOffset &&
+               feNodes[compositeIndex - 1]->tag() == SVGTag::FeGaussianBlur) {
+      offsetFe = std::static_pointer_cast<SVGFeOffset>(feNodes[compositeIndex - 2]);
+      blurFe = std::static_pointer_cast<SVGFeGaussianBlur>(feNodes[compositeIndex - 1]);
     } else {
       return nullptr;
     }
@@ -203,12 +242,12 @@ std::shared_ptr<ImageFilter> SVGFilter::buildInnerShadowFilter(
     auto dy = offsetFe->getDy() * scale.y * context.matrix().getScaleY();
     auto blurrinessX = blurFe->getstdDeviation().X * scale.x * context.matrix().getScaleX();
     auto blurrinessY = blurFe->getstdDeviation().Y * scale.y * context.matrix().getScaleY();
-    auto colorMatrixFe = std::static_pointer_cast<SVGFeColorMatrix>(children[compositeIndex + 1]);
+    auto colorMatrixFe = std::static_pointer_cast<SVGFeColorMatrix>(feNodes[compositeIndex + 1]);
     auto colorMatrix = colorMatrixFe->getValues();
     Color color{colorMatrix[4], colorMatrix[9], colorMatrix[14], colorMatrix[18]};
 
-    if (compositeIndex + 2 < children.size() &&
-        children[compositeIndex + 2]->tag() == SVGTag::FeBlend) {
+    if (compositeIndex + 2 < feNodes.size() &&
+        feNodes[compositeIndex + 2]->tag() == SVGTag::FeBlend) {
       return ImageFilter::InnerShadow(dx, dy, blurrinessX, blurrinessY, color);
     }
     return ImageFilter::InnerShadowOnly(dx, dy, blurrinessX, blurrinessY, color);

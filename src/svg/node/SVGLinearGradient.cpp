@@ -22,6 +22,7 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Shader.h"
+#include "tgfx/core/Size.h"
 #include "tgfx/core/TileMode.h"
 
 namespace tgfx {
@@ -41,8 +42,12 @@ std::shared_ptr<Shader> SVGLinearGradient::onMakeShader(const SVGRenderContext& 
                                                         const std::vector<Color>& colors,
                                                         const std::vector<float>& positions,
                                                         TileMode /*tileMode*/,
-                                                        const Matrix& /*localMatrix*/) const {
+                                                        const Matrix& localMatrix) const {
   SVGLengthContext lengthContext = context.lengthContext();
+  if (getGradientUnits().type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
+    // Resolve bounding box coordinates in the unit square; localMatrix maps them to user space.
+    lengthContext = SVGLengthContext(Size::Make(1, 1));
+  }
   lengthContext.setBoundingBoxUnits(getGradientUnits());
 
   auto startPoint = Point::Make(lengthContext.resolve(X1, SVGLengthContext::LengthType::Horizontal),
@@ -50,7 +55,8 @@ std::shared_ptr<Shader> SVGLinearGradient::onMakeShader(const SVGRenderContext& 
   auto endPoint = Point::Make(lengthContext.resolve(X2, SVGLengthContext::LengthType::Horizontal),
                               lengthContext.resolve(Y2, SVGLengthContext::LengthType::Vertical));
 
-  return Shader::MakeLinearGradient(startPoint, endPoint, colors, positions);
+  auto shader = Shader::MakeLinearGradient(startPoint, endPoint, colors, positions);
+  return shader ? shader->makeWithMatrix(localMatrix) : nullptr;
 }
 
 }  // namespace tgfx
