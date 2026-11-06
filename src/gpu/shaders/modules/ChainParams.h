@@ -8,12 +8,15 @@
 namespace tgfx {
 
 struct ChainParams {
-  // The per-slot records of the fused interpreter (SlotPacked is an ivec4 table).
+  // The per-slot records of the fused interpreter (SlotPacked is an ivec4 table). The parameter
+  // registers are named by function, not by operator: a slot holds exactly one operator, so its
+  // whole parameter area belongs to it. The allocation table (which operator reads which register)
+  // lives in pointwise_chain_uniforms.inc; a new operator picks a free register there.
   static constexpr Param<ParamType::Int4> SlotPacked{"SlotPacked"};
-  static constexpr Param<ParamType::Float4x4> SlotColorMatrix{"SlotColorMatrix"};
-  static constexpr Param<ParamType::Float4> SlotColorVector{"SlotColorVector"};
-  static constexpr Param<ParamType::Float4> SlotLumaThresh{"SlotLumaThresh"};
-  static constexpr Param<ParamType::Float4> SlotConstColor{"SlotConstColor"};
+  static constexpr Param<ParamType::Float4x4> SlotMat{"SlotMat"};
+  static constexpr Param<ParamType::Float4> SlotVec0{"SlotVec0"};
+  static constexpr Param<ParamType::Float4> SlotVec1{"SlotVec1"};
+  static constexpr Param<ParamType::Float4> SlotVec2{"SlotVec2"};
 
   // The runtime clip channels the chain composites as its coverage input.
   static constexpr Param<ParamType::Float4> CoverageRect{"CoverageRect"};
@@ -133,10 +136,10 @@ struct ChainParams {
                                                     TiledDimension2.name, TiledStrict2.name};
 
   static constexpr ParamInfo Fields[] = {SlotPacked,
-                                         SlotColorMatrix,
-                                         SlotColorVector,
-                                         SlotLumaThresh,
-                                         SlotConstColor,
+                                         SlotMat,
+                                         SlotVec0,
+                                         SlotVec1,
+                                         SlotVec2,
                                          CoverageRect,
                                          CoverageLocalRect,
                                          CoverageLocalDeviceToLocal,

@@ -118,7 +118,7 @@ vec4 evalChainSlot(int slot) {
   if (Packed.x == OP_CONST_COLOR) {
     // The input mode occupies the selector's low bits; bits 20-24 carry the result register.
     int constMode = Packed.w & 0xF;
-    return pmApplyConstColor(SlotConstColor[slot], in0, constMode);
+    return pmApplyConstColor(SlotVec1[slot], in0, constMode);
   }
   if (Packed.x == OP_BLEND) {
     vec4 blendSrc = in0;
@@ -139,13 +139,13 @@ vec4 evalChainSlot(int slot) {
   }
   vec4 color = in0;
   if (Packed.x == OP_COLOR_MATRIX) {
-    return pmApplyColorMatrix(color, SlotColorMatrix[slot], SlotColorVector[slot]);
+    return pmApplyColorMatrix(color, SlotMat[slot], SlotVec0[slot]);
   }
   if (Packed.x == OP_LUMA) {
-    return pmApplyLuma(color, SlotLumaThresh[slot].rgb);
+    return pmApplyLuma(color, SlotVec2[slot].rgb);
   }
   if (Packed.x == OP_ALPHA_THRESHOLD) {
-    return pmApplyAlphaThreshold(color, SlotLumaThresh[slot].a);
+    return pmApplyAlphaThreshold(color, SlotVec2[slot].a);
   }
   if (Packed.x == OP_AARECT_COVERAGE) {
     // Analytic AA-rect coverage (identical math to GLSLRectEffect): falloff from the fragment's

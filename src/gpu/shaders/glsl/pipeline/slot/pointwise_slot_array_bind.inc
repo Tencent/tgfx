@@ -8,12 +8,12 @@
 // afterwards. The self-referential expansions are safe: the preprocessor does not rescan the
 // macro's own name.
 #define OpType (SlotPacked[slot].x)
-#define ColorMatrix SlotColorMatrix[slot]
-#define ColorVector SlotColorVector[slot]
-#define Kr SlotLumaThresh[slot].x
-#define Kg SlotLumaThresh[slot].y
-#define Kb SlotLumaThresh[slot].z
-#define Threshold SlotLumaThresh[slot].w
+#define ColorMatrix SlotMat[slot]
+#define ColorVector SlotVec0[slot]
+#define Kr SlotVec2[slot].x
+#define Kg SlotVec2[slot].y
+#define Kb SlotVec2[slot].z
+#define Threshold SlotVec2[slot].w
 #define CSFlags ChainCSFlags
 #define SrcTF0 ChainSrcTF0
 #define SrcTF1 ChainSrcTF1
@@ -24,7 +24,7 @@
 #define DstTF0 ChainDstTF0
 #define DstTF1 ChainDstTF1
 #define DstTFType ChainDstTFType
-#define ConstColorValue SlotConstColor[slot]
+#define ConstColorValue SlotVec1[slot]
 #define ConstInputMode (SlotPacked[slot].w & 0xFF)
 #define BlendModeValue (SlotPacked[slot].w & 0xFF)
 #define BlendConstFirst ((SlotPacked[slot].w >> 8) & 1)

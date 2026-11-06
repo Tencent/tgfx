@@ -155,27 +155,27 @@ void BindColorMatrixSlot(UniformData* uniformData, size_t index, int /*ordinal*/
   float matrixData[16];
   float vectorData[4];
   PackAOTColorMatrix(slot.colorMatrix.matrix, matrixData, vectorData);
-  uniformData->setArrayElementOptional(ChainParams::SlotColorMatrix.name, index, matrixData);
-  uniformData->setArrayElementOptional(ChainParams::SlotColorVector.name, index, vectorData);
+  uniformData->setArrayElementOptional(ChainParams::SlotMat.name, index, matrixData);
+  uniformData->setArrayElementOptional(ChainParams::SlotVec0.name, index, vectorData);
 }
 
 void BindLumaSlot(UniformData* uniformData, size_t index, int /*ordinal*/,
                   const AOTChainSlot& slot) {
   float lumaThresh[] = {slot.luma.kr, slot.luma.kg, slot.luma.kb, 0.0f};
-  uniformData->setArrayElementOptional(ChainParams::SlotLumaThresh.name, index, lumaThresh);
+  uniformData->setArrayElementOptional(ChainParams::SlotVec2.name, index, lumaThresh);
 }
 
 void BindAlphaThresholdSlot(UniformData* uniformData, size_t index, int /*ordinal*/,
                             const AOTChainSlot& slot) {
   float lumaThresh[] = {0.0f, 0.0f, 0.0f, slot.alphaThreshold.threshold};
-  uniformData->setArrayElementOptional(ChainParams::SlotLumaThresh.name, index, lumaThresh);
+  uniformData->setArrayElementOptional(ChainParams::SlotVec2.name, index, lumaThresh);
 }
 
 void BindConstColorSlot(UniformData* uniformData, size_t index, int /*ordinal*/,
                         const AOTChainSlot& slot) {
   const auto& color = slot.constColor.color;
   float colorData[] = {color[0], color[1], color[2], color[3]};
-  uniformData->setArrayElementOptional(ChainParams::SlotConstColor.name, index, colorData);
+  uniformData->setArrayElementOptional(ChainParams::SlotVec1.name, index, colorData);
 }
 
 void BindAARectCoverageSlot(UniformData* uniformData, size_t /*index*/, int ordinal,
