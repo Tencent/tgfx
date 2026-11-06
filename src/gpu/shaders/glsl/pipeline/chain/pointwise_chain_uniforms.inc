@@ -19,4 +19,4 @@
   // The per-slot parameter pool: TGFX_CHAIN_DATA_SLOT_WORDS vec4 words per slot, holding whichever
   // operator's parameters that slot carries. Each operator's layout exists only in ChainOps.h and
   // the readers come from the same declarations.
-  vec4 ChainData[CHAIN_SLOT_CAPACITY * TGFX_CHAIN_DATA_SLOT_WORDS];
+  vec4 ChainData[CHAIN_SLOT_CAPACITY * TGFX_CHAIN_DATA_SLOT_WORDS + TGFX_CHAIN_BLOCK_WORDS];

@@ -16,22 +16,26 @@ bool evalGradientSlot(ivec4 Packed, vec4 in0, out vec4 value) {
   // dual-interval scale/bias pair and the unrolled-binary tree, each byte-matching its
   // dedicated kernel. The epilogue premultiplies and modulates by the input alpha, matching
   // the runtime ClampedGradientEffect emission.
+  // The gradient's block sits in the pool's chain-wide region: one gradient per chain, so the
+  // offset is the region base plus the block's fixed slot, not a per-slot index.
+  GradientData d = chainLoadGradient(CHAIN_SLOT_CAPACITY * TGFX_CHAIN_DATA_SLOT_WORDS +
+                                     TGFX_CHAIN_BLOCK_GRADIENT);
   highp vec2 gradientCoord = SourceCoords.xy / SourceCoords.z;
-  float gradT = gradientLayoutT(GradientLayoutType, GradientBias, GradientScale, gradientCoord);
+  float gradT = gradientLayoutT(GradientLayoutType, d.bias, d.scale, gradientCoord);
   vec4 gradColor;
   if (gradT <= 0.0) {
-    gradColor = GradientLeftBorder;
+    gradColor = d.leftBorder;
   } else if (gradT >= 1.0) {
-    gradColor = GradientRightBorder;
+    gradColor = d.rightBorder;
   } else if (GradientColorizerKind == 0) {
     // Keep the same arithmetic order as GLSLSingleIntervalGradientColorizer on the JIT path.
-    gradColor = (1.0 - gradT) * GradientStart + gradT * GradientEnd;
+    gradColor = (1.0 - gradT) * d.start + gradT * d.end;
   } else if (GradientColorizerKind == 1) {
-    vec4 gradScale = GradientScale01;
-    vec4 gradBias = GradientBias01;
-    if (gradT >= GradientThreshold) {
-      gradScale = GradientScale23;
-      gradBias = GradientBias23;
+    vec4 gradScale = d.scale01;
+    vec4 gradBias = d.bias01;
+    if (gradT >= d.threshold) {
+      gradScale = d.scale23;
+      gradBias = d.bias23;
     }
     gradColor = vec4(gradT * gradScale + gradBias);
   } else if (GradientColorizerKind == 3) {
@@ -61,11 +65,10 @@ bool evalGradientSlot(ivec4 Packed, vec4 in0, out vec4 value) {
 #endif
   } else {
     gradColor = gradientColorizeUnrolled(
-        gradT, GradientThresholds1_7, GradientThresholds9_13, GradientScale0_1, GradientBias0_1,
-        GradientScale2_3, GradientBias2_3, GradientScale4_5, GradientBias4_5, GradientScale6_7,
-        GradientBias6_7, GradientScale8_9, GradientBias8_9, GradientScale10_11,
-        GradientBias10_11, GradientScale12_13, GradientBias12_13, GradientScale14_15,
-        GradientBias14_15);
+        gradT, d.thresholds1_7, d.thresholds9_13, d.scales[0], d.biases[0], d.scales[1],
+        d.biases[1], d.scales[2], d.biases[2], d.scales[3], d.biases[3], d.scales[4],
+        d.biases[4], d.scales[5], d.biases[5], d.scales[6], d.biases[6], d.scales[7],
+        d.biases[7]);
   }
   gradColor.rgb *= gradColor.a;
   value = gradColor * in0.a;

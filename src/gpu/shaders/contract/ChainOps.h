@@ -166,6 +166,7 @@ using Int32 = int32_t;
 /// The data-pool stride of one slot: the widest operator a single slot can carry.
 inline constexpr int PoolSlotWords = 7;
 
+
 #define TGFX_CHAIN_DECLARE_OP(name, dataFields, structureFields)                            \
   struct name##Data {                                                                       \
     dataFields(TGFX_CHAIN_DATA_MEMBER)                                                      \
@@ -302,6 +303,12 @@ TGFX_CHAIN_DECLARE_OP(MulAlpha, TGFX_CHAIN_EMPTY_FIELDS, TGFX_CHAIN_EMPTY_FIELDS
   T(Int32, stitchTiles)                \
   T(Int32, lutLeaf)
 TGFX_CHAIN_DECLARE_OP(PerlinNoise, TGFX_PERLIN_NOISE_DATA, TGFX_PERLIN_NOISE_STRUCTURE)
+
+/// The chain-wide block region: operators whose data exceeds the slot stride get a fixed offset
+/// here instead of a slot index. The region starts right after the slot region, so a reader takes
+/// `CHAIN_SLOT_CAPACITY * PoolSlotWords + <offset>` as its pool offset.
+inline constexpr int BlockGradientOffset = 0;
+inline constexpr int BlockWords = BlockGradientOffset + GradientDataWords;
 
 // The slot stride must hold every operator a slot can carry inside the pool region. The gradient
 // and the color-space transform are the two registered exceptions: they use chain-wide regions

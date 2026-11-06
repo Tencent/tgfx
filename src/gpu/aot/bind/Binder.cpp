@@ -118,28 +118,41 @@ void UploadSlotData(UniformData* uniformData, size_t index, const Data& data,
   }
 }
 
-// Writes the extended chain's gradient parameter block.
-void UploadGradientParams(UniformData* uniformData, const AOTGradientParameters& params) {
+ChainISA::Float4 ToFloat4(const std::array<float, 4>& values) {
+  return {values[0], values[1], values[2], values[3]};
+}
+
+// Writes the chain's gradient parameter block into the pool's chain-wide region. The three
+// selectors stay runtime uniforms until the structural fields move to specialization constants.
+void UploadGradientParams(UniformData* uniformData, size_t blockBase,
+                          const AOTGradientParameters& params) {
   uniformData->setDataOptional(ChainParams::GradientLayoutType.name, params.layoutType);
-  uniformData->setDataOptional(ChainParams::GradientBias.name, params.bias);
-  uniformData->setDataOptional(ChainParams::GradientScale.name, params.scale);
   uniformData->setDataOptional(ChainParams::GradientColorizerKind.name, params.colorizerKind);
-  uniformData->setDataOptional(ChainParams::GradientLeftBorder.name, params.leftBorder);
-  uniformData->setDataOptional(ChainParams::GradientRightBorder.name, params.rightBorder);
-  uniformData->setDataOptional(ChainParams::GradientStart.name, params.start);
-  uniformData->setDataOptional(ChainParams::GradientEnd.name, params.end);
-  uniformData->setDataOptional(ChainParams::GradientScale01.name, params.scale01);
-  uniformData->setDataOptional(ChainParams::GradientBias01.name, params.bias01);
-  uniformData->setDataOptional(ChainParams::GradientScale23.name, params.scale23);
-  uniformData->setDataOptional(ChainParams::GradientBias23.name, params.bias23);
-  uniformData->setDataOptional(ChainParams::GradientThreshold.name, params.threshold);
   uniformData->setDataOptional(ChainParams::GradientIntervalCount.name, params.intervalCount);
-  uniformData->setDataOptional(ChainParams::GradientThresholds1_7.name, params.thresholds1_7);
-  uniformData->setDataOptional(ChainParams::GradientThresholds9_13.name, params.thresholds9_13);
+  ChainISA::GradientData data = {};
+  data.leftBorder = ToFloat4(params.leftBorder);
+  data.rightBorder = ToFloat4(params.rightBorder);
+  data.start = ToFloat4(params.start);
+  data.end = ToFloat4(params.end);
+  data.scale01 = ToFloat4(params.scale01);
+  data.bias01 = ToFloat4(params.bias01);
+  data.scale23 = ToFloat4(params.scale23);
+  data.bias23 = ToFloat4(params.bias23);
+  data.threshold = params.threshold;
+  data.bias = params.bias;
+  data.scale = params.scale;
+  data.thresholds1_7 = ToFloat4(params.thresholds1_7);
+  data.thresholds9_13 = ToFloat4(params.thresholds9_13);
   for (size_t index = 0; index < 8; ++index) {
-    const auto& pair = ChainParams::GradientPairs[index];
-    uniformData->setDataOptional(pair.scale, params.scales[index]);
-    uniformData->setDataOptional(pair.bias, params.biases[index]);
+    data.scales.v[index] = ToFloat4(params.scales[index]);
+    data.biases.v[index] = ToFloat4(params.biases[index]);
+  }
+  float words[ChainISA::GradientDataWords * 4] = {};
+  ChainISA::PackGradient(data, words);
+  for (size_t word = 0; word < static_cast<size_t>(ChainISA::GradientDataWords); ++word) {
+    const std::array<float, 4> word4 = {words[word * 4], words[word * 4 + 1], words[word * 4 + 2],
+                                        words[word * 4 + 3]};
+    uniformData->setArrayElementOptional(ChainParams::ChainData.name, blockBase + word, word4);
   }
 }
 
@@ -407,7 +420,10 @@ void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
   // CoordTransformMatrix_0 instead.
   for (size_t index = 0; index < slotCount; ++index) {
     if (slots[index].op == AOTChainOp::Gradient) {
-      UploadGradientParams(fragmentUniformData, slots[index].gradient);
+      const size_t blockBase =
+          GetAOTResourceCapacity(program.profile)->instructions * ChainISA::PoolSlotWords +
+          ChainISA::BlockGradientOffset;
+      UploadGradientParams(fragmentUniformData, blockBase, slots[index].gradient);
       break;
     }
     if (slots[index].op == AOTChainOp::PerlinNoise) {

@@ -75,7 +75,9 @@ inline std::vector<std::string> SlotCapacityDefines() {
   return {"TGFX_CHAIN_SLOT_CAPACITY=" + std::to_string(ChainResourceCapacity.instructions),
           "TGFX_NOISE_SLOT_CAPACITY=" + std::to_string(NoiseGraphResourceCapacity.instructions),
           "TGFX_TAIL_SLOT_CAPACITY=" + std::to_string(MaxPointwiseSlots),
-          "TGFX_CHAIN_DATA_SLOT_WORDS=" + std::to_string(ChainISA::PoolSlotWords)};
+          "TGFX_CHAIN_DATA_SLOT_WORDS=" + std::to_string(ChainISA::PoolSlotWords),
+          "TGFX_CHAIN_BLOCK_WORDS=" + std::to_string(ChainISA::BlockWords),
+          "TGFX_CHAIN_BLOCK_GRADIENT=" + std::to_string(ChainISA::BlockGradientOffset)};
 }
 
 inline const AOTResourceCapacity* GetAOTResourceCapacity(AOTResourceProfile profile) {

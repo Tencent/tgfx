@@ -58,54 +58,10 @@ struct ChainParams {
 
   // The gradient resource kind's parameter block.
   static constexpr Param<ParamType::Int> GradientLayoutType{"GradientLayoutType"};
-  static constexpr Param<ParamType::Float> GradientBias{"GradientBias"};
-  static constexpr Param<ParamType::Float> GradientScale{"GradientScale"};
   static constexpr Param<ParamType::Int> GradientColorizerKind{"GradientColorizerKind"};
-  static constexpr Param<ParamType::Float4> GradientLeftBorder{"GradientLeftBorder"};
-  static constexpr Param<ParamType::Float4> GradientRightBorder{"GradientRightBorder"};
-  static constexpr Param<ParamType::Float4> GradientStart{"GradientStart"};
-  static constexpr Param<ParamType::Float4> GradientEnd{"GradientEnd"};
-  static constexpr Param<ParamType::Float4> GradientScale01{"GradientScale01"};
-  static constexpr Param<ParamType::Float4> GradientBias01{"GradientBias01"};
-  static constexpr Param<ParamType::Float4> GradientScale23{"GradientScale23"};
-  static constexpr Param<ParamType::Float4> GradientBias23{"GradientBias23"};
-  static constexpr Param<ParamType::Float> GradientThreshold{"GradientThreshold"};
   static constexpr Param<ParamType::Int> GradientIntervalCount{"GradientIntervalCount"};
-  static constexpr Param<ParamType::Float4> GradientThresholds1_7{"GradientThresholds1_7"};
-  static constexpr Param<ParamType::Float4> GradientThresholds9_13{"GradientThresholds9_13"};
 
   // The unrolled colorizer's per-interval parameter pairs (vec4 scale and bias each).
-  static constexpr Param<ParamType::Float4> GradientScale0_1{"GradientScale0_1"};
-  static constexpr Param<ParamType::Float4> GradientBias0_1{"GradientBias0_1"};
-  static constexpr Param<ParamType::Float4> GradientScale2_3{"GradientScale2_3"};
-  static constexpr Param<ParamType::Float4> GradientBias2_3{"GradientBias2_3"};
-  static constexpr Param<ParamType::Float4> GradientScale4_5{"GradientScale4_5"};
-  static constexpr Param<ParamType::Float4> GradientBias4_5{"GradientBias4_5"};
-  static constexpr Param<ParamType::Float4> GradientScale6_7{"GradientScale6_7"};
-  static constexpr Param<ParamType::Float4> GradientBias6_7{"GradientBias6_7"};
-  static constexpr Param<ParamType::Float4> GradientScale8_9{"GradientScale8_9"};
-  static constexpr Param<ParamType::Float4> GradientBias8_9{"GradientBias8_9"};
-  static constexpr Param<ParamType::Float4> GradientScale10_11{"GradientScale10_11"};
-  static constexpr Param<ParamType::Float4> GradientBias10_11{"GradientBias10_11"};
-  static constexpr Param<ParamType::Float4> GradientScale12_13{"GradientScale12_13"};
-  static constexpr Param<ParamType::Float4> GradientBias12_13{"GradientBias12_13"};
-  static constexpr Param<ParamType::Float4> GradientScale14_15{"GradientScale14_15"};
-  static constexpr Param<ParamType::Float4> GradientBias14_15{"GradientBias14_15"};
-
-  // The name pair table the per-slot gradient upload walks.
-  struct GradientPairNames {
-    const char* scale;
-    const char* bias;
-  };
-  static constexpr GradientPairNames GradientPairs[8] = {
-      {GradientScale0_1.name, GradientBias0_1.name},
-      {GradientScale2_3.name, GradientBias2_3.name},
-      {GradientScale4_5.name, GradientBias4_5.name},
-      {GradientScale6_7.name, GradientBias6_7.name},
-      {GradientScale8_9.name, GradientBias8_9.name},
-      {GradientScale10_11.name, GradientBias10_11.name},
-      {GradientScale12_13.name, GradientBias12_13.name},
-      {GradientScale14_15.name, GradientBias14_15.name}};
 
   // One tiled recipe's field names, for the suffix-form upload walk.
   struct TiledRecipeNames {
@@ -156,37 +112,8 @@ struct ChainParams {
                                          NoiseFrequencyStitch,
                                          NoiseModeOctaves,
                                          GradientLayoutType,
-                                         GradientBias,
-                                         GradientScale,
                                          GradientColorizerKind,
-                                         GradientLeftBorder,
-                                         GradientRightBorder,
-                                         GradientStart,
-                                         GradientEnd,
-                                         GradientScale01,
-                                         GradientBias01,
-                                         GradientScale23,
-                                         GradientBias23,
-                                         GradientThreshold,
-                                         GradientIntervalCount,
-                                         GradientThresholds1_7,
-                                         GradientThresholds9_13,
-                                         GradientScale0_1,
-                                         GradientBias0_1,
-                                         GradientScale2_3,
-                                         GradientBias2_3,
-                                         GradientScale4_5,
-                                         GradientBias4_5,
-                                         GradientScale6_7,
-                                         GradientBias6_7,
-                                         GradientScale8_9,
-                                         GradientBias8_9,
-                                         GradientScale10_11,
-                                         GradientBias10_11,
-                                         GradientScale12_13,
-                                         GradientBias12_13,
-                                         GradientScale14_15,
-                                         GradientBias14_15};
+                                         GradientIntervalCount};
 };
 
 }  // namespace tgfx
