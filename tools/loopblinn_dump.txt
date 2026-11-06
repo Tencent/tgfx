@@ -1,0 +1,9 @@
+=== at 43469848 len 349 ===
+layout(std140)uniform UniformBlock{mat3 vertexTransform;int texHeight;float scale;float dummyPadding0;float dummyPadding1;};uniform sampler2D texture0;in vec2 _coord2;out vec4 fig_FragColor;void main(){vec2 a=_coord2-0.5;float b=length(a)-0.5;b/=float(texHeight)*length(vec2(dFdx(b),dFdy(b)));fig_FragColor=texture(texture0,vec2(0.5,b*scale+0.5));}
+
+=== at 43470115 len 267 ===
+uniform int texHeight;uniform float scale;uniform sampler2D texture0;in vec2 _coord2;out vec4 fig_FragColor;void main(){vec2 a=_coord2-0.5;float b=length(a)-0.5;b/=float(texHeight)*length(vec2(dFdx(b),dFdy(b)));fig_FragColor=texture(texture0,vec2(0.5,b*scale+0.5));}
+
+=== at 43470410 len 296 ===
+#extension GL_OES_standard_derivatives:enable
+uniform int texHeight;uniform float scale;uniform sampler2D texture0;varying vec2 _coord2;void main(){vec2 a=_coord2-0.5;float b=length(a)-0.5;b/=float(texHeight)*length(vec2(dFdx(b),dFdy(b)));gl_FragColor=texture2D(texture0,vec2(0.5,b*scale+0.5));}

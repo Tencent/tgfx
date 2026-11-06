@@ -19,6 +19,7 @@
 #include "OpsCompositor.h"
 #include "core/MeshBase.h"
 #include "core/PathRef.h"
+#include "core/RRectUtils.h"
 #include "core/VertexMesh.h"
 #include "core/utils/ColorHelper.h"
 #include "core/utils/ColorSpaceHelper.h"
@@ -132,6 +133,21 @@ static bool ComplexMismatch(const RRect& newRRect,
   return newRRect.isComplex() != pending.front()->rRect.isComplex();
 }
 
+// Plain and smooth RRects use different GPs. Smoothness values do not affect batching because
+// smoothness is stored per record in the vertex data.
+static bool SmoothLayoutMismatch(const RRect& newRRect,
+                                 const std::vector<PlacementPtr<RRectRecord>>& pending) {
+  if (pending.empty()) {
+    return false;
+  }
+  const auto& first = pending.front()->rRect;
+  const auto smoothness = newRRect.smoothness() > 0.0f;
+  if (smoothness != (first.smoothness() > 0.0f)) {
+    return true;
+  }
+  return false;
+}
+
 void OpsCompositor::fillRect(const Rect& rect, const Matrix& matrix, const ClipStack& clip,
                              const Brush& brush, const Stroke* stroke) {
   DEBUG_ASSERT(!rect.isEmpty());
@@ -154,7 +170,8 @@ void OpsCompositor::drawRRect(const RRect& rRect, const Matrix& matrix, const Cl
   // Complex and non-Complex RRects use different GPs and vertex layouts, so they cannot be
   // batched into the same op; flush if the incoming RRect's complexity disagrees with pending.
   if (!canAppend(PendingOpType::RRect, clip, rectBrush) ||
-      ShouldFlushRectOps(pendingStrokes, stroke) || ComplexMismatch(rRect, pendingRRects)) {
+      ShouldFlushRectOps(pendingStrokes, stroke) || ComplexMismatch(rRect, pendingRRects) ||
+      SmoothLayoutMismatch(rRect, pendingRRects)) {
     flushPendingOps(PendingOpType::RRect, clip, rectBrush);
   }
   auto record = drawingAllocator()->make<RRectRecord>(rRect, matrix, rectBrush.color);

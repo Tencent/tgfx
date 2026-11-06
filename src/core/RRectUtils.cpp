@@ -163,6 +163,11 @@ static bool RadiiOverflow(const Rect& rect, const std::array<Point, 4>& radii) {
 }
 
 std::optional<RRect> RRectUtils::ConservativeIntersect(const RRect& a, const RRect& b) {
+  // The corner analysis assumes each corner is a single ellipse arc, which a smoothed corner
+  // violates; refuse to merge rather than produce a non-conservative intersection.
+  if (a.smoothness() > 0.0f || b.smoothness() > 0.0f) {
+    return std::nullopt;
+  }
   Rect intersection = a.rect();
   if (!intersection.intersect(b.rect())) {
     // Bounding rects do not overlap; return an explicit empty RRect.
@@ -191,6 +196,11 @@ std::optional<RRect> RRectUtils::ConservativeIntersect(const RRect& a, const RRe
 }
 
 bool RRectUtils::ContainsPoint(const RRect& rRect, const Point& point) {
+  // IsInnerToCorners hardcodes the ellipse equation, which a smoothed corner's transition curves
+  // violate, so the analytic answer would not be conservative.
+  if (rRect.smoothness() > 0.0f) {
+    return false;
+  }
   return rRect.rect().contains(point.x, point.y) && IsInnerToCorners(rRect, point);
 }
 
@@ -208,10 +218,12 @@ Rect RRectUtils::InnerBounds(const RRect& rr) {
 
   auto innerBounds = rr.rect();
   const auto& r = rr.radii();
-  const auto leftShift = std::max(r[0].x, r[3].x);
-  const auto topShift = std::max(r[0].y, r[1].y);
-  const auto rightShift = std::max(r[1].x, r[2].x);
-  const auto bottomShift = std::max(r[3].y, r[2].y);
+  // Smoothed corners occupy (1 + smoothness) * radius along each edge.
+  const auto rScale = 1.0f + rr.smoothness();
+  const auto leftShift = std::max(r[0].x, r[3].x) * rScale;
+  const auto topShift = std::max(r[0].y, r[1].y) * rScale;
+  const auto rightShift = std::max(r[1].x, r[2].x) * rScale;
+  const auto bottomShift = std::max(r[3].y, r[2].y) * rScale;
   const auto dw = leftShift + rightShift;
   const auto dh = topShift + bottomShift;
   const auto horizArea = (innerBounds.width() - dw) * innerBounds.height();
@@ -220,8 +232,11 @@ Rect RRectUtils::InnerBounds(const RRect& rr) {
   // sqrt(2)/2 * (rX, rY). Scale all corner shifts by (1 - sqrt(2)/2) to get the safe inset.
   // Add a small epsilon so the shifted corners stay safely inside the curves.
   static constexpr float diagInsetScale = (1.0f - 0.70710678118f) + 1e-5f;
-  const auto innerArea =
-      (innerBounds.width() - diagInsetScale * dw) * (innerBounds.height() - diagInsetScale * dh);
+  // The diagonal inset is derived from the circular arc; a smoothed corner's transition curves
+  // have no closed-form diagonal inset, so only the edge strips are available there.
+  const auto innerArea = rr.smoothness() == 0.0f ? (innerBounds.width() - diagInsetScale * dw) *
+                                                       (innerBounds.height() - diagInsetScale * dh)
+                                                 : 0.0f;
 
   if (horizArea > vertArea && horizArea > innerArea) {
     innerBounds.left += leftShift;
@@ -235,9 +250,11 @@ Rect RRectUtils::InnerBounds(const RRect& rr) {
     innerBounds.top += diagInsetScale * topShift;
     innerBounds.bottom -= diagInsetScale * bottomShift;
   } else {
-    // Unreachable for a valid RRect: ScaleRadii keeps each side's adjacent radii within the side
-    // length, so the diagonal inset area stays positive. Guard against a broken invariant.
-    DEBUG_ASSERT(false);
+    // Unreachable for a valid RRect without smoothness: ScaleRadii keeps each side's adjacent
+    // radii within the side length, so the diagonal inset area stays positive. With smoothness
+    // the diagonal inset is skipped, so widened footprints can legitimately consume the whole
+    // rect. Guard against a broken invariant.
+    DEBUG_ASSERT(rr.smoothness() > 0.0f);
     return Rect::MakeEmpty();
   }
 
@@ -327,8 +344,19 @@ std::optional<RRect> RRectUtils::TryAxisAlignedTransform(const RRect& src, const
   }
 
   RRect dst = {};
-  dst.setRectRadii(newRect, radii);
+  // The smoothness constraint (1 + s) * (radiusA + radiusB) <= edgeLength scales per axis along
+  // with the radii and edge lengths, so the resolved value carries over unchanged.
+  dst.setRectRadii(newRect, radii, src.smoothness());
   return dst;
+}
+
+bool RRectUtils::HasEllipticalCorner(const RRect& rRect) {
+  for (const auto& corner : rRect.radii()) {
+    if (corner.x > 0.0f && corner.x != corner.y) {
+      return true;
+    }
+  }
+  return false;
 }
 
 }  // namespace tgfx

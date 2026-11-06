@@ -23,7 +23,8 @@
 
 namespace tgfx {
 /**
- * RRect describes a rounded rectangle defined by a bounding rect and per-corner radii.
+ * RRect describes a rounded rectangle defined by a bounding rect, per-corner radii, and a corner
+ * smoothness shared by all four corners.
  */
 class RRect {
  public:
@@ -39,18 +40,19 @@ class RRect {
   /**
    * Returns an RRect with the same radii for all four corners. See setRectXY() for details.
    */
-  static RRect MakeRectXY(const Rect& rect, float radiusX, float radiusY) {
+  static RRect MakeRectXY(const Rect& rect, float radiusX, float radiusY, float smoothness = 0.0f) {
     RRect rr = {};
-    rr.setRectXY(rect, radiusX, radiusY);
+    rr.setRectXY(rect, radiusX, radiusY, smoothness);
     return rr;
   }
 
   /**
    * Returns an RRect with per-corner radii. See setRectRadii() for details.
    */
-  static RRect MakeRectRadii(const Rect& rect, const std::array<Point, 4>& radii) {
+  static RRect MakeRectRadii(const Rect& rect, const std::array<Point, 4>& radii,
+                             float smoothness = 0.0f) {
     RRect rr = {};
-    rr.setRectRadii(rect, radii);
+    rr.setRectRadii(rect, radii, smoothness);
     return rr;
   }
 
@@ -113,17 +115,22 @@ class RRect {
    * @param rect  bounds of rounded rectangle
    * @param radiusX  x-axis radius of corners
    * @param radiusY  y-axis radius of corners
+   * @param smoothness  corner smoothness applied uniformly to all corners
    */
-  void setRectXY(const Rect& rect, float radiusX, float radiusY);
+  void setRectXY(const Rect& rect, float radiusX, float radiusY, float smoothness = 0.0f);
 
   /**
    * Sets to rounded rectangle with per-corner radii. If either component of a corner radius is
-   * negative, that entire corner is forced to (0, 0) (producing a sharp corner). The remaining
-   * radii are then scaled down proportionally if adjacent corners would overlap along any edge.
+   * negative, that entire corner is forced to (0, 0) (producing a sharp corner). When an edge is
+   * too short to fit the smoothed corners at both of its ends, the smoothness is reduced first;
+   * the radii are then scaled down proportionally only if the corners still overlap at zero
+   * smoothness.
    * @param rect  bounds of rounded rectangle
    * @param radii  per-corner radii in the order [top-left, top-right, bottom-right, bottom-left]
+   * @param smoothness  corner smoothness in [0, 1]. A value of 0 produces circular corner arcs;
+   * larger values blend each arc into the adjacent edges over a longer span.
    */
-  void setRectRadii(const Rect& rect, const std::array<Point, 4>& radii);
+  void setRectRadii(const Rect& rect, const std::array<Point, 4>& radii, float smoothness = 0.0f);
 
   /**
    * Sets bounds to oval, x-axis radii to half oval.width(), and all y-axis radii to half
@@ -161,14 +168,24 @@ class RRect {
   }
 
   /**
-   * Compares a and b; returns true if they have the same bounding rect and corner radii.
+   * Returns the corner smoothness in [0, 1], after reduction by edge competition. It is always 0
+   * when the type is Rect or Oval.
    */
-  friend bool operator==(const RRect& a, const RRect& b) {
-    return a._rect == b._rect && a._radii == b._radii;
+  float smoothness() const {
+    return _smoothness;
   }
 
   /**
-   * Compares a and b; returns true if they differ in bounding rect or any corner radius.
+   * Compares a and b; returns true if they have the same bounding rect, corner radii, and corner
+   * smoothness.
+   */
+  friend bool operator==(const RRect& a, const RRect& b) {
+    return a._rect == b._rect && a._radii == b._radii && a._smoothness == b._smoothness;
+  }
+
+  /**
+   * Compares a and b; returns true if they differ in bounding rect, any corner radius, or corner
+   * smoothness.
    */
   friend bool operator!=(const RRect& a, const RRect& b) {
     return !(a == b);
@@ -177,6 +194,8 @@ class RRect {
  private:
   Rect _rect = {};
   std::array<Point, 4> _radii = {};
+  // The resolved smoothness after edge competition, not the authored input.
+  float _smoothness = 0.0f;
   Type _type = Type::Rect;
 };
 }  // namespace tgfx

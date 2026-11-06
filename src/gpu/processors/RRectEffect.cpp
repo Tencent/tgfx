@@ -20,13 +20,17 @@
 
 namespace tgfx {
 
-// Only needTransform is keyed. The transform path adds a per-fragment matrix multiply, so a
-// dedicated program that skips this for the identity case is worth the extra program. The AA branch
-// adds only a bounded amount of work that does not grow with the input, so keeping antiAlias a
-// runtime uniform and sharing one program across AA and non-AA draws is a better trade-off than
-// doubling the program count.
+// The transform path adds a per-fragment matrix multiply, so a dedicated program that skips this
+// for the identity case is worth the extra program. The AA branch adds only a bounded amount of
+// work that does not grow with the input, so keeping antiAlias a runtime uniform and sharing one
+// program across AA and non-AA draws is a better trade-off than doubling the program count.
 void RRectEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
-  bytesKey->write(static_cast<uint32_t>(_needTransform ? 1 : 0));
+  // Both flags change the generated shader code, so they must take part in the key. The smoothness
+  // value itself stays a uniform and is deliberately left out, otherwise every distinct value would
+  // produce its own program.
+  uint32_t key = _needTransform ? 1 : 0;
+  key |= _hasSmoothness ? 2 : 0;
+  bytesKey->write(key);
 }
 
 }  // namespace tgfx

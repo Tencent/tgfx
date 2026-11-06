@@ -1,0 +1,155 @@
+uniform int colorConversionType;
+vec3 a(vec3 b){vec3 c;
+for(int d=0;
+d<3;
+d++){float e=b[d];
+float sign=e<0.0?-1.0:1.0;
+float f=abs(e);
+if(f<0.04045){c[d]=e/12.92;
+}
+else{c[d]=sign*pow((f+0.055)/1.055,2.4);
+}
+}
+return c;
+}
+vec3 g(vec3 b){vec3 c;
+for(int d=0;
+d<3;
+d++){float e=b[d];
+float sign=e<0.0?-1.0:1.0;
+float f=abs(e);
+if(f>0.0031308){c[d]=sign*(1.055*pow(f,1.0/2.4)-0.055);
+}
+else{c[d]=12.92*e;
+}
+}
+return c;
+}
+vec3 h(vec3 b){const float i=0.17883277;
+const float j=0.28466892;
+const float k=0.55991073;
+vec3 c;
+for(int d=0;
+d<3;
+d++){float e=b[d];
+if(e<=0.5){c[d]=(e*e)/3.0;
+}
+else{c[d]=(exp((e-k)/i)+j)/12.0;
+}
+}
+return c;
+}
+vec3 l(vec3 m){const float n=1.2;
+float o=dot(m,vec3(0.2627,0.6780,0.0593));
+float p=pow(max(o,0.0),n-1.0);
+return m*p;
+}
+vec3 q(vec3 b){const float r=0.1593017578125;
+const float s=78.84375;
+const float t=0.8359375;
+const float u=18.8515625;
+const float v=18.6875;
+vec3 c;
+for(int d=0;
+d<3;
+d++){float e=pow(max(b[d],0.0),1.0/s);
+float w=max(e-t,0.0);
+float x=u-v*e;
+c[d]=pow(w/max(x,1e-6),1.0/r);
+}
+return c;
+}
+vec3 y(vec3 z){const float aa=0.6;
+vec3 c;
+for(int d=0;
+d<3;
+d++){c[d]=pow(max(z[d],0.0),aa);
+}
+return c;
+}
+const mat3 ab=mat3(0.6369580483012914,0.26270021201126703,0.0,0.14461690358620838,0.6779980715188644,0.028072693049087428,0.16888097516417208,0.05930171646986854,1.0609850577107909);
+vec3 ac(vec3 ad){const int ae=0;
+const int af=1;
+const int ag=2;
+const int ah=3;
+const int ai=4;
+const int aj=5;
+const int ak=6;
+if(colorConversionType==ae){return ad;
+}
+else if(colorConversionType==ah){vec3 m=h(ad);
+vec3 al=l(m);
+mat3 am=mat3(3.2409699419045213,-0.9692436362808798,0.05563007969699361,-1.5373831775700935,1.8759675015077206,-0.20397695888897657,-0.4986107602930033,0.04155505740717561,1.0569715142428786);
+vec3 an=am*ab*al;
+return g(clamp(an,0.0,1.0));
+}
+else if(colorConversionType==ai){vec3 m=h(ad);
+vec3 al=l(m);
+mat3 ao=mat3(2.4934969119414245,-0.829488969561575,0.035845830243784335,-0.9313836179191236,1.7626640603183468,-0.07617238926804171,-0.40271078445071684,0.02362468584194359,0.9568845240076873);
+vec3 ap=ao*ab*al;
+return g(clamp(ap,0.0,1.0));
+}
+else if(colorConversionType==aj){vec3 z=q(ad);
+vec3 aq=y(z);
+mat3 am=mat3(3.2409699419045213,-0.9692436362808798,0.05563007969699361,-1.5373831775700935,1.8759675015077206,-0.20397695888897657,-0.4986107602930033,0.04155505740717561,1.0569715142428786);
+vec3 an=am*ab*aq;
+return g(clamp(an,0.0,1.0));
+}
+else if(colorConversionType==ak){vec3 z=q(ad);
+vec3 aq=y(z);
+mat3 ao=mat3(2.4934969119414245,-0.829488969561575,0.035845830243784335,-0.9313836179191236,1.7626640603183468,-0.07617238926804171,-0.40271078445071684,0.02362468584194359,0.9568845240076873);
+vec3 ap=ao*ab*aq;
+return g(clamp(ap,0.0,1.0));
+}
+else if(colorConversionType==af){vec3 an=a(ad);
+mat3 ar=mat3(0.4123907992659595,0.21263900587151036,0.01933081871559185,0.35758433938387796,0.7151686787677559,0.11919477979462599,0.1804807884018343,0.07219231536073371,0.9505321522496606);
+mat3 ao=mat3(2.4934969119414245,-0.829488969561575,0.035845830243784335,-0.9313836179191236,1.7626640603183468,-0.07617238926804171,-0.40271078445071684,0.02362468584194359,0.9568845240076873);
+vec3 ap=ao*ar*an;
+vec3 as=g(ap);
+return as;
+}
+else if(colorConversionType==ag){vec3 ap=a(ad);
+mat3 at=mat3(0.48657094864821626,0.22897456406974884,0,0.26566769316909294,0.6917385218365062,0.045113381858902575,0.1982172852343625,0.079286914093745,1.0439443689009757);
+mat3 am=mat3(3.2409699419045213,-0.9692436362808798,0.05563007969699361,-1.5373831775700935,1.8759675015077206,-0.20397695888897657,-0.4986107602930033,0.04155505740717561,1.0569715142428786);
+vec3 an=am*at*ap;
+vec3 au=g(an);
+vec3 av=clamp(au,0.0,1.0);
+return av;
+}
+return ad;
+}
+uniform int emulateWrapAddress;
+uniform sampler2D texture0;
+varying vec2 _coord2;
+vec4 aw(){if(bool(emulateWrapAddress)){return texture2D(texture0,fract(_coord2));
+}
+else{vec4 e=texture2D(texture0,_coord2);
+if(_coord2==clamp(_coord2,0.0,1.0)){return e;
+}
+else{return vec4(0.0);
+}
+}
+}
+uniform float alpha;
+bool ax(vec2 ay,vec2 az,float ba){vec2 bb=abs(ay*az-az/2.0)-(az/2.0)+ba;
+return min(max(bb.x,bb.y),0.0)+length(max(bb,0.0))<=ba;
+}
+uniform int uShapeType;
+uniform float cornerRadius;
+uniform vec2 rectSize;
+varying vec2 _vertexCoord2;
+const int bc=1;
+const int bd=2;
+void be(){if(uShapeType==bc){if(!ax(_vertexCoord2,rectSize,cornerRadius)){discard;
+}
+}
+else if(uShapeType==bd){vec2 bf=vec2(0.5,0.5)-_vertexCoord2;
+if((bf.x*bf.x)/(0.5*0.5)+(bf.y*bf.y)/(0.5*0.5)>1.0){discard;
+}
+}
+}
+void main(){be();
+vec4 b=aw();
+b.rgb=ac(b.rgb)*b.a;
+gl_FragColor=b*alpha;
+}

@@ -17,9 +17,60 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSLRRectEffect.h"
+#include "core/SmoothCornerCoeffs.h"
 #include "core/utils/Log.h"
+#include "gpu/ShaderBuilder.h"
+#include "gpu/glsl/GLSLSmoothCorner.h"
 
 namespace tgfx {
+
+static std::string EmitSmoothCornerDistFunction(ShaderBuilder* builder) {
+  const auto bezierDistName = EmitNewtonCubicBezierDistFunction(builder, 2, false);
+
+  // Signed distance to the smoothed circular corner, negative inside.
+  //   q           the point in the corner frame, with the vertex at the origin and the interior
+  //               in the first quadrant
+  //   radius      the corner radius
+  //   coeffs      the per-unit-radius transition coefficients (footprint, step, arcOffsetX,
+  //               arcOffsetY)
+  //   smoothness  the corner smoothness
+  //   return      the signed distance
+  const auto cornerDistName = builder->getMangledFunctionName("smoothCornerDist");
+  // clang-format off
+  builder->addFunction(R"(
+highp float )" + cornerDistName + R"((highp vec2 q, highp float radius, highp vec4 coeffs,
+                                      highp float smoothness) {
+  highp float clampedSmoothness = clamp(smoothness, 0.0, 1.0);
+  highp float turnAngle = 3.14159265359 * 0.25 * clampedSmoothness;
+  highp float turnSin = sin(turnAngle);
+  highp float turnCos = cos(turnAngle);
+  highp float footprint = coeffs.x * radius;
+  highp float step = coeffs.y * radius;
+  highp float ctrl2 = footprint - 3.0 * step;
+  highp vec2 ps = vec2(ctrl2 - coeffs.z * radius, coeffs.w * radius);
+  highp vec2 pe = ps.yx;
+  highp float fs = turnCos * (q.x - ps.x) - turnSin * (q.y - ps.y);
+  highp float fe = turnSin * (q.x - pe.x) - turnCos * (q.y - pe.y);
+  if (fs > 0.0) {
+    if (fe > 0.0) {
+      return )" + bezierDistName + R"((q, vec2(footprint, 0.0),
+                                       vec2(footprint - 2.0 * step, 0.0), vec2(ctrl2, 0.0), ps);
+    }
+    return min(length(q - ps), length(q - pe));
+  }
+  if (fe > 0.0) {
+    // The join-point normals pass through the arc center, so the radial projection of a fragment
+    // in this sector always lands within the retained sweep and the exact circle distance applies.
+    highp vec2 arcDir = q - vec2(radius);
+    return length(arcDir) - radius;
+  }
+  return )" + bezierDistName + R"((q, pe, vec2(0.0, ctrl2),
+                                   vec2(0.0, footprint - 2.0 * step), vec2(0.0, footprint));
+}
+)");
+  // clang-format on
+  return cornerDistName;
+}
 
 PlacementPtr<RRectEffect> RRectEffect::Make(BlockAllocator* allocator, const RRect& rRect,
                                             const Matrix& matrix, bool antiAlias) {
@@ -38,6 +89,12 @@ PlacementPtr<RRectEffect> RRectEffect::Make(BlockAllocator* allocator, const RRe
     if (scales.x == 0 || scales.y == 0) {
       return nullptr;
     }
+    // Unequal axis scales would bake into the radii and turn circular smoothed corners into
+    // elliptical ones, which the analytic shader cannot evaluate; the caller falls back to the
+    // CPU path.
+    if (rRect.smoothness() > 0.0f && scales.x != scales.y) {
+      return nullptr;
+    }
     // Bake axisScales into the rrect so the shader's local-space distance comparison
     // matches device-space half-pixel AA semantics.
     adjustedRRect.scale(scales.x, scales.y);
@@ -47,13 +104,21 @@ PlacementPtr<RRectEffect> RRectEffect::Make(BlockAllocator* allocator, const RRe
       return nullptr;
     }
   }
+  if (rRect.smoothness() > 0.0f) {
+    // Analytic smoothed corners are only defined for circular corners.
+    for (const auto& corner : adjustedRRect.radii()) {
+      if (corner.x > 0.0f && corner.x != corner.y) {
+        return nullptr;
+      }
+    }
+  }
   return allocator->make<GLSLRRectEffect>(adjustedRRect.rect(), adjustedRRect.radii(),
-                                          deviceToLocal, antiAlias);
+                                          adjustedRRect.smoothness(), deviceToLocal, antiAlias);
 }
 
 GLSLRRectEffect::GLSLRRectEffect(const Rect& localRect, const std::array<Point, 4>& radii,
-                                 const Matrix& deviceToLocal, bool antiAlias)
-    : RRectEffect(localRect, radii, deviceToLocal, antiAlias) {
+                                 float smoothness, const Matrix& deviceToLocal, bool antiAlias)
+    : RRectEffect(localRect, radii, smoothness, deviceToLocal, antiAlias) {
 }
 
 void GLSLRRectEffect::emitCode(EmitArgs& args) const {
@@ -68,6 +133,16 @@ void GLSLRRectEffect::emitCode(EmitArgs& args) const {
       uniformHandler->addUniform("RadiiY", UniformFormat::Float4, ShaderStage::Fragment);
   const auto antiAliasName =
       uniformHandler->addUniform("AntiAlias", UniformFormat::Float, ShaderStage::Fragment);
+  std::string curveCoeffsName = {};
+  std::string smoothnessName = {};
+  std::string smoothCornerDistName = {};
+  if (hasSmoothness()) {
+    curveCoeffsName =
+        uniformHandler->addUniform("CurveCoeffs", UniformFormat::Float4, ShaderStage::Fragment);
+    smoothnessName =
+        uniformHandler->addUniform("Smoothness", UniformFormat::Float, ShaderStage::Fragment);
+    smoothCornerDistName = EmitSmoothCornerDistFunction(fragBuilder);
+  }
 
   // Step 1: get local-space coordinate.
   if (needTransform()) {
@@ -92,8 +167,17 @@ void GLSLRRectEffect::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("highp vec4 dx = (vec4(local.x) - cornersX) * signsX;");
   fragBuilder->codeAppend("highp vec4 dy = (vec4(local.y) - cornersY) * signsY;");
   // inBox is 1.0 for each corner whose arc box contains the fragment.
-  fragBuilder->codeAppendf("vec4 inBox = step(dx, %s) * step(dy, %s);", radiiXName.c_str(),
-                           radiiYName.c_str());
+  if (hasSmoothness()) {
+    // A smoothed corner extends to (1 + smoothness) * radius along each edge, so the arc boxes
+    // are widened by the start coefficient. Edge competition in RRect keeps the widened boxes of adjacent
+    // corners disjoint.
+    fragBuilder->codeAppendf("vec4 inBox = step(dx, %s * %s.x) * step(dy, %s * %s.x);",
+                             radiiXName.c_str(), curveCoeffsName.c_str(), radiiYName.c_str(),
+                             curveCoeffsName.c_str());
+  } else {
+    fragBuilder->codeAppendf("vec4 inBox = step(dx, %s) * step(dy, %s);", radiiXName.c_str(),
+                             radiiYName.c_str());
+  }
   // One-hot collapse: when adjacent arc boxes share a fragment along their boundary, keep
   // the first hit so subsequent queries (arcCenter, radii) collapse to a single corner.
   fragBuilder->codeAppend(
@@ -116,12 +200,37 @@ void GLSLRRectEffect::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppend("highp vec2 safeRadii = max(r, vec2(0.5));");
 
   // Step 5: ellipse SDF (Sampson distance) inside the corner region.
-  fragBuilder->codeAppend("highp vec2 offset = (local - arcCenter) / safeRadii;");
-  fragBuilder->codeAppend("highp vec2 safeOffset = max(abs(offset), vec2(1.0/4096.0));");
-  fragBuilder->codeAppend("highp float test = dot(safeOffset, safeOffset) - 1.0;");
-  fragBuilder->codeAppend("highp vec2 grad = 2.0 * safeOffset / safeRadii;");
-  fragBuilder->codeAppend("highp float gradDot = max(dot(grad, grad), 1.1755e-38);");
-  fragBuilder->codeAppend("highp float cornerDist = test * inversesqrt(gradDot);");
+  if (hasSmoothness()) {
+    // Map the fragment into the selected corner's frame: vertex at the origin, edges along the
+    // +x/+y axes, interior in the first quadrant. The signs double up as the mirroring factors.
+    fragBuilder->codeAppend(
+        "highp vec2 cornerVertex = vec2(dot(inBox, cornersX), dot(inBox, cornersY));");
+    fragBuilder->codeAppend(
+        "highp vec2 cornerSigns = vec2(dot(inBox, signsX), dot(inBox, signsY));");
+    fragBuilder->codeAppend("highp vec2 q = (local - cornerVertex) * cornerSigns;");
+    fragBuilder->codeAppend("highp float cornerDist = 0.0;");
+    // Zero-radius corners keep the ellipse evaluation: their box only catches the outside
+    // quadrant past the vertex, where the clamped 0.5 radius gives the same sharp-corner result
+    // as the standard variant.
+    fragBuilder->codeAppend("if (r.x > 0.0) {");
+    fragBuilder->codeAppendf("cornerDist = %s(q, r.x, %s, %s);", smoothCornerDistName.c_str(),
+                             curveCoeffsName.c_str(), smoothnessName.c_str());
+    fragBuilder->codeAppend("} else {");
+    fragBuilder->codeAppend("highp vec2 offset = (local - arcCenter) / safeRadii;");
+    fragBuilder->codeAppend("highp vec2 safeOffset = max(abs(offset), vec2(1.0/4096.0));");
+    fragBuilder->codeAppend("highp float test = dot(safeOffset, safeOffset) - 1.0;");
+    fragBuilder->codeAppend("highp vec2 grad = 2.0 * safeOffset / safeRadii;");
+    fragBuilder->codeAppend("highp float gradDot = max(dot(grad, grad), 1.1755e-38);");
+    fragBuilder->codeAppend("cornerDist = test * inversesqrt(gradDot);");
+    fragBuilder->codeAppend("}");
+  } else {
+    fragBuilder->codeAppend("highp vec2 offset = (local - arcCenter) / safeRadii;");
+    fragBuilder->codeAppend("highp vec2 safeOffset = max(abs(offset), vec2(1.0/4096.0));");
+    fragBuilder->codeAppend("highp float test = dot(safeOffset, safeOffset) - 1.0;");
+    fragBuilder->codeAppend("highp vec2 grad = 2.0 * safeOffset / safeRadii;");
+    fragBuilder->codeAppend("highp float gradDot = max(dot(grad, grad), 1.1755e-38);");
+    fragBuilder->codeAppend("highp float cornerDist = test * inversesqrt(gradDot);");
+  }
 
   // Step 6: edge / center distance (negative inside, positive outside).
   fragBuilder->codeAppendf("highp vec2 d0 = local - %s.xy;", rectName.c_str());
@@ -150,6 +259,13 @@ void GLSLRRectEffect::onSetData(UniformData*, UniformData* fragmentUniformData) 
   fragmentUniformData->setData("RadiiY", radiiYValues);
   const float antiAliasValue = antiAlias ? 1.0f : 0.0f;
   fragmentUniformData->setData("AntiAlias", antiAliasValue);
+  if (hasSmoothness()) {
+    const auto coeffs = ComputeSmoothCornerCoeffs(smoothness);
+    const std::array<float, 4> coeffsValues = {coeffs.start, coeffs.step,
+                                               coeffs.arcOffsetX, coeffs.arcOffsetY};
+    fragmentUniformData->setData("CurveCoeffs", coeffsValues);
+    fragmentUniformData->setData("Smoothness", smoothness);
+  }
   if (needTransform()) {
     fragmentUniformData->setData("DeviceToLocal", deviceToLocal());
   }

@@ -23,6 +23,7 @@
 #include "gpu/processors/RectEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gtest/gtest.h"
+#include "tgfx/core/BytesKey.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
@@ -133,6 +134,56 @@ TGFX_TEST_PRIVATE(ClipTest, RRectEffect) {
         auto fp = RRectEffect::Make(&allocator, RRect::MakeRectXY(Rect::MakeWH(100, 80), 10, 12),
                                     Matrix::MakeScale(0, 1), true);
         EXPECT_EQ(fp, nullptr);
+      }
+
+      // Case 4: Smooth circular corners produce the smooth variant.
+      {
+        const auto rRect = RRect::MakeRectXY(Rect::MakeWH(100, 80), 10, 10, 0.5f);
+        auto fp = RRectEffect::Make(&allocator, rRect, Matrix::I(), true);
+        ASSERT_NE(fp, nullptr);
+        EXPECT_TRUE(fp->hasSmoothness());
+        EXPECT_FLOAT_EQ(fp->smoothness, 0.5f);
+      }
+
+      // Case 5: Smooth elliptical corners cannot be evaluated analytically.
+      {
+        const auto rRect = RRect::MakeRectXY(Rect::MakeWH(100, 80), 10, 12, 0.5f);
+        auto fp = RRectEffect::Make(&allocator, rRect, Matrix::I(), true);
+        EXPECT_EQ(fp, nullptr);
+      }
+
+      // Case 6: Non-uniform scale would bake into elliptical corners and falls back; uniform
+      // scale keeps the corners circular.
+      {
+        const auto rRect = RRect::MakeRectXY(Rect::MakeWH(100, 80), 10, 10, 0.5f);
+        auto fp = RRectEffect::Make(&allocator, rRect, Matrix::MakeScale(2, 3), true);
+        EXPECT_EQ(fp, nullptr);
+        fp = RRectEffect::Make(&allocator, rRect, Matrix::MakeScale(2, 2), true);
+        ASSERT_NE(fp, nullptr);
+        EXPECT_TRUE(fp->hasSmoothness());
+        EXPECT_FLOAT_EQ(fp->radii[0].x, 20.f);
+      }
+
+      // Case 7: The smoothness flag joins the processor key; the value itself does not.
+      {
+        const auto rect = Rect::MakeWH(100, 80);
+        auto plain =
+            RRectEffect::Make(&allocator, RRect::MakeRectXY(rect, 10, 10), Matrix::I(), true);
+        auto smooth =
+            RRectEffect::Make(&allocator, RRect::MakeRectXY(rect, 10, 10, 0.3f), Matrix::I(), true);
+        auto smoother =
+            RRectEffect::Make(&allocator, RRect::MakeRectXY(rect, 10, 10, 0.7f), Matrix::I(), true);
+        ASSERT_NE(plain, nullptr);
+        ASSERT_NE(smooth, nullptr);
+        ASSERT_NE(smoother, nullptr);
+        BytesKey plainKey = {};
+        BytesKey smoothKey = {};
+        BytesKey smootherKey = {};
+        plain->onComputeProcessorKey(&plainKey);
+        smooth->onComputeProcessorKey(&smoothKey);
+        smoother->onComputeProcessorKey(&smootherKey);
+        EXPECT_FALSE(plainKey == smoothKey);
+        EXPECT_TRUE(smoothKey == smootherKey);
       })
 }
 
@@ -897,6 +948,10 @@ TGFX_TEST(ClipTest, Overview) {
                           {0.88f, 0.95f, 0.92f, 1.0f}, {0.95f, 0.88f, 0.88f, 1.0f}};
   Paint fillPaint = {};
   fillPaint.setColor({0.72f, 0.22f, 0.18f, 1.0f});
+  // High-contrast underlay color for the smoothed-rrect cells: the plain contour shows through
+  // wherever the smoothed contour pulls inward.
+  Paint contrastPaint = {};
+  contrastPaint.setColor({1.0f, 0.0f, 0.6f, 1.0f});
 
   for (int row = 0; row < kRows; ++row) {
     for (int col = 0; col < kCols; ++col) {
@@ -1061,6 +1116,41 @@ TGFX_TEST(ClipTest, Overview) {
           canvas->drawRect(Rect::MakeXYWH(20, 20, 80, 80), fillPaint);
           canvas->restore();
           canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), fillPaint);
+          break;
+        }
+
+        // ---------- Smoothed RRect variants ----------
+        case 14: {
+          // Cell 14: Smoothed Simple RRect, AA, identity. RRectEffect smoothness variant. The
+          // plain-rrect underlay shows through wherever the smoothed contour pulls inward,
+          // pinning the clip FP's contour to the draw op's.
+          canvas->save();
+          canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(30, 30, 140, 140), 30, 30), true);
+          canvas->drawRect(Rect::MakeWH(kCell, kCell), contrastPaint);
+          canvas->restore();
+          canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(30, 30, 140, 140), 30, 30, 0.6f),
+                            true);
+          canvas->drawRect(Rect::MakeWH(kCell, kCell), fillPaint);
+          break;
+        }
+        case 15: {
+          // Cell 15: Smoothed Simple RRect under a uniform scale, AA. RRectEffect transform
+          // variant with the smoothness flag on, drawn over a plain-rrect underlay.
+          canvas->translate(kCell / 2.f, kCell / 2.f);
+          canvas->scale(1.2f, 1.2f);
+          canvas->save();
+          canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(-60, -60, 120, 120), 25, 25), true);
+          canvas->resetMatrix();
+          canvas->translate(static_cast<float>(col * kCell), static_cast<float>(row * kCell));
+          canvas->drawRect(Rect::MakeWH(kCell, kCell), contrastPaint);
+          canvas->restore();
+          canvas->save();
+          canvas->clipRRect(RRect::MakeRectXY(Rect::MakeXYWH(-60, -60, 120, 120), 25, 25, 0.5f),
+                            true);
+          canvas->resetMatrix();
+          canvas->translate(static_cast<float>(col * kCell), static_cast<float>(row * kCell));
+          canvas->drawRect(Rect::MakeWH(kCell, kCell), fillPaint);
+          canvas->restore();
           break;
         }
       }

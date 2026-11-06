@@ -1,0 +1,569 @@
+===== offset 42960833 len 6850 =====
+vec2 a(float b){float c=floor(b*255.0)*(1.0/255.0);
+float d=(b-c)*255.0;
+return vec2(c,d);
+}
+vec4 e(float b){vec2 f=a(b);
+float g=f.x+f.y*(1.0/255.0);
+float h=(b-g)*65025.0;
+vec2 i=a(h);
+return vec4(f,i);
+}
+const vec4 j=vec4(1.0,1.0/255.0,1.0/65025.0,1.0/16581375.0);
+float k(vec4 l){return dot(l,j);
+}
+vec2 m(vec2 b){float n=dot(b,b);
+return n>1.0e-10?b/sqrt(n):vec2(0.0,0.0);
+}
+float o(vec2 p,vec2 q){vec2 r=abs(p)-q;
+return length(max(r,vec2(0.0)))+min(max(r.x,r.y),0.0);
+}
+float s(vec2 p,vec2 q,float t){float u=min(t,min(q.x,q.y));
+return o(p,q-u)-u;
+}
+float v(vec2 p,vec2 q,vec4 w){float r=-9999999.0;
+vec2 x=q*2.0;
+r=max(r,s(p*vec2(1.0,1.0)+q,x,w.x));
+r=max(r,s(p*vec2(-1.0,1.0)+q,x,w.y));
+r=max(r,s(p*vec2(-1.0,-1.0)+q,x,w.z));
+r=max(r,s(p*vec2(1.0,-1.0)+q,x,w.w));
+return r;
+}
+mat2 y(float z){float aa=cos(z);
+float ab=sin(z);
+return mat2(aa,-ab,ab,aa);
+}
+const int ac=2;
+const int ad=3;
+const float ae=1.0;
+int af(float ag,float ah,float ai,out vec3 aj){float p=ah-ag*ag/3.0;
+float ak=ag*(2.0*ag*ag-9.0*ah)/27.0+ai;
+float al=p*p*p;
+float am=ak*ak+4.0*al/27.0;
+float an=-ag/3.0;
+if(am>=0.0){float ao=sqrt(am);
+float ap=(-ak+ao)/2.0;
+float b=(-ak-ao)/2.0;
+ap=sign(ap)*pow(abs(ap),1.0/3.0);
+b=sign(b)*pow(abs(b),1.0/3.0);
+aj[0]=an+ap+b;
+float aq=((aj[0]+ag)*aj[0]+ah)*aj[0]+ai;
+float ar=(3.*aj[0]+2.*ag)*aj[0]+ah;
+aj[0]-=aq/ar;
+return 1;
+}
+float ap=sqrt(-p/3.0);
+float b=acos(-sqrt(-27.0/al)*ak/2.0)/3.0;
+float as=cos(b),at=sin(b)*1.732050808;
+aj[0]=an+ap*(as+as);
+aj[1]=an-ap*(at+as);
+aj[2]=an+ap*(at-as);
+vec3 aq=((aj+ag)*aj+ah)*aj+ai;
+vec3 ar=(3.0*aj+2.0*ag)*aj+ah;
+aj-=aq/ar;
+return 3;
+}
+float au(vec2 av,vec2 aw,vec2 ax,vec2 ay,vec2 al){float az=(-aw.y+3.0*ax.y-3.0*ay.y+al.y);
+float ba=(3.0*aw.y-6.0*ax.y+3.0*ay.y);
+float bb=(-3.0*aw.y+3.0*ax.y);
+float bc=aw.y-av.y;
+vec3 aj;
+int bd=af(ba/az,bb/az,bc/az,aj);
+int be=0;
+for(int bf=0;
+bf<3;
+bf++){if(bf<bd){if(aj[bf]>=0.0&&aj[bf]<=1.0){float z=aj[bf];
+float bg=((((-aw.x+3.*ax.x-3.*ay.x+al.x)*z+(3.*aw.x-6.*ax.x+3.*ay.x))*z)+(-3.*aw.x+3.*ax.x))*z+aw.x;
+if(bg<av.x){be++;
+}
+}
+}
+}
+vec2 bh=aw.xy-ax.xy;
+vec2 bi=ay.xy-al.xy;
+vec2 bj=vec2(bh.y,-bh.x);
+vec2 bk=vec2(bi.y,-bi.x);
+if(aw.y<ax.y){if((av.y<=aw.y)&&(dot(av-aw.xy,bj)<0.0)){be++;
+}
+}
+else{if(!(av.y<=aw.y)&&!(dot(av-aw.xy,bj)<0.0)){be++;
+}
+}
+if(ay.y<al.y){if(!(av.y<=al.y)&&dot(av-al.xy,bk)<0.0){be++;
+}
+}
+else{if((av.y<=al.y)&&!(dot(av-al.xy,bk)<0.0)){be++;
+}
+}
+if(be==0||be==2||be==4){return 1.0;
+}
+else{return-1.0;
+}
+}
+float bl(float z,vec2 bm,vec2 bn,vec2 bo,vec2 bp){vec2 bq=bo+z*bp;
+vec2 br=bn+z*bq;
+vec2 bs=bq+z*bp;
+vec2 bt=bm+z*br;
+vec2 bu=br+z*bs;
+float bv=dot(bu,bu);
+float bw=dot(bu,bt);
+return z-ae*bw/bv;
+}
+float bx(vec2 av,vec2 aw,vec2 ax,vec2 ay,vec2 al){vec2 bp=(-aw+3.0*ax-3.0*ay+al);
+vec2 bo=(3.0*aw-6.0*ax+3.0*ay);
+vec2 bn=(-3.0*aw+3.0*ax);
+vec2 bm=aw-av;
+float by=1.0e38;
+float bz=0.;
+float z;
+for(int bf=0;
+bf<ad;
+bf++){z=bz;
+for(int ca=0;
+ca<ac;
+ca++){z=bl(z,bm,bn,bo,bp);
+}
+z=clamp(z,0.0,1.0);
+vec2 bt=((bp*z+bo)*z+bn)*z+bm;
+by=min(by,dot(bt,bt));
+bz+=1./float(ad-1);
+}
+return by;
+}
+float cb(vec2 av,vec2 aw,vec2 ax,vec2 ay,vec2 al){return sqrt(bx(av,aw,ax,ay,al));
+}
+float cc(vec2 av,float cd,float ce){float cf=3.14159265359;
+float cg=cf*0.5;
+float ch=1.41421356237;
+float ci=0.5*cg*ce;
+float cj=cg*(1.0-ce);
+float ck=(1.0+ce)*cd;
+float cl=tan(ci);
+float cm=sin(cj*0.5)*cd*ch;
+float ai=cd*tan(ci*0.5)*cos(ci);
+float r=ai*cl;
+float ah=((ck-cm)-(1.0+cl)*ai)/3.0;
+float ag=2.0*ah;
+av=y(cf*-0.25)*av;
+av.x=-abs(av.x);
+vec2 cn=av+vec2(0.0,1.414213)*cd;
+float co=atan(cn.x,cn.y);
+av=y(cf*0.25)*av;
+vec2 aw=vec2(-ck,0.0);
+vec2 ax=aw+vec2(ag,0.0);
+vec2 ay=ax+vec2(ah,0.0);
+vec2 al=ay+vec2(ai,-r);
+vec2 cp=av+ck;
+if(cp.x<0.0){return cp.y-ck;
+}
+else if(abs(co)<cj*0.5){return length(cn)-cd;
+}
+float cq=cb(av,aw,ax,ay,al);
+float cr=-au(av,aw,ax,ay,al);
+return cq*cr;
+}
+float cs(vec2 av,vec2 q,float cd,float ce){if(cd<=1e-6){return o(av,q);
+}
+float ct=min(q.x,q.y);
+float cu=cd*(1.0+ce);
+float cv=max(0.0,cu-ct)/cd;
+float cw=max(0.0,ce-cv);
+float cx=min(ct,cd);
+if(cw<=1e-6){return s(av,q,cx);
+}
+vec2 p=abs(av)-q;
+return cc(p,cx,cw);
+}
+float cy(vec2 p,vec2 q,vec4 cz,vec4 da){float r=o(p,q);
+vec2 x=q*2.0;
+r=max(r,cs(p*vec2(1.0,1.0)+q,x,cz.x,da.x));
+r=max(r,cs(p*vec2(-1.0,1.0)+q,x,cz.y,da.y));
+r=max(r,cs(p*vec2(-1.0,-1.0)+q,x,cz.z,da.z));
+r=max(r,cs(p*vec2(1.0,-1.0)+q,x,cz.w,da.w));
+return r;
+}
+const float cg=1.57079632679;
+const float db=0.2;
+const float dc=0.35;
+const float dd=0.6;
+const int de=8;
+const float df=6.0;
+const float dg=0.1;
+uniform sampler2D texture0;
+uniform sampler2D texture1;
+uniform sampler2D texture2;
+varying vec2 _coord2;
+uniform float tileExpansionScale;
+uniform float heightExpansionScale;
+uniform float bevelExpansionScale;
+uniform float heightMapTexelSize;
+uniform mat3 nodeToTileSpace;
+uniform mat3 tileToNodeSpace;
+uniform float frameRotation;
+uniform float refractionIntensity;
+uniform float refractionDistance;
+uniform float lightIntensity;
+uniform float lightAngle;
+uniform float bevelSize;
+uniform float chromaticAberration;
+uniform float splay;
+uniform vec2 nodeSpaceCenterPoint;
+vec2 dh(vec2 di,float dj){vec2 dk=(nodeToTileSpace*vec3(di,1.0)).xy;
+vec2 dl=(dk-0.5)*dj+0.5;
+return dl;
+}
+vec4 dm(vec2 p){vec2 dn=dh(p,tileExpansionScale);
+return texture2D(texture0,dn);
+}
+vec4 dp(vec2 p,vec2 dq,float dr){vec4 ds=vec4(0.0,0.0,0.0,0.0);
+float dt=1.0/float(de-1);
+float du=0.0;
+for(int bf=0;
+bf<de;
+bf++){float dv=float(bf)*dt-0.5;
+float dw=1.0-abs(dv*2.0);
+vec4 dx=dm(p+(dv+0.5)*dr*dq);
+vec4 dy=dm(p+dv*dr*dq);
+vec4 dz=dm(p+(dv-0.5)*dr*dq);
+float ea=max(max(dx.a,dy.a),dz.a);
+ds+=vec4(dx.r,dy.g,dz.b,ea)*dw;
+du+=dw;
+}
+return ds/du;
+}
+float eb(vec2 ec){return texture2D(texture2,dh(ec,bevelExpansionScale)).a*2.0-1.0;
+}
+float ed(vec2 ec){return k(texture2D(texture1,ec));
+}
+vec2 ee(vec2 di,float ef){float step=clamp(ef,1.0,df);
+float eg=ed(dh(di-vec2(step,0.0),heightExpansionScale));
+float eh=ed(dh(di+vec2(step,0.0),heightExpansionScale));
+float ei=ed(dh(di-vec2(0.0,step),heightExpansionScale));
+float ej=ed(dh(di+vec2(0.0,step),heightExpansionScale));
+return vec2(eh-eg,ej-ei)/(2.0*step);
+}
+vec2 ek(vec2 el){float em=max(dot(el,el),1e-12);
+return el*inversesqrt(em);
+}
+vec2 en(vec2 eo,vec2 ec){float ep=length(eo);
+vec2 eq=ep>0.0?normalize(eo):vec2(0.0);
+vec2 er=-normalize(ec-nodeSpaceCenterPoint);
+vec2 es=mix(eq,er,splay);
+return es*ep;
+}
+void main(){vec2 ec=(tileToNodeSpace*vec3(_coord2,1.0)).xy;
+vec2 et=dh(ec,heightExpansionScale);
+vec2 eo=ee(ec,refractionDistance);
+eo=en(eo,ec);
+vec2 eu=ek(eo);
+eo=eo*((refractionDistance-1.0)*0.5);
+eo=sign(eo)*pow(abs(eo),vec2(1.4));
+float ev=smoothstep(0.0,0.5,1.0-eb(ec));
+vec2 ew=vec2(0.999)*refractionDistance;
+vec2 an=refractionIntensity*eo*refractionDistance;
+an=clamp(an,-ew,ew);
+vec2 ex=refractionIntensity*eo*0.2*ew;
+vec2 dq=mix(an,ex,ev);
+vec2 p=ec+dq;
+vec4 ey=vec4(0.0);
+if(chromaticAberration<0.001){ey=dm(p);
+}
+else{ey=dp(p,dq,chromaticAberration);
+}
+float ez=lightIntensity;
+float fa=bevelSize*0.5;
+float fb=lightAngle-frameRotation+cg;
+vec2 fc=-vec2(cos(fb),sin(fb));
+float fd=smoothstep(dc,1.0,dot(-eu,-fc))*ev*ez;
+float fe=smoothstep(dc,1.0,dot(-eu,fc))*ev*ez*dd;
+ey.xyz+=fd+fe;
+gl_FragColor=ey;
+}
+
+===== offset 42974967 len 6830 =====
+layout(std140)uniform UniformBlock{mat3 nodeToTileSpace;
+mat3 tileToNodeSpace;
+vec4 quad;
+vec2 nodeSpaceCenterPoint;
+float tileExpansionScale;
+float heightExpansionScale;
+float bevelExpansionScale;
+float heightMapTexelSize;
+float frameRotation;
+float refractionIntensity;
+float refractionDistance;
+float lightIntensity;
+float lightAngle;
+float bevelSize;
+float chromaticAberration;
+float splay;
+float dummyPadding0;
+float dummyPadding1;
+}
+;
+vec2 a(float b){float c=floor(b*255.0)*(1.0/255.0);
+float d=(b-c)*255.0;
+return vec2(c,d);
+}
+vec4 e(float b){vec2 f=a(b);
+float g=f.x+f.y*(1.0/255.0);
+float h=(b-g)*65025.0;
+vec2 i=a(h);
+return vec4(f,i);
+}
+const vec4 j=vec4(1.0,1.0/255.0,1.0/65025.0,1.0/16581375.0);
+float k(vec4 l){return dot(l,j);
+}
+vec2 m(vec2 b){float n=dot(b,b);
+return n>1.0e-10?b/sqrt(n):vec2(0.0,0.0);
+}
+float o(vec2 p,vec2 q){vec2 r=abs(p)-q;
+return length(max(r,vec2(0.0)))+min(max(r.x,r.y),0.0);
+}
+float s(vec2 p,vec2 q,float t){float u=min(t,min(q.x,q.y));
+return o(p,q-u)-u;
+}
+float v(vec2 p,vec2 q,vec4 w){float r=-9999999.0;
+vec2 x=q*2.0;
+r=max(r,s(p*vec2(1.0,1.0)+q,x,w.x));
+r=max(r,s(p*vec2(-1.0,1.0)+q,x,w.y));
+r=max(r,s(p*vec2(-1.0,-1.0)+q,x,w.z));
+r=max(r,s(p*vec2(1.0,-1.0)+q,x,w.w));
+return r;
+}
+mat2 y(float z){float aa=cos(z);
+float ab=sin(z);
+return mat2(aa,-ab,ab,aa);
+}
+const int ac=2;
+const int ad=3;
+const float ae=1.0;
+int af(float ag,float ah,float ai,out vec3 aj){float p=ah-ag*ag/3.0;
+float ak=ag*(2.0*ag*ag-9.0*ah)/27.0+ai;
+float al=p*p*p;
+float am=ak*ak+4.0*al/27.0;
+float an=-ag/3.0;
+if(am>=0.0){float ao=sqrt(am);
+float ap=(-ak+ao)/2.0;
+float b=(-ak-ao)/2.0;
+ap=sign(ap)*pow(abs(ap),1.0/3.0);
+b=sign(b)*pow(abs(b),1.0/3.0);
+aj[0]=an+ap+b;
+float aq=((aj[0]+ag)*aj[0]+ah)*aj[0]+ai;
+float ar=(3.*aj[0]+2.*ag)*aj[0]+ah;
+aj[0]-=aq/ar;
+return 1;
+}
+float ap=sqrt(-p/3.0);
+float b=acos(-sqrt(-27.0/al)*ak/2.0)/3.0;
+float as=cos(b),at=sin(b)*1.732050808;
+aj[0]=an+ap*(as+as);
+aj[1]=an-ap*(at+as);
+aj[2]=an+ap*(at-as);
+vec3 aq=((aj+ag)*aj+ah)*aj+ai;
+vec3 ar=(3.0*aj+2.0*ag)*aj+ah;
+aj-=aq/ar;
+return 3;
+}
+float au(vec2 av,vec2 aw,vec2 ax,vec2 ay,vec2 al){float az=(-aw.y+3.0*ax.y-3.0*ay.y+al.y);
+float ba=(3.0*aw.y-6.0*ax.y+3.0*ay.y);
+float bb=(-3.0*aw.y+3.0*ax.y);
+float bc=aw.y-av.y;
+vec3 aj;
+int bd=af(ba/az,bb/az,bc/az,aj);
+int be=0;
+for(int bf=0;
+bf<3;
+bf++){if(bf<bd){if(aj[bf]>=0.0&&aj[bf]<=1.0){float z=aj[bf];
+float bg=((((-aw.x+3.*ax.x-3.*ay.x+al.x)*z+(3.*aw.x-6.*ax.x+3.*ay.x))*z)+(-3.*aw.x+3.*ax.x))*z+aw.x;
+if(bg<av.x){be++;
+}
+}
+}
+}
+vec2 bh=aw.xy-ax.xy;
+vec2 bi=ay.xy-al.xy;
+vec2 bj=vec2(bh.y,-bh.x);
+vec2 bk=vec2(bi.y,-bi.x);
+if(aw.y<ax.y){if((av.y<=aw.y)&&(dot(av-aw.xy,bj)<0.0)){be++;
+}
+}
+else{if(!(av.y<=aw.y)&&!(dot(av-aw.xy,bj)<0.0)){be++;
+}
+}
+if(ay.y<al.y){if(!(av.y<=al.y)&&dot(av-al.xy,bk)<0.0){be++;
+}
+}
+else{if((av.y<=al.y)&&!(dot(av-al.xy,bk)<0.0)){be++;
+}
+}
+if(be==0||be==2||be==4){return 1.0;
+}
+else{return-1.0;
+}
+}
+float bl(float z,vec2 bm,vec2 bn,vec2 bo,vec2 bp){vec2 bq=bo+z*bp;
+vec2 br=bn+z*bq;
+vec2 bs=bq+z*bp;
+vec2 bt=bm+z*br;
+vec2 bu=br+z*bs;
+float bv=dot(bu,bu);
+float bw=dot(bu,bt);
+return z-ae*bw/bv;
+}
+float bx(vec2 av,vec2 aw,vec2 ax,vec2 ay,vec2 al){vec2 bp=(-aw+3.0*ax-3.0*ay+al);
+vec2 bo=(3.0*aw-6.0*ax+3.0*ay);
+vec2 bn=(-3.0*aw+3.0*ax);
+vec2 bm=aw-av;
+float by=1.0e38;
+float bz=0.;
+float z;
+for(int bf=0;
+bf<ad;
+bf++){z=bz;
+for(int ca=0;
+ca<ac;
+ca++){z=bl(z,bm,bn,bo,bp);
+}
+z=clamp(z,0.0,1.0);
+vec2 bt=((bp*z+bo)*z+bn)*z+bm;
+by=min(by,dot(bt,bt));
+bz+=1./float(ad-1);
+}
+return by;
+}
+float cb(vec2 av,vec2 aw,vec2 ax,vec2 ay,vec2 al){return sqrt(bx(av,aw,ax,ay,al));
+}
+float cc(vec2 av,float cd,float ce){float cf=3.14159265359;
+float cg=cf*0.5;
+float ch=1.41421356237;
+float ci=0.5*cg*ce;
+float cj=cg*(1.0-ce);
+float ck=(1.0+ce)*cd;
+float cl=tan(ci);
+float cm=sin(cj*0.5)*cd*ch;
+float ai=cd*tan(ci*0.5)*cos(ci);
+float r=ai*cl;
+float ah=((ck-cm)-(1.0+cl)*ai)/3.0;
+float ag=2.0*ah;
+av=y(cf*-0.25)*av;
+av.x=-abs(av.x);
+vec2 cn=av+vec2(0.0,1.414213)*cd;
+float co=atan(cn.x,cn.y);
+av=y(cf*0.25)*av;
+vec2 aw=vec2(-ck,0.0);
+vec2 ax=aw+vec2(ag,0.0);
+vec2 ay=ax+vec2(ah,0.0);
+vec2 al=ay+vec2(ai,-r);
+vec2 cp=av+ck;
+if(cp.x<0.0){return cp.y-ck;
+}
+else if(abs(co)<cj*0.5){return length(cn)-cd;
+}
+float cq=cb(av,aw,ax,ay,al);
+float cr=-au(av,aw,ax,ay,al);
+return cq*cr;
+}
+float cs(vec2 av,vec2 q,float cd,float ce){if(cd<=1e-6){return o(av,q);
+}
+float ct=min(q.x,q.y);
+float cu=cd*(1.0+ce);
+float cv=max(0.0,cu-ct)/cd;
+float cw=max(0.0,ce-cv);
+float cx=min(ct,cd);
+if(cw<=1e-6){return s(av,q,cx);
+}
+vec2 p=abs(av)-q;
+return cc(p,cx,cw);
+}
+float cy(vec2 p,vec2 q,vec4 cz,vec4 da){float r=o(p,q);
+vec2 x=q*2.0;
+r=max(r,cs(p*vec2(1.0,1.0)+q,x,cz.x,da.x));
+r=max(r,cs(p*vec2(-1.0,1.0)+q,x,cz.y,da.y));
+r=max(r,cs(p*vec2(-1.0,-1.0)+q,x,cz.z,da.z));
+r=max(r,cs(p*vec2(1.0,-1.0)+q,x,cz.w,da.w));
+return r;
+}
+const float cg=1.57079632679;
+const float db=0.2;
+const float dc=0.35;
+const float dd=0.6;
+const int de=8;
+const float df=6.0;
+const float dg=0.1;
+uniform sampler2D texture0;
+uniform sampler2D texture1;
+uniform sampler2D texture2;
+in vec2 _coord2;
+out vec4 fig_FragColor;
+vec2 dh(vec2 di,float dj){vec2 dk=(nodeToTileSpace*vec3(di,1.0)).xy;
+vec2 dl=(dk-0.5)*dj+0.5;
+return dl;
+}
+vec4 dm(vec2 p){vec2 dn=dh(p,tileExpansionScale);
+return texture(texture0,dn);
+}
+vec4 dp(vec2 p,vec2 dq,float dr){vec4 ds=vec4(0.0,0.0,0.0,0.0);
+float dt=1.0/float(de-1);
+float du=0.0;
+for(int bf=0;
+bf<de;
+bf++){float dv=float(bf)*dt-0.5;
+float dw=1.0-abs(dv*2.0);
+vec4 dx=dm(p+(dv+0.5)*dr*dq);
+vec4 dy=dm(p+dv*dr*dq);
+vec4 dz=dm(p+(dv-0.5)*dr*dq);
+float ea=max(max(dx.a,dy.a),dz.a);
+ds+=vec4(dx.r,dy.g,dz.b,ea)*dw;
+du+=dw;
+}
+return ds/du;
+}
+float eb(vec2 ec){return texture(texture2,dh(ec,bevelExpansionScale)).a*2.0-1.0;
+}
+float ed(vec2 ec){return k(texture(texture1,ec));
+}
+vec2 ee(vec2 di,float ef){float step=clamp(ef,1.0,df);
+float eg=ed(dh(di-vec2(step,0.0),heightExpansionScale));
+float eh=ed(dh(di+vec2(step,0.0),heightExpansionScale));
+float ei=ed(dh(di-vec2(0.0,step),heightExpansionScale));
+float ej=ed(dh(di+vec2(0.0,step),heightExpansionScale));
+return vec2(eh-eg,ej-ei)/(2.0*step);
+}
+vec2 ek(vec2 el){float em=max(dot(el,el),1e-12);
+return el*inversesqrt(em);
+}
+vec2 en(vec2 eo,vec2 ec){float ep=length(eo);
+vec2 eq=ep>0.0?normalize(eo):vec2(0.0);
+vec2 er=-normalize(ec-nodeSpaceCenterPoint);
+vec2 es=mix(eq,er,splay);
+return es*ep;
+}
+void main(){vec2 ec=(tileToNodeSpace*vec3(_coord2,1.0)).xy;
+vec2 et=dh(ec,heightExpansionScale);
+vec2 eo=ee(ec,refractionDistance);
+eo=en(eo,ec);
+vec2 eu=ek(eo);
+eo=eo*((refractionDistance-1.0)*0.5);
+eo=sign(eo)*pow(abs(eo),vec2(1.4));
+float ev=smoothstep(0.0,0.5,1.0-eb(ec));
+vec2 ew=vec2(0.999)*refractionDistance;
+vec2 an=refractionIntensity*eo*refractionDistance;
+an=clamp(an,-ew,ew);
+vec2 ex=refractionIntensity*eo*0.2*ew;
+vec2 dq=mix(an,ex,ev);
+vec2 p=ec+dq;
+vec4 ey=vec4(0.0);
+if(chromaticAberration<0.001){ey=dm(p);
+}
+else{ey=dp(p,dq,chromaticAberration);
+}
+float ez=lightIntensity;
+float fa=bevelSize*0.5;
+float fb=lightAngle-frameRotation+cg;
+vec2 fc=-vec2(cos(fb),sin(fb));
+float fd=smoothstep(dc,1.0,dot(-eu,-fc))*ev*ez;
+float fe=smoothstep(dc,1.0,dot(-eu,fc))*ev*ez*dd;
+ey.xyz+=fd+fe;
+fig_FragColor=ey;
+}

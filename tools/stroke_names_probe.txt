@@ -1,0 +1,35 @@
+===== strokeWeight
+ * plain strokeWeight
+ * plain node cannot have both strokeWeight and individualStrokeWeights: 
+ * plain strokeWeight
+ * plain strokeWeightVar
+ * plain HstrokeWeight
+ * plain strokeWeightTag
+===== lineWidth
+ * plain lineWidth
+ * plain lineWidth
+ * plain lineWidth
+ * plain lineWidth
+ * plain lineWidth
+===== thickness
+ * plain text-decoration-thickness
+ * plain Cannot set text decoration thickness on a non-underlined text range
+ * plain     float wave(vec2 uv, float speed, float yPos, float thickness, float softness) {
+ * plain       return 1.0 - smoothstep(thickness, thickness + softness + falloff * 0.0, abs(uv.y - y));
+ * plain       return 1.0 - smoothstep(thickness, thickness + softness + falloff * 0.0, abs(uv.y - y));
+ * plain           float thickness = 0.003;
+ * plain           col.xyz += wave(uv, uSpeed * (1.0 + t), uAmplitude, thickness, softness) * lineCol * amt;
+ * plain thickness
+ * plain thickness
+ * plain thickness
+ * plain thickness
+ * plain thickness
+ * plain thickness
+ * plain thickness
+===== strokeAlign
+ * plain Invalid value for strokeAlign
+ * plain strokeAlign
+ * plain NstrokeAlign
+ * plain strokeAlignTag
+===== strokeWidth
+ * plain strokeWidth

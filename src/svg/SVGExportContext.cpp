@@ -174,9 +174,9 @@ void SVGExportContext::drawRect(const Rect& rect, const Matrix& matrix, const Cl
 
 void SVGExportContext::drawRRect(const RRect& roundRect, const Matrix& matrix,
                                  const ClipStack& clip, const Brush& brush, const Stroke* stroke) {
-  if (roundRect.isComplex()) {
-    // SVG <rect> only supports uniform rx/ry; complex RRects must be exported as <path>.
-    // With stroke, route through drawShape so the generic stroker handles it.
+  if (roundRect.isComplex() || roundRect.smoothness() > 0.0f) {
+    // SVG <rect> only supports uniform rx/ry and has no corner smoothness; such RRects must be
+    // exported as <path>. With stroke, route through drawShape so the generic stroker handles it.
     Path path = {};
     path.addRRect(roundRect);
     if (stroke) {
