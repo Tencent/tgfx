@@ -125,6 +125,11 @@ highp float gpPixelCoverage = 1.0;
 #else
 #define TGFX_CHAIN_UNIT_COVERAGE vec4(1.0)
 #endif
+// The spec accessors are read here and nowhere else in the chain family: the tool rejects
+// SPEC_ outside a file that declares itself a reader, so the specialization surface of this
+// family is this file plus the generated include.
+#pragma tgfx_spec_reader
+
 #include "pipeline/chain/pointwise_chain_eval.inc"
 
 // The XferProcessor source without coverage: the root, times the coverage subtree root in the
@@ -166,14 +171,6 @@ void chainRunSlotAt(int n, inout vec4 result, inout vec4 clipRegister,
   vec4 value = evalChainSlot(n);
   CHAIN_SLOT_WRITE(n, value)
 }
-
-// One unrolled call site. The guards and the literal indices are what let the driver delete the
-// out-of-range call sites entirely once the specialization constants are injected — the static
-// reduction the generic loop's runtime trip counter can never provide.
-#define CHAIN_RUN_AT(n)                                                    \
-  if (SPEC_SlotCount() > n) {                                              \
-    chainRunSlotAt(n, result, clipRegister, coverageRootRegister);         \
-  }
 
 void main() {
 #if GP_LAYOUT == 1
@@ -262,40 +259,10 @@ void main() {
     // The specialized executor: one call site per slot with literal indices. Once the runtime
     // injects the values, every guard and every selector word becomes a compile-time constant, so
     // the driver deletes the out-of-range call sites entirely.
-    CHAIN_RUN_AT(0)
-    CHAIN_RUN_AT(1)
-    CHAIN_RUN_AT(2)
-    CHAIN_RUN_AT(3)
-    CHAIN_RUN_AT(4)
-    CHAIN_RUN_AT(5)
-    CHAIN_RUN_AT(6)
-    CHAIN_RUN_AT(7)
-    CHAIN_RUN_AT(8)
-    CHAIN_RUN_AT(9)
-    CHAIN_RUN_AT(10)
-    CHAIN_RUN_AT(11)
-    CHAIN_RUN_AT(12)
-    CHAIN_RUN_AT(13)
-    CHAIN_RUN_AT(14)
-    CHAIN_RUN_AT(15)
-#if CHAIN_SLOT_CAPACITY > 16
-    CHAIN_RUN_AT(16)
-    CHAIN_RUN_AT(17)
-    CHAIN_RUN_AT(18)
-    CHAIN_RUN_AT(19)
-    CHAIN_RUN_AT(20)
-    CHAIN_RUN_AT(21)
-    CHAIN_RUN_AT(22)
-    CHAIN_RUN_AT(23)
-    CHAIN_RUN_AT(24)
-    CHAIN_RUN_AT(25)
-    CHAIN_RUN_AT(26)
-    CHAIN_RUN_AT(27)
-    CHAIN_RUN_AT(28)
-    CHAIN_RUN_AT(29)
-    CHAIN_RUN_AT(30)
-    CHAIN_RUN_AT(31)
-#endif
+    // Generated: one guarded call site per slot of the declared capacity. The pragma keeps
+    // the tool the only place that knows the site count; the capacity macro picks the subset
+    // each profile compiles.
+    #pragma tgfx_spec_unroll chainRunSlotAt CHAIN_SLOT_CAPACITY SPEC_SlotCount (result, clipRegister, coverageRootRegister)
 #if HAS_XP >= 1
     if (xpNeedsBlendPass()) {
       chainXPSrc = CHAIN_XP_SRC_UNPREMUL;

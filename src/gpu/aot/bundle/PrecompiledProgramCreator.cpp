@@ -33,8 +33,8 @@
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "gpu/aot/select/PermutationMatch.h"
-#include "gpu/aot/spec/SpecCapture.h"
-#include "gpu/aot/spec/SpecInject.h"
+#include "gpu/aot/spec/SpecInjector.h"
+#include "gpu/aot/spec/SpecResolver.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
@@ -45,25 +45,6 @@
 #include "tgfx/gpu/GPU.h"
 
 namespace tgfx {
-
-// The format names the payload the bundle stores. The backend picks the dialect and the bundle
-// header says whether that dialect arrives as driver source text or as a precompiled container;
-// Metal and D3D12 support both forms, so their choice is read from the bundle rather than assumed.
-static ShaderCodeFormat FormatForBackend(Backend backend, uint16_t payloadFormat) {
-  const bool binary = payloadFormat == BundleFormat::Payload::Binary;
-  switch (backend) {
-    case Backend::Vulkan:
-      return ShaderCodeFormat::SPIRV;
-    case Backend::Metal:
-      return binary ? ShaderCodeFormat::METALLIB : ShaderCodeFormat::MSL;
-    case Backend::WebGPU:
-      return ShaderCodeFormat::WGSL;
-    case Backend::D3D12:
-      return binary ? ShaderCodeFormat::DXBC : ShaderCodeFormat::HLSL;
-    default:
-      return ShaderCodeFormat::GLSL;
-  }
-}
 
 // Which descriptor field carries the blob. Derived from the format rather than from the bundle's
 // payload field so the two can never disagree: a format that names a container reads binaryData,
@@ -358,15 +339,30 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   cache->recordAOTStage(PrecompiledAOTStage::PermutationMatched);
   // The plain route's key is the processor tree, which already determines the chain shape, so
   // the specialization values need not join the key here — unlike the pass-IR route, whose key
-  // carries no fragment list (see AOTProgramInfo). GL-only in this stage, like the pass-IR route.
-  SpecValues spec = {};
-  if (context->backend() == Backend::OpenGL || context->backend() == Backend::Metal) {
-    spec =
-        SpecCapture::Capture(context, *programInfo, matchResult->shaderName,
-                             matchResult->vertPermutationIndex, matchResult->fragPermutationIndex);
-  }
+  // carries no fragment list (see AOTProgramInfo). Both routes resolve through the same entry,
+  // so they cannot disagree about whether this draw specializes.
+  const SpecValues spec =
+      SpecResolver::Resolve(context, *programInfo, matchResult->shaderName,
+                            matchResult->vertPermutationIndex, matchResult->fragPermutationIndex);
   return CreateProgramFromMatch(context, programInfo, *matchResult, spec.empty() ? nullptr : &spec);
 }
+
+namespace {
+
+// The one fallback: a specialization that failed to build must not drop the draw, and the generic
+// text of the same variant always built, so re-enter without values (this recursion carries no
+// spec and cannot loop). The caller caches the returned program under the specialization-bearing
+// key, so this shape never retries the failing compile.
+std::shared_ptr<Program> FallbackToGeneric(Context* context, const ProgramInfo* programInfo,
+                                           const PermutationMatchResult& match, const char* stage) {
+  LOGE(
+      "PrecompiledProgramCreator: the specialized %s of %s[frag=%u] failed to build; falling "
+      "back to the generic form",
+      stage, match.shaderName.c_str(), match.fragPermutationIndex);
+  return PrecompiledProgramCreator::CreateProgramFromMatch(context, programInfo, match, nullptr);
+}
+
+}  // namespace
 
 std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
     Context* context, const ProgramInfo* programInfo, const PermutationMatchResult& match,
@@ -399,7 +395,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   }
   cache->recordArtifactHit();
 
-  auto format = FormatForBackend(context->backend(), cache->payloadFormat());
+  auto format = SpecFormatForBackend(context->backend(), cache->payloadFormat());
   const bool binaryPayload = IsBinaryFormat(format);
 
   ShaderModuleDescriptor vertexDesc = {};
@@ -426,28 +422,28 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   } else {
     fragmentDesc.code = std::string(fragBlob->data.begin(), fragBlob->data.end());
   }
-  // The GLSL text backends specialize by rewriting the generated TGFX_SPEC_<id> declarations to
-  // this draw's captured values, the master switch first; the driver's compiler then folds every
-  // accessor read and the unrolled executor's guards. The metallib backend carries the same
-  // values through the pipeline's fragment-constant table (MTLFunctionConstantValues), resolved
-  // at function creation. Other formats (v1: Vulkan's SPIR-V specialization map is not wired
-  // yet) and a failed injection keep the generic text.
+  // The format's injector decides where the values land: the driver-source formats rewrite the
+  // generated TGFX_SPEC_<id> declarations (the driver's compiler then folds every accessor read
+  // and the unrolled executor's guards), the container formats append the pipeline's constant
+  // table. A format without a registered injector serves the generic form.
   bool specInjected = false;
   std::vector<std::pair<std::string, double>> specConstants = {};
-  if (spec != nullptr && !spec->empty() && format == ShaderCodeFormat::GLSL) {
-    auto specialized = InjectSpecGLSL(fragmentDesc.code, fragBlob->specFields, *spec);
-    if (!specialized.empty()) {
-      fragmentDesc.code = std::move(specialized);
-      specInjected = true;
-    } else {
-      LOGE(
-          "PrecompiledProgramCreator: specialization injection found no TGFX_SPEC declarations "
-          "for %s[frag=%u]; serving the generic form",
-          matchResult->shaderName.c_str(), matchResult->fragPermutationIndex);
+  if (spec != nullptr && !spec->empty()) {
+    if (const auto* injector = FindSpecInjector(format)) {
+      SpecInjection injection = {};
+      if (injector->Apply(fragmentDesc.code, fragBlob->specFields, *spec, &injection)) {
+        if (!injection.code.empty()) {
+          fragmentDesc.code = std::move(injection.code);
+        }
+        specConstants = std::move(injection.constants);
+        specInjected = true;
+      } else {
+        LOGE(
+            "PrecompiledProgramCreator: specialization injection found no TGFX_SPEC declarations "
+            "for %s[frag=%u]; serving the generic form",
+            matchResult->shaderName.c_str(), matchResult->fragPermutationIndex);
+      }
     }
-  } else if (spec != nullptr && !spec->empty() && format == ShaderCodeFormat::METALLIB) {
-    AppendSpecConstants(fragBlob->specFields, *spec, &specConstants);
-    specInjected = true;
   }
   if (!fragBlob->uniforms.empty()) {
     fragmentDesc.uniformSlots = {
@@ -498,15 +494,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   auto fragmentShader = shaderCache->findOrCreateModule(fragmentDesc);
   if (fragmentShader == nullptr) {
     if (specInjected) {
-      // A specialized module that does not compile must not drop the draw: the generic text of
-      // the same variant always compiled, so serve it (this recursion carries no spec and cannot
-      // loop). The caller caches the returned program under the specialization-bearing key, so
-      // this shape never retries the failing compile.
-      LOGE(
-          "PrecompiledProgramCreator: the specialized fragment of %s[frag=%u] failed to compile; "
-          "falling back to the generic form",
-          matchResult->shaderName.c_str(), matchResult->fragPermutationIndex);
-      return CreateProgramFromMatch(context, programInfo, match, nullptr);
+      return FallbackToGeneric(context, programInfo, match, "fragment module");
     }
     cache->recordFailure(PrecompiledFallbackReason::FragmentModuleCreationFailed,
                          MakeFallbackRecord(cache, programInfo, &*matchResult));
@@ -669,13 +657,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   auto pipeline = shaderCache->findOrCreatePipeline(descriptor);
   if (pipeline == nullptr) {
     if (specInjected) {
-      // Same contract as the module failure above: a specialized pipeline that does not build
-      // falls back to the generic form rather than dropping the draw.
-      LOGE(
-          "PrecompiledProgramCreator: the specialized pipeline of %s[frag=%u] failed to create; "
-          "falling back to the generic form",
-          matchResult->shaderName.c_str(), matchResult->fragPermutationIndex);
-      return CreateProgramFromMatch(context, programInfo, match, nullptr);
+      return FallbackToGeneric(context, programInfo, match, "pipeline");
     }
     // The same shader variant (identical vert/frag artifact) can create successfully for some draws
     // and fail for others, so the mismatch must live in the runtime-derived pipeline state rather

@@ -207,14 +207,25 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
   std::string vertSource = source != nullptr ? source->vertex : "";
   std::string fragSource = source != nullptr ? source->fragment : "";
 
+  // The unrolled executor's call sites are generated, not counted: every
+  // `#pragma tgfx_spec_unroll` line becomes one guarded call per slot of the largest declared
+  // capacity, so the template carries no site list to keep in sync with a profile.
+  if (!fragSource.empty()) {
+    auto expanded = ExpandUnrollPragmas(fragSource);
+    if (expanded.empty()) {
+      RecordBuildError(diagnostics, Layer::Compile, DiagnosticCode::CompileGlsl, info.name, "",
+                       -1, -1, "malformed #pragma tgfx_spec_unroll (expected <fn> <capacity> "
+                               "<guard> (<args>))");
+      return report;
+    }
+    fragSource = std::move(expanded);
+  }
+
   // The specialization scan runs once per family: it collects the SPEC_<name>() fields the
   // fragment reads and checks none of them is read directly (a direct read would escape the
   // folding a specialized compile performs). A family without the include marker scans empty
   // and every source below stays the template itself.
   const auto specUsage = ScanSpecUsage(fragSource, info.name, diagnostics);
-  // The largest specialized array this family's variants declare; the unrolled call-site check
-  // below compares the template's site count against it.
-  uint16_t maxSpecArraySize = 0;
 
   // The variant plan of this family: the Compose-reachable set (the single source of truth the
   // runtime matcher uses too), validated against the declared domains. The build loop,
@@ -317,11 +328,6 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
                                     diagnostics);
       genericFragSource = ReplaceSpecMarker(fragSource, GenerateSpecInclude(specEntries, false));
       specFragSource = ReplaceSpecMarker(fragSource, GenerateSpecInclude(specEntries, true));
-      for (const auto& entry : specEntries) {
-        if (entry.arraySize > maxSpecArraySize) {
-          maxSpecArraySize = entry.arraySize;
-        }
-      }
       // The spec dialect must not move a uniform or a sampler: the specialized program has to
       // stay a drop-in replacement of the generic one, layout included. Reflect the spec compile
       // and compare it against the stub pass's reflection.
@@ -388,16 +394,6 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
       variant.fragmentReflection.specEntries = specEntries;
       outVariants->push_back(std::move(variant));
     }
-  }
-  if (specUsage.present && maxSpecArraySize > 0) {
-    // The unrolled executor's call sites live in the family's template (one #define plus one site
-    // per slot of the largest capacity; the smaller capacities compile a subset through the
-    // CHAIN_SLOT_CAPACITY guard), so the count check runs once per family against the largest
-    // capacity. The chain family's token is CHAIN_RUN_AT — family knowledge that stays here until
-    // a second spec family generalizes it.
-    CheckSpecUnrolledCallSites(fragSource, "CHAIN_RUN_AT",
-                               static_cast<uint32_t>(maxSpecArraySize) + 1, info.name, 0,
-                               diagnostics);
   }
   return report;
 }

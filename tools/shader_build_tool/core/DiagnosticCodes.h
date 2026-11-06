@@ -65,8 +65,9 @@ inline constexpr const char* SpecRawRead = "spec.raw-read";
 /// A SPEC_ name has no matching int or ivec4 member in the uniform block.
 inline constexpr const char* SpecUnknownField = "spec.unknown-field";
 
-/// The unrolled executor's call-site count does not match the specialized array's capacity.
-inline constexpr const char* SpecUnrollCount = "spec.unroll-count";
+/// A source reads SPEC_ without declaring itself a reader (`#pragma tgfx_spec_reader`): the
+/// specialization surface of a family must stay a declared, reviewable set of files.
+inline constexpr const char* SpecReader = "spec.reader-undeclared";
 
 /// The uniform layout differs between the generic and the spec-dialect compile.
 inline constexpr const char* SpecLayoutDrift = "spec.layout-drift";
@@ -174,7 +175,7 @@ inline constexpr const char* AllCodes[] = {
     SourcesUnreadable,     PlanNoEnumerator,   PlanUnbuildable,
     CompileGlsl,           CompileCacheDisabled, ReflectUnknownType,
     EmitFailed,            EmitFormLeak,
-    SpecRawRead,           SpecUnknownField,  SpecUnrollCount,
+    SpecRawRead,           SpecUnknownField,  SpecReader,
     SpecLayoutDrift,
     VerifyClipField,
     VerifySourceFile,      VerifySourceFamily, VerifyReflection,

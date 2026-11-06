@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "compile/SpecCodegen.h"
+#include <sstream>
+#include "gpu/aot/AOTResourceProfile.h"
 #include <cctype>
 #include <map>
 #include "core/DiagnosticCodes.h"
@@ -333,22 +335,60 @@ std::string ReplaceSpecMarker(const std::string& source, const std::string& incl
   return source.substr(0, lineStart) + includeText + "\n" + source.substr(lineEnd);
 }
 
-void CheckSpecUnrolledCallSites(const std::string& source, const std::string& callToken,
-                                uint32_t expectedCallSites, const std::string& shaderName,
-                                uint32_t fragIndex, Diagnostics* diagnostics) {
-  const auto token = callToken + "(";
-  size_t count = 0;
-  for (size_t offset = source.find(token); offset != std::string::npos;
-       offset = source.find(token, offset + token.size())) {
-    ++count;
+std::string ExpandUnrollPragmas(const std::string& source) {
+  constexpr const char* marker = "#pragma tgfx_spec_unroll";
+  const size_t markerLength = std::char_traits<char>::length(marker);
+  const size_t maxSites =
+      std::max(ChainResourceCapacity.instructions, NoiseGraphResourceCapacity.instructions);
+  const auto trim = [](const std::string& text) {
+    const auto first = text.find_first_not_of(" \t");
+    if (first == std::string::npos) {
+      return std::string();
+    }
+    const auto last = text.find_last_not_of(" \t");
+    return text.substr(first, last - first + 1);
+  };
+  std::string result;
+  size_t lineStart = 0;
+  while (lineStart <= source.size()) {
+    auto lineEnd = source.find('\n', lineStart);
+    if (lineEnd == std::string::npos) {
+      lineEnd = source.size();
+    }
+    const std::string line = source.substr(lineStart, lineEnd - lineStart);
+    const auto first = line.find_first_not_of(" \t");
+    if (first == std::string::npos || line.compare(first, markerLength, marker) != 0) {
+      result += line;
+    } else {
+      const std::string rest = line.substr(first + markerLength);
+      const auto open = rest.find('(');
+      const auto close = rest.rfind(')');
+      if (open == std::string::npos || close == std::string::npos || close < open) {
+        return {};
+      }
+      std::istringstream head(rest.substr(0, open));
+      std::string functionName;
+      std::string capacity;
+      std::string guard;
+      head >> functionName >> capacity >> guard;
+      if (functionName.empty() || capacity.empty() || guard.empty()) {
+        return {};
+      }
+      const auto args = trim(rest.substr(open + 1, close - open - 1));
+      for (size_t n = 0; n < maxSites; ++n) {
+        const auto index = std::to_string(n);
+        result += "#if " + capacity + " > " + index + "\n";
+        result += "    if (" + guard + "() > " + index + ") { " + functionName + "(" + index +
+                  (args.empty() ? "" : ", " + args) + "); }\n";
+        result += "#endif\n";
+      }
+    }
+    if (lineEnd < source.size()) {
+      result += '\n';
+    }
+    lineStart = lineEnd + 1;
   }
-  if (count != expectedCallSites) {
-    ReportSpecDiagnostic(diagnostics, DiagnosticCode::SpecUnrollCount, shaderName, fragIndex,
-                         "the unrolled executor carries " + std::to_string(count) + " '" +
-                             callToken + "(' occurrences (the #define plus one call site per "
-                             "slot) where " + std::to_string(expectedCallSites) +
-                             " were expected");
-  }
+  return result;
 }
 
 }  // namespace tgfx

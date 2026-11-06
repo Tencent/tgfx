@@ -50,6 +50,10 @@ size_t ValidatePointwiseDispatch(const std::string& shaderDir, Diagnostics* diag
 /// violation count.
 size_t ValidateMirroredDimensions(Diagnostics* diagnostics);
 
+/// Checks that every source reading the SPEC_ accessors declares `#pragma tgfx_spec_reader`.
+/// Reports spec.reader-undeclared and returns the violation count.
+size_t ValidateSpecReaders(const std::string& shaderDir, Diagnostics* diagnostics);
+
 /// Validates that the shader sources do not refer to things that no longer exist: every
 /// "name.inc/.frag/.vert" token must name a file under shaderDir, and every "XxxShader" token must
 /// name a registered shader family (registeredShaders). A reference to a removed file or merged-away

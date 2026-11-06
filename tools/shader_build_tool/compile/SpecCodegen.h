@@ -74,12 +74,12 @@ std::string GenerateSpecStubInclude(const SpecUsage& usage);
 /// Replaces the marker line with the include text. A source without the marker returns unchanged.
 std::string ReplaceSpecMarker(const std::string& source, const std::string& includeText);
 
-/// Counts the unrolled call sites `callToken(` carries (the #define itself included) and reports
-/// spec.unroll-count when it does not equal one define plus the specialized array's capacity:
-/// a missing call site would drop a slot, an extra one would compile dead code against a wrong
-/// bound.
-void CheckSpecUnrolledCallSites(const std::string& source, const std::string& callToken,
-                                uint32_t expectedCallSites, const std::string& shaderName,
-                                uint32_t fragIndex, Diagnostics* diagnostics);
+/// Expands every `#pragma tgfx_spec_unroll <fn> <capacity> <guard> (<args>)` line into one
+/// guarded call site per slot of the largest declared capacity, so the site count lives in the
+/// tool instead of a hand-written block: `if (<guard> > n) { <fn>(n, <args>); }` behind
+/// `#if <capacity> > n`, which keeps the smaller profiles a strict subset. Returns the source
+/// unchanged when it carries no pragma, and an empty string when a pragma is malformed (the build
+/// reports that instead of silently dropping the call sites a GLSL compiler would ignore).
+std::string ExpandUnrollPragmas(const std::string& source);
 
 }  // namespace tgfx

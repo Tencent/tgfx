@@ -25,7 +25,7 @@
 #include "gpu/aot/ir/Program.h"
 #include "gpu/aot/select/DrawShape.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
-#include "gpu/aot/spec/SpecCapture.h"
+#include "gpu/aot/spec/SpecResolver.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/kernels/PointwiseChainShader.h"
 #include "tgfx/core/BytesKey.h"
@@ -95,13 +95,11 @@ AOTProgramInfo::AOTProgramInfo(const ProgramInfo& info, const AOTProgram& progra
   // (same GP, same XP, same slot-count class) encode different chains, so the structural words
   // this draw captured must join the key or the second shape would silently reuse the first
   // shape's specialized program. The capture runs the draw's own uniform writers over a CPU
-  // scratch buffer (SpecCapture), so the key and the fold share one source of values. GL-only in
-  // this stage: the SPIR-V-family backends inject at pipeline creation and are wired next.
-  SpecValues spec = {};
-  if (context->backend() == Backend::OpenGL || context->backend() == Backend::Metal) {
-    spec = SpecCapture::Capture(context, info, PointwiseChainShader::Name,
-                                variant->vertPermutationIndex, variant->fragPermutationIndex);
-  }
+  // scratch buffer (SpecCapture), so the key and the fold share one source of values. The entry
+  // is the same one the plain route uses (SpecResolver), so both routes agree.
+  const SpecValues spec =
+      SpecResolver::Resolve(context, info, PointwiseChainShader::Name,
+                            variant->vertPermutationIndex, variant->fragPermutationIndex);
   if (!spec.empty()) {
     spec.writeKey(&key);
   }
