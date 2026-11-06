@@ -130,6 +130,10 @@ struct ShaderAOTTestResult {
   std::vector<PrecompiledHitRecord> hitRecords = {};
   std::vector<PrecompiledFallbackRecord> fallbackRecords = {};
   AOTDrawStats drawStats = {};
+  // Specialization cost: how many draws resolved values, and how many distinct value sets (the
+  // compile count a fully specialized runtime pays) they covered.
+  uint64_t specCaptures = 0;
+  uint64_t distinctSpecStructures = 0;
 };
 
 struct ShaderAOTSummary {
@@ -139,6 +143,8 @@ struct ShaderAOTSummary {
   std::array<uint64_t, AOT_STAGE_COUNT> aotStageCounts = {};
   std::array<uint64_t, FALLBACK_REASON_COUNT> fallbackCounts = {};
   AOTDrawStats drawStats = {};
+  uint64_t specCaptures = 0;
+  uint64_t distinctSpecStructures = 0;
 };
 
 static void AddDrawStats(AOTDrawStats* target, const AOTDrawStats& source) {
@@ -644,6 +650,9 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         result.hitRecords = cache->hitRecords();
         result.fallbackRecords = cache->fallbackRecords();
         result.drawStats = cache->drawStats();
+        auto specStats = cache->specStats();
+        result.specCaptures = specStats.captures;
+        result.distinctSpecStructures = specStats.distinctStructures;
         cache->setDiagnosticRecordingEnabled(false);
         device->unlock();
       }
@@ -732,6 +741,8 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       }
       AddProgramStats(&summary.programStats, testResult.programStats);
       AddDrawStats(&summary.drawStats, testResult.drawStats);
+      summary.specCaptures += testResult.specCaptures;
+      summary.distinctSpecStructures += testResult.distinctSpecStructures;
       summary.artifactHits += testResult.artifactHits;
       summary.artifactMisses += testResult.artifactMisses;
       for (size_t i = 0; i < AOT_STAGE_COUNT; ++i) {
@@ -797,6 +808,9 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
            {"drawMetrics", DrawStatsToJSON(testResult.drawStats)},
            {"artifactLookups",
             {{"hits", testResult.artifactHits}, {"misses", testResult.artifactMisses}}},
+           {"specialization",
+            {{"captures", testResult.specCaptures},
+             {"distinctStructures", testResult.distinctSpecStructures}}},
            {"consistencyChecks", std::move(testConsistency.checks)},
            {"hitRecords", std::move(hitRecordsJSON)},
            {"fallbackReasons", FallbackCountsToJSON(testResult.fallbackCounts)},
@@ -954,6 +968,8 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
 #endif
                                {"gitHead", GitHeadAtRun()},
                                {"runtimeToolchainABI", ExpectedToolchainABI}};
+    ShaderCacheStats shaderCacheStats = {};
+    bool specializationEnabled = false;
     {
       auto device = DevicePool::Make();
       if (device != nullptr) {
@@ -964,68 +980,82 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
           identity["bundleProfileTag"] = cache->profileTag();
           identity["bundleIdentityHash"] = cache->bundleIdentityHash();
           identity["bundleToolchainABI"] = cache->bundleToolchainABI();
+          shaderCacheStats = cache->shaderCache()->stats();
+          specializationEnabled = cache->specializationEnabled();
           device->unlock();
         }
       }
     }
     nlohmann::json report = {
-        {"backend", TGFX_BACKEND_NAME},
-        {"identity", std::move(identity)},
-        {"iteration", currentIteration},
-        {"coverageGate",
-         {{"noMatchingRule", coverageGate.noMatchingRule},
-          {"runtimeCompiles", coverageGate.runtimeCompiles},
-          {"excludedEnvironment", coverageGate.excludedEnvironment},
-          {"droppedDraws", coverageGate.droppedDraws},
-          {"consistent", coverageGate.consistent},
-          {"precompiledArtifactCreations", summary.programStats.precompiledArtifactCreations},
-          {"vacuous",
-           coverageGate.passed() && summary.programStats.precompiledArtifactCreations == 0},
-          {"passed",
-           AOTCoverageGateMet(coverageGate, summary.programStats.precompiledArtifactCreations)}}},
-        {"metricDefinitions",
-         {{"coldAOTHitRate",
-           "precompiledArtifactCreations among all cold creations, excluding deliberate "
-           "(test fixture) and deferred-texture stub fallbacks"},
-          {"artifactLookupHitRate", "artifactHits / (artifactHits + artifactMisses)"},
-          {"successfulHit", "AOT render pipeline created successfully"},
-          {"cacheHitsExcludedFromColdAOTRate", true}}},
-        {"summary",
-         {{"testCount", testResults.size()},
-          {"failedTestCount", failedTestCount},
-          {"skippedTestCount", skippedTestCount},
-          {"allTestsConsistent", inconsistentTestCount == 0},
-          {"inconsistentTestCount", inconsistentTestCount},
-          {"testsWithColdPrograms", testsWithColdPrograms},
-          {"testsWithAOTHits", testsWithAOTHits},
-          {"testsWithFallbacks", testsWithFallbacks},
-          {"program", ProgramStatsToJSON(summary.programStats)},
-          {"aotStages", AOTStageCountsToJSON(summary.aotStageCounts)},
-          {"drawMetrics", DrawStatsToJSON(summary.drawStats)},
-          {"coldProgramCreations", coldCreations},
-          {"excludedDeliberateOrByDesignFallbacks", excludedFallbacks},
-          {"artifactLookups",
-           {{"hits", summary.artifactHits},
-            {"misses", summary.artifactMisses},
-            {"hitRate", Percentage(summary.artifactHits, artifactLookups)}}},
-          {"successfulHitCount", hitRecordCount},
-          {"uniqueSuccessfulShaders", sortedShaders.size()},
-          {"uniqueSuccessfulPermutations", sortedPermutations.size()},
-          {"uniqueSuccessfulEffects", sortedHitEffects.size()},
-          {"uniqueSuccessfulStructures", sortedHitStructures.size()},
-          {"fallbackReasons", FallbackCountsToJSON(summary.fallbackCounts)},
-          {"uniqueFallbackEffects", fallbackEffectKeys.size()},
-          {"uniqueFallbackStructures", sortedFallbacks.size()}}},
-        {"consistencyChecks", std::move(globalConsistency.checks)},
-        {"successfulShaders", std::move(successfulShadersJSON)},
-        {"successfulPermutations", std::move(successfulPermutationsJSON)},
-        {"successfulEffects", std::move(successfulEffectsJSON)},
-        {"successfulStructures", std::move(successfulStructuresJSON)},
-        {"fallbackEffectsByReason", std::move(fallbackEffectsByReasonJSON)},
-        {"fallbackStructures", std::move(fallbackStructuresJSON)},
-        {"decompositionAudit", std::move(decompositionAudit)},
-        {"rootCauseProgramKeyAttribution", std::move(rootCauseProgramKeyAttribution)},
-        {"tests", std::move(testsJSON)}};
+      {"backend", TGFX_BACKEND_NAME}, {"identity", std::move(identity)},
+      {"iteration", currentIteration},
+      {"coverageGate",
+       {{"noMatchingRule", coverageGate.noMatchingRule},
+        {"runtimeCompiles", coverageGate.runtimeCompiles},
+        {"excludedEnvironment", coverageGate.excludedEnvironment},
+        {"droppedDraws", coverageGate.droppedDraws},
+        {"consistent", coverageGate.consistent},
+        {"precompiledArtifactCreations", summary.programStats.precompiledArtifactCreations},
+        {"vacuous",
+         coverageGate.passed() && summary.programStats.precompiledArtifactCreations == 0},
+        {"passed",
+         AOTCoverageGateMet(coverageGate, summary.programStats.precompiledArtifactCreations)}}},
+      {"metricDefinitions",
+       {{"coldAOTHitRate",
+         "precompiledArtifactCreations among all cold creations, excluding deliberate "
+         "(test fixture) and deferred-texture stub fallbacks"},
+        {"artifactLookupHitRate", "artifactHits / (artifactHits + artifactMisses)"},
+        {"successfulHit", "AOT render pipeline created successfully"},
+        {"cacheHitsExcludedFromColdAOTRate", true}}},
+      {"summary",
+       {{"testCount", testResults.size()},
+        {"failedTestCount", failedTestCount},
+        {"skippedTestCount", skippedTestCount},
+        {"allTestsConsistent", inconsistentTestCount == 0},
+        {"inconsistentTestCount", inconsistentTestCount},
+        {"testsWithColdPrograms", testsWithColdPrograms},
+        {"testsWithAOTHits", testsWithAOTHits},
+        {"testsWithFallbacks", testsWithFallbacks},
+        {"program", ProgramStatsToJSON(summary.programStats)},
+        {"aotStages", AOTStageCountsToJSON(summary.aotStageCounts)},
+        {"drawMetrics", DrawStatsToJSON(summary.drawStats)},
+        {"coldProgramCreations", coldCreations},
+        {"excludedDeliberateOrByDesignFallbacks", excludedFallbacks},
+        {"artifactLookups",
+         {{"hits", summary.artifactHits},
+          {"misses", summary.artifactMisses},
+          {"hitRate", Percentage(summary.artifactHits, artifactLookups)}}},
+        {"successfulHitCount", hitRecordCount},
+        {"uniqueSuccessfulShaders", sortedShaders.size()},
+        {"uniqueSuccessfulPermutations", sortedPermutations.size()},
+        {"uniqueSuccessfulEffects", sortedHitEffects.size()},
+        {"uniqueSuccessfulStructures", sortedHitStructures.size()},
+        {"fallbackReasons", FallbackCountsToJSON(summary.fallbackCounts)},
+        {"uniqueFallbackEffects", fallbackEffectKeys.size()},
+        {"uniqueFallbackStructures", sortedFallbacks.size()},
+        {"specialization",
+         {{"enabled", specializationEnabled},
+          {"captures", summary.specCaptures},
+          {"distinctStructures", summary.distinctSpecStructures}}},
+        {"shaderCache",
+         {{"moduleHits", shaderCacheStats.moduleHits},
+          {"moduleCreations", shaderCacheStats.moduleCreations},
+          {"moduleCreationsMs",
+           static_cast<double>(shaderCacheStats.moduleCreationMicros) / 1000.0},
+          {"pipelineHits", shaderCacheStats.pipelineHits},
+          {"pipelineCreations", shaderCacheStats.pipelineCreations},
+          {"pipelineCreationsMs",
+           static_cast<double>(shaderCacheStats.pipelineCreationMicros) / 1000.0}}}}},
+       {"consistencyChecks", std::move(globalConsistency.checks)},
+       {"successfulShaders", std::move(successfulShadersJSON)},
+       {"successfulPermutations", std::move(successfulPermutationsJSON)},
+       {"successfulEffects", std::move(successfulEffectsJSON)},
+       {"successfulStructures", std::move(successfulStructuresJSON)},
+       {"fallbackEffectsByReason", std::move(fallbackEffectsByReasonJSON)},
+       {"fallbackStructures", std::move(fallbackStructuresJSON)},
+       {"decompositionAudit", std::move(decompositionAudit)},
+       {"rootCauseProgramKeyAttribution", std::move(rootCauseProgramKeyAttribution)},
+       {"tests", std::move(testsJSON)}};
 
     auto outputPath = ProjectPath::Absolute(std::string("test/out/shader_aot_report.") +
                                             TGFX_BACKEND_NAME + ".json");

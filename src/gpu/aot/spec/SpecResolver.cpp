@@ -54,7 +54,9 @@ SpecValues SpecResolver::Resolve(Context* context, const ProgramInfo& info,
       nullptr) {
     return {};
   }
-  return SpecCapture::Capture(context, info, shaderName, vertIndex, fragIndex);
+  auto values = SpecCapture::Capture(context, info, shaderName, vertIndex, fragIndex);
+  cache->recordSpecCapture(values);
+  return values;
 }
 
 }  // namespace tgfx

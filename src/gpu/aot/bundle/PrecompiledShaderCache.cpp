@@ -36,8 +36,24 @@
 
 namespace tgfx {
 
+namespace {
+
+// The run-wide opt-in for specialization: absent or 0 keeps the generic default, any other value
+// turns it on. The cost audit runs one full suite each way without a code change.
+bool SpecializationRequestedByEnvironment() {
+  const char* value = std::getenv("TGFX_AOT_SPECIALIZE");
+  if (value == nullptr) {
+    return false;
+  }
+  std::string text = value;
+  return text != "0" && text != "false" && text != "off";
+}
+
+}  // namespace
+
 PrecompiledShaderCache::PrecompiledShaderCache(Context* context, Backend backend)
-    : _context(context), _backend(backend), _shaderCache(context) {
+    : _context(context), _backend(backend), _shaderCache(context),
+      _specializationEnabled(SpecializationRequestedByEnvironment()) {
 }
 
 const char* PrecompiledFallbackReasonName(PrecompiledFallbackReason reason) {
@@ -202,9 +218,30 @@ AOTDrawStats PrecompiledShaderCache::drawStats() const {
   return _drawStats;
 }
 
+void PrecompiledShaderCache::recordSpecCapture(const SpecValues& values) {
+  if (values.empty()) {
+    return;
+  }
+  std::lock_guard<std::mutex> autoLock(_specStatsMutex);
+  _specStats.captures++;
+  if (_specStructures.insert(values.values).second) {
+    _specStats.distinctStructures++;
+  }
+}
+
+PrecompiledShaderCache::SpecStats PrecompiledShaderCache::specStats() const {
+  std::lock_guard<std::mutex> autoLock(_specStatsMutex);
+  return _specStats;
+}
+
 void PrecompiledShaderCache::resetStats() {
   _hitCount.store(0, std::memory_order_relaxed);
   _missCount.store(0, std::memory_order_relaxed);
+  {
+    std::lock_guard<std::mutex> specLock(_specStatsMutex);
+    _specStats = {};
+    _specStructures.clear();
+  }
   for (auto& count : aotStageCounts) {
     count.store(0, std::memory_order_relaxed);
   }

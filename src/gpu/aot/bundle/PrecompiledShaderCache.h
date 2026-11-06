@@ -25,6 +25,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -34,6 +35,7 @@
 #include "gpu/Uniform.h"
 #include "gpu/UniformData.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
+#include "gpu/aot/spec/SpecValues.h"
 #include "gpu/shaders/contract/AOTFailure.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/Backend.h"
@@ -457,7 +459,8 @@ class PrecompiledShaderCache {
   /// Whether the AOT route may specialize a precompiled variant with the draw's structural
   /// uniform values before creating its program. Off by default: specialization trades a
   /// synchronous compile of the hot shape for a leaner specialized program, so the caller opts
-  /// in (the perf matrix and the specialization A/B tests flip it).
+  /// in (the perf matrix and the specialization A/B tests flip it, and TGFX_AOT_SPECIALIZE=1
+  /// turns it on for a whole run without touching code).
   bool specializationEnabled() const {
     return _specializationEnabled;
   }
@@ -465,6 +468,21 @@ class PrecompiledShaderCache {
   void setSpecializationEnabled(bool enabled) {
     _specializationEnabled = enabled;
   }
+
+  /// What the specialization route paid for: how many resolves returned values, and how many
+  /// distinct value sets those resolves covered. The second number is the compile count a
+  /// fully-specialized runtime pays for one run of a scene on a cold pipeline cache, so the cost
+  /// audit compares it between runs with TGFX_AOT_SPECIALIZE off and on.
+  struct SpecStats {
+    uint64_t captures = 0;
+    uint64_t distinctStructures = 0;
+  };
+
+  /// Records one resolved specialization. An empty value set is the generic form and is ignored.
+  void recordSpecCapture(const SpecValues& values);
+
+  /// Returns a snapshot of the specialization accounting since the last resetStats().
+  SpecStats specStats() const;
 
   /// The specialization capture's per-variant scratch: uniform data backed by CPU buffers, so
   /// the capture runs the very writers the upload runs without touching any GPU object. One
@@ -541,6 +559,11 @@ class PrecompiledShaderCache {
   /// the scratch was built from may no longer be the same).
   std::map<std::pair<HashKey, HashKey>, std::unique_ptr<SpecScratch>> _specScratch;
   bool _specializationEnabled = false;
+  mutable std::mutex _specStatsMutex;
+  SpecStats _specStats = {};
+  // The distinct value sets themselves rather than a digest: the audit reports a compile count,
+  // and a collision would understate it.
+  std::set<std::vector<int32_t>> _specStructures;
   std::shared_ptr<const ParsedBundle> _bundle = nullptr;
   mutable std::mutex _programMissMutex;
   std::unordered_map<BytesKey, PrecompiledFallbackReason, BytesKeyHasher> _programMisses;
