@@ -46,16 +46,15 @@ struct AOTBinding {
 
 /// The runtime operator of one chain slot. The integer values are part of the precompiled kernel
 /// ABI: each member assigns its Op constant directly, and shader_build_tool injects the same
-/// values into every compiled variant as the OP_* defines.
+/// values into every compiled variant as the OP_* defines. The pointwise color operators generate
+/// from the op list (TGFX_POINTWISE_OPS in KernelContract.h); the rest is the chain interpreter's
+/// instruction vocabulary.
 enum class AOTChainOp : int {
-  ColorMatrix = Op::ColorMatrix,
-  Luma = Op::Luma,
-  AlphaThreshold = Op::AlphaThreshold,
-  ColorSpaceXform = Op::ColorSpaceXform,
-  None = Op::None,
+#define TGFX_AOT_CHAIN_OP(name, id, params, member, passBoundarySensitive) name = Op::name,
+  TGFX_POINTWISE_OPS(TGFX_AOT_CHAIN_OP)
+#undef TGFX_AOT_CHAIN_OP
+      None = Op::None,
   Texture = Op::Texture,
-  ConstColor = Op::ConstColor,
-  Blend = Op::Blend,
   AARectCoverage = Op::AARectCoverage,
   Gradient = Op::Gradient,
   LocalRectCoverage = Op::LocalRectCoverage,
@@ -109,12 +108,12 @@ struct AOTChainSlot {
   // are all clear).
   int texModulateSourceSlot = -1;
   int texModulateAlphaOnly = 0;
-  AOTColorMatrixParameters colorMatrix = {};
-  AOTLumaParameters luma = {};
-  AOTAlphaThresholdParameters alphaThreshold = {};
-  AOTColorSpaceXformParameters colorSpaceXform = {};
-  AOTConstColorParameters constColor = {};
-  AOTBlendParameters blend = {};
+  // The pointwise color operators' parameter blocks, generated from the op list
+  // (TGFX_POINTWISE_OPS in KernelContract.h) in the list's order, so the layout is stable.
+#define TGFX_AOT_CHAIN_SLOT_MEMBER(name, id, params, member, passBoundarySensitive) \
+  params member = {};
+  TGFX_POINTWISE_OPS(TGFX_AOT_CHAIN_SLOT_MEMBER)
+#undef TGFX_AOT_CHAIN_SLOT_MEMBER
   // OP_AARECT_COVERAGE only: the clip rect in device coordinates. The kernel reads the chain-wide
   // CoverageRect uniform, so at most one slot per chain may carry this op (enforced by the
   // builder).

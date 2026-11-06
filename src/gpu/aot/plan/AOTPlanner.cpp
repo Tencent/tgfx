@@ -79,13 +79,14 @@ static bool ValidateCutPlan(const AOTEffectGraph& graph, const Plan& plan) {
         }
       }
     }
-    // A pass boundary quantizes to the 1/255 grid, and an AlphaThreshold amplifies that rounding
-    // into a step flip (see CanStartPassAt in AOTEffectDecomposer.cpp), so a threshold must share
-    // its pass with the node producing its input: the input may only be a node of the same pass,
-    // the geometry color, or a copied designator — never a value crossing a pass boundary.
+    // A pass boundary quantizes to the 1/255 grid, and a pass-boundary-sensitive operator (a step
+    // function — AlphaThreshold today, per its row on the op list) amplifies that rounding into a
+    // flip (see CanStartPassAt in AOTEffectDecomposer.cpp), so it must share its pass with the
+    // node producing its input: the input may only be a node of the same pass, the geometry color,
+    // or a copied designator — never a value crossing a pass boundary.
     for (auto nodeID : pass.nodes) {
       const auto* node = graph.nodeAt(nodeID);
-      if (node == nullptr || node->kind != AOTEffectKind::AlphaThreshold) {
+      if (node == nullptr || !IsPassBoundarySensitive(node->kind)) {
         continue;
       }
       for (auto input : node->inputs) {

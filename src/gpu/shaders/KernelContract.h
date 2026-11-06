@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -49,6 +50,24 @@ constexpr const char* DeviceToLocal = "DeviceToLocal";
 
 }  // namespace ClipContract
 
+// The pointwise color operators of the fused kernels, one row per operator: the single place an
+// operator's name, ABI value and facts are declared. Every mirror below is generated from this
+// list — the Op constants and the OP_* defines here, the AOTEffectKind / AOTPointwiseOpType /
+// AOTChainOp members and the parameter variant in the IR — so adding an operator is one row plus
+// its own semantics (parameter struct, math, bind), and removing a row fails every consumer's
+// compile instead of leaving a stale mirror behind.
+// Columns: name, ABI value (Op::*, frozen bundle compatibility), the IR parameter struct, the
+// per-slot parameter member name, and pass-boundary sensitivity — an operator that amplifies the
+// 1/255 pass-boundary rounding into a visible flip (a step function) must share its pass with its
+// input's producer (IsPassBoundarySensitive; see AOTEffectDecomposer's CanStartPassAt).
+#define TGFX_POINTWISE_OPS(X)                                                 \
+  X(ColorMatrix, 0, AOTColorMatrixParameters, colorMatrix, false)             \
+  X(Luma, 1, AOTLumaParameters, luma, false)                                  \
+  X(AlphaThreshold, 2, AOTAlphaThresholdParameters, alphaThreshold, true)     \
+  X(ColorSpaceXform, 3, AOTColorSpaceXformParameters, colorSpaceXform, false) \
+  X(ConstColor, 6, AOTConstColorParameters, constColor, false)                \
+  X(Blend, 7, AOTBlendParameters, blend, false)
+
 namespace Op {
 
 // The one op table of the pointwise interpreters (chain and slot): the single place an op value
@@ -56,15 +75,14 @@ namespace Op {
 // defines (Op::Defines); op_codes.inc only marks the include point, and the AOTChainOp enum
 // anchors to them by assignment. The single-slot interpreter dispatches on the AOTPointwiseOpType
 // subset of these values, so it deliberately never emits the chain-only ones (Texture, the
-// coverage ops, and the modulators).
-constexpr int ColorMatrix = 0;
-constexpr int Luma = 1;
-constexpr int AlphaThreshold = 2;
-constexpr int ColorSpaceXform = 3;
+// coverage ops, and the modulators). The pointwise color operators come from the list above; the
+// rest is the chain interpreter's instruction vocabulary (pass-through marker, texture, the
+// coverage ops, the modulators, the noise source), which has no IR mirror to keep in sync.
+#define TGFX_OP_CONSTANT(name, id, params, member, passBoundarySensitive) constexpr int name = id;
+TGFX_POINTWISE_OPS(TGFX_OP_CONSTANT)
+#undef TGFX_OP_CONSTANT
 constexpr int None = 4;
 constexpr int Texture = 5;
-constexpr int ConstColor = 6;
-constexpr int Blend = 7;
 constexpr int AARectCoverage = 8;
 constexpr int Gradient = 9;
 constexpr int LocalRectCoverage = 10;
@@ -74,26 +92,100 @@ constexpr int InputOpaque = 13;
 constexpr int MulAlpha = 14;
 constexpr int PerlinNoise = 15;
 
+namespace detail {
+
+// The ABI value set, split the way the declarations are: the list's pointwise operators and the
+// chain vocabulary. The asserts below pin uniqueness and the historical values — the OP_* values
+// are part of every shipped variant's encoding (slot words, uniform OpType), so renumbering
+// invalidates every bundle rather than failing loudly.
+constexpr int PointwiseAbiValues[] = {
+#define TGFX_OP_ABI_VALUE(name, id, params, member, passBoundarySensitive) id,
+    TGFX_POINTWISE_OPS(TGFX_OP_ABI_VALUE)
+#undef TGFX_OP_ABI_VALUE
+};
+constexpr int VocabularyAbiValues[] = {
+    None,          Texture,     AARectCoverage, Gradient, LocalRectCoverage,
+    RRectCoverage, TexModulate, InputOpaque,    MulAlpha, PerlinNoise};
+
+constexpr bool AbiValuesUnique() {
+  for (size_t i = 0; i < sizeof(PointwiseAbiValues) / sizeof(int); ++i) {
+    for (size_t j = i + 1; j < sizeof(PointwiseAbiValues) / sizeof(int); ++j) {
+      if (PointwiseAbiValues[i] == PointwiseAbiValues[j]) {
+        return false;
+      }
+    }
+    for (size_t j = 0; j < sizeof(VocabularyAbiValues) / sizeof(int); ++j) {
+      if (PointwiseAbiValues[i] == VocabularyAbiValues[j]) {
+        return false;
+      }
+    }
+  }
+  for (size_t i = 0; i < sizeof(VocabularyAbiValues) / sizeof(int); ++i) {
+    for (size_t j = i + 1; j < sizeof(VocabularyAbiValues) / sizeof(int); ++j) {
+      if (VocabularyAbiValues[i] == VocabularyAbiValues[j]) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+}  // namespace detail
+
+static_assert(detail::AbiValuesUnique(), "two ops share one ABI value");
+static_assert(None == 4 && Texture == 5 && PerlinNoise == 15,
+              "the op ABI values are frozen bundle compatibility");
+
+/// The OP_* macro name of a pointwise operator: CamelCase to SCREAMING_SNAKE (ColorSpaceXform to
+/// COLOR_SPACE_XFORM). The chain vocabulary's names carry consecutive capitals (AARectCoverage)
+/// and are spelled out explicitly below instead.
+inline std::string PointwiseDefineName(const char* name) {
+  std::string result;
+  for (size_t i = 0; name[i] != '\0'; ++i) {
+    const char c = name[i];
+    if (c >= 'A' && c <= 'Z' && i > 0) {
+      result.push_back('_');
+    }
+    result.push_back(static_cast<char>(c >= 'a' && c <= 'z' ? c - 'a' + 'A' : c));
+  }
+  return result;
+}
+
 /// The OP_* macros every compiled variant receives. The table above is their only definition, so a
 /// shader source cannot carry a second copy that drifts; shader_build_tool prepends this list to
-/// every stage's defines and covers it with the manifest's source digest.
+/// every stage's defines and covers it with the manifest's source digest. The output is sorted by
+/// ABI value, so it is byte-identical regardless of how the two tables above are ordered.
 inline std::vector<std::string> Defines() {
-  return {"OP_COLOR_MATRIX=" + std::to_string(ColorMatrix),
-          "OP_LUMA=" + std::to_string(Luma),
-          "OP_ALPHA_THRESHOLD=" + std::to_string(AlphaThreshold),
-          "OP_COLOR_SPACE_XFORM=" + std::to_string(ColorSpaceXform),
-          "OP_NONE=" + std::to_string(None),
-          "OP_TEXTURE=" + std::to_string(Texture),
-          "OP_CONST_COLOR=" + std::to_string(ConstColor),
-          "OP_BLEND=" + std::to_string(Blend),
-          "OP_AARECT_COVERAGE=" + std::to_string(AARectCoverage),
-          "OP_GRADIENT=" + std::to_string(Gradient),
-          "OP_LOCAL_RECT_COVERAGE=" + std::to_string(LocalRectCoverage),
-          "OP_RRECT_COVERAGE=" + std::to_string(RRectCoverage),
-          "OP_TEX_MODULATE=" + std::to_string(TexModulate),
-          "OP_INPUT_OPAQUE=" + std::to_string(InputOpaque),
-          "OP_MUL_ALPHA=" + std::to_string(MulAlpha),
-          "OP_PERLIN_NOISE=" + std::to_string(PerlinNoise)};
+  struct Entry {
+    int value;
+    const char* name;
+    const char* define;
+  };
+  std::vector<Entry> entries = {
+#define TGFX_OP_DEFINE(name, id, params, member, passBoundarySensitive) {id, #name, ""},
+      TGFX_POINTWISE_OPS(TGFX_OP_DEFINE)
+#undef TGFX_OP_DEFINE
+          {None, "None", "NONE"},
+      {Texture, "Texture", "TEXTURE"},
+      {AARectCoverage, "AARectCoverage", "AARECT_COVERAGE"},
+      {Gradient, "Gradient", "GRADIENT"},
+      {LocalRectCoverage, "LocalRectCoverage", "LOCAL_RECT_COVERAGE"},
+      {RRectCoverage, "RRectCoverage", "RRECT_COVERAGE"},
+      {TexModulate, "TexModulate", "TEX_MODULATE"},
+      {InputOpaque, "InputOpaque", "INPUT_OPAQUE"},
+      {MulAlpha, "MulAlpha", "MUL_ALPHA"},
+      {PerlinNoise, "PerlinNoise", "PERLIN_NOISE"},
+  };
+  std::stable_sort(entries.begin(), entries.end(),
+                   [](const Entry& a, const Entry& b) { return a.value < b.value; });
+  std::vector<std::string> defines;
+  defines.reserve(entries.size());
+  for (const auto& entry : entries) {
+    const std::string define =
+        entry.define[0] != '\0' ? std::string(entry.define) : PointwiseDefineName(entry.name);
+    defines.push_back("OP_" + define + "=" + std::to_string(entry.value));
+  }
+  return defines;
 }
 
 }  // namespace Op

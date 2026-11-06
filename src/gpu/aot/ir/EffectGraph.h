@@ -75,13 +75,12 @@ class AOTNodeID {
 enum class AOTEffectKind {
   GeometryColor,
   TextureSource,
-  ColorMatrix,
-  Luma,
-  AlphaThreshold,
-  ColorSpaceXform,
-  ConstColor,
-  Blend,
-  PerlinNoiseSource,
+// The pointwise color operators: generated from the single op list (TGFX_POINTWISE_OPS in
+// KernelContract.h), in the list's order, so the KindContracts rows below stay aligned.
+#define TGFX_AOT_EFFECT_KIND(name, id, params, member, passBoundarySensitive) name,
+  TGFX_POINTWISE_OPS(TGFX_AOT_EFFECT_KIND)
+#undef TGFX_AOT_EFFECT_KIND
+      PerlinNoiseSource,
   RectCoverage,
   GradientSource,
   RRectCoverage,
@@ -310,28 +309,40 @@ struct AOTRRectCoverageParameters {
   float antiAlias = 1.0f;
 };
 
-using AOTEffectParameters =
-    std::variant<std::monostate, AOTTextureParameters, AOTColorMatrixParameters, AOTLumaParameters,
-                 AOTAlphaThresholdParameters, AOTColorSpaceXformParameters, AOTConstColorParameters,
-                 AOTBlendParameters, AOTPerlinNoiseParameters, AOTRectCoverageParameters,
-                 AOTGradientParameters, AOTRRectCoverageParameters, AOTOpaqueKernelParameters>;
+using AOTEffectParameters = std::variant<std::monostate, AOTTextureParameters,
+#define TGFX_AOT_PARAM_TYPE(name, id, params, member, passBoundarySensitive) params,
+                                         TGFX_POINTWISE_OPS(TGFX_AOT_PARAM_TYPE)
+#undef TGFX_AOT_PARAM_TYPE
+                                             AOTPerlinNoiseParameters,
+                                         AOTRectCoverageParameters, AOTGradientParameters,
+                                         AOTRRectCoverageParameters, AOTOpaqueKernelParameters>;
 
 // Runtime-selected pointwise operator applied by the fused kernels (PointwiseChain and
 // YUVTextureFill). The values are the AOTPointwiseOpType subset of the shared
 // op table (operator/op_codes.inc): the kernels declare every operator's parameter block
 // unconditionally and select at draw time via a uniform, so the operator kind is never a
-// compile-time permutation axis.
+// compile-time permutation axis. The members generate from the op list; None is the pass-through
+// marker the slot interpreters also use.
 enum class AOTPointwiseOpType : int {
-  ColorMatrix = Op::ColorMatrix,
-  Luma = Op::Luma,
-  AlphaThreshold = Op::AlphaThreshold,
-  ColorSpaceXform = Op::ColorSpaceXform,
-  None = Op::None,
-  // 5 is OP_TEXTURE in the chain kernel's slot ABI and never a pointwise op. 6/7 mirror the
-  // chain kernel's OP_CONST_COLOR / OP_BLEND values.
-  ConstColor = Op::ConstColor,
-  Blend = Op::Blend,
+#define TGFX_AOT_POINTWISE_OP(name, id, params, member, passBoundarySensitive) name = Op::name,
+  TGFX_POINTWISE_OPS(TGFX_AOT_POINTWISE_OP)
+#undef TGFX_AOT_POINTWISE_OP
+      None = Op::None,
 };
+
+/// Whether the operator amplifies the 1/255 pass-boundary rounding into a visible flip (a step
+/// function) and must therefore share its pass with its input's producer. The single declaration
+/// both the decomposer's cut placement (CanStartPassAt) and the planner's validation read — the
+/// flag lives on the op list's row (TGFX_POINTWISE_OPS in KernelContract.h).
+constexpr bool IsPassBoundarySensitive(AOTEffectKind kind) {
+#define TGFX_AOT_PASS_SENSITIVE(name, id, params, member, passBoundarySensitive) \
+  if (kind == AOTEffectKind::name) {                                             \
+    return passBoundarySensitive;                                                \
+  }
+  TGFX_POINTWISE_OPS(TGFX_AOT_PASS_SENSITIVE)
+#undef TGFX_AOT_PASS_SENSITIVE
+  return false;
+}
 
 /**
  * Splits a 20-element color matrix into the two uniform records every pointwise-slot layout uses:
@@ -350,17 +361,13 @@ inline void PackAOTColorMatrix(const std::array<float, 20>& matrix, float* matri
 }
 
 // One pointwise-operator slot of a fused kernel, carrying the full parameter set of whichever
-// operator it holds. Only the member matching type is read.
+// operator it holds. Only the member matching type is read. The members generate from the op
+// list (TGFX_POINTWISE_OPS in KernelContract.h), in the list's order, so the layout is stable.
 struct AOTPointwiseSlot {
   AOTPointwiseOpType type = AOTPointwiseOpType::None;
-  AOTColorMatrixParameters colorMatrix = {};
-  AOTLumaParameters luma = {};
-  AOTAlphaThresholdParameters alphaThreshold = {};
-  AOTColorSpaceXformParameters colorSpaceXform = {};
-  // ConstColor op: the constant and its input mode. Blend op: constColor holds the constant
-  // operand and blend carries the mode plus the operand order (childType).
-  AOTConstColorParameters constColor = {};
-  AOTBlendParameters blend = {};
+#define TGFX_AOT_SLOT_MEMBER(name, id, params, member, passBoundarySensitive) params member = {};
+  TGFX_POINTWISE_OPS(TGFX_AOT_SLOT_MEMBER)
+#undef TGFX_AOT_SLOT_MEMBER
 };
 
 struct AOTEffectNode {

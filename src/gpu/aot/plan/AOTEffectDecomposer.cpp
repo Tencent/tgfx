@@ -136,11 +136,11 @@ static AOTTextureParameters CutIntermediatePlaceholder() {
 
 // Whether a multi-pass plan may start a new pass at this node. A pass boundary stores the previous
 // pass's output in an RGBA8 target, rounding it to the 1/255 grid. Most operators move by at most
-// that rounding, but AlphaThreshold is a step function: an input just below the threshold can round
-// to a grid point just above it and flip the output from 0 to the full color. So an AlphaThreshold
-// always shares a pass with the operator that produces its input.
+// that rounding, but a pass-boundary-sensitive operator (a step function — AlphaThreshold today,
+// per its row on the op list) can flip: an input just below the threshold can round to a grid
+// point just above it. Such an operator always shares a pass with the one producing its input.
 static bool CanStartPassAt(const AOTEffectNode* node) {
-  return node != nullptr && node->kind != AOTEffectKind::AlphaThreshold;
+  return node != nullptr && !IsPassBoundarySensitive(node->kind);
 }
 
 // Whether the linear chain's operator run [firstOperator, passEnd) forms one chain pass, with the
