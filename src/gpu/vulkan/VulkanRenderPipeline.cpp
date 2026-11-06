@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <cstdlib>
 #include "VulkanRenderPipeline.h"
 #include "VulkanGPU.h"
 #include "VulkanShaderModule.h"
@@ -306,6 +307,32 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
   // Shader stages
   std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
 
+  // The fragment stage's specialization map. The keys are the SpecIds in decimal, the same
+  // vocabulary Metal's function constants use; an entry the artifact does not declare is ignored
+  // by the driver, so the runtime never has to prune the list against the shader.
+  std::vector<VkSpecializationMapEntry> specMapEntries;
+  std::vector<int32_t> specData;
+  VkSpecializationInfo specInfo = {};
+  for (const auto& constant : descriptor.fragment.constants) {
+    char* end = nullptr;
+    const unsigned long specId = std::strtoul(constant.first.c_str(), &end, 10);
+    if (end == constant.first.c_str()) {
+      continue;
+    }
+    VkSpecializationMapEntry mapEntry = {};
+    mapEntry.constantID = static_cast<uint32_t>(specId);
+    mapEntry.offset = static_cast<uint32_t>(specData.size() * sizeof(int32_t));
+    mapEntry.size = sizeof(int32_t);
+    specMapEntries.push_back(mapEntry);
+    specData.push_back(static_cast<int32_t>(constant.second));
+  }
+  if (!specMapEntries.empty()) {
+    specInfo.mapEntryCount = static_cast<uint32_t>(specMapEntries.size());
+    specInfo.pMapEntries = specMapEntries.data();
+    specInfo.dataSize = specData.size() * sizeof(int32_t);
+    specInfo.pData = specData.data();
+  }
+
   if (descriptor.vertex.module) {
     auto vertexShader = std::static_pointer_cast<VulkanShaderModule>(descriptor.vertex.module);
     if (vertexShader->vulkanShaderModule() == VK_NULL_HANDLE) {
@@ -331,6 +358,9 @@ bool VulkanRenderPipeline::createPipeline(VulkanGPU* gpu,
     stage.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
     stage.module = fragmentShader->vulkanShaderModule();
     stage.pName = "main";
+    if (!specMapEntries.empty()) {
+      stage.pSpecializationInfo = &specInfo;
+    }
     shaderStages.push_back(stage);
   }
 
