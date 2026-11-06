@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 #include "gpu/shaders/contract/ChainISA.h"
+#include "gpu/shaders/contract/ChainOps.h"
 
 namespace tgfx {
 

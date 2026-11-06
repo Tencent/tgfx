@@ -21,6 +21,17 @@
 namespace tgfx {
 namespace ChainISA {
 
+// The template's capacities: the bounds the encoder enforces and the generator expands to. They
+// bound the template, not the runtime cost — a specialized compile deletes every unused slot, so
+// one capacity serves every shape (no per-resource-profile tiers).
+inline constexpr int SlotCapacity = 32;
+inline constexpr int RegisterCapacity = 16;
+inline constexpr int LeafCapacity = 4;
+/// The per-slot data pool in vec4 words. A field owns whole words, so a float costs one word.
+inline constexpr int DataCapacity = 256;
+/// The structural ints a single operator may declare, one specialization constant each.
+inline constexpr int StructureCapacity = 5;
+
 // The chain interpreter's instruction set: one row per operator, the single place an operator's
 // name, ABI value and operand count are declared. Every mirror is generated from this list — the
 // Op::* constants, the OP_* defines shader_build_tool injects into every compiled variant, and
