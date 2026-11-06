@@ -19,6 +19,7 @@
 #include "gpu/aot/select/KernelTable.h"
 #include <cassert>
 #include <type_traits>
+#include "core/utils/Log.h"
 #include "gpu/shaders/AllShaderFamilies.h"
 #include "gpu/shaders/ShaderFamily.h"
 
@@ -31,10 +32,45 @@ namespace {
 template <typename F>
 constexpr bool IsInterpreterFamily = std::is_same_v<F, PointwiseChainShader>;
 
+#if DEBUG
+/// The offline exclusivity test enumerates the DrawShape field space with a null IR, so the
+/// IR-reading families sit outside its coverage; this runtime pre-pass closes that gap over real
+/// draws. At most one table family may accept a shape — with two, the table order silently picks
+/// the winner and the second family's coverage is dead weight.
+void AssertAtMostOneFamilyAccepts(const DrawShape& facts) {
+  int accepting = 0;
+  const char* first = nullptr;
+#define TGFX_COUNT_FAMILY(F)                                           \
+  if constexpr (FamilyJoinsKernelTable<F>::value) {                    \
+    if (!facts.alphaOnlyTarget || F::ServesAlphaOnly) {                \
+      PermutationMatchFailure ignored = PermutationMatchFailure::None; \
+      if (F::MatchFromFacts(facts, &ignored)) {                        \
+        if (accepting == 0) {                                          \
+          first = F::Name;                                             \
+        }                                                              \
+        ++accepting;                                                   \
+      }                                                                \
+    }                                                                  \
+  }
+  TGFX_FOR_EACH_SHADER_FAMILY(TGFX_COUNT_FAMILY)
+#undef TGFX_COUNT_FAMILY
+  if (accepting > 1) {
+    LOGE(
+        "KernelTableLookup: %d families accept one shape (%s first); the table order silently "
+        "picks the winner — narrow the families' Accept predicates",
+        accepting, first);
+    DEBUG_ASSERT(false);
+  }
+}
+#endif
+
 }  // namespace
 
 std::optional<AOTKernelMatch> KernelTableLookup(const DrawShape& facts,
                                                 PermutationMatchFailure* failure) {
+#if DEBUG
+  AssertAtMostOneFamilyAccepts(facts);
+#endif
   // Every family must either join the table (FillKernel) or be the named interpreter: a family
   // that forgets both would otherwise vanish from matching silently.
 #define TGFX_TRY_FAMILY(F)                                                                 \

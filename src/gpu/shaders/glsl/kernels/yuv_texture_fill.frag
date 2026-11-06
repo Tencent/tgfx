@@ -32,11 +32,7 @@ layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING)
   // branch, mirroring QuadTextureFillShader).
   vec2 AlphaStart;
   int HasRgbaaa;
-#if HAS_XP
-  vec2 DstTextureUpperLeft;
-  vec2 DstTextureCoordScale;
-  int XPBlendMode;
-#endif
+#include "xp/xp_uniforms.inc"
   int OutputAlphaSwizzle;
 
   // The color-grade tail rides the chain interpreter's instruction records — the same uniform

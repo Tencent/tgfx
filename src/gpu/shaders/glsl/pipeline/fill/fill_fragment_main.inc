@@ -27,7 +27,6 @@
 #define FILL_COLOR_VARYING 1            // vColor varying
 #define FILL_COLOR_VARYING_OR_COMMON 2  // vColor, or the exact Color uniform when HasCommonColor != 0
                                         // (the varying is 8-bit quantized)
-#define FILL_COLOR_WHITE 3              // constant vec4(1.0): no color uniform and no color varying
 
 #define FILL_SOURCE_COLOR 0  // the input color
 // TextureEffect contract: TextureSampler_0 at TransformedCoords_0 (vec3, perspective divided),
@@ -48,7 +47,6 @@
 #define FILL_COVERAGE_NONE 0
 #define FILL_COVERAGE_VERTEX 1   // vCoverage varying
 #define FILL_COVERAGE_ELLIPSE 2  // ellipse_coverage.inc on vEllipseOffsets / vEllipseRadii
-#define FILL_COVERAGE_MASK 3     // red channel of TextureSampler_0 at TransformedCoords_0
 #define FILL_COVERAGE_HAIRLINE_LINE 4  // hairline_line_coverage.inc on vEdgeDistance
 #define FILL_COVERAGE_HAIRLINE_QUAD 5  // hairline_quad_coverage.inc (Loop-Blinn) on vHairQuadEdge
 #define FILL_COVERAGE_RRECT 6           // rrect_coverage.inc (hard step) on vLocalCoord
@@ -89,6 +87,11 @@
 #endif
 #ifndef FILL_OUTPUT_SWIZZLE
 #define FILL_OUTPUT_SWIZZLE 0
+#endif
+// The atlas step's color replace writes result after the operator stage, so the combination has
+// no defined order; it fails the compile here instead of producing a wrong-order blend.
+#if FILL_OPERATOR && FILL_COVERAGE == FILL_COVERAGE_ATLAS_TEXT
+#error "FILL_COVERAGE_ATLAS_TEXT is not combinable with FILL_OPERATOR: the atlas color replace has no defined order against the operator (use FILL_COVERAGE_VERTEX_MASK-style mask coverage instead)"
 #endif
 
 #include "xp/xp_porter_duff.inc"
@@ -149,8 +152,6 @@ float fillDeviceMaskCoverage() {
 vec4 fillColorStage() {
 #if FILL_COLOR == FILL_COLOR_UNIFORM
   return Color;
-#elif FILL_COLOR == FILL_COLOR_WHITE
-  return vec4(1.0);
 #else
   vec4 outputColor = vColor;
 #if FILL_COLOR == FILL_COLOR_VARYING_OR_COMMON
@@ -236,8 +237,6 @@ float fillCoverageStage(inout vec4 result) {
   return vCoverage;
 #elif FILL_COVERAGE == FILL_COVERAGE_ELLIPSE
   return ellipseEdgeCoverage(vEllipseOffsets, vEllipseRadii, StrokeEnabled);
-#elif FILL_COVERAGE == FILL_COVERAGE_MASK
-  return texture(TextureSampler_0, TransformedCoords_0).r;
 #elif FILL_COVERAGE == FILL_COVERAGE_VERTEX_MASK
   return vCoverage * texture(TextureSampler_0, TransformedCoords_0).r;
 #elif FILL_COVERAGE == FILL_COVERAGE_HAIRLINE_LINE

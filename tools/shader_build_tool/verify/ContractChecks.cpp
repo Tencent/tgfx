@@ -439,9 +439,17 @@ struct DimensionNameVisitor {
 // The macro-name rule: every identifier a preprocessor condition references must be a family
 // permutation dimension, a define in the shader sources, or a whitelisted builtin. A typo
 // evaluates silently to zero and compiles a wrong variant, so it fails the build instead.
+// Two further invariants ride the same scan:
+//   1. A kernel file's guard default (`#ifndef X` / `#define X 0`) is the dimension-default
+//      pattern, so X must be a dimension some family declares — otherwise the name silently
+//      self-legitimizes (pass one would whitelist its own define) and every variant compiles
+//      with the default value. MAX_SIGMA is the one non-dimension constant that uses the same
+//      guard pattern, by its kernel's declaration.
+//   2. A declared dimension no preprocessor condition ever references compiles identical code
+//      for every value and only multiplies the bundle, so it fails the build as dead.
 size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics) {
   size_t errors = 0;
-  std::set<std::string> allowed;
+  std::set<std::string> declaredDimensions;
   for (const auto& factory : ShaderRegistry::All()) {
     const auto shader = factory();
     // The domains are members of the info value, so a local keeps them alive through the loops:
@@ -449,12 +457,13 @@ size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics
     // a destroyed temporary.
     const auto info = shader->info();
     for (const auto& dimension : info.vertDomain.getDimensions()) {
-      allowed.insert(std::visit(DimensionNameVisitor(), dimension));
+      declaredDimensions.insert(std::visit(DimensionNameVisitor(), dimension));
     }
     for (const auto& dimension : info.fragDomain.getDimensions()) {
-      allowed.insert(std::visit(DimensionNameVisitor(), dimension));
+      declaredDimensions.insert(std::visit(DimensionNameVisitor(), dimension));
     }
   }
+  std::set<std::string> allowed = declaredDimensions;
   allowed.insert("GL_ES");
   allowed.insert("__VERSION__");
 
@@ -470,18 +479,40 @@ size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics
     files.push_back(it->path().string());
   }
   const std::regex definePattern("^[ \t]*#[ \t]*define[ \t]+([A-Za-z_][A-Za-z0-9_]*)");
+  const std::regex ifndefPattern("^[ \t]*#[ \t]*ifndef[ \t]+([A-Za-z_][A-Za-z0-9_]*)");
   const std::regex conditionPattern(
       "^[ \\t]*#[ \\t]*(?:ifdef|ifndef|elif|if)\\b[ \\t]*(.*)$");
   const std::regex identifierPattern("([A-Za-z_][A-Za-z0-9_]*)");
-  // Pass one: the defines of every file join the allowed set, because an includer sees them.
+  static const std::set<std::string> guardDefaultWhitelist = {"MAX_SIGMA"};
+  std::set<std::string> usedInConditions;
+  // Pass one: the defines of every file join the allowed set, because an includer sees them —
+  // with the kernel-file guard-default exception explained above.
   for (const auto& file : files) {
+    const auto relative = std::filesystem::relative(file, shaderDir).generic_string();
+    const bool kernelFile = relative.rfind("kernels/", 0) == 0;
     std::ifstream stream(file);
     std::string line;
+    std::string pendingIfndef;
     while (std::getline(stream, line)) {
       std::smatch match;
-      if (std::regex_search(line, match, definePattern)) {
-        allowed.insert(match[1].str());
+      if (std::regex_search(line, match, ifndefPattern)) {
+        pendingIfndef = match[1].str();
+        continue;
       }
+      if (std::regex_search(line, match, definePattern)) {
+        const auto name = match[1].str();
+        if (kernelFile && name == pendingIfndef && !declaredDimensions.count(name) &&
+            !guardDefaultWhitelist.count(name)) {
+          Report(diagnostics, Severity::Error, DiagnosticCode::VerifyMacroUnknown, "", "", -1, -1,
+                 relative + " defaults '" + name +
+                     "' with the #ifndef pattern, but no family dimension declares it; either "
+                     "declare the dimension in the family's Dim arrays or remove the guard");
+          ++errors;
+        } else {
+          allowed.insert(name);
+        }
+      }
+      pendingIfndef.clear();
     }
   }
   // Pass two: every identifier a condition references must be known. The TGFX_ and __ prefixes
@@ -502,6 +533,7 @@ size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics
         const auto name = (*identifier)[1].str();
         if (name == "defined" || name.rfind("TGFX_", 0) == 0 || name.rfind("__", 0) == 0 ||
             allowed.count(name) > 0) {
+          usedInConditions.insert(name);
           continue;
         }
         Report(diagnostics, Severity::Error, DiagnosticCode::VerifyMacroUnknown, "", "", -1, -1,
@@ -509,6 +541,15 @@ size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics
                    "', which no family dimension or source define declares");
         ++errors;
       }
+    }
+  }
+  for (const auto& dimension : declaredDimensions) {
+    if (usedInConditions.count(dimension) == 0) {
+      Report(diagnostics, Severity::Error, DiagnosticCode::VerifyMacroUnknown, "", "", -1, -1,
+             "dimension '" + dimension +
+                 "' is declared by a family but no preprocessor condition references it; every "
+                 "value compiles identical code, so the dimension only multiplies the bundle");
+      ++errors;
     }
   }
   return errors;

@@ -37,11 +37,7 @@ layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING)
   // never read — the mask is sampled unclamped.
   vec4 DeviceMaskSubset;
   int HasDeviceMask;
-#if HAS_XP
-  vec2 DstTextureUpperLeft;
-  vec2 DstTextureCoordScale;
-  int XPBlendMode;
-#endif
+#include "xp/xp_uniforms.inc"
   // Alpha-only source (R8 texture) and RGBAAA dual-plane are runtime uniforms rather than
   // compile-time permutations: both are pure fragment math (RGBAAA adds one coherent-branch sample),
   // so folding them into uniform branches shrinks the variant count.

@@ -27,11 +27,8 @@
 #include "gpu/aot/select/DrawShape.h"
 #include "gpu/aot/select/KernelTable.h"
 #include "gpu/aot/select/PermutationMatch.h"
-#include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ClampedGradientEffect.h"
-#include "gpu/processors/ColorMatrixFragmentProcessor.h"
-#include "gpu/processors/ColorSpaceXFormEffect.h"
 #include "gpu/processors/ComplexEllipseGeometryProcessor.h"
 #include "gpu/processors/ComplexNonAARRectGeometryProcessor.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
@@ -43,7 +40,6 @@
 #include "gpu/processors/GaussianBlur1DFragmentProcessor.h"
 #include "gpu/processors/HairlineLineGeometryProcessor.h"
 #include "gpu/processors/HairlineQuadGeometryProcessor.h"
-#include "gpu/processors/LumaFragmentProcessor.h"
 #include "gpu/processors/MeshGeometryProcessor.h"
 #include "gpu/processors/NonAARRectGeometryProcessor.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
@@ -425,39 +421,6 @@ bool IsChainQuadSubsetServable(const QuadPerEdgeAAGeometryProcessor* quadGP,
 // TFTypeToIndex lives in ColorSpaceXformHelper as the single mapping authority: unknown kinds
 // return -1 there, which this matcher treats as "cannot ride the AOT path" and the upload path
 // reports loudly instead of silently downgrading (see that header for the contract).
-
-// Returns true if fp is one of the four pointwise operators that share the runtime OpType uniform
-// (ColorMatrix / Luma / AlphaThreshold / ColorSpaceXform). For ColorSpaceXform the transfer-function
-// type must be in the supported 0-3 range; the pipeline flags themselves are runtime uniforms.
-bool IsSupportedPointwiseOp(const FragmentProcessor* fp) {
-  if (IsProcessor<ColorMatrixFragmentProcessor>(fp) || IsProcessor<LumaFragmentProcessor>(fp) ||
-      IsProcessor<AlphaThresholdFragmentProcessor>(fp)) {
-    return true;
-  }
-  if (!IsProcessor<ColorSpaceXformEffect>(fp)) {
-    return false;
-  }
-  auto* cse = static_cast<const ColorSpaceXformEffect*>(fp);
-  auto* xform = cse->colorXform();
-  if (!xform) {
-    return false;
-  }
-  if (xform->flags.linearize) {
-    int srcIdx = TFTypeToIndex(gfx::skcms_TransferFunction_getType(
-        reinterpret_cast<const gfx::skcms_TransferFunction*>(&xform->srcTransferFunction)));
-    if (srcIdx < 0) {
-      return false;
-    }
-  }
-  if (xform->flags.encode) {
-    int dstIdx = TFTypeToIndex(gfx::skcms_TransferFunction_getType(
-        reinterpret_cast<const gfx::skcms_TransferFunction*>(&xform->dstTransferFunctionInverse)));
-    if (dstIdx < 0) {
-      return false;
-    }
-  }
-  return true;
-}
 
 bool SupportedFillKernelSteps(const ColorSpaceXformSteps* steps) {
   if (steps == nullptr) {

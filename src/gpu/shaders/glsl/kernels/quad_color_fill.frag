@@ -28,11 +28,7 @@ layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING)
 #if HAS_MASK_TEXTURE
   mat3 DeviceCoordMatrix;
 #endif
-#if HAS_XP
-  vec2 DstTextureUpperLeft;
-  vec2 DstTextureCoordScale;
-  int XPBlendMode;
-#endif
+#include "xp/xp_uniforms.inc"
 };
 
 layout(location = 0) in float vCoverage;

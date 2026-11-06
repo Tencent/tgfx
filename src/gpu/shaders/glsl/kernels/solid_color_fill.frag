@@ -15,11 +15,7 @@ layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING)
   vec4 Rect;
   int HasClip;
 #include "coverage/rrect_clip_uniforms.inc"
-#if HAS_XP
-  vec2 DstTextureUpperLeft;
-  vec2 DstTextureCoordScale;
-  int XPBlendMode;
-#endif
+#include "xp/xp_uniforms.inc"
   int OutputAlphaSwizzle;
 };
 

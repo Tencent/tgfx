@@ -6,8 +6,8 @@
 // exactly matching the runtime path's uniform contract so AOT and JIT renders stay bit-identical.
 // Permutation dimensions (frag):
 //   HAS_XP (0~2): 0=Empty, 1=PorterDuff DST_TEX, 2=PorterDuff FBF
-//   HAS_TILED_CHILD (bool): When 1, the child is a TiledTextureEffect: each tap is tiled through the
-//                           shared tiled_sample.inc logic (mirrors the runtime per-tap tiling).
+//   A tiled child is not a dimension: the TiledChild runtime uniform selects the per-tap tiling
+//   (a plain child never takes the branch), so one variant serves both child kinds.
 //   Child subset clamping is always on: the kernel always clamps each tap to Subset, and a child
 //   without a real subset uploads the full texture bounds, so the clamp is a no-op.
 #version 450
@@ -21,9 +21,6 @@
 #endif
 #define HAS_RUNTIME_CLIP 1
 #define HAS_RUNTIME_DEVICE_MASK 1
-#ifndef HAS_TILED_CHILD
-#define HAS_TILED_CHILD 0
-#endif
 // Mirrors Blur1DFragmentProcessor::KERNEL_VEC4_COUNT: the vec4 capacity of the half-kernel table.
 // The size stays a literal because the reflection extractor does not expand preprocessor macros.
 

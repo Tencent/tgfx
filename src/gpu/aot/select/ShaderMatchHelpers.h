@@ -102,10 +102,6 @@ struct OpaqueKernelIRShape {
 std::optional<OpaqueKernelIRShape> ReadOpaqueKernelIRShape(const DrawIR* ir, int kernelKind,
                                                            bool requiresTextureChild);
 
-/// Whether the FP is one of the four pointwise operators (ColorMatrix / Luma / AlphaThreshold /
-/// ColorSpaceXform) that share the TexturedEffect structural class.
-bool IsSupportedPointwiseOp(const FragmentProcessor* fp);
-
 /// Records why a candidate rejected the draw into the match's failure out-parameter (the first
 /// rejection wins) and returns nullopt.
 std::nullopt_t Fail(PermutationMatchFailure* failure, PermutationMatchFailure reason);
