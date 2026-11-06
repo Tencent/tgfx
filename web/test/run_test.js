@@ -118,6 +118,11 @@ async function run() {
     if (process.platform === 'linux') {
       launchArgs.push('--disable-dev-shm-usage');
     }
+    // CI runners have no GPU; TGFX_WEBGPU_SWIFTSHADER=1 forces the SwiftShader WebGPU adapter.
+    if (BACKEND === 'webgpu' && process.env.TGFX_WEBGPU_SWIFTSHADER &&
+        process.env.TGFX_WEBGPU_SWIFTSHADER !== '0') {
+      launchArgs.push('--use-webgpu-adapter=swiftshader');
+    }
     browser = await puppeteer.launch({
       headless: true,
       args: launchArgs,

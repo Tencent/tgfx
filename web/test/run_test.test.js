@@ -81,6 +81,7 @@ function RunScenario(options) {
       async newPage() { return page; },
       async close() {},
     };
+    let launchOptions = null;
     const modules = {
       child_process: {
         spawn() {
@@ -90,7 +91,12 @@ function RunScenario(options) {
       },
       path,
       fs: filesystem,
-      puppeteer: { async launch() { return browser; } },
+      puppeteer: {
+        async launch(options_) {
+          launchOptions = options_;
+          return browser;
+        },
+      },
       'adm-zip': FakeZip,
       './reference_cache': {
         PublishReference(zip, selectedBackend, revision, tests) {
@@ -111,7 +117,8 @@ function RunScenario(options) {
           mode === 'reference' ? [`--reference-commit=${commit}`,
             `--web-root=${path.join(__dirname, `build-reference-${backend}`, 'session/runtime')}`] : []),
         platform: 'darwin',
-        exit(code) { resolve({ code, output, extracted, mutations, published }); },
+        env: options.env || {},
+        exit(code) { resolve({ code, output, extracted, mutations, published, launchOptions }); },
       },
       console: {
         log(...args) { output.push(args.join(' ')); },
@@ -266,5 +273,19 @@ for (const [name, options, exportsReference, fails] of PAGE_CASES) {
     assert.equal(result.messages.at(-1), DONE);
     if (exportsReference) assert.deepEqual(result.files, ['md5.json', 'version.json']);
     if (options.configuration) assert.deepEqual(result.calls, ['GetTestConfiguration']);
+  });
+}
+
+const LAUNCH_ARG_CASES = [
+  ['webgpu swiftshader env forces the software adapter', 'webgpu', { TGFX_WEBGPU_SWIFTSHADER: '1' }, true],
+  ['webgpu default keeps the hardware adapter', 'webgpu', {}, false],
+  ['webgpu swiftshader env zero keeps the hardware adapter', 'webgpu', { TGFX_WEBGPU_SWIFTSHADER: '0' }, false],
+  ['webgl ignores the swiftshader env', 'webgl', { TGFX_WEBGPU_SWIFTSHADER: '1' }, false],
+];
+for (const [name, backend, env, forced] of LAUNCH_ARG_CASES) {
+  test(name, { timeout: 2000 }, async function() {
+    const result = await RunScenario({ backend, env, messages: [SUCCESS, DONE] });
+    assert.equal(result.code, 0, result.output.join('\n'));
+    assert.equal(result.launchOptions.args.includes('--use-webgpu-adapter=swiftshader'), forced);
   });
 }
