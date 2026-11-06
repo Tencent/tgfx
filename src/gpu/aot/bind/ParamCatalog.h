@@ -25,9 +25,6 @@ struct ParamCatalog {
   // transform matrices (numbered by slot), the chain's per-slot const-color records, the fused
   // blend's operand order, and the atlas text size. Their writers stay on the runtime side.
   static constexpr Param<ParamType::Float3x3> CoordTransformMatrix{"CoordTransformMatrix"};
-  static constexpr Param<ParamType::Float4> ConstColorValue{"ConstColorValue"};
-  static constexpr Param<ParamType::Int> ConstInputMode{"ConstInputMode"};
-  static constexpr Param<ParamType::Int> BlendConstFirst{"BlendConstFirst"};
   static constexpr Param<ParamType::Float2> AtlasSizeInv{"atlasSizeInv"};
 
   // The chain's prefixed color-space fields (ColorSpaceXformHelper's prefix form).
@@ -63,14 +60,14 @@ struct ParamCatalog {
   static constexpr Param<ParamType::Int> InputIsPacked{"InputIsPacked"};
 
   static constexpr ParamInfo Fields[] = {
-      Color,           HasCommonColor, Matrix,          ViewMatrix,      UVMatrix,
-      TexSubsetMatrix, Coverage,       AAEnabled,       StrokeEnabled,   CoordTransformMatrix,
-      ConstColorValue, ConstInputMode, BlendConstFirst, AtlasSizeInv,    ChainCSFlags,
-      ChainSrcTF0,     ChainSrcTF1,    ChainSrcTFType,  ChainSrcOOTF,    ChainColorXform,
-      ChainDstOOTF,    ChainDstTF0,    ChainDstTF1,     ChainDstTFType,  GlassOpticsP0,
-      GlassOpticsP1,   GlassLightDir,  GlassOpticsP2,   GlassOpticsP3,   LightingOn,
-      GlassShapeP0,    GlassShapeP1,   GlassEdgeSpan,   GlassFineMaskUV, GlassEdgeMaskUV,
-      EdgeMaskOn,      GlassUDFRadius, GlassUDFStep,    Field,           InputIsPacked};
+      Color,           HasCommonColor,  Matrix,        ViewMatrix,     UVMatrix,
+      TexSubsetMatrix, Coverage,        AAEnabled,     StrokeEnabled,  CoordTransformMatrix,
+      AtlasSizeInv,    ChainCSFlags,    ChainSrcTF0,   ChainSrcTF1,    ChainSrcTFType,
+      ChainSrcOOTF,    ChainColorXform, ChainDstOOTF,  ChainDstTF0,    ChainDstTF1,
+      ChainDstTFType,  GlassOpticsP0,   GlassOpticsP1, GlassLightDir,  GlassOpticsP2,
+      GlassOpticsP3,   LightingOn,      GlassShapeP0,  GlassShapeP1,   GlassEdgeSpan,
+      GlassFineMaskUV, GlassEdgeMaskUV, EdgeMaskOn,    GlassUDFRadius, GlassUDFStep,
+      Field,           InputIsPacked};
 };
 
 }  // namespace tgfx

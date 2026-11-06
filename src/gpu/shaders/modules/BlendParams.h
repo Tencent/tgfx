@@ -15,7 +15,7 @@ struct BlendParams {
   static constexpr Param<ParamType::Int> Child0AlphaOnly{"Child0AlphaOnly"};
   static constexpr Param<ParamType::Int> Child1AlphaOnly{"Child1AlphaOnly"};
 
-  static constexpr ParamInfo Fields[] = {BlendModeValue, HasLocalMask};
+  static constexpr ParamInfo Fields[] = {HasLocalMask};
 };
 
 }  // namespace tgfx

@@ -107,14 +107,14 @@ void BindDeviceMaskLeaf(const AOTTextureParameters& mask, ParamWriter* writer);
 /// node's own discriminators gate exactly the fields the processor walk's three separate binds
 /// wrote.
 void BindGradientNode(const AOTGradientParameters& params, ParamWriter* writer);
-/// The xfer-mode operand: the blend mode value and the operand mapping, gated like the
-/// processor's onSetData.
-void BindBlendNode(const AOTBlendParameters& params, ParamWriter* writer);
-void BindAlphaThresholdNode(float threshold, ParamWriter* writer);
 void BindRectClipNode(const AOTRectCoverageParameters& params, ParamWriter* writer);
 void BindRRectClipNode(const AOTRRectCoverageParameters& params, ParamWriter* writer);
-void BindColorMatrixNode(const AOTColorMatrixParameters& params, ParamWriter* writer);
-void BindLumaNode(const AOTLumaParameters& params, ParamWriter* writer);
+///
+/// Uploads one pointwise operator as chain slot 0: the packed word (operator value and selector
+/// bits) plus the operator's parameter registers -- the same encoding the chain's slots use, so a
+/// dedicated single-operator kernel and the chain share one parameter ABI. The shader side reads
+/// it through applyPointwiseOp (pipeline/slot/pointwise_op.inc).
+void UploadPointwiseSlot(UniformData* uniformData, const AOTChainSlot& slot);
 /// The blur node's upload values plus its child leaf (TiledChild/AlphaChild and the step's
 /// matrix come off the child).
 void BindBlurKernelNode(const AOTOpaqueKernelParameters& params, const AOTTextureParameters* child,

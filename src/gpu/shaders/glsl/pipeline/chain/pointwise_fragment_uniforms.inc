@@ -53,16 +53,7 @@
   int HasRgbaaa_3;
 #endif
   // Shared ColorSpaceXform parameters; at most one slot per chain may be OP_COLOR_SPACE_XFORM.
-  int ChainCSFlags;
-  vec4 ChainSrcTF0;
-  vec4 ChainSrcTF1;
-  int ChainSrcTFType;
-  vec4 ChainSrcOOTF;
-  mat3 ChainColorXform;
-  vec4 ChainDstOOTF;
-  vec4 ChainDstTF0;
-  vec4 ChainDstTF1;
-  int ChainDstTFType;
+#include "pipeline/chain/pointwise_cs_uniforms.inc"
   // AA-rect clip parameters, two slots per space (selector bits 16-19 carry the slot's ordinal
   // into these arrays). CoverageRect is in destination device coordinates and already carries the
   // 0.5 outset for the AA falloff. CoverageLocalRect keeps exact coordinates; the kernel maps

@@ -17,7 +17,14 @@
 layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform FragmentUniformBlock {
   vec4 Color;
   vec4 Subset;
-#include "pipeline/slot/pointwise_op_uniforms.inc"
+  // One chain slot: the kernel applies exactly one pointwise operator, addressed through the same
+  // parameter registers the chain and the YUV tail read (see
+  // pipeline/chain/pointwise_chain_uniforms.inc's allocation table), so the operator's upload and
+  // the shader's read share one ABI.
+#define CHAIN_SLOT_CAPACITY 1
+#include "pipeline/chain/pointwise_chain_uniforms.inc"
+#undef CHAIN_SLOT_CAPACITY
+#include "pipeline/chain/pointwise_cs_uniforms.inc"
 #include "xp/xp_uniforms.inc"
 };
 

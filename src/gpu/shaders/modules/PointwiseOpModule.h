@@ -8,6 +8,10 @@ namespace tgfx {
 
 class FragmentProcessor;
 
+// The pre-slot-array operator fields. They are no longer declared by any kernel (the operator
+// parameters ride the chain slot registers, see pointwise_chain_uniforms.inc), so this module is
+// not part of the parameter registry; the remaining writers (the fragment processors' legacy
+// setData fallback) resolve to nothing. Kept until that fallback retires.
 struct PointwiseOpModule {
   static constexpr Param<ParamType::Int> OpType{"OpType"};
   static constexpr Param<ParamType::Float4x4> ColorMatrix{"ColorMatrix"};

@@ -45,16 +45,7 @@ layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING)
 #undef CHAIN_SLOT_CAPACITY
   // Shared color-space parameters, one block tail-wide like the interpreter's: at most one tail
   // operator may be a color-space transform (enforced by the matching walk).
-  int ChainCSFlags;
-  vec4 ChainSrcTF0;
-  vec4 ChainSrcTF1;
-  int ChainSrcTFType;
-  vec4 ChainSrcOOTF;
-  mat3 ChainColorXform;
-  vec4 ChainDstOOTF;
-  vec4 ChainDstTF0;
-  vec4 ChainDstTF1;
-  int ChainDstTFType;
+#include "pipeline/chain/pointwise_cs_uniforms.inc"
 };
 
 layout(location = 0) in vec3 TransformedCoords_0;
@@ -70,9 +61,7 @@ layout(set = TGFX_TEXTURE_SET, binding = 2) uniform sampler2D TextureSampler_2;
 #define XP_DST_TEX_BINDING 2
 #endif
 // NOTE: include order is semantic in this file — the interleaved comments below split the
-// include blocks so clang-format's sorting cannot reorder across them. In particular,
-// pointwise_slot_array_bind.inc defines the array-suffix bindings pointwise_op.inc's functions
-// are written against; compiling op before bind yields array/scalar type mismatches.
+// include blocks so clang-format's sorting cannot reorder across them.
 #include "xp/xp_porter_duff.inc"
 #include "xp/xp_porter_duff_fbf.inc"
 #include "xp/xp_blend_pass.inc"
@@ -81,10 +70,7 @@ layout(set = TGFX_TEXTURE_SET, binding = 2) uniform sampler2D TextureSampler_2;
 
 layout(location = 0) out vec4 fragColor;
 
-#include "pipeline/slot/pointwise_slot_array_bind.inc"
-// The op functions are written against the array bindings above.
 #include "pipeline/slot/pointwise_op.inc"
-#include "pipeline/slot/pointwise_slot_array_unbind.inc"
 #include "pipeline/slot/pointwise_slot_loop.inc"
 
 void main() {

@@ -35,7 +35,6 @@
 #include "gpu/shaders/modules/DeviceMaskModule.h"
 #include "gpu/shaders/modules/GradientModule.h"
 #include "gpu/shaders/modules/ParamWriter.h"
-#include "gpu/shaders/modules/PointwiseOpModule.h"
 #include "gpu/shaders/modules/PorterDuffXPModule.h"
 #include "gpu/shaders/modules/TextureSourceModule.h"
 #include "gpu/shaders/modules/TiledSourceModule.h"
@@ -147,6 +146,20 @@ void UploadGradientParams(UniformData* uniformData, const AOTGradientParameters&
 }
 
 }  // namespace
+
+void UploadPointwiseSlot(UniformData* uniformData, const AOTChainSlot& slot) {
+  // One pointwise operator as chain slot 0: the packed word and the parameter registers the slot
+  // interpreter reads (pointwise_op.inc). A single-operator kernel (TexturedEffect) and the chain
+  // thus share one parameter ABI.
+  UploadChainSlot(uniformData, 0, slot, -1, -1, -1);
+  if (slot.op == AOTChainOp::Blend) {
+    // The slot interpreter's Blend reads its constant operand from SlotVec1 (a chain Blend's
+    // operands are registers, so its bind row writes no parameter block).
+    const auto& color = slot.constColor.color;
+    float colorData[] = {color[0], color[1], color[2], color[3]};
+    uniformData->setArrayElementOptional(ChainParams::SlotVec1.name, 0, colorData);
+  }
+}
 
 // The instruction contract's bind column (declared in Binder.h): each function writes one op's
 // per-slot parameter block into the chain arrays.
@@ -701,16 +714,6 @@ void BindGradientNode(const AOTGradientParameters& params, ParamWriter* writer) 
   }
 }
 
-void BindBlendNode(const AOTBlendParameters& params, ParamWriter* writer) {
-  writer->setArrayElement(BlendParams::BlendModeValue, 0, params.blendMode);
-  writer->set(BlendParams::ChildType, params.childType);
-}
-
-void BindAlphaThresholdNode(float threshold, ParamWriter* writer) {
-  writer->setArrayElement(PointwiseOpModule::Threshold, 0, threshold);
-  writer->setArrayElement(PointwiseOpModule::OpType, 0, Op::AlphaThreshold);
-}
-
 void BindRectClipNode(const AOTRectCoverageParameters& params, ParamWriter* writer) {
   const float localRect[4] = {params.rect[0], params.rect[1], params.rect[2], params.rect[3]};
   writer->set(AnalyticClipModule::LocalRect, localRect);
@@ -739,22 +742,6 @@ void BindRRectClipNode(const AOTRRectCoverageParameters& params, ParamWriter* wr
   writer->set(AnalyticClipModule::AntiAlias, params.antiAlias);
   writer->set(AnalyticClipModule::DeviceToLocal, AlignedFromRowMajor(params.deviceToLocal));
   writer->set(AnalyticClipModule::HasClip, 2);
-}
-
-void BindColorMatrixNode(const AOTColorMatrixParameters& params, ParamWriter* writer) {
-  float matrixData[16] = {};
-  float vectorData[4] = {};
-  PackAOTColorMatrix(params.matrix, matrixData, vectorData);
-  writer->setArrayElement(PointwiseOpModule::ColorMatrix, 0, matrixData);
-  writer->setArrayElement(PointwiseOpModule::ColorVector, 0, vectorData);
-  writer->setArrayElement(PointwiseOpModule::OpType, 0, Op::ColorMatrix);
-}
-
-void BindLumaNode(const AOTLumaParameters& params, ParamWriter* writer) {
-  writer->setArrayElement(PointwiseOpModule::Kr, 0, params.kr);
-  writer->setArrayElement(PointwiseOpModule::Kg, 0, params.kg);
-  writer->setArrayElement(PointwiseOpModule::Kb, 0, params.kb);
-  writer->setArrayElement(PointwiseOpModule::OpType, 0, Op::Luma);
 }
 
 void BindBlurKernelNode(const AOTOpaqueKernelParameters& params, const AOTTextureParameters* child,

@@ -408,17 +408,26 @@ void PrecompiledProgramWriter::writeProcessorsByTree(const ProgramInfo& info,
         }
       } else if (IsProcessor<ColorMatrixFragmentProcessor>(fp)) {
         if (colorMatrixCursor < colorMatrices.size()) {
-          BindColorMatrixNode(*colorMatrices[colorMatrixCursor++], &paramWriter);
+          AOTChainSlot slot = {};
+          slot.op = AOTChainOp::ColorMatrix;
+          slot.colorMatrix = *colorMatrices[colorMatrixCursor++];
+          UploadPointwiseSlot(fragmentUniformData, slot);
           bound = true;
         }
       } else if (IsProcessor<LumaFragmentProcessor>(fp)) {
         if (lumaCursor < lumas.size()) {
-          BindLumaNode(*lumas[lumaCursor++], &paramWriter);
+          AOTChainSlot slot = {};
+          slot.op = AOTChainOp::Luma;
+          slot.luma = *lumas[lumaCursor++];
+          UploadPointwiseSlot(fragmentUniformData, slot);
           bound = true;
         }
       } else if (IsProcessor<AlphaThresholdFragmentProcessor>(fp)) {
         if (alphaThresholdCursor < alphaThresholds.size()) {
-          BindAlphaThresholdNode(alphaThresholds[alphaThresholdCursor++], &paramWriter);
+          AOTChainSlot slot = {};
+          slot.op = AOTChainOp::AlphaThreshold;
+          slot.alphaThreshold = {alphaThresholds[alphaThresholdCursor++]};
+          UploadPointwiseSlot(fragmentUniformData, slot);
           bound = true;
         }
       } else if (IsProcessor<ClampedGradientEffect>(fp)) {
@@ -478,11 +487,7 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
       DeviceMask,
       RectClip,
       RRectClip,
-      ColorMatrix,
-      Luma,
-      AlphaThreshold,
-      ColorSpaceXform,
-      Blend,
+      Pointwise,
       Gradient,
       Blur,
     } kind = Kind::PlainLeaf;
@@ -491,17 +496,15 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
     const AOTTextureParameters* blurChild = nullptr;
     const AOTRectCoverageParameters* rectClip = nullptr;
     const AOTRRectCoverageParameters* rrectClip = nullptr;
-    const AOTColorMatrixParameters* colorMatrix = nullptr;
-    const AOTLumaParameters* luma = nullptr;
-    float alphaThreshold = 0.0f;
-    const AOTColorSpaceXformParameters* colorSpaceXform = nullptr;
-    const AOTBlendParameters* blend = nullptr;
+    // One pointwise operator as a chain slot record: the operator value plus its parameter block.
+    // The upload writes it through Binder::UploadPointwiseSlot, the same encoding the chain's
+    // slots use, so a dedicated single-operator kernel and a chain share one parameter ABI.
+    AOTChainSlot pointwise = {};
     const AOTGradientParameters* gradient = nullptr;
     const AOTOpaqueKernelParameters* blur = nullptr;
   };
   std::vector<Action> actions = {};
   size_t textureOrdinal = 0;
-  size_t blendOrdinal = 0;
   // The glass family's opaque kernels (kind 1/2) still upload through their processors'
   // setData; an IR carrying one takes the tree walk instead of the action list.
   bool hasProcessorBoundOpaqueKernel = false;
@@ -533,8 +536,9 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
       case AOTEffectKind::ColorMatrix: {
         auto* params = std::get_if<AOTColorMatrixParameters>(&node->parameters);
         if (params != nullptr) {
-          action.kind = Action::Kind::ColorMatrix;
-          action.colorMatrix = params;
+          action.kind = Action::Kind::Pointwise;
+          action.pointwise.op = AOTChainOp::ColorMatrix;
+          action.pointwise.colorMatrix = *params;
           resolved = true;
         }
         break;
@@ -542,8 +546,9 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
       case AOTEffectKind::Luma: {
         auto* params = std::get_if<AOTLumaParameters>(&node->parameters);
         if (params != nullptr) {
-          action.kind = Action::Kind::Luma;
-          action.luma = params;
+          action.kind = Action::Kind::Pointwise;
+          action.pointwise.op = AOTChainOp::Luma;
+          action.pointwise.luma = *params;
           resolved = true;
         }
         break;
@@ -551,8 +556,9 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
       case AOTEffectKind::AlphaThreshold: {
         auto* params = std::get_if<AOTAlphaThresholdParameters>(&node->parameters);
         if (params != nullptr) {
-          action.kind = Action::Kind::AlphaThreshold;
-          action.alphaThreshold = params->threshold;
+          action.kind = Action::Kind::Pointwise;
+          action.pointwise.op = AOTChainOp::AlphaThreshold;
+          action.pointwise.alphaThreshold = *params;
           resolved = true;
         }
         break;
@@ -560,18 +566,9 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
       case AOTEffectKind::ColorSpaceXform: {
         auto* params = std::get_if<AOTColorSpaceXformParameters>(&node->parameters);
         if (params != nullptr) {
-          action.kind = Action::Kind::ColorSpaceXform;
-          action.colorSpaceXform = params;
-          resolved = true;
-        }
-        break;
-      }
-      case AOTEffectKind::Blend: {
-        auto* params = std::get_if<AOTBlendParameters>(&node->parameters);
-        if (params != nullptr) {
-          action.kind = Action::Kind::Blend;
-          action.ordinal = blendOrdinal++;
-          action.blend = params;
+          action.kind = Action::Kind::Pointwise;
+          action.pointwise.op = AOTChainOp::ColorSpaceXform;
+          action.pointwise.colorSpaceXform = *params;
           resolved = true;
         }
         break;
@@ -680,30 +677,16 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
           BindRRectClipNode(*action.rrectClip, &paramWriter);
         }
         break;
-      case Action::Kind::ColorMatrix:
-        if (action.colorMatrix != nullptr) {
-          BindColorMatrixNode(*action.colorMatrix, &paramWriter);
-        }
-        break;
-      case Action::Kind::Luma:
-        if (action.luma != nullptr) {
-          BindLumaNode(*action.luma, &paramWriter);
-        }
-        break;
-      case Action::Kind::AlphaThreshold:
-        BindAlphaThresholdNode(action.alphaThreshold, &paramWriter);
-        break;
-      case Action::Kind::ColorSpaceXform:
-        // The shared helper writes the color-space block; the steps object is the one the
-        // lowering recorded, the same object the processor carried.
-        if (action.colorSpaceXform != nullptr && action.colorSpaceXform->steps != nullptr) {
-          ColorSpaceXformHelper helper = {};
-          helper.setData(fragmentUniformData, action.colorSpaceXform->steps.get());
-        }
-        break;
-      case Action::Kind::Blend:
-        if (action.blend != nullptr) {
-          BindBlendNode(*action.blend, &paramWriter);
+      case Action::Kind::Pointwise:
+        // One chain slot record for every pointwise operator: the packed word (operator value and
+        // selector bits) plus the operator's parameter registers.
+        UploadPointwiseSlot(fragmentUniformData, action.pointwise);
+        if (action.pointwise.op == AOTChainOp::ColorSpaceXform &&
+            action.pointwise.colorSpaceXform.steps != nullptr) {
+          // The color-space parameters are one program-level block; the "Chain" prefix is the
+          // block the interpreter reads (shared with the chain and the YUV tail).
+          ColorSpaceXformHelper("Chain").setData(fragmentUniformData,
+                                                 action.pointwise.colorSpaceXform.steps.get());
         }
         break;
       case Action::Kind::Gradient:

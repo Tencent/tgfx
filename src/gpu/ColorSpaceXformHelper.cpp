@@ -18,7 +18,6 @@
 #include "ColorSpaceXformHelper.h"
 #include "core/utils/Log.h"
 #include "gpu/shaders/modules/ColorSpaceParams.h"
-#include "gpu/shaders/modules/PointwiseOpModule.h"
 namespace tgfx {
 
 int TFTypeToIndex(gfx::skcms_TFType type) {
@@ -66,8 +65,6 @@ void ColorSpaceXformHelper::setData(UniformData* uniformData,
   // steps get identity placeholders: their CSFlags bit is 0, so the shader never reads them.
   static const float Zero4[4] = {0.0f, 0.0f, 0.0f, 0.0f};
   writeOptional(uniformData, ColorSpaceParams::CSFlags.name, static_cast<int>(flags.mask()));
-  // Select the ColorSpaceXform operator in the shared pointwise operator table (absent elsewhere).
-  writeOptional(uniformData, PointwiseOpModule::OpType.name, 3);
 
   if (this->applySrcTF()) {
     float srcTF0[4] = {
