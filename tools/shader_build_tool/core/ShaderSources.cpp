@@ -178,6 +178,25 @@ const ShaderSource* ShaderSourceSet::find(const std::string& name) const {
   return nullptr;
 }
 
+bool ReadGeneratorContract(const std::string& shaderDir, std::string* text, std::string* error) {
+  if (text == nullptr || error == nullptr) {
+    return false;
+  }
+  text->clear();
+  FileCache files;
+  auto contractRoot = NormalizePath(shaderDir + "/..");
+  for (const auto* file : GeneratorContractFiles) {
+    auto path = NormalizePath(contractRoot + "/" + file);
+    std::string contents;
+    if (!files.read(path, &contents)) {
+      *error = "cannot read the generator contract " + path;
+      return false;
+    }
+    *text += "// " + std::string(file) + "\n" + contents + "\n";
+  }
+  return true;
+}
+
 ShaderSourceSet LoadShaderSources(const std::string& shaderDir) {
   ShaderSourceSet set;
   for (const auto& factory : ShaderRegistry::All()) {

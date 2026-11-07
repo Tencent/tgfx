@@ -113,7 +113,8 @@ bool ParseDecimal(const std::string& text, uint64_t* value) {
 
 }  // namespace
 
-SourceDigestResult ComputeSourceDigest(const ShaderSourceSet& sources, ShaderProfile profile) {
+SourceDigestResult ComputeSourceDigest(const ShaderSourceSet& sources, ShaderProfile profile,
+                                       const std::string& generatorContract) {
   SourceDigestResult result;
   if (!sources.ok) {
     result.error = sources.errors.empty() ? "the shader sources failed to load" : sources.errors[0];
@@ -135,6 +136,10 @@ SourceDigestResult ComputeSourceDigest(const ShaderSourceSet& sources, ShaderPro
   for (const auto& capacityDefine : SlotCapacityDefines()) {
     stream.feedString(capacityDefine);
   }
+  // The operator table and the data-pool field lists generate the stage text through the
+  // chain-ops pragma, so a change there changes what was compiled without touching any shader
+  // source. They are C++ headers, so the per-shader loop below cannot see them.
+  stream.feedString(generatorContract);
   // The freshness contract stops at the sources: the tool's own build, the vendored translators
   // and the compiler versions change what the same text compiles to, and are covered by the
   // toolchain ABI discipline and by regenerating and comparing the bundle — not by this digest.

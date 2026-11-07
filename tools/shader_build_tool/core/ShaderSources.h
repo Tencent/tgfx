@@ -56,4 +56,17 @@ ShaderSourceSet LoadShaderSources(const std::string& shaderDir);
 /// The deepest include nesting LoadShaderSources accepts.
 inline constexpr int MaxIncludeDepth = 32;
 
+/// The contract headers whose content the generated shader text derives from: the operator table
+/// and the data-pool field lists it expands into. They are C++ headers, so no stage includes them
+/// and the loader above never sees them; their text must still reach the source digest, or a
+/// layout change would look like a fresh bundle.
+inline constexpr const char* GeneratorContractFiles[] = {"contract/ChainISA.h",
+                                                         "contract/ChainOps.h"};
+
+/// Reads GeneratorContractFiles from the contract directory beside shaderDir (shaderDir points at
+/// .../shaders/glsl; the contract headers live in .../shaders/contract) and concatenates them in
+/// declaration order. Returns false with an error when one cannot be read: a digest that silently
+/// omitted them would call a stale bundle fresh.
+bool ReadGeneratorContract(const std::string& shaderDir, std::string* text, std::string* error);
+
 }  // namespace tgfx

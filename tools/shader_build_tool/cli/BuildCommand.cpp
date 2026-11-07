@@ -537,6 +537,9 @@ int RunBuildCommand(const BuildOptions& options) {
   // Every shader file is read exactly once, here. The compile loop and the manifests' source
   // digests both use this set, so a manifest always describes the text that was compiled.
   ShaderSourceSet sources;
+  // The contract headers generate the stage text through the chain-ops pragma; they are C++
+  // headers, so the source set cannot carry them and the digests below must cover them here.
+  std::string generatorContract;
   const bool compiling = !options.shaderDir.empty();
   if (compiling) {
     sources = LoadShaderSources(options.shaderDir);
@@ -548,6 +551,14 @@ int RunBuildCommand(const BuildOptions& options) {
       PrintDiagnostics(report.diagnostics);
       std::cerr << "Build failed: " << sources.errors.size() << " shader source error(s) in "
                 << options.shaderDir << ".\n";
+      return 1;
+    }
+    std::string contractError;
+    if (!ReadGeneratorContract(options.shaderDir, &generatorContract, &contractError)) {
+      RecordBuildError(&report.diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable, "",
+                       "", -1, -1, contractError);
+      PrintDiagnostics(report.diagnostics);
+      std::cerr << "Build failed: " << contractError << ".\n";
       return 1;
     }
   }
@@ -675,7 +686,7 @@ int RunBuildCommand(const BuildOptions& options) {
                   << pair.first << "\n";
         return 1;
       }
-      auto digest = ComputeSourceDigest(sources, *profile);
+      auto digest = ComputeSourceDigest(sources, *profile, generatorContract);
       std::string manifestError;
       if (!digest.ok || !WriteBundleManifest(path, *profile, digest, &manifestError)) {
         std::cerr << "Failed to write the manifest of " << filename << ": "

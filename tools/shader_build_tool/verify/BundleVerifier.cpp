@@ -209,7 +209,14 @@ size_t CheckManifest(const std::string& bundlePath, ShaderProfile profile,
            expectedTag.c_str(), "not checked: pass --shader-dir to compare against the sources");
     return violations;
   }
-  auto current = ComputeSourceDigest(*sources, profile);
+  std::string generatorContract;
+  std::string contractError;
+  if (!ReadGeneratorContract(shaderDir, &generatorContract, &contractError)) {
+    Report(diagnostics, Severity::Error, DiagnosticCode::VerifyStale, expectedTag.c_str(),
+           "cannot read the generator contract: " + contractError);
+    return violations + 1;
+  }
+  auto current = ComputeSourceDigest(*sources, profile, generatorContract);
   if (!current.ok) {
     Report(diagnostics, Severity::Error, DiagnosticCode::VerifyStale, expectedTag.c_str(),
            "cannot compute the current source digest: " + current.error);

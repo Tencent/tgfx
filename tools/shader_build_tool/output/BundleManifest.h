@@ -38,20 +38,24 @@ struct SourceDigestResult {
 /// Computes the source digest of one backend: a 64-bit FNV-1a over a canonical stream made of
 ///  - the toolchain ABI and the backend tag;
 ///  - for Metal, the compiler invocation (MetalCompilerFingerprint);
+///  - the C++ contract headers whose declarations the generated shader text expands from, read
+///    through ReadGeneratorContract (passed as generatorContract);
 ///  - for every registered shader, ordered by name: its file names, the vertex and fragment
 ///    sources with every #include expanded (the exact text the compiler receives), and for every
 ///    rule-reachable permutation the backend compiles: the two permutation indices and the
 ///    #define lists they expand to.
-/// Shader text, include closure, variant declarations and matcher rules therefore all move the
-/// digest. It deliberately does NOT cover the translation code inside shader_build_tool or the
-/// versions of shaderc / SPIRV-Cross / tint / Xcode: those change what the same text compiles to.
-/// They are covered by the toolchain ABI discipline and by regenerating and comparing the bundle.
-/// The digest is an accident detector, not a security measure.
+/// Shader text, include closure, variant declarations, the operator/data-pool contract and the
+/// matcher rules therefore all move the digest. It deliberately does NOT cover the translation
+/// code inside shader_build_tool or the versions of shaderc / SPIRV-Cross / tint / Xcode: those
+/// change what the same text compiles to. They are covered by the toolchain ABI discipline and by
+/// regenerating and comparing the bundle. The digest is an accident detector, not a security
+/// measure.
 ///
 /// It is computed from an already loaded source set, never by reading the files again: a build
 /// passes the set it compiled from, so the digest cannot describe text the compiler never saw.
 /// Fails when the set did not load.
-SourceDigestResult ComputeSourceDigest(const ShaderSourceSet& sources, ShaderProfile profile);
+SourceDigestResult ComputeSourceDigest(const ShaderSourceSet& sources, ShaderProfile profile,
+                                       const std::string& generatorContract);
 
 /// The sidecar record that ties one published bundle to the sources it was built from. It lives in
 /// shader_bundle.<backend>.manifest next to the .bin, so the binary format and the runtime loader
