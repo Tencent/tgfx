@@ -24,9 +24,9 @@
 #include <string>
 #include <vector>
 #include "compile/ShaderCompiler.h"
-#include "compile/SpecCodegen.h"
 #include "compile/StageCompiler.h"
 #include "core/Diagnostics.h"
+#include "core/Types.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/shaders/PrecompiledShader.h"
 

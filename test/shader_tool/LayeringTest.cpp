@@ -120,6 +120,8 @@ const std::set<std::string>& AllowedRuntimeHeaders() {
       // contract layer
       "gpu/aot/AOTResourceProfile.h",
       "gpu/shaders/contract/ShaderBundleContract.h",
+      "gpu/shaders/contract/ChainISA.h",
+      "gpu/shaders/contract/ChainOps.h",
       "gpu/Uniform.h",
       "gpu/shaders/BundleCodec.h",
       "gpu/shaders/KernelContract.h",
@@ -142,6 +144,8 @@ const std::vector<std::string>& ContractHeaders() {
   static const std::vector<std::string> headers = {
       "gpu/aot/AOTResourceProfile.h",
       "gpu/shaders/contract/ShaderBundleContract.h",
+      "gpu/shaders/contract/ChainISA.h",
+      "gpu/shaders/contract/ChainOps.h",
       "gpu/Uniform.h",
       "gpu/shaders/BundleCodec.h",
       "gpu/shaders/KernelContract.h",
@@ -462,8 +466,10 @@ TEST(LayeringTest, TheProfileEmittersDependOnlyOnTheirDialectAndTheCompiler) {
   // translation has grown a dependency of its own.
   auto graph = ToolModuleGraph();
   ASSERT_EQ(graph.count("ProfileEmitter"), 1u);
+  // "Types" is the core data-type header (the spec table and gate records an emitter consumes);
+  // it carries no behaviour, so depending on it is not depending on a layer.
   const std::set<std::string> allowed = {"DiagnosticCodes", "Diagnostics", "ShaderCompiler",
-                                         "StageCompiler", "FormCheck", "GLSLDialect"};
+                                         "StageCompiler", "FormCheck", "GLSLDialect", "Types"};
   for (const auto& dependency : graph["ProfileEmitter"]) {
     EXPECT_EQ(allowed.count(dependency), 1u)
         << "ProfileEmitter depends on " << dependency

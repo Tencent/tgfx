@@ -33,19 +33,6 @@ struct SpecUsageField {
   bool indexed = false;
 };
 
-/// One code gate: `#pragma tgfx_spec_gate <name> : <expr>` in a reader file, directly above a
-/// function definition. The expression may reference the SPEC_<name>() scalar accessors, integer
-/// literals and the OP_* constants, with comparison and boolean operators. A closed gate swaps
-/// the function's body for a generated stub — never its signature — so every declaration
-/// (uniforms, samplers, varyings) stays outside the gate and the layout cannot drift.
-struct SpecGateInfo {
-  std::string name;
-  std::string expr;
-  /// The gated function's name, parsed at scan time: the preprocessor drops unknown pragma
-  /// lines, so the text passes locate the function by name, never by the pragma.
-  std::string functionName;
-};
-
 /// What the scan found in one family's expanded fragment template.
 struct SpecUsage {
   /// The `#pragma tgfx_spec_include` marker is present, so the tool generates and injects the

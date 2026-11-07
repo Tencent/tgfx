@@ -365,10 +365,10 @@ TEST(FamilyParamsTest, ADeclaredConstantNoVariantCarriesIsReported) {
 }
 
 TEST(FamilyParamsTest, ANameEndingInDigitsStaysItself) {
-  // GradientThresholds1_7 is itself declared; stripping its trailing digits would resolve it to
-  // nothing and report the wrong reason.
-  auto report = CheckFamilyParams({VariantWithFragment({Field("GradientThresholds1_7")})});
-  EXPECT_FALSE(report.mentions("'GradientThresholds1_7'")) << report.log;
+  // TiledSubset2 is itself declared; stripping its trailing digits would resolve it to
+  // TiledSubset, which is declared too, so the wrong field would answer for it.
+  auto report = CheckFamilyParams({VariantWithFragment({Field("TiledSubset2")})});
+  EXPECT_FALSE(report.mentions("'TiledSubset2'")) << report.log;
 }
 
 // ---- the macro-name rule --------------------------------------------------------------------

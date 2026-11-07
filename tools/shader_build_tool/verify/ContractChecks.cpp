@@ -450,17 +450,32 @@ struct DimensionNameVisitor {
 size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics) {
   size_t errors = 0;
   std::set<std::string> declaredDimensions;
+  // The dimensions whose sources this scan actually reads: the directory may carry only part of
+  // the registered families (a fixture, a partial copy), and demanding references for dimensions
+  // whose sources are not here would report every one of them as dead.
+  std::set<std::string> checkedDimensions;
   for (const auto& factory : ShaderRegistry::All()) {
     const auto shader = factory();
     // The domains are members of the info value, so a local keeps them alive through the loops:
     // ranging over shader->info().vertDomain.getDimensions() directly would hold a reference into
     // a destroyed temporary.
     const auto info = shader->info();
+    const bool present =
+        std::filesystem::exists(shaderDir + "/" + info.vertexFile) ||
+        std::filesystem::exists(shaderDir + "/" + info.fragmentFile);
     for (const auto& dimension : info.vertDomain.getDimensions()) {
-      declaredDimensions.insert(std::visit(DimensionNameVisitor(), dimension));
+      auto name = std::visit(DimensionNameVisitor(), dimension);
+      declaredDimensions.insert(name);
+      if (present) {
+        checkedDimensions.insert(name);
+      }
     }
     for (const auto& dimension : info.fragDomain.getDimensions()) {
-      declaredDimensions.insert(std::visit(DimensionNameVisitor(), dimension));
+      auto name = std::visit(DimensionNameVisitor(), dimension);
+      declaredDimensions.insert(name);
+      if (present) {
+        checkedDimensions.insert(name);
+      }
     }
   }
   std::set<std::string> allowed = declaredDimensions;
@@ -553,7 +568,7 @@ size_t ValidateMacroNames(const std::string& shaderDir, Diagnostics* diagnostics
       }
     }
   }
-  for (const auto& dimension : declaredDimensions) {
+  for (const auto& dimension : checkedDimensions) {
     if (usedInConditions.count(dimension) == 0) {
       Report(diagnostics, Severity::Error, DiagnosticCode::VerifyMacroUnknown, "", "", -1, -1,
              "dimension '" + dimension +

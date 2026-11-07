@@ -44,8 +44,8 @@ SourceRuleContext RealSourceContext() {
 
 }  // namespace
 
-TEST(ContractRulesTest, TheSourceRegistryHoldsTheTwoSourceRules) {
-  EXPECT_EQ(MakeSourceRules().size(), 2u);
+TEST(ContractRulesTest, TheSourceRegistryHoldsTheFiveSourceRules) {
+  EXPECT_EQ(MakeSourceRules().size(), 5u);
 }
 
 TEST(ContractRulesTest, TheArtifactRegistryHoldsTheFiveArtifactRules) {
