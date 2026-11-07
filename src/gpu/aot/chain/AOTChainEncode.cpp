@@ -89,7 +89,7 @@ bool BuildPointwiseSlot(const AOTEffectGraph& graph, const AOTEffectNode* node,
     return true;
   }
   if (node->kind == AOTEffectKind::Luma) {
-    auto parameters = std::get_if<AOTLumaParameters>(&node->parameters);
+    auto parameters = std::get_if<ChainISA::LumaData>(&node->parameters);
     if (parameters == nullptr) {
       return false;
     }
@@ -98,7 +98,7 @@ bool BuildPointwiseSlot(const AOTEffectGraph& graph, const AOTEffectNode* node,
     return true;
   }
   if (node->kind == AOTEffectKind::AlphaThreshold) {
-    auto parameters = std::get_if<AOTAlphaThresholdParameters>(&node->parameters);
+    auto parameters = std::get_if<ChainISA::AlphaThresholdData>(&node->parameters);
     if (parameters == nullptr) {
       return false;
     }

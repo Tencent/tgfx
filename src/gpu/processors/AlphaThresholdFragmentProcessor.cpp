@@ -26,7 +26,7 @@ bool AlphaThresholdFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNod
   if (builder == nullptr || output == nullptr) {
     return false;
   }
-  AOTAlphaThresholdParameters parameters = {threshold};
+  ChainISA::AlphaThresholdData parameters = {threshold};
   return builder->addAlphaThreshold(input, parameters, output);
 }
 

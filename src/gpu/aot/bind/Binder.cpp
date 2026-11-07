@@ -77,7 +77,7 @@ constexpr AOTOpContract OpContracts[] = {
 };
 
 constexpr size_t OpContractCount = sizeof(OpContracts) / sizeof(AOTOpContract);
-static_assert(OpContractCount == 16,
+static_assert(OpContractCount == ChainISA::OpCount,
               "every AOTChainOp needs exactly one contract row in OpContracts");
 
 const AOTOpContract& OpContractOf(AOTChainOp op) {
@@ -223,18 +223,12 @@ void BindColorMatrixSlot(UniformData* uniformData, size_t index, int /*ordinal*/
 
 void BindLumaSlot(UniformData* uniformData, size_t index, int /*ordinal*/,
                   const AOTChainSlot& slot) {
-  ChainISA::LumaData data = {};
-  data.kr = slot.luma.kr;
-  data.kg = slot.luma.kg;
-  data.kb = slot.luma.kb;
-  UploadSlotData(uniformData, index, data, ChainISA::PackLuma);
+  UploadSlotData(uniformData, index, slot.luma, ChainISA::PackLuma);
 }
 
 void BindAlphaThresholdSlot(UniformData* uniformData, size_t index, int /*ordinal*/,
                             const AOTChainSlot& slot) {
-  ChainISA::AlphaThresholdData data = {};
-  data.threshold = slot.alphaThreshold.threshold;
-  UploadSlotData(uniformData, index, data, ChainISA::PackAlphaThreshold);
+  UploadSlotData(uniformData, index, slot.alphaThreshold, ChainISA::PackAlphaThreshold);
 }
 
 void BindConstColorSlot(UniformData* uniformData, size_t index, int /*ordinal*/,

@@ -79,13 +79,13 @@ bool AOTNodeBuilder::addColorMatrix(AOTNodeID input, const AOTColorMatrixParamet
   return addUnaryNode(AOTEffectKind::ColorMatrix, input, parameters, output);
 }
 
-bool AOTNodeBuilder::addLuma(AOTNodeID input, const AOTLumaParameters& parameters,
+bool AOTNodeBuilder::addLuma(AOTNodeID input, const ChainISA::LumaData& parameters,
                              AOTNodeID* output) {
   return addUnaryNode(AOTEffectKind::Luma, input, parameters, output);
 }
 
 bool AOTNodeBuilder::addAlphaThreshold(AOTNodeID input,
-                                       const AOTAlphaThresholdParameters& parameters,
+                                       const ChainISA::AlphaThresholdData& parameters,
                                        AOTNodeID* output) {
   return addUnaryNode(AOTEffectKind::AlphaThreshold, input, parameters, output);
 }

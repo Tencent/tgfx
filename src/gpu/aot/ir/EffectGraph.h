@@ -148,18 +148,6 @@ struct AOTColorMatrixParameters {
   std::array<float, 20> matrix = {};
 };
 
-struct AOTLumaParameters {
-  float kr = 0.2126f;
-  float kg = 0.7152f;
-  float kb = 0.0722f;
-};
-
-// Alpha-step operand (AlphaThresholdFragmentProcessor). threshold is compared against the input
-// alpha; it is a runtime uniform in the fused kernel rather than a structural axis.
-struct AOTAlphaThresholdParameters {
-  float threshold = 0.0f;
-};
-
 // Color-space transform operand (ColorSpaceXformEffect). The steps object is shared with the JIT
 // path so the fused kernel uploads byte-identical parameters through ColorSpaceXformHelper, which
 // keeps the AOT and runtime results in agreement.
@@ -419,9 +407,9 @@ class AOTNodeBuilder {
   bool addColorMatrix(AOTNodeID input, const AOTColorMatrixParameters& parameters,
                       AOTNodeID* output);
 
-  bool addLuma(AOTNodeID input, const AOTLumaParameters& parameters, AOTNodeID* output);
+  bool addLuma(AOTNodeID input, const ChainISA::LumaData& parameters, AOTNodeID* output);
 
-  bool addAlphaThreshold(AOTNodeID input, const AOTAlphaThresholdParameters& parameters,
+  bool addAlphaThreshold(AOTNodeID input, const ChainISA::AlphaThresholdData& parameters,
                          AOTNodeID* output);
 
   bool addColorSpaceXform(AOTNodeID input, const AOTColorSpaceXformParameters& parameters,

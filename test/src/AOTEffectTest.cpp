@@ -489,7 +489,7 @@ TGFX_TEST(AOTEffectTest, ProcessorChainLowersTypedParameters) {
   EXPECT_FALSE(textureParameters->tiledRecipe.has_value());
   auto matrixParameters =
       std::get_if<AOTColorMatrixParameters>(&graph.nodeAt(AOTNodeID(2))->parameters);
-  auto lumaParameters = std::get_if<AOTLumaParameters>(&graph.nodeAt(AOTNodeID(3))->parameters);
+  auto lumaParameters = std::get_if<ChainISA::LumaData>(&graph.nodeAt(AOTNodeID(3))->parameters);
   ASSERT_NE(matrixParameters, nullptr);
   ASSERT_NE(lumaParameters, nullptr);
   EXPECT_EQ(matrixParameters->matrix, IdentityColorMatrix);

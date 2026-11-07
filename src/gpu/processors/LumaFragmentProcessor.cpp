@@ -30,7 +30,7 @@ bool LumaFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNodeID input,
   if (builder == nullptr || output == nullptr) {
     return false;
   }
-  AOTLumaParameters parameters = {_lumaFactor.kr, _lumaFactor.kg, _lumaFactor.kb};
+  ChainISA::LumaData parameters = {_lumaFactor.kr, _lumaFactor.kg, _lumaFactor.kb};
   return builder->addLuma(input, parameters, output);
 }
 

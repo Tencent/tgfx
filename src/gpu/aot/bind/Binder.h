@@ -28,16 +28,8 @@ namespace tgfx {
 class UniformData;
 class ParamWriter;
 class XferProcessor;
-struct AOTTextureParameters;
-struct AOTGradientParameters;
-struct AOTBlendParameters;
-struct AOTRectCoverageParameters;
-struct AOTRRectCoverageParameters;
-struct AOTColorMatrixParameters;
-struct AOTLumaParameters;
-struct AOTOpaqueKernelParameters;
 
-// The instruction contract's bind column (NodeContract.h's AOTOpContract): one function per op
+// The instruction contract's bind column (Binder.cpp's AOTOpContract): one function per op
 // that writes a per-slot parameter block. The caller writes the packed word and its selector with
 // its own dialect, then dispatches here with the slot's index and its ordinal into the per-kind
 // parameter array (the coverage capacities; the slot index for every other op).

@@ -262,7 +262,7 @@ void PrecompiledProgramWriter::writeProcessorsByTree(const ProgramInfo& info,
   std::vector<const AOTRectCoverageParameters*> rectClips = {};
   std::vector<const AOTRRectCoverageParameters*> rrectClips = {};
   std::vector<const AOTColorMatrixParameters*> colorMatrices = {};
-  std::vector<const AOTLumaParameters*> lumas = {};
+  std::vector<const ChainISA::LumaData*> lumas = {};
   std::vector<float> alphaThresholds = {};
   std::vector<const AOTGradientParameters*> gradients = {};
   std::vector<std::pair<const AOTOpaqueKernelParameters*, const AOTTextureParameters*>> blurs = {};
@@ -295,12 +295,12 @@ void PrecompiledProgramWriter::writeProcessorsByTree(const ProgramInfo& info,
             }
             break;
           case AOTEffectKind::Luma:
-            if (auto* params = std::get_if<AOTLumaParameters>(&node->parameters)) {
+            if (auto* params = std::get_if<ChainISA::LumaData>(&node->parameters)) {
               lumas.push_back(params);
             }
             break;
           case AOTEffectKind::AlphaThreshold:
-            if (auto* params = std::get_if<AOTAlphaThresholdParameters>(&node->parameters)) {
+            if (auto* params = std::get_if<ChainISA::AlphaThresholdData>(&node->parameters)) {
               alphaThresholds.push_back(params->threshold);
             }
             break;
@@ -544,7 +544,7 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
         break;
       }
       case AOTEffectKind::Luma: {
-        auto* params = std::get_if<AOTLumaParameters>(&node->parameters);
+        auto* params = std::get_if<ChainISA::LumaData>(&node->parameters);
         if (params != nullptr) {
           action.kind = Action::Kind::Pointwise;
           action.pointwise.op = AOTChainOp::Luma;
@@ -554,7 +554,7 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
         break;
       }
       case AOTEffectKind::AlphaThreshold: {
-        auto* params = std::get_if<AOTAlphaThresholdParameters>(&node->parameters);
+        auto* params = std::get_if<ChainISA::AlphaThresholdData>(&node->parameters);
         if (params != nullptr) {
           action.kind = Action::Kind::Pointwise;
           action.pointwise.op = AOTChainOp::AlphaThreshold;

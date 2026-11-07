@@ -65,8 +65,8 @@ constexpr const char* DeviceToLocal = "DeviceToLocal";
 // input's producer (IsPassBoundarySensitive; see AOTEffectDecomposer's CanStartPassAt).
 #define TGFX_POINTWISE_OPS(X)                                                                    \
   X(ColorMatrix, ChainISA::ColorMatrix, AOTColorMatrixParameters, colorMatrix, false)            \
-  X(Luma, ChainISA::Luma, AOTLumaParameters, luma, false)                                        \
-  X(AlphaThreshold, ChainISA::AlphaThreshold, AOTAlphaThresholdParameters, alphaThreshold, true) \
+  X(Luma, ChainISA::Luma, ChainISA::LumaData, luma, false)                                        \
+  X(AlphaThreshold, ChainISA::AlphaThreshold, ChainISA::AlphaThresholdData, alphaThreshold, true) \
   X(ColorSpaceXform, ChainISA::ColorSpaceXform, AOTColorSpaceXformParameters, colorSpaceXform,   \
     false)                                                                                       \
   X(ConstColor, ChainISA::ConstColor, AOTConstColorParameters, constColor, false)                \
