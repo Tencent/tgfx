@@ -26,24 +26,25 @@ struct BundleEntry {
   size_t size = 0;
 };
 
-// Backend enum: Unknown=0, OpenGL=1, Metal=2, Vulkan=3, WebGPU=4
-static constexpr int BACKEND_COUNT = 5;
-static_assert(static_cast<int>(Backend::WebGPU) < BACKEND_COUNT, "Backend enum exceeds array size");
+// Backend enum: Unknown=0, OpenGL=1, Metal=2, Vulkan=3, WebGPU=4, D3D12=5
+static constexpr size_t BackendCount = static_cast<size_t>(Backend::D3D12) + 1;
+// A new backend must be reviewed here: the table is keyed by the enum value, so a slot the table
+// does not carry would silently drop that backend's embedded bundle.
+static_assert(BackendCount == 6, "a new backend needs its embedded bundle slot reviewed");
 
-static BundleEntry& GetEntry(Backend backend) {
-  static BundleEntry entries[BACKEND_COUNT];
-  auto index = static_cast<int>(backend);
-  if (index < 0 || index >= BACKEND_COUNT) {
-    static BundleEntry empty;
-    return empty;
-  }
-  return entries[index];
+static BundleEntry* FindEntry(Backend backend) {
+  static BundleEntry entries[BackendCount];
+  auto index = static_cast<size_t>(static_cast<int>(backend));
+  return index < BackendCount ? &entries[index] : nullptr;
 }
 
 void EmbeddedShaderBundles::Register(Backend backend, const uint8_t* data, size_t size) {
-  auto& entry = GetEntry(backend);
-  entry.data = data;
-  entry.size = size;
+  auto* entry = FindEntry(backend);
+  if (entry == nullptr) {
+    return;
+  }
+  entry->data = data;
+  entry->size = size;
 }
 
 std::pair<const uint8_t*, size_t> EmbeddedShaderBundles::GetBundle(Backend backend) {
@@ -53,9 +54,9 @@ std::pair<const uint8_t*, size_t> EmbeddedShaderBundles::GetBundle(Backend backe
     embedded::RegisterAllEmbeddedBundles();
 #endif
   });
-  auto& entry = GetEntry(backend);
-  if (entry.data != nullptr && entry.size > 0) {
-    return {entry.data, entry.size};
+  auto* entry = FindEntry(backend);
+  if (entry != nullptr && entry->data != nullptr && entry->size > 0) {
+    return {entry->data, entry->size};
   }
   return {nullptr, 0};
 }
