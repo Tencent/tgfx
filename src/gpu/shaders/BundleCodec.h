@@ -34,10 +34,9 @@ namespace tgfx {
  * [nameLen:u8][name][format:u8][location:u8], then per spec entry
  * [nameLen:u8][name][format:u8][arraySize:u16 LE][firstId:u16 LE].
  *
- * The codec is byte-level only. The format byte is an opaque UniformFormat value (the tool links
- * no Uniform.h), so the semantic rules — which formats may be uniforms, which samplers, sampler
- * array sizes, and vertex-input locations that strictly increase — stay with the runtime, which
- * owns the enum.
+ * The codec is byte-level only: the format byte is an opaque UniformFormat value here, so the
+ * semantic rules — which formats may be uniforms, which samplers, sampler array sizes, and
+ * vertex-input locations that strictly increase — stay with the runtime, which owns the enum.
  */
 
 /// One uniform or sampler entry of a stage's reflection.

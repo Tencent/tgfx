@@ -34,8 +34,8 @@ namespace ChainISA {
 //              and the same values ride the fallback form's uniform mirror.
 //
 // A new operator declares its two field lists and one row in TGFX_CHAIN_OPS; the structs, the
-// word counts and the capacity checks below all derive from those. Nothing here is consumed yet:
-// the encoder and the GLSL generator are the next steps.
+// word counts and the capacity checks below all derive from those, and the encoder, the packer
+// and the GLSL generator consume them.
 
 struct Float2 {
   float x = 0.0f;

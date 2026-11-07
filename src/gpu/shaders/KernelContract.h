@@ -32,9 +32,10 @@ namespace tgfx {
 // the bundle build instead of silently leaving contract fields unwritten or misinterpreting a
 // chain slot.
 // The YUV kernel's color-grade tail capacity: the size of the chain instruction arrays the tail
-// reads (the same slot encoding the interpreter uses). The GLSL side instantiates the same
-// capacity via CHAIN_SLOT_CAPACITY in yuv_texture_fill.frag, and shader_build_tool parses that
-// define and fails the bundle build on drift, so this constant is the single source.
+// reads (the same slot encoding the interpreter uses). The GLSL side aliases CHAIN_SLOT_CAPACITY
+// from TGFX_TAIL_SLOT_CAPACITY (yuv_texture_fill.frag), which the build injects from
+// AOTResourceProfile::SlotCapacityDefines() into every compiled stage, so this constant is the
+// single source and the compiled arrays cannot drift from it.
 inline constexpr size_t MaxPointwiseSlots = 3;
 
 namespace ClipContract {
