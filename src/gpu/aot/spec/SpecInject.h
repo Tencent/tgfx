@@ -26,21 +26,6 @@
 namespace tgfx {
 
 /**
- * The text backends' injection: rewrites the generated `TGFX_SPEC_<id> = 0` declarations of a
- * stored GLSL artifact to this draw's values, so the driver's compiler folds them (the master
- * switch turns the accessors' constant branch on). Values equal to the default are left alone,
- * and every non-default id must find exactly one declaration — an artifact that lost one fails
- * the injection, which the caller answers with the generic form.
- * @param code    The stored fragment-stage GLSL text.
- * @param fields  The variant's spec table (the id assignment order).
- * @param values  The captured values (the master switch first).
- * @return        The specialized text, or an empty string when the artifact does not carry the
- *                expected declarations.
- */
-std::string InjectSpecGLSL(const std::string& code, const std::vector<SpecFieldInfo>& fields,
-                           const SpecValues& values);
-
-/**
  * Appends the captured values to a pipeline's fragment-constant table, keyed the way the
  * pipeline-constant backends resolve them: the SpecId in decimal (Metal's MSL function
  * constants carry the SpecId as their index; the Vulkan specialization map keys by SpecId).

@@ -23,19 +23,51 @@ namespace tgfx {
 
 namespace {
 
-/// Driver source text (GLSL today): rewrites the generated TGFX_SPEC_<id> declarations, so the
-/// driver's compiler folds the accessors before it ever sees the code.
-class SourceRewriteInjector final : public SpecInjector {
+/// Driver source text (GLSL and HLSL): prepends one `#define <prefix><id> <value>` line per
+/// captured value. The stored text declares each value as an idempotent macro default — GLSL's
+/// `#ifndef TGFX_SPEC_<id>` block (the emitter rewrites the generated const into it), HLSL's
+/// SPIRV-Cross `#ifndef SPIRV_CROSS_CONSTANT_ID_<id>` block — so the defines fold every accessor
+/// and gate condition in the preprocessor pass, before the compiler parses a single line. GLSL
+/// inserts after the #version line (directives must not precede it); HLSL prepends at the top
+/// (its text opens with includes, not a version directive).
+class MacroPrefixInjector final : public SpecInjector {
  public:
+  MacroPrefixInjector(std::string macroPrefix, bool afterVersionLine)
+      : prefix(std::move(macroPrefix)), afterVersion(afterVersionLine) {
+  }
+
   bool Apply(const std::string& code, const std::vector<SpecFieldInfo>& fields,
              const SpecValues& values, SpecInjection* injection) const override {
-    auto specialized = InjectSpecGLSL(code, fields, values);
-    if (specialized.empty()) {
+    injection->constants.clear();
+    AppendSpecConstants(fields, values, &injection->constants);
+    if (injection->constants.empty()) {
       return false;
     }
-    injection->code = std::move(specialized);
+    std::string defines;
+    for (const auto& entry : injection->constants) {
+      defines += "#define " + prefix + entry.first + " " +
+                 std::to_string(static_cast<int>(entry.second)) + "\n";
+    }
+    injection->constants.clear();
+    if (!afterVersion) {
+      injection->code = defines + code;
+      return true;
+    }
+    const auto versionPos = code.find("#version");
+    if (versionPos == std::string::npos) {
+      return false;
+    }
+    const auto versionEnd = code.find('\n', versionPos);
+    if (versionEnd == std::string::npos) {
+      return false;
+    }
+    injection->code = code.substr(0, versionEnd + 1) + defines + code.substr(versionEnd + 1);
     return true;
   }
+
+ private:
+  std::string prefix;
+  bool afterVersion;
 };
 
 /// A precompiled container resolved with function/pipeline constants (Metal's metallib today,
@@ -49,40 +81,17 @@ class PipelineConstantInjector final : public SpecInjector {
   }
 };
 
-/// Driver source text without the rewrite marker (HLSL): prepends one define per constant.
-/// SPIRV-Cross's HLSL writer emits each SpecId as an `#ifndef SPIRV_CROSS_CONSTANT_ID_<id>`
-/// block, so a define in front of the text folds the value into D3DCompiler's preprocessor pass.
-class DefinePrefixInjector final : public SpecInjector {
- public:
-  bool Apply(const std::string& code, const std::vector<SpecFieldInfo>& fields,
-             const SpecValues& values, SpecInjection* injection) const override {
-    injection->constants.clear();
-    AppendSpecConstants(fields, values, &injection->constants);
-    if (injection->constants.empty()) {
-      return false;
-    }
-    std::string prefix;
-    for (const auto& entry : injection->constants) {
-      prefix += "#define SPIRV_CROSS_CONSTANT_ID_" + entry.first + " " +
-                std::to_string(static_cast<int>(entry.second)) + "\n";
-    }
-    injection->constants.clear();
-    injection->code = prefix + code;
-    return true;
-  }
-};
-
 }  // namespace
 
 const SpecInjector* FindSpecInjector(ShaderCodeFormat format) {
-  static const SourceRewriteInjector sourceRewrite;
+  static const MacroPrefixInjector glslMacros{"TGFX_SPEC_", true};
   static const PipelineConstantInjector pipelineConstants;
-  static const DefinePrefixInjector definePrefix;
+  static const MacroPrefixInjector hlslMacros{"SPIRV_CROSS_CONSTANT_ID_", false};
   switch (format) {
     case ShaderCodeFormat::GLSL:
-      return &sourceRewrite;
+      return &glslMacros;
     case ShaderCodeFormat::HLSL:
-      return &definePrefix;
+      return &hlslMacros;
     case ShaderCodeFormat::METALLIB:
     case ShaderCodeFormat::SPIRV:
     case ShaderCodeFormat::WGSL:

@@ -63,7 +63,15 @@ DirectFormLeak FindDirectFormLeak(const std::string& text, bool esForm) {
   if (bindingOffset != std::string::npos) {
     return {"surviving binding", bindingOffset};
   }
-  if (std::regex_search(text, conditional)) {
+  // The runtime-overridable spec value defaults the emitter writes (`#ifndef TGFX_SPEC_<id> /
+  // #define TGFX_SPEC_<id> 0 / #endif`) are the one sanctioned conditional: the runtime
+  // specializes the text by inserting `#define` lines ahead of them (MacroPrefixInjector), so
+  // the preprocessor folds every accessor before the driver's compiler parses the code. Every
+  // other conditional is a leak of the unpreprocessed form.
+  static const std::regex specDefaultBlock(
+      R"((^|\n)#ifndef TGFX_SPEC_[0-9]+\n#define TGFX_SPEC_[0-9]+ 0\n#endif)");
+  const std::string withoutSpecDefaults = std::regex_replace(text, specDefaultBlock, "$1");
+  if (std::regex_search(withoutSpecDefaults, conditional)) {
     return {"surviving conditional", 0};
   }
   if (text.find("subpassInput") != std::string::npos ||

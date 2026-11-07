@@ -224,6 +224,21 @@ std::string EmitDirectGLSL330Impl(const std::string& source, ShaderStageType sta
       cursor = lineEnd == std::string::npos ? result.size() : lineEnd + 1;
       continue;
     }
+    // The generated spec constants (`const int TGFX_SPEC_<id> = 0;` from the generic spec
+    // include) become idempotent macro defaults: the runtime specializes the text by inserting
+    // `#define TGFX_SPEC_<id> <value>` lines after the #version line, and the preprocessor
+    // folds every accessor before the compiler parses a single line of code. A const
+    // declaration could only be specialized by rewriting the text.
+    {
+      static const std::regex specConstDefault(R"(^const int (TGFX_SPEC_[0-9]+) = 0;[ \t\r]*$)");
+      std::smatch specMatch;
+      if (std::regex_match(code, specMatch, specConstDefault)) {
+        const auto macro = specMatch[1].str();
+        out += "#ifndef " + macro + "\n#define " + macro + " 0\n#endif\n";
+        cursor = lineEnd == std::string::npos ? result.size() : lineEnd + 1;
+        continue;
+      }
+    }
     // Rewrite layout(...) lists: drop set/binding, drop varying locations, fold location ids.
     {
       auto open = code.find("layout(");
