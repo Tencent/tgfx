@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/aot/plan/AOTShapeRules.h"
+#include "gpu/aot/chain/AOTShapeRules.h"
 #include "gpu/aot/ir/NodeContract.h"
 
 namespace tgfx {

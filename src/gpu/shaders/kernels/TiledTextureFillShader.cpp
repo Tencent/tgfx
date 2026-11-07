@@ -19,7 +19,7 @@
 #include "gpu/shaders/kernels/TiledTextureFillShader.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/aot/ir/DrawIR.h"
-#include "gpu/aot/plan/AOTChainBuilder.h"
+#include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/select/DrawShape.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
 

@@ -20,7 +20,7 @@
 
 #include <cstddef>
 #include <vector>
-#include "gpu/aot/ir/ChainContext.h"
+#include "gpu/aot/chain/ChainContext.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/NodeContract.h"
 

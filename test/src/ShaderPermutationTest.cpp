@@ -35,7 +35,7 @@
 #include "gpu/aot/bundle/EmbeddedShaderBundles.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/ir/DrawIR.h"
-#include "gpu/aot/plan/AOTChainBuilder.h"
+#include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/ir/Lowering.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "gpu/aot/select/PermutationMatch.h"

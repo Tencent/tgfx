@@ -19,7 +19,7 @@
 #include <cstddef>
 #include <vector>
 #include "base/TGFXTest.h"
-#include "gpu/aot/plan/AOTChainRegisterAllocator.h"
+#include "gpu/aot/chain/AOTChainRegisterAllocator.h"
 #include "gtest/gtest.h"
 
 namespace tgfx {

@@ -22,7 +22,7 @@
 #include "gpu/aot/AOTResourceProfile.h"
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/aot/ir/Program.h"
-#include "gpu/aot/plan/AOTChainRegisterAllocator.h"
+#include "gpu/aot/chain/AOTChainRegisterAllocator.h"
 
 namespace tgfx {
 
@@ -66,23 +66,5 @@ struct AOTChainContext {
   size_t localRectCoverageSlots = 0;
   AOTChainRegisterAssignment assignment = {};
 };
-
-// The per-kind contract implementations the node contract table registers: each encoder turns one
-// scheduled node into its chain slot (0..2 slots — a computed-input texture emits the raw sample
-// and a modulate), and each demand adds the node's resource demand to the profile tally.
-bool EncodeTextureSourceSlot(AOTChainContext* ctx, size_t combined, size_t slotIndex);
-bool EncodePerlinNoiseSlot(AOTChainContext* ctx, size_t combined, size_t slotIndex);
-bool EncodeConstColorSlot(AOTChainContext* ctx, size_t combined, size_t slotIndex);
-// Shared by the four unary pointwise kinds (the single pointwise op ABI value picks the math).
-bool EncodeUnaryPointwiseSlot(AOTChainContext* ctx, size_t combined, size_t slotIndex);
-bool EncodeInputOpaqueSlot(AOTChainContext* ctx, size_t combined, size_t slotIndex);
-bool EncodeMulAlphaSlot(AOTChainContext* ctx, size_t combined, size_t slotIndex);
-bool EncodeBlendSlot(AOTChainContext* ctx, size_t combined, size_t slotIndex);
-bool EncodeRectCoverageSlot(AOTChainContext* ctx, size_t combined, size_t slotIndex);
-bool EncodeRRectCoverageSlot(AOTChainContext* ctx, size_t combined, size_t slotIndex);
-bool EncodeGradientSlot(AOTChainContext* ctx, size_t combined, size_t slotIndex);
-
-void DemandTextureSource(const AOTEffectNode* node, AOTResourceDemand* demand);
-void DemandGradientSource(const AOTEffectNode* node, AOTResourceDemand* demand);
 
 }  // namespace tgfx

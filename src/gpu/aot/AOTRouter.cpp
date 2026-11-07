@@ -21,7 +21,7 @@
 #include <utility>
 #include <vector>
 #include "gpu/DrawingManager.h"
-#include "gpu/aot/plan/AOTEffectDecomposer.h"
+#include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/plan/AOTPlanner.h"
 #include "gpu/ops/StandardDrawOp.h"
 #include "tgfx/gpu/Context.h"
@@ -72,7 +72,7 @@ PlacementPtr<RenderTask> AOTRouter::routeDraw(PlacementPtr<DrawOp>* op,
       // A graph one fused pass can carry needs no plan at all: prepare compiles that pass from the
       // graph itself, which is the same decision the DAG planner would make.
       PassIR fused = {};
-      if (AOTEffectDecomposer::PlanFusedPass(ir->color, &fused)) {
+      if (AOTChainBuilder::PlanFusedPass(ir->color, &fused)) {
         return nullptr;
       }
       auto plan = AOTPlanner::MakePlan(*ir);
@@ -143,7 +143,7 @@ PlacementPtr<RenderTask> AOTRouter::routeFill(PlacementPtr<DrawOp>* op,
   }
   // A graph one fused pass can carry needs no plan: prepare compiles that pass from the graph.
   PassIR fused = {};
-  if (AOTEffectDecomposer::PlanFusedPass(ir->color, &fused)) {
+  if (AOTChainBuilder::PlanFusedPass(ir->color, &fused)) {
     return nullptr;
   }
   if (auto plan = AOTPlanner::MakePlan(*ir)) {

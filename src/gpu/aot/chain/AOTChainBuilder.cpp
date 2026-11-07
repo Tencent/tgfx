@@ -15,7 +15,7 @@
 //  and limitations under the license.
 //
 
-#include "gpu/aot/plan/AOTChainBuilder.h"
+#include "gpu/aot/chain/AOTChainBuilder.h"
 #include <algorithm>
 #include <unordered_map>
 #include <utility>
@@ -23,13 +23,13 @@
 #include "gpu/ColorSpaceXformHelper.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/aot/ir/ChainContext.h"
+#include "gpu/aot/chain/ChainContext.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/NodeContract.h"
-#include "gpu/aot/plan/AOTChainInternal.h"
-#include "gpu/aot/plan/AOTChainRegisterAllocator.h"
-#include "gpu/aot/plan/AOTEffectDecomposer.h"
-#include "gpu/aot/plan/AOTShapeRules.h"
+#include "gpu/aot/chain/AOTChainInternal.h"
+#include "gpu/aot/chain/AOTChainRegisterAllocator.h"
+#include "gpu/aot/chain/AOTPassIR.h"
+#include "gpu/aot/chain/AOTShapeRules.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
 #include "gpu/processors/ConstColorProcessor.h"
@@ -90,6 +90,70 @@ AOTTextureParameters AOTChainBuilder::IntermediateSource(std::shared_ptr<Texture
   return parameters;
 }
 
+// Plans one fused chain pass over the given reachable node set, rooted at subtreeRoot: the shape
+// whitelist (which node kinds a single fused pass may carry), the pass node list (designators
+// excluded) and the chain builder's own profile resolution, so the planner, CanExecute and
+// construction cannot count differently. Leaf parameters and budgets belong to the chain builder's
+// planner, consulted through ResolveChainProfile.
+static bool PlanReachableSubtree(const AOTEffectGraph& graph, AOTNodeID subtreeRoot,
+                                 const std::vector<bool>& reachable, PassIR* pass) {
+  if (pass == nullptr) {
+    return false;
+  }
+  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+    if (!reachable[index]) {
+      continue;
+    }
+    auto node = graph.nodeAt(AOTNodeID(index));
+    if (node == nullptr) {
+      return false;
+    }
+    if (!TraitsOf(node->kind).chainFusable) {
+      return false;
+    }
+  }
+  *pass = {};
+  pass->output = subtreeRoot;
+  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+    auto node = graph.nodeAt(AOTNodeID(index));
+    if (!reachable[index] || TraitsOf(node->kind).isInputDesignator()) {
+      continue;
+    }
+    pass->nodes.push_back(AOTNodeID(index));
+  }
+  AOTResourceProfile profile = AOTResourceProfile::Automatic;
+  if (!AOTChainBuilder::FitsChainPlan(graph, *pass, &profile)) {
+    return false;
+  }
+  pass->resourceProfile = profile;
+  return true;
+}
+
+// Planner for a pointwise DAG whose only leaves are texture sources / const colors and whose
+// interior nodes are pure pointwise or blend ops. Such a DAG evaluates in a single fused pass (the
+// PointwiseChain kernel) with no intermediate materialization. Resolved plain, tiled and
+// device-space texture leaves are supported; non-pointwise nodes require a different planner.
+// A noise-free graph admits its whole node space (a dead node would still encode as a dead slot);
+// a noise graph keeps to the root-reachable set, which is all the noise family's budgets cover.
+bool AOTChainBuilder::PlanFusedPass(const AOTEffectGraph& graph, PassIR* pass) {
+  if (pass == nullptr || graph.nodeCount() < 2) {
+    return false;
+  }
+  auto geometryNode = graph.nodeAt(AOTNodeID(0));
+  if (geometryNode == nullptr || geometryNode->kind != AOTEffectKind::GeometryColor) {
+    return false;
+  }
+  bool containsNoise = false;
+  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+    containsNoise |= graph.nodeAt(AOTNodeID(index))->kind == AOTEffectKind::PerlinNoiseSource;
+  }
+  std::vector<bool> reachable(graph.nodeCount(), !containsNoise);
+  if (containsNoise && !CollectReachableNodes(graph, graph.root(), &reachable)) {
+    return false;
+  }
+  return PlanReachableSubtree(graph, graph.root(), reachable, pass);
+}
+
 bool AOTChainBuilder::CompileGraph(const AOTEffectGraph& graph,
                                    const std::vector<AOTCoverageTerm>* coverageTerms,
                                    AOTProgram* out) {
@@ -97,10 +161,11 @@ bool AOTChainBuilder::CompileGraph(const AOTEffectGraph& graph,
     return false;
   }
   PassIR pass = {};
-  if (!AOTEffectDecomposer::PlanFusedPass(graph, &pass)) {
+  PassIR fused = {};
+  if (!PlanFusedPass(graph, &fused)) {
     return false;
   }
-  return CompileChainProgramLayout(graph, pass, coverageTerms, out);
+  return CompileChainProgramLayout(graph, fused, coverageTerms, out);
 }
 
 bool AOTChainBuilder::CompileSegment(const DrawIR& segmentIR, AOTProgram* out) {

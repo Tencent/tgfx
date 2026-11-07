@@ -22,42 +22,12 @@
 #include <string>
 #include <vector>
 #include "gpu/aot/AOTResourceProfile.h"
+#include "gpu/aot/chain/AOTPassIR.h"
 #include "gpu/aot/ir/EffectGraph.h"
 
 namespace tgfx {
 class FragmentProcessor;
 class ProgramInfo;
-
-// The pass cap of a cut plan: every pass but the last is one materialization edge, so this bounds
-// both the intermediate memory and the planning work; a shape needing more passes is refused.
-inline constexpr size_t MaxCutPlanPasses = 8;
-
-/**
- * One kernel invocation of a plan. A plan with several passes is a linear chain split into chain
- * passes, each fitting one chain pass: every pass but the last renders into an intermediate RGBA8
- * texture (materializesOutput), and each later pass reads its predecessor's texture in device space
- * as its source (dependencies holds that predecessor's index), so its nodes are operators only.
- *
- * The cut form instead replaces over-budget blend operand subtrees one cut at a time: each pass is a
- * self-contained fused chain pass over its own original-graph nodes, reading the earlier cuts as
- * texture leaves — materializedInputs[i] names the original-graph node that dependencies[i]'s output
- * texture replaces. The passes are in topological order and the last one is the terminal draw (the
- * only pass that runs on the destination). A pass's resource profile is resolved by its segment
- * build; a plan-time fit check runs the same build over placeholder intermediate leaves.
- */
-struct PassIR {
-  std::vector<AOTNodeID> nodes = {};
-  std::vector<uint32_t> dependencies = {};
-  AOTNodeID output = AOTNodeID::Invalid();
-  bool materializesOutput = false;
-  AOTResourceProfile resourceProfile = AOTResourceProfile::Automatic;
-  std::vector<AOTNodeID> materializedInputs = {};
-};
-
-struct Plan {
-  std::vector<PassIR> passes = {};
-  AOTNodeID output = AOTNodeID::Invalid();
-};
 
 /**
  * Result of statically analyzing whether one effect axis (color or coverage) can be reduced onto
@@ -99,16 +69,9 @@ struct AOTDecomposeAnalysis {
 class AOTEffectDecomposer {
  public:
   /**
-   * Plans the single fused pass that carries the whole graph, or returns false when no fused pass
-   * can express it. This is the only source of a single-pass plan: the DAG planner is the only
-   * planner that yields one, so a caller that has this answer never has to plan at all.
-   */
-  static bool PlanFusedPass(const AOTEffectGraph& graph, PassIR* pass);
-
-  /**
    * Decomposes the graph into a multi-pass execution plan: the blend cut planner first, then the
    * linear chain planner. Both materialize, so the result always needs a task. Callers that serve
-   * a fused pass in place must ask PlanFusedPass first.
+   * a fused pass in place must ask AOTChainBuilder::PlanFusedPass first.
    */
   static bool DecomposeMultiPass(const AOTEffectGraph& graph, Plan* plan);
 

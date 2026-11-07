@@ -21,7 +21,7 @@
 #include <vector>
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/Program.h"
-#include "gpu/aot/plan/AOTEffectDecomposer.h"
+#include "gpu/aot/chain/AOTPassIR.h"
 
 namespace tgfx {
 
@@ -54,6 +54,13 @@ class AOTChainBuilder {
  public:
   /** Whether the chain kernel's tiled path can execute the given shader wrap mode directly. */
   static bool IsChainCompatibleTiledMode(TiledTextureShaderMode mode);
+
+  /**
+   * Plans the single fused pass that carries the whole graph, or returns false when no fused pass
+   * can express it. This is the only source of a single-pass plan: a caller that has this answer
+   * serves the pass in place and never plans at all.
+   */
+  static bool PlanFusedPass(const AOTEffectGraph& graph, PassIR* pass);
 
   /**
    * A fit probe, not an admission: runs the chain planner (slot encoding, closure, budget,

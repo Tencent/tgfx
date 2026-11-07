@@ -19,7 +19,7 @@
 #pragma once
 
 #include "gpu/aot/ir/EffectGraph.h"
-#include "gpu/aot/plan/AOTEffectDecomposer.h"
+#include "gpu/aot/chain/AOTPassIR.h"
 
 namespace tgfx {
 

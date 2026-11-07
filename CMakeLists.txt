@@ -214,6 +214,7 @@ file(GLOB_RECURSE SRC_FILES
         src/gpu/aot/*.*
         src/gpu/aot/bind/*.*
         src/gpu/aot/bundle/*.*
+        src/gpu/aot/chain/*.*
         src/gpu/aot/ir/*.*
         src/gpu/aot/plan/*.*
         src/gpu/aot/select/*.*

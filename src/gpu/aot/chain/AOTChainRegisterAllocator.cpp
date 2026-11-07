@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/aot/plan/AOTChainRegisterAllocator.h"
+#include "gpu/aot/chain/AOTChainRegisterAllocator.h"
 
 namespace tgfx {
 
