@@ -71,6 +71,12 @@ bool AssignChainRegisters(AOTChainContext* ctx);
 // Stage eight: slot rules and the final profile's capacities.
 bool FinalizeChainLayout(AOTChainContext* ctx);
 
+/// Describes a graph that is its own pass: every non-designator node in index order, rooted at the
+/// graph's root, with the resource profile the chain plan resolves. A cut segment graph and a
+/// fused draw graph are both exactly that, so one derivation keeps them from disagreeing. Returns
+/// false when the graph cannot fit one fused pass.
+bool DeriveWholeGraphPass(const AOTEffectGraph& graph, PassIR* pass);
+
 // The pipeline entry: stages one through eight over one merged node space.
 bool PlanChainLayout(const AOTEffectGraph& graph, const PassIR& pass,
                      const AOTEffectGraph* coverageGraph, AOTNodeID coverageRoot,

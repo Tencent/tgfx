@@ -187,16 +187,5 @@ class DrawOp {
    * path, which is exactly the pre-IR behavior.
    */
   void tryLowerIR();
-
-  /**
-   * Stores the record-time plan's single in-place pass on the draw's IR, so the matcher compiles
-   * from the plan instead of decomposing the same graph again at prepare. Only the record-time
-   * route calls it, before any prepare; the descriptor is write-once.
-   */
-  void storeSinglePassPlan(const PassIR& pass) {
-    if (ir != nullptr && !ir->passDescriptor.has_value()) {
-      ir->passDescriptor = pass;
-    }
-  }
 };
 }  // namespace tgfx

@@ -283,11 +283,10 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
             isTerminal ? Matrix::I() : deviceLeafRemap, &segment, &segmentPass)) {
       return false;
     }
-    // The pass travels as its IR: the segment graph plus the descriptor the planner fit. The
-    // processor is rebuilt from it once per prepare, never re-planned.
+    // The pass travels as its IR: the segment graph is its own pass, so the processor is rebuilt
+    // from it once per prepare and never re-planned.
     DrawIR passIR = {};
     passIR.color = std::move(segment);
-    passIR.passDescriptor = std::move(segmentPass);
     if (isTerminal && terminalCoverage != nullptr && !terminalCoverage->empty()) {
       // The draw's coverage terms ride the terminal pass — the same merge the plain route's
       // single-pass serving applies, so a multi-pass plan serves coverage exactly as the fused
@@ -297,7 +296,7 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
     }
     // The pass program is built here, once, and travels on the IR: prepare never compiles.
     AOTProgram passProgram = {};
-    if (!AOTChainBuilder::CompilePassProgram(passIR, &passProgram)) {
+    if (!AOTChainBuilder::CompileSegment(passIR, &passProgram)) {
       return false;
     }
     passIR.program = std::move(passProgram);
@@ -326,27 +325,17 @@ static bool BuildPassIRs(Context* context, uint32_t renderFlags, const AOTEffect
                          const Plan& plan, const Rect& deviceBounds,
                          const RenderTargetProxy* destination, const Point& fpCoordOffset,
                          const std::optional<Matrix>& deviceToLocal, AOTRenderPlan* renderPlan,
-                         float sourceAlpha, const std::vector<AOTCoverageTerm>* terminalCoverage,
-                         AOTChainCompile* singlePassCompiled) {
+                         float sourceAlpha, const std::vector<AOTCoverageTerm>* terminalCoverage) {
   auto drawingManager = context->drawingManager();
   auto allocator = drawingManager->drawingAllocator();
   if (plan.passes.size() == 1) {
-    const auto& pass = plan.passes[0];
-    // Production never reaches a single-pass task (a fused single pass serves its draw in place,
-    // and RouteRecordPlan keeps such a plan off the task route), but the API contract admits one:
-    // the terminal draw carries the pass IR like any other chain pass.
+    // Production never reaches a single-pass task (a fused pass is served in place, so MakePlan
+    // never returns one), but the API contract admits one: the terminal draw carries the whole
+    // graph and compiles it on first serve like any plain draw.
     DrawIR passIR = {};
     passIR.color = graph;
-    passIR.passDescriptor = pass;
     if (terminalCoverage != nullptr) {
       passIR.coverage = *terminalCoverage;
-    }
-    // The program validation compiled rides the pass IR. Without a validation result the same
-    // compile runs here, so a built pass IR is never programless.
-    if (singlePassCompiled != nullptr) {
-      passIR.program = std::move(singlePassCompiled->program);
-    } else if (!AOTChainBuilder::CompilePassProgram(passIR, &passIR.program.emplace())) {
-      return false;
     }
     renderPlan->terminalIR = allocator->make<DrawIR>(std::move(passIR));
     return renderPlan->terminalIR != nullptr;
@@ -360,7 +349,7 @@ static bool BuildPassIRs(Context* context, uint32_t renderFlags, const AOTEffect
 
 std::optional<Plan> AOTPlanner::MakePlan(const DrawIR& ir, AOTDecomposeOutcome* failureOutcome) {
   Plan plan = {};
-  if (!AOTEffectDecomposer::Decompose(ir.color, &plan)) {
+  if (!AOTEffectDecomposer::DecomposeMultiPass(ir.color, &plan)) {
     if (failureOutcome != nullptr) {
       *failureOutcome = AOTDecomposeOutcome::UnsupportedShape;
     }
@@ -370,15 +359,6 @@ std::optional<Plan> AOTPlanner::MakePlan(const DrawIR& ir, AOTDecomposeOutcome* 
     *failureOutcome = AOTDecomposeOutcome::FusablePointwise;
   }
   return plan;
-}
-
-bool AOTPlanner::ServesInPlacePass(const Plan& plan) {
-  if (plan.passes.size() != 1) {
-    return false;
-  }
-  const auto& pass = plan.passes[0];
-  return !pass.nodes.empty() && pass.output == plan.output && pass.dependencies.empty() &&
-         !pass.materializesOutput;
 }
 
 bool AOTPlanner::TaskCarriesCoverage(const Plan& plan,
@@ -400,9 +380,8 @@ bool AOTPlanner::PlanRequiresTask(const Plan& plan) {
 AOTRecordRoute AOTPlanner::RouteRecordPlan(const Plan& plan,
                                            const std::vector<AOTCoverageTerm>& coverageTerms,
                                            BlendMode blendMode) {
-  if (ServesInPlacePass(plan)) {
-    return AOTRecordRoute::InPlace;
-  }
+  // A single-pass plan never reaches here: the record-time route asks PlanFusedPass instead and
+  // serves that pass in place, so every plan this decides on needs a task.
   if (PlanRequiresTask(plan) && TaskCarriesCoverage(plan, coverageTerms, blendMode)) {
     return AOTRecordRoute::Task;
   }
@@ -460,10 +439,7 @@ PlacementPtr<RenderTask> AOTPlanner::Build(Context* context, uint32_t renderFlag
       originalDraw == nullptr || *originalDraw == nullptr) {
     return nullptr;
   }
-  // Validation compiles a single chain pass; its program rides the terminal pass IR, so the build
-  // and every prepare read it back instead of compiling the same expression again.
-  AOTChainCompile singlePassCompiled = {};
-  if (!Validate(graph, plan, terminalCoverage, &singlePassCompiled) ||
+  if (!Validate(graph, plan, terminalCoverage) ||
       (deviceToLocal.has_value() && deviceToLocal->hasPerspective())) {
     return nullptr;
   }
@@ -492,8 +468,7 @@ PlacementPtr<RenderTask> AOTPlanner::Build(Context* context, uint32_t renderFlag
     sourceAlpha = color->alpha;
   }
   if (!BuildPassIRs(context, renderFlags, graph, plan, deviceBounds, destination.get(),
-                    fpCoordOffset, deviceToLocal, &renderPlan, sourceAlpha, terminalCoverage,
-                    &singlePassCompiled) ||
+                    fpCoordOffset, deviceToLocal, &renderPlan, sourceAlpha, terminalCoverage) ||
       !renderPlan.isWellFormed()) {
     return nullptr;
   }

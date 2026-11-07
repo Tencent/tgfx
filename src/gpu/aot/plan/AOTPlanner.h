@@ -35,7 +35,7 @@ struct AOTChainCompile;
 
 /// The record-time route one plan takes: served in place at prepare (its descriptor rides the
 /// draw's IR), run as a plan task, or left to the plain lookup at prepare.
-enum class AOTRecordRoute : uint8_t { Plain, InPlace, Task };
+enum class AOTRecordRoute : uint8_t { Plain, Task };
 
 /**
  * The record-time route's one planner: the decomposition, the routing predicates, the pass
@@ -58,23 +58,16 @@ enum class AOTRecordRoute : uint8_t { Plain, InPlace, Task };
 class AOTPlanner {
  public:
   /**
-   * Plans a draw whose record-time IR already carries the lowered color graph: the decomposition
-   * runs on ir.color with no second lowering, and the coverage terms stay on the draw — a
-   * multi-pass plan merges them into its terminal pass (see TaskCarriesCoverage). Returns
-   * nullopt when no planner covers the color graph; failureOutcome then receives
+   * Plans a draw whose record-time IR already carries the lowered color graph, for the task route:
+   * the multi-pass decomposition runs on ir.color with no second lowering, and the coverage terms
+   * stay on the draw — the plan merges them into its terminal pass (see TaskCarriesCoverage).
+   * Returns nullopt when the graph needs no task; failureOutcome then receives
    * AOTDecomposeOutcome::UnsupportedShape (the graph already lowered, so no lowering can block).
+   * A graph one fused pass can carry is not a task at all: the caller asks PlanFusedPass first and
+   * serves that pass in place.
    */
   static std::optional<Plan> MakePlan(const DrawIR& ir,
                                       AOTDecomposeOutcome* failureOutcome = nullptr);
-
-  /**
-   * Whether the plan's single pass is served in place by the prepare-time fused serving: the draw
-   * keeps the plain route and its IR carries the pass descriptor, so the matcher compiles from the
-   * record-time plan instead of decomposing the same graph again at prepare. The conditions mirror
-   * Validate's single-pass branch exactly: a plan whose one pass materializes, carries
-   * dependencies, or does not output the plan's root needs a task even at one pass.
-   */
-  static bool ServesInPlacePass(const Plan& plan);
 
   /**
    * Whether a plan that needs a task may carry the draw's coverage terms on its terminal pass:
@@ -88,8 +81,8 @@ class AOTPlanner {
                                   BlendMode blendMode);
 
   /**
-   * Whether a plan can only run as a plan task: more than one pass. A single fused pass serves
-   * its draw in place at prepare time.
+   * Whether a plan can only run as a plan task: more than one pass. A single fused pass is served
+   * in place at prepare time, so a plan made for the task route always requires one.
    */
   static bool PlanRequiresTask(const Plan& plan);
 

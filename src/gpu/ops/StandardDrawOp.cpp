@@ -143,9 +143,9 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
   const DrawIR* resolvedPassIR = passIR;
   if (resolvedPassIR == nullptr) {
     auto* lowered = loweredIR();
-    if (lowered != nullptr && lowered->passDescriptor.has_value() && lowered->program.has_value()) {
-      // A pass IR carries both its descriptor and its program; a draw IR may carry a single
-      // in-place pass's descriptor only (the plan rides it, the program compiles on first match).
+    if (lowered != nullptr && lowered->program.has_value()) {
+      // A plan pass carries its compiled program from the pass build; a draw's own IR compiles on
+      // its first match and then carries the program the same way.
       resolvedPassIR = lowered;
     }
   }

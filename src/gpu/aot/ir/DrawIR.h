@@ -22,7 +22,6 @@
 #include <vector>
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/aot/ir/Program.h"
-#include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/SamplingOptions.h"
 
@@ -78,16 +77,6 @@ struct DrawIR {
   /// terms from, so the IR stays the draw's complete expression instead of being dropped.
   size_t colorFPCount = 0;
   size_t coverageFPCount = 0;
-  /**
-   * Plan-pass serving: the fused pass descriptor the color graph was cut for (node list,
-   * profile, dependencies). A pass IR carries it so its processor is rebuilt exactly as the
-   * planner fit it — never re-planned. A draw IR carries it when the record-time route planned a
-   * single in-place pass, so the matcher compiles from that plan instead of decomposing again;
-   * otherwise its single pass is planned on first match. Intermediate passes carry no coverage
-   * terms; the TERMINAL pass of a draw's plan carries the draw's terms, which its chain program
-   * merges exactly as the plain route's single-pass serving does (see AOTPlanner::Build).
-   */
-  std::optional<PassIR> passDescriptor = std::nullopt;
   /**
    * The draw's compiled program — the chain interpreter's or the YUV tail's, whichever resolves
    * this IR. A plan pass carries it from the pass build (admission already compiled the same

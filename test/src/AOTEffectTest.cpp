@@ -62,14 +62,19 @@
 
 namespace tgfx {
 
-// The construction forms of one pass: a chain pass compiles from its pass IR (the form every
-// production plan carries).
+// The construction form of one pass: the tests hand in the plan's pass so a deliberately broken
+// plan (a wrong profile, a missing producer) is still the thing compiled.
 static bool CompileChainForTest(const AOTEffectGraph& graph, const PassIR& pass,
                                 AOTProgram* program) {
-  DrawIR passIR = {};
-  passIR.color = graph;
-  passIR.passDescriptor = pass;
-  return AOTChainBuilder::CompilePassProgram(passIR, program);
+  if (program == nullptr) {
+    return false;
+  }
+  AOTChainCompile compiled = {};
+  if (!AOTChainBuilder::Compile(graph, pass, nullptr, &compiled)) {
+    return false;
+  }
+  *program = std::move(compiled.program);
+  return true;
 }
 
 // The coverage-carrying form: the coverage FPs lower through the shared classifier first, exactly
@@ -77,17 +82,23 @@ static bool CompileChainForTest(const AOTEffectGraph& graph, const PassIR& pass,
 static bool CompileChainForTest(const AOTEffectGraph& graph, const PassIR& pass,
                                 const std::vector<const FragmentProcessor*>& coverageFPs,
                                 BlockAllocator* allocator, AOTProgram* program) {
-  DrawIR passIR = {};
-  passIR.color = graph;
-  passIR.passDescriptor = pass;
+  if (program == nullptr) {
+    return false;
+  }
+  std::vector<AOTCoverageTerm> coverageTerms = {};
   if (!coverageFPs.empty()) {
     auto terms = LowerCoverageTerms(coverageFPs, nullptr, allocator);
     if (!terms.has_value()) {
       return false;
     }
-    passIR.coverage = std::move(*terms);
+    coverageTerms = std::move(*terms);
   }
-  return AOTChainBuilder::CompilePassProgram(passIR, program);
+  AOTChainCompile compiled = {};
+  if (!AOTChainBuilder::Compile(graph, pass, &coverageTerms, &compiled)) {
+    return false;
+  }
+  *program = std::move(compiled.program);
+  return true;
 }
 
 // The device-space leaf mask the shell used to expose: bit k is set when leaf k samples in

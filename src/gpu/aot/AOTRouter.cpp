@@ -21,6 +21,7 @@
 #include <utility>
 #include <vector>
 #include "gpu/DrawingManager.h"
+#include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "gpu/aot/plan/AOTPlanner.h"
 #include "gpu/ops/StandardDrawOp.h"
 #include "tgfx/gpu/Context.h"
@@ -68,14 +69,15 @@ PlacementPtr<RenderTask> AOTRouter::routeDraw(PlacementPtr<DrawOp>* op,
   if (cache->aotPolicy().decomposition && request.deviceBounds.has_value() &&
       !request.deviceBounds->isEmpty()) {
     if (auto* ir = drawOp->loweredIR()) {
+      // A graph one fused pass can carry needs no plan at all: prepare compiles that pass from the
+      // graph itself, which is the same decision the DAG planner would make.
+      PassIR fused = {};
+      if (AOTEffectDecomposer::PlanFusedPass(ir->color, &fused)) {
+        return nullptr;
+      }
       auto plan = AOTPlanner::MakePlan(*ir);
       if (plan.has_value()) {
         switch (AOTPlanner::RouteRecordPlan(*plan, ir->coverage, request.blend)) {
-          case AOTRecordRoute::InPlace:
-            // The single pass serves in place at prepare: its descriptor rides the draw's IR, so
-            // the matcher compiles from the record-time plan and never decomposes again.
-            drawOp->storeSinglePassPlan(plan->passes[0]);
-            break;
           case AOTRecordRoute::Task: {
             // A fill pass carrying local-coordinate leaves (a plain texture, a gradient, a noise
             // source) evaluates them at top-left device positions and needs one affine
@@ -139,13 +141,13 @@ PlacementPtr<RenderTask> AOTRouter::routeFill(PlacementPtr<DrawOp>* op,
   if (ir == nullptr) {
     return nullptr;
   }
+  // A graph one fused pass can carry needs no plan: prepare compiles that pass from the graph.
+  PassIR fused = {};
+  if (AOTEffectDecomposer::PlanFusedPass(ir->color, &fused)) {
+    return nullptr;
+  }
   if (auto plan = AOTPlanner::MakePlan(*ir)) {
     switch (AOTPlanner::RouteRecordPlan(*plan, {}, BlendMode::Src)) {
-      case AOTRecordRoute::InPlace:
-        // The single pass serves in place at prepare: its descriptor rides the fill's IR, so the
-        // matcher compiles from the record-time plan and never decomposes again.
-        op->get()->storeSinglePassPlan(plan->passes[0]);
-        break;
       case AOTRecordRoute::Task:
         // A fill's local coordinates are exactly device plus coordOffset, so the task's local
         // remap stays nullopt — Build's built-in meaning for that case — instead of re-deriving

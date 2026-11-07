@@ -684,16 +684,15 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
           if (coverage != nullptr) {
             coverageProcessors.push_back(coverage.get());
           }
-          DrawIR passIR = {};
-          passIR.color = graph;
-          passIR.passDescriptor = plan.passes[0];
+          std::vector<AOTCoverageTerm> coverageTerms = {};
           if (!coverageProcessors.empty()) {
             auto terms = LowerCoverageTerms(coverageProcessors, nullptr, &allocator);
             ASSERT_TRUE(terms.has_value());
-            passIR.coverage = std::move(*terms);
+            coverageTerms = std::move(*terms);
           }
-          AOTProgram chain = {};
-          ASSERT_TRUE(AOTChainBuilder::CompilePassProgram(passIR, &chain));
+          AOTChainCompile compiled = {};
+          ASSERT_TRUE(AOTChainBuilder::Compile(graph, plan.passes[0], &coverageTerms, &compiled));
+          auto chain = std::move(compiled.program);
           ProgramInfo programInfo(renderTarget.get(), gp.get(), xp.get(), BlendMode::SrcOver,
                                   !coverageProcessors.empty());
           // The interpreter's own match: a program-holding draw resolves through MatchProgram,
@@ -744,14 +743,11 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
     Plan plan;
     ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
     ASSERT_EQ(plan.passes.size(), 1u);
-    DrawIR passIR = {};
-    passIR.color = graph;
-    passIR.passDescriptor = plan.passes[0];
     auto terms = LowerCoverageTerms({coverage.get()}, nullptr, &allocator);
     ASSERT_TRUE(terms.has_value());
-    passIR.coverage = std::move(*terms);
-    AOTProgram chain = {};
-    ASSERT_TRUE(AOTChainBuilder::CompilePassProgram(passIR, &chain));
+    AOTChainCompile compiled = {};
+    ASSERT_TRUE(AOTChainBuilder::Compile(graph, plan.passes[0], &*terms, &compiled));
+    auto chain = std::move(compiled.program);
     ProgramInfo programInfo(renderTarget.get(), gp.get(), nullptr, BlendMode::SrcOver, true);
     // The interpreter's own match: a program-holding draw resolves through MatchProgram, not the
     // family walk (whose dedicated families would claim the empty processor list).

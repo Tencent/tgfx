@@ -102,13 +102,24 @@ class AOTEffectDecomposer {
   static bool Lower(const std::vector<const FragmentProcessor*>& processors, AOTEffectGraph* graph,
                     std::string* blockingProcessor = nullptr);
   /**
-   * Decomposes the graph into an execution plan, preferring fusion: a single fused pass is chosen
-   * whenever the graph's shape allows it. singlePassOnly skips the cut planner — its plans always
-   * start with a materializing pass and always need a task — for callers that only consume
-   * single-pass plans (the prepare-time fused serving) and would otherwise run its iterative
-   * segment builds only to discard the result.
+   * Plans the single fused pass that carries the whole graph, or returns false when no fused pass
+   * can express it. This is the only source of a single-pass plan: the DAG planner is the only
+   * planner that yields one, so a caller that has this answer never has to plan at all.
    */
-  static bool Decompose(const AOTEffectGraph& graph, Plan* plan, bool singlePassOnly = false);
+  static bool PlanFusedPass(const AOTEffectGraph& graph, PassIR* pass);
+
+  /**
+   * Decomposes the graph into a multi-pass execution plan: the blend cut planner first, then the
+   * linear chain planner. Both materialize, so the result always needs a task. Callers that serve
+   * a fused pass in place must ask PlanFusedPass first.
+   */
+  static bool DecomposeMultiPass(const AOTEffectGraph& graph, Plan* plan);
+
+  /**
+   * Decomposes the graph into an execution plan, preferring fusion: a single fused pass is chosen
+   * whenever the graph's shape allows it, otherwise the multi-pass planners answer.
+   */
+  static bool Decompose(const AOTEffectGraph& graph, Plan* plan);
 
   /**
    * Statically classifies whether the color and coverage effect axes of the given draw can be

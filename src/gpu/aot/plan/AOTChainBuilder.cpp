@@ -28,6 +28,7 @@
 #include "gpu/aot/ir/NodeContract.h"
 #include "gpu/aot/plan/AOTChainInternal.h"
 #include "gpu/aot/plan/AOTChainRegisterAllocator.h"
+#include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "gpu/aot/plan/AOTShapeRules.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
@@ -78,15 +79,28 @@ AOTTextureParameters AOTChainBuilder::IntermediateSource(std::shared_ptr<Texture
   return parameters;
 }
 
-bool AOTChainBuilder::CompilePassProgram(const DrawIR& passIR, AOTProgram* out) {
-  if (out == nullptr || !passIR.passDescriptor.has_value()) {
+bool AOTChainBuilder::CompileGraph(const AOTEffectGraph& graph,
+                                   const std::vector<AOTCoverageTerm>* coverageTerms,
+                                   AOTProgram* out) {
+  if (out == nullptr) {
     return false;
   }
-  const auto& pass = *passIR.passDescriptor;
-  if (pass.nodes.empty()) {
+  PassIR pass = {};
+  if (!AOTEffectDecomposer::PlanFusedPass(graph, &pass)) {
     return false;
   }
-  return CompileChainProgramLayout(passIR.color, pass, &passIR.coverage, out);
+  return CompileChainProgramLayout(graph, pass, coverageTerms, out);
+}
+
+bool AOTChainBuilder::CompileSegment(const DrawIR& segmentIR, AOTProgram* out) {
+  if (out == nullptr) {
+    return false;
+  }
+  PassIR pass = {};
+  if (!DeriveWholeGraphPass(segmentIR.color, &pass)) {
+    return false;
+  }
+  return CompileChainProgramLayout(segmentIR.color, pass, &segmentIR.coverage, out);
 }
 
 bool AOTChainBuilder::CollectTextureTail(const AOTEffectGraph& graph, AOTTextureTailShape* shape) {
@@ -345,22 +359,9 @@ static bool CompileChainProgramForInfo(const ProgramInfo* programInfo, AOTProgra
   if (carried == nullptr) {
     return false;
   }
-  // A draw the record-time route planned carries its single in-place pass on the IR: compile from
-  // it instead of decomposing the same graph again. An unplanned draw (no device bounds, or no
-  // planner covered it) decomposes here once — the single-pass-only form the fused serving can
-  // express; the perlin kernels have their own families, and anything the single-pass
-  // decomposition cannot fit needs a plan task.
-  PassIR descriptor = {};
-  if (carried->passDescriptor.has_value()) {
-    descriptor = *carried->passDescriptor;
-  } else {
-    Plan plan = {};
-    if (!AOTEffectDecomposer::Decompose(carried->color, &plan, true) || plan.passes.size() != 1) {
-      return false;
-    }
-    descriptor = plan.passes[0];
-  }
-  return CompileChainProgramLayout(carried->color, descriptor, &carried->coverage, out);
+  // The whole expression is the pass: the fused form is derived from the graph itself, so a draw
+  // the record-time route left to this point needs no planning input beyond its IR.
+  return AOTChainBuilder::CompileGraph(carried->color, &carried->coverage, out);
 }
 
 // The memoization both consumers share: the program lives on the draw's IR, the first caller that

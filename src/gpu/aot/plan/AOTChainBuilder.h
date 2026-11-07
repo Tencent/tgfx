@@ -77,11 +77,18 @@ class AOTChainBuilder {
                       const std::vector<AOTCoverageTerm>* coverageTerms, AOTChainCompile* out);
 
   /**
-   * Compiles one plan pass's IR into the fused chain program and its binding table, without
-   * building the pass's processor: the AOT route resolves a pass draw from the program alone.
-   * Returns false when the IR carries no pass descriptor or the pass does not compile.
+   * Compiles a draw's whole color expression into the fused chain program: the single pass the DAG
+   * planner would build, derived from the graph. Returns false when the graph is not a single fused
+   * pass, so a caller can use it as the serving decision instead of planning first.
    */
-  static bool CompilePassProgram(const DrawIR& passIR, AOTProgram* out);
+  static bool CompileGraph(const AOTEffectGraph& graph,
+                           const std::vector<AOTCoverageTerm>* coverageTerms, AOTProgram* out);
+
+  /**
+   * Compiles one plan segment's IR into the fused chain program: a segment graph is its own pass,
+   * so nothing is re-planned here. Returns false when the segment does not fit one fused pass.
+   */
+  static bool CompileSegment(const DrawIR& segmentIR, AOTProgram* out);
 
   /**
    * Validates an encoded instruction array (register domains, opcodes, selector fields, leaf

@@ -284,8 +284,8 @@ static bool PlanReachableSubtree(const AOTEffectGraph& graph, AOTNodeID subtreeR
 // device-space texture leaves are supported; non-pointwise nodes require a different planner.
 // A noise-free graph admits its whole node space (a dead node would still encode as a dead slot);
 // a noise graph keeps to the root-reachable set, which is all the noise family's budgets cover.
-static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, Plan* plan) {
-  if (plan == nullptr || graph.nodeCount() < 2) {
+bool AOTEffectDecomposer::PlanFusedPass(const AOTEffectGraph& graph, PassIR* pass) {
+  if (pass == nullptr || graph.nodeCount() < 2) {
     return false;
   }
   auto geometryNode = graph.nodeAt(AOTNodeID(0));
@@ -300,8 +300,15 @@ static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, Plan* plan) {
   if (containsNoise && !CollectReachableNodes(graph, graph.root(), &reachable)) {
     return false;
   }
+  return PlanReachableSubtree(graph, graph.root(), reachable, pass);
+}
+
+static bool DecomposePointwiseDAG(const AOTEffectGraph& graph, Plan* plan) {
+  if (plan == nullptr) {
+    return false;
+  }
   PassIR pass = {};
-  if (!PlanReachableSubtree(graph, graph.root(), reachable, &pass)) {
+  if (!AOTEffectDecomposer::PlanFusedPass(graph, &pass)) {
     return false;
   }
   Plan result = {};
@@ -475,36 +482,38 @@ static bool DecomposeMaterializedBlend(const AOTEffectGraph& graph, Plan* plan) 
   }
 }
 
-bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, Plan* plan, bool singlePassOnly) {
-  // Pointwise DAGs (noise and gradient sources included) run on the chain family within its
-  // budgets, without materialization. A linear chain over one chain pass's budget splits into
-  // several chain passes; YUV sources keep their dedicated family and never plan here.
+bool AOTEffectDecomposer::DecomposeMultiPass(const AOTEffectGraph& graph, Plan* plan) {
+  // Only plans that materialize: a graph one fused pass can carry never reaches these planners
+  // (PlanFusedPass is the only source of a single-pass plan), so a multi-pass plan here always
+  // has at least two passes and always needs a task.
   if (plan == nullptr) {
     return false;
   }
   using Planner = bool (*)(const AOTEffectGraph&, Plan*);
-  for (Planner planner :
-       {DecomposePointwiseDAG, DecomposeMaterializedBlend, DecomposeLinearMultiPass}) {
-    if (singlePassOnly && planner == &DecomposeMaterializedBlend) {
-      // The cut planner's plans always start with a materializing pass and always need a task;
-      // a single-pass-only caller would run its iterative segment builds only to discard the
-      // result.
-      continue;
-    }
+  for (Planner planner : {DecomposeMaterializedBlend, DecomposeLinearMultiPass}) {
     Plan candidate = {};
     if (!planner(graph, &candidate)) {
       continue;
     }
-    // Each planner's own admission subsumes what AOTPlanner::Validate would re-derive: the
-    // DAG planner resolves the profile, the linear planner's fit calls
-    // BuildCutSegment with the same placeholder admission the planner's validation relies on, and
-    // the cut planner runs the same segment build construction uses over placeholder intermediates.
-    // The re-check therefore runs only as a debug assertion.
+    // Each planner's own admission subsumes what AOTPlanner::Validate would re-derive: the linear
+    // planner's fit calls BuildCutSegment with the same placeholder admission the planner's
+    // validation relies on, and the cut planner runs the same segment build construction uses over
+    // placeholder intermediates. The re-check therefore runs only as a debug assertion.
     DEBUG_ASSERT(AOTPlanner::Validate(graph, candidate));
     *plan = std::move(candidate);
     return true;
   }
   return false;
+}
+
+bool AOTEffectDecomposer::Decompose(const AOTEffectGraph& graph, Plan* plan) {
+  // Pointwise DAGs (noise and gradient sources included) run on the chain family within its
+  // budgets, without materialization. A linear chain over one chain pass's budget splits into
+  // several chain passes; YUV sources keep their dedicated family and never plan here.
+  if (DecomposePointwiseDAG(graph, plan)) {
+    return true;
+  }
+  return DecomposeMultiPass(graph, plan);
 }
 
 AOTDecomposeAnalysis AOTEffectDecomposer::Analyze(const ProgramInfo* programInfo) {

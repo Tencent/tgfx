@@ -172,6 +172,31 @@ static bool CopyChainNodes(const AOTEffectGraph& graph, const std::vector<bool>&
 // Finishes the builder's graph at the mapped root and resolves the segment pass over the copy:
 // the node list in the caller's order, the profile and the kernel the segment's own graph settles
 // on — which is the pass's real fit.
+bool DeriveWholeGraphPass(const AOTEffectGraph& graph, PassIR* pass) {
+  if (pass == nullptr || graph.nodeCount() < 2 || !graph.root().isValid()) {
+    return false;
+  }
+  PassIR result = {};
+  result.output = graph.root();
+  for (uint32_t index = 1; index < graph.nodeCount(); ++index) {
+    const auto* node = graph.nodeAt(AOTNodeID(index));
+    if (node == nullptr || TraitsOf(node->kind).isInputDesignator()) {
+      continue;
+    }
+    result.nodes.push_back(AOTNodeID(index));
+  }
+  if (result.nodes.empty()) {
+    return false;
+  }
+  AOTResourceProfile profile = AOTResourceProfile::Automatic;
+  if (!AOTChainBuilder::FitsChainPlan(graph, result, &profile)) {
+    return false;
+  }
+  result.resourceProfile = profile;
+  *pass = std::move(result);
+  return true;
+}
+
 static bool FinishSegmentPass(const AOTNodeBuilder& builder, AOTNodeID root,
                               const std::unordered_map<uint32_t, AOTNodeID>& builtMap,
                               AOTEffectGraph* segment, PassIR* pass) {
@@ -184,23 +209,11 @@ static bool FinishSegmentPass(const AOTNodeBuilder& builder, AOTNodeID root,
     return false;
   }
   PassIR resultPass = {};
-  resultPass.output = rootMapped;
-  // The pass node list is every non-designator node of the segment graph itself — the copy may
-  // have added nodes the caller did not list (the replacement texture leaf), so every
-  // non-designator node of the segment graph itself is listed.
-  for (uint32_t index = 1; index < built.nodeCount(); ++index) {
-    auto* node = built.nodeAt(AOTNodeID(index));
-    if (node == nullptr || node->kind == AOTEffectKind::GeometryColorOpaqueInput ||
-        node->kind == AOTEffectKind::GeometryWhiteInput) {
-      continue;
-    }
-    resultPass.nodes.push_back(AOTNodeID(index));
-  }
-  AOTResourceProfile profile = AOTResourceProfile::Automatic;
-  if (!AOTChainBuilder::FitsChainPlan(built, resultPass, &profile)) {
+  // The copy may have added nodes the caller did not list (the replacement texture leaf), so the
+  // pass is described from the segment graph itself, not from the requested node list.
+  if (!DeriveWholeGraphPass(built, &resultPass)) {
     return false;
   }
-  resultPass.resourceProfile = profile;
   *segment = std::move(built);
   *pass = std::move(resultPass);
   return true;
