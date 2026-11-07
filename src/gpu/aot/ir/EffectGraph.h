@@ -477,13 +477,15 @@ class AOTNodeBuilder {
     return contains(nodeID) && nodes[nodeID.index()].kind == AOTEffectKind::GeometryWhiteInput;
   }
 
- private:
-  friend class AOTEffectDecomposer;
-  friend class FragmentProcessor;
-
+  /// The first processor that failed to lower, for the caller's diagnostic. Null when the build
+  /// has not seen a failure.
   const FragmentProcessor* missingLoweringProcessor() const {
     return missingLowering;
   }
+
+ private:
+  friend class FragmentProcessor;
+
 
   void recordMissingLowering(const FragmentProcessor* processor) {
     if (missingLowering == nullptr) {

@@ -98,9 +98,6 @@ struct AOTDecomposeAnalysis {
 
 class AOTEffectDecomposer {
  public:
-  /** Lowers a processor chain and optionally reports the first processor missing an implementation. */
-  static bool Lower(const std::vector<const FragmentProcessor*>& processors, AOTEffectGraph* graph,
-                    std::string* blockingProcessor = nullptr);
   /**
    * Plans the single fused pass that carries the whole graph, or returns false when no fused pass
    * can express it. This is the only source of a single-pass plan: the DAG planner is the only
@@ -133,15 +130,5 @@ class AOTEffectDecomposer {
    */
   static AOTDecomposeAnalysis Analyze(const ProgramInfo* programInfo);
 };
-
-/**
- * Diagnostic counters over AOTEffectDecomposer::Lower: how many successful lowerings have run
- * since the last reset. Paired with AOTLowerDrawCount (DrawIR.h), they assert the single-lowering
- * invariant: every successful lowering belongs to one record-time LowerDraw, with no second
- * analysis over the FP tree at route or prepare time. Diagnostic only; nothing on the render path
- * reads these.
- */
-uint64_t AOTDecomposerLowerCount();
-void ResetAOTDecomposerLowerCount();
 
 }  // namespace tgfx

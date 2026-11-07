@@ -31,6 +31,7 @@
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/aot/plan/AOTChainBuilder.h"
+#include "gpu/aot/ir/Lowering.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "gpu/aot/plan/AOTPlanner.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
@@ -202,7 +203,7 @@ static bool BuildTripleGraph(Context* context, BlockAllocator* allocator, AOTEff
   if (texture == nullptr || colorMatrix == nullptr || luma == nullptr) {
     return false;
   }
-  return AOTEffectDecomposer::Lower({texture.get(), colorMatrix.get(), luma.get()}, graph);
+  return LowerToGraph({texture.get(), colorMatrix.get(), luma.get()}, graph);
 }
 
 TGFX_TEST_PRIVATE(AOTEffectTest, ExecutorTakesOwnershipOfStandardDraw) {
@@ -400,7 +401,7 @@ TGFX_TEST(AOTEffectTest, LowerDrawClassifiesCoverageTerms) {
     // The compile side rejects all three shapes (at most one mask, an affine mask matrix, at
     // most one subtree).
     AOTEffectGraph graph = {};
-    ASSERT_TRUE(AOTEffectDecomposer::Lower({texture.get()}, &graph));
+    ASSERT_TRUE(LowerToGraph({texture.get()}, &graph));
     Plan plan = {};
     ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
     AOTProgram chain = {};
@@ -473,7 +474,7 @@ TGFX_TEST(AOTEffectTest, ProcessorChainLowersTypedParameters) {
   ASSERT_NE(luma, nullptr);
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({texture.get(), colorMatrix.get(), luma.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({texture.get(), colorMatrix.get(), luma.get()}, &graph));
   ASSERT_EQ(graph.nodeCount(), 4u);
   EXPECT_EQ(graph.root(), AOTNodeID(3));
   EXPECT_EQ(graph.nodeAt(AOTNodeID(0))->kind, AOTEffectKind::GeometryColor);
@@ -536,7 +537,7 @@ TGFX_TEST(AOTEffectTest, UnsupportedProcessorFailsAtomically) {
   BlockAllocator allocator;
   ShapeRejectingFragmentProcessor unsupported;
   AOTEffectGraph graph;
-  EXPECT_FALSE(AOTEffectDecomposer::Lower({&unsupported}, &graph));
+  EXPECT_FALSE(LowerToGraph({&unsupported}, &graph));
   EXPECT_EQ(graph.nodeCount(), 0u);
   EXPECT_FALSE(graph.root().isValid());
 }
@@ -564,7 +565,7 @@ TGFX_TEST(AOTEffectTest, TiledHardwareSamplingSnapshotMatchesLowering) {
   ExpectSamplerStateEquals(processor->samplerStateAt(0), resolved->hardwareSampler);
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({processor.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({processor.get()}, &graph));
   auto parameters = std::get_if<AOTTextureParameters>(&graph.nodeAt(AOTNodeID(1))->parameters);
   ASSERT_NE(parameters, nullptr);
   ExpectResolvedSamplingMatchesLowering(*resolved, *parameters);
@@ -636,7 +637,7 @@ TGFX_TEST(AOTEffectTest, TiledShaderModesAndStrictSubsetMatchLowering) {
     EXPECT_TRUE(resolved->strict);
 
     AOTEffectGraph graph;
-    ASSERT_TRUE(AOTEffectDecomposer::Lower({processor.get()}, &graph));
+    ASSERT_TRUE(LowerToGraph({processor.get()}, &graph));
     auto parameters = std::get_if<AOTTextureParameters>(&graph.nodeAt(AOTNodeID(1))->parameters);
     ASSERT_NE(parameters, nullptr);
     ExpectResolvedSamplingMatchesLowering(*resolved, *parameters);
@@ -683,7 +684,7 @@ TGFX_TEST(AOTEffectTest, ChainSharesTiledBlockBetweenIdenticalLeaves) {
   ASSERT_NE(blend, nullptr);
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({blend.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({blend.get()}, &graph));
   Plan plan;
   EXPECT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   // Decompose already ran CanExecute on the single fused pass it built; assert it directly so the
@@ -727,7 +728,7 @@ TGFX_TEST(AOTEffectTest, ChainKeepsIndependentRecipesForTwoTiledLeaves) {
     ASSERT_NE(blend, nullptr);
 
     AOTEffectGraph graph;
-    ASSERT_TRUE(AOTEffectDecomposer::Lower({blend.get()}, &graph));
+    ASSERT_TRUE(LowerToGraph({blend.get()}, &graph));
     Plan plan;
     ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
     ASSERT_EQ(plan.passes.size(), 1u);
@@ -775,7 +776,7 @@ TGFX_TEST(AOTEffectTest, ThreeTiledLeavesUseGraphAndFourthIsRejected) {
   ASSERT_NE(outer, nullptr);
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({outer.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({outer.get()}, &graph));
   Plan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
@@ -801,7 +802,7 @@ TGFX_TEST(AOTEffectTest, ThreeTiledLeavesUseGraphAndFourthIsRejected) {
       &allocator, std::move(outer), std::move(fourth), BlendMode::SrcOver);
   ASSERT_NE(tooWide, nullptr);
   AOTEffectGraph wideGraph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({tooWide.get()}, &wideGraph));
+  ASSERT_TRUE(LowerToGraph({tooWide.get()}, &wideGraph));
   Plan widePlan;
   // Four tiled leaves exceed the single-pass TiledGraph budget, but the cut planner materializes
   // the three-leaf operand into its own pass: the main pass keeps the fourth tiled leaf plus the
@@ -1075,7 +1076,7 @@ TGFX_TEST(AOTEffectTest, CoverageRecipeCanPromoteChainToGraph) {
       &allocator, std::move(first), std::move(second), BlendMode::SrcOver);
   ASSERT_NE(blend, nullptr);
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({blend.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({blend.get()}, &graph));
   Plan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   EXPECT_EQ(plan.passes[0].resourceProfile, AOTResourceProfile::Chain);
@@ -1100,7 +1101,7 @@ TGFX_TEST(AOTEffectTest, CoverageGradientPromotesBaseChainToTiledGraph) {
   ASSERT_NE(color, nullptr);
   ASSERT_NE(coverage, nullptr);
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({color.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({color.get()}, &graph));
   Plan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
@@ -1139,7 +1140,7 @@ TGFX_TEST(AOTEffectTest, TiledAlphaOnlySnapshotMatchesLowering) {
   EXPECT_TRUE(resolved->alphaOnly);
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({processor.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({processor.get()}, &graph));
   auto parameters = std::get_if<AOTTextureParameters>(&graph.nodeAt(AOTNodeID(1))->parameters);
   ASSERT_NE(parameters, nullptr);
   ExpectResolvedSamplingMatchesLowering(*resolved, *parameters);
@@ -1160,7 +1161,7 @@ TGFX_TEST(AOTEffectTest, TiledPerspectiveSnapshotMatchesLowering) {
   EXPECT_TRUE(resolved->hasPerspective);
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({processor.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({processor.get()}, &graph));
   auto parameters = std::get_if<AOTTextureParameters>(&graph.nodeAt(AOTNodeID(1))->parameters);
   ASSERT_NE(parameters, nullptr);
   ExpectResolvedSamplingMatchesLowering(*resolved, *parameters);
@@ -1186,7 +1187,7 @@ TGFX_TEST(AOTEffectTest, TiledBottomLeftSnapshotResolvesUniformCoordinates) {
   EXPECT_EQ(resolved->shaderClamp, Rect::MakeLTRB(1.5f, 2.5f, 6.5f, 4.5f));
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({processor.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({processor.get()}, &graph));
   auto parameters = std::get_if<AOTTextureParameters>(&graph.nodeAt(AOTNodeID(1))->parameters);
   ASSERT_NE(parameters, nullptr);
   ExpectResolvedSamplingMatchesLowering(*resolved, *parameters);
@@ -1235,7 +1236,7 @@ TGFX_TEST(AOTEffectTest, ColorMatrixChainFusesToSinglePass) {
   ASSERT_NE(texture, nullptr);
   ASSERT_NE(colorMatrix, nullptr);
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({texture.get(), colorMatrix.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({texture.get(), colorMatrix.get()}, &graph));
 
   Plan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
@@ -1299,7 +1300,7 @@ TGFX_TEST(AOTEffectTest, DeviceSpaceLinearChainUsesChainKernel) {
            {texture.get(), colorMatrix.get(), luma.get(), colorMatrix2.get()}}) {
     SCOPED_TRACE(processors.size());
     AOTEffectGraph graph;
-    ASSERT_TRUE(AOTEffectDecomposer::Lower(processors, &graph));
+    ASSERT_TRUE(LowerToGraph(processors, &graph));
     Plan plan;
     ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
     ASSERT_EQ(plan.passes.size(), 1u);
@@ -1367,7 +1368,7 @@ TGFX_TEST(AOTEffectTest, ChainLeavesTakeAlphaOnlyDeviceAndRgbaaaSources) {
     SCOPED_TRACE(testCase.device ? "device-alpha-only" : "rgbaaa");
     std::vector<const FragmentProcessor*> processors = {testCase.source, colorMatrix.get()};
     AOTEffectGraph graph;
-    ASSERT_TRUE(AOTEffectDecomposer::Lower(processors, &graph));
+    ASSERT_TRUE(LowerToGraph(processors, &graph));
     Plan plan;
     ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
     ASSERT_EQ(plan.passes.size(), 1u);
@@ -1416,7 +1417,7 @@ TGFX_TEST(AOTEffectTest, MultiPassPlanNeverStartsPassAtThreshold) {
   processors.push_back(threshold());
   processors.push_back(matrix());
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower(processors, &graph));
+  ASSERT_TRUE(LowerToGraph(processors, &graph));
   Plan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ExpectSegmentedChainPlan(graph, plan, 2);
@@ -1444,7 +1445,7 @@ TGFX_TEST(AOTEffectTest, MultiPassPlanNeverStartsPassAtThreshold) {
     refusedProcessors.push_back(threshold());
   }
   AOTEffectGraph refusedGraph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower(refusedProcessors, &refusedGraph));
+  ASSERT_TRUE(LowerToGraph(refusedProcessors, &refusedGraph));
   Plan refusedPlan;
   EXPECT_FALSE(AOTEffectDecomposer::Decompose(refusedGraph, &refusedPlan));
 }
@@ -1504,7 +1505,7 @@ TGFX_TEST(AOTEffectTest, TwoColorSpaceTransformsSplitIntoChainPasses) {
     }
     processors.push_back(second.get());
     AOTEffectGraph graph;
-    ASSERT_TRUE(AOTEffectDecomposer::Lower(processors, &graph));
+    ASSERT_TRUE(LowerToGraph(processors, &graph));
     // Two transforms exceed the chain kernel's single color-space block, so the multi-pass
     // planner cuts the chain in front of the second one: [source, xform(, luma)] | [xform].
     Plan plan;
@@ -1599,7 +1600,7 @@ TGFX_TEST(AOTEffectTest, LinearChainSlotBoundaryIsChainInstructionBudget) {
     std::vector<const FragmentProcessor*> processors = {texture.get()};
     processors.insert(processors.end(), opCount, matrix.get());
     AOTEffectGraph graph;
-    ASSERT_TRUE(AOTEffectDecomposer::Lower(processors, &graph));
+    ASSERT_TRUE(LowerToGraph(processors, &graph));
     // The chain kernel carries 16 instructions with a recycled 16-entry register file, so a
     // texture plus 15 operators fuses into one pass; the 16th operator moves to a second pass.
     Plan plan;
@@ -1675,7 +1676,7 @@ TGFX_TEST(AOTEffectTest, XfermodeDstLowersToBinaryBlend) {
   ASSERT_NE(xfermode, nullptr);
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({xfermode.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({xfermode.get()}, &graph));
   // node0=geometry, node1=white input (the runtime feeds a single-child xfer's child white),
   // node2=texture(dst, input edge = the white designator), node3=blend(src=geometry, dst=texture).
   ASSERT_EQ(graph.nodeCount(), 4u);
@@ -1713,7 +1714,7 @@ TGFX_TEST(AOTEffectTest, XfermodeTwoLowersBothChildren) {
   ASSERT_NE(xfermode, nullptr);
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({xfermode.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({xfermode.get()}, &graph));
   // node0=geometry, node1=opaque-alpha geometry input (the runtime feeds the children
   // vec4(inputColor.rgb, 1.0)), node2=src texture(input=1), node3=dst texture(input=1),
   // node4=blend(src=2, dst=3).
@@ -1763,7 +1764,7 @@ TGFX_TEST(AOTEffectTest, BlendTreeDecomposesToPointwiseChain) {
   ASSERT_NE(xfermode, nullptr);
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({xfermode.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({xfermode.get()}, &graph));
   // The linear planner cannot represent the two-input blend DAG; the pointwise-DAG planner folds
   // the whole graph into a single PointwiseChain pass covering nodes 1..3.
   Plan plan;
@@ -1852,7 +1853,7 @@ TGFX_TEST(AOTEffectTest, ConstColorChainDecomposesToPointwiseChain) {
   ASSERT_NE(colorMatrix, nullptr);
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({constColor.get(), colorMatrix.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({constColor.get(), colorMatrix.get()}, &graph));
   Plan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
@@ -1911,7 +1912,7 @@ TGFX_TEST(AOTEffectTest, TextureParametersRebuildIsLossless) {
   ASSERT_NE(original, nullptr);
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({original.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({original.get()}, &graph));
   ASSERT_EQ(graph.nodeCount(), 2u);
   auto parameters = std::get_if<AOTTextureParameters>(&graph.nodeAt(AOTNodeID(1))->parameters);
   ASSERT_NE(parameters, nullptr);
@@ -1944,7 +1945,7 @@ TGFX_TEST(AOTEffectTest, PerlinNoiseLowersToPerlinNoiseSourceNode) {
   ASSERT_NE(perlin, nullptr);
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({perlin.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({perlin.get()}, &graph));
   ASSERT_EQ(graph.nodeCount(), 2u);
   auto node = graph.nodeAt(AOTNodeID(1));
   ASSERT_NE(node, nullptr);
@@ -1966,8 +1967,8 @@ TGFX_TEST(AOTEffectTest, PerlinNoiseLookupIdentityAndComputationAreSeparate) {
   ASSERT_NE(second, nullptr);
   AOTEffectGraph firstGraph;
   AOTEffectGraph secondGraph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({first.get()}, &firstGraph));
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({second.get()}, &secondGraph));
+  ASSERT_TRUE(LowerToGraph({first.get()}, &firstGraph));
+  ASSERT_TRUE(LowerToGraph({second.get()}, &secondGraph));
   const auto* firstParameters =
       std::get_if<AOTPerlinNoiseParameters>(&firstGraph.nodeAt(AOTNodeID(1))->parameters);
   const auto* secondParameters =
@@ -2054,7 +2055,7 @@ TGFX_TEST(AOTEffectTest, PerlinNoiseReconstructionPreservesLookupEvidence) {
   auto original = MakePerlinProcessor(context);
   ASSERT_NE(original, nullptr);
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({original.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({original.get()}, &graph));
   const auto* parameters =
       std::get_if<AOTPerlinNoiseParameters>(&graph.nodeAt(AOTNodeID(1))->parameters);
   ASSERT_NE(parameters, nullptr);
@@ -2062,7 +2063,7 @@ TGFX_TEST(AOTEffectTest, PerlinNoiseReconstructionPreservesLookupEvidence) {
   auto rebuilt = PerlinNoiseFragmentProcessor::MakeFromAOTParameters(&allocator, *parameters);
   ASSERT_NE(rebuilt, nullptr);
   AOTEffectGraph rebuiltGraph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({rebuilt.get()}, &rebuiltGraph));
+  ASSERT_TRUE(LowerToGraph({rebuilt.get()}, &rebuiltGraph));
   const auto& rebuiltParameters =
       std::get<AOTPerlinNoiseParameters>(rebuiltGraph.nodeAt(AOTNodeID(1))->parameters);
   EXPECT_EQ(rebuiltParameters.lookupData, parameters->lookupData);
@@ -2077,7 +2078,7 @@ TGFX_TEST(AOTEffectTest, PerlinNoiseReconstructionPreservesLookupEvidence) {
       parameters->noiseView, &parameters->uvMatrix);
   ASSERT_NE(rawRebuild, nullptr);
   AOTEffectGraph rawGraph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({rawRebuild.get()}, &rawGraph));
+  ASSERT_TRUE(LowerToGraph({rawRebuild.get()}, &rawGraph));
   const auto& rawParameters =
       std::get<AOTPerlinNoiseParameters>(rawGraph.nodeAt(AOTNodeID(1))->parameters);
   EXPECT_EQ(rawParameters.lookupData, nullptr);
@@ -2119,7 +2120,7 @@ TGFX_TEST(AOTEffectTest, PerlinDensityBranchesShareLookupResources) {
           auto processor = FragmentProcessor::Make(shader, args);
           ASSERT_NE(processor, nullptr);
           AOTEffectGraph graph;
-          ASSERT_TRUE(AOTEffectDecomposer::Lower({processor.get()}, &graph));
+          ASSERT_TRUE(LowerToGraph({processor.get()}, &graph));
           const AOTPerlinNoiseParameters* firstNoise = nullptr;
           size_t noiseNodes = 0;
           for (size_t index = 0; index < graph.nodeCount(); ++index) {
@@ -2307,7 +2308,7 @@ TGFX_TEST(AOTEffectTest, PerlinDAGMaterializesDistinctNoiseAndPrunesUnusedInputs
   auto original = MakePerlinProcessor(context);
   ASSERT_NE(original, nullptr);
   AOTEffectGraph originalGraph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({original.get()}, &originalGraph));
+  ASSERT_TRUE(LowerToGraph({original.get()}, &originalGraph));
   auto noise = std::get<AOTPerlinNoiseParameters>(originalGraph.nodeAt(AOTNodeID(1))->parameters);
   ASSERT_TRUE(AOTPerlinNoiseParametersSupported(noise));
   for (int changedField = 0; changedField < 4; ++changedField) {
@@ -2383,7 +2384,7 @@ TGFX_TEST(AOTEffectTest, BarePerlinNoisePlansOntoTheChainDAG) {
   ASSERT_NE(perlin, nullptr);
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({perlin.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({perlin.get()}, &graph));
   Plan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
@@ -2403,7 +2404,7 @@ TGFX_TEST(AOTEffectTest, PerlinNoisePlusOneOpFusesToSinglePass) {
   ASSERT_NE(colorMatrix, nullptr);
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({perlin.get(), colorMatrix.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({perlin.get(), colorMatrix.get()}, &graph));
   Plan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
@@ -2423,7 +2424,7 @@ TGFX_TEST(AOTEffectTest, RectCoverageFoldsIntoPointwiseChain) {
   ASSERT_NE(rectCoverage, nullptr);
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({texture.get(), rectCoverage.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({texture.get(), rectCoverage.get()}, &graph));
   ASSERT_EQ(graph.nodeCount(), 3u);
   auto node = graph.nodeAt(AOTNodeID(2));
   ASSERT_NE(node, nullptr);
@@ -2458,7 +2459,7 @@ TGFX_TEST(AOTEffectTest, ChainedRectCoverageRidesTheClipChannel) {
   ASSERT_NE(coverage, nullptr);
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({texture.get(), colorMatrix.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({texture.get(), colorMatrix.get()}, &graph));
   Plan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
@@ -2490,7 +2491,7 @@ static void ExpectComposedClipsWithLocalMask(size_t rectCount, size_t rrectCount
   auto color = ConstColorProcessor::Make(&allocator, PMColor::White(), InputMode::ModulateRGBA);
   ASSERT_NE(color, nullptr);
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({color.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({color.get()}, &graph));
   Plan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
@@ -2585,7 +2586,7 @@ static void ExpectAdditionalClipChainsOntoClipCoverage(AOTChainOp op, bool withM
     auto texture = MakeTextureProcessor(context, &allocator, PixelFormat::RGBA_8888);
     ASSERT_NE(texture, nullptr);
     AOTEffectGraph graph;
-    ASSERT_TRUE(AOTEffectDecomposer::Lower({texture.get()}, &graph));
+    ASSERT_TRUE(LowerToGraph({texture.get()}, &graph));
     Plan plan;
     ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
     ASSERT_EQ(plan.passes.size(), 1u);
@@ -2669,7 +2670,7 @@ TGFX_TEST(AOTEffectTest, WhiteInputFeedsTwoChildBlendChildren) {
   ASSERT_NE(maskWrap, nullptr);
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({maskWrap.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({maskWrap.get()}, &graph));
   Plan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
@@ -2695,7 +2696,7 @@ TGFX_TEST(AOTEffectTest, TextureConsumingComputedInputLowersToChain) {
   ASSERT_NE(imageTexture, nullptr);
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({maskTexture.get(), imageTexture.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({maskTexture.get(), imageTexture.get()}, &graph));
   Plan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
@@ -2741,7 +2742,7 @@ TGFX_TEST(AOTEffectTest, TwoChildBlendOverComputedInputLowers) {
   ASSERT_NE(blend, nullptr);
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({maskTexture.get(), blend.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({maskTexture.get(), blend.get()}, &graph));
   Plan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
@@ -2807,7 +2808,7 @@ TGFX_TEST(AOTEffectTest, NonRootCoverageTextureModulatesByUnit) {
   ASSERT_NE(coverage, nullptr);
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({texture.get(), colorMatrix.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({texture.get(), colorMatrix.get()}, &graph));
   Plan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
@@ -2855,7 +2856,7 @@ TGFX_TEST_PRIVATE(AOTEffectTest, ChainRejectsNonRGBAColorFormats) {
         SCOPED_TRACE(static_cast<int>(format));
         AOTEffectGraph graph = {};
         // The lowering must refuse the leaf (no swizzle contract on the chain's plain path).
-        EXPECT_FALSE(AOTEffectDecomposer::Lower({grayLeaf.get(), colorMatrix.get()}, &graph));
+        EXPECT_FALSE(LowerToGraph({grayLeaf.get(), colorMatrix.get()}, &graph));
       })
 }
 
@@ -2889,7 +2890,7 @@ TGFX_TEST(AOTEffectTest, ComputedInputExpansionCountsTowardSlotBudget) {
     AOTEffectGraph graph = {};
     Plan plan = {};
     // The DAG planner consults CanExecute: a budget overrun must surface as a planning refusal.
-    return AOTEffectDecomposer::Lower(raw, &graph) && AOTEffectDecomposer::Decompose(graph, &plan);
+    return LowerToGraph(raw, &graph) && AOTEffectDecomposer::Decompose(graph, &plan);
   };
   // mask(1) + computed-input image(1) + 13 matrices = 15 nodes, 16 encoded: accepted.
   EXPECT_TRUE(build(ChainResourceCapacity.instructions - 3));
@@ -2911,7 +2912,7 @@ TGFX_TEST(AOTEffectTest, PerlinNoisePlusTwoOpsFusesToSinglePass) {
 
   AOTEffectGraph graph;
   ASSERT_TRUE(
-      AOTEffectDecomposer::Lower({perlin.get(), colorMatrix.get(), alphaThreshold.get()}, &graph));
+      LowerToGraph({perlin.get(), colorMatrix.get(), alphaThreshold.get()}, &graph));
   Plan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
@@ -2942,7 +2943,7 @@ TGFX_TEST(AOTEffectTest, PerlinNoiseConstBlendFusesToSinglePass) {
   ASSERT_NE(blend, nullptr);
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower({perlin.get(), blend.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({perlin.get(), blend.get()}, &graph));
   // node0=geometry, node1=perlin, node2=white designator, node3=const (input = node2),
   // node4=blend(src=const, dst=perlin).
   ASSERT_EQ(graph.nodeCount(), 5u);
@@ -2979,7 +2980,7 @@ TGFX_TEST(AOTEffectTest, PerlinNoiseOpsThenConstBlendFusesToSinglePass) {
   ASSERT_NE(blend, nullptr);
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(AOTEffectDecomposer::Lower(
+  ASSERT_TRUE(LowerToGraph(
       {perlin.get(), colorMatrix.get(), alphaThreshold.get(), blend.get()}, &graph));
   ASSERT_EQ(graph.nodeCount(), 7u);
   Plan plan;
@@ -3136,7 +3137,7 @@ TGFX_TEST(AOTEffectTest, AdmissionMatrixKeepsPlanningAndConstructionAligned) {
       processors.push_back(owner.get());
     }
     AOTEffectGraph graph;
-    bool lowered = AOTEffectDecomposer::Lower(processors, &graph);
+    bool lowered = LowerToGraph(processors, &graph);
     EXPECT_EQ(lowered, row.lowers);
     // The route's IR-form classification: a lowering failure leaves the draw without an IR
     // (BlockedByLowering at record time), a lowered graph reports exactly what planning finds.

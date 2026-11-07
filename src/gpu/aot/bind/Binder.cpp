@@ -21,7 +21,6 @@
 #include "gpu/ColorSpaceXformHelper.h"
 #include "gpu/Swizzle.h"
 #include "gpu/YUVColorConversion.h"
-#include "gpu/aot/bind/Binder.h"
 #include "gpu/aot/ir/NodeContract.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/proxies/TextureProxy.h"
@@ -42,6 +41,50 @@
 
 namespace tgfx {
 namespace {
+
+/// One chain instruction's per-slot parameter write. The packed word and its selector stay with
+/// the caller's dialect (the chain encodes result registers, the YUV tail encodes the op's small
+/// value), so the table carries only the parameter arrays: `index` is the slot's index (the
+/// per-op arrays), `ordinal` is its ordinal into a per-kind array (the coverage capacities; the
+/// slot index for every other op). A null row means the instruction writes no parameter block.
+using AOTOpBinder = void (*)(UniformData* uniformData, size_t index, int ordinal,
+                             const AOTChainSlot& slot);
+
+/// One row per AOTChainOp, in the op ABI value order (Op::* in KernelContract.h): the
+/// instruction's uniform write. A separate table on purpose — the instruction vocabulary and the
+/// node vocabulary are not one-to-one (see ChainOps.h and NodeContract.h).
+struct AOTOpContract {
+  AOTOpBinder bind = nullptr;
+};
+
+constexpr AOTOpContract OpContracts[] = {
+    {BindColorMatrixSlot},        // ColorMatrix (0)
+    {BindLumaSlot},               // Luma (1)
+    {BindAlphaThresholdSlot},     // AlphaThreshold (2)
+    {},                           // ColorSpaceXform (3): rides the program-level Chain block
+    {},                           // None (4, the inactive-slot marker)
+    {},                           // Texture (5): the sampler binding carries its records
+    {BindConstColorSlot},         // ConstColor (6)
+    {},                           // Blend (7): the chain's operands are registers
+    {BindAARectCoverageSlot},     // AARectCoverage (8)
+    {},                           // Gradient (9): the program-level gradient block
+    {BindLocalRectCoverageSlot},  // LocalRectCoverage (10)
+    {BindRRectCoverageSlot},      // RRectCoverage (11)
+    {},                           // TexModulate (12, synthesized by the texture encoder)
+    {},                           // InputOpaque (13)
+    {},                           // MulAlpha (14)
+    {},                           // PerlinNoise (15): the program-level noise block
+};
+
+constexpr size_t OpContractCount = sizeof(OpContracts) / sizeof(AOTOpContract);
+static_assert(OpContractCount == 16,
+              "every AOTChainOp needs exactly one contract row in OpContracts");
+
+const AOTOpContract& OpContractOf(AOTChainOp op) {
+  static constexpr AOTOpContract fallback = {};
+  auto index = static_cast<size_t>(op);
+  return index < OpContractCount ? OpContracts[index] : fallback;
+}
 
 // std140 column packing of a 3x3 matrix stored in Matrix::get9 row-major order, mirroring
 // UniformData::setData(const Matrix&) so chain uploads match the same layout.

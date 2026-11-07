@@ -36,6 +36,7 @@
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/plan/AOTChainBuilder.h"
+#include "gpu/aot/ir/Lowering.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "gpu/aot/select/PermutationMatch.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
@@ -675,7 +676,7 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
             ASSERT_NE(xp, nullptr);
           }
           AOTEffectGraph graph;
-          ASSERT_TRUE(AOTEffectDecomposer::Lower({gradient.get()}, &graph));
+          ASSERT_TRUE(LowerToGraph({gradient.get()}, &graph));
           Plan plan;
           ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
           ASSERT_EQ(plan.passes.size(), 1u);
@@ -739,7 +740,7 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
         FragmentProcessor::MulInputByChildAlpha(&allocator, std::move(tiledMask), false);
     ASSERT_NE(coverage, nullptr);
     AOTEffectGraph graph;
-    ASSERT_TRUE(AOTEffectDecomposer::Lower({gradient.get()}, &graph));
+    ASSERT_TRUE(LowerToGraph({gradient.get()}, &graph));
     Plan plan;
     ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
     ASSERT_EQ(plan.passes.size(), 1u);

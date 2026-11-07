@@ -41,6 +41,17 @@
 
 namespace tgfx {
 
+namespace {
+
+// Whether a value is a schedulable chain instruction: inside the op vocabulary's bounds and not
+// the inactive-slot marker. The kernel's evaluation switch has no default branch, so an
+// out-of-enum opcode must be rejected here rather than silently misread.
+bool IsSchedulableChainOp(AOTChainOp op) {
+  return op != AOTChainOp::None && static_cast<int>(op) < ChainISA::OpCount;
+}
+
+}  // namespace
+
 bool AOTChainBuilder::IsChainCompatibleTiledMode(TiledTextureShaderMode mode) {
   return mode == TiledTextureShaderMode::None || mode == TiledTextureShaderMode::Clamp ||
          mode == TiledTextureShaderMode::RepeatNearestNone ||

@@ -18,8 +18,8 @@
 
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include <algorithm>
-#include <atomic>
 #include "gpu/ProgramInfo.h"
+#include "gpu/aot/ir/Lowering.h"
 #include "gpu/aot/ir/NodeContract.h"
 #include "gpu/aot/plan/AOTChainBuilder.h"
 #include "gpu/aot/plan/AOTPlanner.h"
@@ -27,20 +27,6 @@
 #include "gpu/processors/FragmentProcessor.h"
 
 namespace tgfx {
-
-// Diagnostic only (mirrors AOTLowerDrawCount in DrawIR.cpp): successful AOTEffectDecomposer::Lower
-// runs since the last reset. The single-lowering invariant — every successful lowering belongs to
-// one LowerDraw at record time, with no second analysis over the FP tree at route or prepare time
-// — is assertable by comparing the two counters.
-static std::atomic<uint64_t> decomposerLowerCount = {0};
-
-uint64_t AOTDecomposerLowerCount() {
-  return decomposerLowerCount.load(std::memory_order_relaxed);
-}
-
-void ResetAOTDecomposerLowerCount() {
-  decomposerLowerCount.store(0, std::memory_order_relaxed);
-}
 
 // Counts texture-sampling leaves across the tree. A fused kernel needs one sampler per leaf, so
 // this is the sampler-budget input the audit reports.
@@ -70,7 +56,7 @@ static AOTAxisAnalysis ClassifyAxis(const std::vector<const FragmentProcessor*>&
     analysis.textureLeafCount += CountTextureLeaves(processor);
   }
   AOTEffectGraph graph = {};
-  if (!AOTEffectDecomposer::Lower(processors, &graph, &analysis.blockingProcessor)) {
+  if (!LowerToGraph(processors, &graph, &analysis.blockingProcessor)) {
     analysis.outcome = analysis.blockingProcessor.empty() ? AOTDecomposeOutcome::UnsupportedShape
                                                           : AOTDecomposeOutcome::BlockedByLowering;
     return analysis;
@@ -84,41 +70,7 @@ static AOTAxisAnalysis ClassifyAxis(const std::vector<const FragmentProcessor*>&
   return analysis;
 }
 
-bool AOTEffectDecomposer::Lower(const std::vector<const FragmentProcessor*>& processors,
-                                AOTEffectGraph* graph, std::string* blockingProcessor) {
-  if (blockingProcessor != nullptr) {
-    blockingProcessor->clear();
-  }
-  if (graph == nullptr || processors.empty()) {
-    return false;
-  }
-  AOTNodeBuilder builder = {};
-  AOTNodeID current = AOTNodeID::Invalid();
-  if (!builder.addGeometryColor(&current)) {
-    return false;
-  }
-  for (auto processor : processors) {
-    if (processor == nullptr) {
-      return false;
-    }
-    AOTNodeID next = AOTNodeID::Invalid();
-    if (!processor->lowerToAOT(&builder, current, &next)) {
-      auto missingLowering = builder.missingLoweringProcessor();
-      if (blockingProcessor != nullptr && missingLowering != nullptr) {
-        *blockingProcessor = missingLowering->name();
-      }
-      return false;
-    }
-    current = next;
-  }
-  AOTEffectGraph result = {};
-  if (!builder.finish(current, &result)) {
-    return false;
-  }
-  *graph = std::move(result);
-  decomposerLowerCount.fetch_add(1, std::memory_order_relaxed);
-  return true;
-}
+
 
 // The multi-pass source, the unary pointwise set and the const-operand blend are shared shape
 // rules (gpu/AOTShapeRules.h) — the same authority the executor's admission checks and the chain

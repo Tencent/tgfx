@@ -18,7 +18,7 @@
 
 #include "gpu/aot/ir/DrawIR.h"
 #include <atomic>
-#include "gpu/aot/plan/AOTEffectDecomposer.h"
+#include "gpu/aot/ir/Lowering.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
 #include "gpu/processors/ConstColorProcessor.h"
@@ -192,7 +192,7 @@ std::optional<DrawIR> LowerDrawCore(const std::vector<const FragmentProcessor*>&
     }
     colors.push_back(unitColor.get());
   }
-  if (!AOTEffectDecomposer::Lower(colors, &ir.color)) {
+  if (!LowerToGraph(colors, &ir.color)) {
     return std::nullopt;
   }
   // No coverage-count gate: the IR is total over the coverage expression (a second mask or

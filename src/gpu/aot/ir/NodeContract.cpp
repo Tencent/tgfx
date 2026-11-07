@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/ir/NodeContract.h"
-#include "gpu/aot/bind/Binder.h"
 #include "gpu/aot/ir/ChainContext.h"
 
 namespace tgfx {
@@ -77,48 +76,12 @@ static_assert(EveryFusableKindIsEncodable(),
               "a scheduled kind must have an encoder; the graph roots and the designators are "
               "the only rows allowed to leave it null");
 
-// One row per AOTChainOp, in the op ABI value order (Op::* in KernelContract.h): the instruction's
-// uniform write. A separate table on purpose — the instruction vocabulary and the node vocabulary
-// are not one-to-one (see the header).
-constexpr AOTOpContract OpContracts[] = {
-    {BindColorMatrixSlot},        // ColorMatrix (0)
-    {BindLumaSlot},               // Luma (1)
-    {BindAlphaThresholdSlot},     // AlphaThreshold (2)
-    {},                           // ColorSpaceXform (3): rides the program-level Chain block
-    {},                           // None (4, the inactive-slot marker)
-    {},                           // Texture (5): the sampler binding carries its records
-    {BindConstColorSlot},         // ConstColor (6)
-    {},                           // Blend (7): the chain's operands are registers
-    {BindAARectCoverageSlot},     // AARectCoverage (8)
-    {},                           // Gradient (9): the program-level gradient block
-    {BindLocalRectCoverageSlot},  // LocalRectCoverage (10)
-    {BindRRectCoverageSlot},      // RRectCoverage (11)
-    {},                           // TexModulate (12, synthesized by the texture encoder)
-    {},                           // InputOpaque (13)
-    {},                           // MulAlpha (14)
-    {},                           // PerlinNoise (15): the program-level noise block
-};
-
-constexpr size_t OpContractCount = sizeof(OpContracts) / sizeof(AOTOpContract);
-static_assert(OpContractCount == 16,
-              "every AOTChainOp needs exactly one contract row in OpContracts");
-
 }  // namespace
 
 const AOTNodeContract& NodeContractOf(AOTEffectKind kind) {
   static constexpr AOTNodeContract fallback = {};
   auto index = static_cast<size_t>(kind);
   return index < KindContractCount ? KindContracts[index] : fallback;
-}
-
-const AOTOpContract& OpContractOf(AOTChainOp op) {
-  static constexpr AOTOpContract fallback = {};
-  auto index = static_cast<size_t>(op);
-  return index < OpContractCount ? OpContracts[index] : fallback;
-}
-
-bool IsSchedulableChainOp(AOTChainOp op) {
-  return static_cast<size_t>(op) < OpContractCount && op != AOTChainOp::None;
 }
 
 const AOTKindTraits& TraitsOf(AOTEffectKind kind) {
