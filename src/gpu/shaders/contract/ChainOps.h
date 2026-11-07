@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstring>
 #include "gpu/shaders/contract/ChainISA.h"
 
 namespace tgfx {
@@ -68,6 +69,10 @@ struct Float4Array8 {
 
 /// The structural int type: one of these becomes one specialization constant per slot.
 using Int32 = int32_t;
+
+// The packer writes an int field as its bit pattern, which is what the generated GLSL reads back
+// (floatBitsToInt): a numeric conversion would reinterpret the value's magnitude, not its bits.
+static_assert(sizeof(Int32) == sizeof(float), "an Int32 field must occupy exactly one float word");
 
 // The word cost of one field type, in the pool's vec4 units.
 #define TGFX_CHAIN_WORD_COUNT_float 1
@@ -149,12 +154,13 @@ using Int32 = int32_t;
       (out)[index * 4 + 3] = (value).v[index].w; \
     }                                            \
   } while (0)
-#define TGFX_CHAIN_PACK_Int32(value, out) \
-  do {                                    \
-    (out)[0] = static_cast<float>(v);     \
-    (out)[1] = 0.0f;                      \
-    (out)[2] = 0.0f;                      \
-    (out)[3] = 0.0f;                      \
+#define TGFX_CHAIN_PACK_Int32(value, out)           \
+  do {                                              \
+    auto packed = (value);                          \
+    std::memcpy(&(out)[0], &packed, sizeof(float)); \
+    (out)[1] = 0.0f;                                \
+    (out)[2] = 0.0f;                                \
+    (out)[3] = 0.0f;                                \
   } while (0)
 
 #define TGFX_CHAIN_PACK_FIELD(type, name)              \
