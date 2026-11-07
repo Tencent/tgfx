@@ -205,6 +205,15 @@ class D3D12Emitter : public ProfileEmitter {
   }
 
   std::optional<EmittedStages> emit(const EmitInput& input, StageCompiler* compiler) override {
+    if (input.fragGates != nullptr && !input.fragGates->empty() && !D3D12UsesDxbc()) {
+      // The HLSL text form is compiled on the device at module creation, so it wants the same
+      // preprocessor gating — not implemented yet. Fail closed instead of shipping the ungated
+      // text silently (the DXBC form compiles here, so it never needs gates).
+      ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
+                    "spec gates are not yet implemented for the HLSL text form; use the dxbc "
+                    "form or drop the gates for this family");
+      return std::nullopt;
+    }
     const auto& hlslVert = compiler->translateHLSL(*input.vertSpirv, ShaderStageType::Vertex);
     if (!hlslVert.success) {
       ReportFailure(input, profile(), DiagnosticCode::EmitFailed,
@@ -300,9 +309,11 @@ std::optional<EmittedStages> DirectGLSLEmitter::emit(const EmitInput& input, Sta
                       XP_FRAMEBUFFER_FETCH;
     std::string emissionError;
     directVert = EmitDirectGLSLES300(PrependDefines(*input.vertSource, *input.vertDefines),
-                                     ShaderStageType::Vertex, false, &emissionError);
+                                     ShaderStageType::Vertex, false, nullptr, nullptr,
+                                     &emissionError);
     directFrag = EmitDirectGLSLES300(PrependDefines(*input.fragSource, *input.fragDefines),
-                                     ShaderStageType::Fragment, fbfVariant, &emissionError);
+                                     ShaderStageType::Fragment, fbfVariant, input.fragGates,
+                                     input.fragSpecEntries, &emissionError);
     if (directVert.empty() || directFrag.empty()) {
       auto message = emissionError.empty()
                          ? std::string("direct-ES emission failed (missing #version 450?)")
@@ -319,9 +330,10 @@ std::optional<EmittedStages> DirectGLSLEmitter::emit(const EmitInput& input, Sta
     // declarations survive the 330 translation verbatim, for the runtime injection to rewrite.
     std::string emissionError;
     directVert = EmitDirectGLSL330(PrependDefines(*input.vertSource, *input.vertDefines),
-                                   ShaderStageType::Vertex, &emissionError);
+                                   ShaderStageType::Vertex, nullptr, nullptr, &emissionError);
     directFrag = EmitDirectGLSL330(PrependDefines(*input.fragSource, *input.fragDefines),
-                                   ShaderStageType::Fragment, &emissionError);
+                                   ShaderStageType::Fragment, input.fragGates,
+                                   input.fragSpecEntries, &emissionError);
     if (directVert.empty() || directFrag.empty()) {
       auto message = emissionError.empty()
                          ? std::string("direct-GL 330 emission failed (missing #version 450?)")

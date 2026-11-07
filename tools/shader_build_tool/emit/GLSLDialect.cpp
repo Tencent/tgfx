@@ -421,7 +421,8 @@ bool FoldIntegerExpression(const std::string& expr, int64_t* value) {
 }
 
 std::string EmitDirectGLSL330(const std::string& source, ShaderStageType stage,
-                              std::string* error) {
+                              const std::vector<SpecGateInfo>* gates,
+                              const std::vector<SpecEntry>* entries, std::string* error) {
   std::string preprocessError;
   auto preprocessed = PreprocessGLSL(source, stage, &preprocessError);
   if (preprocessed.empty()) {
@@ -430,11 +431,24 @@ std::string EmitDirectGLSL330(const std::string& source, ShaderStageType stage,
     }
     return {};
   }
+  if (gates != nullptr && !gates->empty()) {
+    const auto gated = ApplyTextSpecGates(preprocessed, *gates,
+                                           entries == nullptr ? std::vector<SpecEntry>{}
+                                                              : *entries);
+    if (!gated.error.empty()) {
+      if (error != nullptr) {
+        *error = gated.error;
+      }
+      return {};
+    }
+    preprocessed = std::move(gated.text);
+  }
   return EmitDirectGLSL330Impl(preprocessed, stage, "#version 330", false, false);
 }
 
 std::string EmitDirectGLSLES300(const std::string& source, ShaderStageType stage, bool fbfVariant,
-                                std::string* error) {
+                                const std::vector<SpecGateInfo>* gates,
+                                const std::vector<SpecEntry>* entries, std::string* error) {
   std::string preprocessError;
   auto preprocessed = PreprocessGLSL(source, stage, &preprocessError);
   if (preprocessed.empty()) {
@@ -442,6 +456,18 @@ std::string EmitDirectGLSLES300(const std::string& source, ShaderStageType stage
       *error = "direct-ES 300 preprocessing failed: " + preprocessError;
     }
     return {};
+  }
+  if (gates != nullptr && !gates->empty()) {
+    const auto gated = ApplyTextSpecGates(preprocessed, *gates,
+                                           entries == nullptr ? std::vector<SpecEntry>{}
+                                                              : *entries);
+    if (!gated.error.empty()) {
+      if (error != nullptr) {
+        *error = gated.error;
+      }
+      return {};
+    }
+    preprocessed = std::move(gated.text);
   }
   return EmitDirectGLSL330Impl(preprocessed, stage, "#version 300 es", true, fbfVariant);
 }

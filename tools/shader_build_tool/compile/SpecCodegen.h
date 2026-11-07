@@ -33,6 +33,19 @@ struct SpecUsageField {
   bool indexed = false;
 };
 
+/// One code gate: `#pragma tgfx_spec_gate <name> : <expr>` in a reader file, directly above a
+/// function definition. The expression may reference the SPEC_<name>() scalar accessors, integer
+/// literals and the OP_* constants, with comparison and boolean operators. A closed gate swaps
+/// the function's body for a generated stub — never its signature — so every declaration
+/// (uniforms, samplers, varyings) stays outside the gate and the layout cannot drift.
+struct SpecGateInfo {
+  std::string name;
+  std::string expr;
+  /// The gated function's name, parsed at scan time: the preprocessor drops unknown pragma
+  /// lines, so the text passes locate the function by name, never by the pragma.
+  std::string functionName;
+};
+
 /// What the scan found in one family's expanded fragment template.
 struct SpecUsage {
   /// The `#pragma tgfx_spec_include` marker is present, so the tool generates and injects the
@@ -40,6 +53,8 @@ struct SpecUsage {
   bool present = false;
   /// The SPEC_<name>() fields in first-use order (SPEC_ACTIVE is not a field and stays out).
   std::vector<SpecUsageField> fields;
+  /// The declared gates, in first-seen order.
+  std::vector<SpecGateInfo> gates;
 };
 
 /// Scans one family's expanded fragment template. Collects the include marker and the
@@ -64,7 +79,8 @@ std::vector<SpecEntry> MakeSpecEntries(const SpecUsage& usage,
 /// compiles keep as OpSpecConstant. The accessor bodies are identical in both forms: they read
 /// the constants when the master switch is on and the uniforms otherwise (the local-variable
 /// indirection keeps tint's SPIR-V reader from forming OpSpecConstantOp, which it rejects).
-std::string GenerateSpecInclude(const std::vector<SpecEntry>& entries, bool specDialect);
+std::string GenerateSpecInclude(const std::vector<SpecEntry>& entries, bool specDialect,
+                                const std::vector<SpecGateInfo>& gates);
 
 /// Generates the stub pass's pass-through macros: every SPEC_ call expands to the direct uniform
 /// read, so the stub compile is semantically today's source and its reflection states the layout
@@ -73,6 +89,32 @@ std::string GenerateSpecStubInclude(const SpecUsage& usage);
 
 /// Replaces the marker line with the include text. A source without the marker returns unchanged.
 std::string ReplaceSpecMarker(const std::string& source, const std::string& includeText);
+
+/// The outcome of the text-gate pass.
+struct TextGateResult {
+  /// The rewritten text (the input unchanged when no gate applied).
+  std::string text;
+  /// How many gates found and wrapped their function.
+  size_t wrapped = 0;
+  /// Empty on success; otherwise the reason the text cannot carry the gates (fail the variant).
+  std::string error;
+};
+
+/// Rewrites a preprocessed fragment text so each declared gate becomes a preprocessor
+/// conditional: a `#define TGFX_GATE_<name> (TGFX_SPEC_0 == 0 || (<cond>))` header line after
+/// #version, and the gated function's body wrapped as `#if TGFX_GATE_<name> <body> #else <stub>
+/// #endif`. The runtime then removes whole code regions by defining the value macros before the
+/// driver's preprocessor runs. A gate whose pragma is absent (the variant pruned the file) is
+/// skipped, not an error. The stub keeps the signature and returns the type's zero value, so
+/// callers stay valid and the closed branch folds away.
+TextGateResult ApplyTextSpecGates(const std::string& preprocessedText,
+                                  const std::vector<SpecGateInfo>& gates,
+                                  const std::vector<SpecEntry>& entries);
+
+/// Replaces every gated function's body with the generated stub, in the 450 source form both
+/// real dialects derive from. The build compiles the result once per family, so a stub that
+/// cannot satisfy the call sites fails the build instead of surfacing on a device.
+std::string StubOutGatedFunctions(const std::string& source, const std::vector<SpecGateInfo>& gates);
 
 /// Expands every `#pragma tgfx_spec_unroll <fn> <capacity> <guard> (<args>)` line into one
 /// guarded call site per slot of the largest declared capacity, so the site count lives in the

@@ -70,8 +70,51 @@ DirectFormLeak FindDirectFormLeak(const std::string& text, bool esForm) {
   // other conditional is a leak of the unpreprocessed form.
   static const std::regex specDefaultBlock(
       R"((^|\n)#ifndef TGFX_SPEC_[0-9]+\n#define TGFX_SPEC_[0-9]+ 0\n#endif)");
-  const std::string withoutSpecDefaults = std::regex_replace(text, specDefaultBlock, "$1");
-  if (std::regex_search(withoutSpecDefaults, conditional)) {
+  std::string cleaned = std::regex_replace(text, specDefaultBlock, "$1");
+  // The tool-generated gate constructs (ApplyTextSpecGates): the `#define TGFX_GATE_<name> ...`
+  // header lines and the `#if TGFX_GATE_<name> / #else / #endif` wrapper around a gated body.
+  // A line-oriented pass drops them; the bodies they wrap are ordinary preprocessed code.
+  {
+    std::string stripped;
+    stripped.reserve(cleaned.size());
+    size_t gateDepth = 0;
+    size_t cursor = 0;
+    while (cursor <= cleaned.size()) {
+      auto lineEnd = cleaned.find('\n', cursor);
+      const auto line = cleaned.substr(
+          cursor, lineEnd == std::string::npos ? std::string::npos : lineEnd - cursor);
+      const auto head = line.find_first_not_of(" \t");
+      const auto trimmedHead = head == std::string::npos ? std::string() : line.substr(head);
+      bool drop = false;
+      if (gateDepth > 0) {
+        if (trimmedHead.rfind("#endif", 0) == 0) {
+          --gateDepth;
+          drop = true;
+        } else if (trimmedHead.rfind("#if", 0) == 0) {
+          ++gateDepth;
+          drop = true;
+        } else if (gateDepth == 1 && trimmedHead.rfind("#else", 0) == 0) {
+          drop = true;
+        }
+      } else if (trimmedHead.rfind("#define TGFX_GATE_", 0) == 0) {
+        drop = true;
+      } else if (trimmedHead.rfind("#if", 0) == 0 &&
+                 trimmedHead.find("TGFX_GATE_") != std::string::npos) {
+        gateDepth = 1;
+        drop = true;
+      }
+      if (!drop) {
+        stripped += line;
+        stripped += '\n';
+      }
+      if (lineEnd == std::string::npos) {
+        break;
+      }
+      cursor = lineEnd + 1;
+    }
+    cleaned = std::move(stripped);
+  }
+  if (std::regex_search(cleaned, conditional)) {
     return {"surviving conditional", 0};
   }
   if (text.find("subpassInput") != std::string::npos ||

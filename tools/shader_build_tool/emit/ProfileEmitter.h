@@ -24,6 +24,7 @@
 #include <string>
 #include <vector>
 #include "compile/ShaderCompiler.h"
+#include "compile/SpecCodegen.h"
 #include "compile/StageCompiler.h"
 #include "core/Diagnostics.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
@@ -71,6 +72,12 @@ struct EmitInput {
   /// the generic behavior until the runtime injects values); Metal and the GL text emitters stay
   /// on fragSource.
   const std::string* fragSpecSource = nullptr;
+  /// The family's spec gates whose fields this variant's spec table carries (the text emitters
+  /// translate them into preprocessor conditionals; the binary emitters ignore them — the driver
+  /// folds the guard accessors with the pipeline constants).
+  const std::vector<SpecGateInfo>* fragGates = nullptr;
+  /// This variant's spec entries, the id assignment the gate conditions reference.
+  const std::vector<SpecEntry>* fragSpecEntries = nullptr;
   /// Where an emitter reports why it could not produce its storage form. The build always sets
   /// it; a test that only cares about the returned optional may leave it null.
   Diagnostics* diagnostics = nullptr;

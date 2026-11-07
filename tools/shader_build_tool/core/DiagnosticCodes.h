@@ -69,6 +69,14 @@ inline constexpr const char* SpecUnknownField = "spec.unknown-field";
 /// specialization surface of a family must stay a declared, reviewable set of files.
 inline constexpr const char* SpecReader = "spec.reader-undeclared";
 
+/// A gated function is called outside its `if (SPEC_GATE_<name>())` guard: the closed gate's
+/// stub would run and produce the zero value.
+inline constexpr const char* SpecGateUnguarded = "spec.gate-unguarded";
+
+/// A gate did not apply where it had to: twice-declared in one text, a pragma not followed by a
+/// stubbable function, or an expression the variant's spec table cannot evaluate.
+inline constexpr const char* SpecGateUnmatched = "spec.gate-unmatched";
+
 /// The uniform layout differs between the generic and the spec-dialect compile.
 inline constexpr const char* SpecLayoutDrift = "spec.layout-drift";
 
@@ -175,7 +183,8 @@ inline constexpr const char* AllCodes[] = {
     SourcesUnreadable,     PlanNoEnumerator,   PlanUnbuildable,
     CompileGlsl,           CompileCacheDisabled, ReflectUnknownType,
     EmitFailed,            EmitFormLeak,
-    SpecRawRead,           SpecUnknownField,  SpecReader,
+    SpecRawRead,           SpecUnknownField,  SpecReader,        SpecGateUnguarded,
+    SpecGateUnmatched,
     SpecLayoutDrift,
     VerifyClipField,
     VerifySourceFile,      VerifySourceFamily, VerifyReflection,

@@ -236,6 +236,51 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
   // and every source below stays the template itself.
   const auto specUsage = ScanSpecUsage(fragSource, info.name, diagnostics);
 
+  // The gates this family can evaluate: every field the expression reads must be a scanned
+  // scalar (a family without the marker cannot evaluate any gate). A gate the family cannot
+  // evaluate folds its guards to true, so the gated code stays in every form — ungated, never
+  // stubbed.
+  std::vector<SpecGateInfo> supportedGates = {};
+  for (const auto& gate : specUsage.gates) {
+    bool supported = specUsage.present;
+    if (supported) {
+      size_t at = 0;
+      while ((at = gate.expr.find("SPEC_", at)) != std::string::npos) {
+        const bool boundary =
+            at == 0 || !(std::isalnum(static_cast<unsigned char>(gate.expr[at - 1])) ||
+                         gate.expr[at - 1] == '_');
+        size_t end = at + 5;
+        while (end < gate.expr.size() &&
+               (std::isalnum(static_cast<unsigned char>(gate.expr[end])) || gate.expr[end] == '_')) {
+          ++end;
+        }
+        if (boundary && end > at + 5) {
+          const auto field = gate.expr.substr(at + 5, end - at - 5);
+          const auto found = std::find_if(
+              specUsage.fields.begin(), specUsage.fields.end(),
+              [&field](const SpecUsageField& f) { return f.name == field && !f.indexed; });
+          if (found == specUsage.fields.end()) {
+            supported = false;
+            break;
+          }
+        }
+        at = end;
+      }
+    }
+    if (supported) {
+      supportedGates.push_back(gate);
+    } else {
+      const auto guard = "SPEC_GATE_" + gate.name + "()";
+      for (auto at = fragSource.find(guard); at != std::string::npos;
+           at = fragSource.find(guard, at + 4)) {
+        fragSource.replace(at, guard.size(), "true");
+      }
+    }
+  }
+  // The stubbed gate bodies are type-checked once per family: a stub the call sites cannot
+  // accept fails the build here, not on a device.
+  bool gatesStubValidated = false;
+
   // The variant plan of this family: the Compose-reachable set (the single source of truth the
   // runtime matcher uses too), validated against the declared domains. The build loop,
   // --audit and --report-only all get their variants from the planner.
@@ -335,8 +380,10 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
     if (specUsage.present) {
       specEntries = MakeSpecEntries(specUsage, reflection.fragmentReflection, info.name, fi,
                                     diagnostics);
-      genericFragSource = ReplaceSpecMarker(fragSource, GenerateSpecInclude(specEntries, false));
-      specFragSource = ReplaceSpecMarker(fragSource, GenerateSpecInclude(specEntries, true));
+      genericFragSource =
+          ReplaceSpecMarker(fragSource, GenerateSpecInclude(specEntries, false, supportedGates));
+      specFragSource =
+          ReplaceSpecMarker(fragSource, GenerateSpecInclude(specEntries, true, supportedGates));
       // The spec dialect must not move a uniform or a sampler: the specialized program has to
       // stay a drop-in replacement of the generic one, layout included. Reflect the spec compile
       // and compare it against the stub pass's reflection.
@@ -362,6 +409,26 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
                          "against the generic compile");
         continue;
       }
+      if (!gatesStubValidated && !supportedGates.empty()) {
+        gatesStubValidated = true;
+        const auto stubbed = StubOutGatedFunctions(genericFragSource, supportedGates);
+        if (stubbed.empty()) {
+          RecordBuildError(diagnostics, Layer::Compile, DiagnosticCode::SpecGateUnmatched,
+                           info.name, "", static_cast<int>(vi), static_cast<int>(fi),
+                           "a gate pragma does not precede a stubbable function (scalar or vector "
+                           "return type required)");
+          continue;
+        }
+        const auto& stubResult =
+            compiler->compileSpirv(PrependDefines(stubbed, fragDefines),
+                                   ShaderStageType::Fragment, info.name, fi, false);
+        if (!stubResult.success) {
+          RecordBuildError(diagnostics, Layer::Compile, DiagnosticCode::SpecGateUnmatched,
+                           info.name, "", static_cast<int>(vi), static_cast<int>(fi),
+                           "the closed gates' stub form failed to compile: " + stubResult.error);
+          continue;
+        }
+      }
     }
 
     for (auto& emitterEntry : emitters) {
@@ -383,6 +450,8 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
       input.vertSpirv = vertSpirv;
       input.fragStage = &fragResult;
       input.fragSpecSource = specFragSource.empty() ? nullptr : &specFragSource;
+      input.fragGates = supportedGates.empty() ? nullptr : &supportedGates;
+      input.fragSpecEntries = specUsage.present ? &specEntries : nullptr;
       input.diagnostics = diagnostics;
       auto stages = emitterEntry.second->emit(input, compiler);
       if (!stages) {
