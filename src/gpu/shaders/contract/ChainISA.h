@@ -45,22 +45,22 @@ inline constexpr int StructureCapacity = 5;
 // function) must share its pass with its input's producer (see IsPassBoundarySensitive).
 // The define spelling is explicit rather than derived from the name: the vocabulary names carry
 // consecutive capitals (AARectCoverage), which a CamelCase-to-SCREAMING_SNAKE rule splits wrong.
-#define TGFX_CHAIN_OPS(X)                                     \
-  X(ColorMatrix, 0, 1, false, COLOR_MATRIX)                   \
-  X(Luma, 1, 1, false, LUMA)                                  \
-  X(AlphaThreshold, 2, 1, true, ALPHA_THRESHOLD)              \
-  X(ColorSpaceXform, 3, 1, false, COLOR_SPACE_XFORM)          \
-  X(None, 4, 0, false, NONE)                                  \
-  X(Texture, 5, 0, false, TEXTURE)                            \
-  X(ConstColor, 6, 1, false, CONST_COLOR)                     \
-  X(Blend, 7, 2, false, BLEND)                                \
-  X(AARectCoverage, 8, 1, false, AARECT_COVERAGE)             \
-  X(Gradient, 9, 0, false, GRADIENT)                          \
-  X(LocalRectCoverage, 10, 1, false, LOCAL_RECT_COVERAGE)     \
-  X(RRectCoverage, 11, 1, false, RRECT_COVERAGE)              \
-  X(TexModulate, 12, 1, false, TEX_MODULATE)                  \
-  X(InputOpaque, 13, 1, false, INPUT_OPAQUE)                  \
-  X(MulAlpha, 14, 2, false, MUL_ALPHA)                        \
+#define TGFX_CHAIN_OPS(X)                                 \
+  X(ColorMatrix, 0, 1, false, COLOR_MATRIX)               \
+  X(Luma, 1, 1, false, LUMA)                              \
+  X(AlphaThreshold, 2, 1, true, ALPHA_THRESHOLD)          \
+  X(ColorSpaceXform, 3, 1, false, COLOR_SPACE_XFORM)      \
+  X(None, 4, 0, false, NONE)                              \
+  X(Texture, 5, 0, false, TEXTURE)                        \
+  X(ConstColor, 6, 1, false, CONST_COLOR)                 \
+  X(Blend, 7, 2, false, BLEND)                            \
+  X(AARectCoverage, 8, 1, false, AARECT_COVERAGE)         \
+  X(Gradient, 9, 0, false, GRADIENT)                      \
+  X(LocalRectCoverage, 10, 1, false, LOCAL_RECT_COVERAGE) \
+  X(RRectCoverage, 11, 1, false, RRECT_COVERAGE)          \
+  X(TexModulate, 12, 1, false, TEX_MODULATE)              \
+  X(InputOpaque, 13, 1, false, INPUT_OPAQUE)              \
+  X(MulAlpha, 14, 2, false, MUL_ALPHA)                    \
   X(PerlinNoise, 15, 0, false, PERLIN_NOISE)
 
 #define TGFX_CHAIN_OP_CONSTANT(name, id, inputs, sensitive, defineName) \

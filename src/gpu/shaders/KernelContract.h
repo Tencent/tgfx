@@ -62,14 +62,13 @@ constexpr const char* DeviceToLocal = "DeviceToLocal";
 // per-slot parameter member name, and pass-boundary sensitivity — an operator that amplifies the
 // 1/255 pass-boundary rounding into a visible flip (a step function) must share its pass with its
 // input's producer (IsPassBoundarySensitive; see AOTEffectDecomposer's CanStartPassAt).
-#define TGFX_POINTWISE_OPS(X)                                                       \
-  X(ColorMatrix, ChainISA::ColorMatrix, AOTColorMatrixParameters, colorMatrix, false) \
-  X(Luma, ChainISA::Luma, AOTLumaParameters, luma, false)                            \
-  X(AlphaThreshold, ChainISA::AlphaThreshold, AOTAlphaThresholdParameters,           \
-    alphaThreshold, true)                                                            \
-  X(ColorSpaceXform, ChainISA::ColorSpaceXform, AOTColorSpaceXformParameters,        \
-    colorSpaceXform, false)                                                          \
-  X(ConstColor, ChainISA::ConstColor, AOTConstColorParameters, constColor, false)    \
+#define TGFX_POINTWISE_OPS(X)                                                                    \
+  X(ColorMatrix, ChainISA::ColorMatrix, AOTColorMatrixParameters, colorMatrix, false)            \
+  X(Luma, ChainISA::Luma, AOTLumaParameters, luma, false)                                        \
+  X(AlphaThreshold, ChainISA::AlphaThreshold, AOTAlphaThresholdParameters, alphaThreshold, true) \
+  X(ColorSpaceXform, ChainISA::ColorSpaceXform, AOTColorSpaceXformParameters, colorSpaceXform,   \
+    false)                                                                                       \
+  X(ConstColor, ChainISA::ConstColor, AOTConstColorParameters, constColor, false)                \
   X(Blend, ChainISA::Blend, AOTBlendParameters, blend, false)
 
 namespace Op {
@@ -81,7 +80,8 @@ namespace Op {
 // dispatches on the AOTPointwiseOpType subset, so it deliberately never emits the chain-only
 // operators (Texture, the coverage ops, the modulators). The pointwise color operators also have
 // an IR mirror (the list above), which the asserts below keep aligned with the ABI values.
-#define TGFX_OP_CONSTANT(name, id, inputs, sensitive, defineName) constexpr int name = ChainISA::name;
+#define TGFX_OP_CONSTANT(name, id, inputs, sensitive, defineName) \
+  constexpr int name = ChainISA::name;
 TGFX_CHAIN_OPS(TGFX_OP_CONSTANT)
 #undef TGFX_OP_CONSTANT
 

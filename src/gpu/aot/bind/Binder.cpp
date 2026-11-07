@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/bind/Binder.h"
-#include "gpu/shaders/contract/ChainOps.h"
 #include <array>
 #include "gpu/ColorSpaceXformHelper.h"
 #include "gpu/Swizzle.h"
@@ -29,6 +28,7 @@
 #include "gpu/resources/TextureView.h"
 #include "gpu/resources/YUVTextureView.h"
 #include "gpu/shaders/KernelContract.h"
+#include "gpu/shaders/contract/ChainOps.h"
 #include "gpu/shaders/modules/AnalyticClipModule.h"
 #include "gpu/shaders/modules/BlendParams.h"
 #include "gpu/shaders/modules/BlurKernelModule.h"

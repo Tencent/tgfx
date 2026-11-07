@@ -108,7 +108,7 @@ struct ChainParams {
                                          TiledClamp2,
                                          TiledDimension2,
                                          TiledStrict2,
-                                          NoiseModeOctaves,
+                                         NoiseModeOctaves,
                                          GradientLayoutType,
                                          GradientColorizerKind,
                                          GradientIntervalCount};
