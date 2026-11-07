@@ -16,14 +16,12 @@ struct GradientModule {
   static constexpr Param<ParamType::Float> Scale{"Scale"};
   static constexpr Param<ParamType::Float4> Start{"start"};
   static constexpr Param<ParamType::Float4> End{"end"};
-  static constexpr Param<ParamType::Int> ColorizerKind{"ColorizerKind"};
 
-  /// The clamped gradient's own record (border colors, mask default, layout branch).
+  /// The clamped gradient's own record: border colors, the layout branch, and the conic layout's
+  /// bias/scale pair (other layouts write nothing) plus the single-interval colorizer's endpoints
+  /// (other colorizers write nothing).
   static constexpr ParamInfo Fields[] = {
       LeftBorderColor, RightBorderColor, LayoutType, Bias, Scale, Start, End};
-
-  /// The conic layout's bias/scale pair; other layouts write nothing.
-  /// The single-interval colorizer's endpoints and kind selector.
 };
 
 }  // namespace tgfx

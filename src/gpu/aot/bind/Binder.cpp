@@ -713,12 +713,13 @@ void BindGradientNode(const AOTGradientParameters& params, ParamWriter* writer) 
     writer->set(GradientModule::Scale, params.scale);
   }
   if (params.colorizerKind == 0) {
-    // The single-interval colorizer child's fields; other colorizers carry none.
+    // The single-interval colorizer child's fields; other colorizers carry none. The kind
+    // selector itself rides the chain-wide GradientColorizerKind block, which the chain upload
+    // writes from the same record.
     const float start[4] = {params.start[0], params.start[1], params.start[2], params.start[3]};
     writer->set(GradientModule::Start, start);
     const float end[4] = {params.end[0], params.end[1], params.end[2], params.end[3]};
     writer->set(GradientModule::End, end);
-    writer->set(GradientModule::ColorizerKind, params.colorizerKind);
   }
 }
 
