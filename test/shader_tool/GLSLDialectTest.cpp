@@ -90,7 +90,8 @@ TEST(FoldIntegerExpressionTest, RejectsALiteralBeyondTheInt64Range) {
 
 TEST(EmitDirectGLSLTest, RewritesTheHeaderDropsSetAndBindingAndFoldsLocations) {
   std::string error;
-  auto text = EmitDirectGLSL330(FragmentTemplate, ShaderStageType::Fragment, &error);
+  auto text =
+      EmitDirectGLSL330(FragmentTemplate, ShaderStageType::Fragment, nullptr, nullptr, &error);
   EXPECT_TRUE(error.empty()) << error;
   ASSERT_FALSE(text.empty());
   EXPECT_NE(text.find("#version 330"), std::string::npos);
@@ -105,7 +106,9 @@ TEST(EmitDirectGLSLTest, RewritesTheHeaderDropsSetAndBindingAndFoldsLocations) {
 
 TEST(EmitDirectGLSLTest, FailsClosedWithoutAVersion450Header) {
   std::string error;
-  EXPECT_TRUE(EmitDirectGLSL330("void main() {}", ShaderStageType::Fragment, &error).empty());
+  EXPECT_TRUE(
+      EmitDirectGLSL330("void main() {}", ShaderStageType::Fragment, nullptr, nullptr, &error)
+          .empty());
   // The failure carries its reason to the caller instead of printing it.
   EXPECT_FALSE(error.empty());
   EXPECT_NE(error.find("preprocessing failed"), std::string::npos) << error;
@@ -113,7 +116,8 @@ TEST(EmitDirectGLSLTest, FailsClosedWithoutAVersion450Header) {
 
 TEST(EmitDirectGLSTest, AddsTheESHeaderPrecisionsAndHighpDecoration) {
   std::string error;
-  auto text = EmitDirectGLSLES300(FragmentTemplate, ShaderStageType::Fragment, false, &error);
+  auto text = EmitDirectGLSLES300(FragmentTemplate, ShaderStageType::Fragment, false, nullptr,
+                                  nullptr, &error);
   EXPECT_TRUE(error.empty()) << error;
   ASSERT_FALSE(text.empty());
   EXPECT_NE(text.find("#version 300 es"), std::string::npos);
@@ -135,7 +139,8 @@ void main() {
 }
 )";
   std::string error;
-  auto text = EmitDirectGLSLES300(FbfTemplate, ShaderStageType::Fragment, true, &error);
+  auto text = EmitDirectGLSLES300(FbfTemplate, ShaderStageType::Fragment, true, nullptr, nullptr,
+                                  &error);
   EXPECT_TRUE(error.empty()) << error;
   ASSERT_FALSE(text.empty());
   EXPECT_EQ(text.find("subpassInput"), std::string::npos) << text;
