@@ -320,7 +320,7 @@ static bool BuildCutPlanPasses(Context* context, uint32_t renderFlags, const AOT
 }
 
 // The pass IRs of a plan Build already validated: single pass or cut plan, each carrying its
-// compiled program (admission's, when Build passes one in).
+// compiled program.
 static bool BuildPassIRs(Context* context, uint32_t renderFlags, const AOTEffectGraph& graph,
                          const Plan& plan, const Rect& deviceBounds,
                          const RenderTargetProxy* destination, const Point& fpCoordOffset,
@@ -389,8 +389,7 @@ AOTRecordRoute AOTPlanner::RouteRecordPlan(const Plan& plan,
 }
 
 bool AOTPlanner::Validate(const AOTEffectGraph& graph, const Plan& plan,
-                          const std::vector<AOTCoverageTerm>* terminalCoverage,
-                          AOTChainCompile* compiled) {
+                          const std::vector<AOTCoverageTerm>* terminalCoverage) {
   if (plan.passes.empty() || !plan.output.isValid() || plan.output != graph.root()) {
     return false;
   }
@@ -405,14 +404,8 @@ bool AOTPlanner::Validate(const AOTEffectGraph& graph, const Plan& plan,
   // A single pass fuses the whole DAG. Validation runs the builder's one compile entry with the
   // plan's terminal coverage: the same slot encoding, parameter blocks, register allocation and
   // binding table the build runs, so a validated pass is by construction buildable.
-  AOTChainCompile result = {};
-  if (!AOTChainBuilder::Compile(graph, pass, terminalCoverage, &result)) {
-    return false;
-  }
-  if (compiled != nullptr) {
-    *compiled = std::move(result);
-  }
-  return true;
+  AOTProgram program = {};
+  return AOTChainBuilder::Compile(graph, pass, terminalCoverage, &program);
 }
 
 bool AOTPlanner::NeedsLocalRemap(const AOTEffectGraph& graph, const Plan& plan) {

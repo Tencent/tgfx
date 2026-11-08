@@ -26,6 +26,22 @@
 
 namespace tgfx {
 
+/**
+ * The compiled result of one chain pass: the data-only program plus the build-time leaf plan the
+ * processor construction reads (graph node pointers for the texture leaves, the LUT gradient and
+ * noise parameter records, and the device-space leaf indices). The shell-free serving path
+ * replaces the leaf plan with the program's binding table.
+ */
+struct AOTChainLayout {
+  AOTProgram program = {};
+  // Texture leaves in sampler order: leafNodes[k] pairs with slot k and TextureSampler_k.
+  std::vector<const AOTEffectNode*> leafNodes = {};
+  const AOTGradientParameters* lutGradient = nullptr;
+  const AOTPerlinNoiseParameters* noise = nullptr;
+  // Indices into leafNodes of the device-space leaves, in leaf order.
+  std::vector<int> deviceLeafIndices = {};
+};
+
 // The chain kernel's own capacities, as the fixed-size GLSL arrays declare them: the instruction
 // storage across the shapes (the noise shape: 32; the gradient shape shares the plain chain's 16),
 // the chainResults register file the allocator recycles by last use, and the chain-wide parameter
@@ -81,11 +97,11 @@ bool DeriveWholeGraphPass(const AOTEffectGraph& graph, PassIR* pass);
 bool PlanChainLayout(const AOTEffectGraph& graph, const PassIR& pass,
                      const AOTEffectGraph* coverageGraph, AOTNodeID coverageRoot,
                      bool coverageLeafFromUVCoord, const std::vector<AOTNodeID>& clipLinks,
-                     AOTChainCompile* layout);
+                     AOTChainLayout* layout);
 
 // The one compile entry: the planner plus the sampler binding table.
 bool CompileChainLayout(const AOTEffectGraph& graph, const PassIR& pass,
-                        const std::vector<AOTCoverageTerm>* coverageTerms, AOTChainCompile* out);
+                        const std::vector<AOTCoverageTerm>* coverageTerms, AOTChainLayout* out);
 
 // The program-only view of the same entry.
 bool CompileChainProgramLayout(const AOTEffectGraph& graph, const PassIR& pass,

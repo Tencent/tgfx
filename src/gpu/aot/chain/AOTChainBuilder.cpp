@@ -65,7 +65,7 @@ bool AOTChainBuilder::FitsChainPlan(const AOTEffectGraph& graph, const PassIR& p
                                     AOTResourceProfile* outProfile) {
   // A fit probe, not an admission: it runs the planner alone (no bindings, no coverage), which is
   // what the decomposer needs to decide whether a cut fits before any program exists.
-  AOTChainCompile layout = {};
+  AOTChainLayout layout = {};
   if (!PlanChainLayout(graph, pass, nullptr, AOTNodeID::Invalid(), false, {}, &layout)) {
     return false;
   }
@@ -76,9 +76,16 @@ bool AOTChainBuilder::FitsChainPlan(const AOTEffectGraph& graph, const PassIR& p
 }
 
 bool AOTChainBuilder::Compile(const AOTEffectGraph& graph, const PassIR& pass,
-                              const std::vector<AOTCoverageTerm>* coverageTerms,
-                              AOTChainCompile* out) {
-  return CompileChainLayout(graph, pass, coverageTerms, out);
+                              const std::vector<AOTCoverageTerm>* coverageTerms, AOTProgram* out) {
+  if (out == nullptr) {
+    return false;
+  }
+  AOTChainLayout layout = {};
+  if (!CompileChainLayout(graph, pass, coverageTerms, &layout)) {
+    return false;
+  }
+  *out = std::move(layout.program);
+  return true;
 }
 
 AOTTextureParameters AOTChainBuilder::IntermediateSource(std::shared_ptr<TextureProxy> textureProxy,

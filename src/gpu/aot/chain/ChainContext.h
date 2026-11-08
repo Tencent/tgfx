@@ -26,7 +26,7 @@
 
 namespace tgfx {
 
-struct AOTChainCompile;
+struct AOTChainLayout;
 struct PassIR;
 
 /**
@@ -45,7 +45,7 @@ struct AOTChainContext {
   const AOTEffectGraph* coverageGraph = nullptr;
   AOTNodeID coverageRoot = AOTNodeID();
   bool coverageLeafFromUVCoord = false;
-  AOTChainCompile* layout = nullptr;
+  AOTChainLayout* layout = nullptr;
   // Stage results, consumed by the later stages.
   std::vector<const AOTEffectNode*> nodes = {};
   size_t colorCount = 0;

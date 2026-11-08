@@ -70,11 +70,7 @@ static bool CompileChainForTest(const AOTEffectGraph& graph, const PassIR& pass,
   if (program == nullptr) {
     return false;
   }
-  AOTChainCompile compiled = {};
-  if (!AOTChainBuilder::Compile(graph, pass, nullptr, &compiled)) {
-    return false;
-  }
-  *program = std::move(compiled.program);
+  return AOTChainBuilder::Compile(graph, pass, nullptr, program);
   return true;
 }
 
@@ -94,11 +90,7 @@ static bool CompileChainForTest(const AOTEffectGraph& graph, const PassIR& pass,
     }
     coverageTerms = std::move(*terms);
   }
-  AOTChainCompile compiled = {};
-  if (!AOTChainBuilder::Compile(graph, pass, &coverageTerms, &compiled)) {
-    return false;
-  }
-  *program = std::move(compiled.program);
+  return AOTChainBuilder::Compile(graph, pass, &coverageTerms, program);
   return true;
 }
 

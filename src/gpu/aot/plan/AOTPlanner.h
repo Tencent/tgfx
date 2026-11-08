@@ -31,7 +31,6 @@ namespace tgfx {
 
 class Context;
 class RenderTargetProxy;
-struct AOTChainCompile;
 
 /// The record-time route one plan takes: served in place at prepare (its descriptor rides the
 /// draw's IR), run as a plan task, or left to the plain lookup at prepare.
@@ -106,8 +105,7 @@ class AOTPlanner {
    * (an AlphaThreshold right after a boundary can flip at the grid gap).
    *
    * A single chain pass is admitted by the builder's one compile entry — the same call the build
-   * makes, terminal coverage included — so a validated single pass is by construction buildable,
-   * and its compiled program is returned through `compiled` for the build to carry on the pass IR.
+   * makes, terminal coverage included — so a validated single pass is by construction buildable.
    * A multi-pass plan is structurally validated here; its segments compile one per pass when
    * Build builds them.
    *
@@ -115,8 +113,7 @@ class AOTPlanner {
    * definition, which the tests assert on and nothing else needs to re-derive.
    */
   static bool Validate(const AOTEffectGraph& graph, const Plan& plan,
-                       const std::vector<AOTCoverageTerm>* terminalCoverage = nullptr,
-                       AOTChainCompile* compiled = nullptr);
+                       const std::vector<AOTCoverageTerm>* terminalCoverage = nullptr);
 
   /**
    * Whether a multi-pass plan's fill passes carry local-coordinate leaves (plainly-sampled

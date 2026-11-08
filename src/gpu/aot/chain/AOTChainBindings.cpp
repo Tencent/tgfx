@@ -112,7 +112,7 @@ static bool BuildTextureLeafBinding(const AOTEffectNode* node, AOTBinding* bindi
 bool PlanChainLayout(const AOTEffectGraph& graph, const PassIR& pass,
                      const AOTEffectGraph* coverageGraph, AOTNodeID coverageRoot,
                      bool coverageLeafFromUVCoord, const std::vector<AOTNodeID>& clipLinks,
-                     AOTChainCompile* layout) {
+                     AOTChainLayout* layout) {
   AOTChainContext ctx = {};
   ctx.graph = &graph;
   ctx.pass = &pass;
@@ -363,7 +363,7 @@ static bool MergeCoverageTerms(const std::vector<AOTCoverageTerm>& terms,
 // padding the four-sampler artifacts need and the mask slot child. coverageTerms is null for a
 // plan pass (plan passes carry no draw coverage).
 bool CompileChainLayout(const AOTEffectGraph& graph, const PassIR& pass,
-                        const std::vector<AOTCoverageTerm>* coverageTerms, AOTChainCompile* out) {
+                        const std::vector<AOTCoverageTerm>* coverageTerms, AOTChainLayout* out) {
   if (out == nullptr) {
     return false;
   }
@@ -375,7 +375,7 @@ bool CompileChainLayout(const AOTEffectGraph& graph, const PassIR& pass,
     }
     coverageGraph = &coverage.graph;
   }
-  AOTChainCompile layout = {};
+  AOTChainLayout layout = {};
   if (!PlanChainLayout(graph, pass, coverageGraph, coverage.coverageRoot,
                        coverage.coverageLeafFromUVCoord, coverage.clipLinks, &layout)) {
     return false;
@@ -446,7 +446,7 @@ bool CompileChainProgramLayout(const AOTEffectGraph& graph, const PassIR& pass,
   if (out == nullptr) {
     return false;
   }
-  AOTChainCompile compiled = {};
+  AOTChainLayout compiled = {};
   if (!CompileChainLayout(graph, pass, coverageTerms, &compiled)) {
     return false;
   }

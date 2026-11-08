@@ -28,22 +28,6 @@ namespace tgfx {
 class ProgramInfo;
 
 /**
- * The compiled result of one chain pass: the data-only program plus the build-time leaf plan the
- * processor construction reads (graph node pointers for the texture leaves, the LUT gradient and
- * noise parameter records, and the device-space leaf indices). The shell-free serving path
- * replaces the leaf plan with the program's binding table.
- */
-struct AOTChainCompile {
-  AOTProgram program = {};
-  // Texture leaves in sampler order: leafNodes[k] pairs with slot k and TextureSampler_k.
-  std::vector<const AOTEffectNode*> leafNodes = {};
-  const AOTGradientParameters* lutGradient = nullptr;
-  const AOTPerlinNoiseParameters* noise = nullptr;
-  // Indices into leafNodes of the device-space leaves, in leaf order.
-  std::vector<int> deviceLeafIndices = {};
-};
-
-/**
  * Compiles the interpreter's programs from a decomposed AOT plan: the fused chain kernel for
  * every plan pass (a multi-pass plan's passes are built as cut segments through BuildCutSegment)
  * and the YUV family's color-grade tail. Used by AOTPlanner's task assembly and by the
@@ -81,7 +65,7 @@ class AOTChainBuilder {
    * draw coverage).
    */
   static bool Compile(const AOTEffectGraph& graph, const PassIR& pass,
-                      const std::vector<AOTCoverageTerm>* coverageTerms, AOTChainCompile* out);
+                      const std::vector<AOTCoverageTerm>* coverageTerms, AOTProgram* out);
 
   /**
    * Compiles a draw's whole color expression into the fused chain program: the single pass the DAG

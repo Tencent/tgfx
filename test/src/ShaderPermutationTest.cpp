@@ -691,9 +691,8 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
             ASSERT_TRUE(terms.has_value());
             coverageTerms = std::move(*terms);
           }
-          AOTChainCompile compiled = {};
-          ASSERT_TRUE(AOTChainBuilder::Compile(graph, plan.passes[0], &coverageTerms, &compiled));
-          auto chain = std::move(compiled.program);
+          AOTProgram chain = {};
+          ASSERT_TRUE(AOTChainBuilder::Compile(graph, plan.passes[0], &coverageTerms, &chain));
           ProgramInfo programInfo(renderTarget.get(), gp.get(), xp.get(), BlendMode::SrcOver,
                                   !coverageProcessors.empty());
           // The interpreter's own match: a program-holding draw resolves through MatchProgram,
@@ -746,9 +745,8 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
     ASSERT_EQ(plan.passes.size(), 1u);
     auto terms = LowerCoverageTerms({coverage.get()}, nullptr, &allocator);
     ASSERT_TRUE(terms.has_value());
-    AOTChainCompile compiled = {};
-    ASSERT_TRUE(AOTChainBuilder::Compile(graph, plan.passes[0], &*terms, &compiled));
-    auto chain = std::move(compiled.program);
+    AOTProgram chain = {};
+    ASSERT_TRUE(AOTChainBuilder::Compile(graph, plan.passes[0], &*terms, &chain));
     ProgramInfo programInfo(renderTarget.get(), gp.get(), nullptr, BlendMode::SrcOver, true);
     // The interpreter's own match: a program-holding draw resolves through MatchProgram, not the
     // family walk (whose dedicated families would claim the empty processor list).
