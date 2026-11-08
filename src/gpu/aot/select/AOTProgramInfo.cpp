@@ -97,9 +97,9 @@ AOTProgramInfo::AOTProgramInfo(const ProgramInfo& info, const AOTProgram& progra
   // shape's specialized program. The capture runs the draw's own uniform writers over a CPU
   // scratch buffer (SpecCapture), so the key and the fold share one source of values. The entry
   // is the same one the plain route uses (SpecResolver), so both routes agree.
-  const SpecValues spec =
-      SpecResolver::Resolve(context, info, PointwiseChainShader::Name,
-                            variant->vertPermutationIndex, variant->fragPermutationIndex);
+  const SpecValues spec = SpecResolver::Resolve(
+      context->precompiledShaderCache(), context->backend(), info, PointwiseChainShader::Name,
+      variant->vertPermutationIndex, variant->fragPermutationIndex);
   if (!spec.empty()) {
     spec.writeKey(&key);
   }

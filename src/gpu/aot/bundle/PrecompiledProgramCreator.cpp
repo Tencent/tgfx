@@ -39,6 +39,7 @@
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/shaders/AllShaderFamilies.h"
+#include "gpu/shaders/ProgramWriterFactory.h"
 #include "gpu/shaders/ShaderFamily.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/shaders/kernels/YUVTextureFillShader.h"
@@ -253,19 +254,6 @@ static bool VertexInputFormatMatches(const std::vector<VertexInput>& inputs, uin
   return false;
 }
 
-// The re-expressing chain family carries its own writer (it compiles the draw's whole expression
-// into the chain program); the YUV family appends its compiled tail records to the standard walk;
-// every other family uses the generic precompiled writer.
-std::unique_ptr<ProgramWriter> MakeProgramWriter(const std::string& shaderName) {
-  if (shaderName == PointwiseChainShader::Name) {
-    return std::make_unique<ChainProgramWriter>();
-  }
-  if (shaderName == YUVTextureFillShader::Name) {
-    return std::make_unique<YUVProgramWriter>();
-  }
-  return std::make_unique<PrecompiledProgramWriter>();
-}
-
 std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* context,
                                                                   const ProgramInfo* programInfo) {
   auto cache = context->precompiledShaderCache();
@@ -343,7 +331,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   // under the structure-bearing key only, which leaves the plain key holding generic programs —
   // those render correctly for every shape, so a plain-key hit is always safe.
   const SpecValues spec =
-      SpecResolver::Resolve(context, *programInfo, matchResult->shaderName,
+      SpecResolver::Resolve(cache, context->backend(), *programInfo, matchResult->shaderName,
                             matchResult->vertPermutationIndex, matchResult->fragPermutationIndex);
   if (spec.empty()) {
     auto program = CreateProgramFromMatch(context, programInfo, *matchResult, nullptr);

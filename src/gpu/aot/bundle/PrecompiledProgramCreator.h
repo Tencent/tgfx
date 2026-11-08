@@ -53,11 +53,4 @@ class PrecompiledProgramCreator {
                                                          const SpecValues* spec = nullptr);
 };
 
-/**
- * The writer one family's programs own: the chain family's fused writer, the YUV family's tail
- * writer, or the generic precompiled walk. Shared with the specialization capture, which must
- * run the very writers the draw's upload will run.
- */
-std::unique_ptr<ProgramWriter> MakeProgramWriter(const std::string& shaderName);
-
 }  // namespace tgfx

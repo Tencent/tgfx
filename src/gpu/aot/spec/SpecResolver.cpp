@@ -18,7 +18,6 @@
 
 #include "gpu/aot/spec/SpecResolver.h"
 #include "gpu/ProgramInfo.h"
-#include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/spec/SpecCapture.h"
 #include "gpu/aot/spec/SpecInjector.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
@@ -41,21 +40,19 @@ ShaderCodeFormat SpecFormatForBackend(Backend backend, uint16_t payloadFormat) {
   }
 }
 
-SpecValues SpecResolver::Resolve(Context* context, const ProgramInfo& info,
+SpecValues SpecResolver::Resolve(SpecSource* source, Backend backend, const ProgramInfo& info,
                                  const std::string& shaderName, uint32_t vertIndex,
                                  uint32_t fragIndex) {
-  auto* cache = context != nullptr ? context->precompiledShaderCache() : nullptr;
-  if (cache == nullptr || !cache->specializationEnabled() || !cache->isLoaded()) {
+  if (source == nullptr || !source->specializationEnabled() || !source->isLoaded()) {
     return {};
   }
   // A format without an injector cannot consume the values, so capturing for it would only cost
   // the draw a scratch write. The gate is the registry, not a backend list.
-  if (FindSpecInjector(SpecFormatForBackend(context->backend(), cache->payloadFormat())) ==
-      nullptr) {
+  if (FindSpecInjector(SpecFormatForBackend(backend, source->payloadFormat())) == nullptr) {
     return {};
   }
-  auto values = SpecCapture::Capture(context, info, shaderName, vertIndex, fragIndex);
-  cache->recordSpecCapture(values);
+  auto values = SpecCapture::Capture(source, info, shaderName, vertIndex, fragIndex);
+  source->recordSpecCapture(values);
   return values;
 }
 

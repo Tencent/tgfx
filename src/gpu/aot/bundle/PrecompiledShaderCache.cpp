@@ -909,8 +909,26 @@ const ShaderStageBlob* PrecompiledShaderCache::findFragment(uint64_t hashHi,
   return &it->second;
 }
 
-PrecompiledShaderCache::SpecScratch* PrecompiledShaderCache::findOrCreateSpecScratch(
-    uint64_t vertHi, uint64_t vertLo, uint64_t fragHi, uint64_t fragLo) {
+const std::vector<Uniform>* PrecompiledShaderCache::findVertexUniforms(uint64_t hashHi,
+                                                                       uint64_t hashLo) const {
+  auto* blob = findVertex(hashHi, hashLo);
+  return blob == nullptr ? nullptr : &blob->uniforms;
+}
+
+const std::vector<Uniform>* PrecompiledShaderCache::findFragmentUniforms(uint64_t hashHi,
+                                                                         uint64_t hashLo) const {
+  auto* blob = findFragment(hashHi, hashLo);
+  return blob == nullptr ? nullptr : &blob->uniforms;
+}
+
+const std::vector<SpecFieldInfo>* PrecompiledShaderCache::findFragmentSpecFields(
+    uint64_t hashHi, uint64_t hashLo) const {
+  auto* blob = findFragment(hashHi, hashLo);
+  return blob == nullptr || blob->specFields.empty() ? nullptr : &blob->specFields;
+}
+
+SpecScratch* PrecompiledShaderCache::findOrCreateSpecScratch(uint64_t vertHi, uint64_t vertLo,
+                                                             uint64_t fragHi, uint64_t fragLo) {
   if (_bundle == nullptr) {
     return nullptr;
   }

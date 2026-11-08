@@ -20,11 +20,11 @@
 
 #include <cstdint>
 #include <string>
+#include "gpu/aot/spec/SpecSource.h"
 #include "gpu/aot/spec/SpecValues.h"
 
 namespace tgfx {
 
-class Context;
 class ProgramInfo;
 
 /**
@@ -45,7 +45,7 @@ class SpecCapture {
   /**
    * Captures the values of the draw `info` describes for the precompiled variant named by
    * (shaderName, vertIndex, fragIndex).
-   * @param context     The context whose precompiled cache holds the bundle.
+   * @param source      The artifact store the draw's reflected layouts come from.
    * @param info        The draw's processor tree and pipeline state.
    * @param shaderName  The variant's family name.
    * @param vertIndex   The variant's vertex permutation index.
@@ -53,7 +53,7 @@ class SpecCapture {
    * @return            The values in spec-table order (the master switch first), or empty when
    *                    the generic form should serve the draw.
    */
-  static SpecValues Capture(Context* context, const ProgramInfo& info,
+  static SpecValues Capture(SpecSource* source, const ProgramInfo& info,
                             const std::string& shaderName, uint32_t vertIndex, uint32_t fragIndex);
 };
 

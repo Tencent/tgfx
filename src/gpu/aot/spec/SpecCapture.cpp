@@ -23,28 +23,22 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProgramWriter.h"
 #include "gpu/UniformData.h"
-#include "gpu/aot/bundle/PrecompiledProgramCreator.h"
-#include "gpu/aot/bundle/PrecompiledShaderCache.h"
+#include "gpu/shaders/ProgramWriterFactory.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
-#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 
-SpecValues SpecCapture::Capture(Context* context, const ProgramInfo& info,
+SpecValues SpecCapture::Capture(SpecSource* source, const ProgramInfo& info,
                                 const std::string& shaderName, uint32_t vertIndex,
                                 uint32_t fragIndex) {
   SpecValues result;
-  if (context == nullptr) {
+  if (source == nullptr || !source->specializationEnabled() || !source->isLoaded()) {
     return result;
   }
-  auto cache = context->precompiledShaderCache();
-  if (cache == nullptr || !cache->specializationEnabled() || !cache->isLoaded()) {
-    return result;
-  }
-  auto vertHash = ComputeVertexKeyHash(shaderName, vertIndex, cache->profileTag());
-  auto fragHash = ComputeFragmentKeyHash(shaderName, fragIndex, cache->profileTag());
-  auto fragBlob = cache->findFragment(fragHash.hi, fragHash.lo);
-  if (fragBlob == nullptr || fragBlob->specFields.empty()) {
+  auto vertHash = ComputeVertexKeyHash(shaderName, vertIndex, source->profileTag());
+  auto fragHash = ComputeFragmentKeyHash(shaderName, fragIndex, source->profileTag());
+  auto* specFields = source->findFragmentSpecFields(fragHash.hi, fragHash.lo);
+  if (specFields == nullptr) {
     return result;
   }
   auto writer = MakeProgramWriter(shaderName);
@@ -52,22 +46,24 @@ SpecValues SpecCapture::Capture(Context* context, const ProgramInfo& info,
     return result;
   }
   auto* scratch =
-      cache->findOrCreateSpecScratch(vertHash.hi, vertHash.lo, fragHash.hi, fragHash.lo);
+      source->findOrCreateSpecScratch(vertHash.hi, vertHash.lo, fragHash.hi, fragHash.lo);
   if (scratch == nullptr) {
     return result;
   }
   if (scratch->fragmentUniformData == nullptr) {
     // Built once per (vertex, fragment) stage pair: the same reflected layouts the created
     // program's uniform data uses, over CPU buffers the writers can fill without a GPU.
-    auto vertBlob = cache->findVertex(vertHash.hi, vertHash.lo);
-    if (vertBlob != nullptr && !vertBlob->uniforms.empty()) {
-      scratch->vertexUniformData =
-          std::unique_ptr<UniformData>(new UniformData(vertBlob->uniforms));
+    auto* vertUniforms = source->findVertexUniforms(vertHash.hi, vertHash.lo);
+    auto* fragUniforms = source->findFragmentUniforms(fragHash.hi, fragHash.lo);
+    if (fragUniforms == nullptr) {
+      return result;
+    }
+    if (vertUniforms != nullptr && !vertUniforms->empty()) {
+      scratch->vertexUniformData = std::unique_ptr<UniformData>(new UniformData(*vertUniforms));
       scratch->vertexUniformData->skipSuffix = true;
       scratch->vertexBuffer.resize(scratch->vertexUniformData->size());
     }
-    scratch->fragmentUniformData =
-        std::unique_ptr<UniformData>(new UniformData(fragBlob->uniforms));
+    scratch->fragmentUniformData = std::unique_ptr<UniformData>(new UniformData(*fragUniforms));
     scratch->fragmentUniformData->skipSuffix = true;
     scratch->fragmentBuffer.resize(scratch->fragmentUniformData->size());
   }
@@ -88,7 +84,7 @@ SpecValues SpecCapture::Capture(Context* context, const ProgramInfo& info,
                              scratch->fragmentUniformData.get());
   result.values.reserve(1);
   result.values.push_back(1);  // The master switch: the injected compile is specialized.
-  for (const auto& field : fragBlob->specFields) {
+  for (const auto& field : *specFields) {
     const auto words = field.arraySize == 1 ? 1u : field.arraySize * 4u;
     for (uint32_t word = 0; word < words; ++word) {
       int32_t value = 0;

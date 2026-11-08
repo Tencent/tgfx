@@ -35,7 +35,7 @@
 #include "gpu/Uniform.h"
 #include "gpu/UniformData.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
-#include "gpu/aot/spec/SpecValues.h"
+#include "gpu/aot/spec/SpecSource.h"
 #include "gpu/shaders/contract/AOTFailure.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/Backend.h"
@@ -177,7 +177,7 @@ struct AOTDrawStats {
 /// Runtime cache that loads precompiled shader bundles and provides O(1) lookup by ShaderKey hash.
 /// Each Context holds one instance. The bundle stores vertex and fragment shaders in separate
 /// pools, enabling M+N storage instead of M*N.
-class PrecompiledShaderCache {
+class PrecompiledShaderCache : public SpecSource {
  public:
   /// The cache is owned by its Context and keeps a back pointer for bundle-generation
   /// bookkeeping: every load or unload bumps the generation and invalidates cached programs.
@@ -228,12 +228,12 @@ class PrecompiledShaderCache {
 
   /// What the loaded bundle's code blobs hold, one of BundleFormat::Payload. Reports the text form
   /// before any bundle is loaded.
-  uint16_t payloadFormat() const {
+  uint16_t payloadFormat() const override {
     return _bundle == nullptr ? BundleFormat::Payload::Text : _bundle->payloadFormat;
   }
 
   /// Returns true if at least one bundle has been loaded.
-  bool isLoaded() const {
+  bool isLoaded() const override {
     return _bundle != nullptr && (!_bundle->vertEntries.empty() || !_bundle->fragEntries.empty());
   }
 
@@ -254,7 +254,7 @@ class PrecompiledShaderCache {
 
   /// Returns the profile tag from the loaded bundle header (e.g. "vulkan"; see
   /// ShaderBundleContract.h).
-  const std::string& profileTag() const {
+  const std::string& profileTag() const override {
     static const std::string empty;
     return _bundle == nullptr ? empty : _bundle->profileTag;
   }
@@ -453,7 +453,7 @@ class PrecompiledShaderCache {
   /// uniform values before creating its program. On by default, and the resolver's format gate
   /// keeps it to the backends whose stored form can consume the values (GLSL text rewrite, Metal
   /// function constants); TGFX_AOT_SPECIALIZE=0 turns it off for a whole run.
-  bool specializationEnabled() const {
+  bool specializationEnabled() const override {
     return _specializationEnabled;
   }
 
@@ -471,7 +471,7 @@ class PrecompiledShaderCache {
   };
 
   /// Records one resolved specialization. An empty value set is the generic form and is ignored.
-  void recordSpecCapture(const SpecValues& values);
+  void recordSpecCapture(const SpecValues& values) override;
 
   /// Returns a snapshot of the specialization accounting since the last resetStats().
   SpecStats specStats() const;
@@ -479,17 +479,17 @@ class PrecompiledShaderCache {
   /// The specialization capture's per-variant scratch: uniform data backed by CPU buffers, so
   /// the capture runs the very writers the upload runs without touching any GPU object. One
   /// scratch per fragment stage key, rebuilt whenever the bundle changes.
-  struct SpecScratch {
-    std::unique_ptr<UniformData> vertexUniformData;
-    std::unique_ptr<UniformData> fragmentUniformData;
-    std::vector<uint8_t> vertexBuffer;
-    std::vector<uint8_t> fragmentBuffer;
-  };
-
   /// Returns the capture scratch of one (vertex, fragment) stage pair, creating it from the two
   /// stages' reflected uniforms on first use. Returns nullptr when either stage has no blob.
   SpecScratch* findOrCreateSpecScratch(uint64_t vertHi, uint64_t vertLo, uint64_t fragHi,
-                                       uint64_t fragLo);
+                                       uint64_t fragLo) override;
+
+  /// SpecSource: the two stages' reflected layouts and the fragment stage's spec table, as the
+  /// capture needs them. A missing stage yields null rather than an empty view.
+  const std::vector<Uniform>* findVertexUniforms(uint64_t hashHi, uint64_t hashLo) const override;
+  const std::vector<Uniform>* findFragmentUniforms(uint64_t hashHi, uint64_t hashLo) const override;
+  const std::vector<SpecFieldInfo>* findFragmentSpecFields(uint64_t hashHi,
+                                                           uint64_t hashLo) const override;
 
   struct HashKey {
     uint64_t hi;
