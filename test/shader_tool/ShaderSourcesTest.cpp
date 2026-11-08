@@ -26,6 +26,7 @@
 #include <string>
 #include "ScratchDir.h"
 #include "core/ShaderSources.h"
+#include "emit/StageEmitter.h"
 #include "gtest/gtest.h"
 
 namespace tgfx {
@@ -41,6 +42,13 @@ class ShaderSourcesTest : public ::testing::Test {
  protected:
   ShaderSourcesTest() : scratch("sources") {
     std::filesystem::copy(RealShaderDir, scratch.dir(), std::filesystem::copy_options::recursive);
+    // The declared families' fragment entries are generated in every build; the copy must hold
+    // them or the loader would report the migrated families as missing files.
+    std::string error;
+    for (const auto& entry : EmitDeclaredFragmentEntries(&error)) {
+      scratch.write(entry.first, entry.second);
+    }
+    EXPECT_TRUE(error.empty()) << error;
   }
 
   std::string Read(const std::string& relativePath) const {

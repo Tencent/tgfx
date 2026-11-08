@@ -18,8 +18,12 @@
 
 #include "VerifyCommand.h"
 #include <iostream>
+#include <map>
+#include <string>
 #include "cli/ReportWriter.h"
+#include "core/DiagnosticCodes.h"
 #include "core/Diagnostics.h"
+#include "emit/StageEmitter.h"
 #include "verify/BundleVerifier.h"
 
 namespace tgfx {
@@ -29,8 +33,26 @@ int RunVerifyCommand(const BuildOptions& options) {
   // command renders both. It is the only printer in the verify path.
   Diagnostics diagnostics;
   BundleVerifyCounts counts;
+  // The declared families' fragment entries are generated, not stored: the digest check must see
+  // the same text a build compiles.
+  std::map<std::string, std::string> stageOverrides;
+  if (!options.shaderDir.empty()) {
+    std::string emitError;
+    stageOverrides = EmitDeclaredFragmentEntries(&emitError);
+    if (stageOverrides.empty() && !emitError.empty()) {
+      Diagnostic diagnostic;
+      diagnostic.severity = Severity::Error;
+      diagnostic.layer = Layer::Sources;
+      diagnostic.code = DiagnosticCode::SourcesUnreadable;
+      diagnostic.message = emitError;
+      diagnostics.report(std::move(diagnostic));
+      PrintDiagnostics(diagnostics);
+      return 1;
+    }
+  }
   auto status = VerifyBundles(options.verifyBundleDir, options.shaderDir, options.requiredBackends,
-                              &diagnostics, &counts);
+                              &diagnostics, &counts,
+                              stageOverrides.empty() ? nullptr : &stageOverrides);
   PrintDiagnostics(diagnostics);
   auto violations = diagnostics.count(Severity::Error) + diagnostics.count(Severity::Unverifiable);
   std::cout << "[verify] summary: " << counts.openedBundles << " bundle(s), " << violations

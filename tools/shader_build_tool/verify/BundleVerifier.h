@@ -55,8 +55,13 @@ struct BundleVerifyCounts {
 /// violation, and a name that is not a backend (or an empty list) fails the run. Backends outside
 /// the list are still verified when their bundle exists. Without a list (std::nullopt) a missing
 /// bundle is not a violation, and the counts say so for the cli's note.
+///
+/// stageOverrides replaces the declared families' fragment files with their generated entries (the
+/// same map a build hands LoadShaderSources), so a verify run compares the digest against the text
+/// a build would compile rather than against files the migration removed.
 int VerifyBundles(const std::string& bundleDir, const std::string& shaderDir,
                   const std::optional<std::vector<std::string>>& requiredBackends,
-                  Diagnostics* diagnostics, BundleVerifyCounts* counts = nullptr);
+                  Diagnostics* diagnostics, BundleVerifyCounts* counts = nullptr,
+                  const std::map<std::string, std::string>* stageOverrides = nullptr);
 
 }  // namespace tgfx

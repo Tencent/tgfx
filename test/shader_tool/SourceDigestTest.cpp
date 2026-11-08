@@ -16,8 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <map>
 #include <string>
 #include "core/ShaderSources.h"
+#include "emit/StageEmitter.h"
 #include "gtest/gtest.h"
 #include "output/BundleManifest.h"
 
@@ -39,7 +41,11 @@ TEST(SourceDigestTest, TheGeneratorContractIsReadable) {
 }
 
 TEST(SourceDigestTest, TheGeneratorContractMovesTheDigest) {
-  auto sources = LoadShaderSources(RealShaderDir);
+  // The declared families' entries are generated; the digest must cover the compiled text.
+  std::string emitError;
+  const auto overrides = EmitDeclaredFragmentEntries(&emitError);
+  ASSERT_TRUE(emitError.empty()) << emitError;
+  auto sources = LoadShaderSources(RealShaderDir, &overrides);
   ASSERT_TRUE(sources.ok) << "the real shader sources must load";
   std::string text;
   std::string error;

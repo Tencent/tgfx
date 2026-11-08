@@ -445,7 +445,8 @@ BundleCheckResult VerifyOneBundle(const std::string& path, ShaderProfile profile
 
 int VerifyBundles(const std::string& bundleDir, const std::string& shaderDir,
                   const std::optional<std::vector<std::string>>& requiredBackends,
-                  Diagnostics* diagnostics, BundleVerifyCounts* counts) {
+                  Diagnostics* diagnostics, BundleVerifyCounts* counts,
+                  const std::map<std::string, std::string>* stageOverrides) {
   std::set<ShaderProfile> required;
   if (requiredBackends) {
     // A typo must not turn into "nothing is required": reject names that are not profiles, and
@@ -468,7 +469,7 @@ int VerifyBundles(const std::string& bundleDir, const std::string& shaderDir,
   // The current sources are read once for every bundle checked, the same way a build reads them.
   ShaderSourceSet sources;
   if (!shaderDir.empty()) {
-    sources = LoadShaderSources(shaderDir);
+    sources = LoadShaderSources(shaderDir, stageOverrides);
     for (const auto& error : sources.errors) {
       Report(diagnostics, Severity::Error, DiagnosticCode::SourcesUnreadable, "", error);
     }

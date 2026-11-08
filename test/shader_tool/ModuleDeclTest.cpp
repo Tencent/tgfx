@@ -23,11 +23,15 @@
 // synthesis. The full byte comparison runs in the build (--emit-declarations + bundle cmp).
 
 #include <cstring>
+#include <fstream>
+#include <iterator>
 #include <string>
+#include <variant>
+#include "emit/StageEmitter.h"
+#include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/decls/AllFragmentDecls.h"
 #include "gpu/shaders/decls/ModuleDecl.h"
 #include "gtest/gtest.h"
-#include "emit/StageEmitter.h"
 
 namespace tgfx {
 namespace {
@@ -136,6 +140,36 @@ TEST(ModuleDeclTest, AnArrayFieldIsRejectedInsteadOfGuessed) {
   std::string error;
   EXPECT_TRUE(EmitFragmentEntry(decl, &error).empty());
   EXPECT_FALSE(error.empty());
+}
+
+TEST(ModuleDeclTest, EveryFragmentDimensionIsReferencedByTheGeneratedText) {
+  // The runtime test that pins this for handwritten families cannot read a generated entry, so the
+  // declaration path checks the same property here: every fragment dimension of the shell must
+  // appear in the generated text or in one of the shared modules it includes. Otherwise a variant
+  // axis would compile to the same code as its neighbour.
+  const std::string shaderDir = std::string(TGFX_SOURCE_DIR) + "/src/gpu/shaders/glsl";
+  std::string error;
+  for (const auto* decl : AllFragmentDecls()) {
+    auto text = EmitFragmentEntry(*decl, &error);
+    ASSERT_FALSE(text.empty()) << error;
+    for (size_t index = 0; index < decl->blockCount; ++index) {
+      const auto& element = decl->block[index];
+      if (element.kind != FragmentElementKind::Module) {
+        continue;
+      }
+      std::ifstream file(shaderDir + "/" + element.name);
+      ASSERT_TRUE(file.is_open()) << element.name;
+      text += std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    }
+    const auto* info = ShaderRegistry::Find(decl->name);
+    ASSERT_NE(info, nullptr) << decl->name;
+    for (const auto& dimension : info->fragDomain.getDimensions()) {
+      const auto defineName =
+          std::visit([](const auto& dim) { return std::string(dim.defineName); }, dimension);
+      EXPECT_NE(text.find(defineName), std::string::npos)
+          << decl->name << " never references the dimension " << defineName;
+    }
+  }
 }
 
 TEST(ModuleDeclTest, TheDeclaredFamiliesExist) {

@@ -79,9 +79,7 @@ void PrintUsage() {
       << "  --compress            Compress data pool with zlib in output bundles\n"
       << "  --cache-dir <path>    Persistent stage cache (default: <out-dir>/stage_cache)\n"
       << "  --no-cache            Compile every stage, reading and writing no persistent cache\n"
-      << "  --no-emit-declarations\n"
-      << "                        Read the declared families' handwritten fragment files instead\n"
-      << "                        of their generated entries (diagnostic for a generator defect)\n"
+
       << "  --metal-sdk <sdk>     Platform of the Metal bundle: macosx (default), iphoneos or\n"
       << "                        iphonesimulator. A metallib only works on its own platform\n"
       << "  --metal-min-os <ver>  Minimum OS version of the Metal bundle, e.g. 15.0\n"
@@ -523,8 +521,7 @@ bool ParseArgs(int argc, char** argv, BuildOptions* options) {
       options->cacheDir = argv[++i];
     } else if (std::strcmp(argv[i], "--no-cache") == 0) {
       options->noCache = true;
-    } else if (std::strcmp(argv[i], "--no-emit-declarations") == 0) {
-      options->emitDeclarations = false;
+
     } else if (std::strcmp(argv[i], "--metal-sdk") == 0 && i + 1 < argc) {
       options->metalSdk = argv[++i];
     } else if (std::strcmp(argv[i], "--metal-min-os") == 0 && i + 1 < argc) {
@@ -562,21 +559,19 @@ int RunBuildCommand(const BuildOptions& options) {
   std::string generatorContract;
   const bool compiling = !options.shaderDir.empty();
   if (compiling) {
-    std::map<std::string, std::string> stageOverrides;
-    if (options.emitDeclarations) {
-      std::string emitError;
-      stageOverrides = EmitDeclaredFragmentEntries(&emitError);
-      if (stageOverrides.empty() && !emitError.empty()) {
-        RecordBuildError(&report.diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable,
-                         "", "", -1, -1, emitError);
-        PrintDiagnostics(report.diagnostics);
-        std::cerr << "Build failed: " << emitError << ".\n";
-        return 1;
-      }
+    // The declared families' fragment entries are generated from their declarations: the
+    // handwritten files are gone, and the override is how their text reaches the compiler.
+    std::string emitError;
+    auto stageOverrides = EmitDeclaredFragmentEntries(&emitError);
+    if (stageOverrides.empty() && !emitError.empty()) {
+      RecordBuildError(&report.diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable, "",
+                       "", -1, -1, emitError);
+      PrintDiagnostics(report.diagnostics);
+      std::cerr << "Build failed: " << emitError << ".\n";
+      return 1;
     }
-    sources = LoadShaderSources(options.shaderDir,
-                                stageOverrides.empty() ? nullptr : &stageOverrides);
-    if (!stageOverrides.empty() && sources.overrideHits != stageOverrides.size()) {
+    sources = LoadShaderSources(options.shaderDir, &stageOverrides);
+    if (sources.overrideHits != stageOverrides.size()) {
       const auto message =
           "generated stage entries did not reach the loader: " +
           std::to_string(stageOverrides.size()) + " declared, " +
