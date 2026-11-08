@@ -47,7 +47,8 @@ struct EllipseFillDecl {
       {"vec4", "vColor", 2, nullptr},
   };
 
-  static constexpr SamplerDecl Samplers[] = {{"MaskTextureSampler", 0, "HAS_DEVICE_MASK"}};
+  static constexpr SamplerDecl Samplers[] = {
+      {"MaskTextureSampler", 0, 1, nullptr, "HAS_DEVICE_MASK"}};
 
   static constexpr StepDecl Steps[] = {
       {"FILL_COLOR", "FILL_COLOR_VARYING_OR_COMMON", nullptr},

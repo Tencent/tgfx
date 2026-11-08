@@ -52,6 +52,9 @@ struct FragmentElement {
   const char* name = nullptr;
   /// The field's value type; unused by a module placeholder.
   ParamType type = ParamType::Float;
+  /// An array field's element count as a macro or literal (e.g. "CHAIN_SLOT_CAPACITY"), or null
+  /// for a scalar field. The chain's per-slot tables are the reason this exists.
+  const char* capacity = nullptr;
 };
 
 /// One fragment input (the vertex stage's output).
@@ -59,15 +62,26 @@ struct VaryingDecl {
   const char* glslType = nullptr;
   const char* name = nullptr;
   int location = 0;
-  /// The dimension macro the declaration is conditional on, or null for an unconditional one.
+  /// When set, printed instead of `location`: a location macro or an expression over dimension
+  /// macros (e.g. "NTEX + 1"). The chain's interface places varyings after a dimension-dependent
+  /// base, so its locations are expressions rather than numbers.
+  const char* locationExpr = nullptr;
+  /// The dimension condition the declaration is conditional on, or null for an unconditional one.
+  /// Any preprocessor expression is allowed; the emitter only prints it after `#if`.
   const char* condition = nullptr;
 };
 
 /// One texture binding of the fragment stage.
 struct SamplerDecl {
+  /// The full name for a single binding; the common prefix when count > 1 (the instances are
+  /// named `<name>0` .. `<name><count-1>`).
   const char* name = nullptr;
   int binding = 0;
-  /// The dimension macro the declaration is conditional on, or null for an unconditional one.
+  /// How many consecutive bindings to declare (the chain always binds four leaves or none).
+  int count = 1;
+  /// When set, printed instead of `binding` (a macro or an expression such as "NTEX").
+  const char* bindingExpr = nullptr;
+  /// The dimension condition the declaration is conditional on, or null for an unconditional one.
   const char* condition = nullptr;
 };
 
@@ -102,16 +116,21 @@ struct FragmentFamilyDecl {
   const char* const* defines = nullptr;
   size_t defineCount = 0;
   /// The XP dst-texture binding: a base value, or both branches of a conditional one
-  /// (xpDstBindingConditional is -1 when the binding is unconditional).
+  /// (xpDstBindingConditional is -1 when the binding is unconditional). A chain's binding is an
+  /// expression over the leaf count, so the expression forms take precedence when set.
   int xpDstBinding = 0;
   int xpDstBindingConditional = -1;
   const char* xpDstCondition = nullptr;
+  const char* xpDstBindingExpr = nullptr;
+  const char* xpDstBindingConditionalExpr = nullptr;
 };
 
 /// One block/interface/step element of a declaration list.
 #define TGFX_DECL_ELEMENT(kind, ...) TGFX_DECL_ELEMENT_##kind(__VA_ARGS__)
 #define TGFX_DECL_ELEMENT_Field(type, name) \
   { FragmentElementKind::Field, #name, ParamType::type }
+#define TGFX_DECL_ELEMENT_ArrayField(type, name, capacity) \
+  { FragmentElementKind::Field, #name, ParamType::type, capacity }
 #define TGFX_DECL_ELEMENT_Module(path) \
   { FragmentElementKind::Module, path, ParamType::Float }
 

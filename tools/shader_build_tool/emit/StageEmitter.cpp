@@ -85,16 +85,25 @@ bool EmitBlock(EntryWriter* writer, const FragmentFamilyDecl& decl) {
       return writer->Fail(std::string("the field '") + element.name +
                           "' has a type the emitter cannot spell in GLSL");
     }
-    writer->Line(std::string("  ") + glslType + " " + element.name + ";");
+    const std::string capacity = element.capacity == nullptr
+                                     ? std::string()
+                                     : std::string("[") + element.capacity + "]";
+    writer->Line(std::string("  ") + glslType + " " + element.name + capacity + ";");
   }
   writer->Line("};");
   return true;
 }
 
+std::string LocationText(const VaryingDecl& varying) {
+  if (varying.locationExpr != nullptr) {
+    return varying.locationExpr;
+  }
+  return std::to_string(varying.location);
+}
+
 bool EmitVarying(EntryWriter* writer, const VaryingDecl& varying) {
-  const std::string declaration = std::string("layout(location = ") +
-                                  std::to_string(varying.location) + ") in " +
-                                  varying.glslType + " " + varying.name + ";";
+  const std::string declaration = std::string("layout(location = ") + LocationText(varying) +
+                                  ") in " + varying.glslType + " " + varying.name + ";";
   if (varying.condition == nullptr) {
     return writer->Line(declaration);
   }
@@ -105,15 +114,29 @@ bool EmitVarying(EntryWriter* writer, const VaryingDecl& varying) {
 }
 
 bool EmitSampler(EntryWriter* writer, const SamplerDecl& sampler) {
-  const std::string declaration = std::string("layout(set = TGFX_TEXTURE_SET, binding = ") +
-                                  std::to_string(sampler.binding) + ") uniform sampler2D " +
-                                  sampler.name + ";";
-  if (sampler.condition == nullptr) {
-    return writer->Line(declaration);
+  const int count = sampler.count > 0 ? sampler.count : 1;
+  const auto bindingText = [&sampler](int index) {
+    if (sampler.bindingExpr != nullptr) {
+      return std::string(sampler.bindingExpr);
+    }
+    return std::to_string(sampler.binding + index);
+  };
+  const auto nameText = [&sampler, count](int index) {
+    if (count == 1) {
+      return std::string(sampler.name);
+    }
+    return std::string(sampler.name) + std::to_string(index);
+  };
+  if (sampler.condition != nullptr) {
+    writer->Line(std::string("#if ") + sampler.condition);
   }
-  writer->Line(std::string("#if ") + sampler.condition);
-  writer->Line(declaration);
-  writer->Line("#endif");
+  for (int index = 0; index < count; ++index) {
+    writer->Line(std::string("layout(set = TGFX_TEXTURE_SET, binding = ") + bindingText(index) +
+                 ") uniform sampler2D " + nameText(index) + ";");
+  }
+  if (sampler.condition != nullptr) {
+    writer->Line("#endif");
+  }
   return true;
 }
 
@@ -129,17 +152,27 @@ bool EmitStep(EntryWriter* writer, const StepDecl& step) {
   return true;
 }
 
+std::string XpDstBindingText(int value, const char* expression) {
+  if (expression != nullptr) {
+    return expression;
+  }
+  return std::to_string(value);
+}
+
 bool EmitXpDstBinding(EntryWriter* writer, const FragmentFamilyDecl& decl) {
   if (decl.xpDstCondition == nullptr) {
-    return writer->Line("#define XP_DST_TEX_BINDING " + std::to_string(decl.xpDstBinding));
+    return writer->Line("#define XP_DST_TEX_BINDING " +
+                        XpDstBindingText(decl.xpDstBinding, decl.xpDstBindingExpr));
   }
-  if (decl.xpDstBindingConditional < 0) {
+  if (decl.xpDstBindingConditional < 0 && decl.xpDstBindingConditionalExpr == nullptr) {
     return writer->Fail("a conditional XP dst binding needs both branches");
   }
   writer->Line(std::string("#if ") + decl.xpDstCondition);
-  writer->Line("#define XP_DST_TEX_BINDING " + std::to_string(decl.xpDstBindingConditional));
+  writer->Line("#define XP_DST_TEX_BINDING " +
+               XpDstBindingText(decl.xpDstBindingConditional, decl.xpDstBindingConditionalExpr));
   writer->Line("#else");
-  writer->Line("#define XP_DST_TEX_BINDING " + std::to_string(decl.xpDstBinding));
+  writer->Line("#define XP_DST_TEX_BINDING " +
+               XpDstBindingText(decl.xpDstBinding, decl.xpDstBindingExpr));
   writer->Line("#endif");
   return true;
 }

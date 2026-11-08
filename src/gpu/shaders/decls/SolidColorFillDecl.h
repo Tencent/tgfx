@@ -40,7 +40,7 @@ struct SolidColorFillDecl {
       TGFX_DECL_ELEMENT(Field, Int, OutputAlphaSwizzle),
   };
 
-  static constexpr VaryingDecl Varyings[] = {{"float", "vCoverage", 0, nullptr}};
+  static constexpr VaryingDecl Varyings[] = {{"float", "vCoverage", 0, nullptr, nullptr}};
 
   // Only the steps that differ from fill_fragment_main.inc's defaults are listed: the color source
   // stays the template's FILL_COLOR_UNIFORM (the DefaultGP provides no vColor varying).

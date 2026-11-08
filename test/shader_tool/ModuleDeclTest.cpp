@@ -30,6 +30,7 @@
 #include "emit/StageEmitter.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/decls/AllFragmentDecls.h"
+#include "gpu/shaders/decls/ChainInterfaceDecl.h"
 #include "gpu/shaders/decls/ModuleDecl.h"
 #include "gtest/gtest.h"
 
@@ -130,9 +131,23 @@ TEST(ModuleDeclTest, StepsCarryTheSymbolNotTheValue) {
   }
 }
 
-TEST(ModuleDeclTest, AnArrayFieldIsRejectedInsteadOfGuessed) {
-  // The emitter has no array spelling: a declaration that needs one extends the language instead
-  // of letting the emitter invent a size.
+TEST(ModuleDeclTest, AnArrayFieldCarriesItsCapacity) {
+  // The chain's per-slot tables are arrays; the declaration states the element count so the
+  // emitter never invents a size.
+  const FragmentElement block[] = {{FragmentElementKind::Field, "SlotPacked", ParamType::Int4,
+                                    "CHAIN_SLOT_CAPACITY"}};
+  const FragmentFamilyDecl decl = {"TestShader", "kernels/test.frag", block, 1, nullptr, 0,
+                                   nullptr,    0,                   nullptr, 0, nullptr, 0,
+                                   0,          -1,                  nullptr};
+  std::string error;
+  const auto text = EmitFragmentEntry(decl, &error);
+  ASSERT_FALSE(text.empty()) << error;
+  EXPECT_TRUE(text.find("ivec4 SlotPacked[CHAIN_SLOT_CAPACITY];") != std::string::npos);
+}
+
+TEST(ModuleDeclTest, AnArrayKindWithoutACapacityIsRejected) {
+  // Float4Array describes an array element, not a scalar: without a declared capacity there is
+  // nothing to print, and the emitter fails instead of guessing.
   const FragmentElement block[] = {{FragmentElementKind::Field, "Table", ParamType::Float4Array}};
   const FragmentFamilyDecl decl = {"TestShader", "kernels/test.frag", block, 1, nullptr, 0,
                                    nullptr,    0,                   nullptr, 0, nullptr, 0,
@@ -140,6 +155,25 @@ TEST(ModuleDeclTest, AnArrayFieldIsRejectedInsteadOfGuessed) {
   std::string error;
   EXPECT_TRUE(EmitFragmentEntry(decl, &error).empty());
   EXPECT_FALSE(error.empty());
+}
+
+TEST(ModuleDeclTest, TheChainInterfaceIsExpressible) {
+  // The interpreter's interface is the language's stress test: dimension-dependent locations,
+  // one group of four leaf samplers, and a conditional XP dst binding over the leaf count.
+  std::string error;
+  const auto text = EmitFragmentEntry(ChainInterfaceDecl::Decl, &error);
+  ASSERT_FALSE(text.empty()) << error;
+  EXPECT_TRUE(text.find("layout(location = NTEX + 1) in vec4 vColor;") != std::string::npos);
+  EXPECT_TRUE(text.find("layout(location = CHAIN_TEX_LOC_BASE + 3) in vec3 TransformedCoords_3;") !=
+              std::string::npos);
+  EXPECT_TRUE(text.find("#if GP_LAYOUT == 1") != std::string::npos);
+  EXPECT_TRUE(text.find("layout(set = TGFX_TEXTURE_SET, binding = 0) uniform sampler2D "
+                        "TextureSampler_0;") != std::string::npos);
+  EXPECT_TRUE(text.find("uniform sampler2D TextureSampler_3;") != std::string::npos);
+  EXPECT_TRUE(text.find("layout(set = TGFX_TEXTURE_SET, binding = NTEX) uniform sampler2D "
+                        "MaskTextureSampler;") != std::string::npos);
+  EXPECT_TRUE(text.find("#define XP_DST_TEX_BINDING NTEX") != std::string::npos);
+  EXPECT_TRUE(text.find("#define XP_DST_TEX_BINDING (NTEX + 1)") != std::string::npos);
 }
 
 TEST(ModuleDeclTest, EveryFragmentDimensionIsReferencedByTheGeneratedText) {

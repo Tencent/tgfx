@@ -50,17 +50,17 @@ struct QuadTextureFillDecl {
   };
 
   static constexpr VaryingDecl Varyings[] = {
-      {"vec3", "TransformedCoords_0", 0, nullptr},
-      {"float", "vCoverage", 1, nullptr},
-      {"vec4", "vColor", 2, nullptr},
-      {"vec4", "vTexSubset", 3, "HAS_SUBSET"},
-      {"vec3", "TransformedCoords_1", 4, "HAS_LOCAL_MASK"},
+      {"vec3", "TransformedCoords_0", 0, nullptr, nullptr},
+      {"float", "vCoverage", 1, nullptr, nullptr},
+      {"vec4", "vColor", 2, nullptr, nullptr},
+      {"vec4", "vTexSubset", 3, nullptr, "HAS_SUBSET"},
+      {"vec3", "TransformedCoords_1", 4, nullptr, "HAS_LOCAL_MASK"},
   };
 
   static constexpr SamplerDecl Samplers[] = {
-      {"TextureSampler_0", 0, nullptr},
-      {"MaskTextureSampler", 1, nullptr},
-      {"LocalMaskSampler", 2, "HAS_LOCAL_MASK"},
+      {"TextureSampler_0", 0, 1, nullptr, nullptr},
+      {"MaskTextureSampler", 1, 1, nullptr, nullptr},
+      {"LocalMaskSampler", 2, 1, nullptr, "HAS_LOCAL_MASK"},
   };
 
   static constexpr StepDecl Steps[] = {
