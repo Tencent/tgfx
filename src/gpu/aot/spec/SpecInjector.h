@@ -50,7 +50,9 @@ class SpecInjector {
 };
 
 /// The injector registered for one code format, or nullptr when the format cannot specialize.
-/// This switch is the only place a format joins the specialization channel.
+/// This switch is the only place a format joins the specialization channel: GLSL and HLSL text
+/// take source macros, metallib, SPIR-V and WGSL take the pipeline-constant table, and the two
+/// precompiled containers that cannot take values (MSL text and DXBC) keep the generic form.
 const SpecInjector* FindSpecInjector(ShaderCodeFormat format);
 
 }  // namespace tgfx

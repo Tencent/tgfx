@@ -91,8 +91,9 @@ class MacroPrefixInjector final : public SpecInjector {
   bool afterVersion;
 };
 
-/// A precompiled container resolved with function/pipeline constants (Metal's metallib today,
-/// Vulkan's SPIR-V specialization map later): the values join the pipeline descriptor.
+/// A precompiled container resolved with function/pipeline constants: Metal's metallib function
+/// constants, Vulkan's VkSpecializationInfo and WebGPU's WGSL pipeline overrides all key their
+/// table by SpecId, so the values join the pipeline descriptor.
 class PipelineConstantInjector final : public SpecInjector {
  public:
   bool Apply(const std::string& /*code*/, const std::vector<SpecFieldInfo>& fields,
