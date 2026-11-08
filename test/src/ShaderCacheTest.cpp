@@ -19,6 +19,7 @@
 #include <functional>
 #include <set>
 #include <unordered_map>
+#include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ShaderCache.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
@@ -93,7 +94,7 @@ TGFX_TEST(ShaderCacheTest, RecreatedProgramReusesModules) {
   auto surface = Surface::Make(context, 64, 64);
   ASSERT_TRUE(surface != nullptr);
   auto* globalCache = context->globalCache();
-  auto* shaderCache = context->precompiledShaderCache()->shaderCache();
+  auto* shaderCache = ContextCacheAccess::Cache(context)->shaderCache();
   if (!shaderCache->moduleCacheActive()) {
     GTEST_SKIP() << "the module cache is disabled (TGFX_SHADER_CACHE_DISABLE)";
   }
@@ -126,7 +127,7 @@ TGFX_TEST(ShaderCacheTest, FailedModuleIsNotCached) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto* shaderCache = context->precompiledShaderCache()->shaderCache();
+  auto* shaderCache = ContextCacheAccess::Cache(context)->shaderCache();
   ShaderModuleDescriptor broken = {};
   broken.stage = ShaderStage::Fragment;
   broken.code = "this is not a shader";
@@ -295,7 +296,7 @@ TGFX_TEST(ShaderCacheTest, RecreatedProgramReusesPipeline) {
   auto surface = Surface::Make(context, 64, 64);
   ASSERT_TRUE(surface != nullptr);
   auto* globalCache = context->globalCache();
-  auto* shaderCache = context->precompiledShaderCache()->shaderCache();
+  auto* shaderCache = ContextCacheAccess::Cache(context)->shaderCache();
   if (!shaderCache->pipelineCacheActive()) {
     GTEST_SKIP() << "the pipeline cache is disabled (TGFX_SHADER_CACHE_DISABLE)";
   }
@@ -325,13 +326,13 @@ TGFX_TEST(ShaderCacheTest, DistinctProgramsShareIdenticalPipeline) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  if (!context->precompiledShaderCache()->isLoaded()) {
+  if (!ContextCacheAccess::Cache(context)->isLoaded()) {
     GTEST_SKIP() << "no precompiled bundle is loaded (runtime route): nothing to share here";
   }
   auto surface = Surface::Make(context, 256, 64);
   ASSERT_TRUE(surface != nullptr);
   auto* globalCache = context->globalCache();
-  auto* shaderCache = context->precompiledShaderCache()->shaderCache();
+  auto* shaderCache = ContextCacheAccess::Cache(context)->shaderCache();
   if (!shaderCache->pipelineCacheActive()) {
     GTEST_SKIP() << "the pipeline cache is disabled (TGFX_SHADER_CACHE_DISABLE)";
   }

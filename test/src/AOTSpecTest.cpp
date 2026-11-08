@@ -18,6 +18,7 @@
 
 #include <array>
 #include <memory>
+#include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gtest/gtest.h"
@@ -130,7 +131,7 @@ TGFX_TEST(AOTSpecTest, SpecializationMatchesGenericPixels) {
   ASSERT_NE(context, nullptr);
   auto image = MakeGradientImage();
   ASSERT_NE(image, nullptr);
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   cache->setDedicatedKernelsEnabled(false);
 
   cache->setSpecializationEnabled(false);
@@ -163,7 +164,7 @@ TGFX_TEST(AOTSpecTest, SpecializationSeparatesChainShapes) {
   ASSERT_NE(context, nullptr);
   auto image = MakeGradientImage();
   ASSERT_NE(image, nullptr);
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   cache->setDedicatedKernelsEnabled(false);
 
   cache->setSpecializationEnabled(false);

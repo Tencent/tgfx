@@ -25,6 +25,7 @@
 #include <map>
 #include <tuple>
 #include "core/utils/Log.h"
+#include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ShaderCaps.h"
 #include "gpu/aot/AOTDiagnostics.h"
@@ -219,7 +220,7 @@ void RecordActiveTemporaryBytes(Context* context, uint64_t bytes) {
   if (context == nullptr) {
     return;
   }
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   if (cache != nullptr) {
     cache->recordActiveTemporaryBytes(bytes);
   }

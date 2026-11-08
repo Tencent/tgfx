@@ -26,6 +26,7 @@
 #include <vector>
 #include "core/utils/BlockAllocator.h"
 #include "core/utils/PixelFormatUtil.h"
+#include "gpu/ContextInternal.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
@@ -679,7 +680,7 @@ TGFX_TEST(GLRenderTest, EmbeddedAOTCreatesPipeline) {
   auto context = scope.getContext();
   SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
-  auto cache = context->precompiledShaderCache();
+  auto cache = ContextCacheAccess::Cache(context);
   auto sourceSurface = Surface::Make(context, 8, 8, false, 1, true);
   ASSERT_NE(sourceSurface, nullptr);
   sourceSurface->getCanvas()->clear(Color::Red());
@@ -737,7 +738,7 @@ TGFX_TEST(GLRenderTest, RectangleTextureImportCopiesTo2D) {
   gl->texImage2D(glInfo.target, 0, static_cast<int>(textureFormat.internalFormatTexImage), width,
                  height, 0, textureFormat.externalFormat, textureFormat.externalType,
                  source.data());
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   for (auto origin : {ImageOrigin::TopLeft, ImageOrigin::BottomLeft}) {
     SCOPED_TRACE(origin == ImageOrigin::TopLeft ? "TopLeft" : "BottomLeft");

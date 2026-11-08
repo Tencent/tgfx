@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AOTPlanRenderTask.h"
+#include "gpu/ContextInternal.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/ops/StandardDrawOp.h"
 #include "gpu/resources/RenderTarget.h"
@@ -95,7 +96,7 @@ void AOTPlanRenderTask::execute(CommandEncoder* encoder) {
   // (e.g. a perspective leaf transform) falls back to the original draw, so its lookup failure
   // must not record a diagnostic miss against the rewritten pipeline — the fallback path records
   // the draw's original pipeline instead.
-  auto* cache = finalTarget->getContext()->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(finalTarget->getContext());
   cache->setMissRecordingPaused(true);
   bool prepared = true;
   for (size_t index = 0; index < plan.passes.size() && prepared; ++index) {
@@ -194,7 +195,7 @@ void AOTPlanRenderTask::executeFallback(CommandEncoder* encoder,
                            PMColor::Transparent())) {
     return;
   }
-  auto cache = finalTarget->getContext()->precompiledShaderCache();
+  auto cache = ContextCacheAccess::Cache(finalTarget->getContext());
   if (cache->diagnosticRecordingEnabled()) {
     AOTDrawStats drawStats = {};
     drawStats.atomicFallbacks = 1;

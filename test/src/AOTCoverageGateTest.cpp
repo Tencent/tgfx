@@ -47,6 +47,7 @@
 #include <string>
 #include <vector>
 #include "base/TGFXTest.h"
+#include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramWriter.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
@@ -520,7 +521,7 @@ TGFX_TEST(AOTCoverageGateTest, DeliberateScopeRestoresNestedState) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   ASSERT_FALSE(cache->deliberateMissMarking());
   auto markAndReturn = [&] {
     ScopedAOTDeliberateMiss outer(context);

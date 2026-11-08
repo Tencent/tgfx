@@ -18,6 +18,7 @@
 
 #include "gpu/aot/select/AOTProgramInfo.h"
 #include <string>
+#include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
@@ -53,7 +54,7 @@ uint32_t ShaderNameHash(const std::string& name) {
 
 AOTProgramInfo::AOTProgramInfo(const ProgramInfo& info, const AOTProgram& program) {
   auto context = info.getContext();
-  auto cache = context != nullptr ? context->precompiledShaderCache() : nullptr;
+  auto cache = context != nullptr ? ContextCacheAccess::Cache(context) : nullptr;
   if (cache == nullptr || !cache->isLoaded()) {
     // Without a bundle there is no route; the plain fallback records the miss itself.
     return;
@@ -98,7 +99,7 @@ AOTProgramInfo::AOTProgramInfo(const ProgramInfo& info, const AOTProgram& progra
   // scratch buffer (SpecCapture), so the key and the fold share one source of values. The entry
   // is the same one the plain route uses (SpecResolver), so both routes agree.
   const SpecValues spec = SpecResolver::Resolve(
-      context->precompiledShaderCache(), context->backend(), info, PointwiseChainShader::Name,
+      ContextCacheAccess::Cache(context), context->backend(), info, PointwiseChainShader::Name,
       variant->vertPermutationIndex, variant->fragPermutationIndex);
   if (!spec.empty()) {
     spec.writeKey(&key);

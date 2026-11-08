@@ -26,6 +26,7 @@
 #include <array>
 #include <cstdio>
 #include "gpu/GlobalCache.h"
+#include "gpu/ContextInternal.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Canvas.h"
@@ -46,7 +47,7 @@ int main() {
     printf("FAIL: no context\n");
     return 1;
   }
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   if (!cache->isLoaded()) {
     printf("FAIL: the embedded bundle is not loaded at startup\n");
     device->unlock();
@@ -94,9 +95,9 @@ int main() {
     device->unlock();
     return 1;
   }
-  if (context->precompiledShaderCache()->drawStats().droppedDraws != 0) {
+  if (ContextCacheAccess::Cache(context)->drawStats().droppedDraws != 0) {
     printf("FAIL: a draw was dropped (droppedDraws=%u)\n",
-           static_cast<unsigned>(context->precompiledShaderCache()->drawStats().droppedDraws));
+           static_cast<unsigned>(ContextCacheAccess::Cache(context)->drawStats().droppedDraws));
     device->unlock();
     return 1;
   }

@@ -31,6 +31,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/aot/bundle/EmbeddedShaderBundles.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
@@ -655,7 +656,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
     if (context == nullptr) {
       return;
     }
-    auto cache = context->precompiledShaderCache();
+    auto cache = ContextCacheAccess::Cache(context);
     if (!cache->isLoaded()) {
       auto bundle = EmbeddedShaderBundles::GetBundle(context->backend());
       if (bundle.first != nullptr && bundle.second > 0) {
@@ -681,7 +682,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       auto context = device->lockContext();
       if (context != nullptr) {
         result.contextAvailable = true;
-        auto cache = context->precompiledShaderCache();
+        auto cache = ContextCacheAccess::Cache(context);
         result.bundleLoadedAtStart = currentBundleLoadedAtStart;
         result.bundleLoadedAtEnd = cache->isLoaded();
         result.profileTag = currentProfileTag;
@@ -730,7 +731,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
     if (context == nullptr) {
       return;
     }
-    auto* shaderCache = context->precompiledShaderCache()->shaderCache();
+    auto* shaderCache = ContextCacheAccess::Cache(context)->shaderCache();
     const auto& stats = shaderCache->stats();
     std::printf(
         "[Shader Cache][%s] modules: requests=%llu hits=%llu created=%llu failed=%llu "
@@ -1070,7 +1071,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       if (device != nullptr) {
         auto context = device->lockContext();
         if (context != nullptr) {
-          auto cache = context->precompiledShaderCache();
+          auto cache = ContextCacheAccess::Cache(context);
           identity["bundleLoaded"] = cache->isLoaded();
           identity["bundleProfileTag"] = cache->profileTag();
           identity["bundleIdentityHash"] = cache->bundleIdentityHash();

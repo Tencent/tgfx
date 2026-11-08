@@ -19,6 +19,7 @@
 #include "DrawingManager.h"
 #include "ProxyProvider.h"
 #include "core/AtlasManager.h"
+#include "gpu/ContextInternal.h"
 #include "gpu/aot/AOTRouter.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -401,7 +402,7 @@ std::shared_ptr<DrawingBuffer> DrawingManager::flush() {
   // offscreen textures built during this flush cycle (blend-child flattens, plan intermediates)
   // coexist until their consumers run, so the running total at this point is the cycle's
   // peak-live footprint. Diagnostic-only, and never influences routing.
-  if (auto* statsCache = context->precompiledShaderCache();
+  if (auto* statsCache = ContextCacheAccess::Cache(context);
       statsCache != nullptr && statsCache->diagnosticRecordingEnabled()) {
     statsCache->settleActiveTemporaryBytes();
   }

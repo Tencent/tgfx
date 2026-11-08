@@ -26,6 +26,7 @@
 #include <sstream>
 #include <vector>
 #include "core/utils/Log.h"
+#include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramSignature.h"
 #include "gpu/ProgramWriter.h"
@@ -256,7 +257,7 @@ static bool VertexInputFormatMatches(const std::vector<VertexInput>& inputs, uin
 
 std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* context,
                                                                   const ProgramInfo* programInfo) {
-  auto cache = context->precompiledShaderCache();
+  auto cache = ContextCacheAccess::Cache(context);
   cache->recordAOTStage(PrecompiledAOTStage::Attempt);
   if (!cache->isLoaded()) {
     // Say why nothing is loaded: a backend or build with no bundle is by design, a rejected bundle
@@ -375,7 +376,7 @@ std::shared_ptr<Program> FallbackToGeneric(Context* context, const ProgramInfo* 
 std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
     Context* context, const ProgramInfo* programInfo, const PermutationMatchResult& match,
     const SpecValues* spec) {
-  auto cache = context->precompiledShaderCache();
+  auto cache = ContextCacheAccess::Cache(context);
   // The callers hold their own match in hand (CreateProgram just ran the walk; the AOT route
   // derives its variant from the compiled program), so this entry starts past the match.
   const PermutationMatchResult* matchResult = &match;

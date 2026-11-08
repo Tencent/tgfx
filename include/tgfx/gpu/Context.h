@@ -39,6 +39,8 @@ class AtlasManager;
 class CommandBuffer;
 class ShaderCaps;
 class AtlasStrikeCache;
+// Declared only because Context owns the cache by pointer; the type is AOT-internal and this
+// header exposes no way to reach the object (see ContextCacheAccess in gpu/ContextInternal.h).
 class PrecompiledShaderCache;
 class SingleOwner;
 
@@ -202,10 +204,6 @@ class Context {
     return _atlasStrikeCache;
   }
 
-  PrecompiledShaderCache* precompiledShaderCache() const {
-    return _precompiledShaderCache;
-  }
-
  private:
   std::shared_ptr<DrawingBuffer> getDrawingBuffer(const Recording* recording) const;
 
@@ -220,6 +218,11 @@ class Context {
   AtlasStrikeCache* _atlasStrikeCache = nullptr;
   PrecompiledShaderCache* _precompiledShaderCache = nullptr;
   std::deque<std::shared_ptr<DrawingBuffer>> pendingDrawingBuffers = {};
+
+  // The precompiled shader cache is AOT-internal and deliberately not part of the public surface:
+  // internal code and the tests reach it through ContextCacheAccess, so no user-facing declaration
+  // hands out an AOT object.
+  friend class ContextCacheAccess;
 
 #if DEBUG
   std::unique_ptr<SingleOwner> singleOwner;

@@ -19,6 +19,7 @@
 #include <string>
 #include <vector>
 #include "base/TGFXTest.h"
+#include "gpu/ContextInternal.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gtest/gtest.h"
 #include "utils/AOTClosureVerifier.h"
@@ -30,7 +31,7 @@ TGFX_TEST(AOTClosureTest, AllRegisteredShadersAreClosed) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
 
   auto result = AOTClosureVerifier::Verify(cache, {});

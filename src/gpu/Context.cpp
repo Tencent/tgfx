@@ -25,6 +25,7 @@
 #include "core/utils/Log.h"
 #include "core/utils/SingleOwner.h"
 #include "core/utils/SlidingWindowTracker.h"
+#include "gpu/ContextInternal.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
@@ -251,4 +252,9 @@ bool Context::purgeResourcesUntilMemoryTo(size_t bytesLimit) {
   ASSERT_OWNER_THREAD;
   return _resourceCache->purgeUntilMemoryTo(bytesLimit);
 }
+
+PrecompiledShaderCache* ContextCacheAccess::Cache(const Context* context) {
+  return context == nullptr ? nullptr : context->_precompiledShaderCache;
+}
+
 }  // namespace tgfx

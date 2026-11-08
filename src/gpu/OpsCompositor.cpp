@@ -27,6 +27,7 @@
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/StrokeUtils.h"
 #include "core/utils/USE.h"
+#include "gpu/ContextInternal.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/AtlasTextOp.h"
@@ -757,7 +758,7 @@ static bool UsesRuntimeFrameBufferFetch(Context* context) {
     return false;
   }
   if (context->backend() == Backend::OpenGL) {
-    auto cache = context->precompiledShaderCache();
+    auto cache = ContextCacheAccess::Cache(context);
     if (cache == nullptr || !cache->isLoaded()) {
       return true;
     }
@@ -771,7 +772,7 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Brush& brush, bool 
                                                        bool hasImageFill) {
   bool needLocalBounds = hasImageFill || brush.shader != nullptr || brush.maskFilter != nullptr;
   bool needDeviceBounds = false;
-  auto cache = context->precompiledShaderCache();
+  auto cache = ContextCacheAccess::Cache(context);
   // The decomposition route only pays off for chains the plain route cannot match directly. A
   // separate Paint color filter always produces such a chain, and so does a color filter baked
   // into the shader via Shader::makeWithColorFilter (e.g. SVG feTurbulence's Perlin ->

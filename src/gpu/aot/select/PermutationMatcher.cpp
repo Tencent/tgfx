@@ -19,6 +19,7 @@
 #include <skcms.h>
 #include "ShaderMatchHelpers.h"
 #include "gpu/ColorSpaceXformHelper.h"
+#include "gpu/ContextInternal.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/Swizzle.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
@@ -510,7 +511,7 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(
   // The two diagnostic switches keep the retired walk's semantics: dedicatedKernelsEnabled gates
   // every dedicated family (the whole executor table), decompositionEnabled the interpreter.
   auto* shaderContext = programInfo->getContext();
-  auto* shaderCache = shaderContext != nullptr ? shaderContext->precompiledShaderCache() : nullptr;
+  auto* shaderCache = shaderContext != nullptr ? ContextCacheAccess::Cache(shaderContext) : nullptr;
   const auto policy =
       shaderCache != nullptr ? shaderCache->aotPolicy() : PrecompiledShaderCache::AOTPolicy{};
   const bool allowDedicated = policy.dedicatedKernels;

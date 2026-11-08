@@ -21,6 +21,7 @@
 #include <sstream>
 #include "AlignTo.h"
 #include "gpu/BlendFormula.h"
+#include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramWriter.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
@@ -297,7 +298,7 @@ std::string ProgramInfo::glProfileTag() const {
 }
 
 bool ProgramInfo::glProfileMatchesCache() const {
-  auto cache = renderTarget->getContext()->precompiledShaderCache();
+  auto cache = ContextCacheAccess::Cache(renderTarget->getContext());
   return cache->profileTag() == glProfileTag();
 }
 

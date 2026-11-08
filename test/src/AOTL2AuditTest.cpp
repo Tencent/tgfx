@@ -32,6 +32,7 @@
 #include <string>
 #include "base/TGFXTest.h"
 #include "core/utils/Log.h"
+#include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gtest/gtest.h"
@@ -120,7 +121,7 @@ TGFX_TEST(AOTL2AuditTest, ServedShapesMatchPlainPathWithinOneLSB) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
 
   {
@@ -169,7 +170,7 @@ TGFX_TEST(AOTL2AuditTest, CleanBlendPrefersPointwiseChain) {
   auto context = scope.getContext();
   SKIP_ON_SWIFTSHADER(context);
   ASSERT_TRUE(context != nullptr);
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   auto dst = Shader::MakeImageShader(imageA, TileMode::Clamp, TileMode::Clamp);
   auto src = Shader::MakeImageShader(imageB, TileMode::Clamp, TileMode::Clamp);

@@ -25,6 +25,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gtest/gtest.h"
@@ -127,7 +128,7 @@ std::string NormalizeTrace(const std::string& raw) {
 // path, and the capture spans the scene and the flush that submits it. Returns an empty string
 // when the route produced no dump — the scene drew nothing, or the bundle is gone.
 std::string RunRoute(Context* context, const std::function<void()>& draw) {
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   if (!LoadEmbeddedBundle(cache, context->backend())) {
     return {};
   }

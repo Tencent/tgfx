@@ -20,6 +20,7 @@
 #include <optional>
 #include <utility>
 #include <vector>
+#include "gpu/ContextInternal.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/plan/AOTPlanner.h"
@@ -40,7 +41,7 @@ PlacementPtr<RenderTask> AOTRouter::route(PlacementPtr<DrawOp>* op,
 }
 
 void AOTRouter::lowerOps(PlacementArray<DrawOp>& ops) {
-  auto cache = _context != nullptr ? _context->precompiledShaderCache() : nullptr;
+  auto cache = _context != nullptr ? ContextCacheAccess::Cache(_context) : nullptr;
   if (cache == nullptr || !cache->isLoaded()) {
     return;
   }
@@ -54,7 +55,7 @@ void AOTRouter::lowerOps(PlacementArray<DrawOp>& ops) {
 PlacementPtr<RenderTask> AOTRouter::routeDraw(PlacementPtr<DrawOp>* op,
                                               const AOTRouteRequest& request) {
   auto* drawOp = op->get();
-  auto cache = _context->precompiledShaderCache();
+  auto cache = ContextCacheAccess::Cache(_context);
   if (cache == nullptr || !cache->isLoaded()) {
     return nullptr;
   }
@@ -117,7 +118,7 @@ PlacementPtr<RenderTask> AOTRouter::routeDraw(PlacementPtr<DrawOp>* op,
 
 PlacementPtr<RenderTask> AOTRouter::routeFill(PlacementPtr<DrawOp>* op,
                                               const AOTRouteRequest& request) {
-  auto cache = _context->precompiledShaderCache();
+  auto cache = ContextCacheAccess::Cache(_context);
   const bool precompiledActive = cache != nullptr && cache->isLoaded();
   if (precompiledActive && request.processor != nullptr) {
     // The fill's single record-time lowering: its whole color expression lands on a DrawIR the op

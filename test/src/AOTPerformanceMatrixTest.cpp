@@ -43,6 +43,7 @@
 #include <string>
 #include <vector>
 #include "base/TGFXTest.h"
+#include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/aot/bundle/EmbeddedShaderBundles.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
@@ -155,7 +156,7 @@ TimingResult MeasureRoute(Context* context, PrecompiledShaderCache* cache, const
   // single-cold-sample design could not.
   for (int cold = 0; cold < ColdSamples; ++cold) {
     context->globalCache()->clearPrograms();
-    context->precompiledShaderCache()->shaderCache()->clear();
+    ContextCacheAccess::Cache(context)->shaderCache()->clear();
     context->globalCache()->resetProgramStats();
     cache->resetStats();
     cache->setDiagnosticRecordingEnabled(true);
@@ -274,7 +275,7 @@ TGFX_TEST(AOTPerformanceMatrixTest, ShortChainSteadyState) {
   auto context = scope.getContext();
   SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   auto image = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_NE(image, nullptr);
 
@@ -310,7 +311,7 @@ TGFX_TEST(AOTPerformanceMatrixTest, SameLayoutEffectReuse) {
   auto context = scope.getContext();
   SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   auto image = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_NE(image, nullptr);
   auto imageShader = Shader::MakeImageShader(image, TileMode::Clamp, TileMode::Clamp);
@@ -339,7 +340,7 @@ TGFX_TEST(AOTPerformanceMatrixTest, MaskClipBlendShortChain) {
   auto context = scope.getContext();
   SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   constexpr int maskSize = 96;
   Bitmap maskBitmap = {};
   ASSERT_TRUE(maskBitmap.allocPixels(maskSize, maskSize, true));
@@ -370,7 +371,7 @@ TGFX_TEST(AOTPerformanceMatrixTest, DualGradientMaterialization) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   constexpr int size = 128;
   std::vector<Color> warmColors = {Color(1.0f, 0.3f, 0.0f, 1.0f), Color(0.9f, 0.1f, 0.2f, 1.0f)};
   std::vector<Color> coolColors = {Color(0.0f, 0.4f, 1.0f, 1.0f), Color(0.1f, 0.2f, 0.9f, 1.0f)};
@@ -401,7 +402,7 @@ TGFX_TEST(AOTPerformanceMatrixTest, PerFamilyMatrix) {
   auto context = scope.getContext();
   SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   auto image = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_NE(image, nullptr);
 
@@ -515,7 +516,7 @@ TGFX_TEST(AOTPerformanceMatrixTest, ChainVsDedicatedDecomposition) {
   auto context = scope.getContext();
   SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   auto image = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_NE(image, nullptr);
 
@@ -556,7 +557,7 @@ TGFX_TEST(AOTPerformanceMatrixTest, ChainSpecializationGain) {
   auto context = scope.getContext();
   SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   auto image = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_NE(image, nullptr);
 
@@ -611,7 +612,7 @@ TGFX_TEST(AOTPerformanceMatrixTest, DedicatedVsChainHotFamilies) {
   auto context = scope.getContext();
   SKIP_ON_SWIFTSHADER(context);
   ASSERT_NE(context, nullptr);
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   auto image = MakeImage("resources/apitest/mandrill_128.png");
   ASSERT_NE(image, nullptr);
   struct SceneCase {

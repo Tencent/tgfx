@@ -18,6 +18,7 @@
 
 #include "StandardDrawOp.h"
 #include "core/utils/Log.h"
+#include "gpu/ContextInternal.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/Program.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
@@ -166,7 +167,7 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
       if (isFinalLookup) {
         LOGE(
             "StandardDrawOp::prepare() the pass carries no compiled program; the draw is dropped!");
-        auto cache = renderTarget->getContext()->precompiledShaderCache();
+        auto cache = ContextCacheAccess::Cache(renderTarget->getContext());
         if (cache->diagnosticRecordingEnabled()) {
           cache->recordDroppedDraw();
         }
@@ -194,7 +195,7 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
         LOGE(
             "StandardDrawOp::prepare() the pass program has no serving variant; the draw is "
             "dropped!");
-        auto cache = renderTarget->getContext()->precompiledShaderCache();
+        auto cache = ContextCacheAccess::Cache(renderTarget->getContext());
         if (cache->diagnosticRecordingEnabled()) {
           cache->recordDroppedDraw();
         }
@@ -243,7 +244,7 @@ bool StandardDrawOp::prepare(RenderTarget* renderTarget, PixelFormat depthStenci
       // The final lookup for this draw (plan-task pass probes fall back to the original draw):
       // nothing will be drawn, so the drop must be visible.
       LOGE("StandardDrawOp::prepare() No program for the draw; the draw is dropped!");
-      auto cache = renderTarget->getContext()->precompiledShaderCache();
+      auto cache = ContextCacheAccess::Cache(renderTarget->getContext());
       if (cache->diagnosticRecordingEnabled()) {
         cache->recordDroppedDraw();
       }
@@ -282,7 +283,7 @@ bool StandardDrawOp::executePrepared(RenderPass* renderPass, RenderTarget* rende
   applyScissor(renderPass, renderTarget);
   onDraw(renderPass, renderTarget);
 
-  auto cache = preparedRenderTarget->getContext()->precompiledShaderCache();
+  auto cache = ContextCacheAccess::Cache(preparedRenderTarget->getContext());
   if (recordDrawStats && cache->diagnosticRecordingEnabled()) {
     AOTDrawStats drawDelta = {};
     drawDelta.kernelInvocations = 1;

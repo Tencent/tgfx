@@ -30,6 +30,7 @@
 #include <string>
 #include <vector>
 #include "base/TGFXTest.h"
+#include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ShaderCaps.h"
 #include "gpu/aot/bundle/EmbeddedShaderBundles.h"
@@ -307,7 +308,7 @@ void ExpectLayoutVariant(const LayoutVariant& variant, const char* gpName) {
     image = MakePatternImage();
     ASSERT_NE(image, nullptr);
   }
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   Bitmap candidate = {};
   Bitmap background = {};
   {
@@ -513,7 +514,7 @@ void ExpectReportedShapeServed(const ReportedShape& shape) {
     ASSERT_NE(image, nullptr);
   }
   const char* gpName = GeometryProcessorName(shape.geometry);
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   Bitmap candidate = {};
   {
     auto [bundleData, bundleBytes] = EmbeddedShaderBundles::GetBundle(context->backend());
@@ -566,7 +567,7 @@ void ExpectSceneServed(const char* label, const char* gpName, const char* signat
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
   SKIP_ON_SWIFTSHADER(context);
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   auto render = [&](Bitmap* outBitmap) {
     auto surface = Surface::Make(context, SceneSize, SceneSize);
     ASSERT_NE(surface, nullptr);

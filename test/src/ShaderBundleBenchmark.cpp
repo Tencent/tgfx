@@ -22,6 +22,7 @@
 #include <mach/mach.h>
 #endif
 #include <cstdlib>
+#include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "tgfx/core/Canvas.h"
@@ -141,7 +142,7 @@ TGFX_TEST(ShaderBundleBenchmark, DISABLED_FirstFrame) {
     auto label = "frame" + std::to_string(frame);
     PrintStats(label.c_str(), micros / 1000.0, context->globalCache()->programStats());
   }
-  auto& modules = context->precompiledShaderCache()->shaderCache()->stats();
+  auto& modules = ContextCacheAccess::Cache(context)->shaderCache()->stats();
   std::printf("[Bench] modules requests=%llu hits=%llu created=%llu createMs=%.2f\n",
               static_cast<unsigned long long>(modules.moduleRequests),
               static_cast<unsigned long long>(modules.moduleHits),
@@ -172,7 +173,7 @@ TGFX_TEST(ShaderBundleBenchmark, DISABLED_ColdFrames) {
   ASSERT_TRUE(surface != nullptr);
   for (int round = 1; round <= 6; round++) {
     // Two frames per round: the second one creates the programs a first frame leaves for later.
-    auto* shaderCache = context->precompiledShaderCache()->shaderCache();
+    auto* shaderCache = ContextCacheAccess::Cache(context)->shaderCache();
     context->globalCache()->clearPrograms();
     if (std::getenv("TGFX_BENCH_KEEP_SHADER_CACHE") == nullptr) {
       shaderCache->clear();

@@ -22,6 +22,7 @@
 #include <fstream>
 #include "ProjectPath.h"
 #include "core/utils/Log.h"
+#include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/aot/bundle/EmbeddedShaderBundles.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
@@ -35,7 +36,7 @@ ScopedAOTStatsPause::ScopedAOTStatsPause(Context* context, bool active) {
   if (!active || context == nullptr) {
     return;
   }
-  cache = context->precompiledShaderCache();
+  cache = ContextCacheAccess::Cache(context);
   prevCachePaused = cache->statsRecordingPaused();
   cache->setStatsRecordingPaused(true);
   globalCache = context->globalCache();
@@ -54,7 +55,7 @@ ScopedAOTStatsPause::~ScopedAOTStatsPause() {
 
 ScopedAOTDeliberateMiss::ScopedAOTDeliberateMiss(Context* context, bool active) {
   if (active && context != nullptr) {
-    cache = context->precompiledShaderCache();
+    cache = ContextCacheAccess::Cache(context);
     previous = cache->deliberateMissMarking();
     cache->setDeliberateMissMarking(true);
   }

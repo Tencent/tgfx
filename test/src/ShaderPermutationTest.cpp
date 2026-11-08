@@ -27,6 +27,7 @@
 #include "base/TGFXTest.h"
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/utils/BlockAllocator.h"
+#include "gpu/ContextInternal.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProgramWriter.h"
@@ -599,7 +600,7 @@ TGFX_TEST(ShaderPermutationTest, GradientUniformsExistOnlyInExtendedChainArtifac
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   const auto hasUniform = [](const ShaderStageBlob* blob, const std::string& name) {
     for (const auto& uniform : blob->uniforms) {
@@ -646,7 +647,7 @@ TGFX_TEST(ShaderPermutationTest, SingleIntervalGradientMatcherSpace) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   auto renderTargetProxy = RenderTargetProxy::Make(context, 8, 8, false);
   ASSERT_NE(renderTargetProxy, nullptr);
@@ -785,7 +786,7 @@ TGFX_TEST(ShaderPermutationTest, LUTGradientWithRealMaskUsesAllLeafSelectors) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_NE(context, nullptr);
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   auto renderTargetProxy = RenderTargetProxy::Make(context, 8, 8, false);
   ASSERT_NE(renderTargetProxy, nullptr);
@@ -941,7 +942,7 @@ TGFX_TEST(ShaderPermutationTest, PrecompiledBundleLoad) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   std::string expectedTag = BundleTag();
   ExpectBundleEntryCounts(*cache, expectedTag);
@@ -1158,7 +1159,7 @@ TGFX_TEST(ShaderPermutationTest, EmbeddedBundleIsPresentAndCurrent) {
 
   // Load it through the Context's own cache, which applies the full acceptance contract (format,
   // ABI, profile tag of this context, content identity hash).
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   ScopedBundleStateRestore restore(cache, backend);
   ASSERT_TRUE(LoadEmbeddedBundle(cache, backend))
       << "The cache rejected the embedded \"" << tag << "\" bundle; see the PrecompiledShaderCache "
@@ -1182,7 +1183,7 @@ TGFX_TEST(ShaderPermutationTest, ContextRecordsTheEmbeddedBundleState) {
   if (backend == Backend::Unknown) {
     GTEST_SKIP() << "This backend has no precompiled shader bundle";
   }
-  auto state = context->precompiledShaderCache()->embeddedBundleState();
+  auto state = ContextCacheAccess::Cache(context)->embeddedBundleState();
   auto [data, size] = GetEmbeddedBundle(backend);
   if (data == nullptr || size == 0) {
     EXPECT_EQ(state, EmbeddedBundleState::NoBundleForBackend)
@@ -1226,7 +1227,7 @@ TGFX_TEST(ShaderPermutationTest, DrawsInABuildWithoutABundleReportNoBundleForBac
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   if (cache->embeddedBundleState() != EmbeddedBundleState::NoBundleForBackend) {
     GTEST_SKIP() << "This build embeds a bundle for the backend (or AOT is disabled)";
   }
@@ -1773,7 +1774,7 @@ TGFX_TEST(ShaderPermutationTest, CreatorFunnelRecordsArtifactMiss) {
   }
   auto surface = Surface::Make(context, 200, 200);
   ASSERT_TRUE(surface != nullptr);
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   // The fake bundle loaded below must not outlive this test: the thread-local Context (and with it
   // this cache) is shared by every later ContextScope of the suite, and a draw against the fake
   // bundle turns their hits into VertexArtifactMissing misses.
@@ -1857,7 +1858,7 @@ TGFX_TEST(ShaderPermutationTest, ARefusedProgramKeyIsNotRematched) {
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 128, 128);
   ASSERT_TRUE(surface != nullptr);
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   cache->setDiagnosticRecordingEnabled(true);
   auto drawOnce = [&]() {
     // The program cache would otherwise serve the second draw without ever asking the creator.
@@ -1960,7 +1961,7 @@ TGFX_TEST(ShaderPermutationTest, DrawImageHitsPrecompiledCache) {
   }
   auto surface = Surface::Make(context, 200, 200);
   ASSERT_TRUE(surface != nullptr);
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   image = MakeTexture2DImage(context, image);
   ASSERT_TRUE(image != nullptr);
   ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
@@ -2002,7 +2003,7 @@ TGFX_TEST(ShaderPermutationTest, AlphaThresholdHitsPrecompiledCache) {
   if (context->backend() == Backend::OpenGL) {
     GTEST_SKIP() << "AlphaThreshold is outside the OpenGL stage 1 whitelist";
   }
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   cache->resetStats();
   auto surface = Surface::Make(context, 100, 100);
@@ -2022,7 +2023,7 @@ TGFX_TEST(ShaderPermutationTest, LumaHitsPrecompiledCache) {
   if (context->backend() == Backend::OpenGL) {
     GTEST_SKIP() << "standalone Luma is outside the OpenGL stage 1 whitelist";
   }
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   cache->resetStats();
   auto surface = Surface::Make(context, 100, 100);
@@ -2044,7 +2045,7 @@ TGFX_TEST(ShaderPermutationTest, GaussianBlurHitsPrecompiledCache) {
   if (context->backend() == Backend::OpenGL) {
     GTEST_SKIP() << "GaussianBlur is outside the OpenGL stage 1 whitelist";
   }
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   cache->resetStats();
   int width = image->width() + 50;
@@ -2065,7 +2066,7 @@ TGFX_TEST(ShaderPermutationTest, ChainBlendClipHitsPrecompiledCache) {
   if (context->backend() == Backend::OpenGL) {
     GTEST_SKIP() << "The pointwise chain is outside the OpenGL stage 1 whitelist";
   }
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   cache->resetStats();
   auto surface = Surface::Make(context, 200, 200);
@@ -2093,7 +2094,7 @@ TGFX_TEST(ShaderPermutationTest, MaskFillHitsPrecompiledCache) {
   if (context->backend() == Backend::OpenGL) {
     GTEST_SKIP() << "MaskFill is outside the OpenGL stage 1 whitelist";
   }
-  auto* cache = context->precompiledShaderCache();
+  auto* cache = ContextCacheAccess::Cache(context);
   ASSERT_TRUE(LoadEmbeddedBundle(cache, context->backend()));
   // hitRecords() is only populated when diagnostic recording is enabled.
   cache->setDiagnosticRecordingEnabled(true);
