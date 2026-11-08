@@ -460,7 +460,8 @@ static bool IsServableBlurChildIR(const AOTTextureParameters& child) {
 // servable texture leaf (returned alongside); the refraction sits directly on the geometry color,
 // with its variant dimensions on the node. Nullopt when the info carries no IR or the shape does
 // not fit — the family walks no processor tree anymore, the node IS the contract.
-std::optional<OpaqueKernelIRShape> ReadOpaqueKernelIRShape(const DrawIR* ir, AOTOpaqueKernel kernelKind,
+std::optional<OpaqueKernelIRShape> ReadOpaqueKernelIRShape(const DrawIR* ir,
+                                                           AOTOpaqueKernel kernelFilter,
                                                            bool requiresTextureChild) {
   if (ir == nullptr) {
     return std::nullopt;
@@ -471,7 +472,7 @@ std::optional<OpaqueKernelIRShape> ReadOpaqueKernelIRShape(const DrawIR* ir, AOT
     return std::nullopt;
   }
   auto* kernel = std::get_if<AOTOpaqueKernelParameters>(&root->parameters);
-  if (kernel == nullptr || kernel->kernel != kernelKind) {
+  if (kernel == nullptr || kernel->kernel != kernelFilter) {
     return std::nullopt;
   }
   OpaqueKernelIRShape shape = {};

@@ -19,6 +19,7 @@
 #include "layers/processors/GlassUDFTentBlurFragmentProcessor.h"
 #include "core/utils/Log.h"
 #include "gpu/aot/ir/EffectGraph.h"
+#include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
 
@@ -87,7 +88,7 @@ void GlassUDFTentBlurFragmentProcessor::onSetData(UniformData*,
   // flag for the same reason; without it the kernel stays on the plain-clamp path and pulls edge
   // texels into the blur wherever the sampling window leaves the subset.
   fragmentUniformData->setDataOptional("TiledChild",
-                                       processor->name() == "TiledTextureEffect" ? 1 : 0);
+                                       IsProcessor<TiledTextureEffect>(processor) ? 1 : 0);
   // Default for the shared kernel's runtime device mask; a present mask FP overwrites it with 1
   // later in traversal. The uniform ring buffer is recycled without clearing, so leaving this
   // unwritten makes the draw inherit an earlier draw's flag and sample the padded dummy mask
