@@ -496,10 +496,9 @@ std::string SublayerOf(const std::string& path) {
 TEST(LayeringTest, TheSublayersDependOnlyWhereTheArchitectureAllows) {
   // The direction map of the tool's sublayers:
   //
-  //   cli ─▶ plan, compile, emit, verify, output, root   (the command line drives everything)
+  //   cli ─▶ compile, emit, verify, output, root   (the command line drives everything)
   //   emit ─▶ compile, core                      (a dialect is translated through the compiler)
   //   compile ─▶ core
-  //   plan ─▶ core
   //   verify ─▶ core, output                     (the checks read shared data structures; the
   //                                               bundle verifier reads the manifest the writer
   //                                               left and recomputes its source digest)
@@ -507,8 +506,8 @@ TEST(LayeringTest, TheSublayersDependOnlyWhereTheArchitectureAllows) {
   //                                               the manifest's source digest includes the Metal
   //                                               compiler fingerprint — a compile-layer fact)
   //
-  // Everything else is forbidden: verify never compiles, plan never emits, output never reaches
-  // into the stages that produce what it writes, and a sublayer never reaches up into cli. The
+  // Everything else is forbidden: verify never compiles, output never reaches into the stages
+  // that produce what it writes, and a sublayer never reaches up into cli. The
   // tool root holds main.cpp alone — the command line — and its includes are unchecked.
   auto allowed = [](const std::string& from, const std::string& to) {
     if (from == to || to.empty() || from.empty()) {
@@ -521,9 +520,6 @@ TEST(LayeringTest, TheSublayersDependOnlyWhereTheArchitectureAllows) {
       return to == "compile" || to == "core";
     }
     if (from == "compile") {
-      return to == "core";
-    }
-    if (from == "plan") {
       return to == "core";
     }
     if (from == "verify") {

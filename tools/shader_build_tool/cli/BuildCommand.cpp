@@ -48,7 +48,6 @@
 #include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/AllShaderFamilies.h"
 #include "gpu/shaders/PrecompiledShader.h"
-#include "plan/VariantPlanner.h"
 #include "verify/ContractRules.h"
 
 namespace tgfx {
@@ -282,26 +281,40 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
   // accept fails the build here, not on a device.
   bool gatesStubValidated = false;
 
-  // The variant plan of this family: the Compose-reachable set (the single source of truth the
-  // runtime matcher uses too), validated against the declared domains. The build loop,
-  // --audit and --report-only all get their variants from the planner.
-  auto plan = VariantPlanner::PlanShader(info);
-  if (!plan.variants) {
+  // The Compose-reachable set is the single source of truth the runtime matcher uses too. A pair
+  // the declared domains cannot serve would compile against a broken vertex/fragment interface,
+  // so the family fails closed instead of emitting it.
+  auto reachable = EnumerateReachablePermutations(info.name);
+  if (!reachable) {
     RecordBuildError(diagnostics, Layer::Plan, DiagnosticCode::PlanNoEnumerator, info.name, "", -1,
                      -1, "every shader must be migrated to the Compose pattern");
     return report;
   }
-  if (!plan.unbuildable.empty()) {
-    // A pair the domains cannot serve would compile against a broken vertex/fragment
-    // interface; fail the family closed instead of emitting it.
-    for (const auto& pair : plan.unbuildable) {
+  bool hasUnbuildable = false;
+  for (const auto& pair : *reachable) {
+    if (!IsBuildablePermutation(info, pair.first, pair.second)) {
+      hasUnbuildable = true;
       RecordBuildError(diagnostics, Layer::Plan, DiagnosticCode::PlanUnbuildable, info.name, "",
                        static_cast<int>(pair.first), static_cast<int>(pair.second),
                        "a reachable variant pair the declared domains cannot serve");
     }
+  }
+  if (hasUnbuildable) {
     return report;
   }
-  for (const auto& permutation : *plan.variants) {
+  // What each backend's bundle must hold: the same filter the manifest and the verifier read, so
+  // the emitted stages and the recorded stage set cannot disagree.
+  std::map<ShaderProfile, std::set<std::pair<uint32_t, uint32_t>>> backendStages;
+  for (const auto& emitterEntry : emitters) {
+    auto stages = EnumerateBackendStages(info, emitterEntry.first);
+    if (!stages) {
+      RecordBuildError(diagnostics, Layer::Plan, DiagnosticCode::PlanNoEnumerator, info.name, "",
+                       -1, -1, "every shader must be migrated to the Compose pattern");
+      return report;
+    }
+    backendStages.emplace(emitterEntry.first, std::move(*stages));
+  }
+  for (const auto& permutation : *reachable) {
     uint32_t vi = permutation.first;
     uint32_t fi = permutation.second;
 
@@ -435,9 +448,9 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
     for (auto& emitterEntry : emitters) {
       const ShaderProfile profile = emitterEntry.first;
       const std::string backend = ProfileTag(profile);
-      // Profile-specific exclusions (the framebuffer fetch variants) share one source of truth
-      // with the closure verifier; see PermutationCompilesForBackend.
-      if (!PermutationCompilesForBackend(info, vi, fi, profile)) {
+      // Profile-specific exclusions (the framebuffer fetch variants) live in EnumerateBackendStages
+      // alone, shared with the manifest and the verifier.
+      if (backendStages.at(profile).count({vi, fi}) == 0) {
         continue;
       }
       EmitInput input;
