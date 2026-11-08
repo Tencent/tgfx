@@ -18,9 +18,26 @@
 
 #pragma once
 
+#include <cstddef>
+#include <string>
 #include "ContractRules.h"
 
 namespace tgfx {
+
+/// What a stored direct-GLSL text contains that its dialect must not: reason names the leak
+/// ("surviving set", "surviving binding", "dialect header", "surviving conditional", "subpass
+/// syntax") or is null for a clean text, and offset is the position of the surviving qualifier
+/// inside text (only meaningful for the two qualifier reasons).
+struct DirectFormLeak {
+  const char* reason = nullptr;
+  size_t offset = 0;
+};
+
+/// Scans one stored direct-GLSL text — already preprocessed, so everything left is live for the
+/// variant — for anything that must not survive the dialect rewrite: a set/binding layout
+/// qualifier (preceded by '(' or ',', the layout-qualifier context), the wrong dialect header,
+/// a surviving conditional directive, or Vulkan-only subpass syntax.
+DirectFormLeak FindDirectFormLeak(const std::string& text, bool esForm);
 
 /// The binding-layout rule: every produced variant must declare its resources exactly where
 /// the runtime pipeline expects them. The WGSL of the WebGPU variants is scanned for its

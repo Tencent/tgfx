@@ -306,19 +306,41 @@ TEST(BindingLayoutRuleTest, AD3D12StageWithoutAnEntryPointIsUnverifiable) {
   EXPECT_NE(diagnostics.records()[0].message.find("SV_Position"), std::string::npos);
 }
 
-TEST(BindingLayoutRuleTest, VariantsOfUncheckedProfilesAreIgnored) {
-  // The GL/GLES storage carries no set or binding and MSL only the binding numbers, so the
-  // rule reads neither; an unparseable profile tag is skipped the same way.
+TEST(BindingLayoutRuleTest, GlStorageIsScannedWhileMetalAndUnknownTagsAreSkipped) {
+  // The GL/GLES storage is GLSL text: the rule scans it for a surviving set/binding qualifier and
+  // the wrong dialect header. MSL carries only the binding numbers and an unparseable tag is
+  // skipped the same way.
   std::vector<VariantData> variants;
   VariantData glVariant;
   glVariant.profileTag = "opengl";
-  glVariant.vertexBlob = SpirvWithDecorations({{9, 9}});
+  glVariant.vertexBlob = BytesOf("#version 330\nvoid main() {}\n");
   variants.push_back(glVariant);
+  VariantData metalVariant;
+  metalVariant.profileTag = "metal";
+  metalVariant.vertexBlob = SpirvWithDecorations({{9, 9}});
+  variants.push_back(metalVariant);
   VariantData unknownTag;
   unknownTag.profileTag = "nosuchprofile";
   unknownTag.vertexBlob = SpirvWithDecorations({{9, 9}});
   variants.push_back(unknownTag);
   EXPECT_EQ(CheckVariants(variants), 0u);
+}
+
+TEST(BindingLayoutRuleTest, GlStorageReportsASurvivingLayoutQualifier) {
+  // The emitters strip the layout qualifiers; a survivor would hand the driver a set/binding the
+  // runtime never binds, so the rule fails it.
+  std::vector<VariantData> variants;
+  VariantData glVariant;
+  glVariant.profileTag = "opengles";
+  glVariant.vertexBlob = BytesOf(
+      "#version 300 es\nprecision mediump float;\nlayout(set = 0, binding = 0) uniform B { "
+      "vec4 c; };\nvoid main() {}\n");
+  variants.push_back(glVariant);
+  Diagnostics diagnostics;
+  auto errors = rule.check(ContextOf(variants, noExpansions), &diagnostics);
+  EXPECT_EQ(errors, 1u);
+  ASSERT_FALSE(diagnostics.records().empty());
+  EXPECT_STREQ(diagnostics.records()[0].code, DiagnosticCode::EmitFormLeak);
 }
 
 // ---- A check that cannot run is reported, never skipped -------------------------------------

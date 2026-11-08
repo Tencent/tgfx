@@ -19,7 +19,7 @@
 #include "ProfileEmitter.h"
 
 #include <utility>
-#include "FormCheck.h"
+
 #include "GLSLDialect.h"
 #include "compile/StageCompiler.h"
 #include "core/DiagnosticCodes.h"
@@ -342,29 +342,10 @@ std::optional<EmittedStages> DirectGLSLEmitter::emit(const EmitInput& input, Sta
       return std::nullopt;
     }
   }
-  // The stored text is preprocessed, so the shared leak scan (FindDirectFormLeak) sees only
-  // live code: the dialect header, no surviving set/binding member, no conditional directive,
-  // and no Vulkan subpass syntax left after the framebuffer-fetch rewrite.
-  auto vertLeak = FindDirectFormLeak(directVert, esDialect);
-  auto fragLeak = FindDirectFormLeak(directFrag, esDialect);
-  const DirectFormLeak* leak = vertLeak.reason != nullptr ? &vertLeak : &fragLeak;
-  if (leak->reason != nullptr) {
-    std::string message;
-    if (esDialect) {
-      message = std::string("direct-ES form assertion failed (") + leak->reason + ")";
-    } else {
-      const char* leakStage = vertLeak.reason != nullptr ? "vert" : "frag";
-      const std::string& leakText = vertLeak.reason != nullptr ? directVert : directFrag;
-      message = std::string("direct-GL 330 form assertion failed (") + leakStage + ", " +
-                leak->reason + ")";
-      if (leak->offset > 0) {
-        auto echoStart = leak->offset > 40 ? leak->offset - 40 : 0;
-        message += " [text @ " + leakText.substr(echoStart, 90) + "]";
-      }
-    }
-    ReportFailure(input, profile(), DiagnosticCode::EmitFormLeak, std::move(message));
-    return std::nullopt;
-  }
+  // The stored text is preprocessed, so only live code remains: the dialect header, no
+  // surviving set/binding member, no conditional directive, and no Vulkan subpass syntax left
+  // after the framebuffer-fetch rewrite. The leak scan lives in the verify layer's binding rule,
+  // which checks every stored GL/GLES variant the same way.
   stages.vertexBlob.assign(directVert.begin(), directVert.end());
   stages.fragmentBlob.assign(directFrag.begin(), directFrag.end());
   return stages;

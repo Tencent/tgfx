@@ -471,7 +471,7 @@ TEST(LayeringTest, TheProfileEmittersDependOnlyOnTheirDialectAndTheCompiler) {
   // "Types" is the core data-type header (the spec table and gate records an emitter consumes);
   // it carries no behaviour, so depending on it is not depending on a layer.
   const std::set<std::string> allowed = {"DiagnosticCodes", "Diagnostics", "ShaderCompiler",
-                                         "StageCompiler", "FormCheck", "GLSLDialect", "Types"};
+                                         "StageCompiler", "GLSLDialect", "Types"};
   for (const auto& dependency : graph["ProfileEmitter"]) {
     EXPECT_EQ(allowed.count(dependency), 1u)
         << "ProfileEmitter depends on " << dependency

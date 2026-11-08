@@ -19,9 +19,9 @@
 #pragma once
 
 #include <vector>
-#include "gpu/aot/chain/AOTPassIR.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/Program.h"
+#include "gpu/aot/plan/AOTPassIR.h"
 
 namespace tgfx {
 

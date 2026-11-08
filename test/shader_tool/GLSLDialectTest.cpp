@@ -27,7 +27,7 @@
 
 #include <cstdint>
 #include <string>
-#include "emit/FormCheck.h"
+#include "verify/BindingLayoutRule.h"
 #include "emit/GLSLDialect.h"
 #include "gtest/gtest.h"
 

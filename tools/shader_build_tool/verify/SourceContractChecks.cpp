@@ -25,6 +25,7 @@
 #include <set>
 #include <sstream>
 #include <string>
+#include <variant>
 #include <vector>
 #include "core/DiagnosticCodes.h"
 #include "gpu/aot/AOTResourceProfile.h"
@@ -462,5 +463,67 @@ size_t ValidateSpecReaders(const std::string& shaderDir, Diagnostics* diagnostic
   return errors;
 }
 
+namespace {
+
+// The shape of one dimension: its name, its kind and its value count (the enum value names join
+// the signature, because two stages agreeing on the count but not on the names would still build
+// different values for the same name).
+struct DimensionSignatureVisitor {
+  std::string operator()(const PermutationBool& dimension) const {
+    return std::string(dimension.defineName) + ":bool:2";
+  }
+  std::string operator()(const PermutationEnum& dimension) const {
+    std::string result =
+        std::string(dimension.defineName) + ":enum:" + std::to_string(dimension.valueNames.size());
+    for (const auto* value : dimension.valueNames) {
+      result += '|';
+      result += value;
+    }
+    return result;
+  }
+  std::string operator()(const PermutationInt& dimension) const {
+    return std::string(dimension.defineName) + ":int:" + std::to_string(dimension.count);
+  }
+};
+
+std::string DimensionNameOf(const std::string& signature) {
+  const auto separator = signature.find(':');
+  return separator == std::string::npos ? signature : signature.substr(0, separator);
+}
+
+}  // namespace
+
+// The mirrored-dimension rule: a dimension both stages declare builds one value (the vertex and
+// fragment stages are compiled from the same permutation), so the two declarations must agree on
+// kind and value count. The runtime MirroredDimsAgree assert catches the mismatch only when the
+// two values happen to differ; a declaration that cannot produce a differing pair (same count,
+// renamed values) would slip through, and the build-time check is where the author can fix it.
+size_t ValidateMirroredDimensions(Diagnostics* diagnostics) {
+  size_t errors = 0;
+  for (const auto& factory : ShaderRegistry::All()) {
+    const auto shader = factory();
+    const auto info = shader->info();
+    std::map<std::string, std::string> vertexDimensions;
+    for (const auto& dimension : info.vertDomain.getDimensions()) {
+      const auto signature = std::visit(DimensionSignatureVisitor(), dimension);
+      vertexDimensions.emplace(DimensionNameOf(signature), signature);
+    }
+    for (const auto& dimension : info.fragDomain.getDimensions()) {
+      const auto signature = std::visit(DimensionSignatureVisitor(), dimension);
+      const auto name = DimensionNameOf(signature);
+      const auto vertex = vertexDimensions.find(name);
+      if (vertex != vertexDimensions.end() && vertex->second != signature) {
+        Report(diagnostics, Severity::Error, DiagnosticCode::VerifyMacroUnknown, "", "", -1, -1,
+               "family '" + std::string(info.name) + "' mirrors dimension '" + name +
+                   "' with different declarations ('" + vertex->second + "' in the vertex "
+                   "domain, '" + signature +
+                   "' in the fragment domain); both stages build the same value, so kind and "
+                   "value count must match");
+        ++errors;
+      }
+    }
+  }
+  return errors;
+}
 
 }  // namespace tgfx

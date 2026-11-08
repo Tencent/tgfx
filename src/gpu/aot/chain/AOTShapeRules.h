@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "gpu/aot/chain/AOTPassIR.h"
 #include "gpu/aot/ir/EffectGraph.h"
+#include "gpu/aot/plan/AOTPassIR.h"
 
 namespace tgfx {
 
