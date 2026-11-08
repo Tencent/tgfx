@@ -29,26 +29,12 @@ highp vec2 chainTiledDimension;
 #include "source/texture_sampling.inc"
 
 #if NTEX > 0
-// Reads tiled leaf leafIndex's texture. Sampler arrays cannot be indexed dynamically on every
-// target, so the sampler is picked by compile-time branches on the leaf index, which is uniform
-// across the draw (main() fetches the tiled leaves in a loop over a uniform bound). The tiling
-// code around the reads (coordinate mapping, seam blend, border) then exists once for all leaves
-// instead of once per leaf: a GPU compiler inlines every call site, so per-leaf call sites used to
-// carry one copy of that code per leaf.
-vec4 aotChainRead(int leafIndex, vec2 coord, int readSwizzle) {
-  vec4 color;
-  if (leafIndex == 0) {
-    color = texture(TextureSampler_0, coord);
-  } else if (leafIndex == 1) {
-    color = texture(TextureSampler_1, coord);
-  } else if (leafIndex == 2) {
-    color = texture(TextureSampler_2, coord);
-  } else {
-    color = texture(TextureSampler_3, coord);
-  }
-  return aotReadSwizzle(color, readSwizzle);
-}
-
+// The leaf reader (aotChainRead) is generated from the declaration's sampler instance group: the
+// sampler must be picked by compile-time branches on the leaf index, which is uniform across the
+// draw (main() fetches the tiled leaves in a loop over a uniform bound). The tiling code around
+// the reads (coordinate mapping, seam blend, border) then exists once for all leaves instead of
+// once per leaf: a GPU compiler inlines every call site, so per-leaf call sites used to carry one
+// copy of that code per leaf.
 vec4 tiledSeamBlend(int leafIndex, vec4 texColor, vec2 subsetCoord, vec2 clampedCoord,
                     int readSwizzle) {
   bool repeatX = ShaderModeX == 3 && subsetCoord.x != clampedCoord.x;

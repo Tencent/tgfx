@@ -6,7 +6,7 @@
 // range offset is a runtime uniform (YUVLimitedRange) since it is pure fragment math.
 // The color-grade tail carries up to three pointwise operators (ColorMatrix / Luma /
 // AlphaThreshold / ColorSpaceXform / ConstColor): the chain interpreter's instruction records
-// (SlotPacked and the per-op arrays, shared encoding with pointwise_chain.frag) with a
+// (SlotPacked and the per-op arrays, shared encoding with the pointwise interpreter) with a
 // runtime-bound slot loop, so the tail rides the same pass as the plane conversion
 // and a video frame with a paint color filter never takes the runtime stitching route. A draw
 // with no operators leaves SlotCount at 0 (the loop never runs), byte-identical to before.
@@ -29,7 +29,7 @@ layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING)
   int OutputAlphaSwizzle;
 
   // The color-grade tail rides the chain interpreter's instruction records — the same uniform
-  // arrays pointwise_chain.frag reads, at the tail's own capacity — so one slot encoding serves
+  // arrays the pointwise interpreter reads, at the tail's own capacity — so one slot encoding serves
   // every kernel (the array order is dataflow order; the selector packs the op's small value in
   // bits 0-7 and the blend operand order in bit 8, matching the YUV binder's writes).
   int SlotCount;

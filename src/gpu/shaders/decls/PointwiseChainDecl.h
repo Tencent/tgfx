@@ -21,38 +21,37 @@
 #include <iterator>
 #include "gpu/shaders/decls/ModuleDecl.h"
 
-// The pointwise interpreter's fragment interface, in the declaration language. This is not yet
-// wired into the emitter: the chain's entry also carries the config defines, the resource-slot
-// glue and the chain main template, which the dedicated-pipeline emitter does not model. The
-// declaration exists to prove the language can express the interface and to pin the gaps that the
-// migration must close first:
+// The pointwise interpreter's fragment entry, declared. Everything the entry used to spell by
+// hand is here: the uniform block (core, the resource profile's modules, XP), the interface
+// (five geometry layouts, the leaf coordinates, the mask), the generated leaf reader, the two
+// tool-generated pragmas, and the pipeline template. The math modules stay as includes; the
+// entry itself is generated.
 //
-//   1. The locations are expressions over the layout and leaf-count dimensions (CHAIN_TEX_LOC_BASE,
-//      NTEX), not numbers — VaryingDecl::locationExpr and SamplerDecl::bindingExpr carry them.
-//   2. The four leaf samplers are one declared instance group (SamplerDecl::count).
-//   3. The XP dst binding is a conditional expression over NTEX.
-//   4. The uniform block stays a module placeholder for now: its per-slot arrays
-//      (SlotPacked[CHAIN_SLOT_CAPACITY], ChainData) need ArrayField once the block is declared
-//      field by field.
-//
-// The layout macros (GP_ELLIPSE_V_OFFSETS and friends) are printed as their numeric values here;
-// the migration must move them into one shared geometry-layout table so the dedicated families and
-// the chain allocate the same varying space from one source.
+// The uniform block still keeps its core fields behind a module include: the per-slot tables are
+// arrays whose capacity comes from the injected resource profile, and declaring them field by
+// field is the next step. The varying-location tables are the geometry layouts' own, shared with
+// the dedicated kernels, so the two sides cannot drift.
 
 namespace tgfx {
 
-struct ChainInterfaceDecl {
+struct PointwiseChainDecl {
   static constexpr const char* Name = "PointwiseChainShader";
   static constexpr const char* File = "kernels/pointwise_chain.frag";
 
   static constexpr FragmentElement Block[] = {
       TGFX_DECL_ELEMENT(Module, "pipeline/chain/pointwise_fragment_uniforms.inc"),
+      TGFX_DECL_ELEMENT_ConditionalModule("pipeline/chain/pointwise_gradient_uniforms.inc",
+                                          "RESOURCE_KIND == 1"),
+      TGFX_DECL_ELEMENT_ConditionalModule("pipeline/chain/pointwise_tiled3_uniforms.inc",
+                                          "RESOURCE_KIND == 1"),
+      TGFX_DECL_ELEMENT_ConditionalModule("pipeline/chain/pointwise_noise_uniforms.inc",
+                                          "RESOURCE_KIND == 2"),
+      TGFX_DECL_ELEMENT_ConditionalModule("pipeline/chain/pointwise_tiled2_uniforms.inc",
+                                          "RESOURCE_KIND != 1"),
+      TGFX_DECL_ELEMENT(Module, "xp/xp_uniforms.inc"),
   };
 
   static constexpr VaryingDecl Varyings[] = {
-      // GP_LAYOUT 0 (rect layouts): coverage and color follow the leaf coordinates.
-      {"float", "vCoverage", 0, "NTEX", "GP_LAYOUT == 0 && HAS_COVERAGE"},
-      {"vec4", "vColor", 0, "NTEX + 1", "GP_LAYOUT == 0"},
       // GP_LAYOUT 1: ellipse, sharing gp_ellipse_layout.inc with the dedicated kernel.
       {"vec2", "vEllipseOffsets", 0, nullptr, "GP_LAYOUT == 1"},
       {"vec4", "vEllipseRadii", 1, nullptr, "GP_LAYOUT == 1"},
@@ -64,8 +63,11 @@ struct ChainInterfaceDecl {
       {"vec2", "vEllipseOffsets", 0, nullptr, "GP_LAYOUT >= 3"},
       {"vec4", "vEllipseRadii", 1, nullptr, "GP_LAYOUT >= 3"},
       {"vec2", "vEdgeDist", 2, nullptr, "GP_LAYOUT >= 3"},
-      {"vec2", "vStrokeWidth", 3, nullptr, "GP_LAYOUT == 4"},
-      {"vec4", "vColor", 4, nullptr, "GP_LAYOUT >= 3"},
+      {"vec2", "vStrokeWidth", 4, nullptr, "GP_LAYOUT == 4"},
+      {"vec4", "vColor", 3, nullptr, "GP_LAYOUT >= 3"},
+      // GP_LAYOUT 0: coverage and color follow the leaf coordinates.
+      {"float", "vCoverage", 0, "NTEX", "GP_LAYOUT == 0 && HAS_COVERAGE"},
+      {"vec4", "vColor", 0, "NTEX + 1", "GP_LAYOUT == 0"},
       // The per-quad subset of a strict draw, in leaf 0's texture space.
       {"vec4", "vTexSubset", 6, nullptr, "HAS_SUBSET"},
       // The four leaf coordinates, placed after the layout's own varyings.
@@ -80,18 +82,24 @@ struct ChainInterfaceDecl {
       {"MaskTextureSampler", 0, 1, "NTEX", "NTEX > 0 || HAS_MASK_TEXTURE"},
   };
 
-  // The leaf reader: one static sampler pick per instance (GLSL ES and WGSL cannot index a
-  // sampler dynamically), then the shared read swizzle. The instance count is the sampler group's.
+  // The leaf reader: one static sampler pick per instance, then the shared read swizzle. The
+  // instance count is the sampler group's, so the two cannot drift.
   static constexpr InstanceDispatchDecl Dispatches[] = {
       {"aotChainRead", "TextureSampler_", "vec4", "vec2", "aotReadSwizzle", "NTEX > 0"},
   };
 
-  // The math and evaluation modules the interface binds to the interpreter's loop. The layout
-  // branches (ellipse/hairline/complex coverage) and the leaf-only tiling module stay inside the
-  // interface include until the migration splits it, so the list below is the base set.
+  static constexpr const char* PrologueIncludes[] = {
+      "pipeline/chain/pointwise_fragment_config.inc",
+      "pipeline/chain/pointwise_interface_layout.inc",
+      // The generated leaf reader applies this decoder, so it must precede the reader.
+      "source/texture_read_swizzle.inc",
+  };
+
+  static constexpr const char* Pragmas[] = {"tgfx_chain_ops", "tgfx_spec_include"};
+
   static constexpr const char* ExtraIncludes[] = {
-      "xp/xp_blend_colors.inc", "xp/xp_porter_duff.inc",       "xp/xp_porter_duff_fbf.inc",
-      "xp/xp_blend_pass.inc",   "source/texture_sampling.inc",
+      "pipeline/chain/pointwise_interface_support.inc",
+      "pipeline/chain/pointwise_resource_eval.inc",
   };
 
   static constexpr FragmentFamilyDecl Decl = {Name,
@@ -115,7 +123,11 @@ struct ChainInterfaceDecl {
                                               std::size(Dispatches),
                                               "pipeline/chain/pointwise_fragment_main.inc",
                                               ExtraIncludes,
-                                              std::size(ExtraIncludes)};
+                                              std::size(ExtraIncludes),
+                                              PrologueIncludes,
+                                              std::size(PrologueIncludes),
+                                              Pragmas,
+                                              std::size(Pragmas)};
 };
 
 }  // namespace tgfx

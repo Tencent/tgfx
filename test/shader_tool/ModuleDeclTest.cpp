@@ -30,7 +30,7 @@
 #include "emit/StageEmitter.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/decls/AllFragmentDecls.h"
-#include "gpu/shaders/decls/ChainInterfaceDecl.h"
+#include "gpu/shaders/decls/PointwiseChainDecl.h"
 #include "gpu/shaders/decls/ModuleDecl.h"
 #include "gtest/gtest.h"
 
@@ -57,7 +57,8 @@ TEST(ModuleDeclTest, EveryDeclarationEmitsAFragmentEntry) {
     const auto& text = found->second;
     EXPECT_EQ(text.rfind("#version 450\n", 0), 0u) << decl->name;
     EXPECT_TRUE(Contains(text, "uniform FragmentUniformBlock {")) << decl->name;
-    EXPECT_TRUE(Contains(text, "#include \"pipeline/fill/fill_fragment_main.inc\""))
+    EXPECT_NE(decl->mainInclude, nullptr) << decl->name;
+    EXPECT_TRUE(Contains(text, std::string("#include \"") + decl->mainInclude + "\""))
         << decl->name;
     EXPECT_TRUE(Contains(text, "#define XP_DST_TEX_BINDING ")) << decl->name;
   }
@@ -95,13 +96,13 @@ TEST(ModuleDeclTest, ConditionalInterfaceIsWrappedInItsDimension) {
       if (varying.condition == nullptr) {
         continue;
       }
-      const std::string guard = std::string("#if ") + varying.condition;
-      const auto guardPos = text.find(guard);
-      const auto declarationPos = text.find(std::string(") in ") + varying.glslType + " " +
-                                  varying.name + ";");
-      ASSERT_NE(guardPos, std::string::npos) << decl->name;
-      ASSERT_NE(declarationPos, std::string::npos) << decl->name;
-      EXPECT_LT(guardPos, declarationPos) << decl->name;
+      const std::string location = varying.locationExpr != nullptr
+                                       ? varying.locationExpr
+                                       : std::to_string(varying.location);
+      const std::string block = std::string("#if ") + varying.condition +
+                                "\nlayout(location = " + location + ") in " + varying.glslType +
+                                " " + varying.name + ";\n#endif";
+      EXPECT_TRUE(Contains(text, block)) << decl->name << " / " << varying.name;
     }
     for (size_t index = 0; index < decl->samplerCount; ++index) {
       const auto& sampler = decl->samplers[index];
@@ -109,8 +110,9 @@ TEST(ModuleDeclTest, ConditionalInterfaceIsWrappedInItsDimension) {
         continue;
       }
       EXPECT_TRUE(Contains(text, std::string("#if ") + sampler.condition)) << decl->name;
-      EXPECT_TRUE(Contains(text, std::string("uniform sampler2D ") + sampler.name + ";"))
-          << decl->name;
+      const std::string instance = std::string("uniform sampler2D ") + sampler.name +
+                                   (sampler.count > 1 ? "0;" : ";");
+      EXPECT_TRUE(Contains(text, instance)) << decl->name;
     }
   }
 }
@@ -161,7 +163,7 @@ TEST(ModuleDeclTest, TheChainInterfaceIsExpressible) {
   // The interpreter's interface is the language's stress test: dimension-dependent locations,
   // one group of four leaf samplers, and a conditional XP dst binding over the leaf count.
   std::string error;
-  const auto text = EmitFragmentEntry(ChainInterfaceDecl::Decl, &error);
+  const auto text = EmitFragmentEntry(PointwiseChainDecl::Decl, &error);
   ASSERT_FALSE(text.empty()) << error;
   EXPECT_TRUE(text.find("layout(location = NTEX + 1) in vec4 vColor;") != std::string::npos);
   EXPECT_TRUE(text.find("layout(location = CHAIN_TEX_LOC_BASE + 3) in vec3 TransformedCoords_3;") !=
@@ -181,17 +183,21 @@ TEST(ModuleDeclTest, ThePipelineTemplateAndSupportModulesComeFromTheDeclaration)
   // template plus the support modules its loop needs. A family that declared neither still gets
   // the fill template, which is why the migrated entries did not change.
   std::string error;
-  const auto chain = EmitFragmentEntry(ChainInterfaceDecl::Decl, &error);
+  const auto chain = EmitFragmentEntry(PointwiseChainDecl::Decl, &error);
   ASSERT_FALSE(chain.empty()) << error;
-  EXPECT_TRUE(chain.find("#include \"xp/xp_blend_colors.inc\"") != std::string::npos);
-  EXPECT_TRUE(chain.find("#include \"source/texture_sampling.inc\"") != std::string::npos);
+  const std::string support = "#include \"pipeline/chain/pointwise_interface_support.inc\"";
+  const std::string resource = "#include \"pipeline/chain/pointwise_resource_eval.inc\"";
+  EXPECT_TRUE(chain.find(support) != std::string::npos);
+  EXPECT_TRUE(chain.find(resource) != std::string::npos);
   const auto chainMain = chain.find("#include \"pipeline/chain/pointwise_fragment_main.inc\"");
   ASSERT_NE(chainMain, std::string::npos);
-  EXPECT_LT(chain.find("#include \"source/texture_sampling.inc\""), chainMain);
+  EXPECT_LT(chain.find(support), chainMain);
+  EXPECT_LT(chain.find(resource), chainMain);
   for (const auto* decl : AllFragmentDecls()) {
     const auto text = EmitFragmentEntry(*decl, &error);
     ASSERT_FALSE(text.empty()) << error;
-    EXPECT_TRUE(text.find("#include \"pipeline/fill/fill_fragment_main.inc\"") != std::string::npos)
+    EXPECT_TRUE(text.find(std::string("#include \"") + decl->mainInclude + "\"") !=
+                std::string::npos)
         << decl->name;
   }
 }
@@ -201,7 +207,7 @@ TEST(ModuleDeclTest, TheInstanceDispatchMatchesTheHandwrittenForm) {
   // instance, the last instance as the else arm (an out-of-range index reads it, which is the
   // handwritten behavior the migration must preserve).
   std::string error;
-  const auto text = EmitFragmentEntry(ChainInterfaceDecl::Decl, &error);
+  const auto text = EmitFragmentEntry(PointwiseChainDecl::Decl, &error);
   ASSERT_FALSE(text.empty()) << error;
   const std::string expected =
       "#if NTEX > 0\n"
@@ -232,14 +238,22 @@ TEST(ModuleDeclTest, EveryFragmentDimensionIsReferencedByTheGeneratedText) {
   for (const auto* decl : AllFragmentDecls()) {
     auto text = EmitFragmentEntry(*decl, &error);
     ASSERT_FALSE(text.empty()) << error;
+    const auto appendModule = [&text, &shaderDir](const char* path) {
+      std::ifstream file(shaderDir + "/" + path);
+      EXPECT_TRUE(file.is_open()) << path;
+      text += std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    };
     for (size_t index = 0; index < decl->blockCount; ++index) {
       const auto& element = decl->block[index];
-      if (element.kind != FragmentElementKind::Module) {
-        continue;
+      if (element.kind == FragmentElementKind::Module) {
+        appendModule(element.name);
       }
-      std::ifstream file(shaderDir + "/" + element.name);
-      ASSERT_TRUE(file.is_open()) << element.name;
-      text += std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    }
+    for (size_t index = 0; index < decl->prologueIncludeCount; ++index) {
+      appendModule(decl->prologueIncludes[index]);
+    }
+    for (size_t index = 0; index < decl->extraIncludeCount; ++index) {
+      appendModule(decl->extraIncludes[index]);
     }
     const auto* info = ShaderRegistry::Find(decl->name);
     ASSERT_NE(info, nullptr) << decl->name;
@@ -261,7 +275,9 @@ TEST(ModuleDeclTest, TheDeclaredFamiliesExist) {
     EXPECT_FALSE(decl->name == nullptr || std::strlen(decl->name) == 0);
     EXPECT_FALSE(decl->file == nullptr || std::strlen(decl->file) == 0);
     EXPECT_GT(decl->blockCount, 0u);
-    EXPECT_GT(decl->stepCount, 0u);
+    // The dedicated families select FILL_* steps; the interpreter selects steps through its
+    // dimensions and resource profile instead.
+    EXPECT_TRUE(decl->stepCount > 0 || decl->varyingCount > 0) << decl->name;
   }
 }
 

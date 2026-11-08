@@ -31,10 +31,10 @@ vec4 applyPorterDuffXP(vec4 srcColor, vec4 coverage) {
   //
   // This helper once dropped the discard, citing an Apple desktop GL miscompile ("fragments die
   // even when the condition never fires"). The miscompile is real but narrower than that: it
-  // reproduced only in pointwise_chain.frag, whose coverage was read back after the evaluation
+  // reproduced only in the pointwise interpreter entry, whose coverage was read back after the evaluation
   // loop as chainResults[<uniform>]. With that read-back, a discard on the coverage killed every
   // fragment of the draw, while the identical expression selected the correct colour when used
-  // without a discard. Capturing the registers inside the loop (see pointwise_chain.frag) makes
+  // without a discard. Capturing the registers inside the loop (see the pointwise interpreter entry) makes
   // the discard behave; the driver-internal cause was not established. No other kernel routed
   // here reads its coverage from a uniform-indexed array.
   if (coverage.r <= 0.0 && coverage.g <= 0.0 && coverage.b <= 0.0) {

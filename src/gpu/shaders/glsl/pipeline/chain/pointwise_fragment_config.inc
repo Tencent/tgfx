@@ -9,9 +9,9 @@
 //     <module>_uniforms.inc                fields of each resource module
 //     xp_uniforms.inc
 //   };
-//   pointwise_fragment_interface.inc       varyings, samplers, blend and tiled-sampling helpers
-//   <module>.inc                           functions of each resource module
-//   evalResourceSlot()                     the entry's dispatcher to its resource ops
+//   pointwise_interface_layout.inc         the layouts' varying-location tables
+//   pointwise_interface_support.inc        blend and tiled-sampling helpers
+//   pointwise_resource_eval.inc            each resource module's functions and evalResourceSlot()
 //   pointwise_fragment_main.inc            leaf fetch, slot evaluation and main()
 // Resource modules:
 //   pointwise_tiled2, pointwise_tiled3   shader-side leaf tiling with two scalar recipes or three
@@ -59,4 +59,13 @@
 #define NTEX 0
 #else
 #define NTEX 4
+#endif
+
+// The instruction-slot capacity of the selected resource profile. The capacities are injected by
+// shader_build_tool from the C++ resource profiles (AOTResourceProfile.h), so no literal here can
+// drift from what the runtime uploads.
+#if RESOURCE_KIND == 2
+#define CHAIN_SLOT_CAPACITY TGFX_NOISE_SLOT_CAPACITY
+#else
+#define CHAIN_SLOT_CAPACITY TGFX_CHAIN_SLOT_CAPACITY
 #endif

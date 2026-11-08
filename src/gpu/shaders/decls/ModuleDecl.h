@@ -55,6 +55,9 @@ struct FragmentElement {
   /// An array field's element count as a macro or literal (e.g. "CHAIN_SLOT_CAPACITY"), or null
   /// for a scalar field. The chain's per-slot tables are the reason this exists.
   const char* capacity = nullptr;
+  /// The dimension condition the entry is conditional on, or null for an unconditional one. The
+  /// chain's resource modules and their uniform blocks are selected this way.
+  const char* condition = nullptr;
 };
 
 /// One fragment input (the vertex stage's output).
@@ -150,6 +153,14 @@ struct FragmentFamilyDecl {
   /// (the math libraries the entry's interface and evaluation loop depend on), or null.
   const char* const* extraIncludes = nullptr;
   size_t extraIncludeCount = 0;
+  /// Modules included before the uniform block (the dimension defaults and the varying-location
+  /// tables a conditional interface needs), or null.
+  const char* const* prologueIncludes = nullptr;
+  size_t prologueIncludeCount = 0;
+  /// Tool-generated pragma directives the entry must carry (`tgfx_chain_ops`,
+  /// `tgfx_spec_include`); they are replaced by the compile pipeline, never by a driver.
+  const char* const* pragmas = nullptr;
+  size_t pragmaCount = 0;
 };
 
 /// One block/interface/step element of a declaration list.
@@ -160,6 +171,8 @@ struct FragmentFamilyDecl {
   { FragmentElementKind::Field, #name, ParamType::type, capacity }
 #define TGFX_DECL_ELEMENT_Module(path) \
   { FragmentElementKind::Module, path, ParamType::Float }
+#define TGFX_DECL_ELEMENT_ConditionalModule(path, condition) \
+  { FragmentElementKind::Module, path, ParamType::Float, nullptr, condition }
 
 /// The GLSL spelling of one uniform field type. An array kind has no scalar spelling: a family
 /// that needs an array extends the declaration instead of guessing a size here.

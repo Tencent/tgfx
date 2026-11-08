@@ -70,7 +70,7 @@ layout(location = GP_COMPLEX_IN_STROKE) in vec2 inStrokeWidth;
 #define CHAIN_SOURCE_COORDS_LOC 7
 #endif
 // The per-quad subset varying (rect layout only: leaves 0-3, coverage 4, color 5); must agree with
-// pointwise_fragment_interface.inc.
+// the declared fragment interface.
 #define CHAIN_SUBSET_LOC 6
 
 layout(std140, set = TGFX_VERTEX_UBO_SET, binding = TGFX_VERTEX_UBO_BINDING) uniform VertexUniformBlock {
