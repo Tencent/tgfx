@@ -75,8 +75,8 @@ bool GlassRefractionFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNo
   if (IsProcessor<GlassSDFGeometryFragmentProcessor>(child)) {
     auto* sdf = static_cast<const GlassSDFGeometryFragmentProcessor*>(child);
     parameters.geometryKind = sdf->getShapeType() == GlassShapeType::RoundedRect
-                                 ? AOTGlassGeometryKind::SdfRoundedRect
-                                 : AOTGlassGeometryKind::SdfOther;
+                                  ? AOTGlassGeometryKind::SdfRoundedRect
+                                  : AOTGlassGeometryKind::SdfOther;
   } else if (IsProcessor<GlassUDFGeometryFragmentProcessor>(child)) {
     // The UDF kind always declares the edge-light mask sampler; an edge-lit-off draw binds the
     // shared dummy texture there and clears the EdgeMaskOn runtime uniform.

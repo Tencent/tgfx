@@ -19,8 +19,8 @@
 #include "gpu/shaders/kernels/GlassRefractionShader.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/aot/ir/DrawIR.h"
-#include "gpu/shaders/contract/DrawFacts.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
+#include "gpu/shaders/contract/DrawFacts.h"
 
 namespace tgfx {
 
@@ -67,9 +67,8 @@ bool GlassRefractionShader::Accept(const DrawShape& shape) {
   // child selects the compile-time dimension because it changes the sampler layout. The node
   // also carries the background-coordinate perspective rejection: both vertex kernels emit the
   // affine coordinate form, so a projective transform must ride the runtime route.
-  auto irShape =
-      ReadOpaqueKernelIRShape(shape.ir, AOTOpaqueKernel::GlassRefraction,
-                                     /*requiresTextureChild=*/false);
+  auto irShape = ReadOpaqueKernelIRShape(shape.ir, AOTOpaqueKernel::GlassRefraction,
+                                         /*requiresTextureChild=*/false);
   return irShape && irShape->kernel->geometryKind.has_value() && !irShape->kernel->hasPerspective;
 }
 
@@ -78,9 +77,8 @@ Variants GlassRefractionShader::Select(const DrawShape& shape) {
   // opaque-kernel node the acceptance verified (the match cache bounds the redundancy: one
   // extraction per distinct program shape).
   int gpKind = shape.geometry.kind == GeometryKind::Ellipse ? 0 : 1;
-  auto irShape =
-      ReadOpaqueKernelIRShape(shape.ir, AOTOpaqueKernel::GlassRefraction,
-                                     /*requiresTextureChild=*/false);
+  auto irShape = ReadOpaqueKernelIRShape(shape.ir, AOTOpaqueKernel::GlassRefraction,
+                                         /*requiresTextureChild=*/false);
   auto geometryKind = irShape && irShape->kernel->geometryKind.has_value()
                           ? *irShape->kernel->geometryKind
                           : AOTGlassGeometryKind::SdfRoundedRect;

@@ -28,9 +28,9 @@
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/aot/bind/Binder.h"
+#include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/EffectGraph.h"
-#include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/ir/Lowering.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "gpu/aot/plan/AOTPlanner.h"
@@ -2903,8 +2903,7 @@ TGFX_TEST(AOTEffectTest, PerlinNoisePlusTwoOpsFusesToSinglePass) {
   ASSERT_NE(alphaThreshold, nullptr);
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(
-      LowerToGraph({perlin.get(), colorMatrix.get(), alphaThreshold.get()}, &graph));
+  ASSERT_TRUE(LowerToGraph({perlin.get(), colorMatrix.get(), alphaThreshold.get()}, &graph));
   Plan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));
   ASSERT_EQ(plan.passes.size(), 1u);
@@ -2972,8 +2971,8 @@ TGFX_TEST(AOTEffectTest, PerlinNoiseOpsThenConstBlendFusesToSinglePass) {
   ASSERT_NE(blend, nullptr);
 
   AOTEffectGraph graph;
-  ASSERT_TRUE(LowerToGraph(
-      {perlin.get(), colorMatrix.get(), alphaThreshold.get(), blend.get()}, &graph));
+  ASSERT_TRUE(
+      LowerToGraph({perlin.get(), colorMatrix.get(), alphaThreshold.get(), blend.get()}, &graph));
   ASSERT_EQ(graph.nodeCount(), 7u);
   Plan plan;
   ASSERT_TRUE(AOTEffectDecomposer::Decompose(graph, &plan));

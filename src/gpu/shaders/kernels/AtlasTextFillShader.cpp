@@ -18,8 +18,8 @@
 
 #include "gpu/shaders/kernels/AtlasTextFillShader.h"
 #include "gpu/ProgramInfo.h"
-#include "gpu/shaders/contract/DrawFacts.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
+#include "gpu/shaders/contract/DrawFacts.h"
 
 namespace tgfx {
 

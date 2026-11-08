@@ -19,9 +19,9 @@
 #pragma once
 
 #include <optional>
-#include "gpu/shaders/contract/DrawFacts.h"
 #include "gpu/aot/select/PermutationMatch.h"
 #include "gpu/shaders/ShaderPermutation.h"
+#include "gpu/shaders/contract/DrawFacts.h"
 
 namespace tgfx {
 

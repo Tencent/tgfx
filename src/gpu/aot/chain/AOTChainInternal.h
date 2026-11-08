@@ -60,8 +60,7 @@ inline constexpr size_t MaxChainColorSpaceXformSlots = 1;
 
 // Turns one scheduled node into its pointwise op slot. Shared by the encoder (EncodeUnaryPointwise)
 // and the texture/YUV tail collectors in AOTChainBuilder.cpp.
-bool BuildPointwiseSlot(const AOTEffectGraph& graph, const AOTEffectNode* node,
-                        AOTChainSlot* slot);
+bool BuildPointwiseSlot(const AOTEffectGraph& graph, const AOTEffectNode* node, AOTChainSlot* slot);
 
 // Stage one: merges the color and coverage node spaces and admits the pass.
 bool MergeNodeSpaces(AOTChainContext* ctx);

@@ -19,11 +19,11 @@
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include <algorithm>
 #include "gpu/ProgramInfo.h"
+#include "gpu/aot/chain/AOTChainBuilder.h"
+#include "gpu/aot/chain/AOTShapeRules.h"
 #include "gpu/aot/ir/Lowering.h"
 #include "gpu/aot/ir/NodeContract.h"
-#include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/plan/AOTPlanner.h"
-#include "gpu/aot/chain/AOTShapeRules.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
@@ -73,8 +73,6 @@ static AOTAxisAnalysis ClassifyAxis(const std::vector<const FragmentProcessor*>&
   analysis.outcome = AOTDecomposeOutcome::FusablePointwise;
   return analysis;
 }
-
-
 
 // The multi-pass source, the unary pointwise set and the const-operand blend are shared shape
 // rules (gpu/AOTShapeRules.h) — the same authority the executor's admission checks and the chain

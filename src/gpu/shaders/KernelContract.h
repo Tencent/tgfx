@@ -63,13 +63,13 @@ constexpr const char* DeviceToLocal = "DeviceToLocal";
 // per-slot parameter member name, and pass-boundary sensitivity — an operator that amplifies the
 // 1/255 pass-boundary rounding into a visible flip (a step function) must share its pass with its
 // input's producer (IsPassBoundarySensitive; see AOTEffectDecomposer's CanStartPassAt).
-#define TGFX_POINTWISE_OPS(X)                                                                    \
-  X(ColorMatrix, ChainISA::ColorMatrix, AOTColorMatrixParameters, colorMatrix, false)            \
+#define TGFX_POINTWISE_OPS(X)                                                                     \
+  X(ColorMatrix, ChainISA::ColorMatrix, AOTColorMatrixParameters, colorMatrix, false)             \
   X(Luma, ChainISA::Luma, ChainISA::LumaData, luma, false)                                        \
   X(AlphaThreshold, ChainISA::AlphaThreshold, ChainISA::AlphaThresholdData, alphaThreshold, true) \
-  X(ColorSpaceXform, ChainISA::ColorSpaceXform, AOTColorSpaceXformParameters, colorSpaceXform,   \
-    false)                                                                                       \
-  X(ConstColor, ChainISA::ConstColor, AOTConstColorParameters, constColor, false)                \
+  X(ColorSpaceXform, ChainISA::ColorSpaceXform, AOTColorSpaceXformParameters, colorSpaceXform,    \
+    false)                                                                                        \
+  X(ConstColor, ChainISA::ConstColor, AOTConstColorParameters, constColor, false)                 \
   X(Blend, ChainISA::Blend, AOTBlendParameters, blend, false)
 
 namespace Op {

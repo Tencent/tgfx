@@ -24,7 +24,6 @@
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/Program.h"
-#include "gpu/shaders/contract/DrawFacts.h"
 #include "gpu/aot/select/KernelTable.h"
 #include "gpu/aot/select/PermutationMatch.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
@@ -43,6 +42,7 @@
 #include "gpu/processors/RoundStrokeRectGeometryProcessor.h"
 #include "gpu/processors/ShapeInstancedGeometryProcessor.h"
 #include "gpu/shaders/AllShaderFamilies.h"
+#include "gpu/shaders/contract/DrawFacts.h"
 #include "tgfx/core/BytesKey.h"
 
 namespace tgfx {

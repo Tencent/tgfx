@@ -43,7 +43,6 @@ void AppendSpecConstants(const std::vector<SpecFieldInfo>& fields, const SpecVal
   }
 }
 
-
 /// Driver source text (GLSL and HLSL): prepends one `#define <prefix><id> <value>` line per
 /// captured value. The stored text declares each value as an idempotent macro default — GLSL's
 /// `#ifndef TGFX_SPEC_<id>` block (the emitter rewrites the generated const into it), HLSL's

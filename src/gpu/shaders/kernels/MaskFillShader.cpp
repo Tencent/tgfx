@@ -19,8 +19,8 @@
 #include "gpu/shaders/kernels/MaskFillShader.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/aot/ir/DrawIR.h"
-#include "gpu/shaders/contract/DrawFacts.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
+#include "gpu/shaders/contract/DrawFacts.h"
 
 namespace tgfx {
 

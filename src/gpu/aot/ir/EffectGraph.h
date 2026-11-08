@@ -467,7 +467,6 @@ class AOTNodeBuilder {
  private:
   friend class FragmentProcessor;
 
-
   void recordMissingLowering(const FragmentProcessor* processor) {
     if (missingLowering == nullptr) {
       missingLowering = processor;

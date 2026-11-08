@@ -16,7 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/shaders/contract/DrawFacts.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/Swizzle.h"
 #include "gpu/aot/ir/DrawIR.h"
@@ -25,6 +24,7 @@
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/shaders/PrecompiledShader.h"
+#include "gpu/shaders/contract/DrawFacts.h"
 
 namespace tgfx {
 

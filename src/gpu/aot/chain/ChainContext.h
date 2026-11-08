@@ -20,9 +20,9 @@
 
 #include <vector>
 #include "gpu/aot/AOTResourceProfile.h"
+#include "gpu/aot/chain/AOTChainRegisterAllocator.h"
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/aot/ir/Program.h"
-#include "gpu/aot/chain/AOTChainRegisterAllocator.h"
 
 namespace tgfx {
 

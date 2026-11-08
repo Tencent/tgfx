@@ -23,8 +23,8 @@
 #include <optional>
 #include <utility>
 #include <vector>
-#include "gpu/shaders/contract/DrawFacts.h"
 #include "gpu/shaders/ShaderFamily.h"
+#include "gpu/shaders/contract/DrawFacts.h"
 
 namespace tgfx {
 

@@ -35,11 +35,11 @@
 #include <set>
 #include <vector>
 #include "base/TGFXTest.h"
-#include "gpu/shaders/contract/DrawFacts.h"
 #include "gpu/aot/select/PermutationMatch.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/shaders/AllShaderFamilies.h"
 #include "gpu/shaders/ShaderFamily.h"
+#include "gpu/shaders/contract/DrawFacts.h"
 #include "gtest/gtest.h"
 
 namespace tgfx {
