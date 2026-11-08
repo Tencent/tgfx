@@ -149,6 +149,18 @@ bool ExpandIncludes(const std::string& source, const std::string& shaderRoot, Fi
   return true;
 }
 
+// Expands one top-level stage text (read from disk or handed in by a declaration emitter).
+bool ExpandStage(const std::string& source, const std::string& path, const std::string& shaderRoot,
+                 FileCache* files, std::string* expanded, std::string* error) {
+  if (source.empty()) {
+    *error = path + " is empty";
+    return false;
+  }
+  auto normalized = NormalizePath(path);
+  std::vector<std::string> chain = {normalized};
+  return ExpandIncludes(source, shaderRoot, files, &chain, expanded, error);
+}
+
 // Reads one top-level shader file and expands its includes. A missing or empty top-level file is
 // an error, as it always was.
 bool LoadStage(const std::string& path, const std::string& shaderRoot, FileCache* files,
@@ -158,13 +170,7 @@ bool LoadStage(const std::string& path, const std::string& shaderRoot, FileCache
     *error = "cannot read " + path;
     return false;
   }
-  if (source.empty()) {
-    *error = path + " is empty";
-    return false;
-  }
-  auto normalized = NormalizePath(path);
-  std::vector<std::string> chain = {normalized};
-  return ExpandIncludes(source, shaderRoot, files, &chain, expanded, error);
+  return ExpandStage(source, path, shaderRoot, files, expanded, error);
 }
 
 }  // namespace
@@ -197,7 +203,8 @@ bool ReadGeneratorContract(const std::string& shaderDir, std::string* text, std:
   return true;
 }
 
-ShaderSourceSet LoadShaderSources(const std::string& shaderDir) {
+ShaderSourceSet LoadShaderSources(const std::string& shaderDir,
+                                  const std::map<std::string, std::string>* stageOverrides) {
   ShaderSourceSet set;
   for (const auto& factory : ShaderRegistry::All()) {
     set.shaders.push_back(ShaderSource{factory()->info(), "", ""});
@@ -208,13 +215,40 @@ ShaderSourceSet LoadShaderSources(const std::string& shaderDir) {
             });
   FileCache files;
   for (auto& shader : set.shaders) {
+    const std::string* vertexOverride = nullptr;
+    const std::string* fragmentOverride = nullptr;
+    if (stageOverrides != nullptr) {
+      auto found = stageOverrides->find(shader.info.vertexFile);
+      if (found != stageOverrides->end()) {
+        vertexOverride = &found->second;
+      }
+      found = stageOverrides->find(shader.info.fragmentFile);
+      if (found != stageOverrides->end()) {
+        fragmentOverride = &found->second;
+      }
+    }
     std::string error;
-    if (!LoadStage(shaderDir + "/" + shader.info.vertexFile, shaderDir, &files, &shader.vertex,
-                   &error)) {
+    const std::string vertexPath = shaderDir + "/" + shader.info.vertexFile;
+    const bool vertexOk =
+        vertexOverride != nullptr
+            ? ExpandStage(*vertexOverride, vertexPath, shaderDir, &files, &shader.vertex, &error)
+            : LoadStage(vertexPath, shaderDir, &files, &shader.vertex, &error);
+    if (vertexOk && vertexOverride != nullptr) {
+      ++set.overrideHits;
+    }
+    if (!vertexOk) {
       set.errors.push_back(shader.info.name + " vertex: " + error);
     }
-    if (!LoadStage(shaderDir + "/" + shader.info.fragmentFile, shaderDir, &files, &shader.fragment,
-                   &error)) {
+    const std::string fragmentPath = shaderDir + "/" + shader.info.fragmentFile;
+    const bool fragmentOk =
+        fragmentOverride != nullptr
+            ? ExpandStage(*fragmentOverride, fragmentPath, shaderDir, &files, &shader.fragment,
+                          &error)
+            : LoadStage(fragmentPath, shaderDir, &files, &shader.fragment, &error);
+    if (fragmentOk && fragmentOverride != nullptr) {
+      ++set.overrideHits;
+    }
+    if (!fragmentOk) {
       set.errors.push_back(shader.info.name + " fragment: " + error);
     }
   }

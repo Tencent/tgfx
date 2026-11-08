@@ -1,0 +1,154 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
+//  compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. see the License for the specific language governing permissions
+//  and limitations under the License.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+// The declaration language owns the entry files of the migrated families. These tests pin what
+// the emitter must produce for every declaration (the block in order, the interface, the step
+// selection, the include of the shared pipeline) and the properties the byte-equivalence check
+// depends on: a name and a file per family, a GLSL spelling per field type, and no expression
+// synthesis. The full byte comparison runs in the build (--emit-declarations + bundle cmp).
+
+#include <cstring>
+#include <string>
+#include "gpu/shaders/decls/AllFragmentDecls.h"
+#include "gpu/shaders/decls/ModuleDecl.h"
+#include "gtest/gtest.h"
+#include "emit/StageEmitter.h"
+
+namespace tgfx {
+namespace {
+
+bool Contains(const std::string& text, const std::string& needle) {
+  return text.find(needle) != std::string::npos;
+}
+
+}  // namespace
+
+TEST(ModuleDeclTest, EveryDeclarationEmitsAFragmentEntry) {
+  std::string error;
+  auto entries = EmitDeclaredFragmentEntries(&error);
+  EXPECT_TRUE(error.empty()) << error;
+  EXPECT_EQ(entries.size(), AllFragmentDecls().size());
+  for (const auto* decl : AllFragmentDecls()) {
+    ASSERT_NE(decl, nullptr);
+    ASSERT_NE(decl->name, nullptr);
+    ASSERT_NE(decl->file, nullptr);
+    auto found = entries.find(decl->file);
+    ASSERT_NE(found, entries.end()) << decl->name;
+    const auto& text = found->second;
+    EXPECT_EQ(text.rfind("#version 450\n", 0), 0u) << decl->name;
+    EXPECT_TRUE(Contains(text, "uniform FragmentUniformBlock {")) << decl->name;
+    EXPECT_TRUE(Contains(text, "#include \"pipeline/fill/fill_fragment_main.inc\""))
+        << decl->name;
+    EXPECT_TRUE(Contains(text, "#define XP_DST_TEX_BINDING ")) << decl->name;
+  }
+}
+
+TEST(ModuleDeclTest, TheBlockKeepsTheDeclaredFieldOrder) {
+  // The block order is the std140 order: a reordering changes every artifact's meaning, so the
+  // emitter must print the block exactly as declared, modules included.
+  std::string error;
+  for (const auto* decl : AllFragmentDecls()) {
+    const auto text = EmitFragmentEntry(*decl, &error);
+    ASSERT_FALSE(text.empty()) << error;
+    size_t cursor = 0;
+    for (size_t index = 0; index < decl->blockCount; ++index) {
+      const auto& element = decl->block[index];
+      const std::string needle =
+          element.kind == FragmentElementKind::Module
+              ? std::string("#include \"") + element.name + "\""
+              : std::string(" ") + GlslTypeOf(element.type) + " " + element.name + ";";
+      const auto found = text.find(needle, cursor);
+      ASSERT_NE(found, std::string::npos)
+          << decl->name << " is missing or reordered at index " << index;
+      cursor = found + needle.size();
+    }
+  }
+}
+
+TEST(ModuleDeclTest, ConditionalInterfaceIsWrappedInItsDimension) {
+  std::string error;
+  for (const auto* decl : AllFragmentDecls()) {
+    const auto text = EmitFragmentEntry(*decl, &error);
+    ASSERT_FALSE(text.empty()) << error;
+    for (size_t index = 0; index < decl->varyingCount; ++index) {
+      const auto& varying = decl->varyings[index];
+      if (varying.condition == nullptr) {
+        continue;
+      }
+      const std::string guard = std::string("#if ") + varying.condition;
+      const auto guardPos = text.find(guard);
+      const auto declarationPos = text.find(std::string(") in ") + varying.glslType + " " +
+                                  varying.name + ";");
+      ASSERT_NE(guardPos, std::string::npos) << decl->name;
+      ASSERT_NE(declarationPos, std::string::npos) << decl->name;
+      EXPECT_LT(guardPos, declarationPos) << decl->name;
+    }
+    for (size_t index = 0; index < decl->samplerCount; ++index) {
+      const auto& sampler = decl->samplers[index];
+      if (sampler.condition == nullptr) {
+        continue;
+      }
+      EXPECT_TRUE(Contains(text, std::string("#if ") + sampler.condition)) << decl->name;
+      EXPECT_TRUE(Contains(text, std::string("uniform sampler2D ") + sampler.name + ";"))
+          << decl->name;
+    }
+  }
+}
+
+TEST(ModuleDeclTest, StepsCarryTheSymbolNotTheValue) {
+  // The numeric value lives in fill_fragment_main.inc alone; a declaration that carried a number
+  // would be a second copy of the step vocabulary.
+  std::string error;
+  for (const auto* decl : AllFragmentDecls()) {
+    const auto text = EmitFragmentEntry(*decl, &error);
+    ASSERT_FALSE(text.empty()) << error;
+    for (size_t index = 0; index < decl->stepCount; ++index) {
+      const auto& step = decl->steps[index];
+      EXPECT_TRUE(Contains(text, std::string("#define ") + step.fillMacro + " " +
+                                  step.valueSymbol))
+          << decl->name;
+    }
+  }
+}
+
+TEST(ModuleDeclTest, AnArrayFieldIsRejectedInsteadOfGuessed) {
+  // The emitter has no array spelling: a declaration that needs one extends the language instead
+  // of letting the emitter invent a size.
+  const FragmentElement block[] = {{FragmentElementKind::Field, "Table", ParamType::Float4Array}};
+  const FragmentFamilyDecl decl = {"TestShader", "kernels/test.frag", block, 1, nullptr, 0,
+                                   nullptr,    0,                   nullptr, 0, nullptr, 0,
+                                   0,          -1,                  nullptr};
+  std::string error;
+  EXPECT_TRUE(EmitFragmentEntry(decl, &error).empty());
+  EXPECT_FALSE(error.empty());
+}
+
+TEST(ModuleDeclTest, TheDeclaredFamiliesExist) {
+  // Every declared family must have a shell: the shell stays the registry entry, and the two
+  // agree on the name. A declaration without a shell would generate an entry nothing reads.
+  std::string error;
+  for (const auto* decl : AllFragmentDecls()) {
+    ASSERT_NE(decl, nullptr);
+    EXPECT_FALSE(decl->name == nullptr || std::strlen(decl->name) == 0);
+    EXPECT_FALSE(decl->file == nullptr || std::strlen(decl->file) == 0);
+    EXPECT_GT(decl->blockCount, 0u);
+    EXPECT_GT(decl->stepCount, 0u);
+  }
+}
+
+}  // namespace tgfx

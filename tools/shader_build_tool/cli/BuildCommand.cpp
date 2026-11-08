@@ -44,6 +44,7 @@
 #include "core/Diagnostics.h"
 #include "emit/ChainOpsGLSL.h"
 #include "emit/ProfileEmitter.h"
+#include "emit/StageEmitter.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/AllShaderFamilies.h"
@@ -78,6 +79,8 @@ void PrintUsage() {
       << "  --compress            Compress data pool with zlib in output bundles\n"
       << "  --cache-dir <path>    Persistent stage cache (default: <out-dir>/stage_cache)\n"
       << "  --no-cache            Compile every stage, reading and writing no persistent cache\n"
+      << "  --emit-declarations   Compile the declared families from their generated fragment\n"
+      << "                        entries instead of the handwritten files (equivalence check)\n"
       << "  --metal-sdk <sdk>     Platform of the Metal bundle: macosx (default), iphoneos or\n"
       << "                        iphonesimulator. A metallib only works on its own platform\n"
       << "  --metal-min-os <ver>  Minimum OS version of the Metal bundle, e.g. 15.0\n"
@@ -519,6 +522,8 @@ bool ParseArgs(int argc, char** argv, BuildOptions* options) {
       options->cacheDir = argv[++i];
     } else if (std::strcmp(argv[i], "--no-cache") == 0) {
       options->noCache = true;
+    } else if (std::strcmp(argv[i], "--emit-declarations") == 0) {
+      options->emitDeclarations = true;
     } else if (std::strcmp(argv[i], "--metal-sdk") == 0 && i + 1 < argc) {
       options->metalSdk = argv[++i];
     } else if (std::strcmp(argv[i], "--metal-min-os") == 0 && i + 1 < argc) {
@@ -556,7 +561,32 @@ int RunBuildCommand(const BuildOptions& options) {
   std::string generatorContract;
   const bool compiling = !options.shaderDir.empty();
   if (compiling) {
-    sources = LoadShaderSources(options.shaderDir);
+    std::map<std::string, std::string> stageOverrides;
+    if (options.emitDeclarations) {
+      std::string emitError;
+      stageOverrides = EmitDeclaredFragmentEntries(&emitError);
+      if (stageOverrides.empty() && !emitError.empty()) {
+        RecordBuildError(&report.diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable,
+                         "", "", -1, -1, emitError);
+        PrintDiagnostics(report.diagnostics);
+        std::cerr << "Build failed: " << emitError << ".\n";
+        return 1;
+      }
+    }
+    sources = LoadShaderSources(options.shaderDir,
+                                stageOverrides.empty() ? nullptr : &stageOverrides);
+    if (!stageOverrides.empty() && sources.overrideHits != stageOverrides.size()) {
+      const auto message =
+          "generated stage entries did not reach the loader: " +
+          std::to_string(stageOverrides.size()) + " declared, " +
+          std::to_string(sources.overrideHits) +
+          " matched; the equivalence check would compare the handwritten files";
+      RecordBuildError(&report.diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable, "",
+                       "", -1, -1, message);
+      PrintDiagnostics(report.diagnostics);
+      std::cerr << "Build failed: " << message << ".\n";
+      return 1;
+    }
     if (!sources.ok) {
       for (const auto& error : sources.errors) {
         RecordBuildError(&report.diagnostics, Layer::Sources, DiagnosticCode::SourcesUnreadable,

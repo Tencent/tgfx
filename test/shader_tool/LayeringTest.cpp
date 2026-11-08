@@ -130,6 +130,9 @@ const std::set<std::string>& AllowedRuntimeHeaders() {
       "gpu/aot/bind/AOTParamRegistry.h",
       "gpu/shaders/AllShaderFamilies.h",
       "gpu/shaders/PrecompiledShader.h",
+      // the fragment-stage declaration language (the emitter walks these tables)
+      "gpu/shaders/decls/AllFragmentDecls.h",
+      "gpu/shaders/decls/ModuleDecl.h",
   };
   return allowed;
 }

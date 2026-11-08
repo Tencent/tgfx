@@ -1021,7 +1021,11 @@ if (TGFX_EMBED_SHADER_BUNDLES)
     # The contract header joins it for the same reason: it carries the ABI constant and the
     # binding layout the templates get their values injected from, so a change to either must
     # rebuild every bundle.
-    list(APPEND TGFX_SHADER_SOURCES
+    # The fragment-stage declarations generate the declared families' entries: their content is
+    # part of what a bundle is built from, so a declaration change must rebuild every bundle.
+    file(GLOB_RECURSE TGFX_SHADER_DECLARATIONS CONFIGURE_DEPENDS
+            src/gpu/shaders/decls/*.h)
+    list(APPEND TGFX_SHADER_SOURCES ${TGFX_SHADER_DECLARATIONS}
             "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/shaders/contract/ShaderBundleContract.h")
     if (TGFX_SHADER_BUNDLES_PREBUILT)
         # This build does not generate bundles; it consumes the ones published under

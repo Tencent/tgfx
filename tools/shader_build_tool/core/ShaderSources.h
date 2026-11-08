@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <map>
 #include <string>
 #include <vector>
 #include "gpu/shaders/PrecompiledShader.h"
@@ -42,6 +43,10 @@ struct ShaderSourceSet {
   std::vector<std::string> errors;
   /// Ordered by shader name, so iteration does not depend on registration order.
   std::vector<ShaderSource> shaders;
+  /// How many top-level stage files came from the caller's override map instead of the disk. The
+  /// caller asserts this reaches the map's size: a key the loader never matched would silently
+  /// compile the handwritten file and make an equivalence check pass on the wrong text.
+  size_t overrideHits = 0;
 
   /// Returns the shader with the given name, or nullptr.
   const ShaderSource* find(const std::string& name) const;
@@ -51,7 +56,12 @@ struct ShaderSourceSet {
 /// includes. A shader file that is missing or empty, an include that cannot be read, an include
 /// cycle, or nesting deeper than MaxIncludeDepth is an error: the build must not silently compile
 /// a shader with a hole in it.
-ShaderSourceSet LoadShaderSources(const std::string& shaderDir);
+///
+/// stageOverrides, when given, maps a family's file (its PrecompiledShaderInfo vertexFile or
+/// fragmentFile) to text that replaces the file's content before the include expansion. The
+/// declaration emitter uses it to compile the generated entries through the very same loader.
+ShaderSourceSet LoadShaderSources(const std::string& shaderDir,
+                                  const std::map<std::string, std::string>* stageOverrides = nullptr);
 
 /// The deepest include nesting LoadShaderSources accepts.
 inline constexpr int MaxIncludeDepth = 32;

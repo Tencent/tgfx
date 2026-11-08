@@ -1,0 +1,209 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2026 Tencent. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
+//  compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+//  either express or implied. see the License for the specific language governing permissions
+//  and limitations under the License.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include "emit/StageEmitter.h"
+
+#include <string>
+#include <utility>
+#include <vector>
+#include "gpu/shaders/decls/AllFragmentDecls.h"
+#include "gpu/shaders/decls/ModuleDecl.h"
+
+namespace tgfx {
+
+namespace {
+
+// The emitter prints declared names and paths only: every line below is a fixed template or a
+// spelling taken verbatim from the declaration, so it can never grow into a small compiler.
+class EntryWriter {
+ public:
+  explicit EntryWriter(std::string* error) : _error(error) {
+  }
+
+  bool Line(const std::string& text) {
+    _text += text;
+    _text += '\n';
+    return true;
+  }
+
+  bool Fail(const std::string& message) {
+    *_error = message;
+    return false;
+  }
+
+  std::string&& Take() {
+    return std::move(_text);
+  }
+
+ private:
+  std::string _text;
+  std::string* _error;
+};
+
+bool EmitDefines(EntryWriter* writer, const FragmentFamilyDecl& decl) {
+  for (size_t index = 0; index < decl.defineCount; ++index) {
+    const std::string define = decl.defines[index];
+    const auto separator = define.find('=');
+    if (separator == std::string::npos || separator == 0 || separator + 1 == define.size()) {
+      return writer->Fail("a declared define must spell NAME=VALUE: " + define);
+    }
+    writer->Line("#define " + define.substr(0, separator) + " " + define.substr(separator + 1));
+  }
+  return true;
+}
+
+bool EmitBlock(EntryWriter* writer, const FragmentFamilyDecl& decl) {
+  writer->Line(
+      "layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform "
+      "FragmentUniformBlock {");
+  for (size_t index = 0; index < decl.blockCount; ++index) {
+    const auto& element = decl.block[index];
+    if (element.name == nullptr) {
+      return writer->Fail("a uniform-block entry has no name");
+    }
+    if (element.kind == FragmentElementKind::Module) {
+      writer->Line(std::string("#include \"") + element.name + "\"");
+      continue;
+    }
+    const char* glslType = GlslTypeOf(element.type);
+    if (glslType == nullptr) {
+      return writer->Fail(std::string("the field '") + element.name +
+                          "' has a type the emitter cannot spell in GLSL");
+    }
+    writer->Line(std::string("  ") + glslType + " " + element.name + ";");
+  }
+  writer->Line("};");
+  return true;
+}
+
+bool EmitVarying(EntryWriter* writer, const VaryingDecl& varying) {
+  const std::string declaration = std::string("layout(location = ") +
+                                  std::to_string(varying.location) + ") in " +
+                                  varying.glslType + " " + varying.name + ";";
+  if (varying.condition == nullptr) {
+    return writer->Line(declaration);
+  }
+  writer->Line(std::string("#if ") + varying.condition);
+  writer->Line(declaration);
+  writer->Line("#endif");
+  return true;
+}
+
+bool EmitSampler(EntryWriter* writer, const SamplerDecl& sampler) {
+  const std::string declaration = std::string("layout(set = TGFX_TEXTURE_SET, binding = ") +
+                                  std::to_string(sampler.binding) + ") uniform sampler2D " +
+                                  sampler.name + ";";
+  if (sampler.condition == nullptr) {
+    return writer->Line(declaration);
+  }
+  writer->Line(std::string("#if ") + sampler.condition);
+  writer->Line(declaration);
+  writer->Line("#endif");
+  return true;
+}
+
+bool EmitStep(EntryWriter* writer, const StepDecl& step) {
+  const std::string selection =
+      std::string("#define ") + step.fillMacro + " " + step.valueSymbol;
+  if (step.condition == nullptr) {
+    return writer->Line(selection);
+  }
+  writer->Line(std::string("#if ") + step.condition);
+  writer->Line(selection);
+  writer->Line("#endif");
+  return true;
+}
+
+bool EmitXpDstBinding(EntryWriter* writer, const FragmentFamilyDecl& decl) {
+  if (decl.xpDstCondition == nullptr) {
+    return writer->Line("#define XP_DST_TEX_BINDING " + std::to_string(decl.xpDstBinding));
+  }
+  if (decl.xpDstBindingConditional < 0) {
+    return writer->Fail("a conditional XP dst binding needs both branches");
+  }
+  writer->Line(std::string("#if ") + decl.xpDstCondition);
+  writer->Line("#define XP_DST_TEX_BINDING " + std::to_string(decl.xpDstBindingConditional));
+  writer->Line("#else");
+  writer->Line("#define XP_DST_TEX_BINDING " + std::to_string(decl.xpDstBinding));
+  writer->Line("#endif");
+  return true;
+}
+
+}  // namespace
+
+std::string EmitFragmentEntry(const FragmentFamilyDecl& decl, std::string* error) {
+  if (error == nullptr) {
+    return {};
+  }
+  error->clear();
+  if (decl.name == nullptr || decl.file == nullptr) {
+    *error = "a declaration needs a family name and a file";
+    return {};
+  }
+  EntryWriter writer(error);
+  writer.Line("#version 450");
+  writer.Line("// Generated by shader_build_tool (emit/StageEmitter); do not edit.");
+  if (!EmitDefines(&writer, decl) || !EmitBlock(&writer, decl)) {
+    return {};
+  }
+  writer.Line("");
+  for (size_t index = 0; index < decl.varyingCount; ++index) {
+    if (!EmitVarying(&writer, decl.varyings[index])) {
+      return {};
+    }
+  }
+  writer.Line("");
+  for (size_t index = 0; index < decl.samplerCount; ++index) {
+    if (!EmitSampler(&writer, decl.samplers[index])) {
+      return {};
+    }
+  }
+  if (!EmitXpDstBinding(&writer, decl)) {
+    return {};
+  }
+  writer.Line("");
+  for (size_t index = 0; index < decl.stepCount; ++index) {
+    if (!EmitStep(&writer, decl.steps[index])) {
+      return {};
+    }
+  }
+  writer.Line("#include \"pipeline/fill/fill_fragment_main.inc\"");
+  return writer.Take();
+}
+
+std::map<std::string, std::string> EmitDeclaredFragmentEntries(std::string* error) {
+  std::map<std::string, std::string> entries;
+  if (error == nullptr) {
+    return entries;
+  }
+  error->clear();
+  for (const auto* decl : AllFragmentDecls()) {
+    if (decl == nullptr || decl->file == nullptr) {
+      *error = "a registered declaration is empty";
+      return {};
+    }
+    auto text = EmitFragmentEntry(*decl, error);
+    if (text.empty()) {
+      return {};
+    }
+    entries.emplace(decl->file, std::move(text));
+  }
+  return entries;
+}
+
+}  // namespace tgfx
