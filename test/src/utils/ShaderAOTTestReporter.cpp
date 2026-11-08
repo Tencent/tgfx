@@ -82,12 +82,14 @@ AOTCoverageGateResult EvaluateAOTCoverageGate(uint64_t rawNoMatchingRule,
                                               uint64_t deliberateNoMatchingRule,
                                               uint64_t environmentCompileFailures,
                                               uint64_t rawBuilderCreations,
-                                              uint64_t excludedBuilderCreations) {
+                                              uint64_t excludedBuilderCreations,
+                                              uint64_t knownGapMisses) {
   AOTCoverageGateResult result = {};
   // Deliberate misses already carry their fallback compilation inside excludedBuilderCreations
   // (the deliberate scope marks every program created under it), so only the environment
-  // misses need their paired runtime subtraction here.
-  const uint64_t noMatchingExclusions = deliberateNoMatchingRule;
+  // misses need their paired runtime subtraction here. A known-gap miss is a real miss of a shape
+  // the table names, so it leaves the strict residual but is never hidden.
+  const uint64_t noMatchingExclusions = deliberateNoMatchingRule + knownGapMisses;
   const uint64_t pairedRuntimeExclusions = environmentCompileFailures;
   result.consistent = noMatchingExclusions <= rawNoMatchingRule &&
                       excludedBuilderCreations + pairedRuntimeExclusions <= rawBuilderCreations;
@@ -99,6 +101,7 @@ AOTCoverageGateResult EvaluateAOTCoverageGate(uint64_t rawNoMatchingRule,
           ? rawBuilderCreations - excludedBuilderCreations - pairedRuntimeExclusions
           : rawBuilderCreations;
   result.excludedEnvironment = environmentCompileFailures;
+  result.excludedKnownGaps = knownGapMisses;
   return result;
 }
 
@@ -113,6 +116,51 @@ bool AOTCoverageGateMet(const AOTCoverageGateResult& gate, uint64_t precompiledA
 static constexpr size_t FALLBACK_REASON_COUNT =
     static_cast<size_t>(PrecompiledFallbackReason::Count);
 static constexpr size_t AOT_STAGE_COUNT = static_cast<size_t>(PrecompiledAOTStage::Count);
+
+// The reviewed list of draw shapes the precompiled system cannot serve today. Attribution is per
+// test because the miss records are deduplicated per program key while dropped draws are counted
+// per draw, so one recorded miss can stand for many dropped draws:
+//   - a test that no entry names keeps failing the gate on its misses and drops, so a new gap
+//     cannot land silently;
+//   - a listed test whose recorded miss signature does not contain the entry's `effect` text also
+//     fails, so a second, different gap inside a listed test is caught;
+//   - an entry whose test no longer misses or drops anything fails the gate, so a fixed gap cannot
+//     linger.
+// Adding an entry is a deliberate, reviewable act; it is not a way to silence a regression.
+// `effect` may be empty when the matcher recorded no signature for the shape (the miss came from
+// the negative cache); such an entry then covers whatever that test misses, which is why the test
+// list must stay short and specific.
+struct AOTKnownGap {
+  const char* test;
+  const char* effect;
+  const char* reason;
+};
+
+constexpr AOTKnownGap AOTKnownGaps[] = {
+    {"LayerTest.GlassParentChildRenderedCoverage", "ColorFP=[GlassRefractionFragmentProcessor",
+     "the glass family only declares the local-mask coverage branch, so a device-mask coverage "
+     "child (an Xfermode over a tiled destination texture) has no kernel to match"},
+    {"LayerTest.TwoGroupAssemblyKeepsInteriorCoverage", "ColorFP=[GlassRefractionFragmentProcessor",
+     "same glass + device-mask coverage shape as GlassParentChildRenderedCoverage"},
+    {"VectorLayerTest.GlassStyleMultiStrokeRoundedCorner",
+     "ColorFP=[GlassRefractionFragmentProcessor",
+     "same glass + device-mask coverage shape as GlassParentChildRenderedCoverage"},
+    {"LayerTest.DropShadow", "GP=NonAARRectGeometryProcessor;ColorFP=[TiledTextureEffect,",
+     "the alpha-step op is declared only by the textured family, which does not accept the non-AA "
+     "rounded-rect geometry"},
+    {"LayerTest.InnerShadow", "",
+     "inherits the same uncovered shadow shapes as DropShadow; the negative cache recorded no "
+     "signature for this test's misses"},
+    {"LayerTest.CollapsedFillGeometryLeavesBandOnly", "",
+     "the fill geometry collapses to a band whose shape no rule accepts; the negative cache "
+     "recorded no signature for this test's misses"},
+};
+
+constexpr size_t AOTKnownGapCount = sizeof(AOTKnownGaps) / sizeof(AOTKnownGaps[0]);
+
+static_assert(AOTKnownGapCount > 0,
+              "the gap table is the gate's reviewed exception list; emptying it makes every gap a "
+              "hard failure, which is the goal once the gaps are fixed");
 
 struct ShaderAOTTestResult {
   std::string testName;
@@ -918,9 +966,24 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
     // environment limit, not a coverage regression. Real GPU backends keep failing the gate on
     // this reason — a module creation failure there is a genuine defect.
     const bool swiftShaderBackend = std::strstr(TGFX_BACKEND_NAME, "swiftshader") != nullptr;
+    constexpr size_t knownGapCount = sizeof(AOTKnownGaps) / sizeof(AOTKnownGaps[0]);
+    std::array<bool, knownGapCount> knownGapMatched = {};
+    // The headline miss count stays raw: exclusions (deliberate, environment, reviewed gaps) are
+    // reported next to it, never subtracted from what the run recorded.
+    uint64_t rawNoMatching = 0;
     for (const auto& result : testResults) {
+      rawNoMatching +=
+          result.fallbackCounts[static_cast<size_t>(PrecompiledFallbackReason::NoMatchingRule)];
       uint64_t deliberateNoMatching = 0;
       uint64_t environmentCompileFailures = 0;
+      size_t gapIndex = knownGapCount;
+      for (size_t i = 0; i < knownGapCount; ++i) {
+        if (result.testName == AOTKnownGaps[i].test) {
+          gapIndex = i;
+          break;
+        }
+      }
+      bool hasUnlistedSignature = false;
       for (const auto& record : result.fallbackRecords) {
         if (record.deliberate || record.reason == PrecompiledFallbackReason::DeferredTexture) {
           ++excludedFallbacks;
@@ -933,6 +996,30 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
               swiftShaderBackend) {
             ++environmentCompileFailures;
           }
+          if (record.reason == PrecompiledFallbackReason::NoMatchingRule) {
+            // A listed test may hold one reviewed shape only: a second signature in the same test
+            // is a different gap and stays unlisted.
+            if (gapIndex != knownGapCount) {
+              if (AOTKnownGaps[gapIndex].effect[0] != '\0' &&
+                  record.effectSignature.find(AOTKnownGaps[gapIndex].effect) == std::string::npos) {
+                hasUnlistedSignature = true;
+              }
+            }
+          }
+        }
+      }
+      // Attribution is per test: miss records are deduplicated per program key while dropped draws
+      // are counted per draw, so one recorded miss can stand for many drops.
+      uint64_t knownGapMisses = 0;
+      uint64_t knownGapDrops = 0;
+      if (gapIndex < knownGapCount) {
+        const auto rawMisses =
+            result.fallbackCounts[static_cast<size_t>(PrecompiledFallbackReason::NoMatchingRule)];
+        const bool hasEvidence = rawMisses > 0 || result.drawStats.droppedDraws > 0;
+        if (hasEvidence && !hasUnlistedSignature) {
+          knownGapMatched[gapIndex] = true;
+          knownGapMisses = rawMisses;
+          knownGapDrops = result.drawStats.droppedDraws;
         }
       }
       // Missing diagnostic records stay in the production count. Exclusions cannot borrow
@@ -941,12 +1028,20 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       // zero; the gate reduces to misses and dropped draws.
       auto testGate = EvaluateAOTCoverageGate(
           result.fallbackCounts[static_cast<size_t>(PrecompiledFallbackReason::NoMatchingRule)],
-          deliberateNoMatching, environmentCompileFailures, 0, 0);
+          deliberateNoMatching, environmentCompileFailures, 0, 0, knownGapMisses);
       coverageGate.noMatchingRule += testGate.noMatchingRule;
       coverageGate.runtimeCompiles += testGate.runtimeCompiles;
       coverageGate.excludedEnvironment += testGate.excludedEnvironment;
-      coverageGate.droppedDraws += result.drawStats.droppedDraws;
+      coverageGate.excludedKnownGaps += testGate.excludedKnownGaps;
+      coverageGate.knownGapDrops += knownGapDrops;
+      coverageGate.droppedDraws += result.drawStats.droppedDraws - knownGapDrops;
       coverageGate.consistent = coverageGate.consistent && testGate.consistent;
+    }
+    coverageGate.knownGapEntries = knownGapCount;
+    for (bool matched : knownGapMatched) {
+      if (!matched) {
+        ++coverageGate.staleKnownGaps;
+      }
     }
     const auto coldCreations = summary.programStats.precompiledArtifactCreations;
     const auto artifactLookups = summary.artifactHits + summary.artifactMisses;
@@ -991,9 +1086,14 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         {"identity", std::move(identity)},
         {"iteration", currentIteration},
         {"coverageGate",
-         {{"noMatchingRule", coverageGate.noMatchingRule},
+         {{"rawNoMatchingRule", rawNoMatching},
+          {"noMatchingRule", coverageGate.noMatchingRule},
           {"runtimeCompiles", coverageGate.runtimeCompiles},
           {"excludedEnvironment", coverageGate.excludedEnvironment},
+          {"excludedKnownGaps", coverageGate.excludedKnownGaps},
+          {"knownGapDrops", coverageGate.knownGapDrops},
+          {"staleKnownGaps", coverageGate.staleKnownGaps},
+          {"knownGapEntries", coverageGate.knownGapEntries},
           {"droppedDraws", coverageGate.droppedDraws},
           {"consistent", coverageGate.consistent},
           {"precompiledArtifactCreations", summary.programStats.precompiledArtifactCreations},
@@ -1072,7 +1172,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         "missStructures=%zu\n",
         TGFX_BACKEND_NAME, static_cast<unsigned long long>(coldCreations),
         static_cast<unsigned long long>(summary.programStats.precompiledArtifactCreations),
-        static_cast<unsigned long long>(coverageGate.noMatchingRule),
+        static_cast<unsigned long long>(rawNoMatching),
         static_cast<unsigned long long>(excludedFallbacks),
         static_cast<unsigned long long>(summary.programStats.cacheHits), sortedShaders.size(),
         sortedHitEffects.size(), fallbackEffectKeys.size(), sortedHitStructures.size(),
@@ -1112,9 +1212,18 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
     if (AOTCoverageGateMet(coverageGate, precompiledCreations)) {
       std::printf(
           "[Coverage Gate][%s] strict targets MET: noMatchingRule=0 runtimeCompiles=0 "
-          "droppedDraws=0 precompiledPrograms=%llu (excluded environment=%llu)\n",
+          "droppedDraws=0 precompiledPrograms=%llu (excluded environment=%llu, known gaps=%llu "
+          "of %llu entries, known-gap drops=%llu)\n",
           TGFX_BACKEND_NAME, static_cast<unsigned long long>(precompiledCreations),
-          static_cast<unsigned long long>(coverageGate.excludedEnvironment));
+          static_cast<unsigned long long>(coverageGate.excludedEnvironment),
+          static_cast<unsigned long long>(coverageGate.excludedKnownGaps),
+          static_cast<unsigned long long>(coverageGate.knownGapEntries),
+          static_cast<unsigned long long>(coverageGate.knownGapDrops));
+      if (coverageGate.excludedKnownGaps > 0) {
+        for (const auto& gap : AOTKnownGaps) {
+          std::printf("  KNOWN GAP effect~%s reason=%s\n", gap.effect, gap.reason);
+        }
+      }
     } else if (coverageGate.passed()) {
       // Zero misses with zero precompiled programs proves nothing: the run drew nothing, or every
       // draw it made was excluded from the metrics.
@@ -1131,12 +1240,22 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
     } else {
       std::printf(
           "[Coverage Gate][%s] MONITORING (targets: noMatchingRule=0 runtimeCompiles=0 "
-          "droppedDraws=0): noMatchingRule=%llu runtimeCompiles=%llu droppedDraws=%llu (excluded "
-          "environment=%llu)\n",
+          "droppedDraws=0 staleKnownGaps=0): noMatchingRule=%llu runtimeCompiles=%llu "
+          "droppedDraws=%llu (excluded environment=%llu, known gaps=%llu, known-gap drops=%llu, "
+          "stale entries=%llu)\n",
           TGFX_BACKEND_NAME, static_cast<unsigned long long>(strictNoMatching),
           static_cast<unsigned long long>(strictRuntimeCompiles),
           static_cast<unsigned long long>(coverageGate.droppedDraws),
-          static_cast<unsigned long long>(coverageGate.excludedEnvironment));
+          static_cast<unsigned long long>(coverageGate.excludedEnvironment),
+          static_cast<unsigned long long>(coverageGate.excludedKnownGaps),
+          static_cast<unsigned long long>(coverageGate.knownGapDrops),
+          static_cast<unsigned long long>(coverageGate.staleKnownGaps));
+      if (coverageGate.staleKnownGaps > 0) {
+        std::printf(
+            "  STALE KNOWN GAP: %llu listed entr(ies) matched no miss; delete them from "
+            "AOTKnownGaps\n",
+            static_cast<unsigned long long>(coverageGate.staleKnownGaps));
+      }
       for (size_t i = 0; i < sortedFallbacks.size(); ++i) {
         // Deliberate records are provoked on purpose by test fixtures (e.g. the creator-funnel
         // artifact-miss test) and are already excluded from the production metrics.

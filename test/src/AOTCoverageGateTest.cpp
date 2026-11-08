@@ -496,6 +496,26 @@ TGFX_TEST(AOTCoverageGateTest, ProductionMetricsPreserveUnmarkedFailures) {
   EXPECT_EQ(stats.precompiledArtifactCreations, 0u);
 }
 
+// A listed gap leaves the strict residual but never disappears from the report, and a table entry
+// that describes nothing fails the gate: the exception list stays honest in both directions.
+TGFX_TEST(AOTCoverageGateTest, KnownGapsAreSurfacedNotHidden) {
+  auto listed = EvaluateAOTCoverageGate(3, 0, 0, 0, 0, 3);
+  EXPECT_TRUE(listed.passed());
+  EXPECT_EQ(listed.noMatchingRule, 0u);
+  EXPECT_EQ(listed.excludedKnownGaps, 3u);
+  // The exclusion may never subtract more than the run recorded.
+  EXPECT_FALSE(EvaluateAOTCoverageGate(2, 0, 0, 0, 0, 3).consistent);
+  // An unlisted miss stays a failure even when the table covers other shapes.
+  auto unlisted = EvaluateAOTCoverageGate(4, 0, 0, 0, 0, 3);
+  EXPECT_EQ(unlisted.noMatchingRule, 1u);
+  EXPECT_FALSE(unlisted.passed());
+  // A stale entry is a cleanup debt, not a silent pass.
+  auto stale = EvaluateAOTCoverageGate(0, 0, 0, 0, 0, 0);
+  stale.staleKnownGaps = 1;
+  EXPECT_FALSE(stale.passed());
+  EXPECT_FALSE(AOTCoverageGateMet(stale, 1));
+}
+
 TGFX_TEST(AOTCoverageGateTest, DeliberateScopeRestoresNestedState) {
   ContextScope scope;
   auto context = scope.getContext();

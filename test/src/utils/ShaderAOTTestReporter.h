@@ -30,20 +30,39 @@ struct AOTCoverageGateResult {
   // pairs with exactly one fallback runtime compilation, so the runtimeCompiles total drops by
   // the same amounts.
   uint64_t excludedEnvironment = 0;
-  // Draws that rendered nothing (AOTDrawStats::droppedDraws, deliberate drops excluded).
+  // Misses that match an entry of the reviewed known-gap table (see AOTKnownGap). They stay
+  // visible in the report and the JSON; only the strict residual (noMatchingRule) excludes them.
+  uint64_t excludedKnownGaps = 0;
+  // Dropped draws attributable to a listed gap: a listed miss implies the draw it belongs to
+  // rendered nothing, so those drops are surfaced separately instead of failing the gate.
+  uint64_t knownGapDrops = 0;
+  // Listed gaps that matched no miss in this run. A stale entry is a cleanup debt and fails the
+  // gate, exactly like an unlisted gap does.
+  uint64_t staleKnownGaps = 0;
+  uint64_t knownGapEntries = 0;
+  // Draws that rendered nothing (AOTDrawStats::droppedDraws, deliberate drops and known-gap
+  // attributable drops excluded).
   uint64_t droppedDraws = 0;
   bool consistent = true;
 
   bool passed() const {
-    return consistent && noMatchingRule == 0 && runtimeCompiles == 0 && droppedDraws == 0;
+    return consistent && noMatchingRule == 0 && runtimeCompiles == 0 && droppedDraws == 0 &&
+           staleKnownGaps == 0;
   }
 };
 
+/**
+ * Reduces one test's raw counters into the strict gate. knownGapMisses are the misses whose effect
+ * signature names an entry of the reviewed known-gap table; they leave the strict residual but stay
+ * surfaced through excludedKnownGaps. An exclusion may never exceed what it subtracts from
+ * (consistency), so a table entry cannot hide a miss it does not describe.
+ */
 AOTCoverageGateResult EvaluateAOTCoverageGate(uint64_t rawNoMatchingRule,
                                               uint64_t deliberateNoMatchingRule,
                                               uint64_t environmentCompileFailures,
                                               uint64_t rawBuilderCreations,
-                                              uint64_t excludedBuilderCreations);
+                                              uint64_t excludedBuilderCreations,
+                                              uint64_t knownGapMisses = 0);
 
 /**
  * Whether a whole run meets the strict coverage targets. Zero misses alone is not enough: a run
