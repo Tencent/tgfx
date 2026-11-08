@@ -161,6 +161,9 @@ struct FragmentFamilyDecl {
   /// `tgfx_spec_include`); they are replaced by the compile pipeline, never by a driver.
   const char* const* pragmas = nullptr;
   size_t pragmaCount = 0;
+  /// When set, the whole uniform block is conditional on this dimension (a family whose only
+  /// uniform is the XP block declares it only when HAS_XP is on).
+  const char* blockCondition = nullptr;
 };
 
 /// One block/interface/step element of a declaration list.

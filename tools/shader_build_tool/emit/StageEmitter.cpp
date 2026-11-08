@@ -68,6 +68,9 @@ bool EmitDefines(EntryWriter* writer, const FragmentFamilyDecl& decl) {
 }
 
 bool EmitBlock(EntryWriter* writer, const FragmentFamilyDecl& decl) {
+  if (decl.blockCondition != nullptr) {
+    writer->Line(std::string("#if ") + decl.blockCondition);
+  }
   writer->Line(
       "layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING) uniform "
       "FragmentUniformBlock {");
@@ -97,6 +100,9 @@ bool EmitBlock(EntryWriter* writer, const FragmentFamilyDecl& decl) {
     }
   }
   writer->Line("};");
+  if (decl.blockCondition != nullptr) {
+    writer->Line("#endif");
+  }
   return true;
 }
 
@@ -283,6 +289,10 @@ std::string EmitFragmentEntry(const FragmentFamilyDecl& decl, std::string* error
     if (!EmitStep(&writer, decl.steps[index])) {
       return {};
     }
+  }
+  if (decl.mainInclude == nullptr) {
+    writer.Fail("a declaration needs a pipeline template");
+    return {};
   }
   for (size_t index = 0; index < decl.extraIncludeCount; ++index) {
     writer.Line(std::string("#include \"") + decl.extraIncludes[index] + "\"");
