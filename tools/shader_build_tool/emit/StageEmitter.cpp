@@ -152,6 +152,55 @@ bool EmitStep(EntryWriter* writer, const StepDecl& step) {
   return true;
 }
 
+const SamplerDecl* FindSamplerGroup(const FragmentFamilyDecl& decl, const char* group) {
+  for (size_t index = 0; index < decl.samplerCount; ++index) {
+    const auto& sampler = decl.samplers[index];
+    if (sampler.name != nullptr && group != nullptr && std::string(sampler.name) == group) {
+      return &sampler;
+    }
+  }
+  return nullptr;
+}
+
+bool EmitInstanceDispatch(EntryWriter* writer, const FragmentFamilyDecl& decl,
+                          const InstanceDispatchDecl& dispatch) {
+  const auto* group = FindSamplerGroup(decl, dispatch.samplerGroup);
+  if (group == nullptr) {
+    return writer->Fail(std::string("the dispatch '") + dispatch.function +
+                        "' names no declared sampler group");
+  }
+  if (group->count < 2) {
+    return writer->Fail(std::string("the dispatch '") + dispatch.function +
+                        "' needs a sampler group of at least two instances");
+  }
+  const int count = group->count;
+  const auto samplerName = [&group](int index) {
+    return std::string(group->name) + std::to_string(index);
+  };
+  if (dispatch.condition != nullptr) {
+    writer->Line(std::string("#if ") + dispatch.condition);
+  }
+  writer->Line(std::string(dispatch.returnType) + " " + dispatch.function + "(int leafIndex, " +
+               dispatch.coordinateType + " coord, int readSwizzle) {");
+  writer->Line("  vec4 color;");
+  for (int index = 0; index < count - 1; ++index) {
+    writer->Line(index == 0 ? "  if (leafIndex == 0) {"
+                            : "  } else if (leafIndex == " + std::to_string(index) + ") {");
+    writer->Line("    color = texture(" + samplerName(index) + ", coord);");
+  }
+  writer->Line("  } else {");
+  writer->Line("    color = texture(" + samplerName(count - 1) + ", coord);");
+  writer->Line("  }");
+  writer->Line(dispatch.swizzleFunction == nullptr
+                   ? std::string("  return color;")
+                   : std::string("  return ") + dispatch.swizzleFunction + "(color, readSwizzle);");
+  writer->Line("}");
+  if (dispatch.condition != nullptr) {
+    writer->Line("#endif");
+  }
+  return true;
+}
+
 std::string XpDstBindingText(int value, const char* expression) {
   if (expression != nullptr) {
     return expression;
@@ -208,6 +257,11 @@ std::string EmitFragmentEntry(const FragmentFamilyDecl& decl, std::string* error
   }
   if (!EmitXpDstBinding(&writer, decl)) {
     return {};
+  }
+  for (size_t index = 0; index < decl.dispatchCount; ++index) {
+    if (!EmitInstanceDispatch(&writer, decl, decl.dispatches[index])) {
+      return {};
+    }
   }
   writer.Line("");
   for (size_t index = 0; index < decl.stepCount; ++index) {

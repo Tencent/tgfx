@@ -176,6 +176,32 @@ TEST(ModuleDeclTest, TheChainInterfaceIsExpressible) {
   EXPECT_TRUE(text.find("#define XP_DST_TEX_BINDING (NTEX + 1)") != std::string::npos);
 }
 
+TEST(ModuleDeclTest, TheInstanceDispatchMatchesTheHandwrittenForm) {
+  // The generated reader must be the handwritten aotChainRead verbatim: one static pick per
+  // instance, the last instance as the else arm (an out-of-range index reads it, which is the
+  // handwritten behavior the migration must preserve).
+  std::string error;
+  const auto text = EmitFragmentEntry(ChainInterfaceDecl::Decl, &error);
+  ASSERT_FALSE(text.empty()) << error;
+  const std::string expected =
+      "#if NTEX > 0\n"
+      "vec4 aotChainRead(int leafIndex, vec2 coord, int readSwizzle) {\n"
+      "  vec4 color;\n"
+      "  if (leafIndex == 0) {\n"
+      "    color = texture(TextureSampler_0, coord);\n"
+      "  } else if (leafIndex == 1) {\n"
+      "    color = texture(TextureSampler_1, coord);\n"
+      "  } else if (leafIndex == 2) {\n"
+      "    color = texture(TextureSampler_2, coord);\n"
+      "  } else {\n"
+      "    color = texture(TextureSampler_3, coord);\n"
+      "  }\n"
+      "  return aotReadSwizzle(color, readSwizzle);\n"
+      "}\n"
+      "#endif\n";
+  EXPECT_TRUE(text.find(expected) != std::string::npos) << text;
+}
+
 TEST(ModuleDeclTest, EveryFragmentDimensionIsReferencedByTheGeneratedText) {
   // The runtime test that pins this for handwritten families cannot read a generated entry, so the
   // declaration path checks the same property here: every fragment dimension of the shell must

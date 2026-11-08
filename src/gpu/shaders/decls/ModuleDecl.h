@@ -97,6 +97,23 @@ struct StepDecl {
 };
 
 /**
+ * One generated dispatch over a sampler instance group: the interpreters read leaf k through a
+ * compile-time sampler pick because GLSL ES and WGSL cannot index a sampler dynamically. The
+ * instance count is not repeated here — it is the referenced sampler group's count, so the two
+ * cannot drift.
+ */
+struct InstanceDispatchDecl {
+  const char* function = nullptr;
+  /// The Samplers entry's name (the group prefix) this dispatch selects among.
+  const char* samplerGroup = nullptr;
+  const char* returnType = nullptr;
+  const char* coordinateType = nullptr;
+  /// The swizzle decoder applied to every read, or null when the read is returned verbatim.
+  const char* swizzleFunction = nullptr;
+  const char* condition = nullptr;
+};
+
+/**
  * The fragment entry of one declared family: its identity, the file the loader would read (also
  * the override key the emitter's text replaces), the uniform block, the interface, and the step
  * selection.
@@ -123,6 +140,9 @@ struct FragmentFamilyDecl {
   const char* xpDstCondition = nullptr;
   const char* xpDstBindingExpr = nullptr;
   const char* xpDstBindingConditionalExpr = nullptr;
+  /// The generated sampler dispatches (one per instance group), or null when none.
+  const InstanceDispatchDecl* dispatches = nullptr;
+  size_t dispatchCount = 0;
 };
 
 /// One block/interface/step element of a declaration list.

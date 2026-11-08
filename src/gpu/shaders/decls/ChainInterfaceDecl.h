@@ -80,15 +80,31 @@ struct ChainInterfaceDecl {
       {"MaskTextureSampler", 0, 1, "NTEX", "NTEX > 0 || HAS_MASK_TEXTURE"},
   };
 
-  static constexpr FragmentFamilyDecl Decl = {Name,        File,
-                                              Block,       std::size(Block),
-                                              Varyings,    std::size(Varyings),
-                                              Samplers,    std::size(Samplers),
-                                              nullptr,     0,
-                                              nullptr,     0,
-                                              0,           -1,
-                                              "NTEX > 0",  "NTEX",
-                                              "(NTEX + 1)"};
+  // The leaf reader: one static sampler pick per instance (GLSL ES and WGSL cannot index a
+  // sampler dynamically), then the shared read swizzle. The instance count is the sampler group's.
+  static constexpr InstanceDispatchDecl Dispatches[] = {
+      {"aotChainRead", "TextureSampler_", "vec4", "vec2", "aotReadSwizzle", "NTEX > 0"},
+  };
+
+  static constexpr FragmentFamilyDecl Decl = {Name,
+                                              File,
+                                              Block,
+                                              std::size(Block),
+                                              Varyings,
+                                              std::size(Varyings),
+                                              Samplers,
+                                              std::size(Samplers),
+                                              nullptr,
+                                              0,
+                                              nullptr,
+                                              0,
+                                              0,
+                                              -1,
+                                              "NTEX > 0",
+                                              "NTEX",
+                                              "(NTEX + 1)",
+                                              Dispatches,
+                                              std::size(Dispatches)};
 };
 
 }  // namespace tgfx
