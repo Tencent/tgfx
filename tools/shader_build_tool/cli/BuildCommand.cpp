@@ -79,8 +79,9 @@ void PrintUsage() {
       << "  --compress            Compress data pool with zlib in output bundles\n"
       << "  --cache-dir <path>    Persistent stage cache (default: <out-dir>/stage_cache)\n"
       << "  --no-cache            Compile every stage, reading and writing no persistent cache\n"
-      << "  --emit-declarations   Compile the declared families from their generated fragment\n"
-      << "                        entries instead of the handwritten files (equivalence check)\n"
+      << "  --no-emit-declarations\n"
+      << "                        Read the declared families' handwritten fragment files instead\n"
+      << "                        of their generated entries (diagnostic for a generator defect)\n"
       << "  --metal-sdk <sdk>     Platform of the Metal bundle: macosx (default), iphoneos or\n"
       << "                        iphonesimulator. A metallib only works on its own platform\n"
       << "  --metal-min-os <ver>  Minimum OS version of the Metal bundle, e.g. 15.0\n"
@@ -522,8 +523,8 @@ bool ParseArgs(int argc, char** argv, BuildOptions* options) {
       options->cacheDir = argv[++i];
     } else if (std::strcmp(argv[i], "--no-cache") == 0) {
       options->noCache = true;
-    } else if (std::strcmp(argv[i], "--emit-declarations") == 0) {
-      options->emitDeclarations = true;
+    } else if (std::strcmp(argv[i], "--no-emit-declarations") == 0) {
+      options->emitDeclarations = false;
     } else if (std::strcmp(argv[i], "--metal-sdk") == 0 && i + 1 < argc) {
       options->metalSdk = argv[++i];
     } else if (std::strcmp(argv[i], "--metal-min-os") == 0 && i + 1 < argc) {

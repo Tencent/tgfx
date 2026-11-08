@@ -42,9 +42,11 @@ struct BuildOptions {
   // Persistent stage cache. Defaults to <out-dir>/stage_cache; --no-cache keeps it memory-only.
   std::string cacheDir;
   bool noCache = false;
-  /// Set by --emit-declarations: the declared families' fragment entries are generated from their
-  /// declarations instead of read from disk. Off by default; the equivalence check runs it on.
-  bool emitDeclarations = false;
+  /// The declared families' fragment entries are generated from their declarations instead of
+  /// read from disk. On by default; --no-emit-declarations re-reads the handwritten files, which
+  /// exists only for diagnosing a generator defect (the files are removed once the migration
+  /// completes).
+  bool emitDeclarations = true;
   // The platform the Metal bundle is compiled for (see SetMetalTarget).
   std::string metalSdk = "macosx";
   /// What a d3d12 bundle stores: dxbc (bytecode compiled here, the default) or hlsl (source the
