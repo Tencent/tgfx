@@ -34,6 +34,7 @@
 #include "gpu/ShaderCache.h"
 #include "gpu/Uniform.h"
 #include "gpu/UniformData.h"
+#include "gpu/aot/bundle/BundleData.h"
 #include "gpu/aot/plan/AOTEffectDecomposer.h"
 #include "gpu/aot/spec/SpecSource.h"
 #include "gpu/shaders/contract/AOTFailure.h"
@@ -45,29 +46,8 @@ namespace tgfx {
 class Context;
 enum class AOTDecomposeOutcome;
 
-// One vertex-stage input recorded in the bundle (format v5): the attribute slot layout the .vert
-// declares. The runtime binds attributes by location, so a mismatch with what the geometry
-// processor emits is a layout contract violation the loader can now detect.
-struct VertexInput {
-  std::string name;
-  UniformFormat format = UniformFormat::Float;
-  uint32_t location = 0;
-};
-
-/// One uniform field the runtime may freeze at pipeline creation (the spec table a bundle's
-/// fragment stage carries). firstId is where the injected constant ids start; an ivec4 array
-/// consumes four ids per element, element-major, and id 0 is the master switch.
-struct ShaderStageBlob {
-  std::vector<uint8_t> data;
-  std::vector<Uniform> uniforms;
-  std::vector<Uniform> samplers;
-  std::vector<VertexInput> vertexInputs;
-  std::vector<SpecFieldInfo> specFields;
-};
-
-// The vocabulary lives in gpu/shaders/contract/AOTFailure.h: the cache's fallback categories and the matcher's
-// rejection reasons are one enum, so a new reason is appended once. This name remains as an alias
-// for the cache-side readers.
+// The bundle data model (stages, keys, the parsed bundle) lives in BundleData.h: the reader that
+// fills it and this cache that stores it are separate translation units.
 
 /// What happened to the bundle embedded in the library when a Context was created.
 enum class EmbeddedBundleState : uint8_t {
@@ -491,36 +471,11 @@ class PrecompiledShaderCache : public SpecSource {
   const std::vector<SpecFieldInfo>* findFragmentSpecFields(uint64_t hashHi,
                                                            uint64_t hashLo) const override;
 
-  struct HashKey {
-    uint64_t hi;
-    uint64_t lo;
-    bool operator==(const HashKey& other) const {
-      return hi == other.hi && lo == other.lo;
-    }
-    bool operator<(const HashKey& other) const {
-      return hi != other.hi ? hi < other.hi : lo < other.lo;
-    }
-  };
+  using HashKey = BundleStageKey;
 
-  struct HashKeyHasher {
-    size_t operator()(const HashKey& k) const {
-      return static_cast<size_t>(k.hi ^ (k.lo * 0x9E3779B97F4A7C15ULL));
-    }
-  };
+  using HashKeyHasher = BundleStageKeyHasher;
 
  private:
-  /// The immutable parse of one bundle. loadBundle() shares one instance per (identity hash, byte
-  /// size) across every cache in the process, so an embedded bundle is parsed once rather than
-  /// once per Context; the parse is contended-free read-only afterwards.
-  struct ParsedBundle {
-    std::string profileTag;
-    uint64_t identityHash = 0;
-    uint32_t toolchainABI = 0;
-    uint16_t payloadFormat = BundleFormat::Payload::Text;
-    std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> vertEntries;
-    std::unordered_map<HashKey, ShaderStageBlob, HashKeyHasher> fragEntries;
-  };
-
   struct SharedBundleKeyHasher {
     size_t operator()(const std::pair<uint64_t, size_t>& key) const {
       return static_cast<size_t>(key.first ^ (key.second * 0x9E3779B97F4A7C15ULL));
