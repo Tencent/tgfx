@@ -173,6 +173,8 @@ struct FragmentFamilyDecl {
   { FragmentElementKind::Module, path, ParamType::Float }
 #define TGFX_DECL_ELEMENT_ConditionalModule(path, condition) \
   { FragmentElementKind::Module, path, ParamType::Float, nullptr, condition }
+#define TGFX_DECL_ELEMENT_ConditionalField(type, name, condition) \
+  { FragmentElementKind::Field, #name, ParamType::type, nullptr, condition }
 
 /// The GLSL spelling of one uniform field type. An array kind has no scalar spelling: a family
 /// that needs an array extends the declaration instead of guessing a size here.

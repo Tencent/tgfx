@@ -20,7 +20,12 @@
 
 #include <vector>
 #include "gpu/shaders/decls/EllipseFillDecl.h"
+#include "gpu/shaders/decls/HairlineLineFillDecl.h"
+#include "gpu/shaders/decls/HairlineQuadFillDecl.h"
+#include "gpu/shaders/decls/MaskFillDecl.h"
+#include "gpu/shaders/decls/MeshFillDecl.h"
 #include "gpu/shaders/decls/PointwiseChainDecl.h"
+#include "gpu/shaders/decls/QuadColorFillDecl.h"
 #include "gpu/shaders/decls/QuadTextureFillDecl.h"
 #include "gpu/shaders/decls/SolidColorFillDecl.h"
 
@@ -32,8 +37,9 @@ namespace tgfx {
 /// entry, and the two agree on the family name (pinned by a static_assert in every shell).
 inline const std::vector<const FragmentFamilyDecl*>& AllFragmentDecls() {
   static const std::vector<const FragmentFamilyDecl*> decls = {
-      &SolidColorFillDecl::Decl, &EllipseFillDecl::Decl, &QuadTextureFillDecl::Decl,
-      &PointwiseChainDecl::Decl};
+      &SolidColorFillDecl::Decl, &EllipseFillDecl::Decl,      &QuadTextureFillDecl::Decl,
+      &QuadColorFillDecl::Decl,  &HairlineLineFillDecl::Decl, &HairlineQuadFillDecl::Decl,
+      &MeshFillDecl::Decl,       &MaskFillDecl::Decl,         &PointwiseChainDecl::Decl};
   return decls;
 }
 
