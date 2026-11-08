@@ -29,7 +29,7 @@
 #include "core/DiagnosticCodes.h"
 #include "gpu/aot/AOTResourceProfile.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
-#include "gpu/aot/AOTParamRegistry.h"
+#include "gpu/aot/bind/AOTParamRegistry.h"
 #include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/PrecompiledShader.h"
 

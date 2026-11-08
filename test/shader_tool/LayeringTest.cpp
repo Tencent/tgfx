@@ -126,7 +126,7 @@ const std::set<std::string>& AllowedRuntimeHeaders() {
       "gpu/shaders/BundleCodec.h",
       "gpu/shaders/KernelContract.h",
       // declaration layer
-      "gpu/aot/AOTParamRegistry.h",
+      "gpu/aot/bind/AOTParamRegistry.h",
       "gpu/shaders/AllShaderFamilies.h",
       "gpu/shaders/PrecompiledShader.h",
   };

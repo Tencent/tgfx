@@ -22,7 +22,7 @@
 #include <cstring>
 #include <string>
 #include "core/utils/Log.h"
-#include "gpu/aot/AOTParamRegistry.h"
+#include "gpu/aot/bind/AOTParamRegistry.h"
 
 namespace tgfx {
 UniformData::UniformData(std::vector<Uniform> uniforms) : _uniforms(std::move(uniforms)) {

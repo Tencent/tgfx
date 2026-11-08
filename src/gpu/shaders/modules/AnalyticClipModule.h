@@ -2,6 +2,7 @@
 // side) a precompiled kernel reads from a rect or rounded-rect effect, declared once and bound
 // from the FP. The rect form selects the branch through HasClip 1/3, the rrect form through 2.
 #pragma once
+#include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/modules/ParamHandle.h"
 
 namespace tgfx {
@@ -9,14 +10,14 @@ namespace tgfx {
 class FragmentProcessor;
 
 struct AnalyticClipModule {
-  static constexpr Param<ParamType::Float4> LocalRect{"LocalRect"};
+  static constexpr Param<ParamType::Float4> LocalRect{ClipContract::LocalRect};
   // Per-corner radii in [TL, TR, BR, BL] order, consumed only by the HasClip == 2 branch.
-  static constexpr Param<ParamType::Float4> RadiiX{"RadiiX"};
-  static constexpr Param<ParamType::Float4> RadiiY{"RadiiY"};
-  static constexpr Param<ParamType::Float> AntiAlias{"AntiAlias"};
-  static constexpr Param<ParamType::Float3x3> DeviceToLocal{"DeviceToLocal"};
-  static constexpr Param<ParamType::Float4> Rect{"Rect"};
-  static constexpr Param<ParamType::Int> HasClip{"HasClip"};
+  static constexpr Param<ParamType::Float4> RadiiX{ClipContract::RadiiX};
+  static constexpr Param<ParamType::Float4> RadiiY{ClipContract::RadiiY};
+  static constexpr Param<ParamType::Float> AntiAlias{ClipContract::AntiAlias};
+  static constexpr Param<ParamType::Float3x3> DeviceToLocal{ClipContract::DeviceToLocal};
+  static constexpr Param<ParamType::Float4> Rect{ClipContract::Rect};
+  static constexpr Param<ParamType::Int> HasClip{ClipContract::HasClip};
 
   static constexpr ParamInfo Fields[] = {LocalRect,     RadiiX, RadiiY, AntiAlias,
                                          DeviceToLocal, Rect,   HasClip};

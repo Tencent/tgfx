@@ -19,7 +19,7 @@
 #include "gpu/aot/bind/AOTParamLayout.h"
 #include <string>
 #include "gpu/UniformData.h"
-#include "gpu/aot/AOTParamRegistry.h"
+#include "gpu/aot/bind/AOTParamRegistry.h"
 
 namespace tgfx {
 namespace {
