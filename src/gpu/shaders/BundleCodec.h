@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -38,6 +39,25 @@ namespace tgfx {
  * semantic rules — which formats may be uniforms, which samplers, sampler array sizes, and
  * vertex-input locations that strictly increase — stay with the runtime, which owns the enum.
  */
+
+/// Little-endian byte readers over the bundle's on-disk layout. The format fact lives in one place
+/// for the same reason the header and reflection grammars do: the runtime loader, the codec's own
+/// parser and the offline verifier all read the same bytes, so a reader that disagreed with another
+/// would disagree about the format.
+inline uint16_t ReadBundleU16LE(const uint8_t* data, size_t offset) {
+  return static_cast<uint16_t>(data[offset] | (data[offset + 1] << 8));
+}
+
+inline uint32_t ReadBundleU32LE(const uint8_t* data, size_t offset) {
+  return static_cast<uint32_t>(data[offset]) | (static_cast<uint32_t>(data[offset + 1]) << 8) |
+         (static_cast<uint32_t>(data[offset + 2]) << 16) |
+         (static_cast<uint32_t>(data[offset + 3]) << 24);
+}
+
+inline uint64_t ReadBundleU64LE(const uint8_t* data, size_t offset) {
+  return static_cast<uint64_t>(ReadBundleU32LE(data, offset)) |
+         (static_cast<uint64_t>(ReadBundleU32LE(data, offset + 4)) << 32);
+}
 
 /// One uniform or sampler entry of a stage's reflection.
 struct BundleReflectionEntry {

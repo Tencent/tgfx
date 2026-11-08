@@ -48,22 +48,6 @@ struct PoolEntryOnDisk {
 
 // The header struct is BundleCodec's (shared with the runtime loader and the manifest writer).
 
-uint32_t ReadU32(const std::vector<uint8_t>& data, size_t offset) {
-  uint32_t value = 0;
-  for (int i = 0; i < 4; i++) {
-    value |= static_cast<uint32_t>(data[offset + static_cast<size_t>(i)]) << (8 * i);
-  }
-  return value;
-}
-
-uint64_t ReadU64(const std::vector<uint8_t>& data, size_t offset) {
-  uint64_t value = 0;
-  for (int i = 0; i < 8; i++) {
-    value |= static_cast<uint64_t>(data[offset + static_cast<size_t>(i)]) << (8 * i);
-  }
-  return value;
-}
-
 struct KeyPairLess {
   bool operator()(const std::pair<uint64_t, uint64_t>& left,
                   const std::pair<uint64_t, uint64_t>& right) const {
@@ -349,12 +333,12 @@ BundleCheckResult VerifyOneBundle(const std::string& path, ShaderProfile profile
         continue;
       }
       PoolEntryOnDisk entry;
-      entry.hash.hi = ReadU64(fileBytes, entryOffset + BundleFormat::EntryOffset::HashHi);
-      entry.hash.lo = ReadU64(fileBytes, entryOffset + BundleFormat::EntryOffset::HashLo);
-      entry.dataOffset = ReadU32(fileBytes, entryOffset + BundleFormat::EntryOffset::DataOffset);
-      entry.dataSize = ReadU32(fileBytes, entryOffset + BundleFormat::EntryOffset::DataSize);
+      entry.hash.hi = ReadBundleU64LE(fileBytes.data(), entryOffset + BundleFormat::EntryOffset::HashHi);
+      entry.hash.lo = ReadBundleU64LE(fileBytes.data(), entryOffset + BundleFormat::EntryOffset::HashLo);
+      entry.dataOffset = ReadBundleU32LE(fileBytes.data(), entryOffset + BundleFormat::EntryOffset::DataOffset);
+      entry.dataSize = ReadBundleU32LE(fileBytes.data(), entryOffset + BundleFormat::EntryOffset::DataSize);
       entry.reflOffset =
-          ReadU32(fileBytes, entryOffset + BundleFormat::EntryOffset::ReflectionOffset);
+          ReadBundleU32LE(fileBytes.data(), entryOffset + BundleFormat::EntryOffset::ReflectionOffset);
       auto key = std::make_pair(entry.hash.hi, entry.hash.lo);
       if (!storedKeys.insert(key).second) {
         Report(diagnostics, Severity::Error, DiagnosticCode::VerifyBundlePool,
@@ -433,11 +417,11 @@ BundleCheckResult VerifyOneBundle(const std::string& path, ShaderProfile profile
     for (uint32_t i = 0; i < count; i++) {
       auto entryOffset = poolOffset + static_cast<size_t>(i) * BundleFormat::PoolEntrySize;
       identity = BundleIdentityHashEntry(
-          identity, ReadU64(fileBytes, entryOffset + BundleFormat::EntryOffset::HashHi),
-          ReadU64(fileBytes, entryOffset + BundleFormat::EntryOffset::HashLo),
-          ReadU32(fileBytes, entryOffset + BundleFormat::EntryOffset::DataOffset),
-          ReadU32(fileBytes, entryOffset + BundleFormat::EntryOffset::DataSize),
-          ReadU32(fileBytes, entryOffset + BundleFormat::EntryOffset::ReflectionOffset));
+          identity, ReadBundleU64LE(fileBytes.data(), entryOffset + BundleFormat::EntryOffset::HashHi),
+          ReadBundleU64LE(fileBytes.data(), entryOffset + BundleFormat::EntryOffset::HashLo),
+          ReadBundleU32LE(fileBytes.data(), entryOffset + BundleFormat::EntryOffset::DataOffset),
+          ReadBundleU32LE(fileBytes.data(), entryOffset + BundleFormat::EntryOffset::DataSize),
+          ReadBundleU32LE(fileBytes.data(), entryOffset + BundleFormat::EntryOffset::ReflectionOffset));
     }
   }
   identity = BundleIdentityHashBytes(identity, dataPool.data(), dataPool.size());

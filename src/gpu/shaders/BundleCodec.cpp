@@ -23,21 +23,6 @@
 namespace tgfx {
 namespace {
 
-uint16_t ReadHeaderU16(const uint8_t* data, size_t offset) {
-  return static_cast<uint16_t>(data[offset] | (data[offset + 1] << 8));
-}
-
-uint32_t ReadHeaderU32(const uint8_t* data, size_t offset) {
-  return static_cast<uint32_t>(data[offset]) | (static_cast<uint32_t>(data[offset + 1]) << 8) |
-         (static_cast<uint32_t>(data[offset + 2]) << 16) |
-         (static_cast<uint32_t>(data[offset + 3]) << 24);
-}
-
-uint64_t ReadHeaderU64(const uint8_t* data, size_t offset) {
-  return static_cast<uint64_t>(ReadHeaderU32(data, offset)) |
-         (static_cast<uint64_t>(ReadHeaderU32(data, offset + 4)) << 32);
-}
-
 void WriteEntries(std::vector<uint8_t>& blob, const std::vector<BundleReflectionEntry>& entries) {
   for (const auto& entry : entries) {
     blob.push_back(static_cast<uint8_t>(entry.name.size()));
@@ -116,21 +101,21 @@ bool ParseBundleHeader(const uint8_t* data, size_t size, BundleHeader* header) {
   if (data == nullptr || header == nullptr || size < BundleFormat::HeaderSize) {
     return false;
   }
-  header->magic = ReadHeaderU32(data, BundleFormat::Offset::Magic);
-  header->formatVersion = ReadHeaderU16(data, BundleFormat::Offset::FormatVersion);
-  header->compressionType = ReadHeaderU16(data, BundleFormat::Offset::CompressionType);
-  header->identityHash = ReadHeaderU64(data, BundleFormat::Offset::IdentityHash);
-  header->toolchainABI = ReadHeaderU32(data, BundleFormat::Offset::ToolchainABI);
-  header->vertPoolCount = ReadHeaderU32(data, BundleFormat::Offset::VertPoolCount);
-  header->fragPoolCount = ReadHeaderU32(data, BundleFormat::Offset::FragPoolCount);
-  header->vertPoolOffset = ReadHeaderU32(data, BundleFormat::Offset::VertPoolOffset);
-  header->fragPoolOffset = ReadHeaderU32(data, BundleFormat::Offset::FragPoolOffset);
-  header->dataOffset = ReadHeaderU32(data, BundleFormat::Offset::DataOffset);
-  header->dataSize = ReadHeaderU32(data, BundleFormat::Offset::DataSize);
-  header->reflectionOffset = ReadHeaderU32(data, BundleFormat::Offset::ReflectionOffset);
+  header->magic = ReadBundleU32LE(data, BundleFormat::Offset::Magic);
+  header->formatVersion = ReadBundleU16LE(data, BundleFormat::Offset::FormatVersion);
+  header->compressionType = ReadBundleU16LE(data, BundleFormat::Offset::CompressionType);
+  header->identityHash = ReadBundleU64LE(data, BundleFormat::Offset::IdentityHash);
+  header->toolchainABI = ReadBundleU32LE(data, BundleFormat::Offset::ToolchainABI);
+  header->vertPoolCount = ReadBundleU32LE(data, BundleFormat::Offset::VertPoolCount);
+  header->fragPoolCount = ReadBundleU32LE(data, BundleFormat::Offset::FragPoolCount);
+  header->vertPoolOffset = ReadBundleU32LE(data, BundleFormat::Offset::VertPoolOffset);
+  header->fragPoolOffset = ReadBundleU32LE(data, BundleFormat::Offset::FragPoolOffset);
+  header->dataOffset = ReadBundleU32LE(data, BundleFormat::Offset::DataOffset);
+  header->dataSize = ReadBundleU32LE(data, BundleFormat::Offset::DataSize);
+  header->reflectionOffset = ReadBundleU32LE(data, BundleFormat::Offset::ReflectionOffset);
   const auto* tag = reinterpret_cast<const char*>(data + BundleFormat::Offset::ProfileTag);
   header->profileTag.assign(tag, strnlen(tag, BundleFormat::ProfileTagSize));
-  header->payloadFormat = ReadHeaderU16(data, BundleFormat::Offset::PayloadFormat);
+  header->payloadFormat = ReadBundleU16LE(data, BundleFormat::Offset::PayloadFormat);
   return true;
 }
 

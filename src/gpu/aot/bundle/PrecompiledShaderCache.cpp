@@ -269,19 +269,6 @@ void PrecompiledShaderCache::resetStats() {
   _fallbackRecords.clear();
 }
 
-static uint32_t ReadU32LE(const uint8_t* p) {
-  return static_cast<uint32_t>(p[0]) | (static_cast<uint32_t>(p[1]) << 8) |
-         (static_cast<uint32_t>(p[2]) << 16) | (static_cast<uint32_t>(p[3]) << 24);
-}
-
-static uint64_t ReadU64LE(const uint8_t* p) {
-  uint64_t val = 0;
-  for (int i = 0; i < 8; i++) {
-    val |= static_cast<uint64_t>(p[i]) << (i * 8);
-  }
-  return val;
-}
-
 // The header and pool entry layout is defined in ShaderBundleContract.h, shared with the bundle writer.
 // Independent bounds for the input/reassembled file and for copied shader/reflection payloads.
 // These are parser limits, not a bound on total process RSS or concurrently retained old bundles.
@@ -423,8 +410,8 @@ static bool CheckPoolPayloadBudget(const uint8_t* fileData, size_t poolOffset, u
                                    size_t dataPoolSize, size_t* remainingBytes) {
   for (uint32_t index = 0; index < poolCount; ++index) {
     auto entry = fileData + poolOffset + static_cast<size_t>(index) * BundleFormat::PoolEntrySize;
-    auto blobOffset = ReadU32LE(entry + BundleFormat::EntryOffset::DataOffset);
-    auto blobSize = ReadU32LE(entry + BundleFormat::EntryOffset::DataSize);
+    auto blobOffset = ReadBundleU32LE(entry + BundleFormat::EntryOffset::DataOffset, 0);
+    auto blobSize = ReadBundleU32LE(entry + BundleFormat::EntryOffset::DataSize, 0);
     if (blobOffset > dataPoolSize || blobSize > dataPoolSize - blobOffset ||
         !ConsumePayloadBudget(sizeof(ShaderStageBlob) + sizeof(PrecompiledShaderCache::HashKey),
                               remainingBytes) ||
@@ -448,11 +435,11 @@ static bool LoadPool(const uint8_t* fileData, size_t fileSize, size_t poolOffset
       return false;
     }
     const uint8_t* entry = fileData + entryOff;
-    uint64_t hashHi = ReadU64LE(entry + BundleFormat::EntryOffset::HashHi);
-    uint64_t hashLo = ReadU64LE(entry + BundleFormat::EntryOffset::HashLo);
-    uint32_t blobOff = ReadU32LE(entry + BundleFormat::EntryOffset::DataOffset);
-    uint32_t blobSize = ReadU32LE(entry + BundleFormat::EntryOffset::DataSize);
-    uint32_t reflOff = ReadU32LE(entry + BundleFormat::EntryOffset::ReflectionOffset);
+    uint64_t hashHi = ReadBundleU64LE(entry + BundleFormat::EntryOffset::HashHi, 0);
+    uint64_t hashLo = ReadBundleU64LE(entry + BundleFormat::EntryOffset::HashLo, 0);
+    uint32_t blobOff = ReadBundleU32LE(entry + BundleFormat::EntryOffset::DataOffset, 0);
+    uint32_t blobSize = ReadBundleU32LE(entry + BundleFormat::EntryOffset::DataSize, 0);
+    uint32_t reflOff = ReadBundleU32LE(entry + BundleFormat::EntryOffset::ReflectionOffset, 0);
 
     auto dataPoolSize = dataPoolEnd - dataPoolStart;
     if (blobOff > dataPoolSize || blobSize > dataPoolSize - blobOff) {
@@ -530,11 +517,12 @@ static bool LoadPool(const uint8_t* fileData, size_t fileSize, size_t poolOffset
 static uint64_t HashPoolEntries(uint64_t state, const uint8_t* pool, uint32_t count) {
   for (uint32_t i = 0; i < count; i++) {
     const uint8_t* entry = pool + static_cast<size_t>(i) * BundleFormat::PoolEntrySize;
-    state = BundleIdentityHashEntry(state, ReadU64LE(entry + BundleFormat::EntryOffset::HashHi),
-                                    ReadU64LE(entry + BundleFormat::EntryOffset::HashLo),
-                                    ReadU32LE(entry + BundleFormat::EntryOffset::DataOffset),
-                                    ReadU32LE(entry + BundleFormat::EntryOffset::DataSize),
-                                    ReadU32LE(entry + BundleFormat::EntryOffset::ReflectionOffset));
+    state = BundleIdentityHashEntry(
+        state, ReadBundleU64LE(entry + BundleFormat::EntryOffset::HashHi, 0),
+        ReadBundleU64LE(entry + BundleFormat::EntryOffset::HashLo, 0),
+        ReadBundleU32LE(entry + BundleFormat::EntryOffset::DataOffset, 0),
+        ReadBundleU32LE(entry + BundleFormat::EntryOffset::DataSize, 0),
+        ReadBundleU32LE(entry + BundleFormat::EntryOffset::ReflectionOffset, 0));
   }
   return state;
 }
