@@ -79,7 +79,7 @@ bool GaussianBlur1DFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNod
     return false;
   }
   AOTOpaqueKernelParameters parameters = {};
-  parameters.kernelKind = 0;
+  parameters.kernel = AOTOpaqueKernel::GaussianBlur1D;
   // The fixed kernel caps sigma at 10; the matcher reads the acceptance range off the node.
   parameters.sigma = maxSigma;
   // The upload values the blur bind reads off the node (see BlurKernelModule's fields). The

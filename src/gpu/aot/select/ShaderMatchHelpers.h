@@ -20,6 +20,7 @@
 
 #include <optional>
 #include "gpu/shaders/contract/AOTFailure.h"
+#include "gpu/shaders/contract/DrawFacts.h"
 
 // Shared predicates of the per-family Match functions. Declared here and defined once in
 // PermutationMatcher.cpp (their private helper chains stay internal to that translation unit);
@@ -32,14 +33,12 @@ class FragmentProcessor;
 class XferProcessor;
 struct DrawIR;
 struct ColorSpaceXformSteps;
+enum class AOTOpaqueKernel : int;
 struct AOTOpaqueKernelParameters;
 struct AOTTextureParameters;
 class QuadPerEdgeAAGeometryProcessor;
 struct AOTProgram;
 struct AOTCoverageTerm;
-struct AOTGeometryDesc;
-struct DrawShape;
-enum class XferKind : uint8_t;
 struct PermutationMatchResult;
 struct PermutationVariant;
 struct PrecompiledShaderInfo;
@@ -75,17 +74,6 @@ XferKind ClassifyXferForMatch(const XferProcessor* xp);
 /// IsSupportedPointwiseOp's color-space half, over the IR's steps.
 bool SupportedFillKernelSteps(const ColorSpaceXformSteps* steps);
 
-/// How the draw's sole coverage FP is served. LocalMask is a distinct capability: it needs a
-/// local-space varying and sampler and therefore cannot be encoded in the shared runtime clip
-/// contract.
-enum class Coverage {
-  None,
-  AARect,
-  RRect,
-  DeviceMask,
-  LocalMask,
-};
-
 /// 0 = Empty XferProcessor, 1 = PorterDuff DST_TEX, 2 = PorterDuff FBF, -1 = none representable.
 int GetXPType(const ProgramInfo* programInfo);
 
@@ -99,7 +87,7 @@ struct OpaqueKernelIRShape {
   const AOTOpaqueKernelParameters* kernel = nullptr;
   const AOTTextureParameters* childTexture = nullptr;
 };
-std::optional<OpaqueKernelIRShape> ReadOpaqueKernelIRShape(const DrawIR* ir, int kernelKind,
+std::optional<OpaqueKernelIRShape> ReadOpaqueKernelIRShape(const DrawIR* ir, AOTOpaqueKernel kernel,
                                                            bool requiresTextureChild);
 
 /// Records why a candidate rejected the draw into the match's failure out-parameter (the first

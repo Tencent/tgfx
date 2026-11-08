@@ -70,15 +70,17 @@ bool GlassRefractionFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTNo
     return false;
   }
   AOTOpaqueKernelParameters parameters = {};
-  parameters.kernelKind = 1;
+  parameters.kernel = AOTOpaqueKernel::GlassRefraction;
   auto child = childProcessor(0);
   if (IsProcessor<GlassSDFGeometryFragmentProcessor>(child)) {
     auto* sdf = static_cast<const GlassSDFGeometryFragmentProcessor*>(child);
-    parameters.geometryKind = sdf->getShapeType() == GlassShapeType::RoundedRect ? 0 : 1;
+    parameters.geometryKind = sdf->getShapeType() == GlassShapeType::RoundedRect
+                                 ? AOTGlassGeometryKind::SdfRoundedRect
+                                 : AOTGlassGeometryKind::SdfOther;
   } else if (IsProcessor<GlassUDFGeometryFragmentProcessor>(child)) {
     // The UDF kind always declares the edge-light mask sampler; an edge-lit-off draw binds the
     // shared dummy texture there and clears the EdgeMaskOn runtime uniform.
-    parameters.geometryKind = 2;
+    parameters.geometryKind = AOTGlassGeometryKind::Udf;
   } else {
     return false;
   }

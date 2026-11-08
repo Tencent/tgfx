@@ -243,23 +243,39 @@ struct AOTGradientParameters {
   bool hasPerspective = false;
 };
 
-// Opaque-kernel operand (see AOTEffectKind::OpaqueKernel). kernelKind: 0 = GaussianBlur1D,
-// 1 = GlassRefraction, 2 = GlassUDFTentBlur. The shape-level facts the dedicated families'
-// matching needs ride here — the matcher reads them from the IR, not the processor tree.
+/// The opaque kernels a draw can carry as one IR node: the dedicated families that the chain
+/// interpreter cannot express. The value is not an ABI fact — the families are separate shaders —
+/// so the enum exists to make a wrong or missing kernel a compile error instead of a silent
+/// mismatch at match time.
+enum class AOTOpaqueKernel : int {
+  GaussianBlur1D = 0,
+  GlassRefraction = 1,
+  GlassUDFTentBlur = 2,
+};
+
+/// The geometry child a GlassRefraction draw carries: a compile-time variant dimension of that
+/// family (the UDF kind always declares the edge-light mask sampler).
+enum class AOTGlassGeometryKind : int {
+  SdfRoundedRect = 0,
+  SdfOther = 1,
+  Udf = 2,
+};
+
+// Opaque-kernel operand (see AOTEffectKind::OpaqueKernel). The shape-level facts the dedicated
+// families' matching needs ride here — the matcher reads them from the IR, not the processor tree.
 struct AOTOpaqueKernelParameters {
-  int kernelKind = 0;
+  AOTOpaqueKernel kernel = AOTOpaqueKernel::GaussianBlur1D;
   // GaussianBlur1D: the acceptance range is [1, 10] — the precompiled kernel's fixed cap.
   int sigma = 0;
   // GlassUDFTentBlur: the loop's fixed bound; a longer radius exceeds it.
   int maxRadius = 64;
-  // GlassRefraction: the compile-time variant dimensions. geometryKind: 0 = SDF rounded rect,
-  // 1 = SDF other, 2 = UDF (the UDF kind always declares the edge-light mask sampler).
-  int geometryKind = -1;
+  // GlassRefraction only; unset for the other kernels.
+  std::optional<AOTGlassGeometryKind> geometryKind = std::nullopt;
   bool dispersionOn = false;
   // GlassRefraction: the kernel's own background-coordinate transform is projective — the
   // precompiled vertex kernels emit the affine form only.
   bool hasPerspective = false;
-  // GaussianBlur1D's upload values (kernelKind 0 only): the packed half-kernel table, its
+  // GaussianBlur1D's upload values only: the packed half-kernel table, its
   // radius, and the step's length and direction — record-time facts. The step vector itself is
   // bind-time (it maps through the child's coordinate transform, whose normalization needs the
   // instantiated view), so the child leaf in the same graph supplies the raw matrix.

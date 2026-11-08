@@ -24,7 +24,10 @@
 #include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/plan/AOTPlanner.h"
 #include "gpu/aot/chain/AOTShapeRules.h"
+#include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/FragmentProcessor.h"
+#include "gpu/processors/TextureEffect.h"
+#include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
 
@@ -34,9 +37,10 @@ static int CountTextureLeaves(const FragmentProcessor* processor) {
   if (processor == nullptr) {
     return 0;
   }
-  auto name = processor->name();
-  int count = (name == "TextureEffect" || name == "TiledTextureEffect" ||
-               name == "DeviceSpaceTextureEffect")
+  // The class test, not the printed name: a name comparison would keep compiling after a rename
+  // and silently report zero samplers.
+  int count = IsProcessor<TextureEffect>(processor) || IsProcessor<TiledTextureEffect>(processor) ||
+                      IsProcessor<DeviceSpaceTextureEffect>(processor)
                   ? 1
                   : 0;
   for (size_t i = 0; i < processor->numChildProcessors(); ++i) {

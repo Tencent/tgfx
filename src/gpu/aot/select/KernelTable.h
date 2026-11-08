@@ -19,7 +19,7 @@
 #pragma once
 
 #include <optional>
-#include "gpu/aot/select/DrawShape.h"
+#include "gpu/shaders/contract/DrawFacts.h"
 #include "gpu/aot/select/PermutationMatch.h"
 #include "gpu/shaders/ShaderPermutation.h"
 

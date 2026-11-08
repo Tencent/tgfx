@@ -19,7 +19,7 @@
 #include "gpu/shaders/kernels/GlassUDFTentBlurShader.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/aot/ir/DrawIR.h"
-#include "gpu/aot/select/DrawShape.h"
+#include "gpu/shaders/contract/DrawFacts.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
 
 namespace tgfx {
@@ -43,7 +43,8 @@ bool GlassUDFTentBlurShader::Accept(const DrawShape& shape) {
   // The color expression reads off the carried IR's opaque-kernel node: the tent blur's barrier
   // over a single servable texture leaf (the horizontal pass reads a plain TextureEffect, the
   // vertical a TiledTextureEffect — the node's child leaf carries the shape).
-  auto irShape = ReadOpaqueKernelIRShape(shape.ir, /*kernelKind=*/2, /*requiresTextureChild=*/true);
+  auto irShape = ReadOpaqueKernelIRShape(shape.ir, AOTOpaqueKernel::GlassUDFTentBlur,
+                                       /*requiresTextureChild=*/true);
   if (!irShape) {
     return false;
   }

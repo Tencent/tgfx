@@ -22,7 +22,7 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/aot/chain/AOTChainBuilder.h"
-#include "gpu/aot/select/DrawShape.h"
+#include "gpu/shaders/contract/DrawFacts.h"
 #include "gpu/aot/select/PermutationMatch.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"

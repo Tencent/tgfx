@@ -30,7 +30,7 @@
 #include "gpu/aot/bind/Binder.h"
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/aot/chain/AOTChainBuilder.h"
-#include "gpu/aot/select/DrawShape.h"
+#include "gpu/shaders/contract/DrawFacts.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/processors/AlphaThresholdFragmentProcessor.h"
 #include "gpu/processors/ClampedGradientEffect.h"
@@ -607,7 +607,7 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
         }
         action.kind = Action::Kind::Blur;
         action.blur = params;
-        if (params->kernelKind != 0) {
+        if (params->kernel != AOTOpaqueKernel::GaussianBlur1D) {
           hasProcessorBoundOpaqueKernel = true;
         }
         if (!node->inputs.empty()) {

@@ -23,7 +23,7 @@
 #include "gpu/aot/bundle/PrecompiledProgramCreator.h"
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/ir/Program.h"
-#include "gpu/aot/select/DrawShape.h"
+#include "gpu/shaders/contract/DrawFacts.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/aot/spec/SpecResolver.h"
 #include "gpu/shaders/PrecompiledShader.h"

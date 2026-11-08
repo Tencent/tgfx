@@ -19,7 +19,7 @@
 #include "gpu/shaders/kernels/YUVTextureFillShader.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/chain/AOTChainBuilder.h"
-#include "gpu/aot/select/DrawShape.h"
+#include "gpu/shaders/contract/DrawFacts.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/resources/YUVTextureView.h"
 

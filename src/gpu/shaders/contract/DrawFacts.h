@@ -4,12 +4,12 @@
 //
 //  Copyright (C) 2026 Tencent. All rights reserved.
 //
-//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
-//  compliance with the License. You may obtain a copy of the License at
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
-//  Unless required by applicable law or agreed to in writing, software distributed under the
+//  unless required by applicable law or agreed to in writing, software distributed under the
 //  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 //  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
@@ -20,8 +20,11 @@
 
 #include <cstdint>
 #include <optional>
-#include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/shaders/ShaderPermutation.h"
+
+// The draw facts a family's Accept/Select reads. They live in the contract layer because the
+// families (shaders/kernels) declare against them: a fact type must not force the declaration
+// layer to include the selection layer that extracts it.
 
 namespace tgfx {
 
@@ -89,6 +92,17 @@ enum class XferKind : uint8_t {
   FrameBufferFetch,
 };
 
+/// How the draw's sole coverage FP is served. LocalMask is a distinct capability: it needs a
+/// local-space varying and sampler and therefore cannot be encoded in the shared runtime clip
+/// contract.
+enum class Coverage {
+  None,
+  AARect,
+  RRect,
+  DeviceMask,
+  LocalMask,
+};
+
 /**
  * A draw's matcher facts, extracted once per match: the geometry and xfer described off the made
  * processors (the matching runs at prepare, where they are the truth), the coverage
@@ -145,6 +159,8 @@ struct DrawShape {
   }
 };
 
+/// Describes one draw's matcher facts off the made processors and its carried IR. The one
+/// extraction every family's Accept/Select runs against.
 DrawShape ExtractDrawShape(const ProgramInfo* programInfo);
 
 }  // namespace tgfx

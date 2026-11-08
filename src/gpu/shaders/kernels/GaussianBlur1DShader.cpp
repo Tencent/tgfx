@@ -19,7 +19,7 @@
 #include "gpu/shaders/kernels/GaussianBlur1DShader.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/aot/ir/DrawIR.h"
-#include "gpu/aot/select/DrawShape.h"
+#include "gpu/shaders/contract/DrawFacts.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
 
 namespace tgfx {
@@ -42,7 +42,8 @@ bool GaussianBlur1DShader::Accept(const DrawShape& shape) {
   }
   // The color expression reads off the carried IR's opaque-kernel node: the blur's barrier over
   // a single servable texture leaf (the node IS the contract; no processor-tree walk).
-  auto irShape = ReadOpaqueKernelIRShape(shape.ir, /*kernelKind=*/0, /*requiresTextureChild=*/true);
+  auto irShape = ReadOpaqueKernelIRShape(shape.ir, AOTOpaqueKernel::GaussianBlur1D,
+                                     /*requiresTextureChild=*/true);
   if (!irShape) {
     return false;
   }

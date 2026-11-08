@@ -24,7 +24,7 @@
 #include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/Program.h"
-#include "gpu/aot/select/DrawShape.h"
+#include "gpu/shaders/contract/DrawFacts.h"
 #include "gpu/aot/select/KernelTable.h"
 #include "gpu/aot/select/PermutationMatch.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
@@ -460,7 +460,7 @@ static bool IsServableBlurChildIR(const AOTTextureParameters& child) {
 // servable texture leaf (returned alongside); the refraction sits directly on the geometry color,
 // with its variant dimensions on the node. Nullopt when the info carries no IR or the shape does
 // not fit — the family walks no processor tree anymore, the node IS the contract.
-std::optional<OpaqueKernelIRShape> ReadOpaqueKernelIRShape(const DrawIR* ir, int kernelKind,
+std::optional<OpaqueKernelIRShape> ReadOpaqueKernelIRShape(const DrawIR* ir, AOTOpaqueKernel kernelKind,
                                                            bool requiresTextureChild) {
   if (ir == nullptr) {
     return std::nullopt;
@@ -471,7 +471,7 @@ std::optional<OpaqueKernelIRShape> ReadOpaqueKernelIRShape(const DrawIR* ir, int
     return std::nullopt;
   }
   auto* kernel = std::get_if<AOTOpaqueKernelParameters>(&root->parameters);
-  if (kernel == nullptr || kernel->kernelKind != kernelKind) {
+  if (kernel == nullptr || kernel->kernel != kernelKind) {
     return std::nullopt;
   }
   OpaqueKernelIRShape shape = {};

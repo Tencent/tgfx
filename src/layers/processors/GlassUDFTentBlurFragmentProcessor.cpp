@@ -118,7 +118,7 @@ bool GlassUDFTentBlurFragmentProcessor::lowerToAOT(AOTNodeBuilder* builder, AOTN
     return false;
   }
   AOTOpaqueKernelParameters parameters = {};
-  parameters.kernelKind = 2;
+  parameters.kernel = AOTOpaqueKernel::GlassUDFTentBlur;
   parameters.maxRadius = maxRadius;
   return builder->addOpaqueKernel(childNode, parameters, output);
 }
