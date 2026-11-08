@@ -23,7 +23,7 @@
 #include "gpu/BackingFit.h"
 #include "gpu/BlendFormula.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/aot/bundle/PrecompiledShaderCache.h"
+#include "gpu/aot/AOTDiagnostics.h"
 #include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/chain/AOTShapeRules.h"
 #include "gpu/aot/plan/AOTRenderPlan.h"
@@ -473,14 +473,11 @@ PlacementPtr<RenderTask> AOTPlanner::Build(Context* context, uint32_t renderFlag
   // The plan's intermediates are temporary bytes of the flush cycle being recorded, so they join
   // the simultaneously-live set at task creation. Counting them at execute time (after this
   // cycle's settle) would push them into the next cycle's peak instead.
-  auto* shaderCache = context->precompiledShaderCache();
-  if (shaderCache != nullptr) {
-    for (const auto& renderPass : renderPlan.passes) {
-      if (renderPass.target != nullptr) {
-        shaderCache->recordActiveTemporaryBytes(static_cast<uint64_t>(renderPass.target->width()) *
-                                                static_cast<uint64_t>(renderPass.target->height()) *
-                                                4);
-      }
+  for (const auto& renderPass : renderPlan.passes) {
+    if (renderPass.target != nullptr) {
+      RecordActiveTemporaryBytes(context, static_cast<uint64_t>(renderPass.target->width()) *
+                                              static_cast<uint64_t>(renderPass.target->height()) *
+                                              4);
     }
   }
   auto allocator = context->drawingManager()->drawingAllocator();

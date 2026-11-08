@@ -27,6 +27,7 @@
 #include "core/utils/Log.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ShaderCaps.h"
+#include "gpu/aot/AOTDiagnostics.h"
 #include "gpu/aot/select/PermutationMatch.h"
 #include "gpu/shaders/BundleCodec.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
@@ -213,6 +214,16 @@ void PrecompiledShaderCache::recordActiveTemporaryBytes(uint64_t bytes) {
   }
   std::lock_guard<std::mutex> autoLock(drawStatsMutex);
   _activeTemporaryBytes += bytes;
+}
+
+void RecordActiveTemporaryBytes(Context* context, uint64_t bytes) {
+  if (context == nullptr) {
+    return;
+  }
+  auto* cache = context->precompiledShaderCache();
+  if (cache != nullptr) {
+    cache->recordActiveTemporaryBytes(bytes);
+  }
 }
 
 AOTDrawStats PrecompiledShaderCache::drawStats() const {
