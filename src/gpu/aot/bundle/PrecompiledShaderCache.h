@@ -166,12 +166,6 @@ class PrecompiledShaderCache : public SpecSource {
   /// contract is in effect and Context::backend() may be called.
   explicit PrecompiledShaderCache(Context* context, Backend backend);
 
-  /// Writes one diagnostics JSON: draw metrics, misses grouped by coarse reason plus the
-  /// sub-reason that rejected them, every miss shape with its full pipeline signature, and hits by
-  /// shader. The caller decides when to write (a test reporter or an app at exit); the cache keeps
-  /// no process-wide state.
-  bool writeDiagnosticsDump(const std::string& path) const;
-
   /// Returns the number of bundle generation changes (loads and unloads) since construction.
   /// Diagnostic counter for lifecycle verification; program invalidation itself happens
   /// eagerly at each generation change.
