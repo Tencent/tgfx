@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/spec/SpecInjector.h"
+#include "gpu/shaders/contract/SpecContract.h"
 
 namespace tgfx {
 
@@ -104,9 +105,9 @@ class PipelineConstantInjector final : public SpecInjector {
 }  // namespace
 
 const SpecInjector* FindSpecInjector(ShaderCodeFormat format) {
-  static const MacroPrefixInjector glslMacros{"TGFX_SPEC_", true};
+  static const MacroPrefixInjector glslMacros{SpecContract::ConstantPrefix, true};
   static const PipelineConstantInjector pipelineConstants;
-  static const MacroPrefixInjector hlslMacros{"SPIRV_CROSS_CONSTANT_ID_", false};
+  static const MacroPrefixInjector hlslMacros{SpecContract::HlslConstantPrefix, false};
   switch (format) {
     case ShaderCodeFormat::GLSL:
       return &glslMacros;

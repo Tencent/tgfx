@@ -1031,8 +1031,7 @@ bool PrecompiledShaderCache::writeDiagnosticsDump(const std::string& path) const
     AppendEscaped(&out, PrecompiledFallbackReasonName(
                             static_cast<PrecompiledFallbackReason>(entry.first.reason)));
     out.append(", \"matchFailure\": ");
-    AppendEscaped(&out, AOTFailureName(
-                            static_cast<PermutationMatchFailure>(entry.first.failure)));
+    AppendEscaped(&out, AOTFailureName(static_cast<PermutationMatchFailure>(entry.first.failure)));
     out.append(", \"count\": " + std::to_string(entry.second) + "}");
   }
   out.append("\n],\n\"missRecords\": [");
@@ -1052,8 +1051,7 @@ bool PrecompiledShaderCache::writeDiagnosticsDump(const std::string& path) const
     out.append(", \"reason\": ");
     AppendEscaped(&out, PrecompiledFallbackReasonName(record.reason));
     out.append(", \"matchFailure\": ");
-    AppendEscaped(&out, AOTFailureName(
-                            static_cast<PermutationMatchFailure>(record.matchFailure)));
+    AppendEscaped(&out, AOTFailureName(static_cast<PermutationMatchFailure>(record.matchFailure)));
     out.append("}");
   }
   out.append("\n],\n\"hitSummary\": [");

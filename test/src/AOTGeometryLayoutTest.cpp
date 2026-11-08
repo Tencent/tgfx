@@ -612,10 +612,8 @@ void ExpectSceneServed(const char* label, const char* gpName, const char* signat
                             << (seen.empty() ? allSeen : seen);
     std::string misses = {};
     for (const auto& record : cache->fallbackRecords()) {
-      misses +=
-          record.effectSignature + " [" +
-          AOTFailureName(static_cast<AOTFailure>(record.matchFailure)) +
-          "]\n";
+      misses += record.effectSignature + " [" +
+                AOTFailureName(static_cast<AOTFailure>(record.matchFailure)) + "]\n";
     }
     EXPECT_TRUE(misses.empty()) << label << " misses:\n" << misses;
     cache->setDiagnosticRecordingEnabled(false);

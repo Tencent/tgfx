@@ -32,6 +32,7 @@
 #include "compile/ShaderCompiler.h"
 #include "compile/SpecCodegen.h"
 #include "core/ShaderSources.h"
+#include "gpu/shaders/contract/SpecContract.h"
 #include "compile/ReflectionExtractor.h"
 #include "compile/StageCache.h"
 #include "output/InlineExpansionReport.h"
@@ -245,7 +246,7 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
     bool supported = specUsage.present;
     if (supported) {
       size_t at = 0;
-      while ((at = gate.expr.find("SPEC_", at)) != std::string::npos) {
+      while ((at = gate.expr.find(SpecContract::FieldAccessorPrefix, at)) != std::string::npos) {
         const bool boundary =
             at == 0 || !(std::isalnum(static_cast<unsigned char>(gate.expr[at - 1])) ||
                          gate.expr[at - 1] == '_');
@@ -270,7 +271,7 @@ ShaderReport CompileOneShaderUncounted(const PrecompiledShaderInfo& info,
     if (supported) {
       supportedGates.push_back(gate);
     } else {
-      const auto guard = "SPEC_GATE_" + gate.name + "()";
+      const auto guard = std::string(SpecContract::GateAccessorPrefix) + gate.name + "()";
       for (auto at = fragSource.find(guard); at != std::string::npos;
            at = fragSource.find(guard, at + 4)) {
         fragSource.replace(at, guard.size(), "true");

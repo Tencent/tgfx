@@ -30,6 +30,7 @@
 #include "gpu/aot/AOTResourceProfile.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/aot/bind/AOTParamRegistry.h"
+#include "gpu/shaders/contract/SpecContract.h"
 #include "gpu/shaders/KernelContract.h"
 #include "gpu/shaders/PrecompiledShader.h"
 
@@ -793,7 +794,8 @@ size_t ValidateSpecReaders(const std::string& shaderDir, Diagnostics* diagnostic
     const auto code = StripSourceComments(source);
     bool readsSpec = false;
     for (size_t index = 0; index + 5 <= code.size(); ++index) {
-      if (code.compare(index, 5, "SPEC_") != 0) {
+      if (code.compare(index, std::strlen(SpecContract::FieldAccessorPrefix),
+                     SpecContract::FieldAccessorPrefix) != 0) {
         continue;
       }
       if (index > 0 && IsScanIdentifierChar(code[index - 1])) {
