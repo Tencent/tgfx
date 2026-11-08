@@ -36,8 +36,9 @@ struct AOTCoverageGateResult {
   // Dropped draws attributable to a listed gap: a listed miss implies the draw it belongs to
   // rendered nothing, so those drops are surfaced separately instead of failing the gate.
   uint64_t knownGapDrops = 0;
-  // Listed gaps that matched no miss in this run. A stale entry is a cleanup debt and fails the
-  // gate, exactly like an unlisted gap does.
+  // Listed gaps whose test ran in this run but matched no miss. A stale entry is a cleanup debt
+  // and fails the gate, exactly like an unlisted gap does; a filtered run that never reached the
+  // test does not count its entry, so blocking mode stays usable on filtered runs.
   uint64_t staleKnownGaps = 0;
   uint64_t knownGapEntries = 0;
   // Draws that rendered nothing (AOTDrawStats::droppedDraws, deliberate drops and known-gap

@@ -125,8 +125,9 @@ static constexpr size_t AOT_STAGE_COUNT = static_cast<size_t>(PrecompiledAOTStag
 //     cannot land silently;
 //   - a listed test whose recorded miss signature does not contain the entry's `effect` text also
 //     fails, so a second, different gap inside a listed test is caught;
-//   - an entry whose test no longer misses or drops anything fails the gate, so a fixed gap cannot
-//     linger.
+//   - an entry whose test ran and no longer misses or drops anything fails the gate, so a fixed
+//     gap cannot linger; a filtered run that never reached the test says nothing and leaves its
+//     entry out of the stale count.
 // Adding an entry is a deliberate, reviewable act; it is not a way to silence a regression.
 // `effect` may be empty when the matcher recorded no signature for the shape (the miss came from
 // the negative cache); such an entry then covers whatever that test misses, which is why the test
@@ -969,6 +970,11 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
     const bool swiftShaderBackend = std::strstr(TGFX_BACKEND_NAME, "swiftshader") != nullptr;
     constexpr size_t knownGapCount = sizeof(AOTKnownGaps) / sizeof(AOTKnownGaps[0]);
     std::array<bool, knownGapCount> knownGapMatched = {};
+    // Which entries' tests this run actually executed. A filtered run (one test, one suite) never
+    // reaches the other tests, so their entries are neither matched nor stale — the stale rule
+    // exists to force cleanup after a gap is fixed, and a test that did not run says nothing about
+    // that. Without this, blocking mode would fail every filtered run.
+    std::array<bool, knownGapCount> knownGapSeen = {};
     // The headline miss count stays raw: exclusions (deliberate, environment, reviewed gaps) are
     // reported next to it, never subtracted from what the run recorded.
     uint64_t rawNoMatching = 0;
@@ -983,6 +989,9 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
           gapIndex = i;
           break;
         }
+      }
+      if (gapIndex < knownGapCount) {
+        knownGapSeen[gapIndex] = true;
       }
       bool hasUnlistedSignature = false;
       for (const auto& record : result.fallbackRecords) {
@@ -1039,8 +1048,8 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       coverageGate.consistent = coverageGate.consistent && testGate.consistent;
     }
     coverageGate.knownGapEntries = knownGapCount;
-    for (bool matched : knownGapMatched) {
-      if (!matched) {
+    for (size_t gap = 0; gap < knownGapCount; ++gap) {
+      if (knownGapSeen[gap] && !knownGapMatched[gap]) {
         ++coverageGate.staleKnownGaps;
       }
     }
