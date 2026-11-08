@@ -219,10 +219,6 @@ class UniformData {
   uint8_t* _buffer = nullptr;
   size_t bufferSize = 0;
   std::vector<Uniform> _uniforms = {};
-  std::string nameSuffix = "";
-  // The precompiled (skipSuffix) path writes base names: its per-instance addressing lives in
-  // the parameter layout and the writer's instance ordinal, not in this suffix.
-  bool skipSuffix = false;
   std::unordered_map<std::string, Field> fieldMap = {};
   size_t cursor = 0;
   /// The one memcpy every write funnels into, so the debug write-range tracking sees them all.

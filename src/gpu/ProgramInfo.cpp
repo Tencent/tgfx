@@ -117,14 +117,6 @@ int ProgramInfo::getProcessorIndex(const Processor* processor) const {
   return result->second;
 }
 
-std::string ProgramInfo::getMangledSuffix(const Processor* processor) const {
-  auto processorIndex = getProcessorIndex(processor);
-  if (processorIndex == -1) {
-    return "";
-  }
-  return "_P" + std::to_string(processorIndex);
-}
-
 std::string ProgramInfo::FormatDiagnosticKey(const BytesKey& key) {
   std::stringstream stream;
   stream << key.size() << ":" << std::hex << std::setfill('0');
@@ -139,10 +131,6 @@ const BytesKey& ProgramInfo::programKey() const {
     cachedProgramKey = buildProgramKey();
   }
   return *cachedProgramKey;
-}
-
-BytesKey ProgramInfo::programKeyForDiagnostics() const {
-  return programKey();
 }
 
 BytesKey ProgramInfo::buildProgramKey() const {
@@ -337,18 +325,5 @@ std::vector<SamplerInfo> ProgramInfo::getSamplers() const {
     samplers.push_back(sampler);
   }
   return samplers;
-}
-
-void ProgramInfo::updateUniformDataSuffix(UniformData* vertexUniformData,
-                                          UniformData* fragmentUniformData,
-                                          const Processor* processor) const {
-  auto suffix = getMangledSuffix(processor);
-  if (vertexUniformData != nullptr) {
-    vertexUniformData->nameSuffix = suffix;
-  }
-
-  if (fragmentUniformData != nullptr) {
-    fragmentUniformData->nameSuffix = suffix;
-  }
 }
 }  // namespace tgfx

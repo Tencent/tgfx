@@ -751,17 +751,12 @@ AAType OpsCompositor::getAAType(bool antiAlias) const {
 // The GL backends' precompiled PorterDuff variants read dst either through a bound texture
 // (HAS_XP=1) or through the GL_EXT_shader_framebuffer_fetch dialect (HAS_XP=2, the opengles
 // bundle only). Devices advertising a different fetch dialect (ARM/NV legacy) keep the
-// dst-texture route under AOT so every device lands on a variant it can compile; the runtime
-// JIT route (no bundle) keeps the native fetch path on every backend.
-static bool UsesRuntimeFrameBufferFetch(Context* context) {
+// dst-texture route so every device lands on a variant it can compile.
+static bool UsesFrameBufferFetch(Context* context) {
   if (!context->shaderCaps()->frameBufferFetchSupport) {
     return false;
   }
   if (context->backend() == Backend::OpenGL) {
-    auto cache = ContextCacheAccess::Cache(context);
-    if (cache == nullptr || !cache->isLoaded()) {
-      return true;
-    }
     return context->shaderCaps()->frameBufferFetchExtensionString ==
            "GL_EXT_shader_framebuffer_fetch";
   }
@@ -803,7 +798,7 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Brush& brush, bool 
   }
   if (BlendModeNeedDstTexture(brush.blendMode, hasCoverage)) {
     auto features = context->gpu()->features();
-    if (!UsesRuntimeFrameBufferFetch(context) &&
+    if (!UsesFrameBufferFetch(context) &&
         (!features->textureBarrier || renderTarget->asTextureProxy() == nullptr ||
          !renderTarget->canBeSampledDirectly() || renderTarget->sampleCount() > 1)) {
       needDeviceBounds = true;
@@ -1035,7 +1030,7 @@ PlacementPtr<FragmentProcessor> OpsCompositor::makeMaskFP(
 }
 
 DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AAType aaType) {
-  if (UsesRuntimeFrameBufferFetch(context)) {
+  if (UsesFrameBufferFetch(context)) {
     return {};
   }
   Rect bounds = {};
@@ -1140,7 +1135,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const ClipStack& clip, co
   auto aaType = getAAType(brush);
   if (BlendModeNeedDstTexture(brush.blendMode, op->hasCoverage())) {
     auto dstTextureInfo = makeDstTextureInfo(deviceBounds.value_or(Rect::MakeEmpty()), aaType);
-    if (!UsesRuntimeFrameBufferFetch(context) && dstTextureInfo.textureProxy == nullptr) {
+    if (!UsesFrameBufferFetch(context) && dstTextureInfo.textureProxy == nullptr) {
       return;
     }
     auto xferProcessor = PorterDuffXferProcessor::Make(drawingAllocator(), brush.blendMode,

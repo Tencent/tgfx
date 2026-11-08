@@ -24,11 +24,8 @@ namespace tgfx {
 
 struct AOTCoverageGateResult {
   uint64_t noMatchingRule = 0;
-  uint64_t runtimeCompiles = 0;
   // Exclusions are surfaced (never silently dropped): environment compile failures are
-  // SwiftShader's compiler memory limit on fully-unrolled AOT artifacts. Each excluded miss
-  // pairs with exactly one fallback runtime compilation, so the runtimeCompiles total drops by
-  // the same amounts.
+  // SwiftShader's compiler memory limit on fully-unrolled AOT artifacts.
   uint64_t excludedEnvironment = 0;
   // Misses that match an entry of the reviewed known-gap table (see AOTKnownGap). They stay
   // visible in the report and the JSON; only the strict residual (noMatchingRule) excludes them.
@@ -47,8 +44,7 @@ struct AOTCoverageGateResult {
   bool consistent = true;
 
   bool passed() const {
-    return consistent && noMatchingRule == 0 && runtimeCompiles == 0 && droppedDraws == 0 &&
-           staleKnownGaps == 0;
+    return consistent && noMatchingRule == 0 && droppedDraws == 0 && staleKnownGaps == 0;
   }
 };
 
@@ -61,8 +57,6 @@ struct AOTCoverageGateResult {
 AOTCoverageGateResult EvaluateAOTCoverageGate(uint64_t rawNoMatchingRule,
                                               uint64_t deliberateNoMatchingRule,
                                               uint64_t environmentCompileFailures,
-                                              uint64_t rawBuilderCreations,
-                                              uint64_t excludedBuilderCreations,
                                               uint64_t knownGapMisses = 0);
 
 /**

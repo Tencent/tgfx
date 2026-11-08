@@ -1876,8 +1876,9 @@ TGFX_TEST(AOTEffectTest, LinearTextureChainPrefersSinglePassChain) {
 
 // M1.0 geodesic probe: the multi-pass executor rebuilds a TextureEffect from the AOTTextureParameters
 // captured by lowerToAOT (rather than reusing the original FP). This verifies the round-trip is
-// lossless — the rebuilt effect must be byte-identical to the original, otherwise the AOT multi-pass
-// path would diverge from the JIT single-pass render. The processor key encodes sampler state,
+// lossless — the rebuilt effect must be byte-identical to the original, otherwise the AOT
+// multi-pass path would diverge from the plain single-pass render. The processor key encodes
+// sampler state,
 // subset, uv matrix, alphaStart and format, so equal keys prove equivalent shader + uniform layout.
 static PlacementPtr<FragmentProcessor> RebuildTextureFromAOTParameters(
     BlockAllocator* allocator, const AOTTextureParameters& parameters) {

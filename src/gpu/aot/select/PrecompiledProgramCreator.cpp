@@ -127,10 +127,6 @@ static std::string BuildPipelineSignature(const ProgramInfo* programInfo) {
   return stream.str();
 }
 
-static std::string ProgramKeyForDiagnostics(const ProgramInfo* programInfo) {
-  return ProgramInfo::FormatDiagnosticKey(programInfo->programKeyForDiagnostics());
-}
-
 static PrecompiledFallbackRecord MakeFallbackRecord(
     const PrecompiledShaderCache* cache, const ProgramInfo* programInfo,
     const PermutationMatchResult* matchResult = nullptr) {
@@ -138,7 +134,7 @@ static PrecompiledFallbackRecord MakeFallbackRecord(
   if (!cache->diagnosticRecordingEnabled()) {
     return record;
   }
-  record.programKey = ProgramKeyForDiagnostics(programInfo);
+  record.programKey = ProgramInfo::FormatDiagnosticKey(programInfo->programKey());
   record.effectSignature = BuildEffectSignature(programInfo);
   record.pipelineSignature = BuildPipelineSignature(programInfo);
   if (matchResult != nullptr) {
@@ -156,7 +152,7 @@ static PrecompiledHitRecord MakeHitRecord(const PrecompiledShaderCache* cache,
   if (!cache->diagnosticRecordingEnabled()) {
     return record;
   }
-  record.programKey = ProgramKeyForDiagnostics(programInfo);
+  record.programKey = ProgramInfo::FormatDiagnosticKey(programInfo->programKey());
   record.effectSignature = BuildEffectSignature(programInfo);
   record.pipelineSignature = BuildPipelineSignature(programInfo);
   record.shaderName = matchResult.shaderName;
@@ -642,7 +638,6 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   std::unique_ptr<UniformData> fragmentUniformData = nullptr;
   if (!vertBlob->uniforms.empty()) {
     vertexUniformData = std::unique_ptr<UniformData>(new UniformData(vertBlob->uniforms));
-    vertexUniformData->skipSuffix = true;
     vertexUniformData->buildParamLayout();
     BindingEntry vertexBinding = {VertexUniformBlockName, VERTEX_UBO_BINDING_POINT,
                                   ShaderVisibility::Vertex};
@@ -650,7 +645,6 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   }
   if (!fragBlob->uniforms.empty()) {
     fragmentUniformData = std::unique_ptr<UniformData>(new UniformData(fragBlob->uniforms));
-    fragmentUniformData->skipSuffix = true;
     fragmentUniformData->buildParamLayout();
     BindingEntry fragmentBinding = {FragmentUniformBlockName, FRAGMENT_UBO_BINDING_POINT,
                                     ShaderVisibility::Fragment};

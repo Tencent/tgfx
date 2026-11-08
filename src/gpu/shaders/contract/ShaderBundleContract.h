@@ -44,9 +44,9 @@ namespace tgfx {
 // dialect a bundle is built for), the stage-key hash, the shader resource binding layout, the
 // on-disk bundle format, and the bundle identity (content hash + toolchain ABI). Changing any of
 // them is a bundle-format or toolchain-ABI change: bump CurrentVersion below for an on-disk layout
-// change and/or ExpectedToolchainABI (see the end of this file) for a semantic change, then
-// republish the bundles under resources/shaders in the same commit with
-// tools/shader_build_tool/publish_bundles.sh. The ABI change history lives in git log (search for
+// change and/or ExpectedToolchainABI (see the end of this file) for a semantic change. Every
+// build generates its own bundle, so there is nothing to republish: the bump takes effect the
+// next time the bundles are built. The ABI change history lives in git log (search for
 // "0x000100"): each bump's commit states what changed and why the older bundles are refused.
 
 // ---------------------------------------------------------------------------------------------
@@ -469,14 +469,10 @@ inline bool ProfileAllowsPayload(ShaderProfile profile, uint16_t payloadFormat) 
  * identity hash covers it). The writer picks the new value up automatically and the loader then
  * refuses every older bundle instead of feeding mismatched layouts to the GPU.
  *
- * Bumping this constant also makes the bundles published under resources/shaders stale: they record
- * the old value, and builds that consume them (cross builds on a Linux host, Web with
- * TGFX_WEB_PREBUILT_BUNDLES) would hand the runtime a bundle it refuses, which then falls back to
- * the runtime shader path on every draw. Republish them in the SAME commit as the bump, with
- * tools/shader_build_tool/publish_bundles.sh (or the tgfx_publish_shader_bundles target). The
- * CI step "Verify Published Shader Bundles" fails the commit that forgets: it rejects a bundle
- * whose recorded ABI is not this value. The same goes for any change to a shader source or to its
- * variant rules, which changes the source digest the manifests record.
+ * Every build generates its bundle together with the library, so an ABI bump cannot hand the
+ * runtime a stale bundle: the next build simply records the new value everywhere. The loader
+ * still refuses bundles whose recorded ABI is not this value, which guards hand-carried or
+ * cached bundle files.
  */
 inline constexpr uint32_t ExpectedToolchainABI = 0x0001001fu;
 

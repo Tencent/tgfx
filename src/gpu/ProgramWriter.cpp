@@ -144,8 +144,8 @@ bool ProgramWriter::write(const ProgramInfo& info, RenderPass* renderPass, Progr
 #if DEBUG
   const char* unifDump = UnifDumpLabel();
   if (unifDump != nullptr) {
-    auto dumpLabel = std::string(unifDump) +
-                     " key=" + ProgramInfo::FormatDiagnosticKey(info.programKeyForDiagnostics());
+    auto dumpLabel =
+        std::string(unifDump) + " key=" + ProgramInfo::FormatDiagnosticKey(info.programKey());
     if (vertexUniformData != nullptr) {
       vertexUniformData->dumpValues(dumpLabel.c_str());
     }
@@ -176,8 +176,6 @@ void ProgramWriter::writeUniformValues(const ProgramInfo& info, UniformData* ver
   writeGeometryProcessor(info, vertexUniformData, fragmentUniformData);
 
   writeProcessors(info, vertexUniformData, fragmentUniformData);
-
-  info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, nullptr);
 }
 
 void ProgramWriter::writeEngineDefaults(const ProgramInfo&, UniformData*) const {
@@ -186,7 +184,6 @@ void ProgramWriter::writeEngineDefaults(const ProgramInfo&, UniformData*) const 
 void ProgramWriter::writeGeometryProcessor(const ProgramInfo& info, UniformData* vertexUniformData,
                                            UniformData* fragmentUniformData) const {
   FragmentProcessor::CoordTransformIter coordTransformIter(&info);
-  info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, info.geometryProcessor);
   info.geometryProcessor->setData(vertexUniformData, fragmentUniformData, &coordTransformIter);
 }
 
@@ -376,7 +373,6 @@ void PrecompiledProgramWriter::writeProcessorsByTree(const ProgramInfo& info,
     FragmentProcessor::Iter iter(fragmentProcessor);
     const FragmentProcessor* fp = iter.next();
     while (fp) {
-      info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, fp);
       int ordinal = classOrdinals[UniformSpaceKey(fp)]++;
       std::string structural = ordinal > 0 ? "_" + std::to_string(ordinal) : "";
       paramWriter.setInstanceOrdinal(static_cast<size_t>(ordinal));
@@ -454,9 +450,7 @@ void PrecompiledProgramWriter::writeProcessorsByTree(const ProgramInfo& info,
     }
   }
   const auto processor = info.getXferProcessor();
-  info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
-  // The suffix reset above puts the XP back on the base names; the offset path's instance
-  // ordinal follows it.
+  // The offset path's instance ordinal for the XP follows the base names.
   paramWriter.setInstanceOrdinal(0);
   if (carriedIR != nullptr && ClassifyXferForMatch(processor) != XferKind::None) {
     // The blend mode off the IR; the dst texture's instance-time facts off the made processor --
@@ -702,7 +696,6 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
     }
   }
   const auto processor = info.getXferProcessor();
-  info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
   paramWriter.setInstanceOrdinal(0);
   if (ClassifyXferForMatch(processor) != XferKind::None) {
     // The blend mode off the IR; the dst texture's instance-time facts off the made processor --
@@ -829,7 +822,6 @@ void ChainProgramWriter::writeGeometryProcessor(const ProgramInfo& info,
   // processor tree orders them differently, so the GP must not consume the tree's iteration.
   auto transforms = BuildChainCoordTransforms(*program);
   FragmentProcessor::CoordTransformIter coordTransformIter(&transforms);
-  info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, info.geometryProcessor);
   info.geometryProcessor->setData(vertexUniformData, fragmentUniformData, &coordTransformIter);
 }
 
@@ -845,12 +837,10 @@ void ChainProgramWriter::writeProcessors(const ProgramInfo& info, UniformData* v
   // The shell-free value write: the draw's whole uniform content comes from the compiled program —
   // the root block plus every binding's per-child records — so no processor tree is walked. The
   // xfer processor still writes through its own bind until the xfer contract lands.
-  info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, nullptr);
   BindChainProgram(*program, vertexUniformData, fragmentUniformData);
   BindChainBindings(*program, fragmentUniformData);
   ParamWriter paramWriter(fragmentUniformData);
   const auto processor = info.getXferProcessor();
-  info.updateUniformDataSuffix(vertexUniformData, fragmentUniformData, processor);
   const auto* chainIR = info.getCarriedIR();
   if (chainIR != nullptr && ClassifyXferForMatch(processor) != XferKind::None) {
     BindPorterDuffXfer(static_cast<int>(chainIR->blendMode), processor, &paramWriter);

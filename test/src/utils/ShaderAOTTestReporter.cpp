@@ -82,25 +82,17 @@ static std::string GitHeadAtRun() {
 AOTCoverageGateResult EvaluateAOTCoverageGate(uint64_t rawNoMatchingRule,
                                               uint64_t deliberateNoMatchingRule,
                                               uint64_t environmentCompileFailures,
-                                              uint64_t rawBuilderCreations,
-                                              uint64_t excludedBuilderCreations,
                                               uint64_t knownGapMisses) {
   AOTCoverageGateResult result = {};
-  // Deliberate misses already carry their fallback compilation inside excludedBuilderCreations
-  // (the deliberate scope marks every program created under it), so only the environment
-  // misses need their paired runtime subtraction here. A known-gap miss is a real miss of a shape
-  // the table names, so it leaves the strict residual but is never hidden.
+  // Deliberate misses carry their exclusion in the deliberate scope's own counters, and a
+  // known-gap miss is a real miss of a shape the table names, so it leaves the strict residual
+  // but is never hidden. Runtime compilation no longer exists, so an environment failure has no
+  // paired creation to subtract: it can only surface, never pass silently.
   const uint64_t noMatchingExclusions = deliberateNoMatchingRule + knownGapMisses;
-  const uint64_t pairedRuntimeExclusions = environmentCompileFailures;
-  result.consistent = noMatchingExclusions <= rawNoMatchingRule &&
-                      excludedBuilderCreations + pairedRuntimeExclusions <= rawBuilderCreations;
+  result.consistent = noMatchingExclusions <= rawNoMatchingRule && environmentCompileFailures == 0;
   result.noMatchingRule = noMatchingExclusions <= rawNoMatchingRule
                               ? rawNoMatchingRule - noMatchingExclusions
                               : rawNoMatchingRule;
-  result.runtimeCompiles =
-      excludedBuilderCreations + pairedRuntimeExclusions <= rawBuilderCreations
-          ? rawBuilderCreations - excludedBuilderCreations - pairedRuntimeExclusions
-          : rawBuilderCreations;
   result.excludedEnvironment = environmentCompileFailures;
   result.excludedKnownGaps = knownGapMisses;
   return result;
@@ -1034,13 +1026,11 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       }
       // Missing diagnostic records stay in the production count. Exclusions cannot borrow
       // successful creations from a different test or from failed PrecompiledOnly probes.
-      // Runtime compilation no longer exists, so the builder-creation inputs are structurally
-      // zero; the gate reduces to misses and dropped draws.
+      // Runtime compilation no longer exists, so the gate reduces to misses and dropped draws.
       auto testGate = EvaluateAOTCoverageGate(
           result.fallbackCounts[static_cast<size_t>(PrecompiledFallbackReason::NoMatchingRule)],
-          deliberateNoMatching, environmentCompileFailures, 0, 0, knownGapMisses);
+          deliberateNoMatching, environmentCompileFailures, knownGapMisses);
       coverageGate.noMatchingRule += testGate.noMatchingRule;
-      coverageGate.runtimeCompiles += testGate.runtimeCompiles;
       coverageGate.excludedEnvironment += testGate.excludedEnvironment;
       coverageGate.excludedKnownGaps += testGate.excludedKnownGaps;
       coverageGate.knownGapDrops += knownGapDrops;
@@ -1098,7 +1088,6 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         {"coverageGate",
          {{"rawNoMatchingRule", rawNoMatching},
           {"noMatchingRule", coverageGate.noMatchingRule},
-          {"runtimeCompiles", coverageGate.runtimeCompiles},
           {"excludedEnvironment", coverageGate.excludedEnvironment},
           {"excludedKnownGaps", coverageGate.excludedKnownGaps},
           {"knownGapDrops", coverageGate.knownGapDrops},
@@ -1207,7 +1196,7 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         static_cast<unsigned long long>(auditFusableNow),
         static_cast<unsigned long long>(auditNeedsLowering));
     // WP5 strict coverage targets. The terminal state requires zero NoMatchingRule fallbacks and
-    // zero runtime program compilations across the full suite; every remaining miss prints as a
+    // zero dropped draws across the full suite; every remaining miss prints as a
     // tracked entry with its effect shape, so a regression adds a name here instead of hiding
     // inside a hit-rate percentage. The summary runs in blocking mode when
     // TGFX_AOT_COVERAGE_GATE=blocking (delivery/CI full-suite runs): a missed target then fails
@@ -1215,13 +1204,12 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
     // cannot land silently. Blocking mode also applies to filtered runs; it verifies only the
     // selected tests and is not a certificate of full-suite coverage. Default runs monitor.
     auto strictNoMatching = coverageGate.noMatchingRule;
-    auto strictRuntimeCompiles = coverageGate.runtimeCompiles;
     const char* gateMode = std::getenv("TGFX_AOT_COVERAGE_GATE");
     const bool blocking = gateMode != nullptr && std::strcmp(gateMode, "blocking") == 0;
     const auto precompiledCreations = summary.programStats.precompiledArtifactCreations;
     if (AOTCoverageGateMet(coverageGate, precompiledCreations)) {
       std::printf(
-          "[Coverage Gate][%s] strict targets MET: noMatchingRule=0 runtimeCompiles=0 "
+          "[Coverage Gate][%s] strict targets MET: noMatchingRule=0 "
           "droppedDraws=0 precompiledPrograms=%llu (excluded environment=%llu, known gaps=%llu "
           "of %llu entries, known-gap drops=%llu)\n",
           TGFX_BACKEND_NAME, static_cast<unsigned long long>(precompiledCreations),
@@ -1249,12 +1237,11 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       }
     } else {
       std::printf(
-          "[Coverage Gate][%s] MONITORING (targets: noMatchingRule=0 runtimeCompiles=0 "
-          "droppedDraws=0 staleKnownGaps=0): noMatchingRule=%llu runtimeCompiles=%llu "
+          "[Coverage Gate][%s] MONITORING (targets: noMatchingRule=0 "
+          "droppedDraws=0 staleKnownGaps=0): noMatchingRule=%llu "
           "droppedDraws=%llu (excluded environment=%llu, known gaps=%llu, known-gap drops=%llu, "
           "stale entries=%llu)\n",
           TGFX_BACKEND_NAME, static_cast<unsigned long long>(strictNoMatching),
-          static_cast<unsigned long long>(strictRuntimeCompiles),
           static_cast<unsigned long long>(coverageGate.droppedDraws),
           static_cast<unsigned long long>(coverageGate.excludedEnvironment),
           static_cast<unsigned long long>(coverageGate.excludedKnownGaps),

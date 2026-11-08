@@ -393,10 +393,11 @@ TGFX_TEST(AOTPerformanceMatrixTest, DualGradientMaterialization) {
 }
 
 // Per-family matrix: one representative scene per top-hit family (the chain kernel has its own
-// five scenarios above), measured on both routes so a per-family AOT/JIT gap shows up by family
-// instead of only on the chain. Each row prints aotDraws — a row with aotDraws=0 did not ride the
-// AOT route and its ratios are meaningless (drop it from the analysis). Gate budgets stay at the
-// chain-calibrated values; the analysis reads the printed ratios, the gate is only a backstop.
+// five scenarios above), measured on the precompiled route so a per-family cost shows up by
+// family instead of only on the chain. Each row prints aotDraws — a row with aotDraws=0 did not
+// ride the AOT route and its ratios are meaningless (drop it from the analysis). Gate budgets
+// stay at the chain-calibrated values; the analysis reads the printed ratios, the gate is only a
+// backstop.
 TGFX_TEST(AOTPerformanceMatrixTest, PerFamilyMatrix) {
   ContextScope scope;
   auto context = scope.getContext();

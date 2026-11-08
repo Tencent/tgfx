@@ -101,12 +101,9 @@ class ProgramInfo {
    */
   int getProcessorIndex(const Processor* processor) const;
 
-  std::string getMangledSuffix(const Processor* processor) const;
-
   /**
-   * Resolves the program for this info from the caches. The lookup policy is the cache's alone:
-   * a loaded precompiled bundle means precompiled-only (a miss drops the draw, no runtime
-   * fallback), while an unloaded cache falls back to runtime shader generation.
+   * Resolves the program for this info from the caches. Precompiled artifacts are the only
+   * program source: a miss drops the draw, with no runtime fallback.
    */
   std::shared_ptr<Program> getProgram() const;
 
@@ -194,10 +191,6 @@ class ProgramInfo {
    * state.
    */
   const BytesKey& programKey() const;
-
-  // Returns the exact cache key for diagnostics without letting reporting code reconstruct it from
-  // effect/pipeline signatures (which omit processor-key details).
-  BytesKey programKeyForDiagnostics() const;
 
   /** Formats a program key as the hex string the diagnostic records carry. */
   static std::string FormatDiagnosticKey(const BytesKey& key);
@@ -295,8 +288,5 @@ class ProgramInfo {
   friend class ChainProgramWriter;
 
   std::vector<SamplerInfo> getSamplers() const;
-
-  void updateUniformDataSuffix(UniformData* vertexUniformData, UniformData* fragmentUniformData,
-                               const Processor* processor) const;
 };
 }  // namespace tgfx

@@ -27,10 +27,8 @@ class ProgramInfo;
 class RenderPass;
 
 /**
- * Writes one program's per-draw uniform values and texture bindings. A Program owns its writer:
- * runtime-generated programs address their uniforms through the JIT per-processor name suffixes,
- * precompiled programs through the artifact's structural layout. Keeping the two addressing
- * routes in separate writers keeps the precompiled-specific rules out of ProgramInfo.
+ * Writes one program's per-draw uniform values and texture bindings. A Program owns its writer;
+ * precompiled programs address their uniforms through the artifact's structural layout.
  */
 class ProgramWriter {
  public:

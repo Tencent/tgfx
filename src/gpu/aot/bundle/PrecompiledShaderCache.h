@@ -307,8 +307,9 @@ class PrecompiledShaderCache : public SpecSource {
   }
 
   /// Pauses or resumes all statistics recording. While paused every record* method is a no-op, so
-  /// intentional JIT renders (e.g. cross-validation reference passes with the bundle unloaded) do
-  /// not pollute the AOT hit-rate accounting with draws that are not production lookups.
+  /// intentional non-production renders (e.g. cross-validation reference passes with the bundle
+  /// unloaded) do not pollute the AOT hit-rate accounting with draws that are not production
+  /// lookups.
   // Pauses only artifact-miss recording (route-validation lookups use this: their failure is a
   // route mismatch, not a user-pipeline miss, and the fallback path records the original
   // pipeline instead). Hit and stage accounting stay live.

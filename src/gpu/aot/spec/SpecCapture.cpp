@@ -60,11 +60,9 @@ SpecValues SpecCapture::Capture(SpecSource* source, const ProgramInfo& info,
     }
     if (vertUniforms != nullptr && !vertUniforms->empty()) {
       scratch->vertexUniformData = std::unique_ptr<UniformData>(new UniformData(*vertUniforms));
-      scratch->vertexUniformData->skipSuffix = true;
       scratch->vertexBuffer.resize(scratch->vertexUniformData->size());
     }
     scratch->fragmentUniformData = std::unique_ptr<UniformData>(new UniformData(*fragUniforms));
-    scratch->fragmentUniformData->skipSuffix = true;
     scratch->fragmentBuffer.resize(scratch->fragmentUniformData->size());
   }
   // Zeroed before every capture: a recycled buffer would leak an earlier draw's structural words

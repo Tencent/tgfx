@@ -58,16 +58,9 @@ ShaderCaps::ShaderCaps(GPU* gpu) {
   auto info = gpu->info();
   PrintGPUInfo(info);
   if (info->backend == Backend::OpenGL) {
-    if (info->version.find("OpenGL ES") != std::string::npos) {
-      usesPrecisionModifiers = true;
-      versionDeclString = "#version 300 es";
-    } else {
-      usesPrecisionModifiers = false;
-      versionDeclString = "#version 150";
-    }
+    usesPrecisionModifiers = info->version.find("OpenGL ES") != std::string::npos;
   } else {
     usesPrecisionModifiers = false;
-    versionDeclString = "#version 450";
   }
   auto limits = gpu->limits();
   maxFragmentSamplers = limits->maxSamplersPerShaderStage;
@@ -78,28 +71,18 @@ ShaderCaps::ShaderCaps(GPU* gpu) {
     // pipeline uses Vulkan subpassInput to represent this, and SPIRV-Cross converts it to
     // the [[color(0)]] attribute when use_framebuffer_fetch_subpasses is enabled.
     frameBufferFetchSupport = true;
-    frameBufferFetchUsesSubpassInput = true;
   } else if (info->backend == Backend::WebGPU) {
-    // WebGPU does not support framebuffer fetch. The shader generation path uses subpassInput
-    // style for consistency with Metal, but the feature is disabled.
     frameBufferFetchSupport = false;
-    frameBufferFetchUsesSubpassInput = true;
     requiresUniformControlFlow = true;
   } else if (HasExtension(info, "GL_EXT_shader_framebuffer_fetch")) {
-    frameBufferFetchNeedsCustomOutput = true;
     frameBufferFetchSupport = true;
-    frameBufferFetchColorName = "gl_LastFragData[0]";
     frameBufferFetchExtensionString = "GL_EXT_shader_framebuffer_fetch";
   } else if (HasExtension(info, "GL_NV_shader_framebuffer_fetch")) {
     // Actually, we haven't seen an ES3.0 device with this extension yet, so we don't know.
-    frameBufferFetchNeedsCustomOutput = false;
     frameBufferFetchSupport = true;
-    frameBufferFetchColorName = "gl_LastFragData[0]";
     frameBufferFetchExtensionString = "GL_NV_shader_framebuffer_fetch";
   } else if (HasExtension(info, "GL_ARM_shader_framebuffer_fetch")) {
-    frameBufferFetchNeedsCustomOutput = false;
     frameBufferFetchSupport = true;
-    frameBufferFetchColorName = "gl_LastFragColorARM";
     frameBufferFetchExtensionString = "GL_ARM_shader_framebuffer_fetch";
   }
 }

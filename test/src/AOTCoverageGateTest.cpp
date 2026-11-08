@@ -440,34 +440,29 @@ TGFX_TEST(AOTCoverageGateTest, GateRejectsSyntheticViolations) {
 }
 
 TGFX_TEST(AOTCoverageGateTest, ProductionMetricsPreserveUnmarkedFailures) {
-  EXPECT_TRUE(EvaluateAOTCoverageGate(0, 0, 0, 0, 0).passed());
-  EXPECT_TRUE(EvaluateAOTCoverageGate(1, 1, 0, 2, 2).passed());
-  auto mixed = EvaluateAOTCoverageGate(2, 1, 0, 2, 1);
+  EXPECT_TRUE(EvaluateAOTCoverageGate(0, 0, 0).passed());
+  EXPECT_TRUE(EvaluateAOTCoverageGate(1, 1, 0).passed());
+  auto mixed = EvaluateAOTCoverageGate(2, 1, 0);
   EXPECT_EQ(mixed.noMatchingRule, 1u);
-  EXPECT_EQ(mixed.runtimeCompiles, 1u);
   EXPECT_FALSE(mixed.passed());
-  EXPECT_FALSE(EvaluateAOTCoverageGate(1, 0, 0, 0, 0).passed());
-  EXPECT_FALSE(EvaluateAOTCoverageGate(0, 1, 0, 0, 0).consistent);
-  EXPECT_FALSE(EvaluateAOTCoverageGate(0, 0, 1, 0, 0).passed());
-  // Environment exclusions pair with their fallback compilations: the strict counts drop, the
-  // exclusion count surfaces, and an unpaired miss still fails.
-  auto environment = EvaluateAOTCoverageGate(0, 0, 3, 3, 0);
-  EXPECT_TRUE(environment.passed());
+  EXPECT_FALSE(EvaluateAOTCoverageGate(1, 0, 0).passed());
+  EXPECT_FALSE(EvaluateAOTCoverageGate(0, 1, 0).consistent);
+  // An environment failure has no paired runtime compilation to subtract (runtime compilation
+  // no longer exists): it can only surface, and it breaks consistency.
+  auto environment = EvaluateAOTCoverageGate(0, 0, 3);
   EXPECT_EQ(environment.excludedEnvironment, 3u);
-  // An exclusion may never hide a miss it cannot pair with: subtracting more builder creations
-  // than exist flips consistency instead of clamping the count to zero.
-  EXPECT_FALSE(EvaluateAOTCoverageGate(0, 0, 3, 1, 0).consistent);
-  EXPECT_FALSE(EvaluateAOTCoverageGate(0, 0, 0, 0, 1).passed());
-  // A dropped draw fails the gate even with no miss and no runtime compilation: it rendered
-  // nothing, whatever the reason its program lookup failed.
-  auto dropped = EvaluateAOTCoverageGate(0, 0, 0, 0, 0);
+  EXPECT_FALSE(environment.consistent);
+  EXPECT_FALSE(EvaluateAOTCoverageGate(0, 0, 0, 1).passed());
+  // A dropped draw fails the gate even with no miss: it rendered nothing, whatever the reason
+  // its program lookup failed.
+  auto dropped = EvaluateAOTCoverageGate(0, 0, 0);
   dropped.droppedDraws = 1;
   EXPECT_FALSE(dropped.passed());
   // A run with no miss is only evidence of coverage when it also served a precompiled program:
   // drawing nothing (or only excluded draws) is vacuous, not met.
-  EXPECT_FALSE(AOTCoverageGateMet(EvaluateAOTCoverageGate(0, 0, 0, 0, 0), 0));
-  EXPECT_TRUE(AOTCoverageGateMet(EvaluateAOTCoverageGate(0, 0, 0, 0, 0), 1));
-  EXPECT_FALSE(AOTCoverageGateMet(EvaluateAOTCoverageGate(0, 0, 0, 1, 0), 5));
+  EXPECT_FALSE(AOTCoverageGateMet(EvaluateAOTCoverageGate(0, 0, 0), 0));
+  EXPECT_TRUE(AOTCoverageGateMet(EvaluateAOTCoverageGate(0, 0, 0), 1));
+  EXPECT_FALSE(AOTCoverageGateMet(EvaluateAOTCoverageGate(0, 0, 0, 1), 5));
 
   GlobalCache programs(nullptr);
   BytesKey firstKey;
@@ -500,18 +495,18 @@ TGFX_TEST(AOTCoverageGateTest, ProductionMetricsPreserveUnmarkedFailures) {
 // A listed gap leaves the strict residual but never disappears from the report, and a table entry
 // that describes nothing fails the gate: the exception list stays honest in both directions.
 TGFX_TEST(AOTCoverageGateTest, KnownGapsAreSurfacedNotHidden) {
-  auto listed = EvaluateAOTCoverageGate(3, 0, 0, 0, 0, 3);
+  auto listed = EvaluateAOTCoverageGate(3, 0, 0, 3);
   EXPECT_TRUE(listed.passed());
   EXPECT_EQ(listed.noMatchingRule, 0u);
   EXPECT_EQ(listed.excludedKnownGaps, 3u);
   // The exclusion may never subtract more than the run recorded.
-  EXPECT_FALSE(EvaluateAOTCoverageGate(2, 0, 0, 0, 0, 3).consistent);
+  EXPECT_FALSE(EvaluateAOTCoverageGate(2, 0, 0, 3).consistent);
   // An unlisted miss stays a failure even when the table covers other shapes.
-  auto unlisted = EvaluateAOTCoverageGate(4, 0, 0, 0, 0, 3);
+  auto unlisted = EvaluateAOTCoverageGate(4, 0, 0, 3);
   EXPECT_EQ(unlisted.noMatchingRule, 1u);
   EXPECT_FALSE(unlisted.passed());
   // A stale entry is a cleanup debt, not a silent pass.
-  auto stale = EvaluateAOTCoverageGate(0, 0, 0, 0, 0, 0);
+  auto stale = EvaluateAOTCoverageGate(0, 0, 0, 0);
   stale.staleKnownGaps = 1;
   EXPECT_FALSE(stale.passed());
   EXPECT_FALSE(AOTCoverageGateMet(stale, 1));

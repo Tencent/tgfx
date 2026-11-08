@@ -115,7 +115,7 @@ void UniformData::onSetArrayElement(const std::string& name, size_t index, const
     return;
   }
 
-  const auto key = skipSuffix ? name : name + nameSuffix;
+  const auto key = name;
   auto field = findField(key);
   // Scalars are accepted as single-element targets (index 0), so writers can use one call form
   // for both scalar fields and array elements.
@@ -140,7 +140,7 @@ void UniformData::onSetData(const std::string& name, const void* data, size_t si
     return;
   }
 
-  const auto key = skipSuffix ? name : name + nameSuffix;
+  const auto key = name;
   auto field = findField(key);
 
   if (field == nullptr) {
@@ -172,13 +172,11 @@ const UniformData::Field* UniformData::findField(const std::string& key) const {
 }
 
 bool UniformData::hasField(const std::string& name) const {
-  const auto key = skipSuffix ? name : name + nameSuffix;
-  return findField(key) != nullptr;
+  return findField(name) != nullptr;
 }
 
 bool UniformData::readInt32(const std::string& name, size_t wordIndex, int32_t* value) const {
-  const auto key = skipSuffix ? name : name + nameSuffix;
-  const auto* field = findField(key);
+  const auto* field = findField(name);
   if (field == nullptr || _buffer == nullptr || value == nullptr ||
       wordIndex >= field->size / sizeof(int32_t)) {
     return false;
@@ -289,8 +287,7 @@ void UniformData::dumpValues(const char* label) const {
   }
   std::sort(sortedFields.begin(), sortedFields.end(),
             [](const Field& a, const Field& b) { return a.offset < b.offset; });
-  std::printf("[UNIF %s] route=%s suffix=%s fields=%zu\n", label, skipSuffix ? "AOT" : "JIT",
-              nameSuffix.c_str(), sortedFields.size());
+  std::printf("[UNIF %s] fields=%zu\n", label, sortedFields.size());
   for (const auto& field : sortedFields) {
     std::printf("  %-24s = [", field.name.c_str());
     bool isInt = field.format == UniformFormat::Int || field.format == UniformFormat::Int2 ||

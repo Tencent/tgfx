@@ -84,7 +84,7 @@ struct LayoutVariant {
 };
 
 // The XP variant a dst-reading draw resolves to: framebuffer fetch when the runtime uses it with a
-// bundle loaded (mirrors OpsCompositor's UsesRuntimeFrameBufferFetch), the dst texture otherwise.
+// bundle loaded (mirrors OpsCompositor's UsesFrameBufferFetch), the dst texture otherwise.
 int ExpectedXPType(Context* context, bool dstRead) {
   if (!dstRead) {
     return 0;

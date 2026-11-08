@@ -82,11 +82,9 @@ class Bitmap;
  * loads when it is created and that shipping code consumes. {nullptr, 0} when the build embeds no
  * bundle for the backend.
  *
- * Tests must use this instead of reading resources/shaders/shader_bundle.<backend>.bin. That
- * directory holds published copies for web builds and offline consumers; a copy older than the
- * sources fails every test that reads it even though the product, which runs the embedded bundle
- * generated from the current sources, is fine. Whether the published copies are fresh is checked
- * by shader_build_tool --verify-bundle, not by rendering tests.
+ * Tests must use this instead of reading a bundle file from disk: every build generates and
+ * embeds its own bundle, and a rendering test must consume exactly the bytes the product
+ * consumes.
  */
 std::pair<const uint8_t*, size_t> GetEmbeddedBundle(Backend backend);
 

@@ -34,12 +34,6 @@ class ShaderCaps {
   explicit ShaderCaps(GPU* gpu);
 
   /**
-   * The version declaration string to be placed at the top of the shader code. For example,
-   * "#version 300 es" for OpenGL ES 3.0, or "#version 150" for OpenGL 3.2.
-   */
-  std::string versionDeclString;
-
-  /**
    * Indicates if the shader language requires precision modifiers (lowp, mediump, highp) to be
    * explicitly specified for floating point types.
    */
@@ -52,29 +46,9 @@ class ShaderCaps {
   bool frameBufferFetchSupport = false;
 
   /**
-   * Indicates if the framebuffer fetch requires a custom output variable to be declared in the
-   * fragment shader. This is true for modern GLSL versions where "inout vec4 <name>" is used
-   * instead of the legacy "gl_LastFragData".
-   */
-  bool frameBufferFetchNeedsCustomOutput = false;
-
-  /**
-   * The name of the variable that holds the input color when using framebuffer fetch. This is
-   * typically "gl_LastFragData" in legacy OpenGL ES, and "inout vec4 <name>" in modern GLSL.
-   */
-  std::string frameBufferFetchColorName;
-
-  /**
    * The extension string required to enable framebuffer fetch support, if any.
    */
   std::string frameBufferFetchExtensionString;
-
-  /**
-   * Indicates if framebuffer fetch uses Vulkan-style subpass input instead of GL ES-style inout.
-   * When true, the fragment shader will declare a subpassInput uniform and use subpassLoad()
-   * to read the destination color. SPIRV-Cross will convert this to MSL's [[color(0)]] attribute.
-   */
-  bool frameBufferFetchUsesSubpassInput = false;
 
   /**
    * Returns the maximum number of texture samplers that can be used in a shader.

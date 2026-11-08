@@ -621,8 +621,7 @@ void BindTextureSourceLeaf(const AOTTextureParameters& leaf, ParamWriter* writer
   float rect[4] = {};
   LeafSubsetRect(leaf.textureProxy, textureView.get(), leaf.subset, leaf.samplerState, rect);
   writer->set(TextureSourceModule::Subset, rect);
-  // The two SubsetClampOn gates are deliberately different facts, and
-  // AOTUniformABTest.BlendTwoImageFills locks the difference: this fill-leaf gate reads the
+  // The two SubsetClampOn gates are deliberately different facts: this fill-leaf gate reads the
   // resolved view (a smaller-than-proxy view or an External texture needs the clamp whatever the
   // lowering decided), while the chain-binding gate below asks only whether the leaf carried a
   // sample area. Unifying the two onto one predicate changes bytes — do not "simplify" this.
@@ -852,8 +851,8 @@ void BindChainBindings(const AOTProgram& program, UniformData* fragmentUniformDa
     BindingSubsetRect(binding, textureView.get(), rect);
     writer.set(TextureSourceModule::Subset, rect);
     // The lowering's own decision (a bounded sample area), not the fill-leaf gate's view facts:
-    // AOTUniformABTest.BlendTwoImageFills holds a leaf whose view facts say "clamp" while the
-    // reference says off. Two gates, two facts — deliberately.
+    // a leaf can carry view facts that say "clamp" while this says off. Two gates, two facts —
+    // deliberately.
     writer.set(TextureSourceModule::SubsetClampOn, binding.args.sampleArea.has_value() ? 1 : 0);
     if (binding.alphaStart != Point::Zero()) {
       // Value-gated exactly like the module bind: single-plane draws leave the field at its
