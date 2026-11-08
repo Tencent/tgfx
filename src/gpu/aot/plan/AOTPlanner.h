@@ -32,8 +32,8 @@ namespace tgfx {
 class Context;
 class RenderTargetProxy;
 
-/// The record-time route one plan takes: served in place at prepare (its descriptor rides the
-/// draw's IR), run as a plan task, or left to the plain lookup at prepare.
+/// The record-time route one plan takes: run as a plan task, or left to the plain lookup at
+/// prepare (a graph one fused pass can carry never plans at all — it is served in place).
 enum class AOTRecordRoute : uint8_t { Plain, Task };
 
 /**

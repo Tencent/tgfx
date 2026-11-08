@@ -330,12 +330,17 @@ static bool BuildPassIRs(Context* context, uint32_t renderFlags, const AOTEffect
   auto allocator = drawingManager->drawingAllocator();
   if (plan.passes.size() == 1) {
     // Production never reaches a single-pass task (a fused pass is served in place, so MakePlan
-    // never returns one), but the API contract admits one: the terminal draw carries the whole
-    // graph and compiles it on first serve like any plain draw.
+    // never returns one), but the API contract admits one. The terminal draw compiles here from
+    // the plan's own pass — the graph may carry dead nodes a fused pass cannot express, so the
+    // whole-graph derivation would refuse what this plan legitimately serves.
     DrawIR passIR = {};
     passIR.color = graph;
     if (terminalCoverage != nullptr) {
       passIR.coverage = *terminalCoverage;
+    }
+    if (!AOTChainBuilder::Compile(graph, plan.passes[0], terminalCoverage,
+                                  &passIR.program.emplace())) {
+      return false;
     }
     renderPlan->terminalIR = allocator->make<DrawIR>(std::move(passIR));
     return renderPlan->terminalIR != nullptr;
