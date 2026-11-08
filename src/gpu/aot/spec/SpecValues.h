@@ -4,14 +4,14 @@
 //
 //  Copyright (C) 2026 Tencent. All rights reserved.
 //
-//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except in
-//  compliance with the License. You may obtain a copy of the License at
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
 //
 //      https://opensource.org/licenses/BSD-3-Clause
 //
 //  unless required by applicable law or agreed to in writing, software distributed under the
 //  License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-//  either express or implied. see the License for the specific language governing permissions
+//  either express or implied. See the License for the specific language governing permissions
 //  and limitations under the License.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -19,10 +19,22 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <vector>
+#include "gpu/Uniform.h"
 #include "tgfx/core/BytesKey.h"
 
 namespace tgfx {
+
+/// One freezable uniform field of a variant, as the bundle's spec table records it: the source
+/// name, the reflected format and the id range the specialization constants occupy (element-major,
+/// four ids per ivec4 element; id 0 is the master switch).
+struct SpecFieldInfo {
+  std::string name;
+  UniformFormat format = UniformFormat::Int;
+  uint32_t arraySize = 1;
+  uint32_t firstId = 0;
+};
 
 /**
  * The specialization values of one draw: one 32-bit integer per injectable constant, in the

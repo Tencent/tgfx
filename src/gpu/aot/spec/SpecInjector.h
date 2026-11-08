@@ -21,7 +21,6 @@
 #include <string>
 #include <utility>
 #include <vector>
-#include "gpu/aot/bundle/PrecompiledShaderCache.h"
 #include "gpu/aot/spec/SpecValues.h"
 #include "tgfx/gpu/ShaderModule.h"
 
