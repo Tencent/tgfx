@@ -143,6 +143,13 @@ struct FragmentFamilyDecl {
   /// The generated sampler dispatches (one per instance group), or null when none.
   const InstanceDispatchDecl* dispatches = nullptr;
   size_t dispatchCount = 0;
+  /// The pipeline template the entry ends with: the dedicated families share the fill pipeline,
+  /// the interpreter has its own chain pipeline.
+  const char* mainInclude = "pipeline/fill/fill_fragment_main.inc";
+  /// The support modules included after the generated interface and before the pipeline template
+  /// (the math libraries the entry's interface and evaluation loop depend on), or null.
+  const char* const* extraIncludes = nullptr;
+  size_t extraIncludeCount = 0;
 };
 
 /// One block/interface/step element of a declaration list.

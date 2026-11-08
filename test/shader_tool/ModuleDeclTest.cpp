@@ -176,6 +176,26 @@ TEST(ModuleDeclTest, TheChainInterfaceIsExpressible) {
   EXPECT_TRUE(text.find("#define XP_DST_TEX_BINDING (NTEX + 1)") != std::string::npos);
 }
 
+TEST(ModuleDeclTest, ThePipelineTemplateAndSupportModulesComeFromTheDeclaration) {
+  // The dedicated families keep the fill pipeline; the interpreter declares its own chain
+  // template plus the support modules its loop needs. A family that declared neither still gets
+  // the fill template, which is why the migrated entries did not change.
+  std::string error;
+  const auto chain = EmitFragmentEntry(ChainInterfaceDecl::Decl, &error);
+  ASSERT_FALSE(chain.empty()) << error;
+  EXPECT_TRUE(chain.find("#include \"xp/xp_blend_colors.inc\"") != std::string::npos);
+  EXPECT_TRUE(chain.find("#include \"source/texture_sampling.inc\"") != std::string::npos);
+  const auto chainMain = chain.find("#include \"pipeline/chain/pointwise_fragment_main.inc\"");
+  ASSERT_NE(chainMain, std::string::npos);
+  EXPECT_LT(chain.find("#include \"source/texture_sampling.inc\""), chainMain);
+  for (const auto* decl : AllFragmentDecls()) {
+    const auto text = EmitFragmentEntry(*decl, &error);
+    ASSERT_FALSE(text.empty()) << error;
+    EXPECT_TRUE(text.find("#include \"pipeline/fill/fill_fragment_main.inc\"") != std::string::npos)
+        << decl->name;
+  }
+}
+
 TEST(ModuleDeclTest, TheInstanceDispatchMatchesTheHandwrittenForm) {
   // The generated reader must be the handwritten aotChainRead verbatim: one static pick per
   // instance, the last instance as the else arm (an out-of-range index reads it, which is the

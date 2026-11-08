@@ -269,7 +269,10 @@ std::string EmitFragmentEntry(const FragmentFamilyDecl& decl, std::string* error
       return {};
     }
   }
-  writer.Line("#include \"pipeline/fill/fill_fragment_main.inc\"");
+  for (size_t index = 0; index < decl.extraIncludeCount; ++index) {
+    writer.Line(std::string("#include \"") + decl.extraIncludes[index] + "\"");
+  }
+  writer.Line(std::string("#include \"") + decl.mainInclude + "\"");
   return writer.Take();
 }
 

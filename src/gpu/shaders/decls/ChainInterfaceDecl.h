@@ -86,6 +86,14 @@ struct ChainInterfaceDecl {
       {"aotChainRead", "TextureSampler_", "vec4", "vec2", "aotReadSwizzle", "NTEX > 0"},
   };
 
+  // The math and evaluation modules the interface binds to the interpreter's loop. The layout
+  // branches (ellipse/hairline/complex coverage) and the leaf-only tiling module stay inside the
+  // interface include until the migration splits it, so the list below is the base set.
+  static constexpr const char* ExtraIncludes[] = {
+      "xp/xp_blend_colors.inc", "xp/xp_porter_duff.inc",       "xp/xp_porter_duff_fbf.inc",
+      "xp/xp_blend_pass.inc",   "source/texture_sampling.inc",
+  };
+
   static constexpr FragmentFamilyDecl Decl = {Name,
                                               File,
                                               Block,
@@ -104,7 +112,10 @@ struct ChainInterfaceDecl {
                                               "NTEX",
                                               "(NTEX + 1)",
                                               Dispatches,
-                                              std::size(Dispatches)};
+                                              std::size(Dispatches),
+                                              "pipeline/chain/pointwise_fragment_main.inc",
+                                              ExtraIncludes,
+                                              std::size(ExtraIncludes)};
 };
 
 }  // namespace tgfx
