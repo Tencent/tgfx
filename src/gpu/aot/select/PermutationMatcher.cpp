@@ -623,8 +623,4 @@ std::optional<PermutationMatchResult> MatchPermutation(const ProgramInfo* progra
   return outcome.match;
 }
 
-const char* PermutationMatchFailureName(PermutationMatchFailure failure) {
-  return AOTFailureName(failure);
-}
-
 }  // namespace tgfx

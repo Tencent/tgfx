@@ -54,7 +54,6 @@ struct PermutationMatchOutcome {
 };
 
 /// Stable name of a failure value for diagnostics dumps. Never null.
-const char* PermutationMatchFailureName(PermutationMatchFailure failure);
 
 /**
  * Matches the program info against the precompiled families (the full family walk plus the

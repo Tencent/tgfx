@@ -614,7 +614,7 @@ void ExpectSceneServed(const char* label, const char* gpName, const char* signat
     for (const auto& record : cache->fallbackRecords()) {
       misses +=
           record.effectSignature + " [" +
-          PermutationMatchFailureName(static_cast<PermutationMatchFailure>(record.matchFailure)) +
+          AOTFailureName(static_cast<AOTFailure>(record.matchFailure)) +
           "]\n";
     }
     EXPECT_TRUE(misses.empty()) << label << " misses:\n" << misses;

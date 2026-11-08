@@ -28,7 +28,6 @@
 #include "gpu/GlobalCache.h"
 #include "gpu/ShaderCaps.h"
 #include "gpu/aot/AOTDiagnostics.h"
-#include "gpu/aot/select/PermutationMatch.h"
 #include "gpu/shaders/BundleCodec.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/shaders/contract/ShaderProfileResolver.h"
@@ -1032,7 +1031,7 @@ bool PrecompiledShaderCache::writeDiagnosticsDump(const std::string& path) const
     AppendEscaped(&out, PrecompiledFallbackReasonName(
                             static_cast<PrecompiledFallbackReason>(entry.first.reason)));
     out.append(", \"matchFailure\": ");
-    AppendEscaped(&out, PermutationMatchFailureName(
+    AppendEscaped(&out, AOTFailureName(
                             static_cast<PermutationMatchFailure>(entry.first.failure)));
     out.append(", \"count\": " + std::to_string(entry.second) + "}");
   }
@@ -1053,7 +1052,7 @@ bool PrecompiledShaderCache::writeDiagnosticsDump(const std::string& path) const
     out.append(", \"reason\": ");
     AppendEscaped(&out, PrecompiledFallbackReasonName(record.reason));
     out.append(", \"matchFailure\": ");
-    AppendEscaped(&out, PermutationMatchFailureName(
+    AppendEscaped(&out, AOTFailureName(
                             static_cast<PermutationMatchFailure>(record.matchFailure)));
     out.append("}");
   }
