@@ -40,7 +40,7 @@
 namespace tgfx {
 
 bool BuildPointwiseSlot(const AOTEffectGraph& graph, const AOTEffectNode* node,
-                        AOTPointwiseSlot* slot) {
+                        AOTChainSlot* slot) {
   if (node == nullptr || slot == nullptr) {
     return false;
   }
@@ -49,7 +49,7 @@ bool BuildPointwiseSlot(const AOTEffectGraph& graph, const AOTEffectNode* node,
     if (parameters == nullptr || node->inputs.size() != 1) {
       return false;
     }
-    slot->type = AOTPointwiseOpType::ConstColor;
+    slot->op = AOTChainOp::ConstColor;
     slot->constColor = *parameters;
     return true;
   }
@@ -74,7 +74,7 @@ bool BuildPointwiseSlot(const AOTEffectGraph& graph, const AOTEffectNode* node,
     if (constParams == nullptr || !AOTConstColorIsInputIndependent(graph, constNode)) {
       return false;
     }
-    slot->type = AOTPointwiseOpType::Blend;
+    slot->op = AOTChainOp::Blend;
     slot->blend = *parameters;
     slot->constColor = *constParams;
     return true;
@@ -84,7 +84,7 @@ bool BuildPointwiseSlot(const AOTEffectGraph& graph, const AOTEffectNode* node,
     if (parameters == nullptr) {
       return false;
     }
-    slot->type = AOTPointwiseOpType::ColorMatrix;
+    slot->op = AOTChainOp::ColorMatrix;
     slot->colorMatrix = *parameters;
     return true;
   }
@@ -93,7 +93,7 @@ bool BuildPointwiseSlot(const AOTEffectGraph& graph, const AOTEffectNode* node,
     if (parameters == nullptr) {
       return false;
     }
-    slot->type = AOTPointwiseOpType::Luma;
+    slot->op = AOTChainOp::Luma;
     slot->luma = *parameters;
     return true;
   }
@@ -102,7 +102,7 @@ bool BuildPointwiseSlot(const AOTEffectGraph& graph, const AOTEffectNode* node,
     if (parameters == nullptr) {
       return false;
     }
-    slot->type = AOTPointwiseOpType::AlphaThreshold;
+    slot->op = AOTChainOp::AlphaThreshold;
     slot->alphaThreshold = *parameters;
     return true;
   }
@@ -111,7 +111,7 @@ bool BuildPointwiseSlot(const AOTEffectGraph& graph, const AOTEffectNode* node,
     if (parameters == nullptr || parameters->steps == nullptr) {
       return false;
     }
-    slot->type = AOTPointwiseOpType::ColorSpaceXform;
+    slot->op = AOTChainOp::ColorSpaceXform;
     slot->colorSpaceXform = *parameters;
     return true;
   }
@@ -327,17 +327,9 @@ bool EncodeUnaryPointwiseSlot(AOTChainContext* ctx, size_t combined, size_t inde
   if (node->inputs.size() != 1) {
     return false;
   }
-  AOTPointwiseSlot pointwise = {};
-  if (!BuildPointwiseSlot(*ctx->graph, node, &pointwise)) {
+  if (!BuildPointwiseSlot(*ctx->graph, node, &slot)) {
     return false;
   }
-  // AOTPointwiseOpType and AOTChainOp share values 0..4 by ABI (both mirror the OP_*
-  // constants), so the pointwise kinds convert directly.
-  slot.op = static_cast<AOTChainOp>(static_cast<int>(pointwise.type));
-  slot.colorMatrix = pointwise.colorMatrix;
-  slot.luma = pointwise.luma;
-  slot.alphaThreshold = pointwise.alphaThreshold;
-  slot.colorSpaceXform = pointwise.colorSpaceXform;
   slot.in0 = MapChainOpInput(ctx, inputBase, node->inputs[0]);
   return true;
 }

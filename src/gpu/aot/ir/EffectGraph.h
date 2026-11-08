@@ -305,19 +305,6 @@ using AOTEffectParameters = std::variant<std::monostate, AOTTextureParameters,
                                          AOTRectCoverageParameters, AOTGradientParameters,
                                          AOTRRectCoverageParameters, AOTOpaqueKernelParameters>;
 
-// Runtime-selected pointwise operator applied by the fused kernels (PointwiseChain and
-// YUVTextureFill). The values are the AOTPointwiseOpType subset of the shared
-// op table (injected as OP_* defines): the kernels declare every operator's parameter block
-// unconditionally and select at draw time via a uniform, so the operator kind is never a
-// compile-time permutation axis. The members generate from the op list; None is the pass-through
-// marker the slot interpreters also use.
-enum class AOTPointwiseOpType : int {
-#define TGFX_AOT_POINTWISE_OP(name, id, params, member, passBoundarySensitive) name = Op::name,
-  TGFX_POINTWISE_OPS(TGFX_AOT_POINTWISE_OP)
-#undef TGFX_AOT_POINTWISE_OP
-      None = Op::None,
-};
-
 /// Whether the operator amplifies the 1/255 pass-boundary rounding into a visible flip (a step
 /// function) and must therefore share its pass with its input's producer. The single declaration
 /// both the decomposer's cut placement (CanStartPassAt) and the planner's validation read — the
@@ -347,16 +334,6 @@ inline void PackAOTColorMatrix(const std::array<float, 20>& matrix, float* matri
   std::copy(packed, packed + 16, matrixData);
   std::copy(vector, vector + 4, vectorData);
 }
-
-// One pointwise-operator slot of a fused kernel, carrying the full parameter set of whichever
-// operator it holds. Only the member matching type is read. The members generate from the op
-// list (TGFX_POINTWISE_OPS in KernelContract.h), in the list's order, so the layout is stable.
-struct AOTPointwiseSlot {
-  AOTPointwiseOpType type = AOTPointwiseOpType::None;
-#define TGFX_AOT_SLOT_MEMBER(name, id, params, member, passBoundarySensitive) params member = {};
-  TGFX_POINTWISE_OPS(TGFX_AOT_SLOT_MEMBER)
-#undef TGFX_AOT_SLOT_MEMBER
-};
 
 struct AOTEffectNode {
   AOTEffectKind kind = AOTEffectKind::GeometryColor;

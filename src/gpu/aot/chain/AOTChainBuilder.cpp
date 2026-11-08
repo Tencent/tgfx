@@ -192,7 +192,7 @@ bool AOTChainBuilder::CollectTextureTail(const AOTEffectGraph& graph, AOTTexture
     }
     // The slot encoding must be able to express the operator — the same record the chain
     // builds from the node.
-    AOTPointwiseSlot slot = {};
+    AOTChainSlot slot = {};
     if (!BuildPointwiseSlot(graph, node, &slot)) {
       return false;
     }
@@ -271,21 +271,12 @@ static bool CompileYUVProgramForInfo(const ProgramInfo* info, AOTProgram* out) {
   AOTProgram program = {};
   program.slots.reserve(shape.ops.size());
   for (auto opID : shape.ops) {
-    AOTPointwiseSlot pointwise = {};
-    if (!BuildPointwiseSlot(ir->color, ir->color.nodeAt(opID), &pointwise)) {
+    AOTChainSlot slot = {};
+    // The register fields stay unset: the tail is linear, array order is dataflow order (the
+    // binder packs its own selector).
+    if (!BuildPointwiseSlot(ir->color, ir->color.nodeAt(opID), &slot)) {
       return false;
     }
-    AOTChainSlot slot = {};
-    // AOTPointwiseOpType and AOTChainOp share values 0..4 by ABI (both mirror the OP_*
-    // constants), so the pointwise kinds convert directly. The register fields stay unset: the
-    // tail is linear, array order is dataflow order (the binder packs its own selector).
-    slot.op = static_cast<AOTChainOp>(static_cast<int>(pointwise.type));
-    slot.colorMatrix = pointwise.colorMatrix;
-    slot.luma = pointwise.luma;
-    slot.alphaThreshold = pointwise.alphaThreshold;
-    slot.colorSpaceXform = pointwise.colorSpaceXform;
-    slot.constColor = pointwise.constColor;
-    slot.blend = pointwise.blend;
     program.slots.push_back(slot);
   }
   *out = std::move(program);
