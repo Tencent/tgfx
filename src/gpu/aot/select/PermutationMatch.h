@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include "gpu/shaders/ShaderPermutation.h"
 #include "gpu/shaders/contract/AOTFailure.h"
 
 namespace tgfx {
@@ -28,14 +29,13 @@ namespace tgfx {
 class ProgramInfo;
 
 /**
- * The matched precompiled family of one program shape, as the permutation matcher resolves it
- * (the variant-only form the family Match functions return is PermutationVariant in
- * ShaderPermutation.h).
+ * The matched precompiled family of one program shape, as the permutation matcher resolves it:
+ * the family name plus the variant its Compose encoded, so every stage of the program-creation
+ * pipeline names the two indices through PermutationVariant instead of re-declaring them.
  */
 struct PermutationMatchResult {
   std::string shaderName;
-  uint32_t vertPermutationIndex;
-  uint32_t fragPermutationIndex;
+  PermutationVariant variant = {};
 };
 
 // The vocabulary itself lives in gpu/shaders/contract/AOTFailure.h: the matcher's rejection reasons and the

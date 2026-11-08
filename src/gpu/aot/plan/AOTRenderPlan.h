@@ -61,12 +61,6 @@ struct MaterializedGeometry {
   bool isEmpty() const {
     return width <= 0 || height <= 0;
   }
-
-  /// The byte footprint an RGBA8 target of this size occupies, for whichever draw metric the
-  /// caller maintains.
-  uint64_t byteSize() const {
-    return static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * 4;
-  }
 };
 
 /**

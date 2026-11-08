@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/ir/DrawIR.h"
-#include <atomic>
 #include "gpu/aot/ir/Lowering.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComposeFragmentProcessor.h"
@@ -34,9 +33,6 @@
 
 namespace tgfx {
 namespace {
-
-// Diagnostic only (see AOTLowerDrawCount): successful LowerDraw runs since the last reset.
-std::atomic<uint64_t> lowerDrawCount = {0};
 
 // Flattens Compose processors recursively: one coverage FP may carry a whole clip stack, and the
 // classifier works per leaf, not per position.
@@ -209,7 +205,6 @@ std::optional<DrawIR> LowerDrawCore(const std::vector<const FragmentProcessor*>&
   ir.coverage = std::move(*terms);
   // The synthesized leaves only had to outlive LowerCoverageTerms; the arena owns the memory.
   (void)ownedLeaves;
-  lowerDrawCount.fetch_add(1, std::memory_order_relaxed);
   return ir;
 }
 
@@ -243,14 +238,6 @@ std::optional<DrawIR> LowerDrawWithAtlas(
   ownedLeaves.push_back(std::move(atlasLeaf));
   return LowerDrawCore(colorProcessors, coverageProcessors, ownedLeaves.back().get(),
                        std::move(ownedLeaves), blendMode, allocator);
-}
-
-uint64_t AOTLowerDrawCount() {
-  return lowerDrawCount.load(std::memory_order_relaxed);
-}
-
-void ResetAOTLowerDrawCount() {
-  lowerDrawCount.store(0, std::memory_order_relaxed);
 }
 
 }  // namespace tgfx

@@ -143,8 +143,8 @@ static PrecompiledFallbackRecord MakeFallbackRecord(
   record.pipelineSignature = BuildPipelineSignature(programInfo);
   if (matchResult != nullptr) {
     record.shaderName = matchResult->shaderName;
-    record.vertPermutationIndex = matchResult->vertPermutationIndex;
-    record.fragPermutationIndex = matchResult->fragPermutationIndex;
+    record.vertPermutationIndex = matchResult->variant.vertPermutationIndex;
+    record.fragPermutationIndex = matchResult->variant.fragPermutationIndex;
   }
   return record;
 }
@@ -160,8 +160,8 @@ static PrecompiledHitRecord MakeHitRecord(const PrecompiledShaderCache* cache,
   record.effectSignature = BuildEffectSignature(programInfo);
   record.pipelineSignature = BuildPipelineSignature(programInfo);
   record.shaderName = matchResult.shaderName;
-  record.vertPermutationIndex = matchResult.vertPermutationIndex;
-  record.fragPermutationIndex = matchResult.fragPermutationIndex;
+  record.vertPermutationIndex = matchResult.variant.vertPermutationIndex;
+  record.fragPermutationIndex = matchResult.variant.fragPermutationIndex;
   return record;
 }
 
@@ -250,8 +250,8 @@ static bool VertexInputFormatMatches(const std::vector<VertexInput>& inputs, uin
   LOGE(
       "PrecompiledProgramCreator: vertex format mismatch for %s[vert=%u]: location %u "
       "reflects format %d but the runtime attribute provides %d",
-      shaderName.c_str(), matchResult->vertPermutationIndex, location, static_cast<int>(reflected),
-      static_cast<int>(runtimeFormat));
+      shaderName.c_str(), matchResult->variant.vertPermutationIndex, location,
+      static_cast<int>(reflected), static_cast<int>(runtimeFormat));
   return false;
 }
 
@@ -331,9 +331,9 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgram(Context* conte
   // built for one shape must never answer the other. A specialized program is therefore cached
   // under the structure-bearing key only, which leaves the plain key holding generic programs —
   // those render correctly for every shape, so a plain-key hit is always safe.
-  const SpecValues spec =
-      SpecResolver::Resolve(cache, context->backend(), *programInfo, matchResult->shaderName,
-                            matchResult->vertPermutationIndex, matchResult->fragPermutationIndex);
+  const SpecValues spec = SpecResolver::Resolve(
+      cache, context->backend(), *programInfo, matchResult->shaderName,
+      matchResult->variant.vertPermutationIndex, matchResult->variant.fragPermutationIndex);
   if (spec.empty()) {
     auto program = CreateProgramFromMatch(context, programInfo, *matchResult, nullptr);
     if (program != nullptr) {
@@ -367,7 +367,7 @@ std::shared_ptr<Program> FallbackToGeneric(Context* context, const ProgramInfo* 
   LOGE(
       "PrecompiledProgramCreator: the specialized %s of %s[frag=%u] failed to build; falling "
       "back to the generic form",
-      stage, match.shaderName.c_str(), match.fragPermutationIndex);
+      stage, match.shaderName.c_str(), match.variant.fragPermutationIndex);
   return PrecompiledProgramCreator::CreateProgramFromMatch(context, programInfo, match, nullptr);
 }
 
@@ -381,17 +381,17 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
   // derives its variant from the compiled program), so this entry starts past the match.
   const PermutationMatchResult* matchResult = &match;
 
-  auto vertHash = ComputeVertexKeyHash(matchResult->shaderName, matchResult->vertPermutationIndex,
-                                       cache->profileTag());
-  auto fragHash = ComputeFragmentKeyHash(matchResult->shaderName, matchResult->fragPermutationIndex,
-                                         cache->profileTag());
+  auto vertHash = ComputeVertexKeyHash(
+      matchResult->shaderName, matchResult->variant.vertPermutationIndex, cache->profileTag());
+  auto fragHash = ComputeFragmentKeyHash(
+      matchResult->shaderName, matchResult->variant.fragPermutationIndex, cache->profileTag());
 
   auto vertBlob = cache->findVertex(vertHash.hi, vertHash.lo);
   if (vertBlob == nullptr) {
     cache->recordArtifactMiss(PrecompiledFallbackReason::VertexArtifactMissing,
                               MakeFallbackRecord(cache, programInfo, &*matchResult));
     LOGE("PrecompiledShaderMiss: vert blob not found for %s[vert=%u]",
-         matchResult->shaderName.c_str(), matchResult->vertPermutationIndex);
+         matchResult->shaderName.c_str(), matchResult->variant.vertPermutationIndex);
     return nullptr;
   }
   auto fragBlob = cache->findFragment(fragHash.hi, fragHash.lo);
@@ -399,7 +399,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
     cache->recordArtifactMiss(PrecompiledFallbackReason::FragmentArtifactMissing,
                               MakeFallbackRecord(cache, programInfo, &*matchResult));
     LOGE("PrecompiledShaderMiss: frag blob not found for %s[frag=%u]",
-         matchResult->shaderName.c_str(), matchResult->fragPermutationIndex);
+         matchResult->shaderName.c_str(), matchResult->variant.fragPermutationIndex);
     return nullptr;
   }
   cache->recordArtifactHit();
@@ -450,7 +450,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
         LOGE(
             "PrecompiledProgramCreator: specialization injection found no TGFX_SPEC declarations "
             "for %s[frag=%u]; serving the generic form",
-            matchResult->shaderName.c_str(), matchResult->fragPermutationIndex);
+            matchResult->shaderName.c_str(), matchResult->variant.fragPermutationIndex);
       }
     }
   }
@@ -466,8 +466,8 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
 #endif
   if (dumpDir != nullptr) {
     std::string base = std::string(dumpDir) + "/" + matchResult->shaderName + "_v" +
-                       std::to_string(matchResult->vertPermutationIndex) + "_f" +
-                       std::to_string(matchResult->fragPermutationIndex);
+                       std::to_string(matchResult->variant.vertPermutationIndex) + "_f" +
+                       std::to_string(matchResult->variant.fragPermutationIndex);
     if (!vertexDesc.code.empty()) {
       std::string path = base + ".vert";
       FILE* file = fopen(path.c_str(), "w");
@@ -496,7 +496,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
     cache->recordFailure(PrecompiledFallbackReason::VertexModuleCreationFailed,
                          MakeFallbackRecord(cache, programInfo, &*matchResult));
     LOGE("PrecompiledProgramCreator: Failed to create vertex shader module for %s[vert=%u]",
-         matchResult->shaderName.c_str(), matchResult->vertPermutationIndex);
+         matchResult->shaderName.c_str(), matchResult->variant.vertPermutationIndex);
     return nullptr;
   }
   cache->recordAOTStage(PrecompiledAOTStage::VertexModuleCreated);
@@ -508,7 +508,7 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
     cache->recordFailure(PrecompiledFallbackReason::FragmentModuleCreationFailed,
                          MakeFallbackRecord(cache, programInfo, &*matchResult));
     LOGE("PrecompiledProgramCreator: Failed to create fragment shader module for %s[frag=%u]",
-         matchResult->shaderName.c_str(), matchResult->fragPermutationIndex);
+         matchResult->shaderName.c_str(), matchResult->variant.fragPermutationIndex);
     return nullptr;
   }
   cache->recordAOTStage(PrecompiledAOTStage::FragmentModuleCreated);
@@ -545,7 +545,8 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
         LOGE(
             "PrecompiledProgramCreator: vertex interface mismatch for %s[vert=%u]: declared input "
             "at location %u, the geometry processor provides no such attribute",
-            matchResult->shaderName.c_str(), matchResult->vertPermutationIndex, input.location);
+            matchResult->shaderName.c_str(), matchResult->variant.vertPermutationIndex,
+            input.location);
         return nullptr;
       }
     }
@@ -555,8 +556,8 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
       LOGE(
           "PrecompiledProgramCreator: vertex interface mismatch for %s[vert=%u]: %zu reflected "
           "vertex inputs vs %zu runtime attributes",
-          matchResult->shaderName.c_str(), matchResult->vertPermutationIndex, vertexInputs.size(),
-          vertexLayout.attributes.size());
+          matchResult->shaderName.c_str(), matchResult->variant.vertPermutationIndex,
+          vertexInputs.size(), vertexLayout.attributes.size());
       return nullptr;
     }
     if (vertexInputs.size() == vertexLayout.attributes.size()) {
@@ -588,7 +589,8 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
               "PrecompiledProgramCreator: vertex interface mismatch for %s[vert=%u]: the shader "
               "reads a subset of the attributes but declares input at location %u, which the "
               "geometry processor does not provide",
-              matchResult->shaderName.c_str(), matchResult->vertPermutationIndex, input->location);
+              matchResult->shaderName.c_str(), matchResult->variant.vertPermutationIndex,
+              input->location);
           return nullptr;
         }
       }
@@ -674,8 +676,8 @@ std::shared_ptr<Program> PrecompiledProgramCreator::CreateProgramFromMatch(
     // can be diffed against a succeeding one (the backend logs the underlying error separately).
     std::ostringstream diag;
     diag << "PrecompiledProgramCreator: Failed to create render pipeline for "
-         << matchResult->shaderName << "[vert=" << matchResult->vertPermutationIndex
-         << ",frag=" << matchResult->fragPermutationIndex << "]";
+         << matchResult->shaderName << "[vert=" << matchResult->variant.vertPermutationIndex
+         << ",frag=" << matchResult->variant.fragPermutationIndex << "]";
     if (!descriptor.fragment.colorAttachments.empty()) {
       const auto& color = descriptor.fragment.colorAttachments[0];
       diag << " colorFormat=" << static_cast<int>(color.format)

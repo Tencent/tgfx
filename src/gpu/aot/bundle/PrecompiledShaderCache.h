@@ -72,7 +72,10 @@ enum class PrecompiledAOTStage : uint8_t {
   Count,
 };
 
-struct PrecompiledHitRecord {
+/// The fields every program-creation record carries: the key an issue reproduces by, the two
+/// signatures a diagnostic groups by, and the matched family variant. Shared by the hit and the
+/// fallback records so a new diagnostic field lands once.
+struct PrecompiledProgramRecord {
   std::string programKey;
   std::string effectSignature;
   std::string pipelineSignature;
@@ -81,14 +84,10 @@ struct PrecompiledHitRecord {
   uint32_t fragPermutationIndex = std::numeric_limits<uint32_t>::max();
 };
 
-struct PrecompiledFallbackRecord {
-  std::string programKey;
+struct PrecompiledHitRecord : PrecompiledProgramRecord {};
+
+struct PrecompiledFallbackRecord : PrecompiledProgramRecord {
   PrecompiledFallbackReason reason = PrecompiledFallbackReason::Unspecified;
-  std::string effectSignature;
-  std::string pipelineSignature;
-  std::string shaderName;
-  uint32_t vertPermutationIndex = std::numeric_limits<uint32_t>::max();
-  uint32_t fragPermutationIndex = std::numeric_limits<uint32_t>::max();
   // Sub-reason of the miss as a PermutationMatchFailure value (0 = None). NoMatchingRule alone
   // cannot say whether the GL gate, a subset attribute, the gradient budget or the enumerated
   // variant set rejected the draw.
@@ -267,11 +266,6 @@ class PrecompiledShaderCache : public SpecSource {
 
   /// Records that both vertex and fragment artifacts were found for one AOT attempt.
   void recordArtifactHit();
-
-  /// Records one artifact-lookup miss without assigning a more specific reason.
-  void recordMiss() {
-    recordArtifactMiss(PrecompiledFallbackReason::Unspecified);
-  }
 
   /// Records one artifact-lookup miss using a fixed low-cardinality reason.
   void recordArtifactMiss(PrecompiledFallbackReason reason,

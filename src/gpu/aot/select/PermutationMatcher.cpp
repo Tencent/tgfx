@@ -526,15 +526,13 @@ static std::optional<PermutationMatchResult> MatchPermutationImpl(
   // dedicatedKernelsEnabled gates the whole table.
   if (allowDedicated) {
     if (auto table = KernelTableLookup(shape, failure)) {
-      return PermutationMatchResult{table->family, table->variant.vertPermutationIndex,
-                                    table->variant.fragPermutationIndex};
+      return PermutationMatchResult{table->family, table->variant};
     }
   }
   // The interpreter stays the walk's documented fallback, tried last.
   if (allowInterpreter && (!alphaOnly || PointwiseChainShader::ServesAlphaOnly)) {
     if (auto result = PointwiseChainShader::Match(programInfo, failure)) {
-      return PermutationMatchResult{PointwiseChainShader::Name, result->vertPermutationIndex,
-                                    result->fragPermutationIndex};
+      return PermutationMatchResult{PointwiseChainShader::Name, *result};
     }
   }
   return alphaOnly ? Fail(failure, PermutationMatchFailure::NoMatchingFamily) : std::nullopt;
@@ -585,8 +583,8 @@ static std::optional<PermutationMatchResult> ComputeMatch(const ProgramInfo* pro
   auto result = MatchPermutationImpl(programInfo, shape, &matchFailure);
   if (result) {
     auto info = ShaderRegistry::Find(result->shaderName);
-    if (info == nullptr || !IsBuildablePermutation(*info, result->vertPermutationIndex,
-                                                   result->fragPermutationIndex)) {
+    if (info == nullptr || !IsBuildablePermutation(*info, result->variant.vertPermutationIndex,
+                                                   result->variant.fragPermutationIndex)) {
       result.reset();
       matchFailure = PermutationMatchFailure::PermutationNotEnumerated;
     } else if (!AdmitMatchedProgram(programInfo, shape, info, &matchFailure)) {

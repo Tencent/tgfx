@@ -21,6 +21,7 @@
 #include "gpu/ColorSpaceXformHelper.h"
 #include "gpu/Swizzle.h"
 #include "gpu/YUVColorConversion.h"
+#include "gpu/aot/ir/ChainLayoutMath.h"
 #include "gpu/aot/ir/NodeContract.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/proxies/TextureProxy.h"
@@ -84,13 +85,6 @@ const AOTOpContract& OpContractOf(AOTChainOp op) {
   static constexpr AOTOpContract fallback = {};
   auto index = static_cast<size_t>(op);
   return index < OpContractCount ? OpContracts[index] : fallback;
-}
-
-// std140 column packing of a 3x3 matrix stored in Matrix::get9 row-major order, mirroring
-// UniformData::setData(const Matrix&) so chain uploads match the same layout.
-std::array<float, 12> MatrixColumnMajor(const std::array<float, 9>& values) {
-  return {values[0], values[3], values[6], 0.0f,      values[1], values[4],
-          values[7], 0.0f,      values[2], values[5], values[8], 0.0f};
 }
 
 // Uploads one tiled recipe into the kernel's Tiled<field><suffix> uniform set ("" for the first
@@ -256,7 +250,7 @@ void BindLocalRectCoverageSlot(UniformData* uniformData, size_t index, int /*ord
   const auto& params = slot.localRectCoverage;
   ChainISA::LocalRectCoverageData data = {};
   data.rect = {params.rect[0], params.rect[1], params.rect[2], params.rect[3]};
-  const auto columns = MatrixColumnMajor(params.deviceToLocal);
+  const auto columns = Mat3ToStd140ColumnMajor(params.deviceToLocal);
   for (size_t column = 0; column < 3; ++column) {
     for (size_t row = 0; row < 3; ++row) {
       data.deviceToLocal.m[column * 3 + row] = columns[column * 4 + row];
@@ -272,7 +266,7 @@ void BindRRectCoverageSlot(UniformData* uniformData, size_t index, int /*ordinal
   data.rect = {params.rect[0], params.rect[1], params.rect[2], params.rect[3]};
   data.radiiX = {params.radiiX[0], params.radiiX[1], params.radiiX[2], params.radiiX[3]};
   data.radiiY = {params.radiiY[0], params.radiiY[1], params.radiiY[2], params.radiiY[3]};
-  const auto columns = MatrixColumnMajor(params.deviceToLocal);
+  const auto columns = Mat3ToStd140ColumnMajor(params.deviceToLocal);
   for (size_t column = 0; column < 3; ++column) {
     for (size_t row = 0; row < 3; ++row) {
       data.deviceToLocal.m[column * 3 + row] = columns[column * 4 + row];
@@ -378,7 +372,7 @@ void BindChainProgram(const AOTProgram& program, UniformData* vertexUniformData,
         deviceCoordMatrix[6], deviceCoordMatrix[7], deviceCoordMatrix[8]};
     fragmentUniformData->setArrayElementOptional(ChainParams::DeviceLeafCoordMatrix.name,
                                                  static_cast<size_t>(deviceLeaf.leafIndex),
-                                                 MatrixColumnMajor(values));
+                                                 Mat3ToStd140ColumnMajor(values));
   }
   bool hasLeaf = false;
   for (const auto& binding : program.bindings) {
@@ -665,23 +659,6 @@ void BindTextureSourceLeaf(const AOTTextureParameters& leaf, ParamWriter* writer
 // field-for-field twin of the module Bind it replaces, with the values read off the IR node
 // the lowering recorded and the instance-time facts off the view the node's proxy resolves.
 
-namespace {
-
-// The 12-float aligned form ParamWriter's Float3x3 overload uploads, built from an IR node's
-// row-major get9 storage without going through a Matrix.
-std::array<float, 12> AlignedFromRowMajor(const std::array<float, 9>& values) {
-  return {values[0], values[3], values[6], 0,         values[1], values[4],
-          values[7], 0,         values[2], values[5], values[8], 0};
-}
-
-bool IsIdentityRowMajor(const std::array<float, 9>& values) {
-  return values[0] == 1.f && values[1] == 0.f && values[2] == 0.f && values[3] == 0.f &&
-         values[4] == 1.f && values[5] == 0.f && values[6] == 0.f && values[7] == 0.f &&
-         values[8] == 1.f;
-}
-
-}  // namespace
-
 void BindTiledSourceLeaf(const AOTTextureParameters& leaf, ParamWriter* writer) {
   if (!leaf.tiledRecipe.has_value()) {
     return;
@@ -768,14 +745,14 @@ void BindRectClipNode(const AOTRectCoverageParameters& params, ParamWriter* writ
   writer->set(AnalyticClipModule::AntiAlias, 1.0f);
   // An identity device-to-local is the device-space form's marker: the kernel reads the rect
   // directly, outset by half a texel for the falloff.
-  if (!IsIdentityRowMajor(params.deviceToLocal)) {
-    writer->set(AnalyticClipModule::DeviceToLocal, AlignedFromRowMajor(params.deviceToLocal));
+  if (!IsIdentityMat3RowMajor(params.deviceToLocal)) {
+    writer->set(AnalyticClipModule::DeviceToLocal, Mat3ToStd140ColumnMajor(params.deviceToLocal));
   } else {
     const float deviceRect[4] = {params.rect[0] - 0.5f, params.rect[1] - 0.5f,
                                  params.rect[2] + 0.5f, params.rect[3] + 0.5f};
     writer->set(AnalyticClipModule::Rect, deviceRect);
   }
-  writer->set(AnalyticClipModule::HasClip, IsIdentityRowMajor(params.deviceToLocal) ? 1 : 3);
+  writer->set(AnalyticClipModule::HasClip, IsIdentityMat3RowMajor(params.deviceToLocal) ? 1 : 3);
 }
 
 void BindRRectClipNode(const AOTRRectCoverageParameters& params, ParamWriter* writer) {
@@ -786,7 +763,7 @@ void BindRRectClipNode(const AOTRRectCoverageParameters& params, ParamWriter* wr
   const float radiiY[4] = {params.radiiY[0], params.radiiY[1], params.radiiY[2], params.radiiY[3]};
   writer->set(AnalyticClipModule::RadiiY, radiiY);
   writer->set(AnalyticClipModule::AntiAlias, params.antiAlias);
-  writer->set(AnalyticClipModule::DeviceToLocal, AlignedFromRowMajor(params.deviceToLocal));
+  writer->set(AnalyticClipModule::DeviceToLocal, Mat3ToStd140ColumnMajor(params.deviceToLocal));
   writer->set(AnalyticClipModule::HasClip, 2);
 }
 

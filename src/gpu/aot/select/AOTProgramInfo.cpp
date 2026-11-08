@@ -108,8 +108,7 @@ AOTProgramInfo::AOTProgramInfo(const ProgramInfo& info, const AOTProgram& progra
   auto globalCache = context->globalCache();
   auto resolved = globalCache->findProgram(key);
   if (resolved == nullptr) {
-    PermutationMatchResult match = {PointwiseChainShader::Name, variant->vertPermutationIndex,
-                                    variant->fragPermutationIndex};
+    PermutationMatchResult match = {PointwiseChainShader::Name, *variant};
     resolved = PrecompiledProgramCreator::CreateProgramFromMatch(context, &info, match,
                                                                  spec.empty() ? nullptr : &spec);
     if (resolved == nullptr) {

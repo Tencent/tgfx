@@ -288,16 +288,6 @@ class FillKernel : public ShaderFamily<T> {
       return true;
     }
   }
-
-  /**
-   * ShaderFamily::Match calls T::Extract; the production dispatch reaches dedicated families
-   * through the executor table instead, but keeping Extract compilable avoids a latent break if
-   * a route ever calls Match on a dedicated family.
-   */
-  static std::optional<DrawShape> Extract(const ProgramInfo* programInfo,
-                                          PermutationMatchFailure* failure) {
-    return ExtractFacts(ExtractDrawShape(programInfo), failure);
-  }
 };
 
 }  // namespace tgfx

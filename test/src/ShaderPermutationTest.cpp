@@ -2187,8 +2187,8 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     EXPECT_EQ(match->shaderName, "ShapeInstancedTextureCoverageShader");
     // The bare coverage form is GRADIENT=0 in the single-bool domain.
     auto expected = ShapeInstancedTextureCoverageShader::VD::domain().encode({0});
-    EXPECT_EQ(match->vertPermutationIndex, expected);
-    EXPECT_EQ(match->fragPermutationIndex, expected);
+    EXPECT_EQ(match->variant.vertPermutationIndex, expected);
+    EXPECT_EQ(match->variant.fragPermutationIndex, expected);
   }
 
   {
@@ -2209,8 +2209,8 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     auto match = MatchPermutation(&programInfo);
     ASSERT_TRUE(match.has_value());
     EXPECT_EQ(match->shaderName, "ShapeInstancedTextureCoverageShader");
-    EXPECT_EQ(match->vertPermutationIndex, 0u);
-    EXPECT_EQ(match->fragPermutationIndex, 0u);
+    EXPECT_EQ(match->variant.vertPermutationIndex, 0u);
+    EXPECT_EQ(match->variant.fragPermutationIndex, 0u);
   }
 
   {
@@ -2309,8 +2309,8 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     ASSERT_TRUE(match.has_value()) << "clipFirst=" << clipFirst;
     EXPECT_EQ(failure, PermutationMatchFailure::None);
     EXPECT_EQ(match->shaderName, "ShapeInstancedTextureCoverageShader");
-    EXPECT_EQ(match->vertPermutationIndex, expectedIndex);
-    EXPECT_EQ(match->fragPermutationIndex, expectedIndex);
+    EXPECT_EQ(match->variant.vertPermutationIndex, expectedIndex);
+    EXPECT_EQ(match->variant.fragPermutationIndex, expectedIndex);
   }
 
   // Two masks (no clip) are still not a shape this kernel evaluates.

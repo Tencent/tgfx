@@ -61,9 +61,6 @@ struct AOTChainContext {
   int coverageRootSlot = -1;
   int clipCoverageSlot = -1;
   int clipChainInput = -4;
-  // Stage-three budget counters carried across the per-kind encoders.
-  size_t rectCoverageSlots = 0;
-  size_t localRectCoverageSlots = 0;
   AOTChainRegisterAssignment assignment = {};
 };
 

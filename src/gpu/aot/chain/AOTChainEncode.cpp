@@ -26,6 +26,7 @@
 #include "gpu/aot/chain/AOTChainRegisterAllocator.h"
 #include "gpu/aot/chain/AOTShapeRules.h"
 #include "gpu/aot/chain/ChainContext.h"
+#include "gpu/aot/ir/ChainLayoutMath.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/NodeContract.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
@@ -135,13 +136,6 @@ static int MapChainInput(const std::vector<const AOTEffectNode*>& nodes,
   }
   auto slot = slotOf[nodeIndex];
   return slot == SIZE_MAX ? -2 : static_cast<int>(slot);
-}
-
-// Whether a Matrix::get9 row-major array is the identity matrix.
-static bool IsIdentityMatrix(const std::array<float, 9>& values) {
-  return values[0] == 1.0f && values[1] == 0.0f && values[2] == 0.0f && values[3] == 0.0f &&
-         values[4] == 1.0f && values[5] == 0.0f && values[6] == 0.0f && values[7] == 0.0f &&
-         values[8] == 1.0f;
 }
 
 // Whether a texture node's parameters describe a leaf the chain kernel samples itself: a resolved
@@ -389,7 +383,7 @@ bool EncodeRectCoverageSlot(AOTChainContext* ctx, size_t combined, size_t index)
   }
   // Every coverage slot owns its own data-pool block, so the only limits are the slot and
   // register budgets the whole chain shares.
-  if (IsIdentityMatrix(parameters->deviceToLocal)) {
+  if (IsIdentityMat3RowMajor(parameters->deviceToLocal)) {
     slot.op = AOTChainOp::AARectCoverage;
     slot.rectCoverage = *parameters;
   } else {
