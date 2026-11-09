@@ -20,10 +20,42 @@
 
 #include "gpu/shaders/Family.h"
 #include "gpu/shaders/modules/AnalyticClip.h"
+#include "gpu/shaders/modules/MaskTexture.h"
+#include "gpu/shaders/modules/QuadGeometry.h"
 #include "gpu/shaders/modules/RRectGeometry.h"
+#include "gpu/shaders/modules/RectGeometry.h"
 #include "gpu/shaders/modules/TiledTexture.h"
 
 namespace tgfx {
+
+/// The SolidColor family (the former SolidColorFillShader): the DefaultGP's rect fill with the
+/// analytic clip riding the runtime contract. Slot layout: Frame(0), RectGeometry(1),
+/// AnalyticClip(2), Xfer(3).
+inline constexpr const Module* RectGeometries[] = {&RectGeometry};
+
+inline constexpr FamilyModule SolidColorBody[] = {&AnalyticClip};
+
+inline constexpr Family SolidColorFamily = {"SolidColor", RectGeometries, 1, SolidColorBody, 1};
+
+/// The MaskFill family (the former MaskFillShader): the DefaultGP's rect fill whose coverage is a
+/// rasterized alpha-only mask texture. Slot layout: Frame(0), RectGeometry(1), MaskTexture(2),
+/// Xfer(3).
+inline constexpr FamilyModule MaskFillBody[] = {&MaskTexture};
+
+inline constexpr Family MaskFillFamily = {"MaskFill", RectGeometries, 1, MaskFillBody, 1};
+
+/// The TiledTextureFill family (the former TiledTextureFillShader): a DefaultGP rect filled with a
+/// nine-mode tiled texture. The quad geometry stays with the legacy QuadTextureFillShader, which
+/// the old table consulted first for QuadPerEdgeAA draws; the quad form migrates with that family.
+/// FULL is pinned to 1 (the full nine-mode recipe), PRESENT to 1 (the texture is the family's
+/// color source). Slot layout: Frame(0), RectGeometry(1), TiledTexture(2: FULL pinned, PRESENT
+/// pinned), Xfer(3).
+inline constexpr int8_t TiledTextureFillPins[] = {1, 1};
+
+inline constexpr FamilyModule TiledTextureFillBody[] = {{&TiledTexture, TiledTextureFillPins}};
+
+inline constexpr Family TiledTextureFillFamily = {"TiledTextureFill", RectGeometries, 1,
+                                                  TiledTextureFillBody, 1};
 
 /// The RRect family (the former NonAARRectFillShader): a non-AA rounded rect, optionally filled
 /// with a single-tap tiled texture, with the analytic clip riding the runtime contract. The
@@ -42,12 +74,16 @@ bool RRectVariantAllowed(const Variant& variant, const Family& family);
 inline constexpr Family RRectFamily = {"RRect", RRectGeometries,    1, RRectBody,
                                        2,       RRectVariantAllowed};
 
+/// The family table, in match priority order. The declaration-driven families are checked before
+/// the legacy kernel table; among themselves the dedicated rules are disjoint.
 inline const Family* FamilyTable() {
-  return &RRectFamily;
+  static const Family families[] = {SolidColorFamily, MaskFillFamily, TiledTextureFillFamily,
+                                    RRectFamily};
+  return families;
 }
 
-inline size_t FamilyTableCount() {
-  return 1;
+inline constexpr size_t FamilyTableCount() {
+  return 4;
 }
 
 }  // namespace tgfx

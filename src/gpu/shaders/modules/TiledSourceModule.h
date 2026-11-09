@@ -9,17 +9,15 @@ namespace tgfx {
 class FragmentProcessor;
 
 struct TiledSourceModule {
-  static constexpr Param<ParamType::Int> ReadSwizzle{"ReadSwizzle"};
   static constexpr Param<ParamType::Float2> Dimension{"Dimension"};
   static constexpr Param<ParamType::Float4> Subset{"Subset"};
   static constexpr Param<ParamType::Float4> Clamp{"Clamp"};
   static constexpr Param<ParamType::Int> ShaderModeX{"ShaderModeX"};
   static constexpr Param<ParamType::Int> ShaderModeY{"ShaderModeY"};
   static constexpr Param<ParamType::Int> AlphaOnly{"AlphaOnly"};
-  static constexpr Param<ParamType::Int> Strict{"Strict"};
 
-  static constexpr ParamInfo Fields[] = {ReadSwizzle, Dimension,   Subset,    Clamp,
-                                         ShaderModeX, ShaderModeY, AlphaOnly, Strict};
+  static constexpr ParamInfo Fields[] = {Dimension,   Subset,      Clamp,
+                                         ShaderModeX, ShaderModeY, AlphaOnly};
 };
 
 }  // namespace tgfx

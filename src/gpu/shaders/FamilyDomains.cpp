@@ -81,6 +81,13 @@ PrecompiledShaderInfo AssembledFamilyInfo(const Family& family) {
   }
   std::vector<PermutationDimension> dims;
   size_t nameIndex = 0;
+  // The variant ordinal encodes the geometry index as its lowest radix (EnumerateVariants starts
+  // the stride at the geometry count). A family with more than one geometry must model that radix
+  // here too, or valueOf would decode an ordinal against a domain that lacks the geometry term
+  // and report the wrong HAS_XP for the profile filters.
+  if (family.geometryCount > 1) {
+    dims.emplace_back(PermutationInt("GEOMETRY", family.geometryCount));
+  }
   for (uint8_t geometry = 0; geometry < family.geometryCount; ++geometry) {
     AppendDomainEntries(family.geometries[geometry], nullptr, owned, &nameIndex, &dims);
   }

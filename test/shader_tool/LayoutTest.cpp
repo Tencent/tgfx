@@ -18,6 +18,7 @@
 
 #include <gtest/gtest.h>
 #include <set>
+#include <string>
 #include "gpu/shaders/FamilyDomains.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/Layout.h"
@@ -27,9 +28,18 @@ namespace {
 
 // The RRect family's slot layout: Frame(0), RRectGeometry(1), TiledTexture(2), AnalyticClip(3),
 // Xfer(4). The flattened dims: [STROKE, FULL, PRESENT, HAS_XP].
+uint16_t FamilyIndexByName(const char* name) {
+  for (size_t index = 0; index < FamilyCount(); ++index) {
+    if (std::string(Families()[index].name) == name) {
+      return static_cast<uint16_t>(index);
+    }
+  }
+  return 0xFFFF;
+}
+
 Variant RRectVariant(uint8_t stroke, uint8_t present, uint8_t hasXp) {
   Variant variant = {};
-  variant.family = 0;
+  variant.family = FamilyIndexByName("RRect");
   variant.geometry = 0;
   variant.values[0] = stroke;
   variant.values[1] = 0;
@@ -42,16 +52,18 @@ Variant RRectVariant(uint8_t stroke, uint8_t present, uint8_t hasXp) {
 }  // namespace
 
 TEST(LayoutTest, RRectEnumerationMatchesTheAllowedRule) {
-  const auto variants = EnumerateVariants(Families()[0], 0);
+  const uint16_t rrect = FamilyIndexByName("RRect");
+  ASSERT_NE(rrect, 0xFFFF);
+  const auto variants = EnumerateVariants(Families()[rrect], rrect);
   ASSERT_EQ(variants.size(), 9u);
   std::set<uint32_t> ordinals;
   for (const auto& variant : variants) {
     ordinals.insert(variant.ordinal);
-    const uint8_t stroke = DimValueOf(Families()[0], variant, 1, 0);
-    const uint8_t present = DimValueOf(Families()[0], variant, 2, 1);
+    const uint8_t stroke = DimValueOf(Families()[rrect], variant, 1, 0);
+    const uint8_t present = DimValueOf(Families()[rrect], variant, 2, 1);
     EXPECT_FALSE(stroke != 0 && present != 0);
     // The pinned FULL dim never iterates.
-    EXPECT_EQ(DimValueOf(Families()[0], variant, 2, 0), 0u);
+    EXPECT_EQ(DimValueOf(Families()[rrect], variant, 2, 0), 0u);
   }
   EXPECT_EQ(ordinals.size(), 9u);
 }
@@ -98,8 +110,9 @@ TEST(LayoutTest, TexturedLayoutNumbersTexturesAndVaryings) {
   EXPECT_EQ(tiled.fields[0].block, 0u);
   // The xfer slice exists (dst dialect) with the three fields.
   const auto xfer = layout.SliceOf(4);
-  ASSERT_EQ(xfer.count, 3u);
+  ASSERT_EQ(xfer.count, 4u);
   EXPECT_EQ(xfer.names[2], "XPBlendMode");
+  EXPECT_EQ(xfer.names[3], "OutputAlphaSwizzle");
 }
 
 TEST(LayoutTest, StrokeLayoutAddsTheAttributeAndVarying) {
@@ -116,10 +129,11 @@ TEST(LayoutTest, FramebufferFetchKeepsTheUnusedDstCoordFields) {
   // shader never reads them, and the reflection equality check pins the declared set.
   const auto layout = DeriveLayout(RRectVariant(0, 0, 2));
   const auto xfer = layout.SliceOf(4);
-  ASSERT_EQ(xfer.count, 3u);
+  ASSERT_EQ(xfer.count, 4u);
   EXPECT_EQ(xfer.names[0], "DstTextureUpperLeft");
   EXPECT_EQ(xfer.names[1], "DstTextureCoordScale");
   EXPECT_EQ(xfer.names[2], "XPBlendMode");
+  EXPECT_EQ(xfer.names[3], "OutputAlphaSwizzle");
   // The dst sampler stays declared under the fetch dialect too (the shader never reads it; the
   // runtime binds the shared dummy texture), so one `when` rule covers the three fields.
   ASSERT_EQ(layout.textures.size(), 1u);
@@ -127,7 +141,9 @@ TEST(LayoutTest, FramebufferFetchKeepsTheUnusedDstCoordFields) {
 }
 
 TEST(LayoutTest, DomainViewMatchesTheOrdinal) {
-  const auto info = AssembledFamilyInfo(Families()[0]);
+  const uint16_t rrect = FamilyIndexByName("RRect");
+  ASSERT_NE(rrect, 0xFFFF);
+  const auto info = AssembledFamilyInfo(Families()[rrect]);
   EXPECT_EQ(info.name, std::string("RRect"));
   EXPECT_EQ(info.fragDomain.totalCount(), 12u);
   const uint8_t strokeValues[] = {0, 1};

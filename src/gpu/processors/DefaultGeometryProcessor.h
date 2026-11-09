@@ -39,6 +39,22 @@ class DefaultGeometryProcessor : public GeometryProcessor {
     return aa;
   }
 
+  /// The view transform the vertex stage applies to the position.
+  const Matrix& getViewMatrix() const {
+    return viewMatrix;
+  }
+
+  /// The paint color the fragment stage reads from the Color uniform.
+  PMColor getCommonColor() const {
+    return commonColor;
+  }
+
+  /// The texture-space transform the coord transforms of the FP tree ride on (setTransformDataHelper
+  /// concatenates it onto every transform).
+  const Matrix& getUVMatrix() const {
+    return uvMatrix;
+  }
+
  protected:
   DefaultGeometryProcessor(PMColor color, int width, int height, AAType aa,
                            const Matrix& viewMatrix, const Matrix& uvMatrix);

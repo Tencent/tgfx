@@ -1,4 +1,4 @@
-// The full nine-mode tiled-sampling source of TiledTextureFillShader (per-axis modes 0-8):
+// The full nine-mode tiled-sampling source of the TiledTextureFill family (per-axis modes 0-8):
 // 0=None, 1=Clamp, 2=RepeatNearestNone, 3=RepeatLinearNone, 4=RepeatNearestMipmap,
 // 5=RepeatLinearMipmap, 6=MirrorRepeat, 7=ClampToBorderNearest, 8=ClampToBorderLinear.
 // The single-tap modes share tiled_sample.inc; the mipmap-repeat modes (4/5) take a 4-tap seam

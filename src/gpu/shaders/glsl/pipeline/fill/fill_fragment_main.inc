@@ -55,7 +55,7 @@
 #define FILL_COVERAGE_ROUND_STROKE 9    // round_stroke_rect_coverage.inc (cap/edge SDF)
 #define FILL_COVERAGE_ATLAS_TEXT 10     // the atlas texture of vTextureCoords is the coverage and,
                                         // for a color atlas (AlphaOnly == 0), also the color
-// Vertex coverage times the red channel of TextureSampler_0 at TransformedCoords_0 (MaskFillShader):
+// Vertex coverage times the red channel of the mask sampler (the MaskFill family's MaskTexture module):
 // the runtime emission takes the GP coverage (a constant 1.0 for non-AA triangles) and multiplies
 // the mask fragment processor's coverage into it.
 #define FILL_COVERAGE_VERTEX_MASK 11

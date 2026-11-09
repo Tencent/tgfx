@@ -44,6 +44,18 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
     return commonColor.has_value();
   }
 
+  /// The paint color the fragment stage reads from the Color uniform (absent for per-vertex
+  /// color draws, which never reach the declaration-driven families).
+  PMColor getCommonColor() const {
+    return commonColor.value_or(PMColor());
+  }
+
+  /// The texture-space transform the coord transforms of the FP tree ride on; identity when the
+  /// draw carries none.
+  Matrix getUVMatrix() const {
+    return uvMatrix.value_or(Matrix::I());
+  }
+
   bool hasUVMatrix() const {
     return uvMatrix.has_value();
   }

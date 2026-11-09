@@ -36,7 +36,7 @@ const std::string RealShaderDir = std::string(TGFX_SOURCE_DIR) + "/src/gpu/shade
 
 // The family whose files the tests damage. Any registered family works; this one has a vertex and
 // a fragment file of its own and includes shared headers.
-constexpr char FamilyName[] = "SolidColorFillShader";
+constexpr char FamilyName[] = "QuadTextureFillShader";
 
 class ShaderSourcesTest : public ::testing::Test {
  protected:

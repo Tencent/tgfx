@@ -36,11 +36,14 @@ inline constexpr Element TiledTextureElements[] = {
     {Element::Kind::Param, ShaderType::Float2, "Dimension", 1, 1},
     {Element::Kind::Param, ShaderType::Int, "AlphaOnly", 1, 1},
     {Element::Kind::Param, ShaderType::Int, "Strict", 1, 1},
+    // The runtime texture read swizzle (texture_read_swizzle.inc); the full nine-mode path
+    // decodes GRAY_8/RG_88 reads with it, the single-tap path has no use for it.
+    {Element::Kind::Param, ShaderType::Int, "ReadSwizzle", 1, 0},
     {Element::Kind::Texture, ShaderType::Float4, "Sampler", 1, 1},
     {Element::Kind::Varying, ShaderType::Float2, "Coord", 1, 1},
 };
 
 inline constexpr Module TiledTexture = {
-    "TiledTexture", TiledTextureDims, 2, TiledTextureElements, 10, true, true};
+    "TiledTexture", TiledTextureDims, 2, TiledTextureElements, 11, true, true};
 
 }  // namespace tgfx

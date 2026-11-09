@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/shaders/PrecompiledShader.h"
+#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -66,6 +67,17 @@ std::set<std::pair<uint32_t, uint32_t>> AssembledFamilyReachable() {
   return pairs;
 }
 
+/// The reachable-set enumerator per table index. The registry stores plain function pointers, so
+/// the per-family instantiations are materialized into one array here; the table may grow up to
+/// MaxDeclaredFamilies before the static_assert below fails.
+inline constexpr size_t MaxDeclaredFamilies = 8;
+
+template <size_t... Indices>
+constexpr std::array<ShaderRegistry::Enumerator, sizeof...(Indices)> MakeDeclaredEnumerators(
+    std::index_sequence<Indices...>) {
+  return {&AssembledFamilyReachable<Indices>...};
+}
+
 const std::map<std::string, RegisteredShader>& ShaderInfos() {
   static const std::map<std::string, RegisteredShader> infos = [] {
     std::map<std::string, RegisteredShader> result;
@@ -84,12 +96,16 @@ const std::map<std::string, RegisteredShader>& ShaderInfos() {
     // The declaration-driven families join the lookup tables (Find and the reachable-set
     // enumerator) but never the factory list: the build tool assembles their text from the
     // declarations, so the legacy per-family compile loop must not see them.
+    static_assert(FamilyTableCount() <= MaxDeclaredFamilies,
+                  "raise MaxDeclaredFamilies above the family table size");
+    const auto declaredEnumerators =
+        MakeDeclaredEnumerators(std::make_index_sequence<MaxDeclaredFamilies>());
     for (size_t index = 0; index < FamilyCount(); ++index) {
       const Family& family = Families()[index];
       auto info = AssembledFamilyInfo(family);
       auto name = info.name;
       result.emplace(std::move(name),
-                     RegisteredShader{std::move(info), &AssembledFamilyReachable<0>});
+                     RegisteredShader{std::move(info), declaredEnumerators[index]});
     }
     return result;
   }();

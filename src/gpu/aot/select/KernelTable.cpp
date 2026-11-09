@@ -73,14 +73,15 @@ std::optional<AOTKernelMatch> KernelTableLookup(const DrawShape& facts,
 #if DEBUG
   AssertAtMostOneFamilyAccepts(facts);
 #endif
-  // The declaration-driven families match first (the transitional arrangement): their variants
-  // ride the same bundle under the ordinal the family table's domains encode.
-  if (auto assembled = MatchAssembledFamily(facts)) {
-    PermutationVariant variant = {};
-    variant.vertPermutationIndex = assembled->variant.ordinal;
-    variant.fragPermutationIndex = assembled->variant.ordinal;
-    return AOTKernelMatch{Families()[assembled->variant.family].name, variant};
-  }
+  // The legacy table runs first during the migration, and this is the equivalence contract, not
+  // a transitional convenience: a draw's old-table home was the first acceptor in file-name
+  // order, the legacy table only ever loses families (never reorders or adds), and a family
+  // earlier in that order that still claims the draw would have won before the migration too —
+  // so consulting the legacy table first reproduces the old outcome exactly, and the declared
+  // families only serve what no legacy family claims (the draws of their deleted predecessors).
+  // Cross-table overlap is therefore expected here (QuadTextureFillShader still wins the
+  // QuadPerEdgeAA tiled draws the declared TiledTextureFill would also accept); it disappears
+  // with the legacy table in P3, where the declared order takes over.
   // Every family must either join the table (FillKernel) or be the named interpreter: a family
   // that forgets both would otherwise vanish from matching silently.
 #define TGFX_TRY_FAMILY(F)                                                                 \
@@ -100,6 +101,14 @@ std::optional<AOTKernelMatch> KernelTableLookup(const DrawShape& facts,
   }
   TGFX_FOR_EACH_SHADER_FAMILY(TGFX_TRY_FAMILY)
 #undef TGFX_TRY_FAMILY
+  // The declaration-driven families' variants ride the same bundle under the ordinal the family
+  // table's domains encode.
+  if (auto assembled = MatchAssembledFamily(facts)) {
+    PermutationVariant variant = {};
+    variant.vertPermutationIndex = assembled->variant.ordinal;
+    variant.fragPermutationIndex = assembled->variant.ordinal;
+    return AOTKernelMatch{Families()[assembled->variant.family].name, variant};
+  }
   return std::nullopt;
 }
 

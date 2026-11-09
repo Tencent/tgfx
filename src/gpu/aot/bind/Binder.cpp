@@ -663,10 +663,6 @@ void BindTiledSourceLeaf(const AOTTextureParameters& leaf, ParamWriter* writer) 
     return;
   }
   const auto& sampling = *leaf.tiledRecipe;
-  auto view = leaf.textureProxy != nullptr ? leaf.textureProxy->getTextureView() : nullptr;
-  if (view != nullptr) {
-    writer->set(TiledSourceModule::ReadSwizzle, AOTReadSwizzleMode(view->getTexture()->format()));
-  }
   if (sampling.usesShaderDimensions) {
     const float dimensions[2] = {sampling.shaderDimensions.x, sampling.shaderDimensions.y};
     writer->set(TiledSourceModule::Dimension, dimensions);
@@ -680,7 +676,6 @@ void BindTiledSourceLeaf(const AOTTextureParameters& leaf, ParamWriter* writer) 
   writer->set(TiledSourceModule::ShaderModeX, static_cast<int32_t>(sampling.shaderModeX));
   writer->set(TiledSourceModule::ShaderModeY, static_cast<int32_t>(sampling.shaderModeY));
   writer->set(TiledSourceModule::AlphaOnly, sampling.alphaOnly ? 1 : 0);
-  writer->set(TiledSourceModule::Strict, sampling.strict ? 1 : 0);
 }
 
 void BindDeviceMaskLeaf(const AOTTextureParameters& mask, ParamWriter* writer) {

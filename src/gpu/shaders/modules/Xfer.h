@@ -37,10 +37,13 @@ inline constexpr Element XferElements[] = {
     {Element::Kind::Param, ShaderType::Float2, "DstTextureUpperLeft", 1, 0},
     {Element::Kind::Param, ShaderType::Float2, "DstTextureCoordScale", 1, 0},
     {Element::Kind::Param, ShaderType::Int, "XPBlendMode", 1, 0},
+    // The render-target write swizzle: 1 for ALPHA_8 targets (AAAA), 0 (a no-op) otherwise. It
+    // stays unconditional because the HAS_XP == 0 path writes the composed color too.
+    {Element::Kind::Param, ShaderType::Int, "OutputAlphaSwizzle"},
     {Element::Kind::Texture, ShaderType::Float4, "DstTextureSampler", 1, 0},
 };
 
-inline constexpr Module Xfer = {"Xfer", XferDims, 1, XferElements, 4, false, true};
+inline constexpr Module Xfer = {"Xfer", XferDims, 1, XferElements, 5, false, true};
 
 inline const Module& XferModule() {
   return Xfer;

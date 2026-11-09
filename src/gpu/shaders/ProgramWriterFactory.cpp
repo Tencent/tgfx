@@ -24,8 +24,8 @@
 
 namespace tgfx {
 
-/// The RRect family's layout-addressed writer (RRectFamilyWriter.cpp).
-std::unique_ptr<ProgramWriter> MakeRRectProgramWriter();
+/// The declaration-driven families' layout-addressed writer (DeclaredFamilyWriter.cpp).
+std::unique_ptr<ProgramWriter> MakeDeclaredFamilyProgramWriter();
 
 // The re-expressing chain family carries its own writer (it compiles the draw's whole expression
 // into the chain program); the YUV family appends its compiled tail records to the standard walk;
@@ -40,7 +40,7 @@ std::unique_ptr<ProgramWriter> MakeProgramWriter(const std::string& shaderName) 
   }
   for (size_t index = 0; index < FamilyCount(); ++index) {
     if (shaderName == Families()[index].name) {
-      return MakeRRectProgramWriter();
+      return MakeDeclaredFamilyProgramWriter();
     }
   }
   return std::make_unique<PrecompiledProgramWriter>();

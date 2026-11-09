@@ -18,7 +18,6 @@
 
 #include <algorithm>
 #include <chrono>
-#include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include <limits>
@@ -316,7 +315,6 @@ TGFX_TEST(ShaderPermutationTest, TypedVertDimsDeclaresTheSameDomain) {
 
 TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
   auto& factories = ShaderRegistry::All();
-  bool foundMaskFill = false;
   for (auto& factory : factories) {
     auto shader = factory();
     auto shaderInfo = shader->info();
@@ -325,18 +323,20 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
     EXPECT_NE(shaderInfo.name, "TextureColorMatrixShader");
     EXPECT_NE(shaderInfo.name, "DeviceSpaceTextureShader");
     EXPECT_NE(shaderInfo.name, "PointwiseDirectShader");
-    if (shaderInfo.name == "MaskFillShader") {
-      foundMaskFill = true;
-      EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 1u);
-      EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 0u);
-      // FragDims: HAS_XP(int3) = 3 permutations.
-      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 3u);
-      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 1u);
-      EXPECT_EQ(shaderInfo.vertexFile, "kernels/plain_texture.vert");
-      EXPECT_EQ(shaderInfo.fragmentFile, "kernels/mask_fill.frag");
-    }
+    // The declaration-driven families have no factory shell; they join Find/Enumerate only.
+    EXPECT_NE(shaderInfo.name, "SolidColor");
+    EXPECT_NE(shaderInfo.name, "MaskFill");
+    EXPECT_NE(shaderInfo.name, "TiledTextureFill");
+    EXPECT_NE(shaderInfo.name, "RRect");
   }
-  EXPECT_TRUE(foundMaskFill);
+  const auto* maskFill = ShaderRegistry::Find("MaskFill");
+  ASSERT_NE(maskFill, nullptr);
+  // The declaration-driven families encode HAS_XP(int3) = 3 permutations; the one domain drives
+  // both stages (the vertex text just never reads the dimension).
+  EXPECT_EQ(maskFill->vertDomain.totalCount(), 3u);
+  EXPECT_EQ(maskFill->vertDomain.dimensionCount(), 1u);
+  EXPECT_EQ(maskFill->fragDomain.totalCount(), 3u);
+  EXPECT_EQ(maskFill->fragDomain.dimensionCount(), 1u);
 }
 
 TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
@@ -373,8 +373,13 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
 
   EXPECT_EQ(*EnumerateReachablePermutations("PointwiseChainShader"),
             PointwiseChainShader::Reachable());
-  const std::set<std::pair<uint32_t, uint32_t>> maskPairs = {{0, 0}, {0, 1}, {0, 2}};
-  EXPECT_EQ(*EnumerateReachablePermutations("MaskFillShader"), maskPairs);
+  // The declaration-driven families enumerate their own ordinals: the geometry IS the family, so
+  // SolidColor/MaskFill list HAS_XP alone and TiledTextureFill leads with the geometry radix.
+  const std::set<std::pair<uint32_t, uint32_t>> solidColorPairs = {{0, 0}, {1, 1}, {2, 2}};
+  EXPECT_EQ(*EnumerateReachablePermutations("SolidColor"), solidColorPairs);
+  EXPECT_EQ(*EnumerateReachablePermutations("MaskFill"), solidColorPairs);
+  const std::set<std::pair<uint32_t, uint32_t>> tiledFillPairs = {{0, 0}, {1, 1}, {2, 2}};
+  EXPECT_EQ(*EnumerateReachablePermutations("TiledTextureFill"), tiledFillPairs);
   const std::set<std::pair<uint32_t, uint32_t>> shapeCoveragePairs = {{0, 0}, {1, 1}};
   EXPECT_EQ(*EnumerateReachablePermutations("ShapeInstancedTextureCoverageShader"),
             shapeCoveragePairs);
@@ -2558,23 +2563,19 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectPreservesPermutationDomains) {
     uint32_t fragmentCount;
   };
   const ExpectedDomain expected[] = {
-      {"QuadColorFillShader", 1, 6},  {"QuadTextureFillShader", 8, 12},
-      {"SolidColorFillShader", 1, 3}, {"HairlineLineShader", 1, 3},
-      {"HairlineQuadShader", 1, 3},
+      {"QuadColorFillShader", 1, 6}, {"QuadTextureFillShader", 8, 12}, {"SolidColor", 3, 3},
+      {"HairlineLineShader", 1, 3},  {"HairlineQuadShader", 1, 3},
   };
   for (const auto& expectedDomain : expected) {
-    bool found = false;
-    for (const auto& factory : ShaderRegistry::All()) {
-      auto shader = factory();
-      auto info = shader->info();
-      if (info.name != expectedDomain.name) {
-        continue;
-      }
-      found = true;
-      EXPECT_EQ(info.vertDomain.totalCount(), expectedDomain.vertexCount);
-      EXPECT_EQ(info.fragDomain.totalCount(), expectedDomain.fragmentCount);
+    // The lookup goes through Find so the declaration-driven families (SolidColor) are covered
+    // alongside the factory families.
+    const auto* registered = ShaderRegistry::Find(expectedDomain.name);
+    EXPECT_NE(registered, nullptr) << expectedDomain.name;
+    if (registered == nullptr) {
+      continue;
     }
-    EXPECT_TRUE(found) << expectedDomain.name;
+    EXPECT_EQ(registered->vertDomain.totalCount(), expectedDomain.vertexCount);
+    EXPECT_EQ(registered->fragDomain.totalCount(), expectedDomain.fragmentCount);
   }
 }
 

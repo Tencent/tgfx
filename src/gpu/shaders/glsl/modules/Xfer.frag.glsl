@@ -26,4 +26,9 @@ void Xfer_fragment(inout Fragment f) {
 #else
   fragColor = f.color * f.coverage;
 #endif
+  // The render-target write swizzle (aligned with the former xp/output_swizzle.inc): only the
+  // ALPHA_8 targets need the AAAA broadcast.
+  if (OutputAlphaSwizzle != 0) {
+    fragColor = fragColor.aaaa;
+  }
 }

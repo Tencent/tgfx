@@ -11,8 +11,8 @@
 // RepeatLinearNone(3) shares RepeatNearestNone(2)'s coordinate math — the linear vs nearest
 // difference is the sampler filter (runtime SamplerState), not shader code — so it needs no extra
 // work here. The mipmap-repeat modes (4,5) need a 4-tap seam blend that the single-tap helpers here
-// do not provide; tiled_texture_fill.frag implements those inline, and blur/blend-merge still fall
-// back for 4/5.
+// do not provide; the TiledTextureFull module hook implements those inline, and blur/blend-merge
+// still fall back for 4/5.
 
 // ClampToBorder and RepeatLinear/mipmap modes require unnormalized (pixel-space) coordinates:
 // the incoming coord is divided by Dimension before tiling and multiplied back when sampling.
@@ -30,7 +30,7 @@ bool tiledEffectiveUnorm(int modeX, int modeY) {
 bool tiledUsesClamp(int mode) {
   // Matches ShaderModeUsesClamp(): Clamp, RepeatNearest/Linear(None+Mipmap), MirrorRepeat and
   // ClampToBorderLinear clamp; None and ClampToBorderNearest do not. Modes 4/5 are only reached by
-  // tiled_texture_fill.frag's 4-tap path.
+  // the full nine-mode hook's 4-tap path.
   return mode == 1 || mode == 2 || mode == 3 || mode == 4 || mode == 5 || mode == 6 || mode == 8;
 }
 

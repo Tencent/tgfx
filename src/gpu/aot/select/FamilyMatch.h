@@ -27,10 +27,12 @@ struct DrawShape;
 struct AOTTextureParameters;
 
 /// One declaration-driven family's match: the variant the draw maps to and the module data
-/// sources the writers read (the tiled leaf for the TiledTexture slot, null when absent).
+/// sources the writers read (the tiled leaf for the TiledTexture slot and the mask leaf for the
+/// MaskTexture slot, null when absent).
 struct FamilyMatchResult {
   Variant variant;
   const AOTTextureParameters* tiledLeaf = nullptr;
+  const AOTTextureParameters* maskLeaf = nullptr;
 };
 
 /// Matches a draw against the declaration-driven family table (Families(), in table order).

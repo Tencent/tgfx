@@ -47,16 +47,18 @@ const std::string GoodFragment =
 
 const std::string BrokenVertex = "#version 450\nvoid main() { this is not glsl }\n";
 
-// A real family's info: the emitters read its name for their diagnostics.
+// A real family's info: the emitters read its name (and nothing else) for their diagnostics, so
+// any registered family serves. Taking the first keeps the test independent of which families
+// still have a factory.
 const PrecompiledShaderInfo* TestFamilyInfo() {
-  for (auto factory : ShaderRegistry::All()) {
-    auto info = factory()->info();
-    if (info.name == "SolidColorFillShader") {
-      static PrecompiledShaderInfo stored = info;
-      return &stored;
+  static const PrecompiledShaderInfo stored = [] {
+    const auto& factories = ShaderRegistry::All();
+    if (factories.empty()) {
+      return PrecompiledShaderInfo{"", "", "", PermutationDomain({}), PermutationDomain({}), 0};
     }
-  }
-  return nullptr;
+    return factories.front()()->info();
+  }();
+  return &stored;
 }
 
 EmitInput InputOf(const std::string& vertSource, const std::string& fragSource,
