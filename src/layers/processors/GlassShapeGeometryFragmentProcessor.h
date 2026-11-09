@@ -78,7 +78,10 @@ struct GlassUDFGeometryParams : public GlassGeometryParams {
 /**
  * Computes shape-dependent refraction geometry from source UV coordinates supplied in inputColor.
  * The output is vec4(refractDirection.xy, displacementDistance, lightResponse): the
- * corner-amplified refraction field, its per-pixel offset and the packed light response. The
+ * corner-amplified refraction field, its per-pixel offset and the packed light response.
+ * refractDirection is unit-length whenever it is nonzero, and displacementDistance is nonnegative.
+ * The refraction processor clamps displacementDistance to the shared physical maximum before
+ * applying it, so this contract bounds the final vector displacement. The
  * analytical SDF path carries the two edge terms (light-facing edge and light-away back-side rim,
  * coefficients 1 and 0.6), shading the adjacent edge faces separately and blending their responses
  * around a corner, plus a signed wide-band dark term (coefficient 0.05) on the light-facing side,

@@ -364,6 +364,9 @@ void GLSLGlassUDFGeometryFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf(
       "  float normalizedThickness = clamp(%s.z / max(min(halfW, halfH), 0.0001), 0.0, 1.0);",
       effect.c_str());
+  // This shallow-depth curve is intentional and scale-invariant: K changes both glassThickness and
+  // minHalf, so normalizedThickness is unchanged. It makes displacement nonlinear in absolute depth
+  // at a fixed shape size, but not in the external K scaling contract.
   fragBuilder->codeAppend("  float depthScale = smoothstep(0.0, 0.1, normalizedThickness);");
   fragBuilder->codeAppendf("  float distance = %s.z * %s.x * depthScale * gradientWeight;",
                            effect.c_str(), effect.c_str());

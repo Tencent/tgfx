@@ -84,10 +84,16 @@ static float GetRefractionOutset(float maxDisplacement, float dispersion) {
   return std::max(maxDisplacement * (1.0f + dispersion), 1.0f);
 }
 
-static float GetGradientSampleRadius(float glassThickness, const Point& udfPixelToLayerPixel) {
-  // The physical radius follows the external geometry/depth scale. A one-texel floor keeps the
-  // shader's central difference finite without creating a shape-sized halo for large, thin panels.
-  return std::max(glassThickness * 0.05f, std::max(udfPixelToLayerPixel.x, udfPixelToLayerPixel.y));
+static float GetGradientSampleRadius(float glassThickness, float minHalf,
+                                     const Point& udfPixelToLayerPixel) {
+  // A one-texel floor changes the normalized gradient span whenever UDF density changes with K.
+  // Use a fixed fraction of the shape instead, so uniform scaling only changes the displacement
+  // magnitude and leaves the reconstructed gradient profile scale-invariant. The actual texel size
+  // remains a fallback for resource-limited UDFs whose density cap drops below the short-side floor.
+  static constexpr float MinGradientSpanRatio = 1.0f / 128.0f;
+  auto normalizedSpan =
+      std::max(glassThickness * 0.05f, std::max(minHalf, 0.0f) * MinGradientSpanRatio);
+  return std::max(normalizedSpan, std::max(udfPixelToLayerPixel.x, udfPixelToLayerPixel.y));
 }
 
 struct GlassShapeInfo {
@@ -458,15 +464,10 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
       if (maxAllowedDim < 1.0f) {
         return;
       }
-      float udfScale = 1.0f;
-      if (fullMaxDim > maxAllowedDim) {
-        udfScale = maxAllowedDim / fullMaxDim;
-      }
       static constexpr float MIN_SHORT_SIDE_TEXELS = 256.0f;
       float fullMinDim = std::min(contentWidth, contentHeight);
-      if (fullMinDim * udfScale < MIN_SHORT_SIDE_TEXELS) {
-        udfScale = MIN_SHORT_SIDE_TEXELS / fullMinDim;
-      }
+      float udfScale =
+          CalculateGlassUDFScale(fullMaxDim, fullMinDim, maxAllowedDim, MIN_SHORT_SIDE_TEXELS);
       // Layer-pixel-to-source-pixel ratio per axis (= contentScale on both axes). Used to convert
       // the layer-space radius into the UDF texel density.
       float layerToSourceX = contentWidth / origBounds.width();
@@ -511,7 +512,8 @@ void GlassStyle::onDraw(Canvas* canvas, const LayerStyleInput& input, float alph
           std::min(effectiveBlurRadius * rhoX, static_cast<float>(GlassUDFMaxTentRadius)),
           std::min(effectiveBlurRadius * rhoY, static_cast<float>(GlassUDFMaxTentRadius))};
       Point udfPixelToLayerPixel = {udfPixelToLayerPixelX, udfPixelToLayerPixelY};
-      float gradientSampleRadius = GetGradientSampleRadius(glassThickness, udfPixelToLayerPixel);
+      float gradientSampleRadius =
+          GetGradientSampleRadius(glassThickness, minHalf, udfPixelToLayerPixel);
       float fineHaloX = std::ceil(gradientSampleRadius / udfPixelToLayerPixelX) + 1.0f;
       float fineHaloY = std::ceil(gradientSampleRadius / udfPixelToLayerPixelY) + 1.0f;
       // Only the visible window of the refraction field is generated, plus the halo the shader
@@ -812,7 +814,7 @@ std::shared_ptr<GlassRefractionImageFilter> GlassStyle::getUDFRefractionFilter(
   udfParams.refractionFactor = getRefractionFactor();
   udfParams.splay = std::clamp(_splay / 100.0f, 0.0f, 1.0f);
   udfParams.gradientSampleRadiusLayerPixels =
-      GetGradientSampleRadius(glassThickness, udf.pixelToLayerPixel);
+      GetGradientSampleRadius(glassThickness, minHalf, udf.pixelToLayerPixel);
   udfParams.lightAngle = _lightAngle;
   udfParams.edgeBandLayerPixels = GetEdgeBandLayerPixels(contentScale);
   udfParams.udfPixelToLayerPixelX = udf.pixelToLayerPixel.x;

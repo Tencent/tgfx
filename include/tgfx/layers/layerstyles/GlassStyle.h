@@ -43,7 +43,8 @@ class GlassStyle : public LayerStyle {
    * Creates a new GlassStyle with the specified parameters.
    * @param refraction The amount of optical distortion along curved edges, range [0, 100].
    * @param depth The inward refraction thickness from edges, in layer-space pixels. Rendering
-   *              clamps it to [0, min(halfWidth, halfHeight)]. Callers that scale the layer
+   *              clamps it to [0, min(halfWidth, halfHeight)]. NaN renders as zero, while infinite
+   *              values clamp to the corresponding finite endpoint. Callers that scale the layer
    *              geometry must scale this value by the same factor.
    * @param frost The amount of background blur (frosted glass), range [0, 100].
    * @param dispersion The intensity of chromatic aberration (rainbow prism effect), range [0, 100].
@@ -71,7 +72,7 @@ class GlassStyle : public LayerStyle {
 
   /**
    * Inward refraction thickness from edges, in layer-space pixels. The value is stored as supplied;
-   * rendering clamps it to [0, min(halfWidth, halfHeight)].
+   * rendering clamps it to [0, min(halfWidth, halfHeight)]. NaN renders as zero.
    */
   float depth() const {
     return _depth;
@@ -199,10 +200,14 @@ class GlassStyle : public LayerStyle {
     return std::clamp(_lightIntensity / 100.0f, 0.0f, 1.0f);
   }
 
-  // The refraction thickness is in layer-space pixels and is capped by the shortest distance from
-  // the geometry edge to its center. A caller scaling geometry must also scale depth; no scale
-  // factor is applied here.
+  // The refraction thickness is in layer-space pixels and is capped by half of the shorter content
+  // bound, min(halfWidth, halfHeight). This is a geometry-bound cap, not the shortest edge-to-center
+  // distance for arbitrary paths. A caller scaling geometry must also scale depth; no scale factor
+  // is applied here.
   float getGlassThickness(float minHalf) const {
+    if (std::isnan(_depth) || !std::isfinite(minHalf)) {
+      return 0.0f;
+    }
     return std::clamp(_depth, 0.0f, std::max(minHalf, 0.0f));
   }
 
