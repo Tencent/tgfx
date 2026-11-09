@@ -196,8 +196,7 @@ void UploadGradientParams(UniformData* uniformData, size_t blockBase,
 
 void UploadPointwiseSlot(UniformData* uniformData, const AOTChainSlot& slot) {
   // One pointwise operator as chain slot 0: the packed word and the parameter registers the slot
-  // interpreter reads (pointwise_op.inc). A single-operator kernel (TexturedEffect) and the chain
-  // thus share one parameter ABI. The single-operator kernels accept the four color operators
+  // interpreter reads (pointwise_op.inc). The YUV tail and the chain thus share one parameter ABI. The single-operator kernels accept the four color operators
   // only; a Blend's operand encoding belongs to UploadYUVTailSlot, whose selector bit 8 carries
   // the operand order where the chain's carries multiplyInputAlpha.
   UploadChainSlot(uniformData, 0, slot);

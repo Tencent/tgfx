@@ -112,9 +112,9 @@ static void AuditCase(Context* context, PrecompiledShaderCache* cache,
   EXPECT_TRUE(result.passed) << shape << " maxDelta=" << result.maxChannelDiff;
 }
 
-// Audits the shapes the L2 route serves today: a plain textured image draw (QuadTextureFill kernel)
-// and an image with a color-matrix color filter (TexturedEffect kernel). Each is validated to be
-// pixel-equivalent (<= 1 LSB) between the plain and L2 paths.
+// Audits the shapes the L2 route serves today: a plain textured image draw and an image with a
+// color-matrix color filter (both reach the chain route once no dedicated family claims them). Each
+// is validated to be pixel-equivalent (<= 1 LSB) between the plain and L2 paths.
 TGFX_TEST(AOTL2AuditTest, ServedShapesMatchPlainPathWithinOneLSB) {
   auto image = MakeImage("resources/apitest/test_timestretch.png");
   ASSERT_TRUE(image != nullptr);

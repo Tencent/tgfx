@@ -43,7 +43,8 @@ void GLSLColorMatrixFragmentProcessor::onSetData(UniformData* /*vertexUniformDat
   };
   fragmentUniformData->setArrayElement("ColorMatrix", 0, m);
   fragmentUniformData->setArrayElement("ColorVector", 0, vec);
-  // Select the ColorMatrix operator in the shared TexturedEffectShader (absent elsewhere).
+  // Select the ColorMatrix operator in the chain interpreter's slot 0 (the only kernel that carries
+  // the operator word now that the single-operator family is gone).
   fragmentUniformData->setArrayElementOptional("OpType", 0, 0);
 }
 }  // namespace tgfx

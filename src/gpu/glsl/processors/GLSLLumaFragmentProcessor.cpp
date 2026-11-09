@@ -34,7 +34,8 @@ void GLSLLumaFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
   fragmentUniformData->setArrayElement("Kr", 0, _lumaFactor.kr);
   fragmentUniformData->setArrayElement("Kg", 0, _lumaFactor.kg);
   fragmentUniformData->setArrayElement("Kb", 0, _lumaFactor.kb);
-  // Select the Luma operator in the shared TexturedEffectShader (absent elsewhere).
+  // Select the Luma operator in the chain interpreter's slot 0 (the only kernel that carries
+  // the operator word now that the single-operator family is gone).
   fragmentUniformData->setArrayElementOptional("OpType", 0, 1);
 }
 

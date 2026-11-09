@@ -27,7 +27,8 @@ PlacementPtr<AlphaThresholdFragmentProcessor> AlphaThresholdFragmentProcessor::M
 void GLSLAlphaThresholdFragmentProcessor::onSetData(UniformData* /*vertexUniformData*/,
                                                     UniformData* fragmentUniformData) const {
   fragmentUniformData->setArrayElement("Threshold", 0, threshold);
-  // Select the AlphaThreshold operator in the shared TexturedEffectShader (absent elsewhere).
+  // Select the AlphaThreshold operator in the chain interpreter's slot 0 (the only kernel that carries
+  // the operator word now that the single-operator family is gone).
   fragmentUniformData->setArrayElementOptional("OpType", 0, 2);
 }
 
