@@ -283,6 +283,23 @@ bool MatchHairline(const DrawShape& shape, GeometryKind kind, uint16_t family, V
   return true;
 }
 
+/// The Ellipse family's rule, carried over from the former EllipseFillShader except for the
+/// device-space mask form, which keeps its old family until ALWAYS and RUNTIME are split. Only
+/// HAS_XP varies, so the ordinal is HAS_XP.
+bool MatchEllipse(const DrawShape& shape, Variant* variant) {
+  if (shape.geometry.kind != GeometryKind::Ellipse || shape.colorFPCount != 0 ||
+      !shape.coverage.has_value() || *shape.coverage == Coverage::LocalMask ||
+      *shape.coverage == Coverage::DeviceMask || shape.xpType() < XP_NONE) {
+    return false;
+  }
+  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
+  variant->family = 10;
+  variant->geometry = 0;
+  variant->values[0] = hasXp;
+  variant->ordinal = static_cast<uint32_t>(hasXp);
+  return true;
+}
+
 std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape) {
   if (FamilyCount() == 0) {
     return std::nullopt;
@@ -305,6 +322,9 @@ std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape) {
     return result;
   }
   if (MatchShapeInstanced(shape, &result.variant)) {
+    return result;
+  }
+  if (MatchEllipse(shape, &result.variant)) {
     return result;
   }
   if (MatchHairline(shape, GeometryKind::HairlineLine, 8, &result.variant)) {

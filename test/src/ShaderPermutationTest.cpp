@@ -2563,7 +2563,7 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectPreservesPermutationDomains) {
     uint32_t fragmentCount;
   };
   const ExpectedDomain expected[] = {
-      {"QuadColor", 6, 6},          {"QuadTextureFillShader", 8, 12}, {"SolidColor", 3, 3},
+      {"QuadColor", 6, 6},    {"QuadTextureFillShader", 8, 12}, {"SolidColor", 3, 3},
       {"HairlineLine", 3, 3}, {"HairlineQuad", 3, 3},
   };
   for (const auto& expectedDomain : expected) {

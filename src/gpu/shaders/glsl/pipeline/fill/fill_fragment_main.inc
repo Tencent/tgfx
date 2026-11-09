@@ -64,6 +64,13 @@
 #define FILL_DEVICE_MASK_ALWAYS 1  // MaskTextureSampler through DeviceCoordMatrix
 #define FILL_DEVICE_MASK_RUNTIME 2  // the same, when HasDeviceMask != 0
 
+// STROKE selects the stroke form of the shape-coverage branches below. The families that
+// used them are declared now, so the guards resolve to the fill form here; the default
+// keeps the macro defined for the reference checker.
+#ifndef STROKE
+#define STROKE 0
+#endif
+
 #ifndef FILL_COLOR
 #define FILL_COLOR FILL_COLOR_UNIFORM
 #endif
