@@ -525,6 +525,56 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
   }
   const Family& family = Families()[match->variant.family];
   const auto layout = DeriveLayout(match->variant);
+#if DEBUG
+  // The pairing contract, spelled the way the program creator applies it: a shader that declares
+  // one input per geometry attribute pairs in order (the count must match), and one that reads a
+  // strict subset pairs by physical slot (every declared location must be a slot the geometry
+  // actually provides). A violation here means the module's element order disagrees with the
+  // geometry's declared attribute order, which would otherwise surface only as pixel damage.
+  {
+    const auto& geometryAttributes = info.getVertexAttributes();
+    const auto& geometrySlots = info.getGeometryProcessor()->vertexAttributeLocations();
+    // Instance inputs occupy the slots after the vertex ones (the creator's own split), so the
+    // pairing checks below see the vertex inputs alone.
+    uint32_t instanceBase = 0;
+    for (auto slot : geometrySlots) {
+      instanceBase = std::max(instanceBase, slot + 1);
+    }
+    size_t vertexInputCount = 0;
+    for (const auto& attribute : layout.attributes) {
+      if (attribute.location < instanceBase) {
+        ++vertexInputCount;
+      }
+    }
+    if (vertexInputCount > geometryAttributes.size()) {
+      LOGE(
+          "DeclaredFamilyProgramWriter: %s declares %zu vertex inputs but the geometry provides "
+          "%zu attributes — the module's element list is out of sync with the geometry",
+          family.name, vertexInputCount, geometryAttributes.size());
+      DEBUG_ASSERT(false);
+    }
+    // Only a strict subset pairs by physical slot (the creator parks the unread attributes); a
+    // one-to-one interface pairs in order, where the declared locations are internal numbering.
+    if (vertexInputCount < geometryAttributes.size()) {
+      for (const auto& attribute : layout.attributes) {
+        if (attribute.location >= instanceBase) {
+          continue;
+        }
+        const bool onSlot = std::any_of(
+            geometrySlots.begin(), geometrySlots.end(),
+            [location = attribute.location](uint32_t slot) { return slot == location; });
+        if (!onSlot) {
+          LOGE(
+              "DeclaredFamilyProgramWriter: attribute %s wants location %u, which the geometry "
+              "does not declare — the module's element order disagrees with the geometry's "
+              "attribute order",
+              attribute.name.c_str(), attribute.location);
+          DEBUG_ASSERT(false);
+        }
+      }
+    }
+  }
+#endif
   const auto modules = ModulesOf(family, match->variant);
   ParamBuffer buffer(vertexUniformData, fragmentUniformData);
   for (uint8_t slot = 0; slot < modules.count; ++slot) {

@@ -45,14 +45,10 @@ inline constexpr const Module* RectGeometries[] = {&RectGeometry};
 
 inline constexpr FamilyModule SolidColorBody[] = {&AnalyticClip};
 
-inline constexpr Family SolidColorFamily = {"SolidColor", RectGeometries, 1, SolidColorBody, 1};
-
 /// The MaskFill family (the former MaskFillShader): the DefaultGP's rect fill whose coverage is a
 /// rasterized alpha-only mask texture. Slot layout: Frame(0), RectGeometry(1), MaskTexture(2),
 /// Xfer(3).
 inline constexpr FamilyModule MaskFillBody[] = {&MaskTexture};
-
-inline constexpr Family MaskFillFamily = {"MaskFill", RectGeometries, 1, MaskFillBody, 1};
 
 /// The TiledTextureFill family (the former TiledTextureFillShader): a rect or quad filled with a
 /// nine-mode tiled texture. The legacy QuadTextureFillShader still wins the Plain-leaf Quad draws
@@ -67,9 +63,6 @@ inline constexpr int8_t TiledTextureFillPins[] = {1, 1};
 
 inline constexpr FamilyModule TiledTextureFillBody[] = {{&TiledTexture, TiledTextureFillPins}};
 
-inline constexpr Family TiledTextureFillFamily = {"TiledTextureFill", RectQuadGeometries, 2,
-                                                  TiledTextureFillBody, 1};
-
 /// The QuadColor family (the former QuadColorFillShader): the QuadPerEdgeAA rect filled with the
 /// per-vertex color (or the exact Color uniform), an optional device-space mask and the analytic
 /// clip. Slot layout: Frame(0), QuadColorGeometry(1), DeviceMask(2: PRESENT), AnalyticClip(3),
@@ -77,8 +70,6 @@ inline constexpr Family TiledTextureFillFamily = {"TiledTextureFill", RectQuadGe
 inline constexpr const Module* QuadColorGeometries[] = {&QuadColorGeometry};
 
 inline constexpr FamilyModule QuadColorBody[] = {&DeviceMask, &AnalyticClip};
-
-inline constexpr Family QuadColorFamily = {"QuadColor", QuadColorGeometries, 1, QuadColorBody, 2};
 
 /// The RRect family (the former NonAARRectFillShader): a non-AA rounded rect, optionally filled
 /// with a single-tap tiled texture, with the analytic clip riding the runtime contract. The
@@ -94,16 +85,11 @@ inline constexpr FamilyModule RRectBody[] = {{&TiledTexture, RRectTiledTexturePi
 /// Slot layout: Frame(0), RRectGeometry(1), TiledTexture(2), AnalyticClip(3), Xfer(4).
 bool RRectVariantAllowed(const Variant& variant, const Family& family);
 
-inline constexpr Family RRectFamily = {"RRect", RRectGeometries,    1, RRectBody,
-                                       2,       RRectVariantAllowed};
-
 /// The Mesh family (the former MeshFillShader): the triangle mesh with no fragment processor. The
 /// top-level color comes from the per-vertex varying or the exact Color uniform; the family carried
 /// no clip step in the old declaration, so the body stays empty. Slot layout: Frame(0),
 /// MeshGeometry(1: TEX_COORDS), Xfer(2).
 inline constexpr const Module* MeshGeometries[] = {&MeshGeometry};
-
-inline constexpr Family MeshFamily = {"Mesh", MeshGeometries, 1, nullptr, 0};
 
 /// The ShapeInstanced family (the former ShapeInstancedFillShader): the instanced path triangles
 /// with no fragment processor. VERTEX_COLOR reserves the geometry's stride-filler color slot and
@@ -114,9 +100,6 @@ inline constexpr const Module* ShapeInstancedGeometries[] = {&ShapeInstancedGeom
 /// Slot layout: Frame(0), ShapeInstancedGeometry(1), Xfer(2).
 bool ShapeInstancedVariantAllowed(const Variant& variant, const Family& family);
 
-inline constexpr Family ShapeInstancedFamily = {
-    "ShapeInstanced", ShapeInstancedGeometries, 1, nullptr, 0, ShapeInstancedVariantAllowed};
-
 /// The family table, in match priority order. The declaration-driven families are checked before
 /// the legacy kernel table; among themselves the dedicated rules are disjoint.
 /// The ComplexRRect family (the former ComplexNonAARRectFillShader): a per-corner-radius rounded
@@ -124,23 +107,14 @@ inline constexpr Family ShapeInstancedFamily = {
 /// attribute and varying). Slot layout: Frame(0), ComplexRRectGeometry(1: STROKE), Xfer(2).
 inline constexpr const Module* ComplexRRectGeometries[] = {&ComplexRRectGeometry};
 
-inline constexpr Family ComplexRRectFamily = {"ComplexRRect", ComplexRRectGeometries, 1, nullptr,
-                                              0};
-
 /// The HairlineLine family (the former HairlineLineShader): a thin line whose coverage is the edge
 /// distance's absolute value times the draw coverage, times the analytic clip. Slot layout:
 /// Frame(0), HairlineLineGeometry(1), Xfer(2).
 inline constexpr const Module* HairlineLineGeometries[] = {&HairlineLineGeometry};
 
-inline constexpr Family HairlineLineFamily = {"HairlineLine", HairlineLineGeometries, 1, nullptr,
-                                              0};
-
 /// The HairlineQuad family (the former HairlineQuadShader): the Loop-Blinn hairline quad, same
 /// slot layout.
 inline constexpr const Module* HairlineQuadGeometries[] = {&HairlineQuadGeometry};
-
-inline constexpr Family HairlineQuadFamily = {"HairlineQuad", HairlineQuadGeometries, 1, nullptr,
-                                              0};
 
 /// The Ellipse family (the former EllipseFillShader): an ellipse whose coverage is the analytic
 /// edge SDF, with an optional device-space mask (the old FILL_DEVICE_MASK_ALWAYS form, so the mask
@@ -150,8 +124,6 @@ inline constexpr const Module* EllipseGeometries[] = {&EllipseGeometry};
 
 inline constexpr FamilyModule EllipseBody[] = {&DeviceMask, &AnalyticClip};
 
-inline constexpr Family EllipseFamily = {"Ellipse", EllipseGeometries, 1, EllipseBody, 2};
-
 /// The ComplexEllipse family (the former ComplexEllipseFillShader): the analytic complex-ellipse
 /// coverage (fill and stroke forms), the shared device-space mask and the analytic clip. Slot
 /// layout: Frame(0), ComplexEllipseGeometry(1: STROKE), DeviceMask(2: PRESENT), AnalyticClip(3),
@@ -160,9 +132,6 @@ inline constexpr const Module* ComplexEllipseGeometries[] = {&ComplexEllipseGeom
 
 inline constexpr FamilyModule ComplexEllipseBody[] = {&DeviceMask, &AnalyticClip};
 
-inline constexpr Family ComplexEllipseFamily = {"ComplexEllipse", ComplexEllipseGeometries, 1,
-                                                ComplexEllipseBody, 2};
-
 /// The RoundStrokeRect family (the former RoundStrokeRectFillShader): a stroked rounded rect whose
 /// coverage is the normalized-offset ellipse SDF, times the analytic clip. Slot layout: Frame(0),
 /// RoundStrokeRectGeometry(1: UV_MATRIX), AnalyticClip(2), Xfer(3).
@@ -170,17 +139,27 @@ inline constexpr const Module* RoundStrokeRectGeometries[] = {&RoundStrokeRectGe
 
 inline constexpr FamilyModule RoundStrokeRectBody[] = {&AnalyticClip};
 
-inline constexpr Family RoundStrokeRectFamily = {"RoundStrokeRect", RoundStrokeRectGeometries, 1,
-                                                 RoundStrokeRectBody, 1};
-
 /// The array is the single source of truth for both the table pointer and its count: keeping them
 /// apart is how a family silently drops out of matching (or the count runs past the array) after
 /// a reformat.
+/// The family table is the single definition site: a family exists by appearing here and nowhere
+/// else, so "defined but not registered" cannot happen — adding a row is the only way to add a
+/// family, and the match rules address the rows by position.
 inline constexpr Family FamilyTableStorage[] = {
-    SolidColorFamily,   MaskFillFamily,     TiledTextureFillFamily, QuadColorFamily,
-    RRectFamily,        MeshFamily,         ShapeInstancedFamily,   ComplexRRectFamily,
-    HairlineLineFamily, HairlineQuadFamily, EllipseFamily,          ComplexEllipseFamily,
-    RoundStrokeRectFamily};
+    {"SolidColor", RectGeometries, 1, SolidColorBody, 1},
+    {"MaskFill", RectGeometries, 1, MaskFillBody, 1},
+    {"TiledTextureFill", RectQuadGeometries, 2, TiledTextureFillBody, 1},
+    {"QuadColor", QuadColorGeometries, 1, QuadColorBody, 2},
+    {"RRect", RRectGeometries, 1, RRectBody, 2, RRectVariantAllowed},
+    {"Mesh", MeshGeometries, 1, nullptr, 0},
+    {"ShapeInstanced", ShapeInstancedGeometries, 1, nullptr, 0, ShapeInstancedVariantAllowed},
+    {"ComplexRRect", ComplexRRectGeometries, 1, nullptr, 0},
+    {"HairlineLine", HairlineLineGeometries, 1, nullptr, 0},
+    {"HairlineQuad", HairlineQuadGeometries, 1, nullptr, 0},
+    {"Ellipse", EllipseGeometries, 1, EllipseBody, 2},
+    {"ComplexEllipse", ComplexEllipseGeometries, 1, ComplexEllipseBody, 2},
+    {"RoundStrokeRect", RoundStrokeRectGeometries, 1, RoundStrokeRectBody, 1},
+};
 
 inline const Family* FamilyTable() {
   return FamilyTableStorage;
