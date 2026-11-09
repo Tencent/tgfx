@@ -1,4 +1,4 @@
-// Round-stroke-rect edge coverage, shared by RoundStrokeRectFillShader's AA and non-AA forms (a
+// Round-stroke-rect edge coverage, shared by the RoundStrokeRect family's AA and non-AA forms (a
 // runtime uniform selects between them). The math is verbatim from the family's geometry emission
 // (GLSLRoundStrokeRectGeometryProcessor::emitCode): the normalized offset-space ellipse SDF scales
 // the per-vertex coverage inside the ramp band when AA is on, a hard inside step otherwise. A

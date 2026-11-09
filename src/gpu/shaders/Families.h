@@ -32,6 +32,7 @@
 #include "gpu/shaders/modules/QuadGeometry.h"
 #include "gpu/shaders/modules/RRectGeometry.h"
 #include "gpu/shaders/modules/RectGeometry.h"
+#include "gpu/shaders/modules/RoundStrokeRectGeometry.h"
 #include "gpu/shaders/modules/ShapeInstancedGeometry.h"
 #include "gpu/shaders/modules/TiledTexture.h"
 
@@ -162,13 +163,24 @@ inline constexpr FamilyModule ComplexEllipseBody[] = {&DeviceMask, &AnalyticClip
 inline constexpr Family ComplexEllipseFamily = {"ComplexEllipse", ComplexEllipseGeometries, 1,
                                                 ComplexEllipseBody, 2};
 
+/// The RoundStrokeRect family (the former RoundStrokeRectFillShader): a stroked rounded rect whose
+/// coverage is the normalized-offset ellipse SDF, times the analytic clip. Slot layout: Frame(0),
+/// RoundStrokeRectGeometry(1: UV_MATRIX), AnalyticClip(2), Xfer(3).
+inline constexpr const Module* RoundStrokeRectGeometries[] = {&RoundStrokeRectGeometry};
+
+inline constexpr FamilyModule RoundStrokeRectBody[] = {&AnalyticClip};
+
+inline constexpr Family RoundStrokeRectFamily = {"RoundStrokeRect", RoundStrokeRectGeometries, 1,
+                                                 RoundStrokeRectBody, 1};
+
 /// The array is the single source of truth for both the table pointer and its count: keeping them
 /// apart is how a family silently drops out of matching (or the count runs past the array) after
 /// a reformat.
 inline constexpr Family FamilyTableStorage[] = {
     SolidColorFamily,   MaskFillFamily,     TiledTextureFillFamily, QuadColorFamily,
     RRectFamily,        MeshFamily,         ShapeInstancedFamily,   ComplexRRectFamily,
-    HairlineLineFamily, HairlineQuadFamily, EllipseFamily,          ComplexEllipseFamily};
+    HairlineLineFamily, HairlineQuadFamily, EllipseFamily,          ComplexEllipseFamily,
+    RoundStrokeRectFamily};
 
 inline const Family* FamilyTable() {
   return FamilyTableStorage;

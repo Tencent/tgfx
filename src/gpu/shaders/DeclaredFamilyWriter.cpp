@@ -36,6 +36,7 @@
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
+#include "gpu/processors/RoundStrokeRectGeometryProcessor.h"
 #include "gpu/processors/ShapeInstancedGeometryProcessor.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/ParamBuffer.h"
@@ -54,6 +55,7 @@
 #include "gpu/shaders/modules/QuadGeometry.h"
 #include "gpu/shaders/modules/RRectGeometry.h"
 #include "gpu/shaders/modules/RectGeometry.h"
+#include "gpu/shaders/modules/RoundStrokeRectGeometry.h"
 #include "gpu/shaders/modules/ShapeInstancedGeometry.h"
 #include "gpu/shaders/modules/TiledTexture.h"
 #include "gpu/shaders/modules/Xfer.h"
@@ -233,6 +235,23 @@ void WriteComplexEllipseGeometry(const ProgramInfo& info, const Layout& layout, 
   };
   put("Color", geometry->getCommonColor());
   put("HasCommonColor", static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
+}
+
+// RoundStrokeRectGeometry: the color pair, the AA flag and the analytic clip.
+void WriteRoundStrokeRectGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
+                                  ParamBuffer* buffer) {
+  const auto slice = layout.SliceOf(slot);
+  const auto* geometry =
+      static_cast<const RoundStrokeRectGeometryProcessor*>(info.getGeometryProcessor());
+  auto put = [&](const char* name, auto&& value) {
+    const auto index = layout.FieldIndexInSlice(slice, "RoundStrokeRectGeometry", name);
+    if (index < slice.count) {
+      buffer->set(slice.fields[index], value);
+    }
+  };
+  put("Color", geometry->getCommonColor());
+  put("HasCommonColor", static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
+  put("AAEnabled", static_cast<int32_t>(geometry->getAAType() == AAType::None ? 0 : 1));
 }
 
 // HairlineLineGeometry / HairlineQuadGeometry: the view matrix, the color/coverage/AA triple and
@@ -517,6 +536,8 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
       WriteFrame(info, layout, slot, &buffer);
     } else if (module == &RectGeometry) {
       WriteRectGeometry(info, layout, slot, &buffer);
+    } else if (module == &RoundStrokeRectGeometry) {
+      WriteRoundStrokeRectGeometry(info, layout, slot, &buffer);
     } else if (module == &ComplexEllipseGeometry) {
       WriteComplexEllipseGeometry(info, layout, slot, &buffer);
     } else if (module == &EllipseGeometry) {

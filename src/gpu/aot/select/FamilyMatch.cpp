@@ -324,6 +324,32 @@ bool MatchComplexEllipse(const DrawShape& shape, Variant* variant) {
   return true;
 }
 
+/// The RoundStrokeRect family's rule, carried over from the former RoundStrokeRectFillShader: the
+/// stroked rounded-rect geometry with no fragment processor, or one bare analytic rect/rrect clip,
+/// rejecting perspective uv matrices. UV_MATRIX and HAS_XP flatten in that order, so the ordinal
+/// is UV_MATRIX + 2 * HAS_XP.
+bool MatchRoundStrokeRect(const DrawShape& shape, Variant* variant) {
+  if (shape.geometry.kind != GeometryKind::RoundStrokeRect) {
+    return false;
+  }
+  const bool directClip = shape.colorFPCount == 0 &&
+                          (shape.coverage == Coverage::AARect || shape.coverage == Coverage::RRect);
+  if (shape.fragmentCount != 0 && !directClip) {
+    return false;
+  }
+  if (shape.geometry.hasUVPerspective || shape.xpType() < XP_NONE) {
+    return false;
+  }
+  const uint8_t uvMatrix = shape.geometry.hasUVMatrix ? 1 : 0;
+  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
+  variant->family = 12;
+  variant->geometry = 0;
+  variant->values[0] = uvMatrix;
+  variant->values[1] = hasXp;
+  variant->ordinal = static_cast<uint32_t>(uvMatrix) + 2u * hasXp;
+  return true;
+}
+
 std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape) {
   if (FamilyCount() == 0) {
     return std::nullopt;
@@ -346,6 +372,9 @@ std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape) {
     return result;
   }
   if (MatchShapeInstanced(shape, &result.variant)) {
+    return result;
+  }
+  if (MatchRoundStrokeRect(shape, &result.variant)) {
     return result;
   }
   if (MatchComplexEllipse(shape, &result.variant)) {

@@ -66,7 +66,6 @@
 #include "gpu/shaders/contract/ShaderProfileResolver.h"
 #include "gpu/shaders/kernels/PointwiseChainShader.h"
 #include "gpu/shaders/kernels/QuadTextureFillShader.h"
-#include "gpu/shaders/kernels/RoundStrokeRectFillShader.h"
 #include "gpu/shaders/kernels/ShapeInstancedTextureCoverageShader.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Bitmap.h"
@@ -292,24 +291,15 @@ TGFX_TEST(ShaderPermutationTest, DefineListForZeroValue) {
 }
 
 TGFX_TEST(ShaderPermutationTest, TypedVertDimsDeclaresTheSameDomain) {
-  // The handle declarations replace the old enum-plus-domain-list pair; the domain they build
-  // is byte-for-byte the bool domain the family always had.
-  using VD = RoundStrokeRectFillShader::VD;
-  auto domain = VD::domain();
-  EXPECT_EQ(domain.dimensionCount(), 1u);
-  EXPECT_EQ(domain.totalCount(), 2u);
-  EXPECT_EQ(domain.defineListFor(1)[0], "HAS_UV_MATRIX=1");
-
-  // The handle declaration is equivalent to the historical bool-names domain.
-  auto handDomain = PermutationDomain::FromBoolNames("HAS_UV_MATRIX");
-  EXPECT_EQ(handDomain.totalCount(), domain.totalCount());
-  EXPECT_EQ(handDomain.dimensionCount(), domain.dimensionCount());
-
-  // Verify encode/decode match between the two.
-  for (uint32_t i = 0; i < domain.totalCount(); i++) {
-    auto v = domain.decode(i);
-    EXPECT_EQ(handDomain.encode(v), i);
-  }
+  // A declared family's domain is built from the module declarations; the RoundStrokeRect family
+  // carries the geometry's UV_MATRIX radix (2) and the Xfer HAS_XP radix (3), and the flattened
+  // ordinal is UV_MATRIX + 2 * HAS_XP.
+  const auto* family = ShaderRegistry::Find("RoundStrokeRect");
+  ASSERT_NE(family, nullptr);
+  const auto& domain = family->vertDomain;
+  EXPECT_EQ(domain.dimensionCount(), 2u);
+  EXPECT_EQ(domain.totalCount(), 6u);
+  EXPECT_EQ(domain.defineListFor(1)[0], "RoundStrokeRectGeometry_UV_MATRIX=1");
 }
 
 TGFX_TEST(ShaderPermutationTest, ShaderRegistry) {
