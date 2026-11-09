@@ -24,11 +24,13 @@
 #include "gpu/aot/select/FamilyMatch.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "gpu/processors/MeshGeometryProcessor.h"
 #include "gpu/processors/NonAARRectGeometryProcessor.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/processors/RRectEffect.h"
 #include "gpu/processors/RectEffect.h"
+#include "gpu/processors/ShapeInstancedGeometryProcessor.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/ParamBuffer.h"
 #include "gpu/shaders/contract/DrawFacts.h"
@@ -36,10 +38,12 @@
 #include "gpu/shaders/modules/DeviceMask.h"
 #include "gpu/shaders/modules/Frame.h"
 #include "gpu/shaders/modules/MaskTexture.h"
+#include "gpu/shaders/modules/MeshGeometry.h"
 #include "gpu/shaders/modules/QuadColorGeometry.h"
 #include "gpu/shaders/modules/QuadGeometry.h"
 #include "gpu/shaders/modules/RRectGeometry.h"
 #include "gpu/shaders/modules/RectGeometry.h"
+#include "gpu/shaders/modules/ShapeInstancedGeometry.h"
 #include "gpu/shaders/modules/TiledTexture.h"
 #include "gpu/shaders/modules/Xfer.h"
 
@@ -93,6 +97,37 @@ void WriteQuadGeometry(const ProgramInfo& info, const Layout& layout, uint8_t sl
       static_cast<const QuadPerEdgeAAGeometryProcessor*>(info.getGeometryProcessor());
   buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "QuadGeometry", "Color")],
               geometry->getCommonColor());
+}
+
+void WriteCoordMatrix(const ProgramInfo& info, const Layout& layout, const char* moduleName,
+                      uint8_t slot, ParamBuffer* buffer);
+
+// MeshGeometry: the view transform, the color pair and the texture coordinate chain.
+void WriteMeshGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
+                       ParamBuffer* buffer) {
+  const auto slice = layout.SliceOf(slot);
+  const auto* geometry = static_cast<const MeshGeometryProcessor*>(info.getGeometryProcessor());
+  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "MeshGeometry", "Matrix")],
+              geometry->getViewMatrix());
+  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "MeshGeometry", "Color")],
+              geometry->getCommonColor());
+  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "MeshGeometry", "HasCommonColor")],
+              static_cast<int32_t>(geometry->getHasColors() ? 0 : 1));
+  WriteCoordMatrix(info, layout, "MeshGeometry", slot, buffer);
+}
+
+// ShapeInstancedGeometry: the local-coordinate recovery, the view transform and the sampling
+// chain. The instance offset and the instance color ride the vertex attributes.
+void WriteShapeInstancedGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
+                                 ParamBuffer* buffer) {
+  const auto slice = layout.SliceOf(slot);
+  const auto* geometry =
+      static_cast<const ShapeInstancedGeometryProcessor*>(info.getGeometryProcessor());
+  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "ShapeInstancedGeometry", "UVMatrix")],
+              geometry->getUVMatrix());
+  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "ShapeInstancedGeometry", "ViewMatrix")],
+              geometry->getViewMatrix());
+  WriteCoordMatrix(info, layout, "ShapeInstancedGeometry", slot, buffer);
 }
 
 // QuadColorGeometry (the QuadPerEdgeAA geometry with the per-vertex color): the exact paint color
@@ -381,6 +416,10 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
       WriteFrame(info, layout, slot, &buffer);
     } else if (module == &RectGeometry) {
       WriteRectGeometry(info, layout, slot, &buffer);
+    } else if (module == &MeshGeometry) {
+      WriteMeshGeometry(info, layout, slot, &buffer);
+    } else if (module == &ShapeInstancedGeometry) {
+      WriteShapeInstancedGeometry(info, layout, slot, &buffer);
     } else if (module == &QuadColorGeometry) {
       WriteQuadColorGeometry(info, layout, slot, &buffer);
     } else if (module == &QuadGeometry) {

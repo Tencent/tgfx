@@ -34,6 +34,16 @@ class ShapeInstancedGeometryProcessor : public GeometryProcessor {
     return "ShapeInstancedGeometryProcessor";
   }
 
+  /// The transform that recovers the shape's local coordinates from the path-triangle positions.
+  const Matrix& getUVMatrix() const {
+    return uvMatrix;
+  }
+
+  /// The view transform the vertex stage applies before the instance offset.
+  const Matrix& getViewMatrix() const {
+    return viewMatrix;
+  }
+
   bool getHasColors() const {
     return hasColors;
   }

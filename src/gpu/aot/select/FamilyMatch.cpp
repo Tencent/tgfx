@@ -206,6 +206,40 @@ bool MatchRRect(const DrawShape& shape, Variant* variant, const AOTTextureParame
 }
 
 }  // namespace
+/// The Mesh family's rule, carried over from the former MeshFillShader: the mesh geometry with no
+/// fragment processor and any xfer. The flattened dims are the geometry's TEX_COORDS then the
+/// Xfer's HAS_XP, so the ordinal is TEX_COORDS + 2 * HAS_XP.
+bool MatchMesh(const DrawShape& shape, Variant* variant) {
+  if (shape.geometry.kind != GeometryKind::Mesh || shape.fragmentCount != 0 ||
+      shape.xpType() < XP_NONE) {
+    return false;
+  }
+  const uint8_t texCoords = shape.geometry.hasTexCoords ? 1 : 0;
+  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
+  variant->family = 5;
+  variant->geometry = 0;
+  variant->values[0] = texCoords;
+  variant->values[1] = hasXp;
+  variant->ordinal = static_cast<uint32_t>(texCoords) + 2u * hasXp;
+  return true;
+}
+
+/// The ShapeInstanced family's rule, carried over from the former ShapeInstancedFillShader: the
+/// instanced path-triangle geometry with no fragment processor and any xfer. VERTEX_COLOR is
+/// always 0 (the reserved stride slot is never read), so the ordinal is HAS_XP alone.
+bool MatchShapeInstanced(const DrawShape& shape, Variant* variant) {
+  if (shape.geometry.kind != GeometryKind::ShapeInstanced || shape.fragmentCount != 0 ||
+      shape.xpType() < XP_NONE) {
+    return false;
+  }
+  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
+  variant->family = 6;
+  variant->geometry = 0;
+  variant->values[0] = 0;
+  variant->values[1] = hasXp;
+  variant->ordinal = static_cast<uint32_t>(hasXp);
+  return true;
+}
 
 std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape) {
   if (FamilyCount() == 0) {
@@ -223,6 +257,12 @@ std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape) {
     return result;
   }
   if (MatchQuadColor(shape, &result.variant)) {
+    return result;
+  }
+  if (MatchMesh(shape, &result.variant)) {
+    return result;
+  }
+  if (MatchShapeInstanced(shape, &result.variant)) {
     return result;
   }
   if (MatchRRect(shape, &result.variant, &result.tiledLeaf)) {

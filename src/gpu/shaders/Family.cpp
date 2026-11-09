@@ -136,6 +136,12 @@ bool RRectVariantAllowed(const Variant& variant, const Family& family) {
   return !(present != 0 && stroke != 0);
 }
 
+/// The ShapeInstanced family's product rule: VERTEX_COLOR only reserves the geometry's
+/// stride-filler color slot, so the variant where it is present is never a real program.
+bool ShapeInstancedVariantAllowed(const Variant& variant, const Family&) {
+  return variant.values[0] == 0;
+}
+
 std::vector<Variant> EnumerateVariants(const Family& family, uint16_t familyIndex) {
   std::vector<Variant> variants;
   std::vector<FreeDim> freeDims;

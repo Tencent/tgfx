@@ -67,7 +67,6 @@
 #include "gpu/shaders/kernels/PointwiseChainShader.h"
 #include "gpu/shaders/kernels/QuadTextureFillShader.h"
 #include "gpu/shaders/kernels/RoundStrokeRectFillShader.h"
-#include "gpu/shaders/kernels/ShapeInstancedFillShader.h"
 #include "gpu/shaders/kernels/ShapeInstancedTextureCoverageShader.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Bitmap.h"

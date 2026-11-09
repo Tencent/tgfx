@@ -22,10 +22,12 @@
 #include "gpu/shaders/modules/AnalyticClip.h"
 #include "gpu/shaders/modules/DeviceMask.h"
 #include "gpu/shaders/modules/MaskTexture.h"
+#include "gpu/shaders/modules/MeshGeometry.h"
 #include "gpu/shaders/modules/QuadColorGeometry.h"
 #include "gpu/shaders/modules/QuadGeometry.h"
 #include "gpu/shaders/modules/RRectGeometry.h"
 #include "gpu/shaders/modules/RectGeometry.h"
+#include "gpu/shaders/modules/ShapeInstancedGeometry.h"
 #include "gpu/shaders/modules/TiledTexture.h"
 
 namespace tgfx {
@@ -89,16 +91,41 @@ bool RRectVariantAllowed(const Variant& variant, const Family& family);
 inline constexpr Family RRectFamily = {"RRect", RRectGeometries,    1, RRectBody,
                                        2,       RRectVariantAllowed};
 
+/// The Mesh family (the former MeshFillShader): the triangle mesh with no fragment processor. The
+/// top-level color comes from the per-vertex varying or the exact Color uniform; the family carried
+/// no clip step in the old declaration, so the body stays empty. Slot layout: Frame(0),
+/// MeshGeometry(1: TEX_COORDS), Xfer(2).
+inline constexpr const Module* MeshGeometries[] = {&MeshGeometry};
+
+inline constexpr Family MeshFamily = {"Mesh", MeshGeometries, 1, nullptr, 0};
+
+/// The ShapeInstanced family (the former ShapeInstancedFillShader): the instanced path triangles
+/// with no fragment processor. VERTEX_COLOR reserves the geometry's stride-filler color slot and
+/// is filtered out of the enumeration, so the instance attributes keep their physical slots.
+/// Slot layout: Frame(0), ShapeInstancedGeometry(1), Xfer(2).
+inline constexpr const Module* ShapeInstancedGeometries[] = {&ShapeInstancedGeometry};
+
+/// Slot layout: Frame(0), ShapeInstancedGeometry(1), Xfer(2).
+bool ShapeInstancedVariantAllowed(const Variant& variant, const Family& family);
+
+inline constexpr Family ShapeInstancedFamily = {
+    "ShapeInstanced", ShapeInstancedGeometries, 1, nullptr, 0, ShapeInstancedVariantAllowed};
+
 /// The family table, in match priority order. The declaration-driven families are checked before
 /// the legacy kernel table; among themselves the dedicated rules are disjoint.
+/// The array is the single source of truth for both the table pointer and its count: keeping them
+/// apart is how a family silently drops out of matching (or the count runs past the array) after
+/// a reformat.
+inline constexpr Family FamilyTableStorage[] = {
+    SolidColorFamily, MaskFillFamily, TiledTextureFillFamily, QuadColorFamily,
+    RRectFamily,      MeshFamily,     ShapeInstancedFamily};
+
 inline const Family* FamilyTable() {
-  static const Family families[] = {SolidColorFamily, MaskFillFamily, TiledTextureFillFamily,
-                                    QuadColorFamily, RRectFamily};
-  return families;
+  return FamilyTableStorage;
 }
 
 inline constexpr size_t FamilyTableCount() {
-  return 5;
+  return sizeof(FamilyTableStorage) / sizeof(FamilyTableStorage[0]);
 }
 
 }  // namespace tgfx

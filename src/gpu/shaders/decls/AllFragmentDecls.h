@@ -24,11 +24,9 @@
 #include "gpu/shaders/decls/EllipseFillDecl.h"
 #include "gpu/shaders/decls/HairlineLineFillDecl.h"
 #include "gpu/shaders/decls/HairlineQuadFillDecl.h"
-#include "gpu/shaders/decls/MeshFillDecl.h"
 #include "gpu/shaders/decls/PointwiseChainDecl.h"
 #include "gpu/shaders/decls/QuadTextureFillDecl.h"
 #include "gpu/shaders/decls/RoundStrokeRectFillDecl.h"
-#include "gpu/shaders/decls/ShapeInstancedFillDecl.h"
 
 namespace tgfx {
 
@@ -37,16 +35,11 @@ namespace tgfx {
 /// declaration joins by being added here; the family's shell (kernels/*.h) stays the registry
 /// entry, and the two agree on the family name (pinned by a static_assert in every shell).
 inline const std::vector<const FragmentFamilyDecl*>& AllFragmentDecls() {
-  static const std::vector<const FragmentFamilyDecl*> decls = {&EllipseFillDecl::Decl,
-                                                               &QuadTextureFillDecl::Decl,
-                                                               &HairlineLineFillDecl::Decl,
-                                                               &HairlineQuadFillDecl::Decl,
-                                                               &MeshFillDecl::Decl,
-                                                               &ComplexEllipseFillDecl::Decl,
-                                                               &ComplexNonAARRectFillDecl::Decl,
-                                                               &RoundStrokeRectFillDecl::Decl,
-                                                               &ShapeInstancedFillDecl::Decl,
-                                                               &PointwiseChainDecl::Decl};
+  static const std::vector<const FragmentFamilyDecl*> decls = {
+      &EllipseFillDecl::Decl,         &QuadTextureFillDecl::Decl,
+      &HairlineLineFillDecl::Decl,    &HairlineQuadFillDecl::Decl,
+      &ComplexEllipseFillDecl::Decl,  &ComplexNonAARRectFillDecl::Decl,
+      &RoundStrokeRectFillDecl::Decl, &PointwiseChainDecl::Decl};
   return decls;
 }
 

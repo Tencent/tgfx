@@ -45,6 +45,16 @@ class MeshGeometryProcessor : public GeometryProcessor {
     return hasColors;
   }
 
+  /// The exact paint color for meshes without per-vertex colors.
+  PMColor getCommonColor() const {
+    return commonColor;
+  }
+
+  /// The view transform the vertex stage applies to the position.
+  const Matrix& getViewMatrix() const {
+    return viewMatrix;
+  }
+
   bool getHasCoverage() const {
     return hasCoverage;
   }
