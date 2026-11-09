@@ -25,6 +25,7 @@
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/aot/select/FamilyMatch.h"
+#include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "gpu/processors/ComplexEllipseGeometryProcessor.h"
 #include "gpu/processors/ComplexNonAARRectGeometryProcessor.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
@@ -45,6 +46,7 @@
 #include "gpu/shaders/ParamBuffer.h"
 #include "gpu/shaders/contract/DrawFacts.h"
 #include "gpu/shaders/modules/AnalyticClip.h"
+#include "gpu/shaders/modules/AtlasTextGeometry.h"
 #include "gpu/shaders/modules/ComplexEllipseGeometry.h"
 #include "gpu/shaders/modules/ComplexRRectGeometry.h"
 #include "gpu/shaders/modules/DeviceMask.h"
@@ -207,6 +209,30 @@ void WriteTextureLeafParams(const AOTTextureParameters& leaf, const Layout& layo
   }
   put("AlphaOnly", static_cast<int32_t>(leaf.isAlphaOnly ? 1 : 0));
   put("HasRgbaaa", static_cast<int32_t>(leaf.hasRGBAAA ? 1 : 0));
+}
+
+// AtlasTextGeometry: the atlas size scale, the color pair and the AlphaOnly switch. The atlas
+// sample supplies the coverage itself, so the geometry needs no transform.
+void WriteAtlasTextGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
+                            ParamBuffer* buffer) {
+  const auto slice = layout.SliceOf(slot);
+  const auto* geometry =
+      static_cast<const AtlasTextGeometryProcessor*>(info.getGeometryProcessor());
+  auto put = [&](const char* name, auto&& value) {
+    const auto index = layout.FieldIndexInSlice(slice, "AtlasTextGeometry", name);
+    if (index < slice.count) {
+      buffer->set(slice.fields[index], value);
+    }
+  };
+  const auto& proxy = geometry->getTextureProxy();
+  auto view = proxy != nullptr ? proxy->getTextureView() : nullptr;
+  if (view != nullptr && view->getTexture() != nullptr) {
+    const auto scale = view->getTextureCoord(1.f, 1.f);
+    put("AtlasSizeInv", std::array<float, 2>{scale.x, scale.y});
+  }
+  put("Color", geometry->getCommonColor());
+  put("HasCommonColor", static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
+  put("AlphaOnly", static_cast<int32_t>(geometry->isAlphaOnly() ? 1 : 0));
 }
 
 // QuadTextureGeometry: the paint color the texture source multiplies by.
@@ -780,6 +806,8 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
       WriteQuadGeometry(info, layout, slot, &buffer);
     } else if (module == &RRectGeometry) {
       WriteRRectGeometry(info, layout, slot, &buffer);
+    } else if (module == &AtlasTextGeometry) {
+      WriteAtlasTextGeometry(info, layout, slot, &buffer);
     } else if (module == &QuadTextureGeometry) {
       WriteQuadTextureGeometry(info, layout, slot, &buffer);
     } else if (module == &Texture) {

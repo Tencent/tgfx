@@ -20,6 +20,7 @@
 
 #include "gpu/shaders/Family.h"
 #include "gpu/shaders/modules/AnalyticClip.h"
+#include "gpu/shaders/modules/AtlasTextGeometry.h"
 #include "gpu/shaders/modules/ComplexEllipseGeometry.h"
 #include "gpu/shaders/modules/ComplexRRectGeometry.h"
 #include "gpu/shaders/modules/DeviceMask.h"
@@ -175,6 +176,14 @@ bool YUVTextureVariantAllowed(const Variant& variant, const Family& family);
 inline constexpr Family YUVTextureFamily = {
     "YUVTexture", QuadTextureGeometries, 1, YUVTextureBody, 2, YUVTextureVariantAllowed};
 
+/// The AtlasText family (the former AtlasTextFillShader): the glyph quad with the runtime device
+/// mask and the analytic clip. HAS_COVERAGE selects whether the geometry carries the per-vertex
+/// coverage channel. Slot layout: Frame(0), AtlasTextGeometry(1: HAS_COVERAGE),
+/// DeviceMaskRuntime(2), AnalyticClip(3), Xfer(4).
+inline constexpr const Module* AtlasTextGeometries[] = {&AtlasTextGeometry};
+
+inline constexpr FamilyModule AtlasTextBody[] = {&DeviceMaskRuntime, &AnalyticClip};
+
 /// The family table is the single definition site: a family exists by appearing here and nowhere
 /// else, so "defined but not registered" cannot happen — adding a row is the only way to add a
 /// family, and the match rules address the rows by position.
@@ -194,6 +203,7 @@ inline constexpr Family FamilyTableStorage[] = {
     {"RoundStrokeRect", RoundStrokeRectGeometries, 1, RoundStrokeRectBody, 1},
     {"QuadTexture", QuadTextureGeometries, 1, QuadTextureBody, 4, QuadTextureVariantAllowed},
     {"YUVTexture", QuadTextureGeometries, 1, YUVTextureBody, 2, YUVTextureVariantAllowed},
+    {"AtlasText", AtlasTextGeometries, 1, AtlasTextBody, 2},
 };
 
 inline const Family* FamilyTable() {

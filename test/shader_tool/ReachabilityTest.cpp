@@ -58,7 +58,7 @@ TEST(FamilyRegistryTest, EveryFamilyIsRegisteredOnceWithItsOwnFiles) {
   // QuadColorFillShader, MeshFillShader, ShapeInstancedFillShader and
   // ComplexNonAARRectFillShader (the declaration-driven
   // families join Find/Enumerate without a shell, see ShaderPermutationTest).
-  EXPECT_EQ(families.size(), 8u);
+  EXPECT_EQ(families.size(), 7u);
   std::set<std::string> names;
   for (const auto& info : families) {
     EXPECT_TRUE(names.insert(info.name).second) << "duplicate family " << info.name;

@@ -47,6 +47,11 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
     return samplerState;
   }
 
+  /// The exact paint color for glyph draws that carry a common color.
+  PMColor getCommonColor() const {
+    return commonColor.value_or(PMColor());
+  }
+
   bool hasCommonColor() const {
     return commonColor.has_value();
   }

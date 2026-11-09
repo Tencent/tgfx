@@ -447,6 +447,35 @@ bool MatchYUVTexture(const DrawShape& shape, Variant* variant,
   return true;
 }
 
+/// The AtlasText family's rule, carried over from the former AtlasTextFillShader: the atlas
+/// geometry kind is the contract — no color processors, at most one coverage processor (a bare
+/// analytic clip or an alpha-only affine device mask), and any xfer. HAS_COVERAGE and HAS_XP
+/// flatten in that order, so the ordinal is HAS_COVERAGE + 2 * HAS_XP.
+bool MatchAtlasText(const DrawShape& shape, Variant* variant) {
+  if (shape.geometry.kind != GeometryKind::AtlasText || shape.colorFPCount != 0 ||
+      shape.fragmentCount > 1 || shape.xpType() < XP_NONE) {
+    return false;
+  }
+  if (shape.fragmentCount == 1) {
+    const bool directClip =
+        *shape.coverage == Coverage::AARect || *shape.coverage == Coverage::RRect;
+    if (!directClip) {
+      const auto* mask = DeviceMaskCoverageLeaf(shape.ir);
+      if (mask == nullptr || !mask->isAlphaOnly || mask->hasPerspective) {
+        return false;
+      }
+    }
+  }
+  const uint8_t hasCoverage = shape.geometry.hasCoverage ? 1 : 0;
+  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
+  variant->family = 15;
+  variant->geometry = 0;
+  variant->values[0] = hasCoverage;
+  variant->values[1] = hasXp;
+  variant->ordinal = static_cast<uint32_t>(hasCoverage) + 2u * hasXp;
+  return true;
+}
+
 std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape) {
   if (FamilyCount() == 0) {
     return std::nullopt;
@@ -469,6 +498,9 @@ std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape) {
     return result;
   }
   if (MatchShapeInstanced(shape, &result.variant)) {
+    return result;
+  }
+  if (MatchAtlasText(shape, &result.variant)) {
     return result;
   }
   if (MatchQuadTexture(shape, &result.variant, &result.tiledLeaf)) {

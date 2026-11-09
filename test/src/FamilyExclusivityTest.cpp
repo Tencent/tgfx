@@ -35,6 +35,7 @@
 #include <set>
 #include <vector>
 #include "base/TGFXTest.h"
+#include "gpu/aot/select/FamilyMatch.h"
 #include "gpu/aot/select/PermutationMatch.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
 #include "gpu/shaders/AllShaderFamilies.h"
@@ -73,6 +74,9 @@ int CountAcceptingFamilies(const DrawShape& shape, const char** first, const cha
 
 TGFX_TEST(FamilyExclusivityTest, DedicatedFamiliesArePairwiseExclusiveOverTheFieldSpace) {
   std::vector<const char*> dedicated;
+  // The declared table routes the basic field space now that the dedicated families are migrating;
+  // it must stay non-degenerate even when no legacy family claims a shape.
+  long long declaredAccepted = 0;
 #define TGFX_COLLECT_DEDICATED(F)                   \
   if constexpr (FamilyJoinsKernelTable<F>::value) { \
     dedicated.push_back(F::Name);                   \
@@ -126,6 +130,9 @@ TGFX_TEST(FamilyExclusivityTest, DedicatedFamiliesArePairwiseExclusiveOverTheFie
                 if (count == 1) {
                   everAccepted.insert(first);
                 }
+                if (MatchAssembledFamily(shape).has_value()) {
+                  ++declaredAccepted;
+                }
                 if (count > 1) {
                   EXPECT_LE(count, 1)
                       << first << " and " << second
@@ -142,8 +149,10 @@ TGFX_TEST(FamilyExclusivityTest, DedicatedFamiliesArePairwiseExclusiveOverTheFie
       }
     }
   }
-  // The space is non-degenerate: the field layer alone routes a meaningful subset of shapes.
-  EXPECT_GT(static_cast<long long>(everAccepted.size()), 0LL);
+  // The space is non-degenerate: the declared table alone routes a meaningful subset of shapes
+  // (the legacy families left are the specialized blur/glass ones, which this basic space does
+  // not reach).
+  EXPECT_GT(declaredAccepted, 0LL);
   EXPECT_GT(checked, 0LL);
 }
 
