@@ -44,17 +44,20 @@ inline constexpr FamilyModule MaskFillBody[] = {&MaskTexture};
 
 inline constexpr Family MaskFillFamily = {"MaskFill", RectGeometries, 1, MaskFillBody, 1};
 
-/// The TiledTextureFill family (the former TiledTextureFillShader): a DefaultGP rect filled with a
-/// nine-mode tiled texture. The quad geometry stays with the legacy QuadTextureFillShader, which
-/// the old table consulted first for QuadPerEdgeAA draws; the quad form migrates with that family.
-/// FULL is pinned to 1 (the full nine-mode recipe), PRESENT to 1 (the texture is the family's
-/// color source). Slot layout: Frame(0), RectGeometry(1), TiledTexture(2: FULL pinned, PRESENT
-/// pinned), Xfer(3).
+/// The TiledTextureFill family (the former TiledTextureFillShader): a rect or quad filled with a
+/// nine-mode tiled texture. The legacy QuadTextureFillShader still wins the Plain-leaf Quad draws
+/// it accepts (the legacy dedicated table runs first); the declared family serves the DefaultGP
+/// form and the Quad draws with a Tiled leaf, which the legacy family never accepted. FULL is
+/// pinned to 1 (the full nine-mode recipe), PRESENT to 1 (the texture is the family's color
+/// source). Slot layout: Frame(0), geometry(1), TiledTexture(2: FULL pinned, PRESENT pinned),
+/// Xfer(3).
+inline constexpr const Module* RectQuadGeometries[] = {&RectGeometry, &QuadGeometry};
+
 inline constexpr int8_t TiledTextureFillPins[] = {1, 1};
 
 inline constexpr FamilyModule TiledTextureFillBody[] = {{&TiledTexture, TiledTextureFillPins}};
 
-inline constexpr Family TiledTextureFillFamily = {"TiledTextureFill", RectGeometries, 1,
+inline constexpr Family TiledTextureFillFamily = {"TiledTextureFill", RectQuadGeometries, 2,
                                                   TiledTextureFillBody, 1};
 
 /// The RRect family (the former NonAARRectFillShader): a non-AA rounded rect, optionally filled

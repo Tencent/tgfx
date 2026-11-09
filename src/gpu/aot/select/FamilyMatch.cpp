@@ -80,13 +80,14 @@ bool MatchMaskFill(const DrawShape& shape, Variant* variant, const AOTTexturePar
 }
 
 /// The TiledTextureFill family's rule, carried over from the former TiledTextureFillShader: a
-/// DefaultGP rect whose sole color processor is the IR's tiled texture leaf (no operators above
-/// it). QuadPerEdgeAA stays with the legacy QuadTextureFillShader (the old table consulted it
-/// first); the quad form migrates with that family. FULL and PRESENT are pinned to 1, so the
-/// ordinal is HAS_XP alone.
+/// position-only rect or quad whose sole color processor is the IR's tiled texture leaf (no
+/// operators above it). The legacy QuadTextureFillShader still wins the Plain-leaf Quad draws it
+/// accepts (the legacy dedicated table runs first); this family serves the DefaultGP form and the
+/// Quad draws with a Tiled leaf. FULL and PRESENT are pinned to 1, so the flattened dim order
+/// stays [FULL=1, PRESENT=1, HAS_XP] and the ordinal is geometry + 2 * HAS_XP.
 bool MatchTiledTextureFill(const DrawShape& shape, Variant* variant,
                            const AOTTextureParameters** leafOut) {
-  if (shape.geometry.kind != GeometryKind::Default) {
+  if (!shape.positionOnlyRect()) {
     return false;
   }
   if (shape.fragmentCount != 1 || shape.xpType() < XP_NONE || shape.ir == nullptr) {
@@ -105,11 +106,16 @@ bool MatchTiledTextureFill(const DrawShape& shape, Variant* variant,
       !TiledFillModeSupported(static_cast<int>(leaf->tiledRecipe->shaderModeY))) {
     return false;
   }
+  const uint8_t geometry = shape.geometry.kind == GeometryKind::Default ? 0 : 1;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
   variant->family = 2;
-  variant->geometry = 0;
-  variant->values[0] = hasXp;
-  variant->ordinal = static_cast<uint32_t>(hasXp);
+  variant->geometry = geometry;
+  // The pinned dims carry their fixed values, exactly as EnumerateVariants spells them; leaving
+  // them at zero would make PRESENT read as "module absent" and skip every tiled uniform.
+  variant->values[0] = 1;
+  variant->values[1] = 1;
+  variant->values[2] = hasXp;
+  variant->ordinal = static_cast<uint32_t>(geometry) + 2u * hasXp;
   *leafOut = leaf;
   return true;
 }

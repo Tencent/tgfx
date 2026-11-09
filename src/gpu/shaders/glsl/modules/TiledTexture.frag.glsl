@@ -1,6 +1,35 @@
-// TiledTexture fragment hook: the single-tap tiled sample modulated by the input color's alpha.
-// The expressions are verbatim from the former fill_fragment_main.inc step FILL_SOURCE_TILED; the
-// alias defines below map the shared tiled_sample.inc contract onto this module's field names.
+// TiledTexture fragment hook. FULL = 0 is the single-tap recipe of the former
+// fill_fragment_main.inc step FILL_SOURCE_TILED; FULL = 1 is the full nine-mode recipe of the
+// former kernels/tiled_texture_fill.frag (FILL_SOURCE_TILED_FULL), including the mipmap-repeat
+// 4-tap seam blend and the runtime read swizzle. Both aliases sets map the shared
+// tiled_sample.inc / tiled_full_sample.inc contract onto this module's field names.
+#if TiledTexture_FULL
+#define ShaderModeX TiledTexture_ShaderModeX
+#define ShaderModeY TiledTexture_ShaderModeY
+#define Subset TiledTexture_Subset
+#define Clamp TiledTexture_Clamp
+#define Dimension TiledTexture_Dimension
+#define AlphaOnly TiledTexture_AlphaOnly
+#define Strict TiledTexture_Strict
+#define ReadSwizzle TiledTexture_ReadSwizzle
+#define TextureSampler_0 TiledTexture_Sampler
+#include "source/tiled_sample.inc"
+#include "source/texture_read_swizzle.inc"
+#include "source/tiled_full_sample.inc"
+#undef ShaderModeX
+#undef ShaderModeY
+#undef Subset
+#undef Clamp
+#undef Dimension
+#undef AlphaOnly
+#undef Strict
+#undef ReadSwizzle
+#undef TextureSampler_0
+
+void TiledTexture_fragment(inout Fragment f) {
+  f.color = aotTiledFullSample(TiledTexture_vCoord, f.color);
+}
+#else
 #define ShaderModeX TiledTexture_ShaderModeX
 #define ShaderModeY TiledTexture_ShaderModeY
 #define Subset TiledTexture_Subset
@@ -29,3 +58,4 @@ void TiledTexture_fragment(inout Fragment f) {
     f.color = texColor * f.color.a;
   }
 }
+#endif

@@ -40,7 +40,10 @@ inline constexpr Element XferElements[] = {
     // The render-target write swizzle: 1 for ALPHA_8 targets (AAAA), 0 (a no-op) otherwise. It
     // stays unconditional because the HAS_XP == 0 path writes the composed color too.
     {Element::Kind::Param, ShaderType::Int, "OutputAlphaSwizzle"},
-    {Element::Kind::Texture, ShaderType::Float4, "DstTextureSampler", 1, 0},
+    // Only the dst-texture dialect declares the sampler: the framebuffer-fetch dialect reads the
+    // destination through the subpass input, and a declared-but-unbound sampler would shift every
+    // later texture binding at runtime.
+    {Element::Kind::Texture, ShaderType::Float4, "DstTextureSampler", 1, 0, 1},
 };
 
 inline constexpr Module Xfer = {"Xfer", XferDims, 1, XferElements, 5, false, true};

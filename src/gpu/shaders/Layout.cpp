@@ -41,7 +41,8 @@ bool ElementPresent(const Element& element, uint8_t dimBase, const Variant& vari
   if (element.when < 0) {
     return true;
   }
-  return variant.values[dimBase + static_cast<uint8_t>(element.when)] != 0;
+  const uint8_t value = variant.values[dimBase + static_cast<uint8_t>(element.when)];
+  return element.whenValue >= 0 ? value == static_cast<uint8_t>(element.whenValue) : value != 0;
 }
 
 }  // namespace

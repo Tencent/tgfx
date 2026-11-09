@@ -134,10 +134,9 @@ TEST(LayoutTest, FramebufferFetchKeepsTheUnusedDstCoordFields) {
   EXPECT_EQ(xfer.names[1], "DstTextureCoordScale");
   EXPECT_EQ(xfer.names[2], "XPBlendMode");
   EXPECT_EQ(xfer.names[3], "OutputAlphaSwizzle");
-  // The dst sampler stays declared under the fetch dialect too (the shader never reads it; the
-  // runtime binds the shared dummy texture), so one `when` rule covers the three fields.
-  ASSERT_EQ(layout.textures.size(), 1u);
-  EXPECT_EQ(layout.textures[0].name, "DstTextureSampler");
+  // The fetch dialect reads the destination through the subpass input, so it declares no dst
+  // sampler at all: a declared-but-unbound sampler would shift every later texture binding.
+  EXPECT_TRUE(layout.textures.empty());
 }
 
 TEST(LayoutTest, DomainViewMatchesTheOrdinal) {

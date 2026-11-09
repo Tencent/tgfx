@@ -378,7 +378,8 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
   const std::set<std::pair<uint32_t, uint32_t>> solidColorPairs = {{0, 0}, {1, 1}, {2, 2}};
   EXPECT_EQ(*EnumerateReachablePermutations("SolidColor"), solidColorPairs);
   EXPECT_EQ(*EnumerateReachablePermutations("MaskFill"), solidColorPairs);
-  const std::set<std::pair<uint32_t, uint32_t>> tiledFillPairs = {{0, 0}, {1, 1}, {2, 2}};
+  const std::set<std::pair<uint32_t, uint32_t>> tiledFillPairs = {{0, 0}, {1, 1}, {2, 2},
+                                                                  {3, 3}, {4, 4}, {5, 5}};
   EXPECT_EQ(*EnumerateReachablePermutations("TiledTextureFill"), tiledFillPairs);
   const std::set<std::pair<uint32_t, uint32_t>> shapeCoveragePairs = {{0, 0}, {1, 1}};
   EXPECT_EQ(*EnumerateReachablePermutations("ShapeInstancedTextureCoverageShader"),
@@ -2133,7 +2134,7 @@ TGFX_TEST(ShaderPermutationTest, MaskFillHitsPrecompiledCache) {
   context->flushAndSubmit(true);
   bool hitMaskFill = false;
   for (const auto& record : cache->hitRecords()) {
-    if (record.shaderName == "MaskFillShader") {
+    if (record.shaderName == "MaskFill") {
       hitMaskFill = true;
       break;
     }
@@ -2521,7 +2522,7 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectCoverageMatchesFiveLevel1Families) 
       }
       ProgramInfo programInfo(renderTarget.get(), gp.get(), {clip.get()}, 0, xp.get(),
                               BlendMode::SrcOver);
-      ExpectDirectAARectMatch(&programInfo, "SolidColorFillShader");
+      ExpectDirectAARectMatch(&programInfo, "SolidColor");
     }
     {
       BlockAllocator allocator;

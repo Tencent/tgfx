@@ -120,9 +120,14 @@ inline std::map<std::string, UniformFormat> BuildParamFormatTable(
         const uint8_t dimBase = DimOffsetOf(family, variant, slot);
         for (uint8_t index = 0; index < module->elementCount; ++index) {
           const Element& element = module->elements[index];
-          if (element.when >= 0 &&
-              variant.values[dimBase + static_cast<uint8_t>(element.when)] == 0) {
-            continue;
+          if (element.when >= 0) {
+            const uint8_t value = variant.values[dimBase + static_cast<uint8_t>(element.when)];
+            const bool present = element.whenValue >= 0
+                                     ? value == static_cast<uint8_t>(element.whenValue)
+                                     : value != 0;
+            if (!present) {
+              continue;
+            }
           }
           if (element.kind != Element::Kind::Param && element.kind != Element::Kind::VertexParam) {
             continue;

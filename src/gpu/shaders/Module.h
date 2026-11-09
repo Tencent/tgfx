@@ -60,8 +60,11 @@ struct Element {
   /// Array length (std140 rounds each element up to 16 bytes).
   uint8_t count = 1;
   /// Index of one of this module's dims; the element exists iff that dim's value is not 0.
-  /// -1 means unconditional.
+  /// -1 means unconditional. whenValue >= 0 narrows the rule to "the dim equals that value", for
+  /// the values a plain non-zero test cannot separate (the dst sampler exists only for HAS_XP==1,
+  /// while the framebuffer-fetch dialect must not declare it at all).
   int8_t when = -1;
+  int8_t whenValue = -1;
   /// Param only: delivered as a specialization constant when active (reserved; no module uses it
   /// before the chain migration).
   bool spec = false;
