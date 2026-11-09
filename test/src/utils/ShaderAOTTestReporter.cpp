@@ -84,10 +84,13 @@ AOTCoverageGateResult EvaluateAOTCoverageGate(uint64_t rawNoMatchingRule,
                                               uint64_t environmentCompileFailures,
                                               uint64_t knownGapMisses) {
   AOTCoverageGateResult result = {};
-  // Deliberate misses carry their exclusion in the deliberate scope's own counters, and a
-  // known-gap miss is a real miss of a shape the table names, so it leaves the strict residual
-  // but is never hidden. Runtime compilation no longer exists, so an environment failure has no
-  // paired creation to subtract: it can only surface, never pass silently.
+  // The gate counts DRAWS, not program lookups: one lookup-level miss record can stand for many
+  // draws the same key serves through another route, and the reverse (a draw no route serves) is
+  // exactly what a drop already counts per draw. Deliberate drops carry their exclusion in the
+  // deliberate scope's own counter, and a known-gap drop is a real unserved draw of a shape the
+  // table names, so it leaves the strict residual but is never hidden. Runtime compilation no
+  // longer exists, so an environment failure has no paired creation to subtract: it can only
+  // surface, never pass silently.
   const uint64_t noMatchingExclusions = deliberateNoMatchingRule + knownGapMisses;
   result.consistent = noMatchingExclusions <= rawNoMatchingRule && environmentCompileFailures == 0;
   result.noMatchingRule = noMatchingExclusions <= rawNoMatchingRule
@@ -1012,7 +1015,6 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
       }
       // Attribution is per test: miss records are deduplicated per program key while dropped draws
       // are counted per draw, so one recorded miss can stand for many drops.
-      uint64_t knownGapMisses = 0;
       uint64_t knownGapDrops = 0;
       if (gapIndex < knownGapCount) {
         const auto rawMisses =
@@ -1020,16 +1022,18 @@ class ShaderAOTTestReporter : public testing::EmptyTestEventListener {
         const bool hasEvidence = rawMisses > 0 || result.drawStats.droppedDraws > 0;
         if (hasEvidence && !hasUnlistedSignature) {
           knownGapMatched[gapIndex] = true;
-          knownGapMisses = rawMisses;
           knownGapDrops = result.drawStats.droppedDraws;
         }
       }
       // Missing diagnostic records stay in the production count. Exclusions cannot borrow
       // successful creations from a different test or from failed PrecompiledOnly probes.
       // Runtime compilation no longer exists, so the gate reduces to misses and dropped draws.
+      // The draw anchor, not the lookup anchor: every prepare that finally refused a draw
+      // incremented droppedDraws once (the pass probes that fall back to the original draw do
+      // not), while the fallback counter also counts negative-cache replays of the same key.
       auto testGate = EvaluateAOTCoverageGate(
-          result.fallbackCounts[static_cast<size_t>(PrecompiledFallbackReason::NoMatchingRule)],
-          deliberateNoMatching, environmentCompileFailures, knownGapMisses);
+          result.drawStats.droppedDraws, deliberateNoMatching, environmentCompileFailures,
+          knownGapDrops);
       coverageGate.noMatchingRule += testGate.noMatchingRule;
       coverageGate.excludedEnvironment += testGate.excludedEnvironment;
       coverageGate.excludedKnownGaps += testGate.excludedKnownGaps;
