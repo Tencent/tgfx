@@ -49,10 +49,12 @@
 #include "gpu/shaders/modules/AtlasTextGeometry.h"
 #include "gpu/shaders/modules/ComplexEllipseGeometry.h"
 #include "gpu/shaders/modules/ComplexRRectGeometry.h"
+#include "gpu/shaders/modules/CoverageTexture.h"
 #include "gpu/shaders/modules/DeviceMask.h"
 #include "gpu/shaders/modules/DeviceMaskRuntime.h"
 #include "gpu/shaders/modules/EllipseGeometry.h"
 #include "gpu/shaders/modules/Frame.h"
+#include "gpu/shaders/modules/Gradient.h"
 #include "gpu/shaders/modules/HairlineLineGeometry.h"
 #include "gpu/shaders/modules/HairlineQuadGeometry.h"
 #include "gpu/shaders/modules/LocalMask.h"
@@ -125,6 +127,14 @@ void WriteQuadGeometry(const ProgramInfo& info, const Layout& layout, uint8_t sl
 void WriteCoordMatrix(const ProgramInfo& info, const Layout& layout, const char* moduleName,
                       uint8_t slot, ParamBuffer* buffer);
 
+/// The transform at the given position in the FP tree's coordinate-transform sequence; a negative
+/// index selects the last one.
+void WriteCoordMatrixAt(const ProgramInfo& info, const Layout& layout, const char* moduleName,
+                        uint8_t slot, ParamBuffer* buffer, int index);
+
+void WriteTextureLeafParams(const AOTTextureParameters& leaf, const Layout& layout,
+                            const char* moduleName, uint8_t slot, ParamBuffer* buffer);
+
 // ComplexRRectGeometry: the color pair. The corner data and the SDF run entirely on the varyings.
 void WriteComplexRRectGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
                                ParamBuffer* buffer) {
@@ -153,7 +163,10 @@ void WriteMeshGeometry(const ProgramInfo& info, const Layout& layout, uint8_t sl
 }
 
 // ShapeInstancedGeometry: the local-coordinate recovery, the view transform and the sampling
-// chain. The instance offset and the instance color ride the vertex attributes.
+// coordinate. The instance offset and the instance color ride the vertex attributes. The sampling
+// transform is the LAST one in the tree: the color graph's transforms come first, so a draw whose
+// only fragment processors are the color ones leaves this unwritten (the instanced fill family
+// carries no processor at all), and a coverage texture lands on it.
 void WriteShapeInstancedGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
                                  ParamBuffer* buffer) {
   const auto slice = layout.SliceOf(slot);
@@ -163,7 +176,39 @@ void WriteShapeInstancedGeometry(const ProgramInfo& info, const Layout& layout, 
               geometry->getUVMatrix());
   buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "ShapeInstancedGeometry", "ViewMatrix")],
               geometry->getViewMatrix());
-  WriteCoordMatrix(info, layout, "ShapeInstancedGeometry", slot, buffer);
+  WriteCoordMatrixAt(info, layout, "ShapeInstancedGeometry", slot, buffer, -1);
+}
+
+// CoverageTexture: the leaf's subset rect and read gates, the same values BindTextureSourceLeaf
+// uploads. The sample coordinate rides the geometry's own transform.
+void WriteCoverageTexture(const AOTTextureParameters& leaf, const Layout& layout, uint8_t slot,
+                          ParamBuffer* buffer) {
+  WriteTextureLeafParams(leaf, layout, "CoverageTexture", slot, buffer);
+}
+
+// Gradient: the clamped single-interval gradient's whole record — the endpoints, the boundary
+// colors, the layout branch and the conic layout's bias/scale pair. The values are the ones
+// BindGradientNode uploads for the legacy instanced-shape kernel; the coordinate transform rides
+// the vertex block.
+void WriteGradient(const AOTGradientParameters& params, const Layout& layout, uint8_t slot,
+                   ParamBuffer* buffer) {
+  const auto slice = layout.SliceOf(slot);
+  auto put = [&](const char* name, auto&& value) {
+    const auto index = layout.FieldIndexInSlice(slice, "Gradient", name);
+    if (index < slice.count) {
+      buffer->set(slice.fields[index], value);
+    }
+  };
+  put("CoordMatrix", params.coordMatrix);
+  put("LeftBorderColor", params.leftBorder);
+  put("RightBorderColor", params.rightBorder);
+  put("LayoutType", static_cast<int32_t>(params.layoutType));
+  // The conic layout is the only one the shared gradient layout maths reads these two for; the
+  // other layouts record their defaults, which the shader never touches.
+  put("Bias", params.bias);
+  put("Scale", params.scale);
+  put("Start", params.start);
+  put("End", params.end);
 }
 
 // The source coordinate matrix every texture leaf shares: the FP tree's first coord transform
@@ -484,15 +529,28 @@ void WriteRRectGeometry(const ProgramInfo& info, const Layout& layout, uint8_t s
               static_cast<int32_t>(commonColor.has_value() ? 1 : 0));
 }
 
-/// The texture-space coordinate transform: the FP tree's first coord transform (local to
-/// normalized texture space), the same matrix setTransformDataHelper uploads for the legacy
-/// families. The IR's uvMatrix keeps the raw user matrix, which does not carry the texture's
-/// normalization.
-void WriteCoordMatrix(const ProgramInfo& info, const Layout& layout, const char* moduleName,
-                      uint8_t slot, ParamBuffer* buffer) {
+/// The texture-space coordinate transform: the FP tree's coord transform at the given position
+/// (local to normalized texture space), the same matrix setTransformDataHelper uploads for the
+/// legacy families. A negative index selects the last transform, which is where the coverage
+/// terms sit — the color graph's transforms come first. The IR's uvMatrix keeps the raw user
+/// matrix, which does not carry the texture's normalization.
+void WriteCoordMatrixAt(const ProgramInfo& info, const Layout& layout, const char* moduleName,
+                        uint8_t slot, ParamBuffer* buffer, int index) {
   const auto slice = layout.SliceOf(slot);
   FragmentProcessor::CoordTransformIter iter(&info);
-  const CoordTransform* coordTransform = iter.next();
+  const CoordTransform* coordTransform = nullptr;
+  int position = 0;
+  while (const CoordTransform* candidate = iter.next()) {
+    if (index < 0) {
+      coordTransform = candidate;
+    } else {
+      if (position == index) {
+        coordTransform = candidate;
+        break;
+      }
+      ++position;
+    }
+  }
   if (coordTransform == nullptr) {
     return;
   }
@@ -509,6 +567,13 @@ void WriteCoordMatrix(const ProgramInfo& info, const Layout& layout, const char*
   Matrix combined = {};
   combined.setConcat(coordTransform->getTotalMatrix(), uvMatrix);
   buffer->set(slice.fields[layout.FieldIndexInSlice(slice, moduleName, "CoordMatrix")], combined);
+}
+
+// The first transform's matrix: every family whose color source is the sole sampler reads it
+// through this form.
+void WriteCoordMatrix(const ProgramInfo& info, const Layout& layout, const char* moduleName,
+                      uint8_t slot, ParamBuffer* buffer) {
+  WriteCoordMatrixAt(info, layout, moduleName, slot, buffer, 0);
 }
 
 // TiledTexture: the single-tap or full nine-mode recipe, field for field the same values
@@ -813,6 +878,14 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
     } else if (module == &Texture) {
       if (match->tiledLeaf != nullptr) {
         WriteTexture(info, *match->tiledLeaf, layout, slot, &buffer);
+      }
+    } else if (module == &CoverageTexture) {
+      if (match->maskLeaf != nullptr) {
+        WriteCoverageTexture(*match->maskLeaf, layout, slot, &buffer);
+      }
+    } else if (module == &Gradient) {
+      if (match->gradient != nullptr) {
+        WriteGradient(*match->gradient, layout, slot, &buffer);
       }
     } else if (module == &LocalMask) {
       WriteLocalMask(info, layout, slot, &buffer);

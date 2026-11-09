@@ -23,9 +23,11 @@
 #include "gpu/shaders/modules/AtlasTextGeometry.h"
 #include "gpu/shaders/modules/ComplexEllipseGeometry.h"
 #include "gpu/shaders/modules/ComplexRRectGeometry.h"
+#include "gpu/shaders/modules/CoverageTexture.h"
 #include "gpu/shaders/modules/DeviceMask.h"
 #include "gpu/shaders/modules/DeviceMaskRuntime.h"
 #include "gpu/shaders/modules/EllipseGeometry.h"
+#include "gpu/shaders/modules/Gradient.h"
 #include "gpu/shaders/modules/HairlineLineGeometry.h"
 #include "gpu/shaders/modules/HairlineQuadGeometry.h"
 #include "gpu/shaders/modules/LocalMask.h"
@@ -184,6 +186,25 @@ inline constexpr const Module* AtlasTextGeometries[] = {&AtlasTextGeometry};
 
 inline constexpr FamilyModule AtlasTextBody[] = {&DeviceMaskRuntime, &AnalyticClip};
 
+/// The ShapeInstancedTextureCoverage family (the former ShapeInstancedTextureCoverageShader): the
+/// instanced path triangles in their non-AA form, whose coverage is a plain texture instead of the
+/// geometry's per-vertex channel (the batch's coverage slot is a stride filler, so the geometry
+/// keeps the same VERTEX_COLOR = 0 hole ShapeInstanced uses), with the optional single-interval
+/// gradient over the instance color and the analytic clip. The geometry's coord matrix is the
+/// coverage texture's transform — the coverage terms trail the color graph, so it is the last one.
+/// The legacy kernel served the no-xfer case only, so HAS_XP stays pinned to XP_NONE. Slot layout:
+/// Frame(0), ShapeInstancedGeometry(1), Gradient(2: PRESENT), CoverageTexture(3), AnalyticClip(4),
+/// Xfer(5: HAS_XP).
+inline constexpr const Module* ShapeInstancedTextureCoverageGeometries[] = {
+    &ShapeInstancedGeometry};
+
+inline constexpr FamilyModule ShapeInstancedTextureCoverageBody[] = {&Gradient, &CoverageTexture,
+                                                                     &AnalyticClip};
+
+/// Slot layout: Frame(0), ShapeInstancedGeometry(1), Gradient(2), CoverageTexture(3),
+/// AnalyticClip(4), Xfer(5).
+bool ShapeInstancedTextureCoverageVariantAllowed(const Variant& variant, const Family& family);
+
 /// The family table is the single definition site: a family exists by appearing here and nowhere
 /// else, so "defined but not registered" cannot happen — adding a row is the only way to add a
 /// family, and the match rules address the rows by position.
@@ -204,6 +225,8 @@ inline constexpr Family FamilyTableStorage[] = {
     {"QuadTexture", QuadTextureGeometries, 1, QuadTextureBody, 4, QuadTextureVariantAllowed},
     {"YUVTexture", QuadTextureGeometries, 1, YUVTextureBody, 2, YUVTextureVariantAllowed},
     {"AtlasText", AtlasTextGeometries, 1, AtlasTextBody, 2},
+    {"ShapeInstancedTextureCoverage", ShapeInstancedTextureCoverageGeometries, 1,
+     ShapeInstancedTextureCoverageBody, 3, ShapeInstancedTextureCoverageVariantAllowed},
 };
 
 inline const Family* FamilyTable() {

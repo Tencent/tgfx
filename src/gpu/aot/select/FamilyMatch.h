@@ -25,14 +25,16 @@ namespace tgfx {
 
 struct DrawShape;
 struct AOTTextureParameters;
+struct AOTGradientParameters;
 
 /// One declaration-driven family's match: the variant the draw maps to and the module data
-/// sources the writers read (the tiled leaf for the TiledTexture slot and the mask leaf for the
-/// MaskTexture slot, null when absent).
+/// sources the writers read (the tiled leaf for the TiledTexture slot, the mask leaf for the
+/// MaskTexture slot and the color graph's gradient node for the Gradient slot, null when absent).
 struct FamilyMatchResult {
   Variant variant;
   const AOTTextureParameters* tiledLeaf = nullptr;
   const AOTTextureParameters* maskLeaf = nullptr;
+  const AOTGradientParameters* gradient = nullptr;
 };
 
 /// Matches a draw against the declaration-driven family table (Families(), in table order).

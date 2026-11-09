@@ -207,6 +207,20 @@ bool MatchRRect(const DrawShape& shape, Variant* variant, const AOTTextureParame
   return true;
 }
 
+/// The gradient form's color graph: the geometry color lowered as the input, then the single
+/// GradientSource over it. Its parameters carry the layout branch, the boundary colors and the
+/// colorizer endpoints the Gradient module writes.
+const AOTGradientParameters* SoleGradientLeaf(const AOTEffectGraph& graph) {
+  if (graph.nodeCount() != 2 || !graph.root().isValid() || graph.root().index() != 1) {
+    return nullptr;
+  }
+  auto* node = graph.nodeAt(graph.root());
+  if (node == nullptr || node->kind != AOTEffectKind::GradientSource) {
+    return nullptr;
+  }
+  return std::get_if<AOTGradientParameters>(&node->parameters);
+}
+
 }  // namespace
 /// The Mesh family's rule, carried over from the former MeshFillShader: the mesh geometry with no
 /// fragment processor and any xfer. The flattened dims are the geometry's TEX_COORDS then the
@@ -240,6 +254,68 @@ bool MatchShapeInstanced(const DrawShape& shape, Variant* variant) {
   variant->values[0] = 0;
   variant->values[1] = hasXp;
   variant->ordinal = static_cast<uint32_t>(hasXp);
+  return true;
+}
+
+/// The ShapeInstancedTextureCoverage family's rule, carried over from the former
+/// ShapeInstancedTextureCoverageShader: the instanced path triangles in their non-AA form (no AA
+/// coverage channel), the color either the instance color alone or one single-interval clamped
+/// gradient over it, and the coverage a plain non-YUV texture optionally accompanied by a bare
+/// analytic clip (the clip rides the runtime contract uniforms, so both forms select the same
+/// variant). The legacy kernel served XP_NONE only. The flattened dims are [VERTEX_COLOR,
+/// GRADIENT, HAS_XP] with the first and last pinned to 0, so the ordinal is 2 * GRADIENT.
+bool MatchShapeInstancedTextureCoverage(const DrawShape& shape, Variant* variant,
+                                        const AOTTextureParameters** coverageOut,
+                                        const AOTGradientParameters** gradientOut) {
+  if (shape.geometry.kind != GeometryKind::ShapeInstanced || shape.geometry.hasCoverage ||
+      shape.xpType() != XP_NONE || shape.ir == nullptr) {
+    return false;
+  }
+  const AOTGradientParameters* gradient = nullptr;
+  if (shape.colorFPCount == 1) {
+    gradient = SoleGradientLeaf(shape.ir->color);
+    if (gradient == nullptr || gradient->colorizerKind != 0 || gradient->hasPerspective) {
+      return false;
+    }
+  } else if (shape.colorFPCount != 0) {
+    return false;
+  }
+  const AOTTextureParameters* coverage = nullptr;
+  if (shape.fragmentCount == shape.colorFPCount + 1) {
+    // The lone term is the texture leaf: record-time, or the rasterized shape's prepare-grown
+    // mask the lowering appended at prepare.
+    coverage =
+        shape.ir->coverage.size() == 1 ? BareTextureCoverageLeaf(shape.ir->coverage[0]) : nullptr;
+  } else if (shape.fragmentCount == shape.colorFPCount + 2) {
+    // The texture-plus-clip form: two single terms in either order, one of them the analytic clip.
+    if (shape.ir->coverage.size() != 2) {
+      return false;
+    }
+    const auto first = ClassifyCoverageTerm(shape.ir->coverage[0]);
+    const auto second = ClassifyCoverageTerm(shape.ir->coverage[1]);
+    const bool firstIsClip = first && (*first == Coverage::AARect || *first == Coverage::RRect);
+    const bool secondIsClip = second && (*second == Coverage::AARect || *second == Coverage::RRect);
+    if (firstIsClip == secondIsClip) {
+      return false;
+    }
+    coverage = BareTextureCoverageLeaf(shape.ir->coverage[firstIsClip ? 1 : 0]);
+  } else {
+    return false;
+  }
+  if (coverage == nullptr || coverage->samplingKind != AOTTextureSamplingKind::Plain ||
+      coverage->isYUV || coverage->hasRGBAAA || coverage->textureProxy == nullptr ||
+      coverage->textureProxy->getTextureView() == nullptr) {
+    return false;
+  }
+  const uint8_t gradientValue = gradient != nullptr ? 1 : 0;
+  variant->family = 16;
+  variant->geometry = 0;
+  variant->values[0] = 0;
+  variant->values[1] = gradientValue;
+  variant->values[2] = 0;
+  variant->ordinal = 2u * gradientValue;
+  *coverageOut = coverage;
+  *gradientOut = gradient;
   return true;
 }
 
@@ -498,6 +574,10 @@ std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape) {
     return result;
   }
   if (MatchShapeInstanced(shape, &result.variant)) {
+    return result;
+  }
+  if (MatchShapeInstancedTextureCoverage(shape, &result.variant, &result.maskLeaf,
+                                         &result.gradient)) {
     return result;
   }
   if (MatchAtlasText(shape, &result.variant)) {

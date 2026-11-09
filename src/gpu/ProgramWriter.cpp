@@ -427,11 +427,12 @@ void PrecompiledProgramWriter::writeProcessorsByTree(const ProgramInfo& info,
           bound = true;
         }
       } else if (IsProcessor<ClampedGradientEffect>(fp)) {
-        // The merged node writes the effect's fields and, gated by its own discriminators, the
-        // conic layout's and the single-interval colorizer's -- everything the three separate
-        // processors used to bind on their own visits.
+        // A gradient reaches a kernel only through the interpreter's chain block now (the module
+        // fields the gradient used to bind died with the last kernel that declared them), so
+        // marking the FP handled is the whole bind — the fallback below would otherwise re-run the
+        // processor's own name-addressed setData against fields no program declares.
         if (gradientCursor < gradients.size()) {
-          BindGradientNode(*gradients[gradientCursor++], &paramWriter);
+          ++gradientCursor;
           bound = true;
         }
       } else if (IsProcessor<GaussianBlur1DFragmentProcessor>(fp)) {
@@ -684,9 +685,8 @@ void PrecompiledProgramWriter::writeProcessors(const ProgramInfo& info,
         }
         break;
       case Action::Kind::Gradient:
-        if (action.gradient != nullptr) {
-          BindGradientNode(*action.gradient, &paramWriter);
-        }
+        // The gradient's parameters travel through the chain block; no kernel declares the legacy
+        // gradient fields any more, so the action writes nothing.
         break;
       case Action::Kind::Blur:
         if (action.blur != nullptr) {

@@ -19,7 +19,6 @@
 #pragma once
 
 #include "gpu/processors/FragmentProcessor.h"
-#include "gpu/shaders/modules/GradientModule.h"
 #include "tgfx/core/Color.h"
 
 namespace tgfx {

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ConicGradientLayout.h"
-#include "gpu/shaders/modules/GradientModule.h"
 
 namespace tgfx {
 ConicGradientLayout::ConicGradientLayout(Matrix matrix, float bias, float scale)

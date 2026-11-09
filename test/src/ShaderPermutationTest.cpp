@@ -65,7 +65,6 @@
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/shaders/contract/ShaderProfileResolver.h"
 #include "gpu/shaders/kernels/PointwiseChainShader.h"
-#include "gpu/shaders/kernels/ShapeInstancedTextureCoverageShader.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ColorFilter.h"
@@ -369,9 +368,10 @@ TGFX_TEST(ShaderPermutationTest, ShaderRegistryEnumerators) {
   const std::set<std::pair<uint32_t, uint32_t>> tiledFillPairs = {{0, 0}, {1, 1}, {2, 2},
                                                                   {3, 3}, {4, 4}, {5, 5}};
   EXPECT_EQ(*EnumerateReachablePermutations("TiledTextureFill"), tiledFillPairs);
-  const std::set<std::pair<uint32_t, uint32_t>> shapeCoveragePairs = {{0, 0}, {1, 1}};
-  EXPECT_EQ(*EnumerateReachablePermutations("ShapeInstancedTextureCoverageShader"),
-            shapeCoveragePairs);
+  // The ShapeInstancedTextureCoverage family keeps 2 pairs: the gradient radix alone, with the
+  // geometry's VERTEX_COLOR and the Xfer's HAS_XP pinned to 0 by the product rule.
+  const std::set<std::pair<uint32_t, uint32_t>> shapeCoveragePairs = {{0, 0}, {2, 2}};
+  EXPECT_EQ(*EnumerateReachablePermutations("ShapeInstancedTextureCoverage"), shapeCoveragePairs);
   // The RRect family (the declaration-driven successor of NonAARRectFillShader) keeps 9 pairs:
   // the 12 forms of [STROKE, PRESENT, HAS_XP] minus the three PRESENT && STROKE combinations the
   // family never serves (one form times three XP kinds). The property check restates the allowed
@@ -2180,11 +2180,11 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     programInfo.setCarriedIR(&*ir);
     auto match = MatchPermutation(&programInfo);
     ASSERT_TRUE(match.has_value());
-    EXPECT_EQ(match->shaderName, "ShapeInstancedTextureCoverageShader");
-    // The bare coverage form is GRADIENT=0 in the single-bool domain.
-    auto expected = ShapeInstancedTextureCoverageShader::VD::domain().encode({0});
-    EXPECT_EQ(match->variant.vertPermutationIndex, expected);
-    EXPECT_EQ(match->variant.fragPermutationIndex, expected);
+    EXPECT_EQ(match->shaderName, "ShapeInstancedTextureCoverage");
+    // The bare coverage form is GRADIENT=0, and the family's allowed rule keeps VERTEX_COLOR and
+    // HAS_XP at 0, so the ordinal is the gradient radix alone.
+    EXPECT_EQ(match->variant.vertPermutationIndex, 0u);
+    EXPECT_EQ(match->variant.fragPermutationIndex, 0u);
   }
 
   {
@@ -2204,7 +2204,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     programInfo.setCarriedIR(&*ir);
     auto match = MatchPermutation(&programInfo);
     ASSERT_TRUE(match.has_value());
-    EXPECT_EQ(match->shaderName, "ShapeInstancedTextureCoverageShader");
+    EXPECT_EQ(match->shaderName, "ShapeInstancedTextureCoverage");
     EXPECT_EQ(match->variant.vertPermutationIndex, 0u);
     EXPECT_EQ(match->variant.fragPermutationIndex, 0u);
   }
@@ -2276,7 +2276,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
   // A rounded clip next to the coverage texture: the clip rides the runtime clip contract uniforms,
   // so the draw selects the same variant as the bare-coverage form (the libpag corpus carries this
   // shape; before the contract it had no precompiled route at all).
-  const auto expectedIndex = ShapeInstancedTextureCoverageShader::VD::domain().encode({0});
+  const auto expectedIndex = 0u;
   for (int clipFirst = 0; clipFirst <= 1; ++clipFirst) {
     BlockAllocator allocator;
     auto gp = ShapeInstancedGeometryProcessor::Make(&allocator, 8, 8, AAType::None, true,
@@ -2304,7 +2304,7 @@ TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactCo
     auto match = MatchPermutation(&programInfo, &failure);
     ASSERT_TRUE(match.has_value()) << "clipFirst=" << clipFirst;
     EXPECT_EQ(failure, PermutationMatchFailure::None);
-    EXPECT_EQ(match->shaderName, "ShapeInstancedTextureCoverageShader");
+    EXPECT_EQ(match->shaderName, "ShapeInstancedTextureCoverage");
     EXPECT_EQ(match->variant.vertPermutationIndex, expectedIndex);
     EXPECT_EQ(match->variant.fragPermutationIndex, expectedIndex);
   }
@@ -2373,19 +2373,16 @@ TGFX_TEST(ShaderPermutationTest, ComplexEllipseTextureCoverageIsServedByChain) {
   EXPECT_EQ(failure, PermutationMatchFailure::None);
 }
 
-TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageShaderRegistry) {
-  bool found = false;
-  for (const auto& factory : ShaderRegistry::All()) {
-    auto shader = factory();
-    auto info = shader->info();
-    if (info.name != "ShapeInstancedTextureCoverageShader") {
-      continue;
-    }
-    found = true;
-    EXPECT_EQ(info.vertDomain.totalCount(), 2u);
-    EXPECT_EQ(info.fragDomain.totalCount(), 2u);
-  }
-  EXPECT_TRUE(found);
+TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageRegistry) {
+  // The family is declaration-driven now: its domain spans the geometry's VERTEX_COLOR, the
+  // Gradient module's PRESENT and Xfer's HAS_XP (2 * 2 * 3); the product rule prunes the
+  // enumerated bundle to the 2 real programs.
+  const auto* registered = ShaderRegistry::Find("ShapeInstancedTextureCoverage");
+  ASSERT_NE(registered, nullptr);
+  EXPECT_EQ(registered->vertDomain.totalCount(), 12u);
+  EXPECT_EQ(registered->fragDomain.totalCount(), 12u);
+  EXPECT_TRUE(registered->vertexFile.empty());
+  EXPECT_TRUE(registered->fragmentFile.empty());
 }
 
 TGFX_TEST(ShaderPermutationTest, EffectDecomposerTripleFP) {

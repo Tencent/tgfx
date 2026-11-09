@@ -23,7 +23,6 @@
 #include "gpu/processors/SingleIntervalGradientColorizer.h"
 #include "gpu/processors/TextureGradientColorizer.h"
 #include "gpu/processors/UnrolledBinaryGradientColorizer.h"
-#include "gpu/shaders/modules/GradientModule.h"
 
 namespace tgfx {
 ClampedGradientEffect::ClampedGradientEffect(PlacementPtr<FragmentProcessor> colorizer,

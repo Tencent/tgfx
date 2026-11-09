@@ -142,6 +142,18 @@ bool ShapeInstancedVariantAllowed(const Variant& variant, const Family&) {
   return variant.values[0] == 0;
 }
 
+/// The ShapeInstancedTextureCoverage family's product rule: VERTEX_COLOR only reserves the
+/// geometry's stride-filler coverage slot, so the variant where it is present is never a real
+/// program (the same hole ShapeInstanced carries); and the legacy kernel served the no-xfer case
+/// only, so the blended xfer kinds stay out of the bundle.
+bool ShapeInstancedTextureCoverageVariantAllowed(const Variant& variant, const Family& family) {
+  // Slot layout: Frame(0), ShapeInstancedGeometry(1), Gradient(2), CoverageTexture(3),
+  // AnalyticClip(4), Xfer(5).
+  const uint8_t vertexColor = DimValueOf(family, variant, 1, 0);
+  const uint8_t hasXp = DimValueOf(family, variant, 5, 0);
+  return vertexColor == 0 && hasXp == 0;
+}
+
 /// The QuadTexture family's product rule: the geometry and the Texture module both spell
 /// HAS_SUBSET, so the two radices must move together.
 bool QuadTextureVariantAllowed(const Variant& variant, const Family& family) {

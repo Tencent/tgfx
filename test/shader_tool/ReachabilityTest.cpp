@@ -53,12 +53,13 @@ struct DefineNameOf {
 
 TEST(FamilyRegistryTest, EveryFamilyIsRegisteredOnceWithItsOwnFiles) {
   auto families = AllFamilies();
-  // The kernel-shell families: 12 after the declaration-driven migration removed
+  // The kernel-shell families: 6 after the declaration-driven migration removed
   // NonAARRectFillShader, SolidColorFillShader, MaskFillShader, TiledTextureFillShader,
-  // QuadColorFillShader, MeshFillShader, ShapeInstancedFillShader and
-  // ComplexNonAARRectFillShader (the declaration-driven
-  // families join Find/Enumerate without a shell, see ShaderPermutationTest).
-  EXPECT_EQ(families.size(), 7u);
+  // QuadColorFillShader, MeshFillShader, ShapeInstancedFillShader, ComplexNonAARRectFillShader,
+  // QuadTextureFillShader, YUVTextureFillShader, AtlasTextFillShader and
+  // ShapeInstancedTextureCoverageShader (the declaration-driven families join Find/Enumerate
+  // without a shell, see ShaderPermutationTest).
+  EXPECT_EQ(families.size(), 6u);
   std::set<std::string> names;
   for (const auto& info : families) {
     EXPECT_TRUE(names.insert(info.name).second) << "duplicate family " << info.name;
