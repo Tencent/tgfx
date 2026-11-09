@@ -1,5 +1,5 @@
 // The single location table of ComplexEllipseGeometryProcessor's vertex interface: the attribute
-// and varying locations the dedicated kernel (kernels/complex_ellipse_fill.vert / .frag) and the
+// and varying locations the dedicated kernel (now the ComplexEllipse module) and the
 // chain's GP_LAYOUT 3/4 both reference, so the two sides cannot drift apart. Attribute order:
 // position, color, ellipseOffset, ellipseRadii, edgeDist, [strokeWidth]. Varying order: offsets 0,
 // radii 1, edge distances 2, color 3, stroke width 4 (stroke variant only). The chain's leaf

@@ -23,6 +23,7 @@
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/aot/select/FamilyMatch.h"
+#include "gpu/processors/ComplexEllipseGeometryProcessor.h"
 #include "gpu/processors/ComplexNonAARRectGeometryProcessor.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
@@ -40,6 +41,7 @@
 #include "gpu/shaders/ParamBuffer.h"
 #include "gpu/shaders/contract/DrawFacts.h"
 #include "gpu/shaders/modules/AnalyticClip.h"
+#include "gpu/shaders/modules/ComplexEllipseGeometry.h"
 #include "gpu/shaders/modules/ComplexRRectGeometry.h"
 #include "gpu/shaders/modules/DeviceMask.h"
 #include "gpu/shaders/modules/EllipseGeometry.h"
@@ -215,6 +217,22 @@ void WriteEllipseGeometry(const ProgramInfo& info, const Layout& layout, uint8_t
   put("Color", geometry->getCommonColor());
   put("HasCommonColor", static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
   put("StrokeEnabled", static_cast<int32_t>(geometry->isStroke() ? 1 : 0));
+}
+
+// ComplexEllipseGeometry: the color pair; the ellipse data rides the varyings.
+void WriteComplexEllipseGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
+                                 ParamBuffer* buffer) {
+  const auto slice = layout.SliceOf(slot);
+  const auto* geometry =
+      static_cast<const ComplexEllipseGeometryProcessor*>(info.getGeometryProcessor());
+  auto put = [&](const char* name, auto&& value) {
+    const auto index = layout.FieldIndexInSlice(slice, "ComplexEllipseGeometry", name);
+    if (index < slice.count) {
+      buffer->set(slice.fields[index], value);
+    }
+  };
+  put("Color", geometry->getCommonColor());
+  put("HasCommonColor", static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
 }
 
 // HairlineLineGeometry / HairlineQuadGeometry: the view matrix, the color/coverage/AA triple and
@@ -499,6 +517,8 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
       WriteFrame(info, layout, slot, &buffer);
     } else if (module == &RectGeometry) {
       WriteRectGeometry(info, layout, slot, &buffer);
+    } else if (module == &ComplexEllipseGeometry) {
+      WriteComplexEllipseGeometry(info, layout, slot, &buffer);
     } else if (module == &EllipseGeometry) {
       WriteEllipseGeometry(info, layout, slot, &buffer);
     } else if (module == &HairlineLineGeometry) {

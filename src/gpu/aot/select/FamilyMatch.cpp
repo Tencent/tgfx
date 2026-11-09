@@ -302,6 +302,28 @@ bool MatchEllipse(const DrawShape& shape, Variant* variant) {
   return true;
 }
 
+/// The ComplexEllipse family's rule, carried over from the former ComplexEllipseFillShader: the
+/// complex-ellipse geometry with no color processor, a coverage that is anything but a local mask,
+/// and any xfer. The flattened dims are STROKE, PRESENT, HAS_XP, so the ordinal is
+/// STROKE + 2 * PRESENT + 4 * HAS_XP.
+bool MatchComplexEllipse(const DrawShape& shape, Variant* variant) {
+  if (shape.geometry.kind != GeometryKind::ComplexEllipse || shape.colorFPCount != 0 ||
+      !shape.coverage.has_value() || *shape.coverage == Coverage::LocalMask ||
+      shape.xpType() < XP_NONE) {
+    return false;
+  }
+  const uint8_t stroke = shape.geometry.isStroke ? 1 : 0;
+  const uint8_t present = *shape.coverage == Coverage::DeviceMask ? 1 : 0;
+  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
+  variant->family = 11;
+  variant->geometry = 0;
+  variant->values[0] = stroke;
+  variant->values[1] = present;
+  variant->values[2] = hasXp;
+  variant->ordinal = static_cast<uint32_t>(stroke) + 2u * present + 4u * hasXp;
+  return true;
+}
+
 std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape) {
   if (FamilyCount() == 0) {
     return std::nullopt;
@@ -324,6 +346,9 @@ std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape) {
     return result;
   }
   if (MatchShapeInstanced(shape, &result.variant)) {
+    return result;
+  }
+  if (MatchComplexEllipse(shape, &result.variant)) {
     return result;
   }
   if (MatchEllipse(shape, &result.variant)) {

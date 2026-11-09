@@ -1,4 +1,4 @@
-// Complex rounded-rect (per-corner radii) edge coverage, shared by ComplexEllipseFillShader and the
+// Complex rounded-rect (per-corner radii) edge coverage, shared by the ComplexEllipse family and the
 // pointwise chain kernel's GP_LAYOUT==3 (fill) / GP_LAYOUT==4 (stroke) paths. The math is verbatim
 // from GLSLComplexEllipseGeometryProcessor::emitCode (offset-based region dispatch: corner ellipse
 // distance, linear edge distance, full interior; then the inner curve for strokes); keep it

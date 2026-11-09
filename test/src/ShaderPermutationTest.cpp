@@ -2391,7 +2391,7 @@ TGFX_TEST(ShaderPermutationTest, ComplexEllipseTextureCoverageIsServedByChain) {
   ProgramInfo accepted(renderTarget.get(), gp.get(), {}, 0, nullptr, BlendMode::SrcOver);
   auto match = MatchPermutation(&accepted, &failure);
   ASSERT_TRUE(match.has_value());
-  EXPECT_EQ(match->shaderName, "ComplexEllipseFillShader");
+  EXPECT_EQ(match->shaderName, "ComplexEllipse");
   EXPECT_EQ(failure, PermutationMatchFailure::None);
 }
 

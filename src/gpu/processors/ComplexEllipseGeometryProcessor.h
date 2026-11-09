@@ -46,6 +46,11 @@ class ComplexEllipseGeometryProcessor : public GeometryProcessor {
     return stroke;
   }
 
+  /// The exact paint color for draws without per-vertex colors.
+  PMColor getCommonColor() const {
+    return commonColor.value_or(PMColor());
+  }
+
   bool hasCommonColor() const {
     return commonColor.has_value();
   }

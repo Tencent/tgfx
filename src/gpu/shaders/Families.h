@@ -20,6 +20,7 @@
 
 #include "gpu/shaders/Family.h"
 #include "gpu/shaders/modules/AnalyticClip.h"
+#include "gpu/shaders/modules/ComplexEllipseGeometry.h"
 #include "gpu/shaders/modules/ComplexRRectGeometry.h"
 #include "gpu/shaders/modules/DeviceMask.h"
 #include "gpu/shaders/modules/EllipseGeometry.h"
@@ -150,13 +151,24 @@ inline constexpr FamilyModule EllipseBody[] = {&DeviceMask, &AnalyticClip};
 
 inline constexpr Family EllipseFamily = {"Ellipse", EllipseGeometries, 1, EllipseBody, 2};
 
+/// The ComplexEllipse family (the former ComplexEllipseFillShader): the analytic complex-ellipse
+/// coverage (fill and stroke forms), the shared device-space mask and the analytic clip. Slot
+/// layout: Frame(0), ComplexEllipseGeometry(1: STROKE), DeviceMask(2: PRESENT), AnalyticClip(3),
+/// Xfer(4).
+inline constexpr const Module* ComplexEllipseGeometries[] = {&ComplexEllipseGeometry};
+
+inline constexpr FamilyModule ComplexEllipseBody[] = {&DeviceMask, &AnalyticClip};
+
+inline constexpr Family ComplexEllipseFamily = {"ComplexEllipse", ComplexEllipseGeometries, 1,
+                                                ComplexEllipseBody, 2};
+
 /// The array is the single source of truth for both the table pointer and its count: keeping them
 /// apart is how a family silently drops out of matching (or the count runs past the array) after
 /// a reformat.
 inline constexpr Family FamilyTableStorage[] = {
     SolidColorFamily,   MaskFillFamily,     TiledTextureFillFamily, QuadColorFamily,
     RRectFamily,        MeshFamily,         ShapeInstancedFamily,   ComplexRRectFamily,
-    HairlineLineFamily, HairlineQuadFamily, EllipseFamily};
+    HairlineLineFamily, HairlineQuadFamily, EllipseFamily,          ComplexEllipseFamily};
 
 inline const Family* FamilyTable() {
   return FamilyTableStorage;
