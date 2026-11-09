@@ -46,6 +46,12 @@ class ComplexNonAARRectGeometryProcessor : public GeometryProcessor {
     return commonColor.has_value();
   }
 
+  /// The exact paint color the fragment stage reads from the Color uniform (absent for per-vertex
+  /// color draws).
+  PMColor getCommonColor() const {
+    return commonColor.value_or(PMColor());
+  }
+
  protected:
   ComplexNonAARRectGeometryProcessor(int width, int height, bool stroke,
                                      std::optional<PMColor> commonColor);

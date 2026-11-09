@@ -20,6 +20,7 @@
 
 #include "gpu/shaders/Family.h"
 #include "gpu/shaders/modules/AnalyticClip.h"
+#include "gpu/shaders/modules/ComplexRRectGeometry.h"
 #include "gpu/shaders/modules/DeviceMask.h"
 #include "gpu/shaders/modules/MaskTexture.h"
 #include "gpu/shaders/modules/MeshGeometry.h"
@@ -113,12 +114,20 @@ inline constexpr Family ShapeInstancedFamily = {
 
 /// The family table, in match priority order. The declaration-driven families are checked before
 /// the legacy kernel table; among themselves the dedicated rules are disjoint.
+/// The ComplexRRect family (the former ComplexNonAARRectFillShader): a per-corner-radius rounded
+/// rect with no fragment processor. STROKE selects the stroke form (it carries the stroke width
+/// attribute and varying). Slot layout: Frame(0), ComplexRRectGeometry(1: STROKE), Xfer(2).
+inline constexpr const Module* ComplexRRectGeometries[] = {&ComplexRRectGeometry};
+
+inline constexpr Family ComplexRRectFamily = {"ComplexRRect", ComplexRRectGeometries, 1, nullptr,
+                                              0};
+
 /// The array is the single source of truth for both the table pointer and its count: keeping them
 /// apart is how a family silently drops out of matching (or the count runs past the array) after
 /// a reformat.
 inline constexpr Family FamilyTableStorage[] = {
     SolidColorFamily, MaskFillFamily, TiledTextureFillFamily, QuadColorFamily,
-    RRectFamily,      MeshFamily,     ShapeInstancedFamily};
+    RRectFamily,      MeshFamily,     ShapeInstancedFamily,   ComplexRRectFamily};
 
 inline const Family* FamilyTable() {
   return FamilyTableStorage;

@@ -22,6 +22,7 @@
 #include "gpu/UniformData.h"
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/aot/select/FamilyMatch.h"
+#include "gpu/processors/ComplexNonAARRectGeometryProcessor.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/MeshGeometryProcessor.h"
@@ -35,6 +36,7 @@
 #include "gpu/shaders/ParamBuffer.h"
 #include "gpu/shaders/contract/DrawFacts.h"
 #include "gpu/shaders/modules/AnalyticClip.h"
+#include "gpu/shaders/modules/ComplexRRectGeometry.h"
 #include "gpu/shaders/modules/DeviceMask.h"
 #include "gpu/shaders/modules/Frame.h"
 #include "gpu/shaders/modules/MaskTexture.h"
@@ -101,6 +103,19 @@ void WriteQuadGeometry(const ProgramInfo& info, const Layout& layout, uint8_t sl
 
 void WriteCoordMatrix(const ProgramInfo& info, const Layout& layout, const char* moduleName,
                       uint8_t slot, ParamBuffer* buffer);
+
+// ComplexRRectGeometry: the color pair. The corner data and the SDF run entirely on the varyings.
+void WriteComplexRRectGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
+                               ParamBuffer* buffer) {
+  const auto slice = layout.SliceOf(slot);
+  const auto* geometry =
+      static_cast<const ComplexNonAARRectGeometryProcessor*>(info.getGeometryProcessor());
+  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "ComplexRRectGeometry", "Color")],
+              geometry->getCommonColor());
+  buffer->set(
+      slice.fields[layout.FieldIndexInSlice(slice, "ComplexRRectGeometry", "HasCommonColor")],
+      static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
+}
 
 // MeshGeometry: the view transform, the color pair and the texture coordinate chain.
 void WriteMeshGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
@@ -416,6 +431,8 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
       WriteFrame(info, layout, slot, &buffer);
     } else if (module == &RectGeometry) {
       WriteRectGeometry(info, layout, slot, &buffer);
+    } else if (module == &ComplexRRectGeometry) {
+      WriteComplexRRectGeometry(info, layout, slot, &buffer);
     } else if (module == &MeshGeometry) {
       WriteMeshGeometry(info, layout, slot, &buffer);
     } else if (module == &ShapeInstancedGeometry) {
