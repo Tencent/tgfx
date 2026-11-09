@@ -20,6 +20,7 @@
 #include "gpu/ProgramWriter.h"
 #include "gpu/Swizzle.h"
 #include "gpu/UniformData.h"
+#include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/aot/select/FamilyMatch.h"
 #include "gpu/processors/ComplexNonAARRectGeometryProcessor.h"
@@ -280,59 +281,73 @@ void WriteMaskTexture(const ProgramInfo& info, const Layout& layout, uint8_t slo
 void WriteAnalyticClip(const ProgramInfo& info, const Layout& layout, uint8_t slot,
                        ParamBuffer* buffer) {
   const auto slice = layout.SliceOf(slot);
-  const RectEffect* rectClip = nullptr;
-  const RRectEffect* rrectClip = nullptr;
-  for (size_t index = 0; index < info.numFragmentProcessors(); ++index) {
-    FragmentProcessor::Iter iter(info.getFragmentProcessor(index));
-    const FragmentProcessor* fp = iter.next();
-    while (fp) {
-      if (rectClip == nullptr && IsProcessor<RectEffect>(fp)) {
-        rectClip = static_cast<const RectEffect*>(fp);
-      } else if (rrectClip == nullptr && IsProcessor<RRectEffect>(fp)) {
-        rrectClip = static_cast<const RRectEffect*>(fp);
+  auto put = [&](const char* name, auto&& value) {
+    const auto index = layout.FieldIndexInSlice(slice, "AnalyticClip", name);
+    if (index < slice.count) {
+      buffer->set(slice.fields[index], value);
+    }
+  };
+  // The lowering already classified the clip into the IR's analytic term and copied every
+  // parameter into its node chain (RectCoverage / RRectCoverage), so the writer reads the draw's
+  // IR instead of searching the processor tree — the same values, sourced from the one place that
+  // owns them.
+  const AOTCoverageTerm* analytic = nullptr;
+  const DrawIR* ir = info.getCarriedIR();
+  if (ir != nullptr) {
+    for (const auto& term : ir->coverage) {
+      if (term.kind == AOTCoverageTermKind::Analytic) {
+        analytic = &term;
+        break;
       }
-      fp = iter.next();
     }
   }
-  if (rectClip != nullptr) {
-    buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "AnalyticClip", "LocalRect")],
-                rectClip->getRect());
-    buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "AnalyticClip", "AntiAlias")],
-                rectClip->isAntiAlias() ? 1.0f : 0.0f);
-    buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "AnalyticClip", "DeviceToLocal")],
-                rectClip->getDeviceToLocal());
-    if (rectClip->isDeviceSpaceRect()) {
-      // The device-space rect uploads half a pixel outward so the coverage ramp centers on the
-      // geometric boundary (GLSLRectEffect::onSetData).
-      buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "AnalyticClip", "Rect")],
-                  rectClip->getRect().makeOutset(0.5f, 0.5f));
-      buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "AnalyticClip", "HasClip")],
-                  static_cast<int32_t>(1));
-    } else {
-      buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "AnalyticClip", "HasClip")],
-                  static_cast<int32_t>(3));
+  if (analytic != nullptr) {
+    for (size_t index = 0; index < analytic->graph.nodeCount(); ++index) {
+      const auto* node =
+          analytic->graph.nodeAt(static_cast<AOTNodeID>(static_cast<uint32_t>(index)));
+      if (node == nullptr) {
+        continue;
+      }
+      if (const auto* rect = std::get_if<AOTRectCoverageParameters>(&node->parameters)) {
+        const Matrix deviceToLocal =
+            Matrix::MakeAll(rect->deviceToLocal[0], rect->deviceToLocal[1], rect->deviceToLocal[2],
+                            rect->deviceToLocal[3], rect->deviceToLocal[4], rect->deviceToLocal[5],
+                            rect->deviceToLocal[6], rect->deviceToLocal[7], rect->deviceToLocal[8]);
+        put("LocalRect",
+            std::array<float, 4>{rect->rect[0], rect->rect[1], rect->rect[2], rect->rect[3]});
+        // The RectCoverage node is the AA form: the lowering routes hard-edged rects through the
+        // rrect node with a zero antiAlias.
+        put("AntiAlias", 1.0f);
+        put("DeviceToLocal", deviceToLocal);
+        if (deviceToLocal == Matrix::I()) {
+          // The device-space form uploads half a pixel outward so the coverage ramp centers on the
+          // geometric boundary (GLSLRectEffect::onSetData).
+          put("Rect", std::array<float, 4>{rect->rect[0] - 0.5f, rect->rect[1] - 0.5f,
+                                           rect->rect[2] + 0.5f, rect->rect[3] + 0.5f});
+          put("HasClip", static_cast<int32_t>(1));
+        } else {
+          put("HasClip", static_cast<int32_t>(3));
+        }
+        return;
+      }
+      if (const auto* rrect = std::get_if<AOTRRectCoverageParameters>(&node->parameters)) {
+        put("LocalRect",
+            std::array<float, 4>{rrect->rect[0], rrect->rect[1], rrect->rect[2], rrect->rect[3]});
+        put("RadiiX", rrect->radiiX);
+        put("RadiiY", rrect->radiiY);
+        put("AntiAlias", rrect->antiAlias);
+        put("DeviceToLocal", Matrix::MakeAll(rrect->deviceToLocal[0], rrect->deviceToLocal[1],
+                                             rrect->deviceToLocal[2], rrect->deviceToLocal[3],
+                                             rrect->deviceToLocal[4], rrect->deviceToLocal[5],
+                                             rrect->deviceToLocal[6], rrect->deviceToLocal[7],
+                                             rrect->deviceToLocal[8]));
+        put("HasClip", static_cast<int32_t>(2));
+        return;
+      }
     }
-    return;
-  }
-  if (rrectClip != nullptr) {
-    buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "AnalyticClip", "LocalRect")],
-                rrectClip->getLocalRect());
-    const auto& radii = rrectClip->getRadii();
-    const float radiiX[4] = {radii[0].x, radii[1].x, radii[2].x, radii[3].x};
-    const float radiiY[4] = {radii[0].y, radii[1].y, radii[2].y, radii[3].y};
-    buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "AnalyticClip", "RadiiX")], radiiX);
-    buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "AnalyticClip", "RadiiY")], radiiY);
-    buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "AnalyticClip", "AntiAlias")],
-                rrectClip->isAntiAlias() ? 1.0f : 0.0f);
-    buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "AnalyticClip", "DeviceToLocal")],
-                rrectClip->getDeviceToLocal());
-    buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "AnalyticClip", "HasClip")],
-                static_cast<int32_t>(2));
-    return;
   }
   // No clip: the contract branch reads nothing but the flag.
-  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "AnalyticClip", "HasClip")],
-              static_cast<int32_t>(0));
+  put("HasClip", static_cast<int32_t>(0));
 }
 
 // Xfer: the blend mode, the dst-texture coord mapping for the dst dialect, and the render-target
