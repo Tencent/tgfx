@@ -1,5 +1,6 @@
 // The single location table of HairlineLineGeometryProcessor's vertex interface: the attribute
-// and varying locations the dedicated hairline kernel (kernels/hairline_line.vert / .frag) and
+// and varying locations the dedicated hairline kernels (now the HairlineLine/HairlineQuad
+// modules) and
 // the chain's GP_LAYOUT 2 both reference, so the two sides cannot drift apart. Attribute order:
 // position, edgeDistance, color — the color attribute is unconditional in the vertex buffers, but
 // only the chain reads it (its color pipeline starts from the geometric color; the dedicated

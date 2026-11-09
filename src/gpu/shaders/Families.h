@@ -22,6 +22,8 @@
 #include "gpu/shaders/modules/AnalyticClip.h"
 #include "gpu/shaders/modules/ComplexRRectGeometry.h"
 #include "gpu/shaders/modules/DeviceMask.h"
+#include "gpu/shaders/modules/HairlineLineGeometry.h"
+#include "gpu/shaders/modules/HairlineQuadGeometry.h"
 #include "gpu/shaders/modules/MaskTexture.h"
 #include "gpu/shaders/modules/MeshGeometry.h"
 #include "gpu/shaders/modules/QuadColorGeometry.h"
@@ -122,12 +124,28 @@ inline constexpr const Module* ComplexRRectGeometries[] = {&ComplexRRectGeometry
 inline constexpr Family ComplexRRectFamily = {"ComplexRRect", ComplexRRectGeometries, 1, nullptr,
                                               0};
 
+/// The HairlineLine family (the former HairlineLineShader): a thin line whose coverage is the edge
+/// distance's absolute value times the draw coverage, times the analytic clip. Slot layout:
+/// Frame(0), HairlineLineGeometry(1), Xfer(2).
+inline constexpr const Module* HairlineLineGeometries[] = {&HairlineLineGeometry};
+
+inline constexpr Family HairlineLineFamily = {"HairlineLine", HairlineLineGeometries, 1, nullptr,
+                                              0};
+
+/// The HairlineQuad family (the former HairlineQuadShader): the Loop-Blinn hairline quad, same
+/// slot layout.
+inline constexpr const Module* HairlineQuadGeometries[] = {&HairlineQuadGeometry};
+
+inline constexpr Family HairlineQuadFamily = {"HairlineQuad", HairlineQuadGeometries, 1, nullptr,
+                                              0};
+
 /// The array is the single source of truth for both the table pointer and its count: keeping them
 /// apart is how a family silently drops out of matching (or the count runs past the array) after
 /// a reformat.
 inline constexpr Family FamilyTableStorage[] = {
-    SolidColorFamily, MaskFillFamily, TiledTextureFillFamily, QuadColorFamily,
-    RRectFamily,      MeshFamily,     ShapeInstancedFamily,   ComplexRRectFamily};
+    SolidColorFamily,   MaskFillFamily,    TiledTextureFillFamily, QuadColorFamily,
+    RRectFamily,        MeshFamily,        ShapeInstancedFamily,   ComplexRRectFamily,
+    HairlineLineFamily, HairlineQuadFamily};
 
 inline const Family* FamilyTable() {
   return FamilyTableStorage;

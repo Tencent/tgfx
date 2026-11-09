@@ -70,7 +70,7 @@ std::set<std::pair<uint32_t, uint32_t>> AssembledFamilyReachable() {
 /// The reachable-set enumerator per table index. The registry stores plain function pointers, so
 /// the per-family instantiations are materialized into one array here; the table may grow up to
 /// MaxDeclaredFamilies before the static_assert below fails.
-inline constexpr size_t MaxDeclaredFamilies = 8;
+inline constexpr size_t MaxDeclaredFamilies = 16;
 
 template <size_t... Indices>
 constexpr std::array<ShaderRegistry::Enumerator, sizeof...(Indices)> MakeDeclaredEnumerators(

@@ -26,6 +26,8 @@
 #include "gpu/processors/ComplexNonAARRectGeometryProcessor.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
+#include "gpu/processors/HairlineLineGeometryProcessor.h"
+#include "gpu/processors/HairlineQuadGeometryProcessor.h"
 #include "gpu/processors/MeshGeometryProcessor.h"
 #include "gpu/processors/NonAARRectGeometryProcessor.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
@@ -40,6 +42,8 @@
 #include "gpu/shaders/modules/ComplexRRectGeometry.h"
 #include "gpu/shaders/modules/DeviceMask.h"
 #include "gpu/shaders/modules/Frame.h"
+#include "gpu/shaders/modules/HairlineLineGeometry.h"
+#include "gpu/shaders/modules/HairlineQuadGeometry.h"
 #include "gpu/shaders/modules/MaskTexture.h"
 #include "gpu/shaders/modules/MeshGeometry.h"
 #include "gpu/shaders/modules/QuadColorGeometry.h"
@@ -187,6 +191,34 @@ void WriteDeviceMask(const ProgramInfo& info, const Layout& layout, uint8_t slot
               deviceCoordMatrix);
 }
 
+void WriteClipParams(const ProgramInfo& info, const Layout& layout, const char* moduleName,
+                     uint8_t slot, ParamBuffer* buffer);
+
+void WriteAnalyticClip(const ProgramInfo& info, const Layout& layout, uint8_t slot,
+                       ParamBuffer* buffer) {
+  WriteClipParams(info, layout, "AnalyticClip", slot, buffer);
+}
+
+// HairlineLineGeometry / HairlineQuadGeometry: the view matrix, the color/coverage/AA triple and
+// the analytic clip the old declaration carried in the same block.
+template <typename Geometry>
+void WriteHairlineGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
+                           const char* moduleName, ParamBuffer* buffer) {
+  const auto slice = layout.SliceOf(slot);
+  const auto* geometry = static_cast<const Geometry*>(info.getGeometryProcessor());
+  auto put = [&](const char* name, auto&& value) {
+    const auto index = layout.FieldIndexInSlice(slice, moduleName, name);
+    if (index < slice.count) {
+      buffer->set(slice.fields[index], value);
+    }
+  };
+  put("Matrix", geometry->getViewMatrix());
+  put("Color", geometry->getCommonColor());
+  put("Coverage", geometry->getCoverage());
+  put("AAEnabled", static_cast<int32_t>(geometry->getAAType() == AAType::None ? 0 : 1));
+  WriteClipParams(info, layout, moduleName, slot, buffer);
+}
+
 // RRectGeometry (the non-AA rounded rect): the exact common color and its flag. The 8-bit
 // quantized varying needs no write; the values come from the geometry processor.
 void WriteRRectGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
@@ -278,11 +310,14 @@ void WriteMaskTexture(const ProgramInfo& info, const Layout& layout, uint8_t slo
 
 // AnalyticClip: the runtime clip contract. The values mirror GLSLRectEffect's and
 // GLSLRRectEffect's onSetData uploads field for field.
-void WriteAnalyticClip(const ProgramInfo& info, const Layout& layout, uint8_t slot,
-                       ParamBuffer* buffer) {
+/// Writes the analytic clip parameters (slot's module fields) from the draw's IR analytic term.
+/// The hairline families carry the same fields inside their geometry module, so the reader takes
+/// the module name instead of hard-coding "AnalyticClip".
+void WriteClipParams(const ProgramInfo& info, const Layout& layout, const char* moduleName,
+                     uint8_t slot, ParamBuffer* buffer) {
   const auto slice = layout.SliceOf(slot);
   auto put = [&](const char* name, auto&& value) {
-    const auto index = layout.FieldIndexInSlice(slice, "AnalyticClip", name);
+    const auto index = layout.FieldIndexInSlice(slice, moduleName, name);
     if (index < slice.count) {
       buffer->set(slice.fields[index], value);
     }
@@ -446,6 +481,12 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
       WriteFrame(info, layout, slot, &buffer);
     } else if (module == &RectGeometry) {
       WriteRectGeometry(info, layout, slot, &buffer);
+    } else if (module == &HairlineLineGeometry) {
+      WriteHairlineGeometry<HairlineLineGeometryProcessor>(info, layout, slot,
+                                                           "HairlineLineGeometry", &buffer);
+    } else if (module == &HairlineQuadGeometry) {
+      WriteHairlineGeometry<HairlineQuadGeometryProcessor>(info, layout, slot,
+                                                           "HairlineQuadGeometry", &buffer);
     } else if (module == &ComplexRRectGeometry) {
       WriteComplexRRectGeometry(info, layout, slot, &buffer);
     } else if (module == &MeshGeometry) {

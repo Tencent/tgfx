@@ -259,6 +259,30 @@ bool MatchComplexRRect(const DrawShape& shape, Variant* variant) {
   return true;
 }
 
+/// The hairline families' shared rule, carried over from the former HairlineLineShader and
+/// HairlineQuadShader: the hairline geometry with no fragment processor, or one that is a bare
+/// analytic rect/rounded-rect clip (no color processors). Only HAS_XP varies, so the ordinal is
+/// HAS_XP alone.
+bool MatchHairline(const DrawShape& shape, GeometryKind kind, uint16_t family, Variant* variant) {
+  if (shape.geometry.kind != kind) {
+    return false;
+  }
+  const bool directClip = shape.colorFPCount == 0 &&
+                          (shape.coverage == Coverage::AARect || shape.coverage == Coverage::RRect);
+  if (shape.fragmentCount != 0 && !directClip) {
+    return false;
+  }
+  if (shape.xpType() < XP_NONE) {
+    return false;
+  }
+  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
+  variant->family = family;
+  variant->geometry = 0;
+  variant->values[0] = hasXp;
+  variant->ordinal = static_cast<uint32_t>(hasXp);
+  return true;
+}
+
 std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape) {
   if (FamilyCount() == 0) {
     return std::nullopt;
@@ -281,6 +305,12 @@ std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape) {
     return result;
   }
   if (MatchShapeInstanced(shape, &result.variant)) {
+    return result;
+  }
+  if (MatchHairline(shape, GeometryKind::HairlineLine, 8, &result.variant)) {
+    return result;
+  }
+  if (MatchHairline(shape, GeometryKind::HairlineQuad, 9, &result.variant)) {
     return result;
   }
   if (MatchComplexRRect(shape, &result.variant)) {

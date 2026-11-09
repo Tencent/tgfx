@@ -1,4 +1,4 @@
-// Hairline line edge coverage, shared by HairlineLineShader and the pointwise chain kernel's
+// Hairline line edge coverage, shared by the HairlineLine family and the pointwise chain kernel's
 // GP_LAYOUT==2 path. The math is verbatim from GLSLHairlineLineGeometryProcessor::emitCode
 // (edge alpha, the non-AA step, then the Coverage scale); keep it character-identical so the
 // precompiled path stays byte-exact with the runtime.

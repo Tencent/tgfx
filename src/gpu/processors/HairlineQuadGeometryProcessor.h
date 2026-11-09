@@ -45,6 +45,21 @@ class HairlineQuadGeometryProcessor : public GeometryProcessor {
     return "HairlineQuadGeometryProcessor";
   }
 
+  /// The view transform the vertex stage applies to the position.
+  const Matrix& getViewMatrix() const {
+    return viewMatrix;
+  }
+
+  /// The exact paint color the fragment stage reads from the Color uniform.
+  PMColor getCommonColor() const {
+    return color;
+  }
+
+  /// The per-draw coverage scale multiplied into the edge alpha.
+  float getCoverage() const {
+    return coverage;
+  }
+
   AAType getAAType() const {
     return aaType;
   }

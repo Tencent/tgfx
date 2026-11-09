@@ -2536,7 +2536,7 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectCoverageMatchesFiveLevel1Families) 
       }
       ProgramInfo programInfo(renderTarget.get(), gp.get(), {clip.get()}, 0, xp.get(),
                               BlendMode::SrcOver);
-      ExpectDirectAARectMatch(&programInfo, "HairlineLineShader");
+      ExpectDirectAARectMatch(&programInfo, "HairlineLine");
     }
     {
       BlockAllocator allocator;
@@ -2551,7 +2551,7 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectCoverageMatchesFiveLevel1Families) 
       }
       ProgramInfo programInfo(renderTarget.get(), gp.get(), {clip.get()}, 0, xp.get(),
                               BlendMode::SrcOver);
-      ExpectDirectAARectMatch(&programInfo, "HairlineQuadShader");
+      ExpectDirectAARectMatch(&programInfo, "HairlineQuad");
     }
   }
 }
@@ -2564,7 +2564,7 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectPreservesPermutationDomains) {
   };
   const ExpectedDomain expected[] = {
       {"QuadColor", 6, 6},          {"QuadTextureFillShader", 8, 12}, {"SolidColor", 3, 3},
-      {"HairlineLineShader", 1, 3}, {"HairlineQuadShader", 1, 3},
+      {"HairlineLine", 3, 3}, {"HairlineQuad", 3, 3},
   };
   for (const auto& expectedDomain : expected) {
     // The lookup goes through Find so the declaration-driven families (SolidColor) are covered
