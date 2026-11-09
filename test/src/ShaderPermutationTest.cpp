@@ -2487,7 +2487,7 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectCoverageMatchesFiveLevel1Families) 
       }
       ProgramInfo programInfo(renderTarget.get(), gp.get(), {clip.get()}, 0, xp.get(),
                               BlendMode::SrcOver);
-      ExpectDirectAARectMatch(&programInfo, "QuadColorFillShader");
+      ExpectDirectAARectMatch(&programInfo, "QuadColor");
     }
     {
       BlockAllocator allocator;
@@ -2564,7 +2564,7 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectPreservesPermutationDomains) {
     uint32_t fragmentCount;
   };
   const ExpectedDomain expected[] = {
-      {"QuadColorFillShader", 1, 6}, {"QuadTextureFillShader", 8, 12}, {"SolidColor", 3, 3},
+      {"QuadColor", 6, 6}, {"QuadTextureFillShader", 8, 12}, {"SolidColor", 3, 3},
       {"HairlineLineShader", 1, 3},  {"HairlineQuadShader", 1, 3},
   };
   for (const auto& expectedDomain : expected) {

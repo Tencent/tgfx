@@ -23,6 +23,7 @@
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/aot/select/FamilyMatch.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
+#include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "gpu/processors/NonAARRectGeometryProcessor.h"
 #include "gpu/processors/PorterDuffXferProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
@@ -32,8 +33,10 @@
 #include "gpu/shaders/ParamBuffer.h"
 #include "gpu/shaders/contract/DrawFacts.h"
 #include "gpu/shaders/modules/AnalyticClip.h"
+#include "gpu/shaders/modules/DeviceMask.h"
 #include "gpu/shaders/modules/Frame.h"
 #include "gpu/shaders/modules/MaskTexture.h"
+#include "gpu/shaders/modules/QuadColorGeometry.h"
 #include "gpu/shaders/modules/QuadGeometry.h"
 #include "gpu/shaders/modules/RRectGeometry.h"
 #include "gpu/shaders/modules/RectGeometry.h"
@@ -90,6 +93,47 @@ void WriteQuadGeometry(const ProgramInfo& info, const Layout& layout, uint8_t sl
       static_cast<const QuadPerEdgeAAGeometryProcessor*>(info.getGeometryProcessor());
   buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "QuadGeometry", "Color")],
               geometry->getCommonColor());
+}
+
+// QuadColorGeometry (the QuadPerEdgeAA geometry with the per-vertex color): the exact paint color
+// and its flag. The per-vertex color rides the varying.
+void WriteQuadColorGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
+                            ParamBuffer* buffer) {
+  const auto slice = layout.SliceOf(slot);
+  const auto* geometry =
+      static_cast<const QuadPerEdgeAAGeometryProcessor*>(info.getGeometryProcessor());
+  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "QuadColorGeometry", "Color")],
+              geometry->getCommonColor());
+  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "QuadColorGeometry", "HasCommonColor")],
+              static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
+}
+
+// DeviceMask: the mask's destination-to-sample transform, the same value BindDeviceMaskLeaf
+// uploads (the effect's uv matrix scaled by the texture view's normalized coord).
+void WriteDeviceMask(const ProgramInfo& info, const Layout& layout, uint8_t slot,
+                     ParamBuffer* buffer) {
+  const auto slice = layout.SliceOf(slot);
+  const DeviceSpaceTextureEffect* mask = nullptr;
+  for (size_t index = info.numColorFragmentProcessors();
+       index < info.numFragmentProcessors() && mask == nullptr; ++index) {
+    const auto* fp = info.getFragmentProcessor(index);
+    if (IsProcessor<DeviceSpaceTextureEffect>(fp)) {
+      mask = static_cast<const DeviceSpaceTextureEffect*>(fp);
+    }
+  }
+  if (mask == nullptr) {
+    return;
+  }
+  auto deviceCoordMatrix = mask->getUVMatrix();
+  const auto& proxy = mask->getTextureProxy();
+  auto view = proxy != nullptr ? proxy->getTextureView() : nullptr;
+  if (view == nullptr || view->getTexture() == nullptr) {
+    return;
+  }
+  const auto scale = view->getTextureCoord(1, 1);
+  deviceCoordMatrix.postScale(scale.x, scale.y);
+  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "DeviceMask", "CoordMatrix")],
+              deviceCoordMatrix);
 }
 
 // RRectGeometry (the non-AA rounded rect): the exact common color and its flag. The 8-bit
@@ -337,6 +381,8 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
       WriteFrame(info, layout, slot, &buffer);
     } else if (module == &RectGeometry) {
       WriteRectGeometry(info, layout, slot, &buffer);
+    } else if (module == &QuadColorGeometry) {
+      WriteQuadColorGeometry(info, layout, slot, &buffer);
     } else if (module == &QuadGeometry) {
       WriteQuadGeometry(info, layout, slot, &buffer);
     } else if (module == &RRectGeometry) {
@@ -345,6 +391,8 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
       if (match->tiledLeaf != nullptr) {
         WriteTiledTexture(info, *match->tiledLeaf, layout, slot, &buffer);
       }
+    } else if (module == &DeviceMask) {
+      WriteDeviceMask(info, layout, slot, &buffer);
     } else if (module == &MaskTexture) {
       WriteMaskTexture(info, layout, slot, &buffer);
     } else if (module == &AnalyticClip) {

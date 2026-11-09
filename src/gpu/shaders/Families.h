@@ -20,7 +20,9 @@
 
 #include "gpu/shaders/Family.h"
 #include "gpu/shaders/modules/AnalyticClip.h"
+#include "gpu/shaders/modules/DeviceMask.h"
 #include "gpu/shaders/modules/MaskTexture.h"
+#include "gpu/shaders/modules/QuadColorGeometry.h"
 #include "gpu/shaders/modules/QuadGeometry.h"
 #include "gpu/shaders/modules/RRectGeometry.h"
 #include "gpu/shaders/modules/RectGeometry.h"
@@ -60,6 +62,16 @@ inline constexpr FamilyModule TiledTextureFillBody[] = {{&TiledTexture, TiledTex
 inline constexpr Family TiledTextureFillFamily = {"TiledTextureFill", RectQuadGeometries, 2,
                                                   TiledTextureFillBody, 1};
 
+/// The QuadColor family (the former QuadColorFillShader): the QuadPerEdgeAA rect filled with the
+/// per-vertex color (or the exact Color uniform), an optional device-space mask and the analytic
+/// clip. Slot layout: Frame(0), QuadColorGeometry(1), DeviceMask(2: PRESENT), AnalyticClip(3),
+/// Xfer(4).
+inline constexpr const Module* QuadColorGeometries[] = {&QuadColorGeometry};
+
+inline constexpr FamilyModule QuadColorBody[] = {&DeviceMask, &AnalyticClip};
+
+inline constexpr Family QuadColorFamily = {"QuadColor", QuadColorGeometries, 1, QuadColorBody, 2};
+
 /// The RRect family (the former NonAARRectFillShader): a non-AA rounded rect, optionally filled
 /// with a single-tap tiled texture, with the analytic clip riding the runtime contract. The
 /// textured form never combines with stroke (the old family's `allowed` rule carried over); FULL
@@ -81,12 +93,12 @@ inline constexpr Family RRectFamily = {"RRect", RRectGeometries,    1, RRectBody
 /// the legacy kernel table; among themselves the dedicated rules are disjoint.
 inline const Family* FamilyTable() {
   static const Family families[] = {SolidColorFamily, MaskFillFamily, TiledTextureFillFamily,
-                                    RRectFamily};
+                                    QuadColorFamily, RRectFamily};
   return families;
 }
 
 inline constexpr size_t FamilyTableCount() {
-  return 4;
+  return 5;
 }
 
 }  // namespace tgfx

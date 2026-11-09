@@ -120,6 +120,37 @@ bool MatchTiledTextureFill(const DrawShape& shape, Variant* variant,
   return true;
 }
 
+/// The QuadColor family's rule, carried over from the former QuadColorFillShader: the
+/// QuadPerEdgeAA rect with no fragment processor, or one coverage processor (an analytic rect or
+/// rounded-rect clip, or a device-space mask). Slot layout: Frame(0), QuadColorGeometry(1),
+/// DeviceMask(2: PRESENT), AnalyticClip(3), Xfer(4: HAS_XP). The ordinal is PRESENT + 2 * HAS_XP.
+bool MatchQuadColor(const DrawShape& shape, Variant* variant) {
+  if (shape.geometry.kind != GeometryKind::QuadPerEdgeAA) {
+    return false;
+  }
+  uint8_t present = 0;
+  if (shape.fragmentCount != 0) {
+    if (shape.colorFPCount != 0 || !shape.coverage.has_value()) {
+      return false;
+    }
+    if (*shape.coverage == Coverage::DeviceMask) {
+      present = 1;
+    } else if (*shape.coverage != Coverage::AARect && *shape.coverage != Coverage::RRect) {
+      return false;
+    }
+  }
+  if (shape.xpType() < XP_NONE) {
+    return false;
+  }
+  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
+  variant->family = 3;
+  variant->geometry = 0;
+  variant->values[0] = present;
+  variant->values[1] = hasXp;
+  variant->ordinal = static_cast<uint32_t>(present) + 2u * hasXp;
+  return true;
+}
+
 /// The RRect family's rule, carried over from the former NonAARRectFillShader: the non-AA
 /// rounded rect, at most one fragment (a sole analytic clip riding the runtime contract, or the
 /// single-tap tiled fill), never alpha-only, any xfer.
@@ -163,7 +194,7 @@ bool MatchRRect(const DrawShape& shape, Variant* variant, const AOTTextureParame
   const uint8_t stroke = shape.geometry.isStroke ? 1 : 0;
   const uint8_t present = tiledLeaf != nullptr ? 1 : 0;
   const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
-  variant->family = 3;
+  variant->family = 4;
   variant->geometry = 0;
   variant->values[0] = stroke;
   variant->values[1] = 0;
@@ -189,6 +220,9 @@ std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape) {
     return result;
   }
   if (MatchTiledTextureFill(shape, &result.variant, &result.tiledLeaf)) {
+    return result;
+  }
+  if (MatchQuadColor(shape, &result.variant)) {
     return result;
   }
   if (MatchRRect(shape, &result.variant, &result.tiledLeaf)) {
