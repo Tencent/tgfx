@@ -92,21 +92,28 @@ AssembledVariant AssembleVariant(const Family& family, const Variant& variant) {
     const uint8_t dimBase = DimOffsetOf(family, variant, slot);
     for (uint8_t index = 0; index < module->elementCount; ++index) {
       const Element& element = module->elements[index];
-      if (!ElementInVariant(element, dimBase, variant)) {
-        continue;
-      }
-      if (element.kind == Element::Kind::VertexParam) {
-        AppendBlockMember(module, element, &vert);
-      } else if (element.kind == Element::Kind::Attribute ||
-                 element.kind == Element::Kind::InstanceAttribute) {
-        attributes += "layout(location = " + std::to_string(attributeLocation) + ") in " +
-                      ShaderTypeGlslName(element.type) + " " + ElementNameOf(module, element) +
-                      ";\n";
+      const bool present = ElementInVariant(element, dimBase, variant);
+      // Slotted kinds (attributes, instance attributes, varyings) number by their position among
+      // all elements of the kind, so an absent one leaves a hole: the shader input then lands on
+      // the geometry's own slot, mirroring GeometryProcessor::setVertexAttributes (a dropped
+      // attribute keeps the declared slot numbering). Block members are not slotted.
+      if (element.kind == Element::Kind::Attribute ||
+          element.kind == Element::Kind::InstanceAttribute) {
+        if (present) {
+          attributes += "layout(location = " + std::to_string(attributeLocation) + ") in " +
+                        ShaderTypeGlslName(element.type) + " " + ElementNameOf(module, element) +
+                        ";\n";
+        }
         attributeLocation++;
       } else if (element.kind == Element::Kind::Varying) {
-        varyings += "layout(location = " + std::to_string(varyingLocation) + ") out " +
-                    ShaderTypeGlslName(element.type) + " " + VaryingNameOf(module, element) + ";\n";
+        if (present) {
+          varyings += "layout(location = " + std::to_string(varyingLocation) + ") out " +
+                      ShaderTypeGlslName(element.type) + " " + VaryingNameOf(module, element) +
+                      ";\n";
+        }
         varyingLocation++;
+      } else if (present && element.kind == Element::Kind::VertexParam) {
+        AppendBlockMember(module, element, &vert);
       }
     }
     if (module->hasVertex) {
@@ -145,17 +152,20 @@ AssembledVariant AssembleVariant(const Family& family, const Variant& variant) {
     const uint8_t dimBase = DimOffsetOf(family, variant, slot);
     for (uint8_t index = 0; index < module->elementCount; ++index) {
       const Element& element = module->elements[index];
-      if (!ElementInVariant(element, dimBase, variant)) {
-        continue;
-      }
-      if (element.kind == Element::Kind::Param) {
-        AppendBlockMember(module, element, &frag);
-      } else if (element.kind == Element::Kind::Varying) {
-        fragVaryings += "layout(location = " + std::to_string(fragVaryingLocation) + ") in " +
-                        ShaderTypeGlslName(element.type) + " " + VaryingNameOf(module, element) +
-                        ";\n";
+      const bool present = ElementInVariant(element, dimBase, variant);
+      // Varyings follow the same hole rule as the vertex stage (the full-order ordinal on both
+      // stages); textures stay compact because the runtime binds them sequentially by order, not
+      // by the declared number.
+      if (element.kind == Element::Kind::Varying) {
+        if (present) {
+          fragVaryings += "layout(location = " + std::to_string(fragVaryingLocation) + ") in " +
+                          ShaderTypeGlslName(element.type) + " " + VaryingNameOf(module, element) +
+                          ";\n";
+        }
         fragVaryingLocation++;
-      } else if (element.kind == Element::Kind::Texture) {
+      } else if (present && element.kind == Element::Kind::Param) {
+        AppendBlockMember(module, element, &frag);
+      } else if (present && element.kind == Element::Kind::Texture) {
         samplers += "layout(set = TGFX_TEXTURE_SET, binding = " + std::to_string(textureBinding) +
                     ") uniform sampler2D " + ElementNameOf(module, element) + ";\n";
         textureBinding++;

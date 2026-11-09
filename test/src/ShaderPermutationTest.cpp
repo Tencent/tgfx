@@ -2564,8 +2564,8 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectPreservesPermutationDomains) {
     uint32_t fragmentCount;
   };
   const ExpectedDomain expected[] = {
-      {"QuadColor", 6, 6}, {"QuadTextureFillShader", 8, 12}, {"SolidColor", 3, 3},
-      {"HairlineLineShader", 1, 3},  {"HairlineQuadShader", 1, 3},
+      {"QuadColor", 6, 6},          {"QuadTextureFillShader", 8, 12}, {"SolidColor", 3, 3},
+      {"HairlineLineShader", 1, 3}, {"HairlineQuadShader", 1, 3},
   };
   for (const auto& expectedDomain : expected) {
     // The lookup goes through Find so the declaration-driven families (SolidColor) are covered
