@@ -7,7 +7,7 @@
 // Dimension normalization of the unnormalized ClampToBorder modes. AlphaOnly (alpha-only source)
 // and Strict (SrcRectConstraint::Strict) are runtime uniforms rather than compile-time
 // permutations: both are pure fragment math, so folding them into coherent uniform branches
-// shrinks the variant count (mirrors QuadTextureFillShader). The coordinate is always affine
+// shrinks the variant count (mirrors the QuadTexture family). The coordinate is always affine
 // (vec2); perspective TiledTextureEffect draws fall back to ProgramBuilder, so no perspective
 // path exists here.
 // Requires: tiled_sample.inc and texture_read_swizzle.inc already included; TextureSampler_0 and

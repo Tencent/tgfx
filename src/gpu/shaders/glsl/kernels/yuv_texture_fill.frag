@@ -22,7 +22,7 @@ layout(std140, set = TGFX_FRAGMENT_UBO_SET, binding = TGFX_FRAGMENT_UBO_BINDING)
   mat3 Mat3ColorConversion;
   int YUVLimitedRange;
   // RGBAAA dual-plane alpha: always declared, only read when HasRgbaaa != 0 (runtime uniform
-  // branch, mirroring QuadTextureFillShader).
+  // branch, mirroring the QuadTexture family).
   vec2 AlphaStart;
   int HasRgbaaa;
 #include "xp/xp_uniforms.inc"

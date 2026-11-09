@@ -28,7 +28,6 @@
 #include "gpu/shaders/AllShaderFamilies.h"
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/ShaderPermutation.h"
-#include "gpu/shaders/kernels/QuadTextureFillShader.h"
 #include "gtest/gtest.h"
 
 namespace tgfx {
@@ -59,7 +58,7 @@ TEST(FamilyRegistryTest, EveryFamilyIsRegisteredOnceWithItsOwnFiles) {
   // QuadColorFillShader, MeshFillShader, ShapeInstancedFillShader and
   // ComplexNonAARRectFillShader (the declaration-driven
   // families join Find/Enumerate without a shell, see ShaderPermutationTest).
-  EXPECT_EQ(families.size(), 9u);
+  EXPECT_EQ(families.size(), 8u);
   std::set<std::string> names;
   for (const auto& info : families) {
     EXPECT_TRUE(names.insert(info.name).second) << "duplicate family " << info.name;
@@ -273,25 +272,20 @@ TEST(PermutationDomainTest, BoolNamesBuildABooleanDomain) {
 
 TEST(PermutationDomainTest, ARealFamilyKeepsItsPublishedIndexLayout) {
   // The variant indices are stored in every published bundle and hashed into every stage key, so a
-  // family's index layout cannot change without invalidating them. QuadTextureFillShader's
-  // fragment dimensions are HAS_SUBSET (2 values), HAS_XP (3) and HAS_LOCAL_MASK (2); the first
-  // varies fastest. The indices below were worked out by hand, not read back from the
-  // implementation.
-  auto info = QuadTextureFillShader().info();
+  // family's index layout cannot change without invalidating them. YUVTextureFillShader's fragment
+  // dimensions are YUV_FORMAT (2 values) and HAS_XP (3); the first varies fastest.
+  auto info = YUVTextureFillShader().info();
   const auto& domain = info.fragDomain;
-  ASSERT_EQ(domain.totalCount(), 12u);
-  // index = subset + 2 * xp + 6 * localMask
-  EXPECT_EQ(domain.encode({0, 0, 0}), 0u);
-  EXPECT_EQ(domain.encode({1, 0, 0}), 1u);
-  EXPECT_EQ(domain.encode({0, 1, 0}), 2u);
-  EXPECT_EQ(domain.encode({1, 2, 0}), 5u);
-  EXPECT_EQ(domain.encode({0, 0, 1}), 6u);
-  EXPECT_EQ(domain.encode({1, 2, 1}), 11u);
-  auto defines = domain.defineListFor(9);  // 9 = 1 + 2 * 1 + 6 * 1
-  ASSERT_EQ(defines.size(), 3u);
-  EXPECT_EQ(defines[0], "HAS_SUBSET=1");
+  ASSERT_EQ(domain.totalCount(), 6u);
+  // index = format + 2 * xp
+  EXPECT_EQ(domain.encode({0, 0}), 0u);
+  EXPECT_EQ(domain.encode({1, 0}), 1u);
+  EXPECT_EQ(domain.encode({0, 1}), 2u);
+  EXPECT_EQ(domain.encode({1, 2}), 5u);
+  auto defines = domain.defineListFor(3);  // 3 = 1 + 2 * 1
+  ASSERT_EQ(defines.size(), 2u);
+  EXPECT_EQ(defines[0], "YUV_FORMAT=1");
   EXPECT_EQ(defines[1], std::string(XP_DEFINE_NAME) + "=1");
-  EXPECT_EQ(defines[2], "HAS_LOCAL_MASK=1");
 }
 
 TEST(PermutationDomainTest, AnEmptyDomainHasExactlyOneVariant) {

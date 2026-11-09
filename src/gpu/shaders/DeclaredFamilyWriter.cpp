@@ -20,6 +20,8 @@
 #include "gpu/ProgramWriter.h"
 #include "gpu/Swizzle.h"
 #include "gpu/UniformData.h"
+#include "gpu/YUVColorConversion.h"
+#include "gpu/aot/bind/Binder.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/ir/EffectGraph.h"
 #include "gpu/aot/select/FamilyMatch.h"
@@ -38,6 +40,7 @@
 #include "gpu/processors/RectEffect.h"
 #include "gpu/processors/RoundStrokeRectGeometryProcessor.h"
 #include "gpu/processors/ShapeInstancedGeometryProcessor.h"
+#include "gpu/processors/TextureEffect.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/ParamBuffer.h"
 #include "gpu/shaders/contract/DrawFacts.h"
@@ -45,20 +48,25 @@
 #include "gpu/shaders/modules/ComplexEllipseGeometry.h"
 #include "gpu/shaders/modules/ComplexRRectGeometry.h"
 #include "gpu/shaders/modules/DeviceMask.h"
+#include "gpu/shaders/modules/DeviceMaskRuntime.h"
 #include "gpu/shaders/modules/EllipseGeometry.h"
 #include "gpu/shaders/modules/Frame.h"
 #include "gpu/shaders/modules/HairlineLineGeometry.h"
 #include "gpu/shaders/modules/HairlineQuadGeometry.h"
+#include "gpu/shaders/modules/LocalMask.h"
 #include "gpu/shaders/modules/MaskTexture.h"
 #include "gpu/shaders/modules/MeshGeometry.h"
 #include "gpu/shaders/modules/QuadColorGeometry.h"
 #include "gpu/shaders/modules/QuadGeometry.h"
+#include "gpu/shaders/modules/QuadTextureGeometry.h"
 #include "gpu/shaders/modules/RRectGeometry.h"
 #include "gpu/shaders/modules/RectGeometry.h"
 #include "gpu/shaders/modules/RoundStrokeRectGeometry.h"
 #include "gpu/shaders/modules/ShapeInstancedGeometry.h"
+#include "gpu/shaders/modules/Texture.h"
 #include "gpu/shaders/modules/TiledTexture.h"
 #include "gpu/shaders/modules/Xfer.h"
+#include "gpu/shaders/modules/YUVTexture.h"
 
 namespace tgfx {
 
@@ -154,6 +162,168 @@ void WriteShapeInstancedGeometry(const ProgramInfo& info, const Layout& layout, 
   buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "ShapeInstancedGeometry", "ViewMatrix")],
               geometry->getViewMatrix());
   WriteCoordMatrix(info, layout, "ShapeInstancedGeometry", slot, buffer);
+}
+
+// The source coordinate matrix every texture leaf shares: the FP tree's first coord transform
+// with the geometry's uv matrix pre-concatenated (setTransformDataHelper's composition).
+Matrix SourceCoordMatrix(const ProgramInfo& info) {
+  FragmentProcessor::CoordTransformIter iter(&info);
+  const CoordTransform* coordTransform = iter.next();
+  Matrix uvMatrix = Matrix::I();
+  const auto* geometry = info.getGeometryProcessor();
+  if (IsProcessor<DefaultGeometryProcessor>(geometry)) {
+    uvMatrix = static_cast<const DefaultGeometryProcessor*>(geometry)->getUVMatrix();
+  } else if (IsProcessor<QuadPerEdgeAAGeometryProcessor>(geometry)) {
+    uvMatrix = static_cast<const QuadPerEdgeAAGeometryProcessor*>(geometry)->getUVMatrix();
+  }
+  Matrix combined = {};
+  combined.setConcat(coordTransform != nullptr ? coordTransform->getTotalMatrix() : Matrix::I(),
+                     uvMatrix);
+  return combined;
+}
+
+// The leaf's subset rect and read gates, the same values BindTextureSourceLeaf uploads.
+void WriteTextureLeafParams(const AOTTextureParameters& leaf, const Layout& layout,
+                            const char* moduleName, uint8_t slot, ParamBuffer* buffer) {
+  const auto slice = layout.SliceOf(slot);
+  auto put = [&](const char* name, auto&& value) {
+    const auto index = layout.FieldIndexInSlice(slice, moduleName, name);
+    if (index < slice.count) {
+      buffer->set(slice.fields[index], value);
+    }
+  };
+  auto view = leaf.textureProxy != nullptr ? leaf.textureProxy->getTextureView() : nullptr;
+  if (view == nullptr || view->getTexture() == nullptr) {
+    return;
+  }
+  float rect[4] = {};
+  LeafSubsetRectForSampler(leaf.textureProxy, view.get(), leaf.subset, leaf.samplerState, rect);
+  put("Subset", std::array<float, 4>{rect[0], rect[1], rect[2], rect[3]});
+  put("SubsetClampOn",
+      static_cast<int32_t>(LeafSubsetClampOn(leaf.textureProxy, view.get(), leaf.subset) ? 1 : 0));
+  if (leaf.hasRGBAAA) {
+    auto coord = view->getTextureCoord(leaf.alphaStart.x, leaf.alphaStart.y);
+    put("AlphaStart", std::array<float, 2>{coord.x, coord.y});
+  }
+  put("AlphaOnly", static_cast<int32_t>(leaf.isAlphaOnly ? 1 : 0));
+  put("HasRgbaaa", static_cast<int32_t>(leaf.hasRGBAAA ? 1 : 0));
+}
+
+// QuadTextureGeometry: the paint color the texture source multiplies by.
+void WriteQuadTextureGeometry(const ProgramInfo& info, const Layout& layout, uint8_t slot,
+                              ParamBuffer* buffer) {
+  const auto slice = layout.SliceOf(slot);
+  const auto* geometry =
+      static_cast<const QuadPerEdgeAAGeometryProcessor*>(info.getGeometryProcessor());
+  auto put = [&](const char* name, auto&& value) {
+    const auto index = layout.FieldIndexInSlice(slice, "QuadTextureGeometry", name);
+    if (index < slice.count) {
+      buffer->set(slice.fields[index], value);
+    }
+  };
+  put("Color", geometry->getCommonColor());
+  put("HasCommonColor", static_cast<int32_t>(geometry->hasCommonColor() ? 1 : 0));
+}
+
+// Texture: the plain leaf source. Both matrices carry the source coordinate transform — the
+// subset bounds go through the same transform whether the geometry supplies uv coordinates or
+// the position (the old kernel's two uniforms held the same value).
+void WriteTexture(const ProgramInfo& info, const AOTTextureParameters& leaf, const Layout& layout,
+                  uint8_t slot, ParamBuffer* buffer) {
+  const auto slice = layout.SliceOf(slot);
+  // The subset bounds go through the leaf's bare coord transform (the old kernel's
+  // texSubsetMatrix), while the source coordinate takes the transform with the geometry's uv
+  // matrix pre-concatenated — the two differ exactly when the geometry carries a uv matrix.
+  FragmentProcessor::CoordTransformIter iter(&info);
+  const CoordTransform* coordTransform = iter.next();
+  const Matrix subsetMatrix =
+      coordTransform != nullptr ? coordTransform->getTotalMatrix() : Matrix::I();
+  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "Texture", "CoordMatrix")],
+              SourceCoordMatrix(info));
+  buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "Texture", "SubsetMatrix")],
+              subsetMatrix);
+  WriteTextureLeafParams(leaf, layout, "Texture", slot, buffer);
+}
+
+// LocalMask: the coverage mask's own coordinate transform, from the coverage TextureEffect.
+void WriteLocalMask(const ProgramInfo& info, const Layout& layout, uint8_t slot,
+                    ParamBuffer* buffer) {
+  const auto slice = layout.SliceOf(slot);
+  for (size_t index = info.numColorFragmentProcessors(); index < info.numFragmentProcessors();
+       ++index) {
+    const auto* fp = info.getFragmentProcessor(index);
+    if (IsProcessor<TextureEffect>(fp)) {
+      Matrix uvMatrix = Matrix::I();
+      const auto* geometry = info.getGeometryProcessor();
+      if (IsProcessor<QuadPerEdgeAAGeometryProcessor>(geometry)) {
+        uvMatrix = static_cast<const QuadPerEdgeAAGeometryProcessor*>(geometry)->getUVMatrix();
+      }
+      Matrix combined = {};
+      combined.setConcat(
+          static_cast<const TextureEffect*>(fp)->getCoordTransform().getTotalMatrix(), uvMatrix);
+      buffer->set(slice.fields[layout.FieldIndexInSlice(slice, "LocalMask", "CoordMatrix")],
+                  combined);
+      return;
+    }
+  }
+}
+
+// DeviceMaskRuntime: the runtime gate plus the same device-space transform WriteDeviceMask
+// computes; a draw without a device mask keeps the branch off.
+void WriteDeviceMaskRuntime(const ProgramInfo& info, const Layout& layout, uint8_t slot,
+                            ParamBuffer* buffer) {
+  const auto slice = layout.SliceOf(slot);
+  auto put = [&](const char* name, auto&& value) {
+    const auto index = layout.FieldIndexInSlice(slice, "DeviceMaskRuntime", name);
+    if (index < slice.count) {
+      buffer->set(slice.fields[index], value);
+    }
+  };
+  const DeviceSpaceTextureEffect* mask = nullptr;
+  for (size_t index = info.numColorFragmentProcessors(); index < info.numFragmentProcessors();
+       ++index) {
+    const auto* fp = info.getFragmentProcessor(index);
+    if (IsProcessor<DeviceSpaceTextureEffect>(fp)) {
+      mask = static_cast<const DeviceSpaceTextureEffect*>(fp);
+    }
+  }
+  put("HasDeviceMask", static_cast<int32_t>(mask != nullptr ? 1 : 0));
+  if (mask == nullptr) {
+    return;
+  }
+  auto deviceCoordMatrix = mask->getUVMatrix();
+  const auto& proxy = mask->getTextureProxy();
+  auto view = proxy != nullptr ? proxy->getTextureView() : nullptr;
+  if (view == nullptr || view->getTexture() == nullptr) {
+    return;
+  }
+  const auto scale = view->getTextureCoord(1, 1);
+  deviceCoordMatrix.postScale(scale.x, scale.y);
+  put("CoordMatrix", deviceCoordMatrix);
+}
+
+// YUVTexture: the source transform, the full-bounds subset and the conversion pair off the view.
+void WriteYUVTexture(const ProgramInfo& info, const AOTTextureParameters& leaf,
+                     const Layout& layout, uint8_t slot, ParamBuffer* buffer) {
+  const auto slice = layout.SliceOf(slot);
+  auto put = [&](const char* name, auto&& value) {
+    const auto index = layout.FieldIndexInSlice(slice, "YUVTexture", name);
+    if (index < slice.count) {
+      buffer->set(slice.fields[index], value);
+    }
+  };
+  put("CoordMatrix", SourceCoordMatrix(info));
+  WriteTextureLeafParams(leaf, layout, "YUVTexture", slot, buffer);
+  auto view = leaf.textureProxy != nullptr ? leaf.textureProxy->getTextureView() : nullptr;
+  if (view == nullptr || !view->isYUV()) {
+    return;
+  }
+  auto* yuvView = static_cast<const YUVTextureView*>(view.get());
+  put("LimitedRange",
+      static_cast<int32_t>(IsLimitedYUVColorRange(yuvView->yuvColorSpace()) ? 1 : 0));
+  if (auto conversion = YUVColorConversionMatrix(yuvView->yuvColorSpace())) {
+    put("ColorConversion", *conversion);
+  }
 }
 
 // QuadColorGeometry (the QuadPerEdgeAA geometry with the per-vertex color): the exact paint color
@@ -610,6 +780,20 @@ void DeclaredFamilyProgramWriter::writeGeometryProcessor(const ProgramInfo& info
       WriteQuadGeometry(info, layout, slot, &buffer);
     } else if (module == &RRectGeometry) {
       WriteRRectGeometry(info, layout, slot, &buffer);
+    } else if (module == &QuadTextureGeometry) {
+      WriteQuadTextureGeometry(info, layout, slot, &buffer);
+    } else if (module == &Texture) {
+      if (match->tiledLeaf != nullptr) {
+        WriteTexture(info, *match->tiledLeaf, layout, slot, &buffer);
+      }
+    } else if (module == &LocalMask) {
+      WriteLocalMask(info, layout, slot, &buffer);
+    } else if (module == &DeviceMaskRuntime) {
+      WriteDeviceMaskRuntime(info, layout, slot, &buffer);
+    } else if (module == &YUVTexture) {
+      if (match->tiledLeaf != nullptr) {
+        WriteYUVTexture(info, *match->tiledLeaf, layout, slot, &buffer);
+      }
     } else if (module == &TiledTexture) {
       if (match->tiledLeaf != nullptr) {
         WriteTiledTexture(info, *match->tiledLeaf, layout, slot, &buffer);

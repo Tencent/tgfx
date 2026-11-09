@@ -124,4 +124,12 @@ void BindPorterDuffXfer(int blendMode, const XferProcessor* processor, ParamWrit
  */
 std::vector<CoordTransform> BuildChainCoordTransforms(const AOTProgram& program);
 
+/// The declared-family writer's leaf-subset facts: the rect and the clamp gate, the same values
+/// the module binds compute.
+bool LeafSubsetClampOn(const std::shared_ptr<TextureProxy>& proxy, const TextureView* view,
+                       const std::optional<Rect>& subset);
+void LeafSubsetRectForSampler(const std::shared_ptr<TextureProxy>& proxy, const TextureView* view,
+                              const std::optional<Rect>& subset, const SamplerState& sampling,
+                              float rect[4]);
+
 }  // namespace tgfx

@@ -142,6 +142,20 @@ bool ShapeInstancedVariantAllowed(const Variant& variant, const Family&) {
   return variant.values[0] == 0;
 }
 
+/// The QuadTexture family's product rule: the geometry and the Texture module both spell
+/// HAS_SUBSET, so the two radices must move together.
+bool QuadTextureVariantAllowed(const Variant& variant, const Family& family) {
+  const uint8_t geometrySubset = DimValueOf(family, variant, 1, 1);
+  const uint8_t textureSubset = DimValueOf(family, variant, 2, 0);
+  return geometrySubset == textureSubset;
+}
+
+/// The YUVTexture family's product rule: the YUV path never carries the geometry's subset
+/// attribute, so only its HAS_SUBSET = 0 half is real.
+bool YUVTextureVariantAllowed(const Variant& variant, const Family& family) {
+  return DimValueOf(family, variant, 1, 1) == 0;
+}
+
 std::vector<Variant> EnumerateVariants(const Family& family, uint16_t familyIndex) {
   std::vector<Variant> variants;
   std::vector<FreeDim> freeDims;

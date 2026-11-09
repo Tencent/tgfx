@@ -23,18 +23,23 @@
 #include "gpu/shaders/modules/ComplexEllipseGeometry.h"
 #include "gpu/shaders/modules/ComplexRRectGeometry.h"
 #include "gpu/shaders/modules/DeviceMask.h"
+#include "gpu/shaders/modules/DeviceMaskRuntime.h"
 #include "gpu/shaders/modules/EllipseGeometry.h"
 #include "gpu/shaders/modules/HairlineLineGeometry.h"
 #include "gpu/shaders/modules/HairlineQuadGeometry.h"
+#include "gpu/shaders/modules/LocalMask.h"
 #include "gpu/shaders/modules/MaskTexture.h"
 #include "gpu/shaders/modules/MeshGeometry.h"
 #include "gpu/shaders/modules/QuadColorGeometry.h"
 #include "gpu/shaders/modules/QuadGeometry.h"
+#include "gpu/shaders/modules/QuadTextureGeometry.h"
 #include "gpu/shaders/modules/RRectGeometry.h"
 #include "gpu/shaders/modules/RectGeometry.h"
 #include "gpu/shaders/modules/RoundStrokeRectGeometry.h"
 #include "gpu/shaders/modules/ShapeInstancedGeometry.h"
+#include "gpu/shaders/modules/Texture.h"
 #include "gpu/shaders/modules/TiledTexture.h"
+#include "gpu/shaders/modules/YUVTexture.h"
 
 namespace tgfx {
 
@@ -142,6 +147,34 @@ inline constexpr FamilyModule RoundStrokeRectBody[] = {&AnalyticClip};
 /// The array is the single source of truth for both the table pointer and its count: keeping them
 /// apart is how a family silently drops out of matching (or the count runs past the array) after
 /// a reformat.
+/// The QuadTexture family (the former QuadTextureFillShader): a textured quad with an optional
+/// local-space mask, the runtime device mask and the analytic clip. The geometry and the Texture
+/// module both carry HAS_SUBSET, and the product rule keeps them in lockstep. Slot layout:
+/// Frame(0), QuadTextureGeometry(1: UV_COORD, SUBSET), Texture(2: SUBSET), LocalMask(3: PRESENT),
+/// DeviceMaskRuntime(4), AnalyticClip(5), Xfer(6).
+inline constexpr const Module* QuadTextureGeometries[] = {&QuadTextureGeometry};
+
+inline constexpr FamilyModule QuadTextureBody[] = {&Texture, &DeviceMaskRuntime, &LocalMask,
+                                                   &AnalyticClip};
+
+/// Slot layout: Frame(0), QuadTextureGeometry(1), Texture(2), LocalMask(3), DeviceMaskRuntime(4),
+/// AnalyticClip(5), Xfer(6).
+bool QuadTextureVariantAllowed(const Variant& variant, const Family& family);
+
+inline constexpr Family QuadTextureFamily = {
+    "QuadTexture", QuadTextureGeometries, 1, QuadTextureBody, 4, QuadTextureVariantAllowed};
+
+/// The YUVTexture family (the simplified former YUVTextureFillShader): the bare three-plane
+/// source with the analytic clip. Color-graded YUV draws keep the legacy kernel until the flatten
+/// fallback lands; the geometry's HAS_SUBSET stays at 0 (the YUV path never carries one).
+inline constexpr FamilyModule YUVTextureBody[] = {&YUVTexture, &AnalyticClip};
+
+/// Slot layout: Frame(0), QuadTextureGeometry(1), YUVTexture(2: FORMAT), AnalyticClip(3), Xfer(4).
+bool YUVTextureVariantAllowed(const Variant& variant, const Family& family);
+
+inline constexpr Family YUVTextureFamily = {
+    "YUVTexture", QuadTextureGeometries, 1, YUVTextureBody, 2, YUVTextureVariantAllowed};
+
 /// The family table is the single definition site: a family exists by appearing here and nowhere
 /// else, so "defined but not registered" cannot happen — adding a row is the only way to add a
 /// family, and the match rules address the rows by position.
@@ -159,6 +192,8 @@ inline constexpr Family FamilyTableStorage[] = {
     {"Ellipse", EllipseGeometries, 1, EllipseBody, 2},
     {"ComplexEllipse", ComplexEllipseGeometries, 1, ComplexEllipseBody, 2},
     {"RoundStrokeRect", RoundStrokeRectGeometries, 1, RoundStrokeRectBody, 1},
+    {"QuadTexture", QuadTextureGeometries, 1, QuadTextureBody, 4, QuadTextureVariantAllowed},
+    {"YUVTexture", QuadTextureGeometries, 1, YUVTextureBody, 2, YUVTextureVariantAllowed},
 };
 
 inline const Family* FamilyTable() {

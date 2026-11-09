@@ -17,9 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/aot/select/FamilyMatch.h"
+#include "gpu/YUVFormat.h"
 #include "gpu/aot/chain/AOTChainBuilder.h"
 #include "gpu/aot/ir/DrawIR.h"
 #include "gpu/aot/select/ShaderMatchHelpers.h"
+#include "gpu/resources/YUVTextureView.h"
 #include "gpu/shaders/Families.h"
 #include "gpu/shaders/contract/DrawFacts.h"
 
@@ -350,6 +352,101 @@ bool MatchRoundStrokeRect(const DrawShape& shape, Variant* variant) {
   return true;
 }
 
+/// The QuadTexture family's rule, carried over from the former QuadTextureFillShader: the
+/// QuadPerEdgeAA geometry with exactly one Plain (non-YUV) texture leaf and no operators above it,
+/// an optional bare analytic clip, device mask or local-space mask, and any xfer. The flattened
+/// dims are [UV_COORD, SUBSET, SUBSET, PRESENT, HAS_XP], so the ordinal is
+/// UV_COORD + 2*SUBSET + 4*SUBSET + 8*PRESENT + 16*HAS_XP.
+bool MatchQuadTexture(const DrawShape& shape, Variant* variant,
+                      const AOTTextureParameters** leafOut) {
+  if (shape.geometry.kind != GeometryKind::QuadPerEdgeAA || shape.colorFPCount != 1 ||
+      shape.xpType() < XP_NONE || shape.ir == nullptr) {
+    return false;
+  }
+  uint8_t present = 0;
+  if (shape.fragmentCount != 1) {
+    switch (*shape.coverage) {
+      case Coverage::AARect:
+      case Coverage::RRect:
+      case Coverage::DeviceMask:
+        break;
+      case Coverage::LocalMask:
+        present = 1;
+        break;
+      default:
+        return false;
+    }
+  }
+  AOTChainBuilder::AOTTextureTailShape tail = {};
+  if (!AOTChainBuilder::CollectTextureTail(shape.ir->color, &tail) || !tail.ops.empty() ||
+      tail.leaf->isYUV || tail.leaf->samplingKind != AOTTextureSamplingKind::Plain) {
+    return false;
+  }
+  if (shape.geometry.hasSubset && (shape.geometry.hasUVPerspective || tail.leaf->hasPerspective)) {
+    return false;
+  }
+  const uint8_t uvCoord = shape.geometry.hasUVMatrix ? 0 : 1;
+  const uint8_t subset = shape.geometry.hasSubset ? 1 : 0;
+  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
+  variant->family = 13;
+  variant->geometry = 0;
+  variant->values[0] = uvCoord;
+  variant->values[1] = subset;
+  variant->values[2] = subset;
+  variant->values[3] = present;
+  variant->values[4] = hasXp;
+  variant->ordinal =
+      static_cast<uint32_t>(uvCoord) + 2u * subset + 4u * subset + 8u * present + 16u * hasXp;
+  *leafOut = tail.leaf;
+  return true;
+}
+
+/// The YUVTexture family's rule, the simplified former YUVTextureFillShader: the QuadPerEdgeAA
+/// geometry with exactly one bare YUV leaf (no operators above it, no coverage processors) and any
+/// xfer. Color-graded YUV draws stay on the legacy kernel until the flatten fallback lands. The
+/// flattened dims are [UV_COORD, SUBSET=0, FORMAT, HAS_XP], so the ordinal is
+/// UV_COORD + 4*FORMAT + 8*HAS_XP.
+bool MatchYUVTexture(const DrawShape& shape, Variant* variant,
+                     const AOTTextureParameters** leafOut) {
+  if (shape.geometry.kind != GeometryKind::QuadPerEdgeAA || shape.geometry.hasSubset ||
+      shape.colorFPCount != 1 || shape.colorFPCount != shape.fragmentCount ||
+      shape.xpType() < XP_NONE || shape.ir == nullptr) {
+    return false;
+  }
+  AOTChainBuilder::AOTYUVTailShape tail = {};
+  if (!AOTChainBuilder::CollectYUVTail(shape.ir->color, &tail) || !tail.ops.empty()) {
+    return false;
+  }
+  int format = tail.leaf->yuvFormat;
+  if (format < 0) {
+    auto textureView =
+        tail.leaf->textureProxy != nullptr ? tail.leaf->textureProxy->getTextureView() : nullptr;
+    if (textureView == nullptr || !textureView->isYUV()) {
+      return false;
+    }
+    auto* yuvView = static_cast<const YUVTextureView*>(textureView.get());
+    if (yuvView->yuvFormat() == YUVFormat::I420) {
+      format = 0;
+    } else if (yuvView->yuvFormat() == YUVFormat::NV12) {
+      format = 1;
+    } else {
+      return false;
+    }
+  }
+  const uint8_t uvCoord = shape.geometry.hasUVMatrix ? 0 : 1;
+  const uint8_t hasXp = static_cast<uint8_t>(shape.xpType());
+  variant->family = 14;
+  variant->geometry = 0;
+  variant->values[0] = uvCoord;
+  variant->values[1] = 0;
+  variant->values[2] = static_cast<uint8_t>(format);
+  variant->values[3] = hasXp;
+  variant->ordinal =
+      static_cast<uint32_t>(uvCoord) + 4u * static_cast<uint32_t>(format) + 8u * hasXp;
+  *leafOut = tail.leaf;
+  return true;
+}
+
 std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape) {
   if (FamilyCount() == 0) {
     return std::nullopt;
@@ -372,6 +469,12 @@ std::optional<FamilyMatchResult> MatchAssembledFamily(const DrawShape& shape) {
     return result;
   }
   if (MatchShapeInstanced(shape, &result.variant)) {
+    return result;
+  }
+  if (MatchQuadTexture(shape, &result.variant, &result.tiledLeaf)) {
+    return result;
+  }
+  if (MatchYUVTexture(shape, &result.variant, &result.tiledLeaf)) {
     return result;
   }
   if (MatchRoundStrokeRect(shape, &result.variant)) {

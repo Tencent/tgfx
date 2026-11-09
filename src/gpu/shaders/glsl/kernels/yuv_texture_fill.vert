@@ -2,7 +2,7 @@
 // Processor layout: QuadPerEdgeAAGeometryProcessor + TextureEffect(YUV) + EmptyXferProcessor
 // Permutation dimensions (vert): HAS_UV_COORD (coverage and color are unconditional attributes)
 // The transformed coordinate is always emitted as a vec3 and perspective-divided in the fragment
-// shader, matching QuadTextureFillShader: affine transforms yield z=1 so the divide is a no-op.
+// shader, matching the QuadTexture family: affine transforms yield z=1 so the divide is a no-op.
 #version 450
 
 layout(std140, set = TGFX_VERTEX_UBO_SET, binding = TGFX_VERTEX_UBO_BINDING) uniform VertexUniformBlock {

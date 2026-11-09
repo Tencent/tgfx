@@ -25,7 +25,7 @@
 #include "gpu/shaders/PrecompiledShader.h"
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/shaders/contract/ShaderProfileResolver.h"
-#include "gpu/shaders/kernels/QuadTextureFillShader.h"
+#include "gpu/shaders/kernels/YUVTextureFillShader.h"
 
 namespace tgfx {
 
@@ -94,7 +94,7 @@ TGFX_TEST(ShaderProfileTest, PayloadFormsFollowTheProfileRule) {
 }
 
 TGFX_TEST(ShaderProfileTest, FramebufferFetchVariantsFollowTheProfileRule) {
-  auto info = QuadTextureFillShader().info();
+  auto info = YUVTextureFillShader().info();
   const auto& fragDomain = info.fragDomain;
   size_t checked = 0;
   for (uint32_t fragIndex = 0; fragIndex < fragDomain.totalCount(); ++fragIndex) {

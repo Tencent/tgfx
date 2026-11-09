@@ -580,6 +580,19 @@ void BindDeviceMaskBinding(const AOTBinding& binding, UniformData* uniformData) 
 
 }  // namespace
 
+/// The declared-family writer reads the same subset facts the module binds compute; the helpers
+/// above stay file-local, so these wrappers export them with the IR leaf's SamplerState.
+bool LeafSubsetClampOn(const std::shared_ptr<TextureProxy>& proxy, const TextureView* view,
+                       const std::optional<Rect>& subset) {
+  return BindingNeedsSubset(proxy, view, subset);
+}
+
+void LeafSubsetRectForSampler(const std::shared_ptr<TextureProxy>& proxy, const TextureView* view,
+                              const std::optional<Rect>& subset, const SamplerState& sampling,
+                              float rect[4]) {
+  LeafSubsetRect(proxy, view, subset, sampling, rect);
+}
+
 std::vector<CoordTransform> BuildChainCoordTransforms(const AOTProgram& program) {
   std::vector<CoordTransform> transforms = {};
   // The extended profiles register one chain-wide transform ahead of the children: the gradient's

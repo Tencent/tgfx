@@ -4,7 +4,7 @@
 
 #if NTEX > 0
 // The leaf's sample position before any subset or tiling math. Perspective divide: affine
-// transforms produce z=1.0, making this a no-op (same contract as QuadTextureFillShader); the
+// transforms produce z=1.0, making this a no-op (same contract as the QuadTexture family); the
 // tiled/subset math then runs on the divided coordinate, matching the runtime's
 // emitPerspTextCoord ordering. A device-space leaf samples at the fragment's destination position,
 // like the runtime DeviceSpaceTextureEffect; its Subset is unbounded, so the plain clamp is a no-op

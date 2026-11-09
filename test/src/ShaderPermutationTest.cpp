@@ -65,7 +65,6 @@
 #include "gpu/shaders/contract/ShaderBundleContract.h"
 #include "gpu/shaders/contract/ShaderProfileResolver.h"
 #include "gpu/shaders/kernels/PointwiseChainShader.h"
-#include "gpu/shaders/kernels/QuadTextureFillShader.h"
 #include "gpu/shaders/kernels/ShapeInstancedTextureCoverageShader.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Bitmap.h"
@@ -905,7 +904,7 @@ TGFX_TEST(ShaderPermutationTest, QuadTextureLocalMaskServesBothCoveragePolaritie
     if (inverted) {
       EXPECT_EQ(match->shaderName, "PointwiseChainShader");
     } else {
-      EXPECT_EQ(match->shaderName, "QuadTextureFillShader");
+      EXPECT_EQ(match->shaderName, "QuadTexture");
     }
   }
 }
@@ -2143,27 +2142,16 @@ TGFX_TEST(ShaderPermutationTest, MaskFillHitsPrecompiledCache) {
 }
 
 TGFX_TEST(ShaderPermutationTest, QuadTextureFillShaderRegistry) {
-  auto& factories = ShaderRegistry::All();
-  bool found = false;
-  for (auto& factory : factories) {
-    auto shader = factory();
-    auto shaderInfo = shader->info();
-    if (shaderInfo.name == "QuadTextureFillShader") {
-      found = true;
-      // VertDims: HAS_UV_COORD, HAS_SUBSET, HAS_LOCAL_MASK. Coverage and color are unconditional
-      // vertex attributes, so they no longer appear as dimensions.
-      EXPECT_EQ(shaderInfo.vertDomain.dimensionCount(), 3u);
-      EXPECT_EQ(shaderInfo.vertDomain.totalCount(), 8u);
-      // FragDims: 2 bools + 1 int(3) = 2^2 * 3 = 12 total permutations. The device mask is a
-      // runtime uniform; ALPHA_ONLY, HAS_RGBAAA and the unsupported YUV path are
-      // runtime/fallback concerns; HAS_LOCAL_MASK is a mirror dimension.
-      EXPECT_EQ(shaderInfo.fragDomain.dimensionCount(), 3u);
-      EXPECT_EQ(shaderInfo.fragDomain.totalCount(), 12u);
-      EXPECT_EQ(shaderInfo.vertexFile, "kernels/quad_texture_fill.vert");
-      EXPECT_EQ(shaderInfo.fragmentFile, "kernels/quad_texture_fill.frag");
-    }
-  }
-  EXPECT_TRUE(found);
+  // The family is declaration-driven now: it has no factory shell and no source files, and its
+  // domain spans the geometry's HAS_UV_COORD/HAS_SUBSET, Texture's HAS_SUBSET, LocalMask's
+  // PRESENT and Xfer's HAS_XP (2 * 2 * 2 * 2 * 3); the product rule prunes the enumerated bundle
+  // to the 24 real programs.
+  const auto* registered = ShaderRegistry::Find("QuadTexture");
+  ASSERT_NE(registered, nullptr);
+  EXPECT_EQ(registered->vertDomain.totalCount(), 48u);
+  EXPECT_EQ(registered->fragDomain.totalCount(), 48u);
+  EXPECT_TRUE(registered->vertexFile.empty());
+  EXPECT_TRUE(registered->fragmentFile.empty());
 }
 
 TGFX_TEST(ShaderPermutationTest, ShapeInstancedTextureCoverageMatchesOnlyExactContract) {
@@ -2496,7 +2484,7 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectCoverageMatchesFiveLevel1Families) 
       }
       ProgramInfo programInfo(renderTarget.get(), gp.get(), {color.get(), clip.get()}, 1, xp.get(),
                               BlendMode::SrcOver);
-      ExpectDirectAARectMatch(&programInfo, "QuadTextureFillShader");
+      ExpectDirectAARectMatch(&programInfo, "QuadTexture");
     }
     {
       BlockAllocator allocator;
@@ -2553,7 +2541,7 @@ TGFX_TEST(ShaderPermutationTest, DirectAARectPreservesPermutationDomains) {
     uint32_t fragmentCount;
   };
   const ExpectedDomain expected[] = {
-      {"QuadColor", 6, 6},    {"QuadTextureFillShader", 8, 12}, {"SolidColor", 3, 3},
+      {"QuadColor", 6, 6},    {"QuadTexture", 48, 48}, {"SolidColor", 3, 3},
       {"HairlineLine", 3, 3}, {"HairlineQuad", 3, 3},
   };
   for (const auto& expectedDomain : expected) {
